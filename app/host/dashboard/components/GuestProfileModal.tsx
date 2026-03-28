@@ -1,7 +1,8 @@
 'use client';
 
 import Image from 'next/image';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useModalClose } from '@/app/hooks/useModalClose';
 import { User, X, Star, Globe, Smile, MessageCircle, Briefcase, Users } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useLanguage } from '@/app/context/LanguageContext';
@@ -70,6 +71,7 @@ function toFlagEmoji(nationality: string): string {
 }
 
 export default function GuestProfileModal({ guest, onClose }: Props) {
+  const { visible, closing, requestClose } = useModalClose(!!guest, onClose);
   const { t, lang } = useLanguage();
   // [Fix] supabase 인스턴스를 ref로 안정화 — 매 렌더마다 새 객체가 생성되어 useEffect가 반복 실행되는 버그 방지
   const supabaseRef = useRef(createClient());
@@ -106,7 +108,7 @@ export default function GuestProfileModal({ guest, onClose }: Props) {
     };
   }, [guest]);
 
-  if (!guest) return null;
+  if (!guest || !visible) return null;
 
   const languages = normalizeLanguageList(guest.languages);
   const joinedAt = guest.created_at
@@ -128,18 +130,18 @@ export default function GuestProfileModal({ guest, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-[160] flex items-center justify-center bg-black/60 px-4 py-8 md:px-4 md:py-6 backdrop-blur-sm animate-in fade-in duration-200"
-      onClick={onClose}
+      className={`fixed inset-0 z-[160] flex items-center justify-center bg-black/60 px-4 py-8 md:px-4 md:py-6 backdrop-blur-sm transition-opacity duration-150 ${closing ? 'opacity-0' : 'animate-in fade-in duration-200'}`}
+      onClick={requestClose}
     >
       <div
-        className="flex max-h-[78vh] md:max-h-[90vh] w-full max-w-[340px] md:max-w-[560px] flex-col overflow-hidden rounded-[24px] md:rounded-[28px] bg-white shadow-[0_8px_40px_rgba(15,23,42,0.22)] md:shadow-[0_24px_80px_rgba(15,23,42,0.28)] animate-in zoom-in-95 duration-200"
+        className={`flex max-h-[78vh] md:max-h-[90vh] w-full max-w-[340px] md:max-w-[560px] flex-col overflow-hidden rounded-[24px] md:rounded-[28px] bg-white shadow-[0_8px_40px_rgba(15,23,42,0.22)] md:shadow-[0_24px_80px_rgba(15,23,42,0.28)] transition-all duration-150 ${closing ? 'opacity-0 scale-95' : 'animate-in zoom-in-95 duration-200'}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* 프로필 헤더 */}
         <div className="relative border-b border-slate-100 bg-slate-50 px-4 pb-4 pt-4 md:px-6 md:pb-7 md:pt-8 flex-shrink-0">
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             className="absolute right-4 top-3 md:top-4 inline-flex h-9 w-9 md:h-10 md:w-10 items-center justify-center rounded-full bg-white/90 text-slate-500 transition-colors hover:text-slate-900"
           >
             <X size={17} />

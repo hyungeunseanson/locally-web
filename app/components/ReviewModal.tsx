@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { Star, X, Camera, Loader2 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client'; // 🟢 Supabase 클라이언트 추가
 import { useToast } from '@/app/context/ToastContext'; // 🟢 토스트 알림 추가
@@ -30,6 +30,16 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
   const supabase = useMemo(() => createClient(), []);
   const { showToast, showHeicUnsupportedToast } = useToast();
   const { t } = useLanguage();
+
+  // 닫힘 애니메이션
+  const [closing, setClosing] = useState(false);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => { if (closeTimerRef.current) clearTimeout(closeTimerRef.current); }, []);
+  const requestClose = useCallback(() => {
+    if (closing) return;
+    setClosing(true);
+    closeTimerRef.current = setTimeout(onClose, 150);
+  }, [closing, onClose]);
 
   // [R5] 수정 모드 감지: trip.review가 있으면 수정 모드
   const isEditMode = !!(trip.review?.id);
@@ -157,18 +167,18 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-end md:items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
-      onClick={onClose}
+      className={`fixed inset-0 z-[200] flex items-end md:items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm transition-opacity duration-150 ${closing ? 'opacity-0' : 'animate-in fade-in duration-200'}`}
+      onClick={requestClose}
     >
       <div
-        className="bg-white w-full max-w-lg rounded-t-3xl md:rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 max-h-[88dvh] md:max-h-[90vh] flex flex-col"
+        className={`bg-white w-full max-w-lg rounded-t-3xl md:rounded-3xl overflow-hidden shadow-2xl transition-all duration-150 max-h-[88dvh] md:max-h-[90vh] flex flex-col ${closing ? 'opacity-0 scale-95' : 'animate-in zoom-in-95 duration-200'}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-5 md:px-6 py-4 border-b border-slate-100 flex justify-between items-center">
           <h3 className="font-bold text-base md:text-lg text-slate-900">
             {isEditMode ? t('rv_title_edit') : t('rv_title_new')}
           </h3>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500 hover:text-slate-900">
+          <button onClick={requestClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500 hover:text-slate-900">
             <X size={20} />
           </button>
         </div>

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { X } from 'lucide-react';
 import { createPortal } from 'react-dom';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { type SiteAnnouncement } from '@/app/config/siteAnnouncements';
 import { useLanguage } from '@/app/context/LanguageContext';
@@ -71,11 +71,21 @@ export default function GlobalAnnouncementModal() {
     };
   }, [announcement, canUseDom, isDismissed]);
 
-  const dismissAnnouncement = (activeAnnouncement: SiteAnnouncement) => {
-    const key = getAnnouncementDismissKey(activeAnnouncement.id);
-    window.localStorage.setItem(key, new Date().toISOString());
-    setDismissedId(activeAnnouncement.id);
-  };
+  // 닫힘 애니메이션
+  const [closing, setClosing] = useState(false);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => { if (closeTimerRef.current) clearTimeout(closeTimerRef.current); }, []);
+
+  const dismissAnnouncement = useCallback((activeAnnouncement: SiteAnnouncement) => {
+    if (closing) return;
+    setClosing(true);
+    closeTimerRef.current = setTimeout(() => {
+      const key = getAnnouncementDismissKey(activeAnnouncement.id);
+      window.localStorage.setItem(key, new Date().toISOString());
+      setDismissedId(activeAnnouncement.id);
+      setClosing(false);
+    }, 150);
+  }, [closing]);
 
   if (!canUseDom || !announcement || isDismissed) {
     return null;
@@ -88,10 +98,10 @@ export default function GlobalAnnouncementModal() {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[160] flex items-center justify-center bg-black/45 px-4 py-6 animate-in fade-in duration-200"
+      className={`fixed inset-0 z-[160] flex items-center justify-center bg-black/45 px-4 py-6 transition-opacity duration-150 ${closing ? 'opacity-0' : 'animate-in fade-in duration-200'}`}
       data-testid="global-site-announcement-modal"
     >
-      <div className="relative w-full max-w-md overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-2xl animate-in zoom-in-95 duration-200">
+      <div className={`relative w-full max-w-md overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-2xl transition-all duration-150 ${closing ? 'opacity-0 scale-95' : 'animate-in zoom-in-95 duration-200'}`}>
         <button
           type="button"
           onClick={() => dismissAnnouncement(announcement)}

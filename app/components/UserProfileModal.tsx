@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { useModalClose } from '@/app/hooks/useModalClose';
 import { createClient } from '@/app/utils/supabase/client';
 import { X, Languages, Smile, User, Globe, Loader2 } from 'lucide-react';
 import Image from 'next/image';
@@ -26,6 +27,7 @@ interface UserProfileModalState {
 }
 
 export default function UserProfileModal({ userId, isOpen, onClose, role }: UserProfileModalProps) {
+  const { visible, closing, requestClose } = useModalClose(isOpen, onClose);
   const [displayProfile, setDisplayProfile] = useState<UserProfileModalState | null>(null);
   const [loading, setLoading] = useState(true);
   const { t } = useLanguage();
@@ -114,15 +116,15 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
   };
   const displayAvatarUrl = secureUrl(displayProfile?.display_avatar);
 
-  if (!isOpen) return null;
+  if (!visible) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 md:p-4 animate-in fade-in duration-200" onClick={onClose}>
+    <div className={`fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 md:p-4 transition-opacity duration-150 ${closing ? 'opacity-0' : 'animate-in fade-in duration-200'}`} onClick={requestClose}>
       <div
-        className="bg-white rounded-2xl md:rounded-[32px] shadow-2xl w-[92vw] max-w-[380px] md:max-w-sm overflow-hidden relative animate-in zoom-in-95 duration-200"
+        className={`bg-white rounded-2xl md:rounded-[32px] shadow-2xl w-[92vw] max-w-[380px] md:max-w-sm overflow-hidden relative transition-all duration-150 ${closing ? 'opacity-0 scale-95' : 'animate-in zoom-in-95 duration-200'}`}
         onClick={(e) => e.stopPropagation()}
       >
-        <button onClick={onClose} className="absolute top-3 md:top-4 right-3 md:right-4 text-slate-400 hover:text-black transition-colors z-20 bg-white/80 p-1.5 md:p-2 rounded-full backdrop-blur-md">
+        <button onClick={requestClose} className="absolute top-3 md:top-4 right-3 md:right-4 text-slate-400 hover:text-black transition-colors z-20 bg-white/80 p-1.5 md:p-2 rounded-full backdrop-blur-md">
           <X size={18} className="md:w-5 md:h-5" />
         </button>
 

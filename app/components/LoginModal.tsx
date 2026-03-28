@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { X, ChevronDown, Loader2 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -11,6 +11,7 @@ import {
   getLoginModalCopy,
   getLoginModalNationalityOptions,
 } from '@/app/components/loginModalLocalization';
+import { useModalClose } from '@/app/hooks/useModalClose';
 
 type Gender = 'Male' | 'Female' | '';
 
@@ -47,6 +48,7 @@ const normalizeRedirectPath = (value?: string | null) => {
 };
 
 export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPath }: LoginModalProps) {
+  const { visible, closing, requestClose } = useModalClose(isOpen, onClose);
   const { t, lang } = useLanguage();
   const [mode, setMode] = useState<'LOGIN' | 'SIGNUP'>('LOGIN');
 
@@ -205,13 +207,13 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
     }
   };
 
-  if (!isOpen) return null;
+  if (!visible) return null;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 md:p-4 animate-in fade-in duration-200">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose}></div>
+    <div className={`fixed inset-0 z-[200] flex items-center justify-center p-4 md:p-4 transition-opacity duration-150 ${closing ? 'opacity-0' : 'animate-in fade-in duration-200'}`}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={requestClose}></div>
 
-      <div className={`bg-white w-full ${mode === 'SIGNUP' ? 'max-w-[356px] md:max-w-[480px]' : 'max-w-[328px] md:max-w-[420px]'} rounded-[22px] md:rounded-2xl shadow-2xl overflow-hidden relative z-10 animate-in zoom-in-95 duration-200 transition-all`}>
+      <div className={`bg-white w-full ${mode === 'SIGNUP' ? 'max-w-[356px] md:max-w-[480px]' : 'max-w-[328px] md:max-w-[420px]'} rounded-[22px] md:rounded-2xl shadow-2xl overflow-hidden relative z-10 transition-all duration-150 ${closing ? 'opacity-0 scale-95' : 'animate-in zoom-in-95 duration-200'}`}>
 
         {/* 🟢 약관 모달 오버레이 */}
         {showLegalText && legalDocument && (
@@ -252,7 +254,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
         )}
 
         <div className="h-12 md:h-14 flex items-center justify-between px-4 md:px-5 border-b border-gray-100">
-          <button onClick={onClose} type="button" className="p-2 hover:bg-gray-100 rounded-full transition-colors -ml-2">
+          <button onClick={requestClose} type="button" className="p-2 hover:bg-gray-100 rounded-full transition-colors -ml-2">
             <X size={18} className="text-gray-900" />
           </button>
           <span className="font-bold text-[14px] md:text-[15px] text-gray-900">

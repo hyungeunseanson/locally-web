@@ -135,7 +135,7 @@ export default function HomeExperienceCard({ data }: { data: HomeExperienceCardD
             onClick={(e) => {
               void toggleWishlist(e);
             }}
-            className="shrink-0 p-0.5 text-white [filter:drop-shadow(0_2px_6px_rgba(0,0,0,0.34))] transition-transform duration-200"
+            className="shrink-0 p-0.5 text-white [filter:drop-shadow(0_2px_6px_rgba(0,0,0,0.34))] transition-transform duration-200 active:scale-125"
           >
             <Heart
               size={20}
@@ -160,7 +160,7 @@ export default function HomeExperienceCard({ data }: { data: HomeExperienceCardD
           onClick={(e) => {
             void toggleWishlist(e);
           }}
-          className="absolute right-3 top-3 z-10 hidden p-1 text-white [filter:drop-shadow(0_2px_6px_rgba(0,0,0,0.34))] transition-transform duration-200 md:block md:hover:scale-105"
+          className="absolute right-3 top-3 z-10 hidden p-1 text-white [filter:drop-shadow(0_2px_6px_rgba(0,0,0,0.34))] transition-transform duration-200 active:scale-125 md:block md:hover:scale-105"
         >
           <Heart
             size={20}

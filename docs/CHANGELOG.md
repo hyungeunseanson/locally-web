@@ -5,6 +5,14 @@
 
 ---
 
+## v3.39.87 — [Interaction Polish Phase 2] 모달 닫힘·하트 팝·스켈레톤 로딩
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟢 모달 닫힘 fade-out 애니메이션 | `useModalClose` 훅 신규 + 9개 모달 적용 — 닫힐 때 `opacity-0 scale-95` 150ms 퇴장 트랜지션. LoginModal, ReviewModal, CancellationModal, UserProfileModal, GlobalAnnouncementModal, GuestProfileModal, CommunityAuthorModal, ChatParticipantProfileModal, ReceiptModal |
+| 🟢 위시리스트 하트 팝 애니메이션 | `HomeExperienceCard.tsx` — 모바일+데스크탑 하트 버튼에 `active:scale-125` 추가, 누를 때 "팝" 피드백 |
+| 🟢 핵심 라우트 loading.tsx 추가 | `experiences/[id]`, `search`, `host/dashboard`, `guest/trips` — 4개 스켈레톤 로딩 화면 신규 생성, 라우트 전환 시 빈 화면 대신 스켈레톤 노출 |
+
 ## v3.39.86 — [Interaction Polish] 모달·토스트·탭·검색·헤더 촉감 개선 Phase 1
 
 | 항목 | 내용 |

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useModalClose } from '@/app/hooks/useModalClose';
 import Link from 'next/link';
 import { ChevronRight, Globe, Languages, Loader2, PenSquare, Smile, User, X } from 'lucide-react';
 import { formatGenderLabel } from '@/app/utils/profile';
@@ -101,6 +102,7 @@ export default function CommunityAuthorModal({
   isOpen,
   onClose,
 }: CommunityAuthorModalProps) {
+  const { visible, closing, requestClose } = useModalClose(isOpen, onClose);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [profile, setProfile] = useState<CommunityAuthorProfileState | null>(null);
@@ -171,16 +173,16 @@ export default function CommunityAuthorModal({
     };
   }, [currentPostId, isOpen, userId]);
 
-  if (!isOpen) return null;
+  if (!visible) return null;
 
   return (
     <div
-      className="fixed inset-0 z-[180] flex items-end md:items-center justify-center bg-black/60 md:px-4 md:py-6 backdrop-blur-sm animate-in fade-in duration-200"
-      onClick={onClose}
+      className={`fixed inset-0 z-[180] flex items-end md:items-center justify-center bg-black/60 md:px-4 md:py-6 backdrop-blur-sm transition-opacity duration-150 ${closing ? 'opacity-0' : 'animate-in fade-in duration-200'}`}
+      onClick={requestClose}
     >
       <div
         data-testid="community-author-modal"
-        className="flex max-h-[85vh] md:max-h-[88vh] w-full md:max-w-lg flex-col overflow-hidden rounded-t-[28px] md:rounded-[30px] bg-white shadow-[0_-8px_40px_rgba(15,23,42,0.18)] md:shadow-[0_24px_80px_rgba(15,23,42,0.28)] animate-in slide-in-from-bottom-4 md:zoom-in-95 duration-200"
+        className={`flex max-h-[85vh] md:max-h-[88vh] w-full md:max-w-lg flex-col overflow-hidden rounded-t-[28px] md:rounded-[30px] bg-white shadow-[0_-8px_40px_rgba(15,23,42,0.18)] md:shadow-[0_24px_80px_rgba(15,23,42,0.28)] transition-all duration-150 ${closing ? 'opacity-0 scale-95 translate-y-2' : 'animate-in slide-in-from-bottom-4 md:zoom-in-95 duration-200'}`}
         onClick={(event) => event.stopPropagation()}
       >
         {/* 모바일 드래그 핸들 */}
@@ -191,7 +193,7 @@ export default function CommunityAuthorModal({
         <div className="relative border-b border-slate-100 bg-slate-50 px-5 pb-4 pt-3 md:px-6 md:pb-6 md:pt-8">
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             className="absolute right-4 top-3 md:top-4 inline-flex h-9 w-9 md:h-10 md:w-10 items-center justify-center rounded-full bg-white/90 text-slate-500 transition-colors hover:text-slate-900"
           >
             <X size={17} />

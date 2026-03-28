@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { X, Download, CheckCircle2, Clock } from 'lucide-react';
 import { useLanguage } from '@/app/context/LanguageContext';
@@ -29,6 +29,17 @@ interface ReceiptTrip {
 
 export default function ReceiptModal({ trip, onClose }: { trip: ReceiptTrip, onClose: () => void }) {
   const { t, lang } = useLanguage();
+
+  // 닫힘 애니메이션
+  const [closing, setClosing] = useState(false);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => { if (closeTimerRef.current) clearTimeout(closeTimerRef.current); }, []);
+  const requestClose = useCallback(() => {
+    if (closing) return;
+    setClosing(true);
+    closeTimerRef.current = setTimeout(onClose, 150);
+  }, [closing, onClose]);
+
   if (!trip) return null;
   const localizedTitle = getContent(trip, 'title', lang) || trip.title;
   const bankInfo = getPublicBankInfo();
@@ -48,10 +59,10 @@ export default function ReceiptModal({ trip, onClose }: { trip: ReceiptTrip, onC
   const guestCount = Number(trip.guests || 1);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-white w-full max-w-sm rounded-2xl md:rounded-3xl shadow-2xl overflow-hidden relative animate-in zoom-in-95 duration-200">
+    <div className={`fixed inset-0 z-50 flex items-center justify-center p-3 md:p-4 bg-black/60 backdrop-blur-sm transition-opacity duration-150 ${closing ? 'opacity-0' : 'animate-in fade-in'}`}>
+      <div className={`bg-white w-full max-w-sm rounded-2xl md:rounded-3xl shadow-2xl overflow-hidden relative transition-all duration-150 ${closing ? 'opacity-0 scale-95' : 'animate-in zoom-in-95 duration-200'}`}>
         <div className="bg-slate-900 p-4 md:p-6 text-white text-center relative">
-          <button onClick={onClose} className="absolute top-3 md:top-4 right-3 md:right-4 p-1.5 md:p-2 bg-white/10 rounded-full hover:bg-white/20"><X className="w-4 h-4 md:w-[18px] md:h-[18px]"/></button>
+          <button onClick={requestClose} className="absolute top-3 md:top-4 right-3 md:right-4 p-1.5 md:p-2 bg-white/10 rounded-full hover:bg-white/20"><X className="w-4 h-4 md:w-[18px] md:h-[18px]"/></button>
           <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center mx-auto mb-2.5 md:mb-3 shadow-lg ${isPending ? 'bg-amber-400' : 'bg-green-500'}`}>
             {isPending ? (
               <Clock className="w-5 h-5 md:w-6 md:h-6 text-white" />

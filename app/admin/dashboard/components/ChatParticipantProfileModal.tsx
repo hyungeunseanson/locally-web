@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { Mail, Phone, User, X } from 'lucide-react';
 
@@ -29,6 +29,16 @@ export default function ChatParticipantProfileModal({
   participant,
   onClose,
 }: ChatParticipantProfileModalProps) {
+  // 닫힘 애니메이션
+  const [closing, setClosing] = useState(false);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => { if (closeTimerRef.current) clearTimeout(closeTimerRef.current); }, []);
+  const requestClose = useCallback(() => {
+    if (closing) return;
+    setClosing(true);
+    closeTimerRef.current = setTimeout(onClose, 150);
+  }, [closing, onClose]);
+
   useEffect(() => {
     if (!participant) return;
 
@@ -37,7 +47,7 @@ export default function ChatParticipantProfileModal({
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        onClose();
+        requestClose();
       }
     };
 
@@ -47,7 +57,7 @@ export default function ChatParticipantProfileModal({
       document.body.style.overflow = originalOverflow;
       window.removeEventListener('keydown', handleEscape);
     };
-  }, [participant, onClose]);
+  }, [participant, requestClose]);
 
   if (!participant) return null;
 
@@ -56,7 +66,7 @@ export default function ChatParticipantProfileModal({
 
   return (
     <div
-      className="fixed inset-0 z-[160] flex items-center justify-center p-4 animate-in fade-in duration-200"
+      className={`fixed inset-0 z-[160] flex items-center justify-center p-4 transition-opacity duration-150 ${closing ? 'opacity-0' : 'animate-in fade-in duration-200'}`}
       role="dialog"
       aria-modal="true"
       aria-label={title}
@@ -66,13 +76,13 @@ export default function ChatParticipantProfileModal({
         type="button"
         aria-label="프로필 모달 닫기"
         className="absolute inset-0 bg-black/55 backdrop-blur-sm"
-        onClick={onClose}
+        onClick={requestClose}
       />
 
-      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl animate-in zoom-in-95 duration-200">
+      <div className={`relative z-10 w-full max-w-md overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl transition-all duration-150 ${closing ? 'opacity-0 scale-95' : 'animate-in zoom-in-95 duration-200'}`}>
         <button
           type="button"
-          onClick={onClose}
+          onClick={requestClose}
           className="absolute right-3 top-3 rounded-full border border-slate-200 bg-white p-2 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900"
         >
           <X size={16} />
