@@ -256,7 +256,7 @@ export default async function CommunityPostDetail({
 
                                 <div className="mb-5">
                                     <CommunityAuthorTrigger
-                                        userId={post.user_id}
+                                        userId={post.is_anonymous ? null : post.user_id}
                                         authorName={authorName}
                                         isAnonymous={post.is_anonymous}
                                         currentPostId={post.id}

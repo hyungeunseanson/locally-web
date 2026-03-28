@@ -83,12 +83,15 @@ export async function GET(request: NextRequest) {
 
         // ② profiles 별도 조회 (실패해도 피드는 유지됨)
         const typedPosts = postsData.map((post) => normalizeCommunityFeedPostRow(post));
-        const userIds = [...new Set(typedPosts.map((post) => post.user_id))];
-        const { data: profiles } = await supabase
-            .from('profiles')
-            .select(COMMUNITY_FEED_PROFILE_SELECT)
-            .in('id', userIds);
-        const typedProfiles = (profiles ?? []) as unknown as CommunityFeedProfile[];
+        const userIds = [...new Set(typedPosts.filter((post) => !post.is_anonymous).map((post) => post.user_id))];
+        let typedProfiles: CommunityFeedProfile[] = [];
+        if (userIds.length > 0) {
+            const { data: profiles } = await supabase
+                .from('profiles')
+                .select(COMMUNITY_FEED_PROFILE_SELECT)
+                .in('id', userIds);
+            typedProfiles = (profiles ?? []) as unknown as CommunityFeedProfile[];
+        }
 
         // ③ experiences 별도 조회 (linked_exp_id가 있는 포스트만)
         const expIds = [...new Set(typedPosts.map((post) => post.linked_exp_id).filter((value): value is number => typeof value === 'number'))];

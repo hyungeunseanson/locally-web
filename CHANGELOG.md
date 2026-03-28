@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-03-29 — Community Security P0: Anonymous Identifier & Author Profile Trim
+
+### Anonymous Identifier Exposure
+- **Anonymous feed sanitization**: 커뮤니티 feed 응답과 SSR initial data에서 익명 게시글은 실제 `user_id` 대신 `null`을 내려 익명 작성자의 stable identifier가 공개 API payload에 남지 않도록 조정
+- **Profile lookup narrowing**: feed API와 SSR 페이지가 익명 게시글 작성자 프로필을 더 이상 조회하지 않도록 profile lookup 대상을 비익명 게시글로 제한
+- **Trigger hardening**: 커뮤니티 feed 카드와 상세 페이지에서 익명 게시글은 author trigger에 `userId`를 넘기지 않도록 방어
+
+### Public Author Profile Trim
+- **Sensitive field reduction**: `/api/community/authors/[id]` 공개 응답에서 `gender`, `mbti`를 제거하고 관련 DB projection도 축소
+- **Modal UX preserved**: author modal은 위치/언어/소개/최근 글 중심으로 유지하고, 제거된 민감 필드 카드는 렌더하지 않도록 정리
+
+### Scope
+- **P0 only**: 익명성 및 공개 프로필 과다 노출 축소만 반영
+- **Comments held**: 댓글 `user_id`는 현재 author modal 소비 경로가 있어 이번 턴에서는 의도적으로 보류
+
 ## 2026-03-29 — Become a Host FAQ Localization
 
 ### FAQ Copy Localization

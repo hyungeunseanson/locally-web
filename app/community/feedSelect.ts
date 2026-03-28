@@ -71,7 +71,8 @@ export type CommunityFeedPostRow = Pick<
   | 'created_at'
   | 'updated_at'
 >;
-export type CommunityFeedPost = CommunityFeedPostRow & {
+export type CommunityFeedPost = Omit<CommunityFeedPostRow, 'user_id'> & {
+  user_id: string | null;
   profiles?: CommunityFeedProfile | null;
   linked_experience?: CommunityFeedExperience | null;
 };
@@ -102,9 +103,11 @@ export function buildCommunityFeedPosts(
 
   return posts.map((post) => {
     const normalizedPost = normalizeCommunityFeedPostRow(post);
+    const publicUserId = normalizedPost.is_anonymous ? null : normalizedPost.user_id;
 
     return {
       ...normalizedPost,
+      user_id: publicUserId,
       profiles: normalizedPost.is_anonymous ? null : profileMap.get(normalizedPost.user_id) ?? null,
       linked_experience: normalizedPost.linked_exp_id ? experienceMap.get(normalizedPost.linked_exp_id) ?? null : null,
     };

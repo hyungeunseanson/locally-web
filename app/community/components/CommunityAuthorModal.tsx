@@ -3,8 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useModalClose } from '@/app/hooks/useModalClose';
 import Link from 'next/link';
-import { ChevronRight, Globe, Languages, Loader2, PenSquare, Smile, User, X } from 'lucide-react';
-import { formatGenderLabel } from '@/app/utils/profile';
+import { ChevronRight, Globe, Languages, Loader2, PenSquare, User, X } from 'lucide-react';
 import { getCommunityCategoryMeta } from '../categoryMeta';
 import type { CommunityCategory } from '@/app/types/community';
 
@@ -22,9 +21,7 @@ type CommunityAuthorProfileState = {
   avatarUrl: string | null;
   bio: string | null;
   location: string | null;
-  mbti: string | null;
   languages: string[];
-  gender: string | null;
   role: 'host' | 'guest';
 };
 
@@ -60,7 +57,7 @@ function LoadingBody() {
   return (
     <>
       <div className="mb-6 grid grid-cols-2 gap-3">
-        {[...Array(4)].map((_, index) => (
+        {[...Array(2)].map((_, index) => (
           <div key={index} className="rounded-2xl bg-slate-50 p-4">
             <div className="mb-2 h-3 w-20 animate-pulse rounded-full bg-slate-200" />
             <div className="h-4 w-24 animate-pulse rounded-full bg-slate-200" />
@@ -264,26 +261,12 @@ export default function CommunityAuthorModal({
                 </div>
                 <div className="rounded-2xl bg-slate-50 p-4">
                   <div className="mb-2 flex items-center gap-2 text-slate-500">
-                    <Smile size={14} />
-                    <span className="text-[11px] font-bold uppercase tracking-[0.14em]">MBTI</span>
-                  </div>
-                  <p className="text-sm font-semibold text-slate-800">{profile.mbti || '비공개'}</p>
-                </div>
-                <div className="rounded-2xl bg-slate-50 p-4">
-                  <div className="mb-2 flex items-center gap-2 text-slate-500">
                     <Languages size={14} />
                     <span className="text-[11px] font-bold uppercase tracking-[0.14em]">Languages</span>
                   </div>
                   <p className="break-words text-sm font-semibold text-slate-800 [overflow-wrap:anywhere]">
                     {profile.languages.length > 0 ? profile.languages.join(', ') : '미입력'}
                   </p>
-                </div>
-                <div className="rounded-2xl bg-slate-50 p-4">
-                  <div className="mb-2 flex items-center gap-2 text-slate-500">
-                    <User size={14} />
-                    <span className="text-[11px] font-bold uppercase tracking-[0.14em]">Gender</span>
-                  </div>
-                  <p className="text-sm font-semibold text-slate-800">{formatGenderLabel(profile.gender)}</p>
                 </div>
               </div>
 

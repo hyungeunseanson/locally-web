@@ -89,7 +89,7 @@ export default function PostGridCard({ post, hub, format, query, sort }: PostGri
                 {/* 데스크탑: 작성자 + 통계 */}
                 <div className="hidden md:flex items-center justify-between gap-3">
                     <CommunityAuthorTrigger
-                        userId={post.user_id}
+                        userId={post.is_anonymous ? null : post.user_id}
                         authorName={authorName}
                         isAnonymous={post.is_anonymous}
                         currentPostId={post.id}

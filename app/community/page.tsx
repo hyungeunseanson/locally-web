@@ -214,12 +214,15 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
 
     let initialData: CommunityFeedPost[] = [];
     if (typedPosts.length > 0) {
-        const userIds = [...new Set(typedPosts.map((post) => post.user_id))];
-        const { data: profiles } = await supabase
-            .from('profiles')
-            .select(COMMUNITY_FEED_PROFILE_SELECT)
-            .in('id', userIds);
-        const typedProfiles: CommunityFeedProfile[] = profiles ?? [];
+        const userIds = [...new Set(typedPosts.filter((post) => !post.is_anonymous).map((post) => post.user_id))];
+        let typedProfiles: CommunityFeedProfile[] = [];
+        if (userIds.length > 0) {
+            const { data: profiles } = await supabase
+                .from('profiles')
+                .select(COMMUNITY_FEED_PROFILE_SELECT)
+                .in('id', userIds);
+            typedProfiles = profiles ?? [];
+        }
 
         const expIds = [...new Set(typedPosts.map((post) => post.linked_exp_id).filter((value): value is number => typeof value === 'number'))];
         let typedExperiences: CommunityFeedExperience[] = [];

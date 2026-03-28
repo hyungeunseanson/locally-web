@@ -15,12 +15,12 @@ export async function GET(
     const [profileResult, hostResult] = await Promise.all([
       supabase
         .from('profiles')
-        .select('id, created_at, full_name, avatar_url, bio, introduction, nationality, gender, mbti, languages')
+        .select('created_at, full_name, avatar_url, bio, introduction, nationality, languages')
         .eq('id', id)
         .maybeSingle(),
       supabase
         .from('host_applications')
-        .select('name, profile_photo, self_intro, languages, profession, host_nationality, status')
+        .select('name, profile_photo, self_intro, languages, host_nationality, status')
         .eq('user_id', id)
         .order('created_at', { ascending: false })
         .limit(1)
@@ -94,9 +94,7 @@ export async function GET(
             avatarUrl: hostPublicProfile.avatarUrl,
             bio: hostPublicProfile.bio,
             location: hostPublicProfile.location,
-            mbti: profileData.mbti ?? null,
             languages: normalizeLanguageList(hostPublicProfile.languages),
-            gender: profileData.gender ?? null,
             role: 'host' as const,
           };
         })()
@@ -106,9 +104,7 @@ export async function GET(
           avatarUrl: profileData.avatar_url ?? null,
           bio: profileData.bio || profileData.introduction || null,
           location: profileData.nationality ?? null,
-          mbti: profileData.mbti ?? null,
           languages: normalizeLanguageList(profileData.languages),
-          gender: profileData.gender ?? null,
           role: 'guest' as const,
         };
 

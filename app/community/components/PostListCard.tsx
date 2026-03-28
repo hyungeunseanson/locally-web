@@ -107,7 +107,7 @@ export default function PostListCard({ post, hub, format, query, sort }: PostLis
 
                     <div className="flex items-center gap-2 text-[11px] text-gray-400 flex-wrap">
                         <CommunityAuthorTrigger
-                            userId={post.user_id}
+                            userId={post.is_anonymous ? null : post.user_id}
                             authorName={authorName}
                             isAnonymous={post.is_anonymous}
                             currentPostId={post.id}
