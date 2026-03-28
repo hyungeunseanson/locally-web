@@ -4,6 +4,7 @@ export interface SearchExperience {
   description?: string;
   category?: string;
   city?: string;
+  subCity?: string;
   country?: string;
   location?: string;
   languages?: string[];
@@ -70,6 +71,7 @@ export const SEARCH_EXPERIENCE_CARD_SELECT_FIELDS = [
   'id',
   'title',
   'city',
+  'subCity',
   'country',
   'category',
   'title_ko',

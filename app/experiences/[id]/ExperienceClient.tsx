@@ -126,7 +126,8 @@ export default function ExperienceClient({
   }, [experience?.id]);
 
   useEffect(() => {
-    const handlePageShow = () => {
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
       void refreshAvailability();
     };
 

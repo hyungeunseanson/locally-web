@@ -25,13 +25,10 @@ type ReservationGuest = {
   id: string | number;
   full_name?: string | null;
   avatar_url?: string | null;
-  email?: string | null;
   phone?: string | null;
-  kakao_id?: string | null;
   introduction?: string | null;
   bio?: string | null;
   job?: string | null;
-  school?: string | null;
   languages?: string[] | string | null;
   nationality?: string | null;
   gender?: string | null;
@@ -40,9 +37,7 @@ type ReservationGuest = {
 };
 
 type ReservationExperience = {
-  id: string | number;
   title?: string | null;
-  photos?: string[] | null;
 };
 
 type ReservationRecord = {
@@ -55,6 +50,8 @@ type ReservationRecord = {
   time?: string | null;
   guests?: number | null;
   amount?: number | null;
+  total_price?: number | null;
+  total_experience_price?: number | null;
   status: string;
   contact_name?: string | null;
   cancel_reason?: string | null;
@@ -77,6 +74,10 @@ type BookingRealtimePayload = {
   old: {
     experience_id?: string | number | null;
   };
+};
+
+type GuestReviewBookingIdRow = {
+  booking_id: number;
 };
 
 const RESERVATION_SELECT = `
@@ -222,14 +223,19 @@ export default function ReservationManager() {
       if (bookingIds.length === 0) {
         setReviewedBookingIds([]);
       } else {
-        const { data: reviews } = await supabase
+        const { data: reviews, error: reviewsError } = await supabase
           .from('guest_reviews')
           .select('booking_id')
           .eq('host_id', hostUserId)
           .in('booking_id', bookingIds);
 
-        if (reviews) {
-          setReviewedBookingIds(reviews.map((review) => review.booking_id));
+        if (reviewsError) {
+          console.error('[ReservationManager] guest_reviews lookup error:', reviewsError);
+          setReviewedBookingIds([]);
+        } else {
+          setReviewedBookingIds(
+            ((reviews as GuestReviewBookingIdRow[] | null) || []).map((review) => review.booking_id)
+          );
         }
       }
 

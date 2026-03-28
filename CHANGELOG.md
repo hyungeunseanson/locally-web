@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-03-28 — Performance Follow-up: Search SubCity, Reservation Safety, BFCache Guard
+
+### Search / Experience Detail
+- **Search card location rollback fix**: desktop search card가 다시 `subCity`까지 받을 수 있도록 search projection에 `subCity` 복구
+- **BFCache-only availability refresh**: 체험 상세 `pageshow` availability refresh를 BFCache 복귀(`persisted`) 시에만 실행하도록 가드 추가
+
+### ReservationManager Safety
+- **Reservation type alignment**: `ReservationManager`의 booking/guest/experience 타입을 실제 select 필드에 맞게 정리하고 정산 계산에 쓰는 금액 필드를 타입에 반영
+- **Review lookup fallback**: `guest_reviews` 조회 실패 시 stale `reviewedBookingIds`를 유지하지 않고 안전하게 초기화하도록 보강
+
+### 변경 파일
+| 파일 | 변경 내용 |
+|------|----------|
+| `app/search/searchContract.ts` | search card projection에 `subCity` 복구 |
+| `app/host/dashboard/components/ReservationManager.tsx` | reservation query 결과 타입 정합성 보강, guest review lookup 실패 시 fallback 처리 |
+| `app/experiences/[id]/ExperienceClient.tsx` | `pageshow` refresh를 BFCache 복귀 시에만 실행하도록 가드 추가 |
+
+---
 ## 2026-03-28 — Performance Phase 1E: Admin Users Summary Projection Trim
 
 ### Users Summary Payload
