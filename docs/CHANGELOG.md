@@ -5,6 +5,17 @@
 
 ---
 
+## v3.39.86 — [Interaction Polish] 모달·토스트·탭·검색·헤더 촉감 개선 Phase 1
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟢 모달 진입 애니메이션 보강 | `GlobalAnnouncementModal`, `UserProfileModal`, `GuestProfileModal`, `CommunityAuthorModal`, `ChatParticipantProfileModal`, `ReceiptModal` — 오버레이 `fade-in` + 컨테이너 `zoom-in-95` 진입 애니메이션 추가 |
+| 🟢 Toast 퇴장 애니메이션 | `ToastContext.tsx` — `isLeaving` 플래그 기반 `opacity-0 translate-y-2 scale-95` 퇴장 전환 (300ms) |
+| 🟢 검색 필터 칩 터치 피드백 | `search/page.tsx` — 유형/시간대 칩 및 하단 시트 필터 버튼에 `active:scale-[0.95]` + `transition-all duration-150` |
+| 🟢 검색 하단 시트 slide-up | `search/page.tsx` — 오버레이 `fade-in` + 시트 `slide-in-from-bottom-8 duration-300` |
+| 🟢 대시보드 탭 fade-in | `host/dashboard/page.tsx`, `admin/dashboard/page.tsx` — 탭 전환 시 `key={activeTab}` + `animate-in fade-in duration-200` |
+| 🟢 SiteHeader 드롭다운 개선 | `SiteHeader.tsx` — 드롭다운 `duration-150`, 메뉴 아이템에 `transition-colors` 추가 |
+
 ## v3.39.85 — [Guest Cancellation] 취소/환불 self-service 안내 보강
 
 | 항목 | 내용 |

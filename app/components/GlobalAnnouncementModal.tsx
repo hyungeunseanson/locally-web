@@ -88,10 +88,10 @@ export default function GlobalAnnouncementModal() {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[160] flex items-center justify-center bg-black/45 px-4 py-6"
+      className="fixed inset-0 z-[160] flex items-center justify-center bg-black/45 px-4 py-6 animate-in fade-in duration-200"
       data-testid="global-site-announcement-modal"
     >
-      <div className="relative w-full max-w-md overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-2xl">
+      <div className="relative w-full max-w-md overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-2xl animate-in zoom-in-95 duration-200">
         <button
           type="button"
           onClick={() => dismissAnnouncement(announcement)}

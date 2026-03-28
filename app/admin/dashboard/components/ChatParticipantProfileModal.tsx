@@ -56,7 +56,7 @@ export default function ChatParticipantProfileModal({
 
   return (
     <div
-      className="fixed inset-0 z-[160] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[160] flex items-center justify-center p-4 animate-in fade-in duration-200"
       role="dialog"
       aria-modal="true"
       aria-label={title}
@@ -69,7 +69,7 @@ export default function ChatParticipantProfileModal({
         onClick={onClose}
       />
 
-      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl">
+      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl animate-in zoom-in-95 duration-200">
         <button
           type="button"
           onClick={onClose}

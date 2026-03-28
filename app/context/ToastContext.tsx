@@ -18,6 +18,7 @@ interface Toast {
   type: ToastType;
   actionLabel?: string;
   onAction?: () => void;
+  isLeaving?: boolean;
 }
 
 interface ToastContextType {
@@ -164,13 +165,20 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       }
     ]);
 
+    const dismissDelay = options?.durationMs ?? 3000;
     setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, options?.durationMs ?? 3000);
+      setToasts((prev) => prev.map((t) => t.id === id ? { ...t, isLeaving: true } : t));
+      setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => t.id !== id));
+      }, 300);
+    }, dismissDelay);
   }, []);
 
   const removeToast = (id: number) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
+    setToasts((prev) => prev.map((t) => t.id === id ? { ...t, isLeaving: true } : t));
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 300);
   };
 
   const openHeicGuide = useCallback(() => {
@@ -198,9 +206,13 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`pointer-events-auto flex gap-3 p-3.5 rounded-2xl shadow-[0_14px_30px_rgba(15,23,42,0.35)] border backdrop-blur-md animate-in slide-in-from-bottom-3 fade-in duration-500 ${
-              toast.type === 'success' 
-                ? 'bg-slate-900/92 border-slate-700 text-slate-100' 
+            className={`pointer-events-auto flex gap-3 p-3.5 rounded-2xl shadow-[0_14px_30px_rgba(15,23,42,0.35)] border backdrop-blur-md transition-all duration-300 ${
+              toast.isLeaving
+                ? 'opacity-0 translate-y-2 scale-95'
+                : 'animate-in slide-in-from-bottom-3 fade-in duration-500'
+            } ${
+              toast.type === 'success'
+                ? 'bg-slate-900/92 border-slate-700 text-slate-100'
                 : 'bg-[#2b1720]/92 border-[#6a2a3d] text-slate-100'
             }`}
           >

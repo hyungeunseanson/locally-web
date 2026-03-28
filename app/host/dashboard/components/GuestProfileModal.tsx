@@ -128,11 +128,11 @@ export default function GuestProfileModal({ guest, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-[160] flex items-center justify-center bg-black/60 px-4 py-8 md:px-4 md:py-6 backdrop-blur-sm"
+      className="fixed inset-0 z-[160] flex items-center justify-center bg-black/60 px-4 py-8 md:px-4 md:py-6 backdrop-blur-sm animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        className="flex max-h-[78vh] md:max-h-[90vh] w-full max-w-[340px] md:max-w-[560px] flex-col overflow-hidden rounded-[24px] md:rounded-[28px] bg-white shadow-[0_8px_40px_rgba(15,23,42,0.22)] md:shadow-[0_24px_80px_rgba(15,23,42,0.28)]"
+        className="flex max-h-[78vh] md:max-h-[90vh] w-full max-w-[340px] md:max-w-[560px] flex-col overflow-hidden rounded-[24px] md:rounded-[28px] bg-white shadow-[0_8px_40px_rgba(15,23,42,0.22)] md:shadow-[0_24px_80px_rgba(15,23,42,0.28)] animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 프로필 헤더 */}

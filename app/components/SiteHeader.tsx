@@ -216,55 +216,55 @@ function SiteHeaderContent() {
               </div>
 
               {!isLoading && user && isMenuOpen && (
-                <div className="absolute top-full right-0 mt-2 w-64 bg-white border border-slate-100 rounded-xl shadow-xl py-2 z-[200] overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                <div className="absolute top-full right-0 mt-2 w-64 bg-white border border-slate-100 rounded-xl shadow-xl py-2 z-[200] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
                   {isHostView ? (
                     <>
                       <div className="py-2 border-b border-slate-100">
-                        <Link href="/host/dashboard?tab=reservations" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
+                        <Link href="/host/dashboard?tab=reservations" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700 transition-colors">
                           <CalendarCheck size={18} /> {t('header_reservations')}
                         </Link>
-                        <Link href="/host/dashboard?tab=experiences" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
+                        <Link href="/host/dashboard?tab=experiences" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700 transition-colors">
                           <LayoutList size={18} /> {t('header_my_experiences')}
                         </Link>
-                        <Link href="/host/dashboard?tab=inquiries" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
+                        <Link href="/host/dashboard?tab=inquiries" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700 transition-colors">
                           <MessageSquare size={18} /> {t('header_inquiries')}
                         </Link>
-                        <Link href="/host/dashboard?tab=service-jobs" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
+                        <Link href="/host/dashboard?tab=service-jobs" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700 transition-colors">
                           <Briefcase size={18} /> {t('header_service_matching')}
                         </Link>
                       </div>
 
                       <div className="py-2 border-b border-slate-100">
-                        <Link href="/host/dashboard?tab=earnings" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                        <Link href="/host/dashboard?tab=earnings" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700 transition-colors">
                           <CircleDollarSign size={18} /> {t('header_earnings')}
                         </Link>
-                        <Link href="/host/dashboard?tab=reviews" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                        <Link href="/host/dashboard?tab=reviews" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700 transition-colors">
                           <Star size={18} /> {t('header_reviews')}
                         </Link>
-                        <Link href="/host/dashboard?tab=guidelines" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                        <Link href="/host/dashboard?tab=guidelines" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700 transition-colors">
                           <BookOpen size={18} /> {t('header_guidelines')}
                         </Link>
-                        <Link href="/host/dashboard?tab=profile" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                        <Link href="/host/dashboard?tab=profile" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700 transition-colors">
                           <Settings size={18} /> {t('header_profile_settings')}
                         </Link>
-                        <Link href="/community" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                        <Link href="/community" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700 transition-colors">
                           <Users2 size={18} /> {t('header_community')}
                         </Link>
                         {hasAdminAccess && (
-                          <Link href="/admin/dashboard" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                          <Link href="/admin/dashboard" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700 transition-colors">
                             <ShieldCheck size={18} /> Admin
                           </Link>
                         )}
-                        <button onClick={handleDropdownMenuClick} className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                        <button onClick={handleDropdownMenuClick} className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700 transition-colors">
                           <User size={18} /> {t('guest_mode')}
                         </button>
                       </div>
 
                       <div className="py-2">
-                        <Link href="/host/help" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                        <Link href="/host/help" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700 transition-colors">
                           <HelpCircle size={18} /> {t('help')}
                         </Link>
-                        <button onClick={handleLogout} className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                        <button onClick={handleLogout} className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700 transition-colors">
                           <LogOut size={18} /> {t('logout')}
                         </button>
                       </div>
@@ -272,39 +272,39 @@ function SiteHeaderContent() {
                   ) : (
                     <>
                       <div className="py-2 border-b border-slate-100">
-                        <Link href="/community" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
+                        <Link href="/community" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700 transition-colors">
                           <Users2 size={18} /> {t('header_community')}
                         </Link>
-                        <Link href="/guest/inbox" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center justify-between text-sm font-semibold text-slate-700">
+                        <Link href="/guest/inbox" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center justify-between text-sm font-semibold text-slate-700 transition-colors">
                           <span className="flex items-center gap-3"><MessageSquare size={18} /> {t('messages')}</span>
                         </Link>
-                        <Link href="/guest/trips" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
+                        <Link href="/guest/trips" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700 transition-colors">
                           <Briefcase size={18} /> {t('my_trips')}
                         </Link>
-                        <Link href="/guest/wishlists" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
+                        <Link href="/guest/wishlists" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700 transition-colors">
                           <Heart size={18} /> {t('wishlist')}
                         </Link>
                       </div>
 
                       <div className="py-2 border-b border-slate-100">
-                        <Link href="/account" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                        <Link href="/account" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700 transition-colors">
                           <User size={18} /> {t('account')}
                         </Link>
                         {hasAdminAccess && (
-                          <Link href="/admin/dashboard" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                          <Link href="/admin/dashboard" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700 transition-colors">
                             <ShieldCheck size={18} /> Admin
                           </Link>
                         )}
-                        <button onClick={handleDropdownMenuClick} className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                        <button onClick={handleDropdownMenuClick} className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700 transition-colors">
                           <Settings size={18} /> {t('host_mode')}
                         </button>
                       </div>
 
                       <div className="py-2">
-                        <Link href="/help" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                        <Link href="/help" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700 transition-colors">
                           <HelpCircle size={18} /> {t('help')}
                         </Link>
-                        <button onClick={handleLogout} className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                        <button onClick={handleLogout} className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700 transition-colors">
                           <LogOut size={18} /> {t('logout')}
                         </button>
                       </div>

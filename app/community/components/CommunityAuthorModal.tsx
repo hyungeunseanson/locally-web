@@ -175,12 +175,12 @@ export default function CommunityAuthorModal({
 
   return (
     <div
-      className="fixed inset-0 z-[180] flex items-end md:items-center justify-center bg-black/60 md:px-4 md:py-6 backdrop-blur-sm"
+      className="fixed inset-0 z-[180] flex items-end md:items-center justify-center bg-black/60 md:px-4 md:py-6 backdrop-blur-sm animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
         data-testid="community-author-modal"
-        className="flex max-h-[85vh] md:max-h-[88vh] w-full md:max-w-lg flex-col overflow-hidden rounded-t-[28px] md:rounded-[30px] bg-white shadow-[0_-8px_40px_rgba(15,23,42,0.18)] md:shadow-[0_24px_80px_rgba(15,23,42,0.28)]"
+        className="flex max-h-[85vh] md:max-h-[88vh] w-full md:max-w-lg flex-col overflow-hidden rounded-t-[28px] md:rounded-[30px] bg-white shadow-[0_-8px_40px_rgba(15,23,42,0.18)] md:shadow-[0_24px_80px_rgba(15,23,42,0.28)] animate-in slide-in-from-bottom-4 md:zoom-in-95 duration-200"
         onClick={(event) => event.stopPropagation()}
       >
         {/* 모바일 드래그 핸들 */}

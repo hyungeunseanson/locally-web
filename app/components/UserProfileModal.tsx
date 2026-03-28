@@ -119,7 +119,7 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 md:p-4 animate-in fade-in duration-200" onClick={onClose}>
       <div
-        className="bg-white rounded-2xl md:rounded-[32px] shadow-2xl w-[92vw] max-w-[380px] md:max-w-sm overflow-hidden relative"
+        className="bg-white rounded-2xl md:rounded-[32px] shadow-2xl w-[92vw] max-w-[380px] md:max-w-sm overflow-hidden relative animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         <button onClick={onClose} className="absolute top-3 md:top-4 right-3 md:right-4 text-slate-400 hover:text-black transition-colors z-20 bg-white/80 p-1.5 md:p-2 rounded-full backdrop-blur-md">

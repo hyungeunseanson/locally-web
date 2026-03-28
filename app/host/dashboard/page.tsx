@@ -367,14 +367,16 @@ function DashboardContent() {
           </div>
         </div>
 
-        {activeTab === 'reservations' && <ReservationManager />}
-        {activeTab === 'experiences' && <MyExperiences />}
-        {activeTab === 'inquiries' && <InquiryChat />}
-        {activeTab === 'service-jobs' && <ServiceJobsTab />}
-        {activeTab === 'earnings' && <Earnings />}
-        {activeTab === 'reviews' && <HostReviews />}
-        {activeTab === 'profile' && <ProfileEditor profile={profile} onUpdate={fetchData} />}
-        {activeTab === 'guidelines' && <GuidelinesTab />}
+        <div key={activeTab} className="animate-in fade-in duration-200">
+          {activeTab === 'reservations' && <ReservationManager />}
+          {activeTab === 'experiences' && <MyExperiences />}
+          {activeTab === 'inquiries' && <InquiryChat />}
+          {activeTab === 'service-jobs' && <ServiceJobsTab />}
+          {activeTab === 'earnings' && <Earnings />}
+          {activeTab === 'reviews' && <HostReviews />}
+          {activeTab === 'profile' && <ProfileEditor profile={profile} onUpdate={fetchData} />}
+          {activeTab === 'guidelines' && <GuidelinesTab />}
+        </div>
       </main>
       </div>
     </>
