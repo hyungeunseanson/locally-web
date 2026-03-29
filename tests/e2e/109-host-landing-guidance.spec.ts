@@ -19,6 +19,8 @@ test.describe('Host landing guidance', () => {
     await page.goto('/become-a-host', { waitUntil: 'domcontentloaded' });
     await dismissAnnouncementIfVisible(page);
 
+    await expect(page.getByTestId('host-landing-status-hint')).toHaveCount(1);
+
     const statusHint = page.getByTestId('host-landing-status-hint').first();
     await expect(statusHint).toBeVisible({ timeout: 15000 });
     await expect(statusHint).toContainText(

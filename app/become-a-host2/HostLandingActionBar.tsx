@@ -122,7 +122,9 @@ export default function HostLandingActionBar({
           }`}
         >
           <div
-            className="flex w-full max-w-[320px] flex-col items-center justify-center gap-2"
+            className={`flex w-full max-w-[320px] flex-col items-center justify-center ${
+              compact ? 'gap-0' : 'gap-2'
+            }`}
           >
             <button
               data-testid="host-landing-primary-cta"
@@ -133,17 +135,19 @@ export default function HostLandingActionBar({
             >
               {primaryLabel}
             </button>
-            <div
-              data-testid="host-landing-status-hint"
-              className="w-full rounded-2xl border border-[#E7E7E7] bg-[#FAFAFA] px-4 py-3 text-left"
-            >
-              <p className="text-[12px] font-semibold tracking-[-0.01em] text-[#2F2F2F]">
-                {helperTitle}
-              </p>
-              <p className="mt-1 text-[11px] leading-5 text-[#6B7280]">
-                {helperDesc}
-              </p>
-            </div>
+            {!compact && (
+              <div
+                data-testid="host-landing-status-hint"
+                className="w-full rounded-2xl border border-[#E7E7E7] bg-[#FAFAFA] px-4 py-3 text-left"
+              >
+                <p className="text-[12px] font-semibold tracking-[-0.01em] text-[#2F2F2F]">
+                  {helperTitle}
+                </p>
+                <p className="mt-1 text-[11px] leading-5 text-[#6B7280]">
+                  {helperDesc}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </section>
