@@ -163,7 +163,7 @@ export default function BecomeHostLandingContentClient({
 
         <HostLandingActionBar />
 
-        <section className="bg-[#f7f7f7] px-[7px] py-12 md:px-6 md:py-24">
+        <section className="bg-white px-[7px] py-12 md:px-6 md:py-24">
           <div className="mx-auto max-w-[1440px]">
             <div className="mx-auto max-w-[760px] md:max-w-[790px]">
               <h2 className="text-center text-[24px] font-semibold tracking-[-0.04em] text-[#2f2f2f] md:text-[54px]">
