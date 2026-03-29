@@ -71,4 +71,57 @@ test.describe('Home landing ingress guidance', () => {
       })
     ).toHaveAttribute('href', '/services/request');
   });
+
+  test('shows localized mobile quick links for about and host support', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    const localeCases = [
+      {
+        locale: 'ko',
+        path: '/',
+        aboutLabel: '로컬리 소개',
+        hostLabel: '호스트 지원',
+      },
+      {
+        locale: 'en',
+        path: '/en',
+        aboutLabel: 'About Locally',
+        hostLabel: 'Become a Host',
+      },
+      {
+        locale: 'ja',
+        path: '/ja',
+        aboutLabel: 'Locallyについて',
+        hostLabel: 'ホストになる',
+      },
+      {
+        locale: 'zh',
+        path: '/zh',
+        aboutLabel: '关于 Locally',
+        hostLabel: '成为房东',
+      },
+    ] as const;
+
+    for (const localeCase of localeCases) {
+      await page.context().clearCookies();
+      await page.goto('/', { waitUntil: 'domcontentloaded' });
+      await page.evaluate((locale) => {
+        window.localStorage.setItem('app_lang', locale);
+        document.cookie = `app_lang=${locale}; path=/`;
+      }, localeCase.locale);
+      await page.goto(localeCase.path, { waitUntil: 'networkidle' });
+      await dismissAnnouncementIfVisible(page);
+
+      const aboutLink = page.getByTestId('home-mobile-about-link');
+      const hostLink = page.getByTestId('home-mobile-host-link');
+
+      await expect(aboutLink).toBeVisible({ timeout: 15000 });
+      await expect(aboutLink).toHaveText(localeCase.aboutLabel);
+      await expect(aboutLink).toHaveAttribute('href', '/about');
+
+      await expect(hostLink).toBeVisible();
+      await expect(hostLink).toHaveText(localeCase.hostLabel);
+      await expect(hostLink).toHaveAttribute('href', '/become-a-host');
+    }
+  });
 });

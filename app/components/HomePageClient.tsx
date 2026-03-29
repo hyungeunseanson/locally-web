@@ -62,7 +62,7 @@ export default function HomePageClient() {
 
   return (
     <>
-    <div className="min-h-screen bg-[#F3F3F3] md:bg-white text-slate-900 font-sans relative">
+    <div className="min-h-screen bg-[#F7F7F5] md:bg-white text-slate-900 font-sans relative">
       {/* 데스크탑 전용: 검색 필드 포커스 시 배경 딤 처리 */}
       {activeSearchField && (
         <div
@@ -72,7 +72,7 @@ export default function HomePageClient() {
       )}
       <div
         className="md:hidden pointer-events-none absolute inset-x-0 top-0 h-[420px] z-0"
-        style={{ backgroundImage: 'linear-gradient(180deg, #E6E6E6 0px, #EEEEEE 210px, #F3F3F3 420px)' }}
+        style={{ backgroundImage: 'linear-gradient(180deg, #EFEFEA 0px, #F5F5F1 210px, #F7F7F5 420px)' }}
       />
       <HomeHero
         activeTab={activeTab}
@@ -99,21 +99,23 @@ export default function HomePageClient() {
       />
 
       <main className="max-w-[1760px] mx-auto px-0 md:px-12 py-0 md:py-8 min-h-screen relative z-[1]">
-        <div className="md:hidden h-[18px] w-full bg-gradient-to-b from-[#E5E5E5] via-[#EFEFEF] to-transparent" />
+        <div className="md:hidden h-[18px] w-full bg-gradient-to-b from-[#ECECE7] via-[#F5F5F1] to-transparent" />
         <div className="md:hidden px-5 pt-[7px] pb-0.5">
-          <div className="w-full h-[46px] rounded-[13px] border border-[#CFCFCF] bg-transparent flex items-center justify-center text-[10px] font-medium text-[#4B4B4B]">
+          <div className="w-full h-[46px] rounded-[13px] border border-[#DCDCD6] bg-white/35 flex items-center justify-center text-[10px] font-medium text-[#555555]">
             <Link
               href="/about"
+              data-testid="home-mobile-about-link"
               className="flex items-center justify-center px-0.5 h-full active:scale-[0.99] transition-transform"
             >
-              <span className="font-semibold underline underline-offset-[2px] decoration-[0.8px]">로컬리 소개</span>
+              <span className="font-semibold underline underline-offset-[2px] decoration-[0.8px]">{t('home_mobile_about_link')}</span>
             </Link>
-            <span className="font-normal mx-[3px]">및</span>
+            <span className="font-normal mx-[3px]">{t('home_mobile_links_joiner')}</span>
             <Link
               href="/become-a-host"
+              data-testid="home-mobile-host-link"
               className="flex items-center justify-center px-0.5 h-full active:scale-[0.99] transition-transform"
             >
-              <span className="font-semibold underline underline-offset-[2px] decoration-[0.8px]">호스트 지원</span>
+              <span className="font-semibold underline underline-offset-[2px] decoration-[0.8px]">{t('home_mobile_host_support_link')}</span>
             </Link>
           </div>
         </div>
@@ -122,7 +124,7 @@ export default function HomePageClient() {
           {activeTab === 'experience' ? (
             <div
               data-testid="home-experience-ingress-hint"
-              className="rounded-[18px] border border-slate-200 bg-white/90 px-4 py-3 text-slate-900 shadow-[0_4px_14px_rgba(15,23,42,0.05)] md:flex md:items-center md:justify-between md:gap-5 md:rounded-[20px] md:px-5"
+              className="rounded-[18px] border border-slate-200 bg-white/95 px-4 py-3 text-slate-900 shadow-[0_4px_14px_rgba(15,23,42,0.05)] md:flex md:items-center md:justify-between md:gap-5 md:rounded-[20px] md:bg-white/90 md:px-5"
             >
               <div>
                 <p className="text-[12px] font-semibold tracking-[-0.01em] md:text-[14px]">
