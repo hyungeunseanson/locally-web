@@ -62,7 +62,7 @@ export default function HomePageClient() {
 
   return (
     <>
-    <div className="min-h-screen bg-[#F7F7F5] md:bg-white text-slate-900 font-sans relative">
+    <div className="min-h-screen bg-white md:bg-white text-slate-900 font-sans relative">
       {/* 데스크탑 전용: 검색 필드 포커스 시 배경 딤 처리 */}
       {activeSearchField && (
         <div
@@ -72,7 +72,7 @@ export default function HomePageClient() {
       )}
       <div
         className="md:hidden pointer-events-none absolute inset-x-0 top-0 h-[420px] z-0"
-        style={{ backgroundImage: 'linear-gradient(180deg, #EFEFEA 0px, #F5F5F1 210px, #F7F7F5 420px)' }}
+        style={{ backgroundImage: 'linear-gradient(180deg, #FAFAFA 0px, #FFFFFF 210px, #FFFFFF 420px)' }}
       />
       <HomeHero
         activeTab={activeTab}
@@ -99,9 +99,9 @@ export default function HomePageClient() {
       />
 
       <main className="max-w-[1760px] mx-auto px-0 md:px-12 py-0 md:py-8 min-h-screen relative z-[1]">
-        <div className="md:hidden h-[18px] w-full bg-gradient-to-b from-[#ECECE7] via-[#F5F5F1] to-transparent" />
+        <div className="md:hidden h-[18px] w-full bg-gradient-to-b from-[#F7F7F7] via-[#FFFFFF] to-transparent" />
         <div className="md:hidden px-5 pt-[7px] pb-0.5">
-          <div className="w-full h-[46px] rounded-[13px] border border-[#DCDCD6] bg-white/35 flex items-center justify-center text-[10px] font-medium text-[#555555]">
+          <div className="w-full h-[46px] rounded-[13px] border border-slate-200 bg-white flex items-center justify-center text-[10px] font-medium text-slate-700">
             <Link
               href="/about"
               data-testid="home-mobile-about-link"
