@@ -1,4 +1,16 @@
 import { expect, test, type Page } from '@playwright/test';
+import {
+  cleanupAuthUsers,
+  createAuthUser,
+  createTestUser,
+  login,
+} from './helpers/experienceBooking';
+
+const createdAuthUserIds: string[] = [];
+
+test.afterAll(async () => {
+  await cleanupAuthUsers(createdAuthUserIds);
+});
 
 async function dismissAnnouncementIfVisible(page: Page) {
   const announcement = page.getByTestId('global-site-announcement-modal');
@@ -21,5 +33,37 @@ test.describe('Login flow guidance', () => {
       /로그인 후 지금 보고 있던 화면으로 다시 돌아갑니다|After login, you will return to the page you were viewing|ログイン後は、今見ていたページに戻ります|登录后会回到你刚才正在查看的页面/
     );
     await expect(page.getByTestId('login-modal-social-return-hint')).toBeVisible();
+  });
+
+  test('redirects authenticated users only to normalized internal returnUrl values', async ({ page }) => {
+    const user = createTestUser('login.return');
+    await createAuthUser(user, createdAuthUserIds);
+    await login(page, user);
+
+    const cases = [
+      {
+        query: '/login?returnUrl=%2Fguest%2Ftrips',
+        expectedPath: '/guest/trips',
+      },
+      {
+        query: '/login?returnUrl=https%3A%2F%2Fevil.example',
+        expectedPath: '/',
+      },
+      {
+        query: '/login?returnUrl=%2F%2Fevil.example',
+        expectedPath: '/',
+      },
+      {
+        query: '/login?returnUrl=javascript%3Aalert(1)',
+        expectedPath: '/',
+      },
+    ] as const;
+
+    for (const testCase of cases) {
+      await page.goto(testCase.query, { waitUntil: 'domcontentloaded' });
+      await expect
+        .poll(() => new URL(page.url()).pathname, { timeout: 15000 })
+        .toBe(testCase.expectedPath);
+    }
   });
 });

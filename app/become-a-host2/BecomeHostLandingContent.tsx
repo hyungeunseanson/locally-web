@@ -1,138 +1,35 @@
-import { ChevronDown } from "lucide-react";
-import Image from "next/image";
-
-import SiteHeader from "@/app/components/SiteHeader";
-import HostLandingActionBar from "./HostLandingActionBar";
 import { HOST_LANDING_FAQ } from "./hostLandingFaq";
+import BecomeHostLandingContentClient, {
+  type HostLandingContentByLocale,
+} from "./BecomeHostLandingContentClient";
 import {
-    getHostLandingSections,
-    type HostLandingLocale,
+  getHostLandingSections,
+  type HostLandingLocale,
 } from "./hostLandingAssets";
 
-function LandingSectionImage({
-    desktop,
-    mobile,
-    alt,
-    priority = false,
-}: {
-    desktop: { src: string; width: number; height: number };
-    mobile: { src: string; width: number; height: number };
-    alt: string;
-    priority?: boolean;
-}) {
-    return (
-        <>
-            <div className="md:hidden">
-                <Image
-                    src={mobile.src}
-                    alt={alt}
-                    width={mobile.width}
-                    height={mobile.height}
-                    className="block h-auto w-full"
-                    priority={priority}
-                    sizes="100vw"
-                    unoptimized
-                />
-            </div>
-            <div className="hidden md:block">
-                <Image
-                    src={desktop.src}
-                    alt={alt}
-                    width={desktop.width}
-                    height={desktop.height}
-                    className="block h-auto w-full"
-                    priority={priority}
-                    sizes="(max-width: 1440px) 100vw, 1440px"
-                    unoptimized
-                />
-            </div>
-        </>
-    );
-}
-
-function renderSection(
-    section: ReturnType<typeof getHostLandingSections>[number],
-    priority = false
-) {
-    return (
-        <LandingSectionImage
-            key={section.alt}
-            desktop={section.desktop}
-            mobile={section.mobile}
-            alt={section.alt}
-            priority={priority}
-        />
-    );
-}
-
 type BecomeHostLandingContentProps = {
-    locale: HostLandingLocale;
+  locale: HostLandingLocale;
 };
 
+const SUPPORTED_LOCALES: HostLandingLocale[] = ["ko", "en", "ja", "zh"];
+
 export default function BecomeHostLandingContent({
-    locale,
+  locale,
 }: BecomeHostLandingContentProps) {
-    const sections = getHostLandingSections(locale);
-    const faqContent = HOST_LANDING_FAQ[locale];
-    const [heroSection, secondSection, ...remainingSections] = sections;
+  const contentByLocale = Object.fromEntries(
+    SUPPORTED_LOCALES.map((localizedLocale) => [
+      localizedLocale,
+      {
+        sections: getHostLandingSections(localizedLocale),
+        faq: HOST_LANDING_FAQ[localizedLocale],
+      },
+    ])
+  ) as HostLandingContentByLocale;
 
-    return (
-        <div className="min-h-screen bg-white text-[#222222] font-sans">
-            <SiteHeader />
-
-            <main>
-                <div className="mx-auto w-full max-w-[1440px]">
-                    {renderSection(heroSection, true)}
-
-                    <HostLandingActionBar compact />
-
-                    {renderSection(secondSection, true)}
-
-                    {remainingSections.map((section) => renderSection(section))}
-                </div>
-
-                <HostLandingActionBar />
-
-                <section className="bg-[#f7f7f7] px-[7px] py-12 md:px-6 md:py-24">
-                    <div className="mx-auto max-w-[1440px]">
-                        <div className="mx-auto max-w-[760px] md:max-w-[790px]">
-                            <h2 className="text-center text-[24px] font-semibold tracking-[-0.04em] text-[#2f2f2f] md:text-[54px]">
-                                {faqContent.sectionTitle}
-                            </h2>
-
-                            <div className="mt-7 border-t border-black/8 md:mt-14">
-                                {faqContent.groups.map((group, index) => (
-                                    <details
-                                        key={group.title}
-                                        className="group border-b border-black/8"
-                                        open={index === 0}
-                                    >
-                                        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-4 text-left md:gap-6 md:py-7 [&::-webkit-details-marker]:hidden">
-                                            <h3 className="text-[18px] font-medium tracking-[-0.03em] text-[#2f2f2f] md:text-[30px]">
-                                                {group.title}
-                                            </h3>
-                                            <ChevronDown className="h-4 w-4 shrink-0 text-[#4b4b4b] transition-transform duration-200 group-open:rotate-180 md:h-6 md:w-6" />
-                                        </summary>
-
-                                        <div className="space-y-5 pb-5 pr-0 text-[#757575] md:space-y-10 md:pb-9">
-                                            {group.items.map((item) => (
-                                                <div key={item.question}>
-                                                    <h4 className="text-[14px] font-medium leading-snug text-[#4a4a4a] md:text-[21px]">
-                                                        {item.question}
-                                                    </h4>
-                                                    <p className="mt-2 text-[12px] leading-6 md:mt-3 md:text-[16px] md:leading-[1.8]">
-                                                        {item.answer}
-                                                    </p>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </details>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                </section>
-            </main>
-        </div>
-    );
+  return (
+    <BecomeHostLandingContentClient
+      initialLocale={locale}
+      contentByLocale={contentByLocale}
+    />
+  );
 }

@@ -1,9 +1,10 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { experienceUiDictionary } from './experienceUiDictionary';
 
-type Locale = 'ko' | 'en' | 'ja' | 'zh';
+export type Locale = 'ko' | 'en' | 'ja' | 'zh';
 const SUPPORTED_LOCALES: Locale[] = ['ko', 'en', 'ja', 'zh'];
 const APP_LANG_KEY = 'app_lang';
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
@@ -5629,13 +5630,20 @@ const interpolate = (template: string, vars?: Record<string, string | number>) =
   });
 };
 
-export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLang] = useState<Locale>('ko');
+export function LanguageProvider({
+  children,
+  initialLocale = 'ko',
+}: {
+  children: React.ReactNode;
+  initialLocale?: Locale;
+}) {
+  const pathname = usePathname();
+  const [lang, setLang] = useState<Locale>(initialLocale);
 
   useEffect(() => {
-    const path = window.location.pathname;
+    const path = window.location.pathname || pathname || '/';
     const pathLang = (path.split('/')[1] || '').toLowerCase();
-    let resolved: Locale = 'ko';
+    let resolved: Locale = initialLocale;
 
     // 1) URL 언어 프리픽스가 있으면 최우선 사용
     if (isSupportedLocale(pathLang)) {
@@ -5647,14 +5655,14 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
         resolved = saved;
       } else {
         // 3) 첫 방문(저장값 없음)만 브라우저 언어로 1회 추론
-        resolved = detectLocaleFromNavigator();
+        resolved = initialLocale || detectLocaleFromNavigator();
       }
     }
 
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLang(resolved);
     persistLocale(resolved);
-  }, []);
+  }, [initialLocale, pathname]);
 
   const changeLang = (newLang: Locale) => {
     setLang(newLang);

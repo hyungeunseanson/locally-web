@@ -13,6 +13,13 @@ const createdExperienceIds: number[] = [];
 const createdBookingIds: string[] = [];
 const createdNotificationIds: number[] = [];
 
+type NotificationRow = {
+  id: number;
+  title: string | null;
+  message: string | null;
+  link: string | null;
+};
+
 async function createHostExperience(hostId: string) {
   const { data, error } = await getAdminClient()
     .from('experiences')
@@ -112,6 +119,24 @@ async function findNotificationIdByTitle(userId: string, title: string) {
   const id = Number(data.id);
   createdNotificationIds.push(id);
   return id;
+}
+
+async function findNotificationByTitle(userId: string, title: string) {
+  const { data, error } = await getAdminClient()
+    .from('notifications')
+    .select('id, title, message, link')
+    .eq('user_id', userId)
+    .eq('title', title)
+    .order('id', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data?.id) return null;
+
+  const notification = data as NotificationRow;
+  createdNotificationIds.push(Number(notification.id));
+  return notification;
 }
 
 test.afterAll(async () => {
@@ -239,5 +264,45 @@ test.describe.serial('Notification email policy', () => {
 
     const notificationId = await findNotificationIdByTitle(hostId, title);
     expect(notificationId).not.toBeNull();
+  });
+
+  test('stores HTML-like text safely and drops unsafe links from legitimate notifications', async ({ page }) => {
+    const host = createTestUser('noti.sanitized.host');
+    const guest = createTestUser('noti.sanitized.guest');
+    const hostId = await createAuthUser(host, createdAuthUserIds);
+    const guestId = await createAuthUser(guest, createdAuthUserIds);
+    const experienceId = await createHostExperience(hostId);
+    const bookingId = await createBooking({
+      guestId,
+      guestName: guest.fullName,
+      guestPhone: guest.phone,
+      experienceId,
+    });
+
+    await login(page, guest);
+
+    const title = `Playwright <b>Unsafe</b> Booking Notification ${Date.now()}`;
+    const message = 'Unsafe <img src=x onerror=alert(1)> content should stay text only';
+    const response = await page.request.post('/api/notifications/email', {
+      data: {
+        recipient_id: hostId,
+        type: 'new_booking',
+        booking_id: bookingId,
+        title,
+        message,
+        link: 'javascript:alert(1)',
+      },
+    });
+
+    expect(response.status()).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+    });
+
+    const notification = await findNotificationByTitle(hostId, title);
+    expect(notification).not.toBeNull();
+    expect(notification?.title).toBe(title);
+    expect(notification?.message).toBe(message);
+    expect(notification?.link).toBeNull();
   });
 });

@@ -32,4 +32,41 @@ test.describe('Host landing guidance', () => {
       /로그인 후 지금 보고 있던 화면으로 다시 돌아갑니다|After login, you will return to the page you were viewing|ログイン後は、今見ていたページに戻ります|登录后会回到你刚才正在查看的页面/
     );
   });
+
+  test('keeps server and client locale in sync for localized host landing routes', async ({ page }) => {
+    await page.addInitScript((storageKey) => {
+      window.localStorage.setItem(storageKey, '1');
+      window.localStorage.removeItem('app_lang');
+      document.cookie = 'app_lang=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    }, ANNOUNCEMENT_DISMISS_KEY);
+
+    const cases = [
+      {
+        path: '/en/become-a-host',
+        title: 'Become a Host | Locally',
+        faqHeading: 'Frequently asked questions',
+        cta: 'Apply to host',
+      },
+      {
+        path: '/ja/become-a-host',
+        title: 'ホストになる | Locally',
+        faqHeading: 'よくあるご質問',
+        cta: 'ホストに応募する',
+      },
+      {
+        path: '/zh/become-a-host',
+        title: '成为房东 | Locally',
+        faqHeading: '常见问题解答',
+        cta: '申请成为房东',
+      },
+    ] as const;
+
+    for (const testCase of cases) {
+      await page.goto(testCase.path, { waitUntil: 'networkidle' });
+      await dismissAnnouncementIfVisible(page);
+      await expect(page).toHaveTitle(testCase.title, { timeout: 15000 });
+      await expect(page.getByRole('heading', { name: testCase.faqHeading, exact: true })).toBeVisible({ timeout: 15000 });
+      await expect(page.getByTestId('host-landing-primary-cta').first()).toHaveText(testCase.cta);
+    }
+  });
 });

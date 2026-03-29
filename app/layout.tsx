@@ -3,7 +3,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { Suspense } from "react";
 import { cookies } from 'next/headers';
-import { LanguageProvider } from '@/app/context/LanguageContext';
+import { LanguageProvider, type Locale } from '@/app/context/LanguageContext';
 import UserPresenceTracker from '@/app/components/UserPresenceTracker';
 import { NotificationProvider } from '@/app/context/NotificationContext';
 import { ToastProvider } from '@/app/context/ToastContext';
@@ -201,7 +201,7 @@ export default async function RootLayout({
             <ViewModeProvider initialViewMode={initialViewMode}>
               <ToastProvider>
                 <NotificationProvider>
-                  <LanguageProvider>
+                  <LanguageProvider initialLocale={locale as Locale}>
                     <SplashProvider>
                       <GlobalSplash />
                       <GlobalAnnouncementModal />

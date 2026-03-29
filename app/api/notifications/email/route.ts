@@ -4,6 +4,8 @@ import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import nodemailer from 'nodemailer';
 
+const CONTROL_CHAR_PATTERN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
+
 type NotificationRequestBody = {
   recipient_id?: string;
   recipient_ids?: string[];
@@ -44,6 +46,77 @@ function getRelatedHostId(relation: HostOwnershipRow | HostOwnershipRow[] | null
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
+}
+
+function sanitizeNotificationTitle(rawValue: unknown) {
+  if (typeof rawValue !== 'string') return '';
+
+  return rawValue
+    .replace(/\r\n?/g, ' ')
+    .replace(/\n/g, ' ')
+    .replace(CONTROL_CHAR_PATTERN, '')
+    .trim();
+}
+
+function sanitizeNotificationMessage(rawValue: unknown) {
+  if (typeof rawValue !== 'string') return '';
+
+  return rawValue
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .replace(CONTROL_CHAR_PATTERN, '')
+    .trim();
+}
+
+function sanitizeNotificationLink(rawValue: unknown) {
+  if (typeof rawValue !== 'string') return null;
+
+  const value = rawValue.trim();
+  if (
+    !value ||
+    !value.startsWith('/') ||
+    value.startsWith('//') ||
+    value.includes('\\') ||
+    /[\u0000-\u001F\u007F]/.test(value)
+  ) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(value, 'https://locally.local');
+    if (parsed.origin !== 'https://locally.local' || !parsed.pathname.startsWith('/')) {
+      return null;
+    }
+
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return null;
+  }
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function getNotificationEmailHref(link: string | null) {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/+$/, '') || '';
+  if (!siteUrl || !link) return null;
+  return `${siteUrl}${link}`;
+}
+
+function buildNotificationEmailHtml(message: string, link: string | null) {
+  const escapedMessage = escapeHtml(message).replace(/\n/g, '<br/>');
+  const href = getNotificationEmailHref(link);
+  const cta = href
+    ? `<br/><a href="${escapeHtml(href)}">확인하기</a>`
+    : '';
+
+  return `<p>${escapedMessage}</p>${cta}`;
 }
 
 async function canSendSingleRecipientNotification(params: {
@@ -129,6 +202,11 @@ export async function POST(request: Request) {
     const body = await request.json() as NotificationRequestBody;
     // 🟢 [수정] recipient_ids(배열) 추가로 받기
     const { recipient_id, recipient_ids, title, message, link, type, booking_id, review_id } = body;
+    const safeTitle = sanitizeNotificationTitle(title);
+    const safeMessage = sanitizeNotificationMessage(message);
+    const safeLink = sanitizeNotificationLink(link);
+    const hasExplicitLink = typeof link === 'string' && link.trim().length > 0;
+    const safeMassLink = hasExplicitLink ? safeLink : '/notifications';
 
     // 🚨 [보안 패치] 다중 발송은 관리자(Admin)만 가능하도록 제한
     if (recipient_ids && Array.isArray(recipient_ids) && recipient_ids.length > 0) {
@@ -147,9 +225,9 @@ export async function POST(request: Request) {
       const notificationsData = recipient_ids.map((id: string) => ({
         user_id: id,
         type: type || 'general',
-        title: title,
-        message: message,
-        link: link || '/notifications',
+        title: safeTitle,
+        message: safeMessage,
+        link: safeMassLink,
         is_read: false
       }));
 
@@ -180,8 +258,8 @@ export async function POST(request: Request) {
           transporter.sendMail({
             from: `"Locally Team" <${process.env.GMAIL_USER}>`,
             to: email,
-            subject: `[Locally] ${title}`,
-            html: `<p>${message}</p><br/><a href="${process.env.NEXT_PUBLIC_SITE_URL}${link}">확인하기</a>`,
+            subject: `[Locally] ${safeTitle}`,
+            html: buildNotificationEmailHtml(safeMessage, safeMassLink),
           }).catch(e => console.error(`❌ 이메일 발송 실패 (${email}):`, e))
         ));
         console.log(`📨 [API] 이메일 ${emails.length}건 발송 시도 완료`);
@@ -213,9 +291,9 @@ export async function POST(request: Request) {
       .insert({
         user_id: recipient_id,
         type: type || 'general',
-        title: title,
-        message: message,
-        link: link,
+        title: safeTitle,
+        message: safeMessage,
+        link: safeLink,
         is_read: false
       });
 
@@ -251,8 +329,8 @@ export async function POST(request: Request) {
         await transporter.sendMail({
           from: `"Locally Team" <${process.env.GMAIL_USER}>`,
           to: emailToSend,
-          subject: `[Locally] ${title}`,
-          html: `<p>${message}</p><br/><a href="${process.env.NEXT_PUBLIC_SITE_URL}${link}">확인하기</a>`,
+          subject: `[Locally] ${safeTitle}`,
+          html: buildNotificationEmailHtml(safeMessage, safeLink),
         });
         console.log('🚀 [Notification API] 이메일 발송 성공');
       } catch (emailError: unknown) {

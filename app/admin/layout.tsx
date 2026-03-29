@@ -49,7 +49,7 @@ export default async function AdminLayout({
   }
 
   const adminSupabase = createAdminClient();
-  const { isAdmin, isWhitelisted, userRole } = await resolveAdminAccess(adminSupabase, {
+  const { isAdmin } = await resolveAdminAccess(adminSupabase, {
     userId: user.id,
     email: user.email,
   });
@@ -57,15 +57,6 @@ export default async function AdminLayout({
   // 관리자가 아니면 메인 홈페이지로 쫓아냄
   if (!isAdmin) {
     redirect("/");
-  }
-
-  // 화이트리스트에 있으나 users.role이 admin이 아닌 경우 자동 승급 (레거시 화면 호환)
-  if (isWhitelisted && userRole !== "admin") {
-    try {
-      await adminSupabase.from("users").update({ role: "admin" }).eq("id", user.id);
-    } catch {
-      // no-op
-    }
   }
 
   return (

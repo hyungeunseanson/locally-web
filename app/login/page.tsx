@@ -9,6 +9,34 @@ import { createClient } from '@/app/utils/supabase/client';
 import Spinner from '@/app/components/ui/Spinner';
 import { useLanguage } from '@/app/context/LanguageContext';
 
+function normalizeReturnUrl(rawValue: string | null | undefined) {
+  if (typeof rawValue !== 'string') {
+    return '/';
+  }
+
+  const value = rawValue.trim();
+  if (
+    !value ||
+    !value.startsWith('/') ||
+    value.startsWith('//') ||
+    value.includes('\\') ||
+    /[\u0000-\u001F\u007F]/.test(value)
+  ) {
+    return '/';
+  }
+
+  try {
+    const parsed = new URL(value, 'https://locally.local');
+    if (parsed.origin !== 'https://locally.local' || !parsed.pathname.startsWith('/')) {
+      return '/';
+    }
+
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return '/';
+  }
+}
+
 /**
  * 로그인 전용 페이지
  * - 이미 로그인된 사용자는 returnUrl 또는 메인으로 리다이렉트
@@ -21,7 +49,10 @@ function LoginPageContent() {
   const [checking, setChecking] = useState(true);
   const supabase = useMemo(() => createClient(), []);
 
-  const returnUrl = searchParams.get('returnUrl') || searchParams.get('next') || '/';
+  const returnUrl = useMemo(
+    () => normalizeReturnUrl(searchParams.get('returnUrl') ?? searchParams.get('next')),
+    [searchParams]
+  );
 
   useEffect(() => {
     const checkSession = async () => {
