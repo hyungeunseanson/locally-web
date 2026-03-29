@@ -67,7 +67,7 @@ const COPY: Record<LoginModalLocale, LoginModalCopy> = {
     privacyAgreement: '[필수] 개인정보 수집 및 이용 동의',
     viewLabel: '보기',
     switchToLogin: '이미 계정이 있으신가요? 로그인',
-    loginHelper: '로그인하면 예약, 메시지, 위시리스트를 바로 이용할 수 있어요.',
+    loginHelper: '로그인하고 계속 진행하세요.',
     returnAfterLogin: '로그인 후 지금 보고 있던 화면으로 다시 돌아갑니다.',
     socialReturnHint: '소셜 로그인 후에도 원래 보던 화면으로 다시 돌아와요.',
   },
