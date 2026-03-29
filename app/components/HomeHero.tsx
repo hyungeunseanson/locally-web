@@ -232,7 +232,7 @@ export default function HomeHero({
       {/* 📱 모바일: 에어비앤비 홈화면 */}
       <div className={`md:hidden sticky top-0 z-40 transition-all duration-300 ${isScrolled ? 'pt-[calc(env(safe-area-inset-top,0px)+6px)] pb-0' : 'pt-[calc(env(safe-area-inset-top,0px)+9px)] pb-0'
         }`} style={{
-          background: 'linear-gradient(180deg, #E4E4E4 0%, #ECECEC 48%, #F3F3F3 100%)',
+          background: 'linear-gradient(180deg, #F7F7F7 0%, #FCFCFC 48%, #FFFFFF 100%)',
         }}>
 
         {/* 검색 캡슐 — 스크림 없이 바로 사용, 배경은 부모에서 상속 */}
@@ -241,14 +241,14 @@ export default function HomeHero({
             onClick={() => setIsMobileSearchOpen(true)}
             className="flex-1 h-[56px] flex items-center justify-center gap-2.5 bg-white rounded-[28px] px-6 active:scale-[0.98] transition-transform"
             style={{
-              boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-              border: '1px solid rgba(0,0,0,0.08)',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+              border: '1px solid rgba(15,23,42,0.06)',
             }}
           >
             <Search size={14} className="text-[#3A3A3A] shrink-0" strokeWidth={2.4} />
             <span className="text-[13px] text-[#3A3A3A] font-medium tracking-[-0.01em]">{t('home_search_cta')}</span>
           </button>
-          <MobileLanguageSwitcher buttonClassName="w-11 h-11 bg-white/95 shadow-sm" />
+          <MobileLanguageSwitcher buttonClassName="w-11 h-11 bg-white shadow-sm" />
         </div>
 
         {/* 아이콘 탭 — 에어비앤비 기본 상태 */}
