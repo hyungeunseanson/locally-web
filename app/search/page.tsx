@@ -11,6 +11,8 @@ import SearchFilter from './components/SearchFilter';
 import {
   Map,
   List,
+  MapPin,
+  ExternalLink,
   Ghost,
   ArrowLeft,
   SlidersHorizontal,
@@ -32,6 +34,7 @@ import {
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { getContent } from '@/app/utils/contentHelper';
+import { getLocalizedExperienceText } from '@/app/utils/experienceTranslation';
 import { formatLocalizedExperienceLocation } from '@/app/utils/locationLocalization';
 import { getExperienceLanguageBadges, getExperiencePriceParts } from '@/app/utils/experienceCardDisplay';
 import { normalizeProfileLanguageValue } from '@/app/utils/profile';
@@ -95,6 +98,24 @@ function getSearchLocationLabel(value: string, t: (key: string, vars?: Record<st
   return value;
 }
 
+function normalizeMapValue(value: unknown) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function getSearchExperienceMeetingPoint(item: SearchExperience, lang: string) {
+  return getLocalizedExperienceText(item as Record<string, unknown>, 'meeting_point', lang).trim();
+}
+
+function getSearchExperienceMapQuery(item: SearchExperience, lang: string) {
+  const meetingPoint = getSearchExperienceMeetingPoint(item, lang);
+  const addressLine = normalizeMapValue(item.location);
+  const city = normalizeMapValue(item.city);
+  const country = normalizeMapValue(item.country);
+  const primary = meetingPoint || addressLine || formatLocalizedExperienceLocation(item, lang);
+
+  return Array.from(new Set([primary, city, country].map(normalizeMapValue).filter(Boolean))).join(', ');
+}
+
 function SearchResults() {
   const searchParams = useSearchParams();
   const { showToast } = useToast();
@@ -103,6 +124,7 @@ function SearchResults() {
   const [experiences, setExperiences] = useState<SearchExperience[]>([]);
   const [loading, setLoading] = useState(true);
   const [showMap, setShowMap] = useState(true);
+  const [activeMapExperienceId, setActiveMapExperienceId] = useState<string | null>(null);
   const requestSeqRef = useRef(0);
 
   const [activeSheet, setActiveSheet] = useState<'type' | 'time' | 'filter' | null>(null);
@@ -176,6 +198,20 @@ function SearchResults() {
     fetchSearchResults();
   }, [location, language, startDate, endDate, selectedTimesKey, selectedTypesKey, showToast, searchSignature]);
 
+  useEffect(() => {
+    if (experiences.length === 0) {
+      setActiveMapExperienceId(null);
+      return;
+    }
+
+    setActiveMapExperienceId((prev) => {
+      if (prev && experiences.some((item) => String(item.id) === prev)) {
+        return prev;
+      }
+      return String(experiences[0].id);
+    });
+  }, [experiences]);
+
   const mobileSections = useMemo(() => {
     const cityName = displayLocation || t('search_place_tokyo');
     const sectionBase = experiences;
@@ -215,6 +251,30 @@ function SearchResults() {
       : activeSheet === 'type'
         ? selectedTypes.length > 0
         : selectedTypes.length > 0 || selectedTimes.length > 0;
+
+  const activeMapExperience = useMemo(() => {
+    if (experiences.length === 0) return null;
+    return experiences.find((item) => String(item.id) === activeMapExperienceId) ?? experiences[0];
+  }, [activeMapExperienceId, experiences]);
+
+  const activeMapTitle = activeMapExperience
+    ? getContent(activeMapExperience, 'title', lang) || t('exp_card_title_fallback')
+    : '';
+
+  const activeMapLocation = activeMapExperience
+    ? getSearchExperienceMeetingPoint(activeMapExperience, lang)
+      || normalizeMapValue(activeMapExperience.location)
+      || formatLocalizedExperienceLocation(activeMapExperience, lang)
+      || t('exp_card_location_fallback')
+    : '';
+
+  const activeMapQuery = activeMapExperience ? getSearchExperienceMapQuery(activeMapExperience, lang) : '';
+  const activeMapEmbedUrl = activeMapQuery
+    ? `https://maps.google.com/maps?q=${encodeURIComponent(activeMapQuery)}&t=&z=15&ie=UTF8&iwloc=&output=embed`
+    : '';
+  const activeMapExternalUrl = activeMapQuery
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activeMapQuery)}`
+    : '';
 
   const renderMobileCard = (item: SearchExperience) => {
     const imageUrl =
@@ -452,7 +512,14 @@ function SearchResults() {
                 </div>
                 <div className={`grid gap-6 ${showMap ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'}`}>
                   {experiences.map((item, index) => (
-                    <div key={item.id} className="animate-in fade-in duration-500" style={{ animationDelay: `${Math.min(index * 60, 600)}ms`, animationFillMode: 'both' }}>
+                    <div
+                      key={item.id}
+                      data-testid={`search-result-card-${item.id}`}
+                      className={`animate-in fade-in duration-500 rounded-2xl transition-shadow ${showMap && String(item.id) === activeMapExperienceId ? 'shadow-[0_10px_35px_rgba(15,23,42,0.10)]' : ''}`}
+                      style={{ animationDelay: `${Math.min(index * 60, 600)}ms`, animationFillMode: 'both' }}
+                      onMouseEnter={() => setActiveMapExperienceId(String(item.id))}
+                      onFocusCapture={() => setActiveMapExperienceId(String(item.id))}
+                    >
                       <ExperienceCard data={item} />
                     </div>
                   ))}
@@ -465,12 +532,66 @@ function SearchResults() {
           </div>
 
           {showMap && (
-            <div className="hidden lg:block flex-1 bg-slate-100 relative h-full border-l border-slate-200">
-              <div className="absolute inset-0 flex items-center justify-center flex-col text-slate-400 bg-slate-50">
-                <Map size={48} className="mb-2 opacity-50" />
-                <span className="text-sm font-medium">지도 뷰 준비 중입니다.</span>
-                <span className="text-xs text-slate-400 mt-1">(Google Maps API 연동 예정)</span>
-              </div>
+            <div className="hidden lg:block flex-1 relative h-full border-l border-slate-200 bg-white">
+              {activeMapExperience && activeMapEmbedUrl ? (
+                <div data-testid="search-map-panel" className="absolute inset-0 flex flex-col bg-white">
+                  <div className="border-b border-slate-200 px-5 py-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                          {t('trip_map')}
+                        </p>
+                        <h3 data-testid="search-map-title" className="mt-2 text-lg font-bold leading-tight text-slate-900 line-clamp-2">
+                          {activeMapTitle}
+                        </h3>
+                      </div>
+                      {activeMapExternalUrl ? (
+                        <Link
+                          data-testid="search-map-external-link"
+                          href={activeMapExternalUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                        >
+                          Google Maps <ExternalLink size={13} />
+                        </Link>
+                      ) : null}
+                    </div>
+
+                    <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                        {t('label_meeting_point')}
+                      </p>
+                      <div className="mt-2 flex items-start gap-2 text-slate-700">
+                        <MapPin size={16} className="mt-0.5 shrink-0 text-slate-500" />
+                        <p data-testid="search-map-meeting-point" className="text-sm font-medium leading-relaxed">
+                          {activeMapLocation}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="min-h-0 flex-1 p-5">
+                    <div className="relative h-full overflow-hidden rounded-[28px] border border-slate-200 bg-slate-100 shadow-[0_18px_50px_rgba(15,23,42,0.10)]">
+                      <iframe
+                        data-testid="search-map-iframe"
+                        title={`${activeMapTitle} ${t('trip_map')}`}
+                        src={activeMapEmbedUrl}
+                        className="h-full w-full"
+                        loading="lazy"
+                        style={{ border: 0 }}
+                        allowFullScreen
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center flex-col text-slate-400 bg-slate-50">
+                  <Map size={48} className="mb-2 opacity-50" />
+                  <span className="text-sm font-medium">{t('search_empty_title')}</span>
+                  <span className="text-xs text-slate-400 mt-1">{t('search_empty_desc')}</span>
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -47,6 +47,7 @@ function buildSearchHaystack(item: SearchExperience) {
     record.description,
     item.city,
     item.country,
+    record.meeting_point,
     item.category,
     record.title_ko,
     record.description_ko,

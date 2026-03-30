@@ -7,6 +7,8 @@ export interface SearchExperience {
   subCity?: string;
   country?: string;
   location?: string;
+  meeting_point?: string;
+  meeting_point_i18n?: Record<string, string> | null;
   languages?: string[];
   image_url?: string;
   photos?: string[];
@@ -87,6 +89,8 @@ export const SEARCH_EXPERIENCE_CARD_SELECT_FIELDS = [
   'review_count',
   'price',
   'location',
+  'meeting_point',
+  'meeting_point_i18n',
 ] as const;
 
 export const SEARCH_EXPERIENCE_TEXT_FILTER_FIELDS = [
