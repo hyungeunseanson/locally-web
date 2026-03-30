@@ -7,7 +7,6 @@ import { useSearchParams } from 'next/navigation';
 import SiteHeader from '@/app/components/SiteHeader';
 import SiteFooter from '@/app/components/SiteFooter';
 import ExperienceCard from '@/app/components/ExperienceCard';
-import SearchFilter from './components/SearchFilter';
 import {
   Map,
   List,
@@ -66,6 +65,26 @@ const SEARCH_LOCALE_MAP: Record<string, string> = {
   zh: 'zh-CN',
 };
 
+const TIME_OPTION_IDS = [
+  { id: 'morning' as SearchTimeId, labelKey: 'search_time_morning', descKey: 'search_time_morning_desc' },
+  { id: 'afternoon' as SearchTimeId, labelKey: 'search_time_afternoon', descKey: 'search_time_afternoon_desc' },
+  { id: 'evening' as SearchTimeId, labelKey: 'search_time_evening', descKey: 'search_time_evening_desc' },
+] as const;
+
+const MAP_VIEW_LABELS: Record<string, string> = {
+  ko: '지도 보기',
+  en: 'Map view',
+  ja: '地図表示',
+  zh: '地图视图',
+};
+
+const LIST_VIEW_LABELS: Record<string, string> = {
+  ko: '리스트 보기',
+  en: 'List view',
+  ja: 'リスト表示',
+  zh: '列表视图',
+};
+
 function formatShortDate(iso: string | null, lang: string) {
   if (!iso) return '';
   const date = new Date(iso);
@@ -78,6 +97,12 @@ function formatShortDate(iso: string | null, lang: string) {
 
 function getSearchLanguageLabel(value: string, t: (key: string) => string) {
   if (!value || value === 'all') return '';
+
+  const normalizedValue = value.trim().toLowerCase();
+  if (normalizedValue === 'ko') return t('lang_ko');
+  if (normalizedValue === 'en') return t('lang_en');
+  if (normalizedValue === 'ja') return t('lang_ja');
+  if (normalizedValue === 'zh') return t('lang_zh');
 
   const normalized = normalizeProfileLanguageValue(value);
   if (normalized === 'Korean') return t('lang_ko');
@@ -96,6 +121,32 @@ function getSearchLocationLabel(value: string, t: (key: string, vars?: Record<st
   if (normalized === '이자카야' || normalized === 'izakaya') return t('search_place_izakaya');
   if (normalized === '서울' || normalized === 'seoul') return t('search_place_seoul');
   return value;
+}
+
+function getTypeLabelKey(id: SearchTypeId) {
+  return `search_type_${id === 'cafe_dessert' ? 'cafe' : id === 'walking_healing' ? 'walking' : id}`;
+}
+
+function formatDesktopDateRange(startDate: string | null, endDate: string | null, lang: string) {
+  const startLabel = formatShortDate(startDate, lang);
+  const endLabel = formatShortDate(endDate, lang);
+
+  if (startLabel && endLabel && startLabel !== endLabel) {
+    return `${startLabel} - ${endLabel}`;
+  }
+
+  return startLabel || endLabel;
+}
+
+function getDesktopViewLabel(showMap: boolean, lang: string) {
+  return showMap ? (LIST_VIEW_LABELS[lang] || LIST_VIEW_LABELS.en) : (MAP_VIEW_LABELS[lang] || MAP_VIEW_LABELS.en);
+}
+
+function getExperienceCountLabel(count: number, lang: string) {
+  if (lang === 'en') return `${count} experiences`;
+  if (lang === 'ja') return `${count}件の体験`;
+  if (lang === 'zh') return `${count}个体验`;
+  return `${count}개의 체험`;
 }
 
 function normalizeMapValue(value: unknown) {
@@ -125,7 +176,9 @@ function SearchResults() {
   const [loading, setLoading] = useState(true);
   const [showMap, setShowMap] = useState(true);
   const [activeMapExperienceId, setActiveMapExperienceId] = useState<string | null>(null);
+  const [desktopPopover, setDesktopPopover] = useState<'type' | 'time' | null>(null);
   const requestSeqRef = useRef(0);
+  const desktopPopoverRef = useRef<HTMLDivElement | null>(null);
 
   const [activeSheet, setActiveSheet] = useState<'type' | 'time' | 'filter' | null>(null);
   const [selectedTimes, setSelectedTimes] = useState<SearchTimeId[]>([]);
@@ -212,6 +265,19 @@ function SearchResults() {
     });
   }, [experiences]);
 
+  useEffect(() => {
+    if (!desktopPopover) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!desktopPopoverRef.current?.contains(event.target as Node)) {
+        setDesktopPopover(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [desktopPopover]);
+
   const mobileSections = useMemo(() => {
     const cityName = displayLocation || t('search_place_tokyo');
     const sectionBase = experiences;
@@ -251,6 +317,27 @@ function SearchResults() {
       : activeSheet === 'type'
         ? selectedTypes.length > 0
         : selectedTypes.length > 0 || selectedTimes.length > 0;
+  const hasDesktopFilters = selectedTypes.length > 0 || selectedTimes.length > 0;
+
+  const desktopSummaryPills = useMemo(() => {
+    const nextPills: Array<{ id: 'location' | 'date' | 'language'; label: string }> = [];
+
+    if (displayLocation) {
+      nextPills.push({ id: 'location', label: displayLocation });
+    }
+
+    const dateLabel = formatDesktopDateRange(startDate, endDate, lang);
+    if (dateLabel) {
+      nextPills.push({ id: 'date', label: dateLabel });
+    }
+
+    const languageLabel = getSearchLanguageLabel(language, t);
+    if (languageLabel) {
+      nextPills.push({ id: 'language', label: languageLabel });
+    }
+
+    return nextPills;
+  }, [displayLocation, endDate, lang, language, startDate, t]);
 
   const activeMapExperience = useMemo(() => {
     if (experiences.length === 0) return null;
@@ -275,6 +362,9 @@ function SearchResults() {
   const activeMapExternalUrl = activeMapQuery
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activeMapQuery)}`
     : '';
+  const desktopGridClassName = showMap
+    ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+    : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5';
 
   const renderMobileCard = (item: SearchExperience) => {
     const imageUrl =
@@ -447,34 +537,179 @@ function SearchResults() {
       </div>
 
       <div className="hidden md:flex pt-0 md:pt-24 pb-12 h-[calc(100vh-80px)] flex-col">
-        <div className="px-4 md:px-6 py-3 md:py-4 border-b border-slate-100 flex items-center justify-between sticky top-[80px] bg-white z-40">
-          <div className="flex items-center gap-2 md:gap-3 overflow-x-auto no-scrollbar">
-            <SearchFilter label="가격 범위" />
-            <SearchFilter label="숙소 유형" />
-            <div className="h-8 w-[1px] bg-slate-200 mx-2 shrink-0"></div>
-            <span className="text-sm font-bold text-slate-500 whitespace-nowrap">{experiences.length}개의 체험</span>
-          </div>
+        <div data-testid="search-desktop-toolbar" className="px-4 md:px-5 xl:px-6 py-3 md:py-4 border-b border-slate-100 sticky top-[80px] bg-white z-40">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0 flex flex-1 flex-wrap items-center gap-2 md:gap-3">
+              {desktopSummaryPills.map((pill) => (
+                <span
+                  key={pill.id}
+                  data-testid={`search-summary-pill-${pill.id}`}
+                  className="inline-flex h-9 items-center rounded-full border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700"
+                >
+                  {pill.label}
+                </span>
+              ))}
 
-          <button
-            onClick={() => setShowMap(!showMap)}
-            className="hidden md:flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-full text-sm font-bold shadow-md hover:bg-black transition-colors"
-          >
-            {showMap ? (
-              <>
-                <List size={16} /> 리스트 보기
-              </>
-            ) : (
-              <>
-                <Map size={16} /> 지도 보기
-              </>
-            )}
-          </button>
+              <div ref={desktopPopoverRef} className="flex items-center gap-2">
+                <div className="relative">
+                  <button
+                    type="button"
+                    data-testid="search-desktop-type-chip"
+                    onClick={() => setDesktopPopover((prev) => (prev === 'type' ? null : 'type'))}
+                    className={`inline-flex h-9 items-center gap-2 rounded-full border px-4 text-sm font-semibold transition-colors ${
+                      selectedTypes.length > 0
+                        ? 'border-slate-900 bg-slate-900 text-white'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                    }`}
+                  >
+                    {t('search_filter_experience_type')}
+                    <ChevronDown size={14} className={desktopPopover === 'type' ? 'rotate-180 transition-transform' : 'transition-transform'} />
+                  </button>
+
+                  {desktopPopover === 'type' && (
+                    <div className="absolute left-0 top-full mt-3 w-[340px] rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.14)]">
+                      <div className="flex items-center justify-between gap-3">
+                        <h3 className="text-sm font-bold text-slate-900">{t('search_filter_experience_type')}</h3>
+                        {selectedTypes.length > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedTypes([])}
+                            className="text-xs font-semibold text-slate-500 hover:text-slate-700"
+                          >
+                            {t('search_filter_clear_all')}
+                          </button>
+                        ) : null}
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-2.5">
+                        {TYPE_OPTION_IDS.map((option) => {
+                          const Icon = option.icon;
+                          const selected = selectedTypes.includes(option.id);
+
+                          return (
+                            <button
+                              key={option.id}
+                              type="button"
+                              onClick={() => toggleType(option.id)}
+                              className={`inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[12px] font-medium transition-colors ${
+                                selected
+                                  ? 'border-slate-900 bg-slate-900 text-white'
+                                  : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                              }`}
+                            >
+                              <Icon size={13} strokeWidth={1.8} />
+                              {t(getTypeLabelKey(option.id))}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="relative">
+                  <button
+                    type="button"
+                    data-testid="search-desktop-time-chip"
+                    onClick={() => setDesktopPopover((prev) => (prev === 'time' ? null : 'time'))}
+                    className={`inline-flex h-9 items-center gap-2 rounded-full border px-4 text-sm font-semibold transition-colors ${
+                      selectedTimes.length > 0
+                        ? 'border-slate-900 bg-slate-900 text-white'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                    }`}
+                  >
+                    {t('search_filter_time_slot')}
+                    <ChevronDown size={14} className={desktopPopover === 'time' ? 'rotate-180 transition-transform' : 'transition-transform'} />
+                  </button>
+
+                  {desktopPopover === 'time' && (
+                    <div className="absolute left-0 top-full mt-3 w-[320px] rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.14)]">
+                      <div className="flex items-center justify-between gap-3">
+                        <h3 className="text-sm font-bold text-slate-900">{t('search_filter_time_slot')}</h3>
+                        {selectedTimes.length > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedTimes([])}
+                            className="text-xs font-semibold text-slate-500 hover:text-slate-700"
+                          >
+                            {t('search_filter_clear_all')}
+                          </button>
+                        ) : null}
+                      </div>
+
+                      <div className="mt-4 space-y-2.5">
+                        {TIME_OPTION_IDS.map((option) => {
+                          const selected = selectedTimes.includes(option.id);
+
+                          return (
+                            <button
+                              key={option.id}
+                              type="button"
+                              onClick={() => toggleTime(option.id)}
+                              className={`flex w-full items-start justify-between rounded-2xl border px-4 py-3 text-left transition-colors ${
+                                selected
+                                  ? 'border-slate-900 bg-slate-900 text-white'
+                                  : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                              }`}
+                            >
+                              <div>
+                                <p className="text-sm font-semibold leading-tight">{t(option.labelKey)}</p>
+                                <p className={`mt-1 text-xs leading-relaxed ${selected ? 'text-white/80' : 'text-slate-500'}`}>
+                                  {t(option.descKey)}
+                                </p>
+                              </div>
+                              <span
+                                className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
+                                  selected ? 'border-white bg-white text-slate-900' : 'border-slate-300 text-transparent'
+                                }`}
+                              >
+                                •
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {hasDesktopFilters ? (
+                  <button
+                    type="button"
+                    onClick={clearAllSearchFilters}
+                    className="inline-flex h-9 items-center rounded-full px-3 text-sm font-semibold text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+                  >
+                    {t('search_filter_clear_all')}
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-3">
+              <span className="text-sm font-bold text-slate-500 whitespace-nowrap">{getExperienceCountLabel(experiences.length, lang)}</span>
+              <button
+                type="button"
+                onClick={() => setShowMap(!showMap)}
+                className="hidden md:flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-full text-sm font-bold shadow-md hover:bg-black transition-colors"
+              >
+                {showMap ? (
+                  <>
+                    <List size={16} /> {getDesktopViewLabel(true, lang)}
+                  </>
+                ) : (
+                  <>
+                    <Map size={16} /> {getDesktopViewLabel(false, lang)}
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="flex flex-1 overflow-hidden">
-          <div className={`flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-6 ${showMap ? 'lg:w-3/5 xl:w-1/2' : 'w-full'}`}>
+          <div className="min-w-0 flex-1 overflow-y-auto px-4 md:px-5 xl:px-6 py-4 md:py-5 xl:py-6">
             {loading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className={`grid gap-4 xl:gap-5 ${desktopGridClassName}`}>
                 {[1, 2, 3, 4, 5, 6].map((i) => (
                   <div key={i} className="animate-pulse">
                     <div className="bg-slate-100 aspect-[4/3] rounded-xl mb-3"></div>
@@ -510,14 +745,14 @@ function SearchResults() {
                   <p className="text-sm font-black text-slate-900">{t('search_flow_hint_title')}</p>
                   <p className="mt-1 text-xs leading-relaxed text-slate-600">{t('search_flow_hint_desc')}</p>
                 </div>
-                <div className={`grid gap-6 ${showMap ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'}`}>
+                <div data-testid="search-desktop-results-grid" className={`grid gap-4 xl:gap-5 ${desktopGridClassName}`}>
                   {experiences.map((item, index) => (
                     <div
                       key={item.id}
                       data-testid={`search-result-card-${item.id}`}
                       className={`animate-in fade-in duration-500 rounded-2xl transition-shadow ${showMap && String(item.id) === activeMapExperienceId ? 'shadow-[0_10px_35px_rgba(15,23,42,0.10)]' : ''}`}
                       style={{ animationDelay: `${Math.min(index * 60, 600)}ms`, animationFillMode: 'both' }}
-                      onMouseEnter={() => setActiveMapExperienceId(String(item.id))}
+                      onMouseMove={() => setActiveMapExperienceId(String(item.id))}
                       onFocusCapture={() => setActiveMapExperienceId(String(item.id))}
                     >
                       <ExperienceCard data={item} />
@@ -532,9 +767,9 @@ function SearchResults() {
           </div>
 
           {showMap && (
-            <div className="hidden lg:block flex-1 relative h-full border-l border-slate-200 bg-white">
+            <div className="hidden lg:flex shrink-0 h-full border-l border-slate-200 bg-white lg:w-[400px] xl:w-[430px] 2xl:w-[460px]">
               {activeMapExperience && activeMapEmbedUrl ? (
-                <div data-testid="search-map-panel" className="absolute inset-0 flex flex-col bg-white">
+                <div data-testid="search-map-panel" className="flex h-full w-full flex-col bg-white">
                   <div className="border-b border-slate-200 px-5 py-5">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -571,13 +806,16 @@ function SearchResults() {
                     </div>
                   </div>
 
-                  <div className="min-h-0 flex-1 p-5">
-                    <div className="relative h-full overflow-hidden rounded-[28px] border border-slate-200 bg-slate-100 shadow-[0_18px_50px_rgba(15,23,42,0.10)]">
+                  <div className="flex flex-1 items-center justify-center px-5 pb-6 pt-5">
+                    <div
+                      data-testid="search-map-frame"
+                      className="relative aspect-square w-full max-w-[320px] overflow-hidden rounded-[28px] border border-slate-200 bg-slate-100 shadow-[0_18px_50px_rgba(15,23,42,0.10)] xl:max-w-[340px] 2xl:max-w-[360px]"
+                    >
                       <iframe
                         data-testid="search-map-iframe"
                         title={`${activeMapTitle} ${t('trip_map')}`}
                         src={activeMapEmbedUrl}
-                        className="h-full w-full"
+                        className="absolute inset-0 h-full w-full"
                         loading="lazy"
                         style={{ border: 0 }}
                         allowFullScreen
@@ -586,7 +824,7 @@ function SearchResults() {
                   </div>
                 </div>
               ) : (
-                <div className="absolute inset-0 flex items-center justify-center flex-col text-slate-400 bg-slate-50">
+                <div className="flex h-full w-full items-center justify-center flex-col text-slate-400 bg-slate-50">
                   <Map size={48} className="mb-2 opacity-50" />
                   <span className="text-sm font-medium">{t('search_empty_title')}</span>
                   <span className="text-xs text-slate-400 mt-1">{t('search_empty_desc')}</span>
@@ -618,11 +856,11 @@ function SearchResults() {
             <div className="px-6 overflow-y-auto">
               {activeSheet === 'time' && (
                 <div className="pt-1 space-y-3">
-                  {([{id:'morning' as SearchTimeId,lk:'search_time_morning',dk:'search_time_morning_desc'},{id:'afternoon' as SearchTimeId,lk:'search_time_afternoon',dk:'search_time_afternoon_desc'},{id:'evening' as SearchTimeId,lk:'search_time_evening',dk:'search_time_evening_desc'}]).map((option) => (
+                  {TIME_OPTION_IDS.map((option) => (
                     <button key={option.id} onClick={() => toggleTime(option.id)} className="w-full flex items-center justify-between text-left">
                       <div>
-                        <p className="text-[15px] font-semibold text-[#222] leading-tight">{t(option.lk)}</p>
-                        <p className="mt-1 text-[11px] text-[#8A8A8A] leading-tight">{t(option.dk)}</p>
+                        <p className="text-[15px] font-semibold text-[#222] leading-tight">{t(option.labelKey)}</p>
+                        <p className="mt-1 text-[11px] text-[#8A8A8A] leading-tight">{t(option.descKey)}</p>
                       </div>
                       <div
                         className={`w-[24px] h-[24px] rounded-[7px] border-2 flex items-center justify-center ${
@@ -641,7 +879,6 @@ function SearchResults() {
                   {TYPE_OPTION_IDS.map((option) => {
                     const Icon = option.icon;
                     const selected = selectedTypes.includes(option.id);
-                    const labelKey = `search_type_${option.id === 'cafe_dessert' ? 'cafe' : option.id === 'walking_healing' ? 'walking' : option.id}`;
                     return (
                       <button
                         key={option.id}
@@ -651,7 +888,7 @@ function SearchResults() {
                         }`}
                       >
                         <Icon size={13} strokeWidth={1.8} />
-                        {t(labelKey)}
+                        {t(getTypeLabelKey(option.id))}
                       </button>
                     );
                   })}
@@ -665,7 +902,6 @@ function SearchResults() {
                     {TYPE_OPTION_IDS.map((option) => {
                       const Icon = option.icon;
                       const selected = selectedTypes.includes(option.id);
-                      const labelKey = `search_type_${option.id === 'cafe_dessert' ? 'cafe' : option.id === 'walking_healing' ? 'walking' : option.id}`;
                       return (
                         <button
                           key={option.id}
@@ -675,7 +911,7 @@ function SearchResults() {
                           }`}
                         >
                           <Icon size={13} strokeWidth={1.8} />
-                          {t(labelKey)}
+                          {t(getTypeLabelKey(option.id))}
                         </button>
                       );
                     })}
@@ -685,7 +921,7 @@ function SearchResults() {
 
                   <h4 className="text-[15px] font-semibold text-[#1F1F1F] mt-5 mb-3">{t('search_filter_time_slot')}</h4>
                   <div className="flex flex-wrap gap-3 pb-2">
-                    {([{id:'morning' as SearchTimeId,lk:'search_time_morning'},{id:'afternoon' as SearchTimeId,lk:'search_time_afternoon'},{id:'evening' as SearchTimeId,lk:'search_time_evening'}]).map((option) => {
+                    {TIME_OPTION_IDS.map((option) => {
                       const selected = selectedTimes.includes(option.id);
                       return (
                         <button
@@ -695,7 +931,7 @@ function SearchResults() {
                             selected ? 'border-[#222] bg-[#F8F8F8] text-[#222]' : 'border-[#D8D8D8] text-[#454545]'
                           }`}
                         >
-                          {t(option.lk)}
+                          {t(option.labelKey)}
                         </button>
                       );
                     })}
