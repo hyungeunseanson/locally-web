@@ -43,7 +43,7 @@ export default function SiteFooter() {
 
             {/* 1. 로컬리 지원 */}
             <div className="space-y-4">
-              <h5 className="font-bold">{t('footer_support')}</h5>
+              <h5 data-testid="footer-column-title-support" className="font-bold">{t('footer_support')}</h5>
               <ul className="space-y-3 text-[#717171] font-light">
                 <li><Link href="/about" className="hover:underline">{t('footer_intro')}</Link></li>
                 <li><Link href="/company/notices" className="hover:underline">{t('footer_notice')}</Link></li>
@@ -62,7 +62,7 @@ export default function SiteFooter() {
 
             {/* 3. 로컬리 */}
             <div className="space-y-4">
-              <h5 className="font-bold">{t('footer_locally')}</h5>
+              <h5 data-testid="footer-column-title-locally" className="font-bold">{t('footer_locally')}</h5>
               <ul className="space-y-3 text-[#717171] font-light">
                 <li><Link href="/company/news" className="hover:underline">{t('footer_news')}</Link></li>
                 <li><Link href="/company/careers" className="hover:underline">{t('footer_careers')}</Link></li>

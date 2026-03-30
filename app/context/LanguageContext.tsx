@@ -80,7 +80,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     city_jeju: "제주",
 
     // [3. 푸터]
-    footer_support: "로컬리 지원",
+    footer_support: "로컬리",
     footer_intro: "로컬리 소개",
     footer_notice: "공지사항",
     footer_help: "도움말 센터",
@@ -91,7 +91,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     home_mobile_links_joiner: "및",
     home_mobile_host_support_link: "호스트 지원",
     footer_community: "커뮤니티",
-    footer_locally: "로컬리",
+    footer_locally: "지원",
     footer_news: "뉴스",
     footer_careers: "채용 정보",
     footer_investors: "투자자 정보",
