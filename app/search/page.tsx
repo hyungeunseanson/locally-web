@@ -3,7 +3,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import SiteHeader from '@/app/components/SiteHeader';
 import SiteFooter from '@/app/components/SiteFooter';
 import ExperienceCard from '@/app/components/ExperienceCard';
@@ -34,9 +34,10 @@ import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { getContent } from '@/app/utils/contentHelper';
 import { getLocalizedExperienceText } from '@/app/utils/experienceTranslation';
-import { formatLocalizedExperienceLocation } from '@/app/utils/locationLocalization';
+import { formatLocalizedExperienceLocation, getLocalizedCityLabel } from '@/app/utils/locationLocalization';
 import { getExperienceLanguageBadges, getExperiencePriceParts } from '@/app/utils/experienceCardDisplay';
 import { normalizeProfileLanguageValue } from '@/app/utils/profile';
+import { normalizeServiceCity } from '@/app/utils/serviceRequestLocation';
 import type {
   SearchExperience,
   SearchExperiencesResponse,
@@ -58,6 +59,8 @@ const TYPE_OPTION_IDS: Array<{ id: SearchTypeId; icon: typeof Utensils }> = [
   { id: 'one_day_class', icon: Palette },
 ] as const;
 
+const CITY_FILTER_OPTIONS = ['도쿄', '오사카', '후쿠오카', '삿포로', '나고야', '서울', '부산', '제주'] as const;
+
 const SEARCH_LOCALE_MAP: Record<string, string> = {
   ko: 'ko-KR',
   en: 'en-US',
@@ -70,20 +73,6 @@ const TIME_OPTION_IDS = [
   { id: 'afternoon' as SearchTimeId, labelKey: 'search_time_afternoon', descKey: 'search_time_afternoon_desc' },
   { id: 'evening' as SearchTimeId, labelKey: 'search_time_evening', descKey: 'search_time_evening_desc' },
 ] as const;
-
-const MAP_VIEW_LABELS: Record<string, string> = {
-  ko: '지도 보기',
-  en: 'Map view',
-  ja: '地図表示',
-  zh: '地图视图',
-};
-
-const LIST_VIEW_LABELS: Record<string, string> = {
-  ko: '리스트 보기',
-  en: 'List view',
-  ja: 'リスト表示',
-  zh: '列表视图',
-};
 
 function formatShortDate(iso: string | null, lang: string) {
   if (!iso) return '';
@@ -138,10 +127,6 @@ function formatDesktopDateRange(startDate: string | null, endDate: string | null
   return startLabel || endLabel;
 }
 
-function getDesktopViewLabel(showMap: boolean, lang: string) {
-  return showMap ? (LIST_VIEW_LABELS[lang] || LIST_VIEW_LABELS.en) : (MAP_VIEW_LABELS[lang] || MAP_VIEW_LABELS.en);
-}
-
 function getExperienceCountLabel(count: number, lang: string) {
   if (lang === 'en') return `${count} experiences`;
   if (lang === 'ja') return `${count}件の体験`;
@@ -168,15 +153,16 @@ function getSearchExperienceMapQuery(item: SearchExperience, lang: string) {
 }
 
 function SearchResults() {
+  const pathname = usePathname();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const { showToast } = useToast();
   const { lang, t } = useLanguage();
 
   const [experiences, setExperiences] = useState<SearchExperience[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showMap, setShowMap] = useState(true);
-  const [activeMapExperienceId, setActiveMapExperienceId] = useState<string | null>(null);
-  const [desktopPopover, setDesktopPopover] = useState<'type' | 'time' | null>(null);
+  const [selectedExperienceId, setSelectedExperienceId] = useState<string | null>(null);
+  const [desktopPopover, setDesktopPopover] = useState<'city' | 'type' | 'time' | null>(null);
   const requestSeqRef = useRef(0);
   const desktopPopoverRef = useRef<HTMLDivElement | null>(null);
 
@@ -188,6 +174,7 @@ function SearchResults() {
   const language = searchParams.get('language') || 'all';
   const startDate = searchParams.get('startDate');
   const endDate = searchParams.get('endDate');
+  const selectedCity = normalizeServiceCity(searchParams.get('city') || '');
 
   const displayLocation = getSearchLocationLabel(location, t);
   const headerTitle = location
@@ -203,12 +190,20 @@ function SearchResults() {
 
   const selectedTimesKey = useMemo(() => [...selectedTimes].sort().join(','), [selectedTimes]);
   const selectedTypesKey = useMemo(() => [...selectedTypes].sort().join(','), [selectedTypes]);
-  const searchSignature = `${location}|${language}|${startDate || ''}|${endDate || ''}|${selectedTimesKey}|${selectedTypesKey}`;
+  const searchSignature = `${location}|${language}|${startDate || ''}|${endDate || ''}|${selectedCity}|${selectedTimesKey}|${selectedTypesKey}`;
+
+  const replaceSearchParams = (mutator: (params: URLSearchParams) => void) => {
+    const nextParams = new URLSearchParams(searchParams.toString());
+    mutator(nextParams);
+    const queryString = nextParams.toString();
+    router.replace(queryString ? `${pathname}?${queryString}` : pathname, { scroll: false });
+  };
 
   useLayoutEffect(() => {
     // 쿼리 변경 직후 이전 결과가 한 프레임 노출되는 현상을 방지
     setLoading(true);
     setExperiences([]);
+    setSelectedExperienceId(null);
   }, [searchSignature]);
 
   useEffect(() => {
@@ -222,6 +217,7 @@ function SearchResults() {
         if (language) params.set('language', language);
         if (startDate) params.set('startDate', startDate);
         if (endDate) params.set('endDate', endDate);
+        if (selectedCity) params.set('city', selectedCity);
         if (selectedTimesKey) params.set('times', selectedTimesKey);
         if (selectedTypesKey) params.set('types', selectedTypesKey);
 
@@ -249,21 +245,14 @@ function SearchResults() {
     };
 
     fetchSearchResults();
-  }, [location, language, startDate, endDate, selectedTimesKey, selectedTypesKey, showToast, searchSignature]);
+  }, [location, language, startDate, endDate, selectedCity, selectedTimesKey, selectedTypesKey, showToast, searchSignature]);
 
   useEffect(() => {
-    if (experiences.length === 0) {
-      setActiveMapExperienceId(null);
-      return;
+    if (!selectedExperienceId) return;
+    if (!experiences.some((item) => String(item.id) === selectedExperienceId)) {
+      setSelectedExperienceId(null);
     }
-
-    setActiveMapExperienceId((prev) => {
-      if (prev && experiences.some((item) => String(item.id) === prev)) {
-        return prev;
-      }
-      return String(experiences[0].id);
-    });
-  }, [experiences]);
+  }, [experiences, selectedExperienceId]);
 
   useEffect(() => {
     if (!desktopPopover) return;
@@ -309,6 +298,11 @@ function SearchResults() {
   const clearAllSearchFilters = () => {
     setSelectedTimes([]);
     setSelectedTypes([]);
+    if (selectedCity) {
+      replaceSearchParams((params) => {
+        params.delete('city');
+      });
+    }
   };
 
   const hasSheetSelection =
@@ -317,7 +311,7 @@ function SearchResults() {
       : activeSheet === 'type'
         ? selectedTypes.length > 0
         : selectedTypes.length > 0 || selectedTimes.length > 0;
-  const hasDesktopFilters = selectedTypes.length > 0 || selectedTimes.length > 0;
+  const hasDesktopFilters = selectedTypes.length > 0 || selectedTimes.length > 0 || Boolean(selectedCity);
 
   const desktopSummaryPills = useMemo(() => {
     const nextPills: Array<{ id: 'location' | 'date' | 'language'; label: string }> = [];
@@ -339,32 +333,72 @@ function SearchResults() {
     return nextPills;
   }, [displayLocation, endDate, lang, language, startDate, t]);
 
-  const activeMapExperience = useMemo(() => {
-    if (experiences.length === 0) return null;
-    return experiences.find((item) => String(item.id) === activeMapExperienceId) ?? experiences[0];
-  }, [activeMapExperienceId, experiences]);
+  const handleCityFilterChange = (value: string) => {
+    setDesktopPopover(null);
+    replaceSearchParams((params) => {
+      if (!value) {
+        params.delete('city');
+        return;
+      }
 
-  const activeMapTitle = activeMapExperience
-    ? getContent(activeMapExperience, 'title', lang) || t('exp_card_title_fallback')
+      params.set('city', value);
+    });
+  };
+
+  const toggleSelectedExperience = (experienceId: string) => {
+    setSelectedExperienceId((prev) => (prev === experienceId ? null : experienceId));
+  };
+
+  const handleDesktopCardClickCapture = (event: React.MouseEvent<HTMLDivElement>, experienceId: string) => {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('button')) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    toggleSelectedExperience(experienceId);
+  };
+
+  const handleDesktopCardKeyDownCapture = (event: React.KeyboardEvent<HTMLDivElement>, experienceId: string) => {
+    if (event.key !== 'Enter' && event.key !== ' ') {
+      return;
+    }
+
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('button')) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    toggleSelectedExperience(experienceId);
+  };
+
+  const selectedExperience = useMemo(() => {
+    if (!selectedExperienceId) return null;
+    return experiences.find((item) => String(item.id) === selectedExperienceId) ?? null;
+  }, [experiences, selectedExperienceId]);
+
+  const activeMapTitle = selectedExperience
+    ? getContent(selectedExperience, 'title', lang) || t('exp_card_title_fallback')
     : '';
 
-  const activeMapLocation = activeMapExperience
-    ? getSearchExperienceMeetingPoint(activeMapExperience, lang)
-      || normalizeMapValue(activeMapExperience.location)
-      || formatLocalizedExperienceLocation(activeMapExperience, lang)
+  const activeMapLocation = selectedExperience
+    ? getSearchExperienceMeetingPoint(selectedExperience, lang)
+      || normalizeMapValue(selectedExperience.location)
+      || formatLocalizedExperienceLocation(selectedExperience, lang)
       || t('exp_card_location_fallback')
     : '';
 
-  const activeMapQuery = activeMapExperience ? getSearchExperienceMapQuery(activeMapExperience, lang) : '';
+  const activeMapQuery = selectedExperience ? getSearchExperienceMapQuery(selectedExperience, lang) : '';
   const activeMapEmbedUrl = activeMapQuery
     ? `https://maps.google.com/maps?q=${encodeURIComponent(activeMapQuery)}&t=&z=15&ie=UTF8&iwloc=&output=embed`
     : '';
   const activeMapExternalUrl = activeMapQuery
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activeMapQuery)}`
     : '';
-  const desktopGridClassName = showMap
-    ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
-    : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5';
+  const desktopGridClassName = 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4';
 
   const renderMobileCard = (item: SearchExperience) => {
     const imageUrl =
@@ -554,6 +588,68 @@ function SearchResults() {
                 <div className="relative">
                   <button
                     type="button"
+                    data-testid="search-desktop-city-chip"
+                    onClick={() => setDesktopPopover((prev) => (prev === 'city' ? null : 'city'))}
+                    className={`inline-flex h-9 items-center gap-2 rounded-full border px-4 text-sm font-semibold transition-colors ${
+                      selectedCity
+                        ? 'border-slate-900 bg-slate-900 text-white'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                    }`}
+                  >
+                    {selectedCity ? getLocalizedCityLabel(selectedCity, lang) : t('search_filter_city')}
+                    <ChevronDown size={14} className={desktopPopover === 'city' ? 'rotate-180 transition-transform' : 'transition-transform'} />
+                  </button>
+
+                  {desktopPopover === 'city' && (
+                    <div className="absolute left-0 top-full mt-3 w-[240px] rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_20px_60px_rgba(15,23,42,0.14)]">
+                      <div className="flex items-center justify-between gap-3 px-1">
+                        <h3 className="text-sm font-bold text-slate-900">{t('search_filter_city')}</h3>
+                        {selectedCity ? (
+                          <button
+                            type="button"
+                            onClick={() => handleCityFilterChange('')}
+                            className="text-xs font-semibold text-slate-500 hover:text-slate-700"
+                          >
+                            {t('lang_all')}
+                          </button>
+                        ) : null}
+                      </div>
+
+                      <div className="mt-3 space-y-1.5">
+                        <button
+                          type="button"
+                          data-testid="search-city-option-all"
+                          onClick={() => handleCityFilterChange('')}
+                          className={`flex w-full items-center justify-between rounded-2xl px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+                            !selectedCity ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          {t('lang_all')}
+                        </button>
+                        {CITY_FILTER_OPTIONS.map((option) => {
+                          const selected = selectedCity === option;
+                          return (
+                            <button
+                              key={option}
+                              type="button"
+                              data-testid={`search-city-option-${option}`}
+                              onClick={() => handleCityFilterChange(option)}
+                              className={`flex w-full items-center justify-between rounded-2xl px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+                                selected ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-50'
+                              }`}
+                            >
+                              {getLocalizedCityLabel(option, lang)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="relative">
+                  <button
+                    type="button"
                     data-testid="search-desktop-type-chip"
                     onClick={() => setDesktopPopover((prev) => (prev === 'type' ? null : 'type'))}
                     className={`inline-flex h-9 items-center gap-2 rounded-full border px-4 text-sm font-semibold transition-colors ${
@@ -689,27 +785,28 @@ function SearchResults() {
               <span className="text-sm font-bold text-slate-500 whitespace-nowrap">{getExperienceCountLabel(experiences.length, lang)}</span>
               <button
                 type="button"
-                onClick={() => setShowMap(!showMap)}
-                className="hidden md:flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-full text-sm font-bold shadow-md hover:bg-black transition-colors"
+                data-testid="search-selected-experience-cta"
+                disabled={!selectedExperienceId}
+                onClick={() => {
+                  if (!selectedExperienceId) return;
+                  router.push(`/experiences/${selectedExperienceId}`);
+                }}
+                className={`hidden md:flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold shadow-md transition-colors ${
+                  selectedExperienceId
+                    ? 'bg-slate-900 text-white hover:bg-black'
+                    : 'cursor-not-allowed bg-slate-200 text-slate-500 shadow-none'
+                }`}
               >
-                {showMap ? (
-                  <>
-                    <List size={16} /> {getDesktopViewLabel(true, lang)}
-                  </>
-                ) : (
-                  <>
-                    <Map size={16} /> {getDesktopViewLabel(false, lang)}
-                  </>
-                )}
+                <List size={16} /> {t('search_selected_experience_cta')}
               </button>
             </div>
           </div>
         </div>
 
-        <div className="flex flex-1 overflow-hidden">
-          <div className="min-w-0 flex-1 overflow-y-auto px-4 md:px-5 xl:px-6 py-4 md:py-5 xl:py-6">
+        <div className="flex flex-1 overflow-hidden lg:grid lg:grid-cols-[minmax(0,0.72fr)_460px] xl:grid-cols-[minmax(0,0.66fr)_560px] 2xl:grid-cols-[minmax(0,0.62fr)_620px]">
+          <div className="min-w-0 overflow-y-auto px-4 md:px-5 xl:px-6 py-4 md:py-5 xl:py-6">
             {loading ? (
-              <div className={`grid gap-4 xl:gap-5 ${desktopGridClassName}`}>
+              <div className={`grid gap-3 xl:gap-4 ${desktopGridClassName}`}>
                 {[1, 2, 3, 4, 5, 6].map((i) => (
                   <div key={i} className="animate-pulse">
                     <div className="bg-slate-100 aspect-[4/3] rounded-xl mb-3"></div>
@@ -745,15 +842,20 @@ function SearchResults() {
                   <p className="text-sm font-black text-slate-900">{t('search_flow_hint_title')}</p>
                   <p className="mt-1 text-xs leading-relaxed text-slate-600">{t('search_flow_hint_desc')}</p>
                 </div>
-                <div data-testid="search-desktop-results-grid" className={`grid gap-4 xl:gap-5 ${desktopGridClassName}`}>
+                <div data-testid="search-desktop-results-grid" className={`grid gap-3 xl:gap-4 ${desktopGridClassName}`}>
                   {experiences.map((item, index) => (
                     <div
                       key={item.id}
                       data-testid={`search-result-card-${item.id}`}
-                      className={`animate-in fade-in duration-500 rounded-2xl transition-shadow ${showMap && String(item.id) === activeMapExperienceId ? 'shadow-[0_10px_35px_rgba(15,23,42,0.10)]' : ''}`}
+                      data-selected={selectedExperienceId === String(item.id) ? 'true' : 'false'}
+                      className={`animate-in fade-in duration-500 rounded-2xl transition-all ${
+                        selectedExperienceId === String(item.id)
+                          ? 'ring-2 ring-slate-900/70 shadow-[0_14px_36px_rgba(15,23,42,0.12)]'
+                          : 'shadow-none'
+                      }`}
                       style={{ animationDelay: `${Math.min(index * 60, 600)}ms`, animationFillMode: 'both' }}
-                      onMouseMove={() => setActiveMapExperienceId(String(item.id))}
-                      onFocusCapture={() => setActiveMapExperienceId(String(item.id))}
+                      onClickCapture={(event) => handleDesktopCardClickCapture(event, String(item.id))}
+                      onKeyDownCapture={(event) => handleDesktopCardKeyDownCapture(event, String(item.id))}
                     >
                       <ExperienceCard data={item} />
                     </div>
@@ -766,72 +868,75 @@ function SearchResults() {
             </div>
           </div>
 
-          {showMap && (
-            <div className="hidden lg:flex shrink-0 h-full border-l border-slate-200 bg-white lg:w-[400px] xl:w-[430px] 2xl:w-[460px]">
-              {activeMapExperience && activeMapEmbedUrl ? (
-                <div data-testid="search-map-panel" className="flex h-full w-full flex-col bg-white">
-                  <div className="border-b border-slate-200 px-5 py-5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                          {t('trip_map')}
-                        </p>
-                        <h3 data-testid="search-map-title" className="mt-2 text-lg font-bold leading-tight text-slate-900 line-clamp-2">
-                          {activeMapTitle}
-                        </h3>
-                      </div>
-                      {activeMapExternalUrl ? (
-                        <Link
-                          data-testid="search-map-external-link"
-                          href={activeMapExternalUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
-                        >
-                          Google Maps <ExternalLink size={13} />
-                        </Link>
-                      ) : null}
-                    </div>
-
-                    <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-                        {t('label_meeting_point')}
+          <div className="hidden lg:flex h-full border-l border-slate-200 bg-white">
+            {selectedExperience && activeMapEmbedUrl ? (
+              <div data-testid="search-map-panel" className="flex h-full w-full flex-col bg-white">
+                <div className="border-b border-slate-200 px-5 py-5 xl:px-6">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        {t('trip_map')}
                       </p>
-                      <div className="mt-2 flex items-start gap-2 text-slate-700">
-                        <MapPin size={16} className="mt-0.5 shrink-0 text-slate-500" />
-                        <p data-testid="search-map-meeting-point" className="text-sm font-medium leading-relaxed">
-                          {activeMapLocation}
-                        </p>
-                      </div>
+                      <h3 data-testid="search-map-title" className="mt-2 text-lg font-bold leading-tight text-slate-900 line-clamp-2">
+                        {activeMapTitle}
+                      </h3>
                     </div>
+                    {activeMapExternalUrl ? (
+                      <Link
+                        data-testid="search-map-external-link"
+                        href={activeMapExternalUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                      >
+                        Google Maps <ExternalLink size={13} />
+                      </Link>
+                    ) : null}
                   </div>
 
-                  <div className="flex flex-1 items-center justify-center px-5 pb-6 pt-5">
-                    <div
-                      data-testid="search-map-frame"
-                      className="relative aspect-square w-full max-w-[320px] overflow-hidden rounded-[28px] border border-slate-200 bg-slate-100 shadow-[0_18px_50px_rgba(15,23,42,0.10)] xl:max-w-[340px] 2xl:max-w-[360px]"
-                    >
-                      <iframe
-                        data-testid="search-map-iframe"
-                        title={`${activeMapTitle} ${t('trip_map')}`}
-                        src={activeMapEmbedUrl}
-                        className="absolute inset-0 h-full w-full"
-                        loading="lazy"
-                        style={{ border: 0 }}
-                        allowFullScreen
-                      />
+                  <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                      {t('label_meeting_point')}
+                    </p>
+                    <div className="mt-2 flex items-start gap-2 text-slate-700">
+                      <MapPin size={16} className="mt-0.5 shrink-0 text-slate-500" />
+                      <p data-testid="search-map-meeting-point" className="text-sm font-medium leading-relaxed">
+                        {activeMapLocation}
+                      </p>
                     </div>
                   </div>
                 </div>
-              ) : (
-                <div className="flex h-full w-full items-center justify-center flex-col text-slate-400 bg-slate-50">
-                  <Map size={48} className="mb-2 opacity-50" />
-                  <span className="text-sm font-medium">{t('search_empty_title')}</span>
-                  <span className="text-xs text-slate-400 mt-1">{t('search_empty_desc')}</span>
+
+                <div className="flex flex-1 items-center justify-center px-5 pb-6 pt-5 xl:px-6">
+                  <div
+                    data-testid="search-map-frame"
+                    className="relative aspect-square w-full max-w-[360px] overflow-hidden rounded-[28px] border border-slate-200 bg-slate-100 shadow-[0_18px_50px_rgba(15,23,42,0.10)] xl:max-w-[420px] 2xl:max-w-[460px]"
+                  >
+                    <iframe
+                      data-testid="search-map-iframe"
+                      title={`${activeMapTitle} ${t('trip_map')}`}
+                      src={activeMapEmbedUrl}
+                      className="absolute inset-0 h-full w-full"
+                      loading="lazy"
+                      style={{ border: 0 }}
+                      allowFullScreen
+                    />
+                  </div>
                 </div>
-              )}
-            </div>
-          )}
+              </div>
+            ) : (
+              <div
+                data-testid="search-map-empty-state"
+                className="flex h-full w-full flex-col items-center justify-center bg-slate-50 px-8 text-center"
+              >
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-sm">
+                  <Map size={28} className="text-slate-400" />
+                </div>
+                <p className="mt-5 text-lg font-bold text-slate-900">{t('search_map_empty_title')}</p>
+                <p className="mt-2 max-w-[320px] text-sm leading-relaxed text-slate-500">{t('search_map_empty_desc')}</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

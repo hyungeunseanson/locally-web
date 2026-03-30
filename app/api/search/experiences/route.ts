@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { createClient } from '@/app/utils/supabase/server';
+import { normalizeServiceCity } from '@/app/utils/serviceRequestLocation';
 import {
   SEARCH_EXPERIENCE_CARD_SELECT,
   SEARCH_EXPERIENCE_SELECT,
@@ -177,6 +178,7 @@ export async function GET(request: NextRequest) {
     const language = searchParams.get('language') || 'all';
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
+    const city = normalizeServiceCity(searchParams.get('city') || '');
     const selectedTimes = parseFilterIds<SearchTimeId>(searchParams.get('times'), ['morning', 'afternoon', 'evening']);
     const selectedTypes = parseFilterIds<SearchTypeId>(searchParams.get('types'), [
       'food_tour',
@@ -199,6 +201,10 @@ export async function GET(request: NextRequest) {
       .from('experiences')
       .select(needsTextFilterFields ? SEARCH_EXPERIENCE_SELECT : SEARCH_EXPERIENCE_CARD_SELECT)
       .eq('status', 'active');
+
+    if (city) {
+      query = query.eq('city', city);
+    }
 
     if (searchTerms.length > 0) {
       const searchFields = [

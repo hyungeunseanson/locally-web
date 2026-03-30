@@ -131,11 +131,13 @@ test.describe.serial('Guest search/detail ingress smoke', () => {
     });
     await dismissAnnouncementIfVisible(page);
 
-    const experienceLink = page.locator(`a[href="/experiences/${experience.id}"]:visible`).first();
-    await expect(experienceLink).toBeVisible({ timeout: 15000 });
+    const experienceCard = page.getByTestId(`search-result-card-${experience.id}`).first();
+    await expect(experienceCard).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId('search-flow-hint')).toBeVisible({ timeout: 15000 });
+    await experienceCard.click();
+    await expect(page.getByTestId('search-selected-experience-cta')).toBeEnabled();
 
-    await experienceLink.click();
+    await page.getByTestId('search-selected-experience-cta').click();
 
     await page.waitForURL(new RegExp(`/experiences/${experience.id}$`), { timeout: 15000 });
     await expect(page.locator('h1:visible').first()).toBeVisible({ timeout: 15000 });
