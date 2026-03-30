@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useLanguage } from '@/app/context/LanguageContext';
 
@@ -16,8 +17,12 @@ const COPY: Record<Locale, {
   mediaKitTitle: string;
   mediaKitDesc: string;
   mediaKitNote: string;
-  mediaKitToggleOpen: string;
-  mediaKitToggleClose: string;
+  mediaKitOpenLabel: string;
+  mediaKitModalTitle: string;
+  mediaKitModalHint: string;
+  mediaKitCloseLabel: string;
+  mediaKitPrevLabel: string;
+  mediaKitNextLabel: string;
   mediaKitFallback: string;
   formTitle: string;
   formDesc: string;
@@ -34,10 +39,14 @@ const COPY: Record<Locale, {
     title: 'Instagram 광고 · 제휴 문의',
     description: '로컬리 인스타그램 채널 광고, 브랜드 협업, 공동 캠페인 문의를 한곳에서 확인하고 바로 문의할 수 있습니다.',
     mediaKitTitle: 'Media kit & rate card',
-    mediaKitDesc: '미디어 킷과 단가표는 아래에서 편하게 펼쳐서 볼 수 있어요.',
+    mediaKitDesc: '미디어 킷과 단가표는 모달로 넘겨보면서 확인할 수 있어요.',
     mediaKitNote: '광고 문의는 아래 폼으로 남겨주시면 확인 후 연락드릴게요.',
-    mediaKitToggleOpen: '미디어 킷 펼쳐보기',
-    mediaKitToggleClose: '미디어 킷 접기',
+    mediaKitOpenLabel: '미디어 킷 보기',
+    mediaKitModalTitle: 'Locally Instagram media kit',
+    mediaKitModalHint: '좌우로 넘기며 채널 소개와 단가표를 확인해보세요.',
+    mediaKitCloseLabel: '닫기',
+    mediaKitPrevLabel: '이전',
+    mediaKitNextLabel: '다음',
     mediaKitFallback: '이미지 업로드 전입니다',
     formTitle: '문의 남기기',
     formDesc: '희망 채널, 예산, 진행 시기, 원하는 협업 형태를 함께 남겨주시면 더 빠르게 검토할 수 있습니다.',
@@ -56,8 +65,12 @@ const COPY: Record<Locale, {
     mediaKitTitle: 'Media kit & rate card',
     mediaKitDesc: 'Check the media kit and rate card below, then send us your inquiry.',
     mediaKitNote: 'Review the media kit and pricing slides in order before sending your inquiry.',
-    mediaKitToggleOpen: 'View media kit',
-    mediaKitToggleClose: 'Hide media kit',
+    mediaKitOpenLabel: 'View media kit',
+    mediaKitModalTitle: 'Locally Instagram media kit',
+    mediaKitModalHint: 'Use the arrows to review the channel overview and pricing slides.',
+    mediaKitCloseLabel: 'Close',
+    mediaKitPrevLabel: 'Previous',
+    mediaKitNextLabel: 'Next',
     mediaKitFallback: 'Waiting for upload',
     formTitle: 'Send an inquiry',
     formDesc: 'Share your target channel, budget, timing, and preferred collaboration format for a faster review.',
@@ -76,8 +89,12 @@ const COPY: Record<Locale, {
     mediaKitTitle: 'Media kit & rate card',
     mediaKitDesc: '下のメディアキットと料金表を確認してからお問い合わせください。',
     mediaKitNote: 'メディアキットと料金表を順番に確認してからお問い合わせください。',
-    mediaKitToggleOpen: 'メディアキットを見る',
-    mediaKitToggleClose: 'メディアキットを閉じる',
+    mediaKitOpenLabel: 'メディアキットを見る',
+    mediaKitModalTitle: 'Locally Instagram media kit',
+    mediaKitModalHint: '左右に切り替えながらチャンネル紹介と料金表を確認できます。',
+    mediaKitCloseLabel: '閉じる',
+    mediaKitPrevLabel: '前へ',
+    mediaKitNextLabel: '次へ',
     mediaKitFallback: '画像アップロード待ちです',
     formTitle: 'お問い合わせ',
     formDesc: '希望チャネル、予算、実施時期、コラボ形式を一緒に送っていただくと確認がスムーズです。',
@@ -96,8 +113,12 @@ const COPY: Record<Locale, {
     mediaKitTitle: 'Media kit & rate card',
     mediaKitDesc: '请先查看下面的媒体资料与报价，再提交合作咨询。',
     mediaKitNote: '请先按顺序查看媒体资料与报价，再提交咨询。',
-    mediaKitToggleOpen: '查看媒体资料',
-    mediaKitToggleClose: '收起媒体资料',
+    mediaKitOpenLabel: '查看媒体资料',
+    mediaKitModalTitle: 'Locally Instagram media kit',
+    mediaKitModalHint: '可逐页查看频道介绍与报价内容。',
+    mediaKitCloseLabel: '关闭',
+    mediaKitPrevLabel: '上一页',
+    mediaKitNextLabel: '下一页',
     mediaKitFallback: '等待上传图片',
     formTitle: '提交咨询',
     formDesc: '填写目标渠道、预算、投放时间与合作方式后，我们会更快完成初步确认。',
@@ -162,10 +183,81 @@ function MediaKitCard({
   );
 }
 
+function MediaKitSlide({
+  index,
+  fallbackLabel,
+}: {
+  index: number;
+  fallbackLabel: string;
+}) {
+  return (
+    <div
+      data-testid={`partnership-media-kit-slide-${index}`}
+      className="mx-auto w-full max-w-[860px] overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.16)]"
+    >
+      <MediaKitCard index={index} fallbackLabel={fallbackLabel} />
+    </div>
+  );
+}
+
 export default function PartnershipPage() {
   const { lang } = useLanguage();
   const copy = COPY[(lang in COPY ? lang : 'ko') as Locale];
-  const [isMediaKitOpen, setIsMediaKitOpen] = useState(false);
+  const [isMediaKitModalOpen, setIsMediaKitModalOpen] = useState(false);
+  const [activeMediaKitIndex, setActiveMediaKitIndex] = useState(0);
+
+  useEffect(() => {
+    if (!isMediaKitModalOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsMediaKitModalOpen(false);
+        return;
+      }
+
+      if (event.key === 'ArrowLeft') {
+        setActiveMediaKitIndex((current) => Math.max(0, current - 1));
+        return;
+      }
+
+      if (event.key === 'ArrowRight') {
+        setActiveMediaKitIndex((current) =>
+          Math.min(MEDIA_KIT_SLOTS.length - 1, current + 1)
+        );
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isMediaKitModalOpen]);
+
+  const openMediaKitModal = () => {
+    setActiveMediaKitIndex(0);
+    setIsMediaKitModalOpen(true);
+  };
+
+  const closeMediaKitModal = () => {
+    setIsMediaKitModalOpen(false);
+  };
+
+  const goToPreviousSlide = () => {
+    setActiveMediaKitIndex((current) => Math.max(0, current - 1));
+  };
+
+  const goToNextSlide = () => {
+    setActiveMediaKitIndex((current) =>
+      Math.min(MEDIA_KIT_SLOTS.length - 1, current + 1)
+    );
+  };
+
+  const activeSlot = MEDIA_KIT_SLOTS[activeMediaKitIndex];
 
   return (
     <div className="min-h-screen bg-white text-[#222222] font-sans selection:bg-black selection:text-white">
@@ -204,28 +296,12 @@ export default function PartnershipPage() {
             <button
               type="button"
               data-testid="partnership-media-kit-toggle"
-              aria-expanded={isMediaKitOpen}
-              onClick={() => setIsMediaKitOpen((current) => !current)}
+              onClick={openMediaKitModal}
               className="inline-flex h-11 items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-[13px] font-semibold text-[#222222] transition-colors hover:bg-slate-100"
             >
-              {isMediaKitOpen ? copy.mediaKitToggleClose : copy.mediaKitToggleOpen}
+              {copy.mediaKitOpenLabel}
             </button>
           </div>
-
-          {isMediaKitOpen && (
-            <div
-              data-testid="partnership-media-kit-panel"
-              className="mt-6 grid gap-4 md:grid-cols-2"
-            >
-              {MEDIA_KIT_SLOTS.map((slot) => (
-                <MediaKitCard
-                  key={slot}
-                  index={slot}
-                  fallbackLabel={copy.mediaKitFallback}
-                />
-              ))}
-            </div>
-          )}
         </section>
 
         <section className="rounded-[32px] border border-slate-200 bg-white px-4 py-5 md:px-6 md:py-7">
@@ -281,6 +357,99 @@ export default function PartnershipPage() {
           </form>
         </section>
       </main>
+
+      {isMediaKitModalOpen && (
+        <div
+          data-testid="partnership-media-kit-modal"
+          className="fixed inset-0 z-[220] flex items-center justify-center bg-black/55 px-4 py-5 backdrop-blur-[4px] md:px-8"
+        >
+          <button
+            type="button"
+            aria-label={copy.mediaKitCloseLabel}
+            className="absolute inset-0 cursor-default"
+            onClick={closeMediaKitModal}
+          />
+
+          <div className="relative z-[1] flex w-full max-w-[1120px] flex-col">
+            <div className="mb-4 flex items-start justify-between gap-4 px-1 text-white">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/65">
+                  {copy.mediaKitModalTitle}
+                </p>
+                <p className="mt-2 text-[14px] text-white/88 md:text-[15px]">
+                  {copy.mediaKitModalHint}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                data-testid="partnership-media-kit-close"
+                onClick={closeMediaKitModal}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white transition-colors hover:bg-white/16"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="relative flex items-center justify-center gap-3 md:gap-5">
+              <button
+                type="button"
+                data-testid="partnership-media-kit-prev"
+                aria-label={copy.mediaKitPrevLabel}
+                onClick={goToPreviousSlide}
+                disabled={activeMediaKitIndex === 0}
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition-colors hover:bg-white/18 disabled:cursor-not-allowed disabled:opacity-35"
+              >
+                <ChevronLeft size={18} />
+              </button>
+
+              <div className="flex-1">
+                <MediaKitSlide
+                  key={activeSlot}
+                  index={activeSlot}
+                  fallbackLabel={copy.mediaKitFallback}
+                />
+              </div>
+
+              <button
+                type="button"
+                data-testid="partnership-media-kit-next"
+                aria-label={copy.mediaKitNextLabel}
+                onClick={goToNextSlide}
+                disabled={activeMediaKitIndex === MEDIA_KIT_SLOTS.length - 1}
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition-colors hover:bg-white/18 disabled:cursor-not-allowed disabled:opacity-35"
+              >
+                <ChevronRight size={18} />
+              </button>
+            </div>
+
+            <div className="mt-5 flex items-center justify-between gap-4 px-1">
+              <div
+                data-testid="partnership-media-kit-counter"
+                className="rounded-full border border-white/12 bg-white/10 px-3 py-1.5 text-[12px] font-medium text-white/88"
+              >
+                {activeMediaKitIndex + 1} / {MEDIA_KIT_SLOTS.length}
+              </div>
+
+              <div className="flex items-center gap-2">
+                {MEDIA_KIT_SLOTS.map((slot, index) => (
+                  <button
+                    key={slot}
+                    type="button"
+                    aria-label={`Go to slide ${slot}`}
+                    onClick={() => setActiveMediaKitIndex(index)}
+                    className={`h-2.5 rounded-full transition-all ${
+                      index === activeMediaKitIndex
+                        ? 'w-8 bg-white'
+                        : 'w-2.5 bg-white/35 hover:bg-white/55'
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

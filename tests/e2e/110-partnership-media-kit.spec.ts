@@ -11,7 +11,7 @@ async function dismissAnnouncementIfVisible(page: Page) {
 }
 
 test.describe('Partnership media kit page', () => {
-  test('expands media kit on demand and shows updated footer section titles', async ({ page }) => {
+  test('opens the media kit in a modal carousel and keeps updated footer section titles', async ({ page }) => {
     await page.addInitScript((storageKey) => {
       window.localStorage.setItem(storageKey, '1');
       window.localStorage.setItem('app_lang', 'ko');
@@ -26,14 +26,22 @@ test.describe('Partnership media kit page', () => {
     ).toBeVisible({ timeout: 15000 });
 
     await expect(page.getByTestId('partnership-media-kit')).toBeVisible();
-    await expect(page.getByTestId('partnership-media-kit-toggle')).toHaveText('미디어 킷 펼쳐보기');
+    await expect(page.getByTestId('partnership-media-kit-toggle')).toHaveText('미디어 킷 보기');
     await expect(page.locator('[data-testid^="partnership-media-kit-card-"]')).toHaveCount(0);
 
     await page.getByTestId('partnership-media-kit-toggle').click();
 
-    await expect(page.getByTestId('partnership-media-kit-toggle')).toHaveText('미디어 킷 접기');
-    await expect(page.getByTestId('partnership-media-kit-panel')).toBeVisible();
-    await expect(page.locator('[data-testid^="partnership-media-kit-card-"]')).toHaveCount(7);
+    await expect(page.getByTestId('partnership-media-kit-modal')).toBeVisible();
+    await expect(page.getByTestId('partnership-media-kit-counter')).toHaveText('1 / 7');
+    await expect(page.getByTestId('partnership-media-kit-slide-1')).toBeVisible();
+
+    await page.getByTestId('partnership-media-kit-next').click();
+
+    await expect(page.getByTestId('partnership-media-kit-counter')).toHaveText('2 / 7');
+    await expect(page.getByTestId('partnership-media-kit-slide-2')).toBeVisible();
+
+    await page.getByTestId('partnership-media-kit-close').click();
+    await expect(page.getByTestId('partnership-media-kit-modal')).toHaveCount(0);
 
     await expect(page.getByTestId('footer-column-title-support')).toHaveText('로컬리');
     await expect(page.getByTestId('footer-column-title-locally')).toHaveText('지원');
