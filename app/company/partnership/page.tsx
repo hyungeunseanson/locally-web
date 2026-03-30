@@ -16,6 +16,8 @@ const COPY: Record<Locale, {
   mediaKitTitle: string;
   mediaKitDesc: string;
   mediaKitNote: string;
+  mediaKitToggleOpen: string;
+  mediaKitToggleClose: string;
   mediaKitFallback: string;
   formTitle: string;
   formDesc: string;
@@ -32,8 +34,10 @@ const COPY: Record<Locale, {
     title: 'Instagram 광고 · 제휴 문의',
     description: '로컬리 인스타그램 채널 광고, 브랜드 협업, 공동 캠페인 문의를 한곳에서 확인하고 바로 문의할 수 있습니다.',
     mediaKitTitle: 'Media kit & rate card',
-    mediaKitDesc: '아래 미디어 킷과 단가표를 먼저 확인한 뒤, 집행 문의를 남겨주세요.',
-    mediaKitNote: '채널 소개서와 단가표를 순서대로 확인한 뒤 문의를 남겨주세요.',
+    mediaKitDesc: '미디어 킷과 단가표는 아래에서 편하게 펼쳐서 볼 수 있어요.',
+    mediaKitNote: '광고 문의는 아래 폼으로 남겨주시면 확인 후 연락드릴게요.',
+    mediaKitToggleOpen: '미디어 킷 펼쳐보기',
+    mediaKitToggleClose: '미디어 킷 접기',
     mediaKitFallback: '이미지 업로드 전입니다',
     formTitle: '문의 남기기',
     formDesc: '희망 채널, 예산, 진행 시기, 원하는 협업 형태를 함께 남겨주시면 더 빠르게 검토할 수 있습니다.',
@@ -52,6 +56,8 @@ const COPY: Record<Locale, {
     mediaKitTitle: 'Media kit & rate card',
     mediaKitDesc: 'Check the media kit and rate card below, then send us your inquiry.',
     mediaKitNote: 'Review the media kit and pricing slides in order before sending your inquiry.',
+    mediaKitToggleOpen: 'View media kit',
+    mediaKitToggleClose: 'Hide media kit',
     mediaKitFallback: 'Waiting for upload',
     formTitle: 'Send an inquiry',
     formDesc: 'Share your target channel, budget, timing, and preferred collaboration format for a faster review.',
@@ -70,6 +76,8 @@ const COPY: Record<Locale, {
     mediaKitTitle: 'Media kit & rate card',
     mediaKitDesc: '下のメディアキットと料金表を確認してからお問い合わせください。',
     mediaKitNote: 'メディアキットと料金表を順番に確認してからお問い合わせください。',
+    mediaKitToggleOpen: 'メディアキットを見る',
+    mediaKitToggleClose: 'メディアキットを閉じる',
     mediaKitFallback: '画像アップロード待ちです',
     formTitle: 'お問い合わせ',
     formDesc: '希望チャネル、予算、実施時期、コラボ形式を一緒に送っていただくと確認がスムーズです。',
@@ -88,6 +96,8 @@ const COPY: Record<Locale, {
     mediaKitTitle: 'Media kit & rate card',
     mediaKitDesc: '请先查看下面的媒体资料与报价，再提交合作咨询。',
     mediaKitNote: '请先按顺序查看媒体资料与报价，再提交咨询。',
+    mediaKitToggleOpen: '查看媒体资料',
+    mediaKitToggleClose: '收起媒体资料',
     mediaKitFallback: '等待上传图片',
     formTitle: '提交咨询',
     formDesc: '填写目标渠道、预算、投放时间与合作方式后，我们会更快完成初步确认。',
@@ -155,6 +165,7 @@ function MediaKitCard({
 export default function PartnershipPage() {
   const { lang } = useLanguage();
   const copy = COPY[(lang in COPY ? lang : 'ko') as Locale];
+  const [isMediaKitOpen, setIsMediaKitOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-white text-[#222222] font-sans selection:bg-black selection:text-white">
@@ -177,27 +188,44 @@ export default function PartnershipPage() {
           data-testid="partnership-media-kit"
           className="rounded-[32px] border border-slate-200 bg-slate-50 px-4 py-5 md:px-6 md:py-7"
         >
-          <div className="max-w-[760px]">
-            <h2 className="text-[24px] font-bold tracking-[-0.04em] text-[#222222] md:text-[34px]">
-              {copy.mediaKitTitle}
-            </h2>
-            <p className="mt-2 text-[14px] leading-7 text-[#666666] md:text-[16px]">
-              {copy.mediaKitDesc}
-            </p>
-            <p className="mt-3 text-[12px] leading-6 text-[#8a8a8a] md:text-[13px]">
-              {copy.mediaKitNote}
-            </p>
+          <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+            <div className="max-w-[760px]">
+              <h2 className="text-[24px] font-bold tracking-[-0.04em] text-[#222222] md:text-[34px]">
+                {copy.mediaKitTitle}
+              </h2>
+              <p className="mt-2 text-[14px] leading-7 text-[#666666] md:text-[16px]">
+                {copy.mediaKitDesc}
+              </p>
+              <p className="mt-3 text-[12px] leading-6 text-[#8a8a8a] md:text-[13px]">
+                {copy.mediaKitNote}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              data-testid="partnership-media-kit-toggle"
+              aria-expanded={isMediaKitOpen}
+              onClick={() => setIsMediaKitOpen((current) => !current)}
+              className="inline-flex h-11 items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-[13px] font-semibold text-[#222222] transition-colors hover:bg-slate-100"
+            >
+              {isMediaKitOpen ? copy.mediaKitToggleClose : copy.mediaKitToggleOpen}
+            </button>
           </div>
 
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
-            {MEDIA_KIT_SLOTS.map((slot) => (
-              <MediaKitCard
-                key={slot}
-                index={slot}
-                fallbackLabel={copy.mediaKitFallback}
-              />
-            ))}
-          </div>
+          {isMediaKitOpen && (
+            <div
+              data-testid="partnership-media-kit-panel"
+              className="mt-6 grid gap-4 md:grid-cols-2"
+            >
+              {MEDIA_KIT_SLOTS.map((slot) => (
+                <MediaKitCard
+                  key={slot}
+                  index={slot}
+                  fallbackLabel={copy.mediaKitFallback}
+                />
+              ))}
+            </div>
+          )}
         </section>
 
         <section className="rounded-[32px] border border-slate-200 bg-white px-4 py-5 md:px-6 md:py-7">

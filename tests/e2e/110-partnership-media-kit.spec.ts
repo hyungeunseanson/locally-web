@@ -11,7 +11,7 @@ async function dismissAnnouncementIfVisible(page: Page) {
 }
 
 test.describe('Partnership media kit page', () => {
-  test('shows media kit slots and updated footer section titles', async ({ page }) => {
+  test('expands media kit on demand and shows updated footer section titles', async ({ page }) => {
     await page.addInitScript((storageKey) => {
       window.localStorage.setItem(storageKey, '1');
       window.localStorage.setItem('app_lang', 'ko');
@@ -26,6 +26,13 @@ test.describe('Partnership media kit page', () => {
     ).toBeVisible({ timeout: 15000 });
 
     await expect(page.getByTestId('partnership-media-kit')).toBeVisible();
+    await expect(page.getByTestId('partnership-media-kit-toggle')).toHaveText('미디어 킷 펼쳐보기');
+    await expect(page.locator('[data-testid^="partnership-media-kit-card-"]')).toHaveCount(0);
+
+    await page.getByTestId('partnership-media-kit-toggle').click();
+
+    await expect(page.getByTestId('partnership-media-kit-toggle')).toHaveText('미디어 킷 접기');
+    await expect(page.getByTestId('partnership-media-kit-panel')).toBeVisible();
     await expect(page.locator('[data-testid^="partnership-media-kit-card-"]')).toHaveCount(7);
 
     await expect(page.getByTestId('footer-column-title-support')).toHaveText('로컬리');
