@@ -85,7 +85,7 @@ test.describe('Search desktop selection map panel', () => {
       });
     });
 
-    await page.setViewportSize({ width: 1440, height: 1100 });
+    await page.setViewportSize({ width: 1850, height: 867 });
     await page.goto('/en/search?location=tokyo&language=en&startDate=2025-05-12&endDate=2025-05-14', {
       waitUntil: 'networkidle',
     });
@@ -101,6 +101,37 @@ test.describe('Search desktop selection map panel', () => {
     await expect(page.getByTestId('search-desktop-type-chip')).toContainText('Experience type');
     await expect(page.getByTestId('search-desktop-time-chip')).toContainText('Time slot');
 
+    const layoutMetrics = await page.evaluate(() => {
+      const header = document.querySelector('header');
+      const toolbar = document.querySelector('[data-testid="search-desktop-toolbar"]');
+      const grid = toolbar?.nextElementSibling as HTMLElement | null;
+      const mapState = document.querySelector('[data-testid="search-map-empty-state"]') as HTMLElement | null;
+      const rect = (element: Element | null) => {
+        if (!element) return null;
+        const { top, bottom, left, right, width, height } = element.getBoundingClientRect();
+        return { top, bottom, left, right, width, height };
+      };
+
+      return {
+        header: rect(header),
+        toolbar: rect(toolbar),
+        gridTemplateColumns: grid ? getComputedStyle(grid).gridTemplateColumns : '',
+        mapPanel: rect(mapState?.parentElement || null),
+        viewportRight: window.innerWidth,
+      };
+    });
+
+    expect(layoutMetrics.header).not.toBeNull();
+    expect(layoutMetrics.toolbar).not.toBeNull();
+    if (layoutMetrics.header && layoutMetrics.toolbar) {
+      expect(layoutMetrics.toolbar.top - layoutMetrics.header.bottom).toBeLessThanOrEqual(16);
+    }
+    expect(layoutMetrics.gridTemplateColumns).toContain('620px');
+    expect(layoutMetrics.mapPanel).not.toBeNull();
+    if (layoutMetrics.mapPanel) {
+      expect(layoutMetrics.viewportRight - layoutMetrics.mapPanel.right).toBeLessThanOrEqual(24);
+    }
+
     await expect(page.getByTestId('search-map-empty-state')).toBeVisible();
     await expect(page.getByTestId('search-selected-experience-cta')).toBeDisabled();
     await expect(page.getByTestId('search-result-card-9002')).toHaveAttribute('data-selected', 'false');
@@ -109,6 +140,7 @@ test.describe('Search desktop selection map panel', () => {
     await expect(page.getByTestId('search-city-option-all')).toContainText('All');
     await expect(page.getByTestId('search-city-option-도쿄')).toContainText('Tokyo');
     await expect(page.getByTestId('search-city-option-오사카')).toContainText('Osaka');
+    await page.getByTestId('search-desktop-city-chip').click();
 
     const cardBoxes = await Promise.all(
       ['9001', '9002', '9003', '9004', '9005'].map(async (id) => page.getByTestId(`search-result-card-${id}`).boundingBox())

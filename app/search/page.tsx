@@ -570,7 +570,7 @@ function SearchResults() {
         </div>
       </div>
 
-      <div className="hidden md:flex pt-0 md:pt-24 pb-12 h-[calc(100vh-80px)] flex-col">
+      <div className="hidden md:flex pb-12 h-[calc(100vh-80px)] flex-col">
         <div data-testid="search-desktop-toolbar" className="px-4 md:px-5 xl:px-6 py-3 md:py-4 border-b border-slate-100 sticky top-[80px] bg-white z-40">
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0 flex flex-1 flex-wrap items-center gap-2 md:gap-3">
@@ -803,7 +803,7 @@ function SearchResults() {
           </div>
         </div>
 
-        <div className="flex flex-1 overflow-hidden lg:grid lg:grid-cols-[minmax(0,0.72fr)_460px] xl:grid-cols-[minmax(0,0.66fr)_560px] 2xl:grid-cols-[minmax(0,0.62fr)_620px]">
+        <div className="flex flex-1 w-full overflow-hidden lg:grid lg:grid-cols-[minmax(0,1fr)_460px] xl:grid-cols-[minmax(0,1fr)_560px] 2xl:grid-cols-[minmax(0,1fr)_620px]">
           <div className="min-w-0 overflow-y-auto px-4 md:px-5 xl:px-6 py-4 md:py-5 xl:py-6">
             {loading ? (
               <div className={`grid gap-3 xl:gap-4 ${desktopGridClassName}`}>
