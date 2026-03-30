@@ -10,9 +10,13 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 import { useViewMode } from '@/app/context/ViewModeContext';
+import { useAuth } from '@/app/context/AuthContext';
+import { useLocallyMembership } from '@/app/hooks/useLocallyMembership';
 
 export default function HelpCenterPage() {
   const { t, lang } = useLanguage(); // 🟢 추가
+  const { user } = useAuth();
+  const { membership, hasLocallyCare } = useLocallyMembership(user?.id);
   const supportCopy = (() => {
     if (lang === 'en') {
       return {
@@ -299,6 +303,21 @@ export default function HelpCenterPage() {
           </p>
         </div>
 
+        {membership && hasLocallyCare && (
+          <div
+            data-testid="help-member-care-strip"
+            className="mx-auto mb-8 max-w-3xl rounded-3xl border border-rose-100 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(255,247,247,1))] px-5 py-4 text-left shadow-sm md:px-6"
+          >
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-rose-400">{t('locally_care_title')}</p>
+            <h2 className="mt-2 text-[18px] font-black tracking-tight text-slate-900 md:text-xl">
+              {t('locally_care_help_strip_title')}
+            </h2>
+            <p className="mt-1 text-[13px] leading-6 text-slate-600 md:text-sm">
+              {t('locally_care_help_strip_desc')}
+            </p>
+          </div>
+        )}
+
         {/* FAQ 리스트 */}
         {filteredData.length === 0 ? (
           <div
@@ -372,7 +391,7 @@ export default function HelpCenterPage() {
               onClick={() => setHelpModalOpen(true)}
               className="bg-black text-white px-6 md:px-8 py-3 md:py-4 text-[12px] md:text-[13px] font-bold uppercase tracking-widest hover:bg-[#333] transition-colors flex items-center justify-center gap-2 md:gap-3 shadow-lg"
             >
-              <MessageCircle size={18} /> {t('btn_chat_support')}
+              <MessageCircle size={18} /> {hasLocallyCare ? t('locally_care_cta') : t('btn_chat_support')}
             </button>
             <a
               href="mailto:help@locally.com"

@@ -1,4 +1,5 @@
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
+import { notifyMembershipMilestone } from '@/app/utils/memberMilestoneNotifications';
 import { getEligibleServiceHostIds } from '@/app/utils/serviceHostNotifications';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 
@@ -103,6 +104,13 @@ export async function notifyServicePaymentOpened(params: ServicePaymentOpenedPar
       ctaLabel: '의뢰 확인하기',
     }).catch((emailError) => {
       console.error('[ServiceNotificationFlows] customer payment-open email failed:', emailError);
+    });
+
+    void notifyMembershipMilestone({
+      supabaseAdmin,
+      userId: customerId,
+    }).catch((milestoneError) => {
+      console.error('[ServiceNotificationFlows] membership milestone failed:', milestoneError);
     });
   } catch (error) {
     console.error('[ServiceNotificationFlows] payment-open side effect failed:', error);

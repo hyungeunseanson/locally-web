@@ -15,6 +15,8 @@ import { isPendingBookingStatus, isConfirmedBookingStatus, isCancelledBookingSta
 import { sendAnalyticsEvent } from '@/app/utils/analytics/client';
 import { getPublicBankInfo } from '@/app/utils/publicBankInfo';
 import { getContent } from '@/app/utils/contentHelper';
+import { useAuth } from '@/app/context/AuthContext';
+import { useLocallyMembership } from '@/app/hooks/useLocallyMembership';
 
 type BookingExperience = {
   id?: string | number;
@@ -45,6 +47,8 @@ function PaymentCompleteContent() {
   const supabase = useMemo(() => createClient(), []);
   const { showToast } = useToast();
   const { t, lang } = useLanguage();
+  const { user } = useAuth();
+  const { membership } = useLocallyMembership(user?.id);
 
   const orderId = searchParams.get('orderId');
   const [booking, setBooking] = useState<BookingData | null>(null);
@@ -240,6 +244,18 @@ function PaymentCompleteContent() {
             </Link>
           </div>
         </div>
+
+        {isConfirmedBookingStatus(booking.status || '') && membership && membership.status !== 'none' && (
+          <div className="mb-8 md:mb-10 rounded-3xl border border-rose-100 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(255,247,247,1))] p-5 text-left shadow-sm max-w-2xl mx-auto">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-rose-400">{t('membership_label')}</p>
+            <h2 className="mt-2 text-[22px] font-black tracking-tight text-slate-900 md:text-[28px]">
+              {membership.status === 'circle' ? t('membership_complete_circle_title') : t('membership_complete_member_title')}
+            </h2>
+            <p className="mt-2 text-[13px] leading-6 text-slate-600 md:text-[15px]">
+              {membership.status === 'circle' ? t('membership_complete_circle_desc') : t('membership_complete_member_desc')}
+            </p>
+          </div>
+        )}
 
         {/* 3. 액션 버튼들 */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 max-w-2xl mx-auto mb-3 md:mb-4 animate-in fade-in duration-500" style={{ animationDelay: '500ms', animationFillMode: 'both' }}>

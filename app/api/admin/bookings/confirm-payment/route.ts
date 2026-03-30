@@ -7,6 +7,7 @@ import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { isPendingBookingStatus } from '@/app/constants/bookingStatus';
 import { getBookingSettlementSnapshot } from '@/app/utils/bookingFinance';
+import { notifyMembershipMilestone } from '@/app/utils/memberMilestoneNotifications';
 
 export async function POST(request: Request) {
   try {
@@ -159,6 +160,11 @@ export async function POST(request: Request) {
           message: `'${experienceTitle}' 입금이 확인되어 예약이 확정되었습니다.`,
           link: '/guest/trips',
           ctaLabel: '내 여행 보기',
+        });
+
+        await notifyMembershipMilestone({
+          supabaseAdmin,
+          userId: booking.user_id,
         });
       }
 

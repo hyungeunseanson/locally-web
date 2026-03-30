@@ -1,4 +1,5 @@
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
+import { notifyMembershipMilestone } from '@/app/utils/memberMilestoneNotifications';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 
 type AdminClient = ReturnType<typeof createAdminClient>;
@@ -118,6 +119,13 @@ export async function notifyExperiencePaymentConfirmed(
       ctaLabel: '내 여행 보기',
     }).catch((emailError) => {
       console.error('[ExperienceNotificationFlows] guest booking email failed:', emailError);
+    });
+
+    void notifyMembershipMilestone({
+      supabaseAdmin,
+      userId: guestId,
+    }).catch((milestoneError) => {
+      console.error('[ExperienceNotificationFlows] membership milestone failed:', milestoneError);
     });
   }
 }

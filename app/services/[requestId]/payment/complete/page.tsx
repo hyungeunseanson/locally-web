@@ -7,6 +7,8 @@ import { CheckCircle, ArrowRight, Loader2, Clock, Landmark, LifeBuoy } from 'luc
 import { useLanguage } from '@/app/context/LanguageContext';
 import SiteHeader from '@/app/components/SiteHeader';
 import { getPublicBankInfo } from '@/app/utils/publicBankInfo';
+import { useAuth } from '@/app/context/AuthContext';
+import { useLocallyMembership } from '@/app/hooks/useLocallyMembership';
 
 function ServicePaymentCompleteContent() {
   const params = useParams<{ requestId: string }>();
@@ -14,6 +16,8 @@ function ServicePaymentCompleteContent() {
   const orderId = searchParams.get('orderId') ?? '';
   const isBank = searchParams.get('method') === 'bank';
   const { t } = useLanguage();
+  const { user } = useAuth();
+  const { membership } = useLocallyMembership(user?.id);
   const bankInfo = getPublicBankInfo();
   const detailHref = `/services/${params.requestId}`;
 
@@ -66,6 +70,18 @@ function ServicePaymentCompleteContent() {
           </p>
         </div>
       </div>
+
+      {!isBank && membership && membership.status !== 'none' && (
+        <div className="mx-auto mb-8 max-w-2xl rounded-3xl border border-rose-100 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(255,247,247,1))] p-5 text-left shadow-sm md:p-6">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-rose-400">{t('membership_label')}</p>
+          <h2 className="mt-2 text-[22px] font-black tracking-tight text-slate-900 md:text-[28px]">
+            {membership.status === 'circle' ? t('membership_complete_circle_title') : t('membership_complete_member_title')}
+          </h2>
+          <p className="mt-2 text-[13px] leading-6 text-slate-600 md:text-[15px]">
+            {membership.status === 'circle' ? t('membership_complete_circle_desc') : t('membership_complete_member_desc')}
+          </p>
+        </div>
+      )}
 
       <div className="mx-auto mb-3 grid max-w-2xl grid-cols-1 gap-3 md:grid-cols-2">
         <Link href={detailHref} className="flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-5 py-3.5 text-[14px] md:text-base font-black text-white transition-colors hover:bg-slate-800">

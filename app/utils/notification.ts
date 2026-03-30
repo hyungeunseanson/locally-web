@@ -1,5 +1,7 @@
 // app/utils/notification.ts
 export type NotificationType =
+  | 'member_welcome'
+  | 'circle_welcome'
   | 'booking_request'
   | 'booking_confirmed'
   | 'booking_cancelled'

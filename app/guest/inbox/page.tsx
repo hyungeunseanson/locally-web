@@ -14,6 +14,8 @@ import { detectChatPolicySignals } from '@/app/utils/chatPolicySignals';
 import { isAdminSupportInquiry, isDeletedInquiryMessage } from '@/app/utils/inquiry';
 import { createClient } from '@/app/utils/supabase/client';
 import { getHostPublicProfile } from '@/app/utils/profile';
+import { useAuth } from '@/app/context/AuthContext';
+import { useLocallyMembership } from '@/app/hooks/useLocallyMembership';
 
 const ADMIN_SUPPORT_AVATAR_SRC = '/images/logos/Frame%201545423142.png';
 const CHAT_POLICY_WARNING_COPY = {
@@ -37,6 +39,8 @@ const CHAT_POLICY_WARNING_COPY = {
 
 function InboxContent() {
   const { t, lang } = useLanguage(); // 🟢 lang 추가 필수!
+  const { user } = useAuth();
+  const { membership, hasLocallyCare } = useLocallyMembership(user?.id);
   const {
     inquiries,
     selectedInquiry,
@@ -377,6 +381,16 @@ function InboxContent() {
           <div className="hidden md:flex items-center px-5 py-4 border-b border-slate-100 bg-white shrink-0">
             <span className="font-bold text-[16px] text-slate-800">{t('msg_list')}</span>
           </div>
+
+          {membership && hasLocallyCare && (
+            <div
+              data-testid="guest-inbox-member-care-strip"
+              className="shrink-0 border-b border-rose-100 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(255,247,247,1))] px-4 py-3 md:px-5"
+            >
+              <p className="text-[11px] font-bold text-slate-900 md:text-[12px]">{t('locally_care_inbox_strip_title')}</p>
+              <p className="mt-1 text-[11px] leading-5 text-slate-500">{t('locally_care_inbox_strip_desc')}</p>
+            </div>
+          )}
 
           <div
             data-testid="guest-inbox-guidance-strip"
