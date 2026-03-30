@@ -56,6 +56,10 @@ test.describe('Home landing ingress guidance', () => {
           name: /검색 결과 전체 보기|View full search results|検索結果をすべて見る|查看完整搜索结果/,
         })
       ).toBeVisible();
+      const aboutLink = page.getByTestId('home-experience-about-link');
+      await expect(aboutLink).toBeVisible();
+      await expect(aboutLink).toHaveText(/로컬리 소개|About Locally|Locallyについて|关于 Locally/);
+      await expect(aboutLink).toHaveAttribute('href', '/about');
     }
 
     await page.goto('/', { waitUntil: 'networkidle' });
