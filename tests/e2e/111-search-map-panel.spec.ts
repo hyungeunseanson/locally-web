@@ -145,17 +145,16 @@ test.describe('Search desktop selection map panel', () => {
     await page.getByTestId('search-desktop-city-chip').click();
 
     const cardBoxes = await Promise.all(
-      ['9001', '9002', '9003', '9004', '9005', '9006'].map(async (id) => page.getByTestId(`search-result-card-${id}`).boundingBox())
+      ['9001', '9002', '9003', '9004', '9005'].map(async (id) => page.getByTestId(`search-result-card-${id}`).boundingBox())
     );
     for (const box of cardBoxes) {
       expect(box).not.toBeNull();
     }
-    const [card1, card2, card3, card4, card5, card6] = cardBoxes as NonNullable<(typeof cardBoxes)[number]>[];
+    const [card1, card2, card3, card4, card5] = cardBoxes as NonNullable<(typeof cardBoxes)[number]>[];
     expect(Math.abs(card1.y - card2.y)).toBeLessThanOrEqual(8);
     expect(Math.abs(card1.y - card3.y)).toBeLessThanOrEqual(8);
     expect(Math.abs(card1.y - card4.y)).toBeLessThanOrEqual(8);
-    expect(Math.abs(card1.y - card5.y)).toBeLessThanOrEqual(8);
-    expect(Math.abs(card1.y - card6.y)).toBeLessThanOrEqual(8);
+    expect(card5.y - card1.y).toBeGreaterThan(24);
 
     await page.evaluate(() => window.scrollTo(0, 500));
     await page.waitForTimeout(100);

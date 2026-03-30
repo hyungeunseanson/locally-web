@@ -398,7 +398,7 @@ function SearchResults() {
   const activeMapExternalUrl = activeMapQuery
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activeMapQuery)}`
     : '';
-  const desktopGridClassName = 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6';
+  const desktopGridClassName = 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-4';
 
   const renderMobileCard = (item: SearchExperience) => {
     const imageUrl =
