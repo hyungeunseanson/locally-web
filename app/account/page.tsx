@@ -14,6 +14,7 @@ import HostModeTransition from '@/app/components/mobile/HostModeTransition';
 import MobileLanguageSwitcher from '@/app/components/mobile/MobileLanguageSwitcher';
 import { usePendingNavigation } from '@/app/hooks/usePendingNavigation';
 import { useLocallyMembership } from '@/app/hooks/useLocallyMembership';
+import LocallyMembershipInfoTrigger from '@/app/components/LocallyMembershipInfoTrigger';
 import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
 import { PROFILE_LANGUAGE_OPTIONS } from '@/app/constants/profile';
 import { getProfileCompletion, normalizeLanguageList, normalizeProfileLanguageValue } from '@/app/utils/profile';
@@ -190,6 +191,7 @@ export default function AccountPage() {
     const title = isCircle ? t('locally_circle') : t('locally_member');
     const description = isCircle ? t('membership_circle_desc') : t('membership_member_desc');
     const nextStep = isCircle ? t('membership_next_circle') : t('membership_next_member');
+    const infoDescription = isCircle ? t('membership_circle_info_desc') : t('membership_member_info_desc');
 
     return (
       <section
@@ -199,7 +201,14 @@ export default function AccountPage() {
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0">
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-rose-400">{t('membership_label')}</p>
-            <h2 className="mt-2 text-[20px] font-black tracking-tight text-slate-900 md:text-2xl">{title}</h2>
+            <div className="mt-2 flex items-center gap-2">
+              <h2 className="text-[20px] font-black tracking-tight text-slate-900 md:text-2xl">{title}</h2>
+              <LocallyMembershipInfoTrigger
+                testIdPrefix="account-membership-info"
+                ariaLabel={t('membership_info_aria') as string}
+                description={infoDescription}
+              />
+            </div>
             <p className="mt-1 text-[13px] leading-6 text-slate-600 md:text-sm">{description}</p>
           </div>
           <button

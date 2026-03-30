@@ -245,6 +245,14 @@ async function login(page: Page, user: TestUser) {
   }
 }
 
+async function dismissAnnouncementIfVisible(page: Page) {
+  const announcement = page.getByTestId('global-site-announcement-modal');
+  if (await announcement.count()) {
+    await page.getByTestId('global-site-announcement-primary').click({ force: true });
+    await expect(announcement).toHaveCount(0);
+  }
+}
+
 test.afterAll(async () => {
   const supabase = getAdminClient();
 
@@ -290,22 +298,32 @@ test.describe.serial('locally membership care experience', () => {
     await login(page, guest);
 
     await page.goto(`/experiences/${experienceId}/payment/complete?orderId=${bookingId}`, { waitUntil: 'domcontentloaded' });
+    await dismissAnnouncementIfVisible(page);
     await expect(page.getByText('이제 Locally Member입니다')).toBeVisible();
 
     await page.goto('/account', { waitUntil: 'domcontentloaded' });
-    const membershipCard = page.getByTestId('account-membership-card').first();
+    await dismissAnnouncementIfVisible(page);
+    const membershipCard = page.locator('[data-testid="account-membership-card"]:visible').first();
     await expect(membershipCard).toContainText('로컬리 회원');
     await expect(membershipCard).toContainText('한 번 더 함께하면 Locally Circle이 됩니다.');
+    await membershipCard.getByTestId('account-membership-info-trigger').dispatchEvent('click');
+    await expect(membershipCard.getByTestId('account-membership-info-panel')).toContainText('첫 구매 후 바로 시작되는 기본 멤버 혜택이에요.');
+    await expect(membershipCard.getByTestId('account-membership-info-panel')).toContainText('여행 관련 안내를 더 쉽게 받고, 로컬리 전용 도움을 이용할 수 있어요.');
 
     await page.goto('/guest/trips', { waitUntil: 'domcontentloaded' });
+    await dismissAnnouncementIfVisible(page);
     await expect(page.getByTestId('guest-trips-membership-banner')).toContainText('Locally Care');
     await expect(page.getByRole('link', { name: 'Locally Care로 문의하기' })).toHaveAttribute('href', '/help');
+    await page.getByTestId('guest-trips-membership-info-trigger').dispatchEvent('click');
+    await expect(page.getByTestId('guest-trips-membership-info-panel')).toContainText('첫 구매 후 바로 시작되는 기본 멤버 혜택이에요.');
 
     await page.goto('/help', { waitUntil: 'domcontentloaded' });
+    await dismissAnnouncementIfVisible(page);
     await expect(page.getByTestId('help-member-care-strip')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Locally Care로 문의하기' })).toBeVisible();
 
     await page.goto('/guest/inbox', { waitUntil: 'domcontentloaded' });
+    await dismissAnnouncementIfVisible(page);
     await expect(page.getByTestId('guest-inbox-member-care-strip')).toBeVisible();
   });
 
@@ -329,11 +347,16 @@ test.describe.serial('locally membership care experience', () => {
     await login(page, guest);
 
     await page.goto('/account', { waitUntil: 'domcontentloaded' });
-    const membershipCard = page.getByTestId('account-membership-card').first();
+    await dismissAnnouncementIfVisible(page);
+    const membershipCard = page.locator('[data-testid="account-membership-card"]:visible').first();
     await expect(membershipCard).toContainText('Locally Circle');
     await expect(membershipCard).toContainText('지금은 Locally Circle 케어가 열려 있어요.');
+    await membershipCard.getByTestId('account-membership-info-trigger').dispatchEvent('click');
+    await expect(membershipCard.getByTestId('account-membership-info-panel')).toContainText('재구매 게스트에게 주어지는 특별 혜택이에요.');
+    await expect(membershipCard.getByTestId('account-membership-info-panel')).toContainText('일반 게스트보다 먼저 안내받고, 더 빠르게 도움을 받을 수 있어요.');
 
     await page.goto('/services/demo-request/payment/complete?orderId=MEMBERSHIP-CIRCLE', { waitUntil: 'domcontentloaded' });
+    await dismissAnnouncementIfVisible(page);
     await expect(page.getByText('다시 오셨네요, 이제 Locally Circle입니다')).toBeVisible();
   });
 });
