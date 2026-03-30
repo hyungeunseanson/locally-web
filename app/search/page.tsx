@@ -398,7 +398,7 @@ function SearchResults() {
   const activeMapExternalUrl = activeMapQuery
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activeMapQuery)}`
     : '';
-  const desktopGridClassName = 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4';
+  const desktopGridClassName = 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6';
 
   const renderMobileCard = (item: SearchExperience) => {
     const imageUrl =
@@ -570,8 +570,8 @@ function SearchResults() {
         </div>
       </div>
 
-      <div className="hidden md:flex pb-12 h-[calc(100vh-80px)] flex-col">
-        <div data-testid="search-desktop-toolbar" className="px-4 md:px-5 xl:px-6 py-3 md:py-4 border-b border-slate-100 sticky top-[80px] bg-white z-40">
+      <div className="hidden md:flex pb-12 flex-col">
+        <div data-testid="search-desktop-toolbar" className="px-5 md:px-6 xl:px-8 2xl:px-10 py-3 md:py-4 border-b border-slate-100 bg-white">
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0 flex flex-1 flex-wrap items-center gap-2 md:gap-3">
               {desktopSummaryPills.map((pill) => (
@@ -803,8 +803,8 @@ function SearchResults() {
           </div>
         </div>
 
-        <div className="flex flex-1 w-full overflow-hidden lg:grid lg:grid-cols-[minmax(0,1fr)_460px] xl:grid-cols-[minmax(0,1fr)_560px] 2xl:grid-cols-[minmax(0,1fr)_620px]">
-          <div className="min-w-0 overflow-y-auto px-4 md:px-5 xl:px-6 py-4 md:py-5 xl:py-6">
+        <div className="w-full px-5 md:px-6 xl:px-8 2xl:px-10 py-4 md:py-5 xl:py-6 lg:grid lg:grid-cols-[minmax(0,1fr)_520px] xl:grid-cols-[minmax(0,1fr)_620px] 2xl:grid-cols-[minmax(0,1fr)_700px] lg:gap-6 xl:gap-8 lg:items-start">
+          <div className="min-w-0">
             {loading ? (
               <div className={`grid gap-3 xl:gap-4 ${desktopGridClassName}`}>
                 {[1, 2, 3, 4, 5, 6].map((i) => (
@@ -838,7 +838,7 @@ function SearchResults() {
               </div>
             ) : (
               <div className="space-y-5">
-                <div data-testid="search-flow-hint" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                <div data-testid="search-flow-hint" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5">
                   <p className="text-sm font-black text-slate-900">{t('search_flow_hint_title')}</p>
                   <p className="mt-1 text-xs leading-relaxed text-slate-600">{t('search_flow_hint_desc')}</p>
                 </div>
@@ -848,7 +848,7 @@ function SearchResults() {
                       key={item.id}
                       data-testid={`search-result-card-${item.id}`}
                       data-selected={selectedExperienceId === String(item.id) ? 'true' : 'false'}
-                      className={`animate-in fade-in duration-500 rounded-2xl transition-all ${
+                      className={`animate-in fade-in duration-500 rounded-2xl transition-all [&>a>div:first-child]:aspect-[4/4.45] ${
                         selectedExperienceId === String(item.id)
                           ? 'ring-2 ring-slate-900/70 shadow-[0_14px_36px_rgba(15,23,42,0.12)]'
                           : 'shadow-none'
@@ -863,12 +863,9 @@ function SearchResults() {
                 </div>
               </div>
             )}
-            <div className="mt-12">
-              <SiteFooter />
-            </div>
           </div>
 
-          <div className="hidden lg:flex h-full border-l border-slate-200 bg-white">
+          <div className="hidden lg:flex self-start lg:sticky lg:top-[104px] h-[calc(100vh-128px)] rounded-[28px] border border-slate-200 bg-white overflow-hidden">
             {selectedExperience && activeMapEmbedUrl ? (
               <div data-testid="search-map-panel" className="flex h-full w-full flex-col bg-white">
                 <div className="border-b border-slate-200 px-5 py-5 xl:px-6">
@@ -910,7 +907,7 @@ function SearchResults() {
                 <div className="flex flex-1 items-center justify-center px-5 pb-6 pt-5 xl:px-6">
                   <div
                     data-testid="search-map-frame"
-                    className="relative aspect-square w-full max-w-[360px] overflow-hidden rounded-[28px] border border-slate-200 bg-slate-100 shadow-[0_18px_50px_rgba(15,23,42,0.10)] xl:max-w-[420px] 2xl:max-w-[460px]"
+                    className="relative aspect-square w-full max-w-[380px] overflow-hidden rounded-[28px] border border-slate-200 bg-slate-100 shadow-[0_18px_50px_rgba(15,23,42,0.10)] xl:max-w-[450px] 2xl:max-w-[500px]"
                   >
                     <iframe
                       data-testid="search-map-iframe"
@@ -937,6 +934,10 @@ function SearchResults() {
               </div>
             )}
           </div>
+        </div>
+
+        <div className="px-5 md:px-6 xl:px-8 2xl:px-10 pt-4">
+          <SiteFooter />
         </div>
       </div>
 

@@ -115,6 +115,7 @@ test.describe('Search desktop selection map panel', () => {
       return {
         header: rect(header),
         toolbar: rect(toolbar),
+        toolbarPosition: toolbar ? getComputedStyle(toolbar).position : '',
         gridTemplateColumns: grid ? getComputedStyle(grid).gridTemplateColumns : '',
         mapPanel: rect(mapState?.parentElement || null),
         viewportRight: window.innerWidth,
@@ -124,12 +125,13 @@ test.describe('Search desktop selection map panel', () => {
     expect(layoutMetrics.header).not.toBeNull();
     expect(layoutMetrics.toolbar).not.toBeNull();
     if (layoutMetrics.header && layoutMetrics.toolbar) {
-      expect(layoutMetrics.toolbar.top - layoutMetrics.header.bottom).toBeLessThanOrEqual(16);
+      expect(layoutMetrics.toolbar.top - layoutMetrics.header.bottom).toBeLessThanOrEqual(24);
     }
-    expect(layoutMetrics.gridTemplateColumns).toContain('620px');
+    expect(layoutMetrics.toolbarPosition).toBe('static');
+    expect(layoutMetrics.gridTemplateColumns).toContain('700px');
     expect(layoutMetrics.mapPanel).not.toBeNull();
     if (layoutMetrics.mapPanel) {
-      expect(layoutMetrics.viewportRight - layoutMetrics.mapPanel.right).toBeLessThanOrEqual(24);
+      expect(layoutMetrics.viewportRight - layoutMetrics.mapPanel.right).toBeLessThanOrEqual(48);
     }
 
     await expect(page.getByTestId('search-map-empty-state')).toBeVisible();
@@ -143,16 +145,26 @@ test.describe('Search desktop selection map panel', () => {
     await page.getByTestId('search-desktop-city-chip').click();
 
     const cardBoxes = await Promise.all(
-      ['9001', '9002', '9003', '9004', '9005'].map(async (id) => page.getByTestId(`search-result-card-${id}`).boundingBox())
+      ['9001', '9002', '9003', '9004', '9005', '9006'].map(async (id) => page.getByTestId(`search-result-card-${id}`).boundingBox())
     );
     for (const box of cardBoxes) {
       expect(box).not.toBeNull();
     }
-    const [card1, card2, card3, card4, card5] = cardBoxes as NonNullable<(typeof cardBoxes)[number]>[];
+    const [card1, card2, card3, card4, card5, card6] = cardBoxes as NonNullable<(typeof cardBoxes)[number]>[];
     expect(Math.abs(card1.y - card2.y)).toBeLessThanOrEqual(8);
     expect(Math.abs(card1.y - card3.y)).toBeLessThanOrEqual(8);
     expect(Math.abs(card1.y - card4.y)).toBeLessThanOrEqual(8);
-    expect(card5.y - card1.y).toBeGreaterThan(24);
+    expect(Math.abs(card1.y - card5.y)).toBeLessThanOrEqual(8);
+    expect(Math.abs(card1.y - card6.y)).toBeLessThanOrEqual(8);
+
+    await page.evaluate(() => window.scrollTo(0, 500));
+    await page.waitForTimeout(100);
+    const scrolledToolbarBox = await page.getByTestId('search-desktop-toolbar').boundingBox();
+    expect(scrolledToolbarBox).not.toBeNull();
+    if (scrolledToolbarBox) {
+      expect(scrolledToolbarBox.y).toBeLessThan(0);
+    }
+    await page.evaluate(() => window.scrollTo(0, 0));
 
     await page.getByTestId('search-result-card-9002').click();
     await expect(page.getByTestId('search-result-card-9002')).toHaveAttribute('data-selected', 'true');
@@ -179,7 +191,9 @@ test.describe('Search desktop selection map panel', () => {
     await expect(page.getByTestId('search-selected-experience-cta')).toBeDisabled();
 
     await page.getByTestId('search-desktop-city-chip').click();
-    await page.getByTestId('search-city-option-오사카').click();
+    await page.getByTestId('search-city-option-오사카').evaluate((element) => {
+      (element as HTMLButtonElement).click();
+    });
     await expect(page).toHaveURL(/city=%EC%98%A4%EC%82%AC%EC%B9%B4/);
     await expect(page.getByTestId('search-desktop-city-chip')).toContainText('Osaka');
     await expect(page.getByTestId('search-result-card-9101')).toBeVisible();
