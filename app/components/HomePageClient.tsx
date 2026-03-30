@@ -124,9 +124,9 @@ export default function HomePageClient() {
           {activeTab === 'experience' ? (
             <div
               data-testid="home-experience-ingress-hint"
-              className="rounded-[18px] border border-slate-200 bg-white/95 px-4 py-3 text-slate-900 shadow-[0_4px_14px_rgba(15,23,42,0.05)] md:mx-auto md:flex md:max-w-[940px] md:items-center md:justify-between md:gap-4 md:rounded-[20px] md:bg-white/90 md:px-5"
+              className="rounded-[18px] border border-slate-200 bg-white/95 px-4 py-3 text-slate-900 shadow-[0_4px_14px_rgba(15,23,42,0.05)] md:mx-auto md:flex md:max-w-[1100px] md:items-center md:justify-between md:gap-4 md:rounded-[20px] md:bg-white/90 md:px-5"
             >
-              <div className="md:max-w-[520px]">
+              <div className="md:max-w-[620px]">
                 <p className="text-[12px] font-semibold tracking-[-0.01em] md:text-[14px]">
                   {t('home_exp_ingress_title')}
                 </p>
