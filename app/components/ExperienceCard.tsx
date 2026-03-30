@@ -3,10 +3,26 @@
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Heart, Star } from 'lucide-react';
+import {
+  Heart,
+  Star,
+  Utensils,
+  Coffee,
+  TreePine,
+  ShoppingBag,
+  Landmark,
+  Dumbbell,
+  MoonStar,
+  Building2,
+  Ticket,
+  Flag,
+  Palette,
+  Sparkles,
+} from 'lucide-react';
 import { useWishlist } from '@/app/hooks/useWishlist';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { getContent } from '@/app/utils/contentHelper';
+import { CATEGORY_OPTIONS } from '@/app/host/create/config';
 import { formatLocalizedExperienceLocation } from '@/app/utils/locationLocalization';
 import { getExperienceLanguageBadges, getExperiencePriceParts } from '@/app/utils/experienceCardDisplay';
 
@@ -32,7 +48,52 @@ type ExperienceCardData = {
   price?: number | string | null;
 };
 
-export default function ExperienceCard({ data }: { data: ExperienceCardData }) {
+function renderCategoryIcon(categoryLabel: string) {
+  const normalizedLabel = categoryLabel.trim().toLowerCase();
+  const matchedOption = CATEGORY_OPTIONS.find((option) => {
+    const labels = Object.values(option.labels).map((label) => label.trim().toLowerCase());
+    return option.value.trim().toLowerCase() === normalizedLabel || labels.includes(normalizedLabel);
+  });
+
+  if (!matchedOption) {
+    return <Sparkles size={11} strokeWidth={2.1} className="shrink-0 text-[#4A4A4A] md:h-[12px] md:w-[12px]" />;
+  }
+
+  switch (matchedOption.icon) {
+    case 'utensils':
+      return <Utensils size={11} strokeWidth={2.1} className="shrink-0 text-[#4A4A4A] md:h-[12px] md:w-[12px]" />;
+    case 'coffee':
+      return <Coffee size={11} strokeWidth={2.1} className="shrink-0 text-[#4A4A4A] md:h-[12px] md:w-[12px]" />;
+    case 'treePine':
+      return <TreePine size={11} strokeWidth={2.1} className="shrink-0 text-[#4A4A4A] md:h-[12px] md:w-[12px]" />;
+    case 'shoppingBag':
+      return <ShoppingBag size={11} strokeWidth={2.1} className="shrink-0 text-[#4A4A4A] md:h-[12px] md:w-[12px]" />;
+    case 'landmark':
+      return <Landmark size={11} strokeWidth={2.1} className="shrink-0 text-[#4A4A4A] md:h-[12px] md:w-[12px]" />;
+    case 'dumbbell':
+      return <Dumbbell size={11} strokeWidth={2.1} className="shrink-0 text-[#4A4A4A] md:h-[12px] md:w-[12px]" />;
+    case 'moonStar':
+      return <MoonStar size={11} strokeWidth={2.1} className="shrink-0 text-[#4A4A4A] md:h-[12px] md:w-[12px]" />;
+    case 'building2':
+      return <Building2 size={11} strokeWidth={2.1} className="shrink-0 text-[#4A4A4A] md:h-[12px] md:w-[12px]" />;
+    case 'ticket':
+      return <Ticket size={11} strokeWidth={2.1} className="shrink-0 text-[#4A4A4A] md:h-[12px] md:w-[12px]" />;
+    case 'flag':
+      return <Flag size={11} strokeWidth={2.1} className="shrink-0 text-[#4A4A4A] md:h-[12px] md:w-[12px]" />;
+    case 'palette':
+      return <Palette size={11} strokeWidth={2.1} className="shrink-0 text-[#4A4A4A] md:h-[12px] md:w-[12px]" />;
+    default:
+      return <Sparkles size={11} strokeWidth={2.1} className="shrink-0 text-[#4A4A4A] md:h-[12px] md:w-[12px]" />;
+  }
+}
+
+export default function ExperienceCard({
+  data,
+  showImageCategoryBadge = false,
+}: {
+  data: ExperienceCardData;
+  showImageCategoryBadge?: boolean;
+}) {
   const { isSaved, toggleWishlist, isLoading } = useWishlist(String(data.id));
   const { lang, t } = useLanguage();
 
@@ -63,6 +124,18 @@ export default function ExperienceCard({ data }: { data: ExperienceCardData }) {
           className="object-cover transition-transform duration-700 ease-out group-hover:scale-110"
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
         />
+
+        {showImageCategoryBadge ? (
+          <div
+            data-testid="experience-card-category-badge"
+            className="absolute left-3 top-3 z-10 max-w-[70%] rounded-full bg-white px-3 py-[5px] text-[10px] font-semibold tracking-[-0.01em] text-[#2B2B2B] shadow-[0_2px_6px_rgba(0,0,0,0.08)]"
+          >
+            <span className="flex items-center gap-1.5">
+              {renderCategoryIcon(String(category))}
+              <span className="block truncate">{category}</span>
+            </span>
+          </div>
+        ) : null}
 
         {/* ❤️ 하트 버튼 (우측 상단 고정 원본 복구) */}
         <button
@@ -107,7 +180,9 @@ export default function ExperienceCard({ data }: { data: ExperienceCardData }) {
                 </span>
               )}
             </div>
-            <p className="mt-0.5 text-[10px] md:text-[13px] text-slate-500 truncate">{category}</p>
+            {!showImageCategoryBadge ? (
+              <p className="mt-0.5 text-[10px] md:text-[13px] text-slate-500 truncate">{category}</p>
+            ) : null}
           </div>
           <div className="flex items-center gap-0.5 md:gap-1 text-[11px] md:text-sm shrink-0">
             <Star size={11} className="md:w-[14px] md:h-[14px]" fill={rating > 0 ? "black" : "none"} />

@@ -137,6 +137,9 @@ test.describe('Search desktop selection map panel', () => {
     await expect(page.getByTestId('search-map-empty-state')).toBeVisible();
     await expect(page.getByTestId('search-selected-experience-cta')).toBeDisabled();
     await expect(page.getByTestId('search-result-card-9002')).toHaveAttribute('data-selected', 'false');
+    await expect(
+      page.getByTestId('search-result-card-9002').getByTestId('experience-card-category-badge')
+    ).toContainText('Cafe & Dessert');
 
     await page.getByTestId('search-desktop-city-chip').click();
     await expect(page.getByTestId('search-city-option-all')).toContainText('All');
