@@ -1,12 +1,14 @@
 'use client';
 
 import Image from 'next/image';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useModalClose } from '@/app/hooks/useModalClose';
 import { User, X, Star, Globe, Smile, MessageCircle, Briefcase, Users } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { formatGenderLabel, normalizeLanguageList, normalizeProfileLanguageValue } from '@/app/utils/profile';
+import type { LocallyMembershipStatus } from '@/app/utils/memberStatus';
+import HostGuestMembershipBadge from './HostGuestMembershipBadge';
 
 interface GuestModalProfile {
   id: string | number;
@@ -35,6 +37,7 @@ interface GuestReview {
 
 interface Props {
   guest: GuestModalProfile | null;
+  membershipStatus?: LocallyMembershipStatus;
   onClose: () => void;
 }
 
@@ -70,7 +73,7 @@ function toFlagEmoji(nationality: string): string {
     .join('');
 }
 
-export default function GuestProfileModal({ guest, onClose }: Props) {
+export default function GuestProfileModal({ guest, membershipStatus = 'none', onClose }: Props) {
   const { visible, closing, requestClose } = useModalClose(!!guest, onClose);
   const { t, lang } = useLanguage();
   // [Fix] supabase 인스턴스를 ref로 안정화 — 매 렌더마다 새 객체가 생성되어 useEffect가 반복 실행되는 버그 방지
@@ -119,6 +122,13 @@ export default function GuestProfileModal({ guest, onClose }: Props) {
   const languageDisplay = languages.length > 0
     ? languages.map((lang: string) => t(`lang_${normalizeProfileLanguageValue(lang)}`)).join(', ')
     : null;
+  const showMembershipBadge = membershipStatus === 'member' || membershipStatus === 'circle';
+  const membershipDescription =
+    membershipStatus === 'circle'
+      ? t('host_guest_membership_circle_desc')
+      : membershipStatus === 'member'
+        ? t('host_guest_membership_member_desc')
+        : null;
 
   // 2×2 attribute grid items — only render non-empty ones
   const gridItems = [
@@ -171,6 +181,13 @@ export default function GuestProfileModal({ guest, onClose }: Props) {
                 <span className="rounded-full bg-neutral-900 px-2 py-0.5 text-[10px] md:text-[11px] font-bold text-white">
                   {t('tab_guest').split(' ')[0]}
                 </span>
+                {showMembershipBadge && (
+                  <HostGuestMembershipBadge
+                    testId="guest-profile-membership-badge"
+                    status={membershipStatus as Extract<LocallyMembershipStatus, 'member' | 'circle'>}
+                    className="bg-white/90"
+                  />
+                )}
                 <span className="text-[10px] md:text-[12px] font-medium text-slate-400">
                   {joinedAt}
                 </span>
@@ -183,6 +200,14 @@ export default function GuestProfileModal({ guest, onClose }: Props) {
                   </span>
                 )}
               </h2>
+              {membershipDescription && (
+                <p
+                  data-testid="guest-profile-membership-desc"
+                  className="mt-2 text-[12px] font-medium text-slate-500 md:text-[13px]"
+                >
+                  {membershipDescription}
+                </p>
+              )}
             </div>
           </div>
         </div>

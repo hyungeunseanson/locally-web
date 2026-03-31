@@ -209,7 +209,7 @@ async function createBooking(params: {
   guestId: string;
   guest: TestUser;
   experienceId: number;
-  status: 'PAID' | 'cancellation_requested';
+  status: 'PAID' | 'PENDING' | 'cancellation_requested';
   daysOffset: number;
   cancelReason?: string;
 }) {
@@ -297,6 +297,14 @@ async function login(page: Page, user: TestUser) {
   await page.waitForLoadState('networkidle');
 }
 
+async function dismissAnnouncementIfVisible(page: Page) {
+  const announcement = page.getByTestId('global-site-announcement-modal');
+  if (await announcement.count()) {
+    await page.getByTestId('global-site-announcement-primary').click({ force: true });
+    await expect(announcement).toHaveCount(0);
+  }
+}
+
 test.afterAll(async () => {
   const supabase = getAdminClient();
 
@@ -330,17 +338,29 @@ test.describe.serial('Host dashboard reservations and inquiries UI coverage', ()
     test.setTimeout(90000);
 
     const host = createUser('host-reservations');
-    const guest = createUser('guest-profile');
+    const memberGuest = createUser('guest-member');
+    const circleGuest = createUser('guest-circle');
+    const pendingGuest = createUser('guest-pending');
     const cancellingGuest = createUser('guest-cancel');
 
     const hostId = await createAuthUser(host);
-    const guestId = await createAuthUser(guest);
+    const memberGuestId = await createAuthUser(memberGuest);
+    const circleGuestId = await createAuthUser(circleGuest);
+    const pendingGuestId = await createAuthUser(pendingGuest);
     const cancellingGuestId = await createAuthUser(cancellingGuest);
 
     await createApprovedHostApplication(hostId, host);
-    await seedGuestProfile(guestId, guest, {
+    await seedGuestProfile(memberGuestId, memberGuest, {
       job: 'Product Designer',
-      introduction: '예약 카드 프로필 모달 검증용 자기소개입니다.',
+      introduction: 'Locally Member 예약 카드 프로필 모달 검증용 자기소개입니다.',
+    });
+    await seedGuestProfile(circleGuestId, circleGuest, {
+      job: 'Photographer',
+      introduction: 'Locally Circle 예약 카드 프로필 모달 검증용 자기소개입니다.',
+    });
+    await seedGuestProfile(pendingGuestId, pendingGuest, {
+      job: 'Planner',
+      introduction: '멤버십 배지가 없어야 하는 게스트 소개입니다.',
     });
     await seedGuestProfile(cancellingGuestId, cancellingGuest, {
       job: 'Marketer',
@@ -348,12 +368,33 @@ test.describe.serial('Host dashboard reservations and inquiries UI coverage', ()
     });
 
     const experience = await createExperienceFixture(hostId);
-    const paidBookingId = await createBooking({
-      guestId,
-      guest,
+    const memberBookingId = await createBooking({
+      guestId: memberGuestId,
+      guest: memberGuest,
       experienceId: experience.id,
       status: 'PAID',
       daysOffset: 5,
+    });
+    await createBooking({
+      guestId: circleGuestId,
+      guest: circleGuest,
+      experienceId: experience.id,
+      status: 'PAID',
+      daysOffset: -2,
+    });
+    const circleBookingId = await createBooking({
+      guestId: circleGuestId,
+      guest: circleGuest,
+      experienceId: experience.id,
+      status: 'PAID',
+      daysOffset: 7,
+    });
+    const pendingBookingId = await createBooking({
+      guestId: pendingGuestId,
+      guest: pendingGuest,
+      experienceId: experience.id,
+      status: 'PENDING',
+      daysOffset: 8,
     });
     const cancelBookingId = await createBooking({
       guestId: cancellingGuestId,
@@ -366,9 +407,19 @@ test.describe.serial('Host dashboard reservations and inquiries UI coverage', ()
 
     await login(page, host);
     await page.goto('/host/dashboard?tab=reservations', { waitUntil: 'networkidle' });
+    await dismissAnnouncementIfVisible(page);
 
-    await expect(page.getByRole('heading', { name: `#${paidBookingId}` })).toBeVisible({ timeout: 15000 });
+    const memberCard = page.getByTestId(`reservation-card-${memberBookingId}`);
+    const circleCard = page.getByTestId(`reservation-card-${circleBookingId}`);
+    const pendingCard = page.getByTestId(`reservation-card-${pendingBookingId}`);
+
+    await expect(memberCard).toBeVisible({ timeout: 15000 });
+    await expect(circleCard).toBeVisible({ timeout: 15000 });
+    await expect(pendingCard).toBeVisible({ timeout: 15000 });
     await expect(page.getByText('₩24,000').last()).toBeVisible();
+    await expect(memberCard.locator('[data-testid="host-reservation-membership-badge"]').first()).toContainText('Locally Member');
+    await expect(circleCard.locator('[data-testid="host-reservation-membership-badge"]').first()).toContainText('Locally Circle');
+    await expect(pendingCard.locator('[data-testid="host-reservation-membership-badge"]')).toHaveCount(0);
     await expect(page.getByRole('button', { name: /취소\/환불|Cancelled/ })).toBeVisible();
 
     await page.getByRole('button', { name: /취소\/환불|Cancelled/ }).click();
@@ -376,11 +427,33 @@ test.describe.serial('Host dashboard reservations and inquiries UI coverage', ()
     await expect(page.getByText(/취소 요청이 접수되었습니다.|Cancellation Request Received/)).toBeVisible();
 
     await page.getByRole('button', { name: /다가오는 일정|Upcoming/ }).click();
-    await page.getByRole('button', { name: new RegExp(`${guest.fullName}.*(프로필|Profile)`) }).click();
+    await memberCard.getByRole('button', { name: new RegExp(`${memberGuest.fullName}.*(프로필|Profile)`) }).click();
 
-    await expect(page.getByRole('heading', { name: guest.fullName })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('heading', { name: memberGuest.fullName })).toBeVisible({ timeout: 15000 });
     await expect(page.getByText('Product Designer')).toBeVisible();
-    await expect(page.getByText('예약 카드 프로필 모달 검증용 자기소개입니다.')).toBeVisible();
+    await expect(page.getByTestId('guest-profile-membership-badge')).toContainText('Locally Member');
+    await expect(page.getByTestId('guest-profile-membership-desc')).toContainText(
+      /처음 로컬리 여행을 시작한 게스트예요.|This guest is starting their first trip with Locally./
+    );
+    await expect(page.getByText('Locally Member 예약 카드 프로필 모달 검증용 자기소개입니다.')).toBeVisible();
+
+    await page.mouse.click(10, 10);
+    await expect(page.getByRole('heading', { name: memberGuest.fullName })).toHaveCount(0);
+
+    await circleCard.getByRole('button', { name: new RegExp(`${circleGuest.fullName}.*(프로필|Profile)`) }).click();
+    await expect(page.getByRole('heading', { name: circleGuest.fullName })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('guest-profile-membership-badge')).toContainText('Locally Circle');
+    await expect(page.getByTestId('guest-profile-membership-desc')).toContainText(
+      /다시 찾아온 게스트예요.|This guest has come back to Locally./
+    );
+
+    await page.mouse.click(10, 10);
+    await expect(page.getByRole('heading', { name: circleGuest.fullName })).toHaveCount(0);
+
+    await pendingCard.getByRole('button', { name: new RegExp(`${pendingGuest.fullName}.*(프로필|Profile)`) }).click();
+    await expect(page.getByRole('heading', { name: pendingGuest.fullName })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('guest-profile-membership-badge')).toHaveCount(0);
+    await expect(page.getByTestId('guest-profile-membership-desc')).toHaveCount(0);
   });
 
   test('opens inquiry chat from a reservation card and sends a host reply', async ({ page }) => {
@@ -409,6 +482,7 @@ test.describe.serial('Host dashboard reservations and inquiries UI coverage', ()
 
     await login(page, host);
     await page.goto('/host/dashboard?tab=reservations', { waitUntil: 'networkidle' });
+    await dismissAnnouncementIfVisible(page);
     await expect(page.getByRole('heading', { name: `#${bookingId}` })).toBeVisible({ timeout: 15000 });
 
     const startChatResponsePromise = page.waitForResponse(

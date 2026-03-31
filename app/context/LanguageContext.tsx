@@ -1282,6 +1282,10 @@ const dictionary: Record<Locale, Record<string, string>> = {
     membership_next_label: "다음 단계",
     membership_next_member: "한 번 더 함께하면 Locally Circle이 됩니다.",
     membership_next_circle: "지금은 Locally Circle 케어가 열려 있어요.",
+    host_guest_membership_member_badge: "Locally Member",
+    host_guest_membership_circle_badge: "Locally Circle",
+    host_guest_membership_member_desc: "처음 로컬리 여행을 시작한 게스트예요.",
+    host_guest_membership_circle_desc: "다시 찾아온 게스트예요.",
 
     // [Host Dashboard & Profile - Missing Keys]
     he_profile_completion: "프로필 완성도",
@@ -2700,6 +2704,10 @@ const dictionary: Record<Locale, Record<string, string>> = {
     membership_next_label: "Next step",
     membership_next_member: "One more trip with us unlocks Locally Circle.",
     membership_next_circle: "Locally Circle care is already open for you.",
+    host_guest_membership_member_badge: "Locally Member",
+    host_guest_membership_circle_badge: "Locally Circle",
+    host_guest_membership_member_desc: "This guest is starting their first trip with Locally.",
+    host_guest_membership_circle_desc: "This guest has come back to Locally.",
 
     // [Host Dashboard & Profile - Missing Keys]
     he_profile_completion: "Profile Completion",
@@ -4119,6 +4127,10 @@ const dictionary: Record<Locale, Record<string, string>> = {
     membership_next_label: "次のステップ",
     membership_next_member: "もう一度利用すると Locally Circle になります。",
     membership_next_circle: "Locally Circle ケアはすでに利用できます。",
+    host_guest_membership_member_badge: "Locally Member",
+    host_guest_membership_circle_badge: "Locally Circle",
+    host_guest_membership_member_desc: "はじめて Locally の旅を始めるゲストです。",
+    host_guest_membership_circle_desc: "もう一度訪れてくれたゲストです。",
 
     // [Host Dashboard & Profile - Missing Keys]
     he_profile_completion: "プロフィール完成度",
@@ -5537,6 +5549,10 @@ const dictionary: Record<Locale, Record<string, string>> = {
     membership_next_label: "下一步",
     membership_next_member: "再和我们同行一次，就会进入 Locally Circle。",
     membership_next_circle: "Locally Circle 专属关怀已经为您开启。",
+    host_guest_membership_member_badge: "Locally Member",
+    host_guest_membership_circle_badge: "Locally Circle",
+    host_guest_membership_member_desc: "这位住客正开始他们在 Locally 的第一次旅程。",
+    host_guest_membership_circle_desc: "这位住客再次回到了 Locally。",
 
     // [Host Dashboard & Profile - Missing Keys]
     he_profile_completion: "个人资料完整度",

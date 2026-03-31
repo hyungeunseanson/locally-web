@@ -20,6 +20,8 @@ import {
   getBookingReviewType,
   isBookingReviewPending,
 } from '@/app/utils/hostUnavailableReview';
+import type { LocallyMembershipStatus } from '@/app/utils/memberStatus';
+import HostGuestMembershipBadge from './HostGuestMembershipBadge';
 
 interface ReservationCardProps {
   res: {
@@ -45,6 +47,7 @@ interface ReservationCardProps {
     experiences?: {
       title?: string | null;
     } | null;
+    membershipStatus?: LocallyMembershipStatus;
   };
   isNew: boolean;
   isProcessing: boolean;
@@ -125,6 +128,7 @@ export default function ReservationCard({
   const bookingReviewType = getBookingReviewType(res.cancel_reason);
   const hasBookingReview = isBookingReviewPending(res.cancel_reason);
   const bookingReviewDetail = getBookingReviewDetail(res.cancel_reason);
+  const showMembershipBadge = res.membershipStatus === 'member' || res.membershipStatus === 'circle';
 
   // 🟢 결제 시간 다국어 포맷팅
   const localeMap: Record<string, string> = { ko: 'ko-KR', en: 'en-US', ja: 'ja-JP', zh: 'zh-CN' };
@@ -138,6 +142,7 @@ export default function ReservationCard({
 
   return (
     <div
+      data-testid={`reservation-card-${String(res.id)}`}
       className={`bg-white rounded-xl md:rounded-2xl border shadow-sm hover:shadow-md transition-all relative overflow-hidden group cursor-pointer
         ${isNew ? 'border-blue-200 ring-1 ring-blue-100' : 'border-slate-200'}
       `}
@@ -211,6 +216,12 @@ export default function ReservationCard({
                       <p className="truncate text-[13px] font-bold text-slate-900">
                         {guestName}
                       </p>
+                      {showMembershipBadge && (
+                        <HostGuestMembershipBadge
+                          testId="host-reservation-membership-badge"
+                          status={res.membershipStatus as Extract<LocallyMembershipStatus, 'member' | 'circle'>}
+                        />
+                      )}
                       <span className="shrink-0 rounded-full bg-white px-1.5 py-0.5 text-[9px] font-semibold text-slate-500 ring-1 ring-slate-200">
                         {t('res_profile_btn')}
                       </span>
@@ -334,6 +345,12 @@ export default function ReservationCard({
                   <p className="font-bold text-slate-900 group-hover/profile:underline underline-offset-2 decoration-2 truncate max-w-[160px]">
                     {guestName}
                   </p>
+                  {showMembershipBadge && (
+                    <HostGuestMembershipBadge
+                      testId="host-reservation-membership-badge"
+                      status={res.membershipStatus as Extract<LocallyMembershipStatus, 'member' | 'circle'>}
+                    />
+                  )}
                   <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 shrink-0">{t('res_profile_btn')}</span>
                 </div>
                 <p className="text-xs text-slate-500">{guestCount}{t('res_people_count')}</p>

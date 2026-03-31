@@ -16,6 +16,7 @@ import {
   isCancelledBookingStatus,
   isPendingBookingStatus,
 } from '@/app/constants/bookingStatus';
+import type { LocallyMembershipStatus } from '@/app/utils/memberStatus';
 
 // 컴포넌트
 import ReservationCard from './ReservationCard';
@@ -80,6 +81,11 @@ type GuestReviewBookingIdRow = {
   booking_id: number;
 };
 
+type GuestMembershipResponse = {
+  success?: boolean;
+  memberships?: Record<string, LocallyMembershipStatus>;
+};
+
 const RESERVATION_SELECT = `
   id,
   order_id,
@@ -129,6 +135,7 @@ export default function ReservationManager() {
   const hostExperienceIdsRef = useRef<Set<string>>(new Set());
   const hostUserIdRef = useRef<string | null>(null);
   const realtimeRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const membershipRequestSeqRef = useRef(0);
 
   const [activeTab, setActiveTab] = useState<'upcoming' | 'completed' | 'cancelled'>('upcoming');
   const [reservations, setReservations] = useState<ReservationRecord[]>([]);
@@ -141,6 +148,7 @@ export default function ReservationManager() {
   const [processingId, setProcessingId] = useState<number | null>(null);
   const [selectedGuest, setSelectedGuest] = useState<ReservationGuest | null>(null);
   const [pendingRefundBooking, setPendingRefundBooking] = useState<ReservationRecord | null>(null);
+  const [membershipByUserId, setMembershipByUserId] = useState<Record<string, LocallyMembershipStatus>>({});
 
   // ✅ [복구] 에러 메시지 상태
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -191,6 +199,42 @@ export default function ReservationManager() {
     }
   }, []);
 
+  const fetchGuestMembershipStatuses = useCallback(async (guestIds: string[]) => {
+    const requestSeq = membershipRequestSeqRef.current + 1;
+    membershipRequestSeqRef.current = requestSeq;
+
+    const normalizedGuestIds = [...new Set(guestIds.map((guestId) => String(guestId || '')).filter(Boolean))];
+
+    if (normalizedGuestIds.length === 0) {
+      if (membershipRequestSeqRef.current === requestSeq) {
+        setMembershipByUserId({});
+      }
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/host/reservations/guest-memberships', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ guestIds: normalizedGuestIds }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to resolve guest memberships.');
+      }
+
+      const payload = (await response.json()) as GuestMembershipResponse;
+      if (membershipRequestSeqRef.current === requestSeq) {
+        setMembershipByUserId(payload.memberships || {});
+      }
+    } catch (error) {
+      console.error('[ReservationManager] guest membership lookup failed:', error);
+      if (membershipRequestSeqRef.current === requestSeq) {
+        setMembershipByUserId({});
+      }
+    }
+  }, []);
+
   const fetchReservations = useCallback(async (isBackground = false) => {
     try {
       if (!isBackground) setLoading(true);
@@ -214,6 +258,7 @@ export default function ReservationManager() {
       if (error) throw error;
       const nextReservations = (data as ReservationRecord[] | null) || [];
       setReservations(nextReservations);
+      void fetchGuestMembershipStatuses(nextReservations.map((reservation) => reservation.user_id));
 
       // 🟢 [추가] 이미 후기를 작성한 예약 ID 조회
       const bookingIds = nextReservations
@@ -247,7 +292,7 @@ export default function ReservationManager() {
     } finally {
       if (!isBackground) setLoading(false);
     }
-  }, [getHostUserId, showToast, supabase, t]);
+  }, [fetchGuestMembershipStatuses, getHostUserId, showToast, supabase, t]);
 
   const scheduleRealtimeRefresh = useCallback(() => {
     clearRealtimeRefresh();
@@ -514,7 +559,10 @@ export default function ReservationManager() {
             {filteredList.map(res => (
               <ReservationCard
                 key={res.id}
-                res={res}
+                res={{
+                  ...res,
+                  membershipStatus: membershipByUserId[String(res.user_id)] || 'none',
+                }}
                 isNew={isNew(res.created_at, res.id)}
                 isProcessing={processingId === res.id}
                 onApproveCancel={() => setPendingRefundBooking(res)}
@@ -546,7 +594,11 @@ export default function ReservationManager() {
       </div>
 
       {selectedGuest && (
-        <GuestProfileModal guest={selectedGuest} onClose={() => setSelectedGuest(null)} />
+        <GuestProfileModal
+          guest={selectedGuest}
+          membershipStatus={membershipByUserId[String(selectedGuest.id)] || 'none'}
+          onClose={() => setSelectedGuest(null)}
+        />
       )}
       {reviewModalOpen && selectedBookingForReview && (
         <GuestReviewModal
