@@ -320,7 +320,8 @@ test.describe.serial('locally membership care experience', () => {
     await expect(page.getByTestId('guest-trips-membership-banner')).toContainText('Locally Care');
     await expect(page.getByRole('link', { name: 'Locally Care로 문의하기' })).toHaveAttribute('href', '/help');
     await page.getByTestId('guest-trips-membership-info-trigger').dispatchEvent('click');
-    await expect(page.getByTestId('guest-trips-membership-info-panel')).toContainText('첫 구매 후 바로 시작되는 기본 멤버 혜택이에요.');
+    await expect(page.getByTestId('guest-trips-membership-info-panel')).toContainText('Locally Tier 1');
+    await expect(page.getByTestId('guest-trips-membership-info-panel')).toContainText('첫 구매 게스트에게 열리는 기본 혜택이에요.');
 
     await page.goto('/help', { waitUntil: 'domcontentloaded' });
     await dismissAnnouncementIfVisible(page);
