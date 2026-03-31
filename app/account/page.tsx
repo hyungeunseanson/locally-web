@@ -14,7 +14,7 @@ import HostModeTransition from '@/app/components/mobile/HostModeTransition';
 import MobileLanguageSwitcher from '@/app/components/mobile/MobileLanguageSwitcher';
 import { usePendingNavigation } from '@/app/hooks/usePendingNavigation';
 import { useLocallyMembership } from '@/app/hooks/useLocallyMembership';
-import LocallyMembershipInfoTrigger from '@/app/components/LocallyMembershipInfoTrigger';
+import LocallyMembershipBadge from '@/app/components/LocallyMembershipBadge';
 import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
 import { PROFILE_LANGUAGE_OPTIONS } from '@/app/constants/profile';
 import { getProfileCompletion, normalizeLanguageList, normalizeProfileLanguageValue } from '@/app/utils/profile';
@@ -41,7 +41,7 @@ type GuestReviewQueryRow = Omit<GuestReview, 'host'> & {
 };
 
 export default function AccountPage() {
-  const { t, lang } = useLanguage(); // 🟢 2. t 함수 추가
+  const { t } = useLanguage(); // 🟢 2. t 함수 추가
   const supabase = useMemo(() => createClient(), []);
   // 🟢 [추가] 커스텀 달력 상태
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -79,7 +79,7 @@ export default function AccountPage() {
   const { unreadCount } = useNotification();
   const { canUseHostView, setHostView } = useViewMode();
   const { user: authUser, hostStatusResolved } = useAuth();
-  const { membership, hasLocallyCare } = useLocallyMembership(authUser?.id);
+  const { membership } = useLocallyMembership(authUser?.id);
 
   // 프로필 상태
   const [profile, setProfile] = useState({
@@ -172,73 +172,6 @@ export default function AccountPage() {
       ]
     }
   } as const;
-
-  const membershipSinceText = useMemo(() => {
-    if (!membership?.firstPurchaseAt) return null;
-    const localeMap: Record<string, string> = {
-      ko: 'ko-KR',
-      en: 'en-US',
-      ja: 'ja-JP',
-      zh: 'zh-CN',
-    };
-    return new Date(membership.firstPurchaseAt).toLocaleDateString(localeMap[lang] || 'ko-KR');
-  }, [lang, membership?.firstPurchaseAt]);
-
-  const renderMembershipCard = (className = '') => {
-    if (!membership || membership.status === 'none') return null;
-
-    const isCircle = membership.status === 'circle';
-    const title = isCircle ? t('locally_circle') : t('locally_member');
-    const description = isCircle ? t('membership_circle_desc') : t('membership_member_desc');
-    const nextStep = isCircle ? t('membership_next_circle') : t('membership_next_member');
-    const infoDescription = isCircle ? t('membership_circle_info_desc') : t('membership_member_info_desc');
-
-    return (
-      <section
-        data-testid="account-membership-card"
-        className={`rounded-3xl border border-rose-100 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(255,247,247,1))] p-5 shadow-sm ${className}`}
-      >
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-rose-400">{t('membership_label')}</p>
-            <div className="mt-2 flex items-center gap-2">
-              <h2 className="text-[20px] font-black tracking-tight text-slate-900 md:text-2xl">{title}</h2>
-              <LocallyMembershipInfoTrigger
-                testIdPrefix="account-membership-info"
-                ariaLabel={t('membership_info_aria') as string}
-                description={infoDescription}
-              />
-            </div>
-            <p className="mt-1 text-[13px] leading-6 text-slate-600 md:text-sm">{description}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => navigate('/help')}
-            className="inline-flex shrink-0 items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-[12px] font-bold text-white transition-colors hover:bg-slate-800"
-          >
-            {t('locally_care_cta')}
-          </button>
-        </div>
-
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <div className="rounded-2xl border border-white/80 bg-white/80 px-4 py-3">
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">{t('membership_since_label')}</p>
-            <p className="mt-1 text-[13px] font-semibold text-slate-900">{membershipSinceText || '—'}</p>
-          </div>
-          <div className="rounded-2xl border border-white/80 bg-white/80 px-4 py-3">
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">{t('membership_next_label')}</p>
-            <p className="mt-1 text-[13px] font-semibold text-slate-900">{nextStep}</p>
-          </div>
-        </div>
-
-        {hasLocallyCare && (
-          <p className="mt-3 text-[11px] leading-5 text-slate-500">
-            {isCircle ? t('locally_care_circle_desc') : t('locally_care_member_desc')}
-          </p>
-        )}
-      </section>
-    );
-  };
 
   useEffect(() => {
     if (loading) return;
@@ -491,6 +424,7 @@ export default function AccountPage() {
           profile={profile}
           userId={user?.id || ''}
           guestReviews={guestReviews}
+          membershipStatus={membership?.status ?? 'none'}
           onBack={() => setShowProfileView(false)}
           onProfileUpdate={(updated) => {
             setProfile(prev => ({ ...prev, ...updated }));
@@ -556,8 +490,6 @@ export default function AccountPage() {
           </div>
         )}
 
-        {renderMembershipCard('mx-4 mb-4')}
-
         {/* ── 프로필 카드 (이미지 3) ── */}
         <button
           onClick={() => setShowProfileView(true)}
@@ -587,8 +519,15 @@ export default function AccountPage() {
             <p className="text-[10px] text-gray-400 mt-0.5">
               {profile.nationality
                 ? countries.find(c => c.code === profile.nationality)?.name?.split(' (')[0] || profile.nationality
-                : t('locally_member')}
+                : t('label_no_nationality')}
             </p>
+            {membership?.status && membership.status !== 'none' && (
+              <LocallyMembershipBadge
+                status={membership.status}
+                testId="account-mobile-membership-badge"
+                className="mt-2"
+              />
+            )}
           </div>
 
           {/* 구분선 */}
@@ -733,6 +672,12 @@ export default function AccountPage() {
               </p>
 
               <div className="flex flex-wrap justify-center gap-2 mb-6">
+                {membership?.status && membership.status !== 'none' && (
+                  <LocallyMembershipBadge
+                    status={membership.status}
+                    testId="account-profile-membership-badge"
+                  />
+                )}
                 <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 rounded-full text-xs font-bold text-slate-600">
                   <ShieldCheck size={14} /> {t('identity_verified')} {/* 🟢 번역 */}
                 </div>
@@ -802,8 +747,6 @@ export default function AccountPage() {
           {/* 오른쪽: 정보 수정 폼 */}
           <div className="flex-1 max-w-2xl">
             <div className="space-y-8 bg-white">
-              {renderMembershipCard()}
-
               <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div>

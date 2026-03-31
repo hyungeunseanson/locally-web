@@ -10,9 +10,11 @@ import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
 import { PROFILE_LANGUAGE_OPTIONS } from '@/app/constants/profile';
-import { getProfileCompletion, PROFILE_COMPLETION_FIELD_LABELS } from '@/app/utils/profile';
+import { getProfileCompletion } from '@/app/utils/profile';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { compressImage, validateImage, isHeicValidationResult } from '@/app/utils/image';
+import type { LocallyMembershipStatus } from '@/app/utils/memberStatus';
+import LocallyMembershipBadge from '@/app/components/LocallyMembershipBadge';
 
 type GuestReview = {
     id: string | number;
@@ -44,6 +46,7 @@ interface MobileProfileViewProps {
     profile: MobileProfileData;
     userId: string;
     guestReviews: GuestReview[];
+    membershipStatus: LocallyMembershipStatus;
     onBack: () => void;
     onProfileUpdate: (updatedProfile: MobileProfileData) => void;
 }
@@ -52,6 +55,7 @@ export default function MobileProfileView({
     profile,
     userId,
     guestReviews,
+    membershipStatus,
     onBack,
     onProfileUpdate,
 }: MobileProfileViewProps) {
@@ -268,7 +272,13 @@ export default function MobileProfileView({
                     ) : (
                         <p className="text-[14px] font-bold text-gray-900 text-center leading-snug">{displayProfile.full_name || t('label_no_name')}</p>
                     )}
-                    <p className="text-[10px] text-gray-400 mt-0.5">{t('locally_member')}</p>
+                    {membershipStatus !== 'none' && (
+                        <LocallyMembershipBadge
+                            status={membershipStatus}
+                            testId="mobile-profile-membership-badge"
+                            className="mt-2"
+                        />
+                    )}
                 </div>
 
                 {/* 구분선 */}
