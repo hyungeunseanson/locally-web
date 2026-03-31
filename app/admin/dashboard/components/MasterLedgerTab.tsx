@@ -901,6 +901,7 @@ export default function MasterLedgerTab({
               <div className="pt-1 md:pt-2">
                 {isPendingBookingStatus(selectedBooking.status) && isBankPaymentMethod(selectedBooking.payment_method) && (
                   <button
+                    data-testid="admin-master-ledger-confirm-payment-action"
                     onClick={() => handleConfirmPayment(selectedBooking.id)}
                     disabled={isProcessing}
                     className="w-full py-2.5 md:py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] md:text-xs font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center gap-2 group"
@@ -962,43 +963,87 @@ export default function MasterLedgerTab({
       )}
 
       {confirmDialog && (
-        <div className="fixed inset-0 z-[120] md:hidden">
-          <button
-            type="button"
-            aria-label="확인 모달 닫기"
-            onClick={() => !isProcessing && setConfirmDialog(null)}
-            className="absolute inset-0 bg-slate-900/45"
-          />
-          <div className="absolute inset-x-4 bottom-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl">
-            <div className="flex items-start gap-3">
-              <div className={`mt-0.5 rounded-full p-2 ${confirmDialog.tone === 'red' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
-                {confirmDialog.tone === 'red' ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />}
+        <>
+          <div className="fixed inset-0 z-[120] hidden items-center justify-center p-4 md:flex">
+            <button
+              type="button"
+              aria-label="확인 모달 닫기"
+              onClick={() => !isProcessing && setConfirmDialog(null)}
+              className="absolute inset-0 bg-slate-900/45"
+            />
+            <div
+              data-testid="admin-master-ledger-confirm-dialog-desktop"
+              className="relative w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl"
+            >
+              <div className="flex items-start gap-3">
+                <div className={`mt-0.5 rounded-full p-2 ${confirmDialog.tone === 'red' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
+                  {confirmDialog.tone === 'red' ? <AlertTriangle size={18} /> : <CheckCircle2 size={18} />}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h4 className="text-base font-black text-slate-900">{confirmDialog.title}</h4>
+                  <p className="mt-1.5 text-sm leading-6 text-slate-600">{confirmDialog.description}</p>
+                </div>
               </div>
-              <div className="min-w-0 flex-1">
-                <h4 className="text-sm font-black text-slate-900">{confirmDialog.title}</h4>
-                <p className="mt-1 text-[12px] leading-5 text-slate-600">{confirmDialog.description}</p>
+              <div className="mt-5 flex gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setConfirmDialog(null)}
+                  disabled={isProcessing}
+                  className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-600"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  data-testid="admin-master-ledger-confirm-dialog-desktop-confirm"
+                  onClick={confirmDialogAction}
+                  disabled={isProcessing}
+                  className={`flex-1 rounded-xl px-4 py-3 text-sm font-bold text-white ${confirmDialog.tone === 'red' ? 'bg-red-600' : 'bg-blue-600'}`}
+                >
+                  {isProcessing ? '처리 중...' : confirmDialog.confirmLabel}
+                </button>
               </div>
-            </div>
-            <div className="mt-4 flex gap-2">
-              <button
-                type="button"
-                onClick={() => setConfirmDialog(null)}
-                disabled={isProcessing}
-                className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs font-bold text-slate-600"
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                onClick={confirmDialogAction}
-                disabled={isProcessing}
-                className={`flex-1 rounded-xl px-4 py-3 text-xs font-bold text-white ${confirmDialog.tone === 'red' ? 'bg-red-600' : 'bg-blue-600'}`}
-              >
-                {isProcessing ? '처리 중...' : confirmDialog.confirmLabel}
-              </button>
             </div>
           </div>
-        </div>
+
+          <div className="fixed inset-0 z-[120] md:hidden">
+            <button
+              type="button"
+              aria-label="확인 모달 닫기"
+              onClick={() => !isProcessing && setConfirmDialog(null)}
+              className="absolute inset-0 bg-slate-900/45"
+            />
+            <div className="absolute inset-x-4 bottom-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl">
+              <div className="flex items-start gap-3">
+                <div className={`mt-0.5 rounded-full p-2 ${confirmDialog.tone === 'red' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
+                  {confirmDialog.tone === 'red' ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h4 className="text-sm font-black text-slate-900">{confirmDialog.title}</h4>
+                  <p className="mt-1 text-[12px] leading-5 text-slate-600">{confirmDialog.description}</p>
+                </div>
+              </div>
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmDialog(null)}
+                  disabled={isProcessing}
+                  className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs font-bold text-slate-600"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDialogAction}
+                  disabled={isProcessing}
+                  className={`flex-1 rounded-xl px-4 py-3 text-xs font-bold text-white ${confirmDialog.tone === 'red' ? 'bg-red-600' : 'bg-blue-600'}`}
+                >
+                  {isProcessing ? '처리 중...' : confirmDialog.confirmLabel}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
