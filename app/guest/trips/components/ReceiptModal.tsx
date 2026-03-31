@@ -60,9 +60,18 @@ export default function ReceiptModal({ trip, onClose }: { trip: ReceiptTrip, onC
 
   return (
     <div className={`fixed inset-0 z-50 flex items-center justify-center p-3 md:p-4 bg-black/60 backdrop-blur-sm transition-opacity duration-150 ${closing ? 'opacity-0' : 'animate-in fade-in'}`}>
-      <div className={`bg-white w-full max-w-sm rounded-2xl md:rounded-3xl shadow-2xl overflow-hidden relative transition-all duration-150 ${closing ? 'opacity-0 scale-95' : 'animate-in zoom-in-95 duration-200'}`}>
+      <div
+        data-testid="guest-trip-receipt-modal"
+        className={`relative flex max-h-[calc(100dvh-1.5rem)] w-full max-w-sm flex-col overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-150 md:max-h-none md:rounded-3xl ${closing ? 'opacity-0 scale-95' : 'animate-in zoom-in-95 duration-200'}`}
+      >
         <div className="bg-slate-900 p-4 md:p-6 text-white text-center relative">
-          <button onClick={requestClose} className="absolute top-3 md:top-4 right-3 md:right-4 p-1.5 md:p-2 bg-white/10 rounded-full hover:bg-white/20"><X className="w-4 h-4 md:w-[18px] md:h-[18px]"/></button>
+          <button
+            data-testid="guest-trip-receipt-close-button"
+            onClick={requestClose}
+            className="absolute top-3 md:top-4 right-3 md:right-4 p-1.5 md:p-2 bg-white/10 rounded-full hover:bg-white/20"
+          >
+            <X className="w-4 h-4 md:w-[18px] md:h-[18px]"/>
+          </button>
           <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center mx-auto mb-2.5 md:mb-3 shadow-lg ${isPending ? 'bg-amber-400' : 'bg-green-500'}`}>
             {isPending ? (
               <Clock className="w-5 h-5 md:w-6 md:h-6 text-white" />
@@ -74,7 +83,7 @@ export default function ReceiptModal({ trip, onClose }: { trip: ReceiptTrip, onC
           <p className="text-slate-400 text-[11px] md:text-xs mt-1">{safeDate(paymentDate)}</p>
         </div>
 
-        <div className="p-4 md:p-6 space-y-5 md:space-y-6">
+        <div data-testid="guest-trip-receipt-body" className="overflow-y-auto p-4 md:p-6 space-y-5 md:space-y-6">
           <div className="space-y-3 md:space-y-4">
             <div className="flex justify-between text-[12px] md:text-sm">
               <span className="text-slate-500">{t('receipt_order_no')}</span>
@@ -133,7 +142,11 @@ export default function ReceiptModal({ trip, onClose }: { trip: ReceiptTrip, onC
             <span className="text-[22px] md:text-2xl font-black text-rose-500">₩{Number(trip.price || trip.amount || 0).toLocaleString()}</span>
           </div>
 
-          <button onClick={() => window.print()} className="w-full py-2.5 md:py-3 bg-slate-100 text-slate-600 rounded-lg md:rounded-xl font-bold text-[13px] md:text-sm hover:bg-slate-200 flex items-center justify-center gap-1.5 md:gap-2">
+          <button
+            data-testid="guest-trip-receipt-save-button"
+            onClick={() => window.print()}
+            className="w-full py-2.5 md:py-3 bg-slate-100 text-slate-600 rounded-lg md:rounded-xl font-bold text-[13px] md:text-sm hover:bg-slate-200 flex items-center justify-center gap-1.5 md:gap-2"
+          >
             <Download className="w-[14px] h-[14px] md:w-4 md:h-4"/> {t('receipt_save')}
           </button>
         </div>

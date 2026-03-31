@@ -594,11 +594,13 @@ test.describe.serial('guest trips completed sync route', () => {
   test('shows pending receipt follow-up guidance and support CTA', async ({ page }) => {
     const host = createUser('host.pending.receipt');
     const guest = createUser('guest.pending.receipt');
+    const mobileViewport = { width: 390, height: 844 };
 
     await page.addInitScript(() => {
       window.localStorage.setItem('app_lang', 'ko');
       document.cookie = 'app_lang=ko; path=/';
     });
+    await page.setViewportSize(mobileViewport);
 
     const hostId = await createAuthUser(host);
     const guestId = await createAuthUser(guest);
@@ -624,13 +626,26 @@ test.describe.serial('guest trips completed sync route', () => {
 
     await login(page, guest);
     await page.goto('/guest/trips', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByTestId('guest-trip-pending-receipt-button').last()).toBeVisible();
-    await page.getByTestId('guest-trip-pending-receipt-button').last().click();
+    const pendingReceiptButton = page.locator('[data-testid="guest-trip-pending-receipt-button"]:visible').first();
+    await expect(pendingReceiptButton).toBeVisible();
+    await pendingReceiptButton.click();
+
+    const receiptModal = page.getByTestId('guest-trip-receipt-modal');
+    await expect(receiptModal).toBeVisible();
+    const receiptModalBox = await receiptModal.boundingBox();
+    expect(receiptModalBox).not.toBeNull();
+    if (!receiptModalBox) throw new Error('Receipt modal bounding box was not available.');
+    expect(receiptModalBox.y).toBeGreaterThanOrEqual(0);
+    expect(receiptModalBox.y + receiptModalBox.height).toBeLessThanOrEqual(mobileViewport.height);
+    await expect(page.getByTestId('guest-trip-receipt-close-button')).toBeVisible();
 
     const receiptFollowup = page.getByTestId('guest-trip-receipt-pending-followup');
     await expect(receiptFollowup).toBeVisible();
     await expect(receiptFollowup).toContainText('입금이 확인되면 예약 내역과 알림에서 상태가 바뀝니다. 계속 입금 대기 상태라면 고객센터에 문의해주세요.');
     await expect(receiptFollowup.getByRole('link', { name: '고객센터 문의하기' })).toHaveAttribute('href', '/help');
+    const receiptSaveButton = page.getByTestId('guest-trip-receipt-save-button');
+    await receiptSaveButton.scrollIntoViewIfNeeded();
+    await expect(receiptSaveButton).toBeVisible();
     await expect(page.getByText(bookingId).first()).toBeVisible();
   });
 

@@ -5,6 +5,13 @@
 
 ---
 
+## v3.39.92 — [Guest Trips] 모바일 영수증 모달 viewport 정리
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟢 모바일 영수증 높이 제한 및 내부 스크롤 보강 | `app/guest/trips/components/ReceiptModal.tsx` — 영수증 모달을 모바일 viewport 안에 맞추고, 본문만 스크롤되도록 조정해 상하 미세 잘림을 줄임 |
+| 🟡 mobile receipt viewport 회귀 체크 추가 | `tests/e2e/57-guest-trips-sync-completed.spec.ts` — 모바일 viewport에서 닫기 버튼이 보이고, 하단 저장 버튼까지 스크롤 접근 가능한지 검증 |
+
 ## v3.39.91 — [Guest Payment] 모바일 서비스 수수료 tooltip 탭 영역 보강
 
 | 항목 | 내용 |
