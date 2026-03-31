@@ -12,7 +12,7 @@ import { createClient } from '@/app/utils/supabase/client';
 import { useNotification } from '@/app/context/NotificationContext';
 import { useAuth } from '@/app/context/AuthContext';
 import { useLocallyMembership } from '@/app/hooks/useLocallyMembership';
-import LocallyMembershipInfoTrigger from '@/app/components/LocallyMembershipInfoTrigger';
+import LocallyMembershipBadgeTrigger from '@/app/components/LocallyMembershipBadgeTrigger';
 
 // 분리된 컴포넌트 & 훅 import
 import { useGuestTrips } from './hooks/useGuestTrips';
@@ -189,14 +189,12 @@ export default function GuestTripsPage() {
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="min-w-0">
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-rose-400">{t('locally_care_title')}</p>
-            <div className="mt-1 flex items-center gap-2">
-              <h2 className="text-[18px] font-black tracking-tight text-slate-900 md:text-xl">
-                {isCircle ? t('locally_circle') : t('locally_member')}
-              </h2>
-              <LocallyMembershipInfoTrigger
-                testIdPrefix="guest-trips-membership-info"
-                ariaLabel={t('membership_info_aria') as string}
+            <div className="mt-1 flex items-center">
+              <LocallyMembershipBadgeTrigger
+                status={isCircle ? 'circle' : 'member'}
                 description={infoDescription}
+                ariaLabel={t('membership_info_aria') as string}
+                testIdPrefix="guest-trips-membership-badge"
               />
             </div>
             <p className="mt-1 text-[12px] leading-6 text-slate-600 md:text-sm">

@@ -14,7 +14,7 @@ import { getProfileCompletion } from '@/app/utils/profile';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { compressImage, validateImage, isHeicValidationResult } from '@/app/utils/image';
 import type { LocallyMembershipStatus } from '@/app/utils/memberStatus';
-import LocallyMembershipBadge from '@/app/components/LocallyMembershipBadge';
+import LocallyMembershipBadgeTrigger from '@/app/components/LocallyMembershipBadgeTrigger';
 
 type GuestReview = {
     id: string | number;
@@ -88,6 +88,10 @@ export default function MobileProfileView({
     const supabase = useMemo(() => createClient(), []);
     const { showToast, showHeicUnsupportedToast } = useToast();
     const { t } = useLanguage();
+    const membershipDescription =
+        membershipStatus === 'circle'
+            ? (t('membership_circle_info_desc') as string)
+            : (t('membership_member_info_desc') as string);
     const completion = getProfileCompletion(isEditing ? editData : profile, 'guest');
     const missingLabels = completion.missingFields
         .slice(0, 4)
@@ -272,10 +276,12 @@ export default function MobileProfileView({
                         <p className="text-[14px] font-bold text-gray-900 text-center leading-snug">{displayProfile.full_name || t('label_no_name')}</p>
                     )}
                     {membershipStatus !== 'none' && (
-                        <LocallyMembershipBadge
+                        <LocallyMembershipBadgeTrigger
                             status={membershipStatus}
-                            testId="mobile-profile-membership-badge"
-                            className="mt-1.5 px-2 py-0.5 text-[10px] leading-none"
+                            description={membershipDescription}
+                            ariaLabel={t('membership_info_aria') as string}
+                            testIdPrefix="mobile-profile-membership-badge"
+                            size="compact"
                         />
                     )}
                 </div>

@@ -166,7 +166,7 @@ function SearchResults() {
   const requestSeqRef = useRef(0);
   const desktopPopoverRef = useRef<HTMLDivElement | null>(null);
 
-  const [activeSheet, setActiveSheet] = useState<'type' | 'time' | 'filter' | null>(null);
+  const [activeSheet, setActiveSheet] = useState<'city' | 'type' | 'time' | 'filter' | null>(null);
   const [selectedTimes, setSelectedTimes] = useState<SearchTimeId[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<SearchTypeId[]>([]);
 
@@ -287,6 +287,7 @@ function SearchResults() {
   };
 
   const clearSheetFilters = () => {
+    if (activeSheet === 'city') handleCityFilterChange('');
     if (activeSheet === 'time') setSelectedTimes([]);
     if (activeSheet === 'type') setSelectedTypes([]);
     if (activeSheet === 'filter') {
@@ -306,7 +307,9 @@ function SearchResults() {
   };
 
   const hasSheetSelection =
-    activeSheet === 'time'
+    activeSheet === 'city'
+      ? Boolean(selectedCity)
+      : activeSheet === 'time'
       ? selectedTimes.length > 0
       : activeSheet === 'type'
         ? selectedTypes.length > 0
@@ -418,7 +421,7 @@ function SearchResults() {
     const price = Number.isFinite(rawPrice) ? Number(rawPrice).toLocaleString() : '45,000';
 
     return (
-      <Link key={item.id} href={`/experiences/${item.id}`} className="w-[168px] shrink-0">
+      <Link key={item.id} href={`/experiences/${item.id}`} data-testid={`search-mobile-result-card-${item.id}`} className="w-[168px] shrink-0">
         <div className="relative w-full aspect-[0.95] rounded-[16px] overflow-hidden bg-slate-200">
           <Image
             src={imageUrl}
@@ -476,25 +479,48 @@ function SearchResults() {
             </button>
           </div>
 
-          <div className="mt-3 flex items-center justify-center gap-2">
-            <button
-              onClick={() => setActiveSheet('type')}
-              className={`h-8 px-3.5 rounded-full border flex items-center gap-1 text-[11px] font-medium whitespace-nowrap transition-all duration-150 active:scale-[0.95] ${
-                selectedTypes.length > 0 ? 'bg-white border-[#222] text-[#222]' : 'bg-white border-[#D8D8D8] text-[#444]'
-              }`}
-            >
-              {t('search_filter_type')}
-              <ChevronDown size={12} />
-            </button>
-            <button
-              onClick={() => setActiveSheet('time')}
-              className={`h-8 px-3.5 rounded-full border flex items-center gap-1 text-[11px] font-medium whitespace-nowrap transition-all duration-150 active:scale-[0.95] ${
-                selectedTimes.length > 0 ? 'bg-white border-[#222] text-[#222]' : 'bg-white border-[#D8D8D8] text-[#444]'
-              }`}
-            >
-              {t('search_filter_time_slot')}
-              <ChevronDown size={12} />
-            </button>
+          <div className="mt-3 -mx-1 overflow-x-auto no-scrollbar">
+            <div className="flex items-center gap-2 px-1">
+              <button
+                type="button"
+                data-testid="search-mobile-type-chip"
+                onClick={() => setActiveSheet('type')}
+                className={`h-8 shrink-0 rounded-full border px-3.5 text-[11px] font-medium whitespace-nowrap transition-all duration-150 active:scale-[0.95] ${
+                  selectedTypes.length > 0 ? 'bg-white border-[#222] text-[#222]' : 'bg-white border-[#D8D8D8] text-[#444]'
+                }`}
+              >
+                <span className="inline-flex items-center gap-1">
+                  {t('search_filter_type')}
+                  <ChevronDown size={12} />
+                </span>
+              </button>
+              <button
+                type="button"
+                data-testid="search-mobile-time-chip"
+                onClick={() => setActiveSheet('time')}
+                className={`h-8 shrink-0 rounded-full border px-3.5 text-[11px] font-medium whitespace-nowrap transition-all duration-150 active:scale-[0.95] ${
+                  selectedTimes.length > 0 ? 'bg-white border-[#222] text-[#222]' : 'bg-white border-[#D8D8D8] text-[#444]'
+                }`}
+              >
+                <span className="inline-flex items-center gap-1">
+                  {t('search_filter_time_slot')}
+                  <ChevronDown size={12} />
+                </span>
+              </button>
+              <button
+                type="button"
+                data-testid="search-mobile-city-chip"
+                onClick={() => setActiveSheet('city')}
+                className={`h-8 shrink-0 rounded-full border px-3.5 text-[11px] font-medium whitespace-nowrap transition-all duration-150 active:scale-[0.95] ${
+                  selectedCity ? 'bg-white border-[#222] text-[#222]' : 'bg-white border-[#D8D8D8] text-[#444]'
+                }`}
+              >
+                <span className="inline-flex items-center gap-1">
+                  {selectedCity ? getLocalizedCityLabel(selectedCity, lang) : t('search_filter_city')}
+                  <ChevronDown size={12} />
+                </span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -947,12 +973,24 @@ function SearchResults() {
 
           <div
             className={`absolute inset-x-0 bottom-0 bg-white rounded-t-[28px] shadow-[0_-12px_32px_rgba(0,0,0,0.16)] flex flex-col animate-in slide-in-from-bottom-8 duration-300 ${
-              activeSheet === 'time' ? 'h-[42dvh]' : activeSheet === 'type' ? 'h-[54dvh]' : 'h-[84dvh]'
+              activeSheet === 'time'
+                ? 'h-[42dvh]'
+                : activeSheet === 'city'
+                  ? 'h-[54dvh]'
+                  : activeSheet === 'type'
+                    ? 'h-[54dvh]'
+                    : 'h-[84dvh]'
             }`}
           >
             <div className="flex items-center justify-between px-6 pt-6 pb-4">
               <h3 className="text-[20px] font-bold text-[#1F1F1F] leading-tight">
-                {activeSheet === 'time' ? t('search_filter_time_slot') : activeSheet === 'type' ? t('search_filter_experience_type') : t('filter')}
+                {activeSheet === 'time'
+                  ? t('search_filter_time_slot')
+                  : activeSheet === 'city'
+                    ? t('search_filter_city')
+                    : activeSheet === 'type'
+                      ? t('search_filter_experience_type')
+                      : t('filter')}
               </h3>
               <button onClick={() => setActiveSheet(null)} className="p-1 text-[#444]" aria-label={t('button_close')}>
                 <X size={20} />
@@ -960,6 +998,37 @@ function SearchResults() {
             </div>
 
             <div className="px-6 overflow-y-auto">
+              {activeSheet === 'city' && (
+                <div data-testid="search-mobile-city-sheet" className="pt-1 space-y-2 pb-3">
+                  <button
+                    type="button"
+                    data-testid="search-mobile-city-option-all"
+                    onClick={() => handleCityFilterChange('')}
+                    className={`flex w-full items-center justify-between rounded-2xl px-3 py-3 text-left text-[14px] font-medium transition-colors ${
+                      !selectedCity ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    {t('lang_all')}
+                  </button>
+                  {CITY_FILTER_OPTIONS.map((option) => {
+                    const selected = selectedCity === option;
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        data-testid={`search-mobile-city-option-${option}`}
+                        onClick={() => handleCityFilterChange(option)}
+                        className={`flex w-full items-center justify-between rounded-2xl px-3 py-3 text-left text-[14px] font-medium transition-colors ${
+                          selected ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        {getLocalizedCityLabel(option, lang)}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
               {activeSheet === 'time' && (
                 <div className="pt-1 space-y-3">
                   {TIME_OPTION_IDS.map((option) => (

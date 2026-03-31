@@ -320,7 +320,10 @@ test.describe.serial('locally membership care experience', () => {
     await page.goto('/account', { waitUntil: 'domcontentloaded' });
     await dismissAnnouncementIfVisible(page);
     await expect(page.getByTestId('account-membership-card')).toHaveCount(0);
-    await expect(page.getByTestId('account-profile-membership-badge')).toContainText('Tier 1', { timeout: 15000 });
+    await expect(page.getByTestId('account-profile-membership-badge-trigger')).toContainText('Tier 1', { timeout: 15000 });
+    await page.getByTestId('account-profile-membership-badge-trigger').dispatchEvent('click');
+    await expect(page.getByTestId('account-profile-membership-badge-panel')).toContainText('Tier 1');
+    await expect(page.getByTestId('account-profile-membership-badge-panel')).toContainText('첫 구매 게스트에게 열리는 기본 혜택이에요.');
     await expect(page.locator('p').filter({ hasText: '대한민국 (South Korea)' }).first()).toBeVisible();
     await expect(page.getByText('"멤버십 프로필 소개"')).toBeVisible();
 
@@ -328,18 +331,23 @@ test.describe.serial('locally membership care experience', () => {
     await page.goto('/account', { waitUntil: 'domcontentloaded' });
     await dismissAnnouncementIfVisible(page);
     await expect(page.getByTestId('account-membership-card')).toHaveCount(0);
-    await expect(page.getByTestId('account-mobile-membership-badge')).toContainText('Tier 1');
-    await dismissAnnouncementIfVisible(page);
-    await page.locator('button').filter({ has: page.getByTestId('account-mobile-membership-badge') }).first().click({ force: true });
-    await expect(page.getByTestId('mobile-profile-membership-badge')).toContainText('Tier 1');
+    await expect(page.getByTestId('account-mobile-membership-badge-trigger')).toContainText('Tier 1');
+    await page.getByTestId('account-mobile-membership-badge-trigger').dispatchEvent('click');
+    await expect(page.getByTestId('account-mobile-membership-badge-panel')).toContainText('Tier 1');
+    await expect(page.getByTestId('account-mobile-membership-badge-panel')).toContainText('첫 구매 게스트에게 열리는 기본 혜택이에요.');
+    await page.getByTestId('account-mobile-profile-card').dispatchEvent('click');
+    await expect(page.getByTestId('mobile-profile-membership-badge-trigger')).toContainText('Tier 1');
+    await page.getByTestId('mobile-profile-membership-badge-trigger').dispatchEvent('click');
+    await expect(page.getByTestId('mobile-profile-membership-badge-panel')).toContainText('Tier 1');
 
     await page.goto('/guest/trips', { waitUntil: 'domcontentloaded' });
     await dismissAnnouncementIfVisible(page);
     await expect(page.getByTestId('guest-trips-membership-banner')).toContainText('Locally Care');
     await expect(page.getByRole('link', { name: 'Locally Care로 문의하기' })).toHaveAttribute('href', '/help');
-    await page.getByTestId('guest-trips-membership-info-trigger').dispatchEvent('click');
-    await expect(page.getByTestId('guest-trips-membership-info-panel')).toContainText('Tier 1');
-    await expect(page.getByTestId('guest-trips-membership-info-panel')).toContainText('첫 구매 게스트에게 열리는 기본 혜택이에요.');
+    await expect(page.getByTestId('guest-trips-membership-info-trigger')).toHaveCount(0);
+    await page.getByTestId('guest-trips-membership-badge-trigger').dispatchEvent('click');
+    await expect(page.getByTestId('guest-trips-membership-badge-panel')).toContainText('Tier 1');
+    await expect(page.getByTestId('guest-trips-membership-badge-panel')).toContainText('첫 구매 게스트에게 열리는 기본 혜택이에요.');
 
     await page.goto('/help', { waitUntil: 'domcontentloaded' });
     await dismissAnnouncementIfVisible(page);
@@ -373,7 +381,7 @@ test.describe.serial('locally membership care experience', () => {
     await page.goto('/account', { waitUntil: 'domcontentloaded' });
     await dismissAnnouncementIfVisible(page);
     await expect(page.getByTestId('account-membership-card')).toHaveCount(0);
-    await expect(page.getByTestId('account-profile-membership-badge')).toContainText('Tier 2', { timeout: 15000 });
+    await expect(page.getByTestId('account-profile-membership-badge-trigger')).toContainText('Tier 2', { timeout: 15000 });
 
     await page.goto('/services/demo-request/payment/complete?orderId=MEMBERSHIP-CIRCLE', { waitUntil: 'domcontentloaded' });
     await dismissAnnouncementIfVisible(page);

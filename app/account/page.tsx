@@ -14,7 +14,7 @@ import HostModeTransition from '@/app/components/mobile/HostModeTransition';
 import MobileLanguageSwitcher from '@/app/components/mobile/MobileLanguageSwitcher';
 import { usePendingNavigation } from '@/app/hooks/usePendingNavigation';
 import { useLocallyMembership } from '@/app/hooks/useLocallyMembership';
-import LocallyMembershipBadge from '@/app/components/LocallyMembershipBadge';
+import LocallyMembershipBadgeTrigger from '@/app/components/LocallyMembershipBadgeTrigger';
 import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
 import { PROFILE_LANGUAGE_OPTIONS } from '@/app/constants/profile';
 import { getProfileCompletion, normalizeLanguageList, normalizeProfileLanguageValue } from '@/app/utils/profile';
@@ -80,6 +80,10 @@ export default function AccountPage() {
   const { canUseHostView, setHostView } = useViewMode();
   const { user: authUser, hostStatusResolved } = useAuth();
   const { membership } = useLocallyMembership(authUser?.id);
+  const membershipDescription =
+    membership?.status === 'circle'
+      ? (t('membership_circle_info_desc') as string)
+      : (t('membership_member_info_desc') as string);
 
   // 프로필 상태
   const [profile, setProfile] = useState({
@@ -497,8 +501,17 @@ export default function AccountPage() {
         )}
 
         {/* ── 프로필 카드 (이미지 3) ── */}
-        <button
+        <div
+          role="button"
+          tabIndex={0}
+          data-testid="account-mobile-profile-card"
           onClick={() => setShowProfileView(true)}
+          onKeyDown={(event) => {
+            if (event.target !== event.currentTarget) return;
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            setShowProfileView(true);
+          }}
           className="relative mx-4 mb-4 flex w-[calc(100%-32px)] items-end gap-4 rounded-xl border border-gray-100 bg-white p-4 text-left shadow-sm transition-all duration-150 active:scale-[0.98] active:bg-gray-50 md:rounded-2xl"
         >
           {profileCompletion.percent < 100 && (
@@ -528,10 +541,12 @@ export default function AccountPage() {
                 : t('label_no_nationality')}
             </p>
             {membership?.status && membership.status !== 'none' && (
-              <LocallyMembershipBadge
+              <LocallyMembershipBadgeTrigger
                 status={membership.status}
-                testId="account-mobile-membership-badge"
-                className="mt-1.5 px-2 py-0.5 text-[10px] leading-none"
+                description={membershipDescription}
+                ariaLabel={t('membership_info_aria') as string}
+                testIdPrefix="account-mobile-membership-badge"
+                size="compact"
               />
             )}
           </div>
@@ -564,7 +579,7 @@ export default function AccountPage() {
               </p>
             </div>
           </div>
-        </button>
+        </div>
 
         {/* ── 메뉴 그룹 1: 기본 메뉴 ── */}
         <div className="px-4">
@@ -679,10 +694,11 @@ export default function AccountPage() {
 
               <div className="flex flex-wrap justify-center gap-2 mb-6">
                 {membership?.status && membership.status !== 'none' && (
-                  <LocallyMembershipBadge
+                  <LocallyMembershipBadgeTrigger
                     status={membership.status}
-                    testId="account-profile-membership-badge"
-                    className="border-sky-200 bg-sky-50 text-sky-700"
+                    description={membershipDescription}
+                    ariaLabel={t('membership_info_aria') as string}
+                    testIdPrefix="account-profile-membership-badge"
                   />
                 )}
                 <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 rounded-full text-xs font-bold text-slate-600">
