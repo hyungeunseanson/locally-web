@@ -276,7 +276,7 @@ export default function MobileProfileView({
                         <LocallyMembershipBadge
                             status={membershipStatus}
                             testId="mobile-profile-membership-badge"
-                            className="mt-2"
+                            className="mt-1.5 px-2 py-0.5 text-[10px] leading-none"
                         />
                     )}
                 </div>

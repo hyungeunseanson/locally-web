@@ -525,7 +525,7 @@ export default function AccountPage() {
               <LocallyMembershipBadge
                 status={membership.status}
                 testId="account-mobile-membership-badge"
-                className="mt-2"
+                className="mt-1.5 px-2 py-0.5 text-[10px] leading-none"
               />
             )}
           </div>
@@ -676,6 +676,7 @@ export default function AccountPage() {
                   <LocallyMembershipBadge
                     status={membership.status}
                     testId="account-profile-membership-badge"
+                    className="border-sky-200 bg-sky-50 text-sky-700"
                   />
                 )}
                 <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 rounded-full text-xs font-bold text-slate-600">

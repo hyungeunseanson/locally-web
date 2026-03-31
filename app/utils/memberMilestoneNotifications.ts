@@ -12,21 +12,21 @@ function getMembershipMilestoneCopy(status: Extract<LocallyMembershipStatus, 'me
   if (status === 'circle') {
     return {
       type: 'circle_welcome' as const,
-      title: '🌙 Locally Tier 2에 오신 것을 환영합니다',
+      title: '🌙 Tier 2에 오신 것을 환영합니다',
       message: '다시 찾아와 주셔서 감사합니다. 더 가까운 케어와 우선 안내가 이어집니다.',
-      emailSubject: '[Locally] Locally Tier 2에 오신 것을 환영합니다',
-      emailTitle: '이제 Locally Tier 2입니다',
+      emailSubject: '[Locally] Tier 2에 오신 것을 환영합니다',
+      emailTitle: '이제 Tier 2입니다',
       emailMessage:
-        '다시 찾아와 주셔서 감사합니다. 이제 Locally Tier 2 게스트로 더 가까운 케어와 우선 안내를 받을 수 있습니다.',
+        '다시 찾아와 주셔서 감사합니다. 이제 Tier 2 게스트로 더 가까운 케어와 우선 안내를 받을 수 있습니다.',
     };
   }
 
   return {
     type: 'member_welcome' as const,
-    title: '✨ Locally Tier 1이 열렸습니다',
+    title: '✨ Tier 1이 열렸습니다',
     message: '첫 구매가 완료되며 로컬리와의 연결이 시작됐어요.',
-    emailSubject: '[Locally] Locally Tier 1이 열렸습니다',
-    emailTitle: '이제 Locally Tier 1입니다',
+    emailSubject: '[Locally] Tier 1이 열렸습니다',
+    emailTitle: '이제 Tier 1입니다',
     emailMessage:
       '첫 구매가 완료되며 로컬리와의 연결이 시작됐어요. 로컬리 안에서 여행 기록이 쌓이고, 필요할 때 Locally Care로 이어갈 수 있습니다.',
   };
