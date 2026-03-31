@@ -102,6 +102,21 @@ async function createAuthUser(user: TestUser) {
   return data.user.id;
 }
 
+async function seedGuestProfile(userId: string) {
+  const supabase = getAdminClient();
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      nationality: 'KR',
+      bio: '멤버십 프로필 소개',
+      languages: ['Korean'],
+      job: '디자이너',
+    })
+    .eq('id', userId);
+
+  if (error) throw error;
+}
+
 async function createApprovedHostApplication(userId: string, user: TestUser) {
   const supabase = getAdminClient();
   const { data, error } = await supabase
@@ -286,6 +301,7 @@ test.describe.serial('locally membership care experience', () => {
 
     const hostId = await createAuthUser(host);
     const guestId = await createAuthUser(guest);
+    await seedGuestProfile(guestId);
     await createApprovedHostApplication(hostId, host);
     const experienceId = await createExperienceFixture(hostId);
     const bookingId = await createPaidBooking({
@@ -305,6 +321,8 @@ test.describe.serial('locally membership care experience', () => {
     await dismissAnnouncementIfVisible(page);
     await expect(page.getByTestId('account-membership-card')).toHaveCount(0);
     await expect(page.getByTestId('account-profile-membership-badge')).toContainText('Tier 1', { timeout: 15000 });
+    await expect(page.locator('p').filter({ hasText: '대한민국 (South Korea)' }).first()).toBeVisible();
+    await expect(page.getByText('"멤버십 프로필 소개"')).toBeVisible();
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/account', { waitUntil: 'domcontentloaded' });

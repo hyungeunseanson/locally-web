@@ -95,7 +95,6 @@ export default function AccountPage() {
     avatar_url: '',
     languages: [] as string[], // 🟢 [추가] 언어 배열 초기화
     job: '',
-    school: ''
   });
   const profileCompletion = getProfileCompletion(profile, 'guest');
   const profileMissingLabels = profileCompletion.missingFields
@@ -188,13 +187,23 @@ export default function AccountPage() {
       const adminAccess = await fetchAdminAccess();
       setHasAdminAccess(adminAccess.isAdmin);
 
-      const { data } = await supabase
+      const fallbackProfile = {
+        email: user.email || '',
+        full_name: user.user_metadata?.full_name || '',
+        avatar_url: user.user_metadata?.avatar_url || '',
+      };
+
+      const { data, error: profileError } = await supabase
         .from('profiles')
-        .select('full_name, email, nationality, birth_date, gender, bio, phone, mbti, kakao_id, avatar_url, languages, job, school')
+        .select('full_name, email, nationality, birth_date, gender, bio, phone, mbti, kakao_id, avatar_url, languages, job')
         .eq('id', user.id)
         .maybeSingle();
 
-      if (data) {
+      if (profileError) {
+        console.error('[account] failed to load profile:', profileError);
+      }
+
+      if (data && !profileError) {
         setProfile({
           full_name: data.full_name || '',
           email: user.email || data.email || '',
@@ -208,14 +217,11 @@ export default function AccountPage() {
           avatar_url: data.avatar_url || user.user_metadata?.avatar_url || '',
           languages: normalizeLanguageList(data.languages).map((language) => normalizeProfileLanguageValue(language)),
           job: data.job || '',
-          school: data.school || ''
         });
       } else {
         setProfile(prev => ({
           ...prev,
-          email: user.email || '',
-          full_name: user.user_metadata?.full_name || '',
-          avatar_url: user.user_metadata?.avatar_url || ''
+          ...fallbackProfile,
         }));
       }
 

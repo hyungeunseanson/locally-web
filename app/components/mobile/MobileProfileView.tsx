@@ -39,7 +39,6 @@ type MobileProfileData = {
     avatar_url: string;
     languages: string[];
     job?: string;
-    school?: string;
 };
 
 interface MobileProfileViewProps {
