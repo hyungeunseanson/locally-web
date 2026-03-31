@@ -334,6 +334,43 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Host dashboard reservations and inquiries UI coverage', () => {
+  test('shows the updated Japanese warning strip copy on reservations', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const host = createUser('host-warning-ja');
+    const guest = createUser('guest-warning-ja');
+
+    await page.addInitScript(() => {
+      window.localStorage.setItem('app_lang', 'ja');
+      document.cookie = 'app_lang=ja; path=/';
+    });
+
+    const hostId = await createAuthUser(host);
+    const guestId = await createAuthUser(guest);
+
+    await createApprovedHostApplication(hostId, host);
+    await seedGuestProfile(guestId, guest);
+
+    const experience = await createExperienceFixture(hostId);
+    await createBooking({
+      guestId,
+      guest,
+      experienceId: experience.id,
+      status: 'PAID',
+      daysOffset: 6,
+    });
+
+    await login(page, host);
+    await page.goto('/host/dashboard?tab=reservations', { waitUntil: 'networkidle' });
+    await dismissAnnouncementIfVisible(page);
+
+    await expect(
+      page.getByText(
+        'ゲストへの無返信・一方的なキャンセル・無断キャンセルは、精算やアカウント停止などに影響する可能性があります。今すぐ対応が必要な予約と問い合わせを優先的に確認してください。'
+      )
+    ).toBeVisible({ timeout: 15000 });
+  });
+
   test('shows reservation cards, cancellation tab state, and guest profile modal', async ({ page }) => {
     test.setTimeout(90000);
 

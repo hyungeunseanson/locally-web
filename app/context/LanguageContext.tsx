@@ -3066,7 +3066,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     menu_profile: "設定",
     res_status: "予約状況",
     res_desc: "ゲストの予約を管理・準備しましょう。",
-    host_dashboard_warning_strip: "ゲスト旅行を損なう無応答・キャンセル・ノーショーは、精算やアカウント状態に直接影響する可能性があります。今すぐ対応が必要な予約と問い合わせを先に確認してください。",
+    host_dashboard_warning_strip: "ゲストへの無返信・一方的なキャンセル・無断キャンセルは、精算やアカウント停止などに影響する可能性があります。今すぐ対応が必要な予約と問い合わせを優先的に確認してください。",
     tab_upcoming: "予定",
     tab_past: "完了",
     tab_cancel: "キャンセル",

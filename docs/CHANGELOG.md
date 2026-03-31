@@ -5,6 +5,13 @@
 
 ---
 
+## v3.39.90 — [Host Reservations] 일본어 warning strip 카피 정리
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟢 예약관리 일본어 경고 문구 교체 | `app/context/LanguageContext.tsx` — `host_dashboard_warning_strip`의 일본어 카피를 `무응답·일방 취소·무단 취소` 중심 문장으로 교체해 운영 톤을 더 정확하게 맞춤 |
+| 🟡 host reservations locale 회귀 체크 추가 | `tests/e2e/40-host-reservations-inquiries-ui.spec.ts` — 일본어 locale에서 예약 탭 상단 warning strip이 새 문구로 노출되는지 얇게 검증 |
+
 ## v3.39.89 — [Interaction Polish Phase 4] 채팅 애니메이션·PageTransition 확장·admin confirm() 제거
 
 | 항목 | 내용 |
