@@ -274,7 +274,7 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('locally membership care experience', () => {
-  test('first purchase customer sees Locally Member across key guest pages', async ({ page }) => {
+  test('first purchase customer sees Locally Tier 1 across key guest pages', async ({ page }) => {
     test.slow();
     const host = createUser('host.member');
     const guest = createUser('guest.member');
@@ -299,21 +299,21 @@ test.describe.serial('locally membership care experience', () => {
 
     await page.goto(`/experiences/${experienceId}/payment/complete?orderId=${bookingId}`, { waitUntil: 'domcontentloaded' });
     await dismissAnnouncementIfVisible(page);
-    await expect(page.getByText('이제 Locally Member입니다')).toBeVisible();
+    await expect(page.getByText('이제 Locally Tier 1입니다')).toBeVisible();
 
     await page.goto('/account', { waitUntil: 'domcontentloaded' });
     await dismissAnnouncementIfVisible(page);
     await expect(page.getByTestId('account-membership-card')).toHaveCount(0);
-    await expect(page.getByTestId('account-profile-membership-badge')).toContainText('로컬리 회원');
+    await expect(page.getByTestId('account-profile-membership-badge')).toContainText('Locally Tier 1');
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/account', { waitUntil: 'domcontentloaded' });
     await dismissAnnouncementIfVisible(page);
     await expect(page.getByTestId('account-membership-card')).toHaveCount(0);
-    await expect(page.getByTestId('account-mobile-membership-badge')).toContainText('로컬리 회원');
+    await expect(page.getByTestId('account-mobile-membership-badge')).toContainText('Locally Tier 1');
     await dismissAnnouncementIfVisible(page);
     await page.locator('button').filter({ has: page.getByTestId('account-mobile-membership-badge') }).first().click({ force: true });
-    await expect(page.getByTestId('mobile-profile-membership-badge')).toContainText('로컬리 회원');
+    await expect(page.getByTestId('mobile-profile-membership-badge')).toContainText('Locally Tier 1');
 
     await page.goto('/guest/trips', { waitUntil: 'domcontentloaded' });
     await dismissAnnouncementIfVisible(page);
@@ -333,7 +333,7 @@ test.describe.serial('locally membership care experience', () => {
     await expect(page.getByTestId('guest-inbox-member-care-strip')).toBeVisible();
   });
 
-  test('repeat customer sees Locally Circle in account and service completion', async ({ page }) => {
+  test('repeat customer sees Locally Tier 2 in account and service completion', async ({ page }) => {
     test.slow();
     const host = createUser('host.circle');
     const guest = createUser('guest.circle');
@@ -355,10 +355,10 @@ test.describe.serial('locally membership care experience', () => {
     await page.goto('/account', { waitUntil: 'domcontentloaded' });
     await dismissAnnouncementIfVisible(page);
     await expect(page.getByTestId('account-membership-card')).toHaveCount(0);
-    await expect(page.getByTestId('account-profile-membership-badge')).toContainText('Locally Circle');
+    await expect(page.getByTestId('account-profile-membership-badge')).toContainText('Locally Tier 2');
 
     await page.goto('/services/demo-request/payment/complete?orderId=MEMBERSHIP-CIRCLE', { waitUntil: 'domcontentloaded' });
     await dismissAnnouncementIfVisible(page);
-    await expect(page.getByText('다시 오셨네요, 이제 Locally Circle입니다')).toBeVisible();
+    await expect(page.getByText('다시 오셨네요, 이제 Locally Tier 2입니다')).toBeVisible();
   });
 });

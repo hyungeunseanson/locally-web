@@ -417,8 +417,8 @@ test.describe.serial('Host dashboard reservations and inquiries UI coverage', ()
     await expect(circleCard).toBeVisible({ timeout: 15000 });
     await expect(pendingCard).toBeVisible({ timeout: 15000 });
     await expect(page.getByText('₩24,000').last()).toBeVisible();
-    await expect(memberCard.locator('[data-testid="host-reservation-membership-badge"]').first()).toContainText('Locally Member');
-    await expect(circleCard.locator('[data-testid="host-reservation-membership-badge"]').first()).toContainText('Locally Circle');
+    await expect(memberCard.locator('[data-testid="host-reservation-membership-badge"]').first()).toContainText('Locally Tier 1');
+    await expect(circleCard.locator('[data-testid="host-reservation-membership-badge"]').first()).toContainText('Locally Tier 2');
     await expect(pendingCard.locator('[data-testid="host-reservation-membership-badge"]')).toHaveCount(0);
     await expect(page.getByRole('button', { name: /취소\/환불|Cancelled/ })).toBeVisible();
 
@@ -431,7 +431,7 @@ test.describe.serial('Host dashboard reservations and inquiries UI coverage', ()
 
     await expect(page.getByRole('heading', { name: memberGuest.fullName })).toBeVisible({ timeout: 15000 });
     await expect(page.getByText('Product Designer')).toBeVisible();
-    await expect(page.getByTestId('guest-profile-membership-badge')).toContainText('Locally Member');
+    await expect(page.getByTestId('guest-profile-membership-badge')).toContainText('Locally Tier 1');
     await expect(page.getByTestId('guest-profile-membership-desc')).toContainText(
       /처음 로컬리 여행을 시작한 게스트예요.|This guest is starting their first trip with Locally./
     );
@@ -442,7 +442,7 @@ test.describe.serial('Host dashboard reservations and inquiries UI coverage', ()
 
     await circleCard.getByRole('button', { name: new RegExp(`${circleGuest.fullName}.*(프로필|Profile)`) }).click();
     await expect(page.getByRole('heading', { name: circleGuest.fullName })).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('guest-profile-membership-badge')).toContainText('Locally Circle');
+    await expect(page.getByTestId('guest-profile-membership-badge')).toContainText('Locally Tier 2');
     await expect(page.getByTestId('guest-profile-membership-desc')).toContainText(
       /다시 찾아온 게스트예요.|This guest has come back to Locally./
     );
