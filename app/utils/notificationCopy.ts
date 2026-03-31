@@ -1,0 +1,987 @@
+import { createAdminClient } from '@/app/utils/supabase/admin';
+import {
+  resolveRecipientLocale,
+  type NotificationLocale,
+} from '@/app/utils/notificationLocale';
+
+type AdminClient = ReturnType<typeof createAdminClient>;
+
+type ReviewType = 'host_unavailable' | 'minimum_participants_unmet';
+
+type BookingNewHostParams = {
+  experienceTitle: string;
+  guestName: string;
+  state: 'pending' | 'processing';
+};
+
+type BookingConfirmedHostParams = {
+  experienceTitle: string;
+  guestName: string;
+};
+
+type BookingConfirmedGuestParams = {
+  experienceTitle: string;
+};
+
+type BookingReviewPendingParams = {
+  experienceTitle: string;
+  reviewType: ReviewType;
+  recipient: 'guest' | 'host';
+};
+
+type BookingCancelledParams = {
+  experienceTitle: string;
+  refundAmount: number;
+  recipient: 'guest' | 'host';
+};
+
+type BookingAdminForceCancelledGuestParams = {
+  experienceTitle: string;
+  refundAmount: number;
+};
+
+type BookingHostFaultCancelledParams = {
+  experienceTitle: string;
+  refundAmount: number;
+  recipient: 'guest' | 'host';
+  reviewType: ReviewType;
+};
+
+type BookingReviewRejectedParams = {
+  experienceTitle: string;
+  reviewType: ReviewType;
+  recipient: 'guest' | 'host';
+};
+
+type InquiryNewMessageParams = {
+  actorDisplayName: string;
+  displayContent: string;
+};
+
+type MembershipParams = {
+  status: 'member' | 'circle';
+};
+
+type HostApplicationStatusParams = {
+  comment?: string;
+};
+
+export type NotificationCopyKey =
+  | 'booking.new.host'
+  | 'booking.confirmed.host'
+  | 'booking.confirmed.guest'
+  | 'booking.bank_confirmed.host'
+  | 'booking.bank_confirmed.guest'
+  | 'booking.review_pending'
+  | 'booking.cancelled'
+  | 'booking.cancelled.admin_force.guest'
+  | 'booking.cancelled.host_fault'
+  | 'booking.review_rejected'
+  | 'inquiry.new_message'
+  | 'membership.member_welcome'
+  | 'membership.circle_welcome'
+  | 'host_application.approved'
+  | 'host_application.revision'
+  | 'host_application.rejected';
+
+type NotificationCopyParams = {
+  'booking.new.host': BookingNewHostParams;
+  'booking.confirmed.host': BookingConfirmedHostParams;
+  'booking.confirmed.guest': BookingConfirmedGuestParams;
+  'booking.bank_confirmed.host': BookingConfirmedHostParams;
+  'booking.bank_confirmed.guest': BookingConfirmedGuestParams;
+  'booking.review_pending': BookingReviewPendingParams;
+  'booking.cancelled': BookingCancelledParams;
+  'booking.cancelled.admin_force.guest': BookingAdminForceCancelledGuestParams;
+  'booking.cancelled.host_fault': BookingHostFaultCancelledParams;
+  'booking.review_rejected': BookingReviewRejectedParams;
+  'inquiry.new_message': InquiryNewMessageParams;
+  'membership.member_welcome': MembershipParams;
+  'membership.circle_welcome': MembershipParams;
+  'host_application.approved': HostApplicationStatusParams;
+  'host_application.revision': HostApplicationStatusParams;
+  'host_application.rejected': HostApplicationStatusParams;
+};
+
+type NotificationCopy = {
+  title: string;
+  message: string;
+};
+
+type LocalizedNotificationInsertInput<K extends NotificationCopyKey> = {
+  supabaseAdmin: AdminClient;
+  userId: string;
+  type: string;
+  link: string;
+  key: K;
+  copyParams: NotificationCopyParams[K];
+};
+
+const NUMBER_FORMAT_LOCALE: Record<NotificationLocale, string> = {
+  ko: 'ko-KR',
+  en: 'en-US',
+  ja: 'ja-JP',
+  zh: 'zh-CN',
+};
+
+function formatKrw(amount: number, locale: NotificationLocale) {
+  return `₩${Math.max(0, amount).toLocaleString(NUMBER_FORMAT_LOCALE[locale])}`;
+}
+
+function getRefundText(refundAmount: number, locale: NotificationLocale) {
+  if (refundAmount > 0) {
+    const formatted = formatKrw(refundAmount, locale);
+    switch (locale) {
+      case 'en':
+        return `Refund amount: ${formatted}`;
+      case 'ja':
+        return `返金額: ${formatted}`;
+      case 'zh':
+        return `退款金额：${formatted}`;
+      case 'ko':
+      default:
+        return `환불 금액: ${formatted}`;
+    }
+  }
+
+  switch (locale) {
+    case 'en':
+      return 'The booking was cancelled before payment was completed.';
+    case 'ja':
+      return '決済完了前に予約がキャンセルされました。';
+    case 'zh':
+      return '该预约已在付款完成前取消。';
+    case 'ko':
+    default:
+      return '결제 전 예약이 취소되었습니다.';
+  }
+}
+
+function getReviewTypeLabel(reviewType: ReviewType, locale: NotificationLocale) {
+  if (reviewType === 'minimum_participants_unmet') {
+    switch (locale) {
+      case 'en':
+        return 'minimum participants not met';
+      case 'ja':
+        return '最低催行人数未達';
+      case 'zh':
+        return '未达到最低成团人数';
+      case 'ko':
+      default:
+        return '최소 진행 인원 미달';
+    }
+  }
+
+  switch (locale) {
+    case 'en':
+      return 'host unavailable';
+    case 'ja':
+      return 'ホスト都合';
+    case 'zh':
+      return '房东无法接待';
+    case 'ko':
+    default:
+      return '호스트 진행 불가';
+  }
+}
+
+function buildBookingNewHostCopy(
+  locale: NotificationLocale,
+  params: BookingNewHostParams
+): NotificationCopy {
+  const { experienceTitle, guestName, state } = params;
+
+  if (state === 'pending') {
+    switch (locale) {
+      case 'en':
+        return {
+          title: '⏳ New booking (bank transfer pending)',
+          message: `A bank transfer booking from ${guestName} was received for '${experienceTitle}'.`,
+        };
+      case 'ja':
+        return {
+          title: '⏳ 新しい予約（入金待ち）',
+          message: `「${experienceTitle}」に${guestName}さんの銀行振込予約が入りました。`,
+        };
+      case 'zh':
+        return {
+          title: '⏳ 新预约（待转账）',
+          message: `「${experienceTitle}」收到来自${guestName}的银行转账预约。`,
+        };
+      case 'ko':
+      default:
+        return {
+          title: '⏳ 새로운 예약 (입금 대기)',
+          message: `'${experienceTitle}'에 ${guestName}님의 무통장 입금 대기 예약이 접수되었습니다.`,
+        };
+    }
+  }
+
+  switch (locale) {
+    case 'en':
+      return {
+        title: '🎉 New booking (payment in progress)',
+        message: `A new payment from ${guestName} is in progress for '${experienceTitle}'.`,
+      };
+    case 'ja':
+      return {
+        title: '🎉 新しい予約（決済進行中）',
+        message: `「${experienceTitle}」に${guestName}さんの新しい決済が進行中です。`,
+      };
+    case 'zh':
+      return {
+        title: '🎉 新预约（支付进行中）',
+        message: `「${experienceTitle}」中来自${guestName}的新支付正在进行中。`,
+      };
+    case 'ko':
+    default:
+      return {
+        title: '🎉 새로운 예약 (결제 진행중)',
+        message: `'${experienceTitle}'에 ${guestName}님의 새로운 결제가 진행되고 있습니다!`,
+      };
+  }
+}
+
+function buildBookingConfirmedHostCopy(
+  locale: NotificationLocale,
+  params: BookingConfirmedHostParams
+): NotificationCopy {
+  const { experienceTitle, guestName } = params;
+
+  switch (locale) {
+    case 'en':
+      return {
+        title: '🎉 New booking confirmed!',
+        message: `The booking from ${guestName} for '${experienceTitle}' has been confirmed.`,
+      };
+    case 'ja':
+      return {
+        title: '🎉 新しい予約が確定しました！',
+        message: `「${experienceTitle}」の${guestName}さんの予約が確定しました。`,
+      };
+    case 'zh':
+      return {
+        title: '🎉 新预约已确认！',
+        message: `「${experienceTitle}」中来自${guestName}的预约已确认。`,
+      };
+    case 'ko':
+    default:
+      return {
+        title: '🎉 새로운 예약 도착!',
+        message: `[${experienceTitle}] 체험에 ${guestName}님의 예약이 확정되었습니다.`,
+      };
+  }
+}
+
+function buildBookingBankConfirmedHostCopy(
+  locale: NotificationLocale,
+  params: BookingConfirmedHostParams
+): NotificationCopy {
+  const { experienceTitle, guestName } = params;
+
+  switch (locale) {
+    case 'en':
+      return {
+        title: '💰 Payment received',
+        message: `The bank transfer from ${guestName} for '${experienceTitle}' has been confirmed.`,
+      };
+    case 'ja':
+      return {
+        title: '💰 入金確認完了',
+        message: `「${experienceTitle}」の${guestName}さんの入金確認が完了しました。`,
+      };
+    case 'zh':
+      return {
+        title: '💰 已确认收款',
+        message: `已确认「${experienceTitle}」中来自${guestName}的转账。`,
+      };
+    case 'ko':
+    default:
+      return {
+        title: '💰 입금 확인 완료!',
+        message: `'${experienceTitle}' ${guestName}님의 입금 확인이 완료되었습니다.`,
+      };
+  }
+}
+
+function buildBookingConfirmedGuestCopy(
+  locale: NotificationLocale,
+  params: BookingConfirmedGuestParams
+): NotificationCopy {
+  const { experienceTitle } = params;
+
+  switch (locale) {
+    case 'en':
+      return {
+        title: '✅ Your booking is confirmed',
+        message: `Your payment for '${experienceTitle}' is complete and the booking is confirmed.`,
+      };
+    case 'ja':
+      return {
+        title: '✅ 予約が確定しました',
+        message: `「${experienceTitle}」の決済が完了し、予約が確定しました。`,
+      };
+    case 'zh':
+      return {
+        title: '✅ 预约已确认',
+        message: `「${experienceTitle}」的付款已完成，预约已确认。`,
+      };
+    case 'ko':
+    default:
+      return {
+        title: '✅ 예약이 확정되었습니다',
+        message: `'${experienceTitle}' 결제가 완료되어 예약이 확정되었습니다.`,
+      };
+  }
+}
+
+function buildBookingBankConfirmedGuestCopy(
+  locale: NotificationLocale,
+  params: BookingConfirmedGuestParams
+): NotificationCopy {
+  const { experienceTitle } = params;
+
+  switch (locale) {
+    case 'en':
+      return {
+        title: '✅ Booking confirmation',
+        message: `The bank transfer for '${experienceTitle}' has been confirmed and your booking is now confirmed.`,
+      };
+    case 'ja':
+      return {
+        title: '✅ 予約確定のお知らせ',
+        message: `「${experienceTitle}」の入金が確認され、予約が確定しました。`,
+      };
+    case 'zh':
+      return {
+        title: '✅ 预约确认通知',
+        message: `已确认「${experienceTitle}」的转账，预约现已确认。`,
+      };
+    case 'ko':
+    default:
+      return {
+        title: '✅ 예약 확정 알림',
+        message: `'${experienceTitle}' 입금이 확인되어 예약이 확정되었습니다.`,
+      };
+  }
+}
+
+function buildBookingReviewPendingCopy(
+  locale: NotificationLocale,
+  params: BookingReviewPendingParams
+): NotificationCopy {
+  const { experienceTitle, recipient, reviewType } = params;
+
+  if (recipient === 'guest') {
+    if (reviewType === 'minimum_participants_unmet') {
+      switch (locale) {
+        case 'en':
+          return {
+            title: 'Your cancellation review request was received.',
+            message: `Your cancellation request for '${experienceTitle}' due to minimum participants not being met has been submitted for admin review.`,
+          };
+        case 'ja':
+          return {
+            title: '最低催行人数未達によるキャンセル審査依頼を受け付けました。',
+            message: `「${experienceTitle}」の最低催行人数未達によるキャンセル依頼は、現在運営チームで確認中です。`,
+          };
+        case 'zh':
+          return {
+            title: '已收到最低成团人数未达的取消审核请求。',
+            message: `「${experienceTitle}」因未达到最低成团人数的取消请求已提交给运营团队审核。`,
+          };
+        case 'ko':
+        default:
+          return {
+            title: '최소 진행 인원 미달 취소 요청이 접수되었습니다.',
+            message: `'${experienceTitle}' 예약의 최소 진행 인원 미달 취소 요청이 운영팀 검토 대기 상태로 접수되었습니다.`,
+          };
+      }
+    }
+
+    switch (locale) {
+      case 'en':
+        return {
+          title: 'Your cancellation review request was received.',
+          message: `Your cancellation request for '${experienceTitle}' has been submitted for admin review.`,
+        };
+      case 'ja':
+        return {
+          title: 'キャンセル審査依頼を受け付けました。',
+          message: `「${experienceTitle}」のキャンセル依頼は、現在運営チームで確認中です。`,
+        };
+      case 'zh':
+        return {
+          title: '已收到取消审核请求。',
+          message: `「${experienceTitle}」的取消请求已提交给运营团队审核。`,
+        };
+      case 'ko':
+      default:
+        return {
+          title: '취소 요청이 접수되었습니다.',
+          message: `'${experienceTitle}' 예약이 운영팀 검토 대기 상태로 접수되었습니다.`,
+        };
+    }
+  }
+
+  if (reviewType === 'minimum_participants_unmet') {
+    switch (locale) {
+      case 'en':
+        return {
+          title: 'Cancellation review request: minimum participants not met',
+          message: `The guest requested admin review for '${experienceTitle}' due to minimum participants not being met.`,
+        };
+      case 'ja':
+        return {
+          title: '最低催行人数未達のキャンセル審査依頼',
+          message: `「${experienceTitle}」について、ゲストが最低催行人数未達を理由に運営チームへ審査を依頼しました。`,
+        };
+      case 'zh':
+        return {
+          title: '最低成团人数未达取消审核请求',
+          message: `关于「${experienceTitle}」，游客以未达到最低成团人数为由请求运营团队审核取消。`,
+        };
+      case 'ko':
+      default:
+        return {
+          title: '최소 진행 인원 미달 취소 검토 요청',
+          message: `'${experienceTitle}' 예약에 대해 고객이 최소 진행 인원 미달 사유로 운영팀 검토를 요청했습니다.`,
+        };
+    }
+  }
+
+  switch (locale) {
+    case 'en':
+      return {
+        title: 'Cancellation review request: host unavailable',
+        message: `The guest requested admin review for '${experienceTitle}'.`,
+      };
+    case 'ja':
+      return {
+        title: 'ホスト都合によるキャンセル審査依頼',
+        message: `「${experienceTitle}」について、ゲストが運営チームへ審査を依頼しました。`,
+      };
+    case 'zh':
+      return {
+        title: '房东无法接待取消审核请求',
+        message: `关于「${experienceTitle}」，游客已向运营团队提交审核请求。`,
+      };
+    case 'ko':
+    default:
+      return {
+        title: '호스트 진행 불가 취소 검토 요청',
+        message: `'${experienceTitle}' 예약에 대해 고객이 운영팀 검토를 요청했습니다.`,
+      };
+  }
+}
+
+function buildBookingCancelledCopy(
+  locale: NotificationLocale,
+  params: BookingCancelledParams
+): NotificationCopy {
+  const { experienceTitle, refundAmount, recipient } = params;
+  const refundText = getRefundText(refundAmount, locale);
+
+  if (recipient === 'host') {
+    switch (locale) {
+      case 'en':
+        return {
+          title: '😢 The booking was cancelled.',
+          message: `[${experienceTitle}] The booking was cancelled. ${refundText}`,
+        };
+      case 'ja':
+        return {
+          title: '😢 予約がキャンセルされました。',
+          message: `[${experienceTitle}] 予約がキャンセルされました。${refundText}`,
+        };
+      case 'zh':
+        return {
+          title: '😢 预约已取消。',
+          message: `[${experienceTitle}] 预约已取消。${refundText}`,
+        };
+      case 'ko':
+      default:
+        return {
+          title: '😢 예약이 취소되었습니다.',
+          message: `[${experienceTitle}] 예약이 취소되었습니다. ${refundText}`,
+        };
+    }
+  }
+
+  switch (locale) {
+    case 'en':
+      return {
+        title: 'The booking was cancelled.',
+        message: `Your booking for '${experienceTitle}' was cancelled. ${refundText}`,
+      };
+    case 'ja':
+      return {
+        title: '予約がキャンセルされました。',
+        message: `「${experienceTitle}」の予約がキャンセルされました。${refundText}`,
+      };
+    case 'zh':
+      return {
+        title: '预约已取消。',
+        message: `「${experienceTitle}」的预约已取消。${refundText}`,
+      };
+    case 'ko':
+    default:
+      return {
+        title: '예약이 취소되었습니다.',
+        message: `'${experienceTitle}' 예약이 취소되었습니다. ${refundText}`,
+      };
+  }
+}
+
+function buildBookingAdminForceCancelledGuestCopy(
+  locale: NotificationLocale,
+  params: BookingAdminForceCancelledGuestParams
+): NotificationCopy {
+  const { experienceTitle, refundAmount } = params;
+  const refundText = getRefundText(refundAmount, locale);
+
+  switch (locale) {
+    case 'en':
+      return {
+        title: 'The booking was cancelled.',
+        message: `Your booking for '${experienceTitle}' was cancelled by the admin team. ${refundText}`,
+      };
+    case 'ja':
+      return {
+        title: '予約がキャンセルされました。',
+        message: `「${experienceTitle}」の予約は運営チームによりキャンセルされました。${refundText}`,
+      };
+    case 'zh':
+      return {
+        title: '预约已取消。',
+        message: `「${experienceTitle}」的预约已由运营团队取消。${refundText}`,
+      };
+    case 'ko':
+    default:
+      return {
+        title: '예약이 취소되었습니다.',
+        message: `'${experienceTitle}' 예약이 관리자에 의해 취소되었습니다. ${refundText}`,
+      };
+  }
+}
+
+function buildBookingHostFaultCancelledCopy(
+  locale: NotificationLocale,
+  params: BookingHostFaultCancelledParams
+): NotificationCopy {
+  const { experienceTitle, refundAmount, recipient, reviewType } = params;
+  const refundText = getRefundText(refundAmount, locale);
+  const reasonLabel = getReviewTypeLabel(reviewType, locale);
+
+  if (recipient === 'host') {
+    switch (locale) {
+      case 'en':
+        return {
+          title: '😢 The booking was cancelled.',
+          message: `[${experienceTitle}] The booking was cancelled due to ${reasonLabel}. ${refundText}`,
+        };
+      case 'ja':
+        return {
+          title: '😢 予約がキャンセルされました。',
+          message: `[${experienceTitle}] 予約は${reasonLabel}のためキャンセル処理されました。${refundText}`,
+        };
+      case 'zh':
+        return {
+          title: '😢 预约已取消。',
+          message: `[${experienceTitle}] 该预约因${reasonLabel}已被取消处理。${refundText}`,
+        };
+      case 'ko':
+      default:
+        return {
+          title: '😢 예약이 취소되었습니다.',
+          message: `[${experienceTitle}] 예약이 ${reasonLabel} 사유로 취소 처리되었습니다. ${refundText}`,
+        };
+    }
+  }
+
+  switch (locale) {
+    case 'en':
+      return {
+        title: `The booking was cancelled due to ${reasonLabel}.`,
+        message: `Your booking for '${experienceTitle}' was cancelled due to ${reasonLabel}. ${refundText}`,
+      };
+    case 'ja':
+      return {
+        title: `${reasonLabel}のため予約がキャンセルされました。`,
+        message: `「${experienceTitle}」の予約は${reasonLabel}のためキャンセルされました。${refundText}`,
+      };
+    case 'zh':
+      return {
+        title: `预约因${reasonLabel}已取消。`,
+        message: `「${experienceTitle}」的预约因${reasonLabel}已取消。${refundText}`,
+      };
+    case 'ko':
+    default:
+      return {
+        title: `${reasonLabel}로 예약이 취소되었습니다.`,
+        message: `[${experienceTitle}] 예약이 ${reasonLabel} 사유로 취소되었습니다. ${refundText}`,
+      };
+    }
+}
+
+function buildBookingReviewRejectedCopy(
+  locale: NotificationLocale,
+  params: BookingReviewRejectedParams
+): NotificationCopy {
+  const { experienceTitle, recipient, reviewType } = params;
+
+  if (recipient === 'guest') {
+    if (reviewType === 'minimum_participants_unmet') {
+      switch (locale) {
+        case 'en':
+          return {
+            title: 'The minimum-participants cancellation request was declined.',
+            message: `Your booking for '${experienceTitle}' will stay active. Please contact the host directly if needed.`,
+          };
+        case 'ja':
+          return {
+            title: '最低催行人数未達によるキャンセル依頼は却下されました。',
+            message: `「${experienceTitle}」の予約は維持されます。必要であればホストに直接ご連絡ください。`,
+          };
+        case 'zh':
+          return {
+            title: '最低成团人数未达的取消请求已被驳回。',
+            message: `「${experienceTitle}」的预约将继续保留，如有需要请直接与房东沟通。`,
+          };
+        case 'ko':
+        default:
+          return {
+            title: '최소 진행 인원 미달 취소 요청이 반려되었습니다.',
+            message: `'${experienceTitle}' 예약은 유지되며, 필요 시 호스트와 직접 소통해주세요.`,
+          };
+      }
+    }
+
+    switch (locale) {
+      case 'en':
+        return {
+          title: 'The host-unavailable cancellation request was declined.',
+          message: `Your booking for '${experienceTitle}' will stay active. Please contact the host directly if needed.`,
+        };
+      case 'ja':
+        return {
+          title: 'ホスト都合によるキャンセル依頼は却下されました。',
+          message: `「${experienceTitle}」の予約は維持されます。必要であればホストに直接ご連絡ください。`,
+        };
+      case 'zh':
+        return {
+          title: '房东无法接待的取消请求已被驳回。',
+          message: `「${experienceTitle}」的预约将继续保留，如有需要请直接与房东沟通。`,
+        };
+      case 'ko':
+      default:
+        return {
+          title: '호스트 진행 불가 취소 요청이 반려되었습니다.',
+          message: `'${experienceTitle}' 예약은 유지되며, 필요 시 호스트와 직접 소통해주세요.`,
+        };
+    }
+  }
+
+  if (reviewType === 'minimum_participants_unmet') {
+    switch (locale) {
+      case 'en':
+        return {
+          title: 'The minimum-participants cancellation request was declined.',
+          message: `The booking for '${experienceTitle}' remains active. Please coordinate with the guest directly.`,
+        };
+      case 'ja':
+        return {
+          title: '最低催行人数未達によるキャンセル依頼は却下されました。',
+          message: `「${experienceTitle}」の予約は維持されます。ゲストと直接ご調整ください。`,
+        };
+      case 'zh':
+        return {
+          title: '最低成团人数未达的取消请求已被驳回。',
+          message: `「${experienceTitle}」的预约将继续保留，请直接与游客沟通。`,
+        };
+      case 'ko':
+      default:
+        return {
+          title: '최소 진행 인원 미달 취소 요청이 반려되었습니다.',
+          message: `'${experienceTitle}' 예약은 유지됩니다. 고객과 직접 소통해주세요.`,
+        };
+    }
+  }
+
+  switch (locale) {
+    case 'en':
+      return {
+        title: 'The host-unavailable cancellation request was declined.',
+        message: `The booking for '${experienceTitle}' remains active. Please coordinate with the guest directly.`,
+      };
+    case 'ja':
+      return {
+        title: 'ホスト都合によるキャンセル依頼は却下されました。',
+        message: `「${experienceTitle}」の予約は維持されます。ゲストと直接ご調整ください。`,
+      };
+    case 'zh':
+      return {
+        title: '房东无法接待的取消请求已被驳回。',
+        message: `「${experienceTitle}」的预约将继续保留，请直接与游客沟通。`,
+      };
+    case 'ko':
+    default:
+      return {
+        title: '호스트 진행 불가 취소 요청이 반려되었습니다.',
+        message: `'${experienceTitle}' 예약은 유지됩니다. 고객과 직접 소통해주세요.`,
+      };
+  }
+}
+
+function buildInquiryNewMessageCopy(
+  locale: NotificationLocale,
+  params: InquiryNewMessageParams
+): NotificationCopy {
+  const { actorDisplayName, displayContent } = params;
+
+  switch (locale) {
+    case 'en':
+      return {
+        title: `💬 New message from ${actorDisplayName}`,
+        message: displayContent,
+      };
+    case 'ja':
+      return {
+        title: `💬 ${actorDisplayName}さんから新しいメッセージ`,
+        message: displayContent,
+      };
+    case 'zh':
+      return {
+        title: `💬 来自${actorDisplayName}的新消息`,
+        message: displayContent,
+      };
+    case 'ko':
+    default:
+      return {
+        title: `💬 ${actorDisplayName}님의 새 메시지`,
+        message: displayContent,
+      };
+  }
+}
+
+function buildMembershipCopy(
+  locale: NotificationLocale,
+  params: MembershipParams
+): NotificationCopy {
+  if (params.status === 'circle') {
+    switch (locale) {
+      case 'en':
+        return {
+          title: '🌙 Welcome to Tier 2',
+          message: 'Thanks for coming back. You now get closer support and earlier updates.',
+        };
+      case 'ja':
+        return {
+          title: '🌙 Tier 2へようこそ',
+          message: '再びご利用いただきありがとうございます。より近いサポートと先行案内を受けられます。',
+        };
+      case 'zh':
+        return {
+          title: '🌙 欢迎来到 Tier 2',
+          message: '感谢再次回来。你现在可以获得更贴近的支持和更早的通知。',
+        };
+      case 'ko':
+      default:
+        return {
+          title: '🌙 Tier 2에 오신 것을 환영합니다',
+          message: '다시 찾아와 주셔서 감사합니다. 더 가까운 케어와 우선 안내가 이어집니다.',
+        };
+    }
+  }
+
+  switch (locale) {
+    case 'en':
+      return {
+        title: '✨ Tier 1 is now open',
+        message: 'Your first purchase is complete, and your connection with Locally has started.',
+      };
+    case 'ja':
+      return {
+        title: '✨ Tier 1が開きました',
+        message: '最初の購入が完了し、Locallyとのつながりが始まりました。',
+      };
+    case 'zh':
+      return {
+        title: '✨ Tier 1 已开启',
+        message: '你的首次购买已完成，你与 Locally 的连接已经开始。',
+      };
+    case 'ko':
+    default:
+      return {
+        title: '✨ Tier 1이 열렸습니다',
+        message: '첫 구매가 완료되며 로컬리와의 연결이 시작됐어요.',
+      };
+  }
+}
+
+function buildHostApplicationStatusCopy(
+  locale: NotificationLocale,
+  key: 'host_application.approved' | 'host_application.revision' | 'host_application.rejected',
+  params: HostApplicationStatusParams
+): NotificationCopy {
+  const trimmedComment = params.comment?.trim();
+
+  if (key === 'host_application.approved') {
+    switch (locale) {
+      case 'en':
+        return {
+          title: '🎉 Your host application is approved',
+          message: 'Your host application has been approved. You can now use the host dashboard and features.',
+        };
+      case 'ja':
+        return {
+          title: '🎉 ホスト承認が完了しました',
+          message: 'ホスト申請が承認されました。これからホストダッシュボードと各機能をご利用いただけます。',
+        };
+      case 'zh':
+        return {
+          title: '🎉 你的房东申请已通过',
+          message: '你的房东申请已获批准，现在可以使用房东后台和相关功能。',
+        };
+      case 'ko':
+      default:
+        return {
+          title: '🎉 호스트 승인이 완료되었습니다',
+          message: '호스트 신청이 승인되었습니다. 이제 호스트 대시보드와 기능을 이용할 수 있습니다.',
+        };
+    }
+  }
+
+  if (key === 'host_application.revision') {
+    switch (locale) {
+      case 'en':
+        return {
+          title: '🛠️ Your host application needs revision',
+          message: trimmedComment
+            ? `Please review the admin comment and update your application.\n\nReason: ${trimmedComment}`
+            : 'Please review the admin comment and update your application.',
+        };
+      case 'ja':
+        return {
+          title: '🛠️ ホスト申請の補完が必要です',
+          message: trimmedComment
+            ? `管理者コメントを確認し、申請内容を補完してください。\n\n補完理由: ${trimmedComment}`
+            : '管理者コメントを確認し、申請内容を補完してください。',
+        };
+      case 'zh':
+        return {
+          title: '🛠️ 你的房东申请需要补充',
+          message: trimmedComment
+            ? `请查看管理员备注并补充你的申请内容。\n\n补充原因：${trimmedComment}`
+            : '请查看管理员备注并补充你的申请内容。',
+        };
+      case 'ko':
+      default:
+        return {
+          title: '🛠️ 호스트 지원서 보완이 필요합니다',
+          message: trimmedComment
+            ? `관리자 코멘트를 확인하고 지원서를 보완해 주세요.\n\n보완 사유: ${trimmedComment}`
+            : '관리자 코멘트를 확인하고 지원서를 보완해 주세요.',
+        };
+    }
+  }
+
+  switch (locale) {
+    case 'en':
+      return {
+        title: '📌 Please review your host application result',
+        message: trimmedComment
+          ? `This host application was not approved.\n\nReason: ${trimmedComment}`
+          : 'This host application was not approved.',
+      };
+    case 'ja':
+      return {
+        title: '📌 ホスト申請結果をご確認ください',
+        message: trimmedComment
+          ? `今回のホスト申請は承認されませんでした。\n\n理由: ${trimmedComment}`
+          : '今回のホスト申請は承認されませんでした。',
+      };
+    case 'zh':
+      return {
+        title: '📌 请查看你的房东申请结果',
+        message: trimmedComment
+          ? `本次房东申请未获批准。\n\n原因：${trimmedComment}`
+          : '本次房东申请未获批准。',
+      };
+    case 'ko':
+    default:
+      return {
+        title: '📌 호스트 지원 결과를 확인해 주세요',
+        message: trimmedComment
+          ? `이번 호스트 신청은 승인되지 않았습니다.\n\n사유: ${trimmedComment}`
+          : '이번 호스트 신청은 승인되지 않았습니다.',
+      };
+  }
+}
+
+export function buildNotificationCopy<K extends NotificationCopyKey>(
+  key: K,
+  locale: NotificationLocale,
+  copyParams: NotificationCopyParams[K]
+): NotificationCopy {
+  switch (key) {
+    case 'booking.new.host':
+      return buildBookingNewHostCopy(locale, copyParams as NotificationCopyParams['booking.new.host']);
+    case 'booking.confirmed.host':
+      return buildBookingConfirmedHostCopy(locale, copyParams as NotificationCopyParams['booking.confirmed.host']);
+    case 'booking.confirmed.guest':
+      return buildBookingConfirmedGuestCopy(locale, copyParams as NotificationCopyParams['booking.confirmed.guest']);
+    case 'booking.bank_confirmed.host':
+      return buildBookingBankConfirmedHostCopy(locale, copyParams as NotificationCopyParams['booking.bank_confirmed.host']);
+    case 'booking.bank_confirmed.guest':
+      return buildBookingBankConfirmedGuestCopy(locale, copyParams as NotificationCopyParams['booking.bank_confirmed.guest']);
+    case 'booking.review_pending':
+      return buildBookingReviewPendingCopy(locale, copyParams as NotificationCopyParams['booking.review_pending']);
+    case 'booking.cancelled':
+      return buildBookingCancelledCopy(locale, copyParams as NotificationCopyParams['booking.cancelled']);
+    case 'booking.cancelled.admin_force.guest':
+      return buildBookingAdminForceCancelledGuestCopy(
+        locale,
+        copyParams as NotificationCopyParams['booking.cancelled.admin_force.guest']
+      );
+    case 'booking.cancelled.host_fault':
+      return buildBookingHostFaultCancelledCopy(locale, copyParams as NotificationCopyParams['booking.cancelled.host_fault']);
+    case 'booking.review_rejected':
+      return buildBookingReviewRejectedCopy(locale, copyParams as NotificationCopyParams['booking.review_rejected']);
+    case 'inquiry.new_message':
+      return buildInquiryNewMessageCopy(locale, copyParams as NotificationCopyParams['inquiry.new_message']);
+    case 'membership.member_welcome':
+      return buildMembershipCopy(locale, { ...(copyParams as NotificationCopyParams['membership.member_welcome']), status: 'member' });
+    case 'membership.circle_welcome':
+      return buildMembershipCopy(locale, { ...(copyParams as NotificationCopyParams['membership.circle_welcome']), status: 'circle' });
+    case 'host_application.approved':
+    case 'host_application.revision':
+    case 'host_application.rejected':
+      return buildHostApplicationStatusCopy(
+        locale,
+        key,
+        copyParams as NotificationCopyParams['host_application.approved']
+      );
+    default:
+      return {
+        title: '',
+        message: '',
+      };
+  }
+}
+
+export async function buildLocalizedNotificationInsert<K extends NotificationCopyKey>(
+  input: LocalizedNotificationInsertInput<K>
+) {
+  const locale = await resolveRecipientLocale(input.supabaseAdmin, input.userId);
+  const copy = buildNotificationCopy(input.key, locale, input.copyParams);
+
+  return {
+    user_id: input.userId,
+    type: input.type,
+    title: copy.title,
+    message: copy.message,
+    link: input.link,
+    is_read: false as const,
+  };
+}

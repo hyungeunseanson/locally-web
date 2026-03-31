@@ -10,6 +10,7 @@ import { cancelCardPayment } from '@/app/utils/payments/card/server';
 import { refundPayPalCapture } from '@/app/utils/paypal/server';
 import { captureServerException } from '@/app/utils/monitoring/sentry';
 import { calculateGuestCancellationRefundRate } from '@/app/utils/bookingCancellationPolicy';
+import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 import {
   formatBookingReviewMarker,
   isBookingReviewPending,
@@ -130,33 +131,37 @@ export async function POST(request: Request) {
         const notifications = [];
 
         if (booking.user_id) {
-          notifications.push({
-            user_id: booking.user_id,
-            type: 'cancellation',
-            title: reviewType === 'minimum_participants_unmet'
-              ? '최소 진행 인원 미달 취소 요청이 접수되었습니다.'
-              : '취소 요청이 접수되었습니다.',
-            message: reviewType === 'minimum_participants_unmet'
-              ? `'${expTitle}' 예약의 최소 진행 인원 미달 취소 요청이 운영팀 검토 대기 상태로 접수되었습니다.`
-              : `'${expTitle}' 예약이 운영팀 검토 대기 상태로 접수되었습니다.`,
-            link: '/guest/trips',
-            is_read: false,
-          });
+          notifications.push(
+            await buildLocalizedNotificationInsert({
+              supabaseAdmin,
+              userId: booking.user_id,
+              type: 'cancellation',
+              link: '/guest/trips',
+              key: 'booking.review_pending',
+              copyParams: {
+                experienceTitle: expTitle,
+                reviewType,
+                recipient: 'guest',
+              },
+            })
+          );
         }
 
         if (hostId) {
-          notifications.push({
-            user_id: hostId,
-            type: 'cancellation',
-            title: reviewType === 'minimum_participants_unmet'
-              ? '최소 진행 인원 미달 취소 검토 요청'
-              : '호스트 진행 불가 취소 검토 요청',
-            message: reviewType === 'minimum_participants_unmet'
-              ? `'${expTitle}' 예약에 대해 고객이 최소 진행 인원 미달 사유로 운영팀 검토를 요청했습니다.`
-              : `'${expTitle}' 예약에 대해 고객이 운영팀 검토를 요청했습니다.`,
-            link: '/host/dashboard',
-            is_read: false,
-          });
+          notifications.push(
+            await buildLocalizedNotificationInsert({
+              supabaseAdmin,
+              userId: hostId,
+              type: 'cancellation',
+              link: '/host/dashboard',
+              key: 'booking.review_pending',
+              copyParams: {
+                experienceTitle: expTitle,
+                reviewType,
+                recipient: 'host',
+              },
+            })
+          );
         }
 
         if (notifications.length > 0) {
@@ -266,24 +271,36 @@ export async function POST(request: Request) {
     try {
       const notifications = [];
       if (hostId) {
-        notifications.push({
-          user_id: hostId,
-          type: 'cancellation',
-          title: '😢 예약이 취소되었습니다.',
-          message: `[${expTitle}] 예약이 취소되었습니다. 환불액: ₩${refundAmount.toLocaleString()}`,
-          link: '/host/dashboard',
-          is_read: false,
-        });
+        notifications.push(
+          await buildLocalizedNotificationInsert({
+            supabaseAdmin,
+            userId: hostId,
+            type: 'cancellation',
+            link: '/host/dashboard',
+            key: 'booking.cancelled',
+            copyParams: {
+              experienceTitle: expTitle,
+              refundAmount,
+              recipient: 'host',
+            },
+          })
+        );
       }
       if (booking.user_id) {
-        notifications.push({
-          user_id: booking.user_id,
-          type: 'cancellation',
-          title: '예약이 취소되었습니다.',
-          message: `'${expTitle}' 예약이 취소되었습니다. 환불액: ₩${refundAmount.toLocaleString()}`,
-          link: '/guest/trips',
-          is_read: false,
-        });
+        notifications.push(
+          await buildLocalizedNotificationInsert({
+            supabaseAdmin,
+            userId: booking.user_id,
+            type: 'cancellation',
+            link: '/guest/trips',
+            key: 'booking.cancelled',
+            copyParams: {
+              experienceTitle: expTitle,
+              refundAmount,
+              recipient: 'guest',
+            },
+          })
+        );
       }
       if (notifications.length > 0) {
         const { error: notificationError } = await supabaseAdmin.from('notifications').insert(notifications);

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState } from 'react';
 import { X, ChevronDown, Loader2 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -131,7 +131,8 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
               phone: phone,
               birth_date: birthDate,
               gender: gender,
-              nationality: nationality
+              nationality: nationality,
+              preferred_locale: lang,
             }
           }
         });

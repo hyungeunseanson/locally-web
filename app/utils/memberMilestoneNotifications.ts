@@ -1,4 +1,5 @@
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
+import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 import {
   fetchLocallyMembershipSummary,
   getLocallyMembershipMilestone,
@@ -47,14 +48,18 @@ export async function notifyMembershipMilestone(params: {
   const copy = getMembershipMilestoneCopy(milestone);
 
   try {
-    const { error } = await supabaseAdmin.from('notifications').insert({
-      user_id: userId,
+    const notificationRow = await buildLocalizedNotificationInsert({
+      supabaseAdmin,
+      userId,
       type: copy.type,
-      title: copy.title,
-      message: copy.message,
       link: '/account',
-      is_read: false,
+      key: milestone === 'circle' ? 'membership.circle_welcome' : 'membership.member_welcome',
+      copyParams: {
+        status: milestone,
+      },
     });
+
+    const { error } = await supabaseAdmin.from('notifications').insert(notificationRow);
 
     if (error) {
       console.error('[memberMilestoneNotifications] notification insert failed:', error);

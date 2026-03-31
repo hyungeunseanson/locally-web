@@ -17,6 +17,26 @@ const createdExperienceIds: number[] = [];
 const createdNotificationIds: number[] = [];
 const createdWhitelistEmails: string[] = [];
 
+async function setPreferredLocale(userId: string, locale: 'ko' | 'en' | 'ja' | 'zh') {
+  const supabase = getAdminClient();
+  const { data, error } = await supabase.auth.admin.getUserById(userId);
+  if (error || !data.user) throw error || new Error(`Failed to fetch auth user ${userId}.`);
+
+  const metadata =
+    data.user.user_metadata && typeof data.user.user_metadata === 'object'
+      ? (data.user.user_metadata as Record<string, unknown>)
+      : {};
+
+  const { error: updateError } = await supabase.auth.admin.updateUserById(userId, {
+    user_metadata: {
+      ...metadata,
+      preferred_locale: locale,
+    },
+  });
+
+  if (updateError) throw updateError;
+}
+
 async function createHostOwnedExperience(hostId: string, host: TestUser) {
   const { data, error } = await getAdminClient()
     .from('experiences')
@@ -145,6 +165,9 @@ test.describe.serial('Host-unavailable review notifications', () => {
     const hostId = await createAuthUser(host, createdAuthUserIds);
     const guestId = await createAuthUser(guest, createdAuthUserIds);
     const adminId = await createAuthUser(admin, createdAuthUserIds);
+    await setPreferredLocale(hostId, 'ko');
+    await setPreferredLocale(guestId, 'en');
+    await setPreferredLocale(adminId, 'ko');
     await makeAdminAndWhitelist(adminId, admin.email);
 
     const experienceId = await createHostOwnedExperience(hostId, host);
@@ -173,14 +196,14 @@ test.describe.serial('Host-unavailable review notifications', () => {
       .select('id, type, title, link, message')
       .eq('user_id', guestId)
       .eq('type', 'cancellation')
-      .eq('title', '취소 요청이 접수되었습니다.')
+      .eq('title', 'Your cancellation review request was received.')
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
     if (guestNotificationError) throw guestNotificationError;
     expect(guestNotification?.link).toBe('/guest/trips');
-    expect(guestNotification?.message).toContain('운영팀 검토 대기');
+    expect(guestNotification?.message).toContain('submitted for admin review');
     if (guestNotification?.id) createdNotificationIds.push(Number(guestNotification.id));
 
     const { data: hostNotification, error: hostNotificationError } = await supabase
@@ -221,6 +244,9 @@ test.describe.serial('Host-unavailable review notifications', () => {
     const hostId = await createAuthUser(host, createdAuthUserIds);
     const guestId = await createAuthUser(guest, createdAuthUserIds);
     const adminId = await createAuthUser(admin, createdAuthUserIds);
+    await setPreferredLocale(hostId, 'ko');
+    await setPreferredLocale(guestId, 'en');
+    await setPreferredLocale(adminId, 'ko');
     await makeAdminAndWhitelist(adminId, admin.email);
 
     const experienceId = await createHostOwnedExperience(hostId, host);
@@ -252,13 +278,13 @@ test.describe.serial('Host-unavailable review notifications', () => {
       .from('notifications')
       .select('id, title, message')
       .eq('user_id', guestId)
-      .eq('title', '호스트 진행 불가 취소 요청이 반려되었습니다.')
+      .eq('title', 'The host-unavailable cancellation request was declined.')
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
     if (rejectedGuestNotificationError) throw rejectedGuestNotificationError;
-    expect(rejectedGuestNotification?.message).toContain('예약은 유지');
+    expect(rejectedGuestNotification?.message).toContain('will stay active');
     if (rejectedGuestNotification?.id) createdNotificationIds.push(Number(rejectedGuestNotification.id));
 
     const { data: rejectedHostNotification, error: rejectedHostNotificationError } = await supabase
@@ -303,13 +329,13 @@ test.describe.serial('Host-unavailable review notifications', () => {
       .from('notifications')
       .select('id, title, message')
       .eq('user_id', guestId)
-      .eq('title', '호스트 진행 불가로 예약이 취소되었습니다.')
+      .eq('title', 'The booking was cancelled due to host unavailable.')
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
     if (approvedGuestNotificationError) throw approvedGuestNotificationError;
-    expect(approvedGuestNotification?.message).toContain('호스트 진행 불가 사유로 취소되었습니다');
+    expect(approvedGuestNotification?.message).toContain('cancelled due to host unavailable');
     if (approvedGuestNotification?.id) createdNotificationIds.push(Number(approvedGuestNotification.id));
 
     const { data: approvedHostNotification, error: approvedHostNotificationError } = await supabase

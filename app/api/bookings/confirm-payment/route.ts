@@ -6,6 +6,7 @@ import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { isPendingBookingStatus } from '@/app/constants/bookingStatus';
+import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 
 // LEGACY ROUTE
 // Current admin-confirm path is `/api/admin/bookings/confirm-payment`.
@@ -130,24 +131,33 @@ export async function POST(request: Request) {
     try {
       const notifications = [];
       if (experience.host_id) {
-        notifications.push({
-          user_id: experience.host_id,
-          type: 'booking_confirmed',
-          title: '💰 입금 확인 완료!',
-          message: `'${experience.title}' 예약의 입금 확인이 완료되었습니다.`,
-          link: '/host/dashboard',
-          is_read: false
-        });
+        notifications.push(
+          await buildLocalizedNotificationInsert({
+            supabaseAdmin: supabase,
+            userId: experience.host_id,
+            type: 'booking_confirmed',
+            link: '/host/dashboard',
+            key: 'booking.bank_confirmed.host',
+            copyParams: {
+              experienceTitle: experience.title,
+              guestName: booking.contact_name || '게스트',
+            },
+          })
+        );
       }
       if (booking.user_id) {
-        notifications.push({
-          user_id: booking.user_id,
-          type: 'booking_confirmed',
-          title: '✅ 예약 확정 알림',
-          message: `'${experience.title}' 입금이 확인되어 예약이 확정되었습니다.`,
-          link: '/guest/trips',
-          is_read: false
-        });
+        notifications.push(
+          await buildLocalizedNotificationInsert({
+            supabaseAdmin: supabase,
+            userId: booking.user_id,
+            type: 'booking_confirmed',
+            link: '/guest/trips',
+            key: 'booking.bank_confirmed.guest',
+            copyParams: {
+              experienceTitle: experience.title,
+            },
+          })
+        );
       }
       if (notifications.length > 0) {
         await supabase.from('notifications').insert(notifications);

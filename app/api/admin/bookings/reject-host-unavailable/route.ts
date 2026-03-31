@@ -7,6 +7,7 @@ import {
   getBookingReviewType,
   isBookingReviewPending,
 } from '@/app/utils/hostUnavailableReview';
+import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 
 type RejectHostUnavailableBody = {
   bookingId?: string;
@@ -76,29 +77,37 @@ export async function POST(request: Request) {
       const notifications = [];
 
       if (booking.user_id) {
-        notifications.push({
-          user_id: booking.user_id,
-          type: 'cancellation',
-          title: reviewType === 'minimum_participants_unmet'
-            ? '최소 진행 인원 미달 취소 요청이 반려되었습니다.'
-            : '호스트 진행 불가 취소 요청이 반려되었습니다.',
-          message: `'${expTitle}' 예약은 유지되며, 필요 시 호스트와 직접 소통해주세요.`,
-          link: '/guest/trips',
-          is_read: false,
-        });
+        notifications.push(
+          await buildLocalizedNotificationInsert({
+            supabaseAdmin,
+            userId: booking.user_id,
+            type: 'cancellation',
+            link: '/guest/trips',
+            key: 'booking.review_rejected',
+            copyParams: {
+              experienceTitle: expTitle,
+              reviewType: reviewType === 'minimum_participants_unmet' ? 'minimum_participants_unmet' : 'host_unavailable',
+              recipient: 'guest',
+            },
+          })
+        );
       }
 
       if (hostId) {
-        notifications.push({
-          user_id: hostId,
-          type: 'cancellation',
-          title: reviewType === 'minimum_participants_unmet'
-            ? '최소 진행 인원 미달 취소 요청이 반려되었습니다.'
-            : '호스트 진행 불가 취소 요청이 반려되었습니다.',
-          message: `'${expTitle}' 예약은 유지됩니다. 고객과 직접 소통해주세요.`,
-          link: '/host/dashboard',
-          is_read: false,
-        });
+        notifications.push(
+          await buildLocalizedNotificationInsert({
+            supabaseAdmin,
+            userId: hostId,
+            type: 'cancellation',
+            link: '/host/dashboard',
+            key: 'booking.review_rejected',
+            copyParams: {
+              experienceTitle: expTitle,
+              reviewType: reviewType === 'minimum_participants_unmet' ? 'minimum_participants_unmet' : 'host_unavailable',
+              recipient: 'host',
+            },
+          })
+        );
       }
 
       if (notifications.length > 0) {

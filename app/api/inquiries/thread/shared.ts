@@ -5,6 +5,8 @@ import {
   CHAT_POLICY_SIGNAL_LABELS,
   detectChatPolicySignals,
 } from '@/app/utils/chatPolicySignals';
+import { buildNotificationCopy } from '@/app/utils/notificationCopy';
+import { resolveRecipientLocale } from '@/app/utils/notificationLocale';
 import { insertAdminAlerts, sendAdminAlertEmails } from '@/app/utils/adminAlertCenter';
 import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
@@ -181,19 +183,26 @@ function escapeHtml(str: string) {
 
 async function notifyRecipient(params: {
   recipientId: string;
-  title: string;
-  message: string;
+  emailTitle: string;
+  emailMessage: string;
+  actorDisplayName: string;
+  displayContent: string;
   link: string;
 }) {
   try {
     const supabaseAdmin = createAdminClient();
-    const { recipientId, title, message, link } = params;
+    const { recipientId, emailTitle, emailMessage, actorDisplayName, displayContent, link } = params;
+    const locale = await resolveRecipientLocale(supabaseAdmin, recipientId);
+    const inAppCopy = buildNotificationCopy('inquiry.new_message', locale, {
+      actorDisplayName,
+      displayContent,
+    });
 
     await supabaseAdmin.from('notifications').insert({
       user_id: recipientId,
       type: 'new_message',
-      title,
-      message,
+      title: inAppCopy.title,
+      message: inAppCopy.message,
       link,
       is_read: false,
     });
@@ -212,8 +221,8 @@ async function notifyRecipient(params: {
       .sendMail({
         from: `"Locally Team" <${process.env.GMAIL_USER}>`,
         to: email,
-        subject: `[Locally] ${title}`,
-        html: `<p>${escapeHtml(message)}</p><br/><a href="${process.env.NEXT_PUBLIC_SITE_URL || ''}${encodeURI(link)}">확인하기</a>`,
+        subject: `[Locally] ${emailTitle}`,
+        html: `<p>${escapeHtml(emailMessage)}</p><br/><a href="${process.env.NEXT_PUBLIC_SITE_URL || ''}${encodeURI(link)}">확인하기</a>`,
       })
       .catch((error) => {
         console.warn('[inquiries/thread] message notification email failed:', error);
@@ -626,8 +635,10 @@ export async function createInquiryMessage(params: {
   if (recipientId && String(recipientId) !== String(actor.id)) {
     await notifyRecipient({
       recipientId,
-      title: `💬 ${actorDisplayName}님의 새 메시지`,
-      message: displayContent,
+      emailTitle: `💬 ${actorDisplayName}님의 새 메시지`,
+      emailMessage: displayContent,
+      actorDisplayName,
+      displayContent,
       link: notificationLink,
     });
   }
@@ -853,8 +864,10 @@ export async function upsertInquiryThread(params: {
     if (recipientId && recipientId !== actor.id) {
       await notifyRecipient({
         recipientId,
-        title: `💬 ${actorDisplayName}님의 새 메시지`,
-        message: cleanMessage,
+        emailTitle: `💬 ${actorDisplayName}님의 새 메시지`,
+        emailMessage: cleanMessage,
+        actorDisplayName,
+        displayContent: cleanMessage,
         link: notificationLink,
       });
     }

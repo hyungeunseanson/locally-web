@@ -1,7 +1,9 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { usePathname } from 'next/navigation';
+import { createClient } from '@/app/utils/supabase/client';
+import { useAuth } from '@/app/context/AuthContext';
 import { experienceUiDictionary } from './experienceUiDictionary';
 
 export type Locale = 'ko' | 'en' | 'ja' | 'zh';
@@ -5778,7 +5780,10 @@ export function LanguageProvider({
   initialLocale?: Locale;
 }) {
   const pathname = usePathname();
+  const { user } = useAuth();
+  const supabase = useMemo(() => createClient(), []);
   const [lang, setLang] = useState<Locale>(initialLocale);
+  const localeSyncRef = useRef<string | null>(null);
 
   useEffect(() => {
     const path = window.location.pathname || pathname || '/';
@@ -5808,6 +5813,54 @@ export function LanguageProvider({
     setLang(newLang);
     persistLocale(newLang);
   };
+
+  useEffect(() => {
+    if (!user?.id) {
+      localeSyncRef.current = null;
+      return;
+    }
+
+    const rawMetadataLocale =
+      typeof user.user_metadata?.preferred_locale === 'string'
+        ? user.user_metadata.preferred_locale.toLowerCase()
+        : null;
+    const metadataLocale =
+      rawMetadataLocale && isSupportedLocale(rawMetadataLocale) ? rawMetadataLocale : null;
+    const syncKey = `${user.id}:${lang}`;
+
+    if (metadataLocale === lang) {
+      localeSyncRef.current = syncKey;
+      return;
+    }
+
+    if (localeSyncRef.current === syncKey) {
+      return;
+    }
+
+    localeSyncRef.current = syncKey;
+    let cancelled = false;
+
+    void supabase.auth.updateUser({
+      data: {
+        ...user.user_metadata,
+        preferred_locale: lang,
+      },
+    }).then(({ error }) => {
+      if (cancelled) return;
+      if (error) {
+        console.warn('[LanguageContext] preferred_locale sync failed:', error);
+        localeSyncRef.current = null;
+      }
+    }).catch((error) => {
+      if (cancelled) return;
+      console.warn('[LanguageContext] preferred_locale sync failed:', error);
+      localeSyncRef.current = null;
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [lang, supabase, user]);
 
   const t = (key: string, vars?: Record<string, string | number>) => {
     const template = dictionary[lang]?.[key] ?? experienceUiDictionary[lang]?.[key] ?? key;

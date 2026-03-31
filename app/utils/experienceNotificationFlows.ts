@@ -1,5 +1,6 @@
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { notifyMembershipMilestone } from '@/app/utils/memberMilestoneNotifications';
+import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 
 type AdminClient = ReturnType<typeof createAdminClient>;
@@ -50,25 +51,34 @@ export async function notifyExperiencePaymentConfirmed(
     const notifications = [];
 
     if (hostId) {
-      notifications.push({
-        user_id: hostId,
-        type: 'new_booking',
-        title: '🎉 새로운 예약 도착!',
-        message: `[${experienceTitle}] 체험에 ${displayName}님의 예약이 확정되었습니다.`,
-        link: '/host/dashboard',
-        is_read: false,
-      });
+      notifications.push(
+        await buildLocalizedNotificationInsert({
+          supabaseAdmin,
+          userId: hostId,
+          type: 'new_booking',
+          link: '/host/dashboard',
+          key: 'booking.confirmed.host',
+          copyParams: {
+            experienceTitle,
+            guestName: displayName,
+          },
+        })
+      );
     }
 
     if (guestId) {
-      notifications.push({
-        user_id: guestId,
-        type: 'booking_confirmed',
-        title: '✅ 예약이 확정되었습니다',
-        message: `'${experienceTitle}' 결제가 완료되어 예약이 확정되었습니다.`,
-        link: '/guest/trips',
-        is_read: false,
-      });
+      notifications.push(
+        await buildLocalizedNotificationInsert({
+          supabaseAdmin,
+          userId: guestId,
+          type: 'booking_confirmed',
+          link: '/guest/trips',
+          key: 'booking.confirmed.guest',
+          copyParams: {
+            experienceTitle,
+          },
+        })
+      );
     }
 
     if (notifications.length > 0) {

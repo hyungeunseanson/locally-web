@@ -8,6 +8,7 @@ import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { isPendingBookingStatus } from '@/app/constants/bookingStatus';
 import { getBookingSettlementSnapshot } from '@/app/utils/bookingFinance';
 import { notifyMembershipMilestone } from '@/app/utils/memberMilestoneNotifications';
+import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 
 export async function POST(request: Request) {
   try {
@@ -118,24 +119,33 @@ export async function POST(request: Request) {
     try {
       const notifications = [];
       if (hostId) {
-        notifications.push({
-          user_id: hostId,
-          type: 'booking_confirmed',
-          title: '💰 입금 확인 완료!',
-          message: `'${experienceTitle}' ${guestDisplayName}님의 입금 확인이 완료되었습니다.`,
-          link: '/host/dashboard',
-          is_read: false,
-        });
+        notifications.push(
+          await buildLocalizedNotificationInsert({
+            supabaseAdmin,
+            userId: hostId,
+            type: 'booking_confirmed',
+            link: '/host/dashboard',
+            key: 'booking.bank_confirmed.host',
+            copyParams: {
+              experienceTitle,
+              guestName: guestDisplayName,
+            },
+          })
+        );
       }
       if (booking.user_id) {
-        notifications.push({
-          user_id: booking.user_id,
-          type: 'booking_confirmed',
-          title: '✅ 예약 확정 알림',
-          message: `'${experienceTitle}' 입금이 확인되어 예약이 확정되었습니다.`,
-          link: '/guest/trips',
-          is_read: false,
-        });
+        notifications.push(
+          await buildLocalizedNotificationInsert({
+            supabaseAdmin,
+            userId: booking.user_id,
+            type: 'booking_confirmed',
+            link: '/guest/trips',
+            key: 'booking.bank_confirmed.guest',
+            copyParams: {
+              experienceTitle,
+            },
+          })
+        );
       }
       if (notifications.length > 0) {
         await supabaseAdmin.from('notifications').insert(notifications);

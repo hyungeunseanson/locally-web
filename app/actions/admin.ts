@@ -5,6 +5,7 @@ import { cookies } from 'next/headers';
 import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
+import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 
 // 🔒 관리자 권한 확인
 async function getAdminClient() {
@@ -120,14 +121,22 @@ export async function updateAdminStatus(table: 'host_applications' | 'experience
 
       const notification = buildHostApplicationStatusNotification(status, comment);
       if (notification) {
-        const { error: notificationError } = await supabaseAdmin.from('notifications').insert({
-          user_id: app.user_id,
+        const notificationKey = status === 'approved'
+          ? 'host_application.approved'
+          : status === 'revision'
+            ? 'host_application.revision'
+            : 'host_application.rejected';
+        const notificationRow = await buildLocalizedNotificationInsert({
+          supabaseAdmin,
+          userId: app.user_id,
           type: notification.type,
-          title: notification.title,
-          message: notification.message,
           link: notification.link,
-          is_read: false,
+          key: notificationKey,
+          copyParams: {
+            comment,
+          },
         });
+        const { error: notificationError } = await supabaseAdmin.from('notifications').insert(notificationRow);
 
         if (notificationError) {
           console.error('Host application status notification insert failed:', notificationError);

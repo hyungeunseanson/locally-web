@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
+import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 import { captureServerException } from '@/app/utils/monitoring/sentry';
 
 type BookingRequestBody = {
@@ -150,19 +151,20 @@ export async function POST(request: Request) {
                     .maybeSingle();
                 if (guestProfile?.full_name) guestDisplayName = guestProfile.full_name;
 
-                const notiTitle = isPending ? '⏳ 새로운 예약 (입금 대기)' : '🎉 새로운 예약 (결제 진행중)';
-                const notiMsg = isPending
-                    ? `'${experienceTitle}'에 ${guestDisplayName}님의 무통장 입금 대기 예약이 접수되었습니다.`
-                    : `'${experienceTitle}'에 ${guestDisplayName}님의 새로운 결제가 진행되고 있습니다!`;
-
-                const { error } = await supabaseAdmin.from('notifications').insert({
-                    user_id: hostId,
+                const notificationRow = await buildLocalizedNotificationInsert({
+                    supabaseAdmin,
+                    userId: hostId,
                     type: 'new_booking',
-                    title: notiTitle,
-                    message: notiMsg,
                     link: '/host/dashboard',
-                    is_read: false
+                    key: 'booking.new.host',
+                    copyParams: {
+                        experienceTitle,
+                        guestName: guestDisplayName,
+                        state: isPending ? 'pending' : 'processing',
+                    },
                 });
+
+                const { error } = await supabaseAdmin.from('notifications').insert(notificationRow);
                 if (error) console.error('Host Notification Error:', error);
             })();
         }

@@ -9,6 +9,7 @@ import { isCancelledBookingStatus, isPendingBookingStatus } from '@/app/constant
 import { cancelCardPayment } from '@/app/utils/payments/card/server';
 import { refundPayPalCapture } from '@/app/utils/paypal/server';
 import { getBookingReviewType, isBookingReviewPending } from '@/app/utils/hostUnavailableReview';
+import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 
 type ForceCancelBody = {
   bookingId?: string;
@@ -162,31 +163,50 @@ export async function POST(request: Request) {
       const notifications = [];
 
       if (hostId) {
-        notifications.push({
-          user_id: hostId,
-          type: 'cancellation',
-          title: '😢 예약이 취소되었습니다.',
-          message: isHostFaultRequest
-            ? `[${expTitle}] 예약이 ${reviewType === 'minimum_participants_unmet' ? '최소 진행 인원 미달' : '호스트 진행 불가'} 사유로 취소 처리되었습니다. ${refundText}`
-            : `[${expTitle}] 예약이 취소되었습니다. ${refundText}`,
-          link: '/host/dashboard',
-          is_read: false,
-        });
+        notifications.push(
+          await buildLocalizedNotificationInsert({
+            supabaseAdmin,
+            userId: hostId,
+            type: 'cancellation',
+            link: '/host/dashboard',
+            key: isHostFaultRequest ? 'booking.cancelled.host_fault' : 'booking.cancelled',
+            copyParams: isHostFaultRequest
+              ? {
+                  experienceTitle: expTitle,
+                  refundAmount: settlement.refundAmount,
+                  recipient: 'host',
+                  reviewType: reviewType === 'minimum_participants_unmet' ? 'minimum_participants_unmet' : 'host_unavailable',
+                }
+              : {
+                  experienceTitle: expTitle,
+                  refundAmount: settlement.refundAmount,
+                  recipient: 'host',
+                },
+          })
+        );
       }
 
       if (guestId) {
-        notifications.push({
-          user_id: guestId,
-          type: 'cancellation',
-          title: isHostFaultRequest
-            ? `${reviewType === 'minimum_participants_unmet' ? '최소 진행 인원 미달' : '호스트 진행 불가'}로 예약이 취소되었습니다.`
-            : '예약이 취소되었습니다.',
-          message: isHostFaultRequest
-            ? `[${expTitle}] 예약이 ${reviewType === 'minimum_participants_unmet' ? '최소 진행 인원 미달' : '호스트 진행 불가'} 사유로 취소되었습니다. ${refundText}`
-            : `[${expTitle}] 예약이 관리자에 의해 취소되었습니다. ${refundText}`,
-          link: '/guest/trips',
-          is_read: false,
-        });
+        notifications.push(
+          await buildLocalizedNotificationInsert({
+            supabaseAdmin,
+            userId: guestId,
+            type: 'cancellation',
+            link: '/guest/trips',
+            key: isHostFaultRequest ? 'booking.cancelled.host_fault' : 'booking.cancelled.admin_force.guest',
+            copyParams: isHostFaultRequest
+              ? {
+                  experienceTitle: expTitle,
+                  refundAmount: settlement.refundAmount,
+                  recipient: 'guest',
+                  reviewType: reviewType === 'minimum_participants_unmet' ? 'minimum_participants_unmet' : 'host_unavailable',
+                }
+              : {
+                  experienceTitle: expTitle,
+                  refundAmount: settlement.refundAmount,
+                },
+          })
+        );
       }
 
       if (notifications.length > 0) {
