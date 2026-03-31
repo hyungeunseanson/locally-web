@@ -12,6 +12,7 @@ type Props = {
   ariaLabel: string;
   testIdPrefix: string;
   size?: 'default' | 'compact';
+  className?: string;
 };
 
 export default function LocallyMembershipBadgeTrigger({
@@ -20,6 +21,7 @@ export default function LocallyMembershipBadgeTrigger({
   ariaLabel,
   testIdPrefix,
   size = 'default',
+  className = '',
 }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [supportsHover] = useState(() => {
@@ -71,7 +73,7 @@ export default function LocallyMembershipBadgeTrigger({
   );
 
   return (
-    <span ref={wrapperRef} className="relative inline-flex shrink-0" {...hoverHandlers}>
+    <span ref={wrapperRef} className={`relative inline-flex shrink-0 ${className}`.trim()} {...hoverHandlers}>
       <button
         type="button"
         aria-label={ariaLabel}

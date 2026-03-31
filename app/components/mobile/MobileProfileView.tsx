@@ -282,6 +282,7 @@ export default function MobileProfileView({
                             ariaLabel={t('membership_info_aria') as string}
                             testIdPrefix="mobile-profile-membership-badge"
                             size="compact"
+                            className="mt-2"
                         />
                     )}
                 </div>

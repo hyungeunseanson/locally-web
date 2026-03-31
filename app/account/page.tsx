@@ -547,6 +547,7 @@ export default function AccountPage() {
                 ariaLabel={t('membership_info_aria') as string}
                 testIdPrefix="account-mobile-membership-badge"
                 size="compact"
+                className="mt-2"
               />
             )}
           </div>
