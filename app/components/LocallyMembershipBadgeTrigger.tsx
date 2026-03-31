@@ -106,24 +106,25 @@ export default function LocallyMembershipBadgeTrigger({
           role="tooltip"
           data-testid={panelId}
           onClick={(event) => event.stopPropagation()}
-          className="absolute left-0 top-full z-20 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-2xl border border-[#E9D6A8] bg-white px-4 py-3 text-[12px] leading-6 text-slate-600 shadow-[0_18px_48px_rgba(91,69,32,0.16)] sm:left-1/2 sm:w-80 sm:-translate-x-1/2 md:text-[13px]"
+          className="absolute left-0 top-full z-20 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-[24px] border border-slate-200 bg-white px-5 py-4 text-[12px] leading-[1.6] text-slate-600 shadow-[0_22px_60px_rgba(15,23,42,0.16)] sm:left-1/2 sm:w-[22rem] sm:-translate-x-1/2 md:text-[13px]"
         >
-          <div className="space-y-3">
+          <div className="divide-y divide-slate-100">
             {sections.map((section) => {
               const isActive = status === section.key;
               return (
-                <div
-                  key={section.key}
-                  className={`rounded-xl border px-3 py-2.5 ${
-                    isActive ? 'border-[#E9D6A8] bg-[#FFF8E6]' : 'border-slate-200 bg-slate-50'
-                  }`}
-                >
+                <div key={section.key} className="py-3 first:pt-0 last:pb-0">
                   {section.title ? (
-                    <p className={`text-[13px] font-bold md:text-sm ${isActive ? 'text-[#5B4520]' : 'text-slate-900'}`}>
-                      {section.title}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`h-2 w-2 rounded-full ${isActive ? 'bg-[#C9A64B]' : 'bg-slate-300'}`}
+                        aria-hidden="true"
+                      />
+                      <p className={`text-[13px] font-bold md:text-sm ${isActive ? 'text-[#5B4520]' : 'text-slate-900'}`}>
+                        {section.title}
+                      </p>
+                    </div>
                   ) : null}
-                  <div className={`${section.title ? 'mt-1' : ''} space-y-0.5`}>
+                  <div className={`${section.title ? 'mt-1.5 pl-4' : ''} space-y-1`}>
                     {section.bodyLines.map((line) => (
                       <p key={line}>{line}</p>
                     ))}
