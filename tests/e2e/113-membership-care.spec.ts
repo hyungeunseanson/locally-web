@@ -323,7 +323,9 @@ test.describe.serial('locally membership care experience', () => {
     await expect(page.getByTestId('account-profile-membership-badge-trigger')).toContainText('Tier 1', { timeout: 15000 });
     await page.getByTestId('account-profile-membership-badge-trigger').dispatchEvent('click');
     await expect(page.getByTestId('account-profile-membership-badge-panel')).toContainText('Tier 1');
+    await expect(page.getByTestId('account-profile-membership-badge-panel')).toContainText('Tier 2');
     await expect(page.getByTestId('account-profile-membership-badge-panel')).toContainText('로컬리와 연결이 시작된 게스트예요.');
+    await expect(page.getByTestId('account-profile-membership-badge-panel')).toContainText('다시 찾아온 게스트에게 열리는 단계예요.');
     await expect(page.locator('p').filter({ hasText: '대한민국 (South Korea)' }).first()).toBeVisible();
     await expect(page.getByText('"멤버십 프로필 소개"')).toBeVisible();
 
@@ -334,11 +336,13 @@ test.describe.serial('locally membership care experience', () => {
     await expect(page.getByTestId('account-mobile-membership-badge-trigger')).toContainText('Tier 1');
     await page.getByTestId('account-mobile-membership-badge-trigger').dispatchEvent('click');
     await expect(page.getByTestId('account-mobile-membership-badge-panel')).toContainText('Tier 1');
+    await expect(page.getByTestId('account-mobile-membership-badge-panel')).toContainText('Tier 2');
     await expect(page.getByTestId('account-mobile-membership-badge-panel')).toContainText('로컬리와 연결이 시작된 게스트예요.');
     await page.getByTestId('account-mobile-profile-card').dispatchEvent('click');
     await expect(page.getByTestId('mobile-profile-membership-badge-trigger')).toContainText('Tier 1');
     await page.getByTestId('mobile-profile-membership-badge-trigger').dispatchEvent('click');
     await expect(page.getByTestId('mobile-profile-membership-badge-panel')).toContainText('Tier 1');
+    await expect(page.getByTestId('mobile-profile-membership-badge-panel')).toContainText('Tier 2');
 
     await page.goto('/guest/trips', { waitUntil: 'domcontentloaded' });
     await dismissAnnouncementIfVisible(page);
@@ -347,6 +351,7 @@ test.describe.serial('locally membership care experience', () => {
     await expect(page.getByTestId('guest-trips-membership-info-trigger')).toHaveCount(0);
     await page.getByTestId('guest-trips-membership-badge-trigger').dispatchEvent('click');
     await expect(page.getByTestId('guest-trips-membership-badge-panel')).toContainText('Tier 1');
+    await expect(page.getByTestId('guest-trips-membership-badge-panel')).toContainText('Tier 2');
     await expect(page.getByTestId('guest-trips-membership-badge-panel')).toContainText('로컬리와 연결이 시작된 게스트예요.');
 
     await page.goto('/help', { waitUntil: 'domcontentloaded' });

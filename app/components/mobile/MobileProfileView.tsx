@@ -88,10 +88,8 @@ export default function MobileProfileView({
     const supabase = useMemo(() => createClient(), []);
     const { showToast, showHeicUnsupportedToast } = useToast();
     const { t } = useLanguage();
-    const membershipDescription =
-        membershipStatus === 'circle'
-            ? (t('membership_circle_info_desc') as string)
-            : (t('membership_member_info_desc') as string);
+    const memberTierDescription = t('membership_member_info_desc') as string;
+    const circleTierDescription = t('membership_circle_info_desc') as string;
     const completion = getProfileCompletion(isEditing ? editData : profile, 'guest');
     const missingLabels = completion.missingFields
         .slice(0, 4)
@@ -278,7 +276,8 @@ export default function MobileProfileView({
                     {membershipStatus !== 'none' && (
                         <LocallyMembershipBadgeTrigger
                             status={membershipStatus}
-                            description={membershipDescription}
+                            memberDescription={memberTierDescription}
+                            circleDescription={circleTierDescription}
                             ariaLabel={t('membership_info_aria') as string}
                             testIdPrefix="mobile-profile-membership-badge"
                             size="compact"

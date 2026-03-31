@@ -80,10 +80,8 @@ export default function AccountPage() {
   const { canUseHostView, setHostView } = useViewMode();
   const { user: authUser, hostStatusResolved } = useAuth();
   const { membership } = useLocallyMembership(authUser?.id);
-  const membershipDescription =
-    membership?.status === 'circle'
-      ? (t('membership_circle_info_desc') as string)
-      : (t('membership_member_info_desc') as string);
+  const memberTierDescription = t('membership_member_info_desc') as string;
+  const circleTierDescription = t('membership_circle_info_desc') as string;
 
   // 프로필 상태
   const [profile, setProfile] = useState({
@@ -543,7 +541,8 @@ export default function AccountPage() {
             {membership?.status && membership.status !== 'none' && (
               <LocallyMembershipBadgeTrigger
                 status={membership.status}
-                description={membershipDescription}
+                memberDescription={memberTierDescription}
+                circleDescription={circleTierDescription}
                 ariaLabel={t('membership_info_aria') as string}
                 testIdPrefix="account-mobile-membership-badge"
                 size="compact"
@@ -697,7 +696,8 @@ export default function AccountPage() {
                 {membership?.status && membership.status !== 'none' && (
                   <LocallyMembershipBadgeTrigger
                     status={membership.status}
-                    description={membershipDescription}
+                    memberDescription={memberTierDescription}
+                    circleDescription={circleTierDescription}
                     ariaLabel={t('membership_info_aria') as string}
                     testIdPrefix="account-profile-membership-badge"
                   />

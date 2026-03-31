@@ -179,7 +179,8 @@ export default function GuestTripsPage() {
     if (!membership || !hasLocallyCare) return null;
 
     const isCircle = membership.status === 'circle';
-    const infoDescription = isCircle ? t('membership_circle_info_desc') : t('membership_member_info_desc');
+    const memberTierDescription = t('membership_member_info_desc') as string;
+    const circleTierDescription = t('membership_circle_info_desc') as string;
 
     return (
       <section
@@ -192,7 +193,8 @@ export default function GuestTripsPage() {
             <div className="mt-1 flex items-center">
               <LocallyMembershipBadgeTrigger
                 status={isCircle ? 'circle' : 'member'}
-                description={infoDescription}
+                memberDescription={memberTierDescription}
+                circleDescription={circleTierDescription}
                 ariaLabel={t('membership_info_aria') as string}
                 testIdPrefix="guest-trips-membership-badge"
               />
