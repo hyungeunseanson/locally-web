@@ -927,16 +927,20 @@ function PaymentContent() {
                 >
                   <button
                     type="button"
+                    data-testid="exp-payment-platform-fee-trigger"
                     aria-label={t('exp_payment_platform_fee_aria') as string}
                     aria-expanded={isFeeInfoOpen}
-                    onClick={() => setIsFeeInfoOpen((prev) => !prev)}
+                    onClick={() => setIsFeeInfoOpen(true)}
                     onFocus={() => setIsFeeInfoOpen(true)}
-                    className="inline-flex items-center justify-center rounded-full text-blue-600 transition-colors hover:text-blue-700 focus:outline-none"
+                    className="inline-flex h-6 w-6 items-center justify-center rounded-full text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 md:h-5 md:w-5"
                   >
                     <Info className="w-3 h-3 md:w-3.5 md:h-3.5" />
                   </button>
                   {isFeeInfoOpen && (
-                    <div className="absolute left-1/2 top-full z-20 mt-2 w-56 -translate-x-1/2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-medium leading-relaxed text-slate-600 shadow-xl md:w-64 md:text-xs">
+                    <div
+                      data-testid="exp-payment-platform-fee-tooltip"
+                      className="absolute left-1/2 top-full z-20 mt-2 w-56 -translate-x-1/2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-medium leading-relaxed text-slate-600 shadow-xl md:w-64 md:text-xs"
+                    >
                       {t('exp_payment_platform_fee_tooltip')}
                     </div>
                   )}

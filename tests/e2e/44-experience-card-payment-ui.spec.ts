@@ -258,6 +258,31 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Experience card payment UI smoke', () => {
+  test('opens the platform fee tooltip on mobile tap without breaking dismissal', async ({ page }) => {
+    test.setTimeout(120000);
+
+    const customerUser = createCustomerUser();
+    await createAuthUser(customerUser);
+    const experience = await prepareBookableExperience();
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await login(page, customerUser);
+    await page.goto(
+      `/experiences/${experience.experienceId}/payment?date=${experience.date}&time=${experience.time}&guests=1`,
+      { waitUntil: 'networkidle' }
+    );
+
+    const feeTrigger = page.getByTestId('exp-payment-platform-fee-trigger');
+    const feeTooltip = page.getByTestId('exp-payment-platform-fee-tooltip');
+
+    await expect(feeTrigger).toBeVisible({ timeout: 15000 });
+    await feeTrigger.click();
+    await expect(feeTooltip).toBeVisible();
+
+    await page.getByText(/로컬리 서비스 수수료|Locally service fee|Locallyサービス手数料|Locally 服务费/).first().click();
+    await expect(feeTooltip).toBeHidden();
+  });
+
   test('completes mocked card payment flow for an experience booking', async ({ page }) => {
     test.setTimeout(120000);
 

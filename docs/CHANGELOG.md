@@ -5,6 +5,13 @@
 
 ---
 
+## v3.39.91 — [Guest Payment] 모바일 서비스 수수료 tooltip 탭 영역 보강
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟢 모바일 fee info 터치 영역 확대 | `app/experiences/[id]/payment/page.tsx` — `로컬리 서비스 수수료` info 버튼에 더 넓은 hit area와 focus ring을 추가해 모바일 탭 누락을 줄이고, tooltip test id를 함께 부여 |
+| 🟡 mobile payment tooltip 회귀 체크 추가 | `tests/e2e/44-experience-card-payment-ui.spec.ts` — 모바일 viewport에서 fee info를 탭하면 tooltip이 열리고, 바깥 클릭으로 다시 닫히는지 얇게 검증 |
+
 ## v3.39.90 — [Host Reservations] 일본어 warning strip 카피 정리
 
 | 항목 | 내용 |
