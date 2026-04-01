@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
+import { buildLocalizedEmailCopy } from '@/app/utils/emailCopy';
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -110,13 +111,22 @@ export async function POST(request: Request) {
         console.error('Review host notification error:', notificationError);
       }
 
+      const emailCopy = await buildLocalizedEmailCopy({
+        supabaseAdmin,
+        userId: experience.host_id,
+        key: 'review.new.host',
+        copyParams: {
+          experienceTitle: experience.title || 'Locally Experience',
+        },
+      });
+
       sendImmediateGenericEmail({
         recipientUserId: experience.host_id,
-        subject: '[Locally] 새 후기가 등록되었습니다',
-        title: '새 후기가 등록되었습니다',
-        message: `'${experience.title}'에 새 후기가 작성되었습니다.`,
+        subject: emailCopy.subject,
+        title: emailCopy.title,
+        message: emailCopy.message,
         link: '/host/dashboard?tab=reviews',
-        ctaLabel: '후기 확인하기',
+        ctaLabel: emailCopy.ctaLabel,
       }).catch((emailError) => {
         console.error('Review host email error:', emailError);
       });

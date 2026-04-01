@@ -5,6 +5,13 @@
 
 ---
 
+## v3.39.97 — [Emails] Guest / Host generic 이메일 다국어 1차
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟢 review / membership / host application 메일 현지화 | `app/utils/emailCopy.ts`, `app/api/reviews/route.ts`, `app/utils/memberMilestoneNotifications.ts`, `app/actions/admin.ts` — 새 guest/host generic 이메일을 recipient `preferred_locale` 기준으로 생성하도록 변경. admin/team recipient 메일은 그대로 한국어 유지 |
+| 🟡 email copy helper 검증 추가 | `tests/e2e/120-email-copy-util.spec.ts`, `docs/email_notification_policy.md` — batch A email copy dictionary를 locale별로 검증하고, 정책 문서에 guest/host 메일만 locale화된다는 기준을 명시 |
+
 ## v3.39.96 — [Notifications] Proxy / Team guest 인앱 알림 다국어 2차 확장
 
 | 항목 | 내용 |
