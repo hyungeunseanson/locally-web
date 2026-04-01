@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { RefreshCw, AlertCircle } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
-import { sendNotification } from '@/app/utils/notification';
 import Skeleton from '@/app/components/ui/Skeleton';
 import EmptyState from '@/app/components/EmptyState';
 import ConfirmModal from '@/app/components/ui/ConfirmModal';
@@ -358,19 +357,6 @@ export default function ReservationManager() {
         body: JSON.stringify({ bookingId: booking.id, reason: t('res_reason_host_approved') }),
       });
       if (!res.ok) throw new Error(t('res_error_refund'));
-
-      await sendNotification({
-        recipient_id: booking.user_id,
-        booking_id: booking.id,
-        type: 'cancellation_approved',
-        title: t('res_notif_refund_title'),
-        content: `${t('res_notif_refund_content_prefix')}${booking.experiences?.title}${t('res_notif_refund_content_suffix')}`,
-        link_url: '/guest/trips',
-        copy_key: 'cancellation_approved',
-        copy_params: {
-          experienceTitle: booking.experiences?.title || '',
-        },
-      });
 
       showToast(t('res_toast_approved'), 'success'); // 🟢 번역
       fetchReservations(true);

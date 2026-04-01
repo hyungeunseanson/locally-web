@@ -5,6 +5,14 @@
 
 ---
 
+## v3.40.05 — [Payments/Notifications] 취소 승인 중복 발송 제거 및 bank 결제 상호작용 안정화
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟢 guest 취소 승인 중복 발송 제거 | `app/host/dashboard/components/ReservationManager.tsx` — 호스트가 취소 승인을 누를 때 `/api/payment/cancel` owner route가 이미 guest 취소 알림/이메일을 생성하므로, 대시보드에서 추가로 보내던 `cancellation_approved` shared send를 제거 |
+| 🟢 bank 결제 상호작용 안정화 | `app/experiences/[id]/payment/page.tsx`, `app/components/ui/Button.tsx` — payment method/agreement 토글을 synchronous commit으로 고정하고, agreement UI를 `role="checkbox"` 단일 클릭 표면으로 정리. submit CTA의 app interaction motion은 클릭 취소를 유발하지 않도록 shadow/brightness 중심으로 축소 |
+| 🟡 focused 회귀 검증 | `tests/e2e/125-experience-bank-payment-success.spec.ts`, `tests/e2e/124-experience-payment-feedback.spec.ts`, `tests/e2e/42-experience-paypal-payment.spec.ts`, `tests/e2e/75-experience-cancel-error-safe.spec.ts`, `tests/e2e/123-cancellation-approved-notification-localization.spec.ts` — bank 결제 성공, payment inline feedback, PayPal 전환, cancel owner flow, cancellation-approved locale 저장 회귀를 함께 재확인 |
+
 ## v3.40.04 — [Emails] Inquiry / shared CTA 남은 locale 누수 정리
 
 | 항목 | 내용 |

@@ -38,10 +38,20 @@ test.describe.serial('Experience bank payment success', () => {
     await page.getByTestId('exp-payment-booker-name').fill(guest.fullName);
     await page.getByTestId('exp-payment-booker-phone').fill(guest.phone);
     await page.getByTestId('exp-payment-method-bank').click({ force: true });
-    await page.getByTestId('exp-payment-agree-off-platform').click();
-    await page.getByTestId('exp-payment-agree-safety').click();
-    await page.getByTestId('exp-payment-agree-terms').click();
+    await expect(page.getByTestId('exp-payment-method-bank')).toHaveClass(/border-black/);
+    const offPlatformAgreement = page.getByTestId('exp-payment-agree-off-platform');
+    const safetyAgreement = page.getByTestId('exp-payment-agree-safety');
+    const termsAgreement = page.getByTestId('exp-payment-agree-terms');
+
+    await offPlatformAgreement.click();
+    await expect(offPlatformAgreement).toHaveAttribute('aria-checked', 'true');
+    await safetyAgreement.click();
+    await expect(safetyAgreement).toHaveAttribute('aria-checked', 'true');
+    await termsAgreement.click();
+    await expect(termsAgreement).toHaveAttribute('aria-checked', 'true');
     await expect(page.getByTestId('exp-payment-submit')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByTestId('exp-payment-agreements-error')).toHaveCount(0);
+    await expect(page.getByTestId('exp-payment-submit-helper')).toHaveCount(0);
     await page.getByTestId('exp-payment-submit').click();
 
     await page.waitForURL(

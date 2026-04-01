@@ -370,6 +370,7 @@ test.describe.serial('Experience PayPal payment smoke', () => {
     await page.getByTestId('exp-payment-method-bank').click({ force: true });
     await expect(page.getByTestId('exp-payment-paypal-panel')).toHaveCount(0);
     await expect(page.getByTestId('exp-payment-submit')).toBeVisible();
+    await expect(page.getByTestId('exp-payment-submit')).toHaveAttribute('aria-busy', 'false');
     await expect(page.getByTestId('exp-payment-total-amount')).toHaveText(totalBefore as string);
 
     await paypalOption.click();

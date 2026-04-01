@@ -66,8 +66,12 @@ test.describe.serial('Experience payment inline feedback', () => {
     );
 
     await expect(page.getByTestId('exp-payment-booker-name')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByTestId('exp-payment-booker-name')).toHaveValue(guest.fullName, { timeout: 30000 });
+    await expect(page.getByTestId('exp-payment-booker-phone')).toHaveValue(guest.phone, { timeout: 30000 });
     const triggerValidation = async () => {
-      await page.getByTestId('exp-payment-submit').click();
+      await page.getByTestId('exp-payment-submit').evaluate((element) => {
+        (element as HTMLButtonElement).click();
+      });
     };
     await page.getByTestId('exp-payment-method-bank').click({ force: true });
     await expect(page.getByTestId('exp-payment-submit')).toBeEnabled({ timeout: 30000 });
@@ -79,6 +83,8 @@ test.describe.serial('Experience payment inline feedback', () => {
     await triggerValidation();
 
     await expect(page.getByTestId('exp-payment-global-error')).toBeVisible();
+    await expect(page.getByTestId('exp-payment-global-error')).toHaveAttribute('role', 'alert');
+    await expect(page.getByTestId('exp-payment-global-error')).toHaveAttribute('data-tone', 'error');
     await expect(page.getByTestId('exp-payment-booker-name-error')).toBeVisible();
     await expect(page.getByTestId('exp-payment-booker-phone-error')).toBeVisible();
 
@@ -95,6 +101,8 @@ test.describe.serial('Experience payment inline feedback', () => {
 
     await expect(page.getByTestId('exp-payment-global-error')).toBeVisible();
     await expect(page.getByTestId('exp-payment-agreements-error')).toBeVisible();
+    await expect(page.getByTestId('exp-payment-agreements-error')).toHaveAttribute('role', 'alert');
+    await expect(page.getByTestId('exp-payment-agreements-error')).toHaveAttribute('data-tone', 'error');
 
     const afterAgreementErrorUrl = new URL(page.url());
     expect(afterAgreementErrorUrl.searchParams.get('date')).toBe(originalUrl.searchParams.get('date'));

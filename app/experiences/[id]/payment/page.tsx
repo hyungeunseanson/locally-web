@@ -3,9 +3,12 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams, useParams } from 'next/navigation';
 import { ChevronLeft, CreditCard, Calendar, Users, ShieldCheck, Clock, Info, CheckCircle2 } from 'lucide-react';
+import { Button } from '@/app/components/ui/Button';
 import Spinner from '@/app/components/ui/Spinner';
+import StatusNotice from '@/app/components/ui/StatusNotice';
 import Script from 'next/script';
 import Image from 'next/image';
+import { flushSync } from 'react-dom';
 import { createClient } from '@/app/utils/supabase/client';
 import { sendAnalyticsEvent } from '@/app/utils/analytics/client';
 import { useToast } from '@/app/context/ToastContext';
@@ -271,6 +274,24 @@ function PaymentContent() {
 
     return null;
   }, [t]);
+
+  const setAgreementChecked = useCallback(
+    (
+      setter: React.Dispatch<React.SetStateAction<boolean>>,
+      nextChecked?: boolean
+    ) => {
+      flushSync(() => {
+        setter((prev) => (typeof nextChecked === 'boolean' ? nextChecked : !prev));
+      });
+    },
+    []
+  );
+
+  const setPaymentMethodChecked = useCallback((nextMethod: PaymentMethod) => {
+    flushSync(() => {
+      setPaymentMethod(nextMethod);
+    });
+  }, []);
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
@@ -1011,12 +1032,12 @@ function PaymentContent() {
 
         <div className="space-y-4 p-4 md:space-y-5 md:p-6">
           {visiblePaymentError && (
-            <div
-              data-testid="exp-payment-global-error"
-              className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-[12px] leading-relaxed text-rose-700 md:text-[13px]"
+            <StatusNotice
+              tone="error"
+              testId="exp-payment-global-error"
             >
               {visiblePaymentError}
-            </div>
+            </StatusNotice>
           )}
 
           <PaymentSectionCard
@@ -1035,7 +1056,7 @@ function PaymentContent() {
                   {experience?.location || 'SEOUL'}
                 </span>
                 <h3 className="line-clamp-3 text-[15px] font-bold leading-snug text-slate-900 md:text-lg">
-                  {experience ? experience.title : <Spinner size={16} className="inline-block" />}
+                  {experience ? experience.title : <Spinner inline size={16} className="inline-block" ariaHidden />}
                 </h3>
               </div>
             </div>
@@ -1077,12 +1098,14 @@ function PaymentContent() {
             </div>
 
             {hostNotice && (
-              <div className="mt-4 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-[12px] leading-6 text-amber-900 md:rounded-2xl md:px-5 md:py-4 md:text-[13px]">
-                <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-amber-700 md:text-xs">
-                  {t('exp_guest_notice_title')}
-                </p>
-                <p className="whitespace-pre-wrap">{hostNotice}</p>
-              </div>
+              <StatusNotice tone="warning" className="mt-4">
+                <div>
+                  <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-amber-700 md:text-xs">
+                    {t('exp_guest_notice_title')}
+                  </p>
+                  <p className="whitespace-pre-wrap">{hostNotice}</p>
+                </div>
+              </StatusNotice>
             )}
           </PaymentSectionCard>
 
@@ -1163,7 +1186,7 @@ function PaymentContent() {
                 onClick={() => {
                   if (isCardReadyResolved && isCardReady) {
                     hasManualPaymentMethodSelectionRef.current = true;
-                    setPaymentMethod('card');
+                    setPaymentMethodChecked('card');
                   }
                 }}
                 disabled={!isCardReadyResolved || !isCardReady}
@@ -1185,7 +1208,7 @@ function PaymentContent() {
                 type="button"
                 onClick={() => {
                   hasManualPaymentMethodSelectionRef.current = true;
-                  setPaymentMethod('bank');
+                  setPaymentMethodChecked('bank');
                 }}
                 className={cn(
                   'rounded-lg border-2 p-3 transition-all md:rounded-xl md:p-4',
@@ -1209,7 +1232,7 @@ function PaymentContent() {
                   type="button"
                   onClick={() => {
                     hasManualPaymentMethodSelectionRef.current = true;
-                    setPaymentMethod('paypal');
+                    setPaymentMethodChecked('paypal');
                   }}
                   className={cn(
                     'rounded-lg border-2 p-3 transition-all md:rounded-xl md:p-4',
@@ -1226,11 +1249,11 @@ function PaymentContent() {
             </div>
 
             {isCardReadyResolved && !isCardReady && (
-              <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700 md:text-xs">
+              <StatusNotice tone="warning" size="sm" className="mb-3">
                 {cardReadyReason === 'missing_imp_code'
                   ? t('exp_payment_card_unavailable_config')
                   : t('exp_payment_card_unavailable_alternative')}
-              </div>
+              </StatusNotice>
             )}
 
             {paymentMethod === 'bank' && (
@@ -1257,21 +1280,41 @@ function PaymentContent() {
                   {t('exp_payment_paypal_desc')}
                 </div>
                 {!isSlotSummaryResolved && (
-                  <div className="flex h-12 items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white text-[12px] text-slate-500">
-                    <Spinner size={16} className="mr-2" />
-                    {t('exp_payment_slot_loading')}
-                  </div>
+                  <StatusNotice
+                    tone="info"
+                    size="sm"
+                    icon={null}
+                    testId="exp-payment-paypal-loading-notice"
+                    className="items-center border-dashed bg-white text-[12px] text-slate-500"
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <Spinner inline size={16} className="text-slate-500" ariaHidden />
+                      <span>{t('exp_payment_slot_loading')}</span>
+                    </span>
+                  </StatusNotice>
                 )}
                 {paypalSdkError && (
-                  <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] text-rose-600 md:text-xs">
+                  <StatusNotice
+                    tone="error"
+                    size="sm"
+                    testId="exp-payment-paypal-error-notice"
+                  >
                     {paypalSdkError}
-                  </div>
+                  </StatusNotice>
                 )}
                 {isSlotSummaryResolved && (!isPayPalSdkReady || !isPayPalButtonsReady) && !paypalSdkError && (
-                  <div className="flex h-12 items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white text-[12px] text-slate-500">
-                    <Spinner size={16} className="mr-2" />
-                    {t('exp_payment_paypal_loading')}
-                  </div>
+                  <StatusNotice
+                    tone="info"
+                    size="sm"
+                    icon={null}
+                    testId="exp-payment-paypal-loading-notice"
+                    className="items-center border-dashed bg-white text-[12px] text-slate-500"
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <Spinner inline size={16} className="text-slate-500" ariaHidden />
+                      <span>{t('exp_payment_paypal_loading')}</span>
+                    </span>
+                  </StatusNotice>
                 )}
                 <div
                   ref={paypalButtonRef}
@@ -1348,9 +1391,13 @@ function PaymentContent() {
                   <ShieldCheck className="h-3.5 w-3.5 md:h-4 md:w-4" /> {t('exp_payment_safety_title')}
                 </h3>
 
-                <label
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={agreeNoOffPlatform}
                   data-testid="exp-payment-agree-off-platform"
-                  className="flex cursor-pointer items-start gap-2.5 rounded-lg p-1.5 transition-colors hover:bg-white/50 md:gap-3 md:p-2"
+                  onClick={() => setAgreementChecked(setAgreeNoOffPlatform)}
+                  className="flex w-full cursor-pointer items-start gap-2.5 rounded-lg p-1.5 text-left transition-colors hover:bg-white/50 md:gap-3 md:p-2"
                 >
                   <div className={cn(
                     'mt-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded border transition-colors md:h-5 md:min-w-[20px]',
@@ -1358,15 +1405,18 @@ function PaymentContent() {
                   )}>
                     <CheckCircle2 className="h-3 w-3 md:h-3.5 md:w-3.5" />
                   </div>
-                  <input type="checkbox" className="hidden" checked={agreeNoOffPlatform} onChange={() => setAgreeNoOffPlatform(!agreeNoOffPlatform)} />
                   <div className="text-[12px] font-medium leading-[1.45] text-slate-700 md:text-sm md:leading-snug">
                     {t('exp_payment_agree_off_platform')}
                   </div>
-                </label>
+                </button>
 
-                <label
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={agreeSafety}
                   data-testid="exp-payment-agree-safety"
-                  className="flex cursor-pointer items-start gap-2.5 rounded-lg p-1.5 transition-colors hover:bg-white/50 md:gap-3 md:p-2"
+                  onClick={() => setAgreementChecked(setAgreeSafety)}
+                  className="flex w-full cursor-pointer items-start gap-2.5 rounded-lg p-1.5 text-left transition-colors hover:bg-white/50 md:gap-3 md:p-2"
                 >
                   <div className={cn(
                     'mt-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded border transition-colors md:h-5 md:min-w-[20px]',
@@ -1374,15 +1424,18 @@ function PaymentContent() {
                   )}>
                     <CheckCircle2 className="h-3 w-3 md:h-3.5 md:w-3.5" />
                   </div>
-                  <input type="checkbox" className="hidden" checked={agreeSafety} onChange={() => setAgreeSafety(!agreeSafety)} />
                   <div className="text-[12px] font-medium leading-[1.45] text-slate-700 md:text-sm md:leading-snug">
                     {t('exp_payment_agree_safety')}
                   </div>
-                </label>
+                </button>
 
-                <label
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={agreeTerms}
                   data-testid="exp-payment-agree-terms"
-                  className="flex cursor-pointer items-start gap-2.5 rounded-lg p-1.5 transition-colors hover:bg-white/50 md:gap-3 md:p-2"
+                  onClick={() => setAgreementChecked(setAgreeTerms)}
+                  className="flex w-full cursor-pointer items-start gap-2.5 rounded-lg p-1.5 text-left transition-colors hover:bg-white/50 md:gap-3 md:p-2"
                 >
                   <div className={cn(
                     'mt-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded border transition-colors md:h-5 md:min-w-[20px]',
@@ -1390,52 +1443,50 @@ function PaymentContent() {
                   )}>
                     <CheckCircle2 className="h-3 w-3 md:h-3.5 md:w-3.5" />
                   </div>
-                  <input type="checkbox" className="hidden" checked={agreeTerms} onChange={() => setAgreeTerms(!agreeTerms)} />
                   <div className="text-[12px] font-medium leading-[1.45] text-slate-700 md:text-sm md:leading-snug">
                     {t('exp_payment_agree_terms')}
                   </div>
-                </label>
+                </button>
 
                 {agreementsError && (
-                  <p
-                    data-testid="exp-payment-agreements-error"
-                    className="pt-1 text-[11px] text-rose-600 md:text-xs"
+                  <StatusNotice
+                    tone="error"
+                    size="sm"
+                    testId="exp-payment-agreements-error"
+                    className="mt-1"
                   >
                     {t('exp_payment_agreements_inline_required')}
-                  </p>
+                  </StatusNotice>
                 )}
               </div>
 
               {paymentMethod !== 'paypal' ? (
-                <button
+                <Button
                   data-testid="exp-payment-submit"
+                  type="button"
                   onClick={handlePayment}
                   disabled={isSubmitDisabled}
-                  aria-busy={isProcessing}
+                  isLoading={isProcessing}
+                  loadingLabel={t('status_processing') as string}
+                  spinnerVariant="inverse"
+                  interaction="app"
+                  size="lg"
+                  variant="primary"
                   className={cn(
-                    'flex h-12 w-full items-center justify-center gap-2 rounded-xl text-[15px] font-bold transition-all md:h-14 md:rounded-2xl md:text-lg',
-                    'shadow-md shadow-slate-200 active:scale-[0.98] disabled:scale-100',
-                    isSubmitDisabled
-                      ? 'bg-slate-300 text-slate-100'
-                      : 'bg-black text-white hover:bg-slate-800'
+                    'h-12 w-full px-0 text-[15px] md:h-14 md:rounded-2xl md:text-lg',
+                    'bg-black text-white hover:bg-slate-800',
+                    'disabled:bg-slate-300 disabled:text-slate-100 disabled:shadow-none'
                   )}
                 >
-                  {isProcessing ? (
-                    <>
-                      <Spinner size={18} className="h-[18px] w-[18px] text-white md:h-5 md:w-5" />
-                      <span>{t('status_processing')}</span>
-                    </>
-                  ) : (
-                    <>
-                      <CreditCard className="h-[18px] w-[18px] md:h-5 md:w-5" />
-                      {t('exp_payment_pay_button', { amount: `₩${finalAmount.toLocaleString()}` })}
-                    </>
-                  )}
-                </button>
+                  <>
+                    <CreditCard className="h-[18px] w-[18px] md:h-5 md:w-5" />
+                    {t('exp_payment_pay_button', { amount: `₩${finalAmount.toLocaleString()}` })}
+                  </>
+                </Button>
               ) : (
-                <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-[12px] text-slate-500 md:rounded-2xl md:text-sm">
+                <StatusNotice tone="info" className="justify-center bg-white text-center md:text-sm">
                   {t('exp_payment_paypal_button_hint')}
-                </div>
+                </StatusNotice>
               )}
 
               {checkoutHelperText && (
