@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
+import { resolveRecipientLocale, type NotificationLocale } from '@/app/utils/notificationLocale';
 import nodemailer from 'nodemailer';
 
 const CONTROL_CHAR_PATTERN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
@@ -16,6 +17,8 @@ type NotificationRequestBody = {
   inquiry_id?: number;
   booking_id?: string | number;
   review_id?: string | number;
+  copy_key?: 'review_reply' | 'cancellation_approved';
+  copy_params?: Record<string, unknown>;
 };
 
 type HostOwnershipRow = {
@@ -119,6 +122,110 @@ function buildNotificationEmailHtml(message: string, link: string | null) {
   return `<p>${escapedMessage}</p>${cta}`;
 }
 
+function buildReviewReplyNotificationCopy(locale: NotificationLocale, replyPreview: string) {
+  switch (locale) {
+    case 'en':
+      return {
+        title: 'The host replied to your review',
+        message: `There is a new reply to your review: "${replyPreview}"`,
+      };
+    case 'ja':
+      return {
+        title: 'ホストがレビューに返信しました',
+        message: `レビューに新しい返信が届きました: 「${replyPreview}」`,
+      };
+    case 'zh':
+      return {
+        title: '房东回复了你的评价',
+        message: `你的评价收到了新回复：「${replyPreview}」`,
+      };
+    case 'ko':
+    default:
+      return {
+        title: '호스트님이 후기에 답글을 남겼습니다',
+        message: `후기에 답글이 달렸습니다: "${replyPreview}"`,
+      };
+  }
+}
+
+function buildCancellationApprovedNotificationCopy(
+  locale: NotificationLocale,
+  experienceTitle?: string | null
+) {
+  const normalizedTitle = typeof experienceTitle === 'string' ? experienceTitle.trim() : '';
+
+  switch (locale) {
+    case 'en':
+      return normalizedTitle
+        ? {
+            title: 'Your cancellation and refund have been approved',
+            message: `The cancellation and refund for "${normalizedTitle}" have been approved.`,
+          }
+        : {
+            title: 'Your cancellation and refund have been approved',
+            message: 'Your cancellation and refund have been approved.',
+          };
+    case 'ja':
+      return normalizedTitle
+        ? {
+            title: 'キャンセルと返金が承認されました',
+            message: `「${normalizedTitle}」のキャンセルと返金が承認されました。`,
+          }
+        : {
+            title: 'キャンセルと返金が承認されました',
+            message: 'キャンセルと返金が承認されました。',
+          };
+    case 'zh':
+      return normalizedTitle
+        ? {
+            title: '您的取消和退款已获批准',
+            message: `“${normalizedTitle}”的取消和退款已获批准。`,
+          }
+        : {
+            title: '您的取消和退款已获批准',
+            message: '您的取消和退款已获批准。',
+          };
+    case 'ko':
+    default:
+      return normalizedTitle
+        ? {
+            title: '취소 및 환불이 승인되었습니다',
+            message: `"${normalizedTitle}" 취소 및 환불이 승인되었습니다.`,
+          }
+        : {
+            title: '취소 및 환불이 승인되었습니다',
+            message: '취소 및 환불이 승인되었습니다.',
+          };
+  }
+}
+
+function resolveLocalizedSingleRecipientCopy(params: {
+  locale: NotificationLocale;
+  type?: string;
+  copyKey?: NotificationRequestBody['copy_key'];
+  copyParams?: NotificationRequestBody['copy_params'];
+}) {
+  const { locale, type, copyKey, copyParams } = params;
+
+  if (
+    type === 'review_reply' &&
+    copyKey === 'review_reply' &&
+    copyParams &&
+    typeof copyParams.replyPreview === 'string'
+  ) {
+    return buildReviewReplyNotificationCopy(locale, copyParams.replyPreview);
+  }
+
+  if (type === 'cancellation_approved' && copyKey === 'cancellation_approved') {
+    return buildCancellationApprovedNotificationCopy(
+      locale,
+      typeof copyParams?.experienceTitle === 'string' ? copyParams.experienceTitle : null
+    );
+  }
+
+  return null;
+}
+
 async function canSendSingleRecipientNotification(params: {
   actorId: string;
   recipientId: string;
@@ -201,7 +308,7 @@ export async function POST(request: Request) {
 
     const body = await request.json() as NotificationRequestBody;
     // 🟢 [수정] recipient_ids(배열) 추가로 받기
-    const { recipient_id, recipient_ids, title, message, link, type, booking_id, review_id } = body;
+    const { recipient_id, recipient_ids, title, message, link, type, booking_id, review_id, copy_key, copy_params } = body;
     const safeTitle = sanitizeNotificationTitle(title);
     const safeMessage = sanitizeNotificationMessage(message);
     const safeLink = sanitizeNotificationLink(link);
@@ -286,13 +393,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    let finalTitle = safeTitle;
+    let finalMessage = safeMessage;
+
+    const localizedCopy = resolveLocalizedSingleRecipientCopy({
+      locale: await resolveRecipientLocale(supabase, recipient_id),
+      type,
+      copyKey: copy_key,
+      copyParams: copy_params,
+    });
+
+    if (localizedCopy) {
+      finalTitle = sanitizeNotificationTitle(localizedCopy.title);
+      finalMessage = sanitizeNotificationMessage(localizedCopy.message);
+    }
+
     const { error: dbError } = await supabase
       .from('notifications')
       .insert({
         user_id: recipient_id,
         type: type || 'general',
-        title: safeTitle,
-        message: safeMessage,
+        title: finalTitle,
+        message: finalMessage,
         link: safeLink,
         is_read: false
       });
@@ -329,8 +451,8 @@ export async function POST(request: Request) {
         await transporter.sendMail({
           from: `"Locally Team" <${process.env.GMAIL_USER}>`,
           to: emailToSend,
-          subject: `[Locally] ${safeTitle}`,
-          html: buildNotificationEmailHtml(safeMessage, safeLink),
+          subject: `[Locally] ${finalTitle}`,
+          html: buildNotificationEmailHtml(finalMessage, safeLink),
         });
         console.log('🚀 [Notification API] 이메일 발송 성공');
       } catch (emailError: unknown) {

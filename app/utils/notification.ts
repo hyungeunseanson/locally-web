@@ -25,6 +25,10 @@ export type NotificationType =
   | 'review_reply'             // 게스트에게: 호스트가 후기에 답글
   | 'review_request';          // 게스트에게: 체험 완료 후 후기 작성 요청
 
+type NotificationCopyKey =
+  | 'review_reply'
+  | 'cancellation_approved';
+
   interface SendNotificationParams {
     recipient_id?: string;
     recipient_ids?: string[]; // 🟢 다중 발송용 (관리자 기능)
@@ -39,6 +43,8 @@ export type NotificationType =
     link?: string;          
     link_url?: string;      
   inquiry_id?: number;
+    copy_key?: NotificationCopyKey;
+    copy_params?: Record<string, unknown>;
 }
 
   export const sendNotification = async ({
@@ -48,7 +54,9 @@ export type NotificationType =
     title,
     message, content,
     link, link_url,
-    inquiry_id
+    inquiry_id,
+    copy_key,
+    copy_params
   }: SendNotificationParams) => {
     
     // 1. 단일 발송 대상
@@ -71,7 +79,9 @@ export type NotificationType =
             message: finalMessage,
             link: finalLink,
             type, 
-            inquiry_id
+            inquiry_id,
+            copy_key,
+            copy_params
           })
         });
   
@@ -107,7 +117,9 @@ export type NotificationType =
         booking_id,
         review_id,
         type, 
-        inquiry_id
+        inquiry_id,
+        copy_key,
+        copy_params
       })
     });
 

@@ -119,6 +119,10 @@ export default function HostReviews() {
           title: '호스트님이 후기에 답글을 남겼습니다',
           message: `후기에 답글이 달렸습니다: "${replyText.slice(0, 40)}${replyText.length > 40 ? '...' : ''}"`,
           link: '/guest/trips',
+          copy_key: 'review_reply',
+          copy_params: {
+            replyPreview: `${replyText.slice(0, 40)}${replyText.length > 40 ? '...' : ''}`,
+          },
         }).catch(console.error);
       }
 

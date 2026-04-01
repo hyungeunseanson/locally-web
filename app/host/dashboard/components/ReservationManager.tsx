@@ -378,7 +378,11 @@ export default function ReservationManager() {
         type: 'cancellation_approved',
         title: t('res_notif_refund_title'),
         content: `${t('res_notif_refund_content_prefix')}${booking.experiences?.title}${t('res_notif_refund_content_suffix')}`,
-        link_url: '/guest/trips'
+        link_url: '/guest/trips',
+        copy_key: 'cancellation_approved',
+        copy_params: {
+          experienceTitle: booking.experiences?.title || '',
+        },
       });
 
       showToast(t('res_toast_approved'), 'success'); // 🟢 번역

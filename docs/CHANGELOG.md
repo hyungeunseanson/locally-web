@@ -5,6 +5,13 @@
 
 ---
 
+## v3.40.02 — [Notifications] Shared guest 알림 이메일 다국어 1차
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟢 `review_reply` / `cancellation_approved` shared copy 현지화 | `app/utils/notification.ts`, `app/api/notifications/email/route.ts`, `app/host/dashboard/HostReviews.tsx`, `app/host/dashboard/components/ReservationManager.tsx` — `sendNotification()` single-recipient 경로에 optional structured copy payload를 추가하고, `/api/notifications/email`은 allowlist 된 두 타입에서만 recipient `preferred_locale` 기준으로 localized title/message를 생성하도록 변경. raw `title/message` fallback과 mass/admin branch는 그대로 유지 |
+| 🟡 shared route focused 검증 추가 | `tests/e2e/122-review-reply-notification-localization.spec.ts`, `tests/e2e/123-cancellation-approved-notification-localization.spec.ts`, `tests/e2e/39-host-review-routes.spec.ts`, `tests/e2e/75-experience-cancel-error-safe.spec.ts` — review reply / cancellation approved locale 저장과 기존 ownership/cancel flow 회귀가 없는지 함께 검증 |
+
 ## v3.40.01 — [Emails] Booking host template 이메일 다국어 5차
 
 | 항목 | 내용 |
