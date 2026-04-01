@@ -29,6 +29,12 @@ type LoginModalCopy = {
   loginHelper: string;
   returnAfterLogin: string;
   socialReturnHint: string;
+  loginSuccessTitle: string;
+  loginSuccessBody: string;
+  signupSuccessTitle: string;
+  signupSuccessBody: string;
+  signupVerificationSentTitle: string;
+  signupVerificationSentBody: string;
 };
 
 type LocalizedOption = {
@@ -44,9 +50,9 @@ const normalizeLocale = (locale: string): LoginModalLocale => {
 
 const COPY: Record<LoginModalLocale, LoginModalCopy> = {
   ko: {
-    signupTitle: '계정 생성하기',
-    signupSubtitle: '빠르고 간편하게 가입하세요.',
-    signupHelper: '가입 후 예약 내역, 메시지 답변, 위시리스트를 바로 이어서 사용할 수 있어요.',
+    signupTitle: '가입하고 바로 시작하기',
+    signupSubtitle: '필요한 정보만 입력하면 바로 이어서 사용할 수 있어요.',
+    signupHelper: '가입하면 예약 내역, 메시지, 위시리스트가 같은 계정에 바로 저장돼요.',
     emailPasswordRequired: '이메일과 비밀번호를 입력해주세요.',
     signupFieldsRequired: '이름, 국적, 연락처, 생년월일, 성별을 모두 입력해주세요.',
     birthDateInvalid: '생년월일 8자리(YYYYMMDD)를 올바르게 입력해주세요.',
@@ -67,14 +73,20 @@ const COPY: Record<LoginModalLocale, LoginModalCopy> = {
     privacyAgreement: '[필수] 개인정보 수집 및 이용 동의',
     viewLabel: '보기',
     switchToLogin: '이미 계정이 있으신가요? 로그인',
-    loginHelper: '로그인하고 계속 진행하세요.',
-    returnAfterLogin: '로그인 후 지금 보고 있던 화면으로 다시 돌아갑니다.',
-    socialReturnHint: '소셜 로그인 후에도 원래 보던 화면으로 다시 돌아와요.',
+    loginHelper: '로그인하면 지금 보던 내용과 저장한 정보를 바로 이어서 확인할 수 있어요.',
+    returnAfterLogin: '로그인 후 지금 보던 화면으로 돌아가 바로 이어서 진행해요.',
+    socialReturnHint: '소셜 로그인 후에도 같은 화면으로 돌아와 이어서 진행해요.',
+    loginSuccessTitle: '로그인 완료',
+    loginSuccessBody: '계정 확인이 끝났어요. 이어서 이동하고 있어요.',
+    signupSuccessTitle: '가입 완료',
+    signupSuccessBody: '계정이 저장됐어요. 바로 이어서 사용할 수 있어요.',
+    signupVerificationSentTitle: '인증 메일 전송 완료',
+    signupVerificationSentBody: '이메일 인증을 마치면 바로 로그인해 이어서 사용할 수 있어요.',
   },
   en: {
-    signupTitle: 'Create your account',
-    signupSubtitle: 'Sign up in a few simple steps.',
-    signupHelper: 'After signing up, you can continue with bookings, messages, and your wishlist right away.',
+    signupTitle: 'Sign up and start right away',
+    signupSubtitle: 'Enter a few details and continue without losing your place.',
+    signupHelper: 'Once you sign up, your bookings, messages, and wishlist are saved in one account.',
     emailPasswordRequired: 'Please enter your email and password.',
     signupFieldsRequired: 'Please fill in your name, nationality, phone number, birth date, and gender.',
     birthDateInvalid: 'Please enter a valid 8-digit birth date (YYYYMMDD).',
@@ -95,14 +107,20 @@ const COPY: Record<LoginModalLocale, LoginModalCopy> = {
     privacyAgreement: '[Required] Agree to Privacy Policy',
     viewLabel: 'View',
     switchToLogin: 'Already have an account? Log in',
-    loginHelper: 'Once you log in, you can continue with bookings, messages, and your wishlist.',
-    returnAfterLogin: 'After login, you will return to the page you were viewing.',
-    socialReturnHint: 'Even after social login, you will come back to the page you were viewing.',
+    loginHelper: 'Log in to keep going with what you were viewing and what you already saved.',
+    returnAfterLogin: 'After login, you will return to the screen you were viewing and continue right away.',
+    socialReturnHint: 'Even after social login, you will come back to the same screen and continue.',
+    loginSuccessTitle: 'Login complete',
+    loginSuccessBody: 'Your account is ready. Taking you back now.',
+    signupSuccessTitle: 'Sign-up complete',
+    signupSuccessBody: 'Your account has been saved. You can continue right away.',
+    signupVerificationSentTitle: 'Verification email sent',
+    signupVerificationSentBody: 'Finish email verification, then log in and continue right away.',
   },
   ja: {
-    signupTitle: 'アカウントを作成',
-    signupSubtitle: '数ステップで簡単に登録できます。',
-    signupHelper: '登録後は予約履歴、メッセージ、お気に入りをそのまま続けて使えます。',
+    signupTitle: '登録してすぐ始める',
+    signupSubtitle: '必要な情報だけ入力すれば、そのまま続けて使えます。',
+    signupHelper: '登録すると、予約履歴、メッセージ、お気に入りが同じアカウントにすぐ保存されます。',
     emailPasswordRequired: 'メールアドレスとパスワードを入力してください。',
     signupFieldsRequired: '氏名、国籍、連絡先、生年月日、性別をすべて入力してください。',
     birthDateInvalid: '生年月日8桁（YYYYMMDD）を正しく入力してください。',
@@ -123,14 +141,20 @@ const COPY: Record<LoginModalLocale, LoginModalCopy> = {
     privacyAgreement: '[必須] 個人情報の収集および利用に同意する',
     viewLabel: '表示',
     switchToLogin: 'すでにアカウントをお持ちですか？ ログイン',
-    loginHelper: 'ログインすると、予約、メッセージ、お気に入りをそのまま続けて使えます。',
-    returnAfterLogin: 'ログイン後は、今見ていたページに戻ります。',
-    socialReturnHint: 'ソーシャルログイン後も、元の画面に戻ります。',
+    loginHelper: 'ログインすると、今見ていた内容や保存済みの情報をすぐに続けて確認できます。',
+    returnAfterLogin: 'ログイン後は、今見ていた画面に戻ってそのまま続けられます。',
+    socialReturnHint: 'ソーシャルログイン後も、同じ画面に戻って続けられます。',
+    loginSuccessTitle: 'ログイン完了',
+    loginSuccessBody: 'アカウントの確認が終わりました。続けて移動しています。',
+    signupSuccessTitle: '登録完了',
+    signupSuccessBody: 'アカウントが保存されました。すぐに続けて使えます。',
+    signupVerificationSentTitle: '認証メール送信完了',
+    signupVerificationSentBody: 'メール認証を完了すると、すぐにログインして続けられます。',
   },
   zh: {
-    signupTitle: '创建账号',
-    signupSubtitle: '只需几步即可快速注册。',
-    signupHelper: '注册后即可继续查看预订、消息回复和心愿单。',
+    signupTitle: '注册后马上开始',
+    signupSubtitle: '填写必要信息后，就能直接继续使用。',
+    signupHelper: '注册后，预订、消息和心愿单会立即保存到同一账号中。',
     emailPasswordRequired: '请输入邮箱和密码。',
     signupFieldsRequired: '请填写姓名、国籍、联系方式、出生日期和性别。',
     birthDateInvalid: '请输入正确的 8 位出生日期（YYYYMMDD）。',
@@ -151,9 +175,15 @@ const COPY: Record<LoginModalLocale, LoginModalCopy> = {
     privacyAgreement: '[必选] 同意隐私政策',
     viewLabel: '查看',
     switchToLogin: '已有账号？去登录',
-    loginHelper: '登录后，你可以继续使用预订、消息和心愿单。',
-    returnAfterLogin: '登录后会回到你刚才正在查看的页面。',
-    socialReturnHint: '使用社交登录后，也会回到你刚才的页面。',
+    loginHelper: '登录后，你刚刚查看的内容和已保存的信息都可以马上继续。',
+    returnAfterLogin: '登录后会回到刚才的页面，直接继续操作。',
+    socialReturnHint: '使用社交登录后，也会回到同一页面继续操作。',
+    loginSuccessTitle: '登录完成',
+    loginSuccessBody: '账号已确认，正在为你继续跳转。',
+    signupSuccessTitle: '注册完成',
+    signupSuccessBody: '账号已保存，你现在可以直接继续使用。',
+    signupVerificationSentTitle: '验证邮件已发送',
+    signupVerificationSentBody: '完成邮箱验证后，即可登录并继续使用。',
   },
 };
 

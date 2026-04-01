@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
-import { X, ChevronDown, Loader2 } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { X, ChevronDown, Loader2, CheckCircle2, MailCheck } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext';
@@ -42,6 +42,8 @@ interface LoginModalProps {
   redirectPath?: string;
 }
 
+type AuthCompletionState = 'idle' | 'success' | 'verification_sent';
+
 const normalizeRedirectPath = (value?: string | null) => {
   if (!value) return '/';
   return /^\/(?!\/)/.test(value) ? value : '/';
@@ -69,6 +71,8 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
   const [loading, setLoading] = useState(false);
   const [socialLoadingProvider, setSocialLoadingProvider] = useState<'google' | 'kakao' | null>(null);
   const [isFocused, setIsFocused] = useState<string | null>(null);
+  const [completionState, setCompletionState] = useState<AuthCompletionState>('idle');
+  const [completionMode, setCompletionMode] = useState<'LOGIN' | 'SIGNUP' | null>(null);
 
   const router = useRouter();
   const pathname = usePathname();
@@ -89,10 +93,89 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
     return normalizeRedirectPath(currentPath);
   }, [currentPath, pathname, redirectPath]);
   const shouldShowReturnHint = resolvedRedirectPath !== '/';
+  const completionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearCompletionTimer = () => {
+    if (completionTimeoutRef.current) {
+      clearTimeout(completionTimeoutRef.current);
+      completionTimeoutRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      clearCompletionTimer();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) {
+      clearCompletionTimer();
+      setCompletionState('idle');
+      setCompletionMode(null);
+    }
+  }, [isOpen]);
+
+  const finalizeSuccessfulAuth = () => {
+    if (onLoginSuccess) {
+      onLoginSuccess();
+    } else {
+      onClose();
+    }
+    router.refresh();
+  };
+
+  const showCompletionState = (
+    nextState: AuthCompletionState,
+    nextMode: 'LOGIN' | 'SIGNUP' | null,
+    delayMs: number,
+    onComplete: () => void
+  ) => {
+    clearCompletionTimer();
+    setCompletionMode(nextMode);
+    setCompletionState(nextState);
+    completionTimeoutRef.current = setTimeout(() => {
+      completionTimeoutRef.current = null;
+      onComplete();
+    }, delayMs);
+  };
+
+  const completionContent = useMemo(() => {
+    if (completionState === 'verification_sent') {
+      return {
+        icon: <MailCheck size={28} className="text-emerald-600" aria-hidden="true" />,
+        title: copy.signupVerificationSentTitle,
+        body: copy.signupVerificationSentBody,
+      };
+    }
+
+    if (completionState === 'success' && completionMode === 'SIGNUP') {
+      return {
+        icon: <CheckCircle2 size={28} className="text-emerald-600" aria-hidden="true" />,
+        title: copy.signupSuccessTitle,
+        body: copy.signupSuccessBody,
+      };
+    }
+
+    if (completionState === 'success' && completionMode === 'LOGIN') {
+      return {
+        icon: <CheckCircle2 size={28} className="text-emerald-600" aria-hidden="true" />,
+        title: copy.loginSuccessTitle,
+        body: copy.loginSuccessBody,
+      };
+    }
+
+    return null;
+  }, [completionMode, completionState, copy]);
+
+  const handleCloseRequest = () => {
+    if (completionState !== 'idle') return;
+    requestClose();
+  };
 
   const handleAuth = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (loading || socialLoadingProvider) return;
+    if (loading || socialLoadingProvider || completionState !== 'idle') return;
 
     if (!email || !password) {
       showToast(copy.emailPasswordRequired, 'error');
@@ -141,15 +224,16 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
 
         if (data.user && data.session) {
           showToast(copy.signupSuccess, 'success');
-          if (onLoginSuccess) {
-            onLoginSuccess();
-          } else {
-            onClose();
-          }
-          router.refresh();
+          showCompletionState('success', 'SIGNUP', 900, finalizeSuccessfulAuth);
         } else {
           showToast(copy.signupVerificationSent, 'success');
-          setMode('LOGIN');
+          showCompletionState('verification_sent', 'SIGNUP', 1200, () => {
+            setCompletionState('idle');
+            setCompletionMode(null);
+            setMode('LOGIN');
+            setPassword('');
+            setTermsError(false);
+          });
         }
 
       } else {
@@ -166,12 +250,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
         }
 
         showToast(copy.loginSuccess, 'success');
-        if (onLoginSuccess) {
-          onLoginSuccess();
-        } else {
-          onClose();
-        }
-        router.refresh();
+        showCompletionState('success', 'LOGIN', 800, finalizeSuccessfulAuth);
       }
     } catch (error) {
       const errorMessage = getErrorMessage(error, copy.unknownError);
@@ -191,7 +270,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
   };
 
   const handleSocialLogin = async (provider: 'google' | 'kakao') => {
-    if (loading || socialLoadingProvider) return;
+    if (loading || socialLoadingProvider || completionState !== 'idle') return;
 
     setSocialLoadingProvider(provider);
 
@@ -212,7 +291,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
 
   return (
     <div className={`fixed inset-0 z-[200] flex items-center justify-center p-4 md:p-4 transition-opacity duration-150 ${closing ? 'opacity-0' : 'animate-in fade-in duration-200'}`}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={requestClose}></div>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleCloseRequest}></div>
 
       <div className={`bg-white w-full ${mode === 'SIGNUP' ? 'max-w-[356px] md:max-w-[480px]' : 'max-w-[328px] md:max-w-[420px]'} rounded-[22px] md:rounded-2xl shadow-2xl overflow-hidden relative z-10 transition-all duration-150 ${closing ? 'opacity-0 scale-95' : 'animate-in zoom-in-95 duration-200'}`}>
 
@@ -255,7 +334,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
         )}
 
         <div className="h-12 md:h-14 flex items-center justify-between px-4 md:px-5 border-b border-gray-100">
-          <button onClick={requestClose} type="button" className="p-2 hover:bg-gray-100 rounded-full transition-colors -ml-2">
+          <button onClick={handleCloseRequest} type="button" className="p-2 hover:bg-gray-100 rounded-full transition-colors -ml-2">
             <X size={18} className="text-gray-900" />
           </button>
           <span className="font-bold text-[14px] md:text-[15px] text-gray-900">
@@ -265,222 +344,251 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
         </div>
 
         <div className={`p-4 md:p-6 max-h-[76dvh] md:max-h-[80vh] overflow-y-auto`} style={{ paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))' }}>
-
-          <div className="mb-5 md:mb-6">
-            <h3 className="text-[18px] md:text-xl font-bold text-gray-900 mb-1">
-              {mode === 'LOGIN' ? t('welcome_title') : copy.signupTitle}
-            </h3>
-            <p className="text-[12px] md:text-sm text-gray-500 font-medium">
-              {mode === 'LOGIN' ? t('welcome_subtitle') : copy.signupSubtitle}
-            </p>
-            <div data-testid="login-modal-flow-hint" className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-left">
-              <p className="text-[11px] md:text-[12px] font-medium leading-5 text-slate-600">
-                {mode === 'LOGIN' ? copy.loginHelper : copy.signupHelper}
-              </p>
-              {shouldShowReturnHint && (
-                <p className="mt-1 text-[11px] md:text-[12px] font-semibold leading-5 text-slate-900">
-                  {copy.returnAfterLogin}
+          {completionContent ? (
+            <div
+              data-testid="auth-success-state"
+              className="flex min-h-[360px] md:min-h-[400px] items-center justify-center py-4"
+              aria-live="polite"
+            >
+              <div className="w-full rounded-[24px] border border-emerald-200 bg-emerald-50/80 px-6 py-10 text-center shadow-[0_16px_40px_rgba(16,185,129,0.08)]">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-sm">
+                  {completionContent.icon}
+                </div>
+                <h3
+                  data-testid="auth-success-title"
+                  className="mt-5 text-[22px] font-bold tracking-[-0.02em] text-slate-900"
+                >
+                  {completionContent.title}
+                </h3>
+                <p
+                  data-testid="auth-success-body"
+                  className="mx-auto mt-3 max-w-[280px] text-[13px] leading-6 text-slate-600"
+                >
+                  {completionContent.body}
                 </p>
-              )}
+              </div>
             </div>
-          </div>
+          ) : (
+            <>
+              <div className="mb-5 md:mb-6">
+                <h3 className="text-[18px] md:text-xl font-bold text-gray-900 mb-1">
+                  {mode === 'LOGIN' ? t('welcome_title') : copy.signupTitle}
+                </h3>
+                <p className="text-[12px] md:text-sm text-gray-500 font-medium">
+                  {mode === 'LOGIN' ? t('welcome_subtitle') : copy.signupSubtitle}
+                </p>
+                <div data-testid="login-modal-flow-hint" className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-left">
+                  <p className="text-[11px] md:text-[12px] font-medium leading-5 text-slate-600">
+                    {mode === 'LOGIN' ? copy.loginHelper : copy.signupHelper}
+                  </p>
+                  {shouldShowReturnHint && (
+                    <p className="mt-1 text-[11px] md:text-[12px] font-semibold leading-5 text-slate-900">
+                      {copy.returnAfterLogin}
+                    </p>
+                  )}
+                </div>
+              </div>
 
-          <form onSubmit={handleAuth}>
-            <div className="border border-gray-300 rounded-xl overflow-hidden mb-5 md:mb-6">
-
-              <InputItem
-                type="email" label={t('email')} value={email} setValue={setEmail}  // 🟢 번역 적용
-                isFirst={true} focusKey="EMAIL" currentFocus={isFocused} setFocus={setIsFocused}
-                autoComplete="username"
-              />
-
-              <InputItem
-                type="password" label={t('password')} value={password} setValue={setPassword} // 🟢 번역 적용
-                isFirst={false} focusKey="PASSWORD" currentFocus={isFocused} setFocus={setIsFocused}
-                autoComplete={mode === 'LOGIN' ? "current-password" : "new-password"}
-              />
-
-              {mode === 'SIGNUP' && (
-                <p className="px-4 py-1.5 text-[11px] md:text-xs text-gray-400 border-t border-gray-300 bg-gray-50">{t('password_min_hint')}</p>
-              )}
-
-              {mode === 'SIGNUP' && (
-                <>
-                  <div className="flex border-t border-gray-300">
-                    <div className="w-1/2 border-r border-gray-300">
-                      <InputItem
-                        type="text" label={copy.realNameLabel} value={fullName} setValue={setFullName}
-                        isFirst={true} focusKey="NAME" currentFocus={isFocused} setFocus={setIsFocused}
-                        autoComplete="name"
-                      />
-                    </div>
-                    <div className={`relative h-12 md:h-14 w-1/2 ${isFocused === 'NATION' ? 'ring-2 ring-black z-10' : ''}`}>
-                      <select
-                        className={`block w-full h-full pt-4 md:pt-5 pb-1 px-3.5 md:px-4 text-[14px] md:text-[15px] bg-white appearance-none focus:outline-none peer relative cursor-pointer ${!nationality ? 'text-transparent' : 'text-gray-900'}`}
-                        value={nationality}
-                        onChange={(e) => setNationality(e.target.value)}
-                        onFocus={() => setIsFocused('NATION')}
-                        onBlur={() => setIsFocused(null)}
-                      >
-                        <option value="" disabled className="text-gray-900">{t('select_nationality')}</option>
-                        {nationalityOptions.map((option) => (
-                          <option key={option.value} value={option.value} className="text-gray-900">
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                      <label className={`absolute duration-150 transform -translate-y-3 scale-75 top-3.5 md:top-4 z-0 origin-[0] left-3.5 md:left-4 text-[13px] md:text-[14px] font-medium pointer-events-none ${!nationality ? 'text-gray-500' : 'text-gray-500'}`}>
-                        {t('label_nationality')}
-                      </label>
-                      <ChevronDown size={16} className="absolute right-3 top-4 md:top-5 text-gray-500 pointer-events-none" />
-                    </div>
-                  </div>
+              <form onSubmit={handleAuth}>
+                <div className="border border-gray-300 rounded-xl overflow-hidden mb-5 md:mb-6">
 
                   <InputItem
-                    type="tel" label={copy.phoneFieldLabel} value={phone} setValue={setPhone}
-                    isFirst={false} focusKey="PHONE" currentFocus={isFocused} setFocus={setIsFocused}
-                    autoComplete="tel"
+                    type="email" label={t('email')} value={email} setValue={setEmail}  // 🟢 번역 적용
+                    isFirst={true} focusKey="EMAIL" currentFocus={isFocused} setFocus={setIsFocused}
+                    autoComplete="username"
                   />
 
-                  <div className="flex border-t border-gray-300">
-                    <div className={`relative h-12 md:h-14 w-1/2 border-r border-gray-300 ${isFocused === 'BIRTH' ? 'ring-2 ring-black z-10' : ''}`}>
-                      <input
-                        type="text"
-                        className="block w-full h-full pt-4 md:pt-5 pb-1 px-3.5 md:px-4 text-[14px] md:text-[15px] text-gray-900 bg-white appearance-none focus:outline-none placeholder-transparent peer"
-                        placeholder={copy.birthDateFieldLabel}
-                        value={birthDate}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 8);
-                          setBirthDate(val);
-                        }}
-                        onFocus={() => setIsFocused('BIRTH')}
-                        onBlur={() => setIsFocused(null)}
-                        autoComplete="bday"
+                  <InputItem
+                    type="password" label={t('password')} value={password} setValue={setPassword} // 🟢 번역 적용
+                    isFirst={false} focusKey="PASSWORD" currentFocus={isFocused} setFocus={setIsFocused}
+                    autoComplete={mode === 'LOGIN' ? "current-password" : "new-password"}
+                  />
+
+                  {mode === 'SIGNUP' && (
+                    <p className="px-4 py-1.5 text-[11px] md:text-xs text-gray-400 border-t border-gray-300 bg-gray-50">{t('password_min_hint')}</p>
+                  )}
+
+                  {mode === 'SIGNUP' && (
+                    <>
+                      <div className="flex border-t border-gray-300">
+                        <div className="w-1/2 border-r border-gray-300">
+                          <InputItem
+                            type="text" label={copy.realNameLabel} value={fullName} setValue={setFullName}
+                            isFirst={true} focusKey="NAME" currentFocus={isFocused} setFocus={setIsFocused}
+                            autoComplete="name"
+                          />
+                        </div>
+                        <div className={`relative h-12 md:h-14 w-1/2 ${isFocused === 'NATION' ? 'ring-2 ring-black z-10' : ''}`}>
+                          <select
+                            className={`block w-full h-full pt-4 md:pt-5 pb-1 px-3.5 md:px-4 text-[14px] md:text-[15px] bg-white appearance-none focus:outline-none peer relative cursor-pointer ${!nationality ? 'text-transparent' : 'text-gray-900'}`}
+                            value={nationality}
+                            onChange={(e) => setNationality(e.target.value)}
+                            onFocus={() => setIsFocused('NATION')}
+                            onBlur={() => setIsFocused(null)}
+                          >
+                            <option value="" disabled className="text-gray-900">{t('select_nationality')}</option>
+                            {nationalityOptions.map((option) => (
+                              <option key={option.value} value={option.value} className="text-gray-900">
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                          <label className={`absolute duration-150 transform -translate-y-3 scale-75 top-3.5 md:top-4 z-0 origin-[0] left-3.5 md:left-4 text-[13px] md:text-[14px] font-medium pointer-events-none ${!nationality ? 'text-gray-500' : 'text-gray-500'}`}>
+                            {t('label_nationality')}
+                          </label>
+                          <ChevronDown size={16} className="absolute right-3 top-4 md:top-5 text-gray-500 pointer-events-none" />
+                        </div>
+                      </div>
+
+                      <InputItem
+                        type="tel" label={copy.phoneFieldLabel} value={phone} setValue={setPhone}
+                        isFirst={false} focusKey="PHONE" currentFocus={isFocused} setFocus={setIsFocused}
+                        autoComplete="tel"
                       />
-                      <label className="absolute text-[13px] md:text-[14px] text-gray-500 duration-150 transform -translate-y-3 scale-75 top-3.5 md:top-4 z-10 origin-[0] left-3.5 md:left-4 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-3 font-medium pointer-events-none">
-                        {copy.birthDateFieldLabel}
-                      </label>
+
+                      <div className="flex border-t border-gray-300">
+                        <div className={`relative h-12 md:h-14 w-1/2 border-r border-gray-300 ${isFocused === 'BIRTH' ? 'ring-2 ring-black z-10' : ''}`}>
+                          <input
+                            type="text"
+                            className="block w-full h-full pt-4 md:pt-5 pb-1 px-3.5 md:px-4 text-[14px] md:text-[15px] text-gray-900 bg-white appearance-none focus:outline-none placeholder-transparent peer"
+                            placeholder={copy.birthDateFieldLabel}
+                            value={birthDate}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 8);
+                              setBirthDate(val);
+                            }}
+                            onFocus={() => setIsFocused('BIRTH')}
+                            onBlur={() => setIsFocused(null)}
+                            autoComplete="bday"
+                          />
+                          <label className="absolute text-[13px] md:text-[14px] text-gray-500 duration-150 transform -translate-y-3 scale-75 top-3.5 md:top-4 z-10 origin-[0] left-3.5 md:left-4 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-3 font-medium pointer-events-none">
+                            {copy.birthDateFieldLabel}
+                          </label>
+                        </div>
+
+                        <div className={`relative h-12 md:h-14 w-1/2 ${isFocused === 'GENDER' ? 'ring-2 ring-black z-10' : ''}`}>
+                          <select
+                            className={`block w-full h-full pt-4 md:pt-5 pb-1 px-3.5 md:px-4 text-[14px] md:text-[15px] bg-white appearance-none focus:outline-none peer relative cursor-pointer ${!gender ? 'text-transparent' : 'text-gray-900'}`}
+                            value={gender}
+                            onChange={(e) => setGender(e.target.value as Gender)}
+                            onFocus={() => setIsFocused('GENDER')}
+                            onBlur={() => setIsFocused(null)}
+                            autoComplete="sex"
+                          >
+                            <option value="" disabled className="text-gray-900">{t('gender_select')}</option>
+                            <option value="Male" className="text-gray-900">{t('gender_male')}</option>
+                            <option value="Female" className="text-gray-900">{t('gender_female')}</option>
+                          </select>
+                          <label className={`absolute duration-150 transform -translate-y-3 scale-75 top-3.5 md:top-4 z-0 origin-[0] left-3.5 md:left-4 text-[13px] md:text-[14px] font-medium pointer-events-none ${!gender ? 'text-gray-500' : 'text-gray-500'}`}>
+                            {t('label_gender')}
+                          </label>
+                          <ChevronDown size={16} className="absolute right-3 top-4 md:top-5 text-gray-500 pointer-events-none" />
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {mode === 'SIGNUP' && (
+                  <div className={`mb-5 md:mb-6 rounded-xl border ${termsError ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50'} text-xs text-gray-700`}>
+                    <div
+                      className="flex items-center p-3.5 md:p-4 border-b border-gray-200 cursor-pointer select-none group"
+                      onClick={() => {
+                        const newValue = !(termsAgreed && privacyAgreed);
+                        setTermsAgreed(newValue);
+                        setPrivacyAgreed(newValue);
+                      }}
+                    >
+                      <div className={`w-5 h-5 rounded flex items-center justify-center border transition-colors ${termsAgreed && privacyAgreed ? 'bg-black border-black text-white' : 'bg-white border-gray-300 group-hover:border-gray-400'}`}>
+                        {(termsAgreed && privacyAgreed) && <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                      </div>
+                      <span className="ml-3 font-bold text-[13px] md:text-sm text-gray-900">{copy.selectAll}</span>
                     </div>
 
-                    <div className={`relative h-12 md:h-14 w-1/2 ${isFocused === 'GENDER' ? 'ring-2 ring-black z-10' : ''}`}>
-                      <select
-                        className={`block w-full h-full pt-4 md:pt-5 pb-1 px-3.5 md:px-4 text-[14px] md:text-[15px] bg-white appearance-none focus:outline-none peer relative cursor-pointer ${!gender ? 'text-transparent' : 'text-gray-900'}`}
-                        value={gender}
-                        onChange={(e) => setGender(e.target.value as Gender)}
-                        onFocus={() => setIsFocused('GENDER')}
-                        onBlur={() => setIsFocused(null)}
-                        autoComplete="sex"
-                      >
-                        <option value="" disabled className="text-gray-900">{t('gender_select')}</option>
-                        <option value="Male" className="text-gray-900">{t('gender_male')}</option>
-                        <option value="Female" className="text-gray-900">{t('gender_female')}</option>
-                      </select>
-                      <label className={`absolute duration-150 transform -translate-y-3 scale-75 top-3.5 md:top-4 z-0 origin-[0] left-3.5 md:left-4 text-[13px] md:text-[14px] font-medium pointer-events-none ${!gender ? 'text-gray-500' : 'text-gray-500'}`}>
-                        {t('label_gender')}
-                      </label>
-                      <ChevronDown size={16} className="absolute right-3 top-4 md:top-5 text-gray-500 pointer-events-none" />
+                    <div className="p-3.5 md:p-4 space-y-3.5 md:space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div
+                          className="flex items-center cursor-pointer select-none group"
+                          onClick={() => setTermsAgreed(!termsAgreed)}
+                        >
+                          <div className={`w-4 h-4 rounded flex items-center justify-center border transition-colors ${termsAgreed ? 'bg-black border-black text-white' : 'bg-white border-gray-300 group-hover:border-gray-400'}`}>
+                            {termsAgreed && <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                          </div>
+                          <span className="ml-2.5 text-gray-700 font-medium text-xs">{copy.termsAgreement}</span>
+                        </div>
+                        <button type="button" onClick={() => setShowLegalText('terms')} className="text-[11px] md:text-[12px] text-gray-400 hover:text-black underline font-medium">{copy.viewLabel}</button>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div
+                          className="flex items-center cursor-pointer select-none group"
+                          onClick={() => setPrivacyAgreed(!privacyAgreed)}
+                        >
+                          <div className={`w-4 h-4 rounded flex items-center justify-center border transition-colors ${privacyAgreed ? 'bg-black border-black text-white' : 'bg-white border-gray-300 group-hover:border-gray-400'}`}>
+                            {privacyAgreed && <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                          </div>
+                          <span className="ml-2.5 text-gray-700 font-medium text-xs">{copy.privacyAgreement}</span>
+                        </div>
+                        <button type="button" onClick={() => setShowLegalText('privacy')} className="text-[11px] md:text-[12px] text-gray-400 hover:text-black underline font-medium">{copy.viewLabel}</button>
+                      </div>
                     </div>
                   </div>
-                </>
-              )}
-            </div>
+                )}
+                {mode === 'LOGIN' && (
+                  <div className="text-[10px] md:text-[11px] text-gray-500 mb-5 md:mb-6 leading-relaxed">
+                    {t('agree_terms')} {/* 🟢 번역 적용 */}
+                  </div>
+                )}
 
-            {mode === 'SIGNUP' && (
-              <div className={`mb-5 md:mb-6 rounded-xl border ${termsError ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50'} text-xs text-gray-700`}>
-                <div
-                  className="flex items-center p-3.5 md:p-4 border-b border-gray-200 cursor-pointer select-none group"
-                  onClick={() => {
-                    const newValue = !(termsAgreed && privacyAgreed);
-                    setTermsAgreed(newValue);
-                    setPrivacyAgreed(newValue);
-                  }}
+                <button
+                  type="submit"
+                  disabled={loading || socialLoadingProvider !== null}
+                  aria-busy={loading}
+                  className="mb-5 md:mb-6 h-11 md:h-12 w-full rounded-xl bg-[#111] text-[14px] md:text-[15px] font-bold text-white shadow-md transition-all active:scale-[0.98] active:brightness-95 hover:bg-black disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                  <div className={`w-5 h-5 rounded flex items-center justify-center border transition-colors ${termsAgreed && privacyAgreed ? 'bg-black border-black text-white' : 'bg-white border-gray-300 group-hover:border-gray-400'}`}>
-                    {(termsAgreed && privacyAgreed) && <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
-                  </div>
-                  <span className="ml-3 font-bold text-[13px] md:text-sm text-gray-900">{copy.selectAll}</span>
-                </div>
+                  <span className="inline-flex items-center justify-center gap-2">
+                    {loading ? <Loader2 size={16} className="animate-spin" /> : null}
+                    {mode === 'LOGIN' ? t('login_button') : t('signup')}
+                  </span>
+                </button>
+              </form>
 
-                <div className="p-3.5 md:p-4 space-y-3.5 md:space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div
-                      className="flex items-center cursor-pointer select-none group"
-                      onClick={() => setTermsAgreed(!termsAgreed)}
-                    >
-                      <div className={`w-4 h-4 rounded flex items-center justify-center border transition-colors ${termsAgreed ? 'bg-black border-black text-white' : 'bg-white border-gray-300 group-hover:border-gray-400'}`}>
-                        {termsAgreed && <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
-                      </div>
-                      <span className="ml-2.5 text-gray-700 font-medium text-xs">{copy.termsAgreement}</span>
-                    </div>
-                    <button type="button" onClick={() => setShowLegalText('terms')} className="text-[11px] md:text-[12px] text-gray-400 hover:text-black underline font-medium">{copy.viewLabel}</button>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div
-                      className="flex items-center cursor-pointer select-none group"
-                      onClick={() => setPrivacyAgreed(!privacyAgreed)}
-                    >
-                      <div className={`w-4 h-4 rounded flex items-center justify-center border transition-colors ${privacyAgreed ? 'bg-black border-black text-white' : 'bg-white border-gray-300 group-hover:border-gray-400'}`}>
-                        {privacyAgreed && <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
-                      </div>
-                      <span className="ml-2.5 text-gray-700 font-medium text-xs">{copy.privacyAgreement}</span>
-                    </div>
-                    <button type="button" onClick={() => setShowLegalText('privacy')} className="text-[11px] md:text-[12px] text-gray-400 hover:text-black underline font-medium">{copy.viewLabel}</button>
-                  </div>
-                </div>
+              <div className="mb-5 md:mb-6 flex items-center gap-3">
+                <div className="flex-1 h-px bg-gray-200"></div>
+                <span className="text-[11px] text-gray-400 font-bold">{t('or')}</span> {/* 🟢 번역 적용 */}
+                <div className="flex-1 h-px bg-gray-200"></div>
               </div>
-            )}
-            {mode === 'LOGIN' && (
-              <div className="text-[10px] md:text-[11px] text-gray-500 mb-5 md:mb-6 leading-relaxed">
-                {t('agree_terms')} {/* 🟢 번역 적용 */}
+
+              <div className="space-y-2.5 md:space-y-3">
+                <SocialButton provider="kakao" label={t('continue_kakao')} onClick={() => handleSocialLogin('kakao')} isLoading={socialLoadingProvider === 'kakao'} disabled={loading || socialLoadingProvider !== null} /> {/* 🟢 번역 적용 */}
+                <SocialButton provider="google" label={t('continue_google')} onClick={() => handleSocialLogin('google')} isLoading={socialLoadingProvider === 'google'} disabled={loading || socialLoadingProvider !== null} /> {/* 🟢 번역 적용 */}
               </div>
-            )}
 
-            <button
-              type="submit"
-              disabled={loading || socialLoadingProvider !== null}
-              aria-busy={loading}
-              className="mb-5 md:mb-6 h-11 md:h-12 w-full rounded-xl bg-[#111] text-[14px] md:text-[15px] font-bold text-white shadow-md transition-all active:scale-[0.98] active:brightness-95 hover:bg-black disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              <span className="inline-flex items-center justify-center gap-2">
-                {loading ? <Loader2 size={16} className="animate-spin" /> : null}
-                {mode === 'LOGIN' ? t('login_button') : t('signup')}
-              </span>
-            </button>
-          </form>
+              {shouldShowReturnHint && (
+                <p data-testid="login-modal-social-return-hint" className="mt-3 text-[11px] md:text-[12px] text-center font-medium text-slate-500">
+                  {copy.socialReturnHint}
+                </p>
+              )}
 
-          <div className="mb-5 md:mb-6 flex items-center gap-3">
-            <div className="flex-1 h-px bg-gray-200"></div>
-            <span className="text-[11px] text-gray-400 font-bold">{t('or')}</span> {/* 🟢 번역 적용 */}
-            <div className="flex-1 h-px bg-gray-200"></div>
-          </div>
-
-          <div className="space-y-2.5 md:space-y-3">
-            <SocialButton provider="kakao" label={t('continue_kakao')} onClick={() => handleSocialLogin('kakao')} isLoading={socialLoadingProvider === 'kakao'} disabled={loading || socialLoadingProvider !== null} /> {/* 🟢 번역 적용 */}
-            <SocialButton provider="google" label={t('continue_google')} onClick={() => handleSocialLogin('google')} isLoading={socialLoadingProvider === 'google'} disabled={loading || socialLoadingProvider !== null} /> {/* 🟢 번역 적용 */}
-          </div>
-
-          {shouldShowReturnHint && (
-            <p data-testid="login-modal-social-return-hint" className="mt-3 text-[11px] md:text-[12px] text-center font-medium text-slate-500">
-              {copy.socialReturnHint}
-            </p>
+              <div className="mt-5 md:mt-6 text-center text-[13px] md:text-sm">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (loading || socialLoadingProvider) return;
+                    clearCompletionTimer();
+                    setCompletionState('idle');
+                    setCompletionMode(null);
+                    setMode(mode === 'LOGIN' ? 'SIGNUP' : 'LOGIN');
+                    setIsFocused(null);
+                  }}
+                  disabled={loading || socialLoadingProvider !== null}
+                  className="text-gray-900 font-semibold underline decoration-1 underline-offset-4 hover:text-gray-600 transition-colors disabled:opacity-50"
+                >
+                  {mode === 'LOGIN' ? `${t('no_account')} ${t('signup')}` : copy.switchToLogin}
+                </button>
+              </div>
+            </>
           )}
-
-          <div className="mt-5 md:mt-6 text-center text-[13px] md:text-sm">
-            <button
-              type="button"
-              onClick={() => {
-                if (loading || socialLoadingProvider) return;
-                setMode(mode === 'LOGIN' ? 'SIGNUP' : 'LOGIN');
-                setIsFocused(null);
-              }}
-              disabled={loading || socialLoadingProvider !== null}
-              className="text-gray-900 font-semibold underline decoration-1 underline-offset-4 hover:text-gray-600 transition-colors disabled:opacity-50"
-            >
-              {mode === 'LOGIN' ? `${t('no_account')} ${t('signup')}` : copy.switchToLogin}
-            </button>
-          </div>
-
         </div>
       </div>
     </div>
