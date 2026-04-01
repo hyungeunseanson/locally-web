@@ -5,6 +5,7 @@ import {
   CHAT_POLICY_SIGNAL_LABELS,
   detectChatPolicySignals,
 } from '@/app/utils/chatPolicySignals';
+import { buildLocalizedEmailCopy } from '@/app/utils/emailCopy';
 import { buildNotificationCopy } from '@/app/utils/notificationCopy';
 import { resolveRecipientLocale } from '@/app/utils/notificationLocale';
 import { insertAdminAlerts, sendAdminAlertEmails } from '@/app/utils/adminAlertCenter';
@@ -181,6 +182,45 @@ function escapeHtml(str: string) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+export async function resolveInquiryNotificationEmailCopy(params: {
+  supabaseAdmin: ReturnType<typeof createAdminClient>;
+  recipientId: string;
+  emailTitle: string;
+  emailMessage: string;
+  actorDisplayName: string;
+  displayContent: string;
+  localizeEmailForRecipient?: boolean;
+}) {
+  const {
+    supabaseAdmin,
+    recipientId,
+    emailTitle,
+    emailMessage,
+    actorDisplayName,
+    displayContent,
+    localizeEmailForRecipient = false,
+  } = params;
+
+  if (!localizeEmailForRecipient) {
+    return {
+      subject: `[Locally] ${emailTitle}`,
+      title: emailTitle,
+      message: emailMessage,
+      ctaLabel: '확인하기',
+    };
+  }
+
+  return buildLocalizedEmailCopy({
+    supabaseAdmin,
+    userId: recipientId,
+    key: 'inquiry.new_message',
+    copyParams: {
+      actorDisplayName,
+      displayContent,
+    },
+  });
+}
+
 async function notifyRecipient(params: {
   recipientId: string;
   emailTitle: string;
@@ -188,10 +228,19 @@ async function notifyRecipient(params: {
   actorDisplayName: string;
   displayContent: string;
   link: string;
+  localizeEmailForRecipient?: boolean;
 }) {
   try {
     const supabaseAdmin = createAdminClient();
-    const { recipientId, emailTitle, emailMessage, actorDisplayName, displayContent, link } = params;
+    const {
+      recipientId,
+      emailTitle,
+      emailMessage,
+      actorDisplayName,
+      displayContent,
+      link,
+      localizeEmailForRecipient = false,
+    } = params;
     const locale = await resolveRecipientLocale(supabaseAdmin, recipientId);
     const inAppCopy = buildNotificationCopy('inquiry.new_message', locale, {
       actorDisplayName,
@@ -212,6 +261,16 @@ async function notifyRecipient(params: {
     const email = await findRecipientEmail(recipientId);
     if (!email) return;
 
+    const emailCopy = await resolveInquiryNotificationEmailCopy({
+      supabaseAdmin,
+      recipientId,
+      emailTitle,
+      emailMessage,
+      actorDisplayName,
+      displayContent,
+      localizeEmailForRecipient,
+    });
+
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
@@ -221,8 +280,8 @@ async function notifyRecipient(params: {
       .sendMail({
         from: `"Locally Team" <${process.env.GMAIL_USER}>`,
         to: email,
-        subject: `[Locally] ${emailTitle}`,
-        html: `<p>${escapeHtml(emailMessage)}</p><br/><a href="${process.env.NEXT_PUBLIC_SITE_URL || ''}${encodeURI(link)}">확인하기</a>`,
+        subject: emailCopy.subject,
+        html: `<p>${escapeHtml(emailCopy.message)}</p><br/><a href="${process.env.NEXT_PUBLIC_SITE_URL || ''}${encodeURI(link)}">${escapeHtml(emailCopy.ctaLabel)}</a>`,
       })
       .catch((error) => {
         console.warn('[inquiries/thread] message notification email failed:', error);
@@ -640,6 +699,7 @@ export async function createInquiryMessage(params: {
       actorDisplayName,
       displayContent,
       link: notificationLink,
+      localizeEmailForRecipient: !(isAdminSupport && String(actor.id) === String(inquiry.user_id)),
     });
   }
 
@@ -869,6 +929,10 @@ export async function upsertInquiryThread(params: {
         actorDisplayName,
         displayContent: cleanMessage,
         link: notificationLink,
+        localizeEmailForRecipient: !(
+          resolved.inquiryType === 'admin_support' &&
+          String(actor.id) === String(resolved.guestId)
+        ),
       });
     }
 

@@ -168,5 +168,27 @@ test.describe('Email localization helpers', () => {
     expect(proxyReplyZh.subject).toBe('[Locally] 你的电话预约请求有新回复');
     expect(proxyReplyZh.message).toContain('我们已经联系到店家了。');
     expect(proxyReplyZh.ctaLabel).toBe('查看回复');
+
+    const inquiryEn = buildEmailCopy('inquiry.new_message', 'en', {
+      actorDisplayName: 'Sora',
+      displayContent: 'Can you share the meeting point?',
+    });
+    expect(inquiryEn.subject).toBe('[Locally] New message from Sora');
+    expect(inquiryEn.message).toBe('Can you share the meeting point?');
+    expect(inquiryEn.ctaLabel).toBe('Check message');
+
+    const inquiryJa = buildEmailCopy('inquiry.new_message', 'ja', {
+      actorDisplayName: 'Sora',
+      displayContent: '集合場所を教えてください。',
+    });
+    expect(inquiryJa.subject).toBe('[Locally] Soraさんから新しいメッセージが届きました');
+    expect(inquiryJa.ctaLabel).toBe('メッセージを確認');
+
+    const inquiryZh = buildEmailCopy('inquiry.new_message', 'zh', {
+      actorDisplayName: 'Sora',
+      displayContent: '可以告诉我集合地点吗？',
+    });
+    expect(inquiryZh.subject).toBe('[Locally] Sora 发来了新消息');
+    expect(inquiryZh.ctaLabel).toBe('查看消息');
   });
 });

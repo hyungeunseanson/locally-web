@@ -86,6 +86,11 @@ type ProxyCommentReplyParams = {
   content: string;
 };
 
+type InquiryNewMessageParams = {
+  actorDisplayName: string;
+  displayContent: string;
+};
+
 export type EmailCopy = {
   subject: string;
   title: string;
@@ -116,7 +121,8 @@ export type EmailCopyKey =
   | 'proxy.payment_confirmed'
   | 'proxy.payment_cancelled'
   | 'proxy.payment_refunded'
-  | 'proxy.comment_reply';
+  | 'proxy.comment_reply'
+  | 'inquiry.new_message';
 
 type EmailCopyParams = {
   'review.new.host': ReviewNewHostParams;
@@ -142,6 +148,7 @@ type EmailCopyParams = {
   'proxy.payment_cancelled': ProxyPaymentParams;
   'proxy.payment_refunded': ProxyPaymentParams;
   'proxy.comment_reply': ProxyCommentReplyParams;
+  'inquiry.new_message': InquiryNewMessageParams;
 };
 
 type LocalizedEmailCopyInput<K extends EmailCopyKey> = {
@@ -1147,6 +1154,45 @@ function buildProxyCommentReplyEmailCopy(
   }
 }
 
+function buildInquiryNewMessageEmailCopy(
+  locale: NotificationLocale,
+  params: InquiryNewMessageParams
+): EmailCopy {
+  const { actorDisplayName, displayContent } = params;
+
+  switch (locale) {
+    case 'en':
+      return {
+        subject: `[Locally] New message from ${actorDisplayName}`,
+        title: `New message from ${actorDisplayName}`,
+        message: displayContent,
+        ctaLabel: 'Check message',
+      };
+    case 'ja':
+      return {
+        subject: `[Locally] ${actorDisplayName}さんから新しいメッセージが届きました`,
+        title: `${actorDisplayName}さんから新しいメッセージが届きました`,
+        message: displayContent,
+        ctaLabel: 'メッセージを確認',
+      };
+    case 'zh':
+      return {
+        subject: `[Locally] ${actorDisplayName} 发来了新消息`,
+        title: `${actorDisplayName} 发来了新消息`,
+        message: displayContent,
+        ctaLabel: '查看消息',
+      };
+    case 'ko':
+    default:
+      return {
+        subject: `[Locally] ${actorDisplayName}님의 새 메시지`,
+        title: `${actorDisplayName}님의 새 메시지`,
+        message: displayContent,
+        ctaLabel: '메시지 확인하기',
+      };
+  }
+}
+
 export function buildEmailCopy<K extends EmailCopyKey>(
   key: K,
   locale: NotificationLocale,
@@ -1235,6 +1281,11 @@ export function buildEmailCopy<K extends EmailCopyKey>(
       return buildProxyCommentReplyEmailCopy(
         locale,
         copyParams as EmailCopyParams['proxy.comment_reply']
+      );
+    case 'inquiry.new_message':
+      return buildInquiryNewMessageEmailCopy(
+        locale,
+        copyParams as EmailCopyParams['inquiry.new_message']
       );
     default:
       return assertNever(key);

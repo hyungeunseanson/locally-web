@@ -112,11 +112,15 @@ function getNotificationEmailHref(link: string | null) {
   return `${siteUrl}${link}`;
 }
 
-function buildNotificationEmailHtml(message: string, link: string | null) {
+export function buildNotificationEmailHtml(
+  message: string,
+  link: string | null,
+  ctaLabel = '확인하기'
+) {
   const escapedMessage = escapeHtml(message).replace(/\n/g, '<br/>');
   const href = getNotificationEmailHref(link);
   const cta = href
-    ? `<br/><a href="${escapeHtml(href)}">확인하기</a>`
+    ? `<br/><a href="${escapeHtml(href)}">${escapeHtml(ctaLabel)}</a>`
     : '';
 
   return `<p>${escapedMessage}</p>${cta}`;
@@ -128,22 +132,26 @@ function buildReviewReplyNotificationCopy(locale: NotificationLocale, replyPrevi
       return {
         title: 'The host replied to your review',
         message: `There is a new reply to your review: "${replyPreview}"`,
+        ctaLabel: 'Check review',
       };
     case 'ja':
       return {
         title: 'ホストがレビューに返信しました',
         message: `レビューに新しい返信が届きました: 「${replyPreview}」`,
+        ctaLabel: 'レビューを確認',
       };
     case 'zh':
       return {
         title: '房东回复了你的评价',
         message: `你的评价收到了新回复：「${replyPreview}」`,
+        ctaLabel: '查看评价',
       };
     case 'ko':
     default:
       return {
         title: '호스트님이 후기에 답글을 남겼습니다',
         message: `후기에 답글이 달렸습니다: "${replyPreview}"`,
+        ctaLabel: '후기 확인하기',
       };
   }
 }
@@ -160,30 +168,36 @@ function buildCancellationApprovedNotificationCopy(
         ? {
             title: 'Your cancellation and refund have been approved',
             message: `The cancellation and refund for "${normalizedTitle}" have been approved.`,
+            ctaLabel: 'Check trip',
           }
         : {
             title: 'Your cancellation and refund have been approved',
             message: 'Your cancellation and refund have been approved.',
+            ctaLabel: 'Check trip',
           };
     case 'ja':
       return normalizedTitle
         ? {
             title: 'キャンセルと返金が承認されました',
             message: `「${normalizedTitle}」のキャンセルと返金が承認されました。`,
+            ctaLabel: '旅行を確認',
           }
         : {
             title: 'キャンセルと返金が承認されました',
             message: 'キャンセルと返金が承認されました。',
+            ctaLabel: '旅行を確認',
           };
     case 'zh':
       return normalizedTitle
         ? {
             title: '您的取消和退款已获批准',
             message: `“${normalizedTitle}”的取消和退款已获批准。`,
+            ctaLabel: '查看行程',
           }
         : {
             title: '您的取消和退款已获批准',
             message: '您的取消和退款已获批准。',
+            ctaLabel: '查看行程',
           };
     case 'ko':
     default:
@@ -191,15 +205,17 @@ function buildCancellationApprovedNotificationCopy(
         ? {
             title: '취소 및 환불이 승인되었습니다',
             message: `"${normalizedTitle}" 취소 및 환불이 승인되었습니다.`,
+            ctaLabel: '여행 확인하기',
           }
         : {
             title: '취소 및 환불이 승인되었습니다',
             message: '취소 및 환불이 승인되었습니다.',
+            ctaLabel: '여행 확인하기',
           };
   }
 }
 
-function resolveLocalizedSingleRecipientCopy(params: {
+export function resolveLocalizedSingleRecipientCopy(params: {
   locale: NotificationLocale;
   type?: string;
   copyKey?: NotificationRequestBody['copy_key'];
@@ -395,6 +411,7 @@ export async function POST(request: Request) {
 
     let finalTitle = safeTitle;
     let finalMessage = safeMessage;
+    let finalCtaLabel = '확인하기';
 
     const localizedCopy = resolveLocalizedSingleRecipientCopy({
       locale: await resolveRecipientLocale(supabase, recipient_id),
@@ -406,6 +423,9 @@ export async function POST(request: Request) {
     if (localizedCopy) {
       finalTitle = sanitizeNotificationTitle(localizedCopy.title);
       finalMessage = sanitizeNotificationMessage(localizedCopy.message);
+      if (typeof localizedCopy.ctaLabel === 'string' && localizedCopy.ctaLabel.trim()) {
+        finalCtaLabel = localizedCopy.ctaLabel.trim();
+      }
     }
 
     const { error: dbError } = await supabase
@@ -452,7 +472,7 @@ export async function POST(request: Request) {
           from: `"Locally Team" <${process.env.GMAIL_USER}>`,
           to: emailToSend,
           subject: `[Locally] ${finalTitle}`,
-          html: buildNotificationEmailHtml(finalMessage, safeLink),
+          html: buildNotificationEmailHtml(finalMessage, safeLink, finalCtaLabel),
         });
         console.log('🚀 [Notification API] 이메일 발송 성공');
       } catch (emailError: unknown) {

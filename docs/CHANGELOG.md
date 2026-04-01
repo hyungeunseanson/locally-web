@@ -5,6 +5,14 @@
 
 ---
 
+## v3.40.04 — [Emails] Inquiry / shared CTA 남은 locale 누수 정리
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟢 inquiry 이메일 locale 적용 | `app/utils/emailCopy.ts`, `app/api/inquiries/thread/shared.ts` — `type='new_message'` 인앱 저장은 그대로 두고, guest/host recipient inquiry 이메일만 `inquiry.new_message` localized email copy를 사용하도록 정리. `admin_support`에서 guest → admin recipient 메일은 기존 한국어 유지 |
+| 🟢 shared CTA locale 적용 | `app/api/notifications/email/route.ts` — allowlist 된 `review_reply`, `cancellation_approved` single-recipient 경로에서만 email CTA를 locale별로 분기하고, mass branch와 raw fallback은 기존 `확인하기`를 유지 |
+| 🟡 focused 검증 추가 | `tests/e2e/120-email-copy-util.spec.ts`, `tests/e2e/124-inquiry-email-localization.spec.ts`, `tests/e2e/125-shared-notification-email-cta.spec.ts` — inquiry email copy locale과 shared CTA helper를 직접 검증하고, 기존 review/cancel/inquiry 인접 spec으로 회귀를 함께 확인 |
+
 ## v3.40.03 — [Notifications] Host realtime dead shared 알림 호출 제거
 
 | 항목 | 내용 |
