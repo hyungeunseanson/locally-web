@@ -69,6 +69,19 @@ test.describe('Notification localization helpers', () => {
     });
     expect(serviceSelectedJa.title).toBe('🎉 ゲストに選ばれました！');
     expect(serviceSelectedJa.message).toContain('東京通訳サポート');
+
+    const serviceCancelRequestedJa = buildNotificationCopy('service.cancel_requested', 'ja', {
+      requestTitle: '東京空港送迎',
+    });
+    expect(serviceCancelRequestedJa.title).toBe('キャンセル依頼を受け付けました。');
+    expect(serviceCancelRequestedJa.message).toContain('運営チームが確認のうえ対応します。');
+
+    const serviceCancelledEn = buildNotificationCopy('service.cancelled', 'en', {
+      requestTitle: 'Airport pickup',
+      refundAmount: 25000,
+    });
+    expect(serviceCancelledEn.title).toBe('The service was cancelled.');
+    expect(serviceCancelledEn.message).toBe("The service 'Airport pickup' was cancelled. Refund amount: ₩25,000");
   });
 
   test('builds host application revision copy with localized reason text', () => {

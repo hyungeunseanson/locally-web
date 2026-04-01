@@ -17,6 +17,7 @@ let adminClient: SupabaseClient | null = null;
 const createdAuthUserIds: string[] = [];
 const createdServiceRequestIds: string[] = [];
 const createdServiceBookingIds: string[] = [];
+const createdNotificationIds: number[] = [];
 
 function loadEnv(): EnvMap {
   return readFileSync('.env.local', 'utf8')
@@ -106,6 +107,26 @@ async function createAuthUser(user: TestUser) {
   if (profileError) throw profileError;
 
   return data.user.id;
+}
+
+async function setPreferredLocale(userId: string, locale: 'ko' | 'en' | 'ja' | 'zh') {
+  const supabase = getAdminClient();
+  const { data, error } = await supabase.auth.admin.getUserById(userId);
+  if (error || !data.user) throw error || new Error(`Failed to fetch auth user ${userId}.`);
+
+  const metadata =
+    data.user.user_metadata && typeof data.user.user_metadata === 'object'
+      ? (data.user.user_metadata as Record<string, unknown>)
+      : {};
+
+  const { error: updateError } = await supabase.auth.admin.updateUserById(userId, {
+    user_metadata: {
+      ...metadata,
+      preferred_locale: locale,
+    },
+  });
+
+  if (updateError) throw updateError;
 }
 
 async function createPendingCancelFixture(customerId: string, customer: TestUser) {
@@ -241,19 +262,125 @@ async function createPaidOpenFixtureWithoutRefundTid(customerId: string, custome
   };
 }
 
-async function login(page: Page, user: TestUser) {
-  await page.goto('/login', { waitUntil: 'networkidle' });
+async function createMatchedCancelFixture(customerId: string, hostId: string, customer: TestUser) {
+  const supabase = getAdminClient();
+  const timestamp = Date.now();
+  const serviceDate = new Date();
+  serviceDate.setDate(serviceDate.getDate() + 9);
+  const createdAt = new Date();
+  createdAt.setMinutes(createdAt.getMinutes() - 20);
+
+  const { data: requestData, error: requestError } = await supabase
+    .from('service_requests')
+    .insert({
+      user_id: customerId,
+      title: `[Playwright] Service Cancel Matched ${timestamp}`,
+      description: '서비스 취소 요청 locale 테스트용 의뢰입니다.',
+      city: 'Seoul',
+      country: 'KR',
+      service_date: formatDate(serviceDate),
+      start_time: '11:00',
+      duration_hours: 4,
+      languages: ['English'],
+      guest_count: 2,
+      contact_name: customer.fullName,
+      contact_phone: customer.phone,
+      status: 'matched',
+      selected_host_id: hostId,
+      created_at: createdAt.toISOString(),
+      updated_at: createdAt.toISOString(),
+    })
+    .select('id, total_customer_price')
+    .single();
+
+  if (requestError || !requestData?.id) {
+    throw requestError || new Error('Failed to create matched cancel service request.');
+  }
+  createdServiceRequestIds.push(requestData.id);
+
+  const bookingId = `SVC-CANCEL-MATCHED-${timestamp}`;
+  const orderId = `SVC-CANCEL-MATCHED-ORD-${timestamp}`;
+  const { error: bookingError } = await supabase.from('service_bookings').insert({
+    id: bookingId,
+    order_id: orderId,
+    request_id: requestData.id,
+    application_id: null,
+    customer_id: customerId,
+    host_id: hostId,
+    amount: requestData.total_customer_price,
+    host_payout_amount: 80000,
+    platform_revenue: Number(requestData.total_customer_price || 0) - 80000,
+    status: 'PAID',
+    payment_method: 'bank',
+    payout_status: 'pending',
+    contact_name: customer.fullName,
+    contact_phone: customer.phone,
+    created_at: createdAt.toISOString(),
+    updated_at: createdAt.toISOString(),
+  });
+
+  if (bookingError) throw bookingError;
+  createdServiceBookingIds.push(bookingId);
+
+  return {
+    orderId,
+    requestId: requestData.id,
+    bookingId,
+  };
+}
+
+async function login(page: Page, user: TestUser, locale: 'ko' | 'en' | 'ja' | 'zh') {
+  await page.context().clearCookies();
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.evaluate((nextLocale) => {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+    window.localStorage.setItem('app_lang', nextLocale);
+    document.cookie = `app_lang=${nextLocale}; path=/; samesite=lax`;
+  }, locale);
+  await page.goto('/login', { waitUntil: 'domcontentloaded' });
+  await page.locator('input[type="email"]').waitFor({ state: 'visible', timeout: 30000 });
 
   await page.locator('input[type="email"]').fill(user.email);
   await page.locator('input[type="password"]').fill(user.password);
   await page.locator('button[type="submit"]').click();
 
-  await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 15000 });
-  await page.waitForLoadState('networkidle');
+  await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 30000 });
+  await page.waitForLoadState('domcontentloaded');
+}
+
+async function waitForNotification(params: { userId: string; type: string; link: string }) {
+  const supabase = getAdminClient();
+
+  for (let attempt = 0; attempt < 16; attempt += 1) {
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('id, title, message')
+      .eq('user_id', params.userId)
+      .eq('type', params.type)
+      .eq('link', params.link)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (data?.id) {
+      createdNotificationIds.push(Number(data.id));
+      return data;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
+  throw new Error(`Notification not found for ${params.userId} / ${params.type} / ${params.link}.`);
 }
 
 test.afterAll(async () => {
   const supabase = getAdminClient();
+
+  if (createdNotificationIds.length > 0) {
+    await supabase.from('notifications').delete().in('id', createdNotificationIds);
+  }
 
   for (const bookingId of createdServiceBookingIds) {
     await supabase.from('service_bookings').delete().eq('id', bookingId);
@@ -278,7 +405,7 @@ test.describe.serial('Service customer cancel error-safe flow', () => {
     const customerId = await createAuthUser(customerUser);
     const fixture = await createPaidOpenFixtureWithoutRefundTid(customerId, customerUser);
 
-    await login(page, customerUser);
+    await login(page, customerUser, 'ko');
 
     const response = await page.request.post('/api/services/cancel', {
       data: {
@@ -319,9 +446,10 @@ test.describe.serial('Service customer cancel error-safe flow', () => {
 
     const customerUser = createCustomerUser('pending');
     const customerId = await createAuthUser(customerUser);
+    await setPreferredLocale(customerId, 'en');
     const fixture = await createPendingCancelFixture(customerId, customerUser);
 
-    await login(page, customerUser);
+    await login(page, customerUser, 'en');
 
     const response = await page.request.post('/api/services/cancel', {
       data: {
@@ -355,15 +483,66 @@ test.describe.serial('Service customer cancel error-safe flow', () => {
     expect(booking?.status).toBe('cancelled');
     expect(serviceRequest?.status).toBe('cancelled');
 
-    const { data: notifications, error: notificationError } = await supabase
-      .from('notifications')
-      .select('id')
-      .eq('user_id', customerId)
-      .eq('type', 'service_cancelled')
-      .eq('link', `/services/${fixture.requestId}`);
+    const notification = await waitForNotification({
+      userId: customerId,
+      type: 'service_cancelled',
+      link: `/services/${fixture.requestId}`,
+    });
 
-    if (notificationError) throw notificationError;
+    expect(notification.title).toBe('The service was cancelled.');
+    expect(notification.message).toContain('No refund amount.');
+  });
 
-    expect((notifications || []).length).toBeGreaterThan(0);
+  test('keeps matched service cancellation requests localized per recipient locale', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const customerUser = createCustomerUser('matched-customer');
+    const hostUser = createCustomerUser('matched-host');
+    const customerId = await createAuthUser(customerUser);
+    const hostId = await createAuthUser(hostUser);
+    await setPreferredLocale(customerId, 'en');
+    await setPreferredLocale(hostId, 'ja');
+
+    const fixture = await createMatchedCancelFixture(customerId, hostId, customerUser);
+
+    await login(page, customerUser, 'en');
+
+    const response = await page.request.post('/api/services/cancel', {
+      data: {
+        order_id: fixture.orderId,
+        cancel_reason: 'Playwright matched cancel request',
+      },
+    });
+
+    expect(response.status()).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+    });
+
+    const supabase = getAdminClient();
+    const { data: booking, error: bookingError } = await supabase
+      .from('service_bookings')
+      .select('status')
+      .eq('id', fixture.bookingId)
+      .maybeSingle();
+
+    if (bookingError) throw bookingError;
+    expect(booking?.status).toBe('cancellation_requested');
+
+    const customerNotification = await waitForNotification({
+      userId: customerId,
+      type: 'service_cancelled',
+      link: `/services/${fixture.requestId}`,
+    });
+    expect(customerNotification.title).toBe('The cancellation request was received.');
+    expect(customerNotification.message).toContain('admin team will review it shortly');
+
+    const hostNotification = await waitForNotification({
+      userId: hostId,
+      type: 'service_cancelled',
+      link: `/services/${fixture.requestId}`,
+    });
+    expect(hostNotification.title).toBe('キャンセル依頼を受け付けました。');
+    expect(hostNotification.message).toContain('運営チームが確認のうえ対応します。');
   });
 });

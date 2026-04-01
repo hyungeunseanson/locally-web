@@ -81,6 +81,15 @@ type ServiceHostSelectionParams = {
   requestTitle: string;
 };
 
+type ServiceCancelRequestedParams = {
+  requestTitle: string;
+};
+
+type ServiceCancelledParams = {
+  requestTitle: string;
+  refundAmount?: number | null;
+};
+
 type MembershipParams = {
   status: 'member' | 'circle';
 };
@@ -107,6 +116,8 @@ export type NotificationCopyKey =
   | 'service.application_new.customer'
   | 'service.host_selected'
   | 'service.host_rejected'
+  | 'service.cancel_requested'
+  | 'service.cancelled'
   | 'membership.member_welcome'
   | 'membership.circle_welcome'
   | 'host_application.approved'
@@ -131,6 +142,8 @@ type NotificationCopyParams = {
   'service.application_new.customer': ServiceApplicationNewCustomerParams;
   'service.host_selected': ServiceHostSelectionParams;
   'service.host_rejected': ServiceHostSelectionParams;
+  'service.cancel_requested': ServiceCancelRequestedParams;
+  'service.cancelled': ServiceCancelledParams;
   'membership.member_welcome': MembershipParams;
   'membership.circle_welcome': MembershipParams;
   'host_application.approved': HostApplicationStatusParams;
@@ -189,6 +202,42 @@ function getRefundText(refundAmount: number, locale: NotificationLocale) {
     case 'ko':
     default:
       return '결제 전 예약이 취소되었습니다.';
+  }
+}
+
+function getServiceRefundText(
+  refundAmount: number | null | undefined,
+  locale: NotificationLocale
+) {
+  if (typeof refundAmount !== 'number') {
+    return '';
+  }
+
+  if (refundAmount > 0) {
+    const formatted = formatKrw(refundAmount, locale);
+    switch (locale) {
+      case 'en':
+        return ` Refund amount: ${formatted}`;
+      case 'ja':
+        return ` 返金額: ${formatted}`;
+      case 'zh':
+        return ` 退款金额：${formatted}`;
+      case 'ko':
+      default:
+        return ` 환불 금액: ${formatted}`;
+    }
+  }
+
+  switch (locale) {
+    case 'en':
+      return ' No refund amount.';
+    case 'ja':
+      return ' 返金額はありません。';
+    case 'zh':
+      return ' 无退款金额。';
+    case 'ko':
+    default:
+      return ' 환불 금액은 없습니다.';
   }
 }
 
@@ -985,6 +1034,69 @@ function buildServiceHostRejectedCopy(
   }
 }
 
+function buildServiceCancelRequestedCopy(
+  locale: NotificationLocale,
+  params: ServiceCancelRequestedParams
+): NotificationCopy {
+  const { requestTitle } = params;
+
+  switch (locale) {
+    case 'en':
+      return {
+        title: 'The cancellation request was received.',
+        message: `A cancellation request for '${requestTitle}' was received. The admin team will review it shortly.`,
+      };
+    case 'ja':
+      return {
+        title: 'キャンセル依頼を受け付けました。',
+        message: `「${requestTitle}」のキャンセル依頼を受け付けました。運営チームが確認のうえ対応します。`,
+      };
+    case 'zh':
+      return {
+        title: '已收到取消申请。',
+        message: `已收到「${requestTitle}」的取消申请，运营团队会尽快审核处理。`,
+      };
+    case 'ko':
+    default:
+      return {
+        title: '취소 요청이 접수되었습니다.',
+        message: `'${requestTitle}' 서비스 취소 요청이 접수되었습니다. 관리자가 검토 후 처리합니다.`,
+      };
+  }
+}
+
+function buildServiceCancelledCopy(
+  locale: NotificationLocale,
+  params: ServiceCancelledParams
+): NotificationCopy {
+  const { requestTitle, refundAmount } = params;
+  const refundText = getServiceRefundText(refundAmount, locale);
+
+  switch (locale) {
+    case 'en':
+      return {
+        title: 'The service was cancelled.',
+        message: `The service '${requestTitle}' was cancelled.${refundText}`,
+      };
+    case 'ja':
+      return {
+        title: 'サービスがキャンセルされました。',
+        message: `「${requestTitle}」サービスがキャンセルされました。${refundText.trimStart()}`,
+      };
+    case 'zh':
+      return {
+        title: '服务已取消。',
+        message: `「${requestTitle}」服务已取消。${refundText.trimStart()}`,
+      };
+    case 'ko':
+    default:
+      return {
+        title: '서비스가 취소되었습니다.',
+        message: `'${requestTitle}' 서비스가 취소되었습니다.${refundText}`,
+      };
+  }
+}
+
 function buildMembershipCopy(
   locale: NotificationLocale,
   params: MembershipParams
@@ -1189,6 +1301,10 @@ export function buildNotificationCopy<K extends NotificationCopyKey>(
       return buildServiceHostSelectedCopy(locale, copyParams as NotificationCopyParams['service.host_selected']);
     case 'service.host_rejected':
       return buildServiceHostRejectedCopy(locale, copyParams as NotificationCopyParams['service.host_rejected']);
+    case 'service.cancel_requested':
+      return buildServiceCancelRequestedCopy(locale, copyParams as NotificationCopyParams['service.cancel_requested']);
+    case 'service.cancelled':
+      return buildServiceCancelledCopy(locale, copyParams as NotificationCopyParams['service.cancelled']);
     case 'membership.member_welcome':
       return buildMembershipCopy(locale, { ...(copyParams as NotificationCopyParams['membership.member_welcome']), status: 'member' });
     case 'membership.circle_welcome':

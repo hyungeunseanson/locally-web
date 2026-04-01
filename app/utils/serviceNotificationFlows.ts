@@ -142,14 +142,20 @@ export async function notifyServiceCancellationRequested(
   if (recipientIds.length === 0) return;
 
   try {
-    const notifications = recipientIds.map((recipientId) => ({
-      user_id: recipientId,
-      type: 'service_cancelled',
-      title: '취소 요청이 접수되었습니다.',
-      message: `'${requestTitle}' 서비스 취소 요청이 접수되었습니다. 관리자가 검토 후 처리합니다.`,
-      link: `/services/${requestId}`,
-      is_read: false,
-    }));
+    const notifications = await Promise.all(
+      recipientIds.map((recipientId) =>
+        buildLocalizedNotificationInsert({
+          supabaseAdmin,
+          userId: recipientId,
+          type: 'service_cancelled',
+          link: `/services/${requestId}`,
+          key: 'service.cancel_requested',
+          copyParams: {
+            requestTitle,
+          },
+        })
+      )
+    );
     const { error } = await supabaseAdmin.from('notifications').insert(notifications);
     if (error) {
       console.error('[ServiceNotificationFlows] cancellation-request notification insert failed:', error);
@@ -182,23 +188,22 @@ export async function notifyServiceCancellationCompleted(
 
   if (recipientIds.length === 0) return;
 
-  const refundText =
-    typeof refundAmount === 'number'
-      ? refundAmount > 0
-        ? ` 환불 금액: ₩${refundAmount.toLocaleString()}`
-        : ' 환불 금액은 없습니다.'
-      : '';
-  const message = `'${requestTitle}' 서비스가 취소되었습니다.${refundText}`;
-
   try {
-    const notifications = recipientIds.map((recipientId) => ({
-      user_id: recipientId,
-      type: 'service_cancelled',
-      title: '서비스가 취소되었습니다.',
-      message,
-      link: `/services/${requestId}`,
-      is_read: false,
-    }));
+    const notifications = await Promise.all(
+      recipientIds.map((recipientId) =>
+        buildLocalizedNotificationInsert({
+          supabaseAdmin,
+          userId: recipientId,
+          type: 'service_cancelled',
+          link: `/services/${requestId}`,
+          key: 'service.cancelled',
+          copyParams: {
+            requestTitle,
+            refundAmount,
+          },
+        })
+      )
+    );
     const { error } = await supabaseAdmin.from('notifications').insert(notifications);
     if (error) {
       console.error('[ServiceNotificationFlows] cancellation-complete notification insert failed:', error);
@@ -213,7 +218,12 @@ export async function notifyServiceCancellationCompleted(
         recipientUserId: recipientId,
         subject: '[Locally] 서비스 취소 안내',
         title: '서비스가 취소되었습니다',
-        message,
+        message:
+          typeof refundAmount === 'number'
+            ? refundAmount > 0
+              ? `'${requestTitle}' 서비스가 취소되었습니다. 환불 금액: ₩${refundAmount.toLocaleString()}`
+              : `'${requestTitle}' 서비스가 취소되었습니다. 환불 금액은 없습니다.`
+            : `'${requestTitle}' 서비스가 취소되었습니다.`,
         link: `/services/${requestId}`,
         ctaLabel: '의뢰 확인하기',
       })

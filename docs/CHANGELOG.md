@@ -5,6 +5,13 @@
 
 ---
 
+## v3.39.95 — [Notifications] Service cancel 인앱 알림 다국어 2차 확장
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟢 service cancel 알림 현지화 | `app/utils/serviceNotificationFlows.ts`, `app/utils/notificationCopy.ts` — `service_cancelled` 인앱 알림을 recipient `preferred_locale` 기준으로 저장하도록 변경하고, 취소 요청/취소 완료 copy를 각각 localized key로 분리 |
+| 🟡 service cancel runtime 회귀 체크 추가 | `tests/e2e/20-service-cancel-error-safe.spec.ts`, `tests/e2e/116-notification-copy-util.spec.ts` — 즉시 취소 완료(PENDING)와 취소 요청(matched/confirmed) 경로에서 locale별 notification title/message가 실제로 저장되는지 검증 |
+
 ## v3.39.94 — [Notifications] Service select-host 인앱 알림 다국어 2차 확장
 
 | 항목 | 내용 |
