@@ -591,6 +591,61 @@ test.describe.serial('guest trips completed sync route', () => {
     await expect(page).toHaveURL(new RegExp(`hostId=${hostId}`));
   });
 
+  test('keeps the desktop pending deposit card fully visible without clipping the receipt CTA', async ({ page }) => {
+    const host = createUser('host.pending.desktop');
+    const guest = createUser('guest.pending.desktop');
+    const desktopViewport = { width: 1440, height: 1200 };
+
+    await page.addInitScript(() => {
+      window.localStorage.setItem('app_lang', 'ko');
+      document.cookie = 'app_lang=ko; path=/';
+    });
+    await page.setViewportSize(desktopViewport);
+
+    const hostId = await createAuthUser(host);
+    const guestId = await createAuthUser(guest);
+    await createApprovedHostApplication(hostId, host);
+
+    const supabase = getAdminClient();
+    const { error: hostProfileError } = await supabase
+      .from('profiles')
+      .update({
+        full_name: host.fullName,
+        avatar_url: '/images/logo.png',
+      })
+      .eq('id', hostId);
+
+    if (hostProfileError) throw hostProfileError;
+
+    const experienceId = await createHostExperience(hostId);
+    const bookingId = await createFuturePendingBooking({
+      guestId,
+      guest,
+      experienceId,
+    });
+
+    await login(page, guest);
+    await page.goto('/guest/trips', { waitUntil: 'domcontentloaded' });
+
+    const tripCard = page
+      .getByTestId('guest-trips-desktop-main')
+      .getByTestId(`guest-trip-card-${bookingId}`);
+    const pendingReceiptButton = tripCard.getByTestId('guest-trip-pending-receipt-button');
+    await expect(tripCard).toBeVisible();
+    await expect(tripCard).toContainText('입금을 기다리고 있습니다. 영수증에서 계좌 정보와 입금 마감 시간을 다시 확인해주세요.');
+    await expect(pendingReceiptButton).toBeVisible();
+    await pendingReceiptButton.scrollIntoViewIfNeeded();
+
+    const cardBox = await tripCard.boundingBox();
+    const buttonBox = await pendingReceiptButton.boundingBox();
+
+    expect(cardBox).not.toBeNull();
+    expect(buttonBox).not.toBeNull();
+    if (!cardBox || !buttonBox) throw new Error('Desktop pending trip layout bounding boxes were not available.');
+
+    expect(buttonBox.y + buttonBox.height).toBeLessThanOrEqual(cardBox.y + cardBox.height);
+  });
+
   test('shows pending receipt follow-up guidance and support CTA', async ({ page }) => {
     const host = createUser('host.pending.receipt');
     const guest = createUser('guest.pending.receipt');

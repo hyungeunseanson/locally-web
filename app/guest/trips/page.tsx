@@ -12,7 +12,6 @@ import { createClient } from '@/app/utils/supabase/client';
 import { useNotification } from '@/app/context/NotificationContext';
 import { useAuth } from '@/app/context/AuthContext';
 import { useLocallyMembership } from '@/app/hooks/useLocallyMembership';
-import LocallyMembershipBadgeTrigger from '@/app/components/LocallyMembershipBadgeTrigger';
 
 // 분리된 컴포넌트 & 훅 import
 import { useGuestTrips } from './hooks/useGuestTrips';
@@ -178,43 +177,26 @@ export default function GuestTripsPage() {
   const LocallyCareBanner = () => {
     if (!membership || !hasLocallyCare) return null;
 
-    const isCircle = membership.status === 'circle';
-    const memberTierDescription = t('membership_member_info_desc') as string;
-    const circleTierDescription = t('membership_circle_info_desc') as string;
-
     return (
       <section
         data-testid="guest-trips-membership-banner"
-        className="mb-5 rounded-3xl border border-rose-100 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(255,247,247,1))] px-5 py-4 shadow-sm md:mb-8 md:px-6 md:py-5"
+        className="mb-5 rounded-2xl border border-rose-100 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(255,247,247,1))] px-4 py-3 shadow-sm md:mb-8 md:px-5 md:py-3.5"
       >
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-rose-400">{t('locally_care_title')}</p>
-            <div className="mt-1 flex items-center">
-              <LocallyMembershipBadgeTrigger
-                status={isCircle ? 'circle' : 'member'}
-                memberDescription={memberTierDescription}
-                circleDescription={circleTierDescription}
-                ariaLabel={t('membership_info_aria') as string}
-                testIdPrefix="guest-trips-membership-badge"
-              />
-            </div>
-            <p className="mt-1 text-[12px] leading-6 text-slate-600 md:text-sm">
-              {isCircle ? t('locally_care_circle_desc') : t('locally_care_member_desc')}
+            <p className="text-[11px] font-bold text-slate-900 md:text-[12px]">
+              {t('locally_care_inbox_strip_title')}
+            </p>
+            <p className="mt-1 text-[11px] leading-5 text-slate-500 md:text-[12px] md:leading-5">
+              {t('locally_care_inbox_strip_desc')}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex shrink-0">
             <Link
               href="/help"
               className="inline-flex items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-[12px] font-bold text-white transition-colors hover:bg-slate-800"
             >
               {t('locally_care_cta')}
-            </Link>
-            <Link
-              href="/guest/inbox"
-              className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-[12px] font-semibold text-slate-700 transition-colors hover:bg-slate-50"
-            >
-              {t('locally_care_inbox_cta')}
             </Link>
           </div>
         </div>

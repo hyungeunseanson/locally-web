@@ -153,6 +153,7 @@ function PaymentSectionCard({
   return (
     <section
       data-testid={testId}
+      data-state={status}
       className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:rounded-3xl md:p-5"
     >
       <div className="mb-4 flex items-start justify-between gap-3">
@@ -163,6 +164,7 @@ function PaymentSectionCard({
           <h2 className="text-[16px] font-bold text-slate-900 md:text-[18px]">{title}</h2>
         </div>
         <span
+          data-testid={testId ? `${testId}-status` : undefined}
           className={cn(
             'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold',
             SECTION_STATE_STYLES[status]
@@ -264,7 +266,7 @@ function PaymentContent() {
   );
 
   const getCheckoutValidationError = useCallback((context: PayPalCheckoutContext) => {
-    if (!context.customerName || !context.customerPhone) {
+    if (!context.customerName.trim() || !context.customerPhone.trim()) {
       return t('exp_payment_validation_customer') as string;
     }
 
@@ -912,8 +914,10 @@ function PaymentContent() {
 
   const imageUrl = experience?.photos?.[0] || experience?.image_url || 'https://images.unsplash.com/photo-1540206395-688085723adb';
   const bankInfo = getPublicBankInfo();
-  const hasCustomerName = customerName.trim().length > 0;
-  const hasCustomerPhone = customerPhone.trim().length > 0;
+  const normalizedCustomerName = customerName.trim();
+  const normalizedCustomerPhone = customerPhone.trim();
+  const hasCustomerName = normalizedCustomerName.length > 0;
+  const hasCustomerPhone = normalizedCustomerPhone.length > 0;
   const isBookerComplete = hasCustomerName && hasCustomerPhone;
   const areRequiredAgreementsComplete = agreeTerms && agreeSafety && agreeNoOffPlatform;
   const hasAvailabilityConflict =

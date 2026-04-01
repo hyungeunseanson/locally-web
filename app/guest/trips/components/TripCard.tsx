@@ -75,6 +75,7 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
   const isReviewPending = isBookingReviewPending(trip.cancelReason);
   const guestCount = Number(trip.guests || 1);
   const isPendingDeposit = (trip.status || '').toLowerCase() === 'pending';
+  const needsExpandedDesktopLayout = isPendingDeposit || isReviewPending;
 
   const buildMessageHref = () => {
     const messageParams = new URLSearchParams({
@@ -215,11 +216,17 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
     <>
       <div
         data-testid={`guest-trip-card-${trip.id}`}
-        className="bg-white rounded-2xl md:rounded-3xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow group flex flex-col md:flex-row h-auto md:h-64 relative"
+        className={`bg-white rounded-2xl md:rounded-3xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow group flex flex-col md:flex-row h-auto relative ${
+          needsExpandedDesktopLayout ? 'md:min-h-64 md:h-auto' : 'md:h-64'
+        }`}
       >
 
         {/* 왼쪽: 이미지 섹션 */}
-        <div className="w-full md:w-72 h-48 md:h-full relative bg-slate-200 shrink-0 cursor-pointer overflow-hidden group/slide flex items-center justify-center">
+        <div
+          className={`w-full md:w-72 h-48 relative bg-slate-200 shrink-0 cursor-pointer overflow-hidden group/slide flex items-center justify-center ${
+            needsExpandedDesktopLayout ? 'md:self-stretch md:min-h-64' : 'md:h-full'
+          }`}
+        >
           <Link href={`/experiences/${trip.expId}`} className="block w-full h-full relative">
             {photos.length > 0 ? (
               <Image
