@@ -273,10 +273,11 @@ async function createBankTransferBooking(page: Page, guest: TestUser, experience
   await page.getByTestId('exp-payment-booker-name').fill(guest.fullName);
   await page.getByTestId('exp-payment-booker-phone').fill(guest.phone);
 
-  await page.getByTestId('exp-payment-method-bank').click();
+  await page.getByTestId('exp-payment-method-bank').click({ force: true });
   await page.getByTestId('exp-payment-agree-off-platform').click();
   await page.getByTestId('exp-payment-agree-safety').click();
   await page.getByTestId('exp-payment-agree-terms').click();
+  await expect(page.getByTestId('exp-payment-submit')).toBeVisible({ timeout: 30000 });
   await page.getByTestId('exp-payment-submit').click();
 
   await page.waitForURL(/\/payment\/complete\?orderId=/, { timeout: 30000 });

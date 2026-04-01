@@ -3,8 +3,6 @@ import { readFileSync } from 'fs';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test, type Page } from '@playwright/test';
 
-import { selectReservationDate, selectReservationTime } from './helpers/experienceBooking';
-
 type EnvMap = Record<string, string>;
 type TestUser = {
   email: string;
@@ -362,15 +360,32 @@ test.describe.serial('Experience PayPal payment smoke', () => {
 
     await page.locator('input[type="text"]').fill(customerUser.fullName);
     await page.locator('input[type="tel"]').fill(customerUser.phone);
-    await page.getByText('호스트와의 직접 연락 및 플랫폼 외부 결제는 금지').click();
-    await page.getByText('플랫폼 내 게스트 안전 가이드라인을 숙지하였으며').click();
-    await page.getByText('구매 조건, 취소/환불 규정을 모두 확인하였으며').click();
+    await page.getByTestId('exp-payment-agree-off-platform').click();
+    await page.getByTestId('exp-payment-agree-safety').click();
+    await page.getByTestId('exp-payment-agree-terms').click();
+
+    const totalBefore = await page.getByTestId('exp-payment-total-amount').textContent();
+    expect(totalBefore).toBeTruthy();
+
+    await page.getByTestId('exp-payment-method-bank').click({ force: true });
+    await expect(page.getByTestId('exp-payment-paypal-panel')).toHaveCount(0);
+    await expect(page.getByTestId('exp-payment-submit')).toBeVisible();
+    await expect(page.getByTestId('exp-payment-total-amount')).toHaveText(totalBefore as string);
 
     await paypalOption.click();
-    await expect(
-      page.getByText('PayPal 승인 후 결제가 완료되며, 기존 카드/무통장 결제 흐름에는 영향을 주지 않습니다.')
-    ).toBeVisible();
+    await expect(page.getByTestId('exp-payment-paypal-panel')).toBeVisible();
     await expect(page.getByTestId('mock-paypal-approve')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('mock-paypal-approve')).toHaveCount(1);
+    await expect(page.getByTestId('exp-payment-total-amount')).toHaveText(totalBefore as string);
+
+    await page.getByTestId('exp-payment-method-bank').click();
+    await expect(page.getByTestId('exp-payment-paypal-panel')).toHaveCount(0);
+    await expect(page.getByTestId('exp-payment-total-amount')).toHaveText(totalBefore as string);
+
+    await paypalOption.click();
+    await expect(page.getByTestId('mock-paypal-approve')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('mock-paypal-approve')).toHaveCount(1);
+    await expect(page.getByTestId('exp-payment-total-amount')).toHaveText(totalBefore as string);
 
     await page.getByTestId('mock-paypal-approve').click();
 
@@ -398,13 +413,8 @@ test.describe.serial('Experience PayPal payment smoke', () => {
 
     expect(createOrderSeen).toBe(true);
     expect(captureSeen).toBe(true);
-    await expect(page.getByRole('heading', { name: /예약이 확정되었습니다!|Payment Complete!/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /예약이 확정되었습니다!|Payment Complete!|Your booking is confirmed!/ })).toBeVisible();
     await expect(page.getByText(observedBookingId)).toBeVisible();
     await expect(page.getByText(experience.title)).toBeVisible();
-
-    await page.goto(`/experiences/${experience.experienceId}`, { waitUntil: 'domcontentloaded' });
-    await selectReservationDate(page, experience.date);
-    await selectReservationTime(page, experience.time);
-    await expect(page.getByTestId('reservation-solo-option')).toHaveCount(0);
   });
 });

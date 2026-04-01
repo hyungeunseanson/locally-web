@@ -112,6 +112,68 @@ declare global {
   }
 }
 
+type CheckoutSectionState = 'complete' | 'required' | 'error' | 'loading';
+
+const SECTION_STATE_STYLES: Record<CheckoutSectionState, string> = {
+  complete: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  required: 'border-amber-200 bg-amber-50 text-amber-700',
+  error: 'border-rose-200 bg-rose-50 text-rose-700',
+  loading: 'border-slate-200 bg-slate-100 text-slate-600',
+};
+
+const SECTION_STATE_DOT_STYLES: Record<CheckoutSectionState, string> = {
+  complete: 'bg-emerald-500',
+  required: 'bg-amber-500',
+  error: 'bg-rose-500',
+  loading: 'bg-slate-500 animate-pulse',
+};
+
+function cn(...values: Array<string | false | null | undefined>) {
+  return values.filter(Boolean).join(' ');
+}
+
+function PaymentSectionCard({
+  step,
+  title,
+  status,
+  statusLabel,
+  testId,
+  children,
+}: {
+  step: number;
+  title: string;
+  status: CheckoutSectionState;
+  statusLabel: string;
+  testId?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      data-testid={testId}
+      className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:rounded-3xl md:p-5"
+    >
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="mb-1 inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+            {step}
+          </div>
+          <h2 className="text-[16px] font-bold text-slate-900 md:text-[18px]">{title}</h2>
+        </div>
+        <span
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold',
+            SECTION_STATE_STYLES[status]
+          )}
+        >
+          <span className={cn('h-1.5 w-1.5 rounded-full', SECTION_STATE_DOT_STYLES[status])} />
+          {statusLabel}
+        </span>
+      </div>
+      {children}
+    </section>
+  );
+}
+
 function PaymentContent() {
   const pathname = usePathname();
   const router = useRouter();
@@ -124,6 +186,7 @@ function PaymentContent() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [experience, setExperience] = useState<PaymentExperience | null>(null);
   const [paymentError, setPaymentError] = useState('');
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
 
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -137,6 +200,7 @@ function PaymentContent() {
   const [cardReadyReason, setCardReadyReason] = useState<ExperienceCardReadyReason | ''>('');
   const [isFeeInfoOpen, setIsFeeInfoOpen] = useState(false);
   const [isPayPalSdkReady, setIsPayPalSdkReady] = useState(false);
+  const [isPayPalButtonsReady, setIsPayPalButtonsReady] = useState(false);
   const [paypalSdkError, setPaypalSdkError] = useState('');
   const [slotSummary, setSlotSummary] = useState<ExperienceSlotSummary | null>(null);
   const [isSlotSummaryResolved, setIsSlotSummaryResolved] = useState(false);
@@ -144,7 +208,13 @@ function PaymentContent() {
   const feeInfoRef = useRef<HTMLDivElement | null>(null);
   const paypalButtonRef = useRef<HTMLDivElement | null>(null);
   const paypalSessionRef = useRef<PayPalPreparedSession | null>(null);
+  const paypalRenderedKeyRef = useRef('');
+  const hasManualPaymentMethodSelectionRef = useRef(false);
   const soloOptionNoticeShownRef = useRef(false);
+  const createPayPalOrderRef = useRef<() => Promise<string>>(async () => {
+    throw new Error('PayPal create order handler is not ready.');
+  });
+  const handlePayPalApproveRef = useRef<(data: PayPalApproveData) => Promise<void>>(async () => {});
   const latestPayPalContextRef = useRef<PayPalCheckoutContext>({
     customerName: '',
     customerPhone: '',
@@ -177,7 +247,7 @@ function PaymentContent() {
     ? (getLocalizedExperienceRules(experience as Record<string, unknown>, lang).host_notice || '').trim()
     : '';
 
-  const buildPayPalSessionKey = useCallback(
+  const payPalCheckoutSessionKey = useMemo(
     () =>
       JSON.stringify([
         experienceId,
@@ -254,7 +324,7 @@ function PaymentContent() {
     } finally {
       setIsSlotSummaryResolved(true);
     }
-  }, [date, experienceId, time]);
+  }, [date, experienceId, t, time]);
 
   useEffect(() => {
     let isMounted = true;
@@ -324,6 +394,7 @@ function PaymentContent() {
     router,
     searchParams,
     showToast,
+    t,
   ]);
 
   useEffect(() => {
@@ -332,8 +403,13 @@ function PaymentContent() {
       return;
     }
 
-    if (isCardReadyResolved && !isCardReady && paymentMethod === 'card') {
-      setPaymentMethod(isPayPalEnabled ? 'paypal' : 'bank');
+    if (
+      isCardReadyResolved &&
+      !isCardReady &&
+      paymentMethod === 'card' &&
+      !hasManualPaymentMethodSelectionRef.current
+    ) {
+      setPaymentMethod('bank');
     }
   }, [isCardReady, isCardReadyResolved, isPayPalEnabled, paymentMethod]);
 
@@ -396,6 +472,7 @@ function PaymentContent() {
   }, [supabase, experienceId, date, time, experience?.max_guests, guests, isPrivate]);
 
   const preparePayPalBooking = useCallback(async () => {
+    setHasAttemptedSubmit(true);
     const context = latestPayPalContextRef.current;
     const validationMessage = getCheckoutValidationError(context);
 
@@ -414,7 +491,7 @@ function PaymentContent() {
       throw new Error(message);
     }
 
-    const sessionKey = buildPayPalSessionKey();
+    const sessionKey = payPalCheckoutSessionKey;
     const existingSession = paypalSessionRef.current;
     if (existingSession && existingSession.key === sessionKey) {
       return existingSession;
@@ -464,7 +541,6 @@ function PaymentContent() {
     paypalSessionRef.current = nextSession;
     return nextSession;
   }, [
-    buildPayPalSessionKey,
     checkAvailability,
     date,
     experienceId,
@@ -472,13 +548,16 @@ function PaymentContent() {
     guests,
     isPrivate,
     effectiveIsSoloGuarantee,
+    payPalCheckoutSessionKey,
     router,
     showToast,
     supabase.auth,
+    t,
     time,
   ]);
 
   const createPayPalOrder = useCallback(async () => {
+    setHasAttemptedSubmit(true);
     setPaymentError('');
     setIsProcessing(true);
 
@@ -502,7 +581,7 @@ function PaymentContent() {
     } finally {
       setIsProcessing(false);
     }
-  }, [preparePayPalBooking, showToast]);
+  }, [preparePayPalBooking, showToast, t]);
 
   const handlePayPalApprove = useCallback(
     async (data: PayPalApproveData) => {
@@ -541,28 +620,79 @@ function PaymentContent() {
         setIsProcessing(false);
       }
     },
-    [experienceId, router, showToast]
+    [experienceId, router, showToast, t]
   );
 
   useEffect(() => {
-    if (paymentMethod !== 'paypal') {
-      if (paypalButtonRef.current) {
-        paypalButtonRef.current.innerHTML = '';
+    createPayPalOrderRef.current = createPayPalOrder;
+  }, [createPayPalOrder]);
+
+  useEffect(() => {
+    handlePayPalApproveRef.current = handlePayPalApprove;
+  }, [handlePayPalApprove]);
+
+  useEffect(() => {
+    if (!isPayPalSdkReady) {
+      setIsPayPalButtonsReady(false);
+      return;
+    }
+
+    let cancelled = false;
+    let attempts = 0;
+
+    const syncPayPalButtons = () => {
+      if (cancelled) return;
+
+      if (window.paypal?.Buttons) {
+        setIsPayPalButtonsReady(true);
+        return;
       }
+
+      if (attempts >= 20) {
+        setIsPayPalButtonsReady(false);
+        return;
+      }
+
+      attempts += 1;
+      window.setTimeout(syncPayPalButtons, 50);
+    };
+
+    syncPayPalButtons();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isPayPalSdkReady]);
+
+  useEffect(() => {
+    const container = paypalButtonRef.current;
+
+    if (paymentMethod !== 'paypal' || !isPayPalEnabled) {
+      if (container && paypalRenderedKeyRef.current) {
+        container.innerHTML = '';
+      }
+      paypalRenderedKeyRef.current = '';
+      return;
+    }
+
+    if (!container) {
       return;
     }
 
     if (
       !isSlotSummaryResolved ||
-      !isPayPalEnabled ||
-      !isPayPalSdkReady ||
-      !paypalButtonRef.current ||
+      !isPayPalButtonsReady ||
       !window.paypal?.Buttons
     ) {
       return;
     }
 
-    const container = paypalButtonRef.current;
+    const nextRenderKey = `${payPalCheckoutSessionKey}:${paymentMethod}`;
+    if (paypalRenderedKeyRef.current === nextRenderKey) {
+      return;
+    }
+
+    paypalRenderedKeyRef.current = '';
     container.innerHTML = '';
 
     window.paypal
@@ -574,8 +704,8 @@ function PaymentContent() {
           layout: 'vertical',
           height: 48,
         },
-        createOrder: async () => createPayPalOrder(),
-        onApprove: async (data) => handlePayPalApprove(data),
+        createOrder: async () => createPayPalOrderRef.current(),
+        onApprove: async (data) => handlePayPalApproveRef.current(data),
         onCancel: () => {
           setIsProcessing(false);
           showToast(t('exp_payment_paypal_cancelled') as string, 'error');
@@ -589,28 +719,38 @@ function PaymentContent() {
         },
       })
       .render(container)
+      .then(() => {
+        paypalRenderedKeyRef.current = nextRenderKey;
+      })
       .catch((error) => {
         const message = error instanceof Error ? error.message : (t('exp_payment_paypal_load_error') as string);
         console.error('[PAYPAL] button render error:', error);
+        paypalRenderedKeyRef.current = '';
         setPaypalSdkError(message);
         setPaymentError(message);
         showToast(message, 'error');
       });
-
-    return () => {
-      container.innerHTML = '';
-    };
   }, [
-    createPayPalOrder,
-    handlePayPalApprove,
     isPayPalEnabled,
-    isPayPalSdkReady,
+    isPayPalButtonsReady,
     isSlotSummaryResolved,
+    payPalCheckoutSessionKey,
     paymentMethod,
     showToast,
+    t,
   ]);
 
+  useEffect(() => {
+    const container = paypalButtonRef.current;
+    return () => {
+      if (container) {
+        container.innerHTML = '';
+      }
+    };
+  }, []);
+
   const handlePayment = async () => {
+    setHasAttemptedSubmit(true);
     setPaymentError('');
 
     const validationMessage = getCheckoutValidationError({
@@ -751,6 +891,96 @@ function PaymentContent() {
 
   const imageUrl = experience?.photos?.[0] || experience?.image_url || 'https://images.unsplash.com/photo-1540206395-688085723adb';
   const bankInfo = getPublicBankInfo();
+  const hasCustomerName = customerName.trim().length > 0;
+  const hasCustomerPhone = customerPhone.trim().length > 0;
+  const isBookerComplete = hasCustomerName && hasCustomerPhone;
+  const areRequiredAgreementsComplete = agreeTerms && agreeSafety && agreeNoOffPlatform;
+  const hasAvailabilityConflict =
+    paymentError === (t('exp_payment_missing_availability') as string) ||
+    paymentError === (t('exp_payment_private_conflict') as string) ||
+    paymentError === (t('exp_payment_capacity_conflict') as string);
+  const isSummaryLoading = !experience || !isSlotSummaryResolved;
+  const isCardMethodLoading = paymentMethod === 'card' && !isCardReadyResolved;
+  const isCardMethodError = paymentMethod === 'card' && isCardReadyResolved && !isCardReady;
+  const isPayPalMethodLoading =
+    paymentMethod === 'paypal' &&
+    (!isSlotSummaryResolved || ((!isPayPalSdkReady || !isPayPalButtonsReady) && !paypalSdkError));
+  const isPayPalMethodError = paymentMethod === 'paypal' && Boolean(paypalSdkError);
+  const isSubmitDisabled =
+    isProcessing ||
+    !isSlotSummaryResolved ||
+    (paymentMethod === 'card' && (!isCardReadyResolved || !isCardReady));
+  const summaryStatus: CheckoutSectionState = isSummaryLoading
+    ? 'loading'
+    : hasAvailabilityConflict
+      ? 'error'
+      : 'complete';
+  const bookerStatus: CheckoutSectionState = isBookerComplete
+    ? 'complete'
+    : hasAttemptedSubmit
+      ? 'error'
+      : 'required';
+  const paymentMethodStatus: CheckoutSectionState = isCardMethodLoading || isPayPalMethodLoading
+    ? 'loading'
+    : isCardMethodError || isPayPalMethodError
+      ? 'error'
+      : 'complete';
+  const finalSectionStatus: CheckoutSectionState = isProcessing
+    ? 'loading'
+    : !isBookerComplete || !areRequiredAgreementsComplete
+      ? (hasAttemptedSubmit ? 'error' : 'required')
+      : isCardMethodLoading || isPayPalMethodLoading
+        ? 'loading'
+        : isCardMethodError || isPayPalMethodError
+          ? 'error'
+          : 'complete';
+  const sectionStatusLabel = {
+    complete: t('btn_complete') as string,
+    required: t('exp_payment_state_required') as string,
+    error: t('exp_payment_state_error') as string,
+    loading: t('exp_payment_state_loading') as string,
+  };
+  const nameInputError = hasAttemptedSubmit && !hasCustomerName;
+  const phoneInputError = hasAttemptedSubmit && !hasCustomerPhone;
+  const agreementsError = hasAttemptedSubmit && !areRequiredAgreementsComplete;
+  const checkoutHelperText = (() => {
+    if (isProcessing) return t('status_processing') as string;
+    if (!isSlotSummaryResolved) return t('exp_payment_slot_loading') as string;
+    if (!isBookerComplete) return t('exp_payment_validation_customer') as string;
+    if (!areRequiredAgreementsComplete) return t('exp_payment_validation_agreements') as string;
+    if (paymentMethod === 'card' && !isCardReadyResolved) {
+      return t('exp_payment_card_loading') as string;
+    }
+    if (paymentMethod === 'card' && !isCardReady) {
+      return (cardReadyReason === 'missing_imp_code'
+        ? t('exp_payment_card_unavailable_config')
+        : t('exp_payment_card_unavailable_alternative')) as string;
+    }
+    if (paymentMethod === 'paypal' && paypalSdkError) return paypalSdkError;
+    if (paymentMethod === 'paypal' && (!isPayPalSdkReady || !isPayPalButtonsReady)) {
+      return t('exp_payment_paypal_loading') as string;
+    }
+    return '';
+  })();
+  const visiblePaymentError = (() => {
+    if (!paymentError) return '';
+    if (paymentError === (t('exp_payment_validation_customer') as string) && isBookerComplete) return '';
+    if (paymentError === (t('exp_payment_validation_agreements') as string) && areRequiredAgreementsComplete) return '';
+    if (
+      paymentMethod !== 'card' &&
+      paymentError === (t('exp_payment_card_unavailable') as string)
+    ) {
+      return '';
+    }
+    if (
+      paymentMethod !== 'paypal' &&
+      (paymentError === (t('exp_payment_paypal_load_error') as string) ||
+        paymentError === (t('exp_payment_paypal_button_error') as string))
+    ) {
+      return '';
+    }
+    return paymentError;
+  })();
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center py-6 md:py-10 font-sans px-3 md:px-4">
@@ -768,6 +998,7 @@ function PaymentContent() {
             const message = t('exp_payment_paypal_load_error') as string;
             setPaypalSdkError(message);
             setIsPayPalSdkReady(false);
+            setIsPayPalButtonsReady(false);
           }}
         />
       )}
@@ -778,90 +1009,224 @@ function PaymentContent() {
           <span className="font-black text-[15px] md:text-lg">{t('exp_payment_title')}</span>
         </div>
 
-        <div className="p-4 md:p-6">
-          <div className="flex gap-3 md:gap-5 mb-6 md:mb-8">
-            <div className="w-20 h-28 md:w-24 md:h-32 relative rounded-lg md:rounded-xl overflow-hidden flex-shrink-0 bg-slate-200 shadow-sm border border-slate-100">
-              <Image src={imageUrl} alt="Experience" fill className="object-cover" sizes="100px" />
-            </div>
-            <div className="flex-1 min-w-0 flex flex-col justify-center py-1">
-              <span className="text-[10px] md:text-xs font-bold text-slate-500 mb-1 md:mb-1.5 uppercase tracking-wide">{experience?.location || 'SEOUL'}</span>
-              <h3 className="font-bold text-slate-900 leading-snug line-clamp-3 text-[15px] md:text-lg">
-                {experience ? experience.title : <Spinner size={16} className="inline-block" />}
-              </h3>
-            </div>
-          </div>
-
-          <h2 className="text-[16px] md:text-xl font-bold mb-3 md:mb-4">{t('exp_payment_summary_title')}</h2>
-          <div className="bg-slate-50 p-4 md:p-6 rounded-xl md:rounded-2xl space-y-3 md:space-y-4 mb-5 md:mb-6 text-[12px] md:text-sm text-slate-700 border border-slate-100">
-            <div className="flex justify-between items-center"><span className="text-slate-500 flex items-center gap-1.5 md:gap-2"><Calendar className="w-3.5 h-3.5 md:w-4 md:h-4" /> {t('exp_payment_label_date')}</span><span className="font-bold">{date}</span></div>
-            <div className="flex justify-between items-center"><span className="text-slate-500 flex items-center gap-1.5 md:gap-2"><Clock className="w-3.5 h-3.5 md:w-4 md:h-4" /> {t('exp_payment_label_time')}</span><span className="font-bold">{time}</span></div>
-            <div className="flex justify-between items-center"><span className="text-slate-500 flex items-center gap-1.5 md:gap-2"><Users className="w-3.5 h-3.5 md:w-4 md:h-4" /> {t('exp_payment_label_guests')}</span><span className="font-bold">{t('trip_meta_guests', { count: String(guests) })}</span></div>
-            {isPrivate && <div className="flex justify-between items-center"><span className="text-slate-500 flex items-center gap-1.5 md:gap-2"><ShieldCheck className="w-3.5 h-3.5 md:w-4 md:h-4" /> {t('exp_payment_label_type')}</span><span className="font-bold text-rose-500">{t('exp_payment_private_type')}</span></div>}
-            {effectiveIsSoloGuarantee && (
-              <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[11px] md:text-xs text-slate-500 leading-relaxed">
-                <span className="font-semibold text-slate-700">{t('exp_payment_solo_note')}</span>
-              </div>
-            )}
-          </div>
-
-          {hostNotice && (
-            <div className="mb-5 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-[12px] leading-6 text-amber-900 md:mb-6 md:rounded-2xl md:px-5 md:py-4 md:text-[13px]">
-              <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-amber-700 md:text-xs">{t('exp_guest_notice_title')}</p>
-              <p className="whitespace-pre-wrap">{hostNotice}</p>
+        <div className="space-y-4 p-4 md:space-y-5 md:p-6">
+          {visiblePaymentError && (
+            <div
+              data-testid="exp-payment-global-error"
+              className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-[12px] leading-relaxed text-rose-700 md:text-[13px]"
+            >
+              {visiblePaymentError}
             </div>
           )}
 
-          <div className="mb-6 md:mb-8 space-y-3 md:space-y-4">
-            <h2 className="text-[16px] md:text-xl font-bold">{t('exp_payment_booker_title')}</h2>
-            <div>
-              <label className="block text-[11px] md:text-xs font-bold text-slate-500 mb-1 md:mb-1.5">{t('exp_payment_name_label')}</label>
-              <input data-testid="exp-payment-booker-name" type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full px-3 py-2.5 md:p-3 text-[13px] md:text-sm bg-slate-50 border border-slate-200 rounded-lg md:rounded-xl outline-none focus:border-black transition-colors" placeholder={t('exp_payment_name_placeholder') as string} />
+          <PaymentSectionCard
+            step={1}
+            title={t('exp_payment_summary_title') as string}
+            status={summaryStatus}
+            statusLabel={sectionStatusLabel[summaryStatus]}
+            testId="exp-payment-section-summary"
+          >
+            <div className="flex gap-3 md:gap-5">
+              <div className="relative h-28 w-20 flex-shrink-0 overflow-hidden rounded-lg border border-slate-100 bg-slate-200 shadow-sm md:h-32 md:w-24 md:rounded-xl">
+                <Image src={imageUrl} alt="Experience" fill className="object-cover" sizes="100px" />
+              </div>
+              <div className="flex min-w-0 flex-1 flex-col justify-center py-1">
+                <span className="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-500 md:mb-1.5 md:text-xs">
+                  {experience?.location || 'SEOUL'}
+                </span>
+                <h3 className="line-clamp-3 text-[15px] font-bold leading-snug text-slate-900 md:text-lg">
+                  {experience ? experience.title : <Spinner size={16} className="inline-block" />}
+                </h3>
+              </div>
             </div>
-            <div>
-              <label className="block text-[11px] md:text-xs font-bold text-slate-500 mb-1 md:mb-1.5">{t('exp_payment_phone_label')}</label>
-              <input data-testid="exp-payment-booker-phone" type="tel" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className="w-full px-3 py-2.5 md:p-3 text-[13px] md:text-sm bg-slate-50 border border-slate-200 rounded-lg md:rounded-xl outline-none focus:border-black transition-colors" placeholder={t('exp_payment_phone_placeholder') as string} />
-            </div>
-          </div>
 
-          <div className="mb-6 md:mb-8">
-            <h2 className="text-[16px] md:text-xl font-bold mb-3 md:mb-4">{t('exp_payment_method_title')}</h2>
-          <div className={`grid gap-2 md:gap-3 mb-3 md:mb-4 ${isPayPalEnabled ? 'grid-cols-3' : 'grid-cols-2'}`}>
+            <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-4 text-[12px] text-slate-700 md:rounded-2xl md:p-5 md:text-sm">
+              <div className="space-y-3 md:space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-slate-500 md:gap-2">
+                    <Calendar className="h-3.5 w-3.5 md:h-4 md:w-4" /> {t('exp_payment_label_date')}
+                  </span>
+                  <span className="font-bold">{date}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-slate-500 md:gap-2">
+                    <Clock className="h-3.5 w-3.5 md:h-4 md:w-4" /> {t('exp_payment_label_time')}
+                  </span>
+                  <span className="font-bold">{time}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-slate-500 md:gap-2">
+                    <Users className="h-3.5 w-3.5 md:h-4 md:w-4" /> {t('exp_payment_label_guests')}
+                  </span>
+                  <span className="font-bold">{t('trip_meta_guests', { count: String(guests) })}</span>
+                </div>
+                {isPrivate && (
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-slate-500 md:gap-2">
+                      <ShieldCheck className="h-3.5 w-3.5 md:h-4 md:w-4" /> {t('exp_payment_label_type')}
+                    </span>
+                    <span className="font-bold text-rose-500">{t('exp_payment_private_type')}</span>
+                  </div>
+                )}
+                {effectiveIsSoloGuarantee && (
+                  <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[11px] leading-relaxed text-slate-500 md:text-xs">
+                    <span className="font-semibold text-slate-700">{t('exp_payment_solo_note')}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {hostNotice && (
+              <div className="mt-4 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-[12px] leading-6 text-amber-900 md:rounded-2xl md:px-5 md:py-4 md:text-[13px]">
+                <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-amber-700 md:text-xs">
+                  {t('exp_guest_notice_title')}
+                </p>
+                <p className="whitespace-pre-wrap">{hostNotice}</p>
+              </div>
+            )}
+          </PaymentSectionCard>
+
+          <PaymentSectionCard
+            step={2}
+            title={t('exp_payment_booker_title') as string}
+            status={bookerStatus}
+            statusLabel={sectionStatusLabel[bookerStatus]}
+            testId="exp-payment-section-booker"
+          >
+            <div className="space-y-4">
+              <div>
+                <label className="mb-1 block text-[11px] font-bold text-slate-500 md:mb-1.5 md:text-xs">
+                  {t('exp_payment_name_label')}
+                </label>
+                <input
+                  data-testid="exp-payment-booker-name"
+                  type="text"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  className={cn(
+                    'w-full rounded-lg border px-3 py-2.5 text-[13px] outline-none transition-colors md:rounded-xl md:p-3 md:text-sm',
+                    nameInputError
+                      ? 'border-rose-300 bg-rose-50/80 focus:border-rose-500'
+                      : 'border-slate-200 bg-slate-50 focus:border-black'
+                  )}
+                  placeholder={t('exp_payment_name_placeholder') as string}
+                />
+                {nameInputError && (
+                  <p
+                    data-testid="exp-payment-booker-name-error"
+                    className="mt-2 text-[11px] text-rose-600 md:text-xs"
+                  >
+                    {t('exp_payment_name_required_inline')}
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="mb-1 block text-[11px] font-bold text-slate-500 md:mb-1.5 md:text-xs">
+                  {t('exp_payment_phone_label')}
+                </label>
+                <input
+                  data-testid="exp-payment-booker-phone"
+                  type="tel"
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  className={cn(
+                    'w-full rounded-lg border px-3 py-2.5 text-[13px] outline-none transition-colors md:rounded-xl md:p-3 md:text-sm',
+                    phoneInputError
+                      ? 'border-rose-300 bg-rose-50/80 focus:border-rose-500'
+                      : 'border-slate-200 bg-slate-50 focus:border-black'
+                  )}
+                  placeholder={t('exp_payment_phone_placeholder') as string}
+                />
+                {phoneInputError && (
+                  <p
+                    data-testid="exp-payment-booker-phone-error"
+                    className="mt-2 text-[11px] text-rose-600 md:text-xs"
+                  >
+                    {t('exp_payment_phone_required_inline')}
+                  </p>
+                )}
+              </div>
+            </div>
+          </PaymentSectionCard>
+
+          <PaymentSectionCard
+            step={3}
+            title={t('exp_payment_method_title') as string}
+            status={paymentMethodStatus}
+            statusLabel={sectionStatusLabel[paymentMethodStatus]}
+            testId="exp-payment-section-method"
+          >
+            <div className={cn('mb-3 grid gap-2 md:mb-4 md:gap-3', isPayPalEnabled ? 'grid-cols-3' : 'grid-cols-2')}>
               <button
                 data-testid="exp-payment-method-card"
                 type="button"
                 onClick={() => {
                   if (isCardReadyResolved && isCardReady) {
+                    hasManualPaymentMethodSelectionRef.current = true;
                     setPaymentMethod('card');
                   }
                 }}
                 disabled={!isCardReadyResolved || !isCardReady}
-                className={`p-3 md:p-4 rounded-lg md:rounded-xl border-2 flex flex-col items-center gap-1.5 md:gap-2 transition-all ${paymentMethod === 'card' ? 'border-black bg-slate-50 text-black' : !isCardReadyResolved || !isCardReady ? 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
+                className={cn(
+                  'rounded-lg border-2 p-3 transition-all md:rounded-xl md:p-4',
+                  'flex flex-col items-center gap-1.5 md:gap-2',
+                  paymentMethod === 'card'
+                    ? 'border-black bg-slate-50 text-black shadow-sm'
+                    : !isCardReadyResolved || !isCardReady
+                      ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300'
+                      : 'border-slate-100 text-slate-400 hover:border-slate-200'
+                )}
               >
-                <CreditCard className="w-5 h-5 md:w-6 md:h-6" />
-                <span className="font-bold text-[12px] md:text-sm">{t('exp_payment_method_card')}</span>
+                <CreditCard className="h-5 w-5 md:h-6 md:w-6" />
+                <span className="text-[12px] font-bold md:text-sm">{t('exp_payment_method_card')}</span>
               </button>
               <button
                 data-testid="exp-payment-method-bank"
-                onClick={() => setPaymentMethod('bank')}
-                className={`p-3 md:p-4 rounded-lg md:rounded-xl border-2 flex flex-col items-center gap-1.5 md:gap-2 transition-all ${paymentMethod === 'bank' ? 'border-black bg-slate-50 text-black' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
+                type="button"
+                onClick={() => {
+                  hasManualPaymentMethodSelectionRef.current = true;
+                  setPaymentMethod('bank');
+                }}
+                className={cn(
+                  'rounded-lg border-2 p-3 transition-all md:rounded-xl md:p-4',
+                  'flex flex-col items-center gap-1.5 md:gap-2',
+                  paymentMethod === 'bank'
+                    ? 'border-black bg-slate-50 text-black shadow-sm'
+                    : 'border-slate-100 text-slate-400 hover:border-slate-200'
+                )}
               >
-                <div className="flex items-center gap-1"><Users className="w-5 h-5 md:w-6 md:h-6" /><span className="text-[9px] md:text-[10px] font-bold bg-rose-100 text-rose-600 px-1 rounded">{t('exp_payment_method_recommended')}</span></div>
-                <span className="font-bold text-[12px] md:text-sm">{t('exp_payment_method_bank')}</span>
+                <div className="flex items-center gap-1">
+                  <Users className="h-5 w-5 md:h-6 md:w-6" />
+                  <span className="rounded bg-rose-100 px-1 text-[9px] font-bold text-rose-600 md:text-[10px]">
+                    {t('exp_payment_method_recommended')}
+                  </span>
+                </div>
+                <span className="text-[12px] font-bold md:text-sm">{t('exp_payment_method_bank')}</span>
               </button>
               {isPayPalEnabled && (
                 <button
                   data-testid="exp-payment-method-paypal"
-                  onClick={() => setPaymentMethod('paypal')}
-                  className={`p-3 md:p-4 rounded-lg md:rounded-xl border-2 flex flex-col items-center gap-1.5 md:gap-2 transition-all ${paymentMethod === 'paypal' ? 'border-black bg-slate-50 text-black' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
+                  type="button"
+                  onClick={() => {
+                    hasManualPaymentMethodSelectionRef.current = true;
+                    setPaymentMethod('paypal');
+                  }}
+                  className={cn(
+                    'rounded-lg border-2 p-3 transition-all md:rounded-xl md:p-4',
+                    'flex flex-col items-center gap-1.5 md:gap-2',
+                    paymentMethod === 'paypal'
+                      ? 'border-black bg-slate-50 text-black shadow-sm'
+                      : 'border-slate-100 text-slate-400 hover:border-slate-200'
+                  )}
                 >
                   <div className="rounded bg-[#0070ba] px-2 py-0.5 text-[10px] font-black text-white">PayPal</div>
-                  <span className="font-bold text-[12px] md:text-sm">{t('exp_payment_method_paypal')}</span>
+                  <span className="text-[12px] font-bold md:text-sm">{t('exp_payment_method_paypal')}</span>
                 </button>
               )}
             </div>
 
             {isCardReadyResolved && !isCardReady && (
-              <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] md:text-xs text-amber-700">
+              <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700 md:text-xs">
                 {cardReadyReason === 'missing_imp_code'
                   ? t('exp_payment_card_unavailable_config')
                   : t('exp_payment_card_unavailable_alternative')}
@@ -869,21 +1234,26 @@ function PaymentContent() {
             )}
 
             {paymentMethod === 'bank' && (
-              <div className="bg-slate-50 p-3 md:p-4 rounded-lg md:rounded-xl border border-slate-200 animate-in fade-in zoom-in-95">
-                <p className="text-[11px] md:text-xs font-bold text-slate-500 mb-1">{t('exp_payment_bank_label')}</p>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="font-black text-[16px] md:text-lg text-slate-900">{bankInfo.account}</span>
-                  <span className="text-[10px] md:text-xs font-bold bg-yellow-300 px-1 md:px-1.5 py-0.5 rounded text-black">{bankInfo.bankName}</span>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 animate-in fade-in zoom-in-95 md:rounded-xl md:p-4">
+                <p className="mb-1 text-[11px] font-bold text-slate-500 md:text-xs">{t('exp_payment_bank_label')}</p>
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="text-[16px] font-black text-slate-900 md:text-lg">{bankInfo.account}</span>
+                  <span className="rounded bg-yellow-300 px-1 py-0.5 text-[10px] font-bold text-black md:px-1.5 md:text-xs">
+                    {bankInfo.bankName}
+                  </span>
                 </div>
-                <p className="text-[11px] md:text-xs text-slate-400">
-                  {t('exp_payment_bank_timeout_prefix')} <span className="text-rose-500 font-bold">{t('exp_payment_bank_timeout_highlight')}</span>{t('exp_payment_bank_timeout_suffix')}
+                <p className="text-[11px] text-slate-400 md:text-xs">
+                  {t('exp_payment_bank_timeout_prefix')} <span className="font-bold text-rose-500">{t('exp_payment_bank_timeout_highlight')}</span>{t('exp_payment_bank_timeout_suffix')}
                 </p>
               </div>
             )}
 
             {paymentMethod === 'paypal' && (
-              <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3 md:rounded-xl md:p-4 animate-in fade-in zoom-in-95">
-                <div className="text-[11px] md:text-xs text-slate-500 leading-relaxed">
+              <div
+                data-testid="exp-payment-paypal-panel"
+                className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3 animate-in fade-in zoom-in-95 md:rounded-xl md:p-4"
+              >
+                <div className="text-[11px] leading-relaxed text-slate-500 md:text-xs">
                   {t('exp_payment_paypal_desc')}
                 </div>
                 {!isSlotSummaryResolved && (
@@ -893,11 +1263,11 @@ function PaymentContent() {
                   </div>
                 )}
                 {paypalSdkError && (
-                  <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] md:text-xs text-rose-600">
+                  <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] text-rose-600 md:text-xs">
                     {paypalSdkError}
                   </div>
                 )}
-                {isSlotSummaryResolved && !isPayPalSdkReady && !paypalSdkError && (
+                {isSlotSummaryResolved && (!isPayPalSdkReady || !isPayPalButtonsReady) && !paypalSdkError && (
                   <div className="flex h-12 items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white text-[12px] text-slate-500">
                     <Spinner size={16} className="mr-2" />
                     {t('exp_payment_paypal_loading')}
@@ -905,110 +1275,182 @@ function PaymentContent() {
                 )}
                 <div
                   ref={paypalButtonRef}
-                  className={isPayPalSdkReady && isSlotSummaryResolved ? 'min-h-[48px]' : 'hidden'}
+                  className={cn(
+                    'transition-opacity duration-200',
+                    isPayPalButtonsReady && isSlotSummaryResolved ? 'min-h-[48px] opacity-100' : 'hidden opacity-0'
+                  )}
                 />
               </div>
             )}
-          </div>
+          </PaymentSectionCard>
 
-          <div className="px-1 md:px-2 space-y-1.5 md:space-y-2 mb-6 md:mb-8 text-[12px] md:text-sm">
-            <div className="flex justify-between items-center text-slate-600"><span>{t('exp_payment_host_price')}</span><span>₩{baseHostPrice.toLocaleString()}</span></div>
-            {effectiveIsSoloGuarantee && (
-              <div className="flex justify-between items-center text-slate-600"><span>{t('exp_payment_solo_price')}</span><span>+ ₩{soloGuaranteePrice.toLocaleString()}</span></div>
-            )}
-            <div className="flex justify-between items-center text-blue-600">
-              <span className="flex items-center gap-1">
-                {t('exp_payment_platform_fee')}
-                <span
-                  ref={feeInfoRef}
-                  className="relative inline-flex"
-                  onMouseEnter={() => setIsFeeInfoOpen(true)}
-                  onMouseLeave={() => setIsFeeInfoOpen(false)}
-                >
-                  <button
-                    type="button"
-                    data-testid="exp-payment-platform-fee-trigger"
-                    aria-label={t('exp_payment_platform_fee_aria') as string}
-                    aria-expanded={isFeeInfoOpen}
-                    onClick={() => setIsFeeInfoOpen(true)}
-                    onFocus={() => setIsFeeInfoOpen(true)}
-                    className="inline-flex h-6 w-6 items-center justify-center rounded-full text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 md:h-5 md:w-5"
-                  >
-                    <Info className="w-3 h-3 md:w-3.5 md:h-3.5" />
-                  </button>
-                  {isFeeInfoOpen && (
-                    <div
-                      data-testid="exp-payment-platform-fee-tooltip"
-                      className="absolute left-1/2 top-full z-20 mt-2 w-56 -translate-x-1/2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-medium leading-relaxed text-slate-600 shadow-xl md:w-64 md:text-xs"
-                    >
-                      {t('exp_payment_platform_fee_tooltip')}
+          <PaymentSectionCard
+            step={4}
+            title={t('exp_payment_final_title') as string}
+            status={finalSectionStatus}
+            statusLabel={sectionStatusLabel[finalSectionStatus]}
+            testId="exp-payment-section-final"
+          >
+            <div className="space-y-5">
+              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-4 text-[12px] md:rounded-2xl md:px-5 md:py-5 md:text-sm">
+                <div className="space-y-1.5 md:space-y-2">
+                  <div className="flex items-center justify-between text-slate-600">
+                    <span>{t('exp_payment_host_price')}</span>
+                    <span>₩{baseHostPrice.toLocaleString()}</span>
+                  </div>
+                  {effectiveIsSoloGuarantee && (
+                    <div className="flex items-center justify-between text-slate-600">
+                      <span>{t('exp_payment_solo_price')}</span>
+                      <span>+ ₩{soloGuaranteePrice.toLocaleString()}</span>
                     </div>
                   )}
-                </span>
-              </span>
-              <span>+ ₩{guestFee.toLocaleString()}</span>
-            </div>
-            <div className="border-t border-slate-100 pt-3 md:pt-4 mt-1.5 md:mt-2 flex justify-between items-center"><span className="font-bold text-slate-900">{t('exp_payment_total')}</span><span className="text-[24px] md:text-3xl font-black text-slate-900">₩{finalAmount.toLocaleString()}</span></div>
-          </div>
-
-          <div className="mb-5 md:mb-6 space-y-2.5 md:space-y-3 bg-red-50/50 p-4 md:p-5 rounded-xl md:rounded-2xl border border-red-100">
-            <h3 className="text-[13px] md:text-sm font-bold text-red-600 mb-2.5 md:mb-3 flex items-center gap-1 md:gap-1.5"><ShieldCheck className="w-3.5 h-3.5 md:w-4 md:h-4" /> {t('exp_payment_safety_title')}</h3>
-
-            <label data-testid="exp-payment-agree-off-platform" className="flex items-start gap-2.5 md:gap-3 cursor-pointer hover:bg-white/50 p-1.5 md:p-2 -ml-1 md:-ml-2 rounded-lg md:rounded-xl transition-colors">
-              <div className={`mt-0.5 min-w-[18px] h-[18px] md:min-w-[20px] md:h-5 rounded border flex items-center justify-center transition-colors ${agreeNoOffPlatform ? 'bg-black border-black text-white' : 'border-slate-300 bg-white text-transparent'}`}><CheckCircle2 className="w-3 h-3 md:w-3.5 md:h-3.5" /></div>
-              <input type="checkbox" className="hidden" checked={agreeNoOffPlatform} onChange={() => setAgreeNoOffPlatform(!agreeNoOffPlatform)} />
-              <div className="text-[12px] md:text-sm font-medium text-slate-700 leading-[1.45] md:leading-snug">
-                {t('exp_payment_agree_off_platform')}
+                  <div className="flex items-center justify-between text-blue-600">
+                    <span className="flex items-center gap-1">
+                      {t('exp_payment_platform_fee')}
+                      <span
+                        ref={feeInfoRef}
+                        className="relative inline-flex"
+                        onMouseEnter={() => setIsFeeInfoOpen(true)}
+                        onMouseLeave={() => setIsFeeInfoOpen(false)}
+                      >
+                        <button
+                          type="button"
+                          data-testid="exp-payment-platform-fee-trigger"
+                          aria-label={t('exp_payment_platform_fee_aria') as string}
+                          aria-expanded={isFeeInfoOpen}
+                          onClick={() => setIsFeeInfoOpen(true)}
+                          onFocus={() => setIsFeeInfoOpen(true)}
+                          className="inline-flex h-6 w-6 items-center justify-center rounded-full text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 md:h-5 md:w-5"
+                        >
+                          <Info className="h-3 w-3 md:h-3.5 md:w-3.5" />
+                        </button>
+                        {isFeeInfoOpen && (
+                          <div
+                            data-testid="exp-payment-platform-fee-tooltip"
+                            className="absolute left-1/2 top-full z-20 mt-2 w-56 -translate-x-1/2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-medium leading-relaxed text-slate-600 shadow-xl md:w-64 md:text-xs"
+                          >
+                            {t('exp_payment_platform_fee_tooltip')}
+                          </div>
+                        )}
+                      </span>
+                    </span>
+                    <span>+ ₩{guestFee.toLocaleString()}</span>
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3 md:mt-4 md:pt-4">
+                  <span className="font-bold text-slate-900">{t('exp_payment_total')}</span>
+                  <span data-testid="exp-payment-total-amount" className="text-[24px] font-black text-slate-900 md:text-3xl">₩{finalAmount.toLocaleString()}</span>
+                </div>
               </div>
-            </label>
 
-            <label data-testid="exp-payment-agree-safety" className="flex items-start gap-2.5 md:gap-3 cursor-pointer hover:bg-white/50 p-1.5 md:p-2 -ml-1 md:-ml-2 rounded-lg md:rounded-xl transition-colors">
-              <div className={`mt-0.5 min-w-[18px] h-[18px] md:min-w-[20px] md:h-5 rounded border flex items-center justify-center transition-colors ${agreeSafety ? 'bg-black border-black text-white' : 'border-slate-300 bg-white text-transparent'}`}><CheckCircle2 className="w-3 h-3 md:w-3.5 md:h-3.5" /></div>
-              <input type="checkbox" className="hidden" checked={agreeSafety} onChange={() => setAgreeSafety(!agreeSafety)} />
-              <div className="text-[12px] md:text-sm font-medium text-slate-700 leading-[1.45] md:leading-snug">
-                {t('exp_payment_agree_safety')}
+              <div className="space-y-2.5 rounded-xl border border-red-100 bg-red-50/50 p-4 md:rounded-2xl md:p-5">
+                <h3 className="mb-1 flex items-center gap-1 text-[13px] font-bold text-red-600 md:text-sm">
+                  <ShieldCheck className="h-3.5 w-3.5 md:h-4 md:w-4" /> {t('exp_payment_safety_title')}
+                </h3>
+
+                <label
+                  data-testid="exp-payment-agree-off-platform"
+                  className="flex cursor-pointer items-start gap-2.5 rounded-lg p-1.5 transition-colors hover:bg-white/50 md:gap-3 md:p-2"
+                >
+                  <div className={cn(
+                    'mt-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded border transition-colors md:h-5 md:min-w-[20px]',
+                    agreeNoOffPlatform ? 'border-black bg-black text-white' : 'border-slate-300 bg-white text-transparent'
+                  )}>
+                    <CheckCircle2 className="h-3 w-3 md:h-3.5 md:w-3.5" />
+                  </div>
+                  <input type="checkbox" className="hidden" checked={agreeNoOffPlatform} onChange={() => setAgreeNoOffPlatform(!agreeNoOffPlatform)} />
+                  <div className="text-[12px] font-medium leading-[1.45] text-slate-700 md:text-sm md:leading-snug">
+                    {t('exp_payment_agree_off_platform')}
+                  </div>
+                </label>
+
+                <label
+                  data-testid="exp-payment-agree-safety"
+                  className="flex cursor-pointer items-start gap-2.5 rounded-lg p-1.5 transition-colors hover:bg-white/50 md:gap-3 md:p-2"
+                >
+                  <div className={cn(
+                    'mt-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded border transition-colors md:h-5 md:min-w-[20px]',
+                    agreeSafety ? 'border-black bg-black text-white' : 'border-slate-300 bg-white text-transparent'
+                  )}>
+                    <CheckCircle2 className="h-3 w-3 md:h-3.5 md:w-3.5" />
+                  </div>
+                  <input type="checkbox" className="hidden" checked={agreeSafety} onChange={() => setAgreeSafety(!agreeSafety)} />
+                  <div className="text-[12px] font-medium leading-[1.45] text-slate-700 md:text-sm md:leading-snug">
+                    {t('exp_payment_agree_safety')}
+                  </div>
+                </label>
+
+                <label
+                  data-testid="exp-payment-agree-terms"
+                  className="flex cursor-pointer items-start gap-2.5 rounded-lg p-1.5 transition-colors hover:bg-white/50 md:gap-3 md:p-2"
+                >
+                  <div className={cn(
+                    'mt-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded border transition-colors md:h-5 md:min-w-[20px]',
+                    agreeTerms ? 'border-black bg-black text-white' : 'border-slate-300 bg-white text-transparent'
+                  )}>
+                    <CheckCircle2 className="h-3 w-3 md:h-3.5 md:w-3.5" />
+                  </div>
+                  <input type="checkbox" className="hidden" checked={agreeTerms} onChange={() => setAgreeTerms(!agreeTerms)} />
+                  <div className="text-[12px] font-medium leading-[1.45] text-slate-700 md:text-sm md:leading-snug">
+                    {t('exp_payment_agree_terms')}
+                  </div>
+                </label>
+
+                {agreementsError && (
+                  <p
+                    data-testid="exp-payment-agreements-error"
+                    className="pt-1 text-[11px] text-rose-600 md:text-xs"
+                  >
+                    {t('exp_payment_agreements_inline_required')}
+                  </p>
+                )}
               </div>
-            </label>
 
-            <label data-testid="exp-payment-agree-terms" className="flex items-start gap-2.5 md:gap-3 cursor-pointer hover:bg-white/50 p-1.5 md:p-2 -ml-1 md:-ml-2 rounded-lg md:rounded-xl transition-colors">
-              <div className={`mt-0.5 min-w-[18px] h-[18px] md:min-w-[20px] md:h-5 rounded border flex items-center justify-center transition-colors ${agreeTerms ? 'bg-black border-black text-white' : 'border-slate-300 bg-white text-transparent'}`}><CheckCircle2 className="w-3 h-3 md:w-3.5 md:h-3.5" /></div>
-              <input type="checkbox" className="hidden" checked={agreeTerms} onChange={() => setAgreeTerms(!agreeTerms)} />
-              <div className="text-[12px] md:text-sm font-medium text-slate-700 leading-[1.45] md:leading-snug">
-                {t('exp_payment_agree_terms')}
-              </div>
-            </label>
-          </div>
-
-          {paymentError && (
-            <div className="mb-4 rounded-lg md:rounded-xl border border-rose-200 bg-rose-50 px-3 md:px-4 py-2.5 md:py-3 text-[12px] md:text-[13px] text-rose-600 leading-relaxed">
-              {paymentError}
-            </div>
-          )}
-
-          {paymentMethod !== 'paypal' ? (
-            <button
-              data-testid="exp-payment-submit"
-              onClick={handlePayment}
-              disabled={
-                isProcessing ||
-                !isSlotSummaryResolved ||
-                (paymentMethod === 'card' && (!isCardReadyResolved || !isCardReady))
-              }
-              className="w-full h-12 md:h-14 rounded-xl md:rounded-2xl font-bold text-[15px] md:text-lg bg-black text-white hover:bg-slate-800 transition-all flex items-center justify-center gap-1.5 md:gap-2 shadow-md md:shadow-lg shadow-slate-200 active:scale-[0.98] disabled:opacity-50 disabled:scale-100"
-            >
-              {isProcessing ? (
-                <Spinner size={20} className="w-[18px] h-[18px] md:w-5 md:h-5 text-white" />
+              {paymentMethod !== 'paypal' ? (
+                <button
+                  data-testid="exp-payment-submit"
+                  onClick={handlePayment}
+                  disabled={isSubmitDisabled}
+                  aria-busy={isProcessing}
+                  className={cn(
+                    'flex h-12 w-full items-center justify-center gap-2 rounded-xl text-[15px] font-bold transition-all md:h-14 md:rounded-2xl md:text-lg',
+                    'shadow-md shadow-slate-200 active:scale-[0.98] disabled:scale-100',
+                    isSubmitDisabled
+                      ? 'bg-slate-300 text-slate-100'
+                      : 'bg-black text-white hover:bg-slate-800'
+                  )}
+                >
+                  {isProcessing ? (
+                    <>
+                      <Spinner size={18} className="h-[18px] w-[18px] text-white md:h-5 md:w-5" />
+                      <span>{t('status_processing')}</span>
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="h-[18px] w-[18px] md:h-5 md:w-5" />
+                      {t('exp_payment_pay_button', { amount: `₩${finalAmount.toLocaleString()}` })}
+                    </>
+                  )}
+                </button>
               ) : (
-                <>
-                  <CreditCard className="w-[18px] h-[18px] md:w-5 md:h-5" /> {t('exp_payment_pay_button', { amount: `₩${finalAmount.toLocaleString()}` })}
-                </>
+                <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-[12px] text-slate-500 md:rounded-2xl md:text-sm">
+                  {t('exp_payment_paypal_button_hint')}
+                </div>
               )}
-            </button>
-          ) : (
-            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-[12px] text-slate-500 md:rounded-2xl md:text-sm">
-              {t('exp_payment_paypal_button_hint')}
+
+              {checkoutHelperText && (
+                <p
+                  data-testid="exp-payment-submit-helper"
+                  className={cn(
+                    'text-center text-[11px] leading-relaxed md:text-xs',
+                    isSubmitDisabled || hasAttemptedSubmit ? 'text-slate-500' : 'text-slate-400'
+                  )}
+                >
+                  {checkoutHelperText}
+                </p>
+              )}
             </div>
-          )}
+          </PaymentSectionCard>
         </div>
       </div>
     </div>
