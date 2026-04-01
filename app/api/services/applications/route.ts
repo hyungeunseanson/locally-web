@@ -3,6 +3,7 @@ import { createClient as createServerClient } from '@/app/utils/supabase/server'
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
+import { buildLocalizedEmailCopy } from '@/app/utils/emailCopy';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 import { isApprovedHostEligibleForServiceRequest } from '@/app/utils/serviceHostNotifications';
 
@@ -135,14 +136,23 @@ export async function POST(request: Request) {
       console.error('Service Application Notification Error:', notificationError);
     });
 
-    sendImmediateGenericEmail({
-      recipientUserId: serviceRequest.user_id,
-      subject: '[Locally] 새로운 호스트 지원자가 있습니다',
-      title: '새로운 호스트 지원자가 있습니다',
-      message: `'${serviceRequest.title}' 의뢰에 새로운 호스트가 지원했습니다. 빠르게 검토해보세요.`,
-      link: `/services/${request_id}`,
-      ctaLabel: '지원자 확인하기',
-    }).catch((emailError) => {
+    buildLocalizedEmailCopy({
+      supabaseAdmin,
+      userId: serviceRequest.user_id,
+      key: 'service.application_new.customer',
+      copyParams: {
+        requestTitle: serviceRequest.title,
+      },
+    }).then((emailCopy) =>
+      sendImmediateGenericEmail({
+        recipientUserId: serviceRequest.user_id,
+        subject: emailCopy.subject,
+        title: emailCopy.title,
+        message: emailCopy.message,
+        link: `/services/${request_id}`,
+        ctaLabel: emailCopy.ctaLabel,
+      })
+    ).catch((emailError) => {
       console.error('Service Application Email Error:', emailError);
     });
 

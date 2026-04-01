@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
+import { buildLocalizedEmailCopy } from '@/app/utils/emailCopy';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 
 type SelectHostBody = {
@@ -158,14 +159,23 @@ function notifyServiceHostSelection(params: {
     console.error('Select Host Notification Error:', notificationError);
   });
 
-  sendImmediateGenericEmail({
-    recipientUserId: selectedHostId,
-    subject: '[Locally] 고객에게 선택되었습니다',
-    title: '고객에게 선택되었습니다',
-    message: `'${requestTitle}' 의뢰에서 선택되셨습니다. 바로 진행을 준비해주세요.`,
-    link: `/services/${requestId}`,
-    ctaLabel: '의뢰 확인하기',
-  }).catch((emailError) => {
+  buildLocalizedEmailCopy({
+    supabaseAdmin,
+    userId: selectedHostId,
+    key: 'service.host_selected',
+    copyParams: {
+      requestTitle,
+    },
+  }).then((emailCopy) =>
+    sendImmediateGenericEmail({
+      recipientUserId: selectedHostId,
+      subject: emailCopy.subject,
+      title: emailCopy.title,
+      message: emailCopy.message,
+      link: `/services/${requestId}`,
+      ctaLabel: emailCopy.ctaLabel,
+    })
+  ).catch((emailError) => {
     console.error('Select Host Email Error:', emailError);
   });
 

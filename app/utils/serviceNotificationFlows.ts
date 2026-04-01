@@ -1,4 +1,5 @@
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
+import { buildLocalizedEmailCopy } from '@/app/utils/emailCopy';
 import { notifyMembershipMilestone } from '@/app/utils/memberMilestoneNotifications';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 import { getEligibleServiceHostIds } from '@/app/utils/serviceHostNotifications';
@@ -77,16 +78,28 @@ export async function notifyServicePaymentOpened(params: ServicePaymentOpenedPar
       }
 
       void Promise.allSettled(
-        hostIds.map((hostId) =>
-          sendImmediateGenericEmail({
+        hostIds.map(async (hostId) => {
+          const emailCopy = await buildLocalizedEmailCopy({
+            supabaseAdmin,
+            userId: hostId,
+            key: 'service.request_new.host',
+            copyParams: {
+              requestTitle,
+              requestCity,
+              durationHours,
+              guestCount,
+            },
+          });
+
+          return sendImmediateGenericEmail({
             recipientUserId: hostId,
-            subject: '[Locally] 새로운 맞춤 서비스 의뢰가 도착했습니다',
-            title: '새로운 맞춤 서비스 의뢰가 도착했습니다',
-            message: `'${requestTitle}' 의뢰가 등록되었습니다. ${requestCity}에서 활동 가능한 호스트에게만 전달된 요청입니다. (${durationHours}시간, ${guestCount}명)`,
+            subject: emailCopy.subject,
+            title: emailCopy.title,
+            message: emailCopy.message,
             link: `/services/${requestId}`,
-            ctaLabel: '의뢰 확인하기',
-          })
-        )
+            ctaLabel: emailCopy.ctaLabel,
+          });
+        })
       ).catch((emailError) => {
         console.error('[ServiceNotificationFlows] host payment-open email dispatch failed:', emailError);
       });
@@ -111,14 +124,23 @@ export async function notifyServicePaymentOpened(params: ServicePaymentOpenedPar
       console.error('[ServiceNotificationFlows] customer payment-open notification insert failed:', customerNotificationError);
     }
 
-    void sendImmediateGenericEmail({
+    void buildLocalizedEmailCopy({
+      supabaseAdmin,
+      userId: customerId,
+      key: 'service.payment_confirmed.customer',
+      copyParams: {
+        requestTitle,
+      },
+    }).then((emailCopy) =>
+      sendImmediateGenericEmail({
       recipientUserId: customerId,
-      subject: '[Locally] 서비스 결제가 완료되었습니다',
-      title: '결제가 완료되었습니다',
-      message: `'${requestTitle}' 결제가 완료되어 현지 호스트 모집이 시작됩니다.`,
+      subject: emailCopy.subject,
+      title: emailCopy.title,
+      message: emailCopy.message,
       link: `/services/${requestId}`,
-      ctaLabel: '의뢰 확인하기',
-    }).catch((emailError) => {
+      ctaLabel: emailCopy.ctaLabel,
+    })
+    ).catch((emailError) => {
       console.error('[ServiceNotificationFlows] customer payment-open email failed:', emailError);
     });
 
@@ -165,16 +187,25 @@ export async function notifyServiceCancellationRequested(
   }
 
   void Promise.allSettled(
-    recipientIds.map((recipientId) =>
-      sendImmediateGenericEmail({
+    recipientIds.map(async (recipientId) => {
+      const emailCopy = await buildLocalizedEmailCopy({
+        supabaseAdmin,
+        userId: recipientId,
+        key: 'service.cancel_requested',
+        copyParams: {
+          requestTitle,
+        },
+      });
+
+      return sendImmediateGenericEmail({
         recipientUserId: recipientId,
-        subject: '[Locally] 서비스 취소 요청이 접수되었습니다',
-        title: '취소 요청이 접수되었습니다',
-        message: `'${requestTitle}' 서비스 취소 요청이 접수되었습니다. 관리자가 검토 후 처리합니다.`,
+        subject: emailCopy.subject,
+        title: emailCopy.title,
+        message: emailCopy.message,
         link: `/services/${requestId}`,
-        ctaLabel: '의뢰 확인하기',
-      })
-    )
+        ctaLabel: emailCopy.ctaLabel,
+      });
+    })
   ).catch((emailError) => {
     console.error('[ServiceNotificationFlows] cancellation-request email dispatch failed:', emailError);
   });
@@ -213,21 +244,26 @@ export async function notifyServiceCancellationCompleted(
   }
 
   void Promise.allSettled(
-    recipientIds.map((recipientId) =>
-      sendImmediateGenericEmail({
+    recipientIds.map(async (recipientId) => {
+      const emailCopy = await buildLocalizedEmailCopy({
+        supabaseAdmin,
+        userId: recipientId,
+        key: 'service.cancelled',
+        copyParams: {
+          requestTitle,
+          refundAmount,
+        },
+      });
+
+      return sendImmediateGenericEmail({
         recipientUserId: recipientId,
-        subject: '[Locally] 서비스 취소 안내',
-        title: '서비스가 취소되었습니다',
-        message:
-          typeof refundAmount === 'number'
-            ? refundAmount > 0
-              ? `'${requestTitle}' 서비스가 취소되었습니다. 환불 금액: ₩${refundAmount.toLocaleString()}`
-              : `'${requestTitle}' 서비스가 취소되었습니다. 환불 금액은 없습니다.`
-            : `'${requestTitle}' 서비스가 취소되었습니다.`,
+        subject: emailCopy.subject,
+        title: emailCopy.title,
+        message: emailCopy.message,
         link: `/services/${requestId}`,
-        ctaLabel: '의뢰 확인하기',
-      })
-    )
+        ctaLabel: emailCopy.ctaLabel,
+      });
+    })
   ).catch((emailError) => {
     console.error('[ServiceNotificationFlows] cancellation-complete email dispatch failed:', emailError);
   });

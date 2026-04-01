@@ -60,5 +60,46 @@ test.describe('Email localization helpers', () => {
     });
     expect(rejectedJa.subject).toBe('[Locally] 📌 ホスト申請結果をご確認ください');
     expect(rejectedJa.message).toContain('理由: 本人確認書類が一致しませんでした。');
+
+    const serviceHostEn = buildEmailCopy('service.request_new.host', 'en', {
+      requestTitle: 'Airport pickup',
+      requestCity: 'Seoul',
+      durationHours: 3,
+      guestCount: 2,
+    });
+    expect(serviceHostEn.subject).toBe('[Locally] A new custom service request has arrived');
+    expect(serviceHostEn.message).toContain('Airport pickup');
+    expect(serviceHostEn.ctaLabel).toBe('View request');
+
+    const serviceCustomerJa = buildEmailCopy('service.payment_confirmed.customer', 'ja', {
+      requestTitle: '東京通訳サポート',
+    });
+    expect(serviceCustomerJa.subject).toBe('[Locally] サービスの決済が完了しました');
+    expect(serviceCustomerJa.message).toContain('現地ホストの募集');
+
+    const serviceApplicationZh = buildEmailCopy('service.application_new.customer', 'zh', {
+      requestTitle: '东京空港接送',
+    });
+    expect(serviceApplicationZh.subject).toBe('[Locally] 有新的房东申请');
+    expect(serviceApplicationZh.ctaLabel).toBe('查看申请人');
+
+    const serviceSelectedJa = buildEmailCopy('service.host_selected', 'ja', {
+      requestTitle: '東京通訳サポート',
+    });
+    expect(serviceSelectedJa.subject).toBe('[Locally] ゲストに選ばれました');
+    expect(serviceSelectedJa.message).toContain('進行の準備');
+
+    const serviceCancelRequestedEn = buildEmailCopy('service.cancel_requested', 'en', {
+      requestTitle: 'Airport pickup',
+    });
+    expect(serviceCancelRequestedEn.subject).toBe('[Locally] Your service cancellation request was received');
+    expect(serviceCancelRequestedEn.message).toContain('admin team will review it shortly');
+
+    const serviceCancelledKo = buildEmailCopy('service.cancelled', 'ko', {
+      requestTitle: '도쿄 공항 픽업',
+      refundAmount: 25000,
+    });
+    expect(serviceCancelledKo.subject).toBe('[Locally] 서비스 취소 안내');
+    expect(serviceCancelledKo.message).toContain('환불 금액: ₩25,000');
   });
 });

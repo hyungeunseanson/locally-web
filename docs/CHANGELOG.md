@@ -5,6 +5,13 @@
 
 ---
 
+## v3.39.98 — [Emails] Service guest / host generic 이메일 다국어 2차
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟢 service guest/host 메일 현지화 | `app/utils/emailCopy.ts`, `app/utils/serviceNotificationFlows.ts`, `app/api/services/applications/route.ts`, `app/api/services/select-host/route.ts` — `service_request_new`, `service_payment_confirmed`, `service_application_new`, `service_host_selected`, `service_cancel_requested`, `service_cancelled` generic 이메일을 recipient `preferred_locale` 기준으로 생성하도록 변경 |
+| 🟡 service email copy 검증 추가 | `tests/e2e/120-email-copy-util.spec.ts` — service email dictionary를 locale별로 검증하고, 기존 service runtime spec으로 인앱/flow 회귀가 없는지 함께 확인 |
+
 ## v3.39.97 — [Emails] Guest / Host generic 이메일 다국어 1차
 
 | 항목 | 내용 |

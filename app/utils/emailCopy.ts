@@ -18,6 +18,30 @@ type HostApplicationStatusParams = {
   comment?: string;
 };
 
+type ServiceRequestNewHostParams = {
+  requestTitle: string;
+  requestCity: string;
+  durationHours: number;
+  guestCount: number;
+};
+
+type ServicePaymentConfirmedCustomerParams = {
+  requestTitle: string;
+};
+
+type ServiceApplicationNewCustomerParams = {
+  requestTitle: string;
+};
+
+type ServiceHostSelectedParams = {
+  requestTitle: string;
+};
+
+type ServiceCancellationParams = {
+  requestTitle: string;
+  refundAmount?: number | null;
+};
+
 export type EmailCopy = {
   subject: string;
   title: string;
@@ -31,7 +55,13 @@ export type EmailCopyKey =
   | 'membership.circle_welcome'
   | 'host_application.approved'
   | 'host_application.revision'
-  | 'host_application.rejected';
+  | 'host_application.rejected'
+  | 'service.request_new.host'
+  | 'service.payment_confirmed.customer'
+  | 'service.application_new.customer'
+  | 'service.host_selected'
+  | 'service.cancel_requested'
+  | 'service.cancelled';
 
 type EmailCopyParams = {
   'review.new.host': ReviewNewHostParams;
@@ -40,6 +70,12 @@ type EmailCopyParams = {
   'host_application.approved': HostApplicationStatusParams;
   'host_application.revision': HostApplicationStatusParams;
   'host_application.rejected': HostApplicationStatusParams;
+  'service.request_new.host': ServiceRequestNewHostParams;
+  'service.payment_confirmed.customer': ServicePaymentConfirmedCustomerParams;
+  'service.application_new.customer': ServiceApplicationNewCustomerParams;
+  'service.host_selected': ServiceHostSelectedParams;
+  'service.cancel_requested': ServiceCancellationParams;
+  'service.cancelled': ServiceCancellationParams;
 };
 
 type LocalizedEmailCopyInput<K extends EmailCopyKey> = {
@@ -291,6 +327,265 @@ function buildHostApplicationStatusEmailCopy(
   }
 }
 
+function formatKrw(amount: number) {
+  return `₩${Math.max(0, amount).toLocaleString('en-US')}`;
+}
+
+function buildServiceRequestNewHostEmailCopy(
+  locale: NotificationLocale,
+  params: ServiceRequestNewHostParams
+): EmailCopy {
+  const { requestTitle, requestCity, durationHours, guestCount } = params;
+
+  switch (locale) {
+    case 'en':
+      return {
+        subject: '[Locally] A new custom service request has arrived',
+        title: 'A new custom service request has arrived',
+        message: `A new request for '${requestTitle}' was submitted. This request was shared only with hosts active in ${requestCity}. (${durationHours}h, ${guestCount} guest${guestCount === 1 ? '' : 's'})`,
+        ctaLabel: 'View request',
+      };
+    case 'ja':
+      return {
+        subject: '[Locally] 新しいカスタムサービス依頼が届きました',
+        title: '新しいカスタムサービス依頼が届きました',
+        message: `「${requestTitle}」の依頼が登録されました。${requestCity}で活動可能なホストにのみ共有された依頼です。（${durationHours}時間、${guestCount}名）`,
+        ctaLabel: '依頼を見る',
+      };
+    case 'zh':
+      return {
+        subject: '[Locally] 你收到了新的定制服务请求',
+        title: '你收到了新的定制服务请求',
+        message: `「${requestTitle}」请求已提交。该请求仅发送给可在${requestCity}活动的房东。（${durationHours}小时，${guestCount}人）`,
+        ctaLabel: '查看请求',
+      };
+    case 'ko':
+    default:
+      return {
+        subject: '[Locally] 새로운 맞춤 서비스 의뢰가 도착했습니다',
+        title: '새로운 맞춤 서비스 의뢰가 도착했습니다',
+        message: `'${requestTitle}' 의뢰가 등록되었습니다. ${requestCity}에서 활동 가능한 호스트에게만 전달된 요청입니다. (${durationHours}시간, ${guestCount}명)`,
+        ctaLabel: '의뢰 확인하기',
+      };
+  }
+}
+
+function buildServicePaymentConfirmedCustomerEmailCopy(
+  locale: NotificationLocale,
+  params: ServicePaymentConfirmedCustomerParams
+): EmailCopy {
+  const { requestTitle } = params;
+
+  switch (locale) {
+    case 'en':
+      return {
+        subject: '[Locally] Your service payment is complete',
+        title: 'Payment is complete',
+        message: `Payment for '${requestTitle}' is complete, and local host recruitment is now starting.`,
+        ctaLabel: 'View request',
+      };
+    case 'ja':
+      return {
+        subject: '[Locally] サービスの決済が完了しました',
+        title: '決済が完了しました',
+        message: `「${requestTitle}」の決済が完了し、現地ホストの募集が始まります。`,
+        ctaLabel: '依頼を見る',
+      };
+    case 'zh':
+      return {
+        subject: '[Locally] 服务付款已完成',
+        title: '付款已完成',
+        message: `「${requestTitle}」的付款已完成，现已开始招募当地房东。`,
+        ctaLabel: '查看请求',
+      };
+    case 'ko':
+    default:
+      return {
+        subject: '[Locally] 서비스 결제가 완료되었습니다',
+        title: '결제가 완료되었습니다',
+        message: `'${requestTitle}' 결제가 완료되어 현지 호스트 모집이 시작됩니다.`,
+        ctaLabel: '의뢰 확인하기',
+      };
+  }
+}
+
+function buildServiceApplicationNewCustomerEmailCopy(
+  locale: NotificationLocale,
+  params: ServiceApplicationNewCustomerParams
+): EmailCopy {
+  const { requestTitle } = params;
+
+  switch (locale) {
+    case 'en':
+      return {
+        subject: '[Locally] A new host has applied',
+        title: 'A new host has applied',
+        message: `A new host applied to '${requestTitle}'. Take a look when you can.`,
+        ctaLabel: 'View applicants',
+      };
+    case 'ja':
+      return {
+        subject: '[Locally] 新しいホスト応募が届きました',
+        title: '新しいホスト応募が届きました',
+        message: `「${requestTitle}」に新しいホストが応募しました。お時間のあるときにご確認ください。`,
+        ctaLabel: '応募者を見る',
+      };
+    case 'zh':
+      return {
+        subject: '[Locally] 有新的房东申请',
+        title: '有新的房东申请',
+        message: `「${requestTitle}」有新的房东提交了申请，请尽快查看。`,
+        ctaLabel: '查看申请人',
+      };
+    case 'ko':
+    default:
+      return {
+        subject: '[Locally] 새로운 호스트 지원자가 있습니다',
+        title: '새로운 호스트 지원자가 있습니다',
+        message: `'${requestTitle}' 의뢰에 새로운 호스트가 지원했습니다. 빠르게 검토해보세요.`,
+        ctaLabel: '지원자 확인하기',
+      };
+  }
+}
+
+function buildServiceHostSelectedEmailCopy(
+  locale: NotificationLocale,
+  params: ServiceHostSelectedParams
+): EmailCopy {
+  const { requestTitle } = params;
+
+  switch (locale) {
+    case 'en':
+      return {
+        subject: '[Locally] You were selected by the guest',
+        title: 'You were selected by the guest',
+        message: `You were selected for '${requestTitle}'. Please get ready to proceed.`,
+        ctaLabel: 'View request',
+      };
+    case 'ja':
+      return {
+        subject: '[Locally] ゲストに選ばれました',
+        title: 'ゲストに選ばれました',
+        message: `「${requestTitle}」の依頼で選ばれました。進行の準備をお願いします。`,
+        ctaLabel: '依頼を見る',
+      };
+    case 'zh':
+      return {
+        subject: '[Locally] 你已被游客选中',
+        title: '你已被游客选中',
+        message: `你已在「${requestTitle}」中被选中，请开始准备后续 진행。`,
+        ctaLabel: '查看请求',
+      };
+    case 'ko':
+    default:
+      return {
+        subject: '[Locally] 고객에게 선택되었습니다',
+        title: '고객에게 선택되었습니다',
+        message: `'${requestTitle}' 의뢰에서 선택되셨습니다. 바로 진행을 준비해주세요.`,
+        ctaLabel: '의뢰 확인하기',
+      };
+  }
+}
+
+function buildServiceCancelEmailCopy(
+  locale: NotificationLocale,
+  key: 'service.cancel_requested' | 'service.cancelled',
+  params: ServiceCancellationParams
+): EmailCopy {
+  const { requestTitle, refundAmount } = params;
+
+  if (key === 'service.cancel_requested') {
+    switch (locale) {
+      case 'en':
+        return {
+          subject: '[Locally] Your service cancellation request was received',
+          title: 'Your cancellation request was received',
+          message: `A cancellation request for '${requestTitle}' was received. The admin team will review it shortly.`,
+          ctaLabel: 'View request',
+        };
+      case 'ja':
+        return {
+          subject: '[Locally] サービスのキャンセル依頼を受け付けました',
+          title: 'キャンセル依頼を受け付けました',
+          message: `「${requestTitle}」サービスのキャンセル依頼を受け付けました。運営チームが確認のうえ対応します。`,
+          ctaLabel: '依頼を見る',
+        };
+      case 'zh':
+        return {
+          subject: '[Locally] 已收到服务取消申请',
+          title: '已收到取消申请',
+          message: `已收到「${requestTitle}」服务的取消申请，运营团队会尽快审核处理。`,
+          ctaLabel: '查看请求',
+        };
+      case 'ko':
+      default:
+        return {
+          subject: '[Locally] 서비스 취소 요청이 접수되었습니다',
+          title: '취소 요청이 접수되었습니다',
+          message: `'${requestTitle}' 서비스 취소 요청이 접수되었습니다. 관리자가 검토 후 처리합니다.`,
+          ctaLabel: '의뢰 확인하기',
+        };
+    }
+  }
+
+  const refundMessage =
+    typeof refundAmount === 'number'
+      ? refundAmount > 0
+        ? {
+            ko: `환불 금액: ${formatKrw(refundAmount)}`,
+            en: `Refund amount: ${formatKrw(refundAmount)}`,
+            ja: `返金額: ${formatKrw(refundAmount)}`,
+            zh: `退款金额：${formatKrw(refundAmount)}`,
+          }
+        : {
+            ko: '환불 금액은 없습니다.',
+            en: 'There is no refund amount.',
+            ja: '返金額はありません。',
+            zh: '无退款金额。',
+          }
+      : null;
+
+  switch (locale) {
+    case 'en':
+      return {
+        subject: '[Locally] Service cancellation notice',
+        title: 'The service was cancelled',
+        message: refundMessage
+          ? `The service '${requestTitle}' was cancelled. ${refundMessage.en}`
+          : `The service '${requestTitle}' was cancelled.`,
+        ctaLabel: 'View request',
+      };
+    case 'ja':
+      return {
+        subject: '[Locally] サービスキャンセルのご案内',
+        title: 'サービスがキャンセルされました',
+        message: refundMessage
+          ? `「${requestTitle}」サービスがキャンセルされました。${refundMessage.ja}`
+          : `「${requestTitle}」サービスがキャンセルされました。`,
+        ctaLabel: '依頼を見る',
+      };
+    case 'zh':
+      return {
+        subject: '[Locally] 服务取消通知',
+        title: '服务已取消',
+        message: refundMessage
+          ? `「${requestTitle}」服务已取消。${refundMessage.zh}`
+          : `「${requestTitle}」服务已取消。`,
+        ctaLabel: '查看请求',
+      };
+    case 'ko':
+    default:
+      return {
+        subject: '[Locally] 서비스 취소 안내',
+        title: '서비스가 취소되었습니다',
+        message: refundMessage
+          ? `'${requestTitle}' 서비스가 취소되었습니다. ${refundMessage.ko}`
+          : `'${requestTitle}' 서비스가 취소되었습니다.`,
+        ctaLabel: '의뢰 확인하기',
+      };
+  }
+}
+
 export function buildEmailCopy<K extends EmailCopyKey>(
   key: K,
   locale: NotificationLocale,
@@ -312,6 +607,33 @@ export function buildEmailCopy<K extends EmailCopyKey>(
         locale,
         key,
         copyParams as EmailCopyParams['host_application.approved']
+      );
+    case 'service.request_new.host':
+      return buildServiceRequestNewHostEmailCopy(
+        locale,
+        copyParams as EmailCopyParams['service.request_new.host']
+      );
+    case 'service.payment_confirmed.customer':
+      return buildServicePaymentConfirmedCustomerEmailCopy(
+        locale,
+        copyParams as EmailCopyParams['service.payment_confirmed.customer']
+      );
+    case 'service.application_new.customer':
+      return buildServiceApplicationNewCustomerEmailCopy(
+        locale,
+        copyParams as EmailCopyParams['service.application_new.customer']
+      );
+    case 'service.host_selected':
+      return buildServiceHostSelectedEmailCopy(
+        locale,
+        copyParams as EmailCopyParams['service.host_selected']
+      );
+    case 'service.cancel_requested':
+    case 'service.cancelled':
+      return buildServiceCancelEmailCopy(
+        locale,
+        key,
+        copyParams as EmailCopyParams['service.cancel_requested']
       );
     default:
       return assertNever(key);
