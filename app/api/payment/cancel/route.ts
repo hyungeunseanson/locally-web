@@ -11,6 +11,7 @@ import { refundPayPalCapture } from '@/app/utils/paypal/server';
 import { captureServerException } from '@/app/utils/monitoring/sentry';
 import { calculateGuestCancellationRefundRate } from '@/app/utils/bookingCancellationPolicy';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
+import { buildLocalizedEmailCopy } from '@/app/utils/emailCopy';
 import {
   formatBookingReviewMarker,
   isBookingReviewPending,
@@ -326,28 +327,53 @@ export async function POST(request: Request) {
       // [Security Fix] 기존 HTTP fetch + x-internal-secret(SERVICE_ROLE_KEY 헤더 전송) 제거
       // — NEXT_PUBLIC_SITE_URL은 클라이언트 노출 변수로 SSRF 위험, 대신 직접 함수 호출
       if (hostEmail) {
-        void sendImmediateGenericEmail({
-          recipientUserId: hostId,
-          subject: '[Locally] 예약 취소 안내 (호스트)',
-          title: '예약이 취소되었습니다',
-          message: `[${expTitle}] 예약이 취소되었습니다. 취소 사유: ${normalizedUserReason || '미제공'}. 환불액: ₩${refundAmount.toLocaleString()}`,
-          link: '/host/dashboard',
-          ctaLabel: '대시보드 보기',
-        }).catch(e => console.error('Host booking cancellation email failed:', e));
+        void buildLocalizedEmailCopy({
+          supabaseAdmin,
+          userId: hostId,
+          key: 'booking.cancelled.host',
+          copyParams: {
+            experienceTitle: expTitle,
+            reason: normalizedUserReason || null,
+            refundAmount,
+          },
+        })
+          .then((hostEmailCopy) =>
+            sendImmediateGenericEmail({
+              recipientUserId: hostId,
+              subject: hostEmailCopy.subject,
+              title: hostEmailCopy.title,
+              message: hostEmailCopy.message,
+              link: '/host/dashboard',
+              ctaLabel: hostEmailCopy.ctaLabel,
+            })
+          )
+          .catch(e => console.error('Host booking cancellation email failed:', e));
       }
     }
 
     if (booking.user_id) {
-      void sendImmediateGenericEmail({
-        recipientUserId: booking.user_id,
-        subject: '[Locally] 예약 취소 안내',
-        title: '예약이 취소되었습니다',
-        message: `'${expTitle}' 예약이 취소되었습니다.\n환불액: ₩${refundAmount.toLocaleString()}`,
-        link: '/guest/trips',
-        ctaLabel: '내 여행 보기',
-      }).catch((emailError) => {
-        console.error('Guest booking cancellation email failed:', emailError);
-      });
+      void buildLocalizedEmailCopy({
+        supabaseAdmin,
+        userId: booking.user_id,
+        key: 'booking.cancelled.guest',
+        copyParams: {
+          experienceTitle: expTitle,
+          refundAmount,
+        },
+      })
+        .then((guestEmailCopy) =>
+          sendImmediateGenericEmail({
+            recipientUserId: booking.user_id as string,
+            subject: guestEmailCopy.subject,
+            title: guestEmailCopy.title,
+            message: guestEmailCopy.message,
+            link: '/guest/trips',
+            ctaLabel: guestEmailCopy.ctaLabel,
+          })
+        )
+        .catch((emailError) => {
+          console.error('Guest booking cancellation email failed:', emailError);
+        });
     }
 
     await insertAdminAlerts({

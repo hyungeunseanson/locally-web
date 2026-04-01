@@ -42,6 +42,42 @@ type ServiceCancellationParams = {
   refundAmount?: number | null;
 };
 
+type ReviewType = 'host_unavailable' | 'minimum_participants_unmet';
+
+type BookingConfirmedGuestParams = {
+  experienceTitle: string;
+};
+
+type BookingBankConfirmedHostParams = {
+  experienceTitle: string;
+};
+
+type BookingBankConfirmedGuestParams = {
+  experienceTitle: string;
+};
+
+type BookingCancelledHostParams = {
+  experienceTitle: string;
+  reason?: string | null;
+  refundAmount: number;
+};
+
+type BookingCancelledGuestParams = {
+  experienceTitle: string;
+  refundAmount: number;
+};
+
+type BookingCancelledAdminForceGuestParams = {
+  experienceTitle: string;
+  refundAmount: number;
+};
+
+type BookingCancelledHostFaultGuestParams = {
+  experienceTitle: string;
+  refundAmount: number;
+  reviewType: ReviewType;
+};
+
 type ProxyPaymentParams = {
   requestTitle: string;
 };
@@ -64,6 +100,13 @@ export type EmailCopyKey =
   | 'host_application.approved'
   | 'host_application.revision'
   | 'host_application.rejected'
+  | 'booking.confirmed.guest'
+  | 'booking.bank_confirmed.host'
+  | 'booking.bank_confirmed.guest'
+  | 'booking.cancelled.host'
+  | 'booking.cancelled.guest'
+  | 'booking.cancelled.admin_force.guest'
+  | 'booking.cancelled.host_fault.guest'
   | 'service.request_new.host'
   | 'service.payment_confirmed.customer'
   | 'service.application_new.customer'
@@ -82,6 +125,13 @@ type EmailCopyParams = {
   'host_application.approved': HostApplicationStatusParams;
   'host_application.revision': HostApplicationStatusParams;
   'host_application.rejected': HostApplicationStatusParams;
+  'booking.confirmed.guest': BookingConfirmedGuestParams;
+  'booking.bank_confirmed.host': BookingBankConfirmedHostParams;
+  'booking.bank_confirmed.guest': BookingBankConfirmedGuestParams;
+  'booking.cancelled.host': BookingCancelledHostParams;
+  'booking.cancelled.guest': BookingCancelledGuestParams;
+  'booking.cancelled.admin_force.guest': BookingCancelledAdminForceGuestParams;
+  'booking.cancelled.host_fault.guest': BookingCancelledHostFaultGuestParams;
   'service.request_new.host': ServiceRequestNewHostParams;
   'service.payment_confirmed.customer': ServicePaymentConfirmedCustomerParams;
   'service.application_new.customer': ServiceApplicationNewCustomerParams;
@@ -345,6 +395,354 @@ function buildHostApplicationStatusEmailCopy(
 
 function formatKrw(amount: number) {
   return `₩${Math.max(0, amount).toLocaleString('en-US')}`;
+}
+
+function getBookingReviewTypeLabel(locale: NotificationLocale, reviewType: ReviewType) {
+  if (reviewType === 'minimum_participants_unmet') {
+    switch (locale) {
+      case 'en':
+        return 'minimum participants not met';
+      case 'ja':
+        return '最低催行人数未達';
+      case 'zh':
+        return '未达到最低成团人数';
+      case 'ko':
+      default:
+        return '최소 진행 인원 미달';
+    }
+  }
+
+  switch (locale) {
+    case 'en':
+      return 'host unavailable';
+    case 'ja':
+      return 'ホスト都合';
+    case 'zh':
+      return '房东无法接待';
+    case 'ko':
+    default:
+      return '호스트 진행 불가';
+  }
+}
+
+function buildBookingRefundLine(locale: NotificationLocale, refundAmount: number) {
+  const formatted = formatKrw(refundAmount);
+
+  switch (locale) {
+    case 'en':
+      return `Refund amount: ${formatted}`;
+    case 'ja':
+      return `返金額: ${formatted}`;
+    case 'zh':
+      return `退款金额：${formatted}`;
+    case 'ko':
+    default:
+      return `환불액: ${formatted}`;
+  }
+}
+
+function buildBookingPrePaymentCancellationLine(locale: NotificationLocale) {
+  switch (locale) {
+    case 'en':
+      return 'The booking was cancelled before payment was completed.';
+    case 'ja':
+      return '決済完了前に予約がキャンセルされました。';
+    case 'zh':
+      return '预订已在付款完成前取消。';
+    case 'ko':
+    default:
+      return '결제 전 예약이 취소되었습니다.';
+  }
+}
+
+function buildBookingConfirmedGuestEmailCopy(
+  locale: NotificationLocale,
+  params: BookingConfirmedGuestParams
+): EmailCopy {
+  const { experienceTitle } = params;
+
+  switch (locale) {
+    case 'en':
+      return {
+        subject: '[Locally] Your booking is confirmed',
+        title: 'Your booking is confirmed',
+        message: `Payment for '${experienceTitle}' is complete and your booking is confirmed.`,
+        ctaLabel: 'View my trips',
+      };
+    case 'ja':
+      return {
+        subject: '[Locally] 予約が確定しました',
+        title: '予約が確定しました',
+        message: `「${experienceTitle}」の決済が完了し、予約が確定しました。`,
+        ctaLabel: '旅行を見る',
+      };
+    case 'zh':
+      return {
+        subject: '[Locally] 你的预订已确认',
+        title: '你的预订已确认',
+        message: `「${experienceTitle}」的付款已完成，预订现已确认。`,
+        ctaLabel: '查看我的行程',
+      };
+    case 'ko':
+    default:
+      return {
+        subject: '[Locally] 예약이 확정되었습니다',
+        title: '예약이 확정되었습니다',
+        message: `'${experienceTitle}' 결제가 완료되어 예약이 확정되었습니다.`,
+        ctaLabel: '내 여행 보기',
+      };
+  }
+}
+
+function buildBookingBankConfirmedEmailCopy(
+  locale: NotificationLocale,
+  key: 'booking.bank_confirmed.host' | 'booking.bank_confirmed.guest',
+  params: BookingBankConfirmedHostParams | BookingBankConfirmedGuestParams
+): EmailCopy {
+  const { experienceTitle } = params;
+
+  if (key === 'booking.bank_confirmed.host') {
+    switch (locale) {
+      case 'en':
+        return {
+          subject: '[Locally] 💰 Bank transfer confirmed',
+          title: 'Bank transfer confirmed',
+          message: `The bank transfer for '${experienceTitle}' has been confirmed.`,
+          ctaLabel: 'Open host dashboard',
+        };
+      case 'ja':
+        return {
+          subject: '[Locally] 💰 入金確認が完了しました',
+          title: '入金確認が完了しました',
+          message: `「${experienceTitle}」予約の入金確認が完了しました。`,
+          ctaLabel: 'ホストダッシュボードを開く',
+        };
+      case 'zh':
+        return {
+          subject: '[Locally] 💰 已确认收款',
+          title: '已确认收款',
+          message: `「${experienceTitle}」预订的收款确认已完成。`,
+          ctaLabel: '打开房东后台',
+        };
+      case 'ko':
+      default:
+        return {
+          subject: '[Locally] 💰 입금 확인 완료!',
+          title: '입금 확인 완료!',
+          message: `'${experienceTitle}' 예약의 입금 확인이 완료되었습니다.`,
+          ctaLabel: '호스트 대시보드 열기',
+        };
+    }
+  }
+
+  switch (locale) {
+    case 'en':
+      return {
+        subject: '[Locally] ✅ Your booking is confirmed',
+        title: 'Booking confirmation',
+        message: `Bank transfer for '${experienceTitle}' was confirmed and your booking is now finalized.`,
+        ctaLabel: 'View my trips',
+      };
+    case 'ja':
+      return {
+        subject: '[Locally] ✅ 予約が確定しました',
+        title: '予約確定のお知らせ',
+        message: `「${experienceTitle}」の入金確認が完了し、予約が確定しました。`,
+        ctaLabel: '旅行を見る',
+      };
+    case 'zh':
+      return {
+        subject: '[Locally] ✅ 你的预订已确认',
+        title: '预订确认通知',
+        message: `「${experienceTitle}」的转账已确认，预订现已完成确认。`,
+        ctaLabel: '查看我的行程',
+      };
+    case 'ko':
+    default:
+      return {
+        subject: '[Locally] ✅ 예약이 확정되었습니다',
+        title: '예약 확정 알림',
+        message: `'${experienceTitle}' 입금이 확인되어 예약이 확정되었습니다.`,
+        ctaLabel: '내 여행 보기',
+      };
+  }
+}
+
+function buildBookingCancelledEmailCopy(
+  locale: NotificationLocale,
+  key:
+    | 'booking.cancelled.host'
+    | 'booking.cancelled.guest'
+    | 'booking.cancelled.admin_force.guest'
+    | 'booking.cancelled.host_fault.guest',
+  params:
+    | BookingCancelledHostParams
+    | BookingCancelledGuestParams
+    | BookingCancelledAdminForceGuestParams
+    | BookingCancelledHostFaultGuestParams
+): EmailCopy {
+  if (key === 'booking.cancelled.host') {
+    const { experienceTitle, reason, refundAmount } = params as BookingCancelledHostParams;
+    const safeReason =
+      typeof reason === 'string' && reason.trim()
+        ? reason.trim()
+        : locale === 'en'
+          ? 'not provided'
+          : locale === 'ja'
+            ? '未提供'
+            : locale === 'zh'
+              ? '未提供'
+              : '미제공';
+    const refundLine = buildBookingRefundLine(locale, refundAmount);
+
+    switch (locale) {
+      case 'en':
+        return {
+          subject: '[Locally] Booking cancellation notice (host)',
+          title: 'The booking was cancelled',
+          message: `The booking for [${experienceTitle}] was cancelled. Reason: ${safeReason}. ${refundLine}`,
+          ctaLabel: 'View dashboard',
+        };
+      case 'ja':
+        return {
+          subject: '[Locally] 予約キャンセルのご案内（ホスト）',
+          title: '予約がキャンセルされました',
+          message: `［${experienceTitle}］予約がキャンセルされました。理由: ${safeReason}。${refundLine}`,
+          ctaLabel: 'ダッシュボードを見る',
+        };
+      case 'zh':
+        return {
+          subject: '[Locally] 预订取消通知（房东）',
+          title: '预订已取消',
+          message: `［${experienceTitle}］预订已取消。原因：${safeReason}。${refundLine}`,
+          ctaLabel: '查看后台',
+        };
+      case 'ko':
+      default:
+        return {
+          subject: '[Locally] 예약 취소 안내 (호스트)',
+          title: '예약이 취소되었습니다',
+          message: `[${experienceTitle}] 예약이 취소되었습니다. 취소 사유: ${safeReason}. ${refundLine}`,
+          ctaLabel: '대시보드 보기',
+        };
+    }
+  }
+
+  if (key === 'booking.cancelled.guest') {
+    const { experienceTitle, refundAmount } = params as BookingCancelledGuestParams;
+    const refundLine = buildBookingRefundLine(locale, refundAmount);
+
+    switch (locale) {
+      case 'en':
+        return {
+          subject: '[Locally] Booking cancellation notice',
+          title: 'Your booking was cancelled',
+          message: `Your booking for '${experienceTitle}' was cancelled.\n${refundLine}`,
+          ctaLabel: 'View my trips',
+        };
+      case 'ja':
+        return {
+          subject: '[Locally] 予約キャンセルのご案内',
+          title: '予約がキャンセルされました',
+          message: `「${experienceTitle}」の予約がキャンセルされました。\n${refundLine}`,
+          ctaLabel: '旅行を見る',
+        };
+      case 'zh':
+        return {
+          subject: '[Locally] 预订取消通知',
+          title: '预订已取消',
+          message: `「${experienceTitle}」的预订已取消。\n${refundLine}`,
+          ctaLabel: '查看我的行程',
+        };
+      case 'ko':
+      default:
+        return {
+          subject: '[Locally] 예약 취소 안내',
+          title: '예약이 취소되었습니다',
+          message: `'${experienceTitle}' 예약이 취소되었습니다.\n${refundLine}`,
+          ctaLabel: '내 여행 보기',
+        };
+    }
+  }
+
+  if (key === 'booking.cancelled.admin_force.guest') {
+    const { experienceTitle, refundAmount } = params as BookingCancelledAdminForceGuestParams;
+    const refundLine =
+      refundAmount > 0
+        ? buildBookingRefundLine(locale, refundAmount)
+        : buildBookingPrePaymentCancellationLine(locale);
+
+    switch (locale) {
+      case 'en':
+        return {
+          subject: '[Locally] Booking cancellation notice',
+          title: 'Your booking was cancelled',
+          message: `Your booking for '${experienceTitle}' was cancelled by the admin.\n${refundLine}`,
+          ctaLabel: 'View my trips',
+        };
+      case 'ja':
+        return {
+          subject: '[Locally] 予約キャンセルのご案内',
+          title: '予約がキャンセルされました',
+          message: `「${experienceTitle}」の予約が管理者によりキャンセルされました。\n${refundLine}`,
+          ctaLabel: '旅行を見る',
+        };
+      case 'zh':
+        return {
+          subject: '[Locally] 预订取消通知',
+          title: '预订已取消',
+          message: `「${experienceTitle}」的预订已被管理员取消。\n${refundLine}`,
+          ctaLabel: '查看我的行程',
+        };
+      case 'ko':
+      default:
+        return {
+          subject: '[Locally] 예약 취소 안내',
+          title: '예약이 취소되었습니다',
+          message: `'${experienceTitle}' 예약이 관리자에 의해 취소되었습니다.\n${refundLine}`,
+          ctaLabel: '내 여행 보기',
+        };
+    }
+  }
+
+  const { experienceTitle, refundAmount, reviewType } = params as BookingCancelledHostFaultGuestParams;
+  const reasonLabel = getBookingReviewTypeLabel(locale, reviewType);
+  const refundLine =
+    refundAmount > 0
+      ? buildBookingRefundLine(locale, refundAmount)
+      : buildBookingPrePaymentCancellationLine(locale);
+
+  switch (locale) {
+    case 'en':
+      return {
+        subject: `[Locally] ${reasonLabel} cancellation notice`,
+        title: `Your booking was cancelled due to ${reasonLabel}`,
+        message: `Your booking for '${experienceTitle}' was cancelled due to ${reasonLabel}.\n${refundLine}`,
+        ctaLabel: 'View my trips',
+      };
+    case 'ja':
+      return {
+        subject: `[Locally] ${reasonLabel} キャンセルのご案内`,
+        title: `${reasonLabel}により予約がキャンセルされました`,
+        message: `「${experienceTitle}」の予約が${reasonLabel}によりキャンセルされました。\n${refundLine}`,
+        ctaLabel: '旅行を見る',
+      };
+    case 'zh':
+      return {
+        subject: `[Locally] ${reasonLabel} 取消通知`,
+        title: `预订因${reasonLabel}而取消`,
+        message: `「${experienceTitle}」的预订因${reasonLabel}而取消。\n${refundLine}`,
+        ctaLabel: '查看我的行程',
+      };
+    case 'ko':
+    default:
+      return {
+        subject: `[Locally] ${reasonLabel} 취소 안내`,
+        title: `${reasonLabel}로 예약이 취소되었습니다`,
+        message: `'${experienceTitle}' 예약이 ${reasonLabel} 사유로 취소되었습니다.\n${refundLine}`,
+        ctaLabel: '내 여행 보기',
+      };
+  }
 }
 
 function buildServiceRequestNewHostEmailCopy(
@@ -770,6 +1168,33 @@ export function buildEmailCopy<K extends EmailCopyKey>(
         locale,
         key,
         copyParams as EmailCopyParams['host_application.approved']
+      );
+    case 'booking.confirmed.guest':
+      return buildBookingConfirmedGuestEmailCopy(
+        locale,
+        copyParams as EmailCopyParams['booking.confirmed.guest']
+      );
+    case 'booking.bank_confirmed.host':
+    case 'booking.bank_confirmed.guest':
+      return buildBookingBankConfirmedEmailCopy(
+        locale,
+        key,
+        copyParams as
+          | EmailCopyParams['booking.bank_confirmed.host']
+          | EmailCopyParams['booking.bank_confirmed.guest']
+      );
+    case 'booking.cancelled.host':
+    case 'booking.cancelled.guest':
+    case 'booking.cancelled.admin_force.guest':
+    case 'booking.cancelled.host_fault.guest':
+      return buildBookingCancelledEmailCopy(
+        locale,
+        key,
+        copyParams as
+          | EmailCopyParams['booking.cancelled.host']
+          | EmailCopyParams['booking.cancelled.guest']
+          | EmailCopyParams['booking.cancelled.admin_force.guest']
+          | EmailCopyParams['booking.cancelled.host_fault.guest']
       );
     case 'service.request_new.host':
       return buildServiceRequestNewHostEmailCopy(

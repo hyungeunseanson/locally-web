@@ -9,6 +9,7 @@ import { isPendingBookingStatus } from '@/app/constants/bookingStatus';
 import { getBookingSettlementSnapshot } from '@/app/utils/bookingFinance';
 import { notifyMembershipMilestone } from '@/app/utils/memberMilestoneNotifications';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
+import { buildLocalizedEmailCopy } from '@/app/utils/emailCopy';
 
 export async function POST(request: Request) {
   try {
@@ -152,24 +153,42 @@ export async function POST(request: Request) {
       }
 
       if (hostId) {
+        const hostEmailCopy = await buildLocalizedEmailCopy({
+          supabaseAdmin,
+          userId: hostId,
+          key: 'booking.bank_confirmed.host',
+          copyParams: {
+            experienceTitle,
+          },
+        });
+
         await sendImmediateGenericEmail({
           recipientUserId: hostId,
-          subject: '[Locally] 💰 입금 확인 완료!',
-          title: '입금 확인 완료!',
-          message: `'${experienceTitle}' 예약의 입금 확인이 완료되었습니다.`,
+          subject: hostEmailCopy.subject,
+          title: hostEmailCopy.title,
+          message: hostEmailCopy.message,
           link: '/host/dashboard',
-          ctaLabel: '호스트 대시보드 열기',
+          ctaLabel: hostEmailCopy.ctaLabel,
         });
       }
 
       if (booking.user_id) {
+        const guestEmailCopy = await buildLocalizedEmailCopy({
+          supabaseAdmin,
+          userId: booking.user_id,
+          key: 'booking.bank_confirmed.guest',
+          copyParams: {
+            experienceTitle,
+          },
+        });
+
         await sendImmediateGenericEmail({
           recipientUserId: booking.user_id,
-          subject: '[Locally] ✅ 예약이 확정되었습니다',
-          title: '예약 확정 알림',
-          message: `'${experienceTitle}' 입금이 확인되어 예약이 확정되었습니다.`,
+          subject: guestEmailCopy.subject,
+          title: guestEmailCopy.title,
+          message: guestEmailCopy.message,
           link: '/guest/trips',
-          ctaLabel: '내 여행 보기',
+          ctaLabel: guestEmailCopy.ctaLabel,
         });
 
         await notifyMembershipMilestone({

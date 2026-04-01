@@ -49,6 +49,54 @@ test.describe('Email localization helpers', () => {
     expect(approvedZh.message).toContain('房东后台');
     expect(approvedZh.ctaLabel).toBe('打开房东后台');
 
+    const bookingConfirmedJa = buildEmailCopy('booking.confirmed.guest', 'ja', {
+      experienceTitle: '東京ナイトツアー',
+    });
+    expect(bookingConfirmedJa.subject).toBe('[Locally] 予約が確定しました');
+    expect(bookingConfirmedJa.message).toContain('決済が完了し、予約が確定しました');
+
+    const bookingBankConfirmedHostEn = buildEmailCopy('booking.bank_confirmed.host', 'en', {
+      experienceTitle: 'Seoul Night Walk',
+    });
+    expect(bookingBankConfirmedHostEn.subject).toBe('[Locally] 💰 Bank transfer confirmed');
+    expect(bookingBankConfirmedHostEn.ctaLabel).toBe('Open host dashboard');
+
+    const bookingBankConfirmedGuestZh = buildEmailCopy('booking.bank_confirmed.guest', 'zh', {
+      experienceTitle: '首尔夜景散步',
+    });
+    expect(bookingBankConfirmedGuestZh.title).toBe('预订确认通知');
+    expect(bookingBankConfirmedGuestZh.message).toContain('转账已确认');
+
+    const bookingCancelledHostEn = buildEmailCopy('booking.cancelled.host', 'en', {
+      experienceTitle: 'Seoul Night Walk',
+      reason: 'Guest changed plans',
+      refundAmount: 25000,
+    });
+    expect(bookingCancelledHostEn.subject).toBe('[Locally] Booking cancellation notice (host)');
+    expect(bookingCancelledHostEn.message).toContain('Reason: Guest changed plans.');
+    expect(bookingCancelledHostEn.message).toContain('Refund amount: ₩25,000');
+
+    const bookingCancelledGuestJa = buildEmailCopy('booking.cancelled.guest', 'ja', {
+      experienceTitle: '東京ナイトツアー',
+      refundAmount: 30000,
+    });
+    expect(bookingCancelledGuestJa.subject).toBe('[Locally] 予約キャンセルのご案内');
+    expect(bookingCancelledGuestJa.message).toContain('返金額: ₩30,000');
+
+    const bookingCancelledAdminForceZh = buildEmailCopy('booking.cancelled.admin_force.guest', 'zh', {
+      experienceTitle: '首尔夜景散步',
+      refundAmount: 15000,
+    });
+    expect(bookingCancelledAdminForceZh.message).toContain('已被管理员取消');
+
+    const bookingCancelledHostFaultJa = buildEmailCopy('booking.cancelled.host_fault.guest', 'ja', {
+      experienceTitle: '東京ナイトツアー',
+      refundAmount: 40000,
+      reviewType: 'minimum_participants_unmet',
+    });
+    expect(bookingCancelledHostFaultJa.subject).toBe('[Locally] 最低催行人数未達 キャンセルのご案内');
+    expect(bookingCancelledHostFaultJa.title).toBe('最低催行人数未達により予約がキャンセルされました');
+
     const revisionEn = buildEmailCopy('host_application.revision', 'en', {
       comment: 'Please upload a clearer ID card photo.',
     });

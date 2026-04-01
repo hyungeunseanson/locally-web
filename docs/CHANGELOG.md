@@ -5,6 +5,13 @@
 
 ---
 
+## v3.40.00 — [Emails] Booking guest / host generic 이메일 다국어 4차
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟢 booking guest/host 메일 현지화 | `app/utils/emailCopy.ts`, `app/utils/experienceNotificationFlows.ts`, `app/api/bookings/confirm-payment/route.ts`, `app/api/admin/bookings/confirm-payment/route.ts`, `app/api/payment/cancel/route.ts`, `app/api/admin/bookings/force-cancel/route.ts` — 새 booking 확정/무통장 확인/취소 generic 이메일을 recipient `preferred_locale` 기준으로 생성하도록 변경. host template 메일과 admin/team 메일은 유지 |
+| 🟡 booking email copy 검증 추가 | `tests/e2e/120-email-copy-util.spec.ts` — booking email dictionary를 locale별로 검증하고, 기존 booking/cancel runtime spec으로 confirm/cancel flow 회귀가 없는지 함께 확인 |
+
 ## v3.39.99 — [Emails] Proxy guest generic 이메일 다국어 3차
 
 | 항목 | 내용 |

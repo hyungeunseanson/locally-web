@@ -7,6 +7,7 @@ import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { isPendingBookingStatus } from '@/app/constants/bookingStatus';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
+import { buildLocalizedEmailCopy } from '@/app/utils/emailCopy';
 
 // LEGACY ROUTE
 // Current admin-confirm path is `/api/admin/bookings/confirm-payment`.
@@ -167,13 +168,22 @@ export async function POST(request: Request) {
       // — 호스트 이메일 실패 시 게스트 이메일이 묻혀버리는 버그 방지
       if (experience.host_id) {
         try {
+          const hostEmailCopy = await buildLocalizedEmailCopy({
+            supabaseAdmin: supabase,
+            userId: experience.host_id,
+            key: 'booking.bank_confirmed.host',
+            copyParams: {
+              experienceTitle: experience.title,
+            },
+          });
+
           await sendImmediateGenericEmail({
             recipientUserId: experience.host_id,
-            subject: `[Locally] 💰 입금 확인 완료!`,
-            title: '입금 확인 완료!',
-            message: `'${experience.title}' 예약의 입금 확인이 완료되었습니다.`,
+            subject: hostEmailCopy.subject,
+            title: hostEmailCopy.title,
+            message: hostEmailCopy.message,
             link: '/host/dashboard',
-            ctaLabel: '호스트 대시보드 열기',
+            ctaLabel: hostEmailCopy.ctaLabel,
           });
         } catch (hostEmailErr) {
           console.error('Host email failed (ignored):', hostEmailErr);
@@ -182,13 +192,22 @@ export async function POST(request: Request) {
 
       if (booking.user_id) {
         try {
+          const guestEmailCopy = await buildLocalizedEmailCopy({
+            supabaseAdmin: supabase,
+            userId: booking.user_id,
+            key: 'booking.bank_confirmed.guest',
+            copyParams: {
+              experienceTitle: experience.title,
+            },
+          });
+
           await sendImmediateGenericEmail({
             recipientUserId: booking.user_id,
-            subject: `[Locally] ✅ 예약이 확정되었습니다`,
-            title: '예약 확정 알림',
-            message: `'${experience.title}' 입금이 확인되어 예약이 확정되었습니다.`,
+            subject: guestEmailCopy.subject,
+            title: guestEmailCopy.title,
+            message: guestEmailCopy.message,
             link: '/guest/trips',
-            ctaLabel: '내 여행 보기',
+            ctaLabel: guestEmailCopy.ctaLabel,
           });
         } catch (guestEmailErr) {
           console.error('Guest email failed (ignored):', guestEmailErr);

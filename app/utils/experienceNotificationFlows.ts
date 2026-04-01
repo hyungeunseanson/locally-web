@@ -1,4 +1,5 @@
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
+import { buildLocalizedEmailCopy } from '@/app/utils/emailCopy';
 import { notifyMembershipMilestone } from '@/app/utils/memberMilestoneNotifications';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 import { createAdminClient } from '@/app/utils/supabase/admin';
@@ -120,13 +121,22 @@ export async function notifyExperiencePaymentConfirmed(
   }
 
   if (guestId) {
+    const guestEmailCopy = await buildLocalizedEmailCopy({
+      supabaseAdmin,
+      userId: guestId,
+      key: 'booking.confirmed.guest',
+      copyParams: {
+        experienceTitle,
+      },
+    });
+
     void sendImmediateGenericEmail({
       recipientUserId: guestId,
-      subject: '[Locally] 예약이 확정되었습니다',
-      title: '예약이 확정되었습니다',
-      message: `'${experienceTitle}' 결제가 완료되어 예약이 확정되었습니다.`,
+      subject: guestEmailCopy.subject,
+      title: guestEmailCopy.title,
+      message: guestEmailCopy.message,
       link: '/guest/trips',
-      ctaLabel: '내 여행 보기',
+      ctaLabel: guestEmailCopy.ctaLabel,
     }).catch((emailError) => {
       console.error('[ExperienceNotificationFlows] guest booking email failed:', emailError);
     });

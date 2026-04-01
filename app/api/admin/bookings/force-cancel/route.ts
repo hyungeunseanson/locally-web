@@ -10,6 +10,7 @@ import { cancelCardPayment } from '@/app/utils/payments/card/server';
 import { refundPayPalCapture } from '@/app/utils/paypal/server';
 import { getBookingReviewType, isBookingReviewPending } from '@/app/utils/hostUnavailableReview';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
+import { buildLocalizedEmailCopy } from '@/app/utils/emailCopy';
 
 type ForceCancelBody = {
   bookingId?: string;
@@ -155,9 +156,6 @@ export async function POST(request: Request) {
     const hostId = experience?.host_id;
     const expTitle = experience?.title || 'Locally 체험';
     const guestId = booking.user_id || null;
-    const refundText = settlement.refundAmount > 0
-      ? `환불 금액: ₩${settlement.refundAmount.toLocaleString()}`
-      : '결제 전 예약이 취소되었습니다.';
 
     try {
       const notifications = [];
@@ -239,19 +237,34 @@ export async function POST(request: Request) {
       }
 
       if (guestId) {
+        const guestEmailCopy = await buildLocalizedEmailCopy({
+          supabaseAdmin,
+          userId: guestId,
+          key: isHostFaultRequest
+            ? 'booking.cancelled.host_fault.guest'
+            : 'booking.cancelled.admin_force.guest',
+          copyParams: isHostFaultRequest
+            ? {
+                experienceTitle: expTitle,
+                refundAmount: settlement.refundAmount,
+                reviewType:
+                  reviewType === 'minimum_participants_unmet'
+                    ? 'minimum_participants_unmet'
+                    : 'host_unavailable',
+              }
+            : {
+                experienceTitle: expTitle,
+                refundAmount: settlement.refundAmount,
+              },
+        });
+
         await sendImmediateGenericEmail({
           recipientUserId: guestId,
-          subject: isHostFaultRequest
-            ? `[Locally] ${reviewType === 'minimum_participants_unmet' ? '최소 진행 인원 미달' : '호스트 진행 불가'} 취소 안내`
-            : '[Locally] 예약 취소 안내',
-          title: isHostFaultRequest
-            ? `${reviewType === 'minimum_participants_unmet' ? '최소 진행 인원 미달' : '호스트 진행 불가'}로 예약이 취소되었습니다`
-            : '예약이 취소되었습니다',
-          message: isHostFaultRequest
-            ? `'${expTitle}' 예약이 ${reviewType === 'minimum_participants_unmet' ? '최소 진행 인원 미달' : '호스트 진행 불가'} 사유로 취소되었습니다.\n${refundText}`
-            : `'${expTitle}' 예약이 관리자에 의해 취소되었습니다.\n${refundText}`,
+          subject: guestEmailCopy.subject,
+          title: guestEmailCopy.title,
+          message: guestEmailCopy.message,
           link: '/guest/trips',
-          ctaLabel: '내 여행 보기',
+          ctaLabel: guestEmailCopy.ctaLabel,
         });
       }
 
