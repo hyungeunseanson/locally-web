@@ -5,6 +5,13 @@
 
 ---
 
+## v3.39.99 — [Emails] Proxy guest generic 이메일 다국어 3차
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟢 proxy guest 메일 현지화 | `app/utils/emailCopy.ts`, `app/utils/proxyBookingNotifications.ts`, `app/api/proxy-bookings/[id]/comments/route.ts` — 전화 예약 결제 상태 메일과 linked inquiry 없는 운영팀 답글 guest 메일을 recipient `preferred_locale` 기준으로 생성하도록 변경 |
+| 🟡 proxy email copy 검증 추가 | `tests/e2e/120-email-copy-util.spec.ts` — proxy guest email dictionary를 locale별로 검증하고, 기존 proxy runtime spec으로 인앱/flow 회귀가 없는지 함께 확인 |
+
 ## v3.39.98 — [Emails] Service guest / host generic 이메일 다국어 2차
 
 | 항목 | 내용 |

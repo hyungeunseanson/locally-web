@@ -42,6 +42,14 @@ type ServiceCancellationParams = {
   refundAmount?: number | null;
 };
 
+type ProxyPaymentParams = {
+  requestTitle: string;
+};
+
+type ProxyCommentReplyParams = {
+  content: string;
+};
+
 export type EmailCopy = {
   subject: string;
   title: string;
@@ -61,7 +69,11 @@ export type EmailCopyKey =
   | 'service.application_new.customer'
   | 'service.host_selected'
   | 'service.cancel_requested'
-  | 'service.cancelled';
+  | 'service.cancelled'
+  | 'proxy.payment_confirmed'
+  | 'proxy.payment_cancelled'
+  | 'proxy.payment_refunded'
+  | 'proxy.comment_reply';
 
 type EmailCopyParams = {
   'review.new.host': ReviewNewHostParams;
@@ -76,6 +88,10 @@ type EmailCopyParams = {
   'service.host_selected': ServiceHostSelectedParams;
   'service.cancel_requested': ServiceCancellationParams;
   'service.cancelled': ServiceCancellationParams;
+  'proxy.payment_confirmed': ProxyPaymentParams;
+  'proxy.payment_cancelled': ProxyPaymentParams;
+  'proxy.payment_refunded': ProxyPaymentParams;
+  'proxy.comment_reply': ProxyCommentReplyParams;
 };
 
 type LocalizedEmailCopyInput<K extends EmailCopyKey> = {
@@ -586,6 +602,153 @@ function buildServiceCancelEmailCopy(
   }
 }
 
+function buildProxyPaymentEmailCopy(
+  locale: NotificationLocale,
+  key: 'proxy.payment_confirmed' | 'proxy.payment_cancelled' | 'proxy.payment_refunded',
+  params: ProxyPaymentParams
+): EmailCopy {
+  const { requestTitle } = params;
+
+  if (key === 'proxy.payment_confirmed') {
+    switch (locale) {
+      case 'en':
+        return {
+          subject: '[Locally] Your phone booking payment was confirmed',
+          title: 'Your phone booking payment was confirmed',
+          message: `Payment for '${requestTitle}' was confirmed. The team will continue your booking now.`,
+          ctaLabel: 'View request',
+        };
+      case 'ja':
+        return {
+          subject: '[Locally] 電話予約の決済が確認されました',
+          title: '電話予約の決済が確認されました',
+          message: `「${requestTitle}」の決済が確認されました。担当チームが予約進行を続けます。`,
+          ctaLabel: '依頼を見る',
+        };
+      case 'zh':
+        return {
+          subject: '[Locally] 电话预约付款已确认',
+          title: '电话预约付款已确认',
+          message: `「${requestTitle}」的付款已确认，团队会继续为你推进预约。`,
+          ctaLabel: '查看请求',
+        };
+      case 'ko':
+      default:
+        return {
+          subject: '[Locally] 전화 예약 결제가 확인되었습니다',
+          title: '전화 예약 결제가 확인되었습니다',
+          message: `'${requestTitle}' 요청의 결제가 확인되었습니다. 담당자가 예약 진행을 이어갑니다.`,
+          ctaLabel: '요청 확인하기',
+        };
+    }
+  }
+
+  if (key === 'proxy.payment_cancelled') {
+    switch (locale) {
+      case 'en':
+        return {
+          subject: '[Locally] Your phone booking payment was cancelled',
+          title: 'Your phone booking payment was cancelled',
+          message: `Payment for '${requestTitle}' was cancelled, so this request is now closed.`,
+          ctaLabel: 'View request',
+        };
+      case 'ja':
+        return {
+          subject: '[Locally] 電話予約の決済がキャンセルされました',
+          title: '電話予約の決済がキャンセルされました',
+          message: `「${requestTitle}」の決済がキャンセルされ、このリクエストは終了しました。`,
+          ctaLabel: '依頼を見る',
+        };
+      case 'zh':
+        return {
+          subject: '[Locally] 电话预约付款已取消',
+          title: '电话预约付款已取消',
+          message: `「${requestTitle}」的付款已取消，该请求现已结束。`,
+          ctaLabel: '查看请求',
+        };
+      case 'ko':
+      default:
+        return {
+          subject: '[Locally] 전화 예약 결제가 취소되었습니다',
+          title: '전화 예약 결제가 취소되었습니다',
+          message: `'${requestTitle}' 요청의 결제가 취소되어 접수가 종료되었습니다.`,
+          ctaLabel: '요청 확인하기',
+        };
+    }
+  }
+
+  switch (locale) {
+    case 'en':
+      return {
+        subject: '[Locally] Your phone booking payment was refunded',
+        title: 'Your phone booking payment was refunded',
+        message: `Payment for '${requestTitle}' was refunded. Please check the team thread for more details.`,
+        ctaLabel: 'View request',
+      };
+    case 'ja':
+      return {
+        subject: '[Locally] 電話予約の決済が返金処理されました',
+        title: '電話予約の決済が返金処理されました',
+        message: `「${requestTitle}」の決済が返金処理されました。詳しくは担当者スレッドをご確認ください。`,
+        ctaLabel: '依頼を見る',
+      };
+    case 'zh':
+      return {
+        subject: '[Locally] 电话预约付款已退款',
+        title: '电话预约付款已退款',
+        message: `「${requestTitle}」的付款已退款，详情请查看客服对话线程。`,
+        ctaLabel: '查看请求',
+      };
+    case 'ko':
+    default:
+      return {
+        subject: '[Locally] 전화 예약 결제가 환불 처리되었습니다',
+        title: '전화 예약 결제가 환불 처리되었습니다',
+        message: `'${requestTitle}' 요청의 결제가 환불 처리되었습니다. 세부 내용은 담당자 스레드에서 확인해주세요.`,
+        ctaLabel: '요청 확인하기',
+      };
+  }
+}
+
+function buildProxyCommentReplyEmailCopy(
+  locale: NotificationLocale,
+  params: ProxyCommentReplyParams
+): EmailCopy {
+  const trimmedContent = params.content.trim();
+
+  switch (locale) {
+    case 'en':
+      return {
+        subject: '[Locally] There is a new reply to your phone booking request',
+        title: 'There is a new reply to your phone booking request',
+        message: `The Locally operations team left a reply to your phone booking request.\n\n${trimmedContent}`,
+        ctaLabel: 'View reply',
+      };
+    case 'ja':
+      return {
+        subject: '[Locally] 電話予約リクエストに新しい返信があります',
+        title: '電話予約リクエストに新しい返信があります',
+        message: `Locally運営チームが電話予約リクエストに返信しました。\n\n${trimmedContent}`,
+        ctaLabel: '返信を見る',
+      };
+    case 'zh':
+      return {
+        subject: '[Locally] 你的电话预约请求有新回复',
+        title: '你的电话预约请求有新回复',
+        message: `Locally 运营团队已回复你的电话预约请求。\n\n${trimmedContent}`,
+        ctaLabel: '查看回复',
+      };
+    case 'ko':
+    default:
+      return {
+        subject: '[Locally] 전화 예약 요청에 새 답변이 도착했습니다',
+        title: '전화 예약 요청에 새 답변이 도착했습니다',
+        message: `Locally 운영팀이 전화 예약 요청에 답변을 남겼습니다.\n\n${trimmedContent}`,
+        ctaLabel: '답변 확인하기',
+      };
+  }
+}
+
 export function buildEmailCopy<K extends EmailCopyKey>(
   key: K,
   locale: NotificationLocale,
@@ -634,6 +797,19 @@ export function buildEmailCopy<K extends EmailCopyKey>(
         locale,
         key,
         copyParams as EmailCopyParams['service.cancel_requested']
+      );
+    case 'proxy.payment_confirmed':
+    case 'proxy.payment_cancelled':
+    case 'proxy.payment_refunded':
+      return buildProxyPaymentEmailCopy(
+        locale,
+        key,
+        copyParams as EmailCopyParams['proxy.payment_confirmed']
+      );
+    case 'proxy.comment_reply':
+      return buildProxyCommentReplyEmailCopy(
+        locale,
+        copyParams as EmailCopyParams['proxy.comment_reply']
       );
     default:
       return assertNever(key);

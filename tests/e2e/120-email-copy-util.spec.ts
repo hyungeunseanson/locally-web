@@ -101,5 +101,24 @@ test.describe('Email localization helpers', () => {
     });
     expect(serviceCancelledKo.subject).toBe('[Locally] 서비스 취소 안내');
     expect(serviceCancelledKo.message).toContain('환불 금액: ₩25,000');
+
+    const proxyConfirmedEn = buildEmailCopy('proxy.payment_confirmed', 'en', {
+      requestTitle: 'Sushi Omakase',
+    });
+    expect(proxyConfirmedEn.subject).toBe('[Locally] Your phone booking payment was confirmed');
+    expect(proxyConfirmedEn.message).toContain('Sushi Omakase');
+
+    const proxyRefundedJa = buildEmailCopy('proxy.payment_refunded', 'ja', {
+      requestTitle: '東京駅送迎',
+    });
+    expect(proxyRefundedJa.subject).toBe('[Locally] 電話予約の決済が返金処理されました');
+    expect(proxyRefundedJa.message).toContain('担当者スレッド');
+
+    const proxyReplyZh = buildEmailCopy('proxy.comment_reply', 'zh', {
+      content: '我们已经联系到店家了。',
+    });
+    expect(proxyReplyZh.subject).toBe('[Locally] 你的电话预约请求有新回复');
+    expect(proxyReplyZh.message).toContain('我们已经联系到店家了。');
+    expect(proxyReplyZh.ctaLabel).toBe('查看回复');
   });
 });

@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
+import { buildLocalizedEmailCopy } from '@/app/utils/emailCopy';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 import { getProxyLinkedInquiryId, getProxyRequestTitle } from '@/app/utils/proxyBooking';
 import type { ProxyFormData, ProxyRequest } from '@/app/types/proxy';
@@ -97,13 +98,22 @@ export async function notifyProxyPaymentEvent(params: {
     console.error('[ProxyBookingNotifications] failed to insert customer notification:', notificationError);
   }
 
+  const emailCopy = await buildLocalizedEmailCopy({
+    supabaseAdmin,
+    userId: params.request.user_id,
+    key: copyKey,
+    copyParams: {
+      requestTitle,
+    },
+  });
+
   await sendImmediateGenericEmail({
     recipientUserId: params.request.user_id,
-    subject: `[Locally] ${payload.title}`,
-    title: payload.title,
-    message: payload.message,
+    subject: emailCopy.subject,
+    title: emailCopy.title,
+    message: emailCopy.message,
     link: payload.link,
-    ctaLabel: '요청 확인하기',
+    ctaLabel: emailCopy.ctaLabel,
   }).catch((emailError) => {
     console.error('[ProxyBookingNotifications] failed to send customer email:', emailError);
   });
