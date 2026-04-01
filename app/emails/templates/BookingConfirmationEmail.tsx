@@ -3,6 +3,7 @@ import { Text, Section, Hr, Row, Column } from '@react-email/components';
 import EmailLayout from '../components/EmailLayout';
 import CTAButton from '../components/CTAButton';
 import { buildAbsoluteUrl } from '@/app/utils/siteUrl';
+import type { BookingConfirmationTemplateCopy } from '@/app/utils/bookingTemplateEmailCopy';
 
 interface BookingConfirmationEmailProps {
     hostName?: string;
@@ -13,6 +14,7 @@ interface BookingConfirmationEmailProps {
     bookingTime?: string;
     totalAmount?: number;
     dashboardLink?: string;
+    copy?: BookingConfirmationTemplateCopy;
 }
 
 export default function BookingConfirmationEmail({
@@ -24,44 +26,75 @@ export default function BookingConfirmationEmail({
     bookingTime = '',
     totalAmount = 0,
     dashboardLink = buildAbsoluteUrl('/host/dashboard'),
+    copy,
 }: BookingConfirmationEmailProps) {
+    const templateCopy: BookingConfirmationTemplateCopy = copy || {
+        subject: '[Locally] 🎉 새로운 예약이 도착했습니다!',
+        previewText: `새 게스트가 찾아왔어요 🎉 ${experienceTitle}`,
+        greetingPrefix: '안녕하세요, ',
+        greetingSuffix: '님 👋',
+        introText: '체험에 새 게스트가 찾아왔어요! 함께하는 시간이 정말 특별해질 거예요 🎉',
+        guestNameLabel: '게스트명',
+        guestCountLabel: '참여 인원',
+        guestCountSuffix: '명',
+        totalAmountLabel: '총 결제 금액',
+        bookingDateLabel: '예약 일자',
+        helperText:
+            '게스트가 설레는 마음으로 기다리고 있어요. 채팅으로 먼저 인사를 건네보시고, 멋진 체험 준비해주세요 🙌',
+        ctaLabel: '예약 상세 확인하기',
+        fallbackHostName: '로컬리 호스트',
+        fallbackGuestName: '게스트',
+        fallbackExperienceTitle: '로컬라이프 체험',
+        fallbackBookingDate: '일정 미정',
+        layout: {
+            helpPrompt: '궁금하신 점이 있으신가요?',
+            helpLinkLabel: '도움 센터 방문하기 ->',
+        },
+    };
+    const resolvedHostName = hostName || templateCopy.fallbackHostName;
+    const resolvedGuestName = guestName || templateCopy.fallbackGuestName;
+    const resolvedExperienceTitle = experienceTitle || templateCopy.fallbackExperienceTitle;
+    const resolvedBookingDate = bookingDate || templateCopy.fallbackBookingDate;
+
     return (
-        <EmailLayout previewText={`새 게스트가 찾아왔어요 🎉 ${experienceTitle}`}>
-            <Text style={greeting}>안녕하세요, {hostName}님 👋</Text>
+        <EmailLayout
+            previewText={templateCopy.previewText}
+            helpPrompt={templateCopy.layout.helpPrompt}
+            helpLinkLabel={templateCopy.layout.helpLinkLabel}
+        >
+            <Text style={greeting}>{templateCopy.greetingPrefix}{resolvedHostName}{templateCopy.greetingSuffix}</Text>
             <Text style={introText}>
-                <b>[{experienceTitle}]</b> 체험에 새 게스트가 찾아왔어요! 함께하는 시간이 정말 특별해질 거예요 🎉
+                <b>[{resolvedExperienceTitle}]</b> {templateCopy.introText}
             </Text>
 
             {/* 영수증 / 예약 정보 형태 박스 */}
             <Section style={receiptBox}>
                 <Row style={receiptRow}>
-                    <Column style={labelCol}>게스트명</Column>
-                    <Column style={valueCol}>{guestName}</Column>
+                    <Column style={labelCol}>{templateCopy.guestNameLabel}</Column>
+                    <Column style={valueCol}>{resolvedGuestName}</Column>
                 </Row>
                 <Hr style={receiptHr} />
                 <Row style={receiptRow}>
-                    <Column style={labelCol}>참여 인원</Column>
-                    <Column style={valueCol}>{guestsCount}명</Column>
+                    <Column style={labelCol}>{templateCopy.guestCountLabel}</Column>
+                    <Column style={valueCol}>{guestsCount}{templateCopy.guestCountSuffix}</Column>
                 </Row>
                 <Hr style={receiptHr} />
                 <Row style={receiptRow}>
-                    <Column style={labelCol}>총 결제 금액</Column>
+                    <Column style={labelCol}>{templateCopy.totalAmountLabel}</Column>
                     <Column style={valueCol}>₩{totalAmount?.toLocaleString() || 0}</Column>
                 </Row>
                 <Hr style={receiptHr} />
                 <Row style={receiptRow}>
-                    <Column style={labelCol}>예약 일자</Column>
+                    <Column style={labelCol}>{templateCopy.bookingDateLabel}</Column>
                     <Column style={valueCol}>
-                        {bookingDate} <br /> {bookingTime}
+                        {resolvedBookingDate} <br /> {bookingTime}
                     </Column>
                 </Row>
             </Section>
 
-            <Text style={helperText}>
-                게스트가 설레는 마음으로 기다리고 있어요. 채팅으로 먼저 인사를 건네보시고, 멋진 체험 준비해주세요 🙌
-            </Text>
+            <Text style={helperText}>{templateCopy.helperText}</Text>
 
-            <CTAButton href={dashboardLink}>예약 상세 확인하기</CTAButton>
+            <CTAButton href={dashboardLink}>{templateCopy.ctaLabel}</CTAButton>
         </EmailLayout>
     );
 }

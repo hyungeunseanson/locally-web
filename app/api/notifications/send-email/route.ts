@@ -5,6 +5,12 @@ import * as React from 'react';
 import { render } from '@react-email/render';
 import BookingConfirmationEmail from '@/app/emails/templates/BookingConfirmationEmail';
 import BookingCancellationEmail from '@/app/emails/templates/BookingCancellationEmail';
+import {
+    buildBookingCancellationTemplateEmailCopy,
+    buildBookingConfirmationTemplateEmailCopy,
+    buildLocalizedBookingCancellationTemplateEmailCopy,
+    buildLocalizedBookingConfirmationTemplateEmailCopy,
+} from '@/app/utils/bookingTemplateEmailCopy';
 
 type SendEmailBody = {
     type?: string;
@@ -89,28 +95,50 @@ export async function POST(request: Request) {
         let subject = '';
 
         if (type === 'booking_confirmation') {
-            subject = `[Locally] 🎉 새로운 예약이 도착했습니다!`;
+            const templateCopy = hostId
+                ? await buildLocalizedBookingConfirmationTemplateEmailCopy({
+                    supabaseAdmin: supabase,
+                    userId: hostId,
+                    experienceTitle,
+                })
+                : buildBookingConfirmationTemplateEmailCopy('ko', {
+                    experienceTitle,
+                });
+
+            subject = templateCopy.subject;
             emailHtml = await render(
                 React.createElement(BookingConfirmationEmail, {
-                    hostName: hostProfile?.full_name || '로컬리 호스트',
-                    guestName: guestName || '게스트',
-                    experienceTitle: experienceTitle || '체험',
+                    hostName: hostProfile?.full_name || templateCopy.fallbackHostName,
+                    guestName: guestName || templateCopy.fallbackGuestName,
+                    experienceTitle: experienceTitle || templateCopy.fallbackExperienceTitle,
                     guestsCount: guestsCount || 1,
                     totalAmount: totalAmount || 0,
-                    bookingDate: bookingDate || '일정 미정',
+                    bookingDate: bookingDate || templateCopy.fallbackBookingDate,
                     bookingTime: bookingTime || '',
-                    dashboardLink: `${process.env.NEXT_PUBLIC_SITE_URL || ''}/host/dashboard`
+                    dashboardLink: `${process.env.NEXT_PUBLIC_SITE_URL || ''}/host/dashboard`,
+                    copy: templateCopy,
                 })
             );
         } else if (type === 'booking_cancellation') {
-            subject = `[Locally] 예약 취소 알림`;
+            const templateCopy = hostId
+                ? await buildLocalizedBookingCancellationTemplateEmailCopy({
+                    supabaseAdmin: supabase,
+                    userId: hostId,
+                    experienceTitle,
+                })
+                : buildBookingCancellationTemplateEmailCopy('ko', {
+                    experienceTitle,
+                });
+
+            subject = templateCopy.subject;
             emailHtml = await render(
                 React.createElement(BookingCancellationEmail, {
-                    hostName: hostProfile?.full_name || '로컬리 호스트',
-                    experienceTitle: experienceTitle || '체험',
-                    cancelReason: cancelReason || '사유 없음',
+                    hostName: hostProfile?.full_name || templateCopy.fallbackHostName,
+                    experienceTitle: experienceTitle || templateCopy.fallbackExperienceTitle,
+                    cancelReason: cancelReason || templateCopy.fallbackCancelReason,
                     refundAmount: refundAmount || 0,
-                    dashboardLink: `${process.env.NEXT_PUBLIC_SITE_URL}/host/dashboard`
+                    dashboardLink: `${process.env.NEXT_PUBLIC_SITE_URL}/host/dashboard`,
+                    copy: templateCopy,
                 })
             );
         } else if (type === 'proxy_comment_notify') {

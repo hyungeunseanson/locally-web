@@ -3,6 +3,7 @@ import { Text, Section, Hr, Row, Column } from '@react-email/components';
 import EmailLayout from '../components/EmailLayout';
 import CTAButton from '../components/CTAButton';
 import { buildAbsoluteUrl } from '@/app/utils/siteUrl';
+import type { BookingCancellationTemplateCopy } from '@/app/utils/bookingTemplateEmailCopy';
 
 interface BookingCancellationEmailProps {
     hostName?: string;
@@ -10,6 +11,7 @@ interface BookingCancellationEmailProps {
     cancelReason?: string;
     refundAmount?: number;
     dashboardLink?: string;
+    copy?: BookingCancellationTemplateCopy;
 }
 
 export default function BookingCancellationEmail({
@@ -18,32 +20,59 @@ export default function BookingCancellationEmail({
     cancelReason = '게스트 개인 사정',
     refundAmount = 0,
     dashboardLink = buildAbsoluteUrl('/host/dashboard'),
+    copy,
 }: BookingCancellationEmailProps) {
+    const templateCopy: BookingCancellationTemplateCopy = copy || {
+        subject: '[Locally] 예약 취소 알림',
+        previewText: `예약 취소 안내 — ${experienceTitle}`,
+        greetingPrefix: '안녕하세요, ',
+        greetingSuffix: '님.',
+        introPrefix: '아쉬운 소식을 전해드려요.',
+        introSuffix: '체험 예약이 취소되었어요.',
+        cancelReasonLabel: '취소 사유',
+        refundAmountLabel: '게스트 환불액',
+        helperText:
+            '일정은 대시보드에서 다시 열어두실 수 있어요. 다음 기회에 더 좋은 인연이 이어지길 바라요. 언제나 응원할게요 💙',
+        ctaLabel: '대시보드 확인하기',
+        fallbackHostName: '로컬리 호스트',
+        fallbackExperienceTitle: '로컬라이프 체험',
+        fallbackCancelReason: '사유 없음',
+        layout: {
+            helpPrompt: '궁금하신 점이 있으신가요?',
+            helpLinkLabel: '도움 센터 방문하기 ->',
+        },
+    };
+    const resolvedHostName = hostName || templateCopy.fallbackHostName;
+    const resolvedExperienceTitle = experienceTitle || templateCopy.fallbackExperienceTitle;
+    const resolvedCancelReason = cancelReason || templateCopy.fallbackCancelReason;
+
     return (
-        <EmailLayout previewText={`예약 취소 안내 — ${experienceTitle}`}>
-            <Text style={greeting}>안녕하세요, {hostName}님.</Text>
+        <EmailLayout
+            previewText={templateCopy.previewText}
+            helpPrompt={templateCopy.layout.helpPrompt}
+            helpLinkLabel={templateCopy.layout.helpLinkLabel}
+        >
+            <Text style={greeting}>{templateCopy.greetingPrefix}{resolvedHostName}{templateCopy.greetingSuffix}</Text>
             <Text style={introText}>
-                아쉬운 소식을 전해드려요. <b>[{experienceTitle}]</b> 체험 예약이 취소되었어요.
+                {templateCopy.introPrefix} <b>[{resolvedExperienceTitle}]</b> {templateCopy.introSuffix}
             </Text>
 
             {/* 영수증 / 예약 정보 형태 박스 */}
             <Section style={receiptBox}>
                 <Row style={receiptRow}>
-                    <Column style={labelCol}>취소 사유</Column>
-                    <Column style={valueCol}>{cancelReason}</Column>
+                    <Column style={labelCol}>{templateCopy.cancelReasonLabel}</Column>
+                    <Column style={valueCol}>{resolvedCancelReason}</Column>
                 </Row>
                 <Hr style={receiptHr} />
                 <Row style={receiptRow}>
-                    <Column style={labelCol}>게스트 환불액</Column>
+                    <Column style={labelCol}>{templateCopy.refundAmountLabel}</Column>
                     <Column style={valueColAlert}>₩{refundAmount?.toLocaleString() || 0}</Column>
                 </Row>
             </Section>
 
-            <Text style={helperText}>
-                일정은 대시보드에서 다시 열어두실 수 있어요. 다음 기회에 더 좋은 인연이 이어지길 바라요. 언제나 응원할게요 💙
-            </Text>
+            <Text style={helperText}>{templateCopy.helperText}</Text>
 
-            <CTAButton href={dashboardLink}>대시보드 확인하기</CTAButton>
+            <CTAButton href={dashboardLink}>{templateCopy.ctaLabel}</CTAButton>
         </EmailLayout>
     );
 }

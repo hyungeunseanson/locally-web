@@ -5,6 +5,13 @@
 
 ---
 
+## v3.40.01 — [Emails] Booking host template 이메일 다국어 5차
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟢 booking host template 메일 현지화 | `app/utils/bookingTemplateEmailCopy.ts`, `app/api/notifications/send-email/route.ts`, `app/emails/templates/BookingConfirmationEmail.tsx`, `app/emails/templates/BookingCancellationEmail.tsx`, `app/emails/components/EmailLayout.tsx` — `/api/notifications/send-email`의 `booking_confirmation`, `booking_cancellation` 분기만 recipient `preferred_locale` 기준으로 렌더되도록 변경하고, template fallback 값과 help section까지 locale-aware copy로 주입 |
+| 🟡 booking template copy 검증 추가 | `tests/e2e/121-booking-template-email-copy.spec.ts` — booking host template 이메일 dictionary를 locale별로 검증하고, 기존 booking owner runtime spec으로 confirm/cancel flow 회귀가 없는지 함께 확인 |
+
 ## v3.40.00 — [Emails] Booking guest / host generic 이메일 다국어 4차
 
 | 항목 | 내용 |

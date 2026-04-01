@@ -17,10 +17,17 @@ const INSTAGRAM_URL = 'https://www.instagram.com/locally.official';
 
 interface EmailLayoutProps {
     previewText?: string;
+    helpPrompt?: string;
+    helpLinkLabel?: string;
     children: React.ReactNode;
 }
 
-export default function EmailLayout({ previewText, children }: EmailLayoutProps) {
+export default function EmailLayout({
+    previewText,
+    helpPrompt = '궁금하신 점이 있으신가요?',
+    helpLinkLabel = '도움 센터 방문하기 →',
+    children,
+}: EmailLayoutProps) {
     const siteUrl = getSiteUrl();
 
     return (
@@ -53,9 +60,9 @@ export default function EmailLayout({ previewText, children }: EmailLayoutProps)
                     <Section style={helpSection}>
                         <Hr style={helpHr} />
                         <Text style={helpText}>
-                            궁금하신 점이 있으신가요?{' '}
+                            {helpPrompt}{' '}
                             <Link href={`${siteUrl}/about`} style={helpLink}>
-                                도움 센터 방문하기 →
+                                {helpLinkLabel}
                             </Link>
                         </Text>
                     </Section>
