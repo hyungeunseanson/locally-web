@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
+import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 import { getProxyLinkedInquiryId, getProxyRequestTitle } from '@/app/utils/proxyBooking';
 import type { ProxyFormData, ProxyRequest } from '@/app/types/proxy';
 
@@ -72,14 +73,25 @@ export async function notifyProxyPaymentEvent(params: {
     link,
   });
 
-  const { error: notificationError } = await supabaseAdmin.from('notifications').insert({
-    user_id: params.request.user_id,
+  const copyKey =
+    params.event === 'confirmed'
+      ? 'proxy.payment_confirmed'
+      : params.event === 'cancelled'
+        ? 'proxy.payment_cancelled'
+        : 'proxy.payment_refunded';
+
+  const notificationRow = await buildLocalizedNotificationInsert({
+    supabaseAdmin,
+    userId: params.request.user_id,
     type: payload.notificationType,
-    title: payload.title,
-    message: payload.message,
     link: payload.link,
-    is_read: false,
+    key: copyKey,
+    copyParams: {
+      requestTitle,
+    },
   });
+
+  const { error: notificationError } = await supabaseAdmin.from('notifications').insert(notificationRow);
 
   if (notificationError) {
     console.error('[ProxyBookingNotifications] failed to insert customer notification:', notificationError);

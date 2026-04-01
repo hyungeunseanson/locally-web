@@ -5,6 +5,7 @@ import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { sendImmediateAdminEmail } from '@/app/utils/adminEmailProvider';
 import { createInquiryMessage } from '@/app/api/inquiries/thread/shared';
+import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 import { getProxyLinkedInquiryId } from '@/app/utils/proxyBooking';
 
 type RequestOwnerProfile = { email?: string | null } | Array<{ email?: string | null }> | null;
@@ -116,17 +117,20 @@ export async function POST(
                     .maybeSingle();
                 const profiles = (ownerProfile ?? null) as RequestOwnerProfile;
                 const userEmail = Array.isArray(profiles) ? profiles[0]?.email : profiles?.email;
-                const notificationTitle = '전화 예약 요청에 새 답변이 도착했습니다';
-                const notificationMessage = content.trim();
                 const notificationLink = `/proxy-bookings/${requestId}`;
 
-                const { error: notificationError } = await supabaseAdmin.from('notifications').insert({
-                    user_id: proxyReq.user_id,
+                const notificationRow = await buildLocalizedNotificationInsert({
+                    supabaseAdmin,
+                    userId: proxyReq.user_id,
                     type: 'new_message',
-                    title: notificationTitle,
-                    message: notificationMessage,
                     link: notificationLink,
+                    key: 'proxy.comment_reply',
+                    copyParams: {
+                        content: content.trim(),
+                    },
                 });
+
+                const { error: notificationError } = await supabaseAdmin.from('notifications').insert(notificationRow);
 
                 if (notificationError) {
                     console.error('Failed to insert proxy reply notification:', notificationError);
@@ -135,8 +139,8 @@ export async function POST(
                 await sendImmediateGenericEmail({
                     recipientEmail: userEmail || null,
                     recipientUserId: proxyReq.user_id,
-                    subject: `[Locally] ${notificationTitle}`,
-                    title: notificationTitle,
+                    subject: '[Locally] 전화 예약 요청에 새 답변이 도착했습니다',
+                    title: '전화 예약 요청에 새 답변이 도착했습니다',
                     message: `Locally 운영팀이 전화 예약 요청에 답변을 남겼습니다.\n\n${content.trim()}`,
                     link: notificationLink,
                     ctaLabel: '답변 확인하기',

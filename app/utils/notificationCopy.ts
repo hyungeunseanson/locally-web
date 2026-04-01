@@ -90,6 +90,14 @@ type ServiceCancelledParams = {
   refundAmount?: number | null;
 };
 
+type ProxyPaymentParams = {
+  requestTitle: string;
+};
+
+type ProxyCommentReplyParams = {
+  content: string;
+};
+
 type MembershipParams = {
   status: 'member' | 'circle';
 };
@@ -118,6 +126,10 @@ export type NotificationCopyKey =
   | 'service.host_rejected'
   | 'service.cancel_requested'
   | 'service.cancelled'
+  | 'proxy.payment_confirmed'
+  | 'proxy.payment_cancelled'
+  | 'proxy.payment_refunded'
+  | 'proxy.comment_reply'
   | 'membership.member_welcome'
   | 'membership.circle_welcome'
   | 'host_application.approved'
@@ -144,6 +156,10 @@ type NotificationCopyParams = {
   'service.host_rejected': ServiceHostSelectionParams;
   'service.cancel_requested': ServiceCancelRequestedParams;
   'service.cancelled': ServiceCancelledParams;
+  'proxy.payment_confirmed': ProxyPaymentParams;
+  'proxy.payment_cancelled': ProxyPaymentParams;
+  'proxy.payment_refunded': ProxyPaymentParams;
+  'proxy.comment_reply': ProxyCommentReplyParams;
   'membership.member_welcome': MembershipParams;
   'membership.circle_welcome': MembershipParams;
   'host_application.approved': HostApplicationStatusParams;
@@ -1097,6 +1113,119 @@ function buildServiceCancelledCopy(
   }
 }
 
+function buildProxyPaymentCopy(
+  locale: NotificationLocale,
+  key: 'proxy.payment_confirmed' | 'proxy.payment_cancelled' | 'proxy.payment_refunded',
+  params: ProxyPaymentParams
+): NotificationCopy {
+  const { requestTitle } = params;
+
+  if (key === 'proxy.payment_confirmed') {
+    switch (locale) {
+      case 'en':
+        return {
+          title: 'Phone booking payment was confirmed.',
+          message: `Payment for '${requestTitle}' was confirmed. The team will continue the booking now.`,
+        };
+      case 'ja':
+        return {
+          title: '電話予約の決済が確認されました。',
+          message: `「${requestTitle}」の決済が確認されました。担当チームが予約進行を続けます。`,
+        };
+      case 'zh':
+        return {
+          title: '电话预约付款已确认。',
+          message: `「${requestTitle}」的付款已确认，团队会继续为你推进预约。`,
+        };
+      case 'ko':
+      default:
+        return {
+          title: '전화 예약 결제가 확인되었습니다',
+          message: `'${requestTitle}' 요청의 결제가 확인되었습니다. 담당자가 예약 진행을 이어갑니다.`,
+        };
+    }
+  }
+
+  if (key === 'proxy.payment_cancelled') {
+    switch (locale) {
+      case 'en':
+        return {
+          title: 'Phone booking payment was cancelled.',
+          message: `Payment for '${requestTitle}' was cancelled, so this request is now closed.`,
+        };
+      case 'ja':
+        return {
+          title: '電話予約の決済がキャンセルされました。',
+          message: `「${requestTitle}」の決済がキャンセルされ、このリクエストは終了しました。`,
+        };
+      case 'zh':
+        return {
+          title: '电话预约付款已取消。',
+          message: `「${requestTitle}」的付款已取消，此请求已结束。`,
+        };
+      case 'ko':
+      default:
+        return {
+          title: '전화 예약 결제가 취소되었습니다',
+          message: `'${requestTitle}' 요청의 결제가 취소되어 접수가 종료되었습니다.`,
+        };
+    }
+  }
+
+  switch (locale) {
+    case 'en':
+      return {
+        title: 'Phone booking payment was refunded.',
+        message: `Payment for '${requestTitle}' was refunded. Please check the team thread for details.`,
+      };
+    case 'ja':
+      return {
+        title: '電話予約の決済が返金処理されました。',
+        message: `「${requestTitle}」の決済が返金処理されました。詳細は担当スレッドでご確認ください。`,
+      };
+    case 'zh':
+      return {
+        title: '电话预约付款已退款。',
+        message: `「${requestTitle}」的付款已退款，详情请在团队对话中查看。`,
+      };
+    case 'ko':
+    default:
+      return {
+        title: '전화 예약 결제가 환불 처리되었습니다',
+        message: `'${requestTitle}' 요청의 결제가 환불 처리되었습니다. 세부 내용은 담당자 스레드에서 확인해주세요.`,
+      };
+  }
+}
+
+function buildProxyCommentReplyCopy(
+  locale: NotificationLocale,
+  params: ProxyCommentReplyParams
+): NotificationCopy {
+  switch (locale) {
+    case 'en':
+      return {
+        title: 'A new reply arrived for your phone booking request.',
+        message: params.content,
+      };
+    case 'ja':
+      return {
+        title: '電話予約リクエストに新しい返信が届きました。',
+        message: params.content,
+      };
+    case 'zh':
+      return {
+        title: '你的电话预约请求有新回复。',
+        message: params.content,
+      };
+    case 'ko':
+    default:
+      return {
+        title: '전화 예약 요청에 새 답변이 도착했습니다',
+        message: params.content,
+      };
+  }
+}
+
 function buildMembershipCopy(
   locale: NotificationLocale,
   params: MembershipParams
@@ -1305,6 +1434,16 @@ export function buildNotificationCopy<K extends NotificationCopyKey>(
       return buildServiceCancelRequestedCopy(locale, copyParams as NotificationCopyParams['service.cancel_requested']);
     case 'service.cancelled':
       return buildServiceCancelledCopy(locale, copyParams as NotificationCopyParams['service.cancelled']);
+    case 'proxy.payment_confirmed':
+    case 'proxy.payment_cancelled':
+    case 'proxy.payment_refunded':
+      return buildProxyPaymentCopy(
+        locale,
+        key,
+        copyParams as NotificationCopyParams['proxy.payment_confirmed']
+      );
+    case 'proxy.comment_reply':
+      return buildProxyCommentReplyCopy(locale, copyParams as NotificationCopyParams['proxy.comment_reply']);
     case 'membership.member_welcome':
       return buildMembershipCopy(locale, { ...(copyParams as NotificationCopyParams['membership.member_welcome']), status: 'member' });
     case 'membership.circle_welcome':

@@ -5,6 +5,14 @@
 
 ---
 
+## v3.39.96 — [Notifications] Proxy / Team guest 인앱 알림 다국어 2차 확장
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟢 proxy payment 상태 알림 현지화 | `app/utils/proxyBookingNotifications.ts`, `app/utils/notificationCopy.ts` — `booking_confirmed`, `cancellation` 타입의 새 전화 예약 결제/환불 인앱 알림을 recipient `preferred_locale` 기준으로 저장하도록 변경 |
+| 🟢 proxy admin reply 알림 현지화 | `app/api/proxy-bookings/[id]/comments/route.ts`, `app/utils/notificationCopy.ts` — linked inquiry가 없는 전화 예약 요청에 운영팀이 답글을 남길 때, guest가 받는 `new_message` 인앱 알림 제목을 recipient locale 기준으로 저장하도록 변경 |
+| 🟡 proxy notification runtime 회귀 체크 추가 | `tests/e2e/119-proxy-notification-localization.spec.ts`, `tests/e2e/116-notification-copy-util.spec.ts`, `tests/e2e/86-proxy-booking-team-workspace.spec.ts` — payment confirm / admin reply locale 저장과 기존 TEAM workspace 흐름을 함께 검증 |
+
 ## v3.39.95 — [Notifications] Service cancel 인앱 알림 다국어 2차 확장
 
 | 항목 | 내용 |

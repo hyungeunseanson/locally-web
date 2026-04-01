@@ -82,6 +82,24 @@ test.describe('Notification localization helpers', () => {
     });
     expect(serviceCancelledEn.title).toBe('The service was cancelled.');
     expect(serviceCancelledEn.message).toBe("The service 'Airport pickup' was cancelled. Refund amount: ₩25,000");
+
+    const proxyConfirmedEn = buildNotificationCopy('proxy.payment_confirmed', 'en', {
+      requestTitle: 'Sushi Omakase',
+    });
+    expect(proxyConfirmedEn.title).toBe('Phone booking payment was confirmed.');
+    expect(proxyConfirmedEn.message).toContain('Sushi Omakase');
+
+    const proxyRefundedJa = buildNotificationCopy('proxy.payment_refunded', 'ja', {
+      requestTitle: '東京駅送迎',
+    });
+    expect(proxyRefundedJa.title).toBe('電話予約の決済が返金処理されました。');
+    expect(proxyRefundedJa.message).toContain('東京駅送迎');
+
+    const proxyReplyZh = buildNotificationCopy('proxy.comment_reply', 'zh', {
+      content: '我们已经联系到店家了。',
+    });
+    expect(proxyReplyZh.title).toBe('你的电话预约请求有新回复。');
+    expect(proxyReplyZh.message).toBe('我们已经联系到店家了。');
   });
 
   test('builds host application revision copy with localized reason text', () => {

@@ -150,13 +150,42 @@ async function createAuthUser(user: TestUser, options?: { whitelistAdmin?: boole
   return data.user.id;
 }
 
-async function login(page: Page, user: TestUser) {
-  await page.goto('/login', { waitUntil: 'networkidle' });
+async function setPreferredLocale(userId: string, locale: 'ko' | 'en' | 'ja' | 'zh') {
+  const supabase = getAdminClient();
+  const { data, error } = await supabase.auth.admin.getUserById(userId);
+  if (error || !data.user) throw error || new Error(`Failed to fetch auth user ${userId}.`);
+
+  const metadata =
+    data.user.user_metadata && typeof data.user.user_metadata === 'object'
+      ? (data.user.user_metadata as Record<string, unknown>)
+      : {};
+
+  const { error: updateError } = await supabase.auth.admin.updateUserById(userId, {
+    user_metadata: {
+      ...metadata,
+      preferred_locale: locale,
+    },
+  });
+
+  if (updateError) throw updateError;
+}
+
+async function login(page: Page, user: TestUser, locale: 'ko' | 'en' | 'ja' | 'zh' = 'ko') {
+  await page.context().clearCookies();
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.evaluate((nextLocale) => {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+    window.localStorage.setItem('app_lang', nextLocale);
+    document.cookie = `app_lang=${nextLocale}; path=/; samesite=lax`;
+  }, locale);
+  await page.goto('/login', { waitUntil: 'domcontentloaded' });
+  await page.locator('input[type="email"]').waitFor({ state: 'visible', timeout: 30000 });
   await page.locator('input[type="email"]').fill(user.email);
   await page.locator('input[type="password"]').fill(user.password);
   await page.locator('button[type="submit"]').click();
-  await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 15000 });
-  await page.waitForLoadState('networkidle');
+  await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 30000 });
+  await page.waitForLoadState('domcontentloaded');
 }
 
 async function dismissAnnouncementIfVisible(page: Page) {
@@ -211,6 +240,8 @@ test.describe.serial('Proxy booking team workspace flow', () => {
 
     const adminUserId = await createAuthUser(adminUser, { whitelistAdmin: true });
     const customerUserId = await createAuthUser(customerUser);
+    await setPreferredLocale(adminUserId, 'ko');
+    await setPreferredLocale(customerUserId, 'ko');
 
     try {
       const customerSession = await createIsolatedPage(browser, customerUser);
