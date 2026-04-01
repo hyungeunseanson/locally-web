@@ -20,6 +20,7 @@ const createdHostApplicationIds: string[] = [];
 const createdExperienceIds: number[] = [];
 const createdServiceRequestIds: string[] = [];
 const createdServiceBookingIds: string[] = [];
+const createdNotificationIds: number[] = [];
 
 function loadEnv(): EnvMap {
   return readFileSync('.env.local', 'utf8')
@@ -138,6 +139,26 @@ async function createAuthUser(user: TestUser, isAdmin = false) {
   }
 
   return data.user.id;
+}
+
+async function setPreferredLocale(userId: string, locale: 'ko' | 'en' | 'ja' | 'zh') {
+  const supabase = getAdminClient();
+  const { data, error } = await supabase.auth.admin.getUserById(userId);
+  if (error || !data.user) throw error || new Error(`Failed to fetch auth user ${userId}.`);
+
+  const metadata =
+    data.user.user_metadata && typeof data.user.user_metadata === 'object'
+      ? (data.user.user_metadata as Record<string, unknown>)
+      : {};
+
+  const { error: updateError } = await supabase.auth.admin.updateUserById(userId, {
+    user_metadata: {
+      ...metadata,
+      preferred_locale: locale,
+    },
+  });
+
+  if (updateError) throw updateError;
 }
 
 async function createHostApplication(userId: string, user: TestUser) {
@@ -337,6 +358,36 @@ async function waitForNotificationCount(params: {
   );
 }
 
+async function waitForNotification(params: {
+  userId: string;
+  type: string;
+  link: string;
+}) {
+  const supabase = getAdminClient();
+
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('id, title, message, link, type')
+      .eq('user_id', params.userId)
+      .eq('type', params.type)
+      .eq('link', params.link)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (data?.id) {
+      createdNotificationIds.push(Number(data.id));
+      return data;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
+  throw new Error(`Notification not found for ${params.userId} / ${params.type} / ${params.link}.`);
+}
+
 async function login(page: Page, user: TestUser) {
   await page.goto('/login', { waitUntil: 'networkidle' });
 
@@ -350,6 +401,10 @@ async function login(page: Page, user: TestUser) {
 
 test.afterAll(async () => {
   const supabase = getAdminClient();
+
+  if (createdNotificationIds.length > 0) {
+    await supabase.from('notifications').delete().in('id', createdNotificationIds);
+  }
 
   for (const bookingId of createdServiceBookingIds) {
     await supabase.from('service_bookings').delete().eq('id', bookingId);
@@ -392,6 +447,9 @@ test.describe.serial('Service host notification scope', () => {
     const customerId = await createAuthUser(customerUser);
     const seoulHostId = await createAuthUser(seoulHostUser);
     const busanHostId = await createAuthUser(busanHostUser);
+    await setPreferredLocale(customerId, 'en');
+    await setPreferredLocale(seoulHostId, 'ja');
+    await setPreferredLocale(busanHostId, 'ko');
 
     expect(adminId).toBeTruthy();
 
@@ -421,6 +479,22 @@ test.describe.serial('Service host notification scope', () => {
       link: `/services/${fixture.requestId}`,
       expectedCount: 1,
     });
+
+    const hostNotification = await waitForNotification({
+      userId: seoulHostId,
+      type: 'service_request_new',
+      link: `/services/${fixture.requestId}`,
+    });
+    expect(hostNotification.title).toBe('📋 新しいカスタムサービス依頼 — Seoul');
+    expect(hostNotification.message).toContain('4時間');
+
+    const customerNotification = await waitForNotification({
+      userId: customerId,
+      type: 'service_payment_confirmed',
+      link: `/services/${fixture.requestId}`,
+    });
+    expect(customerNotification.title).toBe('✅ Payment completed');
+    expect(customerNotification.message).toContain('host recruitment is now starting');
 
     const supabase = getAdminClient();
     const { data: booking, error: bookingError } = await supabase

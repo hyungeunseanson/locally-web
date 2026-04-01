@@ -62,6 +62,21 @@ type ReviewNewHostParams = {
   experienceTitle: string;
 };
 
+type ServiceRequestNewHostParams = {
+  requestTitle: string;
+  requestCity: string;
+  durationHours: number;
+  guestCount: number;
+};
+
+type ServicePaymentConfirmedCustomerParams = {
+  requestTitle: string;
+};
+
+type ServiceApplicationNewCustomerParams = {
+  requestTitle: string;
+};
+
 type MembershipParams = {
   status: 'member' | 'circle';
 };
@@ -83,6 +98,9 @@ export type NotificationCopyKey =
   | 'booking.review_rejected'
   | 'inquiry.new_message'
   | 'review.new.host'
+  | 'service.request_new.host'
+  | 'service.payment_confirmed.customer'
+  | 'service.application_new.customer'
   | 'membership.member_welcome'
   | 'membership.circle_welcome'
   | 'host_application.approved'
@@ -102,6 +120,9 @@ type NotificationCopyParams = {
   'booking.review_rejected': BookingReviewRejectedParams;
   'inquiry.new_message': InquiryNewMessageParams;
   'review.new.host': ReviewNewHostParams;
+  'service.request_new.host': ServiceRequestNewHostParams;
+  'service.payment_confirmed.customer': ServicePaymentConfirmedCustomerParams;
+  'service.application_new.customer': ServiceApplicationNewCustomerParams;
   'membership.member_welcome': MembershipParams;
   'membership.circle_welcome': MembershipParams;
   'host_application.approved': HostApplicationStatusParams;
@@ -801,6 +822,99 @@ function buildReviewNewHostCopy(
   }
 }
 
+function buildServiceRequestNewHostCopy(
+  locale: NotificationLocale,
+  params: ServiceRequestNewHostParams
+): NotificationCopy {
+  const { requestTitle, requestCity, durationHours, guestCount } = params;
+
+  switch (locale) {
+    case 'en':
+      return {
+        title: `📋 New custom service request — ${requestCity}`,
+        message: `${requestTitle} (${durationHours}h, ${guestCount} guest${guestCount === 1 ? '' : 's'})`,
+      };
+    case 'ja':
+      return {
+        title: `📋 新しいカスタムサービス依頼 — ${requestCity}`,
+        message: `${requestTitle}（${durationHours}時間、${guestCount}名）`,
+      };
+    case 'zh':
+      return {
+        title: `📋 新的定制服务请求 — ${requestCity}`,
+        message: `${requestTitle}（${durationHours}小时，${guestCount}人）`,
+      };
+    case 'ko':
+    default:
+      return {
+        title: `📋 새로운 맞춤 서비스 의뢰 — ${requestCity}`,
+        message: `${requestTitle} (${durationHours}시간, ${guestCount}명)`,
+      };
+  }
+}
+
+function buildServicePaymentConfirmedCustomerCopy(
+  locale: NotificationLocale,
+  params: ServicePaymentConfirmedCustomerParams
+): NotificationCopy {
+  const { requestTitle } = params;
+
+  switch (locale) {
+    case 'en':
+      return {
+        title: '✅ Payment completed',
+        message: `Payment for '${requestTitle}' is complete, and host recruitment is now starting.`,
+      };
+    case 'ja':
+      return {
+        title: '✅ 決済が完了しました',
+        message: `「${requestTitle}」の決済が完了し、現地ホストの募集が始まります。`,
+      };
+    case 'zh':
+      return {
+        title: '✅ 付款已完成',
+        message: `「${requestTitle}」的付款已完成，现已开始招募当地房东。`,
+      };
+    case 'ko':
+    default:
+      return {
+        title: '✅ 결제가 완료되었습니다',
+        message: `'${requestTitle}' 결제가 완료되어 현지 호스트 모집이 시작됩니다.`,
+      };
+  }
+}
+
+function buildServiceApplicationNewCustomerCopy(
+  locale: NotificationLocale,
+  params: ServiceApplicationNewCustomerParams
+): NotificationCopy {
+  const { requestTitle } = params;
+
+  switch (locale) {
+    case 'en':
+      return {
+        title: '📩 A new host has applied',
+        message: `A new host applied to '${requestTitle}'.`,
+      };
+    case 'ja':
+      return {
+        title: '📩 新しいホスト応募が届きました',
+        message: `「${requestTitle}」に新しいホストが応募しました。`,
+      };
+    case 'zh':
+      return {
+        title: '📩 有新的房东申请',
+        message: `「${requestTitle}」有新的房东提交了申请。`,
+      };
+    case 'ko':
+    default:
+      return {
+        title: '📩 새로운 호스트 지원자가 있습니다!',
+        message: `'${requestTitle}'에 새로운 호스트가 지원했습니다.`,
+      };
+  }
+}
+
 function buildMembershipCopy(
   locale: NotificationLocale,
   params: MembershipParams
@@ -989,6 +1103,18 @@ export function buildNotificationCopy<K extends NotificationCopyKey>(
       return buildInquiryNewMessageCopy(locale, copyParams as NotificationCopyParams['inquiry.new_message']);
     case 'review.new.host':
       return buildReviewNewHostCopy(locale, copyParams as NotificationCopyParams['review.new.host']);
+    case 'service.request_new.host':
+      return buildServiceRequestNewHostCopy(locale, copyParams as NotificationCopyParams['service.request_new.host']);
+    case 'service.payment_confirmed.customer':
+      return buildServicePaymentConfirmedCustomerCopy(
+        locale,
+        copyParams as NotificationCopyParams['service.payment_confirmed.customer']
+      );
+    case 'service.application_new.customer':
+      return buildServiceApplicationNewCustomerCopy(
+        locale,
+        copyParams as NotificationCopyParams['service.application_new.customer']
+      );
     case 'membership.member_welcome':
       return buildMembershipCopy(locale, { ...(copyParams as NotificationCopyParams['membership.member_welcome']), status: 'member' });
     case 'membership.circle_welcome':

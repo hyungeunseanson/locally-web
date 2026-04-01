@@ -5,6 +5,14 @@
 
 ---
 
+## v3.39.93 — [Notifications] Service 인앱 알림 다국어 2차 범위 축소 적용
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟢 service payment-open 알림 현지화 | `app/utils/serviceNotificationFlows.ts`, `app/utils/notificationCopy.ts` — 새 `service_request_new`, `service_payment_confirmed` 인앱 알림을 recipient `preferred_locale` 기준으로 저장하도록 변경 |
+| 🟢 service application 알림 현지화 | `app/api/services/applications/route.ts`, `app/utils/notificationCopy.ts` — `service_application_new` 인앱 알림을 고객 locale 기준으로 localized copy로 저장 |
+| 🟡 service 2차 범위 축소 검증 | `tests/e2e/22-service-host-notification-scope.spec.ts`, `tests/e2e/118-service-notification-localization.spec.ts`, `tests/e2e/116-notification-copy-util.spec.ts` — working path인 payment-open/apply만 집중 검증하고, 기존 `select-host`/cancel regression이 섞인 경로는 이번 배치에서 의도적으로 제외 |
+
 ## v3.39.92 — [Guest Trips] 모바일 영수증 모달 viewport 정리
 
 | 항목 | 내용 |

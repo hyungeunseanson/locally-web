@@ -48,6 +48,21 @@ test.describe('Notification localization helpers', () => {
     });
     expect(reviewJa.title).toBe('新しいレビューが登録されました');
     expect(reviewJa.message).toBe('「東京ナイトツアー」に新しいレビューが投稿されました。');
+
+    const serviceHostEn = buildNotificationCopy('service.request_new.host', 'en', {
+      requestTitle: 'Airport pickup',
+      requestCity: 'Seoul',
+      durationHours: 3,
+      guestCount: 2,
+    });
+    expect(serviceHostEn.title).toBe('📋 New custom service request — Seoul');
+    expect(serviceHostEn.message).toBe('Airport pickup (3h, 2 guests)');
+
+    const serviceApplicationZh = buildNotificationCopy('service.application_new.customer', 'zh', {
+      requestTitle: '东京口译支持',
+    });
+    expect(serviceApplicationZh.title).toBe('📩 有新的房东申请');
+    expect(serviceApplicationZh.message).toContain('东京口译支持');
   });
 
   test('builds host application revision copy with localized reason text', () => {

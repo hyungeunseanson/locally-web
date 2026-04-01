@@ -1,5 +1,6 @@
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { notifyMembershipMilestone } from '@/app/utils/memberMilestoneNotifications';
+import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 import { getEligibleServiceHostIds } from '@/app/utils/serviceHostNotifications';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 
@@ -53,14 +54,23 @@ export async function notifyServicePaymentOpened(params: ServicePaymentOpenedPar
     });
 
     if (hostIds.length > 0) {
-      const notifications = hostIds.map((hostId) => ({
-        user_id: hostId,
-        type: 'service_request_new',
-        title: `📋 새로운 맞춤 서비스 의뢰 — ${requestCity}`,
-        message: `${requestTitle} (${durationHours}시간, ${guestCount}명)`,
-        link: `/services/${requestId}`,
-        is_read: false,
-      }));
+      const notifications = await Promise.all(
+        hostIds.map((hostId) =>
+          buildLocalizedNotificationInsert({
+            supabaseAdmin,
+            userId: hostId,
+            type: 'service_request_new',
+            link: `/services/${requestId}`,
+            key: 'service.request_new.host',
+            copyParams: {
+              requestTitle,
+              requestCity,
+              durationHours,
+              guestCount,
+            },
+          })
+        )
+      );
       const { error } = await supabaseAdmin.from('notifications').insert(notifications);
       if (error) {
         console.error('[ServiceNotificationFlows] host payment-open notification insert failed:', error);
@@ -82,14 +92,20 @@ export async function notifyServicePaymentOpened(params: ServicePaymentOpenedPar
       });
     }
 
-    const { error: customerNotificationError } = await supabaseAdmin.from('notifications').insert({
-      user_id: customerId,
+    const customerNotificationRow = await buildLocalizedNotificationInsert({
+      supabaseAdmin,
+      userId: customerId,
       type: 'service_payment_confirmed',
-      title: '✅ 결제가 완료되었습니다',
-      message: `'${requestTitle}' 결제가 완료되어 현지 호스트 모집이 시작됩니다.`,
       link: `/services/${requestId}`,
-      is_read: false,
+      key: 'service.payment_confirmed.customer',
+      copyParams: {
+        requestTitle,
+      },
     });
+
+    const { error: customerNotificationError } = await supabaseAdmin
+      .from('notifications')
+      .insert(customerNotificationRow);
 
     if (customerNotificationError) {
       console.error('[ServiceNotificationFlows] customer payment-open notification insert failed:', customerNotificationError);

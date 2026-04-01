@@ -3,6 +3,7 @@ import { createClient as createServerClient } from '@/app/utils/supabase/server'
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
+import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 import { isApprovedHostEligibleForServiceRequest } from '@/app/utils/serviceHostNotifications';
 
 type ApplyBody = {
@@ -117,15 +118,21 @@ export async function POST(request: Request) {
     }
 
     // 5. 의뢰 소유자(고객)에게 알림 (비동기)
-    supabaseAdmin.from('notifications').insert({
-      user_id: serviceRequest.user_id,
+    buildLocalizedNotificationInsert({
+      supabaseAdmin,
+      userId: serviceRequest.user_id,
       type: 'service_application_new',
-      title: '📩 새로운 호스트 지원자가 있습니다!',
-      message: `'${serviceRequest.title}'에 새로운 호스트가 지원했습니다.`,
       link: `/services/${request_id}`,
-      is_read: false,
+      key: 'service.application_new.customer',
+      copyParams: {
+        requestTitle: serviceRequest.title,
+      },
+    }).then((notificationRow) => {
+      return supabaseAdmin.from('notifications').insert(notificationRow);
     }).then(({ error }) => {
       if (error) console.error('Service Application Notification Error:', error);
+    }).catch((notificationError) => {
+      console.error('Service Application Notification Error:', notificationError);
     });
 
     sendImmediateGenericEmail({
