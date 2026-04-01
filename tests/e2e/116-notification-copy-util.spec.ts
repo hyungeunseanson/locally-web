@@ -63,6 +63,12 @@ test.describe('Notification localization helpers', () => {
     });
     expect(serviceApplicationZh.title).toBe('📩 有新的房东申请');
     expect(serviceApplicationZh.message).toContain('东京口译支持');
+
+    const serviceSelectedJa = buildNotificationCopy('service.host_selected', 'ja', {
+      requestTitle: '東京通訳サポート',
+    });
+    expect(serviceSelectedJa.title).toBe('🎉 ゲストに選ばれました！');
+    expect(serviceSelectedJa.message).toContain('東京通訳サポート');
   });
 
   test('builds host application revision copy with localized reason text', () => {

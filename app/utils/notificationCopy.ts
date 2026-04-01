@@ -77,6 +77,10 @@ type ServiceApplicationNewCustomerParams = {
   requestTitle: string;
 };
 
+type ServiceHostSelectionParams = {
+  requestTitle: string;
+};
+
 type MembershipParams = {
   status: 'member' | 'circle';
 };
@@ -101,6 +105,8 @@ export type NotificationCopyKey =
   | 'service.request_new.host'
   | 'service.payment_confirmed.customer'
   | 'service.application_new.customer'
+  | 'service.host_selected'
+  | 'service.host_rejected'
   | 'membership.member_welcome'
   | 'membership.circle_welcome'
   | 'host_application.approved'
@@ -123,6 +129,8 @@ type NotificationCopyParams = {
   'service.request_new.host': ServiceRequestNewHostParams;
   'service.payment_confirmed.customer': ServicePaymentConfirmedCustomerParams;
   'service.application_new.customer': ServiceApplicationNewCustomerParams;
+  'service.host_selected': ServiceHostSelectionParams;
+  'service.host_rejected': ServiceHostSelectionParams;
   'membership.member_welcome': MembershipParams;
   'membership.circle_welcome': MembershipParams;
   'host_application.approved': HostApplicationStatusParams;
@@ -915,6 +923,68 @@ function buildServiceApplicationNewCustomerCopy(
   }
 }
 
+function buildServiceHostSelectedCopy(
+  locale: NotificationLocale,
+  params: ServiceHostSelectionParams
+): NotificationCopy {
+  const { requestTitle } = params;
+
+  switch (locale) {
+    case 'en':
+      return {
+        title: '🎉 You were selected by the guest',
+        message: `You were selected for '${requestTitle}'. Payment is already complete, so you can start right away.`,
+      };
+    case 'ja':
+      return {
+        title: '🎉 ゲストに選ばれました！',
+        message: `「${requestTitle}」で選ばれました。決済はすでに完了しているため、そのまま進行できます。`,
+      };
+    case 'zh':
+      return {
+        title: '🎉 你已被游客选中',
+        message: `你已在「${requestTitle}」中被选中。付款已完成，可以立即开始准备。`,
+      };
+    case 'ko':
+    default:
+      return {
+        title: '🎉 고객에게 선택되었습니다!',
+        message: `'${requestTitle}' 의뢰에서 선택되셨습니다. 결제는 이미 완료되어 바로 진행됩니다.`,
+      };
+  }
+}
+
+function buildServiceHostRejectedCopy(
+  locale: NotificationLocale,
+  params: ServiceHostSelectionParams
+): NotificationCopy {
+  const { requestTitle } = params;
+
+  switch (locale) {
+    case 'en':
+      return {
+        title: 'Another host was selected.',
+        message: `Another host was selected for '${requestTitle}'.`,
+      };
+    case 'ja':
+      return {
+        title: '別のホストが選ばれました。',
+        message: `「${requestTitle}」では別のホストが選ばれました。`,
+      };
+    case 'zh':
+      return {
+        title: '已选择其他房东。',
+        message: `「${requestTitle}」已选择其他房东。`,
+      };
+    case 'ko':
+    default:
+      return {
+        title: '다른 호스트가 선택되었습니다.',
+        message: `'${requestTitle}' 의뢰에서 다른 호스트가 선택되었습니다.`,
+      };
+  }
+}
+
 function buildMembershipCopy(
   locale: NotificationLocale,
   params: MembershipParams
@@ -1115,6 +1185,10 @@ export function buildNotificationCopy<K extends NotificationCopyKey>(
         locale,
         copyParams as NotificationCopyParams['service.application_new.customer']
       );
+    case 'service.host_selected':
+      return buildServiceHostSelectedCopy(locale, copyParams as NotificationCopyParams['service.host_selected']);
+    case 'service.host_rejected':
+      return buildServiceHostRejectedCopy(locale, copyParams as NotificationCopyParams['service.host_rejected']);
     case 'membership.member_welcome':
       return buildMembershipCopy(locale, { ...(copyParams as NotificationCopyParams['membership.member_welcome']), status: 'member' });
     case 'membership.circle_welcome':

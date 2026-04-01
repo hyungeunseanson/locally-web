@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
+import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 
 type SelectHostBody = {
   request_id?: string;
@@ -140,15 +141,21 @@ function notifyServiceHostSelection(params: {
 }) {
   const { supabaseAdmin, requestId, requestTitle, selectedHostId, rejectedHostIds } = params;
 
-  supabaseAdmin.from('notifications').insert({
-    user_id: selectedHostId,
+  buildLocalizedNotificationInsert({
+    supabaseAdmin,
+    userId: selectedHostId,
     type: 'service_host_selected',
-    title: '🎉 고객에게 선택되었습니다!',
-    message: `'${requestTitle}' 의뢰에서 선택되셨습니다. 결제는 이미 완료되어 바로 진행됩니다.`,
     link: `/services/${requestId}`,
-    is_read: false,
+    key: 'service.host_selected',
+    copyParams: {
+      requestTitle,
+    },
+  }).then((notificationRow) => {
+    return supabaseAdmin.from('notifications').insert(notificationRow);
   }).then(({ error }) => {
     if (error) console.error('Select Host Notification Error:', error);
+  }).catch((notificationError) => {
+    console.error('Select Host Notification Error:', notificationError);
   });
 
   sendImmediateGenericEmail({
@@ -175,18 +182,28 @@ function notifyServiceHostSelection(params: {
   Promise.resolve(rejectedHostIds)
     .then((rejected) => {
       if (rejected.length === 0) return;
-      const notifications = rejected.map((hostId) => ({
-        user_id: hostId,
-        type: 'service_host_rejected',
-        title: '다른 호스트가 선택되었습니다.',
-        message: `'${requestTitle}' 의뢰에서 다른 호스트가 선택되었습니다.`,
-        link: '/services',
-        is_read: false,
-      }));
-      if (notifications.length === 0) return;
-      supabaseAdmin.from('notifications').insert(notifications).then(({ error }) => {
-        if (error) console.error('Reject Notification Error:', error);
+      return Promise.all(
+        rejected.map((hostId) =>
+          buildLocalizedNotificationInsert({
+            supabaseAdmin,
+            userId: hostId,
+            type: 'service_host_rejected',
+            link: '/services',
+            key: 'service.host_rejected',
+            copyParams: {
+              requestTitle,
+            },
+          })
+        )
+      ).then((notifications) => {
+        if (notifications.length === 0) return;
+        return supabaseAdmin.from('notifications').insert(notifications).then(({ error }) => {
+          if (error) console.error('Reject Notification Error:', error);
+        });
       });
+    })
+    .catch((notificationError) => {
+      console.error('Reject Notification Error:', notificationError);
     });
 }
 

@@ -5,6 +5,13 @@
 
 ---
 
+## v3.39.94 — [Notifications] Service select-host 인앱 알림 다국어 2차 확장
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟢 service select-host 알림 현지화 | `app/api/services/select-host/route.ts`, `app/utils/notificationCopy.ts` — 새 `service_host_selected`, `service_host_rejected` 인앱 알림을 recipient `preferred_locale` 기준으로 저장하도록 변경 |
+| 🟡 service select-host runtime 회귀 체크 추가 | `tests/e2e/118-service-notification-localization.spec.ts`, `tests/e2e/50-service-select-host-atomicity.spec.ts`, `tests/e2e/116-notification-copy-util.spec.ts` — locale별 selected/rejected copy와 기존 select-host atomicity 경로를 함께 검증 |
+
 ## v3.39.93 — [Notifications] Service 인앱 알림 다국어 2차 범위 축소 적용
 
 | 항목 | 내용 |

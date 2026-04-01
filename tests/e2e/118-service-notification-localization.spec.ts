@@ -271,13 +271,15 @@ async function createPaidOpenRequest(customerId: string, customer: TestUser) {
   };
 }
 
-async function login(page: Page, user: TestUser) {
+async function login(page: Page, user: TestUser, locale: 'ko' | 'en' | 'ja' | 'zh') {
   await page.context().clearCookies();
   await page.goto('/', { waitUntil: 'domcontentloaded' });
-  await page.evaluate(() => {
+  await page.evaluate((nextLocale) => {
     window.localStorage.clear();
     window.sessionStorage.clear();
-  });
+    window.localStorage.setItem('app_lang', nextLocale);
+    document.cookie = `app_lang=${nextLocale}; path=/; samesite=lax`;
+  }, locale);
   await page.goto('/login', { waitUntil: 'domcontentloaded' });
   await page.locator('input[type="email"]').waitFor({ state: 'visible', timeout: 30000 });
   await page.locator('input[type="email"]').fill(user.email);
@@ -285,6 +287,23 @@ async function login(page: Page, user: TestUser) {
   await page.locator('button[type="submit"]').click();
   await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 30000 });
   await page.waitForLoadState('domcontentloaded');
+}
+
+async function getApplicationId(requestId: string, hostId: string) {
+  const supabase = getAdminClient();
+  const { data, error } = await supabase
+    .from('service_applications')
+    .select('id')
+    .eq('request_id', requestId)
+    .eq('host_id', hostId)
+    .maybeSingle();
+
+  if (error || !data?.id) {
+    throw error || new Error(`Failed to find service application for ${hostId}.`);
+  }
+
+  createdServiceApplicationIds.push(data.id);
+  return String(data.id);
 }
 
 async function waitForNotification(params: {
@@ -353,31 +372,45 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Service notification localization', () => {
-  test('localizes service application notifications by recipient locale', async ({ page }) => {
+  test('localizes service application and host selection notifications by recipient locale', async ({ page }) => {
     test.setTimeout(120000);
 
     const customer = createUser('customer');
-    const host = createUser('host');
+    const selectedHost = createUser('selected-host');
+    const rejectedHost = createUser('rejected-host');
 
     const customerId = await createAuthUser(customer);
-    const hostId = await createAuthUser(host);
+    const selectedHostId = await createAuthUser(selectedHost);
+    const rejectedHostId = await createAuthUser(rejectedHost);
 
     await setPreferredLocale(customerId, 'en');
-    await setPreferredLocale(hostId, 'ja');
+    await setPreferredLocale(selectedHostId, 'ja');
+    await setPreferredLocale(rejectedHostId, 'zh');
 
-    await createHostApplication(hostId, host);
-    await createActiveExperience(hostId, 'Seoul');
+    await createHostApplication(selectedHostId, selectedHost);
+    await createHostApplication(rejectedHostId, rejectedHost);
+    await createActiveExperience(selectedHostId, 'Seoul');
+    await createActiveExperience(rejectedHostId, 'Seoul');
 
     const requestFixture = await createPaidOpenRequest(customerId, customer);
 
-    await login(page, host);
-    const applyResponse = await page.request.post('/api/services/applications', {
+    await login(page, selectedHost, 'ja');
+    const selectedApplyResponse = await page.request.post('/api/services/applications', {
       data: {
         request_id: requestFixture.requestId,
-        appeal_message: 'Localized host application',
+        appeal_message: 'Selected host application',
       },
     });
-    expect(applyResponse.status()).toBe(200);
+    expect(selectedApplyResponse.status()).toBe(200);
+
+    await login(page, rejectedHost, 'zh');
+    const rejectedApplyResponse = await page.request.post('/api/services/applications', {
+      data: {
+        request_id: requestFixture.requestId,
+        appeal_message: 'Rejected host application',
+      },
+    });
+    expect(rejectedApplyResponse.status()).toBe(200);
 
     const applicationNewNotification = await waitForNotification({
       userId: customerId,
@@ -386,5 +419,32 @@ test.describe.serial('Service notification localization', () => {
     });
     expect(applicationNewNotification.title).toBe('📩 A new host has applied');
     expect(applicationNewNotification.message).toContain(requestFixture.requestTitle);
+
+    const selectedApplicationId = await getApplicationId(requestFixture.requestId, selectedHostId);
+
+    await login(page, customer, 'en');
+    const selectResponse = await page.request.post('/api/services/select-host', {
+      data: {
+        request_id: requestFixture.requestId,
+        application_id: selectedApplicationId,
+      },
+    });
+    expect(selectResponse.status()).toBe(200);
+
+    const selectedNotification = await waitForNotification({
+      userId: selectedHostId,
+      type: 'service_host_selected',
+      link: `/services/${requestFixture.requestId}`,
+    });
+    expect(selectedNotification.title).toBe('🎉 ゲストに選ばれました！');
+    expect(selectedNotification.message).toContain(requestFixture.requestTitle);
+
+    const rejectedNotification = await waitForNotification({
+      userId: rejectedHostId,
+      type: 'service_host_rejected',
+      link: '/services',
+    });
+    expect(rejectedNotification.title).toBe('已选择其他房东。');
+    expect(rejectedNotification.message).toContain(requestFixture.requestTitle);
   });
 });
