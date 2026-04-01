@@ -315,28 +315,15 @@ export default function ReservationManager() {
 
           scheduleRealtimeRefresh();
 
-          const hostUserId = await getHostUserId();
-          if (!hostUserId) return;
-
           if (eventPayload.eventType === 'INSERT') {
+            // Persistent host notifications are created by the booking owner route.
+            // The realtime dashboard layer only surfaces an in-session toast.
             showToast(t('res_toast_new'), 'success'); // 🟢 번역
-            await sendNotification({
-              recipient_id: hostUserId,
-              type: 'new_booking',
-              title: t('res_notif_new_title'),
-              content: t('res_notif_new_content'),
-              link_url: '/host/dashboard'
-            });
           }
           else if (eventPayload.eventType === 'UPDATE' && eventPayload.new?.status && isCancellationRequestedBookingStatus(eventPayload.new.status)) {
+            // Review-pending cancellation notifications are created by the cancel owner route.
+            // The realtime dashboard layer only surfaces an in-session toast.
             showToast(t('res_toast_cancel'), 'error'); // 🟢 번역
-            await sendNotification({
-              recipient_id: hostUserId,
-              type: 'booking_cancel_request',
-              title: t('res_notif_cancel_title'),
-              content: t('res_notif_cancel_content'),
-              link_url: '/host/dashboard?tab=cancelled'
-            });
           }
         }
       ).subscribe();
@@ -345,7 +332,7 @@ export default function ReservationManager() {
       clearRealtimeRefresh();
       supabase.removeChannel(channel);
     };
-  }, [clearRealtimeRefresh, getHostUserId, scheduleRealtimeRefresh, supabase, showToast, t]);
+  }, [clearRealtimeRefresh, scheduleRealtimeRefresh, supabase, showToast, t]);
 
   const addToGoogleCalendar = (res: ReservationRecord) => {
     const guestDisplayName = res.guest?.full_name || res.contact_name || t('res_gcal_none');

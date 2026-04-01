@@ -5,6 +5,13 @@
 
 ---
 
+## v3.40.03 — [Notifications] Host realtime dead shared 알림 호출 제거
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟢 dead shared send 제거 | `app/host/dashboard/components/ReservationManager.tsx` — host dashboard realtime listener가 더 이상 `new_booking`, `booking_cancel_request`를 `/api/notifications/email`로 재전송하지 않도록 정리. 두 이벤트의 persistent notification/email은 기존 booking/cancel owner route가 계속 담당하고, realtime layer는 toast + background refresh만 유지 |
+| 🟡 owner route 회귀 재검증 | `tests/e2e/117-notification-localization-runtime.spec.ts`, `tests/e2e/92-host-unavailable-review-notifications.spec.ts` — 새 예약 host 알림과 운영 검토 취소 요청 알림이 기존 owner route에서 그대로 생성되는지 다시 확인 |
+
 ## v3.40.02 — [Notifications] Shared guest 알림 이메일 다국어 1차
 
 | 항목 | 내용 |
