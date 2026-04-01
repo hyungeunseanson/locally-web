@@ -22,6 +22,26 @@ const createdReviewIds: number[] = [];
 const createdNotificationIds: number[] = [];
 const createdAdminAlertIds: number[] = [];
 
+async function setPreferredLocale(userId: string, locale: 'ko' | 'en' | 'ja' | 'zh') {
+  const supabase = getAdminClient();
+  const { data, error } = await supabase.auth.admin.getUserById(userId);
+  if (error || !data.user) throw error || new Error(`Failed to fetch auth user ${userId}.`);
+
+  const metadata =
+    data.user.user_metadata && typeof data.user.user_metadata === 'object'
+      ? (data.user.user_metadata as Record<string, unknown>)
+      : {};
+
+  const { error: updateError } = await supabase.auth.admin.updateUserById(userId, {
+    user_metadata: {
+      ...metadata,
+      preferred_locale: locale,
+    },
+  });
+
+  if (updateError) throw updateError;
+}
+
 function loadEnv(): EnvMap {
   return readFileSync('.env.local', 'utf8')
     .split(/\n/)
@@ -271,6 +291,8 @@ test.describe.serial('Review host notification runtime', () => {
     const guest = createUser('guest');
     const hostId = await createAuthUser(host);
     const guestId = await createAuthUser(guest);
+    await setPreferredLocale(hostId, 'ja');
+    await setPreferredLocale(guestId, 'en');
     await createApprovedHostApplication(hostId, host);
 
     const experience = await createExperienceFixture(hostId);
@@ -329,8 +351,8 @@ test.describe.serial('Review host notification runtime', () => {
 
     expect(notificationRow?.type).toBe('new_review');
     expect(notificationRow?.link).toBe('/host/dashboard?tab=reviews');
-    expect(notificationRow?.title).toBe('새 후기가 등록되었습니다');
-    expect(notificationRow?.message).toContain(experience.title);
+    expect(notificationRow?.title).toBe('新しいレビューが登録されました');
+    expect(notificationRow?.message).toBe(`「${experience.title}」に新しいレビューが投稿されました。`);
 
     if (notificationRow?.id) createdNotificationIds.push(Number(notificationRow.id));
 

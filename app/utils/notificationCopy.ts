@@ -58,6 +58,10 @@ type InquiryNewMessageParams = {
   displayContent: string;
 };
 
+type ReviewNewHostParams = {
+  experienceTitle: string;
+};
+
 type MembershipParams = {
   status: 'member' | 'circle';
 };
@@ -78,6 +82,7 @@ export type NotificationCopyKey =
   | 'booking.cancelled.host_fault'
   | 'booking.review_rejected'
   | 'inquiry.new_message'
+  | 'review.new.host'
   | 'membership.member_welcome'
   | 'membership.circle_welcome'
   | 'host_application.approved'
@@ -96,6 +101,7 @@ type NotificationCopyParams = {
   'booking.cancelled.host_fault': BookingHostFaultCancelledParams;
   'booking.review_rejected': BookingReviewRejectedParams;
   'inquiry.new_message': InquiryNewMessageParams;
+  'review.new.host': ReviewNewHostParams;
   'membership.member_welcome': MembershipParams;
   'membership.circle_welcome': MembershipParams;
   'host_application.approved': HostApplicationStatusParams;
@@ -764,6 +770,37 @@ function buildInquiryNewMessageCopy(
   }
 }
 
+function buildReviewNewHostCopy(
+  locale: NotificationLocale,
+  params: ReviewNewHostParams
+): NotificationCopy {
+  const { experienceTitle } = params;
+
+  switch (locale) {
+    case 'en':
+      return {
+        title: 'A new review was posted',
+        message: `A new review was left for '${experienceTitle}'.`,
+      };
+    case 'ja':
+      return {
+        title: '新しいレビューが登録されました',
+        message: `「${experienceTitle}」に新しいレビューが投稿されました。`,
+      };
+    case 'zh':
+      return {
+        title: '已收到新评价',
+        message: `「${experienceTitle}」收到了新的评价。`,
+      };
+    case 'ko':
+    default:
+      return {
+        title: '새 후기가 등록되었습니다',
+        message: `'${experienceTitle}'에 새 후기가 작성되었습니다.`,
+      };
+  }
+}
+
 function buildMembershipCopy(
   locale: NotificationLocale,
   params: MembershipParams
@@ -950,6 +987,8 @@ export function buildNotificationCopy<K extends NotificationCopyKey>(
       return buildBookingReviewRejectedCopy(locale, copyParams as NotificationCopyParams['booking.review_rejected']);
     case 'inquiry.new_message':
       return buildInquiryNewMessageCopy(locale, copyParams as NotificationCopyParams['inquiry.new_message']);
+    case 'review.new.host':
+      return buildReviewNewHostCopy(locale, copyParams as NotificationCopyParams['review.new.host']);
     case 'membership.member_welcome':
       return buildMembershipCopy(locale, { ...(copyParams as NotificationCopyParams['membership.member_welcome']), status: 'member' });
     case 'membership.circle_welcome':

@@ -42,6 +42,12 @@ test.describe('Notification localization helpers', () => {
     });
     expect(membershipEn.title).toBe('✨ Tier 1 is now open');
     expect(membershipEn.message).toContain('first purchase');
+
+    const reviewJa = buildNotificationCopy('review.new.host', 'ja', {
+      experienceTitle: '東京ナイトツアー',
+    });
+    expect(reviewJa.title).toBe('新しいレビューが登録されました');
+    expect(reviewJa.message).toBe('「東京ナイトツアー」に新しいレビューが投稿されました。');
   });
 
   test('builds host application revision copy with localized reason text', () => {

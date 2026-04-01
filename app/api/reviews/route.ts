@@ -3,6 +3,7 @@ import { createAdminClient } from '@/app/utils/supabase/admin';
 import { NextResponse } from 'next/server';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
+import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -94,15 +95,17 @@ export async function POST(request: Request) {
     // [R1] 호스트에게 새 후기 알림 발송
     if (experience?.host_id) {
       const supabaseAdmin = createAdminClient();
-      const { error: notificationError } = await supabaseAdmin.from('notifications').insert({
-        user_id: experience.host_id,
+      const notificationRow = await buildLocalizedNotificationInsert({
+        supabaseAdmin,
+        userId: experience.host_id,
         type: 'new_review',
-        title: '새 후기가 등록되었습니다',
-        message: `'${experience.title}'에 새 후기가 작성되었습니다.`,
         link: '/host/dashboard?tab=reviews',
-        is_read: false,
-        created_at: new Date().toISOString(),
+        key: 'review.new.host',
+        copyParams: {
+          experienceTitle: experience.title || 'Locally Experience',
+        },
       });
+      const { error: notificationError } = await supabaseAdmin.from('notifications').insert(notificationRow);
       if (notificationError) {
         console.error('Review host notification error:', notificationError);
       }
