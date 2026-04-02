@@ -10,8 +10,6 @@ import { useLanguage } from '@/app/context/LanguageContext';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import { useNotification } from '@/app/context/NotificationContext';
-import { useAuth } from '@/app/context/AuthContext';
-import { useLocallyMembership } from '@/app/hooks/useLocallyMembership';
 
 // 분리된 컴포넌트 & 훅 import
 import { useGuestTrips } from './hooks/useGuestTrips';
@@ -49,8 +47,6 @@ export default function GuestTripsPage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const hasServiceUnread = useServiceUnread();
-  const { user } = useAuth();
-  const { membership, hasLocallyCare } = useLocallyMembership(user?.id);
 
   const {
     upcomingTrips,
@@ -174,36 +170,6 @@ export default function GuestTripsPage() {
     </section>
   );
 
-  const LocallyCareBanner = () => {
-    if (!membership || !hasLocallyCare) return null;
-
-    return (
-      <section
-        data-testid="guest-trips-membership-banner"
-        className="mb-5 rounded-2xl border border-rose-100 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(255,247,247,1))] px-4 py-3 shadow-sm md:mb-8 md:px-5 md:py-3.5"
-      >
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <div className="min-w-0">
-            <p className="text-[11px] font-bold text-slate-900 md:text-[12px]">
-              {t('locally_care_inbox_strip_title')}
-            </p>
-            <p className="mt-1 text-[11px] leading-5 text-slate-500 md:text-[12px] md:leading-5">
-              {t('locally_care_inbox_strip_desc')}
-            </p>
-          </div>
-          <div className="flex shrink-0">
-            <Link
-              href="/help"
-              className="inline-flex items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-[12px] font-bold text-white transition-colors hover:bg-slate-800"
-            >
-              {t('locally_care_cta')}
-            </Link>
-          </div>
-        </div>
-      </section>
-    );
-  };
-
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <SiteHeader />
@@ -220,8 +186,6 @@ export default function GuestTripsPage() {
         </div>
 
         <h1 className="text-[18px] md:text-4xl font-extrabold mb-3 md:mb-12 mt-1.5 md:mt-0 tracking-tight leading-tight text-slate-900">{t('my_trips')}</h1>
-
-        <LocallyCareBanner />
 
         {errorMsg && (
           <div className="bg-red-50 text-red-600 p-3 md:p-4 mb-5 md:mb-8 rounded-lg md:rounded-xl flex items-center gap-2 md:gap-3 text-[13px] md:text-sm font-medium">

@@ -346,8 +346,8 @@ test.describe.serial('locally membership care experience', () => {
 
     await page.goto('/guest/trips', { waitUntil: 'domcontentloaded' });
     await dismissAnnouncementIfVisible(page);
-    await expect(page.getByTestId('guest-trips-membership-banner')).toContainText('Locally Care');
-    await expect(page.getByRole('link', { name: 'Locally Care로 문의하기' })).toHaveAttribute('href', '/help');
+    await expect(page.getByTestId('guest-trips-membership-banner')).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Locally Care로 문의하기' })).toHaveCount(0);
     await expect(page.getByTestId('guest-trips-membership-info-trigger')).toHaveCount(0);
     await expect(page.getByTestId('guest-trips-membership-badge-trigger')).toHaveCount(0);
     await expect(page.getByRole('link', { name: '메시지함 보기' })).toHaveCount(0);

@@ -55,6 +55,32 @@ function chunk(items, size) {
   return chunks;
 }
 
+function dedupeRows(rows, keyFn = (row) => row.id) {
+  const unique = new Map();
+  for (const row of rows) {
+    const key = keyFn(row);
+    if (!key || unique.has(key)) continue;
+    unique.set(key, row);
+  }
+  return Array.from(unique.values());
+}
+
+async function selectByInChunks(label, table, select, column, values, size = 100) {
+  if (!values.length) return [];
+
+  const rows = [];
+  for (const valueChunk of chunk(values, size)) {
+    const { data } = await runQuery(`${label} (${column})`, () =>
+      supabase
+        .from(table)
+        .select(select)
+        .in(column, valueChunk)
+    );
+    rows.push(...(data || []));
+  }
+  return rows;
+}
+
 async function collectCleanupTargets() {
   const profileEmailRes = await runQuery('profiles by email', () =>
     supabase.from('profiles').select('id,email').ilike('email', 'codex.%@example.com')
@@ -80,20 +106,6 @@ async function collectCleanupTargets() {
     supabase.from('admin_task_comments').select('id,content').ilike('content', '코덱스%')
   );
 
-  const bookingsRes = await runQuery('bookings by order_id prefixes', () =>
-    supabase
-      .from('bookings')
-      .select('id,order_id')
-      .or('order_id.like.HOST-REV-BOOKING-%,order_id.like.REV-HOST-NOTI-%,order_id.like.USR-BOOK-%,order_id.like.TEST-BOOKING-%')
-  );
-
-  const notificationContentRes = await runQuery('notifications by codex content', () =>
-    supabase
-      .from('notifications')
-      .select('id,user_id,title,message')
-      .or(CODEX_NOTIFICATION_FILTER)
-  );
-
   const codexUserIds = Array.from(
     new Set([
       ...(profileEmailRes.data || []).map((row) => row.id),
@@ -107,6 +119,80 @@ async function collectCleanupTargets() {
       ...(hostApplicationsRes.data || []).map((row) => row.email).filter(Boolean),
       ...(adminWhitelistRes.data || []).map((row) => row.email).filter(Boolean),
     ])
+  );
+
+  const experienceRows = dedupeRows(
+    await selectByInChunks('experiences by host ids', 'experiences', 'id,host_id', 'host_id', codexUserIds, 25)
+  );
+  const experienceIds = experienceRows.map((row) => row.id);
+
+  const bookingsByPrefixRes = await runQuery('bookings by order_id prefixes', () =>
+    supabase
+      .from('bookings')
+      .select('id,order_id,user_id,experience_id')
+      .or('order_id.like.HOST-REV-BOOKING-%,order_id.like.REV-HOST-NOTI-%,order_id.like.USR-BOOK-%,order_id.like.TEST-BOOKING-%')
+  );
+  const bookingsByUserRows = await selectByInChunks('bookings by user ids', 'bookings', 'id,order_id,user_id,experience_id', 'user_id', codexUserIds, 25);
+  const bookingsByExperienceRows = await selectByInChunks('bookings by experience ids', 'bookings', 'id,order_id,user_id,experience_id', 'experience_id', experienceIds, 25);
+  const bookingRows = dedupeRows([
+    ...(bookingsByPrefixRes.data || []),
+    ...bookingsByUserRows,
+    ...bookingsByExperienceRows,
+  ]);
+
+  const reviewRows = dedupeRows([
+    ...(await selectByInChunks('reviews by user ids', 'reviews', 'id,user_id,experience_id,booking_id', 'user_id', codexUserIds, 25)),
+    ...(await selectByInChunks('reviews by experience ids', 'reviews', 'id,user_id,experience_id,booking_id', 'experience_id', experienceIds, 25)),
+  ]);
+
+  const guestReviewRows = dedupeRows([
+    ...(await selectByInChunks('guest_reviews by guest ids', 'guest_reviews', 'id,guest_id,host_id', 'guest_id', codexUserIds, 25)),
+    ...(await selectByInChunks('guest_reviews by host ids', 'guest_reviews', 'id,guest_id,host_id', 'host_id', codexUserIds, 25)),
+  ]);
+
+  const wishlistRows = dedupeRows([
+    ...(await selectByInChunks('wishlists by user ids', 'wishlists', 'id,user_id,experience_id', 'user_id', codexUserIds, 25)),
+    ...(await selectByInChunks('wishlists by experience ids', 'wishlists', 'id,user_id,experience_id', 'experience_id', experienceIds, 25)),
+  ]);
+
+  const experienceAvailabilityRows = dedupeRows(
+    await selectByInChunks('experience availability by experience ids', 'experience_availability', 'id,experience_id', 'experience_id', experienceIds, 25)
+  );
+
+  const serviceRequestRows = dedupeRows([
+    ...(await selectByInChunks('service_requests by user ids', 'service_requests', 'id,user_id,selected_host_id', 'user_id', codexUserIds, 25)),
+    ...(await selectByInChunks('service_requests by selected_host ids', 'service_requests', 'id,user_id,selected_host_id', 'selected_host_id', codexUserIds, 25)),
+  ]);
+  const serviceRequestIds = serviceRequestRows.map((row) => row.id);
+
+  const serviceApplicationRows = dedupeRows([
+    ...(await selectByInChunks('service_applications by host ids', 'service_applications', 'id,request_id,host_id', 'host_id', codexUserIds, 25)),
+    ...(await selectByInChunks('service_applications by request ids', 'service_applications', 'id,request_id,host_id', 'request_id', serviceRequestIds, 25)),
+  ]);
+
+  const serviceBookingRows = dedupeRows([
+    ...(await selectByInChunks('service_bookings by customer ids', 'service_bookings', 'id,request_id,application_id,customer_id,host_id', 'customer_id', codexUserIds, 25)),
+    ...(await selectByInChunks('service_bookings by host ids', 'service_bookings', 'id,request_id,application_id,customer_id,host_id', 'host_id', codexUserIds, 25)),
+    ...(await selectByInChunks('service_bookings by request ids', 'service_bookings', 'id,request_id,application_id,customer_id,host_id', 'request_id', serviceRequestIds, 25)),
+  ]);
+
+  const inquiryRows = dedupeRows([
+    ...(await selectByInChunks('inquiries by user ids', 'inquiries', 'id,user_id,host_id,experience_id', 'user_id', codexUserIds, 25)),
+    ...(await selectByInChunks('inquiries by host ids', 'inquiries', 'id,user_id,host_id,experience_id', 'host_id', codexUserIds, 25)),
+    ...(await selectByInChunks('inquiries by experience ids', 'inquiries', 'id,user_id,host_id,experience_id', 'experience_id', experienceIds, 25)),
+  ]);
+  const inquiryIds = inquiryRows.map((row) => row.id);
+
+  const inquiryMessageRows = dedupeRows([
+    ...(await selectByInChunks('inquiry_messages by sender ids', 'inquiry_messages', 'id,inquiry_id,sender_id', 'sender_id', codexUserIds, 25)),
+    ...(await selectByInChunks('inquiry_messages by inquiry ids', 'inquiry_messages', 'id,inquiry_id,sender_id', 'inquiry_id', inquiryIds, 25)),
+  ]);
+
+  const notificationContentRes = await runQuery('notifications by codex content', () =>
+    supabase
+      .from('notifications')
+      .select('id,user_id,title,message')
+      .or(CODEX_NOTIFICATION_FILTER)
   );
   const emailByUserId = new Map(
     [
@@ -155,7 +241,17 @@ async function collectCleanupTargets() {
     hostApplications: hostApplicationsRes.data || [],
     adminTasks: adminTasksRes.data || [],
     adminTaskComments: adminTaskCommentsRes.data || [],
-    bookings: bookingsRes.data || [],
+    experiences: experienceRows,
+    bookings: bookingRows,
+    reviews: reviewRows,
+    guestReviews: guestReviewRows,
+    wishlists: wishlistRows,
+    experienceAvailability: experienceAvailabilityRows,
+    serviceRequests: serviceRequestRows,
+    serviceApplications: serviceApplicationRows,
+    serviceBookings: serviceBookingRows,
+    inquiries: inquiryRows,
+    inquiryMessages: inquiryMessageRows,
     notificationsExecute: executeNotifications,
     notificationsReview: reviewNotifications,
     profiles: (profileEmailRes.data || []).map((row) => ({ id: row.id, email: row.email })),
@@ -175,7 +271,17 @@ function printSummary(targets) {
     ['notifications_review', targets.notificationsReview.length],
     ['admin_tasks', targets.adminTasks.length],
     ['admin_task_comments', targets.adminTaskComments.length],
+    ['experiences', targets.experiences.length],
     ['bookings', targets.bookings.length],
+    ['reviews', targets.reviews.length],
+    ['guest_reviews', targets.guestReviews.length],
+    ['wishlists', targets.wishlists.length],
+    ['experience_availability', targets.experienceAvailability.length],
+    ['service_requests', targets.serviceRequests.length],
+    ['service_applications', targets.serviceApplications.length],
+    ['service_bookings', targets.serviceBookings.length],
+    ['inquiries', targets.inquiries.length],
+    ['inquiry_messages', targets.inquiryMessages.length],
   ];
 
   console.log(JSON.stringify(summary.map(([table, count]) => ({ table, count })), null, 2));
@@ -204,9 +310,19 @@ async function executeCleanup(targets) {
       ...(shouldIncludeContentNotifications ? targets.notificationsReview.map((row) => row.id) : []),
     ]
   );
+  deleted.inquiryMessages = await deleteByIds('inquiry_messages', targets.inquiryMessages.map((row) => row.id));
+  deleted.guestReviews = await deleteByIds('guest_reviews', targets.guestReviews.map((row) => row.id));
+  deleted.reviews = await deleteByIds('reviews', targets.reviews.map((row) => row.id));
   deleted.adminTaskComments = await deleteByIds('admin_task_comments', targets.adminTaskComments.map((row) => row.id));
   deleted.adminTasks = await deleteByIds('admin_tasks', targets.adminTasks.map((row) => row.id));
   deleted.bookings = await deleteByIds('bookings', targets.bookings.map((row) => row.id));
+  deleted.serviceBookings = await deleteByIds('service_bookings', targets.serviceBookings.map((row) => row.id));
+  deleted.serviceApplications = await deleteByIds('service_applications', targets.serviceApplications.map((row) => row.id));
+  deleted.inquiries = await deleteByIds('inquiries', targets.inquiries.map((row) => row.id));
+  deleted.wishlists = await deleteByIds('wishlists', targets.wishlists.map((row) => row.id));
+  deleted.experienceAvailability = await deleteByIds('experience_availability', targets.experienceAvailability.map((row) => row.id));
+  deleted.experiences = await deleteByIds('experiences', targets.experiences.map((row) => row.id));
+  deleted.serviceRequests = await deleteByIds('service_requests', targets.serviceRequests.map((row) => row.id));
   deleted.hostApplications = await deleteByIds('host_applications', targets.hostApplications.map((row) => row.id));
   deleted.adminAuditLogs = await deleteByIds('admin_audit_logs', targets.adminAuditLogs.map((row) => row.id));
 
