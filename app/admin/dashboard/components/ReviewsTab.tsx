@@ -159,7 +159,7 @@ export default function ReviewsTab() {
                 {/* 게스트 아바타 */}
                 <div className="w-9 h-9 rounded-full bg-slate-200 overflow-hidden shrink-0 border border-slate-100">
                   {review.guest?.avatar_url
-                    ? <Image src={review.guest.avatar_url} width={36} height={36} className="w-full h-full object-cover" alt="" />
+                    ? <Image src={review.guest.avatar_url} width={36} height={36} unoptimized className="w-full h-full object-cover" alt="" />
                     : <div className="w-full h-full flex items-center justify-center text-xs text-slate-400 font-bold">
                         {review.guest?.full_name?.[0] || '?'}
                       </div>
@@ -213,6 +213,7 @@ export default function ReviewsTab() {
                             alt=""
                             width={48}
                             height={48}
+                            unoptimized
                             className="w-12 h-12 rounded-lg object-cover border border-slate-100 hover:opacity-80 transition-opacity"
                           />
                         </a>

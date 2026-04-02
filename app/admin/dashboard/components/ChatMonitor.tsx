@@ -400,7 +400,7 @@ export default function ChatMonitor() {
 
                 <div className="w-8 h-8 md:w-12 md:h-12 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden border border-slate-200 shadow-sm shrink-0">
                   {selectedInquiry.guest?.avatar_url ? (
-                    <Image src={selectedInquiry.guest.avatar_url} className="w-full h-full object-cover" alt="Profile" width={48} height={48} />
+                    <Image src={selectedInquiry.guest.avatar_url} className="w-full h-full object-cover" alt="Profile" width={48} height={48} unoptimized />
                   ) : (
                     <User className="text-slate-400 w-4 h-4 md:w-6 md:h-6" />
                   )}
@@ -446,6 +446,7 @@ export default function ChatMonitor() {
                           alt="게스트 프로필"
                           width={44}
                           height={44}
+                          unoptimized
                         />
                       ) : (
                         <User className="h-5 w-5 text-slate-400" />
@@ -480,6 +481,7 @@ export default function ChatMonitor() {
                           alt="호스트 프로필"
                           width={44}
                           height={44}
+                          unoptimized
                         />
                       ) : (
                         <User className="h-5 w-5 text-slate-400" />

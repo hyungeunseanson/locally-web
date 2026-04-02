@@ -204,7 +204,7 @@ export default function ReservationCard({
                 >
                   <div className="relative h-8 w-8 shrink-0 rounded-full border border-slate-200 bg-slate-100 overflow-hidden">
                     {res.guest?.avatar_url ? (
-                      <Image src={secureUrl(res.guest.avatar_url)!} alt={guestName} fill sizes="32px" className="object-cover" />
+                      <Image src={secureUrl(res.guest.avatar_url)!} alt={guestName} fill sizes="32px" unoptimized className="object-cover" />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center">
                         <User size={14} className="text-slate-400" />
@@ -335,7 +335,7 @@ export default function ReservationCard({
             >
               <div className="relative w-12 h-12 rounded-full bg-slate-100 overflow-hidden border border-slate-200 group-hover/profile:ring-2 ring-slate-900 transition-all shrink-0">
                 {res.guest?.avatar_url ? (
-                  <Image src={secureUrl(res.guest.avatar_url)!} alt={guestName} fill sizes="48px" className="object-cover" />
+                  <Image src={secureUrl(res.guest.avatar_url)!} alt={guestName} fill sizes="48px" unoptimized className="object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-slate-400"><User size={20} /></div>
                 )}

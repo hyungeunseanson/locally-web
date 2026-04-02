@@ -100,6 +100,7 @@ export default function ChatParticipantProfileModal({
                   alt={`${title} 아바타`}
                   width={64}
                   height={64}
+                  unoptimized
                   className="h-full w-full object-cover"
                 />
               ) : (
