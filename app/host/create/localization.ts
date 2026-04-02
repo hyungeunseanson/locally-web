@@ -733,7 +733,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     ageLimitHelp: '当日に混乱が起きないよう、参加基準ははっきり書いてください。',
     activityLevelLabel: '活動強度',
     hostNoticeLabel: 'ホストからの案内',
-    hostNoticeHelp: '予約前に必ず知っておいてほしいことを書いてください。例：2名から開催、室内 진행、階段 이동あり、早朝開始。',
+    hostNoticeHelp: '予約前に必ず知っておいてほしいことを書いてください。例：2名から開催、室内実施、階段移動あり、早朝開始。',
     hostNoticePlaceholder: '例）この体験は2名から開催です。人数が集まらない場合は日程調整またはキャンセルとなることがあります。',
     refundPolicyLabel: '返金ポリシー',
     refundPolicyHelp: '返金ポリシーは固定で自動適用されます。',
@@ -754,8 +754,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     pricingGuideExamplesTitle: '価格を考えるときのチェック例',
     pricingGuideExamples: [
       '基本価格の例：2時間の散策＋軽いおやつ＋写真スポット案内',
-      'プライベート価格の例：1組限定で参加し、動線調整まで含まれる場合',
-      '安すぎる価格より、何が含まれているかが伝わる価格のほうが信頼されやすいです。',
+      'プライベート価格の例：1組限定で参加し、動線調整まで含まれる場合。安すぎる価格より、何が含まれているかが伝わる価格のほうが信頼されやすいです。',
     ],
     privateOptionLabel: 'プライベートツアーオプション',
     privateOptionDesc: '他のゲストなしで、グループだけが参加するプライベートツアーの価格を設定します。',
