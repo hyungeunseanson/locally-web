@@ -331,6 +331,12 @@ async function login(page: Page, user: TestUser) {
   await page.waitForLoadState('networkidle');
 }
 
+async function confirmModalAction(page: Page, title: string, confirmLabel: string) {
+  const modal = page.locator('div.fixed.inset-0.z-\\[9999\\]');
+  await expect(modal.getByRole('heading', { name: title })).toBeVisible({ timeout: 10000 });
+  await modal.getByRole('button', { name: confirmLabel }).click();
+}
+
 test.afterAll(async () => {
   const supabase = getAdminClient();
 
@@ -390,10 +396,14 @@ test.describe.serial('Admin service requests smoke', () => {
     await expect(page.getByText('입금 확인 시 의뢰가 공개되고 호스트 모집이 바로 시작됩니다.')).toBeVisible();
     await expect(page.getByRole('button', { name: /💰 입금 확인/ })).toBeVisible();
 
-    page.once('dialog', async (dialog) => {
-      await dialog.accept();
-    });
+    const confirmPaymentResponsePromise = page.waitForResponse((response) =>
+      response.url().includes('/api/admin/service-confirm-payment') &&
+      response.request().method() === 'POST'
+    );
     await page.getByRole('button', { name: /💰 입금 확인/ }).click();
+    await confirmModalAction(page, '입금 확인', '입금 확인');
+    const confirmPaymentResponse = await confirmPaymentResponsePromise;
+    expect(confirmPaymentResponse.ok()).toBeTruthy();
     await expect(page.getByText('입금 확인 완료. 의뢰가 공개되었습니다.')).toBeVisible({ timeout: 20000 });
 
     await page.getByRole('button', { name: '정산 대기' }).click();
@@ -403,10 +413,14 @@ test.describe.serial('Admin service requests smoke', () => {
     await expect(page.getByRole('button', { name: /이체 완료 처리/ })).toBeVisible();
     await expect(page.getByRole('button', { name: /명세서 CSV/ })).toBeVisible();
 
-    page.once('dialog', async (dialog) => {
-      await dialog.accept();
-    });
+    const markPaidResponsePromise = page.waitForResponse((response) =>
+      response.url().includes('/api/admin/service-payouts/mark-paid') &&
+      response.request().method() === 'POST'
+    );
     await page.getByRole('button', { name: /이체 완료 처리/ }).click();
+    await confirmModalAction(page, '정산 완료 처리', '정산 완료');
+    const markPaidResponse = await markPaidResponsePromise;
+    expect(markPaidResponse.ok()).toBeTruthy();
     await expect(page.getByText('정산 완료 처리되었습니다.')).toBeVisible({ timeout: 20000 });
 
     await page.getByRole('button', { name: '취소·환불 내역' }).click();

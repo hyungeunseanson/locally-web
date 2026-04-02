@@ -118,6 +118,10 @@ async function closeAnalyticsModal(page: Page) {
   await expect(overlay).toBeHidden({ timeout: 10000 });
 }
 
+function countRouteHits(urls: string[], route: string) {
+  return urls.filter((url) => url.includes(route)).length;
+}
+
 test.afterAll(async () => {
   const supabase = getAdminClient();
 
@@ -139,8 +143,16 @@ test.describe.serial('Admin analytics smoke', () => {
     const adminUser = createAdminUser();
     await createAuthUser(adminUser);
 
-    const analyticsHostSummaryPromise = page.waitForResponse((response) =>
-      response.url().includes('/api/admin/analytics-host-summary') && response.request().method() === 'GET'
+    const analyticsResponseUrls: string[] = [];
+    page.on('response', (response) => {
+      const url = response.url();
+      if (response.request().method() !== 'GET') return;
+      if (!url.includes('/api/admin/analytics-')) return;
+      analyticsResponseUrls.push(url);
+    });
+
+    const analyticsSummaryPromise = page.waitForResponse((response) =>
+      response.url().includes('/api/admin/analytics-summary') && response.request().method() === 'GET'
     );
     const analyticsSearchIntentPromise = page.waitForResponse((response) =>
       response.url().includes('/api/admin/analytics-search-intent') && response.request().method() === 'GET'
@@ -151,9 +163,14 @@ test.describe.serial('Admin analytics smoke', () => {
 
     await login(page, adminUser);
     await page.goto('/admin/dashboard?tab=ANALYTICS', { waitUntil: 'networkidle' });
-    await analyticsHostSummaryPromise;
+    await analyticsSummaryPromise;
     await analyticsSearchIntentPromise;
     await analyticsCustomerCompositionPromise;
+
+    expect(countRouteHits(analyticsResponseUrls, '/api/admin/analytics-summary')).toBeGreaterThan(0);
+    expect(countRouteHits(analyticsResponseUrls, '/api/admin/analytics-search-intent')).toBeGreaterThan(0);
+    expect(countRouteHits(analyticsResponseUrls, '/api/admin/analytics-customer-composition')).toBeGreaterThan(0);
+    expect(countRouteHits(analyticsResponseUrls, '/api/admin/analytics-host-summary')).toBe(0);
 
     await expect(page.getByRole('heading', { name: '데이터 심층 분석' })).toBeVisible({ timeout: 15000 });
     await expect(page.getByRole('button', { name: 'Business & Guest' })).toBeVisible();
@@ -227,7 +244,13 @@ test.describe.serial('Admin analytics smoke', () => {
     });
 
     await test.step('Open Host tab after host summary load', async () => {
+      const hostSummaryCountBefore = countRouteHits(analyticsResponseUrls, '/api/admin/analytics-host-summary');
+      const hostSummaryPromise = page.waitForResponse((response) =>
+        response.url().includes('/api/admin/analytics-host-summary') && response.request().method() === 'GET'
+      );
       await page.getByRole('button', { name: 'Host Ecosystem' }).click();
+      await hostSummaryPromise;
+      expect(countRouteHits(analyticsResponseUrls, '/api/admin/analytics-host-summary')).toBe(hostSummaryCountBefore + 1);
       await expect(page.getByText('호스트 퍼널 / 유망주 / 집중 관리 기준')).toBeVisible({ timeout: 10000 });
       await expect(page.getByText('퍼널은 지원부터 첫 결제 창출까지의 흐름이며, 유망주는 평점 4.0 이상·취소 0건, 집중 관리는 취소 누적 또는 저평점 호스트 기준입니다.')).toBeVisible();
       await expect(page.getByText('응답시간 / 응답률 기준')).toBeVisible();
@@ -238,12 +261,34 @@ test.describe.serial('Admin analytics smoke', () => {
     });
 
     await test.step('Open Review Quality and audit role copy', async () => {
+      const summaryCountsBeforeReviews = {
+        business: countRouteHits(analyticsResponseUrls, '/api/admin/analytics-summary'),
+        host: countRouteHits(analyticsResponseUrls, '/api/admin/analytics-host-summary'),
+        searchIntent: countRouteHits(analyticsResponseUrls, '/api/admin/analytics-search-intent'),
+        customerComposition: countRouteHits(analyticsResponseUrls, '/api/admin/analytics-customer-composition'),
+      };
       await page.getByRole('button', { name: 'Review Quality' }).click();
+      await page.waitForLoadState('networkidle');
+      expect(countRouteHits(analyticsResponseUrls, '/api/admin/analytics-summary')).toBe(summaryCountsBeforeReviews.business);
+      expect(countRouteHits(analyticsResponseUrls, '/api/admin/analytics-host-summary')).toBe(summaryCountsBeforeReviews.host);
+      expect(countRouteHits(analyticsResponseUrls, '/api/admin/analytics-search-intent')).toBe(summaryCountsBeforeReviews.searchIntent);
+      expect(countRouteHits(analyticsResponseUrls, '/api/admin/analytics-customer-composition')).toBe(summaryCountsBeforeReviews.customerComposition);
       await expect(page.getByText('Review Quality는 리뷰 품질과 이상 징후를 보는 운영 구간입니다.')).toBeVisible({ timeout: 10000 });
       await expect(page.getByText('리뷰 삭제, 미응답 상태, 후기 내용 확인처럼 품질 관리에 필요한 작업만 집중해서 봅니다.')).toBeVisible();
       await expect(page.getByRole('heading', { name: /리뷰 품질 관리/ })).toBeVisible();
 
+      const summaryCountsBeforeLogs = {
+        business: countRouteHits(analyticsResponseUrls, '/api/admin/analytics-summary'),
+        host: countRouteHits(analyticsResponseUrls, '/api/admin/analytics-host-summary'),
+        searchIntent: countRouteHits(analyticsResponseUrls, '/api/admin/analytics-search-intent'),
+        customerComposition: countRouteHits(analyticsResponseUrls, '/api/admin/analytics-customer-composition'),
+      };
       await page.getByRole('button', { name: '운영 감사 로그' }).click();
+      await page.waitForLoadState('networkidle');
+      expect(countRouteHits(analyticsResponseUrls, '/api/admin/analytics-summary')).toBe(summaryCountsBeforeLogs.business);
+      expect(countRouteHits(analyticsResponseUrls, '/api/admin/analytics-host-summary')).toBe(summaryCountsBeforeLogs.host);
+      expect(countRouteHits(analyticsResponseUrls, '/api/admin/analytics-search-intent')).toBe(summaryCountsBeforeLogs.searchIntent);
+      expect(countRouteHits(analyticsResponseUrls, '/api/admin/analytics-customer-composition')).toBe(summaryCountsBeforeLogs.customerComposition);
       await expect(page.getByText('운영 감사 로그는 관리자 작업 추적용 구간입니다.')).toBeVisible({ timeout: 10000 });
       await expect(page.getByText('누가 어떤 운영 액션을 언제 수행했는지 확인하는 감사 이력만 보여주며, 일반 분석 숫자와는 분리해서 읽어야 합니다.')).toBeVisible();
       await expect(page.getByRole('heading', { name: /운영 감사 로그/ })).toBeVisible();
