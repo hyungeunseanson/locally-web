@@ -210,8 +210,8 @@ function PaymentCompleteContent() {
         <div className="bg-slate-50 rounded-2xl md:rounded-3xl p-4 md:p-10 border border-slate-100 shadow-sm text-left mb-8 md:mb-10 max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '300ms', animationFillMode: 'both' }}>
           <div className="flex flex-col md:flex-row gap-4 md:gap-6 items-start">
             {/* 이미지 */}
-            <div className="w-full md:w-32 h-28 md:h-32 bg-slate-200 rounded-xl md:rounded-2xl relative overflow-hidden shrink-0 shadow-inner">
-              <Image src={bookingImage} alt={t('pay_complete_image_alt')} fill className="object-cover" />
+              <div className="w-full md:w-32 h-28 md:h-32 bg-slate-200 rounded-xl md:rounded-2xl relative overflow-hidden shrink-0 shadow-inner">
+              <Image src={bookingImage} alt={t('pay_complete_image_alt')} fill unoptimized className="object-cover" />
             </div>
 
             {/* 텍스트 정보 */}
@@ -262,7 +262,7 @@ function PaymentCompleteContent() {
           <Link href="/guest/trips" className="flex items-center justify-center gap-2 py-3 md:py-4 px-4 md:px-6 bg-slate-900 text-white hover:bg-black hover:shadow-lg rounded-xl md:rounded-2xl transition-all font-bold text-[13px] md:text-base">
             <ArrowRight className="w-4 h-4 md:w-[18px] md:h-[18px]" /> {t('pay_complete_view_detail')}
           </Link>
-          <Link href={messageHref} className="flex items-center justify-center gap-2 py-3 md:py-4 px-4 md:px-6 bg-blue-600 text-white hover:bg-blue-700 hover:shadow-lg rounded-xl md:rounded-2xl transition-all font-bold text-[13px] md:text-base">
+          <Link href={messageHref} className="flex items-center justify-center gap-2 py-3 md:py-4 px-4 md:px-6 border border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200 hover:text-slate-900 hover:shadow-md rounded-xl md:rounded-2xl transition-all font-bold text-[13px] md:text-base">
             <MessageCircle className="w-4 h-4 md:w-[18px] md:h-[18px]" /> {t('pay_complete_message_cta')}
           </Link>
           <button onClick={handleAddToCalendar} className="flex items-center justify-center gap-2 py-3 md:py-4 px-4 md:px-6 bg-white border border-slate-200 hover:border-black hover:shadow-md rounded-xl md:rounded-2xl transition-all font-bold text-[13px] md:text-base text-slate-700">

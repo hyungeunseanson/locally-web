@@ -12,15 +12,15 @@ export async function GET(request: Request) {
   try {
     const supabase = createAdminClient();
 
-    // 1 hour ago
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    // 2 hours ago
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
 
-    // Find pending bookings older than 1 hour
+    // Find pending bookings older than 2 hours
     const { data: expiredBookings, error } = await supabase
       .from('bookings')
       .select('id, created_at')
       .eq('status', 'PENDING')
-      .lt('created_at', oneHourAgo);
+      .lt('created_at', twoHoursAgo);
 
     if (error) throw error;
 
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
       .from('bookings')
       .update({
         status: 'cancelled',
-        cancel_reason: '입금 기한 만료 (1시간 경과 자동 취소)'
+        cancel_reason: '입금 기한 만료 (2시간 경과 자동 취소)'
       })
       .in('id', expiredIds)
       .eq('status', 'PENDING');
@@ -44,8 +44,9 @@ export async function GET(request: Request) {
     console.log(`[CRON] Auto-cancelled ${expiredBookings.length} pending bookings.`);
 
     return NextResponse.json({ success: true, count: expiredBookings.length, ids: expiredIds });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[CRON] Error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    const message = err instanceof Error ? err.message : 'Unknown cron error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

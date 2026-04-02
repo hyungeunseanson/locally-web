@@ -65,7 +65,7 @@ test.describe.serial('Experience bank payment success', () => {
 
     const orderId = new URL(page.url()).searchParams.get('orderId');
     expect(orderId).toBeTruthy();
-    await expect(page.getByRole('heading', { name: /입금 대기 중입니다!|Payment Complete!|Your booking is confirmed!|Your payment is pending!/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /입금 대기 중입니다|Payment Complete!|Your booking is confirmed!|Your payment is pending!?/ })).toBeVisible();
     await expect(page.getByText(orderId as string).first()).toBeVisible({ timeout: 15000 });
   });
 });

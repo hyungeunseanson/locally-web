@@ -329,7 +329,7 @@ test.describe.serial('Live guest post-booking experience flow', () => {
     });
 
     await test.step('Move from payment complete page into guest trips', async () => {
-      await expect(page.getByText(/입금을 대기 중입니다|입금 확인 중|Payment pending/i)).toBeVisible({
+      await expect(page.getByText(/입금 대기 중입니다|입금 확인 중|Payment pending/i)).toBeVisible({
         timeout: 15000,
       });
       await expect(page.getByText(paymentBankAccount)).toBeVisible({ timeout: 10000 });
