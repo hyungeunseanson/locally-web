@@ -78,13 +78,20 @@ function buildHostApplicationStatusNotification(status: string, comment?: string
 }
 
 // ✅ 상태 변경 (승인/거절)
-export async function updateAdminStatus(table: 'host_applications' | 'experiences', id: string, status: string, comment?: string) {
+export async function updateAdminStatus(
+  table: 'host_applications' | 'experiences',
+  id: string | number,
+  status: string,
+  comment?: string
+) {
   const supabase = await getAdminClient();
   const { data: { user: adminUser } } = await supabase.auth.getUser();
   const supabaseAdmin = createAdminClient();
+  const trimmedComment = comment?.trim();
+  const targetId = String(id);
 
   // 🟢 [추가] 기록 전 대상 이름(제목/호스트명) 가져오기
-  let targetTitle = id;
+  let targetTitle = targetId;
   try {
     if (table === 'experiences') {
       const { data } = await supabaseAdmin.from('experiences').select('title').eq('id', id).maybeSingle();
@@ -96,7 +103,9 @@ export async function updateAdminStatus(table: 'host_applications' | 'experience
   } catch { }
 
   const updateData: { status: string; admin_comment?: string } = { status };
-  if (comment) updateData.admin_comment = comment;
+  if ((table === 'host_applications' || table === 'experiences') && trimmedComment) {
+    updateData.admin_comment = trimmedComment;
+  }
 
   const { error } = await supabaseAdmin.from(table).update(updateData).eq('id', id);
   if (error) throw new Error(error.message);
@@ -120,7 +129,7 @@ export async function updateAdminStatus(table: 'host_applications' | 'experience
         }
       }
 
-      const notification = buildHostApplicationStatusNotification(status, comment);
+      const notification = buildHostApplicationStatusNotification(status, trimmedComment);
       if (notification) {
         const notificationKey = status === 'approved'
           ? 'host_application.approved'
@@ -134,7 +143,7 @@ export async function updateAdminStatus(table: 'host_applications' | 'experience
           link: notification.link,
           key: notificationKey,
           copyParams: {
-            comment,
+            comment: trimmedComment,
           },
         });
         const { error: notificationError } = await supabaseAdmin.from('notifications').insert(notificationRow);
@@ -149,7 +158,7 @@ export async function updateAdminStatus(table: 'host_applications' | 'experience
             userId: app.user_id,
             key: notificationKey,
             copyParams: {
-              comment,
+              comment: trimmedComment,
             },
           });
 
@@ -174,11 +183,11 @@ export async function updateAdminStatus(table: 'host_applications' | 'experience
     admin_email: adminUser?.email,
     action_type: `UPDATE_${table.toUpperCase()}_STATUS`,
     target_type: table,
-    target_id: id,
+    target_id: targetId,
     details: {
       target_info: targetTitle,
       new_status: status,
-      comment
+      comment: trimmedComment
     }
   });
 

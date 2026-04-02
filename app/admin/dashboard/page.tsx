@@ -17,6 +17,7 @@ import AdminAlertsTab from './components/AdminAlertsTab';
 // Custom Hook
 import { useAdminUsersData } from './hooks/useAdminUsersData';
 import { useAdminApprovalsData } from './hooks/useAdminApprovalsData';
+import type { AdminPanelSelectedItem } from '@/app/types/admin';
 
 function subscribeToAdminTabStorage(callback: () => void) {
   if (typeof window === 'undefined') {
@@ -62,8 +63,8 @@ function DataDrivenAdminTab({
   activeTab: string;
   filter: string;
   setFilter: React.Dispatch<React.SetStateAction<string>>;
-  selectedItem: unknown;
-  setSelectedItem: React.Dispatch<React.SetStateAction<unknown>>;
+  selectedItem: AdminPanelSelectedItem | null;
+  setSelectedItem: React.Dispatch<React.SetStateAction<AdminPanelSelectedItem | null>>;
 }) {
   const { apps, exps, isLoading, updateStatus, deleteItem } = useAdminApprovalsData();
 
@@ -104,8 +105,8 @@ function ApprovalsDataTab({
   activeTab: string;
   filter: string;
   setFilter: React.Dispatch<React.SetStateAction<string>>;
-  selectedItem: unknown;
-  setSelectedItem: React.Dispatch<React.SetStateAction<unknown>>;
+  selectedItem: AdminPanelSelectedItem | null;
+  setSelectedItem: React.Dispatch<React.SetStateAction<AdminPanelSelectedItem | null>>;
 }) {
   const { apps, exps, isLoading, updateStatus, deleteItem } = useAdminApprovalsData();
 
@@ -130,7 +131,7 @@ function ApprovalsDataTab({
 
 function AdminDashboardContent() {
   const [filter, setFilter] = useState('ALL');
-  const [selectedItem, setSelectedItem] = useState<unknown>(null);
+  const [selectedItem, setSelectedItem] = useState<AdminPanelSelectedItem | null>(null);
   const searchParams = useSearchParams();
   const router = useRouter();
   const urlTab = searchParams.get('tab')?.toUpperCase();

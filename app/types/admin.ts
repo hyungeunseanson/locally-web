@@ -100,11 +100,31 @@ export interface HostApplication {
   content: Record<string, unknown> | null;
 }
 
+export type AdminApprovalTable = 'host_applications' | 'experiences';
+export type AdminItemId = string | number;
+
+export type AdminStatusChangeExecutor = (
+  table: AdminApprovalTable,
+  id: AdminItemId,
+  status: string,
+  comment?: string
+) => Promise<boolean>;
+
+export type AdminStatusChangeRequestHandler = (
+  table: AdminApprovalTable,
+  id: AdminItemId,
+  status: string
+) => Promise<void> | void;
+
+export type AdminDeleteExecutor = (table: string, id: AdminItemId) => Promise<boolean> | void;
+export type AdminDeleteRequestHandler = (table: string, id: AdminItemId) => Promise<void> | void;
+
 export interface ExperienceApprovalItem {
-  id: string;
+  id: AdminItemId;
   created_at: string;
   title: string;
   status: 'pending' | 'active' | 'rejected' | 'revision';
+  admin_comment?: string | null;
   price?: number;
   duration?: number;
   max_guests?: number;
@@ -114,6 +134,8 @@ export interface ExperienceApprovalItem {
   is_private_enabled?: boolean;
   private_price?: number;
   category?: string;
+  languages?: string[];
+  language_levels?: LanguageLevelEntry[];
   meeting_point?: string;
   location?: string;
   description?: string;
@@ -126,26 +148,90 @@ export interface ExperienceApprovalItem {
   profiles?: { full_name: string | null; email: string | null };
 }
 
+export type AdminPanelSelectedItem = Record<string, unknown> & {
+  id: AdminItemId;
+  created_at?: string;
+  status?: string | null;
+  profile_photo?: string | null;
+  avatar_url?: string | null;
+  name?: string | null;
+  title?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  host_nationality?: string | null;
+  dob?: string | null;
+  instagram?: string | null;
+  source?: string | null;
+  language_cert?: string | null;
+  target_language?: string | null;
+  self_intro?: string | null;
+  motivation?: string | null;
+  bank_name?: string | null;
+  account_number?: string | null;
+  account_holder?: string | null;
+  id_card_file?: string | null;
+  id_card_signed_url?: string | null;
+  admin_comment?: string | null;
+  languages?: string[] | null;
+  language_levels?: LanguageLevelEntry[] | null;
+  photos?: string[] | null;
+  price?: number | null;
+  duration?: number | null;
+  max_guests?: number | null;
+  city?: string | null;
+  country?: string | null;
+  subCity?: string | null;
+  is_private_enabled?: boolean | null;
+  private_price?: number | null;
+  category?: string | null;
+  meeting_point?: string | null;
+  location?: string | null;
+  description?: string | null;
+  supplies?: string | null;
+  itinerary?: { title: string; description: string }[] | null;
+  inclusions?: string[] | null;
+  exclusions?: string[] | null;
+  rules?: { age_limit?: string; activity_level?: string } | null;
+  profiles?: { full_name?: string | null; email?: string | null; name?: string | null; phone?: string | null } | null;
+  birth_date?: string | null;
+  nationality?: string | null;
+  kakao_id?: string | null;
+  mbti?: string | null;
+  user_name?: string | null;
+  user_phone?: string | null;
+  user_email?: string | null;
+  experience_title?: string | null;
+  experiences?: { title?: string | null } | null;
+  amount?: number | null;
+  total_price?: number | null;
+  guests?: number | string | null;
+  date?: string | null;
+  time?: string | null;
+  sender_name?: string | null;
+  receiver_name?: string | null;
+  content?: string | Record<string, unknown> | null;
+};
+
 export interface AdminManagementTabProps {
   activeTab: string;
   filter: string;
   setFilter: (f: string) => void;
   apps: HostApplication[];
   exps: ExperienceApprovalItem[];
-  users: any[];
-  messages: any[];
-  selectedItem: any;
-  setSelectedItem: (item: any) => void;
-  updateStatus: (table: 'host_applications' | 'experiences', id: string, status: string, comment?: string) => Promise<boolean> | void;
-  deleteItem: (table: string, id: string) => Promise<boolean> | void;
+  users: AdminPanelSelectedItem[];
+  messages: AdminPanelSelectedItem[];
+  selectedItem: AdminPanelSelectedItem | null;
+  setSelectedItem: (item: AdminPanelSelectedItem | null) => void;
+  updateStatus: AdminStatusChangeExecutor;
+  deleteItem: AdminDeleteExecutor;
 }
 
 export interface AdminDetailsPanelProps {
   activeTab: string;
-  selectedItem: any;
-  setSelectedItem: (item: any) => void;
-  updateStatus: (table: 'host_applications' | 'experiences', id: string, status: string, comment?: string) => Promise<boolean> | void;
-  deleteItem: (table: string, id: string) => Promise<boolean> | void;
+  selectedItem: AdminPanelSelectedItem | null;
+  setSelectedItem: (item: AdminPanelSelectedItem | null) => void;
+  onRequestStatusChange: AdminStatusChangeRequestHandler;
+  onRequestDeleteItem: AdminDeleteRequestHandler;
 }
 
 export interface AdminServiceBooking {

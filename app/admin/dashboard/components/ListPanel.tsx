@@ -4,6 +4,7 @@ import Image from 'next/image';
 import React from 'react';
 import { ChevronRight, User } from 'lucide-react';
 import { type LanguageLevelEntry, getLanguageNames } from '@/app/utils/languageLevels';
+import type { AdminPanelSelectedItem } from '@/app/types/admin';
 
 const OPTIMIZED_IMAGE_HOSTS = new Set([
   'images.unsplash.com',
@@ -27,7 +28,7 @@ function canUseOptimizedImage(src: string | null) {
 
 type ListPanelItem = {
   id: string | number;
-  created_at: string;
+  created_at?: string;
   status?: string | null;
   title?: string | null;
   name?: string | null;
@@ -45,7 +46,7 @@ type ListPanelItem = {
   profiles?: { full_name?: string | null } | null;
   sender_name?: string | null;
   receiver_name?: string | null;
-  content?: string | null;
+  content?: string | Record<string, unknown> | null;
 };
 
 interface ListPanelProps {
@@ -53,8 +54,8 @@ interface ListPanelProps {
   filter: string;
   setFilter: (value: string) => void;
   listItems: ListPanelItem[];
-  selectedItem: { id?: string | number } | null;
-  setSelectedItem: (item: ListPanelItem | null) => void;
+  selectedItem: AdminPanelSelectedItem | null;
+  setSelectedItem: (item: AdminPanelSelectedItem | null) => void;
 }
 
 export default function ListPanel({
@@ -121,9 +122,11 @@ export default function ListPanel({
                     <ChevronRight size={10} className="text-slate-300" />
                     <span className="bg-slate-900 text-white px-1.5 rounded">{item.receiver_name || 'Host'}</span>
                   </span>
-                  <span className="text-[10px] text-slate-400">{new Date(item.created_at).toLocaleString()}</span>
+                  <span className="text-[10px] text-slate-400">{item.created_at ? new Date(item.created_at).toLocaleString() : '-'}</span>
                 </div>
-                <p className="text-sm text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-100 line-clamp-2">{item.content}</p>
+                <p className="text-sm text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-100 line-clamp-2">
+                  {typeof item.content === 'string' ? item.content : ''}
+                </p>
               </div>
             );
           }
@@ -170,7 +173,7 @@ export default function ListPanel({
                       : activeTab === 'EXPS' ? `Host: ${item.profiles?.full_name || '알 수 없음'} | ₩${item.price?.toLocaleString()}`
                         : item.email}
                   </span>
-                  <span className="text-slate-400 font-mono">{new Date(item.created_at).toLocaleDateString()}</span>
+                  <span className="text-slate-400 font-mono">{item.created_at ? new Date(item.created_at).toLocaleDateString() : '-'}</span>
                 </div>
               </div>
             </div>

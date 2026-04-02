@@ -10,7 +10,13 @@ import {
   CreditCard, FileText, Shield, Download, Check, X
 } from 'lucide-react';
 import { formatLanguageLevelSummary, getLanguageNames, normalizeLanguageLevels, LanguageLevelEntry } from '@/app/utils/languageLevels';
-import { AdminDetailsPanelProps, type ExperienceApprovalItem, type HostApplication } from '@/app/types/admin';
+import {
+  AdminApprovalTable,
+  AdminDetailsPanelProps,
+  AdminItemId,
+  type AdminPanelSelectedItem,
+  type ExperienceApprovalItem,
+} from '@/app/types/admin';
 
 type ExperienceItineraryItem = NonNullable<ExperienceApprovalItem['itinerary']>[number];
 
@@ -26,11 +32,17 @@ interface StatSmallProps {
   color?: string;
 }
 
-export default function DetailsPanel({ activeTab, selectedItem: rawSelectedItem, setSelectedItem, updateStatus, deleteItem }: AdminDetailsPanelProps) {
+export default function DetailsPanel({
+  activeTab,
+  selectedItem: rawSelectedItem,
+  setSelectedItem,
+  onRequestStatusChange,
+  onRequestDeleteItem,
+}: AdminDetailsPanelProps) {
   const router = useRouter();
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [csLoading, setCsLoading] = useState(false);
-  const [appDetails, setAppDetails] = useState<HostApplication | null>(null);
+  const [appDetails, setAppDetails] = useState<AdminPanelSelectedItem | null>(null);
   const [appDetailsLoading, setAppDetailsLoading] = useState(false);
 
   const handleStartCSChat = async () => {
@@ -109,6 +121,12 @@ export default function DetailsPanel({ activeTab, selectedItem: rawSelectedItem,
     3
   );
   const applicationLanguageNames = getLanguageNames(applicationLanguageLevels);
+  const selectedAvatarSrc =
+    typeof selectedItem?.profile_photo === 'string' && selectedItem.profile_photo
+      ? selectedItem.profile_photo
+      : typeof selectedItem?.avatar_url === 'string' && selectedItem.avatar_url
+        ? selectedItem.avatar_url
+        : null;
 
   const closePanel = () => {
     setAppDetails(null);
@@ -116,22 +134,12 @@ export default function DetailsPanel({ activeTab, selectedItem: rawSelectedItem,
     setSelectedItem?.(null);
   };
 
-  const handleApprovalStatusUpdate = async (
-    table: 'host_applications' | 'experiences',
-    id: string,
-    status: string
-  ) => {
-    const success = await updateStatus(table, id, status);
-    if (success) {
-      closePanel();
-    }
+  const handleApprovalStatusUpdate = (table: AdminApprovalTable, id: AdminItemId, status: string) => {
+    void onRequestStatusChange(table, id, status);
   };
 
-  const handleApprovalDelete = async (table: 'host_applications' | 'experiences', id: string) => {
-    const success = await deleteItem(table, id);
-    if (success) {
-      closePanel();
-    }
+  const handleApprovalDelete = (table: AdminApprovalTable, id: AdminItemId) => {
+    void onRequestDeleteItem(table, id);
   };
 
   useEffect(() => {
@@ -180,7 +188,7 @@ export default function DetailsPanel({ activeTab, selectedItem: rawSelectedItem,
         <div className="border-b border-slate-100 pb-3 md:pb-5 flex justify-between items-start relative">
           {/* 🟢 [추가] 모바일 닫기 버튼 */}
           <button
-            onClick={() => setSelectedItem?.(null)}
+            onClick={closePanel}
             className="md:hidden absolute -top-2 right-0 p-2 text-slate-400 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors z-10"
           >
             <X size={20} />
@@ -188,9 +196,9 @@ export default function DetailsPanel({ activeTab, selectedItem: rawSelectedItem,
 
           <div className="flex items-center gap-2.5 md:gap-4 pr-10">
             <div className="relative w-10 h-10 md:w-14 md:h-14 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shrink-0">
-              {selectedItem.profile_photo || selectedItem.avatar_url ? (
+              {selectedAvatarSrc ? (
                 <Image
-                  src={selectedItem.profile_photo || selectedItem.avatar_url}
+                  src={selectedAvatarSrc}
                   alt={selectedItem.name || selectedItem.title || 'Selected item avatar'}
                   fill
                   sizes="56px"
@@ -247,7 +255,7 @@ export default function DetailsPanel({ activeTab, selectedItem: rawSelectedItem,
               >
                 <MessageCircle size={16} /> {csLoading ? '처리 중...' : '1:1 CS 메시지 보내기'}
               </button>
-              <button onClick={() => deleteItem('profiles', selectedItem.id)} className="w-full py-4 rounded-xl font-bold text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 transition-colors flex items-center justify-center gap-2"><Trash2 size={16} /> 계정 영구 삭제</button>
+              <button onClick={() => onRequestDeleteItem('profiles', selectedItem.id)} className="w-full py-4 rounded-xl font-bold text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 transition-colors flex items-center justify-center gap-2"><Trash2 size={16} /> 계정 영구 삭제</button>
             </div>
           </div>
         )}
@@ -301,8 +309,8 @@ export default function DetailsPanel({ activeTab, selectedItem: rawSelectedItem,
 
             {/* 소셜 & 유입경로 */}
             <div className="grid grid-cols-2 gap-2 md:gap-3">
-              <div className="bg-slate-50 p-2.5 md:p-3 rounded-lg border border-slate-100"><div className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mb-1">Instagram</div><div className="font-bold text-xs md:text-sm">{selectedItem.instagram || '-'}</div></div>
-              <div className="bg-slate-50 p-2.5 md:p-3 rounded-lg border border-slate-100"><div className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mb-1">가입 경로</div><div className="font-bold text-xs md:text-sm">{selectedItem.source || '-'}</div></div>
+              <div className="bg-slate-50 p-2.5 md:p-3 rounded-lg border border-slate-100"><div className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mb-1">Instagram</div><div className="font-bold text-xs md:text-sm">{typeof selectedItem.instagram === 'string' && selectedItem.instagram ? selectedItem.instagram : '-'}</div></div>
+              <div className="bg-slate-50 p-2.5 md:p-3 rounded-lg border border-slate-100"><div className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mb-1">가입 경로</div><div className="font-bold text-xs md:text-sm">{typeof selectedItem.source === 'string' && selectedItem.source ? selectedItem.source : '-'}</div></div>
             </div>
 
             <div className="bg-slate-50 p-3 md:p-4 rounded-xl text-[11px] md:text-xs leading-relaxed text-slate-700 border border-slate-100">
@@ -393,7 +401,7 @@ export default function DetailsPanel({ activeTab, selectedItem: rawSelectedItem,
             <div className="grid grid-cols-2 gap-2 md:gap-3">
               <InfoBox label="담당 호스트" value={selectedItem.profiles?.full_name || '알 수 없음'} />
               <InfoBox label="카테고리" value={selectedItem.category || '-'} />
-              <InfoBox label="가격" value={selectedItem.price !== undefined ? `₩${selectedItem.price.toLocaleString()}` : '-'} />
+              <InfoBox label="가격" value={selectedItem.price != null ? `₩${selectedItem.price.toLocaleString()}` : '-'} />
               <InfoBox label="소요 시간" value={selectedItem.duration ? `${selectedItem.duration}시간` : '-'} />
               <InfoBox label="최대 인원" value={selectedItem.max_guests ? `${selectedItem.max_guests}명` : '-'} />
               <InfoBox label="지역" value={selectedItem.city ? `${selectedItem.country || ''} > ${selectedItem.city}${selectedItem.subCity ? `, ${selectedItem.subCity}` : ''}` : '-'} />

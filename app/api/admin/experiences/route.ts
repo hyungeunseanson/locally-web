@@ -4,6 +4,34 @@ import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
+const ADMIN_EXPERIENCE_SELECT = `
+  id,
+  created_at,
+  title,
+  status,
+  admin_comment,
+  price,
+  duration,
+  max_guests,
+  city,
+  country,
+  is_private_enabled,
+  private_price,
+  category,
+  meeting_point,
+  location,
+  description,
+  supplies,
+  itinerary,
+  inclusions,
+  exclusions,
+  photos,
+  rules,
+  languages,
+  language_levels,
+  profiles!experiences_host_id_fkey(full_name, email)
+`;
+
 /**
  * GET /api/admin/experiences
  * 어드민 전용: experiences 전체 조회 (service_role 키 사용)
@@ -48,7 +76,7 @@ export async function GET(request: Request) {
 
         const { data, error } = await supabaseAdmin
             .from('experiences')
-            .select('*, profiles!experiences_host_id_fkey(full_name, email)')
+            .select(ADMIN_EXPERIENCE_SELECT)
             .order('created_at', { ascending: false })
             .limit(limitParam);
 

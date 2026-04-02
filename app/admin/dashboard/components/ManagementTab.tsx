@@ -5,12 +5,13 @@ import ListPanel from './ListPanel';
 import DetailsPanel from './DetailsPanel';
 import SettlementTab from './SettlementTab';
 import { Users, MapPin, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { AdminApprovalTable, AdminItemId, AdminManagementTabProps } from '@/app/types/admin';
 
 type ConfirmDialogState =
   | {
       kind: 'update-status';
-      table: 'host_applications' | 'experiences';
-      id: string;
+      table: AdminApprovalTable;
+      id: AdminItemId;
       status: string;
       title: string;
       description: string;
@@ -21,7 +22,7 @@ type ConfirmDialogState =
   | {
       kind: 'delete-item';
       table: string;
-      id: string;
+      id: AdminItemId;
       title: string;
       description: string;
       confirmLabel: string;
@@ -29,8 +30,6 @@ type ConfirmDialogState =
       requireComment?: false;
     }
   | null;
-
-import { AdminManagementTabProps } from '@/app/types/admin';
 
 export default function ManagementTab({
   activeTab, filter, setFilter,
@@ -54,10 +53,10 @@ export default function ManagementTab({
   // 현재 탭과 필터에 맞는 리스트 반환
   const getFilteredList = () => {
     if (effectiveTab === 'APPS') {
-      return apps.filter((i: any) => filter === 'ALL' ? true : filter === 'PENDING' ? i.status === 'pending' : i.status !== 'pending');
+      return apps.filter((i) => filter === 'ALL' ? true : filter === 'PENDING' ? i.status === 'pending' : i.status !== 'pending');
     }
     if (effectiveTab === 'EXPS') {
-      return exps.filter((i: any) => filter === 'ALL' ? true : filter === 'PENDING' ? i.status === 'pending' : i.status === 'active');
+      return exps.filter((i) => filter === 'ALL' ? true : filter === 'PENDING' ? i.status === 'pending' : i.status === 'active');
     }
     if (effectiveTab === 'CHATS') return messages;
     return users; // USERS
@@ -65,7 +64,13 @@ export default function ManagementTab({
 
   const listItems = getFilteredList();
 
-  const handleUpdateStatusClick = (table: 'host_applications' | 'experiences', id: string, status: string) => {
+  const handleSuccessfulMutation = () => {
+    setConfirmDialog(null);
+    setCommentInput('');
+    setSelectedItem(null);
+  };
+
+  const handleUpdateStatusClick = async (table: AdminApprovalTable, id: AdminItemId, status: string) => {
     if (status === 'rejected' || status === 'revision') {
       setConfirmDialog({
         kind: 'update-status',
@@ -91,13 +96,15 @@ export default function ManagementTab({
         requireComment: false,
       });
     } else {
-       // Just in case
-       updateStatus(table, id, status, '');
+      const success = await updateStatus(table, id, status, '');
+      if (success) {
+        handleSuccessfulMutation();
+      }
     }
     setCommentInput('');
   };
 
-  const handleDeleteItemClick = (table: string, id: string) => {
+  const handleDeleteItemClick = (table: string, id: AdminItemId) => {
     setConfirmDialog({
       kind: 'delete-item',
       table,
@@ -125,8 +132,7 @@ export default function ManagementTab({
     } finally {
       setIsProcessing(false);
       if (success) {
-        setConfirmDialog(null);
-        setCommentInput('');
+        handleSuccessfulMutation();
       }
     }
   };
@@ -143,13 +149,13 @@ export default function ManagementTab({
               onClick={() => { setSubTab('APPS'); setSelectedItem(null); setFilter('ALL'); }}
               className={`flex items-center gap-1.5 md:gap-2 px-2.5 md:px-4 py-1.5 md:py-2 rounded-md text-[11px] md:text-sm font-bold transition-all ${subTab === 'APPS' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
-              <Users size={14} className="md:w-4 md:h-4" /> 호스트 지원서 ({apps.filter((a: any) => a.status === 'pending').length})
+              <Users size={14} className="md:w-4 md:h-4" /> 호스트 지원서 ({apps.filter((a) => a.status === 'pending').length})
             </button>
             <button
               onClick={() => { setSubTab('EXPS'); setSelectedItem(null); setFilter('ALL'); }}
               className={`flex items-center gap-1.5 md:gap-2 px-2.5 md:px-4 py-1.5 md:py-2 rounded-md text-[11px] md:text-sm font-bold transition-all ${subTab === 'EXPS' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
-              <MapPin size={14} className="md:w-4 md:h-4" /> 체험 등록 ({exps.filter((e: any) => e.status === 'pending').length})
+              <MapPin size={14} className="md:w-4 md:h-4" /> 체험 등록 ({exps.filter((e) => e.status === 'pending').length})
             </button>
           </div>
         </div>
@@ -175,8 +181,8 @@ export default function ManagementTab({
               activeTab={effectiveTab}
               selectedItem={selectedItem}
               setSelectedItem={setSelectedItem}
-              updateStatus={handleUpdateStatusClick}
-              deleteItem={handleDeleteItemClick}
+              onRequestStatusChange={handleUpdateStatusClick}
+              onRequestDeleteItem={handleDeleteItemClick}
             />
           </div>
         )}

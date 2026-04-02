@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Browser, type Page } from '@playwright/test';
 
 type EnvMap = Record<string, string>;
 type TestUser = {
@@ -54,12 +54,12 @@ function createAdminUser(): TestUser {
   };
 }
 
-function createApplicantUser(): TestUser {
+function createApplicantUser(prefix: 'host' | 'applicant' = 'applicant'): TestUser {
   const timestamp = Date.now();
   return {
-    email: `codex.approvals.host.${timestamp}@example.com`,
+    email: `codex.approvals.${prefix}.${timestamp}@example.com`,
     password: TEST_PASSWORD,
-    fullName: `Approvals Host ${timestamp}`,
+    fullName: `Approvals ${prefix === 'host' ? 'Host' : 'Applicant'} ${timestamp}`,
     phone: `010${String(timestamp).slice(-8)}`,
   };
 }
@@ -114,7 +114,7 @@ async function createAuthUser(user: TestUser, isAdmin = false) {
   return data.user.id;
 }
 
-async function createPendingHostApplication(userId: string, user: TestUser) {
+async function createHostApplication(userId: string, user: TestUser, status: 'pending' | 'approved' = 'pending') {
   const supabase = getAdminClient();
   const { data, error } = await supabase
     .from('host_applications')
@@ -137,16 +137,28 @@ async function createPendingHostApplication(userId: string, user: TestUser) {
       account_number: '12345678901234',
       account_holder: user.fullName,
       motivation: '관리자 승인 관리 테스트를 위한 지원서입니다.',
-      status: 'pending',
+      status,
     })
     .select('id')
     .single();
 
   if (error || !data?.id) {
-    throw error || new Error('Failed to create pending host application.');
+    throw error || new Error('Failed to create host application.');
   }
 
   createdHostApplicationIds.push(data.id);
+
+  if (status === 'approved') {
+    const { error: roleError } = await supabase
+      .from('users')
+      .update({ role: 'host' })
+      .eq('id', userId);
+
+    if (roleError) {
+      console.warn('Approved host fixture could not update users.role:', roleError.message);
+    }
+  }
+
   return data.id;
 }
 
@@ -166,7 +178,7 @@ async function createPendingExperience(hostId: string) {
       language_levels: [{ language: '한국어', level: 5 }],
       duration: 2,
       max_guests: 4,
-      description: '승인 관리 E2E 테스트용 체험 설명입니다.',
+      description: '승인 관리 E2E 테스트용 체험 설명입니다. 호스트 재제출과 관리자 승인 흐름을 안정적으로 검증하기 위한 충분히 긴 소개 문구입니다.',
       itinerary: [{ title: '홍대입구역', description: '테스트 동선입니다.' }],
       spots: '홍대입구역',
       meeting_point: '홍대입구역 1번 출구',
@@ -233,17 +245,17 @@ async function assertHostApplicationStatus(applicationId: string, expectedStatus
   throw new Error(`Host application ${applicationId} did not reach ${expectedStatus}.`);
 }
 
-async function assertExperienceStatus(experienceId: number, expectedStatus: string) {
+async function assertExperienceStatus(experienceId: number, expectedStatus: string, expectedComment?: string) {
   const supabase = getAdminClient();
   for (let attempt = 0; attempt < 15; attempt += 1) {
     const { data, error } = await supabase
       .from('experiences')
-      .select('status')
+      .select('status, admin_comment')
       .eq('id', experienceId)
       .maybeSingle();
 
     if (error) throw error;
-    if (data?.status === expectedStatus) {
+    if (data?.status === expectedStatus && (!expectedComment || data.admin_comment === expectedComment)) {
       return;
     }
 
@@ -251,6 +263,32 @@ async function assertExperienceStatus(experienceId: number, expectedStatus: stri
   }
 
   throw new Error(`Experience ${experienceId} did not reach ${expectedStatus}.`);
+}
+
+async function openApprovals(page: Page) {
+  await page.goto('/admin/dashboard?tab=APPROVALS', { waitUntil: 'networkidle' });
+}
+
+async function openApprovalsExperienceSubtab(page: Page) {
+  await page.getByRole('button', { name: /체험 등록/ }).click();
+}
+
+async function openSelectedExperienceEditor(page: Page, experienceId: number) {
+  const editLink = page.locator(`a[href="/host/experiences/${experienceId}/edit"]`).last();
+  await expect(editLink).toBeVisible({ timeout: 15000 });
+  await editLink.scrollIntoViewIfNeeded();
+  await editLink.click();
+  await page.waitForURL(`**/host/experiences/${experienceId}/edit`, { timeout: 15000 });
+}
+
+async function updateExperienceTitleAndSave(page: Page, nextTitle: string) {
+  const titleInput = page.locator('input:not([type="file"])').first();
+  await expect(titleInput).toBeVisible({ timeout: 15000 });
+  await titleInput.fill(nextTitle);
+
+  const saveButton = page.getByRole('button', { name: /저장하기|Save|保存する|保存/ }).first();
+  await expect(saveButton).toBeVisible({ timeout: 15000 });
+  await saveButton.click();
 }
 
 test.afterAll(async () => {
@@ -276,61 +314,102 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Admin approvals smoke', () => {
-  test('handles host application revision and experience approval from approvals dashboard', async ({ page }) => {
-    test.setTimeout(90000);
+  test('handles host application revision, experience revision, host resubmission, and experience approval', async ({ browser }: { browser: Browser }) => {
+    test.setTimeout(120000);
 
     const adminUser = createAdminUser();
-    const applicantUser = createApplicantUser();
+    const applicantUser = createApplicantUser('applicant');
+    const hostUser = createApplicantUser('host');
 
     await createAuthUser(adminUser, true);
     const applicantUserId = await createAuthUser(applicantUser);
-    const hostApplicationId = await createPendingHostApplication(applicantUserId, applicantUser);
-    const experience = await createPendingExperience(applicantUserId);
-    const revisionReason = `E2E revision reason ${Date.now()}`;
+    const hostUserId = await createAuthUser(hostUser);
 
-    await login(page, adminUser);
-    await page.goto('/admin/dashboard?tab=APPROVALS', { waitUntil: 'networkidle' });
+    const hostApplicationId = await createHostApplication(applicantUserId, applicantUser, 'pending');
+    await createHostApplication(hostUserId, hostUser, 'approved');
+    const experience = await createPendingExperience(hostUserId);
 
-    await test.step('Request revision for a pending host application', async () => {
-      const hostListItem = page.locator('div.cursor-pointer').filter({ hasText: applicantUser.fullName }).first();
-      await expect(hostListItem).toBeVisible({ timeout: 15000 });
-      await hostListItem.click();
-      await expect(page.getByRole('button', { name: '보완 요청' })).toBeVisible({ timeout: 15000 });
+    const hostRevisionReason = `Host application revision ${Date.now()}`;
+    const experienceRevisionReason = `Experience revision ${Date.now()}`;
+    const resubmittedTitle = `${experience.title} Resubmitted`;
 
-      await page.getByRole('button', { name: '보완 요청' }).click();
+    const adminContext = await browser.newContext();
+    const hostContext = await browser.newContext();
+    const adminPage = await adminContext.newPage();
+    const hostPage = await hostContext.newPage();
 
-      // Wait for the custom dialog
-      const dialogTitle = page.locator('h4', { hasText: '보완 사유 입력' }).filter({ visible: true }).first();
-      await expect(dialogTitle).toBeVisible({ timeout: 5000 });
+    try {
+      await login(adminPage, adminUser);
+      await openApprovals(adminPage);
 
-      // Fill in textarea for comment
-      await page.locator('textarea[placeholder*="사유를 입력해주세요"]').filter({ visible: true }).first().fill(revisionReason);
+      await test.step('Request revision for a pending host application and close the details panel', async () => {
+        const hostListItem = adminPage.locator('div.cursor-pointer').filter({ hasText: applicantUser.fullName }).first();
+        await expect(hostListItem).toBeVisible({ timeout: 15000 });
+        await hostListItem.click();
 
-      // Click the dialog confirm button
-      await page.getByRole('button', { name: '보완 요청 전송' }).filter({ visible: true }).first().click();
+        const hostApproveButton = adminPage.getByRole('button', { name: /승인 \(호스트 권한 부여\)/ });
+        await expect(hostApproveButton).toBeVisible({ timeout: 15000 });
 
-      await assertHostApplicationStatus(hostApplicationId, 'revision', revisionReason);
-    });
+        await adminPage.getByRole('button', { name: '보완 요청' }).click();
+        await expect(adminPage.locator('h4', { hasText: '보완 사유 입력' }).filter({ visible: true }).first()).toBeVisible({ timeout: 5000 });
+        await adminPage.locator('textarea[placeholder*="사유를 입력해주세요"]').filter({ visible: true }).first().fill(hostRevisionReason);
+        await adminPage.getByRole('button', { name: '보완 요청 전송' }).filter({ visible: true }).first().click();
 
-    await test.step('Approve a pending experience from approvals dashboard', async () => {
-      await page.getByRole('button', { name: /체험 등록/ }).click();
+        await assertHostApplicationStatus(hostApplicationId, 'revision', hostRevisionReason);
+        await expect(hostApproveButton).not.toBeVisible({ timeout: 15000 });
+      });
 
-      const expListItem = page.locator('div.cursor-pointer').filter({ hasText: experience.title }).first();
-      await expect(expListItem).toBeVisible({ timeout: 15000 });
-      await expListItem.click();
-      const approveButton = page.locator('button').filter({ hasText: /^승인$/ }).first();
-      await expect(approveButton).toBeVisible({ timeout: 15000 });
+      await test.step('Request revision for a pending experience, persist admin_comment, and clear stale selection', async () => {
+        await openApprovalsExperienceSubtab(adminPage);
 
-      await approveButton.click();
+        const expListItem = adminPage.locator('div.cursor-pointer').filter({ hasText: experience.title }).first();
+        await expect(expListItem).toBeVisible({ timeout: 15000 });
+        await expListItem.click();
 
-      // Wait for the custom dialog
-      const dialogTitle = page.locator('h4', { hasText: '승인 확인' }).filter({ visible: true }).first();
-      await expect(dialogTitle).toBeVisible({ timeout: 5000 });
+        const experienceApproveButton = adminPage.locator('button').filter({ hasText: /^승인$/ }).first();
+        await expect(experienceApproveButton).toBeVisible({ timeout: 15000 });
 
-      // Click the dialog confirm button
-      await page.getByRole('button', { name: '승인 및 권한 부여' }).filter({ visible: true }).first().click();
+        await adminPage.getByRole('button', { name: '보완 요청' }).click();
+        await expect(adminPage.locator('h4', { hasText: '보완 사유 입력' }).filter({ visible: true }).first()).toBeVisible({ timeout: 5000 });
+        await adminPage.locator('textarea[placeholder*="사유를 입력해주세요"]').filter({ visible: true }).first().fill(experienceRevisionReason);
+        await adminPage.getByRole('button', { name: '보완 요청 전송' }).filter({ visible: true }).first().click();
 
-      await assertExperienceStatus(experience.id, 'active');
-    });
+        await assertExperienceStatus(experience.id, 'revision', experienceRevisionReason);
+        await expect(experienceApproveButton).not.toBeVisible({ timeout: 15000 });
+      });
+
+      await test.step('Host sees the revision comment and resubmits the experience back to pending', async () => {
+        await login(hostPage, hostUser);
+        await hostPage.goto('/host/dashboard?tab=experiences', { waitUntil: 'networkidle' });
+
+        await expect(hostPage.getByText(experienceRevisionReason)).toBeVisible({ timeout: 15000 });
+        await openSelectedExperienceEditor(hostPage, experience.id);
+        await updateExperienceTitleAndSave(hostPage, resubmittedTitle);
+
+        await assertExperienceStatus(experience.id, 'pending');
+      });
+
+      await test.step('Admin can approve the resubmitted experience from approvals dashboard', async () => {
+        await openApprovals(adminPage);
+        await openApprovalsExperienceSubtab(adminPage);
+
+        const expListItem = adminPage.locator('div.cursor-pointer').filter({ hasText: resubmittedTitle }).first();
+        await expect(expListItem).toBeVisible({ timeout: 15000 });
+        await expListItem.click();
+
+        const experienceApproveButton = adminPage.locator('button').filter({ hasText: /^승인$/ }).first();
+        await expect(experienceApproveButton).toBeVisible({ timeout: 15000 });
+        await experienceApproveButton.click();
+
+        await expect(adminPage.locator('h4', { hasText: '승인 확인' }).filter({ visible: true }).first()).toBeVisible({ timeout: 5000 });
+        await adminPage.getByRole('button', { name: '승인 및 권한 부여' }).filter({ visible: true }).first().click();
+
+        await assertExperienceStatus(experience.id, 'active');
+        await expect(experienceApproveButton).not.toBeVisible({ timeout: 15000 });
+      });
+    } finally {
+      await adminContext.close();
+      await hostContext.close();
+    }
   });
 });

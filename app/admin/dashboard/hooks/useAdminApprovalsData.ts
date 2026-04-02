@@ -4,9 +4,34 @@ import { useCallback, useEffect, useState } from 'react';
 import { useToast } from '@/app/context/ToastContext';
 import { updateAdminStatus } from '@/app/actions/admin';
 
-import { HostApplication, ExperienceApprovalItem } from '@/app/types/admin';
+import { AdminApprovalTable, AdminItemId, HostApplication, ExperienceApprovalItem } from '@/app/types/admin';
 
 const HOST_APPLICATION_SUMMARY_SELECT = 'id,user_id,created_at,name,status,host_nationality,profile_photo,languages,language_levels,target_language';
+
+type AdminApiPayload<T> = {
+  data?: T;
+  error?: string;
+};
+
+async function fetchAdminPayload<T>(url: string): Promise<AdminApiPayload<T>> {
+  const response = await fetch(url);
+
+  let payload: AdminApiPayload<T> = {};
+  try {
+    payload = await response.json();
+  } catch {
+    payload = {};
+  }
+
+  if (!response.ok) {
+    return {
+      data: payload.data,
+      error: payload.error || `Request failed (${response.status})`,
+    };
+  }
+
+  return payload;
+}
 
 export function useAdminApprovalsData() {
   const { showToast } = useToast();
@@ -19,26 +44,23 @@ export function useAdminApprovalsData() {
     setIsLoading(true);
     try {
       const [appsResult, expsResult] = await Promise.all([
-        fetch(`/api/admin/host-applications?select=${encodeURIComponent(HOST_APPLICATION_SUMMARY_SELECT)}`).then((response) =>
-          response.ok ? response.json() : { data: [] }
-        ),
-        fetch(`/api/admin/experiences`).then((response) =>
-          response.ok ? response.json() : { data: [] }
-        ),
+        fetchAdminPayload<HostApplication[]>(`/api/admin/host-applications?select=${encodeURIComponent(HOST_APPLICATION_SUMMARY_SELECT)}`),
+        fetchAdminPayload<ExperienceApprovalItem[]>(`/api/admin/experiences`),
       ]);
 
-      const appsArray = Array.isArray(appsResult)
-        ? appsResult
-        : Array.isArray(appsResult?.data)
-          ? appsResult.data
-          : [];
+      const appsArray = Array.isArray(appsResult.data) ? appsResult.data : [];
+      const expsArray = Array.isArray(expsResult.data) ? expsResult.data : [];
 
-      setApps(appsArray);
-      setExps(expsResult.data || []);
+      if (appsResult.error) {
+        throw new Error(appsResult.error);
+      }
 
       if (expsResult.error) {
-        throw expsResult.error;
+        throw new Error(expsResult.error);
       }
+
+      setApps(appsArray);
+      setExps(expsArray);
     } catch (error) {
       console.error('[useAdminApprovalsData] fetch error:', error);
       showToast('승인 데이터를 불러오지 못했습니다.', 'error');
@@ -54,8 +76,8 @@ export function useAdminApprovalsData() {
   }, [fetchApprovals]);
 
   const updateStatus = useCallback(async (
-    table: 'host_applications' | 'experiences',
-    id: string,
+    table: AdminApprovalTable,
+    id: AdminItemId,
     status: string,
     comment: string = ''
   ) => {
@@ -77,7 +99,7 @@ export function useAdminApprovalsData() {
     }
   }, [fetchApprovals, showToast]);
 
-  const deleteItem = useCallback(async (table: string, id: string) => {
+  const deleteItem = useCallback(async (table: string, id: AdminItemId) => {
 
     try {
       const response = await fetch('/api/admin/delete', {
