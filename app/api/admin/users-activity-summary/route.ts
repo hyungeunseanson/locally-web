@@ -57,7 +57,18 @@ function isConfirmedServiceBookingStatus(status: string | null) {
   return [...SERVICE_BOOKING_ACTIVE_STATUSES, ...SERVICE_BOOKING_COMPLETED_STATUSES].includes(status as never);
 }
 
-export async function GET() {
+function parseRequestedProfileIds(request: Request) {
+  const url = new URL(request.url);
+  const rawIds = url.searchParams.get('ids');
+
+  if (!rawIds) return [];
+
+  return Array.from(
+    new Set(rawIds.split(',').map((id) => id.trim()).filter(Boolean))
+  ).slice(0, 200);
+}
+
+export async function GET(request: Request) {
   try {
     const supabaseServer = await createServerClient();
     const { data: { user }, error: authError } = await supabaseServer.auth.getUser();
@@ -76,15 +87,20 @@ export async function GET() {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
     }
 
-    const { data: profileIdsData, error: profilesError } = await supabaseAdmin
-      .from('profiles')
-      .select('id')
-      .order('created_at', { ascending: false })
-      .limit(5000);
+    const requestedProfileIds = parseRequestedProfileIds(request);
+    let profileIds: string[] = requestedProfileIds;
 
-    if (profilesError) throw profilesError;
+    if (profileIds.length === 0) {
+      const { data: profileIdsData, error: profilesError } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .order('created_at', { ascending: false })
+        .limit(5000);
 
-    const profileIds = ((profileIdsData || []) as ProfileIdRow[]).map((profile) => profile.id).filter(Boolean);
+      if (profilesError) throw profilesError;
+
+      profileIds = ((profileIdsData || []) as ProfileIdRow[]).map((profile) => profile.id).filter(Boolean);
+    }
 
     if (profileIds.length === 0) {
       return NextResponse.json({ success: true, data: [] });

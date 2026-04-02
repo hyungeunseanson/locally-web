@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 // 🟢 [수정] 아이콘 추가 및 유틸리티 import
 import {
   Wifi, Search, User, Mail, Calendar, X, Phone, Clock, MapPin,
@@ -11,11 +11,10 @@ import { sendNotification } from '@/app/utils/notification';
 import { useToast } from '@/app/context/ToastContext';
 import { useConfirmDialog } from '@/app/hooks/useConfirmDialog';
 import type { AdminUserActivityBooking, AdminUserTimelineItem, AdminUserDashboardRow, OnlineUser } from '@/app/types/admin';
-import type { Profile } from '@/app/types';
 
 // 🟢 [Utility] 시간을 "방금 전", "5분 전" 등으로 변환하는 컴포넌트
 function TimeAgo({ dateString }: { dateString: string | null | undefined }) {
-  const [ticker, setTicker] = useState(0);
+  const [, setTicker] = useState(0);
 
   useEffect(() => {
     if (!dateString) return;
@@ -49,6 +48,9 @@ type UserActivitySummary = {
   recent_activity_at: string | null;
 };
 
+const BASE_PREFETCH_LIMIT = 50;
+const SUMMARY_SORT_PREFETCH_LIMIT = 200;
+
 function getUserRoleLabel(role?: string | null) {
   if (role === 'admin') return 'Admin';
   if (role === 'host') return 'Host';
@@ -72,13 +74,9 @@ function UserAvatarImage({
   sizes: string;
   fallbackClassName: string;
 }) {
-  const [hasError, setHasError] = useState(false);
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
 
-  useEffect(() => {
-    setHasError(false);
-  }, [src]);
-
-  if (!src || hasError) {
+  if (!src || failedSrc === src) {
     return <User className={fallbackClassName} />;
   }
 
@@ -90,7 +88,7 @@ function UserAvatarImage({
       sizes={sizes}
       unoptimized
       className="object-cover"
-      onError={() => setHasError(true)}
+      onError={() => setFailedSrc(src)}
     />
   );
 }
@@ -122,7 +120,9 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: {
   const [userTimeline, setUserTimeline] = useState<AdminUserTimelineItem[]>([]);
   const [isActivityLoading, setIsActivityLoading] = useState(false);
   const [activitySummaryMap, setActivitySummaryMap] = useState<Map<string, UserActivitySummary>>(new Map());
-  const [isSummaryLoading, setIsSummaryLoading] = useState(false);
+  const [loadingSummaryIds, setLoadingSummaryIds] = useState<Set<string>>(new Set());
+  const cachedSummaryIdsRef = useRef<Set<string>>(new Set());
+  const inFlightSummaryIdsRef = useRef<Set<string>>(new Set());
 
   // 🟢 [수정] 검색 필터 변경 시 다중 선택 내용 즉시 초기화
   useEffect(() => {
@@ -130,56 +130,65 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: {
   }, [searchTerm, roleFilter, showOnlineOnly]);
 
   useEffect(() => {
-    let isMounted = true;
+    cachedSummaryIdsRef.current = new Set(activitySummaryMap.keys());
+  }, [activitySummaryMap]);
 
-    const fetchUserActivitySummary = async () => {
-      if (!Array.isArray(users) || users.length === 0) {
-        if (isMounted) {
-          setActivitySummaryMap(new Map());
-          setIsSummaryLoading(false);
-        }
-        return;
+  useEffect(() => {
+    if (Array.isArray(users) && users.length > 0) return;
+    cachedSummaryIdsRef.current = new Set();
+    inFlightSummaryIdsRef.current = new Set();
+    setActivitySummaryMap(new Map());
+    setLoadingSummaryIds(new Set());
+  }, [users]);
+
+  const fetchUserActivitySummaryByIds = useCallback(async (ids: string[]) => {
+    const requestedIds = Array.from(
+      new Set(ids.map((id) => id.trim()).filter(Boolean))
+    ).filter((id) => (
+      !cachedSummaryIdsRef.current.has(id) &&
+      !inFlightSummaryIdsRef.current.has(id)
+    ));
+
+    if (requestedIds.length === 0) return;
+
+    requestedIds.forEach((id) => inFlightSummaryIdsRef.current.add(id));
+    setLoadingSummaryIds((prev) => {
+      const next = new Set(prev);
+      requestedIds.forEach((id) => next.add(id));
+      return next;
+    });
+
+    try {
+      const params = new URLSearchParams({ ids: requestedIds.join(',') });
+      const response = await fetch(`/api/admin/users-activity-summary?${params.toString()}`);
+      const result = await response.json();
+
+      if (!response.ok || result?.success === false) {
+        throw new Error(result?.error || '회원 활동 요약 조회 실패');
       }
 
-      setIsSummaryLoading(true);
-
-      try {
-        const response = await fetch('/api/admin/users-activity-summary');
-        const result = await response.json();
-
-        if (!response.ok || result?.success === false) {
-          throw new Error(result?.error || '회원 활동 요약 조회 실패');
-        }
-
-        const nextSummaryMap = new Map<string, UserActivitySummary>();
+      setActivitySummaryMap((prev) => {
+        const nextSummaryMap = new Map(prev);
 
         (result?.data || []).forEach((summary: UserActivitySummary) => {
           if (!summary?.id) return;
           nextSummaryMap.set(summary.id, summary);
         });
 
-        if (isMounted) {
-          setActivitySummaryMap(nextSummaryMap);
-        }
-      } catch (error) {
-        console.error('Failed to fetch user activity summary', error);
-        if (isMounted) {
-          setActivitySummaryMap(new Map());
-          showToast('회원 활동 요약을 불러오지 못했습니다.', 'error');
-        }
-      } finally {
-        if (isMounted) {
-          setIsSummaryLoading(false);
-        }
-      }
-    };
-
-    fetchUserActivitySummary();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [users, showToast]);
+        return nextSummaryMap;
+      });
+    } catch (error) {
+      console.error('Failed to fetch user activity summary', error);
+      showToast('회원 활동 요약을 불러오지 못했습니다.', 'error');
+    } finally {
+      requestedIds.forEach((id) => inFlightSummaryIdsRef.current.delete(id));
+      setLoadingSummaryIds((prev) => {
+        const next = new Set(prev);
+        requestedIds.forEach((id) => next.delete(id));
+        return next;
+      });
+    }
+  }, [showToast]);
 
   const displayUsers: AdminUserDashboardRow[] = (users || []).map((user: AdminUserDashboardRow) => {
     const summary = activitySummaryMap.get(user.id);
@@ -269,6 +278,24 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: {
 
       return getTimestamp(b.recent_activity_at) - getTimestamp(a.recent_activity_at);
     });
+
+  const summaryPrefetchLimit =
+    sortKey === 'recent_activity' || sortKey === 'total_spent'
+      ? SUMMARY_SORT_PREFETCH_LIMIT
+      : BASE_PREFETCH_LIMIT;
+  const summaryPrefetchIds = visibleUsers.slice(0, summaryPrefetchLimit).map((user: AdminUserDashboardRow) => user.id);
+  const summaryPrefetchKey = summaryPrefetchIds.join(',');
+
+  useEffect(() => {
+    if (!summaryPrefetchKey) return;
+    void fetchUserActivitySummaryByIds(summaryPrefetchKey.split(',').filter(Boolean));
+  }, [fetchUserActivitySummaryByIds, summaryPrefetchKey]);
+
+  useEffect(() => {
+    if (!selectedUser?.id) return;
+    if (cachedSummaryIdsRef.current.has(selectedUser.id)) return;
+    void fetchUserActivitySummaryByIds([selectedUser.id]);
+  }, [fetchUserActivitySummaryByIds, selectedUser?.id]);
 
   // 🟢 [추가] 전체 선택/해제
   const visibleSelectedCount = visibleUsers.filter((user: AdminUserDashboardRow) => selectedUserIds.includes(user.id)).length;
@@ -517,7 +544,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: {
                             <div className="text-[9px] md:text-[10px] text-slate-400">확정 결제 기준</div>
                           </>
                         ) : (
-                          <div className="text-[9px] md:text-[10px] text-slate-400">{isSummaryLoading ? '집계 중...' : '-'}</div>
+                          <div className="text-[9px] md:text-[10px] text-slate-400">{loadingSummaryIds.has(user.id) ? '집계 중...' : '-'}</div>
                         )}
                       </td>
                       <td className="px-2 md:px-6 py-2.5 md:py-4">
@@ -529,7 +556,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: {
                             <div className="text-[9px] md:text-[10px] text-slate-400">누적 생성 건수</div>
                           </>
                         ) : (
-                          <div className="text-[9px] md:text-[10px] text-slate-400">{isSummaryLoading ? '집계 중...' : '-'}</div>
+                          <div className="text-[9px] md:text-[10px] text-slate-400">{loadingSummaryIds.has(user.id) ? '집계 중...' : '-'}</div>
                         )}
                       </td>
                       <td className="px-2 md:px-6 py-2.5 md:py-4">
@@ -541,7 +568,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: {
                         ) : activitySummaryMap.has(user.id) ? (
                           <span className="text-slate-400 text-[9px] md:text-[10px]">활동 없음</span>
                         ) : (
-                          <span className="text-slate-400 text-[9px] md:text-[10px]">{isSummaryLoading ? '집계 중...' : '-'}</span>
+                          <span className="text-slate-400 text-[9px] md:text-[10px]">{loadingSummaryIds.has(user.id) ? '집계 중...' : '-'}</span>
                         )}
                       </td>
 
@@ -788,7 +815,15 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: {
 }
 
 // 헬퍼 컴포넌트 (아이콘 + 라벨 + 값)
-function InfoRow({ icon, label, value }: any) {
+function InfoRow({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: React.ReactNode;
+}) {
   return (
     <div className="flex items-center gap-3 md:gap-4">
       <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400 shrink-0">
