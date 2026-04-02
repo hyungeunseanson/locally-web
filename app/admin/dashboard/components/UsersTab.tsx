@@ -104,7 +104,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: {
   const [selectedUser, setSelectedUser] = useState<AdminUserDashboardRow | null>(null);
   const detailScrollRef = useRef<HTMLDivElement | null>(null);
   const detailPanelRef = useRef<HTMLDivElement | null>(null);
-  const [sortKey, setSortKey] = useState<'recent_activity' | 'recent_access' | 'recent_signup' | 'total_spent'>('recent_activity');
+  const [sortKey, setSortKey] = useState<'recent_access' | 'recent_signup' | 'total_spent'>('recent_access');
   const [roleFilter, setRoleFilter] = useState<'all' | 'guest' | 'host' | 'admin'>('all');
   const [showOnlineOnly, setShowOnlineOnly] = useState(false);
 
@@ -276,11 +276,11 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: {
         return getTimestamp(b.last_active_at) - getTimestamp(a.last_active_at);
       }
 
-      return getTimestamp(b.recent_activity_at) - getTimestamp(a.recent_activity_at);
+      return getTimestamp(b.last_active_at) - getTimestamp(a.last_active_at);
     });
 
   const summaryPrefetchLimit =
-    sortKey === 'recent_activity' || sortKey === 'total_spent'
+    sortKey === 'total_spent'
       ? SUMMARY_SORT_PREFETCH_LIMIT
       : BASE_PREFETCH_LIMIT;
   const summaryPrefetchIds = visibleUsers.slice(0, summaryPrefetchLimit).map((user: AdminUserDashboardRow) => user.id);
@@ -441,7 +441,6 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: {
                 className="shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 md:py-2 text-[11px] md:text-sm text-slate-700 focus:outline-none focus:border-slate-400"
                 aria-label="회원 정렬"
               >
-                <option value="recent_activity">최근 활동순</option>
                 <option value="recent_access">최근 접속순</option>
                 <option value="recent_signup">최근 가입순</option>
                 <option value="total_spent">결제액순</option>
