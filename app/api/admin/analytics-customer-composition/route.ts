@@ -66,6 +66,7 @@ type CustomerStats = {
 };
 
 type SourceStatus = 'ready' | 'collecting' | 'unavailable';
+const SOURCE_EVENTS_CHUNK_SIZE = 200;
 
 function toBuckets(counts: Record<string, number>, totalCustomers: number): CompositionBucket[] {
   return Object.entries(counts)
@@ -142,6 +143,55 @@ function isMissingColumnError(error: unknown, columnName: string) {
   const code = 'code' in error ? String((error as { code?: string }).code || '') : '';
   const message = 'message' in error ? String((error as { message?: string }).message || '') : '';
   return code === '42703' && message.includes(columnName);
+}
+
+function isSourceEventsQuerySizeError(error: unknown) {
+  if (!error || typeof error !== 'object') return false;
+  const message = 'message' in error ? String((error as { message?: string }).message || '') : '';
+  const details = 'details' in error ? String((error as { details?: string }).details || '') : '';
+  const combined = `${message}\n${details}`;
+  return combined.includes('HeadersOverflowError')
+    || combined.includes('UND_ERR_HEADERS_OVERFLOW')
+    || combined.toLowerCase().includes('headers overflow');
+}
+
+async function fetchSourceEventsByUserChunks({
+  supabaseAdmin,
+  userIds,
+  startAt,
+  endAt,
+}: {
+  supabaseAdmin: ReturnType<typeof createAdminClient>;
+  userIds: string[];
+  startAt: string | null;
+  endAt: string | null;
+}) {
+  const rows: AnalyticsEventSourceRow[] = [];
+
+  for (let index = 0; index < userIds.length; index += SOURCE_EVENTS_CHUNK_SIZE) {
+    const chunk = userIds.slice(index, index + SOURCE_EVENTS_CHUNK_SIZE);
+    if (chunk.length === 0) continue;
+
+    let sourceEventsQuery = supabaseAdmin
+      .from('analytics_events')
+      .select('user_id, created_at, utm_source, utm_medium, referrer_host, landing_path')
+      .in('user_id', chunk)
+      .in('event_type', ['view', 'click', 'payment_init']);
+
+    if (startAt) {
+      sourceEventsQuery = sourceEventsQuery.gte('created_at', startAt);
+    }
+
+    if (endAt) {
+      sourceEventsQuery = sourceEventsQuery.lte('created_at', endAt);
+    }
+
+    const { data: sourceEvents, error: sourceEventsError } = await sourceEventsQuery;
+    if (sourceEventsError) throw sourceEventsError;
+    rows.push(...((sourceEvents || []) as AnalyticsEventSourceRow[]));
+  }
+
+  return rows;
 }
 
 export async function GET(request: Request) {
@@ -336,27 +386,16 @@ export async function GET(request: Request) {
 
     if (sourceUserIds.length > 0) {
       try {
-        let sourceEventsQuery = supabaseAdmin
-          .from('analytics_events')
-          .select('user_id, created_at, utm_source, utm_medium, referrer_host, landing_path')
-          .in('user_id', sourceUserIds)
-          .in('event_type', ['view', 'click', 'payment_init']);
-
-        if (startAt) {
-          sourceEventsQuery = sourceEventsQuery.gte('created_at', startAt);
-        }
-
-        if (endAt) {
-          sourceEventsQuery = sourceEventsQuery.lte('created_at', endAt);
-        }
-
-        const { data: sourceEvents, error: sourceEventsError } = await sourceEventsQuery;
-
-        if (sourceEventsError) throw sourceEventsError;
+        const sourceEvents = await fetchSourceEventsByUserChunks({
+          supabaseAdmin,
+          userIds: sourceUserIds,
+          startAt,
+          endAt,
+        });
 
         const firstSourceByUser = new Map<string, string>();
 
-        ((sourceEvents || []) as AnalyticsEventSourceRow[])
+        sourceEvents
           .filter((event) => Boolean(event.user_id))
           .sort((left, right) => {
             const leftTime = new Date(left.created_at || 0).getTime();
@@ -420,6 +459,10 @@ export async function GET(request: Request) {
           || isMissingColumnError(sourceError, 'analytics_events.referrer_host')
           || isMissingColumnError(sourceError, 'analytics_events.landing_path')
         ) {
+          console.warn('[api/admin/analytics-customer-composition] source mix schema unavailable');
+          sourceStatus = 'unavailable';
+        } else if (isSourceEventsQuerySizeError(sourceError)) {
+          console.warn('[api/admin/analytics-customer-composition] source mix query too large', sourceError);
           sourceStatus = 'unavailable';
         } else {
           console.warn('[api/admin/analytics-customer-composition] source mix unavailable', sourceError);
