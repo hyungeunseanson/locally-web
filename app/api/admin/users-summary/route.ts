@@ -38,6 +38,18 @@ type UserRoleRow = {
   role: string | null;
 };
 
+const USER_ROLE_BATCH_SIZE = 100;
+
+function chunkIds(ids: string[], size: number) {
+  const chunks: string[][] = [];
+
+  for (let index = 0; index < ids.length; index += size) {
+    chunks.push(ids.slice(index, index + size));
+  }
+
+  return chunks;
+}
+
 export async function GET() {
   try {
     const supabaseServer = await createServerClient();
@@ -73,14 +85,19 @@ export async function GET() {
     const roleMap = new Map<string, string | null>();
 
     if (profileIds.length > 0) {
-      const { data: userRows, error: usersError } = await supabaseAdmin
-        .from('users')
-        .select('id, role')
-        .in('id', profileIds);
+      const userRoleChunks = await Promise.all(
+        chunkIds(profileIds, USER_ROLE_BATCH_SIZE).map(async (batchIds) => {
+          const { data: userRows, error: usersError } = await supabaseAdmin
+            .from('users')
+            .select('id, role')
+            .in('id', batchIds);
 
-      if (usersError) throw usersError;
+          if (usersError) throw usersError;
+          return (userRows || []) as UserRoleRow[];
+        })
+      );
 
-      ((userRows || []) as UserRoleRow[]).forEach((userRow) => {
+      userRoleChunks.flat().forEach((userRow) => {
         roleMap.set(userRow.id, userRow.role);
       });
     }
