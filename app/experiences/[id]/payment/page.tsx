@@ -1105,7 +1105,7 @@ function PaymentContent() {
           >
             <div className="flex gap-3 md:gap-5">
               <div className="relative h-28 w-20 flex-shrink-0 overflow-hidden rounded-lg border border-slate-100 bg-slate-200 shadow-sm md:h-32 md:w-24 md:rounded-xl">
-                <Image src={imageUrl} alt="Experience" fill className="object-cover" sizes="100px" />
+                <Image src={imageUrl} alt="Experience" fill unoptimized className="object-cover" sizes="100px" />
               </div>
               <div className="flex min-w-0 flex-1 flex-col justify-center py-1">
                 <span className="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-500 md:mb-1.5 md:text-xs">

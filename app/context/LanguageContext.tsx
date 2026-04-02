@@ -671,15 +671,15 @@ const dictionary: Record<Locale, Record<string, string>> = {
     exp_payment_agree_safety: "허위 예약, 무단 불참, 타인 명의 결제 등 위험 행위를 하지 않겠습니다.",
     exp_payment_agree_terms: "취소/환불 규정과 서비스 이용약관에 동의합니다.",
     exp_payment_agree_off_platform_label: "외부·직접 결제는 금지됩니다",
-    exp_payment_agree_manners_label: "호스트를 존중하고 기본 매너를 지킬게요",
+    exp_payment_agree_manners_label: "호스트 존중 및 기본 매너를 준수합니다",
     exp_payment_agree_terms_label: "취소·환불 규정을 확인했어요",
-    exp_payment_agree_off_platform_title: "외부·직접 결제는 금지됩니다",
-    exp_payment_agree_manners_title: "호스트를 존중하고 기본 매너를 지켜주세요",
+    exp_payment_agree_off_platform_title: "외부·직접 결제 금지 및 결제 보호 안내",
+    exp_payment_agree_manners_title: "호스트 존중 및 기본 매너 준수",
     exp_payment_agree_terms_title: "취소·환불 규정을 확인해주세요",
     exp_payment_agree_off_platform_body:
-      "로컬리 밖에서 직접 송금하거나 현장 결제를 진행하는 것은 금지됩니다.\n외부 결제를 따르다 생기는 사기, 환불, 분쟁은 플랫폼 보호 대상이 아닐 수 있습니다.\n안전한 결제 보호는 로컬리 결제에서만 적용됩니다.",
+      "로컬리 외부에서 직접 송금하거나 현장 결제를 진행하는 것은 금지됩니다.\n플랫폼 밖에서 이뤄진 결제는 사기, 환불, 분쟁 발생 시 로컬리의 결제 보호 및 지원 대상에서 제외될 수 있습니다.\n예약 보호와 결제 안전 장치는 로컬리 내 결제에 대해서만 적용됩니다.",
     exp_payment_agree_manners_body:
-      "시간 약속을 지키고, 무단 불참이나 무례한 행동은 피해주세요.\n현장에서는 호스트의 안내와 운영 방식을 존중해주세요.\n문제가 될 수 있는 명의 도용 결제나 부적절한 요구도 금지됩니다.",
+      "예약한 시간과 장소를 성실히 지키고, 무단 불참이나 일방적인 일정 변경은 삼가주세요.\n체험 진행 중에는 호스트의 안내, 운영 방식, 현장 규칙을 존중해 주세요.\n과도한 요구, 무례한 언행, 타인 명의 결제 등 운영에 문제를 일으킬 수 있는 행동은 제한될 수 있습니다.",
     exp_payment_agree_terms_body:
       "취소 시점에 따라 환불 기준이 달라질 수 있습니다.\n예약 전에 취소·환불 규정을 꼭 확인해주세요.\n결제 이후에는 해당 규정이 그대로 적용됩니다.",
     exp_payment_pay_button: "{amount} 결제하기",
