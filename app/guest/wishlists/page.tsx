@@ -238,6 +238,7 @@ export default function WishlistsPage() {
                         src={imageUrl}
                         alt={title}
                         fill
+                        unoptimized
                         className="object-cover transition-transform duration-500 ease-out md:group-hover:scale-[1.04]"
                         sizes="(max-width: 768px) 42vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 18vw"
                       />

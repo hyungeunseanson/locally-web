@@ -428,6 +428,7 @@ function SearchResults() {
             alt={title}
             fill
             sizes="168px"
+            unoptimized
             className="object-cover"
           />
           <button
@@ -597,7 +598,7 @@ function SearchResults() {
       </div>
 
       <div className="hidden md:flex pb-12 flex-col">
-        <div data-testid="search-desktop-toolbar" className="px-5 md:px-6 xl:px-8 2xl:px-10 py-3 md:py-4 border-b border-slate-100 bg-white">
+        <div data-testid="search-desktop-toolbar" className="z-30 px-5 md:px-6 xl:px-8 2xl:px-10 py-3 md:py-4 border-b border-slate-100 bg-white">
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0 flex flex-1 flex-wrap items-center gap-2 md:gap-3">
               {desktopSummaryPills.map((pill) => (
@@ -627,7 +628,7 @@ function SearchResults() {
                   </button>
 
                   {desktopPopover === 'city' && (
-                    <div className="absolute left-0 top-full mt-3 w-[240px] rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_20px_60px_rgba(15,23,42,0.14)]">
+                    <div className="absolute left-0 top-full z-40 mt-3 w-[240px] rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_20px_60px_rgba(15,23,42,0.14)]">
                       <div className="flex items-center justify-between gap-3 px-1">
                         <h3 className="text-sm font-bold text-slate-900">{t('search_filter_city')}</h3>
                         {selectedCity ? (
@@ -689,7 +690,7 @@ function SearchResults() {
                   </button>
 
                   {desktopPopover === 'type' && (
-                    <div className="absolute left-0 top-full mt-3 w-[340px] rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.14)]">
+                    <div className="absolute left-0 top-full z-40 mt-3 w-[340px] rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.14)]">
                       <div className="flex items-center justify-between gap-3">
                         <h3 className="text-sm font-bold text-slate-900">{t('search_filter_experience_type')}</h3>
                         {selectedTypes.length > 0 ? (
@@ -745,7 +746,7 @@ function SearchResults() {
                   </button>
 
                   {desktopPopover === 'time' && (
-                    <div className="absolute left-0 top-full mt-3 w-[320px] rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.14)]">
+                    <div className="absolute left-0 top-full z-40 mt-3 w-[320px] rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.14)]">
                       <div className="flex items-center justify-between gap-3">
                         <h3 className="text-sm font-bold text-slate-900">{t('search_filter_time_slot')}</h3>
                         {selectedTimes.length > 0 ? (
@@ -868,7 +869,7 @@ function SearchResults() {
                   <p className="text-sm font-black text-slate-900">{t('search_flow_hint_title')}</p>
                   <p className="mt-1 text-xs leading-relaxed text-slate-600">{t('search_flow_hint_desc')}</p>
                 </div>
-                <div data-testid="search-desktop-results-grid" className={`grid gap-3 xl:gap-4 ${desktopGridClassName}`}>
+                <div data-testid="search-desktop-results-grid" className={`relative z-0 grid gap-3 xl:gap-4 ${desktopGridClassName}`}>
                   {experiences.map((item, index) => (
                     <div
                       key={item.id}
