@@ -136,6 +136,11 @@ export default function DetailsPanel({
     typeof selectedItem?.profile_photo === 'string' &&
     Boolean(selectedItem.profile_photo) &&
     brokenProfilePhotoSrc !== selectedItem.profile_photo;
+  const getApprovalStatusClass = (status?: string | null) => {
+    if (status === 'pending') return 'bg-yellow-100 text-yellow-700';
+    if (status === 'revision') return 'bg-orange-100 text-orange-700';
+    return 'bg-green-100 text-green-700';
+  };
 
   const closePanel = () => {
     setAppDetails(null);
@@ -237,7 +242,7 @@ export default function DetailsPanel({
               ) : <div className="w-full h-full flex items-center justify-center text-slate-300"><User size={24} /></div>}
             </div>
             <div>
-              <span className={`inline-block px-1.5 py-0.5 md:px-2 md:py-1 rounded-full text-[9px] md:text-[10px] font-bold mb-0.5 md:mb-1 uppercase tracking-wide ${activeTab === 'USERS' ? 'bg-slate-100 text-slate-600' : selectedItem.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>
+              <span className={`inline-block px-1.5 py-0.5 md:px-2 md:py-1 rounded-full text-[9px] md:text-[10px] font-bold mb-0.5 md:mb-1 uppercase tracking-wide ${activeTab === 'USERS' ? 'bg-slate-100 text-slate-600' : getApprovalStatusClass(selectedItem.status)}`}>
                 {activeTab === 'USERS' ? 'Customer' : selectedItem.status}
               </span>
               <h2 className="text-base md:text-xl font-black text-slate-900 leading-tight pr-4">

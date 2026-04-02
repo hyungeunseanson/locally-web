@@ -367,6 +367,9 @@ test.describe.serial('Admin approvals smoke', () => {
 
         await assertHostApplicationStatus(hostApplicationId, 'revision', hostRevisionReason);
         await expect(hostApproveButton).not.toBeVisible({ timeout: 15000 });
+        await adminPage.getByRole('button', { name: 'PENDING' }).click();
+        await expect(adminPage.locator('div.cursor-pointer').filter({ hasText: applicantUser.fullName }).first()).toBeVisible({ timeout: 15000 });
+        await adminPage.getByRole('button', { name: 'ALL' }).click();
       });
 
       await test.step('Request revision for a pending experience, persist admin_comment, and clear stale selection', async () => {

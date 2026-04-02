@@ -63,6 +63,12 @@ export default function ListPanel({
 }: ListPanelProps) {
   const [brokenApprovalImages, setBrokenApprovalImages] = useState<Record<string, true>>({});
   const useRawApprovalImages = activeTab === 'APPS' || activeTab === 'EXPS';
+  const getApprovalStatusClass = (status?: string | null) => {
+    if (status === 'pending') return 'bg-yellow-100 text-yellow-700';
+    if (status === 'revision') return 'bg-orange-100 text-orange-700';
+    if (status === 'approved' || status === 'active') return 'bg-green-100 text-green-700';
+    return 'bg-red-100 text-red-700';
+  };
   const filterOptions = [
     { value: 'ALL', label: 'ALL' },
     { value: 'PENDING', label: 'PENDING' },
@@ -194,7 +200,7 @@ export default function ListPanel({
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between mb-0.5">
                   <div className="font-bold text-[11px] md:text-xs truncate text-slate-900 pr-2">{item.title || item.name || item.full_name || 'Unknown'}</div>
-                  <span className={`text-[8px] md:text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide shrink-0 ${activeTab === 'USERS' ? 'bg-slate-100 text-slate-500' : item.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : item.status === 'approved' || item.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                  <span className={`text-[8px] md:text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide shrink-0 ${activeTab === 'USERS' ? 'bg-slate-100 text-slate-500' : getApprovalStatusClass(item.status)}`}>
                     {activeTab === 'USERS' ? (item.nationality || 'Customer') : item.status}
                   </span>
                 </div>
