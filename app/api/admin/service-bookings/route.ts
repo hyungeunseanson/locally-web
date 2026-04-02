@@ -25,7 +25,7 @@ export async function GET() {
         // Fetch all service bookings ordered by creation date
         const { data: serviceBookings, error: sbError } = await supabaseAdmin
             .from('service_bookings')
-            .select('*')
+            .select('id, order_id, request_id, application_id, customer_id, host_id, amount, host_payout_amount, platform_revenue, status, payout_status, tid, payment_method, cancel_reason, refund_amount, created_at')
             .order('created_at', { ascending: false });
 
         if (sbError) throw sbError;
@@ -39,21 +39,23 @@ export async function GET() {
         // Fetch related data in parallel
         const [reqsRes, usersRes, appsRes] = await Promise.all([
             requestIds.length > 0
-                ? supabaseAdmin.from('service_requests').select('*').in('id', requestIds)
+                ? supabaseAdmin.from('service_requests').select('id, title, description, city, service_date, duration_hours, status').in('id', requestIds)
                 : { data: [] },
             userIds.length > 0
-                ? supabaseAdmin.from('profiles').select('id, full_name, email, avatar_url').in('id', userIds)
+                ? supabaseAdmin.from('profiles').select('id, full_name, email').in('id', userIds)
                 : { data: [] },
             appIds.length > 0
-                ? supabaseAdmin.from('service_applications').select('id, request_id, host_id, appeal_message').in('id', appIds)
+                ? supabaseAdmin.from('service_applications').select('id, request_id, host_id').in('id', appIds)
                 : { data: [] },
         ]);
+
+        const appsMap = new Map((appsRes.data || []).map((a) => [a.id, a]));
 
         const hostIds = Array.from(
             new Set(
                 serviceBookings
                     .flatMap((booking) => {
-                        const matchedApplication = (appsRes.data || []).find((application) => application.id === booking.application_id);
+                        const matchedApplication = appsMap.get(booking.application_id);
                         return [booking.host_id, matchedApplication?.host_id];
                     })
                     .filter(Boolean)
@@ -73,7 +75,6 @@ export async function GET() {
         // Build lookup maps
         const requestsMap = new Map((reqsRes.data || []).map((r) => [r.id, r]));
         const usersMap = new Map((usersRes.data || []).map((u) => [u.id, u]));
-        const appsMap = new Map((appsRes.data || []).map((a) => [a.id, a]));
         const hostApplicationsMap = new Map<string, (typeof hostApplications)[number]>();
 
         for (const application of hostApplications || []) {

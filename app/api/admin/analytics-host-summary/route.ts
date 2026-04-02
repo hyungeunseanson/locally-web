@@ -14,10 +14,13 @@ type HostApplicationRow = {
   languages: string[] | string | null;
 };
 
-type ExperienceRow = {
+type ReferencedExperienceRow = {
   id: number;
   host_id: string | null;
-  status: string | null;
+};
+
+type ActiveExperienceHostRow = {
+  host_id: string | null;
 };
 
 type BookingRow = {
@@ -130,45 +133,67 @@ export async function GET(request: Request) {
 
     const [
       { data: appRows, error: appsError },
-      { data: experienceRows, error: expsError },
       { data: bookingRows, error: bookingsError },
       { data: reviewRows, error: reviewsError },
       { data: inquiryRows, error: inquiriesError },
     ] = await Promise.all([
       appsQuery,
-      supabaseAdmin.from('experiences').select('id, host_id, status'),
       bookingsQuery,
       reviewsQuery,
       inquiriesQuery,
     ]);
 
     if (appsError) throw appsError;
-    if (expsError) throw expsError;
     if (bookingsError) throw bookingsError;
     if (reviewsError) throw reviewsError;
     if (inquiriesError) throw inquiriesError;
 
     const apps = (appRows || []) as HostApplicationRow[];
-    const exps = (experienceRows || []) as ExperienceRow[];
     const bookings = (bookingRows || []) as BookingRow[];
     const reviews = (reviewRows || []) as ReviewRow[];
     const inquiries = (inquiryRows || []) as InquiryRow[];
 
     const inquiryIds = inquiries.map((inquiry) => inquiry.id).filter(Boolean);
+    const referencedExperienceIds = Array.from(
+      new Set([
+        ...bookings.map((booking) => booking.experience_id).filter((experienceId): experienceId is number => experienceId != null),
+        ...reviews.map((review) => review.experience_id).filter((experienceId): experienceId is number => experienceId != null),
+      ])
+    );
+
     let inquiryMessages: InquiryMessageRow[] = [];
+    let referencedExperiences: ReferencedExperienceRow[] = [];
+    let activeExperienceHosts: ActiveExperienceHostRow[] = [];
 
-    if (inquiryIds.length > 0) {
-      const { data: messageRows, error: messagesError } = await supabaseAdmin
-        .from('inquiry_messages')
-        .select('inquiry_id, sender_id, created_at')
-        .in('inquiry_id', inquiryIds);
+    const [
+      { data: referencedExperienceRows, error: referencedExperiencesError },
+      { data: activeExperienceHostRows, error: activeExperienceHostsError },
+      { data: messageRows, error: messagesError },
+    ] = await Promise.all([
+      referencedExperienceIds.length > 0
+        ? supabaseAdmin.from('experiences').select('id, host_id').in('id', referencedExperienceIds)
+        : { data: [], error: null },
+      supabaseAdmin.from('experiences').select('host_id').eq('status', 'active'),
+      inquiryIds.length > 0
+        ? supabaseAdmin
+            .from('inquiry_messages')
+            .select('inquiry_id, sender_id, created_at')
+            .in('inquiry_id', inquiryIds)
+            .order('inquiry_id', { ascending: true })
+            .order('created_at', { ascending: true })
+        : { data: [], error: null },
+    ]);
 
-      if (messagesError) throw messagesError;
-      inquiryMessages = (messageRows || []) as InquiryMessageRow[];
-    }
+    if (referencedExperiencesError) throw referencedExperiencesError;
+    if (activeExperienceHostsError) throw activeExperienceHostsError;
+    if (messagesError) throw messagesError;
 
-    const expById = new Map<number, ExperienceRow>();
-    exps.forEach((exp) => {
+    referencedExperiences = (referencedExperienceRows || []) as ReferencedExperienceRow[];
+    activeExperienceHosts = (activeExperienceHostRows || []) as ActiveExperienceHostRow[];
+    inquiryMessages = (messageRows || []) as InquiryMessageRow[];
+
+    const expById = new Map<number, ReferencedExperienceRow>();
+    referencedExperiences.forEach((exp) => {
       expById.set(exp.id, exp);
     });
 
@@ -285,10 +310,8 @@ export async function GET(request: Request) {
     });
 
     const activeHosts = new Set<string>();
-    exps.forEach((exp) => {
-      if (exp.status === 'active' && exp.host_id) {
-        activeHosts.add(exp.host_id);
-      }
+    activeExperienceHosts.forEach((exp) => {
+      if (exp.host_id) activeHosts.add(exp.host_id);
     });
 
     const bookedHosts = new Set<string>();
@@ -307,14 +330,6 @@ export async function GET(request: Request) {
         messagesByInquiry[message.inquiry_id] = [];
       }
       messagesByInquiry[message.inquiry_id].push(message);
-    });
-
-    Object.values(messagesByInquiry).forEach((messages) => {
-      messages.sort((left, right) => {
-        const leftMs = left.created_at ? new Date(left.created_at).getTime() : 0;
-        const rightMs = right.created_at ? new Date(right.created_at).getTime() : 0;
-        return leftMs - rightMs;
-      });
     });
 
     const hostCommStats: Record<string, { total: number; answered: number; timeMs: number }> = {};

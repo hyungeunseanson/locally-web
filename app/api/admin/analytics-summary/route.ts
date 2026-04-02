@@ -21,11 +21,9 @@ type AnalyticsBookingRow = {
   solo_guarantee_price: number | null;
 };
 
-type AnalyticsExperienceRow = {
+type AnalyticsExperienceTitleRow = {
   id: number;
   title: string | null;
-  status: string | null;
-  created_at: string | null;
 };
 
 type AnalyticsReviewRow = {
@@ -240,7 +238,6 @@ export async function GET(request: Request) {
 
     const [
       { data: bookingRows, error: bookingsError },
-      { data: experienceRows, error: experiencesError },
       { data: reviewRows, error: reviewsError },
       { count: totalUsersCount, error: newUsersCountError },
       { data: newUserPreviewRows, error: newUsersPreviewError },
@@ -251,7 +248,6 @@ export async function GET(request: Request) {
       { data: serviceBookingRows, error: serviceBookingsError },
     ] = await Promise.all([
       bookingsQuery,
-      supabaseAdmin.from('experiences').select('id, title, status, created_at'),
       reviewsQuery,
       newUsersCountQuery,
       newUsersPreviewQuery,
@@ -263,7 +259,6 @@ export async function GET(request: Request) {
     ]);
 
     if (bookingsError) throw bookingsError;
-    if (experiencesError) throw experiencesError;
     if (reviewsError) throw reviewsError;
     if (newUsersCountError) throw newUsersCountError;
     if (newUsersPreviewError) throw newUsersPreviewError;
@@ -274,7 +269,6 @@ export async function GET(request: Request) {
     if (serviceBookingsError) throw serviceBookingsError;
 
     const bookings = (bookingRows || []) as AnalyticsBookingRow[];
-    const experiences = (experienceRows || []) as AnalyticsExperienceRow[];
     const reviews = (reviewRows || []) as AnalyticsReviewRow[];
     const newUsers = (newUserPreviewRows || []) as AnalyticsProfileRow[];
     const totalUsers = totalUsersCount || 0;
@@ -393,11 +387,55 @@ export async function GET(request: Request) {
       experienceStats[experienceKey].reviewCount += 1;
     }
 
-    const allExperiences = experiences
-      .map((experience) => {
-        const stat = experienceStats[String(experience.id)] || { count: 0, revenue: 0, ratingSum: 0, reviewCount: 0 };
+    const referencedExperienceIds = Object.keys(experienceStats)
+      .map((experienceId) => Number(experienceId))
+      .filter((experienceId) => Number.isFinite(experienceId));
+
+    let newExpsCountQuery = supabaseAdmin
+      .from('experiences')
+      .select('id', { count: 'exact', head: true });
+
+    if (startAt) {
+      newExpsCountQuery = newExpsCountQuery.gte('created_at', startAt);
+    }
+
+    if (endAt) {
+      newExpsCountQuery = newExpsCountQuery.lte('created_at', endAt);
+    }
+
+    const [
+      { count: activeExpsCount, error: activeExpsError },
+      { count: pendingExpsCount, error: pendingExpsError },
+      { count: rejectedExpsCount, error: rejectedExpsError },
+      { count: newExpsCount, error: newExpsError },
+      { data: experienceTitleRows, error: experienceTitlesError },
+    ] = await Promise.all([
+      supabaseAdmin.from('experiences').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+      supabaseAdmin.from('experiences').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+      supabaseAdmin.from('experiences').select('id', { count: 'exact', head: true }).eq('status', 'rejected'),
+      newExpsCountQuery,
+      referencedExperienceIds.length > 0
+        ? supabaseAdmin.from('experiences').select('id, title').in('id', referencedExperienceIds)
+        : { data: [], error: null },
+    ]);
+
+    if (activeExpsError) throw activeExpsError;
+    if (pendingExpsError) throw pendingExpsError;
+    if (rejectedExpsError) throw rejectedExpsError;
+    if (newExpsError) throw newExpsError;
+    if (experienceTitlesError) throw experienceTitlesError;
+
+    const experienceTitles = (experienceTitleRows || []) as AnalyticsExperienceTitleRow[];
+    const experienceTitleMap = new Map<number, string | null>(
+      experienceTitles.map((experience) => [experience.id, experience.title])
+    );
+
+    const allExperiences = referencedExperienceIds
+      .map((experienceId) => {
+        const stat = experienceStats[String(experienceId)] || { count: 0, revenue: 0, ratingSum: 0, reviewCount: 0 };
         return {
-          ...experience,
+          id: experienceId,
+          title: experienceTitleMap.get(experienceId) ?? null,
           bookingCount: stat.count,
           totalRevenue: stat.revenue,
           rating: stat.reviewCount > 0 ? (stat.ratingSum / stat.reviewCount).toFixed(1) : 'New',
@@ -408,26 +446,12 @@ export async function GET(request: Request) {
       .sort((left, right) => right.bookingCount - left.bookingCount);
 
     const topExperiences = allExperiences.slice(0, 5);
-
-    const expsBreakdown = experiences.reduce(
-      (acc, experience) => {
-        if (experience.created_at) {
-          const createdAt = new Date(experience.created_at);
-          const createdAtMs = createdAt.getTime();
-          const startMs = startAt ? new Date(startAt).getTime() : null;
-          const endMs = endAt ? new Date(endAt).getTime() : null;
-          const withinRange = (!startMs || createdAtMs >= startMs) && (!endMs || createdAtMs <= endMs);
-          if (withinRange) acc.new += 1;
-        }
-
-        if (experience.status === 'active') acc.active += 1;
-        else if (experience.status === 'pending') acc.pending += 1;
-        else if (experience.status === 'rejected') acc.rejected += 1;
-
-        return acc;
-      },
-      { new: 0, active: 0, pending: 0, rejected: 0 }
-    );
+    const expsBreakdown = {
+      new: newExpsCount || 0,
+      active: activeExpsCount || 0,
+      pending: pendingExpsCount || 0,
+      rejected: rejectedExpsCount || 0,
+    };
 
     const returnUsers = Object.values(userBookingCounts).filter((count) => count > 1).length;
     const retentionBreakdown = Object.values(userBookingCounts).reduce(
@@ -512,7 +536,7 @@ export async function GET(request: Request) {
       success: true,
       data: {
         totalUsers,
-        activeExpsCount: experiences.filter((experience) => experience.status === 'active').length,
+        activeExpsCount: activeExpsCount || 0,
         gmv,
         netRevenue,
         hostPayout: Math.max(0, gmv - netRevenue),
