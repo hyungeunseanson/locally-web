@@ -389,13 +389,13 @@ export default function HelpCenterPage() {
           <div className="flex flex-col sm:flex-row justify-center gap-3 md:gap-6">
             <button
               onClick={() => setHelpModalOpen(true)}
-              className="bg-black text-white px-6 md:px-8 py-3 md:py-4 text-[12px] md:text-[13px] font-bold uppercase tracking-widest hover:bg-[#333] transition-colors flex items-center justify-center gap-2 md:gap-3 shadow-lg"
+              className="rounded-full bg-slate-900 px-6 md:px-8 py-3 md:py-3.5 text-[12px] md:text-[13px] font-semibold text-white hover:bg-slate-800 transition-colors flex items-center justify-center gap-2.5 md:gap-3 shadow-[0_10px_24px_rgba(15,23,42,0.08)]"
             >
               <MessageCircle size={18} /> {hasLocallyCare ? t('locally_care_cta') : t('btn_chat_support')}
             </button>
             <a
               href="mailto:help@locally.com"
-              className="bg-white border-2 border-black text-black px-6 md:px-8 py-3 md:py-4 text-[12px] md:text-[13px] font-bold uppercase tracking-widest hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 md:gap-3"
+              className="rounded-full bg-white border border-slate-200 text-slate-700 px-6 md:px-8 py-3 md:py-3.5 text-[12px] md:text-[13px] font-semibold hover:bg-slate-50 transition-colors flex items-center justify-center gap-2.5 md:gap-3 shadow-[0_6px_18px_rgba(15,23,42,0.04)]"
             >
               <Mail size={18} /> {t('btn_email_us')}
             </a>
