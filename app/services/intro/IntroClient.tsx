@@ -163,11 +163,11 @@ export default function ServiceIntroAirbnbStylePage() {
                 <section className="hidden md:block relative rounded-2xl overflow-hidden h-[480px] mb-12 bg-slate-100 group border border-slate-200 shadow-sm select-none">
                     <div className="grid grid-cols-4 grid-rows-2 gap-2 h-full cursor-pointer" onClick={() => setIsGalleryOpen(true)}>
                         <div className="col-span-2 row-span-2 relative overflow-hidden">
-                            <Image src={PHOTOS[0]} alt="Main" fill className="object-cover hover:scale-105 transition-transform duration-700" />
+                            <Image src={PHOTOS[0]} alt="Main" fill unoptimized className="object-cover hover:scale-105 transition-transform duration-700" />
                         </div>
                         {PHOTOS.slice(1, 5).map((photo, i) => (
                             <div key={i} className="col-span-1 row-span-1 relative overflow-hidden">
-                                <Image src={photo} alt={`Sub ${i}`} fill className="object-cover hover:scale-105 transition-transform duration-700" />
+                                <Image src={photo} alt={`Sub ${i}`} fill unoptimized className="object-cover hover:scale-105 transition-transform duration-700" />
                             </div>
                         ))}
                     </div>
@@ -187,16 +187,16 @@ export default function ServiceIntroAirbnbStylePage() {
                     >
                         <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-[5px] bg-white">
                             <div className="relative overflow-hidden w-full h-full rounded-tl-[24px]">
-                                <Image src={PHOTOS[0]} alt="Main" fill className="object-cover" />
+                                <Image src={PHOTOS[0]} alt="Main" fill unoptimized className="object-cover" />
                             </div>
                             <div className="relative overflow-hidden w-full h-full rounded-tr-[24px]">
-                                <Image src={PHOTOS[1]} alt="Sub 1" fill className="object-cover" />
+                                <Image src={PHOTOS[1]} alt="Sub 1" fill unoptimized className="object-cover" />
                             </div>
                             <div className="relative overflow-hidden w-full h-full rounded-bl-[24px]">
-                                <Image src={PHOTOS[2]} alt="Sub 2" fill className="object-cover" />
+                                <Image src={PHOTOS[2]} alt="Sub 2" fill unoptimized className="object-cover" />
                             </div>
                             <div className="relative overflow-hidden w-full h-full rounded-br-[24px]">
-                                <Image src={PHOTOS[3]} alt="Sub 3" fill className="object-cover" />
+                                <Image src={PHOTOS[3]} alt="Sub 3" fill unoptimized className="object-cover" />
                             </div>
                         </div>
                         <div className="absolute bottom-4 right-4 bg-white p-2.5 rounded-full shadow-[0_3px_10px_rgba(0,0,0,0.15)] border border-slate-200 z-10 text-slate-800">
@@ -478,7 +478,7 @@ export default function ServiceIntroAirbnbStylePage() {
                         <div className="max-w-4xl mx-auto space-y-4">
                             {PHOTOS.map((photo, index) => (
                                 <div key={index} className="relative w-full aspect-[4/3] md:aspect-[16/10] bg-slate-200 rounded-xl overflow-hidden shadow-sm">
-                                    <Image src={photo} alt={`Gallery ${index}`} fill className="object-contain bg-black/5" />
+                                    <Image src={photo} alt={`Gallery ${index}`} fill unoptimized className="object-contain bg-black/5" />
                                 </div>
                             ))}
                         </div>
