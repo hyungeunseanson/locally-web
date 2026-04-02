@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import React from 'react';
+import React, { useState } from 'react';
 import { ChevronRight, User } from 'lucide-react';
 import { type LanguageLevelEntry, getLanguageNames } from '@/app/utils/languageLevels';
 import type { AdminPanelSelectedItem } from '@/app/types/admin';
@@ -61,6 +61,8 @@ interface ListPanelProps {
 export default function ListPanel({
   activeTab, filter, setFilter, listItems, selectedItem, setSelectedItem
 }: ListPanelProps) {
+  const [brokenApprovalImages, setBrokenApprovalImages] = useState<Record<string, true>>({});
+  const useRawApprovalImages = activeTab === 'APPS' || activeTab === 'EXPS';
   const filterOptions = [
     { value: 'ALL', label: 'ALL' },
     { value: 'PENDING', label: 'PENDING' },
@@ -138,26 +140,55 @@ export default function ListPanel({
               onClick={() => setSelectedItem(item)}
               className={`p-2.5 md:p-3 rounded-xl border cursor-pointer transition-all flex gap-2.5 md:gap-3 items-center ${selectedItem?.id === item.id ? 'border-slate-900 bg-slate-50 ring-1 ring-slate-900' : 'border-slate-100 hover:border-slate-300 hover:bg-white bg-white'}`}
             >
-              {/* 🟢 [수정됨] 위에서 구한 imgSrc 사용 */}
-              {imgSrc ? (
-                canUseOptimizedImage(imgSrc) ? (
-                  <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-slate-100 border border-slate-100 shrink-0">
-                    <Image
+              {(() => {
+                const approvalImageKey = imgSrc ? `${activeTab}:${String(item.id)}:${imgSrc}` : null;
+                const isBrokenApprovalImage = approvalImageKey ? Boolean(brokenApprovalImages[approvalImageKey]) : false;
+
+                if (!imgSrc || (useRawApprovalImages && isBrokenApprovalImage)) {
+                  return (
+                    <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 shrink-0">
+                      <User size={16} />
+                    </div>
+                  );
+                }
+
+                if (useRawApprovalImages) {
+                  return (
+                    // Approvals surfaces should bypass Next image optimization to avoid quota-based breakage.
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
                       src={imgSrc}
                       alt={item.title || item.name || item.full_name || 'List item thumbnail'}
-                      fill
-                      sizes="40px"
-                      className="object-cover"
+                      className="w-10 h-10 rounded-lg object-cover bg-slate-100 border border-slate-100 shrink-0"
+                      onError={() => {
+                        if (approvalImageKey) {
+                          setBrokenApprovalImages((prev) => ({ ...prev, [approvalImageKey]: true }));
+                        }
+                      }}
                     />
-                  </div>
-                ) : (
+                  );
+                }
+
+                if (canUseOptimizedImage(imgSrc)) {
+                  return (
+                    <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-slate-100 border border-slate-100 shrink-0">
+                      <Image
+                        src={imgSrc}
+                        alt={item.title || item.name || item.full_name || 'List item thumbnail'}
+                        fill
+                        sizes="40px"
+                        className="object-cover"
+                      />
+                    </div>
+                  );
+                }
+
+                return (
                   // Keep raw <img> fallback for URLs outside the current Next image allowlist.
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={imgSrc} alt={item.title || item.name || item.full_name || 'List item thumbnail'} className="w-10 h-10 rounded-lg object-cover bg-slate-100 border border-slate-100 shrink-0" />
-                )
-              ) : (
-                <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 shrink-0"><User size={16} /></div>
-              )}
+                );
+              })()}
 
               {/* 텍스트 정보 */}
               <div className="flex-1 min-w-0">

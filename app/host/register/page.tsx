@@ -80,6 +80,22 @@ function isLikelyPhone(value: string | null | undefined) {
   return digits.length >= 8 && digits.length <= 15;
 }
 
+function isHttpUrl(value: string | null | undefined) {
+  if (!value) return false;
+
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function sanitizeProfilePhotoForSubmit(value: string | null | undefined) {
+  const trimmed = value?.trim() || '';
+  return isHttpUrl(trimmed) ? trimmed : null;
+}
+
 function getFallbackLevel(value: unknown): LanguageLevel {
   const parsed = Number(value);
   if (parsed >= 1 && parsed <= 5) {
@@ -315,17 +331,19 @@ export default function HostRegisterPage() {
       } = await supabase.auth.getUser();
       if (!user) throw new Error(copy.loginRequired);
 
-      let profileUrl = formData.profilePhoto;
+      let profileUrl = sanitizeProfilePhotoForSubmit(formData.profilePhoto);
       let idCardUrl = formData.idCardFile;
 
       if (files.profile) {
         const compressedProfile = await compressImage(files.profile); // 🟢 압축 추가
         const fileName = `profile/${user.id}_${Date.now()}`;
         const { error } = await supabase.storage.from('images').upload(fileName, compressedProfile);
-        if (!error) {
-          const { data } = supabase.storage.from('images').getPublicUrl(fileName);
-          profileUrl = data.publicUrl;
+        if (error) {
+          throw error;
         }
+
+        const { data } = supabase.storage.from('images').getPublicUrl(fileName);
+        profileUrl = sanitizeProfilePhotoForSubmit(data.publicUrl);
       }
 
       if (files.idCard) {

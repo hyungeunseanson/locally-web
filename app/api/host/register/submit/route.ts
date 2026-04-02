@@ -39,11 +39,6 @@ function asTrimmedString(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-function asNullableTrimmedString(value: unknown) {
-  const normalized = asTrimmedString(value);
-  return normalized || null;
-}
-
 function hasTextValue(value: unknown): boolean {
   return typeof value === 'string' && value.trim().length > 0;
 }
@@ -71,6 +66,22 @@ function isLikelyPhone(value: string): boolean {
 
 function normalizeAccountNumber(value: string): string {
   return value.replace(/\D/g, '');
+}
+
+function normalizeAllowedProfilePhoto(value: unknown): string | null | 'invalid' {
+  const normalized = asTrimmedString(value);
+  if (!normalized) return null;
+
+  try {
+    const url = new URL(normalized);
+    if (url.protocol === 'http:' || url.protocol === 'https:') {
+      return normalized;
+    }
+  } catch {
+    return 'invalid';
+  }
+
+  return 'invalid';
 }
 
 function shouldNotifyAdmin(existingApplicationStatus: string | null, hasExistingApplication: boolean) {
@@ -124,6 +135,11 @@ export async function POST(request: NextRequest) {
     const trimmedAccountNumber = normalizeAccountNumber(asTrimmedString(body.accountNumber));
     const trimmedAccountHolder = asTrimmedString(body.accountHolder);
     const trimmedMotivation = asTrimmedString(body.motivation);
+    const normalizedProfilePhoto = normalizeAllowedProfilePhoto(body.profilePhoto);
+
+    if (normalizedProfilePhoto === 'invalid') {
+      return NextResponse.json({ success: false, error: 'Profile photo URL is invalid.' }, { status: 400 });
+    }
 
     if (!trimmedHostNationality) {
       return NextResponse.json({ success: false, error: 'Nationality is required.' }, { status: 400 });
@@ -185,10 +201,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Account number is required.' }, { status: 400 });
     }
 
-    if (trimmedAccountNumber.length < 8) {
-      return NextResponse.json({ success: false, error: 'Account number format is invalid.' }, { status: 400 });
-    }
-
     if (!trimmedAccountHolder) {
       return NextResponse.json({ success: false, error: 'Account holder is required.' }, { status: 400 });
     }
@@ -220,7 +232,7 @@ export async function POST(request: NextRequest) {
       instagram: asTrimmedString(body.instagram),
       source: asTrimmedString(body.source),
       language_cert: asTrimmedString(body.languageCert),
-      profile_photo: asNullableTrimmedString(body.profilePhoto),
+      profile_photo: normalizedProfilePhoto,
       self_intro: trimmedSelfIntro,
       id_card_file: trimmedIdCardFile,
       bank_name: trimmedBankName,
@@ -271,8 +283,8 @@ export async function POST(request: NextRequest) {
       profileSeedUpdates.full_name = asTrimmedString(body.name);
     }
 
-    if (!hasTextValue(currentProfile?.avatar_url) && hasTextValue(body.profilePhoto)) {
-      profileSeedUpdates.avatar_url = asTrimmedString(body.profilePhoto);
+    if (!hasTextValue(currentProfile?.avatar_url) && normalizedProfilePhoto) {
+      profileSeedUpdates.avatar_url = normalizedProfilePhoto;
     }
 
     if (!hasLanguageValues(currentProfile?.languages) && languageNames.length > 0) {

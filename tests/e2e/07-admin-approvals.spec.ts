@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { expect, test, type Browser, type Page } from '@playwright/test';
+import { expect, test, type Browser, type Locator, type Page } from '@playwright/test';
 
 type EnvMap = Record<string, string>;
 type TestUser = {
@@ -12,6 +12,8 @@ type TestUser = {
 };
 
 const TEST_PASSWORD = 'LocallyTest!2026';
+const HOST_PROFILE_PHOTO_URL = 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=512';
+const EXPERIENCE_PHOTO_URL = 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200';
 
 let adminClient: SupabaseClient | null = null;
 const createdAuthUserIds: string[] = [];
@@ -130,7 +132,7 @@ async function createHostApplication(userId: string, user: TestUser, status: 'pe
       instagram: `@${user.fullName.replace(/\s+/g, '').toLowerCase()}`,
       source: 'E2E approvals test',
       language_cert: 'TOPIK 6',
-      profile_photo: null,
+      profile_photo: HOST_PROFILE_PHOTO_URL,
       self_intro: '승인 관리 E2E 테스트용 호스트 지원서입니다.',
       id_card_file: null,
       bank_name: '테스트은행',
@@ -183,7 +185,7 @@ async function createPendingExperience(hostId: string) {
       spots: '홍대입구역',
       meeting_point: '홍대입구역 1번 출구',
       location: '서울 마포구 양화로 160',
-      photos: ['https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200'],
+      photos: [EXPERIENCE_PHOTO_URL],
       price: 50000,
       inclusions: ['가이드'],
       exclusions: ['개인 경비'],
@@ -291,6 +293,12 @@ async function updateExperienceTitleAndSave(page: Page, nextTitle: string) {
   await saveButton.click();
 }
 
+async function expectDirectImageSrc(locator: Locator, expectedPattern: RegExp) {
+  await expect(locator).toHaveAttribute('src', expectedPattern, { timeout: 15000 });
+  const src = await locator.getAttribute('src');
+  expect(src).not.toContain('/_next/image');
+}
+
 test.afterAll(async () => {
   const supabase = getAdminClient();
 
@@ -345,10 +353,12 @@ test.describe.serial('Admin approvals smoke', () => {
       await test.step('Request revision for a pending host application and close the details panel', async () => {
         const hostListItem = adminPage.locator('div.cursor-pointer').filter({ hasText: applicantUser.fullName }).first();
         await expect(hostListItem).toBeVisible({ timeout: 15000 });
+        await expectDirectImageSrc(hostListItem.locator('img').first(), /images\.unsplash\.com/);
         await hostListItem.click();
 
         const hostApproveButton = adminPage.getByRole('button', { name: /승인 \(호스트 권한 부여\)/ });
         await expect(hostApproveButton).toBeVisible({ timeout: 15000 });
+        await expectDirectImageSrc(adminPage.getByAltText('Host application profile photo'), /images\.unsplash\.com/);
 
         await adminPage.getByRole('button', { name: '보완 요청' }).click();
         await expect(adminPage.locator('h4', { hasText: '보완 사유 입력' }).filter({ visible: true }).first()).toBeVisible({ timeout: 5000 });
@@ -364,10 +374,12 @@ test.describe.serial('Admin approvals smoke', () => {
 
         const expListItem = adminPage.locator('div.cursor-pointer').filter({ hasText: experience.title }).first();
         await expect(expListItem).toBeVisible({ timeout: 15000 });
+        await expectDirectImageSrc(expListItem.locator('img').first(), /images\.unsplash\.com/);
         await expListItem.click();
 
         const experienceApproveButton = adminPage.locator('button').filter({ hasText: /^승인$/ }).first();
         await expect(experienceApproveButton).toBeVisible({ timeout: 15000 });
+        await expectDirectImageSrc(adminPage.locator('img[alt$="photo 1"]').first(), /images\.unsplash\.com/);
 
         await adminPage.getByRole('button', { name: '보완 요청' }).click();
         await expect(adminPage.locator('h4', { hasText: '보완 사유 입력' }).filter({ visible: true }).first()).toBeVisible({ timeout: 5000 });

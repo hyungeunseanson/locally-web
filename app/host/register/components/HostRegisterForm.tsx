@@ -168,11 +168,9 @@ export default function HostRegisterForm({
     ));
 
   const trimmedBankName = formData.bankName.trim();
-  const normalizedAccountNumber = formData.accountNumber.replace(/\D/g, '');
   const trimmedAccountHolder = formData.accountHolder.trim();
   const trimmedMotivation = formData.motivation.trim();
   const bankNameLooksShort = trimmedBankName.length > 0 && trimmedBankName.length < 2;
-  const accountNumberLooksShort = normalizedAccountNumber.length > 0 && normalizedAccountNumber.length < 8;
   const accountHolderLooksShort = trimmedAccountHolder.length > 0 && trimmedAccountHolder.length < 2;
   const motivationLooksShort = trimmedMotivation.length > 0 && trimmedMotivation.length < 20;
   const motivationLooksReady = trimmedMotivation.length >= 20;
@@ -375,7 +373,6 @@ export default function HostRegisterForm({
                 <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">{copy.accountNumberLabel}</label>
                 <div className="relative"><CreditCard size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" /><input type="tel" placeholder={copy.accountNumberPlaceholder} value={formData.accountNumber} onChange={(e) => updateData('accountNumber', e.target.value.replace(/\D/g, ''))} className="w-full p-3.5 pl-10 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black border border-slate-200 text-sm" /></div>
                 <FieldHint>{copy.accountNumberHelp}</FieldHint>
-                {accountNumberLooksShort && <FieldHint className="text-amber-600">{copy.accountNumberInlineShort}</FieldHint>}
               </div>
               <div>
                 <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">{copy.accountHolderLabel}</label>

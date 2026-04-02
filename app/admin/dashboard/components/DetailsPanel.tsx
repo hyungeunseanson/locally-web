@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import {
   Search, User, Mail, Globe, MessageCircle, Phone, Smile, Clock,
   MapPin, Cake, CheckCircle2, ShoppingBag, Trash2, Edit,
-  CreditCard, FileText, Shield, Download, Check, X
+  CreditCard, FileText, Shield, Download, Check, X, ImageOff
 } from 'lucide-react';
 import { formatLanguageLevelSummary, getLanguageNames, normalizeLanguageLevels, LanguageLevelEntry } from '@/app/utils/languageLevels';
 import {
@@ -44,6 +44,9 @@ export default function DetailsPanel({
   const [csLoading, setCsLoading] = useState(false);
   const [appDetails, setAppDetails] = useState<AdminPanelSelectedItem | null>(null);
   const [appDetailsLoading, setAppDetailsLoading] = useState(false);
+  const [brokenSelectedAvatarSrc, setBrokenSelectedAvatarSrc] = useState<string | null>(null);
+  const [brokenProfilePhotoSrc, setBrokenProfilePhotoSrc] = useState<string | null>(null);
+  const [brokenExperiencePhotos, setBrokenExperiencePhotos] = useState<Record<string, true>>({});
 
   const handleStartCSChat = async () => {
     if (!rawSelectedItem?.id) return;
@@ -121,12 +124,18 @@ export default function DetailsPanel({
     3
   );
   const applicationLanguageNames = getLanguageNames(applicationLanguageLevels);
+  const useRawApprovalImages = activeTab === 'APPS' || activeTab === 'EXPS';
   const selectedAvatarSrc =
     typeof selectedItem?.profile_photo === 'string' && selectedItem.profile_photo
       ? selectedItem.profile_photo
       : typeof selectedItem?.avatar_url === 'string' && selectedItem.avatar_url
         ? selectedItem.avatar_url
         : null;
+  const showSelectedAvatarImage = Boolean(selectedAvatarSrc) && brokenSelectedAvatarSrc !== selectedAvatarSrc;
+  const showProfilePhotoImage =
+    typeof selectedItem?.profile_photo === 'string' &&
+    Boolean(selectedItem.profile_photo) &&
+    brokenProfilePhotoSrc !== selectedItem.profile_photo;
 
   const closePanel = () => {
     setAppDetails(null);
@@ -160,6 +169,12 @@ export default function DetailsPanel({
 
     setSignedUrl(null);
   }, [activeTab, selectedItem?.id_card_file, selectedItem?.id_card_signed_url]);
+
+  useEffect(() => {
+    setBrokenSelectedAvatarSrc(null);
+    setBrokenProfilePhotoSrc(null);
+    setBrokenExperiencePhotos({});
+  }, [activeTab, rawSelectedItem?.id, appDetails?.id, selectedAvatarSrc, selectedItem?.profile_photo]);
 
   if (!selectedItem) {
     return (
@@ -196,14 +211,29 @@ export default function DetailsPanel({
 
           <div className="flex items-center gap-2.5 md:gap-4 pr-10">
             <div className="relative w-10 h-10 md:w-14 md:h-14 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shrink-0">
-              {selectedAvatarSrc ? (
-                <Image
-                  src={selectedAvatarSrc}
-                  alt={selectedItem.name || selectedItem.title || 'Selected item avatar'}
-                  fill
-                  sizes="56px"
-                  className="object-cover"
-                />
+              {showSelectedAvatarImage ? (
+                useRawApprovalImages ? (
+                  // Approvals photos should avoid optimizer dependency so admin can still review items after quota exhaustion.
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={selectedAvatarSrc}
+                    alt={selectedItem.name || selectedItem.title || 'Selected item avatar'}
+                    className="w-full h-full object-cover"
+                    onError={() => {
+                      if (selectedAvatarSrc) {
+                        setBrokenSelectedAvatarSrc(selectedAvatarSrc);
+                      }
+                    }}
+                  />
+                ) : (
+                  <Image
+                    src={selectedAvatarSrc}
+                    alt={selectedItem.name || selectedItem.title || 'Selected item avatar'}
+                    fill
+                    sizes="56px"
+                    className="object-cover"
+                  />
+                )
               ) : <div className="w-full h-full flex items-center justify-center text-slate-300"><User size={24} /></div>}
             </div>
             <div>
@@ -279,8 +309,18 @@ export default function DetailsPanel({
             {/* 프로필 사진 */}
             <div className="flex items-center gap-3 bg-slate-50 p-2.5 md:p-3.5 rounded-xl border border-slate-100">
               <div className="relative w-14 h-14 md:w-16 md:h-16 rounded-full bg-white overflow-hidden border border-slate-200 flex-shrink-0">
-                {selectedItem.profile_photo ? (
-                  <Image src={selectedItem.profile_photo} alt="Host application profile photo" fill sizes="64px" className="object-cover" />
+                {showProfilePhotoImage ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={selectedItem.profile_photo}
+                    alt="Host application profile photo"
+                    className="w-full h-full object-cover"
+                    onError={() => {
+                      if (selectedItem.profile_photo) {
+                        setBrokenProfilePhotoSrc(selectedItem.profile_photo);
+                      }
+                    }}
+                  />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-slate-300"><User size={24} /></div>
                 )}
@@ -383,17 +423,33 @@ export default function DetailsPanel({
               <div>
                 <h4 className="text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-2 md:mb-3">등록된 사진</h4>
                 <div className="grid grid-cols-4 gap-1.5 md:gap-2">
-                  {selectedItem.photos.map((url: string, i: number) => (
-                    <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-slate-100">
-                      <Image
-                        src={url}
-                        alt={`${selectedItem.title || 'Experience'} photo ${i + 1}`}
-                        fill
-                        sizes="(max-width: 768px) 25vw, 96px"
-                        className="object-cover"
-                      />
-                    </div>
-                  ))}
+                  {selectedItem.photos.map((url: string, i: number) => {
+                    const photoKey = `${String(selectedItem.id)}:${i}:${url}`;
+                    const isBrokenPhoto = Boolean(brokenExperiencePhotos[photoKey]);
+
+                    return (
+                      <div key={photoKey} className="relative aspect-square rounded-lg overflow-hidden border border-slate-100">
+                        {isBrokenPhoto ? (
+                          <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-slate-50 px-2 text-center text-slate-400">
+                            <ImageOff size={16} />
+                            <span className="text-[10px] font-medium">사진 로드 실패</span>
+                          </div>
+                        ) : (
+                          <>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={url}
+                              alt={`${selectedItem.title || 'Experience'} photo ${i + 1}`}
+                              className="w-full h-full object-cover"
+                              onError={() => {
+                                setBrokenExperiencePhotos((prev) => ({ ...prev, [photoKey]: true }));
+                              }}
+                            />
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
