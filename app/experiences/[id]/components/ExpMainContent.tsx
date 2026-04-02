@@ -101,7 +101,7 @@ export default function ExpMainContent({
               <div key={`${item?.title || 'step'}-${idx}`} className="flex items-center gap-3 md:gap-5">
                 <div className="w-[72px] h-[72px] md:w-[100px] md:h-[100px] rounded-[14px] md:rounded-[20px] overflow-hidden shrink-0 bg-slate-100 border border-slate-200">
                   <div className="relative w-full h-full">
-                    <Image src={imageSrc} fill sizes="(max-width: 768px) 72px, 100px" className="object-cover" alt={item?.title || `itinerary-${idx + 1}`} />
+                    <Image src={imageSrc} fill sizes="(max-width: 768px) 72px, 100px" unoptimized className="object-cover" alt={item?.title || `itinerary-${idx + 1}`} />
                   </div>
                 </div>
                 <div className="min-h-[72px] md:min-h-[100px] flex-1 flex flex-col justify-center overflow-hidden">
