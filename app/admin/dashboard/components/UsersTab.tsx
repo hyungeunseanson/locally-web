@@ -61,6 +61,40 @@ function getUserRoleBadgeClassName(role?: string | null) {
   return 'bg-slate-100 text-slate-600 border border-slate-200';
 }
 
+function UserAvatarImage({
+  src,
+  alt,
+  sizes,
+  fallbackClassName,
+}: {
+  src?: string | null;
+  alt: string;
+  sizes: string;
+  fallbackClassName: string;
+}) {
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setHasError(false);
+  }, [src]);
+
+  if (!src || hasError) {
+    return <User className={fallbackClassName} />;
+  }
+
+  return (
+    <Image
+      src={src}
+      alt={alt}
+      fill
+      sizes={sizes}
+      unoptimized
+      className="object-cover"
+      onError={() => setHasError(true)}
+    />
+  );
+}
+
 export default function UsersTab({ users, onlineUsers, deleteItem }: { 
   users: AdminUserDashboardRow[]; 
   onlineUsers: OnlineUser[]; 
@@ -325,11 +359,12 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: {
                     className={`flex-shrink-0 w-36 md:w-48 p-2.5 md:p-4 bg-slate-50 border border-green-100 rounded-xl flex items-center gap-2.5 md:gap-3 relative overflow-hidden ${matchedUser ? 'cursor-pointer hover:bg-slate-100 transition-colors' : ''}`}
                   >
                     <div className={`relative w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center font-bold text-xs md:text-sm overflow-hidden shadow-sm ${u.is_anonymous ? 'bg-slate-300' : 'bg-slate-200 text-slate-500'}`}>
-                      {displayAvatar ? (
-                        <Image src={displayAvatar} alt={displayName} fill sizes="40px" className="object-cover" />
-                      ) : (
-                        <User className="w-4 h-4 md:w-5 md:h-5" />
-                      )}
+                      <UserAvatarImage
+                        src={displayAvatar}
+                        alt={displayName}
+                        sizes="40px"
+                        fallbackClassName="w-4 h-4 md:w-5 md:h-5"
+                      />
                     </div>
                     <div className="min-w-0">
                       <div className="text-[10px] md:text-xs font-bold truncate text-slate-900">{displayName}</div>
@@ -460,11 +495,12 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: {
 
                       <td className="px-2 md:px-6 py-2.5 md:py-4 flex items-center gap-2 md:gap-3">
                         <div className="relative w-7 h-7 md:w-9 md:h-9 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 overflow-hidden border border-slate-100">
-                          {user.avatar_url ? (
-                            <Image src={user.avatar_url} alt={user.full_name || user.email || 'User avatar'} fill sizes="36px" className="object-cover" />
-                          ) : (
-                            <User className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                          )}
+                          <UserAvatarImage
+                            src={user.avatar_url}
+                            alt={user.full_name || user.email || 'User avatar'}
+                            sizes="36px"
+                            fallbackClassName="w-3.5 h-3.5 md:w-4 md:h-4"
+                          />
                           {/* 🟢 온라인 상태일 때 초록색 점 표시 */}
                           {isOnline && <div className="absolute bottom-0 right-0 w-2 h-2 md:w-2.5 md:h-2.5 bg-green-500 border-2 border-white rounded-full"></div>}
                         </div>
@@ -542,11 +578,14 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: {
             {/* 1. 기본 정보 */}
             <div className="p-4 md:p-6 border-b border-slate-100 flex items-center gap-3 md:gap-5">
               <div className="relative w-14 h-14 md:w-20 md:h-20 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shrink-0">
-                {selectedUser.avatar_url ? (
-                  <Image src={selectedUser.avatar_url} alt={selectedUser.full_name || selectedUser.email || 'Selected user avatar'} fill sizes="80px" className="object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-slate-400"><User className="w-6 h-6 md:w-8 md:h-8" /></div>
-                )}
+                <div className="w-full h-full flex items-center justify-center text-slate-400">
+                  <UserAvatarImage
+                    src={selectedUser.avatar_url}
+                    alt={selectedUser.full_name || selectedUser.email || 'Selected user avatar'}
+                    sizes="80px"
+                    fallbackClassName="w-6 h-6 md:w-8 md:h-8"
+                  />
+                </div>
                 {onlineUserIds.has(selectedUser.id) && <div className="absolute bottom-1 right-1 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full"></div>}
               </div>
               <div>
