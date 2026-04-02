@@ -234,6 +234,7 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
                 alt={localizedTitle}
                 fill
                 sizes="(max-width: 768px) 100vw, 288px"
+                unoptimized
                 className="object-cover transition-transform duration-700 group-hover:scale-105"
               />
             ) : (

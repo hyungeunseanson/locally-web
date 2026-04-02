@@ -47,6 +47,7 @@ export default function PastTripCard({ trip, onOpenReview }: PastTripCardProps) 
             alt={localizedTitle}
             width={56}
             height={56}
+            unoptimized
             className="w-full h-full object-cover grayscale opacity-80 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-300"
           />
         ) : (

@@ -445,7 +445,7 @@ function InboxContent() {
                     {isAdminSupport ? (
                       <Image src={ADMIN_SUPPORT_AVATAR_SRC} alt="Locally support" fill sizes="(max-width: 768px) 44px, 48px" unoptimized className="object-cover" />
                     ) : (
-                      <Image src={secureUrl(display.avatar)} alt="host" fill sizes="(max-width: 768px) 44px, 48px" className="object-cover" />
+                      <Image src={secureUrl(display.avatar)} alt="host" fill sizes="(max-width: 768px) 44px, 48px" unoptimized className="object-cover" />
                     )}
                   </div>
 
@@ -507,7 +507,7 @@ function InboxContent() {
                     {selectedIsAdminSupport ? (
                       <Image src={ADMIN_SUPPORT_AVATAR_SRC} alt="Locally support" fill sizes="(max-width: 768px) 28px, 32px" unoptimized className="object-cover" />
                     ) : (
-                      <Image src={secureUrl(currentHostDisplay.avatar)} alt="host" fill sizes="(max-width: 768px) 28px, 32px" className="object-cover" />
+                      <Image src={secureUrl(currentHostDisplay.avatar)} alt="host" fill sizes="(max-width: 768px) 28px, 32px" unoptimized className="object-cover" />
                     )}
                   </div>
                   <div className="min-w-0">
@@ -548,6 +548,7 @@ function InboxContent() {
                                 alt="sender"
                                 fill
                                 sizes="(max-width: 768px) 26px, 28px"
+                                unoptimized
                                 className="object-cover"
                               />
                             )}
@@ -587,7 +588,7 @@ function InboxContent() {
                             {msg.type === 'image' && msg.image_url && (
                               <div className="mb-1 rounded-lg overflow-hidden">
                                 <a href={msg.image_url} rel="noopener noreferrer">
-                                  <Image src={msg.image_url} alt="chat-img" width={240} height={240} className="w-full h-auto object-cover hover:opacity-90 transition-opacity" />
+                                  <Image src={msg.image_url} alt="chat-img" width={240} height={240} unoptimized className="w-full h-auto object-cover hover:opacity-90 transition-opacity" />
                                 </a>
                               </div>
                             )}

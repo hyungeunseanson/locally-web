@@ -276,7 +276,7 @@ export default function InquiryChat() {
                 {/* 아바타 */}
                 <div className="w-11 h-11 md:w-12 md:h-12 rounded-full shrink-0 overflow-hidden relative bg-slate-100 border border-slate-200">
                   {inq.guest?.avatar_url
-                    ? <Image src={secureUrl(inq.guest.avatar_url)!} alt="guest" fill sizes="(max-width: 768px) 44px, 48px" className="object-cover" />
+                    ? <Image src={secureUrl(inq.guest.avatar_url)!} alt="guest" fill sizes="(max-width: 768px) 44px, 48px" unoptimized className="object-cover" />
                     : <div className="w-full h-full flex items-center justify-center"><User size={18} className="text-slate-400" /></div>
                   }
                 </div>
@@ -351,7 +351,7 @@ export default function InquiryChat() {
               >
                 <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gray-100 overflow-hidden border border-gray-200 relative shrink-0">
                   {selectedInquiry.guest?.avatar_url
-                    ? <Image src={secureUrl(selectedInquiry.guest.avatar_url)!} alt="guest" fill sizes="(max-width: 768px) 32px, 40px" className="object-cover" />
+                    ? <Image src={secureUrl(selectedInquiry.guest.avatar_url)!} alt="guest" fill sizes="(max-width: 768px) 32px, 40px" unoptimized className="object-cover" />
                     : <div className="w-full h-full flex items-center justify-center"><User size={14} className="text-slate-400" /></div>
                   }
                 </div>
@@ -366,11 +366,11 @@ export default function InquiryChat() {
 
             {/* 메시지 영역 */}
             <div className="flex-1 overflow-y-auto px-3 py-3 md:px-5 md:py-4 space-y-3 md:space-y-4 bg-gray-50" ref={scrollRef}>
-	              {messages.map((msg) => {
-	                const isMe = String(msg.sender_id) === String(currentUser?.id);
-	                const isDeletedMessage = isDeletedInquiryMessage(msg.type);
+              {messages.map((msg) => {
+                const isMe = String(msg.sender_id) === String(currentUser?.id);
+                const isDeletedMessage = isDeletedInquiryMessage(msg.type);
                   const shouldAnimateMessage = animatedMessageIds.includes(String(msg.id));
-	                return (
+                return (
                   <div key={msg.id} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} ${shouldAnimateMessage ? `animate-in fade-in duration-300 ${isMe ? 'slide-in-from-right-2' : 'slide-in-from-left-2'}` : ''}`}>
                     {!isMe && (
                       <div
@@ -379,7 +379,7 @@ export default function InquiryChat() {
                       >
                         <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gray-200 overflow-hidden relative border border-gray-200 shrink-0">
                           {selectedInquiry.guest?.avatar_url
-                            ? <Image src={secureUrl(selectedInquiry.guest.avatar_url)!} alt="guest" fill sizes="(max-width: 768px) 28px, 32px" className="object-cover" />
+                            ? <Image src={secureUrl(selectedInquiry.guest.avatar_url)!} alt="guest" fill sizes="(max-width: 768px) 28px, 32px" unoptimized className="object-cover" />
                             : <div className="w-full h-full flex items-center justify-center"><User size={12} className="text-slate-400" /></div>
                           }
                         </div>
@@ -412,12 +412,12 @@ export default function InquiryChat() {
                           </div>
                         )}
 
-	                        <div className={`px-3 py-2 md:px-4 md:py-2.5 rounded-2xl text-[13px] md:text-[14px] leading-relaxed shadow-sm break-words ${isDeletedMessage
-	                          ? 'bg-slate-100 border border-dashed border-slate-300 text-slate-500 italic'
-	                          : isMe
-	                            ? 'bg-black text-white rounded-tr-sm'
-	                            : 'bg-white border border-gray-200 rounded-tl-sm'
-	                          }`}>
+                        <div className={`px-3 py-2 md:px-4 md:py-2.5 rounded-2xl text-[13px] md:text-[14px] leading-relaxed shadow-sm break-words ${isDeletedMessage
+                          ? 'bg-slate-100 border border-dashed border-slate-300 text-slate-500 italic'
+                          : isMe
+                            ? 'bg-black text-white rounded-tr-sm'
+                            : 'bg-white border border-gray-200 rounded-tl-sm'
+                          }`}>
                           {msg.type === 'image' && msg.image_url && (
                             <div className="mb-1 rounded-lg overflow-hidden">
                               <a href={msg.image_url} rel="noopener noreferrer">
@@ -426,6 +426,7 @@ export default function InquiryChat() {
                                   alt="chat-img"
                                   width={240}
                                   height={240}
+                                  unoptimized
                                   className="w-full h-auto object-cover hover:opacity-90 transition-opacity"
                                 />
                               </a>
