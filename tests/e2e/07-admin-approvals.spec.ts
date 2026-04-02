@@ -391,6 +391,9 @@ test.describe.serial('Admin approvals smoke', () => {
 
         await assertExperienceStatus(experience.id, 'revision', experienceRevisionReason);
         await expect(experienceApproveButton).not.toBeVisible({ timeout: 15000 });
+        await adminPage.getByRole('button', { name: 'PENDING' }).click();
+        await expect(adminPage.locator('div.cursor-pointer').filter({ hasText: experience.title }).first()).toBeVisible({ timeout: 15000 });
+        await adminPage.getByRole('button', { name: 'ALL' }).click();
       });
 
       await test.step('Host sees the revision comment and resubmits the experience back to pending', async () => {

@@ -39,9 +39,12 @@ export function useAdminApprovalsData() {
   const [apps, setApps] = useState<HostApplication[]>([]);
   const [exps, setExps] = useState<ExperienceApprovalItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
   const fetchApprovals = useCallback(async () => {
-    setIsLoading(true);
+    if (!hasLoadedOnce) {
+      setIsLoading(true);
+    }
     try {
       const [appsResult, expsResult] = await Promise.all([
         fetchAdminPayload<HostApplication[]>(`/api/admin/host-applications?select=${encodeURIComponent(HOST_APPLICATION_SUMMARY_SELECT)}`),
@@ -61,15 +64,17 @@ export function useAdminApprovalsData() {
 
       setApps(appsArray);
       setExps(expsArray);
+      setHasLoadedOnce(true);
     } catch (error) {
       console.error('[useAdminApprovalsData] fetch error:', error);
       showToast('승인 데이터를 불러오지 못했습니다.', 'error');
       setApps([]);
       setExps([]);
+      setHasLoadedOnce(true);
     } finally {
       setIsLoading(false);
     }
-  }, [showToast]);
+  }, [hasLoadedOnce, showToast]);
 
   useEffect(() => {
     fetchApprovals();

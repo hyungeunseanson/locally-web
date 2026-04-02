@@ -58,7 +58,7 @@ export default function ManagementTab({
       return apps.filter((i) => filter === 'ALL' ? true : filter === 'PENDING' ? isPendingApprovalStatus(i.status) : !isPendingApprovalStatus(i.status));
     }
     if (effectiveTab === 'EXPS') {
-      return exps.filter((i) => filter === 'ALL' ? true : filter === 'PENDING' ? i.status === 'pending' : i.status === 'active');
+      return exps.filter((i) => filter === 'ALL' ? true : filter === 'PENDING' ? isPendingApprovalStatus(i.status) : i.status === 'active');
     }
     if (effectiveTab === 'CHATS') return messages;
     return users; // USERS
@@ -157,7 +157,7 @@ export default function ManagementTab({
               onClick={() => { setSubTab('EXPS'); setSelectedItem(null); setFilter('ALL'); }}
               className={`flex items-center gap-1.5 md:gap-2 px-2.5 md:px-4 py-1.5 md:py-2 rounded-md text-[11px] md:text-sm font-bold transition-all ${subTab === 'EXPS' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
-              <MapPin size={14} className="md:w-4 md:h-4" /> 체험 등록 ({exps.filter((e) => e.status === 'pending').length})
+              <MapPin size={14} className="md:w-4 md:h-4" /> 체험 등록 ({exps.filter((e) => isPendingApprovalStatus(e.status)).length})
             </button>
           </div>
         </div>
