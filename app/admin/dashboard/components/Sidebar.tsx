@@ -2,14 +2,9 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import React, { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
-import {
-  ensureAdminTeamLastViewed,
-  getAdminUnviewedPendingBookingCount,
-} from '@/app/utils/adminBadgeState';
-import { isAdminAlertNotification } from '@/app/utils/adminNotifications';
 import {
   Users, CheckCircle2, MessageSquare,
   BarChart2, CreditCard, LayoutDashboard,
@@ -21,7 +16,6 @@ type NavButtonProps = {
   onClick: () => void;
   icon: ReactNode;
   label: string;
-  count?: number | string;
 };
 
 type SidebarUser = {
@@ -29,14 +23,7 @@ type SidebarUser = {
   email?: string | null;
 } | null;
 
-type PresenceUser = {
-  user_id?: string;
-};
-
-const SIDEBAR_COUNTS_REFRESH_DEBOUNCE_MS = 300;
-const SIDEBAR_TEAM_REFRESH_DEBOUNCE_MS = 300;
-
-const NavButton = ({ active, onClick, icon, label, count }: NavButtonProps) => (
+const NavButton = ({ active, onClick, icon, label }: NavButtonProps) => (
   <button
     onClick={onClick}
     className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 group ${active
@@ -48,12 +35,6 @@ const NavButton = ({ active, onClick, icon, label, count }: NavButtonProps) => (
       <div className="shrink-0">{icon}</div>
       <span className="text-[11px] md:text-sm font-medium truncate">{label}</span>
     </div>
-    {count !== undefined && count !== 0 && (
-      <span className={`text-[10px] md:text-xs px-1.5 md:px-2 py-0.5 rounded-full font-bold ml-2 shrink-0 ${active ? 'bg-white/20 text-white' : 'bg-rose-500 text-white'
-        }`}>
-        {count}
-      </span>
-    )}
   </button>
 );
 
@@ -63,196 +44,31 @@ export default function Sidebar() {
   const supabase = useMemo(() => createClient(), []);
 
   const urlTab = searchParams.get('tab')?.toUpperCase();
-  const [activeTab, setActiveTab] = useState<string>('APPS');
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState<SidebarUser>(null);
-  const countsRefreshTimeoutRef = useRef<number | null>(null);
-  const teamRefreshTimeoutRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    const savedTab = localStorage.getItem('admin_active_tab');
-    if (urlTab) {
-      setActiveTab(urlTab);
-    } else if (savedTab) {
-      setActiveTab(savedTab);
+  const [savedTab] = useState<string | null>(() => {
+    if (typeof window === 'undefined') {
+      return null;
     }
-  }, [urlTab]);
-
-  const [counts, setCounts] = useState({
-    apps: 0,
-    exps: 0,
-    online: 0,
-    pendingBookings: 0,
-    adminAlertsUnread: 0,
-    teamNewCount: 0,
-    servicePendingBank: 0,  // 서비스 무통장 입금 대기 건수
-    csUnreadCount: 0,       // CS 미답변 건수
+    return localStorage.getItem('admin_active_tab');
   });
+  const [currentUser, setCurrentUser] = useState<SidebarUser>(null);
 
-  const fetchCounts = useCallback(async () => {
-    try {
-      const res = await fetch('/api/admin/sidebar-counts');
+  const activeTab = urlTab || savedTab || 'APPS';
 
-      if (!res.ok) throw new Error('Failed to fetch sidebar counts');
-
-      const { data, success } = await res.json();
-      if (!success || !data) throw new Error('Invalid backend response');
-
-      const unviewedPendingBookings = currentUser?.id
-        ? getAdminUnviewedPendingBookingCount(currentUser.id, data.pendingBookingIds || [])
-        : 0;
-
-      setCounts(prev => ({
-        ...prev,
-        apps: data.appsCount || 0,
-        exps: data.expsCount || 0,
-        pendingBookings: unviewedPendingBookings,
-        servicePendingBank: data.svcBankPendingCount || 0,
-        csUnreadCount: data.csUnreadCount || 0,
-        adminAlertsUnread: data.adminAlertsUnread || 0,
-      }));
-    } catch (e) {
-      console.error('Sidebar counts fetch error:', e);
-    }
-  }, [currentUser?.id]);
-
-  const fetchTeamCounts = useCallback(async () => {
-    try {
-      if (!currentUser?.id) {
-        setCounts(prev => ({ ...prev, teamNewCount: 0 }));
-        return;
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        setCurrentUser(user);
+      } catch (e) {
+        console.log('Error fetching user:', e);
       }
+    };
 
-      const lastViewed = ensureAdminTeamLastViewed(currentUser.id);
-      const res = await fetch(`/api/admin/team-counts?lastViewed=${encodeURIComponent(lastViewed)}`);
-
-      if (!res.ok) throw new Error('Failed to fetch team counts');
-
-      const { data, success } = await res.json();
-      if (!success || !data) throw new Error('Invalid backend response');
-
-      setCounts(prev => ({
-        ...prev,
-        teamNewCount: data.newWorkspaceCount ?? ((data.newTasksCount || 0) + (data.newCommentsCount || 0)),
-      }));
-    } catch (e) {
-      console.error('Sidebar team counts fetch error:', e);
-    }
-  }, [currentUser?.id]);
-
-  const fetchCurrentUser = useCallback(async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      setCurrentUser(user);
-    } catch (e) {
-      console.log('Error fetching user:', e);
-    }
+    void fetchCurrentUser();
   }, [supabase]);
-
-  const scheduleFetchCounts = useCallback(() => {
-    if (countsRefreshTimeoutRef.current) {
-      clearTimeout(countsRefreshTimeoutRef.current);
-    }
-
-    countsRefreshTimeoutRef.current = window.setTimeout(() => {
-      countsRefreshTimeoutRef.current = null;
-      void fetchCounts();
-    }, SIDEBAR_COUNTS_REFRESH_DEBOUNCE_MS);
-  }, [fetchCounts]);
-
-  const scheduleFetchTeamCounts = useCallback(() => {
-    if (teamRefreshTimeoutRef.current) {
-      clearTimeout(teamRefreshTimeoutRef.current);
-    }
-
-    teamRefreshTimeoutRef.current = window.setTimeout(() => {
-      teamRefreshTimeoutRef.current = null;
-      void fetchTeamCounts();
-    }, SIDEBAR_TEAM_REFRESH_DEBOUNCE_MS);
-  }, [fetchTeamCounts]);
-
-  useEffect(() => {
-    fetchCurrentUser();
-  }, [fetchCurrentUser]);
-
-  useEffect(() => {
-    if (!currentUser?.id) return;
-
-    fetchCounts();
-    fetchTeamCounts();
-
-    window.addEventListener('booking-viewed', scheduleFetchCounts);
-    window.addEventListener('team-viewed', scheduleFetchTeamCounts);
-    const intervalId = window.setInterval(fetchCounts, 300000);
-
-    return () => {
-      if (countsRefreshTimeoutRef.current) {
-        clearTimeout(countsRefreshTimeoutRef.current);
-        countsRefreshTimeoutRef.current = null;
-      }
-      if (teamRefreshTimeoutRef.current) {
-        clearTimeout(teamRefreshTimeoutRef.current);
-        teamRefreshTimeoutRef.current = null;
-      }
-      window.removeEventListener('booking-viewed', scheduleFetchCounts);
-      window.removeEventListener('team-viewed', scheduleFetchTeamCounts);
-      window.clearInterval(intervalId);
-    };
-  }, [currentUser?.id, fetchCounts, fetchTeamCounts, scheduleFetchCounts, scheduleFetchTeamCounts]);
-
-  useEffect(() => {
-    const channel = supabase.channel('online_users_sidebar')
-      .on('presence', { event: 'sync' }, () => {
-        const state = channel.presenceState();
-        const uniqueUsers = new Set(
-          Object.values(state)
-            .flat()
-            .map((presence) => (presence as PresenceUser).user_id)
-            .filter((userId): userId is string => Boolean(userId))
-        );
-        setCounts(prev => ({ ...prev, online: uniqueUsers.size }));
-      })
-      .subscribe();
-
-    const teamChannel = supabase.channel('team_notifications')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_tasks' }, () => { scheduleFetchTeamCounts(); })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_task_comments' }, () => { scheduleFetchTeamCounts(); })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-      supabase.removeChannel(teamChannel);
-    };
-  }, [scheduleFetchTeamCounts, supabase]);
-
-  useEffect(() => {
-    if (!currentUser?.id) return;
-
-    const adminAlertsChannel = supabase
-      .channel(`admin_alert_notifications_sidebar_${currentUser.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${currentUser.id}`,
-        },
-        (payload) => {
-          const nextRow = payload.new as { type?: string | null; link?: string | null } | null;
-          const prevRow = payload.old as { type?: string | null; link?: string | null } | null;
-          const targetRow = nextRow || prevRow;
-
-          if (!targetRow || !isAdminAlertNotification(targetRow)) return;
-          scheduleFetchCounts();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(adminAlertsChannel);
-    };
-  }, [currentUser?.id, scheduleFetchCounts, supabase]);
 
   const handleTabChange = (tab: string) => {
     router.push(`/admin/dashboard?tab=${tab}`);
@@ -292,23 +108,21 @@ export default function Sidebar() {
               onClick={() => handleTabChange('APPROVALS')}
               icon={<CheckCircle2 size={16} className="md:w-[18px] md:h-[18px]" />}
               label="Approvals"
-              count={counts.apps + counts.exps}
             />
-            <NavButton active={activeTab === 'USERS'} onClick={() => handleTabChange('USERS')} icon={<Users size={16} className="md:w-[18px] md:h-[18px]" />} label="User Management" count={counts.online > 0 ? `${counts.online} 접속` : undefined} />
+            <NavButton active={activeTab === 'USERS'} onClick={() => handleTabChange('USERS')} icon={<Users size={16} className="md:w-[18px] md:h-[18px]" />} label="User Management" />
           </div>
         </div>
 
         <div>
           <h2 className="text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2.5 md:mb-3 px-2">Operation</h2>
           <div className="space-y-0.5 md:space-y-1">
-            <NavButton active={activeTab === 'ALERTS'} onClick={() => handleTabChange('ALERTS')} icon={<Bell size={16} className="md:w-[18px] md:h-[18px]" />} label="Admin Alerts" count={activeTab !== 'ALERTS' ? counts.adminAlertsUnread : undefined} />
-            <NavButton active={activeTab === 'CHATS'} onClick={() => handleTabChange('CHATS')} icon={<MessageSquare size={16} className="md:w-[18px] md:h-[18px]" />} label="Message Monitoring" count={activeTab !== 'CHATS' ? counts.csUnreadCount : undefined} />
+            <NavButton active={activeTab === 'ALERTS'} onClick={() => handleTabChange('ALERTS')} icon={<Bell size={16} className="md:w-[18px] md:h-[18px]" />} label="Admin Alerts" />
+            <NavButton active={activeTab === 'CHATS'} onClick={() => handleTabChange('CHATS')} icon={<MessageSquare size={16} className="md:w-[18px] md:h-[18px]" />} label="Message Monitoring" />
             <NavButton
               active={activeTab === 'TEAM'}
               onClick={() => handleTabChange('TEAM')}
               icon={<Briefcase size={16} className="md:w-[18px] md:h-[18px]" />}
               label="Team Workspace"
-              count={activeTab !== 'TEAM' ? counts.teamNewCount : undefined}
             />
           </div>
         </div>
@@ -316,8 +130,8 @@ export default function Sidebar() {
         <div>
           <h2 className="text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2.5 md:mb-3 px-2">Finance</h2>
           <div className="space-y-0.5 md:space-y-1">
-            <NavButton active={activeTab === 'LEDGER'} onClick={() => handleTabChange('LEDGER')} icon={<LayoutDashboard size={16} className="md:w-[18px] md:h-[18px]" />} label="Master Ledger" count={counts.pendingBookings} />
-            <NavButton active={activeTab === 'SERVICE_REQUESTS'} onClick={() => handleTabChange('SERVICE_REQUESTS')} icon={<ClipboardList size={16} className="md:w-[18px] md:h-[18px]" />} label="Service Requests" count={counts.servicePendingBank} />
+            <NavButton active={activeTab === 'LEDGER'} onClick={() => handleTabChange('LEDGER')} icon={<LayoutDashboard size={16} className="md:w-[18px] md:h-[18px]" />} label="Master Ledger" />
+            <NavButton active={activeTab === 'SERVICE_REQUESTS'} onClick={() => handleTabChange('SERVICE_REQUESTS')} icon={<ClipboardList size={16} className="md:w-[18px] md:h-[18px]" />} label="Service Requests" />
             <NavButton active={activeTab === 'SALES'} onClick={() => handleTabChange('SALES')} icon={<CreditCard size={16} className="md:w-[18px] md:h-[18px]" />} label="Billing & Revenue" />
             <NavButton active={activeTab === 'ANALYTICS'} onClick={() => handleTabChange('ANALYTICS')} icon={<BarChart2 size={16} className="md:w-[18px] md:h-[18px]" />} label="Data Analytics" />
           </div>
@@ -328,7 +142,7 @@ export default function Sidebar() {
         <div className="flex items-center gap-2 mb-4 px-1">
           <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-emerald-500 animate-pulse"></div>
           <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-            {counts.online} Online Now
+            Admin Console
           </span>
         </div>
         <div className="flex items-center gap-2.5 md:gap-3">
