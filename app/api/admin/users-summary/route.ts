@@ -5,7 +5,6 @@ import { resolveAdminAccess } from '@/app/utils/adminAccess';
 
 const ADMIN_USERS_SUMMARY_SELECT = [
   'id',
-  'name',
   'full_name',
   'avatar_url',
   'email',
@@ -88,6 +87,7 @@ export async function GET() {
 
     const mergedProfiles = profileRows.map((profile) => ({
       ...profile,
+      name: profile.name ?? profile.full_name ?? null,
       role: roleMap.get(profile.id) ?? null,
     }));
 
