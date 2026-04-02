@@ -272,6 +272,7 @@ export type AnalyticsTabProps = {
 };
 
 export type AnalyticsSummaryDataArgs = Required<AnalyticsTabProps> & {
+  activeMainTab: AnalyticsMainTab;
   dateRange: import('react-date-range').Range[];
 };
 

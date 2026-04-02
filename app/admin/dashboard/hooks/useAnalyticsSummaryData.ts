@@ -85,6 +85,45 @@ type HostCommunicationAccumulator = {
   timeMs: number;
 };
 
+function pickBusinessSummary(stats: AnalyticsStats): AnalyticsBusinessSummary {
+  return {
+    totalUsers: stats.totalUsers,
+    activeExpsCount: stats.activeExpsCount,
+    gmv: stats.gmv,
+    netRevenue: stats.netRevenue,
+    hostPayout: stats.hostPayout,
+    conversionRate: stats.conversionRate,
+    retentionRate: stats.retentionRate,
+    aov: stats.aov,
+    cancellationRate: stats.cancellationRate,
+    topExperiences: stats.topExperiences,
+    allExperiences: stats.allExperiences,
+    funnel: stats.funnel,
+    cancelBreakdown: stats.cancelBreakdown,
+    priceDistribution: stats.priceDistribution,
+    demographics: stats.demographics,
+    searchTrends: stats.searchTrends,
+    allSearchTrends: stats.allSearchTrends,
+    timeSeries: stats.timeSeries,
+    newUsersList: stats.newUsersList,
+    topRevenueDate: stats.topRevenueDate,
+    expsBreakdown: stats.expsBreakdown,
+    retentionBreakdown: stats.retentionBreakdown,
+  };
+}
+
+function pickHostSummary(stats: AnalyticsStats): AnalyticsHostSummary {
+  return {
+    superHostCandidates: stats.superHostCandidates,
+    riskHosts: stats.riskHosts,
+    hostEcosystem: stats.hostEcosystem,
+    avgResponseTime: stats.avgResponseTime,
+    responseRate: stats.responseRate,
+    topRespHosts: stats.topRespHosts,
+    bottomRespHosts: stats.bottomRespHosts,
+  };
+}
+
 export function useAnalyticsSummaryData({
   bookings,
   users,
@@ -95,6 +134,7 @@ export function useAnalyticsSummaryData({
   analyticsEvents,
   inquiries,
   inquiryMessages,
+  activeMainTab,
   dateRange,
 }: AnalyticsSummaryDataArgs): AnalyticsSummaryDataResult {
   const [loading, setLoading] = useState(true);
@@ -503,6 +543,13 @@ export function useAnalyticsSummaryData({
     let cancelled = false;
 
     const loadAnalyticsData = async () => {
+      if (activeMainTab === 'reviews' || activeMainTab === 'logs') {
+        if (!cancelled) {
+          setLoading(false);
+        }
+        return;
+      }
+
       setLoading(true);
 
       let localStats: AnalyticsStats | null = null;
@@ -532,114 +579,125 @@ export function useAnalyticsSummaryData({
       const cachedSearchIntent = searchIntentCacheRef.current[cacheKey];
       const cachedCustomerComposition = customerCompositionCacheRef.current[cacheKey];
 
-      const [businessResult, hostResult, searchIntentResult, customerCompositionResult] = await Promise.allSettled([
-        fetch(analyticsSummaryUrl).then(async (response) => {
-          if (!response.ok) {
-            throw new Error('Analytics summary fetch failed');
-          }
-          const result = await response.json();
-          if (!result?.success) {
-            throw new Error(result?.error || 'Analytics summary fetch failed');
-          }
-          return result.data as AnalyticsBusinessSummary;
-        }),
-        fetch(analyticsHostUrl).then(async (response) => {
-          if (!response.ok) {
-            throw new Error('Analytics host summary fetch failed');
-          }
-          const result = await response.json();
-          if (!result?.success) {
-            throw new Error(result?.error || 'Analytics host summary fetch failed');
-          }
-          return result.data as AnalyticsHostSummary;
-        }),
-        fetch(analyticsSearchIntentUrl).then(async (response) => {
-          if (!response.ok) {
-            throw new Error('Analytics search intent fetch failed');
-          }
-          const result = await response.json();
-          if (!result?.success) {
-            throw new Error(result?.error || 'Analytics search intent fetch failed');
-          }
-          return result.data as AnalyticsSearchIntentSummary;
-        }),
-        fetch(analyticsCustomerCompositionUrl).then(async (response) => {
-          if (!response.ok) {
-            throw new Error('Analytics customer composition fetch failed');
-          }
-          const result = await response.json();
-          if (!result?.success) {
-            throw new Error(result?.error || 'Analytics customer composition fetch failed');
-          }
-          return result.data as AnalyticsCustomerCompositionSummary;
-        }),
-      ]);
-
-      const nextSummarySource: AnalyticsSummarySources = {
-        business: 'fallback',
-        host: 'fallback',
-      };
       let nextStats = statsRef.current;
 
-      if (businessResult.status === 'fulfilled') {
-        summaryCacheRef.current.business[cacheKey] = businessResult.value;
-        nextStats = { ...nextStats, ...businessResult.value };
-        nextSummarySource.business = 'server';
-      } else if (cachedBusinessSummary) {
-        nextStats = { ...nextStats, ...cachedBusinessSummary };
-        nextSummarySource.business = 'cached';
-      } else {
-        nextStats = { ...nextStats, ...getLocalStats() };
-        console.error('[AnalyticsTab] analytics-summary fallback:', businessResult.reason);
+      if (activeMainTab === 'business') {
+        const [businessResult, searchIntentResult, customerCompositionResult] = await Promise.allSettled([
+          cachedBusinessSummary
+            ? Promise.resolve(cachedBusinessSummary)
+            : fetch(analyticsSummaryUrl).then(async (response) => {
+                if (!response.ok) {
+                  throw new Error('Analytics summary fetch failed');
+                }
+                const result = await response.json();
+                if (!result?.success) {
+                  throw new Error(result?.error || 'Analytics summary fetch failed');
+                }
+                return result.data as AnalyticsBusinessSummary;
+              }),
+          cachedSearchIntent
+            ? Promise.resolve(cachedSearchIntent)
+            : fetch(analyticsSearchIntentUrl).then(async (response) => {
+                if (!response.ok) {
+                  throw new Error('Analytics search intent fetch failed');
+                }
+                const result = await response.json();
+                if (!result?.success) {
+                  throw new Error(result?.error || 'Analytics search intent fetch failed');
+                }
+                return result.data as AnalyticsSearchIntentSummary;
+              }),
+          cachedCustomerComposition
+            ? Promise.resolve(cachedCustomerComposition)
+            : fetch(analyticsCustomerCompositionUrl).then(async (response) => {
+                if (!response.ok) {
+                  throw new Error('Analytics customer composition fetch failed');
+                }
+                const result = await response.json();
+                if (!result?.success) {
+                  throw new Error(result?.error || 'Analytics customer composition fetch failed');
+                }
+                return result.data as AnalyticsCustomerCompositionSummary;
+              }),
+        ]);
+
+        let nextBusinessSource: AnalyticsSummarySources['business'] = 'fallback';
+        let nextSearchIntent: AnalyticsSearchIntentSummary | null = null;
+        let nextSearchIntentSource: SearchIntentSource = 'unavailable';
+        let nextCustomerComposition: AnalyticsCustomerCompositionSummary | null = null;
+        let nextCustomerCompositionSource: CustomerCompositionSource = 'unavailable';
+
+        if (businessResult.status === 'fulfilled') {
+          summaryCacheRef.current.business[cacheKey] = businessResult.value;
+          nextStats = { ...nextStats, ...businessResult.value };
+          nextBusinessSource = cachedBusinessSummary ? 'cached' : 'server';
+        } else {
+          nextStats = { ...nextStats, ...pickBusinessSummary(getLocalStats()) };
+          console.error('[AnalyticsTab] analytics-summary fallback:', businessResult.reason);
+        }
+
+        if (searchIntentResult.status === 'fulfilled') {
+          searchIntentCacheRef.current[cacheKey] = searchIntentResult.value;
+          nextSearchIntent = searchIntentResult.value;
+          nextSearchIntentSource = cachedSearchIntent ? 'cached' : 'server';
+        } else {
+          console.error('[AnalyticsTab] analytics-search-intent unavailable:', searchIntentResult.reason);
+        }
+
+        if (customerCompositionResult.status === 'fulfilled') {
+          customerCompositionCacheRef.current[cacheKey] = customerCompositionResult.value;
+          nextCustomerComposition = customerCompositionResult.value;
+          nextCustomerCompositionSource = cachedCustomerComposition ? 'cached' : 'server';
+        } else {
+          console.error('[AnalyticsTab] analytics-customer-composition unavailable:', customerCompositionResult.reason);
+        }
+
+        if (!cancelled) {
+          statsRef.current = nextStats;
+          setStats(nextStats);
+          setSummarySource((prev) => ({ ...prev, business: nextBusinessSource }));
+          setSearchIntent(nextSearchIntent);
+          setSearchIntentSource(nextSearchIntentSource);
+          setCustomerComposition(nextCustomerComposition);
+          setCustomerCompositionSource(nextCustomerCompositionSource);
+          setLoading(false);
+        }
+
+        return;
       }
+
+      const hostResult = await (cachedHostSummary
+        ? Promise.resolve(cachedHostSummary)
+        : fetch(analyticsHostUrl).then(async (response) => {
+            if (!response.ok) {
+              throw new Error('Analytics host summary fetch failed');
+            }
+            const result = await response.json();
+            if (!result?.success) {
+              throw new Error(result?.error || 'Analytics host summary fetch failed');
+            }
+            return result.data as AnalyticsHostSummary;
+          })
+      ).then(
+        (value) => ({ status: 'fulfilled' as const, value }),
+        (reason) => ({ status: 'rejected' as const, reason })
+      );
+
+      let nextHostSource: AnalyticsSummarySources['host'] = 'fallback';
 
       if (hostResult.status === 'fulfilled') {
         summaryCacheRef.current.host[cacheKey] = hostResult.value;
         nextStats = { ...nextStats, ...hostResult.value };
-        nextSummarySource.host = 'server';
-      } else if (cachedHostSummary) {
-        nextStats = { ...nextStats, ...cachedHostSummary };
-        nextSummarySource.host = 'cached';
+        nextHostSource = cachedHostSummary ? 'cached' : 'server';
       } else {
-        nextStats = { ...nextStats, ...getLocalStats() };
+        nextStats = { ...nextStats, ...pickHostSummary(getLocalStats()) };
         console.error('[AnalyticsTab] analytics-host-summary fallback:', hostResult.reason);
-      }
-
-      let nextSearchIntent: AnalyticsSearchIntentSummary | null = null;
-      let nextSearchIntentSource: SearchIntentSource = 'unavailable';
-      let nextCustomerComposition: AnalyticsCustomerCompositionSummary | null = null;
-      let nextCustomerCompositionSource: CustomerCompositionSource = 'unavailable';
-
-      if (searchIntentResult.status === 'fulfilled') {
-        searchIntentCacheRef.current[cacheKey] = searchIntentResult.value;
-        nextSearchIntent = searchIntentResult.value;
-        nextSearchIntentSource = 'server';
-      } else if (cachedSearchIntent) {
-        nextSearchIntent = cachedSearchIntent;
-        nextSearchIntentSource = 'cached';
-      } else {
-        console.error('[AnalyticsTab] analytics-search-intent unavailable:', searchIntentResult.reason);
-      }
-
-      if (customerCompositionResult.status === 'fulfilled') {
-        customerCompositionCacheRef.current[cacheKey] = customerCompositionResult.value;
-        nextCustomerComposition = customerCompositionResult.value;
-        nextCustomerCompositionSource = 'server';
-      } else if (cachedCustomerComposition) {
-        nextCustomerComposition = cachedCustomerComposition;
-        nextCustomerCompositionSource = 'cached';
-      } else {
-        console.error('[AnalyticsTab] analytics-customer-composition unavailable:', customerCompositionResult.reason);
       }
 
       if (!cancelled) {
         statsRef.current = nextStats;
         setStats(nextStats);
-        setSummarySource(nextSummarySource);
-        setSearchIntent(nextSearchIntent);
-        setSearchIntentSource(nextSearchIntentSource);
-        setCustomerComposition(nextCustomerComposition);
-        setCustomerCompositionSource(nextCustomerCompositionSource);
+        setSummarySource((prev) => ({ ...prev, host: nextHostSource }));
         setLoading(false);
       }
     };
@@ -649,7 +707,7 @@ export function useAnalyticsSummaryData({
     return () => {
       cancelled = true;
     };
-  }, [buildLocalStats, dateRange]);
+  }, [activeMainTab, buildLocalStats, dateRange]);
 
   return {
     loading,

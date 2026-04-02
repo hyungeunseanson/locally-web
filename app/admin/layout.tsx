@@ -3,7 +3,6 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ReactNode, Suspense } from "react";
 import Sidebar from "@/app/admin/dashboard/components/Sidebar";
-import GlobalTeamChat from "@/app/admin/dashboard/components/GlobalTeamChat";
 import { createAdminClient } from "@/app/utils/supabase/admin";
 import { resolveAdminAccess } from "@/app/utils/adminAccess";
 import { PRIVATE_NOINDEX_METADATA } from "@/app/utils/seo";
@@ -81,9 +80,6 @@ export default async function AdminLayout({
           {children}
         </div>
       </main>
-
-      {/* 🟢 전역 팀 채팅창 마운트 */}
-      <GlobalTeamChat />
     </div>
   );
 }

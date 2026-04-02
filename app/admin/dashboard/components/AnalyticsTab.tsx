@@ -94,10 +94,13 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
     analyticsEvents,
     inquiries,
     inquiryMessages,
+    activeMainTab,
     dateRange,
   });
 
-  if (loading) return <div className="p-8"><Skeleton className="w-full h-96 rounded-xl" /></div>;
+  if (loading && (activeMainTab === 'business' || activeMainTab === 'host')) {
+    return <div className="p-8"><Skeleton className="w-full h-96 rounded-xl" /></div>;
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
