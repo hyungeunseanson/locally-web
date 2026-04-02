@@ -84,6 +84,7 @@ export default function BottomTabNavigation() {
                         alt={t('nav_trips')}
                         fill
                         sizes="24px"
+                        unoptimized
                         className="object-cover"
                         style={{ transform: 'scale(1.35)' }}
                     />

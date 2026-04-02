@@ -339,6 +339,7 @@ export default function DetailsPanel({ activeTab, selectedItem: rawSelectedItem,
                       alt="Host application identification document"
                       fill
                       sizes="(max-width: 768px) 100vw, 420px"
+                      unoptimized
                       className="object-contain bg-black/5"
                     />
                     <a href={signedUrl} rel="noreferrer" className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white font-bold text-sm">

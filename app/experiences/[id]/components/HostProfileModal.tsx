@@ -69,6 +69,7 @@ export default function HostProfileModal({ isOpen, onClose, host }: HostProfileM
                     src={host.avatarUrl}
                     className="object-cover"
                     fill
+                    sizes="(max-width: 768px) 96px, 128px"
                     alt={`${host.name} ${t('exp_host_modal_title')}`}
                   />
                 ) : (

@@ -141,6 +141,7 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
                     src={displayAvatarUrl}
                     alt="profile"
                     fill
+                    sizes="(max-width: 768px) 80px, 112px"
                     className="object-cover"
                   />
                 ) : (

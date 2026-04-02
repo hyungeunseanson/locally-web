@@ -11,8 +11,6 @@ const OPTIMIZED_IMAGE_HOSTS = new Set([
   'k.kakaocdn.net',
   't1.kakaocdn.net',
   'uhinvcydgzqlpnvieyal.supabase.co',
-  'via.placeholder.com',
-  'placehold.co',
 ]);
 
 function canUseOptimizedImage(src: string | null) {

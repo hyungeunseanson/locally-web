@@ -233,6 +233,7 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
                 src={photos[currentPhotoIndex]}
                 alt={localizedTitle}
                 fill
+                sizes="(max-width: 768px) 100vw, 288px"
                 className="object-cover transition-transform duration-700 group-hover:scale-105"
               />
             ) : (

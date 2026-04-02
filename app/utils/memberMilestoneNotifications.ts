@@ -1,5 +1,3 @@
-import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
-import { buildLocalizedEmailCopy } from '@/app/utils/emailCopy';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 import {
   fetchLocallyMembershipSummary,
@@ -15,14 +13,12 @@ function getMembershipMilestoneCopy(status: Extract<LocallyMembershipStatus, 'me
     return {
       type: 'circle_welcome' as const,
       notificationKey: 'membership.circle_welcome' as const,
-      emailKey: 'membership.circle_welcome' as const,
     };
   }
 
   return {
     type: 'member_welcome' as const,
     notificationKey: 'membership.member_welcome' as const,
-    emailKey: 'membership.member_welcome' as const,
   };
 }
 
@@ -60,26 +56,6 @@ export async function notifyMembershipMilestone(params: {
   } catch (error) {
     console.error('[memberMilestoneNotifications] notification side effect failed:', error);
   }
-
-  const emailCopy = await buildLocalizedEmailCopy({
-    supabaseAdmin,
-    userId,
-    key: copy.emailKey,
-    copyParams: {
-      status: milestone,
-    },
-  });
-
-  void sendImmediateGenericEmail({
-    recipientUserId: userId,
-    subject: emailCopy.subject,
-    title: emailCopy.title,
-    message: emailCopy.message,
-    link: '/account',
-    ctaLabel: emailCopy.ctaLabel,
-  }).catch((error) => {
-    console.error('[memberMilestoneNotifications] email dispatch failed:', error);
-  });
 
   return membership;
 }

@@ -273,6 +273,7 @@ export default function Sidebar() {
             alt="Locally Logo"
             width={32}
             height={32}
+            unoptimized
             className="w-8 h-8 object-contain group-hover:scale-105 transition-transform duration-300"
           />
         </div>
@@ -358,6 +359,7 @@ export default function Sidebar() {
             alt="Logo"
             width={28}
             height={28}
+            unoptimized
             className="w-7 h-7 object-contain"
           />
           <span className="text-[15px] font-bold tracking-tight">Locally</span>

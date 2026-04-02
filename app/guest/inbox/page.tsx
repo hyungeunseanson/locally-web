@@ -443,9 +443,9 @@ function InboxContent() {
                   {/* 아바타 */}
                   <div className={`w-11 h-11 md:w-12 md:h-12 rounded-full flex items-center justify-center shrink-0 overflow-hidden relative ${isAdminSupport ? 'bg-white border border-slate-200' : 'bg-gray-100'}`}>
                     {isAdminSupport ? (
-                      <Image src={ADMIN_SUPPORT_AVATAR_SRC} alt="Locally support" fill className="object-cover" />
+                      <Image src={ADMIN_SUPPORT_AVATAR_SRC} alt="Locally support" fill sizes="(max-width: 768px) 44px, 48px" unoptimized className="object-cover" />
                     ) : (
-                      <Image src={secureUrl(display.avatar)} alt="host" fill className="object-cover" />
+                      <Image src={secureUrl(display.avatar)} alt="host" fill sizes="(max-width: 768px) 44px, 48px" className="object-cover" />
                     )}
                   </div>
 
@@ -505,9 +505,9 @@ function InboxContent() {
                 >
                   <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gray-100 overflow-hidden border border-gray-200 relative shrink-0">
                     {selectedIsAdminSupport ? (
-                      <Image src={ADMIN_SUPPORT_AVATAR_SRC} alt="Locally support" fill className="object-cover" />
+                      <Image src={ADMIN_SUPPORT_AVATAR_SRC} alt="Locally support" fill sizes="(max-width: 768px) 28px, 32px" unoptimized className="object-cover" />
                     ) : (
-                      <Image src={secureUrl(currentHostDisplay.avatar)} alt="host" fill className="object-cover" />
+                      <Image src={secureUrl(currentHostDisplay.avatar)} alt="host" fill sizes="(max-width: 768px) 28px, 32px" className="object-cover" />
                     )}
                   </div>
                   <div className="min-w-0">
@@ -538,12 +538,17 @@ function InboxContent() {
                                 src={ADMIN_SUPPORT_AVATAR_SRC}
                                 alt="Locally support"
                                 fill
+                                sizes="(max-width: 768px) 26px, 28px"
+                                unoptimized
                                 className="object-cover"
                               />
                             ) : (
                               <Image
                                 src={secureUrl(currentHostDisplay.avatar)}
-                                alt="sender" fill className="object-cover"
+                                alt="sender"
+                                fill
+                                sizes="(max-width: 768px) 26px, 28px"
+                                className="object-cover"
                               />
                             )}
                           </div>

@@ -159,7 +159,7 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
                     <div className="flex items-center gap-2.5 mb-2.5">
                       <div className="w-9 h-9 bg-slate-200 rounded-full overflow-hidden relative shrink-0">
                         {avatarUrl ? (
-                          <Image src={avatarUrl} alt="user" fill className="object-cover"/>
+                          <Image src={avatarUrl} alt="user" fill sizes="36px" className="object-cover"/>
                         ) : (
                           <div className="w-full h-full bg-slate-300 flex items-center justify-center text-xs text-slate-500">?</div>
                         )}
@@ -199,7 +199,7 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
                   <div className="flex items-center gap-3 mb-3">
                     <div className="w-11 h-11 bg-slate-200 rounded-full overflow-hidden relative shrink-0">
                       {avatarUrl ? (
-                        <Image src={avatarUrl} alt="user" fill className="object-cover"/>
+                        <Image src={avatarUrl} alt="user" fill sizes="44px" className="object-cover"/>
                       ) : (
                         <div className="w-full h-full bg-slate-300 flex items-center justify-center text-xs text-slate-500">?</div>
                       )}
@@ -268,7 +268,7 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
                       <div className="flex gap-3">
                         <div className="w-9 h-9 bg-slate-200 rounded-full overflow-hidden relative shrink-0 border border-slate-100">
                            {avatarUrl ? (
-                             <Image src={avatarUrl} alt="user" fill className="object-cover"/>
+                             <Image src={avatarUrl} alt="user" fill sizes="36px" className="object-cover"/>
                            ) : <div className="w-full h-full bg-slate-300 flex items-center justify-center text-xs text-slate-500">?</div>}
                         </div>
 

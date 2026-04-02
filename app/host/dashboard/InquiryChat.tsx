@@ -276,7 +276,7 @@ export default function InquiryChat() {
                 {/* 아바타 */}
                 <div className="w-11 h-11 md:w-12 md:h-12 rounded-full shrink-0 overflow-hidden relative bg-slate-100 border border-slate-200">
                   {inq.guest?.avatar_url
-                    ? <Image src={secureUrl(inq.guest.avatar_url)!} alt="guest" fill className="object-cover" />
+                    ? <Image src={secureUrl(inq.guest.avatar_url)!} alt="guest" fill sizes="(max-width: 768px) 44px, 48px" className="object-cover" />
                     : <div className="w-full h-full flex items-center justify-center"><User size={18} className="text-slate-400" /></div>
                   }
                 </div>
@@ -351,7 +351,7 @@ export default function InquiryChat() {
               >
                 <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gray-100 overflow-hidden border border-gray-200 relative shrink-0">
                   {selectedInquiry.guest?.avatar_url
-                    ? <Image src={secureUrl(selectedInquiry.guest.avatar_url)!} alt="guest" fill className="object-cover" />
+                    ? <Image src={secureUrl(selectedInquiry.guest.avatar_url)!} alt="guest" fill sizes="(max-width: 768px) 32px, 40px" className="object-cover" />
                     : <div className="w-full h-full flex items-center justify-center"><User size={14} className="text-slate-400" /></div>
                   }
                 </div>
@@ -379,7 +379,7 @@ export default function InquiryChat() {
                       >
                         <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gray-200 overflow-hidden relative border border-gray-200 shrink-0">
                           {selectedInquiry.guest?.avatar_url
-                            ? <Image src={secureUrl(selectedInquiry.guest.avatar_url)!} alt="guest" fill className="object-cover" />
+                            ? <Image src={secureUrl(selectedInquiry.guest.avatar_url)!} alt="guest" fill sizes="(max-width: 768px) 28px, 32px" className="object-cover" />
                             : <div className="w-full h-full flex items-center justify-center"><User size={12} className="text-slate-400" /></div>
                           }
                         </div>

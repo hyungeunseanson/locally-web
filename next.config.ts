@@ -3,7 +3,8 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // ✅ 이미지 최적화 설정
   images: {
-    formats: ['image/avif', 'image/webp'], // 🟢 차세대 이미지 포맷 강제
+    formats: ['image/webp'],
+    minimumCacheTTL: 86400,
     remotePatterns: [
       {
         protocol: 'https',
@@ -32,14 +33,6 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'uhinvcydgzqlpnvieyal.supabase.co', // Supabase Storage
-      },
-      {
-        protocol: 'https',
-        hostname: 'via.placeholder.com', // 🟢 테스트용 임시 이미지 로드 허용
-      },
-      {
-        protocol: 'https',
-        hostname: 'placehold.co', // 🟢 테스트용 임시 이미지 허용 (추가 방어)
       }
     ],
     dangerouslyAllowSVG: true,

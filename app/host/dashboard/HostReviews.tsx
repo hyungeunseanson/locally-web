@@ -260,6 +260,7 @@ export default function HostReviews() {
                                 src={guest.avatar_url}
                                 alt="Guest"
                                 fill
+                                sizes="48px"
                                 className="object-cover"
                               />
                             ) : (
@@ -291,7 +292,7 @@ export default function HostReviews() {
                             <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
                               {review.photos.map((photo, idx) => (
                                 <div key={idx} className="w-20 h-20 rounded-lg overflow-hidden relative shrink-0 border border-slate-200">
-                                  <Image src={photo} alt="Review" fill className="object-cover" />
+                                  <Image src={photo} alt="Review" fill sizes="80px" className="object-cover" />
                                 </div>
                               ))}
                             </div>
