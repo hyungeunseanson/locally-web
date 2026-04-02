@@ -670,6 +670,18 @@ const dictionary: Record<Locale, Record<string, string>> = {
     exp_payment_agree_off_platform: "예약 후 오프플랫폼 직거래를 시도하지 않겠습니다.",
     exp_payment_agree_safety: "허위 예약, 무단 불참, 타인 명의 결제 등 위험 행위를 하지 않겠습니다.",
     exp_payment_agree_terms: "취소/환불 규정과 서비스 이용약관에 동의합니다.",
+    exp_payment_agree_off_platform_label: "외부·직접 결제는 금지됩니다",
+    exp_payment_agree_manners_label: "호스트를 존중하고 기본 매너를 지킬게요",
+    exp_payment_agree_terms_label: "취소·환불 규정을 확인했어요",
+    exp_payment_agree_off_platform_title: "외부·직접 결제는 금지됩니다",
+    exp_payment_agree_manners_title: "호스트를 존중하고 기본 매너를 지켜주세요",
+    exp_payment_agree_terms_title: "취소·환불 규정을 확인해주세요",
+    exp_payment_agree_off_platform_body:
+      "로컬리 밖에서 직접 송금하거나 현장 결제를 진행하는 것은 금지됩니다.\n외부 결제를 따르다 생기는 사기, 환불, 분쟁은 플랫폼 보호 대상이 아닐 수 있습니다.\n안전한 결제 보호는 로컬리 결제에서만 적용됩니다.",
+    exp_payment_agree_manners_body:
+      "시간 약속을 지키고, 무단 불참이나 무례한 행동은 피해주세요.\n현장에서는 호스트의 안내와 운영 방식을 존중해주세요.\n문제가 될 수 있는 명의 도용 결제나 부적절한 요구도 금지됩니다.",
+    exp_payment_agree_terms_body:
+      "취소 시점에 따라 환불 기준이 달라질 수 있습니다.\n예약 전에 취소·환불 규정을 꼭 확인해주세요.\n결제 이후에는 해당 규정이 그대로 적용됩니다.",
     exp_payment_pay_button: "{amount} 결제하기",
     exp_payment_paypal_button_hint: "위 PayPal 버튼에서 승인하면 결제가 완료됩니다.",
     exp_payment_date_tbd: "날짜 미정",
@@ -2099,6 +2111,18 @@ const dictionary: Record<Locale, Record<string, string>> = {
     exp_payment_agree_off_platform: "I will not attempt off-platform direct transactions after booking.",
     exp_payment_agree_safety: "I will not engage in risky behavior such as fake bookings, no-shows, or payments under another person's name.",
     exp_payment_agree_terms: "I agree to the cancellation/refund policy and Terms of Service.",
+    exp_payment_agree_off_platform_label: "Off-platform or direct payment is not allowed",
+    exp_payment_agree_manners_label: "I will respect the host and follow basic manners",
+    exp_payment_agree_terms_label: "I reviewed the cancellation and refund policy",
+    exp_payment_agree_off_platform_title: "Off-platform or direct payment is not allowed",
+    exp_payment_agree_manners_title: "Please respect the host and follow basic manners",
+    exp_payment_agree_terms_title: "Please review the cancellation and refund policy",
+    exp_payment_agree_off_platform_body:
+      "Direct transfers, cash payments, or personal account payments outside Locally are not allowed.\nIf you choose an outside payment, fraud, refund, or dispute issues may not be protected by the platform.\nPayment protection only applies to bookings paid through Locally.",
+    exp_payment_agree_manners_body:
+      "Please keep your time commitment and avoid no-shows or rude behavior.\nPlease respect the host's guidance and on-site rules during the experience.\nProblematic actions such as paying under someone else's name are also not allowed.",
+    exp_payment_agree_terms_body:
+      "Refund eligibility may change depending on when you cancel.\nPlease review the cancellation and refund policy before booking.\nOnce the reservation is made, the listed policy applies.",
     exp_payment_pay_button: "Pay {amount}",
     exp_payment_paypal_button_hint: "Payment will be completed when you approve in the PayPal button above.",
     exp_payment_date_tbd: "Date TBD",
@@ -3531,6 +3555,18 @@ const dictionary: Record<Locale, Record<string, string>> = {
     exp_payment_agree_off_platform: "予約後にプラットフォーム外での直接取引を試みません。",
     exp_payment_agree_safety: "虚偽予約、無断欠席、他人名義決済などの危険行為を行いません。",
     exp_payment_agree_terms: "キャンセル/返金規定および利用規約に同意します。",
+    exp_payment_agree_off_platform_label: "外部・直接決済は禁止です",
+    exp_payment_agree_manners_label: "ホストを尊重し、基本的なマナーを守ります",
+    exp_payment_agree_terms_label: "キャンセル・返金規定を確認しました",
+    exp_payment_agree_off_platform_title: "外部・直接決済は禁止です",
+    exp_payment_agree_manners_title: "ホストを尊重し、基本的なマナーを守ってください",
+    exp_payment_agree_terms_title: "キャンセル・返金規定をご確認ください",
+    exp_payment_agree_off_platform_body:
+      "Locally以外での直接送金、現地決済、個人口座への支払いはできません。\n外部決済により発生した詐欺、返金、トラブルはプラットフォーム保護の対象外となる場合があります。\n安全な決済保護はLocally決済にのみ適用されます。",
+    exp_payment_agree_manners_body:
+      "時間の約束を守り、無断欠席や失礼な行為はお控えください。\n現地ではホストの案内や進行を尊重してください。\n他人名義での決済など問題となる行為も禁止です。",
+    exp_payment_agree_terms_body:
+      "キャンセルの時点によって返金基準が変わる場合があります。\n予約前にキャンセル・返金規定を必ずご確認ください。\n決済後はその規定がそのまま適用されます。",
     exp_payment_pay_button: "{amount}を決済する",
     exp_payment_paypal_button_hint: "上のPayPalボタンで承認すると決済が完了します。",
     exp_payment_date_tbd: "日付未定",
@@ -4961,6 +4997,18 @@ const dictionary: Record<Locale, Record<string, string>> = {
     exp_payment_agree_off_platform: "预订后我不会尝试进行平台外私下交易。",
     exp_payment_agree_safety: "我不会进行虚假预订、无故缺席、冒用他人名义付款等风险行为。",
     exp_payment_agree_terms: "我同意取消/退款规则及服务条款。",
+    exp_payment_agree_off_platform_label: "禁止平台外或直接付款",
+    exp_payment_agree_manners_label: "我会尊重房东并遵守基本礼仪",
+    exp_payment_agree_terms_label: "我已确认取消与退款规则",
+    exp_payment_agree_off_platform_title: "禁止平台外或直接付款",
+    exp_payment_agree_manners_title: "请尊重房东并遵守基本礼仪",
+    exp_payment_agree_terms_title: "请确认取消与退款规则",
+    exp_payment_agree_off_platform_body:
+      "禁止在 Locally 之外直接转账、现场付款或向个人账户付款。\n如果选择平台外付款，相关诈骗、退款或纠纷可能不受平台保护。\n支付保障仅适用于通过 Locally 完成的付款。",
+    exp_payment_agree_manners_body:
+      "请遵守时间约定，避免无故缺席或失礼行为。\n现场体验时，请尊重房东的说明和安排。\n使用他人名义付款等可能引发问题的行为也被禁止。",
+    exp_payment_agree_terms_body:
+      "退款标准可能会因取消时间不同而变化。\n请在预订前仔细确认取消与退款规则。\n付款完成后，将按该规则执行。",
     exp_payment_pay_button: "支付 {amount}",
     exp_payment_paypal_button_hint: "在上方 PayPal 按钮完成授权后即会完成支付。",
     exp_payment_date_tbd: "日期待定",

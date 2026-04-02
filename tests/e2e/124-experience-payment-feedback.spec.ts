@@ -122,5 +122,27 @@ test.describe.serial('Experience payment inline feedback', () => {
     expect(afterAgreementErrorUrl.searchParams.get('guests')).toBe(originalUrl.searchParams.get('guests'));
     expect(afterAgreementErrorUrl.searchParams.get('type')).toBe(originalUrl.searchParams.get('type'));
     expect(afterAgreementErrorUrl.searchParams.get('solo')).toBe(originalUrl.searchParams.get('solo'));
+
+    const openAgreementAndClose = async (testId: string, closeWith: 'overlay' | 'button') => {
+      const row = page.getByTestId(testId);
+      await row.click();
+      await expect(page.getByTestId('exp-payment-agreement-modal')).toBeVisible();
+
+      if (closeWith === 'overlay') {
+        await page.getByTestId('exp-payment-agreement-modal-overlay').click({ position: { x: 10, y: 10 } });
+      } else {
+        await page.getByTestId('exp-payment-agreement-modal-close').click();
+      }
+
+      await expect(page.getByTestId('exp-payment-agreement-modal')).toHaveCount(0);
+      await expect(row).toHaveAttribute('aria-checked', 'true');
+    };
+
+    await openAgreementAndClose('exp-payment-agree-off-platform', 'overlay');
+    await openAgreementAndClose('exp-payment-agree-safety', 'button');
+    await openAgreementAndClose('exp-payment-agree-terms', 'button');
+
+    await expect(page.getByTestId('exp-payment-agreements-error')).toHaveCount(0);
+    await expect(page.getByTestId('exp-payment-global-error')).toHaveCount(0);
   });
 });

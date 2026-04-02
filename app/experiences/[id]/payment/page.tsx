@@ -2,7 +2,7 @@
 
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams, useParams } from 'next/navigation';
-import { ChevronLeft, CreditCard, Calendar, Users, ShieldCheck, Clock, Info, CheckCircle2 } from 'lucide-react';
+import { ChevronLeft, CreditCard, Calendar, Users, ShieldCheck, Clock, Info, CheckCircle2, X } from 'lucide-react';
 import { Button } from '@/app/components/ui/Button';
 import Spinner from '@/app/components/ui/Spinner';
 import StatusNotice from '@/app/components/ui/StatusNotice';
@@ -109,6 +109,8 @@ type PayPalCheckoutContext = {
   agreeNoOffPlatform: boolean;
 };
 
+type AgreementKey = 'off_platform' | 'manners' | 'refund';
+
 declare global {
   interface Window {
     paypal?: PayPalNamespace;
@@ -198,6 +200,7 @@ function PaymentContent() {
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [agreeSafety, setAgreeSafety] = useState(false);
   const [agreeNoOffPlatform, setAgreeNoOffPlatform] = useState(false);
+  const [activeAgreement, setActiveAgreement] = useState<AgreementKey | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
   const [cardProvider, setCardProvider] = useState<CardPaymentProvider>('portone');
   const [isCardReady, setIsCardReady] = useState(false);
@@ -277,23 +280,26 @@ function PaymentContent() {
     return null;
   }, [t]);
 
-  const setAgreementChecked = useCallback(
-    (
-      setter: React.Dispatch<React.SetStateAction<boolean>>,
-      nextChecked?: boolean
-    ) => {
-      flushSync(() => {
-        setter((prev) => (typeof nextChecked === 'boolean' ? nextChecked : !prev));
-      });
-    },
-    []
-  );
-
   const setPaymentMethodChecked = useCallback((nextMethod: PaymentMethod) => {
     flushSync(() => {
       setPaymentMethod(nextMethod);
     });
   }, []);
+
+  const markAgreementChecked = useCallback((key: AgreementKey) => {
+    flushSync(() => {
+      if (key === 'off_platform') setAgreeNoOffPlatform(true);
+      if (key === 'manners') setAgreeSafety(true);
+      if (key === 'refund') setAgreeTerms(true);
+    });
+  }, []);
+
+  const closeAgreementModal = useCallback(() => {
+    if (activeAgreement) {
+      markAgreementChecked(activeAgreement);
+    }
+    setActiveAgreement(null);
+  }, [activeAgreement, markAgreementChecked]);
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
@@ -305,6 +311,25 @@ function PaymentContent() {
     document.addEventListener('pointerdown', handlePointerDown);
     return () => document.removeEventListener('pointerdown', handlePointerDown);
   }, []);
+
+  useEffect(() => {
+    if (!activeAgreement) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeAgreementModal();
+      }
+    };
+
+    window.addEventListener('keydown', handleEsc);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleEsc);
+    };
+  }, [activeAgreement, closeAgreementModal]);
 
   useEffect(() => {
     latestPayPalContextRef.current = {
@@ -1006,6 +1031,33 @@ function PaymentContent() {
     }
     return paymentError;
   })();
+  const agreementRows = [
+    {
+      key: 'off_platform' as const,
+      checked: agreeNoOffPlatform,
+      testId: 'exp-payment-agree-off-platform',
+      labelKey: 'exp_payment_agree_off_platform_label',
+      titleKey: 'exp_payment_agree_off_platform_title',
+      bodyKey: 'exp_payment_agree_off_platform_body',
+    },
+    {
+      key: 'manners' as const,
+      checked: agreeSafety,
+      testId: 'exp-payment-agree-safety',
+      labelKey: 'exp_payment_agree_manners_label',
+      titleKey: 'exp_payment_agree_manners_title',
+      bodyKey: 'exp_payment_agree_manners_body',
+    },
+    {
+      key: 'refund' as const,
+      checked: agreeTerms,
+      testId: 'exp-payment-agree-terms',
+      labelKey: 'exp_payment_agree_terms_label',
+      titleKey: 'exp_payment_agree_terms_title',
+      bodyKey: 'exp_payment_agree_terms_body',
+    },
+  ];
+  const activeAgreementMeta = agreementRows.find((agreement) => agreement.key === activeAgreement) || null;
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center py-6 md:py-10 font-sans px-3 md:px-4">
@@ -1395,62 +1447,29 @@ function PaymentContent() {
                   <ShieldCheck className="h-3.5 w-3.5 md:h-4 md:w-4" /> {t('exp_payment_safety_title')}
                 </h3>
 
-                <button
+                {agreementRows.map((agreement) => (
+                  <button
+                  key={agreement.key}
                   type="button"
                   role="checkbox"
-                  aria-checked={agreeNoOffPlatform}
-                  data-testid="exp-payment-agree-off-platform"
-                  onClick={() => setAgreementChecked(setAgreeNoOffPlatform)}
+                  aria-checked={agreement.checked}
+                  data-testid={agreement.testId}
+                  onClick={() => setActiveAgreement(agreement.key)}
                   className="flex w-full cursor-pointer items-start gap-2.5 rounded-lg p-1.5 text-left transition-colors hover:bg-white/50 md:gap-3 md:p-2"
                 >
-                  <div className={cn(
-                    'mt-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded border transition-colors md:h-5 md:min-w-[20px]',
-                    agreeNoOffPlatform ? 'border-black bg-black text-white' : 'border-slate-300 bg-white text-transparent'
-                  )}>
-                    <CheckCircle2 className="h-3 w-3 md:h-3.5 md:w-3.5" />
-                  </div>
-                  <div className="text-[12px] font-medium leading-[1.45] text-slate-700 md:text-sm md:leading-snug">
-                    {t('exp_payment_agree_off_platform')}
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  role="checkbox"
-                  aria-checked={agreeSafety}
-                  data-testid="exp-payment-agree-safety"
-                  onClick={() => setAgreementChecked(setAgreeSafety)}
-                  className="flex w-full cursor-pointer items-start gap-2.5 rounded-lg p-1.5 text-left transition-colors hover:bg-white/50 md:gap-3 md:p-2"
-                >
-                  <div className={cn(
-                    'mt-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded border transition-colors md:h-5 md:min-w-[20px]',
-                    agreeSafety ? 'border-black bg-black text-white' : 'border-slate-300 bg-white text-transparent'
-                  )}>
-                    <CheckCircle2 className="h-3 w-3 md:h-3.5 md:w-3.5" />
-                  </div>
-                  <div className="text-[12px] font-medium leading-[1.45] text-slate-700 md:text-sm md:leading-snug">
-                    {t('exp_payment_agree_safety')}
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  role="checkbox"
-                  aria-checked={agreeTerms}
-                  data-testid="exp-payment-agree-terms"
-                  onClick={() => setAgreementChecked(setAgreeTerms)}
-                  className="flex w-full cursor-pointer items-start gap-2.5 rounded-lg p-1.5 text-left transition-colors hover:bg-white/50 md:gap-3 md:p-2"
-                >
-                  <div className={cn(
-                    'mt-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded border transition-colors md:h-5 md:min-w-[20px]',
-                    agreeTerms ? 'border-black bg-black text-white' : 'border-slate-300 bg-white text-transparent'
-                  )}>
-                    <CheckCircle2 className="h-3 w-3 md:h-3.5 md:w-3.5" />
-                  </div>
-                  <div className="text-[12px] font-medium leading-[1.45] text-slate-700 md:text-sm md:leading-snug">
-                    {t('exp_payment_agree_terms')}
-                  </div>
-                </button>
+                    <div
+                      className={cn(
+                        'mt-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded border transition-colors md:h-5 md:min-w-[20px]',
+                        agreement.checked ? 'border-black bg-black text-white' : 'border-slate-300 bg-white text-transparent'
+                      )}
+                    >
+                      <CheckCircle2 className="h-3 w-3 md:h-3.5 md:w-3.5" />
+                    </div>
+                    <div className="min-w-0 flex-1 text-[12px] font-medium leading-[1.45] text-slate-700 md:text-sm md:leading-snug">
+                      {t(agreement.labelKey)}
+                    </div>
+                  </button>
+                ))}
 
                 {agreementsError && (
                   <StatusNotice
@@ -1508,6 +1527,50 @@ function PaymentContent() {
           </PaymentSectionCard>
         </div>
       </div>
+
+      {activeAgreementMeta && (
+        <div
+          className="fixed inset-0 z-[220] flex items-end bg-black/45 p-0 backdrop-blur-[1px] md:items-center md:justify-center md:p-4"
+          data-testid="exp-payment-agreement-modal-overlay"
+          onClick={closeAgreementModal}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="exp-payment-agreement-modal-title"
+            data-testid="exp-payment-agreement-modal"
+            data-agreement-key={activeAgreementMeta.key}
+            className="relative w-full rounded-t-[26px] bg-white px-5 pb-[calc(max(env(safe-area-inset-bottom,0px),0px)+20px)] pt-5 shadow-2xl md:max-w-md md:rounded-[28px] md:px-6 md:pb-6 md:pt-6"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={closeAgreementModal}
+              data-testid="exp-payment-agreement-modal-close"
+              className="absolute right-4 top-4 rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <div className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-full bg-red-50 text-red-600">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+            <h3
+              id="exp-payment-agreement-modal-title"
+              data-testid="exp-payment-agreement-modal-title"
+              className="pr-10 text-[18px] font-bold leading-snug text-slate-900 md:text-[20px]"
+            >
+              {t(activeAgreementMeta.titleKey)}
+            </h3>
+            <p
+              data-testid="exp-payment-agreement-modal-body"
+              className="mt-3 whitespace-pre-line text-[13px] leading-6 text-slate-600 md:text-sm"
+            >
+              {t(activeAgreementMeta.bodyKey)}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
