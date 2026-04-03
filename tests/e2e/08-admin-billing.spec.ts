@@ -14,6 +14,8 @@ type TestUser = {
 type CreatedServiceFixtures = {
   recentOrderId: string;
   oldOrderId: string;
+  recentCreatedAt: string;
+  oldCreatedAt: string;
 };
 
 type ServiceCsvResponseRow = {
@@ -325,7 +327,12 @@ async function createServiceFixtures(customerId: string, hostId: string): Promis
   if (oldBookingError) throw oldBookingError;
   createdServiceBookingIds.push(oldOrderId);
 
-  return { recentOrderId, oldOrderId };
+  return {
+    recentOrderId,
+    oldOrderId,
+    recentCreatedAt: recentCreatedAt.toISOString(),
+    oldCreatedAt: oldCreatedAt.toISOString(),
+  };
 }
 
 async function login(page: Page, user: TestUser) {
@@ -343,11 +350,33 @@ async function openBilling(page: Page, adminUser: TestUser) {
   await login(page, adminUser);
   await page.goto('/admin/dashboard?tab=SALES', { waitUntil: 'networkidle' });
   await expect(page.getByText('매출 및 재무 현황')).toBeVisible({ timeout: 20000 });
+  await expect(page.getByTestId('sales-date-basis-note')).toBeVisible();
   await expect(page.getByText('총 거래액 (GMV)')).toBeVisible();
   await expect(page.getByText('순매출 (Net Revenue)')).toBeVisible();
-  await expect(page.getByText(/체험 정산 (예정금|가능액)/)).toBeVisible();
+  await expect(page.getByText('통합 정산 가능액')).toBeVisible();
   await expect(page.getByText('객단가 (AOV)')).toBeVisible();
   await expect(page.getByRole('button', { name: /일괄 지급 준비중/ })).toBeDisabled();
+}
+
+async function fetchSalesSummary(page: Page, startAt: string, endAt: string) {
+  return page.evaluate(async ({ startAt: start, endAt: end }) => {
+    const params = new URLSearchParams({ startAt: start, endAt: end });
+    const response = await fetch(`/api/admin/sales-summary?${params.toString()}`);
+    return {
+      status: response.status,
+      body: await response.json(),
+    };
+  }, { startAt, endAt });
+}
+
+async function fetchPayoutQueue(page: Page) {
+  return page.evaluate(async () => {
+    const response = await fetch('/api/admin/payout-queue');
+    return {
+      status: response.status,
+      body: await response.json(),
+    };
+  });
 }
 
 async function downloadServiceCsvAndReadResponse(page: Page) {
@@ -416,10 +445,33 @@ test.describe.serial('Admin billing smoke', () => {
     await openBilling(page, adminUser);
     await expect(page.getByRole('button', { name: /맞춤 의뢰 명세서/ })).toBeVisible({ timeout: 15000 });
 
-    await page.getByRole('button', { name: /정산 완료 \(History\)/ }).click();
+    const recentSummary = await fetchSalesSummary(page, fixtures.recentCreatedAt, fixtures.recentCreatedAt);
+    expect(recentSummary.status).toBe(200);
+    expect(recentSummary.body.success).toBeTruthy();
+    expect(recentSummary.body.serviceSummaryRows).toHaveLength(1);
+    expect(recentSummary.body.serviceSummaryRows[0]).toMatchObject({
+      amount: 140000,
+      host_payout_amount: 80000,
+      platform_revenue: 60000,
+      status: 'PAID',
+      payout_status: 'pending',
+    });
+
     await page.getByTestId('sales-settlement-card').click();
     await expect(page.getByRole('button', { name: /정산 대기 \(Pending\)/ })).toHaveClass(/border-slate-900/);
-    await expect(page.getByTestId('sales-settlement-panel')).toContainText('정산 가능');
+    await expect(page.getByTestId('sales-settlement-panel')).toContainText(
+      '서비스는 완료 처리 후 바로 대기 목록에 반영됩니다.'
+    );
+
+    const payoutQueue = await fetchPayoutQueue(page);
+    expect(payoutQueue.status).toBe(200);
+    expect(payoutQueue.body.success).toBeTruthy();
+    expect(
+      (payoutQueue.body.combinedHostTotals || []).some(
+        (row: { domains?: { service?: { pending_entries?: Array<{ order_id: string | null }> } | null } }) =>
+          (row.domains?.service?.pending_entries || []).some((entry) => entry.order_id === fixtures.recentOrderId)
+      )
+    ).toBeFalsy();
 
     await page.getByRole('button', { name: '30D' }).click();
     const rangeFiltered = await downloadServiceCsvAndReadResponse(page);

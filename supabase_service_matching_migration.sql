@@ -145,6 +145,7 @@ CREATE TABLE public.service_bookings (
                                   CHECK (status IN ('PENDING','PAID','confirmed','completed','cancelled','cancellation_requested')),
   payout_status       TEXT        DEFAULT 'pending'
                                   CHECK (payout_status IN ('pending','processing','paid','failed')),
+  payout_paid_at      TIMESTAMPTZ,
 
   -- 연락처 (예약 확정 시 복사)
   contact_name        TEXT,

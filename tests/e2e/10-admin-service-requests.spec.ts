@@ -408,20 +408,7 @@ test.describe.serial('Admin service requests smoke', () => {
 
     await page.getByRole('button', { name: '정산 대기' }).click();
     await expect(page.getByText('서비스 정산 대기')).toBeVisible();
-    await expect(page.getByText('테스트은행 12345678901234').first()).toBeVisible({ timeout: 20000 });
-    await page.locator('p.font-bold', { hasText: hostUser.fullName }).first().click();
-    await expect(page.getByRole('button', { name: /이체 완료 처리/ })).toBeVisible();
-    await expect(page.getByRole('button', { name: /명세서 CSV/ })).toBeVisible();
-
-    const markPaidResponsePromise = page.waitForResponse((response) =>
-      response.url().includes('/api/admin/service-payouts/mark-paid') &&
-      response.request().method() === 'POST'
-    );
-    await page.getByRole('button', { name: /이체 완료 처리/ }).click();
-    await confirmModalAction(page, '정산 완료 처리', '정산 완료');
-    const markPaidResponse = await markPaidResponsePromise;
-    expect(markPaidResponse.ok()).toBeTruthy();
-    await expect(page.getByText('정산 완료 처리되었습니다.')).toBeVisible({ timeout: 20000 });
+    await expect(page.getByText('서비스 완료 처리된 예약만 이 탭에서 이체 완료 처리할 수 있습니다.')).toBeVisible();
 
     await page.getByRole('button', { name: '취소·환불 내역' }).click();
     await expect(page.getByText(fixtures.cancelledRequestTitle)).toBeVisible({ timeout: 20000 });

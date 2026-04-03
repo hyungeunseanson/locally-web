@@ -12,6 +12,8 @@ type TestUser = {
 };
 
 const TEST_PASSWORD = 'LocallyTest!2026';
+const SCHEDULE_COMMITMENT_TEXT =
+  /열어둔 일정은 약속입니다|Open dates are a commitment|公開した日程は約束です|已开放的日期就是承诺/;
 
 let adminClient: SupabaseClient | null = null;
 const createdAuthUserIds: string[] = [];
@@ -339,12 +341,14 @@ test.describe.serial('Host dashboard edit and dates UI coverage', () => {
 
     await page.locator(`a[href="/host/experiences/${experience.id}/dates"]:visible`).first().click();
     await page.waitForURL(new RegExp(`/host/experiences/${experience.id}/dates`), { timeout: 15000 });
+    await expect(page.getByText(SCHEDULE_COMMITMENT_TEXT)).toBeVisible({ timeout: 10000 });
 
     await maybeAdvanceCalendar(page, targetDate);
     await dayCell(page, targetDate.getDate()).click();
     await expect(page.getByText(targetDateString)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('button', { name: '07:00' }).first()).toBeVisible({ timeout: 10000 });
 
-    await page.getByRole('button', { name: '12:00' }).first().click();
+    await page.getByRole('button', { name: '07:00' }).first().click();
 
     const saveResponsePromise = page.waitForResponse(
       (response) =>
@@ -364,14 +368,54 @@ test.describe.serial('Host dashboard edit and dates UI coverage', () => {
       .select('date,start_time')
       .eq('experience_id', experience.id)
       .eq('date', targetDateString)
-      .eq('start_time', '12:00')
+      .eq('start_time', '07:00')
       .maybeSingle();
 
     if (error) throw error;
 
     expect(data).toMatchObject({
       date: targetDateString,
-      start_time: '12:00',
+      start_time: '07:00',
     });
+  });
+
+  test('keeps the mobile schedule editor compact while exposing 07:00 slots', async ({ page }) => {
+    test.setTimeout(120000);
+
+    const hostUser = createUser('dates-mobile');
+    const hostId = await createAuthUser(hostUser);
+    await createApprovedHostApplication(hostId, hostUser);
+    const experience = await createExperienceFixture(hostId);
+    const targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() + 3);
+    const targetDateString = formatDate(targetDate);
+
+    await seedAvailability(experience.id, targetDateString);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await login(page, hostUser);
+    await openExperienceTab(page, experience.id);
+
+    await page.locator(`a[href="/host/experiences/${experience.id}/dates"]:visible`).first().click();
+    await page.waitForURL(new RegExp(`/host/experiences/${experience.id}/dates`), { timeout: 15000 });
+    await expect(page.getByText(SCHEDULE_COMMITMENT_TEXT)).toBeVisible({ timeout: 10000 });
+
+    await maybeAdvanceCalendar(page, targetDate);
+    const targetDayCell = dayCell(page, targetDate.getDate());
+    await expect(targetDayCell).toBeVisible({ timeout: 10000 });
+
+    const dayCellBox = await targetDayCell.boundingBox();
+    expect(dayCellBox).not.toBeNull();
+    expect(dayCellBox!.height).toBeLessThanOrEqual(70);
+
+    await targetDayCell.click();
+    await expect(page.getByText(targetDateString)).toBeVisible({ timeout: 10000 });
+
+    const earlyTimeButton = page.getByRole('button', { name: '07:00' }).first();
+    await expect(earlyTimeButton).toBeVisible({ timeout: 10000 });
+
+    const timeButtonBox = await earlyTimeButton.boundingBox();
+    expect(timeButtonBox).not.toBeNull();
+    expect(timeButtonBox!.height).toBeLessThanOrEqual(38);
   });
 });

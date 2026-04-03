@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useRouter, useParams } from 'next/navigation';
-import { ChevronLeft, ChevronRight, Check, Clock, Trash2, X } from 'lucide-react';
+import { AlertCircle, ChevronLeft, ChevronRight, Check, Clock, Trash2, X } from 'lucide-react';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 1. Import
 import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
@@ -25,6 +25,9 @@ type ScheduleSaveResponse = {
   error?: string;
   skippedBookedDeletions?: Array<{ date: string; time: string }>;
 };
+
+const SCHEDULE_START_HOUR = 7;
+const SCHEDULE_END_HOUR = 21;
 
 export default function ManageDatesPage() {
   const { t, lang } = useLanguage(); // 🟢 2. Hook
@@ -164,9 +167,9 @@ export default function ManageDatesPage() {
   // ... (UI 렌더링 부분은 기존 코드와 동일하여 생략, 아래 return 사용) ...
   const generateTimeOptions = () => {
     const times = [];
-    for (let h = 8; h <= 21; h++) {
+    for (let h = SCHEDULE_START_HOUR; h <= SCHEDULE_END_HOUR; h++) {
       times.push(`${String(h).padStart(2, '0')}:00`);
-      if (h !== 21) times.push(`${String(h).padStart(2, '0')}:30`);
+      if (h !== SCHEDULE_END_HOUR) times.push(`${String(h).padStart(2, '0')}:30`);
     }
     return times;
   };
@@ -182,7 +185,7 @@ export default function ManageDatesPage() {
     const firstDay = getFirstDayOfMonth(year, month);
 
     const days = [];
-    for (let i = 0; i < firstDay; i++) days.push(<div key={`empty-${i}`} className="h-16"></div>);
+    for (let i = 0; i < firstDay; i++) days.push(<div key={`empty-${i}`} className="h-16 md:h-20"></div>);
 
     for (let day = 1; day <= daysInMonth; day++) {
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -199,10 +202,10 @@ export default function ManageDatesPage() {
         <div
           key={day}
           onClick={() => handleDateClick(dateStr)}
-          className={`h-20 border border-slate-100 flex flex-col items-center justify-start pt-2 cursor-pointer transition-all rounded-xl m-1 relative group ${isSelected ? 'ring-2 ring-black bg-slate-50 z-10' : 'hover:bg-slate-50 text-slate-700'
+          className={`h-16 md:h-20 border border-slate-100 flex flex-col items-center justify-start pt-1.5 md:pt-2 cursor-pointer transition-all rounded-lg md:rounded-xl m-0.5 md:m-1 relative group ${isSelected ? 'ring-2 ring-black bg-slate-50 z-10' : 'hover:bg-slate-50 text-slate-700'
             }`}
         >
-          <span className={`text-sm font-bold ${isSelected ? 'text-black' : ''}`}>{day}</span>
+          <span className={`text-[12px] md:text-sm font-bold ${isSelected ? 'text-black' : ''}`}>{day}</span>
 
           {hasSlots && (
             <div className="flex gap-0.5 mt-1">
@@ -213,10 +216,10 @@ export default function ManageDatesPage() {
 
           {hasSlots && (
             <div className="mt-auto mb-1 flex flex-col items-center">
-              <span className="text-[10px] text-slate-500 font-bold bg-slate-100 px-1.5 py-0.5 rounded-md group-hover:bg-white transition-colors">
+              <span className="text-[9px] md:text-[10px] text-slate-500 font-bold bg-slate-100 px-1 md:px-1.5 py-0.5 rounded md:rounded-md group-hover:bg-white transition-colors">
                 {slotCount}{t('sched_slots')} {/* 🟢 번역 */}
               </span>
-              {bookedCount > 0 && <span className="text-[8px] text-rose-500 font-bold mt-0.5">{bookedCount} {t('sched_booked')}</span>} {/* 🟢 번역 */}
+              {bookedCount > 0 && <span className="text-[7px] md:text-[8px] text-rose-500 font-bold mt-0.5">{bookedCount} {t('sched_booked')}</span>} {/* 🟢 번역 */}
             </div>
           )}
         </div>
@@ -265,6 +268,19 @@ export default function ManageDatesPage() {
 
           <div className="w-full lg:w-96">
             <div className="sticky top-24 bg-slate-50 border border-slate-200 rounded-2xl md:rounded-3xl p-4 md:p-6 min-h-[300px] md:min-h-[500px]">
+              <div className="mb-4 md:mb-5 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3">
+                <div className="flex items-start gap-2">
+                  <AlertCircle size={16} className="mt-0.5 shrink-0 text-amber-700" />
+                  <div className="min-w-0">
+                    <p className="text-[12px] md:text-[13px] font-bold text-amber-900">
+                      {t('sched_commitment_title')}
+                    </p>
+                    <p className="mt-1 text-[11px] md:text-[12px] leading-5 text-amber-800">
+                      {t('sched_commitment_desc')}
+                    </p>
+                  </div>
+                </div>
+              </div>
               {selectedDate ? (
                 <div className="animate-in fade-in slide-in-from-right-4 duration-300">
                   <div className="flex justify-between items-start mb-5 md:mb-6">
@@ -279,8 +295,8 @@ export default function ManageDatesPage() {
                       availability[selectedDate].map(time => {
                         const isBooked = (bookingCounts[`${selectedDate}_${time}`] || 0) > 0;
                         return (
-                          <div key={time} className={`flex justify-between items-center bg-white p-2.5 px-3 md:p-3 md:px-4 rounded-xl border shadow-sm ${isBooked ? 'border-rose-200 bg-rose-50' : 'border-slate-200'}`}>
-                            <div className="flex items-center gap-3">
+                          <div key={time} className={`flex justify-between items-center bg-white p-2 px-2.5 md:p-3 md:px-4 rounded-xl border shadow-sm ${isBooked ? 'border-rose-200 bg-rose-50' : 'border-slate-200'}`}>
+                            <div className="flex items-center gap-2.5 md:gap-3">
                               <Clock size={16} className={isBooked ? "text-rose-400" : "text-slate-400"} />
                               <span className={`text-[12px] md:text-sm font-bold ${isBooked ? "text-rose-700" : "text-slate-800"}`}>{time}</span>
                               {isBooked && <span className="text-[9px] md:text-[10px] font-bold bg-rose-200 text-rose-700 px-1.5 py-0.5 rounded">{t('sched_booked')}</span>} {/* 🟢 번역 */}
@@ -298,15 +314,15 @@ export default function ManageDatesPage() {
                     ) : <div className="text-center py-10 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 text-sm">{t('sched_add_guide')}</div>} {/* 🟢 번역 */}
                   </div>
                   <div className="border-t border-slate-200 pt-6">
-                    <label className="text-[10px] md:text-xs font-bold text-slate-500 mb-3 block uppercase">{t('sched_add_label')} (08:00 ~ 21:00)</label> {/* 🟢 번역 */}
-                    <div className="grid grid-cols-3 md:grid-cols-3 gap-1.5 md:gap-2 max-h-44 md:max-h-60 overflow-y-auto custom-scrollbar">
+                    <label className="text-[10px] md:text-xs font-bold text-slate-500 mb-3 block uppercase">{t('sched_add_label')} (07:00 ~ 21:00)</label> {/* 🟢 번역 */}
+                    <div className="grid grid-cols-3 md:grid-cols-3 gap-1.5 md:gap-2 max-h-52 md:max-h-60 overflow-y-auto custom-scrollbar">
                       {timeOptions.map(time => {
                         const isAdded = availability[selectedDate]?.includes(time);
                         const isBooked = (bookingCounts[`${selectedDate}_${time}`] || 0) > 0;
                         return (
                           <button key={time} onClick={() => isAdded ? removeTimeSlot(time) : addTimeSlot(time)}
                             disabled={isBooked}
-                            className={`py-1.5 md:py-2 text-[12px] md:text-sm font-bold rounded-lg border transition-all ${isAdded
+                            className={`py-1 md:py-2 text-[11px] md:text-sm font-bold rounded-md md:rounded-lg border transition-all ${isAdded
                                 ? (isBooked ? 'bg-rose-100 text-rose-400 border-rose-200 cursor-not-allowed' : 'bg-black text-white border-black')
                                 : 'bg-white text-slate-600 border-slate-200 hover:border-black'
                               }`}>

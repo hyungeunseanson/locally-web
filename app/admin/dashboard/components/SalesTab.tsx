@@ -1,135 +1,279 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { DollarSign, TrendingUp, CreditCard, Wallet, AlertTriangle, CheckCircle, Calendar as CalendarIcon, ChevronDown, ChevronRight, ChevronUp, Download, Check } from 'lucide-react';
+import {
+  AlertTriangle,
+  Calendar as CalendarIcon,
+  Check,
+  CheckCircle,
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
+  CreditCard,
+  Download,
+  DollarSign,
+  TrendingUp,
+  Wallet,
+} from 'lucide-react';
 import dynamic from 'next/dynamic';
 import 'react-date-range/dist/styles.css';
 import 'react-date-range/dist/theme/default.css';
 import { Range } from 'react-date-range';
-import { differenceInCalendarDays, format, subDays, startOfDay, endOfDay } from 'date-fns';
-import { useToast } from '@/app/context/ToastContext';
-import { useConfirmDialog } from '@/app/hooks/useConfirmDialog';
+import { endOfDay, format, startOfDay, subDays } from 'date-fns';
+
 import { settleHostPayout } from '@/app/actions/admin';
+import type {
+  AdminCombinedPayoutQueueRow,
+  AdminPayoutQueueDomainGroup,
+  AdminPayoutQueueEntry,
+  AdminPayoutQueueState,
+  AdminSalesBooking,
+  AdminServiceBooking,
+} from '@/app/types/admin';
+import { useConfirmDialog } from '@/app/hooks/useConfirmDialog';
+import { useToast } from '@/app/context/ToastContext';
 import { isCancelledOnlyBookingStatus, isCompletedBookingStatus } from '@/app/constants/bookingStatus';
-import { getBookingHostPayout, getBookingPaidAmount, getBookingPlatformRevenue } from '@/app/utils/bookingFinance';
-import { AdminSalesBooking, AdminServiceBooking } from '@/app/types/admin';
+import {
+  EXPERIENCE_PAYOUT_THRESHOLD_KRW,
+  EXPERIENCE_PAYOUT_LONG_HOLD_DAYS,
+} from '@/app/utils/payoutQueue';
+import { getBookingPaidAmount, getBookingPlatformRevenue } from '@/app/utils/bookingFinance';
 
-const DateRange = dynamic(() => import('react-date-range').then(mod => mod.DateRange), { ssr: false });
+const DateRange = dynamic(() => import('react-date-range').then((mod) => mod.DateRange), { ssr: false });
 
-const MIN_PAYOUT_THRESHOLD_KRW = 100000;
-const LONG_HOLD_DAYS = 90;
+type ServiceSalesBookingSummary = Pick<
+  AdminServiceBooking,
+  'amount' | 'host_payout_amount' | 'platform_revenue' | 'status' | 'created_at' | 'payout_status'
+>;
 
-type SettlementState = 'eligible' | 'hold' | 'long_hold' | 'completed';
-
-type SettlementBookingRow = AdminSalesBooking & {
-  calculatedPayout: number;
+type SalesSummaryResponse = {
+  success: boolean;
+  error?: string;
+  data?: AdminSalesBooking[];
+  serviceSummaryRows?: ServiceSalesBookingSummary[];
 };
 
-type SettlementGroup = {
-  id: string;
-  hostName: string;
-  bank: string;
-  accountNumber: string;
-  accountHolder: string;
-  hostNationality: string;
-  totalAmount: number;
-  count: number;
-  status: string;
-  bookings: SettlementBookingRow[];
-  oldestBookingCreatedAt: string | null;
-  settlementState: SettlementState;
+type PayoutQueueResponse = {
+  success: boolean;
+  error?: string;
+  combinedHostTotals?: AdminCombinedPayoutQueueRow[];
 };
 
-const SETTLEMENT_STATE_META: Record<SettlementState, { label: string; className: string }> = {
+const SETTLEMENT_STATE_META: Record<AdminPayoutQueueState, { label: string; className: string }> = {
   eligible: { label: '정산 가능', className: 'bg-emerald-100 text-emerald-700' },
   hold: { label: '10만원 미만', className: 'bg-slate-100 text-slate-500' },
   long_hold: { label: '장기 보류', className: 'bg-amber-100 text-amber-700' },
   completed: { label: '지급 완료', className: 'bg-blue-100 text-blue-700' },
 };
 
-const PENDING_SETTLEMENT_STATE_ORDER: Record<SettlementState, number> = {
+const PENDING_SETTLEMENT_STATE_ORDER: Record<AdminPayoutQueueState, number> = {
   eligible: 0,
   long_hold: 1,
   hold: 2,
   completed: 3,
 };
 
-function getSettlementState(group: SettlementGroup): SettlementState {
-  if (group.settlementState === 'completed') {
-    return 'completed';
-  }
+type StatCardProps = {
+  title: string;
+  value: string;
+  sub: string;
+  icon: React.ReactNode;
+  bg: string;
+  text?: string;
+  onClick?: () => void;
+  actionLabel?: string;
+  testId?: string;
+};
 
-  if (group.totalAmount >= MIN_PAYOUT_THRESHOLD_KRW) {
-    return 'eligible';
-  }
+function getPendingPolicyNotes(row: AdminCombinedPayoutQueueRow) {
+  const notes: string[] = [];
 
-  if (group.oldestBookingCreatedAt) {
-    const pendingDays = differenceInCalendarDays(new Date(), new Date(group.oldestBookingCreatedAt));
-    if (pendingDays >= LONG_HOLD_DAYS) {
-      return 'long_hold';
+  if (row.domains.experience?.pending_count) {
+    if (row.domains.experience.settlement_state === 'long_hold') {
+      notes.push(
+        `체험 정산은 ₩${EXPERIENCE_PAYOUT_THRESHOLD_KRW.toLocaleString()} 미만 누적 보류이며 ${EXPERIENCE_PAYOUT_LONG_HOLD_DAYS}일 이상 장기 보류 상태입니다.`
+      );
+    } else if (row.domains.experience.settlement_state === 'hold') {
+      notes.push(
+        `체험 정산은 누적 ₩${EXPERIENCE_PAYOUT_THRESHOLD_KRW.toLocaleString()} 이상부터 이체 대상입니다.`
+      );
     }
   }
 
-  return 'hold';
+  if (row.domains.service?.pending_count) {
+    notes.push('서비스 정산은 완료 처리된 건만 대기 목록에 집계됩니다.');
+  }
+
+  return notes;
 }
 
-function getSettlementPolicyNote(group: SettlementGroup) {
-  if (group.settlementState === 'eligible' || group.settlementState === 'completed') {
-    return null;
+function formatEntryId(entry: AdminPayoutQueueEntry) {
+  const raw = entry.order_id || entry.id;
+  return raw.length > 14 ? raw.slice(-12) : raw;
+}
+
+function getEntryStatusLabel(entry: AdminPayoutQueueEntry) {
+  if (entry.domain === 'experience') {
+    return isCompletedBookingStatus(entry.status) ? '완료' : '위약금';
   }
 
-  if (group.settlementState === 'long_hold') {
-    return `누적 정산액이 ₩${MIN_PAYOUT_THRESHOLD_KRW.toLocaleString()} 미만이라 장기 보류 중입니다.`;
+  if (entry.status === 'completed') return '완료';
+  if (entry.status === 'confirmed') return '확정';
+  if (entry.status === 'PAID') return '결제 완료';
+  return entry.status;
+}
+
+function getEntryStatusClass(entry: AdminPayoutQueueEntry) {
+  if (entry.domain === 'experience') {
+    return isCompletedBookingStatus(entry.status)
+      ? 'bg-blue-50 text-blue-600'
+      : 'bg-red-50 text-red-600';
   }
 
-  return `누적 정산액이 ₩${MIN_PAYOUT_THRESHOLD_KRW.toLocaleString()} 이상부터 정산 대상입니다.`;
+  if (entry.status === 'completed') return 'bg-emerald-50 text-emerald-700';
+  if (entry.status === 'confirmed') return 'bg-indigo-50 text-indigo-700';
+  return 'bg-slate-100 text-slate-600';
+}
+
+function renderDomainSection(params: {
+  domainLabel: string;
+  domain: AdminPayoutQueueDomainGroup;
+  settlementTab: 'PENDING' | 'COMPLETED';
+}) {
+  const { domainLabel, domain, settlementTab } = params;
+  const entries = settlementTab === 'PENDING' ? domain.pending_entries : domain.paid_entries;
+
+  if (entries.length === 0) return null;
+
+  const sectionAmount = settlementTab === 'PENDING' ? domain.pending_amount : domain.paid_amount;
+
+  return (
+    <div className="mt-4 first:mt-0">
+      <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h5 className="text-sm font-bold text-slate-900">{domainLabel}</h5>
+          <p className="text-[10px] md:text-xs text-slate-500">
+            {settlementTab === 'PENDING'
+              ? `${domain.pending_count}건 · ₩${domain.pending_amount.toLocaleString()}`
+              : `${domain.paid_count}건 · ₩${domain.paid_amount.toLocaleString()}`}
+          </p>
+        </div>
+        <span className={`w-fit rounded-full px-2 py-1 text-[10px] font-bold uppercase ${SETTLEMENT_STATE_META[domain.settlement_state].className}`}>
+          {settlementTab === 'COMPLETED' ? '지급 완료' : SETTLEMENT_STATE_META[domain.settlement_state].label}
+        </span>
+      </div>
+
+      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+        <table className="w-full min-w-[560px] text-left text-[10px] md:text-xs">
+          <thead className="border-b border-slate-100 bg-slate-50 text-slate-500">
+            <tr>
+              <th className="px-3 py-2 md:px-4 md:py-3">결제일</th>
+              <th className="px-3 py-2 md:px-4 md:py-3">주문 ID</th>
+              <th className="px-3 py-2 md:px-4 md:py-3">게스트</th>
+              <th className="px-3 py-2 md:px-4 md:py-3">진행 상태</th>
+              <th className="px-3 py-2 text-right md:px-4 md:py-3">결제 금액</th>
+              <th className="px-3 py-2 text-right md:px-4 md:py-3">지급액</th>
+              <th className="px-3 py-2 text-right md:px-4 md:py-3">
+                {settlementTab === 'PENDING' ? '서비스일/체험일' : '지급 완료'}
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-50">
+            {entries.map((entry) => (
+              <tr key={entry.id} className="hover:bg-slate-50">
+                <td className="px-3 py-2 text-slate-500 md:px-4 md:py-3">
+                  {format(new Date(entry.created_at), 'yy.MM.dd')}
+                  <span className="ml-1 text-[9px]">{format(new Date(entry.created_at), 'HH:mm')}</span>
+                </td>
+                <td className="px-3 py-2 font-mono text-slate-400 md:px-4 md:py-3">{formatEntryId(entry)}</td>
+                <td className="px-3 py-2 font-medium text-slate-700 md:px-4 md:py-3">{entry.guest_name}</td>
+                <td className="px-3 py-2 md:px-4 md:py-3">
+                  <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase md:px-2 md:text-[10px] ${getEntryStatusClass(entry)}`}>
+                    {getEntryStatusLabel(entry)}
+                  </span>
+                </td>
+                <td className="px-3 py-2 text-right text-slate-500 md:px-4 md:py-3">₩{entry.amount.toLocaleString()}</td>
+                <td className="px-3 py-2 text-right font-bold text-purple-600 md:px-4 md:py-3">
+                  ₩{entry.payout_amount.toLocaleString()}
+                </td>
+                <td className="px-3 py-2 text-right text-slate-500 md:px-4 md:py-3">
+                  {settlementTab === 'PENDING'
+                    ? entry.date || '-'
+                    : entry.payout_paid_at
+                      ? format(new Date(entry.payout_paid_at), 'yy.MM.dd HH:mm')
+                      : '-'}
+                </td>
+              </tr>
+            ))}
+            <tr className="bg-slate-50/70">
+              <td colSpan={5} className="px-3 py-2 text-right font-bold text-slate-600 md:px-4 md:py-3">
+                {domainLabel} 합계
+              </td>
+              <td className="px-3 py-2 text-right font-black text-slate-900 md:px-4 md:py-3">
+                ₩{sectionAmount.toLocaleString()}
+              </td>
+              <td className="px-3 py-2 md:px-4 md:py-3" />
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }
 
 export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
-  type ServiceSalesBookingSummary = Pick<
-    AdminServiceBooking,
-    'amount' | 'host_payout_amount' | 'platform_revenue' | 'status' | 'created_at' | 'payout_status'
-  >;
-
-  const [dateRange, setDateRange] = useState<Range[]>([{
-    startDate: subDays(new Date(), 30),
-    endDate: new Date(),
-    key: 'selection'
-  }]);
+  const [dateRange, setDateRange] = useState<Range[]>([
+    {
+      startDate: subDays(new Date(), 30),
+      endDate: new Date(),
+      key: 'selection',
+    },
+  ]);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [activePreset, setActivePreset] = useState<string>('30D');
   const [settlementTab, setSettlementTab] = useState<'PENDING' | 'COMPLETED'>('PENDING');
   const [expandedHostId, setExpandedHostId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [salesBookings, setSalesBookings] = useState<AdminSalesBooking[]>([]);
-  const [isSalesLoading, setIsSalesLoading] = useState(true);
   const [serviceBookings, setServiceBookings] = useState<ServiceSalesBookingSummary[]>([]);
+  const [settlementRows, setSettlementRows] = useState<AdminCombinedPayoutQueueRow[]>([]);
+  const [isSalesLoading, setIsSalesLoading] = useState(true);
   const [serviceCSVLoading, setServiceCSVLoading] = useState(false);
   const datePickerRef = useRef<HTMLDivElement>(null);
   const settlementSectionRef = useRef<HTMLDivElement>(null);
   const { showToast } = useToast();
   const { requestConfirm, ConfirmDialogElement } = useConfirmDialog();
+
   const salesStartAt = dateRange[0].startDate ? startOfDay(dateRange[0].startDate).toISOString() : '';
   const salesEndAt = dateRange[0].endDate ? endOfDay(dateRange[0].endDate).toISOString() : '';
 
-  const fetchSalesBookings = useCallback(async () => {
+  const fetchSalesData = useCallback(async () => {
     setIsSalesLoading(true);
+
     try {
       const params = new URLSearchParams();
-      if (salesStartAt) {
-        params.set('startAt', salesStartAt);
-      }
-      if (salesEndAt) {
-        params.set('endAt', salesEndAt);
+      if (salesStartAt) params.set('startAt', salesStartAt);
+      if (salesEndAt) params.set('endAt', salesEndAt);
+      const query = params.toString() ? `?${params.toString()}` : '';
+
+      const [salesRes, payoutQueueRes] = await Promise.all([
+        fetch(`/api/admin/sales-summary${query}`),
+        fetch(`/api/admin/payout-queue${query}`),
+      ]);
+
+      const salesJson = (await salesRes.json()) as SalesSummaryResponse;
+      if (!salesRes.ok || !salesJson.success) {
+        throw new Error(salesJson.error || '매출 데이터를 불러오지 못했습니다.');
       }
 
-      const res = await fetch(`/api/admin/sales-summary${params.toString() ? `?${params.toString()}` : ''}`);
-      const result = await res.json();
-      if (!res.ok || !result.success) {
-        throw new Error(result.error || '매출 데이터를 불러오지 못했습니다.');
+      const payoutQueueJson = (await payoutQueueRes.json()) as PayoutQueueResponse;
+      if (!payoutQueueRes.ok || !payoutQueueJson.success) {
+        throw new Error(payoutQueueJson.error || '정산 큐 데이터를 불러오지 못했습니다.');
       }
-      setSalesBookings((result.data || []) as AdminSalesBooking[]);
-      setServiceBookings((result.serviceSummaryRows || []) as ServiceSalesBookingSummary[]);
+
+      setSalesBookings((salesJson.data || []) as AdminSalesBooking[]);
+      setServiceBookings((salesJson.serviceSummaryRows || []) as ServiceSalesBookingSummary[]);
+      setSettlementRows((payoutQueueJson.combinedHostTotals || []) as AdminCombinedPayoutQueueRow[]);
     } catch (error: unknown) {
       console.error('Sales summary fetch error:', error);
       showToast(error instanceof Error ? error.message : '매출 데이터를 불러오지 못했습니다.', 'error');
@@ -139,23 +283,24 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
   }, [salesEndAt, salesStartAt, showToast]);
 
   useEffect(() => {
-    void fetchSalesBookings();
-  }, [fetchSalesBookings]);
+    void fetchSalesData();
+  }, [fetchSalesData]);
 
-  // 달력 외부 클릭 시 닫기
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (datePickerRef.current && !datePickerRef.current.contains(event.target as Node)) {
         setShowDatePicker(false);
       }
     }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const handlePresetClick = (preset: string) => {
     setActivePreset(preset);
     const now = new Date();
+
     if (preset === '1D') {
       setDateRange([{ startDate: subDays(now, 1), endDate: now, key: 'selection' }]);
     } else if (preset === '7D') {
@@ -171,128 +316,79 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
     }
   };
 
-  // 날짜 필터 (입력된 날짜가 dateRange 안에 있는지 정밀 검사)
   const filterDate = (dateString: string) => {
     if (!dateRange[0].startDate || !dateRange[0].endDate) return true;
 
     const target = new Date(dateString);
-    const sd = startOfDay(dateRange[0].startDate);
-    const ed = endOfDay(dateRange[0].endDate);
+    const startDate = startOfDay(dateRange[0].startDate);
+    const endDate = endOfDay(dateRange[0].endDate);
 
-    return target >= sd && target <= ed;
+    return target >= startDate && target <= endDate;
   };
 
-  // 🟢 [수정] 유효한 매출 데이터 필터링 (완료됨 + 취소됐는데 위약금 있는거)
-  const validBookings = salesBookings.filter(b =>
-    filterDate(b.created_at) &&
-    (isCompletedBookingStatus(b.status) || (isCancelledOnlyBookingStatus(b.status) && ((b.platform_revenue ?? 0) > 0 || (b.host_payout_amount ?? 0) > 0)))
+  const validBookings = salesBookings.filter(
+    (booking) =>
+      filterDate(booking.created_at) &&
+      (isCompletedBookingStatus(booking.status) ||
+        (isCancelledOnlyBookingStatus(booking.status) &&
+          ((booking.platform_revenue ?? 0) > 0 || (booking.host_payout_amount ?? 0) > 0)))
   );
 
-  // 맞춤 의뢰 service_bookings KPI (date range 필터 적용)
-  const validServiceBookings = serviceBookings.filter(b => filterDate(b.created_at));
-  const svcRevenue = validServiceBookings.reduce((sum, b) => sum + (b.amount || 0), 0);
-  const svcPlatformFee = validServiceBookings.reduce((sum, b) => sum + (b.platform_revenue || 0), 0);
-  const svcPendingHostPayout = validServiceBookings
-    .filter((b) => b.payout_status !== 'paid')
-    .reduce((sum, b) => sum + (b.host_payout_amount || 0), 0);
+  const validServiceBookings = serviceBookings.filter((booking) => filterDate(booking.created_at));
+  const svcRevenue = validServiceBookings.reduce((sum, booking) => sum + (booking.amount || 0), 0);
+  const svcPlatformFee = validServiceBookings.reduce(
+    (sum, booking) => sum + (booking.platform_revenue || 0),
+    0
+  );
 
-  // 🟢 [수정] 매출/수익 계산 (DB 컬럼 기반) — 체험 + 맞춤 의뢰 합산
-  const expRevenue = validBookings.reduce((sum, b) => sum + (b.amount || 0), 0);
+  const expRevenue = validBookings.reduce((sum, booking) => sum + (booking.amount || 0), 0);
   const totalRevenue = expRevenue + svcRevenue;
-
-  // 플랫폼 수익: platform_revenue 컬럼이 있으면 쓰고, 없으면(옛날데이터) 대충 계산
-  const expPlatformFee = validBookings.reduce((sum, b) => {
-    return sum + getBookingPlatformRevenue(b);
-  }, 0);
+  const expPlatformFee = validBookings.reduce(
+    (sum, booking) => sum + getBookingPlatformRevenue(booking),
+    0
+  );
   const platformFee = expPlatformFee + svcPlatformFee;
-
   const allCount = validBookings.length + validServiceBookings.length;
   const averageOrderValue = allCount > 0 ? totalRevenue / allCount : 0;
 
-  const buildSettlementGroups = (targetTab: 'PENDING' | 'COMPLETED') => {
-    const settlementMap = new Map<string, SettlementGroup>();
-
-    // 정산 대상: 완료된 건 + 취소 위약금 건
-    const targetBookings = salesBookings.filter(b =>
-      filterDate(b.created_at) &&
-      (isCompletedBookingStatus(b.status) || (isCancelledOnlyBookingStatus(b.status) && (b.host_payout_amount ?? 0) > 0))
-    );
-
-    targetBookings.forEach(booking => {
-      if (targetTab === 'PENDING' && booking.payout_status === 'paid') return;
-      if (targetTab === 'COMPLETED' && booking.payout_status !== 'paid') return;
-
-      const hostId = booking.experiences?.host_id;
-      if (!hostId) return;
-
-      if (!settlementMap.has(hostId)) {
-        const hostInfo = booking.host_application;
-        settlementMap.set(hostId, {
-          id: hostId,
-          hostName: hostInfo?.name || booking.experiences?.profiles?.name || '알 수 없음',
-          bank: hostInfo?.bank_name ? `${hostInfo.bank_name}` : '계좌 미등록',
-          accountNumber: hostInfo?.account_number || '',
-          accountHolder: hostInfo?.account_holder || '-',
-          hostNationality: hostInfo?.host_nationality || '-',
-          totalAmount: 0,
-          count: 0,
-          status: booking.payout_status || 'pending',
-          bookings: [],
-          oldestBookingCreatedAt: booking.created_at,
-          settlementState: targetTab === 'COMPLETED' ? 'completed' : 'hold',
-        });
-      }
-
-      const current = settlementMap.get(hostId);
-      if (!current) return;
-
-      // 🟢 [중요] 호스트 줄 돈 계산
-      const payout = getBookingHostPayout(booking);
-
-      current.totalAmount += payout;
-      current.count += 1;
-      current.bookings.push({ ...booking, calculatedPayout: payout } as SettlementBookingRow);
-      if (!current.oldestBookingCreatedAt || new Date(booking.created_at) < new Date(current.oldestBookingCreatedAt)) {
-        current.oldestBookingCreatedAt = booking.created_at;
-      }
+  const pendingSettlementList = [...settlementRows]
+    .filter((row) => row.pending_amount > 0)
+    .sort((left, right) => {
+      const orderDiff =
+        PENDING_SETTLEMENT_STATE_ORDER[left.settlement_state] -
+        PENDING_SETTLEMENT_STATE_ORDER[right.settlement_state];
+      if (orderDiff !== 0) return orderDiff;
+      return right.pending_amount - left.pending_amount;
     });
 
-    const groups = Array.from(settlementMap.values())
-      .filter((item) => item.count > 0)
-      .map((item) => {
-        const settlementState = targetTab === 'COMPLETED' ? 'completed' : getSettlementState(item);
-        return {
-          ...item,
-          settlementState,
-        };
-      });
+  const completedSettlementList = [...settlementRows]
+    .filter((row) => row.paid_amount > 0)
+    .sort((left, right) => right.paid_amount - left.paid_amount);
 
-    if (targetTab === 'PENDING') {
-      groups.sort((a, b) => {
-        const orderDiff = PENDING_SETTLEMENT_STATE_ORDER[a.settlementState] - PENDING_SETTLEMENT_STATE_ORDER[b.settlementState];
-        if (orderDiff !== 0) return orderDiff;
-        return b.totalAmount - a.totalAmount;
-      });
-    }
-
-    return groups;
-  };
-
-  const pendingSettlementList = buildSettlementGroups('PENDING');
-  const completedSettlementList = buildSettlementGroups('COMPLETED');
   const settlementList = settlementTab === 'PENDING' ? pendingSettlementList : completedSettlementList;
-  const eligibleSettlementList = pendingSettlementList.filter((item) => item.settlementState === 'eligible');
-  const holdSettlementList = pendingSettlementList.filter((item) => item.settlementState !== 'eligible');
-  const eligibleSettlementAmount = eligibleSettlementList.reduce((sum, item) => sum + item.totalAmount, 0);
-  const holdSettlementAmount = holdSettlementList.reduce((sum, item) => sum + item.totalAmount, 0);
-  const longHoldCount = pendingSettlementList.filter((item) => item.settlementState === 'long_hold').length;
+  const eligibleSettlementList = pendingSettlementList.filter((row) => row.settlement_state === 'eligible');
+  const holdSettlementList = pendingSettlementList.filter((row) => row.settlement_state !== 'eligible');
+  const eligibleSettlementAmount = eligibleSettlementList.reduce((sum, row) => sum + row.pending_amount, 0);
+  const holdSettlementAmount = holdSettlementList.reduce(
+    (sum, row) => sum + (row.domains.experience?.pending_amount || 0),
+    0
+  );
+  const longHoldCount = pendingSettlementList.filter((row) => row.settlement_state === 'long_hold').length;
+  const svcPendingHostPayout = pendingSettlementList.reduce(
+    (sum, row) => sum + (row.domains.service?.pending_amount || 0),
+    0
+  );
   const expSettlementCardSubtext = [
-    holdSettlementAmount > 0 ? `보류 ₩${holdSettlementAmount.toLocaleString()} (10만원 미만)` : null,
-    svcPendingHostPayout > 0 ? `서비스 미지급 ₩${svcPendingHostPayout.toLocaleString()}` : '서비스 정산 대기 없음',
-  ].filter(Boolean).join(' · ');
+    holdSettlementAmount > 0 ? `체험 보류 ₩${holdSettlementAmount.toLocaleString()} (10만원 미만)` : null,
+    svcPendingHostPayout > 0
+      ? `서비스 정산 대기 ₩${svcPendingHostPayout.toLocaleString()}`
+      : '서비스 정산 대기 없음',
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   const toggleExpand = (hostId: string) => {
-    setExpandedHostId(prev => prev === hostId ? null : hostId);
+    setExpandedHostId((current) => (current === hostId ? null : hostId));
   };
 
   const handleOpenSettlementDrilldown = () => {
@@ -301,37 +397,76 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
     settlementSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const handleSettlePayout = (hostId: string, bookingIds: string[]) => {
-    requestConfirm({
-      title: '정산 완료 처리',
-      description: `이 호스트의 ${bookingIds.length}건 정산을 완료 처리하시겠습니까?`,
-      confirmLabel: '정산 완료',
-      tone: 'default',
-    }, async () => {
-      setIsProcessing(true);
-      try {
-        const res = await settleHostPayout(bookingIds);
-        if (res.success) {
-          showToast('성공적으로 정산 처리되었습니다.', 'success');
-          await Promise.all([
-            fetchSalesBookings(),
-            Promise.resolve(onRefresh?.()),
-          ]);
-        } else {
-          throw new Error(res.error || 'Server error');
+  const handleSettleExperiencePayout = (bookingIds: string[]) => {
+    requestConfirm(
+      {
+        title: '체험 정산 완료 처리',
+        description: `체험 예약 ${bookingIds.length}건을 지급 완료 처리하시겠습니까?`,
+        confirmLabel: '체험 정산 완료',
+        tone: 'default',
+      },
+      async () => {
+        setIsProcessing(true);
+        try {
+          const result = await settleHostPayout(bookingIds);
+          if (!result.success) throw new Error(result.error || 'Server error');
+
+          showToast('체험 정산이 완료 처리되었습니다.', 'success');
+          await Promise.all([fetchSalesData(), Promise.resolve(onRefresh?.())]);
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : '체험 정산 처리 실패';
+          console.error(error);
+          showToast(message, 'error');
+        } finally {
+          setIsProcessing(false);
         }
-      } catch (err: any) {
-        console.error(err);
-        showToast('정산 처리 실패: ' + err.message, 'error');
-      } finally {
-        setIsProcessing(false);
       }
-    });
+    );
   };
 
-  const handleDownloadCSV = (item: any) => {
+  const handleSettleServicePayout = (bookingIds: string[]) => {
+    requestConfirm(
+      {
+        title: '서비스 정산 완료 처리',
+        description: `서비스 예약 ${bookingIds.length}건을 지급 완료 처리하시겠습니까?`,
+        confirmLabel: '서비스 정산 완료',
+        tone: 'default',
+      },
+      async () => {
+        setIsProcessing(true);
+        try {
+          const response = await fetch('/api/admin/service-payouts/mark-paid', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bookingIds }),
+          });
+          const result = await response.json();
+
+          if (!response.ok || !result.success) {
+            throw new Error(result.error || '서비스 정산 처리 실패');
+          }
+
+          showToast('서비스 정산이 완료 처리되었습니다.', 'success');
+          await Promise.all([fetchSalesData(), Promise.resolve(onRefresh?.())]);
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : '서비스 정산 처리 실패';
+          console.error(error);
+          showToast(message, 'error');
+        } finally {
+          setIsProcessing(false);
+        }
+      }
+    );
+  };
+
+  const handleDownloadExperienceCSV = (row: AdminCombinedPayoutQueueRow) => {
+    const experienceDomain = row.domains.experience;
+    if (!experienceDomain) return;
+
+    const entries = settlementTab === 'PENDING' ? experienceDomain.pending_entries : experienceDomain.paid_entries;
+    if (entries.length === 0) return;
+
     try {
-      // 국세청 해외송금 증빙용 포맷 (수기 입력란 포함)
       const headers = [
         '결제일시',
         '예약번호(ID)',
@@ -345,181 +480,235 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
         '위약금반환액',
         '플랫폼수수료(Fee)',
         '실지급정산액(Net)',
-        '비고(외국인신분증등_수기입력)'
+        '비고(외국인신분증등_수기입력)',
       ];
 
-      const rows = item.bookings.map((b: any) => {
-        // 취소된 경우와 완료된 경우의 매출/위약금 계산
-        const gross = getBookingPaidAmount(b);
-        let refundPenaltyAmount = 0; // 취소 위약금 발생액
-        const fee = getBookingPlatformRevenue(b);
-        const net = b.calculatedPayout || getBookingHostPayout(b); // 호스트 지급액
-
-        if (isCancelledOnlyBookingStatus(b.status)) {
-          refundPenaltyAmount = Math.max(0, gross - Number(b.refund_amount || 0));
-        }
-
-        const expTitle = b.experiences?.title || '로컬 가이드 서비스';
-        // 따옴표나 쉼표가 있을 수 있으므로 필드 보호 (CSV 이스케이프)
-        const escapeCSV = (str: any) => `"${String(str).replace(/"/g, '""')}"`;
+      const escapeCSV = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+      const rows = entries.map((entry) => {
+        const refundPenaltyAmount =
+          entry.status === 'cancelled'
+            ? Math.max(0, getBookingPaidAmount({ amount: entry.amount }) - entry.payout_amount - entry.platform_revenue)
+            : 0;
 
         return [
-          escapeCSV(format(new Date(b.created_at), 'yyyy-MM-dd HH:mm')),
-          escapeCSV(b.id),
-          escapeCSV(item.accountHolder),
-          escapeCSV(item.hostNationality),
-          escapeCSV(item.bank),
-          escapeCSV(item.accountNumber),
-          escapeCSV(`플랫폼 로컬 체험/가이드 용역 (${expTitle})`),
-          escapeCSV(b.profiles?.name || 'Unknown User'),
-          gross,
+          escapeCSV(format(new Date(entry.created_at), 'yyyy-MM-dd HH:mm')),
+          escapeCSV(entry.id),
+          escapeCSV(row.account_holder),
+          escapeCSV(row.host_nationality),
+          escapeCSV(row.bank),
+          escapeCSV(row.account_number),
+          escapeCSV(`플랫폼 로컬 체험/가이드 용역 (${entry.title})`),
+          escapeCSV(entry.guest_name),
+          entry.amount,
           refundPenaltyAmount,
-          fee,
-          net,
-          '""' // 수기입력란 (빈칸)
+          entry.platform_revenue,
+          entry.payout_amount,
+          '""',
         ];
       });
 
-      const csvContent = [
-        headers.join(','),
-        ...rows.map((row: any[]) => row.join(','))
-      ].join('\n');
-
-      // Excel에서 한글 깨짐을 방지하기 위해 UTF-8 BOM(Byte Order Mark) 추가
+      const csvContent = [headers.join(','), ...rows.map((item) => item.join(','))].join('\n');
       const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `세무증빙_정산명세서_${item.hostName}_${format(new Date(), 'yyyyMMdd')}.csv`);
+      link.setAttribute(
+        'download',
+        `세무증빙_체험정산명세서_${row.host_name}_${format(new Date(), 'yyyyMMdd')}.csv`
+      );
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      showToast('국세청 소명용 명세서(CSV) 다운로드가 시작되었습니다.', 'success');
-    } catch (err) {
-      console.error('CSV Gen Error:', err);
-      showToast('CSV 생성 중 오류가 발생했습니다.', 'error');
+      showToast('체험 정산 명세서(CSV) 다운로드가 시작되었습니다.', 'success');
+    } catch (error) {
+      console.error('Experience CSV error:', error);
+      showToast('체험 정산 명세서 생성 중 오류가 발생했습니다.', 'error');
+    }
+  };
+
+  const handleDownloadServiceSettlementCSV = (row: AdminCombinedPayoutQueueRow) => {
+    const serviceDomain = row.domains.service;
+    if (!serviceDomain) return;
+
+    const entries = settlementTab === 'PENDING' ? serviceDomain.pending_entries : serviceDomain.paid_entries;
+    if (entries.length === 0) return;
+
+    try {
+      const escapeCSV = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+      const headers = ['결제일시', '주문번호', '의뢰명', '서비스일', '고객명', '결제액', '플랫폼수수료', '호스트지급액'];
+      const rows = entries.map((entry) => [
+        escapeCSV(format(new Date(entry.created_at), 'yyyy-MM-dd HH:mm')),
+        escapeCSV(entry.order_id || entry.id),
+        escapeCSV(entry.title),
+        escapeCSV(entry.date || '-'),
+        escapeCSV(entry.guest_name),
+        entry.amount,
+        entry.platform_revenue,
+        entry.payout_amount,
+      ]);
+      const csv = [headers.join(','), ...rows.map((item) => item.join(','))].join('\n');
+      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute(
+        'download',
+        `맞춤의뢰_호스트정산명세서_${row.host_name}_${format(new Date(), 'yyyyMMdd')}.csv`
+      );
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast('서비스 정산 명세서(CSV) 다운로드가 시작되었습니다.', 'success');
+    } catch (error) {
+      console.error('Service settlement CSV error:', error);
+      showToast('서비스 정산 명세서 생성 중 오류가 발생했습니다.', 'error');
     }
   };
 
   const handleDownloadServiceCSV = async () => {
     setServiceCSVLoading(true);
     try {
-      // 🔒 host_applications(계좌 포함 민감 정보)는 service_role API Route로 조회
       const params = new URLSearchParams();
-      if (salesStartAt) {
-        params.set('startAt', salesStartAt);
-      }
-      if (salesEndAt) {
-        params.set('endAt', salesEndAt);
-      }
+      if (salesStartAt) params.set('startAt', salesStartAt);
+      if (salesEndAt) params.set('endAt', salesEndAt);
 
-      const res = await fetch(`/api/admin/service-bookings-csv?${params.toString()}`);
-      if (!res.ok) throw new Error('서버 오류: 데이터 조회 실패');
-      const { data } = await res.json();
-      const rows = (data || []).filter((b: any) => filterDate(b.created_at));
+      const response = await fetch(`/api/admin/service-bookings-csv?${params.toString()}`);
+      if (!response.ok) throw new Error('서버 오류: 데이터 조회 실패');
+
+      const { data } = await response.json();
+      const rows = (data || []).filter((booking: { created_at: string }) => filterDate(booking.created_at));
 
       if (rows.length === 0) {
         showToast('해당 기간에 서비스 결제 내역이 없습니다.', 'error');
         return;
       }
 
-      const escapeCSV = (str: any) => `"${String(str ?? '').replace(/"/g, '""')}"`;
-      const headers = ['결제일시', '주문번호', '의뢰명', '도시', '서비스일', '고객명', '호스트명', '결제수단', '결제액', '플랫폼수수료', '호스트지급액', '예금주', '은행', '계좌번호', '결제상태', '정산상태'];
+      const escapeCSV = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+      const headers = [
+        '결제일시',
+        '주문번호',
+        '의뢰명',
+        '도시',
+        '서비스일',
+        '고객명',
+        '호스트명',
+        '결제수단',
+        '결제액',
+        '플랫폼수수료',
+        '호스트지급액',
+        '예금주',
+        '은행',
+        '계좌번호',
+        '결제상태',
+        '정산상태',
+      ];
 
-      const csvRows = rows.map((b: any) => [
-        escapeCSV(format(new Date(b.created_at), 'yyyy-MM-dd HH:mm')),
-        escapeCSV(b.order_id || b.id),
-        escapeCSV(b.service_requests?.title || '-'),
-        escapeCSV(b.service_requests?.city || '-'),
-        escapeCSV(b.service_requests?.service_date || '-'),
-        escapeCSV(b.profiles?.full_name || b.profiles?.email || b.customer_id?.slice(-6)),
-        escapeCSV(b.host_application?.name || '-'),
-        escapeCSV(b.payment_method === 'bank' ? '무통장' : '카드'),
-        b.amount || 0,
-        b.platform_revenue || 0,
-        b.host_payout_amount || 0,
-        escapeCSV(b.host_application?.account_holder || '-'),
-        escapeCSV(b.host_application?.bank_name || '-'),
-        escapeCSV(b.host_application?.account_number || '-'),
-        escapeCSV(b.status),
-        escapeCSV(b.payout_status === 'paid' ? '정산완료' : (b.host_id ? '정산대기' : '미선택')),
+      const csvRows = rows.map((booking: AdminServiceBooking) => [
+        escapeCSV(format(new Date(booking.created_at), 'yyyy-MM-dd HH:mm')),
+        escapeCSV(booking.order_id || booking.id),
+        escapeCSV(booking.service_requests?.title || '-'),
+        escapeCSV(booking.service_requests?.city || '-'),
+        escapeCSV(booking.service_requests?.service_date || '-'),
+        escapeCSV(booking.profiles?.full_name || booking.profiles?.email || booking.customer_id?.slice(-6)),
+        escapeCSV(booking.host_application?.name || '-'),
+        escapeCSV(booking.payment_method === 'bank' ? '무통장' : '카드'),
+        booking.amount || 0,
+        booking.platform_revenue || 0,
+        booking.host_payout_amount || 0,
+        escapeCSV(booking.host_application?.account_holder || '-'),
+        escapeCSV(booking.host_application?.bank_name || '-'),
+        escapeCSV(booking.host_application?.account_number || '-'),
+        escapeCSV(booking.status),
+        escapeCSV(booking.payout_status === 'paid' ? '정산완료' : booking.host_id ? '정산대기' : '미선택'),
       ]);
 
-      const csv = [headers.join(','), ...csvRows.map((r: any[]) => r.join(','))].join('\n');
+      const csv = [headers.join(','), ...csvRows.map((row: Array<string | number>) => row.join(','))].join('\n');
       const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `맞춤의뢰_정산명세서_${format(dateRange[0].startDate!, 'yyyyMMdd')}_${format(dateRange[0].endDate!, 'yyyyMMdd')}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute(
+        'download',
+        `맞춤의뢰_정산명세서_${format(dateRange[0].startDate!, 'yyyyMMdd')}_${format(dateRange[0].endDate!, 'yyyyMMdd')}.csv`
+      );
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
       showToast(`맞춤 의뢰 명세서 ${rows.length}건 다운로드 완료`, 'success');
-    } catch (err: any) {
-      console.error('Service CSV error:', err);
-      showToast('서비스 CSV 생성 오류: ' + err.message, 'error');
+    } catch (error: unknown) {
+      console.error('Service CSV error:', error);
+      showToast(`서비스 CSV 생성 오류: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
     } finally {
       setServiceCSVLoading(false);
     }
   };
 
   return (
-    <div className="flex-1 space-y-4 md:space-y-8 overflow-y-auto p-1 md:p-2 animate-in fade-in zoom-in-95 duration-300">
-
-      {/* 헤더 & 필터 */}
-      <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 md:gap-0">
+    <div className="animate-in fade-in zoom-in-95 duration-300 flex-1 space-y-4 overflow-y-auto p-1 md:space-y-8 md:p-2">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between md:gap-0">
         <div>
-          <h2 className="text-xl md:text-2xl font-black text-slate-900 flex items-center gap-2">
-            <Wallet className="text-yellow-500 w-5 h-5 md:w-6 md:h-6" /> 매출 및 재무 현황
+          <h2 className="flex items-center gap-2 text-xl font-black text-slate-900 md:text-2xl">
+            <Wallet className="h-5 w-5 text-yellow-500 md:h-6 md:w-6" /> 매출 및 재무 현황
           </h2>
-          <p className="text-xs md:text-sm text-slate-500 mt-1">기간별 매출 추이와 호스트 정산 내역을 관리합니다.</p>
+          <p className="mt-1 text-xs text-slate-500 md:text-sm">기간별 매출 추이와 호스트 정산 내역을 관리합니다.</p>
+          <p data-testid="sales-date-basis-note" className="mt-2 text-[11px] text-slate-500 md:text-xs">
+            Billing 기간은 결제 생성일 기준입니다. 체험일 또는 서비스일 기준 비교는 Master Ledger에서 확인하세요.
+          </p>
         </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 md:gap-3 relative">
-          {/* Preset Buttons */}
-          <div className="bg-slate-100 p-1 rounded-lg flex text-[10px] md:text-xs font-bold overflow-x-auto scrollbar-hide shrink-0">
-            {['1D', '7D', '30D', '3M', '1Y', 'ALL'].map(f => (
+        <div className="relative flex flex-col items-stretch gap-2 sm:flex-row sm:items-center md:gap-3">
+          <div className="flex shrink-0 overflow-x-auto rounded-lg bg-slate-100 p-1 text-[10px] font-bold scrollbar-hide md:text-xs">
+            {['1D', '7D', '30D', '3M', '1Y', 'ALL'].map((preset) => (
               <button
-                key={f} onClick={() => handlePresetClick(f)}
-                className={`flex-1 md:flex-none px-2 md:px-3 py-1.5 md:py-2 rounded-md transition-all whitespace-nowrap ${activePreset === f ? 'bg-white shadow text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}
+                key={preset}
+                onClick={() => handlePresetClick(preset)}
+                className={`flex-1 whitespace-nowrap rounded-md px-2 py-1.5 transition-all md:flex-none md:px-3 md:py-2 ${
+                  activePreset === preset
+                    ? 'bg-white text-slate-900 shadow'
+                    : 'text-slate-400 hover:text-slate-600'
+                }`}
               >
-                {f}
+                {preset}
               </button>
             ))}
           </div>
 
-          {/* Custom Date Picker Toggle */}
           <div className="relative w-full sm:w-auto" ref={datePickerRef}>
             <button
-              onClick={() => setShowDatePicker(!showDatePicker)}
-              className="flex items-center justify-center gap-2 w-full px-3 md:px-4 py-2 bg-white border border-slate-200 rounded-lg text-xs md:text-sm font-medium hover:bg-slate-50 transition-colors shrink-0"
+              onClick={() => setShowDatePicker((current) => !current)}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium transition-colors hover:bg-slate-50 md:px-4 md:text-sm"
             >
-              <CalendarIcon size={14} className="text-slate-400 md:w-4 md:h-4" />
-              <span className="text-slate-700 md:min-w-[170px] text-center">
+              <CalendarIcon size={14} className="text-slate-400 md:h-4 md:w-4" />
+              <span className="text-center text-slate-700 md:min-w-[170px]">
                 {dateRange[0].startDate && dateRange[0].endDate
                   ? `${format(dateRange[0].startDate, 'yyyy.MM.dd')} ~ ${format(dateRange[0].endDate, 'yyyy.MM.dd')}`
                   : '기간 선택'}
               </span>
-              <ChevronDown size={14} className="text-slate-400 ml-1 md:w-4 md:h-4" />
+              <ChevronDown size={14} className="ml-1 text-slate-400 md:h-4 md:w-4" />
             </button>
 
-            {/* Dropdown Calendar */}
             {showDatePicker && (
-              <div className="absolute right-0 top-full mt-2 z-50 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2">
-                <div className="p-2 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                  <span className="text-xs font-bold text-slate-500 uppercase px-2">Custom Range</span>
-                  <button onClick={() => setShowDatePicker(false)} className="text-xs text-slate-400 hover:text-slate-600 px-2 font-medium">Close</button>
+              <div className="animate-in fade-in slide-in-from-top-2 absolute right-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+                <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 p-2">
+                  <span className="px-2 text-xs font-bold uppercase text-slate-500">Custom Range</span>
+                  <button
+                    onClick={() => setShowDatePicker(false)}
+                    className="px-2 text-xs font-medium text-slate-400 hover:text-slate-600"
+                  >
+                    Close
+                  </button>
                 </div>
                 <DateRange
                   editableDateInputs={true}
                   onChange={(item) => {
                     setDateRange([item.selection]);
-                    setActivePreset('CUSTOM'); // 달력 조작 시 프리셋 해제
+                    setActivePreset('CUSTOM');
                   }}
                   moveRangeOnFirstSelection={false}
                   ranges={dateRange}
                   months={1}
                   direction="horizontal"
                   className="!border-0 text-xs md:text-sm"
-                  rangeColors={['#0f172a']} // slate-900
+                  rangeColors={['#0f172a']}
                 />
               </div>
             )}
@@ -527,42 +716,81 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
         </div>
       </div>
 
-      {/* KPI 카드 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        <StatCard title="총 거래액 (GMV)" value={`₩${totalRevenue.toLocaleString()}`} sub={`체험 ₩${expRevenue.toLocaleString()} | 의뢰 ₩${svcRevenue.toLocaleString()}`} icon={<DollarSign size={16} className="text-white md:w-5 md:h-5" />} bg="bg-slate-900" />
-        <StatCard title="순매출 (Net Revenue)" value={`₩${platformFee.toLocaleString()}`} sub="플랫폼 수익 (수수료)" icon={<TrendingUp size={16} className="text-white md:w-5 md:h-5" />} bg="bg-blue-600" />
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
         <StatCard
-          title="체험 정산 가능액"
+          title="총 거래액 (GMV)"
+          value={`₩${totalRevenue.toLocaleString()}`}
+          sub={`체험 ₩${expRevenue.toLocaleString()} | 의뢰 ₩${svcRevenue.toLocaleString()}`}
+          icon={<DollarSign size={16} className="text-white md:h-5 md:w-5" />}
+          bg="bg-slate-900"
+        />
+        <StatCard
+          title="순매출 (Net Revenue)"
+          value={`₩${platformFee.toLocaleString()}`}
+          sub="플랫폼 수익 (수수료)"
+          icon={<TrendingUp size={16} className="text-white md:h-5 md:w-5" />}
+          bg="bg-blue-600"
+        />
+        <StatCard
+          title="통합 정산 가능액"
           value={`₩${eligibleSettlementAmount.toLocaleString()}`}
-          sub={expSettlementCardSubtext || `₩${MIN_PAYOUT_THRESHOLD_KRW.toLocaleString()} 이상부터 정산 대상`}
-          icon={<CreditCard size={16} className="text-white md:w-5 md:h-5" />}
+          sub={expSettlementCardSubtext || `체험은 ₩${EXPERIENCE_PAYOUT_THRESHOLD_KRW.toLocaleString()} 이상부터 정산 대상`}
+          icon={<CreditCard size={16} className="text-white md:h-5 md:w-5" />}
           bg="bg-purple-600"
           onClick={handleOpenSettlementDrilldown}
           actionLabel="정산 대상 보기"
           testId="sales-settlement-card"
         />
-        <StatCard title="객단가 (AOV)" value={`₩${Math.round(averageOrderValue).toLocaleString()}`} sub="건당 평균 결제액" icon={<Wallet size={16} className="text-slate-900 md:w-5 md:h-5" />} bg="bg-yellow-400" text="text-slate-900" />
+        <StatCard
+          title="객단가 (AOV)"
+          value={`₩${Math.round(averageOrderValue).toLocaleString()}`}
+          sub="건당 평균 결제액"
+          icon={<Wallet size={16} className="text-slate-900 md:h-5 md:w-5" />}
+          bg="bg-yellow-400"
+          text="text-slate-900"
+        />
       </div>
 
-      {/* 정산 리스트 */}
-      <div ref={settlementSectionRef} data-testid="sales-settlement-panel" className="bg-white rounded-xl md:rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-        <div className="p-4 md:p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between sm:items-center bg-slate-50 gap-4 sm:gap-0">
-          <div className="flex gap-4 md:gap-6 border-b border-slate-200 sm:border-0">
-            <button onClick={() => setSettlementTab('PENDING')} className={`font-bold text-xs md:text-sm pb-2 sm:pb-0 border-b-2 sm:border-b-2 sm:-mb-[17px] md:-mb-[25px] transition-all ${settlementTab === 'PENDING' ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-400'}`}>정산 대기 (Pending)</button>
-            <button onClick={() => setSettlementTab('COMPLETED')} className={`font-bold text-xs md:text-sm pb-2 sm:pb-0 border-b-2 sm:border-b-2 sm:-mb-[17px] md:-mb-[25px] transition-all ${settlementTab === 'COMPLETED' ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-400'}`}>정산 완료 (History)</button>
+      <div
+        ref={settlementSectionRef}
+        data-testid="sales-settlement-panel"
+        className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm md:rounded-2xl"
+      >
+        <div className="flex flex-col gap-4 border-b border-slate-100 bg-slate-50 p-4 md:flex-row md:items-center md:justify-between md:p-6">
+          <div className="flex gap-4 border-b border-slate-200 md:gap-6 md:border-0">
+            <button
+              onClick={() => setSettlementTab('PENDING')}
+              className={`border-b-2 pb-2 text-xs font-bold transition-all md:-mb-[25px] md:text-sm ${
+                settlementTab === 'PENDING'
+                  ? 'border-slate-900 text-slate-900'
+                  : 'border-transparent text-slate-400'
+              }`}
+            >
+              정산 대기 (Pending)
+            </button>
+            <button
+              onClick={() => setSettlementTab('COMPLETED')}
+              className={`border-b-2 pb-2 text-xs font-bold transition-all md:-mb-[25px] md:text-sm ${
+                settlementTab === 'COMPLETED'
+                  ? 'border-slate-900 text-slate-900'
+                  : 'border-transparent text-slate-400'
+              }`}
+            >
+              정산 완료 (History)
+            </button>
           </div>
           <div className="flex gap-2">
             <button
               onClick={handleDownloadServiceCSV}
               disabled={serviceCSVLoading}
-              className="border border-slate-200 text-slate-600 px-3 md:px-4 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors w-full sm:w-auto disabled:opacity-60"
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-60 md:w-auto md:px-4"
             >
               <Download size={14} /> {serviceCSVLoading ? '생성 중...' : '맞춤 의뢰 명세서 ↓'}
             </button>
             {settlementTab === 'PENDING' && (
               <button
                 disabled
-                className="bg-slate-200 text-slate-500 px-3 md:px-4 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 cursor-not-allowed w-full sm:w-auto"
+                className="flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-lg bg-slate-200 px-3 py-2 text-xs font-bold text-slate-500 md:w-auto md:px-4"
               >
                 <CheckCircle size={14} /> 일괄 지급 준비중
               </button>
@@ -571,136 +799,201 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
         </div>
 
         {settlementTab === 'PENDING' && (
-          <div className="px-4 md:px-6 py-3 bg-purple-50 border-b border-purple-100 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-            <div className="flex flex-wrap gap-2 md:gap-3 text-[10px] md:text-xs font-bold">
-              <span className="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">
+          <div className="flex flex-col gap-2 border-b border-purple-100 bg-purple-50 px-4 py-3 md:flex-row md:items-center md:justify-between md:px-6">
+            <div className="flex flex-wrap gap-2 text-[10px] font-bold md:gap-3 md:text-xs">
+              <span className="rounded-full bg-emerald-100 px-2 py-1 text-emerald-700">
                 정산 가능 {eligibleSettlementList.length}명 · ₩{eligibleSettlementAmount.toLocaleString()}
               </span>
-              <span className="px-2 py-1 rounded-full bg-slate-100 text-slate-600">
-                정산 보류 {holdSettlementList.length}명 · ₩{holdSettlementAmount.toLocaleString()}
+              <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-600">
+                체험 보류 {holdSettlementList.length}명 · ₩{holdSettlementAmount.toLocaleString()}
               </span>
               {longHoldCount > 0 && (
-                <span className="px-2 py-1 rounded-full bg-amber-100 text-amber-700">
+                <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-700">
                   장기 보류 {longHoldCount}명
                 </span>
               )}
             </div>
-            <p className="text-[10px] md:text-xs text-slate-500 font-medium">
-              ₩{MIN_PAYOUT_THRESHOLD_KRW.toLocaleString()} 이상부터 정산 대상이며, 미만 금액은 누적 보류됩니다.
+            <p className="text-[10px] font-medium text-slate-500 md:text-xs">
+              체험은 누적 ₩{EXPERIENCE_PAYOUT_THRESHOLD_KRW.toLocaleString()} 이상부터 정산 대상이며, 서비스는 완료 처리 후 바로 대기 목록에 반영됩니다.
             </p>
           </div>
         )}
 
         <div className="overflow-x-auto">
-          <table className="w-full text-xs md:text-sm text-left min-w-[600px]">
-            <thead className="bg-white text-slate-500 text-[10px] md:text-xs uppercase border-b border-slate-100">
+          <table className="w-full min-w-[640px] text-left text-xs md:text-sm">
+            <thead className="border-b border-slate-100 bg-white text-[10px] uppercase text-slate-500 md:text-xs">
               <tr>
-                <th className="px-4 md:px-6 py-3 md:py-4">호스트 정보</th>
-                <th className="px-4 md:px-6 py-3 md:py-4">지급 총액</th>
-                <th className="px-4 md:px-6 py-3 md:py-4">계좌 정보</th>
-                <th className="px-4 md:px-6 py-3 md:py-4">건수</th>
-                <th className="px-4 md:px-6 py-3 md:py-4 text-right">상태</th>
+                <th className="px-4 py-3 md:px-6 md:py-4">호스트 정보</th>
+                <th className="px-4 py-3 md:px-6 md:py-4">지급 총액</th>
+                <th className="px-4 py-3 md:px-6 md:py-4">계좌 정보</th>
+                <th className="px-4 py-3 md:px-6 md:py-4">건수</th>
+                <th className="px-4 py-3 text-right md:px-6 md:py-4">상태</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {settlementList.length > 0 ? settlementList.map((item: SettlementGroup, idx: number) => (
-                <React.Fragment key={idx}>
-                  <tr
-                    className={`hover:bg-slate-50 cursor-pointer transition-colors ${expandedHostId === item.id ? 'bg-slate-50' : ''}`}
-                    onClick={() => toggleExpand(item.id)}
-                  >
-                    <td className="px-4 md:px-6 py-3 md:py-4">
-                      <div className="flex items-center gap-1 md:gap-2">
-                        {expandedHostId === item.id ? <ChevronUp size={14} className="text-slate-400 md:w-4 md:h-4" /> : <ChevronRight size={14} className="text-slate-400 md:w-4 md:h-4" />}
-                        <div>
-                          <div className="font-bold text-slate-900 text-xs md:text-sm">{item.hostName}</div>
-                          <div className="text-[10px] md:text-xs text-slate-400">{item.accountHolder}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 md:px-6 py-3 md:py-4 font-mono font-bold text-purple-600 text-xs md:text-sm">₩{item.totalAmount.toLocaleString()}</td>
-                    <td className="px-4 md:px-6 py-3 md:py-4 text-slate-500 flex items-center gap-1 text-[10px] md:text-xs">
-                      {item.bank === '계좌 미등록' ? <AlertTriangle size={12} className="text-red-500 md:w-3.5 md:h-3.5" /> : <CreditCard size={12} className="md:w-3.5 md:h-3.5" />}
-                      {item.bank} {item.accountNumber}
-                    </td>
-                    <td className="px-4 md:px-6 py-3 md:py-4 text-slate-500 text-xs md:text-sm">{item.count}건</td>
-                    <td className="px-4 md:px-6 py-3 md:py-4 text-right">
-                      <span className={`px-1.5 md:px-2 py-0.5 md:py-1 rounded text-[9px] md:text-[10px] font-bold uppercase ${item.bank === '계좌 미등록' ? 'bg-red-100 text-red-600' : SETTLEMENT_STATE_META[item.settlementState].className}`}>
-                        {item.bank === '계좌 미등록' ? '계좌 필요' : SETTLEMENT_STATE_META[item.settlementState].label}
-                      </span>
-                    </td>
-                  </tr>
+              {settlementList.length > 0 ? (
+                settlementList.map((row) => {
+                  const totalAmount =
+                    settlementTab === 'PENDING' ? row.pending_amount : row.paid_amount;
+                  const totalCount =
+                    settlementTab === 'PENDING' ? row.pending_count : row.paid_count;
+                  const notes = settlementTab === 'PENDING' ? getPendingPolicyNotes(row) : [];
+                  const canSettleExperience =
+                    settlementTab === 'PENDING' &&
+                    row.domains.experience?.pending_count &&
+                    row.domains.experience.settlement_state === 'eligible';
+                  const canSettleService =
+                    settlementTab === 'PENDING' && row.domains.service?.pending_count;
 
-                  {/* 상세 내역 아코디언 */}
-                  {expandedHostId === item.id && (
-                    <tr>
-                      <td colSpan={5} className="bg-slate-50 p-0 border-b border-slate-100">
-                        <div className="px-4 md:px-14 py-4 md:py-6 overflow-x-auto">
-                          <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-3 md:mb-4 gap-3 sm:gap-0">
-                            <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                              <Wallet size={16} className="text-slate-500" /> 세부 정산 내역
-                            </h4>
-                            <div className="flex flex-wrap gap-2">
-                              {/* 향후 CSV 다운로드 / 지급 연결 등 */}
-                              <button
-                                onClick={() => handleDownloadCSV(item)}
-                                className="flex items-center justify-center gap-1.5 px-3 py-2 md:py-1.5 text-xs font-medium bg-white text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors shadow-sm w-full sm:w-auto"
-                              >
-                                <Download size={14} /> 명세서 다운로드
-                              </button>
-                              {settlementTab === 'PENDING' && item.settlementState === 'eligible' && (
-                                <button
-                                  onClick={() => handleSettlePayout(item.id, item.bookings.map((b: SettlementBookingRow) => b.id))}
-                                  disabled={isProcessing}
-                                  className={`flex items-center justify-center gap-1.5 px-3 py-2 md:py-1.5 text-xs font-bold bg-slate-900 text-white rounded-lg transition-colors shadow-sm w-full sm:w-auto ${isProcessing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-800'}`}
-                                >
-                                  <Check size={14} /> {isProcessing ? '처리 중...' : '일괄 지급 완료 처리'}
-                                </button>
-                              )}
+                  return (
+                    <React.Fragment key={row.host_id}>
+                      <tr
+                        className={`cursor-pointer transition-colors hover:bg-slate-50 ${
+                          expandedHostId === row.host_id ? 'bg-slate-50' : ''
+                        }`}
+                        onClick={() => toggleExpand(row.host_id)}
+                      >
+                        <td className="px-4 py-3 md:px-6 md:py-4">
+                          <div className="flex items-center gap-1 md:gap-2">
+                            {expandedHostId === row.host_id ? (
+                              <ChevronUp size={14} className="text-slate-400 md:h-4 md:w-4" />
+                            ) : (
+                              <ChevronRight size={14} className="text-slate-400 md:h-4 md:w-4" />
+                            )}
+                            <div>
+                              <div className="text-xs font-bold text-slate-900 md:text-sm">{row.host_name}</div>
+                              <div className="text-[10px] text-slate-400 md:text-xs">{row.account_holder}</div>
                             </div>
                           </div>
-                          {settlementTab === 'PENDING' && getSettlementPolicyNote(item) && (
-                            <p className="mb-3 md:mb-4 text-[10px] md:text-xs font-medium text-slate-500">
-                              {getSettlementPolicyNote(item)}
-                            </p>
-                          )}
-                          <div className="bg-white rounded-lg border border-slate-200 overflow-x-auto shadow-sm">
-                            <table className="w-full text-[10px] md:text-xs text-left min-w-[500px]">
-                              <thead className="bg-slate-50 text-slate-500 border-b border-slate-100">
-                                <tr>
-                                  <th className="px-3 md:px-4 py-2 md:py-3">결제일</th>
-                                  <th className="px-3 md:px-4 py-2 md:py-3">예약 ID</th>
-                                  <th className="px-3 md:px-4 py-2 md:py-3">게스트</th>
-                                  <th className="px-3 md:px-4 py-2 md:py-3">진행 상태</th>
-                                  <th className="px-3 md:px-4 py-2 md:py-3 text-right">결제 금액</th>
-                                  <th className="px-3 md:px-4 py-2 md:py-3 text-right text-purple-600">정산 대상액</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-slate-50">
-                                {item.bookings.map((b: SettlementBookingRow) => (
-                                  <tr key={b.id} className="hover:bg-slate-50">
-                                    <td className="px-3 md:px-4 py-2 md:py-3 text-slate-500">{format(new Date(b.created_at), 'yy.MM.dd')} <span className="text-[9px]">{format(new Date(b.created_at), 'HH:mm')}</span></td>
-                                    <td className="px-3 md:px-4 py-2 md:py-3 font-mono text-slate-400">{b.id.split('-').pop()}</td>
-                                    <td className="px-3 md:px-4 py-2 md:py-3 font-medium text-slate-700">{b.profiles?.name || 'Unknown'}</td>
-                                    <td className="px-3 md:px-4 py-2 md:py-3">
-                                      <span className={`px-1.5 md:px-2 py-0.5 rounded text-[9px] md:text-[10px] font-bold uppercase ${isCompletedBookingStatus(b.status) ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-600'}`}>
-                                        {isCompletedBookingStatus(b.status) ? '완료' : '위약금'}
-                                      </span>
-                                    </td>
-                                    <td className="px-3 md:px-4 py-2 md:py-3 text-right text-slate-500">₩{(b.amount || 0).toLocaleString()}</td>
-                                    <td className="px-3 md:px-4 py-2 md:py-3 text-right font-bold text-purple-600">₩{b.calculatedPayout.toLocaleString()}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs font-bold text-purple-600 md:px-6 md:py-4 md:text-sm">
+                          ₩{totalAmount.toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3 text-[10px] text-slate-500 md:px-6 md:py-4 md:text-xs">
+                          <div className="flex items-center gap-1">
+                            {row.bank === '계좌 미등록' ? (
+                              <AlertTriangle size={12} className="text-red-500 md:h-3.5 md:w-3.5" />
+                            ) : (
+                              <CreditCard size={12} className="md:h-3.5 md:w-3.5" />
+                            )}
+                            <span>
+                              {row.bank} {row.account_number}
+                            </span>
                           </div>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </React.Fragment>
-              )) : (
-                <tr><td colSpan={5} className="px-4 md:px-6 py-8 md:py-10 text-center text-xs md:text-sm text-slate-400">{isSalesLoading ? '정산 데이터를 불러오는 중입니다.' : '내역이 없습니다.'}</td></tr>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-500 md:px-6 md:py-4 md:text-sm">{totalCount}건</td>
+                        <td className="px-4 py-3 text-right md:px-6 md:py-4">
+                          <span
+                            className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase md:px-2 md:py-1 md:text-[10px] ${
+                              row.bank === '계좌 미등록'
+                                ? 'bg-red-100 text-red-600'
+                                : SETTLEMENT_STATE_META[row.settlement_state].className
+                            }`}
+                          >
+                            {row.bank === '계좌 미등록'
+                              ? '계좌 필요'
+                              : settlementTab === 'COMPLETED'
+                                ? '지급 완료'
+                                : SETTLEMENT_STATE_META[row.settlement_state].label}
+                          </span>
+                        </td>
+                      </tr>
+
+                      {expandedHostId === row.host_id && (
+                        <tr>
+                          <td colSpan={5} className="border-b border-slate-100 bg-slate-50 p-0">
+                            <div className="px-4 py-4 md:px-14 md:py-6">
+                              <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between md:mb-4">
+                                <h4 className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                                  <Wallet size={16} className="text-slate-500" /> 통합 정산 내역
+                                </h4>
+                                <div className="flex flex-wrap gap-2">
+                                  {row.domains.experience && (
+                                    <button
+                                      onClick={() => handleDownloadExperienceCSV(row)}
+                                      className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 shadow-sm transition-colors hover:bg-slate-100 sm:w-auto md:py-1.5"
+                                    >
+                                      <Download size={14} /> 체험 명세서
+                                    </button>
+                                  )}
+                                  {row.domains.service && (
+                                    <button
+                                      onClick={() => handleDownloadServiceSettlementCSV(row)}
+                                      className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 shadow-sm transition-colors hover:bg-slate-100 sm:w-auto md:py-1.5"
+                                    >
+                                      <Download size={14} /> 서비스 명세서
+                                    </button>
+                                  )}
+                                  {canSettleExperience ? (
+                                    <button
+                                      onClick={() =>
+                                        handleSettleExperiencePayout(
+                                          row.domains.experience!.pending_entries.map((entry) => entry.id)
+                                        )
+                                      }
+                                      disabled={isProcessing || row.bank === '계좌 미등록'}
+                                      className={`flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold text-white shadow-sm transition-colors sm:w-auto md:py-1.5 ${
+                                        isProcessing || row.bank === '계좌 미등록'
+                                          ? 'cursor-not-allowed bg-slate-300'
+                                          : 'bg-slate-900 hover:bg-slate-800'
+                                      }`}
+                                    >
+                                      <Check size={14} /> 체험 정산 완료
+                                    </button>
+                                  ) : null}
+                                  {canSettleService ? (
+                                    <button
+                                      onClick={() =>
+                                        handleSettleServicePayout(
+                                          row.domains.service!.pending_entries.map((entry) => entry.id)
+                                        )
+                                      }
+                                      disabled={isProcessing || row.bank === '계좌 미등록'}
+                                      className={`flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold text-white shadow-sm transition-colors sm:w-auto md:py-1.5 ${
+                                        isProcessing || row.bank === '계좌 미등록'
+                                          ? 'cursor-not-allowed bg-slate-300'
+                                          : 'bg-emerald-600 hover:bg-emerald-500'
+                                      }`}
+                                    >
+                                      <Check size={14} /> 서비스 정산 완료
+                                    </button>
+                                  ) : null}
+                                </div>
+                              </div>
+
+                              {notes.length > 0 && (
+                                <div className="mb-4 space-y-1 text-[10px] font-medium text-slate-500 md:text-xs">
+                                  {notes.map((note) => (
+                                    <p key={note}>{note}</p>
+                                  ))}
+                                </div>
+                              )}
+
+                              {row.domains.experience &&
+                                renderDomainSection({
+                                  domainLabel: '체험 예약',
+                                  domain: row.domains.experience,
+                                  settlementTab,
+                                })}
+                              {row.domains.service &&
+                                renderDomainSection({
+                                  domainLabel: '맞춤 의뢰',
+                                  domain: row.domains.service,
+                                  settlementTab,
+                                })}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-xs text-slate-400 md:px-6 md:py-10 md:text-sm">
+                    {isSalesLoading ? '정산 데이터를 불러오는 중입니다.' : '내역이 없습니다.'}
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
@@ -711,36 +1004,42 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
   );
 }
 
-// (StatCard 컴포넌트는 기존과 동일하되 비율 튜닝)
-function StatCard({ title, value, sub, icon, bg, text = 'text-white', onClick, actionLabel, testId }: any) {
-  const cardClassName = `p-4 md:p-5 rounded-xl md:rounded-2xl shadow-sm border bg-white flex flex-col justify-between h-28 md:h-32 relative overflow-hidden group w-full ${
+function StatCard({
+  title,
+  value,
+  sub,
+  icon,
+  bg,
+  text = 'text-white',
+  onClick,
+  actionLabel,
+  testId,
+}: StatCardProps) {
+  const cardClassName = `group relative flex h-28 w-full flex-col justify-between overflow-hidden rounded-xl border bg-white p-4 shadow-sm md:h-32 md:rounded-2xl md:p-5 ${
     onClick
-      ? 'border-purple-100 hover:border-purple-200 hover:shadow-md transition-all cursor-pointer text-left'
+      ? 'cursor-pointer border-purple-100 text-left transition-all hover:border-purple-200 hover:shadow-md'
       : 'border-slate-100'
   }`;
 
   const content = (
     <>
-      <div className={`absolute top-4 right-4 w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center ${bg} shadow-md group-hover:scale-110 transition-transform`}>
+      <div className={`absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full shadow-md transition-transform group-hover:scale-110 md:h-10 md:w-10 ${bg}`}>
         {icon}
       </div>
-      <div className="text-[9px] md:text-xs font-bold text-slate-400 uppercase tracking-wider pr-10">{title}</div>
+      <div className="pr-10 text-[9px] font-bold uppercase tracking-wider text-slate-400 md:text-xs">{title}</div>
       <div>
-        <div className={`text-lg md:text-2xl font-black ${text === 'text-white' ? 'text-slate-900' : text} tracking-tight truncate pr-8`}>{value}</div>
-        <div className="text-[9px] md:text-[10px] text-slate-400 mt-0.5 md:mt-1 font-medium">{sub}</div>
-        {actionLabel && <div className="text-[9px] md:text-[10px] text-purple-600 mt-2 font-bold">{actionLabel}</div>}
+        <div className={`truncate pr-8 text-lg font-black tracking-tight md:text-2xl ${text === 'text-white' ? 'text-slate-900' : text}`}>
+          {value}
+        </div>
+        <div className="mt-0.5 text-[9px] font-medium text-slate-400 md:mt-1 md:text-[10px]">{sub}</div>
+        {actionLabel ? <div className="mt-2 text-[9px] font-bold text-purple-600 md:text-[10px]">{actionLabel}</div> : null}
       </div>
     </>
   );
 
   if (onClick) {
     return (
-      <button
-        type="button"
-        data-testid={testId}
-        onClick={onClick}
-        className={cardClassName}
-      >
+      <button type="button" data-testid={testId} onClick={onClick} className={cardClassName}>
         {content}
       </button>
     );

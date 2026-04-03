@@ -678,9 +678,9 @@ export default function MasterLedgerTab({
               )}
             </button>
           </div>
-          <div className="flex gap-2 w-full md:w-auto mt-0 md:mt-0">
-            <div className="relative flex-1 md:w-64">
-              <Search className="absolute left-2.5 md:left-3 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
+        <div className="flex gap-2 w-full md:w-auto mt-0 md:mt-0">
+          <div className="relative flex-1 md:w-64">
+            <Search className="absolute left-2.5 md:left-3 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
               <input
                 type="text"
                 placeholder="검색 (이름, 예약번호)"
@@ -696,6 +696,13 @@ export default function MasterLedgerTab({
               <Download size={14} className="md:w-[18px] md:h-[18px]" />
             </button>
           </div>
+        </div>
+
+        <div
+          data-testid="ledger-date-basis-note"
+          className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-medium text-slate-500 md:px-4 md:text-xs"
+        >
+          Master Ledger 기간은 체험일과 서비스일 기준입니다. 결제 생성일 기준 매출 집계는 Billing & Revenue에서 확인하세요.
         </div>
 
         <div className="bg-white rounded-xl md:rounded-[24px] border border-slate-200 shadow-sm overflow-hidden flex-1 flex flex-col">

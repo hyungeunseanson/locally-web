@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
+import { attachNullPayoutPaidAt, isMissingPayoutPaidAtColumnError } from '@/app/utils/payoutPaidAt';
 
 export async function GET() {
     try {
@@ -23,10 +24,20 @@ export async function GET() {
         }
 
         // Fetch all service bookings ordered by creation date
-        const { data: serviceBookings, error: sbError } = await supabaseAdmin
+        let { data: serviceBookings, error: sbError } = await supabaseAdmin
             .from('service_bookings')
-            .select('id, order_id, request_id, application_id, customer_id, host_id, amount, host_payout_amount, platform_revenue, status, payout_status, tid, payment_method, cancel_reason, refund_amount, created_at')
+            .select('id, order_id, request_id, application_id, customer_id, host_id, amount, host_payout_amount, platform_revenue, status, payout_status, payout_paid_at, tid, payment_method, cancel_reason, refund_amount, created_at')
             .order('created_at', { ascending: false });
+
+        if (sbError && isMissingPayoutPaidAtColumnError(sbError)) {
+            const fallbackResult = await supabaseAdmin
+                .from('service_bookings')
+                .select('id, order_id, request_id, application_id, customer_id, host_id, amount, host_payout_amount, platform_revenue, status, payout_status, tid, payment_method, cancel_reason, refund_amount, created_at')
+                .order('created_at', { ascending: false });
+
+            serviceBookings = attachNullPayoutPaidAt(fallbackResult.data);
+            sbError = fallbackResult.error;
+        }
 
         if (sbError) throw sbError;
         if (!serviceBookings) return NextResponse.json({ data: [] });

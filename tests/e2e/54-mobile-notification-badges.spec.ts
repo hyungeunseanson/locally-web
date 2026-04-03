@@ -242,5 +242,6 @@ test.describe.serial('mobile unread badges', () => {
     await page.goto('/host/menu', { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('host-mobile-menu-unread-dot')).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId('host-menu-bell-unread-dot')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('button', { name: /커뮤니티|Community|コミュニティ|社区/ })).toHaveCount(0);
   });
 });

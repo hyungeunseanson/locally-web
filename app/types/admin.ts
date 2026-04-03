@@ -55,6 +55,7 @@ export interface AdminBooking {
 export interface AdminSalesBooking extends AdminBooking {
   order_id: string | null;
   payout_status: string | null;
+  payout_paid_at?: string | null;
   host_payout_amount: number | null;
   platform_revenue: number | null;
   refund_amount: number | null;
@@ -245,6 +246,7 @@ export interface AdminServiceBooking {
   platform_revenue: number | null; // internal only — never expose ratio in UI
   status: string;
   payout_status: string | null;
+  payout_paid_at?: string | null;
   tid: string | null;
   payment_method: string | null;
   cancel_reason: string | null;
@@ -267,6 +269,60 @@ export interface AdminServiceBooking {
     account_number: string | null;
     account_holder: string | null;
   } | null;
+}
+
+export type AdminPayoutQueueState = 'eligible' | 'hold' | 'long_hold' | 'completed';
+
+export interface AdminPayoutQueueEntry {
+  id: string;
+  order_id: string | null;
+  domain: 'experience' | 'service';
+  created_at: string;
+  payout_paid_at: string | null;
+  date: string | null;
+  time: string | null;
+  title: string;
+  guest_name: string;
+  amount: number;
+  payout_amount: number;
+  platform_revenue: number;
+  status: string;
+  payout_status: string | null;
+}
+
+export interface AdminPayoutQueueDomainGroup {
+  host_id: string;
+  host_name: string;
+  bank: string;
+  account_number: string;
+  account_holder: string;
+  host_nationality: string;
+  pending_amount: number;
+  paid_amount: number;
+  pending_count: number;
+  paid_count: number;
+  oldest_pending_created_at: string | null;
+  settlement_state: AdminPayoutQueueState;
+  pending_entries: AdminPayoutQueueEntry[];
+  paid_entries: AdminPayoutQueueEntry[];
+}
+
+export interface AdminCombinedPayoutQueueRow {
+  host_id: string;
+  host_name: string;
+  bank: string;
+  account_number: string;
+  account_holder: string;
+  host_nationality: string;
+  pending_amount: number;
+  paid_amount: number;
+  pending_count: number;
+  paid_count: number;
+  settlement_state: AdminPayoutQueueState;
+  domains: {
+    experience: AdminPayoutQueueDomainGroup | null;
+    service: AdminPayoutQueueDomainGroup | null;
+  };
 }
 
 export interface AdminMasterLedgerEntry {

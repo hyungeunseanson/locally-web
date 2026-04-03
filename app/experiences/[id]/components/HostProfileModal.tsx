@@ -36,7 +36,13 @@ export default function HostProfileModal({ isOpen, onClose, host }: HostProfileM
   );
   const languageLevelLabel = formatLanguageLevelLabel(host.languageLevel, lang);
   const localizedLanguages = Array.isArray(host.languages)
-    ? host.languages.map((language) => getLocalizedLanguageLabel(String(language), lang)).filter(Boolean)
+    ? Array.from(
+        new Set(
+          host.languages
+            .map((language) => getLocalizedLanguageLabel(String(language).trim(), lang))
+            .filter(Boolean)
+        )
+      )
     : [];
 
   const handleContactHost = () => {

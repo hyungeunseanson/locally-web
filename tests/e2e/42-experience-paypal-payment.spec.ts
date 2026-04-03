@@ -2,6 +2,7 @@ import { readFileSync } from 'fs';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test, type Page } from '@playwright/test';
+import { reviewAllExperiencePaymentAgreements } from './helpers/experienceBooking';
 
 type EnvMap = Record<string, string>;
 type TestUser = {
@@ -360,9 +361,7 @@ test.describe.serial('Experience PayPal payment smoke', () => {
 
     await page.locator('input[type="text"]').fill(customerUser.fullName);
     await page.locator('input[type="tel"]').fill(customerUser.phone);
-    await page.getByTestId('exp-payment-agree-off-platform').click();
-    await page.getByTestId('exp-payment-agree-safety').click();
-    await page.getByTestId('exp-payment-agree-terms').click();
+    await reviewAllExperiencePaymentAgreements(page);
 
     const totalBefore = await page.getByTestId('exp-payment-total-amount').textContent();
     expect(totalBefore).toBeTruthy();

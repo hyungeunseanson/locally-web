@@ -81,9 +81,9 @@ export type ServiceBooking = {
   id: string;
   order_id: string;
   request_id: string;
-  application_id: string;
+  application_id: string | null;
   customer_id: string;
-  host_id: string;
+  host_id: string | null;
   amount: number;
   tid: string | null;
   status: ServiceBookingStatus;
@@ -91,6 +91,7 @@ export type ServiceBooking = {
   host_payout_amount: number | null;
   platform_revenue: number | null;
   payout_status: string | null;
+  payout_paid_at: string | null;
   contact_name: string | null;
   contact_phone: string | null;
   cancel_reason: string | null;

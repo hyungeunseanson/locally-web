@@ -58,7 +58,7 @@ function buildProfilePayload(name: string) {
     job: 'Tour Curator',
     dreamDestination: 'Lisbon',
     favoriteSong: 'Ocean Eyes',
-    languages: ['한국어', 'English'],
+    languages: ['한국어', 'English', '영어'],
     introduction: '호스트 프로필 저장 route 검증용 자기소개입니다.',
     avatarUrl: 'https://example.com/host-avatar.png',
   };
@@ -226,7 +226,7 @@ test.describe.serial('Host profile save route', () => {
       job: 'Tour Curator',
       dream_destination: 'Lisbon',
       favorite_song: 'Ocean Eyes',
-      languages: ['한국어', 'English'],
+      languages: ['Korean', 'English'],
       avatar_url: 'https://example.com/host-avatar.png',
     });
 

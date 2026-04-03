@@ -4,6 +4,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
+import { settleExperienceBookingPayouts } from '@/app/utils/adminPayouts';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { buildLocalizedEmailCopy } from '@/app/utils/emailCopy';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
@@ -258,42 +259,16 @@ export async function settleHostPayout(bookingIds: string[]) {
 
   if (!bookingIds || bookingIds.length === 0) return { success: false, error: 'No bookings provided' };
 
-  // 🔒 Fix #3: 이미 정산된 건 사전 검증 — service-payouts/mark-paid와 동일한 방어 로직
-  const { data: targetBookings, error: fetchError } = await supabaseAdmin
-    .from('bookings')
-    .select('id, payout_status')
-    .in('id', bookingIds);
-
-  if (fetchError) throw new Error(fetchError.message);
-
-  const missingCount = (targetBookings?.length ?? 0) < bookingIds.length;
-  if (missingCount) {
-    return { success: false, error: '일부 예약 정보를 찾을 수 없습니다.' };
-  }
-
-  const alreadyPaid = (targetBookings || []).filter(b => b.payout_status === 'paid');
-  if (alreadyPaid.length > 0) {
-    return {
-      success: false,
-      error: `이미 정산 완료된 예약이 포함되어 있습니다. (${alreadyPaid.length}건)`,
-      alreadyPaidIds: alreadyPaid.map(b => b.id),
-    };
-  }
-
-  const { error } = await supabaseAdmin
-    .from('bookings')
-    .update({ payout_status: 'paid' })
-    .in('id', bookingIds);
-
-  if (error) throw new Error(error.message);
+  const result = await settleExperienceBookingPayouts(supabaseAdmin, bookingIds);
+  if (!result.success) return result;
 
   await recordAuditLog({
     admin_id: adminUser?.id,
     admin_email: adminUser?.email,
     action_type: 'SETTLE_HOST_PAYOUT',
     target_type: 'bookings',
-    target_id: bookingIds.length > 1 ? 'MULTIPLE' : bookingIds[0],
-    details: { booking_ids: bookingIds, count: bookingIds.length }
+    target_id: result.updatedIds.length > 1 ? 'MULTIPLE' : result.updatedIds[0],
+    details: { booking_ids: result.updatedIds, count: result.updatedIds.length }
   });
 
   return { success: true };

@@ -15,9 +15,8 @@ const TEST_PASSWORD = 'LocallyTest!2026';
 
 let adminClient: SupabaseClient | null = null;
 const createdAuthUserIds: string[] = [];
-const createdApplicationIds: number[] = [];
+const createdApplicationIds: string[] = [];
 const createdExperienceIds: number[] = [];
-const createdBookingIds: string[] = [];
 
 function loadEnv(): EnvMap {
   return readFileSync('.env.local', 'utf8')
@@ -47,9 +46,9 @@ function getAdminClient() {
 function createUser(prefix: string): TestUser {
   const timestamp = Date.now();
   return {
-    email: `codex.host.earnings.${prefix}.${timestamp}@example.com`,
+    email: `codex.host.profile.lang.${prefix}.${timestamp}@example.com`,
     password: TEST_PASSWORD,
-    fullName: `Host Earnings ${prefix} ${timestamp}`,
+    fullName: `Host Profile Lang ${prefix} ${timestamp}`,
     phone: `010${String(timestamp).slice(-8)}`,
   };
 }
@@ -66,7 +65,6 @@ async function waitForProfile(userId: string) {
 
     if (error) throw error;
     if (data?.id) return;
-
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
 
@@ -96,7 +94,10 @@ async function createAuthUser(user: TestUser) {
     .from('profiles')
     .update({
       full_name: user.fullName,
+      bio: '호스트 언어 중복 회귀 검증용 소개입니다.',
+      introduction: 'host profile language dedup validation',
       phone: user.phone,
+      job: 'Neighborhood Guide',
     })
     .eq('id', data.user.id);
 
@@ -105,29 +106,28 @@ async function createAuthUser(user: TestUser) {
   return data.user.id;
 }
 
-async function createApprovedHostApplication(userId: string, user: TestUser) {
-  const supabase = getAdminClient();
-  const { data, error } = await supabase
+async function createHostApplication(userId: string, user: TestUser) {
+  const { data, error } = await getAdminClient()
     .from('host_applications')
     .insert({
       user_id: userId,
       host_nationality: '대한민국',
-      languages: ['한국어'],
-      language_levels: [{ language: '한국어', level: 5 }],
+      languages: ['영어'],
+      language_levels: [{ language: '영어', level: 4 }],
       name: user.fullName,
       phone: user.phone,
-      dob: '1991-01-01',
+      dob: '1990-01-01',
       email: user.email,
-      instagram: '@codex_host_earnings',
+      instagram: '@codex_host_profile_lang',
       source: 'playwright',
       language_cert: '',
       profile_photo: '',
-      self_intro: '호스트 수익 탭 정책 검증용 승인 호스트입니다.',
+      self_intro: '호스트 언어 중복 회귀 검증용 승인 호스트입니다.',
       id_card_file: '',
       bank_name: '국민은행',
       account_number: '12345678901234',
       account_holder: user.fullName,
-      motivation: '호스트 수익 정책 검증',
+      motivation: '호스트 언어 중복 회귀 검증',
       status: 'approved',
     })
     .select('id')
@@ -137,30 +137,30 @@ async function createApprovedHostApplication(userId: string, user: TestUser) {
     throw error || new Error('Failed to create approved host application.');
   }
 
-  createdApplicationIds.push(Number(data.id));
+  createdApplicationIds.push(String(data.id));
 }
 
-async function createExperienceFixture(hostId: string) {
-  const supabase = getAdminClient();
-  const { data, error } = await supabase
+async function createActiveExperience(hostId: string) {
+  const title = `[Playwright] Host Profile Language Dedup ${Date.now()}`;
+  const { data, error } = await getAdminClient()
     .from('experiences')
     .insert({
       host_id: hostId,
       country: '대한민국',
-      city: 'Seoul',
-      title: `[Playwright] Host Earnings ${Date.now()}`,
+      city: '서울',
+      title,
       category: '맛집 탐방',
-      languages: ['한국어'],
-      language_levels: [{ language: '한국어', level: 5 }],
+      languages: ['영어'],
+      language_levels: [{ language: '영어', level: 4 }],
       duration: 2,
       max_guests: 4,
-      description: '호스트 수익 탭 정책 검증용 체험입니다.',
-      itinerary: [{ title: '홍대입구역', description: '수익 정책 검증 코스입니다.' }],
+      description: '호스트 언어 중복 회귀 검증용 체험입니다.',
+      itinerary: [{ title: '홍대입구역', description: '호스트 언어 중복 회귀 검증 동선' }],
       spots: '홍대입구역',
       meeting_point: '홍대입구역 1번 출구',
       location: '서울 마포구 양화로 160',
       photos: ['https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200'],
-      price: 30000,
+      price: 49000,
       inclusions: ['가이드'],
       exclusions: ['개인 경비'],
       supplies: '편한 복장',
@@ -168,8 +168,7 @@ async function createExperienceFixture(hostId: string) {
         age_limit: '만 19세 이상',
         activity_level: '보통',
       },
-      status: 'approved',
-      is_active: true,
+      status: 'active',
       is_private_enabled: false,
       private_price: 0,
       source_locale: 'ko',
@@ -181,50 +180,11 @@ async function createExperienceFixture(hostId: string) {
     .single();
 
   if (error || !data?.id) {
-    throw error || new Error('Failed to create host earnings fixture.');
+    throw error || new Error('Failed to create active experience.');
   }
 
   createdExperienceIds.push(Number(data.id));
   return Number(data.id);
-}
-
-async function seedCompletedBooking(params: {
-  hostId: string;
-  host: TestUser;
-  experienceId: number;
-}) {
-  const supabase = getAdminClient();
-  const bookingId = `HOST-EARNINGS-BOOKING-${Date.now()}`;
-  const bookingDate = new Date();
-  bookingDate.setDate(bookingDate.getDate() - 3);
-
-  const { error } = await supabase.from('bookings').insert({
-    id: bookingId,
-    order_id: bookingId,
-    user_id: params.hostId,
-    experience_id: params.experienceId,
-    amount: 33000,
-    total_price: 30000,
-    total_experience_price: 30000,
-    status: 'completed',
-    guests: 1,
-    date: bookingDate.toISOString().slice(0, 10),
-    time: '10:00',
-    type: 'group',
-    contact_name: params.host.fullName,
-    contact_phone: params.host.phone,
-    message: '',
-    created_at: bookingDate.toISOString(),
-    payment_method: 'card',
-    host_payout_amount: 24000,
-    platform_revenue: 9000,
-    payout_status: 'pending',
-    is_solo_guarantee: false,
-    solo_guarantee_price: 0,
-  });
-
-  if (error) throw error;
-  createdBookingIds.push(bookingId);
 }
 
 async function login(page: Page, user: TestUser) {
@@ -238,10 +198,6 @@ async function login(page: Page, user: TestUser) {
 
 test.afterAll(async () => {
   const supabase = getAdminClient();
-
-  for (const bookingId of createdBookingIds) {
-    await supabase.from('bookings').delete().eq('id', bookingId);
-  }
 
   for (const experienceId of createdExperienceIds) {
     await supabase.from('experience_availability').delete().eq('experience_id', experienceId);
@@ -259,34 +215,82 @@ test.afterAll(async () => {
   }
 });
 
-test.describe.serial('Host earnings payout-focused policy', () => {
-  test('shows only host payout numbers, not guest-paid totals or fee rows', async ({ page }) => {
+test.describe.serial('Host profile language dedup', () => {
+  test('preselects canonical language chips and saves deduped profile languages', async ({ page }) => {
     test.setTimeout(90000);
 
-    const hostUser = createUser('policy');
-    const hostId = await createAuthUser(hostUser);
-    await createApprovedHostApplication(hostId, hostUser);
-    const experienceId = await createExperienceFixture(hostId);
-    await seedCompletedBooking({ hostId, host: hostUser, experienceId });
+    const user = createUser('dashboard');
+    const userId = await createAuthUser(user);
+    await createHostApplication(userId, user);
 
-    await login(page, hostUser);
-    await page.goto('/host/dashboard?tab=earnings', { waitUntil: 'networkidle' });
+    const supabase = getAdminClient();
+    const { error: seedError } = await supabase
+      .from('profiles')
+      .update({ languages: ['영어'] })
+      .eq('id', userId);
 
-    await expect(page.getByRole('heading', { name: /호스팅 수입|Hosting Income|ホスティング収入|住宿收入/ })).toBeVisible();
-    await expect(page.getByTestId('host-earnings-scope-note')).toContainText(/체험 예약 정산만 집계|experience booking payouts only|体験予約の精算のみ集計|仅统计体验预订结算/);
-    await expect(page.getByTestId('host-earnings-payout-summary')).toContainText('₩24,000');
-    await expect(page.getByTestId('host-earnings-payout-summary')).toContainText('₩0');
-    await expect(page.getByText('₩24,000').first()).toBeVisible();
-    await expect(page.getByText(/총 1건의 예약 완료|Total 1 bookings completed|計1件の予約完了|共完成1个预定/)).toBeVisible();
+    if (seedError) throw seedError;
 
-    await page.getByRole('button', { name: /수입 상세 내역 보기|View Income Details|収入詳細を見る|查看收入详情/ }).click();
+    await login(page, user);
+    await page.goto('/host/dashboard?tab=profile', { waitUntil: 'networkidle' });
 
-    await expect(page.getByText(/총 예약 건수|Total Bookings|総予約件数|总预订数/)).toBeVisible();
-    await expect(page.getByText(/1\s*건|1 bookings|1件|1个/).first()).toBeVisible();
-    await expect(page.getByText(/최종 지급액 \(Net\)|Net Payout|最終支払額 \(Net\)|最终支付额 \(Net\)/)).toBeVisible();
+    const englishChip = page.getByRole('button', { name: 'English' }).first();
+    await expect(englishChip).toBeVisible({ timeout: 15000 });
+    await expect(englishChip).toHaveClass(/bg-slate-900/);
 
-    await expect(page.getByText(/총 매출 \(게스트 결제액\)|Total Revenue \(Guest Paid\)|総売上（ゲスト決済額）|总收入 \(房客付款\)/)).toHaveCount(0);
-    await expect(page.getByText(/서비스 수수료|Service Fee|サービス手数料|服务费/)).toHaveCount(0);
-    await expect(page.getByText(/결제망 이용료|Payment Gateway Fee|決済網利用料|支付网关手续费/)).toHaveCount(0);
+    const saveButton = page.getByRole('button', { name: /변경사항 저장하기|Save Changes|保存/ }).last();
+    const saveResponsePromise = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/host/profile') &&
+        response.request().method() === 'POST'
+    );
+
+    await saveButton.click();
+    const saveResponse = await saveResponsePromise;
+    expect(saveResponse.status()).toBe(200);
+
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('languages')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (profileError) throw profileError;
+
+    expect(profile?.languages).toEqual(['English']);
+  });
+
+  test('dedupes aliased host languages in the experience detail host modal', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const user = createUser('modal');
+    const userId = await createAuthUser(user);
+    await createHostApplication(userId, user);
+    const experienceId = await createActiveExperience(userId);
+
+    const supabase = getAdminClient();
+    const { error: seedError } = await supabase
+      .from('profiles')
+      .update({ languages: ['영어', 'English'] })
+      .eq('id', userId);
+
+    if (seedError) throw seedError;
+
+    await page.goto(`/experiences/${experienceId}`, { waitUntil: 'networkidle' });
+
+    const hostCardButton = page.getByRole('button', { name: new RegExp(user.fullName) }).first();
+    await expect(hostCardButton).toBeVisible({ timeout: 15000 });
+    await hostCardButton.click();
+
+    await expect(
+      page.getByRole('heading', { name: /호스트 소개|Host profile|ホスト紹介|房东介绍/ })
+    ).toBeVisible({ timeout: 15000 });
+
+    await expect(
+      page.getByText(/구사 언어: 영어|Languages: English|話せる言語: 英語|会说的语言: 英语/)
+    ).toBeVisible();
+    await expect(
+      page.getByText(/영어, 영어|English, English|英語, 英語|英语, 英语/)
+    ).toHaveCount(0);
   });
 });

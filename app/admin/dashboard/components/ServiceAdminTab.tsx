@@ -58,10 +58,16 @@ function getRowActionCopy(booking: AdminServiceBooking) {
       cls: 'text-indigo-600',
     };
   }
-  if ((booking.status === 'PAID' || booking.status === 'confirmed' || booking.status === 'completed') && booking.host_id && booking.payout_status === 'pending') {
+  if (booking.status === 'completed' && booking.host_id && booking.payout_status === 'pending') {
     return {
       text: '서비스 완료 후에는 정산 대기 탭에서 이체 완료 처리가 필요합니다.',
       cls: 'text-emerald-600',
+    };
+  }
+  if ((booking.status === 'PAID' || booking.status === 'confirmed') && booking.host_id && booking.payout_status !== 'paid') {
+    return {
+      text: '서비스 종료 후 자동 완료 처리되면 정산 대기 탭에서 이체를 진행할 수 있습니다.',
+      cls: 'text-slate-500',
     };
   }
   return {
@@ -452,8 +458,20 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
                   </td>
                   <td className="px-4 py-3">{statusBadge(b.status, BOOKING_STATUS_LABELS)}</td>
                   <td className="px-4 py-3">
-                    <span className={`text-[9px] md:text-[10px] px-2 py-0.5 rounded font-bold whitespace-nowrap ${b.payout_status === 'paid' ? 'bg-emerald-50 text-emerald-700' : 'bg-yellow-50 text-yellow-700'}`}>
-                      {b.payout_status === 'paid' ? '정산완료' : (b.host_id ? '정산대기' : '미선택')}
+                    <span className={`text-[9px] md:text-[10px] px-2 py-0.5 rounded font-bold whitespace-nowrap ${
+                      b.payout_status === 'paid'
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : b.host_id && b.status === 'completed'
+                          ? 'bg-yellow-50 text-yellow-700'
+                          : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      {b.payout_status === 'paid'
+                        ? '정산완료'
+                        : !b.host_id
+                          ? '미선택'
+                          : b.status === 'completed'
+                            ? '정산대기'
+                            : '완료 후 정산'}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-[10px] md:text-xs text-slate-400">
@@ -519,10 +537,10 @@ function SettlementTab({ bookings, onRefresh }: { bookings: AdminServiceBooking[
   const [expandedHost, setExpandedHost] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Filter: PAID/confirmed/completed + payout=pending + host selected
+  // Filter: completed only + payout=pending + host selected
   const pendingBookings = bookings.filter(
     b =>
-      ['PAID', 'confirmed', 'completed'].includes(b.status) &&
+      b.status === 'completed' &&
       b.payout_status === 'pending' &&
       b.host_id !== null
   );
@@ -613,7 +631,7 @@ function SettlementTab({ bookings, onRefresh }: { bookings: AdminServiceBooking[
           <h3 className="text-[13px] md:text-base font-black text-slate-900 flex items-center gap-2">
             <DollarSign size={16} className="text-emerald-600 md:w-5 md:h-5" /> 서비스 정산 대기
           </h3>
-          <p className="text-[10px] md:text-sm text-slate-500 mt-0.5">호스트에게 이체 후 &quot;이체 완료 처리&quot; 버튼을 누르세요.</p>
+          <p className="text-[10px] md:text-sm text-slate-500 mt-0.5">서비스 완료 처리된 예약만 이 탭에서 이체 완료 처리할 수 있습니다.</p>
         </div>
         <div className="text-right">
           <p className="text-[10px] md:text-xs text-slate-400 font-bold uppercase mb-0.5">총 지급 대기액</p>
@@ -801,7 +819,7 @@ export default function ServiceAdminTab() {
 
   // KPI counts
   const totalPaid = bookings.filter(b => ['PAID', 'confirmed', 'completed'].includes(b.status)).reduce((s, b) => s + b.amount, 0);
-  const pendingSettlement = bookings.filter(b => ['PAID', 'confirmed', 'completed'].includes(b.status) && b.payout_status === 'pending' && b.host_id).length;
+  const pendingSettlement = bookings.filter(b => b.status === 'completed' && b.payout_status === 'pending' && b.host_id).length;
   const cancelledCount = bookings.filter(b => b.status === 'cancelled').length;
   const cancellationRequestedCount = bookings.filter(b => b.status === 'cancellation_requested').length;
   const totalHostPayout = bookings.filter(b => ['PAID', 'confirmed', 'completed'].includes(b.status)).reduce((s, b) => s + (b.host_payout_amount ?? 0), 0);

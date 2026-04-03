@@ -5,7 +5,7 @@ import { User, Briefcase, Globe, Music, MessageCircle, Save, Camera, Lock, Credi
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 import { PROFILE_LANGUAGE_OPTIONS } from '@/app/constants/profile';
-import { getProfileCompletion, normalizeLanguageList } from '@/app/utils/profile';
+import { getProfileCompletion, normalizeProfileLanguageList } from '@/app/utils/profile';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { compressImage, validateImage, isHeicValidationResult } from '@/app/utils/image'; // 🟢 이미지 압축 추가
 
@@ -93,7 +93,7 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
         job: profile.job || '',
         dream_destination: profile.dream_destination || '',
         favorite_song: profile.favorite_song || '',
-        languages: normalizeLanguageList(profile.languages),
+        languages: normalizeProfileLanguageList(profile.languages),
         introduction: profile.introduction || profile.bio || '',
         phone: profile.phone || '',
         dob: profile.dob || profile.birth_date || '',

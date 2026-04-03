@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
+import { attachNullPayoutPaidAt, isMissingPayoutPaidAtColumnError } from '@/app/utils/payoutPaidAt';
 
 type SalesBookingRow = {
   id: string;
@@ -17,6 +18,7 @@ type SalesBookingRow = {
   contact_phone: string | null;
   guests: number | null;
   payout_status: string | null;
+  payout_paid_at: string | null;
   host_payout_amount: number | null;
   platform_revenue: number | null;
   refund_amount: number | null;
@@ -56,6 +58,7 @@ type SalesServiceSummaryRow = {
   status: string;
   created_at: string;
   payout_status: string | null;
+  payout_paid_at?: string | null;
 };
 
 export async function GET(request: Request) {
@@ -89,45 +92,74 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
     }
 
-    let bookingsQuery = supabaseAdmin
-      .from('bookings')
-      .select(
-        'id, order_id, created_at, experience_id, user_id, amount, status, date, time, contact_name, contact_phone, guests, payout_status, host_payout_amount, platform_revenue, refund_amount, payment_method, total_price, total_experience_price, price_at_booking, solo_guarantee_price'
-      )
-      .in('status', ['completed', 'cancelled'])
-      .order('created_at', { ascending: false });
+    const buildBookingsQuery = (includePaidAt: boolean) => {
+      const selectColumns = includePaidAt
+        ? 'id, order_id, created_at, experience_id, user_id, amount, status, date, time, contact_name, contact_phone, guests, payout_status, payout_paid_at, host_payout_amount, platform_revenue, refund_amount, payment_method, total_price, total_experience_price, price_at_booking, solo_guarantee_price'
+        : 'id, order_id, created_at, experience_id, user_id, amount, status, date, time, contact_name, contact_phone, guests, payout_status, host_payout_amount, platform_revenue, refund_amount, payment_method, total_price, total_experience_price, price_at_booking, solo_guarantee_price';
 
-    if (startAt) {
-      bookingsQuery = bookingsQuery.gte('created_at', startAt);
+      let query = supabaseAdmin
+        .from('bookings')
+        .select(selectColumns)
+        .in('status', ['completed', 'cancelled'])
+        .order('created_at', { ascending: false });
+
+      if (startAt) {
+        query = query.gte('created_at', startAt);
+      }
+
+      if (endAt) {
+        query = query.lte('created_at', endAt);
+      }
+
+      if (!startAt && !endAt) {
+        query = query.limit(1000);
+      }
+
+      return query;
+    };
+
+    const buildServiceSummaryQuery = (includePaidAt: boolean) => {
+      const selectColumns = includePaidAt
+        ? 'amount, host_payout_amount, platform_revenue, status, created_at, payout_status, payout_paid_at'
+        : 'amount, host_payout_amount, platform_revenue, status, created_at, payout_status';
+
+      let query = supabaseAdmin
+        .from('service_bookings')
+        .select(selectColumns)
+        .in('status', ['PAID', 'confirmed', 'completed'])
+        .order('created_at', { ascending: false });
+
+      if (startAt) {
+        query = query.gte('created_at', startAt);
+      }
+
+      if (endAt) {
+        query = query.lte('created_at', endAt);
+      }
+
+      if (!startAt && !endAt) {
+        query = query.limit(1000);
+      }
+
+      return query;
+    };
+
+    let [
+      { data: salesBookings, error: bookingsError },
+      { data: serviceSummaryRows, error: serviceSummaryError },
+    ] = await Promise.all([buildBookingsQuery(true), buildServiceSummaryQuery(true)]);
+
+    if (bookingsError && isMissingPayoutPaidAtColumnError(bookingsError)) {
+      const fallbackResult = await buildBookingsQuery(false);
+      salesBookings = attachNullPayoutPaidAt(fallbackResult.data);
+      bookingsError = fallbackResult.error;
     }
 
-    if (endAt) {
-      bookingsQuery = bookingsQuery.lte('created_at', endAt);
+    if (serviceSummaryError && isMissingPayoutPaidAtColumnError(serviceSummaryError)) {
+      const fallbackResult = await buildServiceSummaryQuery(false);
+      serviceSummaryRows = attachNullPayoutPaidAt(fallbackResult.data);
+      serviceSummaryError = fallbackResult.error;
     }
-
-    let serviceSummaryQuery = supabaseAdmin
-      .from('service_bookings')
-      .select('amount, host_payout_amount, platform_revenue, status, created_at, payout_status')
-      .in('status', ['confirmed', 'completed'])
-      .order('created_at', { ascending: false });
-
-    if (startAt) {
-      serviceSummaryQuery = serviceSummaryQuery.gte('created_at', startAt);
-    }
-
-    if (endAt) {
-      serviceSummaryQuery = serviceSummaryQuery.lte('created_at', endAt);
-    }
-
-    if (!startAt && !endAt) {
-      bookingsQuery = bookingsQuery.limit(1000);
-      serviceSummaryQuery = serviceSummaryQuery.limit(1000);
-    }
-
-    const [{ data: salesBookings, error: bookingsError }, { data: serviceSummaryRows, error: serviceSummaryError }] = await Promise.all([
-      bookingsQuery,
-      serviceSummaryQuery,
-    ]);
 
     if (bookingsError) throw bookingsError;
     if (serviceSummaryError) throw serviceSummaryError;

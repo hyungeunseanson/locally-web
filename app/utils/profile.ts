@@ -133,8 +133,24 @@ export function normalizeProfileLanguageValue(value: string): string {
   return alias || trimmed;
 }
 
+export function normalizeProfileLanguageList(value: unknown): string[] {
+  const seen = new Set<string>();
+
+  return normalizeLanguageList(value).reduce<string[]>((acc, language) => {
+    const normalized = normalizeProfileLanguageValue(language);
+
+    if (!normalized || seen.has(normalized)) {
+      return acc;
+    }
+
+    seen.add(normalized);
+    acc.push(normalized);
+    return acc;
+  }, []);
+}
+
 export function formatProfileLanguages(value: unknown, emptyLabel = '미입력'): string {
-  const languages = normalizeLanguageList(value).map((language) => normalizeProfileLanguageValue(language));
+  const languages = normalizeProfileLanguageList(value);
   return languages.length > 0 ? languages.join(', ') : emptyLabel;
 }
 
@@ -173,6 +189,8 @@ export function getHostPublicProfile(
   hostApplication: HostApplicationPublicSource | null | undefined,
   fallbackName = 'Locally Host'
 ) {
+  const profileLanguages = normalizeProfileLanguageList(profile?.languages);
+  const hostApplicationLanguages = normalizeProfileLanguageList(hostApplication?.languages);
   const name = getProfileDisplayName(
     {
       full_name: profile?.full_name,
@@ -185,10 +203,7 @@ export function getHostPublicProfile(
     name,
     avatarUrl: profile?.avatar_url || hostApplication?.profile_photo || null,
     bio: hostApplication?.self_intro || profile?.introduction || null,
-    languages:
-      normalizeLanguageList(profile?.languages).length > 0
-        ? normalizeLanguageList(profile?.languages)
-        : normalizeLanguageList(hostApplication?.languages),
+    languages: profileLanguages.length > 0 ? profileLanguages : hostApplicationLanguages,
     job: profile?.job || hostApplication?.profession || null,
     dreamDestination: profile?.dream_destination || hostApplication?.dream_destination || null,
     favoriteSong: profile?.favorite_song || hostApplication?.favorite_song || null,

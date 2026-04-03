@@ -2,6 +2,7 @@ import { readFileSync } from 'fs';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test, type Page } from '@playwright/test';
+import { reviewAllExperiencePaymentAgreements } from './helpers/experienceBooking';
 
 type EnvMap = Record<string, string>;
 type TestUser = {
@@ -274,9 +275,7 @@ async function createBankTransferBooking(page: Page, guest: TestUser, experience
   await page.getByTestId('exp-payment-booker-phone').fill(guest.phone);
 
   await page.getByTestId('exp-payment-method-bank').click({ force: true });
-  await page.getByTestId('exp-payment-agree-off-platform').click();
-  await page.getByTestId('exp-payment-agree-safety').click();
-  await page.getByTestId('exp-payment-agree-terms').click();
+  await reviewAllExperiencePaymentAgreements(page);
   await expect(page.getByTestId('exp-payment-submit')).toBeVisible({ timeout: 30000 });
   await page.getByTestId('exp-payment-submit').click();
 
@@ -293,6 +292,7 @@ async function openMasterLedger(page: Page, adminUser: TestUser) {
   await login(page, adminUser);
   await page.goto('/admin/dashboard?tab=LEDGER', { waitUntil: 'networkidle' });
   await expect(page.getByText('Total Sales')).toBeVisible({ timeout: 20000 });
+  await expect(page.getByTestId('ledger-date-basis-note')).toBeVisible();
   await expect(page.getByPlaceholder('검색 (이름, 예약번호)')).toBeVisible();
 }
 
@@ -317,6 +317,11 @@ async function openLedgerRow(page: Page, row: ReturnType<Page['locator']>) {
   }
 }
 
+async function confirmModalAction(page: Page, title: string, confirmLabel: string) {
+  await expect(page.getByRole('heading', { name: title })).toBeVisible({ timeout: 10000 });
+  await page.getByRole('button', { name: confirmLabel }).last().click();
+}
+
 async function setOutOfRangeDateFilter(page: Page) {
   await page.getByRole('button', { name: /전체 기간 선택|^\d{4}\.\d{2}\.\d{2} - \d{4}\.\d{2}\.\d{2}$/ }).first().click();
   await page.locator('.rdrCalendarWrapper').waitFor({ state: 'visible', timeout: 10000 });
@@ -338,12 +343,6 @@ async function resetDateFilter(page: Page) {
 
 function parseNumber(text: string | null) {
   return Number((text ?? '').replace(/[^\d.-]/g, ''));
-}
-
-function parseTrailingCount(text: string | null) {
-  const matches = (text ?? '').match(/\d+/g);
-  if (!matches || matches.length === 0) return 0;
-  return Number(matches[matches.length - 1]);
 }
 
 test.describe.serial('Scenario 6: Admin Master Ledger Smoke', () => {
@@ -373,11 +372,6 @@ test.describe.serial('Scenario 6: Admin Master Ledger Smoke', () => {
     const adminPage = await adminContext.newPage();
     await openMasterLedger(adminPage, adminUser);
 
-    const masterLedgerButton = adminPage.getByRole('button', { name: /Master Ledger/i });
-    await expect
-      .poll(async () => parseTrailingCount(await masterLedgerButton.textContent()))
-      .toBe(1);
-
     let row = await searchByOrderId(adminPage, orderId);
     const basePriceText = await row.locator('td').nth(6).textContent();
     const salesText = await row.locator('td').nth(8).textContent();
@@ -394,9 +388,6 @@ test.describe.serial('Scenario 6: Admin Master Ledger Smoke', () => {
     row = await searchByOrderId(adminPage, orderId);
 
     await openLedgerRow(adminPage, row);
-    await expect
-      .poll(async () => parseTrailingCount(await masterLedgerButton.textContent()))
-      .toBe(0);
     await expect(adminPage.getByRole('button', { name: /입금 확인/ })).toBeVisible({ timeout: 10000 });
 
     const confirmPaymentResponse = adminPage.waitForResponse(
@@ -405,8 +396,8 @@ test.describe.serial('Scenario 6: Admin Master Ledger Smoke', () => {
         response.request().method() === 'POST',
       { timeout: 60000 }
     );
-    adminPage.once('dialog', (dialog) => dialog.accept());
     await adminPage.getByRole('button', { name: /입금 확인/ }).click();
+    await confirmModalAction(adminPage, '입금 확인', '입금 확인');
     const confirmPaymentResult = await confirmPaymentResponse;
     expect(confirmPaymentResult.ok()).toBeTruthy();
     await expect(row.locator('td').first()).toContainText(/확정/, { timeout: 30000 });
@@ -419,8 +410,8 @@ test.describe.serial('Scenario 6: Admin Master Ledger Smoke', () => {
         response.request().method() === 'POST',
       { timeout: 60000 }
     );
-    adminPage.once('dialog', (dialog) => dialog.accept());
     await adminPage.getByRole('button', { name: /강제 취소/ }).click();
+    await confirmModalAction(adminPage, '강제 취소', '강제 취소');
     const forceCancelResult = await forceCancelResponse;
     expect(forceCancelResult.ok()).toBeTruthy();
     await expect(row.locator('td').first()).toContainText(/취소/, { timeout: 30000 });

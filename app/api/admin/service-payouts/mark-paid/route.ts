@@ -2,12 +2,13 @@ import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
+import { isMissingPayoutPaidAtColumnError } from '@/app/utils/payoutPaidAt';
 
 type MarkServicePayoutsBody = {
   bookingIds?: string[];
 };
 
-const ELIGIBLE_SERVICE_PAYOUT_STATUSES = ['PAID', 'confirmed', 'completed'];
+const ELIGIBLE_SERVICE_PAYOUT_STATUSES = ['completed'];
 
 export async function POST(request: Request) {
   try {
@@ -66,11 +67,24 @@ export async function POST(request: Request) {
     }
 
     // [Race Guard] payout_status='pending' 조건부 UPDATE — 이중 정산 방지
-    const { error: updateError } = await supabaseAdmin
+    const paidAt = new Date().toISOString();
+    let { error: updateError } = await supabaseAdmin
       .from('service_bookings')
-      .update({ payout_status: 'paid' })
+      .update({ payout_status: 'paid', payout_paid_at: paidAt })
       .in('id', bookingIds)
-      .eq('payout_status', 'pending');
+      .eq('payout_status', 'pending')
+      .eq('status', 'completed');
+
+    if (updateError && isMissingPayoutPaidAtColumnError(updateError)) {
+      const fallbackResult = await supabaseAdmin
+        .from('service_bookings')
+        .update({ payout_status: 'paid' })
+        .in('id', bookingIds)
+        .eq('payout_status', 'pending')
+        .eq('status', 'completed');
+
+      updateError = fallbackResult.error;
+    }
 
     if (updateError) {
       throw updateError;

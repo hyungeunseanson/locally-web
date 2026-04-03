@@ -359,7 +359,7 @@ test.describe.serial('locally membership care experience', () => {
 
     await page.goto('/guest/inbox', { waitUntil: 'domcontentloaded' });
     await dismissAnnouncementIfVisible(page);
-    await expect(page.getByTestId('guest-inbox-member-care-strip')).toBeVisible();
+    await expect(page.getByTestId('guest-inbox-member-care-strip')).toHaveCount(0);
   });
 
   test('repeat customer sees Tier 2 in account and service completion', async ({ page }) => {

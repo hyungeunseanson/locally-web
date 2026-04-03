@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs';
 
-import { type Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 type EnvMap = Record<string, string>;
@@ -200,6 +200,61 @@ export async function login(page: Page, user: TestUser) {
 
   await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 30000 });
   await page.waitForLoadState('domcontentloaded');
+}
+
+export async function reviewExperiencePaymentAgreement(
+  page: Page,
+  testId: 'exp-payment-agree-off-platform' | 'exp-payment-agree-safety' | 'exp-payment-agree-terms',
+  closeWith: 'button' | 'overlay' = 'button'
+) {
+  const row = page.getByTestId(testId);
+  let state: 'modal' | 'checked' | 'pending' = 'pending';
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await row.click({ force: attempt > 0 });
+
+    try {
+      await expect
+        .poll(
+          async () => {
+            const checked = await row.getAttribute('aria-checked');
+            const modalVisible = await page.getByTestId('exp-payment-agreement-modal').isVisible().catch(() => false);
+            if (modalVisible) return 'modal';
+            if (checked === 'true') return 'checked';
+            return 'pending';
+          },
+          { timeout: 1500 }
+        )
+        .not.toBe('pending');
+
+      state = await page.getByTestId('exp-payment-agreement-modal').isVisible().catch(() => false)
+        ? 'modal'
+        : 'checked';
+      break;
+    } catch {
+      state = 'pending';
+    }
+  }
+
+  expect(state).not.toBe('pending');
+
+  if (state === 'modal') {
+    if (closeWith === 'overlay') {
+      await page.getByTestId('exp-payment-agreement-modal-overlay').click({ position: { x: 10, y: 10 } });
+    } else {
+      await page.getByTestId('exp-payment-agreement-modal-close').click();
+    }
+
+    await expect(page.getByTestId('exp-payment-agreement-modal')).toHaveCount(0);
+  }
+
+  await expect(row).toHaveAttribute('aria-checked', 'true');
+}
+
+export async function reviewAllExperiencePaymentAgreements(page: Page) {
+  await reviewExperiencePaymentAgreement(page, 'exp-payment-agree-off-platform');
+  await reviewExperiencePaymentAgreement(page, 'exp-payment-agree-safety');
+  await reviewExperiencePaymentAgreement(page, 'exp-payment-agree-terms');
 }
 
 export async function selectReservationDate(page: Page, isoDate: string) {

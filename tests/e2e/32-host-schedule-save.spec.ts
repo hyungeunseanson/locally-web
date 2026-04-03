@@ -323,4 +323,39 @@ test.describe.serial('Host schedule availability save route', () => {
       time: '10:00',
     });
   });
+
+  test('accepts 07:00 slots for owner schedule updates', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const hostUser = createUser('owner-early');
+    const hostId = await createAuthUser(hostUser);
+    const experienceId = await createExperienceFixture(hostId);
+    const experienceDate = formatDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+
+    await seedAvailability(experienceId, experienceDate);
+    await login(page, hostUser);
+
+    const saveResponse = await page.request.post(`/api/host/experiences/${experienceId}/availability`, {
+      data: { availability: { [experienceDate]: ['07:00'] } },
+    });
+    expect(saveResponse.status()).toBe(200);
+    await expect(saveResponse.json()).resolves.toMatchObject({
+      success: true,
+      insertedCount: 1,
+    });
+
+    const supabase = getAdminClient();
+    const { data: slots, error: slotError } = await supabase
+      .from('experience_availability')
+      .select('date, start_time')
+      .eq('experience_id', experienceId)
+      .order('date', { ascending: true })
+      .order('start_time', { ascending: true });
+
+    if (slotError) throw slotError;
+
+    expect(slots).toEqual([
+      { date: experienceDate, start_time: '07:00' },
+    ]);
+  });
 });

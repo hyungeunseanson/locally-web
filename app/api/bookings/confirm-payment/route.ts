@@ -8,6 +8,7 @@ import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { isPendingBookingStatus } from '@/app/constants/bookingStatus';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 import { buildLocalizedEmailCopy } from '@/app/utils/emailCopy';
+import { getBookingSettlementSnapshot } from '@/app/utils/bookingFinance';
 
 // LEGACY ROUTE
 // Current admin-confirm path is `/api/admin/bookings/confirm-payment`.
@@ -48,7 +49,22 @@ export async function POST(request: Request) {
     // 1. 예약 정보 조회
     const { data: booking, error: fetchError } = await supabase
       .from('bookings')
-      .select('*')
+      .select(`
+        id,
+        experience_id,
+        user_id,
+        amount,
+        total_price,
+        total_experience_price,
+        price_at_booking,
+        solo_guarantee_price,
+        status,
+        payment_method,
+        contact_name,
+        guests,
+        date,
+        time
+      `)
       .eq('id', bookingId)
       .maybeSingle();
 
@@ -80,23 +96,20 @@ export async function POST(request: Request) {
     }
 
     // 3. 정산 데이터 계산
-    const guestCount = Number(booking.guests || 1);
-    const basePrice = booking.type === 'private'
-      ? Number(experience.private_price || 0)
-      : Number(experience.price || 0) * guestCount;
-    const totalExpPrice = Number(booking.total_price || 0);
-    const payoutAmount = Math.floor(totalExpPrice * 0.8);
-    const platformRev = Number(booking.amount || 0) - payoutAmount;
+    const snapshot = getBookingSettlementSnapshot({
+      ...booking,
+      amount: Number(booking.amount || 0),
+    });
 
     // 4. 업데이트 (확정) — [Race Guard] status 조건부 UPDATE로 동시 요청 중복 확정 방지
     const { data: updatedRows, error: updateError } = await supabase
       .from('bookings')
       .update({
         status: 'confirmed',
-        price_at_booking: basePrice,
-        total_experience_price: totalExpPrice,
-        host_payout_amount: payoutAmount,
-        platform_revenue: platformRev,
+        price_at_booking: snapshot.basePrice,
+        total_experience_price: snapshot.totalExperiencePrice,
+        host_payout_amount: snapshot.hostPayout,
+        platform_revenue: snapshot.platformRevenue,
         payout_status: 'pending'
       })
       .eq('id', bookingId)

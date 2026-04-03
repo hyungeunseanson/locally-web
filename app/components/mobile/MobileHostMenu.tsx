@@ -5,7 +5,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
     Bell, Settings, HelpCircle, Star,
     ChevronRight, BookOpen, CornerUpRight, Loader2,
-    CalendarCheck, LayoutList, MessageSquare, CircleDollarSign, User, Briefcase, Users
+    CalendarCheck, LayoutList, MessageSquare, CircleDollarSign, User, Briefcase
 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
@@ -253,7 +253,6 @@ export default function MobileHostMenu() {
                     disabled={isNavigating}
                     onNavigate={navigate}
                 />
-                <HostMenuItem href="/community" icon={<Users size={17} />} label={t('profile_menu_community')} isPending={pendingHref === '/community'} disabled={isNavigating} onNavigate={navigate} />
                 <HostMenuItem href="/host/help" icon={<HelpCircle size={17} />} label={t('profile_menu_help')} isPending={pendingHref === '/host/help'} disabled={isNavigating} onNavigate={navigate} />
             </div>
 

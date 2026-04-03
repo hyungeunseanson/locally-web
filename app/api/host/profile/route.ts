@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { normalizeLanguageList } from '@/app/utils/profile';
+import { normalizeProfileLanguageList } from '@/app/utils/profile';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
       job: asNullableTrimmedString(body.job)?.slice(0, MAX.job) ?? null,
       dream_destination: asNullableTrimmedString(body.dreamDestination)?.slice(0, MAX.place) ?? null,
       favorite_song: asNullableTrimmedString(body.favoriteSong)?.slice(0, MAX.song) ?? null,
-      languages: normalizeLanguageList(body.languages),
+      languages: normalizeProfileLanguageList(body.languages),
       avatar_url: asNullableTrimmedString(body.avatarUrl)?.slice(0, MAX.url) ?? null,
     };
 

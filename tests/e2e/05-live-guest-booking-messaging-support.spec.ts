@@ -2,6 +2,7 @@ import { readFileSync } from 'fs';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test, type Browser, type Page } from '@playwright/test';
+import { reviewAllExperiencePaymentAgreements } from './helpers/experienceBooking';
 
 const LIVE_BASE_URL = 'https://locally-web.vercel.app';
 const HOST_EMAIL = 'codex.host.1772980212472@example.com';
@@ -325,9 +326,7 @@ test.describe.serial('Live guest booking, host messaging, and support inquiry fl
       await page.getByTestId('exp-payment-booker-phone').fill(guest.phone);
 
       await page.getByTestId('exp-payment-method-bank').click();
-      await page.getByTestId('exp-payment-agree-off-platform').click();
-      await page.getByTestId('exp-payment-agree-safety').click();
-      await page.getByTestId('exp-payment-agree-terms').click();
+      await reviewAllExperiencePaymentAgreements(page);
 
       await page.getByTestId('exp-payment-submit').click();
       await page.waitForURL(/\/payment\/complete\?orderId=/, { timeout: 30000 });

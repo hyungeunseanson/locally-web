@@ -8,6 +8,7 @@ import Skeleton from '@/app/components/ui/Skeleton';
 import { BOOKING_CONFIRMED_STATUSES, isCancelledOnlyBookingStatus } from '@/app/constants/bookingStatus';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { getBookingHostPayout } from '@/app/utils/bookingFinance';
+import { isMissingPayoutPaidAtColumnError } from '@/app/utils/payoutPaidAt';
 
 type EarningsBookingRow = {
   amount?: number | null;
@@ -16,12 +17,31 @@ type EarningsBookingRow = {
   created_at: string;
   status: string;
   host_payout_amount?: number | null;
+  payout_status?: string | null;
+  payout_paid_at?: string | null;
 };
+
+function formatLatestPayoutDate(value: string | null, locale: string) {
+  if (!value) return null;
+
+  const localeMap: Record<string, string> = {
+    ko: 'ko-KR',
+    en: 'en-US',
+    ja: 'ja-JP',
+    zh: 'zh-CN',
+  };
+
+  return new Intl.DateTimeFormat(localeMap[locale] || 'ko-KR', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  }).format(new Date(value));
+}
 
 export default function Earnings() {
   const supabase = createClient();
   const router = useRouter();
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
 
   const [loading, setLoading] = useState(true);
   const [showSummary, setShowSummary] = useState(false);
@@ -30,6 +50,11 @@ export default function Earnings() {
   const [stats, setStats] = useState({
     net: 0,
     count: 0
+  });
+  const [payoutSummary, setPayoutSummary] = useState({
+    pending: 0,
+    paid: 0,
+    latestPaidAt: null as string | null,
   });
 
   const [chartData, setChartData] = useState<{
@@ -52,7 +77,7 @@ export default function Earnings() {
         if (!user) return;
 
         // 예약 데이터 가져오기
-        const { data: bookings, error } = await supabase
+        let { data: bookings, error } = await supabase
           .from('bookings')
           .select(`
             amount,
@@ -61,15 +86,43 @@ export default function Earnings() {
             created_at,
             status,
             host_payout_amount,
+            payout_status,
+            payout_paid_at,
             experiences!inner ( host_id )
           `)
           .eq('experiences.host_id', user.id)
           .in('status', [...BOOKING_CONFIRMED_STATUSES, 'cancelled', 'CANCELLED']);
 
+        if (error && isMissingPayoutPaidAtColumnError(error)) {
+          const fallbackResult = await supabase
+            .from('bookings')
+            .select(`
+              amount,
+              total_price,
+              total_experience_price,
+              created_at,
+              status,
+              host_payout_amount,
+              payout_status,
+              experiences!inner ( host_id )
+            `)
+            .eq('experiences.host_id', user.id)
+            .in('status', [...BOOKING_CONFIRMED_STATUSES, 'cancelled', 'CANCELLED']);
+
+          bookings = ((fallbackResult.data || []) as EarningsBookingRow[]).map((booking) => ({
+            ...booking,
+            payout_paid_at: null,
+          }));
+          error = fallbackResult.error;
+        }
+
         if (error) throw error;
 
         let totalNet = 0;
         let validCount = 0;
+        let pendingPayout = 0;
+        let paidPayout = 0;
+        let latestPaidAt: string | null = null;
 
         const dailyIncome: Record<string, number> = {};
 
@@ -85,6 +138,15 @@ export default function Earnings() {
           const itemNet = getBookingHostPayout(booking);
           totalNet += itemNet;
           validCount++;
+
+          if (booking.payout_status === 'paid') {
+            paidPayout += itemNet;
+            if (!latestPaidAt || (booking.payout_paid_at && booking.payout_paid_at > latestPaidAt)) {
+              latestPaidAt = booking.payout_paid_at || latestPaidAt;
+            }
+          } else {
+            pendingPayout += itemNet;
+          }
 
           if (dailyIncome[dateStr]) {
             dailyIncome[dateStr] += itemNet;
@@ -114,6 +176,11 @@ export default function Earnings() {
         setStats({
           net: totalNet,
           count: validCount
+        });
+        setPayoutSummary({
+          pending: pendingPayout,
+          paid: paidPayout,
+          latestPaidAt,
         });
 
         setChartData(chart);
@@ -169,6 +236,43 @@ export default function Earnings() {
 
       {/* 메인 카드 */}
       <div className="bg-white rounded-2xl md:rounded-[2.5rem] p-5 md:p-8 shadow-xl shadow-slate-200/60 border border-slate-100 relative overflow-hidden">
+        <div
+          data-testid="host-earnings-scope-note"
+          className="mb-5 flex items-start gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-[11px] font-medium leading-relaxed text-slate-600 md:mb-6 md:text-xs"
+        >
+          <Info size={14} className="mt-0.5 shrink-0 text-slate-400" />
+          <p>{t('hp_earn_scope_note')}</p>
+        </div>
+
+        <div
+          data-testid="host-earnings-payout-summary"
+          className="mb-5 grid grid-cols-1 gap-3 md:mb-6 md:grid-cols-3"
+        >
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-amber-700 md:text-[11px]">
+              {t('hp_earn_pending')}
+            </p>
+            <p className="mt-1 text-lg font-black text-slate-900 md:text-xl">
+              ₩{payoutSummary.pending.toLocaleString()}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700 md:text-[11px]">
+              {t('hp_earn_completed')}
+            </p>
+            <p className="mt-1 text-lg font-black text-slate-900 md:text-xl">
+              ₩{payoutSummary.paid.toLocaleString()}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500 md:text-[11px]">
+              {t('hp_earn_last_paid')}
+            </p>
+            <p className="mt-1 text-sm font-bold text-slate-900 md:text-base">
+              {formatLatestPayoutDate(payoutSummary.latestPaidAt, lang) || t('hp_earn_last_paid_empty')}
+            </p>
+          </div>
+        </div>
 
         <div className="text-center mb-6 md:mb-10 relative z-10">
           <p className="text-slate-400 font-bold text-[10px] md:text-xs mb-1.5 md:mb-2 flex items-center justify-center gap-1 uppercase tracking-wider">
