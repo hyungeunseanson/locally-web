@@ -210,7 +210,7 @@ test.describe.serial('Live host signup and registration flow', () => {
       await clickFooterNext(page);
 
       await page.locator('input[placeholder="홍길동"], input[placeholder="John Doe"]').fill(user.fullName);
-      await page.locator('input[placeholder="YYYY.MM.DD"]').fill('1990.01.01');
+      await page.locator('input[autocomplete="bday"]').fill('19900101');
       await page.locator('input[placeholder="010-1234-5678"]').fill(user.phone);
       await page.locator('input[placeholder="example@gmail.com"]').fill(user.email);
       await page.locator('input[placeholder="@locally.host"]').fill(`@${user.instagram}`);

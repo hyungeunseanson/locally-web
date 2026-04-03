@@ -100,7 +100,7 @@ test.describe.serial('Epic: Fully Integrated Ecosystem Test (End-to-End)', () =>
 
         // Step 3: 연락처
         await hostPage.locator('input[placeholder="홍길동"]').fill(hostUser.fullName);
-        await hostPage.locator('input[placeholder="YYYY.MM.DD"]').fill('1990.01.01');
+        await hostPage.locator('input[autocomplete="bday"]').fill('19900101');
         await hostPage.locator('input[type="tel"]').fill('010-1234-5678');
         await hostPage.locator('input[type="email"]').fill(hostUser.email);
         await hostPage.getByRole('button', { name: '다음' }).click();

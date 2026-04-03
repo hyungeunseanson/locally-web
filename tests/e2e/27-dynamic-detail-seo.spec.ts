@@ -4,12 +4,18 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test } from '@playwright/test';
 
 type EnvMap = Record<string, string>;
+type TestUser = {
+  email: string;
+  password: string;
+  fullName: string;
+  phone: string;
+};
 
-const HOST_USER_ID = 'cc84b331-7e78-4818-b9ba-f1a960017473';
 const TEST_PASSWORD = 'LocallyTest!2026';
 
 let adminClient: SupabaseClient | null = null;
 const createdAuthUserIds: string[] = [];
+const createdApplicationIds: string[] = [];
 const createdExperienceIds: number[] = [];
 const createdServiceRequestIds: string[] = [];
 
@@ -57,15 +63,17 @@ async function waitForProfile(userId: string) {
   throw new Error(`Profile was not created for auth user ${userId}.`);
 }
 
-async function createCustomerUser() {
+function createUser(prefix: string): TestUser {
   const timestamp = Date.now();
-  const user = {
-    email: `codex.dynamic.seo.${timestamp}@example.com`,
+  return {
+    email: `codex.dynamic.seo.${prefix}.${timestamp}@example.com`,
     password: TEST_PASSWORD,
-    fullName: `Dynamic SEO Customer ${timestamp}`,
+    fullName: `Dynamic SEO ${prefix} ${timestamp}`,
     phone: `010${String(timestamp).slice(-8)}`,
   };
+}
 
+async function createAuthUser(user: TestUser) {
   const supabase = getAdminClient();
   const { data, error } = await supabase.auth.admin.createUser({
     email: user.email,
@@ -97,14 +105,55 @@ async function createCustomerUser() {
   return { id: data.user.id, ...user };
 }
 
-async function createExperienceFixture(status: 'active' | 'inactive') {
+async function createCustomerUser() {
+  return createAuthUser(createUser('customer'));
+}
+
+async function createVisibleHostUser() {
+  const host = await createAuthUser(createUser('host'));
+
+  const { data, error } = await getAdminClient()
+    .from('host_applications')
+    .insert({
+      user_id: host.id,
+      host_nationality: '대한민국',
+      languages: ['한국어'],
+      language_levels: [{ language: '한국어', level: 5 }],
+      name: host.fullName,
+      phone: host.phone,
+      dob: '1991-03-14',
+      email: host.email,
+      instagram: '@codex_dynamic_seo_host',
+      source: 'playwright',
+      language_cert: '',
+      profile_photo: '/images/logo.png',
+      self_intro: '동적 SEO 회귀 테스트용 공개 호스트입니다.',
+      id_card_file: '',
+      bank_name: '국민은행',
+      account_number: '12345678901234',
+      account_holder: host.fullName,
+      motivation: '동적 SEO 회귀 테스트',
+      status: 'approved',
+    })
+    .select('id')
+    .single();
+
+  if (error || !data?.id) {
+    throw error || new Error('Failed to create visible host application.');
+  }
+
+  createdApplicationIds.push(String(data.id));
+  return host.id;
+}
+
+async function createExperienceFixture(hostId: string, status: 'active' | 'inactive') {
   const supabase = getAdminClient();
   const title = `[Playwright] SEO Experience ${status} ${Date.now()}`;
 
   const { data, error } = await supabase
     .from('experiences')
     .insert({
-      host_id: HOST_USER_ID,
+      host_id: hostId,
       country: '대한민국',
       city: 'Seoul',
       title,
@@ -194,7 +243,13 @@ test.afterAll(async () => {
     await supabase.from('experiences').delete().in('id', createdExperienceIds);
   }
 
+  if (createdApplicationIds.length > 0) {
+    await supabase.from('host_applications').delete().in('id', createdApplicationIds);
+  }
+
   for (const userId of createdAuthUserIds.reverse()) {
+    await supabase.from('profiles').delete().eq('id', userId);
+    await supabase.from('users').delete().eq('id', userId);
     await supabase.auth.admin.deleteUser(userId);
   }
 });
@@ -202,8 +257,9 @@ test.afterAll(async () => {
 test.describe('Dynamic detail SEO boundaries', () => {
   test('keeps active experiences indexable and marks private-like detail pages as noindex', async ({ page }) => {
     const customer = await createCustomerUser();
-    const activeExperience = await createExperienceFixture('active');
-    const inactiveExperience = await createExperienceFixture('inactive');
+    const visibleHostId = await createVisibleHostUser();
+    const activeExperience = await createExperienceFixture(visibleHostId, 'active');
+    const inactiveExperience = await createExperienceFixture(visibleHostId, 'inactive');
     const serviceRequest = await createOpenServiceRequestFixture(customer);
 
     await page.goto(`/experiences/${activeExperience.id}`, { waitUntil: 'domcontentloaded' });

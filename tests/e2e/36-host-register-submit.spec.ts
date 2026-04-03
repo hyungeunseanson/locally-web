@@ -52,7 +52,17 @@ function createUser(prefix: string): TestUser {
   };
 }
 
-function buildSubmitPayload(user: TestUser) {
+function buildSubmitPayload(
+  user: TestUser,
+  overrides: Partial<ReturnType<typeof buildSubmitPayloadBase>> = {}
+) {
+  return {
+    ...buildSubmitPayloadBase(user),
+    ...overrides,
+  };
+}
+
+function buildSubmitPayloadBase(user: TestUser) {
   return {
     hostNationality: 'Korea',
     languageLevels: [{ language: '한국어', level: 5 }],
@@ -64,12 +74,12 @@ function buildSubmitPayload(user: TestUser) {
     instagram: '@codex_host_submit',
     source: 'playwright',
     profilePhoto: 'https://example.com/profile.png',
-    selfIntro: '호스트 등록 submit route 검증용 자기소개입니다.',
+    selfIntro: '호스트 등록 submit route 검증용 자기소개입니다. 실제 제출 경로에서 최소 글자 수를 충분히 넘기도록 작성한 테스트 소개문입니다.',
     idCardFile: 'id_card/example-path',
     bankName: '국민은행',
     accountNumber: '12345678901234',
     accountHolder: user.fullName,
-    motivation: 'route semantics verification',
+    motivation: 'Locally 호스트로서 어떤 게스트에게 어떤 시간을 제공하고 싶은지 충분히 설명하는 테스트 지원 동기입니다.',
   };
 }
 
@@ -195,6 +205,10 @@ test.describe.serial('Host register submit route', () => {
     });
 
     expect(response.status()).toBe(401);
+    await expect(response.json()).resolves.toMatchObject({
+      success: false,
+      errorCode: 'unauthorized',
+    });
   });
 
   test('creates a pending application and seeds missing profile fields for a new host', async ({ page }) => {
@@ -246,6 +260,60 @@ test.describe.serial('Host register submit route', () => {
     expect(profile).toMatchObject({
       avatar_url: 'https://example.com/profile.png',
       languages: ['한국어'],
+    });
+  });
+
+  test('accepts birth dates entered without separators and normalizes them for storage', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const user = createUser('dob-digits');
+    const userId = await createAuthUser(user);
+
+    await login(page, user);
+    const response = await page.request.post('/api/host/register/submit', {
+      data: buildSubmitPayload(user, { dob: '19900101' }),
+    });
+
+    expect(response.status()).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      status: 'pending',
+    });
+
+    const supabase = getAdminClient();
+    const { data: application, error } = await supabase
+      .from('host_applications')
+      .select('id, dob, status')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    expect(application).toMatchObject({
+      dob: '1990-01-01',
+      status: 'pending',
+    });
+
+    createdApplicationIds.push(String(application?.id));
+  });
+
+  test('returns a stable error code when the account holder name is too short', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const user = createUser('account-holder-short');
+    await createAuthUser(user);
+
+    await login(page, user);
+    const response = await page.request.post('/api/host/register/submit', {
+      data: buildSubmitPayload(user, { accountHolder: 'A' }),
+    });
+
+    expect(response.status()).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      success: false,
+      errorCode: 'account_holder_too_short',
     });
   });
 

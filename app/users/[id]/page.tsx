@@ -7,6 +7,10 @@ import SiteHeader from '@/app/components/SiteHeader';
 import { User, CheckCircle2, Star } from 'lucide-react';
 import ExperienceCard from '@/app/components/ExperienceCard';
 import { useLanguage } from '@/app/context/LanguageContext';
+import {
+  isPublicHostApplicationStatus,
+  pickLatestPublicHostApplication,
+} from '@/app/utils/hostVisibility';
 
 type PublicHostProfile = {
   full_name: string | null;
@@ -51,22 +55,26 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
       // 공개 호스트 프로필은 safe projection view만 사용한다.
       const { data: hostApp } = await supabase
         .from('public_host_applications')
-        .select('status, name, profile_photo, self_intro, languages')
+        .select('id, status, name, profile_photo, self_intro, languages, created_at')
         .eq('user_id', resolvedParams.id)
-        .maybeSingle();
+        .order('created_at', { ascending: false });
 
-      setProfile(hostApp ? {
-        full_name: hostApp.name,
-        avatar_url: hostApp.profile_photo,
-        bio: hostApp.self_intro,
-        introduction: hostApp.self_intro,
-        languages: Array.isArray(hostApp.languages)
-          ? hostApp.languages.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      const latestHostApp = pickLatestPublicHostApplication(hostApp || []);
+
+      const isPublicHost = isPublicHostApplicationStatus(latestHostApp?.status);
+
+      setProfile(isPublicHost && latestHostApp ? {
+        full_name: latestHostApp.name,
+        avatar_url: latestHostApp.profile_photo,
+        bio: latestHostApp.self_intro,
+        introduction: latestHostApp.self_intro,
+        languages: Array.isArray(latestHostApp.languages)
+          ? latestHostApp.languages.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
           : [],
       } : null);
 
-      // 승인된 호스트의 경우에만 운영 중인 활성 체험 가져오기
-      if (hostApp?.status === 'approved') {
+      // 공개 상태 호스트의 경우에만 운영 중인 활성 체험 가져오기
+      if (isPublicHost) {
         const { data: expData } = await supabase
           .from('experiences')
           .select('*')
@@ -74,6 +82,8 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
           .eq('status', 'active');
 
         if (expData) setHostExperiences(expData);
+      } else {
+        setHostExperiences([]);
       }
       setLoading(false);
     };

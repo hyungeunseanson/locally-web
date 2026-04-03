@@ -141,7 +141,7 @@ test('host register keeps previous button visible and shows self-intro language 
   await expect(page.getByRole('heading', { name: /호스트님의\s*연락처를 알려주세요|Tell us how to\s*reach you|連絡先を\s*教えてください|请告诉我们\s*您的联系方式/ })).toBeVisible();
 
   await page.locator('input[placeholder="홍길동"], input[placeholder="John Doe"]').fill(user.fullName);
-  await page.locator('input[placeholder="YYYY.MM.DD"]').fill('1990.01.01');
+  await page.locator('input[autocomplete="bday"]').fill('19900101');
   await page.locator('input[placeholder="010-1234-5678"]').fill(user.phone);
   await page.locator('input[placeholder="example@gmail.com"]').fill(user.email);
   await page.locator('input[placeholder="@locally.host"]').fill('@host_visibility');

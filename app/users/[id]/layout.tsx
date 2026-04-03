@@ -1,6 +1,10 @@
 import type { Metadata } from 'next';
 
 import { PRIVATE_NOINDEX_METADATA } from '@/app/utils/seo';
+import {
+  isPublicHostApplicationStatus,
+  pickLatestPublicHostApplication,
+} from '@/app/utils/hostVisibility';
 import { getCurrentLocale } from '@/app/utils/locale';
 import { buildAbsoluteUrl, buildLocalizedAbsoluteUrl } from '@/app/utils/siteUrl';
 import { createAdminClient } from '@/app/utils/supabase/admin';
@@ -28,16 +32,14 @@ export async function generateMetadata(
   const locale = await getCurrentLocale();
   const supabase = createAdminClient();
 
-  const { data: hostApp, error } = await supabase
+  const { data: hostApps, error } = await supabase
     .from('public_host_applications')
-    .select('user_id, status, name, self_intro, profile_photo, created_at')
+    .select('id, user_id, status, name, self_intro, profile_photo, created_at')
     .eq('user_id', id)
-    .in('status', ['approved', 'active'])
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .order('created_at', { ascending: false });
+  const hostApp = pickLatestPublicHostApplication(hostApps || []);
 
-  if (error || !hostApp?.user_id || !hostApp.name) {
+  if (error || !hostApp?.user_id || !hostApp.name || !isPublicHostApplicationStatus(hostApp.status)) {
     return {
       ...PRIVATE_NOINDEX_METADATA,
       title: 'Host Profile',

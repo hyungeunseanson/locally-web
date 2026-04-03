@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import type { HostRegisterSubmitErrorCode } from '@/app/host/register/localization';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
+import { normalizeDateOfBirth } from '@/app/utils/dateOfBirth';
 import { getLanguageNames, normalizeLanguageLevels, type LanguageLevelEntry } from '@/app/utils/languageLevels';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
@@ -55,10 +57,6 @@ function isLikelyEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-function isLikelyDob(value: string): boolean {
-  return /^\d{4}[-./]\d{2}[-./]\d{2}$/.test(value);
-}
-
 function isLikelyPhone(value: string): boolean {
   const digits = value.replace(/\D/g, '');
   return digits.length >= 8 && digits.length <= 15;
@@ -91,6 +89,10 @@ function shouldNotifyAdmin(existingApplicationStatus: string | null, hasExisting
   );
 }
 
+function createErrorResponse(status: number, errorCode: HostRegisterSubmitErrorCode, error: string) {
+  return NextResponse.json({ success: false, errorCode, error }, { status });
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabaseServer = await createServerClient();
@@ -100,7 +102,7 @@ export async function POST(request: NextRequest) {
     } = await supabaseServer.auth.getUser();
 
     if (authError || !user) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+      return createErrorResponse(401, 'unauthorized', 'Unauthorized');
     }
 
     const body = (await request.json()) as HostRegisterSubmitBody;
@@ -136,85 +138,86 @@ export async function POST(request: NextRequest) {
     const trimmedAccountHolder = asTrimmedString(body.accountHolder);
     const trimmedMotivation = asTrimmedString(body.motivation);
     const normalizedProfilePhoto = normalizeAllowedProfilePhoto(body.profilePhoto);
+    const normalizedDob = normalizeDateOfBirth(trimmedDob);
 
     if (normalizedProfilePhoto === 'invalid') {
-      return NextResponse.json({ success: false, error: 'Profile photo URL is invalid.' }, { status: 400 });
+      return createErrorResponse(400, 'invalid_profile_photo_url', 'Profile photo URL is invalid.');
     }
 
     if (!trimmedHostNationality) {
-      return NextResponse.json({ success: false, error: 'Nationality is required.' }, { status: 400 });
+      return createErrorResponse(400, 'nationality_required', 'Nationality is required.');
     }
 
     if (languageLevels.length < 1) {
-      return NextResponse.json({ success: false, error: 'At least one language is required.' }, { status: 400 });
+      return createErrorResponse(400, 'languages_required', 'At least one language is required.');
     }
 
     if (!trimmedName) {
-      return NextResponse.json({ success: false, error: 'Name is required.' }, { status: 400 });
+      return createErrorResponse(400, 'name_required', 'Name is required.');
     }
 
     if (trimmedName.length < 2) {
-      return NextResponse.json({ success: false, error: 'Name must be at least 2 characters.' }, { status: 400 });
+      return createErrorResponse(400, 'name_too_short', 'Name must be at least 2 characters.');
     }
 
     if (!trimmedDob) {
-      return NextResponse.json({ success: false, error: 'Date of birth is required.' }, { status: 400 });
+      return createErrorResponse(400, 'dob_required', 'Date of birth is required.');
     }
 
-    if (!isLikelyDob(trimmedDob)) {
-      return NextResponse.json({ success: false, error: 'Date of birth must use YYYY.MM.DD format.' }, { status: 400 });
+    if (!normalizedDob) {
+      return createErrorResponse(400, 'dob_invalid', 'Date of birth is invalid.');
     }
 
     if (!trimmedPhone) {
-      return NextResponse.json({ success: false, error: 'Phone number is required.' }, { status: 400 });
+      return createErrorResponse(400, 'phone_required', 'Phone number is required.');
     }
 
     if (!isLikelyPhone(trimmedPhone)) {
-      return NextResponse.json({ success: false, error: 'Phone number format is invalid.' }, { status: 400 });
+      return createErrorResponse(400, 'phone_invalid', 'Phone number format is invalid.');
     }
 
     if (!trimmedEmail) {
-      return NextResponse.json({ success: false, error: 'Email is required.' }, { status: 400 });
+      return createErrorResponse(400, 'email_required', 'Email is required.');
     }
 
     if (!isLikelyEmail(trimmedEmail)) {
-      return NextResponse.json({ success: false, error: 'Email format is invalid.' }, { status: 400 });
+      return createErrorResponse(400, 'email_invalid', 'Email format is invalid.');
     }
 
     if (!hasMinLength(body.selfIntro, 50)) {
-      return NextResponse.json({ success: false, error: 'Self introduction must be at least 50 characters.' }, { status: 400 });
+      return createErrorResponse(400, 'self_intro_too_short', 'Self introduction must be at least 50 characters.');
     }
 
     if (!trimmedIdCardFile) {
-      return NextResponse.json({ success: false, error: 'ID card image is required.' }, { status: 400 });
+      return createErrorResponse(400, 'id_card_required', 'ID card image is required.');
     }
 
     if (!trimmedBankName) {
-      return NextResponse.json({ success: false, error: 'Bank name is required.' }, { status: 400 });
+      return createErrorResponse(400, 'bank_name_required', 'Bank name is required.');
     }
 
     if (trimmedBankName.length < 2) {
-      return NextResponse.json({ success: false, error: 'Bank name must be at least 2 characters.' }, { status: 400 });
+      return createErrorResponse(400, 'bank_name_too_short', 'Bank name must be at least 2 characters.');
     }
 
     if (!trimmedAccountNumber) {
-      return NextResponse.json({ success: false, error: 'Account number is required.' }, { status: 400 });
+      return createErrorResponse(400, 'account_number_required', 'Account number is required.');
     }
 
     if (!trimmedAccountHolder) {
-      return NextResponse.json({ success: false, error: 'Account holder is required.' }, { status: 400 });
+      return createErrorResponse(400, 'account_holder_required', 'Account holder is required.');
     }
 
     if (trimmedAccountHolder.length < 2) {
-      return NextResponse.json({ success: false, error: 'Account holder name must be at least 2 characters.' }, { status: 400 });
+      return createErrorResponse(400, 'account_holder_too_short', 'Account holder name must be at least 2 characters.');
     }
 
     if (!trimmedMotivation) {
-      return NextResponse.json({ success: false, error: 'Motivation is required.' }, { status: 400 });
+      return createErrorResponse(400, 'motivation_required', 'Motivation is required.');
     }
 
     if (trimmedMotivation.length < 20) {
-      return NextResponse.json({ success: false, error: 'Motivation must be at least 20 characters.' }, { status: 400 });
+      return createErrorResponse(400, 'motivation_too_short', 'Motivation must be at least 20 characters.');
     }
 
     const languageNames = getLanguageNames(languageLevels);
@@ -227,7 +230,7 @@ export async function POST(request: NextRequest) {
       language_levels: languageLevels satisfies LanguageLevelEntry[],
       name: trimmedName,
       phone: trimmedPhone,
-      dob: trimmedDob,
+      dob: normalizedDob,
       email: trimmedEmail,
       instagram: asTrimmedString(body.instagram),
       source: asTrimmedString(body.source),
@@ -325,7 +328,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Host register submit route error:', error);
-    const message = error instanceof Error ? error.message : 'Failed to submit host application.';
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return createErrorResponse(500, 'unexpected_error', 'Failed to submit host application.');
   }
 }

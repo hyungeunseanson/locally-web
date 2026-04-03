@@ -85,7 +85,11 @@ async function createAuthUser(user: TestUser) {
   return data.user.id;
 }
 
-async function createApprovedHostApplication(userId: string, user: TestUser) {
+async function createHostApplication(
+  userId: string,
+  user: TestUser,
+  status: 'approved' | 'revision' | 'pending' | 'active' = 'approved'
+) {
   const supabase = getAdminClient();
   const { data, error } = await supabase
     .from('host_applications')
@@ -108,13 +112,13 @@ async function createApprovedHostApplication(userId: string, user: TestUser) {
       account_number: '12345678901234',
       account_holder: user.fullName,
       motivation: '검색 필터 검증',
-      status: 'approved',
+      status,
     })
     .select('id')
     .single();
 
   if (error || !data?.id) {
-    throw error || new Error('Failed to create approved host application.');
+    throw error || new Error(`Failed to create ${status} host application.`);
   }
 
   createdApplicationIds.push(Number(data.id));
@@ -201,35 +205,47 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Public search server filters', () => {
-  test('applies type and time filters on the server route', async ({ request }) => {
-    const host = createUser('host');
-    const hostId = await createAuthUser(host);
-    await createApprovedHostApplication(hostId, host);
-    const experience = await createExperienceFixture(hostId);
+  test('applies type and time filters on the server route while excluding hidden hosts', async ({ request }) => {
+    const visibleHost = createUser('visible-host');
+    const visibleHostId = await createAuthUser(visibleHost);
+    await createHostApplication(visibleHostId, visibleHost, 'approved');
+    const visibleExperience = await createExperienceFixture(visibleHostId);
+
+    const hiddenHost = createUser('hidden-host');
+    const hiddenHostId = await createAuthUser(hiddenHost);
+    await createHostApplication(hiddenHostId, hiddenHost, 'revision');
+    const hiddenExperience = await createExperienceFixture(hiddenHostId);
 
     const matchingResponse = await request.get(
-      `/api/search/experiences?location=${encodeURIComponent('서울')}&language=all&types=food_tour&times=evening&startDate=${experience.date}&endDate=${experience.date}`
+      `/api/search/experiences?location=${encodeURIComponent('서울')}&language=all&types=food_tour&times=evening&startDate=${visibleExperience.date}&endDate=${visibleExperience.date}`
     );
     expect(matchingResponse.ok()).toBeTruthy();
     const matchingPayload = await matchingResponse.json();
     expect(matchingPayload.data).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          id: experience.id,
-          title: experience.title,
+          id: visibleExperience.id,
+          title: visibleExperience.title,
+        }),
+      ])
+    );
+    expect(matchingPayload.data).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: hiddenExperience.id,
         }),
       ])
     );
 
     const excludedResponse = await request.get(
-      `/api/search/experiences?location=${encodeURIComponent('서울')}&language=all&types=food_tour&times=morning&startDate=${experience.date}&endDate=${experience.date}`
+      `/api/search/experiences?location=${encodeURIComponent('서울')}&language=all&types=food_tour&times=morning&startDate=${visibleExperience.date}&endDate=${visibleExperience.date}`
     );
     expect(excludedResponse.ok()).toBeTruthy();
     const excludedPayload = await excludedResponse.json();
     expect(excludedPayload.data).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          id: experience.id,
+          id: visibleExperience.id,
         }),
       ])
     );

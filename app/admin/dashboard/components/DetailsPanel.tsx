@@ -32,6 +32,38 @@ interface StatSmallProps {
   color?: string;
 }
 
+const SUPABASE_STORAGE_BUCKET_NAME = 'verification-docs';
+
+function getSupabaseStorageDashboardUrl() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  if (!supabaseUrl) {
+    return null;
+  }
+
+  try {
+    const projectRef = new URL(supabaseUrl).hostname.split('.')[0];
+    return projectRef
+      ? `https://supabase.com/dashboard/project/${projectRef}/storage/buckets`
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function getVerificationDocumentPath(value: unknown) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.startsWith('http') || trimmed.startsWith('blob:')) {
+    return null;
+  }
+
+  return trimmed;
+}
+
 export default function DetailsPanel({
   activeTab,
   selectedItem: rawSelectedItem,
@@ -125,6 +157,8 @@ export default function DetailsPanel({
   );
   const applicationLanguageNames = getLanguageNames(applicationLanguageLevels);
   const useRawApprovalImages = activeTab === 'APPS' || activeTab === 'EXPS';
+  const storageDashboardUrl = getSupabaseStorageDashboardUrl();
+  const verificationDocumentPath = getVerificationDocumentPath(selectedItem?.id_card_file);
   const selectedAvatarSrc =
     typeof selectedItem?.profile_photo === 'string' && selectedItem.profile_photo
       ? selectedItem.profile_photo
@@ -399,12 +433,58 @@ export default function DetailsPanel({
                       <Download size={16} className="mr-2" /> 원본 다운로드
                     </a>
                   </div>
+                  <div className="flex flex-wrap gap-2">
+                    <a
+                      href={signedUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                    >
+                      <Download size={14} /> 새 탭에서 문서 열기
+                    </a>
+                    {storageDashboardUrl ? (
+                      <a
+                        href={storageDashboardUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                      >
+                        <Shield size={14} /> Supabase Storage 열기
+                      </a>
+                    ) : null}
+                  </div>
+                  {verificationDocumentPath ? (
+                    <p className="break-all rounded-lg bg-white px-3 py-2 text-[11px] text-slate-500 border border-slate-200">
+                      저장 경로: {SUPABASE_STORAGE_BUCKET_NAME}/{verificationDocumentPath}
+                    </p>
+                  ) : null}
                   <p className="text-[10px] text-slate-400 text-center">* 보안을 위해 1시간 후 링크가 만료됩니다.</p>
                 </div>
               ) : (
-                <div className="w-full h-24 bg-white rounded-xl border border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 text-sm">
-                  <FileText size={20} className="mb-2 opacity-50" />
-                  {selectedItem.id_card_file ? '이미지 로딩 중...' : '제출된 신분증이 없습니다.'}
+                <div className="space-y-3">
+                  <div className="w-full h-24 bg-white rounded-xl border border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 text-sm">
+                    <FileText size={20} className="mb-2 opacity-50" />
+                    {selectedItem.id_card_file ? '미리보기를 불러오지 못했습니다.' : '제출된 신분증이 없습니다.'}
+                  </div>
+                  {selectedItem.id_card_file ? (
+                    <div className="space-y-2">
+                      {storageDashboardUrl ? (
+                        <a
+                          href={storageDashboardUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                        >
+                          <Shield size={14} /> Supabase Storage에서 확인
+                        </a>
+                      ) : null}
+                      <p className="break-all rounded-lg bg-white px-3 py-2 text-[11px] text-slate-500 border border-slate-200">
+                        {verificationDocumentPath
+                          ? `저장 경로: ${SUPABASE_STORAGE_BUCKET_NAME}/${verificationDocumentPath}`
+                          : `저장 값: ${String(selectedItem.id_card_file)}`}
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
               )}
             </div>

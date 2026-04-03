@@ -2,6 +2,10 @@ import { MetadataRoute } from 'next';
 import { stat } from 'fs/promises';
 import path from 'path';
 import { createAdminClient } from '@/app/utils/supabase/admin';
+import {
+  isPublicHostApplicationStatus,
+  pickLatestPublicHostApplicationsByUser,
+} from '@/app/utils/hostVisibility';
 import { buildAbsoluteUrl } from '@/app/utils/siteUrl';
 
 // 1시간 캐시: 매 크롤러 요청마다 DB 조회하지 않도록
@@ -140,7 +144,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const [{ data: experiences }, { data: communityPosts }, { data: publicHosts }] = await Promise.all([
       supabase
         .from('experiences')
-        .select('id, updated_at, is_active')
+        .select('id, host_id, updated_at, is_active')
         .eq('status', 'active'),
       supabase
         .from('community_posts')
@@ -148,13 +152,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         .order('created_at', { ascending: false }),
       supabase
         .from('public_host_applications')
-        .select('user_id, status, created_at')
-        .in('status', ['approved', 'active'])
+        .select('id, user_id, status, created_at')
         .order('created_at', { ascending: false }),
     ]);
 
+    const latestPublicHosts = Array.from(
+      pickLatestPublicHostApplicationsByUser(publicHosts || []).values()
+    );
+    const publicHostIds = new Set(
+      latestPublicHosts
+        .filter((host) => host.user_id && isPublicHostApplicationStatus(host.status))
+        .map((host) => String(host.user_id))
+    );
+
     const experienceUrls: MetadataRoute.Sitemap = (experiences || [])
-      .filter((exp) => exp.is_active !== false)
+      .filter((exp) => exp.is_active !== false && exp.host_id && publicHostIds.has(String(exp.host_id)))
       .map((exp) => ({
         url: buildAbsoluteUrl(`/experiences/${exp.id}`),
         lastModified: exp.updated_at ? new Date(exp.updated_at) : new Date(),
@@ -169,20 +181,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7,
     }));
 
-    const latestPublicHostByUser = new Map<string, { created_at: string | null }>();
-    for (const host of publicHosts || []) {
-      if (!host.user_id || latestPublicHostByUser.has(host.user_id)) {
-        continue;
-      }
-      latestPublicHostByUser.set(host.user_id, { created_at: host.created_at ?? null });
-    }
-
-    const publicHostUrls: MetadataRoute.Sitemap = Array.from(latestPublicHostByUser.entries()).map(([userId, host]) => ({
-      url: buildAbsoluteUrl(`/users/${userId}`),
-      lastModified: host.created_at ? new Date(host.created_at) : new Date(),
-      changeFrequency: 'weekly',
-      priority: 0.6,
-    }));
+    const publicHostUrls: MetadataRoute.Sitemap = latestPublicHosts
+      .filter((host) => host.user_id && isPublicHostApplicationStatus(host.status))
+      .map((host) => ({
+        url: buildAbsoluteUrl(`/users/${host.user_id}`),
+        lastModified: host.created_at ? new Date(host.created_at) : new Date(),
+        changeFrequency: 'weekly' as const,
+        priority: 0.6,
+      }));
 
     return [...staticUrls, ...experienceUrls, ...communityUrls, ...publicHostUrls];
   } catch {

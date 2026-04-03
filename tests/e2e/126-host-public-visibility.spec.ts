@@ -46,9 +46,9 @@ function getAdminClient() {
 function createHostUser(): TestUser {
   const timestamp = Date.now();
   return {
-    email: `codex.public.host.${timestamp}@example.com`,
+    email: `codex.host.visibility.${timestamp}@example.com`,
     password: TEST_PASSWORD,
-    fullName: `Public Host ${timestamp}`,
+    fullName: `Host Visibility ${timestamp}`,
     phone: `010${String(timestamp).slice(-8)}`,
   };
 }
@@ -94,8 +94,8 @@ async function createAuthUser(user: TestUser) {
     .from('profiles')
     .update({
       full_name: user.fullName,
-      bio: '공개 호스트 프로필 검증용 소개입니다.',
-      introduction: 'public_host_applications 경유 프로필 노출 확인',
+      bio: '호스트 공개 상태 회귀 테스트용 소개입니다.',
+      introduction: '호스트 공개 상태 회귀 테스트용 소개입니다.',
       phone: user.phone,
     })
     .eq('id', data.user.id);
@@ -105,11 +105,7 @@ async function createAuthUser(user: TestUser) {
   return data.user.id;
 }
 
-async function createHostApplication(
-  userId: string,
-  user: TestUser,
-  status: 'approved' | 'active' = 'approved'
-) {
+async function createHostApplication(userId: string, user: TestUser, status: 'approved' | 'revision') {
   const { data, error } = await getAdminClient()
     .from('host_applications')
     .insert({
@@ -124,16 +120,16 @@ async function createHostApplication(
       phone: user.phone,
       dob: '1991-03-14',
       email: user.email,
-      instagram: '@codex_public_host',
+      instagram: '@codex_host_visibility',
       source: 'playwright',
       language_cert: '',
       profile_photo: '/images/logo.png',
-      self_intro: '공개 호스트 프로필 검증용 승인 호스트입니다.',
+      self_intro: `호스트 공개 상태 ${status} 테스트용 지원서입니다.`,
       id_card_file: '',
       bank_name: '국민은행',
       account_number: '12345678901234',
       account_holder: user.fullName,
-      motivation: '공개 프로필 검증',
+      motivation: '공개 상태 회귀 테스트',
       status,
     })
     .select('id')
@@ -144,10 +140,11 @@ async function createHostApplication(
   }
 
   createdApplicationIds.push(String(data.id));
+  return String(data.id);
 }
 
 async function createActiveExperience(hostId: string) {
-  const title = `[Playwright] Public Host Profile ${Date.now()}`;
+  const title = `[Playwright] Host Visibility ${Date.now()}`;
   const { data, error } = await getAdminClient()
     .from('experiences')
     .insert({
@@ -160,8 +157,8 @@ async function createActiveExperience(hostId: string) {
       language_levels: [{ language: '한국어', level: 5 }],
       duration: 2,
       max_guests: 4,
-      description: '공개 호스트 프로필 검증용 체험입니다.',
-      itinerary: [{ title: '홍대입구역', description: '공개 프로필 동선 검증' }],
+      description: '호스트 공개 상태 회귀 테스트용 체험입니다.',
+      itinerary: [{ title: '홍대입구역', description: '공개 상태 회귀 테스트 코스입니다.' }],
       spots: '홍대입구역',
       meeting_point: '홍대입구역 1번 출구',
       location: '서울 마포구 양화로 160',
@@ -175,6 +172,7 @@ async function createActiveExperience(hostId: string) {
         activity_level: '보통',
       },
       status: 'active',
+      is_active: true,
       is_private_enabled: false,
       private_price: 0,
       source_locale: 'ko',
@@ -186,12 +184,12 @@ async function createActiveExperience(hostId: string) {
     .single();
 
   if (error || !data?.id) {
-    throw error || new Error('Failed to create active experience.');
+    throw error || new Error('Failed to create active visibility test experience.');
   }
 
   createdExperienceIds.push(Number(data.id));
   return {
-    experienceId: Number(data.id),
+    id: Number(data.id),
     title: String(data.title),
   };
 }
@@ -215,39 +213,37 @@ test.afterAll(async () => {
   }
 });
 
-test.describe.serial('Public host profile', () => {
-  test('renders approved host profile and active experiences through the public projection path', async ({ page }) => {
-    test.setTimeout(90000);
-
+test.describe.serial('Host public visibility', () => {
+  test('uses the latest host status to hide active experiences from public surfaces', async ({ request }) => {
     const host = createHostUser();
     const hostId = await createAuthUser(host);
+
     await createHostApplication(hostId, host, 'approved');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    await createHostApplication(hostId, host, 'revision');
+
     const experience = await createActiveExperience(hostId);
 
-    await page.goto(`/users/${hostId}`, { waitUntil: 'networkidle' });
+    const searchResponse = await request.get(
+      `/api/search/experiences?location=${encodeURIComponent(experience.title)}&language=all`
+    );
+    expect(searchResponse.ok()).toBeTruthy();
+    const searchPayload = await searchResponse.json();
+    expect(searchPayload.data).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: experience.id,
+        }),
+      ])
+    );
 
-    await expect(page.getByRole('heading', { name: host.fullName, exact: true })).toBeVisible({ timeout: 15000 });
-    await expect(page.getByText('공개 호스트 프로필 검증용 승인 호스트입니다.')).toBeVisible();
-    await expect(page.getByTestId('public-host-experiences-section')).toBeVisible();
-    await expect(page.getByTestId('public-host-languages')).toBeVisible();
-    await expect(page.getByTestId('public-host-languages').getByText('English')).toBeVisible();
-    await expect(page.getByText(experience.title)).toBeVisible();
-  });
+    const detailResponse = await request.get(`/experiences/${experience.id}`);
+    const detailHtml = await detailResponse.text();
+    expect(detailHtml).toMatch(/This page could not be found|404/);
 
-  test('renders active host profiles through the same public projection path', async ({ page }) => {
-    test.setTimeout(90000);
-
-    const host = createHostUser();
-    const hostId = await createAuthUser(host);
-    await createHostApplication(hostId, host, 'active');
-    const experience = await createActiveExperience(hostId);
-
-    await page.goto(`/users/${hostId}`, { waitUntil: 'networkidle' });
-
-    await expect(page.getByRole('heading', { name: host.fullName, exact: true })).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('public-host-experiences-section')).toBeVisible();
-    await expect(page.getByTestId('public-host-languages')).toBeVisible();
-    await expect(page.getByTestId('public-host-languages').getByText('English')).toBeVisible();
-    await expect(page.getByText(experience.title)).toBeVisible();
+    const sitemapResponse = await request.get('/sitemap.xml');
+    expect(sitemapResponse.ok()).toBeTruthy();
+    const sitemapXml = await sitemapResponse.text();
+    expect(sitemapXml).not.toContain(`/experiences/${experience.id}`);
   });
 });

@@ -9,6 +9,30 @@ export type HostRegisterLanguageOption = {
   codeLabels: LocalizedText;
 };
 
+export type HostRegisterSubmitErrorCode =
+  | 'unauthorized'
+  | 'invalid_profile_photo_url'
+  | 'nationality_required'
+  | 'languages_required'
+  | 'name_required'
+  | 'name_too_short'
+  | 'dob_required'
+  | 'dob_invalid'
+  | 'phone_required'
+  | 'phone_invalid'
+  | 'email_required'
+  | 'email_invalid'
+  | 'self_intro_too_short'
+  | 'id_card_required'
+  | 'bank_name_required'
+  | 'bank_name_too_short'
+  | 'account_number_required'
+  | 'account_holder_required'
+  | 'account_holder_too_short'
+  | 'motivation_required'
+  | 'motivation_too_short'
+  | 'unexpected_error';
+
 type SafetyPolicyItem = {
   icon: 'shield' | 'lock' | 'user' | 'creditCard' | 'checkCircle';
   accentClass: string;
@@ -25,6 +49,7 @@ type HostRegisterCopy = {
   step2Badge: string;
   step2Title: string;
   step2Desc: string;
+  languageLevelLabels: [string, string, string, string, string];
   languageCertLabel: string;
   languageCertPlaceholder: string;
   step3Badge: string;
@@ -49,11 +74,13 @@ type HostRegisterCopy = {
   step4Title: string;
   step4Desc: string;
   profilePhotoHelp: string;
+  profilePhotoPreviewAlt: string;
   selfIntroLabel: string;
   selfIntroHelp: string;
   selfIntroGuideTitle: string;
   selfIntroGuideBody: string;
   selfIntroPlaceholder: string;
+  selfIntroCountSuffix: string;
   step5Badge: string;
   step5Title: string;
   step5Desc: string;
@@ -64,6 +91,7 @@ type HostRegisterCopy = {
   chooseFileButton: string;
   uploadDone: string;
   idSecurityNote: string;
+  idCardPreviewAlt: string;
   step6Badge: string;
   step6Title: string;
   step6Desc: string;
@@ -104,22 +132,29 @@ type HostRegisterCopy = {
   nextButton: string;
   submitButton: string;
   submittingButton: string;
+  profilePhotoUploadFailed: string;
+  idCardUploadFailed: string;
   validationLanguages: string;
   validationLanguageLevels: string;
   validationNationality: string;
   validationName: string;
+  validationNameShort: string;
   validationDob: string;
   validationDobFormat: string;
   validationPhone: string;
   validationPhoneFormat: string;
   validationEmail: string;
   validationEmailFormat: string;
+  validationProfilePhoto: string;
   validationSelfIntro: string;
   validationIdCard: string;
   validationBankName: string;
+  validationBankNameShort: string;
   validationAccountNumber: string;
   validationAccountHolder: string;
+  validationAccountHolderShort: string;
   validationMotivation: string;
+  validationMotivationShort: string;
   validationAgreements: string;
   loginRequired: string;
   submitSuccess: string;
@@ -165,6 +200,7 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     step2Badge: 'Step 2. 구사 언어 및 레벨',
     step2Title: '어떤 언어로 소통이\n가능하신가요?',
     step2Desc: '선택한 각 언어의 레벨을 함께 설정해 주세요.',
+    languageLevelLabels: ['기초', '초급', '중급', '고급', '원어민'],
     languageCertLabel: '어학 자격증 (선택사항)',
     languageCertPlaceholder: '예) JLPT N1, TOEIC 900',
     step3Badge: 'Step 3. 기본 정보',
@@ -174,8 +210,8 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     namePlaceholder: '홍길동',
     nameHelp: '정산과 신원 확인에 사용되는 이름입니다. 신분증 정보와 일치하게 입력해주세요.',
     dobLabel: '생년월일',
-    dobPlaceholder: 'YYYY.MM.DD',
-    dobHelp: '성인 확인과 기본 신원 검토에 사용됩니다.',
+    dobPlaceholder: '예: 19900115',
+    dobHelp: '성인 확인과 기본 신원 검토에 사용됩니다. 구분자 없이 입력해도 됩니다.',
     phoneLabel: '휴대전화 번호',
     phonePlaceholder: '010-1234-5678',
     phoneHelp: '운영팀과 게스트가 중요한 일정 변경 시 연락할 수 있는 번호예요.',
@@ -189,11 +225,13 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     step4Title: '게스트에게 보여질\n모습을 꾸며보세요',
     step4Desc: '게스트가 안심하고 예약할 수 있도록, 믿음 가는 첫인상을 만들어주세요.',
     profilePhotoHelp: '게스트가 가장 먼저 보는 사진이에요. 얼굴이 잘 보이는 밝은 사진을 권장합니다.',
+    profilePhotoPreviewAlt: '프로필 사진 미리보기',
     selfIntroLabel: '자기소개',
     selfIntroHelp: '보여주고 싶은 게스트의 언어로 작성해주세요. 예: 한국인 게스트에게 보여주고 싶다면 한국어로 작성하면 됩니다.',
     selfIntroGuideTitle: '어떤 소개가 좋은가요?',
     selfIntroGuideBody: '내가 어떤 분위기의 호스트인지, 어떤 게스트와 잘 맞는지, 체험에서 어떤 시간을 만들어주고 싶은지를 짧고 자연스럽게 적어주세요. 너무 짧거나 추상적인 소개보다 실제로 함께할 장면이 떠오르는 소개가 더 좋습니다.',
     selfIntroPlaceholder: '안녕하세요! 저는 여행과 사진을 좋아하는 호스트입니다. (최소 50자 이상)',
+    selfIntroCountSuffix: '자',
     step5Badge: 'Step 5. 신뢰 인증',
     step5Title: '인증된 호스트\n배지를 받아보세요',
     step5Desc: '신분증을 제출하면 프로필에 인증 배지가 표시됩니다.',
@@ -204,6 +242,7 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     chooseFileButton: '파일 선택하기',
     uploadDone: '업로드 완료',
     idSecurityNote: '* 제출된 신분증 정보는 본인 확인 용도로만 사용되며, 확인 즉시 안전하게 파기됩니다.',
+    idCardPreviewAlt: '신분증 미리보기',
     step6Badge: 'Step 6. 정산 계좌',
     step6Title: '수익을 지급받을\n계좌를 알려주세요',
     step6Desc: '본인 명의의 계좌만 등록 가능합니다.',
@@ -244,22 +283,29 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     nextButton: '다음',
     submitButton: '신청 완료하기',
     submittingButton: '신청 중...',
+    profilePhotoUploadFailed: '프로필 사진 업로드에 실패했습니다. 다시 시도해주세요.',
+    idCardUploadFailed: '신분증 업로드에 실패했습니다. 다시 시도해주세요.',
     validationLanguages: '구사 가능한 언어를 1개 이상 선택해주세요.',
     validationLanguageLevels: '선택한 각 언어의 레벨을 설정해주세요.',
     validationNationality: '국적을 선택해주세요.',
     validationName: '실명을 입력해주세요.',
+    validationNameShort: '이름은 두 글자 이상 입력해주세요.',
     validationDob: '생년월일을 입력해주세요.',
-    validationDobFormat: '생년월일은 YYYY.MM.DD 형식으로 입력해주세요.',
+    validationDobFormat: '생년월일을 다시 확인해주세요.',
     validationPhone: '연락 가능한 휴대전화 번호를 입력해주세요.',
     validationPhoneFormat: '휴대전화 번호 형식을 다시 확인해주세요.',
     validationEmail: '이메일 주소를 입력해주세요.',
     validationEmailFormat: '올바른 이메일 주소를 입력해주세요.',
+    validationProfilePhoto: '프로필 사진 정보를 다시 확인해주세요.',
     validationSelfIntro: '자기소개는 50자 이상 작성해주세요.',
     validationIdCard: '신분증 이미지를 업로드해주세요.',
     validationBankName: '은행명을 입력해주세요.',
+    validationBankNameShort: '은행명은 두 글자 이상 입력해주세요.',
     validationAccountNumber: '계좌번호를 입력해주세요.',
     validationAccountHolder: '예금주명을 입력해주세요.',
+    validationAccountHolderShort: '예금주명은 두 글자 이상 입력해주세요.',
     validationMotivation: '호스트 지원 동기를 작성해주세요.',
+    validationMotivationShort: '호스트 지원 동기는 20자 이상 작성해주세요.',
     validationAgreements: '모든 필수 교육 시청 및 서약에 동의해주세요.',
     loginRequired: '로그인이 필요합니다.',
     submitSuccess: '신청이 완료되었습니다! 관리자 승인을 기다려주세요.',
@@ -313,6 +359,7 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     step2Badge: 'Step 2. Languages & Levels',
     step2Title: 'Which languages can\nyou communicate in?',
     step2Desc: 'Please set a level for each selected language.',
+    languageLevelLabels: ['Basic', 'Beginner', 'Intermediate', 'Advanced', 'Native'],
     languageCertLabel: 'Language certificate (optional)',
     languageCertPlaceholder: 'e.g. JLPT N1, TOEIC 900',
     step3Badge: 'Step 3. Basic Information',
@@ -322,8 +369,8 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     namePlaceholder: 'John Doe',
     nameHelp: 'This name is used for identity review and payouts. Please match your ID.',
     dobLabel: 'Date of birth',
-    dobPlaceholder: 'YYYY.MM.DD',
-    dobHelp: 'This is used for adult verification and basic identity review.',
+    dobPlaceholder: 'e.g. 19900115',
+    dobHelp: 'This is used for adult verification and basic identity review. Digits only is fine.',
     phoneLabel: 'Phone number',
     phonePlaceholder: '010-1234-5678',
     phoneHelp: 'We may use this number for urgent updates about schedules or guests.',
@@ -337,11 +384,13 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     step4Title: 'Shape the profile\nguests will see',
     step4Desc: 'Help guests feel comfortable booking with you by creating a warm first impression.',
     profilePhotoHelp: 'This is often the first image guests notice. A bright photo with your face clearly visible works best.',
+    profilePhotoPreviewAlt: 'Profile photo preview',
     selfIntroLabel: 'Self introduction',
     selfIntroHelp: 'Write this in the language of the guests you want to show it to. Example: if you want Korean guests to read it, write it in Korean.',
     selfIntroGuideTitle: 'What makes a good introduction?',
     selfIntroGuideBody: 'Briefly explain what kind of host you are, what kind of guests you enjoy meeting, and what kind of time you want to create. Concrete and natural introductions work better than vague one-liners.',
     selfIntroPlaceholder: 'Hi! I am a host who loves travel and photography. (At least 50 characters)',
+    selfIntroCountSuffix: ' chars',
     step5Badge: 'Step 5. Verification',
     step5Title: 'Earn a verified host\nbadge',
     step5Desc: 'Upload your ID to show a verified badge on your profile.',
@@ -352,6 +401,7 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     chooseFileButton: 'Choose file',
     uploadDone: 'Uploaded',
     idSecurityNote: '* Submitted ID information is used only for identity verification and will be securely destroyed immediately after review.',
+    idCardPreviewAlt: 'ID preview',
     step6Badge: 'Step 6. Payout Account',
     step6Title: 'Tell us which account\nshould receive payouts',
     step6Desc: 'Only an account under your own name can be registered.',
@@ -392,22 +442,29 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     nextButton: 'Next',
     submitButton: 'Submit application',
     submittingButton: 'Submitting...',
+    profilePhotoUploadFailed: 'Failed to upload the profile photo. Please try again.',
+    idCardUploadFailed: 'Failed to upload the ID image. Please try again.',
     validationLanguages: 'Please select at least one language you can speak.',
     validationLanguageLevels: 'Please set a level for each selected language.',
     validationNationality: 'Please select your nationality.',
     validationName: 'Please enter your legal name.',
+    validationNameShort: 'Name must be at least 2 characters.',
     validationDob: 'Please enter your date of birth.',
-    validationDobFormat: 'Enter your date of birth in YYYY.MM.DD format.',
+    validationDobFormat: 'Please check your date of birth.',
     validationPhone: 'Please enter a phone number we can reach.',
     validationPhoneFormat: 'Please check your phone number format.',
     validationEmail: 'Please enter your email address.',
     validationEmailFormat: 'Please enter a valid email address.',
+    validationProfilePhoto: 'Please check your profile photo information.',
     validationSelfIntro: 'Please write at least 50 characters for your self-introduction.',
     validationIdCard: 'Please upload your ID image.',
     validationBankName: 'Please enter your bank name.',
+    validationBankNameShort: 'Bank name must be at least 2 characters.',
     validationAccountNumber: 'Please enter your account number.',
     validationAccountHolder: 'Please enter the account holder name.',
+    validationAccountHolderShort: 'Account holder name must be at least 2 characters.',
     validationMotivation: 'Please tell us why you want to host with Locally.',
+    validationMotivationShort: 'Motivation must be at least 20 characters.',
     validationAgreements: 'Please agree to all required training and pledges.',
     loginRequired: 'Login is required.',
     submitSuccess: 'Your application has been submitted! Please wait for admin approval.',
@@ -461,6 +518,7 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     step2Badge: 'Step 2. 対応言語とレベル',
     step2Title: 'どの言語で\nコミュニケーションできますか？',
     step2Desc: '選択した各言語のレベルも設定してください。',
+    languageLevelLabels: ['基礎', '初級', '中級', '上級', 'ネイティブ'],
     languageCertLabel: '語学資格（任意）',
     languageCertPlaceholder: '例）JLPT N1, TOEIC 900',
     step3Badge: 'Step 3. 基本情報',
@@ -470,8 +528,8 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     namePlaceholder: '山田 太郎',
     nameHelp: '本人確認と精算に使われる名前です。身分証の情報と一致させてください。',
     dobLabel: '生年月日',
-    dobPlaceholder: 'YYYY.MM.DD',
-    dobHelp: '成人確認と基本的な本人確認に使用されます。',
+    dobPlaceholder: '例）19900115',
+    dobHelp: '成人確認と基本的な本人確認に使用されます。区切り文字なしでも入力できます。',
     phoneLabel: '携帯電話番号',
     phonePlaceholder: '010-1234-5678',
     phoneHelp: '運営やゲストが重要な予定変更時に連絡できる番号です。',
@@ -485,11 +543,13 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     step4Title: 'ゲストに見える\nプロフィールを整えましょう',
     step4Desc: 'ゲストが安心して予約できるよう、信頼できる第一印象を作ってください。',
     profilePhotoHelp: 'ゲストが最初に目にしやすい写真です。顔がはっきり見える明るい写真がおすすめです。',
+    profilePhotoPreviewAlt: 'プロフィール写真プレビュー',
     selfIntroLabel: '自己紹介',
     selfIntroHelp: '見せたいゲストの言語で作成してください。例：韓国人ゲストに見せたい場合は韓国語で作成してください。',
     selfIntroGuideTitle: '良い自己紹介のコツ',
     selfIntroGuideBody: 'どんな雰囲気のホストなのか、どんなゲストと相性が良いのか、どんな時間を作りたいのかを自然に書いてください。短すぎる一文より、実際の体験が想像できる紹介のほうが伝わります。',
     selfIntroPlaceholder: 'こんにちは！旅行と写真が好きなホストです。（50文字以上推奨）',
+    selfIntroCountSuffix: '文字',
     step5Badge: 'Step 5. 信頼認証',
     step5Title: '認証済みホスト\nバッジを獲得しましょう',
     step5Desc: '身分証を提出すると、プロフィールに認証バッジが表示されます。',
@@ -500,6 +560,7 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     chooseFileButton: 'ファイルを選択',
     uploadDone: 'アップロード完了',
     idSecurityNote: '* 提出された身分証情報は本人確認の目的にのみ使用され、確認後すぐに安全に破棄されます。',
+    idCardPreviewAlt: '身分証プレビュー',
     step6Badge: 'Step 6. 精算口座',
     step6Title: '収益を受け取る\n口座を教えてください',
     step6Desc: 'ご本人名義の口座のみ登録できます。',
@@ -540,22 +601,29 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     nextButton: '次へ',
     submitButton: '申請を完了する',
     submittingButton: '申請中...',
+    profilePhotoUploadFailed: 'プロフィール写真のアップロードに失敗しました。もう一度お試しください。',
+    idCardUploadFailed: '身分証画像のアップロードに失敗しました。もう一度お試しください。',
     validationLanguages: '対応可能な言語を1つ以上選択してください。',
     validationLanguageLevels: '選択した各言語のレベルを設定してください。',
     validationNationality: '国籍を選択してください。',
     validationName: '実名を入力してください。',
+    validationNameShort: '氏名は2文字以上で入力してください。',
     validationDob: '生年月日を入力してください。',
-    validationDobFormat: '生年月日は YYYY.MM.DD 形式で入力してください。',
+    validationDobFormat: '生年月日をもう一度ご確認ください。',
     validationPhone: '連絡可能な電話番号を入力してください。',
     validationPhoneFormat: '電話番号の形式をもう一度ご確認ください。',
     validationEmail: 'メールアドレスを入力してください。',
     validationEmailFormat: '正しいメールアドレスを入力してください。',
+    validationProfilePhoto: 'プロフィール写真の情報をもう一度ご確認ください。',
     validationSelfIntro: '自己紹介は50文字以上で入力してください。',
     validationIdCard: '本人確認書類の画像をアップロードしてください。',
     validationBankName: '銀行名を入力してください。',
+    validationBankNameShort: '銀行名は2文字以上で入力してください。',
     validationAccountNumber: '口座番号を入力してください。',
     validationAccountHolder: '口座名義を入力してください。',
+    validationAccountHolderShort: '口座名義は2文字以上で入力してください。',
     validationMotivation: 'ホスト応募の理由を入力してください。',
+    validationMotivationShort: '応募理由は20文字以上で入力してください。',
     validationAgreements: 'すべての必須教育および誓約に同意してください。',
     loginRequired: 'ログインが必要です。',
     submitSuccess: '申請が完了しました！管理者の承認をお待ちください。',
@@ -609,6 +677,7 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     step2Badge: 'Step 2. 可使用语言与等级',
     step2Title: '您可以使用哪些语言\n进行沟通？',
     step2Desc: '请选择语言后，同时设置对应等级。',
+    languageLevelLabels: ['基础', '初级', '中级', '高级', '母语'],
     languageCertLabel: '语言资格证书（可选）',
     languageCertPlaceholder: '例如：JLPT N1, TOEIC 900',
     step3Badge: 'Step 3. 基本信息',
@@ -618,8 +687,8 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     namePlaceholder: '张三',
     nameHelp: '该姓名会用于身份审核和结算，请与证件信息保持一致。',
     dobLabel: '出生日期',
-    dobPlaceholder: 'YYYY.MM.DD',
-    dobHelp: '用于成年确认和基础身份审核。',
+    dobPlaceholder: '例如：19900115',
+    dobHelp: '用于成年确认和基础身份审核。无需输入分隔符也可以。',
     phoneLabel: '手机号码',
     phonePlaceholder: '010-1234-5678',
     phoneHelp: '运营团队或游客在重要日程变更时可能会联系您。',
@@ -633,11 +702,13 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     step4Title: '完善房客将看到的\n个人形象',
     step4Desc: '请用能让游客安心预订的方式展示自己。',
     profilePhotoHelp: '这通常是游客最先看到的照片。建议使用光线明亮、能清楚看到脸部的照片。',
+    profilePhotoPreviewAlt: '头像预览',
     selfIntroLabel: '自我介绍',
     selfIntroHelp: '请使用你想展示给游客看的语言来填写。例：如果你想给韩国游客看，就用韩语来写。',
     selfIntroGuideTitle: '怎样的介绍更好？',
     selfIntroGuideBody: '可以简单说明你是什么样的房东、适合接待什么样的游客，以及你希望为游客创造什么样的体验。比起过于简短或抽象的介绍，更推荐能让人想象实际同行画面的介绍。',
     selfIntroPlaceholder: '你好！我是喜欢旅行和摄影的房东。（建议至少50字）',
+    selfIntroCountSuffix: '字',
     step5Badge: 'Step 5. 信任认证',
     step5Title: '获得认证房东\n徽章',
     step5Desc: '提交身份证件后，个人资料上会显示认证徽章。',
@@ -648,6 +719,7 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     chooseFileButton: '选择文件',
     uploadDone: '上传完成',
     idSecurityNote: '* 提交的身份证件信息仅用于身份验证，审核完成后将立即安全销毁。',
+    idCardPreviewAlt: '证件预览',
     step6Badge: 'Step 6. 结算账户',
     step6Title: '请填写用于收款的\n账户信息',
     step6Desc: '仅可登记本人名下账户。',
@@ -688,22 +760,29 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     nextButton: '下一步',
     submitButton: '完成申请',
     submittingButton: '提交中...',
+    profilePhotoUploadFailed: '头像上传失败，请重试。',
+    idCardUploadFailed: '证件图片上传失败，请重试。',
     validationLanguages: '请至少选择一种可使用语言。',
     validationLanguageLevels: '请为每种已选语言设置等级。',
     validationNationality: '请选择国籍。',
     validationName: '请输入真实姓名。',
+    validationNameShort: '姓名至少输入 2 个字符。',
     validationDob: '请输入出生日期。',
-    validationDobFormat: '出生日期请按 YYYY.MM.DD 格式填写。',
+    validationDobFormat: '请再次确认出生日期。',
     validationPhone: '请输入可联系的手机号。',
     validationPhoneFormat: '请重新检查手机号格式。',
     validationEmail: '请输入邮箱地址。',
     validationEmailFormat: '请输入有效的邮箱地址。',
+    validationProfilePhoto: '请重新确认头像信息。',
     validationSelfIntro: '自我介绍请至少填写 50 个字符。',
     validationIdCard: '请上传身份证明图片。',
     validationBankName: '请输入银行名称。',
+    validationBankNameShort: '银行名称至少输入 2 个字符。',
     validationAccountNumber: '请输入账号。',
     validationAccountHolder: '请输入账户姓名。',
+    validationAccountHolderShort: '账户姓名至少输入 2 个字符。',
     validationMotivation: '请填写申请成为房东的原因。',
+    validationMotivationShort: '申请理由至少填写 20 个字符。',
     validationAgreements: '请同意所有必修培训和承诺。',
     loginRequired: '需要登录。',
     submitSuccess: '申请已提交完成！请等待管理员审核。',
@@ -761,4 +840,59 @@ export function getLocalizedText(text: LocalizedText, lang: string): string {
 
 export function getHostRegisterCopy(lang: string): HostRegisterCopy {
   return COPY[normalizeHostRegisterLocale(lang)];
+}
+
+export function getHostRegisterSubmitErrorMessage(
+  copy: HostRegisterCopy,
+  errorCode?: string | null,
+  fallbackMessage?: string | null
+): string {
+  switch (errorCode as HostRegisterSubmitErrorCode | undefined) {
+    case 'unauthorized':
+      return copy.loginRequired;
+    case 'invalid_profile_photo_url':
+      return copy.validationProfilePhoto;
+    case 'nationality_required':
+      return copy.validationNationality;
+    case 'languages_required':
+      return copy.validationLanguages;
+    case 'name_required':
+      return copy.validationName;
+    case 'name_too_short':
+      return copy.validationNameShort;
+    case 'dob_required':
+      return copy.validationDob;
+    case 'dob_invalid':
+      return copy.validationDobFormat;
+    case 'phone_required':
+      return copy.validationPhone;
+    case 'phone_invalid':
+      return copy.validationPhoneFormat;
+    case 'email_required':
+      return copy.validationEmail;
+    case 'email_invalid':
+      return copy.validationEmailFormat;
+    case 'self_intro_too_short':
+      return copy.validationSelfIntro;
+    case 'id_card_required':
+      return copy.validationIdCard;
+    case 'bank_name_required':
+      return copy.validationBankName;
+    case 'bank_name_too_short':
+      return copy.validationBankNameShort;
+    case 'account_number_required':
+      return copy.validationAccountNumber;
+    case 'account_holder_required':
+      return copy.validationAccountHolder;
+    case 'account_holder_too_short':
+      return copy.validationAccountHolderShort;
+    case 'motivation_required':
+      return copy.validationMotivation;
+    case 'motivation_too_short':
+      return copy.validationMotivationShort;
+    case 'unexpected_error':
+      return copy.unknownError;
+    default:
+      return fallbackMessage?.trim() || copy.unknownError;
+  }
 }

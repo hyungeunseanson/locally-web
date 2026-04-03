@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import {
+  isPublicHostApplicationStatus,
+  pickLatestPublicHostApplicationsByUser,
+} from '@/app/utils/hostVisibility';
 import { createClient } from '@/app/utils/supabase/server';
 import { normalizeServiceCity } from '@/app/utils/serviceRequestLocation';
 import {
@@ -173,6 +177,24 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
     const { searchParams } = new URL(request.url);
+    const { data: publicHostApplications, error: visibleHostsError } = await supabase
+      .from('public_host_applications')
+      .select('id, user_id, status, created_at');
+
+    if (visibleHostsError) throw visibleHostsError;
+
+    const visibleHostIds = Array.from(
+      pickLatestPublicHostApplicationsByUser(publicHostApplications || [])
+        .values()
+    )
+      .filter((row) => isPublicHostApplicationStatus(row.status))
+      .map((row) => String(row.user_id || ''))
+      .filter(Boolean);
+
+    if (visibleHostIds.length === 0) {
+      const emptyResponse: SearchExperiencesResponse = { data: [] };
+      return NextResponse.json(emptyResponse);
+    }
 
     const location = searchParams.get('location') || '';
     const language = searchParams.get('language') || 'all';
@@ -200,7 +222,8 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('experiences')
       .select(needsTextFilterFields ? SEARCH_EXPERIENCE_SELECT : SEARCH_EXPERIENCE_CARD_SELECT)
-      .eq('status', 'active');
+      .eq('status', 'active')
+      .in('host_id', visibleHostIds);
 
     if (city) {
       query = query.eq('city', city);

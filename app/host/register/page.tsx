@@ -13,7 +13,8 @@ import {
 import { compressImage, validateImage, isHeicValidationResult } from '@/app/utils/image'; // 🟢 이미지 압축 추가
 import { useLanguage } from '@/app/context/LanguageContext';
 import { useAuth } from '@/app/context/AuthContext';
-import { getHostRegisterCopy } from './localization';
+import { normalizeDateOfBirth } from '@/app/utils/dateOfBirth';
+import { getHostRegisterCopy, getHostRegisterSubmitErrorMessage } from './localization';
 
 type HostRegisterFormData = {
   languageLevels: LanguageLevelEntry[];
@@ -71,10 +72,6 @@ function isLikelyEmail(value: string | null | undefined) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value?.trim() || '');
 }
 
-function isLikelyDob(value: string | null | undefined) {
-  return /^\d{4}[-./]\d{2}[-./]\d{2}$/.test(value?.trim() || '');
-}
-
 function isLikelyPhone(value: string | null | undefined) {
   const digits = (value || '').replace(/\D/g, '');
   return digits.length >= 8 && digits.length <= 15;
@@ -103,6 +100,8 @@ function getFallbackLevel(value: unknown): LanguageLevel {
   }
   return 3;
 }
+
+class LocalizedSubmitError extends Error {}
 
 export default function HostRegisterPage() {
   const { lang } = useLanguage();
@@ -218,7 +217,7 @@ export default function HostRegisterPage() {
           showToast(copy.validationDob, 'error');
           return false;
         }
-        if (!isLikelyDob(formData.dob)) {
+        if (!normalizeDateOfBirth(formData.dob)) {
           showToast(copy.validationDobFormat, 'error');
           return false;
         }
@@ -339,7 +338,7 @@ export default function HostRegisterPage() {
         const fileName = `profile/${user.id}_${Date.now()}`;
         const { error } = await supabase.storage.from('images').upload(fileName, compressedProfile);
         if (error) {
-          throw error;
+          throw new LocalizedSubmitError(copy.profilePhotoUploadFailed);
         }
 
         const { data } = supabase.storage.from('images').getPublicUrl(fileName);
@@ -351,10 +350,11 @@ export default function HostRegisterPage() {
         const fileName = `id_card/${user.id}_${Date.now()}`;
         // 🟢 신분증은 보안 버킷인 verification-docs로 업로드합니다.
         const { error } = await supabase.storage.from('verification-docs').upload(fileName, compressedIdCard);
-        if (!error) {
-          // 보안 버킷이므로 PublicURL 대신 파일명(경로)만 저장하여 DetailsPanel에서 추출 및 서명된 URL 발급할 수 있게 함
-          idCardUrl = fileName;
+        if (error) {
+          throw new LocalizedSubmitError(copy.idCardUploadFailed);
         }
+        // 보안 버킷이므로 PublicURL 대신 파일명(경로)만 저장하여 DetailsPanel에서 추출 및 서명된 URL 발급할 수 있게 함
+        idCardUrl = fileName;
       }
 
       const payload = {
@@ -363,7 +363,7 @@ export default function HostRegisterPage() {
         languageCert: formData.languageCert,
         name: formData.name,
         phone: formData.phone,
-        dob: formData.dob,
+        dob: normalizeDateOfBirth(formData.dob) || formData.dob,
         email: formData.email,
         instagram: formData.instagram,
         source: formData.source,
@@ -385,15 +385,21 @@ export default function HostRegisterPage() {
       const submitResult = await submitResponse.json();
 
       if (!submitResponse.ok || !submitResult?.success) {
-        throw new Error(submitResult?.error || copy.unknownError);
+        throw new LocalizedSubmitError(
+          getHostRegisterSubmitErrorMessage(copy, submitResult?.errorCode, submitResult?.error)
+        );
       }
 
       await refreshAuth();
       showToast(copy.submitSuccess, 'success');
       router.push('/host/dashboard');
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : copy.unknownError;
       console.error(error);
+      const message = error instanceof LocalizedSubmitError
+        ? error.message
+        : error instanceof Error && error.message === copy.loginRequired
+          ? error.message
+          : copy.unknownError;
       showToast(copy.submitFailPrefix + message, 'error');
     } finally {
       setLoading(false);

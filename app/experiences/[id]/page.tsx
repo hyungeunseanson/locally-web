@@ -7,6 +7,10 @@ import { notFound } from 'next/navigation';
 import { getCurrentLocale } from '@/app/utils/locale';
 import { buildAbsoluteUrl, buildLocalizedAbsoluteUrl } from '@/app/utils/siteUrl';
 import { getContent } from '@/app/utils/contentHelper';
+import {
+  isPublicHostApplicationStatus,
+  pickLatestPublicHostApplication,
+} from '@/app/utils/hostVisibility';
 import { getHostPublicProfile } from '@/app/utils/profile';
 import { ExperienceDetail, HostProfileDetail } from './types';
 import { PRIVATE_NOINDEX_METADATA } from '@/app/utils/seo';
@@ -17,10 +21,21 @@ type Props = {
   params: Promise<{ id: string }>;
 }
 
+type ServerSupabaseClient = Awaited<ReturnType<typeof createClient>>;
+type PublicHostApplicationRow = {
+  user_id: string | null;
+  status: string | null;
+  name?: string | null;
+  profile_photo?: string | null;
+  self_intro?: string | null;
+  languages?: string[] | null;
+};
+
 export const dynamic = 'force-dynamic';
 
 const EXPERIENCE_METADATA_SELECT = [
   'id',
+  'host_id',
   'title',
   'description',
   'title_ko',
@@ -101,15 +116,14 @@ const HOST_PROFILE_SELECT = [
 ].join(', ');
 
 const PUBLIC_HOST_APPLICATION_SELECT = [
+  'id',
   'user_id',
+  'created_at',
+  'status',
   'name',
   'profile_photo',
   'self_intro',
   'languages',
-  'profession',
-  'dream_destination',
-  'favorite_song',
-  'host_nationality',
 ].join(', ');
 
 function parseProfileNumber(value: unknown) {
@@ -123,6 +137,35 @@ function parseProfileNumber(value: unknown) {
   }
 
   return null;
+}
+
+function isPublicExperienceCandidate(experience: { status?: string | null; is_active?: boolean | null }) {
+  return experience.status === 'active' && experience.is_active !== false;
+}
+
+async function loadPublicHostApplication(supabase: ServerSupabaseClient, hostId: string | null | undefined) {
+  if (!hostId) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from('public_host_applications')
+    .select(PUBLIC_HOST_APPLICATION_SELECT)
+    .eq('user_id', hostId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('[Experience detail] Failed to load public host application:', {
+      hostId,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+    });
+    return null;
+  }
+
+  return pickLatestPublicHostApplication((data || []) as PublicHostApplicationRow[]);
 }
 
 // 🟢 메타데이터 생성 (SEO & 다국어)
@@ -151,7 +194,7 @@ export async function generateMetadata(
   const title = getContent(experience, 'title', locale);
   const description = getContent(experience, 'description', locale);
   const imageUrl = experience.photos?.[0] || experience.image_url || 'https://images.unsplash.com/photo-1540206395-688085723adb';
-  const isPublicExperience = experience.status === 'active' && experience.is_active !== false;
+  const isPublicExperience = isPublicExperienceCandidate(experience);
 
   const metadata: Metadata = {
     title,
@@ -182,6 +225,14 @@ export async function generateMetadata(
   };
 
   if (!isPublicExperience) {
+    return {
+      ...metadata,
+      robots: PRIVATE_NOINDEX_METADATA.robots,
+    };
+  }
+
+  const publicHostApplication = await loadPublicHostApplication(supabase, experience.host_id);
+  if (!isPublicHostApplicationStatus(publicHostApplication?.status)) {
     return {
       ...metadata,
       robots: PRIVATE_NOINDEX_METADATA.robots,
@@ -219,6 +270,17 @@ export default async function Page({ params }: Props) {
     return notFound();
   }
 
+  const isPublicExperience = isPublicExperienceCandidate(experience);
+  let visibleHostApplication: PublicHostApplicationRow | null = null;
+
+  if (isPublicExperience) {
+    visibleHostApplication = await loadPublicHostApplication(supabase, experience.host_id);
+
+    if (!isPublicHostApplicationStatus(visibleHostApplication?.status)) {
+      return notFound();
+    }
+  }
+
   // 2. 호스트 프로필 데이터 가져오기
   let hostProfile: HostProfileDetail = null;
   const [availabilitySummary, hostProfileResult] = await Promise.all([
@@ -232,15 +294,11 @@ export default async function Page({ params }: Props) {
         return null;
       }
 
-      const [{ data: profile }, { data: app }] = await Promise.all([
+      const [{ data: profile }, app] = await Promise.all([
         supabase.from('profiles').select(HOST_PROFILE_SELECT).eq('id', experience.host_id).maybeSingle(),
-        supabase
-          .from('public_host_applications')
-          .select(PUBLIC_HOST_APPLICATION_SELECT)
-          .eq('user_id', experience.host_id)
-          .limit(1)
-          .maybeSingle(),
+        visibleHostApplication ? Promise.resolve(visibleHostApplication) : loadPublicHostApplication(supabase, experience.host_id),
       ]);
+      const publicHostApplication = isPublicHostApplicationStatus(app?.status) ? app : null;
 
       const joinedYear = profile?.created_at
         ? Math.max(1, new Date().getFullYear() - new Date(profile.created_at).getFullYear())
@@ -270,7 +328,7 @@ export default async function Page({ params }: Props) {
           : null;
       }
 
-      const publicHostProfile = getHostPublicProfile(profile, app, 'Locally Host');
+      const publicHostProfile = getHostPublicProfile(profile, publicHostApplication, 'Locally Host');
 
       return {
         id: experience.host_id,
@@ -290,7 +348,6 @@ export default async function Page({ params }: Props) {
   hostProfile = hostProfileResult;
 
   // 4. Client Component로 데이터 전달
-  const isPublicExperience = experience.status === 'active' && experience.is_active !== false;
   const experienceJsonLd =
     isPublicExperience
       ? buildExperienceProductJsonLd({
