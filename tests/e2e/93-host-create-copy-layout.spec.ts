@@ -179,13 +179,15 @@ test('host create shows structured primary language guidance and refund policy c
 
   await login(page, host);
 
-  await page.goto('/host/create', { waitUntil: 'domcontentloaded' });
+  await page.goto('/host/create', { waitUntil: 'networkidle' });
 
-  const cityButton = page.locator('button').filter({ hasText: /^Seoul$/ }).first();
-  const categoryButton = page.locator('button').filter({ hasText: /^Food Tour$/ }).first();
+  const cityButton = page.getByRole('button', { name: /^(서울|Seoul|ソウル|首尔)$/ }).first();
+  const categoryButton = page.getByRole('button', { name: /^(맛집 탐방|Food Tour|グルメ巡り|美食探索)$/ }).first();
 
+  await expect(cityButton).toBeVisible();
   await cityButton.click();
   await expect(cityButton).toHaveClass(/bg-black/);
+  await expect(categoryButton).toBeVisible();
   await categoryButton.click();
   await expect(categoryButton).toHaveClass(/border-\[#222\]/);
   await clickFooterButton(page, /다음|Next|次へ|下一步/);
@@ -305,9 +307,9 @@ test('host create shows structured primary language guidance and refund policy c
   ).toBeVisible();
   await page
     .locator(
-      'textarea[placeholder^="예) 이 체험은 최소 2인부터 진행됩니다"], textarea[placeholder^="e.g. This experience runs from 2 guests"], textarea[placeholder^="例）この体験は2名から開催です"], textarea[placeholder^="例如：本体验需满2人才能进行"]'
+      'textarea[placeholder^="예) 골목길이 많아 편한 운동화를 추천해요"], textarea[placeholder^="e.g. There are a lot of alleys"], textarea[placeholder^="例）路地が多いので歩きやすいスニーカー"], textarea[placeholder^="例如：路线里有不少小巷"]'
     )
-    .fill('This experience runs from 2 guests. If the group is too small, the schedule may be adjusted.');
+    .fill('Comfortable walking shoes are recommended. If it rains, part of the route may move indoors.');
 
   await page
     .locator(
@@ -321,6 +323,22 @@ test('host create shows structured primary language guidance and refund policy c
       /게스트가 경험의 가치를 이해할 수 있도록 포함 항목과 함께 생각해주세요\.|Think about price together with duration, inclusions, and the value guests will feel\.|所要時間、含まれる内容、ゲストが感じる価値を一緒に考えて価格を決めてください。|请结合时长、包含内容和游客能感受到的价值来考虑价格。/
     )
   ).toBeVisible();
+  await expect(
+    page.getByText(
+      /1인 출발 확정 옵션|Guaranteed solo departure option|1名出発確定オプション|1人出发保障选项/
+    )
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      /혼자 예약한 게스트가 이 옵션을 선택하면 최소 인원 미달이어도 취소 없이 출발합니다\.|If a solo guest buys this option, the experience can go ahead without cancellation even when the minimum group size is not met\.|1名予約のゲストがこのオプションを選ぶと、最少人数に満たなくてもキャンセルなしで出発できます。|如果单人游客购买这个选项，即使未达到最低成团人数，也可以不取消直接出发。/
+    )
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      /\*추가 인원 모객 시 게스트에게 자동 환불|\*Automatically refunded to the guest if more people join later|\*後から参加者が増えた場合はゲストへ自動返金|\*后续有更多游客加入时，会自动退还给游客/
+    )
+  ).toBeVisible();
+  await expect(page.getByText('+ ₩30,000')).toBeVisible();
 
   const basePriceInput = page.locator('input[inputmode="numeric"]').first();
   await basePriceInput.fill('');
@@ -330,4 +348,5 @@ test('host create shows structured primary language guidance and refund policy c
     )
   ).toBeVisible();
   await basePriceInput.fill('50000');
+  await expect(basePriceInput).toHaveValue('50,000');
 });

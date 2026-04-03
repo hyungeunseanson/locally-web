@@ -24,6 +24,7 @@ import {
   Palette,
 } from 'lucide-react';
 import Link from 'next/link';
+import { SOLO_GUARANTEE_PRICE } from '@/app/constants/soloGuarantee';
 import {
   ACTIVITY_LEVEL_OPTIONS,
   CATEGORY_OPTIONS,
@@ -66,6 +67,14 @@ interface ExperienceFormStepsProps {
 }
 
 const LEVELS: LanguageLevel[] = [1, 2, 3, 4, 5];
+
+function formatPriceInputValue(value: number | null | undefined) {
+  if (!value || value <= 0) {
+    return '';
+  }
+
+  return value.toLocaleString('en-US');
+}
 
 function LanguageLevelSelector({
   entries,
@@ -179,6 +188,7 @@ export default function ExperienceFormSteps({
 }: ExperienceFormStepsProps) {
   const { lang } = useLanguage();
   const copy = getExperienceFormCopy(lang);
+  const soloGuaranteePriceLabel = `+ ₩${SOLO_GUARANTEE_PRICE.toLocaleString('en-US')}`;
   const manualLocales = getManualLocalesFromLanguageLevels(formData.language_levels || []);
   const selectedLanguageOptions = EXPERIENCE_LANGUAGE_OPTIONS.filter((option) => manualLocales.includes(option.code));
   const normalizedTempInclusion = normalizeListItem(tempInclusion);
@@ -782,13 +792,13 @@ export default function ExperienceFormSteps({
               <input
                 type="text"
                 inputMode="numeric"
-                value={formData.price || ''}
+                value={formatPriceInputValue(formData.price)}
                 onChange={(e) => {
                   const v = e.target.value.replace(/[^0-9]/g, '');
                   updateData('price', v ? Number(v) : 0);
                 }}
                 className="w-full pl-12 pr-4 py-3 md:py-4 text-3xl md:text-5xl font-black text-center border-b-2 border-slate-200 focus:border-black outline-none bg-transparent"
-                placeholder="0"
+                placeholder={copy.pricePlaceholder}
               />
             </div>
             <FieldHint className="text-center ml-0 mt-2">{copy.priceHelp}</FieldHint>
@@ -797,6 +807,20 @@ export default function ExperienceFormSteps({
               <p>{copy.pricingGuideBody}</p>
               <GuideExampleCard title={copy.pricingGuideExamplesTitle} items={copy.pricingGuideExamples} />
             </HelpDisclosure>
+          </div>
+
+          <div className="w-full rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5 md:p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-2">
+                <p className="text-sm md:text-base font-bold text-slate-900">{copy.soloGuaranteeTitle}</p>
+                <p className="text-sm text-slate-700 leading-6">{copy.soloGuaranteeDesc}</p>
+                <p className="text-xs md:text-sm font-semibold text-emerald-700">{copy.soloGuaranteeRefundNote}</p>
+                <p className="text-xs md:text-sm text-slate-500">{copy.soloGuaranteeHostNote}</p>
+              </div>
+              <div className="shrink-0 rounded-full border border-emerald-300 bg-white px-4 py-2 text-base md:text-lg font-black text-emerald-700">
+                {soloGuaranteePriceLabel}
+              </div>
+            </div>
           </div>
 
           <div className="w-full bg-slate-50 p-6 rounded-2xl border border-slate-200">
@@ -825,7 +849,7 @@ export default function ExperienceFormSteps({
                   <input
                     type="text"
                     inputMode="numeric"
-                    value={formData.private_price || ''}
+                    value={formatPriceInputValue(formData.private_price)}
                     onChange={(e) => {
                       const v = e.target.value.replace(/[^0-9]/g, '');
                       updateData('private_price', v ? Number(v) : 0);

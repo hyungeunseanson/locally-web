@@ -264,11 +264,16 @@ type ExperienceFormCopy = {
   step7Title: string;
   step7Desc: string;
   priceLabel: string;
+  pricePlaceholder: string;
   priceHelp: string;
   pricingGuideTitle: string;
   pricingGuideBody: string;
   pricingGuideExamplesTitle: string;
   pricingGuideExamples: string[];
+  soloGuaranteeTitle: string;
+  soloGuaranteeDesc: string;
+  soloGuaranteeRefundNote: string;
+  soloGuaranteeHostNote: string;
   privateOptionLabel: string;
   privateOptionDesc: string;
   privatePriceHelp: string;
@@ -409,8 +414,8 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     ageLimitHelp: '현장에서 바로 혼선이 생기지 않도록 참여 기준을 분명히 적어주세요.',
     activityLevelLabel: '활동 강도',
     hostNoticeLabel: '호스트 주의사항',
-    hostNoticeHelp: '게스트가 예약 전에 꼭 알아야 할 점을 적어주세요. 예: 최소 2인부터 진행, 실내 진행, 계단 이동, 이른 아침 시작',
-    hostNoticePlaceholder: '예) 이 체험은 최소 2인부터 진행됩니다. 인원이 모이지 않으면 일정 조정 또는 취소가 있을 수 있습니다.',
+    hostNoticeHelp: '게스트가 예약 전에 꼭 알아야 할 점을 적어주세요. 예: 실내 진행, 계단 이동, 우천 시 동선 변경, 편한 신발 추천',
+    hostNoticePlaceholder: '예) 골목길이 많아 편한 운동화를 추천해요. 비가 오면 실내 코스로 일부 조정될 수 있어요.',
     refundPolicyLabel: '환불 정책',
     refundPolicyHelp: '환불 정책은 고정으로 자동 적용됩니다.',
     refundPolicyItems: [
@@ -424,6 +429,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step7Title: '요금 설정',
     step7Desc: '가격을 설정하세요.',
     priceLabel: '기본 1인당 가격',
+    pricePlaceholder: '50,000',
     priceHelp: '게스트가 경험의 가치를 이해할 수 있도록 포함 항목과 함께 생각해주세요.',
     pricingGuideTitle: '가격을 정할 때 이런 기준이 좋아요',
     pricingGuideBody: '소요 시간, 포함 항목, 이동 동선, 준비 난이도, 현장 케어 수준을 함께 생각하면 가격을 더 자신 있게 정할 수 있습니다. 너무 싸게 시작하기보다 경험의 가치를 설명할 수 있는 가격이 좋습니다.',
@@ -433,10 +439,14 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
       '단독 투어 가격 예: 우리 팀만 참여하고 이동 동선 조율이 포함되는 경우',
       '너무 낮은 가격보다 “무엇이 포함되는지”가 설명되는 가격이 신뢰를 줍니다.',
     ],
+    soloGuaranteeTitle: '1인 출발 확정 옵션',
+    soloGuaranteeDesc: '혼자 예약한 게스트가 이 옵션을 선택하면 최소 인원 미달이어도 취소 없이 출발합니다.',
+    soloGuaranteeRefundNote: '*추가 인원 모객 시 게스트에게 자동 환불',
+    soloGuaranteeHostNote: '이 옵션이 선택되면 호스트 정산 기준은 설정한 기본 가격에 30,000원이 더해집니다.',
     privateOptionLabel: '단독 투어 옵션',
     privateOptionDesc: '다른 게스트 없이 우리 그룹만 참여하는 프라이빗 투어 가격을 설정합니다.',
     privatePriceHelp: '기본 가격과 별도로, 우리 그룹만 참여할 때의 고정 가격을 정하는 옵션입니다.',
-    privatePricePlaceholder: '단독 투어 고정 가격',
+    privatePricePlaceholder: '150,000',
     step8Title: '체험 등록 완료! 🎉',
     step8DescLine1: '관리자 검토 후 공개됩니다.',
     step8DescLine2: '이제 일정을 열어 예약을 받아보세요.',
@@ -571,8 +581,8 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     ageLimitHelp: 'Clear participation rules help avoid confusion on the day.',
     activityLevelLabel: 'Activity level',
     hostNoticeLabel: 'Host notice',
-    hostNoticeHelp: 'Add anything guests should know before booking. For example: runs from 2 guests, indoors, stairs involved, early-morning start.',
-    hostNoticePlaceholder: 'e.g. This experience runs from 2 guests. If the group is too small, the schedule may be adjusted or cancelled.',
+    hostNoticeHelp: 'Add anything guests should know before booking. For example: indoor route, stairs, rainy-day adjustments, or comfortable shoes recommended.',
+    hostNoticePlaceholder: 'e.g. There are a lot of alleys, so comfortable walking shoes are recommended. If it rains, part of the route may move indoors.',
     refundPolicyLabel: 'Refund policy',
     refundPolicyHelp: 'The refund policy is fixed and applied automatically.',
     refundPolicyItems: [
@@ -586,6 +596,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step7Title: 'Pricing',
     step7Desc: 'Set your price.',
     priceLabel: 'Base price per guest',
+    pricePlaceholder: '50,000',
     priceHelp: 'Think about price together with duration, inclusions, and the value guests will feel.',
     pricingGuideTitle: 'A simple way to think about pricing',
     pricingGuideBody: 'Consider time, inclusions, route complexity, preparation effort, and how much care you provide on the day. A confident price with a clear value story works better than pricing too low.',
@@ -595,10 +606,14 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
       'Private price example: only one group joins and the route can be adjusted for them',
       'A clear value story builds more trust than setting the price too low.',
     ],
+    soloGuaranteeTitle: 'Guaranteed solo departure option',
+    soloGuaranteeDesc: 'If a solo guest buys this option, the experience can go ahead without cancellation even when the minimum group size is not met.',
+    soloGuaranteeRefundNote: '*Automatically refunded to the guest if more people join later',
+    soloGuaranteeHostNote: 'When this option is purchased, your payout is based on your set price plus 30,000 KRW.',
     privateOptionLabel: 'Private tour option',
     privateOptionDesc: 'Set a fixed price for a private tour where only the booking group participates.',
     privatePriceHelp: 'Use this when you want a separate fixed price for one booking group only.',
-    privatePricePlaceholder: 'Fixed private tour price',
+    privatePricePlaceholder: '150,000',
     step8Title: 'Experience submitted! 🎉',
     step8DescLine1: 'It will be published after admin review.',
     step8DescLine2: 'Open your schedule and start receiving bookings.',
@@ -733,8 +748,8 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     ageLimitHelp: '当日に混乱が起きないよう、参加基準ははっきり書いてください。',
     activityLevelLabel: '活動強度',
     hostNoticeLabel: 'ホストからの案内',
-    hostNoticeHelp: '予約前に必ず知っておいてほしいことを書いてください。例：2名から開催、室内実施、階段移動あり、早朝開始。',
-    hostNoticePlaceholder: '例）この体験は2名から開催です。人数が集まらない場合は日程調整またはキャンセルとなることがあります。',
+    hostNoticeHelp: '予約前に必ず知っておいてほしいことを書いてください。例：屋内進行、階段移動、雨天時の動線変更、歩きやすい靴のおすすめ。',
+    hostNoticePlaceholder: '例）路地が多いので歩きやすいスニーカーがおすすめです。雨の日は一部のコースを屋内に変更する場合があります。',
     refundPolicyLabel: '返金ポリシー',
     refundPolicyHelp: '返金ポリシーは固定で自動適用されます。',
     refundPolicyItems: [
@@ -748,6 +763,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step7Title: '料金設定',
     step7Desc: '価格を設定してください。',
     priceLabel: '基本の1人あたり価格',
+    pricePlaceholder: '50,000',
     priceHelp: '所要時間、含まれる内容、ゲストが感じる価値を一緒に考えて価格を決めてください。',
     pricingGuideTitle: '価格を決めるときの考え方',
     pricingGuideBody: '時間、含まれる内容、移動動線、準備の手間、当日のケアの深さを合わせて考えると決めやすくなります。安くしすぎるより、価値を説明できる価格のほうが長く続けやすいです。',
@@ -756,10 +772,14 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
       '基本価格の例：2時間の散策＋軽いおやつ＋写真スポット案内',
       'プライベート価格の例：1組限定で参加し、動線調整まで含まれる場合。安すぎる価格より、何が含まれているかが伝わる価格のほうが信頼されやすいです。',
     ],
+    soloGuaranteeTitle: '1名出発確定オプション',
+    soloGuaranteeDesc: '1名予約のゲストがこのオプションを選ぶと、最少人数に満たなくてもキャンセルなしで出発できます。',
+    soloGuaranteeRefundNote: '*後から参加者が増えた場合はゲストへ自動返金',
+    soloGuaranteeHostNote: 'このオプションが購入されると、ホスト精算基準は設定した基本価格に30,000ウォンが加算されます。',
     privateOptionLabel: 'プライベートツアーオプション',
     privateOptionDesc: '他のゲストなしで、グループだけが参加するプライベートツアーの価格を設定します。',
     privatePriceHelp: '1組だけで参加する場合の固定価格を別で設定したいときに使います。',
-    privatePricePlaceholder: 'プライベートツアー固定価格',
+    privatePricePlaceholder: '150,000',
     step8Title: '体験登録が完了しました！ 🎉',
     step8DescLine1: '管理者の確認後に公開されます。',
     step8DescLine2: '次は日程を開けて予約を受け付けましょう。',
@@ -894,8 +914,8 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     ageLimitHelp: '请明确填写参加条件，避免现场产生混乱。',
     activityLevelLabel: '活动强度',
     hostNoticeLabel: '主办方提醒',
-    hostNoticeHelp: '请写下游客在预订前一定要知道的内容。例如：满2人出发、室内进行、有楼梯、清晨开始。',
-    hostNoticePlaceholder: '例如：本体验需满2人才能进行。若人数不足，可能会调整日程或取消。',
+    hostNoticeHelp: '请写下游客在预订前一定要知道的内容。例如：室内进行、需要走楼梯、下雨时路线调整、建议穿舒适的鞋子。',
+    hostNoticePlaceholder: '例如：路线里有不少小巷，建议穿舒适的运动鞋。下雨时，部分行程可能调整为室内路线。',
     refundPolicyLabel: '退款政策',
     refundPolicyHelp: '退款政策为固定并自动应用。',
     refundPolicyItems: [
@@ -909,6 +929,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step7Title: '价格设置',
     step7Desc: '请设置价格。',
     priceLabel: '基础单价（每人）',
+    pricePlaceholder: '50,000',
     priceHelp: '请结合时长、包含内容和游客能感受到的价值来考虑价格。',
     pricingGuideTitle: '设定价格时可以这样想',
     pricingGuideBody: '可以一起考虑时长、包含内容、路线复杂度、准备难度以及当天的陪同与照顾程度。比起一味压低价格，更重要的是设定一个能体现体验价值的价格。',
@@ -918,10 +939,14 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
       '私享价格示例：只有一个团队参加，并包含路线调整时',
       '比起过低价格，能解释清楚价值的价格更容易建立信任。',
     ],
+    soloGuaranteeTitle: '1人出发保障选项',
+    soloGuaranteeDesc: '如果单人游客购买这个选项，即使未达到最低成团人数，也可以不取消直接出发。',
+    soloGuaranteeRefundNote: '*后续有更多游客加入时，会自动退还给游客',
+    soloGuaranteeHostNote: '当这个选项被购买时，主办方结算会按你设置的基础价格再加 30,000 韩元计算。',
     privateOptionLabel: '私人团选项',
     privateOptionDesc: '设置仅预订团体参加、无其他游客的私人团价格。',
     privatePriceHelp: '如果想为单独一组游客设置固定价格，可以开启这个选项。',
-    privatePricePlaceholder: '私人团固定价格',
+    privatePricePlaceholder: '150,000',
     step8Title: '体验提交完成！ 🎉',
     step8DescLine1: '管理员审核后将会公开。',
     step8DescLine2: '现在可以开放日程并开始接收预订。',
