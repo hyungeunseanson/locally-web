@@ -196,24 +196,24 @@ export default function ReservationCard({
           </div>
 
           <div className="min-w-0 flex-1">
-            <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-3.5 py-3">
-              <div className="flex items-start justify-between gap-3">
+            <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-slate-50 to-white px-3.5 py-3">
+              <div className="flex items-center gap-3">
                 <button
                   onClick={(e) => { e.stopPropagation(); onShowProfile(); }}
-                  className="min-w-0 flex items-center gap-2.5 text-left"
+                  className="min-w-0 flex flex-1 items-center gap-3 text-left"
                 >
-                  <div className="relative h-8 w-8 shrink-0 rounded-full border border-slate-200 bg-slate-100 overflow-hidden">
+                  <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full border border-slate-200 bg-slate-100">
                     {res.guest?.avatar_url ? (
-                      <Image src={secureUrl(res.guest.avatar_url)!} alt={guestName} fill sizes="32px" unoptimized className="object-cover" />
+                      <Image src={secureUrl(res.guest.avatar_url)!} alt={guestName} fill sizes="36px" unoptimized className="object-cover" />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center">
                         <User size={14} className="text-slate-400" />
                       </div>
                     )}
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <p className="truncate text-[13px] font-bold text-slate-900">
+                      <p className="truncate text-[13px] font-bold leading-tight text-slate-900">
                         {guestName}
                       </p>
                       {showMembershipBadge && (
@@ -222,19 +222,18 @@ export default function ReservationCard({
                           status={res.membershipStatus as Extract<LocallyMembershipStatus, 'member' | 'circle'>}
                         />
                       )}
-                      <span className="shrink-0 rounded-full bg-white px-1.5 py-0.5 text-[9px] font-semibold text-slate-500 ring-1 ring-slate-200">
+                    </div>
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <span className="inline-flex shrink-0 items-center rounded-full bg-white px-2 py-0.5 text-[9px] font-semibold text-slate-500 ring-1 ring-slate-200">
                         {t('res_profile_btn')}
                       </span>
                     </div>
-                    <p className="mt-1 text-[11px] text-slate-500">
-                      {guestCount}{t('res_people_count')}
-                    </p>
                   </div>
                 </button>
 
-                <div className="shrink-0 text-right">
-                  <p className="text-[10px] font-semibold text-slate-400">{t('res_expected_income')}</p>
-                  <p className="mt-1 text-[15px] font-black text-slate-900">
+                <div className="min-w-[96px] shrink-0 rounded-xl bg-white/90 px-3 py-2 text-right ring-1 ring-slate-200/80">
+                  <p className="text-[10px] font-semibold leading-none text-slate-400">{t('res_expected_income')}</p>
+                  <p className="mt-1.5 text-[15px] font-black leading-none text-slate-900">
                     {expectedIncomeDisplay}
                   </p>
                 </div>
