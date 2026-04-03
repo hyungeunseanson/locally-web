@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveTeamAdminContext, teamError } from '@/app/api/admin/team/_shared';
+import { deleteTeamWorkspaceTaskCascade } from '@/app/utils/teamWorkspaceRetention';
 
 const ALLOWED_STATUS_TEXT = new Set(['Done', 'Progress']);
 
@@ -143,13 +144,19 @@ export async function DELETE(
       return teamError('본인이 작성한 항목만 삭제할 수 있습니다.', 403);
     }
 
-    const { error } = await context.supabaseAdmin
-      .from('admin_tasks')
-      .delete()
-      .eq('id', id);
+    try {
+      const result = await deleteTeamWorkspaceTaskCascade(context.supabaseAdmin, id, {
+        adminId: context.user.id,
+        adminEmail: context.user.email,
+        reason: 'manual_delete',
+        targetTaskId: id,
+      });
 
-    if (error) {
-      console.error('[admin/team/tasks/[id]] delete error:', error);
+      if (!result.deleted && result.notFound) {
+        return teamError('작업을 찾을 수 없습니다.', 404);
+      }
+    } catch (deleteError) {
+      console.error('[admin/team/tasks/[id]] delete error:', deleteError);
       return teamError('팀 작업 삭제에 실패했습니다.', 500);
     }
 

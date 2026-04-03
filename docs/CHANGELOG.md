@@ -5,6 +5,16 @@
 
 ---
 
+## v3.40.06 — [Admin Team] Team Workspace non-chat retention / cleanup hardening
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟢 non-chat retention helper 추가 | `app/utils/teamWorkspaceRetention.ts`, `app/api/admin/team/tasks/route.ts`, `app/api/admin/team/comments/route.ts` — Team Chat은 제외하고 `admin_tasks` 작성 후 전체 워크스페이스 100개, `admin_task_comments` 작성 후 각 task 댓글 100개까지만 유지하도록 server-side prune 경계를 추가. RPC가 있는 환경에서는 advisory lock 기반 retention 함수를 우선 사용하고, 아직 migration이 없는 환경에서는 exact-prune fallback으로 과삭제 없이 정리하도록 구성 |
+| 🟢 메모 삭제 cleanup 보강 | `app/api/admin/team/tasks/[id]/route.ts`, `app/utils/teamWorkspaceRetention.ts` — 메모 삭제 시 child comment 정리와 `admin_files/markdown_images/*` storage cleanup을 같은 helper로 묶고, storage/db cleanup 실패는 `admin_audit_logs`에 남겨 orphan 재정리 경로를 유지 |
+| 🟢 운영 계약 문구 정리 | `app/admin/dashboard/components/TeamTab.tsx` — Team Workspace 헤더 안내를 `워크스페이스 항목 100개 / 각 댓글 스레드 100개` 보관 정책으로 교체해, 전체 댓글 cap과 task별 comment cap 혼동을 줄임 |
+| 🟡 DB migration 추가 | `docs/migrations/v3_40_06_team_workspace_retention.sql` — `prune_team_workspace_tasks`, `prune_team_workspace_comments` SECURITY DEFINER RPC를 추가해 advisory lock 기반 retention을 service-role 경계에서 사용할 수 있게 동기화 |
+| 🟡 안전 범위 검증 추가 | `tests/e2e/136-team-workspace-retention.spec.ts` — memo markdown 이미지 path parsing contract와, 실제 수동 memo delete 시 child comment + uploaded memo image cleanup이 같이 일어나는지 안전 범위에서 검증 |
+
 ## v3.40.05 — [Payments/Notifications] 취소 승인 중복 발송 제거 및 bank 결제 상호작용 안정화
 
 | 항목 | 내용 |

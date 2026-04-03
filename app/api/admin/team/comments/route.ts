@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveTeamAdminContext, teamError, TEAM_CHAT_ROOM_ID } from '@/app/api/admin/team/_shared';
+import { pruneTeamWorkspaceComments } from '@/app/utils/teamWorkspaceRetention';
 
 function sanitizeCommentMetadata(rawMetadata: unknown) {
   if (!rawMetadata || typeof rawMetadata !== 'object') {
@@ -108,6 +109,19 @@ export async function POST(request: NextRequest) {
       }
       console.error('[admin/team/comments] create error:', error);
       return teamError('댓글 작성에 실패했습니다.', 500);
+    }
+
+    if (taskId !== TEAM_CHAT_ROOM_ID) {
+      try {
+        await pruneTeamWorkspaceComments(context.supabaseAdmin, taskId, {
+          adminId: context.user.id,
+          adminEmail: context.user.email,
+          reason: 'comment_retention',
+          targetTaskId: taskId,
+        });
+      } catch (pruneError) {
+        console.error('[admin/team/comments] comment retention prune failed:', pruneError);
+      }
     }
 
     return NextResponse.json({ success: true, data }, { status: 201 });

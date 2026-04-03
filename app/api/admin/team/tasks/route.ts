@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveTeamAdminContext, teamError } from '@/app/api/admin/team/_shared';
+import { pruneTeamWorkspaceTasks } from '@/app/utils/teamWorkspaceRetention';
 
 const ALLOWED_TASK_TYPES = new Set(['DAILY_LOG', 'TODO', 'MEMO']);
 const ALLOWED_STATUS_TEXT = new Set(['Done', 'Progress']);
@@ -66,6 +67,17 @@ export async function POST(request: NextRequest) {
     if (error) {
       console.error('[admin/team/tasks] create error:', error);
       return teamError('팀 작업 생성에 실패했습니다.', 500);
+    }
+
+    try {
+      await pruneTeamWorkspaceTasks(context.supabaseAdmin, {
+        adminId: context.user.id,
+        adminEmail: context.user.email,
+        reason: 'task_retention',
+        targetTaskId: data?.id || null,
+      });
+    } catch (pruneError) {
+      console.error('[admin/team/tasks] task retention prune failed:', pruneError);
     }
 
     return NextResponse.json({ success: true, data }, { status: 201 });

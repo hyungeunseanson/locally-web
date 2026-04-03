@@ -172,9 +172,10 @@ test.describe.serial('Admin team smoke', () => {
       response.request().method() === 'DELETE'
     );
 
-    page.once('dialog', (dialog) => dialog.accept());
     await row.hover();
     await row.locator('button').last().click({ force: true });
+    await page.getByText('삭제하시겠습니까?', { exact: true }).waitFor({ state: 'visible', timeout: 15000 });
+    await page.getByRole('button', { name: '삭제', exact: true }).last().click();
     await deleteResponsePromise;
 
     await expect.poll(async () => {

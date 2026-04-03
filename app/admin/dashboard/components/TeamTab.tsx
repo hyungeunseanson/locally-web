@@ -653,7 +653,7 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
             <ClipboardList size={12} className="text-rose-500" /> Team Sync HQ
           </h2>
           <p className="mt-1 text-[9px] md:text-xs text-slate-400">
-            최근 100개 기준으로 동기화됩니다.
+            워크스페이스 항목은 최근 100개, 각 댓글 스레드는 최근 100개만 보관되며 초과분은 오래된 순서대로 정리됩니다.
           </p>
         </div>
 
