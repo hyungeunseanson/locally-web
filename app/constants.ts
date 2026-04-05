@@ -22,12 +22,12 @@ export type HomeMobileCityShortcut = {
   id: HomeMobileCityShortcutId;
   label: 'city_all' | 'city_tokyo' | 'city_osaka' | 'city_fukuoka' | 'city_seoul' | 'city_busan';
   cityValue?: '도쿄' | '오사카' | '후쿠오카' | '서울' | '부산';
-  visual: 'none' | 'emoji' | 'special';
-  emoji?: '🗼' | '🏯' | '🍜';
+  visual: 'emoji' | 'special';
+  emoji?: '🌏' | '🗼' | '🏯' | '🍜';
 };
 
 export const HOME_MOBILE_CITY_SHORTCUTS: HomeMobileCityShortcut[] = [
-  { id: 'all', label: 'city_all', visual: 'none' },
+  { id: 'all', label: 'city_all', visual: 'emoji', emoji: '🌏' },
   { id: 'tokyo', label: 'city_tokyo', cityValue: '도쿄', visual: 'emoji', emoji: '🗼' },
   { id: 'osaka', label: 'city_osaka', cityValue: '오사카', visual: 'emoji', emoji: '🏯' },
   { id: 'fukuoka', label: 'city_fukuoka', cityValue: '후쿠오카', visual: 'emoji', emoji: '🍜' },

@@ -136,31 +136,38 @@ export default function HomePageClient() {
           {activeTab === 'experience' ? (
             <>
               <div className="md:hidden -mx-5 overflow-x-auto px-5 no-scrollbar" data-testid="home-mobile-city-shortcuts">
-                <div className="flex items-stretch gap-3 py-0.5 pr-2">
+                <div className="flex items-center gap-7 border-b border-slate-100 pb-2 pr-4">
                   {HOME_MOBILE_CITY_SHORTCUTS.map((shortcut) => (
                     <Link
                       key={shortcut.id}
                       href={getMobileCityShortcutHref(shortcut.cityValue)}
                       data-testid={`home-mobile-city-shortcut-${shortcut.id}`}
-                      className="flex min-w-[72px] shrink-0 flex-col items-center justify-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-center text-slate-900 shadow-[0_4px_14px_rgba(15,23,42,0.04)] transition-transform active:scale-[0.97]"
+                      aria-current={shortcut.id === 'all' ? 'page' : undefined}
+                      className={
+                        shortcut.id === 'all'
+                          ? 'flex min-w-fit shrink-0 flex-col items-center gap-2 border-b-2 border-black pb-2 text-center text-slate-900 transition-transform active:scale-[0.97]'
+                          : 'flex min-w-fit shrink-0 flex-col items-center gap-2 border-b-2 border-transparent pb-2 text-center text-slate-500 transition-transform active:scale-[0.97]'
+                      }
                     >
                       {shortcut.visual === 'emoji' ? (
                         <>
-                          <span className="text-[18px] leading-none">{shortcut.emoji}</span>
-                          <span className="text-[11px] font-semibold leading-tight">{t(shortcut.label)}</span>
+                          <span className="flex h-[32px] items-center justify-center text-2xl leading-none">
+                            {shortcut.emoji}
+                          </span>
+                          <span className={`text-xs font-bold leading-tight whitespace-nowrap ${shortcut.id === 'all' ? 'text-black' : 'text-slate-600'}`}>
+                            {t(shortcut.label)}
+                          </span>
                         </>
-                      ) : shortcut.visual === 'special' ? (
+                      ) : (
                         <>
                           <span
                             data-testid={`home-mobile-city-shortcut-${shortcut.id}-visual`}
-                            className="flex h-[28px] items-center justify-center"
+                            className="flex h-[32px] items-center justify-center"
                           >
                             <HomeCategoryIcon id={shortcut.id} />
                           </span>
-                          <span className="text-[11px] font-semibold leading-tight">{t(shortcut.label)}</span>
+                          <span className="text-xs font-bold leading-tight whitespace-nowrap text-slate-600">{t(shortcut.label)}</span>
                         </>
-                      ) : (
-                        <span className="text-[12px] font-semibold leading-tight">{t(shortcut.label)}</span>
                       )}
                     </Link>
                   ))}
