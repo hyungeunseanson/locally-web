@@ -157,6 +157,7 @@ function SearchResults() {
   const desktopPopoverRef = useRef<HTMLDivElement | null>(null);
 
   const [activeSheet, setActiveSheet] = useState<'city' | 'type' | 'time' | 'filter' | null>(null);
+  const [mobileCitySheetMode, setMobileCitySheetMode] = useState<'filter' | 'header' | null>(null);
   const [selectedTimes, setSelectedTimes] = useState<SearchTimeId[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<SearchTypeId[]>([]);
 
@@ -186,7 +187,23 @@ function SearchResults() {
     const nextParams = new URLSearchParams(searchParams.toString());
     mutator(nextParams);
     const queryString = nextParams.toString();
-    router.replace(queryString ? `${pathname}?${queryString}` : pathname, { scroll: false });
+
+    if (!queryString) {
+      window.history.replaceState(null, '', pathname);
+      return;
+    }
+
+    router.replace(`${pathname}?${queryString}`, { scroll: false });
+  };
+
+  const closeSheet = () => {
+    setActiveSheet(null);
+    setMobileCitySheetMode(null);
+  };
+
+  const openMobileCitySheet = (mode: 'filter' | 'header') => {
+    setMobileCitySheetMode(mode);
+    setActiveSheet('city');
   };
 
   useLayoutEffect(() => {
@@ -277,7 +294,13 @@ function SearchResults() {
   };
 
   const clearSheetFilters = () => {
-    if (activeSheet === 'city') handleCityFilterChange('');
+    if (activeSheet === 'city') {
+      if (mobileCitySheetMode === 'header') {
+        handleHeaderCitySelection('');
+      } else {
+        handleCityFilterChange('');
+      }
+    }
     if (activeSheet === 'time') setSelectedTimes([]);
     if (activeSheet === 'type') setSelectedTypes([]);
     if (activeSheet === 'filter') {
@@ -296,9 +319,17 @@ function SearchResults() {
     }
   };
 
+  const getActiveCitySelection = () => (
+    mobileCitySheetMode === 'header'
+      ? normalizeServiceCity(location)
+      : selectedCity
+  );
+
+  const activeCitySelection = getActiveCitySelection();
+
   const hasSheetSelection =
     activeSheet === 'city'
-      ? Boolean(selectedCity)
+      ? Boolean(activeCitySelection)
       : activeSheet === 'time'
       ? selectedTimes.length > 0
       : activeSheet === 'type'
@@ -334,6 +365,19 @@ function SearchResults() {
         return;
       }
 
+      params.set('city', value);
+    });
+  };
+
+  const handleHeaderCitySelection = (value: string) => {
+    replaceSearchParams((params) => {
+      if (!value) {
+        params.delete('location');
+        params.delete('city');
+        return;
+      }
+
+      params.set('location', value);
       params.set('city', value);
     });
   };
@@ -460,12 +504,22 @@ function SearchResults() {
               <ArrowLeft size={20} />
             </button>
 
-            <div className="flex-1 h-[56px] rounded-full bg-white border border-[#E6E6E6] px-4 text-center shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex flex-col items-center justify-center">
-              <div data-testid="search-mobile-header-title" className="text-[12px] font-semibold text-[#202020] leading-tight">{headerTitle}</div>
-              {headerSub && <div className="text-[10px] text-[#787878] leading-tight mt-[1px]">{headerSub}</div>}
-            </div>
+            <button
+              type="button"
+              data-testid="search-mobile-header-trigger"
+              aria-haspopup="dialog"
+              aria-expanded={activeSheet === 'city' && mobileCitySheetMode === 'header'}
+              onClick={() => openMobileCitySheet('header')}
+              className="flex-1 h-[56px] rounded-full bg-white border border-[#E6E6E6] px-4 text-center shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex flex-col items-center justify-center"
+            >
+              <span className="inline-flex items-center gap-1">
+                <span data-testid="search-mobile-header-title" className="text-[12px] font-semibold text-[#202020] leading-tight">{headerTitle}</span>
+                <ChevronDown size={13} className="text-[#7C7C7C]" />
+              </span>
+              {headerSub && <span className="text-[10px] text-[#787878] leading-tight mt-[1px]">{headerSub}</span>}
+            </button>
 
-            <button onClick={() => setActiveSheet('filter')} className="w-9 h-9 flex items-center justify-center text-[#222]">
+            <button onClick={() => { setMobileCitySheetMode(null); setActiveSheet('filter'); }} className="w-9 h-9 flex items-center justify-center text-[#222]">
               <SlidersHorizontal size={18} />
             </button>
           </div>
@@ -475,7 +529,7 @@ function SearchResults() {
               <button
                 type="button"
                 data-testid="search-mobile-type-chip"
-                onClick={() => setActiveSheet('type')}
+                onClick={() => { setMobileCitySheetMode(null); setActiveSheet('type'); }}
                 className={`h-8 shrink-0 rounded-full border px-3.5 text-[11px] font-medium whitespace-nowrap transition-all duration-150 active:scale-[0.95] ${
                   selectedTypes.length > 0 ? 'bg-white border-[#222] text-[#222]' : 'bg-white border-[#D8D8D8] text-[#444]'
                 }`}
@@ -488,7 +542,7 @@ function SearchResults() {
               <button
                 type="button"
                 data-testid="search-mobile-time-chip"
-                onClick={() => setActiveSheet('time')}
+                onClick={() => { setMobileCitySheetMode(null); setActiveSheet('time'); }}
                 className={`h-8 shrink-0 rounded-full border px-3.5 text-[11px] font-medium whitespace-nowrap transition-all duration-150 active:scale-[0.95] ${
                   selectedTimes.length > 0 ? 'bg-white border-[#222] text-[#222]' : 'bg-white border-[#D8D8D8] text-[#444]'
                 }`}
@@ -501,7 +555,7 @@ function SearchResults() {
               <button
                 type="button"
                 data-testid="search-mobile-city-chip"
-                onClick={() => setActiveSheet('city')}
+                onClick={() => openMobileCitySheet('filter')}
                 className={`h-8 shrink-0 rounded-full border px-3.5 text-[11px] font-medium whitespace-nowrap transition-all duration-150 active:scale-[0.95] ${
                   selectedCity ? 'bg-white border-[#222] text-[#222]' : 'bg-white border-[#D8D8D8] text-[#444]'
                 }`}
@@ -960,7 +1014,7 @@ function SearchResults() {
 
       {activeSheet && (
         <div className="fixed inset-0 z-[190] md:hidden">
-          <button className="absolute inset-0 bg-black/35 animate-in fade-in duration-200" onClick={() => setActiveSheet(null)} aria-label={t('button_close')} />
+          <button className="absolute inset-0 bg-black/35 animate-in fade-in duration-200" onClick={closeSheet} aria-label={t('button_close')} />
 
           <div
             className={`absolute inset-x-0 bottom-0 bg-white rounded-t-[28px] shadow-[0_-12px_32px_rgba(0,0,0,0.16)] flex flex-col animate-in slide-in-from-bottom-8 duration-300 ${
@@ -983,7 +1037,7 @@ function SearchResults() {
                       ? t('search_filter_experience_type')
                       : t('filter')}
               </h3>
-              <button onClick={() => setActiveSheet(null)} className="p-1 text-[#444]" aria-label={t('button_close')}>
+              <button onClick={closeSheet} className="p-1 text-[#444]" aria-label={t('button_close')}>
                 <X size={20} />
               </button>
             </div>
@@ -994,21 +1048,33 @@ function SearchResults() {
                   <button
                     type="button"
                     data-testid="search-mobile-city-option-all"
-                    onClick={() => handleCityFilterChange('')}
+                    onClick={() => {
+                      if (mobileCitySheetMode === 'header') {
+                        handleHeaderCitySelection('');
+                        return;
+                      }
+                      handleCityFilterChange('');
+                    }}
                     className={`flex w-full items-center justify-between rounded-2xl px-3 py-3 text-left text-[14px] font-medium transition-colors ${
-                      !selectedCity ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-50'
+                      !activeCitySelection ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-50'
                     }`}
                   >
                     {t('lang_all')}
                   </button>
                   {CITY_FILTER_OPTIONS.map((option) => {
-                    const selected = selectedCity === option;
+                    const selected = activeCitySelection === option;
                     return (
                       <button
                         key={option}
                         type="button"
                         data-testid={`search-mobile-city-option-${option}`}
-                        onClick={() => handleCityFilterChange(option)}
+                        onClick={() => {
+                          if (mobileCitySheetMode === 'header') {
+                            handleHeaderCitySelection(option);
+                            return;
+                          }
+                          handleCityFilterChange(option);
+                        }}
                         className={`flex w-full items-center justify-between rounded-2xl px-3 py-3 text-left text-[14px] font-medium transition-colors ${
                           selected ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-50'
                         }`}
@@ -1115,7 +1181,7 @@ function SearchResults() {
                 {t('search_filter_clear_all')}
               </button>
               <button
-                onClick={() => setActiveSheet(null)}
+                onClick={closeSheet}
                 className="h-[44px] px-6 rounded-[10px] bg-[#222429] text-white text-[14px] font-semibold transition-all duration-150 active:scale-[0.97]"
               >
                 {t('search_filter_show_results')}

@@ -91,9 +91,11 @@ test.describe('Search mobile city filter', () => {
     await expect(page.getByTestId('search-mobile-city-option-오사카')).toContainText('Osaka');
 
     await page.getByTestId('search-mobile-city-option-오사카').click();
+    await expect(page).toHaveURL(/location=tokyo/);
     await expect(page).toHaveURL(/city=%EC%98%A4%EC%82%AC%EC%B9%B4/);
     await page.getByRole('button', { name: 'Show results' }).click();
 
+    await expect(page.getByTestId('search-mobile-header-title')).toContainText('Tokyo');
     await expect(page.getByTestId('search-mobile-city-chip')).toContainText('Osaka');
     await expect(page.getByTestId('search-mobile-result-card-9201').first()).toBeVisible();
     await expect(page.getByTestId('search-mobile-result-card-9201').first()).toContainText('Osaka Backstreet Dinner Walk');

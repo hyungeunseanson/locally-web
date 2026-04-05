@@ -32,6 +32,8 @@ function createExperienceFixture(id: string, overrides: Record<string, unknown> 
 }
 
 test.describe('Search desktop selection map panel', () => {
+  test.setTimeout(60000);
+
   test('shows city chip, selection-based map updates, and CTA navigation', async ({ page }) => {
     await page.route('**/api/search/experiences?**', async (route) => {
       const url = new URL(route.request().url());

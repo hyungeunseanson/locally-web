@@ -3,10 +3,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Ghost } from 'lucide-react';
 import Link from 'next/link';
+import HomeCategoryIcon from '@/app/components/HomeCategoryIcon';
 import HomeHero from '@/app/components/HomeHero';
 import HomeExperienceCard, { type HomeExperienceCardData } from '@/app/components/HomeExperienceCard';
 import ServiceCard from '@/app/components/ServiceCard';
-import { LOCALLY_SERVICES } from '@/app/constants';
+import { HOME_MOBILE_CITY_SHORTCUTS, LOCALLY_SERVICES } from '@/app/constants';
 import { useExperienceFilter } from '@/app/hooks/useExperienceFilter';
 import { HomeExperienceCardSkeleton } from '@/app/components/skeletons/HomeExperienceCardSkeleton';
 import { useLanguage } from '@/app/context/LanguageContext';
@@ -59,6 +60,17 @@ export default function HomePageClient() {
     const query = params.toString();
     return query ? `/search?${query}` : '/search';
   }, [dateRange.end, dateRange.start, locationInput, selectedLanguage]);
+
+  const getMobileCityShortcutHref = (cityValue?: string) => {
+    if (!cityValue) {
+      return '/search';
+    }
+
+    const params = new URLSearchParams();
+    params.set('location', cityValue);
+    params.set('city', cityValue);
+    return `/search?${params.toString()}`;
+  };
 
   return (
     <>
@@ -122,34 +134,68 @@ export default function HomePageClient() {
 
         <div className="px-5 pb-3 pt-3 md:px-0 md:pb-6 md:pt-0">
           {activeTab === 'experience' ? (
-            <div
-              data-testid="home-experience-ingress-hint"
-              className="rounded-[18px] border border-slate-200 bg-white/95 px-4 py-3 text-slate-900 shadow-[0_4px_14px_rgba(15,23,42,0.05)] md:mx-auto md:flex md:max-w-[1100px] md:items-center md:justify-between md:gap-4 md:rounded-[20px] md:bg-white/90 md:px-5"
-            >
-              <div className="md:max-w-[620px]">
-                <p className="text-[12px] font-semibold tracking-[-0.01em] md:text-[14px]">
-                  {t('home_exp_ingress_title')}
-                </p>
-                <p className="mt-1 text-[11px] leading-5 text-slate-500 md:text-[13px]">
-                  {t('home_exp_ingress_desc')}
-                </p>
+            <>
+              <div className="md:hidden -mx-5 overflow-x-auto px-5 no-scrollbar" data-testid="home-mobile-city-shortcuts">
+                <div className="flex items-stretch gap-3 py-0.5 pr-2">
+                  {HOME_MOBILE_CITY_SHORTCUTS.map((shortcut) => (
+                    <Link
+                      key={shortcut.id}
+                      href={getMobileCityShortcutHref(shortcut.cityValue)}
+                      data-testid={`home-mobile-city-shortcut-${shortcut.id}`}
+                      className="flex min-w-[72px] shrink-0 flex-col items-center justify-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-center text-slate-900 shadow-[0_4px_14px_rgba(15,23,42,0.04)] transition-transform active:scale-[0.97]"
+                    >
+                      {shortcut.visual === 'emoji' ? (
+                        <>
+                          <span className="text-[18px] leading-none">{shortcut.emoji}</span>
+                          <span className="text-[11px] font-semibold leading-tight">{t(shortcut.label)}</span>
+                        </>
+                      ) : shortcut.visual === 'special' ? (
+                        <>
+                          <span
+                            data-testid={`home-mobile-city-shortcut-${shortcut.id}-visual`}
+                            className="flex h-[28px] items-center justify-center"
+                          >
+                            <HomeCategoryIcon id={shortcut.id} />
+                          </span>
+                          <span className="text-[11px] font-semibold leading-tight">{t(shortcut.label)}</span>
+                        </>
+                      ) : (
+                        <span className="text-[12px] font-semibold leading-tight">{t(shortcut.label)}</span>
+                      )}
+                    </Link>
+                  ))}
+                </div>
               </div>
-              <div className="mt-3 flex flex-col gap-2 md:mt-0 md:flex-row md:items-center md:justify-end md:gap-2.5">
-                <Link
-                  href={searchHref}
-                  className="inline-flex h-10 items-center justify-center rounded-full border border-slate-300 px-4 text-[12px] font-semibold text-slate-900 transition-colors hover:bg-slate-50 md:shrink-0"
-                >
-                  {t('home_exp_ingress_cta')}
-                </Link>
-                <Link
-                  href="/about"
-                  data-testid="home-experience-about-link"
-                  className="hidden h-10 items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-4 text-[12px] font-semibold text-slate-700 transition-colors hover:bg-slate-100 md:inline-flex md:shrink-0"
-                >
-                  {t('footer_intro')}
-                </Link>
+
+              <div
+                data-testid="home-experience-ingress-hint"
+                className="hidden rounded-[18px] border border-slate-200 bg-white/95 px-4 py-3 text-slate-900 shadow-[0_4px_14px_rgba(15,23,42,0.05)] md:mx-auto md:flex md:max-w-[1100px] md:items-center md:justify-between md:gap-4 md:rounded-[20px] md:bg-white/90 md:px-5"
+              >
+                <div className="md:max-w-[620px]">
+                  <p className="text-[12px] font-semibold tracking-[-0.01em] md:text-[14px]">
+                    {t('home_exp_ingress_title')}
+                  </p>
+                  <p className="mt-1 text-[11px] leading-5 text-slate-500 md:text-[13px]">
+                    {t('home_exp_ingress_desc')}
+                  </p>
+                </div>
+                <div className="mt-3 flex flex-col gap-2 md:mt-0 md:flex-row md:items-center md:justify-end md:gap-2.5">
+                  <Link
+                    href={searchHref}
+                    className="inline-flex h-10 items-center justify-center rounded-full border border-slate-300 px-4 text-[12px] font-semibold text-slate-900 transition-colors hover:bg-slate-50 md:shrink-0"
+                  >
+                    {t('home_exp_ingress_cta')}
+                  </Link>
+                  <Link
+                    href="/about"
+                    data-testid="home-experience-about-link"
+                    className="hidden h-10 items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-4 text-[12px] font-semibold text-slate-700 transition-colors hover:bg-slate-100 md:inline-flex md:shrink-0"
+                  >
+                    {t('footer_intro')}
+                  </Link>
+                </div>
               </div>
-            </div>
+            </>
           ) : (
             <div
               data-testid="home-service-ingress-hint"

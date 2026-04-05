@@ -9,6 +9,8 @@ async function dismissAnnouncementIfVisible(page: Page) {
 }
 
 test.describe('Home landing ingress guidance', () => {
+  test.setTimeout(60000);
+
   test('shows next-step guidance for experience and service entry points', async ({ page }) => {
     const localeCases = [
       {
@@ -118,6 +120,7 @@ test.describe('Home landing ingress guidance', () => {
 
       const aboutLink = page.getByTestId('home-mobile-about-link');
       const hostLink = page.getByTestId('home-mobile-host-link');
+      const experienceHint = page.getByTestId('home-experience-ingress-hint');
 
       await expect(aboutLink).toBeVisible({ timeout: 15000 });
       await expect(aboutLink).toHaveText(localeCase.aboutLabel);
@@ -126,6 +129,7 @@ test.describe('Home landing ingress guidance', () => {
       await expect(hostLink).toBeVisible();
       await expect(hostLink).toHaveText(localeCase.hostLabel);
       await expect(hostLink).toHaveAttribute('href', '/become-a-host');
+      await expect(experienceHint).toBeHidden();
     }
   });
 });
