@@ -31,7 +31,7 @@ test.describe('Host landing guidance', () => {
 
     await expect(page.getByTestId('login-modal-flow-hint')).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId('login-modal-flow-hint')).toContainText(
-      /로그인 후 지금 보고 있던 화면으로 다시 돌아갑니다|After login, you will return to the page you were viewing|ログイン後は、今見ていたページに戻ります|登录后会回到你刚才正在查看的页面/
+      /로그인 후 지금 보고 있던 화면으로 다시 돌아갑니다|After login, you will return to the (page|screen) you were viewing(?: and continue right away)?|ログイン後は、今見ていたページに戻ります|登录后会回到你刚才正在查看的页面/
     );
   });
 

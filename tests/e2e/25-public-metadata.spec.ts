@@ -25,8 +25,8 @@ const EXPECTED_META = [
   },
   {
     path: '/community',
-    title: '커뮤니티 | Locally',
-    description: '현지인과 여행자들이 생생한 정보를 나누고 동행을 구하는 로컬리 커뮤니티',
+    title: '로컬리 콘텐츠 | Locally',
+    description: '로컬이 직접 정리한 여행 콘텐츠 — 루트, 맛집, 현지 추천 정보를 확인하세요.',
   },
   {
     path: '/company/news',
