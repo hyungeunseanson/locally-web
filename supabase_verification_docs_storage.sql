@@ -17,6 +17,28 @@ set public = excluded.public;
 --    Storage RLS 는 기본적으로 활성화된 상태를 전제로 policy 만 관리합니다.
 
 -- 3. 재실행 안전 처리
+do $$
+declare
+  stale_policy record;
+begin
+  for stale_policy in
+    select policyname
+    from pg_policies
+    where schemaname = 'storage'
+      and tablename = 'objects'
+      and cmd in ('SELECT', 'ALL')
+      and policyname <> 'Verification docs owners can read'
+      and (
+        coalesce(qual, '') like '%verification-docs%'
+        or coalesce(with_check, '') like '%verification-docs%'
+      )
+      and position('auth.uid' in coalesce(qual, '')) = 0
+  loop
+    execute format('drop policy if exists %I on storage.objects', stale_policy.policyname);
+  end loop;
+end
+$$;
+
 drop policy if exists "Verification docs owners can upload" on storage.objects;
 drop policy if exists "Verification docs owners can read" on storage.objects;
 drop policy if exists "Verification docs owners can update" on storage.objects;
