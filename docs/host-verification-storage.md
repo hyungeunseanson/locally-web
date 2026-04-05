@@ -24,6 +24,12 @@
 3. 정책이 `id_card/<auth.uid()>_<timestamp>` 패턴을 허용하는지 확인
 4. `/host/register` 재현 시 브라우저 network 에서 `/storage/v1/object/verification-docs/...` 응답 코드와 body 확인
 
+## SQL 적용 시 주의
+- `storage.objects` 는 Supabase managed system table 이라 owner-only `ALTER TABLE storage.objects ...` 는 피한다
+- `must be owner of table objects` 가 나오면, 보통 불필요한 owner-level DDL 을 실행한 것이다
+- 현재 source-of-truth SQL 은 bucket 생성과 policy 정의만 포함하고, RLS enable 자체는 건드리지 않는다
+- 만약 `CREATE POLICY` 단계에서도 권한 오류가 나면, 일반 app 연결이 아니라 Supabase SQL Editor 또는 Storage Policies UI 에서 적용해야 한다
+
 ## 증상별 해석
 - `403` 또는 `new row violates row-level security`: policy mismatch 가능성 높음
 - `401`: auth/session 전달 문제 또는 unauthenticated upload

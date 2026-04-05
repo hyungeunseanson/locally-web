@@ -12,8 +12,9 @@ values ('verification-docs', 'verification-docs', false)
 on conflict (id) do update
 set public = excluded.public;
 
--- 2. storage.objects RLS 활성화
-alter table storage.objects enable row level security;
+-- 2. storage.objects 는 Supabase managed system table 이므로
+--    owner-only ALTER TABLE 을 여기서 실행하지 않습니다.
+--    Storage RLS 는 기본적으로 활성화된 상태를 전제로 policy 만 관리합니다.
 
 -- 3. 재실행 안전 처리
 drop policy if exists "Verification docs owners can upload" on storage.objects;
