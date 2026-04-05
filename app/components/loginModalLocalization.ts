@@ -5,7 +5,6 @@ type LocalizedText = Record<LoginModalLocale, string>;
 type LoginModalCopy = {
   signupTitle: string;
   signupSubtitle: string;
-  signupHelper: string;
   emailPasswordRequired: string;
   signupFieldsRequired: string;
   birthDateInvalid: string;
@@ -52,7 +51,6 @@ const COPY: Record<LoginModalLocale, LoginModalCopy> = {
   ko: {
     signupTitle: '가입하고 바로 시작하기',
     signupSubtitle: '필요한 정보만 입력하면 바로 이어서 사용할 수 있어요.',
-    signupHelper: '가입하면 예약 내역, 메시지, 위시리스트가 같은 계정에 바로 저장돼요.',
     emailPasswordRequired: '이메일과 비밀번호를 입력해주세요.',
     signupFieldsRequired: '이름, 국적, 연락처, 생년월일, 성별을 모두 입력해주세요.',
     birthDateInvalid: '생년월일 8자리(YYYYMMDD)를 올바르게 입력해주세요.',
@@ -86,7 +84,6 @@ const COPY: Record<LoginModalLocale, LoginModalCopy> = {
   en: {
     signupTitle: 'Sign up and start right away',
     signupSubtitle: 'Enter a few details and continue without losing your place.',
-    signupHelper: 'Once you sign up, your bookings, messages, and wishlist are saved in one account.',
     emailPasswordRequired: 'Please enter your email and password.',
     signupFieldsRequired: 'Please fill in your name, nationality, phone number, birth date, and gender.',
     birthDateInvalid: 'Please enter a valid 8-digit birth date (YYYYMMDD).',
@@ -120,7 +117,6 @@ const COPY: Record<LoginModalLocale, LoginModalCopy> = {
   ja: {
     signupTitle: '登録してすぐ始める',
     signupSubtitle: '必要な情報だけ入力すれば、そのまま続けて使えます。',
-    signupHelper: '登録すると、予約履歴、メッセージ、お気に入りが同じアカウントにすぐ保存されます。',
     emailPasswordRequired: 'メールアドレスとパスワードを入力してください。',
     signupFieldsRequired: '氏名、国籍、連絡先、生年月日、性別をすべて入力してください。',
     birthDateInvalid: '生年月日8桁（YYYYMMDD）を正しく入力してください。',
@@ -154,7 +150,6 @@ const COPY: Record<LoginModalLocale, LoginModalCopy> = {
   zh: {
     signupTitle: '注册后马上开始',
     signupSubtitle: '填写必要信息后，就能直接继续使用。',
-    signupHelper: '注册后，预订、消息和心愿单会立即保存到同一账号中。',
     emailPasswordRequired: '请输入邮箱和密码。',
     signupFieldsRequired: '请填写姓名、国籍、联系方式、出生日期和性别。',
     birthDateInvalid: '请输入正确的 8 位出生日期（YYYYMMDD）。',

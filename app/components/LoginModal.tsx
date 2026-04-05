@@ -377,16 +377,18 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
                 <p className="text-[12px] md:text-sm text-gray-500 font-medium">
                   {mode === 'LOGIN' ? t('welcome_subtitle') : copy.signupSubtitle}
                 </p>
-                <div data-testid="login-modal-flow-hint" className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-left">
-                  <p className="text-[11px] md:text-[12px] font-medium leading-5 text-slate-600">
-                    {mode === 'LOGIN' ? copy.loginHelper : copy.signupHelper}
-                  </p>
-                  {shouldShowReturnHint && (
-                    <p className="mt-1 text-[11px] md:text-[12px] font-semibold leading-5 text-slate-900">
-                      {copy.returnAfterLogin}
+                {mode === 'LOGIN' && (
+                  <div data-testid="login-modal-flow-hint" className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-left">
+                    <p className="text-[11px] md:text-[12px] font-medium leading-5 text-slate-600">
+                      {copy.loginHelper}
                     </p>
-                  )}
-                </div>
+                    {shouldShowReturnHint && (
+                      <p className="mt-1 text-[11px] md:text-[12px] font-semibold leading-5 text-slate-900">
+                        {copy.returnAfterLogin}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               <form onSubmit={handleAuth}>
