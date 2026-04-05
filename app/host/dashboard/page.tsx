@@ -12,6 +12,7 @@ import SiteHeader from '@/app/components/SiteHeader';
 import Spinner from '@/app/components/ui/Spinner';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { useNotification } from '@/app/context/NotificationContext';
+import { useAuth } from '@/app/context/AuthContext';
 
 // 컴포넌트 임포트
 import ReservationManager from './components/ReservationManager';
@@ -36,6 +37,7 @@ interface HostStatusSummary {
 function DashboardContent() {
   const { t } = useLanguage();
   const { notifications, markAsRead } = useNotification();
+  const { applicationStatus, refreshHostStatus } = useAuth();
   // 서비스 관련 안 읽은 알림 여부 (N 배지용)
   const serviceUnread = notifications.some(
     (n) => !n.is_read && [
@@ -148,7 +150,22 @@ function DashboardContent() {
     void fetchData();
   }, [fetchData, searchParams]);
 
-  const status = hostStatus?.status?.toLowerCase().trim();
+  useEffect(() => {
+    void refreshHostStatus();
+  }, [refreshHostStatus]);
+
+  const contextStatus = applicationStatus?.toLowerCase().trim() || null;
+  const hostRecordStatus = hostStatus?.status?.toLowerCase().trim() || null;
+  const status = contextStatus || hostRecordStatus;
+
+  useEffect(() => {
+    if (!contextStatus || !hostRecordStatus || contextStatus === hostRecordStatus) {
+      return;
+    }
+
+    void fetchData();
+  }, [contextStatus, fetchData, hostRecordStatus]);
+
   const approvalNotification = notifications.find(
     (notification) =>
       notification.type === 'host_application_approved' &&
@@ -197,7 +214,7 @@ function DashboardContent() {
   const hostProfileCompletion = profile ? getProfileCompletion(profile, 'host') : null;
 
   // 1. 신청 내역 없음
-  if (!hostStatus) {
+  if (!hostStatus && !status) {
     return (
       <div className="max-w-2xl mx-auto px-6 py-20 text-center animate-in fade-in slide-in-from-bottom-4">
         <h1 className="text-3xl font-black mb-4 text-slate-900">{t('no_host_title')}</h1> {/* 🟢 번역 */}

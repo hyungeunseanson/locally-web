@@ -24,13 +24,13 @@ export default function HostLandingActionBar({
 }: HostLandingActionBarProps) {
   const router = useRouter();
   const { t } = useLanguage();
-  const { user, isHost, applicationStatus, isLoading, refreshAuth } = useAuth();
+  const { user, isHost, applicationStatus, isLoading, refreshHostStatus } = useAuth();
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
   useEffect(() => {
     if (!user?.id) return;
-    void refreshAuth();
-  }, [refreshAuth, user?.id]);
+    void refreshHostStatus();
+  }, [refreshHostStatus, user?.id]);
 
   const normalizedStatus = useMemo<ApplicationStatus>(() => {
     const status = applicationStatus?.toLowerCase().trim();

@@ -44,9 +44,9 @@ function getAdminClient() {
 function createUser(prefix: string): TestUser {
   const timestamp = Date.now();
   return {
-    email: `codex.host.approval.overlay.${prefix}.${timestamp}@example.com`,
+    email: `codex.host.status.refresh.${prefix}.${timestamp}@example.com`,
     password: TEST_PASSWORD,
-    fullName: `Host Approval Overlay ${timestamp}`,
+    fullName: `Host Status Refresh ${timestamp}`,
     phone: `010${String(timestamp).slice(-8)}`,
   };
 }
@@ -87,57 +87,67 @@ async function createAuthUser(user: TestUser) {
 
   createdAuthUserIds.push(data.user.id);
   await waitForProfile(data.user.id);
-
-  const { error: roleError } = await supabase
-    .from('users')
-    .update({ role: 'host' })
-    .eq('id', data.user.id);
-
-  if (roleError) {
-    throw roleError;
-  }
-
   return data.user.id;
 }
 
-async function createApprovedHostApplication(userId: string, user: TestUser) {
+async function createRevisionHostApplication(userId: string, user: TestUser) {
   const supabase = getAdminClient();
   const { data, error } = await supabase
     .from('host_applications')
     .insert({
       user_id: userId,
-      host_nationality: '대한민국',
+      host_nationality: 'Korea',
       languages: ['한국어'],
       language_levels: [{ language: '한국어', level: 5 }],
       name: user.fullName,
       phone: user.phone,
-      dob: '1992-04-12',
+      dob: '1990.01.01',
       email: user.email,
-      instagram: '@codex_host_overlay',
+      instagram: '@codex_host_status_refresh',
       source: 'playwright',
-      language_cert: '',
+      language_cert: 'TOPIK 6',
       profile_photo: '',
-      self_intro: '호스트 승인 축하 오버레이 검증용 승인 호스트입니다.',
+      self_intro: '호스트 승인 stale 상태 갱신 검증용 지원서입니다. 충분한 길이의 소개 문장을 포함합니다.',
       id_card_file: '',
-      bank_name: '국민은행',
+      bank_name: '테스트은행',
       account_number: '12345678901234',
       account_holder: user.fullName,
-      motivation: '호스트 승인 축하 오버레이 검증',
-      status: 'approved',
+      motivation: '호스트 승인 stale 상태 갱신 검증을 위한 테스트 지원서입니다.',
+      status: 'revision',
+      admin_comment: '사진을 조금 더 선명하게 업로드해 주세요.',
     })
     .select('id')
     .single();
 
   if (error || !data?.id) {
-    throw error || new Error('Failed to create approved host application.');
+    throw error || new Error('Failed to create revision host application.');
   }
 
   createdApplicationIds.push(String(data.id));
+  return String(data.id);
 }
 
-async function insertUnreadApprovalNotification(userId: string) {
+async function approveHostApplication(applicationId: string, userId: string) {
   const supabase = getAdminClient();
-  const { data, error } = await supabase
+
+  const { error: applicationError } = await supabase
+    .from('host_applications')
+    .update({
+      status: 'approved',
+      admin_comment: null,
+    })
+    .eq('id', applicationId);
+
+  if (applicationError) throw applicationError;
+
+  const { error: roleError } = await supabase
+    .from('users')
+    .update({ role: 'host' })
+    .eq('id', userId);
+
+  if (roleError) throw roleError;
+
+  const { data: notification, error: notificationError } = await supabase
     .from('notifications')
     .insert({
       user_id: userId,
@@ -150,12 +160,11 @@ async function insertUnreadApprovalNotification(userId: string) {
     .select('id')
     .single();
 
-  if (error || !data?.id) {
-    throw error || new Error('Failed to insert host approval notification.');
+  if (notificationError || !notification?.id) {
+    throw notificationError || new Error('Failed to insert approval notification.');
   }
 
-  createdNotificationIds.push(Number(data.id));
-  return Number(data.id);
+  createdNotificationIds.push(Number(notification.id));
 }
 
 async function login(page: Page, user: TestUser) {
@@ -163,6 +172,7 @@ async function login(page: Page, user: TestUser) {
   await page.locator('input[type="email"]').fill(user.email);
   await page.locator('input[type="password"]').fill(user.password);
   await page.locator('button[type="submit"]').click();
+
   const results = await Promise.allSettled([
     page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 15000 }),
     page.getByText('Welcome back. You are now logged in.').waitFor({ state: 'visible', timeout: 15000 }),
@@ -187,48 +197,33 @@ test.afterAll(async () => {
   }
 
   for (const userId of createdAuthUserIds) {
+    await supabase.from('profiles').delete().eq('id', userId);
+    await supabase.from('users').delete().eq('id', userId);
     await supabase.auth.admin.deleteUser(userId);
   }
 });
 
-test('approved host sees a one-time welcome overlay and dismiss marks the token read', async ({ page }) => {
-  const user = createUser('welcome');
+test('refreshes an open host dashboard from revision to approved without a page reload', async ({ page }) => {
+  const user = createUser('dashboard');
   const userId = await createAuthUser(user);
-  await createApprovedHostApplication(userId, user);
-  const notificationId = await insertUnreadApprovalNotification(userId);
+  const applicationId = await createRevisionHostApplication(userId, user);
 
   await login(page, user);
   await page.goto('/host/dashboard', { waitUntil: 'domcontentloaded' });
 
-  const overlay = page.getByTestId('host-approval-welcome-overlay');
-  await expect(overlay).toBeVisible({ timeout: 15000 });
   await expect(
-    overlay.getByText(
+    page.getByRole('heading', { name: /보완이 필요합니다|Revision Required|修正が必要です|需要补充信息/ })
+  ).toBeVisible({ timeout: 15000 });
+
+  await approveHostApplication(applicationId, userId);
+
+  await expect(page.getByTestId('host-approval-welcome-overlay')).toBeVisible({ timeout: 15000 });
+  await expect(
+    page.getByText(
       /호스트 승인이 완료되었어요!|Your host approval is complete!|ホスト承認が完了しました！|恭喜，你已通过房东审核！/
     )
-  ).toBeVisible();
-
-  await overlay.getByRole('button', { name: /나중에 보기|Maybe later|あとで見る|稍后再说/ }).click();
-  await expect(overlay).toBeHidden({ timeout: 15000 });
-
-  const supabase = getAdminClient();
-  let notificationRow: { is_read: boolean } | null = null;
-
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    const { data, error } = await supabase
-      .from('notifications')
-      .select('is_read')
-      .eq('id', notificationId)
-      .maybeSingle();
-
-    if (error) throw error;
-    notificationRow = data;
-    if (data?.is_read) break;
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
-
-  expect(notificationRow?.is_read).toBe(true);
-
-  await page.reload({ waitUntil: 'domcontentloaded' });
-  await expect(page.getByTestId('host-approval-welcome-overlay')).toHaveCount(0);
+  ).toBeVisible({ timeout: 15000 });
+  await expect(
+    page.getByRole('heading', { name: /보완이 필요합니다|Revision Required|修正が必要です|需要补充信息/ })
+  ).toHaveCount(0);
 });

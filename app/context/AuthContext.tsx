@@ -18,6 +18,7 @@ interface AuthContextType {
   isLoading: boolean;
   hostStatusResolved: boolean;
   refreshAuth: () => Promise<void>;
+  refreshHostStatus: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -30,6 +31,14 @@ const AUTH_LOCAL_STORAGE_KEYS = [
   'last_active_update',
   'locally_recent_searches',
 ] as const;
+
+const HOST_STATUS_FALLBACK_POLL_MS = 30_000;
+const HOST_STATUS_PENDING_VALUES = new Set(['pending', 'revision', 'rejected']);
+
+function normalizeApplicationStatus(status: string | null | undefined) {
+  const normalized = status?.trim().toLowerCase();
+  return normalized || null;
+}
 
 export function AuthProvider({
   children,
@@ -45,26 +54,35 @@ export function AuthProvider({
   const [hostStatusResolved, setHostStatusResolved] = useState(!initialUser);
   const supabase = useMemo(() => createClient(), []);
 
-  const checkHostStatus = useCallback(async (userId: string) => {
-    setHostStatusResolved(false);
+  const resolveHostStatus = useCallback(async (userId: string, options?: { indicateLoading?: boolean }) => {
+    if (options?.indicateLoading ?? true) {
+      setHostStatusResolved(false);
+    }
+
     try {
-      const { data: app } = await supabase
-        .from('host_applications')
-        .select('status')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const [{ data: app }, { count }] = await Promise.all([
+        supabase
+          .from('host_applications')
+          .select('status')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from('experiences')
+          .select('*', { count: 'exact', head: true })
+          .eq('host_id', userId),
+      ]);
 
-      if (app) setApplicationStatus(app.status);
-      else setApplicationStatus(null);
+      if (app) {
+        setApplicationStatus(app.status);
+      } else {
+        setApplicationStatus(null);
+      }
 
-      const { count } = await supabase
-        .from('experiences')
-        .select('*', { count: 'exact', head: true })
-        .eq('host_id', userId);
+      const normalizedStatus = normalizeApplicationStatus(app?.status);
 
-      if ((app && (app.status === 'approved' || app.status === 'active')) || (count && count > 0)) {
+      if ((normalizedStatus && (normalizedStatus === 'approved' || normalizedStatus === 'active')) || (count && count > 0)) {
         setIsHost(true);
       } else {
         setIsHost(false);
@@ -73,6 +91,22 @@ export function AuthProvider({
       setHostStatusResolved(true);
     }
   }, [supabase]);
+
+  const refreshHostStatus = useCallback(async () => {
+    if (!user?.id) {
+      setIsHost(false);
+      setApplicationStatus(null);
+      setHostStatusResolved(true);
+      return;
+    }
+
+    try {
+      await resolveHostStatus(user.id, { indicateLoading: false });
+    } catch (error) {
+      console.error('Host status refresh failed:', error);
+      setHostStatusResolved(true);
+    }
+  }, [resolveHostStatus, user?.id]);
 
   const loadUser = useCallback(async () => {
     try {
@@ -100,7 +134,7 @@ export function AuthProvider({
           }
         };
         setUser(updatedUser as User);
-        await checkHostStatus(authUser.id);
+        await resolveHostStatus(authUser.id, { indicateLoading: true });
       } else {
         setUser(null);
         setIsHost(false);
@@ -123,7 +157,7 @@ export function AuthProvider({
     } finally {
       setIsLoading(false);
     }
-  }, [checkHostStatus, supabase]);
+  }, [resolveHostStatus, supabase]);
 
   const signOut = async () => {
     try {
@@ -142,10 +176,10 @@ export function AuthProvider({
 
   useEffect(() => {
       if (initialUser) {
-        checkHostStatus(initialUser.id);
+        void resolveHostStatus(initialUser.id, { indicateLoading: true });
       } else {
         setHostStatusResolved(true);
-        loadUser();
+        void loadUser();
       }
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -161,10 +195,53 @@ export function AuthProvider({
     });
 
     return () => subscription.unsubscribe();
-  }, [checkHostStatus, initialUser, loadUser, supabase]);
+  }, [initialUser, loadUser, resolveHostStatus, supabase]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      return;
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshHostStatus();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [refreshHostStatus, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      return;
+    }
+
+    const normalizedStatus = normalizeApplicationStatus(applicationStatus);
+    if (!normalizedStatus || !HOST_STATUS_PENDING_VALUES.has(normalizedStatus)) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      void refreshHostStatus();
+    }, HOST_STATUS_FALLBACK_POLL_MS);
+
+    return () => window.clearInterval(intervalId);
+  }, [applicationStatus, refreshHostStatus, user?.id]);
 
   return (
-    <AuthContext.Provider value={{ user, isHost, applicationStatus, isLoading, hostStatusResolved, refreshAuth: loadUser, signOut }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        isHost,
+        applicationStatus,
+        isLoading,
+        hostStatusResolved,
+        refreshAuth: loadUser,
+        refreshHostStatus,
+        signOut,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

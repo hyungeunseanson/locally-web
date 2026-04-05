@@ -6,6 +6,7 @@ import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import { X, Bell, MessageSquare } from 'lucide-react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import { useAuth } from '@/app/context/AuthContext';
 
 interface NotificationDB {
   id: number;
@@ -38,6 +39,10 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 const NOTIFICATION_SELECT_COLUMNS = 'id, user_id, type, title, message, link, is_read, created_at';
 const TOAST_DURATION_MS = 5000;
 const VISIBILITY_SYNC_MIN_INTERVAL_MS = 2500;
+const HOST_STATUS_REFRESH_NOTIFICATION_TYPES = new Set([
+  'host_application_approved',
+  'application_status_changed',
+]);
 
 async function markNotificationsRead(params: { notificationId?: number; markAll?: boolean }) {
   const response = await fetch('/api/notifications/read', {
@@ -63,6 +68,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { user, refreshHostStatus } = useAuth();
 
   const channelRef = useRef<RealtimeChannel | null>(null);
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -70,6 +76,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const syncingUserIdRef = useRef<string | null>(null);
   const lastSyncAtRef = useRef(0);
   const currentUserIdRef = useRef<string | null>(null);
+  const currentUserId = user?.id ?? null;
 
   const showToast = useCallback((payload: NotificationDB) => {
     if (toastTimeoutRef.current) {
@@ -88,6 +95,14 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       toastTimeoutRef.current = null;
     }, TOAST_DURATION_MS);
   }, []);
+
+  const refreshHostStatusIfNeeded = useCallback((notificationType: string | null | undefined) => {
+    if (!notificationType || !HOST_STATUS_REFRESH_NOTIFICATION_TYPES.has(notificationType)) {
+      return;
+    }
+
+    void refreshHostStatus();
+  }, [refreshHostStatus]);
 
   const syncNotifications = useCallback((userId: string) => {
     if (syncPromiseRef.current && syncingUserIdRef.current === userId) {
@@ -118,12 +133,19 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         return;
       }
 
-      const candidate = data.find((notification) => new Date(notification.created_at) > new Date(cursor));
+      const newlySeenNotifications = data.filter(
+        (notification) => new Date(notification.created_at) > new Date(cursor)
+      );
+
+      const candidate = newlySeenNotifications[0];
 
       if (!candidate) return;
 
       sessionStorage.setItem('lastSeenNotiCreatedAt', data[0].created_at);
       showToast(candidate);
+      if (newlySeenNotifications.some((notification) => HOST_STATUS_REFRESH_NOTIFICATION_TYPES.has(notification.type))) {
+        void refreshHostStatus();
+      }
 
       if (candidate.type === 'booking_confirmed' && candidate.link === '/guest/trips') {
         queryClient.invalidateQueries({ queryKey: ['guestTrips'] });
@@ -139,21 +161,22 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
     syncPromiseRef.current = currentSync;
     return currentSync;
-  }, [supabase, queryClient, showToast]);
+  }, [supabase, queryClient, refreshHostStatus, showToast]);
 
   useEffect(() => {
     const setupRealtime = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
+      if (!currentUserId) {
         currentUserIdRef.current = null;
+        setNotifications([]);
+        if (channelRef.current) {
+          supabase.removeChannel(channelRef.current);
+          channelRef.current = null;
+        }
         return;
       }
 
-      currentUserIdRef.current = user.id;
-      await syncNotifications(user.id);
+      currentUserIdRef.current = currentUserId;
+      await syncNotifications(currentUserId);
 
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
@@ -164,10 +187,10 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         .channel('global-alerts')
         .on(
           'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+          { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${currentUserId}` },
           (payload) => {
             const newNoti = payload.new as NotificationDB;
-            if (newNoti.user_id !== user.id) return;
+            if (newNoti.user_id !== currentUserId) return;
 
             setNotifications((prev) => {
               if (prev.some((notification) => notification.id === newNoti.id)) {
@@ -179,6 +202,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             lastSyncAtRef.current = Date.now();
             sessionStorage.setItem('lastSeenNotiCreatedAt', newNoti.created_at);
             showToast(newNoti);
+            refreshHostStatusIfNeeded(newNoti.type);
 
             if (newNoti.type === 'booking_confirmed' && newNoti.link === '/guest/trips') {
               queryClient.invalidateQueries({ queryKey: ['guestTrips'] });
@@ -188,27 +212,18 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         .subscribe();
     };
 
-    setupRealtime();
+    void setupRealtime();
 
     const handleVisibility = async () => {
       if (document.visibilityState !== 'visible') return;
       if (syncPromiseRef.current) return;
       if (Date.now() - lastSyncAtRef.current < VISIBILITY_SYNC_MIN_INTERVAL_MS) return;
 
-      const currentUserId = currentUserIdRef.current;
-
       if (currentUserId) {
+        currentUserIdRef.current = currentUserId;
         await syncNotifications(currentUserId);
         return;
       }
-
-      const {
-        data: { user: currentUser },
-      } = await supabase.auth.getUser();
-
-      if (!currentUser) return;
-      currentUserIdRef.current = currentUser.id;
-      await syncNotifications(currentUser.id);
     };
 
     document.addEventListener('visibilitychange', handleVisibility);
@@ -224,7 +239,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       }
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [supabase, syncNotifications, queryClient, showToast]);
+  }, [currentUserId, queryClient, refreshHostStatusIfNeeded, showToast, supabase, syncNotifications]);
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
