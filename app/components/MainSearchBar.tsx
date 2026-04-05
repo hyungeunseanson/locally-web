@@ -3,14 +3,12 @@
 import React, { useEffect, useRef } from 'react';
 import { Search } from 'lucide-react';
 import { useLanguage } from '@/app/context/LanguageContext';
+import {
+  getLocalizedSearchLocationLabel,
+  matchSearchPreset,
+  RECOMMENDED_SEARCH_PRESETS,
+} from '@/app/utils/searchLocationCatalog';
 import DatePicker from './DatePicker';
-
-const recommendedPlaces = [
-  { id: 'tokyo',   name: '도쿄',    desc: '도쿄 타워가 빛나는 곳' },
-  { id: 'osaka',   name: '오사카',  desc: '미식과 야경이 살아있는 곳' },
-  { id: 'izakaya', name: '이자카야', desc: '현지 밤문화를 맛보고 싶다면' },
-  { id: 'seoul',   name: '서울',    desc: '남산 타워와 한강, 그리고 K-pop' },
-];
 
 const PlaceIcon = ({ type }: { type: string }) => {
   const colors: Record<string, string> = {
@@ -126,7 +124,7 @@ export default function MainSearchBar({
   onCategorySelect, isVisible,
   onSearch
 }: MainSearchBarProps) {
-  const { t } = useLanguage(); // 🟢 추가
+  const { t, lang } = useLanguage();
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -175,6 +173,15 @@ export default function MainSearchBar({
     { label: t('lang_ja'), value: '일본어', code: 'jp' },
     { label: t('lang_zh'), value: '중국어', code: 'cn' },
   ];
+  const recommendedPlaces = RECOMMENDED_SEARCH_PRESETS.map((preset) => ({
+    ...preset,
+    name: t(preset.labelKey),
+    desc: t(preset.descKey),
+  }));
+  const displayLocationInput =
+    locationInput && matchSearchPreset(locationInput, lang, t)
+      ? getLocalizedSearchLocationLabel(locationInput, lang, t)
+      : locationInput;
 
   return (
     <div
@@ -185,15 +192,16 @@ export default function MainSearchBar({
 
         {/* 1. 여행지 입력 */}
         <div
+          data-testid="home-desktop-search-location-field"
           className={`flex-1 relative h-full flex flex-col justify-center px-8 rounded-full cursor-pointer transition-all duration-300 z-10 group
             ${activeSearchField === 'location' ? 'bg-white shadow-[var(--shadow-floating)]' : 'hover:bg-slate-100/80'}`}
           onClick={() => setActiveSearchField('location')}
         >
-          <label className="text-[11px] font-bold text-slate-800">{t('label_destination')}</label> {/* 🟢 교체 */}
+          <label className="text-[11px] font-bold text-slate-800">{t('label_destination')}</label>
           <input
             type="text"
-            placeholder={t('search_placeholder')} // 🟢 교체
-            value={locationInput}
+            placeholder={t('search_placeholder')}
+            value={displayLocationInput}
             onChange={(e) => setLocationInput(e.target.value)}
             onKeyDown={handleKeyDown}
             className="w-full text-sm outline-none bg-transparent placeholder:text-slate-500 text-black font-semibold truncate cursor-pointer"
@@ -260,6 +268,7 @@ export default function MainSearchBar({
       {/* 여행지 선택 팝업 */}
       {activeSearchField === 'location' && (
         <div
+          data-testid="home-desktop-location-popover"
           className="absolute top-[80px] left-0 w-[360px] bg-white p-5 z-50 animate-in fade-in slide-in-from-left-2 duration-200 ease-out"
           style={{
             borderRadius: '22px',
@@ -267,16 +276,17 @@ export default function MainSearchBar({
             border: '0.5px solid #E6E6E6',
           }}
         >
-          <h4 className="text-[15px] font-extrabold text-[#222222] mb-4">여행지</h4>
+          <h4 className="text-[15px] font-extrabold text-[#222222] mb-4">{t('label_destination')}</h4>
           <div className="space-y-0.5">
             {recommendedPlaces.map((place) => (
               <button
                 key={place.id}
+                data-testid={`home-desktop-location-option-${place.id}`}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setLocationInput(place.name);
+                  setLocationInput(place.queryValue);
                   setActiveSearchField(null);
-                  onSearch(place.name);
+                  onSearch(place.queryValue);
                 }}
                 className="flex items-center gap-3 w-full py-2.5 px-2 rounded-xl hover:bg-[#F7F7F7] transition-colors text-left"
               >

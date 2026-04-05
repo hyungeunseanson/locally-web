@@ -35,6 +35,7 @@ import { useLanguage } from '@/app/context/LanguageContext';
 import { getContent } from '@/app/utils/contentHelper';
 import { getLocalizedExperienceText } from '@/app/utils/experienceTranslation';
 import { formatLocalizedExperienceLocation, getLocalizedCityLabel } from '@/app/utils/locationLocalization';
+import { getLocalizedSearchLocationLabel } from '@/app/utils/searchLocationCatalog';
 import { getExperienceLanguageBadges, getExperiencePriceParts } from '@/app/utils/experienceCardDisplay';
 import { normalizeProfileLanguageValue } from '@/app/utils/profile';
 import { normalizeServiceCity } from '@/app/utils/serviceRequestLocation';
@@ -98,17 +99,6 @@ function getSearchLanguageLabel(value: string, t: (key: string) => string) {
   if (normalized === 'English') return t('lang_en');
   if (normalized === 'Japanese') return t('lang_ja');
   if (normalized === 'Chinese') return t('lang_zh');
-  return value;
-}
-
-function getSearchLocationLabel(value: string, t: (key: string, vars?: Record<string, string | number>) => string) {
-  if (!value) return '';
-
-  const normalized = value.trim().toLowerCase();
-  if (normalized === '도쿄' || normalized === 'tokyo') return t('search_place_tokyo');
-  if (normalized === '오사카' || normalized === 'osaka') return t('search_place_osaka');
-  if (normalized === '이자카야' || normalized === 'izakaya') return t('search_place_izakaya');
-  if (normalized === '서울' || normalized === 'seoul') return t('search_place_seoul');
   return value;
 }
 
@@ -176,7 +166,7 @@ function SearchResults() {
   const endDate = searchParams.get('endDate');
   const selectedCity = normalizeServiceCity(searchParams.get('city') || '');
 
-  const displayLocation = getSearchLocationLabel(location, t);
+  const displayLocation = getLocalizedSearchLocationLabel(location, lang, t);
   const headerTitle = location
     ? t('search_mobile_header_title_with_location', { location: displayLocation })
     : t('search_mobile_header_title');
@@ -471,7 +461,7 @@ function SearchResults() {
             </button>
 
             <div className="flex-1 h-[56px] rounded-full bg-white border border-[#E6E6E6] px-4 text-center shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex flex-col items-center justify-center">
-              <div className="text-[12px] font-semibold text-[#202020] leading-tight">{headerTitle}</div>
+              <div data-testid="search-mobile-header-title" className="text-[12px] font-semibold text-[#202020] leading-tight">{headerTitle}</div>
               {headerSub && <div className="text-[10px] text-[#787878] leading-tight mt-[1px]">{headerSub}</div>}
             </div>
 

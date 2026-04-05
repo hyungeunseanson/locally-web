@@ -238,6 +238,7 @@ export default function HomeHero({
         {/* 검색 캡슐 — 스크림 없이 바로 사용, 배경은 부모에서 상속 */}
         <div className="px-5 mb-2 transition-all duration-300 flex items-center gap-2.5">
           <button
+            data-testid="home-mobile-search-trigger"
             onClick={() => setIsMobileSearchOpen(true)}
             className="flex-1 h-[56px] flex items-center justify-center gap-2.5 bg-white rounded-[28px] px-6 active:scale-[0.98] transition-transform"
             style={{

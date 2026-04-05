@@ -5,15 +5,196 @@ import { Search, X, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/app/context/LanguageContext';
 import DatePicker from '@/app/components/DatePicker';
+import {
+    getLocalizedSearchLocationLabel,
+    getSearchableCityAliases,
+    matchSearchPreset,
+    RECOMMENDED_SEARCH_PRESETS,
+} from '@/app/utils/searchLocationCatalog';
 import { createPortal } from 'react-dom';
+
+type SearchDateRange = { start: Date | null; end: Date | null };
+
+type RecentSearch = { name: string; desc?: string };
+
+type CollapsedPanelProps = {
+    label: string;
+    value: string;
+    placeholder: string;
+    onOpen: () => void;
+    testId?: string;
+};
+
+function readRecentSearches(): RecentSearch[] {
+    if (typeof window === 'undefined') return [];
+
+    try {
+        const stored = window.localStorage.getItem('locally_recent_searches');
+        if (!stored) return [];
+
+        const parsed = JSON.parse(stored);
+        if (!Array.isArray(parsed)) return [];
+
+        return parsed
+            .map((item: unknown) => {
+                if (typeof item === 'string') return { name: item.trim() };
+                if (!item || typeof item !== 'object') return null;
+                const entry = item as { name?: unknown; desc?: unknown };
+                const name = typeof entry.name === 'string' ? entry.name.trim() : '';
+                if (!name) return null;
+                const desc = typeof entry.desc === 'string' && entry.desc.trim() ? entry.desc.trim() : undefined;
+                return { name, desc };
+            })
+            .filter((item): item is RecentSearch => !!item)
+            .slice(0, 6);
+    } catch {
+        return [];
+    }
+}
+
+function PlaceIcon({ type }: { type: string }) {
+    const colors: Record<string, string> = {
+        tokyo: '#EE7B7B',
+        osaka: '#F2A15A',
+        seoul: '#7CB0ED',
+        izakaya: '#D5AE3D',
+    };
+    const stroke = colors[type] || '#6B7280';
+    const sw = 1.0;
+    const blurId = `icon-soft-${type}`;
+
+    const paths = () => {
+        if (type === 'tokyo') {
+            return (
+                <>
+                    <path d="M13 3V6.2" stroke={stroke} strokeWidth={sw} />
+                    <path d="M11.1 6.2H14.9" stroke={stroke} strokeWidth={sw} />
+                    <path d="M10.8 6.2L9.7 10.5H16.3L15.2 6.2" stroke={stroke} strokeWidth={sw} />
+                    <path d="M8.7 12H17.3" stroke={stroke} strokeWidth={sw} />
+                    <path d="M9.4 12V15.4" stroke={stroke} strokeWidth={sw} />
+                    <path d="M16.6 12V15.4" stroke={stroke} strokeWidth={sw} />
+                    <path d="M7.5 17.3H18.5" stroke={stroke} strokeWidth={sw} />
+                    <path d="M6.2 22H19.8" stroke={stroke} strokeWidth={sw} />
+                    <path d="M7.5 22L10.8 17.3" stroke={stroke} strokeWidth={sw} />
+                    <path d="M18.5 22L15.2 17.3" stroke={stroke} strokeWidth={sw} />
+                    <path d="M10.8 15.4H15.2" stroke={stroke} strokeWidth={sw} />
+                </>
+            );
+        }
+        if (type === 'osaka') {
+            return (
+                <>
+                    <path d="M4.5 7.8C9.2 9.2 16.8 9.2 21.5 7.8" stroke={stroke} strokeWidth={sw} />
+                    <path d="M5.4 10.2H20.6" stroke={stroke} strokeWidth={sw} />
+                    <path d="M7.2 10.2V21.5" stroke={stroke} strokeWidth={sw} />
+                    <path d="M18.8 10.2V21.5" stroke={stroke} strokeWidth={sw} />
+                    <path d="M9.8 12.6H16.2" stroke={stroke} strokeWidth={sw} />
+                    <path d="M8.5 15.8H17.5" stroke={stroke} strokeWidth={sw} />
+                    <path d="M6.2 21.5H9.4" stroke={stroke} strokeWidth={sw} />
+                    <path d="M16.6 21.5H19.8" stroke={stroke} strokeWidth={sw} />
+                </>
+            );
+        }
+        if (type === 'seoul') {
+            return (
+                <>
+                    <path d="M13 2.8V6.1" stroke={stroke} strokeWidth={sw} />
+                    <path d="M11.9 6.1H14.1" stroke={stroke} strokeWidth={sw} />
+                    <path d="M11.3 6.1V9.2H14.7V6.1" stroke={stroke} strokeWidth={sw} />
+                    <rect x="9.6" y="9.9" width="6.8" height="3.9" rx="0.8" stroke={stroke} strokeWidth={sw} />
+                    <path d="M13 13.8V20.1" stroke={stroke} strokeWidth={sw} />
+                    <path d="M10.3 16.6H15.7" stroke={stroke} strokeWidth={sw} />
+                    <path d="M9.8 20.1H16.2" stroke={stroke} strokeWidth={sw} />
+                    <path d="M7.7 22H18.3" stroke={stroke} strokeWidth={sw} />
+                </>
+            );
+        }
+        if (type === 'custom') {
+            return (
+                <>
+                    <path d="M13 22C13 22 19 15.9 19 11.5C19 8.2 16.3 5.5 13 5.5C9.7 5.5 7 8.2 7 11.5C7 15.9 13 22 13 22Z" stroke={stroke} strokeWidth={sw} />
+                    <circle cx="13" cy="11.5" r="2.2" stroke={stroke} strokeWidth={sw} />
+                </>
+            );
+        }
+        return (
+            <>
+                <rect x="8" y="6.2" width="8.8" height="13.5" rx="2.2" stroke={stroke} strokeWidth={sw} />
+                <path d="M16.8 9.2H18.6C19.7 9.2 20.5 10 20.5 11.1V15.4C20.5 16.5 19.7 17.3 18.6 17.3H16.8" stroke={stroke} strokeWidth={sw} />
+                <path d="M10.4 10V16.8" stroke={stroke} strokeWidth={sw} />
+                <path d="M12.4 10V16.8" stroke={stroke} strokeWidth={sw} />
+                <path d="M14.4 10V16.8" stroke={stroke} strokeWidth={sw} />
+                <path d="M9 5.3C9.6 4.3 10.8 4.3 11.4 5.3C12 6.3 13.2 6.3 13.8 5.3C14.4 4.3 15.6 4.3 16.2 5.3" stroke={stroke} strokeWidth={sw} />
+            </>
+        );
+    };
+
+    return (
+        <svg width="24" height="24" viewBox="0 0 26 26" fill="none" strokeLinecap="round" strokeLinejoin="round">
+            <defs>
+                <filter id={blurId} x="-30%" y="-30%" width="160%" height="160%">
+                    <feGaussianBlur stdDeviation="0.4" />
+                </filter>
+            </defs>
+            <g opacity="0.2" filter={`url(#${blurId})`} transform="translate(0 0.5)">
+                {paths()}
+            </g>
+            <g>{paths()}</g>
+        </svg>
+    );
+}
+
+function PlaceBadge({ type }: { type: string }) {
+    const styles: Record<string, { bg: string; border: string }> = {
+        tokyo: { bg: 'linear-gradient(135deg, #FDF0F0 0%, #FFF8F8 100%)', border: '#F3DFDF' },
+        osaka: { bg: 'linear-gradient(135deg, #FEF3E8 0%, #FFF9F2 100%)', border: '#F4E3D1' },
+        seoul: { bg: 'linear-gradient(135deg, #EEF5FD 0%, #F7FBFF 100%)', border: '#DBE8F6' },
+        izakaya: { bg: 'linear-gradient(135deg, #FCF7E7 0%, #FFFBEF 100%)', border: '#EEE4C4' },
+        custom: { bg: 'linear-gradient(135deg, #F1F4F8 0%, #FBFCFE 100%)', border: '#DEE5EE' },
+    };
+    const style = styles[type] || { bg: '#F3F4F6', border: '#E5E7EB' };
+
+    return (
+        <div
+            className="w-[38px] h-[38px] rounded-[11px] flex items-center justify-center shrink-0"
+            style={{
+                background: style.bg,
+                border: `1px solid ${style.border}`,
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.55), 0 1px 2px rgba(0,0,0,0.03)',
+            }}
+        >
+            <div style={{ filter: 'contrast(104%) saturate(98%)' }}>
+                <PlaceIcon type={type} />
+            </div>
+        </div>
+    );
+}
+
+function CollapsedPanel({ label, value, placeholder, onOpen, testId }: CollapsedPanelProps) {
+    return (
+        <button
+            data-testid={testId}
+            onClick={onOpen}
+            className="w-full bg-white flex items-center justify-between px-5 py-[14px] text-left active:scale-[0.99] transition-transform"
+            style={{
+                borderRadius: '16px',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06)',
+                border: '0.5px solid #E3E3E3',
+            }}
+        >
+            <span className="text-[12px] text-[#717171] font-medium">{label}</span>
+            <span className={`text-[12px] ${value ? 'text-[#222222] font-semibold' : 'text-[#B0B0B0] font-medium'}`}>{value || placeholder}</span>
+        </button>
+    );
+}
 
 interface MobileSearchModalProps {
     isOpen: boolean;
     onClose: () => void;
     locationInput: string;
     setLocationInput: (val: string) => void;
-    dateRange: { start: Date | null; end: Date | null };
-    setDateRange: (range: any) => void;
+    dateRange: SearchDateRange;
+    setDateRange: (range: SearchDateRange) => void;
     selectedLanguage: string;
     setSelectedLanguage: (lang: string) => void;
 }
@@ -29,7 +210,7 @@ export default function MobileSearchModal({
     const [activePanel, setActivePanel] = useState<'location' | 'date' | 'language' | null>('location');
     const [isVisible, setIsVisible] = useState(false);
     const [isSearchExpanded, setIsSearchExpanded] = useState(false);
-    const [recentSearches, setRecentSearches] = useState<{ name: string; desc?: string }[]>([]);
+    const [recentSearches, setRecentSearches] = useState<RecentSearch[]>(() => readRecentSearches());
     const expandedInputRef = useRef<HTMLInputElement>(null);
     const scrollLockRef = useRef({
         locked: false,
@@ -57,62 +238,31 @@ export default function MobileSearchModal({
         { label: t('lang_ja'), value: '일본어', sub: englishLanguageNames?.of('ja') || 'Japanese', code: 'jp' },
         { label: t('lang_zh'), value: '중국어', sub: englishLanguageNames?.of('zh') || 'Chinese', code: 'cn' },
     ];
-    const recommendedPlaces = [
-        { id: 'tokyo', queryValue: '도쿄', name: t('search_place_tokyo'), desc: t('search_place_tokyo_desc') },
-        { id: 'osaka', queryValue: '오사카', name: t('search_place_osaka'), desc: t('search_place_osaka_desc') },
-        { id: 'izakaya', queryValue: '이자카야', name: t('search_place_izakaya'), desc: t('search_place_izakaya_desc') },
-        { id: 'seoul', queryValue: '서울', name: t('search_place_seoul'), desc: t('search_place_seoul_desc') },
-    ];
+    const recommendedPlaces = RECOMMENDED_SEARCH_PRESETS.map((preset) => ({
+        ...preset,
+        name: t(preset.labelKey),
+        desc: t(preset.descKey),
+    }));
 
     const normalizeText = (value: unknown) => String(value ?? '').toLowerCase().replace(/\s+/g, '').trim();
     const inferPlaceType = (name: unknown): string => {
-        const value = normalizeText(name);
-        if (value.includes('도쿄') || value.includes('tokyo')) return 'tokyo';
-        if (value.includes('오사카') || value.includes('osaka')) return 'osaka';
-        if (value.includes('서울') || value.includes('seoul')) return 'seoul';
-        if (value.includes('이자카야') || value.includes('izakaya')) return 'izakaya';
-        return 'custom';
+        return matchSearchPreset(name, lang, t)?.id || 'custom';
     };
 
     useEffect(() => {
         if (isOpen) {
-            setActivePanel('location');
-            setIsSearchExpanded(false);
-            if (!selectedLanguage) {
-                setSelectedLanguage('한국어');
-            }
-            requestAnimationFrame(() => setIsVisible(true));
+            requestAnimationFrame(() => {
+                setActivePanel('location');
+                setIsSearchExpanded(false);
+                if (!selectedLanguage) {
+                    setSelectedLanguage('한국어');
+                }
+                setIsVisible(true);
+            });
         } else {
-            setIsVisible(false);
+            requestAnimationFrame(() => setIsVisible(false));
         }
     }, [isOpen, selectedLanguage, setSelectedLanguage]);
-
-    useEffect(() => {
-        if (typeof window === 'undefined') return;
-        try {
-            const stored = window.localStorage.getItem('locally_recent_searches');
-            if (stored) {
-                const parsed = JSON.parse(stored);
-                if (Array.isArray(parsed)) {
-                    const normalized = parsed
-                        .map((item: unknown) => {
-                            if (typeof item === 'string') return { name: item.trim() };
-                            if (!item || typeof item !== 'object') return null;
-                            const entry = item as { name?: unknown; desc?: unknown };
-                            const name = typeof entry.name === 'string' ? entry.name.trim() : '';
-                            if (!name) return null;
-                            const desc = typeof entry.desc === 'string' && entry.desc.trim() ? entry.desc.trim() : undefined;
-                            return { name, desc };
-                        })
-                        .filter((item): item is { name: string; desc?: string } => !!item)
-                        .slice(0, 6);
-                    setRecentSearches(normalized);
-                }
-            }
-        } catch {
-            // ignore
-        }
-    }, []);
 
     useEffect(() => {
         if (typeof window === 'undefined') return;
@@ -216,123 +366,6 @@ export default function MobileSearchModal({
         selectLocation(typed, closeExpanded);
     };
 
-    const PlaceIcon = ({ type }: { type: string }) => {
-        const colors: Record<string, string> = {
-            tokyo: '#EE7B7B',
-            osaka: '#F2A15A',
-            seoul: '#7CB0ED',
-            izakaya: '#D5AE3D',
-        };
-        const stroke = colors[type] || '#6B7280';
-        const sw = 1.0;
-        const blurId = `icon-soft-${type}`;
-
-        const paths = () => {
-            if (type === 'tokyo') {
-                return (
-                    <>
-                        <path d="M13 3V6.2" stroke={stroke} strokeWidth={sw} />
-                        <path d="M11.1 6.2H14.9" stroke={stroke} strokeWidth={sw} />
-                        <path d="M10.8 6.2L9.7 10.5H16.3L15.2 6.2" stroke={stroke} strokeWidth={sw} />
-                        <path d="M8.7 12H17.3" stroke={stroke} strokeWidth={sw} />
-                        <path d="M9.4 12V15.4" stroke={stroke} strokeWidth={sw} />
-                        <path d="M16.6 12V15.4" stroke={stroke} strokeWidth={sw} />
-                        <path d="M7.5 17.3H18.5" stroke={stroke} strokeWidth={sw} />
-                        <path d="M6.2 22H19.8" stroke={stroke} strokeWidth={sw} />
-                        <path d="M7.5 22L10.8 17.3" stroke={stroke} strokeWidth={sw} />
-                        <path d="M18.5 22L15.2 17.3" stroke={stroke} strokeWidth={sw} />
-                        <path d="M10.8 15.4H15.2" stroke={stroke} strokeWidth={sw} />
-                    </>
-                );
-            }
-            if (type === 'osaka') {
-                return (
-                    <>
-                        <path d="M4.5 7.8C9.2 9.2 16.8 9.2 21.5 7.8" stroke={stroke} strokeWidth={sw} />
-                        <path d="M5.4 10.2H20.6" stroke={stroke} strokeWidth={sw} />
-                        <path d="M7.2 10.2V21.5" stroke={stroke} strokeWidth={sw} />
-                        <path d="M18.8 10.2V21.5" stroke={stroke} strokeWidth={sw} />
-                        <path d="M9.8 12.6H16.2" stroke={stroke} strokeWidth={sw} />
-                        <path d="M8.5 15.8H17.5" stroke={stroke} strokeWidth={sw} />
-                        <path d="M6.2 21.5H9.4" stroke={stroke} strokeWidth={sw} />
-                        <path d="M16.6 21.5H19.8" stroke={stroke} strokeWidth={sw} />
-                    </>
-                );
-            }
-            if (type === 'seoul') {
-                return (
-                    <>
-                        <path d="M13 2.8V6.1" stroke={stroke} strokeWidth={sw} />
-                        <path d="M11.9 6.1H14.1" stroke={stroke} strokeWidth={sw} />
-                        <path d="M11.3 6.1V9.2H14.7V6.1" stroke={stroke} strokeWidth={sw} />
-                        <rect x="9.6" y="9.9" width="6.8" height="3.9" rx="0.8" stroke={stroke} strokeWidth={sw} />
-                        <path d="M13 13.8V20.1" stroke={stroke} strokeWidth={sw} />
-                        <path d="M10.3 16.6H15.7" stroke={stroke} strokeWidth={sw} />
-                        <path d="M9.8 20.1H16.2" stroke={stroke} strokeWidth={sw} />
-                        <path d="M7.7 22H18.3" stroke={stroke} strokeWidth={sw} />
-                    </>
-                );
-            }
-            if (type === 'custom') {
-                return (
-                    <>
-                        <path d="M13 22C13 22 19 15.9 19 11.5C19 8.2 16.3 5.5 13 5.5C9.7 5.5 7 8.2 7 11.5C7 15.9 13 22 13 22Z" stroke={stroke} strokeWidth={sw} />
-                        <circle cx="13" cy="11.5" r="2.2" stroke={stroke} strokeWidth={sw} />
-                    </>
-                );
-            }
-            return (
-                <>
-                    <rect x="8" y="6.2" width="8.8" height="13.5" rx="2.2" stroke={stroke} strokeWidth={sw} />
-                    <path d="M16.8 9.2H18.6C19.7 9.2 20.5 10 20.5 11.1V15.4C20.5 16.5 19.7 17.3 18.6 17.3H16.8" stroke={stroke} strokeWidth={sw} />
-                    <path d="M10.4 10V16.8" stroke={stroke} strokeWidth={sw} />
-                    <path d="M12.4 10V16.8" stroke={stroke} strokeWidth={sw} />
-                    <path d="M14.4 10V16.8" stroke={stroke} strokeWidth={sw} />
-                    <path d="M9 5.3C9.6 4.3 10.8 4.3 11.4 5.3C12 6.3 13.2 6.3 13.8 5.3C14.4 4.3 15.6 4.3 16.2 5.3" stroke={stroke} strokeWidth={sw} />
-                </>
-            );
-        };
-
-        return (
-            <svg width="24" height="24" viewBox="0 0 26 26" fill="none" strokeLinecap="round" strokeLinejoin="round">
-                <defs>
-                    <filter id={blurId} x="-30%" y="-30%" width="160%" height="160%">
-                        <feGaussianBlur stdDeviation="0.4" />
-                    </filter>
-                </defs>
-                <g opacity="0.2" filter={`url(#${blurId})`} transform="translate(0 0.5)">
-                    {paths()}
-                </g>
-                <g>{paths()}</g>
-            </svg>
-        );
-    };
-
-    const PlaceBadge = ({ type }: { type: string }) => {
-        const styles: Record<string, { bg: string; border: string }> = {
-            tokyo: { bg: 'linear-gradient(135deg, #FDF0F0 0%, #FFF8F8 100%)', border: '#F3DFDF' },
-            osaka: { bg: 'linear-gradient(135deg, #FEF3E8 0%, #FFF9F2 100%)', border: '#F4E3D1' },
-            seoul: { bg: 'linear-gradient(135deg, #EEF5FD 0%, #F7FBFF 100%)', border: '#DBE8F6' },
-            izakaya: { bg: 'linear-gradient(135deg, #FCF7E7 0%, #FFFBEF 100%)', border: '#EEE4C4' },
-            custom: { bg: 'linear-gradient(135deg, #F1F4F8 0%, #FBFCFE 100%)', border: '#DEE5EE' },
-        };
-        const style = styles[type] || { bg: '#F3F4F6', border: '#E5E7EB' };
-        return (
-            <div
-                className="w-[38px] h-[38px] rounded-[11px] flex items-center justify-center shrink-0"
-                style={{
-                    background: style.bg,
-                    border: `1px solid ${style.border}`,
-                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.55), 0 1px 2px rgba(0,0,0,0.03)',
-                }}
-            >
-                <div style={{ filter: 'contrast(104%) saturate(98%)' }}>
-                    <PlaceIcon type={type} />
-                </div>
-            </div>
-        );
-    };
-
     const handleClose = () => {
         setIsVisible(false);
         setTimeout(onClose, 250);
@@ -388,44 +421,27 @@ export default function MobileSearchModal({
     };
 
     const getLocalizedPlaceName = (value: string) => {
-        const matchedPlace = recommendedPlaces.find((place) => (
-            normalizeText(place.queryValue) === normalizeText(value) ||
-            normalizeText(place.name) === normalizeText(value)
-        ));
-        return matchedPlace?.name || value;
+        return getLocalizedSearchLocationLabel(value, lang, t);
+    };
+
+    const getPlaceSearchTokens = (place: (typeof recommendedPlaces)[number]) => {
+        const tokens = [place.queryValue, place.name, place.desc, place.id];
+        if (place.cityValue) {
+            tokens.push(...getSearchableCityAliases(place.cityValue));
+        }
+        return tokens;
     };
 
     const trimmedInput = locationInput.trim();
     const filteredRecommendedPlaces = recommendedPlaces.filter((place) => {
         if (!trimmedInput) return true;
         const normalizedInput = normalizeText(trimmedInput);
-        return (
-            normalizeText(place.queryValue).includes(normalizedInput) ||
-            normalizeText(place.name).includes(normalizedInput) ||
-            normalizeText(place.desc).includes(normalizedInput)
-        );
+        return getPlaceSearchTokens(place).some((token) => normalizeText(token).includes(normalizedInput));
     });
     const hasExactRecommendedMatch = !!trimmedInput && filteredRecommendedPlaces.some((place) => (
-        normalizeText(place.queryValue) === normalizeText(trimmedInput) ||
-        normalizeText(place.name) === normalizeText(trimmedInput)
+        getPlaceSearchTokens(place).some((token) => normalizeText(token) === normalizeText(trimmedInput))
     ));
     const showCustomTypedOption = !!trimmedInput && !hasExactRecommendedMatch;
-
-    // 접힌 패널
-    const CollapsedPanel = ({ label, value, placeholder, panelKey }: { label: string; value: string; placeholder: string; panelKey: 'location' | 'date' | 'language' }) => (
-        <button
-            onClick={() => setActivePanel(panelKey)}
-            className="w-full bg-white flex items-center justify-between px-5 py-[14px] text-left active:scale-[0.99] transition-transform"
-            style={{
-                borderRadius: '16px',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06)',
-                border: '0.5px solid #E3E3E3',
-            }}
-        >
-            <span className="text-[12px] text-[#717171] font-medium">{label}</span>
-            <span className={`text-[12px] ${value ? 'text-[#222222] font-semibold' : 'text-[#B0B0B0] font-medium'}`}>{value || placeholder}</span>
-        </button>
-    );
 
     const modalView = (
         <div className="fixed inset-0 z-[200] flex h-[100svh] flex-col overflow-hidden overscroll-none">
@@ -451,6 +467,7 @@ export default function MobileSearchModal({
                     {/* 위치 패널 */}
                     {activePanel === 'location' ? (
                         <div
+                            data-testid="home-mobile-location-panel"
                             className="bg-white mb-2 overflow-hidden transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
                             style={{ borderRadius: '22px', boxShadow: '0 2px 6px rgba(0,0,0,0.05), 0 8px 18px rgba(0,0,0,0.06)', border: '0.5px solid #E6E6E6' }}
                         >
@@ -497,6 +514,7 @@ export default function MobileSearchModal({
                                     {recommendedPlaces.map((place) => (
                                         <button
                                             key={place.id}
+                                            data-testid={`home-mobile-location-option-${place.id}`}
                                             onClick={() => selectLocation(place.queryValue)}
                                             className="flex items-center gap-2.5 w-full py-[8px] text-left active:bg-[#F3F3F3] rounded-lg transition-colors"
                                         >
@@ -513,7 +531,13 @@ export default function MobileSearchModal({
                     ) : (
                         <div className="mb-2 flex items-center gap-2.5">
                             <div className="flex-1">
-                                <CollapsedPanel label={t('label_destination')} value={getLocalizedPlaceName(locationInput)} placeholder={t('mobile_add_destination')} panelKey="location" />
+                                <CollapsedPanel
+                                    label={t('label_destination')}
+                                    value={getLocalizedPlaceName(locationInput)}
+                                    placeholder={t('mobile_add_destination')}
+                                    onOpen={() => setActivePanel('location')}
+                                    testId="home-mobile-collapsed-location"
+                                />
                             </div>
                             <button
                                 onClick={handleClose}
@@ -546,7 +570,13 @@ export default function MobileSearchModal({
                         </div>
                     ) : (
                         <div className="mb-2">
-                    <CollapsedPanel label={t('label_date')} value={formatDateRange()} placeholder={t('add_dates')} panelKey="date" />
+                            <CollapsedPanel
+                                label={t('label_date')}
+                                value={formatDateRange()}
+                                placeholder={t('add_dates')}
+                                onOpen={() => setActivePanel('date')}
+                                testId="home-mobile-collapsed-date"
+                            />
                         </div>
                     )}
 
@@ -595,7 +625,13 @@ export default function MobileSearchModal({
                         </div>
                     ) : (
                         <div className="mb-2">
-                    <CollapsedPanel label={t('label_language')} value={getLanguageLabel()} placeholder={t('mobile_language_select')} panelKey="language" />
+                            <CollapsedPanel
+                                label={t('label_language')}
+                                value={getLanguageLabel()}
+                                placeholder={t('mobile_language_select')}
+                                onOpen={() => setActivePanel('language')}
+                                testId="home-mobile-collapsed-language"
+                            />
                         </div>
                     )}
                 </div>
@@ -613,6 +649,7 @@ export default function MobileSearchModal({
                         {t('mobile_clear_all')}
                     </button>
                     <button
+                        data-testid="home-mobile-search-submit"
                         onClick={handleSearch}
                         className="flex items-center gap-1.5 text-white px-5 py-[11px] rounded-[10px] text-[13px] font-bold active:scale-[0.97] transition-transform"
                         style={{ background: 'linear-gradient(to right, #E61E4D 0%, #E31C5F 50%, #D70466 100%)' }}
@@ -692,6 +729,7 @@ export default function MobileSearchModal({
                             {filteredRecommendedPlaces.map((place, idx) => (
                                 <button
                                     key={idx}
+                                    data-testid={`home-mobile-location-option-${place.id}-expanded`}
                                     onClick={() => selectLocation(place.queryValue, true)}
                                     className="flex items-center gap-3 w-full py-[10px] px-1 text-left active:bg-[#EDEDED] rounded-xl transition-colors"
                                 >

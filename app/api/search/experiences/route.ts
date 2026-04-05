@@ -4,6 +4,7 @@ import {
   isPublicHostApplicationStatus,
   pickLatestPublicHostApplicationsByUser,
 } from '@/app/utils/hostVisibility';
+import { getSearchableCityAliases } from '@/app/utils/searchLocationCatalog';
 import { createClient } from '@/app/utils/supabase/server';
 import { normalizeServiceCity } from '@/app/utils/serviceRequestLocation';
 import {
@@ -51,6 +52,7 @@ function buildSearchHaystack(item: SearchExperience) {
     item.title,
     record.description,
     item.city,
+    ...getSearchableCityAliases(item.city),
     item.country,
     record.meeting_point,
     item.category,
@@ -250,8 +252,12 @@ export async function GET(request: NextRequest) {
       ];
 
       const seedTerm = searchTerms[0].replace(/[%_]/g, '');
-      if (seedTerm) {
-        const orQuery = searchFields.map((field) => `${field}.ilike.%${seedTerm}%`).join(',');
+      const canonicalSeedCity = normalizeServiceCity(seedTerm).replace(/[%_]/g, '');
+      const seedVariants = Array.from(new Set([seedTerm, canonicalSeedCity].filter(Boolean)));
+      if (seedVariants.length > 0) {
+        const orQuery = seedVariants
+          .flatMap((term) => searchFields.map((field) => `${field}.ilike.%${term}%`))
+          .join(',');
         query = query.or(orQuery);
       }
     }
