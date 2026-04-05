@@ -47,6 +47,7 @@ export interface HomeExperienceCardData {
   price?: number | string | null;
   rating?: number | null;
   review_count?: number | null;
+  wishlist_count?: number | null;
   photos?: string[] | null;
   image_url?: string | null;
 }

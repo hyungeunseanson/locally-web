@@ -272,6 +272,7 @@ export default function HomeHero({
               {CATEGORIES.map((cat) => (
                 <button
                   key={cat.id}
+                  data-testid={`home-desktop-category-${cat.id}`}
                   onClick={() => setSelectedCategory(cat.id)}
                   className={
                     selectedCategory === cat.id

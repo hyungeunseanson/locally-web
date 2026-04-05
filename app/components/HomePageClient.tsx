@@ -12,11 +12,19 @@ import { useExperienceFilter } from '@/app/hooks/useExperienceFilter';
 import { HomeExperienceCardSkeleton } from '@/app/components/skeletons/HomeExperienceCardSkeleton';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { useSplash } from '@/app/context/SplashContext';
+import { buildHomeExperienceSections } from '@/app/utils/homeExperienceSections';
 
 type HomeExperience = HomeExperienceCardData & {
   created_at?: string | null;
   languages?: string[] | null;
 };
+
+function getDesktopPopularVisibilityClass(index: number) {
+  if (index >= 5) return 'hidden 2xl:block';
+  if (index >= 4) return 'hidden xl:block 2xl:block';
+  if (index >= 3) return 'hidden lg:block xl:block 2xl:block';
+  return 'block';
+}
 
 export default function HomePageClient() {
   const { t } = useLanguage();
@@ -61,6 +69,13 @@ export default function HomePageClient() {
     return query ? `/search?${query}` : '/search';
   }, [dateRange.end, dateRange.start, locationInput, selectedLanguage]);
 
+  const { popularExperiences, allExperiencesLatest } = React.useMemo(
+    () => buildHomeExperienceSections(filteredExperiences as HomeExperience[]),
+    [filteredExperiences]
+  );
+  const mobilePopularExperiences = popularExperiences.slice(0, 10);
+  const desktopPopularExperiences = popularExperiences.slice(0, 6);
+
   const getMobileCityShortcutHref = (cityValue?: string) => {
     if (!cityValue) {
       return '/search';
@@ -70,6 +85,13 @@ export default function HomePageClient() {
     params.set('location', cityValue);
     params.set('city', cityValue);
     return `/search?${params.toString()}`;
+  };
+
+  const handleMobileCityShortcutSelect = (cityValue?: string) => {
+    const destination = getMobileCityShortcutHref(cityValue);
+    if (typeof window !== 'undefined') {
+      window.location.assign(destination);
+    }
   };
 
   return (
@@ -138,11 +160,11 @@ export default function HomePageClient() {
               <div className="md:hidden -mx-5 overflow-x-auto px-5 no-scrollbar" data-testid="home-mobile-city-shortcuts">
                 <div className="mx-auto flex w-max min-w-full items-center justify-center gap-5 border-b border-slate-100 px-1 pb-2">
                   {HOME_MOBILE_CITY_SHORTCUTS.map((shortcut) => (
-                    <Link
+                    <button
                       key={shortcut.id}
-                      href={getMobileCityShortcutHref(shortcut.cityValue)}
+                      type="button"
                       data-testid={`home-mobile-city-shortcut-${shortcut.id}`}
-                      aria-current={shortcut.id === 'all' ? 'page' : undefined}
+                      onClick={() => handleMobileCityShortcutSelect(shortcut.cityValue)}
                       className={
                         shortcut.id === 'all'
                           ? 'flex min-w-fit shrink-0 flex-col items-center gap-1 border-b-2 border-black pb-2 text-center text-slate-900 transition-transform active:scale-[0.97]'
@@ -169,7 +191,7 @@ export default function HomePageClient() {
                           <span className="text-[11px] font-medium leading-tight tracking-[0.02em] whitespace-nowrap text-slate-600">{t(shortcut.label)}</span>
                         </>
                       )}
-                    </Link>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -274,68 +296,88 @@ export default function HomePageClient() {
             </div>
           ) : (
             <>
-              {/* 📱 모바일: 에어비앤비 다중 섹션 레이아웃 */}
+              {/* 📱 모바일: 인기 + 전체 체험 */}
               <div className="md:hidden pb-4">
-                {/* 섹션 렌더 헬퍼 */}
-                {(() => {
-                  const list = filteredExperiences as HomeExperience[];
-
-                  // 섹션별 체험 분류
-                  const popular = list.slice(0, 10);
-                  const newest = [...list].sort((a, b) =>
-                    new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
-                  ).slice(0, 10);
-                  const koreanExp = list.filter((e) => e.languages?.includes('한국어')).slice(0, 10);
-                  const japaneseExp = list.filter((e) => e.languages?.includes('일본어')).slice(0, 10);
-                  const englishExp = list.filter((e) => e.languages?.includes('영어')).slice(0, 10);
-                  const chineseExp = list.filter((e) => e.languages?.includes('중국어')).slice(0, 10);
-
-                  // 언어별 섹션 (사용자 언어에 따라 순서 변경)
-                  const langSections: { title: string; data: HomeExperience[] }[] = [];
-                  if (koreanExp.length > 0) langSections.push({ title: t('home_section_lang_ko'), data: koreanExp });
-                  if (japaneseExp.length > 0) langSections.push({ title: t('home_section_lang_ja'), data: japaneseExp });
-                  if (englishExp.length > 0) langSections.push({ title: t('home_section_lang_en'), data: englishExp });
-                  if (chineseExp.length > 0) langSections.push({ title: t('home_section_lang_zh'), data: chineseExp });
-
-                  const allSections = [
-                    { title: t('home_section_popular_experiences'), data: popular },
-                    { title: t('home_section_new_experiences'), data: newest },
-                    ...langSections,
-                  ].filter(s => s.data.length > 0);
-
-                  const SectionArrow = () => (
-                    <button className="w-[36px] h-[36px] rounded-full flex items-center justify-center shrink-0"
-                      style={{ border: '0.5px solid #B0B0B0' }}>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#222" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
-                    </button>
-                  );
-
-                  return allSections.map((section, idx) => (
-                    <div key={idx}>
-                      {idx > 0 && <div className="h-[12px] w-full mb-1 bg-gradient-to-b from-[#E5E5E5] via-[#EFEFEF] to-transparent" />}
-                      <div className="flex items-center justify-between px-5 pt-3 pb-2">
-                        <h2 className="text-[17px] font-semibold text-[#222222] tracking-[-0.02em] leading-tight">{section.title}</h2>
-                        <SectionArrow />
+                <section data-testid="home-mobile-popular-experiences-section">
+                  <div className="px-5 pt-3 pb-2">
+                    <h2 className="text-[17px] font-semibold leading-tight tracking-[-0.02em] text-[#222222]">
+                      {t('home_section_popular_experiences')}
+                    </h2>
+                  </div>
+                  <div className="flex gap-[10px] overflow-x-auto no-scrollbar px-5 pb-5">
+                    {mobilePopularExperiences.map((item) => (
+                      <div
+                        key={item.id}
+                        data-testid={`home-popular-experience-card-${item.id}`}
+                        className="min-w-[42vw] max-w-[42vw] shrink-0"
+                      >
+                        <HomeExperienceCard data={item} />
                       </div>
-                      <div className="flex gap-[10px] overflow-x-auto no-scrollbar px-5 pb-5">
-                        {section.data.map((item) => (
-                          <div key={item.id} className="min-w-[42vw] max-w-[42vw] shrink-0">
-                            <HomeExperienceCard data={item} />
-                          </div>
-                        ))}
+                    ))}
+                  </div>
+                </section>
+
+                <section data-testid="home-mobile-all-experiences-section">
+                  <div className="px-5 pt-1 pb-3">
+                    <h2 className="text-[17px] font-semibold leading-tight tracking-[-0.02em] text-[#222222]">
+                      {t('home_section_all_experiences')}
+                    </h2>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-2.5 gap-y-5 px-5 pb-5">
+                    {allExperiencesLatest.map((item) => (
+                      <div
+                        key={item.id}
+                        data-testid={`home-all-experience-card-${item.id}`}
+                        className="min-w-0"
+                      >
+                        <HomeExperienceCard data={item} />
                       </div>
-                    </div>
-                  ));
-                })()}
+                    ))}
+                  </div>
+                </section>
               </div>
 
-              {/* 🖥️ 데스크탑: 기존 그리드 */}
-              <div className="hidden md:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-6 gap-y-10">
-                {(filteredExperiences as HomeExperience[]).map((item, index) => (
-                  <div key={item.id} className="animate-in fade-in duration-500" style={{ animationDelay: `${Math.min(index * 60, 600)}ms`, animationFillMode: 'both' }}>
-                    <HomeExperienceCard data={item} />
+              {/* 🖥️ 데스크탑: 인기 체험 1행 + 전체 체험 */}
+              <div className="hidden md:block">
+                <section data-testid="home-desktop-popular-experiences-section">
+                  <div className="mb-5">
+                    <h2 className="text-[28px] font-semibold tracking-[-0.025em] text-slate-900">
+                      {t('home_section_popular_experiences')}
+                    </h2>
                   </div>
-                ))}
+                  <div className="grid md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-6 gap-y-10">
+                    {desktopPopularExperiences.map((item, index) => (
+                      <div
+                        key={item.id}
+                        data-testid={`home-popular-experience-card-${item.id}`}
+                        className={`${getDesktopPopularVisibilityClass(index)} animate-in fade-in duration-500`}
+                        style={{ animationDelay: `${Math.min(index * 60, 360)}ms`, animationFillMode: 'both' }}
+                      >
+                        <HomeExperienceCard data={item} />
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                <section data-testid="home-desktop-all-experiences-section" className="mt-14">
+                  <div className="mb-5">
+                    <h2 className="text-[28px] font-semibold tracking-[-0.025em] text-slate-900">
+                      {t('home_section_all_experiences')}
+                    </h2>
+                  </div>
+                  <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-6 gap-y-10">
+                    {allExperiencesLatest.map((item, index) => (
+                      <div
+                        key={item.id}
+                        data-testid={`home-all-experience-card-${item.id}`}
+                        className="animate-in fade-in duration-500"
+                        style={{ animationDelay: `${Math.min(index * 60, 600)}ms`, animationFillMode: 'both' }}
+                      >
+                        <HomeExperienceCard data={item} />
+                      </div>
+                    ))}
+                  </div>
+                </section>
               </div>
             </>
           )

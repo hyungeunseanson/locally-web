@@ -2,11 +2,23 @@ export interface Experience {
     id: number;
     host_id: string;
     title: string;
+    title_ko?: string | null;
+    title_en?: string | null;
+    title_ja?: string | null;
+    title_zh?: string | null;
     city: string;
+    subCity?: string | null;
     country: string;
     description: string;
+    description_ko?: string | null;
+    description_en?: string | null;
+    description_ja?: string | null;
+    description_zh?: string | null;
     price: number;
     category: string;
+    category_en?: string | null;
+    category_ja?: string | null;
+    category_zh?: string | null;
     tags: string[];
     languages: string[];
     photos: string[];
@@ -14,9 +26,14 @@ export interface Experience {
     max_guests: number;
     duration: number;
     meeting_point: string;
+    meeting_point_i18n?: Record<string, string> | null;
+    location?: string | null;
     status: 'active' | 'inactive';
     created_at: string;
-    available_dates?: string[]; 
+    available_dates?: string[];
+    rating?: number | null;
+    review_count?: number | null;
+    wishlist_count?: number | null;
   }
   
   export interface Profile {

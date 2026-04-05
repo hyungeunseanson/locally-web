@@ -24,8 +24,9 @@ export function useExperienceFilter() {
     isLoading: loading,
     isSuccess
   } = useQuery({
-    queryKey: ['experiences', 'active'], // 캐시 키
+    queryKey: ['home-experiences', 'active'], // 캐시 키
     queryFn: fetchActiveExperiences,     // API 호출 함수
+    staleTime: 60 * 1000,
   });
 
   // 필터링된 결과 상태
