@@ -13,6 +13,8 @@ import {
 import { compressImage, validateImage, isHeicValidationResult } from '@/app/utils/image'; // 🟢 이미지 압축 추가
 import { useLanguage } from '@/app/context/LanguageContext';
 import { useAuth } from '@/app/context/AuthContext';
+import { captureClientException } from '@/app/utils/monitoring/sentry';
+import { buildStorageUploadFailureDiagnostic } from '@/app/utils/supabase/storageUploadDiagnostics';
 import { normalizeDateOfBirth } from '@/app/utils/dateOfBirth';
 import { getHostRegisterCopy, getHostRegisterSubmitErrorMessage } from './localization';
 
@@ -102,6 +104,45 @@ function getFallbackLevel(value: unknown): LanguageLevel {
 }
 
 class LocalizedSubmitError extends Error {}
+
+function reportHostRegisterStorageUploadFailure(
+  error: unknown,
+  {
+    bucket,
+    fileKind,
+    filePath,
+    locale,
+  }: {
+    bucket: string;
+    fileKind: 'profile_photo' | 'id_card';
+    filePath: string;
+    locale: string;
+  }
+) {
+  const diagnostic = buildStorageUploadFailureDiagnostic(error, {
+    route: '/host/register',
+    boundary: 'host_register_storage_upload',
+    bucket,
+    fileKind,
+    filePath,
+    locale,
+  });
+
+  console.error('[host/register] storage upload failed:', diagnostic, error);
+  captureClientException(
+    error instanceof Error ? error : new Error(`[host/register] ${fileKind} storage upload failed`),
+    {
+      route: diagnostic.route,
+      boundary: diagnostic.boundary,
+      bucket: diagnostic.bucket,
+      file_kind: diagnostic.fileKind,
+      path_prefix: diagnostic.pathPrefix || 'unknown',
+      locale: diagnostic.locale || 'unknown',
+      error_code: diagnostic.errorCode || 'unknown',
+      status_code: diagnostic.statusCode ? String(diagnostic.statusCode) : 'unknown',
+    }
+  );
+}
 
 export default function HostRegisterPage() {
   const { lang } = useLanguage();
@@ -338,6 +379,12 @@ export default function HostRegisterPage() {
         const fileName = `profile/${user.id}_${Date.now()}`;
         const { error } = await supabase.storage.from('images').upload(fileName, compressedProfile);
         if (error) {
+          reportHostRegisterStorageUploadFailure(error, {
+            bucket: 'images',
+            fileKind: 'profile_photo',
+            filePath: fileName,
+            locale: lang,
+          });
           throw new LocalizedSubmitError(copy.profilePhotoUploadFailed);
         }
 
@@ -351,6 +398,12 @@ export default function HostRegisterPage() {
         // 🟢 신분증은 보안 버킷인 verification-docs로 업로드합니다.
         const { error } = await supabase.storage.from('verification-docs').upload(fileName, compressedIdCard);
         if (error) {
+          reportHostRegisterStorageUploadFailure(error, {
+            bucket: 'verification-docs',
+            fileKind: 'id_card',
+            filePath: fileName,
+            locale: lang,
+          });
           throw new LocalizedSubmitError(copy.idCardUploadFailed);
         }
         // 보안 버킷이므로 PublicURL 대신 파일명(경로)만 저장하여 DetailsPanel에서 추출 및 서명된 URL 발급할 수 있게 함

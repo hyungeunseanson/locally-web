@@ -7,6 +7,12 @@ import { expect, test, type Page } from '@playwright/test';
 const LIVE_BASE_URL = 'https://locally-web.vercel.app';
 const TEST_IMAGE_PATH = path.resolve(__dirname, 'test-image.png');
 type EnvMap = Record<string, string>;
+type StorageResponseRecord = {
+  url: string;
+  method: string;
+  status: number;
+  bodySnippet: string | null;
+};
 
 let adminClient: SupabaseClient | null = null;
 const createdAuthUserIds: string[] = [];
@@ -113,6 +119,7 @@ test.describe.serial('Live host signup and registration flow', () => {
   test('signs up from host landing and submits a host application', async ({ page }, testInfo) => {
     const user = createUniqueUser();
     const browserIssues: string[] = [];
+    const verificationDocResponses: StorageResponseRecord[] = [];
     createdUserEmails.push(user.email);
     createdAdminAlertMessageFragments.push(user.fullName);
 
@@ -124,6 +131,28 @@ test.describe.serial('Live host signup and registration flow', () => {
       if (message.type() === 'error') {
         browserIssues.push(`[console:error] ${message.text()}`);
       }
+    });
+
+    page.on('response', async (response) => {
+      if (!response.url().includes('/storage/v1/object/verification-docs/')) {
+        return;
+      }
+
+      let bodySnippet: string | null = null;
+      if (response.status() >= 400) {
+        try {
+          bodySnippet = (await response.text()).slice(0, 1000);
+        } catch {
+          bodySnippet = null;
+        }
+      }
+
+      verificationDocResponses.push({
+        url: response.url(),
+        method: response.request().method(),
+        status: response.status(),
+        bodySnippet,
+      });
     });
 
     await test.step('Open host landing and switch login modal to signup mode', async () => {
@@ -255,10 +284,32 @@ test.describe.serial('Live host signup and registration flow', () => {
         )
         .click();
 
+      const idCardUploadResponsePromise = page.waitForResponse(
+        (response) =>
+          response.url().includes('/storage/v1/object/verification-docs/') &&
+          ['POST', 'PUT'].includes(response.request().method()),
+        { timeout: 30000 }
+      );
+
       await page
         .locator('footer')
         .getByRole('button', { name: /신청 완료하기|Submit|提出|送信/ })
         .click();
+
+      const idCardUploadResponse = await idCardUploadResponsePromise;
+
+      if (idCardUploadResponse.status() >= 400) {
+        let bodySnippet = '';
+        try {
+          bodySnippet = (await idCardUploadResponse.text()).slice(0, 1000);
+        } catch {
+          bodySnippet = '';
+        }
+
+        throw new Error(
+          `ID card upload failed before host submit route. status=${idCardUploadResponse.status()} body=${bodySnippet || '<unavailable>'}`
+        );
+      }
 
       await page.waitForURL('**/host/dashboard**', { timeout: 30000 });
       await expect(page).toHaveURL(/\/host\/dashboard/);
@@ -292,6 +343,13 @@ test.describe.serial('Live host signup and registration flow', () => {
         await testInfo.attach('browser-issues.txt', {
           body: browserIssues.join('\n'),
           contentType: 'text/plain',
+        });
+      }
+
+      if (verificationDocResponses.length > 0) {
+        await testInfo.attach('verification-docs-responses.json', {
+          body: JSON.stringify(verificationDocResponses, null, 2),
+          contentType: 'application/json',
         });
       }
     });
