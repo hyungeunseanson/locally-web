@@ -43,10 +43,25 @@ type BookingApiResponse = {
   success?: boolean;
   newOrderId?: string;
   finalAmount?: number;
+  errorCode?: string;
   error?: string;
 };
 
 type PaymentMethod = 'card' | 'bank' | 'paypal';
+type BookingErrorCode =
+  | 'unauthorized'
+  | 'missing_required_fields'
+  | 'customer_name_too_long'
+  | 'customer_phone_invalid'
+  | 'solo_guarantee_invalid'
+  | 'invalid_payment_method'
+  | 'max_guests_exceeded'
+  | 'booking_conflict'
+  | 'booking_not_found'
+  | 'booking_bad_request'
+  | 'solo_guarantee_unavailable_existing_booking'
+  | 'profile_sync_in_progress'
+  | 'server_error';
 type ExperienceCardReadyReason = CardPaymentReadiness['reason'];
 type ExperienceCardReadyResponse = CardPaymentReadiness;
 
@@ -218,6 +233,7 @@ function PaymentContent() {
   const paypalSessionRef = useRef<PayPalPreparedSession | null>(null);
   const paypalRenderedKeyRef = useRef('');
   const hasManualPaymentMethodSelectionRef = useRef(false);
+
   const soloOptionNoticeShownRef = useRef(false);
   const createPayPalOrderRef = useRef<() => Promise<string>>(async () => {
     throw new Error('PayPal create order handler is not ready.');
@@ -246,6 +262,35 @@ function PaymentContent() {
   const baseHostPrice = isPrivate ? Number(experience?.private_price || 300000) : expPrice * guests;
   const soloGuaranteePrice = effectiveIsSoloGuarantee ? SOLO_GUARANTEE_PRICE : 0;
   const hostPrice = baseHostPrice + soloGuaranteePrice;
+
+  const getLocalizedBookingApiError = useCallback((result?: Pick<BookingApiResponse, 'errorCode' | 'error'>) => {
+    if (!result) return t('exp_payment_booking_error') as string;
+
+    switch (result.errorCode as BookingErrorCode | undefined) {
+      case 'unauthorized':
+        return t('login_required') as string;
+      case 'booking_conflict':
+        return isPrivate
+          ? (t('exp_payment_private_conflict') as string)
+          : (t('exp_payment_capacity_conflict') as string);
+      case 'server_error':
+        return t('server_error') as string;
+      default:
+        break;
+    }
+
+    if (result.error?.includes('해당 시간대에 남은 좌석이 부족합니다.')) {
+      return isPrivate
+        ? (t('exp_payment_private_conflict') as string)
+        : (t('exp_payment_capacity_conflict') as string);
+    }
+
+    if (lang === 'ko' && result.error?.trim()) {
+      return result.error.trim();
+    }
+
+    return t('exp_payment_booking_error') as string;
+  }, [isPrivate, lang, t]);
   const guestFee = Math.floor(hostPrice * 0.1);
   const finalAmount = hostPrice + guestFee;
   const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '';
@@ -574,7 +619,7 @@ function PaymentContent() {
     const result = (await res.json()) as BookingApiResponse;
 
     if (!res.ok || !result.success || !result.newOrderId) {
-      const message = result.error || (t('exp_payment_booking_error') as string);
+      const message = getLocalizedBookingApiError(result);
       setPaymentError(message);
       showToast(message, 'error');
       throw new Error(message);
@@ -593,6 +638,7 @@ function PaymentContent() {
     date,
     experienceId,
     getCheckoutValidationError,
+    getLocalizedBookingApiError,
     guests,
     isPrivate,
     effectiveIsSoloGuarantee,
@@ -862,7 +908,7 @@ function PaymentContent() {
       const result = (await res.json()) as BookingApiResponse;
 
       if (!res.ok || !result.success || !result.newOrderId || result.finalAmount == null) {
-        const message = result.error || (t('exp_payment_booking_error') as string);
+        const message = getLocalizedBookingApiError(result);
         setPaymentError(message);
         showToast(message, 'error');
         setIsProcessing(false);
