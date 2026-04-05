@@ -1,19 +1,77 @@
 import type { Experience } from '../../types';
+import { createClient } from '../supabase/client';
+import {
+  isPublicHostApplicationStatus,
+  pickLatestPublicHostApplicationsByUser,
+} from '../hostVisibility';
 
-type HomeExperiencesResponse = {
-  data?: Experience[];
+type PublicHostApplicationRow = {
+  id?: string | number | null;
+  user_id?: string | null;
+  status?: string | null;
+  created_at?: string | null;
+};
+
+type AvailabilityRow = {
+  experience_id: number | string | null;
+  date: string | null;
 };
 
 export const fetchActiveExperiences = async (): Promise<Experience[]> => {
-  const response = await fetch('/api/home/experiences', {
-    cache: 'no-store',
-    credentials: 'same-origin',
-  });
+  const supabase = createClient();
 
-  if (!response.ok) {
+  const { data: publicHostApplications, error: applicationError } = await supabase
+    .from('public_host_applications')
+    .select('id, user_id, status, created_at');
+
+  if (applicationError) {
     throw new Error('체험 데이터를 불러오는 데 실패했습니다.');
   }
 
-  const payload = (await response.json()) as HomeExperiencesResponse;
-  return Array.isArray(payload.data) ? payload.data : [];
+  const visibleHostIds = Array.from(
+    pickLatestPublicHostApplicationsByUser((publicHostApplications || []) as PublicHostApplicationRow[])
+      .values()
+  )
+    .filter((row) => isPublicHostApplicationStatus(row.status))
+    .map((row) => row.user_id)
+    .filter((value): value is string => typeof value === 'string' && value.length > 0);
+
+  if (visibleHostIds.length === 0) {
+    return [];
+  }
+
+  const { data: experiences, error: experiencesError } = await supabase
+    .from('experiences')
+    .select('*')
+    .eq('status', 'active')
+    .in('host_id', visibleHostIds)
+    .order('created_at', { ascending: false });
+
+  if (experiencesError) {
+    throw new Error('체험 데이터를 불러오는 데 실패했습니다.');
+  }
+
+  const experienceRows = (experiences || []) as Experience[];
+  if (experienceRows.length === 0) {
+    return [];
+  }
+
+  const experienceIds = experienceRows.map((experience) => experience.id);
+  const { data: availabilityRows, error: availabilityError } = await supabase
+    .from('experience_availability')
+    .select('experience_id, date')
+    .in('experience_id', experienceIds);
+
+  if (availabilityError) {
+    throw new Error('체험 데이터를 불러오는 데 실패했습니다.');
+  }
+
+  return experienceRows.map((experience) => ({
+    ...experience,
+    available_dates:
+      ((availabilityRows || []) as AvailabilityRow[])
+        .filter((row) => String(row.experience_id) === String(experience.id))
+        .map((row) => row.date)
+        .filter((date): date is string => typeof date === 'string' && date.length > 0),
+  }));
 };

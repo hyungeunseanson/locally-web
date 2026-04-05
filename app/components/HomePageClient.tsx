@@ -40,7 +40,7 @@ export default function HomePageClient() {
   const searchRef = useRef<HTMLDivElement>(null);
 
   const {
-    loading, filteredExperiences, allExperiences,
+    loading, loadError, refetchExperiences, filteredExperiences, allExperiences,
     locationInput, setLocationInput,
     selectedCategory, setSelectedCategory,
     selectedLanguage, setSelectedLanguage,
@@ -75,6 +75,7 @@ export default function HomePageClient() {
   );
   const mobilePopularExperiences = popularExperiences.slice(0, 10);
   const desktopPopularExperiences = popularExperiences.slice(0, 6);
+  const showLoadError = loadError && allExperiences.length === 0 && filteredExperiences.length === 0;
 
   const getMobileCityShortcutHref = (cityValue?: string) => {
     if (!cityValue) {
@@ -268,6 +269,33 @@ export default function HomePageClient() {
                 ))}
               </div>
             </>
+          ) : showLoadError ? (
+            <div
+              data-testid="home-load-error-state"
+              className="flex flex-col items-center justify-center py-40 text-center px-5"
+            >
+              <Ghost size={48} className="text-slate-300 mb-4" />
+              <h3 className="text-lg font-bold text-slate-900 mb-2">{t('home_load_error_title')}</h3>
+              <p className="text-slate-500 text-sm mb-2">{t('home_load_error_desc')}</p>
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                <button
+                  type="button"
+                  data-testid="home-load-error-retry"
+                  onClick={() => {
+                    void refetchExperiences();
+                  }}
+                  className="px-6 py-3 bg-slate-100 text-slate-900 rounded-xl font-bold hover:bg-slate-200 transition-colors"
+                >
+                  {t('home_load_error_retry')}
+                </button>
+                <Link
+                  href="/search"
+                  className="px-6 py-3 rounded-xl border border-slate-300 text-slate-900 font-bold hover:bg-slate-50 transition-colors"
+                >
+                  {t('home_empty_browse')}
+                </Link>
+              </div>
+            </div>
           ) : filteredExperiences.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-40 text-center px-5">
               <Ghost size={48} className="text-slate-300 mb-4" />

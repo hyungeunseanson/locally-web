@@ -18,41 +18,36 @@ const cityMap: Record<string, string> = {
 };
 
 export function useExperienceFilter() {
-  // 🟢 1. React Query를 이용한 데이터 패칭 및 캐싱 (로딩 상태 자동 관리)
   const {
-    data: allExperiences = [], // 기본값 빈 배열
+    data: allExperiences = [],
     isLoading: loading,
-    isSuccess
+    isSuccess,
+    isError,
+    refetch,
   } = useQuery({
-    queryKey: ['home-experiences', 'active'], // 캐시 키
-    queryFn: fetchActiveExperiences,     // API 호출 함수
+    queryKey: ['home-experiences', 'active'],
+    queryFn: fetchActiveExperiences,
     staleTime: 60 * 1000,
+    retry: false,
   });
 
-  // 필터링된 결과 상태
   const [filteredExperiences, setFilteredExperiences] = useState<Experience[]>([]);
-
-  // 필터 컨트롤 상태 (유지)
   const [locationInput, setLocationInput] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedLanguage, setSelectedLanguage] = useState('all');
   const [dateRange, setDateRange] = useState<{ start: Date | null; end: Date | null }>({ start: null, end: null });
 
-  // 🟢 2. React Query로 데이터를 성공적으로 불러오면 초기 필터링 결과에 세팅
   useEffect(() => {
     if (isSuccess) {
       setFilteredExperiences(allExperiences);
     }
   }, [allExperiences, isSuccess]);
 
-  // 🟢 3. 필터 적용 로직 (기존 로직 100% 유지)
   const applyFilters = (locationOverride?: string) => {
     let result = allExperiences;
     const searchTerm = locationOverride !== undefined ? locationOverride : locationInput;
 
-    // 검색어 필터
     if (searchTerm.trim()) {
-      // 🟢 검색 로그 기록 (Supabase, 비동기로 백그라운드에서 실행)
       sendSearchLog(searchTerm.trim(), 'main');
 
       const searchTerms = searchTerm.replace(/[·,.]/g, ' ').toLowerCase().split(/\s+/).filter(t => t.length > 0);
@@ -63,12 +58,10 @@ export function useExperienceFilter() {
       });
     }
 
-    // 언어 필터
     if (selectedLanguage !== 'all' && selectedLanguage !== '전체') {
       result = result.filter(item => item.languages?.includes(selectedLanguage));
     }
 
-    // 날짜 필터
     if (dateRange.start) {
       const start = new Date(dateRange.start); start.setHours(0, 0, 0, 0);
       const end = dateRange.end ? new Date(dateRange.end) : new Date(dateRange.start); end.setHours(23, 59, 59, 999);
@@ -81,7 +74,6 @@ export function useExperienceFilter() {
       );
     }
 
-    // 카테고리(도시) 필터
     if (selectedCategory !== 'all') {
       const targetCity = cityMap[selectedCategory] || selectedCategory;
       result = result.filter(item => item.city === targetCity);
@@ -90,15 +82,15 @@ export function useExperienceFilter() {
     setFilteredExperiences(result);
   };
 
-  // 🟢 4. 카테고리, 언어, 날짜 변경 시 자동 필터 적용 (유지)
   useEffect(() => {
-    // 검색어가 비어있을 때만 자동 필터 적용 (검색 버튼 클릭 시나리오 유지)
     if (!locationInput) applyFilters();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCategory, selectedLanguage, dateRange, allExperiences]); // allExperiences 변경 시 재실행 추가
+  }, [selectedCategory, selectedLanguage, dateRange, allExperiences]);
 
   return {
     loading,
+    loadError: isError,
+    refetchExperiences: refetch,
     filteredExperiences,
     allExperiences,
     locationInput, setLocationInput,

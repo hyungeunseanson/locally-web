@@ -32,7 +32,6 @@ type StubExperience = {
   available_dates: string[];
   review_count: number;
   rating: number;
-  wishlist_count: number;
 };
 
 const HOME_FIXTURES: StubExperience[] = [
@@ -142,7 +141,6 @@ function buildHomeExperience(input: {
     available_dates: ['2025-05-01', '2025-05-02'],
     review_count: input.reviewCount,
     rating: 4.8,
-    wishlist_count: input.wishlistCount,
   };
 }
 
@@ -166,11 +164,72 @@ async function prepareLocale(page: Page, locale: 'ko' | 'en' | 'ja' | 'zh', path
 }
 
 async function stubHomeExperiences(page: Page) {
-  await page.route('**/api/home/experiences', async (route) => {
+  const publicHostApplications = HOME_FIXTURES.map((experience, index) => ({
+    id: String(index + 1),
+    user_id: experience.host_id,
+    status: 'approved',
+    created_at: experience.created_at,
+  }));
+  const experienceRows = HOME_FIXTURES.map((experience) => ({
+    id: experience.id,
+    title: experience.title,
+    title_en: experience.title_en,
+    title_ja: experience.title_ja,
+    title_zh: experience.title_zh,
+    city: experience.city,
+    country: experience.country,
+    description: experience.description,
+    description_en: experience.description_en,
+    description_ja: experience.description_ja,
+    description_zh: experience.description_zh,
+    category: experience.category,
+    category_en: experience.category_en,
+    category_ja: experience.category_ja,
+    category_zh: experience.category_zh,
+    tags: experience.tags,
+    languages: experience.languages,
+    photos: experience.photos,
+    image_url: experience.image_url,
+    price: experience.price,
+    duration: experience.duration,
+    max_guests: experience.max_guests,
+    host_id: experience.host_id,
+    meeting_point: experience.meeting_point,
+    meeting_point_i18n: experience.meeting_point_i18n,
+    location: experience.location,
+    status: experience.status,
+    created_at: experience.created_at,
+    review_count: experience.review_count,
+    rating: experience.rating,
+  }));
+  const availabilityRows = HOME_FIXTURES.flatMap((experience) =>
+    experience.available_dates.map((date) => ({
+      experience_id: experience.id,
+      date,
+    }))
+  );
+
+  await page.route('**/rest/v1/public_host_applications?*', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ data: HOME_FIXTURES }),
+      body: JSON.stringify(publicHostApplications),
+    });
+  });
+
+  await page.route('**/rest/v1/experiences?*', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(experienceRows),
+    });
+  });
+
+  await page.route('**/rest/v1/experience_availability?*', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(availabilityRows),
     });
   });
 }
@@ -190,12 +249,12 @@ test.describe('Home experience sections', () => {
     await expect(allSection).toContainText('All Experiences');
 
     const popularCards = popularSection.locator('[data-testid^="home-popular-experience-card-"]');
-    await expect(popularCards.nth(0)).toContainText('Tokyo Epsilon');
-    await expect(popularCards.nth(1)).toContainText('Tokyo Beta');
-    await expect(popularCards.nth(2)).toContainText('Seoul Gamma');
+    await expect(popularCards.nth(0)).toContainText('Seoul Gamma');
+    await expect(popularCards.nth(1)).toContainText('Tokyo Epsilon');
+    await expect(popularCards.nth(2)).toContainText('Tokyo Alpha');
     await expect(popularCards.nth(3)).toContainText('Fukuoka Zeta');
-    await expect(popularCards.nth(4)).toContainText('Osaka Eta');
-    await expect(popularSection.getByTestId('home-popular-experience-card-9001')).toBeHidden();
+    await expect(popularCards.nth(4)).toContainText('Tokyo Beta');
+    await expect(popularSection.getByTestId('home-popular-experience-card-9007')).toBeHidden();
 
     const allCards = allSection.locator('[data-testid^="home-all-experience-card-"]');
     await expect(allCards.nth(0)).toContainText('Seoul Gamma');
@@ -221,9 +280,9 @@ test.describe('Home experience sections', () => {
     await expect(page.getByText('Experiences in Chinese')).toHaveCount(0);
 
     const popularCards = popularSection.locator('[data-testid^="home-popular-experience-card-"]');
-    await expect(popularCards.nth(0)).toContainText('Tokyo Epsilon');
-    await expect(popularCards.nth(1)).toContainText('Tokyo Beta');
-    await expect(popularCards.nth(2)).toContainText('Seoul Gamma');
+    await expect(popularCards.nth(0)).toContainText('Seoul Gamma');
+    await expect(popularCards.nth(1)).toContainText('Tokyo Epsilon');
+    await expect(popularCards.nth(2)).toContainText('Tokyo Alpha');
 
     const allCards = allSection.locator('[data-testid^="home-all-experience-card-"]');
     await expect(allCards.nth(0)).toContainText('Seoul Gamma');
@@ -245,8 +304,8 @@ test.describe('Home experience sections', () => {
 
     await expect(popularCards).toHaveCount(4);
     await expect(popularCards.nth(0)).toContainText('Tokyo Epsilon');
-    await expect(popularCards.nth(1)).toContainText('Tokyo Beta');
-    await expect(popularCards.nth(2)).toContainText('Tokyo Alpha');
+    await expect(popularCards.nth(1)).toContainText('Tokyo Alpha');
+    await expect(popularCards.nth(2)).toContainText('Tokyo Beta');
     await expect(popularCards.nth(3)).toContainText('Tokyo Theta');
 
     await expect(allCards).toHaveCount(4);
