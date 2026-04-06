@@ -4,7 +4,6 @@ import { useLanguage } from '@/app/context/LanguageContext';
 import {
   getExperienceDurationHours,
   getExperienceLanguageBadges,
-  getExperiencePriceParts,
 } from '@/app/utils/experienceCardDisplay';
 
 type ExperienceCardMetaProps = {
@@ -32,7 +31,6 @@ export default function ExperienceCardMeta({
 }: ExperienceCardMetaProps) {
   const { lang, t } = useLanguage();
   const languageBadges = getExperienceLanguageBadges(languages, lang);
-  const { prefix: pricePrefix, suffix: priceSuffix } = getExperiencePriceParts(lang);
   const rawPrice = typeof price === 'number' ? price : Number(price);
   const formattedPrice = Number.isFinite(rawPrice) ? rawPrice.toLocaleString() : '45,000';
   const durationHours = getExperienceDurationHours(duration);
@@ -72,8 +70,7 @@ export default function ExperienceCardMeta({
         className="mt-0.5 flex flex-wrap items-center gap-x-1 gap-y-0.5 overflow-hidden text-[10px] text-slate-500 md:text-[14px]"
       >
         <span data-testid="experience-card-meta-price" className="shrink-0">
-          {pricePrefix ? <span>{pricePrefix} </span> : null}
-          <span className="font-semibold text-slate-900">₩{formattedPrice}{priceSuffix}</span>
+          <span className="font-semibold text-slate-900">₩{formattedPrice}</span>
         </span>
         {durationText && (
           <>

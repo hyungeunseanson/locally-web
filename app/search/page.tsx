@@ -36,7 +36,7 @@ import { getContent } from '@/app/utils/contentHelper';
 import { getLocalizedExperienceText } from '@/app/utils/experienceTranslation';
 import { formatLocalizedExperienceLocation, getLocalizedCityLabel } from '@/app/utils/locationLocalization';
 import { getLocalizedSearchLocationLabel } from '@/app/utils/searchLocationCatalog';
-import { getExperienceLanguageBadges, getExperiencePriceParts } from '@/app/utils/experienceCardDisplay';
+import { getExperienceLanguageBadges } from '@/app/utils/experienceCardDisplay';
 import { normalizeProfileLanguageValue } from '@/app/utils/profile';
 import { normalizeServiceCity } from '@/app/utils/serviceRequestLocation';
 import type {
@@ -449,7 +449,6 @@ function SearchResults() {
         lang
       ) || t('exp_card_location_fallback');
     const languageBadges = getExperienceLanguageBadges(item.languages, lang);
-    const { prefix: pricePrefix, suffix: priceSuffix } = getExperiencePriceParts(lang);
     const rating = item.rating && item.rating > 0 ? item.rating.toFixed(2) : t('exp_card_new');
     const rawPrice = typeof item.price === 'number' ? item.price : Number(item.price);
     const price = Number.isFinite(rawPrice) ? Number(rawPrice).toLocaleString() : '45,000';
@@ -487,8 +486,11 @@ function SearchResults() {
               </span>
             )}
           </div>
-          <p className="mt-0.5 text-[11px] text-[#3E3E3E]">
-            {pricePrefix}<span className="font-semibold">₩{price}{priceSuffix}</span> · ★ {rating}
+          <p
+            data-testid={`search-mobile-result-card-price-${item.id}`}
+            className="mt-0.5 text-[11px] text-[#3E3E3E]"
+          >
+            <span className="font-semibold">₩{price}</span> · ★ {rating}
           </p>
         </div>
       </Link>

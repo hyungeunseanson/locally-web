@@ -152,6 +152,14 @@ async function expectMetaHierarchy(card: Locator) {
   }
 }
 
+async function expectCompactPrice(locator: Locator) {
+  await expect(locator).toContainText('₩89,000');
+  await expect(locator).not.toContainText('1인당');
+  await expect(locator).not.toContainText('/ guest');
+  await expect(locator).not.toContainText('から / 人');
+  await expect(locator).not.toContainText('起 / 人');
+}
+
 test.describe('Home/search card meta parity', () => {
   test('keeps home meta layout and applies the same hierarchy to search results', async ({ page }) => {
     await stubHomeExperiences(page);
@@ -165,6 +173,7 @@ test.describe('Home/search card meta parity', () => {
     const homeCard = page.locator(`a[href="/experiences/${FIXTURE.id}"]:visible`).first();
     await expect(homeCard).toBeVisible({ timeout: 15000 });
     await expectMetaHierarchy(homeCard);
+    await expectCompactPrice(homeCard.getByTestId('experience-card-meta-price'));
     await expect(homeCard.getByTestId('experience-card-duration')).toContainText('3');
     await expect(homeCard.getByTestId('experience-card-meta-rating')).toContainText('★4.8');
     const homeLocationText = await homeCard.getByTestId('experience-card-meta-location').textContent();
@@ -176,9 +185,24 @@ test.describe('Home/search card meta parity', () => {
     const searchCard = page.getByTestId(`search-result-card-${FIXTURE.id}`).first();
     await expect(searchCard).toBeVisible({ timeout: 15000 });
     await expectMetaHierarchy(searchCard);
+    await expectCompactPrice(searchCard.getByTestId('experience-card-meta-price'));
     await expect(searchCard.getByTestId('experience-card-duration')).toContainText('3');
     await expect(searchCard.getByTestId('experience-card-meta-rating')).toContainText('★4.8');
     await expect(searchCard.getByTestId('experience-card-meta-rating')).toContainText('(12)');
     await expect(searchCard.getByTestId('experience-card-meta-location')).toHaveText(homeLocationText || '');
+  });
+
+  test('keeps mobile search result prices compact without locale suffixes', async ({ page }) => {
+    await stubSearchExperiences(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    await page.goto(`/search?location=${encodeURIComponent(FIXTURE.title)}`, { waitUntil: 'networkidle' });
+    await dismissAnnouncementIfVisible(page);
+
+    const mobileCard = page.getByTestId(`search-mobile-result-card-${FIXTURE.id}`).first();
+    await expect(mobileCard).toBeVisible({ timeout: 15000 });
+    await expect(mobileCard).toContainText(/도쿄 야시장 투어|Tokyo Night Market Tour/);
+    await expectCompactPrice(mobileCard.getByTestId(`search-mobile-result-card-price-${FIXTURE.id}`));
+    await expect(mobileCard).toContainText('★ 4.80');
   });
 });
