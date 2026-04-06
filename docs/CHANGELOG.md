@@ -5,6 +5,15 @@
 
 ---
 
+## v3.40.07 — [Home] Wishlist popularity snapshot reintroduced with fail-open home loading
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟢 홈 인기 랭킹 snapshot 복구 | `supabase_home_popularity_snapshot.sql`, `app/utils/api/experiences.ts` — `experience_popularity_snapshot` 공개 snapshot 테이블과 `refresh_experience_popularity_snapshot()` SECURITY DEFINER 함수를 추가하고, 홈 브라우저 fetch가 `wishlist_count` 를 snapshot에서 합류해 인기 체험을 다시 위시리스트 저장 수 기준으로 정렬하도록 복구 |
+| 🟢 홈 fail-open 경계 유지 | `app/utils/api/experiences.ts` — `public_host_applications`, `experiences`, `experience_availability` 실패는 기존처럼 load error로 처리하되, popularity snapshot 조회만 실패하면 홈 전체를 비우지 않고 `wishlist_count=0` fallback 으로 계속 렌더링하도록 분리 |
+| 🟢 하루 1회 snapshot 갱신 경로 추가 | `app/api/cron/home-popularity-snapshot/route.ts`, `.github/workflows/home-popularity-snapshot.yml` — `CRON_SECRET` 보호 cron route와 GitHub Actions daily scheduler / workflow_dispatch 를 추가해 인기 snapshot을 매일 1회 갱신할 수 있게 구성 |
+| 🟡 focused 홈 회귀 검증 보강 | `tests/e2e/144-home-experience-sections.spec.ts`, `tests/e2e/146-home-popularity-snapshot-fail-open.spec.ts` — wishlist_count 기반 인기 순서와 snapshot query 단독 실패 시 홈 카드가 계속 보이는 fail-open 동작을 검증 |
+
 ## v3.40.06 — [Admin Team] Team Workspace non-chat retention / cleanup hardening
 
 | 항목 | 내용 |

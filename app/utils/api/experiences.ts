@@ -17,6 +17,11 @@ type AvailabilityRow = {
   date: string | null;
 };
 
+type PopularitySnapshotRow = {
+  experience_id: number | string | null;
+  wishlist_count: number | null;
+};
+
 export const fetchActiveExperiences = async (): Promise<Experience[]> => {
   const supabase = createClient();
 
@@ -66,8 +71,26 @@ export const fetchActiveExperiences = async (): Promise<Experience[]> => {
     throw new Error('체험 데이터를 불러오는 데 실패했습니다.');
   }
 
+  let popularityByExperienceId = new Map<string, number>();
+  const { data: popularityRows, error: popularityError } = await supabase
+    .from('experience_popularity_snapshot')
+    .select('experience_id, wishlist_count')
+    .in('experience_id', experienceIds);
+
+  if (popularityError) {
+    console.warn('[Home Experiences] Failed to load popularity snapshot:', popularityError.message);
+  } else {
+    popularityByExperienceId = new Map(
+      ((popularityRows || []) as PopularitySnapshotRow[]).map((row) => [
+        String(row.experience_id),
+        Number.isFinite(row.wishlist_count) ? Number(row.wishlist_count) : 0,
+      ])
+    );
+  }
+
   return experienceRows.map((experience) => ({
     ...experience,
+    wishlist_count: popularityByExperienceId.get(String(experience.id)) ?? 0,
     available_dates:
       ((availabilityRows || []) as AvailabilityRow[])
         .filter((row) => String(row.experience_id) === String(experience.id))
