@@ -928,7 +928,7 @@ function SearchResults() {
                       onClickCapture={(event) => handleDesktopCardClickCapture(event, String(item.id))}
                       onKeyDownCapture={(event) => handleDesktopCardKeyDownCapture(event, String(item.id))}
                     >
-                      <ExperienceCard data={item} showImageCategoryBadge />
+                      <ExperienceCard data={item} showImageCategoryBadge metaLayout="home" />
                     </div>
                   ))}
                 </div>

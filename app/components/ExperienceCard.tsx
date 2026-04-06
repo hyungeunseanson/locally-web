@@ -25,6 +25,7 @@ import { getContent } from '@/app/utils/contentHelper';
 import { CATEGORY_OPTIONS } from '@/app/host/create/config';
 import { formatLocalizedExperienceLocation } from '@/app/utils/locationLocalization';
 import { getExperienceLanguageBadges, getExperiencePriceParts } from '@/app/utils/experienceCardDisplay';
+import ExperienceCardMeta from '@/app/components/ExperienceCardMeta';
 
 type ExperienceCardData = {
   id: number | string;
@@ -46,6 +47,7 @@ type ExperienceCardData = {
   rating?: number | null;
   review_count?: number | null;
   price?: number | string | null;
+  duration?: number | string | null;
 };
 
 function renderCategoryIcon(categoryLabel: string) {
@@ -90,9 +92,11 @@ function renderCategoryIcon(categoryLabel: string) {
 export default function ExperienceCard({
   data,
   showImageCategoryBadge = false,
+  metaLayout = 'legacy',
 }: {
   data: ExperienceCardData;
   showImageCategoryBadge?: boolean;
+  metaLayout?: 'legacy' | 'home';
 }) {
   const { isSaved, toggleWishlist, isLoading } = useWishlist(String(data.id));
   const { lang, t } = useLanguage();
@@ -157,54 +161,68 @@ export default function ExperienceCard({
         </button>
       </div>
 
-      {/* 📝 텍스트 영역 (원본 레이아웃 복구) */}
-      <div className="space-y-0.5 md:space-y-1 px-0.5 md:px-1">
+      {/* 📝 텍스트 영역 */}
+      {metaLayout === 'home' ? (
+        <ExperienceCardMeta
+          title={title}
+          location={location}
+          languages={data.languages}
+          price={data.price}
+          duration={data.duration}
+          rating={data.rating}
+          reviewCount={data.review_count}
+          showReviewCount
+          className="space-y-0.5 px-0.5 md:space-y-1 md:px-1"
+        />
+      ) : (
+        <div className="space-y-0.5 md:space-y-1 px-0.5 md:px-1">
 
-        {/* 1열: [지역 · 카테고리] --------- [별점] */}
-        <div className="flex justify-between items-start">
-          <div className="min-w-0 pr-2">
-            <div className="flex items-center gap-1 overflow-hidden">
-              <h3 className="font-bold text-slate-900 text-[11px] md:text-[13px] truncate leading-none tracking-tight">
-                {location}
-              </h3>
-              {languageBadges.visible.map((label) => (
-                <span
-                  key={label}
-                  className="inline-flex h-[15px] shrink-0 items-center self-center rounded-full border border-slate-200 bg-slate-50 px-1.5 text-[8px] font-medium leading-none text-slate-600 md:h-[18px] md:px-1.5 md:text-[9px]"
-                >
-                  {label}
-                </span>
-              ))}
-              {languageBadges.hiddenCount > 0 && (
-                <span className="inline-flex h-[15px] shrink-0 items-center self-center rounded-full border border-slate-200 bg-slate-50 px-1.5 text-[8px] font-medium leading-none text-slate-600 md:h-[18px] md:px-1.5 md:text-[9px]">
-                  {t('exp_card_languages_more', { count: languageBadges.hiddenCount })}
-                </span>
-              )}
+          {/* 1열: [지역 · 카테고리] --------- [별점] */}
+          <div className="flex justify-between items-start">
+            <div className="min-w-0 pr-2">
+              <div className="flex items-center gap-1 overflow-hidden">
+                <h3 className="font-bold text-slate-900 text-[11px] md:text-[13px] truncate leading-none tracking-tight">
+                  {location}
+                </h3>
+                {languageBadges.visible.map((label) => (
+                  <span
+                    key={label}
+                    className="inline-flex h-[15px] shrink-0 items-center self-center rounded-full border border-slate-200 bg-slate-50 px-1.5 text-[8px] font-medium leading-none text-slate-600 md:h-[18px] md:px-1.5 md:text-[9px]"
+                  >
+                    {label}
+                  </span>
+                ))}
+                {languageBadges.hiddenCount > 0 && (
+                  <span className="inline-flex h-[15px] shrink-0 items-center self-center rounded-full border border-slate-200 bg-slate-50 px-1.5 text-[8px] font-medium leading-none text-slate-600 md:h-[18px] md:px-1.5 md:text-[9px]">
+                    {t('exp_card_languages_more', { count: languageBadges.hiddenCount })}
+                  </span>
+                )}
+              </div>
+              {!showImageCategoryBadge ? (
+                <p className="mt-0.5 text-[10px] md:text-[13px] text-slate-500 truncate">{category}</p>
+              ) : null}
             </div>
-            {!showImageCategoryBadge ? (
-              <p className="mt-0.5 text-[10px] md:text-[13px] text-slate-500 truncate">{category}</p>
-            ) : null}
+            <div className="flex items-center gap-0.5 md:gap-1 text-[11px] md:text-sm shrink-0">
+              <Star size={11} className="md:w-[14px] md:h-[14px]" fill={rating > 0 ? "black" : "none"} />
+              <span>{rating > 0 ? rating.toFixed(2) : t('exp_card_new')}</span>
+              {reviewCount > 0 && <span className="text-slate-400 font-normal">({reviewCount})</span>}
+            </div>
           </div>
-          <div className="flex items-center gap-0.5 md:gap-1 text-[11px] md:text-sm shrink-0">
-            <Star size={11} className="md:w-[14px] md:h-[14px]" fill={rating > 0 ? "black" : "none"} />
-            <span>{rating > 0 ? rating.toFixed(2) : t('exp_card_new')}</span>
-            {reviewCount > 0 && <span className="text-slate-400 font-normal">({reviewCount})</span>}
+
+          {/* 2열: 제목 */}
+          <p className="text-[11px] md:text-[15px] text-slate-500 line-clamp-1 leading-snug tracking-tight">
+            {title}
+          </p>
+
+          {/* 3열: 가격 */}
+          <div className="mt-0.5 md:mt-1">
+            <span className="text-[11px] md:text-[14px] text-slate-500 font-normal">{pricePrefix}</span>
+            <span className="font-black text-slate-900 text-[12px] md:text-[15px] tracking-tight">
+              ₩{Number(data.price).toLocaleString()}{priceSuffix}
+            </span>
           </div>
         </div>
-
-        {/* 2열: 제목 */}
-        <p className="text-[11px] md:text-[15px] text-slate-500 line-clamp-1 leading-snug tracking-tight">
-          {title}
-        </p>
-
-        {/* 3열: 가격 */}
-        <div className="mt-0.5 md:mt-1">
-          <span className="text-[11px] md:text-[14px] text-slate-500 font-normal">{pricePrefix}</span>
-          <span className="font-black text-slate-900 text-[12px] md:text-[15px] tracking-tight">
-            ₩{Number(data.price).toLocaleString()}{priceSuffix}
-          </span>
-        </div>
-      </div>
+      )}
     </Link>
   );
 }

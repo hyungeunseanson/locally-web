@@ -134,6 +134,7 @@ test.describe.serial('Guest search/detail ingress smoke', () => {
     const experienceCard = page.getByTestId(`search-result-card-${experience.id}`).first();
     await expect(experienceCard).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId('search-flow-hint')).toBeVisible({ timeout: 15000 });
+    await expect(experienceCard.getByTestId('experience-card-duration')).toHaveText(durationPattern);
     await experienceCard.click();
     await expect(page.getByTestId('search-selected-experience-cta')).toBeEnabled();
 

@@ -14,6 +14,7 @@ export interface SearchExperience {
   photos?: string[];
   rating?: number;
   price?: number | string;
+  duration?: number | string | null;
   review_count?: number | null;
   available_dates?: string[];
   available_times?: string[];
@@ -88,6 +89,7 @@ export const SEARCH_EXPERIENCE_CARD_SELECT_FIELDS = [
   'rating',
   'review_count',
   'price',
+  'duration',
   'location',
   'meeting_point',
   'meeting_point_i18n',
