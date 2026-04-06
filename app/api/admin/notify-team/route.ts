@@ -10,50 +10,10 @@ import {
     type TeamEventType,
 } from '@/app/utils/teamNotificationPolicy';
 
-const TEAM_CHAT_ROOM_ID = '00000000-0000-0000-0000-000000000000';
-
 type TeamRecipient = {
     email: string;
     userId: string | null;
 };
-
-async function getUnreadTeamChatCount(recipientUserId: string) {
-    const supabaseAdmin = createAdminClient();
-    const unreadFilter = `read_by.is.null,read_by.not.cs.{${recipientUserId}}`;
-
-    const countQuery = await supabaseAdmin
-        .from('admin_task_comments')
-        .select('id', { count: 'exact', head: true })
-        .eq('task_id', TEAM_CHAT_ROOM_ID)
-        .neq('author_id', recipientUserId)
-        .or(unreadFilter);
-
-    if (!countQuery.error && typeof countQuery.count === 'number') {
-        return countQuery.count;
-    }
-
-    const fallbackQuery = await supabaseAdmin
-        .from('admin_task_comments')
-        .select('id, read_by')
-        .eq('task_id', TEAM_CHAT_ROOM_ID)
-        .neq('author_id', recipientUserId)
-        .order('created_at', { ascending: false })
-        .limit(500);
-
-    if (fallbackQuery.error) {
-        throw new Error(fallbackQuery.error.message);
-    }
-
-    return (fallbackQuery.data || []).filter((row) => {
-        const readBy = Array.isArray(row.read_by) ? row.read_by : [];
-        return !readBy.includes(recipientUserId);
-    }).length;
-}
-
-async function shouldSendUnreadTeamChatEmail(recipientUserId: string) {
-    const unreadCount = await getUnreadTeamChatCount(recipientUserId);
-    return unreadCount === 1;
-}
 
 export async function POST(request: Request) {
     try {
@@ -198,35 +158,6 @@ export async function POST(request: Request) {
                     }
                     return;
                 }
-
-                if (eventType === 'team_chat') {
-                    const recipient = recipients.find((item) => item.email === recipientEmail);
-                    if (!recipient?.userId) {
-                        skippedCount += 1;
-                        return;
-                    }
-
-                    const shouldSend = await shouldSendUnreadTeamChatEmail(recipient.userId);
-                    if (!shouldSend) {
-                        skippedCount += 1;
-                        return;
-                    }
-
-                    const result = await sendImmediateAdminEmail({
-                        to: recipientEmail,
-                        subject: `[Locally Admin] ${title}`,
-                        title,
-                        message,
-                        link: notificationLink,
-                        ctaLabel: '대시보드에서 확인하기',
-                    });
-                    if (result.sent) {
-                        sentCount += 1;
-                    } else {
-                        skippedCount += 1;
-                    }
-                    return;
-                }
             } catch (emailError) {
                 console.error(`❌ [Admin Notify API] 이메일 발송 실패 (${recipientEmail}):`, emailError);
             }
@@ -236,7 +167,7 @@ export async function POST(request: Request) {
             success: true,
             count: sentCount,
             skipped: skippedCount,
-            mode: eventType === 'team_chat' ? 'first_unread_only' : 'immediate',
+            mode: 'immediate',
         });
 
     } catch (error: unknown) {

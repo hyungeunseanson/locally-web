@@ -29,18 +29,20 @@ test.describe('Team notify recipient policy', () => {
     expect(recipients).toEqual(['teammate@example.com']);
   });
 
-  test('still excludes the author for team chat emails', async () => {
+  test('sends team task comment emails immediately while excluding the author', async () => {
     const recipients = buildTeamEmailRecipients({
-      eventType: 'team_chat',
+      eventType: 'team_task_comment',
       whitelistEmails: ['teammate@example.com', 'author@example.com'],
       actorEmail: 'author@example.com',
     });
 
+    expect(shouldSendTeamEmail('team_task_comment')).toBe(true);
+    expect(isImmediateTeamEmail('team_task_comment')).toBe(true);
     expect(recipients).toEqual(['teammate@example.com']);
   });
 
-  test('keeps team task comments as in-app only', async () => {
-    expect(shouldSendTeamEmail('team_task_comment')).toBe(false);
-    expect(isImmediateTeamEmail('team_task_comment')).toBe(false);
+  test('keeps unknown team event types non-email', async () => {
+    expect(shouldSendTeamEmail(undefined)).toBe(false);
+    expect(isImmediateTeamEmail(undefined)).toBe(false);
   });
 });

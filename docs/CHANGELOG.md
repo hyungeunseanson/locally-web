@@ -5,6 +5,14 @@
 
 ---
 
+## v3.40.08 — [Admin Team] Team task comments now send immediate email
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟢 팀 할 일 댓글 메일 즉시 발송 | `app/utils/teamNotificationPolicy.ts`, `app/api/admin/notify-team/route.ts`, `app/admin/dashboard/components/TeamTab.tsx` — `team_task_comment`를 즉시 메일 대상에 포함하고, `admin_whitelist` 수신자에게 작성자 제외 원칙으로 바로 발송하도록 정리 |
+| 🟢 obsolete team chat 메일 분기 제거 | `app/utils/teamNotificationPolicy.ts`, `app/api/admin/notify-team/route.ts` — 더 이상 사용하지 않는 `team_chat` 메일 분기와 unread-first helper를 제거해 팀 알림 경계를 TODO/메모 중심으로 축소 |
+| 🟡 정책 문서/테스트 정합성 복구 | `docs/email_notification_policy.md`, `docs/gemini.md`, `tests/e2e/45-team-notify-policy.spec.ts`, `tests/e2e/79-team-notify-guard.spec.ts` — 팀 할 일 댓글 메일 발송/작성자 제외 기준으로 정책을 맞추고, 오래된 `team_todo in-app only` 기대값을 현재 동작으로 교정 |
+
 ## v3.40.07 — [Home] Wishlist popularity snapshot reintroduced with fail-open home loading
 
 | 항목 | 내용 |
