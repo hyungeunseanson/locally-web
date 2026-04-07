@@ -44,6 +44,16 @@ export default function ManageDatesPage() {
   const [loading, setLoading] = useState(false);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const experienceId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const hasAvailabilityChanges = useMemo(
+    () => JSON.stringify(availability) !== JSON.stringify(initialData),
+    [availability, initialData]
+  );
+  const selectedDateSlotCount = selectedDate ? availability[selectedDate]?.length || 0 : 0;
+  const hasIncompleteDraftDate = Boolean(
+    selectedDate &&
+    selectedDateSlotCount === 0 &&
+    (initialData[selectedDate]?.length || 0) === 0
+  );
 
   // 1. 데이터 불러오기
   const fetchDates = useCallback(async () => {
@@ -156,6 +166,10 @@ export default function ManageDatesPage() {
 
   const handleSaveClick = () => {
     if (loading) return;
+    if (hasIncompleteDraftDate && !hasAvailabilityChanges) {
+      showToast(t('sched_time_required'), 'error');
+      return;
+    }
     setIsSaveModalOpen(true);
   };
 
@@ -311,7 +325,23 @@ export default function ManageDatesPage() {
                           </div>
                         )
                       })
-                    ) : <div className="text-center py-10 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 text-sm">{t('sched_add_guide')}</div>} {/* 🟢 번역 */}
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="rounded-xl border-2 border-dashed border-slate-200 py-10 text-center text-sm text-slate-400">
+                          {t('sched_add_guide')}
+                        </div>
+                        {hasIncompleteDraftDate && (
+                          <div className="rounded-2xl border border-rose-200/80 bg-rose-50/80 px-3.5 py-3 md:px-4">
+                            <div className="flex items-start gap-2.5">
+                              <AlertCircle size={15} className="mt-0.5 shrink-0 text-rose-500 md:h-4 md:w-4" />
+                              <p className="text-[11px] leading-5 text-rose-700 md:text-[12px]">
+                                {t('sched_time_required')}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )} {/* 🟢 번역 */}
                   </div>
                   <div className="border-t border-slate-200 pt-6">
                     <label className="text-[10px] md:text-xs font-bold text-slate-500 mb-3 block uppercase">{t('sched_add_label')} (07:00 ~ 21:00)</label> {/* 🟢 번역 */}
