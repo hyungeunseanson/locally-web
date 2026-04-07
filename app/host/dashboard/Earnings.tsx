@@ -357,7 +357,7 @@ export default function Earnings() {
                 type="button"
                 key={i}
                 data-testid={`host-earnings-group-${d.date}`}
-                className="group relative z-10 flex flex-1 cursor-pointer flex-col items-center gap-2 appearance-none border-0 bg-transparent p-0 text-inherit focus:outline-none"
+                className="group relative z-10 flex h-full flex-1 cursor-pointer flex-col items-center justify-end gap-2 appearance-none border-0 bg-transparent p-0 text-inherit focus:outline-none"
                 aria-label={`${d.date} ${t('hp_earn_bar_total_caption')}: ₩${d.amount.toLocaleString()}`}
                 onMouseEnter={() => setActiveTooltipDate(d.date)}
                 onMouseLeave={() => setActiveTooltipDate((current) => (current === d.date ? null : current))}
@@ -367,7 +367,7 @@ export default function Earnings() {
               >
                 <div
                   data-testid={`host-earnings-tooltip-${d.date}`}
-                  className={`pointer-events-none absolute -top-20 z-20 w-max min-w-[152px] rounded-lg bg-slate-900 px-3 py-2 text-center text-[10px] text-white shadow-md transition-opacity opacity-0 group-hover:opacity-100 group-focus:opacity-100 ${
+                  className={`pointer-events-none absolute bottom-full left-1/2 z-20 mb-3 w-max min-w-[152px] -translate-x-1/2 rounded-lg bg-slate-900 px-3 py-2 text-center text-[10px] text-white shadow-md transition-opacity opacity-0 group-hover:opacity-100 group-focus:opacity-100 ${
                     isTooltipVisible ? 'opacity-100' : ''
                   }`}
                 >
