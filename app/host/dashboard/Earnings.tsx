@@ -348,29 +348,21 @@ export default function Earnings() {
           </div>
 
           {chartData.map((d, i) => {
-            // Apply scale to leave 35% empty space at the top for the tooltip
-            const heightPercent = (d.amount / maxAmount) * 65;
-            const barHeight = Math.max(heightPercent, 4);
             const isTooltipVisible = activeTooltipDate === d.date;
 
             return (
               <div
                 key={i}
                 data-testid={`host-earnings-group-${d.date}`}
-                className="group relative z-10 flex h-full flex-1 cursor-pointer flex-col items-center justify-end gap-2"
+                className="group relative z-10 flex h-full flex-1 cursor-pointer flex-col items-center justify-end gap-1.5 pb-1"
                 onMouseEnter={() => setActiveTooltipDate(d.date)}
                 onMouseLeave={() => setActiveTooltipDate((current) => (current === d.date ? null : current))}
                 onClick={() => setActiveTooltipDate((current) => (current === d.date ? null : d.date))}
               >
-                <div
-                  data-testid={`host-earnings-bar-${d.date}`}
-                  className={`w-full max-w-[20px] rounded-t-lg transition-all duration-500 ease-out relative 
-                        ${d.isToday ? 'bg-slate-900' : 'bg-slate-200 group-hover:bg-slate-300'}`}
-                  style={{ height: `${barHeight}%` }}
-                >
+                <div className="relative flex flex-col items-center w-full">
                   <div
                     data-testid={`host-earnings-tooltip-${d.date}`}
-                    className={`pointer-events-none absolute bottom-full left-1/2 z-20 mb-3 w-[150px] md:w-[180px] -translate-x-1/2 rounded-lg bg-slate-900 px-3 py-2 text-center text-white shadow-md transition-opacity opacity-0 group-hover:opacity-100 ${
+                    className={`pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-[150px] md:w-[180px] -translate-x-1/2 rounded-lg bg-slate-900 px-3 py-2 text-center text-white shadow-md transition-opacity opacity-0 group-hover:opacity-100 ${
                       isTooltipVisible ? 'opacity-100' : ''
                     }`}
                   >
@@ -382,8 +374,11 @@ export default function Earnings() {
                     <div className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-slate-900"></div>
                   </div>
 
-                  {d.isToday && (
-                    <div className="absolute -top-1 right-0 w-2.5 h-2.5 bg-rose-500 rounded-full ring-2 ring-white"></div>
+                  {d.isToday ? (
+                    <div className="w-2.5 h-2.5 bg-rose-500 rounded-full ring-2 ring-white"></div>
+                  ) : (
+                    // 보이지 않는 점선 역할의 공간(높이 유지)
+                    <div className="w-2.5 h-2.5 opacity-0"></div>
                   )}
                 </div>
 
