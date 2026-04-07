@@ -285,7 +285,7 @@ export default function Earnings() {
       </div>
 
       {/* 메인 카드 */}
-      <div className="bg-white rounded-2xl md:rounded-[2.5rem] p-5 md:p-8 shadow-xl shadow-slate-200/60 border border-slate-100 relative overflow-hidden">
+      <div className="bg-white rounded-2xl md:rounded-[2.5rem] p-5 md:p-8 shadow-xl shadow-slate-200/60 border border-slate-100 relative">
         <div
           data-testid="host-earnings-scope-note"
           className="mb-5 flex items-start gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-[11px] font-medium leading-relaxed text-slate-600 md:mb-6 md:text-xs"
@@ -371,9 +371,9 @@ export default function Earnings() {
                   }`}
                 >
                   <div className="font-bold mb-1 text-slate-300">{d.date}</div>
-                  <div className="text-white">
-                    <span className="font-black">₩{d.amount.toLocaleString()}</span>{' '}
-                    <span className="text-slate-300">{t('hp_earn_bar_total_caption')}</span>
+                  <div className="text-white flex flex-col items-center gap-0.5">
+                    <span className="font-black text-xs">₩{d.amount.toLocaleString()}</span>
+                    <span className="text-slate-300 leading-tight">{t('hp_earn_bar_total_caption')}</span>
                   </div>
                   <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-900 rotate-45"></div>
                 </div>
