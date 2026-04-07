@@ -340,7 +340,7 @@ export default function Earnings() {
           </div>
         </div>
 
-        <div className="h-36 md:h-48 flex items-end justify-between gap-1 md:gap-4 relative z-10">
+        <div className="h-44 md:h-56 mt-4 flex items-end justify-between gap-1 md:gap-4 relative z-10">
           <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-10 z-0">
             <div className="border-t border-slate-900 border-dashed w-full h-px"></div>
             <div className="border-t border-slate-900 border-dashed w-full h-px"></div>
@@ -348,42 +348,40 @@ export default function Earnings() {
           </div>
 
           {chartData.map((d, i) => {
-            const heightPercent = (d.amount / maxAmount) * 100;
+            // Apply scale to leave 35% empty space at the top for the tooltip
+            const heightPercent = (d.amount / maxAmount) * 65;
             const barHeight = Math.max(heightPercent, 4);
             const isTooltipVisible = activeTooltipDate === d.date;
 
             return (
-              <button
-                type="button"
+              <div
                 key={i}
                 data-testid={`host-earnings-group-${d.date}`}
-                className="group relative z-10 flex h-full flex-1 cursor-pointer flex-col items-center justify-end gap-2 appearance-none border-0 bg-transparent p-0 text-inherit focus:outline-none"
+                className="group relative z-10 flex h-full flex-1 cursor-pointer flex-col items-center justify-end gap-2"
                 onMouseEnter={() => setActiveTooltipDate(d.date)}
                 onMouseLeave={() => setActiveTooltipDate((current) => (current === d.date ? null : current))}
-                onFocus={() => setActiveTooltipDate(d.date)}
-                onBlur={() => setActiveTooltipDate((current) => (current === d.date ? null : current))}
                 onClick={() => setActiveTooltipDate((current) => (current === d.date ? null : d.date))}
               >
-                <div
-                  data-testid={`host-earnings-tooltip-${d.date}`}
-                  className={`pointer-events-none absolute bottom-full left-1/2 z-20 mb-3 w-[180px] -translate-x-1/2 rounded-lg bg-slate-900 px-3 py-2 text-center text-white shadow-md transition-opacity opacity-0 group-hover:opacity-100 group-focus:opacity-100 ${
-                    isTooltipVisible ? 'opacity-100' : ''
-                  }`}
-                >
-                  <div className="mb-0.5 text-[10px] font-bold text-slate-300 md:text-[11px]">{d.date}</div>
-                  <div className="text-xs font-black md:text-sm">₩{d.amount.toLocaleString()}</div>
-                  <div className="mt-1 text-[10px] text-slate-300 md:text-xs">
-                    {t('hp_earn_bar_total_caption')}
-                  </div>
-                  <div className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-slate-900"></div>
-                </div>
-
                 <div
                   data-testid={`host-earnings-bar-${d.date}`}
                   className={`w-full max-w-[20px] rounded-t-lg transition-all duration-500 ease-out relative 
                         ${d.isToday ? 'bg-slate-900' : 'bg-slate-200 group-hover:bg-slate-300'}`}
                   style={{ height: `${barHeight}%` }}
                 >
+                  <div
+                    data-testid={`host-earnings-tooltip-${d.date}`}
+                    className={`pointer-events-none absolute bottom-full left-1/2 z-20 mb-3 w-[150px] md:w-[180px] -translate-x-1/2 rounded-lg bg-slate-900 px-3 py-2 text-center text-white shadow-md transition-opacity opacity-0 group-hover:opacity-100 ${
+                      isTooltipVisible ? 'opacity-100' : ''
+                    }`}
+                  >
+                    <div className="mb-0.5 text-[10px] font-bold text-slate-300 md:text-[11px]">{d.date}</div>
+                    <div className="text-xs font-black md:text-sm">₩{d.amount.toLocaleString()}</div>
+                    <div className="mt-1 text-[10px] text-slate-300 md:text-xs">
+                      {t('hp_earn_bar_total_caption')}
+                    </div>
+                    <div className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-slate-900"></div>
+                  </div>
+
                   {d.isToday && (
                     <div className="absolute -top-1 right-0 w-2.5 h-2.5 bg-rose-500 rounded-full ring-2 ring-white"></div>
                   )}
@@ -392,7 +390,7 @@ export default function Earnings() {
                 <span className={`text-[10px] font-bold ${d.isToday ? 'text-slate-900' : 'text-slate-400'}`}>
                   {d.label}
                 </span>
-              </button>
+              </div>
             )
           })}
         </div>
