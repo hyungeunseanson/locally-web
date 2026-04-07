@@ -158,7 +158,7 @@ export default function ReservationCard({
       <div className="md:hidden px-4 py-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[11px] font-semibold text-slate-500">
+            <p className="truncate text-[12px] font-semibold text-slate-700">
               {res.experiences?.title || '-'}
             </p>
             <div className="mt-1 flex items-center gap-1.5 min-w-0">
@@ -181,7 +181,7 @@ export default function ReservationCard({
         </div>
 
         <div className="mt-3 flex items-stretch gap-2">
-          <div className="flex w-[76px] shrink-0 flex-col items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-2.5 py-3 text-center">
+          <div className="flex w-[72px] shrink-0 flex-col items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-2 py-2.5 text-center">
             <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${dDay === t('res_card_today')
               ? 'bg-rose-100 text-rose-600'
               : isConfirmed
@@ -190,19 +190,19 @@ export default function ReservationCard({
               }`}>
               {dDay}
             </span>
-            <span className="mt-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">{monthName}</span>
-            <span className="mt-1 text-[28px] font-black leading-none text-slate-900">{new Date(res.date).getDate()}</span>
-            <span className="mt-1 text-[10px] font-medium text-slate-400">{res.time || '-'}</span>
+            <span className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{monthName}</span>
+            <span className="mt-1 text-[26px] font-black leading-none text-slate-900">{new Date(res.date).getDate()}</span>
+            <span className="mt-1 text-[10px] font-medium text-slate-300">{res.time || '-'}</span>
           </div>
 
           <div className="min-w-0 flex-1">
-            <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-slate-50 to-white px-3.5 py-3">
+            <div className="rounded-[18px] bg-slate-50 px-3 py-3">
               <div className="flex items-center gap-2">
                 <button
                   onClick={(e) => { e.stopPropagation(); onShowProfile(); }}
                   className="min-w-0 flex flex-1 items-center gap-2 text-left"
                 >
-                  <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full border border-slate-200 bg-slate-100">
+                  <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full border border-slate-200 bg-slate-100">
                     {res.guest?.avatar_url ? (
                       <Image src={secureUrl(res.guest.avatar_url)!} alt={guestName} fill sizes="36px" unoptimized className="object-cover" />
                     ) : (
@@ -213,40 +213,36 @@ export default function ReservationCard({
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <p className="truncate text-[13px] font-bold leading-tight text-slate-900">
+                      <p className="truncate text-[15px] font-semibold leading-tight tracking-[-0.02em] text-slate-900">
                         {guestName}
                       </p>
                       {showMembershipBadge && (
                         <HostGuestMembershipBadge
+                          className="px-1.5 py-0.5 text-[9px]"
                           testId="host-reservation-membership-badge"
                           status={res.membershipStatus as Extract<LocallyMembershipStatus, 'member' | 'circle'>}
                         />
                       )}
                     </div>
-                    <div className="mt-1.5 flex items-center gap-2">
-                      <span className="inline-flex shrink-0 items-center rounded-full bg-white px-2 py-0.5 text-[9px] font-semibold text-slate-500 ring-1 ring-slate-200">
-                        {t('res_profile_btn')}
-                      </span>
-                    </div>
                   </div>
                 </button>
 
-                <div className="min-w-[80px] shrink-0 rounded-xl bg-white/90 px-2 py-2 text-right ring-1 ring-slate-200/80">
-                  <p className="text-[10px] font-semibold leading-none text-slate-400">{t('res_expected_income')}</p>
-                  <p className="mt-1.5 text-[14px] font-black leading-none text-slate-900">
+                <div className="min-w-[76px] shrink-0 pl-2 text-right">
+                  <p className="text-[9px] font-semibold leading-none text-slate-400">{t('res_expected_income')}</p>
+                  <p className="mt-1.5 text-[18px] font-black leading-none tracking-[-0.02em] text-slate-900">
                     {expectedIncomeDisplay}
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-slate-500">
-              <span className="inline-flex max-w-full items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 font-medium">
-                <Clock size={11} className="shrink-0 text-slate-400" />
+            <div className="mt-2 flex flex-wrap gap-2 text-[10px] text-slate-500">
+              <span className="inline-flex max-w-full items-center gap-1 rounded-full bg-slate-50 px-2 py-1 font-medium">
+                <Clock size={10} className="shrink-0 text-slate-400" />
                 <span className="truncate">{paymentTime || '-'}</span>
               </span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 font-medium">
-                <User size={11} className="shrink-0 text-slate-400" />
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1 font-medium">
+                <User size={10} className="shrink-0 text-slate-400" />
                 {guestCount}{t('res_people_count')}
               </span>
             </div>
@@ -409,9 +405,9 @@ export default function ReservationCard({
       )}
 
       {isConfirmed && !isPast && !isCancellationRequestedBookingStatus(res.status) && !hasBookingReview && (
-        <div className="mx-4 md:mx-6 mb-4 rounded-lg border border-amber-200 bg-amber-50 p-2.5 flex items-start gap-2">
+        <div className="mx-4 md:mx-6 mb-4 rounded-xl border border-amber-200/80 bg-amber-50 p-3 flex items-start gap-2">
           <AlertTriangle className="mt-0.5 shrink-0 text-amber-600" size={14} />
-          <p className="text-[11px] leading-snug text-amber-900 font-medium">
+          <p className="text-[12px] leading-[1.45] text-amber-900 font-medium">
             {t('res_card_host_cancel_warning')}
           </p>
         </div>
@@ -477,7 +473,7 @@ function MobileActionButton({
         onClick();
       }}
       disabled={disabled}
-      className={`flex min-h-10 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-[12px] font-bold transition-colors disabled:cursor-default disabled:opacity-70 ${fullWidth ? 'col-span-2' : ''} ${primary
+      className={`flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 py-2 text-[13px] font-bold transition-colors disabled:cursor-default disabled:opacity-70 ${fullWidth ? 'col-span-2' : ''} ${primary
         ? 'bg-slate-900 text-white hover:bg-black'
         : 'border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
         }`}
