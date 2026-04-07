@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, Suspense, useCallback, useMemo, useRef } from 'react';
 import {
   List, MessageSquare, DollarSign, Star, Plus,
   Clock, AlertCircle, XCircle, UserCog, CalendarCheck, ShieldCheck, ArrowLeft, Briefcase
@@ -33,19 +33,22 @@ interface HostStatusSummary {
   admin_comment?: string | null;
 }
 
+const SERVICE_NOTIFICATION_TYPES = new Set([
+  'service_request_new',
+  'service_application_new',
+  'service_host_selected',
+  'service_host_rejected',
+  'service_payment_confirmed',
+  'service_cancelled',
+]);
+
 // 실제 대시보드 로직
 function DashboardContent() {
   const { t } = useLanguage();
   const { notifications, markAsRead } = useNotification();
   const { applicationStatus, refreshHostStatus } = useAuth();
-  // 서비스 관련 안 읽은 알림 여부 (N 배지용)
-  const serviceUnread = notifications.some(
-    (n) => !n.is_read && [
-      'service_request_new', 'service_application_new',
-      'service_host_selected', 'service_host_rejected',
-      'service_payment_confirmed', 'service_cancelled'
-    ].includes(n.type)
-  );
+  const serviceNotificationReadInFlightRef = useRef<Set<number>>(new Set());
+  const markAsReadRef = useRef(markAsRead);
   const [activeTab, setActiveTab] = useState('reservations');
   const [hostStatus, setHostStatus] = useState<HostStatusSummary | null>(null);
   const [profile, setProfile] = useState<HostProfile | null>(null);
@@ -57,6 +60,14 @@ function DashboardContent() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const searchParams = useSearchParams();
+  const unreadServiceNotificationIds = useMemo(
+    () =>
+      notifications
+        .filter((notification) => !notification.is_read && SERVICE_NOTIFICATION_TYPES.has(notification.type))
+        .map((notification) => notification.id),
+    [notifications]
+  );
+  const serviceUnread = unreadServiceNotificationIds.length > 0;
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
@@ -151,8 +162,48 @@ function DashboardContent() {
   }, [fetchData, searchParams]);
 
   useEffect(() => {
+    markAsReadRef.current = markAsRead;
+  }, [markAsRead]);
+
+  useEffect(() => {
     void refreshHostStatus();
   }, [refreshHostStatus]);
+
+  useEffect(() => {
+    if (activeTab !== 'service-jobs' || unreadServiceNotificationIds.length === 0) {
+      return;
+    }
+
+    const idsToMark = unreadServiceNotificationIds.filter(
+      (notificationId) => !serviceNotificationReadInFlightRef.current.has(notificationId)
+    );
+
+    if (idsToMark.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const markServiceNotificationsAsRead = async () => {
+      for (const notificationId of idsToMark) {
+        if (cancelled) return;
+
+        serviceNotificationReadInFlightRef.current.add(notificationId);
+
+        try {
+          await markAsReadRef.current(notificationId);
+        } finally {
+          serviceNotificationReadInFlightRef.current.delete(notificationId);
+        }
+      }
+    };
+
+    void markServiceNotificationsAsRead();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, unreadServiceNotificationIds]);
 
   const contextStatus = applicationStatus?.toLowerCase().trim() || null;
   const hostRecordStatus = hostStatus?.status?.toLowerCase().trim() || null;
@@ -311,10 +362,17 @@ function DashboardContent() {
             <MessageSquare size={20} /> {t('menu_inquiry')}
           </button>
 
-          <button onClick={() => handleTabChange('service-jobs')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'service-jobs' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
+          <button
+            onClick={() => handleTabChange('service-jobs')}
+            data-testid="host-dashboard-service-jobs-tab"
+            className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'service-jobs' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}
+          >
             <Briefcase size={20} /> {t('menu_service_jobs')}
             {serviceUnread && activeTab !== 'service-jobs' && (
-              <span className="ml-auto w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              <span
+                data-testid="host-dashboard-service-jobs-unread-dot"
+                className="ml-auto w-2 h-2 rounded-full bg-red-500 animate-pulse"
+              />
             )}
           </button>
 

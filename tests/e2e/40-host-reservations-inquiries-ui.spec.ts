@@ -19,6 +19,7 @@ const createdApplicationIds: number[] = [];
 const createdExperienceIds: number[] = [];
 const createdBookingIds: string[] = [];
 const createdInquiryIds: number[] = [];
+const createdNotificationIds: number[] = [];
 
 function loadEnv(): EnvMap {
   return readFileSync('.env.local', 'utf8')
@@ -249,6 +250,35 @@ async function createBooking(params: {
   return bookingId;
 }
 
+async function createNotification(params: {
+  userId: string;
+  type: string;
+  title: string;
+  message: string;
+  link: string;
+}) {
+  const supabase = getAdminClient();
+  const { data, error } = await supabase
+    .from('notifications')
+    .insert({
+      user_id: params.userId,
+      type: params.type,
+      title: params.title,
+      message: params.message,
+      link: params.link,
+      is_read: false,
+    })
+    .select('id')
+    .single();
+
+  if (error || !data?.id) {
+    throw error || new Error('Failed to create notification fixture.');
+  }
+
+  createdNotificationIds.push(Number(data.id));
+  return Number(data.id);
+}
+
 async function findLatestInquiry(params: {
   userId: string;
   hostId: string;
@@ -288,6 +318,25 @@ async function findInquiryMessage(inquiryId: number, content: string) {
   return data;
 }
 
+async function waitForNotificationReadState(notificationId: number, expectedRead: boolean) {
+  const supabase = getAdminClient();
+
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('id, is_read')
+      .eq('id', notificationId)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (data?.is_read === expectedRead) return;
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
+  throw new Error(`Notification ${notificationId} did not reach is_read=${expectedRead}.`);
+}
+
 async function login(page: Page, user: TestUser) {
   await page.goto('/login', { waitUntil: 'networkidle' });
   await page.locator('input[type="email"]').fill(user.email);
@@ -307,6 +356,10 @@ async function dismissAnnouncementIfVisible(page: Page) {
 
 test.afterAll(async () => {
   const supabase = getAdminClient();
+
+  if (createdNotificationIds.length > 0) {
+    await supabase.from('notifications').delete().in('id', createdNotificationIds);
+  }
 
   for (const inquiryId of createdInquiryIds) {
     await supabase.from('inquiry_messages').delete().eq('inquiry_id', inquiryId);
@@ -369,6 +422,39 @@ test.describe.serial('Host dashboard reservations and inquiries UI coverage', ()
         'ゲストへの無返信・一方的なキャンセル・無断キャンセルは、精算やアカウント停止などに影響する可能性があります。今すぐ対応が必要な予約と問い合わせを優先的に確認してください。'
       )
     ).toBeVisible({ timeout: 15000 });
+  });
+
+  test('marks service notifications as read when entering the service jobs tab', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const host = createUser('host-service-read');
+    const hostId = await createAuthUser(host);
+
+    await createApprovedHostApplication(hostId, host);
+
+    const notificationId = await createNotification({
+      userId: hostId,
+      type: 'service_request_new',
+      title: '새 서비스 의뢰가 도착했어요',
+      message: '서비스 매칭 탭에서 확인해 주세요.',
+      link: '/services/test-request',
+    });
+
+    await login(page, host);
+    await page.goto('/host/dashboard?tab=reservations', { waitUntil: 'networkidle' });
+    await dismissAnnouncementIfVisible(page);
+
+    const serviceJobsTab = page.getByTestId('host-dashboard-service-jobs-tab');
+    const unreadDot = page.getByTestId('host-dashboard-service-jobs-unread-dot');
+
+    await expect(serviceJobsTab).toBeVisible({ timeout: 15000 });
+    await expect(unreadDot).toBeVisible();
+
+    await serviceJobsTab.click();
+    await page.waitForURL(/\/host\/dashboard\?tab=service-jobs/, { timeout: 15000 });
+    await expect(unreadDot).toHaveCount(0);
+
+    await waitForNotificationReadState(notificationId, true);
   });
 
   test('shows reservation cards, cancellation tab state, and guest profile modal', async ({ page }) => {
