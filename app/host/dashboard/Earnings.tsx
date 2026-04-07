@@ -339,6 +339,15 @@ export default function Earnings() {
           </div>
         </div>
 
+        <div className="mb-3 flex justify-center md:mb-4">
+          <p
+            data-testid="host-earnings-chart-caption"
+            className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-medium text-slate-500 md:text-xs"
+          >
+            {t('hp_earn_bar_total_caption')}
+          </p>
+        </div>
+
         <div className="h-36 md:h-48 flex items-end justify-between gap-1 md:gap-4 relative z-10">
           <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-10 z-0">
             <div className="border-t border-slate-900 border-dashed w-full h-px"></div>
