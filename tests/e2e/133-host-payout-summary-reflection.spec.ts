@@ -207,6 +207,8 @@ test.describe.serial('Host payout summary reflection', () => {
       /아직 지급 완료 내역이 없어요|No completed payout yet|まだ支払い完了履歴がありません|暂时还没有已完成结算/
     );
     await expect(page.getByText('₩60,000').first()).toBeVisible();
-    await expect(page.getByText(/총 2건의 예약 완료|Total 2 bookings completed|計2件の予約完了|共完成2个预定/)).toBeVisible();
+    await expect(page.getByTestId('host-earnings-completed-booking-count')).toContainText(
+      /완료된 예약 2건|Completed 2 bookings|完了した予約2件|已完成预订2个/
+    );
   });
 });

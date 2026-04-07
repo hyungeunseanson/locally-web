@@ -227,6 +227,46 @@ async function seedCompletedBooking(params: {
   createdBookingIds.push(bookingId);
 }
 
+async function seedCancelledPenaltyBooking(params: {
+  hostId: string;
+  host: TestUser;
+  experienceId: number;
+  payoutAmount: number;
+}) {
+  const supabase = getAdminClient();
+  const bookingId = `HOST-EARNINGS-CANCELLED-${Date.now()}`;
+  const bookingDate = new Date();
+  bookingDate.setDate(bookingDate.getDate() - 2);
+
+  const { error } = await supabase.from('bookings').insert({
+    id: bookingId,
+    order_id: bookingId,
+    user_id: params.hostId,
+    experience_id: params.experienceId,
+    amount: 33000,
+    total_price: 30000,
+    total_experience_price: 30000,
+    status: 'cancelled',
+    guests: 1,
+    date: bookingDate.toISOString().slice(0, 10),
+    time: '11:00',
+    type: 'group',
+    contact_name: params.host.fullName,
+    contact_phone: params.host.phone,
+    message: '',
+    created_at: bookingDate.toISOString(),
+    payment_method: 'card',
+    host_payout_amount: params.payoutAmount,
+    platform_revenue: 12000,
+    payout_status: 'pending',
+    is_solo_guarantee: false,
+    solo_guarantee_price: 0,
+  });
+
+  if (error) throw error;
+  createdBookingIds.push(bookingId);
+}
+
 async function login(page: Page, user: TestUser) {
   await page.goto('/login', { waitUntil: 'networkidle' });
   await page.locator('input[type="email"]').fill(user.email);
@@ -277,16 +317,46 @@ test.describe.serial('Host earnings payout-focused policy', () => {
     await expect(page.getByTestId('host-earnings-payout-summary')).toContainText('₩24,000');
     await expect(page.getByTestId('host-earnings-payout-summary')).toContainText('₩0');
     await expect(page.getByText('₩24,000').first()).toBeVisible();
-    await expect(page.getByText(/총 1건의 예약 완료|Total 1 bookings completed|計1件の予約完了|共完成1个预定/)).toBeVisible();
+    await expect(page.getByTestId('host-earnings-completed-booking-count')).toContainText(
+      /완료된 예약 1건|Completed 1 bookings|完了した予約1件|已完成预订1个/
+    );
+    await expect(page.getByTestId('host-earnings-today-marker-note')).toContainText(
+      /빨간 점은 오늘 날짜 표시입니다\.|The red dot marks today on the chart\.|赤い点は今日の日付を示します。|红点表示图表中的今天。/
+    );
 
     await page.getByRole('button', { name: /수입 상세 내역 보기|View Income Details|収入詳細を見る|查看收入详情/ }).click();
 
-    await expect(page.getByText(/총 예약 건수|Total Bookings|総予約件数|总预订数/)).toBeVisible();
+    await expect(page.getByText(/완료된 예약 건수|Completed Bookings|完了した予約件数|已完成预订数/)).toBeVisible();
     await expect(page.getByText(/1\s*건|1 bookings|1件|1个/).first()).toBeVisible();
+    await expect(page.getByText(/정산 반영 항목|Payout Items|精算反映項目|结算计入项目/)).toBeVisible();
     await expect(page.getByText(/최종 지급액 \(Net\)|Net Payout|最終支払額 \(Net\)|最终支付额 \(Net\)/)).toBeVisible();
 
     await expect(page.getByText(/총 매출 \(게스트 결제액\)|Total Revenue \(Guest Paid\)|総売上（ゲスト決済額）|总收入 \(房客付款\)/)).toHaveCount(0);
     await expect(page.getByText(/서비스 수수료|Service Fee|サービス手数料|服务费/)).toHaveCount(0);
     await expect(page.getByText(/결제망 이용료|Payment Gateway Fee|決済網利用料|支付网关手续费/)).toHaveCount(0);
+  });
+
+  test('keeps cancelled penalty payouts in totals but excludes them from completed booking counts', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const hostUser = createUser('cancelled-penalty');
+    const hostId = await createAuthUser(hostUser);
+    await createApprovedHostApplication(hostId, hostUser);
+    const experienceId = await createExperienceFixture(hostId);
+    await seedCompletedBooking({ hostId, host: hostUser, experienceId });
+    await seedCancelledPenaltyBooking({ hostId, host: hostUser, experienceId, payoutAmount: 12000 });
+
+    await login(page, hostUser);
+    await page.goto('/host/dashboard?tab=earnings', { waitUntil: 'networkidle' });
+
+    await expect(page.getByTestId('host-earnings-total-payout')).toContainText('₩36,000');
+    await expect(page.getByTestId('host-earnings-completed-booking-count')).toContainText(
+      /완료된 예약 1건|Completed 1 bookings|完了した予約1件|已完成预订1个/
+    );
+
+    await page.getByRole('button', { name: /수입 상세 내역 보기|View Income Details|収入詳細を見る|查看收入详情/ }).click();
+
+    await expect(page.getByTestId('host-earnings-summary-completed-count')).toContainText(/1/);
+    await expect(page.getByTestId('host-earnings-summary-payout-items')).toContainText(/2/);
   });
 });
