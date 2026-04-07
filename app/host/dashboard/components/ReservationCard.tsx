@@ -180,7 +180,7 @@ export default function ReservationCard({
           </div>
         </div>
 
-        <div className="mt-3 flex items-stretch gap-3">
+        <div className="mt-3 flex items-stretch gap-2">
           <div className="flex w-[76px] shrink-0 flex-col items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-2.5 py-3 text-center">
             <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${dDay === t('res_card_today')
               ? 'bg-rose-100 text-rose-600'
@@ -197,12 +197,12 @@ export default function ReservationCard({
 
           <div className="min-w-0 flex-1">
             <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-slate-50 to-white px-3.5 py-3">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <button
                   onClick={(e) => { e.stopPropagation(); onShowProfile(); }}
-                  className="min-w-0 flex flex-1 items-center gap-3 text-left"
+                  className="min-w-0 flex flex-1 items-center gap-2 text-left"
                 >
-                  <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full border border-slate-200 bg-slate-100">
+                  <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full border border-slate-200 bg-slate-100">
                     {res.guest?.avatar_url ? (
                       <Image src={secureUrl(res.guest.avatar_url)!} alt={guestName} fill sizes="36px" unoptimized className="object-cover" />
                     ) : (
@@ -231,9 +231,9 @@ export default function ReservationCard({
                   </div>
                 </button>
 
-                <div className="min-w-[96px] shrink-0 rounded-xl bg-white/90 px-3 py-2 text-right ring-1 ring-slate-200/80">
+                <div className="min-w-[80px] shrink-0 rounded-xl bg-white/90 px-2 py-2 text-right ring-1 ring-slate-200/80">
                   <p className="text-[10px] font-semibold leading-none text-slate-400">{t('res_expected_income')}</p>
-                  <p className="mt-1.5 text-[15px] font-black leading-none text-slate-900">
+                  <p className="mt-1.5 text-[14px] font-black leading-none text-slate-900">
                     {expectedIncomeDisplay}
                   </p>
                 </div>
