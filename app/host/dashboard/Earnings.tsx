@@ -359,10 +359,11 @@ export default function Earnings() {
                 {/* ✅ [수정] 툴팁에 날짜 표시 추가 */}
                 <div
                   data-testid={`host-earnings-tooltip-${d.date}`}
-                  className="opacity-0 group-hover:opacity-100 absolute -top-14 bg-slate-900 text-white text-[10px] px-2 py-1.5 rounded transition-opacity whitespace-nowrap z-20 shadow-md text-center"
+                  className="opacity-0 group-hover:opacity-100 absolute -top-16 bg-slate-900 text-white text-[10px] px-2 py-1.5 rounded transition-opacity whitespace-nowrap z-20 shadow-md text-center"
                 >
                   <div className="font-bold mb-0.5 text-slate-300">{d.date}</div>
                   <div className="font-bold">₩{d.amount.toLocaleString()}</div>
+                  <div className="text-[9px] text-slate-300">{t('hp_earn_bar_total_caption')}</div>
                   <div className="text-slate-300">{t('hp_earn_payout_items')}: {d.itemCount}{t('unit_cases')}</div>
                   <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-900 rotate-45"></div>
                 </div>
