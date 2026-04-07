@@ -351,7 +351,6 @@ export default function Earnings() {
             const heightPercent = (d.amount / maxAmount) * 100;
             const barHeight = Math.max(heightPercent, 4);
             const isTooltipVisible = activeTooltipDate === d.date;
-            const tooltipTitle = `${d.date} ${t('hp_earn_bar_total_caption')}: ₩${d.amount.toLocaleString()}`;
 
             return (
               <button
@@ -359,8 +358,7 @@ export default function Earnings() {
                 key={i}
                 data-testid={`host-earnings-group-${d.date}`}
                 className="group relative z-10 flex flex-1 cursor-pointer flex-col items-center gap-2 appearance-none border-0 bg-transparent p-0 text-inherit focus:outline-none"
-                title={tooltipTitle}
-                aria-label={tooltipTitle}
+                aria-label={`${d.date} ${t('hp_earn_bar_total_caption')}: ₩${d.amount.toLocaleString()}`}
                 onMouseEnter={() => setActiveTooltipDate(d.date)}
                 onMouseLeave={() => setActiveTooltipDate((current) => (current === d.date ? null : current))}
                 onFocus={() => setActiveTooltipDate(d.date)}
@@ -369,14 +367,14 @@ export default function Earnings() {
               >
                 <div
                   data-testid={`host-earnings-tooltip-${d.date}`}
-                  className={`pointer-events-none absolute -top-16 z-20 whitespace-nowrap rounded bg-slate-900 px-2 py-1.5 text-center text-[10px] text-white shadow-md transition-opacity opacity-0 group-hover:opacity-100 group-focus:opacity-100 ${
+                  className={`pointer-events-none absolute -top-20 z-20 w-max min-w-[152px] rounded-lg bg-slate-900 px-3 py-2 text-center text-[10px] text-white shadow-md transition-opacity opacity-0 group-hover:opacity-100 group-focus:opacity-100 ${
                     isTooltipVisible ? 'opacity-100' : ''
                   }`}
                 >
-                  <div className="font-bold mb-0.5 text-slate-300">{d.date}</div>
-                  <div className="font-bold">₩{d.amount.toLocaleString()}</div>
-                  <div className="text-[9px] text-slate-300">{t('hp_earn_bar_total_caption')}</div>
-                  <div className="text-slate-300">{t('hp_earn_payout_items')}: {d.itemCount}{t('unit_cases')}</div>
+                  <div className="font-bold text-slate-300">{d.date}</div>
+                  <div className="mt-1 text-[10px] font-medium leading-tight text-slate-200">{t('hp_earn_bar_total_caption')}</div>
+                  <div className="mt-1 text-sm font-black text-white">₩{d.amount.toLocaleString()}</div>
+                  <div className="mt-1 text-slate-300">{t('hp_earn_payout_items')}: {d.itemCount}{t('unit_cases')}</div>
                   <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-900 rotate-45"></div>
                 </div>
 

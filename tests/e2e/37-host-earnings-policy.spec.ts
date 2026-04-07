@@ -333,7 +333,7 @@ test.describe.serial('Host earnings payout-focused policy', () => {
       /완료된 예약 1건|Completed 1 bookings|完了した予約1件|已完成预订1个/
     );
     await expect(page.getByTestId('host-earnings-today-marker-note')).toContainText(
-      /빨간 점은 오늘 날짜 표시이고, 막대는 체험일 기준 정산 합계입니다\.|The red dot marks today, and each bar is grouped by experience date\.|赤い点は今日の日付を示し、棒グラフは体験日ごとの精算合計です。|红点表示今天，柱状图按体验日期汇总结算金额。/
+      /빨간 점은 오늘 날짜 표시입니다\. 막대는 체험일 기준 정산 합계입니다\.|The red dot marks today\. Each bar is grouped by experience date\.|赤い点は今日の日付を示します。棒グラフは体験日ごとの精算合計です。|红点表示今天。柱状图按体验日期汇总结算金额。/
     );
 
     await page.getByRole('button', { name: /수입 상세 내역 보기|View Income Details|収入詳細を見る|查看收入详情/ }).click();
