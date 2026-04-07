@@ -368,8 +368,8 @@ export default function Earnings() {
                   >
                     <div className="mb-0.5 text-[10px] font-bold text-slate-300 md:text-[11px]">{d.date}</div>
                     <div className="text-xs font-black md:text-sm">₩{d.amount.toLocaleString()}</div>
-                    <div className="mt-1 text-[10px] text-slate-300 md:text-xs">
-                      이 날짜에 결제된 총금액
+                    <div suppressHydrationWarning className="mt-1 text-[10px] text-slate-300 md:text-xs">
+                      {t('hp_earn_bar_total_caption')}
                     </div>
                     <div className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-slate-900"></div>
                   </div>
