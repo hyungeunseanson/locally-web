@@ -398,9 +398,15 @@ test.describe.serial('Host earnings payout-focused policy', () => {
     await page.goto('/host/dashboard?tab=earnings', { waitUntil: 'networkidle' });
 
     await page.getByTestId(`host-earnings-group-${bookingDateKey}`).hover();
+    await expect(page.getByTestId(`host-earnings-tooltip-${bookingDateKey}`)).toBeVisible();
     await expect(page.getByTestId(`host-earnings-tooltip-${bookingDateKey}`)).toContainText('₩24,000');
     await expect(page.getByTestId(`host-earnings-tooltip-${bookingDateKey}`)).toContainText(
-      /정산 반영 항목: 1건|Payout Items: 1 bookings|精算反映項目: 1件|结算计入项目: 1件/
+      /이 날짜에 결제된 총금액|Total amount paid on this date|この日に決済された合計金額|这一天支付的总金额/
     );
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByTestId(`host-earnings-group-${bookingDateKey}`).click();
+    await expect(page.getByTestId(`host-earnings-tooltip-${bookingDateKey}`)).toBeVisible();
+    await expect(page.getByTestId(`host-earnings-tooltip-${bookingDateKey}`)).toContainText('₩24,000');
   });
 });
