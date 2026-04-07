@@ -371,9 +371,11 @@ export default function Earnings() {
                   }`}
                 >
                   <div className="font-bold mb-1 text-slate-300">{d.date}</div>
-                  <div className="text-white flex flex-col items-center gap-0.5">
-                    <span className="font-black text-xs">₩{d.amount.toLocaleString()}</span>
-                    <span className="text-slate-300 leading-tight">{t('hp_earn_bar_total_caption')}</span>
+                  <div className="text-white text-center">
+                    <div className="font-black text-xs md:text-sm">₩{d.amount.toLocaleString()}</div>
+                    <div className="text-slate-300 text-[10px] md:text-[11px] leading-tight whitespace-nowrap mt-1 block">
+                      {t('hp_earn_bar_total_caption')}
+                    </div>
                   </div>
                   <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-900 rotate-45"></div>
                 </div>
