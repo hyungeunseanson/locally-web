@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
-import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
+import { insertAdminAlerts, sendAdminAlertEmails } from '@/app/utils/adminAlertCenter';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 import { captureServerException } from '@/app/utils/monitoring/sentry';
 
@@ -165,11 +165,11 @@ export async function POST(request: Request) {
         const finalAmount = Number(bookingData.final_amount);
         const hostId = bookingData.host_id;
         const experienceTitle = bookingData.experience_title || 'Locally 체험';
+        const isBankTransferPending = paymentMethod === 'bank';
 
         // 7. 호스트 알림 발송 (클라이언트 인젝션 완벽 차단)
         // - 에러가 나더라도 예약 진행을 막지 않도록 비동기로 별도 에러 로깅만 처리
         if (hostId) {
-            const isPending = paymentMethod === 'bank';
             const guestUserId = user.id;
             (async () => {
                 let guestDisplayName = customerName || '게스트';
@@ -189,7 +189,7 @@ export async function POST(request: Request) {
                     copyParams: {
                         experienceTitle,
                         guestName: guestDisplayName,
-                        state: isPending ? 'pending' : 'processing',
+                        state: isBankTransferPending ? 'pending' : 'processing',
                     },
                 });
 
@@ -198,11 +198,27 @@ export async function POST(request: Request) {
             })();
         }
 
-        insertAdminAlerts({
-            title: paymentMethod === 'bank' ? '새 예약이 접수되었습니다 (입금 대기)' : '새 예약이 생성되었습니다',
-            message: `'${experienceTitle}' 예약이 ${paymentMethod === 'bank' ? '무통장 입금 대기 상태로' : '결제 진행 상태로'} 생성되었습니다.`,
-            link: '/admin/dashboard?tab=LEDGER',
-        }).catch((adminAlertError) => {
+        const adminAlertTitle = isBankTransferPending ? '새 예약이 접수되었습니다 (입금 대기)' : '새 예약이 생성되었습니다';
+        const adminAlertMessage = `'${experienceTitle}' 예약이 ${isBankTransferPending ? '무통장 입금 대기 상태로' : '결제 진행 상태로'} 생성되었습니다.`;
+        const adminAlertLink = '/admin/dashboard?tab=LEDGER';
+
+        void (async () => {
+            await insertAdminAlerts({
+                title: adminAlertTitle,
+                message: adminAlertMessage,
+                link: adminAlertLink,
+            });
+
+            if (!isBankTransferPending) return;
+
+            await sendAdminAlertEmails({
+                subject: `[Locally Admin] ${adminAlertTitle}`,
+                title: adminAlertTitle,
+                message: `${adminAlertMessage}\n\nLEDGER 탭에서 예약을 확인해주세요.`,
+                link: adminAlertLink,
+                ctaLabel: '예약 보기',
+            });
+        })().catch((adminAlertError) => {
             console.error('Booking Admin Alert Error:', adminAlertError);
         });
 
