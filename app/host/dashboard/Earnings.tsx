@@ -19,6 +19,7 @@ type EarningsBookingRow = {
   total_price?: number | null;
   total_experience_price?: number | null;
   created_at: string;
+  date?: string | null;
   status: string;
   host_payout_amount?: number | null;
   platform_revenue?: number | null;
@@ -54,6 +55,21 @@ function formatLatestPayoutDate(value: string | null, locale: string) {
   }).format(new Date(value));
 }
 
+function formatDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getBookingChartDateKey(booking: EarningsBookingRow) {
+  if (booking.date && /^\d{4}-\d{2}-\d{2}$/.test(booking.date)) {
+    return booking.date;
+  }
+
+  return formatDateKey(new Date(booking.created_at));
+}
+
 export default function Earnings() {
   const supabase = createClient();
   const router = useRouter();
@@ -75,6 +91,7 @@ export default function Earnings() {
   const [chartData, setChartData] = useState<{
     date: string;
     amount: number;
+    itemCount: number;
     label: string;
     isToday: boolean;
   }[]>([]);
@@ -99,6 +116,7 @@ export default function Earnings() {
             total_price,
             total_experience_price,
             created_at,
+            date,
             status,
             host_payout_amount,
             platform_revenue,
@@ -119,6 +137,7 @@ export default function Earnings() {
               total_price,
               total_experience_price,
               created_at,
+              date,
               status,
               host_payout_amount,
               platform_revenue,
@@ -147,6 +166,7 @@ export default function Earnings() {
         let latestPaidAt: string | null = null;
 
         const dailyIncome: Record<string, number> = {};
+        const dailyItemCounts: Record<string, number> = {};
 
         (bookings as EarningsBookingRow[] | null)?.forEach((booking) => {
           const itemPayout = getBookingHostPayout(booking);
@@ -154,7 +174,7 @@ export default function Earnings() {
             return;
           }
 
-          const dateStr = booking.created_at.split('T')[0];
+          const dateStr = getBookingChartDateKey(booking);
           totalPayout += itemPayout;
           payoutItemCount++;
 
@@ -176,6 +196,12 @@ export default function Earnings() {
           } else {
             dailyIncome[dateStr] = itemPayout;
           }
+
+          if (dailyItemCounts[dateStr]) {
+            dailyItemCounts[dateStr] += 1;
+          } else {
+            dailyItemCounts[dateStr] = 1;
+          }
         });
 
         // 차트 데이터 생성
@@ -185,12 +211,13 @@ export default function Earnings() {
         for (let i = -7; i <= 4; i++) {
           const d = new Date();
           d.setDate(today.getDate() + i);
-          const dateStr = d.toISOString().split('T')[0];
+          const dateStr = formatDateKey(d);
           const dayLabel = String(d.getDate());
 
           chart.push({
             date: dateStr,
             amount: dailyIncome[dateStr] || 0,
+            itemCount: dailyItemCounts[dateStr] || 0,
             label: dayLabel,
             isToday: i === 0
           });
@@ -324,15 +351,24 @@ export default function Earnings() {
             const barHeight = Math.max(heightPercent, 4);
 
             return (
-              <div key={i} className="flex-1 flex flex-col items-center gap-2 group cursor-pointer relative z-10">
+              <div
+                key={i}
+                data-testid={`host-earnings-group-${d.date}`}
+                className="flex-1 flex flex-col items-center gap-2 group cursor-pointer relative z-10"
+              >
                 {/* ✅ [수정] 툴팁에 날짜 표시 추가 */}
-                <div className="opacity-0 group-hover:opacity-100 absolute -top-12 bg-slate-900 text-white text-[10px] px-2 py-1.5 rounded transition-opacity whitespace-nowrap z-20 shadow-md text-center">
+                <div
+                  data-testid={`host-earnings-tooltip-${d.date}`}
+                  className="opacity-0 group-hover:opacity-100 absolute -top-14 bg-slate-900 text-white text-[10px] px-2 py-1.5 rounded transition-opacity whitespace-nowrap z-20 shadow-md text-center"
+                >
                   <div className="font-bold mb-0.5 text-slate-300">{d.date}</div>
                   <div className="font-bold">₩{d.amount.toLocaleString()}</div>
+                  <div className="text-slate-300">{t('hp_earn_payout_items')}: {d.itemCount}{t('unit_cases')}</div>
                   <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-900 rotate-45"></div>
                 </div>
 
                 <div
+                  data-testid={`host-earnings-bar-${d.date}`}
                   className={`w-full max-w-[20px] rounded-t-lg transition-all duration-500 ease-out relative 
                         ${d.isToday ? 'bg-slate-900' : 'bg-slate-200 group-hover:bg-slate-300'}`}
                   style={{ height: `${barHeight}%` }}

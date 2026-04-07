@@ -54,6 +54,13 @@ function createUser(prefix: string): TestUser {
   };
 }
 
+function formatDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 async function waitForProfile(userId: string) {
   const supabase = getAdminClient();
 
@@ -192,11 +199,16 @@ async function seedCompletedBooking(params: {
   hostId: string;
   host: TestUser;
   experienceId: number;
+  bookingDate?: string;
+  createdAt?: Date;
 }) {
   const supabase = getAdminClient();
   const bookingId = `HOST-EARNINGS-BOOKING-${Date.now()}`;
-  const bookingDate = new Date();
-  bookingDate.setDate(bookingDate.getDate() - 3);
+  const createdAt = params.createdAt ?? new Date();
+  if (!params.createdAt) {
+    createdAt.setDate(createdAt.getDate() - 3);
+  }
+  const bookingDate = params.bookingDate ?? formatDateKey(createdAt);
 
   const { error } = await supabase.from('bookings').insert({
     id: bookingId,
@@ -208,13 +220,13 @@ async function seedCompletedBooking(params: {
     total_experience_price: 30000,
     status: 'completed',
     guests: 1,
-    date: bookingDate.toISOString().slice(0, 10),
+    date: bookingDate,
     time: '10:00',
     type: 'group',
     contact_name: params.host.fullName,
     contact_phone: params.host.phone,
     message: '',
-    created_at: bookingDate.toISOString(),
+    created_at: createdAt.toISOString(),
     payment_method: 'card',
     host_payout_amount: 24000,
     platform_revenue: 9000,
@@ -321,14 +333,14 @@ test.describe.serial('Host earnings payout-focused policy', () => {
       /완료된 예약 1건|Completed 1 bookings|完了した予約1件|已完成预订1个/
     );
     await expect(page.getByTestId('host-earnings-today-marker-note')).toContainText(
-      /빨간 점은 오늘 날짜 표시입니다\.|The red dot marks today on the chart\.|赤い点は今日の日付を示します。|红点表示图表中的今天。/
+      /빨간 점은 오늘 날짜 표시이고, 막대는 체험일 기준 정산 합계입니다\.|The red dot marks today, and each bar is grouped by experience date\.|赤い点は今日の日付を示し、棒グラフは体験日ごとの精算合計です。|红点表示今天，柱状图按体验日期汇总结算金额。/
     );
 
     await page.getByRole('button', { name: /수입 상세 내역 보기|View Income Details|収入詳細を見る|查看收入详情/ }).click();
 
     await expect(page.getByText(/완료된 예약 건수|Completed Bookings|完了した予約件数|已完成预订数/)).toBeVisible();
     await expect(page.getByText(/1\s*건|1 bookings|1件|1个/).first()).toBeVisible();
-    await expect(page.getByText(/정산 반영 항목|Payout Items|精算反映項目|结算计入项目/)).toBeVisible();
+    await expect(page.getByTestId('host-earnings-summary-payout-items')).toContainText(/1/);
     await expect(page.getByText(/최종 지급액 \(Net\)|Net Payout|最終支払額 \(Net\)|最终支付额 \(Net\)/)).toBeVisible();
 
     await expect(page.getByText(/총 매출 \(게스트 결제액\)|Total Revenue \(Guest Paid\)|総売上（ゲスト決済額）|总收入 \(房客付款\)/)).toHaveCount(0);
@@ -358,5 +370,37 @@ test.describe.serial('Host earnings payout-focused policy', () => {
 
     await expect(page.getByTestId('host-earnings-summary-completed-count')).toContainText(/1/);
     await expect(page.getByTestId('host-earnings-summary-payout-items')).toContainText(/2/);
+  });
+
+  test('charts earnings by booking date instead of payment creation date', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const hostUser = createUser('chart-date');
+    const hostId = await createAuthUser(hostUser);
+    await createApprovedHostApplication(hostId, hostUser);
+    const experienceId = await createExperienceFixture(hostId);
+
+    const createdAt = new Date();
+    createdAt.setDate(createdAt.getDate() - 3);
+    const bookingDate = new Date();
+    bookingDate.setDate(bookingDate.getDate() + 2);
+    const bookingDateKey = formatDateKey(bookingDate);
+
+    await seedCompletedBooking({
+      hostId,
+      host: hostUser,
+      experienceId,
+      createdAt,
+      bookingDate: bookingDateKey,
+    });
+
+    await login(page, hostUser);
+    await page.goto('/host/dashboard?tab=earnings', { waitUntil: 'networkidle' });
+
+    await page.getByTestId(`host-earnings-group-${bookingDateKey}`).hover();
+    await expect(page.getByTestId(`host-earnings-tooltip-${bookingDateKey}`)).toContainText('₩24,000');
+    await expect(page.getByTestId(`host-earnings-tooltip-${bookingDateKey}`)).toContainText(
+      /정산 반영 항목: 1건|Payout Items: 1 bookings|精算反映項目: 1件|结算计入项目: 1件/
+    );
   });
 });
