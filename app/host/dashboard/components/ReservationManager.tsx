@@ -480,21 +480,21 @@ export default function ReservationManager() {
       )}
 
       {reservations.length > 0 && (
-        <div className="mx-4 md:mx-6 mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
+        <div className="mx-4 md:mx-6 mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900">
           <div className="flex items-start gap-2">
-            <AlertCircle size={16} className="mt-0.5 shrink-0 text-amber-600" />
+            <AlertCircle size={16} className="mt-0.5 shrink-0 text-slate-400" />
             <div className="min-w-0">
               <p className="text-[12px] md:text-[13px] font-semibold leading-5">
                 {t('host_dashboard_warning_strip')}
               </p>
-              <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-amber-800">
+              <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-slate-600">
                 {actionableReservationCount > 0 && (
-                  <span className="rounded-full border border-amber-200 bg-white/70 px-2.5 py-1 font-semibold">
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 font-semibold text-slate-700">
                     {t('tab_upcoming')} {actionableReservationCount}
                   </span>
                 )}
                 {cancellationRequestCount > 0 && (
-                  <span className="rounded-full border border-amber-200 bg-white/70 px-2.5 py-1 font-semibold">
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 font-semibold text-slate-700">
                     {t('res_cancel_req')} {cancellationRequestCount}
                   </span>
                 )}
