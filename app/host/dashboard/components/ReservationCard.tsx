@@ -181,7 +181,7 @@ export default function ReservationCard({
         </div>
 
         <div className="mt-3 flex items-stretch gap-2">
-          <div className="flex w-[72px] shrink-0 flex-col items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-2 py-2.5 text-center">
+          <div className="flex w-[68px] shrink-0 flex-col items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-2 py-2.5 text-center">
             <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${dDay === t('res_card_today')
               ? 'bg-rose-100 text-rose-600'
               : isConfirmed
@@ -191,7 +191,7 @@ export default function ReservationCard({
               {dDay}
             </span>
             <span className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{monthName}</span>
-            <span className="mt-1 text-[26px] font-black leading-none text-slate-900">{new Date(res.date).getDate()}</span>
+            <span className="mt-1 text-[24px] font-black leading-none text-slate-900">{new Date(res.date).getDate()}</span>
             <span className="mt-1 text-[10px] font-medium text-slate-300">{res.time || '-'}</span>
           </div>
 
@@ -213,7 +213,7 @@ export default function ReservationCard({
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <p className="truncate text-[15px] font-semibold leading-tight tracking-[-0.02em] text-slate-900">
+                      <p className="truncate text-[14px] font-semibold leading-tight tracking-[-0.02em] text-slate-900">
                         {guestName}
                       </p>
                       {showMembershipBadge && (
@@ -227,9 +227,9 @@ export default function ReservationCard({
                   </div>
                 </button>
 
-                <div className="min-w-[76px] shrink-0 pl-2 text-right">
+                <div className="min-w-[72px] shrink-0 pl-2 text-right">
                   <p className="text-[9px] font-semibold leading-none text-slate-400">{t('res_expected_income')}</p>
-                  <p className="mt-1.5 text-[18px] font-black leading-none tracking-[-0.02em] text-slate-900">
+                  <p className="mt-1.5 text-[17px] font-black leading-none tracking-[-0.02em] text-slate-900">
                     {expectedIncomeDisplay}
                   </p>
                 </div>
