@@ -84,6 +84,8 @@ export default function GuestProfileModal({ guest, membershipStatus = 'none', on
   useEffect(() => {
     const fetchReviews = async () => {
       if (!guest?.id) return;
+      setLoadingReviews(true);
+      setReviews([]);
 
       const { data, error } = await supabaseRef.current
         .from('guest_reviews')
@@ -140,59 +142,57 @@ export default function GuestProfileModal({ guest, membershipStatus = 'none', on
 
   return (
     <div
-      className={`fixed inset-0 z-[160] flex items-center justify-center bg-black/60 px-4 py-8 md:px-4 md:py-6 backdrop-blur-sm transition-opacity duration-150 ${closing ? 'opacity-0' : 'animate-in fade-in duration-200'}`}
+      className={`fixed inset-0 z-[160] flex items-center justify-center bg-black/60 px-3 py-6 md:px-4 md:py-6 backdrop-blur-sm transition-opacity duration-150 ${closing ? 'opacity-0' : 'animate-in fade-in duration-200'}`}
       onClick={requestClose}
     >
       <div
-        className={`flex max-h-[78vh] md:max-h-[90vh] w-full max-w-[340px] md:max-w-[560px] flex-col overflow-hidden rounded-[24px] md:rounded-[28px] bg-white shadow-[0_8px_40px_rgba(15,23,42,0.22)] md:shadow-[0_24px_80px_rgba(15,23,42,0.28)] transition-all duration-150 ${closing ? 'opacity-0 scale-95' : 'animate-in zoom-in-95 duration-200'}`}
+        className={`flex max-h-[82vh] md:max-h-[90vh] w-full max-w-[356px] md:max-w-[560px] flex-col overflow-hidden rounded-[28px] md:rounded-[28px] bg-white shadow-[0_18px_60px_rgba(15,23,42,0.22)] md:shadow-[0_24px_80px_rgba(15,23,42,0.28)] transition-all duration-150 ${closing ? 'opacity-0 scale-95' : 'animate-in zoom-in-95 duration-200'}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* 프로필 헤더 */}
-        <div className="relative border-b border-slate-100 bg-slate-50 px-4 pb-4 pt-4 md:px-6 md:pb-7 md:pt-8 flex-shrink-0">
+        <div className="relative flex-shrink-0 border-b border-slate-200/70 bg-[linear-gradient(180deg,rgba(248,250,252,0.96)_0%,#ffffff_100%)] px-5 pb-5 pt-5 md:px-6 md:pb-7 md:pt-8">
           <button
             type="button"
             onClick={requestClose}
-            className="absolute right-4 top-3 md:top-4 inline-flex h-9 w-9 md:h-10 md:w-10 items-center justify-center rounded-full bg-white/90 text-slate-500 transition-colors hover:text-slate-900"
+            aria-label="프로필 모달 닫기"
+            className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/80 bg-white/90 text-slate-400 shadow-sm transition-colors hover:text-slate-900 md:top-4 md:h-10 md:w-10"
           >
             <X size={17} />
           </button>
 
-          <div className="flex items-center gap-3 md:gap-4">
+          <div className="flex items-start gap-3.5 pr-12 md:gap-4 md:pr-12">
             {/* 아바타 */}
-            <div className="h-12 w-12 md:h-24 md:w-24 shrink-0 overflow-hidden rounded-full border-4 border-white bg-slate-200 shadow-lg flex items-center justify-center">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border-[3px] border-white bg-slate-200 shadow-[0_10px_24px_rgba(148,163,184,0.18)] md:h-24 md:w-24 md:border-4 md:shadow-lg">
               {guest.avatar_url ? (
                 <div className="relative h-full w-full">
                   <Image
                     src={guest.avatar_url}
                     alt={guest.full_name ?? 'Guest'}
                     fill
-                    sizes="(max-width: 768px) 48px, 96px"
+                    sizes="(max-width: 768px) 56px, 96px"
                     className="object-cover"
                   />
                 </div>
               ) : (
-                <User size={18} className="text-slate-400 md:hidden" />
+                <User size={20} className="text-slate-400 md:hidden" />
               )}
               {!guest.avatar_url && <User size={32} className="text-slate-400 hidden md:block" />}
             </div>
 
             <div className="min-w-0 flex-1">
-              <div className="mb-1 flex flex-wrap items-center gap-1.5">
-                <span className="rounded-full bg-neutral-900 px-2 py-0.5 text-[10px] md:text-[11px] font-bold text-white">
+              <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                <span className="rounded-full bg-neutral-900 px-2 py-0.5 text-[10px] font-bold text-white md:text-[11px]">
                   {t('tab_guest').split(' ')[0]}
                 </span>
                 {showMembershipBadge && (
                   <HostGuestMembershipBadge
                     testId="guest-profile-membership-badge"
                     status={membershipStatus as Extract<LocallyMembershipStatus, 'member' | 'circle'>}
-                    className="bg-white/90"
+                    className="border-slate-200/90 bg-white/95 shadow-sm"
                   />
                 )}
-                <span className="text-[10px] md:text-[12px] font-medium text-slate-400">
-                  {joinedAt}
-                </span>
               </div>
-              <h2 className="break-words text-[17px] md:text-[24px] font-black text-slate-900 [overflow-wrap:anywhere] flex items-center gap-1.5 flex-wrap">
+              <h2 className="flex flex-wrap items-center gap-1.5 break-words text-[18px] font-black leading-tight tracking-[-0.03em] text-slate-900 [overflow-wrap:anywhere] md:text-[24px]">
                 {guest.full_name}
                 {guest.nationality && (
                   <span className="text-[18px] md:text-[22px] leading-none" title={guest.nationality}>
@@ -200,10 +200,13 @@ export default function GuestProfileModal({ guest, membershipStatus = 'none', on
                   </span>
                 )}
               </h2>
+              <p className="mt-1.5 text-[11px] font-medium text-slate-400 md:text-[12px]">
+                {joinedAt}
+              </p>
               {membershipDescription && (
                 <p
                   data-testid="guest-profile-membership-desc"
-                  className="mt-2 text-[12px] font-medium text-slate-500 md:text-[13px]"
+                  className="mt-2.5 text-[13px] font-medium leading-5 text-slate-500 md:text-[13px]"
                 >
                   {membershipDescription}
                 </p>
@@ -214,20 +217,20 @@ export default function GuestProfileModal({ guest, membershipStatus = 'none', on
 
         {/* 스크롤 본문 */}
         <div 
-          className="overflow-y-auto px-4 pt-4 pb-6 md:px-6 md:py-6 custom-scrollbar flex-1" 
+          className="custom-scrollbar flex-1 overflow-y-auto px-5 pb-6 pt-5 md:px-6 md:py-6" 
           style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))' }}
         >
 
           {/* 속성 그리드 */}
           {gridItems.length > 0 && (
-            <div className="mb-6 grid grid-cols-2 gap-3">
+            <div className="mb-5 grid grid-cols-1 gap-2.5 md:mb-6 md:grid-cols-2 md:gap-3">
               {gridItems.map((item) => (
-                <div key={item.label} className="rounded-xl md:rounded-2xl bg-slate-50 p-3 md:p-4">
+                <div key={item.label} className="rounded-[18px] border border-slate-100 bg-slate-50/90 px-3.5 py-3 md:rounded-2xl md:p-4">
                   <div className="mb-1.5 flex items-center gap-1.5 text-slate-500">
                     {item.icon}
-                    <span className="text-[10px] md:text-[11px] font-bold uppercase tracking-[0.14em]">{item.label}</span>
+                    <span className="text-[11px] font-semibold text-slate-500 md:text-[11px] md:font-bold md:uppercase md:tracking-[0.14em]">{item.label}</span>
                   </div>
-                  <p className="break-words text-[12px] md:text-sm font-semibold text-slate-800 [overflow-wrap:anywhere]">
+                  <p className="break-words text-[14px] font-semibold leading-5 text-slate-800 [overflow-wrap:anywhere] md:text-sm">
                     {item.value}
                   </p>
                 </div>
@@ -236,9 +239,9 @@ export default function GuestProfileModal({ guest, membershipStatus = 'none', on
           )}
 
           {/* About */}
-          <section className="mb-6 md:mb-8">
-            <h3 className="mb-2 md:mb-3 text-[10px] md:text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">{t('profile_about')}</h3>
-            <div className="rounded-2xl md:rounded-3xl bg-slate-50 p-4 md:p-5 text-[13px] md:text-[15px] leading-6 md:leading-7 text-slate-700">
+          <section className="mb-5 md:mb-8">
+            <h3 className="mb-2.5 text-[11px] font-semibold tracking-[0.08em] text-slate-400 md:mb-3 md:text-[11px] md:font-bold md:uppercase md:tracking-[0.14em]">{t('profile_about')}</h3>
+            <div className="rounded-[22px] bg-slate-50 px-4 py-4 text-[14px] leading-[1.65] text-slate-700 md:rounded-3xl md:p-5 md:text-[15px] md:leading-7">
               <p className="break-words whitespace-pre-wrap [overflow-wrap:anywhere]">
                 {guest.introduction || guest.bio || t('guest_modal_intro_empty')}
               </p>
@@ -248,8 +251,8 @@ export default function GuestProfileModal({ guest, membershipStatus = 'none', on
           {/* 받은 후기 */}
           <section>
             <div className="mb-3 flex items-center gap-2">
-              <Star size={14} className="text-slate-900 md:w-4 md:h-4" fill="currentColor" />
-              <h3 className="text-[14px] md:text-[16px] font-bold text-slate-900">
+              <Star size={14} className="text-slate-900 md:h-4 md:w-4" fill="currentColor" />
+              <h3 className="text-[15px] font-black text-slate-900 md:text-[16px]">
                 {t('guest_modal_reviews')} ({reviews.length})
               </h3>
             </div>
@@ -257,18 +260,18 @@ export default function GuestProfileModal({ guest, membershipStatus = 'none', on
             {loadingReviews ? (
               <div className="space-y-3">
                 {[1, 2].map((i) => (
-                  <div key={i} className="h-24 rounded-3xl bg-slate-50 animate-pulse" />
+                  <div key={i} className="h-24 animate-pulse rounded-[24px] bg-slate-50 md:rounded-3xl" />
                 ))}
               </div>
             ) : reviews.length === 0 ? (
-              <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 py-8 text-center">
-                <MessageCircle size={24} className="mx-auto text-slate-300 mb-2" />
-                <p className="text-[13px] md:text-sm text-slate-400">{t('guest_modal_no_reviews')}</p>
+              <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-4 py-7 text-center md:rounded-3xl md:py-8">
+                <MessageCircle size={22} className="mx-auto mb-2 text-slate-300 md:h-6 md:w-6" />
+                <p className="text-[14px] text-slate-400 md:text-sm">{t('guest_modal_no_reviews')}</p>
               </div>
             ) : (
               <div className="space-y-3">
                 {reviews.map((review) => (
-                  <div key={review.id} className="rounded-2xl md:rounded-3xl border border-slate-100 px-3 py-3 md:px-4 md:py-4 transition-colors hover:border-slate-200 hover:bg-slate-50">
+                  <div key={review.id} className="rounded-[22px] border border-slate-100 px-3.5 py-3.5 transition-colors hover:border-slate-200 hover:bg-slate-50 md:rounded-3xl md:px-4 md:py-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-2">
                         <div className="h-7 w-7 shrink-0 overflow-hidden rounded-full bg-slate-200">
