@@ -366,18 +366,16 @@ export default function Earnings() {
               >
                 <div
                   data-testid={`host-earnings-tooltip-${d.date}`}
-                  className={`pointer-events-none absolute bottom-full left-1/2 z-20 mb-3 min-w-[176px] -translate-x-1/2 rounded-lg bg-slate-900 px-3 py-2 text-center text-[10px] text-white shadow-md transition-opacity opacity-0 group-hover:opacity-100 group-focus:opacity-100 ${
+                  className={`pointer-events-none absolute bottom-full left-1/2 z-20 mb-3 w-[180px] -translate-x-1/2 rounded-lg bg-slate-900 px-3 py-2 text-center text-white shadow-md transition-opacity opacity-0 group-hover:opacity-100 group-focus:opacity-100 ${
                     isTooltipVisible ? 'opacity-100' : ''
                   }`}
                 >
-                  <div className="font-bold mb-1 text-slate-300">{d.date}</div>
-                  <div className="text-white text-center">
-                    <div className="font-black text-xs md:text-sm">₩{d.amount.toLocaleString()}</div>
-                    <div className="text-slate-300 text-[10px] md:text-[11px] leading-tight whitespace-nowrap mt-1 block">
-                      {t('hp_earn_bar_total_caption')}
-                    </div>
+                  <div className="mb-0.5 text-[10px] font-bold text-slate-300 md:text-[11px]">{d.date}</div>
+                  <div className="text-xs font-black md:text-sm">₩{d.amount.toLocaleString()}</div>
+                  <div className="mt-1 text-[10px] text-slate-300 md:text-xs">
+                    {t('hp_earn_bar_total_caption')}
                   </div>
-                  <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-900 rotate-45"></div>
+                  <div className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-slate-900"></div>
                 </div>
 
                 <div
