@@ -78,7 +78,6 @@ export default function Earnings() {
   const [loading, setLoading] = useState(true);
   const [showSummary, setShowSummary] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [activeTooltipDate, setActiveTooltipDate] = useState<string | null>(null);
 
   const [stats, setStats] = useState<EarningsStats>({
     totalPayout: 0,
@@ -350,31 +349,20 @@ export default function Earnings() {
           {chartData.map((d, i) => {
             const heightPercent = (d.amount / maxAmount) * 100;
             const barHeight = Math.max(heightPercent, 4);
-            const isTooltipVisible = activeTooltipDate === d.date;
 
             return (
-              <button
-                type="button"
+              <div
                 key={i}
                 data-testid={`host-earnings-group-${d.date}`}
-                className="group relative z-10 flex h-full flex-1 cursor-pointer flex-col items-center justify-end gap-2 appearance-none border-0 bg-transparent p-0 text-inherit focus:outline-none"
-                aria-label={`${d.date} ${t('hp_earn_bar_total_caption')}: ₩${d.amount.toLocaleString()}`}
-                onMouseEnter={() => setActiveTooltipDate(d.date)}
-                onMouseLeave={() => setActiveTooltipDate((current) => (current === d.date ? null : current))}
-                onFocus={() => setActiveTooltipDate(d.date)}
-                onBlur={() => setActiveTooltipDate((current) => (current === d.date ? null : current))}
-                onClick={() => setActiveTooltipDate((current) => (current === d.date ? null : d.date))}
+                className="flex-1 flex flex-col items-center gap-2 group cursor-pointer relative z-10"
               >
                 <div
                   data-testid={`host-earnings-tooltip-${d.date}`}
-                  className={`pointer-events-none absolute bottom-full left-1/2 z-20 mb-3 w-max min-w-[152px] -translate-x-1/2 rounded-lg bg-slate-900 px-3 py-2 text-center text-[10px] text-white shadow-md transition-opacity opacity-0 group-hover:opacity-100 group-focus:opacity-100 ${
-                    isTooltipVisible ? 'opacity-100' : ''
-                  }`}
+                  className="opacity-0 group-hover:opacity-100 absolute -top-14 bg-slate-900 text-white text-[10px] px-2 py-1.5 rounded transition-opacity whitespace-nowrap z-20 shadow-md text-center"
                 >
-                  <div className="font-bold text-slate-300">{d.date}</div>
-                  <div className="mt-1 text-[10px] font-medium leading-tight text-slate-200">{t('hp_earn_bar_total_caption')}</div>
-                  <div className="mt-1 text-sm font-black text-white">₩{d.amount.toLocaleString()}</div>
-                  <div className="mt-1 text-slate-300">{t('hp_earn_payout_items')}: {d.itemCount}{t('unit_cases')}</div>
+                  <div className="font-bold mb-0.5 text-slate-300">{d.date}</div>
+                  <div className="font-bold">₩{d.amount.toLocaleString()}</div>
+                  <div className="text-slate-300">{t('hp_earn_payout_items')}: {d.itemCount}{t('unit_cases')}</div>
                   <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-900 rotate-45"></div>
                 </div>
 
@@ -392,7 +380,7 @@ export default function Earnings() {
                 <span className={`text-[10px] font-bold ${d.isToday ? 'text-slate-900' : 'text-slate-400'}`}>
                   {d.label}
                 </span>
-              </button>
+              </div>
             )
           })}
         </div>
