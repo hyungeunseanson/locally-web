@@ -78,6 +78,7 @@ export default function Earnings() {
   const [loading, setLoading] = useState(true);
   const [showSummary, setShowSummary] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [activeTooltipDate, setActiveTooltipDate] = useState<string | null>(null);
 
   const [stats, setStats] = useState<EarningsStats>({
     totalPayout: 0,
@@ -339,15 +340,6 @@ export default function Earnings() {
           </div>
         </div>
 
-        <div className="mb-3 flex justify-center md:mb-4">
-          <p
-            data-testid="host-earnings-chart-caption"
-            className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-medium text-slate-500 md:text-xs"
-          >
-            {t('hp_earn_bar_total_caption')}
-          </p>
-        </div>
-
         <div className="h-36 md:h-48 flex items-end justify-between gap-1 md:gap-4 relative z-10">
           <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-10 z-0">
             <div className="border-t border-slate-900 border-dashed w-full h-px"></div>
@@ -358,17 +350,25 @@ export default function Earnings() {
           {chartData.map((d, i) => {
             const heightPercent = (d.amount / maxAmount) * 100;
             const barHeight = Math.max(heightPercent, 4);
+            const isTooltipVisible = activeTooltipDate === d.date;
 
             return (
-              <div
+              <button
+                type="button"
                 key={i}
                 data-testid={`host-earnings-group-${d.date}`}
-                className="flex-1 flex flex-col items-center gap-2 group cursor-pointer relative z-10"
+                className="group relative z-10 flex flex-1 cursor-pointer flex-col items-center gap-2 appearance-none border-0 bg-transparent p-0 text-inherit focus:outline-none"
+                onMouseEnter={() => setActiveTooltipDate(d.date)}
+                onMouseLeave={() => setActiveTooltipDate((current) => (current === d.date ? null : current))}
+                onFocus={() => setActiveTooltipDate(d.date)}
+                onBlur={() => setActiveTooltipDate((current) => (current === d.date ? null : current))}
+                onClick={() => setActiveTooltipDate((current) => (current === d.date ? null : d.date))}
               >
-                {/* ✅ [수정] 툴팁에 날짜 표시 추가 */}
                 <div
                   data-testid={`host-earnings-tooltip-${d.date}`}
-                  className="opacity-0 group-hover:opacity-100 absolute -top-16 bg-slate-900 text-white text-[10px] px-2 py-1.5 rounded transition-opacity whitespace-nowrap z-20 shadow-md text-center"
+                  className={`absolute -top-16 rounded bg-slate-900 px-2 py-1.5 text-center text-[10px] text-white shadow-md transition-opacity whitespace-nowrap z-20 ${
+                    isTooltipVisible ? 'opacity-100' : 'pointer-events-none opacity-0'
+                  }`}
                 >
                   <div className="font-bold mb-0.5 text-slate-300">{d.date}</div>
                   <div className="font-bold">₩{d.amount.toLocaleString()}</div>
@@ -391,7 +391,7 @@ export default function Earnings() {
                 <span className={`text-[10px] font-bold ${d.isToday ? 'text-slate-900' : 'text-slate-400'}`}>
                   {d.label}
                 </span>
-              </div>
+              </button>
             )
           })}
         </div>
