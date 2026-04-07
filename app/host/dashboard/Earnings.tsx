@@ -246,8 +246,6 @@ export default function Earnings() {
 
   if (loading) return <Skeleton className="w-full h-[500px] rounded-3xl" />;
 
-  const maxAmount = Math.max(...chartData.map(d => d.amount), 10000);
-
   return (
     <div className="max-w-md mx-auto md:max-w-none md:mx-0 min-h-[600px] animate-in fade-in slide-in-from-bottom-4 duration-500">
 
@@ -294,47 +292,23 @@ export default function Earnings() {
           <p>{t('hp_earn_scope_note')}</p>
         </div>
 
-        <div
-          data-testid="host-earnings-payout-summary"
-          className="mb-5 grid grid-cols-1 gap-3 md:mb-6 md:grid-cols-3"
-        >
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-amber-700 md:text-[11px]">
-              {t('hp_earn_pending')}
-            </p>
-            <p className="mt-1 text-lg font-black text-slate-900 md:text-xl">
-              ₩{stats.pendingPayout.toLocaleString()}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700 md:text-[11px]">
-              {t('hp_earn_completed')}
-            </p>
-            <p className="mt-1 text-lg font-black text-slate-900 md:text-xl">
-              ₩{stats.paidPayout.toLocaleString()}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500 md:text-[11px]">
-              {t('hp_earn_last_paid')}
-            </p>
-            <p className="mt-1 text-sm font-bold text-slate-900 md:text-base">
-              {formatLatestPayoutDate(stats.latestPaidAt, lang) || t('hp_earn_last_paid_empty')}
-            </p>
-          </div>
-        </div>
-
         <div className="text-center mb-6 md:mb-10 relative z-10">
           <p className="text-slate-400 font-bold text-[10px] md:text-xs mb-1.5 md:mb-2 flex items-center justify-center gap-1 uppercase tracking-wider">
-            {t('hp_earn_total_pending')} <Info size={12} />
+            {t('hp_earn_pending')} <Info size={12} />
           </p>
           <h1 data-testid="host-earnings-total-payout" className="text-3xl md:text-5xl font-black text-slate-900 tracking-tight mb-2">
-            ₩{stats.totalPayout.toLocaleString()}
+            ₩{stats.pendingPayout.toLocaleString()}
           </h1>
+          <p
+            data-testid="host-earnings-last-paid-inline"
+            className="mt-1 text-[10px] font-medium text-slate-400 md:text-xs"
+          >
+            {t('hp_earn_last_paid_inline')}: {formatLatestPayoutDate(stats.latestPaidAt, lang) || t('hp_earn_last_paid_empty')}
+          </p>
 
           <div
             data-testid="host-earnings-completed-booking-count"
-            className="inline-flex items-center gap-1 px-3 py-1 bg-slate-100 rounded-full text-xs font-bold text-slate-600"
+            className="mt-3 inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600"
           >
             {t('hp_earn_count_completed').replace('{count}', String(stats.completedBookingCount))}
           </div>
@@ -431,9 +405,32 @@ export default function Earnings() {
                 </span>
               </div>
 
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-slate-500">{t('hp_earn_pending')}</span>
+                <span data-testid="host-earnings-summary-pending-payout" className="font-bold text-slate-900">
+                  ₩{stats.pendingPayout.toLocaleString()}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-slate-500">{t('hp_earn_completed')}</span>
+                <span data-testid="host-earnings-summary-paid-payout" className="font-bold text-slate-900">
+                  ₩{stats.paidPayout.toLocaleString()}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-slate-500">{t('hp_earn_last_paid')}</span>
+                <span data-testid="host-earnings-summary-last-paid" className="font-bold text-slate-900">
+                  {formatLatestPayoutDate(stats.latestPaidAt, lang) || t('hp_earn_last_paid_empty')}
+                </span>
+              </div>
+
               <div className="flex justify-between items-center">
                 <span className="font-black text-sm md:text-base text-slate-900">{t('hp_earn_net')}</span>
-                <span className="font-black text-xl md:text-2xl text-slate-900">₩{stats.totalPayout.toLocaleString()}</span>
+                <span data-testid="host-earnings-summary-net-payout" className="font-black text-xl md:text-2xl text-slate-900">
+                  ₩{stats.totalPayout.toLocaleString()}
+                </span>
               </div>
               <p className="text-[10px] text-slate-400 text-right mt-1">{t('hp_earn_tax_note')}</p>
             </div>
