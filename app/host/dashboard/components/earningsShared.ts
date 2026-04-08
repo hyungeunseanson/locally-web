@@ -1,6 +1,11 @@
 export function formatLatestPayoutDate(value: string | null, locale: string) {
   if (!value) return null;
 
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
   const localeMap: Record<string, string> = {
     ko: 'ko-KR',
     en: 'en-US',
@@ -12,7 +17,7 @@ export function formatLatestPayoutDate(value: string | null, locale: string) {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
-  }).format(new Date(value));
+  }).format(parsed);
 }
 
 export function formatDateKey(date: Date) {
