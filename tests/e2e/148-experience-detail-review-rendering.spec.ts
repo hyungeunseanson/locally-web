@@ -45,22 +45,12 @@ function getAdminClient() {
   return adminClient;
 }
 
-function createHostUser(): TestUser {
+function createUser(prefix: string, fullName?: string): TestUser {
   const timestamp = Date.now();
   return {
-    email: `codex.public.host.${timestamp}@example.com`,
+    email: `codex.experience.review.${prefix}.${timestamp}@example.com`,
     password: TEST_PASSWORD,
-    fullName: `Public Host ${timestamp}`,
-    phone: `010${String(timestamp).slice(-8)}`,
-  };
-}
-
-function createGuestUser(): TestUser {
-  const timestamp = Date.now();
-  return {
-    email: `codex.public.host.guest.${timestamp}@example.com`,
-    password: TEST_PASSWORD,
-    fullName: `Public Guest ${timestamp}`,
+    fullName: fullName || `Experience Review ${prefix} ${timestamp}`,
     phone: `010${String(timestamp).slice(-8)}`,
   };
 }
@@ -106,8 +96,6 @@ async function createAuthUser(user: TestUser) {
     .from('profiles')
     .update({
       full_name: user.fullName,
-      bio: '공개 호스트 프로필 검증용 소개입니다.',
-      introduction: 'public_host_applications 경유 프로필 노출 확인',
       phone: user.phone,
     })
     .eq('id', data.user.id);
@@ -117,49 +105,42 @@ async function createAuthUser(user: TestUser) {
   return data.user.id;
 }
 
-async function createHostApplication(
-  userId: string,
-  user: TestUser,
-  status: 'approved' | 'active' = 'approved'
-) {
+async function createHostApplication(userId: string, user: TestUser) {
   const { data, error } = await getAdminClient()
     .from('host_applications')
     .insert({
       user_id: userId,
       host_nationality: '대한민국',
-      languages: ['한국어', 'English'],
-      language_levels: [
-        { language: '한국어', level: 5 },
-        { language: 'English', level: 4 },
-      ],
+      languages: ['한국어'],
+      language_levels: [{ language: '한국어', level: 5 }],
       name: user.fullName,
       phone: user.phone,
       dob: '1991-03-14',
       email: user.email,
-      instagram: '@codex_public_host',
+      instagram: '@codex_experience_review',
       source: 'playwright',
       language_cert: '',
       profile_photo: '/images/logo.png',
-      self_intro: '공개 호스트 프로필 검증용 승인 호스트입니다.',
+      self_intro: '체험 상세 후기 렌더링 검증용 공개 호스트입니다.',
       id_card_file: '',
       bank_name: '국민은행',
       account_number: '12345678901234',
       account_holder: user.fullName,
-      motivation: '공개 프로필 검증',
-      status,
+      motivation: '체험 상세 후기 렌더링 검증',
+      status: 'approved',
     })
     .select('id')
     .single();
 
   if (error || !data?.id) {
-    throw error || new Error(`Failed to create ${status} host application.`);
+    throw error || new Error('Failed to create approved host application.');
   }
 
   createdApplicationIds.push(String(data.id));
 }
 
 async function createActiveExperience(hostId: string) {
-  const title = `[Playwright] Public Host Profile ${Date.now()}`;
+  const title = `[Playwright] Experience Review ${Date.now()}`;
   const { data, error } = await getAdminClient()
     .from('experiences')
     .insert({
@@ -172,12 +153,12 @@ async function createActiveExperience(hostId: string) {
       language_levels: [{ language: '한국어', level: 5 }],
       duration: 2,
       max_guests: 4,
-      description: '공개 호스트 프로필 검증용 체험입니다.',
-      itinerary: [{ title: '홍대입구역', description: '공개 프로필 동선 검증' }],
+      description: '체험 상세 후기 렌더링 검증용 체험입니다.',
+      itinerary: [{ title: '홍대입구역', description: '체험 상세 후기 렌더링 코스입니다.' }],
       spots: '홍대입구역',
       meeting_point: '홍대입구역 1번 출구',
       location: '서울 마포구 양화로 160',
-      photos: ['https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200'],
+      photos: ['/images/logo.png'],
       price: 49000,
       inclusions: ['가이드'],
       exclusions: ['개인 경비'],
@@ -187,6 +168,7 @@ async function createActiveExperience(hostId: string) {
         activity_level: '보통',
       },
       status: 'active',
+      is_active: true,
       is_private_enabled: false,
       private_price: 0,
       source_locale: 'ko',
@@ -213,7 +195,7 @@ async function createCompletedBooking(params: {
   guest: TestUser;
   experienceId: number;
 }) {
-  const bookingId = `PUBLIC-HOST-BOOKING-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  const bookingId = `EXP-DETAIL-REVIEW-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
   const bookingDate = new Date();
   bookingDate.setDate(bookingDate.getDate() - 3);
 
@@ -252,8 +234,6 @@ async function createReview(params: {
   experienceId: number;
   bookingId: string;
   content: string;
-  reply: string;
-  photos?: string[];
 }) {
   const { data, error } = await getAdminClient()
     .from('reviews')
@@ -263,9 +243,7 @@ async function createReview(params: {
       booking_id: params.bookingId,
       rating: 5,
       content: params.content,
-      reply: params.reply,
-      reply_at: new Date().toISOString(),
-      photos: params.photos || [],
+      photos: ['/images/logo.png'],
     })
     .select('id')
     .single();
@@ -304,25 +282,16 @@ test.afterAll(async () => {
   }
 });
 
-test.describe.serial('Public host profile', () => {
-  test('does not expose public review feeds for non-public users', async ({ page }) => {
+test.describe.serial('Experience detail public reviews', () => {
+  test('renders masked reviewer identity, avatar, and review photos on detail and modal', async ({ page }) => {
     test.setTimeout(90000);
 
-    const privateUser = createGuestUser();
-    const privateUserId = await createAuthUser(privateUser);
-
-    const response = await page.request.get(`/api/public/hosts/${privateUserId}/reviews`);
-    expect(response.status()).toBe(404);
-  });
-
-  test('renders approved host profile and active experiences through the public projection path', async ({ page }) => {
-    test.setTimeout(90000);
-
-    const host = createHostUser();
+    const host = createUser('host');
     const hostId = await createAuthUser(host);
-    await createHostApplication(hostId, host, 'approved');
+    await createHostApplication(hostId, host);
     const experience = await createActiveExperience(hostId);
-    const guest = createGuestUser();
+
+    const guest = createUser('guest', '김성호');
     const guestId = await createAuthUser(guest);
     const supabase = getAdminClient();
     const { error: guestProfileError } = await supabase
@@ -334,29 +303,25 @@ test.describe.serial('Public host profile', () => {
       .eq('id', guestId);
 
     if (guestProfileError) throw guestProfileError;
+
     const bookingId = await createCompletedBooking({
       guestId,
       guest,
       experienceId: experience.experienceId,
     });
-    const reviewContent = `공개 호스트 프로필 리뷰 본문 ${Date.now()}`;
-    const replyContent = `공개 호스트 프로필 답글 ${Date.now()}`;
+    const reviewContent = `체험 상세 후기 본문 ${Date.now()}`;
     await createReview({
       guestId,
       experienceId: experience.experienceId,
       bookingId,
       content: reviewContent,
-      reply: replyContent,
-      photos: ['/images/logo.png'],
     });
 
-    const apiResponse = await page.request.get(`/api/public/hosts/${hostId}/reviews?lang=ko`);
+    const apiResponse = await page.request.get(`/api/public/experiences/${experience.experienceId}/reviews?lang=ko`);
     expect(apiResponse.status()).toBe(200);
     const apiPayload = await apiResponse.json();
     expect(apiPayload.success).toBe(true);
-    expect(Array.isArray(apiPayload.data)).toBe(true);
     expect(apiPayload.data[0]).toMatchObject({
-      rating: 5,
       content: reviewContent,
       photos: ['/images/logo.png'],
       reviewer: {
@@ -366,49 +331,36 @@ test.describe.serial('Public host profile', () => {
     });
     expect(Object.prototype.hasOwnProperty.call(apiPayload.data[0], 'user_id')).toBe(false);
 
-    await page.goto(`/users/${hostId}`, { waitUntil: 'networkidle' });
+    await page.goto(`/experiences/${experience.experienceId}`, { waitUntil: 'networkidle' });
 
-    await expect(page.getByRole('heading', { name: host.fullName, exact: true })).toBeVisible({ timeout: 15000 });
-    await expect(page.getByText('공개 호스트 프로필 검증용 승인 호스트입니다.')).toBeVisible();
-    await expect(page.getByTestId('public-host-experiences-section')).toBeVisible();
-    await expect(page.getByTestId('public-host-reviews-section')).toBeVisible();
-    await expect(page.getByTestId('public-host-languages')).toBeVisible();
-    await expect(page.getByTestId('public-host-languages').getByText('English')).toBeVisible();
-    await expect(page.getByText(experience.title)).toBeVisible();
-    await expect(page.getByTestId('public-host-reviews-section').locator('[data-testid="public-reviewer-name"]:visible').first()).toHaveText('김성*');
-    await expect(page.getByTestId('public-host-reviews-section').locator('[data-testid="public-reviewer-avatar"]:visible').first()).toBeVisible();
-    await expect(page.getByTestId('public-host-reviews-section').locator('[data-testid="public-review-photo"]:visible').first()).toBeVisible();
-    await expect(
-      page.locator('[data-testid="public-host-reviews-section"] p:visible').filter({ hasText: reviewContent }).first()
-    ).toBeVisible();
-    await expect(
-      page.locator('[data-testid="public-host-reviews-section"] p:visible').filter({ hasText: replyContent }).first()
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: experience.title, exact: true })).toBeVisible({ timeout: 15000 });
+    const reviewsSection = page.getByTestId('experience-public-reviews-section');
+    await expect(reviewsSection).toBeVisible();
+    await expect(reviewsSection.locator('[data-testid="public-reviewer-name"]:visible').first()).toHaveText('김성*');
+    await expect(reviewsSection.locator('[data-testid="public-reviewer-avatar"]:visible').first()).toBeVisible();
+    await expect(reviewsSection.locator('[data-testid="public-review-photo"]:visible').first()).toBeVisible();
+    await expect(reviewsSection.locator('p:visible').filter({ hasText: reviewContent }).first()).toBeVisible();
 
-    await page
-      .getByTestId('public-host-reviews-section')
+    await reviewsSection
       .getByRole('button', { name: /모든 후기 보기|Show all reviews|すべてのレビューを見る|查看全部评价/ })
       .click();
-    await expect(page.getByTestId('public-review-modal')).toBeVisible();
-    await expect(page.getByTestId('public-review-modal').locator('[data-testid="public-reviewer-name"]:visible').first()).toHaveText('김성*');
-    await expect(page.getByTestId('public-review-modal').locator('[data-testid="public-reviewer-avatar"]:visible').first()).toBeVisible();
-    await expect(page.getByTestId('public-review-modal').locator('[data-testid="public-review-photo"]:visible').first()).toBeVisible();
+
+    const reviewModal = page.getByTestId('public-review-modal');
+    await expect(reviewModal).toBeVisible();
+    await expect(reviewModal.locator('[data-testid="public-reviewer-name"]:visible').first()).toHaveText('김성*');
+    await expect(reviewModal.locator('[data-testid="public-reviewer-avatar"]:visible').first()).toBeVisible();
+    await expect(reviewModal.locator('[data-testid="public-review-photo"]:visible').first()).toBeVisible();
+    await expect(reviewModal.locator('p:visible').filter({ hasText: reviewContent }).first()).toBeVisible();
   });
 
-  test('renders active host profiles through the same public projection path', async ({ page }) => {
+  test('returns 404 for public experience review feeds when the host is not public', async ({ page }) => {
     test.setTimeout(90000);
 
-    const host = createHostUser();
-    const hostId = await createAuthUser(host);
-    await createHostApplication(hostId, host, 'active');
-    const experience = await createActiveExperience(hostId);
+    const privateHost = createUser('private.host');
+    const privateHostId = await createAuthUser(privateHost);
+    const experience = await createActiveExperience(privateHostId);
 
-    await page.goto(`/users/${hostId}`, { waitUntil: 'networkidle' });
-
-    await expect(page.getByRole('heading', { name: host.fullName, exact: true })).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('public-host-experiences-section')).toBeVisible();
-    await expect(page.getByTestId('public-host-languages')).toBeVisible();
-    await expect(page.getByTestId('public-host-languages').getByText('English')).toBeVisible();
-    await expect(page.getByText(experience.title)).toBeVisible();
+    const response = await page.request.get(`/api/public/experiences/${experience.experienceId}/reviews?lang=ko`);
+    expect(response.status()).toBe(404);
   });
 });

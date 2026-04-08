@@ -1,11 +1,11 @@
 'use client';
 
 import Image from 'next/image';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Star, X } from 'lucide-react';
 
 import { useLanguage } from '@/app/context/LanguageContext';
-import { createClient } from '@/app/utils/supabase/client';
+import type { PublicReviewItem } from '@/app/utils/reviews/publicReview';
 
 type ReviewSourceProps =
   | {
@@ -23,35 +23,9 @@ type ReviewSectionProps = ReviewSourceProps & {
   testId?: string;
 };
 
-type ProfileRow = {
-  id: string;
-  full_name?: string | null;
-  name?: string | null;
-  username?: string | null;
-  avatar_url?: string | null;
-};
-
-type ReviewRow = {
-  id: number;
-  user_id: string | null;
-  rating: number;
-  content: string | null;
-  created_at: string;
-  reply?: string | null;
-  reply_at?: string | null;
-  photos?: string[] | null;
-};
-
-type PublicReviewView = ReviewRow & {
-  user: {
-    name: string;
-    avatar_url: string | null;
-  };
-};
-
 type PublicReviewPayload = {
   success?: boolean;
-  data?: ReviewRow[];
+  data?: PublicReviewItem[];
   error?: string;
 };
 
@@ -67,19 +41,47 @@ function formatDate(dateString: string) {
   return `${date.getFullYear()}. ${String(date.getMonth() + 1).padStart(2, '0')}. ${String(date.getDate()).padStart(2, '0')}.`;
 }
 
-function getProfileDisplayName(profile: ProfileRow | undefined, fallbackLabel: string) {
-  if (!profile) return fallbackLabel;
+function PublicReviewPhotos({
+  photos,
+  maxPhotos,
+}: {
+  photos: string[];
+  maxPhotos: number;
+}) {
+  if (photos.length === 0) return null;
 
-  return profile.full_name || profile.name || profile.username || fallbackLabel;
+  return (
+    <div className="mt-2 grid grid-cols-2 gap-2">
+      {photos.slice(0, maxPhotos).map((photo, index) => {
+        const photoUrl = secureUrl(photo);
+        if (!photoUrl) return null;
+
+        return (
+          <div
+            key={`${photoUrl}-${index}`}
+            data-testid="public-review-photo"
+            className="relative aspect-square overflow-hidden rounded-xl border border-slate-200 bg-slate-100"
+          >
+            <Image
+              src={photoUrl}
+              alt="Review photo"
+              fill
+              sizes="(max-width: 768px) 96px, 120px"
+              unoptimized
+              className="object-cover"
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 export default function PublicReviewSection(props: ReviewSectionProps) {
-  const supabase = useMemo(() => createClient(), []);
-  const { t } = useLanguage();
-  const guestLabel = t('exp_review_guest_label');
+  const { t, lang } = useLanguage();
   const reviewHostId = 'hostId' in props ? props.hostId : null;
   const reviewExperienceId = 'experienceId' in props ? props.experienceId : null;
-  const [reviews, setReviews] = useState<PublicReviewView[]>([]);
+  const [reviews, setReviews] = useState<PublicReviewItem[]>([]);
   const [isReviewsExpanded, setIsReviewsExpanded] = useState(false);
   const [isPolicyOpen, setIsPolicyOpen] = useState(false);
   const [sortOrder, setSortOrder] = useState<'latest' | 'oldest'>('latest');
@@ -92,74 +94,25 @@ export default function PublicReviewSection(props: ReviewSectionProps) {
       try {
         setLoading(true);
 
-        let reviewRows: ReviewRow[] = [];
+        const endpoint = reviewHostId
+          ? `/api/public/hosts/${encodeURIComponent(reviewHostId)}/reviews?lang=${encodeURIComponent(lang)}`
+          : `/api/public/experiences/${encodeURIComponent(String(reviewExperienceId))}/reviews?lang=${encodeURIComponent(lang)}`;
 
-        if (reviewHostId) {
-          const response = await fetch(`/api/public/hosts/${encodeURIComponent(reviewHostId)}/reviews`, {
-            cache: 'no-store',
-          });
+        const response = await fetch(endpoint, { cache: 'no-store' });
+        const result = (await response.json()) as PublicReviewPayload;
 
-          const result = (await response.json()) as PublicReviewPayload;
-          if (!response.ok) {
-            if (response.status === 404) {
-              reviewRows = [];
-            } else {
-              throw new Error(result.error || 'Failed to load public host reviews.');
-            }
-          } else {
-            reviewRows = result.data || [];
+        if (!response.ok) {
+          if (response.status === 404) {
+            if (isActive) setReviews([]);
+            return;
           }
-        } else if (reviewExperienceId) {
-          const { data, error } = await supabase
-            .from('reviews')
-            .select('id, user_id, rating, content, created_at, reply, reply_at, photos')
-            .eq('experience_id', reviewExperienceId)
-            .order('created_at', { ascending: false });
 
-          if (error) throw error;
-          reviewRows = (data as ReviewRow[] | null) || [];
+          throw new Error(result.error || 'Failed to load public reviews.');
         }
 
-        if (!isActive) return;
-
-        if (reviewRows.length === 0) {
-          setReviews([]);
-          return;
+        if (isActive) {
+          setReviews(result.data || []);
         }
-
-        const userIds = Array.from(
-          new Set(reviewRows.map((review) => review.user_id).filter((userId): userId is string => Boolean(userId)))
-        );
-
-        const { data: profilesData, error: profileError } = userIds.length > 0
-          ? await supabase
-              .from('profiles')
-              .select('id, full_name, name, username, avatar_url')
-              .in('id', userIds)
-          : { data: [], error: null };
-
-        if (profileError) {
-          console.error('[PublicReviewSection] profile lookup failed:', profileError);
-        }
-
-        if (!isActive) return;
-
-        const profileMap = new Map<string, ProfileRow>(
-          ((profilesData as ProfileRow[] | null) || []).map((profile) => [profile.id, profile])
-        );
-
-        const combinedReviews: PublicReviewView[] = reviewRows.map((review) => {
-          const profile = review.user_id ? profileMap.get(review.user_id) : undefined;
-          return {
-            ...review,
-            user: {
-              name: getProfileDisplayName(profile, guestLabel),
-              avatar_url: profile?.avatar_url || null,
-            },
-          };
-        });
-
-        setReviews(combinedReviews);
       } catch (error) {
         console.error('[PublicReviewSection] review lookup failed:', error);
         if (isActive) setReviews([]);
@@ -173,7 +126,7 @@ export default function PublicReviewSection(props: ReviewSectionProps) {
     return () => {
       isActive = false;
     };
-  }, [guestLabel, reviewExperienceId, reviewHostId, supabase]);
+  }, [lang, reviewExperienceId, reviewHostId]);
 
   const averageRating = reviews.length > 0
     ? (reviews.reduce((acc, cur) => acc + cur.rating, 0) / reviews.length).toFixed(2)
@@ -183,6 +136,7 @@ export default function PublicReviewSection(props: ReviewSectionProps) {
     const timeB = new Date(b.created_at).getTime();
     return sortOrder === 'latest' ? timeB - timeA : timeA - timeB;
   });
+  const previewReviews = reviews.slice(0, 4);
 
   if (loading) {
     return <div className="py-10 text-center text-slate-400">{t('exp_review_loading')}</div>;
@@ -198,20 +152,37 @@ export default function PublicReviewSection(props: ReviewSectionProps) {
         <>
           <div className="-mx-1 overflow-x-auto pb-2 md:hidden">
             <div className="flex min-w-max gap-3 px-1">
-              {reviews.slice(0, 4).map((review) => {
-                const avatarUrl = secureUrl(review.user.avatar_url);
+              {previewReviews.map((review) => {
+                const avatarUrl = secureUrl(review.reviewer.avatar_url);
+
                 return (
-                  <article key={review.id} className="w-[250px] border-r border-slate-200 pr-3">
+                  <article
+                    key={review.id}
+                    data-testid="public-review-card"
+                    className="w-[260px] border-r border-slate-200 pr-3"
+                  >
                     <div className="mb-2.5 flex items-center gap-2.5">
-                      <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full bg-slate-200">
+                      <div
+                        data-testid="public-reviewer-avatar"
+                        className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full bg-slate-200"
+                      >
                         {avatarUrl ? (
-                          <Image src={avatarUrl} alt="user" fill sizes="36px" className="object-cover" />
+                          <Image
+                            src={avatarUrl}
+                            alt={review.reviewer.display_name}
+                            fill
+                            sizes="36px"
+                            unoptimized
+                            className="object-cover"
+                          />
                         ) : (
                           <div className="flex h-full w-full items-center justify-center bg-slate-300 text-xs text-slate-500">?</div>
                         )}
                       </div>
-                      <div>
-                        <div className="text-[13px] font-semibold text-slate-900">{review.user.name}</div>
+                      <div className="min-w-0">
+                        <div data-testid="public-reviewer-name" className="truncate text-[13px] font-semibold text-slate-900">
+                          {review.reviewer.display_name}
+                        </div>
                         <div className="text-[11px] text-slate-500">{formatDate(review.created_at)}</div>
                       </div>
                     </div>
@@ -227,6 +198,7 @@ export default function PublicReviewSection(props: ReviewSectionProps) {
                       <span className="ml-1 text-[11px]">{review.rating}.0</span>
                     </div>
                     <p className="mb-1.5 line-clamp-4 text-[12px] leading-[1.4] text-slate-700">{review.content || ''}</p>
+                    <PublicReviewPhotos photos={review.photos} maxPhotos={2} />
                     {review.reply && (
                       <div className="mt-2 rounded-lg border border-slate-100 bg-slate-50 p-2">
                         <div className="mb-1 text-[11px] font-bold text-slate-800">{t('hr_host_reply')}</div>
@@ -246,24 +218,42 @@ export default function PublicReviewSection(props: ReviewSectionProps) {
           </div>
 
           <div className="hidden grid-cols-2 gap-8 md:grid">
-            {reviews.slice(0, 4).map((review) => {
-              const avatarUrl = secureUrl(review.user.avatar_url);
+            {previewReviews.map((review) => {
+              const avatarUrl = secureUrl(review.reviewer.avatar_url);
+
               return (
-                <article key={review.id} className="border-r border-slate-200 pr-6">
+                <article
+                  key={review.id}
+                  data-testid="public-review-card"
+                  className="border-r border-slate-200 pr-6"
+                >
                   <div className="mb-3 flex items-center gap-3">
-                    <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-slate-200">
+                    <div
+                      data-testid="public-reviewer-avatar"
+                      className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-slate-200"
+                    >
                       {avatarUrl ? (
-                        <Image src={avatarUrl} alt="user" fill sizes="44px" className="object-cover" />
+                        <Image
+                          src={avatarUrl}
+                          alt={review.reviewer.display_name}
+                          fill
+                          sizes="44px"
+                          unoptimized
+                          className="object-cover"
+                        />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center bg-slate-300 text-xs text-slate-500">?</div>
                       )}
                     </div>
-                    <div>
-                      <div className="text-sm font-bold text-slate-900">{review.user.name}</div>
+                    <div className="min-w-0">
+                      <div data-testid="public-reviewer-name" className="truncate text-sm font-bold text-slate-900">
+                        {review.reviewer.display_name}
+                      </div>
                       <div className="text-xs text-slate-500">{formatDate(review.created_at)}</div>
                     </div>
                   </div>
                   <p className="line-clamp-4 text-sm leading-relaxed text-slate-600">{review.content || ''}</p>
+                  <PublicReviewPhotos photos={review.photos} maxPhotos={2} />
                   {review.reply && (
                     <div className="mt-3 rounded-2xl border border-slate-100 bg-slate-50 p-3">
                       <div className="mb-1 text-xs font-bold text-slate-800">{t('hr_host_reply')}</div>
@@ -304,6 +294,7 @@ export default function PublicReviewSection(props: ReviewSectionProps) {
           onClick={() => setIsReviewsExpanded(false)}
         >
           <div
+            data-testid="public-review-modal"
             className="flex h-[86dvh] w-full max-w-[380px] flex-col overflow-hidden rounded-[30px] bg-[#fcfcfc] shadow-2xl animate-in zoom-in-95 duration-200 md:h-[82vh] md:max-w-[760px] md:rounded-3xl"
             onClick={(event) => event.stopPropagation()}
           >
@@ -344,14 +335,24 @@ export default function PublicReviewSection(props: ReviewSectionProps) {
             <div className="flex-1 overflow-y-auto px-5 pb-6">
               <div className="space-y-0">
                 {sortedReviews.map((review) => {
-                  const avatarUrl = secureUrl(review.user.avatar_url);
+                  const avatarUrl = secureUrl(review.reviewer.avatar_url);
 
                   return (
-                    <article key={review.id} className="border-b border-slate-200 py-4">
+                    <article key={review.id} data-testid="public-review-card" className="border-b border-slate-200 py-4">
                       <div className="flex gap-3">
-                        <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full border border-slate-100 bg-slate-200">
+                        <div
+                          data-testid="public-reviewer-avatar"
+                          className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full border border-slate-100 bg-slate-200"
+                        >
                           {avatarUrl ? (
-                            <Image src={avatarUrl} alt="user" fill sizes="36px" className="object-cover" />
+                            <Image
+                              src={avatarUrl}
+                              alt={review.reviewer.display_name}
+                              fill
+                              sizes="36px"
+                              unoptimized
+                              className="object-cover"
+                            />
                           ) : (
                             <div className="flex h-full w-full items-center justify-center bg-slate-300 text-xs text-slate-500">?</div>
                           )}
@@ -359,7 +360,9 @@ export default function PublicReviewSection(props: ReviewSectionProps) {
 
                         <div className="min-w-0 flex-1">
                           <div className="text-[11px] leading-none text-slate-900 md:text-[11px]">
-                            <div className="font-medium">{review.user.name}</div>
+                            <div data-testid="public-reviewer-name" className="font-medium">
+                              {review.reviewer.display_name}
+                            </div>
                             <div className="mt-1 text-[10px] text-slate-500 md:text-[10px]">
                               {t('exp_review_guest_label')}
                             </div>
@@ -388,6 +391,31 @@ export default function PublicReviewSection(props: ReviewSectionProps) {
                             <p className="mb-1.5 whitespace-pre-wrap text-[10px] font-normal leading-[1.45] text-slate-700 md:text-[10px]">
                               {review.content || ''}
                             </p>
+                            {review.photos.length > 0 && (
+                              <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-3">
+                                {review.photos.map((photo, index) => {
+                                  const photoUrl = secureUrl(photo);
+                                  if (!photoUrl) return null;
+
+                                  return (
+                                    <div
+                                      key={`${photoUrl}-${index}`}
+                                      data-testid="public-review-photo"
+                                      className="relative aspect-square overflow-hidden rounded-xl border border-slate-200 bg-slate-100"
+                                    >
+                                      <Image
+                                        src={photoUrl}
+                                        alt="Review photo"
+                                        fill
+                                        sizes="(max-width: 768px) 120px, 160px"
+                                        unoptimized
+                                        className="object-cover"
+                                      />
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
                             {review.reply && (
                               <div className="mt-2 rounded-2xl border border-slate-100 bg-slate-50 p-3">
                                 <div className="mb-1 text-[10px] font-bold text-slate-800">{t('hr_host_reply')}</div>

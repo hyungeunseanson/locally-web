@@ -536,6 +536,47 @@ test.describe.serial('guest trips completed sync route', () => {
     await expect(page.getByText(experience.titleKo)).toBeVisible();
   });
 
+  test('uses experience photos as the review modal context image when image_url is empty', async ({ page }) => {
+    const host = createUser('host.review.modal.image');
+    const guest = createUser('guest.review.modal.image');
+
+    await page.addInitScript(() => {
+      window.localStorage.setItem('app_lang', 'ko');
+      document.cookie = 'app_lang=ko; path=/';
+    });
+
+    const hostId = await createAuthUser(host);
+    const guestId = await createAuthUser(guest);
+    await createApprovedHostApplication(hostId, host);
+
+    const supabase = getAdminClient();
+    const { error: hostProfileError } = await supabase
+      .from('profiles')
+      .update({
+        full_name: host.fullName,
+        avatar_url: '/images/logo.png',
+      })
+      .eq('id', hostId);
+
+    if (hostProfileError) throw hostProfileError;
+
+    const experienceId = await createHostExperience(hostId);
+    await createPastPaidBooking({
+      guestId,
+      guest,
+      experienceId,
+    });
+
+    await login(page, guest);
+    await page.goto('/guest/trips', { waitUntil: 'networkidle' });
+
+    await page.locator('button:visible', { hasText: '후기 작성하기' }).first().click();
+
+    const contextImage = page.getByTestId('review-modal-context-image');
+    await expect(contextImage).toBeVisible();
+    await expect(contextImage).toHaveAttribute('src', /https:\/\/images\.unsplash\.com/);
+  });
+
   test('shows trip context meta and contact-host CTA in the cancellation modal', async ({ page }) => {
     const host = createUser('host.trip.meta');
     const guest = createUser('guest.trip.meta');

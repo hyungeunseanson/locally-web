@@ -10,7 +10,12 @@ interface ReviewSectionProps {
 export default function ReviewSection({ experienceId, hostName }: ReviewSectionProps) {
   return (
     <div className="border-b border-slate-200">
-      <PublicReviewSection experienceId={experienceId} hostName={hostName} sectionId="reviews" />
+      <PublicReviewSection
+        experienceId={experienceId}
+        hostName={hostName}
+        sectionId="reviews"
+        testId="experience-public-reviews-section"
+      />
     </div>
   );
 }

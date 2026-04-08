@@ -18,7 +18,14 @@ type PublicHostApplicationRow = {
   created_at?: string | null;
 };
 
-type PublicHostReviewPayload = {
+type PublicExperienceRow = {
+  id: string | number;
+  host_id: string | null;
+  status: string | null;
+  is_active?: boolean | null;
+};
+
+type PublicExperienceReviewPayload = {
   success: boolean;
   data?: PublicReviewItem[];
   error?: string;
@@ -26,32 +33,61 @@ type PublicHostReviewPayload = {
 
 export async function GET(
   request: Request,
-  context: { params: Promise<{ hostId: string }> }
+  context: { params: Promise<{ experienceId: string }> }
 ) {
   try {
-    const { hostId } = await context.params;
-    if (!hostId) {
-      return NextResponse.json({ success: false, error: 'Invalid host id' }, { status: 400 });
+    const { experienceId } = await context.params;
+    if (!experienceId) {
+      return NextResponse.json<PublicExperienceReviewPayload>(
+        { success: false, error: 'Invalid experience id' },
+        { status: 400 }
+      );
     }
 
     const supabaseAdmin = createAdminClient();
+    const { data: experienceRow, error: experienceError } = await supabaseAdmin
+      .from('experiences')
+      .select('id, host_id, status, is_active')
+      .eq('id', experienceId)
+      .maybeSingle();
+
+    if (experienceError) throw experienceError;
+
+    const experience = experienceRow as PublicExperienceRow | null;
+    if (!experience) {
+      return NextResponse.json<PublicExperienceReviewPayload>(
+        { success: false, error: 'Experience not found' },
+        { status: 404 }
+      );
+    }
+
+    if (experience.status !== 'active' || experience.is_active === false || !experience.host_id) {
+      return NextResponse.json<PublicExperienceReviewPayload>(
+        { success: false, error: 'Experience not found' },
+        { status: 404 }
+      );
+    }
+
     const { data: hostAppRows, error: hostAppError } = await supabaseAdmin
       .from('public_host_applications')
       .select('id, user_id, status, created_at')
-      .eq('user_id', hostId)
+      .eq('user_id', experience.host_id)
       .order('created_at', { ascending: false });
 
     if (hostAppError) throw hostAppError;
 
     const hostApp = pickLatestPublicHostApplication((hostAppRows || []) as PublicHostApplicationRow[]);
     if (!hostApp || !isPublicHostApplicationStatus(hostApp.status)) {
-      return NextResponse.json({ success: false, error: 'Host not found' }, { status: 404 });
+      return NextResponse.json<PublicExperienceReviewPayload>(
+        { success: false, error: 'Experience not found' },
+        { status: 404 }
+      );
     }
 
     const { data: reviewRows, error: reviewsError } = await supabaseAdmin
       .from('reviews')
-      .select('id, user_id, rating, content, created_at, reply, reply_at, photos, experiences!inner(host_id)')
-      .eq('experiences.host_id', hostId)
+      .select('id, user_id, rating, content, created_at, reply, reply_at, photos')
+      .eq('experience_id', experienceId)
       .order('created_at', { ascending: false });
 
     if (reviewsError) throw reviewsError;
@@ -73,7 +109,7 @@ export async function GET(
     const requestLocale = resolvePublicReviewLocale(new URL(request.url).searchParams.get('lang'));
     const locale = requestLocale || await getCurrentLocale();
 
-    return NextResponse.json<PublicHostReviewPayload>({
+    return NextResponse.json<PublicExperienceReviewPayload>({
       success: true,
       data: buildPublicReviewItems({
         reviews,
@@ -82,8 +118,8 @@ export async function GET(
       }),
     });
   } catch (error) {
-    console.error('[api/public/hosts/[hostId]/reviews] GET failed:', error);
-    const message = error instanceof Error ? error.message : 'Failed to load public host reviews';
-    return NextResponse.json<PublicHostReviewPayload>({ success: false, error: message }, { status: 500 });
+    console.error('[api/public/experiences/[experienceId]/reviews] GET failed:', error);
+    const message = error instanceof Error ? error.message : 'Failed to load public experience reviews';
+    return NextResponse.json<PublicExperienceReviewPayload>({ success: false, error: message }, { status: 500 });
   }
 }

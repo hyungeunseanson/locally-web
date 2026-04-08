@@ -26,6 +26,12 @@ interface ReviewModalProps {
   onReviewSubmitted?: () => void; // 🟢 후기 작성/수정 완료 후 목록 새로고침용 콜백
 }
 
+function secureUrl(url: string | null | undefined) {
+  if (!url) return null;
+  if (url.startsWith('http://')) return url.replace('http://', 'https://');
+  return url;
+}
+
 export default function ReviewModal({ trip, onClose, onReviewSubmitted }: ReviewModalProps) {
   const supabase = useMemo(() => createClient(), []);
   const { showToast, showHeicUnsupportedToast } = useToast();
@@ -54,6 +60,7 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
   const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const contextImageSrc = secureUrl(trip.photos?.[0] || trip.image || null);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -186,8 +193,17 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
         <div className="p-5 md:p-8 overflow-y-auto">
           <div className="flex items-center gap-3 md:gap-4 mb-6 md:mb-8">
             <div className="w-14 h-14 md:w-16 md:h-16 rounded-xl bg-slate-200 overflow-hidden shrink-0 border border-slate-100">
-              {/* eslint-disable-next-line @next/next/no-img-element -- review modal cover renders arbitrary public trip image URLs */}
-              {trip.image ? <img src={trip.image} alt={trip.title} className="w-full h-full object-cover" /> : <div className="bg-slate-200 w-full h-full" />}
+              {contextImageSrc ? (
+                /* eslint-disable-next-line @next/next/no-img-element -- review modal cover renders arbitrary public trip image URLs */
+                <img
+                  data-testid="review-modal-context-image"
+                  src={contextImageSrc}
+                  alt={trip.title}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="bg-slate-200 w-full h-full" />
+              )}
             </div>
             <div>
               <h4 className="font-bold text-sm text-slate-900 line-clamp-1">{trip.title}</h4>
