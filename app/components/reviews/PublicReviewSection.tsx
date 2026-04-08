@@ -293,7 +293,7 @@ export default function PublicReviewSection(props: ReviewSectionProps) {
           <button
             data-testid="public-review-cta"
             onClick={() => setIsReviewsExpanded(true)}
-            className="h-11 w-full rounded-full border border-slate-300 bg-white px-5 text-[13px] font-medium text-slate-800 transition-colors hover:border-slate-400 hover:bg-slate-50 md:w-auto md:min-w-[180px] md:px-6 md:text-[14px]"
+            className="h-9 w-auto min-w-[136px] rounded-full border border-slate-300 bg-white px-4 text-[12px] font-medium text-slate-800 transition-colors hover:border-slate-400 hover:bg-slate-50 md:h-10 md:min-w-[152px] md:px-5 md:text-[13px]"
           >
             {t('exp_review_view_all')}
           </button>
