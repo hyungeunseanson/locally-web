@@ -125,19 +125,21 @@ function isMissingServiceRpcError(error: ServiceRpcErrorLike | null | undefined,
   );
 }
 
-function parseAtomicConfirmError(message: string): ConfirmServiceBankPaymentFailure {
-  if (message.includes('SVC_NOT_FOUND')) {
+function parseAtomicConfirmError(error: ServiceRpcErrorLike): ConfirmServiceBankPaymentFailure {
+  const combinedMessage = `${error.message || ''} ${error.details || ''} ${error.hint || ''}`;
+
+  if (combinedMessage.includes('SVC_NOT_FOUND')) {
     return { success: false, status: 404, error: '예약 정보를 찾을 수 없습니다.' };
   }
 
-  if (message.includes('SVC_INVALID_PAYMENT_METHOD')) {
+  if (combinedMessage.includes('SVC_INVALID_PAYMENT_METHOD')) {
     return { success: false, status: 409, error: '무통장 입금 예약이 아닙니다.' };
   }
 
   if (
-    message.includes('SVC_INVALID_STATUS') ||
-    message.includes('SVC_REQUEST_INVALID_STATUS') ||
-    message.includes('SVC_REQUEST_MISSING')
+    combinedMessage.includes('SVC_INVALID_STATUS') ||
+    combinedMessage.includes('SVC_REQUEST_INVALID_STATUS') ||
+    combinedMessage.includes('SVC_REQUEST_MISSING')
   ) {
     return {
       success: false,
@@ -168,10 +170,14 @@ async function tryConfirmServiceBankPaymentAtomic(
     if (isMissingServiceRpcError(error, rpcName)) {
       return { kind: 'missing' as const };
     }
+    const failure = parseAtomicConfirmError(error);
+    if (failure.status === 500) {
+      console.error('[service bank confirm] atomic RPC error:', error);
+    }
 
     return {
       kind: 'error' as const,
-      failure: parseAtomicConfirmError(error.message || '서비스 입금 확인 중 오류가 발생했습니다.'),
+      failure,
     };
   }
 

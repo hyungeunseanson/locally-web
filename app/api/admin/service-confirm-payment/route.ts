@@ -38,7 +38,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, message: 'Already processed' });
     }
 
-    await runServiceBankConfirmSideEffects(supabaseAdmin, result.payment);
+    try {
+      await runServiceBankConfirmSideEffects(supabaseAdmin, result.payment);
+    } catch (sideEffectError) {
+      console.error('[ADMIN] service-confirm-payment side effects failed:', sideEffectError);
+    }
 
     try {
       await recordAuditLog({

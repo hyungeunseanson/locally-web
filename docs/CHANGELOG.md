@@ -11,8 +11,9 @@
 | --- | --- |
 | 🟢 서비스 무통장 입금 확인 코어 분리 | `app/utils/services/confirmServiceBankPayment.ts`, `app/api/admin/service-confirm-payment/route.ts` — 관리자 서비스 무통장 확인의 core DB 확정 경로를 helper로 분리하고, route는 관리자 권한 확인 + 부가 작업 orchestration만 담당하도록 정리 |
 | 🟢 atomic RPC 경로 추가 | `docs/migrations/v3_40_10_confirm_service_bank_payment_atomic.sql` — `confirm_service_bank_payment_atomic()` SECURITY DEFINER 함수를 추가해 `service_bookings.status='PAID'`와 `service_requests.status='open'` 전이를 하나의 DB 트랜잭션으로 처리할 수 있게 구성 |
+| 🟢 atomic RPC SQL 정합성 보정 | `docs/migrations/v3_40_10_confirm_service_bank_payment_atomic.sql`, `app/utils/services/confirmServiceBankPayment.ts` — 적용된 RPC의 ambiguous column/type 반환 오류를 alias + 명시 cast로 보정하고, helper는 RPC error의 `message/details/hint`를 함께 읽어 `404/409`를 안정적으로 분기하도록 수정 |
 | 🟢 unmigrated 환경 guarded fallback + best-effort side effects | `app/utils/services/confirmServiceBankPayment.ts`, `app/api/admin/service-confirm-payment/route.ts` — migration 미적용 환경에서는 compare-and-set + rollback fallback으로 정합성을 최대한 지키고, 알림/메일/관리자 alert/audit log 실패가 이미 확정된 DB 상태를 깨뜨리거나 500으로 전파되지 않도록 분리 |
-| 🟡 서비스 무통장 guard 검증 추가 | `tests/e2e/151-service-bank-confirm-guard.spec.ts`, `tests/e2e/10-admin-service-requests.spec.ts`, `tests/e2e/22-service-host-notification-scope.spec.ts`, `tests/e2e/118-service-notification-localization.spec.ts` — 비관리자 차단, 비무통장 예약 차단, 동시 요청 멱등성, 단일 customer 알림/감사 로그 생성, 관리자 UI와 locale side effect 회귀를 함께 검증 |
+| 🟡 서비스 무통장 guard 검증 추가 | `tests/e2e/151-service-bank-confirm-guard.spec.ts`, `tests/e2e/10-admin-service-requests.spec.ts`, `tests/e2e/22-service-host-notification-scope.spec.ts`, `tests/e2e/118-service-notification-localization.spec.ts`, `tests/e2e/132-service-payout-eligibility-after-completion.spec.ts`, `tests/e2e/134-admin-payout-queue-unified-host-rollup.spec.ts` — 비관리자 차단, 비무통장 예약 차단, 동시 요청 멱등성, 단일 customer 알림/감사 로그 생성, 관리자 UI/locale side effect, 완료 후 payout queue 반영과 통합 host rollup 회귀를 함께 검증 |
 
 ## v3.40.09 — [Reviews] Public review compact redesign and route recovery
 

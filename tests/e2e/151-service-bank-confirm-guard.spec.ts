@@ -301,12 +301,15 @@ test.describe.serial('Service bank confirm guard contract', () => {
 
     const { data: auditLogs, error: auditError } = await supabase
       .from('admin_audit_logs')
-      .select('id')
+      .select('id, details')
       .eq('action_type', 'ADMIN_SERVICE_CONFIRM_BANK')
       .eq('target_id', fixture.orderId);
 
     if (auditError) throw auditError;
 
     expect(auditLogs || []).toHaveLength(1);
+    expect(auditLogs?.[0]?.details).toMatchObject({
+      used_atomic_rpc: true,
+    });
   });
 });

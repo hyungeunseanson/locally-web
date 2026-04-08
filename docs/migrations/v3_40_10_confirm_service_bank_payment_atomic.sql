@@ -35,8 +35,8 @@ DECLARE
   v_order_id TEXT := trim(p_order_id);
 BEGIN
   SELECT * INTO v_booking
-  FROM public.service_bookings
-  WHERE order_id = v_order_id
+  FROM public.service_bookings AS sb
+  WHERE sb.order_id = v_order_id
   FOR UPDATE;
 
   IF NOT FOUND THEN
@@ -48,8 +48,8 @@ BEGIN
   END IF;
 
   SELECT * INTO v_request
-  FROM public.service_requests
-  WHERE id = v_booking.request_id
+  FROM public.service_requests AS sr
+  WHERE sr.id = v_booking.request_id
   FOR UPDATE;
 
   IF NOT FOUND THEN
@@ -61,14 +61,14 @@ BEGIN
     SELECT
       v_booking.id,
       v_booking.order_id,
-      v_booking.request_id,
-      v_booking.customer_id,
-      v_booking.amount,
+      v_booking.request_id::UUID,
+      v_booking.customer_id::UUID,
+      v_booking.amount::INTEGER,
       v_request.title,
       v_request.city,
       v_request.country,
-      v_request.duration_hours,
-      v_request.guest_count,
+      v_request.duration_hours::INTEGER,
+      v_request.guest_count::INTEGER,
       TRUE,
       v_request.status = 'open';
     RETURN;
@@ -82,11 +82,11 @@ BEGIN
     RAISE EXCEPTION 'SVC_REQUEST_INVALID_STATUS: request status must be pending_payment or open';
   END IF;
 
-  UPDATE public.service_bookings
+  UPDATE public.service_bookings AS sb
   SET status = 'PAID'
-  WHERE id = v_booking.id
-    AND status = 'PENDING'
-    AND COALESCE(lower(payment_method), '') = 'bank';
+  WHERE sb.id = v_booking.id
+    AND sb.status = 'PENDING'
+    AND COALESCE(lower(sb.payment_method), '') = 'bank';
 
   GET DIAGNOSTICS v_booking_count = ROW_COUNT;
   IF v_booking_count <> 1 THEN
@@ -94,10 +94,10 @@ BEGIN
   END IF;
 
   IF v_request.status = 'pending_payment' THEN
-    UPDATE public.service_requests
+    UPDATE public.service_requests AS sr
     SET status = 'open'
-    WHERE id = v_request.id
-      AND status = 'pending_payment';
+    WHERE sr.id = v_request.id
+      AND sr.status = 'pending_payment';
 
     GET DIAGNOSTICS v_request_count = ROW_COUNT;
     IF v_request_count <> 1 THEN
@@ -111,14 +111,14 @@ BEGIN
   SELECT
     v_booking.id,
     v_booking.order_id,
-    v_booking.request_id,
-    v_booking.customer_id,
-    v_booking.amount,
+    v_booking.request_id::UUID,
+    v_booking.customer_id::UUID,
+    v_booking.amount::INTEGER,
     v_request.title,
     v_request.city,
     v_request.country,
-    v_request.duration_hours,
-    v_request.guest_count,
+    v_request.duration_hours::INTEGER,
+    v_request.guest_count::INTEGER,
     FALSE,
     v_request_was_opened;
 END;
