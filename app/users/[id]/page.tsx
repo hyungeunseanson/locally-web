@@ -6,6 +6,7 @@ import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import { User, CheckCircle2, Star } from 'lucide-react';
 import ExperienceCard from '@/app/components/ExperienceCard';
+import PublicReviewSection from '@/app/components/reviews/PublicReviewSection';
 import { useLanguage } from '@/app/context/LanguageContext';
 import {
   isPublicHostApplicationStatus,
@@ -218,16 +219,14 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
             </section>
 
             {/* 후기 (추후 구현) */}
-            <section className="pt-12 border-t border-slate-100">
+            <section data-testid="public-host-reviews-section" className="pt-12 border-t border-slate-100">
               <h2 className="text-xl md:text-2xl font-bold mb-2 md:mb-3 flex items-center gap-2">
                 <Star className="fill-black" size={24} /> {t('public_host_profile_reviews_title')}
               </h2>
               <p className="mb-4 text-sm leading-relaxed text-slate-500 md:mb-6">
                 {t('public_host_profile_reviews_desc')}
               </p>
-              <div className="p-8 bg-slate-50 rounded-2xl text-center text-slate-500">
-                {t('public_host_profile_reviews_empty')}
-              </div>
+              <PublicReviewSection hostId={resolvedParams.id} hostName={displayName} />
             </section>
 
           </div>

@@ -17,6 +17,8 @@ let adminClient: SupabaseClient | null = null;
 const createdAuthUserIds: string[] = [];
 const createdApplicationIds: string[] = [];
 const createdExperienceIds: number[] = [];
+const createdBookingIds: string[] = [];
+const createdReviewIds: number[] = [];
 
 function loadEnv(): EnvMap {
   return readFileSync('.env.local', 'utf8')
@@ -49,6 +51,16 @@ function createHostUser(): TestUser {
     email: `codex.public.host.${timestamp}@example.com`,
     password: TEST_PASSWORD,
     fullName: `Public Host ${timestamp}`,
+    phone: `010${String(timestamp).slice(-8)}`,
+  };
+}
+
+function createGuestUser(): TestUser {
+  const timestamp = Date.now();
+  return {
+    email: `codex.public.host.guest.${timestamp}@example.com`,
+    password: TEST_PASSWORD,
+    fullName: `Public Guest ${timestamp}`,
     phone: `010${String(timestamp).slice(-8)}`,
   };
 }
@@ -196,8 +208,84 @@ async function createActiveExperience(hostId: string) {
   };
 }
 
+async function createCompletedBooking(params: {
+  guestId: string;
+  guest: TestUser;
+  experienceId: number;
+}) {
+  const bookingId = `PUBLIC-HOST-BOOKING-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  const bookingDate = new Date();
+  bookingDate.setDate(bookingDate.getDate() - 3);
+
+  const { error } = await getAdminClient().from('bookings').insert({
+    id: bookingId,
+    order_id: bookingId,
+    user_id: params.guestId,
+    experience_id: params.experienceId,
+    amount: 33000,
+    total_price: 30000,
+    total_experience_price: 30000,
+    status: 'completed',
+    guests: 1,
+    date: bookingDate.toISOString().slice(0, 10),
+    time: '10:00',
+    type: 'group',
+    contact_name: params.guest.fullName,
+    contact_phone: params.guest.phone,
+    message: '',
+    created_at: bookingDate.toISOString(),
+    payment_method: 'card',
+    host_payout_amount: 24000,
+    platform_revenue: 9000,
+    payout_status: 'pending',
+    is_solo_guarantee: false,
+    solo_guarantee_price: 0,
+  });
+
+  if (error) throw error;
+  createdBookingIds.push(bookingId);
+  return bookingId;
+}
+
+async function createReview(params: {
+  guestId: string;
+  experienceId: number;
+  bookingId: string;
+  content: string;
+  reply: string;
+}) {
+  const { data, error } = await getAdminClient()
+    .from('reviews')
+    .insert({
+      user_id: params.guestId,
+      experience_id: params.experienceId,
+      booking_id: params.bookingId,
+      rating: 5,
+      content: params.content,
+      reply: params.reply,
+      reply_at: new Date().toISOString(),
+      photos: [],
+    })
+    .select('id')
+    .single();
+
+  if (error || !data?.id) {
+    throw error || new Error('Failed to create review fixture.');
+  }
+
+  createdReviewIds.push(Number(data.id));
+}
+
 test.afterAll(async () => {
   const supabase = getAdminClient();
+
+  for (const reviewId of createdReviewIds) {
+    await supabase.from('reviews').delete().eq('id', reviewId);
+  }
+
+  for (const bookingId of createdBookingIds) {
+    await supabase.from('bookings').delete().eq('id', bookingId);
+  }
 
   for (const experienceId of createdExperienceIds) {
     await supabase.from('experience_availability').delete().eq('experience_id', experienceId);
@@ -216,6 +304,16 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Public host profile', () => {
+  test('does not expose public review feeds for non-public users', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const privateUser = createGuestUser();
+    const privateUserId = await createAuthUser(privateUser);
+
+    const response = await page.request.get(`/api/public/hosts/${privateUserId}/reviews`);
+    expect(response.status()).toBe(404);
+  });
+
   test('renders approved host profile and active experiences through the public projection path', async ({ page }) => {
     test.setTimeout(90000);
 
@@ -223,15 +321,38 @@ test.describe.serial('Public host profile', () => {
     const hostId = await createAuthUser(host);
     await createHostApplication(hostId, host, 'approved');
     const experience = await createActiveExperience(hostId);
+    const guest = createGuestUser();
+    const guestId = await createAuthUser(guest);
+    const bookingId = await createCompletedBooking({
+      guestId,
+      guest,
+      experienceId: experience.experienceId,
+    });
+    const reviewContent = `공개 호스트 프로필 리뷰 본문 ${Date.now()}`;
+    const replyContent = `공개 호스트 프로필 답글 ${Date.now()}`;
+    await createReview({
+      guestId,
+      experienceId: experience.experienceId,
+      bookingId,
+      content: reviewContent,
+      reply: replyContent,
+    });
 
     await page.goto(`/users/${hostId}`, { waitUntil: 'networkidle' });
 
     await expect(page.getByRole('heading', { name: host.fullName, exact: true })).toBeVisible({ timeout: 15000 });
     await expect(page.getByText('공개 호스트 프로필 검증용 승인 호스트입니다.')).toBeVisible();
     await expect(page.getByTestId('public-host-experiences-section')).toBeVisible();
+    await expect(page.getByTestId('public-host-reviews-section')).toBeVisible();
     await expect(page.getByTestId('public-host-languages')).toBeVisible();
     await expect(page.getByTestId('public-host-languages').getByText('English')).toBeVisible();
     await expect(page.getByText(experience.title)).toBeVisible();
+    await expect(
+      page.locator('[data-testid="public-host-reviews-section"] p:visible').filter({ hasText: reviewContent }).first()
+    ).toBeVisible();
+    await expect(
+      page.locator('[data-testid="public-host-reviews-section"] p:visible').filter({ hasText: replyContent }).first()
+    ).toBeVisible();
   });
 
   test('renders active host profiles through the same public projection path', async ({ page }) => {

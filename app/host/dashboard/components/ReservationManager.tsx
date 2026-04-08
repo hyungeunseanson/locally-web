@@ -40,8 +40,11 @@ type ReservationExperience = {
   title?: string | null;
 };
 
+type ReservationGuestRelation = ReservationGuest | ReservationGuest[] | null;
+type ReservationExperienceRelation = ReservationExperience | ReservationExperience[] | null;
+
 type ReservationRecord = {
-  id: number;
+  id: string | number;
   order_id?: string | number | null;
   user_id: string;
   experience_id?: string | number | null;
@@ -61,6 +64,11 @@ type ReservationRecord = {
   experiences?: ReservationExperience | null;
 };
 
+type RawReservationRecord = Omit<ReservationRecord, 'guest' | 'experiences'> & {
+  guest?: ReservationGuestRelation;
+  experiences?: ReservationExperienceRelation;
+};
+
 type HostExperienceRef = {
   id: string | number;
 };
@@ -77,7 +85,7 @@ type BookingRealtimePayload = {
 };
 
 type GuestReviewBookingIdRow = {
-  booking_id: number;
+  booking_id: string | number;
 };
 
 type GuestMembershipResponse = {
@@ -123,6 +131,16 @@ const RESERVATION_SELECT = `
 
 const REALTIME_REFRESH_DEBOUNCE_MS = 350;
 
+function getSingleGuest(guest?: ReservationGuestRelation) {
+  if (Array.isArray(guest)) return guest[0] ?? null;
+  return guest ?? null;
+}
+
+function getSingleExperience(experience?: ReservationExperienceRelation) {
+  if (Array.isArray(experience)) return experience[0] ?? null;
+  return experience ?? null;
+}
+
 export default function ReservationManager() {
   const { t } = useLanguage(); // 🟢 2. t 함수 추가
   const router = useRouter();
@@ -130,7 +148,7 @@ export default function ReservationManager() {
   const { showToast } = useToast();
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [selectedBookingForReview, setSelectedBookingForReview] = useState<ReservationRecord | null>(null);
-  const [reviewedBookingIds, setReviewedBookingIds] = useState<number[]>([]); // 작성 완료된 예약 ID 목록
+  const [reviewedBookingIds, setReviewedBookingIds] = useState<string[]>([]); // 작성 완료된 예약 ID 목록
   const hostExperienceIdsRef = useRef<Set<string>>(new Set());
   const hostUserIdRef = useRef<string | null>(null);
   const realtimeRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -140,11 +158,11 @@ export default function ReservationManager() {
   const [reservations, setReservations] = useState<ReservationRecord[]>([]);
 
   // ✅ [복구] 읽음 처리 상태 & 마운트 상태
-  const [checkedIds, setCheckedIds] = useState<number[]>([]);
+  const [checkedIds, setCheckedIds] = useState<string[]>([]);
   const [isMounted, setIsMounted] = useState(false);
 
   const [loading, setLoading] = useState(true);
-  const [processingId, setProcessingId] = useState<number | null>(null);
+  const [processingId, setProcessingId] = useState<string | number | null>(null);
   const [selectedGuest, setSelectedGuest] = useState<ReservationGuest | null>(null);
   const [pendingRefundBooking, setPendingRefundBooking] = useState<ReservationRecord | null>(null);
   const [membershipByUserId, setMembershipByUserId] = useState<Record<string, LocallyMembershipStatus>>({});
@@ -158,7 +176,9 @@ export default function ReservationManager() {
     const saved = localStorage.getItem('host_checked_reservations');
     if (saved) {
       try {
-        setCheckedIds(JSON.parse(saved));
+        setCheckedIds(
+          (JSON.parse(saved) as Array<string | number>).map((id) => String(id))
+        );
       } catch (e) {
         console.error("Failed to parse checked reservations", e);
       }
@@ -166,18 +186,19 @@ export default function ReservationManager() {
   }, []);
 
   // ✅ [복구] 읽음 처리 함수
-  const markAsRead = (id: number) => {
-    if (!checkedIds.includes(id)) {
-      const newChecked = [...checkedIds, id];
+  const markAsRead = (id: string | number) => {
+    const normalizedId = String(id);
+    if (!checkedIds.includes(normalizedId)) {
+      const newChecked = [...checkedIds, normalizedId];
       setCheckedIds(newChecked);
       localStorage.setItem('host_checked_reservations', JSON.stringify(newChecked));
     }
   };
 
   // ✅ [복구] 신규 예약 판별 로직 (24시간 이내 & 안 읽음)
-  const isNew = (createdAt: string, id: number) => {
+  const isNew = (createdAt: string, id: string | number) => {
     if (!isMounted) return false;
-    if (checkedIds.includes(id)) return false; // 이미 읽었으면 New 아님
+    if (checkedIds.includes(String(id))) return false; // 이미 읽었으면 New 아님
     return (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60) < 24;
   };
 
@@ -255,14 +276,18 @@ export default function ReservationManager() {
         .eq('experiences.host_id', hostUserId);
 
       if (error) throw error;
-      const nextReservations = (data as ReservationRecord[] | null) || [];
+      const nextReservations = ((data as RawReservationRecord[] | null) || []).map((reservation) => ({
+        ...reservation,
+        guest: getSingleGuest(reservation.guest),
+        experiences: getSingleExperience(reservation.experiences),
+      }));
       setReservations(nextReservations);
       void fetchGuestMembershipStatuses(nextReservations.map((reservation) => reservation.user_id));
 
       // 🟢 [추가] 이미 후기를 작성한 예약 ID 조회
       const bookingIds = nextReservations
-        .map((reservation) => Number(reservation.id))
-        .filter((reservationId) => Number.isFinite(reservationId));
+        .map((reservation) => String(reservation.id || ''))
+        .filter(Boolean);
 
       if (bookingIds.length === 0) {
         setReviewedBookingIds([]);
@@ -278,7 +303,7 @@ export default function ReservationManager() {
           setReviewedBookingIds([]);
         } else {
           setReviewedBookingIds(
-            ((reviews as GuestReviewBookingIdRow[] | null) || []).map((review) => review.booking_id)
+            ((reviews as GuestReviewBookingIdRow[] | null) || []).map((review) => String(review.booking_id))
           );
         }
       }
@@ -548,7 +573,7 @@ export default function ReservationManager() {
                 onMessage={() => router.push(`/host/dashboard?tab=inquiries&guestId=${res.user_id}&expId=${res.experience_id || ''}`)}
                 onCalendar={() => addToGoogleCalendar(res)}
                 // 🟢 [추가] 후기 관련 Props
-                hasReview={reviewedBookingIds.includes(res.id)}
+                hasReview={reviewedBookingIds.includes(String(res.id))}
                 onReview={() => {
                   const [year, month, day] = res.date.split('-').map(Number);
                   const tripDate = new Date(year, month - 1, day);

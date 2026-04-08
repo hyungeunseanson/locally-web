@@ -184,6 +184,7 @@ async function createBooking(params: {
   guestId: string;
   guest: TestUser;
   experienceId: number;
+  status?: 'completed' | 'PAID' | 'PENDING';
 }) {
   const supabase = getAdminClient();
   const bookingId = `HOST-REV-BOOKING-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
@@ -198,7 +199,7 @@ async function createBooking(params: {
     amount: 33000,
     total_price: 30000,
     total_experience_price: 30000,
-    status: 'completed',
+    status: params.status || 'completed',
     guests: 1,
     date: bookingDate.toISOString().slice(0, 10),
     time: '10:00',
@@ -290,6 +291,9 @@ test.describe.serial('Host review routes', () => {
     });
     expect(guestReviewResponse.status()).toBe(401);
 
+    const guestReviewsResponse = await page.request.get('/api/host/guests/missing/reviews');
+    expect(guestReviewsResponse.status()).toBe(401);
+
     const replyResponse = await page.request.post('/api/host/reviews/reply', {
       data: { reviewId: 1, reply: 'test' },
     });
@@ -320,10 +324,80 @@ test.describe.serial('Host review routes', () => {
     });
     expect(guestReviewResponse.status()).toBe(403);
 
+    const guestReviewsResponse = await page.request.get(`/api/host/guests/${guestId}/reviews`);
+    expect(guestReviewsResponse.status()).toBe(403);
+
     const replyResponse = await page.request.post('/api/host/reviews/reply', {
       data: { reviewId, reply: '권한 없는 답글' },
     });
     expect(replyResponse.status()).toBe(403);
+  });
+
+  test('forbid guest users from reading host-only guest review feeds', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const host = createUser('host-guest-feed');
+    const guest = createUser('guest-guest-feed');
+    const hostId = await createAuthUser(host);
+    const guestId = await createAuthUser(guest);
+    await createApprovedHostApplication(hostId, host);
+
+    const experienceId = await createExperienceFixture(hostId);
+    const bookingId = await createBooking({ hostId, guestId, guest, experienceId });
+
+    const supabase = getAdminClient();
+    const { data: guestReview, error: guestReviewError } = await supabase
+      .from('guest_reviews')
+      .insert({
+        booking_id: bookingId,
+        host_id: hostId,
+        guest_id: guestId,
+        rating: 5,
+        content: '호스트 전용 게스트 피드 검증용 후기입니다.',
+      })
+      .select('id')
+      .single();
+
+    if (guestReviewError || !guestReview?.id) {
+      throw guestReviewError || new Error('Failed to seed guest review fixture.');
+    }
+    createdGuestReviewIds.push(Number(guestReview.id));
+
+    await login(page, guest);
+
+    const guestReviewsResponse = await page.request.get(`/api/host/guests/${guestId}/reviews`);
+    expect(guestReviewsResponse.status()).toBe(403);
+  });
+
+  test('reject host guest reviews for incomplete bookings', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const host = createUser('host-incomplete');
+    const guest = createUser('guest-incomplete');
+    const hostId = await createAuthUser(host);
+    const guestId = await createAuthUser(guest);
+    await createApprovedHostApplication(hostId, host);
+
+    const experienceId = await createExperienceFixture(hostId);
+    const bookingId = await createBooking({
+      hostId,
+      guestId,
+      guest,
+      experienceId,
+      status: 'PAID',
+    });
+
+    await login(page, host);
+
+    const guestReviewResponse = await page.request.post('/api/host/guest-reviews', {
+      data: { bookingId, rating: 4, content: '완료 전 리뷰는 막혀야 합니다.' },
+    });
+
+    expect(guestReviewResponse.status()).toBe(400);
+    await expect(guestReviewResponse.json()).resolves.toMatchObject({
+      success: false,
+      error: '완료된 예약에 대해서만 후기를 작성할 수 있습니다.',
+    });
   });
 
   test('allow owner guest review creation and review reply writes', async ({ page }) => {
@@ -364,6 +438,19 @@ test.describe.serial('Host review routes', () => {
       content: '호스트가 남긴 게스트 후기입니다.',
     });
     if (guestReview?.id) createdGuestReviewIds.push(Number(guestReview.id));
+
+    const guestReviewsResponse = await page.request.get(`/api/host/guests/${guestId}/reviews`);
+    expect(guestReviewsResponse.status()).toBe(200);
+    await expect(guestReviewsResponse.json()).resolves.toMatchObject({
+      success: true,
+      data: [
+        expect.objectContaining({
+          content: '호스트가 남긴 게스트 후기입니다.',
+          rating: 4,
+          host: expect.anything(),
+        }),
+      ],
+    });
 
     const duplicateGuestReviewResponse = await page.request.post('/api/host/guest-reviews', {
       data: { bookingId, rating: 4, content: '중복 후기' },

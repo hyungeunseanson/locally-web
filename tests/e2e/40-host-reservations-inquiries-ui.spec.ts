@@ -20,6 +20,7 @@ const createdExperienceIds: number[] = [];
 const createdBookingIds: string[] = [];
 const createdInquiryIds: number[] = [];
 const createdNotificationIds: number[] = [];
+const createdGuestReviewIds: number[] = [];
 
 function loadEnv(): EnvMap {
   return readFileSync('.env.local', 'utf8')
@@ -210,7 +211,7 @@ async function createBooking(params: {
   guestId: string;
   guest: TestUser;
   experienceId: number;
-  status: 'PAID' | 'PENDING' | 'cancellation_requested';
+  status: 'PAID' | 'PENDING' | 'cancellation_requested' | 'completed';
   daysOffset: number;
   cancelReason?: string;
 }) {
@@ -248,6 +249,34 @@ async function createBooking(params: {
   if (error) throw error;
   createdBookingIds.push(bookingId);
   return bookingId;
+}
+
+async function createGuestReview(params: {
+  bookingId: string;
+  hostId: string;
+  guestId: string;
+  content: string;
+  rating?: number;
+}) {
+  const supabase = getAdminClient();
+  const { data, error } = await supabase
+    .from('guest_reviews')
+    .insert({
+      booking_id: params.bookingId,
+      host_id: params.hostId,
+      guest_id: params.guestId,
+      rating: params.rating || 5,
+      content: params.content,
+    })
+    .select('id')
+    .single();
+
+  if (error || !data?.id) {
+    throw error || new Error('Failed to create guest review fixture.');
+  }
+
+  createdGuestReviewIds.push(Number(data.id));
+  return Number(data.id);
 }
 
 async function createNotification(params: {
@@ -359,6 +388,10 @@ test.afterAll(async () => {
 
   if (createdNotificationIds.length > 0) {
     await supabase.from('notifications').delete().in('id', createdNotificationIds);
+  }
+
+  for (const guestReviewId of createdGuestReviewIds) {
+    await supabase.from('guest_reviews').delete().eq('id', guestReviewId);
   }
 
   for (const inquiryId of createdInquiryIds) {
@@ -498,11 +531,11 @@ test.describe.serial('Host dashboard reservations and inquiries UI coverage', ()
       status: 'PAID',
       daysOffset: 5,
     });
-    await createBooking({
+    const circlePastBookingId = await createBooking({
       guestId: circleGuestId,
       guest: circleGuest,
       experienceId: experience.id,
-      status: 'PAID',
+      status: 'completed',
       daysOffset: -2,
     });
     const circleBookingId = await createBooking({
@@ -527,6 +560,14 @@ test.describe.serial('Host dashboard reservations and inquiries UI coverage', ()
       daysOffset: 4,
       cancelReason: '일정 조정이 필요합니다.',
     });
+    const guestReviewContent = `게스트 프로필 모달 후기 ${Date.now()}`;
+    await createGuestReview({
+      bookingId: circlePastBookingId,
+      hostId,
+      guestId: circleGuestId,
+      content: guestReviewContent,
+      rating: 5,
+    });
 
     await login(page, host);
     await page.goto('/host/dashboard?tab=reservations', { waitUntil: 'networkidle' });
@@ -543,6 +584,8 @@ test.describe.serial('Host dashboard reservations and inquiries UI coverage', ()
     await expect(memberCard.locator('[data-testid="host-reservation-membership-badge"]').first()).toContainText('Tier 1');
     await expect(circleCard.locator('[data-testid="host-reservation-membership-badge"]').first()).toContainText('Tier 2');
     await expect(pendingCard.locator('[data-testid="host-reservation-membership-badge"]')).toHaveCount(0);
+    await expect(memberCard.getByRole('button', { name: /게스트 후기|Write Review/ })).toHaveCount(0);
+    await expect(circleCard.getByRole('button', { name: /게스트 후기|Write Review/ })).toHaveCount(0);
     await expect(page.getByRole('button', { name: /취소\/환불|Cancelled/ })).toBeVisible();
 
     await page.getByRole('button', { name: /취소\/환불|Cancelled/ }).click();
@@ -569,10 +612,18 @@ test.describe.serial('Host dashboard reservations and inquiries UI coverage', ()
     await expect(page.getByTestId('guest-profile-membership-desc')).toContainText(
       /다시 찾아온 게스트예요.|This guest has come back to Locally./
     );
+    await expect(page.getByTestId('guest-profile-reviews-section')).toBeVisible();
+    await expect(page.getByTestId('guest-profile-review-item')).toContainText(guestReviewContent);
 
     await page.mouse.click(10, 10);
     await expect(page.getByRole('heading', { name: circleGuest.fullName })).toHaveCount(0);
 
+    await page.getByRole('button', { name: /지난 일정|Completed/ }).click();
+    const completedCircleCard = page.getByTestId(`reservation-card-${circlePastBookingId}`);
+    await expect(completedCircleCard).toBeVisible({ timeout: 15000 });
+    await expect(completedCircleCard.getByRole('button', { name: /후기 작성됨|Review Written/ })).toBeVisible();
+
+    await page.getByRole('button', { name: /다가오는 일정|Upcoming/ }).click();
     await pendingCard.getByRole('button', { name: new RegExp(`${pendingGuest.fullName}.*(프로필|Profile)`) }).click();
     await expect(page.getByRole('heading', { name: pendingGuest.fullName })).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId('guest-profile-membership-badge')).toHaveCount(0);

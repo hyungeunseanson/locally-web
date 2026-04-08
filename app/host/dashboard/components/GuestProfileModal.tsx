@@ -1,10 +1,9 @@
 'use client';
 
 import Image from 'next/image';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useModalClose } from '@/app/hooks/useModalClose';
 import { User, X, Star, Globe, Smile, MessageCircle, Briefcase, Users } from 'lucide-react';
-import { createClient } from '@/app/utils/supabase/client';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { formatGenderLabel, normalizeLanguageList, normalizeProfileLanguageValue } from '@/app/utils/profile';
 import type { LocallyMembershipStatus } from '@/app/utils/memberStatus';
@@ -76,33 +75,55 @@ function toFlagEmoji(nationality: string): string {
 export default function GuestProfileModal({ guest, membershipStatus = 'none', onClose }: Props) {
   const { visible, closing, requestClose } = useModalClose(!!guest, onClose);
   const { t, lang } = useLanguage();
-  // [Fix] supabase 인스턴스를 ref로 안정화 — 매 렌더마다 새 객체가 생성되어 useEffect가 반복 실행되는 버그 방지
-  const supabaseRef = useRef(createClient());
   const [reviews, setReviews] = useState<GuestReview[]>([]);
   const [loadingReviews, setLoadingReviews] = useState(true);
 
   useEffect(() => {
+    let isActive = true;
+
     const fetchReviews = async () => {
-      if (!guest?.id) return;
+      if (!guest?.id) {
+        if (isActive) {
+          setReviews([]);
+          setLoadingReviews(false);
+        }
+        return;
+      }
+
       setLoadingReviews(true);
       setReviews([]);
 
-      const { data, error } = await supabaseRef.current
-        .from('guest_reviews')
-        .select(`
-          *,
-          host:profiles!guest_reviews_host_id_fkey(full_name, avatar_url)
-        `)
-        .eq('guest_id', guest.id)
-        .order('created_at', { ascending: false });
+      try {
+        const response = await fetch(`/api/host/guests/${encodeURIComponent(String(guest.id))}/reviews`, {
+          cache: 'no-store',
+        });
+        const result = await response.json();
 
-      // [Fix] 에러 무시 방지 — RLS 설정 문제로 데이터 없을 때 빈 후기로 오표시
-      if (error) console.error('[GuestProfileModal] guest_reviews fetch error:', error);
-      if (data) setReviews(data);
-      setLoadingReviews(false);
+        if (!response.ok || !result?.success) {
+          throw new Error(result?.error || 'Failed to load guest reviews');
+        }
+
+        if (isActive) {
+          setReviews((result.data as GuestReview[] | undefined) || []);
+        }
+      } catch (error) {
+        console.error('[GuestProfileModal] guest_reviews fetch error:', error);
+        if (isActive) {
+          setReviews([]);
+        }
+      } finally {
+        if (isActive) {
+          setLoadingReviews(false);
+        }
+      }
     };
-    fetchReviews();
-  }, [guest]);
+
+    void fetchReviews();
+
+    return () => {
+      isActive = false;
+    };
+  }, [guest?.id]);
 
   useEffect(() => {
     if (!guest) return undefined;
@@ -249,7 +270,7 @@ export default function GuestProfileModal({ guest, membershipStatus = 'none', on
           </section>
 
           {/* 받은 후기 */}
-          <section>
+          <section data-testid="guest-profile-reviews-section">
             <div className="mb-3 flex items-center gap-2">
               <Star size={14} className="text-slate-900 md:h-4 md:w-4" fill="currentColor" />
               <h3 className="text-[15px] font-black text-slate-900 md:text-[16px]">
@@ -271,7 +292,11 @@ export default function GuestProfileModal({ guest, membershipStatus = 'none', on
             ) : (
               <div className="space-y-3">
                 {reviews.map((review) => (
-                  <div key={review.id} className="rounded-[22px] border border-slate-100 px-3.5 py-3.5 transition-colors hover:border-slate-200 hover:bg-slate-50 md:rounded-3xl md:px-4 md:py-4">
+                  <div
+                    key={review.id}
+                    data-testid="guest-profile-review-item"
+                    className="rounded-[22px] border border-slate-100 px-3.5 py-3.5 transition-colors hover:border-slate-200 hover:bg-slate-50 md:rounded-3xl md:px-4 md:py-4"
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-2">
                         <div className="h-7 w-7 shrink-0 overflow-hidden rounded-full bg-slate-200">

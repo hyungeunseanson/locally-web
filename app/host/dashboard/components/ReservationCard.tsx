@@ -11,6 +11,7 @@ import {
   isCancellationRequestedBookingStatus,
   isCancelledBookingStatus,
   isCancelledOnlyBookingStatus,
+  isCompletedBookingStatus,
   isConfirmedBookingStatus,
   isPendingBookingStatus,
 } from '@/app/constants/bookingStatus';
@@ -120,8 +121,8 @@ export default function ReservationCard({
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const isPast = targetDate < today;
-  const canReview = isPast && !isCancelledBookingStatus(res.status);
-  const showDesktopReviewButton = !isCancelledBookingStatus(res.status);
+  const canReview = isPast && isCompletedBookingStatus(res.status) && !isCancelledBookingStatus(res.status);
+  const showDesktopReviewButton = canReview;
   const orderDisplay = String(res.order_id || res.id);
   const guestCount = res.guests ?? 0;
   const expectedIncomeDisplay = `₩${getBookingHostPayout(res).toLocaleString()}`;
