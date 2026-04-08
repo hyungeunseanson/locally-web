@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-03-22 (v3.39.38 phone reservation payment simplification)
-**Version:** 3.39.38 (Phone Reservation Payment Simplification)
+**Last Updated:** 2026-04-08 (v3.40.10 service bank confirm hardening)
+**Version:** 3.40.10 (Service Bank Confirm Hardening)
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -46,7 +46,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - `/api/admin/reviews/[id]`: Data Analytics `Review Quality` 전용 서버 삭제 API (관리자 권한 확인 후 리뷰 삭제 + audit log)
 - `/api/admin/audit-logs`: Data Analytics `운영 감사 로그` 전용 서버 읽기 API (최근 100개 admin_audit_logs)
 - `/api/admin/service-cancel`: 관리자 강제 취소/환불 API (NicePay error-safe)
-- `/api/admin/service-confirm-payment`: 무통장 입금 확인 API (PENDING→PAID + request→open, v3.9.2)
+- `/api/admin/service-confirm-payment`: 서비스 무통장 입금 확인 API (관리자 권한 확인 후 `confirm_service_bank_payment_atomic` RPC 우선, 미적용 환경만 guarded fallback. DB 확정 후 알림/메일/관리자 alert/audit log는 best-effort)
 - `/api/admin/service-payouts/mark-paid`: 서비스 정산 완료 처리 API (`service_bookings.payout_status='paid'` + audit log)
 - `/api/admin/service-bookings`: RLS 우회용 맞춤 의뢰 조회 서버 API (v3.9.3, 최신 `host_applications` 계좌정보 조립 포함)
 - `/api/admin/service-requests`: 관리자 맞춤 의뢰 수정 API (`pending_payment/open` 상태만 수정 허용 + audit log)
@@ -77,6 +77,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 서비스 NicePay 카드결제는 `/api/services/payment/nicepay-callback`에서 브라우저 성공 payload를 신뢰하지 않고, PortOne REST API 재조회(`imp_uid`)로 `status=paid`, `merchant_uid=service_bookings.order_id`, `amount=service_bookings.amount`를 모두 확인한 뒤에만 `service_bookings.status='PAID'`, `payment_method='card'`, `service_requests.status='open'`으로 확정한다.
 - 서비스 결제 페이지는 pending `service_bookings.payment_method`를 함께 읽는다. 이미 `payment_method='bank'`로 표시된 `PENDING` 예약은 UI에서 무통장으로 고정되고, `/api/services/payment/nicepay-callback` 및 `/api/services/payment/paypal/capture-order`도 같은 예약에 대한 카드/PayPal 확정을 거부한다.
 - 서비스 결제 완료 후 호스트 모집 알림(`service_request_new`)은 카드/NicePay, PayPal, 무통장 입금 확인 모두 같은 helper로 대상을 고른다. 기준은 `host_applications.status='approved'` + `service_requests.country/city`와 같은 위치에 활성 체험(`experiences.is_active=true`)이 등록된 호스트만 대상으로 하며, 고객 본인은 제외한다. 잡보드(`/services`)와 서비스 상세 읽기 권한도 같은 eligible-host 기준을 사용한다.
+- 서비스 관리자 무통장 입금 확인은 `service_bookings.status='PAID'`와 `service_requests.status='open'`를 같은 DB 확정 단위로 취급한다. 기본 경로는 `confirm_service_bank_payment_atomic` RPC이며, migration 미적용 환경에서만 route helper의 compare-and-set + rollback fallback을 허용한다. 알림/메일/관리자 alert/audit log 실패는 이미 확정된 DB 상태를 되돌리지 않는다.
 - `/api/services/requests`는 `service_requests(status='pending_payment')`와 사전 생성 `service_bookings(status='PENDING')`를 같은 요청 안에서 만들고, booking 생성 실패 시 방금 만든 의뢰를 즉시 삭제(실패 시 `cancelled` fallback)해 orphan `pending_payment` 의뢰를 남기지 않는다.
 - `/api/services/select-host`는 `service_bookings.host_id/application_id`, 선택 지원서 `selected`, 나머지 지원서 `rejected`, `service_requests.status='matched'`를 순차 적용하되, 중간 실패 시 현재 request 최종 상태에 맞춰 rollback/alignment를 수행해 부분 성공 상태를 남기지 않는다.
 - 서비스 매칭 write 경계는 RPC 우선으로 강화한다. `/api/services/requests`는 `create_service_request_with_booking_atomic`, `/api/services/select-host`는 `select_service_host_atomic`을 먼저 시도하고, 해당 함수가 아직 없는 환경에서만 기존 JS cleanup/rollback 경로로 fallback 한다. non-production 실패 주입 헤더 검증은 계속 legacy 경로를 사용한다.
