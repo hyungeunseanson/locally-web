@@ -46,6 +46,14 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
+        source: '/api/public/hosts/:hostId/reviews',
+        destination: '/api/public-hosts/:hostId/reviews',
+      },
+      {
+        source: '/api/public/experiences/:experienceId/reviews',
+        destination: '/api/public-experiences/:experienceId/reviews',
+      },
+      {
         source: '/:locale(ko|en|ja|zh)/:path*',
         destination: '/:path*',
       },

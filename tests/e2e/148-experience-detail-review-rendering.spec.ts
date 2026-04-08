@@ -127,13 +127,13 @@ async function createHostApplication(userId: string, user: TestUser) {
       account_number: '12345678901234',
       account_holder: user.fullName,
       motivation: '체험 상세 후기 렌더링 검증',
-      status: 'approved',
+      status: 'active',
     })
     .select('id')
     .single();
 
   if (error || !data?.id) {
-    throw error || new Error('Failed to create approved host application.');
+    throw error || new Error('Failed to create public host application.');
   }
 
   createdApplicationIds.push(String(data.id));
@@ -317,6 +317,12 @@ test.describe.serial('Experience detail public reviews', () => {
       content: reviewContent,
     });
 
+    await expect
+      .poll(
+        async () => (await page.request.get(`/api/public/experiences/${experience.experienceId}/reviews?lang=ko`)).status(),
+        { timeout: 15000 }
+      )
+      .toBe(200);
     const apiResponse = await page.request.get(`/api/public/experiences/${experience.experienceId}/reviews?lang=ko`);
     expect(apiResponse.status()).toBe(200);
     const apiPayload = await apiResponse.json();
@@ -336,10 +342,22 @@ test.describe.serial('Experience detail public reviews', () => {
     await expect(page.getByRole('heading', { name: experience.title, exact: true })).toBeVisible({ timeout: 15000 });
     const reviewsSection = page.getByTestId('experience-public-reviews-section');
     await expect(reviewsSection).toBeVisible();
+    await expect(reviewsSection.locator('[data-testid="public-review-preview-grid"]:visible').first()).toBeVisible();
+    await expect(reviewsSection.getByTestId('public-review-cta')).toBeVisible();
     await expect(reviewsSection.locator('[data-testid="public-reviewer-name"]:visible').first()).toHaveText('김성*');
     await expect(reviewsSection.locator('[data-testid="public-reviewer-avatar"]:visible').first()).toBeVisible();
     await expect(reviewsSection.locator('[data-testid="public-review-photo"]')).toHaveCount(0);
     await expect(reviewsSection.locator('p:visible').filter({ hasText: reviewContent }).first()).toBeVisible();
+    await expect(reviewsSection.getByRole('button', { name: /더보기|more|もっと|更多/i })).toHaveCount(0);
+
+    const headerFontSize = await reviewsSection.locator('h3').evaluate((element) => getComputedStyle(element).fontSize);
+    expect(parseFloat(headerFontSize)).toBeLessThanOrEqual(22);
+
+    const previewAvatarWidth = await reviewsSection
+      .locator('[data-testid="public-reviewer-avatar"]:visible')
+      .first()
+      .evaluate((element) => Math.round(element.getBoundingClientRect().width));
+    expect(previewAvatarWidth).toBeLessThanOrEqual(32);
 
     await reviewsSection
       .getByRole('button', { name: /모든 후기 보기|Show all reviews|すべてのレビューを見る|查看全部评价/ })
@@ -351,6 +369,13 @@ test.describe.serial('Experience detail public reviews', () => {
     await expect(reviewModal.locator('[data-testid="public-reviewer-avatar"]:visible').first()).toBeVisible();
     await expect(reviewModal.locator('[data-testid="public-review-photo"]')).toHaveCount(0);
     await expect(reviewModal.locator('p:visible').filter({ hasText: reviewContent }).first()).toBeVisible();
+
+    const modalBodyFontSize = await reviewModal
+      .locator('p:visible')
+      .filter({ hasText: reviewContent })
+      .first()
+      .evaluate((element) => getComputedStyle(element).fontSize);
+    expect(parseFloat(modalBodyFontSize)).toBeGreaterThanOrEqual(13);
   });
 
   test('returns 404 for public experience review feeds when the host is not public', async ({ page }) => {

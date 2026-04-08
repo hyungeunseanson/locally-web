@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import React, { useEffect, useState } from 'react';
-import { Star, X } from 'lucide-react';
+import { Star, User, X } from 'lucide-react';
 
 import { useLanguage } from '@/app/context/LanguageContext';
 import type { PublicReviewItem } from '@/app/utils/reviews/publicReview';
@@ -39,6 +39,96 @@ function formatDate(dateString: string) {
   if (!dateString) return '';
   const date = new Date(dateString);
   return `${date.getFullYear()}. ${String(date.getMonth() + 1).padStart(2, '0')}. ${String(date.getDate()).padStart(2, '0')}.`;
+}
+
+function ReviewAvatar({
+  avatarUrl,
+  alt,
+  sizeClassName,
+  imageSize,
+}: {
+  avatarUrl: string | null;
+  alt: string;
+  sizeClassName: string;
+  imageSize: string;
+}) {
+  return (
+    <div
+      data-testid="public-reviewer-avatar"
+      className={`relative shrink-0 overflow-hidden rounded-full border border-slate-200 bg-slate-100 ${sizeClassName}`}
+    >
+      {avatarUrl ? (
+        <Image
+          src={avatarUrl}
+          alt={alt}
+          fill
+          sizes={imageSize}
+          unoptimized
+          className="object-cover"
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center text-slate-400">
+          <User size={14} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReviewMeta({
+  rating,
+  createdAt,
+  starSize,
+  textClassName,
+}: {
+  rating: number;
+  createdAt: string;
+  starSize: number;
+  textClassName: string;
+}) {
+  return (
+    <div className={`flex flex-wrap items-center gap-x-1.5 gap-y-1 text-slate-500 ${textClassName}`}>
+      <div className="flex items-center gap-0.5 text-slate-800">
+        {[...Array(5)].map((_, idx) => (
+          <Star
+            key={idx}
+            size={starSize}
+            fill={idx < rating ? 'currentColor' : 'none'}
+            className={idx < rating ? '' : 'text-slate-300'}
+          />
+        ))}
+      </div>
+      <span className="text-slate-300">·</span>
+      <span>{formatDate(createdAt)}</span>
+    </div>
+  );
+}
+
+function ReviewReply({
+  label,
+  reply,
+  compact = false,
+}: {
+  label: string;
+  reply: string | null;
+  compact?: boolean;
+}) {
+  if (!reply) return null;
+
+  return (
+    <div className={`mt-3 border-l border-slate-200 pl-3 ${compact ? 'space-y-1' : 'space-y-1.5'}`}>
+      <div className={`text-slate-700 ${compact ? 'text-[11px] font-medium' : 'text-[12px] font-medium'}`}>
+        {label}
+      </div>
+      <p
+        className={`whitespace-pre-wrap text-slate-600 ${
+          compact ? 'line-clamp-2 text-[11px] leading-[1.45]' : 'text-[13px] leading-[1.6]'
+        }`}
+      >
+        {reply}
+      </p>
+    </div>
+  );
 }
 
 export default function PublicReviewSection(props: ReviewSectionProps) {
@@ -93,29 +183,31 @@ export default function PublicReviewSection(props: ReviewSectionProps) {
   }, [lang, reviewExperienceId, reviewHostId]);
 
   const averageRating = reviews.length > 0
-    ? (reviews.reduce((acc, cur) => acc + cur.rating, 0) / reviews.length).toFixed(2)
+    ? (reviews.reduce((acc, cur) => acc + cur.rating, 0) / reviews.length).toFixed(1)
     : '0.0';
   const sortedReviews = [...reviews].sort((a, b) => {
     const timeA = new Date(a.created_at).getTime();
     const timeB = new Date(b.created_at).getTime();
     return sortOrder === 'latest' ? timeB - timeA : timeA - timeB;
   });
-  const previewReviews = reviews.slice(0, 4);
+  const previewReviews = [...reviews]
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 4);
 
   if (loading) {
     return <div className="py-10 text-center text-slate-400">{t('exp_review_loading')}</div>;
   }
 
   return (
-    <div id={props.sectionId} data-testid={props.testId} className="pb-8 md:pb-10 scroll-mt-24">
-      <h3 className="mb-5 flex items-center gap-1.5 text-[18px] font-semibold tracking-[-0.01em] md:text-[28px]">
-        <Star size={15} fill="black" /> {averageRating} · {t('exp_review_count', { count: reviews.length })}
+    <div id={props.sectionId} data-testid={props.testId} className="scroll-mt-24 pb-8">
+      <h3 className="mb-4 flex items-center gap-1.5 text-[17px] font-semibold tracking-[-0.01em] md:mb-[18px] md:text-[22px]">
+        <Star size={14} fill="black" className="md:h-4 md:w-4" /> {averageRating} · {t('exp_review_count', { count: reviews.length })}
       </h3>
 
       {reviews.length > 0 ? (
         <>
-          <div className="-mx-1 overflow-x-auto pb-2 md:hidden">
-            <div className="flex min-w-max gap-3 px-1">
+          <div className="-mx-1 overflow-x-auto pb-1 md:hidden">
+            <div className="flex min-w-max gap-4 px-1" data-testid="public-review-preview-grid">
               {previewReviews.map((review) => {
                 const avatarUrl = secureUrl(review.reviewer.avatar_url);
 
@@ -123,64 +215,36 @@ export default function PublicReviewSection(props: ReviewSectionProps) {
                   <article
                     key={review.id}
                     data-testid="public-review-card"
-                    className="w-[260px] border-r border-slate-200 pr-3"
+                    className="w-[216px] shrink-0"
                   >
-                    <div className="mb-2.5 flex items-center gap-2.5">
-                      <div
-                        data-testid="public-reviewer-avatar"
-                        className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full bg-slate-200"
-                      >
-                        {avatarUrl ? (
-                          <Image
-                            src={avatarUrl}
-                            alt={review.reviewer.display_name}
-                            fill
-                            sizes="36px"
-                            unoptimized
-                            className="object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center bg-slate-300 text-xs text-slate-500">?</div>
-                        )}
-                      </div>
+                    <div className="mb-2 flex items-center gap-2">
+                      <ReviewAvatar
+                        avatarUrl={avatarUrl}
+                        alt={review.reviewer.display_name}
+                        sizeClassName="h-7 w-7"
+                        imageSize="28px"
+                      />
                       <div className="min-w-0">
-                        <div data-testid="public-reviewer-name" className="truncate text-[13px] font-semibold text-slate-900">
+                        <div data-testid="public-reviewer-name" className="truncate text-[12px] font-semibold text-slate-900">
                           {review.reviewer.display_name}
                         </div>
-                        <div className="text-[11px] text-slate-500">{formatDate(review.created_at)}</div>
-                      </div>
-                    </div>
-                    <div className="mb-1.5 flex items-center gap-1 text-slate-700">
-                      {[...Array(5)].map((_, idx) => (
-                        <Star
-                          key={idx}
-                          size={11}
-                          fill={idx < review.rating ? 'currentColor' : 'none'}
-                          className={idx < review.rating ? '' : 'text-slate-300'}
+                        <ReviewMeta
+                          rating={review.rating}
+                          createdAt={review.created_at}
+                          starSize={10}
+                          textClassName="mt-1 text-[11px]"
                         />
-                      ))}
-                      <span className="ml-1 text-[11px]">{review.rating}.0</span>
-                    </div>
-                    <p className="mb-1.5 line-clamp-4 text-[12px] leading-[1.4] text-slate-700">{review.content || ''}</p>
-                    {review.reply && (
-                      <div className="mt-2 rounded-lg border border-slate-100 bg-slate-50 p-2">
-                        <div className="mb-1 text-[11px] font-bold text-slate-800">{t('hr_host_reply')}</div>
-                        <p className="line-clamp-2 text-[11px] text-slate-600">{review.reply}</p>
                       </div>
-                    )}
-                    <button
-                      onClick={() => setIsReviewsExpanded(true)}
-                      className="mt-2 text-[12px] font-semibold underline underline-offset-2"
-                    >
-                      {t('exp_review_more')}
-                    </button>
+                    </div>
+                    <p className="line-clamp-2 text-[12px] leading-[1.45] text-slate-700">{review.content || ''}</p>
+                    <ReviewReply label={t('hr_host_reply')} reply={review.reply} compact />
                   </article>
                 );
               })}
             </div>
           </div>
 
-          <div className="hidden grid-cols-2 gap-8 md:grid">
+          <div data-testid="public-review-preview-grid" className="hidden grid-cols-2 gap-x-8 gap-y-6 md:grid">
             {previewReviews.map((review) => {
               const avatarUrl = secureUrl(review.reviewer.avatar_url);
 
@@ -188,40 +252,29 @@ export default function PublicReviewSection(props: ReviewSectionProps) {
                 <article
                   key={review.id}
                   data-testid="public-review-card"
-                  className="border-r border-slate-200 pr-6"
+                  className="min-w-0"
                 >
                   <div className="mb-3 flex items-center gap-3">
-                    <div
-                      data-testid="public-reviewer-avatar"
-                      className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-slate-200"
-                    >
-                      {avatarUrl ? (
-                        <Image
-                          src={avatarUrl}
-                          alt={review.reviewer.display_name}
-                          fill
-                          sizes="44px"
-                          unoptimized
-                          className="object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center bg-slate-300 text-xs text-slate-500">?</div>
-                      )}
-                    </div>
+                    <ReviewAvatar
+                      avatarUrl={avatarUrl}
+                      alt={review.reviewer.display_name}
+                      sizeClassName="h-8 w-8"
+                      imageSize="32px"
+                    />
                     <div className="min-w-0">
-                      <div data-testid="public-reviewer-name" className="truncate text-sm font-bold text-slate-900">
+                      <div data-testid="public-reviewer-name" className="truncate text-[13px] font-semibold text-slate-900">
                         {review.reviewer.display_name}
                       </div>
-                      <div className="text-xs text-slate-500">{formatDate(review.created_at)}</div>
+                      <ReviewMeta
+                        rating={review.rating}
+                        createdAt={review.created_at}
+                        starSize={11}
+                        textClassName="mt-1 text-[12px]"
+                      />
                     </div>
                   </div>
-                  <p className="line-clamp-4 text-sm leading-relaxed text-slate-600">{review.content || ''}</p>
-                  {review.reply && (
-                    <div className="mt-3 rounded-2xl border border-slate-100 bg-slate-50 p-3">
-                      <div className="mb-1 text-xs font-bold text-slate-800">{t('hr_host_reply')}</div>
-                      <p className="text-xs leading-relaxed text-slate-600">{review.reply}</p>
-                    </div>
-                  )}
+                  <p className="line-clamp-3 text-[13px] leading-[1.45] text-slate-700">{review.content || ''}</p>
+                  <ReviewReply label={t('hr_host_reply')} reply={review.reply} compact />
                 </article>
               );
             })}
@@ -236,16 +289,19 @@ export default function PublicReviewSection(props: ReviewSectionProps) {
       )}
 
       {reviews.length > 0 && (
-        <button
-          onClick={() => setIsReviewsExpanded(true)}
-          className="mt-5 w-full rounded-2xl bg-[#ececec] py-3 text-[13px] font-medium text-slate-700 transition-colors hover:bg-[#e5e5e5] md:text-[15px]"
-        >
-          {t('exp_review_view_all')}
-        </button>
+        <div className="mt-4 flex justify-center md:justify-start">
+          <button
+            data-testid="public-review-cta"
+            onClick={() => setIsReviewsExpanded(true)}
+            className="h-11 w-full rounded-full border border-slate-300 bg-white px-5 text-[13px] font-medium text-slate-800 transition-colors hover:border-slate-400 hover:bg-slate-50 md:w-auto md:min-w-[180px] md:px-6 md:text-[14px]"
+          >
+            {t('exp_review_view_all')}
+          </button>
+        </div>
       )}
       <button
         onClick={() => setIsPolicyOpen(true)}
-        className="mt-3 w-full text-center text-[11px] text-slate-400 underline underline-offset-2"
+        className="mt-3 block w-full text-center text-[11px] text-slate-400 underline underline-offset-2 md:w-fit md:text-left"
       >
         {t('exp_review_policy_link')}
       </button>
@@ -257,32 +313,32 @@ export default function PublicReviewSection(props: ReviewSectionProps) {
         >
           <div
             data-testid="public-review-modal"
-            className="flex h-[86dvh] w-full max-w-[380px] flex-col overflow-hidden rounded-[30px] bg-[#fcfcfc] shadow-2xl animate-in zoom-in-95 duration-200 md:h-[82vh] md:max-w-[760px] md:rounded-3xl"
+            className="flex h-[86dvh] w-full max-w-[380px] flex-col overflow-hidden rounded-[24px] bg-[#fcfcfc] shadow-2xl animate-in zoom-in-95 duration-200 md:h-[80vh] md:max-w-[680px] md:rounded-[28px]"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex justify-start px-5 pb-2 pt-4">
               <button
                 onClick={() => setIsReviewsExpanded(false)}
-                className="rounded-full p-1.5 text-slate-600 transition-colors hover:bg-slate-200"
+                className="rounded-full p-1.5 text-slate-600 transition-colors hover:bg-slate-100"
               >
-                <X size={18} />
+                <X size={17} />
               </button>
             </div>
 
             <div className="px-5 pb-2">
-              <h3 className="flex items-center gap-1.5 text-[24px] font-semibold tracking-[-0.02em] md:text-[22px]">
-                <Star size={18} fill="black" className="mb-0.5" />
+              <h3 className="flex items-center gap-1.5 text-[18px] font-semibold tracking-[-0.02em] md:text-[20px]">
+                <Star size={16} fill="black" className="mb-0.5" />
                 {averageRating}
               </h3>
-              <div className="mt-3 flex items-center justify-between">
-                <p className="text-[14px] font-medium tracking-[-0.01em]">
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <p className="text-[13px] font-medium tracking-[-0.01em] md:text-[14px]">
                   {t('exp_review_count', { count: reviews.length })}
                 </p>
                 <div className="relative">
                   <select
                     value={sortOrder}
                     onChange={(event) => setSortOrder(event.target.value as 'latest' | 'oldest')}
-                    className="appearance-none rounded-full border border-slate-300 bg-white py-1.5 pl-3.5 pr-7 text-[10px] font-normal text-slate-700"
+                    className="appearance-none rounded-full border border-slate-300 bg-white py-1.5 pl-3.5 pr-7 text-[12px] font-normal text-slate-700"
                   >
                     <option value="latest">{t('exp_review_sort_latest')}</option>
                     <option value="oldest">{t('exp_review_sort_oldest')}</option>
@@ -300,67 +356,30 @@ export default function PublicReviewSection(props: ReviewSectionProps) {
                   const avatarUrl = secureUrl(review.reviewer.avatar_url);
 
                   return (
-                    <article key={review.id} data-testid="public-review-card" className="border-b border-slate-200 py-4">
+                    <article key={review.id} data-testid="public-review-card" className="border-b border-slate-200 py-5">
                       <div className="flex gap-3">
-                        <div
-                          data-testid="public-reviewer-avatar"
-                          className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full border border-slate-100 bg-slate-200"
-                        >
-                          {avatarUrl ? (
-                            <Image
-                              src={avatarUrl}
-                              alt={review.reviewer.display_name}
-                              fill
-                              sizes="36px"
-                              unoptimized
-                              className="object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center bg-slate-300 text-xs text-slate-500">?</div>
-                          )}
-                        </div>
+                        <ReviewAvatar
+                          avatarUrl={avatarUrl}
+                          alt={review.reviewer.display_name}
+                          sizeClassName="h-8 w-8"
+                          imageSize="32px"
+                        />
 
                         <div className="min-w-0 flex-1">
-                          <div className="text-[11px] leading-none text-slate-900 md:text-[11px]">
-                            <div data-testid="public-reviewer-name" className="font-medium">
+                          <div className="text-slate-900">
+                            <div data-testid="public-reviewer-name" className="text-[13px] font-semibold leading-none">
                               {review.reviewer.display_name}
                             </div>
-                            <div className="mt-1 text-[10px] text-slate-500 md:text-[10px]">
-                              {t('exp_review_guest_label')}
-                            </div>
-                            <div className="mb-2 mt-2 flex items-center gap-1 text-slate-700">
-                              {[...Array(5)].map((_, idx) => (
-                                <Star
-                                  key={idx}
-                                  size={10}
-                                  fill={idx < review.rating ? 'currentColor' : 'none'}
-                                  className={idx < review.rating ? '' : 'text-slate-300'}
-                                />
-                              ))}
-                              <span className="ml-1 text-[10px] text-slate-500">
-                                {review.created_at
-                                  ? t('exp_review_days_ago', {
-                                      days: Math.max(
-                                        1,
-                                        Math.floor(
-                                          (Date.now() - new Date(review.created_at).getTime()) / (1000 * 60 * 60 * 24)
-                                        )
-                                      ),
-                                    })
-                                  : ''}
-                              </span>
-                            </div>
-                            <p className="mb-1.5 whitespace-pre-wrap text-[10px] font-normal leading-[1.45] text-slate-700 md:text-[10px]">
+                            <ReviewMeta
+                              rating={review.rating}
+                              createdAt={review.created_at}
+                              starSize={11}
+                              textClassName="mt-2 text-[12px]"
+                            />
+                            <p className="mt-3 whitespace-pre-wrap text-[13px] font-normal leading-[1.6] text-slate-700">
                               {review.content || ''}
                             </p>
-                            {review.reply && (
-                              <div className="mt-2 rounded-2xl border border-slate-100 bg-slate-50 p-3">
-                                <div className="mb-1 text-[10px] font-bold text-slate-800">{t('hr_host_reply')}</div>
-                                <p className="whitespace-pre-wrap text-[10px] leading-[1.45] text-slate-600">
-                                  {review.reply}
-                                </p>
-                              </div>
-                            )}
+                            <ReviewReply label={t('hr_host_reply')} reply={review.reply} />
                           </div>
                         </div>
                       </div>

@@ -5,6 +5,15 @@
 
 ---
 
+## v3.40.09 — [Reviews] Public review compact redesign and route recovery
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟢 후기 섹션 컴팩트 리디자인 | `app/components/reviews/PublicReviewSection.tsx` — 상세 체험 페이지/공개 호스트 프로필의 공개 후기 프리뷰를 4개 짧은 텍스트 중심 레이아웃으로 재정리하고, 헤더/아바타/본문/CTA 버튼/모달 타이포를 전반적으로 축소해 기존의 크고 둔한 인상을 줄임 |
+| 🟢 dead public review route 복구 | `app/api/public-hosts/[hostId]/reviews/route.ts`, `app/api/public-experiences/[experienceId]/reviews/route.ts`, `next.config.ts` — Next route manifest에 등록되지 않던 기존 `app/api/public/...` 파일 대신 살아 있는 route 경로로 구현을 옮기고, `/api/public/hosts/:hostId/reviews`, `/api/public/experiences/:experienceId/reviews` rewrite를 추가해 기존 public fetch URL 계약을 유지 |
+| 🟢 공개 후기 입력 가드 보강 | `app/api/public-hosts/[hostId]/reviews/route.ts` — malformed `hostId`가 DB uuid cast error로 500을 내지 않도록 UUID 형식 가드를 추가해 404로 fail-closed 처리 |
+| 🟡 공개 후기 UI/route 회귀 검증 보강 | `tests/e2e/71-public-host-profile.spec.ts`, `tests/e2e/148-experience-detail-review-rendering.spec.ts` — compact preview grid/CTA, 개별 더보기 제거, 축소된 아바타/헤더/모달 본문 폰트, malformed/non-public/hidden host 404와 공개 호스트/체험 리뷰 200 응답을 함께 검증 |
+
 ## v3.40.08 — [Admin Team] Team task comments now send immediate email
 
 | 항목 | 내용 |

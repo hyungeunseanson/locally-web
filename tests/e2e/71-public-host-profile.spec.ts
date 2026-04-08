@@ -305,6 +305,11 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Public host profile', () => {
+  test('returns 404 for malformed public host review ids', async ({ page }) => {
+    const response = await page.request.get('/api/public/hosts/not-a-uuid/reviews?lang=ko');
+    expect(response.status()).toBe(404);
+  });
+
   test('does not expose public review feeds for non-public users', async ({ page }) => {
     test.setTimeout(90000);
 
@@ -315,12 +320,12 @@ test.describe.serial('Public host profile', () => {
     expect(response.status()).toBe(404);
   });
 
-  test('renders approved host profile and active experiences through the public projection path', async ({ page }) => {
+  test('renders public host reviews through the public projection path', async ({ page }) => {
     test.setTimeout(90000);
 
     const host = createHostUser();
     const hostId = await createAuthUser(host);
-    await createHostApplication(hostId, host, 'approved');
+    await createHostApplication(hostId, host, 'active');
     const experience = await createActiveExperience(hostId);
     const guest = createGuestUser();
     const guestId = await createAuthUser(guest);
@@ -350,6 +355,12 @@ test.describe.serial('Public host profile', () => {
       photos: ['/images/logo.png'],
     });
 
+    await expect
+      .poll(
+        async () => (await page.request.get(`/api/public/hosts/${hostId}/reviews?lang=ko`)).status(),
+        { timeout: 15000 }
+      )
+      .toBe(200);
     const apiResponse = await page.request.get(`/api/public/hosts/${hostId}/reviews?lang=ko`);
     expect(apiResponse.status()).toBe(200);
     const apiPayload = await apiResponse.json();
@@ -375,9 +386,13 @@ test.describe.serial('Public host profile', () => {
     await expect(page.getByTestId('public-host-languages')).toBeVisible();
     await expect(page.getByTestId('public-host-languages').getByText('English')).toBeVisible();
     await expect(page.getByText(experience.title)).toBeVisible();
-    await expect(page.getByTestId('public-host-reviews-section').locator('[data-testid="public-reviewer-name"]:visible').first()).toHaveText('김성*');
-    await expect(page.getByTestId('public-host-reviews-section').locator('[data-testid="public-reviewer-avatar"]:visible').first()).toBeVisible();
-    await expect(page.getByTestId('public-host-reviews-section').locator('[data-testid="public-review-photo"]')).toHaveCount(0);
+    const publicReviewsSection = page.getByTestId('public-host-reviews-section');
+    await expect(publicReviewsSection.locator('[data-testid="public-review-preview-grid"]:visible').first()).toBeVisible();
+    await expect(publicReviewsSection.getByTestId('public-review-cta')).toBeVisible();
+    await expect(publicReviewsSection.locator('[data-testid="public-reviewer-name"]:visible').first()).toHaveText('김성*');
+    await expect(publicReviewsSection.locator('[data-testid="public-reviewer-avatar"]:visible').first()).toBeVisible();
+    await expect(publicReviewsSection.locator('[data-testid="public-review-photo"]')).toHaveCount(0);
+    await expect(publicReviewsSection.getByRole('button', { name: /더보기|more|もっと|更多/i })).toHaveCount(0);
     await expect(
       page.locator('[data-testid="public-host-reviews-section"] p:visible').filter({ hasText: reviewContent }).first()
     ).toBeVisible();
@@ -385,8 +400,13 @@ test.describe.serial('Public host profile', () => {
       page.locator('[data-testid="public-host-reviews-section"] p:visible').filter({ hasText: replyContent }).first()
     ).toBeVisible();
 
-    await page
-      .getByTestId('public-host-reviews-section')
+    const hostPreviewAvatarWidth = await publicReviewsSection
+      .locator('[data-testid="public-reviewer-avatar"]:visible')
+      .first()
+      .evaluate((element) => Math.round(element.getBoundingClientRect().width));
+    expect(hostPreviewAvatarWidth).toBeLessThanOrEqual(32);
+
+    await publicReviewsSection
       .getByRole('button', { name: /모든 후기 보기|Show all reviews|すべてのレビューを見る|查看全部评价/ })
       .click();
     await expect(page.getByTestId('public-review-modal')).toBeVisible();
