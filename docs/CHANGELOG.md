@@ -5,6 +5,15 @@
 
 ---
 
+## v3.40.12 — [Host Dashboard] Unified pending payout summary replaces earnings tabs
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟢 통합 정산 대기 요약 BFF 추가 | `app/api/host/earnings/summary/route.ts`, `app/utils/hostEarningsSummary.ts`, `app/types/hostEarnings.ts` — 호스트 본인 기준 체험/서비스 정산 요약을 서버에서 함께 계산해 `total_pending_payout_amount`, `in_progress`, `paid`, 최근 지급일을 한 번에 내려주는 BFF를 추가. 프론트는 더 이상 체험/서비스 금액을 직접 더하지 않음 |
+| 🟢 수익 화면을 모바일 퍼스트 통합 구조로 전환 | `app/host/dashboard/Earnings.tsx`, `app/host/dashboard/components/UnifiedEarningsHeroCard.tsx`, `app/host/dashboard/components/UnifiedEarningsBreakdownCard.tsx`, `app/host/dashboard/components/ExperienceEarningsPanel.tsx`, `app/host/dashboard/components/ServiceEarningsPanel.tsx` — 상단 `통합 정산 대기 총액`과 출처별 분해 카드를 first fold에 배치하고, 기존 `체험 수익 / 서비스 수익` 탭은 제거. 상세는 체험/서비스 아코디언으로 분리 유지 |
+| 🟢 체험 정산 단계 의미 서비스와 동기화 | `app/utils/hostEarningsSummary.ts`, `app/host/dashboard/components/ExperienceEarningsPanel.tsx` — 체험도 `pending / in_progress / paid` 기준으로 재정렬해 메인 총액에는 `completed` 및 위약금 정산만 포함하고, `PAID/confirmed`는 `진행 중 예상 수익`으로만 노출하도록 정리 |
+| 🟡 skeleton-at-once / 모바일 레이아웃 회귀 추가 | `tests/e2e/37-host-earnings-policy.spec.ts`, `tests/e2e/133-host-payout-summary-reflection.spec.ts`, `tests/e2e/152-host-service-earnings-separation.spec.ts`, `tests/e2e/153-host-unified-earnings-summary.spec.ts`, `tests/e2e/154-host-earnings-mobile-layout.spec.ts` — 상단 요약이 지연 중에는 전체 skeleton 상태를 유지하다가 데이터 도착 후 한 번에 렌더되는지, 모바일 첫 화면에서 통합 총액/체험 정산 대기/서비스 정산 대기를 스크롤 없이 인지할 수 있는지, 서비스 fixture가 체험 상세 수치를 오염시키지 않는지 검증 |
+
 ## v3.40.11 — [Host Dashboard] Experience and service earnings split into isolated tabs
 
 | 항목 | 내용 |

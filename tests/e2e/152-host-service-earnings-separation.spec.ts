@@ -152,6 +152,20 @@ async function fetchHostServiceEarnings(page: Page) {
   });
 }
 
+async function fetchHostUnifiedEarnings(page: Page) {
+  return page.evaluate(async () => {
+    const response = await fetch('/api/host/earnings/summary', {
+      method: 'GET',
+      credentials: 'include',
+    });
+
+    return {
+      status: response.status,
+      body: await response.json(),
+    };
+  });
+}
+
 test.afterAll(async () => {
   const supabase = getTestAdminClient();
 
@@ -179,7 +193,7 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Host service earnings separation', () => {
-  test('shows host-scoped service settlement data in a separate earnings tab', async ({ page, request }) => {
+  test('shows host-scoped service settlement data in unified earnings with a separate service drilldown', async ({ page, request }) => {
     test.setTimeout(120000);
 
     const hostAUser = createTestUser('host.service.earnings.a');
@@ -242,11 +256,27 @@ test.describe.serial('Host service earnings separation', () => {
     await login(page, hostAUser);
     await page.goto('/host/dashboard?tab=earnings', { waitUntil: 'networkidle' });
 
-    await expect(page.getByTestId('host-earnings-tab-experience')).toBeVisible();
-    await expect(page.getByTestId('host-earnings-tab-service')).toBeVisible();
-    await expect(page.getByTestId('host-earnings-scope-note')).toContainText(
-      /체험 예약 정산만 집계|experience booking payouts only|体験予約の精算のみ集計|仅统计体验预订结算/
-    );
+    await expect(page.getByTestId('host-earnings-unified-total')).toContainText('₩90,000');
+    await expect(page.getByTestId('host-earnings-breakdown-experience-pending')).toContainText('₩0');
+    await expect(page.getByTestId('host-earnings-breakdown-service-pending')).toContainText('₩90,000');
+    await expect(page.getByTestId('host-earnings-breakdown-in-progress')).toContainText(/₩0/);
+    await expect(page.getByTestId('host-earnings-breakdown-in-progress')).toContainText(/₩70,000/);
+
+    const summaryResponse = await fetchHostUnifiedEarnings(page);
+    expect(summaryResponse.status).toBe(200);
+    expect(summaryResponse.body.success).toBeTruthy();
+    expect(summaryResponse.body.summary).toMatchObject({
+      total_pending_payout_amount: 90000,
+      total_in_progress_amount: 70000,
+      total_paid_amount: 80000,
+      service: {
+        pending_payout_amount: 90000,
+        in_progress_amount: 70000,
+        paid_payout_amount: 80000,
+        completed_service_count: 2,
+        payout_item_count: 3,
+      },
+    });
 
     const routeResponse = await fetchHostServiceEarnings(page);
     expect(routeResponse.status).toBe(200);
@@ -275,10 +305,10 @@ test.describe.serial('Host service earnings separation', () => {
     expect(stageMap.get(pendingFixture.bookingId)).toBe('pending');
     expect(stageMap.get(paidFixture.bookingId)).toBe('paid');
 
-    await page.getByTestId('host-earnings-tab-service').click();
+    await page.getByTestId('host-earnings-service-toggle').click();
 
     await expect(page.getByTestId('host-service-earnings-scope-note')).toContainText(
-      /완료 처리 후 정산 대기에 반영|move into pending payout only after completion|完了後に精算待ちへ反映|完成后才会计入待结算金额/
+      /완료 후 정산 대기로 넘어간 금액|completed pending payouts|完了後の精算待ち金額|已完成后的待结算金额/
     );
     await expect(page.getByTestId('host-service-earnings-total-pending')).toContainText('₩90,000');
     await expect(page.getByTestId('host-service-earnings-in-progress')).toContainText('₩70,000');

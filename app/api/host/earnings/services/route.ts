@@ -3,9 +3,8 @@ import { NextResponse } from 'next/server';
 import type {
   HostServiceEarningsItem,
   HostServiceEarningsResponse,
-  HostServiceEarningsSummary,
-  HostServiceSettlementStage,
 } from '@/app/types/hostEarnings';
+import { buildServiceEarningsSummary, getServiceSettlementStage } from '@/app/utils/hostEarningsSummary';
 import { attachNullPayoutPaidAt, isMissingPayoutPaidAtColumnError } from '@/app/utils/payoutPaidAt';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
@@ -30,20 +29,6 @@ type ServiceRequestMetaRow = {
 };
 
 const INCLUDED_SERVICE_EARNINGS_STATUSES = ['PAID', 'confirmed', 'completed'] as const;
-
-function getSettlementStage(
-  booking: Pick<ServiceEarningsBookingRow, 'status' | 'payout_status'>
-): HostServiceSettlementStage {
-  if (booking.payout_status === 'paid') {
-    return 'paid';
-  }
-
-  if (booking.status === 'completed') {
-    return 'pending';
-  }
-
-  return 'in_progress';
-}
 
 export async function GET() {
   try {
@@ -122,40 +107,11 @@ export async function GET() {
         host_payout_amount: Number(booking.host_payout_amount || 0),
         payout_paid_at: booking.payout_paid_at,
         created_at: booking.created_at,
-        settlement_stage: getSettlementStage(booking),
+        settlement_stage: getServiceSettlementStage(booking),
       };
     });
 
-    const summary = items.reduce<HostServiceEarningsSummary>(
-      (acc, item) => {
-        acc.payout_item_count += 1;
-
-        if (item.status === 'completed') {
-          acc.completed_service_count += 1;
-        }
-
-        if (item.settlement_stage === 'in_progress') {
-          acc.in_progress_amount += item.host_payout_amount;
-        } else if (item.settlement_stage === 'pending') {
-          acc.pending_payout_amount += item.host_payout_amount;
-        } else {
-          acc.paid_payout_amount += item.host_payout_amount;
-          if (!acc.latest_paid_at || (item.payout_paid_at && item.payout_paid_at > acc.latest_paid_at)) {
-            acc.latest_paid_at = item.payout_paid_at || acc.latest_paid_at;
-          }
-        }
-
-        return acc;
-      },
-      {
-        in_progress_amount: 0,
-        pending_payout_amount: 0,
-        paid_payout_amount: 0,
-        completed_service_count: 0,
-        payout_item_count: 0,
-        latest_paid_at: null,
-      }
-    );
+    const summary = buildServiceEarningsSummary(serviceBookings);
 
     const response: HostServiceEarningsResponse = {
       success: true,

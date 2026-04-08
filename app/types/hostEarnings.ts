@@ -1,4 +1,16 @@
-export type HostServiceSettlementStage = 'in_progress' | 'pending' | 'paid';
+export type HostSettlementStage = 'in_progress' | 'pending' | 'paid';
+
+export type HostServiceSettlementStage = HostSettlementStage;
+
+export type HostExperienceEarningsSummary = {
+  pending_payout_amount: number;
+  in_progress_amount: number;
+  paid_payout_amount: number;
+  payout_item_count: number;
+  completed_booking_count: number;
+  latest_paid_at: string | null;
+  total_payout_amount: number;
+};
 
 export type HostServiceEarningsItem = {
   id: string;
@@ -22,10 +34,25 @@ export type HostServiceEarningsSummary = {
   completed_service_count: number;
   payout_item_count: number;
   latest_paid_at: string | null;
+  total_payout_amount: number;
 };
 
 export type HostServiceEarningsResponse = {
   success: true;
   summary: HostServiceEarningsSummary;
   items: HostServiceEarningsItem[];
+};
+
+export type HostUnifiedEarningsSummary = {
+  total_pending_payout_amount: number;
+  total_in_progress_amount: number;
+  total_paid_amount: number;
+  latest_paid_at: string | null;
+  experience: HostExperienceEarningsSummary;
+  service: HostServiceEarningsSummary;
+};
+
+export type HostUnifiedEarningsSummaryResponse = {
+  success: true;
+  summary: HostUnifiedEarningsSummary;
 };

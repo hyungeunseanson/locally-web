@@ -425,30 +425,28 @@ test.describe.serial('Host earnings payout-focused policy', () => {
     await page.goto('/host/dashboard?tab=earnings', { waitUntil: 'networkidle' });
 
     await expect(page.getByRole('heading', { name: /호스팅 수입|Hosting Income|ホスティング収入|住宿收入/ })).toBeVisible();
-    await expect(page.getByTestId('host-earnings-scope-note')).toContainText(/체험 예약 정산만 집계|experience booking payouts only|体験予約の精算のみ集計|仅统计体验预订结算/);
-    await expect(page.getByTestId('host-earnings-total-payout')).toContainText('₩24,000');
-    await expect(page.getByTestId('host-earnings-last-paid-inline')).toContainText(
+    await expect(page.getByTestId('host-earnings-unified-total')).toContainText('₩104,000');
+    await expect(page.getByTestId('host-earnings-breakdown-experience-pending')).toContainText('₩24,000');
+    await expect(page.getByTestId('host-earnings-breakdown-service-pending')).toContainText('₩80,000');
+    await expect(page.getByTestId('host-earnings-unified-last-paid')).toContainText(
       /마지막 정산 지급: 아직 지급 완료 내역이 없어요|Last payout sent: No completed payout yet|最後の精算支払い: まだ支払い完了履歴がありません|最后结算支付: 暂时还没有已完成结算/
     );
-    await expect(page.getByTestId('host-earnings-completed-booking-count')).toContainText(
-      /완료된 예약 1건|Completed 1 bookings|完了した予約1件|已完成预订1个/
-    );
-    await expect(page.getByTestId('host-earnings-today-marker-note')).toContainText(
-      /빨간 점은 오늘 날짜 표시입니다\.|The red dot marks today\.|赤い点は今日の日付を示します。|红点表示今天。/
-    );
-
-    await page.getByRole('button', { name: /수입 상세 내역 보기|View Income Details|収入詳細を見る|查看收入详情/ }).click();
+    await page.getByTestId('host-earnings-experience-toggle').click();
 
     await expect(page.getByText(/완료된 예약 건수|Completed Bookings|完了した予約件数|已完成预订数/)).toBeVisible();
     await expect(page.getByText(/1\s*건|1 bookings|1件|1个/).first()).toBeVisible();
     await expect(page.getByTestId('host-earnings-summary-payout-items')).toContainText(/1/);
     await expect(page.getByTestId('host-earnings-summary-pending-payout')).toContainText('₩24,000');
+    await expect(page.getByTestId('host-earnings-summary-in-progress')).toContainText('₩0');
     await expect(page.getByTestId('host-earnings-summary-paid-payout')).toContainText('₩0');
     await expect(page.getByTestId('host-earnings-summary-last-paid')).toContainText(
       /아직 지급 완료 내역이 없어요|No completed payout yet|まだ支払い完了履歴がありません|暂时还没有已完成结算/
     );
     await expect(page.getByTestId('host-earnings-summary-net-payout')).toContainText('₩24,000');
     await expect(page.getByText(/최종 지급액 \(Net\)|Net Payout|最終支払額 \(Net\)|最终支付额 \(Net\)/)).toBeVisible();
+    await expect(page.getByTestId('host-earnings-today-marker-note')).toContainText(
+      /빨간 점은 오늘 날짜 표시입니다\.|The red dot marks today\.|赤い点は今日の日付を示します。|红点表示今天。/
+    );
 
     await expect(page.getByText(/총 매출 \(게스트 결제액\)|Total Revenue \(Guest Paid\)|総売上（ゲスト決済額）|总收入 \(房客付款\)/)).toHaveCount(0);
     await expect(page.getByText(/서비스 수수료|Service Fee|サービス手数料|服务费/)).toHaveCount(0);
@@ -468,19 +466,18 @@ test.describe.serial('Host earnings payout-focused policy', () => {
     await login(page, hostUser);
     await page.goto('/host/dashboard?tab=earnings', { waitUntil: 'networkidle' });
 
-    await expect(page.getByTestId('host-earnings-total-payout')).toContainText('₩36,000');
-    await expect(page.getByTestId('host-earnings-last-paid-inline')).toContainText(
+    await expect(page.getByTestId('host-earnings-unified-total')).toContainText('₩36,000');
+    await expect(page.getByTestId('host-earnings-breakdown-experience-pending')).toContainText('₩36,000');
+    await expect(page.getByTestId('host-earnings-breakdown-service-pending')).toContainText('₩0');
+    await expect(page.getByTestId('host-earnings-unified-last-paid')).toContainText(
       /마지막 정산 지급: 아직 지급 완료 내역이 없어요|Last payout sent: No completed payout yet|最後の精算支払い: まだ支払い完了履歴がありません|最后结算支付: 暂时还没有已完成结算/
     );
-    await expect(page.getByTestId('host-earnings-completed-booking-count')).toContainText(
-      /완료된 예약 1건|Completed 1 bookings|完了した予約1件|已完成预订1个/
-    );
-
-    await page.getByRole('button', { name: /수입 상세 내역 보기|View Income Details|収入詳細を見る|查看收入详情/ }).click();
+    await page.getByTestId('host-earnings-experience-toggle').click();
 
     await expect(page.getByTestId('host-earnings-summary-completed-count')).toContainText(/1/);
     await expect(page.getByTestId('host-earnings-summary-payout-items')).toContainText(/2/);
     await expect(page.getByTestId('host-earnings-summary-pending-payout')).toContainText('₩36,000');
+    await expect(page.getByTestId('host-earnings-summary-in-progress')).toContainText('₩0');
     await expect(page.getByTestId('host-earnings-summary-paid-payout')).toContainText('₩0');
     await expect(page.getByTestId('host-earnings-summary-net-payout')).toContainText('₩36,000');
   });
@@ -510,6 +507,7 @@ test.describe.serial('Host earnings payout-focused policy', () => {
     await login(page, hostUser);
     await page.goto('/host/dashboard?tab=earnings', { waitUntil: 'networkidle' });
 
+    await page.getByTestId('host-earnings-experience-toggle').click();
     await page.getByTestId(`host-earnings-group-${bookingDateKey}`).hover();
     await expect(page.getByTestId(`host-earnings-tooltip-${bookingDateKey}`)).toBeVisible();
     await expect(page.getByTestId(`host-earnings-tooltip-${bookingDateKey}`)).toContainText('₩24,000');
