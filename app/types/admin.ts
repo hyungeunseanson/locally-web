@@ -325,6 +325,77 @@ export interface AdminCombinedPayoutQueueRow {
   };
 }
 
+export type SettlementSyncJobName =
+  | 'experience_completion_sync'
+  | 'service_completion_sync';
+
+export type SettlementSyncHealthState =
+  | 'healthy'
+  | 'delayed'
+  | 'failed'
+  | 'running'
+  | 'running_stale';
+
+export type SettlementSyncScope = 'experience' | 'service' | 'all';
+export type SettlementSyncTriggerSource = 'cron' | 'manual_run_due' | 'manual_force_one';
+export type SettlementSyncTriggerMode = 'run_due' | 'force_one';
+export type SettlementSyncTriggerDomain = 'experience' | 'service' | 'all' | 'auto';
+export type SettlementSyncTriggerOutcome =
+  | 'completed'
+  | 'already_processed'
+  | 'not_due'
+  | 'no_candidates'
+  | 'already_running'
+  | 'ambiguous_target';
+
+export interface SettlementSyncJobHealth {
+  job_name: SettlementSyncJobName;
+  health_state: SettlementSyncHealthState;
+  is_running: boolean;
+  running_since: string | null;
+  stale_running: boolean;
+  last_success_at: string | null;
+  last_failure_at: string | null;
+  last_failure_message: string | null;
+  last_processed_count: number | null;
+  due_candidate_count: number;
+  oldest_due_at: string | null;
+  lag_minutes: number | null;
+}
+
+export interface SettlementSyncStatusResponse {
+  success: true;
+  generated_at: string;
+  jobs: SettlementSyncJobHealth[];
+}
+
+export type SettlementSyncTriggerRequest =
+  | {
+      mode: 'run_due';
+      domain: 'experience' | 'service' | 'all';
+    }
+  | {
+      mode: 'force_one';
+      domain: 'auto' | 'experience' | 'service';
+      identifier: string;
+    };
+
+export interface SettlementSyncTriggerResponse {
+  success: true;
+  mode: SettlementSyncTriggerMode;
+  domain: 'experience' | 'service' | 'all';
+  run_id: number;
+  outcome: SettlementSyncTriggerOutcome;
+  processed_count: number;
+  skipped_count: number;
+  target?: {
+    booking_id: string;
+    order_id: string | null;
+    request_id?: string | null;
+  };
+  message: string;
+}
+
 export interface AdminMasterLedgerEntry {
   _type: 'experience' | 'service';
   id: string;

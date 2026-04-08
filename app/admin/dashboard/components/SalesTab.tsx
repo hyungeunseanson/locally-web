@@ -38,6 +38,7 @@ import {
   EXPERIENCE_PAYOUT_LONG_HOLD_DAYS,
 } from '@/app/utils/payoutQueue';
 import { getBookingPaidAmount, getBookingPlatformRevenue } from '@/app/utils/bookingFinance';
+import SettlementSyncPanel from './SettlementSyncPanel';
 
 const DateRange = dynamic(() => import('react-date-range').then((mod) => mod.DateRange), { ssr: false });
 
@@ -715,6 +716,8 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
           </div>
         </div>
       </div>
+
+      <SettlementSyncPanel onSyncApplied={fetchSalesData} />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
         <StatCard

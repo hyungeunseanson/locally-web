@@ -1,83 +1,62 @@
 import { NextResponse } from 'next/server';
+
+import { runExperienceCompletionSync } from '@/app/utils/settlementSync/experienceCompletion';
 import { createAdminClient } from '@/app/utils/supabase/admin';
-import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
+
+function parseTestDelayMs(request: Request) {
+  if (process.env.NODE_ENV === 'production') return undefined;
+  const raw = request.headers.get('x-locally-test-delay-settlement-sync-ms');
+  const parsed = Number(raw || 0);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
 
 export async function GET(request: Request) {
-    // [M-2] Auto Complete Scheduler
-    // Secure this endpoint with a secret key
-    const authHeader = request.headers.get('authorization');
-    if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-        return new NextResponse('Unauthorized', { status: 401 });
-    }
+  const authHeader = request.headers.get('authorization');
+  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return new NextResponse('Unauthorized', { status: 401 });
+  }
 
-    try {
-        const supabase = createAdminClient();
-        const now = new Date().toISOString();
+  try {
+    const result = await runExperienceCompletionSync({
+      supabaseAdmin: createAdminClient(),
+      triggerSource: 'cron',
+      testDelayMs: parseTestDelayMs(request),
+    });
 
-        // 1. 상태가 PAID 또는 confirmed 인 예약 중, 날짜/시간이 현재보다 과거인 예약 물색
-        const { data: pastBookings, error } = await supabase
-            .from('bookings')
-            .select('id, date, time, user_id, experiences(title)')
-            .in('status', [...BOOKING_ACTIVE_STATUS_FOR_CAPACITY]);
-
-        if (error) throw error;
-        if (!pastBookings || pastBookings.length === 0) {
-            return NextResponse.json({ message: 'No pending past bookings to complete' });
-        }
-
-        const bookingsToComplete = pastBookings.filter(b => {
-            const expDateTime = new Date(`${b.date}T${b.time || '00:00'}`);
-            return expDateTime < new Date(now);
+    if (!result.success) {
+      if (result.outcome === 'already_running') {
+        return NextResponse.json({
+          success: true,
+          message: 'Experience completion sync already running',
+          count: 0,
+          ids: [],
         });
+      }
 
-        const idsToComplete = bookingsToComplete.map(b => b.id);
-
-        if (idsToComplete.length === 0) {
-            return NextResponse.json({ message: 'No pending past bookings to complete' });
-        }
-
-        // 2. 일괄 업데이트 (Batch Update)
-        const { error: updateError } = await supabase
-            .from('bookings')
-            .update({ status: 'completed' })
-            .in('id', idsToComplete)
-            .in('status', [...BOOKING_ACTIVE_STATUS_FOR_CAPACITY]);
-
-        if (updateError) throw updateError;
-
-        console.log(`[CRON] Auto-completed ${idsToComplete.length} past bookings.`);
-
-        // [R2] 완료된 예약 게스트에게 후기 작성 요청 알림 발송
-        if (bookingsToComplete.length > 0) {
-            const notifications = bookingsToComplete.map(b => {
-                const exp = b.experiences as any;
-                const expTitle = exp?.title || '체험';
-                return {
-                    user_id: b.user_id,
-                    type: 'review_request',
-                    title: '후기를 남겨주세요!',
-                    message: `'${expTitle}' 어떠셨나요? 소중한 후기를 남겨주세요.`,
-                    link: '/guest/trips',
-                    is_read: false,
-                    created_at: new Date().toISOString(),
-                };
-            });
-
-            const { error: notifError } = await supabase
-                .from('notifications')
-                .insert(notifications);
-
-            if (notifError) {
-                console.error('[CRON] Review request notification error:', notifError);
-            } else {
-                console.log(`[CRON] Sent ${notifications.length} review request notifications.`);
-            }
-        }
-
-        return NextResponse.json({ success: true, count: idsToComplete.length, ids: idsToComplete });
-    } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'Internal Server Error';
-        console.error('[CRON Complete] Error:', err);
-        return NextResponse.json({ error: message }, { status: 500 });
+      return NextResponse.json({ success: false, error: result.error }, { status: result.status });
     }
+
+    const bookingIds = Array.isArray(result.details?.booking_ids)
+      ? (result.details.booking_ids as string[])
+      : [];
+
+    if (result.outcome === 'no_candidates') {
+      return NextResponse.json({
+        success: true,
+        message: 'No pending past bookings to complete',
+        count: 0,
+        ids: [],
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      count: result.processedCount,
+      ids: bookingIds,
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Internal Server Error';
+    console.error('[CRON Complete] Error:', err);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

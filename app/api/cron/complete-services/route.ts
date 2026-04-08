@@ -1,24 +1,14 @@
 import { NextResponse } from 'next/server';
 
-import {
-  SERVICE_BOOKING_ACTIVE_STATUSES,
-  SERVICE_REQUEST_ACTIVE_STATUSES,
-} from '@/app/constants/serviceStatus';
+import { runServiceCompletionSync } from '@/app/utils/settlementSync/serviceCompletion';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 
-type ServiceCompletionRequestRow = {
-  id: string;
-  service_date: string | null;
-  status: string;
-  selected_host_id: string | null;
-};
-
-type ServiceCompletionBookingRow = {
-  id: string;
-  request_id: string | null;
-  status: string;
-  host_id: string | null;
-};
+function parseTestDelayMs(request: Request) {
+  if (process.env.NODE_ENV === 'production') return undefined;
+  const raw = request.headers.get('x-locally-test-delay-settlement-sync-ms');
+  const parsed = Number(raw || 0);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
 
 function getTodayKSTDateString() {
   const formatter = new Intl.DateTimeFormat('en-CA', {
@@ -38,84 +28,40 @@ export async function GET(request: Request) {
   }
 
   try {
-    const supabaseAdmin = createAdminClient();
-    const todayKST = getTodayKSTDateString();
+    const result = await runServiceCompletionSync({
+      supabaseAdmin: createAdminClient(),
+      triggerSource: 'cron',
+      testDelayMs: parseTestDelayMs(request),
+    });
 
-    const { data: candidateRequestsRaw, error: requestError } = await supabaseAdmin
-      .from('service_requests')
-      .select('id, service_date, status, selected_host_id')
-      .lt('service_date', todayKST)
-      .in('status', [...SERVICE_REQUEST_ACTIVE_STATUSES]);
+    if (!result.success) {
+      if (result.outcome === 'already_running') {
+        return NextResponse.json({
+          success: true,
+          requestCount: 0,
+          bookingCount: 0,
+          requestIds: [],
+          bookingIds: [],
+        });
+      }
 
-    if (requestError) throw requestError;
-
-    const candidateRequests = ((candidateRequestsRaw || []) as ServiceCompletionRequestRow[])
-      .filter((row) => row.selected_host_id);
-
-    if (candidateRequests.length === 0) {
-      return NextResponse.json({
-        success: true,
-        requestCount: 0,
-        bookingCount: 0,
-        requestIds: [],
-        bookingIds: [],
-      });
+      return NextResponse.json({ success: false, error: result.error }, { status: result.status });
     }
 
-    const requestIds = candidateRequests.map((row) => row.id);
-    const { data: candidateBookingsRaw, error: bookingError } = await supabaseAdmin
-      .from('service_bookings')
-      .select('id, request_id, status, host_id')
-      .in('request_id', requestIds)
-      .in('status', [...SERVICE_BOOKING_ACTIVE_STATUSES]);
-
-    if (bookingError) throw bookingError;
-
-    const candidateBookings = ((candidateBookingsRaw || []) as ServiceCompletionBookingRow[])
-      .filter((row) => row.host_id && row.request_id);
-
-    if (candidateBookings.length === 0) {
-      return NextResponse.json({
-        success: true,
-        requestCount: 0,
-        bookingCount: 0,
-        requestIds: [],
-        bookingIds: [],
-      });
-    }
-
-    const bookingIdsToComplete = candidateBookings.map((row) => row.id);
-    const requestIdsToComplete = Array.from(
-      new Set(candidateBookings.map((row) => row.request_id).filter(Boolean))
-    ) as string[];
-
-    const [{ error: updateBookingError }, { error: updateRequestError }] = await Promise.all([
-      supabaseAdmin
-        .from('service_bookings')
-        .update({ status: 'completed' })
-        .in('id', bookingIdsToComplete)
-        .in('status', [...SERVICE_BOOKING_ACTIVE_STATUSES]),
-      supabaseAdmin
-        .from('service_requests')
-        .update({ status: 'completed' })
-        .in('id', requestIdsToComplete)
-        .in('status', [...SERVICE_REQUEST_ACTIVE_STATUSES]),
-    ]);
-
-    if (updateBookingError) throw updateBookingError;
-    if (updateRequestError) throw updateRequestError;
-
-    console.log(
-      `[CRON] Auto-completed ${bookingIdsToComplete.length} service bookings across ${requestIdsToComplete.length} requests.`
-    );
+    const bookingIds = Array.isArray(result.details?.booking_ids)
+      ? (result.details.booking_ids as string[])
+      : [];
+    const requestIds = Array.isArray(result.details?.request_ids)
+      ? (result.details.request_ids as string[])
+      : [];
 
     return NextResponse.json({
       success: true,
-      requestCount: requestIdsToComplete.length,
-      bookingCount: bookingIdsToComplete.length,
-      requestIds: requestIdsToComplete,
-      bookingIds: bookingIdsToComplete,
-      completedBeforeDate: todayKST,
+      requestCount: requestIds.length,
+      bookingCount: bookingIds.length,
+      requestIds,
+      bookingIds,
+      completedBeforeDate: getTodayKSTDateString(),
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal Server Error';

@@ -5,6 +5,15 @@
 
 ---
 
+## v3.40.13 — [Admin Sales] Settlement sync health / manual fallback for completion cron
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟢 완료 동기화 가시성 API 및 shared worker 추가 | `app/api/admin/settlement-sync/route.ts`, `app/utils/settlementSync/jobRuns.ts`, `app/utils/settlementSync/health.ts`, `app/utils/settlementSync/experienceCompletion.ts`, `app/utils/settlementSync/serviceCompletion.ts` — 체험/서비스 완료 cron을 shared worker로 정리하고, 마지막 성공/실패, backlog, lag, running/running_stale 상태를 `/api/admin/settlement-sync` 하나로 집계하도록 추가 |
+| 🟢 Billing & Revenue 상단 운영 패널 추가 | `app/admin/dashboard/components/SettlementSyncPanel.tsx`, `app/admin/dashboard/components/SalesTab.tsx` — `Settlement Sync Health` 카드 2개와 단건 `Force-sync` 폼을 `SALES` 탭 상단에 배치해 운영자가 지연 건 실행과 booking_id/order_id 기반 즉시 동기화를 같은 화면에서 처리하도록 정리 |
+| 🟢 cron/manual 동시성 방어 및 서비스 atomic completion RPC 추가 | `app/api/cron/complete-trips/route.ts`, `app/api/cron/complete-services/route.ts`, `docs/migrations/v3_40_13_admin_job_runs.sql`, `docs/migrations/v3_40_14_complete_service_booking_if_due_atomic.sql` — batch는 `admin_job_runs` running lock, 단건은 row-level compare-and-set / RPC atomic completion으로 중복 완료와 중복 후속 처리 방지. migration 미적용 환경은 `admin_audit_logs` + in-memory fallback lock으로 fail-open 운영 |
+| 🟡 정산 완료 동기화 회귀/경쟁 테스트 추가 | `tests/e2e/81-cron-secret-guards.spec.ts`, `tests/e2e/131-service-completion-cron.spec.ts`, `tests/e2e/132-service-payout-eligibility-after-completion.spec.ts`, `tests/e2e/155-admin-settlement-sync-status.spec.ts`, `tests/e2e/156-admin-settlement-sync-manual-trigger.spec.ts`, `tests/e2e/157-settlement-sync-race-guard.spec.ts` — cron secret guard 유지, service completion/payout eligibility 회귀, admin health panel, force-one safe fallback, cron/manual race 및 overlapping batch lock을 검증 |
+
 ## v3.40.12 — [Host Dashboard] Unified pending payout summary replaces earnings tabs
 
 | 항목 | 내용 |

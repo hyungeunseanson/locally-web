@@ -7,6 +7,7 @@ test.describe('Cron secret guards', () => {
     const responses = await Promise.all([
       request.get('/api/cron/cancel-pending'),
       request.get('/api/cron/complete-trips'),
+      request.get('/api/cron/complete-services'),
       request.get('/api/cron/experience-translations'),
     ]);
 
@@ -21,6 +22,9 @@ test.describe('Cron secret guards', () => {
         headers: { authorization: 'Bearer wrong-secret' },
       }),
       request.get('/api/cron/complete-trips', {
+        headers: { authorization: 'Bearer wrong-secret' },
+      }),
+      request.get('/api/cron/complete-services', {
         headers: { authorization: 'Bearer wrong-secret' },
       }),
       request.get('/api/cron/experience-translations', {
