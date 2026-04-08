@@ -226,9 +226,9 @@ async function createPendingBankBooking(params: {
     message: '',
     created_at: new Date().toISOString(),
     payment_method: 'bank',
-    host_payout_amount: 24000,
-    platform_revenue: 9000,
-    payout_status: 'pending',
+    host_payout_amount: null,
+    platform_revenue: null,
+    payout_status: null,
     is_solo_guarantee: false,
     solo_guarantee_price: 0,
   });
@@ -334,13 +334,19 @@ test.describe.serial('Admin master ledger desktop confirm modal regression', () 
       .poll(async () => {
         const { data, error } = await getAdminClient()
           .from('bookings')
-          .select('status')
+          .select('status, price_at_booking, total_experience_price, host_payout_amount, platform_revenue, payout_status')
           .eq('id', bookingId)
           .maybeSingle();
 
         if (error) throw error;
-        return data?.status;
+        return data;
       })
-      .toBe('confirmed');
+      .toMatchObject({
+        status: 'confirmed',
+        total_experience_price: 30000,
+        host_payout_amount: 24000,
+        platform_revenue: 9000,
+        payout_status: 'pending',
+      });
   });
 });

@@ -90,6 +90,9 @@ async function createPendingBankBooking(params: {
     message: '',
     created_at: new Date().toISOString(),
     payment_method: 'bank',
+    host_payout_amount: null,
+    platform_revenue: null,
+    payout_status: null,
     is_solo_guarantee: false,
     solo_guarantee_price: 0,
   });
@@ -208,7 +211,10 @@ test.describe.serial('Experience bank confirm snapshot parity', () => {
     expect(legacyBooking?.status).toBe('confirmed');
     expect(adminBooking?.payout_status).toBe('pending');
     expect(legacyBooking?.payout_status).toBe('pending');
+    expect(adminBooking?.host_payout_amount).toBe(80000);
+    expect(adminBooking?.platform_revenue).toBe(20000);
     expect(adminBooking?.price_at_booking).toBe(legacyBooking?.price_at_booking);
+    expect(adminBooking?.total_experience_price).toBe(100000);
     expect(adminBooking?.total_experience_price).toBe(legacyBooking?.total_experience_price);
     expect(adminBooking?.host_payout_amount).toBe(legacyBooking?.host_payout_amount);
     expect(adminBooking?.platform_revenue).toBe(legacyBooking?.platform_revenue);
