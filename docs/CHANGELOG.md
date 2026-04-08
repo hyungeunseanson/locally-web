@@ -5,6 +5,15 @@
 
 ---
 
+## v3.40.11 — [Host Dashboard] Experience and service earnings split into isolated tabs
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟢 호스트 서비스 정산 전용 read path 추가 | `app/api/host/earnings/services/route.ts`, `app/types/hostEarnings.ts` — 호스트 본인의 `service_bookings`만 읽는 서비스 정산 전용 API를 추가하고, `settlement_stage(in_progress/pending/paid)` 판단과 요약 금액 계산을 서버에서만 수행하도록 정리 |
+| 🟢 수익 화면 탭 분리 및 상태 격리 | `app/host/dashboard/Earnings.tsx`, `app/host/dashboard/components/ExperienceEarningsPanel.tsx`, `app/host/dashboard/components/ServiceEarningsPanel.tsx`, `app/host/dashboard/components/earningsShared.ts` — 기존 체험 수익 로직을 experience panel로 분리하고, 서비스 탭은 별도 summary/items state로만 렌더링하도록 구성해 체험 통계와 서비스 정산 상태가 같은 React state나 합산 변수에 섞이지 않게 정리 |
+| 🟢 서비스 수익 문구/로케일 추가 | `app/context/LanguageContext.tsx` — `체험 수익 / 서비스 수익` 탭 라벨과 서비스 정산 상태, scope note, 빈 상태 문구를 4개 locale에 추가 |
+| 🟡 데이터 오염 방지 및 host-scope 검증 추가 | `tests/e2e/37-host-earnings-policy.spec.ts`, `tests/e2e/152-host-service-earnings-separation.spec.ts` — 같은 호스트의 서비스 booking fixture를 주입해도 기존 체험 탭 총액이 변하지 않는지 고정하고, 서비스 탭/API가 다른 호스트 데이터를 포함하지 않으며 `in_progress/pending/paid`를 서버 계산값 그대로 렌더링하는지 검증 |
+
 ## v3.40.10 — [Service Payments] Bank confirm hardening with atomic payment-open path
 
 | 항목 | 내용 |

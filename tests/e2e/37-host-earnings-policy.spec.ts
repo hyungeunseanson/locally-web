@@ -18,6 +18,9 @@ const createdAuthUserIds: string[] = [];
 const createdApplicationIds: number[] = [];
 const createdExperienceIds: number[] = [];
 const createdBookingIds: string[] = [];
+const createdServiceRequestIds: string[] = [];
+const createdServiceApplicationIds: string[] = [];
+const createdServiceBookingIds: string[] = [];
 
 function loadEnv(): EnvMap {
   return readFileSync('.env.local', 'utf8')
@@ -279,6 +282,81 @@ async function seedCancelledPenaltyBooking(params: {
   createdBookingIds.push(bookingId);
 }
 
+async function seedServiceBooking(params: {
+  hostId: string;
+  host: TestUser;
+  customerId: string;
+  status: 'PAID' | 'confirmed' | 'completed';
+  payoutStatus: 'pending' | 'paid';
+  payoutAmount: number;
+}) {
+  const supabase = getAdminClient();
+  const timestamp = Date.now();
+  const serviceDate = new Date();
+  serviceDate.setDate(serviceDate.getDate() + 4);
+
+  const { data: requestRow, error: requestError } = await supabase
+    .from('service_requests')
+    .insert({
+      user_id: params.customerId,
+      title: `[Playwright] Host Service Earnings ${timestamp}`,
+      description: '호스트 서비스 수익 분리 회귀 검증용 의뢰입니다.',
+      city: 'Seoul',
+      country: 'KR',
+      service_date: formatDateKey(serviceDate),
+      start_time: '13:00',
+      duration_hours: 4,
+      languages: ['한국어'],
+      guest_count: 2,
+      status: params.status === 'completed' ? 'completed' : 'matched',
+      selected_host_id: params.hostId,
+      contact_name: params.host.fullName,
+      contact_phone: params.host.phone,
+    })
+    .select('id')
+    .single();
+
+  if (requestError || !requestRow?.id) {
+    throw requestError || new Error('Failed to create host service earnings request fixture.');
+  }
+  createdServiceRequestIds.push(requestRow.id);
+
+  const { data: applicationRow, error: applicationError } = await supabase
+    .from('service_applications')
+    .insert({
+      request_id: requestRow.id,
+      host_id: params.hostId,
+      appeal_message: '호스트 서비스 수익 분리 회귀 검증용 지원입니다.',
+      status: 'selected',
+    })
+    .select('id')
+    .single();
+
+  if (applicationError || !applicationRow?.id) {
+    throw applicationError || new Error('Failed to create host service earnings application fixture.');
+  }
+  createdServiceApplicationIds.push(applicationRow.id);
+
+  const bookingId = `HOST-SERVICE-EARNINGS-${timestamp}`;
+  const { error: bookingError } = await supabase.from('service_bookings').insert({
+    id: bookingId,
+    order_id: bookingId,
+    request_id: requestRow.id,
+    application_id: applicationRow.id,
+    customer_id: params.customerId,
+    host_id: params.hostId,
+    amount: params.payoutAmount + 40000,
+    host_payout_amount: params.payoutAmount,
+    platform_revenue: 40000,
+    status: params.status,
+    payout_status: params.payoutStatus,
+    payment_method: 'card',
+  });
+
+  if (bookingError) throw bookingError;
+  createdServiceBookingIds.push(bookingId);
+}
+
 async function login(page: Page, user: TestUser) {
   await page.goto('/login', { waitUntil: 'networkidle' });
   await page.locator('input[type="email"]').fill(user.email);
@@ -290,6 +368,18 @@ async function login(page: Page, user: TestUser) {
 
 test.afterAll(async () => {
   const supabase = getAdminClient();
+
+  for (const bookingId of createdServiceBookingIds) {
+    await supabase.from('service_bookings').delete().eq('id', bookingId);
+  }
+
+  for (const applicationId of createdServiceApplicationIds) {
+    await supabase.from('service_applications').delete().eq('id', applicationId);
+  }
+
+  for (const requestId of createdServiceRequestIds) {
+    await supabase.from('service_requests').delete().eq('id', requestId);
+  }
 
   for (const bookingId of createdBookingIds) {
     await supabase.from('bookings').delete().eq('id', bookingId);
@@ -317,9 +407,19 @@ test.describe.serial('Host earnings payout-focused policy', () => {
 
     const hostUser = createUser('policy');
     const hostId = await createAuthUser(hostUser);
+    const customerUser = createUser('service-customer');
+    const customerId = await createAuthUser(customerUser);
     await createApprovedHostApplication(hostId, hostUser);
     const experienceId = await createExperienceFixture(hostId);
     await seedCompletedBooking({ hostId, host: hostUser, experienceId });
+    await seedServiceBooking({
+      hostId,
+      host: hostUser,
+      customerId,
+      status: 'completed',
+      payoutStatus: 'pending',
+      payoutAmount: 80000,
+    });
 
     await login(page, hostUser);
     await page.goto('/host/dashboard?tab=earnings', { waitUntil: 'networkidle' });
