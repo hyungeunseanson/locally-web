@@ -575,6 +575,7 @@ test.describe.serial('guest trips completed sync route', () => {
     const contextImage = page.getByTestId('review-modal-context-image');
     await expect(contextImage).toBeVisible();
     await expect(contextImage).toHaveAttribute('src', /https:\/\/images\.unsplash\.com/);
+    await expect(page.locator('input[type="file"]')).toHaveCount(0);
   });
 
   test('shows trip context meta and contact-host CTA in the cancellation modal', async ({ page }) => {

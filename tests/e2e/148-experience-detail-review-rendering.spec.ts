@@ -283,7 +283,7 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Experience detail public reviews', () => {
-  test('renders masked reviewer identity, avatar, and review photos on detail and modal', async ({ page }) => {
+  test('renders masked reviewer identity without exposing review photos on detail and modal', async ({ page }) => {
     test.setTimeout(90000);
 
     const host = createUser('host');
@@ -323,13 +323,13 @@ test.describe.serial('Experience detail public reviews', () => {
     expect(apiPayload.success).toBe(true);
     expect(apiPayload.data[0]).toMatchObject({
       content: reviewContent,
-      photos: ['/images/logo.png'],
       reviewer: {
         display_name: '김성*',
         avatar_url: '/images/logo.png',
       },
     });
     expect(Object.prototype.hasOwnProperty.call(apiPayload.data[0], 'user_id')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(apiPayload.data[0], 'photos')).toBe(false);
 
     await page.goto(`/experiences/${experience.experienceId}`, { waitUntil: 'networkidle' });
 
@@ -338,7 +338,7 @@ test.describe.serial('Experience detail public reviews', () => {
     await expect(reviewsSection).toBeVisible();
     await expect(reviewsSection.locator('[data-testid="public-reviewer-name"]:visible').first()).toHaveText('김성*');
     await expect(reviewsSection.locator('[data-testid="public-reviewer-avatar"]:visible').first()).toBeVisible();
-    await expect(reviewsSection.locator('[data-testid="public-review-photo"]:visible').first()).toBeVisible();
+    await expect(reviewsSection.locator('[data-testid="public-review-photo"]')).toHaveCount(0);
     await expect(reviewsSection.locator('p:visible').filter({ hasText: reviewContent }).first()).toBeVisible();
 
     await reviewsSection
@@ -349,7 +349,7 @@ test.describe.serial('Experience detail public reviews', () => {
     await expect(reviewModal).toBeVisible();
     await expect(reviewModal.locator('[data-testid="public-reviewer-name"]:visible').first()).toHaveText('김성*');
     await expect(reviewModal.locator('[data-testid="public-reviewer-avatar"]:visible').first()).toBeVisible();
-    await expect(reviewModal.locator('[data-testid="public-review-photo"]:visible').first()).toBeVisible();
+    await expect(reviewModal.locator('[data-testid="public-review-photo"]')).toHaveCount(0);
     await expect(reviewModal.locator('p:visible').filter({ hasText: reviewContent }).first()).toBeVisible();
   });
 

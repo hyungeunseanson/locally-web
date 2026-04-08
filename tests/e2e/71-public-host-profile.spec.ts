@@ -358,13 +358,13 @@ test.describe.serial('Public host profile', () => {
     expect(apiPayload.data[0]).toMatchObject({
       rating: 5,
       content: reviewContent,
-      photos: ['/images/logo.png'],
       reviewer: {
         display_name: '김성*',
         avatar_url: '/images/logo.png',
       },
     });
     expect(Object.prototype.hasOwnProperty.call(apiPayload.data[0], 'user_id')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(apiPayload.data[0], 'photos')).toBe(false);
 
     await page.goto(`/users/${hostId}`, { waitUntil: 'networkidle' });
 
@@ -377,7 +377,7 @@ test.describe.serial('Public host profile', () => {
     await expect(page.getByText(experience.title)).toBeVisible();
     await expect(page.getByTestId('public-host-reviews-section').locator('[data-testid="public-reviewer-name"]:visible').first()).toHaveText('김성*');
     await expect(page.getByTestId('public-host-reviews-section').locator('[data-testid="public-reviewer-avatar"]:visible').first()).toBeVisible();
-    await expect(page.getByTestId('public-host-reviews-section').locator('[data-testid="public-review-photo"]:visible').first()).toBeVisible();
+    await expect(page.getByTestId('public-host-reviews-section').locator('[data-testid="public-review-photo"]')).toHaveCount(0);
     await expect(
       page.locator('[data-testid="public-host-reviews-section"] p:visible').filter({ hasText: reviewContent }).first()
     ).toBeVisible();
@@ -392,7 +392,7 @@ test.describe.serial('Public host profile', () => {
     await expect(page.getByTestId('public-review-modal')).toBeVisible();
     await expect(page.getByTestId('public-review-modal').locator('[data-testid="public-reviewer-name"]:visible').first()).toHaveText('김성*');
     await expect(page.getByTestId('public-review-modal').locator('[data-testid="public-reviewer-avatar"]:visible').first()).toBeVisible();
-    await expect(page.getByTestId('public-review-modal').locator('[data-testid="public-review-photo"]:visible').first()).toBeVisible();
+    await expect(page.getByTestId('public-review-modal').locator('[data-testid="public-review-photo"]')).toHaveCount(0);
   });
 
   test('renders active host profiles through the same public projection path', async ({ page }) => {

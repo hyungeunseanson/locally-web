@@ -86,7 +86,7 @@ export async function GET(
 
     const { data: reviewRows, error: reviewsError } = await supabaseAdmin
       .from('reviews')
-      .select('id, user_id, rating, content, created_at, reply, reply_at, photos')
+      .select('id, user_id, rating, content, created_at, reply, reply_at')
       .eq('experience_id', experienceId)
       .order('created_at', { ascending: false });
 

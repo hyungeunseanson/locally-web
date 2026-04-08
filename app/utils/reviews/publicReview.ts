@@ -15,7 +15,6 @@ export type PublicReviewRow = {
   created_at: string;
   reply?: string | null;
   reply_at?: string | null;
-  photos?: string[] | null;
 };
 
 export type PublicReviewItem = {
@@ -25,7 +24,6 @@ export type PublicReviewItem = {
   created_at: string;
   reply: string | null;
   reply_at: string | null;
-  photos: string[];
   reviewer: {
     display_name: string;
     avatar_url: string | null;
@@ -99,7 +97,6 @@ export function buildPublicReviewItems(params: {
       created_at: review.created_at,
       reply: review.reply || null,
       reply_at: review.reply_at || null,
-      photos: review.photos || [],
       reviewer: {
         display_name: maskPublicReviewerName(getPublicReviewerSourceName(profile), fallbackLabel),
         avatar_url: profile?.avatar_url || null,

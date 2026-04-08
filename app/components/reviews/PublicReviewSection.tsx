@@ -41,42 +41,6 @@ function formatDate(dateString: string) {
   return `${date.getFullYear()}. ${String(date.getMonth() + 1).padStart(2, '0')}. ${String(date.getDate()).padStart(2, '0')}.`;
 }
 
-function PublicReviewPhotos({
-  photos,
-  maxPhotos,
-}: {
-  photos: string[];
-  maxPhotos: number;
-}) {
-  if (photos.length === 0) return null;
-
-  return (
-    <div className="mt-2 grid grid-cols-2 gap-2">
-      {photos.slice(0, maxPhotos).map((photo, index) => {
-        const photoUrl = secureUrl(photo);
-        if (!photoUrl) return null;
-
-        return (
-          <div
-            key={`${photoUrl}-${index}`}
-            data-testid="public-review-photo"
-            className="relative aspect-square overflow-hidden rounded-xl border border-slate-200 bg-slate-100"
-          >
-            <Image
-              src={photoUrl}
-              alt="Review photo"
-              fill
-              sizes="(max-width: 768px) 96px, 120px"
-              unoptimized
-              className="object-cover"
-            />
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 export default function PublicReviewSection(props: ReviewSectionProps) {
   const { t, lang } = useLanguage();
   const reviewHostId = 'hostId' in props ? props.hostId : null;
@@ -198,7 +162,6 @@ export default function PublicReviewSection(props: ReviewSectionProps) {
                       <span className="ml-1 text-[11px]">{review.rating}.0</span>
                     </div>
                     <p className="mb-1.5 line-clamp-4 text-[12px] leading-[1.4] text-slate-700">{review.content || ''}</p>
-                    <PublicReviewPhotos photos={review.photos} maxPhotos={2} />
                     {review.reply && (
                       <div className="mt-2 rounded-lg border border-slate-100 bg-slate-50 p-2">
                         <div className="mb-1 text-[11px] font-bold text-slate-800">{t('hr_host_reply')}</div>
@@ -253,7 +216,6 @@ export default function PublicReviewSection(props: ReviewSectionProps) {
                     </div>
                   </div>
                   <p className="line-clamp-4 text-sm leading-relaxed text-slate-600">{review.content || ''}</p>
-                  <PublicReviewPhotos photos={review.photos} maxPhotos={2} />
                   {review.reply && (
                     <div className="mt-3 rounded-2xl border border-slate-100 bg-slate-50 p-3">
                       <div className="mb-1 text-xs font-bold text-slate-800">{t('hr_host_reply')}</div>
@@ -391,31 +353,6 @@ export default function PublicReviewSection(props: ReviewSectionProps) {
                             <p className="mb-1.5 whitespace-pre-wrap text-[10px] font-normal leading-[1.45] text-slate-700 md:text-[10px]">
                               {review.content || ''}
                             </p>
-                            {review.photos.length > 0 && (
-                              <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-3">
-                                {review.photos.map((photo, index) => {
-                                  const photoUrl = secureUrl(photo);
-                                  if (!photoUrl) return null;
-
-                                  return (
-                                    <div
-                                      key={`${photoUrl}-${index}`}
-                                      data-testid="public-review-photo"
-                                      className="relative aspect-square overflow-hidden rounded-xl border border-slate-200 bg-slate-100"
-                                    >
-                                      <Image
-                                        src={photoUrl}
-                                        alt="Review photo"
-                                        fill
-                                        sizes="(max-width: 768px) 120px, 160px"
-                                        unoptimized
-                                        className="object-cover"
-                                      />
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
                             {review.reply && (
                               <div className="mt-2 rounded-2xl border border-slate-100 bg-slate-50 p-3">
                                 <div className="mb-1 text-[10px] font-bold text-slate-800">{t('hr_host_reply')}</div>

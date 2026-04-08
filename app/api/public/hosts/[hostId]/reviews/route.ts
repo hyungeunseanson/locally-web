@@ -50,7 +50,7 @@ export async function GET(
 
     const { data: reviewRows, error: reviewsError } = await supabaseAdmin
       .from('reviews')
-      .select('id, user_id, rating, content, created_at, reply, reply_at, photos, experiences!inner(host_id)')
+      .select('id, user_id, rating, content, created_at, reply, reply_at, experiences!inner(host_id)')
       .eq('experiences.host_id', hostId)
       .order('created_at', { ascending: false });
 

@@ -46,7 +46,7 @@ export async function GET() {
           meeting_point,
           meeting_point_i18n
         ),
-        reviews (id, rating, content, photos, created_at)
+        reviews (id, rating, content, created_at)
       `)
       .eq('user_id', user.id)
       .order('date', { ascending: false });
@@ -137,7 +137,6 @@ export async function GET() {
           id: firstReview.id,
           rating: firstReview.rating,
           content: firstReview.content,
-          photos: firstReview.photos || [],
           created_at: firstReview.created_at,
         } : null,
       });

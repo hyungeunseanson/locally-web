@@ -1,18 +1,16 @@
 'use client';
 
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
-import { Star, X, Camera, Loader2 } from 'lucide-react';
+import { Star, X, Loader2 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client'; // 🟢 Supabase 클라이언트 추가
 import { useToast } from '@/app/context/ToastContext'; // 🟢 토스트 알림 추가
 import { useLanguage } from '@/app/context/LanguageContext';
-import { compressImage, validateImage, isHeicValidationResult } from '@/app/utils/image'; // 🟢 이미지 압축 추가
 import type { GuestTrip } from '@/app/guest/trips/components/TripCard';
 
 type EditableReview = {
   id?: number | string | null;
   rating?: number | null;
   content?: string | null;
-  photos?: string[] | null;
 };
 
 type ReviewTrip = GuestTrip & {
@@ -34,7 +32,7 @@ function secureUrl(url: string | null | undefined) {
 
 export default function ReviewModal({ trip, onClose, onReviewSubmitted }: ReviewModalProps) {
   const supabase = useMemo(() => createClient(), []);
-  const { showToast, showHeicUnsupportedToast } = useToast();
+  const { showToast } = useToast();
   const { t } = useLanguage();
 
   // 닫힘 애니메이션
@@ -54,50 +52,8 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
   const [rating, setRating] = useState(isEditMode ? (existingReview.rating || 0) : 0);
   const [hoverRating, setHoverRating] = useState(0);
   const [reviewText, setReviewText] = useState(isEditMode ? (existingReview.content || '') : '');
-
-  // 이미지 관리
-  const [existingPhotoUrls, setExistingPhotoUrls] = useState<string[]>(isEditMode ? (existingReview.photos || []) : []);
-  const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]);
-  const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const contextImageSrc = secureUrl(trip.photos?.[0] || trip.image || null);
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const totalImages = existingPhotoUrls.length + imageFiles.length;
-      if (totalImages >= 2) {
-        e.target.value = '';
-        return showToast(t('rv_max_photos') as string, 'error');
-      }
-
-      const file = e.target.files[0];
-      const validation = validateImage(file);
-      if (!validation.valid) {
-        if (isHeicValidationResult(validation)) {
-          showHeicUnsupportedToast(validation.message);
-        } else {
-          showToast(validation.message || (t('rv_save_fail') as string), 'error');
-        }
-        e.target.value = '';
-        return;
-      }
-
-      const imageUrl = URL.createObjectURL(file);
-
-      setNewImagePreviews(prev => [...prev, imageUrl]);
-      setImageFiles(prev => [...prev, file]);
-      e.target.value = '';
-    }
-  };
-
-  const removeExistingPhoto = (index: number) => {
-    setExistingPhotoUrls(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const removeNewImage = (index: number) => {
-    setNewImagePreviews(prev => prev.filter((_, i) => i !== index));
-    setImageFiles(prev => prev.filter((_, i) => i !== index));
-  };
 
   const handleSubmit = async () => {
     if (rating === 0) return showToast(t('rv_select_rating') as string, 'error');
@@ -109,26 +65,12 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error(t('error_login_required') as string);
 
-      // 새 이미지 업로드 (최적화 적용)
-      const uploadedUrls: string[] = [];
-      for (const file of imageFiles) {
-        const compressedFile = await compressImage(file); // 🟢 압축 추가
-        const fileName = `reviews/${user.id}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-        const { error: uploadError } = await supabase.storage.from('images').upload(fileName, compressedFile);
-        if (uploadError) throw uploadError;
-        const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
-        uploadedUrls.push(publicUrl);
-      }
-
-      // 최종 사진 배열: 기존 유지 + 새 업로드
-      const finalPhotos = [...existingPhotoUrls, ...uploadedUrls];
-
       if (isEditMode) {
         // [R5] 수정 모드: PATCH API 호출
         const res = await fetch(`/api/reviews/${existingReview.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ rating, content: reviewText, photos: finalPhotos })
+          body: JSON.stringify({ rating, content: reviewText })
         });
 
         if (!res.ok) {
@@ -146,8 +88,7 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
             experienceId: trip.expId,
             bookingId: trip.id,
             rating,
-            content: reviewText,
-            photos: finalPhotos
+            content: reviewText
           })
         });
 
@@ -243,43 +184,6 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
             value={reviewText}
             onChange={(e) => setReviewText(e.target.value)}
           />
-
-          <div className="flex gap-2.5 md:gap-3 mb-5 md:mb-6 flex-wrap">
-            {/* 기존 사진 (수정 모드) */}
-            {existingPhotoUrls.map((url, idx) => (
-              <div key={`existing-${idx}`} className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-200 group">
-                {/* eslint-disable-next-line @next/next/no-img-element -- existing review photos render already-uploaded public URLs */}
-                <img src={url} alt="review" className="w-full h-full object-cover" />
-                <button
-                  onClick={() => removeExistingPhoto(idx)}
-                  className="absolute top-0 right-0 bg-black/50 text-white p-0.5 rounded-bl-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <X size={12} />
-                </button>
-              </div>
-            ))}
-            {/* 새로 추가된 사진 */}
-            {newImagePreviews.map((url, idx) => (
-              <div key={`new-${idx}`} className="relative w-16 h-16 rounded-lg overflow-hidden border border-blue-200 group">
-                {/* eslint-disable-next-line @next/next/no-img-element -- new review previews use blob URLs before upload */}
-                <img src={url} alt="new review" className="w-full h-full object-cover" />
-                <button
-                  onClick={() => removeNewImage(idx)}
-                  className="absolute top-0 right-0 bg-black/50 text-white p-0.5 rounded-bl-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <X size={12} />
-                </button>
-              </div>
-            ))}
-            {/* 사진 추가 버튼 */}
-            {existingPhotoUrls.length + imageFiles.length < 2 && (
-              <label className="w-16 h-16 rounded-lg border border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 cursor-pointer hover:border-slate-500 hover:text-slate-600 transition-colors bg-slate-50 hover:bg-slate-100">
-                <Camera size={20} />
-                <span className="text-[10px] mt-1 font-medium">{t('rv_add_photo')}</span>
-                <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-              </label>
-            )}
-          </div>
 
           {isEditMode && (
             <p className="text-[11px] text-slate-400 text-center mb-3">

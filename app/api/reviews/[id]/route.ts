@@ -1,4 +1,5 @@
 import { createClient } from '@/app/utils/supabase/server';
+import { createAdminClient } from '@/app/utils/supabase/admin';
 import { NextResponse } from 'next/server';
 
 export async function PATCH(
@@ -6,6 +7,7 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> }
 ) {
   const supabase = await createClient();
+  const supabaseAdmin = createAdminClient();
 
   try {
     const { data: { user } } = await supabase.auth.getUser();
@@ -16,7 +18,7 @@ export async function PATCH(
     if (!reviewId) return NextResponse.json({ error: '잘못된 후기 ID입니다.' }, { status: 400 });
 
     const body = await request.json();
-    const { rating, content, photos } = body;
+    const { rating, content } = body;
 
     if (!rating || !content) {
       return NextResponse.json({ error: '필수 정보가 누락되었습니다.' }, { status: 400 });
@@ -45,12 +47,11 @@ export async function PATCH(
     }
 
     // 후기 수정
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseAdmin
       .from('reviews')
       .update({
         rating,
         content,
-        photos: photos || [],
         updated_at: new Date().toISOString(),
       })
       .eq('id', reviewId);
@@ -58,7 +59,7 @@ export async function PATCH(
     if (updateError) throw updateError;
 
     // 체험 평점 재집계
-    const { data: allReviews } = await supabase
+    const { data: allReviews } = await supabaseAdmin
       .from('reviews')
       .select('rating')
       .eq('experience_id', existing.experience_id);
@@ -66,21 +67,21 @@ export async function PATCH(
     if (allReviews && allReviews.length > 0) {
       const totalRating = allReviews.reduce((sum, r) => sum + r.rating, 0);
       const newAverage = Number((totalRating / allReviews.length).toFixed(2));
-      await supabase
+      await supabaseAdmin
         .from('experiences')
         .update({ rating: newAverage, review_count: allReviews.length })
         .eq('id', existing.experience_id);
 
       // 호스트 프로필 집계
       try {
-        const { data: exp } = await supabase
+        const { data: exp } = await supabaseAdmin
           .from('experiences')
           .select('host_id')
           .eq('id', existing.experience_id)
           .maybeSingle();
 
         if (exp?.host_id) {
-          const { data: hostReviews } = await supabase
+          const { data: hostReviews } = await supabaseAdmin
             .from('reviews')
             .select('rating, experiences!inner(host_id)')
             .eq('experiences.host_id', exp.host_id);
@@ -88,7 +89,7 @@ export async function PATCH(
           if (hostReviews && hostReviews.length > 0) {
             const hostTotal = hostReviews.reduce((s, r) => s + r.rating, 0);
             const hostAvg = Number((hostTotal / hostReviews.length).toFixed(2));
-            await supabase
+            await supabaseAdmin
               .from('profiles')
               .update({ average_rating: hostAvg, total_review_count: hostReviews.length })
               .eq('id', exp.host_id);
@@ -101,8 +102,9 @@ export async function PATCH(
 
     return NextResponse.json({ success: true });
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Review PATCH error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    const message = err instanceof Error ? err.message : '서버 오류가 발생했습니다.';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

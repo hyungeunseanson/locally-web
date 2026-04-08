@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json();
-    const { experienceId, bookingId, rating, content, photos } = body;
+    const { experienceId, bookingId, rating, content } = body;
 
     // 2. 필수 값 체크
     if (!experienceId || !bookingId || !rating) {
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
       booking_id: bookingId,
       rating,
       content,
-      photos: photos || [], // 🟢 누락되었던 photos 필드 추가
+      photos: [],
       created_at: new Date().toISOString()
     });
 
