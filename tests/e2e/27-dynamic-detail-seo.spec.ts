@@ -264,6 +264,9 @@ test.describe('Dynamic detail SEO boundaries', () => {
 
     await page.goto(`/experiences/${activeExperience.id}`, { waitUntil: 'domcontentloaded' });
 
+    await expect(page.getByRole('heading', { name: activeExperience.title, exact: true })).toBeVisible({
+      timeout: 15000,
+    });
     const activeCanonical = page.locator('link[rel="canonical"]');
     await expect(activeCanonical).toHaveAttribute('href', new RegExp(`/experiences/${activeExperience.id}$`));
     await expect(page.locator('meta[name="robots"]')).toHaveCount(0);

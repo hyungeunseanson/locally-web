@@ -54,6 +54,22 @@ type InsertTestBookingInput = {
   contactPhone?: string;
 };
 
+type PublicHostApplicationRow = {
+  user_id?: string | null;
+  status?: string | null;
+};
+
+type ExperienceFixtureRow = {
+  id: number | string | null;
+  title: string | null;
+  status: string | null;
+  host_id: string | null;
+  max_guests: number | null;
+  price: number | null;
+  private_price: number | null;
+  is_private_enabled: boolean | null;
+};
+
 const TEST_PASSWORD = 'LocallyTest!2026';
 export const HOST_USER_ID = 'cc84b331-7e78-4818-b9ba-f1a960017473';
 
@@ -257,10 +273,18 @@ export async function reviewAllExperiencePaymentAgreements(page: Page) {
   await reviewExperiencePaymentAgreement(page, 'exp-payment-agree-terms');
 }
 
+export function getVisibleReservationCard(page: Page) {
+  return page.locator('#reservation-card:visible').last();
+}
+
+export function getVisibleReservationByTestId(page: Page, testId: string) {
+  return getVisibleReservationCard(page).locator(`[data-testid="${testId}"]:visible`).first();
+}
+
 export async function selectReservationDate(page: Page, isoDate: string) {
-  const targetDay = page.getByTestId(`reservation-day-${isoDate}`);
-  const nextMonthButton = page.getByTestId('reservation-next-month');
-  const prevMonthButton = page.getByTestId('reservation-prev-month');
+  const targetDay = getVisibleReservationByTestId(page, `reservation-day-${isoDate}`);
+  const nextMonthButton = getVisibleReservationByTestId(page, 'reservation-next-month');
+  const prevMonthButton = getVisibleReservationByTestId(page, 'reservation-prev-month');
 
   await nextMonthButton.waitFor({ state: 'visible', timeout: 30000 });
 
@@ -287,7 +311,7 @@ export async function selectReservationDate(page: Page, isoDate: string) {
 }
 
 export async function selectReservationTime(page: Page, time: string) {
-  await page.getByTestId(`reservation-time-${time.slice(0, 5)}`).click();
+  await getVisibleReservationByTestId(page, `reservation-time-${time.slice(0, 5)}`).click();
 }
 
 export async function getLatestHostExperience(hostUserId = HOST_USER_ID) {
@@ -306,25 +330,59 @@ export async function getLatestHostExperienceWithOptions({
   searchAnyHost?: boolean;
 }) {
   const supabase = getAdminClient();
-  let query = supabase
-    .from('experiences')
-    .select('id, title, status, host_id, max_guests, price, private_price, is_private_enabled')
-    .gte('max_guests', minimumMaxGuests);
 
-  if (!searchAnyHost) {
-    query = query.eq('host_id', hostUserId);
-  } else {
-    query = query.in('status', ['approved', 'active']);
+  const buildExperienceQuery = (hostIds?: string[]) => {
+    let query = supabase
+      .from('experiences')
+      .select('id, title, status, host_id, max_guests, price, private_price, is_private_enabled')
+      .gte('max_guests', minimumMaxGuests);
+
+    if (hostIds && hostIds.length > 0) {
+      query = query.in('host_id', hostIds);
+      query = query.in('status', ['approved', 'active']);
+    } else if (!searchAnyHost) {
+      query = query.eq('host_id', hostUserId);
+    } else {
+      query = query.in('status', ['approved', 'active']);
+    }
+
+    if (requirePrivateEnabled) {
+      query = query.eq('is_private_enabled', true).gt('private_price', 0);
+    }
+
+    return query
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle<ExperienceFixtureRow>();
+  };
+
+  let { data: experience, error } = await buildExperienceQuery();
+
+  if (error) throw error;
+
+  if (!experience && !searchAnyHost) {
+    const { data: visibleHostRows, error: visibleHostError } = await supabase
+      .from('public_host_applications')
+      .select('user_id, status');
+
+    if (visibleHostError) throw visibleHostError;
+
+    const visibleHostIds = (visibleHostRows ?? [])
+      .reduce<string[]>((acc, row: PublicHostApplicationRow) => {
+        const userId = typeof row.user_id === 'string' ? row.user_id : '';
+        if (!userId) return acc;
+        if (row.status !== 'approved' && row.status !== 'active') return acc;
+        if (acc.includes(userId)) return acc;
+        acc.push(userId);
+        return acc;
+      }, []);
+
+    if (visibleHostIds.length > 0) {
+      const fallbackResult = await buildExperienceQuery(visibleHostIds);
+      experience = fallbackResult.data;
+      error = fallbackResult.error;
+    }
   }
-
-  if (requirePrivateEnabled) {
-    query = query.eq('is_private_enabled', true).gt('private_price', 0);
-  }
-
-  const { data: experience, error } = await query
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
 
   if (error) throw error;
   if (!experience) {

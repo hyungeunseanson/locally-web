@@ -20,11 +20,13 @@ import {
   getExperiencePrimaryImage,
   getHostReviewAggregateFromRatings,
   isPublicExperienceViewModel,
+  normalizeIdentifierValue,
   normalizeExperienceDetailRow,
   normalizeExperienceMetadataRow,
   normalizeHostProfileRow,
   normalizePublicHostApplicationRows,
   normalizeReviewRatingRows,
+  toExperienceRawRow,
   toExperienceRawRows,
   type PublicHostApplicationViewModel,
 } from './experienceRowHelpers';
@@ -178,7 +180,7 @@ async function loadHostReviewAggregate(
 
   const targetExperienceIds = toExperienceRawRows(experienceRows).reduce<string[]>(
     (acc, row) => {
-      const id = typeof row.id === 'string' ? row.id.trim() : '';
+      const id = normalizeIdentifierValue(row.id);
       if (id) {
         acc.push(id);
       }
@@ -227,6 +229,17 @@ export async function generateMetadata(
     .maybeSingle();
 
   const normalizedExperience = normalizeExperienceMetadataRow(experience);
+  if (!normalizedExperience) {
+    const rawExperience = toExperienceRawRow(experience);
+    if (rawExperience) {
+      console.error('[Experience detail] metadata normalize failed for fetched row', {
+        routeId: id,
+        rawIdValue: rawExperience.id,
+        rawIdType: typeof rawExperience.id,
+        rawKeys: Object.keys(rawExperience),
+      });
+    }
+  }
 
   if (!normalizedExperience) {
     return {
@@ -313,6 +326,17 @@ export default async function Page({ params }: Props) {
   }
 
   const experience = normalizeExperienceDetailRow(expResult.data);
+  if (!experience) {
+    const rawExperience = toExperienceRawRow(expResult.data);
+    if (rawExperience) {
+      console.error('[Experience detail] normalize failed for fetched row', {
+        routeId: id,
+        rawIdValue: rawExperience.id,
+        rawIdType: typeof rawExperience.id,
+        rawKeys: Object.keys(rawExperience),
+      });
+    }
+  }
 
   if (!experience) {
     return notFound();

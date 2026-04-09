@@ -104,6 +104,23 @@ function readTrimmedStringField(row: ExperienceRawRow, key: string): string | nu
   return value ? value : null;
 }
 
+export function normalizeIdentifierValue(value: unknown): string | null {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed ? trimmed : null;
+  }
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value);
+  }
+
+  return null;
+}
+
+function readIdentifierField(row: ExperienceRawRow, key: string): string | null {
+  return normalizeIdentifierValue(row[key]);
+}
+
 function readNumberField(row: ExperienceRawRow, key: string): number | null {
   const value = row[key];
 
@@ -312,7 +329,7 @@ function readLanguageLevelEntries(row: ExperienceRawRow): LanguageLevelEntry[] {
 }
 
 function readExperienceBaseFields(row: ExperienceRawRow): ExperienceMetadataViewModel | null {
-  const id = readTrimmedStringField(row, 'id');
+  const id = readIdentifierField(row, 'id');
   if (!id) {
     return null;
   }
@@ -346,7 +363,7 @@ export function normalizePublicHostApplicationRow(
   }
 
   return {
-    id: readTrimmedStringField(row, 'id'),
+    id: readIdentifierField(row, 'id'),
     user_id: readTrimmedStringField(row, 'user_id'),
     created_at: readTrimmedStringField(row, 'created_at'),
     status: readTrimmedStringField(row, 'status'),

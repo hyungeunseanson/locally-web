@@ -6,6 +6,8 @@ import {
   cleanupBookings,
   createAuthUser,
   createTestUser,
+  getVisibleReservationByTestId,
+  getVisibleReservationCard,
   getAdminClient,
   login,
   prepareBookableExperience,
@@ -66,10 +68,11 @@ test.describe.serial('Experience detail availability summary', () => {
     await selectReservationDate(page, experience.date);
     await selectReservationTime(page, experience.time);
 
-    await expect(page.getByTestId('reservation-solo-option')).toHaveCount(0);
+    const reservationCard = getVisibleReservationCard(page);
+    await expect(reservationCard.locator('[data-testid="reservation-solo-option"]:visible')).toHaveCount(0);
 
-    const guestOptions = page
-      .getByTestId('reservation-guest-select')
+    const guestOptions = reservationCard
+      .locator('[data-testid="reservation-guest-select"]:visible')
       .locator('option:not([value="private"])');
 
     await expect(guestOptions).toHaveCount(Math.min(expectedRemainingSeats, 6));
@@ -112,7 +115,7 @@ test.describe.serial('Experience detail availability summary', () => {
 
     await selectReservationDate(page, experience.date);
 
-    const privateTimeSlot = page.getByTestId(`reservation-time-${experience.time}`);
+    const privateTimeSlot = getVisibleReservationByTestId(page, `reservation-time-${experience.time}`);
     await expect(privateTimeSlot).toBeVisible();
     await expect(privateTimeSlot).toBeDisabled();
     await expect(privateTimeSlot).toContainText(/프라이빗 예약 마감|Private booking sold out|貸切予約締切|私人团已售罄/);
@@ -160,7 +163,7 @@ test.describe.serial('Experience detail availability summary', () => {
 
     await selectReservationDate(page, experience.date);
 
-    const soldOutTimeSlot = page.getByTestId(`reservation-time-${experience.time}`);
+    const soldOutTimeSlot = getVisibleReservationByTestId(page, `reservation-time-${experience.time}`);
     await expect(soldOutTimeSlot).toBeVisible();
     await expect(soldOutTimeSlot).toBeDisabled();
     await expect(soldOutTimeSlot).toContainText(/매진|Sold out|満席|售罄/);

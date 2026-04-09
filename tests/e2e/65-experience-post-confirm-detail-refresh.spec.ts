@@ -6,6 +6,7 @@ import {
   cleanupBookings,
   createAuthUser,
   createTestUser,
+  getVisibleReservationCard,
   getAdminClient,
   login,
   prepareBookableExperience,
@@ -37,7 +38,8 @@ test.describe.serial('Experience detail refresh after booking confirmation', () 
 
     await selectReservationDate(page, experience.date);
     await selectReservationTime(page, experience.time);
-    await expect(page.getByTestId('reservation-solo-option')).toBeVisible();
+    const reservationCard = getVisibleReservationCard(page);
+    await expect(reservationCard.locator('[data-testid="reservation-solo-option"]:visible')).toBeVisible();
 
     await page.getByTestId('reservation-submit').click();
     await page.waitForURL(new RegExp(`/experiences/${experience.experienceId}/payment`));
@@ -72,7 +74,11 @@ test.describe.serial('Experience detail refresh after booking confirmation', () 
 
     await selectReservationDate(page, experience.date);
     await selectReservationTime(page, experience.time);
-    await expect(page.getByTestId('reservation-solo-option')).toHaveCount(0);
-    await expect(page.getByTestId('reservation-guest-select').locator('option:not([value="private"])')).toHaveCount(1);
+    await expect(reservationCard.locator('[data-testid="reservation-solo-option"]:visible')).toHaveCount(0);
+    await expect(
+      reservationCard
+        .locator('[data-testid="reservation-guest-select"]:visible')
+        .locator('option:not([value="private"])')
+    ).toHaveCount(1);
   });
 });
