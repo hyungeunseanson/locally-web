@@ -263,6 +263,7 @@ function DashboardContent() {
   }
 
   const hostProfileCompletion = profile ? getProfileCompletion(profile, 'host') : null;
+  const adminComment = hostStatus?.admin_comment ?? null;
 
   // 1. 신청 내역 없음
   if (!hostStatus && !status) {
@@ -301,11 +302,11 @@ function DashboardContent() {
                 t('status_rejected_desc')} {/* 🟢 번역 */}
           </p>
 
-          {(status === 'revision' || status === 'rejected') && hostStatus.admin_comment && (
+          {(status === 'revision' || status === 'rejected') && adminComment && (
             <div className={`bg-slate-50 border p-6 rounded-2xl text-left mb-8 shadow-sm ${status === 'revision' ? 'border-orange-100 bg-orange-50 text-orange-800' : 'border-red-100 bg-red-50 text-red-800'
               }`}>
               <h4 className="font-bold mb-2 flex items-center gap-2"><MessageSquare size={16} /> {t('admin_comment_title')}</h4> {/* 🟢 번역 */}
-              <p className="text-sm whitespace-pre-wrap leading-relaxed">{hostStatus.admin_comment}</p>
+              <p className="text-sm whitespace-pre-wrap leading-relaxed">{adminComment}</p>
             </div>
           )}
 

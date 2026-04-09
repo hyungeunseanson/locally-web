@@ -2,7 +2,6 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type {
   SettlementSyncJobHealth,
-  SettlementSyncJobName,
   SettlementSyncScope,
   SettlementSyncTriggerDomain,
   SettlementSyncTriggerOutcome,
@@ -29,7 +28,7 @@ export type SettlementSyncRunSuccess = {
 
 export type SettlementSyncRunFailure = {
   success: false;
-  status: 400 | 401 | 403 | 404 | 409 | 500;
+  status: 400 | 401 | 403 | 404 | 409 | 500 | 503;
   error: string;
   runId?: number;
   outcome?: Exclude<SettlementSyncTriggerOutcome, 'completed' | 'no_candidates'>;
@@ -47,6 +46,11 @@ export type SettlementSyncRunDueParams = {
   triggerSource: Extract<SettlementSyncTriggerSource, 'cron' | 'manual_run_due'>;
   initiatedByAdminId?: string | null;
   testDelayMs?: number;
+  testLeaseMs?: number;
+  simulateMissingAdminJobRuns?: boolean;
+  simulateMissingExperienceDueRpc?: boolean;
+  simulateMissingServiceCompletionRpc?: boolean;
+  failPhase?: 'after_lock';
 };
 
 export type SettlementSyncForceOneParams = {
@@ -55,6 +59,11 @@ export type SettlementSyncForceOneParams = {
   initiatedByAdminId?: string | null;
   identifier: string;
   testDelayMs?: number;
+  testLeaseMs?: number;
+  simulateMissingAdminJobRuns?: boolean;
+  simulateMissingExperienceDueRpc?: boolean;
+  simulateMissingServiceCompletionRpc?: boolean;
+  failPhase?: 'after_lock';
 };
 
 export type SettlementSyncJobRunRecord = {
@@ -68,6 +77,9 @@ export type SettlementSyncJobRunRecord = {
   processedCount: number;
   skippedCount: number;
   errorMessage: string | null;
+  leaseToken: string | null;
+  leaseExpiresAt: string | null;
+  lastHeartbeatAt: string | null;
 };
 
 export type SettlementSyncDueBacklog = {
@@ -87,3 +99,28 @@ export type SettlementSyncIdentifierResolution = {
   orderId: string | null;
   requestId?: string | null;
 };
+
+const DEFAULT_SETTLEMENT_SYNC_INFRA_ERROR =
+  '정산 동기화 인프라를 사용할 수 없습니다. 마이그레이션 또는 RPC 상태를 확인하세요.';
+
+export class SettlementSyncInfrastructureError extends Error {
+  readonly status = 503;
+
+  constructor(message = DEFAULT_SETTLEMENT_SYNC_INFRA_ERROR) {
+    super(message);
+    this.name = 'SettlementSyncInfrastructureError';
+  }
+}
+
+export class SettlementSyncLeaseLostError extends SettlementSyncInfrastructureError {
+  constructor(message = '정산 동기화 lease를 상실해 실행을 계속할 수 없습니다. 잠시 후 다시 시도해 주세요.') {
+    super(message);
+    this.name = 'SettlementSyncLeaseLostError';
+  }
+}
+
+export function isSettlementSyncInfrastructureError(
+  error: unknown
+): error is SettlementSyncInfrastructureError {
+  return error instanceof SettlementSyncInfrastructureError;
+}

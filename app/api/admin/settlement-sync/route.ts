@@ -9,14 +9,74 @@ import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { forceExperienceCompletionSync, resolveExperienceCompletionTarget, runExperienceCompletionSync } from '@/app/utils/settlementSync/experienceCompletion';
 import { getSettlementSyncHealthSnapshot } from '@/app/utils/settlementSync/health';
 import { forceServiceCompletionSync, resolveServiceCompletionTarget, runServiceCompletionSync } from '@/app/utils/settlementSync/serviceCompletion';
+import type { SettlementSyncRunSuccess } from '@/app/utils/settlementSync/types';
+import { isSettlementSyncInfrastructureError } from '@/app/utils/settlementSync/types';
 import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
+
+const RUN_DUE_DOMAINS = ['experience', 'service', 'all'] as const;
+const FORCE_ONE_DOMAINS = ['auto', 'experience', 'service'] as const;
 
 function parseTestDelayMs(request: Request) {
   if (process.env.NODE_ENV === 'production') return undefined;
   const raw = request.headers.get('x-locally-test-delay-settlement-sync-ms');
   const parsed = Number(raw || 0);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function parseTestLeaseMs(request: Request) {
+  if (process.env.NODE_ENV === 'production') return undefined;
+  const raw = request.headers.get('x-locally-test-settlement-sync-lease-ms');
+  const parsed = Number(raw || 0);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function parseBooleanTestHeader(request: Request, headerName: string) {
+  if (process.env.NODE_ENV === 'production') return false;
+  const value = request.headers.get(headerName);
+  return value === '1' || value === 'true';
+}
+
+function parseFailPhase(request: Request) {
+  if (process.env.NODE_ENV === 'production') return undefined;
+  const value = request.headers.get('x-locally-test-fail-settlement-sync-phase');
+  return value === 'after_lock' ? 'after_lock' : undefined;
+}
+
+function isRunDueRequest(
+  value: unknown
+): value is Extract<SettlementSyncTriggerRequest, { mode: 'run_due' }> {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const mode = 'mode' in value ? value.mode : undefined;
+  const domain = 'domain' in value ? value.domain : undefined;
+
+  return (
+    mode === 'run_due' &&
+    typeof domain === 'string' &&
+    RUN_DUE_DOMAINS.includes(domain as (typeof RUN_DUE_DOMAINS)[number])
+  );
+}
+
+function isForceOneRequest(
+  value: unknown
+): value is Extract<SettlementSyncTriggerRequest, { mode: 'force_one' }> {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const mode = 'mode' in value ? value.mode : undefined;
+  const domain = 'domain' in value ? value.domain : undefined;
+  const identifier = 'identifier' in value ? value.identifier : undefined;
+
+  return (
+    mode === 'force_one' &&
+    typeof domain === 'string' &&
+    FORCE_ONE_DOMAINS.includes(domain as (typeof FORCE_ONE_DOMAINS)[number]) &&
+    typeof identifier === 'string'
+  );
 }
 
 function buildTriggerMessage(result: {
@@ -84,7 +144,7 @@ async function recordManualTriggerAudit(params: {
 }) {
   await recordAuditLog({
     admin_id: params.adminId,
-    admin_email: params.adminEmail,
+    admin_email: params.adminEmail ?? undefined,
     action_type: params.actionType,
     target_type: 'settlement_sync',
     target_id: params.targetId,
@@ -92,12 +152,21 @@ async function recordManualTriggerAudit(params: {
   });
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const auth = await requireAdmin();
     if ('error' in auth) return auth.error;
 
-    const snapshot = await getSettlementSyncHealthSnapshot(auth.supabaseAdmin);
+    const snapshot = await getSettlementSyncHealthSnapshot(auth.supabaseAdmin, {
+      simulateMissingAdminJobRuns: parseBooleanTestHeader(
+        request,
+        'x-locally-test-simulate-missing-admin-job-runs'
+      ),
+      simulateMissingExperienceDueRpc: parseBooleanTestHeader(
+        request,
+        'x-locally-test-simulate-missing-experience-completion-rpc'
+      ),
+    });
 
     return NextResponse.json({
       success: true,
@@ -105,6 +174,10 @@ export async function GET() {
       jobs: snapshot.jobs,
     });
   } catch (error: unknown) {
+    if (isSettlementSyncInfrastructureError(error)) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 503 });
+    }
+
     console.error('[ADMIN] settlement-sync GET error:', error);
     const message = error instanceof Error ? error.message : '서버 오류가 발생했습니다.';
     return NextResponse.json({ success: false, error: message }, { status: 500 });
@@ -116,13 +189,24 @@ export async function POST(request: Request) {
     const auth = await requireAdmin();
     if ('error' in auth) return auth.error;
 
-    const body = (await request.json()) as SettlementSyncTriggerRequest;
+    const body: unknown = await request.json();
     const testDelayMs = parseTestDelayMs(request);
+    const testLeaseMs = parseTestLeaseMs(request);
+    const failPhase = parseFailPhase(request);
+    const simulateMissingAdminJobRuns = parseBooleanTestHeader(
+      request,
+      'x-locally-test-simulate-missing-admin-job-runs'
+    );
+    const simulateMissingExperienceDueRpc = parseBooleanTestHeader(
+      request,
+      'x-locally-test-simulate-missing-experience-completion-rpc'
+    );
+    const simulateMissingServiceCompletionRpc = parseBooleanTestHeader(
+      request,
+      'x-locally-test-simulate-missing-service-completion-rpc'
+    );
 
-    if (body.mode === 'run_due') {
-      if (!body.domain || !['experience', 'service', 'all'].includes(body.domain)) {
-        return NextResponse.json({ success: false, error: '유효한 동기화 도메인이 필요합니다.' }, { status: 400 });
-      }
+    if (isRunDueRequest(body)) {
 
       const runOne = async (domain: Extract<SettlementSyncTriggerDomain, 'experience' | 'service'>) =>
         domain === 'experience'
@@ -131,12 +215,20 @@ export async function POST(request: Request) {
               triggerSource: 'manual_run_due',
               initiatedByAdminId: auth.user.id,
               testDelayMs,
+              testLeaseMs,
+              simulateMissingAdminJobRuns,
+              simulateMissingExperienceDueRpc,
+              failPhase,
             })
           : runServiceCompletionSync({
               supabaseAdmin: auth.supabaseAdmin,
               triggerSource: 'manual_run_due',
               initiatedByAdminId: auth.user.id,
               testDelayMs,
+              testLeaseMs,
+              simulateMissingAdminJobRuns,
+              simulateMissingServiceCompletionRpc,
+              failPhase,
             });
 
       const domains =
@@ -144,10 +236,12 @@ export async function POST(request: Request) {
           ? (['experience', 'service'] as const)
           : ([body.domain] as const);
 
-      const results = [];
+      const results: Array<{
+        domain: Extract<SettlementSyncTriggerDomain, 'experience' | 'service'>;
+        result: SettlementSyncRunSuccess;
+      }> = [];
       for (const domain of domains) {
         const result = await runOne(domain);
-        results.push({ domain, result });
         if (!result.success) {
           await recordManualTriggerAudit({
             adminId: auth.user.id,
@@ -173,6 +267,8 @@ export async function POST(request: Request) {
             { status: result.status }
           );
         }
+
+        results.push({ domain, result });
       }
 
       const processedCount = results.reduce((sum, item) => sum + item.result.processedCount, 0);
@@ -213,7 +309,7 @@ export async function POST(request: Request) {
       return NextResponse.json(response);
     }
 
-    if (body.mode !== 'force_one' || typeof body.identifier !== 'string' || !body.identifier.trim()) {
+    if (!isForceOneRequest(body) || !body.identifier.trim()) {
       return NextResponse.json({ success: false, error: '유효한 식별자가 필요합니다.' }, { status: 400 });
     }
 
@@ -254,6 +350,10 @@ export async function POST(request: Request) {
             initiatedByAdminId: auth.user.id,
             identifier: body.identifier,
             testDelayMs,
+            testLeaseMs,
+            simulateMissingAdminJobRuns,
+            simulateMissingExperienceDueRpc,
+            failPhase,
           })
         : await forceServiceCompletionSync({
             supabaseAdmin: auth.supabaseAdmin,
@@ -261,6 +361,10 @@ export async function POST(request: Request) {
             initiatedByAdminId: auth.user.id,
             identifier: body.identifier,
             testDelayMs,
+            testLeaseMs,
+            simulateMissingAdminJobRuns,
+            simulateMissingServiceCompletionRpc,
+            failPhase,
           });
 
     await recordManualTriggerAudit({
@@ -310,6 +414,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json(response);
   } catch (error: unknown) {
+    if (isSettlementSyncInfrastructureError(error)) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 503 });
+    }
+
     console.error('[ADMIN] settlement-sync POST error:', error);
     const message = error instanceof Error ? error.message : '서버 오류가 발생했습니다.';
     return NextResponse.json({ success: false, error: message }, { status: 500 });

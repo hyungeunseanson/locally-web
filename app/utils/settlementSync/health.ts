@@ -1,4 +1,3 @@
-import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 import {
   SERVICE_BOOKING_ACTIVE_STATUSES,
   SERVICE_REQUEST_ACTIVE_STATUSES,
@@ -15,11 +14,11 @@ import type {
   SettlementSyncDueBacklog,
   SettlementSyncHealthSnapshot,
 } from './types';
+import { SettlementSyncInfrastructureError } from './types';
 
-type ExperienceDueRow = {
-  id: string;
-  date: string | null;
-  time: string | null;
+type ExperienceDueBacklogRpcRow = {
+  due_count: number | string | null;
+  oldest_due_at: string | null;
 };
 
 type ServiceDueRequestRow = {
@@ -57,13 +56,6 @@ function getTodayKSTDateString() {
   return formatter.format(new Date());
 }
 
-function getExperienceDueAt(row: Pick<ExperienceDueRow, 'date' | 'time'>) {
-  if (!row.date) return null;
-  const dueAt = new Date(`${row.date}T${row.time || '00:00'}`);
-  if (Number.isNaN(dueAt.getTime())) return null;
-  return dueAt.toISOString();
-}
-
 function getServiceDueAt(row: Pick<ServiceDueRequestRow, 'service_date'>) {
   if (!row.service_date) return null;
   const dueAt = new Date(`${row.service_date}T00:00:00+09:00`);
@@ -71,36 +63,48 @@ function getServiceDueAt(row: Pick<ServiceDueRequestRow, 'service_date'>) {
   return dueAt.toISOString();
 }
 
+function isMissingExperienceDueRpcError(
+  error: { code?: string | null; message?: string | null; details?: string | null; hint?: string | null } | null | undefined,
+  functionName: string
+) {
+  if (!error) return false;
+  const combinedMessage = `${error.message || ''} ${error.details || ''} ${error.hint || ''}`;
+  return (
+    error.code === 'PGRST202' ||
+    (combinedMessage.includes(functionName) &&
+      (combinedMessage.includes('Could not find the function') ||
+        combinedMessage.includes('No function matches') ||
+        combinedMessage.includes('does not exist')))
+  );
+}
+
 export async function getExperienceCompletionDueBacklog(
-  supabaseAdmin: SettlementSyncAdminClient
+  supabaseAdmin: SettlementSyncAdminClient,
+  simulateMissingExperienceDueRpc?: boolean
 ): Promise<SettlementSyncDueBacklog> {
-  const { data, error } = await supabaseAdmin
-    .from('bookings')
-    .select('id, date, time')
-    .in('status', [...BOOKING_ACTIVE_STATUS_FOR_CAPACITY]);
+  if (simulateMissingExperienceDueRpc) {
+    throw new SettlementSyncInfrastructureError();
+  }
 
-  if (error) throw error;
+  const rpcName = 'get_experience_completion_due_backlog';
+  const { data, error } = await supabaseAdmin.rpc(rpcName);
 
-  const now = new Date();
-  let count = 0;
-  let oldestDueAt: string | null = null;
-
-  ((data || []) as ExperienceDueRow[]).forEach((row) => {
-    const dueAt = getExperienceDueAt(row);
-    if (!dueAt) return;
-    const dueDate = new Date(dueAt);
-    if (dueDate >= now) return;
-
-    count += 1;
-    if (!oldestDueAt || dueAt < oldestDueAt) {
-      oldestDueAt = dueAt;
+  if (error) {
+    if (isMissingExperienceDueRpcError(error, rpcName)) {
+      throw new SettlementSyncInfrastructureError();
     }
-  });
+
+    throw error;
+  }
+
+  const row = Array.isArray(data)
+    ? ((data[0] || null) as ExperienceDueBacklogRpcRow | null)
+    : ((data || null) as ExperienceDueBacklogRpcRow | null);
 
   return {
-    count,
-    oldestDueAt,
-    lagMinutes: getDueLagMinutes(oldestDueAt),
+    count: Number(row?.due_count || 0),
+    oldestDueAt: row?.oldest_due_at || null,
+    lagMinutes: getDueLagMinutes(row?.oldest_due_at || null),
   };
 }
 
@@ -160,11 +164,22 @@ export async function getServiceCompletionDueBacklog(
 }
 
 export async function getSettlementSyncHealthSnapshot(
-  supabaseAdmin: SettlementSyncAdminClient
+  supabaseAdmin: SettlementSyncAdminClient,
+  options?: {
+    simulateMissingAdminJobRuns?: boolean;
+    simulateMissingExperienceDueRpc?: boolean;
+  }
 ): Promise<SettlementSyncHealthSnapshot> {
   const [history, experienceBacklog, serviceBacklog] = await Promise.all([
-    loadSettlementSyncRunHistory(supabaseAdmin, [EXPERIENCE_JOB_NAME, SERVICE_JOB_NAME]),
-    getExperienceCompletionDueBacklog(supabaseAdmin),
+    loadSettlementSyncRunHistory(
+      supabaseAdmin,
+      [EXPERIENCE_JOB_NAME, SERVICE_JOB_NAME],
+      options?.simulateMissingAdminJobRuns
+    ),
+    getExperienceCompletionDueBacklog(
+      supabaseAdmin,
+      options?.simulateMissingExperienceDueRpc
+    ),
     getServiceCompletionDueBacklog(supabaseAdmin),
   ]);
 

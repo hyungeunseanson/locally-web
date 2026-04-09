@@ -31,7 +31,7 @@ export default function ChatParticipantProfileModal({
 }: ChatParticipantProfileModalProps) {
   // 닫힘 애니메이션
   const [closing, setClosing] = useState(false);
-  const closeTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (closeTimerRef.current) clearTimeout(closeTimerRef.current); }, []);
   const requestClose = useCallback(() => {
     if (closing) return;

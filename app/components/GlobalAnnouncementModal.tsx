@@ -73,8 +73,13 @@ export default function GlobalAnnouncementModal() {
 
   // 닫힘 애니메이션
   const [closing, setClosing] = useState(false);
-  const closeTimerRef = useRef<ReturnType<typeof setTimeout>>();
-  useEffect(() => () => { if (closeTimerRef.current) clearTimeout(closeTimerRef.current); }, []);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (closeTimerRef.current !== null) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  }, []);
 
   const dismissAnnouncement = useCallback((activeAnnouncement: SiteAnnouncement) => {
     if (closing) return;
@@ -84,6 +89,7 @@ export default function GlobalAnnouncementModal() {
       window.localStorage.setItem(key, new Date().toISOString());
       setDismissedId(activeAnnouncement.id);
       setClosing(false);
+      closeTimerRef.current = null;
     }, 150);
   }, [closing]);
 

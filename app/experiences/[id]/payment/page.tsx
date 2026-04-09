@@ -297,7 +297,7 @@ function PaymentContent() {
   const isPayPalEnabled = Boolean(paypalClientId);
   const portOneImpCode = process.env.NEXT_PUBLIC_PORTONE_IMP_CODE || '';
   const hostNotice = experience
-    ? (getLocalizedExperienceRules(experience as Record<string, unknown>, lang).host_notice || '').trim()
+    ? (getLocalizedExperienceRules(experience, lang).host_notice || '').trim()
     : '';
 
   const payPalCheckoutSessionKey = useMemo(

@@ -1,3 +1,4 @@
+import type { PostgrestError } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
 import type {
@@ -6,6 +7,13 @@ import type {
   AdminPayoutQueueEntry,
 } from '@/app/types/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
+import {
+  type AdminRawRow,
+  isPresent,
+  readNumberField,
+  readStringField,
+  toAdminRawRows,
+} from '@/app/utils/adminRowHelpers';
 import { getBookingHostPayout, getBookingPlatformRevenue } from '@/app/utils/bookingFinance';
 import { attachNullPayoutPaidAt, isMissingPayoutPaidAtColumnError } from '@/app/utils/payoutPaidAt';
 import { getExperiencePayoutQueueState } from '@/app/utils/payoutQueue';
@@ -37,7 +45,7 @@ type ExperienceMetaRow = {
 type ProfileRow = {
   id: string;
   full_name: string | null;
-  email?: string | null;
+  email: string | null;
 };
 
 type HostApplicationRow = {
@@ -47,7 +55,6 @@ type HostApplicationRow = {
   account_number: string | null;
   account_holder: string | null;
   host_nationality: string | null;
-  created_at: string;
 };
 
 type ServiceQueueRow = {
@@ -73,6 +80,132 @@ type ServiceRequestRow = {
   contact_name: string | null;
   status: string | null;
 };
+
+type RowQueryResult = {
+  data: AdminRawRow[];
+  error: PostgrestError | null;
+};
+
+async function executeRowQuery(
+  query: PromiseLike<{ data: unknown; error: PostgrestError | null }>
+): Promise<RowQueryResult> {
+  const { data, error } = await query;
+  return {
+    data: toAdminRawRows(data),
+    error,
+  };
+}
+
+function normalizeExperienceQueueRow(row: AdminRawRow): ExperienceQueueRow | null {
+  const id = readStringField(row, 'id');
+  const createdAt = readStringField(row, 'created_at');
+  const amount = readNumberField(row, 'amount');
+  const status = readStringField(row, 'status');
+
+  if (!id || !createdAt || amount == null || !status) {
+    return null;
+  }
+
+  return {
+    id,
+    order_id: readStringField(row, 'order_id'),
+    created_at: createdAt,
+    date: readStringField(row, 'date'),
+    time: readStringField(row, 'time'),
+    amount,
+    status,
+    payout_status: readStringField(row, 'payout_status'),
+    payout_paid_at: readStringField(row, 'payout_paid_at'),
+    host_payout_amount: readNumberField(row, 'host_payout_amount'),
+    platform_revenue: readNumberField(row, 'platform_revenue'),
+    experience_id: readNumberField(row, 'experience_id'),
+    user_id: readStringField(row, 'user_id'),
+  };
+}
+
+function normalizeExperienceMetaRow(row: AdminRawRow): ExperienceMetaRow | null {
+  const id = readNumberField(row, 'id');
+  if (id == null) {
+    return null;
+  }
+
+  return {
+    id,
+    title: readStringField(row, 'title'),
+    host_id: readStringField(row, 'host_id'),
+  };
+}
+
+function normalizeProfileRow(row: AdminRawRow): ProfileRow | null {
+  const id = readStringField(row, 'id');
+  if (!id) {
+    return null;
+  }
+
+  return {
+    id,
+    full_name: readStringField(row, 'full_name'),
+    email: readStringField(row, 'email'),
+  };
+}
+
+function normalizeHostApplicationRow(row: AdminRawRow): HostApplicationRow | null {
+  const userId = readStringField(row, 'user_id');
+  if (!userId) {
+    return null;
+  }
+
+  return {
+    user_id: userId,
+    name: readStringField(row, 'name'),
+    bank_name: readStringField(row, 'bank_name'),
+    account_number: readStringField(row, 'account_number'),
+    account_holder: readStringField(row, 'account_holder'),
+    host_nationality: readStringField(row, 'host_nationality'),
+  };
+}
+
+function normalizeServiceQueueRow(row: AdminRawRow): ServiceQueueRow | null {
+  const id = readStringField(row, 'id');
+  const createdAt = readStringField(row, 'created_at');
+  const amount = readNumberField(row, 'amount');
+  const status = readStringField(row, 'status');
+
+  if (!id || !createdAt || amount == null || !status) {
+    return null;
+  }
+
+  return {
+    id,
+    order_id: readStringField(row, 'order_id'),
+    request_id: readStringField(row, 'request_id'),
+    customer_id: readStringField(row, 'customer_id'),
+    host_id: readStringField(row, 'host_id'),
+    amount,
+    status,
+    payout_status: readStringField(row, 'payout_status'),
+    payout_paid_at: readStringField(row, 'payout_paid_at'),
+    host_payout_amount: readNumberField(row, 'host_payout_amount'),
+    platform_revenue: readNumberField(row, 'platform_revenue'),
+    created_at: createdAt,
+  };
+}
+
+function normalizeServiceRequestRow(row: AdminRawRow): ServiceRequestRow | null {
+  const id = readStringField(row, 'id');
+  if (!id) {
+    return null;
+  }
+
+  return {
+    id,
+    title: readStringField(row, 'title'),
+    service_date: readStringField(row, 'service_date'),
+    start_time: readStringField(row, 'start_time'),
+    contact_name: readStringField(row, 'contact_name'),
+    status: readStringField(row, 'status'),
+  };
+}
 
 function sortEntriesDesc(left: AdminPayoutQueueEntry, right: AdminPayoutQueueEntry) {
   return left.created_at < right.created_at ? 1 : -1;
@@ -162,7 +295,7 @@ export async function GET(request: Request) {
         query = query.limit(1500);
       }
 
-      return query;
+      return executeRowQuery(query);
     };
 
     const buildServiceQuery = (includePaidAt: boolean) => {
@@ -188,13 +321,11 @@ export async function GET(request: Request) {
         query = query.limit(1500);
       }
 
-      return query;
+      return executeRowQuery(query);
     };
 
-    let [
-      { data: experienceRowsRaw, error: experienceError },
-      { data: serviceRowsRaw, error: serviceError },
-    ] = await Promise.all([buildExperienceQuery(true), buildServiceQuery(true)]);
+    let [{ data: experienceRowsRaw, error: experienceError }, { data: serviceRowsRaw, error: serviceError }] =
+      await Promise.all([buildExperienceQuery(true), buildServiceQuery(true)]);
 
     if (experienceError && isMissingPayoutPaidAtColumnError(experienceError)) {
       const fallbackResult = await buildExperienceQuery(false);
@@ -211,21 +342,22 @@ export async function GET(request: Request) {
     if (experienceError) throw experienceError;
     if (serviceError) throw serviceError;
 
-    const experienceRows = (experienceRowsRaw || []) as ExperienceQueueRow[];
-    const serviceRows = (serviceRowsRaw || []) as ServiceQueueRow[];
+    const experienceRows = experienceRowsRaw.map(normalizeExperienceQueueRow).filter(isPresent);
+    const serviceRows = serviceRowsRaw.map(normalizeServiceQueueRow).filter(isPresent);
 
     const experienceIds = Array.from(
-      new Set(experienceRows.map((row) => row.experience_id).filter(Boolean))
-    ) as number[];
+      new Set(experienceRows.map((row) => row.experience_id).filter(isPresent))
+    );
     const serviceRequestIds = Array.from(
-      new Set(serviceRows.map((row) => row.request_id).filter(Boolean))
-    ) as string[];
+      new Set(serviceRows.map((row) => row.request_id).filter(isPresent))
+    );
     const guestIds = Array.from(
-      new Set([
-        ...experienceRows.map((row) => row.user_id),
-        ...serviceRows.map((row) => row.customer_id),
-      ].filter(Boolean))
-    ) as string[];
+      new Set(
+        [...experienceRows.map((row) => row.user_id), ...serviceRows.map((row) => row.customer_id)].filter(
+          isPresent
+        )
+      )
+    );
 
     const [
       { data: experiencesRaw, error: experiencesError },
@@ -233,16 +365,22 @@ export async function GET(request: Request) {
       { data: guestProfilesRaw, error: guestProfilesError },
     ] = await Promise.all([
       experienceIds.length > 0
-        ? supabaseAdmin.from('experiences').select('id, title, host_id').in('id', experienceIds)
+        ? executeRowQuery(
+            supabaseAdmin.from('experiences').select('id, title, host_id').in('id', experienceIds)
+          )
         : Promise.resolve({ data: [], error: null }),
       serviceRequestIds.length > 0
-        ? supabaseAdmin
-            .from('service_requests')
-            .select('id, title, service_date, start_time, contact_name, status')
-            .in('id', serviceRequestIds)
+        ? executeRowQuery(
+            supabaseAdmin
+              .from('service_requests')
+              .select('id, title, service_date, start_time, contact_name, status')
+              .in('id', serviceRequestIds)
+          )
         : Promise.resolve({ data: [], error: null }),
       guestIds.length > 0
-        ? supabaseAdmin.from('profiles').select('id, full_name, email').in('id', guestIds)
+        ? executeRowQuery(
+            supabaseAdmin.from('profiles').select('id, full_name, email').in('id', guestIds)
+          )
         : Promise.resolve({ data: [], error: null }),
     ]);
 
@@ -251,35 +389,43 @@ export async function GET(request: Request) {
     if (guestProfilesError) throw guestProfilesError;
 
     const experienceMap = new Map(
-      ((experiencesRaw || []) as ExperienceMetaRow[]).map((row) => [row.id, row])
+      experiencesRaw.map(normalizeExperienceMetaRow).filter(isPresent).map((row) => [row.id, row])
     );
     const serviceRequestMap = new Map(
-      ((serviceRequestsRaw || []) as ServiceRequestRow[]).map((row) => [row.id, row])
+      serviceRequestsRaw.map(normalizeServiceRequestRow).filter(isPresent).map((row) => [row.id, row])
     );
     const guestProfileMap = new Map(
-      ((guestProfilesRaw || []) as ProfileRow[]).map((row) => [row.id, row])
+      guestProfilesRaw.map(normalizeProfileRow).filter(isPresent).map((row) => [row.id, row])
     );
 
     const hostIds = Array.from(
-      new Set([
-        ...((experiencesRaw || []) as ExperienceMetaRow[]).map((row) => row.host_id),
-        ...serviceRows.map((row) => row.host_id),
-      ].filter(Boolean))
-    ) as string[];
+      new Set(
+        [
+          ...Array.from(experienceMap.values()).map((row) => row.host_id),
+          ...serviceRows.map((row) => row.host_id),
+        ].filter(isPresent)
+      )
+    );
 
     const [
       { data: hostProfilesRaw, error: hostProfilesError },
       { data: hostApplicationsRaw, error: hostApplicationsError },
     ] = await Promise.all([
       hostIds.length > 0
-        ? supabaseAdmin.from('profiles').select('id, full_name').in('id', hostIds)
+        ? executeRowQuery(
+            supabaseAdmin.from('profiles').select('id, full_name').in('id', hostIds)
+          )
         : Promise.resolve({ data: [], error: null }),
       hostIds.length > 0
-        ? supabaseAdmin
-            .from('host_applications')
-            .select('user_id, name, bank_name, account_number, account_holder, host_nationality, created_at')
-            .in('user_id', hostIds)
-            .order('created_at', { ascending: false })
+        ? executeRowQuery(
+            supabaseAdmin
+              .from('host_applications')
+              .select(
+                'user_id, name, bank_name, account_number, account_holder, host_nationality, created_at'
+              )
+              .in('user_id', hostIds)
+              .order('created_at', { ascending: false })
+          )
         : Promise.resolve({ data: [], error: null }),
     ]);
 
@@ -287,12 +433,14 @@ export async function GET(request: Request) {
     if (hostApplicationsError) throw hostApplicationsError;
 
     const hostProfileMap = new Map(
-      ((hostProfilesRaw || []) as ProfileRow[]).map((row) => [row.id, row])
+      hostProfilesRaw.map(normalizeProfileRow).filter(isPresent).map((row) => [row.id, row])
     );
     const hostApplicationMap = new Map<string, HostApplicationRow>();
 
-    for (const application of (hostApplicationsRaw || []) as HostApplicationRow[]) {
-      if (application.user_id && !hostApplicationMap.has(application.user_id)) {
+    for (const application of hostApplicationsRaw
+      .map(normalizeHostApplicationRow)
+      .filter(isPresent)) {
+      if (!hostApplicationMap.has(application.user_id)) {
         hostApplicationMap.set(application.user_id, application);
       }
     }
@@ -345,7 +493,7 @@ export async function GET(request: Request) {
         time: booking.time,
         title: experience?.title || 'Unknown Experience',
         guest_name: guestProfile?.full_name || 'No Name',
-        amount: booking.amount || 0,
+        amount: booking.amount,
         payout_amount: payoutAmount,
         platform_revenue: getBookingPlatformRevenue(booking),
         status: booking.status,
@@ -417,9 +565,9 @@ export async function GET(request: Request) {
         time: requestInfo?.start_time || null,
         title: requestInfo?.title || '맞춤 서비스',
         guest_name: customerProfile?.full_name || requestInfo?.contact_name || 'No Name',
-        amount: booking.amount || 0,
-        payout_amount: Number(booking.host_payout_amount || 0),
-        platform_revenue: Number(booking.platform_revenue || 0),
+        amount: booking.amount,
+        payout_amount: booking.host_payout_amount ?? 0,
+        platform_revenue: booking.platform_revenue ?? 0,
         status: booking.status,
         payout_status: booking.payout_status,
       };
@@ -438,7 +586,7 @@ export async function GET(request: Request) {
       }
     }
 
-    const experienceGroups = Array.from(experienceGroupsMap.values())
+    const experienceGroups: AdminPayoutQueueDomainGroup[] = Array.from(experienceGroupsMap.values())
       .map((group) => {
         const pending_entries = [...group.pending_entries].sort(sortEntriesDesc);
         const paid_entries = [...group.paid_entries].sort(sortEntriesDesc);
@@ -458,47 +606,50 @@ export async function GET(request: Request) {
       })
       .sort((left, right) => right.pending_amount - left.pending_amount);
 
-    const serviceGroups = Array.from(serviceGroupsMap.values())
-      .map((group) => ({
-        ...group,
-        pending_entries: [...group.pending_entries].sort(sortEntriesDesc),
-        paid_entries: [...group.paid_entries].sort(sortEntriesDesc),
-        settlement_state: group.pending_count > 0 ? 'eligible' : 'completed',
-      }))
+    const serviceGroups: AdminPayoutQueueDomainGroup[] = Array.from(serviceGroupsMap.values())
+      .map((group) => {
+        const settlementState: AdminPayoutQueueDomainGroup['settlement_state'] =
+          group.pending_count > 0 ? 'eligible' : 'completed';
+
+        return {
+          ...group,
+          pending_entries: [...group.pending_entries].sort(sortEntriesDesc),
+          paid_entries: [...group.paid_entries].sort(sortEntriesDesc),
+          settlement_state: settlementState,
+        };
+      })
       .sort((left, right) => right.pending_amount - left.pending_amount);
 
     const experienceGroupMap = new Map(experienceGroups.map((group) => [group.host_id, group]));
     const serviceGroupMap = new Map(serviceGroups.map((group) => [group.host_id, group]));
-    const allHostIds = Array.from(
-      new Set([...experienceGroupMap.keys(), ...serviceGroupMap.keys()])
-    );
+    const allHostIds = Array.from(new Set([...experienceGroupMap.keys(), ...serviceGroupMap.keys()]));
 
     const combinedHostTotals: AdminCombinedPayoutQueueRow[] = allHostIds.map((hostId) => {
-      const experienceGroup = experienceGroupMap.get(hostId) || null;
-      const serviceGroup = serviceGroupMap.get(hostId) || null;
-      const fallback = experienceGroup || serviceGroup;
+      const experienceGroup = experienceGroupMap.get(hostId) ?? null;
+      const serviceGroup = serviceGroupMap.get(hostId) ?? null;
+      const fallbackGroup = experienceGroup ?? serviceGroup;
 
       const pending_amount =
-        (experienceGroup?.pending_amount || 0) + (serviceGroup?.pending_amount || 0);
-      const paid_amount = (experienceGroup?.paid_amount || 0) + (serviceGroup?.paid_amount || 0);
+        (experienceGroup?.pending_amount ?? 0) + (serviceGroup?.pending_amount ?? 0);
+      const paid_amount = (experienceGroup?.paid_amount ?? 0) + (serviceGroup?.paid_amount ?? 0);
       const pending_count =
-        (experienceGroup?.pending_count || 0) + (serviceGroup?.pending_count || 0);
-      const paid_count = (experienceGroup?.paid_count || 0) + (serviceGroup?.paid_count || 0);
+        (experienceGroup?.pending_count ?? 0) + (serviceGroup?.pending_count ?? 0);
+      const paid_count = (experienceGroup?.paid_count ?? 0) + (serviceGroup?.paid_count ?? 0);
 
       let settlement_state: AdminCombinedPayoutQueueRow['settlement_state'] = 'completed';
-      if ((serviceGroup?.pending_count || 0) > 0) {
+      if ((serviceGroup?.pending_count ?? 0) > 0) {
         settlement_state = 'eligible';
-      } else if ((experienceGroup?.pending_count || 0) > 0) {
-        settlement_state = experienceGroup?.settlement_state || 'hold';
+      } else if ((experienceGroup?.pending_count ?? 0) > 0) {
+        settlement_state = experienceGroup?.settlement_state ?? 'hold';
       }
 
       return {
         host_id: hostId,
-        host_name: fallback?.host_name || '알 수 없는 호스트',
-        bank: fallback?.bank || '계좌 미등록',
-        account_number: fallback?.account_number || '',
-        account_holder: fallback?.account_holder || '-',
-        host_nationality: fallback?.host_nationality || '-',
+        host_name: fallbackGroup?.host_name || '알 수 없는 호스트',
+        bank: fallbackGroup?.bank || '계좌 미등록',
+        account_number: fallbackGroup?.account_number || '',
+        account_holder: fallbackGroup?.account_holder || '-',
+        host_nationality: fallbackGroup?.host_nationality || '-',
         pending_amount,
         paid_amount,
         pending_count,

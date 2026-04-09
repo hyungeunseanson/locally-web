@@ -32,12 +32,20 @@ export default function ReceiptModal({ trip, onClose }: { trip: ReceiptTrip, onC
 
   // 닫힘 애니메이션
   const [closing, setClosing] = useState(false);
-  const closeTimerRef = useRef<ReturnType<typeof setTimeout>>();
-  useEffect(() => () => { if (closeTimerRef.current) clearTimeout(closeTimerRef.current); }, []);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (closeTimerRef.current !== null) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  }, []);
   const requestClose = useCallback(() => {
     if (closing) return;
     setClosing(true);
-    closeTimerRef.current = setTimeout(onClose, 150);
+    closeTimerRef.current = setTimeout(() => {
+      closeTimerRef.current = null;
+      onClose();
+    }, 150);
   }, [closing, onClose]);
 
   if (!trip) return null;

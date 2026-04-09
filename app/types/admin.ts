@@ -271,6 +271,16 @@ export interface AdminServiceBooking {
   } | null;
 }
 
+export interface AdminServiceSalesSummary {
+  amount: number;
+  host_payout_amount: number | null;
+  platform_revenue: number | null;
+  status: string;
+  created_at: string;
+  payout_status: string | null;
+  payout_paid_at: string | null;
+}
+
 export type AdminPayoutQueueState = 'eligible' | 'hold' | 'long_hold' | 'completed';
 
 export interface AdminPayoutQueueEntry {
@@ -354,6 +364,7 @@ export interface SettlementSyncJobHealth {
   is_running: boolean;
   running_since: string | null;
   stale_running: boolean;
+  last_heartbeat_at: string | null;
   last_success_at: string | null;
   last_failure_at: string | null;
   last_failure_message: string | null;

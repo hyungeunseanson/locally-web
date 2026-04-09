@@ -52,6 +52,19 @@ type ConfirmServiceBankPaymentFailure = {
   error: string;
 };
 
+type AtomicConfirmServiceBankPaymentResult =
+  | {
+      kind: 'missing';
+    }
+  | {
+      kind: 'error';
+      failure: ConfirmServiceBankPaymentFailure;
+    }
+  | {
+      kind: 'success';
+      data: AtomicConfirmServiceBankPaymentRow;
+    };
+
 export type ServiceBankPaymentContext = {
   bookingId: string;
   orderId: string;
@@ -158,7 +171,7 @@ function parseAtomicConfirmError(error: ServiceRpcErrorLike): ConfirmServiceBank
 async function tryConfirmServiceBankPaymentAtomic(
   supabaseAdmin: SupabaseClient,
   orderId: string
-) {
+): Promise<AtomicConfirmServiceBankPaymentResult> {
   const rpcName = 'confirm_service_bank_payment_atomic';
   const { data, error } = await supabaseAdmin
     .rpc(rpcName, {

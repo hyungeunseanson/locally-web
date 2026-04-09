@@ -11,25 +11,29 @@ import {
   isPublicHostApplicationStatus,
   pickLatestPublicHostApplication,
 } from '@/app/utils/hostVisibility';
-import { getHostPublicProfile } from '@/app/utils/profile';
-import { ExperienceDetail, HostProfileDetail } from './types';
+import { HostProfileDetail } from './types';
 import { PRIVATE_NOINDEX_METADATA } from '@/app/utils/seo';
 import { buildBreadcrumbJsonLd, buildExperienceProductJsonLd } from '@/app/utils/structuredData';
 import { fetchExperienceAvailabilitySummary } from '@/app/utils/experienceAvailability';
+import {
+  buildHostProfileDetail,
+  getExperiencePrimaryImage,
+  getHostReviewAggregateFromRatings,
+  isPublicExperienceViewModel,
+  normalizeExperienceDetailRow,
+  normalizeExperienceMetadataRow,
+  normalizeHostProfileRow,
+  normalizePublicHostApplicationRows,
+  normalizeReviewRatingRows,
+  toExperienceRawRows,
+  type PublicHostApplicationViewModel,
+} from './experienceRowHelpers';
 
 type Props = {
   params: Promise<{ id: string }>;
-}
+};
 
 type ServerSupabaseClient = Awaited<ReturnType<typeof createClient>>;
-type PublicHostApplicationRow = {
-  user_id: string | null;
-  status: string | null;
-  name?: string | null;
-  profile_photo?: string | null;
-  self_intro?: string | null;
-  languages?: string[] | null;
-};
 
 export const dynamic = 'force-dynamic';
 
@@ -126,23 +130,6 @@ const PUBLIC_HOST_APPLICATION_SELECT = [
   'languages',
 ].join(', ');
 
-function parseProfileNumber(value: unknown) {
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? value : null;
-  }
-
-  if (typeof value === 'string' && value.trim()) {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-
-  return null;
-}
-
-function isPublicExperienceCandidate(experience: { status?: string | null; is_active?: boolean | null }) {
-  return experience.status === 'active' && experience.is_active !== false;
-}
-
 async function loadPublicHostApplication(supabase: ServerSupabaseClient, hostId: string | null | undefined) {
   if (!hostId) {
     return null;
@@ -165,7 +152,63 @@ async function loadPublicHostApplication(supabase: ServerSupabaseClient, hostId:
     return null;
   }
 
-  return pickLatestPublicHostApplication((data || []) as PublicHostApplicationRow[]);
+  return pickLatestPublicHostApplication(normalizePublicHostApplicationRows(data));
+}
+
+async function loadHostReviewAggregate(
+  supabase: ServerSupabaseClient,
+  hostId: string
+) {
+  const { data: experienceRows, error: experienceError } = await supabase
+    .from('experiences')
+    .select('id')
+    .eq('host_id', hostId);
+
+  if (experienceError) {
+    console.error('[Experience detail] Failed to load host experiences for review aggregate:', {
+      hostId,
+      message: experienceError.message,
+      details: experienceError.details,
+      hint: experienceError.hint,
+      code: experienceError.code,
+    });
+
+    return getHostReviewAggregateFromRatings([]);
+  }
+
+  const targetExperienceIds = toExperienceRawRows(experienceRows).reduce<string[]>(
+    (acc, row) => {
+      const id = typeof row.id === 'string' ? row.id.trim() : '';
+      if (id) {
+        acc.push(id);
+      }
+      return acc;
+    },
+    []
+  );
+
+  if (targetExperienceIds.length === 0) {
+    return getHostReviewAggregateFromRatings([]);
+  }
+
+  const { data: reviewRows, error: reviewError } = await supabase
+    .from('reviews')
+    .select('rating')
+    .in('experience_id', targetExperienceIds);
+
+  if (reviewError) {
+    console.error('[Experience detail] Failed to load review aggregate fallback:', {
+      hostId,
+      message: reviewError.message,
+      details: reviewError.details,
+      hint: reviewError.hint,
+      code: reviewError.code,
+    });
+
+    return getHostReviewAggregateFromRatings([]);
+  }
+
+  return getHostReviewAggregateFromRatings(normalizeReviewRatingRows(reviewRows));
 }
 
 // 🟢 메타데이터 생성 (SEO & 다국어)
@@ -183,18 +226,20 @@ export async function generateMetadata(
     .eq('id', id)
     .maybeSingle();
 
-  if (!experience) {
+  const normalizedExperience = normalizeExperienceMetadataRow(experience);
+
+  if (!normalizedExperience) {
     return {
       title: '체험을 찾을 수 없습니다',
       robots: PRIVATE_NOINDEX_METADATA.robots,
-    }
+    };
   }
 
   // 언어에 맞는 제목과 설명 가져오기
-  const title = getContent(experience, 'title', locale);
-  const description = getContent(experience, 'description', locale);
-  const imageUrl = experience.photos?.[0] || experience.image_url || 'https://images.unsplash.com/photo-1540206395-688085723adb';
-  const isPublicExperience = isPublicExperienceCandidate(experience);
+  const title = getContent(normalizedExperience, 'title', locale);
+  const description = getContent(normalizedExperience, 'description', locale);
+  const imageUrl = getExperiencePrimaryImage(normalizedExperience);
+  const isPublicExperience = isPublicExperienceViewModel(normalizedExperience);
 
   const metadata: Metadata = {
     title,
@@ -231,7 +276,10 @@ export async function generateMetadata(
     };
   }
 
-  const publicHostApplication = await loadPublicHostApplication(supabase, experience.host_id);
+  const publicHostApplication = await loadPublicHostApplication(
+    supabase,
+    normalizedExperience.host_id
+  );
   if (!isPublicHostApplicationStatus(publicHostApplication?.status)) {
     return {
       ...metadata,
@@ -264,14 +312,14 @@ export default async function Page({ params }: Props) {
     });
   }
 
-  const experience = expResult.data as ExperienceDetail | null;
+  const experience = normalizeExperienceDetailRow(expResult.data);
 
   if (!experience) {
     return notFound();
   }
 
-  const isPublicExperience = isPublicExperienceCandidate(experience);
-  let visibleHostApplication: PublicHostApplicationRow | null = null;
+  const isPublicExperience = isPublicExperienceViewModel(experience);
+  let visibleHostApplication: PublicHostApplicationViewModel | null = null;
 
   if (isPublicExperience) {
     visibleHostApplication = await loadPublicHostApplication(supabase, experience.host_id);
@@ -287,7 +335,7 @@ export default async function Page({ params }: Props) {
     fetchExperienceAvailabilitySummary(
       createAdminClient(),
       id,
-      Number(experience.max_guests || 10)
+      experience.max_guests
     ),
     (async (): Promise<HostProfileDetail> => {
       if (!experience.host_id) {
@@ -300,49 +348,29 @@ export default async function Page({ params }: Props) {
       ]);
       const publicHostApplication = isPublicHostApplicationStatus(app?.status) ? app : null;
 
-      const joinedYear = profile?.created_at
-        ? Math.max(1, new Date().getFullYear() - new Date(profile.created_at).getFullYear())
-        : null;
+      const normalizedProfile = normalizeHostProfileRow(profile);
+      const cachedReviewCount = normalizedProfile?.total_review_count;
+      const cachedAverageRating = normalizedProfile?.average_rating;
 
-      const cachedReviewCount = parseProfileNumber(profile?.total_review_count);
-      const cachedAverageRating = parseProfileNumber(profile?.average_rating);
-      const hasValidCachedReviewAggregate =
+      const reviewAggregate =
         cachedReviewCount !== null &&
+        cachedReviewCount !== undefined &&
         cachedReviewCount >= 0 &&
-        cachedAverageRating !== null;
+        cachedAverageRating !== null &&
+        cachedAverageRating !== undefined
+          ? {
+              reviewCount: cachedReviewCount,
+              averageRating: Number(cachedAverageRating.toFixed(2)),
+            }
+          : await loadHostReviewAggregate(supabase, experience.host_id);
 
-      let hostReviewCount = hasValidCachedReviewAggregate ? cachedReviewCount : 0;
-      let hostAverageRating = hasValidCachedReviewAggregate
-        ? Number(cachedAverageRating.toFixed(2))
-        : null;
-
-      if (!hasValidCachedReviewAggregate) {
-        const { data: reviewRows } = await supabase
-          .from('reviews')
-          .select('rating, experiences!inner(host_id)')
-          .eq('experiences.host_id', experience.host_id);
-
-        hostReviewCount = reviewRows?.length || 0;
-        hostAverageRating = hostReviewCount > 0
-          ? Number(((reviewRows || []).reduce((sum, row) => sum + Number(row.rating || 0), 0) / hostReviewCount).toFixed(2))
-          : null;
-      }
-
-      const publicHostProfile = getHostPublicProfile(profile, publicHostApplication, 'Locally Host');
-
-      return {
-        id: experience.host_id,
-        name: publicHostProfile.name,
-        avatar_url: publicHostProfile.avatarUrl || undefined,
-        languages: publicHostProfile.languages,
-        introduction: publicHostProfile.bio || '안녕하세요! 로컬리 호스트입니다.',
-        job: publicHostProfile.job || undefined,
-        dream_destination: publicHostProfile.dreamDestination || undefined,
-        favorite_song: publicHostProfile.favoriteSong || undefined,
-        joined_year: joinedYear,
-        review_count: hostReviewCount,
-        rating: hostAverageRating,
-      };
+      return buildHostProfileDetail({
+        hostId: experience.host_id,
+        profile: normalizedProfile,
+        publicHostApplication,
+        fallbackName: 'Locally Host',
+        reviewAggregate,
+      });
     })(),
   ]);
   hostProfile = hostProfileResult;
@@ -355,11 +383,11 @@ export default async function Page({ params }: Props) {
           locale,
           title: getContent(experience, 'title', locale),
           description: getContent(experience, 'description', locale),
-          imageUrl: experience.photos?.[0] || experience.image_url || 'https://images.unsplash.com/photo-1540206395-688085723adb',
-          price: typeof experience.price === 'number' ? experience.price : Number(experience.price || 0),
+          imageUrl: getExperiencePrimaryImage(experience),
+          price: experience.price,
           category: experience.category || null,
-          city: experience.city || null,
-          country: typeof experience.country === 'string' ? experience.country : null,
+          city: experience.city,
+          country: experience.country,
           providerName: hostProfile?.name || null,
         })
       : null;

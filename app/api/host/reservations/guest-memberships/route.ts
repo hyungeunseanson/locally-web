@@ -12,6 +12,25 @@ type BookingGuestRef = {
   user_id: string;
 };
 
+function normalizeBookingGuestRefs(value: unknown): BookingGuestRef[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.reduce<BookingGuestRef[]>((acc, entry) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      return acc;
+    }
+
+    const userId = typeof entry.user_id === 'string' ? entry.user_id.trim() : '';
+    if (userId) {
+      acc.push({ user_id: userId });
+    }
+
+    return acc;
+  }, []);
+}
+
 function normalizeGuestIds(value: unknown) {
   if (!Array.isArray(value)) return [];
 
@@ -51,7 +70,7 @@ export async function POST(request: NextRequest) {
     if (bookingRefsError) throw bookingRefsError;
 
     const allowedGuestIds = [...new Set(
-      ((bookingRefs as BookingGuestRef[] | null) || []).map((row) => row.user_id).filter(Boolean)
+      normalizeBookingGuestRefs(bookingRefs).map((row) => row.user_id).filter(Boolean)
     )];
 
     if (allowedGuestIds.length === 0) {

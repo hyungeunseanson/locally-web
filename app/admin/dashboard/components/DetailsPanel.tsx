@@ -170,6 +170,11 @@ export default function DetailsPanel({
     typeof selectedItem?.profile_photo === 'string' &&
     Boolean(selectedItem.profile_photo) &&
     brokenProfilePhotoSrc !== selectedItem.profile_photo;
+  const selectedAvatarImageSrc = showSelectedAvatarImage ? selectedAvatarSrc : null;
+  const selectedProfilePhotoSrc =
+    showProfilePhotoImage && typeof selectedItem?.profile_photo === 'string'
+      ? selectedItem.profile_photo
+      : null;
   const getApprovalStatusClass = (status?: string | null) => {
     if (status === 'pending') return 'bg-yellow-100 text-yellow-700';
     if (status === 'revision') return 'bg-orange-100 text-orange-700';
@@ -250,23 +255,23 @@ export default function DetailsPanel({
 
           <div className="flex items-center gap-2.5 md:gap-4 pr-10">
             <div className="relative w-10 h-10 md:w-14 md:h-14 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shrink-0">
-              {showSelectedAvatarImage ? (
+              {selectedAvatarImageSrc ? (
                 useRawApprovalImages ? (
                   // Approvals photos should avoid optimizer dependency so admin can still review items after quota exhaustion.
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={selectedAvatarSrc}
+                    src={selectedAvatarImageSrc}
                     alt={selectedItem.name || selectedItem.title || 'Selected item avatar'}
                     className="w-full h-full object-cover"
                     onError={() => {
-                      if (selectedAvatarSrc) {
-                        setBrokenSelectedAvatarSrc(selectedAvatarSrc);
+                      if (selectedAvatarImageSrc) {
+                        setBrokenSelectedAvatarSrc(selectedAvatarImageSrc);
                       }
                     }}
                   />
                 ) : (
                   <Image
-                    src={selectedAvatarSrc}
+                    src={selectedAvatarImageSrc}
                     alt={selectedItem.name || selectedItem.title || 'Selected item avatar'}
                     fill
                     sizes="56px"
@@ -348,15 +353,15 @@ export default function DetailsPanel({
             {/* 프로필 사진 */}
             <div className="flex items-center gap-3 bg-slate-50 p-2.5 md:p-3.5 rounded-xl border border-slate-100">
               <div className="relative w-14 h-14 md:w-16 md:h-16 rounded-full bg-white overflow-hidden border border-slate-200 flex-shrink-0">
-                {showProfilePhotoImage ? (
+                {selectedProfilePhotoSrc ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={selectedItem.profile_photo}
+                    src={selectedProfilePhotoSrc}
                     alt="Host application profile photo"
                     className="w-full h-full object-cover"
                     onError={() => {
-                      if (selectedItem.profile_photo) {
-                        setBrokenProfilePhotoSrc(selectedItem.profile_photo);
+                      if (selectedProfilePhotoSrc) {
+                        setBrokenProfilePhotoSrc(selectedProfilePhotoSrc);
                       }
                     }}
                   />

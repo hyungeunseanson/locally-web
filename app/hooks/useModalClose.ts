@@ -10,22 +10,30 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  */
 export function useModalClose(isOpen: boolean, onClose: () => void, duration = 150) {
   const [closing, setClosing] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // isOpen이 다시 열리면 closing 리셋
   useEffect(() => {
-    if (isOpen) setClosing(false);
+    if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reopening must clear exit state immediately to preserve modal timing.
+      setClosing(false);
+    }
   }, [isOpen]);
 
   // cleanup
   useEffect(() => {
-    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+    return () => {
+      if (timerRef.current !== null) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
   }, []);
 
   const requestClose = useCallback(() => {
     if (closing) return;
     setClosing(true);
     timerRef.current = setTimeout(() => {
+      timerRef.current = null;
       setClosing(false);
       onClose();
     }, duration);

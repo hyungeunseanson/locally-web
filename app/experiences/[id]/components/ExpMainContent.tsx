@@ -165,7 +165,7 @@ export default function ExpMainContent({
 
       {/* 자기소개 */}
       <HostProfileSection
-        hostId={experience.host_id}
+        hostId={experience.host_id ?? undefined}
         name={hostProfile?.name || t('exp_detail_host_default_name')}
         avatarUrl={hostProfile?.avatar_url}
         reviewCount={hostProfile?.review_count}
@@ -174,7 +174,7 @@ export default function ExpMainContent({
         dreamDestination={hostProfile?.dream_destination}
         favoriteSong={hostProfile?.favorite_song}
         languages={hostProfile?.languages || []}
-        intro={hostProfile?.introduction || hostProfile?.bio}
+        intro={hostProfile?.introduction}
         joinedYear={hostProfile?.joined_year}
         category={translatedCategory || experience.category || t('cat_exp')}
         onMessageHost={openHostMessage}

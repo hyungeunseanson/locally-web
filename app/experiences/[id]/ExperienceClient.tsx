@@ -17,8 +17,10 @@ import { getLocalizedExperienceText } from '@/app/utils/experienceTranslation';
 import { sendAnalyticsEvent } from '@/app/utils/analytics/client';
 import {
   ExperienceAvailabilitySummary,
+  ExperienceCalendarDayStatus,
   ExperienceDetail,
   HostProfileDetail,
+  ExperienceSlotSummary,
 } from './types';
 import { formatLocalizedExperienceLocation } from '@/app/utils/locationLocalization';
 import { getLocalizedLanguageLabel } from '@/app/utils/languageLevels';
@@ -35,6 +37,95 @@ type Props = {
   initialAvailabilitySummary: ExperienceAvailabilitySummary;
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function readStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((entry): entry is string => typeof entry === 'string');
+}
+
+function normalizeSlotSummaryMap(value: unknown): Record<string, ExperienceSlotSummary> {
+  if (!isRecord(value)) {
+    return {};
+  }
+
+  const normalized: Record<string, ExperienceSlotSummary> = {};
+
+  for (const [key, entry] of Object.entries(value)) {
+    if (!isRecord(entry)) {
+      continue;
+    }
+
+    const remainingSeats =
+      typeof entry.remainingSeats === 'number' && Number.isFinite(entry.remainingSeats)
+        ? entry.remainingSeats
+        : 0;
+    const isBookable = typeof entry.isBookable === 'boolean' ? entry.isBookable : false;
+    const soldOutReason =
+      entry.soldOutReason === 'capacity_full' || entry.soldOutReason === 'private_booked'
+        ? entry.soldOutReason
+        : undefined;
+    const soloGuaranteeEligible =
+      typeof entry.soloGuaranteeEligible === 'boolean'
+        ? entry.soloGuaranteeEligible
+        : false;
+
+    normalized[key] = {
+      remainingSeats,
+      isBookable,
+      soldOutReason,
+      soloGuaranteeEligible,
+    };
+  }
+
+  return normalized;
+}
+
+function normalizeAvailabilitySummary(value: unknown): ExperienceAvailabilitySummary {
+  if (!isRecord(value)) {
+    return {
+      availableDates: [],
+      dateToTimeMap: {},
+      calendarDayStatusMap: {},
+      slotSummaryMap: {},
+    };
+  }
+
+  const dateToTimeMap = isRecord(value.dateToTimeMap)
+    ? Object.fromEntries(
+        Object.entries(value.dateToTimeMap).map(([key, entry]) => [key, readStringArray(entry)])
+      )
+    : {};
+
+  const calendarDayStatusMap: Record<string, ExperienceCalendarDayStatus> = isRecord(value.calendarDayStatusMap)
+    ? Object.fromEntries(
+        Object.entries(value.calendarDayStatusMap).flatMap(([key, entry]) =>
+          entry === 'available' || entry === 'sold_out' ? [[key, entry]] : []
+        )
+      )
+    : {};
+
+  return {
+    availableDates: readStringArray(value.availableDates),
+    dateToTimeMap,
+    calendarDayStatusMap,
+    slotSummaryMap: normalizeSlotSummaryMap(value.slotSummaryMap),
+  };
+}
+
+function readRouteParam(value: string | string[] | undefined): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  return Array.isArray(value) ? value[0] ?? '' : '';
+}
+
 export default function ExperienceClient({
   initialUser,
   initialExperience,
@@ -48,7 +139,7 @@ export default function ExperienceClient({
   const { createInquiry } = useChat();
   const { lang, t } = useLanguage(); // 🟢 현재 언어 (LanguageContext는 lang 제공)
 
-  const experienceId = params?.id as string;
+  const experienceId = readRouteParam(params?.id);
   const { isSaved, toggleWishlist, isLoading: isSaveLoading } = useWishlist(experienceId);
 
   const [user] = useState(initialUser);
@@ -106,13 +197,8 @@ export default function ExperienceClient({
         throw new Error(`Failed to refresh availability: ${response.status}`);
       }
 
-      const summary = (await response.json()) as ExperienceAvailabilitySummary;
-      setAvailabilitySummary({
-        availableDates: Array.isArray(summary.availableDates) ? summary.availableDates : [],
-        dateToTimeMap: summary.dateToTimeMap || {},
-        calendarDayStatusMap: summary.calendarDayStatusMap || {},
-        slotSummaryMap: summary.slotSummaryMap || {},
-      });
+      const summary = normalizeAvailabilitySummary(await response.json());
+      setAvailabilitySummary(summary);
     } catch (error) {
       console.error('Experience availability refresh error:', error);
     }

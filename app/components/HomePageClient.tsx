@@ -7,7 +7,7 @@ import HomeCategoryIcon from '@/app/components/HomeCategoryIcon';
 import HomeHero from '@/app/components/HomeHero';
 import HomeExperienceCard, { type HomeExperienceCardData } from '@/app/components/HomeExperienceCard';
 import ServiceCard from '@/app/components/ServiceCard';
-import { HOME_MOBILE_CITY_SHORTCUTS, LOCALLY_SERVICES } from '@/app/constants';
+import { HOME_MOBILE_CITY_SHORTCUTS, LOCALLY_SERVICES, type HomeMobileCityShortcutId } from '@/app/constants';
 import { useExperienceFilter } from '@/app/hooks/useExperienceFilter';
 import { HomeExperienceCardSkeleton } from '@/app/components/skeletons/HomeExperienceCardSkeleton';
 import { useLanguage } from '@/app/context/LanguageContext';
@@ -18,6 +18,10 @@ type HomeExperience = HomeExperienceCardData & {
   created_at?: string | null;
   languages?: string[] | null;
 };
+
+function isHomeCategoryIconId(id: HomeMobileCityShortcutId): id is 'seoul' | 'busan' {
+  return id === 'seoul' || id === 'busan';
+}
 
 function getDesktopPopularVisibilityClass(index: number) {
   if (index >= 5) return 'hidden 2xl:block';
@@ -187,7 +191,9 @@ export default function HomePageClient() {
                             data-testid={`home-mobile-city-shortcut-${shortcut.id}-visual`}
                             className="flex h-[29px] items-center justify-center"
                           >
-                            <HomeCategoryIcon id={shortcut.id} size={25} />
+                            {isHomeCategoryIconId(shortcut.id) ? (
+                              <HomeCategoryIcon id={shortcut.id} size={25} />
+                            ) : null}
                           </span>
                           <span className="text-[11px] font-medium leading-tight tracking-[0.02em] whitespace-nowrap text-slate-600">{t(shortcut.label)}</span>
                         </>

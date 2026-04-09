@@ -29,20 +29,32 @@ export default function ConfirmModal({
 }: ConfirmModalProps) {
   // 닫힘 애니메이션
   const [closing, setClosing] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (isOpen) setClosing(false);
+    if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reopening must clear exit state immediately to preserve modal timing.
+      setClosing(false);
+    }
   }, [isOpen]);
 
   useEffect(() => {
-    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+    return () => {
+      if (timerRef.current !== null) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
   }, []);
 
   const handleCancel = useCallback(() => {
     if (closing || isProcessing) return;
     setClosing(true);
-    timerRef.current = setTimeout(onCancel, 150);
+    timerRef.current = setTimeout(() => {
+      timerRef.current = null;
+      setClosing(false);
+      onCancel();
+    }, 150);
   }, [closing, isProcessing, onCancel]);
 
   // Escape 키 지원

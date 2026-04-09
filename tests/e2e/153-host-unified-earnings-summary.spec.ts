@@ -17,6 +17,23 @@ const createdServiceRequestIds: string[] = [];
 const createdServiceApplicationIds: string[] = [];
 const createdServiceBookingIds: string[] = [];
 
+function createAsyncGate() {
+  let release: (() => void) | undefined;
+  const wait = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  return {
+    wait,
+    release() {
+      if (!release) {
+        throw new Error('Async gate was not initialized.');
+      }
+      release();
+    },
+  };
+}
+
 async function createApprovedHostApplication(userId: string, user: E2ETestUser) {
   const supabase = getTestAdminClient();
   const { data, error } = await supabase
@@ -422,13 +439,18 @@ test.describe.serial('Host unified earnings summary', () => {
 
     await login(page, hostUser);
 
+    const summaryResponseGate = createAsyncGate();
+
     await page.route('**/api/host/earnings/summary', async (route) => {
-      await route.continue({
+      const response = await route.fetch({
         headers: {
           ...route.request().headers(),
-          'x-locally-test-delay-host-earnings-summary': '700',
+          'x-locally-test-delay-host-earnings-summary': '500',
         },
       });
+
+      await summaryResponseGate.wait;
+      await route.fulfill({ response });
     });
 
     await page.goto('/host/dashboard?tab=earnings', { waitUntil: 'domcontentloaded' });
@@ -436,6 +458,8 @@ test.describe.serial('Host unified earnings summary', () => {
     await expect(page.getByTestId('host-earnings-unified-hero-skeleton')).toBeVisible();
     await expect(page.getByTestId('host-earnings-breakdown-skeleton')).toBeVisible();
     await expect(page.getByTestId('host-earnings-unified-total')).toHaveCount(0);
+
+    summaryResponseGate.release();
 
     await expect(page.getByTestId('host-earnings-unified-total')).toContainText('₩104,000');
     await expect(page.getByTestId('host-earnings-breakdown-experience-pending')).toContainText('₩24,000');

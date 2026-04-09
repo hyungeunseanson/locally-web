@@ -7,6 +7,7 @@ import {
 import {
   finishSettlementSyncRunFailure,
   finishSettlementSyncRunSuccess,
+  renewSettlementSyncRunLease,
   startSettlementSyncRun,
 } from './jobRuns';
 import type {
@@ -16,6 +17,17 @@ import type {
   SettlementSyncRunResult,
   SettlementSyncTarget,
 } from './types';
+import {
+  isSettlementSyncInfrastructureError,
+  SettlementSyncInfrastructureError,
+} from './types';
+import {
+  readSettlementSyncNestedRowOrFirst,
+  readSettlementSyncString,
+  readSettlementSyncTrimmedString,
+  toSettlementSyncRawRow,
+  toSettlementSyncRawRows,
+} from './rowHelpers';
 
 type ServiceCompletionRequestRow = {
   id: string;
@@ -27,21 +39,24 @@ type ServiceCompletionRequestRow = {
 type ServiceCompletionBookingRow = {
   id: string;
   order_id: string | null;
-  request_id: string | null;
+  request_id: string;
   status: string;
-  host_id: string | null;
+  host_id: string;
 };
 
-type ServiceCompletionTargetRow = {
-  id: string;
+type ServiceCompletionCandidate = ServiceCompletionBookingRow & {
+  service_date: string | null;
+  request_status: string;
+};
+
+type ServiceCompletionTarget = {
+  booking_id: string;
   order_id: string | null;
   request_id: string | null;
   status: string;
   host_id: string | null;
-  service_requests:
-    | { id: string; service_date: string | null; status: string | null }
-    | Array<{ id: string; service_date: string | null; status: string | null }>
-    | null;
+  service_date: string | null;
+  request_status: string | null;
 };
 
 type AtomicCompleteServiceBookingRow = {
@@ -64,8 +79,16 @@ type ServiceRpcErrorLike = {
 
 type AtomicCompletionResult =
   | { kind: 'success'; data: AtomicCompleteServiceBookingRow }
-  | { kind: 'missing' }
   | { kind: 'error'; status: 404 | 409 | 500; error: string };
+
+type ServiceCompletionAttemptResult =
+  | { kind: 'completed'; target: SettlementSyncTarget }
+  | { kind: 'already_processed'; target: SettlementSyncTarget }
+  | { kind: 'not_due'; target: SettlementSyncTarget }
+  | { kind: 'error'; status: 404 | 409 | 500; error: string };
+
+const SERVICE_SYNC_JOB_NAME = 'service_completion_sync';
+const SERVICE_FORCE_ONE_JOB_NAME = 'service_completion_sync_force_one';
 
 function getTodayKSTDateString() {
   const formatter = new Intl.DateTimeFormat('en-CA', {
@@ -83,17 +106,109 @@ function delay(ms?: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function normalizeServiceRequestMeta(value: ServiceCompletionTargetRow['service_requests']) {
-  if (Array.isArray(value)) {
-    return value[0] || null;
-  }
+async function delayWithHeartbeat(ms: number | undefined, renew: () => Promise<void>) {
+  if (!ms || ms <= 0) return;
+  let remaining = ms;
 
-  return value || null;
+  while (remaining > 0) {
+    const chunk = Math.min(remaining, 100);
+    await delay(chunk);
+    remaining -= chunk;
+    if (remaining > 0) {
+      await renew();
+    }
+  }
 }
 
-function isServiceDue(serviceDate: string | null) {
-  if (!serviceDate) return false;
-  return serviceDate < getTodayKSTDateString();
+function createServiceLeaseHeartbeat(
+  params: SettlementSyncRunDueParams | SettlementSyncForceOneParams,
+  started: { runId: number; leaseToken: string }
+): () => Promise<void> {
+  const jobName =
+    params.triggerSource === 'manual_force_one'
+      ? SERVICE_FORCE_ONE_JOB_NAME
+      : SERVICE_SYNC_JOB_NAME;
+
+  return async () => {
+    await renewSettlementSyncRunLease({
+      supabaseAdmin: params.supabaseAdmin,
+      runId: started.runId,
+      jobName,
+      leaseToken: started.leaseToken,
+      testLeaseMs: params.testLeaseMs,
+      simulateMissingAdminJobRuns: params.simulateMissingAdminJobRuns,
+    });
+  };
+}
+
+function maybeThrowInjectedFailure(failPhase: SettlementSyncRunDueParams['failPhase']) {
+  if (process.env.NODE_ENV !== 'production' && failPhase === 'after_lock') {
+    throw new Error('Injected settlement sync failure after lock.');
+  }
+}
+
+function normalizeServiceCompletionRequestRows(value: unknown): ServiceCompletionRequestRow[] {
+  return toSettlementSyncRawRows(value).reduce<ServiceCompletionRequestRow[]>((acc, row) => {
+    const id = readSettlementSyncTrimmedString(row, 'id');
+    const status = readSettlementSyncTrimmedString(row, 'status');
+    if (!id || !status) {
+      return acc;
+    }
+
+    acc.push({
+      id,
+      service_date: readSettlementSyncString(row, 'service_date'),
+      status,
+      selected_host_id: readSettlementSyncTrimmedString(row, 'selected_host_id'),
+    });
+    return acc;
+  }, []);
+}
+
+function normalizeServiceCompletionBookingRows(value: unknown): ServiceCompletionBookingRow[] {
+  return toSettlementSyncRawRows(value).reduce<ServiceCompletionBookingRow[]>((acc, row) => {
+    const id = readSettlementSyncTrimmedString(row, 'id');
+    const requestId = readSettlementSyncTrimmedString(row, 'request_id');
+    const status = readSettlementSyncTrimmedString(row, 'status');
+    const hostId = readSettlementSyncTrimmedString(row, 'host_id');
+    if (!id || !requestId || !status || !hostId) {
+      return acc;
+    }
+
+    acc.push({
+      id,
+      order_id: readSettlementSyncTrimmedString(row, 'order_id'),
+      request_id: requestId,
+      status,
+      host_id: hostId,
+    });
+    return acc;
+  }, []);
+}
+
+function normalizeServiceCompletionTargetRow(value: unknown): ServiceCompletionTarget | null {
+  const row = toSettlementSyncRawRow(value);
+  if (!row) {
+    return null;
+  }
+
+  const bookingId = readSettlementSyncTrimmedString(row, 'id');
+  const status = readSettlementSyncTrimmedString(row, 'status');
+  if (!bookingId || !status) {
+    return null;
+  }
+
+  const requestMeta = readSettlementSyncNestedRowOrFirst(row, 'service_requests');
+
+  return {
+    booking_id: bookingId,
+    order_id: readSettlementSyncTrimmedString(row, 'order_id'),
+    request_id: readSettlementSyncTrimmedString(row, 'request_id'),
+    status,
+    host_id: readSettlementSyncTrimmedString(row, 'host_id'),
+    service_date: requestMeta ? readSettlementSyncString(requestMeta, 'service_date') : null,
+    request_status: requestMeta ? readSettlementSyncTrimmedString(requestMeta, 'status') : null,
+  };
 }
 
 function isMissingServiceCompletionRpcError(
@@ -141,8 +256,13 @@ function parseAtomicCompletionError(error: ServiceRpcErrorLike) {
 
 async function tryCompleteServiceBookingAtomic(
   supabaseAdmin: SettlementSyncAdminClient,
-  bookingId: string
+  bookingId: string,
+  simulateMissingServiceCompletionRpc?: boolean
 ): Promise<AtomicCompletionResult> {
+  if (simulateMissingServiceCompletionRpc) {
+    throw new SettlementSyncInfrastructureError();
+  }
+
   const rpcName = 'complete_service_booking_if_due_atomic';
   const { data, error } = await supabaseAdmin
     .rpc(rpcName, { p_booking_id: bookingId })
@@ -150,7 +270,7 @@ async function tryCompleteServiceBookingAtomic(
 
   if (error) {
     if (isMissingServiceCompletionRpcError(error, rpcName)) {
-      return { kind: 'missing' };
+      throw new SettlementSyncInfrastructureError();
     }
 
     return parseAtomicCompletionError(error);
@@ -181,11 +301,11 @@ async function fetchServiceCompletionCandidates(
 
   if (requestError) throw requestError;
 
-  const requestRows = ((requestRowsRaw || []) as ServiceCompletionRequestRow[]).filter(
+  const requestRows = normalizeServiceCompletionRequestRows(requestRowsRaw).filter(
     (row) => row.selected_host_id
   );
   if (requestRows.length === 0) {
-    return [] as Array<ServiceCompletionBookingRow & { service_date: string | null; request_status: string }>;
+    return [] as ServiceCompletionCandidate[];
   }
 
   const requestMap = new Map(requestRows.map((row) => [row.id, row]));
@@ -197,8 +317,7 @@ async function fetchServiceCompletionCandidates(
 
   if (bookingError) throw bookingError;
 
-  return ((bookingRowsRaw || []) as ServiceCompletionBookingRow[])
-    .filter((row) => row.host_id && row.request_id)
+  return normalizeServiceCompletionBookingRows(bookingRowsRaw)
     .map((row) => {
       const request = row.request_id ? requestMap.get(row.request_id) : null;
       return {
@@ -207,27 +326,6 @@ async function fetchServiceCompletionCandidates(
         request_status: request?.status || '',
       };
     });
-}
-
-async function fetchServiceCompletionTarget(
-  supabaseAdmin: SettlementSyncAdminClient,
-  bookingId: string
-) {
-  const { data, error } = await supabaseAdmin
-    .from('service_bookings')
-    .select(`
-      id,
-      order_id,
-      request_id,
-      status,
-      host_id,
-      service_requests(id, service_date, status)
-    `)
-    .eq('id', bookingId)
-    .maybeSingle();
-
-  if (error || !data) return null;
-  return data as ServiceCompletionTargetRow;
 }
 
 export async function resolveServiceCompletionTarget(
@@ -254,208 +352,31 @@ export async function resolveServiceCompletionTarget(
   const idMatch = await query('id');
   if (idMatch.error) throw idMatch.error;
   if (idMatch.data) {
-    const requestMeta = normalizeServiceRequestMeta(
-      (idMatch.data as ServiceCompletionTargetRow).service_requests
-    );
-    return {
-      ...(idMatch.data as ServiceCompletionTargetRow),
-      booking_id: idMatch.data.id,
-      order_id: idMatch.data.order_id,
-      request_id: idMatch.data.request_id,
-      service_date: requestMeta?.service_date || null,
-      request_status: requestMeta?.status || null,
-    };
+    return normalizeServiceCompletionTargetRow(idMatch.data);
   }
 
   const orderMatch = await query('order_id');
   if (orderMatch.error) throw orderMatch.error;
-  if (!orderMatch.data) return null;
-
-  const requestMeta = normalizeServiceRequestMeta(
-    (orderMatch.data as ServiceCompletionTargetRow).service_requests
-  );
-
-  return {
-    ...(orderMatch.data as ServiceCompletionTargetRow),
-    booking_id: orderMatch.data.id,
-    order_id: orderMatch.data.order_id,
-    request_id: orderMatch.data.request_id,
-    service_date: requestMeta?.service_date || null,
-    request_status: requestMeta?.status || null,
-  };
-}
-
-async function completeServiceBookingFallback(
-  supabaseAdmin: SettlementSyncAdminClient,
-  bookingId: string
-): Promise<SettlementSyncRunResult> {
-  const booking = await fetchServiceCompletionTarget(supabaseAdmin, bookingId);
-  if (!booking) {
-    return { success: false, status: 404, error: '서비스 예약을 찾을 수 없습니다.' };
-  }
-
-  const requestMeta = normalizeServiceRequestMeta(booking.service_requests);
-  const target: SettlementSyncTarget = {
-    booking_id: booking.id,
-    order_id: booking.order_id,
-    request_id: booking.request_id,
-  };
-
-  if (!requestMeta?.id) {
-    return {
-      success: false,
-      status: 409,
-      error: '현재 상태에서는 서비스 완료 동기화를 실행할 수 없습니다.',
-      target,
-    };
-  }
-
-  if (String(booking.status || '').toLowerCase() === 'completed') {
-    return {
-      success: true,
-      runId: 0,
-      outcome: 'already_processed',
-      processedCount: 0,
-      skippedCount: 1,
-      target,
-    };
-  }
-
-  if (!SERVICE_BOOKING_ACTIVE_STATUSES.includes(booking.status as (typeof SERVICE_BOOKING_ACTIVE_STATUSES)[number])) {
-    return {
-      success: false,
-      status: 409,
-      error: '현재 상태에서는 서비스 완료 동기화를 실행할 수 없습니다.',
-      target,
-    };
-  }
-
-  if (!isServiceDue(requestMeta.service_date)) {
-    return {
-      success: true,
-      runId: 0,
-      outcome: 'not_due',
-      processedCount: 0,
-      skippedCount: 1,
-      target,
-    };
-  }
-
-  const { data: updatedBooking, error: bookingUpdateError } = await supabaseAdmin
-    .from('service_bookings')
-    .update({ status: 'completed' })
-    .eq('id', booking.id)
-    .in('status', [...SERVICE_BOOKING_ACTIVE_STATUSES])
-    .select('id')
-    .maybeSingle();
-
-  if (bookingUpdateError) {
-    throw new Error(`[settlement sync] service booking update failed: ${bookingUpdateError.message}`);
-  }
-
-  if (!updatedBooking) {
-    const latest = await fetchServiceCompletionTarget(supabaseAdmin, booking.id);
-    const latestStatus = String(latest?.status || '').toLowerCase();
-    return {
-      success: true,
-      runId: 0,
-      outcome: latestStatus === 'completed' ? 'already_processed' : 'not_due',
-      processedCount: 0,
-      skippedCount: 1,
-      target,
-    };
-  }
-
-  if (requestMeta.status === 'completed') {
-    return {
-      success: true,
-      runId: 0,
-      outcome: 'completed',
-      processedCount: 1,
-      skippedCount: 0,
-      target,
-    };
-  }
-
-  const { data: updatedRequest, error: requestUpdateError } = await supabaseAdmin
-    .from('service_requests')
-    .update({ status: 'completed' })
-    .eq('id', requestMeta.id)
-    .in('status', [...SERVICE_REQUEST_ACTIVE_STATUSES])
-    .select('id')
-    .maybeSingle();
-
-  if (requestUpdateError) {
-    const rollbackResult = await supabaseAdmin
-      .from('service_bookings')
-      .update({ status: booking.status })
-      .eq('id', booking.id)
-      .eq('status', 'completed');
-
-    if (rollbackResult.error) {
-      console.error('[settlement sync] service completion rollback failed:', rollbackResult.error);
-    }
-
-    throw new Error(`[settlement sync] service request update failed: ${requestUpdateError.message}`);
-  }
-
-  if (!updatedRequest) {
-    const latestRequest = await supabaseAdmin
-      .from('service_requests')
-      .select('status')
-      .eq('id', requestMeta.id)
-      .maybeSingle();
-
-    if (latestRequest.error) {
-      throw latestRequest.error;
-    }
-
-    if (latestRequest.data?.status !== 'completed') {
-      const rollbackResult = await supabaseAdmin
-        .from('service_bookings')
-        .update({ status: booking.status })
-        .eq('id', booking.id)
-        .eq('status', 'completed');
-
-      if (rollbackResult.error) {
-        console.error('[settlement sync] service completion rollback after request miss failed:', rollbackResult.error);
-      }
-
-      return {
-        success: false,
-        status: 409,
-        error: '현재 상태에서는 서비스 완료 동기화를 실행할 수 없습니다.',
-        target,
-      };
-    }
-  }
-
-  return {
-    success: true,
-    runId: 0,
-    outcome: 'completed',
-    processedCount: 1,
-    skippedCount: 0,
-    target,
-  };
+  return normalizeServiceCompletionTargetRow(orderMatch.data);
 }
 
 async function completeServiceBookingOnce(
   supabaseAdmin: SettlementSyncAdminClient,
-  bookingId: string
-): Promise<SettlementSyncRunResult> {
-  const atomic = await tryCompleteServiceBookingAtomic(supabaseAdmin, bookingId);
+  bookingId: string,
+  simulateMissingServiceCompletionRpc?: boolean
+): Promise<ServiceCompletionAttemptResult> {
+  const atomic = await tryCompleteServiceBookingAtomic(
+    supabaseAdmin,
+    bookingId,
+    simulateMissingServiceCompletionRpc
+  );
 
   if (atomic.kind === 'error') {
     return {
-      success: false,
+      kind: 'error',
       status: atomic.status,
       error: atomic.error,
     };
-  }
-
-  if (atomic.kind === 'missing') {
-    return completeServiceBookingFallback(supabaseAdmin, bookingId);
   }
 
   const target: SettlementSyncTarget = {
@@ -466,32 +387,20 @@ async function completeServiceBookingOnce(
 
   if (atomic.data.not_due) {
     return {
-      success: true,
-      runId: 0,
-      outcome: 'not_due',
-      processedCount: 0,
-      skippedCount: 1,
+      kind: 'not_due',
       target,
     };
   }
 
   if (atomic.data.already_processed) {
     return {
-      success: true,
-      runId: 0,
-      outcome: 'already_processed',
-      processedCount: 0,
-      skippedCount: 1,
+      kind: 'already_processed',
       target,
     };
   }
 
   return {
-    success: true,
-    runId: 0,
-    outcome: 'completed',
-    processedCount: atomic.data.completed ? 1 : 0,
-    skippedCount: atomic.data.completed ? 0 : 1,
+    kind: atomic.data.completed ? 'completed' : 'already_processed',
     target,
   };
 }
@@ -501,10 +410,12 @@ export async function runServiceCompletionSync(
 ): Promise<SettlementSyncRunResult> {
   const started = await startSettlementSyncRun({
     supabaseAdmin: params.supabaseAdmin,
-    jobName: 'service_completion_sync',
+    jobName: SERVICE_SYNC_JOB_NAME,
     scope: 'service',
     triggerSource: params.triggerSource,
     initiatedByAdminId: params.initiatedByAdminId,
+    testLeaseMs: params.testLeaseMs,
+    simulateMissingAdminJobRuns: params.simulateMissingAdminJobRuns,
   });
 
   if (!started.ok) {
@@ -519,16 +430,21 @@ export async function runServiceCompletionSync(
   }
 
   try {
+    const renewLease = createServiceLeaseHeartbeat(params, started);
     const candidates = await fetchServiceCompletionCandidates(params.supabaseAdmin);
+    await renewLease();
     if (candidates.length === 0) {
       await finishSettlementSyncRunSuccess({
         supabaseAdmin: params.supabaseAdmin,
         runId: started.runId,
-        jobName: 'service_completion_sync',
+        jobName: SERVICE_SYNC_JOB_NAME,
         startedAt: started.startedAt,
+        leaseToken: started.leaseToken,
         processedCount: 0,
         skippedCount: 0,
         details: { mode: 'run_due', candidate_count: 0 },
+        testLeaseMs: params.testLeaseMs,
+        simulateMissingAdminJobRuns: params.simulateMissingAdminJobRuns,
       });
 
       return {
@@ -541,31 +457,40 @@ export async function runServiceCompletionSync(
       };
     }
 
-    await delay(params.testDelayMs);
+    await delayWithHeartbeat(params.testDelayMs, renewLease);
+    maybeThrowInjectedFailure(params.failPhase);
 
     const completedIds: string[] = [];
     const requestIds = new Set<string>();
     let skippedCount = 0;
 
     for (const candidate of candidates) {
-      const result = await completeServiceBookingOnce(params.supabaseAdmin, candidate.id);
-      if (!result.success) {
-        throw new Error(result.error);
-      }
-
-      if (result.outcome === 'completed') {
-        completedIds.push(candidate.id);
-        if (candidate.request_id) requestIds.add(candidate.request_id);
-      } else {
-        skippedCount += 1;
+      await renewLease();
+      const result = await completeServiceBookingOnce(
+        params.supabaseAdmin,
+        candidate.id,
+        params.simulateMissingServiceCompletionRpc
+      );
+      switch (result.kind) {
+        case 'completed':
+          completedIds.push(candidate.id);
+          requestIds.add(candidate.request_id);
+          break;
+        case 'already_processed':
+        case 'not_due':
+          skippedCount += 1;
+          break;
+        case 'error':
+          throw new Error(result.error);
       }
     }
 
     await finishSettlementSyncRunSuccess({
       supabaseAdmin: params.supabaseAdmin,
       runId: started.runId,
-      jobName: 'service_completion_sync',
+      jobName: SERVICE_SYNC_JOB_NAME,
       startedAt: started.startedAt,
+      leaseToken: started.leaseToken,
       processedCount: completedIds.length,
       skippedCount,
       details: {
@@ -573,6 +498,8 @@ export async function runServiceCompletionSync(
         booking_ids: completedIds,
         request_ids: Array.from(requestIds),
       },
+      testLeaseMs: params.testLeaseMs,
+      simulateMissingAdminJobRuns: params.simulateMissingAdminJobRuns,
     });
 
     return {
@@ -591,12 +518,19 @@ export async function runServiceCompletionSync(
     await finishSettlementSyncRunFailure({
       supabaseAdmin: params.supabaseAdmin,
       runId: started.runId,
-      jobName: 'service_completion_sync',
+      jobName: SERVICE_SYNC_JOB_NAME,
       startedAt: started.startedAt,
+      leaseToken: started.leaseToken,
       processedCount: 0,
       skippedCount: 0,
       errorMessage: message,
+      testLeaseMs: params.testLeaseMs,
+      simulateMissingAdminJobRuns: params.simulateMissingAdminJobRuns,
     });
+
+    if (isSettlementSyncInfrastructureError(error)) {
+      throw error;
+    }
 
     return {
       success: false,
@@ -623,11 +557,13 @@ export async function forceServiceCompletionSync(
 
   const started = await startSettlementSyncRun({
     supabaseAdmin: params.supabaseAdmin,
-    jobName: 'service_completion_sync_force_one',
+    jobName: SERVICE_FORCE_ONE_JOB_NAME,
     scope: 'service',
     triggerSource: params.triggerSource,
     initiatedByAdminId: params.initiatedByAdminId,
     targetIdentifier: params.identifier,
+    testLeaseMs: params.testLeaseMs,
+    simulateMissingAdminJobRuns: params.simulateMissingAdminJobRuns,
   });
 
   if (!started.ok) {
@@ -643,43 +579,70 @@ export async function forceServiceCompletionSync(
   }
 
   try {
-    await delay(params.testDelayMs);
-    const result = await completeServiceBookingOnce(params.supabaseAdmin, target.booking_id);
-    if (!result.success) {
+    const renewLease = createServiceLeaseHeartbeat(params, started);
+    await delayWithHeartbeat(params.testDelayMs, renewLease);
+    await renewLease();
+    maybeThrowInjectedFailure(params.failPhase);
+    const result = await completeServiceBookingOnce(
+      params.supabaseAdmin,
+      target.booking_id,
+      params.simulateMissingServiceCompletionRpc
+    );
+    if (result.kind === 'error') {
       await finishSettlementSyncRunFailure({
         supabaseAdmin: params.supabaseAdmin,
         runId: started.runId,
-        jobName: 'service_completion_sync_force_one',
+        jobName: SERVICE_FORCE_ONE_JOB_NAME,
         startedAt: started.startedAt,
+        leaseToken: started.leaseToken,
         processedCount: 0,
         skippedCount: 0,
         errorMessage: result.error,
+        testLeaseMs: params.testLeaseMs,
+        simulateMissingAdminJobRuns: params.simulateMissingAdminJobRuns,
       });
 
       return {
-        ...result,
+        success: false,
+        status: result.status,
+        error: result.error,
         runId: started.runId,
         target: targetSummary,
       };
     }
 
+    const outcome =
+      result.kind === 'completed'
+        ? 'completed'
+        : result.kind === 'already_processed'
+          ? 'already_processed'
+          : 'not_due';
+    const processedCount = result.kind === 'completed' ? 1 : 0;
+    const skippedCount = result.kind === 'completed' ? 0 : 1;
+
     await finishSettlementSyncRunSuccess({
       supabaseAdmin: params.supabaseAdmin,
       runId: started.runId,
-      jobName: 'service_completion_sync_force_one',
+      jobName: SERVICE_FORCE_ONE_JOB_NAME,
       startedAt: started.startedAt,
-      processedCount: result.processedCount,
-      skippedCount: result.skippedCount,
+      leaseToken: started.leaseToken,
+      processedCount,
+      skippedCount,
       details: {
         mode: 'force_one',
         target: targetSummary,
-        outcome: result.outcome,
+        outcome,
       },
+      testLeaseMs: params.testLeaseMs,
+      simulateMissingAdminJobRuns: params.simulateMissingAdminJobRuns,
     });
 
     return {
-      ...result,
+      success: true,
       runId: started.runId,
+      outcome,
+      processedCount,
+      skippedCount,
       target: targetSummary,
     };
   } catch (error) {
@@ -687,12 +650,19 @@ export async function forceServiceCompletionSync(
     await finishSettlementSyncRunFailure({
       supabaseAdmin: params.supabaseAdmin,
       runId: started.runId,
-      jobName: 'service_completion_sync_force_one',
+      jobName: SERVICE_FORCE_ONE_JOB_NAME,
       startedAt: started.startedAt,
+      leaseToken: started.leaseToken,
       processedCount: 0,
       skippedCount: 0,
       errorMessage: message,
+      testLeaseMs: params.testLeaseMs,
+      simulateMissingAdminJobRuns: params.simulateMissingAdminJobRuns,
     });
+
+    if (isSettlementSyncInfrastructureError(error)) {
+      throw error;
+    }
 
     return {
       success: false,

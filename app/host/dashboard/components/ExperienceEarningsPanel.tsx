@@ -28,6 +28,81 @@ type ExperienceChartBookingRow = {
   payout_paid_at?: string | null;
 };
 
+function isExperienceChartBookingRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function readExperienceChartNumber(
+  row: Record<string, unknown>,
+  key: keyof ExperienceChartBookingRow
+): number | null | undefined {
+  const value = row[key];
+  if (value === null) return null;
+  if (value === undefined) return undefined;
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return undefined;
+}
+
+function readExperienceChartString(
+  row: Record<string, unknown>,
+  key: keyof ExperienceChartBookingRow
+): string | null | undefined {
+  const value = row[key];
+  if (value === null) return null;
+  if (value === undefined) return undefined;
+  return typeof value === 'string' ? value : undefined;
+}
+
+function normalizeExperienceChartBookingRow(raw: unknown): ExperienceChartBookingRow | null {
+  if (!isExperienceChartBookingRecord(raw)) {
+    return null;
+  }
+
+  const createdAt = readExperienceChartString(raw, 'created_at');
+  const status = readExperienceChartString(raw, 'status');
+
+  if (!createdAt || !status) {
+    return null;
+  }
+
+  return {
+    amount: readExperienceChartNumber(raw, 'amount'),
+    total_price: readExperienceChartNumber(raw, 'total_price'),
+    total_experience_price: readExperienceChartNumber(raw, 'total_experience_price'),
+    created_at: createdAt,
+    date: readExperienceChartString(raw, 'date'),
+    status,
+    host_payout_amount: readExperienceChartNumber(raw, 'host_payout_amount'),
+    platform_revenue: readExperienceChartNumber(raw, 'platform_revenue'),
+    price_at_booking: readExperienceChartNumber(raw, 'price_at_booking'),
+    solo_guarantee_price: readExperienceChartNumber(raw, 'solo_guarantee_price'),
+    payout_status: readExperienceChartString(raw, 'payout_status'),
+    payout_paid_at: readExperienceChartString(raw, 'payout_paid_at') ?? null,
+  };
+}
+
+function normalizeExperienceChartBookingRows(rawRows: unknown): ExperienceChartBookingRow[] {
+  if (!Array.isArray(rawRows)) {
+    return [];
+  }
+
+  return rawRows.reduce<ExperienceChartBookingRow[]>((rows, rawRow) => {
+    const normalizedRow = normalizeExperienceChartBookingRow(rawRow);
+    if (normalizedRow) {
+      rows.push(normalizedRow);
+    }
+    return rows;
+  }, []);
+}
+
 type ExperienceChartPoint = {
   date: string;
   amount: number;
@@ -81,7 +156,7 @@ export default function ExperienceEarningsPanel({ summary }: ExperienceEarningsP
           return;
         }
 
-        let { data: bookings, error } = await supabase
+        const initialResult = await supabase
           .from('bookings')
           .select(`
             amount,
@@ -100,6 +175,9 @@ export default function ExperienceEarningsPanel({ summary }: ExperienceEarningsP
           `)
           .eq('experiences.host_id', user.id)
           .in('status', [...BOOKING_CONFIRMED_STATUSES, 'cancelled', 'CANCELLED']);
+
+        let bookings = normalizeExperienceChartBookingRows(initialResult.data);
+        let error = initialResult.error;
 
         if (error && isMissingPayoutPaidAtColumnError(error)) {
           const fallbackResult = await supabase
@@ -121,10 +199,7 @@ export default function ExperienceEarningsPanel({ summary }: ExperienceEarningsP
             .eq('experiences.host_id', user.id)
             .in('status', [...BOOKING_CONFIRMED_STATUSES, 'cancelled', 'CANCELLED']);
 
-          bookings = ((fallbackResult.data || []) as ExperienceChartBookingRow[]).map((booking) => ({
-            ...booking,
-            payout_paid_at: null,
-          }));
+          bookings = normalizeExperienceChartBookingRows(fallbackResult.data);
           error = fallbackResult.error;
         }
 
@@ -135,7 +210,7 @@ export default function ExperienceEarningsPanel({ summary }: ExperienceEarningsP
         const dailyIncome: Record<string, number> = {};
         const dailyItemCounts: Record<string, number> = {};
 
-        (bookings as ExperienceChartBookingRow[] | null)?.forEach((booking) => {
+        bookings.forEach((booking) => {
           const itemPayout = getBookingHostPayout(booking);
           if (isCancelledOnlyBookingStatus(booking.status) && itemPayout <= 0) {
             return;

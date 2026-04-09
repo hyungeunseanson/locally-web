@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { runExperienceCompletionSync } from '@/app/utils/settlementSync/experienceCompletion';
+import { isSettlementSyncInfrastructureError } from '@/app/utils/settlementSync/types';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 
 function parseTestDelayMs(request: Request) {
@@ -8,6 +9,25 @@ function parseTestDelayMs(request: Request) {
   const raw = request.headers.get('x-locally-test-delay-settlement-sync-ms');
   const parsed = Number(raw || 0);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function parseTestLeaseMs(request: Request) {
+  if (process.env.NODE_ENV === 'production') return undefined;
+  const raw = request.headers.get('x-locally-test-settlement-sync-lease-ms');
+  const parsed = Number(raw || 0);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function parseBooleanTestHeader(request: Request, headerName: string) {
+  if (process.env.NODE_ENV === 'production') return false;
+  const value = request.headers.get(headerName);
+  return value === '1' || value === 'true';
+}
+
+function parseFailPhase(request: Request) {
+  if (process.env.NODE_ENV === 'production') return undefined;
+  const value = request.headers.get('x-locally-test-fail-settlement-sync-phase');
+  return value === 'after_lock' ? 'after_lock' : undefined;
 }
 
 export async function GET(request: Request) {
@@ -21,6 +41,16 @@ export async function GET(request: Request) {
       supabaseAdmin: createAdminClient(),
       triggerSource: 'cron',
       testDelayMs: parseTestDelayMs(request),
+      testLeaseMs: parseTestLeaseMs(request),
+      simulateMissingAdminJobRuns: parseBooleanTestHeader(
+        request,
+        'x-locally-test-simulate-missing-admin-job-runs'
+      ),
+      simulateMissingExperienceDueRpc: parseBooleanTestHeader(
+        request,
+        'x-locally-test-simulate-missing-experience-completion-rpc'
+      ),
+      failPhase: parseFailPhase(request),
     });
 
     if (!result.success) {
@@ -55,6 +85,10 @@ export async function GET(request: Request) {
       ids: bookingIds,
     });
   } catch (err: unknown) {
+    if (isSettlementSyncInfrastructureError(err)) {
+      return NextResponse.json({ error: err.message }, { status: 503 });
+    }
+
     const message = err instanceof Error ? err.message : 'Internal Server Error';
     console.error('[CRON Complete] Error:', err);
     return NextResponse.json({ error: message }, { status: 500 });

@@ -223,14 +223,19 @@ async function seedServiceBooking(params: {
   };
 }
 
-async function postAdminSync(page: Page, body: Record<string, unknown>, delayMs?: number) {
+async function postAdminSync(
+  page: Page,
+  body: Record<string, unknown>,
+  options?: { delayMs?: number; leaseMs?: number }
+) {
   return page.evaluate(
-    async ({ payload, delay }) => {
+    async ({ payload, delay, lease }) => {
       const response = await fetch('/api/admin/settlement-sync', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(delay ? { 'x-locally-test-delay-settlement-sync-ms': String(delay) } : {}),
+          ...(lease ? { 'x-locally-test-settlement-sync-lease-ms': String(lease) } : {}),
         },
         body: JSON.stringify(payload),
         credentials: 'include',
@@ -241,7 +246,7 @@ async function postAdminSync(page: Page, body: Record<string, unknown>, delayMs?
         body: await response.json(),
       };
     },
-    { payload: body, delay: delayMs || 0 }
+    { payload: body, delay: options?.delayMs || 0, lease: options?.leaseMs || 0 }
   );
 }
 
@@ -343,6 +348,7 @@ test.describe.serial('Settlement sync race guard', () => {
       headers: {
         authorization: `Bearer ${cronSecret}`,
         'x-locally-test-delay-settlement-sync-ms': '700',
+        'x-locally-test-settlement-sync-lease-ms': '300',
       },
     });
     await page.waitForTimeout(120);
@@ -381,6 +387,7 @@ test.describe.serial('Settlement sync race guard', () => {
       headers: {
         authorization: `Bearer ${cronSecret}`,
         'x-locally-test-delay-settlement-sync-ms': '700',
+        'x-locally-test-settlement-sync-lease-ms': '300',
       },
     });
     await page.waitForTimeout(120);
@@ -421,18 +428,19 @@ test.describe.serial('Settlement sync race guard', () => {
       )
     ).toHaveLength(1);
 
-    const firstBatchPromise = postAdminSync(
-      page,
-      {
-        mode: 'run_due',
-        domain: 'experience',
-      },
-      700
-    );
+    const firstBatchPromise = postAdminSync(page, {
+      mode: 'run_due',
+      domain: 'experience',
+    }, {
+      delayMs: 700,
+      leaseMs: 300,
+    });
     await page.waitForTimeout(120);
     const secondBatchPromise = postAdminSync(page, {
       mode: 'run_due',
       domain: 'experience',
+    }, {
+      leaseMs: 300,
     });
 
     const [firstBatch, secondBatch] = await Promise.all([firstBatchPromise, secondBatchPromise]);

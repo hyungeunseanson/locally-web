@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-04-08 (v3.40.10 service bank confirm hardening)
-**Version:** 3.40.10 (Service Bank Confirm Hardening)
+**Last Updated:** 2026-04-09 (v3.40.14 settlement sync hotfix)
+**Version:** 3.40.14 (Settlement Sync Lease / Fail-Closed Hotfix)
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -155,9 +155,11 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 공개 목록 화면은 `select('*')`를 기본으로 쓰지 않는다. `/search`는 검색/카드 렌더에 필요한 experience 필드만, `/community`와 `/api/community`는 feed 카드에 필요한 `community_posts`/`profiles`/`linked experience` 필드만 선택한다. 실제 DB에 없는 drift 컬럼(`experiences.tags`, `experiences.available_dates`)은 목록 select에 넣지 않는다.
 - Admin 맞춤 의뢰 관리 통합(v3.9.0): `service_bookings` 테이블 결제 흐름을 Admin이 통제할 수 있도록 별도 탭 `SERVICE_REQUESTS`를 신설하고, `useServiceAdminData.ts` 독립 훅·`ServiceAdminTab.tsx` 3-서브탭 컴포넌트·`/api/admin/service-cancel` 강제 취소 API를 추가. NicePay cancel 실패 시 DB 상태 미변경(에러 안전) 보장. `SalesTab` KPI에 service_bookings GMV/정산액 합산(수수료율 % 미노출). 관리자 탭 데이터는 공통 eager load 대신 탭별 전용 훅/API를 기준으로 유지한다.
 - `Billing & Revenue` 탭은 `/api/admin/sales-summary`를 전용 source로 사용하므로, `page.tsx`에서 공통 로딩 게이트 밖에서 직접 렌더링한다.
-- `Billing & Revenue` 탭 상단에는 `Settlement Sync Health` 운영 패널을 둔다. 이 패널은 `/api/admin/settlement-sync`를 단일 source로 사용해 체험/서비스 완료 동기화 cron의 마지막 성공/실패, backlog, lag, running 상태를 보여주고, 운영자가 `booking_id/order_id` 기반 `force_one` 또는 backlog 전체 `run_due`를 실행하게 한다.
+- `Billing & Revenue` 탭 상단에는 `Settlement Sync Health` 운영 패널을 둔다. 이 패널은 `/api/admin/settlement-sync`를 단일 source로 사용해 체험/서비스 완료 동기화 cron의 마지막 성공/실패, backlog, lag, running/running_stale 상태를 보여주고, 운영자가 `booking_id/order_id` 기반 `force_one` 또는 backlog 전체 `run_due`를 실행하게 한다.
 - `GET /api/cron/complete-trips`, `GET /api/cron/complete-services`는 URL 계약은 유지하되, 실제 완료 처리 로직은 shared worker(`app/utils/settlementSync/*`)만 사용한다. 수동 fallback route도 같은 worker를 재사용하고, future booking/order를 억지 완료시키지 않도록 `force_one`도 반드시 due 조건을 통과한 대상만 처리한다.
-- 완료 동기화 run visibility와 batch lock의 source of truth는 `admin_job_runs`다. migration 미적용 환경에서는 `admin_audit_logs`와 in-memory fallback lock으로 fail-open 운영하되, distributed lock 보장은 `admin_job_runs` 적용 이후를 기준으로 본다.
+- 완료 동기화 run visibility와 batch lock의 source of truth는 `admin_job_runs`다. `running` 소유권은 `lease_token`, `lease_expires_at`, `last_heartbeat_at` 기준으로 판정하고, batch는 주요 checkpoint마다 lease를 갱신한다. 더 이상 `started_at + stale threshold`로 락을 회수하지 않는다.
+- 체험 완료 due 판단과 backlog 계산은 앱 서버 `Date`가 아니라 PostgreSQL RPC(`list_due_experience_completion_candidates`, `get_experience_completion_due_backlog`)가 KST 기준으로 계산한다. 서비스 완료는 계속 `service_date < todayKST` 정책을 유지한다.
+- settlement sync 필수 인프라(`admin_job_runs`, `complete_service_booking_if_due_atomic`, experience due RPC)가 없으면 더 이상 fail-open fallback을 쓰지 않는다. `/api/admin/settlement-sync`, `/api/cron/complete-trips`, `/api/cron/complete-services`는 즉시 `503`을 반환하고, `SettlementSyncPanel`은 red infra banner + disabled manual trigger 상태를 보여준다.
 - `Master Ledger` 탭은 `/api/admin/master-ledger`를 전용 source로 사용하므로, `page.tsx`에서 공통 로딩 게이트 밖에서 직접 렌더링한다. `MasterLedgerTab`은 자체 realtime 구독(`bookings INSERT/UPDATE`, `service_bookings INSERT/UPDATE`)으로 최신성을 유지한다.
 - `Data Analytics` 탭은 `/api/admin/analytics-summary`, `/api/admin/analytics-host-summary`, `/api/admin/reviews`, `/api/admin/audit-logs`를 전용 source로 사용하므로, `page.tsx`에서 공통 로딩 게이트 밖에서 직접 렌더링한다. `AnalyticsTab`의 shared props는 마지막 fallback 안전망으로만 유지한다.
 - `User Management` 탭은 `/api/admin/users-summary`와 presence 구독을 쓰는 `useAdminUsersData.ts` 경량 훅으로 `page.tsx`에서 직접 렌더링한다.

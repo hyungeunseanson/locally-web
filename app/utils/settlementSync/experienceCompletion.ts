@@ -3,6 +3,7 @@ import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatu
 import {
   finishSettlementSyncRunFailure,
   finishSettlementSyncRunSuccess,
+  renewSettlementSyncRunLease,
   startSettlementSyncRun,
 } from './jobRuns';
 import type {
@@ -12,6 +13,22 @@ import type {
   SettlementSyncRunResult,
   SettlementSyncTarget,
 } from './types';
+import {
+  isSettlementSyncInfrastructureError,
+  SettlementSyncInfrastructureError,
+} from './types';
+import {
+  readSettlementSyncNestedRowOrFirst,
+  readSettlementSyncString,
+  readSettlementSyncTrimmedString,
+  toSettlementSyncRawRow,
+  toSettlementSyncRawRows,
+  type SettlementSyncRawRow,
+} from './rowHelpers';
+
+type ExperienceTitleMeta = {
+  title: string | null;
+} | null;
 
 type ExperienceCompletionRow = {
   id: string;
@@ -20,27 +37,36 @@ type ExperienceCompletionRow = {
   date: string | null;
   time: string | null;
   status: string;
-  experiences: { title?: string | null } | Array<{ title?: string | null }> | null;
+  experiences: ExperienceTitleMeta;
 };
 
+type ExperienceUpdatedRow = {
+  id: string;
+  order_id: string | null;
+  user_id: string | null;
+};
+
+type ExperienceCompletionTarget = {
+  booking_id: string;
+  order_id: string | null;
+  user_id: string | null;
+  date: string | null;
+  time: string | null;
+  status: string;
+  experiences: ExperienceTitleMeta;
+};
+
+type ExperienceReviewNotificationCandidate = {
+  user_id: string | null;
+  experiences: ExperienceTitleMeta;
+};
+
+const EXPERIENCE_SYNC_JOB_NAME = 'experience_completion_sync';
+const EXPERIENCE_FORCE_ONE_JOB_NAME = 'experience_completion_sync_force_one';
+const EXPERIENCE_ACTIVE_STATUS_SET = new Set<string>(BOOKING_ACTIVE_STATUS_FOR_CAPACITY);
+
 function normalizeExperienceTitle(value: ExperienceCompletionRow['experiences']) {
-  if (Array.isArray(value)) {
-    return value[0]?.title || '체험';
-  }
-
   return value?.title || '체험';
-}
-
-function getExperienceDueDate(row: Pick<ExperienceCompletionRow, 'date' | 'time'>) {
-  if (!row.date) return null;
-  const dueDate = new Date(`${row.date}T${row.time || '00:00'}`);
-  if (Number.isNaN(dueDate.getTime())) return null;
-  return dueDate;
-}
-
-function isExperienceDue(row: Pick<ExperienceCompletionRow, 'date' | 'time'>) {
-  const dueDate = getExperienceDueDate(row);
-  return Boolean(dueDate && dueDate < new Date());
 }
 
 function delay(ms?: number) {
@@ -48,9 +74,171 @@ function delay(ms?: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function delayWithHeartbeat(ms: number | undefined, renew: () => Promise<void>) {
+  if (!ms || ms <= 0) return;
+  let remaining = ms;
+
+  while (remaining > 0) {
+    const chunk = Math.min(remaining, 100);
+    await delay(chunk);
+    remaining -= chunk;
+    if (remaining > 0) {
+      await renew();
+    }
+  }
+}
+
+function createExperienceLeaseHeartbeat(
+  params:
+    | SettlementSyncRunDueParams
+    | SettlementSyncForceOneParams,
+  started: { runId: number; leaseToken: string }
+): () => Promise<void> {
+  const jobName =
+    params.triggerSource === 'manual_force_one'
+      ? EXPERIENCE_FORCE_ONE_JOB_NAME
+      : EXPERIENCE_SYNC_JOB_NAME;
+
+  return async () => {
+    await renewSettlementSyncRunLease({
+      supabaseAdmin: params.supabaseAdmin,
+      runId: started.runId,
+      jobName,
+      leaseToken: started.leaseToken,
+      testLeaseMs: params.testLeaseMs,
+      simulateMissingAdminJobRuns: params.simulateMissingAdminJobRuns,
+    });
+  };
+}
+
+function normalizeExperienceTitleMeta(row: SettlementSyncRawRow): ExperienceTitleMeta {
+  const experienceRow = readSettlementSyncNestedRowOrFirst(row, 'experiences');
+  if (!experienceRow) {
+    return null;
+  }
+
+  return {
+    title: readSettlementSyncString(experienceRow, 'title'),
+  };
+}
+
+function normalizeExperienceDueCandidateRows(value: unknown): ExperienceCompletionRow[] {
+  return toSettlementSyncRawRows(value).reduce<ExperienceCompletionRow[]>((acc, row) => {
+    const id = readSettlementSyncTrimmedString(row, 'booking_id');
+    const status = readSettlementSyncTrimmedString(row, 'status');
+    if (!id || !status) {
+      return acc;
+    }
+
+    acc.push({
+      id,
+      order_id: readSettlementSyncTrimmedString(row, 'order_id'),
+      user_id: readSettlementSyncTrimmedString(row, 'user_id'),
+      date: readSettlementSyncString(row, 'date'),
+      time: readSettlementSyncString(row, 'time'),
+      status,
+      experiences: {
+        title: readSettlementSyncString(row, 'experience_title'),
+      },
+    });
+    return acc;
+  }, []);
+}
+
+function normalizeExperienceCompletionTargetRow(value: unknown): ExperienceCompletionTarget | null {
+  const row = toSettlementSyncRawRow(value);
+  if (!row) {
+    return null;
+  }
+
+  const bookingId = readSettlementSyncTrimmedString(row, 'id');
+  const status = readSettlementSyncTrimmedString(row, 'status');
+  if (!bookingId || !status) {
+    return null;
+  }
+
+  return {
+    booking_id: bookingId,
+    order_id: readSettlementSyncTrimmedString(row, 'order_id'),
+    user_id: readSettlementSyncTrimmedString(row, 'user_id'),
+    date: readSettlementSyncString(row, 'date'),
+    time: readSettlementSyncString(row, 'time'),
+    status,
+    experiences: normalizeExperienceTitleMeta(row),
+  };
+}
+
+function normalizeUpdatedExperienceRows(value: unknown): ExperienceUpdatedRow[] {
+  return toSettlementSyncRawRows(value).reduce<ExperienceUpdatedRow[]>((acc, row) => {
+    const id = readSettlementSyncTrimmedString(row, 'id');
+    if (!id) {
+      return acc;
+    }
+
+    acc.push({
+      id,
+      order_id: readSettlementSyncTrimmedString(row, 'order_id'),
+      user_id: readSettlementSyncTrimmedString(row, 'user_id'),
+    });
+    return acc;
+  }, []);
+}
+
+function isExperienceActiveStatus(status: string): status is (typeof BOOKING_ACTIVE_STATUS_FOR_CAPACITY)[number] {
+  return EXPERIENCE_ACTIVE_STATUS_SET.has(status);
+}
+
+function maybeThrowInjectedFailure(failPhase: SettlementSyncRunDueParams['failPhase']) {
+  if (process.env.NODE_ENV !== 'production' && failPhase === 'after_lock') {
+    throw new Error('Injected settlement sync failure after lock.');
+  }
+}
+
+function isMissingExperienceDueRpcError(
+  error: { code?: string | null; message?: string | null; details?: string | null; hint?: string | null } | null | undefined,
+  functionName: string
+) {
+  if (!error) return false;
+  const combinedMessage = `${error.message || ''} ${error.details || ''} ${error.hint || ''}`;
+  return (
+    error.code === 'PGRST202' ||
+    (combinedMessage.includes(functionName) &&
+      (combinedMessage.includes('Could not find the function') ||
+        combinedMessage.includes('No function matches') ||
+        combinedMessage.includes('does not exist')))
+  );
+}
+
+async function listDueExperienceCompletionCandidates(
+  supabaseAdmin: SettlementSyncAdminClient,
+  params?: {
+    bookingId?: string;
+    simulateMissingExperienceDueRpc?: boolean;
+  }
+) {
+  if (params?.simulateMissingExperienceDueRpc) {
+    throw new SettlementSyncInfrastructureError();
+  }
+
+  const rpcName = 'list_due_experience_completion_candidates';
+  const { data, error } = await supabaseAdmin.rpc(rpcName, {
+    p_booking_id: params?.bookingId || null,
+  });
+
+  if (error) {
+    if (isMissingExperienceDueRpcError(error, rpcName)) {
+      throw new SettlementSyncInfrastructureError();
+    }
+
+    throw error;
+  }
+
+  return normalizeExperienceDueCandidateRows(data);
+}
+
 async function sendReviewRequestNotifications(
   supabaseAdmin: SettlementSyncAdminClient,
-  rows: Array<ExperienceCompletionRow>
+  rows: ExperienceReviewNotificationCandidate[]
 ) {
   if (rows.length === 0) return;
 
@@ -75,22 +263,10 @@ async function sendReviewRequestNotifications(
   }
 }
 
-async function fetchExperienceCompletionCandidates(
-  supabaseAdmin: SettlementSyncAdminClient
-) {
-  const { data, error } = await supabaseAdmin
-    .from('bookings')
-    .select('id, order_id, user_id, date, time, status, experiences(title)')
-    .in('status', [...BOOKING_ACTIVE_STATUS_FOR_CAPACITY]);
-
-  if (error) throw error;
-  return (data || []) as ExperienceCompletionRow[];
-}
-
 export async function resolveExperienceCompletionTarget(
   supabaseAdmin: SettlementSyncAdminClient,
   identifier: string
-): Promise<(SettlementSyncTarget & Pick<ExperienceCompletionRow, 'date' | 'time' | 'status' | 'user_id' | 'experiences'>) | null> {
+): Promise<ExperienceCompletionTarget | null> {
   const trimmed = identifier.trim();
   if (!trimmed) return null;
 
@@ -104,22 +280,12 @@ export async function resolveExperienceCompletionTarget(
   const idMatch = await query('id');
   if (idMatch.error) throw idMatch.error;
   if (idMatch.data) {
-    return {
-      ...(idMatch.data as ExperienceCompletionRow),
-      booking_id: idMatch.data.id,
-      order_id: idMatch.data.order_id,
-    };
+    return normalizeExperienceCompletionTargetRow(idMatch.data);
   }
 
   const orderMatch = await query('order_id');
   if (orderMatch.error) throw orderMatch.error;
-  if (!orderMatch.data) return null;
-
-  return {
-    ...(orderMatch.data as ExperienceCompletionRow),
-    booking_id: orderMatch.data.id,
-    order_id: orderMatch.data.order_id,
-  };
+  return normalizeExperienceCompletionTargetRow(orderMatch.data);
 }
 
 export async function runExperienceCompletionSync(
@@ -127,10 +293,12 @@ export async function runExperienceCompletionSync(
 ): Promise<SettlementSyncRunResult> {
   const started = await startSettlementSyncRun({
     supabaseAdmin: params.supabaseAdmin,
-    jobName: 'experience_completion_sync',
+    jobName: EXPERIENCE_SYNC_JOB_NAME,
     scope: 'experience',
     triggerSource: params.triggerSource,
     initiatedByAdminId: params.initiatedByAdminId,
+    testLeaseMs: params.testLeaseMs,
+    simulateMissingAdminJobRuns: params.simulateMissingAdminJobRuns,
   });
 
   if (!started.ok) {
@@ -145,18 +313,24 @@ export async function runExperienceCompletionSync(
   }
 
   try {
-    const candidates = await fetchExperienceCompletionCandidates(params.supabaseAdmin);
-    const dueCandidates = candidates.filter((row) => isExperienceDue(row));
+    const renewLease = createExperienceLeaseHeartbeat(params, started);
+    const dueCandidates = await listDueExperienceCompletionCandidates(params.supabaseAdmin, {
+      simulateMissingExperienceDueRpc: params.simulateMissingExperienceDueRpc,
+    });
+    await renewLease();
 
     if (dueCandidates.length === 0) {
       await finishSettlementSyncRunSuccess({
         supabaseAdmin: params.supabaseAdmin,
         runId: started.runId,
-        jobName: 'experience_completion_sync',
+        jobName: EXPERIENCE_SYNC_JOB_NAME,
         startedAt: started.startedAt,
+        leaseToken: started.leaseToken,
         processedCount: 0,
         skippedCount: 0,
         details: { mode: 'run_due', candidate_count: 0 },
+        testLeaseMs: params.testLeaseMs,
+        simulateMissingAdminJobRuns: params.simulateMissingAdminJobRuns,
       });
 
       return {
@@ -169,7 +343,8 @@ export async function runExperienceCompletionSync(
       };
     }
 
-    await delay(params.testDelayMs);
+    await delayWithHeartbeat(params.testDelayMs, renewLease);
+    maybeThrowInjectedFailure(params.failPhase);
 
     const dueMap = new Map(dueCandidates.map((row) => [row.id, row]));
     const { data: updatedRowsRaw, error: updateError } = await params.supabaseAdmin
@@ -180,25 +355,30 @@ export async function runExperienceCompletionSync(
       .select('id, order_id, user_id');
 
     if (updateError) throw updateError;
+    await renewLease();
 
-    const updatedIds = ((updatedRowsRaw || []) as Array<Pick<ExperienceCompletionRow, 'id' | 'order_id' | 'user_id'>>).map((row) => row.id);
+    const updatedIds = normalizeUpdatedExperienceRows(updatedRowsRaw).map((row) => row.id);
     const updatedRows = updatedIds
       .map((id) => dueMap.get(id))
-      .filter(Boolean) as ExperienceCompletionRow[];
+      .filter((row): row is ExperienceCompletionRow => row !== undefined);
 
     await sendReviewRequestNotifications(params.supabaseAdmin, updatedRows);
+    await renewLease();
 
     await finishSettlementSyncRunSuccess({
       supabaseAdmin: params.supabaseAdmin,
       runId: started.runId,
-      jobName: 'experience_completion_sync',
+      jobName: EXPERIENCE_SYNC_JOB_NAME,
       startedAt: started.startedAt,
+      leaseToken: started.leaseToken,
       processedCount: updatedRows.length,
       skippedCount: Math.max(0, dueCandidates.length - updatedRows.length),
       details: {
         mode: 'run_due',
         booking_ids: updatedIds,
       },
+      testLeaseMs: params.testLeaseMs,
+      simulateMissingAdminJobRuns: params.simulateMissingAdminJobRuns,
     });
 
     return {
@@ -214,12 +394,19 @@ export async function runExperienceCompletionSync(
     await finishSettlementSyncRunFailure({
       supabaseAdmin: params.supabaseAdmin,
       runId: started.runId,
-      jobName: 'experience_completion_sync_force_one',
+      jobName: EXPERIENCE_SYNC_JOB_NAME,
       startedAt: started.startedAt,
+      leaseToken: started.leaseToken,
       processedCount: 0,
       skippedCount: 0,
       errorMessage: message,
+      testLeaseMs: params.testLeaseMs,
+      simulateMissingAdminJobRuns: params.simulateMissingAdminJobRuns,
     });
+
+    if (isSettlementSyncInfrastructureError(error)) {
+      throw error;
+    }
 
     return {
       success: false,
@@ -240,11 +427,13 @@ export async function forceExperienceCompletionSync(
 
   const started = await startSettlementSyncRun({
     supabaseAdmin: params.supabaseAdmin,
-    jobName: 'experience_completion_sync_force_one',
+    jobName: EXPERIENCE_FORCE_ONE_JOB_NAME,
     scope: 'experience',
     triggerSource: params.triggerSource,
     initiatedByAdminId: params.initiatedByAdminId,
     targetIdentifier: params.identifier,
+    testLeaseMs: params.testLeaseMs,
+    simulateMissingAdminJobRuns: params.simulateMissingAdminJobRuns,
   });
 
   if (!started.ok) {
@@ -263,6 +452,7 @@ export async function forceExperienceCompletionSync(
   }
 
   try {
+    const renewLease = createExperienceLeaseHeartbeat(params, started);
     const targetSummary: SettlementSyncTarget = {
       booking_id: target.booking_id,
       order_id: target.order_id,
@@ -272,11 +462,14 @@ export async function forceExperienceCompletionSync(
       await finishSettlementSyncRunSuccess({
         supabaseAdmin: params.supabaseAdmin,
         runId: started.runId,
-        jobName: 'experience_completion_sync_force_one',
+        jobName: EXPERIENCE_FORCE_ONE_JOB_NAME,
         startedAt: started.startedAt,
+        leaseToken: started.leaseToken,
         processedCount: 0,
         skippedCount: 1,
         details: { mode: 'force_one', target: targetSummary, outcome: 'already_processed' },
+        testLeaseMs: params.testLeaseMs,
+        simulateMissingAdminJobRuns: params.simulateMissingAdminJobRuns,
       });
 
       return {
@@ -289,15 +482,18 @@ export async function forceExperienceCompletionSync(
       };
     }
 
-    if (!BOOKING_ACTIVE_STATUS_FOR_CAPACITY.includes(target.status as (typeof BOOKING_ACTIVE_STATUS_FOR_CAPACITY)[number])) {
+    if (!isExperienceActiveStatus(target.status)) {
       await finishSettlementSyncRunFailure({
         supabaseAdmin: params.supabaseAdmin,
         runId: started.runId,
-        jobName: 'experience_completion_sync_force_one',
+        jobName: EXPERIENCE_FORCE_ONE_JOB_NAME,
         startedAt: started.startedAt,
+        leaseToken: started.leaseToken,
         processedCount: 0,
         skippedCount: 1,
         errorMessage: '현재 상태에서는 체험 완료 동기화를 실행할 수 없습니다.',
+        testLeaseMs: params.testLeaseMs,
+        simulateMissingAdminJobRuns: params.simulateMissingAdminJobRuns,
       });
 
       return {
@@ -309,15 +505,25 @@ export async function forceExperienceCompletionSync(
       };
     }
 
-    if (!isExperienceDue(target)) {
+    await renewLease();
+
+    const dueRows = await listDueExperienceCompletionCandidates(params.supabaseAdmin, {
+      bookingId: target.booking_id,
+      simulateMissingExperienceDueRpc: params.simulateMissingExperienceDueRpc,
+    });
+
+    if (dueRows.length === 0) {
       await finishSettlementSyncRunSuccess({
         supabaseAdmin: params.supabaseAdmin,
         runId: started.runId,
-        jobName: 'experience_completion_sync_force_one',
+        jobName: EXPERIENCE_FORCE_ONE_JOB_NAME,
         startedAt: started.startedAt,
+        leaseToken: started.leaseToken,
         processedCount: 0,
         skippedCount: 1,
         details: { mode: 'force_one', target: targetSummary, outcome: 'not_due' },
+        testLeaseMs: params.testLeaseMs,
+        simulateMissingAdminJobRuns: params.simulateMissingAdminJobRuns,
       });
 
       return {
@@ -330,7 +536,8 @@ export async function forceExperienceCompletionSync(
       };
     }
 
-    await delay(params.testDelayMs);
+    await delayWithHeartbeat(params.testDelayMs, renewLease);
+    maybeThrowInjectedFailure(params.failPhase);
 
     const { data: updatedRowsRaw, error: updateError } = await params.supabaseAdmin
       .from('bookings')
@@ -340,17 +547,26 @@ export async function forceExperienceCompletionSync(
       .select('id, order_id, user_id');
 
     if (updateError) throw updateError;
+    await renewLease();
 
     if ((updatedRowsRaw || []).length === 1) {
-      await sendReviewRequestNotifications(params.supabaseAdmin, [target]);
+      await sendReviewRequestNotifications(params.supabaseAdmin, [
+        {
+          user_id: target.user_id,
+          experiences: target.experiences,
+        },
+      ]);
       await finishSettlementSyncRunSuccess({
         supabaseAdmin: params.supabaseAdmin,
         runId: started.runId,
-        jobName: 'experience_completion_sync_force_one',
+        jobName: EXPERIENCE_FORCE_ONE_JOB_NAME,
         startedAt: started.startedAt,
+        leaseToken: started.leaseToken,
         processedCount: 1,
         skippedCount: 0,
         details: { mode: 'force_one', target: targetSummary, outcome: 'completed' },
+        testLeaseMs: params.testLeaseMs,
+        simulateMissingAdminJobRuns: params.simulateMissingAdminJobRuns,
       });
 
       return {
@@ -370,11 +586,14 @@ export async function forceExperienceCompletionSync(
     await finishSettlementSyncRunSuccess({
       supabaseAdmin: params.supabaseAdmin,
       runId: started.runId,
-      jobName: 'experience_completion_sync_force_one',
+      jobName: EXPERIENCE_FORCE_ONE_JOB_NAME,
       startedAt: started.startedAt,
+      leaseToken: started.leaseToken,
       processedCount: 0,
       skippedCount: 1,
       details: { mode: 'force_one', target: targetSummary, outcome },
+      testLeaseMs: params.testLeaseMs,
+      simulateMissingAdminJobRuns: params.simulateMissingAdminJobRuns,
     });
 
     return {
@@ -390,12 +609,19 @@ export async function forceExperienceCompletionSync(
     await finishSettlementSyncRunFailure({
       supabaseAdmin: params.supabaseAdmin,
       runId: started.runId,
-      jobName: 'experience_completion_sync',
+      jobName: EXPERIENCE_FORCE_ONE_JOB_NAME,
       startedAt: started.startedAt,
+      leaseToken: started.leaseToken,
       processedCount: 0,
       skippedCount: 0,
       errorMessage: message,
+      testLeaseMs: params.testLeaseMs,
+      simulateMissingAdminJobRuns: params.simulateMissingAdminJobRuns,
     });
+
+    if (isSettlementSyncInfrastructureError(error)) {
+      throw error;
+    }
 
     return {
       success: false,

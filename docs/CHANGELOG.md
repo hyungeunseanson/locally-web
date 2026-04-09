@@ -14,6 +14,16 @@
 | 🟢 cron/manual 동시성 방어 및 서비스 atomic completion RPC 추가 | `app/api/cron/complete-trips/route.ts`, `app/api/cron/complete-services/route.ts`, `docs/migrations/v3_40_13_admin_job_runs.sql`, `docs/migrations/v3_40_14_complete_service_booking_if_due_atomic.sql` — batch는 `admin_job_runs` running lock, 단건은 row-level compare-and-set / RPC atomic completion으로 중복 완료와 중복 후속 처리 방지. migration 미적용 환경은 `admin_audit_logs` + in-memory fallback lock으로 fail-open 운영 |
 | 🟡 정산 완료 동기화 회귀/경쟁 테스트 추가 | `tests/e2e/81-cron-secret-guards.spec.ts`, `tests/e2e/131-service-completion-cron.spec.ts`, `tests/e2e/132-service-payout-eligibility-after-completion.spec.ts`, `tests/e2e/155-admin-settlement-sync-status.spec.ts`, `tests/e2e/156-admin-settlement-sync-manual-trigger.spec.ts`, `tests/e2e/157-settlement-sync-race-guard.spec.ts` — cron secret guard 유지, service completion/payout eligibility 회귀, admin health panel, force-one safe fallback, cron/manual race 및 overlapping batch lock을 검증 |
 
+## v3.40.14 — [Admin Sales] Settlement sync lease / DB-KST / fail-closed hotfix
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟢 experience job name 기록 버그 수정 | `app/utils/settlementSync/experienceCompletion.ts` — 체험 완료 실패 이력이 `run_due`는 `experience_completion_sync`, `force_one`은 `experience_completion_sync_force_one`으로 정확히 남도록 worker-local 상수로 고정 |
+| 🟢 stale-by-started_at 폐기, lease + heartbeat 도입 | `app/utils/settlementSync/jobRuns.ts`, `docs/migrations/v3_40_15_admin_job_runs_lease.sql` — `admin_job_runs`에 `lease_token`, `lease_expires_at`, `last_heartbeat_at`를 추가하고, batch lock은 이제 lease ownership + heartbeat 기준으로만 유지. finish/heartbeat는 같은 token을 가진 실행만 성공하도록 제한 |
+| 🟢 체험 완료 due 계산을 DB KST RPC로 이관 | `app/utils/settlementSync/experienceCompletion.ts`, `app/utils/settlementSync/health.ts`, `docs/migrations/v3_40_16_experience_completion_due_kst.sql` — 앱 서버 로컬 `Date` 비교를 제거하고 `list_due_experience_completion_candidates`, `get_experience_completion_due_backlog` RPC를 통해 PostgreSQL `AT TIME ZONE 'Asia/Seoul'` 기준으로 완료 후보/지연 backlog를 계산 |
+| 🟢 fail-open fallback 제거, infra missing 시 503 fail-closed 전환 | `app/utils/settlementSync/jobRuns.ts`, `app/utils/settlementSync/serviceCompletion.ts`, `app/api/admin/settlement-sync/route.ts`, `app/api/cron/complete-trips/route.ts`, `app/api/cron/complete-services/route.ts`, `app/admin/dashboard/components/SettlementSyncPanel.tsx` — `admin_job_runs`/RPC가 없으면 더 이상 `admin_audit_logs`/in-memory/app-layer fallback으로 우회하지 않고 `503`을 반환한다. 운영 패널은 infra banner를 띄우고 manual trigger를 비활성화한다 |
+| 🟡 lease/fail-closed/timezone 회귀 추가 | `tests/e2e/155-admin-settlement-sync-status.spec.ts`, `tests/e2e/157-settlement-sync-race-guard.spec.ts`, `tests/e2e/158-settlement-sync-fail-closed.spec.ts`, `tests/e2e/159-experience-completion-kst-boundary.spec.ts`, `tests/e2e/160-settlement-sync-job-name-recording.spec.ts` — `lease_expires_at` 기반 stale 판정, overlapping batch lease guard, infra missing 503, KST due 경계, experience failure job_name 기록을 함께 고정 |
+
 ## v3.40.12 — [Host Dashboard] Unified pending payout summary replaces earnings tabs
 
 | 항목 | 내용 |

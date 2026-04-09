@@ -21,6 +21,39 @@ type ActionResult = {
   message: string;
 };
 
+const INFRA_DISABLED_JOB_CARDS: SettlementSyncJobHealth[] = [
+  {
+    job_name: 'experience_completion_sync',
+    health_state: 'failed',
+    is_running: false,
+    running_since: null,
+    stale_running: false,
+    last_heartbeat_at: null,
+    last_success_at: null,
+    last_failure_at: null,
+    last_failure_message: null,
+    last_processed_count: null,
+    due_candidate_count: 0,
+    oldest_due_at: null,
+    lag_minutes: null,
+  },
+  {
+    job_name: 'service_completion_sync',
+    health_state: 'failed',
+    is_running: false,
+    running_since: null,
+    stale_running: false,
+    last_heartbeat_at: null,
+    last_success_at: null,
+    last_failure_at: null,
+    last_failure_message: null,
+    last_processed_count: null,
+    due_candidate_count: 0,
+    oldest_due_at: null,
+    lag_minutes: null,
+  },
+];
+
 function formatDateTime(value: string | null) {
   if (!value) return '-';
   const date = new Date(value);
@@ -71,6 +104,7 @@ export default function SettlementSyncPanel({ onSyncApplied }: SettlementSyncPan
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<ActionResult | null>(null);
+  const [infraError, setInfraError] = useState<string | null>(null);
   const [forceDomain, setForceDomain] = useState<SettlementSyncTriggerDomain>('auto');
   const [identifier, setIdentifier] = useState('');
 
@@ -85,11 +119,24 @@ export default function SettlementSyncPanel({ onSyncApplied }: SettlementSyncPan
       const payload = (await response.json()) as SettlementSyncStatusResponse & { error?: string };
 
       if (!response.ok || !payload.success) {
+        if (response.status === 503) {
+          const message =
+            payload.error ||
+            '정산 동기화 인프라를 사용할 수 없습니다. 마이그레이션 또는 RPC 상태를 확인하세요.';
+          if (!signal?.aborted) {
+            setStatus(null);
+            setInfraError(message);
+            setResult({ tone: 'error', message });
+          }
+          return;
+        }
+
         throw new Error(payload.error || '동기화 상태를 불러오지 못했습니다.');
       }
 
       if (!signal?.aborted) {
         setStatus(payload);
+        setInfraError(null);
       }
     } catch (error) {
       if (signal?.aborted) return;
@@ -109,9 +156,10 @@ export default function SettlementSyncPanel({ onSyncApplied }: SettlementSyncPan
   }, [loadStatus]);
 
   const jobs = useMemo(() => {
-    if (!status?.jobs) return [];
-    return status.jobs;
-  }, [status]);
+    if (status?.jobs?.length) return status.jobs;
+    if (infraError) return INFRA_DISABLED_JOB_CARDS;
+    return [] as SettlementSyncJobHealth[];
+  }, [infraError, status]);
 
   const executeTrigger = useCallback(
     async (body: Record<string, unknown>) => {
@@ -130,6 +178,9 @@ export default function SettlementSyncPanel({ onSyncApplied }: SettlementSyncPan
 
         if (!response.ok || !payload.success) {
           const message = payload.error || '정산 완료 동기화 실행에 실패했습니다.';
+          if (response.status === 503) {
+            setInfraError(message);
+          }
           setResult({ tone: 'error', message });
           showToast(message, 'error');
           return;
@@ -141,7 +192,7 @@ export default function SettlementSyncPanel({ onSyncApplied }: SettlementSyncPan
         } satisfies ActionResult;
 
         setResult(actionResult);
-        showToast(payload.message, actionResult.tone === 'success' ? 'success' : 'info');
+        showToast(payload.message, actionResult.tone === 'error' ? 'error' : 'success');
         await Promise.all([loadStatus(), Promise.resolve(onSyncApplied?.())]);
       } catch (error) {
         const message = error instanceof Error ? error.message : '정산 완료 동기화 실행에 실패했습니다.';
@@ -217,6 +268,15 @@ export default function SettlementSyncPanel({ onSyncApplied }: SettlementSyncPan
         </div>
       ) : null}
 
+      {infraError ? (
+        <div
+          data-testid="settlement-sync-infra-banner"
+          className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+        >
+          {infraError}
+        </div>
+      ) : null}
+
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         {(isLoading && !status ? [0, 1] : jobs).map((job, index) => {
           if (typeof job === 'number') {
@@ -270,6 +330,10 @@ export default function SettlementSyncPanel({ onSyncApplied }: SettlementSyncPan
                   <dd>{formatDateTime(job.last_failure_at)}</dd>
                 </div>
                 <div className="flex items-center justify-between gap-3">
+                  <dt>마지막 heartbeat</dt>
+                  <dd>{formatDateTime(job.last_heartbeat_at)}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-3">
                   <dt>지연 건수</dt>
                   <dd data-testid={`settlement-sync-due-count-${domain}`}>{job.due_candidate_count}건</dd>
                 </div>
@@ -288,7 +352,7 @@ export default function SettlementSyncPanel({ onSyncApplied }: SettlementSyncPan
                 type="button"
                 data-testid={`settlement-sync-run-due-${domain}`}
                 onClick={() => handleRunDue(domain)}
-                disabled={isSubmitting}
+                disabled={isSubmitting || Boolean(infraError)}
                 className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full border border-slate-900 px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Play className="h-4 w-4" />
@@ -319,6 +383,7 @@ export default function SettlementSyncPanel({ onSyncApplied }: SettlementSyncPan
             data-testid="settlement-sync-force-domain"
             value={forceDomain}
             onChange={(event) => setForceDomain(event.target.value as SettlementSyncTriggerDomain)}
+            disabled={Boolean(infraError)}
             className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
           >
             <option value="auto">자동 감지 (권장)</option>
@@ -330,6 +395,7 @@ export default function SettlementSyncPanel({ onSyncApplied }: SettlementSyncPan
             data-testid="settlement-sync-force-identifier"
             value={identifier}
             onChange={(event) => setIdentifier(event.target.value)}
+            disabled={Boolean(infraError)}
             placeholder="booking_id 또는 order_id"
             className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400"
           />
@@ -337,7 +403,7 @@ export default function SettlementSyncPanel({ onSyncApplied }: SettlementSyncPan
           <button
             type="submit"
             data-testid="settlement-sync-force-submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || Boolean(infraError)}
             className="rounded-full bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
             즉시 동기화

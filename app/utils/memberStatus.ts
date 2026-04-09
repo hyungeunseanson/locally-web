@@ -1,3 +1,5 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
+
 import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
 import {
   SERVICE_BOOKING_ACTIVE_STATUSES,
@@ -15,26 +17,10 @@ export type LocallyMembershipSummary = {
   remainingToCircle: number;
 };
 
-type SupabaseLike = {
-  from: (table: string) => {
-    select: (...args: unknown[]) => {
-      eq: (...args: unknown[]) => {
-        in: (...args: unknown[]) => PromiseLike<{
-          count: number | null;
-          error: { message?: string } | null;
-        }> & {
-          order: (...args: unknown[]) => {
-            limit: (...args: unknown[]) => {
-              maybeSingle: () => Promise<{
-                data: { created_at?: string | null } | null;
-                error: { message?: string } | null;
-              }>;
-            };
-          };
-        };
-      };
-    };
-  };
+type MembershipSupabaseClient = SupabaseClient;
+
+type FirstPurchaseRow = {
+  created_at: string | null;
 };
 
 const SUCCESSFUL_SERVICE_BOOKING_STATUSES = [
@@ -64,6 +50,7 @@ export function createLocallyMembershipSummary(params: {
   const experiencePurchaseCount = Math.max(0, params.experiencePurchaseCount || 0);
   const servicePurchaseCount = Math.max(0, params.servicePurchaseCount || 0);
   const purchaseCount = experiencePurchaseCount + servicePurchaseCount;
+
   return {
     status: getLocallyMembershipStatus(purchaseCount),
     purchaseCount,
@@ -80,52 +67,99 @@ function getEarlierDate(left: string | null, right: string | null) {
   return new Date(left).getTime() <= new Date(right).getTime() ? left : right;
 }
 
+async function fetchExperiencePurchaseCount(
+  supabase: MembershipSupabaseClient,
+  userId: string
+) {
+  const { count, error } = await supabase
+    .from('bookings')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .in('status', [...BOOKING_CONFIRMED_STATUSES]);
+
+  if (error) {
+    throw new Error(error.message || 'Failed to count confirmed bookings.');
+  }
+
+  return count ?? 0;
+}
+
+async function fetchServicePurchaseCount(
+  supabase: MembershipSupabaseClient,
+  userId: string
+) {
+  const { count, error } = await supabase
+    .from('service_bookings')
+    .select('id', { count: 'exact', head: true })
+    .eq('customer_id', userId)
+    .in('status', [...SUCCESSFUL_SERVICE_BOOKING_STATUSES]);
+
+  if (error) {
+    throw new Error(error.message || 'Failed to count service bookings.');
+  }
+
+  return count ?? 0;
+}
+
+async function fetchFirstExperiencePurchaseAt(
+  supabase: MembershipSupabaseClient,
+  userId: string
+) {
+  const { data, error } = await supabase
+    .from('bookings')
+    .select('created_at')
+    .eq('user_id', userId)
+    .in('status', [...BOOKING_CONFIRMED_STATUSES])
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle<FirstPurchaseRow>();
+
+  if (error) {
+    throw new Error(error.message || 'Failed to resolve first booking date.');
+  }
+
+  return data?.created_at || null;
+}
+
+async function fetchFirstServicePurchaseAt(
+  supabase: MembershipSupabaseClient,
+  userId: string
+) {
+  const { data, error } = await supabase
+    .from('service_bookings')
+    .select('created_at')
+    .eq('customer_id', userId)
+    .in('status', [...SUCCESSFUL_SERVICE_BOOKING_STATUSES])
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle<FirstPurchaseRow>();
+
+  if (error) {
+    throw new Error(error.message || 'Failed to resolve first service booking date.');
+  }
+
+  return data?.created_at || null;
+}
+
 export async function fetchLocallyMembershipSummary(
-  supabase: SupabaseLike,
+  supabase: MembershipSupabaseClient,
   userId: string
 ): Promise<LocallyMembershipSummary> {
   const [
-    { count: experiencePurchaseCount, error: bookingCountError },
-    { count: servicePurchaseCount, error: serviceCountError },
-    { data: firstBooking, error: firstBookingError },
-    { data: firstServiceBooking, error: firstServiceBookingError },
+    experiencePurchaseCount,
+    servicePurchaseCount,
+    firstBookingAt,
+    firstServiceBookingAt,
   ] = await Promise.all([
-    supabase
-      .from('bookings')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .in('status', [...BOOKING_CONFIRMED_STATUSES]),
-    supabase
-      .from('service_bookings')
-      .select('id', { count: 'exact', head: true })
-      .eq('customer_id', userId)
-      .in('status', [...SUCCESSFUL_SERVICE_BOOKING_STATUSES]),
-    supabase
-      .from('bookings')
-      .select('created_at')
-      .eq('user_id', userId)
-      .in('status', [...BOOKING_CONFIRMED_STATUSES])
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .maybeSingle(),
-    supabase
-      .from('service_bookings')
-      .select('created_at')
-      .eq('customer_id', userId)
-      .in('status', [...SUCCESSFUL_SERVICE_BOOKING_STATUSES])
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .maybeSingle(),
+    fetchExperiencePurchaseCount(supabase, userId),
+    fetchServicePurchaseCount(supabase, userId),
+    fetchFirstExperiencePurchaseAt(supabase, userId),
+    fetchFirstServicePurchaseAt(supabase, userId),
   ]);
 
-  if (bookingCountError) throw new Error(bookingCountError.message || 'Failed to count confirmed bookings.');
-  if (serviceCountError) throw new Error(serviceCountError.message || 'Failed to count service bookings.');
-  if (firstBookingError) throw new Error(firstBookingError.message || 'Failed to resolve first booking date.');
-  if (firstServiceBookingError) throw new Error(firstServiceBookingError.message || 'Failed to resolve first service booking date.');
-
   return createLocallyMembershipSummary({
-    experiencePurchaseCount: experiencePurchaseCount || 0,
-    servicePurchaseCount: servicePurchaseCount || 0,
-    firstPurchaseAt: getEarlierDate(firstBooking?.created_at || null, firstServiceBooking?.created_at || null),
+    experiencePurchaseCount,
+    servicePurchaseCount,
+    firstPurchaseAt: getEarlierDate(firstBookingAt, firstServiceBookingAt),
   });
 }

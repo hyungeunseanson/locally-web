@@ -391,8 +391,8 @@ export function getLocalizedRefundPolicyLabel(locale: string) {
   return FIXED_REFUND_POLICY_LABELS[targetLocale] || FIXED_REFUND_POLICY_LABELS.ko;
 }
 
-export function getLocalizedExperienceText(
-  row: Record<string, unknown> | null | undefined,
+export function getLocalizedExperienceText<T extends object>(
+  row: T | null | undefined,
   field: ExperienceTextField,
   locale: string
 ) {
@@ -400,18 +400,19 @@ export function getLocalizedExperienceText(
     return '';
   }
 
+  const source = row as Record<string, unknown>;
   const targetLocale = isExperienceLocale(locale) ? locale : 'ko';
-  const localized = readLocalizedJsonValue(row, field, targetLocale);
+  const localized = readLocalizedJsonValue(source, field, targetLocale);
 
   if (typeof localized === 'string' && localized.trim()) {
     return localized.trim();
   }
 
-  return asTrimmedString(row[field]);
+  return asTrimmedString(source[field]);
 }
 
-export function getLocalizedExperienceList(
-  row: Record<string, unknown> | null | undefined,
+export function getLocalizedExperienceList<T extends object>(
+  row: T | null | undefined,
   field: ExperienceListField,
   locale: string
 ) {
@@ -419,48 +420,51 @@ export function getLocalizedExperienceList(
     return [] as string[];
   }
 
+  const source = row as Record<string, unknown>;
   const targetLocale = isExperienceLocale(locale) ? locale : 'ko';
-  const localized = readLocalizedJsonValue(row, field, targetLocale);
+  const localized = readLocalizedJsonValue(source, field, targetLocale);
   const localizedList = normalizeStringArray(localized);
 
   if (localizedList.length > 0) {
     return localizedList;
   }
 
-  return normalizeStringArray(row[field]);
+  return normalizeStringArray(source[field]);
 }
 
-export function getLocalizedExperienceItinerary(
-  row: Record<string, unknown> | null | undefined,
+export function getLocalizedExperienceItinerary<T extends object>(
+  row: T | null | undefined,
   locale: string
 ) {
   if (!row) {
     return [] as ExperienceItineraryTranslationItem[];
   }
 
+  const source = row as Record<string, unknown>;
   const targetLocale = isExperienceLocale(locale) ? locale : 'ko';
-  const localized = normalizeItineraryArray(readLocalizedJsonValue(row, 'itinerary', targetLocale));
+  const localized = normalizeItineraryArray(readLocalizedJsonValue(source, 'itinerary', targetLocale));
 
   if (localized.length > 0) {
     return localized;
   }
 
-  return normalizeItineraryArray(row.itinerary);
+  return normalizeItineraryArray(source.itinerary);
 }
 
-export function getLocalizedExperienceRules(
-  row: Record<string, unknown> | null | undefined,
+export function getLocalizedExperienceRules<T extends object>(
+  row: T | null | undefined,
   locale: string
 ) {
   if (!row) {
     return normalizeRules(null);
   }
 
+  const source = row as Record<string, unknown>;
   const targetLocale = isExperienceLocale(locale) ? locale : 'ko';
-  const localized = normalizeRules(readLocalizedJsonValue(row, 'rules', targetLocale));
+  const localized = normalizeRules(readLocalizedJsonValue(source, 'rules', targetLocale));
 
   if (localized.age_limit || localized.activity_level || localized.refund_policy || localized.host_notice) {
-    const fallback = normalizeRules(row.rules);
+    const fallback = normalizeRules(source.rules);
     return {
       ...fallback,
       ...Object.fromEntries(
@@ -469,7 +473,7 @@ export function getLocalizedExperienceRules(
     };
   }
 
-  return normalizeRules(row.rules);
+  return normalizeRules(source.rules);
 }
 
 export function buildSourceTranslationContent(params: {

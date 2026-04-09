@@ -17,8 +17,6 @@ const createdServiceRequestIds: string[] = [];
 const createdServiceApplicationIds: string[] = [];
 const createdServiceBookingIds: string[] = [];
 const createdJobRunIds: number[] = [];
-const createdAuditLogIds: number[] = [];
-let usesAdminJobRunsTable = false;
 
 async function createApprovedHostApplication(userId: string, user: E2ETestUser) {
   const supabase = getTestAdminClient();
@@ -222,12 +220,14 @@ async function seedServiceBooking(params: {
 async function insertJobRunFixture(params: {
   jobName: 'experience_completion_sync' | 'service_completion_sync';
   scope: 'experience' | 'service';
-  status: 'running' | 'success' | 'failed';
+  status: 'running' | 'success' | 'failed' | 'abandoned';
   startedAt: string;
   finishedAt?: string;
   processedCount?: number;
   skippedCount?: number;
   errorMessage?: string;
+  leaseExpiresAt?: string;
+  lastHeartbeatAt?: string;
 }) {
   const supabase = getTestAdminClient();
   const tableInsert = await supabase
@@ -248,79 +248,19 @@ async function insertJobRunFixture(params: {
       skipped_count: params.skippedCount || 0,
       error_message: params.errorMessage || null,
       details: {},
-    })
-    .select('id')
-    .maybeSingle();
-
-  if (!tableInsert.error && tableInsert.data?.id) {
-    usesAdminJobRunsTable = true;
-    createdJobRunIds.push(Number(tableInsert.data.id));
-    return;
-  }
-
-  const combined = `${tableInsert.error?.code || ''} ${tableInsert.error?.message || ''} ${tableInsert.error?.details || ''}`;
-  const missingTable =
-    tableInsert.error?.code === 'PGRST205' ||
-    (combined.includes('admin_job_runs') &&
-      (combined.includes('does not exist') || combined.includes('Could not find')));
-
-  if (!missingTable) {
-    throw tableInsert.error;
-  }
-
-  const startEvent = await supabase
-    .from('admin_audit_logs')
-    .insert({
-      action_type: 'SETTLEMENT_SYNC_START',
-      target_type: 'settlement_sync',
-      target_id: params.jobName,
-      created_at: params.startedAt,
-      details: {
-        job_name: params.jobName,
-        scope: params.scope,
-        trigger_source: 'cron',
-        started_at: params.startedAt,
-        status: 'running',
-      },
+      lease_token: crypto.randomUUID(),
+      lease_expires_at:
+        params.leaseExpiresAt || params.finishedAt || new Date(Date.now() + 60_000).toISOString(),
+      last_heartbeat_at: params.lastHeartbeatAt || params.startedAt,
     })
     .select('id')
     .single();
 
-  if (startEvent.error || !startEvent.data?.id) {
-    throw startEvent.error || new Error('Failed to create settlement sync audit start event.');
-  }
-  createdAuditLogIds.push(Number(startEvent.data.id));
-
-  if (params.status === 'running') {
-    return;
+  if (tableInsert.error || !tableInsert.data?.id) {
+    throw tableInsert.error || new Error('Failed to create settlement sync job run fixture.');
   }
 
-  const actionType = params.status === 'success' ? 'SETTLEMENT_SYNC_SUCCESS' : 'SETTLEMENT_SYNC_FAILED';
-  const finishEvent = await supabase
-    .from('admin_audit_logs')
-    .insert({
-      action_type: actionType,
-      target_type: 'settlement_sync',
-      target_id: String(startEvent.data.id),
-      created_at: params.finishedAt || params.startedAt,
-      details: {
-        job_name: params.jobName,
-        run_id: Number(startEvent.data.id),
-        status: params.status,
-        started_at: params.startedAt,
-        finished_at: params.finishedAt || params.startedAt,
-        processed_count: params.processedCount || 0,
-        skipped_count: params.skippedCount || 0,
-        error_message: params.errorMessage || null,
-      },
-    })
-    .select('id')
-    .single();
-
-  if (finishEvent.error || !finishEvent.data?.id) {
-    throw finishEvent.error || new Error('Failed to create settlement sync audit finish event.');
-  }
-  createdAuditLogIds.push(Number(finishEvent.data.id));
+  createdJobRunIds.push(Number(tableInsert.data.id));
 }
 
 async function fetchStatus(page: Page) {
@@ -342,10 +282,6 @@ test.afterAll(async () => {
 
   if (createdJobRunIds.length > 0) {
     await supabase.from('admin_job_runs').delete().in('id', createdJobRunIds);
-  }
-
-  if (createdAuditLogIds.length > 0) {
-    await supabase.from('admin_audit_logs').delete().in('id', createdAuditLogIds);
   }
 
   for (const bookingId of createdServiceBookingIds) {
@@ -435,6 +371,8 @@ test.describe.serial('Admin settlement sync status visibility', () => {
       scope: 'service',
       status: 'running',
       startedAt: new Date(now - 30 * 60 * 1000).toISOString(),
+      leaseExpiresAt: new Date(now - 5 * 60 * 1000).toISOString(),
+      lastHeartbeatAt: new Date(now - 10 * 60 * 1000).toISOString(),
     });
 
     const unauthorized = await request.get('/api/admin/settlement-sync');
@@ -445,14 +383,11 @@ test.describe.serial('Admin settlement sync status visibility', () => {
 
     await expect(page.getByTestId('settlement-sync-panel')).toBeVisible();
     await expect(page.getByTestId('settlement-sync-state-experience')).toContainText('지연');
-    await expect(page.getByTestId('settlement-sync-state-service')).toContainText(
-      usesAdminJobRunsTable ? '실행 중 멈춤' : '지연'
-    );
+    await expect(page.getByTestId('settlement-sync-state-service')).toContainText('실행 중 멈춤');
     await expect(page.getByTestId('settlement-sync-due-count-experience')).not.toContainText('0건');
     await expect(page.getByTestId('settlement-sync-due-count-service')).not.toContainText('0건');
-    if (usesAdminJobRunsTable) {
-      await expect(page.getByTestId('settlement-sync-card-service')).toContainText('서비스 완료 동기화 실패 테스트');
-    }
+    await expect(page.getByTestId('settlement-sync-card-service')).toContainText('서비스 완료 동기화 실패 테스트');
+    await expect(page.getByTestId('settlement-sync-card-service')).toContainText('마지막 heartbeat');
 
     const status = await fetchStatus(page);
     expect(status.status).toBe(200);
@@ -466,18 +401,13 @@ test.describe.serial('Admin settlement sync status visibility', () => {
     );
 
     expect(experienceJob.health_state).toBe('delayed');
-    if (usesAdminJobRunsTable) {
-      expect(experienceJob.last_success_at).toBeTruthy();
-    }
+    expect(experienceJob.last_success_at).toBeTruthy();
     expect(experienceJob.due_candidate_count).toBeGreaterThan(0);
     expect(experienceJob.lag_minutes).toBeGreaterThan(120);
 
-    expect(serviceJob.health_state).toBe(usesAdminJobRunsTable ? 'running_stale' : 'delayed');
-    if (usesAdminJobRunsTable) {
-      expect(serviceJob.last_failure_message).toMatch(/실패 테스트/);
-    }
-    if (usesAdminJobRunsTable) {
-      expect(serviceJob.stale_running).toBeTruthy();
-    }
+    expect(serviceJob.health_state).toBe('running_stale');
+    expect(serviceJob.last_failure_message).toMatch(/실패 테스트/);
+    expect(serviceJob.stale_running).toBeTruthy();
+    expect(serviceJob.last_heartbeat_at).toBeTruthy();
   });
 });

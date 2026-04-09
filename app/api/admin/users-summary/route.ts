@@ -2,6 +2,12 @@ import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
+import {
+  type AdminRawRow,
+  isPresent,
+  readStringField,
+  toAdminRawRows,
+} from '@/app/utils/adminRowHelpers';
 
 const ADMIN_USERS_SUMMARY_SELECT = [
   'id',
@@ -50,6 +56,41 @@ function chunkIds(ids: string[], size: number) {
   return chunks;
 }
 
+function normalizeProfileRow(row: AdminRawRow): ProfileRow | null {
+  const id = readStringField(row, 'id');
+  if (!id) {
+    return null;
+  }
+
+  return {
+    id,
+    name: readStringField(row, 'name'),
+    full_name: readStringField(row, 'full_name'),
+    avatar_url: readStringField(row, 'avatar_url'),
+    email: readStringField(row, 'email'),
+    phone: readStringField(row, 'phone'),
+    birth_date: readStringField(row, 'birth_date'),
+    nationality: readStringField(row, 'nationality'),
+    kakao_id: readStringField(row, 'kakao_id'),
+    mbti: readStringField(row, 'mbti'),
+    last_active_at: readStringField(row, 'last_active_at'),
+    created_at: readStringField(row, 'created_at'),
+    role: null,
+  };
+}
+
+function normalizeUserRoleRow(row: AdminRawRow): UserRoleRow | null {
+  const id = readStringField(row, 'id');
+  if (!id) {
+    return null;
+  }
+
+  return {
+    id,
+    role: readStringField(row, 'role'),
+  };
+}
+
 export async function GET() {
   try {
     const supabaseServer = await createServerClient();
@@ -79,7 +120,7 @@ export async function GET() {
       throw profilesError;
     }
 
-    const profileRows = (profiles || []) as ProfileRow[];
+    const profileRows = toAdminRawRows(profiles).map(normalizeProfileRow).filter(isPresent);
     const profileIds = profileRows.map((profile) => profile.id).filter(Boolean);
 
     const roleMap = new Map<string, string | null>();
@@ -93,7 +134,7 @@ export async function GET() {
             .in('id', batchIds);
 
           if (usersError) throw usersError;
-          return (userRows || []) as UserRoleRow[];
+          return toAdminRawRows(userRows).map(normalizeUserRoleRow).filter(isPresent);
         })
       );
 

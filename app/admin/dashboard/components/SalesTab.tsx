@@ -29,6 +29,7 @@ import type {
   AdminPayoutQueueState,
   AdminSalesBooking,
   AdminServiceBooking,
+  AdminServiceSalesSummary,
 } from '@/app/types/admin';
 import { useConfirmDialog } from '@/app/hooks/useConfirmDialog';
 import { useToast } from '@/app/context/ToastContext';
@@ -42,16 +43,11 @@ import SettlementSyncPanel from './SettlementSyncPanel';
 
 const DateRange = dynamic(() => import('react-date-range').then((mod) => mod.DateRange), { ssr: false });
 
-type ServiceSalesBookingSummary = Pick<
-  AdminServiceBooking,
-  'amount' | 'host_payout_amount' | 'platform_revenue' | 'status' | 'created_at' | 'payout_status'
->;
-
 type SalesSummaryResponse = {
   success: boolean;
   error?: string;
   data?: AdminSalesBooking[];
-  serviceSummaryRows?: ServiceSalesBookingSummary[];
+  serviceSummaryRows?: AdminServiceSalesSummary[];
 };
 
 type PayoutQueueResponse = {
@@ -236,7 +232,7 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
   const [expandedHostId, setExpandedHostId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [salesBookings, setSalesBookings] = useState<AdminSalesBooking[]>([]);
-  const [serviceBookings, setServiceBookings] = useState<ServiceSalesBookingSummary[]>([]);
+  const [serviceBookings, setServiceBookings] = useState<AdminServiceSalesSummary[]>([]);
   const [settlementRows, setSettlementRows] = useState<AdminCombinedPayoutQueueRow[]>([]);
   const [isSalesLoading, setIsSalesLoading] = useState(true);
   const [serviceCSVLoading, setServiceCSVLoading] = useState(false);
@@ -272,9 +268,9 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
         throw new Error(payoutQueueJson.error || '정산 큐 데이터를 불러오지 못했습니다.');
       }
 
-      setSalesBookings((salesJson.data || []) as AdminSalesBooking[]);
-      setServiceBookings((salesJson.serviceSummaryRows || []) as ServiceSalesBookingSummary[]);
-      setSettlementRows((payoutQueueJson.combinedHostTotals || []) as AdminCombinedPayoutQueueRow[]);
+      setSalesBookings(salesJson.data ?? []);
+      setServiceBookings(salesJson.serviceSummaryRows ?? []);
+      setSettlementRows(payoutQueueJson.combinedHostTotals ?? []);
     } catch (error: unknown) {
       console.error('Sales summary fetch error:', error);
       showToast(error instanceof Error ? error.message : '매출 데이터를 불러오지 못했습니다.', 'error');
@@ -607,10 +603,14 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
       const csvRows = rows.map((booking: AdminServiceBooking) => [
         escapeCSV(format(new Date(booking.created_at), 'yyyy-MM-dd HH:mm')),
         escapeCSV(booking.order_id || booking.id),
-        escapeCSV(booking.service_requests?.title || '-'),
-        escapeCSV(booking.service_requests?.city || '-'),
-        escapeCSV(booking.service_requests?.service_date || '-'),
-        escapeCSV(booking.profiles?.full_name || booking.profiles?.email || booking.customer_id?.slice(-6)),
+        escapeCSV(booking.service_request?.title || '-'),
+        escapeCSV(booking.service_request?.city || '-'),
+        escapeCSV(booking.service_request?.service_date || '-'),
+        escapeCSV(
+          booking.customer_profile?.full_name ||
+            booking.customer_profile?.email ||
+            booking.customer_id.slice(-6)
+        ),
         escapeCSV(booking.host_application?.name || '-'),
         escapeCSV(booking.payment_method === 'bank' ? '무통장' : '카드'),
         booking.amount || 0,

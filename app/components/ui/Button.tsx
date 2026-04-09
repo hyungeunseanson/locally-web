@@ -1,9 +1,11 @@
 // app/components/ui/Button.tsx
-import React, { ButtonHTMLAttributes } from 'react';
+import React from 'react';
 import Spinner, { type SpinnerVariant } from './Spinner';
 
+type NativeButtonProps = React.ComponentPropsWithoutRef<'button'>;
+
 // 디자인 변형(Variant)과 크기(Size)를 타입으로 정의
-export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+export interface ButtonProps extends NativeButtonProps {
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'tab';
   size?: 'sm' | 'md' | 'lg' | 'icon';
   isLoading?: boolean;
@@ -54,8 +56,9 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       app: "shadow-md shadow-slate-200/70 hover:-translate-y-[1px] hover:shadow-lg active:shadow-sm active:brightness-95 disabled:hover:translate-y-0 disabled:hover:shadow-none disabled:active:brightness-100",
     };
     const resolvedAriaBusy = ariaBusyProp != null
-      ? String(ariaBusyProp)
-      : (isLoading ? 'true' : 'false');
+      ? ariaBusyProp
+      : Boolean(isLoading);
+    const isDisabled = Boolean(disabled) || Boolean(isLoading);
 
     // 조합
     const combinedClassName = `${baseStyle} ${variants[variant]} ${sizes[size]} ${interactions[interaction]} ${className}`;
@@ -64,7 +67,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         {...props}
-        disabled={disabled || isLoading}
+        disabled={isDisabled}
         aria-busy={resolvedAriaBusy}
         className={combinedClassName}
       >

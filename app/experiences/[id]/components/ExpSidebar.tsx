@@ -24,12 +24,12 @@ export default function ExpSidebar({
   return (
     <div id="reservation-card" className="w-full md:w-[380px] scroll-mt-24 md:-mt-[150px]">
       <ReservationCard
-        price={Number(experience.price)}
-        maxGuests={Number(experience.max_guests || 10)}
+        price={experience.price}
+        maxGuests={experience.max_guests}
         slotSummaryMap={slotSummaryMap}
-        privatePrice={Number(experience.private_price)}
+        privatePrice={experience.private_price ?? 0}
         isPrivateEnabled={experience.is_private_enabled}
-        duration={Number(experience.duration || 2)}
+        duration={experience.duration ?? 2}
         availableDates={availableDates}
         dateToTimeMap={dateToTimeMap}
         calendarDayStatusMap={calendarDayStatusMap}

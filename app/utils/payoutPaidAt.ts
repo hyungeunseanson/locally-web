@@ -1,3 +1,5 @@
+type PayoutPaidAtRow = Record<string, unknown>;
+
 export function isMissingPayoutPaidAtColumnError(error: unknown) {
   const message =
     typeof error === 'object' && error !== null && 'message' in error
@@ -13,8 +15,10 @@ export function isMissingPayoutPaidAtColumnError(error: unknown) {
   );
 }
 
-export function attachNullPayoutPaidAt<T extends Record<string, unknown>>(rows: T[] | null | undefined) {
-  return ((rows || []) as T[]).map((row) => ({
+export function attachNullPayoutPaidAt<T extends PayoutPaidAtRow>(
+  rows: readonly T[] | null | undefined
+): Array<T & { payout_paid_at: null }> {
+  return (rows ?? []).map((row) => ({
     ...row,
     payout_paid_at: null,
   }));
