@@ -27,7 +27,7 @@ async function forceEnglishLocale(page: Page) {
 }
 
 test.describe('Auth success transition', () => {
-  test('shows a short success state before redirecting after login', async ({ page }) => {
+  test('shows a longer success toast and redirects after login without a success card', async ({ page }) => {
     const user = createTestUser('auth.success.login');
     await createAuthUser(user, createdAuthUserIds);
     await forceEnglishLocale(page);
@@ -40,13 +40,11 @@ test.describe('Auth success transition', () => {
     await page.getByRole('button', { name: 'Log in' }).click();
 
     await expect(page.getByText('Welcome back. You are now logged in.')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('auth-success-state')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('auth-success-title')).toHaveText('Login complete');
-    await expect(page.getByTestId('auth-success-body')).toHaveText('Your account is ready. Taking you back now.');
+    await expect(page.getByTestId('auth-success-state')).toHaveCount(0);
     await page.waitForURL('**/guest/trips', { timeout: 15000 });
   });
 
-  test('shows a verification sent state, then returns to login mode with the same email', async ({ page }) => {
+  test('keeps the verification toast visible while immediately returning to login mode', async ({ page }) => {
     const signupEmail = `codex.signup.transition.${Date.now()}@example.com`;
     const signupPassword = 'LocallyTest!2026';
     const signupResponsePattern = '**/auth/v1/signup*';
@@ -90,9 +88,7 @@ test.describe('Auth success transition', () => {
     await page.getByText('Agree to all').click();
     await page.getByRole('button', { name: 'Sign up' }).click();
 
-    await expect(page.getByTestId('auth-success-state')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('auth-success-title')).toHaveText('Verification email sent');
-    await expect(page.getByTestId('auth-success-body')).toHaveText('Finish email verification, then log in and continue right away.');
+    await expect(page.getByTestId('auth-success-state')).toHaveCount(0);
     await expect(page.getByText('Verification email sent! Confirm your email to unlock all features.')).toBeVisible({
       timeout: 15000,
     });

@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { X, ChevronDown, Loader2, CheckCircle2, MailCheck } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { X, ChevronDown, Loader2 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext';
@@ -42,7 +42,8 @@ interface LoginModalProps {
   redirectPath?: string;
 }
 
-type AuthCompletionState = 'idle' | 'success' | 'verification_sent';
+const AUTH_SUCCESS_TOAST_DURATION_MS = 4500;
+const AUTH_VERIFICATION_TOAST_DURATION_MS = 5000;
 
 const normalizeRedirectPath = (value?: string | null) => {
   if (!value) return '/';
@@ -71,8 +72,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
   const [loading, setLoading] = useState(false);
   const [socialLoadingProvider, setSocialLoadingProvider] = useState<'google' | 'kakao' | null>(null);
   const [isFocused, setIsFocused] = useState<string | null>(null);
-  const [completionState, setCompletionState] = useState<AuthCompletionState>('idle');
-  const [completionMode, setCompletionMode] = useState<'LOGIN' | 'SIGNUP' | null>(null);
 
   const router = useRouter();
   const pathname = usePathname();
@@ -93,28 +92,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
     return normalizeRedirectPath(currentPath);
   }, [currentPath, pathname, redirectPath]);
   const shouldShowReturnHint = resolvedRedirectPath !== '/';
-  const completionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const clearCompletionTimer = () => {
-    if (completionTimeoutRef.current) {
-      clearTimeout(completionTimeoutRef.current);
-      completionTimeoutRef.current = null;
-    }
-  };
-
-  useEffect(() => {
-    return () => {
-      clearCompletionTimer();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!isOpen) {
-      clearCompletionTimer();
-      setCompletionState('idle');
-      setCompletionMode(null);
-    }
-  }, [isOpen]);
 
   const finalizeSuccessfulAuth = () => {
     if (onLoginSuccess) {
@@ -125,57 +102,13 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
     router.refresh();
   };
 
-  const showCompletionState = (
-    nextState: AuthCompletionState,
-    nextMode: 'LOGIN' | 'SIGNUP' | null,
-    delayMs: number,
-    onComplete: () => void
-  ) => {
-    clearCompletionTimer();
-    setCompletionMode(nextMode);
-    setCompletionState(nextState);
-    completionTimeoutRef.current = setTimeout(() => {
-      completionTimeoutRef.current = null;
-      onComplete();
-    }, delayMs);
-  };
-
-  const completionContent = useMemo(() => {
-    if (completionState === 'verification_sent') {
-      return {
-        icon: <MailCheck size={28} className="text-emerald-600" aria-hidden="true" />,
-        title: copy.signupVerificationSentTitle,
-        body: copy.signupVerificationSentBody,
-      };
-    }
-
-    if (completionState === 'success' && completionMode === 'SIGNUP') {
-      return {
-        icon: <CheckCircle2 size={28} className="text-emerald-600" aria-hidden="true" />,
-        title: copy.signupSuccessTitle,
-        body: copy.signupSuccessBody,
-      };
-    }
-
-    if (completionState === 'success' && completionMode === 'LOGIN') {
-      return {
-        icon: <CheckCircle2 size={28} className="text-emerald-600" aria-hidden="true" />,
-        title: copy.loginSuccessTitle,
-        body: copy.loginSuccessBody,
-      };
-    }
-
-    return null;
-  }, [completionMode, completionState, copy]);
-
   const handleCloseRequest = () => {
-    if (completionState !== 'idle') return;
     requestClose();
   };
 
   const handleAuth = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (loading || socialLoadingProvider || completionState !== 'idle') return;
+    if (loading || socialLoadingProvider) return;
 
     if (!email || !password) {
       showToast(copy.emailPasswordRequired, 'error');
@@ -223,17 +156,15 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
         if (error) throw error;
 
         if (data.user && data.session) {
-          showToast(copy.signupSuccess, 'success');
-          showCompletionState('success', 'SIGNUP', 900, finalizeSuccessfulAuth);
+          showToast(copy.signupSuccess, 'success', { durationMs: AUTH_SUCCESS_TOAST_DURATION_MS });
+          finalizeSuccessfulAuth();
         } else {
-          showToast(copy.signupVerificationSent, 'success');
-          showCompletionState('verification_sent', 'SIGNUP', 1200, () => {
-            setCompletionState('idle');
-            setCompletionMode(null);
-            setMode('LOGIN');
-            setPassword('');
-            setTermsError(false);
+          showToast(copy.signupVerificationSent, 'success', {
+            durationMs: AUTH_VERIFICATION_TOAST_DURATION_MS,
           });
+          setMode('LOGIN');
+          setPassword('');
+          setTermsError(false);
         }
 
       } else {
@@ -249,8 +180,8 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
           throw error;
         }
 
-        showToast(copy.loginSuccess, 'success');
-        showCompletionState('success', 'LOGIN', 800, finalizeSuccessfulAuth);
+        showToast(copy.loginSuccess, 'success', { durationMs: AUTH_SUCCESS_TOAST_DURATION_MS });
+        finalizeSuccessfulAuth();
       }
     } catch (error) {
       const errorMessage = getErrorMessage(error, copy.unknownError);
@@ -270,7 +201,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
   };
 
   const handleSocialLogin = async (provider: 'google' | 'kakao') => {
-    if (loading || socialLoadingProvider || completionState !== 'idle') return;
+    if (loading || socialLoadingProvider) return;
 
     setSocialLoadingProvider(provider);
 
@@ -344,32 +275,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
         </div>
 
         <div className={`p-4 md:p-6 max-h-[76dvh] md:max-h-[80vh] overflow-y-auto`} style={{ paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))' }}>
-          {completionContent ? (
-            <div
-              data-testid="auth-success-state"
-              className="flex min-h-[360px] md:min-h-[400px] items-center justify-center py-4"
-              aria-live="polite"
-            >
-              <div className="w-full rounded-[24px] border border-emerald-200 bg-emerald-50/80 px-6 py-10 text-center shadow-[0_16px_40px_rgba(16,185,129,0.08)]">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-sm">
-                  {completionContent.icon}
-                </div>
-                <h3
-                  data-testid="auth-success-title"
-                  className="mt-5 text-[22px] font-bold tracking-[-0.02em] text-slate-900"
-                >
-                  {completionContent.title}
-                </h3>
-                <p
-                  data-testid="auth-success-body"
-                  className="mx-auto mt-3 max-w-[280px] text-[13px] leading-6 text-slate-600"
-                >
-                  {completionContent.body}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <>
+          <>
               <div className="mb-5 md:mb-6">
                 <h3 className="text-[18px] md:text-xl font-bold text-gray-900 mb-1">
                   {mode === 'LOGIN' ? t('welcome_title') : copy.signupTitle}
@@ -577,9 +483,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
                   type="button"
                   onClick={() => {
                     if (loading || socialLoadingProvider) return;
-                    clearCompletionTimer();
-                    setCompletionState('idle');
-                    setCompletionMode(null);
                     setMode(mode === 'LOGIN' ? 'SIGNUP' : 'LOGIN');
                     setIsFocused(null);
                   }}
@@ -589,8 +492,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
                   {mode === 'LOGIN' ? `${t('no_account')} ${t('signup')}` : copy.switchToLogin}
                 </button>
               </div>
-            </>
-          )}
+          </>
         </div>
       </div>
     </div>
