@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-04-09 (v3.40.14 settlement sync hotfix)
-**Version:** 3.40.14 (Settlement Sync Lease / Fail-Closed Hotfix)
+**Last Updated:** 2026-04-10 (v3.40.17 admin support unread alerts)
+**Version:** 3.40.17 (Admin Support Unread Alerts)
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -113,6 +113,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - **[관리자 읽기 경계 결정]** `admin_tasks`, `admin_task_comments`, `admin_whitelist`, `admin_audit_logs`는 쓰기(write)가 아니라 읽기(select)만 admin-only client 경로를 허용한다. TEAM/감사 로그의 목록·realtime 읽기는 유지하되, mutation은 서버 경계 또는 service-role 정책으로만 처리한다.
 - **[관리자 알림센터 결정]** 운영 알림센터는 신규 테이블을 만들지 않고 기존 `notifications`를 재사용한다. 관리자 전용 누적 알림은 `type='admin_alert'`로 저장하고, Admin Dashboard `ALERTS` 탭에서 소비한다.
 - **[관리자 메일 provider 결정]** 관리자 대상 운영 메일은 `app/utils/adminEmailProvider.ts`를 단일 source로 사용하고, `RESEND_API_KEY` + `RESEND_FROM_EMAIL`가 있으면 Resend, 없으면 Gmail fallback을 사용한다. guest/host 일반 메일은 기존 `emailNotificationJobs` 경계를 유지한다.
+- **[고객센터 1:1 문의 unread 알림 결정]** `admin_support/admin` 문의에서 고객이 보낸 메시지는 즉시 관리자 메일을 보내지 않는다. 대신 `admin_support_unread_alert_batches` 배치를 만들고, 관리자가 읽지 않은 상태가 10분 유지되면 `admin_alert` + 팀 메일을 1회만 발송한다. 읽음 기준은 `GET /api/admin/inquiries/[id]/messages`가 서버에서 실행하는 `markInquiryMessagesRead()`다.
 - **[알림 API 보안 결정]** `/api/notifications/email`의 단일 수신자 경로는 범용 발송 API로 사용하지 않는다. self 알림이나 서버 검증 가능한 소유권 컨텍스트(`review_reply`, `cancellation_approved` 등)만 허용하고, 그 외는 각 도메인 서버 라우트에서 직접 발송한다.
 - **[알림 mutation 경계 결정]** 일반 `notifications`의 읽음 처리와 삭제는 `/api/notifications/read`, `DELETE /api/notifications/[id]`만 사용한다. 브라우저에서 `notifications`를 direct `update/delete`하지 않는다. 인앱 알림 생성 역시 서버 route/service-role 경계에서만 수행한다.
 

@@ -100,7 +100,7 @@ export async function insertAdminAlerts(params: {
   const inAppRecipients = recipients.filter((recipient): recipient is AdminAlertRecipient & { userId: string } => Boolean(recipient.userId));
 
   if (inAppRecipients.length === 0) {
-    return { success: true, count: 0 };
+    return { success: true, count: 0, targetCount: 0 };
   }
 
   const supabaseAdmin = createAdminClient();
@@ -119,7 +119,7 @@ export async function insertAdminAlerts(params: {
     throw new Error(error.message);
   }
 
-  return { success: true, count: inAppRecipients.length };
+  return { success: true, count: inAppRecipients.length, targetCount: inAppRecipients.length };
 }
 
 export async function sendAdminAlertEmails(params: {
@@ -132,7 +132,7 @@ export async function sendAdminAlertEmails(params: {
   const recipients = await getAdminAlertRecipients();
 
   if (recipients.length === 0) {
-    return { success: true, count: 0 };
+    return { success: true, count: 0, targetCount: 0 };
   }
 
   let sentCount = 0;
@@ -156,5 +156,5 @@ export async function sendAdminAlertEmails(params: {
     }
   }));
 
-  return { success: true, count: sentCount };
+  return { success: true, count: sentCount, targetCount: recipients.length };
 }

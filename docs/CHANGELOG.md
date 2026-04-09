@@ -5,6 +5,17 @@
 
 ---
 
+## v3.40.17 — [Admin Support] unread 10분 1회 관리자 ALERTS + 팀 메일 복구
+
+**작업일:** 2026-04-10
+
+| 항목 | 내용 |
+|------|------|
+| 🟢 고객센터 1:1 unread 배치 테이블 추가 | `docs/migrations/v3_40_17_admin_support_unread_alert_batches.sql` — `admin_support/admin` 고객 unread를 10분 기준 1회 알림용 batch 상태로 관리하는 테이블과 claim RPC를 추가 |
+| 🟢 고객 문의 unread worker / cron 추가 | `app/utils/adminSupportUnreadAlerts.ts`, `app/api/cron/admin-support-unread-alerts/route.ts`, `.github/workflows/admin-support-unread-alerts.yml` — 고객 unread 10분 경과 batch를 `admin_alert` + 팀 메일로 1회 발송하도록 전용 worker와 GitHub 10분 스케줄러를 추가 |
+| 🟡 관리자 메시지 GET 읽음 연계 | `app/api/admin/inquiries/[id]/messages/route.ts`, `app/admin/dashboard/hooks/useAdminChatQuery.ts`, `app/api/inquiries/thread/shared.ts` — 고객센터 1:1 문의를 관리자가 열면 서버가 read 처리와 batch clear를 같이 수행하고, 고객 후속 메시지는 unread batch를 새로 시작하도록 연결 |
+| 🟡 회귀 테스트 추가 | `tests/e2e/81-cron-secret-guards.spec.ts`, `tests/e2e/161-admin-support-unread-alerts.spec.ts` — cron secret guard 유지, 10분 1회 발송, 같은 unread 배치 중복 방지, 관리자 읽음 후 재-arm, 일반 문의 제외를 검증 |
+
 ## v3.40.13 — [Admin Sales] Settlement sync health / manual fallback for completion cron
 
 | 항목 | 내용 |

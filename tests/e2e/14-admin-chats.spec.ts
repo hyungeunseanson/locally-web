@@ -207,7 +207,7 @@ test.describe.serial('Admin chats smoke', () => {
     const inquiryId = await seedAdminSupportInquiry(guestUserId, inquiryMessage);
 
     await login(page, adminUser);
-    await page.goto(`/admin/dashboard?tab=CHATS&inquiryId=${inquiryId}`, { waitUntil: 'networkidle' });
+    await page.goto(`/admin/dashboard?tab=CHATS&inquiryId=${inquiryId}`, { waitUntil: 'domcontentloaded' });
 
     await expect(
       page.locator('div.bg-white.border.border-slate-200.rounded-tl-none').filter({ hasText: inquiryMessage }).last()
@@ -239,7 +239,7 @@ test.describe.serial('Admin chats smoke', () => {
     const inquiryId = await seedAdminSupportInquiry(guestUserId, inquiryMessage);
 
     await login(page, adminUser);
-    await page.goto(`/admin/dashboard?tab=CHATS&inquiryId=${inquiryId}`, { waitUntil: 'networkidle' });
+    await page.goto(`/admin/dashboard?tab=CHATS&inquiryId=${inquiryId}`, { waitUntil: 'domcontentloaded' });
 
     await expect(
       page.locator('div.bg-white.border.border-slate-200.rounded-tl-none').filter({ hasText: inquiryMessage }).last()
@@ -280,7 +280,7 @@ test.describe.serial('Admin chats smoke', () => {
     const inquiryId = await seedAdminSupportInquiry(guestUserId, inquiryMessage);
 
     await login(page, adminUser);
-    await page.goto(`/admin/dashboard?tab=CHATS&inquiryId=${inquiryId}`, { waitUntil: 'networkidle' });
+    await page.goto(`/admin/dashboard?tab=CHATS&inquiryId=${inquiryId}`, { waitUntil: 'domcontentloaded' });
 
     await expect(
       page.locator('div.bg-white.border.border-slate-200.rounded-tl-none').filter({ hasText: inquiryMessage }).last()

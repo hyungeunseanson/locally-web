@@ -3,10 +3,12 @@ import {
   ACTIVE_CHAT_POLICY_SIGNAL_CATEGORIES,
   detectChatPolicySignals,
 } from '@/app/utils/chatPolicySignals';
-import { getInquiryMessageDisplayContent } from '@/app/utils/inquiry';
+import { clearAdminSupportUnreadBatch } from '@/app/utils/adminSupportUnreadAlerts';
+import { getInquiryMessageDisplayContent, isAdminSupportInquiry } from '@/app/utils/inquiry';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
+import { markInquiryMessagesRead } from '@/app/api/inquiries/thread/shared';
 import { getHostPublicProfile } from '@/app/utils/profile';
 
 type ProfileRow = {
@@ -21,6 +23,11 @@ type HostApplicationRow = {
   user_id: string;
   name?: string | null;
   profile_photo?: string | null;
+};
+
+type InquiryTypeRow = {
+  id: number | string;
+  type?: string | null;
 };
 
 export async function GET(
@@ -46,6 +53,29 @@ export async function GET(
     
     if (!isAdmin) {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+    }
+
+    const { data: inquiryRow, error: inquiryError } = await supabaseAdmin
+      .from('inquiries')
+      .select('id, type')
+      .eq('id', inquiryId)
+      .maybeSingle<InquiryTypeRow>();
+
+    if (inquiryError) throw inquiryError;
+
+    if (inquiryRow && isAdminSupportInquiry(inquiryRow.type)) {
+      await markInquiryMessagesRead({
+        actor: {
+          id: user.id,
+          email: user.email,
+        },
+        body: { inquiryId },
+      });
+
+      await clearAdminSupportUnreadBatch({
+        supabaseAdmin,
+        inquiryId,
+      });
     }
 
     // 메시지 쿼리

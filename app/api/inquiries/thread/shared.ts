@@ -8,6 +8,7 @@ import {
 import { buildLocalizedEmailCopy } from '@/app/utils/emailCopy';
 import { buildNotificationCopy } from '@/app/utils/notificationCopy';
 import { resolveRecipientLocale } from '@/app/utils/notificationLocale';
+import { startOrAdvanceAdminSupportUnreadBatch } from '@/app/utils/adminSupportUnreadAlerts';
 import { insertAdminAlerts, sendAdminAlertEmails } from '@/app/utils/adminAlertCenter';
 import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
@@ -101,6 +102,7 @@ type InquiryMessageAccessRow = {
 
 type InquiryMessageInsertRow = {
   id: number | string;
+  created_at?: string | null;
 };
 
 type InquiryUpdatedAtRow = {
@@ -647,7 +649,7 @@ export async function createInquiryMessage(params: {
       type: normalizedType,
       is_read: false,
     })
-    .select('id')
+    .select('id, created_at')
     .maybeSingle<InquiryMessageInsertRow>();
 
   if (messageError || !insertedMessage) {
@@ -672,8 +674,18 @@ export async function createInquiryMessage(params: {
   }
 
   const canonicalUpdatedAt = updatedInquiry?.updated_at || updatedAt;
+  const canonicalMessageCreatedAt = insertedMessage.created_at || canonicalUpdatedAt;
 
   const actorDisplayName = await getActorDisplayName(actor.id);
+
+  if (isAdminSupport && String(actor.id) === String(inquiry.user_id)) {
+    await startOrAdvanceAdminSupportUnreadBatch({
+      supabaseAdmin,
+      inquiryId: inquiry.id,
+      messageId: insertedMessage.id,
+      messageCreatedAt: canonicalMessageCreatedAt,
+    });
+  }
 
   const recipientId = (() => {
     if (isAdminSupport) {
@@ -898,7 +910,7 @@ export async function upsertInquiryThread(params: {
         type: 'text',
         is_read: false,
       })
-      .select('id')
+      .select('id, created_at')
       .maybeSingle<InquiryMessageInsertRow>();
 
     if (messageError || !insertedMessage) {
@@ -920,6 +932,18 @@ export async function upsertInquiryThread(params: {
     createdMessageId = insertedMessage?.id;
     createdMessageDisplayContent = cleanMessage;
     createdMessageUpdatedAt = updatedAt;
+
+    if (
+      resolved.inquiryType === 'admin_support' &&
+      String(actor.id) === String(resolved.guestId)
+    ) {
+      await startOrAdvanceAdminSupportUnreadBatch({
+        supabaseAdmin,
+        inquiryId: inquiry.id,
+        messageId: insertedMessage.id,
+        messageCreatedAt: insertedMessage.created_at || updatedAt,
+      });
+    }
 
     const actorDisplayName = await getActorDisplayName(actor.id);
     const recipientId = actor.id === resolved.hostId ? resolved.guestId : resolved.hostId;

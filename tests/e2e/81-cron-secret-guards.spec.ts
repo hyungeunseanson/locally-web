@@ -9,6 +9,7 @@ test.describe('Cron secret guards', () => {
       request.get('/api/cron/complete-trips'),
       request.get('/api/cron/complete-services'),
       request.get('/api/cron/experience-translations'),
+      request.get('/api/cron/admin-support-unread-alerts'),
     ]);
 
     for (const response of responses) {
@@ -28,6 +29,9 @@ test.describe('Cron secret guards', () => {
         headers: { authorization: 'Bearer wrong-secret' },
       }),
       request.get('/api/cron/experience-translations', {
+        headers: { authorization: 'Bearer wrong-secret' },
+      }),
+      request.get('/api/cron/admin-support-unread-alerts', {
         headers: { authorization: 'Bearer wrong-secret' },
       }),
     ]);

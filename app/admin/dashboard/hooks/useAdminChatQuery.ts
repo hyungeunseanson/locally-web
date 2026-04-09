@@ -163,11 +163,13 @@ export function useAdminChatQuery() {
         selectedInquiryRef.current = selected;
         setSelectedInquiry(selected);
       }
+
+      await fetchInquiries(false);
     } catch (err: unknown) {
       console.error('[AdminChatQuery] loadMessages error:', err);
       showToast('메시지를 불러오지 못했습니다.', 'error');
     }
-  }, [showToast]);
+  }, [fetchInquiries, showToast]);
 
   const sendMessage = async (inquiryId: number | string, content: string): Promise<AdminSendMessageResult> => {
     const cleanContent = sanitizeText(content);

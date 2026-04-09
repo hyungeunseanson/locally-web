@@ -1,3 +1,4 @@
+import { appendFile } from 'fs/promises';
 import nodemailer from 'nodemailer';
 
 type SendAdminEmailParams = {
@@ -12,7 +13,7 @@ type SendAdminEmailParams = {
 type SendAdminEmailResult = {
   success: boolean;
   sent: boolean;
-  provider: 'resend' | 'gmail' | 'none';
+  provider: 'resend' | 'gmail' | 'mock' | 'none';
   skipped?: 'provider_not_configured' | 'recipient_missing';
 };
 
@@ -22,6 +23,11 @@ function hasResendConfig() {
 
 function hasGmailConfig() {
   return Boolean(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
+}
+
+function getMockCapturePath() {
+  const value = process.env.MOCK_ADMIN_ALERT_EMAILS_FILE;
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
 function getSiteUrl() {
@@ -111,6 +117,27 @@ async function sendWithGmail(params: {
   });
 }
 
+async function sendWithMockFile(params: {
+  to: string;
+  subject: string;
+  html: string;
+}) {
+  const capturePath = getMockCapturePath();
+  if (!capturePath) return false;
+
+  await appendFile(
+    capturePath,
+    `${JSON.stringify({
+      to: params.to,
+      subject: params.subject,
+      html: params.html,
+    })}\n`,
+    'utf8'
+  );
+
+  return true;
+}
+
 export async function sendImmediateAdminEmail(
   params: SendAdminEmailParams
 ): Promise<SendAdminEmailResult> {
@@ -129,6 +156,18 @@ export async function sendImmediateAdminEmail(
     ctaLink: params.link || null,
     ctaLabel: params.ctaLabel || '운영 대시보드 보기',
   });
+
+  if (await sendWithMockFile({
+    to: params.to,
+    subject: params.subject,
+    html,
+  })) {
+    return {
+      success: true,
+      sent: true,
+      provider: 'mock',
+    };
+  }
 
   if (hasResendConfig()) {
     await sendWithResend({
