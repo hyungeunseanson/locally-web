@@ -305,7 +305,7 @@ export default function HostRegisterForm({
               <FieldHint className="text-center ml-0 -mt-2">{copy.profilePhotoHelp}</FieldHint>
               <div className="w-full text-left">
                 <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">{copy.selfIntroLabel}</label>
-                <p className="mt-1 ml-1 text-xs leading-5 text-slate-500">{copy.selfIntroHelp}</p>
+                <p className="mt-1 ml-1 text-xs leading-5 text-slate-500">{renderMultilineText(copy.selfIntroHelp)}</p>
                 <textarea placeholder={copy.selfIntroPlaceholder} value={formData.selfIntro} onChange={(e) => updateData('selfIntro', e.target.value)} className="w-full p-3.5 h-32 bg-slate-50 rounded-xl outline-none text-sm resize-none border border-transparent focus:border-black focus:bg-white transition-all" />
                 <p className={`text-[11px] mt-1.5 ml-1 ${(formData.selfIntro?.length || 0) >= 50 ? 'text-green-500' : 'text-slate-400'}`}>
                   {formData.selfIntro?.length || 0}/50{copy.selfIntroCountSuffix}
@@ -359,7 +359,7 @@ export default function HostRegisterForm({
               <p className="text-sm text-slate-500">{copy.step6Desc}</p>
             </div>
             <HelpDisclosure title={copy.payoutGuideTitle}>
-              <p>{copy.payoutGuideBody}</p>
+              <p className="text-left">{copy.payoutGuideBody}</p>
             </HelpDisclosure>
             <div className="space-y-4 text-left">
               <div>
@@ -395,7 +395,7 @@ export default function HostRegisterForm({
             {motivationLooksShort && <FieldHint className="text-center ml-0 text-amber-600">{copy.motivationInlineShort}</FieldHint>}
             {motivationLooksReady && <FieldHint className="text-center ml-0 text-green-600">{copy.motivationInlineReady}</FieldHint>}
             <HelpDisclosure title={copy.motivationGuideTitle}>
-              <p>{copy.motivationGuideBody}</p>
+              <p className="text-left">{copy.motivationGuideBody}</p>
             </HelpDisclosure>
             <div className="pt-2 text-left">
               <label className="flex items-start gap-3 cursor-pointer p-4 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all">

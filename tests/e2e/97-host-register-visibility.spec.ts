@@ -156,7 +156,7 @@ test('host register keeps previous button visible and shows self-intro language 
 
   await expect(
     page.getByText(
-      /보여주고 싶은 게스트의 언어로 작성해주세요\.|Write this in the language of the guests you want to show it to\.|見せたいゲストの言語で作成してください。|请使用你想展示给游客看的语言来填写。/
+      /보여주고 싶은 게스트의 언어로 작성해주세요\.\s*예: 한국인 게스트에게 보여주고 싶다면 한국어로 작성하면 됩니다\.|Write this in the language of the guests you want to show it to\.\s*Example: if you want Korean guests to read it, write it in Korean\.|見せたいゲストの言語で作成してください。\s*例：韓国人ゲストに見せたい場合は韓国語で作成してください。|请使用你想展示给游客看的语言来填写。\s*例：如果你想给韩国游客看，就用韩语来写。/
     )
   ).toBeVisible();
 });
