@@ -339,3 +339,52 @@ test('guest inbox appends text messages optimistically before delayed send resol
     return row?.content || null;
   }).toBe(messageText);
 });
+
+test('guest inbox shows a host reply without reloading the page', async ({ browser }) => {
+  test.setTimeout(90000);
+
+  const host = createUser('host-reply');
+  const guest = createUser('guest-reply');
+  const hostId = await createAuthUser(host);
+  const guestId = await createAuthUser(guest);
+  await createApprovedHostApplication(hostId, host);
+  const experienceId = await createExperienceFixture(hostId);
+  const inquiryId = await createInquiry({ guestId, hostId, experienceId });
+  const initialGuestMessage = `Initial guest message ${Date.now()}`;
+  await createInquiryMessage({
+    inquiryId,
+    senderId: guestId,
+    content: initialGuestMessage,
+  });
+
+  const guestContext = await browser.newContext();
+  const hostContext = await browser.newContext();
+  const guestPage = await guestContext.newPage();
+  const hostPage = await hostContext.newPage();
+
+  try {
+    await login(guestPage, guest);
+    await guestPage.goto(`/guest/inbox?inquiryId=${inquiryId}`, { waitUntil: 'networkidle' });
+    await expect(guestPage.getByText(initialGuestMessage).last()).toBeVisible({ timeout: 15000 });
+
+    await login(hostPage, host);
+    await hostPage.goto(`/host/dashboard?tab=inquiries&inquiryId=${inquiryId}`, { waitUntil: 'networkidle' });
+    await expect(hostPage.getByText(initialGuestMessage).last()).toBeVisible({ timeout: 15000 });
+
+    const hostReplyMessage = `Host realtime reply ${Date.now()}`;
+    await hostPage.locator('input[placeholder="답장 입력..."], input[placeholder="Type a reply..."]').first().fill(hostReplyMessage);
+    await hostPage.locator('button.bg-black.text-white.rounded-full').last().click();
+
+    await expect.poll(async () => {
+      const row = await findInquiryMessage(inquiryId, hostReplyMessage);
+      return row?.content || null;
+    }).toBe(hostReplyMessage);
+
+    await expect(
+      guestPage.locator('div.bg-white.border.border-gray-200.rounded-tl-sm').filter({ hasText: hostReplyMessage }).last()
+    ).toBeVisible({ timeout: 8000 });
+  } finally {
+    await guestContext.close();
+    await hostContext.close();
+  }
+});

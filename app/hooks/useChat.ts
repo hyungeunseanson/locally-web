@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { User } from '@supabase/supabase-js';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
+import { useNotification } from '@/app/context/NotificationContext';
 import { sanitizeText } from '@/app/utils/sanitize';
 import { compressImage, sanitizeFileName, validateImage, isHeicValidationResult } from '@/app/utils/image';
 import {
@@ -100,7 +101,13 @@ type RealtimeMessagePayload = {
   inquiry_id?: number | string;
 };
 
+type RealtimeInquiryPayload = {
+  id?: number | string;
+  updated_at?: string | null;
+};
+
 const REALTIME_INQUIRY_REFRESH_DEBOUNCE_MS = 300;
+const REALTIME_MESSAGE_REFRESH_DEBOUNCE_MS = 250;
 
 export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   const [inquiries, setInquiries] = useState<InquiryListItem[]>([]);
@@ -111,6 +118,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
   const supabase = useMemo(() => createClient(), []);
   const { showToast, showHeicUnsupportedToast } = useToast();
+  const { notifications } = useNotification();
 
   // 실시간 이벤트 중복 수신 방지 (메시지 id 단위)
   const processedEventRef = useRef<Set<string>>(new Set());
@@ -118,6 +126,9 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   const inquiriesRef = useRef<InquiryListItem[]>([]);
   const selectedInquiryRef = useRef<InquiryListItem | null>(null);
   const realtimeRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const realtimeMessageRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasPrimedNotificationsRef = useRef(false);
+  const latestNotificationIdRef = useRef<number | null>(null);
 
   const secureUrl = (url: string | null | undefined) => {
     if (!url || url === '') return null;
@@ -321,6 +332,19 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       void fetchInquiries(false);
     }, REALTIME_INQUIRY_REFRESH_DEBOUNCE_MS);
   }, [fetchInquiries]);
+
+  const scheduleRealtimeMessageRefresh = useCallback((inquiryId: number | string) => {
+    if (realtimeMessageRefreshTimeoutRef.current) {
+      clearTimeout(realtimeMessageRefreshTimeoutRef.current);
+    }
+
+    realtimeMessageRefreshTimeoutRef.current = setTimeout(() => {
+      realtimeMessageRefreshTimeoutRef.current = null;
+
+      if (!selectedInquiryRef.current || String(selectedInquiryRef.current.id) !== String(inquiryId)) return;
+      void loadMessages(inquiryId);
+    }, REALTIME_MESSAGE_REFRESH_DEBOUNCE_MS);
+  }, [loadMessages]);
 
   const sendMessage = async (inquiryId: number | string, content: string, file?: File, senderId?: string) => {
     const cleanContent = sanitizeText(content);
@@ -641,7 +665,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
           if (newPayload && newPayload.sender_id !== currentUser.id) {
             scheduleRealtimeInquiryRefresh();
             if (selectedInquiryRef.current && String(newPayload.inquiry_id) === String(selectedInquiryRef.current.id)) {
-              loadMessages(selectedInquiryRef.current.id);
+              scheduleRealtimeMessageRefresh(selectedInquiryRef.current.id);
             }
           }
         }
@@ -664,25 +688,76 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
           scheduleRealtimeInquiryRefresh();
 
           if (selectedInquiryRef.current && String(inquiryId) === String(selectedInquiryRef.current.id)) {
-            loadMessages(selectedInquiryRef.current.id);
+            scheduleRealtimeMessageRefresh(selectedInquiryRef.current.id);
           }
         }
       )
       .on(
         'postgres_changes',
         inquiryRealtimeConfig,
-        () => scheduleRealtimeInquiryRefresh()
+        (payload) => {
+          const newPayload = payload.new as RealtimeInquiryPayload | null;
+          const selected = selectedInquiryRef.current;
+
+          scheduleRealtimeInquiryRefresh();
+
+          if (!selected || String(newPayload?.id) !== String(selected.id)) return;
+          if (newPayload?.updated_at && newPayload.updated_at === selected.updated_at) return;
+
+          scheduleRealtimeMessageRefresh(selected.id);
+        }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status !== 'SUBSCRIBED') return;
+
+        // Catch up once when the realtime channel becomes active so messages
+        // inserted just before subscribe/reconnect are not missed.
+        scheduleRealtimeInquiryRefresh();
+        if (selectedInquiryRef.current) {
+          scheduleRealtimeMessageRefresh(selectedInquiryRef.current.id);
+        }
+      });
 
     return () => {
       if (realtimeRefreshTimeoutRef.current) {
         clearTimeout(realtimeRefreshTimeoutRef.current);
         realtimeRefreshTimeoutRef.current = null;
       }
+      if (realtimeMessageRefreshTimeoutRef.current) {
+        clearTimeout(realtimeMessageRefreshTimeoutRef.current);
+        realtimeMessageRefreshTimeoutRef.current = null;
+      }
       supabase.removeChannel(channel);
     };
-  }, [supabase, currentUser, loadMessages, role, scheduleRealtimeInquiryRefresh]);
+  }, [supabase, currentUser, role, scheduleRealtimeInquiryRefresh, scheduleRealtimeMessageRefresh]);
+
+  useEffect(() => {
+    hasPrimedNotificationsRef.current = false;
+    latestNotificationIdRef.current = null;
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    const latestMessageNotification = notifications.find((notification) => notification.type === 'new_message');
+
+    if (!hasPrimedNotificationsRef.current) {
+      hasPrimedNotificationsRef.current = true;
+      latestNotificationIdRef.current = latestMessageNotification?.id ?? null;
+      return;
+    }
+
+    if (!latestMessageNotification) return;
+    if (latestNotificationIdRef.current === latestMessageNotification.id) return;
+    latestNotificationIdRef.current = latestMessageNotification.id;
+
+    scheduleRealtimeInquiryRefresh();
+
+    const selected = selectedInquiryRef.current;
+    const linkedInquiryId = getInquiryIdFromNotificationLink(latestMessageNotification.link);
+    if (!selected || !linkedInquiryId) return;
+    if (String(linkedInquiryId) !== String(selected.id)) return;
+
+    scheduleRealtimeMessageRefresh(selected.id);
+  }, [notifications, scheduleRealtimeInquiryRefresh, scheduleRealtimeMessageRefresh]);
 
   const clearSelected = () => {
     selectedInquiryRef.current = null;
@@ -707,4 +782,11 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
 function normalizedHasText(value: string) {
   return value.trim().length > 0;
+}
+
+function getInquiryIdFromNotificationLink(link: string | null | undefined) {
+  if (!link) return null;
+
+  const match = link.match(/[?&]inquiryId=([^&]+)/);
+  return match?.[1] ? decodeURIComponent(match[1]) : null;
 }
