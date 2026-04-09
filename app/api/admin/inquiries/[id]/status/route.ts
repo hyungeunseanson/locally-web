@@ -47,6 +47,7 @@ export async function PATCH(
 
     const body = await request.json();
     const nextStatus = typeof body?.status === 'string' ? body.status : '';
+    // Caller must send the latest server-confirmed inquiry.updated_at token.
     const clientUpdatedAt = typeof body?.updated_at === 'string' ? body.updated_at : null;
 
     if (!ALLOWED_STATUSES.has(nextStatus)) {

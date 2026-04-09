@@ -12,6 +12,9 @@ import ChatParticipantProfileModal, { type ChatParticipantProfile } from './Chat
 
 type CSStatus = 'open' | 'in_progress' | 'resolved';
 type CSStatusFilter = 'ALL' | CSStatus;
+type UpdateCSStatusOptions = {
+  updatedAt?: string | null;
+};
 
 const CS_STATUS_LABELS: Record<CSStatus, string> = { open: '대기', in_progress: '처리중', resolved: '완료' };
 const CS_STATUS_COLORS: Record<CSStatus, string> = {
@@ -107,12 +110,19 @@ export default function ChatMonitor() {
     }
   };
 
-  const handleUpdateCSStatus = async (inquiryId: number | string, newStatus: CSStatus) => {
+  const handleUpdateCSStatus = async (
+    inquiryId: number | string,
+    newStatus: CSStatus,
+    options?: UpdateCSStatusOptions
+  ) => {
     try {
       const response = await fetch(`/api/admin/inquiries/${inquiryId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus, updated_at: selectedInquiry?.updated_at }),
+        body: JSON.stringify({
+          status: newStatus,
+          updated_at: options?.updatedAt ?? selectedInquiry?.updated_at ?? null,
+        }),
       });
 
       const result = await response.json();
@@ -134,14 +144,16 @@ export default function ChatMonitor() {
   const handleSend = async () => {
     if (selectedInquiry && replyText.trim()) {
       try {
-        await sendMessage(selectedInquiry.id, replyText);
+        const messageResult = await sendMessage(selectedInquiry.id, replyText);
         setReplyText('');
 
         // 🟢 첫 번째 답변 시: '대기(open)' 상태를 '처리중(in_progress)'으로 자동 전환
         if (activeTab === 'admin' && isAdminSupportInquiry(selectedInquiry.type)) {
           const currentStatus = selectedInquiry.status;
           if (!currentStatus || currentStatus === 'open') {
-            await handleUpdateCSStatus(selectedInquiry.id, 'in_progress');
+            await handleUpdateCSStatus(selectedInquiry.id, 'in_progress', {
+              updatedAt: messageResult.updatedAt,
+            });
           }
         }
       } catch (error) {

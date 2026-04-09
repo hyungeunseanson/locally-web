@@ -18,6 +18,7 @@ const createdAuthUserIds: string[] = [];
 const createdWhitelistEmails: string[] = [];
 const createdInquiryIds: number[] = [];
 const createdInquiryMessageIds: number[] = [];
+const FALSE_CONFLICT_TOAST = '다른 관리자에 의해 이미 상태가 변경되었습니다. 최신 상태를 확인해주세요.';
 
 function loadEnv(): EnvMap {
   return readFileSync('.env.local', 'utf8')
@@ -148,6 +149,17 @@ async function seedAdminSupportInquiry(guestUserId: string, message: string) {
   return Number(inquiry.id);
 }
 
+async function readInquiryStatus(inquiryId: number) {
+  const { data, error } = await getAdminClient()
+    .from('inquiries')
+    .select('status, updated_at')
+    .eq('id', inquiryId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
 async function login(page: Page, user: TestUser) {
   await page.goto('/login', { waitUntil: 'networkidle' });
 
@@ -205,17 +217,108 @@ test.describe.serial('Admin chats smoke', () => {
     await detailStatusGroup.getByRole('button', { name: '처리중', exact: true }).click();
 
     await expect.poll(async () => {
-      const { data, error } = await getAdminClient()
-        .from('inquiries')
-        .select('status')
-        .eq('id', inquiryId)
-        .maybeSingle();
-
-      if (error) throw error;
-      return data?.status || null;
+      const inquiry = await readInquiryStatus(inquiryId);
+      return inquiry?.status || null;
     }, {
       timeout: 15000,
       intervals: [500, 1000, 1500],
     }).toBe('in_progress');
+  });
+
+  test('promotes first admin reply to in_progress without showing false conflict toast', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const adminUser = createUser('admin.chats.reply');
+    const guestUser = createUser('guest.chats.reply');
+
+    await createAuthUser(adminUser, { whitelistAdmin: true });
+    const guestUserId = await createAuthUser(guestUser);
+
+    const inquiryMessage = `코덱스 관리자 첫 답변 문의 ${Date.now()}`;
+    const adminReply = `관리자 첫 답변 ${Date.now()}`;
+    const inquiryId = await seedAdminSupportInquiry(guestUserId, inquiryMessage);
+
+    await login(page, adminUser);
+    await page.goto(`/admin/dashboard?tab=CHATS&inquiryId=${inquiryId}`, { waitUntil: 'networkidle' });
+
+    await expect(
+      page.locator('div.bg-white.border.border-slate-200.rounded-tl-none').filter({ hasText: inquiryMessage }).last()
+    ).toBeVisible({ timeout: 15000 });
+
+    await page.getByPlaceholder('답변을 입력하세요...').fill(adminReply);
+    await page.getByPlaceholder('답변을 입력하세요...').press('Enter');
+
+    await expect(
+      page
+        .locator('div[data-message-id]')
+        .filter({ hasText: adminReply })
+        .last()
+        .locator('div.bg-black.text-white')
+    ).toBeVisible({ timeout: 15000 });
+
+    await expect.poll(async () => {
+      const inquiry = await readInquiryStatus(inquiryId);
+      return inquiry?.status || null;
+    }, {
+      timeout: 15000,
+      intervals: [500, 1000, 1500],
+    }).toBe('in_progress');
+
+    await expect(page.getByText(FALSE_CONFLICT_TOAST)).toHaveCount(0);
+  });
+
+  test('still shows the conflict toast when inquiry status really changed elsewhere', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const adminUser = createUser('admin.chats.conflict');
+    const guestUser = createUser('guest.chats.conflict');
+
+    await createAuthUser(adminUser, { whitelistAdmin: true });
+    const guestUserId = await createAuthUser(guestUser);
+
+    const inquiryMessage = `코덱스 관리자 충돌 문의 ${Date.now()}`;
+    const inquiryId = await seedAdminSupportInquiry(guestUserId, inquiryMessage);
+
+    await login(page, adminUser);
+    await page.goto(`/admin/dashboard?tab=CHATS&inquiryId=${inquiryId}`, { waitUntil: 'networkidle' });
+
+    await expect(
+      page.locator('div.bg-white.border.border-slate-200.rounded-tl-none').filter({ hasText: inquiryMessage }).last()
+    ).toBeVisible({ timeout: 15000 });
+
+    let conflictInjected = false;
+    await page.route(`**/api/admin/inquiries/${inquiryId}/status`, async (route) => {
+      if (!conflictInjected) {
+        conflictInjected = true;
+        const { error } = await getAdminClient()
+          .from('inquiries')
+          .update({
+            status: 'resolved',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', inquiryId);
+
+        if (error) {
+          throw error;
+        }
+      }
+
+      await route.continue();
+    });
+
+    const detailStatusGroup = page.locator('div.absolute.top-2.right-2');
+    await detailStatusGroup.getByRole('button', { name: '처리중', exact: true }).click();
+
+    await expect(page.getByText(FALSE_CONFLICT_TOAST)).toBeVisible({ timeout: 15000 });
+
+    await expect.poll(async () => {
+      const inquiry = await readInquiryStatus(inquiryId);
+      return inquiry?.status || null;
+    }, {
+      timeout: 15000,
+      intervals: [500, 1000, 1500],
+    }).toBe('resolved');
+
+    await page.unroute(`**/api/admin/inquiries/${inquiryId}/status`);
   });
 });

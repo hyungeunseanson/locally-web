@@ -44,6 +44,29 @@ type InquiryRealtimeRow = {
   updated_at?: string | null;
 };
 
+type AdminSendMessageResult = {
+  inquiryId: number | string;
+  messageId: number | string;
+  displayContent: string;
+  updatedAt: string;
+};
+
+type InquiryPreviewPatch = Pick<MonitorInquiry, 'content' | 'updated_at'>;
+
+function isAdminSendMessageResult(value: unknown): value is AdminSendMessageResult {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  return (
+    (typeof candidate.inquiryId === 'string' || typeof candidate.inquiryId === 'number') &&
+    (typeof candidate.messageId === 'string' || typeof candidate.messageId === 'number') &&
+    typeof candidate.displayContent === 'string' &&
+    typeof candidate.updatedAt === 'string'
+  );
+}
+
 export function useAdminChatQuery() {
   const [inquiries, setInquiries] = useState<MonitorInquiry[]>([]);
   const [selectedInquiry, setSelectedInquiry] = useState<MonitorInquiry | null>(null);
@@ -68,6 +91,31 @@ export function useAdminChatQuery() {
     return user;
   }, [supabase, currentUser]);
 
+  const syncSelectedInquiryFromRows = useCallback((nextInquiries: MonitorInquiry[]) => {
+    if (!selectedInquiryRef.current) return;
+
+    const selectedId = String(selectedInquiryRef.current.id);
+    const nextSelected = nextInquiries.find((inquiry) => String(inquiry.id) === selectedId);
+
+    if (!nextSelected) return;
+
+    selectedInquiryRef.current = nextSelected;
+    setSelectedInquiry(nextSelected);
+  }, []);
+
+  const patchInquiryPreview = useCallback((inquiryId: number | string, patch: InquiryPreviewPatch) => {
+    const targetId = String(inquiryId);
+    const nextInquiries = inquiriesRef.current.map((inquiry) =>
+      String(inquiry.id) === targetId
+        ? { ...inquiry, ...patch }
+        : inquiry
+    );
+
+    inquiriesRef.current = nextInquiries;
+    setInquiries(nextInquiries);
+    syncSelectedInquiryFromRows(nextInquiries);
+  }, [syncSelectedInquiryFromRows]);
+
   const fetchInquiries = useCallback(async (showLoading = true) => {
     if (showLoading && inquiriesRef.current.length === 0) setIsLoading(true);
     setError(undefined);
@@ -86,8 +134,10 @@ export function useAdminChatQuery() {
         throw new Error(result.error || '목록을 불러오지 못했습니다.');
       }
 
-      setInquiries(result.data);
-      inquiriesRef.current = result.data;
+      const nextInquiries = Array.isArray(result.data) ? result.data as MonitorInquiry[] : [];
+      setInquiries(nextInquiries);
+      inquiriesRef.current = nextInquiries;
+      syncSelectedInquiryFromRows(nextInquiries);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '로딩 오류';
       console.error('[AdminChatQuery] fetchInquiries error:', err);
@@ -95,7 +145,7 @@ export function useAdminChatQuery() {
     } finally {
       setIsLoading(false);
     }
-  }, [getAuthenticatedUser]);
+  }, [getAuthenticatedUser, syncSelectedInquiryFromRows]);
 
   const loadMessages = useCallback(async (inquiryId: number | string) => {
     try {
@@ -119,9 +169,11 @@ export function useAdminChatQuery() {
     }
   }, [showToast]);
 
-  const sendMessage = async (inquiryId: number | string, content: string) => {
+  const sendMessage = async (inquiryId: number | string, content: string): Promise<AdminSendMessageResult> => {
     const cleanContent = sanitizeText(content);
-    if (!cleanContent.trim()) return;
+    if (!cleanContent.trim()) {
+      throw new Error('메시지 전송에 실패했습니다.');
+    }
 
     try {
       const response = await fetch('/api/inquiries/message', {
@@ -134,14 +186,33 @@ export function useAdminChatQuery() {
         }),
       });
 
-      const result = await response.json();
+      const result: unknown = await response.json();
 
-      if (!response.ok || !result?.success) {
-        throw new Error(result?.error || '메시지 전송에 실패했습니다.');
+      if (
+        !response.ok ||
+        typeof result !== 'object' ||
+        result === null ||
+        !('success' in result) ||
+        result.success !== true ||
+        !isAdminSendMessageResult(result)
+      ) {
+        const errorMessage =
+          typeof result === 'object' &&
+          result !== null &&
+          'error' in result &&
+          typeof result.error === 'string'
+            ? result.error
+            : '메시지 전송에 실패했습니다.';
+        throw new Error(errorMessage);
       }
 
+      patchInquiryPreview(inquiryId, {
+        content: result.displayContent,
+        updated_at: result.updatedAt,
+      });
       await loadMessages(inquiryId);
       await fetchInquiries(false); // Update list snippet & timestamp
+      return result;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.';
       showToast('메시지 전송 실패: ' + message, 'error');

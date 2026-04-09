@@ -103,6 +103,10 @@ type InquiryMessageInsertRow = {
   id: number | string;
 };
 
+type InquiryUpdatedAtRow = {
+  updated_at: string | null;
+};
+
 type ResolvedInquiryThread = {
   existing: InquiryInsertRow | null;
   guestId: string;
@@ -653,17 +657,21 @@ export async function createInquiryMessage(params: {
     throw new InquiryThreadError(500, '메시지 저장에 실패했습니다.');
   }
 
-  const { error: updateError } = await supabaseAdmin
+  const { data: updatedInquiry, error: updateError } = await supabaseAdmin
     .from('inquiries')
     .update({
       content: displayContent,
       updated_at: updatedAt,
     })
-    .eq('id', inquiry.id);
+    .eq('id', inquiry.id)
+    .select('updated_at')
+    .maybeSingle<InquiryUpdatedAtRow>();
 
   if (updateError) {
     throw new InquiryThreadError(500, '문의방 갱신에 실패했습니다.');
   }
+
+  const canonicalUpdatedAt = updatedInquiry?.updated_at || updatedAt;
 
   const actorDisplayName = await getActorDisplayName(actor.id);
 
@@ -738,7 +746,7 @@ export async function createInquiryMessage(params: {
     inquiryId: inquiry.id,
     messageId: insertedMessage.id,
     displayContent,
-    updatedAt,
+    updatedAt: canonicalUpdatedAt,
   } satisfies InquiryMessageResponse;
 }
 
