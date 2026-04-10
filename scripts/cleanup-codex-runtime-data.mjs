@@ -65,6 +65,32 @@ function dedupeRows(rows, keyFn = (row) => row.id) {
   return Array.from(unique.values());
 }
 
+async function listAuthUsersByEmailPattern(pattern) {
+  const users = [];
+  const seenIds = new Set();
+  const perPage = 200;
+  let page = 1;
+
+  while (true) {
+    const { data } = await runQuery(`auth.users page ${page}`, () =>
+      supabase.auth.admin.listUsers({ page, perPage })
+    );
+    const pageUsers = data?.users || [];
+
+    for (const user of pageUsers) {
+      const email = user.email || null;
+      if (!email || !pattern.test(email) || seenIds.has(user.id)) continue;
+      seenIds.add(user.id);
+      users.push({ id: user.id, email });
+    }
+
+    if (pageUsers.length < perPage) break;
+    page += 1;
+  }
+
+  return users;
+}
+
 async function selectByInChunks(label, table, select, column, values, size = 100) {
   if (!values.length) return [];
 
@@ -82,9 +108,16 @@ async function selectByInChunks(label, table, select, column, values, size = 100
 }
 
 async function collectCleanupTargets() {
-  const profileEmailRes = await runQuery('profiles by email', () =>
-    supabase.from('profiles').select('id,email').ilike('email', 'codex.%@example.com')
-  );
+  const authUsers = await listAuthUsersByEmailPattern(/^codex\..*@example\.com$/i);
+  const authUserIds = authUsers.map((user) => user.id);
+
+  const profileEmailRows = (
+    await runQuery('profiles by email', () =>
+      supabase.from('profiles').select('id,email').ilike('email', 'codex.%@example.com')
+    )
+  ).data || [];
+  const profileIdRows = await selectByInChunks('profiles by auth ids', 'profiles', 'id,email', 'id', authUserIds, 100);
+  const profileRows = dedupeRows([...profileEmailRows, ...profileIdRows]);
 
   const adminWhitelistRes = await runQuery('admin_whitelist by email', () =>
     supabase.from('admin_whitelist').select('id,email').ilike('email', 'codex.%@example.com')
@@ -94,9 +127,20 @@ async function collectCleanupTargets() {
     supabase.from('admin_audit_logs').select('id,admin_email').ilike('admin_email', 'codex.%@example.com')
   );
 
-  const hostApplicationsRes = await runQuery('host_applications by email', () =>
-    supabase.from('host_applications').select('id,user_id,email').ilike('email', 'codex.%@example.com')
+  const hostApplicationsByEmail = (
+    await runQuery('host_applications by email', () =>
+      supabase.from('host_applications').select('id,user_id,email').ilike('email', 'codex.%@example.com')
+    )
+  ).data || [];
+  const hostApplicationsByUserId = await selectByInChunks(
+    'host_applications by auth ids',
+    'host_applications',
+    'id,user_id,email',
+    'user_id',
+    authUserIds,
+    100
   );
+  const hostApplicationRows = dedupeRows([...hostApplicationsByEmail, ...hostApplicationsByUserId]);
 
   const adminTasksRes = await runQuery('admin_tasks by content', () =>
     supabase.from('admin_tasks').select('id,content').ilike('content', '코덱스%')
@@ -108,15 +152,17 @@ async function collectCleanupTargets() {
 
   const codexUserIds = Array.from(
     new Set([
-      ...(profileEmailRes.data || []).map((row) => row.id),
-      ...(hostApplicationsRes.data || []).map((row) => row.user_id).filter(Boolean),
+      ...authUserIds,
+      ...profileRows.map((row) => row.id),
+      ...hostApplicationRows.map((row) => row.user_id).filter(Boolean),
     ])
   );
 
   const codexEmails = Array.from(
     new Set([
-      ...(profileEmailRes.data || []).map((row) => row.email).filter(Boolean),
-      ...(hostApplicationsRes.data || []).map((row) => row.email).filter(Boolean),
+      ...authUsers.map((row) => row.email).filter(Boolean),
+      ...profileRows.map((row) => row.email).filter(Boolean),
+      ...hostApplicationRows.map((row) => row.email).filter(Boolean),
       ...(adminWhitelistRes.data || []).map((row) => row.email).filter(Boolean),
     ])
   );
@@ -194,14 +240,6 @@ async function collectCleanupTargets() {
       .select('id,user_id,title,message')
       .or(CODEX_NOTIFICATION_FILTER)
   );
-  const emailByUserId = new Map(
-    [
-      ...(profileEmailRes.data || []).map((row) => [row.id, row.email]),
-      ...(hostApplicationsRes.data || [])
-        .filter((row) => row.user_id && row.email)
-        .map((row) => [row.user_id, row.email]),
-    ]
-  );
 
   const notificationRowsByContent = [...(notificationContentRes.data || [])];
   const notificationRowsByUserId = [];
@@ -229,16 +267,17 @@ async function collectCleanupTargets() {
     ).values()
   );
 
+  const publicUserRows = dedupeRows(
+    await selectByInChunks('public users by auth ids', 'users', 'id', 'id', codexUserIds, 100)
+  );
+
   return {
-    authUsers: codexUserIds.map((id) => ({
-      id,
-      email: emailByUserId.get(id) || null,
-    })),
+    authUsers,
     authUserIds: codexUserIds,
     authEmails: codexEmails,
     adminWhitelist: adminWhitelistRes.data || [],
     adminAuditLogs: adminAuditLogsRes.data || [],
-    hostApplications: hostApplicationsRes.data || [],
+    hostApplications: hostApplicationRows,
     adminTasks: adminTasksRes.data || [],
     adminTaskComments: adminTaskCommentsRes.data || [],
     experiences: experienceRows,
@@ -254,8 +293,8 @@ async function collectCleanupTargets() {
     inquiryMessages: inquiryMessageRows,
     notificationsExecute: executeNotifications,
     notificationsReview: reviewNotifications,
-    profiles: (profileEmailRes.data || []).map((row) => ({ id: row.id, email: row.email })),
-    publicUsers: codexUserIds.map((id) => ({ id })),
+    profiles: profileRows.map((row) => ({ id: row.id, email: row.email })),
+    publicUsers: publicUserRows.map((row) => ({ id: row.id })),
   };
 }
 
