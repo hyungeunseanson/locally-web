@@ -32,13 +32,13 @@ function getDesktopPopularVisibilityClass(index: number) {
 
 function PopularExperienceHint({ text }: { text: string }) {
   return (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-rose-100 bg-rose-50/60 px-2 py-[3px] text-[9px] font-medium tracking-[-0.01em] text-slate-500 md:px-2.5 md:py-1 md:text-[10px]">
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-rose-200/70 bg-gradient-to-r from-rose-50 via-white to-amber-50 px-2.5 py-1 text-[10px] font-medium tracking-[-0.01em] text-rose-700 shadow-[0_2px_8px_rgba(244,63,94,0.08)] md:px-3 md:py-1.5 md:text-[12px]">
       <Heart
-        size={10}
-        strokeWidth={2}
-        fill="none"
+        size={12}
+        strokeWidth={2.1}
+        fill="currentColor"
         aria-hidden="true"
-        className="text-rose-400 md:h-[11px] md:w-[11px]"
+        className="text-rose-500 md:h-[13px] md:w-[13px]"
       />
       <span>{text}</span>
     </span>
