@@ -32,13 +32,13 @@ function getDesktopPopularVisibilityClass(index: number) {
 
 function PopularExperienceHint({ text }: { text: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-rose-200/70 bg-gradient-to-r from-rose-50 via-white to-amber-50 px-2.5 py-1 text-[10px] font-medium tracking-[-0.01em] text-rose-700 shadow-[0_2px_8px_rgba(244,63,94,0.08)] md:px-3 md:py-1.5 md:text-[12px]">
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-rose-100 bg-rose-50/60 px-2 py-[3px] text-[9px] font-medium tracking-[-0.01em] text-slate-500 md:px-2.5 md:py-1 md:text-[10px]">
       <Heart
-        size={12}
-        strokeWidth={2.1}
-        fill="currentColor"
+        size={10}
+        strokeWidth={2}
+        fill="none"
         aria-hidden="true"
-        className="text-rose-500 md:h-[13px] md:w-[13px]"
+        className="text-rose-400 md:h-[11px] md:w-[11px]"
       />
       <span>{text}</span>
     </span>
@@ -348,11 +348,13 @@ export default function HomePageClient() {
               {/* 📱 모바일: 인기 + 전체 체험 */}
               <div className="md:hidden pb-4">
                 <section data-testid="home-mobile-popular-experiences-section">
-                  <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-5 pt-3 pb-2">
-                    <h2 className="text-[17px] font-semibold leading-tight tracking-[-0.02em] text-[#222222]">
-                      {t('home_section_popular_experiences')}
-                    </h2>
-                    <PopularExperienceHint text={t('home_section_popular_experiences_hint')} />
+                  <div className="px-5 pt-3 pb-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <h2 className="text-[17px] font-semibold leading-tight tracking-[-0.02em] text-[#222222]">
+                        {t('home_section_popular_experiences')}
+                      </h2>
+                      <PopularExperienceHint text={t('home_section_popular_experiences_hint')} />
+                    </div>
                   </div>
                   <div className="flex gap-[10px] overflow-x-auto no-scrollbar px-5 pb-5">
                     {mobilePopularExperiences.map((item) => (
@@ -390,11 +392,13 @@ export default function HomePageClient() {
               {/* 🖥️ 데스크탑: 인기 체험 1행 + 전체 체험 */}
               <div className="hidden md:block">
                 <section data-testid="home-desktop-popular-experiences-section">
-                  <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-                    <h2 className="text-[28px] font-semibold tracking-[-0.025em] text-slate-900">
-                      {t('home_section_popular_experiences')}
-                    </h2>
-                    <PopularExperienceHint text={t('home_section_popular_experiences_hint')} />
+                  <div className="mb-5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="text-[28px] font-semibold tracking-[-0.025em] text-slate-900">
+                        {t('home_section_popular_experiences')}
+                      </h2>
+                      <PopularExperienceHint text={t('home_section_popular_experiences_hint')} />
+                    </div>
                   </div>
                   <div className="grid md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-6 gap-y-10">
                     {desktopPopularExperiences.map((item, index) => (
