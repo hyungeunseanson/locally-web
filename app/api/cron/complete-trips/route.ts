@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { hasValidCronAuthorization } from '@/app/utils/cronAuth';
 import { runExperienceCompletionSync } from '@/app/utils/settlementSync/experienceCompletion';
 import { isSettlementSyncInfrastructureError } from '@/app/utils/settlementSync/types';
 import { createAdminClient } from '@/app/utils/supabase/admin';
@@ -32,7 +33,7 @@ function parseFailPhase(request: Request) {
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization');
-  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!hasValidCronAuthorization(authHeader)) {
     return new NextResponse('Unauthorized', { status: 401 });
   }
 

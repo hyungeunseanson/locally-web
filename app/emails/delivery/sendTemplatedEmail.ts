@@ -21,6 +21,8 @@ type SendTemplatedEmailResult = {
   text: string;
 };
 
+const LOCAL_DEV_FALLBACK_MAIL_CAPTURE_PATH = '/tmp/locally-mock-nodemailer.jsonl';
+
 function hasResendConfig() {
   return Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL);
 }
@@ -31,7 +33,15 @@ function hasGmailConfig() {
 
 function getMockCapturePath() {
   const value = process.env.MOCK_ADMIN_ALERT_EMAILS_FILE;
-  return typeof value === 'string' && value.trim() ? value.trim() : null;
+  if (typeof value === 'string' && value.trim()) {
+    return value.trim();
+  }
+
+  if (process.env.NODE_ENV !== 'production') {
+    return LOCAL_DEV_FALLBACK_MAIL_CAPTURE_PATH;
+  }
+
+  return null;
 }
 
 async function resolveRecipientEmail(

@@ -342,6 +342,8 @@ export default function ChatMonitor() {
             filteredInquiries.map((inq) => (
               <div
                 key={inq.id}
+                data-testid={`admin-chat-inquiry-row-${inq.id}`}
+                data-has-policy-signal={inq.has_policy_signal ? 'true' : 'false'}
                 onClick={() => loadMessages(inq.id)}
                 className={`p-3 md:px-3 md:py-2.5 border-b border-slate-100 cursor-pointer transition-colors hover:bg-slate-50 md:min-h-[76px] ${selectedInquiry?.id === inq.id ? 'bg-blue-50 border-l-[3px] md:border-l-4 border-l-blue-500' : 'border-l-[3px] md:border-l-4 border-l-transparent'}`}
               >
@@ -364,7 +366,10 @@ export default function ChatMonitor() {
                 <div className="flex items-start gap-1.5">
                   <p className="text-[11px] md:text-[12px] text-slate-600 line-clamp-2 leading-4 flex-1">{inq.content || '(내용 없음)'}</p>
                   {inq.has_policy_signal && (
-                    <span className="mt-0.5 shrink-0 inline-flex items-center gap-1 rounded-full bg-rose-100 px-1.5 py-0.5 text-[8px] md:text-[9px] font-bold text-rose-700 border border-rose-200 leading-none">
+                    <span
+                      data-testid="admin-chat-list-policy-badge"
+                      className="mt-0.5 shrink-0 inline-flex items-center gap-1 rounded-full bg-rose-100 px-1.5 py-0.5 text-[8px] md:text-[9px] font-bold text-rose-700 border border-rose-200 leading-none"
+                    >
                       <AlertTriangle size={9} />
                       정책위반 의심
                     </span>
@@ -543,7 +548,10 @@ export default function ChatMonitor() {
                         {displayName}
                       </span>
                       {msg.has_policy_signal && !isDeletedMessage && (
-                        <div className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[8px] md:text-[10px] font-bold text-rose-700 border border-rose-200">
+                        <div
+                          data-testid="admin-chat-message-policy-badge"
+                          className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[8px] md:text-[10px] font-bold text-rose-700 border border-rose-200"
+                        >
                           <AlertTriangle size={10} />
                           정책위반 의심
                         </div>

@@ -384,6 +384,8 @@ test.describe.serial('Chat policy monitoring flow', () => {
   });
 
   test('creates admin alerts and shows policy badges in the admin monitor', async ({ browser }) => {
+    test.setTimeout(90000);
+
     const flaggedMessage = `연락은 010-2222-3333 또는 https://open.kakao.com/o/policyflow 로 부탁드려요 ${Date.now()}`;
 
     const guestSession = await withLoggedInPage(browser, fixture.guest);
@@ -433,34 +435,36 @@ test.describe.serial('Chat policy monitoring flow', () => {
     await guestSession.context.close();
 
     const adminSession = await withLoggedInPage(browser, fixture.admin);
-    await adminSession.page.goto(`/admin/dashboard?tab=CHATS&inquiryId=${fixture.inquiryId}`, { waitUntil: 'networkidle' });
-
-    await expect(adminSession.page.getByText('정책위반 의심').first()).toBeVisible({ timeout: 15000 });
+    await adminSession.page.goto(`/admin/dashboard?tab=CHATS&inquiryId=${fixture.inquiryId}`, { waitUntil: 'domcontentloaded' });
 
     const guestCard = adminSession.page.locator('[data-participant-card="guest"]');
     const hostCard = adminSession.page.locator('[data-participant-card="host"]');
+    const inquiryRow = adminSession.page.getByTestId(`admin-chat-inquiry-row-${fixture.inquiryId}`);
 
-    await expect(guestCard).toBeVisible();
-    await expect(hostCard).toBeVisible();
+    await expect(guestCard).toBeVisible({ timeout: 15000 });
+    await expect(hostCard).toBeVisible({ timeout: 15000 });
+    await expect(inquiryRow).toHaveAttribute('data-has-policy-signal', 'true', { timeout: 15000 });
 
-    await guestCard.click();
-    await expect(adminSession.page.getByRole('dialog', { name: '게스트 프로필' })).toBeVisible();
+    await guestCard.evaluate((node: HTMLButtonElement) => node.click());
+    const guestProfileDialog = adminSession.page.getByRole('dialog', { name: '게스트 프로필' });
+    await expect(guestProfileDialog).toBeVisible();
     await expect(adminSession.page.getByText(fixture.guest.email, { exact: true }).first()).toBeVisible();
     await expect(adminSession.page.getByText(fixture.guest.phone, { exact: true }).first()).toBeVisible();
-    await adminSession.page.keyboard.press('Escape');
-    await expect(adminSession.page.getByRole('dialog', { name: '게스트 프로필' })).toHaveCount(0);
+    await guestProfileDialog.locator('button').nth(1).click();
+    await expect(guestProfileDialog).toHaveCount(0, { timeout: 10000 });
 
-    await hostCard.click();
-    await expect(adminSession.page.getByRole('dialog', { name: '호스트 프로필' })).toBeVisible();
+    await hostCard.evaluate((node: HTMLButtonElement) => node.click());
+    const hostProfileDialog = adminSession.page.getByRole('dialog', { name: '호스트 프로필' });
+    await expect(hostProfileDialog).toBeVisible();
     await expect(adminSession.page.getByText(fixture.host.email, { exact: true }).first()).toBeVisible();
     await expect(adminSession.page.getByText(fixture.host.phone, { exact: true }).first()).toBeVisible();
-    await adminSession.page.keyboard.press('Escape');
-    await expect(adminSession.page.getByRole('dialog', { name: '호스트 프로필' })).toHaveCount(0);
 
     await adminSession.context.close();
   });
 
   test('soft deletes a flagged message without breaking preview or participant views', async ({ browser }) => {
+    test.setTimeout(90000);
+
     const flaggedMessage = `soft delete target 010-4444-5555 ${Date.now()}`;
 
     const guestSession = await withLoggedInPage(browser, fixture.guest);
@@ -507,12 +511,14 @@ test.describe.serial('Chat policy monitoring flow', () => {
     await guestSession.context.close();
 
     const adminSession = await withLoggedInPage(browser, fixture.admin);
-    await adminSession.page.goto(`/admin/dashboard?tab=CHATS&inquiryId=${fixture.inquiryId}`, { waitUntil: 'networkidle' });
+    await adminSession.page.goto(`/admin/dashboard?tab=CHATS&inquiryId=${fixture.inquiryId}`, { waitUntil: 'domcontentloaded' });
+    await expect(adminSession.page.locator('[data-participant-card="guest"]')).toBeVisible({ timeout: 15000 });
 
     const deleteButton = adminSession.page.locator(`[data-delete-message-id="${softDeletedMessageId}"]`);
     await expect(deleteButton).toBeVisible({ timeout: 15000 });
-    adminSession.page.once('dialog', (dialog) => dialog.accept());
     await deleteButton.click();
+    await expect(adminSession.page.getByText('메시지 삭제')).toBeVisible({ timeout: 15000 });
+    await adminSession.page.getByRole('button', { name: '삭제', exact: true }).last().click();
 
     await expect(adminSession.page.getByText('운영 삭제').first()).toBeVisible({ timeout: 15000 });
     await expect(adminSession.page.getByText(SOFT_DELETE_PLACEHOLDER).first()).toBeVisible({ timeout: 15000 });

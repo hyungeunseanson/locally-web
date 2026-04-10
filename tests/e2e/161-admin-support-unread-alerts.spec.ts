@@ -518,6 +518,14 @@ test.describe.serial('Admin support unread alerts', () => {
       await sendInquiryMessage(guestPage, inquiryId, thirdMessage);
 
       if (hasBatchTable) {
+        await expect.poll(async () => {
+          const row = await readUnreadBatch(inquiryId);
+          return row?.is_active ?? false;
+        }, {
+          timeout: 15000,
+          intervals: [500, 1000, 1500],
+        }).toBe(true);
+
         const restartedBatch = await readUnreadBatch(inquiryId);
         expect(restartedBatch?.is_active).toBe(true);
         expect(restartedBatch?.in_app_sent_at).toBeNull();

@@ -298,8 +298,13 @@ async function login(page: Page, user: TestUser) {
   await page.goto('/login', { waitUntil: 'networkidle' });
   await page.locator('input[type="email"]').fill(user.email);
   await page.locator('input[type="password"]').fill(user.password);
-  await page.locator('button[type="submit"]').click();
-  await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 15000 });
+  await Promise.all([
+    page.waitForURL((url) => !url.pathname.startsWith('/login'), {
+      timeout: 15000,
+      waitUntil: 'commit',
+    }),
+    page.locator('button[type="submit"]').click(),
+  ]);
   await page.waitForLoadState('networkidle');
 }
 

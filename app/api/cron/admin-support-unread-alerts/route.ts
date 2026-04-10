@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 
+import { hasValidCronAuthorization } from '@/app/utils/cronAuth';
 import { processDueAdminSupportUnreadAlerts } from '@/app/utils/adminSupportUnreadAlerts';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization');
-  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!hasValidCronAuthorization(authHeader)) {
     return new NextResponse('Unauthorized', { status: 401 });
   }
 

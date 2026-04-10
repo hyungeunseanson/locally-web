@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { generateFriendlyComment } from '@/app/utils/bot/ai';
+import { hasValidCronAuthorization } from '@/app/utils/cronAuth';
 import { sanitizeText } from '@/app/utils/sanitize';
 
 // 봇 유저 UUID 리스트 (추후 Supabase profiles에서 봇 계정을 생성하고 UUID를 입력하세요)
@@ -12,11 +13,8 @@ const BOT_UUIDS: string[] = [
 
 export async function GET(request: Request) {
     // 1. 보안 검증: 크론 스케줄러(Github Actions)만 호출 가능하게 시크릿 확인
-    if (!process.env.CRON_SECRET) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
     const authHeader = request.headers.get('authorization');
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    if (!hasValidCronAuthorization(authHeader)) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -83,8 +81,9 @@ export async function GET(request: Request) {
             postId: latestPost.id
         });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[Bot Auto-Comment Error]', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        const message = error instanceof Error ? error.message : 'Internal Server Error';
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }
