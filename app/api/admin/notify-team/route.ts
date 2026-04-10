@@ -145,11 +145,21 @@ export async function POST(request: Request) {
                 if (isImmediateTeamEmail(eventType)) {
                     const result = await sendImmediateAdminEmail({
                         to: recipientEmail,
-                        subject: `[Locally Admin] ${title}`,
-                        title,
-                        message,
-                        link: notificationLink,
-                        ctaLabel: '대시보드에서 확인하기',
+                        subject: '',
+                        title: '',
+                        message: '',
+                        templatedEmail: {
+                            templateId: 'notice.custom',
+                            audience: 'admin',
+                            payload: {
+                                subject: `[Locally Admin] ${title}`,
+                                title,
+                                message,
+                                ctaLabel: '대시보드에서 확인하기',
+                                ctaUrl: notificationLink,
+                                footerVariant: 'opsAdmin',
+                            },
+                        },
                     });
                     if (result.sent) {
                         sentCount += 1;

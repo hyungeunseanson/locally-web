@@ -1,5 +1,4 @@
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
-import { buildLocalizedEmailCopy } from '@/app/utils/emailCopy';
 import { notifyMembershipMilestone } from '@/app/utils/memberMilestoneNotifications';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 import { createAdminClient } from '@/app/utils/supabase/admin';
@@ -17,10 +16,6 @@ type ExperiencePaymentConfirmedParams = {
   bookingTime: string | null;
   totalAmount: number;
 };
-
-function getSiteUrl() {
-  return process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-}
 
 export async function notifyExperiencePaymentConfirmed(
   params: ExperiencePaymentConfirmedParams
@@ -93,50 +88,47 @@ export async function notifyExperiencePaymentConfirmed(
   }
 
   if (hostId) {
-    const internalApiSecret = process.env.INTERNAL_API_SECRET;
-
-    if (!internalApiSecret) {
-      console.error('[ExperienceNotificationFlows] INTERNAL_API_SECRET is missing. Skipping host booking email dispatch.');
-    } else {
-      void fetch(`${getSiteUrl()}/api/notifications/send-email`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-internal-secret': internalApiSecret,
-        },
-        body: JSON.stringify({
-          type: 'booking_confirmation',
-          hostId,
-          guestName: displayName,
+    void sendImmediateGenericEmail({
+      recipientUserId: hostId,
+      subject: '',
+      title: '',
+      message: '',
+      templatedEmail: {
+        templateId: 'booking.confirmed',
+        audience: 'host',
+        payload: {
           experienceTitle,
-          guestsCount,
           bookingDate,
-          bookingTime,
-          totalAmount,
-        }),
-      }).catch((mailError) => {
-        console.error('[ExperienceNotificationFlows] host booking email dispatch failed:', mailError);
-      });
-    }
+          bookingTime: bookingTime || undefined,
+          partySize: guestsCount,
+          amount: totalAmount,
+          ctaUrl: '/host/dashboard',
+          guestName: displayName,
+        },
+      },
+    }).catch((mailError) => {
+      console.error('[ExperienceNotificationFlows] host booking email dispatch failed:', mailError);
+    });
   }
 
   if (guestId) {
-    const guestEmailCopy = await buildLocalizedEmailCopy({
-      supabaseAdmin,
-      userId: guestId,
-      key: 'booking.confirmed.guest',
-      copyParams: {
-        experienceTitle,
-      },
-    });
-
     void sendImmediateGenericEmail({
       recipientUserId: guestId,
-      subject: guestEmailCopy.subject,
-      title: guestEmailCopy.title,
-      message: guestEmailCopy.message,
-      link: '/guest/trips',
-      ctaLabel: guestEmailCopy.ctaLabel,
+      subject: '',
+      title: '',
+      message: '',
+      templatedEmail: {
+        templateId: 'booking.confirmed',
+        audience: 'guest',
+        payload: {
+          experienceTitle,
+          bookingDate,
+          bookingTime: bookingTime || undefined,
+          partySize: guestsCount,
+          amount: totalAmount,
+          ctaUrl: '/guest/trips',
+        },
+      },
     }).catch((emailError) => {
       console.error('[ExperienceNotificationFlows] guest booking email failed:', emailError);
     });

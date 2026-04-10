@@ -1,5 +1,4 @@
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
-import { buildLocalizedEmailCopy } from '@/app/utils/emailCopy';
 import { notifyMembershipMilestone } from '@/app/utils/memberMilestoneNotifications';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 import { getEligibleServiceHostIds } from '@/app/utils/serviceHostNotifications';
@@ -79,25 +78,25 @@ export async function notifyServicePaymentOpened(params: ServicePaymentOpenedPar
 
       void Promise.allSettled(
         hostIds.map(async (hostId) => {
-          const emailCopy = await buildLocalizedEmailCopy({
-            supabaseAdmin,
-            userId: hostId,
-            key: 'service.request_new.host',
-            copyParams: {
-              requestTitle,
-              requestCity,
-              durationHours,
-              guestCount,
-            },
-          });
-
           return sendImmediateGenericEmail({
             recipientUserId: hostId,
-            subject: emailCopy.subject,
-            title: emailCopy.title,
-            message: emailCopy.message,
-            link: `/services/${requestId}`,
-            ctaLabel: emailCopy.ctaLabel,
+            subject: '',
+            title: '',
+            message: '',
+            templatedEmail: {
+              templateId: 'notice.copy',
+              audience: 'host',
+              payload: {
+                copyKey: 'service.request_new.host',
+                copyParams: {
+                  requestTitle,
+                  requestCity,
+                  durationHours,
+                  guestCount,
+                },
+                ctaUrl: `/services/${requestId}`,
+              },
+            },
           });
         })
       ).catch((emailError) => {
@@ -124,23 +123,20 @@ export async function notifyServicePaymentOpened(params: ServicePaymentOpenedPar
       console.error('[ServiceNotificationFlows] customer payment-open notification insert failed:', customerNotificationError);
     }
 
-    void buildLocalizedEmailCopy({
-      supabaseAdmin,
-      userId: customerId,
-      key: 'service.payment_confirmed.customer',
-      copyParams: {
-        requestTitle,
-      },
-    }).then((emailCopy) =>
-      sendImmediateGenericEmail({
+    void sendImmediateGenericEmail({
       recipientUserId: customerId,
-      subject: emailCopy.subject,
-      title: emailCopy.title,
-      message: emailCopy.message,
-      link: `/services/${requestId}`,
-      ctaLabel: emailCopy.ctaLabel,
-    })
-    ).catch((emailError) => {
+      subject: '',
+      title: '',
+      message: '',
+      templatedEmail: {
+        templateId: 'service.payment_confirmed',
+        audience: 'guest',
+        payload: {
+          requestTitle,
+          ctaUrl: `/services/${requestId}`,
+        },
+      },
+    }).catch((emailError) => {
       console.error('[ServiceNotificationFlows] customer payment-open email failed:', emailError);
     });
 
@@ -188,22 +184,22 @@ export async function notifyServiceCancellationRequested(
 
   void Promise.allSettled(
     recipientIds.map(async (recipientId) => {
-      const emailCopy = await buildLocalizedEmailCopy({
-        supabaseAdmin,
-        userId: recipientId,
-        key: 'service.cancel_requested',
-        copyParams: {
-          requestTitle,
-        },
-      });
-
       return sendImmediateGenericEmail({
         recipientUserId: recipientId,
-        subject: emailCopy.subject,
-        title: emailCopy.title,
-        message: emailCopy.message,
-        link: `/services/${requestId}`,
-        ctaLabel: emailCopy.ctaLabel,
+        subject: '',
+        title: '',
+        message: '',
+        templatedEmail: {
+          templateId: 'notice.copy',
+          audience: recipientId === hostId ? 'host' : 'guest',
+          payload: {
+            copyKey: 'service.cancel_requested',
+            copyParams: {
+              requestTitle,
+            },
+            ctaUrl: `/services/${requestId}`,
+          },
+        },
       });
     })
   ).catch((emailError) => {
@@ -245,23 +241,23 @@ export async function notifyServiceCancellationCompleted(
 
   void Promise.allSettled(
     recipientIds.map(async (recipientId) => {
-      const emailCopy = await buildLocalizedEmailCopy({
-        supabaseAdmin,
-        userId: recipientId,
-        key: 'service.cancelled',
-        copyParams: {
-          requestTitle,
-          refundAmount,
-        },
-      });
-
       return sendImmediateGenericEmail({
         recipientUserId: recipientId,
-        subject: emailCopy.subject,
-        title: emailCopy.title,
-        message: emailCopy.message,
-        link: `/services/${requestId}`,
-        ctaLabel: emailCopy.ctaLabel,
+        subject: '',
+        title: '',
+        message: '',
+        templatedEmail: {
+          templateId: 'notice.copy',
+          audience: recipientId === hostId ? 'host' : 'guest',
+          payload: {
+            copyKey: 'service.cancelled',
+            copyParams: {
+              requestTitle,
+              refundAmount,
+            },
+            ctaUrl: `/services/${requestId}`,
+          },
+        },
       });
     })
   ).catch((emailError) => {

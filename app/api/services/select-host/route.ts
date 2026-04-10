@@ -3,7 +3,6 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
-import { buildLocalizedEmailCopy } from '@/app/utils/emailCopy';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 
 type SelectHostBody = {
@@ -159,23 +158,23 @@ function notifyServiceHostSelection(params: {
     console.error('Select Host Notification Error:', notificationError);
   });
 
-  buildLocalizedEmailCopy({
-    supabaseAdmin,
-    userId: selectedHostId,
-    key: 'service.host_selected',
-    copyParams: {
-      requestTitle,
-    },
-  }).then((emailCopy) =>
-    sendImmediateGenericEmail({
+  sendImmediateGenericEmail({
       recipientUserId: selectedHostId,
-      subject: emailCopy.subject,
-      title: emailCopy.title,
-      message: emailCopy.message,
-      link: `/services/${requestId}`,
-      ctaLabel: emailCopy.ctaLabel,
-    })
-  ).catch((emailError) => {
+      subject: '',
+      title: '',
+      message: '',
+      templatedEmail: {
+        templateId: 'notice.copy',
+        audience: 'host',
+        payload: {
+          copyKey: 'service.host_selected',
+          copyParams: {
+            requestTitle,
+          },
+          ctaUrl: `/services/${requestId}`,
+        },
+      },
+    }).catch((emailError) => {
     console.error('Select Host Email Error:', emailError);
   });
 

@@ -6,7 +6,6 @@ import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { settleExperienceBookingPayouts } from '@/app/utils/adminPayouts';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
-import { buildLocalizedEmailCopy } from '@/app/utils/emailCopy';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 
 // 🔒 관리자 권한 확인
@@ -154,22 +153,20 @@ export async function updateAdminStatus(
         }
 
         try {
-          const emailCopy = await buildLocalizedEmailCopy({
-            supabaseAdmin,
-            userId: app.user_id,
-            key: notificationKey,
-            copyParams: {
-              comment: trimmedComment,
-            },
-          });
-
           await sendImmediateGenericEmail({
             recipientUserId: app.user_id,
-            subject: emailCopy.subject,
-            title: emailCopy.title,
-            message: emailCopy.message,
-            link: notification.link,
-            ctaLabel: emailCopy.ctaLabel,
+            subject: '',
+            title: '',
+            message: '',
+            templatedEmail: {
+              templateId: 'host_application.status',
+              audience: 'host',
+              payload: {
+                status: status as 'approved' | 'revision' | 'rejected',
+                note: trimmedComment,
+                ctaUrl: notification.link,
+              },
+            },
           });
         } catch (emailError) {
           console.error('Host application status email failed:', emailError);

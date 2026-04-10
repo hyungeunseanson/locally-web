@@ -36,6 +36,13 @@ test.describe('Email localization helpers', () => {
     expect(reviewJa.message).toBe('「東京ナイトツアー」に新しいレビューが投稿されました。');
     expect(reviewJa.ctaLabel).toBe('レビューを見る');
 
+    const reviewReplyEn = buildEmailCopy('review.reply.guest', 'en', {
+      replyPreview: 'Thanks for joining.',
+    });
+    expect(reviewReplyEn.subject).toBe('[Locally] The host replied to your review');
+    expect(reviewReplyEn.message).toContain('Thanks for joining.');
+    expect(reviewReplyEn.ctaLabel).toBe('Check review');
+
     const circleEn = buildEmailCopy('membership.circle_welcome', 'en', {
       status: 'circle',
     });
@@ -54,6 +61,13 @@ test.describe('Email localization helpers', () => {
     });
     expect(bookingConfirmedJa.subject).toBe('[Locally] 予約が確定しました');
     expect(bookingConfirmedJa.message).toContain('決済が完了し、予約が確定しました');
+
+    const cancellationApprovedZh = buildEmailCopy('booking.cancellation_approved.guest', 'zh', {
+      experienceTitle: '首尔夜景散步',
+    });
+    expect(cancellationApprovedZh.subject).toBe('[Locally] 您的取消和退款已获批准');
+    expect(cancellationApprovedZh.message).toContain('取消和退款已获批准');
+    expect(cancellationApprovedZh.ctaLabel).toBe('查看行程');
 
     const bookingBankConfirmedHostEn = buildEmailCopy('booking.bank_confirmed.host', 'en', {
       experienceTitle: 'Seoul Night Walk',

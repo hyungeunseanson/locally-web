@@ -10,7 +10,6 @@ import { cancelCardPayment } from '@/app/utils/payments/card/server';
 import { refundPayPalCapture } from '@/app/utils/paypal/server';
 import { getBookingReviewType, isBookingReviewPending } from '@/app/utils/hostUnavailableReview';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
-import { buildLocalizedEmailCopy } from '@/app/utils/emailCopy';
 
 type ForceCancelBody = {
   bookingId?: string;
@@ -212,59 +211,55 @@ export async function POST(request: Request) {
       }
 
       if (hostId) {
-        const internalApiSecret = process.env.INTERNAL_API_SECRET;
-
-        if (!internalApiSecret) {
-          console.error('[ADMIN] INTERNAL_API_SECRET is missing. Skipping booking cancellation email dispatch.');
-        } else {
-          fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/notifications/send-email`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-internal-secret': internalApiSecret,
-            },
-            body: JSON.stringify({
-              type: 'booking_cancellation',
-              hostId,
+        void sendImmediateGenericEmail({
+          recipientUserId: hostId,
+          subject: '',
+          title: '',
+          message: '',
+          templatedEmail: {
+            templateId: 'booking.cancelled',
+            audience: 'host',
+            payload: {
               experienceTitle: expTitle,
-              cancelReason,
+              reason: cancelReason,
               refundAmount: settlement.refundAmount,
-            }),
-          }).catch((emailError) => {
-            console.error('[ADMIN] booking cancel email error:', emailError);
-          });
-        }
+              ctaUrl: '/host/dashboard',
+              variant: isHostFaultRequest ? 'host_fault' : 'admin_force',
+              reviewType:
+                reviewType === 'minimum_participants_unmet'
+                  ? 'minimum_participants_unmet'
+                  : reviewType === 'host_unavailable'
+                    ? 'host_unavailable'
+                    : undefined,
+            },
+          },
+        }).catch((emailError) => {
+          console.error('[ADMIN] booking cancel email error:', emailError);
+        });
       }
 
       if (guestId) {
-        const guestEmailCopy = await buildLocalizedEmailCopy({
-          supabaseAdmin,
-          userId: guestId,
-          key: isHostFaultRequest
-            ? 'booking.cancelled.host_fault.guest'
-            : 'booking.cancelled.admin_force.guest',
-          copyParams: isHostFaultRequest
-            ? {
-                experienceTitle: expTitle,
-                refundAmount: settlement.refundAmount,
-                reviewType:
-                  reviewType === 'minimum_participants_unmet'
-                    ? 'minimum_participants_unmet'
-                    : 'host_unavailable',
-              }
-            : {
-                experienceTitle: expTitle,
-                refundAmount: settlement.refundAmount,
-              },
-        });
-
         await sendImmediateGenericEmail({
           recipientUserId: guestId,
-          subject: guestEmailCopy.subject,
-          title: guestEmailCopy.title,
-          message: guestEmailCopy.message,
-          link: '/guest/trips',
-          ctaLabel: guestEmailCopy.ctaLabel,
+          subject: '',
+          title: '',
+          message: '',
+          templatedEmail: {
+            templateId: 'booking.cancelled',
+            audience: 'guest',
+            payload: {
+              experienceTitle: expTitle,
+              refundAmount: settlement.refundAmount,
+              ctaUrl: '/guest/trips',
+              variant: isHostFaultRequest ? 'host_fault' : 'admin_force',
+              reviewType:
+                reviewType === 'minimum_participants_unmet'
+                  ? 'minimum_participants_unmet'
+                  : reviewType === 'host_unavailable'
+                    ? 'host_unavailable'
+                    : undefined,
+            },
+          },
         });
       }
 

@@ -4,7 +4,6 @@ import { NextResponse } from 'next/server';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
-import { buildLocalizedEmailCopy } from '@/app/utils/emailCopy';
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -111,22 +110,22 @@ export async function POST(request: Request) {
         console.error('Review host notification error:', notificationError);
       }
 
-      const emailCopy = await buildLocalizedEmailCopy({
-        supabaseAdmin,
-        userId: experience.host_id,
-        key: 'review.new.host',
-        copyParams: {
-          experienceTitle: experience.title || 'Locally Experience',
-        },
-      });
-
       sendImmediateGenericEmail({
         recipientUserId: experience.host_id,
-        subject: emailCopy.subject,
-        title: emailCopy.title,
-        message: emailCopy.message,
-        link: '/host/dashboard?tab=reviews',
-        ctaLabel: emailCopy.ctaLabel,
+        subject: '',
+        title: '',
+        message: '',
+        templatedEmail: {
+          templateId: 'notice.copy',
+          audience: 'host',
+          payload: {
+            copyKey: 'review.new.host',
+            copyParams: {
+              experienceTitle: experience.title || 'Locally Experience',
+            },
+            ctaUrl: '/host/dashboard?tab=reviews',
+          },
+        },
       }).catch((emailError) => {
         console.error('Review host email error:', emailError);
       });

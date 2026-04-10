@@ -141,11 +141,21 @@ export async function sendAdminAlertEmails(params: {
     try {
       const result = await sendImmediateAdminEmail({
         to: recipient.email,
-        subject: params.subject,
-        title: params.title,
-        message: params.message,
-        link: params.link || '/admin/dashboard?tab=ALERTS',
-        ctaLabel: params.ctaLabel || '운영 대시보드 보기',
+        subject: '',
+        title: '',
+        message: '',
+        templatedEmail: {
+          templateId: 'notice.custom',
+          audience: 'admin',
+          payload: {
+            subject: params.subject,
+            title: params.title,
+            message: params.message,
+            ctaLabel: params.ctaLabel || '운영 대시보드 보기',
+            ctaUrl: params.link || '/admin/dashboard?tab=ALERTS',
+            footerVariant: 'opsAdmin',
+          },
+        },
       });
 
       if (result.sent) {

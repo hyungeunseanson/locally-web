@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
+import { sendTemplatedEmail } from '@/app/emails/delivery/sendTemplatedEmail';
+import type { EmailPayloadMap } from '@/app/emails/registry/emailTypes';
 import { resolveRecipientLocale, type NotificationLocale } from '@/app/utils/notificationLocale';
-import nodemailer from 'nodemailer';
 
 const CONTROL_CHAR_PATTERN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
 
@@ -33,10 +34,6 @@ type ReviewOwnershipRow = {
 type BookingOwnershipRow = {
   user_id: string;
   experiences: HostOwnershipRow | HostOwnershipRow[] | null;
-};
-
-type ProfileEmailRow = {
-  email: string | null;
 };
 
 function getRelatedHostId(relation: HostOwnershipRow | HostOwnershipRow[] | null | undefined) {
@@ -95,35 +92,6 @@ function sanitizeNotificationLink(rawValue: unknown) {
   } catch {
     return null;
   }
-}
-
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function getNotificationEmailHref(link: string | null) {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/+$/, '') || '';
-  if (!siteUrl || !link) return null;
-  return `${siteUrl}${link}`;
-}
-
-export function buildNotificationEmailHtml(
-  message: string,
-  link: string | null,
-  ctaLabel = '확인하기'
-) {
-  const escapedMessage = escapeHtml(message).replace(/\n/g, '<br/>');
-  const href = getNotificationEmailHref(link);
-  const cta = href
-    ? `<br/><a href="${escapeHtml(href)}">${escapeHtml(ctaLabel)}</a>`
-    : '';
-
-  return `<p>${escapedMessage}</p>${cta}`;
 }
 
 function buildReviewReplyNotificationCopy(locale: NotificationLocale, replyPreview: string) {
@@ -237,6 +205,43 @@ export function resolveLocalizedSingleRecipientCopy(params: {
       locale,
       typeof copyParams?.experienceTitle === 'string' ? copyParams.experienceTitle : null
     );
+  }
+
+  return null;
+}
+
+function resolveLocalizedSingleRecipientTemplatePayload(params: {
+  type?: string;
+  copyKey?: NotificationRequestBody['copy_key'];
+  copyParams?: NotificationRequestBody['copy_params'];
+  ctaUrl: string;
+}): EmailPayloadMap['notice.copy'] | null {
+  const { type, copyKey, copyParams, ctaUrl } = params;
+
+  if (
+    type === 'review_reply' &&
+    copyKey === 'review_reply' &&
+    copyParams &&
+    typeof copyParams.replyPreview === 'string'
+  ) {
+    return {
+      copyKey: 'review.reply.guest',
+      copyParams: {
+        replyPreview: copyParams.replyPreview,
+      },
+      ctaUrl,
+    };
+  }
+
+  if (type === 'cancellation_approved' && copyKey === 'cancellation_approved') {
+    return {
+      copyKey: 'booking.cancellation_approved.guest',
+      copyParams: {
+        experienceTitle:
+          typeof copyParams?.experienceTitle === 'string' ? copyParams.experienceTitle : undefined,
+      },
+      ctaUrl,
+    };
   }
 
   return null;
@@ -360,32 +365,36 @@ export async function POST(request: Request) {
       else console.log('✅ [API] DB 일괄 저장 성공');
 
       // 2. 이메일 대상 조회 (한 번에 조회)
-      const { data: profiles } = await supabase
+      const { data: profileRows } = await supabase
         .from('profiles')
-        .select('email')
+        .select('id, email')
         .in('id', recipient_ids);
 
-      const emails = (profiles as ProfileEmailRow[] | null)?.flatMap((profile) =>
-        profile.email ? [profile.email] : []
-      ) || [];
+      const recipients = (profileRows as Array<{ id: string; email: string | null }> | null)?.map((profile) => ({
+        userId: profile.id,
+        email: profile.email || null,
+      })) || [];
 
       // 3. 이메일 발송 (병렬 처리)
-      if (emails.length > 0) {
-        const transporter = nodemailer.createTransport({
-          service: 'gmail',
-          auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
-        });
-
-        // 서버 부하 방지를 위해 Promise.all 사용 (비동기 병렬 발송)
-        await Promise.all(emails.map((email: string) =>
-          transporter.sendMail({
-            from: `"Locally Team" <${process.env.GMAIL_USER}>`,
-            to: email,
-            subject: `[Locally] ${safeTitle}`,
-            html: buildNotificationEmailHtml(safeMessage, safeMassLink),
-          }).catch(e => console.error(`❌ 이메일 발송 실패 (${email}):`, e))
+      if (recipients.length > 0) {
+        await Promise.all(recipients.map((recipient) =>
+          sendTemplatedEmail({
+            templateId: 'notice.custom',
+            audience: 'guest',
+            recipient: {
+              userId: recipient.userId,
+              email: recipient.email,
+            },
+            payload: {
+              subject: `[Locally] ${safeTitle}`,
+              title: safeTitle,
+              message: safeMessage,
+              ctaLabel: '확인하기',
+              ctaUrl: safeMassLink || '/notifications',
+            },
+          }).catch((e) => console.error(`❌ 이메일 발송 실패 (${recipient.email || recipient.userId}):`, e))
         ));
-        console.log(`📨 [API] 이메일 ${emails.length}건 발송 시도 완료`);
+        console.log(`📨 [API] 이메일 ${recipients.length}건 발송 시도 완료`);
       }
 
       return NextResponse.json({ success: true, count: recipient_ids.length });
@@ -445,40 +454,40 @@ export async function POST(request: Request) {
     }
     console.log('✅ [Notification API] DB 저장 성공 (알림창 노출)');
 
-    // 3. 수신자 이메일 찾기 (기존 로직)
-    let emailToSend = '';
-    const { data: userProfile } = await supabase.from('profiles').select('email').eq('id', recipient_id).maybeSingle();
-    if (userProfile?.email) emailToSend = userProfile.email;
-    else {
-      const { data: authData } = await supabase.auth.admin.getUserById(recipient_id);
-      if (authData?.user?.email) emailToSend = authData.user.email;
-    }
-
-    if (!emailToSend) {
-      console.error('❌ [Notification API] 이메일 없음');
-      // DB 저장은 성공했을 수 있으므로 에러 대신 성공 처리하되 로그만 남김 (선택 사항)
-      // return NextResponse.json({ error: 'Email not found' }, { status: 404 });
-    }
-
     // 4. 메일 발송 — 실패해도 인앱 알림(DB)은 이미 저장됐으므로 성공 응답
-    if (emailToSend) {
-      try {
-        const transporter = nodemailer.createTransport({
-          service: 'gmail',
-          auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
-        });
-
-        await transporter.sendMail({
-          from: `"Locally Team" <${process.env.GMAIL_USER}>`,
-          to: emailToSend,
+    try {
+      const linkForEmail = safeLink || '/notifications';
+      const localizedTemplatePayload = resolveLocalizedSingleRecipientTemplatePayload({
+        type,
+        copyKey: copy_key,
+        copyParams: copy_params,
+        ctaUrl: linkForEmail,
+      });
+      const result = await sendTemplatedEmail({
+        templateId: localizedTemplatePayload ? 'notice.copy' : 'notice.custom',
+        audience: 'guest',
+        recipient: {
+          userId: recipient_id,
+        },
+        payload: localizedTemplatePayload || {
           subject: `[Locally] ${finalTitle}`,
-          html: buildNotificationEmailHtml(finalMessage, safeLink, finalCtaLabel),
-        });
+          title: finalTitle,
+          message: finalMessage,
+          ctaLabel: finalCtaLabel,
+          ctaUrl: linkForEmail,
+        },
+      }, {
+        supabaseAdmin: supabase,
+      });
+
+      if (result.sent) {
         console.log('🚀 [Notification API] 이메일 발송 성공');
-      } catch (emailError: unknown) {
-        // 이메일 실패는 인앱 알림 성공과 무관 — 경고 로그만 남기고 계속 진행
-        console.warn('⚠️ [Notification API] 이메일 발송 실패 (인앱 알림은 저장됨):', getErrorMessage(emailError));
+      } else {
+        console.warn(`⚠️ [Notification API] 이메일 발송 스킵: ${result.skipped || 'unknown'}`);
       }
+    } catch (emailError: unknown) {
+      // 이메일 실패는 인앱 알림 성공과 무관 — 경고 로그만 남기고 계속 진행
+      console.warn('⚠️ [Notification API] 이메일 발송 실패 (인앱 알림은 저장됨):', getErrorMessage(emailError));
     }
 
     return NextResponse.json({ success: true });

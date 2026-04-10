@@ -1,5 +1,3 @@
-import nodemailer from 'nodemailer';
-
 import {
   ACTIVE_CHAT_POLICY_SIGNAL_CATEGORIES,
   CHAT_POLICY_SIGNAL_LABELS,
@@ -12,6 +10,7 @@ import { startOrAdvanceAdminSupportUnreadBatch } from '@/app/utils/adminSupportU
 import { insertAdminAlerts, sendAdminAlertEmails } from '@/app/utils/adminAlertCenter';
 import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
+import { sendTemplatedEmail } from '@/app/emails/delivery/sendTemplatedEmail';
 import { sanitizeText, sanitizeUrl } from '@/app/utils/sanitize';
 
 type AuthActor = {
@@ -277,18 +276,23 @@ async function notifyRecipient(params: {
       localizeEmailForRecipient,
     });
 
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
-    });
-
-    void transporter
-      .sendMail({
-        from: `"Locally Team" <${process.env.GMAIL_USER}>`,
-        to: email,
-        subject: emailCopy.subject,
-        html: `<p>${escapeHtml(emailCopy.message)}</p><br/><a href="${process.env.NEXT_PUBLIC_SITE_URL || ''}${encodeURI(link)}">${escapeHtml(emailCopy.ctaLabel)}</a>`,
-      })
+    void sendTemplatedEmail({
+      templateId: 'inquiry.new_message',
+      audience: localizeEmailForRecipient ? 'guest' : 'admin',
+      locale: localizeEmailForRecipient ? locale : 'ko',
+      recipient: {
+        userId: recipientId,
+        email,
+      },
+      payload: {
+        actorName: actorDisplayName,
+        messagePreview: emailCopy.message,
+        ctaUrl: link,
+      },
+      transportPolicy: 'transactional',
+    }, {
+      supabaseAdmin,
+    })
       .catch((error) => {
         console.warn('[inquiries/thread] message notification email failed:', error);
       });

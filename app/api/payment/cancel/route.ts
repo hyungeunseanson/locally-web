@@ -11,7 +11,6 @@ import { refundPayPalCapture } from '@/app/utils/paypal/server';
 import { captureServerException } from '@/app/utils/monitoring/sentry';
 import { calculateGuestCancellationRefundRate } from '@/app/utils/bookingCancellationPolicy';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
-import { buildLocalizedEmailCopy } from '@/app/utils/emailCopy';
 import {
   formatBookingReviewMarker,
   isBookingReviewPending,
@@ -327,53 +326,46 @@ export async function POST(request: Request) {
       // [Security Fix] 기존 HTTP fetch + x-internal-secret(SERVICE_ROLE_KEY 헤더 전송) 제거
       // — NEXT_PUBLIC_SITE_URL은 클라이언트 노출 변수로 SSRF 위험, 대신 직접 함수 호출
       if (hostEmail) {
-        void buildLocalizedEmailCopy({
-          supabaseAdmin,
-          userId: hostId,
-          key: 'booking.cancelled.host',
-          copyParams: {
-            experienceTitle: expTitle,
-            reason: normalizedUserReason || null,
-            refundAmount,
+        void sendImmediateGenericEmail({
+          recipientUserId: hostId,
+          recipientEmail: hostEmail,
+          subject: '',
+          title: '',
+          message: '',
+          templatedEmail: {
+            templateId: 'booking.cancelled',
+            audience: 'host',
+            payload: {
+              experienceTitle: expTitle,
+              reason: normalizedUserReason || undefined,
+              refundAmount,
+              ctaUrl: '/host/dashboard',
+              variant: 'standard',
+            },
           },
-        })
-          .then((hostEmailCopy) =>
-            sendImmediateGenericEmail({
-              recipientUserId: hostId,
-              subject: hostEmailCopy.subject,
-              title: hostEmailCopy.title,
-              message: hostEmailCopy.message,
-              link: '/host/dashboard',
-              ctaLabel: hostEmailCopy.ctaLabel,
-            })
-          )
-          .catch(e => console.error('Host booking cancellation email failed:', e));
+        }).catch(e => console.error('Host booking cancellation email failed:', e));
       }
     }
 
     if (booking.user_id) {
-      void buildLocalizedEmailCopy({
-        supabaseAdmin,
-        userId: booking.user_id,
-        key: 'booking.cancelled.guest',
-        copyParams: {
-          experienceTitle: expTitle,
-          refundAmount,
+      void sendImmediateGenericEmail({
+        recipientUserId: booking.user_id as string,
+        subject: '',
+        title: '',
+        message: '',
+        templatedEmail: {
+          templateId: 'booking.cancelled',
+          audience: 'guest',
+          payload: {
+            experienceTitle: expTitle,
+            refundAmount,
+            ctaUrl: '/guest/trips',
+            variant: 'standard',
+          },
         },
-      })
-        .then((guestEmailCopy) =>
-          sendImmediateGenericEmail({
-            recipientUserId: booking.user_id as string,
-            subject: guestEmailCopy.subject,
-            title: guestEmailCopy.title,
-            message: guestEmailCopy.message,
-            link: '/guest/trips',
-            ctaLabel: guestEmailCopy.ctaLabel,
-          })
-        )
-        .catch((emailError) => {
-          console.error('Guest booking cancellation email failed:', emailError);
-        });
+      }).catch((emailError) => {
+        console.error('Guest booking cancellation email failed:', emailError);
+      });
     }
 
     await insertAdminAlerts({

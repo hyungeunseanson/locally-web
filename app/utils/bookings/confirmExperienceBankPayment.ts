@@ -3,7 +3,6 @@ import { revalidatePath } from 'next/cache';
 
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { getBookingSettlementSnapshot } from '@/app/utils/bookingFinance';
-import { buildLocalizedEmailCopy } from '@/app/utils/emailCopy';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { notifyMembershipMilestone } from '@/app/utils/memberMilestoneNotifications';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
@@ -263,22 +262,22 @@ export async function runExperienceBankConfirmSideEffects(
 
   if (hostId) {
     try {
-      const hostEmailCopy = await buildLocalizedEmailCopy({
-        supabaseAdmin,
-        userId: hostId,
-        key: 'booking.bank_confirmed.host',
-        copyParams: {
-          experienceTitle,
-        },
-      });
-
       await sendImmediateGenericEmail({
         recipientUserId: hostId,
-        subject: hostEmailCopy.subject,
-        title: hostEmailCopy.title,
-        message: hostEmailCopy.message,
-        link: '/host/dashboard',
-        ctaLabel: hostEmailCopy.ctaLabel,
+        subject: '',
+        title: '',
+        message: '',
+        templatedEmail: {
+          templateId: 'notice.copy',
+          audience: 'host',
+          payload: {
+            copyKey: 'booking.bank_confirmed.host',
+            copyParams: {
+              experienceTitle,
+            },
+            ctaUrl: '/host/dashboard',
+          },
+        },
       });
     } catch (error) {
       console.error('[experience bank confirm] host email failed:', error);
@@ -287,22 +286,22 @@ export async function runExperienceBankConfirmSideEffects(
 
   if (booking.user_id) {
     try {
-      const guestEmailCopy = await buildLocalizedEmailCopy({
-        supabaseAdmin,
-        userId: booking.user_id,
-        key: 'booking.bank_confirmed.guest',
-        copyParams: {
-          experienceTitle,
-        },
-      });
-
       await sendImmediateGenericEmail({
         recipientUserId: booking.user_id,
-        subject: guestEmailCopy.subject,
-        title: guestEmailCopy.title,
-        message: guestEmailCopy.message,
-        link: '/guest/trips',
-        ctaLabel: guestEmailCopy.ctaLabel,
+        subject: '',
+        title: '',
+        message: '',
+        templatedEmail: {
+          templateId: 'notice.copy',
+          audience: 'guest',
+          payload: {
+            copyKey: 'booking.bank_confirmed.guest',
+            copyParams: {
+              experienceTitle,
+            },
+            ctaUrl: '/guest/trips',
+          },
+        },
       });
     } catch (error) {
       console.error('[experience bank confirm] guest email failed:', error);

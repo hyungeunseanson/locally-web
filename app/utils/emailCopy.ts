@@ -10,6 +10,10 @@ type ReviewNewHostParams = {
   experienceTitle: string;
 };
 
+type ReviewReplyGuestParams = {
+  replyPreview: string;
+};
+
 type MembershipParams = {
   status: 'member' | 'circle';
 };
@@ -46,6 +50,10 @@ type ReviewType = 'host_unavailable' | 'minimum_participants_unmet';
 
 type BookingConfirmedGuestParams = {
   experienceTitle: string;
+};
+
+type BookingCancellationApprovedGuestParams = {
+  experienceTitle?: string | null;
 };
 
 type BookingBankConfirmedHostParams = {
@@ -100,12 +108,14 @@ export type EmailCopy = {
 
 export type EmailCopyKey =
   | 'review.new.host'
+  | 'review.reply.guest'
   | 'membership.member_welcome'
   | 'membership.circle_welcome'
   | 'host_application.approved'
   | 'host_application.revision'
   | 'host_application.rejected'
   | 'booking.confirmed.guest'
+  | 'booking.cancellation_approved.guest'
   | 'booking.bank_confirmed.host'
   | 'booking.bank_confirmed.guest'
   | 'booking.cancelled.host'
@@ -126,12 +136,14 @@ export type EmailCopyKey =
 
 type EmailCopyParams = {
   'review.new.host': ReviewNewHostParams;
+  'review.reply.guest': ReviewReplyGuestParams;
   'membership.member_welcome': MembershipParams;
   'membership.circle_welcome': MembershipParams;
   'host_application.approved': HostApplicationStatusParams;
   'host_application.revision': HostApplicationStatusParams;
   'host_application.rejected': HostApplicationStatusParams;
   'booking.confirmed.guest': BookingConfirmedGuestParams;
+  'booking.cancellation_approved.guest': BookingCancellationApprovedGuestParams;
   'booking.bank_confirmed.host': BookingBankConfirmedHostParams;
   'booking.bank_confirmed.guest': BookingBankConfirmedGuestParams;
   'booking.cancelled.host': BookingCancelledHostParams;
@@ -192,6 +204,45 @@ function buildReviewNewHostEmailCopy(
         subject: '[Locally] 새 후기가 등록되었습니다',
         title: '새 후기가 등록되었습니다',
         message: `'${experienceTitle}'에 새 후기가 작성되었습니다.`,
+        ctaLabel: '후기 확인하기',
+      };
+  }
+}
+
+function buildReviewReplyGuestEmailCopy(
+  locale: NotificationLocale,
+  params: ReviewReplyGuestParams
+): EmailCopy {
+  const { replyPreview } = params;
+
+  switch (locale) {
+    case 'en':
+      return {
+        subject: '[Locally] The host replied to your review',
+        title: 'The host replied to your review',
+        message: `There is a new reply to your review: "${replyPreview}"`,
+        ctaLabel: 'Check review',
+      };
+    case 'ja':
+      return {
+        subject: '[Locally] ホストがレビューに返信しました',
+        title: 'ホストがレビューに返信しました',
+        message: `レビューに新しい返信が届きました: 「${replyPreview}」`,
+        ctaLabel: 'レビューを確認',
+      };
+    case 'zh':
+      return {
+        subject: '[Locally] 房东回复了你的评价',
+        title: '房东回复了你的评价',
+        message: `你的评价收到了新回复：「${replyPreview}」`,
+        ctaLabel: '查看评价',
+      };
+    case 'ko':
+    default:
+      return {
+        subject: '[Locally] 호스트님이 후기에 답글을 남겼습니다',
+        title: '호스트님이 후기에 답글을 남겼습니다',
+        message: `후기에 답글이 달렸습니다: "${replyPreview}"`,
         ctaLabel: '후기 확인하기',
       };
   }
@@ -752,6 +803,74 @@ function buildBookingCancelledEmailCopy(
   }
 }
 
+function buildBookingCancellationApprovedGuestEmailCopy(
+  locale: NotificationLocale,
+  params: BookingCancellationApprovedGuestParams
+): EmailCopy {
+  const normalizedTitle =
+    typeof params.experienceTitle === 'string' ? params.experienceTitle.trim() : '';
+
+  switch (locale) {
+    case 'en':
+      return normalizedTitle
+        ? {
+            subject: '[Locally] Your cancellation and refund have been approved',
+            title: 'Your cancellation and refund have been approved',
+            message: `The cancellation and refund for "${normalizedTitle}" have been approved.`,
+            ctaLabel: 'Check trip',
+          }
+        : {
+            subject: '[Locally] Your cancellation and refund have been approved',
+            title: 'Your cancellation and refund have been approved',
+            message: 'Your cancellation and refund have been approved.',
+            ctaLabel: 'Check trip',
+          };
+    case 'ja':
+      return normalizedTitle
+        ? {
+            subject: '[Locally] キャンセルと返金が承認されました',
+            title: 'キャンセルと返金が承認されました',
+            message: `「${normalizedTitle}」のキャンセルと返金が承認されました。`,
+            ctaLabel: '旅行を確認',
+          }
+        : {
+            subject: '[Locally] キャンセルと返金が承認されました',
+            title: 'キャンセルと返金が承認されました',
+            message: 'キャンセルと返金が承認されました。',
+            ctaLabel: '旅行を確認',
+          };
+    case 'zh':
+      return normalizedTitle
+        ? {
+            subject: '[Locally] 您的取消和退款已获批准',
+            title: '您的取消和退款已获批准',
+            message: `“${normalizedTitle}”的取消和退款已获批准。`,
+            ctaLabel: '查看行程',
+          }
+        : {
+            subject: '[Locally] 您的取消和退款已获批准',
+            title: '您的取消和退款已获批准',
+            message: '您的取消和退款已获批准。',
+            ctaLabel: '查看行程',
+          };
+    case 'ko':
+    default:
+      return normalizedTitle
+        ? {
+            subject: '[Locally] 취소 및 환불이 승인되었습니다',
+            title: '취소 및 환불이 승인되었습니다',
+            message: `"${normalizedTitle}" 취소 및 환불이 승인되었습니다.`,
+            ctaLabel: '여행 확인하기',
+          }
+        : {
+            subject: '[Locally] 취소 및 환불이 승인되었습니다',
+            title: '취소 및 환불이 승인되었습니다',
+            message: '취소 및 환불이 승인되었습니다.',
+            ctaLabel: '여행 확인하기',
+          };
+  }
+}
+
 function buildServiceRequestNewHostEmailCopy(
   locale: NotificationLocale,
   params: ServiceRequestNewHostParams
@@ -1201,6 +1320,11 @@ export function buildEmailCopy<K extends EmailCopyKey>(
   switch (key) {
     case 'review.new.host':
       return buildReviewNewHostEmailCopy(locale, copyParams as EmailCopyParams['review.new.host']);
+    case 'review.reply.guest':
+      return buildReviewReplyGuestEmailCopy(
+        locale,
+        copyParams as EmailCopyParams['review.reply.guest']
+      );
     case 'membership.member_welcome':
     case 'membership.circle_welcome':
       return buildMembershipEmailCopy(locale, {
@@ -1219,6 +1343,11 @@ export function buildEmailCopy<K extends EmailCopyKey>(
       return buildBookingConfirmedGuestEmailCopy(
         locale,
         copyParams as EmailCopyParams['booking.confirmed.guest']
+      );
+    case 'booking.cancellation_approved.guest':
+      return buildBookingCancellationApprovedGuestEmailCopy(
+        locale,
+        copyParams as EmailCopyParams['booking.cancellation_approved.guest']
       );
     case 'booking.bank_confirmed.host':
     case 'booking.bank_confirmed.guest':

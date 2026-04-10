@@ -1,16 +1,12 @@
 import { expect, test } from '@playwright/test';
 
 import {
-  buildNotificationEmailHtml,
   resolveLocalizedSingleRecipientCopy,
 } from '@/app/api/notifications/email/route';
+import { buildNoticeCopyTemplateProps } from '@/app/emails/registry/emailContentBuilders';
 
 test.describe('Shared notification email CTA localization', () => {
-  test.beforeEach(() => {
-    process.env.NEXT_PUBLIC_SITE_URL = 'https://locally.test';
-  });
-
-  test('localizes review reply CTA label and preserves localized email html', () => {
+  test('localizes review reply CTA label through the typed notice template', () => {
     const localizedCopy = resolveLocalizedSingleRecipientCopy({
       locale: 'en',
       type: 'review_reply',
@@ -23,17 +19,24 @@ test.describe('Shared notification email CTA localization', () => {
     expect(localizedCopy?.title).toBe('The host replied to your review');
     expect(localizedCopy?.ctaLabel).toBe('Check review');
 
-    const html = buildNotificationEmailHtml(
-      localizedCopy?.message || '',
-      '/guest/trips',
-      localizedCopy?.ctaLabel
-    );
+    const rendered = buildNoticeCopyTemplateProps({
+      audience: 'guest',
+      locale: 'en',
+      payload: {
+        copyKey: 'review.reply.guest',
+        copyParams: {
+          replyPreview: 'Thanks for joining.',
+        },
+        ctaUrl: '/guest/trips',
+      },
+    });
 
-    expect(html).toContain('Check review');
-    expect(html).not.toContain('확인하기');
+    expect(rendered.ctaLabel).toBe('Check review');
+    expect(rendered.bodyText).toContain('Thanks for joining.');
+    expect(rendered.ctaUrl).toContain('/guest/trips');
   });
 
-  test('localizes cancellation approved CTA label and keeps default fallback Korean', () => {
+  test('localizes cancellation approved CTA label and keeps the Korean fallback explicit', () => {
     const localizedCopy = resolveLocalizedSingleRecipientCopy({
       locale: 'ja',
       type: 'cancellation_approved',
@@ -46,16 +49,27 @@ test.describe('Shared notification email CTA localization', () => {
     expect(localizedCopy?.title).toBe('キャンセルと返金が承認されました');
     expect(localizedCopy?.ctaLabel).toBe('旅行を確認');
 
-    const localizedHtml = buildNotificationEmailHtml(
-      localizedCopy?.message || '',
-      '/guest/trips',
-      localizedCopy?.ctaLabel
-    );
+    const rendered = buildNoticeCopyTemplateProps({
+      audience: 'guest',
+      locale: 'ja',
+      payload: {
+        copyKey: 'booking.cancellation_approved.guest',
+        copyParams: {
+          experienceTitle: '東京ナイトツアー',
+        },
+        ctaUrl: '/guest/trips',
+      },
+    });
 
-    expect(localizedHtml).toContain('旅行を確認');
-    expect(localizedHtml).not.toContain('확인하기');
+    expect(rendered.ctaLabel).toBe('旅行を確認');
+    expect(rendered.bodyText).toContain('東京ナイトツアー');
 
-    const fallbackHtml = buildNotificationEmailHtml('기본 메시지', '/guest/trips');
-    expect(fallbackHtml).toContain('확인하기');
+    const fallbackLabel =
+      resolveLocalizedSingleRecipientCopy({
+        locale: 'ko',
+        type: 'general',
+      })?.ctaLabel || '확인하기';
+
+    expect(fallbackLabel).toBe('확인하기');
   });
 });

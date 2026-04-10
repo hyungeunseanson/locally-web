@@ -4,7 +4,6 @@ import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { sendImmediateAdminEmail } from '@/app/utils/adminEmailProvider';
-import { buildLocalizedEmailCopy } from '@/app/utils/emailCopy';
 import { createInquiryMessage } from '@/app/api/inquiries/thread/shared';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 import { getProxyLinkedInquiryId } from '@/app/utils/proxyBooking';
@@ -137,23 +136,23 @@ export async function POST(
                     console.error('Failed to insert proxy reply notification:', notificationError);
                 }
 
-                const emailCopy = await buildLocalizedEmailCopy({
-                    supabaseAdmin,
-                    userId: proxyReq.user_id,
-                    key: 'proxy.comment_reply',
-                    copyParams: {
-                        content: content.trim(),
-                    },
-                });
-
                 await sendImmediateGenericEmail({
                     recipientEmail: userEmail || null,
                     recipientUserId: proxyReq.user_id,
-                    subject: emailCopy.subject,
-                    title: emailCopy.title,
-                    message: emailCopy.message,
-                    link: notificationLink,
-                    ctaLabel: emailCopy.ctaLabel,
+                    subject: '',
+                    title: '',
+                    message: '',
+                    templatedEmail: {
+                        templateId: 'notice.copy',
+                        audience: 'guest',
+                        payload: {
+                            copyKey: 'proxy.comment_reply',
+                            copyParams: {
+                                content: content.trim(),
+                            },
+                            ctaUrl: notificationLink,
+                        },
+                    },
                 }).catch((err) => console.error('Failed to send proxy reply email:', err));
             } else {
                 const adminEmail = process.env.ADMIN_SUPPORT_EMAIL || process.env.GMAIL_USER || null;
@@ -162,11 +161,21 @@ export async function POST(
                 } else {
                     await sendImmediateAdminEmail({
                         to: adminEmail,
-                        subject: '[Locally Admin] 전화 예약 요청에 새 답변이 등록되었습니다',
-                        title: '전화 예약 요청에 새 답변이 등록되었습니다',
-                        message: content.trim(),
-                        link: `/proxy-bookings/${requestId}`,
-                        ctaLabel: '전화 예약 요청 보기',
+                        subject: '',
+                        title: '',
+                        message: '',
+                        templatedEmail: {
+                            templateId: 'notice.custom',
+                            audience: 'admin',
+                            payload: {
+                                subject: '[Locally Admin] 전화 예약 요청에 새 답변이 등록되었습니다',
+                                title: '전화 예약 요청에 새 답변이 등록되었습니다',
+                                message: content.trim(),
+                                ctaLabel: '전화 예약 요청 보기',
+                                ctaUrl: `/proxy-bookings/${requestId}`,
+                                footerVariant: 'opsAdmin',
+                            },
+                        },
                     }).catch(err => console.error('Failed to send proxy comment admin email:', err));
                 }
             }

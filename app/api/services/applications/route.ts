@@ -3,7 +3,6 @@ import { createClient as createServerClient } from '@/app/utils/supabase/server'
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
-import { buildLocalizedEmailCopy } from '@/app/utils/emailCopy';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 import { isApprovedHostEligibleForServiceRequest } from '@/app/utils/serviceHostNotifications';
 
@@ -136,23 +135,23 @@ export async function POST(request: Request) {
       console.error('Service Application Notification Error:', notificationError);
     });
 
-    buildLocalizedEmailCopy({
-      supabaseAdmin,
-      userId: serviceRequest.user_id,
-      key: 'service.application_new.customer',
-      copyParams: {
-        requestTitle: serviceRequest.title,
-      },
-    }).then((emailCopy) =>
-      sendImmediateGenericEmail({
+    sendImmediateGenericEmail({
         recipientUserId: serviceRequest.user_id,
-        subject: emailCopy.subject,
-        title: emailCopy.title,
-        message: emailCopy.message,
-        link: `/services/${request_id}`,
-        ctaLabel: emailCopy.ctaLabel,
-      })
-    ).catch((emailError) => {
+        subject: '',
+        title: '',
+        message: '',
+        templatedEmail: {
+          templateId: 'notice.copy',
+          audience: 'guest',
+          payload: {
+            copyKey: 'service.application_new.customer',
+            copyParams: {
+              requestTitle: serviceRequest.title,
+            },
+            ctaUrl: `/services/${request_id}`,
+          },
+        },
+      }).catch((emailError) => {
       console.error('Service Application Email Error:', emailError);
     });
 
