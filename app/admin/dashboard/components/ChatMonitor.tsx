@@ -248,6 +248,7 @@ export default function ChatMonitor() {
   };
 
   const openHostProfile = () => {
+    if (selectedInquiry && isAdminSupportInquiry(selectedInquiry.type)) return;
     const hostProfile = buildHostProfile(selectedInquiry);
     if (!hostProfile) return;
     setProfileModal(hostProfile);
@@ -267,7 +268,7 @@ export default function ChatMonitor() {
     ? Boolean(selectedInquiry.has_policy_signal || messages.some((message) => message.has_policy_signal))
     : false;
   const guestProfile = buildGuestProfile(selectedInquiry);
-  const hostProfile = buildHostProfile(selectedInquiry);
+  const hostProfile = selectedIsAdminSupport ? null : buildHostProfile(selectedInquiry);
 
   return (
     <div className="flex h-[calc(100dvh-190px)] md:h-[calc(100dvh-185px)] lg:h-[calc(100dvh-195px)] gap-4 md:gap-6 w-full relative">
@@ -441,7 +442,7 @@ export default function ChatMonitor() {
             </div>
 
             <div className="px-3 md:px-4 py-3 border-b border-slate-100 bg-white">
-              <div className="grid gap-2 md:grid-cols-2">
+              <div className={`grid gap-2 ${selectedIsAdminSupport ? '' : 'md:grid-cols-2'}`}>
                 <button
                   type="button"
                   data-participant-card="guest"
@@ -472,42 +473,44 @@ export default function ChatMonitor() {
                   </div>
                 </button>
 
-                <button
-                  type="button"
-                  data-participant-card="host"
-                  aria-label="호스트 프로필 열기"
-                  onClick={openHostProfile}
-                  disabled={!hostProfile}
-                  className={`rounded-xl border p-3 text-left transition-colors ${
-                    hostProfile
-                      ? 'border-slate-200 bg-slate-50 hover:border-emerald-200 hover:bg-emerald-50/70'
-                      : 'cursor-not-allowed border-slate-200 bg-slate-50/70 opacity-70'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm">
-                      {hostProfile?.avatar_url ? (
-                        <Image
-                          src={hostProfile.avatar_url}
-                          className="h-full w-full object-cover"
-                          alt="호스트 프로필"
-                          width={44}
-                          height={44}
-                          unoptimized
-                        />
-                      ) : (
-                        <User className="h-5 w-5 text-slate-400" />
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-[10px] md:text-[11px] font-bold uppercase text-slate-500">Host</div>
-                      <div className="truncate text-xs font-bold text-slate-900 md:text-sm">{getHostName(selectedInquiry)}</div>
-                      <div className="mt-1 text-[10px] text-slate-500 md:text-[11px]">
-                        {hostProfile ? '클릭하여 프로필 보기' : '연결된 호스트 정보 없음'}
+                {!selectedIsAdminSupport && (
+                  <button
+                    type="button"
+                    data-participant-card="host"
+                    aria-label="호스트 프로필 열기"
+                    onClick={openHostProfile}
+                    disabled={!hostProfile}
+                    className={`rounded-xl border p-3 text-left transition-colors ${
+                      hostProfile
+                        ? 'border-slate-200 bg-slate-50 hover:border-emerald-200 hover:bg-emerald-50/70'
+                        : 'cursor-not-allowed border-slate-200 bg-slate-50/70 opacity-70'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm">
+                        {hostProfile?.avatar_url ? (
+                          <Image
+                            src={hostProfile.avatar_url}
+                            className="h-full w-full object-cover"
+                            alt="호스트 프로필"
+                            width={44}
+                            height={44}
+                            unoptimized
+                          />
+                        ) : (
+                          <User className="h-5 w-5 text-slate-400" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[10px] md:text-[11px] font-bold uppercase text-slate-500">Host</div>
+                        <div className="truncate text-xs font-bold text-slate-900 md:text-sm">{getHostName(selectedInquiry)}</div>
+                        <div className="mt-1 text-[10px] text-slate-500 md:text-[11px]">
+                          {hostProfile ? '클릭하여 프로필 보기' : '연결된 호스트 정보 없음'}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </button>
+                  </button>
+                )}
               </div>
             </div>
 

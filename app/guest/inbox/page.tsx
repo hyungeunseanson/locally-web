@@ -304,8 +304,16 @@ function InboxContent() {
   const getDisplayHost = (inqOrSelected: {
     id?: string | number;
     host_id?: string | null;
+    type?: string | null;
     host?: { id: string | null; name: string; avatar_url: string | null };
   } | null | undefined) => {
+    if (isAdminSupportInquiry(inqOrSelected?.type)) {
+      return {
+        name: t('admin_name'),
+        avatar: ADMIN_SUPPORT_AVATAR_SRC,
+        id: null,
+      };
+    }
     if (inqOrSelected?.host) {
       return {
         name: inqOrSelected.host.name,
@@ -328,6 +336,7 @@ function InboxContent() {
 
   // 🟢 프로필 클릭 핸들러
   const handleProfileClick = (id: string | null) => {
+    if (selectedIsAdminSupport) return;
     if (id) {
       setModalUserId(id);
     }
@@ -337,7 +346,7 @@ function InboxContent() {
     <div className="h-[100dvh] bg-white text-slate-900 font-sans flex flex-col overflow-hidden">
       <SiteHeader />
 
-      {/* 게스트는 무조건 호스트의 프로필을 봐야 하므로 role="host" 고정 */}
+      {/* 일반 문의에서는 호스트 프로필 모달을 재사용하고, 고객센터 문의에서는 클릭 자체를 비활성화한다. */}
       <UserProfileModal
         userId={modalUserId || ''}
         isOpen={!!modalUserId}
@@ -486,7 +495,8 @@ function InboxContent() {
                   <ArrowLeft className="w-4 h-4 md:w-[18px] md:h-[18px] text-gray-700" />
                 </button>
                 <div
-                  className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer"
+                  data-testid="guest-inbox-header-profile-trigger"
+                  className={`flex items-center gap-2 flex-1 min-w-0 ${selectedIsAdminSupport ? '' : 'cursor-pointer'}`}
                   onClick={() => handleProfileClick(currentHostDisplay.id)}
                 >
                   <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gray-100 overflow-hidden border border-gray-200 relative shrink-0">
@@ -515,7 +525,8 @@ function InboxContent() {
                     <div key={msg.id} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} ${shouldAnimateMessage ? `animate-in fade-in duration-300 ${isMe ? 'slide-in-from-right-2' : 'slide-in-from-left-2'}` : ''}`}>
                       {!isMe && (
                         <div
-                          className="flex flex-col items-center mr-1.5 cursor-pointer"
+                          data-testid={`guest-inbox-message-sender-trigger-${msg.id}`}
+                          className={`flex flex-col items-center mr-1.5 ${selectedIsAdminSupport ? '' : 'cursor-pointer'}`}
                           onClick={() => handleProfileClick(msg.sender_id)}
                         >
                           <div className="w-[26px] h-[26px] md:w-7 md:h-7 rounded-full bg-gray-200 overflow-hidden relative border border-gray-200 shrink-0">
@@ -544,8 +555,11 @@ function InboxContent() {
 
                       <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[72%]`}>
                         {!isMe && (
-                          <span className="text-[10px] md:text-[11px] text-gray-500 mb-0.5 ml-0.5 cursor-pointer" onClick={() => handleProfileClick(msg.sender_id)}>
-                            {msg.sender?.name || currentHostDisplay.name}
+                          <span
+                            className={`text-[10px] md:text-[11px] text-gray-500 mb-0.5 ml-0.5 ${selectedIsAdminSupport ? '' : 'cursor-pointer'}`}
+                            onClick={() => handleProfileClick(msg.sender_id)}
+                          >
+                            {selectedIsAdminSupport ? t('admin_name') : (msg.sender?.name || currentHostDisplay.name)}
                           </span>
                         )}
 

@@ -212,6 +212,8 @@ test.describe.serial('Admin chats smoke', () => {
     await expect(
       page.locator('div.bg-white.border.border-slate-200.rounded-tl-none').filter({ hasText: inquiryMessage }).last()
     ).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('[data-participant-card="guest"]')).toBeVisible();
+    await expect(page.locator('[data-participant-card="host"]')).toHaveCount(0);
 
     const detailStatusGroup = page.locator('div.absolute.top-2.right-2');
     await detailStatusGroup.getByRole('button', { name: '처리중', exact: true }).click();
