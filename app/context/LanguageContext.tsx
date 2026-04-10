@@ -313,6 +313,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     label_progress_language: "진행 언어",
     add_language: "언어 추가", // 🟢 [수정] 게스트 추가 -> 언어 추가
     home_section_popular_experiences: "인기 체험",
+    home_section_popular_experiences_hint: "많이 저장된 순",
     home_section_all_experiences: "전체 체험",
     home_section_new_experiences: "신규 등록된 체험",
     home_section_popular_services: "인기 서비스",
@@ -1806,6 +1807,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     lang_zh: "Chinese",
     add_language: "Add language",
     home_section_popular_experiences: "Popular Experiences",
+    home_section_popular_experiences_hint: "Most saved",
     home_section_all_experiences: "All Experiences",
     home_section_new_experiences: "Newly Added Experiences",
     home_section_popular_services: "Popular Services",
@@ -3283,6 +3285,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     lang_zh: "中国語",
     add_language: "言語を追加", // 🟢 [수정] Add guests -> Add language
     home_section_popular_experiences: "人気の体験",
+    home_section_popular_experiences_hint: "保存の多い順",
     home_section_all_experiences: "すべての体験",
     home_section_new_experiences: "新着体験",
     home_section_popular_services: "人気サービス",
@@ -4764,6 +4767,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     lang_zh: "中文",
     add_language: "添加语言", // 🟢 [수정] Add guests -> Add language
     home_section_popular_experiences: "热门体验",
+    home_section_popular_experiences_hint: "按收藏热度",
     home_section_all_experiences: "全部体验",
     home_section_new_experiences: "新上架体验",
     home_section_popular_services: "热门服务",

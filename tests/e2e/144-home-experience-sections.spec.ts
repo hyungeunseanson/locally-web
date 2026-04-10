@@ -259,8 +259,10 @@ test.describe('Home experience sections', () => {
 
     await expect(popularSection).toBeVisible({ timeout: 10000 });
     await expect(popularSection).toContainText('Popular Experiences');
+    await expect(popularSection).toContainText('Most saved');
     await expect(allSection).toBeVisible({ timeout: 10000 });
     await expect(allSection).toContainText('All Experiences');
+    await expect(allSection).not.toContainText('Most saved');
 
     const popularCards = popularSection.locator('[data-testid^="home-popular-experience-card-"]');
     await expect(popularCards.nth(0)).toContainText('Tokyo Epsilon');
@@ -286,7 +288,9 @@ test.describe('Home experience sections', () => {
     const allSection = page.getByTestId('home-mobile-all-experiences-section');
 
     await expect(popularSection).toBeVisible({ timeout: 10000 });
+    await expect(popularSection).toContainText('Most saved');
     await expect(allSection).toBeVisible({ timeout: 10000 });
+    await expect(allSection).not.toContainText('Most saved');
     await expect(page.getByText('Newly Added Experiences')).toHaveCount(0);
     await expect(page.getByText('Experiences in Korean')).toHaveCount(0);
     await expect(page.getByText('Experiences in Japanese')).toHaveCount(0);
