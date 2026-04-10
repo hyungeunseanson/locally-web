@@ -9,6 +9,7 @@ import { formatLanguageLevelLabel, getLocalizedLanguageLabel } from '@/app/utils
 type HostModalData = {
   name: string;
   avatarUrl?: string;
+  nationality?: string;
   reviewCount?: number;
   rating?: number | null;
   joinedYear?: number | null;
@@ -27,6 +28,120 @@ type HostProfileModalProps = {
   host: HostModalData;
 };
 
+const NATIONALITY_DISPLAY: Record<string, { code: string; labels: Record<'ko' | 'en' | 'ja' | 'zh', string> }> = {
+  kr: {
+    code: 'KR',
+    labels: { ko: '한국', en: 'Korea', ja: '韓国', zh: '韩国' },
+  },
+  jp: {
+    code: 'JP',
+    labels: { ko: '일본', en: 'Japan', ja: '日本', zh: '日本' },
+  },
+  us: {
+    code: 'US',
+    labels: { ko: '미국', en: 'United States', ja: 'アメリカ', zh: '美国' },
+  },
+  cn: {
+    code: 'CN',
+    labels: { ko: '중국', en: 'China', ja: '中国', zh: '中国' },
+  },
+  tw: {
+    code: 'TW',
+    labels: { ko: '대만', en: 'Taiwan', ja: '台湾', zh: '台湾' },
+  },
+  hk: {
+    code: 'HK',
+    labels: { ko: '홍콩', en: 'Hong Kong', ja: '香港', zh: '香港' },
+  },
+  sg: {
+    code: 'SG',
+    labels: { ko: '싱가포르', en: 'Singapore', ja: 'シンガポール', zh: '新加坡' },
+  },
+  my: {
+    code: 'MY',
+    labels: { ko: '말레이시아', en: 'Malaysia', ja: 'マレーシア', zh: '马来西亚' },
+  },
+};
+
+const NATIONALITY_ALIAS_TO_KEY: Record<string, keyof typeof NATIONALITY_DISPLAY> = {
+  kr: 'kr',
+  korea: 'kr',
+  'south korea': 'kr',
+  korean: 'kr',
+  '대한민국': 'kr',
+  '한국': 'kr',
+  '한국인': 'kr',
+  jp: 'jp',
+  japan: 'jp',
+  japanese: 'jp',
+  '일본': 'jp',
+  '일본인': 'jp',
+  '日本': 'jp',
+  us: 'us',
+  usa: 'us',
+  america: 'us',
+  'united states': 'us',
+  '미국': 'us',
+  cn: 'cn',
+  china: 'cn',
+  chinese: 'cn',
+  '중국': 'cn',
+  '中国': 'cn',
+  tw: 'tw',
+  taiwan: 'tw',
+  '대만': 'tw',
+  '台湾': 'tw',
+  hk: 'hk',
+  'hong kong': 'hk',
+  hongkong: 'hk',
+  '홍콩': 'hk',
+  '香港': 'hk',
+  sg: 'sg',
+  singapore: 'sg',
+  '싱가포르': 'sg',
+  my: 'my',
+  malaysia: 'my',
+  '말레이시아': 'my',
+};
+
+function normalizeHostModalLocale(locale: string): 'ko' | 'en' | 'ja' | 'zh' {
+  if (locale === 'en' || locale === 'ja' || locale === 'zh') return locale;
+  return 'ko';
+}
+
+function toFlagEmoji(countryCode: string): string {
+  return [...countryCode.toUpperCase()]
+    .map((char) => String.fromCodePoint(0x1f1e6 + char.charCodeAt(0) - 65))
+    .join('');
+}
+
+function getNationalityDisplay(nationality: string | undefined, locale: string) {
+  const trimmed = String(nationality || '').trim();
+  if (!trimmed) return null;
+
+  const normalizedLocale = normalizeHostModalLocale(locale);
+  const normalizedKey = NATIONALITY_ALIAS_TO_KEY[trimmed.toLowerCase()];
+  if (normalizedKey) {
+    const match = NATIONALITY_DISPLAY[normalizedKey];
+    return {
+      flag: toFlagEmoji(match.code),
+      label: match.labels[normalizedLocale],
+    };
+  }
+
+  if (/^[A-Za-z]{2}$/.test(trimmed)) {
+    return {
+      flag: toFlagEmoji(trimmed.toUpperCase()),
+      label: trimmed.toUpperCase(),
+    };
+  }
+
+  return {
+    flag: null,
+    label: trimmed,
+  };
+}
+
 export default function HostProfileModal({ isOpen, onClose, host }: HostProfileModalProps) {
   const { lang, t } = useLanguage();
   if (!isOpen) return null;
@@ -44,6 +159,7 @@ export default function HostProfileModal({ isOpen, onClose, host }: HostProfileM
         )
       )
     : [];
+  const nationalityDisplay = getNationalityDisplay(host.nationality, lang);
 
   const handleContactHost = () => {
     onClose();
@@ -67,7 +183,7 @@ export default function HostProfileModal({ isOpen, onClose, host }: HostProfileM
 
         {/* 🟢 왼쪽: 호스트 카드 (고정 영역) */}
         <div className="w-full md:w-[360px] bg-white p-5 md:p-10 flex flex-col items-start border-b md:border-b-0 md:border-r border-slate-100 overflow-y-auto shadow-none md:shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-10">
-          <div className="flex flex-col items-center w-full text-center mb-5 md:mb-8">
+          <div className={`flex flex-col items-center w-full text-center ${nationalityDisplay ? 'mb-[18px] md:mb-6' : 'mb-5 md:mb-8'}`}>
             <div className="relative mb-3 md:mb-4">
               <div className="relative w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden shadow-lg border-4 border-white">
                 {host.avatarUrl ? (
@@ -90,6 +206,19 @@ export default function HostProfileModal({ isOpen, onClose, host }: HostProfileM
             <div className="flex items-center gap-2 text-[12px] md:text-sm font-bold text-slate-500">
               <span>{host.joinedYear ? t('exp_host_active_since', { year: host.joinedYear }) : t('exp_host_default_status')}</span>
             </div>
+            {nationalityDisplay && (
+              <div
+                data-testid="host-profile-nationality-chip"
+                className="mt-2.5 md:mt-3 inline-flex h-[26px] md:h-[30px] items-center gap-1.5 md:gap-[7px] rounded-full border border-slate-200/80 bg-slate-50/95 px-2.5 md:px-3 text-[12px] md:text-[13px] font-medium md:font-semibold text-slate-600 shadow-sm"
+              >
+                {nationalityDisplay.flag ? (
+                  <span className="text-[14px] md:text-[16px] leading-none" aria-hidden="true">
+                    {nationalityDisplay.flag}
+                  </span>
+                ) : null}
+                <span className="leading-none">{nationalityDisplay.label}</span>
+              </div>
+            )}
           </div>
 
           {hasStats && (

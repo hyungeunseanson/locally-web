@@ -658,6 +658,7 @@ export default function ServiceRequestDetailPage() {
             host={{
               name: modalName,
               avatarUrl: hostPublicProfile.avatarUrl || undefined,
+              nationality: hostPublicProfile.location || undefined,
               reviewCount: app.review_count,
               rating: app.review_avg,
               joinedYear: hostPublicProfile.createdAt ? new Date(hostPublicProfile.createdAt).getFullYear() : undefined,

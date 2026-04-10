@@ -72,6 +72,7 @@ export type HostProfileDetail = {
   id: string;
   name: string;
   avatar_url?: string;
+  nationality?: string;
   languages: string[];
   introduction: string;
   job?: string;

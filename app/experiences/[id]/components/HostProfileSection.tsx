@@ -11,6 +11,7 @@ interface HostProfileProps {
   hostId?: string;
   name: string;
   avatarUrl?: string;
+  nationality?: string;
   reviewCount?: number;
   rating?: number | null;
   job?: string;

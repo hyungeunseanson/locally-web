@@ -355,9 +355,10 @@ export default async function Page({ params }: Props) {
 
   // 2. 호스트 프로필 데이터 가져오기
   let hostProfile: HostProfileDetail = null;
+  const adminSupabase = createAdminClient();
   const [availabilitySummary, hostProfileResult] = await Promise.all([
     fetchExperienceAvailabilitySummary(
-      createAdminClient(),
+      adminSupabase,
       id,
       experience.max_guests
     ),
@@ -371,6 +372,29 @@ export default async function Page({ params }: Props) {
         visibleHostApplication ? Promise.resolve(visibleHostApplication) : loadPublicHostApplication(supabase, experience.host_id),
       ]);
       const publicHostApplication = isPublicHostApplicationStatus(app?.status) ? app : null;
+      const hostApplicationNationality =
+        publicHostApplication?.id
+          ? await adminSupabase
+              .from('host_applications')
+              .select('host_nationality')
+              .eq('id', publicHostApplication.id)
+              .maybeSingle()
+              .then(({ data, error }) => {
+                if (error) {
+                  console.error('[Experience detail] Failed to load host nationality fallback:', {
+                    hostId: experience.host_id,
+                    applicationId: publicHostApplication.id,
+                    message: error.message,
+                    details: error.details,
+                    hint: error.hint,
+                    code: error.code,
+                  });
+                  return null;
+                }
+
+                return typeof data?.host_nationality === 'string' ? data.host_nationality.trim() || null : null;
+              })
+          : null;
 
       const normalizedProfile = normalizeHostProfileRow(profile);
       const cachedReviewCount = normalizedProfile?.total_review_count;
@@ -388,13 +412,22 @@ export default async function Page({ params }: Props) {
             }
           : await loadHostReviewAggregate(supabase, experience.host_id);
 
-      return buildHostProfileDetail({
+      const builtHostProfile = buildHostProfileDetail({
         hostId: experience.host_id,
         profile: normalizedProfile,
         publicHostApplication,
         fallbackName: 'Locally Host',
         reviewAggregate,
       });
+
+      if (builtHostProfile && !builtHostProfile.nationality && hostApplicationNationality) {
+        return {
+          ...builtHostProfile,
+          nationality: hostApplicationNationality,
+        };
+      }
+
+      return builtHostProfile;
     })(),
   ]);
   hostProfile = hostProfileResult;

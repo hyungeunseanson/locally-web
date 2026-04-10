@@ -289,6 +289,7 @@ test.describe.serial('Host profile language dedup', () => {
     await expect(
       page.getByText(/구사 언어: 영어|Languages: English|話せる言語: 英語|会说的语言: 英语/)
     ).toBeVisible();
+    await expect(page.getByTestId('host-profile-nationality-chip')).toContainText(/한국|Korea|韓国|韩国/);
     await expect(
       page.getByText(/영어, 영어|English, English|英語, 英語|英语, 英语/)
     ).toHaveCount(0);

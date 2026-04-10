@@ -505,6 +505,7 @@ export function buildHostProfileDetail(params: {
     id: params.hostId,
     name: publicProfile.name,
     avatar_url: publicProfile.avatarUrl ?? undefined,
+    nationality: publicProfile.location ?? undefined,
     languages: publicProfile.languages,
     introduction: publicProfile.bio || '안녕하세요! 로컬리 호스트입니다.',
     job: publicProfile.job ?? undefined,

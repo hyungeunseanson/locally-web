@@ -168,6 +168,7 @@ export default function ExpMainContent({
         hostId={experience.host_id ?? undefined}
         name={hostProfile?.name || t('exp_detail_host_default_name')}
         avatarUrl={hostProfile?.avatar_url}
+        nationality={hostProfile?.nationality}
         reviewCount={hostProfile?.review_count}
         rating={hostProfile?.rating}
         job={hostProfile?.job}
