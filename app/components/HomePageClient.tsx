@@ -32,9 +32,9 @@ function getDesktopPopularVisibilityClass(index: number) {
 
 function PopularExperienceHint({ text }: { text: string }) {
   return (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-rose-200/70 bg-gradient-to-r from-rose-50 via-white to-amber-50 px-2 py-[3px] text-[9px] font-medium tracking-[-0.01em] text-rose-700 shadow-[0_2px_6px_rgba(244,63,94,0.07)] md:px-2.5 md:py-1 md:text-[10px]">
+    <span className="inline-flex items-center gap-[3px] whitespace-nowrap rounded-full border border-rose-200/70 bg-gradient-to-r from-rose-50 via-white to-amber-50 px-[7px] py-[2.5px] text-[8px] font-medium leading-none tracking-[-0.01em] text-rose-700 shadow-[0_2px_6px_rgba(244,63,94,0.07)] md:gap-1 md:px-2.5 md:py-1 md:text-[10px]">
       <Heart
-        size={10}
+        size={8}
         strokeWidth={2}
         fill="currentColor"
         aria-hidden="true"
@@ -349,7 +349,7 @@ export default function HomePageClient() {
               <div className="md:hidden pb-4">
                 <section data-testid="home-mobile-popular-experiences-section">
                   <div className="px-5 pt-3 pb-2">
-                    <div className="flex flex-wrap items-center gap-1.5">
+                    <div className="flex flex-wrap items-end gap-1.5">
                       <h2 className="text-[17px] font-semibold leading-tight tracking-[-0.02em] text-[#222222]">
                         {t('home_section_popular_experiences')}
                       </h2>
@@ -393,7 +393,7 @@ export default function HomePageClient() {
               <div className="hidden md:block">
                 <section data-testid="home-desktop-popular-experiences-section">
                   <div className="mb-5">
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-end gap-2">
                       <h2 className="text-[28px] font-semibold tracking-[-0.025em] text-slate-900">
                         {t('home_section_popular_experiences')}
                       </h2>
