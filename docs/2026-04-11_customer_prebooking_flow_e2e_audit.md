@@ -19,11 +19,13 @@
 - 재실행 결과
   - 초기 감사 묶음: `47 passed / 1 failed`
   - 후속 continuity/guardrail 묶음: `19 passed / 0 failed`
+  - share hardening/guardrail 묶음: `11 passed / 0 failed`
 - 최종 판정
   - 인증 진입, 검색 계약, 공개 체험 상세 SSR/SEO/리뷰/호스트 공개 projection은 현재 기준 `정상`
   - 홈 공개 탐색은 데스크탑/모바일 의미 차이를 의도된 제품 차이로 잠근 상태에서, analytics 적재와 guardrail까지 현재 기준 `정상`
   - 체험 상세의 문의 continuity, private guest surface auth return, wishlist auth/localization은 후속 보정으로 닫혔다
-  - 남은 리스크는 `체험 상세 share failure path`와 `wishlist share path`처럼 공유 계열의 실패/대체 경로 검증으로 축소됐다
+  - 체험 상세 share와 wishlist share도 `Web Share → clipboard fallback → localized fail-closed` 기준으로 보정 및 검증됐다
+  - 이 문서 범위의 프리북킹 surface에서는 현재 high-priority open gap이 남아 있지 않다
   - private surface noindex, guest inbox 기본 도착지, account/wishlist 직접 진입 복귀는 `정상`
 
 ## Test Execution
@@ -61,6 +63,13 @@
 - 후속 결과
   - 위 7개 스펙, 총 `19 passed / 0 failed`
   - `tests/e2e/24-experience-card-verification.spec.ts`는 이제 [tests/e2e/helpers/experienceBooking.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/tests/e2e/helpers/experienceBooking.ts:480)의 shared helper를 사용하므로, 초기 감사 당시의 fixture drift는 현재 active blocker가 아니다
+- share hardening/guardrail 재실행
+  - `tests/e2e/43-guest-search-detail-ingress.spec.ts`
+  - `tests/e2e/165-guest-wishlist-account-continuity.spec.ts`
+  - `tests/e2e/166-prebooking-share-guardrails.spec.ts`
+- share 결과
+  - 위 3개 스펙, 총 `11 passed / 0 failed`
+  - `POST /api/inquiries/thread` redirect, wishlist/account continuity, detail/wishlist share fallback이 함께 유지되는지 같은 pass에서 교차 확인했다
 
 ## Summary Matrix
 | 구간 | 로그아웃/로그인 | 모바일/데스크탑 | 판정 | 핵심 메모 |
@@ -68,8 +77,8 @@
 | 인증 진입 | 둘 다 확인 | 공통 | 정상 | `/login` + modal signup, `returnUrl`/`next` 정규화 정상 |
 | 홈 탐색 | 공개 진입 중심 | 둘 다 확인 | 정상 | 데스크탑 인페이지 필터 / 모바일 `/search` launcher 차이를 의도된 제품 차이로 잠그고, analytics도 둘 다 적재 |
 | 검색 결과 | 공개 진입 중심 | 둘 다 확인 | 정상 | server route 계약, city/type/time/date 필터 보장 |
-| 체험 상세 | 로그아웃/로그인 혼재 | 둘 다 확인 | 부분 보장 | 문의 redirect와 찜 auth/localization은 정상, share 실패/대체 경로는 아직 얇음 |
-| 위시리스트/인박스/계정 도착지 | 로그인 필요 | 주로 모바일 + private path | 부분 보장 | inbox/noindex와 auth return은 정상, account 진입 및 wishlist load/remove smoke는 추가됨, share path는 별도 gap |
+| 체험 상세 | 로그아웃/로그인 혼재 | 둘 다 확인 | 정상 | 문의 redirect, 찜 auth/localization, share fallback/fail-closed 모두 확인 |
+| 위시리스트/인박스/계정 도착지 | 로그인 필요 | 주로 모바일 + private path | 정상 | inbox/noindex, auth return, account 진입, wishlist load/remove/share guardrail 확인 |
 
 ## Chain-by-Chain Audit
 
@@ -154,7 +163,7 @@
   - detail client는 `view/click` analytics, gallery, host modal, review section, wishlist, inquiry modal, availability refresh를 처리한다
   - date/time/guest selection은 reservation card에서 수행되지만, 실제 결제 route push는 `handleReserve()` 경계 뒤로 끊어진다
   - `handleInquiry()`는 `useChat().createInquiry()`의 `redirectUrl`을 실제로 소비해 success 후 바로 guest inbox thread로 이동한다
-  - `handleShare()`는 `navigator.clipboard.writeText()`만 호출하고 예외 처리나 Web Share fallback이 없다
+  - `handleShare()`는 `navigator.share` 우선, 없으면 clipboard fallback, 둘 다 실패하면 localized error toast로 fail-closed 한다
   - wishlist auth gate는 [app/hooks/useWishlist.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/hooks/useWishlist.ts:1)에서 localized `login_required` toast를 쓴다
 - 현재 보장 테스트
   - `tests/e2e/27-dynamic-detail-seo.spec.ts`
@@ -164,10 +173,10 @@
   - `tests/e2e/60-inquiry-thread-contract.spec.ts`
   - `tests/e2e/147-home-search-card-meta-parity.spec.ts`
 - 실제 결과
-  - 판정: `부분 보장`
+  - 판정: `정상`
   - 메모
-    - 문의 success 후 inbox continuity와 찜하기 auth/localization은 후속 보정으로 닫혔다
-    - 남은 리스크는 share 버튼이 clipboard-only이며 실패/대체 경로가 없는 점이다
+    - 문의 success 후 inbox continuity, 찜하기 auth/localization, share fallback/fail-closed가 모두 후속 보정으로 닫혔다
+    - `tests/e2e/166-prebooking-share-guardrails.spec.ts`로 detail share의 clipboard fallback, AbortError 무시, localized fail toast까지 잠겼다
 
 ### 5. 주변 연속성 surface
 - source of truth
@@ -182,7 +191,7 @@
   - guest inbox는 query param bootstrap과 empty state CTA가 있고, 관련 계약 테스트는 통과했다
   - private path는 noindex가 보장된다
   - `/guest/wishlists`와 `/account`는 비로그인 직접 진입 시 각각 canonical `returnUrl`을 붙인 `/login?returnUrl=...`로 보낸다
-  - 위시리스트 페이지는 load/remove/share 구현이 있고, account 모바일 메뉴에서 inbox/wishlist로 이어지는 smoke와 wishlist load/remove smoke가 추가됐다
+  - 위시리스트 페이지는 load/remove/share 구현이 있고, account 모바일 메뉴에서 inbox/wishlist로 이어지는 smoke와 wishlist load/remove/share guardrail이 추가됐다
 - 현재 보장 테스트
   - `tests/e2e/60-inquiry-thread-contract.spec.ts`
   - `tests/e2e/95-guest-inbox-empty-state.spec.ts`
@@ -190,27 +199,17 @@
   - `tests/e2e/108-login-flow-guidance.spec.ts`
   - `tests/e2e/165-guest-wishlist-account-continuity.spec.ts`
 - 실제 결과
-  - 판정: `부분 보장`
+  - 판정: `정상`
   - 메모
     - inbox, private surface SEO, auth returnUrl continuity는 닫혀 있다
-    - wishlist/account는 load/remove 및 모바일 진입 smoke까지 닫혔지만, share path는 아직 전용 검증이 없다
+    - wishlist/account는 load/remove, 모바일 진입, Web Share success, clipboard fallback, AbortError 무시까지 전용 검증이 있다
 
 ## Confirmed Risks
-1. 체험 상세 share 경로는 여전히 clipboard-only다
-   - `navigator.clipboard.writeText()` 성공 경로만 있고, 실패 처리나 Web Share fallback이 없다
-   - 고객이 권한 거부, insecure context, clipboard unavailable 환경에 있으면 조용히 끊길 여지가 있다
-
-2. wishlist share 경로는 구현은 있지만 전용 계약 테스트가 아직 없다
-   - page load/remove/account entry는 후속 smoke로 닫혔다
-   - 반면 `navigator.share` / clipboard fallback / abort 처리까지는 아직 자동화로 잠기지 않았다
+현재 이 문서 범위의 프리북킹 surface에서 별도 제품 리스크로 남겨둘 high-priority open item은 없다.
 
 ## Coverage Gaps
-- experience detail share failure path
-  - clipboard 권한 거부
-  - non-secure context fallback
-- wishlist share path
-  - `navigator.share` success/abort
-  - clipboard fallback / failure
+현재 문서 범위에서는 추가 coverage gap을 남기지 않는다.
+다음 gap은 명시적으로 범위 밖인 `/experiences/[id]/payment` 이후 체인에서 다시 열린다.
 
 ## Boundary Handoff
 - 다음 단계 감사 범위

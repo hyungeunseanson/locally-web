@@ -229,10 +229,30 @@ export default function ExperienceClient({
     if (element) element.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const handleShare = () => {
-    navigator.clipboard.writeText(window.location.href);
-    setIsCopySuccess(true);
-    setTimeout(() => setIsCopySuccess(false), 3000);
+  const handleShare = async () => {
+    const shareUrl = window.location.href;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: translatedTitle || experience.title || 'Locally',
+          url: shareUrl,
+        });
+        return;
+      }
+
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+        setIsCopySuccess(true);
+        setTimeout(() => setIsCopySuccess(false), 3000);
+        return;
+      }
+
+      throw new Error('share-unavailable');
+    } catch (error: unknown) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      showToast(t('trip_share_fail'), 'error');
+    }
   };
 
   const handleInquiry = async (): Promise<boolean> => {
