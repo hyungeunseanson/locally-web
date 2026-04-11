@@ -5,6 +5,20 @@
 - NicePay direct code path now exists for `experience + service + proxy`, but it stays dormant until the provider env is flipped.
 - Cutover goal is "no code change on launch day": only env switch, PG console registration, and focused smoke verification.
 
+## Decision Gate
+- NicePay currently exposes two official integration families.
+  `start.nicepay.co.kr` documents the `AUTHNICE.requestPay + clientId + secretKey + webhook` flow.
+  `developers.nicepay.co.kr` documents the legacy WebStd `goPay + AuthToken/NextAppURL + MerchantKey` flow.
+- The current app implementation matches the legacy WebStd family, not the newer `AUTHNICE` family.
+  Evidence in code:
+  `nicepay-pg-web.js`
+  `goPay(...)`
+  `AuthToken`
+  `NextAppURL`
+  `MerchantKey`-based signature verification
+- Before any production flip, confirm which NicePay product / console flow your real merchant account actually uses.
+  If the real account is `AUTHNICE`-only, stop here and treat that as a separate implementation project instead of a same-day env cutover.
+
 ## Source Of Truth
 - Provider boundary: [app/utils/payments/card/server.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/utils/payments/card/server.ts)
 - Client launch boundary: [app/utils/payments/card/client.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/utils/payments/card/client.ts)
@@ -34,7 +48,9 @@
 ### Mapping from the NicePay / Imweb side
 - `MID` -> `NICEPAY_MID`
 - `SIGN KEY` -> `NICEPAY_MERCHANT_KEY`
-- NicePay direct client key is separate. `MID + SIGN KEY` only is not enough for this code path.
+- `MID + SIGN KEY` map to the current WebStd implementation.
+- `client key` and `secret key` belong to the newer `AUTHNICE` / Start NicePay guide and should not be treated as the same thing as `SIGN KEY`.
+- The current project still keeps `NICEPAY_CLIENT_KEY` and `NEXT_PUBLIC_NICEPAY_CLIENT_KEY` in the env contract as a cutover guardrail, but the active approval algorithm in code is still the WebStd `MerchantKey` path.
 
 ## Cutover Day Checklist
 1. Rotate any exposed NicePay merchant key first.
