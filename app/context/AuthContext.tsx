@@ -32,7 +32,8 @@ const AUTH_LOCAL_STORAGE_KEYS = [
   'locally_recent_searches',
 ] as const;
 
-const HOST_STATUS_FALLBACK_POLL_MS = 30_000;
+// Keep host approval/revision screens from feeling stuck if a realtime notification is missed.
+const HOST_STATUS_FALLBACK_POLL_MS = 5_000;
 const HOST_STATUS_PENDING_VALUES = new Set(['pending', 'revision', 'rejected']);
 
 function normalizeApplicationStatus(status: string | null | undefined) {
