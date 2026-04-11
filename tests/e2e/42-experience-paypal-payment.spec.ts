@@ -2,7 +2,10 @@ import { readFileSync } from 'fs';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test, type Page } from '@playwright/test';
-import { reviewAllExperiencePaymentAgreements } from './helpers/experienceBooking';
+import {
+  prepareBookableExperience as prepareSharedBookableExperience,
+  reviewAllExperiencePaymentAgreements,
+} from './helpers/experienceBooking';
 
 type EnvMap = Record<string, string>;
 type TestUser = {
@@ -26,7 +29,6 @@ type AvailabilityKey = {
 };
 
 const TEST_PASSWORD = 'LocallyTest!2026';
-const HOST_USER_ID = 'cc84b331-7e78-4818-b9ba-f1a960017473';
 const MOCK_PAYPAL_ORDER_ID = 'PAYPAL-EXP-ORDER-TEST';
 const MOCK_PAYPAL_CAPTURE_ID = 'PAYPAL-EXP-CAPTURE-TEST';
 const MOCK_PAYPAL_SDK = `
@@ -81,10 +83,6 @@ function getAdminClient() {
   );
 
   return adminClient;
-}
-
-function formatDate(date: Date) {
-  return date.toISOString().slice(0, 10);
 }
 
 function createCustomerUser(): TestUser {
@@ -149,86 +147,16 @@ async function createAuthUser(user: TestUser) {
 }
 
 async function prepareBookableExperience(): Promise<BookableExperience> {
-  const supabase = getAdminClient();
-  const { data: experience, error: experienceError } = await supabase
-    .from('experiences')
-    .select('id, title, status, host_id')
-    .eq('host_id', HOST_USER_ID)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (experienceError) throw experienceError;
-  if (!experience) {
-    throw new Error('No host experience found for the approved test host.');
-  }
-
-  if (experience.status !== 'approved' && experience.status !== 'active') {
-    const { error: updateError } = await supabase
-      .from('experiences')
-      .update({ status: 'approved' })
-      .eq('id', experience.id);
-
-    if (updateError) throw updateError;
-  }
-
-  let date = '';
-  const time = '10:00';
-
-  for (let offset = 14; offset <= 45; offset += 1) {
-    const candidateDate = new Date();
-    candidateDate.setDate(candidateDate.getDate() + offset);
-    const candidate = formatDate(candidateDate);
-
-    const { count, error: bookingCountError } = await supabase
-      .from('bookings')
-      .select('*', { count: 'exact', head: true })
-      .eq('experience_id', experience.id)
-      .eq('date', candidate)
-      .eq('time', time)
-      .in('status', ['PENDING', 'PAID', 'confirmed', 'pending', 'paid']);
-
-    if (bookingCountError) throw bookingCountError;
-
-    if (!count || count === 0) {
-      date = candidate;
-      break;
-    }
-  }
-
-  if (!date) {
-    throw new Error('Could not find an empty future booking slot for the test experience.');
-  }
-
-  const { data: existingSlots, error: slotFetchError } = await supabase
-    .from('experience_availability')
-    .select('experience_id')
-    .eq('experience_id', experience.id)
-    .eq('date', date)
-    .eq('start_time', time)
-    .limit(1);
-
-  if (slotFetchError) throw slotFetchError;
-
-  if (!existingSlots || existingSlots.length === 0) {
-    const { error: slotInsertError } = await supabase
-      .from('experience_availability')
-      .insert({
-        experience_id: experience.id,
-        date,
-        start_time: time,
-        is_booked: false,
-      });
-
-    if (slotInsertError) throw slotInsertError;
-    createdAvailabilityKeys.push({ experienceId: Number(experience.id), date, time });
-  }
+  const experience = await prepareSharedBookableExperience(createdAvailabilityKeys, {
+    searchAnyHost: true,
+    time: '10:00',
+  });
 
   return {
-    experienceId: Number(experience.id),
-    title: String(experience.title || 'Locally 체험'),
-    date,
-    time,
+    experienceId: experience.experienceId,
+    title: experience.title,
+    date: experience.date,
+    time: experience.time,
   };
 }
 
@@ -415,6 +343,8 @@ test.describe.serial('Experience PayPal payment smoke', () => {
     expect(captureSeen).toBe(true);
     await expect(page.getByRole('heading', { name: /예약이 확정되었습니다!|Payment Complete!|Your booking is confirmed!/ })).toBeVisible();
     await expect(page.getByText(observedBookingId)).toBeVisible();
-    await expect(page.getByText(experience.title)).toBeVisible();
+    await expect(page.getByRole('heading', { level: 3 })).toBeVisible();
+    await expect(page.getByText(experience.date)).toBeVisible();
+    await expect(page.getByText(experience.time)).toBeVisible();
   });
 });
