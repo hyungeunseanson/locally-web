@@ -8,7 +8,12 @@ import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { launchCardPayment } from '@/app/utils/payments/card/client';
-import type { CardPaymentProvider, CardPaymentReadiness } from '@/app/utils/payments/card/types';
+import { buildCardPaymentCallbackRequestBody } from '@/app/utils/payments/card/public';
+import type {
+  CardPaymentProvider,
+  CardPaymentPublicRuntime,
+  CardPaymentReadiness,
+} from '@/app/utils/payments/card/types';
 import type { ServiceRequest } from '@/app/types/service';
 import { getPublicBankInfo } from '@/app/utils/publicBankInfo';
 
@@ -94,6 +99,7 @@ function ServicePaymentContent() {
   const [paymentError, setPaymentError] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
   const [cardProvider, setCardProvider] = useState<CardPaymentProvider>('portone');
+  const [cardRuntime, setCardRuntime] = useState<CardPaymentPublicRuntime | null>(null);
   const [isCardReady, setIsCardReady] = useState(false);
   const [isCardReadyResolved, setIsCardReadyResolved] = useState(false);
   const [cardReadyReason, setCardReadyReason] = useState<ServiceCardReadyReason | ''>('');
@@ -102,7 +108,6 @@ function ServicePaymentContent() {
   const paypalButtonRef = useRef<HTMLDivElement | null>(null);
   const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '';
   const isPayPalEnabled = Boolean(paypalClientId);
-  const portOneImpCode = process.env.NEXT_PUBLIC_PORTONE_IMP_CODE || '';
   const isBankLockedBooking = (pendingBooking?.payment_method || '').toLowerCase() === 'bank';
   const bankInfo = getPublicBankInfo();
 
@@ -176,12 +181,14 @@ function ServicePaymentContent() {
 
         setIsCardReady(Boolean(response.ok && result.ready));
         setCardProvider(result.provider || 'portone');
+        setCardRuntime(result.runtime || null);
         setCardReadyReason(response.ok && !result.ready ? result.reason || '' : '');
       } catch {
         if (!isMounted) return;
 
         setIsCardReady(false);
         setCardProvider('portone');
+        setCardRuntime(null);
         setCardReadyReason('missing_portone_credentials');
       } finally {
         if (isMounted) {
@@ -311,7 +318,7 @@ function ServicePaymentContent() {
     } finally {
       setIsProcessing(false);
     }
-  }, [pendingBooking, requestId, router, showToast]);
+  }, [pendingBooking, requestId, router, showToast, t]);
 
   const releaseCardSelection = useCallback(async (orderId: string) => {
     try {
@@ -375,7 +382,7 @@ function ServicePaymentContent() {
     return () => {
       container.innerHTML = '';
     };
-  }, [createPayPalOrder, handlePayPalApprove, isPayPalEnabled, isPayPalSdkReady, paymentMethod, showToast]);
+  }, [createPayPalOrder, handlePayPalApprove, isPayPalEnabled, isPayPalSdkReady, paymentMethod, showToast, t]);
 
   const handlePayment = useCallback(async () => {
     setPaymentError('');
@@ -422,7 +429,7 @@ function ServicePaymentContent() {
         return;
       }
 
-      if (!isCardReady || !portOneImpCode) {
+      if (!isCardReady || !cardRuntime?.merchantCode) {
         const message = t('sp_err_card_unavailable') as string;
         setPaymentError(message);
         showToast(message, 'error');
@@ -452,7 +459,8 @@ function ServicePaymentContent() {
 
         const paymentSession = await launchCardPayment({
           provider: cardProvider,
-          merchantCode: portOneImpCode,
+          merchantCode: cardRuntime.merchantCode,
+          publicClientKey: cardRuntime.publicClientKey,
           orderId,
           productName: currentRequest.title,
           amount,
@@ -466,12 +474,12 @@ function ServicePaymentContent() {
         const callbackRes = await fetch('/api/services/payment/nicepay-callback', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            imp_uid: paymentSession.approvalId,
-            approvalId: paymentSession.approvalId,
-            merchant_uid: orderId,
-            orderId,
-          }),
+          body: JSON.stringify(
+            buildCardPaymentCallbackRequestBody({
+              orderId,
+              paymentSession,
+            })
+          ),
         });
 
         const callbackResult = (await callbackRes.json()) as { success?: boolean; error?: string };
@@ -497,7 +505,7 @@ function ServicePaymentContent() {
       setPaymentError(message);
       setIsProcessing(false);
     }
-  }, [cardProvider, contactName, contactPhone, getCheckoutValidationError, isCardReady, paymentMethod, pendingBooking, portOneImpCode, releaseCardSelection, request, requestId, router, showToast, supabase, t]);
+  }, [cardProvider, cardRuntime, contactName, contactPhone, getCheckoutValidationError, isCardReady, paymentMethod, pendingBooking, releaseCardSelection, request, requestId, router, showToast, supabase, t]);
 
   if (!request || !pendingBooking) {
     return (
@@ -509,7 +517,13 @@ function ServicePaymentContent() {
 
   return (
     <>
-      <Script src="https://cdn.iamport.kr/v1/iamport.js" strategy="lazyOnload" />
+      {cardRuntime?.scriptSrc && (
+        <Script
+          id={`service-card-sdk-${cardRuntime.provider}`}
+          src={cardRuntime.scriptSrc}
+          strategy="lazyOnload"
+        />
+      )}
       {isPayPalEnabled && (
         <Script
           id="paypal-js-sdk-service"

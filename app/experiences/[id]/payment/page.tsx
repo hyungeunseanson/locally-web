@@ -16,7 +16,12 @@ import { useLanguage } from '@/app/context/LanguageContext';
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 import { SOLO_GUARANTEE_PRICE } from '@/app/constants/soloGuarantee';
 import { launchCardPayment } from '@/app/utils/payments/card/client';
-import type { CardPaymentProvider, CardPaymentReadiness } from '@/app/utils/payments/card/types';
+import { buildCardPaymentCallbackRequestBody } from '@/app/utils/payments/card/public';
+import type {
+  CardPaymentProvider,
+  CardPaymentPublicRuntime,
+  CardPaymentReadiness,
+} from '@/app/utils/payments/card/types';
 import { getPublicBankInfo } from '@/app/utils/publicBankInfo';
 import { getLocalizedExperienceRules } from '@/app/utils/experienceTranslation';
 import { ExperienceAvailabilitySummary, ExperienceSlotSummary } from '../types';
@@ -218,6 +223,7 @@ function PaymentContent() {
   const [activeAgreement, setActiveAgreement] = useState<AgreementKey | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
   const [cardProvider, setCardProvider] = useState<CardPaymentProvider>('portone');
+  const [cardRuntime, setCardRuntime] = useState<CardPaymentPublicRuntime | null>(null);
   const [isCardReady, setIsCardReady] = useState(false);
   const [isCardReadyResolved, setIsCardReadyResolved] = useState(false);
   const [cardReadyReason, setCardReadyReason] = useState<ExperienceCardReadyReason | ''>('');
@@ -295,7 +301,6 @@ function PaymentContent() {
   const finalAmount = hostPrice + guestFee;
   const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '';
   const isPayPalEnabled = Boolean(paypalClientId);
-  const portOneImpCode = process.env.NEXT_PUBLIC_PORTONE_IMP_CODE || '';
   const hostNotice = experience
     ? (getLocalizedExperienceRules(experience, lang).host_notice || '').trim()
     : '';
@@ -433,12 +438,14 @@ function PaymentContent() {
 
         setIsCardReady(Boolean(response.ok && result.ready));
         setCardProvider(result.provider || 'portone');
+        setCardRuntime(result.runtime || null);
         setCardReadyReason(response.ok && !result.ready ? result.reason || '' : '');
       } catch {
         if (!isMounted) return;
 
         setIsCardReady(false);
         setCardProvider('portone');
+        setCardRuntime(null);
         setCardReadyReason('missing_portone_credentials');
       } finally {
         if (isMounted) {
@@ -922,7 +929,7 @@ function PaymentContent() {
         return;
       }
 
-      if (!isCardReady || !portOneImpCode) {
+      if (!isCardReady || !cardRuntime?.merchantCode) {
         const message = t('exp_payment_card_unavailable') as string;
         setPaymentError(message);
         showToast(message, 'error');
@@ -933,7 +940,8 @@ function PaymentContent() {
       try {
         const paymentSession = await launchCardPayment({
           provider: cardProvider,
-          merchantCode: portOneImpCode,
+          merchantCode: cardRuntime.merchantCode,
+          publicClientKey: cardRuntime.publicClientKey,
           orderId: newOrderId,
           productName: experience?.title || (t('exp_payment_fallback_product_name') as string),
           amount: Number(secureFinalAmount),
@@ -946,12 +954,12 @@ function PaymentContent() {
         const response = await fetch('/api/payment/nicepay-callback', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            imp_uid: paymentSession.approvalId,
-            approvalId: paymentSession.approvalId,
-            merchant_uid: newOrderId,
-            orderId: newOrderId,
-          }),
+          body: JSON.stringify(
+            buildCardPaymentCallbackRequestBody({
+              orderId: newOrderId,
+              paymentSession,
+            })
+          ),
         });
         const callbackResult = (await response.json()) as { success?: boolean; error?: string };
 
@@ -1107,7 +1115,13 @@ function PaymentContent() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center py-6 md:py-10 font-sans px-3 md:px-4">
-      <Script src="https://cdn.iamport.kr/v1/iamport.js" strategy="afterInteractive" />
+      {cardRuntime?.scriptSrc && (
+        <Script
+          id={`card-sdk-${cardRuntime.provider}`}
+          src={cardRuntime.scriptSrc}
+          strategy="afterInteractive"
+        />
+      )}
       {isPayPalEnabled && (
         <Script
           id="paypal-js-sdk"

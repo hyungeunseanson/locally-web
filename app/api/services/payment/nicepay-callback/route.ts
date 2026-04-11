@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 
-import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
+import { finalizeServiceCardPayment } from '@/app/api/services/payment/serviceCardConfirmation';
 import { captureServerException } from '@/app/utils/monitoring/sentry';
 import { getCurrentCardPaymentProvider, verifyApprovedCardPayment } from '@/app/utils/payments/card/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
-import { notifyServicePaymentOpened } from '@/app/utils/serviceNotificationFlows';
 
 type ServiceNicePayCallbackBody = {
+  providerPayload?: Record<string, unknown>;
   imp_uid?: string;
   approvalId?: string;
   merchant_uid?: string;
@@ -28,9 +28,40 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = (await request.json()) as ServiceNicePayCallbackBody;
-    const impUid = (body.imp_uid || body.approvalId || '').trim();
-    const orderId = (body.merchant_uid || body.orderId || '').trim();
+    let impUid = '';
+    let orderId = '';
+    let providerPayload: Record<string, string> = {};
+    const contentType = request.headers.get('content-type') || '';
+
+    if (contentType.includes('application/json')) {
+      const body = (await request.json()) as ServiceNicePayCallbackBody;
+      impUid = (body.imp_uid || body.approvalId || '').trim();
+      orderId = (body.merchant_uid || body.orderId || '').trim();
+      providerPayload = Object.entries({
+        ...body,
+        ...(body.providerPayload || {}),
+      }).reduce<Record<string, string>>((acc, [key, value]) => {
+        if (value == null || typeof value === 'object') return acc;
+        acc[key] = String(value);
+        return acc;
+      }, {});
+    } else {
+      const formData = await request.formData();
+      impUid =
+        formData.get('imp_uid')?.toString().trim() ||
+        formData.get('approvalId')?.toString().trim() ||
+        formData.get('TxTid')?.toString().trim() ||
+        '';
+      orderId =
+        formData.get('merchant_uid')?.toString().trim() ||
+        formData.get('orderId')?.toString().trim() ||
+        formData.get('Moid')?.toString().trim() ||
+        formData.get('moid')?.toString().trim() ||
+        '';
+      providerPayload = Object.fromEntries(
+        Array.from(formData.entries()).map(([key, value]) => [key, String(value)])
+      );
+    }
 
     if (!impUid || !orderId) {
       return NextResponse.json(
@@ -88,6 +119,7 @@ export async function POST(request: Request) {
         approvalId: impUid,
         orderId: serviceBooking.order_id,
         expectedAmount: Number(serviceBooking.amount || 0),
+        providerPayload,
       });
     } catch (verificationError) {
       const message =
@@ -97,63 +129,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: message }, { status: 400 });
     }
 
-    const requestInfo =
-      serviceBooking.service_requests as
-        | { title?: string; city?: string; country?: string; duration_hours?: number; guest_count?: number }
-        | null;
-    const requestTitle = requestInfo?.title || '맞춤 서비스';
-    const reqCity = requestInfo?.city ?? '';
-    const reqCountry = requestInfo?.country ?? '';
-    const reqDuration = requestInfo?.duration_hours ?? 0;
-    const reqGuests = requestInfo?.guest_count ?? 0;
+    const confirmationResult = await finalizeServiceCardPayment({
+      supabaseAdmin,
+      serviceBooking,
+      verificationResult,
+    });
 
-    // [Race Guard] PENDING 상태일 때만 업데이트 — 중복 처리 방지
-    const { data: updatedBooking, error: bookingUpdateErr } = await supabaseAdmin
-      .from('service_bookings')
-      .update({
-        status: 'PAID',
-        payment_method: 'card',
-        tid: verificationResult.providerTransactionId,
-      })
-      .eq('order_id', orderId)
-      .eq('status', 'PENDING')
-      .select('id')
-      .maybeSingle();
-
-    if (bookingUpdateErr) {
-      throw new Error(`[SERVICE] Booking update failed: ${bookingUpdateErr.message}`);
+    if (!confirmationResult.success) {
+      return NextResponse.json(
+        { success: false, error: confirmationResult.error },
+        { status: confirmationResult.status }
+      );
     }
-    if (!updatedBooking) {
+
+    if (confirmationResult.alreadyProcessed) {
       return NextResponse.json({ success: true, message: 'Already processed' });
     }
-
-    const { error: requestUpdateErr } = await supabaseAdmin
-      .from('service_requests')
-      .update({ status: 'open' })
-      .eq('id', serviceBooking.request_id);
-
-    if (requestUpdateErr) {
-      console.error('[SERVICE] Request status update failed:', requestUpdateErr);
-    }
-
-    await notifyServicePaymentOpened({
-      supabaseAdmin,
-      requestId: serviceBooking.request_id,
-      requestTitle,
-      requestCity: reqCity,
-      requestCountry: reqCountry,
-      durationHours: reqDuration,
-      guestCount: reqGuests,
-      customerId: serviceBooking.customer_id,
-    });
-
-    insertAdminAlerts({
-      title: '서비스 결제가 완료되었습니다',
-      message: `'${requestTitle}' 서비스 결제가 완료되어 호스트 모집이 시작되었습니다.`,
-      link: '/admin/dashboard?tab=SERVICE_REQUESTS',
-    }).catch((adminAlertError) => {
-      console.error('[SERVICE] Payment Admin Alert Error:', adminAlertError);
-    });
 
     console.log(`✅ [SERVICE] Payment confirmed. Order: ${orderId}`);
     return NextResponse.json({ success: true });

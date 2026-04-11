@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 
-import { finalizeExperienceCardPayment } from '@/app/api/payment/experienceCardConfirmation';
+import { finalizeProxyCardPayment } from '@/app/api/proxy-bookings/payment/proxyCardConfirmation';
 import {
   getCurrentCardPaymentProvider,
   readCardPaymentNotificationRequest,
   verifyCardPaymentNotification,
 } from '@/app/utils/payments/card/server';
+import type { ProxyCategory } from '@/app/types/proxy';
+import { getProxyRequestFeeKrw } from '@/app/utils/proxyBooking';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 
 export async function POST(request: Request) {
@@ -37,23 +39,21 @@ export async function POST(request: Request) {
 
   try {
     const supabaseAdmin = createAdminClient();
-    let lookupQuery = supabaseAdmin
-      .from('bookings')
-      .select('*, experiences (price, private_price, max_guests, host_id, title)');
+    let lookupQuery = supabaseAdmin.from('proxy_requests').select('*');
 
     if (notification.orderId) {
-      lookupQuery = lookupQuery.eq('order_id', notification.orderId);
+      lookupQuery = lookupQuery.eq('locally_order_id', notification.orderId);
     } else {
       lookupQuery = lookupQuery.eq('tid', notification.providerTransactionId);
     }
 
-    const { data: booking, error } = await lookupQuery.maybeSingle();
+    const { data: proxyRequest, error } = await lookupQuery.maybeSingle();
 
-    if (error || !booking) {
+    if (error || !proxyRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: '예약 정보를 찾을 수 없습니다.',
+          error: '요청 정보를 찾을 수 없습니다.',
           orderId: notification.orderId,
           idempotencyKey: notification.idempotencyKey,
         },
@@ -61,40 +61,32 @@ export async function POST(request: Request) {
       );
     }
 
-    if (['PAID', 'confirmed'].includes(String(booking.status || '').toUpperCase())) {
+    if (proxyRequest.payment_channel !== 'LOCALLY') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: '로컬리 결제 요청만 처리할 수 있습니다.',
+        },
+        { status: 409 }
+      );
+    }
+
+    if (String(proxyRequest.payment_status || '').toUpperCase() === 'COMPLETED') {
       return NextResponse.json({ success: true, message: 'Already processed' });
-    }
-
-    if (String(booking.status || '').toUpperCase() !== 'PENDING') {
-      return NextResponse.json(
-        {
-          success: false,
-          error: '이미 처리된 예약이거나 결제 대기 상태가 아닙니다.',
-        },
-        { status: 409 }
-      );
-    }
-
-    const normalizedPaymentMethod = String(booking.payment_method || '').toLowerCase();
-    if (normalizedPaymentMethod && normalizedPaymentMethod !== 'card') {
-      return NextResponse.json(
-        {
-          success: false,
-          error: '카드 결제 대기 예약만 카드 결제를 확정할 수 있습니다.',
-        },
-        { status: 409 }
-      );
     }
 
     const verificationResult = await verifyCardPaymentNotification({
       notification,
-      orderId: booking.order_id || booking.id,
-      expectedAmount: Number(booking.amount || 0),
+      orderId: proxyRequest.locally_order_id || proxyRequest.id,
+      expectedAmount: getProxyRequestFeeKrw(
+        String(proxyRequest.category || 'RESTAURANT') as ProxyCategory,
+        (proxyRequest.form_data as Record<string, unknown> | null | undefined) ?? undefined
+      ),
     });
 
-    const confirmationResult = await finalizeExperienceCardPayment({
+    const confirmationResult = await finalizeProxyCardPayment({
       supabaseAdmin,
-      originalBooking: booking,
+      proxyRequest,
       verificationResult,
     });
 
@@ -112,7 +104,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : '결제 통보 처리 중 서버 오류가 발생했습니다.';
+      error instanceof Error ? error.message : '전화 예약 결제 통보 처리 중 서버 오류가 발생했습니다.';
 
     return NextResponse.json(
       {

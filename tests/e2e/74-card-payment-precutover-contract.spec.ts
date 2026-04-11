@@ -16,6 +16,7 @@ test.describe('Card payment pre-cutover contracts', () => {
         ready?: unknown;
         missingConfig?: unknown;
         reason?: unknown;
+        runtime?: unknown;
       };
 
       expect(typeof body.provider).toBe('string');
@@ -25,10 +26,17 @@ test.describe('Card payment pre-cutover contracts', () => {
       if (body.reason != null) {
         expect(typeof body.reason).toBe('string');
       }
+
+      if (body.runtime != null) {
+        expect(typeof body.runtime).toBe('object');
+        expect(typeof (body.runtime as { provider?: unknown }).provider).toBe('string');
+        expect(typeof (body.runtime as { merchantCode?: unknown }).merchantCode).toBe('string');
+        expect(typeof (body.runtime as { scriptSrc?: unknown }).scriptSrc).toBe('string');
+      }
     }
   });
 
-  test('keeps card notification routes disabled while exposing idempotency anchors', async ({
+  test('keeps card notification routes inert under PortOne while exposing idempotency anchors', async ({
     request,
   }) => {
     const experienceResponse = await request.post('/api/payment/card-notification', {
@@ -40,9 +48,10 @@ test.describe('Card payment pre-cutover contracts', () => {
       },
     });
 
-    expect(experienceResponse.status()).toBe(501);
+    expect(experienceResponse.status()).toBe(202);
     await expect(experienceResponse.json()).resolves.toMatchObject({
-      success: false,
+      success: true,
+      ignored: true,
       orderId: 'EXP-CARD-NOTI-TEST',
       idempotencyKey: 'EXP-CARD-NOTI-TEST',
     });
@@ -56,11 +65,29 @@ test.describe('Card payment pre-cutover contracts', () => {
       },
     });
 
-    expect(serviceResponse.status()).toBe(501);
+    expect(serviceResponse.status()).toBe(202);
     await expect(serviceResponse.json()).resolves.toMatchObject({
-      success: false,
+      success: true,
+      ignored: true,
       orderId: 'SVC-CARD-NOTI-TEST',
       idempotencyKey: 'SVC-CARD-NOTI-TEST',
+    });
+
+    const proxyResponse = await request.post('/api/proxy-bookings/payment/card-notification', {
+      form: {
+        Moid: 'LOCALLY-PROXY-NOTI-TEST',
+        TID: 'proxy_tid_test_value',
+        Amt: '4500',
+        ResultCode: '0000',
+      },
+    });
+
+    expect(proxyResponse.status()).toBe(202);
+    await expect(proxyResponse.json()).resolves.toMatchObject({
+      success: true,
+      ignored: true,
+      orderId: 'LOCALLY-PROXY-NOTI-TEST',
+      idempotencyKey: 'LOCALLY-PROXY-NOTI-TEST',
     });
   });
 });

@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
 
+import { finalizeProxyCardPayment } from '@/app/api/proxy-bookings/payment/proxyCardConfirmation';
 import { getCurrentCardPaymentProvider, verifyApprovedCardPayment } from '@/app/utils/payments/card/server';
 import { getProxyRequestFeeKrw } from '@/app/utils/proxyBooking';
-import { notifyProxyPaymentEvent } from '@/app/utils/proxyBookingNotifications';
 import type { ProxyCategory } from '@/app/types/proxy';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
-import { updateProxyPaymentState } from '@/app/api/admin/proxy-bookings/shared';
 
 type ProxyCardCallbackBody = {
+  providerPayload?: Record<string, unknown>;
   imp_uid?: string;
   approvalId?: string;
   merchant_uid?: string;
@@ -30,22 +30,36 @@ export async function POST(request: Request) {
     const contentType = request.headers.get('content-type') || '';
     let approvalId = '';
     let orderId = '';
+    let providerPayload: Record<string, string> = {};
 
     if (contentType.includes('application/json')) {
       const body = (await request.json()) as ProxyCardCallbackBody;
       approvalId = String(body.imp_uid || body.approvalId || '').trim();
       orderId = String(body.merchant_uid || body.orderId || '').trim();
+      providerPayload = Object.entries({
+        ...body,
+        ...(body.providerPayload || {}),
+      }).reduce<Record<string, string>>((acc, [key, value]) => {
+        if (value == null || typeof value === 'object') return acc;
+        acc[key] = String(value);
+        return acc;
+      }, {});
     } else {
       const formData = await request.formData();
       approvalId =
         formData.get('imp_uid')?.toString().trim() ||
         formData.get('approvalId')?.toString().trim() ||
+        formData.get('TxTid')?.toString().trim() ||
         '';
       orderId =
         formData.get('merchant_uid')?.toString().trim() ||
         formData.get('orderId')?.toString().trim() ||
+        formData.get('Moid')?.toString().trim() ||
         formData.get('moid')?.toString().trim() ||
         '';
+      providerPayload = Object.fromEntries(
+        Array.from(formData.entries()).map(([key, value]) => [key, String(value)])
+      );
     }
 
     if (!approvalId || !orderId) {
@@ -88,6 +102,7 @@ export async function POST(request: Request) {
         approvalId,
         orderId,
         expectedAmount,
+        providerPayload,
       });
     } catch (verificationError) {
       const message =
@@ -97,28 +112,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: message }, { status: 400 });
     }
 
-    const updated = await updateProxyPaymentState({
+    const confirmationResult = await finalizeProxyCardPayment({
       supabaseAdmin,
-      requestId: originalRequest.id,
-      currentPaymentStatus: 'WAITING',
-      paymentStatus: 'COMPLETED',
-      tid: verificationResult.providerTransactionId,
-      paidAt: new Date().toISOString(),
+      proxyRequest: originalRequest,
+      verificationResult,
     });
 
-    if (!updated) {
-      return NextResponse.json({ success: true, message: 'Already processed' });
+    if (!confirmationResult.success) {
+      return NextResponse.json(
+        { success: false, error: confirmationResult.error },
+        { status: confirmationResult.status }
+      );
     }
 
-    await notifyProxyPaymentEvent({
-      event: 'confirmed',
-      request: {
-        id: originalRequest.id,
-        user_id: originalRequest.user_id,
-        category: originalRequest.category,
-        form_data: originalRequest.form_data,
-      },
-    });
+    if (confirmationResult.alreadyProcessed) {
+      return NextResponse.json({ success: true, message: 'Already processed' });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

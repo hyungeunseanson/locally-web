@@ -1,5 +1,12 @@
 export type CardPaymentProvider = 'portone' | 'nicepay';
 
+export type CardPaymentPublicRuntime = {
+  provider: CardPaymentProvider;
+  merchantCode: string;
+  scriptSrc: string;
+  publicClientKey?: string;
+};
+
 export type CardPaymentReadinessReason =
   | 'missing_imp_code'
   | 'missing_portone_credentials'
@@ -11,11 +18,13 @@ export type CardPaymentReadiness = {
   ready: boolean;
   reason?: CardPaymentReadinessReason;
   missingConfig?: string[];
+  runtime?: CardPaymentPublicRuntime;
 };
 
 export type CardPaymentLaunchParams = {
   provider: CardPaymentProvider;
   merchantCode: string;
+  publicClientKey?: string;
   orderId: string;
   productName: string;
   amount: number;
@@ -36,6 +45,7 @@ export type VerifyApprovedCardPaymentParams = {
   approvalId: string;
   orderId: string;
   expectedAmount: number;
+  providerPayload?: Record<string, string>;
 };
 
 export type VerifiedCardPayment = {
@@ -68,6 +78,7 @@ export type CardPaymentNotificationEnvelope = {
   providerTransactionId: string | null;
   amount: number | null;
   status: string | null;
+  payload: Record<string, string>;
   rawBody: string;
   headers: Record<string, string>;
 };

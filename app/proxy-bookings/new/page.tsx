@@ -16,6 +16,11 @@ import type { ProxyCategory, RestaurantServiceOption } from '@/app/types/proxy';
 import { ProxyRequestValidationSchema } from '@/app/schemas/proxyRequestSchema';
 import { createClient } from '@/app/utils/supabase/client';
 import { launchCardPayment } from '@/app/utils/payments/card/client';
+import { buildCardPaymentCallbackRequestBody } from '@/app/utils/payments/card/public';
+import type {
+  CardPaymentPublicRuntime,
+  CardPaymentReadiness,
+} from '@/app/utils/payments/card/types';
 import {
   getProxyCategoryLabel,
   getProxyRequestFeeKrw,
@@ -26,11 +31,7 @@ import {
 type PaymentMethod = 'card' | 'bank';
 type PaymentChannel = 'NAVER' | 'LOCALLY';
 
-type CardReadyResponse = {
-  provider: 'portone' | 'nicepay';
-  ready: boolean;
-  reason?: string;
-};
+type CardReadyResponse = CardPaymentReadiness;
 
 type CategoryOption = {
   id: ProxyCategory;
@@ -570,13 +571,13 @@ function TextareaField({
 export default function NewProxyBooking() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
-  const portOneImpCode = process.env.NEXT_PUBLIC_PORTONE_IMP_CODE || '';
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [category, setCategory] = useState<ProxyCategory>('RESTAURANT');
   const [paymentChannel, setPaymentChannel] = useState<PaymentChannel>('NAVER');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
+  const [cardRuntime, setCardRuntime] = useState<CardPaymentPublicRuntime | null>(null);
   const [naverBuyerName, setNaverBuyerName] = useState('');
   const [contactName, setContactName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
@@ -587,6 +588,29 @@ export default function NewProxyBooking() {
   const [transportForm, setTransportForm] = useState<TransportFormData>(DEFAULT_TRANSPORT_FORM);
   const [generalForm, setGeneralForm] = useState<GeneralInquiryFormData>(DEFAULT_GENERAL_FORM);
   const [lostForm, setLostForm] = useState<LostAndFoundFormData>(DEFAULT_LOST_FORM);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchCardRuntime = async () => {
+      try {
+        const readinessRes = await fetch('/api/payment/card-ready', { cache: 'no-store' });
+        const readiness = (await readinessRes.json()) as CardReadyResponse;
+
+        if (!isMounted) return;
+        setCardRuntime(readiness.runtime || null);
+      } catch {
+        if (!isMounted) return;
+        setCardRuntime(null);
+      }
+    };
+
+    void fetchCardRuntime();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const updateRestaurantField = <K extends keyof RestaurantFormData>(key: K, value: RestaurantFormData[K]) => {
     setRestaurantForm((prev) => ({ ...prev, [key]: value }));
@@ -760,8 +784,9 @@ export default function NewProxyBooking() {
       if (requiresLocallyPayment && paymentMethod === 'card') {
         const readinessRes = await fetch('/api/payment/card-ready', { cache: 'no-store' });
         readiness = (await readinessRes.json()) as CardReadyResponse;
+        setCardRuntime(readiness.runtime || null);
 
-        if (!readinessRes.ok || !readiness?.ready || !portOneImpCode) {
+        if (!readinessRes.ok || !readiness?.ready || !readiness.runtime?.merchantCode) {
           setError('카드 결제를 지금 사용할 수 없습니다. 무통장 입금을 이용해주세요.');
           setLoading(false);
           return;
@@ -801,7 +826,8 @@ export default function NewProxyBooking() {
       try {
         const paymentSession = await launchCardPayment({
           provider: readiness?.provider || 'portone',
-          merchantCode: portOneImpCode,
+          merchantCode: readiness?.runtime?.merchantCode || cardRuntime?.merchantCode || '',
+          publicClientKey: readiness?.runtime?.publicClientKey || cardRuntime?.publicClientKey,
           orderId: locallyOrderId,
           productName: `Locally ${getProxyCategoryLabel(category)}`,
           amount: finalAmount,
@@ -814,12 +840,12 @@ export default function NewProxyBooking() {
         const callbackRes = await fetch('/api/proxy-bookings/payment/nicepay-callback', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            imp_uid: paymentSession.approvalId,
-            approvalId: paymentSession.approvalId,
-            merchant_uid: locallyOrderId,
-            orderId: locallyOrderId,
-          }),
+          body: JSON.stringify(
+            buildCardPaymentCallbackRequestBody({
+              orderId: locallyOrderId,
+              paymentSession,
+            })
+          ),
         });
 
         const callbackResult = await callbackRes.json();
@@ -1359,7 +1385,13 @@ export default function NewProxyBooking() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-5 sm:px-5 sm:py-8">
-      <Script src="https://cdn.iamport.kr/v1/iamport.js" strategy="afterInteractive" />
+      {cardRuntime?.scriptSrc && (
+        <Script
+          id={`proxy-card-sdk-${cardRuntime.provider}`}
+          src={cardRuntime.scriptSrc}
+          strategy="afterInteractive"
+        />
+      )}
 
       <button
         onClick={() => router.back()}

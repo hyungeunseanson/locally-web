@@ -1,16 +1,14 @@
 import { NextResponse } from 'next/server';
-import { revalidatePath } from 'next/cache';
 
+import { finalizeExperienceCardPayment } from '@/app/api/payment/experienceCardConfirmation';
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 import { getCurrentCardPaymentProvider, verifyApprovedCardPayment } from '@/app/utils/payments/card/server';
-import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
-import { getBookingSettlementSnapshot } from '@/app/utils/bookingFinance';
-import { notifyExperiencePaymentConfirmed } from '@/app/utils/experienceNotificationFlows';
 import { captureServerException } from '@/app/utils/monitoring/sentry';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 
 type BookingNicePayCallbackBody = {
+  providerPayload?: Record<string, unknown>;
   imp_uid?: string;
   approvalId?: string;
   merchant_uid?: string;
@@ -33,12 +31,21 @@ export async function POST(request: Request) {
 
     let impUid = '';
     let orderId = '';
+    let providerPayload: Record<string, string> = {};
     const contentType = request.headers.get('content-type') || '';
 
     if (contentType.includes('application/json')) {
       const body = (await request.json()) as BookingNicePayCallbackBody;
       impUid = (body.imp_uid || body.approvalId || '').trim();
       orderId = (body.merchant_uid || body.orderId || '').trim();
+      providerPayload = Object.entries({
+        ...body,
+        ...(body.providerPayload || {}),
+      }).reduce<Record<string, string>>((acc, [key, value]) => {
+        if (value == null || typeof value === 'object') return acc;
+        acc[key] = String(value);
+        return acc;
+      }, {});
     } else {
       const formData = await request.formData();
       impUid =
@@ -50,6 +57,9 @@ export async function POST(request: Request) {
         formData.get('moid')?.toString().trim() ||
         formData.get('orderId')?.toString().trim() ||
         '';
+      providerPayload = Object.fromEntries(
+        Array.from(formData.entries()).map(([key, value]) => [key, String(value)])
+      );
     }
 
     if (!impUid || !orderId) {
@@ -106,6 +116,7 @@ export async function POST(request: Request) {
         approvalId: impUid,
         orderId: expectedOrderId,
         expectedAmount,
+        providerPayload,
       });
     } catch (verificationError) {
       const message =
@@ -115,94 +126,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: message }, { status: 400 });
     }
 
-    const experienceMeta = Array.isArray(originalBooking.experiences)
-      ? originalBooking.experiences[0]
-      : originalBooking.experiences;
+    const confirmationResult = await finalizeExperienceCardPayment({
+      supabaseAdmin,
+      originalBooking,
+      verificationResult,
+    });
 
-    const { data: existingBookings } = await supabaseAdmin
-      .from('bookings')
-      .select('id, guests, type')
-      .eq('experience_id', originalBooking.experience_id)
-      .eq('date', originalBooking.date)
-      .eq('time', originalBooking.time)
-      .neq('id', originalBooking.id)
-      .in('status', [...BOOKING_ACTIVE_STATUS_FOR_CAPACITY]);
-
-    const currentBookedCount =
-      existingBookings?.reduce((sum, booking) => sum + Number(booking.guests || 0), 0) || 0;
-    const hasPrivateBooking = existingBookings?.some((booking) => booking.type === 'private');
-    const maxGuests = experienceMeta?.max_guests || 10;
-
-    if (
-      hasPrivateBooking ||
-      (originalBooking.type === 'private' && currentBookedCount > 0) ||
-      (originalBooking.type !== 'private' &&
-        currentBookedCount + Number(originalBooking.guests || 0) > maxGuests)
-    ) {
+    if (!confirmationResult.success) {
       return NextResponse.json(
-        { success: false, error: '잔여 좌석이 부족하여 예약을 확정할 수 없습니다.' },
-        { status: 409 }
+        { success: false, error: confirmationResult.error },
+        { status: confirmationResult.status }
       );
     }
 
-    const snapshot = getBookingSettlementSnapshot({
-      ...originalBooking,
-      amount: expectedAmount,
-    });
-
-    const { data: bookingData, error: updateError } = await supabaseAdmin
-      .from('bookings')
-      .update({
-        status: 'PAID',
-        payment_method: 'card',
-        tid: verificationResult.providerTransactionId,
-        price_at_booking: snapshot.basePrice,
-        total_experience_price: snapshot.totalExperiencePrice,
-        host_payout_amount: snapshot.hostPayout,
-        platform_revenue: snapshot.platformRevenue,
-        payout_status: 'pending',
-      })
-      .eq('id', originalBooking.id)
-      .eq('status', 'PENDING') // [Race Guard] PENDING 상태일 때만 업데이트 — 중복 처리 방지
-      .select('*, experiences (host_id, title)')
-      .maybeSingle();
-
-    if (updateError) {
-      throw new Error(updateError.message || '결제 확정 업데이트에 실패했습니다.');
-    }
-    if (!bookingData) {
-      // 다른 요청이 이미 처리 완료 — 멱등성 응답
+    if (confirmationResult.alreadyProcessed) {
       return NextResponse.json({ success: true, message: 'Already processed' });
     }
-
-    const bookingExperienceMeta = Array.isArray(bookingData.experiences)
-      ? bookingData.experiences[0]
-      : bookingData.experiences;
-    const expTitle = bookingExperienceMeta?.title || 'Locally 체험';
-    const resolvedHostId = bookingExperienceMeta?.host_id;
-    const guestName = bookingData.contact_name || '게스트';
-
-    await notifyExperiencePaymentConfirmed({
-      supabaseAdmin,
-      guestId: bookingData.user_id || null,
-      hostId: resolvedHostId || null,
-      experienceTitle: expTitle,
-      guestName,
-      guestsCount: Number(bookingData.guests || 1),
-      bookingDate: bookingData.date,
-      bookingTime: bookingData.time || null,
-      totalAmount: Number(bookingData.amount || expectedAmount || 0),
-    });
-
-    insertAdminAlerts({
-      title: '체험 예약 결제가 완료되었습니다',
-      message: `'${expTitle}' 예약 결제가 완료되었습니다. 게스트: ${guestName}`,
-      link: '/admin/dashboard?tab=LEDGER',
-    }).catch((adminAlertError) => {
-      console.error('Booking Payment Admin Alert Error:', adminAlertError);
-    });
-
-    revalidatePath(`/experiences/${originalBooking.experience_id}`);
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
