@@ -4,6 +4,18 @@ import { NextResponse } from 'next/server';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
+import { syncReviewAggregates } from '@/app/utils/reviews/reviewAggregates';
+
+function parseReviewRating(value: unknown) {
+  const normalized = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(normalized)) return null;
+  if (normalized < 1 || normalized > 5) return null;
+  return normalized;
+}
+
+function normalizeReviewContent(value: unknown) {
+  return typeof value === 'string' ? value.trim() : '';
+}
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -15,17 +27,27 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const { experienceId, bookingId, rating, content } = body;
+    const normalizedExperienceId = Number(experienceId);
+    const normalizedBookingId = typeof bookingId === 'string' ? bookingId.trim() : '';
+    const normalizedRating = parseReviewRating(rating);
+    const normalizedContent = normalizeReviewContent(content);
 
     // 2. 필수 값 체크
-    if (!experienceId || !bookingId || !rating) {
+    if (!Number.isInteger(normalizedExperienceId) || normalizedExperienceId <= 0 || !normalizedBookingId) {
       return NextResponse.json({ error: '필수 정보가 누락되었습니다.' }, { status: 400 });
+    }
+    if (normalizedRating === null) {
+      return NextResponse.json({ error: '평점은 1점부터 5점까지 입력해주세요.' }, { status: 400 });
+    }
+    if (normalizedContent.length < 10) {
+      return NextResponse.json({ error: '후기는 10자 이상 작성해주세요.' }, { status: 400 });
     }
 
     // 🟢 [보안 핵심] 예약 유효성 검증 (Status Check & Ownership Check)
     const { data: booking } = await supabase
       .from('bookings')
-      .select('status, user_id')
-      .eq('id', bookingId)
+      .select('status, user_id, experience_id')
+      .eq('id', normalizedBookingId)
       .maybeSingle();
 
     if (!booking) {
@@ -39,12 +61,15 @@ export async function POST(request: Request) {
     if (booking.status !== 'completed') {
       return NextResponse.json({ error: '체험 완료(completed) 상태일 때만 후기를 작성할 수 있습니다.' }, { status: 400 });
     }
+    if (booking.experience_id !== normalizedExperienceId) {
+      return NextResponse.json({ error: '예약 정보와 일치하지 않는 체험입니다.' }, { status: 400 });
+    }
 
     // 🟢 [중복 방지] 이미 작성된 후기가 있는지 확인
     const { count: existingReviewCount } = await supabase
       .from('reviews')
       .select('*', { count: 'exact', head: true })
-      .eq('booking_id', bookingId);
+      .eq('booking_id', normalizedBookingId);
 
     if (existingReviewCount && existingReviewCount > 0) {
       return NextResponse.json({ error: '이미 후기를 작성하셨습니다.' }, { status: 409 });
@@ -54,47 +79,31 @@ export async function POST(request: Request) {
     const { data: experience } = await supabase
       .from('experiences')
       .select('host_id, title')
-      .eq('id', experienceId)
+      .eq('id', booking.experience_id)
       .maybeSingle();
 
     // 3. 후기 저장 (Insert)
     const { error: insertError } = await supabase.from('reviews').insert({
       user_id: user.id,
-      experience_id: experienceId,
-      booking_id: bookingId,
-      rating,
-      content,
+      experience_id: booking.experience_id,
+      booking_id: normalizedBookingId,
+      rating: normalizedRating,
+      content: normalizedContent,
       photos: [],
       created_at: new Date().toISOString()
     });
 
     if (insertError) throw insertError;
 
-    // 🟢 [실시간 반영] 체험의 평균 평점 및 후기 수 업데이트 (Aggregation)
-    // (1) 해당 체험의 모든 평점 가져오기
-    const { data: allReviews } = await supabase
-      .from('reviews')
-      .select('rating')
-      .eq('experience_id', experienceId);
-
-    if (allReviews && allReviews.length > 0) {
-      const totalRating = allReviews.reduce((sum, r) => sum + r.rating, 0);
-      const newAverage = Number((totalRating / allReviews.length).toFixed(2)); // 소수점 2자리
-      const newCount = allReviews.length;
-
-      // (2) experiences 테이블 업데이트 (컬럼이 없다면 추가 필요: rating, review_count)
-      await supabase
-        .from('experiences')
-        .update({
-          rating: newAverage,
-          review_count: newCount
-        })
-        .eq('id', experienceId);
-    }
+    const supabaseAdmin = createAdminClient();
+    await syncReviewAggregates({
+      experienceId: booking.experience_id,
+      hostId: experience?.host_id ?? null,
+      supabaseAdmin,
+    });
 
     // [R1] 호스트에게 새 후기 알림 발송
     if (experience?.host_id) {
-      const supabaseAdmin = createAdminClient();
       const notificationRow = await buildLocalizedNotificationInsert({
         supabaseAdmin,
         userId: experience.host_id,
@@ -139,30 +148,6 @@ export async function POST(request: Request) {
         });
       } catch (adminAlertError) {
         console.error('Review admin alert error:', adminAlertError);
-      }
-    }
-
-    // [R6] 호스트 프로필 전체 평점 집계 업데이트
-    if (experience?.host_id) {
-      try {
-        const { data: hostReviews } = await supabase
-          .from('reviews')
-          .select('rating, experiences!inner(host_id)')
-          .eq('experiences.host_id', experience.host_id);
-
-        if (hostReviews && hostReviews.length > 0) {
-          const hostTotal = hostReviews.reduce((sum, r) => sum + r.rating, 0);
-          const hostAvg = Number((hostTotal / hostReviews.length).toFixed(2));
-          await supabase
-            .from('profiles')
-            .update({
-              average_rating: hostAvg,
-              total_review_count: hostReviews.length,
-            })
-            .eq('id', experience.host_id);
-        }
-      } catch {
-        // 프로필 집계 실패는 후기 등록 성공에 영향 없음
       }
     }
 

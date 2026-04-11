@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
+import { syncReviewAggregates } from '@/app/utils/reviews/reviewAggregates';
 
 type ReviewDeleteContext = {
   id: number;
@@ -68,7 +69,7 @@ export async function DELETE(
         ? supabaseAdmin.from('profiles').select('full_name').eq('id', review.user_id).maybeSingle()
         : Promise.resolve({ data: null, error: null }),
       review.experience_id
-        ? supabaseAdmin.from('experiences').select('title').eq('id', review.experience_id).maybeSingle()
+        ? supabaseAdmin.from('experiences').select('title, host_id').eq('id', review.experience_id).maybeSingle()
         : Promise.resolve({ data: null, error: null }),
     ]);
 
@@ -87,6 +88,14 @@ export async function DELETE(
     if (deleteError) {
       console.error('[admin/reviews/[id]] delete error:', deleteError);
       return NextResponse.json({ success: false, error: '리뷰 삭제 중 오류가 발생했습니다.' }, { status: 500 });
+    }
+
+    if (review.experience_id) {
+      await syncReviewAggregates({
+        experienceId: review.experience_id,
+        hostId: experienceResult.data?.host_id ?? null,
+        supabaseAdmin,
+      });
     }
 
     await recordAuditLog({

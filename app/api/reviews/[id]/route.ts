@@ -1,6 +1,18 @@
 import { createClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { NextResponse } from 'next/server';
+import { syncReviewAggregates } from '@/app/utils/reviews/reviewAggregates';
+
+function parseReviewRating(value: unknown) {
+  const normalized = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(normalized)) return null;
+  if (normalized < 1 || normalized > 5) return null;
+  return normalized;
+}
+
+function normalizeReviewContent(value: unknown) {
+  return typeof value === 'string' ? value.trim() : '';
+}
 
 export async function PATCH(
   request: Request,
@@ -19,11 +31,13 @@ export async function PATCH(
 
     const body = await request.json();
     const { rating, content } = body;
+    const normalizedRating = parseReviewRating(rating);
+    const normalizedContent = normalizeReviewContent(content);
 
-    if (!rating || !content) {
-      return NextResponse.json({ error: '필수 정보가 누락되었습니다.' }, { status: 400 });
+    if (normalizedRating === null) {
+      return NextResponse.json({ error: '평점은 1점부터 5점까지 입력해주세요.' }, { status: 400 });
     }
-    if (content.length < 10) {
+    if (normalizedContent.length < 10) {
       return NextResponse.json({ error: '후기는 10자 이상 작성해주세요.' }, { status: 400 });
     }
 
@@ -50,55 +64,18 @@ export async function PATCH(
     const { error: updateError } = await supabaseAdmin
       .from('reviews')
       .update({
-        rating,
-        content,
+        rating: normalizedRating,
+        content: normalizedContent,
         updated_at: new Date().toISOString(),
       })
       .eq('id', reviewId);
 
     if (updateError) throw updateError;
 
-    // 체험 평점 재집계
-    const { data: allReviews } = await supabaseAdmin
-      .from('reviews')
-      .select('rating')
-      .eq('experience_id', existing.experience_id);
-
-    if (allReviews && allReviews.length > 0) {
-      const totalRating = allReviews.reduce((sum, r) => sum + r.rating, 0);
-      const newAverage = Number((totalRating / allReviews.length).toFixed(2));
-      await supabaseAdmin
-        .from('experiences')
-        .update({ rating: newAverage, review_count: allReviews.length })
-        .eq('id', existing.experience_id);
-
-      // 호스트 프로필 집계
-      try {
-        const { data: exp } = await supabaseAdmin
-          .from('experiences')
-          .select('host_id')
-          .eq('id', existing.experience_id)
-          .maybeSingle();
-
-        if (exp?.host_id) {
-          const { data: hostReviews } = await supabaseAdmin
-            .from('reviews')
-            .select('rating, experiences!inner(host_id)')
-            .eq('experiences.host_id', exp.host_id);
-
-          if (hostReviews && hostReviews.length > 0) {
-            const hostTotal = hostReviews.reduce((s, r) => s + r.rating, 0);
-            const hostAvg = Number((hostTotal / hostReviews.length).toFixed(2));
-            await supabaseAdmin
-              .from('profiles')
-              .update({ average_rating: hostAvg, total_review_count: hostReviews.length })
-              .eq('id', exp.host_id);
-          }
-        }
-      } catch {
-        // 프로필 집계 실패는 수정 성공에 영향 없음
-      }
-    }
+    await syncReviewAggregates({
+      experienceId: existing.experience_id,
+      supabaseAdmin,
+    });
 
     return NextResponse.json({ success: true });
 
