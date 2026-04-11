@@ -231,6 +231,22 @@ test.describe.serial('mobile unread badges', () => {
     await expect(page.getByTestId('guest-mobile-profile-unread-dot')).toBeVisible({ timeout: 15000 });
   });
 
+  test('guest mobile messages tab ignores proxy new_message notifications', async ({ page }) => {
+    const guest = createUser('guest-proxy-message');
+    const guestId = await createAuthUser(guest);
+    await insertUnreadNotification(guestId, '/proxy-bookings/test-request', {
+      type: 'new_message',
+      title: '전화 예약 답변 테스트',
+      message: '운영팀이 전화 예약 요청에 답변했습니다.',
+    });
+
+    await login(page, guest);
+
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('guest-mobile-messages-unread-dot')).toHaveCount(0);
+    await expect(page.getByTestId('guest-mobile-profile-unread-dot')).toBeVisible({ timeout: 15000 });
+  });
+
   test('host mobile menu entry points show unread badge', async ({ page }) => {
     const host = createUser('host');
     const hostId = await createAuthUser(host);

@@ -60,6 +60,9 @@ export default function BottomTabNavigation() {
         return `mobile-tab-${href.split('?')[0].replace(/\//g, '-').replace(/^-+/, '')}`;
     };
 
+    const isGuestInboxMessageNotificationLink = (link: string | null | undefined) =>
+        link === '/guest/inbox' || Boolean(link?.startsWith('/guest/inbox?'));
+
     const guestTabs = [
         {
             name: t('nav_search'),
@@ -97,7 +100,10 @@ export default function BottomTabNavigation() {
             requireAuth: true,
             icon: (isActive: boolean) => {
                 const hasUnreadMessageNotification = notifications.some(
-                    (notification) => !notification.is_read && notification.type.includes('message')
+                    (notification) =>
+                        !notification.is_read &&
+                        notification.type === 'new_message' &&
+                        isGuestInboxMessageNotificationLink(notification.link)
                 );
 
                 return (
