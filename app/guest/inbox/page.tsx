@@ -67,6 +67,13 @@ function InboxContent() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
+  const shouldRedirectToLogin = !currentUser && !isLoading;
+
+  useEffect(() => {
+    if (!shouldRedirectToLogin) return;
+    router.replace('/login?returnUrl=%2Fguest%2Finbox');
+  }, [router, shouldRedirectToLogin]);
+
   const handleMobileBack = () => {
     if (typeof window !== 'undefined' && window.history.length > 1) {
       router.back();
@@ -341,6 +348,10 @@ function InboxContent() {
       setModalUserId(id);
     }
   };
+
+  if ((isLoading && !currentUser) || shouldRedirectToLogin) {
+    return <Spinner fullScreen />;
+  }
 
   return (
     <div className="h-[100dvh] bg-white text-slate-900 font-sans flex flex-col overflow-hidden">

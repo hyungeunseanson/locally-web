@@ -50,6 +50,16 @@ test.describe('Home/search location localization', () => {
     await stubSearchApi(page);
     await page.setViewportSize({ width: 390, height: 844 });
     await prepareLocale(page, 'ja', '/ja');
+    const analyticsPayloads: Array<{ keyword?: string; route?: string }> = [];
+
+    await page.route('**/api/analytics/search', async (route) => {
+      analyticsPayloads.push((route.request().postDataJSON() as { keyword?: string; route?: string }) || {});
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true }),
+      });
+    });
 
     await page.getByTestId('home-mobile-search-trigger').click();
     await expect(page.getByTestId('home-mobile-location-panel')).toBeVisible();
@@ -62,6 +72,11 @@ test.describe('Home/search location localization', () => {
     await expect(page.getByTestId('home-mobile-collapsed-location')).toContainText('東京');
 
     await page.getByTestId('home-mobile-search-submit').click();
+    await expect.poll(() => analyticsPayloads.length, { timeout: 15000 }).toBe(1);
+    expect(analyticsPayloads[0]).toMatchObject({
+      keyword: '도쿄',
+      route: 'main',
+    });
     await expect(page).toHaveURL(/\/search\?/);
     await expect(page.getByTestId('search-mobile-header-title')).toContainText('東京');
   });

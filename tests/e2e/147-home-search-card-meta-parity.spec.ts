@@ -205,4 +205,22 @@ test.describe('Home/search card meta parity', () => {
     await expectCompactPrice(mobileCard.getByTestId(`search-mobile-result-card-price-${FIXTURE.id}`));
     await expect(mobileCard).toContainText('★ 4.80');
   });
+
+  test('shows a localized login-required toast when logged-out users tap wishlist on home cards', async ({ page }) => {
+    await stubHomeExperiences(page);
+    await page.setViewportSize({ width: 1440, height: 1200 });
+
+    await page.goto('/en', { waitUntil: 'networkidle' });
+    await dismissAnnouncementIfVisible(page);
+
+    const wishlistButton = page.locator('button[aria-label="Save to wishlist"]:visible').first();
+    await expect(wishlistButton).toBeVisible({ timeout: 15000 });
+
+    await wishlistButton.click();
+
+    await expect(page.getByText('Login required.')).toBeVisible();
+    await expect
+      .poll(() => new URL(page.url()).pathname)
+      .toBe('/en');
+  });
 });

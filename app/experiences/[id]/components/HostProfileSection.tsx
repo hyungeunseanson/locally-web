@@ -65,6 +65,7 @@ export default function HostProfileSection(props: HostProfileProps) {
         <button
           type="button"
           onClick={props.onMessageHost}
+          data-testid="exp-host-message-trigger"
           className="mt-4 w-full min-h-[44px] rounded-xl bg-[#e7e7e9] px-4 py-3 text-[11px] font-medium text-slate-700 shadow-[0_8px_20px_rgba(15,23,42,0.05)] transition-colors hover:bg-[#dddddf] md:mt-5 md:py-2.5 md:text-[14px]"
         >
           {t('exp_host_message_button', { name: props.name })}

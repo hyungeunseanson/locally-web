@@ -244,4 +244,27 @@ test.describe.serial('analytics ingest routes', () => {
 
     if (searchRow?.id) createdSearchLogIds.push(String(searchRow.id));
   });
+
+  test('fails closed with 400 for malformed search analytics payloads', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+
+    const result = await page.evaluate(async () => {
+      const response = await fetch('/api/analytics/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{',
+      });
+
+      return {
+        status: response.status,
+        body: await response.json(),
+      };
+    });
+
+    expect(result.status).toBe(400);
+    expect(result.body).toMatchObject({
+      success: false,
+      error: 'Invalid JSON body',
+    });
+  });
 });

@@ -183,7 +183,10 @@ export default function AccountPage() {
   useEffect(() => {
     const getProfile = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/'); return; }
+      if (!user) {
+        router.replace('/login?returnUrl=%2Faccount');
+        return;
+      }
       setUser(user);
 
       const adminAccess = await fetchAdminAccess();

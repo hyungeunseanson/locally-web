@@ -298,6 +298,7 @@ export default function ExpMainContent({
             <h3 className="mb-1.5 text-[18px] font-medium leading-tight tracking-[-0.01em] md:text-[24px]">{t('exp_message_modal_title', { name: hostProfile?.name || t('exp_detail_host_default_name') })}</h3>
             <p className="mb-4 text-[11px] leading-snug text-slate-500 md:mb-5 md:text-[13px] md:leading-relaxed">{t('exp_message_modal_body')}</p>
             <textarea
+              data-testid="exp-message-modal-textarea"
               value={inquiryText}
               onChange={(e) => setInquiryText(e.target.value)}
               placeholder={t('exp_message_modal_placeholder')}
@@ -306,6 +307,7 @@ export default function ExpMainContent({
             <div className="mt-4 md:mt-5">
               <button
                 onClick={handleSubmitMessage}
+                data-testid="exp-message-modal-submit"
                 disabled={!inquiryText.trim() || isSubmittingMessage}
                 className={`w-full rounded-[18px] py-3 text-[13px] font-medium md:rounded-2xl md:py-3.5 md:text-[15px] ${
                   !inquiryText.trim() || isSubmittingMessage

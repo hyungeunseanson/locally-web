@@ -20,6 +20,12 @@ async function dismissAnnouncementIfVisible(page: Page) {
   }
 }
 
+async function submitLoginForm(page: Page, email: string, password: string) {
+  await page.locator('input[type="email"]').fill(email);
+  await page.locator('input[type="password"]').fill(password);
+  await page.locator('button[type="submit"]').click();
+}
+
 test.describe('Login flow guidance', () => {
   test('shows return guidance when a returnUrl is present', async ({ page }) => {
     await page.goto('/login?returnUrl=%2Fguest%2Ftrips', { waitUntil: 'domcontentloaded' });
@@ -69,4 +75,26 @@ test.describe('Login flow guidance', () => {
         .toBe(testCase.expectedPath);
     }
   });
+
+  for (const protectedPath of ['/guest/inbox', '/guest/wishlists', '/account'] as const) {
+    test(`redirects ${protectedPath} to login and resumes on the same canonical page after login`, async ({ page }) => {
+      const user = createTestUser(`login.protected-return.${protectedPath.replace(/\W+/g, '.')}`);
+      await createAuthUser(user, createdAuthUserIds);
+
+      await page.goto(protectedPath, { waitUntil: 'domcontentloaded' });
+
+      await expect
+        .poll(() => new URL(page.url()).pathname, { timeout: 15000 })
+        .toBe('/login');
+      await expect
+        .poll(() => new URL(page.url()).searchParams.get('returnUrl'))
+        .toBe(protectedPath);
+
+      await dismissAnnouncementIfVisible(page);
+      await submitLoginForm(page, user.email, user.password);
+      await expect
+        .poll(() => new URL(page.url()).pathname, { timeout: 30000 })
+        .toBe(protectedPath);
+    });
+  }
 });

@@ -98,7 +98,10 @@ export default function WishlistsPage() {
   useEffect(() => {
     const fetchWishlists = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/'); return; }
+      if (!user) {
+        router.replace('/login?returnUrl=%2Fguest%2Fwishlists');
+        return;
+      }
 
       // 🟢 [수정] experiences(*)로 모든 컬럼을 가져와서 에러 방지
       const { data, error } = await supabase

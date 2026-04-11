@@ -250,9 +250,17 @@ export default function ExperienceClient({
         showToast(t('exp_detail_host_missing'), 'error');
         return false;
       }
-      await createInquiry(experience.host_id, String(experience.id), inquiryText);
+      const result = await createInquiry(experience.host_id, String(experience.id), inquiryText);
+      const redirectUrl =
+        typeof result?.redirectUrl === 'string' && result.redirectUrl.trim()
+          ? result.redirectUrl
+          : `/guest/inbox?inquiryId=${result?.inquiryId ?? ''}`;
+
       showToast(t('exp_detail_message_sent'), 'success');
       setInquiryText('');
+      window.setTimeout(() => {
+        router.push(redirectUrl);
+      }, 0);
       return true;
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : t('exp_detail_unknown_error');

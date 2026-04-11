@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useAuth } from '@/app/context/AuthContext';
+import { useLanguage } from '@/app/context/LanguageContext';
 import { useToast } from '@/app/context/ToastContext';
 
 const WISHLIST_SYNC_EVENT = 'wishlist:sync';
@@ -23,6 +24,7 @@ export function useWishlist(experienceId: string) {
   const [isLoading, setIsLoading] = useState(false);
   const supabase = useMemo(() => createClient(), []);
   const { user, isLoading: isAuthLoading } = useAuth();
+  const { t } = useLanguage();
   const { showToast } = useToast();
   const userId = user?.id ?? null;
   const statusRequestRef = useRef(0);
@@ -137,7 +139,7 @@ export function useWishlist(experienceId: string) {
     if (isAuthLoading || isLoading) return;
 
     if (!userId) {
-      showToast('로그인이 필요한 서비스입니다.', 'error');
+      showToast(t('login_required'), 'error');
       return;
     }
 

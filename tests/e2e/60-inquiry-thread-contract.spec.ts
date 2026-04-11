@@ -20,6 +20,14 @@ const createdExperienceIds: number[] = [];
 const createdInquiryIds: number[] = [];
 const createdMessageIds: number[] = [];
 
+async function dismissAnnouncementIfVisible(page: Page) {
+  const announcement = page.getByTestId('global-site-announcement-modal');
+  if (await announcement.count()) {
+    await page.getByTestId('global-site-announcement-primary').click({ force: true });
+    await expect(announcement).toHaveCount(0);
+  }
+}
+
 function loadEnv(): EnvMap {
   return readFileSync('.env.local', 'utf8')
     .split(/\n/)
@@ -158,7 +166,7 @@ async function createExperienceFixture(hostId: string) {
       exclusions: ['개인 경비'],
       supplies: '편한 복장',
       rules: { age_limit: '만 19세 이상', activity_level: '보통' },
-      status: 'approved',
+      status: 'active',
       is_active: true,
       is_private_enabled: false,
       private_price: 0,
@@ -250,5 +258,54 @@ test.describe.serial('Inquiry thread response contract', () => {
 
     createdInquiryIds.push(Number(json.inquiryId));
     createdMessageIds.push(Number(json.messageId));
+  });
+
+  test('redirects experience-detail inquiries into the guest inbox thread after submit', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const guest = createUser('guest-ui');
+    const host = createUser('host-ui');
+    await createAuthUser(guest);
+    const hostId = await createAuthUser(host);
+    await createApprovedHostApplication(hostId, host);
+    const experienceId = await createExperienceFixture(hostId);
+
+    await login(page, guest);
+    await page.goto(`/experiences/${experienceId}`, { waitUntil: 'networkidle' });
+    await dismissAnnouncementIfVisible(page);
+
+    const inquiryMessage = `체험 상세 문의 UI ${Date.now()}`;
+    const hostMessageButton = page.getByTestId('exp-host-message-trigger');
+    await hostMessageButton.scrollIntoViewIfNeeded();
+    await hostMessageButton.click();
+
+    await page.getByTestId('exp-message-modal-textarea').fill(inquiryMessage);
+    await page.getByTestId('exp-message-modal-submit').click();
+
+    await page.waitForURL(/\/guest\/inbox\?inquiryId=\d+/, { timeout: 20000 });
+
+    const inquiryId = new URL(page.url()).searchParams.get('inquiryId');
+    expect(inquiryId).toBeTruthy();
+    if (inquiryId) {
+      createdInquiryIds.push(Number(inquiryId));
+    }
+
+    await expect(page.getByTestId('guest-inbox-header-profile-trigger')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(inquiryMessage).last()).toBeVisible({ timeout: 15000 });
+
+    const { data: messageRow, error: messageError } = await getAdminClient()
+      .from('inquiry_messages')
+      .select('id')
+      .eq('inquiry_id', Number(inquiryId))
+      .eq('content', inquiryMessage)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (messageError) throw messageError;
+    expect(messageRow?.id).toBeTruthy();
+    if (messageRow?.id) {
+      createdMessageIds.push(Number(messageRow.id));
+    }
   });
 });

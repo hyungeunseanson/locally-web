@@ -23,7 +23,14 @@ type AnalyticsSearchRequestBody = {
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as AnalyticsSearchRequestBody;
+    let body: AnalyticsSearchRequestBody;
+
+    try {
+      body = (await request.json()) as AnalyticsSearchRequestBody;
+    } catch {
+      return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 });
+    }
+
     const keyword = normalizeRequiredText(body.keyword, 200);
 
     if (!keyword) {

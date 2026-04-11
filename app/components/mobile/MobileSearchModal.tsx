@@ -5,6 +5,7 @@ import { Search, X, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/app/context/LanguageContext';
 import DatePicker from '@/app/components/DatePicker';
+import { sendSearchLog } from '@/app/utils/analytics/client';
 import {
     getLocalizedSearchLocationLabel,
     getSearchableCityAliases,
@@ -375,6 +376,7 @@ export default function MobileSearchModal({
         const typed = locationInput.trim();
         if (typed) {
             saveRecentSearch(typed);
+            sendSearchLog(typed, 'main');
         }
         setIsVisible(false);
         onClose();
