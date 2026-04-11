@@ -303,7 +303,7 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('service host flow guidance', () => {
-  test('shows clearer host guidance on the board and owner detail page', async ({ browser }) => {
+  test('redirects legacy /services entry to the host dashboard open tab and keeps owner detail guidance', async ({ browser }) => {
     const customerUser = createUser('customer');
     const hostUser = createUser('host');
     const customerId = await createAuthUser(customerUser);
@@ -317,8 +317,9 @@ test.describe.serial('service host flow guidance', () => {
     const hostSession = await createLoggedInPage(browser, hostUser);
     await hostSession.page.goto('/services', { waitUntil: 'domcontentloaded' });
     await dismissAnnouncementIfVisible(hostSession.page);
-    await expect(hostSession.page.getByText('Check these before you apply')).toBeVisible();
-    await expect(hostSession.page.getByText('What happens after applying')).toBeVisible();
+    await hostSession.page.waitForURL(/\/host\/dashboard\?tab=service-jobs&serviceTab=open/, { timeout: 15000 });
+    await expect(hostSession.page.getByTestId('service-jobs-open-tab')).toHaveAttribute('aria-pressed', 'true');
+    await expect(hostSession.page.getByTestId('service-jobs-applications-tab')).toHaveAttribute('aria-pressed', 'false');
     await expect(hostSession.page.getByText(request.title)).toBeVisible();
     await hostSession.context.close();
 
@@ -328,5 +329,38 @@ test.describe.serial('service host flow guidance', () => {
     await expect(customerSession.page.getByText('Compare the appeal message, languages, reviews, and introduction to choose the best-fit host. After selection, you can coordinate details in the inbox right away.')).toBeVisible();
     await expect(customerSession.page.getByText(hostUser.fullName)).toBeVisible();
     await customerSession.context.close();
+  });
+
+  test('defaults host dashboard service jobs to applications and syncs sub-tab URLs', async ({ browser }) => {
+    const customerUser = createUser('customer-default');
+    const hostUser = createUser('host-default');
+    const customerId = await createAuthUser(customerUser);
+    const hostId = await createAuthUser(hostUser);
+
+    await createApprovedHostApplication(hostId, hostUser);
+    await createActiveExperience(hostId);
+    const request = await createOpenRequest(customerId, customerUser);
+    await createApplication(request.id, hostId);
+
+    const hostSession = await createLoggedInPage(browser, hostUser);
+    await hostSession.page.goto('/host/dashboard?tab=service-jobs', { waitUntil: 'domcontentloaded' });
+    await dismissAnnouncementIfVisible(hostSession.page);
+
+    await expect(hostSession.page.locator('[data-testid^="service-jobs-"][data-testid$="-tab"]')).toHaveCount(2);
+    await expect(hostSession.page.getByTestId('service-jobs-applications-tab')).toHaveAttribute('aria-pressed', 'true');
+    await expect(hostSession.page.getByTestId('service-jobs-open-tab')).toHaveAttribute('aria-pressed', 'false');
+    await expect(hostSession.page.getByText(request.title)).toBeVisible();
+
+    await hostSession.page.getByTestId('service-jobs-open-tab').click();
+    await hostSession.page.waitForURL(/\/host\/dashboard\?tab=service-jobs&serviceTab=open/, { timeout: 15000 });
+    await expect(hostSession.page.getByTestId('service-jobs-open-tab')).toHaveAttribute('aria-pressed', 'true');
+    await expect(hostSession.page.getByTestId('service-jobs-applications-tab')).toHaveAttribute('aria-pressed', 'false');
+    await expect(hostSession.page.getByText(request.title)).toBeVisible();
+
+    await hostSession.page.getByTestId('service-jobs-applications-tab').click();
+    await hostSession.page.waitForURL(/\/host\/dashboard\?tab=service-jobs&serviceTab=applications/, { timeout: 15000 });
+    await expect(hostSession.page.getByTestId('service-jobs-applications-tab')).toHaveAttribute('aria-pressed', 'true');
+    await expect(hostSession.page.getByTestId('service-jobs-open-tab')).toHaveAttribute('aria-pressed', 'false');
+    await hostSession.context.close();
   });
 });

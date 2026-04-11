@@ -2,7 +2,8 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Clock, MapPin, Users, Calendar, ChevronRight, Briefcase } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Clock, MapPin, Users, Calendar, ChevronRight } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useLanguage } from '@/app/context/LanguageContext';
 import {
@@ -12,20 +13,35 @@ import {
 } from '@/app/constants/serviceStatus';
 import type { ServiceRequestCard, ServiceApplication } from '@/app/types/service';
 
-type SubTab = 'board' | 'my-applications' | 'active';
+type SubTab = 'open' | 'applications';
 
 type ApplicationWithRequest = ServiceApplication & {
   service_requests?: Pick<ServiceRequestCard, 'id' | 'title' | 'city' | 'service_date' | 'duration_hours' | 'total_host_payout' | 'status'> | null;
 };
 
+function normalizeSubTab(value: string | null): SubTab {
+  return value === 'open' ? 'open' : 'applications';
+}
+
 export default function ServiceJobsTab() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
   const { t } = useLanguage();
-  const [subTab, setSubTab] = useState<SubTab>('my-applications');
   const [requests, setRequests] = useState<ServiceRequestCard[]>([]);
   const [myApplications, setMyApplications] = useState<ApplicationWithRequest[]>([]);
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const subTab = normalizeSubTab(searchParams.get('serviceTab'));
+
+  const handleSubTabChange = (nextTab: SubTab) => {
+    if (nextTab === subTab) return;
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', 'service-jobs');
+    params.set('serviceTab', nextTab);
+    router.replace(`/host/dashboard?${params.toString()}`, { scroll: false });
+  };
 
   useEffect(() => {
     const init = async () => {
@@ -39,11 +55,11 @@ export default function ServiceJobsTab() {
     if (!userId) return;
     const load = async () => {
       setLoading(true);
-      if (subTab === 'board') {
+      if (subTab === 'open') {
         const res = await fetch('/api/services/requests?mode=board');
         const data = await res.json();
-        if (data.success) setRequests(data.data ?? []);
-      } else if (subTab === 'my-applications' || subTab === 'active') {
+        setRequests(data.success ? data.data ?? [] : []);
+      } else {
         const { data: apps } = await supabase
           .from('service_applications')
           .select(`
@@ -53,13 +69,7 @@ export default function ServiceJobsTab() {
           .eq('host_id', userId)
           .order('created_at', { ascending: false });
 
-        const all = (apps ?? []) as ApplicationWithRequest[];
-
-        if (subTab === 'active') {
-          setMyApplications(all.filter((a) => a.status === 'selected' && a.service_requests?.status !== 'cancelled'));
-        } else {
-          setMyApplications(all);
-        }
+        setMyApplications((apps ?? []) as ApplicationWithRequest[]);
       }
       setLoading(false);
     };
@@ -90,14 +100,21 @@ export default function ServiceJobsTab() {
     <div className="space-y-4">
       {/* 서브탭 */}
       <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-        <button className={subTabClass('my-applications')} onClick={() => setSubTab('my-applications')}>
-          {t('tab_my_apps')}
-        </button>
-        <button className={subTabClass('board')} onClick={() => setSubTab('board')}>
+        <button
+          data-testid="service-jobs-open-tab"
+          aria-pressed={subTab === 'open'}
+          className={subTabClass('open')}
+          onClick={() => handleSubTabChange('open')}
+        >
           {t('tab_open_reqs')}
         </button>
-        <button className={subTabClass('active')} onClick={() => setSubTab('active')}>
-          {t('tab_active_services')}
+        <button
+          data-testid="service-jobs-applications-tab"
+          aria-pressed={subTab === 'applications'}
+          className={subTabClass('applications')}
+          onClick={() => handleSubTabChange('applications')}
+        >
+          {t('tab_my_apps')}
         </button>
       </div>
 
@@ -108,7 +125,7 @@ export default function ServiceJobsTab() {
       ) : (
         <>
           {/* 열린 의뢰 탭 */}
-          {subTab === 'board' && (
+          {subTab === 'open' && (
             requests.length === 0 ? (
               <div className="text-center py-16 text-slate-400 text-[13px] md:text-sm">
                 {t('empty_open_reqs')}
@@ -139,11 +156,11 @@ export default function ServiceJobsTab() {
             )
           )}
 
-          {/* 내 지원 / 진행중 탭 */}
-          {(subTab === 'my-applications' || subTab === 'active') && (
+          {/* 내 지원 현황 탭 */}
+          {subTab === 'applications' && (
             myApplications.length === 0 ? (
               <div className="text-center py-16 text-slate-400 text-[13px] md:text-sm">
-                {subTab === 'active' ? t('empty_active_services') : t('empty_my_apps')}
+                {t('empty_my_apps')}
               </div>
             ) : (
               <div className="space-y-3">
@@ -185,15 +202,6 @@ export default function ServiceJobsTab() {
             )
           )}
         </>
-      )}
-
-      {/* 잡보드로 이동 버튼 */}
-      {subTab === 'board' && (
-        <Link href="/services">
-          <button className="w-full border border-slate-200 rounded-2xl py-3 text-[12px] md:text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors flex items-center justify-center gap-2 mt-2">
-            <Briefcase size={14} /> {t('btn_view_job_board')}
-          </button>
-        </Link>
       )}
     </div>
   );
