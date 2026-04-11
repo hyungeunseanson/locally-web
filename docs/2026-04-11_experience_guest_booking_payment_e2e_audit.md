@@ -7,7 +7,8 @@
 - 실행 결과
   - 로컬/계약 감사 묶음 1차: `35 passed / 2 failed / 3 did not run`
   - 실패 subset 재실행: `4 passed / 1 failed`
-  - 최종 해석: persistent failure는 `tests/e2e/42-experience-paypal-payment.spec.ts` 1건뿐이며, `tests/e2e/43-guest-search-detail-ingress.spec.ts`의 초기 실패는 재현되지 않았다
+  - 후속 스펙 정리 + 최종 non-live 재실행: `40 passed / 0 failed`
+  - 최종 해석: non-live 감사 묶음 기준 persistent failure는 남지 않았고, PayPal까지 active smoke가 복구됐다
 - live mutation 경계
   - `tests/e2e/23-live-guest-post-booking.spec.ts`
   - `tests/e2e/31-live-guest-trip-cancel.spec.ts`
@@ -16,7 +17,7 @@
   - `카드` 체인은 현재 운영 path 기준 `정상`
   - `무통장 pending → admin confirm → guest surface 반영` 체인은 현재 기준 `정상`
   - `payment complete → guest/trips → membership/notification` 후속 surface는 현재 기준 `정상`
-  - `PayPal` 체인은 코드상 contract는 연결돼 있으나, 자동 스모크가 fixture drift로 깨져 있어 이번 감사 기준 `부분 보장`
+  - `PayPal` 체인은 코드상 contract와 active smoke가 모두 현재 기준 `정상`
   - `account`는 booking read model이 아니라 entry surface로만 동작하며, 이번 범위 기준 `정상`
 
 ## Test Execution
@@ -44,8 +45,8 @@
   - `tests/e2e/56-notification-read-route.spec.ts`
   - `tests/e2e/113-membership-care.spec.ts`
 - 재실행 결과 메모
-  - `42-experience-paypal-payment`는 재실행에서도 동일하게 실패했다
-  - `43-guest-search-detail-ingress`는 묶음 실행에서는 첫 test가 `/` 진입 `networkidle` timeout으로 실패했고, 단독 재실행에서는 4개 test가 모두 통과했다
+  - `42-experience-paypal-payment`는 shared helper 기준으로 정리한 뒤 최종 재실행에서 통과했다
+  - `43-guest-search-detail-ingress`의 초기 `networkidle` timeout은 단독 재실행과 최종 full rerun에서는 재현되지 않았다
 
 ## Summary Matrix
 | 체인 | source of truth | 현재 보장 테스트 | 판정 | 핵심 메모 |
@@ -53,7 +54,7 @@
 | 상세 → payment handoff | `app/experiences/[id]/ExperienceClient.tsx`, `app/experiences/[id]/payment/page.tsx` | `43`, `24` | 정상 | `date/time/guests/type/solo` query handoff가 명확하다 |
 | 예약 생성 | `POST /api/bookings`, `create_booking_atomic` | `124`, `125`, `44`, `42`, `24` | 정상 | `paymentMethod=card|bank|paypal` 허용, `new_order_id/final_amount` 반환 확인 |
 | 카드 결제 | payment page client, `/api/payment/card-ready`, `/api/payment/nicepay-callback`, `finalizeExperienceCardPayment()` | `44`, `76`, `74`, `24` | 정상 | owner guard, idempotency, `order_id` 중심 확인, `status='PAID'` 의미 일치 |
-| PayPal 결제 | payment page PayPal prep, `/api/payment/paypal/create-order`, `/api/payment/paypal/capture-order` | `42` | 부분 보장 | route contract는 정합적이나 smoke test가 stale fixture로 깨져 active pass를 못 주었다 |
+| PayPal 결제 | payment page PayPal prep, `/api/payment/paypal/create-order`, `/api/payment/paypal/capture-order` | `42` | 정상 | route contract와 active smoke가 모두 green이며 `PAID + paypal + tid` 저장 의미도 일치한다 |
 | 무통장 pending → admin confirm | payment page bank branch, `/api/admin/bookings/confirm-payment`, `confirmExperienceBankPayment()`, `MasterLedgerTab` | `125`, `150`, `135`, `115`, `06`, `117` | 정상 | `PENDING + payment_method='bank'` 가드, snapshot/payout_status, side effects 정합적 |
 | 완료 후 guest surface | `payment/complete`, `/api/guest/trips`, `/api/guest/trips/sync-completed`, `TripCard`, `ReceiptModal` | `57`, `52`, `56`, `113` | 정상 | localized title, pending receipt copy, CTA/bootstrap, membership 반영 일관적 |
 | account entry continuity | `app/account/page.tsx` | 기존 prebooking continuity 감사, `108` reference | 정상 | account는 booking truth surface가 아니라 `/guest/trips` 진입 surface로 동작 |
@@ -150,13 +151,11 @@
 - 현재 보장 테스트
   - `tests/e2e/42-experience-paypal-payment.spec.ts`
 - 실제 결과
-  - 판정: `부분 보장`
+  - 판정: `정상`
   - 메모
     - route contract 자체는 booking/order/amount 검증과 `PAID + paypal + tid` 저장 의미가 명확하다
-    - 하지만 automated smoke `42`는 재실행에서도 `No host experience found for the approved test host.`로 실패했다
-    - 원인은 결제 체인 로직보다 spec fixture drift에 가깝다
-      `42`가 여전히 고정 `HOST_USER_ID` 기반 bookable experience 탐색을 사용한다
-    - 따라서 PayPal은 “코드상 source는 정합적이나, 현재 active smoke가 깨져 있어 운영 보장 test가 비어 있다”로 기록한다
+    - automated smoke `42`도 shared helper 기준으로 정리한 뒤 최종 재실행에서 통과했다
+    - 따라서 PayPal은 코드상 source와 active regression guard가 모두 닫힌 상태로 본다
 
 ### 5. 무통장 pending → 관리자 수동 확인 → guest 반영
 - source of truth
@@ -240,33 +239,24 @@
     - 이번 감사 범위에서 account는 booking truth surface가 아니라 navigation continuity surface로만 취급하는 것이 현재 구조와 맞다
 
 ## Confirmed Risks
-- `tests/e2e/42-experience-paypal-payment.spec.ts`
-  - persistent failure
-  - 분류: `test maintenance risk`
-  - 이유: 고정 `HOST_USER_ID` 기반 fixture 탐색이 현재 shared helper 흐름과 어긋나 PayPal chain 자체를 검증하기 전에 멈춘다
-- `tests/e2e/43-guest-search-detail-ingress.spec.ts`
-  - 1차 묶음에서 `/` 진입 `networkidle` timeout 발생
-  - 단독 재실행에서는 4개 test 모두 통과
-  - 분류: `runner/environment risk`, 현재 active product regression으로는 보지 않음
+- non-live 감사 묶음 기준 현재 persistent product/test risk는 확인되지 않았다
+- 단, live mutation 스펙은 이번 감사에서도 재실행하지 않았으므로 coverage 경계는 남아 있다
 
 ## Coverage Gaps
 - live mutation coverage는 이번 감사에서 재실행하지 않았다
   - `tests/e2e/23-live-guest-post-booking.spec.ts`
   - `tests/e2e/31-live-guest-trip-cancel.spec.ts`
   - 이유: `https://locally-web.vercel.app`에 실제 회원가입/예약을 만드는 운영 영향 스펙이기 때문
-- PayPal은 route contract는 읽혔지만, active smoke pass가 없어 이번 문서에서 `정상` 판정을 주지 않는다
 - account는 entry surface만 검증했고, booking state surface로는 다루지 않았다
 
 ## Follow-up Need
 - 즉시 제품 버그 수정이 필요한 결함은 이번 감사에서 확인되지 않았다
-- 가장 가까운 후속 작업은 1건이다
-  - `42-experience-paypal-payment.spec.ts`를 `44`와 같은 shared `prepareBookableExperience()` helper 기준으로 정리해 PayPal smoke 신뢰도를 복구할 것
-- 그 다음 순서는 선택 사항이다
+- 가장 가까운 후속 작업은 선택 사항 1건이다
   - live mutation 스펙 `23`, `31`을 안전한 staging용으로 분리할지
   - 아니면 현재처럼 reference-only 운영 smoke로 유지할지
 
 ## Final Verdict
 - `홈/검색/상세 → payment → booking create → card/bank confirm → payment complete → guest/trips·notifications·account entry` 체인은 현재 코드 기준으로 대체로 끊김 없이 설명된다
 - card와 bank manual confirm 운영 플로우는 현재 기준 `정상`
-- PayPal은 코드 contract는 일관되지만 active smoke가 stale fixture로 깨져 있어 `부분 보장`
-- 따라서 이번 감사의 최종 판정은 `전반 정상, 단 PayPal 자동 검증 신뢰도는 후속 정리 필요`다
+- PayPal도 코드 contract와 active smoke가 현재 기준 `정상`
+- 따라서 이번 감사의 최종 판정은 `non-live guest booking/payment 체인 전반 정상`이다
