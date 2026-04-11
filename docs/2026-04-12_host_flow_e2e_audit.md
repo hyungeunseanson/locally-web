@@ -9,12 +9,14 @@
   - `tests/e2e/04-live-host-experience-create.spec.ts`
 - 실행 방식: 정적 코드 감사 + non-live E2E 재실행 + 실패 subset 재실행
 - 최신 재실행 결과
-  - host non-live 묶음: `55 passed / 5 failed / 4 did not run`
-  - 실패 subset 재실행: `5 failed / 0 healed`
+  - 초기 host non-live 묶음: `55 passed / 5 failed / 4 did not run`
+  - approval refresh 핀셋 수정 후 관련 subset: `6 passed`
+  - locale/test drift 보정 후 관련 subset: `9 passed`
+  - 최종 host non-live 묶음 재실행: `62 passed / 1 failed / 1 did not run`
 - 최종 판정
-  - `호스트 신청/승인 route`, `체험 write/delete route`, `리뷰 write/reply`, `수익/정산/서비스 매칭`은 현재 기준 `정상`
-  - `호스트 진입/모드 전환`, `대시보드 approval refresh`, `체험 dates/detail 일부 UI smoke`는 `부분 보장`
-  - persistent findings 5건 중 1건은 실제 host-flow 리스크, 4건은 locale/copy 또는 brittle UI expectation drift 성격이 강하다
+  - `호스트 진입/모드 전환`, `호스트 신청/승인 route`, `체험 edit/delete route`, `리뷰 write/reply`, `수익/정산/서비스 매칭`은 현재 기준 `정상`
+  - 초기 persistent findings 5건 중 `140`, `55`, `35`, `40`은 이번 패스에서 해소되었다
+  - 현재 남은 것은 `34 host dates UI` 1건뿐이며, 성격은 `confirmed product bug`보다 `flaky UI/test contract gap`에 가깝다
 
 ## Test Execution
 - ingress / status / mode
@@ -57,10 +59,10 @@
 ## Summary Matrix
 | 체인 | source of truth | 현재 보장 테스트 | 판정 | 핵심 메모 |
 | --- | --- | --- | --- | --- |
-| 호스트 진입 / 랜딩 / 승인 상태 | `/become-a-host`, `AuthContext`, `ViewModeContext`, `/host/menu`, `/host/dashboard` | `109`, `97`, `98`, `141` | 부분 보장 | landing CTA refresh는 green이지만 dashboard revision→approved 무새로고침 전환은 깨진다 |
+| 호스트 진입 / 랜딩 / 승인 상태 | `/become-a-host`, `AuthContext`, `ViewModeContext`, `/host/menu`, `/host/dashboard` | `109`, `97`, `98`, `140`, `141`, `55` | 정상 | approval refresh와 view mode persistence는 최신 기준 green |
 | 호스트 신청 / 재제출 / 승인 경계 | `/host/register`, `/api/host/register/submit`, `host_applications`, profile seed | `36`, `97`, `98`, `141` | 정상 | approved re-submit fail-closed, validation, admin alert 경로는 유지된다 |
-| 체험 작성 / 수정 / 삭제 / 일정 관리 | `/host/create`, `/api/host/experiences*`, `/host/experiences/[id]*` | `93`, `32`, `33`, `51`, `126` | 부분 보장 | route 계약은 정상이나 dates/detail UI smoke 2건이 persistent failure다 |
-| 예약 / 문의 / 리뷰 응대 | `ReservationManager`, `InquiryChat`, `HostReviews`, `/api/host/start-chat`, `/api/host/guest-reviews`, `/api/host/reviews/reply` | `39`, `72`, `92`, `122` | 정상 | core route/notification 경로는 green, `40`의 일본어 경고문만 stale copy failure |
+| 체험 작성 / 수정 / 삭제 / 일정 관리 | `/host/create`, `/api/host/experiences*`, `/host/experiences/[id]*` | `93`, `32`, `33`, `34`, `35`, `51`, `126` | 부분 보장 | delete/detail smoke는 회복됐고, `34`의 schedule add interaction만 간헐 실패가 남는다 |
+| 예약 / 문의 / 리뷰 응대 | `ReservationManager`, `InquiryChat`, `HostReviews`, `/api/host/start-chat`, `/api/host/guest-reviews`, `/api/host/reviews/reply` | `39`, `40`, `72`, `92`, `122` | 정상 | warning strip copy expectation까지 최신 기준 green |
 | 수익 / 정산 / 서비스 매칭 | `Earnings`, `/api/host/earnings/*`, `ServiceJobsTab`, service board/applications flow | `37`, `133`, `153`, `154`, `152`, `106`, `22`, `50`, `130`, `134` | 정상 | host earnings와 admin payout reflection은 현재 기준 정합적 |
 | public/admin boundary reflection | public host profile, guest detail host projection, admin host payout/analytics | `71`, `126`, `130`, `134` | 정상 | approved visibility, public profile read path, admin payout rollup 연결은 유지된다 |
 
@@ -80,14 +82,12 @@
   - approved/active는 host view 전환과 dashboard 진입이 가능해야 한다
   - approval notification은 welcome overlay와 연결된다
 - 현재 보장 테스트
-  - `109`, `97`, `98`, `141`
+  - `109`, `97`, `98`, `140`, `141`, `55`
 - 실제 결과
-  - 판정: `부분 보장`
+  - 판정: `정상`
   - 메모
-    - `141`은 host landing CTA가 revision→approved 이후 무새로고침으로 `Switch to Host`로 바뀌는 것을 보장한다
-    - 그러나 `140`은 같은 승인 이벤트 뒤 `/host/dashboard`가 15초 안에 revision screen에서 approval welcome overlay로 전환되지 못한다
-    - code상 dashboard는 `applicationStatus` refresh가 늦으면 revision early return에 그대로 머물 수 있다
-    - `AuthContext`의 pending/revision/rejected fallback poll이 `30_000ms`라서, 현 테스트 기대(15초) 기준으로는 stale window가 남아 있다
+    - `AuthContext`의 pending/revision/rejected fallback refresh를 `30_000ms → 5_000ms`로 줄인 뒤 `140`, `141`, `98`, `55`가 최신 기준 모두 green
+    - 현재 감사 기준에서는 revision/pending 화면이 승인 후 stale하게 오래 남는 핵심 host ingress 리스크는 더 이상 재현되지 않는다
 
 ### 2. 호스트 신청 / 재제출 / 승인 경계
 - source of truth
@@ -121,7 +121,7 @@
   - availability save는 booked slot 보호 규칙을 유지한다
   - approved visibility는 public host/profile surfaces와 같은 기준을 본다
 - 현재 보장 테스트
-  - `93`, `32`, `33`, `51`, `126`, `71`, `129`
+  - `93`, `32`, `33`, `34`, `35`, `51`, `126`, `71`, `129`
 - 실제 결과
   - 판정: `부분 보장`
   - 메모
@@ -129,13 +129,11 @@
       - `32` availability route green
       - `33` delete route green
       - `126`, `71`, `129` public reflection green
-    - persistent failures 2건이 남았다
-      - `34` host dashboard dates UI
-        - selected date가 기대 `2026-04-14` 대신 `2026-04-15`로 잡힌 snapshot이 재현됐다
-        - route 저장 자체가 아니라 calendar day selection contract 또는 test locator brittle issue에 가깝다
-      - `35` host detail delete UI
-        - detail page에 delete button은 실제 존재하지만 snapshot상 accessible name이 `Delete`로 렌더링되어 Korean-only expectation이 깨진다
-        - delete route failure가 아니라 detail UI locale expectation drift 성격이 강하다
+    - `35` host detail delete UI는 confirm modal 2단계와 locale-aware selector 보정 후 최신 기준 green
+    - 다만 `34` host dashboard dates UI는 최신 full bundle에서 아직 1건 남는다
+      - 단독 실행은 통과했지만 latest full bundle과 `--repeat-each=3`에서는 간헐 실패가 재현됐다
+      - 현재 failure shape는 `POST /availability` 200 + success toast 이후에도 `07:00` row가 DB에서 조회되지 않는 형태다
+      - failure snapshot에서는 저장 직전 선택 패널에 `10:00 / 11:00`만 남아 있어, backend write path보다 slot add interaction 또는 UI automation contract의 간헐 실패를 더 강하게 시사한다
 
 ### 4. 예약 / 문의 / 게스트 컨텍스트 / 리뷰 응대
 - source of truth
@@ -150,14 +148,13 @@
   - inquiry deep link는 `guestId/expId/inquiryId` 기반 bootstrap이 가능해야 한다
   - host review reply와 guest review write는 owner guard와 notification/email side effects를 가진다
 - 현재 보장 테스트
-  - `39`, `72`, `92`, `122`
-  - `40` 일부 UI smoke
+  - `39`, `40`, `72`, `92`, `122`
 - 실제 결과
   - 판정: `정상`
   - 메모
     - review reply, guest review write, host notification flow는 모두 green
-    - `40`의 일본어 warning strip copy만 persistent failure인데, 현재 source string은 `LanguageContext`에서 더 짧은 새 문구로 바뀌어 있어 stale expectation으로 분류한다
-    - 같은 파일의 service unread mark-as-read, guest profile modal, inquiry chat reply 케이스는 통과했다
+    - `40`의 일본어 warning strip copy expectation도 최신 문구로 갱신 후 green
+    - 같은 파일의 service unread mark-as-read, guest profile modal, inquiry chat reply 케이스도 계속 통과한다
 
 ### 5. 호스트 수익 / 정산 반영 / 서비스 매칭
 - source of truth
@@ -177,83 +174,35 @@
     - pending / in-progress / paid bucket, unified rollup, service separation, admin settle guard가 모두 현재 기준 green
 
 ## Confirmed Findings
-1. `host dashboard`의 revision → approved 무새로고침 전환은 현재 끊긴다
-   - source of truth
-     - [app/host/dashboard/page.tsx](/Users/hyungeunseanson/Documents/서비스/locally-web/app/host/dashboard/page.tsx:173)
-     - [app/context/AuthContext.tsx](/Users/hyungeunseanson/Documents/서비스/locally-web/app/context/AuthContext.tsx:31)
-   - 증상
-     - `tests/e2e/140-host-status-refresh-after-approval.spec.ts`가 독립 재실행에서도 실패
-     - approval notification insert 후에도 revision screen이 15초 안에 overlay로 전환되지 않는다
-   - 분류: `product risk`
-   - severity: `medium`
-   - 이유
-     - landing CTA refresh(`141`)는 green이지만 dashboard status refresh + welcome overlay chain은 현재 동기 보장이 부족하다
-
-2. host dates dashboard UI는 route 보장에 비해 UI continuity가 약하다
+1. host dates dashboard UI는 route 보장에 비해 schedule add interaction의 안정성이 약하다
    - source of truth
      - [app/host/experiences/[id]/dates/page.tsx](/Users/hyungeunseanson/Documents/서비스/locally-web/app/host/experiences/%5Bid%5D/dates/page.tsx:298)
    - 증상
-     - `tests/e2e/34-host-edit-and-dates-ui.spec.ts`가 독립 재실행에서도 실패
-     - selected date snapshot이 target day와 1일 어긋난 상태로 재현됐다
-   - 분류: `ui contract gap`
-   - severity: `low-medium`
+     - `tests/e2e/34-host-edit-and-dates-ui.spec.ts`의 schedule add/save 케이스가 단독 실행에서는 통과하지만, latest full bundle과 `--repeat-each=3`에서는 간헐 실패가 남는다
+     - failure shape는 `POST /availability` 200 + success toast 이후에도 `07:00` row가 DB에서 조회되지 않는 형태다
+     - failure snapshot에서는 저장 직전 우측 패널에 `10:00 / 11:00`만 남아 있어 `07:00` 추가 click이 반영되지 않은 상태가 관측됐다
+   - 분류: `flaky ui contract gap`
+   - severity: `low`
    - 이유
      - `32` route contract는 green이라 server write integrity는 보장된다
-     - 현재 깨지는 지점은 calendar day selection or selector contract 쪽이다
-
-3. host detail delete UI smoke는 locale expectation drift가 남아 있다
-   - source of truth
-     - [app/host/experiences/[id]/page.tsx](/Users/hyungeunseanson/Documents/서비스/locally-web/app/host/experiences/%5Bid%5D/page.tsx:105)
-   - 증상
-     - `tests/e2e/35-host-experience-detail-delete-ui.spec.ts`가 독립 재실행에서도 실패
-     - snapshot상 delete button은 존재하지만 accessible name이 `Delete`
-   - 분류: `test drift`
-   - severity: `low`
-   - 이유
-     - `33` delete route는 green이고, 실제 UI surface도 존재한다
-     - failure는 locale-fixed selector expectation에 가깝다
-
-4. host view mode persistence smoke는 locale-fixed CTA expectation이 stale하다
-   - source of truth
-     - [app/account/page.tsx](/Users/hyungeunseanson/Documents/서비스/locally-web/app/account/page.tsx:636)
-   - 증상
-     - `tests/e2e/55-host-view-mode-persistence.spec.ts`가 독립 재실행에서도 실패
-     - snapshot상 CTA는 존재하지만 label이 `Switch to Host`
-   - 분류: `test drift`
-   - severity: `low`
-   - 이유
-     - 버튼 노출 자체는 살아 있고, failure는 Korean-only accessible name expectation이다
-
-5. reservations warning strip 일본어 문구 expectation이 stale하다
-   - source of truth
-     - [app/host/dashboard/components/ReservationManager.tsx](/Users/hyungeunseanson/Documents/서비스/locally-web/app/host/dashboard/components/ReservationManager.tsx:519)
-     - [app/context/LanguageContext.tsx](/Users/hyungeunseanson/Documents/서비스/locally-web/app/context/LanguageContext.tsx:3191)
-   - 증상
-     - `tests/e2e/40-host-reservations-inquiries-ui.spec.ts`가 독립 재실행에서도 실패
-     - 현재 ja copy는 더 짧은 새 문구인데 test는 이전 장문 copy를 기대한다
-   - 분류: `copy drift`
-   - severity: `low`
+     - 현재 evidence는 backend write regression보다 slot add UI interaction 또는 test click/selector contract의 간헐 실패를 더 강하게 가리킨다
 
 ## Coverage Gaps
 - live mutation coverage는 이번 감사에서 재실행하지 않았다
   - `tests/e2e/03-live-host-signup-registration.spec.ts`
   - `tests/e2e/04-live-host-experience-create.spec.ts`
-- `55`, `35`, `40`은 host core logic gap보다 locale/copy expectation drift 성격이 강하다
-- `34`는 route integrity는 보장되지만, 실제 calendar selection UX가 test helper drift인지 제품 문제인지 추가 probe 없이는 단정하기 어렵다
+- 이전 `55`, `35`, `40`, `140`은 이번 패스에서 해소됐다
+- `34`는 route integrity는 보장되지만, 실제 slot add UX가 간헐적으로 미반영되는지 아니면 UI automation contract drift인지 추가 probe 없이는 단정하기 어렵다
 
 ## Follow-up Need
-- 즉시 후속 구현/수정이 필요한 우선순위 1건
-  - host dashboard approval refresh
-    - revision/pending screen에 머물던 세션이 승인 후 더 빠르게 `applicationStatus`와 overlay state를 반영하도록 점검 필요
-- 테스트 신뢰도 복구 후속 3건
-  - `55-host-view-mode-persistence`를 locale-agnostic selector로 보강
-  - `35-host-experience-detail-delete-ui`를 locale-agnostic selector 또는 confirm-modal flow 기준으로 보강
-  - `40-host-reservations-inquiries-ui`의 일본어 warning strip copy expectation 갱신
-- 분류 확인용 수동 probe 1건
-  - host dates UI에서 target day click이 실제로 하루 밀리는지, 아니면 `dayCell()` selector drift인지 확인
+- 즉시 후속 구현이 꼭 필요한 confirmed product risk는 현재 없다
+- 남은 후속 1건
+  - `34-host-edit-and-dates-ui`
+    - slot add interaction이 실제로 간헐 미반영되는지, 아니면 `07:00` 버튼 click/selected-state assert가 빠진 스펙 불안정성인지 분리 필요
+    - 다음 단계는 UI에 손대기보다 먼저 interaction probe와 selected-state assertion 강화가 더 안전하다
 
 ## Final Verdict
-- 호스트 신청/승인 route, 체험 create/edit/delete route, 리뷰 write/reply, 수익/정산/서비스 매칭은 현재 기준 `정상`
-- 현재 감사 기준의 핵심 persistent host-flow 리스크는 `dashboard revision → approved refresh/overlay chain` 1건이다
-- 나머지 persistent failures는 대부분 locale/copy 또는 brittle UI smoke drift라서, 호스트 도메인 본체 전체가 불안정하다고 보기는 어렵다
-- 따라서 이번 감사의 최종 판정은 `전반 정상, 단 host dashboard approval refresh와 일부 UI smoke 신뢰도는 후속 정리 필요`다
+- 호스트 진입/모드 전환, 신청/승인, 체험 create/edit/delete, 리뷰 응대, 수익/정산/서비스 매칭은 최신 기준 `정상`
+- 이전 감사의 핵심 product risk였던 `dashboard revision → approved refresh/overlay chain`은 이번 패스에서 해소됐다
+- 현재 남은 것은 `34 host dates UI` 1건뿐이며, 성격상 `confirmed product bug`보다는 `flaky low-severity UI contract gap`으로 보는 것이 가장 보수적이다
+- 따라서 이번 감사의 최신 판정은 `호스트 도메인 전반 정상, 단 host dates schedule add interaction은 추가 분류 필요`다
