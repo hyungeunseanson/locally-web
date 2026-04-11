@@ -38,7 +38,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - `types/admin.ts`: 관리자 전용 타입 중앙화 (`AdminServiceBooking` 포함)
 - `/api/admin/users-summary`: User Management/Analytics 공용 경량 회원 목록 API (`profiles + users.role` 병합)
 - `/api/admin/users-activity-summary`: User Management 리스트 전용 활동 summary API (`총 결제액/예약·의뢰 수/최근 활동` 지연 집계)
-- `/api/admin/users/[userId]/timeline`: User Management 상세 패널용 회원 활동 타임라인 API (예약/리뷰/문의 진행/맞춤 의뢰 상태 이벤트 조립)
+- `/api/admin/users/[userId]/timeline`: User Management 상세 패널용 회원 활동 타임라인 API (예약/리뷰/문의 진행/맞춤 의뢰 상태 이벤트 조립 + `guest_reviews` read-only 상세 데이터 포함)
 - `/api/admin/analytics-summary`: Data Analytics `Business & Guest` 전용 서버 집계 API (상단 비즈니스 KPI, 반복 결제 고객 비율, 결제 고객 인구통계는 체험 예약 + 서비스 결제 기준, 검색/Top 체험은 기존 체험 중심 기준 유지)
 - `/api/admin/analytics-search-intent`: Data Analytics `고객 검색 수요 분석` 전용 서버 집계 API (검색량 TOP, 급상승, 공급 부족, 동일 세션 기준 참고용 검색→클릭/결제 시작 전환 + 유입 source별 대표 검색 수요 조립)
 - `/api/admin/analytics-customer-composition`: Data Analytics `고객 구성 분석` 전용 서버 집계 API (체험 예약 + 서비스 결제 고객 기준 국적, 언어권, 신규/반복, 체험/서비스 선호 조립 + 추적된 고객 기준 유입 source/가입→결제 전환/결제액/반복 고객/주요 고객 국적·언어 참고용 집계)
@@ -84,6 +84,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - `/api/services/payment/card-ready`는 서비스 카드결제 검증 준비 상태를 반환한다. `NEXT_PUBLIC_PORTONE_IMP_CODE`, `PORTONE_API_KEY`, `PORTONE_API_SECRET`가 모두 있어야 `ready=true`이며, 서비스 결제 페이지는 readiness가 false일 때 카드 결제를 비활성화하고 무통장/PayPal만 허용한다.
 - Data Analytics `Business & Guest`는 `useAdminData`의 최근 20건 예약 캐시를 재사용하지 않고 `/api/admin/analytics-summary`를 단일 집계 source로 사용한다. 현재 플랫폼 전체화 범위는 상단 비즈니스 KPI(GMV/순수익/AOV/결제건수), 반복 결제 고객 비율, 결제 고객 인구통계이며, `Host Ecosystem`, `Review Management`, `Audit Logs`, `Top 체험`, `검색 트렌드`는 기존 구조를 유지한다.
 - Data Analytics의 `Review Quality`, `운영 감사 로그`는 이제 브라우저 직접 select 대신 각각 `/api/admin/reviews`, `/api/admin/audit-logs`를 초기 읽기 source로 사용한다. 현재 실시간성은 감사 로그 INSERT 구독만 클라이언트에 남겨둔다.
+- `guest_reviews`는 `/api/admin/reviews`나 Data Analytics `Review Quality`에 섞지 않는다. 관리자 노출은 `/api/admin/users/[userId]/timeline`과 `Users` 상세 패널 read-only surface로만 유지하고, 별도 moderation/delete semantics는 정의하지 않는다.
 - Data Analytics에서 `취소율`, `체험 검색 인기 트렌드`, `Top 체험`은 여전히 체험 예약/체험 검색 기준이다. 플랫폼 전체 KPI와 체험 전용 섹션이 섞여 있으므로 카드/섹션 문구로 기준을 명시한다.
 - Data Analytics `고객 검색 수요 분석`은 `/api/admin/analytics-search-intent`를 전용 source로 사용한다. 현재 범위는 `검색량 TOP`, `급상승`, `공급 부족`과 `동일 세션 안에서 다음 검색 전까지 발생한 click/payment_init`를 연결한 참고용 `검색→클릭`, `검색→결제 시작` 전환, 그리고 `유입 source별 대표 검색 수요/공급 부족 신호`까지 포함한다. 전환율과 source별 검색 수요는 정확한 예약 귀속이 아니라 세션 기준 참고 지표이므로 화면에 `동일 세션 기준 참고용`, `source + 세션 기준 참고용`으로 표시한다.
 - `analytics-search-intent`, `analytics-customer-composition`는 source tracking 마이그레이션(`search_logs.session_id`, `analytics_events.utm_* / referrer_host / landing_path`)이 아직 적용되지 않은 환경에서도 기존 검색량/고객 구성 지표를 500 없이 유지해야 한다. 새 컬럼이 없으면 전환/source 분석만 `collecting/unavailable`로 내려간다.
