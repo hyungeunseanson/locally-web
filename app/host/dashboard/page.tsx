@@ -33,6 +33,13 @@ interface HostStatusSummary {
   admin_comment?: string | null;
 }
 
+interface ApprovalNotificationSummary {
+  id: number;
+  type: string;
+  link: string;
+  is_read: boolean;
+}
+
 const SERVICE_NOTIFICATION_TYPES = new Set([
   'service_request_new',
   'service_application_new',
@@ -53,6 +60,7 @@ function DashboardContent() {
   const [hostStatus, setHostStatus] = useState<HostStatusSummary | null>(null);
   const [profile, setProfile] = useState<HostProfile | null>(null);
   const [experienceCount, setExperienceCount] = useState<number | null>(null);
+  const [approvalNotificationToken, setApprovalNotificationToken] = useState<ApprovalNotificationSummary | null>(null);
   const [hasConsumedApprovalWelcome, setHasConsumedApprovalWelcome] = useState(false);
   const [welcomeDismissed, setWelcomeDismissed] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -106,15 +114,34 @@ function DashboardContent() {
         setExperienceCount(hostExperienceCount ?? 0);
       }
 
-      const { count: consumedApprovalCount, error: consumedApprovalError } = await supabase
-        .from('notifications')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('type', 'host_application_approved')
-        .eq('is_read', true);
+      const [
+        { count: consumedApprovalCount, error: consumedApprovalError },
+        { data: unreadApprovalNotification, error: unreadApprovalError },
+      ] = await Promise.all([
+        supabase
+          .from('notifications')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('type', 'host_application_approved')
+          .eq('is_read', true),
+        supabase
+          .from('notifications')
+          .select('id, type, link, is_read')
+          .eq('user_id', user.id)
+          .eq('type', 'host_application_approved')
+          .eq('link', '/host/dashboard')
+          .eq('is_read', false)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
 
       if (!consumedApprovalError) {
         setHasConsumedApprovalWelcome((consumedApprovalCount ?? 0) > 0);
+      }
+
+      if (!unreadApprovalError) {
+        setApprovalNotificationToken(unreadApprovalNotification ?? null);
       }
 
       const { data: profileData } = await supabase
@@ -217,7 +244,7 @@ function DashboardContent() {
     void fetchData();
   }, [contextStatus, fetchData, hostRecordStatus]);
 
-  const approvalNotification = notifications.find(
+  const approvalNotification = approvalNotificationToken ?? notifications.find(
     (notification) =>
       notification.type === 'host_application_approved' &&
       notification.link === '/host/dashboard' &&
@@ -237,6 +264,7 @@ function DashboardContent() {
 
     setWelcomeDismissed(true);
     setHasConsumedApprovalWelcome(true);
+    setApprovalNotificationToken(null);
 
     try {
       await markAsRead(approvalNotification.id);

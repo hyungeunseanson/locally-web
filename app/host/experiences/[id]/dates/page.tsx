@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useRouter, useParams } from 'next/navigation';
@@ -43,6 +43,7 @@ export default function ManageDatesPage() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const availabilityRef = useRef<AvailabilityMap>({});
   const experienceId = Array.isArray(params.id) ? params.id[0] : params.id;
   const hasAvailabilityChanges = useMemo(
     () => JSON.stringify(availability) !== JSON.stringify(initialData),
@@ -54,6 +55,11 @@ export default function ManageDatesPage() {
     selectedDateSlotCount === 0 &&
     (initialData[selectedDate]?.length || 0) === 0
   );
+
+  const setAvailabilitySnapshot = useCallback((nextAvailability: AvailabilityMap) => {
+    availabilityRef.current = nextAvailability;
+    setAvailability(nextAvailability);
+  }, []);
 
   // 1. 데이터 불러오기
   const fetchDates = useCallback(async () => {
@@ -91,7 +97,9 @@ export default function ManageDatesPage() {
       });
     }
 
-    setAvailability(JSON.parse(JSON.stringify(availMap)));
+    const nextAvailability = JSON.parse(JSON.stringify(availMap)) as AvailabilityMap;
+    availabilityRef.current = nextAvailability;
+    setAvailability(nextAvailability);
     setInitialData(JSON.parse(JSON.stringify(availMap)));
     setBookingCounts(countMap);
   }, [params.id, supabase]);
@@ -102,11 +110,13 @@ export default function ManageDatesPage() {
 
   const addTimeSlot = (time: string) => {
     if (!selectedDate) return;
-    setAvailability(prev => {
-      const currentSlots = prev[selectedDate] || [];
-      if (currentSlots.includes(time)) return prev;
-      return { ...prev, [selectedDate]: [...currentSlots, time].sort() };
-    });
+    const currentSlots = availabilityRef.current[selectedDate] || [];
+    if (currentSlots.includes(time)) return;
+    const nextAvailability = {
+      ...availabilityRef.current,
+      [selectedDate]: [...currentSlots, time].sort(),
+    };
+    setAvailabilitySnapshot(nextAvailability);
   };
 
   const removeTimeSlot = (time: string) => {
@@ -118,12 +128,10 @@ export default function ManageDatesPage() {
       return;
     }
 
-    setAvailability(prev => {
-      const newSlots = (prev[selectedDate] || []).filter(t => t !== time);
-      const newMap = { ...prev, [selectedDate]: newSlots };
-      if (newSlots.length === 0) delete newMap[selectedDate];
-      return newMap;
-    });
+    const newSlots = (availabilityRef.current[selectedDate] || []).filter(t => t !== time);
+    const nextAvailability = { ...availabilityRef.current, [selectedDate]: newSlots };
+    if (newSlots.length === 0) delete nextAvailability[selectedDate];
+    setAvailabilitySnapshot(nextAvailability);
   };
 
   // 🟢 [핵심] 안전한 저장 로직 (Diff Algorithm)
@@ -135,12 +143,13 @@ export default function ManageDatesPage() {
         throw new Error('Experience id is missing.');
       }
 
+      const availabilitySnapshot = JSON.parse(JSON.stringify(availabilityRef.current)) as AvailabilityMap;
       const response = await fetch(`/api/host/experiences/${experienceId}/availability`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ availability }),
+        body: JSON.stringify({ availability: availabilitySnapshot }),
       });
       const result = (await response.json()) as ScheduleSaveResponse;
 
@@ -254,7 +263,7 @@ export default function ManageDatesPage() {
             <ChevronLeft size={16} /> {t('nav_dashboard')} {/* 🟢 번역 */}
           </button>
           <div className="flex gap-3">
-            <button onClick={() => { setAvailability(initialData); setSelectedDate(null); }} className="px-4 py-2 text-sm font-bold text-slate-400 hover:bg-slate-100 rounded-full">{t('btn_undo')}</button> {/* 🟢 번역 */}
+            <button onClick={() => { setAvailabilitySnapshot(initialData); setSelectedDate(null); }} className="px-4 py-2 text-sm font-bold text-slate-400 hover:bg-slate-100 rounded-full">{t('btn_undo')}</button> {/* 🟢 번역 */}
             <button onClick={handleSaveClick} disabled={loading} className="px-4 md:px-6 py-2 bg-black text-white rounded-full font-bold text-xs md:text-sm hover:scale-105 transition-transform flex items-center gap-1.5 md:gap-2 shadow-lg disabled:opacity-50">
               {loading ? t('saving') : <><Check size={16} /> {t('btn_save_changes')}</>} {/* 🟢 기존 키 활용 */}
             </button>
