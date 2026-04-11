@@ -452,7 +452,7 @@ test.describe.serial('Host dashboard reservations and inquiries UI coverage', ()
 
     await expect(
       page.getByText(
-        'ゲストへの無返信・一方的なキャンセル・無断キャンセルは、精算やアカウント停止などに影響する可能性があります。今すぐ対応が必要な予約と問い合わせを優先的に確認してください。'
+        '返信が遅れると予約の進行に影響することがあります。確認が必要な予約と問い合わせを先にご確認ください。'
       )
     ).toBeVisible({ timeout: 15000 });
   });

@@ -12,6 +12,17 @@ type TestUser = {
 };
 
 const TEST_PASSWORD = 'LocallyTest!2026';
+const SWITCH_TO_HOST_LABEL =
+  /호스트 모드로 전환|Switch to Host|ホストモードへ|切换到房东模式/;
+const SWITCHING_TO_HOST_LABEL =
+  /호스트 모드로 전환 중|Switching to Host Mode|ホストモードに切り替え中|正在切换到房东模式/;
+const SWITCH_TO_GUEST_LABEL =
+  /게스트 모드로 전환|Switch to Guest|ゲストモードへ|切换到旅客模式/;
+const SWITCHING_TO_GUEST_LABEL =
+  /게스트 모드로 전환 중|Switching to Guest Mode|ゲストモードに切り替え中|正在切换到游客模式/;
+const RESERVATIONS_NAV_LABEL = /예약|Bookings|予約|预约/;
+const MORE_NAV_LABEL = /더보기|More|もっと見る|更多/;
+const PROFILE_NAV_LABEL = /프로필|Profile|プロフィール|个人资料/;
 
 let adminClient: SupabaseClient | null = null;
 const createdAuthUserIds: string[] = [];
@@ -178,39 +189,39 @@ test.describe.serial('host view mode persistence', () => {
 
     await login(page, host);
 
-    const hostModeButton = page.getByRole('button', { name: '호스트 모드로 전환' });
+    const hostModeButton = page.getByRole('button', { name: SWITCH_TO_HOST_LABEL });
     await expect(hostModeButton).toBeVisible({ timeout: 15000 });
     await expect(hostModeButton).toBeEnabled();
     await hostModeButton.click();
-    await expect(page.getByText('호스트 모드로 전환 중')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(SWITCHING_TO_HOST_LABEL)).toBeVisible({ timeout: 5000 });
     await page.waitForURL(/\/host\/menu/, { timeout: 15000, waitUntil: 'domcontentloaded' });
 
     await page.goto('/community', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('button', { name: '예약' })).toBeVisible({ timeout: 15000 });
-    await expect(page.getByRole('button', { name: '더보기' })).toBeVisible();
-    await expect(page.getByRole('button', { name: '프로필' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: RESERVATIONS_NAV_LABEL })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('button', { name: MORE_NAV_LABEL })).toBeVisible();
+    await expect(page.getByRole('button', { name: PROFILE_NAV_LABEL })).toHaveCount(0);
 
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('button', { name: '예약' })).toBeVisible({ timeout: 15000 });
-    await expect(page.getByRole('button', { name: '더보기' })).toBeVisible();
+    await expect(page.getByRole('button', { name: RESERVATIONS_NAV_LABEL })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('button', { name: MORE_NAV_LABEL })).toBeVisible();
 
     await page.goto('/become-a-host', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('button', { name: '예약' })).toBeVisible({ timeout: 15000 });
-    await expect(page.getByRole('button', { name: '더보기' })).toBeVisible();
+    await expect(page.getByRole('button', { name: RESERVATIONS_NAV_LABEL })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('button', { name: MORE_NAV_LABEL })).toBeVisible();
 
     await page.goto('/help', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('button', { name: '예약' })).toBeVisible({ timeout: 15000 });
-    await expect(page.getByRole('button', { name: '더보기' })).toBeVisible();
+    await expect(page.getByRole('button', { name: RESERVATIONS_NAV_LABEL })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('button', { name: MORE_NAV_LABEL })).toBeVisible();
 
     await page.goto('/host/menu', { waitUntil: 'domcontentloaded' });
-    const guestModeButton = page.getByRole('button', { name: /게스트 모드로 전환/ });
+    const guestModeButton = page.getByRole('button', { name: SWITCH_TO_GUEST_LABEL });
     await expect(guestModeButton).toBeVisible({ timeout: 15000 });
     await guestModeButton.click();
-    await expect(page.getByText('게스트 모드로 전환 중')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(SWITCHING_TO_GUEST_LABEL)).toBeVisible({ timeout: 5000 });
     await page.waitForURL(/\/account/, { timeout: 15000, waitUntil: 'domcontentloaded' });
 
     await page.goto('/community', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('button', { name: '프로필' })).toBeVisible({ timeout: 15000 });
-    await expect(page.getByRole('button', { name: '예약' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: PROFILE_NAV_LABEL })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('button', { name: RESERVATIONS_NAV_LABEL })).toHaveCount(0);
   });
 });

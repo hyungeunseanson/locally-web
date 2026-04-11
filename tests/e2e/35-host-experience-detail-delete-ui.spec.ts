@@ -12,6 +12,7 @@ type TestUser = {
 };
 
 const TEST_PASSWORD = 'LocallyTest!2026';
+const DELETE_LABEL = /삭제|Delete|削除|删除/;
 
 let adminClient: SupabaseClient | null = null;
 const createdAuthUserIds: string[] = [];
@@ -206,7 +207,9 @@ test.describe.serial('Host experience detail delete UI', () => {
       { timeout: 15000 }
     );
 
-    await page.getByRole('button', { name: /삭제/ }).click();
+    const deleteButtons = page.getByRole('button', { name: DELETE_LABEL });
+    await deleteButtons.first().click();
+    await deleteButtons.last().click();
     await deleteResponsePromise;
     await page.waitForURL(/\/host\/dashboard\?tab=experiences/, { timeout: 15000 });
 
