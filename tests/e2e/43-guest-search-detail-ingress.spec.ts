@@ -108,6 +108,12 @@ test.describe.serial('Guest search/detail ingress smoke', () => {
     await homeSearchInput.fill(experience.title);
     await homeSearchInput.press('Enter');
 
+    await expect
+      .poll(() => new URL(page.url()).pathname, { timeout: 15000 })
+      .toMatch(/^\/(en|ja|zh)?$/);
+    await expect(page.getByTestId('home-desktop-popular-experiences-section')).toBeVisible();
+    await expect(page.getByTestId('home-desktop-all-experiences-section')).toBeVisible();
+
     const experienceLink = page.locator(`a[href="/experiences/${experience.id}"]:visible`).first();
     await expect(experienceLink).toBeVisible({ timeout: 15000 });
     await expect(experienceLink.getByTestId('experience-card-duration')).toHaveText(durationPattern);
@@ -120,6 +126,29 @@ test.describe.serial('Guest search/detail ingress smoke', () => {
     const durationFacts = page.getByTestId('experience-duration-facts');
     await expect(durationFacts).toBeVisible();
     await expect(durationFacts).toContainText(durationPattern);
+  });
+
+  test('keeps desktop home search button submissions on home while filtering the feed', async ({ page }) => {
+    const experience = await getPublicExperienceFixture();
+    const durationPattern = getDurationPattern(experience.duration);
+
+    await page.goto('/', { waitUntil: 'networkidle' });
+    await dismissAnnouncementIfVisible(page);
+
+    const homeSearchInput = page.locator('input[type="text"]').first();
+    await expect(homeSearchInput).toBeVisible({ timeout: 15000 });
+    await homeSearchInput.fill(experience.title);
+    await page.getByTestId('home-desktop-search-submit').click();
+
+    await expect
+      .poll(() => new URL(page.url()).pathname, { timeout: 15000 })
+      .toMatch(/^\/(en|ja|zh)?$/);
+    await expect(page.getByTestId('home-desktop-popular-experiences-section')).toBeVisible();
+    await expect(page.getByTestId('home-desktop-all-experiences-section')).toBeVisible();
+
+    const experienceLink = page.locator(`a[href="/experiences/${experience.id}"]:visible`).first();
+    await expect(experienceLink).toBeVisible({ timeout: 15000 });
+    await expect(experienceLink.getByTestId('experience-card-duration')).toHaveText(durationPattern);
   });
 
   test('opens the same experience detail from search results', async ({ page }) => {

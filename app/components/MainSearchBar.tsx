@@ -253,6 +253,7 @@ export default function MainSearchBar({
         {/* 4. 검색 버튼 */}
         <div className="pl-2 pr-2 h-full flex items-center justify-end rounded-full z-10">
           <button
+            data-testid="home-desktop-search-submit"
             onClick={(e) => {
               e.stopPropagation();
               onSearch();

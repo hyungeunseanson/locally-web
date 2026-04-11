@@ -43,6 +43,11 @@ test.describe('Home/search location localization', () => {
     await expect(page.getByTestId('home-desktop-location-option-seoul')).toContainText('Seoul');
 
     await page.getByTestId('home-desktop-location-option-tokyo').click();
+    await expect
+      .poll(() => new URL(page.url()).pathname, { timeout: 15000 })
+      .toBe('/en');
+    await expect(page.getByTestId('home-desktop-popular-experiences-section')).toBeVisible();
+    await expect(page.getByTestId('home-desktop-all-experiences-section')).toBeVisible();
     await expect(page.getByTestId('home-desktop-search-location-field').locator('input')).toHaveValue('Tokyo');
   });
 
