@@ -410,6 +410,14 @@ async function createUserFixtures(params: {
     expectedRequestCount: '예약 1 · 의뢰 1',
     experienceTitle: params.experienceTitle,
     hostReviewTimelineTitle: `호스트 평가 수신 · ${params.hostName}`,
+    guestReviewHostName: params.hostName,
+    guestReviewRating: '4.0',
+    guestReviewContent: 'UsersTab 호스트 평가 수신 검증용 후기입니다.',
+    guestReviewDate: new Intl.DateTimeFormat('ko-KR', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    }).format(guestReviewCreatedAt),
     serviceTitle: `[Playwright] Users Service ${timestamp}`,
   };
 }
@@ -526,8 +534,16 @@ test.describe('Admin UsersTab smoke', () => {
 
     await customerRow.click();
 
+    const guestReviewsSection = page.getByTestId('admin-user-guest-reviews-section');
+
     await expect(page.getByText('기본 프로필')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Guest' })).toBeVisible();
+    await expect(guestReviewsSection).toBeVisible();
+    await expect(guestReviewsSection.getByText('받은 호스트 평가', { exact: false })).toBeVisible();
+    await expect(guestReviewsSection.getByText(fixture.guestReviewHostName, { exact: true })).toBeVisible();
+    await expect(guestReviewsSection.getByText(fixture.guestReviewRating, { exact: true })).toBeVisible();
+    await expect(guestReviewsSection).toContainText(fixture.guestReviewContent);
+    await expect(guestReviewsSection.getByText(fixture.guestReviewDate, { exact: true })).toBeVisible();
     await expect(page.getByText('회원 타임라인', { exact: false })).toBeVisible();
     await expect(page.getByText(`체험 예약 · ${fixture.experienceTitle}`)).toBeVisible();
     await expect(page.getByText(`리뷰 작성 · ${fixture.experienceTitle}`)).toBeVisible();

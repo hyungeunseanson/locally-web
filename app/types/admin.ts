@@ -452,6 +452,16 @@ export interface AdminUserActivityBooking {
   experience_title: string | null;
 }
 
+export interface AdminUserGuestReviewItem {
+  id: number;
+  created_at: string;
+  rating: number | null;
+  content: string | null;
+  host_id: string | null;
+  host_name: string | null;
+  host_avatar_url: string | null;
+}
+
 export interface AdminUserTimelineItem {
   id: string;
   occurred_at: string;

@@ -4,7 +4,11 @@ import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { isAdminSupportInquiry } from '@/app/utils/inquiry';
 import { getServiceBookingStatusLabel, getServiceRequestStatusLabel } from '@/app/constants/serviceStatus';
-import type { AdminUserActivityBooking, AdminUserTimelineItem } from '@/app/types/admin';
+import type {
+  AdminUserActivityBooking,
+  AdminUserGuestReviewItem,
+  AdminUserTimelineItem,
+} from '@/app/types/admin';
 import type { ServiceBookingStatus, ServiceRequestStatus } from '@/app/types/service';
 
 type BookingRow = {
@@ -52,6 +56,7 @@ type ExperienceTitleRow = {
 type HostProfileRow = {
   id: string;
   full_name: string | null;
+  avatar_url: string | null;
 };
 
 type ServiceRequestRow = {
@@ -246,7 +251,7 @@ export async function GET(
             .order('created_at', { ascending: true })
         : Promise.resolve({ data: [] as InquiryMessageRow[], error: null }),
       hostIds.length > 0
-        ? supabaseAdmin.from('profiles').select('id, full_name').in('id', hostIds)
+        ? supabaseAdmin.from('profiles').select('id, full_name, avatar_url').in('id', hostIds)
         : Promise.resolve({ data: [] as HostProfileRow[], error: null }),
     ]);
 
@@ -287,6 +292,19 @@ export async function GET(
       time: row.time,
       experience_title: row.experience_id ? experienceMap.get(row.experience_id)?.title ?? null : null,
     }));
+
+    const guestReviews: AdminUserGuestReviewItem[] = guestReviewRows.map((row) => {
+      const hostProfile = row.host_id ? hostProfileMap.get(row.host_id) ?? null : null;
+      return {
+        id: row.id,
+        created_at: row.created_at,
+        rating: row.rating,
+        content: row.content,
+        host_id: row.host_id,
+        host_name: hostProfile?.full_name ?? null,
+        host_avatar_url: hostProfile?.avatar_url ?? null,
+      };
+    });
 
     const timeline: AdminUserTimelineItem[] = [
       ...bookingRows.map((row) => {
@@ -455,7 +473,7 @@ export async function GET(
       .sort((a, b) => new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime())
       .slice(0, TIMELINE_LIMIT);
 
-    return NextResponse.json({ success: true, data: { bookings, timeline } });
+    return NextResponse.json({ success: true, data: { bookings, timeline, guestReviews } });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Server error';
     console.error('[ADMIN] /api/admin/users/[userId]/timeline error:', error);

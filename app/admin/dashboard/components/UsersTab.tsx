@@ -10,7 +10,13 @@ import {
 import { sendNotification } from '@/app/utils/notification';
 import { useToast } from '@/app/context/ToastContext';
 import { useConfirmDialog } from '@/app/hooks/useConfirmDialog';
-import type { AdminUserActivityBooking, AdminUserTimelineItem, AdminUserDashboardRow, OnlineUser } from '@/app/types/admin';
+import type {
+  AdminUserActivityBooking,
+  AdminUserDashboardRow,
+  AdminUserGuestReviewItem,
+  AdminUserTimelineItem,
+  OnlineUser,
+} from '@/app/types/admin';
 
 // 🟢 [Utility] 시간을 "방금 전", "5분 전" 등으로 변환하는 컴포넌트
 function TimeAgo({ dateString }: { dateString: string | null | undefined }) {
@@ -115,8 +121,9 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: {
   const [notiMessage, setNotiMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
 
-  // 🟢 실제 결제 내역 및 회원 타임라인
+  // 🟢 실제 결제 내역, 받은 호스트 평가, 회원 타임라인
   const [userBookings, setUserBookings] = useState<AdminUserActivityBooking[]>([]);
+  const [userGuestReviews, setUserGuestReviews] = useState<AdminUserGuestReviewItem[]>([]);
   const [userTimeline, setUserTimeline] = useState<AdminUserTimelineItem[]>([]);
   const [isActivityLoading, setIsActivityLoading] = useState(false);
   const [activitySummaryMap, setActivitySummaryMap] = useState<Map<string, UserActivitySummary>>(new Map());
@@ -210,6 +217,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: {
       const fetchActivity = async () => {
         setIsActivityLoading(true);
         setUserBookings([]);
+        setUserGuestReviews([]);
         setUserTimeline([]);
         try {
           const response = await fetch(`/api/admin/users/${selectedUser.id}/timeline`);
@@ -221,6 +229,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: {
 
           if (isMounted) {
             setUserBookings(result?.data?.bookings || []);
+            setUserGuestReviews(result?.data?.guestReviews || []);
             setUserTimeline(result?.data?.timeline || []);
           }
         } catch (e) {
@@ -709,7 +718,67 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: {
               )}
             </div>
 
-            {/* 4. 회원 타임라인 */}
+            {/* 4. 받은 호스트 평가 */}
+            <div className="p-4 md:p-6 border-b border-slate-100" data-testid="admin-user-guest-reviews-section">
+              <h4 className="text-[10px] md:text-xs font-bold text-slate-900 uppercase mb-3 md:mb-4">
+                받은 호스트 평가 ({userGuestReviews.length}개)
+              </h4>
+              {isActivityLoading ? (
+                <div className="space-y-3">
+                  {[1, 2].map((index) => (
+                    <div key={index} className="h-24 animate-pulse rounded-xl bg-slate-50" />
+                  ))}
+                </div>
+              ) : userGuestReviews.length === 0 ? (
+                <div className="text-center py-8 bg-slate-50 border border-slate-100 border-dashed rounded-xl">
+                  <p className="text-[11px] md:text-xs font-bold text-slate-500">받은 호스트 평가가 없습니다</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {userGuestReviews.map((review) => (
+                    <div
+                      key={review.id}
+                      data-testid="admin-user-guest-review-card"
+                      className="rounded-xl border border-slate-100 px-3.5 py-3.5 transition-colors hover:border-slate-200 hover:bg-slate-50"
+                    >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-2 min-w-0">
+                          <div className="relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-200">
+                            <UserAvatarImage
+                              src={review.host_avatar_url}
+                              alt={review.host_name || 'Host avatar'}
+                              sizes="28px"
+                              fallbackClassName="h-3.5 w-3.5 text-slate-400"
+                            />
+                          </div>
+                          <span className="truncate text-[13px] md:text-sm font-bold text-slate-900">
+                            {review.host_name || '알 수 없는 호스트'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Star size={11} fill="currentColor" className="text-amber-400" />
+                          <span className="text-[12px] font-bold text-slate-700">
+                            {(review.rating || 0).toFixed(1)}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="mt-2 break-words whitespace-pre-wrap text-[13px] md:text-[14px] leading-relaxed text-slate-600">
+                        &ldquo;{review.content || '내용 없음'}&rdquo;
+                      </p>
+                      <p className="mt-2 text-right text-[11px] text-slate-400">
+                        {new Date(review.created_at).toLocaleDateString('ko-KR', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 5. 회원 타임라인 */}
             <div className="p-4 md:p-6 border-b border-slate-100">
               <h4 className="text-[10px] md:text-xs font-bold text-slate-900 uppercase mb-3 md:mb-4">회원 타임라인 ({userTimeline.length}개)</h4>
               {isActivityLoading ? (
