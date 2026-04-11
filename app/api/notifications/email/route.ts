@@ -5,6 +5,11 @@ import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { sendTemplatedEmail } from '@/app/emails/delivery/sendTemplatedEmail';
 import type { EmailPayloadMap } from '@/app/emails/registry/emailTypes';
 import { resolveRecipientLocale, type NotificationLocale } from '@/app/utils/notificationLocale';
+import {
+  buildReviewReplyNotificationCopy,
+  buildReviewReplyTemplatePayload,
+  deliverReviewReplyNotification,
+} from '@/app/utils/reviews/reviewReplyNotification';
 
 const CONTROL_CHAR_PATTERN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
 
@@ -91,36 +96,6 @@ function sanitizeNotificationLink(rawValue: unknown) {
     return `${parsed.pathname}${parsed.search}${parsed.hash}`;
   } catch {
     return null;
-  }
-}
-
-function buildReviewReplyNotificationCopy(locale: NotificationLocale, replyPreview: string) {
-  switch (locale) {
-    case 'en':
-      return {
-        title: 'The host replied to your review',
-        message: `There is a new reply to your review: "${replyPreview}"`,
-        ctaLabel: 'Check review',
-      };
-    case 'ja':
-      return {
-        title: 'ホストがレビューに返信しました',
-        message: `レビューに新しい返信が届きました: 「${replyPreview}」`,
-        ctaLabel: 'レビューを確認',
-      };
-    case 'zh':
-      return {
-        title: '房东回复了你的评价',
-        message: `你的评价收到了新回复：「${replyPreview}」`,
-        ctaLabel: '查看评价',
-      };
-    case 'ko':
-    default:
-      return {
-        title: '호스트님이 후기에 답글을 남겼습니다',
-        message: `후기에 답글이 달렸습니다: "${replyPreview}"`,
-        ctaLabel: '후기 확인하기',
-      };
   }
 }
 
@@ -224,13 +199,10 @@ function resolveLocalizedSingleRecipientTemplatePayload(params: {
     copyParams &&
     typeof copyParams.replyPreview === 'string'
   ) {
-    return {
-      copyKey: 'review.reply.guest',
-      copyParams: {
-        replyPreview: copyParams.replyPreview,
-      },
+    return buildReviewReplyTemplatePayload({
+      replyPreview: copyParams.replyPreview,
       ctaUrl,
-    };
+    });
   }
 
   if (type === 'cancellation_approved' && copyKey === 'cancellation_approved') {
@@ -402,6 +374,27 @@ export async function POST(request: Request) {
     // [Fix] 400 guard를 DB insert 전으로 이동 — insert 후 실패 시 이메일 발송 계속되는 문제 방지
     if (!recipient_id) {
       return NextResponse.json({ error: 'recipient_id is required' }, { status: 400 });
+    }
+
+    if (type === 'review_reply') {
+      const deliveryResult = await deliverReviewReplyNotification({
+        actorId: user.id,
+        recipientId: recipient_id,
+        reviewId: review_id || '',
+        replyPreview:
+          copy_key === 'review_reply' && typeof copy_params?.replyPreview === 'string'
+            ? copy_params.replyPreview
+            : safeMessage,
+        link: safeLink || '/guest/trips',
+        supabaseAdmin: supabase,
+      });
+
+      if (!deliveryResult.allowed) {
+        console.error(`🚨 [Security Warning] Unauthorized single notification attempt by ${user.email} (${type})`);
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+
+      return NextResponse.json({ success: true });
     }
 
     // 2. DB 알림 테이블에 저장

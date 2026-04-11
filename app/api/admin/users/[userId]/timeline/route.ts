@@ -27,6 +27,14 @@ type ReviewRow = {
   experience_id: number | null;
 };
 
+type GuestReviewRow = {
+  id: number;
+  created_at: string;
+  rating: number | null;
+  content: string | null;
+  host_id: string | null;
+};
+
 type InquiryRow = {
   id: string;
   created_at: string;
@@ -39,6 +47,11 @@ type InquiryRow = {
 type ExperienceTitleRow = {
   id: number;
   title: string | null;
+};
+
+type HostProfileRow = {
+  id: string;
+  full_name: string | null;
 };
 
 type ServiceRequestRow = {
@@ -139,6 +152,7 @@ export async function GET(
     const [
       bookingsRes,
       reviewsRes,
+      guestReviewsRes,
       inquiriesRes,
       serviceRequestsRes,
       serviceBookingsRes,
@@ -153,6 +167,12 @@ export async function GET(
         .from('reviews')
         .select('id, created_at, rating, content, experience_id')
         .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(PER_SOURCE_LIMIT),
+      supabaseAdmin
+        .from('guest_reviews')
+        .select('id, created_at, rating, content, host_id')
+        .eq('guest_id', userId)
         .order('created_at', { ascending: false })
         .limit(PER_SOURCE_LIMIT),
       supabaseAdmin
@@ -177,12 +197,14 @@ export async function GET(
 
     if (bookingsRes.error) throw bookingsRes.error;
     if (reviewsRes.error) throw reviewsRes.error;
+    if (guestReviewsRes.error) throw guestReviewsRes.error;
     if (inquiriesRes.error) throw inquiriesRes.error;
     if (serviceRequestsRes.error) throw serviceRequestsRes.error;
     if (serviceBookingsRes.error) throw serviceBookingsRes.error;
 
     const bookingRows = (bookingsRes.data || []) as BookingRow[];
     const reviewRows = (reviewsRes.data || []) as ReviewRow[];
+    const guestReviewRows = (guestReviewsRes.data || []) as GuestReviewRow[];
     const inquiryRows = (inquiriesRes.data || []) as InquiryRow[];
     const serviceRequestRows = (serviceRequestsRes.data || []) as ServiceRequestRow[];
     const serviceBookingRows = (serviceBookingsRes.data || []) as ServiceBookingRow[];
@@ -205,7 +227,11 @@ export async function GET(
       ].filter(Boolean))
     ) as string[];
 
-    const [experiencesRes, serviceRequestLookupRes, inquiryMessagesRes] = await Promise.all([
+    const hostIds = Array.from(
+      new Set(guestReviewRows.map((row) => row.host_id).filter(Boolean))
+    ) as string[];
+
+    const [experiencesRes, serviceRequestLookupRes, inquiryMessagesRes, hostProfilesRes] = await Promise.all([
       experienceIds.length > 0
         ? supabaseAdmin.from('experiences').select('id, title').in('id', experienceIds)
         : Promise.resolve({ data: [] as ExperienceTitleRow[], error: null }),
@@ -219,11 +245,15 @@ export async function GET(
             .in('inquiry_id', Array.from(inquiryIds))
             .order('created_at', { ascending: true })
         : Promise.resolve({ data: [] as InquiryMessageRow[], error: null }),
+      hostIds.length > 0
+        ? supabaseAdmin.from('profiles').select('id, full_name').in('id', hostIds)
+        : Promise.resolve({ data: [] as HostProfileRow[], error: null }),
     ]);
 
     if (experiencesRes.error) throw experiencesRes.error;
     if (serviceRequestLookupRes.error) throw serviceRequestLookupRes.error;
     if (inquiryMessagesRes.error) throw inquiryMessagesRes.error;
+    if (hostProfilesRes.error) throw hostProfilesRes.error;
 
     const inquiryMessageRows = (inquiryMessagesRes.data || []) as InquiryMessageRow[];
 
@@ -233,6 +263,10 @@ export async function GET(
 
     const serviceRequestMap = new Map<string, ServiceRequestRow>(
       ((serviceRequestLookupRes.data || []) as ServiceRequestRow[]).map((row) => [row.id, row])
+    );
+
+    const hostProfileMap = new Map<string, HostProfileRow>(
+      ((hostProfilesRes.data || []) as HostProfileRow[]).map((row) => [row.id, row])
     );
 
     inquiryMessageRows.forEach((row) => {
@@ -276,6 +310,20 @@ export async function GET(
           occurred_at: row.created_at,
           kind: 'review' as const,
           title: `리뷰 작성 · ${experienceTitle || '알 수 없는 체험'}`,
+          description: reviewSummary ? `평점 ${(row.rating || 0).toFixed(1)}점 · ${reviewSummary}` : `평점 ${(row.rating || 0).toFixed(1)}점`,
+          status: null,
+          status_label: null,
+          amount: null,
+        };
+      }),
+      ...guestReviewRows.map((row) => {
+        const hostName = row.host_id ? hostProfileMap.get(row.host_id)?.full_name ?? null : null;
+        const reviewSummary = truncateText(row.content);
+        return {
+          id: `guest_review:${row.id}`,
+          occurred_at: row.created_at,
+          kind: 'review' as const,
+          title: `호스트 평가 수신 · ${hostName || '알 수 없는 호스트'}`,
           description: reviewSummary ? `평점 ${(row.rating || 0).toFixed(1)}점 · ${reviewSummary}` : `평점 ${(row.rating || 0).toFixed(1)}점`,
           status: null,
           status_label: null,

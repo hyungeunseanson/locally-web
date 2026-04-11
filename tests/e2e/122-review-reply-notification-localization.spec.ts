@@ -319,18 +319,10 @@ test.describe.serial('Review reply notification localization', () => {
     await login(page, host);
 
     const replyPreview = 'Thanks for joining us and leaving a review.';
-    const response = await page.request.post('/api/notifications/email', {
+    const response = await page.request.post('/api/host/reviews/reply', {
       data: {
-        recipient_id: guestId,
-        review_id: reviewId,
-        type: 'review_reply',
-        title: '호스트님이 후기에 답글을 남겼습니다',
-        message: `후기에 답글이 달렸습니다: "${replyPreview}"`,
-        link: '/guest/trips',
-        copy_key: 'review_reply',
-        copy_params: {
-          replyPreview,
-        },
+        reviewId,
+        reply: replyPreview,
       },
     });
 
@@ -347,8 +339,9 @@ test.describe.serial('Review reply notification localization', () => {
 
     if (error) throw error;
 
+    const expectedPreview = `${replyPreview.slice(0, 40)}${replyPreview.length > 40 ? '...' : ''}`;
     expect(notification?.title).toBe('The host replied to your review');
-    expect(notification?.message).toContain(replyPreview);
+    expect(notification?.message).toContain(expectedPreview);
     expect(notification?.link).toBe('/guest/trips');
 
     if (notification?.id) createdNotificationIds.push(Number(notification.id));

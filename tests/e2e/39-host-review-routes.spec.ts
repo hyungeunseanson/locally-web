@@ -20,6 +20,7 @@ const createdExperienceIds: number[] = [];
 const createdBookingIds: string[] = [];
 const createdReviewIds: number[] = [];
 const createdGuestReviewIds: number[] = [];
+const createdNotificationIds: number[] = [];
 
 function loadEnv(): EnvMap {
   return readFileSync('.env.local', 'utf8')
@@ -256,6 +257,10 @@ async function login(page: Page, user: TestUser) {
 test.afterAll(async () => {
   const supabase = getAdminClient();
 
+  if (createdNotificationIds.length > 0) {
+    await supabase.from('notifications').delete().in('id', createdNotificationIds);
+  }
+
   for (const guestReviewId of createdGuestReviewIds) {
     await supabase.from('guest_reviews').delete().eq('id', guestReviewId);
   }
@@ -473,5 +478,39 @@ test.describe.serial('Host review routes', () => {
     expect(review).toMatchObject({
       reply: '호스트 답글 route 검증용 답글입니다.',
     });
+
+    await expect
+      .poll(async () => {
+        const { data: notification, error: notificationError } = await supabase
+          .from('notifications')
+          .select('id, title, message, type, link')
+          .eq('user_id', guestId)
+          .eq('type', 'review_reply')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (notificationError) throw notificationError;
+        return notification;
+      }, { timeout: 15000 })
+      .toMatchObject({
+        id: expect.any(Number),
+        type: 'review_reply',
+        title: '호스트님이 후기에 답글을 남겼습니다',
+        message: '후기에 답글이 달렸습니다: "호스트 답글 route 검증용 답글입니다."',
+        link: '/guest/trips',
+      });
+
+    const { data: notification, error: notificationError } = await supabase
+      .from('notifications')
+      .select('id')
+      .eq('user_id', guestId)
+      .eq('type', 'review_reply')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (notificationError) throw notificationError;
+    if (notification?.id) createdNotificationIds.push(Number(notification.id));
   });
 });

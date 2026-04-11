@@ -6,7 +6,6 @@ import { createClient } from '@/app/utils/supabase/client';
 import Image from 'next/image';
 import { useToast } from '@/app/context/ToastContext';
 import Skeleton from '@/app/components/ui/Skeleton';
-import { sendNotification } from '@/app/utils/notification';
 import { useLanguage } from '@/app/context/LanguageContext';
 
 type HostReviewGuest = {
@@ -82,7 +81,7 @@ export default function HostReviews() {
     } finally {
       setLoading(false);
     }
-  }, [showToast, supabase]);
+  }, [showToast, supabase, t]);
 
   useEffect(() => {
     void fetchReviews();
@@ -108,23 +107,6 @@ export default function HostReviews() {
       }
 
       showToast('답글이 등록되었습니다!', 'success');
-
-      // [R3] 게스트에게 답글 알림
-      const review = reviews.find(r => r.id === reviewId);
-      if (review?.user_id) {
-        sendNotification({
-          recipient_id: review.user_id,
-          review_id: reviewId,
-          type: 'review_reply',
-          title: '호스트님이 후기에 답글을 남겼습니다',
-          message: `후기에 답글이 달렸습니다: "${replyText.slice(0, 40)}${replyText.length > 40 ? '...' : ''}"`,
-          link: '/guest/trips',
-          copy_key: 'review_reply',
-          copy_params: {
-            replyPreview: `${replyText.slice(0, 40)}${replyText.length > 40 ? '...' : ''}`,
-          },
-        }).catch(console.error);
-      }
 
       setReviews(prev => prev.map(r =>
         r.id === reviewId

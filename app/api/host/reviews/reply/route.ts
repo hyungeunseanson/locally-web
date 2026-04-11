@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import { deliverReviewReplyNotification } from '@/app/utils/reviews/reviewReplyNotification';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 
@@ -74,6 +75,21 @@ export async function POST(request: NextRequest) {
       .eq('experience_id', review.experience_id); // [TOCTOU Guard] 소유권 재확인
 
     if (updateError) throw updateError;
+
+    if (review.user_id) {
+      try {
+        await deliverReviewReplyNotification({
+          actorId: user.id,
+          recipientId: review.user_id,
+          reviewId,
+          replyText: reply,
+          link: '/guest/trips',
+          supabaseAdmin,
+        });
+      } catch (notificationError) {
+        console.warn('Host review reply notification failed after reply save:', notificationError);
+      }
+    }
 
     return NextResponse.json({ success: true, recipientId: review.user_id, replyAt });
   } catch (error) {

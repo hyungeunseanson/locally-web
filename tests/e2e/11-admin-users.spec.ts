@@ -19,6 +19,7 @@ const createdWhitelistEmails: string[] = [];
 const createdExperienceIds: number[] = [];
 const createdBookingIds: string[] = [];
 const createdReviewIds: string[] = [];
+const createdGuestReviewIds: number[] = [];
 const createdInquiryIds: string[] = [];
 const createdInquiryMessageIds: string[] = [];
 const createdServiceRequestIds: string[] = [];
@@ -199,6 +200,7 @@ async function createUserFixtures(params: {
   customerId: string;
   customer: TestUser;
   hostId: string;
+  hostName: string;
   experienceId: number;
   experienceTitle: string;
 }) {
@@ -255,6 +257,9 @@ async function createUserFixtures(params: {
   const reviewCreatedAt = new Date();
   reviewCreatedAt.setMinutes(reviewCreatedAt.getMinutes() - 40);
 
+  const guestReviewCreatedAt = new Date();
+  guestReviewCreatedAt.setMinutes(guestReviewCreatedAt.getMinutes() - 35);
+
   const { data: reviewData, error: reviewError } = await supabase
     .from('reviews')
     .insert({
@@ -273,6 +278,24 @@ async function createUserFixtures(params: {
     throw reviewError || new Error('Failed to create review.');
   }
   createdReviewIds.push(reviewData.id);
+
+  const { data: guestReviewData, error: guestReviewError } = await supabase
+    .from('guest_reviews')
+    .insert({
+      booking_id: bookingId,
+      host_id: params.hostId,
+      guest_id: params.customerId,
+      rating: 4,
+      content: 'UsersTab 호스트 평가 수신 검증용 후기입니다.',
+      created_at: guestReviewCreatedAt.toISOString(),
+    })
+    .select('id')
+    .single();
+
+  if (guestReviewError || !guestReviewData?.id) {
+    throw guestReviewError || new Error('Failed to create guest review.');
+  }
+  createdGuestReviewIds.push(Number(guestReviewData.id));
 
   const { data: inquiryData, error: inquiryError } = await supabase
     .from('inquiries')
@@ -386,6 +409,7 @@ async function createUserFixtures(params: {
     expectedTotalSpent: '₩205,000',
     expectedRequestCount: '예약 1 · 의뢰 1',
     experienceTitle: params.experienceTitle,
+    hostReviewTimelineTitle: `호스트 평가 수신 · ${params.hostName}`,
     serviceTitle: `[Playwright] Users Service ${timestamp}`,
   };
 }
@@ -414,6 +438,10 @@ async function cleanupFixtures() {
 
   for (const reviewId of createdReviewIds) {
     await supabase.from('reviews').delete().eq('id', reviewId);
+  }
+
+  for (const guestReviewId of createdGuestReviewIds) {
+    await supabase.from('guest_reviews').delete().eq('id', guestReviewId);
   }
 
   for (const bookingId of createdBookingIds) {
@@ -468,6 +496,7 @@ test.describe('Admin UsersTab smoke', () => {
       customerId,
       customer: customerUser,
       hostId,
+      hostName: hostUser.fullName,
       experienceId: experience.id,
       experienceTitle: experience.title,
     });
@@ -502,6 +531,7 @@ test.describe('Admin UsersTab smoke', () => {
     await expect(page.getByText('회원 타임라인', { exact: false })).toBeVisible();
     await expect(page.getByText(`체험 예약 · ${fixture.experienceTitle}`)).toBeVisible();
     await expect(page.getByText(`리뷰 작성 · ${fixture.experienceTitle}`)).toBeVisible();
+    await expect(page.getByText(fixture.hostReviewTimelineTitle)).toBeVisible();
     await expect(page.getByText(`문의 답변 도착 · ${fixture.experienceTitle}`)).toBeVisible();
     await expect(page.getByText(`맞춤 의뢰 결제 · ${fixture.serviceTitle}`)).toBeVisible();
     await expect(page.getByRole('button', { name: /이 회원 계정 영구 삭제/ })).toBeVisible();
