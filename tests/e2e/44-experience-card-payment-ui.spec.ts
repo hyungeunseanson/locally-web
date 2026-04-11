@@ -3,7 +3,12 @@ import { readFileSync } from 'fs';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test, type Page } from '@playwright/test';
 
-import { selectReservationDate, selectReservationTime } from './helpers/experienceBooking';
+import {
+  prepareBookableExperience as prepareSharedBookableExperience,
+  reviewAllExperiencePaymentAgreements,
+  selectReservationDate,
+  selectReservationTime,
+} from './helpers/experienceBooking';
 
 type EnvMap = Record<string, string>;
 type TestUser = {
@@ -27,7 +32,6 @@ type AvailabilityKey = {
 };
 
 const TEST_PASSWORD = 'LocallyTest!2026';
-const HOST_USER_ID = 'cc84b331-7e78-4818-b9ba-f1a960017473';
 const MOCK_IMP_UID = 'MOCK-IMP-UID-TEST';
 const MOCK_TID = 'MOCK-NICEPAY-TID';
 const MOCK_IAMPORT_SDK = `
@@ -71,10 +75,6 @@ function getAdminClient() {
   );
 
   return adminClient;
-}
-
-function formatDate(date: Date) {
-  return date.toISOString().slice(0, 10);
 }
 
 function createCustomerUser(): TestUser {
@@ -139,86 +139,16 @@ async function createAuthUser(user: TestUser) {
 }
 
 async function prepareBookableExperience(): Promise<BookableExperience> {
-  const supabase = getAdminClient();
-  const { data: experience, error: experienceError } = await supabase
-    .from('experiences')
-    .select('id, title, status, host_id')
-    .eq('host_id', HOST_USER_ID)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (experienceError) throw experienceError;
-  if (!experience) {
-    throw new Error('No host experience found for the approved test host.');
-  }
-
-  if (experience.status !== 'approved' && experience.status !== 'active') {
-    const { error: updateError } = await supabase
-      .from('experiences')
-      .update({ status: 'approved' })
-      .eq('id', experience.id);
-
-    if (updateError) throw updateError;
-  }
-
-  let date = '';
-  const time = '10:00';
-
-  for (let offset = 14; offset <= 45; offset += 1) {
-    const candidateDate = new Date();
-    candidateDate.setDate(candidateDate.getDate() + offset);
-    const candidate = formatDate(candidateDate);
-
-    const { count, error: bookingCountError } = await supabase
-      .from('bookings')
-      .select('*', { count: 'exact', head: true })
-      .eq('experience_id', experience.id)
-      .eq('date', candidate)
-      .eq('time', time)
-      .in('status', ['PENDING', 'PAID', 'confirmed', 'pending', 'paid']);
-
-    if (bookingCountError) throw bookingCountError;
-
-    if (!count || count === 0) {
-      date = candidate;
-      break;
-    }
-  }
-
-  if (!date) {
-    throw new Error('Could not find an empty future booking slot for the test experience.');
-  }
-
-  const { data: existingSlots, error: slotFetchError } = await supabase
-    .from('experience_availability')
-    .select('experience_id')
-    .eq('experience_id', experience.id)
-    .eq('date', date)
-    .eq('start_time', time)
-    .limit(1);
-
-  if (slotFetchError) throw slotFetchError;
-
-  if (!existingSlots || existingSlots.length === 0) {
-    const { error: slotInsertError } = await supabase
-      .from('experience_availability')
-      .insert({
-        experience_id: experience.id,
-        date,
-        start_time: time,
-        is_booked: false,
-      });
-
-    if (slotInsertError) throw slotInsertError;
-    createdAvailabilityKeys.push({ experienceId: Number(experience.id), date, time });
-  }
+  const experience = await prepareSharedBookableExperience(createdAvailabilityKeys, {
+    searchAnyHost: true,
+    time: '10:00',
+  });
 
   return {
-    experienceId: Number(experience.id),
-    title: String(experience.title || 'Locally 체험'),
-    date,
-    time,
+    experienceId: experience.experienceId,
+    title: experience.title,
+    date: experience.date,
+    time: experience.time,
   };
 }
 
@@ -297,7 +227,15 @@ test.describe.serial('Experience card payment UI smoke', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ ready: true }),
+        body: JSON.stringify({
+          ready: true,
+          provider: 'portone',
+          runtime: {
+            provider: 'portone',
+            merchantCode: 'imp_test_locally',
+            scriptSrc: 'https://cdn.iamport.kr/v1/iamport.js',
+          },
+        }),
       });
     });
 
@@ -324,8 +262,8 @@ test.describe.serial('Experience card payment UI smoke', () => {
 
       const { data: booking, error: bookingError } = await getAdminClient()
         .from('bookings')
-        .select('status, payment_method, user_id')
-        .eq('id', observedOrderId)
+        .select('id, status, payment_method, user_id')
+        .eq('order_id', observedOrderId)
         .maybeSingle();
 
       if (bookingError) throw bookingError;
@@ -343,7 +281,7 @@ test.describe.serial('Experience card payment UI smoke', () => {
           payment_method: 'card',
           tid: MOCK_TID,
         })
-        .eq('id', observedOrderId);
+        .eq('id', booking.id);
 
       if (updateError) throw updateError;
 
@@ -364,9 +302,7 @@ test.describe.serial('Experience card payment UI smoke', () => {
 
     await page.locator('input[type="text"]').fill(customerUser.fullName);
     await page.locator('input[type="tel"]').fill(customerUser.phone);
-    await page.getByText(/오프플랫폼 직거래|off-platform direct transactions|プラットフォーム外での直接取引|平台外私下交易/).click();
-    await page.getByText(/허위 예약, 무단 불참|risky behavior such as fake bookings|虚偽予約、無断欠席|虚假预订、无故缺席/).click();
-    await page.getByText(/취소\/환불 규정|cancellation\/refund policy|キャンセル\/返金規定|取消\/退款规则/).click();
+    await reviewAllExperiencePaymentAgreements(page);
 
     await expect(page.getByRole('button', { name: /카드|Card|カード|银行卡/ }).first()).toBeEnabled({ timeout: 15000 });
     await page.getByRole('button', { name: /결제하기|Pay|決済する|支付/ }).last().click();
@@ -378,7 +314,7 @@ test.describe.serial('Experience card payment UI smoke', () => {
         const { data, error } = await getAdminClient()
           .from('bookings')
           .select('status, payment_method, tid')
-          .eq('id', observedOrderId)
+          .eq('order_id', observedOrderId)
           .maybeSingle();
 
         if (error) throw error;
@@ -400,7 +336,9 @@ test.describe.serial('Experience card payment UI smoke', () => {
       page.getByRole('heading', { name: /예약이 확정되었습니다!|Your booking is confirmed!|予約が確定しました！|预订已确认！/ })
     ).toBeVisible();
     await expect(page.getByText(observedOrderId)).toBeVisible();
-    await expect(page.getByText(experience.title)).toBeVisible();
+    await expect(page.getByRole('heading', { level: 3 })).toBeVisible();
+    await expect(page.getByText(experience.date)).toBeVisible();
+    await expect(page.getByText(experience.time)).toBeVisible();
 
     await page.goto(`/experiences/${experience.experienceId}`, { waitUntil: 'domcontentloaded' });
     await selectReservationDate(page, experience.date);
