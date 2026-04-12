@@ -164,6 +164,7 @@
       - tracked caller는 확인되지 않았지만, stale client나 수동 호출이 submit 직후 이 route를 다시 치면 admin alert 중복 적재 가능성은 남아 있다
       - 다만 현재까지의 static + history evidence만 보면 이 위험은 current product path가 아니라 external stale client surface에 한정된다
       - `.vercel/`, `.next/dev/logs/` 같은 저장소 로컬 산출물에서도 이 route의 실제 운영 access 흔적을 보여 주는 로그는 확인되지 않았다
+      - 현재 Codex 세션에서는 `vercel` CLI 미설치, `VERCEL_*` auth env 부재, `~/.vercel` 설정 부재가 함께 확인됐고, `npx vercel whoami`도 홈 디렉터리(`~/Library/Application Support/com.vercel.cli`, `~/Library/Caches/com.vercel.cli`) 쓰기 권한 EPERM으로 막혀 runtime query를 더 진행할 수 없었다
       - 따라서 이 경계는 저장소 안에서 더 줄일 수 있는 문제가 아니라, 저장소 밖 운영 로그 확인으로만 닫을 수 있는 종류의 gap이다
 
 ### 3. 체험 작성 / 수정 / 삭제 / 일정 관리 / 공개 반영
@@ -244,6 +245,7 @@
 - 호스트 신청/승인 경계의 non-live gap
   - legacy `/api/host/register/admin-alert`는 tracked app/tests에서 호출 흔적이 없고 git history상도 intentional legacy route지만, external stale client 대비 dedupe contract는 없다
   - 저장소 로컬 산출물(`.vercel`, `.next/dev/logs`)에는 이 route의 실제 운영 호출 여부를 판단할 access evidence가 없었다
+  - 현재 Codex 세션 자체도 Vercel runtime query 권한/환경을 갖고 있지 않아, 이 gap은 repo 밖 운영 관측으로만 닫을 수 있다
 - 이전 `55`, `35`, `40`, `140`은 이번 패스에서 해소됐다
 
 ## Follow-up Need
@@ -253,6 +255,7 @@
     - 가장 안전한 다음 단계는 저장소 밖 운영 로그/라우트 access evidence로 `legacy admin-alert` 실제 호출 유무를 확인한 뒤, 미사용이면 제거하고 사용 중이면 dedupe guard를 넣는 것이다
     - 현재 코드와 git history 기준으로는 tracked client caller가 없으므로 우선순위는 “즉시 제품 버그 수정”보다 “external stale client cleanup”에 가깝다
     - 저장소 안 증거는 이미 충분히 모였고, 이제 추가 분류에 필요한 건 Vercel/관측 도구 수준의 runtime access log다
+    - 이번 Codex 세션에서는 로컬 CLI/auth/access boundary까지 확인했으므로, 다음 액션은 구현이 아니라 운영자 권한으로 실제 Vercel runtime request log를 조회하는 것이다
 
 ## Final Verdict
 - 호스트 진입/모드 전환, 체험 create/edit/delete, 리뷰 응대, 수익/정산/서비스 매칭은 최신 기준 `정상`
