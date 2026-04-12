@@ -98,6 +98,8 @@ async function createCommunityPost(
   options?: {
     title?: string;
     createdAt?: string;
+    updatedAt?: string;
+    category?: 'qna' | 'locally_content';
   }
 ) {
   const supabase = getAdminClient();
@@ -105,12 +107,13 @@ async function createCommunityPost(
     .from('community_posts')
     .insert({
       user_id: authorId,
-      category: 'qna',
+      category: options?.category || 'qna',
       title: options?.title || `[Playwright] Community Detail ${Date.now()}`,
       content: '좋아요/댓글 카운트 정합성 검증용 게시글입니다.',
       images: [],
       linked_exp_id: null,
       created_at: options?.createdAt,
+      updated_at: options?.updatedAt,
     })
     .select('id, like_count, comment_count')
     .single();
@@ -272,5 +275,48 @@ test.describe.serial('Community detail state consistency', () => {
     expect(prevHref).toBeTruthy();
     expect(prevHref).toContain('category=qna');
     expect(prevHref).toContain('sort=popular');
+  });
+
+  test('keeps locally_content details indexable and marks legacy details noindex while showing modified time only when updated', async ({ page, request }) => {
+    test.setTimeout(90000);
+
+    const author = createUser('seo');
+    const authorId = await createAuthUser(author);
+    const baseTime = Date.now();
+    const createdAt = new Date(baseTime - 2 * 60 * 60 * 1000).toISOString();
+    const updatedAt = new Date(baseTime - 60 * 60 * 1000).toISOString();
+
+    const locallyContentPostId = await createCommunityPost(authorId, {
+      title: `[Playwright] Community SEO Content ${baseTime}`,
+      category: 'locally_content',
+      createdAt,
+      updatedAt,
+    });
+    const legacyPostId = await createCommunityPost(authorId, {
+      title: `[Playwright] Community SEO Legacy ${baseTime}`,
+      category: 'qna',
+      createdAt,
+      updatedAt: createdAt,
+    });
+
+    const locallyContentResponse = await request.get(`/community/${locallyContentPostId}`);
+    expect(locallyContentResponse.ok()).toBeTruthy();
+    const locallyContentHtml = await locallyContentResponse.text();
+    expect(locallyContentHtml).not.toMatch(/<meta[^>]+name="robots"[^>]+content="[^"]*noindex/i);
+
+    const legacyResponse = await request.get(`/community/${legacyPostId}`);
+    expect(legacyResponse.ok()).toBeTruthy();
+    const legacyHtml = await legacyResponse.text();
+    expect(legacyHtml).toMatch(/<meta[^>]+name="robots"[^>]+content="[^"]*noindex[^"]*nofollow/i);
+
+    await page.goto(`/community/${locallyContentPostId}?category=locally_content`, {
+      waitUntil: 'networkidle',
+    });
+    await expect(page.getByTestId('community-detail-updated-at')).toContainText('수정됨');
+
+    await page.goto(`/community/${legacyPostId}?category=qna`, {
+      waitUntil: 'networkidle',
+    });
+    await expect(page.getByTestId('community-detail-updated-at')).toHaveCount(0);
   });
 });

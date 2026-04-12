@@ -99,11 +99,12 @@ async function createPost(
     title: string;
     isAnonymous?: boolean;
     createdAt?: string;
+    category?: 'qna' | 'locally_content';
   }
 ) {
   const insertPayload = {
     user_id: userId,
-    category: 'qna',
+    category: options.category || 'qna',
     title: options.title,
     content: `${options.title} 내용입니다.`,
     images: [],
@@ -196,5 +197,25 @@ test.describe.serial('Community author modal', () => {
       await page.getByText('익명').click();
       await expect(page.getByTestId('community-author-modal')).toHaveCount(0);
     }
+  });
+
+  test('adds author url to article json-ld for visible locally_content authors', async ({ request }) => {
+    test.setTimeout(90000);
+
+    const author = createUser('seo');
+    const authorId = await createAuthUser(author);
+    const timestamp = Date.now();
+    const contentPost = await createPost(authorId, {
+      title: `[Playwright] Community Author SEO ${timestamp}`,
+      category: 'locally_content',
+    });
+
+    const response = await request.get(`/community/${contentPost.id}?category=locally_content`);
+    expect(response.ok()).toBeTruthy();
+
+    const html = await response.text();
+
+    expect(html).toContain('"@type":"Article"');
+    expect(html).toContain(`"url":"https://locally-web.vercel.app/users/${authorId}"`);
   });
 });

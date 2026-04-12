@@ -29,6 +29,7 @@ type ArticleStructuredDataArgs = {
   url: string;
   imageUrl: string;
   authorName: string;
+  authorUrl?: string | null;
   datePublished: string;
   dateModified?: string | null;
   section?: string | null;
@@ -145,6 +146,7 @@ export function buildCommunityArticleJsonLd({
   url,
   imageUrl,
   authorName,
+  authorUrl,
   datePublished,
   dateModified,
   section,
@@ -163,6 +165,7 @@ export function buildCommunityArticleJsonLd({
     author: {
       '@type': 'Person',
       name: authorName,
+      url: authorUrl || undefined,
     },
     publisher: {
       '@type': 'Organization',

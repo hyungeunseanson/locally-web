@@ -7,6 +7,7 @@ import {
   pickLatestPublicHostApplicationsByUser,
 } from '@/app/utils/hostVisibility';
 import { buildAbsoluteUrl } from '@/app/utils/siteUrl';
+import { COMMUNITY_OPEN } from '@/app/community/categoryMeta';
 
 // 1시간 캐시: 매 크롤러 요청마다 DB 조회하지 않도록
 export const revalidate = 3600;
@@ -146,10 +147,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         .from('experiences')
         .select('id, host_id, updated_at, is_active')
         .eq('status', 'active'),
-      supabase
-        .from('community_posts')
-        .select('id, created_at, updated_at')
-        .order('created_at', { ascending: false }),
+      (() => {
+        let query = supabase
+          .from('community_posts')
+          .select('id, category, created_at, updated_at')
+          .order('created_at', { ascending: false });
+
+        if (!COMMUNITY_OPEN) {
+          query = query.eq('category', 'locally_content');
+        }
+
+        return query;
+      })(),
       supabase
         .from('public_host_applications')
         .select('id, user_id, status, created_at')

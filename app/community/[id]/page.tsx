@@ -16,7 +16,7 @@ import { getCurrentLocale } from '@/app/utils/locale';
 import { buildAbsoluteUrl, buildLocalizedAbsoluteUrl } from '@/app/utils/siteUrl';
 import { buildBreadcrumbJsonLd, buildCommunityArticleJsonLd } from '@/app/utils/structuredData';
 import { getCommunityAuthorAvatar, getCommunityAuthorInitial, getCommunityAuthorName } from '../authorDisplay';
-import { getCommunityCategoryMeta, isLocallyContentCategory } from '../categoryMeta';
+import { COMMUNITY_OPEN, getCommunityCategoryMeta, isLocallyContentCategory } from '../categoryMeta';
 import { getCommunityHubMeta } from '../hubMeta';
 import { getCommunityCategoryFromFormat } from '../categoryMeta';
 import { resolveCommunityCategory, resolveCommunityFormat, resolveCommunityHub, resolveCommunitySort } from '../queryParams';
@@ -37,6 +37,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     const defaultImage = post.images && post.images.length > 0 ? post.images[0] : buildAbsoluteUrl('/images/logo.png');
     const pagePath = `/community/${id}`;
     const canonicalUrl = buildLocalizedAbsoluteUrl(locale, pagePath);
+    const isSearchIndexable = COMMUNITY_OPEN || isLocallyContentCategory(post.category);
 
     let prefix = '';
     if (post.category === 'qna') prefix = '[Q&A] ';
@@ -66,6 +67,10 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
                 ja: buildLocalizedAbsoluteUrl('ja', pagePath),
                 zh: buildLocalizedAbsoluteUrl('zh', pagePath),
             },
+        },
+        robots: isSearchIndexable ? undefined : {
+            index: false,
+            follow: false,
         },
     };
 }
@@ -136,14 +141,23 @@ export default async function CommunityPostDetail({
     // ④ 이전글/다음글 (같은 카테고리)
     const isCompanion = post.category === 'companion';
     const isLocallyContent = isLocallyContentCategory(post.category);
+    const isSearchIndexable = COMMUNITY_OPEN || isLocallyContent;
     const authorName = getCommunityAuthorName(profile, post.is_anonymous);
     const authorInitial = getCommunityAuthorInitial(profile, post.is_anonymous);
     const authorAvatar = getCommunityAuthorAvatar(profile, post.is_anonymous);
+    const authorProfileUrl = !post.is_anonymous && post.user_id
+        ? buildAbsoluteUrl(`/users/${post.user_id}`)
+        : null;
     const categoryMeta = getCommunityCategoryMeta(post.category);
     const hubMeta = post.destination_hub ? getCommunityHubMeta(post.destination_hub) : null;
     const pageUrl = buildAbsoluteUrl(`/community/${id}`);
     const articleDescription = post.content.substring(0, 160) + (post.content.length > 160 ? '...' : '');
     const articleImage = post.images && post.images.length > 0 ? post.images[0] : buildAbsoluteUrl('/images/logo.png');
+    const hasVisibleUpdatedAt = Boolean(
+        post.updated_at
+        && post.created_at
+        && new Date(post.updated_at).getTime() > new Date(post.created_at).getTime()
+    );
     const fallbackHub = resolveCommunityHub(detailSearchParams?.hub as string);
     const fallbackRequestedCategory = resolveCommunityCategory((detailSearchParams?.category as string) || post.category);
     const fallbackFormat = resolveCommunityFormat(
@@ -197,16 +211,19 @@ export default async function CommunityPostDetail({
         <>
             <JsonLd
                 data={[
-                    buildCommunityArticleJsonLd({
-                        title: post.title,
-                        description: articleDescription,
-                        url: pageUrl,
-                        imageUrl: articleImage,
-                        authorName,
-                        datePublished: post.created_at,
-                        dateModified: post.updated_at,
-                        section: post.category,
-                    }),
+                    ...(isSearchIndexable ? [
+                        buildCommunityArticleJsonLd({
+                            title: post.title,
+                            description: articleDescription,
+                            url: pageUrl,
+                            imageUrl: articleImage,
+                            authorName,
+                            authorUrl: authorProfileUrl,
+                            datePublished: post.created_at,
+                            dateModified: post.updated_at,
+                            section: post.category,
+                        }),
+                    ] : []),
                     buildBreadcrumbJsonLd([
                         { name: 'Home', item: buildAbsoluteUrl('/') },
                         { name: '커뮤니티', item: buildAbsoluteUrl('/community') },
@@ -274,9 +291,14 @@ export default async function CommunityPostDetail({
                                                 <span className="block break-words text-[13px] font-semibold leading-tight text-slate-900 [overflow-wrap:anywhere] md:text-[15px] md:font-bold">
                                                     {authorName}
                                                 </span>
-                                                <span className="text-[11px] font-medium text-slate-400 md:text-[12px]">
-                                                    {getTimeString(post.created_at)}
-                                                </span>
+                                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium text-slate-400 md:text-[12px]">
+                                                    <span>{getTimeString(post.created_at)}</span>
+                                                    {hasVisibleUpdatedAt && (
+                                                        <span data-testid="community-detail-updated-at">
+                                                            수정됨 {getTimeString(post.updated_at)}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     </CommunityAuthorTrigger>
