@@ -428,8 +428,8 @@ test.describe.serial('Admin support unread alerts', () => {
       expect(await countAdminAlerts(recipientIds)).toBe(0);
       expect(countCapturedAdminSupportAlertEmailsForRecipients(recipientEmails)).toBe(0);
 
+      const firstBatch = hasBatchTable ? await readUnreadBatch(inquiryId) : null;
       if (hasBatchTable) {
-        const firstBatch = await readUnreadBatch(inquiryId);
         expect(firstBatch?.is_active).toBe(true);
         expect(firstBatch?.in_app_sent_at).toBeNull();
         expect(firstBatch?.email_sent_at).toBeNull();
@@ -449,6 +449,9 @@ test.describe.serial('Admin support unread alerts', () => {
       expect(firstCronResponse.status()).toBe(200);
       const firstCronBody = await firstCronResponse.json() as Record<string, unknown>;
       expect(firstCronBody.success).toBe(true);
+      expect(firstCronBody.claimedCount).toBe(1);
+      expect(Number(firstCronBody.alertedCount)).toBeGreaterThanOrEqual(2);
+      expect(Number(firstCronBody.emailedCount)).toBeGreaterThanOrEqual(2);
 
       await expect.poll(async () => countAdminAlerts(recipientIds), {
         timeout: 15000,
@@ -545,6 +548,17 @@ test.describe.serial('Admin support unread alerts', () => {
       expect(thirdCronResponse.status()).toBe(200);
       const thirdCronBody = await thirdCronResponse.json() as Record<string, unknown>;
       expect(thirdCronBody.success).toBe(true);
+      expect(thirdCronBody.claimedCount).toBe(1);
+      expect(Number(thirdCronBody.alertedCount)).toBeGreaterThanOrEqual(2);
+      expect(Number(thirdCronBody.emailedCount)).toBeGreaterThanOrEqual(2);
+
+      if (hasBatchTable) {
+        const restartedBatch = await readUnreadBatch(inquiryId);
+        expect(restartedBatch?.first_unread_message_id).toBeTruthy();
+        expect(restartedBatch?.first_unread_message_id).not.toBe(firstBatch?.first_unread_message_id);
+        expect(restartedBatch?.first_unread_message_at).toBeTruthy();
+        expect(restartedBatch?.first_unread_message_at).not.toBe(firstBatch?.first_unread_message_at);
+      }
 
       await expect.poll(async () => countAdminAlerts(recipientIds), {
         timeout: 15000,

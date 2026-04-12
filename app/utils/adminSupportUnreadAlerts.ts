@@ -62,6 +62,12 @@ type FallbackUnreadBatchCandidate = {
   preview: string | null;
 };
 
+type InquiryUnreadWaveIdentity = {
+  inquiryId: Identifier;
+  firstUnreadMessageId: Identifier;
+  firstUnreadMessageAt: string | null;
+};
+
 const UNREAD_BATCH_TABLE = 'admin_support_unread_alert_batches';
 const UNREAD_BATCH_CLAIM_RPC = 'claim_due_admin_support_unread_alert_batches';
 const UNREAD_ALERT_IN_APP_AUDIT_ACTION = 'ADMIN_SUPPORT_UNREAD_ALERT_IN_APP_SENT';
@@ -159,6 +165,73 @@ function doesAuditMarkerMatchBatch(
     markerBatchStartedAt === batchStartedAt &&
     markerMessageId === String(firstUnreadMessageId)
   );
+}
+
+function getUnreadWaveIdentity(params: {
+  inquiryId: Identifier;
+  firstUnreadMessageId?: Identifier | null;
+  firstUnreadMessageAt?: string | null;
+}) {
+  const firstUnreadMessageId = normalizeIdentifier(params.firstUnreadMessageId);
+  if (!firstUnreadMessageId) return null;
+
+  return {
+    inquiryId: params.inquiryId,
+    firstUnreadMessageId,
+    firstUnreadMessageAt: normalizeIsoTimestamp(params.firstUnreadMessageAt),
+  } satisfies InquiryUnreadWaveIdentity;
+}
+
+function buildNewUnreadBatchWriteSet(params: {
+  messageId: Identifier;
+  messageCreatedAt: string;
+}) {
+  return {
+    is_active: true,
+    first_unread_message_id: params.messageId,
+    first_unread_message_at: params.messageCreatedAt,
+    last_unread_message_id: params.messageId,
+    last_unread_message_at: params.messageCreatedAt,
+    alert_due_at: addMinutes(params.messageCreatedAt, 10),
+    in_app_sent_at: null,
+    email_sent_at: null,
+    processing_started_at: null,
+  };
+}
+
+async function updateUnreadBatchForWave(params: {
+  supabaseAdmin: SupabaseAdminClient;
+  inquiryId: Identifier;
+  expectedWave?: InquiryUnreadWaveIdentity | null;
+  patch: Record<string, unknown>;
+}) {
+  const nextUpdatedAt = new Date().toISOString();
+
+  let query = params.supabaseAdmin
+    .from(UNREAD_BATCH_TABLE)
+    .update({
+      ...params.patch,
+      updated_at: nextUpdatedAt,
+    })
+    .eq('inquiry_id', params.inquiryId);
+
+  if (params.expectedWave) {
+    query = query.eq('first_unread_message_id', params.expectedWave.firstUnreadMessageId);
+
+    if (params.expectedWave.firstUnreadMessageAt) {
+      query = query.eq('first_unread_message_at', params.expectedWave.firstUnreadMessageAt);
+    } else {
+      query = query.is('first_unread_message_at', null);
+    }
+  }
+
+  const { data, error } = await query.select('inquiry_id');
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return { updated: Array.isArray(data) ? data.length > 0 : Boolean(data) };
 }
 
 async function insertUnreadAlertAuditMarker(params: {
@@ -467,27 +540,36 @@ async function claimDueAdminSupportUnreadAlertBatchesWithoutRpc(params: {
     return [] as InquiryUnreadBatchRow[];
   }
 
-  const inquiryIds = dueRows
-    .map((row) => row.inquiry_id)
-    .filter((value): value is Identifier => value !== null && value !== undefined);
+  const claimedRows: InquiryUnreadBatchRow[] = [];
 
-  const { error: updateError } = await supabaseAdmin
-    .from('admin_support_unread_alert_batches')
-    .update({
+  for (const row of dueRows) {
+    const wave = getUnreadWaveIdentity({
+      inquiryId: row.inquiry_id,
+      firstUnreadMessageId: row.first_unread_message_id,
+      firstUnreadMessageAt: row.first_unread_message_at,
+    });
+
+    const updateResult = await updateUnreadBatchForWave({
+      supabaseAdmin,
+      inquiryId: row.inquiry_id,
+      expectedWave: wave,
+      patch: {
+        processing_started_at: nowIso,
+      },
+    });
+
+    if (!updateResult.updated) {
+      continue;
+    }
+
+    claimedRows.push({
+      ...row,
       processing_started_at: nowIso,
       updated_at: nowIso,
-    })
-    .in('inquiry_id', inquiryIds);
-
-  if (updateError) {
-    throw new Error(updateError.message);
+    });
   }
 
-  return dueRows.map((row) => ({
-    ...row,
-    processing_started_at: nowIso,
-    updated_at: nowIso,
-  }));
+  return claimedRows;
 }
 
 export function buildAdminSupportUnreadAlertCopy(params: {
@@ -534,15 +616,10 @@ export async function startOrAdvanceAdminSupportUnreadBatch(params: {
       .from('admin_support_unread_alert_batches')
       .upsert({
         inquiry_id: params.inquiryId,
-        is_active: true,
-        first_unread_message_id: params.messageId,
-        first_unread_message_at: messageCreatedAt,
-        last_unread_message_id: params.messageId,
-        last_unread_message_at: messageCreatedAt,
-        alert_due_at: addMinutes(messageCreatedAt, 10),
-        in_app_sent_at: null,
-        email_sent_at: null,
-        processing_started_at: null,
+        ...buildNewUnreadBatchWriteSet({
+          messageId: params.messageId,
+          messageCreatedAt,
+        }),
         updated_at: new Date().toISOString(),
       });
 
@@ -579,6 +656,7 @@ export async function startOrAdvanceAdminSupportUnreadBatch(params: {
 export async function clearAdminSupportUnreadBatch(params: {
   supabaseAdmin?: SupabaseAdminClient;
   inquiryId: Identifier;
+  expectedWave?: InquiryUnreadWaveIdentity | null;
 }) {
   const supabaseAdmin = params.supabaseAdmin ?? createAdminClient();
 
@@ -611,9 +689,11 @@ export async function clearAdminSupportUnreadBatch(params: {
     return { success: true, cleared: false, remainingUnreadCount: count || 0 };
   }
 
-  const { error: clearError } = await supabaseAdmin
-    .from('admin_support_unread_alert_batches')
-    .update({
+  const clearResult = await updateUnreadBatchForWave({
+    supabaseAdmin,
+    inquiryId: inquiry.id,
+    expectedWave: params.expectedWave || null,
+    patch: {
       is_active: false,
       first_unread_message_id: null,
       first_unread_message_at: null,
@@ -623,12 +703,9 @@ export async function clearAdminSupportUnreadBatch(params: {
       in_app_sent_at: null,
       email_sent_at: null,
       processing_started_at: null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('inquiry_id', inquiry.id);
-
-  if (clearError) {
-    if (isMissingUnreadBatchInfraMessage(clearError.message)) {
+    },
+  }).catch((error) => {
+    if (error instanceof Error && isMissingUnreadBatchInfraMessage(error.message)) {
       return {
         success: true,
         cleared: false,
@@ -636,10 +713,18 @@ export async function clearAdminSupportUnreadBatch(params: {
         storage: 'audit-log-fallback',
       } as const;
     }
-    throw new Error(clearError.message);
+    throw error;
+  });
+
+  if ('storage' in clearResult) {
+    return clearResult;
   }
 
-  return { success: true, cleared: true, remainingUnreadCount: 0 };
+  return {
+    success: true,
+    cleared: clearResult.updated,
+    remainingUnreadCount: 0,
+  };
 }
 
 export async function processDueAdminSupportUnreadAlerts(params?: {
@@ -742,11 +827,18 @@ export async function processDueAdminSupportUnreadAlerts(params?: {
   let failureCount = 0;
 
   for (const row of safeClaimedRows) {
+    const claimedWave = getUnreadWaveIdentity({
+      inquiryId: row.inquiry_id,
+      firstUnreadMessageId: row.first_unread_message_id,
+      firstUnreadMessageAt: row.first_unread_message_at,
+    });
+
     const inquiry = inquiryMap.get(String(row.inquiry_id));
     if (!inquiry || !isAdminSupportInquiry(inquiry.type)) {
       await clearAdminSupportUnreadBatch({
         supabaseAdmin,
         inquiryId: row.inquiry_id,
+        expectedWave: claimedWave,
       });
       skippedCount += 1;
       continue;
@@ -767,6 +859,7 @@ export async function processDueAdminSupportUnreadAlerts(params?: {
       await clearAdminSupportUnreadBatch({
         supabaseAdmin,
         inquiryId: inquiry.id,
+        expectedWave: claimedWave,
       });
       skippedCount += 1;
       continue;
@@ -819,18 +912,22 @@ export async function processDueAdminSupportUnreadAlerts(params?: {
       rowFailed = true;
       console.error('[AdminSupportUnreadAlerts] failed to send unread alerts:', error);
     } finally {
-      const { error: releaseError } = await supabaseAdmin
-        .from('admin_support_unread_alert_batches')
-        .update({
+      const releaseResult = await updateUnreadBatchForWave({
+        supabaseAdmin,
+        inquiryId: row.inquiry_id,
+        expectedWave: claimedWave,
+        patch: {
           in_app_sent_at: nextInAppSentAt,
           email_sent_at: nextEmailSentAt,
           processing_started_at: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('inquiry_id', row.inquiry_id);
+        },
+      });
 
-      if (releaseError) {
-        throw new Error(releaseError.message);
+      if (!releaseResult.updated && claimedWave) {
+        console.warn(
+          '[AdminSupportUnreadAlerts] skipped release for superseded unread wave:',
+          claimedWave
+        );
       }
     }
 
