@@ -104,6 +104,14 @@
   service payment-method lock
   NicePay readiness / launch field / approval / notification contracts
 
+## Verified On 2026-04-12
+- `tests/e2e/165-card-payment-provider-cutover.spec.ts`
+- proxy NicePay notification route-level contract rerun passed
+- Included coverage:
+  proxy notification `orderId` lookup
+  proxy notification `providerTransactionId` fallback lookup
+  proxy notification idempotent replay
+
 ## Open Operational Checks
 - Confirm the actual NicePay notification registration model before production flip.
 - Confirm the real NicePay direct client key issuance path; the code requires a real `NEXT_PUBLIC_NICEPAY_CLIENT_KEY`.

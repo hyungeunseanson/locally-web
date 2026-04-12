@@ -32,6 +32,9 @@
   - cancel/refund direct contract rerun
     - `tests/e2e/119-proxy-notification-localization.spec.ts`
     - `3 passed (33.7s)` under `playwright.contracts.config.ts`
+  - proxy nicepay notification route-level rerun
+    - `tests/e2e/165-card-payment-provider-cutover.spec.ts`
+    - `6 passed (10.8s)` under `playwright.contracts.config.ts`
 - 이번 패스 핵심 결론
   - 전화 예약 도메인의 write/read source of truth는 현재 `proxy_requests`로 잘 고정되어 있다
   - 결제 상태 변경 owner도 `generic PATCH /api/proxy-bookings/[id]`가 아니라 전용 admin route / card callback 경계로 정리돼 있다
@@ -62,7 +65,7 @@
 | Chain | Source of truth | Current tests | Verdict | Notes |
 | --- | --- | --- | --- | --- |
 | 공개 진입 / 요청 생성 | `app/proxy-bookings/new/page.tsx`, `/api/proxy-bookings` | `86`, `88`, `87` | 정상 | category별 form_data, `service_fee_krw`, `linked_inquiry_id`, admin alert deep link가 현재 생성 시점에 함께 정리된다 |
-| 결제 확정 / 취소 / 환불 | `/api/proxy-bookings/payment/nicepay-callback`, `/api/proxy-bookings/payment/card-notification`, `/api/admin/proxy-bookings/*`, `proxyCardConfirmation.ts` | `74`, `165`, `119`, static audit | 부분 보장 | PortOne 운영 경계에서 notification route의 `202 ignored` contract는 rerun으로 다시 확인됐다. 수동 `confirm/cancel/refund` 뒤 고객 localized notification과 proxy row 상태 전이도 `119` direct rerun으로 다시 확인됐다. NicePay approval/notification helper와 proxy callback/notification의 shared finalize semantics도 static audit로 맞는다. 다만 proxy notification route 자체를 `CARD_PAYMENT_PROVIDER=nicepay` 상태에서 route-level로 직접 재실행한 건은 아직 없다 |
+| 결제 확정 / 취소 / 환불 | `/api/proxy-bookings/payment/nicepay-callback`, `/api/proxy-bookings/payment/card-notification`, `/api/admin/proxy-bookings/*`, `proxyCardConfirmation.ts` | `74`, `165`, `119`, static audit | 정상 | PortOne 운영 경계의 `202 ignored`, NicePay helper contract, proxy notification route의 `orderId / providerTransactionId fallback / idempotent replay`, 수동 `confirm/cancel/refund` 뒤 상태 전이와 localized notification까지 모두 rerun으로 다시 확인됐다 |
 | TEAM > 전화 예약 운영 | `PhoneReservationTab`, `/api/proxy-bookings/[id]`, `/api/proxy-bookings/[id]/comments` | `86`, reference `15`, `89`, `136` | 정상 | TEAM 탭의 결제 확인, 진행 상태 변경, 운영 답글 저장, 고객 inbox persisted visibility가 latest rerun 기준 green이다 |
 | 고객 self-service / 상세 | `app/proxy-bookings/page.tsx`, `app/proxy-bookings/[id]/page.tsx`, `/api/proxy-bookings/[id]` | `105`, `88` | 정상 | 목록 next-step copy, 상세 계좌 안내, message CTA, 결제/진행 상태 반영이 현재 truth와 맞는다 |
 | 알림 / localization | `proxyBookingNotifications.ts`, `/api/proxy-bookings/[id]/comments`, `buildLocalizedNotificationInsert` | `119` | 정상 | payment confirm / admin reply notification이 recipient locale 기준으로 저장된다 |
@@ -153,7 +156,8 @@
 - 이번 rerun 근거
   - `74-card-payment-precutover-contract`: 현재 운영 provider가 `portone`일 때 proxy notification route가 `202 ignored`로 inert하게 남는 것을 확인했다
   - `165-card-payment-provider-cutover`: NicePay approval/notification helper가 같은 provider env contract와 같은 금액 검증 의미를 공유하는 것을 확인했다
-- 따라서 현재 가장 정확한 해석은 “callback과 notification은 서로 다른 entrypoint이지만, proxy 쪽 write truth는 같은 finalize helper에 묶여 있다. 다만 NicePay provider 상태에서 proxy notification route 자체를 직접 때린 route-level rerun만 아직 남아 있다”이다
+  - 같은 `165`에서 proxy notification route 자체를 `CARD_PAYMENT_PROVIDER=nicepay` 상태로 직접 호출해 `orderId` 경로, `providerTransactionId` fallback, idempotent replay까지 확인했다
+- 따라서 현재 가장 정확한 해석은 “callback과 notification은 서로 다른 entrypoint이지만, proxy 쪽 write truth는 같은 finalize helper에 묶여 있고, notification route 경계도 provider-specific rerun으로 닫혔다”이다
 
 ### 8. 수동 결제 운영은 admin action owner와 고객 반영이 일관되다
 - `POST /api/admin/proxy-bookings/confirm-payment`
@@ -182,8 +186,7 @@
 - `POST /api/proxy-bookings`는 linked inquiry를 먼저 만들고, 그 다음 `proxy_requests`를 insert한다
   - insert 실패 cleanup은 있지만, 반대 방향의 orphan risk를 더 줄일지 여부는 이번 감사 범위 밖이다
 - `/api/proxy-bookings/payment/card-notification`은 provider가 `nicepay`가 아닐 때 `ignored: true`로 202 응답한다
-  - `74-card-payment-precutover-contract`로 현재 운영 provider 기준 inert contract는 확인됐다
-  - 다만 `CARD_PAYMENT_PROVIDER=nicepay` 상태에서 proxy route 자체를 직접 호출하는 route-level rerun은 아직 없다
+  - `74-card-payment-precutover-contract`로 현재 운영 provider 기준 inert contract를, `165-card-payment-provider-cutover`로 NicePay route-level dispatch를 각각 확인했다
 - `PhoneReservationTab`과 고객 상세는 linked inquiry가 있는 요청을 사실상 inbox 엔진으로 읽는데도, UI 라벨은 여전히 “전화 예약 (담당자 소통 스레드)”로 남아 있다
   - 제품 의미상 의도일 수 있으나, 운영/테스트 셀렉터 관점에서는 중복 텍스트 surface를 만들 가능성이 있다
 
@@ -193,23 +196,22 @@
   - `tests/e2e/16-admin-team-chat.spec.ts`
   - `tests/e2e/89-admin-team-mobile.spec.ts`
   - `tests/e2e/136-team-workspace-retention.spec.ts`
-- `card-notification` external callback path는 현재 운영 provider(`portone`) 기준으로는 rerun으로 닫혔지만, `nicepay` provider 상태의 proxy route-level dispatch는 아직 직접 재실행하지 않았다
+- app-owned `POST /api/proxy-bookings/payment/nicepay-callback` browser route는 proxy 전용 direct rerun보다 shared helper/static audit 근거 비중이 더 크다
 - cleanup된 missing row가 정확히 어떤 historical create path에서 생겼는지까지는 이번 문서에서 단정하지 않는다
 - `tests/e2e/105-proxy-booking-self-service.spec.ts`, `tests/e2e/119-proxy-notification-localization.spec.ts`는 모두 linked inquiry 기반 fixture를 사용한다
 - 즉 current close-out rerun 묶음과 운영 데이터 모두 `proxy_comments` legacy branch를 더 이상 active truth로 사용하지 않는다
 
 ## Follow-up Need
 - 1순위
-  - 운영 기준 urgent follow-up은 더 이상 route fallback 쪽이 아니다
-  - 문서상 남은 실제 결제 gap은 이제 하나다
-  - `CARD_PAYMENT_PROVIDER=nicepay` 상태의 proxy notification route-level contract
+  - 운영 기준 urgent follow-up은 더 이상 결제 notification 쪽이 아니다
+  - 필요하다면 다음 결제 후속은 app-owned `nicepay-callback` browser route를 proxy 전용으로 한 번 더 잠그는 정도다
 - 2순위
   - 필요하면 `proxy_comments` 테이블/cleanup code 자체를 남길지, schema/fixture 레벨까지 걷어낼지 별도 운영 결정을 내릴 수 있다
 - 3순위
-  - `card-notification` route를 provider cutover 이후에도 실제 운영 path로 쓸 계획이면 proxy-specific fixture를 둔 route-level rerun을 묶는 편이 안전하다
+  - proxy 운영 체인을 여기서 닫고 다음 감사 도메인으로 넘어가도 무리가 없다
 
 ## Final Verdict
 - 전화 예약(proxy) 운영 체인은 현재 `proxy_requests` 단일 source, 전용 결제 route, TEAM 운영 탭, 고객 self-service surface가 비교적 잘 정리돼 있다
-- latest close-out rerun과 payment notification boundary rerun 기준 핵심 non-live bundle은 모두 green이다
-- 따라서 현재 남은 것은 제품 breakage가 아니라 future NicePay cutover rehearsal에서만 의미가 커지는 route-level boundary gap이다
-- 이번 감사 기준 최종 판정은 `proxy core chain은 정상`, `proxy card notification 경계는 현재 운영 기준 정상에 가깝지만 future NicePay direct route rerun 전까지는 부분 보장으로 유지`가 가장 정확하다
+- latest close-out rerun, bank/card 운영 rerun, proxy NicePay notification route-level rerun 기준 핵심 non-live bundle은 모두 green이다
+- 따라서 현재 결론은 “proxy core chain과 payment notification boundary는 모두 정상”이 가장 정확하다
+- 남는 것은 제품 breakage가 아니라 선택적 depth 확장이나 다음 도메인 감사 우선순위다
