@@ -138,9 +138,8 @@
       - `161`는 admin support unread batch lifecycle이 현재 unread source와 side effect 의미를 유지한다는 근거다
       - 즉 `/api/admin/sidebar-counts`의 `csUnreadCount`가 current sidebar에 렌더되진 않더라도 unread source 자체가 깨진 상태는 아니다
   - drift
-    - `page.tsx` default fallback은 `APPROVALS`
-    - `Sidebar.tsx` fallback은 `APPS`
-    - 현재는 대부분 URL/localStorage가 덮어써서 치명적 증거는 없지만, alias drift로 남는다
+    - `page.tsx`, `Sidebar.tsx` default fallback은 모두 `APPROVALS`로 정렬됐다
+    - 남아 있는 hidden alias drift는 default mismatch가 아니라 direct query/localStorage의 `APPS`, `EXPS` compatibility path다
   - 판정: `의도된 제거`
 
 ### 2. Management: Approvals / Users
@@ -374,15 +373,15 @@
 - 해석
   - 현재 admin 도메인의 주 잔여 과제는 탭 본체 기능보다 stale sidebar contract 정리에 더 가깝다
 
-### 3. `APPROVALS` vs `APPS` fallback alias drift가 남아 있다
-- confirmed but low severity
+### 3. `APPROVALS` vs `APPS` default fallback drift는 닫혔고, hidden alias만 남아 있다
+- confirmed
 - 근거
   - `page.tsx` 기본 fallback은 `APPROVALS`
-  - `Sidebar.tsx` 내부 fallback은 `APPS`
+  - `Sidebar.tsx` 내부 fallback도 `APPROVALS`로 맞췄다
   - `page.tsx`는 `savedTab`이 있으면 복귀시키되, `SETTLEMENT`만 `SALES`로 먼저 정규화한다
-  - 따라서 hidden path 재진입 risk는 이제 `APPS`, `EXPS`에만 남는다
+  - 따라서 hidden path 재진입 risk는 이제 default mismatch가 아니라 `APPS`, `EXPS` direct alias에만 남는다
 - 영향
-  - 현재는 URL/localStorage가 대부분 덮어써서 즉시 재현 bug는 아니지만, shell contract를 흐리는 drift다
+  - shell default contract는 하나로 잠겼고, 다음 정리 대상도 더 분명해졌다
 
 ### 4. 비노출 레거시 surface는 성격이 둘로 갈린다
 - confirmed
@@ -412,8 +411,7 @@
   - `adminBadgeState.ts`는 지금 당장 제거 대상이 아니라, sidebar count 전용 부분과 탭 내부 viewed-state helper를 분리할지 검토하는 편이 안전하다
   - 다시 쓸 계획이 있으면 최소한 deprecated/dormant contract로 문서화하는 편이 안전하다
 - 3순위 후속 정리
-  - 1단계: `APPROVALS` / `APPS` fallback alias를 한쪽으로 통일
-  - 2단계: `APPS`, `EXPS` direct query/localStorage alias를 장기적으로 유지할지 차단할지 결정
+  - 1단계: `APPS`, `EXPS` direct query/localStorage alias를 장기적으로 유지할지 차단할지 결정
 - 현재 기준 즉시 제품 blocker는 아니다
   - 본문 탭 기능은 warmed rerun에서 green
   - 좌측 숫자 미노출도 현재 제품 의도와 일치한다

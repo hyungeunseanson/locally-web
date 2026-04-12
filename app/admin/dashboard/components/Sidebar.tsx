@@ -55,7 +55,7 @@ export default function Sidebar() {
   });
   const [currentUser, setCurrentUser] = useState<SidebarUser>(null);
 
-  const activeTab = urlTab || normalizeAdminDashboardTab(savedTab) || 'APPS';
+  const activeTab = urlTab || normalizeAdminDashboardTab(savedTab) || 'APPROVALS';
 
   useEffect(() => {
     const fetchCurrentUser = async () => {
