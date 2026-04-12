@@ -236,10 +236,6 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
         .on('postgres_changes', { event: '*', schema: 'public', table: 'proxy_requests' }, () => {
           scheduleRefresh();
         })
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'proxy_comments' }, (payload) => {
-          const requestId = typeof payload.new?.request_id === 'string' ? payload.new.request_id : null;
-          scheduleRefresh(requestId);
-        })
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'inquiry_messages' }, (payload) => {
           const linkedInquiryId = getProxyLinkedInquiryId(selectedRequestRef.current?.form_data);
           const payloadInquiryId = payload.new?.inquiry_id != null ? String(payload.new.inquiry_id) : null;

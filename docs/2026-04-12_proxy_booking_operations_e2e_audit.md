@@ -24,7 +24,7 @@
   - 전화 예약 도메인의 write/read source of truth는 현재 `proxy_requests`로 잘 고정되어 있다
   - 결제 상태 변경 owner도 `generic PATCH /api/proxy-bookings/[id]`가 아니라 전용 admin route / card callback 경계로 정리돼 있다
   - 현재 tracked 생성 경로는 새 요청마다 `linked_inquiry_id`를 함께 심고, linked inquiry가 없는 경우에만 `proxy_comments` fallback을 유지한다
-  - repo-wide static audit 기준 추가 tracked creator는 보이지 않았고, 남은 production 의존은 fallback read/write route와 `PhoneReservationTab`의 `proxy_comments` realtime 구독뿐이다
+  - repo-wide static audit 기준 추가 tracked creator는 보이지 않았고, `PhoneReservationTab`의 `proxy_comments` realtime 구독도 이번 패스에서 제거됐다
   - 최신 close-out rerun 기준 핵심 non-live bundle은 모두 green이다
   - `86-proxy-booking-team-workspace`도 현재는 page-wide text가 아니라 guest inbox thread persistence를 기준으로 검증되며 green 복구됐다
   - 따라서 현재 최종 판정은 `proxy core chain은 정상`, `남는 것은 boundary-only gap`이다
@@ -90,7 +90,7 @@
   - 결제 액션: `/api/admin/proxy-bookings/confirm-payment|cancel-payment|refund-payment`
   - 답글: `POST /api/proxy-bookings/[id]/comments`
   를 직접 사용한다
-- `proxy_requests` realtime과 `proxy_comments`, `inquiry_messages` INSERT를 함께 구독해서 선택된 요청 상세를 refresh한다
+- `proxy_requests` realtime과 linked inquiry의 `inquiry_messages` INSERT를 구독해서 선택된 요청 상세를 refresh한다
 - 결제 완료 전에는 `IN_PROGRESS` / `COMPLETED`로 못 넘어가도록 UI와 server guard가 둘 다 잠겨 있다
 
 ### 4. 고객 self-service는 “상세 유지 + 메시지함 병행” 의미로 정리돼 있다
@@ -127,11 +127,10 @@
 - 남은 production 의존은 다음 세 군데로 좁혀진다
   - `/api/proxy-bookings/[id]/comments`의 fallback write
   - `/api/proxy-bookings/[id]`의 fallback read
-  - `PhoneReservationTab`의 `proxy_comments` realtime subscription
 - 따라서 현재 결론은
   - “운영 데이터 정리”는 이미 끝났고
   - “테스트 fixture 현대화”도 끝났고
-  - 이제 실제 제거를 검토한다면 TEAM realtime 구독 정리 → route fallback 제거 순서로 가는 편이 가장 안전하다
+  - 이제 실제 제거를 검토한다면 route fallback 제거 자체를 별도 patch로 가는 편이 가장 안전하다
 
 ## Static Risk Notes
 - `POST /api/proxy-bookings`는 linked inquiry를 먼저 만들고, 그 다음 `proxy_requests`를 insert한다
@@ -154,10 +153,10 @@
 
 ## Follow-up Need
 - 1순위
-  - 제거로 간다면 `PhoneReservationTab`의 `proxy_comments` realtime subscription을 먼저 걷는 편이 가장 안전하다
-  - 현재 운영 데이터와 close-out rerun fixture 모두 linked inquiry 경로로 정리됐기 때문에, 이 구독은 가장 먼저 줄일 수 있는 production 잔여 의존이다
+  - 다음 제거 후보는 `/api/proxy-bookings/[id]`, `/api/proxy-bookings/[id]/comments`의 legacy read/write fallback이다
+  - 현재 운영 데이터와 close-out rerun fixture 모두 linked inquiry 경로로 정리됐기 때문에, 이제 남은 production 잔여 의존은 route fallback 자체다
 - 2순위
-  - 그 다음 `/api/proxy-bookings/[id]`, `/api/proxy-bookings/[id]/comments`의 legacy read/write fallback 제거를 separate patch로 가는 편이 안전하다
+  - 제거로 간다면 read path와 write path를 한 번에 지우지 말고, route contract test 보강 후 separate patch로 가는 편이 안전하다
 - 3순위
   - `card-notification` route를 provider cutover 이후에도 실제 운영 path로 쓸 계획이면 별도 contract rerun을 묶는 편이 안전하다
 
