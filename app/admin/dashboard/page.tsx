@@ -13,6 +13,7 @@ import MasterLedgerTab from './components/MasterLedgerTab';
 import TeamTab from './components/TeamTab';
 import ServiceAdminTab from './components/ServiceAdminTab';
 import AdminAlertsTab from './components/AdminAlertsTab';
+import { normalizeAdminDashboardTab } from './tabRouting';
 
 // Custom Hook
 import { useAdminUsersData } from './hooks/useAdminUsersData';
@@ -134,23 +135,33 @@ function AdminDashboardContent() {
   const [selectedItem, setSelectedItem] = useState<AdminPanelSelectedItem | null>(null);
   const searchParams = useSearchParams();
   const router = useRouter();
-  const urlTab = searchParams.get('tab')?.toUpperCase();
-  const savedTab = useSyncExternalStore(
+  const rawUrlTab = searchParams.get('tab');
+  const urlTab = normalizeAdminDashboardTab(rawUrlTab);
+  const storedTab = useSyncExternalStore(
     subscribeToAdminTabStorage,
     getStoredAdminTab,
     getServerStoredAdminTab
   );
-  const activeTab = urlTab || savedTab?.toUpperCase() || 'APPROVALS';
+  const savedTab = normalizeAdminDashboardTab(storedTab);
+  const activeTab = urlTab || savedTab || 'APPROVALS';
   const teamTab = searchParams.get('teamTab');
   const proxyRequestId = searchParams.get('proxyRequestId');
 
   useEffect(() => {
+    if (urlTab && rawUrlTab?.toUpperCase() !== urlTab) {
+      const nextParams = new URLSearchParams(searchParams.toString());
+      nextParams.set('tab', urlTab);
+      localStorage.setItem('admin_active_tab', urlTab);
+      router.replace(`/admin/dashboard?${nextParams.toString()}`);
+      return;
+    }
+
     if (urlTab) {
       localStorage.setItem('admin_active_tab', urlTab);
     } else if (savedTab) {
-      router.replace(`/admin/dashboard?tab=${savedTab.toUpperCase()}`);
+      router.replace(`/admin/dashboard?tab=${savedTab}`);
     }
-  }, [urlTab, savedTab, router]);
+  }, [rawUrlTab, router, savedTab, searchParams, urlTab]);
 
   return (
     <div className="bg-white p-2 md:p-6 rounded-lg md:rounded-2xl shadow-sm border border-slate-100 min-h-[80vh] flex flex-col h-full lg:h-auto overflow-hidden lg:overflow-visible">

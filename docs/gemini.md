@@ -16,6 +16,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 
 ### 2.1 Admin 구조
 - `page.tsx`: 뷰/탭 라우팅 (탭: APPROVALS/USERS/LEDGER/SALES/SERVICE_REQUESTS/ANALYTICS/CHATS/TEAM/ALERTS)
+- 관리자 대시보드의 legacy `SETTLEMENT` query/localStorage 값은 더 이상 독립 화면을 열지 않고 official `SALES` tab으로 정규화한다. 반면 `APPS`/`EXPS`는 아직 `APPROVALS` 내부 호환 alias로 유지된다.
 - 관리자 대시보드의 레거시 공통 훅 `hooks/useAdminData.ts`는 제거되었고, 탭별 경량 훅/전용 admin API(`useAdminApprovalsData`, `useAdminUsersData`, `/api/admin/*`)가 단일 source다.
 - `hooks/useServiceAdminData.ts`: service_bookings 전용 독립 훅 (v3.9.0 신설, v3.9.3부터 `/api/admin/service-bookings` 경유)
 - `components/ServiceAdminTab.tsx`: 맞춤 의뢰 관리 탭 — 전체 의뢰 / 정산 대기 / 취소·환불 내역 (v3.9.0 신설)

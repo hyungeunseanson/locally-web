@@ -166,4 +166,22 @@ test.describe.serial('Admin sidebar smoke', () => {
     const alertsButton = page.getByRole('button', { name: /Admin Alerts/i });
     await expect(alertsButton).toHaveText('Admin Alerts', { timeout: 15000 });
   });
+
+  test('normalizes the legacy SETTLEMENT tab query to the official SALES tab', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const adminUser = createAdminUser();
+    await createAuthUser(adminUser);
+
+    await login(page, adminUser);
+    await page.goto('/admin/dashboard?tab=SETTLEMENT', { waitUntil: 'domcontentloaded' });
+
+    await expect
+      .poll(() => new URL(page.url()).searchParams.get('tab'))
+      .toBe('SALES');
+
+    await expect
+      .poll(() => page.evaluate(() => window.localStorage.getItem('admin_active_tab')))
+      .toBe('SALES');
+  });
 });

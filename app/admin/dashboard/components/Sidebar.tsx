@@ -5,6 +5,7 @@ import Link from 'next/link';
 import React, { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
+import { normalizeAdminDashboardTab } from '../tabRouting';
 import {
   Users, CheckCircle2, MessageSquare,
   BarChart2, CreditCard, LayoutDashboard,
@@ -43,7 +44,8 @@ export default function Sidebar() {
   const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
 
-  const urlTab = searchParams.get('tab')?.toUpperCase();
+  const rawUrlTab = searchParams.get('tab');
+  const urlTab = normalizeAdminDashboardTab(rawUrlTab);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [savedTab] = useState<string | null>(() => {
     if (typeof window === 'undefined') {
@@ -53,7 +55,7 @@ export default function Sidebar() {
   });
   const [currentUser, setCurrentUser] = useState<SidebarUser>(null);
 
-  const activeTab = urlTab || savedTab || 'APPS';
+  const activeTab = urlTab || normalizeAdminDashboardTab(savedTab) || 'APPS';
 
   useEffect(() => {
     const fetchCurrentUser = async () => {
