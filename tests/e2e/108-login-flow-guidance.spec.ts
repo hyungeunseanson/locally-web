@@ -36,9 +36,6 @@ test.describe('Login flow guidance', () => {
       /로그인하면 바로 이어서 진행할 수 있어요|You can continue right away after login|ログインするとすぐに続けられます|登录后可以立刻继续/
     );
     await expect(page.getByTestId('login-modal-flow-hint')).toContainText(
-      /로그인하고 계속 진행해요|Log in to continue|ログインして続けましょう|登录后继续/
-    );
-    await expect(page.getByTestId('login-modal-flow-hint')).toContainText(
       /로그인 후 지금 보던 화면으로 돌아가 바로 이어서 진행해요|After login, you will return to the screen you were viewing and continue right away|ログイン後は、今見ていた画面に戻ってそのまま続けられます|登录后会回到刚才的页面，直接继续操作/
     );
     await expect(page.getByTestId('login-modal-social-return-hint')).toBeVisible();
