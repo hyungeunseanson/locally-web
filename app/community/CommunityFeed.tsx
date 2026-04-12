@@ -70,22 +70,29 @@ function EmptyState({
     const writeHref = `/community/write?${writeParams.toString()}`;
     const isSearchMode = Boolean(query.trim());
     const showWriteButton = !isSearchMode && (!isLocallyPickFormat(format) || canWriteLocallyContent);
+    const emptyTitle = isSearchMode
+        ? '검색 결과가 없어요'
+        : isLocallyPickFormat(format)
+            ? '아직 콘텐츠가 없어요'
+            : '아직 게시글이 없어요';
+    const emptyDescription = isSearchMode
+        ? '다른 키워드나 정렬로 다시 찾아보세요.'
+        : isLocallyPickFormat(format)
+            ? '첫 콘텐츠를 발행해 허브를 채워보세요.'
+            : '첫 글의 주인공이 되어보세요!';
+    const writeButtonLabel = isLocallyPickFormat(format) ? '로컬리 콘텐츠 작성' : '글 작성하기';
 
     return (
         <div className="bg-white rounded-2xl p-12 flex flex-col items-center justify-center border border-dashed border-gray-300 text-center">
             <MessageSquareDashed className="w-12 h-12 text-gray-300 mb-4" strokeWidth={1.5} />
-            <p className="text-gray-500 font-semibold text-[16px] mb-1">
-                {isSearchMode ? '검색 결과가 없어요' : '아직 게시글이 없어요'}
-            </p>
-            <p className="text-gray-400 text-sm mb-6">
-                {isSearchMode ? '다른 키워드나 정렬로 다시 찾아보세요.' : '첫 글의 주인공이 되어보세요!'}
-            </p>
+            <p className="text-gray-500 font-semibold text-[16px] mb-1">{emptyTitle}</p>
+            <p className="text-gray-400 text-sm mb-6">{emptyDescription}</p>
             {showWriteButton && (
                 <Link
                     href={writeHref}
                     className="px-6 py-2.5 bg-[#111111] text-white text-[14px] font-bold rounded-full hover:bg-black active:scale-95 transition-all shadow-[0_10px_22px_rgba(15,23,42,0.14)]"
                 >
-                    글 작성하기
+                    {writeButtonLabel}
                 </Link>
             )}
         </div>

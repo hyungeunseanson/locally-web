@@ -15,7 +15,7 @@ export const COMMUNITY_HUB_META: Record<CommunityHub, CommunityHubMeta> = {
     label: '도쿄',
     shortLabel: '도쿄',
     eyebrow: 'TOKYO',
-    description: '첫 일본 여행 질문이 가장 많이 모이는 허브',
+    description: '첫 일본 여행 동선과 로컬 추천을 먼저 모아보는 허브',
     accentClassName: 'from-rose-100 via-white to-amber-50 border-rose-200',
   },
   osaka_kyoto: {
@@ -23,7 +23,7 @@ export const COMMUNITY_HUB_META: Record<CommunityHub, CommunityHubMeta> = {
     label: '오사카·교토',
     shortLabel: '오사카·교토',
     eyebrow: 'OSAKA · KYOTO',
-    description: '동선과 맛집, 당일치기 고민이 가장 많은 허브',
+    description: '동선, 맛집, 근교 루트를 한 번에 훑어보는 허브',
     accentClassName: 'from-orange-100 via-white to-amber-50 border-orange-200',
   },
   fukuoka: {
@@ -31,7 +31,7 @@ export const COMMUNITY_HUB_META: Record<CommunityHub, CommunityHubMeta> = {
     label: '후쿠오카',
     shortLabel: '후쿠오카',
     eyebrow: 'FUKUOKA',
-    description: '혼행, 근교, 주말 동행 수요가 빠르게 도는 허브',
+    description: '주말 여행, 근교 코스, 먹거리 콘텐츠가 모이는 허브',
     accentClassName: 'from-emerald-100 via-white to-lime-50 border-emerald-200',
   },
   jp_other: {
@@ -47,7 +47,7 @@ export const COMMUNITY_HUB_META: Record<CommunityHub, CommunityHubMeta> = {
     label: '서울',
     shortLabel: '서울',
     eyebrow: 'SEOUL',
-    description: '방한 여행자와 로컬이 만나는 도시 허브',
+    description: '방한 여행자에게 필요한 서울 로컬 콘텐츠를 모은 허브',
     accentClassName: 'from-violet-100 via-white to-fuchsia-50 border-violet-200',
   },
   busan: {
@@ -55,7 +55,7 @@ export const COMMUNITY_HUB_META: Record<CommunityHub, CommunityHubMeta> = {
     label: '부산',
     shortLabel: '부산',
     eyebrow: 'BUSAN',
-    description: '바다, 카페, 당일 이동 팁이 강한 허브',
+    description: '바다, 카페, 당일 코스 추천이 강한 허브',
     accentClassName: 'from-cyan-100 via-white to-blue-50 border-cyan-200',
   },
   jeju: {

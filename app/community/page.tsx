@@ -346,8 +346,8 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
                                         <MessageCircle size={18} className="text-slate-500" />
                                     </div>
                                     <div>
-                                        <p className="text-[12px] font-semibold text-slate-800 md:text-[14px]">커뮤니티 기능 오픈 준비 중</p>
-                                        <p className="text-[11px] text-slate-500 md:text-[13px]">질문 · 동행 · 여행 꿀팁 탭이 곧 열립니다</p>
+                                        <p className="text-[12px] font-semibold text-slate-800 md:text-[14px]">로컬리 콘텐츠 허브 운영 중</p>
+                                        <p className="text-[11px] text-slate-500 md:text-[13px]">도시별 루트, 맛집, 현지 추천 콘텐츠를 먼저 공개하고 있습니다.</p>
                                     </div>
                                 </div>
                             )}
@@ -409,7 +409,7 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
                 <Link
                     href={writeHref}
                     className="fixed bottom-20 right-4 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-[#111111] text-white shadow-[0_14px_28px_rgba(15,23,42,0.18)] transition-all hover:bg-black active:scale-95 lg:hidden"
-                    aria-label="글쓰기"
+                    aria-label={!COMMUNITY_OPEN ? '로컬리 콘텐츠 작성' : '글쓰기'}
                 >
                     <Edit3 size={20} strokeWidth={2.5} />
                 </Link>

@@ -158,7 +158,9 @@ test.describe.serial('Community content layout and access', () => {
     await page.setViewportSize({ width: 1440, height: 1200 });
     await page.goto('/community?category=locally_content', { waitUntil: 'networkidle' });
 
-    await expect(page.getByRole('button', { name: '커뮤니티 글쓰기' })).toHaveCount(0);
+    await expect(page.getByText('로컬리 콘텐츠 허브 운영 중')).toBeVisible();
+    await expect(page.getByText('도시별 루트, 맛집, 현지 추천 콘텐츠를 먼저 공개하고 있습니다.')).toBeVisible();
+    await expect(page.getByRole('button', { name: '로컬리 콘텐츠 작성' })).toHaveCount(0);
 
     const communityDetailHrefs = await page.locator('a[href*="/community/"]').evaluateAll((elements) =>
       elements
@@ -185,9 +187,10 @@ test.describe.serial('Community content layout and access', () => {
     await page.setViewportSize({ width: 1440, height: 1200 });
     await page.goto('/community?category=locally_content', { waitUntil: 'networkidle' });
 
-    await expect(page.getByRole('button', { name: '커뮤니티 글쓰기' })).toBeVisible();
-    await page.getByRole('button', { name: '커뮤니티 글쓰기' }).click();
+    await expect(page.getByRole('button', { name: '로컬리 콘텐츠 작성' })).toBeVisible();
+    await page.getByRole('button', { name: '로컬리 콘텐츠 작성' }).click();
     await expect.poll(() => page.url()).toContain('/community/write?category=locally_content');
+    await expect(page.getByRole('heading', { name: '로컬리 콘텐츠 작성' })).toBeVisible();
     await expect(page.getByTestId('community-content-editorial-checklist')).toBeVisible();
     await expect(page.getByText('대표 이미지 1장 이상')).toBeVisible();
     await expect(page.getByText('제목 8자 이상')).toBeVisible();

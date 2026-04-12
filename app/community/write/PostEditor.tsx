@@ -121,6 +121,10 @@ export default function PostEditor({
         && selectedHub
         && (!isCompanion || (companionDate && companionCity.trim()))
     );
+    const editorTitle = isLocallyPick ? '로컬리 콘텐츠 작성' : '커뮤니티 글쓰기';
+    const editorSubtitle = isLocallyPick
+        ? '검색 유입용 공개 콘텐츠를 발행하기 전에 핵심 정보와 품질을 함께 점검합니다.'
+        : '도시 허브와 포맷을 먼저 고르면 1분 안에 올릴 수 있습니다.';
 
     useEffect(() => {
         if (format === 'locally_pick' && isAnonymous) {
@@ -324,8 +328,8 @@ export default function PostEditor({
                     </button>
 
                     <div className="text-center">
-                        <h1 className="text-[18px] font-semibold text-slate-900 md:text-[22px]">커뮤니티 글쓰기</h1>
-                        <p className="mt-1 hidden text-[13px] text-slate-500 md:block">도시 허브와 포맷을 먼저 고르면 1분 안에 올릴 수 있습니다.</p>
+                        <h1 className="text-[18px] font-semibold text-slate-900 md:text-[22px]">{editorTitle}</h1>
+                        <p className="mt-1 hidden text-[13px] text-slate-500 md:block">{editorSubtitle}</p>
                     </div>
 
                     <button

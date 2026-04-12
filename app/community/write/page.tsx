@@ -6,12 +6,14 @@ import { createClient } from '@/app/utils/supabase/server';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { getCurrentLocale } from '@/app/utils/locale';
 import type { CommunityCategory } from '@/app/types/community';
-import { getCommunityCategoryFromFormat } from '../categoryMeta';
+import { COMMUNITY_OPEN, getCommunityCategoryFromFormat } from '../categoryMeta';
 import { resolveCommunityCategory, resolveCommunityFormat, resolveCommunityHub } from '../queryParams';
 
 export const metadata: Metadata = {
-    title: '글쓰기 - 커뮤니티 | Locally',
-    description: '로컬리 커뮤니티에 새로운 게시글이나 질문, 동행 구하기 글을 작성합니다.',
+    title: COMMUNITY_OPEN ? '글쓰기 - 커뮤니티 | Locally' : '로컬리 콘텐츠 작성 | Locally',
+    description: COMMUNITY_OPEN
+        ? '로컬리 커뮤니티에 새로운 게시글이나 질문, 동행 구하기 글을 작성합니다.'
+        : '관리자용 로컬리 콘텐츠 발행면입니다. 검색 노출용 콘텐츠를 작성하고 점검할 수 있습니다.',
     robots: { index: false, follow: false } // 글쓰기 페이지는 구글 검색에 노출될 필요 없음
 };
 

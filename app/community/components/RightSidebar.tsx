@@ -83,6 +83,9 @@ export default function RightSidebar({
     const showWriteButton = COMMUNITY_OPEN
         ? (!isLocallyContentCategory(category) || canWriteLocallyContent)
         : canWriteLocallyContent;
+    const writeButtonLabel = !COMMUNITY_OPEN || isLocallyContentCategory(category)
+        ? '로컬리 콘텐츠 작성'
+        : '커뮤니티 글쓰기';
     const writeParams = new URLSearchParams();
     writeParams.set('category', category);
     if (hub !== 'all') writeParams.set('hub', hub);
@@ -97,7 +100,7 @@ export default function RightSidebar({
                     className="w-full rounded-xl bg-[#111111] py-3.5 text-[15px] font-bold text-white shadow-[0_14px_28px_rgba(15,23,42,0.14)] transition-all duration-200 hover:bg-black active:scale-95 flex items-center justify-center gap-2"
                 >
                     <Edit3 size={17} strokeWidth={2.5} />
-                    커뮤니티 글쓰기
+                    {writeButtonLabel}
                 </Link>
             )}
 
