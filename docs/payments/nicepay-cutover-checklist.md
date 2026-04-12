@@ -106,8 +106,12 @@
 
 ## Verified On 2026-04-12
 - `tests/e2e/165-card-payment-provider-cutover.spec.ts`
-- proxy NicePay notification route-level contract rerun passed
+- proxy NicePay callback + notification route-level contract rerun passed
 - Included coverage:
+  proxy callback unauthenticated guard
+  proxy callback owner guard
+  proxy callback idempotent replay
+  proxy callback route-level confirmation
   proxy notification `orderId` lookup
   proxy notification `providerTransactionId` fallback lookup
   proxy notification idempotent replay

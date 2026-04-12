@@ -2,8 +2,9 @@ import crypto from 'crypto';
 import { readFileSync } from 'fs';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
+import { POST as proxyNicePayCallbackPost } from '@/app/api/proxy-bookings/payment/nicepay-callback/route';
 import { POST as proxyCardNotificationPost } from '@/app/api/proxy-bookings/payment/card-notification/route';
 import * as proxyBookingNotifications from '@/app/utils/proxyBookingNotifications';
 import {
@@ -13,6 +14,7 @@ import {
   verifyCardPaymentNotification,
   readCardPaymentNotificationRequest,
 } from '@/app/utils/payments/card/server';
+import * as supabaseServerModule from '@/app/utils/supabase/server';
 
 const NICEPAY_STATUS_QUERY_URL = 'https://pg-api.nicepay.co.kr/webapi/common/trans_status.jsp';
 const TEST_PASSWORD = 'LocallyTest!2026';
@@ -231,6 +233,17 @@ async function createProxyRequestFixture(params: {
   };
 }
 
+async function login(page: Page, user: TestUser) {
+  await page.goto('/login', { waitUntil: 'networkidle' });
+
+  await page.locator('input[type="email"]').fill(user.email);
+  await page.locator('input[type="password"]').fill(user.password);
+  await page.locator('button[type="submit"]').click();
+
+  await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 15000 });
+  await page.waitForLoadState('networkidle');
+}
+
 function withNicePayEnv() {
   process.env.CARD_PAYMENT_PROVIDER = 'nicepay';
   process.env.NICEPAY_MID = 'nicepay-test-mid';
@@ -277,6 +290,73 @@ test.afterAll(async () => {
 });
 
 test.describe('Card payment provider cutover contracts', () => {
+  test('rejects unauthenticated proxy callback attempts', async ({ request }) => {
+    const response = await request.post('/api/proxy-bookings/payment/nicepay-callback', {
+      data: {
+        orderId: 'LOCALLY-PROXY-UNAUTH-TEST',
+      },
+    });
+
+    expect(response.status()).toBe(401);
+  });
+
+  test('blocks proxy callback confirmation from a different logged-in user', async ({ page }) => {
+    ensureSupabaseEnv();
+
+    const owner = createUser('proxy-callback-owner');
+    const other = createUser('proxy-callback-other');
+    const ownerId = await createAuthUser(owner);
+    await createAuthUser(other);
+
+    const fixture = await createProxyRequestFixture({
+      userId: ownerId,
+      user: owner,
+      paymentStatus: 'WAITING',
+    });
+
+    await login(page, other);
+
+    const response = await page.request.post('/api/proxy-bookings/payment/nicepay-callback', {
+      data: {
+        approvalId: 'TX-TID-PROXY-CROSS-USER',
+        merchant_uid: fixture.orderId,
+        orderId: fixture.orderId,
+      },
+    });
+
+    expect(response.status()).toBe(403);
+  });
+
+  test('treats already completed proxy callbacks as idempotent', async ({ page }) => {
+    ensureSupabaseEnv();
+
+    const owner = createUser('proxy-callback-idempotent');
+    const ownerId = await createAuthUser(owner);
+
+    const fixture = await createProxyRequestFixture({
+      userId: ownerId,
+      user: owner,
+      paymentStatus: 'COMPLETED',
+      tid: 'TX-TID-PROXY-ALREADY-PROCESSED',
+    });
+
+    await login(page, owner);
+
+    const response = await page.request.post('/api/proxy-bookings/payment/nicepay-callback', {
+      data: {
+        approvalId: 'TX-TID-PROXY-ALREADY-PROCESSED',
+        merchant_uid: fixture.orderId,
+        orderId: fixture.orderId,
+      },
+    });
+
+    expect(response.status()).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      message: 'Already processed',
+    });
+  });
+
   test('requires the full NicePay credential bundle before the provider is ready', () => {
     process.env.CARD_PAYMENT_PROVIDER = 'nicepay';
     delete process.env.NICEPAY_MID;
@@ -645,6 +725,151 @@ test.describe('Card payment provider cutover contracts', () => {
       ]);
     } finally {
       global.fetch = originalFetch;
+      (proxyBookingNotifications as { notifyProxyPaymentEvent: typeof proxyBookingNotifications.notifyProxyPaymentEvent }).notifyProxyPaymentEvent =
+        originalNotifyProxyPaymentEvent;
+    }
+  });
+
+  test('processes proxy NicePay callback routes for the owning user and stays idempotent on replay', async () => {
+    ensureSupabaseEnv();
+    withNicePayEnv();
+
+    const guest = createUser('proxy-callback-direct');
+    const guestId = await createAuthUser(guest);
+    await setPreferredLocale(guestId, 'en');
+
+    const fixture = await createProxyRequestFixture({
+      userId: guestId,
+      user: guest,
+    });
+
+    const authToken = 'AUTH-TOKEN-PROXY-CALLBACK';
+    const amount = 4500;
+    const providerPayload = {
+      AuthResultCode: '0000',
+      AuthToken: authToken,
+      TxTid: 'TX-TID-PROXY-CALLBACK',
+      MID: process.env.NICEPAY_MID!,
+      Moid: fixture.orderId,
+      Amt: String(amount),
+      NextAppURL: 'https://webapi.nicepay.co.kr/webapi/pay_process.jsp',
+      PayMethod: 'CARD',
+      Signature: sha256Hex(
+        `${authToken}${process.env.NICEPAY_MID}${amount}${process.env.NICEPAY_MERCHANT_KEY}`
+      ),
+    };
+
+    const originalFetch = global.fetch;
+    const originalCreateServerClient = supabaseServerModule.createClient;
+    const originalNotifyProxyPaymentEvent = proxyBookingNotifications.notifyProxyPaymentEvent;
+    const capturedEvents: Array<{ event: string; requestId: string }> = [];
+
+    global.fetch = (async (input, init) => {
+      if (String(input) === 'https://webapi.nicepay.co.kr/webapi/pay_process.jsp') {
+        expect(init?.method).toBe('POST');
+        const body = new URLSearchParams(String(init?.body || ''));
+        expect(body.get('MID')).toBe(process.env.NICEPAY_MID);
+        expect(body.get('AuthToken')).toBe(authToken);
+        expect(body.get('Amt')).toBe(String(amount));
+
+        return new Response(
+          JSON.stringify({
+            ResultCode: '3001',
+            ResultMsg: 'Approval complete',
+            TID: 'TX-TID-PROXY-CALLBACK',
+            Moid: fixture.orderId,
+            Amt: String(amount),
+            PayMethod: 'CARD',
+            Signature: sha256Hex(
+              `TX-TID-PROXY-CALLBACK${process.env.NICEPAY_MID}${amount}${process.env.NICEPAY_MERCHANT_KEY}`
+            ),
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      return originalFetch(input, init);
+    }) as typeof fetch;
+
+    (supabaseServerModule as { createClient: typeof supabaseServerModule.createClient }).createClient =
+      (async () =>
+        ({
+          auth: {
+            getUser: async () => ({
+              data: { user: { id: guestId } },
+              error: null,
+            }),
+          },
+        }) as Awaited<ReturnType<typeof supabaseServerModule.createClient>>) as typeof supabaseServerModule.createClient;
+
+    (proxyBookingNotifications as { notifyProxyPaymentEvent: typeof proxyBookingNotifications.notifyProxyPaymentEvent }).notifyProxyPaymentEvent =
+      (async (params) => {
+        capturedEvents.push({
+          event: params.event,
+          requestId: params.request.id,
+        });
+      }) as typeof proxyBookingNotifications.notifyProxyPaymentEvent;
+
+    try {
+      const requestBody = {
+        approvalId: 'TX-TID-PROXY-CALLBACK',
+        merchant_uid: fixture.orderId,
+        orderId: fixture.orderId,
+        providerPayload,
+      };
+
+      const response = await proxyNicePayCallbackPost(
+        new Request('https://locally.example/api/proxy-bookings/payment/nicepay-callback', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody),
+        })
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({ success: true });
+
+      const { data: updatedRow, error: updatedRowError } = await getAdminClient()
+        .from('proxy_requests')
+        .select('payment_status, tid')
+        .eq('id', fixture.requestId)
+        .maybeSingle();
+
+      if (updatedRowError) throw updatedRowError;
+      expect(updatedRow).toMatchObject({
+        payment_status: 'COMPLETED',
+        tid: 'TX-TID-PROXY-CALLBACK',
+      });
+
+      expect(capturedEvents).toEqual([
+        {
+          event: 'confirmed',
+          requestId: fixture.requestId,
+        },
+      ]);
+
+      const replayResponse = await proxyNicePayCallbackPost(
+        new Request('https://locally.example/api/proxy-bookings/payment/nicepay-callback', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody),
+        })
+      );
+
+      expect(replayResponse.status).toBe(200);
+      await expect(replayResponse.json()).resolves.toMatchObject({
+        success: true,
+        message: 'Already processed',
+      });
+      expect(capturedEvents).toHaveLength(1);
+    } finally {
+      global.fetch = originalFetch;
+      (supabaseServerModule as { createClient: typeof supabaseServerModule.createClient }).createClient =
+        originalCreateServerClient;
       (proxyBookingNotifications as { notifyProxyPaymentEvent: typeof proxyBookingNotifications.notifyProxyPaymentEvent }).notifyProxyPaymentEvent =
         originalNotifyProxyPaymentEvent;
     }
