@@ -14,6 +14,10 @@
   - locale/test drift 보정 후 관련 subset: `9 passed`
   - host approval happy path 보강 subset: `3 passed`
   - revision resubmit UI 보강 subset: `8 passed`
+  - host dates classification subset
+    - `34-host-edit-and-dates-ui.spec.ts`: `1 failed / 1 did not run / 1 passed`
+    - `32-host-schedule-save.spec.ts`: `3 passed`
+    - `34` failing-case immediate rerun: `1 passed`
   - 최종 host non-live 묶음 재실행: `62 passed / 1 failed / 1 did not run`
 - 최종 판정
   - `호스트 진입/모드 전환`, `체험 edit/delete route`, `리뷰 write/reply`, `수익/정산/서비스 매칭`은 현재 기준 `정상`
@@ -175,7 +179,10 @@
     - `35` host detail delete UI는 confirm modal 2단계와 locale-aware selector 보정 후 최신 기준 green
     - 다만 `34` host dashboard dates UI는 최신 full bundle에서 아직 1건 남는다
       - 단독 실행은 통과했지만 latest full bundle과 `--repeat-each=3`에서는 간헐 실패가 재현됐다
+      - 이번 후속 분리 실행에서도 `34` 전체 파일 단독 재실행은 다시 `1 failed / 1 did not run / 1 passed`였고, 같은 failing case 즉시 재실행은 `1 passed`였다
+      - 따라서 현재 관측은 deterministic backend regression보다 interaction race 또는 test contract drift와 더 잘 맞는다
       - 현재 failure shape는 `POST /availability` 200 + success toast 이후에도 `07:00` row가 DB에서 조회되지 않는 형태다
+      - 같은 날 `32-host-schedule-save` route subset은 `3 passed`로 유지되어 availability diff/upsert/delete 경계는 계속 정상이다
       - failure snapshot에서는 저장 직전 선택 패널에 `10:00 / 11:00`만 남아 있어, backend write path보다 slot add interaction 또는 UI automation contract의 간헐 실패를 더 강하게 시사한다
 
 ### 4. 예약 / 문의 / 게스트 컨텍스트 / 리뷰 응대
@@ -221,13 +228,14 @@
    - source of truth
      - [app/host/experiences/[id]/dates/page.tsx](/Users/hyungeunseanson/Documents/서비스/locally-web/app/host/experiences/%5Bid%5D/dates/page.tsx:298)
    - 증상
-     - `tests/e2e/34-host-edit-and-dates-ui.spec.ts`의 schedule add/save 케이스가 단독 실행에서는 통과하지만, latest full bundle과 `--repeat-each=3`에서는 간헐 실패가 남는다
+     - `tests/e2e/34-host-edit-and-dates-ui.spec.ts`의 schedule add/save 케이스가 latest full bundle과 `--repeat-each=3`에서 간헐 실패했고, 이번 후속 분리 실행에서도 전체 파일 재실행은 다시 `1 failed / 1 did not run / 1 passed`였다
+     - 같은 failing case를 바로 다시 단독 실행하면 `1 passed`로 돌아와 deterministic regression보다는 interaction instability 패턴을 보였다
      - failure shape는 `POST /availability` 200 + success toast 이후에도 `07:00` row가 DB에서 조회되지 않는 형태다
      - failure snapshot에서는 저장 직전 우측 패널에 `10:00 / 11:00`만 남아 있어 `07:00` 추가 click이 반영되지 않은 상태가 관측됐다
    - 분류: `flaky ui contract gap`
    - severity: `low`
    - 이유
-     - `32` route contract는 green이라 server write integrity는 보장된다
+     - 같은 날 `32-host-schedule-save.spec.ts`가 `3 passed`로 재확인돼 server write integrity는 계속 보장된다
      - 현재 evidence는 backend write regression보다 slot add UI interaction 또는 test click/selector contract의 간헐 실패를 더 강하게 가리킨다
 
 ## Coverage Gaps
