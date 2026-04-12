@@ -12,10 +12,11 @@
   - 초기 host non-live 묶음: `55 passed / 5 failed / 4 did not run`
   - approval refresh 핀셋 수정 후 관련 subset: `6 passed`
   - locale/test drift 보정 후 관련 subset: `9 passed`
+  - host approval happy path 보강 subset: `3 passed`
   - 최종 host non-live 묶음 재실행: `62 passed / 1 failed / 1 did not run`
 - 최종 판정
   - `호스트 진입/모드 전환`, `체험 edit/delete route`, `리뷰 write/reply`, `수익/정산/서비스 매칭`은 현재 기준 `정상`
-  - `호스트 신청/승인 경계`는 submit route와 downstream reflection은 안정적이지만, admin approve happy path와 legacy alert 경로까지 합치면 현재 기준 `부분 보장`
+  - `호스트 신청/승인 경계`는 submit route, admin approve happy path, downstream reflection은 안정적이지만, revision 재제출 UI coverage와 legacy alert 경로까지 합치면 현재 기준 `부분 보장`
   - 초기 persistent findings 5건 중 `140`, `55`, `35`, `40`은 이번 패스에서 해소되었다
   - 현재 남은 것은 `호스트 신청/승인 경계 coverage gap`과 `34 host dates UI 분류 미완료`이며, 둘 다 `confirmed product regression`보다는 감사/계약 정밀화 성격이 더 강하다
 
@@ -31,6 +32,7 @@
   - `tests/e2e/36-host-register-submit.spec.ts`
   - `tests/e2e/38-host-profile-save.spec.ts`
   - `tests/e2e/129-host-profile-language-dedup.spec.ts`
+  - `tests/e2e/164-admin-host-approval-happy-path.spec.ts`
   - `tests/e2e/93-host-create-copy-layout.spec.ts`
   - `tests/e2e/32-host-schedule-save.spec.ts`
   - `tests/e2e/34-host-edit-and-dates-ui.spec.ts`
@@ -61,7 +63,7 @@
 | 체인 | source of truth | 현재 보장 테스트 | 판정 | 핵심 메모 |
 | --- | --- | --- | --- | --- |
 | 호스트 진입 / 랜딩 / 승인 상태 | `/become-a-host`, `AuthContext`, `ViewModeContext`, `/host/menu`, `/host/dashboard` | `109`, `97`, `98`, `140`, `141`, `55` | 정상 | approval refresh와 view mode persistence는 최신 기준 green |
-| 호스트 신청 / 재제출 / 승인 경계 | `/host/register`, `/api/host/register/submit`, `/api/admin/host-applications`, `updateAdminStatus()`, `AuthContext` | `36`, `97`, `07`, `98`, `140`, `141` | 부분 보장 | submit route는 안전하지만 admin approve happy path E2E와 legacy admin-alert dedupe는 비어 있다 |
+| 호스트 신청 / 재제출 / 승인 경계 | `/host/register`, `/api/host/register/submit`, `/api/admin/host-applications`, `updateAdminStatus()`, `AuthContext` | `36`, `97`, `07`, `98`, `140`, `141`, `164` | 부분 보장 | submit route와 admin approve happy path는 green, revision resubmit UI coverage와 legacy admin-alert dedupe는 비어 있다 |
 | 체험 작성 / 수정 / 삭제 / 일정 관리 | `/host/create`, `/api/host/experiences*`, `/host/experiences/[id]*` | `93`, `32`, `33`, `34`, `35`, `51`, `126` | 부분 보장 | delete/detail smoke는 회복됐고, `34`의 schedule add interaction만 간헐 실패가 남는다 |
 | 예약 / 문의 / 리뷰 응대 | `ReservationManager`, `InquiryChat`, `HostReviews`, `/api/host/start-chat`, `/api/host/guest-reviews`, `/api/host/reviews/reply` | `39`, `40`, `72`, `92`, `122` | 정상 | warning strip copy expectation까지 최신 기준 green |
 | 수익 / 정산 / 서비스 매칭 | `Earnings`, `/api/host/earnings/*`, `ServiceJobsTab`, service board/applications flow | `37`, `133`, `153`, `154`, `152`, `106`, `22`, `50`, `130`, `134` | 정상 | host earnings와 admin payout reflection은 현재 기준 정합적 |
@@ -113,6 +115,8 @@
     - `/host/register` ingress, step visibility, localized helper copy
   - `07`
     - admin approvals UI의 host application `revision` write와 `admin_comment` 저장
+  - `164`
+    - admin approvals UI의 host application `approved` happy path, `users.role='host'`, approval notification, host welcome overlay, dismiss read 처리
   - `98`, `140`, `141`
     - 승인 후 overlay, dashboard refresh, landing CTA refresh
 - 실제 결과
@@ -130,9 +134,9 @@
     - admin status write의 static contract는 일관된다
       - `approved`는 `users.role='host'`를 부여하고 `host_application_approved` 알림/이메일/audit log를 남긴다
       - `revision/rejected`는 `admin_comment`를 저장하고 localized notification/email을 남긴다
-    - 다만 세 가지 audit gap이 남는다
-      - host application `approved` happy path를 실제 admin UI 버튼으로 끝까지 검증하는 E2E는 없다
-        - `07`은 `revision`만 다루고, `98/140/141`은 DB row와 notification을 직접 심어 downstream reflection만 본다
+    - `164` 보강 후 admin approve happy path는 현재 기준 green이다
+      - admin approvals UI 버튼으로 승인하면 `host_applications.status='approved'`, `users.role='host'`, unread approval notification, host dashboard overlay까지 한 체인으로 이어진다
+    - 다만 두 가지 audit gap이 남는다
       - `revision` host application을 호스트가 다시 제출해 `pending`으로 되돌리는 UI 경로는 직접 E2E로 잠겨 있지 않다
         - 현재는 `36`의 rejected same-row 재제출과 submit route code로만 동등 semantics를 추론한다
       - legacy [app/api/host/register/admin-alert/route.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/api/host/register/admin-alert/route.ts:1)는 아직 살아 있어, 구형 client가 submit 뒤 추가 호출하면 admin alert 중복 적재 가능성이 남아 있다
@@ -222,7 +226,6 @@
   - `tests/e2e/03-live-host-signup-registration.spec.ts`
   - `tests/e2e/04-live-host-experience-create.spec.ts`
 - 호스트 신청/승인 경계의 non-live gap
-  - admin dashboard에서 host application `approved`를 실제로 눌러 `users.role`, notification/email, host overlay 반영까지 잇는 happy path E2E가 없다
   - `revision` host application을 호스트가 다시 제출해 `pending`으로 되돌리는 UI 경로는 직접 E2E로 잠겨 있지 않고, 현재는 `36`의 rejected same-row 재제출과 route code로만 추론된다
   - legacy `/api/host/register/admin-alert` 호출 중복에 대한 dedupe contract가 없다
 - 이전 `55`, `35`, `40`, `140`은 이번 패스에서 해소됐다
@@ -232,7 +235,7 @@
 - 즉시 후속 구현이 꼭 필요한 confirmed product risk는 현재 없다
 - 남은 후속 2건
   - host 신청/승인 경계
-    - 가장 안전한 다음 단계는 구현 변경보다 `admin approve happy path`와 `revision host resubmit` coverage를 먼저 보강하는 것이다
+    - 가장 안전한 다음 단계는 구현 변경보다 `revision host resubmit` coverage를 먼저 보강하는 것이다
     - legacy `admin-alert` route는 실제 구형 client 호출이 없다면 후속에서 제거하거나 dedupe guard를 넣는 편이 안전하다
   - `34-host-edit-and-dates-ui`
     - slot add interaction이 실제로 간헐 미반영되는지, 아니면 `07:00` 버튼 click/selected-state assert가 빠진 스펙 불안정성인지 분리 필요
@@ -240,7 +243,7 @@
 
 ## Final Verdict
 - 호스트 진입/모드 전환, 체험 create/edit/delete, 리뷰 응대, 수익/정산/서비스 매칭은 최신 기준 `정상`
-- 호스트 신청/승인 경계는 submit route와 downstream reflection은 안정적이지만, admin approve UI happy path와 legacy alert 경로까지 포함하면 최신 기준 `부분 보장`이다
+- 호스트 신청/승인 경계는 submit route, admin approve UI happy path, downstream reflection은 안정적이지만, revision 재제출 UI coverage와 legacy alert 경로까지 포함하면 최신 기준 `부분 보장`이다
 - 이전 감사의 핵심 product risk였던 `dashboard revision → approved refresh/overlay chain`은 이번 패스에서 해소됐다
 - 현재 남은 것은 `호스트 신청/승인 경계 coverage gap`과 `34 host dates UI 분류 미완료`다
 - 둘 다 성격상 `confirmed product bug`보다는 contract/coverage 정밀화 과제에 가깝다
