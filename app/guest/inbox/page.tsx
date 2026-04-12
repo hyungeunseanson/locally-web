@@ -527,7 +527,11 @@ function InboxContent() {
               </div>
 
               {/* 메시지 영역 */}
-              <div className="flex-1 overflow-y-auto px-2.5 md:px-5 py-2.5 md:py-4 space-y-2.5 md:space-y-4 bg-gray-50" ref={scrollRef}>
+              <div
+                data-testid="guest-inbox-message-thread"
+                className="flex-1 overflow-y-auto px-2.5 md:px-5 py-2.5 md:py-4 space-y-2.5 md:space-y-4 bg-gray-50"
+                ref={scrollRef}
+              >
                 {messages.map((msg) => {
                   const isMe = String(msg.sender_id) === String(currentUser?.id);
                   const isDeletedMessage = isDeletedInquiryMessage(msg.type);
