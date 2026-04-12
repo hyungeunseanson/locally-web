@@ -26,7 +26,7 @@
     - `좌측 카운트 계약`: `의도된 제거`
     - `비노출 surface`: `부분 보장`
       - `APPS / EXPS / SETTLEMENT`는 current sidebar에는 없지만 direct query/localStorage alias로는 아직 reachable한 hidden compatibility surface다
-      - `RealtimeTab / RealtimeBookings`는 current shell 어디에서도 소비되지 않는 import-orphan이며, 현 기준 삭제·보관 후보다
+      - `RealtimeTab / RealtimeBookings`는 zero-consumer orphan로 확인되어 이번 close-out에서 제거했다
 
 ## Test Execution
 - 대표 재실행 스펙
@@ -87,7 +87,7 @@
 | Service Requests | `useServiceAdminData`, `/api/admin/service-bookings`, `/api/admin/service-confirm-payment`, `/api/admin/service-cancel`, `/api/admin/service-payouts/mark-paid`, `ServiceAdminTab` | `10`, `132`, 이번 rerun `10` | 정상 | `ALL/SETTLEMENT/REFUND` 본체는 정상이고, sidebar pending count는 현재 제품에서 쓰지 않는다 |
 | Sales | `/api/admin/sales-summary`, `/api/admin/payout-queue`, `settleHostPayout`, `/api/admin/settlement-sync`, `SalesTab` | `08`, `130`, `134`, `155`, `156`, `157`, `158`, `160`, 이번 rerun `08` | 정상 | pending/completed 정산 view와 sync panel은 현재 유지 |
 | Analytics | `/api/admin/analytics-*`, `/api/admin/reviews`, `/api/admin/audit-logs`, `AnalyticsTab` | `09`, `70`, 이번 rerun `09` | 정상 | `business/host/reviews/logs` 탭 분기와 route 호출 의미는 유지 |
-| 비노출 / 레거시 surface | `ManagementTab`의 `SETTLEMENT`, `RealtimeTab`, `RealtimeBookings` | 별도 direct E2E 없음 | 부분 보장 | `APPS / EXPS / SETTLEMENT`는 hidden compatibility route, `Realtime*`는 current shell 미연결 orphan으로 성격이 갈린다 |
+| 비노출 / 레거시 surface | `ManagementTab`의 `SETTLEMENT` | 별도 direct E2E 없음 | 부분 보장 | 남아 있는 비노출 경계는 `APPS / EXPS / SETTLEMENT` hidden compatibility route뿐이며, orphan `Realtime*`는 제거 완료 |
 
 ## Chain-by-Chain Audit
 
@@ -322,8 +322,7 @@
 ### 5. 비노출·레거시·도달성 정리
 - 확인 대상
   - `app/admin/dashboard/components/ManagementTab.tsx`의 `SETTLEMENT` branch
-  - `app/admin/dashboard/components/RealtimeTab.tsx`
-  - `app/admin/dashboard/components/RealtimeBookings.tsx`
+  - legacy query/localStorage alias인 `APPS`, `EXPS`
 - 실제 결과
   - `ManagementTab` 내부에는 `activeTab === 'SETTLEMENT'` 분기가 남아 있다
   - `page.tsx`는 현재 운영 탭 9개 외의 값에 대해 `DataDrivenAdminTab`으로 fallback 한다
@@ -331,9 +330,10 @@
     - 같은 구조로 legacy alias인 `/admin/dashboard?tab=APPS`, `/admin/dashboard?tab=EXPS`도 여전히 direct reachability가 있다
   - `Sidebar.tsx`는 `APPROVALS` 버튼 active 판정에 `APPS`, `EXPS`를 여전히 포함한다
     - 즉 UI 노출은 `APPROVALS` 하나로 줄었지만, shell contract 차원에서는 alias drift가 아직 살아 있다
-  - 반면 `RealtimeTab`, `RealtimeBookings`는 저장소 검색 기준 current page/sidebar/컴포넌트 import graph에서 소비 흔적이 없다
-    - export는 남아 있지만 current shell 기준 import-orphan로 보는 편이 맞다
-    - 더 중요한 점은 `page.tsx`가 알 수 없는 `tab` 값을 받아도 `RealtimeTab`을 연결하지 않고 `DataDrivenAdminTab -> ManagementTab` fallback만 타므로, `/admin/dashboard?tab=REALTIME` 같은 수동 query로도 이 컴포넌트들이 열리지 않는다
+  - orphan close-out
+    - `RealtimeTab`, `RealtimeBookings`는 저장소 검색 기준 current page/sidebar/컴포넌트 import graph에서 소비 흔적이 없었고,
+    - `page.tsx`도 unknown `tab`에서 이들을 연결하지 않으므로 수동 query로도 직접 열리지 않았다
+    - 따라서 이번 패스에서 두 파일은 제거했다
   - 반면 `PhoneReservationTab`은 비노출 레거시가 아니라 `TEAM.proxy`의 active 운영 surface다
 - 판정
   - `SETTLEMENT`: hidden compatibility surface
@@ -341,10 +341,9 @@
     - 따라서 orphan 삭제 후보가 아니라 “유지할지 차단할지”를 별도로 결정해야 하는 숨은 진입면이다
   - `APPS`, `EXPS`: hidden compatibility alias
     - 공식 운영 탭은 아니지만 direct query/localStorage alias는 남아 있다
-    - 따라서 `APPROVALS`와 한 묶음의 호환 경로로 봐야 하며, `Realtime*`와 같이 삭제 판단하면 안 된다
-  - `RealtimeTab`, `RealtimeBookings`: 삭제·보관 후보
-    - current shell 기준 import consumer가 없고, 수동 query로도 직접 열리지 않는다
-    - 현 코드 기준 가장 안전한 정리는 “다음 정리 패스에서 별도 제거/보관 후보로 분리”다
+    - 따라서 `APPROVALS`와 한 묶음의 호환 경로로 봐야 하며, orphan 제거와 같이 다루면 안 된다
+  - orphan close-out: `RealtimeTab`, `RealtimeBookings`
+    - current shell 기준 import consumer가 없고, 수동 query로도 직접 열리지 않는다는 점을 확인한 뒤 제거 완료
 
 ## Confirmed Findings
 ### 1. 좌측 사이드바 숫자 계약은 현재 의도적으로 제거된 상태다
@@ -378,17 +377,17 @@
 - 근거
   - `ManagementTab.SETTLEMENT`는 `page.tsx`의 fallback 구조 때문에 `/admin/dashboard?tab=SETTLEMENT`로 direct reachability가 있다
   - `APPS`, `EXPS`도 같은 방식으로 legacy alias reachability가 남아 있다
-  - `RealtimeTab`, `RealtimeBookings`는 current shell 기준 import consumer가 보이지 않고, unknown `tab` query로도 이 컴포넌트가 직접 열리지 않는다
+  - `RealtimeTab`, `RealtimeBookings`는 current shell 기준 import consumer가 보이지 않고, unknown `tab` query로도 직접 열리지 않아 제거해도 운영 path에 영향이 없다
 - 영향
   - 후속 정리는 한 묶음으로 삭제하면 안 된다
   - `SETTLEMENT/APPS/EXPS`는 먼저 “숨은 진입면을 닫을지 유지할지” 결정이 필요하고,
-  - `Realtime*`는 현재 기준으로 가장 명확한 제거·보관 후보다
+  - orphan `Realtime*` 정리는 이번 패스에서 이미 닫았다
 
 ## Coverage Gaps
 - `15-admin-team`, `16-admin-team-chat`, `79`, `86`, `89`, `136`은 이번 패스에서 full rerun하지 않았다
   - `TeamTab` static audit과 `18` rerun으로 current plain-label intent는 이미 확인됐다
 - `SETTLEMENT/APPS/EXPS`는 static route reachability는 닫았지만, 실제 운영에서 의도적으로 허용한 deep link인지까지는 문서 근거가 약하다
-- `RealtimeTab`, `RealtimeBookings`는 현재 shell 기준 미연결 orphan라는 점은 닫았지만, 과거 왜 남겨졌는지에 대한 운영 메모는 저장소 안에서 찾지 못했다
+- orphan `Realtime*`를 왜 과거에 남겨뒀는지에 대한 운영 메모는 저장소 안에서 찾지 못했다
 
 ## Follow-up Need
 - 1순위 후속 정리
@@ -402,7 +401,6 @@
 - 3순위 후속 정리
   - `APPROVALS` / `APPS` fallback alias를 한쪽으로 통일
   - `SETTLEMENT`, `APPS`, `EXPS` direct query/localStorage alias를 유지할지 차단할지 결정
-  - `RealtimeTab`, `RealtimeBookings`는 current shell 기준 consumer가 없으므로 다음 정리 패스의 1순위 제거·보관 후보로 별도 분리 검토
 - 현재 기준 즉시 제품 blocker는 아니다
   - 본문 탭 기능은 warmed rerun에서 green
   - 좌측 숫자 미노출도 현재 제품 의도와 일치한다
