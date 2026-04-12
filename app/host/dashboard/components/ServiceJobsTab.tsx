@@ -12,16 +12,13 @@ import {
   isOpenServiceRequest,
 } from '@/app/constants/serviceStatus';
 import type { ServiceRequestCard, ServiceApplication } from '@/app/types/service';
+import { normalizeHostServiceJobsTab } from '@/app/host/dashboard/navigation';
 
 type SubTab = 'open' | 'applications';
 
 type ApplicationWithRequest = ServiceApplication & {
   service_requests?: Pick<ServiceRequestCard, 'id' | 'title' | 'city' | 'service_date' | 'duration_hours' | 'total_host_payout' | 'status'> | null;
 };
-
-function normalizeSubTab(value: string | null): SubTab {
-  return value === 'open' ? 'open' : 'applications';
-}
 
 export default function ServiceJobsTab() {
   const router = useRouter();
@@ -32,7 +29,7 @@ export default function ServiceJobsTab() {
   const [myApplications, setMyApplications] = useState<ApplicationWithRequest[]>([]);
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
-  const subTab = normalizeSubTab(searchParams.get('serviceTab'));
+  const subTab = normalizeHostServiceJobsTab(searchParams.get('serviceTab')) as SubTab;
 
   const handleSubTabChange = (nextTab: SubTab) => {
     if (nextTab === subTab) return;

@@ -17,6 +17,7 @@ import { useViewMode } from '@/app/context/ViewModeContext';
 import { usePendingNavigation } from '@/app/hooks/usePendingNavigation';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { getBookingHostPayout } from '@/app/utils/bookingFinance';
+import { getHostDashboardHref } from '@/app/host/dashboard/navigation';
 
 type MobileHostProfile = {
     avatar_url?: string | null;
@@ -57,6 +58,14 @@ export default function MobileHostMenu() {
     const { setGuestView } = useViewMode();
     const { t, lang } = useLanguage();
     const { notifications, unreadCount } = useNotification();
+    const reservationsHref = getHostDashboardHref('reservations');
+    const experiencesHref = getHostDashboardHref('experiences');
+    const inquiriesHref = getHostDashboardHref('inquiries');
+    const serviceJobsHref = getHostDashboardHref('service-jobs');
+    const earningsHref = getHostDashboardHref('earnings');
+    const reviewsHref = getHostDashboardHref('reviews');
+    const guidelinesHref = getHostDashboardHref('guidelines');
+    const profileHref = getHostDashboardHref('profile');
     const serviceUnread = notifications.some(
         (n) => !n.is_read && [
             'service_request_new', 'service_application_new',
@@ -194,8 +203,8 @@ export default function MobileHostMenu() {
                 <DashboardShortcutCard
                     title={t('host_menu_hosting_income')}
                     subtitle={earnings?.month || '-'}
-                    href="/host/dashboard?tab=earnings"
-                    isPending={pendingHref === '/host/dashboard?tab=earnings'}
+                    href={earningsHref}
+                    isPending={pendingHref === earningsHref}
                     disabled={isNavigating}
                     onNavigate={navigate}
                 >
@@ -206,8 +215,8 @@ export default function MobileHostMenu() {
                 <DashboardShortcutCard
                     title={t('host_menu_insights')}
                     subtitle={reviewSummary.count > 0 ? t('exp_review_count', { count: reviewSummary.count }) : t('exp_review_empty_title')}
-                    href="/host/dashboard?tab=reviews"
-                    isPending={pendingHref === '/host/dashboard?tab=reviews'}
+                    href={reviewsHref}
+                    isPending={pendingHref === reviewsHref}
                     disabled={isNavigating}
                     onNavigate={navigate}
                 >
@@ -225,19 +234,19 @@ export default function MobileHostMenu() {
 
             {/* ── 메뉴 그룹 1 ── */}
             <div className="px-5 mb-1">
-                <HostMenuItem href="/host/dashboard?tab=reservations" icon={<CalendarCheck size={17} />} label={t('nav_reservations')} isPending={pendingHref === '/host/dashboard?tab=reservations'} disabled={isNavigating} onNavigate={navigate} />
-                <HostMenuItem href="/host/dashboard?tab=experiences" icon={<LayoutList size={17} />} label={t('nav_manage')} isPending={pendingHref === '/host/dashboard?tab=experiences'} disabled={isNavigating} onNavigate={navigate} />
-                <HostMenuItem href="/host/dashboard?tab=inquiries" icon={<MessageSquare size={17} />} label={t('nav_messages')} isPending={pendingHref === '/host/dashboard?tab=inquiries'} disabled={isNavigating} onNavigate={navigate} />
-                <HostMenuItem href="/host/dashboard?tab=service-jobs" icon={<Briefcase size={17} />} label={t('host_menu_service_matching')} showDot={serviceUnread} isPending={pendingHref === '/host/dashboard?tab=service-jobs'} disabled={isNavigating} onNavigate={navigate} />
+                <HostMenuItem href={reservationsHref} icon={<CalendarCheck size={17} />} label={t('nav_reservations')} isPending={pendingHref === reservationsHref} disabled={isNavigating} onNavigate={navigate} />
+                <HostMenuItem href={experiencesHref} icon={<LayoutList size={17} />} label={t('nav_manage')} isPending={pendingHref === experiencesHref} disabled={isNavigating} onNavigate={navigate} />
+                <HostMenuItem href={inquiriesHref} icon={<MessageSquare size={17} />} label={t('nav_messages')} isPending={pendingHref === inquiriesHref} disabled={isNavigating} onNavigate={navigate} />
+                <HostMenuItem href={serviceJobsHref} icon={<Briefcase size={17} />} label={t('host_menu_service_matching')} showDot={serviceUnread} isPending={pendingHref === serviceJobsHref} disabled={isNavigating} onNavigate={navigate} />
             </div>
 
             <div className="my-3 mx-5 border-t border-gray-100" />
 
             {/* ── 메뉴 그룹 2 ── */}
             <div className="px-5 mb-1">
-                <HostMenuItem href="/host/dashboard?tab=earnings" icon={<CircleDollarSign size={17} />} label={t('host_menu_earnings')} isPending={pendingHref === '/host/dashboard?tab=earnings'} disabled={isNavigating} onNavigate={navigate} />
-                <HostMenuItem href="/host/dashboard?tab=reviews" icon={<Star size={17} />} label={t('host_menu_received_reviews')} isPending={pendingHref === '/host/dashboard?tab=reviews'} disabled={isNavigating} onNavigate={navigate} />
-                <HostMenuItem href="/host/dashboard?tab=guidelines" icon={<BookOpen size={17} />} label={t('host_menu_education')} isPending={pendingHref === '/host/dashboard?tab=guidelines'} disabled={isNavigating} onNavigate={navigate} />
+                <HostMenuItem href={earningsHref} icon={<CircleDollarSign size={17} />} label={t('host_menu_earnings')} isPending={pendingHref === earningsHref} disabled={isNavigating} onNavigate={navigate} />
+                <HostMenuItem href={reviewsHref} icon={<Star size={17} />} label={t('host_menu_received_reviews')} isPending={pendingHref === reviewsHref} disabled={isNavigating} onNavigate={navigate} />
+                <HostMenuItem href={guidelinesHref} icon={<BookOpen size={17} />} label={t('host_menu_education')} isPending={pendingHref === guidelinesHref} disabled={isNavigating} onNavigate={navigate} />
             </div>
 
             <div className="my-3 mx-5 border-t border-gray-100" />
@@ -245,11 +254,11 @@ export default function MobileHostMenu() {
             {/* ── 메뉴 그룹 3 ── */}
             <div className="px-5">
                 <HostMenuItem
-                    href="/host/dashboard?tab=profile"
+                    href={profileHref}
                     icon={<Settings size={17} />}
                     label={t('host_menu_profile_settings')}
                     badge={profileCompletion && profileCompletion.percent < 100 ? `${profileCompletion.percent}%` : null}
-                    isPending={pendingHref === '/host/dashboard?tab=profile'}
+                    isPending={pendingHref === profileHref}
                     disabled={isNavigating}
                     onNavigate={navigate}
                 />

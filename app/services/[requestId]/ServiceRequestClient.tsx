@@ -22,6 +22,7 @@ import { normalizeLanguageLevels, formatLanguageLevelLabel, getLanguageNames } f
 import { getHostPublicProfile } from '@/app/utils/profile';
 import type { ServiceRequest, ServiceApplicationWithProfile } from '@/app/types/service';
 import HostProfileModal from '@/app/experiences/[id]/components/HostProfileModal';
+import { getHostDashboardHref } from '@/app/host/dashboard/navigation';
 
 // ── 매칭 스텝 정의 (v2 에스크로) ────────────────────────────────
 const MATCHING_STEPS = [
@@ -131,7 +132,12 @@ export default function ServiceRequestDetailPage() {
         showToast(data.error || t('server_error'), 'error');
         return;
       }
-      router.push(data.redirectUrl || (isOwner ? `/guest/inbox?inquiryId=${data.inquiryId}` : `/host/dashboard?tab=inquiries&inquiryId=${data.inquiryId}`));
+      router.push(
+        data.redirectUrl ||
+          (isOwner
+            ? `/guest/inbox?inquiryId=${data.inquiryId}`
+            : getHostDashboardHref('inquiries', { inquiryId: data.inquiryId }))
+      );
     } catch {
       showToast(t('server_error'), 'error');
     } finally {

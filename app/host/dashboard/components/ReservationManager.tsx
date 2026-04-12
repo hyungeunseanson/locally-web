@@ -15,6 +15,7 @@ import {
   isCancelledBookingStatus,
   isPendingBookingStatus,
 } from '@/app/constants/bookingStatus';
+import { getHostDashboardHref } from '@/app/host/dashboard/navigation';
 import type { LocallyMembershipStatus } from '@/app/utils/memberStatus';
 
 // 컴포넌트
@@ -570,7 +571,14 @@ export default function ReservationManager() {
                 onApproveCancel={() => setPendingRefundBooking(res)}
                 onShowProfile={() => setSelectedGuest(res.guest || null)}
                 onCheck={() => markAsRead(res.id)}
-                onMessage={() => router.push(`/host/dashboard?tab=inquiries&guestId=${res.user_id}&expId=${res.experience_id || ''}`)}
+                onMessage={() =>
+                  router.push(
+                    getHostDashboardHref('inquiries', {
+                      guestId: res.user_id,
+                      expId: res.experience_id || undefined,
+                    })
+                  )
+                }
                 onCalendar={() => addToGoogleCalendar(res)}
                 // 🟢 [추가] 후기 관련 Props
                 hasReview={reviewedBookingIds.includes(String(res.id))}

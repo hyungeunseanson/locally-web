@@ -13,6 +13,10 @@ import { useViewMode } from '@/app/context/ViewModeContext';
 import { useLanguage } from '@/app/context/LanguageContext';
 import LoginModal from '@/app/components/LoginModal';
 import { usePendingNavigation } from '@/app/hooks/usePendingNavigation';
+import {
+    getHostDashboardHref,
+    normalizeHostDashboardTab,
+} from '@/app/host/dashboard/navigation';
 
 export default function BottomTabNavigation() {
     const pathname = usePathname();
@@ -22,7 +26,7 @@ export default function BottomTabNavigation() {
         pathname?.startsWith('/host/create') ||
         pathname?.startsWith('/host/register') ||
         pathname?.startsWith('/host/experiences/');
-    const activeHostTab = searchParams?.get('tab') || 'reservations';
+    const activeHostTab = normalizeHostDashboardTab(searchParams?.get('tab'));
     const { user } = useAuth();
     const { unreadCount, notifications } = useNotification();
     const avatarUrl = user?.user_metadata?.avatar_url;
@@ -164,25 +168,25 @@ export default function BottomTabNavigation() {
     const hostTabs = [
         {
             name: t('nav_reservations'),
-            href: '/host/dashboard?tab=reservations',
+            href: getHostDashboardHref('reservations'),
             requireAuth: true,
             icon: (isActive: boolean) => <CalendarCheck size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />
         },
         {
             name: t('nav_manage'),
-            href: '/host/dashboard?tab=experiences',
+            href: getHostDashboardHref('experiences'),
             requireAuth: true,
             icon: (isActive: boolean) => <LayoutList size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />
         },
         {
             name: t('nav_education'),
-            href: '/host/dashboard?tab=guidelines',
+            href: getHostDashboardHref('guidelines'),
             requireAuth: true,
             icon: (isActive: boolean) => <BookOpen size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />
         },
         {
             name: t('nav_messages'),
-            href: '/host/dashboard?tab=inquiries',
+            href: getHostDashboardHref('inquiries'),
             requireAuth: true,
             icon: (isActive: boolean) => <MessageSquare size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={2} />
         },
@@ -209,7 +213,8 @@ export default function BottomTabNavigation() {
         if (href === '/') return pathname === '/';
 
         if (href.startsWith('/host/dashboard?tab=')) {
-            const tabValue = href.split('tab=')[1];
+            const hrefValue = new URL(href, 'https://locally.invalid');
+            const tabValue = normalizeHostDashboardTab(hrefValue.searchParams.get('tab'));
             return pathname?.startsWith('/host/dashboard') && activeHostTab === tabValue;
         }
 

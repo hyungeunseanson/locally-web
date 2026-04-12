@@ -26,6 +26,11 @@ import GuidelinesTab from './components/GuidelinesTab'; // 🟢 필수 교육 �
 import ServiceJobsTab from './components/ServiceJobsTab';
 import { getHostPublicProfile, getProfileCompletion } from '@/app/utils/profile';
 import HostApprovalWelcomeOverlay from './components/HostApprovalWelcomeOverlay';
+import {
+  type HostDashboardTab,
+  getHostDashboardHref,
+  normalizeHostDashboardTab,
+} from './navigation';
 
 interface HostStatusSummary {
   id?: string | number | null;
@@ -56,7 +61,7 @@ function DashboardContent() {
   const { applicationStatus, refreshHostStatus } = useAuth();
   const serviceNotificationReadInFlightRef = useRef<Set<number>>(new Set());
   const markAsReadRef = useRef(markAsRead);
-  const [activeTab, setActiveTab] = useState('reservations');
+  const [activeTab, setActiveTab] = useState<HostDashboardTab>('reservations');
   const [hostStatus, setHostStatus] = useState<HostStatusSummary | null>(null);
   const [profile, setProfile] = useState<HostProfile | null>(null);
   const [experienceCount, setExperienceCount] = useState<number | null>(null);
@@ -77,9 +82,9 @@ function DashboardContent() {
   );
   const serviceUnread = unreadServiceNotificationIds.length > 0;
 
-  const handleTabChange = (tab: string) => {
+  const handleTabChange = (tab: HostDashboardTab) => {
     setActiveTab(tab);
-    router.push(`/host/dashboard?tab=${tab}`, { scroll: false });
+    router.push(getHostDashboardHref(tab), { scroll: false });
   };
 
   const handleMobileBack = () => {
@@ -182,8 +187,7 @@ function DashboardContent() {
   }, [router, supabase]);
 
   useEffect(() => {
-    const tab = searchParams.get('tab');
-    if (tab) setActiveTab(tab);
+    setActiveTab(normalizeHostDashboardTab(searchParams.get('tab')));
 
     void fetchData();
   }, [fetchData, searchParams]);

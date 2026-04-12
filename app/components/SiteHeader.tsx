@@ -29,6 +29,7 @@ import dynamic from 'next/dynamic';
 import LanguageSelector from './LanguageSelector'; // 🟢 [추가] 새로 만든 파일 불러오기
 import DesktopModeTransition from './DesktopModeTransition';
 import { fetchAdminAccess } from '@/app/utils/adminAccessClient';
+import { getHostDashboardHref } from '@/app/host/dashboard/navigation';
 
 
 // 🟢 LoginModal 동적 로딩 (SSR false)
@@ -57,6 +58,14 @@ function SiteHeaderContent() {
   const { t } = useLanguage();
   const router = useRouter();
   const pathname = usePathname();
+  const hostReservationsHref = getHostDashboardHref('reservations');
+  const hostExperiencesHref = getHostDashboardHref('experiences');
+  const hostInquiriesHref = getHostDashboardHref('inquiries');
+  const hostServiceJobsHref = getHostDashboardHref('service-jobs');
+  const hostEarningsHref = getHostDashboardHref('earnings');
+  const hostReviewsHref = getHostDashboardHref('reviews');
+  const hostGuidelinesHref = getHostDashboardHref('guidelines');
+  const hostProfileHref = getHostDashboardHref('profile');
 
   const handleLogoClick = (e: React.MouseEvent) => {
     if (pathname === '/') {
@@ -83,8 +92,8 @@ function SiteHeaderContent() {
 
   useEffect(() => {
     router.prefetch('/account');
-    router.prefetch('/host/dashboard?tab=reservations');
-  }, [router]);
+    router.prefetch(hostReservationsHref);
+  }, [hostReservationsHref, router]);
 
   useEffect(() => {
     return () => {
@@ -147,7 +156,7 @@ function SiteHeaderContent() {
 
     if (canUseHostView && (applicationStatus || isHost)) {
       setHostView();
-      startDesktopModeTransition('/host/dashboard?tab=reservations', 'host');
+      startDesktopModeTransition(hostReservationsHref, 'host');
     } else {
       router.push('/become-a-host');
     }
@@ -220,31 +229,31 @@ function SiteHeaderContent() {
                   {isHostView ? (
                     <>
                       <div className="py-2 border-b border-slate-100">
-                        <Link href="/host/dashboard?tab=reservations" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700 transition-colors">
+                        <Link href={hostReservationsHref} onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700 transition-colors">
                           <CalendarCheck size={18} /> {t('header_reservations')}
                         </Link>
-                        <Link href="/host/dashboard?tab=experiences" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700 transition-colors">
+                        <Link href={hostExperiencesHref} onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700 transition-colors">
                           <LayoutList size={18} /> {t('header_my_experiences')}
                         </Link>
-                        <Link href="/host/dashboard?tab=inquiries" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700 transition-colors">
+                        <Link href={hostInquiriesHref} onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700 transition-colors">
                           <MessageSquare size={18} /> {t('header_inquiries')}
                         </Link>
-                        <Link href="/host/dashboard?tab=service-jobs" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700 transition-colors">
+                        <Link href={hostServiceJobsHref} onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700 transition-colors">
                           <Briefcase size={18} /> {t('header_service_matching')}
                         </Link>
                       </div>
 
                       <div className="py-2 border-b border-slate-100">
-                        <Link href="/host/dashboard?tab=earnings" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700 transition-colors">
+                        <Link href={hostEarningsHref} onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700 transition-colors">
                           <CircleDollarSign size={18} /> {t('header_earnings')}
                         </Link>
-                        <Link href="/host/dashboard?tab=reviews" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700 transition-colors">
+                        <Link href={hostReviewsHref} onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700 transition-colors">
                           <Star size={18} /> {t('header_reviews')}
                         </Link>
-                        <Link href="/host/dashboard?tab=guidelines" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700 transition-colors">
+                        <Link href={hostGuidelinesHref} onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700 transition-colors">
                           <BookOpen size={18} /> {t('header_guidelines')}
                         </Link>
-                        <Link href="/host/dashboard?tab=profile" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700 transition-colors">
+                        <Link href={hostProfileHref} onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700 transition-colors">
                           <Settings size={18} /> {t('header_profile_settings')}
                         </Link>
                         <Link href="/community" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700 transition-colors">
