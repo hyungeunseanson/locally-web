@@ -173,13 +173,13 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 새 전화 예약 요청 생성 owner인 `/api/proxy-bookings`는 성공 직후 `adminAlertCenter`를 통해 관리자 인앱 alert + 관리자 이메일을 best-effort로 보낸다. deep link는 `/admin/dashboard?tab=TEAM&teamTab=proxy&proxyRequestId=...` 를 사용한다.
 - 전화 예약 결제 상태 변경 owner는 더 이상 `PATCH /api/proxy-bookings/[id]`가 아니다. 수동 결제 처리는 전용 admin route (`confirm-payment`, `cancel-payment`, `refund-payment`)만 사용하고, `PATCH /api/proxy-bookings/[id]`는 운영 상태 변경 전용으로 유지한다.
 - 전화 예약은 `payment_status`와 `status`를 분리 유지한다. `payment_status !== COMPLETED` 인 요청은 `IN_PROGRESS` 또는 `COMPLETED`로 진행 상태를 바꿀 수 없고, UI와 API 모두 같은 결제 게이트를 적용한다.
-- 전화 예약 운영 답글의 source of truth는 `/api/proxy-bookings/[id]/comments`다. linked inquiry가 있는 요청은 기존 `inquiries / inquiry_messages` 알림 흐름을 그대로 재사용하고, legacy 요청만 `proxy_comments` fallback을 유지한다.
+- 전화 예약 운영 답글의 source of truth는 `/api/proxy-bookings/[id]/comments`다. 현재 route는 linked inquiry가 연결된 요청만 허용하고, 답글 저장과 알림 흐름은 기존 `inquiries / inquiry_messages` 엔진을 그대로 재사용한다.
 - 전화 예약 입력 화면 `/proxy-bookings/new`는 서비스 안내 섹션과 5개 카테고리(식당, 숙소, 교통, 일반 문의, 분실물) JSON form을 단일 페이지에서 처리한다. DB 스키마는 늘리지 않고 `proxy_requests.form_data`를 계속 source of truth로 사용하며, category별 상세 양식과 `service_fee_krw`는 서버 생성 시점에 함께 저장한다.
 - 전화 예약 수수료는 helper `getProxyRequestFeeKrw()`를 단일 source로 유지한다. 기본 요금은 식당 4,500원, 숙소/교통/일반 문의 6,000원, 분실물 9,000원이며, 식당 카테고리만 `restaurant_service_option`으로 `0120/0570=8,000원`, `쿠이테이=9,000원` 특수 요금을 선택할 수 있다. 고객 상세와 admin `PhoneReservationTab`은 저장된 `service_fee_krw`를 우선 표시한다.
 - 전화 예약 상단 안내는 수수료 표를 따로 두지 않고, 일본 현지인 팀원이 직접 전화한다는 메시지를 강조한 소개 카드와 별도의 서비스 안내 카드로 상하 분리한다. 실제 가격 노출은 카테고리 선택 카드와 결제 섹션만 source of truth로 사용한다.
 - 식당 예약 양식은 체험 상세 예약 카드 톤앤매너를 참고한 커스텀 슬롯 picker로 1/2/3지망 일시를 모두 필수로 받고, `대체 식당 진행(1회 대체 동의)`을 결제 옵션이 아닌 form field로 처리한다. 숙소 양식은 `booking_platform`(예: Agoda, Booking.com)을 추가로 수집한다.
 - 새 전화 예약 요청은 생성 시점에 `admin_support` inquiry를 같이 만들고, `proxy_requests.form_data.linked_inquiry_id`로 연결한다. 고객은 `/proxy-bookings/[id]` 상세 대신 바로 `/guest/inbox?inquiryId=...` 로 이동해 담당자 소통 스레드에서 이어서 대화한다.
-- `TEAM > 전화 예약`은 계속 `proxy_requests`를 source of truth로 쓰되, linked inquiry가 있는 요청의 대화는 더 이상 `proxy_comments`가 아니라 기존 `inquiries / inquiry_messages`를 읽고 쓴다. 즉 전화 예약 탭은 요청 보드이고, 실제 고객 대화 엔진은 기존 문의함 하나로 통일한다.
+- `TEAM > 전화 예약`은 계속 `proxy_requests`를 source of truth로 쓰되, 대화는 기존 `inquiries / inquiry_messages`만 읽고 쓴다. 즉 전화 예약 탭은 요청 보드이고, 실제 고객 대화 엔진은 기존 문의함 하나로 통일한다.
 - 카드 환불을 위해 `proxy_requests`에는 `tid`, `paid_at`, `refunded_at` nullable 컬럼을 추가하는 migration 문서를 유지한다 (`docs/migrations/v3_39_15_proxy_request_payment_tracking.sql`). callback은 컬럼이 있는 환경에서 결제 추적 값을 저장하고, 컬럼이 아직 없는 환경에서는 `payment_status`만 fallback 갱신한다.
 - `TEAM`/`Audit Logs` 읽기 경로는 admin-only SELECT 정책 위에서 client Supabase 목록/realtime을 유지한다. server-only로 전면 전환하지 않고, write 봉쇄와 read 회귀 방지를 동시에 맞춘다.
 - `TEAM` 탭 진입 시 `last_viewed_team`을 현재 시각으로 갱신하고 `team-viewed` 이벤트를 발생시켜, 사이드바 `Team Workspace` 배지가 같은 탭 세션에서도 즉시 0으로 돌아가게 유지한다.

@@ -1,14 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
-import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
-import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
-import { sendImmediateAdminEmail } from '@/app/utils/adminEmailProvider';
 import { createInquiryMessage } from '@/app/api/inquiries/thread/shared';
-import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 import { getProxyLinkedInquiryId } from '@/app/utils/proxyBooking';
 
-type RequestOwnerProfile = { email?: string | null } | Array<{ email?: string | null }> | null;
 type CommentAuthorProfile = { full_name?: string | null; avatar_url?: string | null } | null;
 
 export async function POST(
@@ -56,132 +51,24 @@ export async function POST(
 
         const linkedInquiryId = getProxyLinkedInquiryId(proxyReq.form_data as Record<string, unknown> | null | undefined);
 
-        if (linkedInquiryId) {
-            const inquiryResult = await createInquiryMessage({
-                actor: {
-                    id: user.id,
-                    email: user.email,
-                },
-                body: {
-                    inquiryId: linkedInquiryId,
-                    content: content.trim(),
-                    type: 'text',
-                },
-            });
-
-            const { data: authorProfile } = await supabase
-                .from('profiles')
-                .select('full_name, avatar_url')
-                .eq('id', user.id)
-                .maybeSingle();
-
-            return NextResponse.json({
-                success: true,
-                data: {
-                    id: String(inquiryResult.messageId),
-                    request_id: requestId,
-                    author_id: user.id,
-                    content: inquiryResult.displayContent,
-                    is_admin: isAdmin,
-                    created_at: inquiryResult.updatedAt,
-                    updated_at: inquiryResult.updatedAt,
-                    profiles: (authorProfile ?? null) as CommentAuthorProfile | undefined,
-                },
-            });
+        if (!linkedInquiryId) {
+            return NextResponse.json(
+                { success: false, error: '전화 예약 문의 스레드가 연결되어 있지 않습니다.' },
+                { status: 409 }
+            );
         }
 
-        const { data: newComment, error: insertError } = await supabase
-            .from('proxy_comments')
-            .insert({
-                request_id: requestId,
-                author_id: user.id,
+        const inquiryResult = await createInquiryMessage({
+            actor: {
+                id: user.id,
+                email: user.email,
+            },
+            body: {
+                inquiryId: linkedInquiryId,
                 content: content.trim(),
-                is_admin: isAdmin,
-            })
-            .select('id, request_id, author_id, content, is_admin, created_at, updated_at')
-            .maybeSingle();
-
-        if (insertError || !newComment) {
-            console.error('Comment Insert Error:', insertError);
-            return NextResponse.json({ success: false, error: 'Failed to add comment' }, { status: 500 });
-        }
-
-        // Trigger notification/email side effects asynchronously
-        try {
-            if (isAdmin) {
-                const supabaseAdmin = createAdminClient();
-                const { data: ownerProfile } = await supabaseAdmin
-                    .from('profiles')
-                    .select('email')
-                    .eq('id', proxyReq.user_id)
-                    .maybeSingle();
-                const profiles = (ownerProfile ?? null) as RequestOwnerProfile;
-                const userEmail = Array.isArray(profiles) ? profiles[0]?.email : profiles?.email;
-                const notificationLink = `/proxy-bookings/${requestId}`;
-
-                const notificationRow = await buildLocalizedNotificationInsert({
-                    supabaseAdmin,
-                    userId: proxyReq.user_id,
-                    type: 'new_message',
-                    link: notificationLink,
-                    key: 'proxy.comment_reply',
-                    copyParams: {
-                        content: content.trim(),
-                    },
-                });
-
-                const { error: notificationError } = await supabaseAdmin.from('notifications').insert(notificationRow);
-
-                if (notificationError) {
-                    console.error('Failed to insert proxy reply notification:', notificationError);
-                }
-
-                await sendImmediateGenericEmail({
-                    recipientEmail: userEmail || null,
-                    recipientUserId: proxyReq.user_id,
-                    subject: '',
-                    title: '',
-                    message: '',
-                    templatedEmail: {
-                        templateId: 'notice.copy',
-                        audience: 'guest',
-                        payload: {
-                            copyKey: 'proxy.comment_reply',
-                            copyParams: {
-                                content: content.trim(),
-                            },
-                            ctaUrl: notificationLink,
-                        },
-                    },
-                }).catch((err) => console.error('Failed to send proxy reply email:', err));
-            } else {
-                const adminEmail = process.env.ADMIN_SUPPORT_EMAIL || process.env.GMAIL_USER || null;
-                if (!adminEmail) {
-                    console.error('ADMIN_SUPPORT_EMAIL/GMAIL_USER is missing. Skipping proxy comment admin email dispatch.');
-                } else {
-                    await sendImmediateAdminEmail({
-                        to: adminEmail,
-                        subject: '',
-                        title: '',
-                        message: '',
-                        templatedEmail: {
-                            templateId: 'notice.custom',
-                            audience: 'admin',
-                            payload: {
-                                subject: '[Locally Admin] 전화 예약 요청에 새 답변이 등록되었습니다',
-                                title: '전화 예약 요청에 새 답변이 등록되었습니다',
-                                message: content.trim(),
-                                ctaLabel: '전화 예약 요청 보기',
-                                ctaUrl: `/proxy-bookings/${requestId}`,
-                                footerVariant: 'opsAdmin',
-                            },
-                        },
-                    }).catch(err => console.error('Failed to send proxy comment admin email:', err));
-                }
-            }
-        } catch {
-            console.warn('Silent email fail on comment creation');
-        }
+                type: 'text',
+            },
+        });
 
         const { data: authorProfile } = await supabase
             .from('profiles')
@@ -192,7 +79,13 @@ export async function POST(
         return NextResponse.json({
             success: true,
             data: {
-                ...newComment,
+                id: String(inquiryResult.messageId),
+                request_id: requestId,
+                author_id: user.id,
+                content: inquiryResult.displayContent,
+                is_admin: isAdmin,
+                created_at: inquiryResult.updatedAt,
+                updated_at: inquiryResult.updatedAt,
                 profiles: (authorProfile ?? null) as CommentAuthorProfile | undefined,
             },
         });

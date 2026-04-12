@@ -92,42 +92,33 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         }
 
         const linkedInquiryId = getProxyLinkedInquiryId(requestRow.form_data);
-        let commentRows: ProxyCommentRow[] = [];
-
-        if (linkedInquiryId) {
-            const { data: inquiryMessages, error: inquiryMessagesError } = await supabase
-                .from('inquiry_messages')
-                .select('id, inquiry_id, sender_id, content, type, created_at')
-                .eq('inquiry_id', linkedInquiryId)
-                .order('created_at', { ascending: true });
-
-            if (inquiryMessagesError) {
-                console.error('Proxy Linked Inquiry Messages Fetch Error:', inquiryMessagesError);
-                return NextResponse.json({ success: false, error: 'Failed to fetch request detail' }, { status: 500 });
-            }
-
-            commentRows = ((inquiryMessages ?? []) as InquiryMessageRow[]).map((message) => ({
-                id: String(message.id),
-                request_id: id,
-                author_id: message.sender_id,
-                content: message.content,
-                is_admin: String(message.sender_id) !== String(requestRow.user_id),
-                created_at: message.created_at,
-                updated_at: message.created_at,
-            }));
-        } else {
-            const { data: comments, error: commentsError } = await supabase
-                .from('proxy_comments')
-                .select('id, request_id, author_id, content, is_admin, created_at, updated_at')
-                .eq('request_id', id)
-                .order('created_at', { ascending: true });
-
-            if (commentsError) {
-                console.error('Proxy Comments Fetch Error:', commentsError);
-            }
-
-            commentRows = (comments ?? []) as ProxyCommentRow[];
+        if (!linkedInquiryId) {
+            return NextResponse.json(
+                { success: false, error: '전화 예약 문의 스레드가 연결되어 있지 않습니다.' },
+                { status: 409 }
+            );
         }
+
+        const { data: inquiryMessages, error: inquiryMessagesError } = await supabase
+            .from('inquiry_messages')
+            .select('id, inquiry_id, sender_id, content, type, created_at')
+            .eq('inquiry_id', linkedInquiryId)
+            .order('created_at', { ascending: true });
+
+        if (inquiryMessagesError) {
+            console.error('Proxy Linked Inquiry Messages Fetch Error:', inquiryMessagesError);
+            return NextResponse.json({ success: false, error: 'Failed to fetch request detail' }, { status: 500 });
+        }
+
+        const commentRows: ProxyCommentRow[] = ((inquiryMessages ?? []) as InquiryMessageRow[]).map((message) => ({
+            id: String(message.id),
+            request_id: id,
+            author_id: message.sender_id,
+            content: message.content,
+            is_admin: String(message.sender_id) !== String(requestRow.user_id),
+            created_at: message.created_at,
+            updated_at: message.created_at,
+        }));
 
         const commentAuthorIds = [...new Set(commentRows.map((comment) => comment.author_id).filter(Boolean))];
         const commentProfilesById = new Map<string, Pick<ProfileRow, 'id' | 'full_name' | 'avatar_url'>>();

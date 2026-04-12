@@ -84,9 +84,9 @@
   - `resolveAdminInitiatedSupportThread()`는 `resolved 여부`, `담당 admin`, `open thread only`를 따로 거르지 않는다
   - 현재 tracked caller는 통일됐지만, 어떤 admin support thread를 재사용할지의 운영 semantics는 여전히 느슨하다
   - 이번 재실행 묶음에는 이 branch를 resolved thread 재사용 관점에서 직접 잠그는 스펙은 없었다
-- `proxy-bookings/[id]/comments`는 linked inquiry가 있을 때만 `createInquiryMessage()`를 재사용한다
-  - linked inquiry가 없으면 여전히 `proxy_comments` 별도 저장 경로를 탄다
-  - 즉 proxy boundary는 완전 통일이 아니라 조건부 브리지 상태다
+- `proxy-bookings/[id]/comments`는 현재 linked inquiry 기반으로만 동작한다
+  - proxy 쪽 대화 write는 `createInquiryMessage()` 재사용으로 정리됐고, legacy `proxy_comments` 별도 저장 경로는 최신 코드 기준 route에서 제거됐다
+  - 즉 proxy boundary는 이제 조건부 브리지가 아니라 inquiry 엔진 고정 재사용 쪽으로 더 정리됐다
 
 ## Coverage Gaps
 - live mutation coverage는 이번 감사에서 재실행하지 않았다

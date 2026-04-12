@@ -1,7 +1,7 @@
 # 전화 예약(proxy) 운영 체인 엔드투엔드 구조 점검
 
 ## Summary
-- 감사 범위: `공개 진입 / 요청 생성 → 결제 분기(NAVER / LOCALLY card / LOCALLY bank) → TEAM > 전화 예약 운영 → linked inquiry 또는 legacy proxy_comments → 고객 self-service 반영`
+- 감사 범위: `공개 진입 / 요청 생성 → 결제 분기(NAVER / LOCALLY card / LOCALLY bank) → TEAM > 전화 예약 운영 → linked inquiry 기반 고객 소통 → 고객 self-service 반영`
 - 제외 범위: `서비스 의뢰 상태 머신`, `커뮤니티`, `live mutation`, 일반 체험 예약/결제 도메인
 - 실행 방식: 정적 코드 감사 + 핵심 non-live E2E 재실행
 - latest run
@@ -23,7 +23,7 @@
 - 이번 패스 핵심 결론
   - 전화 예약 도메인의 write/read source of truth는 현재 `proxy_requests`로 잘 고정되어 있다
   - 결제 상태 변경 owner도 `generic PATCH /api/proxy-bookings/[id]`가 아니라 전용 admin route / card callback 경계로 정리돼 있다
-  - 현재 tracked 생성 경로는 새 요청마다 `linked_inquiry_id`를 함께 심고, linked inquiry가 없는 경우에만 `proxy_comments` fallback을 유지한다
+  - 현재 tracked 생성 경로는 새 요청마다 `linked_inquiry_id`를 함께 심고, route read/write도 linked inquiry 전제로만 동작한다
   - repo-wide static audit 기준 추가 tracked creator는 보이지 않았고, `PhoneReservationTab`의 `proxy_comments` realtime 구독도 이번 패스에서 제거됐다
   - 최신 close-out rerun 기준 핵심 non-live bundle은 모두 green이다
   - `86-proxy-booking-team-workspace`도 현재는 page-wide text가 아니라 guest inbox thread persistence를 기준으로 검증되며 green 복구됐다
@@ -54,7 +54,7 @@
 | TEAM > 전화 예약 운영 | `PhoneReservationTab`, `/api/proxy-bookings/[id]`, `/api/proxy-bookings/[id]/comments` | `86`, reference `15`, `89`, `136` | 정상 | TEAM 탭의 결제 확인, 진행 상태 변경, 운영 답글 저장, 고객 inbox persisted visibility가 latest rerun 기준 green이다 |
 | 고객 self-service / 상세 | `app/proxy-bookings/page.tsx`, `app/proxy-bookings/[id]/page.tsx`, `/api/proxy-bookings/[id]` | `105`, `88` | 정상 | 목록 next-step copy, 상세 계좌 안내, message CTA, 결제/진행 상태 반영이 현재 truth와 맞는다 |
 | 알림 / localization | `proxyBookingNotifications.ts`, `/api/proxy-bookings/[id]/comments`, `buildLocalizedNotificationInsert` | `119` | 정상 | payment confirm / admin reply notification이 recipient locale 기준으로 저장된다 |
-| linked inquiry / legacy fallback | `/api/proxy-bookings/[id]/comments`, `/api/proxy-bookings/[id]`, `getProxyLinkedInquiryId()` | `86`, `119`, static audit + runtime probe | 부분 보장 | tracked 생성 경로는 `linked_inquiry_id`를 항상 심고, post-cleanup runtime probe 기준 현재 운영 누락 row는 `0`건이다. 다만 `proxy_comments` fallback 코드는 legacy/manual seeded fixture 보호 경계로 아직 남아 있다 |
+| linked inquiry contract | `/api/proxy-bookings/[id]/comments`, `/api/proxy-bookings/[id]`, `getProxyLinkedInquiryId()` | `86`, `105`, `119`, static audit + runtime probe | 정상 | tracked 생성 경로는 `linked_inquiry_id`를 항상 심고, route read/write도 linked inquiry 전제로만 동작한다. post-cleanup runtime probe 기준 현재 운영 누락 row는 `0`건이다 |
 
 ## Confirmed Findings
 ### 1. 전화 예약 요청 생성은 `proxy_requests` 단일 source로 잘 고정돼 있다
@@ -101,22 +101,22 @@
   - 상세는 계좌 안내, 결제/진행 상태, next-step copy, 메시지함 CTA를 같이 보여준다
 - 즉 현재 제품 의미는 “요청 보드는 남기되, 실제 대화 엔진은 inbox를 우선 사용” 쪽이다
 
-### 5. linked inquiry 경계는 상당히 정리됐지만 legacy fallback이 아직 남아 있다
+### 5. linked inquiry 경계는 이제 route 레벨에서도 고정됐다
 - `POST /api/proxy-bookings`
   - 새 요청 생성 시 `upsertInquiryThread(contextType='admin_support')`를 먼저 호출하고, 그 결과 `inquiryId`를 `form_data.linked_inquiry_id`로 같이 저장한다
   - 코드 기준으로는 현재 tracked create path에서 linked inquiry 없이 생성되는 분기가 보이지 않는다
 - `POST /api/proxy-bookings/[id]/comments`
-  - `linked_inquiry_id`가 있으면 `createInquiryMessage()`를 사용해 기존 문의 엔진에 답글을 쓴다
-  - 없으면 `proxy_comments`에 직접 저장한다
+  - `linked_inquiry_id`가 없으면 `409`로 fail-closed 한다
+  - 연결된 요청만 `createInquiryMessage()`를 사용해 기존 문의 엔진에 답글을 쓴다
 - `GET /api/proxy-bookings/[id]`
-  - linked inquiry가 있으면 `inquiry_messages`를 comment rows처럼 projection 한다
-  - 없으면 `proxy_comments`를 그대로 읽는다
+  - `linked_inquiry_id`가 없으면 `409`로 fail-closed 한다
+  - 연결된 요청만 `inquiry_messages`를 comment rows처럼 projection 한다
 - `2026-04-12` runtime probe 결과
   - 초기 read-only check에서는 `linked_inquiry_id` 누락 row `1`건이 보였고, inspection 결과 `Locally` 계정 + 테스트성 comment가 붙은 internal artifact로 판정됐다
   - same-day cleanup 후 post-check 기준 현재 `proxy_requests`는 총 `2`건이고, `linked_inquiry_id` 누락 row는 `0`건이다
-- 따라서 현재 해석은 “신규 운영 경로는 linked inquiry 우선으로 이미 통일됐고, 현재 운영 runtime에는 확인된 legacy fallback row가 없다. 다만 `proxy_comments` 코드는 dormant fallback 경계로 남아 있다”가 가장 정확하다
+- 따라서 현재 해석은 “신규 운영 경로는 linked inquiry 우선으로 이미 통일됐고, 현재 운영 runtime에도 확인된 legacy row가 없다. route 레벨 fallback도 제거돼 inquiry 엔진 고정 재사용으로 정리됐다”가 가장 정확하다
 
-### 6. 제거 준비도(removal readiness) 관점에서는 “후보”까지는 왔지만 바로 삭제 단계는 아니다
+### 6. 제거 준비도(removal readiness) 감사는 route close-out까지 진행됐다
 - repo-wide static audit 기준 `proxy_requests` 생성자는 현재 두 종류뿐이다
   - production create path: `POST /api/proxy-bookings`
   - test fixture seed: `tests/e2e/105-proxy-booking-self-service.spec.ts`, `tests/e2e/119-proxy-notification-localization.spec.ts`
@@ -124,13 +124,10 @@
   - `105`는 처음부터 항상 `linked_inquiry_id`를 넣는다
   - `86`은 실제 UI 생성 경로를 타므로 linked inquiry가 같이 생긴다
   - 즉 현재 close-out rerun 묶음에는 `linked_inquiry_id` 없는 legacy fixture를 의도적으로 만드는 스펙이 남아 있지 않다
-- 남은 production 의존은 다음 세 군데로 좁혀진다
-  - `/api/proxy-bookings/[id]/comments`의 fallback write
-  - `/api/proxy-bookings/[id]`의 fallback read
 - 따라서 현재 결론은
   - “운영 데이터 정리”는 이미 끝났고
   - “테스트 fixture 현대화”도 끝났고
-  - 이제 실제 제거를 검토한다면 route fallback 제거 자체를 별도 patch로 가는 편이 가장 안전하다
+  - route fallback 제거까지 별도 patch로 마감됐다
 
 ## Static Risk Notes
 - `POST /api/proxy-bookings`는 linked inquiry를 먼저 만들고, 그 다음 `proxy_requests`를 insert한다
@@ -149,19 +146,19 @@
 - `card-notification` external callback path는 static audit로만 확인했고, 이번 패스에서는 직접 재실행하지 않았다
 - cleanup된 missing row가 정확히 어떤 historical create path에서 생겼는지까지는 이번 문서에서 단정하지 않는다
 - `tests/e2e/105-proxy-booking-self-service.spec.ts`, `tests/e2e/119-proxy-notification-localization.spec.ts`는 모두 linked inquiry 기반 fixture를 사용한다
-- 즉 current close-out rerun 묶음에는 `proxy_comments` legacy branch를 직접 잠그는 active spec이 남아 있지 않다
+- 즉 current close-out rerun 묶음과 운영 데이터 모두 `proxy_comments` legacy branch를 더 이상 active truth로 사용하지 않는다
 
 ## Follow-up Need
 - 1순위
-  - 다음 제거 후보는 `/api/proxy-bookings/[id]`, `/api/proxy-bookings/[id]/comments`의 legacy read/write fallback이다
-  - 현재 운영 데이터와 close-out rerun fixture 모두 linked inquiry 경로로 정리됐기 때문에, 이제 남은 production 잔여 의존은 route fallback 자체다
+  - 다음으로 가치가 큰 후속은 proxy route fallback이 아니라 `card-notification` external callback contract 재검증이다
+  - route/read/write/source 정리는 현재 기준으로 한 번 닫혔다
 - 2순위
-  - 제거로 간다면 read path와 write path를 한 번에 지우지 말고, route contract test 보강 후 separate patch로 가는 편이 안전하다
+  - 필요하면 `proxy_comments` 테이블/cleanup code 자체를 남길지, schema/fixture 레벨까지 걷어낼지 별도 운영 결정을 내릴 수 있다
 - 3순위
   - `card-notification` route를 provider cutover 이후에도 실제 운영 path로 쓸 계획이면 별도 contract rerun을 묶는 편이 안전하다
 
 ## Final Verdict
 - 전화 예약(proxy) 운영 체인은 현재 `proxy_requests` 단일 source, 전용 결제 route, TEAM 운영 탭, 고객 self-service surface가 비교적 잘 정리돼 있다
 - latest close-out rerun 기준 핵심 non-live bundle은 모두 green이다
-- 따라서 현재 남은 것은 제품 breakage가 아니라 `external card-notification verification`, `linked inquiry 미존재 legacy fallback` 같은 boundary-only gap이다
+- 따라서 현재 남은 것은 제품 breakage가 아니라 `external card-notification verification` 같은 boundary-only gap이다
 - 이번 감사 기준 최종 판정은 `proxy core chain은 정상, boundary-only gap은 부분 보장`이다
