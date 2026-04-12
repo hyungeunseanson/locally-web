@@ -13,6 +13,17 @@
   - approval refresh 핀셋 수정 후 관련 subset: `6 passed`
   - locale/test drift 보정 후 관련 subset: `9 passed`
   - host approval happy path 보강 subset: `3 passed`
+  - host dashboard shell close-out subset
+    - `tests/e2e/55-host-view-mode-persistence.spec.ts`
+    - `tests/e2e/98-host-approved-welcome-overlay.spec.ts`
+    - `tests/e2e/106-service-host-flow-guidance.spec.ts`
+    - `tests/e2e/140-host-status-refresh-after-approval.spec.ts`
+    - `tests/e2e/141-host-landing-cta-refresh-after-approval.spec.ts`
+    - `6 passed` under `playwright.contracts.config.ts`
+  - host dashboard service unread read-on-entry subset
+    - `tests/e2e/40-host-reservations-inquiries-ui.spec.ts`
+    - `marks service notifications as read when entering the service jobs tab`
+    - `1 passed` under `playwright.contracts.config.ts`
   - revision resubmit UI 보강 subset: `8 passed`
   - host dates classification subset
     - `34-host-edit-and-dates-ui.spec.ts`: `1 failed / 1 did not run / 1 passed`
@@ -72,7 +83,7 @@
 ## Summary Matrix
 | 체인 | source of truth | 현재 보장 테스트 | 판정 | 핵심 메모 |
 | --- | --- | --- | --- | --- |
-| 호스트 진입 / 랜딩 / 승인 상태 | `/become-a-host`, `AuthContext`, `ViewModeContext`, `/host/menu`, `/host/dashboard` | `109`, `97`, `98`, `140`, `141`, `55` | 정상 | approval refresh와 view mode persistence는 최신 기준 green |
+| 호스트 진입 / 랜딩 / 승인 상태 | `/become-a-host`, `AuthContext`, `ViewModeContext`, `/host/menu`, `/host/dashboard`, `navigation.ts` | `109`, `97`, `98`, `140`, `141`, `55`, `106`, `40` | 정상 | dashboard shell의 tab normalize/deep link, approval welcome, service unread read-on-entry까지 최신 기준 green |
 | 호스트 신청 / 재제출 / 승인 경계 | `/host/register`, `/api/host/register/submit`, `/api/admin/host-applications`, `updateAdminStatus()`, `AuthContext` | `36`, `97`, `07`, `98`, `140`, `141`, `164`, `167` | 부분 보장 | tracked client는 submit route만 호출하고 git history도 legacy 분리를 확인해 주지만, external stale client용 admin-alert compatibility endpoint는 아직 남아 있다 |
 | 체험 작성 / 수정 / 삭제 / 일정 관리 | `/host/create`, `/api/host/experiences*`, `/host/experiences/[id]*` | `93`, `32`, `33`, `34`, `35`, `51`, `126` | 정상 | route integrity와 UI smoke는 green이며, `34`는 readiness/click stabilization 후 repeat-each까지 통과했다 |
 | 예약 / 문의 / 리뷰 응대 | `ReservationManager`, `InquiryChat`, `HostReviews`, `/api/host/start-chat`, `/api/host/guest-reviews`, `/api/host/reviews/reply` | `39`, `40`, `72`, `92`, `122` | 정상 | warning strip copy expectation까지 최신 기준 green |
@@ -89,18 +100,38 @@
   - [app/context/ViewModeContext.tsx](/Users/hyungeunseanson/Documents/서비스/locally-web/app/context/ViewModeContext.tsx:1)
   - [app/components/mobile/MobileHostMenu.tsx](/Users/hyungeunseanson/Documents/서비스/locally-web/app/components/mobile/MobileHostMenu.tsx:1)
   - [app/host/dashboard/page.tsx](/Users/hyungeunseanson/Documents/서비스/locally-web/app/host/dashboard/page.tsx:1)
+  - [app/host/dashboard/navigation.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/host/dashboard/navigation.ts:1)
 - 기대 상태 전이
   - 비호스트는 `/become-a-host` 또는 `/host/register`로 유도된다
   - pending/revision/rejected는 host dashboard full access가 막히고 상태 화면으로 고정된다
   - approved/active는 host view 전환과 dashboard 진입이 가능해야 한다
   - approval notification은 welcome overlay와 연결된다
+  - dashboard shell은 `tab`/`serviceTab` 정규화, mobile host menu deep link, service unread dot/read-on-entry를 같은 계약으로 유지해야 한다
 - 현재 보장 테스트
-  - `109`, `97`, `98`, `140`, `141`, `55`
+  - `109`, `97`, `98`, `140`, `141`, `55`, `106`, `40`
 - 실제 결과
   - 판정: `정상`
   - 메모
     - `AuthContext`의 pending/revision/rejected fallback refresh를 `30_000ms → 5_000ms`로 줄인 뒤 `140`, `141`, `98`, `55`가 최신 기준 모두 green
     - 현재 감사 기준에서는 revision/pending 화면이 승인 후 stale하게 오래 남는 핵심 host ingress 리스크는 더 이상 재현되지 않는다
+    - `app/host/dashboard/navigation.ts`가 현재 hidden contract의 중심이다
+      - `normalizeHostDashboardTab()`은 invalid `tab`을 `reservations`로 fail-closed 한다
+      - `normalizeHostServiceJobsTab()`은 invalid `serviceTab`을 `applications`로 fail-closed 한다
+      - `getHostDashboardHref()`는 mobile menu와 dashboard shell이 같은 deep link 형식을 공유하게 만든다
+    - `MobileHostMenu`도 이 navigation helper를 직접 사용한다
+      - `reservations`, `experiences`, `inquiries`, `service-jobs`, `earnings`, `reviews`, `guidelines`, `profile` 모두 개별 string literal이 아니라 shared href builder를 탄다
+      - 따라서 mobile host menu와 desktop dashboard shell의 진입 계약 drift는 현재 기준 작다
+    - service jobs shell contract도 현재 기준 green이다
+      - `106` 기준 `/services` legacy redirect는 `/host/dashboard?tab=service-jobs&serviceTab=open`으로 들어간다
+      - `/host/dashboard?tab=service-jobs` 직접 진입은 기본 `applications`를 연다
+      - sub-tab 전환은 URL의 `serviceTab=open|applications`와 동기화된다
+    - shell-level unread semantics도 현재 기준 green이다
+      - dashboard sidebar dot는 unread service notification 존재 시에만 뜬다
+      - `40` 기준 `service-jobs` 탭 진입 시 해당 unread service notifications가 read-on-entry로 해소된다
+      - 즉 “dot 표시 owner”와 “dot 해소 owner”가 둘 다 dashboard shell에 고정돼 있다
+    - approval welcome overlay도 shell contract로 안정적이다
+      - unread `host_application_approved` notification + `experienceCount===0` + approved/active host 조합일 때만 열린다
+      - `98`, `140`, `141` 기준 dismiss/read token과 승인 직후 stale refresh가 함께 닫혀 있다
 
 ### 2. 호스트 신청 / 재제출 / 승인 경계
 - source of truth
