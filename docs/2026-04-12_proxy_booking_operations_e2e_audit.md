@@ -17,6 +17,9 @@
     - same-day inspection 결과 internal test artifact로 판정 후 cleanup
     - post-cleanup current `proxy_requests`: `2`
     - post-cleanup `linked_inquiry_id` missing rows: `0`
+  - fixture modernization rerun
+    - `tests/e2e/119-proxy-notification-localization.spec.ts`
+    - linked inquiry 기반 fixture로 전환 후 `1 passed (17.1s)`
 - 이번 패스 핵심 결론
   - 전화 예약 도메인의 write/read source of truth는 현재 `proxy_requests`로 잘 고정되어 있다
   - 결제 상태 변경 owner도 `generic PATCH /api/proxy-bookings/[id]`가 아니라 전용 admin route / card callback 경계로 정리돼 있다
@@ -117,17 +120,18 @@
 - repo-wide static audit 기준 `proxy_requests` 생성자는 현재 두 종류뿐이다
   - production create path: `POST /api/proxy-bookings`
   - test fixture seed: `tests/e2e/105-proxy-booking-self-service.spec.ts`, `tests/e2e/119-proxy-notification-localization.spec.ts`
-- 이 중 `linked_inquiry_id`를 의도적으로 생략하는 fixture는 현재 `119-proxy-notification-localization`뿐이다
-  - `105`는 항상 `linked_inquiry_id`를 넣는다
+- latest follow-up 기준 `119-proxy-notification-localization`도 linked inquiry 기반 fixture로 전환됐다
+  - `105`는 처음부터 항상 `linked_inquiry_id`를 넣는다
   - `86`은 실제 UI 생성 경로를 타므로 linked inquiry가 같이 생긴다
+  - 즉 현재 close-out rerun 묶음에는 `linked_inquiry_id` 없는 legacy fixture를 의도적으로 만드는 스펙이 남아 있지 않다
 - 남은 production 의존은 다음 세 군데로 좁혀진다
   - `/api/proxy-bookings/[id]/comments`의 fallback write
   - `/api/proxy-bookings/[id]`의 fallback read
   - `PhoneReservationTab`의 `proxy_comments` realtime subscription
 - 따라서 현재 결론은
   - “운영 데이터 정리”는 이미 끝났고
-  - “코드 제거 준비도 감사”도 상당 부분 끝났지만
-  - 실제 제거는 `119` fixture 정리와 TEAM realtime 구독 정리까지 묶어서 순차적으로 가는 편이 가장 안전하다
+  - “테스트 fixture 현대화”도 끝났고
+  - 이제 실제 제거를 검토한다면 TEAM realtime 구독 정리 → route fallback 제거 순서로 가는 편이 가장 안전하다
 
 ## Static Risk Notes
 - `POST /api/proxy-bookings`는 linked inquiry를 먼저 만들고, 그 다음 `proxy_requests`를 insert한다
@@ -145,14 +149,15 @@
   - `tests/e2e/136-team-workspace-retention.spec.ts`
 - `card-notification` external callback path는 static audit로만 확인했고, 이번 패스에서는 직접 재실행하지 않았다
 - cleanup된 missing row가 정확히 어떤 historical create path에서 생겼는지까지는 이번 문서에서 단정하지 않는다
-- `tests/e2e/105-proxy-booking-self-service.spec.ts`, `tests/e2e/119-proxy-notification-localization.spec.ts`는 여전히 linked inquiry 유무를 수동 fixture로 seed할 수 있어 fallback branch 자체는 테스트 surface에 남아 있다
+- `tests/e2e/105-proxy-booking-self-service.spec.ts`, `tests/e2e/119-proxy-notification-localization.spec.ts`는 모두 linked inquiry 기반 fixture를 사용한다
+- 즉 current close-out rerun 묶음에는 `proxy_comments` legacy branch를 직접 잠그는 active spec이 남아 있지 않다
 
 ## Follow-up Need
 - 1순위
-  - `119-proxy-notification-localization`를 linked inquiry 기반 fixture로 바꿀지 먼저 결정해야 한다
-  - 이 테스트가 계속 legacy branch를 유일하게 잠그고 있으므로, 제품 의미를 유지할지 fixture를 현대화할지 판단이 선행돼야 한다
+  - 제거로 간다면 `PhoneReservationTab`의 `proxy_comments` realtime subscription을 먼저 걷는 편이 가장 안전하다
+  - 현재 운영 데이터와 close-out rerun fixture 모두 linked inquiry 경로로 정리됐기 때문에, 이 구독은 가장 먼저 줄일 수 있는 production 잔여 의존이다
 - 2순위
-  - 제거로 간다면 `PhoneReservationTab`의 `proxy_comments` realtime subscription을 먼저 걷고, 그 뒤 route read/write fallback 제거로 가는 2단계가 가장 안전하다
+  - 그 다음 `/api/proxy-bookings/[id]`, `/api/proxy-bookings/[id]/comments`의 legacy read/write fallback 제거를 separate patch로 가는 편이 안전하다
 - 3순위
   - `card-notification` route를 provider cutover 이후에도 실제 운영 path로 쓸 계획이면 별도 contract rerun을 묶는 편이 안전하다
 

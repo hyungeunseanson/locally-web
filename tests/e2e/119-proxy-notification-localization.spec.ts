@@ -17,6 +17,7 @@ let adminClient: SupabaseClient | null = null;
 const createdAuthUserIds: string[] = [];
 const createdWhitelistEmails: string[] = [];
 const createdProxyRequestIds: string[] = [];
+const createdInquiryIds: string[] = [];
 const createdNotificationIds: number[] = [];
 
 function loadEnv(): EnvMap {
@@ -135,12 +136,36 @@ async function setPreferredLocale(userId: string, locale: 'ko' | 'en' | 'ja' | '
   if (updateError) throw updateError;
 }
 
+async function createAdminSupportInquiry(userId: string) {
+  const { data, error } = await getAdminClient()
+    .from('inquiries')
+    .insert({
+      user_id: userId,
+      host_id: null,
+      experience_id: null,
+      content: '전화 예약 알림 로컬라이제이션 검증용 문의방입니다.',
+      type: 'admin_support',
+    })
+    .select('id')
+    .single();
+
+  if (error || !data?.id) {
+    throw error || new Error('Failed to create admin support inquiry fixture.');
+  }
+
+  const inquiryId = String(data.id);
+  createdInquiryIds.push(inquiryId);
+  return inquiryId;
+}
+
 async function createProxyRequest(params: {
   userId: string;
   user: TestUser;
   includeLinkedInquiry?: boolean;
 }) {
-  const linkedInquiryId = params.includeLinkedInquiry ? Number(String(Date.now()).slice(-9)) : null;
+  const linkedInquiryId = params.includeLinkedInquiry
+    ? await createAdminSupportInquiry(params.userId)
+    : null;
 
   const { data, error } = await getAdminClient()
     .from('proxy_requests')
@@ -176,6 +201,7 @@ async function createProxyRequest(params: {
   return {
     requestId: String(data.id),
     restaurantName: String((data.form_data as Record<string, unknown>)?.restaurant_name || ''),
+    linkedInquiryId,
   };
 }
 
@@ -234,9 +260,17 @@ test.afterAll(async () => {
     await supabase.from('notifications').delete().in('id', createdNotificationIds);
   }
 
+  if (createdInquiryIds.length > 0) {
+    await supabase.from('inquiry_messages').delete().in('inquiry_id', createdInquiryIds);
+  }
+
   if (createdProxyRequestIds.length > 0) {
     await supabase.from('proxy_comments').delete().in('request_id', createdProxyRequestIds);
     await supabase.from('proxy_requests').delete().in('id', createdProxyRequestIds);
+  }
+
+  if (createdInquiryIds.length > 0) {
+    await supabase.from('inquiries').delete().in('id', createdInquiryIds);
   }
 
   for (const email of createdWhitelistEmails) {
@@ -268,12 +302,12 @@ test.describe.serial('Proxy notification localization', () => {
     const paymentRequest = await createProxyRequest({
       userId: paymentGuestId,
       user: paymentGuest,
-      includeLinkedInquiry: false,
+      includeLinkedInquiry: true,
     });
     const replyRequest = await createProxyRequest({
       userId: replyGuestId,
       user: replyGuest,
-      includeLinkedInquiry: false,
+      includeLinkedInquiry: true,
     });
 
     await login(page, adminUser, 'ko');
@@ -288,7 +322,7 @@ test.describe.serial('Proxy notification localization', () => {
     const paymentNotification = await waitForNotification({
       userId: paymentGuestId,
       type: 'booking_confirmed',
-      link: `/proxy-bookings/${paymentRequest.requestId}`,
+      link: `/guest/inbox?inquiryId=${encodeURIComponent(paymentRequest.linkedInquiryId || '')}`,
     });
     expect(paymentNotification.title).toBe('Phone booking payment was confirmed.');
     expect(paymentNotification.message).toContain(paymentRequest.restaurantName);
@@ -304,9 +338,9 @@ test.describe.serial('Proxy notification localization', () => {
     const replyNotification = await waitForNotification({
       userId: replyGuestId,
       type: 'new_message',
-      link: `/proxy-bookings/${replyRequest.requestId}`,
+      link: `/guest/inbox?inquiryId=${encodeURIComponent(replyRequest.linkedInquiryId || '')}`,
     });
-    expect(replyNotification.title).toBe('電話予約リクエストに新しい返信が届きました。');
+    expect(replyNotification.title).toBe(`💬 ${adminUser.fullName}さんから新しいメッセージ`);
     expect(replyNotification.message).toBe(replyText);
   });
 });
