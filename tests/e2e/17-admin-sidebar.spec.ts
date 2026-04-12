@@ -184,4 +184,21 @@ test.describe.serial('Admin sidebar smoke', () => {
       .poll(() => page.evaluate(() => window.localStorage.getItem('admin_active_tab')))
       .toBe('SALES');
   });
+
+  test('keeps APPS and EXPS legacy aliases reachable as approvals compatibility views', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const adminUser = createAdminUser();
+    await createAuthUser(adminUser);
+
+    await login(page, adminUser);
+
+    await page.goto('/admin/dashboard?tab=APPS', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByText('호스트 지원서')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('button', { name: '처리완료' })).toBeVisible();
+
+    await page.goto('/admin/dashboard?tab=EXPS', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByText('등록된 체험')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('button', { name: '승인완료' })).toBeVisible();
+  });
 });

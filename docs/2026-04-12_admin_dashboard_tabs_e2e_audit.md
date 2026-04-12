@@ -65,10 +65,11 @@
     - `6 passed (38.3s)` under `playwright.contracts.config.ts`
   - hidden tab alias close-out subset
     - `tests/e2e/17-admin-sidebar.spec.ts`
-    - `2 passed (14.7s)` under `playwright.contracts.config.ts`
+    - `3 passed` under `playwright.contracts.config.ts`
     - 확인 항목
       - unread admin alert가 있어도 sidebar label은 plain text 유지
       - legacy `/admin/dashboard?tab=SETTLEMENT` 진입은 official `SALES` tab으로 정규화
+      - legacy `/admin/dashboard?tab=APPS|EXPS`는 approvals compatibility view로 계속 열린다
 - 관찰 메모
   - warmup 이전에는 `/login` 이후 첫 화면 load 대기 때문에 admin 스모크가 흔들렸지만, warmed rerun에서는 탭 본체 스펙 대부분이 정상 복구됐다
   - `17`, `18`의 초기 failure는 제품 회귀가 아니라 “예전 badge 계약을 그대로 기대한 stale test”로 분류하는 것이 맞다
@@ -348,6 +349,8 @@
     - 공식 운영 탭은 아니지만 direct query/localStorage alias는 남아 있다
     - `docs/gemini.md`와 과거 변경 로그도 아직 이들을 `Approvals`의 legacy alias로 설명한다
     - `ManagementTab`, `ListPanel`, `DetailsPanel`이 여전히 `APPS/EXPS` 의미를 직접 소비하므로, 단순 dead code가 아니라 `APPROVALS` 내부 표현을 노출한 호환 경로에 가깝다
+    - current pass의 기본 결정은 “차단하지 않고 유지”다
+      - 이유: explicit `approvalSubTab` URL 계약이 아직 없고, 지금 차단하면 bookmarked URL/localStorage 복귀가 의미 없이 깨질 수 있다
   - `SETTLEMENT`: closed legacy query
     - current sidebar에는 없고, direct query/localStorage로 들어와도 official `SALES` tab으로 정규화된다
     - 따라서 더 이상 hidden screen이 아니라 redirect-only compatibility value로 보는 편이 맞다
@@ -387,18 +390,19 @@
 - confirmed
 - 근거
   - `APPS`, `EXPS`는 `ManagementTab`의 실제 내부 의미(`subTab`, `ListPanel`, `DetailsPanel`)와 계속 연결돼 있고, 문서 기준으로도 legacy approvals alias로 살아 있다
+  - `17-admin-sidebar` close-out subset이 `APPS`, `EXPS` direct query가 현재도 approvals compatibility view를 연다는 점을 다시 확인했다
   - `SETTLEMENT`는 이번 패스에서 `SALES`로 정규화돼 hidden screen 성격이 닫혔다
   - `RealtimeTab`, `RealtimeBookings`는 current shell 기준 import consumer가 보이지 않고, unknown `tab` query로도 직접 열리지 않아 제거해도 운영 path에 영향이 없다
 - 영향
   - 후속 정리는 한 묶음으로 삭제하면 안 된다
-  - `APPS/EXPS`는 `APPROVALS` 내부 호환 경로로 보고 유지/정규화 여부를 결정해야 하고,
+  - `APPS/EXPS`는 현재 기준 유지가 맞고, 나중에 정리하더라도 먼저 explicit approval subtab URL 계약을 만든 뒤에 닫아야 한다
   - `SETTLEMENT` hidden screen 정리는 이번 패스에서 이미 닫았다
   - orphan `Realtime*` 정리는 이번 패스에서 이미 닫았다
 
 ## Coverage Gaps
 - `15-admin-team`, `16-admin-team-chat`, `79`, `86`, `89`, `136`은 이번 패스에서 full rerun하지 않았다
   - `TeamTab` static audit과 `18` rerun으로 current plain-label intent는 이미 확인됐다
-- `APPS/EXPS`는 legacy approvals alias라는 문서 근거는 있지만, 앞으로도 URL/localStorage 호환을 유지할지에 대한 최신 결정 문서는 없다
+- `APPS/EXPS` 유지 결정은 이번 close-out에서 잠갔지만, 장기적으로 alias를 닫으려면 먼저 approval subtab URL 계약을 별도로 설계해야 한다
 - orphan `Realtime*`를 왜 과거에 남겨뒀는지에 대한 운영 메모는 저장소 안에서 찾지 못했다
 
 ## Follow-up Need
@@ -411,7 +415,8 @@
   - `adminBadgeState.ts`는 지금 당장 제거 대상이 아니라, sidebar count 전용 부분과 탭 내부 viewed-state helper를 분리할지 검토하는 편이 안전하다
   - 다시 쓸 계획이 있으면 최소한 deprecated/dormant contract로 문서화하는 편이 안전하다
 - 3순위 후속 정리
-  - 1단계: `APPS`, `EXPS` direct query/localStorage alias를 장기적으로 유지할지 차단할지 결정
+  - 1단계: `APPS`, `EXPS`를 닫고 싶다면 먼저 `APPROVALS` 하위 subtab URL 계약을 별도로 만든다
+  - 2단계: 그 다음에만 legacy alias redirect 또는 차단을 검토한다
 - 현재 기준 즉시 제품 blocker는 아니다
   - 본문 탭 기능은 warmed rerun에서 green
   - 좌측 숫자 미노출도 현재 제품 의도와 일치한다
