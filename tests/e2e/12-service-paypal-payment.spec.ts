@@ -297,7 +297,6 @@ test.describe.serial('Service PayPal payment smoke', () => {
     await page.locator('input[type="checkbox"]').check();
 
     await paypalOption.click();
-    await expect(page.getByText('PayPal 승인 후 결제가 완료되며, 기존 카드/무통장 결제 흐름에는 영향을 주지 않습니다.')).toBeVisible();
     await expect(page.getByTestId('mock-paypal-approve')).toBeVisible({ timeout: 15000 });
 
     await page.getByTestId('mock-paypal-approve').click();

@@ -106,11 +106,19 @@
   - `tests/e2e/49-service-request-contract.spec.ts`
   - `tests/e2e/48-service-visibility.spec.ts`
   - 결과: `4 passed (37.5s)` under `playwright.contracts.config.ts`
+- 결제 core subset
+  - `tests/e2e/19-service-card-verification.spec.ts`
+  - `tests/e2e/12-service-paypal-payment.spec.ts`
+  - `tests/e2e/21-service-payment-method-lock.spec.ts`
+  - 결과: `7 passed (28.4s)` under `playwright.contracts.config.ts`
 - 이번 패스에서 직접 닫은 항목
   - 서울 request 생성 시 country가 `대한민국`으로 정규화되는 생성 계약
   - booking pre-create 실패 시 `pending_payment` request cleanup 계약
   - apply page가 persisted `total_host_payout`을 읽는 계약
   - board/detail이 eligible approved host에게만 열리고 customer/other host에는 닫히는 visibility 계약
+  - card callback이 fabricated success payload나 unauthenticated confirm 시도로 booking을 확정하지 않는 계약
+  - PayPal approve UI가 localized body copy가 아니라 capture/complete contract 자체로 잠겨 있다는 점
+  - pending booking의 bank/card 전환 잠금 규칙이 시작/해제/legacy placeholder 상태별로 유지된다는 점
 
 ## Initial Findings
 
@@ -122,23 +130,31 @@
 - 판정
   - `생성 / 공개 / 가시성`: `정상`
 
-### 2. 서비스 의뢰 감사는 이제 결제와 완료/정산 구간만 다시 붙이면 된다
+### 2. 결제 구간도 현재 계약 기준으로는 green이다
 - confirmed
 - 근거
-  - 앞단 문서/실행 근거가 생겼고, 아직 직접 rerun하지 않은 큰 묶음은 결제(`19/12/21/74`)와 완료/정산(`131/132/151/152/08/10/155~160`) 쪽이다
+  - `19`에서 card callback verify가 owner/auth guard와 fabricated payload 차단을 다시 잠갔다
+  - `12`에서 PayPal approve 흐름은 UI copy가 아니라 mocked approval → capture → complete 경계로 확인됐다
+  - `21`에서 bank/card/paypal 전환 잠금 의미가 untouched placeholder, card-started, bank-marked 상태별로 유지됨이 다시 확인됐다
+- 판정
+  - `결제`: `정상`
+
+### 3. 현재 남은 재감사 핵심은 완료 / 정산 / host-admin reflection이다
+- confirmed
+- 근거
+  - 앞단 생성/공개/결제는 모두 직접 rerun 근거가 생겼다
+  - 아직 직접 rerun하지 않은 큰 묶음은 완료 sync, bank confirm, payout eligibility, host earnings reflection, admin service finance 반영(`131/132/151/152/08/10/155~160`) 쪽이다
 - 판정
   - `도메인 close-out 상태`: `부분 보장`
 
 ## Next Slice
-- 다음 묶음은 가장 앞단 core chain으로 고정한다.
-  - `49-service-request-contract.spec.ts`
-  - `48-service-visibility.spec.ts`
-- 이 두 개로 먼저 확인할 것
-  - `pending_payment + PENDING booking` 사전 생성 계약
-  - open 공개 범위와 same city/country eligible host visibility 계약
-  - customer/host/other-host가 같은 request truth를 어떻게 다르게 읽는지
-  - 결과: 이번 패스에서 green 확인 완료
 - 다음 실행 묶음
-  - `19-service-card-verification.spec.ts`
-  - `12-service-paypal-payment.spec.ts`
-  - `21-service-payment-method-lock.spec.ts`
+  - `131-service-completion-cron.spec.ts`
+  - `132-service-payout-eligibility-after-completion.spec.ts`
+  - `151-service-bank-confirm-guard.spec.ts`
+  - `152-host-service-earnings-separation.spec.ts`
+- 이 묶음에서 먼저 확인할 것
+  - `service_date` 경과 후 completion sync가 `service_bookings`와 `service_requests`를 같은 의미로 완료 처리하는지
+  - admin bank confirm이 `PENDING + bank` 경계만 허용하는지
+  - payout eligibility와 host earnings/services read model이 같은 completed truth를 읽는지
+  - 완료/정산 체인 앞단이 green이면 그다음 마지막으로 admin finance reflection(`08/10/155~160`)을 붙여 최종 close-out으로 간다
