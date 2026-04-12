@@ -220,6 +220,11 @@ test('host create shows structured primary language guidance and refund policy c
       /게스트가 한눈에 이해할 수 있게 장소, 분위기, 핵심 경험이 드러나면 좋아요\.|A strong title quickly shows the place, mood, and core experience\.|場所、雰囲気、体験の核がひと目で伝わるタイトルが理想です。|如果能一眼看出地点、氛围和核心体验，会更吸引游客。/
     )
   ).toBeVisible();
+  await expect(
+    page.getByText(
+      /대표사진에는 호스트 본인 얼굴이 나온 사진을 최소 1장 이상 꼭 포함해주세요\.|Please include at least one hero photo where the host’s face is clearly visible\.|ホスト本人の顔が分かる写真を最低1枚は必ず含めてください。|请至少包含一张能清楚看到房东本人脸部的照片。/
+    )
+  ).toBeVisible();
 
   await page
     .locator(

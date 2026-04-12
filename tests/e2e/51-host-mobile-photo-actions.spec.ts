@@ -154,7 +154,13 @@ async function createExperienceFixture(hostId: string) {
       duration: 2,
       max_guests: 4,
       description: '모바일 사진 액션 검증용 체험입니다. 수정 화면에서 대표 사진 교체/삭제를 확인합니다.',
-      itinerary: [{ title: '홍대입구역', description: '테스트 코스입니다.' }],
+      itinerary: [
+        {
+          title: '홍대입구역',
+          description: '테스트 코스입니다.',
+          image_url: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200',
+        },
+      ],
       spots: '홍대입구역',
       meeting_point: '홍대입구역 3번 출구',
       location: '서울 마포구 양화로 160',
@@ -231,7 +237,7 @@ test('mobile host create/edit supports hero photo replace and delete actions', a
 
   await login(page, host);
 
-  await page.goto('/host/create', { waitUntil: 'domcontentloaded' });
+  await page.goto('/host/create', { waitUntil: 'networkidle' });
   const cityButton = page.locator('button').filter({ hasText: /^Seoul$/ }).first();
   const categoryButton = page.locator('button').filter({ hasText: /^Food Tour$/ }).first();
   const languageButton = page.locator('button').filter({ hasText: /^Korean$/ }).first();
@@ -251,6 +257,11 @@ test('mobile host create/edit supports hero photo replace and delete actions', a
   await page.getByRole('button', { name: /Lv\.?5/ }).first().click();
   await page.getByRole('button', { name: 'Next', exact: true }).click();
 
+  await page
+    .locator(
+      'input[placeholder="체험 제목을 입력하세요"], input[placeholder="Enter experience title"], input[placeholder="体験タイトルを入力してください"], input[placeholder="请输入体验标题"]'
+    )
+    .fill('Mobile Photo Test Experience');
   await page.locator('input[type="file"][multiple]').setInputFiles(TEST_IMAGE);
   await expect(page.locator('img[alt="preview 0"]')).toBeVisible();
 
@@ -268,6 +279,44 @@ test('mobile host create/edit supports hero photo replace and delete actions', a
   await page.getByTestId('create-replace-photo-input').setInputFiles(TEST_IMAGE);
   await expect.poll(async () => createPreview.getAttribute('src')).not.toBe(beforeReplaceSrc);
 
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await page
+    .locator(
+      'input[placeholder="예) 스타벅스 홍대역점"], input[placeholder="e.g. Starbucks Hongdae Station"], input[placeholder="例）スターバックス弘大駅店"], input[placeholder="例如：弘大站星巴克"]'
+    )
+    .fill('Mobile Photo Test Meeting Point');
+  await page
+    .locator(
+      'input[placeholder="예) 서울특별시 마포구 양화로 165"], input[placeholder="e.g. 165 Yanghwa-ro, Mapo-gu, Seoul"], input[placeholder="例）ソウル特別市 麻浦区 楊花路 165"], input[placeholder="例如：首尔特别市麻浦区杨花路165"]'
+    )
+    .fill('165 Yanghwa-ro, Mapo-gu, Seoul');
+  await page
+    .locator(
+      'input[placeholder="장소 이름"], input[placeholder="Place name"], input[placeholder="Location name"], input[placeholder="場所名"], input[placeholder="地点名称"]'
+    )
+    .first()
+    .fill('Mobile Photo Itinerary Stop');
+  await page
+    .getByLabel(/장소 사진 추가|Add place photo|場所の写真を追加|添加地点照片/)
+    .setInputFiles(TEST_IMAGE);
+
+  const createItineraryTile = page.getByTestId('host-create-itinerary-photo-tile-0');
+  await expect(createItineraryTile).toBeVisible();
+  let createItineraryBox = { width: 0, height: 0 };
+  await expect
+    .poll(
+      async () => {
+        createItineraryBox = await createItineraryTile.evaluate((element) => {
+          const rect = element.getBoundingClientRect();
+          return { width: rect.width, height: rect.height };
+        });
+        return createItineraryBox.width;
+      },
+      { timeout: 5000 }
+    )
+    .toBeGreaterThan(0);
+  expect(Math.abs(createItineraryBox.width - createItineraryBox.height)).toBeLessThanOrEqual(2);
+
   await page.goto(`/host/experiences/${experienceId}/edit`, { waitUntil: 'commit' }).catch(() => {});
   await expect(page).toHaveURL(new RegExp(`/host/experiences/${experienceId}/edit`));
   const editPreview = page.locator('img[alt="experience-0"]');
@@ -282,4 +331,23 @@ test('mobile host create/edit supports hero photo replace and delete actions', a
   await editPreview.click();
   await page.getByTestId('host-photo-action-delete').click();
   await expect(page.locator('img[alt="experience-0"]')).toHaveCount(0);
+
+  await page.getByRole('button', { name: /Course & Rules|코스 및 규칙/ }).click();
+  const editItineraryTile = page.getByTestId('host-edit-itinerary-photo-tile-0');
+  await editItineraryTile.scrollIntoViewIfNeeded();
+  await expect(editItineraryTile).toBeVisible();
+  let editItineraryBox = { width: 0, height: 0 };
+  await expect
+    .poll(
+      async () => {
+        editItineraryBox = await editItineraryTile.evaluate((element) => {
+          const rect = element.getBoundingClientRect();
+          return { width: rect.width, height: rect.height };
+        });
+        return editItineraryBox.width;
+      },
+      { timeout: 5000 }
+    )
+    .toBeGreaterThan(0);
+  expect(Math.abs(editItineraryBox.width - editItineraryBox.height)).toBeLessThanOrEqual(2);
 });

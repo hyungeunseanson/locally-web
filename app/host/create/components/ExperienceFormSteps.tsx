@@ -503,7 +503,10 @@ export default function ExperienceFormSteps({
                     <div className="pt-1">
                       <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2 block">{copy.itineraryPhotoLabel}</label>
                       {item.image_url ? (
-                        <div className="relative w-full h-36 md:h-44 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                        <div
+                          data-testid={`host-create-itinerary-photo-tile-${idx}`}
+                          className="relative h-32 w-32 md:h-40 md:w-40 overflow-hidden rounded-2xl border border-slate-200 bg-white"
+                        >
                           <img src={item.image_url} alt={`${item.title || 'itinerary'} preview`} className="w-full h-full object-cover" />
                           <div className="absolute top-2 right-2 flex gap-2">
                             <label className="bg-white/90 text-slate-700 px-3 py-1.5 rounded-full text-[11px] font-bold cursor-pointer">
@@ -516,7 +519,10 @@ export default function ExperienceFormSteps({
                           </div>
                         </div>
                       ) : (
-                        <label className="flex items-center justify-center gap-2 h-20 rounded-2xl border-2 border-dashed border-slate-300 text-slate-500 text-xs font-bold cursor-pointer hover:border-black hover:text-black transition-colors">
+                        <label
+                          data-testid={`host-create-itinerary-photo-tile-${idx}`}
+                          className="flex h-32 w-32 md:h-40 md:w-40 items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 px-3 text-center text-xs font-bold text-slate-500 cursor-pointer hover:border-black hover:text-black transition-colors"
+                        >
                           <Camera size={16} />
                           {copy.itineraryAddPhoto}
                           <input type="file" accept="image/*" className="hidden" onChange={(e) => handleItineraryImageUpload(idx, e)} />

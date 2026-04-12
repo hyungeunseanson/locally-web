@@ -772,7 +772,10 @@ export default function EditExperiencePage() {
                       <div className="mt-3">
                         <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase">{copy.itineraryPhotoLabel}</label>
                         {item.image_url ? (
-                          <div className="relative h-32 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                          <div
+                            data-testid={`host-edit-itinerary-photo-tile-${i}`}
+                            className="relative h-32 w-32 md:h-40 md:w-40 overflow-hidden rounded-xl border border-slate-200 bg-slate-50"
+                          >
                             <img src={item.image_url} className="w-full h-full object-cover" alt={`itinerary-${i}`} />
                             <div className="absolute top-2 right-2 flex gap-2">
                               <label className="bg-white/90 px-3 py-1.5 rounded-full text-[10px] font-bold text-slate-700 cursor-pointer">
@@ -791,7 +794,10 @@ export default function EditExperiencePage() {
                             </div>
                           </div>
                         ) : (
-                          <label className="flex h-20 items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 text-xs font-bold text-slate-500 cursor-pointer hover:border-black hover:text-black transition-colors">
+                          <label
+                            data-testid={`host-edit-itinerary-photo-tile-${i}`}
+                            className="flex h-32 w-32 md:h-40 md:w-40 items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 px-3 text-center text-xs font-bold text-slate-500 cursor-pointer hover:border-black hover:text-black transition-colors"
+                          >
                             {uploadingItineraryIndex === i ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
                             {copy.itineraryAddPhoto}
                             <input
