@@ -111,6 +111,12 @@
   - `tests/e2e/12-service-paypal-payment.spec.ts`
   - `tests/e2e/21-service-payment-method-lock.spec.ts`
   - 결과: `7 passed (28.4s)` under `playwright.contracts.config.ts`
+- 완료 / 정산 core subset
+  - `tests/e2e/131-service-completion-cron.spec.ts`
+  - `tests/e2e/132-service-payout-eligibility-after-completion.spec.ts`
+  - `tests/e2e/151-service-bank-confirm-guard.spec.ts`
+  - `tests/e2e/152-host-service-earnings-separation.spec.ts`
+  - 결과: `6 passed (26.1s)` under `playwright.contracts.config.ts`
 - 이번 패스에서 직접 닫은 항목
   - 서울 request 생성 시 country가 `대한민국`으로 정규화되는 생성 계약
   - booking pre-create 실패 시 `pending_payment` request cleanup 계약
@@ -119,6 +125,9 @@
   - card callback이 fabricated success payload나 unauthenticated confirm 시도로 booking을 확정하지 않는 계약
   - PayPal approve UI가 localized body copy가 아니라 capture/complete contract 자체로 잠겨 있다는 점
   - pending booking의 bank/card 전환 잠금 규칙이 시작/해제/legacy placeholder 상태별로 유지된다는 점
+  - completion cron이 paid service booking만 완료 처리하고 payout eligibility를 여는 계약
+  - admin service bank confirm이 `PENDING + bank` 경계와 idempotent confirm semantics를 유지한다는 점
+  - host earnings summary와 service drilldown이 completed service truth를 다른 source로 읽지 않는다는 점
 
 ## Initial Findings
 
@@ -142,19 +151,31 @@
 ### 3. 현재 남은 재감사 핵심은 완료 / 정산 / host-admin reflection이다
 - confirmed
 - 근거
-  - 앞단 생성/공개/결제는 모두 직접 rerun 근거가 생겼다
-  - 아직 직접 rerun하지 않은 큰 묶음은 완료 sync, bank confirm, payout eligibility, host earnings reflection, admin service finance 반영(`131/132/151/152/08/10/155~160`) 쪽이다
+  - `131`에서 completion cron이 과거 `PAID` service booking을 `completed`로 승격시키고 payout queue 진입 전제를 다시 잠갔다
+  - `132`에서 payout queue는 completion 이전에는 닫히고, completion 이후에만 열리는 계약이 유지됐다
+  - `151`에서 admin confirm은 non-admin, non-bank, concurrent confirm 모두 fail-closed 또는 idempotent semantics를 유지했다
+  - `152`에서 host service earnings는 unified summary와 service-only drilldown이 같은 host-scoped settlement truth를 읽는 것이 다시 확인됐다
+- 판정
+  - `완료 / 정산 / 호스트 반영`: `정상`
+
+### 4. 현재 남은 마지막 재감사 핵심은 admin finance reflection close-out이다
+- confirmed
+- 근거
+  - 생성/공개/결제/완료/정산 앞단까지는 직접 rerun 근거가 모두 생겼다
+  - 아직 직접 rerun하지 않은 큰 묶음은 admin service finance reflection과 settlement sync 운영 표면(`08/10/155~160`)이다
 - 판정
   - `도메인 close-out 상태`: `부분 보장`
 
 ## Next Slice
 - 다음 실행 묶음
-  - `131-service-completion-cron.spec.ts`
-  - `132-service-payout-eligibility-after-completion.spec.ts`
-  - `151-service-bank-confirm-guard.spec.ts`
-  - `152-host-service-earnings-separation.spec.ts`
+  - `08-admin-billing.spec.ts`
+  - `10-admin-service-requests.spec.ts`
+  - `155-admin-settlement-sync-status.spec.ts`
+  - `156-admin-settlement-sync-manual-trigger.spec.ts`
+  - `157-settlement-sync-race-guard.spec.ts`
+  - `158-settlement-sync-fail-closed.spec.ts`
+  - `160-settlement-sync-job-name-recording.spec.ts`
 - 이 묶음에서 먼저 확인할 것
-  - `service_date` 경과 후 completion sync가 `service_bookings`와 `service_requests`를 같은 의미로 완료 처리하는지
-  - admin bank confirm이 `PENDING + bank` 경계만 허용하는지
-  - payout eligibility와 host earnings/services read model이 같은 completed truth를 읽는지
-  - 완료/정산 체인 앞단이 green이면 그다음 마지막으로 admin finance reflection(`08/10/155~160`)을 붙여 최종 close-out으로 간다
+  - admin service booking/request tab이 same booking truth를 settlement/refund/all 뷰에서 일관되게 읽는지
+  - payout queue, sync status, manual trigger, race guard, fail-closed semantics가 service booking 흐름과 충돌하지 않는지
+  - 이 묶음이 green이면 서비스 의뢰 감사는 close-out 최종 판정으로 올릴 수 있다
