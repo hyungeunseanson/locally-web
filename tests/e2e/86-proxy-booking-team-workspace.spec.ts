@@ -347,6 +347,7 @@ test.describe.serial('Proxy booking team workspace flow', () => {
       await replyInput.fill(replyText);
       await adminPage.locator('form').filter({ has: replyInput }).getByRole('button').click();
       await expect(adminPage.getByText(replyText)).toBeVisible({ timeout: 15000 });
+      await customerPage.reload({ waitUntil: 'domcontentloaded' });
       await expect(customerPage.getByTestId('guest-inbox-message-thread').getByText(replyText)).toBeVisible({ timeout: 15000 });
 
     } finally {
