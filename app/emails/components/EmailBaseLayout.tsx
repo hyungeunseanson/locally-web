@@ -12,6 +12,7 @@ import {
 import * as React from 'react';
 import EmailFooter from './EmailFooter';
 import EmailHeader from './EmailHeader';
+import type { EmailLocale } from '@/app/emails/registry/emailTypes';
 import type { EmailFooterVariant } from '@/app/emails/theme/variants';
 import {
   emailColors,
@@ -24,8 +25,8 @@ import {
 } from '@/app/emails/theme/tokens';
 
 interface EmailBaseLayoutProps {
+  locale: EmailLocale;
   previewText: string;
-  eyebrow?: string;
   helpPrompt?: string;
   helpLinkLabel?: string;
   helpLinkHref?: string;
@@ -34,8 +35,8 @@ interface EmailBaseLayoutProps {
 }
 
 export default function EmailBaseLayout({
+  locale,
   previewText,
-  eyebrow,
   helpPrompt,
   helpLinkLabel,
   helpLinkHref,
@@ -50,14 +51,15 @@ export default function EmailBaseLayout({
       <Preview>{previewText}</Preview>
       <Body style={body}>
         <Container style={container}>
-          <EmailHeader eyebrow={eyebrow} />
+          <EmailHeader />
           <Section style={accentBar} />
           <Section style={content}>{children}</Section>
           {hasHelp ? (
             <Section style={helpSection} data-skip-in-text="true">
-              <Hr style={divider} />
               <Text style={helpText}>
-                {helpPrompt}{' '}
+                {helpPrompt}
+              </Text>
+              <Text style={helpLinkRow}>
                 <Link href={helpLinkHref} style={helpLink}>
                   {helpLinkLabel}
                 </Link>
@@ -65,7 +67,7 @@ export default function EmailBaseLayout({
             </Section>
           ) : null}
           <Hr style={footerDivider} data-skip-in-text="true" />
-          <EmailFooter variant={footerVariant} />
+          <EmailFooter variant={footerVariant} locale={locale} />
         </Container>
       </Body>
     </Html>
@@ -75,7 +77,7 @@ export default function EmailBaseLayout({
 const body = {
   backgroundColor: emailColors.canvas,
   fontFamily: EMAIL_FONT_STACK,
-  padding: `${emailSpacing.outerDesktop} 0`,
+  padding: `${emailSpacing.outerDesktop} 12px`,
 };
 
 const container = {
@@ -89,8 +91,8 @@ const container = {
 
 const accentBar = {
   backgroundColor: emailColors.brandPrimary,
-  height: '4px',
-  lineHeight: '4px',
+  height: '2px',
+  lineHeight: '2px',
   fontSize: '0',
 };
 
@@ -99,17 +101,16 @@ const content = {
 };
 
 const helpSection = {
-  padding: `0 ${emailSpacing.contentDesktop} ${emailSpacing.sectionDesktop}`,
-};
-
-const divider = {
-  borderColor: emailColors.border,
-  margin: '0 0 20px',
+  backgroundColor: emailColors.subtle,
+  border: `1px solid ${emailColors.border}`,
+  borderRadius: emailRadii.card,
+  margin: `0 ${emailSpacing.contentDesktop} ${emailSpacing.sectionDesktop}`,
+  padding: '12px 14px',
 };
 
 const footerDivider = {
   borderColor: emailColors.border,
-  margin: `0 ${emailSpacing.contentDesktop}`,
+  margin: `0 ${emailSpacing.contentDesktop} 0`,
 };
 
 const helpText = {
@@ -117,8 +118,13 @@ const helpText = {
   fontFamily: EMAIL_FONT_STACK,
   fontSize: emailTypography.label,
   lineHeight: '1.6',
+  margin: '0 0 4px',
+  textAlign: 'left' as const,
+};
+
+const helpLinkRow = {
   margin: '0',
-  textAlign: 'center' as const,
+  textAlign: 'left' as const,
 };
 
 const helpLink = {

@@ -10,15 +10,17 @@ interface EmailKVRowProps {
   label: string;
   value: string;
   emphasis?: boolean;
+  isLast?: boolean;
 }
 
 export default function EmailKVRow({
   label,
   value,
   emphasis = false,
+  isLast = false,
 }: EmailKVRowProps) {
   return (
-    <Section style={row}>
+    <Section style={{ ...row, ...(isLast ? lastRow : null) }}>
       <Text style={labelStyle}>{label}</Text>
       <Text style={emphasis ? valueStrongStyle : valueStyle}>{value}</Text>
     </Section>
@@ -28,7 +30,12 @@ export default function EmailKVRow({
 const row = {
   borderBottom: `1px solid ${emailColors.border}`,
   margin: '0',
-  padding: '0 0 12px',
+  padding: '0 0 10px',
+};
+
+const lastRow = {
+  borderBottom: 'none',
+  paddingBottom: '0',
 };
 
 const labelStyle = {
@@ -36,7 +43,7 @@ const labelStyle = {
   fontFamily: EMAIL_FONT_STACK,
   fontSize: emailTypography.label,
   fontWeight: '600',
-  margin: '0 0 6px',
+  margin: '0 0 5px',
 };
 
 const valueStyle = {

@@ -47,11 +47,13 @@ export default function BookingCancellationEmail({
 
   return (
     <BookingCancelledEmailTemplate
+      locale="ko"
       subject={templateCopy.subject}
       preheader={templateCopy.previewText}
-      title={templateCopy.subject.replace(/^\[Locally\]\s*/u, '').trim()}
+      title="예약이 취소되었습니다"
       description={`${templateCopy.greetingPrefix}${resolvedHostName}${templateCopy.greetingSuffix} ${templateCopy.introPrefix} [${resolvedExperienceTitle}] ${templateCopy.introSuffix}`}
-      statusLabel={templateCopy.previewText}
+      summaryTitle="예약 정보"
+      statusLabel="예약 취소"
       statusTone="danger"
       summaryItems={[
         {
@@ -68,7 +70,7 @@ export default function BookingCancellationEmail({
       ctaLabel={templateCopy.ctaLabel}
       ctaUrl={dashboardLink}
       helpPrompt={templateCopy.layout.helpPrompt}
-      helpLinkLabel={templateCopy.layout.helpLinkLabel}
+      helpLinkLabel={templateCopy.layout.helpLinkLabel.replace(/\s*->$/u, '')}
       helpLinkHref="/about"
       footerVariant="transactional"
     />

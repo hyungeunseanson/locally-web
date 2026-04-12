@@ -1,4 +1,4 @@
-import { Button } from '@react-email/components';
+import { Button, Section } from '@react-email/components';
 import * as React from 'react';
 import {
   emailColors,
@@ -16,11 +16,18 @@ export default function EmailPrimaryCTA({
   children,
 }: EmailPrimaryCTAProps) {
   return (
-    <Button href={href} style={buttonStyle}>
-      {children}
-    </Button>
+    <Section style={buttonWrap}>
+      <Button href={href} style={buttonStyle}>
+        {children}
+      </Button>
+    </Section>
   );
 }
+
+const buttonWrap = {
+  margin: '4px 0 0',
+  textAlign: 'left' as const,
+};
 
 const buttonStyle = {
   backgroundColor: emailColors.brandPrimary,
@@ -28,11 +35,9 @@ const buttonStyle = {
   color: '#ffffff',
   display: 'inline-block',
   fontFamily: EMAIL_FONT_STACK,
-  fontSize: '14px',
+  fontSize: '13px',
   fontWeight: '700',
-  minHeight: '48px',
-  padding: '16px 0',
+  padding: '11px 18px',
   textAlign: 'center' as const,
   textDecoration: 'none',
-  width: '100%',
 };

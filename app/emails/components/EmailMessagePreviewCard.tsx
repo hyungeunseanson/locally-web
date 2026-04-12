@@ -25,11 +25,11 @@ export default function EmailMessagePreviewCard({
 }
 
 const card = {
-  backgroundColor: '#FFFFFF',
+  backgroundColor: emailColors.surface,
   border: `1px solid ${emailColors.border}`,
   borderRadius: emailRadii.card,
-  padding: '16px 18px',
-  marginBottom: '20px',
+  padding: '14px',
+  marginBottom: '16px',
 };
 
 const titleStyle = {
@@ -38,7 +38,6 @@ const titleStyle = {
   fontSize: emailTypography.label,
   fontWeight: '700',
   margin: '0 0 8px',
-  textTransform: 'uppercase' as const,
 };
 
 const messageStyle = {

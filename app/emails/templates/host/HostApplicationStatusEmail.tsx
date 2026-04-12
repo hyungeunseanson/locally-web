@@ -6,6 +6,7 @@ import EmailTitleBlock from '@/app/emails/components/EmailTitleBlock';
 import type { HostApplicationStatusTemplateProps } from '@/app/emails/registry/emailTypes';
 
 export default function HostApplicationStatusEmail({
+  locale,
   preheader,
   eyebrow,
   title,
@@ -23,14 +24,15 @@ export default function HostApplicationStatusEmail({
 }: HostApplicationStatusTemplateProps) {
   return (
     <EmailBaseLayout
+      locale={locale}
       previewText={preheader}
-      eyebrow={eyebrow}
       helpPrompt={helpPrompt}
       helpLinkLabel={helpLinkLabel}
       helpLinkHref={helpLinkHref}
       footerVariant={footerVariant}
     >
       <EmailTitleBlock
+        eyebrow={eyebrow}
         title={title}
         description={description}
         statusLabel={statusLabel}

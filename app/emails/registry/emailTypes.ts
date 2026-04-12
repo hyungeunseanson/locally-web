@@ -113,6 +113,7 @@ export type EmailSendRequest<T extends EmailTemplateId = EmailTemplateId> = {
 };
 
 type BaseTemplateProps = {
+  locale: EmailLocale;
   subject: string;
   preheader: string;
   title: string;
@@ -123,6 +124,7 @@ type BaseTemplateProps = {
   ctaLabel: string;
   ctaUrl: string;
   summaryItems?: EmailSummaryItem[];
+  summaryTitle?: string;
   helperText?: string;
   helpPrompt?: string;
   helpLinkLabel?: string;
@@ -134,6 +136,7 @@ export type BookingConfirmedTemplateProps = BaseTemplateProps;
 export type BookingCancelledTemplateProps = BaseTemplateProps;
 export type InquiryNewMessageTemplateProps = BaseTemplateProps & {
   messagePreview: string;
+  messagePreviewTitle?: string;
 };
 export type HostApplicationStatusTemplateProps = BaseTemplateProps & {
   note?: string;
@@ -142,6 +145,7 @@ export type HostApplicationStatusTemplateProps = BaseTemplateProps & {
 export type ServicePaymentConfirmedTemplateProps = BaseTemplateProps;
 export type NoticeTemplateProps = BaseTemplateProps & {
   bodyText?: string;
+  bodyCardTitle?: string;
 };
 
 export type EmailTemplatePropsMap = {

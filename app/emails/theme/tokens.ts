@@ -5,9 +5,11 @@ export const emailColors = {
   canvas: '#F7F7F7',
   surface: '#FFFFFF',
   subtle: '#F8FAFC',
+  softAccent: '#FFF3F5',
   strongText: '#222222',
   defaultText: '#374151',
   mutedText: '#6B7280',
+  softText: '#94A3B8',
   border: '#E5E7EB',
   brandPrimary: '#FF385C',
   brandPrimaryHover: '#D90B3E',
@@ -20,34 +22,34 @@ export const emailColors = {
 } as const;
 
 export const emailSpacing = {
-  outerDesktop: '40px',
-  outerMobile: '24px',
-  contentDesktop: '32px',
-  contentMobile: '20px',
-  sectionDesktop: '24px',
-  sectionMobile: '16px',
-  itemDesktop: '12px',
+  outerDesktop: '24px',
+  outerMobile: '16px',
+  contentDesktop: '24px',
+  contentMobile: '18px',
+  sectionDesktop: '18px',
+  sectionMobile: '14px',
+  itemDesktop: '10px',
   itemMobile: '8px',
 } as const;
 
 export const emailTypography = {
-  titleDesktop: '28px',
-  titleMobile: '24px',
-  body: '15px',
+  titleDesktop: '24px',
+  titleMobile: '22px',
+  body: '14px',
   label: '12px',
   footer: '11px',
-  bodyLineHeight: '1.6',
+  bodyLineHeight: '1.62',
 } as const;
 
 export const emailRadii = {
-  container: '20px',
-  card: '16px',
-  button: '12px',
+  container: '18px',
+  card: '14px',
+  button: '10px',
   pill: '999px',
 } as const;
 
 export const emailShadows = {
-  container: '0 10px 30px rgba(15, 23, 42, 0.08)',
+  container: '0 8px 24px rgba(15, 23, 42, 0.06)',
 } as const;
 
 export const EMAIL_MAX_WIDTH = 600;

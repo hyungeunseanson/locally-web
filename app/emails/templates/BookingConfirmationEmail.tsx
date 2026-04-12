@@ -57,10 +57,14 @@ export default function BookingConfirmationEmail({
 
   return (
     <BookingConfirmedEmailTemplate
+      locale="ko"
       subject={templateCopy.subject}
       preheader={templateCopy.previewText}
-      title={templateCopy.subject.replace(/^\[Locally\]\s*/u, '').trim()}
+      title="새 예약이 접수되었습니다"
       description={`${templateCopy.greetingPrefix}${resolvedHostName}${templateCopy.greetingSuffix} [${resolvedExperienceTitle}] ${templateCopy.introText}`}
+      summaryTitle="예약 정보"
+      statusLabel="예약 접수"
+      statusTone="success"
       summaryItems={[
         {
           label: templateCopy.guestNameLabel,
@@ -84,7 +88,7 @@ export default function BookingConfirmationEmail({
       ctaLabel={templateCopy.ctaLabel}
       ctaUrl={dashboardLink}
       helpPrompt={templateCopy.layout.helpPrompt}
-      helpLinkLabel={templateCopy.layout.helpLinkLabel}
+      helpLinkLabel={templateCopy.layout.helpLinkLabel.replace(/\s*->$/u, '')}
       helpLinkHref="/about"
       footerVariant="transactional"
     />

@@ -12,7 +12,10 @@ import {
   buildServicePaymentConfirmedTemplateProps,
 } from '@/app/emails/registry/emailContentBuilders';
 import { emailTemplateRegistry } from '@/app/emails/registry/emailTemplates';
-import { sendTemplatedEmail } from '@/app/emails/delivery/sendTemplatedEmail';
+import {
+  resolveGmailSenderProfile,
+  sendTemplatedEmail,
+} from '@/app/emails/delivery/sendTemplatedEmail';
 import {
   resolveRequestedEmailLocale,
 } from '@/app/emails/render/renderEmailTemplate';
@@ -41,7 +44,9 @@ test.describe('Templated email system phase 2 contracts', () => {
 
     expect(rendered.subject).toBe('[Locally] 🎉 새로운 예약이 도착했습니다!');
     expect(rendered.preheader).toContain('도쿄 야경 투어');
-    expect(rendered.title).toContain('새로운 예약이 도착했습니다');
+    expect(rendered.title).toBe('새 예약이 접수되었습니다');
+    expect(rendered.summaryTitle).toBe('예약 정보');
+    expect(rendered.statusLabel).toBe('예약 접수');
     expect(rendered.summaryItems?.map((item) => item.value)).toContain('Sora');
     expect(rendered.ctaLabel).toBe('예약 상세 확인하기');
     expect(rendered.ctaUrl).toContain('/host/dashboard');
@@ -62,6 +67,8 @@ test.describe('Templated email system phase 2 contracts', () => {
     expect(rendered.subject).toBe('[Locally] New message from Locally Support');
     expect(rendered.preheader).toBe('We checked your request and shared the pickup details.');
     expect(rendered.summaryItems?.[1]?.value).toBe('Airport pickup request');
+    expect(rendered.summaryTitle).toBe('Conversation details');
+    expect(rendered.messagePreviewTitle).toBe('Latest message');
     expect(rendered.messagePreview).toContain('pickup details');
     expect(rendered.ctaLabel).toBe('Check message');
     expect(Object.keys(emailTemplateRegistry).sort()).toEqual([
@@ -88,6 +95,7 @@ test.describe('Templated email system phase 2 contracts', () => {
 
     expect(hostStatus.subject).toBe('[Locally] 🛠️ Your host application needs revision');
     expect(hostStatus.preheader).toContain('Please review the admin comment');
+    expect(hostStatus.statusLabel).toBe('Revision needed');
     expect(hostStatus.ctaLabel).toBe('Open host dashboard');
     expect(hostStatus.note).toContain('Please upload a clearer ID image.');
 
@@ -103,6 +111,8 @@ test.describe('Templated email system phase 2 contracts', () => {
 
     expect(servicePayment.subject).toBe('[Locally] サービスの決済が完了しました');
     expect(servicePayment.preheader).toContain('現地ホストの募集が始まります');
+    expect(servicePayment.summaryTitle).toBe('依頼情報');
+    expect(servicePayment.statusLabel).toBe('決済完了');
     expect(servicePayment.ctaLabel).toBe('依頼を見る');
     expect(servicePayment.summaryItems?.[0]?.value).toBe('東京通訳サポート');
   });
@@ -122,6 +132,7 @@ test.describe('Templated email system phase 2 contracts', () => {
 
     expect(copyNotice.subject).toBe('[Locally] 새 후기가 등록되었습니다');
     expect(copyNotice.bodyText).toContain('도쿄 야경 투어');
+    expect(copyNotice.bodyCardTitle).toBe('안내 내용');
     expect(copyNotice.ctaLabel).toBe('후기 확인하기');
 
     const customNotice = buildNoticeCustomTemplateProps({
@@ -139,6 +150,7 @@ test.describe('Templated email system phase 2 contracts', () => {
 
     expect(customNotice.subject).toBe('[Locally Admin] 운영팀 확인이 필요한 알림입니다');
     expect(customNotice.bodyText).toBe('새로운 운영 이벤트가 발생했습니다.');
+    expect(customNotice.bodyCardTitle).toBe('확인 내용');
     expect(customNotice.footerVariant).toBe('opsAdmin');
     expect(customNotice.ctaUrl).toContain('/admin/dashboard?tab=ALERTS');
   });
@@ -218,5 +230,48 @@ test.describe('Templated email system phase 2 contracts', () => {
     expect(adminResult.success).toBe(true);
     expect(adminResult.sent).toBe(false);
     expect(adminResult.skipped).toBe('recipient_missing');
+  });
+
+  test('prefers dedicated admin Gmail credentials for ops admin transport when configured', () => {
+    const sender = resolveGmailSenderProfile('opsAdmin', {
+      ADMIN_GMAIL_USER: 'ops-admin@example.com',
+      ADMIN_GMAIL_APP_PASSWORD: 'admin-pass',
+      GMAIL_USER: 'general@example.com',
+      GMAIL_APP_PASSWORD: 'general-pass',
+    });
+
+    expect(sender).toEqual({
+      user: 'ops-admin@example.com',
+      pass: 'admin-pass',
+      from: '"Locally Admin" <ops-admin@example.com>',
+    });
+  });
+
+  test('falls back to the shared Gmail sender for ops admin transport when dedicated admin credentials are missing', () => {
+    const sender = resolveGmailSenderProfile('opsAdmin', {
+      GMAIL_USER: 'general@example.com',
+      GMAIL_APP_PASSWORD: 'general-pass',
+    });
+
+    expect(sender).toEqual({
+      user: 'general@example.com',
+      pass: 'general-pass',
+      from: '"Locally Team" <general@example.com>',
+    });
+  });
+
+  test('keeps transactional mail on the shared Gmail sender even when dedicated admin credentials exist', () => {
+    const sender = resolveGmailSenderProfile('transactional', {
+      ADMIN_GMAIL_USER: 'ops-admin@example.com',
+      ADMIN_GMAIL_APP_PASSWORD: 'admin-pass',
+      GMAIL_USER: 'general@example.com',
+      GMAIL_APP_PASSWORD: 'general-pass',
+    });
+
+    expect(sender).toEqual({
+      user: 'general@example.com',
+      pass: 'general-pass',
+      from: '"Locally Team" <general@example.com>',
+    });
   });
 });

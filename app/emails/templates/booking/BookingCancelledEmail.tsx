@@ -1,4 +1,4 @@
-import { Section, Text } from '@react-email/components';
+import { Text } from '@react-email/components';
 import * as React from 'react';
 import EmailBaseLayout from '@/app/emails/components/EmailBaseLayout';
 import EmailKVRow from '@/app/emails/components/EmailKVRow';
@@ -13,6 +13,7 @@ import {
 } from '@/app/emails/theme/tokens';
 
 export default function BookingCancelledEmail({
+  locale,
   preheader,
   eyebrow,
   title,
@@ -20,6 +21,7 @@ export default function BookingCancelledEmail({
   statusLabel,
   statusTone,
   summaryItems = [],
+  summaryTitle,
   helperText,
   ctaLabel,
   ctaUrl,
@@ -30,14 +32,15 @@ export default function BookingCancelledEmail({
 }: BookingCancelledTemplateProps) {
   return (
     <EmailBaseLayout
+      locale={locale}
       previewText={preheader}
-      eyebrow={eyebrow}
       helpPrompt={helpPrompt}
       helpLinkLabel={helpLinkLabel}
       helpLinkHref={helpLinkHref}
       footerVariant={footerVariant}
     >
       <EmailTitleBlock
+        eyebrow={eyebrow}
         title={title}
         description={description}
         statusLabel={statusLabel}
@@ -45,15 +48,15 @@ export default function BookingCancelledEmail({
       />
 
       {summaryItems.length > 0 ? (
-        <EmailSummaryCard title="Summary">
+        <EmailSummaryCard title={summaryTitle}>
           {summaryItems.map((item, index) => (
-            <Section key={`${item.label}-${index}`} style={index === summaryItems.length - 1 ? lastRow : undefined}>
-              <EmailKVRow
-                label={item.label}
-                value={item.value}
-                emphasis={item.emphasis}
-              />
-            </Section>
+            <EmailKVRow
+              key={`${item.label}-${index}`}
+              label={item.label}
+              value={item.value}
+              emphasis={item.emphasis}
+              isLast={index === summaryItems.length - 1}
+            />
           ))}
         </EmailSummaryCard>
       ) : null}
@@ -70,9 +73,5 @@ const helperStyle = {
   fontFamily: EMAIL_FONT_STACK,
   fontSize: emailTypography.body,
   lineHeight: '1.6',
-  margin: '0 0 20px',
-};
-
-const lastRow = {
-  borderBottom: 'none',
+  margin: '0 0 14px',
 };

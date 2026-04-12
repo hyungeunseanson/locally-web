@@ -23,15 +23,27 @@ type SendTemplatedEmailResult = {
 
 const LOCAL_DEV_FALLBACK_MAIL_CAPTURE_PATH = '/tmp/locally-mock-nodemailer.jsonl';
 
+type EmailEnv = Partial<Record<
+  | 'RESEND_API_KEY'
+  | 'RESEND_FROM_EMAIL'
+  | 'GMAIL_USER'
+  | 'GMAIL_APP_PASSWORD'
+  | 'ADMIN_GMAIL_USER'
+  | 'ADMIN_GMAIL_APP_PASSWORD'
+  | 'MOCK_ADMIN_ALERT_EMAILS_FILE'
+  | 'NODE_ENV',
+  string
+>>;
+
 function hasResendConfig() {
   return Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL);
 }
 
-function hasGmailConfig(env: NodeJS.ProcessEnv = process.env) {
+function hasGmailConfig(env: EmailEnv = process.env) {
   return Boolean(env.GMAIL_USER && env.GMAIL_APP_PASSWORD);
 }
 
-export function hasAdminGmailConfig(env: NodeJS.ProcessEnv = process.env) {
+export function hasAdminGmailConfig(env: EmailEnv = process.env) {
   return Boolean(env.ADMIN_GMAIL_USER && env.ADMIN_GMAIL_APP_PASSWORD);
 }
 
@@ -43,7 +55,7 @@ type GmailSenderProfile = {
 
 export function resolveGmailSenderProfile(
   policy: EmailTransportPolicy = 'transactional',
-  env: NodeJS.ProcessEnv = process.env
+  env: EmailEnv = process.env
 ): GmailSenderProfile | null {
   if (policy === 'opsAdmin' && hasAdminGmailConfig(env)) {
     return {

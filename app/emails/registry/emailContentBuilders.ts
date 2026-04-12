@@ -111,6 +111,191 @@ function buildSummaryItems(items: Array<EmailSummaryItem | null | undefined>) {
   return items.filter((item): item is EmailSummaryItem => Boolean(item));
 }
 
+function buildBookingSummaryTitle(locale: EmailLocale) {
+  switch (locale) {
+    case 'en':
+      return 'Booking details';
+    case 'ja':
+      return '予約情報';
+    case 'zh':
+      return '预订信息';
+    case 'ko':
+    default:
+      return '예약 정보';
+  }
+}
+
+function buildConversationSummaryTitle(locale: EmailLocale) {
+  switch (locale) {
+    case 'en':
+      return 'Conversation details';
+    case 'ja':
+      return '会話情報';
+    case 'zh':
+      return '对话信息';
+    case 'ko':
+    default:
+      return '대화 정보';
+  }
+}
+
+function buildMessagePreviewTitle(locale: EmailLocale) {
+  switch (locale) {
+    case 'en':
+      return 'Latest message';
+    case 'ja':
+      return '最新メッセージ';
+    case 'zh':
+      return '最新消息';
+    case 'ko':
+    default:
+      return '새 메시지';
+  }
+}
+
+function buildServiceSummaryTitle(locale: EmailLocale) {
+  switch (locale) {
+    case 'en':
+      return 'Request details';
+    case 'ja':
+      return '依頼情報';
+    case 'zh':
+      return '请求信息';
+    case 'ko':
+    default:
+      return '요청 정보';
+  }
+}
+
+function buildNoticeBodyCardTitle(locale: EmailLocale, audience: 'guest' | 'host' | 'admin') {
+  if (audience === 'admin') {
+    switch (locale) {
+      case 'en':
+        return 'What to check';
+      case 'ja':
+        return '確認内容';
+      case 'zh':
+        return '确认内容';
+      case 'ko':
+      default:
+        return '확인 내용';
+    }
+  }
+
+  switch (locale) {
+    case 'en':
+      return 'Details';
+    case 'ja':
+      return '안내 내용';
+    case 'zh':
+      return '详细内容';
+    case 'ko':
+    default:
+      return '안내 내용';
+  }
+}
+
+function buildBookingConfirmedStatusLabel(locale: EmailLocale, audience: 'guest' | 'host' | 'admin') {
+  if (audience === 'host') {
+    switch (locale) {
+      case 'en':
+        return 'New booking';
+      case 'ja':
+        return '新規予約';
+      case 'zh':
+        return '新预订';
+      case 'ko':
+      default:
+        return '예약 접수';
+    }
+  }
+
+  switch (locale) {
+    case 'en':
+      return 'Confirmed';
+    case 'ja':
+      return '予約確定';
+    case 'zh':
+      return '已确认';
+    case 'ko':
+    default:
+      return '예약 확정';
+  }
+}
+
+function buildBookingCancelledStatusLabel(locale: EmailLocale) {
+  switch (locale) {
+    case 'en':
+      return 'Cancelled';
+    case 'ja':
+      return 'キャンセル';
+    case 'zh':
+      return '已取消';
+    case 'ko':
+    default:
+      return '예약 취소';
+  }
+}
+
+function buildHostApplicationStatusLabel(
+  locale: EmailLocale,
+  status: 'approved' | 'revision' | 'rejected'
+) {
+  if (status === 'approved') {
+    switch (locale) {
+      case 'en':
+        return 'Approved';
+      case 'ja':
+        return '承認完了';
+      case 'zh':
+        return '已通过';
+      case 'ko':
+      default:
+        return '승인 완료';
+    }
+  }
+
+  if (status === 'revision') {
+    switch (locale) {
+      case 'en':
+        return 'Revision needed';
+      case 'ja':
+        return '補完が必要';
+      case 'zh':
+        return '需要补充';
+      case 'ko':
+      default:
+        return '보완 필요';
+    }
+  }
+
+  switch (locale) {
+    case 'en':
+      return 'Not approved';
+    case 'ja':
+      return '未承認';
+    case 'zh':
+      return '未通过';
+    case 'ko':
+    default:
+      return '미승인';
+  }
+}
+
+function buildServicePaymentStatusLabel(locale: EmailLocale) {
+  switch (locale) {
+    case 'en':
+      return 'Payment complete';
+    case 'ja':
+      return '決済完了';
+    case 'zh':
+      return '支付完成';
+    case 'ko':
+    default:
+      return '결제 완료';
+  }
+}
+
 // Ownership rule:
 // - emailTypes.ts owns template ids and payload contracts.
 // - emailContentBuilders.ts owns localized subject/preheader/body/CTA derivation.
@@ -131,10 +316,14 @@ export function buildBookingConfirmedTemplateProps({
     });
 
     return {
+      locale,
       subject: copy.subject,
       preheader: copy.message,
       title: copy.title,
       description: copy.message,
+      summaryTitle: buildBookingSummaryTitle(locale),
+      statusLabel: buildBookingConfirmedStatusLabel(locale, audience),
+      statusTone: 'success',
       ctaLabel: copy.ctaLabel,
       ctaUrl: buildAbsoluteUrl(payload.ctaUrl),
       summaryItems: buildSummaryItems([
@@ -156,10 +345,21 @@ export function buildBookingConfirmedTemplateProps({
   const resolvedRecipientName = payload.recipientName || copy.fallbackHostName;
 
   return {
+    locale,
     subject: copy.subject,
     preheader: copy.previewText,
-    title: stripLocallyPrefix(copy.subject),
+    title:
+      locale === 'ko'
+        ? '새 예약이 접수되었습니다'
+        : locale === 'ja'
+          ? '新しい予約が入りました'
+          : locale === 'zh'
+            ? '你收到了一笔新预订'
+            : 'A new booking has arrived',
     description: `${copy.greetingPrefix}${resolvedRecipientName}${copy.greetingSuffix} ${copy.introText}`,
+    summaryTitle: buildBookingSummaryTitle(locale),
+    statusLabel: buildBookingConfirmedStatusLabel(locale, audience),
+    statusTone: 'success',
     ctaLabel: copy.ctaLabel,
     ctaUrl: buildAbsoluteUrl(payload.ctaUrl),
     summaryItems: buildSummaryItems([
@@ -210,11 +410,13 @@ export function buildBookingCancelledTemplateProps({
     });
 
     return {
+      locale,
       subject: copy.subject,
       preheader: copy.message,
       title: copy.title,
       description: copy.message,
-      statusLabel: stripLocallyPrefix(copy.subject),
+      summaryTitle: buildBookingSummaryTitle(locale),
+      statusLabel: buildBookingCancelledStatusLabel(locale),
       statusTone: 'danger',
       ctaLabel: copy.ctaLabel,
       ctaUrl: buildAbsoluteUrl(payload.ctaUrl),
@@ -241,11 +443,20 @@ export function buildBookingCancelledTemplateProps({
   const resolvedReason = payload.reason || copy.fallbackCancelReason;
 
   return {
+    locale,
     subject: copy.subject,
     preheader: copy.previewText,
-    title: stripLocallyPrefix(copy.subject),
+    title:
+      locale === 'ko'
+        ? '예약이 취소되었습니다'
+        : locale === 'ja'
+          ? '予約がキャンセルされました'
+          : locale === 'zh'
+            ? '预订已取消'
+            : 'The booking was cancelled',
     description: `${copy.greetingPrefix}${resolvedRecipientName}${copy.greetingSuffix} ${copy.introPrefix} [${payload.experienceTitle}] ${copy.introSuffix}`,
-    statusLabel: stripLocallyPrefix(copy.previewText),
+    summaryTitle: buildBookingSummaryTitle(locale),
+    statusLabel: buildBookingCancelledStatusLabel(locale),
     statusTone: 'danger',
     ctaLabel: copy.ctaLabel,
     ctaUrl: buildAbsoluteUrl(payload.ctaUrl),
@@ -279,10 +490,13 @@ export function buildInquiryNewMessageTemplateProps({
   });
 
   return {
+    locale,
     subject: copy.subject,
     preheader: payload.messagePreview,
     title: copy.title,
     description: buildInquiryDescription(locale, payload.threadTitle),
+    summaryTitle: buildConversationSummaryTitle(locale),
+    messagePreviewTitle: buildMessagePreviewTitle(locale),
     ctaLabel: copy.ctaLabel,
     ctaUrl: buildAbsoluteUrl(payload.ctaUrl),
     messagePreview: payload.messagePreview,
@@ -340,12 +554,12 @@ function buildHostApplicationEyebrow(locale: EmailLocale) {
     case 'en':
       return 'Host application';
     case 'ja':
-      return 'Host application';
+      return 'ホスト申請';
     case 'zh':
-      return 'Host application';
+      return '房东申请';
     case 'ko':
     default:
-      return 'Host application';
+      return '호스트 신청';
   }
 }
 
@@ -395,12 +609,13 @@ export function buildHostApplicationStatusTemplateProps({
   const splitMessage = splitPrimaryAndNote(copy.message);
 
   return {
+    locale,
     subject: copy.subject,
     preheader: splitMessage.primary || copy.message,
     eyebrow: buildHostApplicationEyebrow(locale),
     title: stripEmojiPrefix(copy.title),
     description: splitMessage.primary || copy.message,
-    statusLabel: stripEmojiPrefix(copy.subject),
+    statusLabel: buildHostApplicationStatusLabel(locale, payload.status),
     statusTone: buildHostApplicationStatusTone(payload.status),
     note: payload.note || splitMessage.note || undefined,
     noteTitle:
@@ -441,12 +656,21 @@ export function buildServicePaymentConfirmedTemplateProps({
   const labels = buildServiceLabels(locale);
 
   return {
+    locale,
     subject: copy.subject,
     preheader: copy.message,
-    eyebrow: locale === 'ko' ? 'Service request' : 'Service request',
+    eyebrow:
+      locale === 'ko'
+        ? '서비스 요청'
+        : locale === 'ja'
+          ? 'サービス依頼'
+          : locale === 'zh'
+            ? '服务请求'
+            : 'Service request',
     title: copy.title,
     description: copy.message,
-    statusLabel: copy.title,
+    summaryTitle: buildServiceSummaryTitle(locale),
+    statusLabel: buildServicePaymentStatusLabel(locale),
     statusTone: 'success',
     ctaLabel: copy.ctaLabel,
     ctaUrl: buildAbsoluteUrl(payload.ctaUrl),
@@ -478,11 +702,13 @@ export function buildNoticeCopyTemplateProps({
   );
 
   return {
+    locale,
     subject: copy.subject,
     preheader: payload.preheader || copy.message,
     eyebrow: payload.eyebrow,
     title: copy.title,
     bodyText: copy.message,
+    bodyCardTitle: buildNoticeBodyCardTitle(locale, audience),
     statusLabel: payload.statusLabel,
     statusTone: payload.statusTone,
     ctaLabel: copy.ctaLabel,
@@ -506,11 +732,13 @@ export function buildNoticeCustomTemplateProps({
   const footerVariant = payload.footerVariant || (audience === 'admin' ? 'opsAdmin' : 'transactional');
 
   return {
+    locale,
     subject: payload.subject,
     preheader: payload.preheader || payload.message,
     eyebrow: payload.eyebrow,
     title: payload.title,
     bodyText: payload.message,
+    bodyCardTitle: buildNoticeBodyCardTitle(locale, audience),
     statusLabel: payload.statusLabel,
     statusTone: payload.statusTone,
     ctaLabel: payload.ctaLabel,

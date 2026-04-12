@@ -1,4 +1,3 @@
-import { Section } from '@react-email/components';
 import * as React from 'react';
 import EmailBaseLayout from '@/app/emails/components/EmailBaseLayout';
 import EmailKVRow from '@/app/emails/components/EmailKVRow';
@@ -9,12 +8,15 @@ import EmailTitleBlock from '@/app/emails/components/EmailTitleBlock';
 import type { InquiryNewMessageTemplateProps } from '@/app/emails/registry/emailTypes';
 
 export default function InquiryNewMessageEmail({
+  locale,
   preheader,
   eyebrow,
   title,
   description,
   summaryItems = [],
+  summaryTitle,
   messagePreview,
+  messagePreviewTitle,
   ctaLabel,
   ctaUrl,
   helpPrompt,
@@ -24,36 +26,32 @@ export default function InquiryNewMessageEmail({
 }: InquiryNewMessageTemplateProps) {
   return (
     <EmailBaseLayout
+      locale={locale}
       previewText={preheader}
-      eyebrow={eyebrow}
       helpPrompt={helpPrompt}
       helpLinkLabel={helpLinkLabel}
       helpLinkHref={helpLinkHref}
       footerVariant={footerVariant}
     >
-      <EmailTitleBlock title={title} description={description} />
+      <EmailTitleBlock eyebrow={eyebrow} title={title} description={description} />
 
       {summaryItems.length > 0 ? (
-        <EmailSummaryCard title="Conversation">
+        <EmailSummaryCard title={summaryTitle}>
           {summaryItems.map((item, index) => (
-            <Section key={`${item.label}-${index}`} style={index === summaryItems.length - 1 ? lastRow : undefined}>
-              <EmailKVRow
-                label={item.label}
-                value={item.value}
-                emphasis={item.emphasis}
-              />
-            </Section>
+            <EmailKVRow
+              key={`${item.label}-${index}`}
+              label={item.label}
+              value={item.value}
+              emphasis={item.emphasis}
+              isLast={index === summaryItems.length - 1}
+            />
           ))}
         </EmailSummaryCard>
       ) : null}
 
-      <EmailMessagePreviewCard title="Message preview" message={messagePreview} />
+      <EmailMessagePreviewCard title={messagePreviewTitle} message={messagePreview} />
 
       <EmailPrimaryCTA href={ctaUrl}>{ctaLabel}</EmailPrimaryCTA>
     </EmailBaseLayout>
   );
 }
-
-const lastRow = {
-  borderBottom: 'none',
-};

@@ -1,4 +1,3 @@
-import { Section } from '@react-email/components';
 import * as React from 'react';
 import EmailBaseLayout from '@/app/emails/components/EmailBaseLayout';
 import EmailKVRow from '@/app/emails/components/EmailKVRow';
@@ -8,6 +7,7 @@ import EmailTitleBlock from '@/app/emails/components/EmailTitleBlock';
 import type { ServicePaymentConfirmedTemplateProps } from '@/app/emails/registry/emailTypes';
 
 export default function ServicePaymentConfirmedEmail({
+  locale,
   preheader,
   eyebrow,
   title,
@@ -15,6 +15,7 @@ export default function ServicePaymentConfirmedEmail({
   statusLabel,
   statusTone,
   summaryItems = [],
+  summaryTitle,
   ctaLabel,
   ctaUrl,
   helpPrompt,
@@ -24,14 +25,15 @@ export default function ServicePaymentConfirmedEmail({
 }: ServicePaymentConfirmedTemplateProps) {
   return (
     <EmailBaseLayout
+      locale={locale}
       previewText={preheader}
-      eyebrow={eyebrow}
       helpPrompt={helpPrompt}
       helpLinkLabel={helpLinkLabel}
       helpLinkHref={helpLinkHref}
       footerVariant={footerVariant}
     >
       <EmailTitleBlock
+        eyebrow={eyebrow}
         title={title}
         description={description}
         statusLabel={statusLabel}
@@ -39,18 +41,15 @@ export default function ServicePaymentConfirmedEmail({
       />
 
       {summaryItems.length > 0 ? (
-        <EmailSummaryCard title="Summary">
+        <EmailSummaryCard title={summaryTitle}>
           {summaryItems.map((item, index) => (
-            <Section
+            <EmailKVRow
               key={`${item.label}-${index}`}
-              style={index === summaryItems.length - 1 ? lastRow : undefined}
-            >
-              <EmailKVRow
-                label={item.label}
-                value={item.value}
-                emphasis={item.emphasis}
-              />
-            </Section>
+              label={item.label}
+              value={item.value}
+              emphasis={item.emphasis}
+              isLast={index === summaryItems.length - 1}
+            />
           ))}
         </EmailSummaryCard>
       ) : null}
@@ -59,7 +58,3 @@ export default function ServicePaymentConfirmedEmail({
     </EmailBaseLayout>
   );
 }
-
-const lastRow = {
-  borderBottom: 'none',
-};

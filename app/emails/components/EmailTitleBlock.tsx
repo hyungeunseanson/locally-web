@@ -10,6 +10,7 @@ import {
 } from '@/app/emails/theme/tokens';
 
 interface EmailTitleBlockProps {
+  eyebrow?: string;
   title: string;
   description?: string;
   statusLabel?: string;
@@ -17,6 +18,7 @@ interface EmailTitleBlockProps {
 }
 
 export default function EmailTitleBlock({
+  eyebrow,
   title,
   description,
   statusLabel,
@@ -26,10 +28,7 @@ export default function EmailTitleBlock({
 
   return (
     <Section style={section}>
-      <Heading as="h1" style={titleStyle}>
-        {title}
-      </Heading>
-      {description ? <Text style={descriptionStyle}>{description}</Text> : null}
+      {eyebrow ? <Text style={eyebrowStyle}>{eyebrow}</Text> : null}
       {statusLabel ? (
         <Text
           style={{
@@ -42,12 +41,26 @@ export default function EmailTitleBlock({
           {statusLabel}
         </Text>
       ) : null}
+      <Heading as="h1" style={titleStyle}>
+        {title}
+      </Heading>
+      {description ? <Text style={descriptionStyle}>{description}</Text> : null}
     </Section>
   );
 }
 
 const section = {
-  marginBottom: '24px',
+  marginBottom: '18px',
+};
+
+const eyebrowStyle = {
+  color: emailColors.mutedText,
+  fontFamily: EMAIL_FONT_STACK,
+  fontSize: emailTypography.label,
+  fontWeight: '700',
+  letterSpacing: '0.08em',
+  margin: '0 0 10px',
+  textTransform: 'uppercase' as const,
 };
 
 const titleStyle = {
@@ -56,8 +69,8 @@ const titleStyle = {
   fontSize: emailTypography.titleDesktop,
   fontWeight: '700',
   letterSpacing: '-0.02em',
-  lineHeight: '1.2',
-  margin: '0 0 10px',
+  lineHeight: '1.24',
+  margin: '0 0 8px',
 };
 
 const descriptionStyle = {
@@ -75,6 +88,6 @@ const statusPill = {
   fontFamily: EMAIL_FONT_STACK,
   fontSize: emailTypography.label,
   fontWeight: '600',
-  margin: '14px 0 0',
-  padding: '6px 10px',
+  margin: '0 0 10px',
+  padding: '5px 9px',
 };
