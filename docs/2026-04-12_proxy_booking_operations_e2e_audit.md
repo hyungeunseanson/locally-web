@@ -15,7 +15,7 @@
 - 이번 패스 핵심 결론
   - 전화 예약 도메인의 write/read source of truth는 현재 `proxy_requests`로 잘 고정되어 있다
   - 결제 상태 변경 owner도 `generic PATCH /api/proxy-bookings/[id]`가 아니라 전용 admin route / card callback 경계로 정리돼 있다
-  - linked inquiry가 있는 요청은 고객 소통을 기존 `inquiries / inquiry_messages` 엔진으로 재사용하고, linked inquiry가 없는 요청만 `proxy_comments` fallback을 유지한다
+  - 현재 tracked 생성 경로는 새 요청마다 `linked_inquiry_id`를 함께 심고, linked inquiry가 없는 경우에만 `proxy_comments` fallback을 유지한다
   - 최신 close-out rerun 기준 핵심 non-live bundle은 모두 green이다
   - `86-proxy-booking-team-workspace`도 현재는 page-wide text가 아니라 guest inbox thread persistence를 기준으로 검증되며 green 복구됐다
   - 따라서 현재 최종 판정은 `proxy core chain은 정상`, `남는 것은 boundary-only gap`이다
@@ -45,7 +45,7 @@
 | TEAM > 전화 예약 운영 | `PhoneReservationTab`, `/api/proxy-bookings/[id]`, `/api/proxy-bookings/[id]/comments` | `86`, reference `15`, `89`, `136` | 정상 | TEAM 탭의 결제 확인, 진행 상태 변경, 운영 답글 저장, 고객 inbox persisted visibility가 latest rerun 기준 green이다 |
 | 고객 self-service / 상세 | `app/proxy-bookings/page.tsx`, `app/proxy-bookings/[id]/page.tsx`, `/api/proxy-bookings/[id]` | `105`, `88` | 정상 | 목록 next-step copy, 상세 계좌 안내, message CTA, 결제/진행 상태 반영이 현재 truth와 맞는다 |
 | 알림 / localization | `proxyBookingNotifications.ts`, `/api/proxy-bookings/[id]/comments`, `buildLocalizedNotificationInsert` | `119` | 정상 | payment confirm / admin reply notification이 recipient locale 기준으로 저장된다 |
-| linked inquiry / legacy fallback | `/api/proxy-bookings/[id]/comments`, `/api/proxy-bookings/[id]`, `getProxyLinkedInquiryId()` | `86`, `119`, static audit | 부분 보장 | linked inquiry가 있으면 inquiry 엔진 재사용, 없으면 `proxy_comments` fallback 유지. 둘 다 current path로 남아 있다 |
+| linked inquiry / legacy fallback | `/api/proxy-bookings/[id]/comments`, `/api/proxy-bookings/[id]`, `getProxyLinkedInquiryId()` | `86`, `119`, static audit | 부분 보장 | tracked 생성 경로는 `linked_inquiry_id`를 항상 심는다. 현재 `proxy_comments` fallback은 legacy row 또는 수동 seeded fixture 보호 경계로 남아 있다 |
 
 ## Confirmed Findings
 ### 1. 전화 예약 요청 생성은 `proxy_requests` 단일 source로 잘 고정돼 있다
@@ -93,13 +93,16 @@
 - 즉 현재 제품 의미는 “요청 보드는 남기되, 실제 대화 엔진은 inbox를 우선 사용” 쪽이다
 
 ### 5. linked inquiry 경계는 상당히 정리됐지만 legacy fallback이 아직 남아 있다
+- `POST /api/proxy-bookings`
+  - 새 요청 생성 시 `upsertInquiryThread(contextType='admin_support')`를 먼저 호출하고, 그 결과 `inquiryId`를 `form_data.linked_inquiry_id`로 같이 저장한다
+  - 코드 기준으로는 현재 tracked create path에서 linked inquiry 없이 생성되는 분기가 보이지 않는다
 - `POST /api/proxy-bookings/[id]/comments`
   - `linked_inquiry_id`가 있으면 `createInquiryMessage()`를 사용해 기존 문의 엔진에 답글을 쓴다
   - 없으면 `proxy_comments`에 직접 저장한다
 - `GET /api/proxy-bookings/[id]`
   - linked inquiry가 있으면 `inquiry_messages`를 comment rows처럼 projection 한다
   - 없으면 `proxy_comments`를 그대로 읽는다
-- 따라서 proxy 도메인은 현재 “완전 통일”이 아니라 “linked inquiry 우선 + legacy fallback 유지” 상태다
+- 따라서 현재 해석은 “신규 운영 경로는 linked inquiry 우선으로 이미 통일됐고, `proxy_comments`는 legacy row / 수동 fixture 보호용 fallback으로 남아 있다”가 가장 가깝다
 
 ## Static Risk Notes
 - `POST /api/proxy-bookings`는 linked inquiry를 먼저 만들고, 그 다음 `proxy_requests`를 insert한다
@@ -116,11 +119,13 @@
   - `tests/e2e/89-admin-team-mobile.spec.ts`
   - `tests/e2e/136-team-workspace-retention.spec.ts`
 - `card-notification` external callback path는 static audit로만 확인했고, 이번 패스에서는 직접 재실행하지 않았다
-- linked inquiry 미존재 legacy branch(`proxy_comments`)가 실제 운영에서 여전히 필요한지까지는 이번 문서에서 단정하지 않는다
+- tracked 생성 경로 밖에서 만들어진 legacy row가 실제 운영 데이터에 여전히 남아 있는지까지는 이번 문서에서 단정하지 않는다
+- `tests/e2e/105-proxy-booking-self-service.spec.ts`, `tests/e2e/119-proxy-notification-localization.spec.ts`는 여전히 linked inquiry 유무를 수동 fixture로 seed할 수 있어 fallback branch 자체는 테스트 surface에 남아 있다
 
 ## Follow-up Need
 - 1순위
-  - linked inquiry 미존재 legacy `proxy_comments` branch를 계속 유지할지, 완전 통일할지 운영 결정을 내려야 한다
+  - production에 `linked_inquiry_id` 없는 legacy proxy row가 실제로 남아 있는지 runtime evidence를 먼저 확인해야 한다
+  - 그 결과가 `없음`이면 `proxy_comments` fallback 제거 계획으로, `있음`이면 유지 범위를 legacy read/write 보호로만 더 명확히 잠그는 쪽이 안전하다
 - 2순위
   - `card-notification` route를 provider cutover 이후에도 실제 운영 path로 쓸 계획이면 별도 contract rerun을 묶는 편이 안전하다
 
