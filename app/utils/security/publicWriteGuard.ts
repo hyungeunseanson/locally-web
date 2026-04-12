@@ -27,22 +27,36 @@ function getRateLimitStore(): RateLimitStore {
   return globalThis.__locallyPublicWriteRateLimitStore;
 }
 
+function isLoopbackHostname(hostname: string) {
+  const normalized = hostname.trim().toLowerCase();
+  return normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '[::1]' || normalized === '::1';
+}
+
+function addOriginCandidate(candidates: Set<string>, value: string) {
+  try {
+    const url = new URL(value);
+    candidates.add(url.origin);
+
+    if (isLoopbackHostname(url.hostname)) {
+      const hostnames = ['localhost', '127.0.0.1'];
+      for (const hostname of hostnames) {
+        candidates.add(`${url.protocol}//${hostname}${url.port ? `:${url.port}` : ''}`);
+      }
+      candidates.add(`${url.protocol}//[::1]${url.port ? `:${url.port}` : ''}`);
+    }
+  } catch {
+    // Ignore malformed URL candidates.
+  }
+}
+
 function getRequestOriginCandidates(request: Request) {
   const candidates = new Set<string>();
 
-  try {
-    candidates.add(new URL(request.url).origin);
-  } catch {
-    // Ignore malformed runtime URLs and fall back to env-based origin checks below.
-  }
+  addOriginCandidate(candidates, request.url);
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
   if (siteUrl) {
-    try {
-      candidates.add(new URL(siteUrl).origin);
-    } catch {
-      // Ignore invalid env configuration.
-    }
+    addOriginCandidate(candidates, siteUrl);
   }
 
   return candidates;

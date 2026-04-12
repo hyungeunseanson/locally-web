@@ -27,14 +27,24 @@ export default function CommunityCommentsPanel({
     const hasTrackedViewRef = useRef(false);
 
     useEffect(() => {
+        setCurrentViewCount(viewCount);
+        hasTrackedViewRef.current = false;
+    }, [postId, viewCount]);
+
+    useEffect(() => {
         if (hasTrackedViewRef.current) return;
         hasTrackedViewRef.current = true;
 
         let isMounted = true;
 
+        // Reflect the first open immediately, then reconcile with the server response.
+        setCurrentViewCount((previous) => Math.max(Number(previous || 0), Number(viewCount || 0), 1));
+
         void fetch('/api/community/views', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            cache: 'no-store',
+            credentials: 'same-origin',
             body: JSON.stringify({ postId }),
         })
             .then(async (response) => {
