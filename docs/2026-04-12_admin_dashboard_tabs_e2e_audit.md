@@ -56,9 +56,21 @@
     - 현재 기대: unread alert가 있어도 좌측 `Admin Alerts` 버튼은 plain label만 유지
   - `18-admin-team-badge`: cold 기대값 기준 `failed` 후, 현재 의도에 맞게 조정한 rerun `passed`
     - 현재 기대: new workspace activity가 있어도 좌측 `Team Workspace` 버튼은 plain label만 유지
+  - admin shell/count close-out subset
+    - `tests/e2e/17-admin-sidebar.spec.ts`
+    - `tests/e2e/18-admin-team-badge.spec.ts`
+    - `tests/e2e/69-admin-role-access.spec.ts`
+    - `tests/e2e/161-admin-support-unread-alerts.spec.ts`
+    - `6 passed (38.3s)` under `playwright.contracts.config.ts`
 - 관찰 메모
   - warmup 이전에는 `/login` 이후 첫 화면 load 대기 때문에 admin 스모크가 흔들렸지만, warmed rerun에서는 탭 본체 스펙 대부분이 정상 복구됐다
   - `17`, `18`의 초기 failure는 제품 회귀가 아니라 “예전 badge 계약을 그대로 기대한 stale test”로 분류하는 것이 맞다
+  - latest close-out subset 기준 `69`, `161`도 green이다
+    - admin role/whitelist access gate
+    - plain sidebar intent
+    - team viewed-state/count API
+    - admin support unread side effect
+    가 현재 shell 해석과 충돌하지 않음이 다시 확인됐다
   - 따라서 최종 판정은 warmed rerun과 현재 제품 의도를 기준으로 잡는다
 
 ## Summary Matrix
@@ -114,6 +126,10 @@
       - `MasterLedgerTab`은 `markAdminBookingViewed()`를 여전히 사용한다
       - 현재 미사용으로 보이는 것은 `getAdminUnviewedPendingBookingCount()`처럼 “사이드바 숫자”에 직접 연결되던 부분이다
     - 현재 제품 의도 기준으로 바꾼 `17-admin-sidebar`, `18-admin-team-badge` rerun은 둘 다 green이다
+    - latest close-out subset에서 `69-admin-role-access`, `161-admin-support-unread-alerts`도 green이다
+      - `69`는 role-only / whitelist-only admin access가 current layout + `/api/admin/access` gate와 계속 맞는다는 근거다
+      - `161`는 admin support unread batch lifecycle이 현재 unread source와 side effect 의미를 유지한다는 근거다
+      - 즉 `/api/admin/sidebar-counts`의 `csUnreadCount`가 current sidebar에 렌더되진 않더라도 unread source 자체가 깨진 상태는 아니다
   - drift
     - `page.tsx` default fallback은 `APPROVALS`
     - `Sidebar.tsx` fallback은 `APPS`
@@ -365,8 +381,6 @@
   - `Realtime*`는 그 다음 “완전 제거 후보”로 보는 편이 더 안전하다
 
 ## Coverage Gaps
-- `161-admin-support-unread-alerts`는 이번 패스에서 재실행하지 않았다
-  - 다만 `/api/admin/sidebar-counts`와 `ChatMonitor` 정적 구조상 unread source는 파악했다
 - `15-admin-team`, `16-admin-team-chat`, `79`, `86`, `89`, `136`은 이번 패스에서 full rerun하지 않았다
   - `TeamTab` static audit과 `18` rerun으로 current plain-label intent는 이미 확인됐다
 - `SETTLEMENT/APPS/EXPS`는 static route reachability는 닫았지만, 실제 운영에서 의도적으로 허용한 deep link인지까지는 문서 근거가 약하다
