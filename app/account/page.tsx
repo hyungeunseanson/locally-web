@@ -1060,6 +1060,18 @@ export default function AccountPage() {
                 <p className="text-xs text-slate-400 mt-1">{t('he_profile_desc_4')}</p>
               </div>
 
+              <div
+                data-testid="account-withdrawal-notice"
+                className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4"
+              >
+                <p className="text-sm font-bold text-amber-900">
+                  {t('account_withdrawal_notice_title')}
+                </p>
+                <p className="mt-1 text-sm leading-relaxed text-amber-800">
+                  {t('account_withdrawal_notice_desc')}
+                </p>
+              </div>
+
               <div className="pt-6 border-t border-slate-100 flex justify-end">
                 <button
                   onClick={handleSave}

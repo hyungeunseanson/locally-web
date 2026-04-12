@@ -25,6 +25,7 @@ interface InputItemProps {
   currentFocus: string | null;
   setFocus: React.Dispatch<React.SetStateAction<string | null>>;
   autoComplete: string;
+  dataTestId?: string;
 }
 
 function getErrorMessage(error: unknown, fallbackMessage: string) {
@@ -57,6 +58,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
 
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
@@ -116,6 +118,14 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
     }
 
     if (mode === 'SIGNUP') {
+      if (!passwordConfirm) {
+        showToast(copy.passwordConfirmRequired, 'error');
+        return;
+      }
+      if (password !== passwordConfirm) {
+        showToast(copy.passwordMismatch, 'error');
+        return;
+      }
       if (!fullName || !phone || !birthDate || !gender || !nationality) {
         showToast(copy.signupFieldsRequired, 'error');
         return;
@@ -164,6 +174,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
           });
           setMode('LOGIN');
           setPassword('');
+          setPasswordConfirm('');
           setTermsError(false);
         }
 
@@ -310,7 +321,23 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
                     type="password" label={t('password')} value={password} setValue={setPassword} // 🟢 번역 적용
                     isFirst={false} focusKey="PASSWORD" currentFocus={isFocused} setFocus={setIsFocused}
                     autoComplete={mode === 'LOGIN' ? "current-password" : "new-password"}
+                    dataTestId={mode === 'SIGNUP' ? 'signup-password-input' : undefined}
                   />
+
+                  {mode === 'SIGNUP' && (
+                    <InputItem
+                      type="password"
+                      label={copy.passwordConfirmLabel}
+                      value={passwordConfirm}
+                      setValue={setPasswordConfirm}
+                      isFirst={false}
+                      focusKey="PASSWORD_CONFIRM"
+                      currentFocus={isFocused}
+                      setFocus={setIsFocused}
+                      autoComplete="new-password"
+                      dataTestId="signup-password-confirm-input"
+                    />
+                  )}
 
                   {mode === 'SIGNUP' && (
                     <p className="px-4 py-1.5 text-[11px] md:text-xs text-gray-400 border-t border-gray-300 bg-gray-50">{t('password_min_hint')}</p>
@@ -484,6 +511,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
                   onClick={() => {
                     if (loading || socialLoadingProvider) return;
                     setMode(mode === 'LOGIN' ? 'SIGNUP' : 'LOGIN');
+                    setPasswordConfirm('');
                     setIsFocused(null);
                   }}
                   disabled={loading || socialLoadingProvider !== null}
@@ -499,7 +527,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
   );
 }
 
-function InputItem({ type, label, value, setValue, isFirst, focusKey, currentFocus, setFocus, autoComplete }: InputItemProps) {
+function InputItem({ type, label, value, setValue, isFirst, focusKey, currentFocus, setFocus, autoComplete, dataTestId }: InputItemProps) {
   const isFocused = currentFocus === focusKey;
 
   return (
@@ -513,6 +541,7 @@ function InputItem({ type, label, value, setValue, isFirst, focusKey, currentFoc
         onFocus={() => setFocus(focusKey)}
         onBlur={() => setFocus(null)}
         autoComplete={autoComplete}
+        data-testid={dataTestId}
       />
       <label className="absolute text-[13px] md:text-[14px] text-gray-500 duration-150 transform -translate-y-3 scale-75 top-3.5 md:top-4 z-10 origin-[0] left-3.5 md:left-4 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-3 font-medium pointer-events-none">
         {label}

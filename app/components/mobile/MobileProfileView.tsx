@@ -344,6 +344,18 @@ export default function MobileProfileView({
                 </div>
             </div>
 
+            <div
+                data-testid="mobile-account-withdrawal-notice"
+                className="mx-4 mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4"
+            >
+                <p className="text-[13px] font-bold text-amber-900">
+                    {t('account_withdrawal_notice_title')}
+                </p>
+                <p className="mt-1 text-[12px] leading-relaxed text-amber-800">
+                    {t('account_withdrawal_notice_desc')}
+                </p>
+            </div>
+
             {/* 상세 정보 */}
             <div className="mx-4 mt-3 space-y-0">
                 {/* 국적 */}

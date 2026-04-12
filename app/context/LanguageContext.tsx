@@ -166,6 +166,8 @@ const dictionary: Record<Locale, Record<string, string>> = {
     btn_save_changes: "변경사항 저장",
     // 👇 여기 추가
     saving: "저장 중...",
+    account_withdrawal_notice_title: "회원 탈퇴는 운영팀에 문의",
+    account_withdrawal_notice_desc: "현재 앱에서 직접 탈퇴는 지원하지 않습니다. 계정 종료가 필요하면 운영팀 문의를 통해 안내받아 주세요.",
     profile_photo_change_done: "프로필 사진이 변경되었습니다.",
     profile_photo_fail: "사진 업로드 실패:",
     profile_save_success: "프로필이 성공적으로 저장되었어요.",
@@ -461,9 +463,9 @@ const dictionary: Record<Locale, Record<string, string>> = {
     q_g_account_1: "호스트는 믿을 수 있는 사람인가요?",
     a_g_account_1: "로컬리의 모든 호스트는 엄격한 신원 인증(본인 확인, 전화번호 인증, 계좌 점유 인증)을 거칩니다. 또한, 실제 투어 참여 게스트들의 솔직한 후기로 평판이 투명하게 관리되고 있어 안심하셔도 됩니다.",
     q_g_account_2: "비밀번호를 잊어버렸어요.",
-    a_g_account_2: "로그인 화면 하단의 '비밀번호 찾기'를 통해 이메일 인증 후 재설정하실 수 있습니다.",
+    a_g_account_2: "현재 비밀번호 재설정 기능은 지원하지 않습니다. 가입 시 사용한 로그인 정보 또는 소셜 로그인 수단을 다시 확인해 주세요.",
     q_g_account_3: "회원 탈퇴는 어떻게 하나요?",
-    a_g_account_3: "마이페이지 > 계정 설정 하단에서 탈퇴 가능합니다. 탈퇴 시 모든 여행 기록과 쿠폰은 소멸되며 복구할 수 없습니다.",
+    a_g_account_3: "회원 탈퇴는 운영팀에 문의해 주세요. 본인 확인 후 필요한 절차를 안내해 드립니다.",
 
     // [FAQ Items - Host]
     // 호스트 시작
@@ -1674,6 +1676,8 @@ const dictionary: Record<Locale, Record<string, string>> = {
     btn_save_changes: "Save Changes",
     // 👇 여기 추가
     saving: "Saving...",
+    account_withdrawal_notice_title: "Account deletion requires contacting the operations team",
+    account_withdrawal_notice_desc: "Direct account deletion is not supported in the app right now. If you need to close your account, please contact the operations team for guidance.",
     profile_photo_change_done: "Profile photo updated.",
     profile_photo_fail: "Upload failed:",
     profile_save_success: "Profile saved successfully.",
@@ -1944,9 +1948,9 @@ const dictionary: Record<Locale, Record<string, string>> = {
     q_g_account_1: "Is the host reliable?",
     a_g_account_1: "All Locally hosts undergo strict identity verification. Plus, their reputation is transparently managed via reviews from real guests.",
     q_g_account_2: "I forgot my password.",
-    a_g_account_2: "Click 'Forgot Password' on the login screen to reset it via email.",
+    a_g_account_2: "Password reset is not supported right now. Please check the login method or social sign-in option you originally used.",
     q_g_account_3: "How do I delete my account?",
-    a_g_account_3: "Go to Account Settings > Delete Account. All data and coupons will be permanently deleted.",
+    a_g_account_3: "Please contact the operations team to delete your account. They will guide you through the required verification steps.",
 
     // [FAQ Items - Host]
     q_h_start_1: "Requirements to be a host?",
@@ -3152,6 +3156,8 @@ const dictionary: Record<Locale, Record<string, string>> = {
     btn_save_changes: "変更を保存",
     // 👇 여기 추가
     saving: "保存中...",
+    account_withdrawal_notice_title: "退会は運営チームへのお問い合わせが必要です",
+    account_withdrawal_notice_desc: "現在、アプリ内での直接退会には対応していません。アカウント終了が必要な場合は、運営チームへお問い合わせください。",
     profile_photo_change_done: "プロフィール写真が変更されました。",
     profile_photo_fail: "アップロード失敗:",
     profile_save_success: "プロフィールが保存されました。",
@@ -3426,9 +3432,9 @@ const dictionary: Record<Locale, Record<string, string>> = {
     q_g_account_1: "ホストは信頼できる人ですか？",
     a_g_account_1: "Locallyのすべてのホストは厳格な本人確認（身分証、電話番号認証、口座認証）を経て登録されています。また、実際にツアーに参加したゲストの正直なレビューにより評判が透明に管理されているため、安心してご利用いただけます。",
     q_g_account_2: "パスワードを忘れました。",
-    a_g_account_2: "ログイン画面下部の「パスワードをお忘れの方」をクリックし、メール認証後に再設定できます。",
+    a_g_account_2: "現在、パスワード再設定機能は提供していません。登録時に利用したログイン方法またはソーシャルログイン手段をご確認ください。",
     q_g_account_3: "退会するにはどうすればよいですか？",
-    a_g_account_3: "マイページ > アカウント設定の下部から退会可能です。退会時、すべての旅行記録とクーポンは消滅し、復元できません。",
+    a_g_account_3: "退会をご希望の場合は、運営チームへお問い合わせください。本人確認後、必要な手続きをご案内します。",
 
     // [FAQ Items - Host]
     // ホスト開始
@@ -4634,6 +4640,8 @@ const dictionary: Record<Locale, Record<string, string>> = {
     label_bio: "自我介绍",
     btn_save_changes: "保存更改",
     saving: "保存中...",
+    account_withdrawal_notice_title: "注销会员需要联系运营团队",
+    account_withdrawal_notice_desc: "目前应用内不支持直接注销账号。如需关闭账号，请联系运营团队获取后续说明。",
     profile_photo_change_done: "头像已更改。",
     profile_photo_fail: "上传失败:",
     profile_save_success: "个人资料已保存。",
@@ -4908,9 +4916,9 @@ const dictionary: Record<Locale, Record<string, string>> = {
     q_g_account_1: "房东值得信任吗？",
     a_g_account_1: "Locally 的所有房东都经过严格的身份认证（本人确认、手机号认证、账户认证）。此外，通过实际参与行程的游客的真实评价，透明地管理声誉，请放心预订。",
     q_g_account_2: "忘记了密码。",
-    a_g_account_2: "点击登录屏幕下方的“找回密码”，通过邮箱验证后即可重新设置。",
+    a_g_account_2: "目前暂不支持密码重置功能。请确认您注册时使用的登录方式或社交登录方式。",
     q_g_account_3: "如何注销会员？",
-    a_g_account_3: "可在 我的页面 > 账号设置 底部进行注销。注销时所有旅行记录和优惠券将消失，且无法恢复。",
+    a_g_account_3: "如需注销账号，请联系运营团队。完成身份确认后，我们会说明后续流程。",
 
     // [FAQ Items - Host]
     // 成为房东

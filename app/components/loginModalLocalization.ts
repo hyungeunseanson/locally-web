@@ -6,6 +6,9 @@ type LoginModalCopy = {
   signupTitle: string;
   signupSubtitle: string;
   emailPasswordRequired: string;
+  passwordConfirmLabel: string;
+  passwordConfirmRequired: string;
+  passwordMismatch: string;
   signupFieldsRequired: string;
   birthDateInvalid: string;
   phoneInvalid: string;
@@ -52,6 +55,9 @@ const COPY: Record<LoginModalLocale, LoginModalCopy> = {
     signupTitle: '가입하고 바로 시작하기',
     signupSubtitle: '필요한 정보만 입력하면 바로 이어서 사용할 수 있어요.',
     emailPasswordRequired: '이메일과 비밀번호를 입력해주세요.',
+    passwordConfirmLabel: '비밀번호 확인',
+    passwordConfirmRequired: '비밀번호 확인을 입력해주세요.',
+    passwordMismatch: '비밀번호가 일치하지 않습니다.',
     signupFieldsRequired: '이름, 국적, 연락처, 생년월일, 성별을 모두 입력해주세요.',
     birthDateInvalid: '생년월일 8자리(YYYYMMDD)를 올바르게 입력해주세요.',
     phoneInvalid: '올바른 연락처를 입력해주세요.',
@@ -85,6 +91,9 @@ const COPY: Record<LoginModalLocale, LoginModalCopy> = {
     signupTitle: 'Sign up and start right away',
     signupSubtitle: 'Enter a few details and continue without losing your place.',
     emailPasswordRequired: 'Please enter your email and password.',
+    passwordConfirmLabel: 'Confirm password',
+    passwordConfirmRequired: 'Please confirm your password.',
+    passwordMismatch: 'Passwords do not match.',
     signupFieldsRequired: 'Please fill in your name, nationality, phone number, birth date, and gender.',
     birthDateInvalid: 'Please enter a valid 8-digit birth date (YYYYMMDD).',
     phoneInvalid: 'Please enter a valid phone number.',
@@ -118,6 +127,9 @@ const COPY: Record<LoginModalLocale, LoginModalCopy> = {
     signupTitle: '登録してすぐ始める',
     signupSubtitle: '必要な情報だけ入力すれば、そのまま続けて使えます。',
     emailPasswordRequired: 'メールアドレスとパスワードを入力してください。',
+    passwordConfirmLabel: 'パスワード確認',
+    passwordConfirmRequired: '確認用パスワードを入力してください。',
+    passwordMismatch: 'パスワードが一致しません。',
     signupFieldsRequired: '氏名、国籍、連絡先、生年月日、性別をすべて入力してください。',
     birthDateInvalid: '生年月日8桁（YYYYMMDD）を正しく入力してください。',
     phoneInvalid: '有効な連絡先を入力してください。',
@@ -151,6 +163,9 @@ const COPY: Record<LoginModalLocale, LoginModalCopy> = {
     signupTitle: '注册后马上开始',
     signupSubtitle: '填写必要信息后，就能直接继续使用。',
     emailPasswordRequired: '请输入邮箱和密码。',
+    passwordConfirmLabel: '确认密码',
+    passwordConfirmRequired: '请输入确认密码。',
+    passwordMismatch: '两次输入的密码不一致。',
     signupFieldsRequired: '请填写姓名、国籍、联系方式、出生日期和性别。',
     birthDateInvalid: '请输入正确的 8 位出生日期（YYYYMMDD）。',
     phoneInvalid: '请输入有效的联系电话。',

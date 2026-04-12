@@ -79,7 +79,8 @@ test.describe('Auth success transition', () => {
 
     await page.getByRole('button', { name: /Don't have an account\?\s*Sign up/i }).click();
     await page.locator('input[autocomplete="username"]').fill(signupEmail);
-    await page.locator('input[autocomplete="new-password"]').fill(signupPassword);
+    await page.getByTestId('signup-password-input').fill(signupPassword);
+    await page.getByTestId('signup-password-confirm-input').fill(signupPassword);
     await page.locator('input[autocomplete="name"]').fill('Signup Transition User');
     await page.locator('select').nth(0).selectOption('US');
     await page.locator('input[autocomplete="tel"]').fill('01012345678');
