@@ -78,7 +78,7 @@ export default function AccountPage() {
   const { pendingHref, isNavigating, navigate } = usePendingNavigation();
   const { unreadCount } = useNotification();
   const { canUseHostView, setHostView } = useViewMode();
-  const { user: authUser, hostStatusResolved } = useAuth();
+  const { user: authUser, hostStatusResolved, signOut } = useAuth();
   const { membership } = useLocallyMembership(authUser?.id);
   const memberTierDescription = t('membership_member_info_desc') as string;
   const circleTierDescription = t('membership_circle_info_desc') as string;
@@ -620,8 +620,7 @@ export default function AccountPage() {
             onClick={async () => {
               if (signingOut) return;
               setSigningOut(true);
-              await supabase.auth.signOut();
-              router.push('/');
+              await signOut();
             }}
             disabled={signingOut}
             className="inline-flex items-center gap-2 py-1 text-[12px] font-semibold text-gray-500 disabled:opacity-60"

@@ -78,6 +78,46 @@ test.describe('Account accessibility auth surfaces', () => {
     await expect(page.getByTestId('account-withdrawal-notice')).toContainText(/회원 탈퇴는 운영팀에 문의/);
   });
 
+  test('signs out from the mobile account menu using the shared auth contract', async ({ page }) => {
+    const user = createTestUser('account.logout.contract');
+    await createAuthUser(user, createdAuthUserIds);
+    await forceKoreanLocale(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await login(page, user);
+
+    await page.goto('/account', { waitUntil: 'domcontentloaded' });
+    await page.evaluate(() => {
+      window.localStorage.setItem('admin_active_tab', 'USERS');
+      window.localStorage.setItem('global_chat_last_viewed', '2026-04-12T00:00:00.000Z');
+      window.localStorage.setItem('host_checked_reservations', JSON.stringify(['booking-1']));
+      window.localStorage.setItem('last_active_update', '2026-04-12T00:00:00.000Z');
+      window.localStorage.setItem('locally_recent_searches', JSON.stringify(['seoul']));
+    });
+
+    await page.getByRole('button', { name: '로그아웃' }).click();
+    await page.waitForURL('**/', { timeout: 15000 });
+
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => ({
+            adminActiveTab: window.localStorage.getItem('admin_active_tab'),
+            globalChatLastViewed: window.localStorage.getItem('global_chat_last_viewed'),
+            hostCheckedReservations: window.localStorage.getItem('host_checked_reservations'),
+            lastActiveUpdate: window.localStorage.getItem('last_active_update'),
+            recentSearches: window.localStorage.getItem('locally_recent_searches'),
+          })),
+        { timeout: 15000 }
+      )
+      .toEqual({
+        adminActiveTab: null,
+        globalChatLastViewed: null,
+        hostCheckedReservations: null,
+        lastActiveUpdate: null,
+        recentSearches: null,
+      });
+  });
+
   test('keeps help account FAQ aligned with the actual account surface', async ({ page }) => {
     await forceKoreanLocale(page);
     await page.goto('/help', { waitUntil: 'domcontentloaded' });
