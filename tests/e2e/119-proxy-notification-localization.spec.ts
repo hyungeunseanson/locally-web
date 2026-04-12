@@ -162,28 +162,36 @@ async function createProxyRequest(params: {
   userId: string;
   user: TestUser;
   includeLinkedInquiry?: boolean;
+  paymentMethod?: 'bank' | 'card';
+  paymentStatus?: 'WAITING' | 'COMPLETED' | 'FAILED' | 'REFUNDED';
+  requestStatus?: 'PENDING' | 'IN_PROGRESS' | 'CANCELLED' | 'COMPLETED';
+  tid?: string | null;
 }) {
   const linkedInquiryId = params.includeLinkedInquiry
     ? await createAdminSupportInquiry(params.userId)
     : null;
+  const paymentMethod = params.paymentMethod || 'bank';
+  const paymentStatus = params.paymentStatus || 'WAITING';
+  const requestStatus = params.requestStatus || 'PENDING';
 
   const { data, error } = await getAdminClient()
     .from('proxy_requests')
     .insert({
       user_id: params.userId,
       category: 'RESTAURANT',
-      status: 'PENDING',
+      status: requestStatus,
       payment_channel: 'LOCALLY',
-      payment_status: 'WAITING',
+      payment_status: paymentStatus,
       locally_order_id: `LOCALLY-PROXY-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
       agreed_to_terms: true,
+      ...(params.tid !== undefined ? { tid: params.tid } : {}),
       form_data: {
         restaurant_name: `테스트 스시 ${Date.now()}`,
         preferred_slot_primary: '2026-01-15T19:00',
         reservation_name: params.user.fullName,
         guest_number: 2,
         korean_contact: params.user.phone,
-        payment_method: 'bank',
+        payment_method: paymentMethod,
         contact_name: params.user.fullName,
         contact_phone: params.user.phone,
         service_fee_krw: 4500,
@@ -342,5 +350,102 @@ test.describe.serial('Proxy notification localization', () => {
     });
     expect(replyNotification.title).toBe(`💬 ${adminUser.fullName}さんから新しいメッセージ`);
     expect(replyNotification.message).toBe(replyText);
+  });
+
+  test('localizes proxy payment cancellation notifications and writes FAILED/CANCELLED state', async ({ page }) => {
+    test.setTimeout(120000);
+
+    const adminUser = createUser('cancel-admin');
+    const cancelGuest = createUser('cancel-guest');
+
+    await createAuthUser(adminUser, { whitelistAdmin: true });
+    const cancelGuestId = await createAuthUser(cancelGuest);
+    await setPreferredLocale(cancelGuestId, 'en');
+
+    const cancelRequest = await createProxyRequest({
+      userId: cancelGuestId,
+      user: cancelGuest,
+      includeLinkedInquiry: true,
+      paymentMethod: 'bank',
+      paymentStatus: 'WAITING',
+      requestStatus: 'PENDING',
+    });
+
+    await login(page, adminUser, 'ko');
+
+    const cancelResponse = await page.request.post('/api/admin/proxy-bookings/cancel-payment', {
+      data: {
+        requestId: cancelRequest.requestId,
+      },
+    });
+    expect(cancelResponse.status()).toBe(200);
+
+    const { data: cancelledRow, error: cancelledRowError } = await getAdminClient()
+      .from('proxy_requests')
+      .select('payment_status, status')
+      .eq('id', cancelRequest.requestId)
+      .maybeSingle();
+
+    if (cancelledRowError) throw cancelledRowError;
+    expect(cancelledRow).toMatchObject({
+      payment_status: 'FAILED',
+      status: 'CANCELLED',
+    });
+
+    const cancelNotification = await waitForNotification({
+      userId: cancelGuestId,
+      type: 'cancellation',
+      link: `/guest/inbox?inquiryId=${encodeURIComponent(cancelRequest.linkedInquiryId || '')}`,
+    });
+    expect(cancelNotification.title).toBe('Phone booking payment was cancelled.');
+    expect(cancelNotification.message).toContain(cancelRequest.restaurantName);
+  });
+
+  test('localizes proxy payment refund notifications and writes REFUNDED state', async ({ page }) => {
+    test.setTimeout(120000);
+
+    const adminUser = createUser('refund-admin');
+    const refundGuest = createUser('refund-guest');
+
+    await createAuthUser(adminUser, { whitelistAdmin: true });
+    const refundGuestId = await createAuthUser(refundGuest);
+    await setPreferredLocale(refundGuestId, 'ja');
+
+    const refundRequest = await createProxyRequest({
+      userId: refundGuestId,
+      user: refundGuest,
+      includeLinkedInquiry: true,
+      paymentMethod: 'bank',
+      paymentStatus: 'COMPLETED',
+      requestStatus: 'PENDING',
+    });
+
+    await login(page, adminUser, 'ko');
+
+    const refundResponse = await page.request.post('/api/admin/proxy-bookings/refund-payment', {
+      data: {
+        requestId: refundRequest.requestId,
+      },
+    });
+    expect(refundResponse.status()).toBe(200);
+
+    const { data: refundedRow, error: refundedRowError } = await getAdminClient()
+      .from('proxy_requests')
+      .select('payment_status')
+      .eq('id', refundRequest.requestId)
+      .maybeSingle();
+
+    if (refundedRowError) throw refundedRowError;
+    expect(refundedRow).toMatchObject({
+      payment_status: 'REFUNDED',
+    });
+
+    const refundNotification = await waitForNotification({
+      userId: refundGuestId,
+      type: 'cancellation',
+      link: `/guest/inbox?inquiryId=${encodeURIComponent(refundRequest.linkedInquiryId || '')}`,
+    });
+    expect(refundNotification.title).toBe('電話予約の決済が返金処理されました。');
+    expect(refundNotification.message).toContain(refundRequest.restaurantName);
   });
 });
