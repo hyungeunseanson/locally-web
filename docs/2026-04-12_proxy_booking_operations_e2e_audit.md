@@ -12,6 +12,11 @@
     - `tests/e2e/119-proxy-notification-localization.spec.ts`
     - `tests/e2e/87-proxy-booking-fee-util.spec.ts`
     - `tests/e2e/88-proxy-booking-mobile-layout.spec.ts`
+  - runtime evidence probe
+    - `2026-04-12` read-only Supabase check
+    - current `proxy_requests`: `3`
+    - `linked_inquiry_id` missing rows: `1`
+    - confirmed live fallback row has `proxy_comments=1`
 - 이번 패스 핵심 결론
   - 전화 예약 도메인의 write/read source of truth는 현재 `proxy_requests`로 잘 고정되어 있다
   - 결제 상태 변경 owner도 `generic PATCH /api/proxy-bookings/[id]`가 아니라 전용 admin route / card callback 경계로 정리돼 있다
@@ -45,7 +50,7 @@
 | TEAM > 전화 예약 운영 | `PhoneReservationTab`, `/api/proxy-bookings/[id]`, `/api/proxy-bookings/[id]/comments` | `86`, reference `15`, `89`, `136` | 정상 | TEAM 탭의 결제 확인, 진행 상태 변경, 운영 답글 저장, 고객 inbox persisted visibility가 latest rerun 기준 green이다 |
 | 고객 self-service / 상세 | `app/proxy-bookings/page.tsx`, `app/proxy-bookings/[id]/page.tsx`, `/api/proxy-bookings/[id]` | `105`, `88` | 정상 | 목록 next-step copy, 상세 계좌 안내, message CTA, 결제/진행 상태 반영이 현재 truth와 맞는다 |
 | 알림 / localization | `proxyBookingNotifications.ts`, `/api/proxy-bookings/[id]/comments`, `buildLocalizedNotificationInsert` | `119` | 정상 | payment confirm / admin reply notification이 recipient locale 기준으로 저장된다 |
-| linked inquiry / legacy fallback | `/api/proxy-bookings/[id]/comments`, `/api/proxy-bookings/[id]`, `getProxyLinkedInquiryId()` | `86`, `119`, static audit | 부분 보장 | tracked 생성 경로는 `linked_inquiry_id`를 항상 심는다. 현재 `proxy_comments` fallback은 legacy row 또는 수동 seeded fixture 보호 경계로 남아 있다 |
+| linked inquiry / legacy fallback | `/api/proxy-bookings/[id]/comments`, `/api/proxy-bookings/[id]`, `getProxyLinkedInquiryId()` | `86`, `119`, static audit + runtime probe | 부분 보장 | tracked 생성 경로는 `linked_inquiry_id`를 항상 심지만, runtime probe 기준 실제 운영 row 1건이 아직 누락 상태다. 현재 `proxy_comments` fallback은 legacy row 보호 경계로 계속 필요하다 |
 
 ## Confirmed Findings
 ### 1. 전화 예약 요청 생성은 `proxy_requests` 단일 source로 잘 고정돼 있다
@@ -102,7 +107,10 @@
 - `GET /api/proxy-bookings/[id]`
   - linked inquiry가 있으면 `inquiry_messages`를 comment rows처럼 projection 한다
   - 없으면 `proxy_comments`를 그대로 읽는다
-- 따라서 현재 해석은 “신규 운영 경로는 linked inquiry 우선으로 이미 통일됐고, `proxy_comments`는 legacy row / 수동 fixture 보호용 fallback으로 남아 있다”가 가장 가깝다
+- `2026-04-12` runtime probe 결과
+  - 현재 `proxy_requests`는 총 `3`건이고, 이 중 `linked_inquiry_id` 누락 row가 `1`건 남아 있었다
+  - 해당 row는 `2026-03-22T11:00:40.751052+00:00` 생성 건이며 `proxy_comments`도 `1`건 존재했다
+- 따라서 현재 해석은 “신규 운영 경로는 linked inquiry 우선으로 이미 통일됐지만, 실제 운영 데이터에도 아직 legacy fallback 대상 row가 남아 있다”가 가장 정확하다
 
 ## Static Risk Notes
 - `POST /api/proxy-bookings`는 linked inquiry를 먼저 만들고, 그 다음 `proxy_requests`를 insert한다
@@ -119,13 +127,13 @@
   - `tests/e2e/89-admin-team-mobile.spec.ts`
   - `tests/e2e/136-team-workspace-retention.spec.ts`
 - `card-notification` external callback path는 static audit로만 확인했고, 이번 패스에서는 직접 재실행하지 않았다
-- tracked 생성 경로 밖에서 만들어진 legacy row가 실제 운영 데이터에 여전히 남아 있는지까지는 이번 문서에서 단정하지 않는다
+- runtime probe로 확인된 missing row가 정확히 어떤 historical create path에서 생겼는지까지는 이번 문서에서 단정하지 않는다
 - `tests/e2e/105-proxy-booking-self-service.spec.ts`, `tests/e2e/119-proxy-notification-localization.spec.ts`는 여전히 linked inquiry 유무를 수동 fixture로 seed할 수 있어 fallback branch 자체는 테스트 surface에 남아 있다
 
 ## Follow-up Need
 - 1순위
-  - production에 `linked_inquiry_id` 없는 legacy proxy row가 실제로 남아 있는지 runtime evidence를 먼저 확인해야 한다
-  - 그 결과가 `없음`이면 `proxy_comments` fallback 제거 계획으로, `있음`이면 유지 범위를 legacy read/write 보호로만 더 명확히 잠그는 쪽이 안전하다
+  - 현재 남아 있는 legacy proxy row를 `linked inquiry backfill` 할지, 아니면 fallback 유지 정책으로 둘지 운영 결정을 내려야 한다
+  - 지금 상태에서는 runtime evidence상 실제 누락 row가 있으므로 `proxy_comments` fallback 제거는 시기상조다
 - 2순위
   - `card-notification` route를 provider cutover 이후에도 실제 운영 path로 쓸 계획이면 별도 contract rerun을 묶는 편이 안전하다
 
