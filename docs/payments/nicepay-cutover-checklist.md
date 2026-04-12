@@ -89,6 +89,10 @@
   Service: `/api/services/payment/nicepay-callback`
   Proxy: `/api/proxy-bookings/payment/nicepay-callback`
 - Notification routes are idempotent by `orderId` first, then `providerTransactionId` fallback.
+- Proxy callback and proxy notification intentionally differ only at the entry boundary.
+  Callback keeps owner/auth guard for the browser return.
+  Notification is server-to-server and skips owner guard.
+  Both converge on the same `finalizeProxyCardPayment()` write path.
 - If provider remains `portone`, the notification routes stay inert and return `202 ignored`.
 
 ## Verified On 2026-04-11
