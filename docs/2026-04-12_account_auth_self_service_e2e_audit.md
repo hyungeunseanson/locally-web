@@ -116,11 +116,6 @@
   - 하지만 `admin_active_tab`, `global_chat_last_viewed`, `host_checked_reservations` 같은 auth-adjacent localStorage cleanup 의미는 header 경로와 완전히 같다고 보장되지 않는다
 - 이번 감사에서는 구현 수정 대신 `부분 보장`으로 기록한다
 
-### 2. runtime과 무관한 stale artifact가 하나 남아 있다
-- [app/help/page copy.txt](/Users/hyungeunseanson/Documents/서비스/locally-web/app/help/page%20copy.txt:57)에는 여전히 예전 “마이페이지 하단에서 탈퇴 가능” 문구가 남아 있다
-- 현재 runtime은 [app/help/page.tsx](/Users/hyungeunseanson/Documents/서비스/locally-web/app/help/page.tsx:127) + `LanguageContext`를 사용하므로 제품 동작에는 영향이 없다
-- 다만 future edit 때 copy source를 혼동시킬 수 있는 repo hygiene candidate다
-
 ## Coverage Gaps
 - 재실행하지 않은 reference
   - live signup / live auth:
@@ -139,8 +134,6 @@
   - sign-out parity를 닫는 얇은 E2E 또는 contract smoke를 추가하면 좋다
     - 예: sign-out 후 `/` 복귀
     - auth-adjacent localStorage cleanup
-- 3순위
-  - runtime과 무관한 `app/help/page copy.txt`는 삭제 또는 archive 후보로 분리 검토
 
 ## Final Verdict
 - 로그인 진입, signup modal, returnUrl continuity, account/help self-service copy는 최신 기준으로 정상이다
