@@ -21,6 +21,7 @@
   - 전화 예약 도메인의 write/read source of truth는 현재 `proxy_requests`로 잘 고정되어 있다
   - 결제 상태 변경 owner도 `generic PATCH /api/proxy-bookings/[id]`가 아니라 전용 admin route / card callback 경계로 정리돼 있다
   - 현재 tracked 생성 경로는 새 요청마다 `linked_inquiry_id`를 함께 심고, linked inquiry가 없는 경우에만 `proxy_comments` fallback을 유지한다
+  - repo-wide static audit 기준 추가 tracked creator는 보이지 않았고, 남은 production 의존은 fallback read/write route와 `PhoneReservationTab`의 `proxy_comments` realtime 구독뿐이다
   - 최신 close-out rerun 기준 핵심 non-live bundle은 모두 green이다
   - `86-proxy-booking-team-workspace`도 현재는 page-wide text가 아니라 guest inbox thread persistence를 기준으로 검증되며 green 복구됐다
   - 따라서 현재 최종 판정은 `proxy core chain은 정상`, `남는 것은 boundary-only gap`이다
@@ -112,6 +113,22 @@
   - same-day cleanup 후 post-check 기준 현재 `proxy_requests`는 총 `2`건이고, `linked_inquiry_id` 누락 row는 `0`건이다
 - 따라서 현재 해석은 “신규 운영 경로는 linked inquiry 우선으로 이미 통일됐고, 현재 운영 runtime에는 확인된 legacy fallback row가 없다. 다만 `proxy_comments` 코드는 dormant fallback 경계로 남아 있다”가 가장 정확하다
 
+### 6. 제거 준비도(removal readiness) 관점에서는 “후보”까지는 왔지만 바로 삭제 단계는 아니다
+- repo-wide static audit 기준 `proxy_requests` 생성자는 현재 두 종류뿐이다
+  - production create path: `POST /api/proxy-bookings`
+  - test fixture seed: `tests/e2e/105-proxy-booking-self-service.spec.ts`, `tests/e2e/119-proxy-notification-localization.spec.ts`
+- 이 중 `linked_inquiry_id`를 의도적으로 생략하는 fixture는 현재 `119-proxy-notification-localization`뿐이다
+  - `105`는 항상 `linked_inquiry_id`를 넣는다
+  - `86`은 실제 UI 생성 경로를 타므로 linked inquiry가 같이 생긴다
+- 남은 production 의존은 다음 세 군데로 좁혀진다
+  - `/api/proxy-bookings/[id]/comments`의 fallback write
+  - `/api/proxy-bookings/[id]`의 fallback read
+  - `PhoneReservationTab`의 `proxy_comments` realtime subscription
+- 따라서 현재 결론은
+  - “운영 데이터 정리”는 이미 끝났고
+  - “코드 제거 준비도 감사”도 상당 부분 끝났지만
+  - 실제 제거는 `119` fixture 정리와 TEAM realtime 구독 정리까지 묶어서 순차적으로 가는 편이 가장 안전하다
+
 ## Static Risk Notes
 - `POST /api/proxy-bookings`는 linked inquiry를 먼저 만들고, 그 다음 `proxy_requests`를 insert한다
   - insert 실패 cleanup은 있지만, 반대 방향의 orphan risk를 더 줄일지 여부는 이번 감사 범위 밖이다
@@ -132,9 +149,11 @@
 
 ## Follow-up Need
 - 1순위
-  - 현재 운영 runtime에서 누락 row가 사라졌으므로, 다음 단계는 `proxy_comments` fallback을 계속 dormant 유지할지, 제거 후보로 올릴지 결정하는 것이다
-  - 단, 제거 검토 전에는 manual seeded fixture와 잠재 stale importer가 더 없는지 한 번 더 확인하는 편이 안전하다
+  - `119-proxy-notification-localization`를 linked inquiry 기반 fixture로 바꿀지 먼저 결정해야 한다
+  - 이 테스트가 계속 legacy branch를 유일하게 잠그고 있으므로, 제품 의미를 유지할지 fixture를 현대화할지 판단이 선행돼야 한다
 - 2순위
+  - 제거로 간다면 `PhoneReservationTab`의 `proxy_comments` realtime subscription을 먼저 걷고, 그 뒤 route read/write fallback 제거로 가는 2단계가 가장 안전하다
+- 3순위
   - `card-notification` route를 provider cutover 이후에도 실제 운영 path로 쓸 계획이면 별도 contract rerun을 묶는 편이 안전하다
 
 ## Final Verdict
