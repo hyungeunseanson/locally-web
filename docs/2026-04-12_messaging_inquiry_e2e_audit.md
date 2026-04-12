@@ -6,19 +6,25 @@
 - 실행 방식: 정적 코드 감사 + 핵심 non-live E2E 재실행 + persistent failure 재재현
 - latest run
   - `17 passed / 1 failed`
-  - persistent failure: `tests/e2e/53-chat-optimistic-send.spec.ts`의 `guest inbox shows a host reply without reloading the page`
+  - persistent failure: `tests/e2e/161-admin-support-unread-alerts.spec.ts`의 `sends one admin alert + team email after 10 minutes of unread customer support inquiry and resets after admin read`
+- targeted rerun after realtime catch-up patch
+  - `tests/e2e/53-chat-optimistic-send.spec.ts`
+  - `tests/e2e/41-inquiry-read-route.spec.ts`
+  - `tests/e2e/60-inquiry-thread-contract.spec.ts`
+  - `tests/e2e/164-guest-inbox-support-profile-context.spec.ts`
+  - result: `8 passed`
 - 이번 재감사 기준 핵심 해석
   - 3월 감사에서 컸던 `문의 생성 경로 분산`은 tracked caller 기준으로 상당 부분 해소됐다
-  - `admin support unread alert`, `policy signal`, `guest/host/admin deep link`, `localized inquiry email`은 현재 기준 정상이다
-  - 다만 `host → guest reply`가 guest inbox에 실시간으로 반영되는 계약은 현재 persistent failure가 있어 최신 판정은 `부분 보장`이다
+  - `guest ↔ host realtime reply`, `policy signal`, `guest/host/admin deep link`, `localized inquiry email`은 현재 기준 정상이다
+  - 다만 `admin support unread alert`의 read 후 재기동(re-arm) 체인은 현재 persistent failure가 있어 최신 판정은 `부분 보장`이다
 
 ## Result Snapshot
 | Chain | Source of truth | Current tests | Verdict | Notes |
 | --- | --- | --- | --- | --- |
 | Thread creation / first message | `app/api/inquiries/thread/shared.ts`, `/api/inquiries/thread` | `60`, `124`, `161`, `164` | 정상 | guest help, host start-chat, service start-chat, admin initiated support가 tracked path 기준 공통 thread upsert를 사용 |
-| Guest ↔ host message send/read | `app/hooks/useChat.ts`, `/api/inquiries/message`, `/api/inquiries/read`, `/guest/inbox`, `host/dashboard/InquiryChat.tsx` | `41`, `53`, `95`, `164`, rerun `53` | 부분 보장 | optimistic send와 read contract는 정상이나, host reply realtime receive는 guest inbox에서 persistent fail |
-| Admin support / monitor | `/api/admin/inquiries*`, `useAdminChatQuery`, `ChatMonitor`, `/api/admin/sidebar-counts` | `14`, `161`, `83` | 정상 | status 변경, unread alert batch, policy monitoring, participant card 모두 latest run green |
-| Notification / email / policy signal | `thread/shared.ts: notifyRecipient`, `InquiryNewMessageEmail`, `emitChatPolicySignal` | `124`, `83`, `161` | 정상 | inquiry new_message notification + localized email + policy admin alert 경로가 current implementation과 일치 |
+| Guest ↔ host message send/read | `app/hooks/useChat.ts`, `/api/inquiries/message`, `/api/inquiries/read`, `/guest/inbox`, `host/dashboard/InquiryChat.tsx` | `41`, `53`, `95`, `164`, rerun `53` | 정상 | optimistic send, read contract, host reply realtime receive가 latest targeted rerun에서 모두 green |
+| Admin support / monitor | `/api/admin/inquiries*`, `useAdminChatQuery`, `ChatMonitor`, `/api/admin/sidebar-counts` | `14`, `161`, `83` | 부분 보장 | status 변경, policy monitoring, participant card는 green이지만 unread alert re-arm chain은 latest run fail |
+| Notification / email / policy signal | `thread/shared.ts: notifyRecipient`, `InquiryNewMessageEmail`, `emitChatPolicySignal` | `124`, `83`, `161` | 부분 보장 | inquiry new_message email/policy alert는 정상이나, admin support unread alert + team email의 두 번째 batch dispatch는 현재 실패 |
 | Boundary entrypoints | `/api/host/start-chat`, `/api/services/start-chat`, `proxy-bookings/[id]/comments` | `60` + static audit | 부분 보장 | host/service는 공통 thread upsert로 정리됐고, proxy는 linked inquiry가 있을 때만 공통 message path를 재사용 |
 
 ## Confirmed Findings
@@ -39,28 +45,30 @@
 - 다만 schema capability check 실패 시에는 여전히 legacy fallback(`experience_id IS NULL`)을 탄다.
 - 현재 저장소 기준으로는 이 fallback이 실제 운영에서 아직 필요한지, 아니면 완전히 제거 가능한지는 이번 감사 범위에서 닫히지 않았다.
 
-### 3. admin support 운영 체인은 현재 기준으로 가장 안정적인 편이다
-- `14-admin-chats`, `161-admin-support-unread-alerts`, `83-chat-policy-monitoring`이 모두 latest run green이었다.
-- 확인된 현재 truth
-  - `/api/admin/inquiries`가 admin monitor 목록 source of truth다
-  - `/api/admin/inquiries/[id]/messages`는 admin support thread 열람 시 read + unread batch clear를 함께 처리한다
-  - `/api/admin/inquiries/[id]/status`는 optimistic locking token(`updated_at`)을 받아 false conflict를 방지한다
-  - guest가 admin support thread에 메시지를 남기면 unread batch / admin alert / team email이 current contract대로 이어진다
+### 3. guest inbox realtime host reply는 이제 latest 기준으로 정상이다
+- 이전 persistent failure였던 `tests/e2e/53-chat-optimistic-send.spec.ts`의 `guest inbox shows a host reply without reloading the page`는 현재 재현되지 않았다.
+- 현재 확인된 사실
+  - host reply row는 DB에 정상 insert된다
+  - guest inbox는 reload 없이 같은 thread bubble을 렌더링한다
+  - 관련 targeted rerun(`53`, `41`, `60`, `164`)은 모두 green이었다
+- 최신 해석으로는 이 이슈는 `useChat` client catch-up 보강으로 닫힌 상태다
 
 ### 4. inquiry message side effect는 예전보다 fail-soft해졌다
 - `createInquiryMessage()`는 message insert와 inquiry preview update까지는 동기 처리하지만, email dispatch는 `notifyRecipient()` 내부에서 `void sendTemplatedEmail(...)`로 fire-and-forget 처리한다.
 - 따라서 3월 감사 당시의 “메시지 send path가 email 시도까지 같은 요청 안에서 돈다”는 해석은 최신 inquiry message 경로에는 그대로 적용되지 않는다.
 - 현재 구조에서 메시지 truth는 DB write이고, email은 best-effort side effect로 분리되어 있다.
 
-### 5. guest inbox realtime host reply는 현재 active risk다
-- 실패 스펙: `tests/e2e/53-chat-optimistic-send.spec.ts`
-- 동일 failure를 감사 묶음 전체 실행과 단일 재실행에서 모두 재현했다.
+### 5. admin support unread alert 재기동(re-arm) 경로가 현재 active risk다
+- 실패 스펙: `tests/e2e/161-admin-support-unread-alerts.spec.ts`
+- 동일 failure를 전체 감사 묶음과 단독 재실행에서 모두 재현했다.
 - 확인된 사실
-  - host reply row 자체는 DB에 정상 insert된다
-  - 그러나 guest inbox는 reload 없이 해당 reply bubble을 timeout 안에 렌더링하지 못한다
-- 따라서 현재 결함의 성격은 `message write contract`가 아니라 `guest inbox realtime receive/catch-up contract`다.
-- 정적 코드상 관련 source는 `app/hooks/useChat.ts`의 realtime `inquiry_messages INSERT/UPDATE` 구독과 `scheduleRealtimeMessageRefresh()` 경로다.
-- 이 finding은 더 이상 단순 test flake로 보기 어렵고, 최신 active risk로 기록하는 편이 맞다.
+  - 첫 unread batch alert/in-app/email dispatch는 동작한다
+  - admin이 thread를 읽은 뒤 batch는 inactive로 내려간다
+  - 새 unread message가 오면 batch는 다시 active로 올라간다
+  - 그러나 이후 cron을 다시 돌려도 admin alert/email 총량이 두 번째 라운드만큼 증가하지 않는다
+- 즉 현재 결함의 성격은 `admin support unread batch reset → re-arm → second dispatch` 계약이다.
+- 정적 코드상 관련 source는 `app/utils/adminSupportUnreadAlerts.ts`의 `startOrAdvanceAdminSupportUnreadBatch()`, `clearAdminSupportUnreadBatch()`, claim/dispatch 경로다.
+- 현재 상태에선 unread batch state는 다시 살아나지만, alert/email dispatch marker가 다음 라운드를 막고 있을 가능성이 높다.
 
 ## Static Risk Notes
 - `admin_initiated_support` 재사용 기준은 여전히 가장 최근 `admin_support/admin` thread 1건을 고른다
@@ -81,8 +89,8 @@
 
 ## Follow-up Need
 - 1순위
-  - `guest inbox realtime host reply` persistent failure를 product/test combined issue가 아니라 `active messaging risk`로 분리해 핀셋 수정 계획을 세우는 것이 맞다
-  - 수정 범위는 `useChat` guest realtime receive/catch-up path 중심으로 좁히는 편이 안전하다
+  - `admin support unread alert`의 read 후 재기동(re-arm) 실패를 핀셋 수정 계획으로 분리하는 것이 맞다
+  - 수정 범위는 `adminSupportUnreadAlerts` 내부의 batch clear / dispatch marker / second-cycle claim 경계로 좁히는 편이 안전하다
 - 2순위
   - `admin_initiated_support` thread reuse semantics를 `resolved 제외` 또는 `openOnly stricter reuse` 기준으로 잠글지 결정해야 한다
 - 3순위
@@ -90,6 +98,6 @@
 
 ## Final Verdict
 - 메시징/문의 도메인은 최신 tracked caller 기준으로 3월보다 구조가 훨씬 정리됐다
-- thread creation, admin support unread, policy monitoring, inquiry notification/email는 현재 기준 `정상`
-- 그러나 guest inbox가 host reply를 reload 없이 반영해야 하는 핵심 UX 계약은 latest rerun에서 지속적으로 실패했다
-- 따라서 이번 재감사의 최종 판정은 `메시징 도메인 전반은 대체로 안정적이지만, guest realtime receive chain에 active risk 1건이 남아 있어 전체로는 부분 보장`이다
+- guest ↔ host realtime reply는 현재 기준 정상으로 회복됐다
+- 그러나 admin support unread alert의 `read 후 새 unread batch 재기동 → 두 번째 dispatch` 계약은 latest rerun에서 지속적으로 실패했다
+- 따라서 이번 재감사의 최종 판정은 `메시징 도메인 전반은 대체로 안정적이지만, admin support unread alert re-arm chain에 active risk 1건이 남아 있어 전체로는 부분 보장`이다
