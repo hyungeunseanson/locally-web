@@ -30,8 +30,6 @@
 - `docs/archive/db_reset_plan.md.resolved`
 - `docs/archive/pre_launch_status_report.md.resolved`
 - `docs/archive/vercel_vs_cloudflare_report.md.resolved`
-- `docs/archive/ScreenShot Tool -20260307002107.png`
-- `docs/archive/henrikdev.ag-quota-1.1.0.vsix`
 
 현재 운영 코드와 직접 연결되지 않는 파일들만 먼저 옮겼습니다.
 
