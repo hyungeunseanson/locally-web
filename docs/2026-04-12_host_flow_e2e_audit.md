@@ -17,9 +17,9 @@
   - 최종 host non-live 묶음 재실행: `62 passed / 1 failed / 1 did not run`
 - 최종 판정
   - `호스트 진입/모드 전환`, `체험 edit/delete route`, `리뷰 write/reply`, `수익/정산/서비스 매칭`은 현재 기준 `정상`
-  - `호스트 신청/승인 경계`는 submit route, admin approve happy path, revision 재제출 UI, downstream reflection은 안정적이지만, legacy alert 경로까지 합치면 현재 기준 `부분 보장`
+  - `호스트 신청/승인 경계`는 tracked 제품 경로 기준으로는 안정적이지만, 미정리된 legacy alert compatibility endpoint까지 합치면 현재 기준 `부분 보장`
   - 초기 persistent findings 5건 중 `140`, `55`, `35`, `40`은 이번 패스에서 해소되었다
-  - 현재 남은 것은 `호스트 신청/승인 경계 coverage gap`과 `34 host dates UI 분류 미완료`이며, 둘 다 `confirmed product regression`보다는 감사/계약 정밀화 성격이 더 강하다
+  - 현재 남은 것은 `legacy admin-alert compatibility gap`과 `34 host dates UI 분류 미완료`이며, 둘 다 `confirmed product regression`보다는 감사/계약 정밀화 성격이 더 강하다
 
 ## Test Execution
 - ingress / status / mode
@@ -65,7 +65,7 @@
 | 체인 | source of truth | 현재 보장 테스트 | 판정 | 핵심 메모 |
 | --- | --- | --- | --- | --- |
 | 호스트 진입 / 랜딩 / 승인 상태 | `/become-a-host`, `AuthContext`, `ViewModeContext`, `/host/menu`, `/host/dashboard` | `109`, `97`, `98`, `140`, `141`, `55` | 정상 | approval refresh와 view mode persistence는 최신 기준 green |
-| 호스트 신청 / 재제출 / 승인 경계 | `/host/register`, `/api/host/register/submit`, `/api/admin/host-applications`, `updateAdminStatus()`, `AuthContext` | `36`, `97`, `07`, `98`, `140`, `141`, `164`, `167` | 부분 보장 | submit route, admin approve happy path, revision resubmit UI는 green이고 legacy admin-alert dedupe만 남는다 |
+| 호스트 신청 / 재제출 / 승인 경계 | `/host/register`, `/api/host/register/submit`, `/api/admin/host-applications`, `updateAdminStatus()`, `AuthContext` | `36`, `97`, `07`, `98`, `140`, `141`, `164`, `167` | 부분 보장 | tracked client는 submit route만 호출하고 admin approve happy path/revision resubmit UI도 green이지만, legacy admin-alert compatibility endpoint는 dedupe가 없다 |
 | 체험 작성 / 수정 / 삭제 / 일정 관리 | `/host/create`, `/api/host/experiences*`, `/host/experiences/[id]*` | `93`, `32`, `33`, `34`, `35`, `51`, `126` | 부분 보장 | delete/detail smoke는 회복됐고, `34`의 schedule add interaction만 간헐 실패가 남는다 |
 | 예약 / 문의 / 리뷰 응대 | `ReservationManager`, `InquiryChat`, `HostReviews`, `/api/host/start-chat`, `/api/host/guest-reviews`, `/api/host/reviews/reply` | `39`, `40`, `72`, `92`, `122` | 정상 | warning strip copy expectation까지 최신 기준 green |
 | 수익 / 정산 / 서비스 매칭 | `Earnings`, `/api/host/earnings/*`, `ServiceJobsTab`, service board/applications flow | `37`, `133`, `153`, `154`, `152`, `106`, `22`, `50`, `130`, `134` | 정상 | host earnings와 admin payout reflection은 현재 기준 정합적 |
@@ -129,6 +129,10 @@
     - `submit` route는 현재 기준 안전하다
       - validation, normalized dob, account holder guard, `approved` fail-closed, profile seed update는 static code와 `36` 기준으로 일관된다
       - client step validation보다 server validation이 더 엄격하지만, write source of truth가 route에 있어 fail-closed 방향으로 동작한다
+    - 현재 tracked 제품 경로는 단일 submit source를 쓴다
+      - `/host/register` client submit은 `fetch('/api/host/register/submit')`만 호출한다
+      - repo tracked app/tests 기준 `'/api/host/register/admin-alert'` 호출자는 route 파일 자신 외에는 확인되지 않았다
+      - 따라서 현재 저장소 기준 live product path 안에서는 submit 후 admin alert가 이중 호출되는 구조가 아니다
     - `/host/register` UI 자체는 `approved` 사용자를 사전 차단하지 않는다
       - 최신 application row를 그대로 hydrate하기 때문에 이미 승인된 호스트도 등록 폼을 다시 볼 수 있다
       - 실제 보호는 submit route에서만 걸리므로 데이터 overwrite는 막히지만, UI 의미는 다소 모호하다
@@ -143,7 +147,8 @@
     - `167` 보강 후 revision host resubmit UI도 현재 기준 green이다
       - revision 상태 대시보드에서 수정하기로 들어가면 기존 신청값이 hydrate되고, 같은 application row가 `pending`으로 되돌아간다
     - 다만 한 가지 audit gap이 남는다
-      - legacy [app/api/host/register/admin-alert/route.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/api/host/register/admin-alert/route.ts:1)는 아직 살아 있어, 구형 client가 submit 뒤 추가 호출하면 admin alert 중복 적재 가능성이 남아 있다
+      - legacy [app/api/host/register/admin-alert/route.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/api/host/register/admin-alert/route.ts:1)는 여전히 `pending` 신청서에 대해 unconditional admin alert insert를 시도한다
+      - tracked caller는 확인되지 않았지만, stale client나 수동 호출이 submit 직후 이 route를 다시 치면 admin alert 중복 적재 가능성은 남아 있다
 
 ### 3. 체험 작성 / 수정 / 삭제 / 일정 관리 / 공개 반영
 - source of truth
@@ -230,7 +235,7 @@
   - `tests/e2e/03-live-host-signup-registration.spec.ts`
   - `tests/e2e/04-live-host-experience-create.spec.ts`
 - 호스트 신청/승인 경계의 non-live gap
-  - legacy `/api/host/register/admin-alert` 호출 중복에 대한 dedupe contract가 없다
+  - legacy `/api/host/register/admin-alert`는 tracked app/tests에서 호출 흔적이 없지만, compatibility endpoint 자체에는 dedupe contract가 없다
 - 이전 `55`, `35`, `40`, `140`은 이번 패스에서 해소됐다
 - `34`는 route integrity는 보장되지만, 실제 slot add UX가 간헐적으로 미반영되는지 아니면 UI automation contract drift인지 추가 probe 없이는 단정하기 어렵다
 
@@ -238,15 +243,16 @@
 - 즉시 후속 구현이 꼭 필요한 confirmed product risk는 현재 없다
 - 남은 후속 2건
   - host 신청/승인 경계
-    - 가장 안전한 다음 단계는 `legacy admin-alert` route의 실제 호출 유무를 확인한 뒤, 미사용이면 제거하고 사용 중이면 dedupe guard를 넣는 것이다
+    - 가장 안전한 다음 단계는 `legacy admin-alert` route의 실제 운영 호출 유무를 확인한 뒤, 미사용이면 제거하고 사용 중이면 dedupe guard를 넣는 것이다
+    - 현재 코드 기준으로는 tracked client caller가 없으므로 우선순위는 “즉시 제품 버그 수정”보다 “legacy surface 정리”에 가깝다
   - `34-host-edit-and-dates-ui`
     - slot add interaction이 실제로 간헐 미반영되는지, 아니면 `07:00` 버튼 click/selected-state assert가 빠진 스펙 불안정성인지 분리 필요
     - 다음 단계는 UI에 손대기보다 먼저 interaction probe와 selected-state assertion 강화가 더 안전하다
 
 ## Final Verdict
 - 호스트 진입/모드 전환, 체험 create/edit/delete, 리뷰 응대, 수익/정산/서비스 매칭은 최신 기준 `정상`
-- 호스트 신청/승인 경계는 submit route, admin approve UI happy path, revision 재제출 UI, downstream reflection은 안정적이지만, legacy alert 경로까지 포함하면 최신 기준 `부분 보장`이다
+- 호스트 신청/승인 경계는 tracked submit/admin/reflection 체인만 보면 안정적이지만, legacy alert compatibility endpoint까지 포함하면 최신 기준 `부분 보장`이다
 - 이전 감사의 핵심 product risk였던 `dashboard revision → approved refresh/overlay chain`은 이번 패스에서 해소됐다
-- 현재 남은 것은 `legacy admin-alert dedupe gap`과 `34 host dates UI 분류 미완료`다
+- 현재 남은 것은 `legacy admin-alert compatibility gap`과 `34 host dates UI 분류 미완료`다
 - 둘 다 성격상 `confirmed product bug`보다는 contract/coverage 정밀화 과제에 가깝다
-- 따라서 이번 감사의 최신 판정은 `호스트 도메인 전반은 대체로 정상이나, legacy admin-alert 경계와 host dates schedule add interaction은 추가 정밀화가 필요`다
+- 따라서 이번 감사의 최신 판정은 `호스트 도메인 전반은 대체로 정상이나, legacy admin-alert compatibility 경계와 host dates schedule add interaction은 추가 정밀화가 필요`다
