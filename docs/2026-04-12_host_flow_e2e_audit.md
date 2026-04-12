@@ -145,6 +145,7 @@
       - `dcd466a2` (`Serverize host register submit writes`)에서 `app/host/register/page.tsx`의 직접 `host_applications` write + `/api/host/register/admin-alert` 후속 호출이 제거되고, submit route 단일 호출로 교체됐다
       - 직후 `9f7e70e0` (`Clarify host register admin alert legacy route`)에서 이 endpoint를 stale client 호환용 compatibility route로 명시했다
       - 즉 현재 repo 기준에서는 “실수로 orphaned된 ambiguous path”보다 “의도적으로 legacy shim으로 남겨둔 path” 해석이 더 강하다
+      - 별도 내부 인벤토리인 [AUDIT_MAP.md](/Users/hyungeunseanson/Documents/서비스/locally-web/AUDIT_MAP.md:131)도 이 route를 `수동 어드민 호출 전용` low-risk로 기록하고 있어, 저장소 내부 문서끼리도 해석이 크게 어긋나지 않는다
     - `/host/register` UI 자체는 `approved` 사용자를 사전 차단하지 않는다
       - 최신 application row를 그대로 hydrate하기 때문에 이미 승인된 호스트도 등록 폼을 다시 볼 수 있다
       - 실제 보호는 submit route에서만 걸리므로 데이터 overwrite는 막히지만, UI 의미는 다소 모호하다
@@ -162,6 +163,8 @@
       - legacy [app/api/host/register/admin-alert/route.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/api/host/register/admin-alert/route.ts:1)는 여전히 `pending` 신청서에 대해 unconditional admin alert insert를 시도한다
       - tracked caller는 확인되지 않았지만, stale client나 수동 호출이 submit 직후 이 route를 다시 치면 admin alert 중복 적재 가능성은 남아 있다
       - 다만 현재까지의 static + history evidence만 보면 이 위험은 current product path가 아니라 external stale client surface에 한정된다
+      - `.vercel/`, `.next/dev/logs/` 같은 저장소 로컬 산출물에서도 이 route의 실제 운영 access 흔적을 보여 주는 로그는 확인되지 않았다
+      - 따라서 이 경계는 저장소 안에서 더 줄일 수 있는 문제가 아니라, 저장소 밖 운영 로그 확인으로만 닫을 수 있는 종류의 gap이다
 
 ### 3. 체험 작성 / 수정 / 삭제 / 일정 관리 / 공개 반영
 - source of truth
@@ -240,6 +243,7 @@
   - `tests/e2e/04-live-host-experience-create.spec.ts`
 - 호스트 신청/승인 경계의 non-live gap
   - legacy `/api/host/register/admin-alert`는 tracked app/tests에서 호출 흔적이 없고 git history상도 intentional legacy route지만, external stale client 대비 dedupe contract는 없다
+  - 저장소 로컬 산출물(`.vercel`, `.next/dev/logs`)에는 이 route의 실제 운영 호출 여부를 판단할 access evidence가 없었다
 - 이전 `55`, `35`, `40`, `140`은 이번 패스에서 해소됐다
 
 ## Follow-up Need
@@ -248,6 +252,7 @@
   - host 신청/승인 경계
     - 가장 안전한 다음 단계는 저장소 밖 운영 로그/라우트 access evidence로 `legacy admin-alert` 실제 호출 유무를 확인한 뒤, 미사용이면 제거하고 사용 중이면 dedupe guard를 넣는 것이다
     - 현재 코드와 git history 기준으로는 tracked client caller가 없으므로 우선순위는 “즉시 제품 버그 수정”보다 “external stale client cleanup”에 가깝다
+    - 저장소 안 증거는 이미 충분히 모였고, 이제 추가 분류에 필요한 건 Vercel/관측 도구 수준의 runtime access log다
 
 ## Final Verdict
 - 호스트 진입/모드 전환, 체험 create/edit/delete, 리뷰 응대, 수익/정산/서비스 매칭은 최신 기준 `정상`
