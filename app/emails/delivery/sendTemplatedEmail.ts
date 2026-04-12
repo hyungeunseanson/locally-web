@@ -27,8 +27,41 @@ function hasResendConfig() {
   return Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL);
 }
 
-function hasGmailConfig() {
-  return Boolean(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
+function hasGmailConfig(env: NodeJS.ProcessEnv = process.env) {
+  return Boolean(env.GMAIL_USER && env.GMAIL_APP_PASSWORD);
+}
+
+export function hasAdminGmailConfig(env: NodeJS.ProcessEnv = process.env) {
+  return Boolean(env.ADMIN_GMAIL_USER && env.ADMIN_GMAIL_APP_PASSWORD);
+}
+
+type GmailSenderProfile = {
+  user: string;
+  pass: string;
+  from: string;
+};
+
+export function resolveGmailSenderProfile(
+  policy: EmailTransportPolicy = 'transactional',
+  env: NodeJS.ProcessEnv = process.env
+): GmailSenderProfile | null {
+  if (policy === 'opsAdmin' && hasAdminGmailConfig(env)) {
+    return {
+      user: env.ADMIN_GMAIL_USER!,
+      pass: env.ADMIN_GMAIL_APP_PASSWORD!,
+      from: `"Locally Admin" <${env.ADMIN_GMAIL_USER!}>`,
+    };
+  }
+
+  if (hasGmailConfig(env)) {
+    return {
+      user: env.GMAIL_USER!,
+      pass: env.GMAIL_APP_PASSWORD!,
+      from: `"Locally Team" <${env.GMAIL_USER!}>`,
+    };
+  }
+
+  return null;
 }
 
 function getMockCapturePath() {
@@ -65,17 +98,18 @@ async function sendWithGmail(params: {
   subject: string;
   html: string;
   text: string;
+  sender: GmailSenderProfile;
 }) {
   const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_APP_PASSWORD,
+      user: params.sender.user,
+      pass: params.sender.pass,
     },
   });
 
   await transporter.sendMail({
-    from: `"Locally Team" <${process.env.GMAIL_USER}>`,
+    from: params.sender.from,
     to: params.to,
     subject: params.subject,
     html: params.html,
@@ -114,6 +148,7 @@ async function sendWithMockFile(params: {
   to: string;
   subject: string;
   html: string;
+  from?: string;
 }) {
   const capturePath = getMockCapturePath();
   if (!capturePath) return false;
@@ -124,6 +159,7 @@ async function sendWithMockFile(params: {
       to: params.to,
       subject: params.subject,
       html: params.html,
+      from: params.from,
     })}\n`,
     'utf8'
   );
@@ -181,16 +217,37 @@ export async function sendTemplatedEmail<T extends EmailTemplateId>(
   }
 
   const transportPolicy = resolveTransportPolicy(request.transportPolicy);
+  const gmailSender = resolveGmailSenderProfile(transportPolicy);
+  const prefersDedicatedAdminGmail =
+    transportPolicy === 'opsAdmin' && hasAdminGmailConfig();
 
   if (transportPolicy === 'opsAdmin' && (await sendWithMockFile({
     to: recipientEmail,
     subject: rendered.subject,
     html: rendered.html,
+    from: gmailSender?.from,
   }))) {
     return {
       success: true,
       sent: true,
       provider: 'mock',
+      ...rendered,
+    };
+  }
+
+  if (prefersDedicatedAdminGmail && gmailSender) {
+    await sendWithGmail({
+      to: recipientEmail,
+      subject: rendered.subject,
+      html: rendered.html,
+      text: rendered.text,
+      sender: gmailSender,
+    });
+
+    return {
+      success: true,
+      sent: true,
+      provider: 'gmail',
       ...rendered,
     };
   }
@@ -211,12 +268,13 @@ export async function sendTemplatedEmail<T extends EmailTemplateId>(
     };
   }
 
-  if (hasGmailConfig()) {
+  if (gmailSender) {
     await sendWithGmail({
       to: recipientEmail,
       subject: rendered.subject,
       html: rendered.html,
       text: rendered.text,
+      sender: gmailSender,
     });
 
     return {
