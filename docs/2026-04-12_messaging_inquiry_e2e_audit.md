@@ -3,11 +3,20 @@
 ## Summary
 - 감사 범위: `guest inbox ↔ host inquiry chat ↔ admin support monitor`, 그리고 이를 잇는 `thread/message/read` 공통 코어와 `service/proxy/host start-chat` boundary
 - 제외 범위: `서비스 의뢰 상태 머신`, `proxy 결제/정산`, `리뷰 reply`, `커뮤니티 댓글`, live mutation 재실행
-- 실행 방식: 정적 코드 감사 + 핵심 non-live E2E 재실행 + persistent failure 재재현
+- 실행 방식: 정적 코드 감사 + 핵심 non-live E2E close-out 재실행
 - latest run
-  - `17 passed / 1 failed`
-  - persistent failure: `tests/e2e/161-admin-support-unread-alerts.spec.ts`의 `sends one admin alert + team email after 10 minutes of unread customer support inquiry and resets after admin read`
-- targeted rerun after realtime catch-up patch
+  - `18 passed (1.4m)`
+  - close-out rerun bundle
+    - `tests/e2e/53-chat-optimistic-send.spec.ts`
+    - `tests/e2e/41-inquiry-read-route.spec.ts`
+    - `tests/e2e/60-inquiry-thread-contract.spec.ts`
+    - `tests/e2e/124-inquiry-email-localization.spec.ts`
+    - `tests/e2e/14-admin-chats.spec.ts`
+    - `tests/e2e/161-admin-support-unread-alerts.spec.ts`
+    - `tests/e2e/83-chat-policy-monitoring.spec.ts`
+    - `tests/e2e/164-guest-inbox-support-profile-context.spec.ts`
+    - `tests/e2e/95-guest-inbox-empty-state.spec.ts`
+- previous targeted rerun after realtime catch-up patch
   - `tests/e2e/53-chat-optimistic-send.spec.ts`
   - `tests/e2e/41-inquiry-read-route.spec.ts`
   - `tests/e2e/60-inquiry-thread-contract.spec.ts`
@@ -16,15 +25,16 @@
 - 이번 재감사 기준 핵심 해석
   - 3월 감사에서 컸던 `문의 생성 경로 분산`은 tracked caller 기준으로 상당 부분 해소됐다
   - `guest ↔ host realtime reply`, `policy signal`, `guest/host/admin deep link`, `localized inquiry email`은 현재 기준 정상이다
-  - 다만 `admin support unread alert`의 read 후 재기동(re-arm) 체인은 현재 persistent failure가 있어 최신 판정은 `부분 보장`이다
+  - 기존 active risk였던 `admin support unread alert`의 read 후 재기동(re-arm) 체인도 최신 close-out rerun 기준으로 green 복구됐다
+  - 이번 close-out 이후 남는 것은 core failure가 아니라 low-risk boundary semantics 두 건이다
 
 ## Result Snapshot
 | Chain | Source of truth | Current tests | Verdict | Notes |
 | --- | --- | --- | --- | --- |
 | Thread creation / first message | `app/api/inquiries/thread/shared.ts`, `/api/inquiries/thread` | `60`, `124`, `161`, `164` | 정상 | guest help, host start-chat, service start-chat, admin initiated support가 tracked path 기준 공통 thread upsert를 사용 |
 | Guest ↔ host message send/read | `app/hooks/useChat.ts`, `/api/inquiries/message`, `/api/inquiries/read`, `/guest/inbox`, `host/dashboard/InquiryChat.tsx` | `41`, `53`, `95`, `164`, rerun `53` | 정상 | optimistic send, read contract, host reply realtime receive가 latest targeted rerun에서 모두 green |
-| Admin support / monitor | `/api/admin/inquiries*`, `useAdminChatQuery`, `ChatMonitor`, `/api/admin/sidebar-counts` | `14`, `161`, `83` | 부분 보장 | status 변경, policy monitoring, participant card는 green이지만 unread alert re-arm chain은 latest run fail |
-| Notification / email / policy signal | `thread/shared.ts: notifyRecipient`, `InquiryNewMessageEmail`, `emitChatPolicySignal` | `124`, `83`, `161` | 부분 보장 | inquiry new_message email/policy alert는 정상이나, admin support unread alert + team email의 두 번째 batch dispatch는 현재 실패 |
+| Admin support / monitor | `/api/admin/inquiries*`, `useAdminChatQuery`, `ChatMonitor`, `/api/admin/sidebar-counts` | `14`, `161`, `83` | 정상 | status 변경, policy monitoring, participant card, unread re-arm close-out rerun까지 현재 green |
+| Notification / email / policy signal | `thread/shared.ts: notifyRecipient`, `InquiryNewMessageEmail`, `emitChatPolicySignal` | `124`, `83`, `161` | 정상 | inquiry new_message email, policy alert, admin support unread alert + team email의 second dispatch까지 green 복구 |
 | Boundary entrypoints | `/api/host/start-chat`, `/api/services/start-chat`, `proxy-bookings/[id]/comments` | `60` + static audit | 부분 보장 | host/service는 공통 thread upsert로 정리됐고, proxy는 linked inquiry가 있을 때만 공통 message path를 재사용 |
 
 ## Confirmed Findings
@@ -58,17 +68,16 @@
 - 따라서 3월 감사 당시의 “메시지 send path가 email 시도까지 같은 요청 안에서 돈다”는 해석은 최신 inquiry message 경로에는 그대로 적용되지 않는다.
 - 현재 구조에서 메시지 truth는 DB write이고, email은 best-effort side effect로 분리되어 있다.
 
-### 5. admin support unread alert 재기동(re-arm) 경로가 현재 active risk다
-- 실패 스펙: `tests/e2e/161-admin-support-unread-alerts.spec.ts`
-- 동일 failure를 전체 감사 묶음과 단독 재실행에서 모두 재현했다.
-- 확인된 사실
-  - 첫 unread batch alert/in-app/email dispatch는 동작한다
-  - admin이 thread를 읽은 뒤 batch는 inactive로 내려간다
-  - 새 unread message가 오면 batch는 다시 active로 올라간다
-  - 그러나 이후 cron을 다시 돌려도 admin alert/email 총량이 두 번째 라운드만큼 증가하지 않는다
-- 즉 현재 결함의 성격은 `admin support unread batch reset → re-arm → second dispatch` 계약이다.
-- 정적 코드상 관련 source는 `app/utils/adminSupportUnreadAlerts.ts`의 `startOrAdvanceAdminSupportUnreadBatch()`, `clearAdminSupportUnreadBatch()`, claim/dispatch 경로다.
-- 현재 상태에선 unread batch state는 다시 살아나지만, alert/email dispatch marker가 다음 라운드를 막고 있을 가능성이 높다.
+### 5. admin support unread alert 재기동(re-arm) 경로는 latest 기준으로 닫혔다
+- 근거 스펙: `tests/e2e/161-admin-support-unread-alerts.spec.ts`
+- 이번 close-out rerun 기준 확인된 사실
+  - 첫 unread wave alert/in-app/email dispatch가 정상 동작한다
+  - admin이 thread를 읽으면 batch가 inactive로 내려간다
+  - 새 unread wave가 오면 batch가 다시 active로 올라가고, sent markers도 새 wave 기준으로 재무장된다
+  - 이후 cron 재실행 시 admin alert/email 총량이 두 번째 라운드만큼 다시 증가한다
+- 현재 해석
+  - unread alert의 제품 의미는 `문의방 전체 1회`가 아니라 `read로 끊기는 unread wave당 1회`로 보는 것이 맞다
+  - `app/utils/adminSupportUnreadAlerts.ts`는 최신 코드 기준으로 이 계약을 다시 만족한다
 
 ## Static Risk Notes
 - `admin_initiated_support` 재사용 기준은 여전히 가장 최근 `admin_support/admin` thread 1건을 고른다
@@ -86,18 +95,19 @@
   - `tests/e2e/16-admin-team-chat.spec.ts`
 - `admin_initiated_support`의 “resolved old thread 재사용 여부”는 정적 구조상 리스크를 확인했지만, dedicated regression spec으로 닫히지 않았다
 - `service_request_id` fallback legacy branch는 static audit로는 파악했지만, production schema capability까지 이번 문서에서 단정하진 않는다
+- `proxy-bookings/[id]/comments`의 linked inquiry 미존재 legacy branch도 이번 close-out에서는 boundary-only로만 확인했다
 
 ## Follow-up Need
 - 1순위
-  - `admin support unread alert`의 read 후 재기동(re-arm) 실패를 핀셋 수정 계획으로 분리하는 것이 맞다
-  - 수정 범위는 `adminSupportUnreadAlerts` 내부의 batch clear / dispatch marker / second-cycle claim 경계로 좁히는 편이 안전하다
-- 2순위
   - `admin_initiated_support` thread reuse semantics를 `resolved 제외` 또는 `openOnly stricter reuse` 기준으로 잠글지 결정해야 한다
-- 3순위
+- 2순위
   - schema가 충분히 정리됐다면 `service_request_id` capability fallback을 언제 걷어낼지 운영 기준을 정할 필요가 있다
+- 3순위
+  - `proxy` linked inquiry 브리지가 완전 통일로 갈지, 현행 조건부 bridge를 유지할지 별도 운영 판단이 필요하다
 
 ## Final Verdict
 - 메시징/문의 도메인은 최신 tracked caller 기준으로 3월보다 구조가 훨씬 정리됐다
 - guest ↔ host realtime reply는 현재 기준 정상으로 회복됐다
-- 그러나 admin support unread alert의 `read 후 새 unread batch 재기동 → 두 번째 dispatch` 계약은 latest rerun에서 지속적으로 실패했다
-- 따라서 이번 재감사의 최종 판정은 `메시징 도메인 전반은 대체로 안정적이지만, admin support unread alert re-arm chain에 active risk 1건이 남아 있어 전체로는 부분 보장`이다
+- `admin support unread alert`의 `read 후 새 unread batch 재기동 → 두 번째 dispatch` 계약도 latest close-out rerun에서 green으로 복구됐다
+- 따라서 이번 close-out 기준 최종 판정은 `메시징 core chain은 정상`이다
+- 다만 `admin_initiated_support` 재사용 semantics, `service_request_id` legacy fallback, `proxy` 조건부 bridge는 여전히 boundary-only gap으로 남아 있다
