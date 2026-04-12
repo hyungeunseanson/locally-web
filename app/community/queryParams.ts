@@ -57,16 +57,25 @@ export function buildCommunitySearchParams(input: {
 }) {
   const params = new URLSearchParams();
   const hub = input.hub ?? 'all';
-  const format = input.format ?? (input.category ? resolveCommunityFormat(null, input.category) : 'all');
+  const normalizedCategory = input.category ? resolveCommunityCategory(input.category) : 'all';
+  let format = input.format ?? (normalizedCategory !== 'all' ? getCommunityFormatFromCategory(normalizedCategory) : 'all');
   const query = input.q?.trim() ?? '';
   const sort = input.sort ?? 'latest';
+
+  // category와 format이 어긋난 legacy/stale 링크는 category truth 기준으로 fail-closed 한다.
+  if (format !== 'all' && normalizedCategory !== 'all') {
+    const categoryFromFormat = getCommunityCategoryFromFormat(format);
+    if (categoryFromFormat !== normalizedCategory) {
+      format = getCommunityFormatFromCategory(normalizedCategory);
+    }
+  }
 
   if (hub !== 'all') params.set('hub', hub);
   if (format !== 'all') {
     params.set('format', format);
     params.set('category', getCommunityCategoryFromFormat(format));
-  } else if (input.category && input.category !== 'all') {
-    params.set('category', input.category);
+  } else if (normalizedCategory !== 'all') {
+    params.set('category', normalizedCategory);
   }
   if (query) params.set('q', query);
   if (sort !== 'latest') params.set('sort', sort);

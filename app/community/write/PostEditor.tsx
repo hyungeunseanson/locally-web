@@ -110,8 +110,11 @@ export default function PostEditor({
 
     const category = getCommunityCategoryFromFormat(format);
     const formatMeta = getCommunityFormatMeta(format);
+    const isLocallyPick = format === 'locally_pick';
     const isCompanion = format === 'companion';
     const canWriteAnonymously = format !== 'locally_pick';
+    const trimmedTitleLength = title.trim().length;
+    const trimmedContentLength = content.trim().length;
     const canSubmit = Boolean(
         title.trim().length > 0
         && content.trim().length > 0
@@ -426,6 +429,62 @@ export default function PostEditor({
                                 </button>
                             </div>
                         </div>
+
+                        {isLocallyPick && (
+                            <div
+                                data-testid="community-content-editorial-checklist"
+                                className="rounded-[24px] border border-amber-200 bg-amber-50/80 px-5 py-4 md:px-6"
+                            >
+                                <div className="text-[11px] font-black uppercase tracking-[0.16em] text-amber-700">
+                                    Editorial Checklist
+                                </div>
+                                <h3 className="mt-2 text-[16px] font-semibold text-slate-900">
+                                    로컬리 콘텐츠 발행 전 체크
+                                </h3>
+                                <p className="mt-1 text-[13px] leading-6 text-slate-600">
+                                    강제로 막지는 않지만, 검색 유입용 콘텐츠는 아래 기준을 맞추는 편이 가장 안전합니다.
+                                </p>
+
+                                <ul className="mt-4 space-y-2 text-[13px] text-slate-700">
+                                    {[
+                                        {
+                                            label: '대표 이미지 1장 이상',
+                                            met: imageFiles.length > 0,
+                                            note: '검색 썸네일 품질을 위해 권장',
+                                        },
+                                        {
+                                            label: '제목 8자 이상',
+                                            met: trimmedTitleLength >= 8,
+                                            note: `현재 ${trimmedTitleLength}자`,
+                                        },
+                                        {
+                                            label: '본문 40자 이상',
+                                            met: trimmedContentLength >= 40,
+                                            note: `현재 ${trimmedContentLength}자`,
+                                        },
+                                    ].map((item) => (
+                                        <li
+                                            key={item.label}
+                                            className="flex items-start justify-between gap-3 rounded-2xl border border-white/80 bg-white/70 px-4 py-3"
+                                        >
+                                            <div className="min-w-0">
+                                                <div className="font-semibold text-slate-900">{item.label}</div>
+                                                <div className="mt-1 text-[12px] text-slate-500">{item.note}</div>
+                                            </div>
+                                            <span
+                                                className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                                                    item.met
+                                                        ? 'bg-emerald-100 text-emerald-700'
+                                                        : 'bg-amber-100 text-amber-700'
+                                                }`}
+                                            >
+                                                {item.met ? '충족' : '권장'}
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
 
                         {canWriteAnonymously && (
                             <div className="rounded-[24px] border border-slate-200 bg-white px-5 py-4 md:px-6">

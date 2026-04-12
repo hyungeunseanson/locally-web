@@ -160,6 +160,16 @@ test.describe.serial('Community content layout and access', () => {
 
     await expect(page.getByRole('button', { name: '커뮤니티 글쓰기' })).toHaveCount(0);
 
+    const communityDetailHrefs = await page.locator('a[href*="/community/"]').evaluateAll((elements) =>
+      elements
+        .map((element) => element.getAttribute('href'))
+        .filter((href): href is string => Boolean(href && href.includes('/community/')))
+    );
+    expect(communityDetailHrefs.some((href) => href.includes('format=question') || href.includes('category=qna'))).toBeFalsy();
+    expect(
+      communityDetailHrefs.some((href) => href.includes('format=locally_pick') && href.includes('category=locally_content'))
+    ).toBeTruthy();
+
     const box = await page.getByTestId('community-content-card').first().boundingBox();
     expect(box).not.toBeNull();
     expect(box!.height).toBeGreaterThan(box!.width * 1.15);
@@ -178,5 +188,9 @@ test.describe.serial('Community content layout and access', () => {
     await expect(page.getByRole('button', { name: '커뮤니티 글쓰기' })).toBeVisible();
     await page.getByRole('button', { name: '커뮤니티 글쓰기' }).click();
     await expect.poll(() => page.url()).toContain('/community/write?category=locally_content');
+    await expect(page.getByTestId('community-content-editorial-checklist')).toBeVisible();
+    await expect(page.getByText('대표 이미지 1장 이상')).toBeVisible();
+    await expect(page.getByText('제목 8자 이상')).toBeVisible();
+    await expect(page.getByText('본문 40자 이상')).toBeVisible();
   });
 });
