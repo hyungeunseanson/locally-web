@@ -117,6 +117,19 @@
   - `tests/e2e/151-service-bank-confirm-guard.spec.ts`
   - `tests/e2e/152-host-service-earnings-separation.spec.ts`
   - 결과: `6 passed (26.1s)` under `playwright.contracts.config.ts`
+- admin finance reflection subset
+  - `tests/e2e/08-admin-billing.spec.ts`
+  - `tests/e2e/10-admin-service-requests.spec.ts`
+  - `tests/e2e/155-admin-settlement-sync-status.spec.ts`
+  - `tests/e2e/156-admin-settlement-sync-manual-trigger.spec.ts`
+  - `tests/e2e/157-settlement-sync-race-guard.spec.ts`
+  - `tests/e2e/158-settlement-sync-fail-closed.spec.ts`
+  - `tests/e2e/160-settlement-sync-job-name-recording.spec.ts`
+  - 병렬 5 worker 재실행에서는 admin login entry noise가 있었고, 단건 확인 후 `--workers=1` 기준으로 재실행했다
+  - 결과: `7 passed / 1 failed (1.4m)` under `playwright.contracts.config.ts`
+  - 남은 실패
+    - `155-admin-settlement-sync-status.spec.ts`
+    - 현재 로컬 환경에서 `settlement-sync` GET이 infra-disabled banner를 반환해, 예전 스펙이 기대한 mixed degraded snapshot copy와 어긋난다
 - 이번 패스에서 직접 닫은 항목
   - 서울 request 생성 시 country가 `대한민국`으로 정규화되는 생성 계약
   - booking pre-create 실패 시 `pending_payment` request cleanup 계약
@@ -128,6 +141,9 @@
   - completion cron이 paid service booking만 완료 처리하고 payout eligibility를 여는 계약
   - admin service bank confirm이 `PENDING + bank` 경계와 idempotent confirm semantics를 유지한다는 점
   - host earnings summary와 service drilldown이 completed service truth를 다른 source로 읽지 않는다는 점
+  - admin billing KPI와 service CSV가 active date range 기준을 유지한다는 점
+  - admin service requests tab이 bank confirm, settlement account, refund list를 같은 booking truth로 읽는다는 점
+  - settlement sync manual trigger, race guard, fail-closed, job-name recording이 현재 service completion 체인과 충돌하지 않는다는 점
 
 ## Initial Findings
 
@@ -158,24 +174,27 @@
 - 판정
   - `완료 / 정산 / 호스트 반영`: `정상`
 
-### 4. 현재 남은 마지막 재감사 핵심은 admin finance reflection close-out이다
+### 4. admin finance reflection은 대부분 green이지만, shared settlement infra 상태 카드 1건이 아직 남아 있다
 - confirmed
 - 근거
-  - 생성/공개/결제/완료/정산 앞단까지는 직접 rerun 근거가 모두 생겼다
-  - 아직 직접 rerun하지 않은 큰 묶음은 admin service finance reflection과 settlement sync 운영 표면(`08/10/155~160`)이다
+  - `08`, `10`, `156`, `157`, `158`, `160`은 serial rerun 기준으로 모두 green이었다
+  - 남은 `155` 실패는 service booking/request 상태 전이 불일치가 아니라, `SettlementSyncPanel`이 현재 로컬 환경에서 infra-disabled banner를 반환해 예전 degraded snapshot copy 기대와 어긋난 케이스다
+  - 즉 서비스 의뢰 도메인 고유 리스크라기보다 체험/서비스 공용 settlement sync infrastructure availability 경계에 더 가깝다
+- 판정
+  - `admin finance reflection`: `부분 보장`
+
+### 5. 서비스 의뢰 도메인은 거의 닫혔지만, 최종 close-out은 shared settlement infra 경계 때문에 한 단계 보류한다
+- confirmed
+- 근거
+  - 생성/공개/결제/완료/정산/host 반영은 모두 직접 rerun 근거가 생겼다
+  - admin finance도 대부분 green이지만, `155` 하나가 shared settlement sync status surface를 막고 있다
 - 판정
   - `도메인 close-out 상태`: `부분 보장`
 
 ## Next Slice
 - 다음 실행 묶음
-  - `08-admin-billing.spec.ts`
-  - `10-admin-service-requests.spec.ts`
   - `155-admin-settlement-sync-status.spec.ts`
-  - `156-admin-settlement-sync-manual-trigger.spec.ts`
-  - `157-settlement-sync-race-guard.spec.ts`
-  - `158-settlement-sync-fail-closed.spec.ts`
-  - `160-settlement-sync-job-name-recording.spec.ts`
 - 이 묶음에서 먼저 확인할 것
-  - admin service booking/request tab이 same booking truth를 settlement/refund/all 뷰에서 일관되게 읽는지
-  - payout queue, sync status, manual trigger, race guard, fail-closed semantics가 service booking 흐름과 충돌하지 않는지
-  - 이 묶음이 green이면 서비스 의뢰 감사는 close-out 최종 판정으로 올릴 수 있다
+  - `get_experience_completion_due_backlog` RPC 또는 동등한 infra capability가 현재 로컬/테스트 환경에 실제로 있는지
+  - `155`가 기대하는 degraded snapshot이 지금도 제품 의미상 유효한지, 아니면 infra-disabled banner가 새 기준선인지
+  - 이 경계가 닫히면 서비스 의뢰 감사는 최종 close-out으로 올릴 수 있다
