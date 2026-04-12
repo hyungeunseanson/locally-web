@@ -25,7 +25,8 @@
     - `대시보드 탭 본체`: 대체로 `정상`
     - `좌측 카운트 계약`: `의도된 제거`
     - `비노출 surface`: `부분 보장`
-      - `APPS / EXPS / SETTLEMENT`는 current sidebar에는 없지만 direct query/localStorage alias로는 아직 reachable한 hidden compatibility surface다
+      - `APPS / EXPS`는 current sidebar에는 없지만 direct query/localStorage alias로는 아직 reachable한 hidden compatibility surface다
+      - `SETTLEMENT`는 current shell 기준 유일하게 남은 hidden legacy screen이다
       - `RealtimeTab / RealtimeBookings`는 zero-consumer orphan로 확인되어 이번 close-out에서 제거했다
 
 ## Test Execution
@@ -87,7 +88,7 @@
 | Service Requests | `useServiceAdminData`, `/api/admin/service-bookings`, `/api/admin/service-confirm-payment`, `/api/admin/service-cancel`, `/api/admin/service-payouts/mark-paid`, `ServiceAdminTab` | `10`, `132`, 이번 rerun `10` | 정상 | `ALL/SETTLEMENT/REFUND` 본체는 정상이고, sidebar pending count는 현재 제품에서 쓰지 않는다 |
 | Sales | `/api/admin/sales-summary`, `/api/admin/payout-queue`, `settleHostPayout`, `/api/admin/settlement-sync`, `SalesTab` | `08`, `130`, `134`, `155`, `156`, `157`, `158`, `160`, 이번 rerun `08` | 정상 | pending/completed 정산 view와 sync panel은 현재 유지 |
 | Analytics | `/api/admin/analytics-*`, `/api/admin/reviews`, `/api/admin/audit-logs`, `AnalyticsTab` | `09`, `70`, 이번 rerun `09` | 정상 | `business/host/reviews/logs` 탭 분기와 route 호출 의미는 유지 |
-| 비노출 / 레거시 surface | `ManagementTab`의 `SETTLEMENT` | 별도 direct E2E 없음 | 부분 보장 | 남아 있는 비노출 경계는 `APPS / EXPS / SETTLEMENT` hidden compatibility route뿐이며, orphan `Realtime*`는 제거 완료 |
+| 비노출 / 레거시 surface | `ManagementTab`의 `SETTLEMENT` | 별도 direct E2E 없음 | 부분 보장 | 남아 있는 비노출 경계는 `APPS / EXPS` hidden compatibility alias와 `SETTLEMENT` hidden legacy screen뿐이며, orphan `Realtime*`는 제거 완료 |
 
 ## Chain-by-Chain Audit
 
@@ -336,12 +337,17 @@
     - 따라서 이번 패스에서 두 파일은 제거했다
   - 반면 `PhoneReservationTab`은 비노출 레거시가 아니라 `TEAM.proxy`의 active 운영 surface다
 - 판정
-  - `SETTLEMENT`: hidden compatibility surface
-    - current sidebar에는 없지만 `/admin/dashboard?tab=SETTLEMENT`로는 여전히 도달 가능하다
-    - 따라서 orphan 삭제 후보가 아니라 “유지할지 차단할지”를 별도로 결정해야 하는 숨은 진입면이다
+  - `APPROVALS`: official tab
+    - current sidebar button, `page.tsx` 공식 분기, approvals E2E가 모두 이 값을 기준으로 잠겨 있다
   - `APPS`, `EXPS`: hidden compatibility alias
     - 공식 운영 탭은 아니지만 direct query/localStorage alias는 남아 있다
-    - 따라서 `APPROVALS`와 한 묶음의 호환 경로로 봐야 하며, orphan 제거와 같이 다루면 안 된다
+    - `docs/gemini.md`와 과거 변경 로그도 아직 이들을 `Approvals`의 legacy alias로 설명한다
+    - `ManagementTab`, `ListPanel`, `DetailsPanel`이 여전히 `APPS/EXPS` 의미를 직접 소비하므로, 단순 dead code가 아니라 `APPROVALS` 내부 표현을 노출한 호환 경로에 가깝다
+  - `SETTLEMENT`: hidden legacy screen
+    - current sidebar에는 없지만 `/admin/dashboard?tab=SETTLEMENT`로는 여전히 도달 가능하다
+    - 그러나 현재 공식 sidebar/tab 계약, `docs/gemini.md`, 최근 E2E 어디에도 유지 surface로 언급되지 않는다
+    - 또한 `Sidebar.tsx` active 판정에서도 `SETTLEMENT`를 포함하지 않아, localStorage나 bookmarked URL로 진입하면 “보이진 않지만 열리는” 단독 drift 경로가 된다
+    - 따라서 남은 비노출 경계 중에서는 가장 먼저 차단 여부를 결정할 후보에 가깝다
   - orphan close-out: `RealtimeTab`, `RealtimeBookings`
     - current shell 기준 import consumer가 없고, 수동 query로도 직접 열리지 않는다는 점을 확인한 뒤 제거 완료
 
@@ -369,24 +375,27 @@
 - 근거
   - `page.tsx` 기본 fallback은 `APPROVALS`
   - `Sidebar.tsx` 내부 fallback은 `APPS`
+  - `page.tsx`는 `savedTab`이 있으면 그대로 `/admin/dashboard?tab=${savedTab.toUpperCase()}`로 복귀시키므로, localStorage에 `APPS`, `EXPS`, `SETTLEMENT`가 남아 있으면 hidden path 재진입도 그대로 허용한다
 - 영향
   - 현재는 URL/localStorage가 대부분 덮어써서 즉시 재현 bug는 아니지만, shell contract를 흐리는 drift다
 
 ### 4. 비노출 레거시 surface는 성격이 둘로 갈린다
 - confirmed
 - 근거
-  - `ManagementTab.SETTLEMENT`는 `page.tsx`의 fallback 구조 때문에 `/admin/dashboard?tab=SETTLEMENT`로 direct reachability가 있다
-  - `APPS`, `EXPS`도 같은 방식으로 legacy alias reachability가 남아 있다
+  - `APPS`, `EXPS`는 `ManagementTab`의 실제 내부 의미(`subTab`, `ListPanel`, `DetailsPanel`)와 계속 연결돼 있고, 문서 기준으로도 legacy approvals alias로 살아 있다
+  - `ManagementTab.SETTLEMENT`는 `page.tsx`의 fallback 구조 때문에 `/admin/dashboard?tab=SETTLEMENT`로 direct reachability가 있지만, 공식 sidebar/tab 계약과는 이미 끊어져 있다
   - `RealtimeTab`, `RealtimeBookings`는 current shell 기준 import consumer가 보이지 않고, unknown `tab` query로도 직접 열리지 않아 제거해도 운영 path에 영향이 없다
 - 영향
   - 후속 정리는 한 묶음으로 삭제하면 안 된다
-  - `SETTLEMENT/APPS/EXPS`는 먼저 “숨은 진입면을 닫을지 유지할지” 결정이 필요하고,
+  - `APPS/EXPS`는 `APPROVALS` 내부 호환 경로로 보고 유지/정규화 여부를 결정해야 하고,
+  - `SETTLEMENT`는 hidden legacy screen으로 따로 떼어 차단 여부를 먼저 결정하는 편이 더 안전하다
   - orphan `Realtime*` 정리는 이번 패스에서 이미 닫았다
 
 ## Coverage Gaps
 - `15-admin-team`, `16-admin-team-chat`, `79`, `86`, `89`, `136`은 이번 패스에서 full rerun하지 않았다
   - `TeamTab` static audit과 `18` rerun으로 current plain-label intent는 이미 확인됐다
-- `SETTLEMENT/APPS/EXPS`는 static route reachability는 닫았지만, 실제 운영에서 의도적으로 허용한 deep link인지까지는 문서 근거가 약하다
+- `APPS/EXPS`는 legacy approvals alias라는 문서 근거는 있지만, 앞으로도 URL/localStorage 호환을 유지할지에 대한 최신 결정 문서는 없다
+- `SETTLEMENT`는 정적 reachability는 닫았지만, 유지 의도를 보여주는 최신 문서나 테스트가 없다
 - orphan `Realtime*`를 왜 과거에 남겨뒀는지에 대한 운영 메모는 저장소 안에서 찾지 못했다
 
 ## Follow-up Need
@@ -399,8 +408,9 @@
   - `adminBadgeState.ts`는 지금 당장 제거 대상이 아니라, sidebar count 전용 부분과 탭 내부 viewed-state helper를 분리할지 검토하는 편이 안전하다
   - 다시 쓸 계획이 있으면 최소한 deprecated/dormant contract로 문서화하는 편이 안전하다
 - 3순위 후속 정리
-  - `APPROVALS` / `APPS` fallback alias를 한쪽으로 통일
-  - `SETTLEMENT`, `APPS`, `EXPS` direct query/localStorage alias를 유지할지 차단할지 결정
+  - 1단계: `SETTLEMENT` hidden legacy screen을 차단할지 유지할지 먼저 결정
+  - 2단계: `APPROVALS` / `APPS` fallback alias를 한쪽으로 통일
+  - 3단계: `APPS`, `EXPS` direct query/localStorage alias를 장기적으로 유지할지 차단할지 결정
 - 현재 기준 즉시 제품 blocker는 아니다
   - 본문 탭 기능은 warmed rerun에서 green
   - 좌측 숫자 미노출도 현재 제품 의도와 일치한다
