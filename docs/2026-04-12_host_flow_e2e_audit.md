@@ -18,6 +18,8 @@
     - `34-host-edit-and-dates-ui.spec.ts`: `1 failed / 1 did not run / 1 passed`
     - `32-host-schedule-save.spec.ts`: `3 passed`
     - `34` failing-case immediate rerun: `1 passed`
+    - `34` probe-hardened full file rerun: `3 passed`
+    - `34` probe-hardened failing-case `--repeat-each=3`: `2 failed / 1 passed`
   - 최종 host non-live 묶음 재실행: `62 passed / 1 failed / 1 did not run`
 - 최종 판정
   - `호스트 진입/모드 전환`, `체험 edit/delete route`, `리뷰 write/reply`, `수익/정산/서비스 매칭`은 현재 기준 `정상`
@@ -185,9 +187,13 @@
     - 다만 `34` host dashboard dates UI는 최신 full bundle에서 아직 1건 남는다
       - 단독 실행은 통과했지만 latest full bundle과 `--repeat-each=3`에서는 간헐 실패가 재현됐다
       - 이번 후속 분리 실행에서도 `34` 전체 파일 단독 재실행은 다시 `1 failed / 1 did not run / 1 passed`였고, 같은 failing case 즉시 재실행은 `1 passed`였다
+      - 이후 `34` 스펙에 클릭 후 active-state / request payload probe를 추가한 뒤 full file 재실행은 `3 passed`였지만, 같은 failing case `--repeat-each=3`에서는 다시 `2 failed / 1 passed`가 나왔다
       - 따라서 현재 관측은 deterministic backend regression보다 interaction race 또는 test contract drift와 더 잘 맞는다
       - 현재 failure shape는 `POST /availability` 200 + success toast 이후에도 `07:00` row가 DB에서 조회되지 않는 형태다
       - 같은 날 `32-host-schedule-save` route subset은 `3 passed`로 유지되어 availability diff/upsert/delete 경계는 계속 정상이다
+      - probe-hardened rerun에서는 실패가 더 앞단에서 갈렸다
+        - 한 반복에서는 `POST /availability` request body 자체가 `["10:00", "11:00"]`만 포함하고 `07:00`을 싣지 못했다
+        - 다른 반복에서는 `07:00` 버튼이 끝내 active class(`bg-black`)로 전환되지 못했다
       - failure snapshot에서는 저장 직전 선택 패널에 `10:00 / 11:00`만 남아 있어, backend write path보다 slot add interaction 또는 UI automation contract의 간헐 실패를 더 강하게 시사한다
 
 ### 4. 예약 / 문의 / 게스트 컨텍스트 / 리뷰 응대
@@ -235,13 +241,16 @@
    - 증상
      - `tests/e2e/34-host-edit-and-dates-ui.spec.ts`의 schedule add/save 케이스가 latest full bundle과 `--repeat-each=3`에서 간헐 실패했고, 이번 후속 분리 실행에서도 전체 파일 재실행은 다시 `1 failed / 1 did not run / 1 passed`였다
      - 같은 failing case를 바로 다시 단독 실행하면 `1 passed`로 돌아와 deterministic regression보다는 interaction instability 패턴을 보였다
+     - probe-hardened rerun에서는 실패가 DB 확인 단계보다 더 앞에서 드러났다
+       - 한 번은 save request body가 `07:00`을 포함하지 않았고
+       - 다른 한 번은 `07:00` 버튼이 active-state로 바뀌지 못했다
      - failure shape는 `POST /availability` 200 + success toast 이후에도 `07:00` row가 DB에서 조회되지 않는 형태다
      - failure snapshot에서는 저장 직전 우측 패널에 `10:00 / 11:00`만 남아 있어 `07:00` 추가 click이 반영되지 않은 상태가 관측됐다
    - 분류: `flaky ui contract gap`
    - severity: `low`
    - 이유
      - 같은 날 `32-host-schedule-save.spec.ts`가 `3 passed`로 재확인돼 server write integrity는 계속 보장된다
-     - 현재 evidence는 backend write regression보다 slot add UI interaction 또는 test click/selector contract의 간헐 실패를 더 강하게 가리킨다
+     - probe-hardened failure가 request generation 이전 단계에서 이미 갈라져, 현재 evidence는 backend write regression보다 slot add UI interaction 또는 test click/selector contract의 간헐 실패를 더 강하게 가리킨다
 
 ## Coverage Gaps
 - live mutation coverage는 이번 감사에서 재실행하지 않았다
@@ -259,8 +268,8 @@
     - 가장 안전한 다음 단계는 저장소 밖 운영 로그/라우트 access evidence로 `legacy admin-alert` 실제 호출 유무를 확인한 뒤, 미사용이면 제거하고 사용 중이면 dedupe guard를 넣는 것이다
     - 현재 코드와 git history 기준으로는 tracked client caller가 없으므로 우선순위는 “즉시 제품 버그 수정”보다 “external stale client cleanup”에 가깝다
   - `34-host-edit-and-dates-ui`
-    - slot add interaction이 실제로 간헐 미반영되는지, 아니면 `07:00` 버튼 click/selected-state assert가 빠진 스펙 불안정성인지 분리 필요
-    - 다음 단계는 UI에 손대기보다 먼저 interaction probe와 selected-state assertion 강화가 더 안전하다
+    - 이번 probe 보강으로 “server write bug인가?”는 많이 줄었고, 이제 남은 질문은 “실제 UI interaction gap인가, automation click drift인가” 쪽이다
+    - 가장 안전한 다음 단계는 제품 코드 수정이 아니라, `07:00` 클릭 직후 selected list row를 더 정밀하게 좁히는 locator와 click retry/visibility stabilization probe를 추가해 원인을 더 분해하는 것이다
 
 ## Final Verdict
 - 호스트 진입/모드 전환, 체험 create/edit/delete, 리뷰 응대, 수익/정산/서비스 매칭은 최신 기준 `정상`

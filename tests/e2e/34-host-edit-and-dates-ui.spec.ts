@@ -265,6 +265,10 @@ function dayCell(page: Page, dayNumber: number): Locator {
     .first();
 }
 
+function selectedTimeLabel(page: Page, time: string): Locator {
+  return page.locator('span').filter({ hasText: time }).first();
+}
+
 test.afterAll(async () => {
   const supabase = getAdminClient();
 
@@ -349,9 +353,12 @@ test.describe.serial('Host dashboard edit and dates UI coverage', () => {
     await maybeAdvanceCalendar(page, targetDate);
     await dayCell(page, targetDate.getDate()).click();
     await expect(page.getByText(targetDateString)).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('button', { name: '07:00' }).first()).toBeVisible({ timeout: 10000 });
+    const earlyTimeButton = page.getByRole('button', { name: '07:00' }).first();
+    await expect(earlyTimeButton).toBeVisible({ timeout: 10000 });
 
-    await page.getByRole('button', { name: '07:00' }).first().click();
+    await earlyTimeButton.click();
+    await expect(earlyTimeButton).toHaveClass(/bg-black/, { timeout: 10000 });
+    await expect(selectedTimeLabel(page, '07:00')).toBeVisible({ timeout: 10000 });
 
     const saveResponsePromise = page.waitForResponse(
       (response) =>
@@ -363,7 +370,12 @@ test.describe.serial('Host dashboard edit and dates UI coverage', () => {
 
     await saveChangesButton(page).click();
     await confirmButton(page).click();
-    await saveResponsePromise;
+    const saveResponse = await saveResponsePromise;
+    const savePayload = saveResponse.request().postDataJSON() as {
+      availability?: Record<string, string[]>;
+    };
+
+    expect(savePayload.availability?.[targetDateString]).toContain('07:00');
 
     const supabase = getAdminClient();
     const { data, error } = await supabase
