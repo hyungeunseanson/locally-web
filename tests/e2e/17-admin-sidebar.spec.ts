@@ -151,7 +151,7 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Admin sidebar smoke', () => {
-  test('shows admin alert unread badge from sidebar server counts', async ({ page }) => {
+  test('keeps the Admin Alerts sidebar label plain even when unread alerts exist', async ({ page }) => {
     test.setTimeout(90000);
 
     const adminUser = createAdminUser();
@@ -164,7 +164,6 @@ test.describe.serial('Admin sidebar smoke', () => {
     await page.goto('/admin/dashboard?tab=APPROVALS', { waitUntil: 'domcontentloaded' });
 
     const alertsButton = page.getByRole('button', { name: /Admin Alerts/i });
-    await expect(alertsButton).toContainText('Admin Alerts', { timeout: 15000 });
-    await expect(alertsButton).toContainText('2', { timeout: 15000 });
+    await expect(alertsButton).toHaveText('Admin Alerts', { timeout: 15000 });
   });
 });

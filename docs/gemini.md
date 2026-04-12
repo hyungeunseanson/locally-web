@@ -30,7 +30,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - `/api/admin/team/comments/[id]`: Team Chat reaction 저장 API (`GlobalTeamChat` direct update 제거)
 - `/api/admin/team/whitelist`: Team Workspace Admin Whitelist 추가 API
 - `/api/admin/team/whitelist/[id]`: Team Workspace Admin Whitelist 삭제 API (+ audit log)
-- `/api/admin/team-counts`: Team Workspace 사이드바 배지 집계 API (`lastViewed` 기준 새 작업/댓글 개별 count + 합산 `newWorkspaceCount`)
+- `/api/admin/team-counts`: Team Workspace 사이드바 배지 집계 API. 현재 `Sidebar.tsx`는 숫자를 렌더링하지 않으므로 dormant compatibility route 성격이 강하고, `lastViewed` 기준 새 작업/댓글 개별 count + 합산 `newWorkspaceCount` 계산 계약만 유지 중이다.
 - `components/PhoneReservationTab.tsx`: Team Workspace `전화 예약` 서브탭 — `proxy_requests` 기반 운영 요청 목록/상세, 전용 결제 액션(confirm/cancel/refund), 진행 상태 변경, linked inquiry 답글 UI
 - `/api/admin/proxy-bookings/confirm-payment`: 전화 예약 수동 입금 확인 API (`NAVER`, `LOCALLY + bank` 전용)
 - `/api/admin/proxy-bookings/cancel-payment`: 전화 예약 결제 대기 취소 API (`WAITING -> FAILED`, 요청 상태 `CANCELLED`)
@@ -50,7 +50,8 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - `/api/admin/service-payouts/mark-paid`: 서비스 정산 완료 처리 API (`service_bookings.payout_status='paid'` + audit log)
 - `/api/admin/service-bookings`: RLS 우회용 맞춤 의뢰 조회 서버 API (v3.9.3, 최신 `host_applications` 계좌정보 조립 포함)
 - `/api/admin/service-requests`: 관리자 맞춤 의뢰 수정 API (`pending_payment/open` 상태만 수정 허용 + audit log)
-- `/api/admin/sidebar-counts`: RLS 우회용 사이드바 배지 카운트 서버 API (v3.9.3, 승인/예약/서비스 무통장/CS 미답변 + 현재 로그인 관리자 `admin_alert` unread count 포함). `pendingBookingIds`는 서버가 내려주고, `Master Ledger` badge의 로컬 열람 상태(`viewed_booking_ids`)는 클라이언트 공용 helper에서 stale id를 정리한 뒤 계산한다.
+- `/api/admin/sidebar-counts`: RLS 우회용 사이드바 배지 카운트 서버 API (v3.9.3). 현재 `Sidebar.tsx`는 숫자를 렌더링하지 않으므로 dormant compatibility route 성격이 강하다. 서버는 승인/예약/서비스 무통장/CS 미답변 + 현재 로그인 관리자 `admin_alert` unread count를 계산하며, `pendingBookingIds`는 예전 `Master Ledger` badge 계약을 위해 내려주던 구조를 유지한다.
+- `app/utils/adminBadgeState.ts`: admin localStorage helper. 현재 사이드바 숫자 렌더링 source로는 쓰이지 않지만, `TeamTab`의 `last_viewed_team`과 `MasterLedgerTab`의 `markAdminBookingViewed` 같은 탭 내부 viewed-state 기록에는 일부 사용 중이다.
 - 관리자 대시보드의 핵심/레거시 승인 경로(`APPROVALS`, `APPS`, `EXPS`)는 모두 `useAdminApprovalsData()`를 사용하고, `useAdminData()`는 더 이상 실제 렌더 경로에서 사용하지 않는다.
 - `/api/services/payment/mark-bank`: 무통장 선택 시 payment_method='bank' 저장 (v3.9.2, 이미 bank면 idempotent success / 다른 결제수단이 지정된 PENDING 예약이면 409)
 - `utils/paypal/server.ts`: PayPal 고객 결제 1단계 공통 서버 유틸 (access token / order create / order get / order capture). 기존 NicePay 결제 경로와 분리 유지
@@ -113,7 +114,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - **[권한 Source 결정]** 관리자 권한 판정 source는 `users.role + admin_whitelist`다. `profiles`는 표시/프로필 데이터용이며, `profiles.role`을 권한 판정에 사용하지 않는다.
 - **[관리자 읽기 경계 결정]** `admin_tasks`, `admin_task_comments`, `admin_whitelist`, `admin_audit_logs`는 쓰기(write)가 아니라 읽기(select)만 admin-only client 경로를 허용한다. TEAM/감사 로그의 목록·realtime 읽기는 유지하되, mutation은 서버 경계 또는 service-role 정책으로만 처리한다.
 - **[관리자 알림센터 결정]** 운영 알림센터는 신규 테이블을 만들지 않고 기존 `notifications`를 재사용한다. 관리자 전용 누적 알림은 `type='admin_alert'`로 저장하고, Admin Dashboard `ALERTS` 탭에서 소비한다.
-- **[관리자 메일 provider 결정]** 관리자 대상 운영 메일은 `app/utils/adminEmailProvider.ts`를 단일 source로 사용하고, `RESEND_API_KEY` + `RESEND_FROM_EMAIL`가 있으면 Resend, 없으면 Gmail fallback을 사용한다. guest/host 일반 메일은 기존 `emailNotificationJobs` 경계를 유지한다.
+- **[관리자 메일 provider 결정]** 관리자 대상 운영 메일은 `app/utils/adminEmailProvider.ts`를 단일 source로 사용한다. `ADMIN_GMAIL_USER` + `ADMIN_GMAIL_APP_PASSWORD`가 있으면 관리자 메일만 전용 Gmail sender(`Locally Admin`)를 사용하고, 없으면 기존 `RESEND_API_KEY` + `RESEND_FROM_EMAIL` → 공용 Gmail fallback 순서를 유지한다. guest/host 일반 메일은 기존 `emailNotificationJobs` 경계를 유지하며 공용 sender를 그대로 사용한다.
 - **[고객센터 1:1 문의 unread 알림 결정]** `admin_support/admin` 문의에서 고객이 보낸 메시지는 즉시 관리자 메일을 보내지 않는다. 대신 `admin_support_unread_alert_batches` 배치를 만들고, 관리자가 읽지 않은 상태가 10분 유지되면 `admin_alert` + 팀 메일을 1회만 발송한다. 읽음 기준은 `GET /api/admin/inquiries/[id]/messages`가 서버에서 실행하는 `markInquiryMessagesRead()`다.
 - **[알림 API 보안 결정]** `/api/notifications/email`의 단일 수신자 경로는 범용 발송 API로 사용하지 않는다. self 알림이나 서버 검증 가능한 소유권 컨텍스트(`review_reply`, `cancellation_approved` 등)만 허용하고, 그 외는 각 도메인 서버 라우트에서 직접 발송한다.
 - **[알림 mutation 경계 결정]** 일반 `notifications`의 읽음 처리와 삭제는 `/api/notifications/read`, `DELETE /api/notifications/[id]`만 사용한다. 브라우저에서 `notifications`를 direct `update/delete`하지 않는다. 인앱 알림 생성 역시 서버 route/service-role 경계에서만 수행한다.

@@ -159,8 +159,8 @@ async function getTeamWorkspaceCount(page: Page) {
   return match ? Number(match[1]) : 0;
 }
 
-async function syncTeamWorkspaceCount(page: Page, lastViewed?: string) {
-  const serverCount = await page.evaluate(async (value) => {
+async function fetchServerTeamWorkspaceCount(page: Page, lastViewed?: string) {
+  return page.evaluate(async (value) => {
     if (value) {
       localStorage.setItem('last_viewed_team', value);
       Object.keys(localStorage)
@@ -177,12 +177,8 @@ async function syncTeamWorkspaceCount(page: Page, lastViewed?: string) {
       throw new Error(result?.error || 'Failed to fetch team workspace count');
     }
 
-    window.dispatchEvent(new Event('team-viewed'));
     return Number(result?.data?.newWorkspaceCount || 0);
   }, lastViewed ?? null);
-
-  await expect.poll(async () => getTeamWorkspaceCount(page), { timeout: 15000 }).toBe(serverCount);
-  return serverCount;
 }
 
 test.afterAll(async () => {
@@ -208,7 +204,7 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Admin team badge smoke', () => {
-  test('clears team workspace badge after visiting TEAM tab', async ({ page }) => {
+  test('keeps the Team Workspace sidebar label plain even when new activity exists', async ({ page }) => {
     test.setTimeout(90000);
 
     const adminUser = createAdminUser();
@@ -219,20 +215,16 @@ test.describe.serial('Admin team badge smoke', () => {
 
     const teamButton = page.getByRole('button', { name: /Team Workspace/i });
     const baselineViewedAt = new Date(Date.now() - 10_000).toISOString();
-    const baselineCount = await syncTeamWorkspaceCount(page, baselineViewedAt);
+    const baselineCount = await fetchServerTeamWorkspaceCount(page, baselineViewedAt);
 
     await seedTeamWorkspaceActivity(adminUserId, adminUser.fullName);
 
-    const seededCount = await syncTeamWorkspaceCount(page);
+    const seededCount = await fetchServerTeamWorkspaceCount(page);
     expect(seededCount).toBeGreaterThanOrEqual(baselineCount + 2);
+    await expect(teamButton).toHaveText('Team Workspace', { timeout: 15000 });
+    await expect.poll(async () => getTeamWorkspaceCount(page), { timeout: 15000 }).toBe(0);
 
     await teamButton.click();
     await expect(page.getByRole('heading', { name: /Team Sync HQ/i })).toBeVisible({ timeout: 15000 });
-
-    await page.getByRole('button', { name: /Approvals/i }).click();
-    await page.waitForURL(/tab=APPROVALS/i);
-
-    const clearedCount = await syncTeamWorkspaceCount(page);
-    expect(clearedCount).toBeLessThan(seededCount);
   });
 });
