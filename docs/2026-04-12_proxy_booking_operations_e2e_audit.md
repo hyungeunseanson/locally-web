@@ -13,10 +13,10 @@
     - `tests/e2e/87-proxy-booking-fee-util.spec.ts`
     - `tests/e2e/88-proxy-booking-mobile-layout.spec.ts`
   - runtime evidence probe
-    - `2026-04-12` read-only Supabase check
-    - current `proxy_requests`: `3`
-    - `linked_inquiry_id` missing rows: `1`
-    - confirmed live fallback row has `proxy_comments=1`
+    - `2026-04-12` read-only Supabase check → missing row `1` 발견
+    - same-day inspection 결과 internal test artifact로 판정 후 cleanup
+    - post-cleanup current `proxy_requests`: `2`
+    - post-cleanup `linked_inquiry_id` missing rows: `0`
 - 이번 패스 핵심 결론
   - 전화 예약 도메인의 write/read source of truth는 현재 `proxy_requests`로 잘 고정되어 있다
   - 결제 상태 변경 owner도 `generic PATCH /api/proxy-bookings/[id]`가 아니라 전용 admin route / card callback 경계로 정리돼 있다
@@ -50,7 +50,7 @@
 | TEAM > 전화 예약 운영 | `PhoneReservationTab`, `/api/proxy-bookings/[id]`, `/api/proxy-bookings/[id]/comments` | `86`, reference `15`, `89`, `136` | 정상 | TEAM 탭의 결제 확인, 진행 상태 변경, 운영 답글 저장, 고객 inbox persisted visibility가 latest rerun 기준 green이다 |
 | 고객 self-service / 상세 | `app/proxy-bookings/page.tsx`, `app/proxy-bookings/[id]/page.tsx`, `/api/proxy-bookings/[id]` | `105`, `88` | 정상 | 목록 next-step copy, 상세 계좌 안내, message CTA, 결제/진행 상태 반영이 현재 truth와 맞는다 |
 | 알림 / localization | `proxyBookingNotifications.ts`, `/api/proxy-bookings/[id]/comments`, `buildLocalizedNotificationInsert` | `119` | 정상 | payment confirm / admin reply notification이 recipient locale 기준으로 저장된다 |
-| linked inquiry / legacy fallback | `/api/proxy-bookings/[id]/comments`, `/api/proxy-bookings/[id]`, `getProxyLinkedInquiryId()` | `86`, `119`, static audit + runtime probe | 부분 보장 | tracked 생성 경로는 `linked_inquiry_id`를 항상 심지만, runtime probe 기준 실제 운영 row 1건이 아직 누락 상태다. 현재 `proxy_comments` fallback은 legacy row 보호 경계로 계속 필요하다 |
+| linked inquiry / legacy fallback | `/api/proxy-bookings/[id]/comments`, `/api/proxy-bookings/[id]`, `getProxyLinkedInquiryId()` | `86`, `119`, static audit + runtime probe | 부분 보장 | tracked 생성 경로는 `linked_inquiry_id`를 항상 심고, post-cleanup runtime probe 기준 현재 운영 누락 row는 `0`건이다. 다만 `proxy_comments` fallback 코드는 legacy/manual seeded fixture 보호 경계로 아직 남아 있다 |
 
 ## Confirmed Findings
 ### 1. 전화 예약 요청 생성은 `proxy_requests` 단일 source로 잘 고정돼 있다
@@ -108,9 +108,9 @@
   - linked inquiry가 있으면 `inquiry_messages`를 comment rows처럼 projection 한다
   - 없으면 `proxy_comments`를 그대로 읽는다
 - `2026-04-12` runtime probe 결과
-  - 현재 `proxy_requests`는 총 `3`건이고, 이 중 `linked_inquiry_id` 누락 row가 `1`건 남아 있었다
-  - 해당 row는 `2026-03-22T11:00:40.751052+00:00` 생성 건이며 `proxy_comments`도 `1`건 존재했다
-- 따라서 현재 해석은 “신규 운영 경로는 linked inquiry 우선으로 이미 통일됐지만, 실제 운영 데이터에도 아직 legacy fallback 대상 row가 남아 있다”가 가장 정확하다
+  - 초기 read-only check에서는 `linked_inquiry_id` 누락 row `1`건이 보였고, inspection 결과 `Locally` 계정 + 테스트성 comment가 붙은 internal artifact로 판정됐다
+  - same-day cleanup 후 post-check 기준 현재 `proxy_requests`는 총 `2`건이고, `linked_inquiry_id` 누락 row는 `0`건이다
+- 따라서 현재 해석은 “신규 운영 경로는 linked inquiry 우선으로 이미 통일됐고, 현재 운영 runtime에는 확인된 legacy fallback row가 없다. 다만 `proxy_comments` 코드는 dormant fallback 경계로 남아 있다”가 가장 정확하다
 
 ## Static Risk Notes
 - `POST /api/proxy-bookings`는 linked inquiry를 먼저 만들고, 그 다음 `proxy_requests`를 insert한다
@@ -127,13 +127,13 @@
   - `tests/e2e/89-admin-team-mobile.spec.ts`
   - `tests/e2e/136-team-workspace-retention.spec.ts`
 - `card-notification` external callback path는 static audit로만 확인했고, 이번 패스에서는 직접 재실행하지 않았다
-- runtime probe로 확인된 missing row가 정확히 어떤 historical create path에서 생겼는지까지는 이번 문서에서 단정하지 않는다
+- cleanup된 missing row가 정확히 어떤 historical create path에서 생겼는지까지는 이번 문서에서 단정하지 않는다
 - `tests/e2e/105-proxy-booking-self-service.spec.ts`, `tests/e2e/119-proxy-notification-localization.spec.ts`는 여전히 linked inquiry 유무를 수동 fixture로 seed할 수 있어 fallback branch 자체는 테스트 surface에 남아 있다
 
 ## Follow-up Need
 - 1순위
-  - 현재 남아 있는 legacy proxy row를 `linked inquiry backfill` 할지, 아니면 fallback 유지 정책으로 둘지 운영 결정을 내려야 한다
-  - 지금 상태에서는 runtime evidence상 실제 누락 row가 있으므로 `proxy_comments` fallback 제거는 시기상조다
+  - 현재 운영 runtime에서 누락 row가 사라졌으므로, 다음 단계는 `proxy_comments` fallback을 계속 dormant 유지할지, 제거 후보로 올릴지 결정하는 것이다
+  - 단, 제거 검토 전에는 manual seeded fixture와 잠재 stale importer가 더 없는지 한 번 더 확인하는 편이 안전하다
 - 2순위
   - `card-notification` route를 provider cutover 이후에도 실제 운영 path로 쓸 계획이면 별도 contract rerun을 묶는 편이 안전하다
 
