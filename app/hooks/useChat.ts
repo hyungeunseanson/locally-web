@@ -127,6 +127,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   const selectedInquiryRef = useRef<InquiryListItem | null>(null);
   const realtimeRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const realtimeMessageRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const realtimeMessageFollowUpTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasPrimedNotificationsRef = useRef(false);
   const latestNotificationIdRef = useRef<number | null>(null);
 
@@ -263,6 +264,10 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     }
   }, [currentUser]);
 
+  useEffect(() => {
+    selectedInquiryRef.current = selectedInquiry;
+  }, [selectedInquiry]);
+
   const loadMessages = useCallback(async (inquiryId: number | string) => {
     try {
       const { data, error } = await supabase
@@ -333,18 +338,40 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     }, REALTIME_INQUIRY_REFRESH_DEBOUNCE_MS);
   }, [fetchInquiries]);
 
-  const scheduleRealtimeMessageRefresh = useCallback((inquiryId: number | string) => {
+  const refreshSelectedInquiryMessages = useCallback((inquiryId: number | string) => {
+    if (!selectedInquiryRef.current || String(selectedInquiryRef.current.id) !== String(inquiryId)) return;
+    void loadMessages(inquiryId);
+  }, [loadMessages]);
+
+  const scheduleRealtimeMessageRefresh = useCallback((
+    inquiryId: number | string,
+    options?: {
+      primaryDelayMs?: number;
+      followUpDelayMs?: number;
+    }
+  ) => {
+    const primaryDelayMs = options?.primaryDelayMs ?? REALTIME_MESSAGE_REFRESH_DEBOUNCE_MS;
+    const followUpDelayMs = options?.followUpDelayMs ?? 0;
+
     if (realtimeMessageRefreshTimeoutRef.current) {
       clearTimeout(realtimeMessageRefreshTimeoutRef.current);
+    }
+    if (realtimeMessageFollowUpTimeoutRef.current) {
+      clearTimeout(realtimeMessageFollowUpTimeoutRef.current);
     }
 
     realtimeMessageRefreshTimeoutRef.current = setTimeout(() => {
       realtimeMessageRefreshTimeoutRef.current = null;
+      refreshSelectedInquiryMessages(inquiryId);
+    }, primaryDelayMs);
 
-      if (!selectedInquiryRef.current || String(selectedInquiryRef.current.id) !== String(inquiryId)) return;
-      void loadMessages(inquiryId);
-    }, REALTIME_MESSAGE_REFRESH_DEBOUNCE_MS);
-  }, [loadMessages]);
+    if (followUpDelayMs > 0) {
+      realtimeMessageFollowUpTimeoutRef.current = setTimeout(() => {
+        realtimeMessageFollowUpTimeoutRef.current = null;
+        refreshSelectedInquiryMessages(inquiryId);
+      }, primaryDelayMs + followUpDelayMs);
+    }
+  }, [refreshSelectedInquiryMessages]);
 
   const sendMessage = async (inquiryId: number | string, content: string, file?: File, senderId?: string) => {
     const cleanContent = sanitizeText(content);
@@ -665,7 +692,10 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
           if (newPayload && newPayload.sender_id !== currentUser.id) {
             scheduleRealtimeInquiryRefresh();
             if (selectedInquiryRef.current && String(newPayload.inquiry_id) === String(selectedInquiryRef.current.id)) {
-              scheduleRealtimeMessageRefresh(selectedInquiryRef.current.id);
+              scheduleRealtimeMessageRefresh(selectedInquiryRef.current.id, {
+                primaryDelayMs: 0,
+                followUpDelayMs: 700,
+              });
             }
           }
         }
@@ -714,7 +744,10 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         // inserted just before subscribe/reconnect are not missed.
         scheduleRealtimeInquiryRefresh();
         if (selectedInquiryRef.current) {
-          scheduleRealtimeMessageRefresh(selectedInquiryRef.current.id);
+          scheduleRealtimeMessageRefresh(selectedInquiryRef.current.id, {
+            primaryDelayMs: 0,
+            followUpDelayMs: 700,
+          });
         }
       });
 
@@ -726,6 +759,10 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       if (realtimeMessageRefreshTimeoutRef.current) {
         clearTimeout(realtimeMessageRefreshTimeoutRef.current);
         realtimeMessageRefreshTimeoutRef.current = null;
+      }
+      if (realtimeMessageFollowUpTimeoutRef.current) {
+        clearTimeout(realtimeMessageFollowUpTimeoutRef.current);
+        realtimeMessageFollowUpTimeoutRef.current = null;
       }
       supabase.removeChannel(channel);
     };
@@ -756,7 +793,10 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     if (!selected || !linkedInquiryId) return;
     if (String(linkedInquiryId) !== String(selected.id)) return;
 
-    scheduleRealtimeMessageRefresh(selected.id);
+    scheduleRealtimeMessageRefresh(selected.id, {
+      primaryDelayMs: 0,
+      followUpDelayMs: 700,
+    });
   }, [notifications, scheduleRealtimeInquiryRefresh, scheduleRealtimeMessageRefresh]);
 
   const clearSelected = () => {
