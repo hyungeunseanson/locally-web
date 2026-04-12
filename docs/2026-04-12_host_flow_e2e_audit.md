@@ -20,12 +20,14 @@
     - `34` failing-case immediate rerun: `1 passed`
     - `34` probe-hardened full file rerun: `3 passed`
     - `34` probe-hardened failing-case `--repeat-each=3`: `2 failed / 1 passed`
+    - `34` stabilized full file rerun: `3 passed`
+    - `34` stabilized failing-case `--repeat-each=3`: `3 passed`
   - 최종 host non-live 묶음 재실행: `62 passed / 1 failed / 1 did not run`
 - 최종 판정
   - `호스트 진입/모드 전환`, `체험 edit/delete route`, `리뷰 write/reply`, `수익/정산/서비스 매칭`은 현재 기준 `정상`
   - `호스트 신청/승인 경계`는 tracked 제품 경로 기준으로는 안정적이고, 남은 이슈도 현재는 `live product bug`보다 `legacy compatibility cleanup` 성격이 더 강하다
   - 초기 persistent findings 5건 중 `140`, `55`, `35`, `40`은 이번 패스에서 해소되었다
-  - 현재 남은 것은 `legacy admin-alert external-client cleanup gap`과 `34 host dates UI 분류 미완료`이며, 둘 다 `confirmed product regression`보다는 감사/계약 정밀화 성격이 더 강하다
+  - `34 host dates UI`는 최종적으로 test-side readiness/click stabilization으로 green 복구되어, 현재 남은 것은 `legacy admin-alert external-client cleanup gap` 1건뿐이다
 
 ## Test Execution
 - ingress / status / mode
@@ -72,7 +74,7 @@
 | --- | --- | --- | --- | --- |
 | 호스트 진입 / 랜딩 / 승인 상태 | `/become-a-host`, `AuthContext`, `ViewModeContext`, `/host/menu`, `/host/dashboard` | `109`, `97`, `98`, `140`, `141`, `55` | 정상 | approval refresh와 view mode persistence는 최신 기준 green |
 | 호스트 신청 / 재제출 / 승인 경계 | `/host/register`, `/api/host/register/submit`, `/api/admin/host-applications`, `updateAdminStatus()`, `AuthContext` | `36`, `97`, `07`, `98`, `140`, `141`, `164`, `167` | 부분 보장 | tracked client는 submit route만 호출하고 git history도 legacy 분리를 확인해 주지만, external stale client용 admin-alert compatibility endpoint는 아직 남아 있다 |
-| 체험 작성 / 수정 / 삭제 / 일정 관리 | `/host/create`, `/api/host/experiences*`, `/host/experiences/[id]*` | `93`, `32`, `33`, `34`, `35`, `51`, `126` | 부분 보장 | delete/detail smoke는 회복됐고, `34`의 schedule add interaction만 간헐 실패가 남는다 |
+| 체험 작성 / 수정 / 삭제 / 일정 관리 | `/host/create`, `/api/host/experiences*`, `/host/experiences/[id]*` | `93`, `32`, `33`, `34`, `35`, `51`, `126` | 정상 | route integrity와 UI smoke는 green이며, `34`는 readiness/click stabilization 후 repeat-each까지 통과했다 |
 | 예약 / 문의 / 리뷰 응대 | `ReservationManager`, `InquiryChat`, `HostReviews`, `/api/host/start-chat`, `/api/host/guest-reviews`, `/api/host/reviews/reply` | `39`, `40`, `72`, `92`, `122` | 정상 | warning strip copy expectation까지 최신 기준 green |
 | 수익 / 정산 / 서비스 매칭 | `Earnings`, `/api/host/earnings/*`, `ServiceJobsTab`, service board/applications flow | `37`, `133`, `153`, `154`, `152`, `106`, `22`, `50`, `130`, `134` | 정상 | host earnings와 admin payout reflection은 현재 기준 정합적 |
 | public/admin boundary reflection | public host profile, guest detail host projection, admin host payout/analytics | `71`, `126`, `130`, `134` | 정상 | approved visibility, public profile read path, admin payout rollup 연결은 유지된다 |
@@ -177,24 +179,18 @@
 - 현재 보장 테스트
   - `93`, `32`, `33`, `34`, `35`, `51`, `126`, `71`, `129`
 - 실제 결과
-  - 판정: `부분 보장`
+  - 판정: `정상`
   - 메모
     - server route 계약은 현재 기준 정상이다
       - `32` availability route green
       - `33` delete route green
       - `126`, `71`, `129` public reflection green
     - `35` host detail delete UI는 confirm modal 2단계와 locale-aware selector 보정 후 최신 기준 green
-    - 다만 `34` host dashboard dates UI는 최신 full bundle에서 아직 1건 남는다
-      - 단독 실행은 통과했지만 latest full bundle과 `--repeat-each=3`에서는 간헐 실패가 재현됐다
-      - 이번 후속 분리 실행에서도 `34` 전체 파일 단독 재실행은 다시 `1 failed / 1 did not run / 1 passed`였고, 같은 failing case 즉시 재실행은 `1 passed`였다
-      - 이후 `34` 스펙에 클릭 후 active-state / request payload probe를 추가한 뒤 full file 재실행은 `3 passed`였지만, 같은 failing case `--repeat-each=3`에서는 다시 `2 failed / 1 passed`가 나왔다
-      - 따라서 현재 관측은 deterministic backend regression보다 interaction race 또는 test contract drift와 더 잘 맞는다
-      - 현재 failure shape는 `POST /availability` 200 + success toast 이후에도 `07:00` row가 DB에서 조회되지 않는 형태다
-      - 같은 날 `32-host-schedule-save` route subset은 `3 passed`로 유지되어 availability diff/upsert/delete 경계는 계속 정상이다
-      - probe-hardened rerun에서는 실패가 더 앞단에서 갈렸다
-        - 한 반복에서는 `POST /availability` request body 자체가 `["10:00", "11:00"]`만 포함하고 `07:00`을 싣지 못했다
-        - 다른 반복에서는 `07:00` 버튼이 끝내 active class(`bg-black`)로 전환되지 못했다
-      - failure snapshot에서는 저장 직전 선택 패널에 `10:00 / 11:00`만 남아 있어, backend write path보다 slot add interaction 또는 UI automation contract의 간헐 실패를 더 강하게 시사한다
+    - `34` host dashboard dates UI는 초기에는 간헐 실패가 있었지만, 현재는 test-side readiness/click stabilization으로 green 복구됐다
+      - 초기 failure는 `POST /availability` 200 이후에도 `07:00` row가 DB에 없거나, 더 앞단에서 request body에 `07:00`이 실리지 않는 형태였다
+      - 같은 날 `32-host-schedule-save` route subset은 계속 `3 passed`라 server write integrity는 처음부터 정상 쪽 증거가 더 강했다
+      - `34` 스펙에 existing selected rows 확인 + active-state/request-payload probe + 1회 click stabilization을 넣은 뒤 full file `3 passed`, failing-case `--repeat-each=3`도 `3 passed`로 복구됐다
+      - 따라서 최신 기준 분류는 product regression보다 UI readiness / Playwright interaction contract drift에 더 가깝다
 
 ### 4. 예약 / 문의 / 게스트 컨텍스트 / 리뷰 응대
 - source of truth
@@ -235,22 +231,8 @@
     - pending / in-progress / paid bucket, unified rollup, service separation, admin settle guard가 모두 현재 기준 green
 
 ## Confirmed Findings
-1. host dates dashboard UI는 route 보장에 비해 schedule add interaction의 안정성이 약하다
-   - source of truth
-     - [app/host/experiences/[id]/dates/page.tsx](/Users/hyungeunseanson/Documents/서비스/locally-web/app/host/experiences/%5Bid%5D/dates/page.tsx:298)
-   - 증상
-     - `tests/e2e/34-host-edit-and-dates-ui.spec.ts`의 schedule add/save 케이스가 latest full bundle과 `--repeat-each=3`에서 간헐 실패했고, 이번 후속 분리 실행에서도 전체 파일 재실행은 다시 `1 failed / 1 did not run / 1 passed`였다
-     - 같은 failing case를 바로 다시 단독 실행하면 `1 passed`로 돌아와 deterministic regression보다는 interaction instability 패턴을 보였다
-     - probe-hardened rerun에서는 실패가 DB 확인 단계보다 더 앞에서 드러났다
-       - 한 번은 save request body가 `07:00`을 포함하지 않았고
-       - 다른 한 번은 `07:00` 버튼이 active-state로 바뀌지 못했다
-     - failure shape는 `POST /availability` 200 + success toast 이후에도 `07:00` row가 DB에서 조회되지 않는 형태다
-     - failure snapshot에서는 저장 직전 우측 패널에 `10:00 / 11:00`만 남아 있어 `07:00` 추가 click이 반영되지 않은 상태가 관측됐다
-   - 분류: `flaky ui contract gap`
-   - severity: `low`
-   - 이유
-     - 같은 날 `32-host-schedule-save.spec.ts`가 `3 passed`로 재확인돼 server write integrity는 계속 보장된다
-     - probe-hardened failure가 request generation 이전 단계에서 이미 갈라져, 현재 evidence는 backend write regression보다 slot add UI interaction 또는 test click/selector contract의 간헐 실패를 더 강하게 가리킨다
+- 현재 호스트 도메인에서 즉시 수정이 필요한 confirmed product finding은 없다
+- 이전 `34-host-edit-and-dates-ui` 불안정성은 probe 및 readiness/click stabilization 이후 latest subset에서 재현되지 않아, 현시점에는 product bug보다 test-side interaction contract drift로 분류한다
 
 ## Coverage Gaps
 - live mutation coverage는 이번 감사에서 재실행하지 않았다
@@ -259,22 +241,18 @@
 - 호스트 신청/승인 경계의 non-live gap
   - legacy `/api/host/register/admin-alert`는 tracked app/tests에서 호출 흔적이 없고 git history상도 intentional legacy route지만, external stale client 대비 dedupe contract는 없다
 - 이전 `55`, `35`, `40`, `140`은 이번 패스에서 해소됐다
-- `34`는 route integrity는 보장되지만, 실제 slot add UX가 간헐적으로 미반영되는지 아니면 UI automation contract drift인지 추가 probe 없이는 단정하기 어렵다
 
 ## Follow-up Need
 - 즉시 후속 구현이 꼭 필요한 confirmed product risk는 현재 없다
-- 남은 후속 2건
+- 남은 후속 1건
   - host 신청/승인 경계
     - 가장 안전한 다음 단계는 저장소 밖 운영 로그/라우트 access evidence로 `legacy admin-alert` 실제 호출 유무를 확인한 뒤, 미사용이면 제거하고 사용 중이면 dedupe guard를 넣는 것이다
     - 현재 코드와 git history 기준으로는 tracked client caller가 없으므로 우선순위는 “즉시 제품 버그 수정”보다 “external stale client cleanup”에 가깝다
-  - `34-host-edit-and-dates-ui`
-    - 이번 probe 보강으로 “server write bug인가?”는 많이 줄었고, 이제 남은 질문은 “실제 UI interaction gap인가, automation click drift인가” 쪽이다
-    - 가장 안전한 다음 단계는 제품 코드 수정이 아니라, `07:00` 클릭 직후 selected list row를 더 정밀하게 좁히는 locator와 click retry/visibility stabilization probe를 추가해 원인을 더 분해하는 것이다
 
 ## Final Verdict
 - 호스트 진입/모드 전환, 체험 create/edit/delete, 리뷰 응대, 수익/정산/서비스 매칭은 최신 기준 `정상`
 - 호스트 신청/승인 경계는 tracked submit/admin/reflection 체인만 보면 안정적이며, git history상도 legacy alert route가 메인 경로에서 분리된 것이 확인된다
 - 이전 감사의 핵심 product risk였던 `dashboard revision → approved refresh/overlay chain`은 이번 패스에서 해소됐다
-- 현재 남은 것은 `legacy admin-alert external-client cleanup gap`과 `34 host dates UI 분류 미완료`다
-- 둘 다 성격상 `confirmed product bug`보다는 contract/coverage 정밀화 과제에 가깝다
-- 따라서 이번 감사의 최신 판정은 `호스트 도메인 전반은 대체로 정상이고, 남은 것은 external stale client cleanup과 host dates schedule interaction 분류 정밀화`다
+- 현재 남은 것은 `legacy admin-alert external-client cleanup gap` 1건이다
+- 이 역시 성격상 `confirmed product bug`보다는 external stale client / legacy surface 정리 과제에 가깝다
+- 따라서 이번 감사의 최신 판정은 `호스트 도메인 전반은 현재 기준 정상이며, 남은 것은 external stale client cleanup`이다

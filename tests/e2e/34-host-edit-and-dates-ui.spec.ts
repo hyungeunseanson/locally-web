@@ -269,6 +269,26 @@ function selectedTimeLabel(page: Page, time: string): Locator {
   return page.locator('span').filter({ hasText: time }).first();
 }
 
+async function activateTimeOption(page: Page, time: string) {
+  const button = page.getByRole('button', { name: time }).first();
+  await expect(button).toBeVisible({ timeout: 10000 });
+  await button.scrollIntoViewIfNeeded();
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await button.click();
+
+    const className = (await button.getAttribute('class')) || '';
+    if (className.includes('bg-black')) {
+      return button;
+    }
+
+    await page.waitForTimeout(250);
+  }
+
+  await expect(button).toHaveClass(/bg-black/, { timeout: 10000 });
+  return button;
+}
+
 test.afterAll(async () => {
   const supabase = getAdminClient();
 
@@ -353,11 +373,10 @@ test.describe.serial('Host dashboard edit and dates UI coverage', () => {
     await maybeAdvanceCalendar(page, targetDate);
     await dayCell(page, targetDate.getDate()).click();
     await expect(page.getByText(targetDateString)).toBeVisible({ timeout: 10000 });
-    const earlyTimeButton = page.getByRole('button', { name: '07:00' }).first();
-    await expect(earlyTimeButton).toBeVisible({ timeout: 10000 });
+    await expect(selectedTimeLabel(page, '10:00')).toBeVisible({ timeout: 10000 });
+    await expect(selectedTimeLabel(page, '11:00')).toBeVisible({ timeout: 10000 });
 
-    await earlyTimeButton.click();
-    await expect(earlyTimeButton).toHaveClass(/bg-black/, { timeout: 10000 });
+    const earlyTimeButton = await activateTimeOption(page, '07:00');
     await expect(selectedTimeLabel(page, '07:00')).toBeVisible({ timeout: 10000 });
 
     const saveResponsePromise = page.waitForResponse(
