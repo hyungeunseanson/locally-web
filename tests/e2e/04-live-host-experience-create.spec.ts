@@ -7,6 +7,8 @@ import { expect, test } from '@playwright/test';
 const LIVE_BASE_URL = 'https://locally-web.vercel.app';
 const HOST_EMAIL = 'codex.host.1772980212472@example.com';
 const HOST_PASSWORD = 'LocallyTest!2026';
+const HOST_FALLBACK_NAME = 'Codex Live Host';
+const HOST_FALLBACK_PHONE = '01017720212';
 type EnvMap = Record<string, string>;
 
 let adminClient: SupabaseClient | null = null;
@@ -37,6 +39,130 @@ function getAdminClient() {
   );
 
   return adminClient;
+}
+
+async function waitForProfile(userId: string) {
+  const supabase = getAdminClient();
+
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (data?.id) return;
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
+  throw new Error(`Profile was not created for auth user ${userId}.`);
+}
+
+async function ensureApprovedLiveHostAccount() {
+  const supabase = getAdminClient();
+  let userId: string | null = null;
+
+  const knownUserResult = await supabase.auth.admin.getUserById('cc84b331-7e78-4818-b9ba-f1a960017473');
+  if (knownUserResult.data.user?.email?.toLowerCase() === HOST_EMAIL.toLowerCase()) {
+    userId = knownUserResult.data.user.id;
+  } else {
+    const listedUsers = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    const matchedUser = listedUsers.data.users.find((user) => user.email?.toLowerCase() === HOST_EMAIL.toLowerCase());
+    if (matchedUser?.id) {
+      userId = matchedUser.id;
+    }
+  }
+
+  if (userId) {
+    const { error: updateUserError } = await supabase.auth.admin.updateUserById(userId, {
+      email: HOST_EMAIL,
+      password: HOST_PASSWORD,
+      email_confirm: true,
+      user_metadata: {
+        full_name: HOST_FALLBACK_NAME,
+        phone: HOST_FALLBACK_PHONE,
+      },
+    });
+
+    if (updateUserError) throw updateUserError;
+  } else {
+    const createdUser = await supabase.auth.admin.createUser({
+      email: HOST_EMAIL,
+      password: HOST_PASSWORD,
+      email_confirm: true,
+      user_metadata: {
+        full_name: HOST_FALLBACK_NAME,
+        phone: HOST_FALLBACK_PHONE,
+      },
+    });
+
+    if (createdUser.error || !createdUser.data.user?.id) {
+      throw createdUser.error || new Error(`Failed to create live host auth user for ${HOST_EMAIL}`);
+    }
+
+    userId = createdUser.data.user.id;
+  }
+
+  await waitForProfile(userId);
+
+  const { error: profileError } = await supabase
+    .from('profiles')
+    .update({
+      full_name: HOST_FALLBACK_NAME,
+      phone: HOST_FALLBACK_PHONE,
+    })
+    .eq('id', userId);
+
+  if (profileError) throw profileError;
+
+  const latestApplication = await supabase
+    .from('host_applications')
+    .select('id')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (latestApplication.error) throw latestApplication.error;
+
+  const hostApplicationPayload = {
+    user_id: userId,
+    host_nationality: '대한민국',
+    languages: ['한국어'],
+    language_levels: [{ language: '한국어', level: 5 }],
+    name: HOST_FALLBACK_NAME,
+    phone: HOST_FALLBACK_PHONE,
+    dob: '1992-04-12',
+    email: HOST_EMAIL,
+    instagram: '@codex_live_host',
+    source: 'playwright',
+    language_cert: '',
+    profile_photo: '',
+    self_intro: '라이브 호스트 체험 등록 E2E 검증용 승인 호스트입니다.',
+    id_card_file: '',
+    bank_name: '국민은행',
+    account_number: '12345678901234',
+    account_holder: HOST_FALLBACK_NAME,
+    motivation: '라이브 호스트 create 플로우 검증',
+    status: 'approved',
+  };
+
+  if (latestApplication.data?.id) {
+    const { error: updateApplicationError } = await supabase
+      .from('host_applications')
+      .update(hostApplicationPayload)
+      .eq('id', latestApplication.data.id);
+
+    if (updateApplicationError) throw updateApplicationError;
+  } else {
+    const { error: insertApplicationError } = await supabase
+      .from('host_applications')
+      .insert(hostApplicationPayload);
+
+    if (insertApplicationError) throw insertApplicationError;
+  }
 }
 
 const IMAGE_POOL = [
@@ -101,6 +227,8 @@ test.describe.serial('Live approved host experience creation flow', () => {
     createdExperienceTitles.push(experienceTitle);
     createdAdminAlertMessageFragments.push(experienceTitle);
 
+    await ensureApprovedLiveHostAccount();
+
     page.on('pageerror', (error) => {
       browserIssues.push(`[pageerror] ${error.message}`);
     });
@@ -114,20 +242,46 @@ test.describe.serial('Live approved host experience creation flow', () => {
     await test.step('Login with the approved test host account', async () => {
       await page.goto('/login', { waitUntil: 'networkidle' });
 
-      const loginResponsePromise = page.waitForResponse(
-        (response) =>
-          response.url().includes('/auth/v1/token?grant_type=password') &&
-          response.request().method() === 'POST' &&
-          response.status() === 200,
-        { timeout: 30000 }
-      );
-
       await page.locator('input[type="email"]').fill(HOST_EMAIL);
       await page.locator('input[type="password"]').fill(HOST_PASSWORD);
       await page.locator('button[type="submit"]').click();
 
-      await loginResponsePromise;
-      await page.waitForTimeout(2000);
+      const results = await Promise.allSettled([
+        page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 30000 }),
+        page.getByText('Welcome back. You are now logged in.').waitFor({ state: 'visible', timeout: 30000 }),
+        expect
+          .poll(
+            async () => {
+              const cookies = await page.context().cookies();
+              return cookies.some((cookie) => cookie.name.startsWith('sb-') && cookie.value.length > 0);
+            },
+            { timeout: 30000 }
+          )
+          .toBeTruthy(),
+      ]);
+
+      if (results.every((result) => result.status === 'rejected')) {
+        const invalidCredentialsVisible = await page
+          .getByText(/invalid email or password|이메일 또는 비밀번호가 올바르지 않습니다|ログイン情報が正しくありません|邮箱或密码不正确/i)
+          .isVisible()
+          .catch(() => false);
+        const rateLimitVisible = await page
+          .getByText(/too many attempts|잠시 후 다시 시도|しばらくしてから再度お試しください|请稍后重试/i)
+          .isVisible()
+          .catch(() => false);
+
+        if (invalidCredentialsVisible) {
+          throw new Error(`Login credentials were rejected for ${HOST_EMAIL}`);
+        }
+        if (rateLimitVisible) {
+          throw new Error(`Login appears rate-limited for ${HOST_EMAIL}`);
+        }
+
+        throw new Error(`Login did not complete for ${HOST_EMAIL}`);
+      }
+
+      await page.goto('/account', { waitUntil: 'networkidle' });
+      await expect(page).toHaveURL(/\/account/);
     });
 
     await test.step('Open the create experience flow as the approved host', async () => {
@@ -234,10 +388,20 @@ test.describe.serial('Live approved host experience creation flow', () => {
       await clickFooterButton(page, /다음|Next|次へ|下一步/);
     });
 
-    await test.step('Complete step 7: pricing and submit', async () => {
-      await page.locator('input[type="number"]').first().fill('57000');
+    await test.step('Complete step 7: pricing, submit, and verify success copy', async () => {
+      await page.locator('input[inputmode="numeric"], input[type="number"]').first().fill('57000');
       await page.locator('footer').getByRole('button', { name: /체험 등록하기|Submit experience|体験を登録する|提交体验/ }).click();
 
+      await expect(
+        page.getByRole('heading', { name: /체험 등록 완료! 🎉|Experience submitted! 🎉|体験登録が完了しました！ 🎉|体验提交完成！ 🎉/ })
+      ).toBeVisible({ timeout: 30000 });
+      await expect(
+        page.getByText(
+          /미리 일정을 열어 예약을 준비해보세요\.|Open your schedule in advance to get ready for bookings\.|Open your schedule and start receiving bookings\.|事前に日程を開けて、予約の受付を準備してみましょう。|请先开放日程，提前做好接待预订的准备。/
+        )
+      ).toBeVisible({ timeout: 30000 });
+
+      await page.getByRole('button', { name: /내 체험 보러가기|View my experiences|自分の体験を見る|查看我的体验/ }).click();
       await page.waitForURL('**/host/dashboard?tab=experiences', { timeout: 30000 });
       await expect(page).toHaveURL(/\/host\/dashboard\?tab=experiences/);
       await expect(page.getByRole('heading', { name: experienceTitle })).toBeVisible({ timeout: 20000 });
