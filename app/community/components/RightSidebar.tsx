@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { Edit3, ChevronRight } from 'lucide-react';
 
@@ -15,6 +16,7 @@ interface RightSidebarProps {
     weeklyQuestions: CommunityHighlightPost[];
     companionPulse: CommunityHighlightPost[];
     locallyPicks: CommunityHighlightPost[];
+    footerSlot?: ReactNode;
 }
 
 function SidebarList({
@@ -79,6 +81,7 @@ export default function RightSidebar({
     weeklyQuestions,
     companionPulse,
     locallyPicks,
+    footerSlot,
 }: RightSidebarProps) {
     const showWriteButton = COMMUNITY_OPEN
         ? (!isLocallyContentCategory(category) || canWriteLocallyContent)
@@ -123,6 +126,7 @@ export default function RightSidebar({
                 items={locallyPicks}
                 moreHref={buildCommunityListHref({ hub, format: 'locally_pick' })}
             />
+            {footerSlot}
         </div>
     );
 }

@@ -161,6 +161,8 @@ test.describe.serial('Community content layout and access', () => {
     await expect(page.getByText('로컬리 콘텐츠 허브 운영 중')).toBeVisible();
     await expect(page.getByText('도시별 루트, 맛집, 현지 추천 콘텐츠를 먼저 공개하고 있습니다.')).toBeVisible();
     await expect(page.getByRole('button', { name: '로컬리 콘텐츠 작성' })).toHaveCount(0);
+    await expect(page.getByTestId('community-list-sidebar-ad')).toBeVisible();
+    await expect(page.getByTestId('community-list-bottom-ad')).toBeVisible();
 
     const communityDetailHrefs = await page.locator('a[href*="/community/"]').evaluateAll((elements) =>
       elements
@@ -175,6 +177,23 @@ test.describe.serial('Community content layout and access', () => {
     const box = await page.getByTestId('community-content-card').first().boundingBox();
     expect(box).not.toBeNull();
     expect(box!.height).toBeGreaterThan(box!.width * 1.15);
+  });
+
+  test('keeps only bottom ad visible on mobile content list', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const author = createUser('mobile-author');
+    const viewer = createUser('mobile-viewer');
+    const authorId = await createAuthUser(author);
+    await createAuthUser(viewer);
+    await createContentPost(authorId, `[Playwright] Community Content Mobile ${Date.now()}`);
+
+    await login(page, viewer);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/community?category=locally_content', { waitUntil: 'networkidle' });
+
+    await expect(page.getByTestId('community-list-bottom-ad')).toBeVisible();
+    await expect(page.getByTestId('community-list-sidebar-ad')).toBeHidden();
   });
 
   test('shows content write CTA for admins', async ({ page }) => {

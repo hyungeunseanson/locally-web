@@ -16,6 +16,7 @@ import MobileWidgetStrip from './components/MobileWidgetStrip';
 import MobileSortBar from './components/MobileSortBar';
 import CommunitySearchControls from './components/CommunitySearchControls';
 import CommunityHubTabs from './components/CommunityHubTabs';
+import CommunityAdSlot from './components/CommunityAdSlot';
 import { COMMUNITY_OPEN, getCommunityCategoryFromFormat, getCommunityFormatFromCategory, getCommunityFormatMeta } from './categoryMeta';
 import { getCommunityHubMeta } from './hubMeta';
 import {
@@ -323,6 +324,7 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
     const showFloatingWriteCta = COMMUNITY_OPEN
         ? (writeCategory !== 'locally_content' || canWriteLocallyContent)
         : canWriteLocallyContent;
+    const showContentAds = !COMMUNITY_OPEN;
     const writeParams = new URLSearchParams();
     writeParams.set('category', writeCategory);
     if (currentHub !== 'all') writeParams.set('hub', currentHub);
@@ -388,6 +390,16 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
                                 sort={sort}
                                 canWriteLocallyContent={canWriteLocallyContent}
                             />
+
+                            {showContentAds && (
+                                <div className="mt-6">
+                                    <CommunityAdSlot
+                                        testId="community-list-bottom-ad"
+                                        variant="bottom"
+                                        title="로컬리 콘텐츠 광고"
+                                    />
+                                </div>
+                            )}
                         </div>
 
                         <div className="col-span-1 lg:col-span-4 hidden lg:flex flex-col">
@@ -399,6 +411,13 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
                                 weeklyQuestions={weeklyQuestions}
                                 companionPulse={companionPulse}
                                 locallyPicks={locallyPicks}
+                                footerSlot={showContentAds ? (
+                                    <CommunityAdSlot
+                                        testId="community-list-sidebar-ad"
+                                        variant="sidebar"
+                                        title="로컬리 콘텐츠 광고"
+                                    />
+                                ) : null}
                             />
                         </div>
                     </div>

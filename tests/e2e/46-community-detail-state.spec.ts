@@ -309,14 +309,26 @@ test.describe.serial('Community detail state consistency', () => {
     const legacyHtml = await legacyResponse.text();
     expect(legacyHtml).toMatch(/<meta[^>]+name="robots"[^>]+content="[^"]*noindex[^"]*nofollow/i);
 
+    await page.setViewportSize({ width: 1440, height: 1200 });
     await page.goto(`/community/${locallyContentPostId}?category=locally_content`, {
       waitUntil: 'networkidle',
     });
     await expect(page.getByTestId('community-detail-updated-at')).toContainText('수정됨');
+    await expect(page.getByTestId('community-detail-sidebar-ad')).toBeVisible();
+    await expect(page.getByTestId('community-detail-bottom-ad')).toBeVisible();
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`/community/${locallyContentPostId}?category=locally_content`, {
+      waitUntil: 'networkidle',
+    });
+    await expect(page.getByTestId('community-detail-bottom-ad')).toBeVisible();
+    await expect(page.getByTestId('community-detail-sidebar-ad')).toBeHidden();
 
     await page.goto(`/community/${legacyPostId}?category=qna`, {
       waitUntil: 'networkidle',
     });
     await expect(page.getByTestId('community-detail-updated-at')).toHaveCount(0);
+    await expect(page.getByTestId('community-detail-bottom-ad')).toHaveCount(0);
+    await expect(page.getByTestId('community-detail-sidebar-ad')).toHaveCount(0);
   });
 });

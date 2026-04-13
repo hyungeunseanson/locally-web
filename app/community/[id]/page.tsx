@@ -7,6 +7,7 @@ import { MapPin, CalendarCheck } from 'lucide-react';
 import LinkedExperienceChip from '../components/LinkedExperienceChip';
 import PostImages from '../components/PostImages';
 import CommunityCommentsPanel from '../components/CommunityCommentsPanel';
+import CommunityAdSlot from '../components/CommunityAdSlot';
 import BackButton from '../components/BackButton';
 import ShareButton from '../components/ShareButton';
 import SiteHeader from '@/app/components/SiteHeader';
@@ -386,24 +387,29 @@ export default async function CommunityPostDetail({
                                 </div>
                             </div>
 
-                            {/* 모바일 전용 광고 영역 (댓글 아래) */}
-                            <div className="lg:hidden mx-5 mb-6 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 h-24 flex items-center justify-center">
-                                <span className="text-[12px] font-medium text-gray-400">광고 영역</span>
-                            </div>
+                            {isLocallyContent && (
+                                <div className="mx-5 mb-6">
+                                    <CommunityAdSlot
+                                        testId="community-detail-bottom-ad"
+                                        variant="bottom"
+                                        title="로컬리 콘텐츠 광고"
+                                    />
+                                </div>
+                            )}
                         </main>
                     </div>
 
-                    {/* ─── 우측: 광고 사이드바 (lg:col-span-4, 모바일 hidden) ─── */}
-                    <div className="hidden lg:block lg:col-span-4">
-                        <div className="sticky top-8 space-y-4">
-                            <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 h-64 flex items-center justify-center shadow-sm">
-                                <span className="text-[13px] font-medium text-gray-400">광고 영역</span>
-                            </div>
-                            <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 h-48 flex items-center justify-center shadow-sm">
-                                <span className="text-[13px] font-medium text-gray-400">광고 영역 2</span>
+                    {isLocallyContent && (
+                        <div className="hidden lg:block lg:col-span-4">
+                            <div className="sticky top-8">
+                                <CommunityAdSlot
+                                    testId="community-detail-sidebar-ad"
+                                    variant="sidebar"
+                                    title="로컬리 콘텐츠 광고"
+                                />
                             </div>
                         </div>
-                    </div>
+                    )}
 
                     </div>
                 </div>
