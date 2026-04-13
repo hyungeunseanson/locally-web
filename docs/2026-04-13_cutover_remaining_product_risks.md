@@ -17,7 +17,7 @@
 | --- | --- | --- | --- | --- |
 | OAuth / PG external parity | `LoginModal`, `/auth/callback`, external console parity audit | static audit + auth rerun | 부분 보장 | blocker 범위는 `Google / Kakao / Supabase / PortOne current live path`로 좁혔지만, operator evidence는 아직 없다 |
 | Live smoke / legacy domain drift | `tests/e2e/helpers/liveBaseUrl.ts`, `171`, `29`, `62` | `171`, `29`, `62` | 정상 | live helper는 env 없을 때 명시적으로 실패하고, domain-sensitive assertion은 configured site URL 기준으로 잠겼다 |
-| Silent old-alias fallback | `app/utils/siteUrl.ts`, `app/opengraph-image.tsx` | static audit + live preflight docs | 부분 보장 | 앱이 깨지지는 않지만, env/redeploy 미반영 시 old alias가 조용히 계속 노출될 수 있다 |
+| Silent old-alias fallback | `app/utils/siteUrl.ts`, `app/opengraph-image.tsx`, `scripts/check-live-domain-parity.mjs` | static audit + live response gate | 부분 보장 | fallback은 남아 있지만, cutover 뒤 `robots/sitemap/canonical/og` live 응답에서 old alias가 남으면 gate가 즉시 실패한다 |
 
 ## Detailed Findings
 
@@ -61,6 +61,7 @@
 - source of truth
   - [app/utils/siteUrl.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/utils/siteUrl.ts:1)
   - [app/opengraph-image.tsx](/Users/hyungeunseanson/Documents/서비스/locally-web/app/opengraph-image.tsx:8)
+  - [scripts/check-live-domain-parity.mjs](/Users/hyungeunseanson/Documents/서비스/locally-web/scripts/check-live-domain-parity.mjs:1)
   - [app/utils/publicMetadata.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/utils/publicMetadata.ts:1)
 - 현재 동작
   - `NEXT_PUBLIC_SITE_URL`가 비어 있으면 fallback으로 `https://locally-web.vercel.app`를 쓴다
@@ -71,6 +72,7 @@
 - 현재 판정
   - `부분 보장`
   - 즉 코드 버그라기보다 `runtime verification 강화 필요` 영역이다
+  - 이제 cutover 뒤에는 `node scripts/check-live-domain-parity.mjs`가 `robots.txt`, `sitemap.xml`, `/`, `/community`의 live 응답을 직접 보고 old alias 잔존을 fail로 잡는다
 
 ## What Is Already Safe
 - 대부분의 public metadata / canonical / OG / structured data absolute URL은 `NEXT_PUBLIC_SITE_URL` 단일 source를 따른다
@@ -88,8 +90,9 @@
    - Supabase Site URL / redirect allowlist
    - PortOne current live path
 2. cutover day pass 기준을 env 저장이 아니라 live response 기준으로만 운영한다
+   - `node scripts/check-live-domain-parity.mjs`
 
 ## Final Verdict
 - 현재 기준으로 앱 core runtime은 cutover-ready에 가깝다
 - 남은 진짜 blocker는 `외부 콘솔 허용 URL parity`
-- 앱 안쪽에서 다음으로 정리할 가치가 큰 것은 `silent old-alias fallback 운영 리스크`
+- 앱 안쪽에서는 `silent old-alias fallback 운영 리스크`에 대한 live response gate까지 추가됐다

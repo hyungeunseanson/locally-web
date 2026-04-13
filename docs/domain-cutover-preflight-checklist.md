@@ -28,6 +28,7 @@
 - Search Console / Naver ops contract: [docs/2026-04-13_locally_content_search_console_ops_checklist.md](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/2026-04-13_locally_content_search_console_ops_checklist.md:1)
 - NicePay cutover contract: [docs/payments/nicepay-cutover-checklist.md](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/payments/nicepay-cutover-checklist.md:1)
 - live smoke launcher: [scripts/run-live-smoke.mjs](/Users/hyungeunseanson/Documents/서비스/locally-web/scripts/run-live-smoke.mjs:94)
+- live domain response gate: [scripts/check-live-domain-parity.mjs](/Users/hyungeunseanson/Documents/서비스/locally-web/scripts/check-live-domain-parity.mjs:1)
 
 ## Preflight Checks
 ### 1. Vercel / Domain Ownership
@@ -110,12 +111,15 @@
    - `/sitemap.xml`
    - `/ads.txt` if AdSense enabled
 7. 결제/로그인/이메일 absolute link를 샘플링한다.
+8. live response gate를 실행한다.
+   - `node scripts/check-live-domain-parity.mjs`
 
 ## Acceptance Checks
 - 브라우저 주소창 기준 production이 새 도메인에서 정상 응답한다.
 - page source 기준 canonical, OG URL, structured data URL이 새 도메인을 가리킨다.
 - `robots.txt`의 sitemap 링크가 새 도메인이다.
 - `sitemap.xml` 내부 URL이 새 도메인이다.
+- `node scripts/check-live-domain-parity.mjs`가 성공한다.
 - AdSense를 열었다면 `/ads.txt`가 200이고, 커뮤니티 슬롯에 `<ins class="adsbygoogle">`가 들어간다.
 - payment / auth redirect가 이전 `vercel.app`로 튀지 않는다.
 - sample email CTA absolute link가 새 도메인이다.

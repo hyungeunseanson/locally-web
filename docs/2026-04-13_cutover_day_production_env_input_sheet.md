@@ -15,6 +15,7 @@
 - AdSense: [docs/adsense-cutover-checklist.md](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/adsense-cutover-checklist.md:1)
 - site URL owner: [app/utils/siteUrl.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/utils/siteUrl.ts:1)
 - live smoke base URL owner: [scripts/run-live-smoke.mjs](/Users/hyungeunseanson/Documents/서비스/locally-web/scripts/run-live-smoke.mjs:94)
+- live domain response gate owner: [scripts/check-live-domain-parity.mjs](/Users/hyungeunseanson/Documents/서비스/locally-web/scripts/check-live-domain-parity.mjs:1)
 - AdSense env owner: [app/utils/adsense.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/utils/adsense.ts:1)
 
 ## Current Runtime Baseline
@@ -110,6 +111,7 @@ NEXT_PUBLIC_ADSENSE_ENABLED=true
 - canonical / sitemap / OG base URL이 `https://www.locally-travel.com` 기준으로 바뀐다.
 - apex는 `https://www.locally-travel.com`으로 redirect 된다.
 - `scripts/run-live-smoke.mjs`가 새 도메인을 base URL로 읽는다.
+- `node scripts/check-live-domain-parity.mjs`가 통과한다.
 - 광고를 연 날이면 `/ads.txt`가 `200`이고, community slot이 실제 AdSense branch를 탄다.
 
 ## Operator Note
