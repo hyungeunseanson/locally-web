@@ -58,6 +58,7 @@
 
 ## Source Of Truth
 - preflight checklist: [docs/domain-cutover-preflight-checklist.md](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/domain-cutover-preflight-checklist.md:1)
+- production env input sheet: [docs/2026-04-13_cutover_day_production_env_input_sheet.md](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/2026-04-13_cutover_day_production_env_input_sheet.md:1)
 - AdSense cutover: [docs/adsense-cutover-checklist.md](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/adsense-cutover-checklist.md:1)
 - SEO ops: [docs/2026-04-13_locally_content_search_console_ops_checklist.md](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/2026-04-13_locally_content_search_console_ops_checklist.md:1)
 - site URL single source: [app/utils/siteUrl.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/utils/siteUrl.ts:1)
