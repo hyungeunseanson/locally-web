@@ -1,4 +1,7 @@
+/* eslint-disable @next/next/no-img-element */
 'use client';
+
+// Community list cards render arbitrary post thumbnails directly from stored public URLs.
 
 import React from 'react';
 import { MessageSquare, Heart, Eye, Loader2 } from 'lucide-react';

@@ -1,4 +1,7 @@
+/* eslint-disable @next/next/no-img-element */
 'use client';
+
+// Community feed cards render arbitrary thumbnails and a plain local fallback logo without Next image transforms.
 
 import React from 'react';
 import { Heart, Loader2, MessageSquare } from 'lucide-react';

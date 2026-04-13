@@ -1,4 +1,7 @@
+/* eslint-disable @next/next/no-img-element */
 'use client';
+
+// Author modal avatars render stored public profile URLs directly and keep the lightweight modal payload free of image transforms.
 
 import React, { useEffect, useState } from 'react';
 import { useModalClose } from '@/app/hooks/useModalClose';

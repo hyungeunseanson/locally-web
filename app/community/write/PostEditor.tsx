@@ -1,4 +1,7 @@
+/* eslint-disable @next/next/no-img-element */
 'use client';
+
+// Post editor previews blob URLs for local uploads before persistence, so raw img is required for immediate client-side previews.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';

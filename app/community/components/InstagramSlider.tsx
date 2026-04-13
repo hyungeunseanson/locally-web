@@ -1,4 +1,7 @@
+/* eslint-disable @next/next/no-img-element */
 'use client';
+
+// Community sliders render arbitrary uploaded images and keep native swipe behavior without Next image transforms.
 
 import React, { useState, useRef, useCallback } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';

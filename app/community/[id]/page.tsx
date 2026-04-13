@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 import React from 'react';
 import { Metadata } from 'next';
 import { createClient } from '@/app/utils/supabase/server';
@@ -21,6 +22,8 @@ import { COMMUNITY_OPEN, getCommunityCategoryMeta, isLocallyContentCategory } fr
 import { getCommunityHubMeta } from '../hubMeta';
 import { getCommunityCategoryFromFormat } from '../categoryMeta';
 import { resolveCommunityCategory, resolveCommunityFormat, resolveCommunityHub, resolveCommunitySort } from '../queryParams';
+
+// Community detail avatars render stored public profile URLs directly and keep server-rendered article markup free of image transforms.
 
 // 🚀 Dynamic Metadata (SSR SEO)
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -340,6 +343,7 @@ export default async function CommunityPostDetail({
                             </article>
 
                             <CommunityCommentsPanel
+                                key={post.id}
                                 postId={post.id}
                                 viewCount={post.view_count || 0}
                                 initialLikeCount={post.like_count || 0}

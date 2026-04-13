@@ -1,6 +1,9 @@
+/* eslint-disable @next/next/no-img-element */
 import React from 'react';
 import Link from 'next/link';
 import { ExternalLink } from 'lucide-react';
+
+// Linked experience chips render stored cover URLs directly so cards can reuse the original thumbnail source.
 
 interface LinkedExperience {
     id: number;

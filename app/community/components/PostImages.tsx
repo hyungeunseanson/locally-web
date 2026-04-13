@@ -1,4 +1,7 @@
+/* eslint-disable @next/next/no-img-element */
 'use client';
+
+// Community post media renders arbitrary uploaded URLs and keeps native image sizing without Next image transforms.
 
 import React, { useRef, useCallback } from 'react';
 import InstagramSlider from './InstagramSlider';

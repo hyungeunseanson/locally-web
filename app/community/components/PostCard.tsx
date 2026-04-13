@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 import React from 'react';
 import Link from 'next/link';
 import { CommunityPost } from '@/app/types/community';
@@ -6,6 +7,8 @@ import PostImages from './PostImages';
 import { MessageSquare, Heart, Eye, MapPin, CalendarCheck } from 'lucide-react';
 import { getCommunityAuthorInitial, getCommunityAuthorName } from '../authorDisplay';
 import { getCommunityCategoryMeta } from '../categoryMeta';
+
+// Community post cards render profile avatars from stored public URLs without routing them through image transforms.
 
 interface PostCardProps {
     post: CommunityPost;

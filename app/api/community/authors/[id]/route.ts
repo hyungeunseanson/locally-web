@@ -47,7 +47,7 @@ export async function GET(
       recentQuery = recentQuery.neq('id', excludePostId);
     }
 
-    let recentResult = await recentQuery;
+    const recentResult = await recentQuery;
     let recentPosts = (recentResult.data ?? []) as Array<{
       id: string;
       title: string;

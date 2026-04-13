@@ -1,4 +1,7 @@
+/* eslint-disable @next/next/no-img-element */
 'use client';
+
+// Comment avatars render user-provided public profile URLs directly and avoid routing them through image transforms.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CornerDownRight, Heart, Loader2, Send } from 'lucide-react';

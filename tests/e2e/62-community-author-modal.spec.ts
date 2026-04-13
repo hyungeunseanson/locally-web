@@ -122,7 +122,8 @@ async function createPost(
     .single();
 
   if (error && !(await hasAnonymousColumn())) {
-    const { is_anonymous: _ignoredAnonymous, ...legacyPayload } = insertPayload;
+    const legacyPayload: Record<string, unknown> = { ...insertPayload };
+    delete legacyPayload.is_anonymous;
     const retryResult = await getAdminClient()
       .from('community_posts')
       .insert(legacyPayload)

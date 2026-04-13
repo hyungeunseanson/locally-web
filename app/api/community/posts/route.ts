@@ -117,12 +117,10 @@ export async function POST(request: NextRequest) {
         let { data, error } = await attemptInsert(currentPayload);
 
         if (error && isMissingCommunityModelColumnError(error)) {
-            const {
-                destination_hub: _ignoredDestinationHub,
-                post_format: _ignoredPostFormat,
-                source_locale: _ignoredSourceLocale,
-                ...legacyCompatiblePayload
-            } = currentPayload;
+            const legacyCompatiblePayload = { ...currentPayload };
+            delete legacyCompatiblePayload.destination_hub;
+            delete legacyCompatiblePayload.post_format;
+            delete legacyCompatiblePayload.source_locale;
             currentPayload = legacyCompatiblePayload;
             const retryResult = await attemptInsert(currentPayload);
             data = retryResult.data;
@@ -130,7 +128,8 @@ export async function POST(request: NextRequest) {
         }
 
         if (error && isMissingAnonymousColumnError(error)) {
-            const { is_anonymous: _ignoredAnonymous, ...legacyPayload } = currentPayload;
+            const legacyPayload = { ...currentPayload };
+            delete legacyPayload.is_anonymous;
             currentPayload = legacyPayload;
             const retryResult = await attemptInsert(currentPayload);
             data = retryResult.data;

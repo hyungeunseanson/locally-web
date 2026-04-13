@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 import CommentSection from './CommentSection';
 import LikeButton from './LikeButton';
@@ -23,22 +23,10 @@ export default function CommunityCommentsPanel({
     onOpenLogin,
 }: CommunityCommentsPanelProps) {
     const [commentCount, setCommentCount] = useState(initialCommentCount);
-    const [currentViewCount, setCurrentViewCount] = useState(viewCount);
-    const hasTrackedViewRef = useRef(false);
+    const [currentViewCount, setCurrentViewCount] = useState(() => Math.max(Number(viewCount || 0), 1));
 
     useEffect(() => {
-        setCurrentViewCount(viewCount);
-        hasTrackedViewRef.current = false;
-    }, [postId, viewCount]);
-
-    useEffect(() => {
-        if (hasTrackedViewRef.current) return;
-        hasTrackedViewRef.current = true;
-
         let isMounted = true;
-
-        // Reflect the first open immediately, then reconcile with the server response.
-        setCurrentViewCount((previous) => Math.max(Number(previous || 0), Number(viewCount || 0), 1));
 
         void fetch('/api/community/views', {
             method: 'POST',
