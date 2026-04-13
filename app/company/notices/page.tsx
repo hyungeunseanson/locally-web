@@ -2,33 +2,10 @@
 
 import React, { useState } from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
-import { Plus, Minus, ArrowLeft } from 'lucide-react'; // 세련된 토글 아이콘
+import { Plus, Minus, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/app/context/LanguageContext';
-
-const NOTICES = [
-  { 
-    id: 1, 
-    type: 'Update',
-    title: '서비스 이용약관 개정 안내', 
-    date: 'Feb 10, 2026', 
-    content: '안녕하세요. Locally 팀입니다.\n\n투명한 서비스 운영을 위해 이용약관이 개정됩니다.\n주요 변경 사항은 위치기반 서비스 사업자 정보 현행화입니다.\n\n시행일: 2026년 2월 20일'
-  },
-  { 
-    id: 2, 
-    type: 'Event',
-    title: '신규 지역 "부산" 오픈 및 런칭 프로모션', 
-    date: 'Jan 20, 2026', 
-    content: '부산 지역 서비스가 공식 오픈되었습니다.\n지금 부산의 로컬 호스트들을 만나보세요.\n\n오픈 기념으로 2월 한 달간 수수료 면제 혜택을 드립니다.'
-  },
-  { 
-    id: 3, 
-    type: 'Notice',
-    title: '시스템 정기 점검 안내', 
-    date: 'Jan 05, 2026', 
-    content: '더 안정적인 서비스를 위해 서버 점검이 진행됩니다.\n새벽 시간대(02:00~04:00) 일시적인 접속 불안정이 발생할 수 있습니다.'
-  },
-];
+import { COMPANY_NOTICES } from '@/app/config/companyNotices';
 
 export default function NoticesPage() {
   const [openId, setOpenId] = useState<number | null>(null);
@@ -75,27 +52,41 @@ export default function NoticesPage() {
         
         {/* 리스트: 선 위주의 디자인 */}
         <div className="border-t border-black">
-          {NOTICES.map((notice) => (
-            <div key={notice.id} className="border-b border-[#EBEBEB] group">
+          {COMPANY_NOTICES.map((notice) => (
+            <div
+              key={notice.id}
+              data-testid="company-notice-item"
+              className="border-b border-[#EBEBEB] group"
+            >
               <button 
+                data-testid={`company-notice-toggle-${notice.id}`}
                 onClick={() => setOpenId(openId === notice.id ? null : notice.id)}
                 className="w-full py-6 md:py-10 flex flex-col md:flex-row md:items-baseline text-left hover:bg-[#F7F7F7] transition-colors -mx-4 md:-mx-6 px-4 md:px-6 rounded-xl"
               >
                 {/* 왼쪽: 날짜 (고정폭) */}
                 <div className="md:w-48 mb-2 md:mb-0 shrink-0">
-                  <span className="text-[11px] md:text-sm font-semibold text-[#717171] tracking-wide uppercase">
-                    {notice.date}
+                  <span
+                    data-testid={`company-notice-date-${notice.id}`}
+                    className="text-[11px] md:text-sm font-semibold text-[#717171] tracking-wide uppercase"
+                  >
+                    {notice.dateLabel}
                   </span>
                 </div>
 
                 {/* 가운데: 제목 & 태그 */}
                 <div className="flex-1 pr-4 md:pr-8">
                   <div className="mb-2">
-                    <span className="text-[10px] md:text-xs font-bold border border-black px-2 py-1 rounded-full uppercase tracking-wider">
+                    <span
+                      data-testid={`company-notice-type-${notice.id}`}
+                      className="text-[10px] md:text-xs font-bold border border-black px-2 py-1 rounded-full uppercase tracking-wider"
+                    >
                       {notice.type}
                     </span>
                   </div>
-                  <h3 className="text-xl md:text-3xl font-bold tracking-tight group-hover:underline underline-offset-4 decoration-2">
+                  <h3
+                    data-testid={`company-notice-title-${notice.id}`}
+                    className="text-xl md:text-3xl font-bold tracking-tight group-hover:underline underline-offset-4 decoration-2"
+                  >
                     {notice.title}
                   </h3>
                 </div>
@@ -109,7 +100,10 @@ export default function NoticesPage() {
               {/* 내용 펼침: 여백을 충분히 줌 */}
               <div className={`overflow-hidden transition-all duration-500 ease-out ${openId === notice.id ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
                 <div className="pl-6 md:pl-52 pr-6 pb-12 pt-2">
-                  <p className="text-base md:text-lg leading-relaxed text-[#484848] whitespace-pre-wrap font-normal">
+                  <p
+                    data-testid={`company-notice-content-${notice.id}`}
+                    className="text-base md:text-lg leading-relaxed text-[#484848] whitespace-pre-wrap font-normal"
+                  >
                     {notice.content}
                   </p>
                 </div>

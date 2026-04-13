@@ -5,14 +5,15 @@
 - 현재 기준 결론:
   - `about`, `help`, `global site announcement`, `company/partnership`는 메타/공개 진입/운영 의미 기준으로 `정상`
   - `company/news`, `company/careers`, `company/investors`는 dead CTA 제거 이후 `정상`
-  - `company/notices`는 메타는 `정상`이지만, 데이터 truth가 정적 placeholder 성격이라 `부분 보장`
+  - `company/notices`도 config-owner public notices source로 정리돼 `정상`
 - 최신 재검증 결과:
   - `110-partnership-media-kit`
   - `172-partnership-inquiry-route`
   - `25-public-metadata`
   - `173-public-company-surface-cta`
   - `174-public-company-mobile-back`
-  - 결과: `17 passed`
+  - `175-public-company-notices`
+  - 결과: `18 passed`
 
 ## Result Snapshot
 | Surface | Source of truth | Current tests | Result | Notes |
@@ -22,7 +23,7 @@
 | Global announcement | `app/config/siteAnnouncements.ts`, `app/utils/siteAnnouncements.ts`, `app/components/GlobalAnnouncementModal.tsx` | `103` | 정상 | path normalize, exclusion, locale fallback, dismissal key 의미가 안정적이다 |
 | Partnership | `app/company/partnership/layout.tsx`, `app/company/partnership/page.tsx`, `/api/company/partnership-inquiry` | `110`, `172`, `25` | 정상 | media kit modal과 public inquiry mail submit이 모두 current truth에 맞게 동작한다 |
 | Newsroom | `app/company/news/layout.tsx`, `app/company/news/page.tsx` | `25`, `173` | 정상 | 기사 카드는 archive preview로만 노출되고 dead link가 제거되었다 |
-| Notices | `app/company/notices/layout.tsx`, `app/company/notices/page.tsx` | 간접 `25` 범위 밖 | 부분 보장 | 아코디언 자체는 단순하지만 데이터가 in-file 정적 배열이다 |
+| Notices | `app/company/notices/layout.tsx`, `app/company/notices/page.tsx`, `app/config/companyNotices.ts` | `175`, 간접 `25`, `174` | 정상 | notices owner가 전용 config 파일로 분리돼 public read-only surface 의미가 분명하다 |
 | Careers | `app/company/careers/layout.tsx`, `app/company/careers/page.tsx` | `173` | 정상 | 채용 링크 owner가 없을 때 upcoming roles 안내형 surface로 내려가 있다 |
 | Investors | `app/company/investors/layout.tsx`, `app/company/investors/page.tsx` | `173` | 정상 | annual report rows는 read-only 안내형으로 정리돼 false click이 없다 |
 
@@ -106,15 +107,20 @@
 - 판정
   - `정상`
 
-### 6. `company/notices`는 여전히 정적 데이터 의존이 남아 있다
+### 6. `company/notices`는 config-owner public notice surface로 정리됐다
 - source of truth
   - `app/company/notices/page.tsx`
+  - `app/config/companyNotices.ts`
 - 현재 동작
-  - 읽기 자체는 가능하지만 데이터 source가 운영 시스템이 아니라 코드 상수다
+  - notices 데이터는 페이지 안 상수가 아니라 전용 config 파일 1곳에서만 관리된다
+  - 정렬 기준은 배열 순서 그대로이고, 페이지는 그 source를 읽어 read-only로 렌더한다
+  - 공지 제목, 타입, 날짜, 본문 펼침 동작은 기존 UX를 유지한다
 - 테스트 보장
-  - 메타 수준에서만 간접 `25-public-metadata`
+  - `175-public-company-notices`
+  - 간접 `25-public-metadata`
+  - `174-public-company-mobile-back`
 - 판정
-  - `부분 보장`
+  - `정상`
 
 ### 7. public company pages의 모바일 fallback은 이제 public brand surface 의미와 맞는다
 - 확인 사실
@@ -126,9 +132,9 @@
   - `정상`
 
 ## Coverage Gap
-- `company/notices` 본문 interaction은 여전히 전용 E2E가 없다
+- public info/brand surface에서 active 기능 gap은 이번 패스 기준으로 없다
 
 ## Final Verdict
 - `public metadata / robots / announcement / help` 축은 현재 기준 `정상`
-- `company/news`, `company/careers`, `company/investors`의 false click affordance와 public mobile fallback mismatch는 닫혔고, 남은 active gap은 `company/notices`의 정적 데이터 owner다
-- 다음 핀셋 수정 1순위는 `company/notices`의 운영 truth 정리다
+- `company/news`, `company/careers`, `company/investors`의 false click affordance, public mobile fallback mismatch, `company/notices`의 owner ambiguity까지 닫혔다
+- 다음 후속은 이 도메인 내부 보정보다, 더 큰 미감사 도메인으로 넘어가는 편이 자연스럽다
