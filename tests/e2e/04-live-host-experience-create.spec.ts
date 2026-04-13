@@ -3,8 +3,8 @@ import path from 'path';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test } from '@playwright/test';
+import { LIVE_BASE_URL } from './helpers/liveBaseUrl';
 
-const LIVE_BASE_URL = 'https://locally-web.vercel.app';
 const HOST_EMAIL = 'codex.host.1772980212472@example.com';
 const HOST_PASSWORD = 'LocallyTest!2026';
 const HOST_FALLBACK_NAME = 'Codex Live Host';

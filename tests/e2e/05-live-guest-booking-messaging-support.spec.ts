@@ -3,8 +3,8 @@ import { readFileSync } from 'fs';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { reviewAllExperiencePaymentAgreements } from './helpers/experienceBooking';
+import { LIVE_BASE_URL } from './helpers/liveBaseUrl';
 
-const LIVE_BASE_URL = 'https://locally-web.vercel.app';
 const HOST_EMAIL = 'codex.host.1772980212472@example.com';
 const HOST_PASSWORD = 'LocallyTest!2026';
 const HOST_USER_ID = 'cc84b331-7e78-4818-b9ba-f1a960017473';
