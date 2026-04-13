@@ -2,6 +2,8 @@
 
 ## Summary
 - 이 문서는 `체험 예약`의 `completed sync` 운영 절차를 고정한다.
+- 실제 운영 당일에는 먼저 아래 짧은 체크리스트를 본다.
+  - [experience settlement day-of checklist](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/2026-04-13_experience_settlement_day_of_checklist.md:1)
 - 대상 체인은 아래로 한정한다.
   - `bookings.status='PAID' | 'confirmed'` 상태의 과거 체험 예약
   - `/api/cron/complete-trips`

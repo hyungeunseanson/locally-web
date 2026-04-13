@@ -241,4 +241,4 @@
 - 남은 핵심 리스크는 이제 `settlement sync 운영 의존성` 하나로 좁혀진다
 - 따라서 다음 후속의 기본 선택은 구현보다 아래를 먼저 닫는 것이다
   - [experience settlement sync 운영 runbook](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/2026-04-13_experience_settlement_sync_runbook.md:1)
-  - `정산 실행 day-of 운영 체크리스트`와 health pass/fail 기준
+  - [experience settlement day-of checklist](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/2026-04-13_experience_settlement_day_of_checklist.md:1)
