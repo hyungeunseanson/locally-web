@@ -13,6 +13,45 @@
   - 지연/실패 시 안전한 수동 복구 순서를 따른다
   - 정산 실행 전에 `completed` 전환이 실제로 끝났는지 확인한다
 
+## 운영자용 짧은 버전
+- 먼저 `Admin > Sales > Settlement Sync Health`의 `체험 카드`만 본다.
+- 아래 4개가 모두 괜찮으면 그날은 sync 쪽에서 추가 작업이 없다.
+  - `health_state='healthy'`
+  - `running_stale=false`
+  - `503 infra banner` 없음
+  - `due count`가 `0`이거나 설명 가능하게 낮다
+- 이 조건이면 바로 다음 단계로 넘어간다.
+  - `payout queue` 확인
+  - 필요한 host만 정산 실행
+- 반대로 아래 셋 중 하나라도 보이면, payout보다 sync를 먼저 본다.
+  - `delayed`
+  - `running_stale`
+  - `failed` 또는 `503`
+
+## 실제 점검 순서
+1. `Admin > Sales`로 들어간다.
+2. `Settlement Sync Health`에서 `체험 카드`만 먼저 본다.
+3. 아래 4가지만 확인한다.
+   - 상태 라벨
+   - `due count`
+   - `last success`
+   - `infra banner` 유무
+4. 카드가 `healthy`면 sync 쪽 조치는 끝이다.
+   - 바로 `payout queue`로 넘어간다.
+5. 카드가 `delayed`면 `run due`를 1회만 실행한다.
+6. 카드가 `running`이면 기다린다.
+   - 중복 클릭하지 않는다.
+7. 카드가 `running_stale`, `failed`, `503`이면 payout 실행을 멈춘다.
+   - 먼저 sync 상태를 복구한다.
+
+## 아무것도 안 해도 되는 조건
+- 아래 조건이면 운영자가 sync에 손대지 않아도 된다.
+  - `health_state='healthy'`
+  - `due count=0`, 또는 남아 있어도 직전 실행/현재 시간대 기준으로 설명 가능하다
+  - `last success`가 오래 끊겨 있지 않다
+  - `running_stale`, `failed`, `503`가 없다
+- 이 경우 해야 할 일은 sync가 아니라 `정산 실행 전 대상 확인`뿐이다.
+
 ## Source Of Truth
 - 체험 완료 동기화 owner
   - [app/utils/settlementSync/experienceCompletion.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/utils/settlementSync/experienceCompletion.ts:1)
