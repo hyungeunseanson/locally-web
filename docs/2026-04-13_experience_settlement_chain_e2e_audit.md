@@ -235,5 +235,5 @@
   - `ReservationManager` completed 분류와 정산 completed 분류의 의미 차이
   - settlement sync 운영 의존성
 - 따라서 다음 후속의 기본 선택은 구현보다 아래 2개를 먼저 닫는 것이다
-  - `experience settlement sync 운영 runbook`
+  - [experience settlement sync 운영 runbook](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/2026-04-13_experience_settlement_sync_runbook.md:1)
   - `completed 의미 차이`를 제품적으로 허용할지에 대한 decision close-out
