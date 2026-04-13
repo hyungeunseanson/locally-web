@@ -31,7 +31,17 @@ const EXPECTED_META = [
   {
     path: '/company/news',
     title: '뉴스룸 | Locally',
-    description: 'Locally의 주요 소식, 보도자료, 미디어 노출을 한곳에서 확인할 수 있는 뉴스룸입니다.',
+    description: '검증이 끝난 외부 기사 링크가 순차적으로 반영되는 Locally 뉴스룸 아카이브 프리뷰입니다.',
+  },
+  {
+    path: '/company/careers',
+    title: '채용 | Locally',
+    description: 'Locally 채용 방향과 예정 역할을 소개하는 프리뷰 페이지입니다. 공식 지원 링크는 오픈 시점에만 공개됩니다.',
+  },
+  {
+    path: '/company/investors',
+    title: '투자자 정보 | Locally',
+    description: 'Locally 투자자 정보 프리뷰 페이지입니다. 공식 리포트와 검증된 자료는 공개 시점에 순차적으로 반영됩니다.',
   },
   {
     path: '/services/intro',

@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import SiteHeader from '@/app/components/SiteHeader';
 import { ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -73,9 +74,32 @@ export default function NewsPage() {
             </h1>
           </div>
           <p className="text-left md:text-right text-[#717171] font-medium mt-3 md:mt-0 text-sm md:text-base">
-            Press & Media Coverage
+            Press & Media Archive Preview
           </p>
         </div>
+
+        <section
+          data-testid="company-news-status-banner"
+          className="mb-12 rounded-[28px] border border-[#E5E7EB] bg-[#F8FAFC] px-6 py-6 md:px-8 md:py-8"
+        >
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#475569]">
+            Archive preview only
+          </p>
+          <h2 className="mt-3 text-xl font-bold tracking-tight text-[#111827] md:text-2xl">
+            External article links are published only after verification.
+          </h2>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-[#64748B] md:text-base">
+            This page stays read-only until each outlet link is verified. If you need an official
+            company update right now, use the notices page instead of this preview archive.
+          </p>
+          <Link
+            href="/company/notices"
+            data-testid="company-news-notices-cta"
+            className="mt-5 inline-flex items-center rounded-full border border-[#CBD5E1] bg-white px-5 py-2.5 text-sm font-semibold text-[#0F172A] transition-colors hover:bg-[#F1F5F9]"
+          >
+            Read official notices
+          </Link>
+        </section>
 
         {/* 뉴스 리스트 */}
         <div className="flex flex-col">
@@ -98,6 +122,12 @@ export default function NewsPage() {
                   <h2 className="text-xl md:text-4xl font-bold leading-tight tracking-tight">
                     {item.title}
                   </h2>
+                  <p
+                    data-testid="company-news-item-status"
+                    className="mt-3 text-xs font-medium tracking-wide text-[#717171] md:text-sm"
+                  >
+                    External link pending verification
+                  </p>
                 </div>
 
                 {/* 운영 문서상 링크 owner가 아직 없으므로 읽기 preview로만 노출 */}
@@ -118,7 +148,7 @@ export default function NewsPage() {
           data-testid="company-news-availability-note"
           className="mt-16 text-center text-sm font-medium text-[#717171]"
         >
-          External article links are being organized and will be added here after verification.
+          Verified external article links will be added here one by one after review.
         </p>
       </main>
     </div>

@@ -1,7 +1,5 @@
 import { existsSync, readFileSync } from 'fs';
 
-const DEFAULT_PUBLIC_SITE_URL = 'https://locally-web.vercel.app';
-
 function loadEnvFile(path: string) {
   if (!existsSync(path)) return {};
 
@@ -30,5 +28,10 @@ export function resolveConfiguredSiteUrl(
     ...process.env,
   },
 ) {
-  return readTrimmedEnv(env, 'NEXT_PUBLIC_SITE_URL') || DEFAULT_PUBLIC_SITE_URL;
+  const configuredSiteUrl = readTrimmedEnv(env, 'NEXT_PUBLIC_SITE_URL');
+  if (!configuredSiteUrl) {
+    throw new Error('Missing NEXT_PUBLIC_SITE_URL for domain-sensitive test expectations.');
+  }
+
+  return configuredSiteUrl.replace(/\/+$/, '');
 }

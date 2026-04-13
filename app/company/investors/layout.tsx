@@ -12,10 +12,10 @@ const TITLE_MAP = {
 } as const;
 
 const DESCRIPTION_MAP = {
-  ko: 'Locally의 성장 지표, 주요 성과, 재무 자료를 확인할 수 있는 투자자 정보 페이지입니다.',
-  en: 'Review Locally’s growth metrics, company highlights, and investor-facing materials.',
-  ja: 'Locallyの成長指標、主要成果、投資家向け資料を確認できるページです。',
-  zh: '查看 Locally 的增长指标、重要成果和面向投资者的资料。',
+  ko: 'Locally 투자자 정보 프리뷰 페이지입니다. 공식 리포트와 검증된 자료는 공개 시점에 순차적으로 반영됩니다.',
+  en: 'Preview Locally’s investor relations page. Official reports and verified materials are published only after release.',
+  ja: 'Locallyの投資家情報プレビューです。公式レポートと検証済み資料は公開時点で順次反映されます。',
+  zh: '这是 Locally 的投资者信息预览页。正式报告和经过验证的资料仅会在发布后逐步公开。',
 } as const;
 
 export async function generateMetadata(): Promise<Metadata> {

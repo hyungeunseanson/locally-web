@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import SiteHeader from '@/app/components/SiteHeader';
 
 const JOBS = [
@@ -27,6 +28,29 @@ export default function CareersPage() {
           </p>
         </div>
 
+        <section
+          data-testid="company-careers-status-banner"
+          className="mb-12 rounded-[28px] border border-[#E5E7EB] bg-[#F8FAFC] px-6 py-6 md:px-8 md:py-8"
+        >
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#475569]">
+            Hiring preview only
+          </p>
+          <h2 className="mt-3 text-xl font-bold tracking-tight text-[#111827] md:text-2xl">
+            Application links are published only when a role officially opens.
+          </h2>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-[#64748B] md:text-base">
+            The roles below are planned hiring directions, not active job postings. Until a team
+            opens a search, this page stays read-only without direct apply links.
+          </p>
+          <Link
+            href="/about"
+            data-testid="company-careers-about-cta"
+            className="mt-5 inline-flex items-center rounded-full border border-[#CBD5E1] bg-white px-5 py-2.5 text-sm font-semibold text-[#0F172A] transition-colors hover:bg-[#F1F5F9]"
+          >
+            Learn about Locally
+          </Link>
+        </section>
+
         <div>
           <div className="flex justify-between items-end border-b border-black pb-4 mb-0">
             <h2 className="text-2xl font-bold">Upcoming Roles</h2>
@@ -47,6 +71,12 @@ export default function CareersPage() {
                     <span>·</span>
                     <span>{job.loc}</span>
                   </div>
+                  <p
+                    data-testid="company-career-role-status"
+                    className="mt-3 text-xs font-medium tracking-wide text-[#717171] md:text-sm"
+                  >
+                    Application link pending role launch
+                  </p>
                 </div>
                 <span className="inline-flex items-center rounded-full border border-[#DDDDDD] px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-[#717171]">
                   Hiring opens soon
@@ -59,7 +89,7 @@ export default function CareersPage() {
             data-testid="company-careers-availability-note"
             className="mt-8 text-sm font-medium text-[#717171]"
           >
-            채용 공고와 지원 링크는 준비 중이며, 오픈 시 이 페이지에서 바로 안내됩니다.
+            채용 공고와 지원 링크는 역할별 검토가 끝난 뒤 이 페이지에 순차적으로 공개됩니다.
           </p>
         </div>
       </main>

@@ -12,10 +12,10 @@ const TITLE_MAP = {
 } as const;
 
 const DESCRIPTION_MAP = {
-  ko: 'Locally의 주요 소식, 보도자료, 미디어 노출을 한곳에서 확인할 수 있는 뉴스룸입니다.',
-  en: 'Read Locally’s latest announcements, press coverage, and newsroom updates in one place.',
-  ja: 'Locallyの最新ニュース、報道資料、メディア掲載情報をまとめて確認できるニュースルームです。',
-  zh: '在这里查看 Locally 的最新消息、媒体报道和新闻中心更新。',
+  ko: '검증이 끝난 외부 기사 링크가 순차적으로 반영되는 Locally 뉴스룸 아카이브 프리뷰입니다.',
+  en: 'Preview Locally’s newsroom archive while verified external article links are being prepared.',
+  ja: '検証済みの外部記事リンクを順次反映していく、Locallyニュースルームのアーカイブプレビューです。',
+  zh: '这是 Locally 新闻中心的归档预览页，已验证的外部报道链接会按顺序补充。',
 } as const;
 
 export async function generateMetadata(): Promise<Metadata> {

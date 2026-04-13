@@ -1,11 +1,15 @@
 import { ImageResponse } from 'next/og';
 
+// The OG image renderer consumes a plain asset URL inside next/og, so raw img is the compatible render primitive here.
+
+import { getSiteUrl } from '@/app/utils/siteUrl';
+
 export const alt = 'Locally';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
 export default async function Image() {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://locally-web.vercel.app';
+  const siteUrl = getSiteUrl();
 
   return new ImageResponse(
     (
@@ -21,6 +25,7 @@ export default async function Image() {
       >
         <img
           src={`${siteUrl}/images/logo-black-transparent.png`}
+          alt="Locally"
           width={280}
           height={280}
           style={{ objectFit: 'contain' }}
