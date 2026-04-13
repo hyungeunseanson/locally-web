@@ -38,6 +38,24 @@
   - SEO base URL은 아직 `locally-web.vercel.app`로 정상 정렬돼 있다
   - cutover 전 공식 smoke 기준 base URL은 `locally-web.vercel.app` 또는 이후의 custom domain이어야 한다
 
+## Runtime Env Inventory
+- 이번 점검에서는 production env 목록을 Vercel CLI로 직접 덤프하지 못했다.
+  - 로컬 macOS 권한 문제로 Vercel CLI cache/config 디렉터리 접근이 막혀 `vercel env ls production` 확인이 실패했다.
+  - 따라서 아래 판정은 모두 실제 live 응답 기준의 runtime inference다.
+- 현재 runtime에서 사실상 확인된 값
+  - effective site URL: `https://locally-web.vercel.app`
+  - effective robots sitemap URL: `https://locally-web.vercel.app/sitemap.xml`
+  - effective AdSense state: disabled 또는 incomplete
+- 근거
+  - `https://locally-web.vercel.app/robots.txt`가 `Sitemap: https://locally-web.vercel.app/sitemap.xml`를 반환했다
+  - `https://locally-web.vercel.app/sitemap.xml` 내부 URL도 `https://locally-web.vercel.app` 기준으로 응답했다
+  - `https://locally-web.vercel.app/ads.txt`는 `404`였다
+  - `/community`와 `/` live HTML에는 AdSense script가 보이지 않았고, 커뮤니티 광고 자리는 placeholder slot만 남아 있었다
+- 현재 운영 해석
+  - production의 `NEXT_PUBLIC_SITE_URL`은 아직 `https://locally-web.vercel.app`로 보는 것이 맞다
+  - `NEXT_PUBLIC_ADSENSE_ENABLED`는 꺼져 있거나, `NEXT_PUBLIC_ADSENSE_CLIENT_ID` 또는 slot env가 비어 있는 상태로 본다
+  - cutover 전 점검 기준 URL은 unique deployment URL이 아니라 project alias `https://locally-web.vercel.app`다
+
 ## Source Of Truth
 - preflight checklist: [docs/domain-cutover-preflight-checklist.md](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/domain-cutover-preflight-checklist.md:1)
 - AdSense cutover: [docs/adsense-cutover-checklist.md](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/adsense-cutover-checklist.md:1)
