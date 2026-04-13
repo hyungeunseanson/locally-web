@@ -279,11 +279,15 @@ export default function AnalyticsMetricModal({
                     </div>
                     <div className="w-12 h-12 rounded-lg bg-slate-100 overflow-hidden flex-shrink-0">
                       {experience.image_url ? (
-                        <img
-                          src={experience.image_url ?? undefined}
-                          alt={experience.title || 'Experience image'}
-                          className="w-full h-full object-cover"
-                        />
+                        <>
+                          {/* Admin ranking cards render remote uploaded cover URLs without changing current fetch behavior. */}
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={experience.image_url ?? undefined}
+                            alt={experience.title || 'Experience image'}
+                            className="w-full h-full object-cover"
+                          />
+                        </>
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-slate-300">
                           <Star size={20} />

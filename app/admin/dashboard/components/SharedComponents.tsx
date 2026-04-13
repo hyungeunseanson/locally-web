@@ -1,9 +1,33 @@
 'use client';
 
-import React from 'react';
+import React, { type ReactNode } from 'react';
+
+type NavButtonProps = {
+  active: boolean;
+  onClick?: () => void;
+  icon: ReactNode;
+  label: string;
+  count?: number | string;
+};
+
+type StatCardProps = {
+  label: string;
+  value: ReactNode;
+  sub?: ReactNode;
+  color: string;
+  icon: ReactNode;
+  onClick?: () => void;
+};
+
+type InfoRowProps = {
+  label: string;
+  value?: ReactNode;
+  isCopyable?: boolean;
+  onCopy?: () => void;
+};
 
 // 1. 네비게이션 버튼 (사이드바용)
-export function NavButton({ active, onClick, icon, label, count }: any) {
+export function NavButton({ active, onClick, icon, label, count }: NavButtonProps) {
   return (
     <button
       onClick={onClick}
@@ -29,7 +53,7 @@ export function NavButton({ active, onClick, icon, label, count }: any) {
 }
 
 // 2. 통계 카드 (대시보드 상단용) - Hover 효과 강화
-export function StatCard({ label, value, sub, color, icon, onClick }: any) {
+export function StatCard({ label, value, sub, color, icon, onClick }: StatCardProps) {
   return (
     <div 
       onClick={onClick}
@@ -55,7 +79,7 @@ export function StatCard({ label, value, sub, color, icon, onClick }: any) {
 }
 
 // 3. 정보 행 (상세 패널용)
-export function InfoRow({ label, value, isCopyable, onCopy }: any) {
+export function InfoRow({ label, value, isCopyable, onCopy }: InfoRowProps) {
   return (
     <div className="flex justify-between items-center border-b border-slate-100 pb-3 last:border-0 hover:bg-slate-50 px-2 rounded-lg transition-colors -mx-2">
       <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">{label}</span>

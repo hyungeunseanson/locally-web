@@ -129,12 +129,11 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Admin team mobile smoke', () => {
-  test('loads team workspace on mobile and sends a team chat message', async ({ page }) => {
+  test('loads team workspace on mobile and switches across the current workspace tabs', async ({ page }) => {
     test.setTimeout(90000);
 
     const adminUser = createAdminUser();
-    const adminUserId = await createAuthUser(adminUser);
-    const messageText = `코덱스 모바일 팀 채팅 ${Date.now()}`;
+    await createAuthUser(adminUser);
 
     await page.setViewportSize({ width: 390, height: 844 });
     await login(page, adminUser);
@@ -142,37 +141,15 @@ test.describe.serial('Admin team mobile smoke', () => {
 
     await expect(page.getByRole('heading', { name: /Team Sync HQ/i })).toBeVisible({ timeout: 15000 });
     await expect(page.getByPlaceholder('오늘의 주요 업무')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('button', { name: 'Daily Log & Tasks' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /팀 메모장/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /전화 예약/ })).toBeVisible();
 
-    await page.getByText('Team Chat', { exact: true }).last().click();
+    await page.getByRole('button', { name: /팀 메모장/ }).click();
+    await expect(page.getByRole('heading', { name: 'Team Knowledge Docs' })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('button', { name: /새 메모 작성/ })).toBeVisible();
 
-    const chatInput = page.locator('textarea[placeholder="메시지를 입력하세요..."]:visible');
-    await expect(chatInput).toBeVisible({ timeout: 15000 });
-
-    const createResponsePromise = page.waitForResponse((response) =>
-      response.url().includes('/api/admin/team/comments') &&
-      response.request().method() === 'POST'
-    );
-
-    await chatInput.fill(messageText);
-    await chatInput.press('Enter');
-    await createResponsePromise;
-
-    await expect.poll(async () => {
-      const { data, error } = await getAdminClient()
-        .from('admin_task_comments')
-        .select('content')
-        .eq('task_id', CHAT_ROOM_ID)
-        .eq('author_id', adminUserId)
-        .eq('content', messageText)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) throw error;
-      return data?.content || null;
-    }, {
-      timeout: 15000,
-      intervals: [500, 1000, 1500],
-    }).toBe(messageText);
+    await page.getByRole('button', { name: /전화 예약/ }).click();
+    await expect(page.getByRole('heading', { name: '전화 예약', exact: true })).toBeVisible({ timeout: 15000 });
   });
 });

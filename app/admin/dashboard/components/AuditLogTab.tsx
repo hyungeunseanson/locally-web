@@ -1,30 +1,52 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  ShieldCheck, Search, Calendar, User, Info,
-  ChevronDown, ChevronUp, AlertCircle, Clock, ArrowRight, MessageSquare
+  ShieldCheck, Search, Info,
+  ChevronDown, ChevronUp, Clock, ArrowRight, MessageSquare
 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 
+type AuditLogDetails = {
+  target_info?: string | null;
+  new_status?: string | null;
+  comment?: string | null;
+};
+
+type AuditLogEntry = {
+  id: string;
+  created_at: string;
+  admin_email: string | null;
+  action_type: string;
+  target_type: string;
+  target_id: string;
+  details?: AuditLogDetails | null;
+};
+
+type AuditLogsResponse = {
+  success?: boolean;
+  error?: string;
+  data?: AuditLogEntry[];
+};
+
 export default function AuditLogTab() {
-  const [logs, setLogs] = useState<any[]>([]);
+  const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const fetchLogs = async () => {
     setLoading(true);
     try {
       const response = await fetch('/api/admin/audit-logs', { cache: 'no-store' });
-      const result = await response.json();
+      const result = (await response.json()) as AuditLogsResponse;
 
       if (!response.ok || !result?.success) {
         throw new Error(result?.error || 'Failed to fetch audit logs');
       }
 
-      setLogs(result.data || []);
+      setLogs(Array.isArray(result.data) ? result.data : []);
     } catch (error) {
       console.error('Error fetching audit logs:', error);
       setLogs([]);
@@ -36,7 +58,7 @@ export default function AuditLogTab() {
     void fetchLogs();
     const channel = supabase.channel('realtime_audit_logs')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_audit_logs' }, (payload) => {
-        setLogs(prev => [payload.new, ...prev]);
+        setLogs(prev => [payload.new as AuditLogEntry, ...prev]);
       })
       .subscribe();
 
@@ -49,9 +71,9 @@ export default function AuditLogTab() {
       clearInterval(refreshTimer);
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [supabase]);
 
-  const getActionInfo = (log: any) => {
+  const getActionInfo = (log: AuditLogEntry) => {
     const type = log.action_type;
     const map: Record<string, { label: string, color: string, description: string }> = {
       'DELETE_USER_FULL': {
@@ -213,7 +235,9 @@ export default function AuditLogTab() {
                                         <MessageSquare size={12} className="text-amber-500 md:w-3.5 md:h-3.5" /> 관리자 코멘트
                                       </h4>
                                       <div className="bg-amber-50/50 text-amber-900 p-2 md:p-3 rounded-lg md:rounded-xl text-[10px] md:text-sm font-medium border border-amber-100 italic">
-                                        "{log.details.comment}"
+                                        <span>&ldquo;</span>
+                                        {log.details.comment}
+                                        <span>&rdquo;</span>
                                       </div>
                                     </div>
                                   )}

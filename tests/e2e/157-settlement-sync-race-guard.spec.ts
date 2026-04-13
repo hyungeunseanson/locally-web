@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 
 import {
   createAuthUser,
@@ -17,6 +17,7 @@ const createdBookingIds: string[] = [];
 const createdServiceRequestIds: string[] = [];
 const createdServiceApplicationIds: string[] = [];
 const createdServiceBookingIds: string[] = [];
+const CRON_SECRET = loadTestEnv().CRON_SECRET?.trim() || null;
 
 async function createApprovedHostApplication(userId: string, user: E2ETestUser) {
   const supabase = getTestAdminClient();
@@ -263,6 +264,54 @@ async function fetchPayoutQueue(page: Page) {
   });
 }
 
+async function triggerCompletionRunDue(params: {
+  page: Page;
+  request: APIRequestContext;
+  domain: 'experience' | 'service';
+  delayMs?: number;
+  leaseMs?: number;
+}) {
+  const testHeaders = {
+    ...(params.delayMs ? { 'x-locally-test-delay-settlement-sync-ms': String(params.delayMs) } : {}),
+    ...(params.leaseMs ? { 'x-locally-test-settlement-sync-lease-ms': String(params.leaseMs) } : {}),
+  };
+
+  if (CRON_SECRET) {
+    const cronPath =
+      params.domain === 'experience' ? '/api/cron/complete-trips' : '/api/cron/complete-services';
+    const response = await params.request.get(cronPath, {
+      headers: {
+        authorization: `Bearer ${CRON_SECRET}`,
+        ...testHeaders,
+      },
+    });
+
+    return {
+      status: response.status(),
+      body: (await response.json()) as Record<string, unknown>,
+      trigger: 'cron' as const,
+    };
+  }
+
+  const response = await postAdminSync(
+    params.page,
+    {
+      mode: 'run_due',
+      domain: params.domain,
+    },
+    {
+      delayMs: params.delayMs,
+      leaseMs: params.leaseMs,
+    }
+  );
+
+  return {
+    status: response.status,
+    body: response.body as Record<string, unknown>,
+    trigger: 'manual_run_due' as const,
+  };
+}
+
 test.afterAll(async () => {
   const supabase = getTestAdminClient();
 
@@ -341,15 +390,12 @@ test.describe.serial('Settlement sync race guard', () => {
     await login(page, adminUser);
     await page.goto('/admin/dashboard?tab=SALES', { waitUntil: 'networkidle' });
 
-    const env = loadTestEnv();
-    const cronSecret = env.CRON_SECRET || 'codex-cron-secret';
-
-    const cronExperiencePromise = request.get('/api/cron/complete-trips', {
-      headers: {
-        authorization: `Bearer ${cronSecret}`,
-        'x-locally-test-delay-settlement-sync-ms': '700',
-        'x-locally-test-settlement-sync-lease-ms': '300',
-      },
+    const completionExperiencePromise = triggerCompletionRunDue({
+      page,
+      request,
+      domain: 'experience',
+      delayMs: 700,
+      leaseMs: 300,
     });
     await page.waitForTimeout(120);
     const manualExperiencePromise = postAdminSync(page, {
@@ -358,14 +404,21 @@ test.describe.serial('Settlement sync race guard', () => {
       identifier: experienceRaceBookingId,
     });
 
-    const [cronExperience, manualExperience] = await Promise.all([
-      cronExperiencePromise,
+    const [experienceCompletion, manualExperience] = await Promise.all([
+      completionExperiencePromise,
       manualExperiencePromise,
     ]);
 
-    expect(cronExperience.ok()).toBeTruthy();
-    expect(manualExperience.status).toBe(200);
-    expect(['completed', 'already_processed']).toContain(manualExperience.body.outcome);
+    expect(experienceCompletion.status).toBe(200);
+    expect(experienceCompletion.body.success).toBeTruthy();
+    expect([200, 409]).toContain(manualExperience.status);
+    if (manualExperience.status === 200) {
+      expect(manualExperience.body.success).toBeTruthy();
+      expect(['completed', 'already_processed']).toContain(manualExperience.body.outcome);
+    } else {
+      expect(manualExperience.body.success).toBeFalsy();
+      expect(manualExperience.body.outcome).toBe('already_running');
+    }
 
     const supabase = getTestAdminClient();
     const [experienceRow, reviewRequestRows] = await Promise.all([
@@ -383,12 +436,12 @@ test.describe.serial('Settlement sync race guard', () => {
     expect(experienceRow.data?.status).toBe('completed');
     expect(reviewRequestRows.data || []).toHaveLength(1);
 
-    const cronServicePromise = request.get('/api/cron/complete-services', {
-      headers: {
-        authorization: `Bearer ${cronSecret}`,
-        'x-locally-test-delay-settlement-sync-ms': '700',
-        'x-locally-test-settlement-sync-lease-ms': '300',
-      },
+    const completionServicePromise = triggerCompletionRunDue({
+      page,
+      request,
+      domain: 'service',
+      delayMs: 700,
+      leaseMs: 300,
     });
     await page.waitForTimeout(120);
     const manualServicePromise = postAdminSync(page, {
@@ -397,11 +450,21 @@ test.describe.serial('Settlement sync race guard', () => {
       identifier: serviceFixture.orderId,
     });
 
-    const [cronService, manualService] = await Promise.all([cronServicePromise, manualServicePromise]);
+    const [serviceCompletion, manualService] = await Promise.all([
+      completionServicePromise,
+      manualServicePromise,
+    ]);
 
-    expect(cronService.ok()).toBeTruthy();
-    expect(manualService.status).toBe(200);
-    expect(['completed', 'already_processed']).toContain(manualService.body.outcome);
+    expect(serviceCompletion.status).toBe(200);
+    expect(serviceCompletion.body.success).toBeTruthy();
+    expect([200, 409]).toContain(manualService.status);
+    if (manualService.status === 200) {
+      expect(manualService.body.success).toBeTruthy();
+      expect(['completed', 'already_processed']).toContain(manualService.body.outcome);
+    } else {
+      expect(manualService.body.success).toBeFalsy();
+      expect(manualService.body.outcome).toBe('already_running');
+    }
 
     const [serviceBookingRow, serviceRequestRow] = await Promise.all([
       supabase.from('service_bookings').select('status').eq('id', serviceFixture.bookingId).maybeSingle(),

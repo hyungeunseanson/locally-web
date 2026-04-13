@@ -39,6 +39,9 @@ type TeamWorkspaceBootstrapResponse = {
   error?: string;
 };
 
+const getErrorMessage = (error: unknown, fallback: string) =>
+  error instanceof Error ? error.message : fallback;
+
 export default function TeamTab({ initialInnerTab, initialProxyRequestId }: TeamTabProps) {
   const { showToast } = useToast();
   const { requestConfirm, ConfirmDialogElement } = useConfirmDialog();
@@ -54,14 +57,13 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
   const [newTodo, setNewTodo] = useState('');
   const [innerTab, setInnerTab] = useState<'todo' | 'memo' | 'proxy'>(initialInnerTab || 'todo'); // 🟢 새로운 서브 탭
   const [isComposingMemo, setIsComposingMemo] = useState(false);
-  const [editingMemo, setEditingMemo] = useState<any>(null); // ⭐ 수정 모드용 상태
+  const [editingMemo, setEditingMemo] = useState<AdminTask | null>(null); // ⭐ 수정 모드용 상태
   const [memoCommentInputs, setMemoCommentInputs] = useState<Record<string, string>>({}); // ⭐ 메모별 댓글 입력 상태
   const [expandedTodo, setExpandedTodo] = useState<string | null>(null);
   const [newComment, setNewComment] = useState('');
   const [currentUser, setCurrentUser] = useState<TeamWorkspaceCurrentUser | null>(null);
   const [isClient, setIsClient] = useState(false);
   const [lastViewed, setLastViewed] = useState<string>(new Date(0).toISOString());
-  const [expandedMemos, setExpandedMemos] = useState<Set<string>>(new Set());
   const [zoomImage, setZoomImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isWorkspaceUnauthorized, setIsWorkspaceUnauthorized] = useState(false);
@@ -134,13 +136,6 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
 
     return payload;
   }, []);
-
-  const toggleMemoExpand = (id: string) => {
-    const newSet = new Set(expandedMemos);
-    if (newSet.has(id)) newSet.delete(id);
-    else newSet.add(id);
-    setExpandedMemos(newSet);
-  };
 
   const fetchTeamWorkspaceState = useCallback(async () => {
     const response = await fetch('/api/admin/team/bootstrap', {
@@ -357,8 +352,8 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
       await fetchTeamWorkspaceState();
       setNewWhitemail('');
       showToast('화이트리스트 추가 완료', 'success');
-    } catch (error: any) {
-      showToast('오류 발생: ' + error.message, 'error');
+    } catch (error: unknown) {
+      showToast(`오류 발생: ${getErrorMessage(error, '화이트리스트 추가에 실패했습니다.')}`, 'error');
     }
   };
 
@@ -377,8 +372,8 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
       await fetchTeamWorkspaceState();
       setNewLog({ task: '', note: '' });
       showToast('Daily Log 기록 성공', 'success');
-    } catch (error: any) {
-      showToast('저장 중 오류가 발생했습니다: ' + error.message, 'error');
+    } catch (error: unknown) {
+      showToast(`저장 중 오류가 발생했습니다: ${getErrorMessage(error, '업무 일지를 저장하지 못했습니다.')}`, 'error');
     }
   };
 
@@ -414,8 +409,8 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
 
       setNewComment('');
       await fetchTeamWorkspaceState();
-    } catch (error: any) {
-      showToast('댓글 작성 실패: ' + error.message, 'error');
+    } catch (error: unknown) {
+      showToast(`댓글 작성 실패: ${getErrorMessage(error, '댓글 작성에 실패했습니다.')}`, 'error');
     } finally {
       setTaskCommentSubmitting(taskId, false);
     }
@@ -432,8 +427,8 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
         }),
       });
       await fetchTeamWorkspaceState();
-    } catch (error: any) {
-      showToast('상태 업데이트 실패: ' + error.message, 'error');
+    } catch (error: unknown) {
+      showToast(`상태 업데이트 실패: ${getErrorMessage(error, '상태 업데이트에 실패했습니다.')}`, 'error');
     }
   };
 
@@ -483,8 +478,8 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
 
       setNewTodo('');
       showToast('할 일이 추가되었습니다.', 'success');
-    } catch (error: any) {
-      showToast('오류: ' + error.message, 'error');
+    } catch (error: unknown) {
+      showToast(`오류: ${getErrorMessage(error, '할 일을 추가하지 못했습니다.')}`, 'error');
     }
   };
 
@@ -520,8 +515,8 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
       setMemoCommentInputs(prev => ({ ...prev, [taskId]: '' }));
       await fetchTeamWorkspaceState();
       showToast('답글을 남겼습니다.', 'success');
-    } catch (error: any) {
-      showToast('오류: ' + error.message, 'error');
+    } catch (error: unknown) {
+      showToast(`오류: ${getErrorMessage(error, '답글 작성에 실패했습니다.')}`, 'error');
     } finally {
       setTaskCommentSubmitting(taskId, false);
     }
@@ -562,8 +557,8 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
       }
       setIsComposingMemo(false);
       setEditingMemo(null);
-    } catch (error: any) {
-      showToast('오류: ' + error.message, 'error');
+    } catch (error: unknown) {
+      showToast(`오류: ${getErrorMessage(error, '메모 저장에 실패했습니다.')}`, 'error');
     }
   };
 
@@ -950,14 +945,18 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
                               <ReactMarkdown
                                 remarkPlugins={[remarkGfm]}
                                 components={{
-                                  img: ({ node, ...props }) => (
-                                    <img
-                                      {...props}
-                                      onClick={() => {
-                                        if (props.src) setZoomImage(props.src as string);
-                                      }}
-                                      alt={props.alt || "markdown image"}
-                                    />
+                                  img: ({ ...props }) => (
+                                    <>
+                                      {/* Admin memo markdown images render arbitrary uploaded URLs and keep the existing zoom interaction. */}
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img
+                                        {...props}
+                                        onClick={() => {
+                                          if (props.src) setZoomImage(props.src as string);
+                                        }}
+                                        alt={props.alt || "markdown image"}
+                                      />
+                                    </>
                                   )
                                 }}
                               >
@@ -1073,6 +1072,8 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
             >
               <X size={24} />
             </button>
+            {/* Keep the admin zoom viewer on a raw image element so arbitrary uploaded URLs continue to render unchanged. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={zoomImage}
               alt="Zoomed"

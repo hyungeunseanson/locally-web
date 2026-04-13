@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
-import { Send, UserCircle, MessageSquare, ChevronUp, ChevronDown } from 'lucide-react';
+import { Send, MessageSquare, ChevronUp, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 
@@ -17,14 +17,15 @@ interface MiniChatBarProps {
     currentUser: { id: string; name: string } | null;
 }
 
+const CHAT_ROOM_ID = '00000000-0000-0000-0000-000000000000';
+
 export default function MiniChatBar({ currentUser }: MiniChatBarProps) {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const [isOpen, setIsOpen] = useState(false);
     const [hasUnread, setHasUnread] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
-    const supabase = createClient();
-    const CHAT_ROOM_ID = '00000000-0000-0000-0000-000000000000'; // Using a fixed task_id for general chat
+    const [supabase] = useState(() => createClient());
 
     const requestTeamCommentApi = async (url: string, init: RequestInit = {}) => {
         const response = await fetch(url, {
@@ -43,31 +44,32 @@ export default function MiniChatBar({ currentUser }: MiniChatBarProps) {
         return payload;
     };
 
-    const fetchMessages = async () => {
-        const { data } = await supabase
-            .from('admin_task_comments')
-            .select('*')
-            .eq('task_id', CHAT_ROOM_ID)
-            .order('created_at', { ascending: true })
-            .limit(50);
+    useEffect(() => {
+        let cancelled = false;
 
-        if (data) {
+        void (async () => {
+            const { data } = await supabase
+                .from('admin_task_comments')
+                .select('*')
+                .eq('task_id', CHAT_ROOM_ID)
+                .order('created_at', { ascending: true })
+                .limit(50);
+
+            if (cancelled || !data) {
+                return;
+            }
+
             setMessages(data);
             if (!isOpen && data.length > 0) {
-                // Quick visual check if last message is not from me
                 const lastMsg = data[data.length - 1];
                 if (lastMsg.author_id !== currentUser?.id) {
                     setHasUnread(true);
                 }
             }
-        }
-    };
-
-    useEffect(() => {
-        fetchMessages();
+        })();
 
         // Make sure we subscribe precisely to the mini chat messages
-        const channel = supabase.channel('admin_mini_chat')
+        const channel = supabase.channel(`admin_mini_chat:${CHAT_ROOM_ID}`)
             .on('postgres_changes', {
                 event: 'INSERT',
                 schema: 'public',
@@ -96,20 +98,31 @@ export default function MiniChatBar({ currentUser }: MiniChatBarProps) {
             .subscribe();
 
         return () => {
+            cancelled = true;
             supabase.removeChannel(channel);
         };
-    }, [currentUser, isOpen]);
+    }, [currentUser?.id, isOpen, supabase]);
 
     useEffect(() => {
-        if (isOpen) {
-            setHasUnread(false);
-            setTimeout(() => {
-                if (scrollRef.current) {
-                    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-                }
-            }, 100);
-        }
+        if (!isOpen) return;
+
+        const scrollTimer = window.setTimeout(() => {
+            if (scrollRef.current) {
+                scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+            }
+        }, 100);
+
+        return () => {
+            window.clearTimeout(scrollTimer);
+        };
     }, [isOpen, messages.length]);
+
+    const handleToggleOpen = () => {
+        if (!isOpen) {
+            setHasUnread(false);
+        }
+        setIsOpen((previous) => !previous);
+    };
 
     const sendMessage = async (e?: React.FormEvent) => {
         e?.preventDefault();
@@ -153,7 +166,7 @@ export default function MiniChatBar({ currentUser }: MiniChatBarProps) {
         <div className={`fixed bottom-0 right-10 w-80 bg-white border border-slate-200 rounded-t-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] transition-all duration-300 z-50 flex flex-col ${isOpen ? 'h-[450px] translate-y-0' : 'h-12 translate-y-0 hover:-translate-y-1'}`}>
             {/* Header (Toggle) */}
             <button
-                onClick={() => setIsOpen(!isOpen)}
+                onClick={handleToggleOpen}
                 className="w-full h-12 px-4 flex items-center justify-between border-b border-slate-700 bg-slate-900 text-white rounded-t-2xl hover:bg-slate-800 transition-colors shrink-0"
             >
                 <div className="flex items-center gap-2">

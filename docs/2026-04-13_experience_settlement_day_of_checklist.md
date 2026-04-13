@@ -2,6 +2,7 @@
 
 ## 목적
 - 이 문서는 `체험 예약 정산 실행 당일`에 운영자가 빠르게 pass/fail을 판단하기 위한 1장짜리 체크리스트다.
+- 이번 release close-out에서는 정산 로직 변경보다 이 체크리스트 준수를 우선한다.
 - 긴 설명과 incident 대응은 아래 문서를 본다.
   - [experience settlement sync 운영 runbook](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/2026-04-13_experience_settlement_sync_runbook.md:1)
   - [experience settlement chain audit](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/2026-04-13_experience_settlement_chain_e2e_audit.md:1)
@@ -17,7 +18,7 @@
 
 ## 실제 점검 순서
 1. `Admin > Sales > Settlement Sync Health`로 들어간다.
-2. `체험 카드`만 본다.
+2. `체험 카드`와 `operator banner`를 같이 본다.
 3. 아래 4개를 확인한다.
    - `health_state`
    - `due count`
@@ -43,7 +44,7 @@
 - `healthy`
   - sync 쪽 추가 작업 없이 payout queue 확인으로 이동
 - `delayed`
-  - `run due` 1회
+  - `지연 건 지금 실행(run due)` 1회
   - 새로고침 후 `due count` 감소 확인
   - 줄지 않으면 payout 보류
 - `running`
@@ -62,6 +63,7 @@
 ## 아무것도 안 해도 되는 조건
 - 아래면 sync는 건드리지 않는다.
   - `healthy`
+  - `operator banner`가 `체험 정산 진행 가능`
   - `due count=0` 또는 설명 가능
   - `last success` 정상
   - `running_stale`, `failed`, `503` 없음

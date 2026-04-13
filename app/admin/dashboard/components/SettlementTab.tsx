@@ -1,19 +1,85 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
-import { DollarSign, CheckCircle, User, ChevronDown, ChevronUp, AlertTriangle, RefreshCcw } from 'lucide-react';
+import { DollarSign, CheckCircle, User, ChevronDown, AlertTriangle, RefreshCcw } from 'lucide-react';
 import { useToast } from '@/app/context/ToastContext';
 import { isCancelledOnlyBookingStatus, isCompletedBookingStatus } from '@/app/constants/bookingStatus';
 import { getBookingHostPayout } from '@/app/utils/bookingFinance';
 import { settleHostPayout } from '@/app/actions/admin';
 import { useConfirmDialog } from '@/app/hooks/useConfirmDialog';
 
+type SettlementExperience = {
+  host_id: string | null;
+  title: string | null;
+};
+
+type SettlementGuestProfile = {
+  name: string | null;
+  email: string | null;
+};
+
+type SettlementBookingRow = {
+  id: string;
+  amount: number | string | null;
+  total_price: number | string | null;
+  total_experience_price: number | string | null;
+  status: string | null;
+  date: string | null;
+  title: string | null;
+  host_payout_amount: number | string | null;
+  refund_amount: number | string | null;
+  platform_revenue: number | string | null;
+  payout_status: string | null;
+  experiences: SettlementExperience | null;
+  profiles: SettlementGuestProfile | null;
+};
+
+type SettlementBookingQueryRow = Omit<SettlementBookingRow, 'experiences' | 'profiles'> & {
+  experiences: SettlementExperience[] | null;
+  profiles: SettlementGuestProfile[] | null;
+};
+
+type SettlementHostApplicationBank = {
+  user_id: string;
+  bank_name: string | null;
+  account_number: string | null;
+  account_holder: string | null;
+};
+
+type SettlementHostApplicationsResponse = {
+  data?: SettlementHostApplicationBank[];
+};
+
+type SettlementHostProfile = {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+};
+
+type SettlementHostInfo = SettlementHostProfile & {
+  name: string;
+  bank: SettlementHostApplicationBank | null;
+};
+
+type SettlementItem = SettlementBookingRow & {
+  calculated_payout: number;
+};
+
+type SettlementGroup = {
+  hostInfo: SettlementHostInfo;
+  items: SettlementItem[];
+  totalPayout: number;
+};
+
+const formatCurrency = (value: number | string | null | undefined) =>
+  Number(value ?? 0).toLocaleString();
+
 export default function SettlementTab() {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const { showToast } = useToast();
   const { requestConfirm, ConfirmDialogElement } = useConfirmDialog();
-  const [settlements, setSettlements] = useState<any[]>([]);
+  const [settlements, setSettlements] = useState<SettlementGroup[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedHost, setExpandedHost] = useState<string | null>(null);
 
@@ -40,16 +106,27 @@ export default function SettlementTab() {
       return;
     }
 
-    // 🟢 [수정] 타입 오류 해결을 위해 any[]로 캐스팅
-    const safeBookings = (bookings || []) as any[];
+    const rawBookings = ((bookings || []) as unknown) as SettlementBookingQueryRow[];
+    const safeBookings: SettlementBookingRow[] = rawBookings.map((booking) => ({
+      ...booking,
+      experiences: Array.isArray(booking.experiences) ? (booking.experiences[0] ?? null) : null,
+      profiles: Array.isArray(booking.profiles) ? (booking.profiles[0] ?? null) : null,
+    }));
 
-    const settlementTargetBookings = safeBookings.filter((b: any) =>
-      isCompletedBookingStatus(b.status) || (isCancelledOnlyBookingStatus(b.status) && Number(b.host_payout_amount) > 0)
+    const settlementTargetBookings = safeBookings.filter((booking) =>
+      isCompletedBookingStatus(booking.status ?? '') ||
+      (isCancelledOnlyBookingStatus(booking.status ?? '') && Number(booking.host_payout_amount) > 0)
     );
 
     // 2. 호스트 정보 가져오기 (계좌 포함)
-    const hostIds = Array.from(new Set(settlementTargetBookings.map(b => b.experiences?.host_id).filter(Boolean)));
-    const hostsMap = new Map();
+    const hostIds = Array.from(
+      new Set(
+        settlementTargetBookings
+          .map((booking) => booking.experiences?.host_id)
+          .filter((hostId): hostId is string => Boolean(hostId))
+      )
+    );
+    const hostsMap = new Map<string, SettlementHostInfo>();
 
     if (hostIds.length > 0) {
       const { data: hosts } = await supabase.from('profiles').select('id, full_name, email').in('id', hostIds);
@@ -57,39 +134,49 @@ export default function SettlementTab() {
       const appsRes = await fetch(
         `/api/admin/host-applications?user_ids=${hostIds.join(',')}&select=user_id,bank_name,account_number,account_holder`
       );
-      const appsJson = appsRes.ok ? await appsRes.json() : { data: [] };
-      const apps = appsJson.data || [];
+      const appsJson = appsRes.ok
+        ? (await appsRes.json()) as SettlementHostApplicationsResponse
+        : { data: [] };
+      const apps = Array.isArray(appsJson.data) ? appsJson.data : [];
+      const safeHosts = (hosts || []) as SettlementHostProfile[];
 
-      hosts?.forEach(h => {
-        const app = apps?.find((a: any) => a.user_id === h.id);
-        hostsMap.set(h.id, {
-          ...h,
-          name: h.full_name || h.email || 'Host',
-          bank: app || {}
+      safeHosts.forEach((host) => {
+        const app = apps.find((application) => application.user_id === host.id) ?? null;
+        hostsMap.set(host.id, {
+          ...host,
+          name: host.full_name || host.email || 'Host',
+          bank: app
         });
       });
     }
 
     // 3. 호스트별 그룹화 & 금액 계산 (여기가 핵심 🔥)
-    const grouped = new Map();
-    settlementTargetBookings.forEach((b: any) => {
-      const hostId = b.experiences?.host_id;
+    const grouped = new Map<string, SettlementGroup>();
+    settlementTargetBookings.forEach((booking) => {
+      const hostId = booking.experiences?.host_id;
       if (!hostId) return;
 
       if (!grouped.has(hostId)) {
         grouped.set(hostId, {
-          hostInfo: hostsMap.get(hostId),
+          hostInfo: hostsMap.get(hostId) ?? {
+            id: hostId,
+            full_name: null,
+            email: null,
+            name: 'Host',
+            bank: null,
+          },
           items: [],
           totalPayout: 0
         });
       }
 
       const group = grouped.get(hostId);
+      if (!group) return;
 
       // 💰 [정산금 계산 로직]
-      const payout = getBookingHostPayout(b);
+      const payout = getBookingHostPayout(booking);
 
-      group.items.push({ ...b, calculated_payout: payout });
+      group.items.push({ ...booking, calculated_payout: payout });
       group.totalPayout += payout;
     });
 
@@ -98,8 +185,8 @@ export default function SettlementTab() {
   }, [supabase]);
 
   useEffect(() => {
-    fetchSettlements();
-  }, []);
+    void fetchSettlements();
+  }, [fetchSettlements]);
 
   // 정산 완료 처리: settleHostPayout Server Action 사용 (감사로그 + 이중 정산 방지 내장)
   const markAsPaid = async (hostId: string, itemIds: string[]) => {
@@ -151,8 +238,8 @@ export default function SettlementTab() {
             <button onClick={fetchSettlements} className="text-xs flex items-center gap-1 hover:text-black"><RefreshCcw size={12} /> 새로고침</button>
           </div>
         ) : (
-          settlements.map((group, idx) => (
-            <div key={idx} className="border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-white hover:shadow-md transition-all duration-200">
+          settlements.map((group) => (
+            <div key={group.hostInfo.id} className="border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-white hover:shadow-md transition-all duration-200">
               {/* 호스트 카드 헤더 */}
               <div className="p-5 flex items-center justify-between cursor-pointer group"
                 onClick={() => setExpandedHost(expandedHost === group.hostInfo.id ? null : group.hostInfo.id)}>
@@ -203,12 +290,12 @@ export default function SettlementTab() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200/50">
-                      {group.items.map((item: any) => (
+                      {group.items.map((item) => (
                         <tr key={item.id}>
                           <td className="py-3 pl-2 font-mono text-slate-500 text-xs">{item.date}</td>
                           <td className="py-3 font-medium text-slate-700">{item.experiences?.title}</td>
                           <td className="py-3">
-                            {isCancelledOnlyBookingStatus(item.status) ? (
+                            {isCancelledOnlyBookingStatus(item.status ?? '') ? (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-600 text-[10px] font-bold rounded">
                                 취소 위약금
                               </span>
@@ -218,7 +305,7 @@ export default function SettlementTab() {
                               </span>
                             )}
                           </td>
-                          <td className="py-3 text-right text-slate-400 font-mono text-xs">₩{item.amount.toLocaleString()}</td>
+                          <td className="py-3 text-right text-slate-400 font-mono text-xs">₩{formatCurrency(item.amount)}</td>
                           <td className="py-3 text-right font-bold text-slate-900 pr-2">
                             ₩{item.calculated_payout.toLocaleString()}
                           </td>
@@ -229,7 +316,7 @@ export default function SettlementTab() {
 
                   <div className="flex justify-end pt-2 border-t border-slate-200">
                     <button
-                      onClick={() => markAsPaid(group.hostInfo.id, group.items.map((i: any) => i.id))}
+                      onClick={() => markAsPaid(group.hostInfo.id, group.items.map((item) => item.id))}
                       disabled={!group.hostInfo?.bank?.bank_name} // 계좌 없으면 버튼 비활성화
                       className={`px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 shadow-sm transition-all ${!group.hostInfo?.bank?.bank_name
                           ? 'bg-slate-200 text-slate-400 cursor-not-allowed'

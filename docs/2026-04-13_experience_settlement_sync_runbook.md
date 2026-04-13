@@ -2,6 +2,7 @@
 
 ## Summary
 - 이 문서는 `체험 예약`의 `completed sync` 운영 절차를 고정한다.
+- 이번 release close-out에서는 정산 비즈니스 로직 리팩터 대신 이 운영 절차를 source of truth로 유지한다.
 - 실제 운영 당일에는 먼저 아래 짧은 체크리스트를 본다.
   - [experience settlement day-of checklist](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/2026-04-13_experience_settlement_day_of_checklist.md:1)
 - 대상 체인은 아래로 한정한다.
@@ -16,7 +17,7 @@
   - 정산 실행 전에 `completed` 전환이 실제로 끝났는지 확인한다
 
 ## 운영자용 짧은 버전
-- 먼저 `Admin > Sales > Settlement Sync Health`의 `체험 카드`만 본다.
+- 먼저 `Admin > Sales > Settlement Sync Health`의 `체험 카드`와 `operator banner`를 함께 본다.
 - 아래 4개가 모두 괜찮으면 그날은 sync 쪽에서 추가 작업이 없다.
   - `health_state='healthy'`
   - `running_stale=false`
@@ -32,7 +33,7 @@
 
 ## 실제 점검 순서
 1. `Admin > Sales`로 들어간다.
-2. `Settlement Sync Health`에서 `체험 카드`만 먼저 본다.
+2. `Settlement Sync Health`에서 `체험 카드`와 `operator banner`를 먼저 본다.
 3. 아래 4가지만 확인한다.
    - 상태 라벨
    - `due count`
@@ -40,7 +41,7 @@
    - `infra banner` 유무
 4. 카드가 `healthy`면 sync 쪽 조치는 끝이다.
    - 바로 `payout queue`로 넘어간다.
-5. 카드가 `delayed`면 `run due`를 1회만 실행한다.
+5. 카드가 `delayed`면 `지연 건 지금 실행(run due)`을 1회만 실행한다.
 6. 카드가 `running`이면 기다린다.
    - 중복 클릭하지 않는다.
 7. 카드가 `running_stale`, `failed`, `503`이면 payout 실행을 멈춘다.
@@ -94,17 +95,17 @@
 
 ## 일일 운영 순서
 1. `Admin > Sales`로 들어간다.
-2. `Settlement Sync Health`의 체험 카드만 먼저 본다.
+2. `Settlement Sync Health`의 체험 카드와 `operator banner`를 먼저 본다.
 3. 아래 4가지를 확인한다.
    - 상태 라벨
    - `due count`
-   - `oldest due`
+   - `최대 지연`
    - `last success` 또는 `last heartbeat`
 4. 체험 카드가 `healthy`면 다음 단계로 간다.
    - `payout queue`에서 pending settlement를 확인한다.
    - 필요한 host만 정산 실행한다.
 5. 체험 카드가 `delayed`면 즉시 아래 순서를 따른다.
-   - `run due`를 1회 실행한다.
+   - `지연 건 지금 실행(run due)`을 1회 실행한다.
    - 성공 메시지가 `completed` 또는 `no_candidates`인지 본다.
    - 새로고침 후 `due count` 감소 여부를 확인한다.
 6. 체험 카드가 `running`이면 기다린다.
@@ -118,7 +119,7 @@
 - 의미
   - due candidate가 있고, 최근 성공으로 backlog가 해소되지 않았다.
 - 조치
-  1. `run due (experience)` 1회 실행
+  1. `지연 건 지금 실행(run due)` 1회 실행
   2. 결과 확인
      - `completed`: 정상 복구 시도 성공
      - `no_candidates`: health snapshot만 늦었는지 새로고침 확인
@@ -126,7 +127,7 @@
   3. `payout queue`에서 pending settlement가 늘거나 이동했는지 확인
   4. host earnings pending bucket이 설명 가능하게 늘었는지 spot check
 - 중단 조건
-  - `run due` 후에도 `due count`가 유지되거나 증가
+  - `지연 건 지금 실행(run due)` 후에도 `due count`가 유지되거나 증가
   - `failed`로 바뀜
   - `running_stale`로 바뀜
 
@@ -136,10 +137,10 @@
 - 조치
   1. 즉시 payout 실행은 멈춘다
   2. `last heartbeat`, `last failure`, `due count`를 기록한다
-  3. 필요 시 1회 새 `run due`를 시도한다
+  3. 필요 시 1회 새 `지연 건 지금 실행(run due)`을 시도한다
   4. 성공적으로 새 run이 잡혀 `completed` 또는 `healthy`로 돌아오면 계속 진행한다
 - 중단 조건
-  - 새 `run due`도 `already_running`만 반복
+  - 새 `지연 건 지금 실행(run due)`도 `already_running`만 반복
   - `503`으로 떨어짐
 
 ### C. `failed`
@@ -148,7 +149,7 @@
 - 조치
   1. `last_failure_message`를 확인한다
   2. 메시지가 infra/RPC/admin_job_runs 계열이면 코드 복구 전까지 payout 중단
-  3. 단순 일시 오류로 판단되면 `run due` 1회 재시도
+  3. 단순 일시 오류로 판단되면 `지연 건 지금 실행(run due)` 1회 재시도
 - 중단 조건
   - 재시도 후 동일 failure 반복
   - `503 infra banner` 동반
@@ -166,12 +167,14 @@
 
 ## 수동 실행 규칙
 
-### `run due`
+### `지연 건 지금 실행(run due)`
 - 용도
   - backlog 전체를 현재 due 기준으로 한 번 처리
 - 사용 시점
   - `delayed`
   - cron 직후인데 backlog가 남아 보일 때
+- 실제 버튼 라벨
+  - `지연 건 지금 실행`
 - 사용 금지
   - `running` 상태에서 중복 클릭
   - `503` infra 상태
@@ -212,12 +215,13 @@
 - cutover day나 운영 점검일에는 아래 순서로만 본다.
 1. `Sales > Settlement Sync Health`
    - 체험 카드 `healthy`
+   - `operator banner`가 `체험 정산 진행 가능`
    - `due count` 설명 가능
 2. `/api/admin/settlement-sync`가 200을 반환하는지
 3. cron 경로가 auth 포함 시 설명 가능한지
    - `/api/cron/complete-trips`
 4. pending payout가 있는 host 1명을 골라 상태만 확인
-   - 실제 payout 실행 전에는 `completed + pending payout`인지
+   - 실제 payout 실행 전에는 `completed`와 `payout_status='pending'`인지
 5. payout 실행 후 host earnings spot check 1회
 
 ## 테스트 근거

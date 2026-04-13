@@ -5,28 +5,44 @@ import { runExperienceCompletionSync } from '@/app/utils/settlementSync/experien
 import { isSettlementSyncInfrastructureError } from '@/app/utils/settlementSync/types';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 
+function allowSettlementSyncTestHeaders(request: Request) {
+  if (process.env.NODE_ENV !== 'production') return true;
+
+  try {
+    const hostname = new URL(request.url).hostname;
+    return (
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '[::1]' ||
+      hostname === '0.0.0.0'
+    );
+  } catch {
+    return false;
+  }
+}
+
 function parseTestDelayMs(request: Request) {
-  if (process.env.NODE_ENV === 'production') return undefined;
+  if (!allowSettlementSyncTestHeaders(request)) return undefined;
   const raw = request.headers.get('x-locally-test-delay-settlement-sync-ms');
   const parsed = Number(raw || 0);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
 function parseTestLeaseMs(request: Request) {
-  if (process.env.NODE_ENV === 'production') return undefined;
+  if (!allowSettlementSyncTestHeaders(request)) return undefined;
   const raw = request.headers.get('x-locally-test-settlement-sync-lease-ms');
   const parsed = Number(raw || 0);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
 function parseBooleanTestHeader(request: Request, headerName: string) {
-  if (process.env.NODE_ENV === 'production') return false;
+  if (!allowSettlementSyncTestHeaders(request)) return false;
   const value = request.headers.get(headerName);
   return value === '1' || value === 'true';
 }
 
 function parseFailPhase(request: Request) {
-  if (process.env.NODE_ENV === 'production') return undefined;
+  if (!allowSettlementSyncTestHeaders(request)) return undefined;
   const value = request.headers.get('x-locally-test-fail-settlement-sync-phase');
   return value === 'after_lock' ? 'after_lock' : undefined;
 }
