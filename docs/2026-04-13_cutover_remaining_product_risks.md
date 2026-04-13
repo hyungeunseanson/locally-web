@@ -15,7 +15,7 @@
 ## Result Snapshot
 | Risk | Source of truth | Current verification | Result | Notes |
 | --- | --- | --- | --- | --- |
-| OAuth / PG external parity | `LoginModal`, `/auth/callback`, NicePay/PortOne/PayPal cutover docs | static audit only | 부분 보장 | 실제 blocker 가능성이 가장 높지만, 외부 콘솔 접근 증거가 아직 없다 |
+| OAuth / PG external parity | `LoginModal`, `/auth/callback`, external console parity audit | static audit + auth rerun | 부분 보장 | blocker 범위는 `Google / Kakao / Supabase / PortOne current live path`로 좁혔지만, operator evidence는 아직 없다 |
 | Live smoke / legacy domain drift | `tests/e2e/helpers/liveBaseUrl.ts`, `171`, `29`, `62` | `171`, `29`, `62` | 정상 | live helper는 env 없을 때 명시적으로 실패하고, domain-sensitive assertion은 configured site URL 기준으로 잠겼다 |
 | Silent old-alias fallback | `app/utils/siteUrl.ts`, `app/opengraph-image.tsx` | static audit + live preflight docs | 부분 보장 | 앱이 깨지지는 않지만, env/redeploy 미반영 시 old alias가 조용히 계속 노출될 수 있다 |
 
@@ -25,20 +25,20 @@
 - source of truth
   - [app/components/LoginModal.tsx](/Users/hyungeunseanson/Documents/서비스/locally-web/app/components/LoginModal.tsx:219)
   - [app/auth/callback/route.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/auth/callback/route.ts:1)
-  - [docs/payments/nicepay-cutover-checklist.md](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/payments/nicepay-cutover-checklist.md:1)
+  - [docs/2026-04-13_external_console_parity_audit.md](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/2026-04-13_external_console_parity_audit.md:1)
   - [docs/domain-cutover-preflight-checklist.md](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/domain-cutover-preflight-checklist.md:1)
 - 현재 코드 의미
   - social login은 `window.location.origin/auth/callback?next=...`로 시작한다
   - `/auth/callback`은 현재 요청 host 기준으로 세션 교환 후 복귀한다
-  - card/payment callback도 현재 origin 또는 실제 request origin 기준으로 return을 조립하는 경로가 많다
+  - 현재 운영 기준 card provider는 `portone`이고, cutover blocker audit도 `PortOne current live path`까지만 포함한다
 - 실제 리스크
   - Google OAuth, Kakao OAuth, Supabase redirect allowlist에 `https://www.locally-travel.com/auth/callback`가 없으면 cutover 후 로그인 복귀가 실패할 수 있다
-  - PortOne / NicePay / PayPal 콘솔에 새 도메인 기준 return/callback/notification/allowlist가 안 맞으면 결제 완료 복귀가 실패할 수 있다
+  - PortOne current live path가 새 도메인 production origin에서 막히면 cutover 후 카드 결제가 실패할 수 있다
 - 현재 판정
   - `부분 보장`
-  - 이유: 코드 경계는 맞지만, 외부 콘솔의 실제 등록 상태는 저장소만으로 확인할 수 없다
+  - 이유: blocker 범위는 좁혔지만, 외부 콘솔의 실제 등록 상태는 저장소만으로 확인할 수 없다
 - close-out 기준
-  - operator evidence로 `이미 준비됨 / cutover 직전 필요 / launch blocker` 중 하나를 붙여야 한다
+  - operator evidence로 `준비됨 / cutover 직전 필요 / blocker` 중 하나를 붙여야 한다
 
 ### 2. live smoke / domain-sensitive assertion drift는 이번 패스로 닫혔다
 - source of truth
@@ -77,6 +77,7 @@
 - OAuth 복귀 라우트와 browser-side payment return은 현재 origin 기반이라 앱 내부 하드코딩 도메인 리스크는 크지 않다
 - cutover 기준 문서 세트는 이미 정리돼 있다
   - [docs/domain-cutover-preflight-checklist.md](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/domain-cutover-preflight-checklist.md:1)
+  - [docs/2026-04-13_external_console_parity_audit.md](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/2026-04-13_external_console_parity_audit.md:1)
   - [docs/2026-04-13_vercel_domain_cutover_rehearsal.md](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/2026-04-13_vercel_domain_cutover_rehearsal.md:1)
   - [docs/2026-04-13_cutover_day_production_env_input_sheet.md](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/2026-04-13_cutover_day_production_env_input_sheet.md:1)
 
@@ -84,8 +85,8 @@
 1. external console parity를 operator evidence로 닫는다
    - Google OAuth
    - Kakao OAuth
-   - Supabase redirect allowlist
-   - PortOne / NicePay / PayPal callback/allowlist
+   - Supabase Site URL / redirect allowlist
+   - PortOne current live path
 2. cutover day pass 기준을 env 저장이 아니라 live response 기준으로만 운영한다
 
 ## Final Verdict

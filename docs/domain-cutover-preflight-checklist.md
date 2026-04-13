@@ -24,6 +24,7 @@
 - Vercel cutover rehearsal: [docs/2026-04-13_vercel_domain_cutover_rehearsal.md](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/2026-04-13_vercel_domain_cutover_rehearsal.md:1)
 - production env input sheet: [docs/2026-04-13_cutover_day_production_env_input_sheet.md](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/2026-04-13_cutover_day_production_env_input_sheet.md:1)
 - remaining product risks close-out: [docs/2026-04-13_cutover_remaining_product_risks.md](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/2026-04-13_cutover_remaining_product_risks.md:1)
+- external console parity audit: [docs/2026-04-13_external_console_parity_audit.md](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/2026-04-13_external_console_parity_audit.md:1)
 - Search Console / Naver ops contract: [docs/2026-04-13_locally_content_search_console_ops_checklist.md](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/2026-04-13_locally_content_search_console_ops_checklist.md:1)
 - NicePay cutover contract: [docs/payments/nicepay-cutover-checklist.md](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/payments/nicepay-cutover-checklist.md:1)
 - live smoke launcher: [scripts/run-live-smoke.mjs](/Users/hyungeunseanson/Documents/서비스/locally-web/scripts/run-live-smoke.mjs:94)
