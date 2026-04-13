@@ -5,7 +5,7 @@
 - 현재 기준 결론은 아래처럼 정리된다.
   - core runtime은 대체로 준비돼 있다
   - 가장 큰 남은 blocker는 앱 코드가 아니라 `OAuth / PG / 외부 콘솔 허용 URL parity`다
-  - 앱 안쪽에서 남아 있는 리스크는 `support contact copy drift`, `silent old-alias fallback 운영 리스크` 정도로 더 좁혀졌다
+  - 앱 안쪽에서 남아 있는 리스크는 `silent old-alias fallback 운영 리스크` 정도로 더 좁혀졌다
 - 최신 얇은 rerun 결과
   - `29-sitemap`
   - `171-live-base-url-contract`
@@ -17,7 +17,6 @@
 | --- | --- | --- | --- | --- |
 | OAuth / PG external parity | `LoginModal`, `/auth/callback`, NicePay/PortOne/PayPal cutover docs | static audit only | 부분 보장 | 실제 blocker 가능성이 가장 높지만, 외부 콘솔 접근 증거가 아직 없다 |
 | Live smoke / legacy domain drift | `tests/e2e/helpers/liveBaseUrl.ts`, `171`, `29`, `62` | `171`, `29`, `62` | 정상 | live helper는 env 없을 때 명시적으로 실패하고, domain-sensitive assertion은 configured site URL 기준으로 잠겼다 |
-| Public support contact copy drift | `/help`, `LanguageContext` account self-service copy | static audit only | 리스크 | `help@locally.com` vs `help@locally.kr`가 현재 동시에 노출된다 |
 | Silent old-alias fallback | `app/utils/siteUrl.ts`, `app/opengraph-image.tsx` | static audit + live preflight docs | 부분 보장 | 앱이 깨지지는 않지만, env/redeploy 미반영 시 old alias가 조용히 계속 노출될 수 있다 |
 
 ## Detailed Findings
@@ -58,21 +57,7 @@
 - 현재 판정
   - `정상`
 
-### 3. public support contact는 현재 visible copy가 두 갈래다
-- source of truth
-  - [app/help/page.tsx](/Users/hyungeunseanson/Documents/서비스/locally-web/app/help/page.tsx:397)
-  - [app/context/LanguageContext.tsx](/Users/hyungeunseanson/Documents/서비스/locally-web/app/context/LanguageContext.tsx:1453)
-- 현재 노출
-  - `/help` 하단 CTA: `help@locally.com`
-  - account self-service private warning: `help@locally.kr`
-- 실제 리스크
-  - cutover blocker는 아니지만, 사용자에게 보이는 support owner가 둘로 갈라져 있어 브랜드/운영 동선 혼선을 만든다
-  - 특히 도메인/메일 owner를 정리하는 시점에 같이 맞추지 않으면 public trust surface가 탁해진다
-- 현재 판정
-  - `리스크`
-  - 이유: visible mismatch가 실제로 존재하고, 현재 자동 보호막도 없다
-
-### 4. `NEXT_PUBLIC_SITE_URL` 미반영 시 앱은 버티지만 old alias가 조용히 남을 수 있다
+### 3. `NEXT_PUBLIC_SITE_URL` 미반영 시 앱은 버티지만 old alias가 조용히 남을 수 있다
 - source of truth
   - [app/utils/siteUrl.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/utils/siteUrl.ts:1)
   - [app/opengraph-image.tsx](/Users/hyungeunseanson/Documents/서비스/locally-web/app/opengraph-image.tsx:8)
@@ -101,10 +86,9 @@
    - Kakao OAuth
    - Supabase redirect allowlist
    - PortOne / NicePay / PayPal callback/allowlist
-2. support contact owner를 하나로 정하고 visible copy를 맞춘다
-3. cutover day pass 기준을 env 저장이 아니라 live response 기준으로만 운영한다
+2. cutover day pass 기준을 env 저장이 아니라 live response 기준으로만 운영한다
 
 ## Final Verdict
 - 현재 기준으로 앱 core runtime은 cutover-ready에 가깝다
 - 남은 진짜 blocker는 `외부 콘솔 허용 URL parity`
-- 앱 안쪽에서 다음으로 정리할 가치가 큰 것은 `support contact copy drift`
+- 앱 안쪽에서 다음으로 정리할 가치가 큰 것은 `silent old-alias fallback 운영 리스크`

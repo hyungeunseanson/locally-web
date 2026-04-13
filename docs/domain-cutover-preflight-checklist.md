@@ -131,7 +131,6 @@
 ## Follow-up Recommended
 - Vercel project에 apex / `www` 중 무엇을 primary로 둘지 운영 결론 확정
 - PortOne / NicePay / PayPal / AdSense 콘솔의 production domain 등록 상태 재확인
-- public support contact owner 정리
 
 ## Official References
 - Vercel custom domain setup

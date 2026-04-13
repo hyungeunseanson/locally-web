@@ -521,7 +521,7 @@
 | 🟢 체험 등록 완료 화면 개선 | `app/host/create/page.tsx`, `app/host/create/components/ExperienceFormSteps.tsx`, `app/host/create/localization.ts` — 등록 성공 시 redirect 대신 Step 8 완료 화면을 표시하고, "일정 관리하기" 주요 CTA 버튼 추가. 체험 등록→일정 오픈 전환율 개선 (4개 언어) |
 | 🟢 하드코딩 문자열 i18n 전환 | `Earnings.tsx`, `MyExperiences.tsx`, `HostReviews.tsx`, `ProfileEditor.tsx`, `ReservationManager.tsx`, `LanguageContext.tsx` — "Year to Date", "삭제", "새로고침", "호스트 승인", "리뷰를 불러오지 못했습니다", "알 수 없는 오류" 등 7건의 하드코딩 한국어/영어 문자열을 `t()` 번역 키로 전환 (ko/en/ja/zh) |
 | 🟢 승인 대기 소요 기간 안내 | `LanguageContext.tsx` — `status_pending_desc`에 "보통 1~2영업일 소요" 문구 추가 (4개 언어). 신규 호스트 불안 해소 |
-| 🟢 Private 탭 고객센터 연락처 | `LanguageContext.tsx` — `hp_private_warn_desc2`의 "관리자에게 문의" → "고객센터(help@locally.kr)로 문의"로 구체화 (4개 언어) |
+| 🟢 Private 탭 고객센터 연락처 | `LanguageContext.tsx` — `hp_private_warn_desc2`의 "관리자에게 문의" → "고객센터(locally.partners@gmail.com)로 문의"로 구체화 (4개 언어) |
 | 🟢 revision 체험 수정 버튼 레이블 | `MyExperiences.tsx` — revision 상태 체험의 수정 버튼이 `btn_edit_app`(신청서 수정)으로 표시되던 문제 → `exp_edit`(수정)으로 통일 |
 
 ## v3.39.51 — [Guest UX] Trips · Inbox · Payment Complete 정리
