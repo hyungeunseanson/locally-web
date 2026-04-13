@@ -195,5 +195,7 @@ test.describe.serial('Community content layout and access', () => {
     await expect(page.getByText('대표 이미지 1장 이상')).toBeVisible();
     await expect(page.getByText('제목 8자 이상')).toBeVisible();
     await expect(page.getByText('본문 40자 이상')).toBeVisible();
+    await expect(page.getByText('첫 문단 20자 이상')).toBeVisible();
+    await expect(page.getByText('문단 2개 이상')).toBeVisible();
   });
 });

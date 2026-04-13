@@ -52,6 +52,12 @@ const parseStoredDate = (dateString: string) => {
     return new Date(year, month - 1, day);
 };
 
+const getNonEmptyParagraphs = (rawContent: string) =>
+    rawContent
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean);
+
 type UploadedImage = {
     path: string;
     publicUrl: string;
@@ -115,6 +121,8 @@ export default function PostEditor({
     const canWriteAnonymously = format !== 'locally_pick';
     const trimmedTitleLength = title.trim().length;
     const trimmedContentLength = content.trim().length;
+    const contentParagraphs = useMemo(() => getNonEmptyParagraphs(content), [content]);
+    const introParagraphLength = contentParagraphs[0]?.length ?? 0;
     const canSubmit = Boolean(
         title.trim().length > 0
         && content.trim().length > 0
@@ -466,6 +474,16 @@ export default function PostEditor({
                                             met: trimmedContentLength >= 40,
                                             note: `현재 ${trimmedContentLength}자`,
                                         },
+                                        {
+                                            label: '첫 문단 20자 이상',
+                                            met: introParagraphLength >= 20,
+                                            note: `현재 ${introParagraphLength}자`,
+                                        },
+                                        {
+                                            label: '문단 2개 이상',
+                                            met: contentParagraphs.length >= 2,
+                                            note: `현재 ${contentParagraphs.length}개 문단`,
+                                        },
                                     ].map((item) => (
                                         <li
                                             key={item.label}
@@ -487,6 +505,10 @@ export default function PostEditor({
                                         </li>
                                     ))}
                                 </ul>
+
+                                <div className="mt-4 rounded-2xl border border-white/80 bg-white/60 px-4 py-3 text-[12px] leading-6 text-slate-600">
+                                    발행 팁: 도시명, 장소명, 핵심 포인트를 제목이나 첫 문단에 자연스럽게 넣어두면 검색 유입 랜딩 품질을 더 안정적으로 맞출 수 있습니다.
+                                </div>
                             </div>
                         )}
 
