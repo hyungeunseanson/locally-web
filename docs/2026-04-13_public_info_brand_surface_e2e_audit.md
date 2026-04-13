@@ -11,7 +11,8 @@
   - `172-partnership-inquiry-route`
   - `25-public-metadata`
   - `173-public-company-surface-cta`
-  - 결과: `15 passed`
+  - `174-public-company-mobile-back`
+  - 결과: `17 passed`
 
 ## Result Snapshot
 | Surface | Source of truth | Current tests | Result | Notes |
@@ -115,20 +116,19 @@
 - 판정
   - `부분 보장`
 
-### 7. public company pages의 모바일 fallback은 현재 정보성 surface 의미와 약간 어긋난다
+### 7. public company pages의 모바일 fallback은 이제 public brand surface 의미와 맞는다
 - 확인 사실
-  - `company/news`, `company/notices`의 모바일 back fallback은 history가 없으면 `/account`로 이동한다
+  - `company/news`, `company/notices`의 모바일 back은 내부 진입이면 `router.back()`, direct entry면 `/about`으로 fallback한다
+  - public page가 guest account surface로 튀는 동선은 제거됐다
+- 테스트 보장
+  - `174-public-company-mobile-back`
 - 판정
-  - `리스크`
-- 이유
-  - 해당 페이지는 public surface인데, direct entry 사용자를 guest account surface로 보내는 것은 정보 구조상 다소 어색하다
-  - 다만 치명적인 기능 결함은 아니므로 low-risk navigation mismatch로 본다
+  - `정상`
 
 ## Coverage Gap
 - `company/notices` 본문 interaction은 여전히 전용 E2E가 없다
-- public info pages의 모바일 back fallback(`/account`) 의미는 테스트로 잠겨 있지 않다
 
 ## Final Verdict
 - `public metadata / robots / announcement / help` 축은 현재 기준 `정상`
-- `company/news`, `company/careers`, `company/investors`의 false click affordance는 닫혔고, 남은 active gap은 `company/notices`의 정적 데이터 owner와 모바일 fallback mismatch다
-- 다음 핀셋 수정 1순위는 `company/notices`의 운영 truth 정리 또는 public company pages 모바일 fallback 경로 정합성 보정이다
+- `company/news`, `company/careers`, `company/investors`의 false click affordance와 public mobile fallback mismatch는 닫혔고, 남은 active gap은 `company/notices`의 정적 데이터 owner다
+- 다음 핀셋 수정 1순위는 `company/notices`의 운영 truth 정리다

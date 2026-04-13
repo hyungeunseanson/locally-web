@@ -36,11 +36,16 @@ export default function NoticesPage() {
   const { t } = useLanguage();
 
   const handleMobileBack = () => {
-    if (typeof window !== 'undefined' && window.history.length > 1) {
-      router.back();
-      return;
+    if (typeof window !== 'undefined') {
+      const hasInternalReferrer = document.referrer.startsWith(window.location.origin);
+
+      if (hasInternalReferrer && window.history.length > 1) {
+        router.back();
+        return;
+      }
     }
-    router.push('/account');
+
+    router.push('/about');
   };
 
   return (
@@ -50,6 +55,7 @@ export default function NoticesPage() {
       <main className="max-w-[1040px] mx-auto px-4 md:px-6 py-12 md:py-24">
         <div className="md:hidden mb-6">
           <button
+            data-testid="company-notices-back-button"
             onClick={handleMobileBack}
             className="h-9 w-9 rounded-full border border-slate-200 bg-white text-slate-700 flex items-center justify-center active:scale-95 transition-transform"
             aria-label={t('button_back')}
