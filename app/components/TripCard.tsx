@@ -4,6 +4,13 @@ import React from 'react';
 import Image from 'next/image';
 import { CheckCircle2, PenTool } from 'lucide-react';
 
+interface TripReviewTarget {
+  id: number;
+  title: string;
+  host: string;
+  image: string;
+}
+
 interface TripCardProps {
   id: number;
   image: string;
@@ -11,7 +18,7 @@ interface TripCardProps {
   date: string;
   host: string;
   isReviewed?: boolean;
-  onReviewClick: (trip: any) => void;
+  onReviewClick: (trip: TripReviewTarget) => void;
 }
 
 export default function TripCard({ id, image, title, date, host, isReviewed, onReviewClick }: TripCardProps) {

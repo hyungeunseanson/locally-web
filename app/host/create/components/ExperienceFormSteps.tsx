@@ -405,6 +405,8 @@ export default function ExperienceFormSteps({
                   }
                 }}
               >
+                {/* Host create photo previews render just-uploaded URLs and keep the current direct preview behavior. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={url} className="w-full h-full object-cover" alt={`preview ${idx}`} />
                 {idx === 0 && (
                   <span className="absolute left-2 top-2 rounded-full bg-black/75 px-2 py-1 text-[10px] font-bold text-white">
@@ -507,6 +509,8 @@ export default function ExperienceFormSteps({
                           data-testid={`host-create-itinerary-photo-tile-${idx}`}
                           className="relative h-32 w-32 md:h-40 md:w-40 overflow-hidden rounded-2xl border border-slate-200 bg-white"
                         >
+                          {/* Itinerary step previews render uploaded image URLs before publish and should keep their current direct loading path. */}
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={item.image_url} alt={`${item.title || 'itinerary'} preview`} className="w-full h-full object-cover" />
                           <div className="absolute top-2 right-2 flex gap-2">
                             <label className="bg-white/90 text-slate-700 px-3 py-1.5 rounded-full text-[11px] font-bold cursor-pointer">

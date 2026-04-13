@@ -4,14 +4,19 @@ import React, { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 
+type DatePickerRange = {
+  start: Date | null;
+  end: Date | null;
+};
+
 export default function DatePicker({
   selectedRange,
   onChange,
   variant = 'default',
   mode = 'range',
 }: {
-  selectedRange: any;
-  onChange: (range: any) => void;
+  selectedRange: DatePickerRange;
+  onChange: (range: DatePickerRange) => void;
   variant?: 'default' | 'mobile';
   mode?: 'range' | 'single';
 }) {

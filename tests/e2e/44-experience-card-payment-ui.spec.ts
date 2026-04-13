@@ -274,6 +274,10 @@ test.describe.serial('Experience card payment UI smoke', () => {
         user_id: customerId,
       });
 
+      if (!booking) {
+        throw new Error(`Expected booking row for order_id=${observedOrderId}`);
+      }
+
       const { error: updateError } = await getAdminClient()
         .from('bookings')
         .update({

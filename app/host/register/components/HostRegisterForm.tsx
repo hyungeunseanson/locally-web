@@ -299,7 +299,13 @@ export default function HostRegisterForm({
             </div>
             <div className="flex flex-col items-center gap-6">
               <label className="w-32 h-32 rounded-full border-2 border-dashed border-slate-300 flex items-center justify-center cursor-pointer hover:border-black overflow-hidden relative bg-slate-50">
-                {formData.profilePhoto ? <img src={formData.profilePhoto} className="w-full h-full object-cover" alt={copy.profilePhotoPreviewAlt} /> : <Camera size={24} className="text-slate-400" />}
+                {formData.profilePhoto ? (
+                  <>
+                    {/* Host register profile previews render just-uploaded images and keep the current direct preview behavior. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={formData.profilePhoto} className="w-full h-full object-cover" alt={copy.profilePhotoPreviewAlt} />
+                  </>
+                ) : <Camera size={24} className="text-slate-400" />}
                 <input type="file" accept="image/*" className="hidden" onChange={(e) => handlePhotoUpload(e, 'profile')} />
               </label>
               <FieldHint className="text-center ml-0 -mt-2">{copy.profilePhotoHelp}</FieldHint>
@@ -332,7 +338,11 @@ export default function HostRegisterForm({
               <input type="file" accept="image/*" className="hidden" id="id-upload" onChange={(e) => handlePhotoUpload(e, 'idCard')} />
               {formData.idCardFile ? (
                 <div className="relative h-40 w-full flex flex-col items-center justify-center">
-                  <img src={formData.idCardFile} className="h-full object-contain rounded-lg shadow-sm" alt={copy.idCardPreviewAlt} />
+                  <>
+                    {/* ID card previews must keep their current direct client-side rendering before submission. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={formData.idCardFile} className="h-full object-contain rounded-lg shadow-sm" alt={copy.idCardPreviewAlt} />
+                  </>
                   <button type="button" onClick={(e) => { e.preventDefault(); updateData('idCardFile', null); }} className="absolute top-0 right-0 bg-black text-white p-1.5 rounded-full hover:scale-110 transition-transform"><X size={14} /></button>
                   <p className="text-green-600 font-bold mt-4 flex items-center gap-2 bg-green-50 px-3 py-1.5 rounded-full text-sm"><CheckCircle2 size={16} /> {copy.uploadDone}</p>
                 </div>

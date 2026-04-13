@@ -465,6 +465,8 @@ export default function EditExperiencePage() {
                       }
                     }}
                   >
+                    {/* Host edit photo previews render uploaded image URLs and keep the current direct preview behavior. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={url} className="w-full h-full object-cover" alt={`experience-${idx}`} />
                     {idx === 0 && (
                       <span className="absolute left-2 top-2 rounded-full bg-black/75 px-2 py-1 text-[10px] font-bold text-white">
@@ -776,6 +778,8 @@ export default function EditExperiencePage() {
                             data-testid={`host-edit-itinerary-photo-tile-${i}`}
                             className="relative h-32 w-32 md:h-40 md:w-40 overflow-hidden rounded-xl border border-slate-200 bg-slate-50"
                           >
+                            {/* Host edit itinerary previews render uploaded image URLs before save/publish and keep the current direct preview path. */}
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={item.image_url} className="w-full h-full object-cover" alt={`itinerary-${i}`} />
                             <div className="absolute top-2 right-2 flex gap-2">
                               <label className="bg-white/90 px-3 py-1.5 rounded-full text-[10px] font-bold text-slate-700 cursor-pointer">

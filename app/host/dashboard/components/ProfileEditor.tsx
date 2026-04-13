@@ -232,7 +232,13 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
           <div className="space-y-5 md:space-y-8 animate-in fade-in">
             <div className="flex flex-col items-center">
               <label className="relative w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-4 border-white shadow-lg cursor-pointer group hover:border-slate-200 transition-all">
-                {avatarUrl ? <img src={avatarUrl} className="w-full h-full object-cover" alt="호스트 프로필 사진" /> : <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-300"><User size={36} className="md:w-12 md:h-12" /></div>}
+                {avatarUrl ? (
+                  <>
+                    {/* Host profile editor previews remote avatar URLs and should keep the current direct preview path. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={avatarUrl} className="w-full h-full object-cover" alt="호스트 프로필 사진" />
+                  </>
+                ) : <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-300"><User size={36} className="md:w-12 md:h-12" /></div>}
                 <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><Camera className="text-white" /></div>
                 <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} disabled={uploading} />
               </label>

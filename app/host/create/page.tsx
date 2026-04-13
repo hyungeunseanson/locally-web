@@ -4,7 +4,6 @@ import React, { useMemo, useRef, useState } from 'react';
 import { X, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { createClient } from '@/app/utils/supabase/client';
-import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext'; // 🟢 알림 기능 사용
 import {
   TOTAL_STEPS,
@@ -40,7 +39,6 @@ export default function CreateExperiencePage() {
   const { lang } = useLanguage();
   const copy = getExperienceFormCopy(lang);
   const supabase = useMemo(() => createClient(), []);
-  const router = useRouter();
   const { showToast, showHeicUnsupportedToast } = useToast(); // 🟢 토스트 훅 가져오기
 
   // --- 상태 관리 ---

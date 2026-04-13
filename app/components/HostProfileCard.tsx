@@ -37,7 +37,11 @@ export default function HostProfileCard({
           <div className="bg-white rounded-3xl p-6 shadow-[0_6px_16px_rgba(0,0,0,0.12)] border border-slate-100 text-center">
             <div className="w-32 h-32 rounded-full overflow-hidden mx-auto mb-4 bg-slate-100">
               {avatarUrl ? (
-                <img src={avatarUrl} alt={name} className="w-full h-full object-cover" />
+                <>
+                  {/* Host profile avatars render remote profile URLs and should keep their current direct loading path. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={avatarUrl} alt={name} className="w-full h-full object-cover" />
+                </>
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-slate-300">
                   <User size={64} />

@@ -137,9 +137,13 @@ export default function ReservationCard({
 
   useEffect(() => {
     if (selectedDate && !availableDates.includes(selectedDate)) {
-      setSelectedDate('');
-      setSelectedTime('');
-      setIsSoloGuaranteed(false);
+      const timeoutId = window.setTimeout(() => {
+        setSelectedDate('');
+        setSelectedTime('');
+        setIsSoloGuaranteed(false);
+      }, 0);
+
+      return () => window.clearTimeout(timeoutId);
     }
   }, [availableDates, selectedDate]);
 
@@ -148,21 +152,33 @@ export default function ReservationCard({
 
     const availableTimes = dateToTimeMap[selectedDate] || [];
     if (!availableTimes.includes(selectedTime)) {
-      setSelectedTime('');
-      setIsSoloGuaranteed(false);
+      const timeoutId = window.setTimeout(() => {
+        setSelectedTime('');
+        setIsSoloGuaranteed(false);
+      }, 0);
+
+      return () => window.clearTimeout(timeoutId);
     }
   }, [dateToTimeMap, selectedDate, selectedTime]);
 
   useEffect(() => {
     if (isSoloGuaranteed && !isSoloEligible) {
-      setIsSoloGuaranteed(false);
+      const timeoutId = window.setTimeout(() => {
+        setIsSoloGuaranteed(false);
+      }, 0);
+
+      return () => window.clearTimeout(timeoutId);
     }
   }, [isSoloEligible, isSoloGuaranteed]);
 
   useEffect(() => {
     if (selectedTime && currentSlotSummary && !currentSlotSummary.isBookable) {
-      setSelectedTime('');
-      setIsSoloGuaranteed(false);
+      const timeoutId = window.setTimeout(() => {
+        setSelectedTime('');
+        setIsSoloGuaranteed(false);
+      }, 0);
+
+      return () => window.clearTimeout(timeoutId);
     }
   }, [currentSlotSummary, selectedTime]);
 

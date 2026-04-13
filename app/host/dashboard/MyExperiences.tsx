@@ -182,7 +182,11 @@ export default function MyExperiences() {
               <div className="flex items-stretch gap-3">
                 <div className="relative h-32 w-24 shrink-0 overflow-hidden rounded-2xl border border-slate-100 bg-slate-100">
                   {exp.photos && exp.photos.length > 0 ? (
-                    <img src={exp.photos[0]} className="h-full w-full object-cover" alt={exp.title} />
+                    <>
+                      {/* Dashboard cards render uploaded experience cover URLs and keep their current direct loading behavior. */}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={exp.photos[0]} className="h-full w-full object-cover" alt={exp.title} />
+                    </>
                   ) : (
                     <div className="flex h-full w-full items-center justify-center px-2 text-center text-[10px] md:text-xs text-slate-400">{t('exp_no_img')}</div>
                   )}
@@ -269,7 +273,11 @@ export default function MyExperiences() {
               <div className="flex min-w-0 items-center gap-4">
                 <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl border border-slate-100 bg-slate-100">
                   {exp.photos && exp.photos.length > 0 ? (
-                    <img src={exp.photos[0]} className="h-full w-full object-cover" alt={exp.title} />
+                    <>
+                      {/* Dashboard cards render uploaded experience cover URLs and keep their current direct loading behavior. */}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={exp.photos[0]} className="h-full w-full object-cover" alt={exp.title} />
+                    </>
                   ) : (
                     <div className="flex h-full w-full items-center justify-center px-2 text-center text-sm text-slate-400">{t('exp_no_img')}</div>
                   )}

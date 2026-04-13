@@ -376,7 +376,7 @@ test.describe.serial('Host dashboard edit and dates UI coverage', () => {
     await expect(selectedTimeLabel(page, '10:00')).toBeVisible({ timeout: 10000 });
     await expect(selectedTimeLabel(page, '11:00')).toBeVisible({ timeout: 10000 });
 
-    const earlyTimeButton = await activateTimeOption(page, '07:00');
+    await activateTimeOption(page, '07:00');
     await expect(selectedTimeLabel(page, '07:00')).toBeVisible({ timeout: 10000 });
 
     const saveResponsePromise = page.waitForResponse(

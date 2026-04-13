@@ -181,15 +181,13 @@ export default function ServiceEarningsPanel({ summary }: ServiceEarningsPanelPr
             </div>
           ) : (
             <div data-testid="host-service-earnings-item-list" className="space-y-3">
-              {serviceItems.map((item) => (
-                <Link
-                  key={item.id}
-                  href={item.request_id ? `/services/${item.request_id}` : '#'}
-                  className={`block ${item.request_id ? '' : 'pointer-events-none'}`}
-                >
+              {serviceItems.map((item) => {
+                const cardContent = (
                   <div
                     data-testid={`host-service-earnings-item-${item.id}`}
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-4 transition-colors hover:bg-slate-50"
+                    className={`rounded-2xl border border-slate-200 bg-white px-4 py-4 ${
+                      item.request_id ? 'transition-colors hover:bg-slate-50' : ''
+                    }`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -222,8 +220,22 @@ export default function ServiceEarningsPanel({ summary }: ServiceEarningsPanelPr
                       </div>
                     </div>
                   </div>
-                </Link>
-              ))}
+                );
+
+                if (!item.request_id) {
+                  return (
+                    <div key={item.id} className="block" aria-disabled="true">
+                      {cardContent}
+                    </div>
+                  );
+                }
+
+                return (
+                  <Link key={item.id} href={`/services/${item.request_id}`} className="block">
+                    {cardContent}
+                  </Link>
+                );
+              })}
             </div>
           )}
         </div>

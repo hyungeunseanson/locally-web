@@ -430,7 +430,13 @@ export default function ServiceRequestDetailPage() {
                         <div className="relative shrink-0">
                           <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-slate-100 overflow-hidden border-2 border-white shadow-md">
                             {avatar
-                              ? <img src={avatar} alt={name} className="w-full h-full object-cover" />
+                              ? (
+                                <>
+                                  {/* Service request host avatars render remote profile URLs and keep the current direct loading behavior. */}
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={avatar} alt={name} className="w-full h-full object-cover" />
+                                </>
+                              )
                               : <div className="w-full h-full flex items-center justify-center text-slate-400 text-lg font-black">{name.charAt(0)}</div>
                             }
                           </div>

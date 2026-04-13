@@ -136,7 +136,11 @@ export default function HostExperienceDetailPage() {
         {/* 이미지 섹션 */}
         <div className="relative aspect-video rounded-3xl overflow-hidden mb-8 bg-slate-100 border border-slate-200">
           {previewImage ? (
-            <img src={previewImage} className="w-full h-full object-cover" alt={experience.title} />
+            <>
+              {/* Host detail preview keeps the current direct cover image rendering for uploaded experience media. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={previewImage} className="w-full h-full object-cover" alt={experience.title} />
+            </>
           ) : (
             <div className="w-full h-full flex items-center justify-center text-slate-400">{t('exp_no_img')}</div>
           )}
