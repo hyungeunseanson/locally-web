@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useLanguage } from '@/app/context/LanguageContext';
+import { useToast } from '@/app/context/ToastContext';
 
 const MEDIA_KIT_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp'] as const;
 const MEDIA_KIT_SLOTS = [1, 2, 3, 4, 5, 6, 7] as const;
@@ -33,6 +34,10 @@ const COPY: Record<Locale, {
   proposalLabel: string;
   proposalPlaceholder: string;
   submitLabel: string;
+  submitSuccess: string;
+  submitFail: string;
+  submitValidation: string;
+  submitSending: string;
 }> = {
   ko: {
     eyebrow: 'Instagram channel',
@@ -57,6 +62,10 @@ const COPY: Record<Locale, {
     proposalLabel: '문의 내용',
     proposalPlaceholder: '광고 집행 목적, 예산 범위, 희망 일정, 요청 사항을 적어주세요.',
     submitLabel: '문의 보내기',
+    submitSuccess: '문의가 접수되었습니다. 확인 후 연락드릴게요.',
+    submitFail: '문의 접수에 실패했습니다. 잠시 후 다시 시도해주세요.',
+    submitValidation: '브랜드명, 이메일, 문의 내용을 모두 올바르게 입력해주세요.',
+    submitSending: '전송 중...',
   },
   en: {
     eyebrow: 'Instagram channel',
@@ -81,6 +90,10 @@ const COPY: Record<Locale, {
     proposalLabel: 'Inquiry details',
     proposalPlaceholder: 'Tell us about your campaign goals, budget, schedule, and request.',
     submitLabel: 'Send inquiry',
+    submitSuccess: 'Your inquiry has been received. We will get back to you soon.',
+    submitFail: 'Failed to send your inquiry. Please try again shortly.',
+    submitValidation: 'Please enter a valid company name, email, and inquiry message.',
+    submitSending: 'Sending...',
   },
   ja: {
     eyebrow: 'Instagram channel',
@@ -105,6 +118,10 @@ const COPY: Record<Locale, {
     proposalLabel: 'お問い合わせ内容',
     proposalPlaceholder: '広告の目的、予算、希望日程、要望内容をご記入ください。',
     submitLabel: '送信する',
+    submitSuccess: 'お問い合わせを受け付けました。確認後ご連絡します。',
+    submitFail: 'お問い合わせの送信に失敗しました。しばらくしてからお試しください。',
+    submitValidation: '会社名、メールアドレス、お問い合わせ内容を正しく入力してください。',
+    submitSending: '送信中...',
   },
   zh: {
     eyebrow: 'Instagram channel',
@@ -129,6 +146,10 @@ const COPY: Record<Locale, {
     proposalLabel: '咨询内容',
     proposalPlaceholder: '请填写投放目标、预算范围、希望时间与合作需求。',
     submitLabel: '发送咨询',
+    submitSuccess: '咨询已提交，我们确认后会尽快联系您。',
+    submitFail: '咨询发送失败，请稍后再试。',
+    submitValidation: '请正确填写品牌名、邮箱和咨询内容。',
+    submitSending: '发送中...',
   },
 };
 
@@ -202,9 +223,14 @@ function MediaKitSlide({
 
 export default function PartnershipPage() {
   const { lang } = useLanguage();
+  const { showToast } = useToast();
   const copy = COPY[(lang in COPY ? lang : 'ko') as Locale];
   const [isMediaKitModalOpen, setIsMediaKitModalOpen] = useState(false);
   const [activeMediaKitIndex, setActiveMediaKitIndex] = useState(0);
+  const [companyName, setCompanyName] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [proposal, setProposal] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (!isMediaKitModalOpen) return;
@@ -255,6 +281,47 @@ export default function PartnershipPage() {
     setActiveMediaKitIndex((current) =>
       Math.min(MEDIA_KIT_SLOTS.length - 1, current + 1)
     );
+  };
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!companyName.trim() || !contactEmail.trim() || proposal.trim().length < 10) {
+      showToast(copy.submitValidation, 'error');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch('/api/company/partnership-inquiry', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          companyName: companyName.trim(),
+          email: contactEmail.trim(),
+          message: proposal.trim(),
+        }),
+      });
+
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || copy.submitFail);
+      }
+
+      setCompanyName('');
+      setContactEmail('');
+      setProposal('');
+      showToast(copy.submitSuccess, 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : copy.submitFail;
+      showToast(message || copy.submitFail, 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const activeSlot = MEDIA_KIT_SLOTS[activeMediaKitIndex];
@@ -314,7 +381,7 @@ export default function PartnershipPage() {
             </p>
           </div>
 
-          <form className="mt-10 space-y-12" onSubmit={(event) => event.preventDefault()}>
+          <form className="mt-10 space-y-12" onSubmit={handleSubmit}>
             <div className="grid gap-12 md:grid-cols-2">
               <div className="group">
                 <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500 group-focus-within:text-black">
@@ -322,8 +389,12 @@ export default function PartnershipPage() {
                 </label>
                 <input
                   type="text"
+                  data-testid="partnership-company-input"
+                  value={companyName}
+                  onChange={(event) => setCompanyName(event.target.value)}
                   className="w-full rounded-none border-b border-gray-300 bg-transparent py-3 text-xl font-medium outline-none transition-colors placeholder:text-gray-300 focus:border-black"
                   placeholder={copy.companyPlaceholder}
+                  disabled={isSubmitting}
                 />
               </div>
               <div className="group">
@@ -332,8 +403,12 @@ export default function PartnershipPage() {
                 </label>
                 <input
                   type="email"
+                  data-testid="partnership-email-input"
+                  value={contactEmail}
+                  onChange={(event) => setContactEmail(event.target.value)}
                   className="w-full rounded-none border-b border-gray-300 bg-transparent py-3 text-xl font-medium outline-none transition-colors placeholder:text-gray-300 focus:border-black"
                   placeholder={copy.emailPlaceholder}
+                  disabled={isSubmitting}
                 />
               </div>
             </div>
@@ -343,14 +418,23 @@ export default function PartnershipPage() {
                 {copy.proposalLabel}
               </label>
               <textarea
+                data-testid="partnership-message-input"
+                value={proposal}
+                onChange={(event) => setProposal(event.target.value)}
                 className="h-40 w-full resize-none rounded-none border-b border-gray-300 bg-transparent py-3 text-xl font-medium outline-none transition-colors placeholder:text-gray-300 focus:border-black"
                 placeholder={copy.proposalPlaceholder}
+                disabled={isSubmitting}
               />
             </div>
 
             <div className="pt-2">
-              <button className="group flex w-full items-center justify-between bg-black px-8 py-6 text-lg font-bold text-white transition-colors hover:bg-[#333]">
-                <span>{copy.submitLabel}</span>
+              <button
+                type="submit"
+                data-testid="partnership-submit-button"
+                disabled={isSubmitting}
+                className="group flex w-full items-center justify-between bg-black px-8 py-6 text-lg font-bold text-white transition-colors hover:bg-[#333] disabled:cursor-not-allowed disabled:bg-[#555]"
+              >
+                <span>{isSubmitting ? copy.submitSending : copy.submitLabel}</span>
                 <span className="transition-transform group-hover:translate-x-2">→</span>
               </button>
             </div>

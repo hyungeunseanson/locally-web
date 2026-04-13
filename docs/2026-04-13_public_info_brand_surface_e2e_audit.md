@@ -3,8 +3,7 @@
 ## Summary
 - 감사 범위: `about`, `company/*`, `help`, `global site announcement`
 - 현재 기준 결론:
-  - `about`, `help`, `global site announcement`는 메타/공개 진입/운영 의미 기준으로 `정상`
-  - `company/partnership`는 media kit 읽기 surface는 `정상`, 하지만 문의 폼 submit은 아직 `UI-only placeholder`라 `부분 보장`
+  - `about`, `help`, `global site announcement`, `company/partnership`는 메타/공개 진입/운영 의미 기준으로 `정상`
   - `company/news`, `company/notices`, `company/careers`, `company/investors`는 메타는 `정상`이지만, 본문 CTA와 데이터 truth는 정적 placeholder가 섞여 있어 `부분 보장`
 - 최신 재검증 결과:
   - `25-public-metadata`
@@ -13,7 +12,8 @@
   - `103-site-announcements`
   - `104-help-self-service`
   - `110-partnership-media-kit`
-  - 결과: `18 passed (17.6s)`
+  - `172-partnership-inquiry-route`
+  - 결과: `21 passed`
 
 ## Result Snapshot
 | Surface | Source of truth | Current tests | Result | Notes |
@@ -21,7 +21,7 @@
 | About | `app/about/page.tsx`, `app/about/layout.tsx`, `app/about/aboutLandingAssets.ts` | `25` | 정상 | locale별 메타와 이미지 랜딩 fallback이 일관된다 |
 | Help | `app/help/layout.tsx`, `app/help/page.tsx` | `25`, `104`, `30` | 정상 | public metadata, FAQ 탐색, 1:1 문의 진입 copy가 현재 구현과 맞다 |
 | Global announcement | `app/config/siteAnnouncements.ts`, `app/utils/siteAnnouncements.ts`, `app/components/GlobalAnnouncementModal.tsx` | `103` | 정상 | path normalize, exclusion, locale fallback, dismissal key 의미가 안정적이다 |
-| Partnership | `app/company/partnership/layout.tsx`, `app/company/partnership/page.tsx` | `110`, `25` | 부분 보장 | media kit modal은 green, 문의 폼은 실제 전송 owner가 없다 |
+| Partnership | `app/company/partnership/layout.tsx`, `app/company/partnership/page.tsx`, `/api/company/partnership-inquiry` | `110`, `172`, `25` | 정상 | media kit modal과 public inquiry mail submit이 모두 current truth에 맞게 동작한다 |
 | Newsroom | `app/company/news/layout.tsx`, `app/company/news/page.tsx` | `25` | 부분 보장 | 메타는 정상이나 기사 링크가 `href="#"` 정적 placeholder다 |
 | Notices | `app/company/notices/layout.tsx`, `app/company/notices/page.tsx` | 간접 `25` 범위 밖 | 부분 보장 | 아코디언 자체는 단순하지만 데이터가 in-file 정적 배열이다 |
 | Careers | `app/company/careers/layout.tsx`, `app/company/careers/page.tsx` | 간접 `25` 범위 밖 | 부분 보장 | open positions CTA가 `href="#"` placeholder다 |
@@ -73,21 +73,23 @@
 - 판정
   - `정상`
 
-### 4. `company/partnership`는 읽기 surface는 닫혔지만 submit truth는 비어 있다
+### 4. `company/partnership`는 media kit + inquiry submit까지 현재 기준 정상이다
 - source of truth
   - `app/company/partnership/layout.tsx`
   - `app/company/partnership/page.tsx`
+  - `app/api/company/partnership-inquiry/route.ts`
 - 현재 동작
   - metadata는 정상이다
   - media kit는 modal carousel과 locale copy 기준으로 동작한다
-  - 하지만 문의 폼은 `onSubmit={(event) => event.preventDefault()}`만 있고, 실제 API 호출이나 mail/contact owner가 없다
+  - 문의 폼은 이제 public route로 연결되고, 유효한 submit은 `locally.partners@gmail.com` 수신 메일로 전달된다
+  - route는 필수값, 이메일 형식, message 길이를 fail-closed로 검증한다
+  - non-production에서는 `opsAdmin` mock capture를 사용해 실제 발송 없이 계약 검증이 가능하다
 - 테스트 보장
   - `110-partnership-media-kit`
+  - `172-partnership-inquiry-route`
   - `25-public-metadata`
 - 판정
-  - `부분 보장`
-- 운영 리스크
-  - 사용자는 “문의 보내기” CTA를 실제 동작으로 기대하지만 현재는 no-op다
+  - `정상`
 
 ### 5. `company/news`, `notices`, `careers`, `investors`는 메타는 정상이지만 본문 truth는 placeholder 비중이 높다
 - source of truth
@@ -119,12 +121,9 @@
 
 ## Coverage Gap
 - `company/news`, `company/notices`, `company/careers`, `company/investors` 본문 interaction 자체를 잠그는 E2E는 없다
-- `partnership`는 media kit만 테스트되고, contact submit owner는 아예 구현되지 않았다
 - public info pages의 모바일 back fallback(`/account`) 의미는 테스트로 잠겨 있지 않다
 
 ## Final Verdict
 - `public metadata / robots / announcement / help` 축은 현재 기준 `정상`
 - `company/*`는 메타/SEO shell은 괜찮지만, 실제 공개 정보 본문은 placeholder 또는 no-op affordance가 남아 있어 전체 도메인 판정은 `부분 보장`
-- 다음 핀셋 수정 1순위는 아래 둘 중 하나다
-  1. `company/partnership` 문의 폼을 실제 owner에 연결하거나, 안내형 읽기 surface로 명시적으로 다운그레이드
-  2. `news/careers/investors`의 dead CTA를 제거하거나 실제 링크 owner를 붙여 public truth를 맞추기
+- 다음 핀셋 수정 1순위는 `news/careers/investors`의 dead CTA를 제거하거나 실제 링크 owner를 붙여 public truth를 맞추는 작업이다
