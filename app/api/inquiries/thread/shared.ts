@@ -261,8 +261,6 @@ async function notifyRecipient(params: {
       is_read: false,
     });
 
-    if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) return;
-
     const email = await findRecipientEmail(recipientId);
     if (!email) return;
 
@@ -293,6 +291,13 @@ async function notifyRecipient(params: {
     }, {
       supabaseAdmin,
     })
+      .then((result) => {
+        if (!result.sent) {
+          console.warn(
+            `[inquiries/thread] message notification email skipped: ${result.skipped || 'unknown'}`
+          );
+        }
+      })
       .catch((error) => {
         console.warn('[inquiries/thread] message notification email failed:', error);
       });

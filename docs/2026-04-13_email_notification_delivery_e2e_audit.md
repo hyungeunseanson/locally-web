@@ -6,7 +6,7 @@
   - `sendTemplatedEmail()` 중심의 템플릿 발송 파이프라인, `transactional / opsAdmin` transport 분기, shared template render/mobile contract는 `정상`
   - `/api/notifications/email`의 인증, mass-send guard, single-recipient allowlist ownership, sanitize/fail-safe mail dispatch는 `정상`
   - `review_reply`는 서버 helper 단일 owner로 정리돼 `정상`
-  - `inquiry.new_message`는 인앱 + localized email이 동작하지만, helper 앞단에 `GMAIL_*` hard gate가 남아 있어 `부분 보장`
+  - `inquiry.new_message`도 provider gate mismatch가 정리돼 `정상`
 - 최신 재검증 결과:
   - `77-notification-email-policy`
   - `123-cancellation-approved-notification-localization`
@@ -15,7 +15,8 @@
   - `162-email-template-render-contract`
   - `163-email-template-mobile-design`
   - `168-admin-email-sender-contract`
-  - 결과: `25 passed (22.5s)`
+  - `176-inquiry-email-provider-contract`
+  - 결과: `26 passed (22.2s)`
 
 ## Result Snapshot
 | Chain | Source of truth | Current tests | Result | Notes |
@@ -24,7 +25,7 @@
 | Generic/admin adapters | `app/utils/emailNotificationJobs.ts`, `app/utils/adminEmailProvider.ts` | `162`, `168` | 정상 | 두 adapter 모두 `sendTemplatedEmail()` 얇은 wrapper로 유지되고 opsAdmin sender split이 명확하다 |
 | Shared notification route | `app/api/notifications/email/route.ts`, `app/utils/notification.ts` | `77`, `123`, `125` | 정상 | auth guard, admin-only mass send, single-recipient allowlist, localized typed CTA가 현재 계약과 맞다 |
 | Review reply delivery | `app/utils/reviews/reviewReplyNotification.ts` | `122`, `125` reference | 정상 | DB notification + localized email을 서버 helper가 단일 owner로 처리한다 |
-| Inquiry new message delivery | `app/api/inquiries/thread/shared.ts`, `app/emails/templates/inquiry/InquiryNewMessageEmail.tsx` | `124`, `162` | 부분 보장 | localized inquiry email은 green이지만 helper 앞단에 `GMAIL_*` hard gate가 남아 Resend-only transactional config를 막는다 |
+| Inquiry new message delivery | `app/api/inquiries/thread/shared.ts`, `app/emails/templates/inquiry/InquiryNewMessageEmail.tsx` | `124`, `162`, `176` | 정상 | localized inquiry email과 provider delegation contract가 현재 발송 파이프라인 의미와 맞는다 |
 
 ## Detailed Findings
 
@@ -90,28 +91,25 @@
 - 판정
   - `정상`
 
-### 5. `inquiry.new_message`는 기능은 green이지만 provider gate가 아직 섞여 있다
+### 5. `inquiry.new_message`는 provider delegation까지 현재 기준 정상이다
 - source of truth
   - `app/api/inquiries/thread/shared.ts`
   - `app/emails/templates/inquiry/InquiryNewMessageEmail.tsx`
 - 현재 동작
   - inquiry message helper는 localized in-app notification을 저장한다
   - recipient email을 찾은 뒤 `sendTemplatedEmail()`로 inquiry template 메일을 best-effort 발송한다
-  - 하지만 그 전에 `if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) return;`로 조기 종료한다
+  - 발송 가능 여부는 helper 앞단 env gate가 아니라 `sendTemplatedEmail()` provider 추상화가 판단한다
+  - 즉, transactional provider가 Gmail이든 Resend든 inquiry 경로가 별도 조기 종료 없이 같은 delivery layer를 탄다
 - 테스트 보장
   - `124-inquiry-email-localization`
   - `162-email-template-render-contract`
+  - `176-inquiry-email-provider-contract`
 - 판정
-  - `부분 보장`
-- 운영 리스크
-  - 전체 메일 파이프라인은 Resend/Gmail 추상화가 있는데, inquiry path만 Gmail env 선행 존재를 요구한다
-  - 즉, Resend-only transactional 구성을 의도할 경우 inquiry 메일만 조용히 빠질 수 있다
+  - `정상`
 
 ## Coverage Gap
-- inquiry message path의 `GMAIL_*` 선행 gate와 `sendTemplatedEmail()` provider fallback 의미를 함께 잠그는 스펙은 아직 없다
 - admin/team mail 전 도메인의 실제 recipient whitelist 운영 증거는 이번 감사 범위 밖이다
 
 ## Final Verdict
-- 템플릿 렌더, sender split, notification route 보안/소유권, localized CTA까지 현재 메일·알림 체인의 대부분은 `정상`
-- 남은 핵심 active gap은 `inquiry.new_message` helper의 Gmail hard gate 1건이다
-- 다음 핀셋 수정 1순위는 `app/api/inquiries/thread/shared.ts`가 `GMAIL_*` 직접 검사 대신 `sendTemplatedEmail()` provider 추상화에 그대로 위임하도록 정리하는 작업이다
+- 템플릿 렌더, sender split, notification route 보안/소유권, localized CTA, inquiry provider delegation까지 현재 메일·알림 체인의 핵심 경로는 `정상`
+- 남는 후속은 active bug 수정이 아니라 admin/team recipient 운영 증거 정리나 broader delivery observability 성격이다
