@@ -121,12 +121,29 @@ async function copyToClipboard(text: string) {
 
 export default function KakaoIabEscapeGate({ locale, enabled }: KakaoIabEscapeGateProps) {
   const [mode, setMode] = useState<GateMode>('idle');
-  const [currentUrl, setCurrentUrl] = useState('');
+  const currentUrlRef = useRef('');
   const initializedRef = useRef(false);
   const copyResetTimerRef = useRef<number | null>(null);
+  const modeTimerRef = useRef<number | null>(null);
+
+  const scheduleMode = (nextMode: GateMode) => {
+    if (typeof window === 'undefined') return;
+
+    if (modeTimerRef.current) {
+      window.clearTimeout(modeTimerRef.current);
+    }
+
+    modeTimerRef.current = window.setTimeout(() => {
+      setMode(nextMode);
+      modeTimerRef.current = null;
+    }, 0);
+  };
 
   useEffect(() => {
     return () => {
+      if (modeTimerRef.current) {
+        window.clearTimeout(modeTimerRef.current);
+      }
       if (copyResetTimerRef.current) {
         window.clearTimeout(copyResetTimerRef.current);
       }
@@ -150,32 +167,46 @@ export default function KakaoIabEscapeGate({ locale, enabled }: KakaoIabEscapeGa
     }
 
     const iabState = window.__LOCALLY_KAKAO_IAB__;
+    const hasBootstrapKakaoMarker =
+      typeof document !== 'undefined' && document.documentElement.dataset.iab === 'kakao';
+    const resolvedIabState =
+      iabState?.detected && iabState.kind === 'kakao'
+        ? iabState
+        : hasBootstrapKakaoMarker
+          ? {
+              detected: true as const,
+              kind: 'kakao' as const,
+              currentUrl: window.location.href,
+            }
+          : null;
 
-    if (!iabState?.detected || iabState.kind !== 'kakao') {
+    if (!resolvedIabState) {
       unlockDocument();
       delete window.__LOCALLY_KAKAO_IAB__;
       return;
     }
 
+    window.__LOCALLY_KAKAO_IAB__ = resolvedIabState;
+
     lockDocument();
 
-    const nextUrl = iabState.currentUrl || window.location.href;
+    const nextUrl = resolvedIabState.currentUrl || window.location.href;
     const storage = getSessionStorage();
     const previousAttemptUrl = storage?.getItem(KAKAO_IAB_ATTEMPT_STORAGE_KEY);
-    setCurrentUrl(nextUrl);
+    currentUrlRef.current = nextUrl;
 
     if (previousAttemptUrl === nextUrl) {
-      setMode('fallback');
+      scheduleMode('fallback');
       return;
     }
 
     storage?.setItem(KAKAO_IAB_ATTEMPT_STORAGE_KEY, nextUrl);
-    setMode('attempting');
+    scheduleMode('attempting');
 
     try {
       window.location.href = buildKakaoOpenExternalUrl(nextUrl);
     } catch {
-      setMode('fallback');
+      scheduleMode('fallback');
       return;
     }
 
@@ -196,6 +227,7 @@ export default function KakaoIabEscapeGate({ locale, enabled }: KakaoIabEscapeGa
   const isVisible = mode !== 'idle';
 
   async function handleCopyLink() {
+    const currentUrl = currentUrlRef.current;
     if (!currentUrl) return;
 
     const copied = await copyToClipboard(currentUrl);
@@ -212,6 +244,7 @@ export default function KakaoIabEscapeGate({ locale, enabled }: KakaoIabEscapeGa
   }
 
   function handleRetryOpen() {
+    const currentUrl = currentUrlRef.current;
     if (!currentUrl) return;
     window.location.href = buildKakaoOpenExternalUrl(currentUrl);
   }

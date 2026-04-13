@@ -121,7 +121,7 @@ export default function MainSearchBar({
   locationInput, setLocationInput,
   dateRange, setDateRange,
   selectedLanguage, setSelectedLanguage,
-  onCategorySelect, isVisible,
+  isVisible,
   onSearch
 }: MainSearchBarProps) {
   const { t, lang } = useLanguage();
@@ -330,6 +330,8 @@ export default function MainSearchBar({
                   {lang.icon ? (
                     <span className="text-lg">{lang.icon}</span>
                   ) : (
+                    /* Keep direct flag CDN images here to avoid changing the existing lightweight language picker behavior. */
+                    /* eslint-disable-next-line @next/next/no-img-element */
                     <img
                       src={`https://flagcdn.com/w40/${lang.code}.png`}
                       alt={lang.label}

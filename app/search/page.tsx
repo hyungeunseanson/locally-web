@@ -252,7 +252,7 @@ function SearchResults() {
     };
 
     fetchSearchResults();
-  }, [location, language, startDate, endDate, selectedCity, selectedTimesKey, selectedTypesKey, showToast, searchSignature]);
+  }, [location, language, startDate, endDate, selectedCity, selectedTimesKey, selectedTypesKey, showToast, t, searchSignature]);
 
   useEffect(() => {
     if (!selectedExperienceId) return;
@@ -592,16 +592,20 @@ function SearchResults() {
           ) : experiences.length === 0 ? (
             <div data-testid="search-empty-state" className="min-h-[66vh] flex flex-col items-center justify-center text-center">
               <div className="relative w-[154px] h-[112px] mb-5">
+                {/* Keep these decorative empty-state thumbnails as direct external image fetches to avoid changing the existing preview collage behavior. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=480&q=80"
                   alt="thumb1"
                   className="absolute top-0 left-[42px] w-[84px] h-[60px] object-cover rounded-[10px] rotate-[7deg]"
                 />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="https://images.unsplash.com/photo-1528715471579-d1bcf0ba5e83?auto=format&fit=crop&w=480&q=80"
                   alt="thumb2"
                   className="absolute top-[18px] left-[14px] w-[92px] h-[66px] object-cover rounded-[12px] -rotate-[14deg]"
                 />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="https://images.unsplash.com/photo-1480796927426-f609979314bd?auto=format&fit=crop&w=480&q=80"
                   alt="thumb3"

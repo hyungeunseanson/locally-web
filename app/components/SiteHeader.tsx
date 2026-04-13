@@ -178,6 +178,8 @@ function SiteHeaderContent() {
       <header className="hidden md:block sticky top-0 z-[100] bg-white border-b border-slate-100" ref={menuRef}>
         <div className="max-w-[1760px] mx-auto px-6 h-20 flex items-center justify-between">
           <Link href="/" onClick={handleLogoClick} className="flex-1 flex items-center gap-[2px] z-[101] group h-full">
+            {/* Keep the local logo as a direct asset fetch to avoid changing header rendering behavior. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/images/logo.png"
               alt="Locally Logo"
@@ -217,6 +219,8 @@ function SiteHeaderContent() {
                 <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden border border-slate-200 flex items-center justify-center text-slate-500">
                   {/* 🟢 로딩 중일 땐 기본 아이콘 유지 */}
                   {!isLoading && user && getAvatarUrl() ? (
+                    /* Keep remote avatar URLs as raw images to preserve direct profile image loading. */
+                    /* eslint-disable-next-line @next/next/no-img-element */
                     <img src={getAvatarUrl()} className="w-full h-full object-cover" referrerPolicy="no-referrer" alt="profile" />
                   ) : (
                     <User size={18} fill="currentColor" />

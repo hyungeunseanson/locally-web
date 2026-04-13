@@ -1,25 +1,29 @@
+/* eslint-disable @next/next/no-img-element */
 'use client';
+
+// Splash art stays on plain static assets to avoid image optimization cost for a short-lived full-screen transition.
 
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 export default function MobileSplash({ onDone }: { onDone: () => void }) {
   const [fading, setFading] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const onDoneRef = useRef(onDone);
-  onDoneRef.current = onDone;
 
   useEffect(() => {
-    setMounted(true);
-    const fadeTimer = setTimeout(() => setFading(true), 1000);
-    const doneTimer = setTimeout(() => onDoneRef.current(), 1300);
+    onDoneRef.current = onDone;
+  }, [onDone]);
+
+  useEffect(() => {
+    const fadeTimer = window.setTimeout(() => setFading(true), 1000);
+    const doneTimer = window.setTimeout(() => onDoneRef.current(), 1300);
     return () => {
-      clearTimeout(fadeTimer);
-      clearTimeout(doneTimer);
+      window.clearTimeout(fadeTimer);
+      window.clearTimeout(doneTimer);
     };
   }, []);
 
-  if (!mounted) return null;
+  if (typeof document === 'undefined') return null;
 
   return createPortal(
     <div

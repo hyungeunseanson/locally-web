@@ -234,10 +234,14 @@ export default function MobileProfileView({
             <div className="mx-4 mt-4 bg-white border border-gray-100 rounded-xl md:rounded-2xl shadow-sm p-4 flex items-end gap-4">
                 {/* 좌측: 아바타 + 인증 배지 + 사진 편집 + 이름/거주지 */}
                 <div className="flex flex-col items-center shrink-0">
-                    <div className="relative mb-2">
+                        <div className="relative mb-2">
                         <div className="w-[68px] h-[68px] rounded-full overflow-hidden bg-gray-200 border-2 border-white shadow-md">
                             {displayProfile.avatar_url ? (
-                                <img src={displayProfile.avatar_url} className="w-full h-full object-cover" alt="avatar" />
+                                <>
+                                    {/* Mobile account avatars render remote user profile URLs and keep the current direct loading path. */}
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={displayProfile.avatar_url} className="w-full h-full object-cover" alt="avatar" />
+                                </>
                             ) : (
                                 <div className="w-full h-full flex items-center justify-center text-gray-400">
                                     <User className="w-7 h-7" />
@@ -586,7 +590,13 @@ export default function MobileProfileView({
                                 <div key={review.id} className="flex gap-2.5">
                                     <div className="w-7 h-7 rounded-full bg-slate-200 overflow-hidden shrink-0">
                                         {review.host?.avatar_url
-                                            ? <img src={review.host.avatar_url} className="w-full h-full object-cover" alt="host" />
+                                            ? (
+                                                <>
+                                                    {/* Review host avatars render remote profile URLs and keep the existing lightweight mobile rendering path. */}
+                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                    <img src={review.host.avatar_url} className="w-full h-full object-cover" alt="host" />
+                                                </>
+                                            )
                                             : <User className="w-[12px] h-[12px] text-slate-400 m-auto mt-[8px]" />
                                         }
                                     </div>

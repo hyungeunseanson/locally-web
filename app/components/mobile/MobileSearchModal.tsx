@@ -602,7 +602,11 @@ export default function MobileSearchModal({
                                             <div className="flex items-center gap-2.5">
                                                 <div className="w-[26px] h-[18px] rounded-[4px] overflow-hidden flex items-center justify-center bg-white border border-[#E5E5E5]">
                                                     {lang.code ? (
-                                                        <img src={`https://flagcdn.com/w40/${lang.code}.png`} alt={lang.label} className="w-full h-full object-cover" />
+                                                        <>
+                                                            {/* Keep direct flag CDN images in the mobile language picker to avoid changing the existing lightweight search modal behavior. */}
+                                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                            <img src={`https://flagcdn.com/w40/${lang.code}.png`} alt={lang.label} className="w-full h-full object-cover" />
+                                                        </>
                                                     ) : (
                                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                                                             <circle cx="12" cy="12" r="9" stroke="#6B7280" strokeWidth="1.6" />

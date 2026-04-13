@@ -107,6 +107,8 @@ export default function HomeHero({
           {/* 체험 탭 */}
           <button data-testid="home-tab-experience" onClick={() => setActiveTab('experience')} className="flex flex-col items-center relative">
             <div className="w-[68px] h-[68px] flex items-center justify-center relative mb-[-4px]">
+              {/* These provider-hosted tab artworks intentionally stay raw to avoid changing existing fetch and optimization behavior. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="https://a0.muscache.com/im/pictures/airbnb-platform-assets/AirbnbPlatformAssets-search-bar-icons/original/e47ab655-027b-4679-b2e6-df1c99a5c33d.png?im_w=240"
                 alt="체험" className={`w-full h-full object-contain transition-opacity duration-200 ${activeTab !== 'experience' ? 'opacity-40' : 'opacity-100'}`}
@@ -124,6 +126,7 @@ export default function HomeHero({
           {/* 서비스 탭 */}
           <button data-testid="home-tab-service" onClick={() => setActiveTab('service')} className="flex flex-col items-center relative">
             <div className="w-[68px] h-[68px] flex items-center justify-center relative mb-[-4px]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="https://a0.muscache.com/im/pictures/airbnb-platform-assets/AirbnbPlatformAssets-search-bar-icons/original/3d67e9a9-520a-49ee-b439-7b3a75ea814d.png?im_w=240"
                 alt="서비스" className={`w-full h-full object-contain transition-opacity duration-200 ${activeTab !== 'service' ? 'opacity-40' : 'opacity-100'}`}
@@ -203,6 +206,8 @@ export default function HomeHero({
                   NEW
                 </div>
                 {/* 고화질 이미지 */}
+                {/* These provider-hosted tab artworks intentionally stay raw to avoid changing existing fetch and optimization behavior. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="https://a0.muscache.com/im/pictures/airbnb-platform-assets/AirbnbPlatformAssets-search-bar-icons/original/e47ab655-027b-4679-b2e6-df1c99a5c33d.png?im_w=240"
                   alt="체험"
@@ -231,6 +236,7 @@ export default function HomeHero({
                   NEW
                 </div>
                 {/* 고화질 이미지 */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="https://a0.muscache.com/im/pictures/airbnb-platform-assets/AirbnbPlatformAssets-search-bar-icons/original/3d67e9a9-520a-49ee-b439-7b3a75ea814d.png?im_w=240"
                   alt="서비스"

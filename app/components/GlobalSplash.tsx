@@ -1,4 +1,7 @@
+/* eslint-disable @next/next/no-img-element */
 'use client';
+
+// Splash art stays on plain static assets to avoid image optimization cost for a short-lived full-screen transition.
 
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -7,26 +10,34 @@ import { useSplash } from '@/app/context/SplashContext';
 export default function GlobalSplash() {
   const { visible, hideSplash } = useSplash();
   const [fading, setFading] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     if (!visible) {
-      setFading(false);
-      return;
+      const resetTimer = window.setTimeout(() => {
+        setFading(false);
+      }, 0);
+
+      return () => {
+        clearTimeout(resetTimer);
+      };
     }
-    const fadeTimer = setTimeout(() => setFading(true), 1000);
-    const doneTimer = setTimeout(() => hideSplash(), 1300);
+
+    const fadeTimer = window.setTimeout(() => {
+      setFading(true);
+    }, 1000);
+    const doneTimer = window.setTimeout(() => {
+      hideSplash();
+    }, 1300);
+
     return () => {
       clearTimeout(fadeTimer);
       clearTimeout(doneTimer);
     };
   }, [visible, hideSplash]);
 
-  if (!mounted || !visible) return null;
+  if (!visible || typeof document === 'undefined') {
+    return null;
+  }
 
   return createPortal(
     <div

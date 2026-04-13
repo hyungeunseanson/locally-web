@@ -1,20 +1,36 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import Script from 'next/script';
 
 declare global {
+  interface GoogleTranslateConstructor {
+    new (
+      options: {
+        pageLanguage: string;
+        includedLanguages: string;
+        layout: unknown;
+        autoDisplay: boolean;
+      },
+      containerId: string,
+    ): unknown;
+    InlineLayout: {
+      SIMPLE: unknown;
+    };
+  }
+
   interface Window {
-    google: any;
-    googleTranslateElementInit: any;
+    google?: {
+      translate?: {
+        TranslateElement: GoogleTranslateConstructor;
+      };
+    };
+    googleTranslateElementInit?: () => void;
   }
 }
 
 const GoogleTranslate = () => {
-  const [mounted, setMounted] = useState(false);
-
   useEffect(() => {
-    setMounted(true);
     window.googleTranslateElementInit = () => {
       if (window.google && window.google.translate) {
         new window.google.translate.TranslateElement({
@@ -26,8 +42,6 @@ const GoogleTranslate = () => {
       }
     };
   }, []);
-
-  if (!mounted) return null;
 
   return (
     <>

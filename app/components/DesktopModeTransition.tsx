@@ -1,4 +1,7 @@
+/* eslint-disable @next/next/no-img-element */
 'use client';
+
+// Mode transition illustrations intentionally use raw static assets to keep the overlay lightweight and avoid image transforms.
 
 import React from 'react';
 import { useLanguage } from '@/app/context/LanguageContext';
