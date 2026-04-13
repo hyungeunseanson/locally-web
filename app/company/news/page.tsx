@@ -2,7 +2,7 @@
 
 import React from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
-import { ArrowUpRight, ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/app/context/LanguageContext';
 
@@ -74,10 +74,10 @@ export default function NewsPage() {
         {/* 뉴스 리스트 */}
         <div className="flex flex-col">
           {NEWS_ITEMS.map((item) => (
-            <a 
-              key={item.id} 
-              href="#" 
-              className="group py-12 border-b border-[#EBEBEB] hover:border-black transition-colors duration-300 block"
+            <article
+              key={item.id}
+              data-testid="company-news-item"
+              className="py-12 border-b border-[#EBEBEB] block"
             >
               <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 md:gap-6">
                 
@@ -89,31 +89,31 @@ export default function NewsPage() {
                     <span className="text-[#999999] font-medium">{item.date}</span>
                   </div>
                   
-                  <h2 className="text-xl md:text-4xl font-bold leading-tight tracking-tight group-hover:text-[#484848] transition-colors">
+                  <h2 className="text-xl md:text-4xl font-bold leading-tight tracking-tight">
                     {item.title}
                   </h2>
                 </div>
 
-                {/* 화살표 아이콘 (호버 시 움직임) */}
+                {/* 운영 문서상 링크 owner가 아직 없으므로 읽기 preview로만 노출 */}
                 <div className="mt-2 md:mt-0">
-                  <div className="w-12 h-12 rounded-full border border-[#DDDDDD] flex items-center justify-center group-hover:bg-black group-hover:border-black transition-all duration-300">
-                    <ArrowUpRight 
-                      size={24} 
-                      className="text-black group-hover:text-white group-hover:rotate-45 transition-transform duration-300" 
-                    />
-                  </div>
+                  <span
+                    data-testid="company-news-preview-badge"
+                    className="inline-flex items-center rounded-full border border-[#DDDDDD] px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-[#717171]"
+                  >
+                    Archive preview
+                  </span>
                 </div>
               </div>
-            </a>
+            </article>
           ))}
         </div>
 
-        {/* 하단 더보기 버튼 */}
-        <div className="mt-20 text-center">
-          <button className="text-sm font-bold underline underline-offset-4 decoration-2 hover:text-[#717171] transition-colors uppercase tracking-widest">
-            Load More News
-          </button>
-        </div>
+        <p
+          data-testid="company-news-availability-note"
+          className="mt-16 text-center text-sm font-medium text-[#717171]"
+        >
+          External article links are being organized and will be added here after verification.
+        </p>
       </main>
     </div>
   );

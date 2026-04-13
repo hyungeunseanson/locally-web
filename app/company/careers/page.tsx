@@ -2,7 +2,6 @@
 
 import React from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
-import { ArrowUpRight } from 'lucide-react';
 
 const JOBS = [
   { title: 'Senior Product Designer', team: 'Design', loc: 'Seoul' },
@@ -30,25 +29,38 @@ export default function CareersPage() {
 
         <div>
           <div className="flex justify-between items-end border-b border-black pb-4 mb-0">
-            <h2 className="text-2xl font-bold">Open Positions</h2>
-            <span className="text-sm font-bold">{JOBS.length} Roles</span>
+            <h2 className="text-2xl font-bold">Upcoming Roles</h2>
+            <span className="text-sm font-bold">{JOBS.length} Planned Roles</span>
           </div>
           
           <div className="divide-y divide-[#EBEBEB]">
             {JOBS.map((job, i) => (
-              <a key={i} href="#" className="group py-10 flex items-center justify-between hover:bg-[#F9F9F9] -mx-4 px-4 transition-colors">
+              <article
+                key={i}
+                data-testid="company-career-role"
+                className="py-10 flex items-center justify-between -mx-4 px-4"
+              >
                 <div>
-                  <h3 className="text-2xl font-bold mb-2 group-hover:underline decoration-2 underline-offset-4">{job.title}</h3>
+                  <h3 className="text-2xl font-bold mb-2">{job.title}</h3>
                   <div className="flex gap-3 text-sm font-medium text-[#717171]">
                     <span>{job.team}</span>
                     <span>·</span>
                     <span>{job.loc}</span>
                   </div>
                 </div>
-                <ArrowUpRight size={24} className="text-gray-300 group-hover:text-black transition-colors" />
-              </a>
+                <span className="inline-flex items-center rounded-full border border-[#DDDDDD] px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-[#717171]">
+                  Hiring opens soon
+                </span>
+              </article>
             ))}
           </div>
+
+          <p
+            data-testid="company-careers-availability-note"
+            className="mt-8 text-sm font-medium text-[#717171]"
+          >
+            채용 공고와 지원 링크는 준비 중이며, 오픈 시 이 페이지에서 바로 안내됩니다.
+          </p>
         </div>
       </main>
     </div>

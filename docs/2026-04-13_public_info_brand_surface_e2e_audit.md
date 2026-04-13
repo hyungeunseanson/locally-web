@@ -4,16 +4,14 @@
 - 감사 범위: `about`, `company/*`, `help`, `global site announcement`
 - 현재 기준 결론:
   - `about`, `help`, `global site announcement`, `company/partnership`는 메타/공개 진입/운영 의미 기준으로 `정상`
-  - `company/news`, `company/notices`, `company/careers`, `company/investors`는 메타는 `정상`이지만, 본문 CTA와 데이터 truth는 정적 placeholder가 섞여 있어 `부분 보장`
+  - `company/news`, `company/careers`, `company/investors`는 dead CTA 제거 이후 `정상`
+  - `company/notices`는 메타는 `정상`이지만, 데이터 truth가 정적 placeholder 성격이라 `부분 보장`
 - 최신 재검증 결과:
-  - `25-public-metadata`
-  - `29-sitemap`
-  - `30-robots-policy`
-  - `103-site-announcements`
-  - `104-help-self-service`
   - `110-partnership-media-kit`
   - `172-partnership-inquiry-route`
-  - 결과: `21 passed`
+  - `25-public-metadata`
+  - `173-public-company-surface-cta`
+  - 결과: `15 passed`
 
 ## Result Snapshot
 | Surface | Source of truth | Current tests | Result | Notes |
@@ -22,10 +20,10 @@
 | Help | `app/help/layout.tsx`, `app/help/page.tsx` | `25`, `104`, `30` | 정상 | public metadata, FAQ 탐색, 1:1 문의 진입 copy가 현재 구현과 맞다 |
 | Global announcement | `app/config/siteAnnouncements.ts`, `app/utils/siteAnnouncements.ts`, `app/components/GlobalAnnouncementModal.tsx` | `103` | 정상 | path normalize, exclusion, locale fallback, dismissal key 의미가 안정적이다 |
 | Partnership | `app/company/partnership/layout.tsx`, `app/company/partnership/page.tsx`, `/api/company/partnership-inquiry` | `110`, `172`, `25` | 정상 | media kit modal과 public inquiry mail submit이 모두 current truth에 맞게 동작한다 |
-| Newsroom | `app/company/news/layout.tsx`, `app/company/news/page.tsx` | `25` | 부분 보장 | 메타는 정상이나 기사 링크가 `href="#"` 정적 placeholder다 |
+| Newsroom | `app/company/news/layout.tsx`, `app/company/news/page.tsx` | `25`, `173` | 정상 | 기사 카드는 archive preview로만 노출되고 dead link가 제거되었다 |
 | Notices | `app/company/notices/layout.tsx`, `app/company/notices/page.tsx` | 간접 `25` 범위 밖 | 부분 보장 | 아코디언 자체는 단순하지만 데이터가 in-file 정적 배열이다 |
-| Careers | `app/company/careers/layout.tsx`, `app/company/careers/page.tsx` | 간접 `25` 범위 밖 | 부분 보장 | open positions CTA가 `href="#"` placeholder다 |
-| Investors | `app/company/investors/layout.tsx`, `app/company/investors/page.tsx` | 간접 `25` 범위 밖 | 부분 보장 | annual report 카드가 클릭 affordance만 있고 실제 링크가 없다 |
+| Careers | `app/company/careers/layout.tsx`, `app/company/careers/page.tsx` | `173` | 정상 | 채용 링크 owner가 없을 때 upcoming roles 안내형 surface로 내려가 있다 |
+| Investors | `app/company/investors/layout.tsx`, `app/company/investors/page.tsx` | `173` | 정상 | annual report rows는 read-only 안내형으로 정리돼 false click이 없다 |
 
 ## Detailed Findings
 
@@ -91,26 +89,33 @@
 - 판정
   - `정상`
 
-### 5. `company/news`, `notices`, `careers`, `investors`는 메타는 정상이지만 본문 truth는 placeholder 비중이 높다
+### 5. `company/news`, `careers`, `investors`는 dead CTA 제거 후 안내형 public surface로 정리됐다
 - source of truth
   - `app/company/news/page.tsx`
-  - `app/company/notices/page.tsx`
   - `app/company/careers/page.tsx`
   - `app/company/investors/page.tsx`
 - 현재 동작
   - 각 layout은 `buildPublicMetadata()`를 사용해 메타를 일관되게 제공한다
-  - 반면 페이지 본문은 전부 in-file static array 또는 static card로 구성돼 있다
-  - `news` 기사, `careers` 공고는 `href="#"`이고 실제 도착지가 없다
-  - `investors` annual report rows는 클릭 affordance만 있고 링크/다운로드 owner가 없다
-  - `notices`는 읽기 자체는 가능하지만 데이터 source가 운영 시스템이 아니라 코드 상수다
+  - `news` 기사 카드는 외부 링크 대신 archive preview 배지와 안내 문구를 노출한다
+  - `careers`는 open positions가 아니라 upcoming roles 읽기 surface로 내려가 있고 지원 링크는 더 이상 노출되지 않는다
+  - `investors` annual report rows는 다운로드 owner가 붙기 전까지 read-only 안내형으로 유지된다
 - 테스트 보장
-  - 메타 수준에서만 `25-public-metadata`
+  - `25-public-metadata`
+  - `173-public-company-surface-cta`
+- 판정
+  - `정상`
+
+### 6. `company/notices`는 여전히 정적 데이터 의존이 남아 있다
+- source of truth
+  - `app/company/notices/page.tsx`
+- 현재 동작
+  - 읽기 자체는 가능하지만 데이터 source가 운영 시스템이 아니라 코드 상수다
+- 테스트 보장
+  - 메타 수준에서만 간접 `25-public-metadata`
 - 판정
   - `부분 보장`
-- 운영 리스크
-  - 검색 유입이나 public entry 이후 사용자가 클릭 가능한 공개 정보 surface로 기대할 때 dead CTA가 발생한다
 
-### 6. public company pages의 모바일 fallback은 현재 정보성 surface 의미와 약간 어긋난다
+### 7. public company pages의 모바일 fallback은 현재 정보성 surface 의미와 약간 어긋난다
 - 확인 사실
   - `company/news`, `company/notices`의 모바일 back fallback은 history가 없으면 `/account`로 이동한다
 - 판정
@@ -120,10 +125,10 @@
   - 다만 치명적인 기능 결함은 아니므로 low-risk navigation mismatch로 본다
 
 ## Coverage Gap
-- `company/news`, `company/notices`, `company/careers`, `company/investors` 본문 interaction 자체를 잠그는 E2E는 없다
+- `company/notices` 본문 interaction은 여전히 전용 E2E가 없다
 - public info pages의 모바일 back fallback(`/account`) 의미는 테스트로 잠겨 있지 않다
 
 ## Final Verdict
 - `public metadata / robots / announcement / help` 축은 현재 기준 `정상`
-- `company/*`는 메타/SEO shell은 괜찮지만, 실제 공개 정보 본문은 placeholder 또는 no-op affordance가 남아 있어 전체 도메인 판정은 `부분 보장`
-- 다음 핀셋 수정 1순위는 `news/careers/investors`의 dead CTA를 제거하거나 실제 링크 owner를 붙여 public truth를 맞추는 작업이다
+- `company/news`, `company/careers`, `company/investors`의 false click affordance는 닫혔고, 남은 active gap은 `company/notices`의 정적 데이터 owner와 모바일 fallback mismatch다
+- 다음 핀셋 수정 1순위는 `company/notices`의 운영 truth 정리 또는 public company pages 모바일 fallback 경로 정합성 보정이다

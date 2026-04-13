@@ -2,9 +2,10 @@
 
 import React from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
-import { ArrowDown } from 'lucide-react';
 
 export default function InvestorsPage() {
+  const reportYears = [2025, 2024, 2023];
+
   return (
     <div className="min-h-screen bg-white text-[#222222] font-sans selection:bg-black selection:text-white">
       <SiteHeader />
@@ -31,16 +32,26 @@ export default function InvestorsPage() {
         {/* Financial Reports */}
         <div>
           <h2 className="text-3xl font-bold mb-10">Financial Reports</h2>
+          <p
+            data-testid="company-investors-availability-note"
+            className="mb-6 text-sm font-medium text-[#717171]"
+          >
+            Downloadable annual reports will be published here once each reporting package is finalized.
+          </p>
           <div className="border-t border-black">
-            {[2025, 2024, 2023].map((year) => (
-              <div key={year} className="flex items-center justify-between py-8 border-b border-[#EBEBEB] group hover:bg-[#F9F9F9] -mx-4 px-4 transition-colors cursor-pointer">
+            {reportYears.map((year) => (
+              <div
+                key={year}
+                data-testid="company-investor-report-row"
+                className="flex items-center justify-between py-8 border-b border-[#EBEBEB] -mx-4 px-4"
+              >
                 <div>
                   <span className="block text-xs font-bold text-[#717171] mb-1">FISCAL YEAR</span>
-                  <span className="text-2xl font-bold group-hover:underline decoration-2 underline-offset-4">{year} Annual Report</span>
+                  <span className="text-2xl font-bold">{year} Annual Report</span>
                 </div>
-                <div className="w-12 h-12 rounded-full border border-[#DDDDDD] flex items-center justify-center group-hover:bg-black group-hover:border-black transition-all">
-                   <ArrowDown size={20} className="group-hover:text-white transition-colors" />
-                </div>
+                <span className="inline-flex items-center rounded-full border border-[#DDDDDD] px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-[#717171]">
+                  Available soon
+                </span>
               </div>
             ))}
           </div>
