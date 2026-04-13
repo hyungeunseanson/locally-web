@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "audit:e2e:host-app-cleanup": "node scripts/audit-e2e-host-application-cleanup.mjs",
     "cleanup:codex:dry": "node scripts/cleanup-codex-runtime-data.mjs",
     "cleanup:codex:execute:safe": "node scripts/cleanup-codex-runtime-data.mjs --execute",
     "cleanup:codex:execute": "node scripts/cleanup-codex-runtime-data.mjs --execute",

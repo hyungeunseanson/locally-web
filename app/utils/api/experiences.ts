@@ -1,16 +1,8 @@
 import type { Experience } from '../../types';
 import { createClient } from '../supabase/client';
 import {
-  isPublicHostApplicationStatus,
-  pickLatestPublicHostApplicationsByUser,
+  getVisiblePublicHostIdSet,
 } from '../hostVisibility';
-
-type PublicHostApplicationRow = {
-  id?: string | number | null;
-  user_id?: string | null;
-  status?: string | null;
-  created_at?: string | null;
-};
 
 type AvailabilityRow = {
   experience_id: number | string | null;
@@ -33,15 +25,9 @@ export const fetchActiveExperiences = async (): Promise<Experience[]> => {
     throw new Error('체험 데이터를 불러오는 데 실패했습니다.');
   }
 
-  const visibleHostIds = Array.from(
-    pickLatestPublicHostApplicationsByUser((publicHostApplications || []) as PublicHostApplicationRow[])
-      .values()
-  )
-    .filter((row) => isPublicHostApplicationStatus(row.status))
-    .map((row) => row.user_id)
-    .filter((value): value is string => typeof value === 'string' && value.length > 0);
+  const visibleHostIds = getVisiblePublicHostIdSet(publicHostApplications || []);
 
-  if (visibleHostIds.length === 0) {
+  if (visibleHostIds.size === 0) {
     return [];
   }
 
@@ -49,14 +35,15 @@ export const fetchActiveExperiences = async (): Promise<Experience[]> => {
     .from('experiences')
     .select('*')
     .eq('status', 'active')
-    .in('host_id', visibleHostIds)
     .order('created_at', { ascending: false });
 
   if (experiencesError) {
     throw new Error('체험 데이터를 불러오는 데 실패했습니다.');
   }
 
-  const experienceRows = (experiences || []) as Experience[];
+  const experienceRows = ((experiences || []) as Experience[]).filter((experience) =>
+    visibleHostIds.has(String(experience.host_id || ''))
+  );
   if (experienceRows.length === 0) {
     return [];
   }

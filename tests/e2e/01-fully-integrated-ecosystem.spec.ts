@@ -1,19 +1,261 @@
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { test, expect } from '@playwright/test';
 
 // 가상 유저 생성기 (중복 에러 방지를 위해 난수가 붙은 계정을 생성합니다)
 const generateFakeUser = (prefix: string) => {
     const timestamp = Date.now();
     return {
-        email: `${prefix}_${timestamp}@test.com`,
+        email: `codex.fully.integrated.${prefix}.${timestamp}@example.com`,
         password: 'password123!',
-        fullName: `Test ${prefix} ${timestamp}`,
+        fullName: `Codex Fully Integrated ${prefix} ${timestamp}`,
         phone: `010${Math.floor(Math.random() * 90000000) + 10000000}`,
         birthDate: '19950505',
         gender: 'Male' // 'Male' or 'Female' (대문자 주의)
     };
 };
+
+type EnvMap = Record<string, string>;
+type HostApplicationCleanupRow = {
+    id: string | number | null;
+    user_id?: string | null;
+};
+
+let adminClient: SupabaseClient | null = null;
+
+function loadEnv(): EnvMap {
+    return readFileSync('.env.local', 'utf8')
+        .split(/\n/)
+        .reduce<EnvMap>((acc, line) => {
+            const match = line.match(/^([^=]+)=(.*)$/);
+            if (match) acc[match[1]] = match[2];
+            return acc;
+        }, {});
+}
+
+function getAdminClient() {
+    if (adminClient) return adminClient;
+
+    const env = loadEnv();
+    adminClient = createClient(
+        env.NEXT_PUBLIC_SUPABASE_URL,
+        env.SUPABASE_SERVICE_ROLE_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+        {
+            auth: { persistSession: false, autoRefreshToken: false },
+        }
+    );
+
+    return adminClient;
+}
+
+async function findAuthUserIdsByEmails(emails: string[]) {
+    const supabase = getAdminClient();
+    const remainingEmails = new Set(emails.map((email) => email.toLowerCase()));
+    const matchedUserIds = new Set<string>();
+    const perPage = 200;
+    let page = 1;
+
+    while (remainingEmails.size > 0) {
+        const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
+        if (error) throw error;
+
+        const pageUsers = data?.users || [];
+        for (const user of pageUsers) {
+            const email = user.email?.toLowerCase();
+            if (!email || !remainingEmails.has(email)) continue;
+            matchedUserIds.add(user.id);
+            remainingEmails.delete(email);
+        }
+
+        if (pageUsers.length < perPage) break;
+        page += 1;
+    }
+
+    return Array.from(matchedUserIds);
+}
+
+async function deleteByIds(table: string, ids: Array<string | number>) {
+    if (ids.length === 0) return;
+
+    const supabase = getAdminClient();
+    const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+    if (uniqueIds.length === 0) return;
+
+    const { error } = await supabase.from(table).delete().in('id', uniqueIds);
+    if (error) throw error;
+}
+
+async function cleanupEpicRows(hostEmail: string, guestEmail: string, experienceTitle?: string) {
+    const supabase = getAdminClient();
+    const emails = [hostEmail, guestEmail];
+    const authUserIds = await findAuthUserIdsByEmails(emails);
+
+    const { data: profiles, error: profileError } = await supabase
+        .from('profiles')
+        .select('id,email')
+        .in('email', emails);
+    if (profileError) throw profileError;
+
+    const userIds = Array.from(
+        new Set([
+            ...authUserIds,
+            ...(profiles || []).map((row) => String(row.id)).filter(Boolean),
+        ])
+    );
+
+    const hostApplicationsByEmail = (
+        await supabase
+            .from('host_applications')
+            .select('id,user_id')
+            .in('email', emails)
+    );
+    if (hostApplicationsByEmail.error) throw hostApplicationsByEmail.error;
+
+    const hostApplicationsByUserId = userIds.length > 0
+        ? await supabase
+            .from('host_applications')
+            .select('id,user_id')
+            .in('user_id', userIds)
+        : { data: [], error: null };
+    if (hostApplicationsByUserId.error) throw hostApplicationsByUserId.error;
+
+    const hostApplicationsById = new Map<string, HostApplicationCleanupRow>();
+    for (const row of hostApplicationsByEmail.data || []) {
+        hostApplicationsById.set(String(row.id), row as HostApplicationCleanupRow);
+    }
+    for (const row of hostApplicationsByUserId.data || []) {
+        hostApplicationsById.set(String(row.id), row as HostApplicationCleanupRow);
+    }
+    const hostApplications = Array.from(hostApplicationsById.values());
+
+    let experienceIds: number[] = [];
+    if (experienceTitle) {
+        const experienceRows = new Map<number, { id: number }>();
+
+        const experienceByTitle = await supabase
+            .from('experiences')
+            .select('id')
+            .eq('title', experienceTitle);
+        if (experienceByTitle.error) throw experienceByTitle.error;
+        for (const row of experienceByTitle.data || []) {
+            experienceRows.set(Number(row.id), { id: Number(row.id) });
+        }
+
+        if (userIds.length > 0) {
+            const experienceByHost = await supabase
+                .from('experiences')
+                .select('id')
+                .in('host_id', userIds);
+            if (experienceByHost.error) throw experienceByHost.error;
+            for (const row of experienceByHost.data || []) {
+                experienceRows.set(Number(row.id), { id: Number(row.id) });
+            }
+        }
+
+        experienceIds = Array.from(experienceRows.keys());
+    } else if (userIds.length > 0) {
+        const { data: experiences, error: experienceError } = await supabase
+            .from('experiences')
+            .select('id')
+            .in('host_id', userIds);
+        if (experienceError) throw experienceError;
+        experienceIds = Array.from(new Set((experiences || []).map((row) => Number(row.id)).filter(Boolean)));
+    }
+
+    const inquiriesByUsers = userIds.length > 0
+        ? await supabase
+            .from('inquiries')
+            .select('id,user_id,host_id')
+            .in('user_id', userIds)
+        : { data: [], error: null };
+    if (inquiriesByUsers.error) throw inquiriesByUsers.error;
+
+    const inquiriesByHosts = userIds.length > 0
+        ? await supabase
+            .from('inquiries')
+            .select('id,user_id,host_id')
+            .in('host_id', userIds)
+        : { data: [], error: null };
+    if (inquiriesByHosts.error) throw inquiriesByHosts.error;
+
+    const { data: inquiriesByExperiences, error: inquiriesByExperiencesError } = experienceIds.length > 0
+        ? await supabase
+            .from('inquiries')
+            .select('id')
+            .in('experience_id', experienceIds.map(String))
+        : { data: [], error: null };
+    if (inquiriesByExperiencesError) throw inquiriesByExperiencesError;
+
+    const inquiryIds = Array.from(new Set([
+        ...((inquiriesByUsers.data || []).map((row) => String(row.id)).filter(Boolean)),
+        ...((inquiriesByHosts.data || []).map((row) => String(row.id)).filter(Boolean)),
+        ...((inquiriesByExperiences || []).map((row) => String(row.id)).filter(Boolean)),
+    ]));
+
+    if (inquiryIds.length > 0) {
+        const { error } = await supabase.from('inquiry_messages').delete().in('inquiry_id', inquiryIds);
+        if (error) throw error;
+        await deleteByIds('inquiries', inquiryIds);
+    }
+
+    if (userIds.length > 0) {
+        const { error: notificationError } = await supabase.from('notifications').delete().in('user_id', userIds);
+        if (notificationError) throw notificationError;
+
+        const { error: likeError } = await supabase.from('community_likes').delete().in('user_id', userIds);
+        if (likeError) throw likeError;
+
+        const { error: commentLikeError } = await supabase.from('community_comment_likes').delete().in('user_id', userIds);
+        if (commentLikeError && !String(commentLikeError.message || '').includes('community_comment_likes')) {
+            throw commentLikeError;
+        }
+
+        const { error: commentError } = await supabase.from('community_comments').delete().in('user_id', userIds);
+        if (commentError) throw commentError;
+
+        const { error: bookingByUserError } = await supabase.from('bookings').delete().in('user_id', userIds);
+        if (bookingByUserError) throw bookingByUserError;
+    }
+
+    if (experienceIds.length > 0) {
+        const { error: bookingByExperienceError } = await supabase.from('bookings').delete().in('experience_id', experienceIds);
+        if (bookingByExperienceError) throw bookingByExperienceError;
+
+        const { error: availabilityError } = await supabase.from('experience_availability').delete().in('experience_id', experienceIds);
+        if (availabilityError) throw availabilityError;
+
+        const { error: experienceError } = await supabase.from('experiences').delete().in('id', experienceIds);
+        if (experienceError) throw experienceError;
+    }
+
+    if (hostApplications && hostApplications.length > 0) {
+        await deleteByIds('host_applications', hostApplications.map((row) => String(row.id)));
+    }
+
+    if (experienceTitle) {
+        const escapedTitle = experienceTitle.replace(/[%_]/g, '\\$&');
+        const { error: adminAlertError } = await supabase
+            .from('notifications')
+            .delete()
+            .eq('type', 'admin_alert')
+            .ilike('message', `%${escapedTitle}%`);
+        if (adminAlertError) throw adminAlertError;
+    }
+
+    for (const userId of userIds) {
+        await supabase.from('profiles').delete().eq('id', userId);
+        await supabase.from('users').delete().eq('id', userId);
+    }
+
+    for (const userId of authUserIds) {
+        const { error } = await supabase.auth.admin.deleteUser(userId);
+        if (error && !String(error.message || '').includes('User not found')) {
+            throw error;
+        }
+    }
+}
 
 test.describe.serial('Epic: Fully Integrated Ecosystem Test (End-to-End)', () => {
     // 🎭 각 등장인물의 "계정 정보"
@@ -24,6 +266,10 @@ test.describe.serial('Epic: Fully Integrated Ecosystem Test (End-to-End)', () =>
 
     let createdExperienceTitle: string;
     test.setTimeout(120000); // 전체 시나리오를 한 번에 돌리므로 제한 시간을 2분으로 넉넉하게 잡습니다.
+
+    test.afterAll(async () => {
+        await cleanupEpicRows(hostUser.email, guestUser.email, createdExperienceTitle);
+    });
 
     test('All Scenes: Signup, Host Approval, EXP Creation, Booking, Payment, Messaging', async ({ browser }) => {
         // ==========================================

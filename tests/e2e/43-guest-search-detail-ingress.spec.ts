@@ -1,42 +1,11 @@
-import { readFileSync } from 'fs';
-
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test } from '@playwright/test';
-
-type EnvMap = Record<string, string>;
 type PublicExperience = {
   id: number;
   title: string;
   city: string | null;
   duration: number;
+  searchTerm: string;
 };
-
-let adminClient: SupabaseClient | null = null;
-
-function loadEnv(): EnvMap {
-  return readFileSync('.env.local', 'utf8')
-    .split(/\n/)
-    .reduce<EnvMap>((acc, line) => {
-      const match = line.match(/^([^=]+)=(.*)$/);
-      if (match) acc[match[1]] = match[2];
-      return acc;
-    }, {});
-}
-
-function getAdminClient() {
-  if (adminClient) return adminClient;
-
-  const env = loadEnv();
-  adminClient = createClient(
-    env.NEXT_PUBLIC_SUPABASE_URL,
-    env.SUPABASE_SERVICE_ROLE_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    {
-      auth: { persistSession: false, autoRefreshToken: false },
-    }
-  );
-
-  return adminClient;
-}
 
 function formatDurationLabel(duration: number) {
   return Number.isInteger(duration) ? String(duration) : duration.toString();
@@ -55,57 +24,78 @@ async function dismissAnnouncementIfVisible(page: import('@playwright/test').Pag
   }
 }
 
-async function getPublicExperienceFixture(): Promise<PublicExperience> {
-  const supabase = getAdminClient();
-  const { data: approvedHosts, error: approvedHostsError } = await supabase
-    .from('public_host_applications')
-    .select('user_id')
-    .eq('status', 'approved');
-
-  if (approvedHostsError) throw approvedHostsError;
-
-  const approvedHostIds = (approvedHosts ?? [])
-    .map((host) => String(host.user_id || ''))
-    .filter(Boolean);
-
-  if (approvedHostIds.length === 0) {
-    throw new Error('No approved hosts found for guest ingress smoke.');
-  }
-
-  const { data, error } = await supabase
-    .from('experiences')
-    .select('id, title, city, duration')
-    .eq('status', 'active')
-    .in('host_id', approvedHostIds)
-    .gt('duration', 0)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error) throw error;
-  if (!data?.id || !data?.title || typeof data.duration !== 'number') {
-    throw new Error('No active public experience with duration found for guest ingress smoke.');
-  }
-
-  return {
-    id: Number(data.id),
-    title: String(data.title),
-    city: data.city ? String(data.city) : null,
-    duration: Number(data.duration),
-  };
+function parseExperienceIdFromHref(href: string | null) {
+  const match = href?.match(/\/experiences\/(\d+)$/);
+  return match ? Number(match[1]) : null;
 }
 
-test.describe.serial('Guest search/detail ingress smoke', () => {
-  test('filters on home and opens the matching experience detail', async ({ page }) => {
-    const experience = await getPublicExperienceFixture();
-    const durationPattern = getDurationPattern(experience.duration);
+async function getPublicExperienceFixture(page: import('@playwright/test').Page): Promise<PublicExperience> {
+  await page.goto('/', { waitUntil: 'networkidle' });
+  await dismissAnnouncementIfVisible(page);
+
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const homeAllSection = page.getByTestId('home-desktop-all-experiences-section');
+    await expect(homeAllSection).toBeVisible({ timeout: 15000 });
+
+    const experienceLink = homeAllSection.locator('a[href^="/experiences/"]:visible').nth(attempt);
+    if (await experienceLink.count() === 0) {
+      break;
+    }
+
+    const href = await experienceLink.getAttribute('href');
+    const id = parseExperienceIdFromHref(href);
+    const title = (await experienceLink.getByTestId('experience-card-meta-title').textContent())?.trim();
+    const location = (await experienceLink.getByTestId('experience-card-meta-location').textContent())?.trim() || null;
+    const durationText = (await experienceLink.getByTestId('experience-card-duration').textContent())?.trim() || '';
+    const duration = Number(durationText.match(/\d+(?:\.\d+)?/)?.[0] || NaN);
+    const searchTerm = location?.split(',')[0]?.trim() || title || '';
+
+    if (!id || !title || !Number.isFinite(duration) || !searchTerm) {
+      continue;
+    }
+
+    await experienceLink.click();
+    await page.waitForURL(new RegExp(`/experiences/${id}$`), { timeout: 15000 });
+
+    const detailHeading = page.locator('h1:visible').first();
+    const notFoundHeading = page.getByRole('heading', {
+      name: /페이지를 찾을 수 없습니다|Page not found|ページが見つかりません|页面未找到/,
+    });
+
+    const hasDetailHeading = await detailHeading
+      .waitFor({ state: 'visible', timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
+    const hasNotFoundHeading = await notFoundHeading
+      .waitFor({ state: 'visible', timeout: 1000 })
+      .then(() => true)
+      .catch(() => false);
 
     await page.goto('/', { waitUntil: 'networkidle' });
     await dismissAnnouncementIfVisible(page);
 
+    if (hasDetailHeading && !hasNotFoundHeading) {
+      return {
+        id,
+        title,
+        city: location,
+        duration,
+        searchTerm,
+      };
+    }
+  }
+
+  throw new Error('No visible home experience fixture with a working public detail page was found.');
+}
+
+test.describe.serial('Guest search/detail ingress smoke', () => {
+  test('filters on home and opens the matching experience detail', async ({ page }) => {
+    const experience = await getPublicExperienceFixture(page);
+    const durationPattern = getDurationPattern(experience.duration);
+
     const homeSearchInput = page.locator('input[type="text"]').first();
     await expect(homeSearchInput).toBeVisible({ timeout: 15000 });
-    await homeSearchInput.fill(experience.title);
+    await homeSearchInput.fill(experience.searchTerm);
     await homeSearchInput.press('Enter');
 
     await expect
@@ -129,15 +119,12 @@ test.describe.serial('Guest search/detail ingress smoke', () => {
   });
 
   test('keeps desktop home search button submissions on home while filtering the feed', async ({ page }) => {
-    const experience = await getPublicExperienceFixture();
+    const experience = await getPublicExperienceFixture(page);
     const durationPattern = getDurationPattern(experience.duration);
-
-    await page.goto('/', { waitUntil: 'networkidle' });
-    await dismissAnnouncementIfVisible(page);
 
     const homeSearchInput = page.locator('input[type="text"]').first();
     await expect(homeSearchInput).toBeVisible({ timeout: 15000 });
-    await homeSearchInput.fill(experience.title);
+    await homeSearchInput.fill(experience.searchTerm);
     await page.getByTestId('home-desktop-search-submit').click();
 
     await expect
@@ -152,10 +139,10 @@ test.describe.serial('Guest search/detail ingress smoke', () => {
   });
 
   test('opens the same experience detail from search results', async ({ page }) => {
-    const experience = await getPublicExperienceFixture();
+    const experience = await getPublicExperienceFixture(page);
     const durationPattern = getDurationPattern(experience.duration);
 
-    await page.goto(`/search?location=${encodeURIComponent(experience.title)}`, {
+    await page.goto(`/search?location=${encodeURIComponent(experience.searchTerm)}`, {
       waitUntil: 'networkidle',
     });
     await dismissAnnouncementIfVisible(page);

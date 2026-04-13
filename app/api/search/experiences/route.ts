@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import {
-  isPublicHostApplicationStatus,
-  pickLatestPublicHostApplicationsByUser,
+  getVisiblePublicHostIdSet,
 } from '@/app/utils/hostVisibility';
 import { getSearchableCityAliases } from '@/app/utils/searchLocationCatalog';
 import { createClient } from '@/app/utils/supabase/server';
@@ -175,6 +174,24 @@ type AvailabilityRow = {
   start_time?: string | null;
 };
 
+function hasVisibleHost(item: SearchExperience, visibleHostIds: Set<string>) {
+  const hostId = asString((item as Record<string, unknown>).host_id);
+  return Boolean(hostId) && visibleHostIds.has(hostId);
+}
+
+function stripInternalExperienceFields(item: SearchExperience) {
+  const publicItem = {
+    ...(item as SearchExperience & {
+      host_id?: unknown;
+    }),
+  } as SearchExperience & {
+    host_id?: unknown;
+  };
+
+  delete publicItem.host_id;
+  return publicItem;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -185,15 +202,9 @@ export async function GET(request: NextRequest) {
 
     if (visibleHostsError) throw visibleHostsError;
 
-    const visibleHostIds = Array.from(
-      pickLatestPublicHostApplicationsByUser(publicHostApplications || [])
-        .values()
-    )
-      .filter((row) => isPublicHostApplicationStatus(row.status))
-      .map((row) => String(row.user_id || ''))
-      .filter(Boolean);
+    const visibleHostIds = getVisiblePublicHostIdSet(publicHostApplications || []);
 
-    if (visibleHostIds.length === 0) {
+    if (visibleHostIds.size === 0) {
       const emptyResponse: SearchExperiencesResponse = { data: [] };
       return NextResponse.json(emptyResponse);
     }
@@ -223,9 +234,12 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from('experiences')
-      .select(needsTextFilterFields ? SEARCH_EXPERIENCE_SELECT : SEARCH_EXPERIENCE_CARD_SELECT)
-      .eq('status', 'active')
-      .in('host_id', visibleHostIds);
+      .select(
+        needsTextFilterFields
+          ? `${SEARCH_EXPERIENCE_SELECT}, host_id`
+          : `${SEARCH_EXPERIENCE_CARD_SELECT}, host_id`
+      )
+      .eq('status', 'active');
 
     if (city) {
       query = query.eq('city', city);
@@ -269,7 +283,9 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query.order('created_at', { ascending: false });
     if (error) throw error;
 
-    let filtered = (data ?? []) as unknown as SearchExperience[];
+    let filtered = ((data ?? []) as unknown as SearchExperience[]).filter((item) =>
+      hasVisibleHost(item, visibleHostIds)
+    );
 
     if (searchTerms.length > 0) {
       filtered = filtered.filter((item) => {
@@ -333,7 +349,7 @@ export async function GET(request: NextRequest) {
     filtered = filtered.filter((item) => matchesTimeSelection(item, selectedTimes));
 
     const response: SearchExperiencesResponse = {
-      data: filtered,
+      data: filtered.map(stripInternalExperienceFields),
     };
 
     return NextResponse.json(response);

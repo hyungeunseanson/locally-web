@@ -106,6 +106,9 @@ test.afterAll(async () => {
   const supabase = getAdminClient();
 
   for (const userId of createdAuthUserIds) {
+    await supabase.from('host_applications').delete().eq('user_id', userId);
+    await supabase.from('profiles').delete().eq('id', userId);
+    await supabase.from('users').delete().eq('id', userId);
     await supabase.auth.admin.deleteUser(userId);
   }
 });

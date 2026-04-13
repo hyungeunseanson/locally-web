@@ -3,6 +3,8 @@ import { readFileSync } from 'fs';
 import { expect, type Page } from '@playwright/test';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
+import { getVisiblePublicHostIdSet } from '@/app/utils/hostVisibility';
+
 type EnvMap = Record<string, string>;
 
 export type TestUser = {
@@ -55,8 +57,10 @@ type InsertTestBookingInput = {
 };
 
 type PublicHostApplicationRow = {
+  id?: string | number | null;
   user_id?: string | null;
   status?: string | null;
+  created_at?: string | null;
 };
 
 type ExperienceFixtureRow = {
@@ -331,16 +335,13 @@ export async function getLatestHostExperienceWithOptions({
 }) {
   const supabase = getAdminClient();
 
-  const buildExperienceQuery = (hostIds?: string[]) => {
+  const buildExperienceQuery = () => {
     let query = supabase
       .from('experiences')
       .select('id, title, status, host_id, max_guests, price, private_price, is_private_enabled')
       .gte('max_guests', minimumMaxGuests);
 
-    if (hostIds && hostIds.length > 0) {
-      query = query.in('host_id', hostIds);
-      query = query.in('status', ['approved', 'active']);
-    } else if (!searchAnyHost) {
+    if (!searchAnyHost) {
       query = query.eq('host_id', hostUserId);
     } else {
       query = query.in('status', ['approved', 'active']);
@@ -363,24 +364,35 @@ export async function getLatestHostExperienceWithOptions({
   if (!experience && !searchAnyHost) {
     const { data: visibleHostRows, error: visibleHostError } = await supabase
       .from('public_host_applications')
-      .select('user_id, status');
+      .select('id, user_id, status, created_at');
 
     if (visibleHostError) throw visibleHostError;
 
-    const visibleHostIds = (visibleHostRows ?? [])
-      .reduce<string[]>((acc, row: PublicHostApplicationRow) => {
-        const userId = typeof row.user_id === 'string' ? row.user_id : '';
-        if (!userId) return acc;
-        if (row.status !== 'approved' && row.status !== 'active') return acc;
-        if (acc.includes(userId)) return acc;
-        acc.push(userId);
-        return acc;
-      }, []);
+    const visibleHostIds = getVisiblePublicHostIdSet(
+      (visibleHostRows ?? []) as PublicHostApplicationRow[]
+    );
 
-    if (visibleHostIds.length > 0) {
-      const fallbackResult = await buildExperienceQuery(visibleHostIds);
-      experience = fallbackResult.data;
-      error = fallbackResult.error;
+    if (visibleHostIds.size > 0) {
+      let fallbackQuery = supabase
+        .from('experiences')
+        .select('id, title, status, host_id, max_guests, price, private_price, is_private_enabled')
+        .in('status', ['approved', 'active'])
+        .gte('max_guests', minimumMaxGuests);
+
+      if (requirePrivateEnabled) {
+        fallbackQuery = fallbackQuery.eq('is_private_enabled', true).gt('private_price', 0);
+      }
+
+      const fallbackResult = await fallbackQuery.order('created_at', { ascending: false });
+      if (fallbackResult.error) {
+        throw fallbackResult.error;
+      }
+
+      experience =
+        ((fallbackResult.data || []) as ExperienceFixtureRow[]).find((row) =>
+          visibleHostIds.has(String(row.host_id || ''))
+        ) ?? null;
+      error = null;
     }
   }
 

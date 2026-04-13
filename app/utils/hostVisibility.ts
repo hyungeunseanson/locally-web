@@ -53,3 +53,18 @@ export function pickLatestPublicHostApplicationsByUser<T extends PublicHostAppli
 
   return latestByUser;
 }
+
+export function getVisiblePublicHostIdSet<T extends PublicHostApplicationLike>(rows: T[]) {
+  const visibleHostIds = new Set<string>();
+
+  for (const row of pickLatestPublicHostApplicationsByUser(rows).values()) {
+    const userId = typeof row.user_id === 'string' ? row.user_id : '';
+    if (!userId || !isPublicHostApplicationStatus(row.status)) {
+      continue;
+    }
+
+    visibleHostIds.add(userId);
+  }
+
+  return visibleHostIds;
+}
