@@ -79,7 +79,7 @@ JSON 형식:
 
     try {
         return JSON.parse(text);
-    } catch (e) {
+    } catch {
         // Fallback for parsing error
         console.error('Failed to parse Gemini JSON output:', text);
         return {

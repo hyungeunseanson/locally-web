@@ -182,11 +182,6 @@ async function findRecipientEmail(recipientId: string) {
   const { data: authData } = await supabaseAdmin.auth.admin.getUserById(recipientId);
   return authData?.user?.email || '';
 }
-
-function escapeHtml(str: string) {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
 export async function resolveInquiryNotificationEmailCopy(params: {
   supabaseAdmin: ReturnType<typeof createAdminClient>;
   recipientId: string;

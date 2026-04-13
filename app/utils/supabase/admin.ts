@@ -26,7 +26,7 @@ interface AuditLogParams {
   action_type: string;
   target_type: string;
   target_id: string;
-  details?: any;
+  details?: unknown;
 }
 
 /**

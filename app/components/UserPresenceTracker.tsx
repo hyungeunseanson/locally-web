@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef } from 'react';
+import type { RealtimeChannel, User } from '@supabase/supabase-js';
 import { usePathname } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 
@@ -11,10 +12,10 @@ export default function UserPresenceTracker() {
 
   // 1. 실시간 채널 (Online 상태 표시용 - 로그인 유저 전용 & 다이나믹 리스너)
   useEffect(() => {
-    let channel: any;
-    let profileChannel: any;
+    let channel: RealtimeChannel | null = null;
+    let profileChannel: RealtimeChannel | null = null;
 
-    const trackPresence = async (user: any) => {
+    const trackPresence = async (user: User | null | undefined) => {
       // 비회원이면 트래킹 안 함
       if (!user) return;
 
@@ -37,10 +38,11 @@ export default function UserPresenceTracker() {
       };
 
       if (!channel) {
-        channel = supabase.channel('online_users');
-        channel.on('presence', { event: 'sync' }, () => { }).subscribe(async (status: string) => {
+        const presenceChannel = supabase.channel('online_users');
+        channel = presenceChannel;
+        presenceChannel.on('presence', { event: 'sync' }, () => { }).subscribe(async (status: string) => {
           if (status === 'SUBSCRIBED') {
-            await channel.track(payload);
+            await presenceChannel.track(payload);
           }
         });
       } else {

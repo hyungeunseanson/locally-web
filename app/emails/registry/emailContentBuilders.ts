@@ -33,10 +33,6 @@ function buildScheduleValue(date: string, time?: string) {
   return [date, time].filter(Boolean).join('\n');
 }
 
-function stripLocallyPrefix(subject: string) {
-  return subject.replace(/^\[Locally\]\s*/u, '').trim();
-}
-
 function buildBookingLabels(locale: EmailLocale) {
   switch (locale) {
     case 'en':

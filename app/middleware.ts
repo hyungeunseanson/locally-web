@@ -19,9 +19,10 @@ export async function middleware(request: NextRequest) {
     return await updateSession(request);
   }
 
+  const originalPathname = new URL(request.url).pathname;
+
   // 1. URL Path에서 locale 추출 (ko|en|ja|zh)
   // next.config rewrites가 prefix를 제거할 수 있으므로 original request URL을 우선 사용한다.
-  const originalPathname = new URL(request.url).pathname;
   const resolvedLocale =
     extractLocaleFromPathname(originalPathname) ||
     extractLocaleFromPathname(pathname);

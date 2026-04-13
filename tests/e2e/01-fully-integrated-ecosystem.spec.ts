@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 import { test, expect } from '@playwright/test';
 
 // 가상 유저 생성기 (중복 에러 방지를 위해 난수가 붙은 계정을 생성합니다)
@@ -21,9 +23,6 @@ test.describe.serial('Epic: Fully Integrated Ecosystem Test (End-to-End)', () =>
     const adminPassword = '00000000';
 
     let createdExperienceTitle: string;
-    let createdExperienceId: string | null = null;
-    let createdBookingId: string | null = null;
-
     test.setTimeout(120000); // 전체 시나리오를 한 번에 돌리므로 제한 시간을 2분으로 넉넉하게 잡습니다.
 
     test('All Scenes: Signup, Host Approval, EXP Creation, Booking, Payment, Messaging', async ({ browser }) => {
@@ -175,7 +174,6 @@ test.describe.serial('Epic: Fully Integrated Ecosystem Test (End-to-End)', () =>
         const fileChooserPromise = hostPage.waitForEvent('filechooser');
         await hostPage.locator('label').filter({ hasText: '대표사진 추가' }).click();
         const fileChooser = await fileChooserPromise;
-        const path = require('path');
         await fileChooser.setFiles(path.join(process.cwd(), 'tests', 'e2e', 'test-image.png'));
 
         // 사진이 업로드되어 미리보기가 나타날 때까지 확실히 대기

@@ -1,12 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import {
     ChevronLeft, ChevronRight, Share, Heart, MapPin, Star, Globe,
-    Check, X, Grid, Copy, ArrowLeft,
+    Check, X, Grid, ArrowLeft,
     Clock, Users, Globe2, Sparkles, AlertCircle
 } from 'lucide-react';
 import SiteHeader from '@/app/components/SiteHeader';
@@ -20,14 +19,6 @@ const PHOTOS = [
     'https://images.unsplash.com/photo-1503899036084-c55cdd92da26?auto=format&fit=crop&q=80&w=800',
     'https://images.unsplash.com/photo-1551482850-24982613ce43?auto=format&fit=crop&q=80&w=800',
     'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&q=80&w=800',
-];
-
-// ── 핵심 요약 ────────────────────────────────────────────────
-const QUICK_FACTS = [
-    { icon: Clock, label: '소요 시간', val: '최소 4시간 (협의 가능)' },
-    { icon: Users, label: '최대 인원', val: '1팀 4명 (추가금 없음)' },
-    { icon: Globe2, label: '사용 언어', val: '한국어 레벨 3~4 (중·고급)' },
-    { icon: MapPin, label: '가능 지역', val: '도쿄, 오사카, 후쿠오카' },
 ];
 
 export default function ServiceIntroAirbnbStylePage() {
