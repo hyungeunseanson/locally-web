@@ -7,10 +7,9 @@
 - 이번 패스 핵심 결론
   - 예약 생성부터 무통장 확정, 어드민 정산 완료, 호스트 수익 반영까지의 핵심 write/read 체인은 현재 기준으로 이어져 있다
   - 체험 정산의 source of truth는 `bookings.status` 와 `bookings.payout_status` 두 축으로 분리되어 있다
-  - 다만 `completed` 의미는 화면마다 완전히 동일하지 않다
-    - `ReservationManager`는 일정 날짜 기준으로 completed 탭에 보낼 수 있다
-    - `host earnings`, `payout queue`, `sales summary`는 실제 DB `status='completed'`를 기준으로 정산 대기/완료를 계산한다
-  - 따라서 핵심 리스크는 코드 파손보다는 `completed sync 운영 의존성`과 `화면별 의미 차이`다
+  - `ReservationManager`는 일정 기준의 `지난 일정`, `host earnings`와 `payout queue`는 DB 완료 동기화 기준의 `정산 대기/완료`를 본다
+  - 이 의미 차이는 2026-04-13 copy 보강으로 화면상 설명 가능해졌고, active product risk보다는 의도된 해석 차이로 분류한다
+  - 따라서 현재 핵심 리스크는 코드 파손보다는 `completed sync 운영 의존성` 쪽에 집중된다
 - 최신 재실행 결과
   - `tests/e2e/150-experience-bank-confirm-guard.spec.ts`
   - `tests/e2e/06-admin-master-ledger.spec.ts`
@@ -42,6 +41,11 @@
   - guest trips의 completed sync와 admin settlement sync health panel이 현재 계약과 맞게 동작한다
   - payout mark-paid 이후 host earnings는 `paid` bucket으로 즉시 반영된다
   - settlement sync health panel은 `delayed`, `running_stale`, `503 fail-closed` 의미를 현재 코드와 일치하게 설명할 수 있다
+  - 호스트 예약 탭의 `지난 일정`과 호스트 수익의 `정산 대기` 의미 차이는 copy로 명시돼 더 이상 숨은 해석 차이로 남지 않는다
+- 후속 얇은 회귀 재확인
+  - `tests/e2e/40-host-reservations-inquiries-ui.spec.ts`
+  - `tests/e2e/133-host-payout-summary-reflection.spec.ts`
+  - 결과: `5 passed (45.7s)`
 
 ## Summary Matrix
 | 체인 | source of truth | 현재 보장 테스트 | 판정 | 핵심 메모 |
@@ -51,7 +55,7 @@
 | 완료 동기화 | `/api/cron/complete-trips`, `/api/admin/settlement-sync`, `experienceCompletion`, `/api/guest/trips/sync-completed` | `57`, `155` | 부분 보장 | due 판단과 `completed` write owner는 명확하지만 운영 job/수동 sync 의존성이 남아 있다 |
 | 정산 큐/매출/정산 실행 | `/api/admin/payout-queue`, `/api/admin/sales-summary`, `settleHostPayout()` | `130`, `06` | 정상 | `payout_status='pending' -> 'paid'`가 queue/sales/action 모두에서 일관된다 |
 | 호스트 수익 반영 | `/api/host/earnings/summary`, `hostEarningsSummary` | `133` | 정상 | `completed + payout_status` 기준으로 pending/paid bucket이 정확히 나뉜다 |
-| 남은 실제 리스크 | `ReservationManager` completed 분류, settlement sync health | 이번 static audit, `57`, `155` | 리스크 | 일정 관점 completed와 DB 정산 관점 completed가 완전히 같지 않다 |
+| 남은 실제 리스크 | settlement sync health / 운영 실행 | 이번 static audit, `57`, `155` | 리스크 | completed write owner가 cron/manual sync에 묶여 있어 운영 health가 핵심이다 |
 
 ## Chain-by-Chain Audit
 
@@ -167,24 +171,9 @@
     - `getExperienceSettlementStage()`는 `completed -> pending`, `paid -> paid`, `confirmed/PAID -> in_progress` 의미를 명확히 갖고 있다
     - `133`이 pending/paid bucket과 latest paid 반영을 직접 검증한다
 
-## Active Risks
+## Active Risk
 
-### A. `ReservationManager` completed 의미와 정산 completed 의미가 다르다
-- 관련 source
-  - [app/host/dashboard/components/ReservationManager.tsx](/Users/hyungeunseanson/Documents/서비스/locally-web/app/host/dashboard/components/ReservationManager.tsx:398)
-  - [app/utils/hostEarningsSummary.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/utils/hostEarningsSummary.ts:26)
-  - [app/api/admin/payout-queue/route.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/api/admin/payout-queue/route.ts:260)
-- 현재 상태
-  - `ReservationManager`는 날짜가 오늘 이전이고 pending/requesting이 아니면 completed 탭으로 분류할 수 있다
-  - 반면 host earnings와 payout queue는 실제 DB `status='completed'`를 기준으로 정산 대기 진입을 계산한다
-- 운영 영향
-  - 호스트가 예약 탭에서는 “지난 일정”으로 보는데, 수익 탭에서는 아직 `in_progress` 로 보일 수 있다
-  - 이는 DB 손상은 아니지만 제품 의미 차이로 인한 혼선 가능성이 있다
-- 현재 판정
-  - `리스크`
-  - 기본 해석은 `예약 화면은 일정 관점`, `정산 화면은 DB 정산 관점`으로 분리하는 쪽이 가장 안전하다
-
-### B. settlement sync 운영 의존성
+### settlement sync 운영 의존성
 - 관련 source
   - [app/utils/settlementSync/experienceCompletion.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/utils/settlementSync/experienceCompletion.ts:291)
   - [app/api/cron/complete-trips/route.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/api/cron/complete-trips/route.ts:1)
@@ -199,6 +188,24 @@
 - 현재 판정
   - `리스크`
   - 코드 수정보다 먼저 `운영 runbook + health pass/fail 체크리스트`로 닫는 것이 적합하다
+
+## Closed Interpretation Gap
+
+### `지난 일정`과 `정산 대기`는 서로 다른 질문을 답한다
+- 관련 source
+  - [app/host/dashboard/components/ReservationManager.tsx](/Users/hyungeunseanson/Documents/서비스/locally-web/app/host/dashboard/components/ReservationManager.tsx:398)
+  - [app/utils/hostEarningsSummary.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/utils/hostEarningsSummary.ts:26)
+  - [app/api/admin/payout-queue/route.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/api/admin/payout-queue/route.ts:260)
+  - [app/context/LanguageContext.tsx](/Users/hyungeunseanson/Documents/서비스/locally-web/app/context/LanguageContext.tsx:210)
+- 현재 해석
+  - 예약 화면은 일정 관점이라 일정이 지나면 `지난 일정`으로 분류될 수 있다
+  - 수익/정산 화면은 DB 완료 동기화 관점이라 실제 `status='completed'` 이후에만 `정산 대기`로 잡힌다
+- close-out 근거
+  - 2026-04-13 기준 host reservation label과 earnings scope copy를 보강해, 숨은 의미 차이가 아니라 명시된 제품 해석으로 정리했다
+  - `tests/e2e/40-host-reservations-inquiries-ui.spec.ts`, `tests/e2e/133-host-payout-summary-reflection.spec.ts` 재확인 결과 `5 passed (45.7s)`
+- 현재 판정
+  - `정상`
+  - 추가 로직 변경 없이 현행 의미 분리를 유지하는 것이 가장 안전하다
 
 ## 영향 파일 인벤토리
 - 예약 생성 / 초기 truth
@@ -231,9 +238,7 @@
 
 ## Close-out
 - 이번 감사 기준으로 `게스트 예약 생성 → 호스트/어드민 초기 반영 → 무통장 확정 snapshot → 어드민 정산 실행 → 호스트 수익 반영` 체인은 현재 정상으로 본다
-- 남은 핵심 리스크는 둘 다 제품 의미/운영 health 성격이다
-  - `ReservationManager` completed 분류와 정산 completed 분류의 의미 차이
-  - settlement sync 운영 의존성
-- 따라서 다음 후속의 기본 선택은 구현보다 아래 2개를 먼저 닫는 것이다
+- 남은 핵심 리스크는 이제 `settlement sync 운영 의존성` 하나로 좁혀진다
+- 따라서 다음 후속의 기본 선택은 구현보다 아래를 먼저 닫는 것이다
   - [experience settlement sync 운영 runbook](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/2026-04-13_experience_settlement_sync_runbook.md:1)
-  - `completed 의미 차이`를 제품적으로 허용할지에 대한 decision close-out
+  - `정산 실행 day-of 운영 체크리스트`와 health pass/fail 기준
