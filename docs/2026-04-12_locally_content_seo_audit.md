@@ -132,10 +132,12 @@
 ## Follow-up Need
 - 1순위
   - Google Search Console / Naver Search Advisor 운영 제출과 inspection 루프를 별도 체크리스트로 운영해야 한다
+  - 현재 체크리스트 문서: [docs/2026-04-13_locally_content_search_console_ops_checklist.md](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/2026-04-13_locally_content_search_console_ops_checklist.md:1)
 - 2순위
   - `locally_content` 발행 시 대표 이미지 품질 기준을 운영 규칙으로 잠그는 것이 좋다
 - 3순위
   - 나중에 `/community`를 도시별 혹은 포맷별 indexable landing으로 넓힐 계획이 생기면 canonical 전략을 다시 열어야 한다
+  - 실도메인 `www.locally-travel.com` cutover 시에는 코드 수정이 아니라 `NEXT_PUBLIC_SITE_URL` 전환과 재배포 기준으로 처리한다
 
 ## Final Verdict
 - 현재 코드 기준 `로컬리 콘텐츠 SEO core`는 `정상`이다

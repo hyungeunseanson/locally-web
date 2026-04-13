@@ -5,6 +5,20 @@
 - 현재 제품 해석은 `COMMUNITY_OPEN=false` 기준 `locally_content` 공개 발행면 운영이다
 - 따라서 운영 체크 대상도 `/community`와 `locally_content` 상세 중심으로 고정한다
 
+## 현재 운영 기준 URL
+- 현재 코드의 site URL single source는 `NEXT_PUBLIC_SITE_URL`이다
+- source of truth
+  - [app/utils/siteUrl.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/utils/siteUrl.ts:1)
+  - [docs/gemini.md](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/gemini.md:458)
+- 아직 기존 웹사이트가 `www.locally-travel.com`을 쓰고 있는 동안에는, 이 저장소의 canonical / sitemap / robots / OG 기준 URL도 현재 배포 도메인으로 유지해야 한다
+- 즉 전환 전 원칙은 단순하다
+  - 현재 운영 배포 도메인 유지
+  - `www.locally-travel.com` cutover 시점까지 SEO 코드 수정은 하지 않음
+  - 최종 전환 시에는 `NEXT_PUBLIC_SITE_URL`만 새 도메인으로 교체하고 재배포
+- 절대 하면 안 되는 것
+  - 실제 연결 전 `NEXT_PUBLIC_SITE_URL`만 먼저 `www.locally-travel.com`으로 바꾸는 것
+  - 이렇게 하면 canonical/sitemap은 새 도메인을 가리키는데 실제 응답은 옛 도메인에 남아 source mismatch가 생긴다
+
 ## 운영 범위
 - indexable 대상
   - `/community`
@@ -19,6 +33,7 @@
 - Search Console에 실제 운영 도메인이 등록되어 있어야 한다
 - 가능하면 URL-prefix보다 Domain property를 우선으로 둔다
 - `https`, `www`, locale path가 실제 운영 도메인과 어긋나지 않는지 확인한다
+- 도메인 전환 전에는 현재 운영 배포 도메인 기준 property를 보고, 전환 후에는 `www.locally-travel.com` 기준 property를 주 속성으로 삼는다
 
 ### 2. sitemap 제출
 - `sitemap.xml` 제출 URL
@@ -59,6 +74,51 @@
   3. sitemap 반영 확인
   4. Search Console URL Inspection
 - 최소 주 1회는 `/community` 허브와 최근 글 3건 정도를 샘플링한다
+
+## 실도메인 cutover 체크리스트
+### 1. cutover 직전
+- `www.locally-travel.com`이 아직 이전 사이트에 연결돼 있으면, 이 저장소의 `NEXT_PUBLIC_SITE_URL`은 그대로 현재 배포 도메인에 둔다
+- cutover 직전에 아래를 같이 준비한다
+  - Vercel 프로젝트에 `www.locally-travel.com` 연결 가능 상태
+  - `NEXT_PUBLIC_SITE_URL=https://www.locally-travel.com`
+  - live smoke를 쓴다면 `PLAYWRIGHT_LIVE_BASE_URL=https://www.locally-travel.com`
+
+### 2. cutover 실행
+- 순서는 반드시 아래처럼 고정한다
+  1. Vercel에서 `www.locally-travel.com`을 현재 프로젝트에 연결
+  2. `NEXT_PUBLIC_SITE_URL`을 `https://www.locally-travel.com`으로 변경
+  3. 필요하면 `PLAYWRIGHT_LIVE_BASE_URL`도 같은 값으로 변경
+  4. production 재배포
+- 이 묶음은 코드 수정이 아니라 env + 배포 작업이다
+
+### 3. cutover 직후 검증
+- 브라우저에서 아래를 바로 확인한다
+  - `https://www.locally-travel.com/robots.txt`
+  - `https://www.locally-travel.com/sitemap.xml`
+  - `https://www.locally-travel.com/community`
+  - 최근 `locally_content` 상세 2건
+- 확인 항목
+  - canonical이 `www.locally-travel.com`으로 바뀌었는지
+  - sitemap URL들도 새 도메인 기준인지
+  - robots의 sitemap 링크가 새 도메인인지
+  - `/community`와 상세의 OG URL이 새 도메인인지
+
+### 4. cutover 후 Search Console / Naver 후속
+- Google
+  - `https://www.locally-travel.com/sitemap.xml` 다시 제출
+  - `/community`와 최근 콘텐츠 2~3건 URL Inspection 실행
+  - 필요 시 `색인 생성 요청`
+- Naver
+  - 새 도메인 기준 sitemap 재제출
+  - robots.txt 재확인
+  - 대표 상세 URL 1~2개 수집 요청 여부 확인
+
+### 5. rollback 기준
+- 아래 중 하나라도 깨지면 우선 env와 연결 상태부터 확인한다
+  - canonical은 새 도메인인데 실제 페이지는 이전 도메인으로 리다이렉트됨
+  - robots/sitemap은 이전 도메인을 계속 가리킴
+  - Search Console inspection에서 alternate canonical mismatch가 뜸
+- 즉 cutover 이슈의 1순위 의심 지점은 코드가 아니라 `도메인 연결 + NEXT_PUBLIC_SITE_URL + 재배포 반영 여부`다
 
 ## Naver Search Advisor 체크리스트
 ### 1. 사이트 등록
@@ -109,6 +169,8 @@
 - 현재 코드는 legacy community 상세를 접근 가능하게 남겨두되 noindex로 미는 정책이다
 - 즉 “열린다”와 “검색에 적극 노출한다”는 같은 뜻이 아니다
 - 검색 유입 성과는 코드보다 실제 콘텐츠 품질, 이미지, 제목, 발행 빈도에 더 크게 좌우될 수 있다
+- 실도메인 cutover는 SEO 로직 변경 작업이 아니라 `site URL env 전환 작업`이다
+- 따라서 cutover 시점에는 코드를 다시 바꾸기보다, env와 배포 반영이 올바른지부터 보는 게 맞다
 
 ## 참고 공식 문서
 - Google Title links
