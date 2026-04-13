@@ -56,6 +56,20 @@ type PayoutQueueResponse = {
   combinedHostTotals?: AdminCombinedPayoutQueueRow[];
 };
 
+type ExperiencePayoutGuard = {
+  safe: boolean;
+  tone: 'success' | 'info' | 'warning' | 'error';
+  title: string;
+  message: string;
+};
+
+const DEFAULT_EXPERIENCE_PAYOUT_GUARD: ExperiencePayoutGuard = {
+  safe: false,
+  tone: 'info',
+  title: '정산 상태 확인 중',
+  message: '잠시 후 다시 확인하거나 점검판을 열어 상태를 확인하세요.',
+};
+
 const SETTLEMENT_STATE_META: Record<AdminPayoutQueueState, { label: string; className: string }> = {
   eligible: { label: '정산 가능', className: 'bg-emerald-100 text-emerald-700' },
   hold: { label: '10만원 미만', className: 'bg-slate-100 text-slate-500' },
@@ -234,6 +248,9 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
   const [salesBookings, setSalesBookings] = useState<AdminSalesBooking[]>([]);
   const [serviceBookings, setServiceBookings] = useState<AdminServiceSalesSummary[]>([]);
   const [settlementRows, setSettlementRows] = useState<AdminCombinedPayoutQueueRow[]>([]);
+  const [experiencePayoutGuard, setExperiencePayoutGuard] = useState<ExperiencePayoutGuard>(
+    DEFAULT_EXPERIENCE_PAYOUT_GUARD
+  );
   const [isSalesLoading, setIsSalesLoading] = useState(true);
   const [serviceCSVLoading, setServiceCSVLoading] = useState(false);
   const datePickerRef = useRef<HTMLDivElement>(null);
@@ -717,7 +734,10 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
         </div>
       </div>
 
-      <SettlementSyncPanel onSyncApplied={fetchSalesData} />
+      <SettlementSyncPanel
+        onSyncApplied={fetchSalesData}
+        onExperiencePayoutGuardChange={setExperiencePayoutGuard}
+      />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
         <StatCard
@@ -808,7 +828,7 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
                 정산 가능 {eligibleSettlementList.length}명 · ₩{eligibleSettlementAmount.toLocaleString()}
               </span>
               <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-600">
-                체험 보류 {holdSettlementList.length}명 · ₩{holdSettlementAmount.toLocaleString()}
+                보류 {holdSettlementList.length}명 · ₩{holdSettlementAmount.toLocaleString()}
               </span>
               {longHoldCount > 0 && (
                 <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-700">
@@ -817,8 +837,24 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
               )}
             </div>
             <p className="text-[10px] font-medium text-slate-500 md:text-xs">
-              체험은 누적 ₩{EXPERIENCE_PAYOUT_THRESHOLD_KRW.toLocaleString()} 이상부터 정산 대상이며, 서비스는 완료 처리 후 바로 대기 목록에 반영됩니다.
+              여기서 호스트별 정산 대상을 확인하고, 실제 송금 후 정산 완료 처리하세요.
             </p>
+          </div>
+        )}
+
+        {settlementTab === 'PENDING' && !experiencePayoutGuard.safe && (
+          <div
+            data-testid="sales-experience-payout-guard"
+            className={`border-b px-4 py-3 text-sm md:px-6 ${
+              experiencePayoutGuard.tone === 'info'
+                ? 'border-blue-100 bg-blue-50 text-blue-700'
+                : experiencePayoutGuard.tone === 'warning'
+                  ? 'border-amber-100 bg-amber-50 text-amber-700'
+                  : 'border-red-100 bg-red-50 text-red-700'
+            }`}
+          >
+            <p className="font-semibold">{experiencePayoutGuard.title}</p>
+            <p className="mt-1">{experiencePayoutGuard.message}</p>
           </div>
         )}
 
@@ -851,6 +887,7 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
                   return (
                     <React.Fragment key={row.host_id}>
                       <tr
+                        data-testid={`sales-settlement-row-${row.host_id}`}
                         className={`cursor-pointer transition-colors hover:bg-slate-50 ${
                           expandedHostId === row.host_id ? 'bg-slate-50' : ''
                         }`}
@@ -929,14 +966,21 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
                                   )}
                                   {canSettleExperience ? (
                                     <button
+                                      data-testid={`sales-settle-experience-${row.host_id}`}
                                       onClick={() =>
                                         handleSettleExperiencePayout(
                                           row.domains.experience!.pending_entries.map((entry) => entry.id)
                                         )
                                       }
-                                      disabled={isProcessing || row.bank === '계좌 미등록'}
+                                      disabled={
+                                        isProcessing ||
+                                        row.bank === '계좌 미등록' ||
+                                        !experiencePayoutGuard.safe
+                                      }
                                       className={`flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold text-white shadow-sm transition-colors sm:w-auto md:py-1.5 ${
-                                        isProcessing || row.bank === '계좌 미등록'
+                                        isProcessing ||
+                                        row.bank === '계좌 미등록' ||
+                                        !experiencePayoutGuard.safe
                                           ? 'cursor-not-allowed bg-slate-300'
                                           : 'bg-slate-900 hover:bg-slate-800'
                                       }`}
@@ -946,6 +990,7 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
                                   ) : null}
                                   {canSettleService ? (
                                     <button
+                                      data-testid={`sales-settle-service-${row.host_id}`}
                                       onClick={() =>
                                         handleSettleServicePayout(
                                           row.domains.service!.pending_entries.map((entry) => entry.id)

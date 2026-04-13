@@ -223,6 +223,12 @@ async function seedServiceBooking(params: {
 }
 
 async function submitForceSyncForm(page: Page, domain: 'auto' | 'experience' | 'service', identifier: string) {
+  const details = page.getByTestId('settlement-sync-details');
+  if (!(await details.isVisible())) {
+    await page.getByTestId('settlement-sync-toggle').click();
+  }
+
+  await expect(details).toBeVisible();
   await page.getByTestId('settlement-sync-force-domain').selectOption(domain);
   await page.getByTestId('settlement-sync-force-identifier').fill(identifier);
   await page.getByTestId('settlement-sync-force-submit').click();

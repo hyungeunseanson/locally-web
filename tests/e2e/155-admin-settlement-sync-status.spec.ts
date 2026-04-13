@@ -277,6 +277,17 @@ async function fetchStatus(page: Page) {
   });
 }
 
+async function openSettlementSyncPanel(page: Page) {
+  await expect(page.getByTestId('settlement-sync-panel')).toBeVisible();
+
+  const details = page.getByTestId('settlement-sync-details');
+  if (!(await details.isVisible())) {
+    await page.getByTestId('settlement-sync-toggle').click();
+  }
+
+  await expect(details).toBeVisible();
+}
+
 test.afterAll(async () => {
   const supabase = getTestAdminClient();
 
@@ -382,11 +393,20 @@ test.describe.serial('Admin settlement sync status visibility', () => {
     await page.goto('/admin/dashboard?tab=SALES', { waitUntil: 'networkidle' });
 
     await expect(page.getByTestId('settlement-sync-panel')).toBeVisible();
+    await expect(page.getByTestId('settlement-sync-summary')).toContainText('점검판을 열어 확인하세요');
+    await openSettlementSyncPanel(page);
     await expect(page.getByTestId('settlement-sync-state-experience')).toContainText('지연');
     await expect(page.getByTestId('settlement-sync-state-service')).toContainText('실행 중 멈춤');
     await expect(page.getByTestId('settlement-sync-due-count-experience')).not.toContainText('0건');
     await expect(page.getByTestId('settlement-sync-due-count-service')).not.toContainText('0건');
     await expect(page.getByTestId('settlement-sync-card-service')).toContainText('마지막 heartbeat');
+    await expect(page.getByTestId('settlement-sync-operator-banner')).toContainText(
+      '최신 반영 확인 필요'
+    );
+    await expect(page.getByTestId('settlement-sync-operator-banner')).toContainText(
+      '최근 완료 건 반영이 늦을 수 있습니다.'
+    );
+    await expect(page.getByTestId('settlement-sync-run-due-experience')).toBeEnabled();
 
     const status = await fetchStatus(page);
     expect(status.status).toBe(200);
@@ -409,5 +429,200 @@ test.describe.serial('Admin settlement sync status visibility', () => {
     expect(serviceJob.last_failure_message?.length || 0).toBeGreaterThan(0);
     expect(serviceJob.stale_running).toBeTruthy();
     expect(serviceJob.last_heartbeat_at).toBeTruthy();
+  });
+
+  test('disables duplicate experience run-due clicks while sync is actively running', async ({
+    page,
+  }) => {
+    test.setTimeout(120000);
+
+    const adminUser = createTestUser('settlement.sync.running.admin');
+    const adminId = await createAuthUser(adminUser, { isAdmin: true });
+    createdAuthUserIds.push(adminId);
+
+    await page.route('**/api/admin/sales-summary**', async (route) => {
+      if (route.request().method() !== 'GET') {
+        await route.continue();
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: [],
+          serviceSummaryRows: [],
+        }),
+      });
+    });
+
+    await page.route('**/api/admin/payout-queue**', async (route) => {
+      if (route.request().method() !== 'GET') {
+        await route.continue();
+        return;
+      }
+
+      const now = new Date().toISOString();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          combinedHostTotals: [
+            {
+              host_id: 'host-running-sync',
+              host_name: 'Running Sync Host',
+              bank: '국민은행',
+              account_number: '12345678901234',
+              account_holder: 'Running Sync Host',
+              host_nationality: '대한민국',
+              pending_amount: 230000,
+              paid_amount: 0,
+              pending_count: 2,
+              paid_count: 0,
+              settlement_state: 'eligible',
+              domains: {
+                experience: {
+                  host_id: 'host-running-sync',
+                  host_name: 'Running Sync Host',
+                  bank: '국민은행',
+                  account_number: '12345678901234',
+                  account_holder: 'Running Sync Host',
+                  host_nationality: '대한민국',
+                  pending_amount: 90000,
+                  paid_amount: 0,
+                  pending_count: 1,
+                  paid_count: 0,
+                  oldest_pending_created_at: now,
+                  settlement_state: 'eligible',
+                  pending_entries: [
+                    {
+                      id: 'exp-running-sync-1',
+                      order_id: 'EXP-RUNNING-SYNC-1',
+                      domain: 'experience',
+                      created_at: now,
+                      payout_paid_at: null,
+                      date: '2026-04-10',
+                      time: '10:00',
+                      title: 'Running Experience',
+                      guest_name: 'Experience Guest',
+                      amount: 120000,
+                      payout_amount: 90000,
+                      platform_revenue: 30000,
+                      status: 'completed',
+                      payout_status: 'pending',
+                    },
+                  ],
+                  paid_entries: [],
+                },
+                service: {
+                  host_id: 'host-running-sync',
+                  host_name: 'Running Sync Host',
+                  bank: '국민은행',
+                  account_number: '12345678901234',
+                  account_holder: 'Running Sync Host',
+                  host_nationality: '대한민국',
+                  pending_amount: 140000,
+                  paid_amount: 0,
+                  pending_count: 1,
+                  paid_count: 0,
+                  oldest_pending_created_at: now,
+                  settlement_state: 'eligible',
+                  pending_entries: [
+                    {
+                      id: 'svc-running-sync-1',
+                      order_id: 'SVC-RUNNING-SYNC-1',
+                      domain: 'service',
+                      created_at: now,
+                      payout_paid_at: null,
+                      date: '2026-04-10',
+                      time: null,
+                      title: 'Running Service',
+                      guest_name: 'Service Guest',
+                      amount: 180000,
+                      payout_amount: 140000,
+                      platform_revenue: 40000,
+                      status: 'completed',
+                      payout_status: 'pending',
+                    },
+                  ],
+                  paid_entries: [],
+                },
+              },
+            },
+          ],
+        }),
+      });
+    });
+
+    await page.route('**/api/admin/settlement-sync', async (route) => {
+      if (route.request().method() !== 'GET') {
+        await route.continue();
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          generated_at: new Date().toISOString(),
+          jobs: [
+            {
+              job_name: 'experience_completion_sync',
+              health_state: 'running',
+              is_running: true,
+              running_since: new Date(Date.now() - 60_000).toISOString(),
+              stale_running: false,
+              last_heartbeat_at: new Date().toISOString(),
+              last_success_at: new Date(Date.now() - 10 * 60_000).toISOString(),
+              last_failure_at: null,
+              last_failure_message: null,
+              last_processed_count: 2,
+              due_candidate_count: 3,
+              oldest_due_at: new Date(Date.now() - 30 * 60_000).toISOString(),
+              lag_minutes: 30,
+            },
+            {
+              job_name: 'service_completion_sync',
+              health_state: 'healthy',
+              is_running: false,
+              running_since: null,
+              stale_running: false,
+              last_heartbeat_at: null,
+              last_success_at: new Date(Date.now() - 5 * 60_000).toISOString(),
+              last_failure_at: null,
+              last_failure_message: null,
+              last_processed_count: 1,
+              due_candidate_count: 0,
+              oldest_due_at: null,
+              lag_minutes: null,
+            },
+          ],
+        }),
+      });
+    });
+
+    await login(page, adminUser);
+    await page.goto('/admin/dashboard?tab=SALES', { waitUntil: 'networkidle' });
+
+    await openSettlementSyncPanel(page);
+    await expect(page.getByTestId('settlement-sync-state-experience')).toContainText('실행 중');
+    await expect(page.getByTestId('settlement-sync-operator-banner')).toContainText(
+      '업데이트 실행 중'
+    );
+    await expect(page.getByTestId('settlement-sync-operator-banner')).toContainText(
+      '지금은 목록을 갱신하는 중입니다.'
+    );
+    await expect(page.getByTestId('settlement-sync-run-due-experience')).toBeDisabled();
+    await expect(page.getByTestId('settlement-sync-run-due-service')).toBeEnabled();
+    await expect(page.getByTestId('sales-experience-payout-guard')).toContainText(
+      '점검판을 먼저 열어 확인하세요.'
+    );
+
+    await page.getByTestId('sales-settlement-row-host-running-sync').click();
+    await expect(page.getByTestId('sales-settle-experience-host-running-sync')).toBeDisabled();
+    await expect(page.getByTestId('sales-settle-service-host-running-sync')).toBeEnabled();
   });
 });

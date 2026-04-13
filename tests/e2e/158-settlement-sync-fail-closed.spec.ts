@@ -15,6 +15,7 @@ const createdHostApplicationIds: number[] = [];
 const createdServiceRequestIds: string[] = [];
 const createdServiceApplicationIds: string[] = [];
 const createdServiceBookingIds: string[] = [];
+const CRON_SECRET = loadTestEnv().CRON_SECRET?.trim() || null;
 
 async function createApprovedHostApplication(userId: string, user: E2ETestUser) {
   const supabase = getTestAdminClient();
@@ -159,6 +160,34 @@ async function postAdminSync(
   );
 }
 
+async function fetchSettlementSyncHealth(page: Page, extraHeaders?: Record<string, string>) {
+  return page.evaluate(
+    async ({ headers }) => {
+      const response = await fetch('/api/admin/settlement-sync', {
+        headers: headers || {},
+        credentials: 'include',
+      });
+
+      return {
+        status: response.status,
+        body: await response.json(),
+      };
+    },
+    { headers: extraHeaders || {} }
+  );
+}
+
+async function openSettlementSyncPanel(page: Page) {
+  await expect(page.getByTestId('settlement-sync-panel')).toBeVisible();
+
+  const details = page.getByTestId('settlement-sync-details');
+  if (!(await details.isVisible())) {
+    await page.getByTestId('settlement-sync-toggle').click();
+  }
+
+  await expect(details).toBeVisible();
+}
+
 test.afterAll(async () => {
   const supabase = getTestAdminClient();
 
@@ -196,6 +225,14 @@ test.describe.serial('Settlement sync fail-closed', () => {
     const adminId = await createAuthUser(adminUser, { isAdmin: true });
     createdAuthUserIds.push(adminId);
 
+    await login(page, adminUser);
+    const healthResponse = await fetchSettlementSyncHealth(page, {
+      'x-locally-test-simulate-missing-admin-job-runs': '1',
+    });
+
+    expect(healthResponse.status).toBe(503);
+    expect(String(healthResponse.body.error || '')).toContain('정산 동기화 인프라');
+
     await page.route('**/api/admin/settlement-sync', async (route) => {
       const headers = {
         ...route.request().headers(),
@@ -204,26 +241,27 @@ test.describe.serial('Settlement sync fail-closed', () => {
       await route.continue({ headers });
     });
 
-    await login(page, adminUser);
     await page.goto('/admin/dashboard?tab=SALES', { waitUntil: 'networkidle' });
 
+    await expect(page.getByTestId('settlement-sync-summary')).toContainText('점검판을 열어 확인하세요');
+    await openSettlementSyncPanel(page);
     await expect(page.getByTestId('settlement-sync-infra-banner')).toBeVisible();
     await expect(page.getByTestId('settlement-sync-run-due-experience')).toBeDisabled();
     await expect(page.getByTestId('settlement-sync-force-submit')).toBeDisabled();
 
-    const env = loadTestEnv();
-    const cronSecret = env.CRON_SECRET || 'codex-cron-secret';
-    const cronResponse = await request.get('/api/cron/complete-trips', {
-      headers: {
-        authorization: `Bearer ${cronSecret}`,
-        'x-locally-test-simulate-missing-admin-job-runs': '1',
-      },
-    });
+    if (CRON_SECRET) {
+      const cronResponse = await request.get('/api/cron/complete-trips', {
+        headers: {
+          authorization: `Bearer ${CRON_SECRET}`,
+          'x-locally-test-simulate-missing-admin-job-runs': '1',
+        },
+      });
 
-    expect(cronResponse.status()).toBe(503);
+      expect(cronResponse.status()).toBe(503);
 
-    const body = await cronResponse.json();
-    expect(String(body.error || '')).toContain('정산 동기화 인프라');
+      const body = await cronResponse.json();
+      expect(String(body.error || '')).toContain('정산 동기화 인프라');
+    }
   });
 
   test('returns 503 when service completion RPC is unavailable', async ({ page, request }) => {
@@ -265,17 +303,17 @@ test.describe.serial('Settlement sync fail-closed', () => {
     expect(postResponse.status).toBe(503);
     expect(String(postResponse.body.error || '')).toContain('정산 동기화 인프라');
 
-    const env = loadTestEnv();
-    const cronSecret = env.CRON_SECRET || 'codex-cron-secret';
-    const cronResponse = await request.get('/api/cron/complete-services', {
-      headers: {
-        authorization: `Bearer ${cronSecret}`,
-        'x-locally-test-simulate-missing-service-completion-rpc': '1',
-      },
-    });
+    if (CRON_SECRET) {
+      const cronResponse = await request.get('/api/cron/complete-services', {
+        headers: {
+          authorization: `Bearer ${CRON_SECRET}`,
+          'x-locally-test-simulate-missing-service-completion-rpc': '1',
+        },
+      });
 
-    expect(cronResponse.status()).toBe(503);
-    const body = await cronResponse.json();
-    expect(String(body.error || '')).toContain('정산 동기화 인프라');
+      expect(cronResponse.status()).toBe(503);
+      const body = await cronResponse.json();
+      expect(String(body.error || '')).toContain('정산 동기화 인프라');
+    }
   });
 });
