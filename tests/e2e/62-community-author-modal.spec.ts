@@ -3,6 +3,8 @@ import { readFileSync } from 'fs';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test } from '@playwright/test';
 
+import { resolveConfiguredSiteUrl } from './helpers/siteUrl';
+
 type EnvMap = Record<string, string>;
 type TestUser = {
   email: string;
@@ -201,6 +203,7 @@ test.describe.serial('Community author modal', () => {
 
   test('adds author url to article json-ld for visible locally_content authors', async ({ request }) => {
     test.setTimeout(90000);
+    const expectedSiteUrl = resolveConfiguredSiteUrl();
 
     const author = createUser('seo');
     const authorId = await createAuthUser(author);
@@ -216,6 +219,6 @@ test.describe.serial('Community author modal', () => {
     const html = await response.text();
 
     expect(html).toContain('"@type":"Article"');
-    expect(html).toContain(`"url":"https://locally-web.vercel.app/users/${authorId}"`);
+    expect(html).toContain(`"url":"${expectedSiteUrl}/users/${authorId}"`);
   });
 });

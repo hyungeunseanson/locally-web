@@ -3,7 +3,9 @@ import { readFileSync } from 'fs';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test, type Page } from '@playwright/test';
 import { reviewAllExperiencePaymentAgreements } from './helpers/experienceBooking';
-import { LIVE_BASE_URL } from './helpers/liveBaseUrl';
+import { requireLiveBaseUrl } from './helpers/liveBaseUrl';
+
+const LIVE_BASE_URL = requireLiveBaseUrl();
 
 const HOST_USER_ID = 'cc84b331-7e78-4818-b9ba-f1a960017473';
 

@@ -3,7 +3,9 @@ import path from 'path';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test, type Page } from '@playwright/test';
-import { LIVE_BASE_URL } from './helpers/liveBaseUrl';
+import { requireLiveBaseUrl } from './helpers/liveBaseUrl';
+
+const LIVE_BASE_URL = requireLiveBaseUrl();
 
 const TEST_IMAGE_PATH = path.resolve(__dirname, 'test-image.png');
 type EnvMap = Record<string, string>;

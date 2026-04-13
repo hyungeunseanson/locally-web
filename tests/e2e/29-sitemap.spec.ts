@@ -3,6 +3,8 @@ import { readFileSync } from 'fs';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test } from '@playwright/test';
 
+import { resolveConfiguredSiteUrl } from './helpers/siteUrl';
+
 type EnvMap = Record<string, string>;
 type TestUser = {
   email: string;
@@ -129,22 +131,24 @@ test.afterAll(async () => {
 
 test.describe('Sitemap route', () => {
   test('exposes only live public paths with stable lastmod tags', async ({ request }) => {
+    const expectedSiteUrl = resolveConfiguredSiteUrl();
     const response = await request.get('/sitemap.xml');
 
     expect(response.ok()).toBeTruthy();
 
     const xml = await response.text();
 
-    expect(xml).toContain('<loc>https://locally-web.vercel.app/search</loc>');
-    expect(xml).toContain('<loc>https://locally-web.vercel.app/community</loc>');
-    expect(xml).toContain('<loc>https://locally-web.vercel.app/services/intro</loc>');
-    expect(xml).toContain('<loc>https://locally-web.vercel.app/site-map</loc>');
+    expect(xml).toContain(`<loc>${expectedSiteUrl}/search</loc>`);
+    expect(xml).toContain(`<loc>${expectedSiteUrl}/community</loc>`);
+    expect(xml).toContain(`<loc>${expectedSiteUrl}/services/intro</loc>`);
+    expect(xml).toContain(`<loc>${expectedSiteUrl}/site-map</loc>`);
     expect(xml).not.toContain('/company/community');
     expect(xml).toMatch(/<lastmod>[^<]+<\/lastmod>/);
   });
 
   test('includes only locally_content community details when community is content-only', async ({ request }) => {
     test.setTimeout(90000);
+    const expectedSiteUrl = resolveConfiguredSiteUrl();
 
     const author = createUser('author');
     const authorId = await createAuthUser(author);
@@ -157,7 +161,7 @@ test.describe('Sitemap route', () => {
 
     const xml = await response.text();
 
-    expect(xml).toContain(`<loc>https://locally-web.vercel.app/community/${locallyContentPostId}</loc>`);
+    expect(xml).toContain(`<loc>${expectedSiteUrl}/community/${locallyContentPostId}</loc>`);
     expect(xml).not.toContain(`/community/${legacyPostId}</loc>`);
   });
 });

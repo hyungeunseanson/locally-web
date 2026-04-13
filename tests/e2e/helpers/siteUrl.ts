@@ -1,5 +1,7 @@
 import { existsSync, readFileSync } from 'fs';
 
+const DEFAULT_PUBLIC_SITE_URL = 'https://locally-web.vercel.app';
+
 function loadEnvFile(path: string) {
   if (!existsSync(path)) return {};
 
@@ -22,30 +24,11 @@ function readTrimmedEnv(env: Record<string, string | undefined>, key: string) {
   return value.length > 0 ? value : null;
 }
 
-export function resolveLiveBaseUrl(
+export function resolveConfiguredSiteUrl(
   env: Record<string, string | undefined> = {
     ...loadEnvFile('.env.local'),
     ...process.env,
   },
 ) {
-  return (
-    readTrimmedEnv(env, 'PLAYWRIGHT_LIVE_BASE_URL') ||
-    readTrimmedEnv(env, 'NEXT_PUBLIC_SITE_URL') ||
-    null
-  );
-}
-
-export function requireLiveBaseUrl(
-  env: Record<string, string | undefined> = {
-    ...loadEnvFile('.env.local'),
-    ...process.env,
-  },
-) {
-  const liveBaseUrl = resolveLiveBaseUrl(env);
-
-  if (!liveBaseUrl) {
-    throw new Error('Missing PLAYWRIGHT_LIVE_BASE_URL or NEXT_PUBLIC_SITE_URL.');
-  }
-
-  return liveBaseUrl;
+  return readTrimmedEnv(env, 'NEXT_PUBLIC_SITE_URL') || DEFAULT_PUBLIC_SITE_URL;
 }

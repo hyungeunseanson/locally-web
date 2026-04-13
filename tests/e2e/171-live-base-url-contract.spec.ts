@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { resolveLiveBaseUrl } from './helpers/liveBaseUrl';
+import { requireLiveBaseUrl, resolveLiveBaseUrl } from './helpers/liveBaseUrl';
 
 test.describe('Live base URL helper', () => {
   test('prefers PLAYWRIGHT_LIVE_BASE_URL over NEXT_PUBLIC_SITE_URL', () => {
@@ -16,7 +16,13 @@ test.describe('Live base URL helper', () => {
     })).toBe('https://www.locally-travel.com');
   });
 
-  test('keeps the legacy vercel domain as the final fallback', () => {
-    expect(resolveLiveBaseUrl({})).toBe('https://locally-web.vercel.app');
+  test('returns null when no live base URL env is configured', () => {
+    expect(resolveLiveBaseUrl({})).toBeNull();
+  });
+
+  test('throws when a live run is requested without any configured base URL', () => {
+    expect(() => requireLiveBaseUrl({})).toThrow(
+      'Missing PLAYWRIGHT_LIVE_BASE_URL or NEXT_PUBLIC_SITE_URL.'
+    );
   });
 });

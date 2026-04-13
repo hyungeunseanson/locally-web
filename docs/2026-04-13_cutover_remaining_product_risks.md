@@ -5,17 +5,18 @@
 - 현재 기준 결론은 아래처럼 정리된다.
   - core runtime은 대체로 준비돼 있다
   - 가장 큰 남은 blocker는 앱 코드가 아니라 `OAuth / PG / 외부 콘솔 허용 URL parity`다
-  - 앱 안쪽에서 남아 있는 리스크는 `live smoke legacy fallback`, `support contact copy drift`, `silent old-alias fallback 운영 리스크` 정도로 좁혀진다
+  - 앱 안쪽에서 남아 있는 리스크는 `support contact copy drift`, `silent old-alias fallback 운영 리스크` 정도로 더 좁혀졌다
 - 최신 얇은 rerun 결과
   - `29-sitemap`
   - `171-live-base-url-contract`
-  - 결과: `5 passed`
+  - `62-community-author-modal`
+  - 결과: `8 passed`
 
 ## Result Snapshot
 | Risk | Source of truth | Current verification | Result | Notes |
 | --- | --- | --- | --- | --- |
 | OAuth / PG external parity | `LoginModal`, `/auth/callback`, NicePay/PortOne/PayPal cutover docs | static audit only | 부분 보장 | 실제 blocker 가능성이 가장 높지만, 외부 콘솔 접근 증거가 아직 없다 |
-| Live smoke / legacy domain drift | `tests/e2e/helpers/liveBaseUrl.ts`, `171`, `29` | `171`, `29` | 부분 보장 | env 우선 규칙은 정상이나, 최종 fallback과 일부 assertion은 아직 old alias를 기준 truth로 둔다 |
+| Live smoke / legacy domain drift | `tests/e2e/helpers/liveBaseUrl.ts`, `171`, `29`, `62` | `171`, `29`, `62` | 정상 | live helper는 env 없을 때 명시적으로 실패하고, domain-sensitive assertion은 configured site URL 기준으로 잠겼다 |
 | Public support contact copy drift | `/help`, `LanguageContext` account self-service copy | static audit only | 리스크 | `help@locally.com` vs `help@locally.kr`가 현재 동시에 노출된다 |
 | Silent old-alias fallback | `app/utils/siteUrl.ts`, `app/opengraph-image.tsx` | static audit + live preflight docs | 부분 보장 | 앱이 깨지지는 않지만, env/redeploy 미반영 시 old alias가 조용히 계속 노출될 수 있다 |
 
@@ -40,22 +41,22 @@
 - close-out 기준
   - operator evidence로 `이미 준비됨 / cutover 직전 필요 / launch blocker` 중 하나를 붙여야 한다
 
-### 2. live smoke helper는 좋아졌지만, legacy alias를 아직 최종 fallback으로 유지한다
+### 2. live smoke / domain-sensitive assertion drift는 이번 패스로 닫혔다
 - source of truth
   - [tests/e2e/helpers/liveBaseUrl.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/tests/e2e/helpers/liveBaseUrl.ts:1)
   - [tests/e2e/171-live-base-url-contract.spec.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/tests/e2e/171-live-base-url-contract.spec.ts:1)
   - [tests/e2e/29-sitemap.spec.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/tests/e2e/29-sitemap.spec.ts:1)
+  - [tests/e2e/62-community-author-modal.spec.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/tests/e2e/62-community-author-modal.spec.ts:1)
 - 현재 동작
-  - `PLAYWRIGHT_LIVE_BASE_URL` 우선, 없으면 `NEXT_PUBLIC_SITE_URL`, 둘 다 없으면 `https://locally-web.vercel.app`
-  - sitemap contract도 현재는 `https://locally-web.vercel.app/...`를 직접 기대한다
+  - live helper는 `PLAYWRIGHT_LIVE_BASE_URL` 우선, 없으면 `NEXT_PUBLIC_SITE_URL`, 둘 다 없으면 `null`을 반환한다
+  - live 실행이 실제로 필요한 경로는 env가 없을 때 즉시 에러를 던진다
+  - sitemap / community structured data assertion은 configured `NEXT_PUBLIC_SITE_URL` 기준으로 기대값을 계산한다
 - rerun 결과
   - `171` green
   - `29` green
-- 실제 리스크
-  - 지금은 green이지만, cutover 후 새 도메인 기준 smoke truth를 공식화하려면 helper fallback과 일부 exact assertion은 정리 대상이다
-  - 사용자 제품이 깨지는 건 아니어도, cutover 당일 smoke가 old alias를 기준으로 false negative를 만들 수 있다
+  - `62` green
 - 현재 판정
-  - `부분 보장`
+  - `정상`
 
 ### 3. public support contact는 현재 visible copy가 두 갈래다
 - source of truth
@@ -100,13 +101,10 @@
    - Kakao OAuth
    - Supabase redirect allowlist
    - PortOne / NicePay / PayPal callback/allowlist
-2. live smoke / legacy alias drift를 핀셋 수정한다
-   - `liveBaseUrl` helper fallback
-   - old domain exact assertion 정리
-3. support contact owner를 하나로 정하고 visible copy를 맞춘다
-4. cutover day pass 기준을 env 저장이 아니라 live response 기준으로만 운영한다
+2. support contact owner를 하나로 정하고 visible copy를 맞춘다
+3. cutover day pass 기준을 env 저장이 아니라 live response 기준으로만 운영한다
 
 ## Final Verdict
 - 현재 기준으로 앱 core runtime은 cutover-ready에 가깝다
 - 남은 진짜 blocker는 `외부 콘솔 허용 URL parity`
-- 앱 안쪽에서 다음으로 정리할 가치가 큰 것은 `live smoke legacy alias drift`와 `support contact copy drift`
+- 앱 안쪽에서 다음으로 정리할 가치가 큰 것은 `support contact copy drift`
