@@ -396,6 +396,7 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
                                     <CommunityAdSlot
                                         testId="community-list-bottom-ad"
                                         variant="bottom"
+                                        placement="community-list-bottom"
                                         title="로컬리 콘텐츠 광고"
                                     />
                                 </div>
@@ -415,6 +416,7 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
                                     <CommunityAdSlot
                                         testId="community-list-sidebar-ad"
                                         variant="sidebar"
+                                        placement="community-list-sidebar"
                                         title="로컬리 콘텐츠 광고"
                                     />
                                 ) : null}

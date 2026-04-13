@@ -16,6 +16,7 @@ import QueryProvider from '@/app/providers/QueryProvider';
 import { AuthProvider } from '@/app/context/AuthContext';
 import { ViewModeProvider, type ViewMode } from '@/app/context/ViewModeContext';
 import { getCurrentLocale } from '@/app/utils/locale';
+import { buildAdSenseScriptUrl, getAdSenseClientId, isAdSenseEnabled } from '@/app/utils/adsense';
 import { buildAbsoluteUrl, buildLocalizedAbsoluteUrl, getSiteUrl } from '@/app/utils/siteUrl';
 import { IAB_ESCAPE_BYPASS_PARAM } from '@/app/utils/iab';
 import { createClient } from '@/app/utils/supabase/server';
@@ -125,6 +126,8 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const locale = await getCurrentLocale();
+  const adSenseEnabled = isAdSenseEnabled(process.env);
+  const adSenseScriptUrl = buildAdSenseScriptUrl(getAdSenseClientId(process.env));
   const kakaoIabEscapeEnabled = process.env.NEXT_PUBLIC_ENABLE_KAKAO_IAB_ESCAPE === 'true';
   const cookieStore = await cookies();
   const initialViewModeCookie = cookieStore.get('locally_view_mode')?.value;
@@ -193,6 +196,14 @@ export default async function RootLayout({
           <Script
             src={`//dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY}&libraries=services,clusterer&autoload=false`}
             strategy="beforeInteractive"
+          />
+        )}
+        {adSenseEnabled && adSenseScriptUrl && (
+          <Script
+            id="locally-google-adsense"
+            src={adSenseScriptUrl}
+            strategy="afterInteractive"
+            crossOrigin="anonymous"
           />
         )}
         <KakaoIabEscapeGate enabled={kakaoIabEscapeEnabled} locale={locale} />

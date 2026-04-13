@@ -392,6 +392,7 @@ export default async function CommunityPostDetail({
                                     <CommunityAdSlot
                                         testId="community-detail-bottom-ad"
                                         variant="bottom"
+                                        placement="community-detail-bottom"
                                         title="로컬리 콘텐츠 광고"
                                     />
                                 </div>
@@ -405,6 +406,7 @@ export default async function CommunityPostDetail({
                                 <CommunityAdSlot
                                     testId="community-detail-sidebar-ad"
                                     variant="sidebar"
+                                    placement="community-detail-sidebar"
                                     title="로컬리 콘텐츠 광고"
                                 />
                             </div>

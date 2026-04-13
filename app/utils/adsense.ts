@@ -1,0 +1,74 @@
+export type AdSenseEnv = Record<string, string | undefined>;
+
+export type CommunityAdPlacement =
+  | 'community-list-sidebar'
+  | 'community-list-bottom'
+  | 'community-detail-sidebar'
+  | 'community-detail-bottom';
+
+const COMMUNITY_SLOT_ENV_KEY: Record<CommunityAdPlacement, keyof AdSenseEnv> = {
+  'community-list-sidebar': 'NEXT_PUBLIC_ADSENSE_COMMUNITY_LIST_SIDEBAR_SLOT',
+  'community-list-bottom': 'NEXT_PUBLIC_ADSENSE_COMMUNITY_LIST_BOTTOM_SLOT',
+  'community-detail-sidebar': 'NEXT_PUBLIC_ADSENSE_COMMUNITY_DETAIL_SIDEBAR_SLOT',
+  'community-detail-bottom': 'NEXT_PUBLIC_ADSENSE_COMMUNITY_DETAIL_BOTTOM_SLOT',
+};
+
+function readTrimmedEnvValue(env: AdSenseEnv, key: keyof AdSenseEnv): string | null {
+  const rawValue = env[key];
+  if (typeof rawValue !== 'string') return null;
+
+  const value = rawValue.trim();
+  return value.length > 0 ? value : null;
+}
+
+export function normalizeAdSenseClientId(value?: string | null): string | null {
+  if (typeof value !== 'string') return null;
+
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith('ca-pub-')) return trimmed;
+  if (trimmed.startsWith('pub-')) return `ca-${trimmed}`;
+  return trimmed;
+}
+
+export function getAdSenseClientId(env: AdSenseEnv = process.env): string | null {
+  return normalizeAdSenseClientId(readTrimmedEnvValue(env, 'NEXT_PUBLIC_ADSENSE_CLIENT_ID'));
+}
+
+export function getAdSensePublisherId(value?: string | null): string | null {
+  const clientId = normalizeAdSenseClientId(value);
+  if (!clientId) return null;
+  return clientId.replace(/^ca-/, '');
+}
+
+export function isAdSenseEnabled(env: AdSenseEnv = process.env): boolean {
+  return readTrimmedEnvValue(env, 'NEXT_PUBLIC_ADSENSE_ENABLED') === 'true' && Boolean(getAdSenseClientId(env));
+}
+
+export function buildAdSenseScriptUrl(value?: string | null): string | null {
+  const clientId = normalizeAdSenseClientId(value);
+  if (!clientId) return null;
+  return `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(clientId)}`;
+}
+
+export function resolveCommunityAdSlotConfig(
+  placement: CommunityAdPlacement,
+  env: AdSenseEnv = process.env,
+) {
+  const clientId = getAdSenseClientId(env);
+  const slotId = readTrimmedEnvValue(env, COMMUNITY_SLOT_ENV_KEY[placement]);
+  const globallyEnabled = isAdSenseEnabled(env);
+
+  return {
+    clientId,
+    slotId,
+    globallyEnabled,
+    enabled: globallyEnabled && Boolean(slotId),
+  };
+}
+
+export function buildAdsTxtEntry(env: AdSenseEnv = process.env): string | null {
+  const publisherId = getAdSensePublisherId(getAdSenseClientId(env));
+  if (!publisherId) return null;
+  return `google.com, ${publisherId}, DIRECT, f08c47fec0942fa0`;
+}
