@@ -4,6 +4,7 @@
 - 이 문서는 `코드가 이미 indexable 상태인지`와 별개로, 실제 Google/Naver 검색엔진에 로컬리 콘텐츠가 잘 잡히게 하는 운영 체크리스트다
 - 현재 제품 해석은 `COMMUNITY_OPEN=false` 기준 `locally_content` 공개 발행면 운영이다
 - 따라서 운영 체크 대상도 `/community`와 `locally_content` 상세 중심으로 고정한다
+- cutover 직후 실제 실행 순서는 [docs/2026-04-13_search_engine_cutover_submission_runbook.md](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/2026-04-13_search_engine_cutover_submission_runbook.md:1) 기준으로 본다
 
 ## 현재 운영 기준 URL
 - 현재 코드의 site URL single source는 `NEXT_PUBLIC_SITE_URL`이다
