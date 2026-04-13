@@ -24,6 +24,9 @@
 - `www.locally-travel.com`을 보는 property가 맞는지 먼저 확인한다.
 - 가능하면 Domain property를 기준으로 보고, 최소한 `https://www.locally-travel.com/` URL-prefix property도 접근 가능해야 한다.
 - 이전 `vercel.app` property를 보고 작업하지 않도록 주의한다.
+- 이번 cutover에서는 `Change of Address`를 쓰지 않는다.
+  - 이유: 최종 사용자 URL을 새 도메인으로 바꾸는 작업이 아니라, 같은 `www.locally-travel.com` URL을 새 호스팅으로 넘기는 작업이기 때문이다.
+  - Google 공식 기준으로도 `moving between www and non-www in the same domain` 또는 `site URL remains the same but you are changing hosting providers` 상황에는 Change of Address tool을 쓰지 않는다.
 
 ### 2. sitemap 제출
 - 제출 URL
@@ -42,6 +45,7 @@
   - crawling allowed인지
   - page fetch successful인지
   - index 요청 버튼이 보이면 request indexing 실행
+  - 단, request indexing은 우선순위를 높이는 신호일 뿐 즉시 색인을 보장하지 않는다
 
 ### 4. Rich Results Test
 - 상세 URL 1~2건을 Rich Results Test로 확인한다.
@@ -116,6 +120,10 @@
 ## References
 - Google: Ask Google to recrawl your URLs
   - <https://developers.google.com/search/docs/advanced/crawling/ask-google-to-recrawl>
+- Google: Change of Address tool
+  - <https://support.google.com/webmasters/answer/9370220?hl=en>
+- Google: Site move with URL changes
+  - <https://developers.google.com/search/docs/crawling-indexing/site-move-with-url-changes>
 - Google: Rich Results Test
   - <https://support.google.com/webmasters/answer/7445569?hl=en>
 - Naver: RSS 및 사이트맵 제출

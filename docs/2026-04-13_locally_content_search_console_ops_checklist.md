@@ -35,6 +35,8 @@
 - 가능하면 URL-prefix보다 Domain property를 우선으로 둔다
 - `https`, `www`, locale path가 실제 운영 도메인과 어긋나지 않는지 확인한다
 - 도메인 전환 전에는 현재 운영 배포 도메인 기준 property를 보고, 전환 후에는 `www.locally-travel.com` 기준 property를 주 속성으로 삼는다
+- 이번 cutover는 `Change of Address` 대상이 아니다
+  - 최종 사용자 URL을 새 도메인으로 바꾸는 작업이 아니라, 같은 `www.locally-travel.com` URL을 새 배포로 넘기는 작업이기 때문이다
 
 ### 2. sitemap 제출
 - `sitemap.xml` 제출 URL
@@ -53,6 +55,7 @@
   - `noindex`가 아닌지
   - 마지막 크롤 날짜가 지나치게 오래되지 않았는지
 - 색인 지연이 있으면 `색인 생성 요청`까지 진행한다
+- 단, `색인 생성 요청`은 우선순위 신호이지 즉시 색인을 보장하지는 않는다
 
 ### 4. Rich Results Test
 - 대표 `locally_content` 상세 URL 1~2개를 Rich Results Test로 확인한다
@@ -196,6 +199,10 @@
   - <https://developers.google.com/search/docs/essentials>
 - Google Helpful content
   - <https://developers.google.com/search/docs/fundamentals/creating-helpful-content>
+- Google Change of Address tool
+  - <https://support.google.com/webmasters/answer/9370220?hl=en>
+- Google Site move with URL changes
+  - <https://developers.google.com/search/docs/crawling-indexing/site-move-with-url-changes>
 - Naver RSS 및 사이트맵 제출
   - <https://searchadvisor.naver.com/guide/request-feed>
 - Naver robots.txt 설정하기

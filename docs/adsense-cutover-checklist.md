@@ -11,6 +11,9 @@
   - Vercel env 입력
   - AdSense 사이트/도메인 확인
   - 최종 smoke check
+- same-domain 운영 원칙도 같이 잠급니다.
+  - 이미 기존 웹사이트에서 같은 `www.locally-travel.com` 도메인을 같은 AdSense 계정으로 운영 중이면, cutover 뒤에도 기본적으로 그 site ownership을 재사용하는 쪽이 가장 단순합니다
+  - 반대로 현재 AdSense 계정에 그 도메인이 없거나 `Ready` 상태가 아니라면, 그때만 새 site 추가/검토 요청이 필요합니다
 
 ## Source Of Truth
 - 전역 AdSense 로드 경계: [app/layout.tsx](/Users/hyungeunseanson/Documents/서비스/locally-web/app/layout.tsx:126)
@@ -42,8 +45,10 @@
    아직 기존 사이트가 live라면 DNS cutover 전 preview/production 대상과 TTL 상태를 먼저 확인합니다.
 2. `NEXT_PUBLIC_SITE_URL`을 최종 도메인으로 바꿉니다.
    기본 fallback은 `https://locally-web.vercel.app`이므로, 이 값이 바뀌지 않으면 canonical/robots/sitemap/ads.txt가 모두 임시 도메인을 계속 가리킵니다.
-3. AdSense에서 최종 도메인을 사이트로 확인합니다.
-   임시 Vercel 도메인이 아니라 실제 운영 도메인 기준으로 승인/연결 상태를 맞춥니다.
+3. AdSense에서 최종 도메인의 현재 상태를 먼저 확인합니다.
+   - 이미 같은 AdSense 계정의 `Sites` 목록에 `www.locally-travel.com`이 있고 상태가 `Ready`면 새 site를 다시 만들지 않습니다
+   - 없다면 그때만 새 site로 추가하고 검토를 요청합니다
+   - 핵심은 `vercel.app`를 광고 사이트 owner로 삼는 것이 아니라 최종 운영 도메인만 owner로 두는 것입니다
 4. Vercel production env에 AdSense env를 입력합니다.
    먼저 `NEXT_PUBLIC_ADSENSE_CLIENT_ID`와 4개 slot id를 넣고, 마지막에만 `NEXT_PUBLIC_ADSENSE_ENABLED=true`를 켭니다.
 5. redeploy 합니다.
@@ -58,6 +63,22 @@
    광고가 즉시 안 보이더라도, DOM 주입과 콘솔 오류 유무를 먼저 봅니다.
    AdSense 승인은 즉시 반영되지 않을 수 있으므로 `스크립트 로드 성공`과 `slot 초기화 오류 없음`을 우선 통과 기준으로 둡니다.
 
+## AdSense Site Decision
+- case 1. 기존 same-domain site가 같은 AdSense 계정에 이미 있음
+  - 가장 쉬운 경로입니다
+  - `www.locally-travel.com`의 기존 site ownership을 유지하고, 새 프로젝트 쪽에서는 도메인 cutover + env + redeploy만 수행합니다
+  - 이 경우 핵심 확인은 아래 셋입니다
+    - 새 페이지에 publisher id가 동일하게 들어가는지
+    - `/ads.txt`가 같은 publisher id로 응답하는지
+    - 커뮤니티 슬롯에 실제 `<ins class="adsbygoogle">`가 렌더되는지
+- case 2. 같은 계정에 site가 없거나 Ready가 아님
+  - `www.locally-travel.com`을 새 site로 추가하고 검토를 요청합니다
+  - 이 경우 cutover 직후 즉시 광고가 뜨지 않아도 이상이 아닐 수 있습니다
+  - 공식 가이드 기준으로 site review는 며칠 이상 걸릴 수 있고, 경우에 따라 더 길어질 수 있습니다
+- case 3. 다른 AdSense 계정에만 묶여 있음
+  - cutover 전에 어느 계정을 최종 owner로 쓸지부터 정리해야 합니다
+  - 서로 다른 계정에서 같은 도메인 운영 의미가 충돌하면 이번 cutover 번들은 열지 않는 편이 안전합니다
+
 ## Verification
 - 요청 기반 확인
   - `GET /ads.txt`가 200이어야 합니다.
@@ -71,6 +92,9 @@
   - `view-source:` 또는 devtools에서 `pagead2.googlesyndication.com/pagead/js/adsbygoogle.js` 스크립트가 로드되는지
   - 각 광고 슬롯 내부에 `<ins class="adsbygoogle">`가 있는지
   - `adsbygoogle.push()` 관련 오류가 없는지
+- 시간 기대치
+  - `ads.txt` 변경은 즉시 반영되지 않을 수 있습니다
+  - Google 측 `ads.txt` 크롤 반영과 site review 반영은 짧게는 수일, 길게는 더 오래 걸릴 수 있으므로, cutover 당일의 pass 기준은 `코드/도메인/ads.txt/DOM 계약 정상`으로 잡는 것이 맞습니다
 
 ## Rollback
 - 가장 안전한 rollback은 `NEXT_PUBLIC_ADSENSE_ENABLED=false` 또는 env 제거 후 redeploy 입니다.
@@ -81,3 +105,13 @@
 - 이번 cutover는 `자동 광고`가 아니라 `수동 슬롯`만 기준입니다.
 - 광고 surface는 `locally_content` 공개 목록/상세로 한정합니다.
 - 커뮤니티 데이터, 댓글/좋아요/조회수, SEO 메타 구조는 이번 cutover에서 건드리지 않습니다.
+
+## Official References
+- AdSense ads.txt guide
+  - <https://support.google.com/adsense/answer/7532444?hl=en>
+- AdSense ads.txt crawl timing and troubleshooting
+  - <https://support.google.com/adsense/answer/7679060?hl=en>
+- AdSense add a new site to your sites list
+  - <https://support.google.com/adsense/answer/12169212?hl=en>
+- AdSense site management
+  - <https://support.google.com/adsense/answer/12131223?hl=en>

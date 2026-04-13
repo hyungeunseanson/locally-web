@@ -5,6 +5,9 @@
 - 목적은 단순하다.
   - 도메인 연결 당일에 `SEO / 광고 / 결제 / 라이브 검증`이 서로 다른 도메인을 보지 않게 미리 잠그는 것
   - 코드 수정 없이 `도메인 연결 + env 전환 + 재배포`만으로 전환 가능한 상태를 만드는 것
+- 이번 전환의 검색엔진 의미도 같이 고정한다.
+  - 이 작업은 `새 도메인으로 사이트를 옮기는 site move`가 아니라, `같은 공개 URL(www.locally-travel.com)을 새 호스팅/Vercel 프로젝트로 옮기는 host migration`에 가깝다
+  - 따라서 Google Search Console의 Change of Address tool 대상이 아니다
 - 현재 기준 사실
   - Vercel project: `locally-web`
   - project id: `prj_bUhlyw1uuWD3Uxl01Kv4ut5jeFrz`
@@ -45,6 +48,11 @@
   - email absolute links
 - cutover 전 금지
   - 도메인은 아직 이전 사이트인데 `NEXT_PUBLIC_SITE_URL`만 미리 `www.locally-travel.com`으로 바꾸는 것
+- 검색엔진 운영 원칙
+  - 이번 전환은 Google의 `Change of Address` 대상이 아니다
+  - 이유는 최종 공개 URL을 `www.locally-travel.com`으로 계속 유지할 계획이기 때문이다
+  - 즉 검색엔진에는 “새 도메인으로 이사”를 알리는 것이 아니라, 새 배포가 같은 canonical URL을 계속 안정적으로 응답한다는 사실이 더 중요하다
+  - `www`와 apex를 함께 쓰더라도, 공식 primary는 `www` 하나로 잠그고 apex는 `301` redirect만 둔다
 
 ### 3. 광고 / AdSense 준비
 - AdSense는 현재 `로컬리 콘텐츠 수동 슬롯`만 준비돼 있다.
@@ -128,3 +136,7 @@
   - <https://vercel.com/docs/domains/set-up-custom-domain>
 - Vercel project domain API
   - <https://vercel.com/docs/rest-api/reference/endpoints/projects/add-a-domain-to-a-project>
+- Google site move with URL changes
+  - <https://developers.google.com/search/docs/crawling-indexing/site-move-with-url-changes>
+- Google Change of Address tool
+  - <https://support.google.com/webmasters/answer/9370220?hl=en>
