@@ -200,6 +200,8 @@ test.describe.serial('Host payout summary reflection', () => {
     await login(page, hostUser);
     await page.goto('/host/dashboard?tab=earnings', { waitUntil: 'networkidle' });
 
+    await expect(page.getByText(/완료 동기화.*정산|completion sync/i).first()).toBeVisible();
+    await expect(page.getByText(/지급 대상으로 잡힌 금액만|eligible for payout/i).first()).toBeVisible();
     await expect(page.getByTestId('host-earnings-unified-total')).toContainText('₩24,000');
     await expect(page.getByTestId('host-earnings-breakdown-experience-pending')).toContainText('₩24,000');
     await expect(page.getByTestId('host-earnings-breakdown-service-pending')).toContainText('₩0');

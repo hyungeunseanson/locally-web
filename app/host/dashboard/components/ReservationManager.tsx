@@ -469,7 +469,7 @@ export default function ReservationManager() {
         <div className="flex w-full sm:w-auto bg-slate-100 p-1 rounded-2xl">
           {[
             { id: 'upcoming', label: 'tab_upcoming' },
-            { id: 'completed', label: 'tab_past' },
+            { id: 'completed', label: 'res_tab_past' },
             { id: 'cancelled', label: 'tab_cancel' }
           ].map(tab => {
             const cancelCount = (tab.id === 'cancelled' || tab.id === 'upcoming')

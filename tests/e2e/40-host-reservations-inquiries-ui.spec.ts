@@ -618,7 +618,7 @@ test.describe.serial('Host dashboard reservations and inquiries UI coverage', ()
     await page.mouse.click(10, 10);
     await expect(page.getByRole('heading', { name: circleGuest.fullName })).toHaveCount(0);
 
-    await page.getByRole('button', { name: /지난 일정|Completed/ }).click();
+    await page.getByRole('button', { name: /지난 일정|Past Trips|Completed/ }).click();
     const completedCircleCard = page.getByTestId(`reservation-card-${circlePastBookingId}`);
     await expect(completedCircleCard).toBeVisible({ timeout: 15000 });
     await expect(completedCircleCard.getByRole('button', { name: /후기 작성됨|Review Written/ })).toBeVisible();
