@@ -8,7 +8,7 @@ const supabaseAdmin = createClient(
 async function checkExperiences() {
     console.log("Using service_role key to bypass RLS...");
     
-    const { data: allApps, error: appError } = await supabaseAdmin
+    const { data: allApps } = await supabaseAdmin
         .from('host_applications')
         .select('user_id, status');
 

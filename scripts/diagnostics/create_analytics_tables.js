@@ -1,12 +1,6 @@
 const path = require('path');
-const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
 const { rootDir } = require('./loadEnv.cjs');
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function run() {
     console.log('Running DDL queries via SQL function or direct REST if available (usually requires psql or supabase CLI).');

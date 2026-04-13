@@ -25,10 +25,6 @@ function readTrimmedEnv(env, key) {
   return value.length > 0 ? value : null;
 }
 
-function escapeRegex(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 function buildUrl(origin, pathname) {
   return `${origin}${pathname}`;
 }
