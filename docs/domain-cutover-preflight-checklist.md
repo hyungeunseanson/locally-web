@@ -18,6 +18,7 @@
 - robots / sitemap: [app/robots.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/robots.ts:1), [app/sitemap.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/sitemap.ts:131)
 - OG image base URL: [app/opengraph-image.tsx](/Users/hyungeunseanson/Documents/서비스/locally-web/app/opengraph-image.tsx:1)
 - AdSense cutover contract: [docs/adsense-cutover-checklist.md](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/adsense-cutover-checklist.md:1)
+- Vercel cutover rehearsal: [docs/2026-04-13_vercel_domain_cutover_rehearsal.md](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/2026-04-13_vercel_domain_cutover_rehearsal.md:1)
 - Search Console / Naver ops contract: [docs/2026-04-13_locally_content_search_console_ops_checklist.md](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/2026-04-13_locally_content_search_console_ops_checklist.md:1)
 - NicePay cutover contract: [docs/payments/nicepay-cutover-checklist.md](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/payments/nicepay-cutover-checklist.md:1)
 - live smoke launcher: [scripts/run-live-smoke.mjs](/Users/hyungeunseanson/Documents/서비스/locally-web/scripts/run-live-smoke.mjs:94)
