@@ -17,6 +17,27 @@
 - current project domains: custom domain 없음, `*.vercel.app` alias만 사용 중
 - latest production deployment는 cutover 직전에 반드시 `READY`인지 다시 확인한다
 
+## Live Preflight Findings
+- 점검 시각 기준 latest production deployment는 `READY`였다.
+  - deployment id: `dpl_5Qfm75rrY7PJtHVP8GG2tV19p5sk`
+  - deployment url: `locally-irjgz1jyi-locallys-projects-b062321b.vercel.app`
+- project domain 상태
+  - custom domain 없음
+  - 현재 확인된 project alias
+    - `locally-web.vercel.app`
+    - `locally-web-locallys-projects-b062321b.vercel.app`
+    - `locally-web-git-main-locallys-projects-b062321b.vercel.app`
+- 실제 응답 확인 결과
+  - `https://locally-web.vercel.app/robots.txt`는 `200`
+  - `https://locally-web.vercel.app/sitemap.xml`는 `200`
+  - `https://locally-web.vercel.app/ads.txt`는 `404`
+  - `robots.txt`와 `sitemap.xml`은 현재 `https://locally-web.vercel.app` 기준 URL을 내보내고 있다
+  - unique deployment URL은 root와 `sitemap.xml`에서 Vercel Authentication이 보였으므로, cutover 전 smoke 기준 URL로 쓰지 않는다
+- 현재 해석
+  - AdSense는 아직 비활성 상태로 보는 게 맞다
+  - SEO base URL은 아직 `locally-web.vercel.app`로 정상 정렬돼 있다
+  - cutover 전 공식 smoke 기준 base URL은 `locally-web.vercel.app` 또는 이후의 custom domain이어야 한다
+
 ## Source Of Truth
 - preflight checklist: [docs/domain-cutover-preflight-checklist.md](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/domain-cutover-preflight-checklist.md:1)
 - AdSense cutover: [docs/adsense-cutover-checklist.md](/Users/hyungeunseanson/Documents/서비스/locally-web/docs/adsense-cutover-checklist.md:1)
@@ -98,6 +119,9 @@
   - `robots.txt`의 sitemap 링크가 새 도메인
   - `sitemap.xml` 내부 URL이 새 도메인
   - apex 접속 시 `www`로 간다
+- 중요한 기준
+  - smoke target은 `custom domain` 또는 `locally-web.vercel.app` 같은 project alias를 쓴다
+  - `locally-irjgz1jyi-...vercel.app` 같은 unique deployment URL은 Vercel Authentication이 걸릴 수 있으므로 운영 smoke 기준 URL로 쓰지 않는다
 
 ### 8. Live smoke
 - 공식 smoke 기준은 `scripts/run-live-smoke.mjs`다.
