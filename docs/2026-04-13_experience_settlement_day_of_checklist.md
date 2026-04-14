@@ -9,6 +9,7 @@
 
 ## 시작 전 원칙
 - 먼저 `Settlement Sync`를 확인하고, 그 다음에만 payout을 실행한다.
+- 실제 day-of 순서는 `체험 카드 -> operator banner -> 상단 정산 가드 -> payout queue 대상 확인 -> payout 실행 -> host earnings spot check`으로 고정한다.
 - 아래 중 하나라도 보이면 정산 실행을 멈춘다.
   - `running_stale`
   - `failed`
@@ -18,14 +19,18 @@
 
 ## 실제 점검 순서
 1. `Admin > Sales > Settlement Sync Health`로 들어간다.
-2. `체험 카드`와 `operator banner`를 같이 본다.
-3. 아래 4개를 확인한다.
+2. `체험 카드`, `operator banner`, 상단 `정산 가드`를 같이 본다.
+3. 아래 6개를 확인한다.
    - `health_state`
+   - `operator banner` 문구
+   - 상단 가드 문구
    - `due count`
    - `last success`
    - `infra banner`
 4. 아래 조건이면 통과다.
    - `health_state='healthy'`
+   - `operator banner`가 `목록 반영 정상` 또는 같은 의미의 진행 가능 안내
+   - 상단 가드가 `정산 진행 가능` 또는 같은 의미의 안전 안내
    - `running_stale=false`
    - `503 infra banner` 없음
    - `due count`가 `0`이거나 설명 가능하게 낮다
@@ -64,6 +69,7 @@
 - 아래면 sync는 건드리지 않는다.
   - `healthy`
   - `operator banner`가 `목록 반영 정상` 또는 같은 의미의 진행 가능 안내를 보여준다
+  - 상단 `정산 가드`가 `정산 진행 가능` 또는 같은 의미의 안전 안내를 보여준다
   - `due count=0` 또는 설명 가능
   - `last success` 정상
   - `running_stale`, `failed`, `503` 없음

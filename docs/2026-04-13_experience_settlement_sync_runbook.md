@@ -17,9 +17,10 @@
   - 정산 실행 전에 `completed` 전환이 실제로 끝났는지 확인한다
 
 ## 운영자용 짧은 버전
-- 먼저 `Admin > Sales > Settlement Sync Health`의 `체험 카드`와 `operator banner`를 함께 본다.
+- 먼저 `Admin > Sales > Settlement Sync Health`의 `체험 카드`, `operator banner`, 상단 `정산 가드`를 함께 본다.
 - 아래 4개가 모두 괜찮으면 그날은 sync 쪽에서 추가 작업이 없다.
   - `health_state='healthy'`
+  - 상단 가드가 `정산 진행 가능` 또는 같은 의미의 안전 안내를 보여준다
   - `running_stale=false`
   - `503 infra banner` 없음
   - `due count`가 `0`이거나 설명 가능하게 낮다
@@ -33,9 +34,11 @@
 
 ## 실제 점검 순서
 1. `Admin > Sales`로 들어간다.
-2. `Settlement Sync Health`에서 `체험 카드`와 `operator banner`를 먼저 본다.
-3. 아래 4가지만 확인한다.
+2. `Settlement Sync Health`에서 `체험 카드`, `operator banner`, 상단 `정산 가드`를 먼저 본다.
+3. 아래 5가지만 확인한다.
    - 상태 라벨
+   - `operator banner` 문구
+   - 상단 가드 문구
    - `due count`
    - `last success`
    - `infra banner` 유무
@@ -80,6 +83,7 @@
 ## 정상 상태 판단
 - `Sales > Settlement Sync Health`에서 체험 카드가 아래 조건이면 정상으로 본다.
   - `health_state='healthy'`
+  - 상단 가드가 `정산 진행 가능`
   - `due_candidate_count=0` 이거나 매우 낮고 빠르게 감소한다
   - `running_stale=false`
   - 최근 `last_success_at`이 설명 가능하다
@@ -93,11 +97,23 @@
   - `failed`
   - `503 infra disabled banner`
 
+## Same-order 잠금
+- 운영 당일에는 아래 순서를 바꾸지 않는다.
+1. `Settlement Sync Health`의 체험 카드 확인
+2. `operator banner`와 상단 `정산 가드` 문구 확인
+3. 필요 시 `지연 건 지금 실행(run due)` 또는 incident 절차 수행
+4. 그 다음에만 `payout queue`에서 대상 booking의 `completed + payout_status='pending'` 확인
+5. 그 다음에만 payout 실행
+6. 실행 직후 host earnings spot check
+- 위 순서 중 1~3이 비어 있으면 `code blocker`가 아니라 `operational hold`로 보고 payout을 보류한다.
+
 ## 일일 운영 순서
 1. `Admin > Sales`로 들어간다.
-2. `Settlement Sync Health`의 체험 카드와 `operator banner`를 먼저 본다.
-3. 아래 4가지를 확인한다.
+2. `Settlement Sync Health`의 체험 카드, `operator banner`, 상단 `정산 가드`를 먼저 본다.
+3. 아래 5가지를 확인한다.
    - 상태 라벨
+   - `operator banner` 문구
+   - 상단 가드 문구
    - `due count`
    - `최대 지연`
    - `last success` 또는 `last heartbeat`
@@ -197,11 +213,13 @@
 
 ## 정산 실행 전 체크
 1. `Settlement Sync Health` 체험 카드가 `healthy` 또는 방금 수동 복구 후 정상화된 상태인지 확인
-2. `payout queue`에서 대상 체험 예약이 pending settlement로 보이는지 확인
-3. 대상 booking의 의미가 아래와 맞는지 확인
+2. 상단 `정산 가드`가 `정산 진행 가능` 또는 같은 의미의 안전 안내인지 확인
+3. `operator banner`가 `목록 반영 정상` 또는 같은 의미의 진행 가능 안내인지 확인
+4. `payout queue`에서 대상 체험 예약이 pending settlement로 보이는지 확인
+5. 대상 booking의 의미가 아래와 맞는지 확인
    - `status='completed'`
    - `payout_status='pending'`
-4. 그 다음에만 host payout 실행
+6. 그 다음에만 host payout 실행
 
 ## 정산 실행 후 체크
 1. `payout queue`에서 해당 host pending amount가 줄었는지 확인
@@ -216,6 +234,7 @@
 1. `Sales > Settlement Sync Health`
    - 체험 카드 `healthy`
    - `operator banner`가 `목록 반영 정상` 또는 같은 의미의 진행 가능 안내를 보여준다
+   - 상단 `정산 가드`가 `정산 진행 가능` 또는 같은 의미의 안전 안내를 보여준다
    - `due count` 설명 가능
 2. `/api/admin/settlement-sync`가 200을 반환하는지
 3. cron 경로가 auth 포함 시 설명 가능한지
