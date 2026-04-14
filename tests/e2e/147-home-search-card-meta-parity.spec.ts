@@ -192,6 +192,45 @@ test.describe('Home/search card meta parity', () => {
     await expect(searchCard.getByTestId('experience-card-meta-location')).toHaveText(homeLocationText || '');
   });
 
+  test('keeps localized desktop home search on the home feed while matching the same card', async ({ page }) => {
+    await stubHomeExperiences(page);
+    await page.setViewportSize({ width: 1440, height: 1200 });
+
+    const localeCases = [
+      { locale: 'en', path: '/en', query: FIXTURE.title_en },
+      { locale: 'ja', path: '/ja', query: FIXTURE.title_ja },
+      { locale: 'zh', path: '/zh', query: FIXTURE.category_zh },
+    ] as const;
+
+    for (const item of localeCases) {
+      await page.context().clearCookies();
+      await page.goto('/', { waitUntil: 'domcontentloaded' });
+      await page.evaluate((locale) => {
+        window.localStorage.setItem('app_lang', locale);
+        document.cookie = `app_lang=${locale}; path=/`;
+      }, item.locale);
+      await page.goto(item.path, { waitUntil: 'networkidle' });
+      await dismissAnnouncementIfVisible(page);
+
+      const searchInput = page.getByTestId('home-desktop-search-location-field').locator('input');
+      await expect(searchInput).toBeVisible({ timeout: 15000 });
+      await searchInput.fill(item.query);
+      await page.getByTestId('home-desktop-search-submit').click();
+
+      await expect
+        .poll(() => new URL(page.url()).pathname, { timeout: 15000 })
+        .toBe(item.path);
+
+      const homeCard = page.locator(`a[href="/experiences/${FIXTURE.id}"]:visible`).first();
+      await expect(homeCard).toBeVisible({ timeout: 15000 });
+      await expect(homeCard.getByTestId('experience-card-meta-title')).toContainText(
+        item.locale === 'en' ? FIXTURE.title_en :
+          item.locale === 'ja' ? FIXTURE.title_ja :
+            FIXTURE.title_zh
+      );
+    }
+  });
+
   test('keeps mobile search result prices compact without locale suffixes', async ({ page }) => {
     await stubSearchExperiences(page);
     await page.setViewportSize({ width: 390, height: 844 });

@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   getVisiblePublicHostIdSet,
 } from '@/app/utils/hostVisibility';
-import { getSearchableCityAliases } from '@/app/utils/searchLocationCatalog';
 import { createClient } from '@/app/utils/supabase/server';
 import { normalizeServiceCity } from '@/app/utils/serviceRequestLocation';
 import {
@@ -16,19 +15,7 @@ import {
   type SearchTimeId,
   type SearchTypeId,
 } from '@/app/search/searchContract';
-
-function normalizeSearchInput(value: string) {
-  return value
-    .replace(/[(),'"`]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
-}
-
-function tokenizeSearchInput(value: string) {
-  const normalized = normalizeSearchInput(value);
-  return normalized ? normalized.split(' ').filter(Boolean) : [];
-}
+import { buildSearchHaystack, tokenizeSearchInput } from '@/app/search/searchText';
 
 function asString(value: unknown) {
   if (typeof value === 'string') return value;
@@ -43,33 +30,6 @@ function parseFilterIds<T extends string>(value: string | null, allowed: readonl
     .split(',')
     .map((entry) => entry.trim())
     .filter((entry): entry is T => allowedSet.has(entry as T));
-}
-
-function buildSearchHaystack(item: SearchExperience) {
-  const record = item as Record<string, unknown>;
-  return [
-    item.title,
-    record.description,
-    item.city,
-    ...getSearchableCityAliases(item.city),
-    item.country,
-    record.meeting_point,
-    item.category,
-    record.title_ko,
-    record.description_ko,
-    record.title_en,
-    record.description_en,
-    record.category_en,
-    record.title_ja,
-    record.description_ja,
-    record.category_ja,
-    record.title_zh,
-    record.description_zh,
-    record.category_zh,
-  ]
-    .map(asString)
-    .join(' ')
-    .toLowerCase();
 }
 
 function parseSearchDate(iso: string | null) {
@@ -183,12 +143,15 @@ function stripInternalExperienceFields(item: SearchExperience) {
   const publicItem = {
     ...(item as SearchExperience & {
       host_id?: unknown;
+      tags?: unknown;
     }),
   } as SearchExperience & {
     host_id?: unknown;
+    tags?: unknown;
   };
 
   delete publicItem.host_id;
+  delete publicItem.tags;
   return publicItem;
 }
 
@@ -251,6 +214,7 @@ export async function GET(request: NextRequest) {
         'description',
         'city',
         'country',
+        'meeting_point',
         'category',
         'title_ko',
         'description_ko',

@@ -3,6 +3,7 @@ export interface SearchExperience {
   title?: string;
   description?: string;
   category?: string;
+  tags?: string[];
   city?: string;
   subCity?: string;
   country?: string;

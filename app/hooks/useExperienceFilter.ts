@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchActiveExperiences } from '../utils/api/experiences';
 import { Experience } from '../types';
 import { sendSearchLog } from '@/app/utils/analytics/client';
-import { getSearchableCityAliases } from '@/app/utils/searchLocationCatalog';
+import { buildSearchHaystack, tokenizeSearchInput } from '@/app/search/searchText';
 
 // 🟢 통역기: 영어 ID가 들어오면 한글 DB 이름으로 바꿔주는 역할 (유지)
 const cityMap: Record<string, string> = {
@@ -50,11 +50,10 @@ export function useExperienceFilter() {
     if (searchTerm.trim()) {
       sendSearchLog(searchTerm.trim(), 'main');
 
-      const searchTerms = searchTerm.replace(/[·,.]/g, ' ').toLowerCase().split(/\s+/).filter(t => t.length > 0);
+      const searchTerms = tokenizeSearchInput(searchTerm);
       result = result.filter(item => {
-        const cityAliases = getSearchableCityAliases(item.city).join(' ');
-        const targetString = `${item.title} ${item.city} ${cityAliases} ${item.description} ${item.category} ${item.tags?.join(' ')}`.toLowerCase();
-        return searchTerms.every(term => targetString.includes(term));
+        const haystack = buildSearchHaystack(item);
+        return searchTerms.every(term => haystack.includes(term));
       });
     }
 
