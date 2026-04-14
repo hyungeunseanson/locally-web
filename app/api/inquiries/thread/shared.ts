@@ -83,6 +83,7 @@ type InquiryInsertRow = {
   experience_id?: string | number | null;
   service_request_id?: string | null;
   type?: string | null;
+  status?: string | null;
   content?: string | null;
 };
 
@@ -485,14 +486,21 @@ async function resolveAdminInitiatedSupportThread(params: {
     throw new InquiryThreadError(400, 'guestId is required');
   }
 
-  const { data: existing } = await supabaseAdmin
+  let existingQuery = supabaseAdmin
     .from('inquiries')
-    .select('id, user_id, host_id, experience_id, type, content')
+    .select('id, user_id, host_id, experience_id, type, status, content')
     .eq('user_id', guestId)
-    .or('type.eq.admin_support,type.eq.admin')
+    .in('type', ['admin_support', 'admin']);
+
+  // openOnly callers expect an active support thread, not a historical resolved one.
+  if (body.openOnly) {
+    existingQuery = existingQuery.or('status.is.null,status.eq.open,status.eq.in_progress');
+  }
+
+  const { data: existing } = await existingQuery
     .order('created_at', { ascending: false })
     .limit(1)
-    .maybeSingle();
+    .maybeSingle<InquiryInsertRow>();
 
   return {
     existing,

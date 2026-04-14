@@ -63,7 +63,7 @@
 ## 아무것도 안 해도 되는 조건
 - 아래면 sync는 건드리지 않는다.
   - `healthy`
-  - `operator banner`가 `체험 정산 진행 가능`
+  - `operator banner`가 `목록 반영 정상` 또는 같은 의미의 진행 가능 안내를 보여준다
   - `due count=0` 또는 설명 가능
   - `last success` 정상
   - `running_stale`, `failed`, `503` 없음

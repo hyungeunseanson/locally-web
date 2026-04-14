@@ -215,7 +215,7 @@
 - cutover day나 운영 점검일에는 아래 순서로만 본다.
 1. `Sales > Settlement Sync Health`
    - 체험 카드 `healthy`
-   - `operator banner`가 `체험 정산 진행 가능`
+   - `operator banner`가 `목록 반영 정상` 또는 같은 의미의 진행 가능 안내를 보여준다
    - `due count` 설명 가능
 2. `/api/admin/settlement-sync`가 200을 반환하는지
 3. cron 경로가 auth 포함 시 설명 가능한지
