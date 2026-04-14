@@ -52,13 +52,20 @@ export default function CancellationModal({ isOpen, onClose, onConfirm, isProces
     : t('modal_cancel_followup_desc');
 
   return (
-    <div className={`fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 md:p-4 transition-opacity duration-150 ${closing ? 'opacity-0' : 'animate-in fade-in duration-200'}`}>
+    <div
+      data-testid="guest-trip-cancel-modal"
+      className={`fixed inset-0 z-[210] flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 md:p-4 transition-opacity duration-150 ${closing ? 'opacity-0' : 'animate-in fade-in duration-200'}`}
+    >
       <div className={`bg-white rounded-xl md:rounded-2xl w-full max-w-md overflow-hidden shadow-2xl transition-all duration-150 ${closing ? 'opacity-0 scale-95' : 'animate-in fade-in zoom-in duration-200'}`}>
         
         {/* 헤더 */}
         <div className="p-4 md:p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
           <h3 className="font-bold text-[16px] md:text-lg text-slate-800">{t('modal_cancel_title')}</h3>
-          <button onClick={requestClose} className="p-1.5 md:p-2 hover:bg-slate-200 rounded-full transition-colors">
+          <button
+            data-testid="guest-trip-cancel-close-button"
+            onClick={requestClose}
+            className="p-1.5 md:p-2 hover:bg-slate-200 rounded-full transition-colors"
+          >
             <X className="w-[18px] h-[18px] md:w-5 md:h-5 text-slate-500" />
           </button>
         </div>

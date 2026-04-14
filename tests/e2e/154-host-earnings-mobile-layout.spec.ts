@@ -255,7 +255,7 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Host earnings mobile layout', () => {
-  test('keeps the unified top summary visible without scroll on mobile', async ({ page }) => {
+  test('keeps the compact summary and tabs readable on mobile without horizontal overflow', async ({ page }) => {
     test.setTimeout(120000);
 
     await page.setViewportSize({ width: 390, height: 844 });
@@ -297,16 +297,21 @@ test.describe.serial('Host earnings mobile layout', () => {
       /진행 중 금액은 상단 총액에 포함되지 않음|not included in the unified total|上部の合計に含まれません|不计入上方总额/
     );
 
-    await expect(page.getByTestId('host-earnings-tabs')).toHaveCount(0);
-    await expect(page.getByTestId('host-earnings-group-2026-06-05')).toHaveCount(0);
+    await expect(page.getByTestId('host-earnings-tabs')).toBeVisible();
+    await expect(page.getByTestId('host-earnings-tab-experience')).toBeVisible();
+    await expect(page.getByTestId('host-earnings-tab-service')).toBeVisible();
+    await expect(page.locator('[data-testid^="host-earnings-group-"]').first()).toBeVisible();
     await expect(page.getByTestId('host-service-earnings-item-list')).toHaveCount(0);
 
     const viewportHeight = page.viewportSize()?.height ?? 844;
-    const breakdownBox = await page.getByTestId('host-earnings-breakdown-card').boundingBox();
-    expect(breakdownBox).not.toBeNull();
-    expect((breakdownBox?.y || 0) + (breakdownBox?.height || 0)).toBeLessThanOrEqual(viewportHeight);
+    const tabsBox = await page.getByTestId('host-earnings-tabs').boundingBox();
+    expect(tabsBox).not.toBeNull();
+    expect((tabsBox?.y || 0) + (tabsBox?.height || 0)).toBeLessThanOrEqual(viewportHeight);
 
     const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
     expect(hasHorizontalOverflow).toBeFalsy();
+
+    await page.getByTestId('host-earnings-tab-service').click();
+    await expect(page.getByTestId('host-service-earnings-total-pending')).toContainText('₩90,000');
   });
 });

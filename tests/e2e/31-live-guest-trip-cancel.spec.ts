@@ -249,9 +249,7 @@ test.describe.serial('Live guest trip cancellation flow', () => {
       await page.locator('button:has(svg.lucide-more-horizontal)').first().click();
       await page.getByRole('button', { name: /취소 요청|취소 요청하기|Cancel/i }).click();
 
-      const cancelModal = page.locator('div.fixed.inset-0.z-50').filter({
-        hasText: /예약 취소 요청|취소 규정 요약/,
-      });
+      const cancelModal = page.getByTestId('guest-trip-cancel-modal');
       await expect(cancelModal).toBeVisible({ timeout: 10000 });
       await cancelModal.locator('textarea').fill(cancelReason);
 

@@ -67,7 +67,7 @@ export default function ReceiptModal({ trip, onClose }: { trip: ReceiptTrip, onC
   const guestCount = Number(trip.guests || 1);
 
   return (
-    <div className={`fixed inset-0 z-50 flex items-center justify-center p-3 md:p-4 bg-black/60 backdrop-blur-sm transition-opacity duration-150 ${closing ? 'opacity-0' : 'animate-in fade-in'}`}>
+    <div className={`fixed inset-0 z-[210] flex items-center justify-center p-3 md:p-4 bg-black/60 backdrop-blur-sm transition-opacity duration-150 ${closing ? 'opacity-0' : 'animate-in fade-in'}`}>
       <div
         data-testid="guest-trip-receipt-modal"
         className={`relative flex max-h-[calc(100dvh-1.5rem)] w-full max-w-sm flex-col overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-150 md:max-h-none md:rounded-3xl ${closing ? 'opacity-0 scale-95' : 'animate-in zoom-in-95 duration-200'}`}

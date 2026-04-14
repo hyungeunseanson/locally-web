@@ -158,7 +158,7 @@ test.describe.serial('Host service earnings null request guard', () => {
 
     await expect(page.getByTestId('host-earnings-unified-total')).toContainText('₩100,000');
 
-    await page.getByTestId('host-earnings-service-toggle').click();
+    await page.getByTestId('host-earnings-tab-service').click();
 
     await expect(page.getByTestId('host-service-earnings-item-host-service-legacy-item')).toBeVisible();
     await expect(page.getByTestId('host-service-earnings-item-host-service-live-item')).toBeVisible();

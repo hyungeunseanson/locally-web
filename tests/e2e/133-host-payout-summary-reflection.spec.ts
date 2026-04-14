@@ -208,7 +208,7 @@ test.describe.serial('Host payout summary reflection', () => {
     await expect(page.getByTestId('host-earnings-unified-last-paid')).not.toContainText(
       /아직 지급 완료 내역이 없어요|No completed payout yet|まだ支払い完了履歴がありません|暂时还没有已完成结算/
     );
-    await page.getByTestId('host-earnings-experience-toggle').click();
+    await page.getByTestId('host-earnings-tab-experience').click();
 
     await expect(page.getByTestId('host-earnings-summary-pending-payout')).toContainText('₩24,000');
     await expect(page.getByTestId('host-earnings-summary-in-progress')).toContainText('₩0');

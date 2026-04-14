@@ -75,7 +75,7 @@ test.describe('Account accessibility auth surfaces', () => {
 
     await page.goto('/account', { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('account-withdrawal-notice')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('account-withdrawal-notice')).toContainText(/회원 탈퇴는 운영팀에 문의/);
+    await expect(page.getByTestId('account-withdrawal-notice')).toContainText(/회원 탈퇴/);
   });
 
   test('signs out from the mobile account menu using the shared auth contract', async ({ page }) => {
@@ -126,6 +126,6 @@ test.describe('Account accessibility auth surfaces', () => {
     await expect(page.getByText('현재 비밀번호 재설정 기능은 지원하지 않습니다.')).toBeVisible({ timeout: 10000 });
 
     await page.getByRole('button', { name: '회원 탈퇴는 어떻게 하나요?' }).click();
-    await expect(page.getByText('회원 탈퇴는 운영팀에 문의해 주세요.')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('회원 탈퇴는 운영팀 문의로 진행됩니다.')).toBeVisible({ timeout: 10000 });
   });
 });

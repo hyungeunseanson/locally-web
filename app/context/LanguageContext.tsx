@@ -166,8 +166,8 @@ const dictionary: Record<Locale, Record<string, string>> = {
     btn_save_changes: "변경사항 저장",
     // 👇 여기 추가
     saving: "저장 중...",
-    account_withdrawal_notice_title: "회원 탈퇴는 운영팀에 문의",
-    account_withdrawal_notice_desc: "현재 앱에서 직접 탈퇴는 지원하지 않습니다. 계정 종료가 필요하면 운영팀 문의를 통해 안내받아 주세요.",
+    account_withdrawal_notice_title: "회원 탈퇴",
+    account_withdrawal_notice_desc: "운영팀 문의로 진행됩니다.",
     profile_photo_change_done: "프로필 사진이 변경되었습니다.",
     profile_photo_fail: "사진 업로드 실패:",
     profile_save_success: "프로필이 성공적으로 저장되었어요.",
@@ -466,7 +466,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     q_g_account_2: "비밀번호를 잊어버렸어요.",
     a_g_account_2: "현재 비밀번호 재설정 기능은 지원하지 않습니다. 가입 시 사용한 로그인 정보 또는 소셜 로그인 수단을 다시 확인해 주세요.",
     q_g_account_3: "회원 탈퇴는 어떻게 하나요?",
-    a_g_account_3: "회원 탈퇴는 운영팀에 문의해 주세요. 본인 확인 후 필요한 절차를 안내해 드립니다.",
+    a_g_account_3: "회원 탈퇴는 운영팀 문의로 진행됩니다.",
 
     // [FAQ Items - Host]
     // 호스트 시작
@@ -1677,8 +1677,8 @@ const dictionary: Record<Locale, Record<string, string>> = {
     btn_save_changes: "Save Changes",
     // 👇 여기 추가
     saving: "Saving...",
-    account_withdrawal_notice_title: "Account deletion requires contacting the operations team",
-    account_withdrawal_notice_desc: "Direct account deletion is not supported in the app right now. If you need to close your account, please contact the operations team for guidance.",
+    account_withdrawal_notice_title: "Account deletion",
+    account_withdrawal_notice_desc: "Please contact the operations team.",
     profile_photo_change_done: "Profile photo updated.",
     profile_photo_fail: "Upload failed:",
     profile_save_success: "Profile saved successfully.",
@@ -3158,8 +3158,8 @@ const dictionary: Record<Locale, Record<string, string>> = {
     btn_save_changes: "変更を保存",
     // 👇 여기 추가
     saving: "保存中...",
-    account_withdrawal_notice_title: "退会は運営チームへのお問い合わせが必要です",
-    account_withdrawal_notice_desc: "現在、アプリ内での直接退会には対応していません。アカウント終了が必要な場合は、運営チームへお問い合わせください。",
+    account_withdrawal_notice_title: "退会",
+    account_withdrawal_notice_desc: "運営チームへお問い合わせください。",
     profile_photo_change_done: "プロフィール写真が変更されました。",
     profile_photo_fail: "アップロード失敗:",
     profile_save_success: "プロフィールが保存されました。",
@@ -4643,8 +4643,8 @@ const dictionary: Record<Locale, Record<string, string>> = {
     label_bio: "自我介绍",
     btn_save_changes: "保存更改",
     saving: "保存中...",
-    account_withdrawal_notice_title: "注销会员需要联系运营团队",
-    account_withdrawal_notice_desc: "目前应用内不支持直接注销账号。如需关闭账号，请联系运营团队获取后续说明。",
+    account_withdrawal_notice_title: "注销会员",
+    account_withdrawal_notice_desc: "请联系运营团队处理。",
     profile_photo_change_done: "头像已更改。",
     profile_photo_fail: "上传失败:",
     profile_save_success: "个人资料已保存。",

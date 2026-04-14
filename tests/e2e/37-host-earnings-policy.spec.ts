@@ -431,7 +431,7 @@ test.describe.serial('Host earnings payout-focused policy', () => {
     await expect(page.getByTestId('host-earnings-unified-last-paid')).toContainText(
       /마지막 정산 지급: 아직 지급 완료 내역이 없어요|Last payout sent: No completed payout yet|最後の精算支払い: まだ支払い完了履歴がありません|最后结算支付: 暂时还没有已完成结算/
     );
-    await page.getByTestId('host-earnings-experience-toggle').click();
+    await page.getByTestId('host-earnings-tab-experience').click();
 
     await expect(page.getByText(/완료된 예약 건수|Completed Bookings|完了した予約件数|已完成预订数/)).toBeVisible();
     await expect(page.getByText(/1\s*건|1 bookings|1件|1个/).first()).toBeVisible();
@@ -472,7 +472,7 @@ test.describe.serial('Host earnings payout-focused policy', () => {
     await expect(page.getByTestId('host-earnings-unified-last-paid')).toContainText(
       /마지막 정산 지급: 아직 지급 완료 내역이 없어요|Last payout sent: No completed payout yet|最後の精算支払い: まだ支払い完了履歴がありません|最后结算支付: 暂时还没有已完成结算/
     );
-    await page.getByTestId('host-earnings-experience-toggle').click();
+    await page.getByTestId('host-earnings-tab-experience').click();
 
     await expect(page.getByTestId('host-earnings-summary-completed-count')).toContainText(/1/);
     await expect(page.getByTestId('host-earnings-summary-payout-items')).toContainText(/2/);
@@ -507,7 +507,7 @@ test.describe.serial('Host earnings payout-focused policy', () => {
     await login(page, hostUser);
     await page.goto('/host/dashboard?tab=earnings', { waitUntil: 'networkidle' });
 
-    await page.getByTestId('host-earnings-experience-toggle').click();
+    await page.getByTestId('host-earnings-tab-experience').click();
     await page.getByTestId(`host-earnings-group-${bookingDateKey}`).hover();
     await expect(page.getByTestId(`host-earnings-tooltip-${bookingDateKey}`)).toBeVisible();
     await expect(page.getByTestId(`host-earnings-tooltip-${bookingDateKey}`)).toContainText('₩24,000');

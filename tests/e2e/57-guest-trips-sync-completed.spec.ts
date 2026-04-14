@@ -620,9 +620,7 @@ test.describe.serial('guest trips completed sync route', () => {
     await page.getByTestId(`guest-trip-menu-button-${bookingId}`).last().click();
     await page.getByTestId(`guest-trip-cancel-button-${bookingId}`).click();
 
-    const cancelModal = page.locator('div.fixed.inset-0.z-50').filter({
-      hasText: /예약 취소 요청|취소 규정 요약/,
-    });
+    const cancelModal = page.getByTestId('guest-trip-cancel-modal');
     await expect(cancelModal).toBeVisible({ timeout: 10000 });
     await expect(cancelModal.getByTestId('guest-trip-cancel-followup')).toContainText('취소 후 결과는 여기서 확인하세요');
     await expect(cancelModal.getByTestId('guest-trip-cancel-followup')).toContainText('취소 요청과 환불 진행 상태는 예약 내역과 알림에서 다시 확인할 수 있어요.');
@@ -686,6 +684,75 @@ test.describe.serial('guest trips completed sync route', () => {
     if (!cardBox || !buttonBox) throw new Error('Desktop pending trip layout bounding boxes were not available.');
 
     expect(buttonBox.y + buttonBox.height).toBeLessThanOrEqual(cardBox.y + cardBox.height);
+  });
+
+  test('keeps desktop receipt and cancellation modals clickable above the sticky header', async ({ page }) => {
+    const host = createUser('host.pending.desktop.modal');
+    const guest = createUser('guest.pending.desktop.modal');
+    const desktopViewport = { width: 1440, height: 1200 };
+
+    await page.addInitScript(() => {
+      window.localStorage.setItem('app_lang', 'ko');
+      document.cookie = 'app_lang=ko; path=/';
+    });
+    await page.setViewportSize(desktopViewport);
+
+    const hostId = await createAuthUser(host);
+    const guestId = await createAuthUser(guest);
+    await createApprovedHostApplication(hostId, host);
+
+    const supabase = getAdminClient();
+    const { error: hostProfileError } = await supabase
+      .from('profiles')
+      .update({
+        full_name: host.fullName,
+        avatar_url: '/images/logo.png',
+      })
+      .eq('id', hostId);
+
+    if (hostProfileError) throw hostProfileError;
+
+    const experienceId = await createHostExperience(hostId);
+    const bookingId = await createFuturePendingBooking({
+      guestId,
+      guest,
+      experienceId,
+    });
+
+    await login(page, guest);
+    await page.goto('/guest/trips', { waitUntil: 'domcontentloaded' });
+
+    const tripCard = page
+      .getByTestId('guest-trips-desktop-main')
+      .getByTestId(`guest-trip-card-${bookingId}`);
+    const pendingReceiptButton = tripCard.getByTestId('guest-trip-pending-receipt-button');
+    await expect(tripCard).toBeVisible();
+    await pendingReceiptButton.click();
+
+    const receiptModal = page.getByTestId('guest-trip-receipt-modal');
+    const receiptCloseButton = page.getByTestId('guest-trip-receipt-close-button');
+    await expect(receiptModal).toBeVisible();
+    await expect.poll(async () => receiptCloseButton.evaluate((button) => {
+      const rect = button.getBoundingClientRect();
+      const elementAtCenter = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      return Boolean(elementAtCenter) && (button === elementAtCenter || button.contains(elementAtCenter));
+    })).toBe(true);
+    await receiptCloseButton.click();
+    await expect(receiptModal).toBeHidden({ timeout: 10000 });
+
+    await tripCard.getByTestId(`guest-trip-menu-button-${bookingId}`).click();
+    await tripCard.getByTestId(`guest-trip-cancel-button-${bookingId}`).click();
+
+    const cancelModal = page.getByTestId('guest-trip-cancel-modal');
+    const cancelCloseButton = page.getByTestId('guest-trip-cancel-close-button');
+    await expect(cancelModal).toBeVisible();
+    await expect.poll(async () => cancelCloseButton.evaluate((button) => {
+      const rect = button.getBoundingClientRect();
+      const elementAtCenter = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      return Boolean(elementAtCenter) && (button === elementAtCenter || button.contains(elementAtCenter));
+    })).toBe(true);
+    await cancelCloseButton.click();
+    await expect(cancelModal).toBeHidden({ timeout: 10000 });
   });
 
   test('shows pending receipt follow-up guidance and support CTA', async ({ page }) => {

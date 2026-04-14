@@ -354,7 +354,7 @@ test.describe.serial('locally membership care experience', () => {
 
     await page.goto('/help', { waitUntil: 'domcontentloaded' });
     await dismissAnnouncementIfVisible(page);
-    await expect(page.getByTestId('help-member-care-strip')).toBeVisible();
+    await expect(page.getByTestId('help-member-care-strip')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Locally Care로 문의하기' })).toBeVisible();
 
     await page.goto('/guest/inbox', { waitUntil: 'domcontentloaded' });

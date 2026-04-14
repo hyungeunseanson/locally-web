@@ -350,12 +350,12 @@ export default function MobileProfileView({
 
             <div
                 data-testid="mobile-account-withdrawal-notice"
-                className="mx-4 mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4"
+                className="mx-4 mt-3 rounded-xl border border-slate-200 bg-white px-3 py-3"
             >
-                <p className="text-[13px] font-bold text-amber-900">
+                <p className="text-[12px] font-medium text-slate-600">
                     {t('account_withdrawal_notice_title')}
                 </p>
-                <p className="mt-1 text-[12px] leading-relaxed text-amber-800">
+                <p className="mt-0.5 text-[11px] leading-relaxed text-slate-400">
                     {t('account_withdrawal_notice_desc')}
                 </p>
             </div>

@@ -13,10 +13,13 @@ import ServiceEarningsPanel from './components/ServiceEarningsPanel';
 import UnifiedEarningsBreakdownCard from './components/UnifiedEarningsBreakdownCard';
 import UnifiedEarningsHeroCard from './components/UnifiedEarningsHeroCard';
 
+type EarningsTab = 'experience' | 'service';
+
 export default function Earnings() {
   const router = useRouter();
   const { t } = useLanguage();
 
+  const [activeTab, setActiveTab] = useState<EarningsTab>('experience');
   const [showSettings, setShowSettings] = useState(false);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [summaryError, setSummaryError] = useState<string | null>(null);
@@ -70,32 +73,39 @@ export default function Earnings() {
     };
   }, []);
 
+  const tabClass = (tab: EarningsTab) =>
+    `inline-flex min-w-0 flex-1 items-center justify-center rounded-full px-3 py-2 text-xs font-bold transition-colors md:flex-none md:px-5 md:text-sm ${
+      activeTab === tab
+        ? 'bg-slate-900 text-white shadow-sm'
+        : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+    }`;
+
   return (
-    <div className="max-w-md mx-auto md:max-w-none md:mx-0 min-h-[600px] animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center justify-between mb-4 md:mb-6 px-1 md:px-2 relative z-50">
-        <h2 className="text-lg md:text-2xl font-bold text-slate-900">{t('hp_earn_title')}</h2>
+    <div className="max-w-md mx-auto min-h-[600px] animate-in fade-in slide-in-from-bottom-4 duration-500 md:max-w-none md:mx-0">
+      <div className="relative z-50 mb-4 flex items-center justify-between px-1 md:mb-6 md:px-2">
+        <h2 className="text-lg font-bold text-slate-900 md:text-2xl">{t('hp_earn_title')}</h2>
         <div className="relative">
           <button
             onClick={(event) => {
               event.stopPropagation();
               setShowSettings((current) => !current);
             }}
-            className="p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-slate-200 transition-colors"
+            className="rounded-full bg-slate-100 p-2 text-slate-500 transition-colors hover:bg-slate-200"
           >
             <Settings size={20} />
           </button>
 
           {showSettings && (
-            <div className="absolute right-0 top-12 w-56 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="absolute right-0 top-12 w-56 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-xl animate-in fade-in zoom-in-95 duration-200">
               <button
                 onClick={() => router.push('/host/help')}
-                className="w-full text-left px-4 py-3 hover:bg-slate-50 text-sm font-medium text-slate-700 flex items-center gap-3 border-b border-slate-50"
+                className="flex w-full items-center gap-3 border-b border-slate-50 px-4 py-3 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
               >
                 <BookOpen size={16} className="text-slate-400" /> {t('host_guidebook')}
               </button>
               <button
                 onClick={() => router.push('/host/dashboard?tab=profile')}
-                className="w-full text-left px-4 py-3 hover:bg-slate-50 text-sm font-medium text-slate-700 flex items-center gap-3"
+                className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
               >
                 <CreditCard size={16} className="text-slate-400" /> {t('manage_payout_account')}
               </button>
@@ -108,10 +118,10 @@ export default function Earnings() {
         {summaryLoading ? (
           <>
             <div data-testid="host-earnings-unified-hero-skeleton">
-              <Skeleton className="h-[128px] w-full rounded-3xl" />
+              <Skeleton className="h-[104px] w-full rounded-3xl" />
             </div>
             <div data-testid="host-earnings-breakdown-skeleton">
-              <Skeleton className="h-[140px] w-full rounded-3xl" />
+              <Skeleton className="h-[112px] w-full rounded-3xl" />
             </div>
           </>
         ) : summaryError || !summary ? (
@@ -122,8 +132,36 @@ export default function Earnings() {
           <>
             <UnifiedEarningsHeroCard summary={summary} />
             <UnifiedEarningsBreakdownCard summary={summary} />
-            <ExperienceEarningsPanel summary={summary.experience} />
-            <ServiceEarningsPanel summary={summary.service} />
+
+            <div className="pt-1">
+              <div
+                data-testid="host-earnings-tabs"
+                className="flex w-full rounded-full border border-slate-200 bg-white p-1 shadow-sm md:inline-flex md:w-auto"
+              >
+                <button
+                  type="button"
+                  data-testid="host-earnings-tab-experience"
+                  className={tabClass('experience')}
+                  onClick={() => setActiveTab('experience')}
+                >
+                  {t('hp_earn_tab_experience')}
+                </button>
+                <button
+                  type="button"
+                  data-testid="host-earnings-tab-service"
+                  className={tabClass('service')}
+                  onClick={() => setActiveTab('service')}
+                >
+                  {t('hp_earn_tab_service')}
+                </button>
+              </div>
+            </div>
+
+            {activeTab === 'experience' ? (
+              <ExperienceEarningsPanel summary={summary.experience} />
+            ) : (
+              <ServiceEarningsPanel summary={summary.service} />
+            )}
           </>
         )}
       </div>

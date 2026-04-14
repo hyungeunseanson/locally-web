@@ -305,7 +305,7 @@ test.describe.serial('Host service earnings separation', () => {
     expect(stageMap.get(pendingFixture.bookingId)).toBe('pending');
     expect(stageMap.get(paidFixture.bookingId)).toBe('paid');
 
-    await page.getByTestId('host-earnings-service-toggle').click();
+    await page.getByTestId('host-earnings-tab-service').click();
 
     await expect(page.getByTestId('host-service-earnings-scope-note')).toContainText(
       /완료 후 정산 대기로 넘어간 금액|completed pending payouts|完了後の精算待ち金額|已完成后的待结算金额/

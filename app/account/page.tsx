@@ -1061,12 +1061,12 @@ export default function AccountPage() {
 
               <div
                 data-testid="account-withdrawal-notice"
-                className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4"
+                className="rounded-xl border border-slate-200 bg-white px-3 py-3"
               >
-                <p className="text-sm font-bold text-amber-900">
+                <p className="text-xs font-medium text-slate-600">
                   {t('account_withdrawal_notice_title')}
                 </p>
-                <p className="mt-1 text-sm leading-relaxed text-amber-800">
+                <p className="mt-0.5 text-xs leading-relaxed text-slate-400">
                   {t('account_withdrawal_notice_desc')}
                 </p>
               </div>

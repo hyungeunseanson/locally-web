@@ -355,9 +355,7 @@ test.describe.serial('Live guest post-booking experience flow', () => {
       await page.locator('button:has(svg.lucide-more-horizontal)').first().click();
       await page.getByRole('button', { name: /취소 요청|취소 요청하기|Cancel/i }).click();
 
-      const cancelModal = page.locator('div.fixed.inset-0.z-50').filter({
-        hasText: /예약 취소 요청|취소 규정 요약/,
-      });
+      const cancelModal = page.getByTestId('guest-trip-cancel-modal');
 
       await expect(cancelModal).toBeVisible({ timeout: 10000 });
       await expect(cancelModal.getByText('결제 후 24시간 이내 철회(투어 2일 전까지): 100%')).toBeVisible({
@@ -380,9 +378,7 @@ test.describe.serial('Live guest post-booking experience flow', () => {
     await test.step('Open and verify the receipt modal from guest trips', async () => {
       await page.getByRole('button', { name: /영수증|Receipt|領収書|收据/i }).last().click();
 
-      const receiptModal = page.locator('div.fixed.inset-0.z-50').filter({
-        hasText: /결제 영수증|Payment Receipt|領収書|付款收据/,
-      });
+      const receiptModal = page.getByTestId('guest-trip-receipt-modal');
       await expect(receiptModal).toBeVisible({ timeout: 15000 });
       await expect(receiptModal.getByText(String(bookingOrderId))).toBeVisible({ timeout: 10000 });
       await expect(receiptModal.getByText(bookableExperience.title)).toBeVisible({ timeout: 10000 });
