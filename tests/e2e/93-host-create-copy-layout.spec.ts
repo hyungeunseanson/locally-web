@@ -222,7 +222,7 @@ test('host create shows structured primary language guidance and refund policy c
   ).toBeVisible();
   await expect(
     page.getByText(
-      /대표사진에는 호스트 본인 얼굴이 나온 사진을 최소 1장 이상 꼭 포함해주세요\.|Please include at least one hero photo where the host’s face is clearly visible\.|ホスト本人の顔が分かる写真を最低1枚は必ず含めてください。|请至少包含一张能清楚看到房东本人脸部的照片。/
+      /대표사진에는 호스트 얼굴이 보이는 사진을 최소 1장 이상 반드시 포함해주세요\.|Please include at least one hero photo showing the host’s face\.|代表写真には、ホスト本人の顔が見える写真を最低1枚以上必ず含めてください。|代表照片中请至少包含一张能看到房东本人脸部的照片。/
     )
   ).toBeVisible();
 

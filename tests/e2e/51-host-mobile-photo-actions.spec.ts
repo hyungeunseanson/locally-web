@@ -256,6 +256,11 @@ test('mobile host create/edit supports hero photo replace and delete actions', a
   await languageButton.click();
   await page.getByRole('button', { name: /Lv\.?5/ }).first().click();
   await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await expect(
+    page.getByText(
+      /대표사진에는 호스트 얼굴이 보이는 사진을 최소 1장 이상 반드시 포함해주세요\.|Please include at least one hero photo showing the host’s face\.|代表写真には、ホスト本人の顔が見える写真を最低1枚以上必ず含めてください。|代表照片中请至少包含一张能看到房东本人脸部的照片。/
+    )
+  ).toBeVisible();
 
   await page
     .locator(
@@ -319,6 +324,11 @@ test('mobile host create/edit supports hero photo replace and delete actions', a
 
   await page.goto(`/host/experiences/${experienceId}/edit`, { waitUntil: 'commit' }).catch(() => {});
   await expect(page).toHaveURL(new RegExp(`/host/experiences/${experienceId}/edit`));
+  await expect(
+    page.getByText(
+      /대표사진에는 호스트 얼굴이 보이는 사진을 최소 1장 이상 반드시 포함해주세요\.|Please include at least one hero photo showing the host’s face\.|代表写真には、ホスト本人の顔が見える写真を最低1枚以上必ず含めてください。|代表照片中请至少包含一张能看到房东本人脸部的照片。/
+    )
+  ).toBeVisible();
   const editPreview = page.locator('img[alt="experience-0"]');
   await expect(editPreview).toBeVisible();
 

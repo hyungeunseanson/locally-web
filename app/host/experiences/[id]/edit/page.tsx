@@ -442,6 +442,7 @@ export default function EditExperiencePage() {
                 <label className="block text-sm font-bold text-slate-900">{copy.editPhotoManagerLabel(formData.photos.length, MAX_EXPERIENCE_PHOTOS)}</label>
                 <span className="text-[11px] text-slate-500">{copy.editPhotoManagerDesc}</span>
               </div>
+              <p className="mb-4 text-[12px] leading-relaxed text-slate-500">{copy.photoHelp}</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
                 {formData.photos.length < MAX_EXPERIENCE_PHOTOS && (
                   <label className="aspect-square rounded-2xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:border-black hover:bg-white transition-all bg-white">
