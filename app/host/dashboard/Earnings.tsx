@@ -10,8 +10,6 @@ import type { HostUnifiedEarningsSummary, HostUnifiedEarningsSummaryResponse } f
 
 import ExperienceEarningsPanel from './components/ExperienceEarningsPanel';
 import ServiceEarningsPanel from './components/ServiceEarningsPanel';
-import UnifiedEarningsBreakdownCard from './components/UnifiedEarningsBreakdownCard';
-import UnifiedEarningsHeroCard from './components/UnifiedEarningsHeroCard';
 
 type EarningsTab = 'experience' | 'service';
 
@@ -115,54 +113,42 @@ export default function Earnings() {
       </div>
 
       <div className="space-y-4 md:space-y-5">
+        <div className="pt-1">
+          <div
+            data-testid="host-earnings-tabs"
+            className="flex w-full rounded-full border border-slate-200 bg-white p-1 shadow-sm md:inline-flex md:w-auto"
+          >
+            <button
+              type="button"
+              data-testid="host-earnings-tab-experience"
+              className={tabClass('experience')}
+              onClick={() => setActiveTab('experience')}
+            >
+              {t('hp_earn_tab_experience')}
+            </button>
+            <button
+              type="button"
+              data-testid="host-earnings-tab-service"
+              className={tabClass('service')}
+              onClick={() => setActiveTab('service')}
+            >
+              {t('hp_earn_tab_service')}
+            </button>
+          </div>
+        </div>
+
         {summaryLoading ? (
-          <>
-            <div data-testid="host-earnings-unified-hero-skeleton">
-              <Skeleton className="h-[104px] w-full rounded-3xl" />
-            </div>
-            <div data-testid="host-earnings-breakdown-skeleton">
-              <Skeleton className="h-[112px] w-full rounded-3xl" />
-            </div>
-          </>
+          <div data-testid="host-earnings-panel-skeleton">
+            <Skeleton className="h-[560px] w-full rounded-3xl md:rounded-[2.5rem]" />
+          </div>
         ) : summaryError || !summary ? (
           <div className="rounded-3xl border border-rose-100 bg-rose-50 px-5 py-6 text-sm font-medium text-rose-700">
             {summaryError || 'Failed to load host earnings.'}
           </div>
+        ) : activeTab === 'experience' ? (
+          <ExperienceEarningsPanel summary={summary.experience} />
         ) : (
-          <>
-            <UnifiedEarningsHeroCard summary={summary} />
-            <UnifiedEarningsBreakdownCard summary={summary} />
-
-            <div className="pt-1">
-              <div
-                data-testid="host-earnings-tabs"
-                className="flex w-full rounded-full border border-slate-200 bg-white p-1 shadow-sm md:inline-flex md:w-auto"
-              >
-                <button
-                  type="button"
-                  data-testid="host-earnings-tab-experience"
-                  className={tabClass('experience')}
-                  onClick={() => setActiveTab('experience')}
-                >
-                  {t('hp_earn_tab_experience')}
-                </button>
-                <button
-                  type="button"
-                  data-testid="host-earnings-tab-service"
-                  className={tabClass('service')}
-                  onClick={() => setActiveTab('service')}
-                >
-                  {t('hp_earn_tab_service')}
-                </button>
-              </div>
-            </div>
-
-            {activeTab === 'experience' ? (
-              <ExperienceEarningsPanel summary={summary.experience} />
-            ) : (
-              <ServiceEarningsPanel summary={summary.service} />
-            )}
-          </>
+          <ServiceEarningsPanel summary={summary.service} />
         )}
       </div>
     </div>

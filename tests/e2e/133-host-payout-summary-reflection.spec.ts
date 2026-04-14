@@ -201,14 +201,10 @@ test.describe.serial('Host payout summary reflection', () => {
     await page.goto('/host/dashboard?tab=earnings', { waitUntil: 'networkidle' });
 
     await expect(page.getByText(/완료 동기화.*정산|completion sync/i).first()).toBeVisible();
-    await expect(page.getByText(/지급 대상으로 잡힌 금액만|eligible for payout/i).first()).toBeVisible();
-    await expect(page.getByTestId('host-earnings-unified-total')).toContainText('₩24,000');
-    await expect(page.getByTestId('host-earnings-breakdown-experience-pending')).toContainText('₩24,000');
-    await expect(page.getByTestId('host-earnings-breakdown-service-pending')).toContainText('₩0');
-    await expect(page.getByTestId('host-earnings-unified-last-paid')).not.toContainText(
+    await expect(page.getByTestId('host-earnings-experience-pending')).toContainText('₩24,000');
+    await expect(page.getByTestId('host-earnings-summary-last-paid-inline')).not.toContainText(
       /아직 지급 완료 내역이 없어요|No completed payout yet|まだ支払い完了履歴がありません|暂时还没有已完成结算/
     );
-    await page.getByTestId('host-earnings-tab-experience').click();
 
     await expect(page.getByTestId('host-earnings-summary-pending-payout')).toContainText('₩24,000');
     await expect(page.getByTestId('host-earnings-summary-in-progress')).toContainText('₩0');

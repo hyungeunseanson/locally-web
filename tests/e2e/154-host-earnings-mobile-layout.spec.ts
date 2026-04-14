@@ -288,18 +288,12 @@ test.describe.serial('Host earnings mobile layout', () => {
     await login(page, hostUser);
     await page.goto('/host/dashboard?tab=earnings', { waitUntil: 'networkidle' });
 
-    await expect(page.getByTestId('host-earnings-unified-hero')).toBeVisible();
-    await expect(page.getByTestId('host-earnings-unified-total')).toContainText('₩114,000');
-    await expect(page.getByTestId('host-earnings-breakdown-card')).toBeVisible();
-    await expect(page.getByTestId('host-earnings-breakdown-experience-pending')).toContainText('₩24,000');
-    await expect(page.getByTestId('host-earnings-breakdown-service-pending')).toContainText('₩90,000');
-    await expect(page.getByTestId('host-earnings-breakdown-note')).toContainText(
-      /진행 중 금액은 상단 총액에 포함되지 않음|not included in the unified total|上部の合計に含まれません|不计入上方总额/
-    );
-
     await expect(page.getByTestId('host-earnings-tabs')).toBeVisible();
     await expect(page.getByTestId('host-earnings-tab-experience')).toBeVisible();
     await expect(page.getByTestId('host-earnings-tab-service')).toBeVisible();
+    await expect(page.getByTestId('host-earnings-unified-hero')).toHaveCount(0);
+    await expect(page.getByTestId('host-earnings-breakdown-card')).toHaveCount(0);
+    await expect(page.getByTestId('host-earnings-experience-pending')).toContainText('₩24,000');
     await expect(page.locator('[data-testid^="host-earnings-group-"]').first()).toBeVisible();
     await expect(page.getByTestId('host-service-earnings-item-list')).toHaveCount(0);
 

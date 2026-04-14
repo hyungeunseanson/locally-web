@@ -398,14 +398,18 @@ test.describe.serial('Host unified earnings summary', () => {
       },
     });
 
-    await expect(page.getByTestId('host-earnings-unified-total')).toContainText('₩126,000');
-    await expect(page.getByTestId('host-earnings-breakdown-experience-pending')).toContainText('₩36,000');
-    await expect(page.getByTestId('host-earnings-breakdown-service-pending')).toContainText('₩90,000');
-    await expect(page.getByTestId('host-earnings-breakdown-in-progress')).toContainText('₩32,000');
-    await expect(page.getByTestId('host-earnings-breakdown-in-progress')).toContainText('₩70,000');
+    await expect(page.getByTestId('host-earnings-tabs')).toBeVisible();
+    await expect(page.getByTestId('host-earnings-experience-pending')).toContainText('₩36,000');
+    await expect(page.getByTestId('host-earnings-summary-in-progress')).toContainText('₩32,000');
+    await expect(page.getByTestId('host-earnings-summary-paid-payout')).toContainText('₩36,000');
+
+    await page.getByTestId('host-earnings-tab-service').click();
+    await expect(page.getByTestId('host-service-earnings-total-pending')).toContainText('₩90,000');
+    await expect(page.getByTestId('host-service-earnings-in-progress')).toContainText('₩70,000');
+    await expect(page.getByTestId('host-service-earnings-paid')).toContainText('₩80,000');
   });
 
-  test('keeps the unified hero and breakdown in skeleton state until summary data arrives', async ({ page }) => {
+  test('keeps tabs visible and shows a panel skeleton until summary data arrives', async ({ page }) => {
     test.setTimeout(120000);
 
     const hostUser = createTestUser('host.unified.earnings.skeleton');
@@ -455,16 +459,16 @@ test.describe.serial('Host unified earnings summary', () => {
 
     await page.goto('/host/dashboard?tab=earnings', { waitUntil: 'domcontentloaded' });
 
-    await expect(page.getByTestId('host-earnings-unified-hero-skeleton')).toBeVisible();
-    await expect(page.getByTestId('host-earnings-breakdown-skeleton')).toBeVisible();
+    await expect(page.getByTestId('host-earnings-tabs')).toBeVisible();
+    await expect(page.getByTestId('host-earnings-panel-skeleton')).toBeVisible();
     await expect(page.getByTestId('host-earnings-unified-total')).toHaveCount(0);
 
     summaryResponseGate.release();
 
-    await expect(page.getByTestId('host-earnings-unified-total')).toContainText('₩104,000');
-    await expect(page.getByTestId('host-earnings-breakdown-experience-pending')).toContainText('₩24,000');
-    await expect(page.getByTestId('host-earnings-breakdown-service-pending')).toContainText('₩80,000');
-    await expect(page.getByTestId('host-earnings-unified-hero-skeleton')).toHaveCount(0);
-    await expect(page.getByTestId('host-earnings-breakdown-skeleton')).toHaveCount(0);
+    await expect(page.getByTestId('host-earnings-experience-pending')).toContainText('₩24,000');
+    await expect(page.getByTestId('host-earnings-panel-skeleton')).toHaveCount(0);
+
+    await page.getByTestId('host-earnings-tab-service').click();
+    await expect(page.getByTestId('host-service-earnings-total-pending')).toContainText('₩80,000');
   });
 });

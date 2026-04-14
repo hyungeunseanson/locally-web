@@ -256,11 +256,13 @@ test.describe.serial('Host service earnings separation', () => {
     await login(page, hostAUser);
     await page.goto('/host/dashboard?tab=earnings', { waitUntil: 'networkidle' });
 
-    await expect(page.getByTestId('host-earnings-unified-total')).toContainText('₩90,000');
-    await expect(page.getByTestId('host-earnings-breakdown-experience-pending')).toContainText('₩0');
-    await expect(page.getByTestId('host-earnings-breakdown-service-pending')).toContainText('₩90,000');
-    await expect(page.getByTestId('host-earnings-breakdown-in-progress')).toContainText(/₩0/);
-    await expect(page.getByTestId('host-earnings-breakdown-in-progress')).toContainText(/₩70,000/);
+    await expect(page.getByTestId('host-earnings-summary-pending-payout')).toContainText('₩0');
+    await expect(page.getByTestId('host-earnings-summary-in-progress')).toContainText('₩0');
+
+    await page.getByTestId('host-earnings-tab-service').click();
+    await expect(page.getByTestId('host-service-earnings-total-pending')).toContainText('₩90,000');
+    await expect(page.getByTestId('host-service-earnings-in-progress')).toContainText('₩70,000');
+    await expect(page.getByTestId('host-service-earnings-paid')).toContainText('₩80,000');
 
     const summaryResponse = await fetchHostUnifiedEarnings(page);
     expect(summaryResponse.status).toBe(200);
