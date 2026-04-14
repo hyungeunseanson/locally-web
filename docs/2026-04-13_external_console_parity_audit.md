@@ -2,8 +2,9 @@
 
 ## Summary
 - 이 문서는 `www.locally-travel.com` cutover 전에 확인해야 하는 마지막 `P0` 외부 콘솔 parity를 현재 운영 경로 기준으로 잠그는 close-out 문서다.
-- `2026-04-13` live 재확인 기준, 현재 project domain / latest deployment / app-side callback owner는 모두 다시 검증했다.
-- 이번 감사의 blocker 범위는 아래 4개만 포함한다.
+- `2026-04-14` live 재확인 기준, 현재 project domain / latest deployment / app-side callback owner는 모두 다시 검증했다.
+- 이번 close-out에서 operator가 잠가야 하는 surface는 아래 5개다.
+  - Vercel custom domain
   - Google OAuth
   - Kakao OAuth
   - Supabase Auth redirect / Site URL
@@ -34,8 +35,8 @@
     - `locally-web-git-main-locallys-projects-b062321b.vercel.app`
   - custom domain: 아직 없음
   - latest production deployment:
-    - id: `dpl_7P2sMDLHMD6Yz4NnFbABx22Wpqnf`
-    - url: `locally-hke9hsim6-locallys-projects-b062321b.vercel.app`
+    - id: `dpl_9GdxYgsHRfWUS2B6KBniL59ozcNf`
+    - url: `locally-id8l00z63-locallys-projects-b062321b.vercel.app`
     - state: `READY`
     - target: `production`
 - app-side source of truth
@@ -71,6 +72,7 @@
 ## Result Snapshot
 | Surface | Code source of truth | External console field to verify | Current observed state | Target | Result |
 | --- | --- | --- | --- | --- | --- |
+| Vercel custom domain | Vercel project domain list + `NEXT_PUBLIC_SITE_URL` owner | project domain connection | `www.locally-travel.com`은 아직 project domain list에 없다 | project에 `www.locally-travel.com` 연결 | `cutover 직전 필요` |
 | Google OAuth | `LoginModal` + `/auth/callback` | OAuth client redirect URI | 코드상 redirect owner는 current origin 기반이고 current public site anchor는 `https://locally-web.vercel.app`다. 콘솔 값은 저장소에서 확인 불가 | `https://www.locally-travel.com/auth/callback` | `cutover 직전 필요` |
 | Kakao OAuth | `LoginModal` + `/auth/callback` | Redirect URI | 코드상 redirect owner는 current origin 기반이고 current public site anchor는 `https://locally-web.vercel.app`다. 콘솔 값은 저장소에서 확인 불가 | `https://www.locally-travel.com/auth/callback` | `cutover 직전 필요` |
 | Supabase Auth | `/auth/callback` + auth flow docs | Site URL, Redirect URLs | callback owner는 current host 기반이고 repo-configured site URL은 `https://locally-web.vercel.app`다. 콘솔 값은 저장소에서 확인 불가 | Site URL=`https://www.locally-travel.com`, Redirect URLs에 최소 `https://www.locally-travel.com/auth/callback` 포함 | `cutover 직전 필요` |
@@ -167,13 +169,23 @@
   - 그런 항목이 없으면 “없음”이 확인되는 운영 화면 1장
 
 ## Evidence Tracker
-| Surface | Current verdict | Evidence attachment | Last checked | Status owner |
+| Surface | Current verdict | Attachment label | Last checked | Status owner |
 | --- | --- | --- | --- | --- |
-| Google OAuth | `cutover 직전 필요` | 첨부 필요 | `2026-04-13` | operator |
-| Kakao OAuth | `cutover 직전 필요` | 첨부 필요 | `2026-04-13` | operator |
-| Supabase Auth | `cutover 직전 필요` | 첨부 필요 | `2026-04-13` | operator |
-| PortOne current live path | `cutover 직전 필요` | 첨부 필요 | `2026-04-13` | operator |
-| Vercel custom domain | `cutover 직전 필요` | 첨부 필요 | `2026-04-13` | operator |
+| Vercel custom domain | `cutover 직전 필요` | `vercel-custom-domain-www-locally-travel-com` | `2026-04-14` | operator |
+| Google OAuth | `cutover 직전 필요` | `google-oauth-redirect-www-locally-travel-com` | `2026-04-14` | operator |
+| Kakao OAuth | `cutover 직전 필요` | `kakao-oauth-redirect-www-locally-travel-com` | `2026-04-14` | operator |
+| Supabase Auth | `cutover 직전 필요` | `supabase-auth-site-url-and-redirects-www-locally-travel-com` | `2026-04-14` | operator |
+| PortOne current live path | `cutover 직전 필요` | `portone-domain-or-not-applicable-www-locally-travel-com` | `2026-04-14` | operator |
+
+## Release Gate
+- surface별 결과는 현재 모두 `cutover 직전 필요`로 설명 가능하다.
+- 다만 operator attachment가 아직 비어 있으므로, 현재 release/cutover 판정은 `operational hold`다.
+- 이 hold는 코드 결함 때문이 아니라 아래 증빙 공란 때문이다.
+  - Vercel custom domain 연결 캡처
+  - Google/Kakao redirect URI 캡처
+  - Supabase Site URL / Redirect URLs 캡처
+  - PortOne domain field 또는 not-applicable 캡처
+- 따라서 repo 안에서 추가 코드 수정으로 이 hold를 해소하지 않는다.
 
 ## Operator Checklist
 - cutover 전에는 아래 5개가 모두 설명 가능해야 한다.
@@ -203,12 +215,12 @@
 
 ## Final Verdict
 - 현재 운영 기준 cutover blocker는 `cutover 시점 Vercel custom domain 연결`과 `외부 콘솔 parity evidence`다.
-- 다만 blocker 범위는 이제 명확히 좁혀졌다.
+- 다만 blocker 범위는 이제 명확히 아래 5개 surface로 좁혀졌다.
+  - Vercel custom domain
   - Google OAuth
   - Kakao OAuth
   - Supabase Auth
   - PortOne current live path
-- 위 4개는 provider/config parity 범위이고, 여기에 별도로 `cutover 당일` Vercel project domain 연결 precondition이 남아 있다.
-- 이 문서에 operator evidence가 붙기 전까지는 최종 판정을 `부분 보장`으로 유지한다.
-- 위 4개가 모두 `준비됨` 또는 안전한 `cutover 직전 필요`로만 설명되면, 외부 콘솔 parity는 close-out 가능하다.
-- 위 항목 중 하나라도 비어 있으면 `code blocker`가 아니라 `operational hold`로 분류한다.
+- 현재 surface별 설명은 모두 `cutover 직전 필요`로 정리되지만, operator evidence attachment가 아직 비어 있으므로 오늘 기준 최종 판정은 `operational hold`다.
+- 이 hold는 `code blocker`가 아니라 `ops evidence gap`이다.
+- 위 5개 attachment가 모두 채워지고 상태가 `준비됨` 또는 설명 가능한 `cutover 직전 필요`로만 남으면, 외부 콘솔 parity는 close-out 가능하다.
