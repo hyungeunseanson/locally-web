@@ -4,7 +4,7 @@ import Image from 'next/image';
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
 import { createClient } from '@/app/utils/supabase/client';
-import { User, ShieldCheck, Heart, Star, Save, Smile, Camera, Loader2, Calendar, ChevronLeft, ChevronRight, X, ChevronDown, Settings, HelpCircle, Bell, FileText, Shield, BookOpen, Users, Globe, MessageSquare } from 'lucide-react';
+import { User, ShieldCheck, Heart, Star, Save, Smile, Camera, Loader2, Calendar, ChevronLeft, ChevronRight, X, ChevronDown, Settings, HelpCircle, Bell, FileText, BookOpen, Users, Globe, MessageSquare } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext';
@@ -19,7 +19,6 @@ import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
 import { PROFILE_LANGUAGE_OPTIONS } from '@/app/constants/profile';
 import { getProfileCompletion, normalizeLanguageList, normalizeProfileLanguageValue } from '@/app/utils/profile';
 import { validateImage, compressImage, sanitizeFileName, isHeicValidationResult } from '@/app/utils/image';
-import { fetchAdminAccess } from '@/app/utils/adminAccessClient';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import { useNotification } from '@/app/context/NotificationContext';
 import { useViewMode } from '@/app/context/ViewModeContext';
@@ -66,7 +65,6 @@ export default function AccountPage() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [user, setUser] = useState<SupabaseUser | null>(null);
-  const [hasAdminAccess, setHasAdminAccess] = useState(false);
   const [showProfileView, setShowProfileView] = useState(false);
   const [showHostTransition, setShowHostTransition] = useState(false);
   const [activeLinkModal, setActiveLinkModal] = useState<null | 'notices' | 'community' | 'news' | 'social'>(null);
@@ -188,9 +186,6 @@ export default function AccountPage() {
         return;
       }
       setUser(user);
-
-      const adminAccess = await fetchAdminAccess();
-      setHasAdminAccess(adminAccess.isAdmin);
 
       const fallbackProfile = {
         email: user.email || '',
@@ -597,7 +592,6 @@ export default function AccountPage() {
         {/* ── 메뉴 그룹 2: 설정 ── */}
         <div className="px-4">
           <MobileMenuItem icon={<Settings className="w-4 h-4" />} label={t('profile_menu_account')} onPress={() => setShowProfileView(true)} />
-          {hasAdminAccess && <MobileMenuItem icon={<Shield className="w-4 h-4" />} label="Admin" onPress={() => navigate('/admin/dashboard')} isPending={pendingHref === '/admin/dashboard'} disabled={isNavigating} />}
           <MobileMenuItem icon={<Users className="w-4 h-4" />} label={t('profile_menu_become_host')} onPress={() => navigate('/become-a-host')} isPending={pendingHref === '/become-a-host'} disabled={isNavigating} />
           <MobileMenuItem icon={<HelpCircle className="w-4 h-4" />} label={t('profile_menu_help')} onPress={() => navigate('/help')} isPending={pendingHref === '/help'} disabled={isNavigating} />
         </div>

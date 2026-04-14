@@ -166,84 +166,11 @@ async function prepareLocale(page: Page, locale: 'ko' | 'en' | 'ja' | 'zh', path
 }
 
 async function stubHomeExperiences(page: Page) {
-  const publicHostApplications = HOME_FIXTURES.map((experience, index) => ({
-    id: String(index + 1),
-    user_id: experience.host_id,
-    status: 'approved',
-    created_at: experience.created_at,
-  }));
-  const experienceRows = HOME_FIXTURES.map((experience) => ({
-    id: experience.id,
-    title: experience.title,
-    title_en: experience.title_en,
-    title_ja: experience.title_ja,
-    title_zh: experience.title_zh,
-    city: experience.city,
-    country: experience.country,
-    description: experience.description,
-    description_en: experience.description_en,
-    description_ja: experience.description_ja,
-    description_zh: experience.description_zh,
-    category: experience.category,
-    category_en: experience.category_en,
-    category_ja: experience.category_ja,
-    category_zh: experience.category_zh,
-    tags: experience.tags,
-    languages: experience.languages,
-    photos: experience.photos,
-    image_url: experience.image_url,
-    price: experience.price,
-    duration: experience.duration,
-    max_guests: experience.max_guests,
-    host_id: experience.host_id,
-    meeting_point: experience.meeting_point,
-    meeting_point_i18n: experience.meeting_point_i18n,
-    location: experience.location,
-    status: experience.status,
-    created_at: experience.created_at,
-    review_count: experience.review_count,
-    rating: experience.rating,
-  }));
-  const availabilityRows = HOME_FIXTURES.flatMap((experience) =>
-    experience.available_dates.map((date) => ({
-      experience_id: experience.id,
-      date,
-    }))
-  );
-  const popularityRows = HOME_FIXTURES.filter((experience) => experience.wishlist_count > 0).map((experience) => ({
-    experience_id: experience.id,
-    wishlist_count: experience.wishlist_count,
-  }));
-
-  await page.route('**/rest/v1/public_host_applications?*', async (route) => {
+  await page.route('**/api/home/experiences', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify(publicHostApplications),
-    });
-  });
-
-  await page.route('**/rest/v1/experiences?*', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(experienceRows),
-    });
-  });
-
-  await page.route('**/rest/v1/experience_availability?*', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(availabilityRows),
-    });
-  });
-
-  await page.route('**/rest/v1/experience_popularity_snapshot?*', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(popularityRows),
+      body: JSON.stringify({ data: HOME_FIXTURES }),
     });
   });
 }

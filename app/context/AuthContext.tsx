@@ -32,10 +32,6 @@ const AUTH_LOCAL_STORAGE_KEYS = [
   'locally_recent_searches',
 ] as const;
 
-// Keep host approval/revision screens from feeling stuck if a realtime notification is missed.
-const HOST_STATUS_FALLBACK_POLL_MS = 5_000;
-const HOST_STATUS_PENDING_VALUES = new Set(['pending', 'revision', 'rejected']);
-
 function normalizeApplicationStatus(status: string | null | undefined) {
   const normalized = status?.trim().toLowerCase();
   return normalized || null;
@@ -212,23 +208,6 @@ export function AuthProvider({
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [refreshHostStatus, user?.id]);
-
-  useEffect(() => {
-    if (!user?.id) {
-      return;
-    }
-
-    const normalizedStatus = normalizeApplicationStatus(applicationStatus);
-    if (!normalizedStatus || !HOST_STATUS_PENDING_VALUES.has(normalizedStatus)) {
-      return;
-    }
-
-    const intervalId = window.setInterval(() => {
-      void refreshHostStatus();
-    }, HOST_STATUS_FALLBACK_POLL_MS);
-
-    return () => window.clearInterval(intervalId);
-  }, [applicationStatus, refreshHostStatus, user?.id]);
 
   return (
     <AuthContext.Provider

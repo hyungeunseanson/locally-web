@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { createClient } from '@/app/utils/supabase/client';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/app/context/AuthContext';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { useToast } from '@/app/context/ToastContext';
@@ -22,7 +21,6 @@ type WishlistPendingDetail = {
 export function useWishlist(experienceId: string) {
   const [isSaved, setIsSaved] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const supabase = useMemo(() => createClient(), []);
   const { user, isLoading: isAuthLoading } = useAuth();
   const { t } = useLanguage();
   const { showToast } = useToast();
@@ -99,23 +97,22 @@ export function useWishlist(experienceId: string) {
     }
 
     const checkStatus = async () => {
-      const { data, error } = await supabase
-        .from('wishlists')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('experience_id', experienceId)
-        .maybeSingle();
+      const response = await fetch(
+        `/api/guest/wishlists?experienceId=${encodeURIComponent(experienceId)}`,
+        { cache: 'no-store' }
+      );
 
       if (cancelled || requestId !== statusRequestRef.current || isPendingRef.current) {
         return;
       }
 
-      if (error) {
-        console.error('Wishlist status check failed:', error);
+      if (!response.ok) {
+        console.error('Wishlist status check failed:', response.status);
         return;
       }
 
-      setIsSaved(Boolean(data));
+      const result = (await response.json()) as { isSaved?: boolean };
+      setIsSaved(Boolean(result.isSaved));
     };
 
     void checkStatus();
@@ -127,7 +124,7 @@ export function useWishlist(experienceId: string) {
         window.removeEventListener(WISHLIST_PENDING_EVENT, handleWishlistPending as EventListener);
       }
     };
-  }, [experienceId, isAuthLoading, supabase, userId]);
+  }, [experienceId, isAuthLoading, userId]);
 
   // 2. 찜하기 토글 함수
   const toggleWishlist = async (e?: React.MouseEvent) => {
@@ -151,24 +148,21 @@ export function useWishlist(experienceId: string) {
 
     try {
       if (previousState) {
-        // 이미 저장됨 -> 삭제
-        const { error } = await supabase
-          .from('wishlists')
-          .delete()
-          .eq('user_id', userId)
-          .eq('experience_id', experienceId);
-        if (error) throw error;
+        const response = await fetch('/api/guest/wishlists', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ experienceId }),
+        });
+        if (!response.ok) throw new Error('wishlist-delete-failed');
         syncWishlistState(false);
         showToast('위시리스트에서 삭제되었습니다.', 'success');
       } else {
-        // 저장 안 됨 -> 추가
-        const { error } = await supabase
-          .from('wishlists')
-          .upsert([{ user_id: userId, experience_id: experienceId }], {
-            onConflict: 'user_id,experience_id',
-            ignoreDuplicates: true,
-          });
-        if (error) throw error;
+        const response = await fetch('/api/guest/wishlists', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ experienceId }),
+        });
+        if (!response.ok) throw new Error('wishlist-save-failed');
         syncWishlistState(true);
         showToast('위시리스트에 저장되었습니다!', 'success');
       }

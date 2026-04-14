@@ -4,7 +4,6 @@ import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
-  Heart,
   Star,
   Utensils,
   Coffee,
@@ -19,13 +18,13 @@ import {
   Palette,
   Sparkles,
 } from 'lucide-react';
-import { useWishlist } from '@/app/hooks/useWishlist';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { getContent } from '@/app/utils/contentHelper';
 import { CATEGORY_OPTIONS } from '@/app/host/create/config';
 import { formatLocalizedExperienceLocation } from '@/app/utils/locationLocalization';
 import { getExperienceLanguageBadges, getExperiencePriceParts } from '@/app/utils/experienceCardDisplay';
 import ExperienceCardMeta from '@/app/components/ExperienceCardMeta';
+import { getExperienceCardImageUrl } from '@/app/utils/experienceImages';
 
 type ExperienceCardData = {
   id: number | string;
@@ -42,6 +41,7 @@ type ExperienceCardData = {
   country?: string | null;
   location?: string | null;
   languages?: string[] | null;
+  card_image_url?: string | null;
   image_url?: string | null;
   photos?: string[] | null;
   rating?: number | null;
@@ -98,7 +98,6 @@ export default function ExperienceCard({
   showImageCategoryBadge?: boolean;
   metaLayout?: 'legacy' | 'home';
 }) {
-  const { isSaved, toggleWishlist, isLoading } = useWishlist(String(data.id));
   const { lang, t } = useLanguage();
 
   // 🟢 [기능 유지] 다국어 데이터 가져오기 (LanguageContext의 lang 사용)
@@ -106,9 +105,7 @@ export default function ExperienceCard({
   const category = getContent(data, 'category', lang) || data.category || t('cat_exp');
 
   // 이미지 주소 처리
-  const imageUrl = (data.photos && data.photos.length > 0)
-    ? data.photos[0]
-    : (data.image_url || "https://images.unsplash.com/photo-1542051841857-5f90071e7989");
+  const imageUrl = getExperienceCardImageUrl(data);
 
   // 지역 정보 (없으면 기본값)
   const location = formatLocalizedExperienceLocation(data, lang) || t('exp_card_location_fallback');
@@ -125,7 +122,7 @@ export default function ExperienceCard({
           src={imageUrl}
           alt={title}
           fill
-          unoptimized
+          quality={65}
           className="object-cover transition-transform duration-700 ease-out group-hover:scale-110"
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
         />
@@ -142,23 +139,6 @@ export default function ExperienceCard({
           </div>
         ) : null}
 
-        {/* ❤️ 하트 버튼 (우측 상단 고정 원본 복구) */}
-        <button
-          type="button"
-          aria-label={t('exp_card_wishlist_toggle')}
-          disabled={isLoading}
-          onClick={(e) => {
-            void toggleWishlist(e);
-          }}
-          className="absolute top-3 right-3 text-white/70 hover:text-white hover:scale-110 transition-all z-10"
-        >
-          <Heart
-            size={24}
-            fill={isSaved ? "#F43F5E" : "rgba(0,0,0,0.5)"}
-            strokeWidth={2}
-            className={isSaved ? "text-rose-500" : ""}
-          />
-        </button>
       </div>
 
       {/* 📝 텍스트 영역 */}

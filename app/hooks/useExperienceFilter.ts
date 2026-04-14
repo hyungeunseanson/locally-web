@@ -27,7 +27,8 @@ export function useExperienceFilter() {
   } = useQuery({
     queryKey: ['home-experiences', 'active'],
     queryFn: fetchActiveExperiences,
-    staleTime: 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
     retry: false,
   });
 

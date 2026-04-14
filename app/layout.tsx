@@ -1,10 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
-import { Suspense } from "react";
 import { cookies } from 'next/headers';
 import { LanguageProvider, type Locale } from '@/app/context/LanguageContext';
-import UserPresenceTracker from '@/app/components/UserPresenceTracker';
 import { NotificationProvider } from '@/app/context/NotificationContext';
 import { ToastProvider } from '@/app/context/ToastContext';
 import SiteFooter from "@/app/components/SiteFooter";
@@ -20,7 +18,6 @@ import { buildAdSenseScriptUrl, getAdSenseClientId, isAdSenseEnabled } from '@/a
 import { buildAbsoluteUrl, buildLocalizedAbsoluteUrl, getSiteUrl } from '@/app/utils/siteUrl';
 import { IAB_ESCAPE_BYPASS_PARAM } from '@/app/utils/iab';
 import { createClient } from '@/app/utils/supabase/server';
-import type { User } from '@supabase/supabase-js';
 import { Analytics } from "@vercel/analytics/react";
 import { SplashProvider } from '@/app/context/SplashContext';
 import GlobalSplash from '@/app/components/GlobalSplash';
@@ -141,25 +138,7 @@ export default async function RootLayout({
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
-  // 프로필 이미지까지 가져와서 주입하면 완벽합니다.
-  let initialUser = user || null;
-  if (initialUser) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('avatar_url')
-      .eq('id', initialUser.id)
-      .maybeSingle();
-    if (profile?.avatar_url) {
-      initialUser = {
-        ...initialUser,
-        user_metadata: {
-          ...initialUser.user_metadata,
-          avatar_url: profile.avatar_url
-        }
-      } as User;
-    }
-  }
+  const initialUser = user || null;
 
   const kakaoIabBootstrapScript = `
     (() => {
@@ -216,10 +195,6 @@ export default async function RootLayout({
                     <SplashProvider>
                       <GlobalSplash />
                       <GlobalAnnouncementModal />
-
-                      <Suspense fallback={null}>
-                        <UserPresenceTracker />
-                      </Suspense>
 
                       <div className="flex flex-col min-h-screen" id="locally-app-shell">
                         <ClientMainWrapper>

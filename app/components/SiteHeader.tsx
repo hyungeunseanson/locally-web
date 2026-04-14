@@ -45,7 +45,10 @@ import { useAuth } from '@/app/context/AuthContext'; // 🟢 Auth 훅 사용
 function SiteHeaderContent() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [hasAdminAccess, setHasAdminAccess] = useState(false);
+  const [adminAccessState, setAdminAccessState] = useState<{ userId: string | null; isAdmin: boolean }>({
+    userId: null,
+    isAdmin: false,
+  });
   const [desktopTransitionTarget, setDesktopTransitionTarget] = useState<'host' | 'guest' | null>(null);
 
   // 🟢 [핵심] 로컬 상태 대신 전역 AuthContext 사용 (깜빡임 해결)
@@ -106,23 +109,27 @@ function SiteHeaderContent() {
   useEffect(() => {
     let cancelled = false;
 
-    const checkAdminAccess = async () => {
-      if (!user?.id) {
-        if (!cancelled) setHasAdminAccess(false);
+    const resolveAdminAccess = async () => {
+      if (!user?.id || !isMenuOpen || adminAccessState.userId === user.id) {
         return;
       }
 
       const adminAccess = await fetchAdminAccess();
+      if (cancelled) {
+        return;
+      }
 
-      if (cancelled) return;
-      setHasAdminAccess(adminAccess.isAdmin);
+      setAdminAccessState({ userId: user.id, isAdmin: adminAccess.isAdmin });
     };
 
-    checkAdminAccess();
+    void resolveAdminAccess();
+
     return () => {
       cancelled = true;
     };
-  }, [user?.id]);
+  }, [adminAccessState.userId, isMenuOpen, user?.id]);
+
+  const hasAdminAccess = user?.id != null && adminAccessState.userId === user.id && adminAccessState.isAdmin;
 
   const startDesktopModeTransition = (targetPath: string, targetMode: 'host' | 'guest') => {
     setIsMenuOpen(false);

@@ -17,7 +17,6 @@ import {
   SlidersHorizontal,
   ChevronDown,
   X,
-  Heart,
   Coffee,
   Building2,
   Ticket,
@@ -39,6 +38,7 @@ import { getLocalizedSearchLocationLabel } from '@/app/utils/searchLocationCatal
 import { getExperienceLanguageBadges } from '@/app/utils/experienceCardDisplay';
 import { normalizeProfileLanguageValue } from '@/app/utils/profile';
 import { normalizeServiceCity } from '@/app/utils/serviceRequestLocation';
+import { getExperienceCardImageUrl } from '@/app/utils/experienceImages';
 import type {
   SearchExperience,
   SearchExperiencesResponse,
@@ -438,10 +438,10 @@ function SearchResults() {
   const desktopGridClassName = 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-4';
 
   const renderMobileCard = (item: SearchExperience) => {
-    const imageUrl =
-      item.photos?.[0] ||
-      item.image_url ||
-      'https://images.unsplash.com/photo-1527631746610-bca00a040d60?auto=format&fit=crop&w=800&q=80';
+    const imageUrl = getExperienceCardImageUrl(
+      item,
+      'https://images.unsplash.com/photo-1527631746610-bca00a040d60?auto=format&fit=crop&w=800&q=80'
+    );
     const title = getContent(item, 'title', lang) || t('exp_card_title_fallback');
     const city =
       formatLocalizedExperienceLocation(
@@ -461,15 +461,9 @@ function SearchResults() {
             alt={title}
             fill
             sizes="168px"
-            unoptimized
+            quality={65}
             className="object-cover"
           />
-          <button
-            className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-black/20 backdrop-blur-[1px] border border-white/70 flex items-center justify-center"
-            aria-label={t('exp_card_wishlist_toggle')}
-          >
-            <Heart size={16} className="text-white" />
-          </button>
         </div>
         <div className="pt-2">
           <p className="text-[11px] font-semibold text-[#222] leading-[1.35] line-clamp-2">{title}</p>

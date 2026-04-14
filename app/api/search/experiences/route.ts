@@ -17,6 +17,10 @@ import {
 } from '@/app/search/searchContract';
 import { buildSearchHaystack, tokenizeSearchInput } from '@/app/search/searchText';
 
+const SEARCH_CACHE_HEADERS = {
+  'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=600',
+} as const;
+
 function asString(value: unknown) {
   if (typeof value === 'string') return value;
   if (typeof value === 'number') return String(value);
@@ -169,7 +173,7 @@ export async function GET(request: NextRequest) {
 
     if (visibleHostIds.size === 0) {
       const emptyResponse: SearchExperiencesResponse = { data: [] };
-      return NextResponse.json(emptyResponse);
+      return NextResponse.json(emptyResponse, { headers: SEARCH_CACHE_HEADERS });
     }
 
     const location = searchParams.get('location') || '';
@@ -316,7 +320,7 @@ export async function GET(request: NextRequest) {
       data: filtered.map(stripInternalExperienceFields),
     };
 
-    return NextResponse.json(response);
+    return NextResponse.json(response, { headers: SEARCH_CACHE_HEADERS });
   } catch (error: unknown) {
     console.error('Search API error:', error);
     const message = error instanceof Error ? error.message : 'Internal Server Error';

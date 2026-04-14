@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Heart, Share2, ArrowRight, ArrowLeft } from 'lucide-react';
 import SiteHeader from '@/app/components/SiteHeader';
-import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useToast } from '@/app/context/ToastContext';
@@ -13,6 +12,8 @@ import Spinner from '@/app/components/ui/Spinner';
 import { getContent } from '@/app/utils/contentHelper';
 import { formatLocalizedExperienceLocation } from '@/app/utils/locationLocalization';
 import { getExperienceLanguageBadges, getExperiencePriceParts } from '@/app/utils/experienceCardDisplay';
+import { useAuth } from '@/app/context/AuthContext';
+import { getExperienceCardImageUrl } from '@/app/utils/experienceImages';
 
 interface WishlistExperience {
   id: number;
@@ -31,6 +32,7 @@ interface WishlistExperience {
   category_zh?: string | null;
   rating?: number | null;
   price?: number | string | null;
+  card_image_url?: string | null;
   image_url?: string | null;
   photos?: string[] | null;
 }
@@ -44,18 +46,32 @@ interface WishlistItem {
 const normalizeWishlistRows = (rows: unknown[]): WishlistItem[] => {
   return rows
     .map((row) => {
-      const item = row as { id: number; created_at?: string; experiences?: unknown };
+      const item = row as { id: number | string; created_at?: string; experiences?: unknown };
       const rawExperience = Array.isArray(item.experiences) ? item.experiences[0] : item.experiences;
       if (!rawExperience || typeof rawExperience !== 'object') return null;
 
       const exp = rawExperience as Partial<WishlistExperience>;
-      if (typeof exp.id !== 'number' || typeof exp.title !== 'string') return null;
+      const experienceId =
+        typeof exp.id === 'number'
+          ? exp.id
+          : typeof exp.id === 'string' && Number.isFinite(Number(exp.id))
+            ? Number(exp.id)
+            : null;
+
+      const wishlistId =
+        typeof item.id === 'number'
+          ? item.id
+          : typeof item.id === 'string' && Number.isFinite(Number(item.id))
+            ? Number(item.id)
+            : null;
+
+      if (experienceId === null || wishlistId === null || typeof exp.title !== 'string') return null;
 
       return {
-        id: Number(item.id),
+        id: wishlistId,
         created_at: item.created_at,
         experiences: {
-          id: exp.id,
+          id: experienceId,
           title: exp.title,
           title_en: exp.title_en ?? null,
           title_ja: exp.title_ja ?? null,
@@ -71,6 +87,7 @@ const normalizeWishlistRows = (rows: unknown[]): WishlistItem[] => {
           category_zh: exp.category_zh ?? null,
           rating: exp.rating ?? null,
           price: exp.price ?? null,
+          card_image_url: exp.card_image_url ?? null,
           image_url: exp.image_url ?? null,
           photos: exp.photos ?? null,
         },
@@ -81,9 +98,9 @@ const normalizeWishlistRows = (rows: unknown[]): WishlistItem[] => {
 
 export default function WishlistsPage() {
   const { lang, t } = useLanguage(); // 🟢 추가
-  const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const { showToast } = useToast();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const [wishlists, setWishlists] = useState<WishlistItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -97,34 +114,30 @@ export default function WishlistsPage() {
 
   useEffect(() => {
     const fetchWishlists = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      if (isAuthLoading) {
+        return;
+      }
+
       if (!user) {
         router.replace('/login?returnUrl=%2Fguest%2Fwishlists');
         return;
       }
 
-      // 🟢 [수정] experiences(*)로 모든 컬럼을 가져와서 에러 방지
-      const { data, error } = await supabase
-        .from('wishlists')
-        .select(`
-          id,
-          created_at,
-          experiences (*) 
-        `)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('위시리스트 로딩 실패:', error);
+      const response = await fetch('/api/guest/wishlists', { cache: 'no-store' });
+      if (!response.ok) {
+        console.error('위시리스트 로딩 실패:', response.status);
         showToast(t('msg_wishlist_load_error'), 'error');
-      } else {
-        setWishlists(normalizeWishlistRows((data ?? []) as unknown[]));
+        setLoading(false);
+        return;
       }
+
+      const payload = (await response.json()) as { data?: unknown[] };
+      setWishlists(normalizeWishlistRows((payload.data ?? []) as unknown[]));
       setLoading(false);
     };
 
-    fetchWishlists();
-  }, [router, showToast, supabase, t]);
+    void fetchWishlists();
+  }, [isAuthLoading, router, showToast, t, user]);
 
   // 🟢 [추가] 찜 해제 기능 (화면에서 바로 사라지게)
   const handleRemove = async (e: React.MouseEvent, wishlistId: number) => {
@@ -134,14 +147,21 @@ export default function WishlistsPage() {
     // 낙관적 업데이트 (UI 먼저 삭제)
     setWishlists(prev => prev.filter(item => item.id !== wishlistId));
 
-    const { error } = await supabase.from('wishlists').delete().eq('id', wishlistId);
-    if (error) {
-      console.error(error);
+    const response = await fetch('/api/guest/wishlists', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wishlistId }),
+    });
+
+    if (!response.ok) {
+      console.error('wishlist remove failed:', response.status);
       showToast(t('msg_wishlist_remove_error'), 'error');
-      const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { data: reData } = await supabase.from('wishlists').select('id, created_at, experiences (*)').eq('user_id', user.id).order('created_at', { ascending: false });
-        setWishlists(normalizeWishlistRows((reData ?? []) as unknown[]));
+        const retryResponse = await fetch('/api/guest/wishlists', { cache: 'no-store' });
+        if (retryResponse.ok) {
+          const retryPayload = (await retryResponse.json()) as { data?: unknown[] };
+          setWishlists(normalizeWishlistRows((retryPayload.data ?? []) as unknown[]));
+        }
       }
     }
   };
@@ -220,7 +240,7 @@ export default function WishlistsPage() {
               {wishlists.map((item) => {
                 const exp = item.experiences;
                 if (!exp) return null;
-                const imageUrl = exp.photos && exp.photos.length > 0 ? exp.photos[0] : (exp.image_url || "https://images.unsplash.com/photo-1542051841857-5f90071e7989");
+                const imageUrl = getExperienceCardImageUrl(exp);
                 const ratingValue = Number(exp.rating ?? 0);
                 const ratingText = Number.isFinite(ratingValue) && ratingValue > 0
                   ? `★${ratingValue.toFixed(1)}`
@@ -241,7 +261,7 @@ export default function WishlistsPage() {
                         src={imageUrl}
                         alt={title}
                         fill
-                        unoptimized
+                        quality={65}
                         className="object-cover transition-transform duration-500 ease-out md:group-hover:scale-[1.04]"
                         sizes="(max-width: 768px) 42vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 18vw"
                       />

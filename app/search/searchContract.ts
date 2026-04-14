@@ -10,6 +10,7 @@ export interface SearchExperience {
   meeting_point?: string;
   meeting_point_i18n?: Record<string, string> | null;
   languages?: string[];
+  card_image_url?: string | null;
   image_url?: string;
   photos?: string[];
   rating?: number;

@@ -23,6 +23,7 @@ export interface Experience {
     languages: string[];
     photos: string[];
     image_url?: string;
+    card_image_url?: string | null;
     max_guests: number;
     duration: number;
     meeting_point: string;

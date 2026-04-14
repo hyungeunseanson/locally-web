@@ -94,6 +94,8 @@ export default function HomePageClient() {
   );
   const mobilePopularExperiences = popularExperiences.slice(0, 10);
   const desktopPopularExperiences = popularExperiences.slice(0, 6);
+  const mobileLatestExperiences = allExperiencesLatest.slice(0, 12);
+  const desktopLatestExperiences = allExperiencesLatest.slice(0, 24);
   const showLoadError = loadError && allExperiences.length === 0 && filteredExperiences.length === 0;
 
   const getMobileCityShortcutHref = (cityValue?: string) => {
@@ -376,7 +378,7 @@ export default function HomePageClient() {
                     </h2>
                   </div>
                   <div className="grid grid-cols-2 gap-x-2.5 gap-y-5 px-5 pb-5">
-                    {allExperiencesLatest.map((item) => (
+                    {mobileLatestExperiences.map((item) => (
                       <div
                         key={item.id}
                         data-testid={`home-all-experience-card-${item.id}`}
@@ -421,7 +423,7 @@ export default function HomePageClient() {
                     </h2>
                   </div>
                   <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-6 gap-y-10">
-                    {allExperiencesLatest.map((item, index) => (
+                    {desktopLatestExperiences.map((item, index) => (
                       <div
                         key={item.id}
                         data-testid={`home-all-experience-card-${item.id}`}

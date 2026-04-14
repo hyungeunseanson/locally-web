@@ -54,82 +54,38 @@ async function prepareLocale(page: Page, locale: 'ko' | 'en' | 'ja' | 'zh', path
 }
 
 async function stubHomeExperiencesWithSnapshotFailure(page: Page) {
-  const publicHostApplications = HOME_FIXTURES.map((experience, index) => ({
-    id: String(index + 1),
-    user_id: experience.host_id,
-    status: 'approved',
-    created_at: experience.created_at,
-  }));
-
-  const experienceRows = HOME_FIXTURES.map((experience) => ({
-    id: experience.id,
-    title: experience.title,
-    title_en: experience.title,
-    title_ja: experience.title,
-    title_zh: experience.title,
-    city: experience.city,
-    country: experience.city === '서울' || experience.city === '부산' ? 'Korea' : 'Japan',
-    description: `${experience.title} description`,
-    description_en: `${experience.title} description`,
-    description_ja: `${experience.title} description`,
-    description_zh: `${experience.title} description`,
-    category: '맛집 탐방',
-    category_en: 'Food Tour',
-    category_ja: 'グルメツアー',
-    category_zh: '美食之旅',
-    tags: ['food', 'city'],
-    languages: ['English', 'Korean'],
-    photos: ['/images/company/partnership-media-kit/1.png'],
-    image_url: '/images/company/partnership-media-kit/1.png',
-    price: 89000,
-    duration: 3,
-    max_guests: 6,
-    host_id: experience.host_id,
-    meeting_point: `${experience.city} Station`,
-    meeting_point_i18n: { en: `${experience.city} Station` },
-    location: `${experience.city} Station`,
-    status: 'active',
-    created_at: experience.created_at,
-    review_count: experience.review_count,
-    rating: 4.8,
-  }));
-
-  const availabilityRows = HOME_FIXTURES.flatMap((experience) =>
-    experience.available_dates.map((date) => ({
-      experience_id: experience.id,
-      date,
-    }))
-  );
-
-  await page.route('**/rest/v1/public_host_applications?*', async (route) => {
+  await page.route('**/api/home/experiences', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify(publicHostApplications),
-    });
-  });
-
-  await page.route('**/rest/v1/experiences?*', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(experienceRows),
-    });
-  });
-
-  await page.route('**/rest/v1/experience_availability?*', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(availabilityRows),
-    });
-  });
-
-  await page.route('**/rest/v1/experience_popularity_snapshot?*', async (route) => {
-    await route.fulfill({
-      status: 500,
-      contentType: 'application/json',
-      body: JSON.stringify({ message: 'forced popularity snapshot failure' }),
+      body: JSON.stringify({
+        data: HOME_FIXTURES.map((experience) => ({
+          id: experience.id,
+          title: experience.title,
+          title_en: experience.title,
+          title_ja: experience.title,
+          title_zh: experience.title,
+          city: experience.city,
+          country: experience.city === '서울' || experience.city === '부산' ? 'Korea' : 'Japan',
+          category: '맛집 탐방',
+          category_en: 'Food Tour',
+          category_ja: 'グルメツアー',
+          category_zh: '美食之旅',
+          languages: ['English', 'Korean'],
+          photos: ['/images/company/partnership-media-kit/1.png'],
+          image_url: '/images/company/partnership-media-kit/1.png',
+          price: 89000,
+          duration: 3,
+          host_id: experience.host_id,
+          meeting_point: `${experience.city} Station`,
+          meeting_point_i18n: { en: `${experience.city} Station` },
+          location: `${experience.city} Station`,
+          created_at: experience.created_at,
+          available_dates: experience.available_dates,
+          review_count: experience.review_count,
+          rating: 4.8,
+        })),
+      }),
     });
   });
 }

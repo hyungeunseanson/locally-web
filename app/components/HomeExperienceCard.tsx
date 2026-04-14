@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import {
-  Heart,
   Utensils,
   Coffee,
   TreePine,
@@ -18,12 +17,12 @@ import {
   Sparkles,
 } from 'lucide-react';
 
-import { useWishlist } from '@/app/hooks/useWishlist';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { getContent } from '@/app/utils/contentHelper';
 import { CATEGORY_OPTIONS } from '@/app/host/create/config';
 import { formatLocalizedExperienceLocation } from '@/app/utils/locationLocalization';
 import ExperienceCardMeta from '@/app/components/ExperienceCardMeta';
+import { getExperienceCardImageUrl } from '@/app/utils/experienceImages';
 
 export interface HomeExperienceCardData {
   id: number | string;
@@ -44,6 +43,7 @@ export interface HomeExperienceCardData {
   rating?: number | null;
   review_count?: number | null;
   wishlist_count?: number | null;
+  card_image_url?: string | null;
   photos?: string[] | null;
   image_url?: string | null;
 }
@@ -89,12 +89,11 @@ function renderCategoryIcon(categoryLabel: string) {
 
 export default function HomeExperienceCard({ data }: { data: HomeExperienceCardData }) {
   const { lang, t } = useLanguage();
-  const { isSaved, toggleWishlist, isLoading } = useWishlist(String(data.id));
 
   const title = getContent(data, 'title', lang) || t('exp_card_title_fallback');
   const category = getContent(data, 'category', lang) || data.category || t('cat_exp');
   const location = formatLocalizedExperienceLocation(data, lang) || t('exp_card_location_fallback');
-  const imageUrl = data.photos?.[0] || data.image_url || 'https://images.unsplash.com/photo-1542051841857-5f90071e7989';
+  const imageUrl = getExperienceCardImageUrl(data);
   return (
     <Link
       href={`/experiences/${data.id}`}
@@ -105,35 +104,18 @@ export default function HomeExperienceCard({ data }: { data: HomeExperienceCardD
           src={imageUrl}
           alt={title}
           fill
-          unoptimized
+          quality={65}
           className="object-cover transition-transform duration-500 ease-out md:group-hover:scale-[1.04]"
           sizes="(max-width: 768px) 42vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 18vw"
         />
 
-        <div className="absolute inset-x-3 top-3 z-10 flex items-center justify-between md:hidden">
+        <div className="absolute inset-x-3 top-3 z-10 flex items-center justify-start md:hidden">
           <div className="max-w-[66%] rounded-full bg-white px-2.5 py-1 text-[9px] font-semibold tracking-[-0.01em] text-[#2B2B2B] shadow-[0_2px_6px_rgba(0,0,0,0.08)]">
             <span className="flex items-center gap-1.5">
               {renderCategoryIcon(String(category))}
               <span className="block truncate">{category}</span>
             </span>
           </div>
-
-          <button
-            type="button"
-            aria-label={t('exp_card_wishlist_toggle')}
-            disabled={isLoading}
-            onClick={(e) => {
-              void toggleWishlist(e);
-            }}
-            className="shrink-0 p-0.5 text-white [filter:drop-shadow(0_2px_6px_rgba(0,0,0,0.34))] transition-transform duration-200 active:scale-125"
-          >
-            <Heart
-              size={20}
-              strokeWidth={1.75}
-              fill={isSaved ? '#F43F5E' : 'none'}
-              className={isSaved ? 'text-rose-500' : 'text-white'}
-            />
-          </button>
         </div>
 
         <div className="absolute left-4 top-4 z-10 hidden max-w-[70%] rounded-full bg-white px-3 py-[5px] text-[10px] font-semibold tracking-[-0.01em] text-[#2B2B2B] shadow-[0_2px_6px_rgba(0,0,0,0.08)] md:block">
@@ -143,22 +125,6 @@ export default function HomeExperienceCard({ data }: { data: HomeExperienceCardD
           </span>
         </div>
 
-        <button
-          type="button"
-          aria-label={t('exp_card_wishlist_toggle')}
-          disabled={isLoading}
-          onClick={(e) => {
-            void toggleWishlist(e);
-          }}
-          className="absolute right-3 top-3 z-10 hidden p-1 text-white [filter:drop-shadow(0_2px_6px_rgba(0,0,0,0.34))] transition-transform duration-200 active:scale-125 md:block md:hover:scale-105"
-        >
-          <Heart
-            size={20}
-            strokeWidth={2.2}
-            fill={isSaved ? '#F43F5E' : 'none'}
-            className={isSaved ? 'text-rose-500' : 'text-white'}
-          />
-        </button>
       </div>
 
       <ExperienceCardMeta
