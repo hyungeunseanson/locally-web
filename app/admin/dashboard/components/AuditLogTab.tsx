@@ -62,7 +62,14 @@ export default function AuditLogTab() {
       })
       .subscribe();
 
+    // Realtime can drift in some local/test environments, so keep a single delayed refresh
+    // instead of a perpetual polling loop.
+    const refreshTimer = window.setTimeout(() => {
+      void fetchLogs();
+    }, 5000);
+
     return () => {
+      clearTimeout(refreshTimer);
       supabase.removeChannel(channel);
     };
   }, [supabase]);
