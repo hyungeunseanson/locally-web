@@ -62,13 +62,7 @@ export default function AuditLogTab() {
       })
       .subscribe();
 
-    // Realtime publication can drift across environments, so keep a light polling fallback.
-    const refreshTimer = setInterval(() => {
-      void fetchLogs();
-    }, 5000);
-
     return () => {
-      clearInterval(refreshTimer);
       supabase.removeChannel(channel);
     };
   }, [supabase]);

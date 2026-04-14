@@ -1,21 +1,31 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { createClient } from '@/app/utils/supabase/client';
+import { useCallback, useEffect, useState } from 'react';
 import { useToast } from '@/app/context/ToastContext';
-import type { AdminUserDashboardRow } from '@/app/types/admin';
+import type { AdminUserDashboardRow, OnlineUser } from '@/app/types/admin';
 
-type OnlineUser = {
-  user_id: string;
-  [key: string]: unknown;
-};
+const ONLINE_ACTIVITY_WINDOW_MS = 10 * 60 * 1000;
 
-function isOnlineUser(value: unknown): value is OnlineUser {
-  return typeof value === 'object' && value !== null && 'user_id' in value;
+function buildOnlineUsers(rows: AdminUserDashboardRow[]): OnlineUser[] {
+  const now = Date.now();
+
+  return rows
+    .filter((user) => {
+      if (!user.last_active_at) return false;
+      const parsed = new Date(user.last_active_at).getTime();
+      if (Number.isNaN(parsed)) return false;
+      return now - parsed <= ONLINE_ACTIVITY_WINDOW_MS;
+    })
+    .map((user) => ({
+      user_id: user.id,
+      is_anonymous: false,
+      avatar_url: user.avatar_url ?? null,
+      full_name: user.full_name ?? null,
+      email: user.email ?? null,
+    }));
 }
 
 export function useAdminUsersData() {
-  const supabase = useMemo(() => createClient(), []);
   const { showToast } = useToast();
 
   const [users, setUsers] = useState<AdminUserDashboardRow[]>([]);
@@ -32,35 +42,22 @@ export function useAdminUsersData() {
         throw new Error(result?.error || '회원 로딩 실패');
       }
 
-      setUsers(Array.isArray(result?.data) ? result.data as AdminUserDashboardRow[] : []);
+      const nextUsers = Array.isArray(result?.data) ? result.data as AdminUserDashboardRow[] : [];
+      setUsers(nextUsers);
+      setOnlineUsers(buildOnlineUsers(nextUsers));
     } catch (error) {
       console.error('[useAdminUsersData] fetch error:', error);
       showToast('회원 데이터를 불러오지 못했습니다.', 'error');
       setUsers([]);
+      setOnlineUsers([]);
     } finally {
       setIsLoading(false);
     }
   }, [showToast]);
 
   useEffect(() => {
-    fetchUsers();
-
-    const presenceChannel = supabase
-      .channel('online_users')
-      .on('presence', { event: 'sync' }, () => {
-        const presenceState = presenceChannel.presenceState();
-        const syncedUsers = (Object.values(presenceState).flat() as unknown[]).filter(isOnlineUser);
-        const uniqueUsers = Array.from(
-          new Map(syncedUsers.map((user) => [user.user_id, user])).values()
-        );
-        setOnlineUsers(uniqueUsers);
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(presenceChannel);
-    };
-  }, [fetchUsers, supabase]);
+    void fetchUsers();
+  }, [fetchUsers]);
 
   const deleteItem = useCallback(async (table: string, id: string) => {
     try {
