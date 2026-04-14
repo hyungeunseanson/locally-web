@@ -23,6 +23,7 @@ export type AvailabilityKey = {
 export type BookableExperience = {
   experienceId: number;
   title: string;
+  hostId: string;
   date: string;
   time: string;
   maxGuests: number;
@@ -421,6 +422,7 @@ export async function getLatestHostExperienceWithOptions({
   return {
     experienceId: Number(experience.id),
     title: String(experience.title || 'Locally 체험'),
+    hostId: String(experience.host_id || ''),
     maxGuests: Number(experience.max_guests || 10),
     price: Number(experience.price || 0),
     privatePrice: Number(experience.private_price || 0),
@@ -522,6 +524,7 @@ export async function prepareBookableExperience(
   return {
     experienceId: experience.experienceId,
     title: experience.title,
+    hostId: experience.hostId,
     date,
     time,
     maxGuests: experience.maxGuests,

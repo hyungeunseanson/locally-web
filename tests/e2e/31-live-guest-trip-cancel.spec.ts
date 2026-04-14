@@ -1,56 +1,14 @@
-import { readFileSync } from 'fs';
-
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test, type Page } from '@playwright/test';
-import { reviewAllExperiencePaymentAgreements } from './helpers/experienceBooking';
+import {
+  cleanupAvailability,
+  getAdminClient,
+  prepareBookableExperience,
+  reviewAllExperiencePaymentAgreements,
+  type AvailabilityKey,
+} from './helpers/experienceBooking';
 import { requireLiveBaseUrl } from './helpers/liveBaseUrl';
 
 const LIVE_BASE_URL = requireLiveBaseUrl();
-
-const HOST_USER_ID = 'cc84b331-7e78-4818-b9ba-f1a960017473';
-
-type EnvMap = Record<string, string>;
-type BookableExperience = {
-  experienceId: number;
-  title: string;
-  hostId: string;
-  date: string;
-  time: string;
-};
-
-let adminClient: SupabaseClient | null = null;
-
-function loadEnv(): EnvMap {
-  return readFileSync('.env.local', 'utf8')
-    .split(/\n/)
-    .reduce<EnvMap>((acc, line) => {
-      const match = line.match(/^([^=]+)=(.*)$/);
-      if (match) acc[match[1]] = match[2];
-      return acc;
-    }, {});
-}
-
-function getAdminClient() {
-  if (adminClient) return adminClient;
-
-  const env = loadEnv();
-  adminClient = createClient(
-    env.NEXT_PUBLIC_SUPABASE_URL,
-    env.SUPABASE_SERVICE_ROLE_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    {
-      auth: { persistSession: false, autoRefreshToken: false },
-    }
-  );
-
-  return adminClient;
-}
-
-function formatDate(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
 
 function createUniqueGuest() {
   const timestamp = Date.now();
@@ -60,91 +18,6 @@ function createUniqueGuest() {
     fullName: `Codex Guest Cancel ${timestamp}`,
     phone: `010${String(timestamp).slice(-8)}`,
     birthDate: '19940203',
-  };
-}
-
-async function prepareBookableExperience(): Promise<BookableExperience> {
-  const supabase = getAdminClient();
-
-  const { data: experience, error: experienceError } = await supabase
-    .from('experiences')
-    .select('id, title, status, host_id')
-    .eq('host_id', HOST_USER_ID)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (experienceError) throw experienceError;
-  if (!experience) {
-    throw new Error('No host experience found for the approved test host.');
-  }
-
-  if (experience.status !== 'approved' && experience.status !== 'active') {
-    const { error: updateError } = await supabase
-      .from('experiences')
-      .update({ status: 'approved' })
-      .eq('id', experience.id);
-
-    if (updateError) throw updateError;
-  }
-
-  let date = '';
-  const time = '10:00';
-
-  for (let offset = 14; offset <= 45; offset += 1) {
-    const candidateDate = new Date();
-    candidateDate.setDate(candidateDate.getDate() + offset);
-    const candidate = formatDate(candidateDate);
-
-    const { count, error: bookingCountError } = await supabase
-      .from('bookings')
-      .select('*', { count: 'exact', head: true })
-      .eq('experience_id', experience.id)
-      .eq('date', candidate)
-      .eq('time', time)
-      .in('status', ['PENDING', 'PAID', 'confirmed', 'pending', 'paid']);
-
-    if (bookingCountError) throw bookingCountError;
-
-    if (!count || count === 0) {
-      date = candidate;
-      break;
-    }
-  }
-
-  if (!date) {
-    throw new Error('Could not find an empty future booking slot for the test experience.');
-  }
-
-  const { data: existingSlots, error: slotFetchError } = await supabase
-    .from('experience_availability')
-    .select('experience_id')
-    .eq('experience_id', experience.id)
-    .eq('date', date)
-    .eq('start_time', time)
-    .limit(1);
-
-  if (slotFetchError) throw slotFetchError;
-
-  if (!existingSlots || existingSlots.length === 0) {
-    const { error: slotInsertError } = await supabase
-      .from('experience_availability')
-      .insert({
-        experience_id: experience.id,
-        date,
-        start_time: time,
-        is_booked: false,
-      });
-
-    if (slotInsertError) throw slotInsertError;
-  }
-
-  return {
-    experienceId: Number(experience.id),
-    title: String(experience.title),
-    hostId: String(experience.host_id),
-    date,
-    time,
   };
 }
 
@@ -170,7 +43,8 @@ async function signUpGuest(page: Page, guest: ReturnType<typeof createUniqueGues
   );
 
   await page.locator('input[type="email"]').fill(guest.email);
-  await page.locator('input[type="password"]').fill(guest.password);
+  await page.getByTestId('signup-password-input').fill(guest.password);
+  await page.getByTestId('signup-password-confirm-input').fill(guest.password);
   await page.locator('input[autocomplete="name"]').fill(guest.fullName);
   await page.locator('select').first().selectOption({ index: 1 });
   await page.locator('input[autocomplete="tel"]').fill(guest.phone);
@@ -201,10 +75,17 @@ test.describe.serial('Live guest trip cancellation flow', () => {
 
   test('creates a pending bank-transfer booking and cancels it from trips', async ({ page }, testInfo) => {
     const guest = createUniqueGuest();
-    const bookableExperience = await prepareBookableExperience();
+    const createdAvailabilityKeys: AvailabilityKey[] = [];
     const cancelReason = `E2E guest cancel reason ${Date.now()}`;
     const browserIssues: string[] = [];
+    const cancelNetworkEvents: string[] = [];
+    const cancelButtonDiagnostics: string[] = [];
     let bookingOrderId = '';
+    let bookingId = '';
+    const getTripCard = () =>
+      page
+        .getByTestId('guest-trips-desktop-main')
+        .getByTestId(`guest-trip-card-${bookingId}`);
 
     page.on('pageerror', (error) => {
       browserIssues.push(`[pageerror] ${error.message}`);
@@ -214,91 +95,165 @@ test.describe.serial('Live guest trip cancellation flow', () => {
         browserIssues.push(`[console:error] ${message.text()}`);
       }
     });
-
-    await test.step('Create a fresh guest account', async () => {
-      await signUpGuest(page, guest);
+    page.on('request', (request) => {
+      if (request.url().includes('/api/payment/cancel')) {
+        cancelNetworkEvents.push(
+          `[request] ${request.method()} ${request.url()} body=${request.postData() || ''}`
+        );
+      }
+    });
+    page.on('response', async (response) => {
+      if (response.url().includes('/api/payment/cancel')) {
+        const body = await response.text().catch(() => '');
+        cancelNetworkEvents.push(
+          `[response] ${response.status()} ${response.url()} body=${body}`
+        );
+      }
     });
 
-    await test.step('Create a pending bank-transfer booking', async () => {
-      await page.goto(
-        `/experiences/${bookableExperience.experienceId}/payment?date=${bookableExperience.date}&time=${bookableExperience.time}&guests=1`,
-        { waitUntil: 'domcontentloaded' }
-      );
-      await expect(page.getByTestId('exp-payment-booker-name')).toBeVisible({ timeout: 30000 });
+    try {
+      const bookableExperience = await prepareBookableExperience(createdAvailabilityKeys);
 
-      await page.getByTestId('exp-payment-booker-name').fill(guest.fullName);
-      await page.getByTestId('exp-payment-booker-phone').fill(guest.phone);
-      await page.getByTestId('exp-payment-method-bank').click();
-
-      await reviewAllExperiencePaymentAgreements(page);
-
-      await page.getByTestId('exp-payment-submit').click();
-      await page.waitForURL(/\/payment\/complete\?orderId=/, { timeout: 30000 });
-
-      const url = new URL(page.url());
-      bookingOrderId = url.searchParams.get('orderId') || '';
-      expect(bookingOrderId).not.toBe('');
-    });
-
-    await test.step('Cancel the pending booking from guest trips', async () => {
-      await page.getByRole('link', {
-        name: /예약 상세 내역 보기|View booking details|Booking details|予約詳細|预订详情/,
-      }).click();
-
-      await page.waitForURL(/\/guest\/trips/, { timeout: 20000 });
-      await page.locator('button:has(svg.lucide-more-horizontal)').first().click();
-      await page.getByRole('button', { name: /취소 요청|취소 요청하기|Cancel/i }).click();
-
-      const cancelModal = page.getByTestId('guest-trip-cancel-modal');
-      await expect(cancelModal).toBeVisible({ timeout: 10000 });
-      await cancelModal.locator('textarea').fill(cancelReason);
-
-      page.once('dialog', async (dialog) => {
-        await dialog.accept();
-      });
-      await cancelModal.getByRole('button', { name: /취소 확정|Confirm/i }).click();
-
-      await expect(page.getByText(/예약 취소가 완료되었습니다|예약이 취소되었습니다/i)).toBeVisible({
-        timeout: 15000,
+      await test.step('Create a fresh guest account', async () => {
+        await signUpGuest(page, guest);
       });
 
-      await expect
-        .poll(async () => {
-          const booking = await findBookingByOrderId(bookingOrderId);
-          return booking?.status || '';
-        }, {
-          timeout: 15000,
-          intervals: [500, 1000, 1500],
-        })
-        .toBe('cancelled');
-    });
+      await test.step('Create a pending bank-transfer booking', async () => {
+        await page.goto(
+          `/experiences/${bookableExperience.experienceId}/payment?date=${bookableExperience.date}&time=${bookableExperience.time}&guests=1`,
+          { waitUntil: 'domcontentloaded' }
+        );
+        await expect(page.getByTestId('exp-payment-booker-name')).toBeVisible({ timeout: 30000 });
 
-    await test.step('Capture final live state', async () => {
-      await page.screenshot({
-        path: testInfo.outputPath('live-guest-trip-cancel.png'),
-        fullPage: true,
+        await page.getByTestId('exp-payment-booker-name').fill(guest.fullName);
+        await page.getByTestId('exp-payment-booker-phone').fill(guest.phone);
+        await page.getByTestId('exp-payment-method-bank').click();
+
+        await reviewAllExperiencePaymentAgreements(page);
+
+        await page.getByTestId('exp-payment-submit').click();
+        await page.waitForURL(/\/payment\/complete\?orderId=/, { timeout: 30000 });
+
+        const url = new URL(page.url());
+        bookingOrderId = url.searchParams.get('orderId') || '';
+        expect(bookingOrderId).not.toBe('');
+
+        const booking = await findBookingByOrderId(bookingOrderId);
+        bookingId = booking?.id ? String(booking.id) : '';
+        expect(bookingId).not.toBe('');
       });
 
-      await testInfo.attach('live-guest-trip-cancel-metadata.json', {
-        body: JSON.stringify(
-          {
-            guest,
-            experience: bookableExperience,
-            bookingOrderId,
-            cancelReason,
-          },
-          null,
-          2
-        ),
-        contentType: 'application/json',
+      await test.step('Cancel the pending booking from guest trips', async () => {
+        await page.getByRole('link', {
+          name: /예약 상세 내역 보기|View booking details|Booking details|予約詳細|预订详情/,
+        }).last().click();
+
+        await page.waitForURL(/\/guest\/trips/, { timeout: 20000 });
+        const tripCard = getTripCard();
+        await expect(tripCard).toBeVisible({ timeout: 20000 });
+        await tripCard.locator('[data-testid^="guest-trip-menu-button-"]').click();
+        await tripCard.locator('[data-testid^="guest-trip-cancel-button-"]').click();
+
+        const cancelModal = page.getByTestId('guest-trip-cancel-modal');
+        await expect(cancelModal).toBeVisible({ timeout: 10000 });
+        await cancelModal.locator('textarea').fill(cancelReason);
+
+        const cancelRequestPromise = page.waitForRequest(
+          (request) =>
+            request.url().includes('/api/payment/cancel') &&
+            request.method() === 'POST',
+          { timeout: 20000 }
+        );
+        const cancelResponsePromise = page.waitForResponse(
+          (response) =>
+            response.url().includes('/api/payment/cancel') &&
+            response.request().method() === 'POST',
+          { timeout: 20000 }
+        );
+        const confirmButton = cancelModal.getByRole('button', { name: /취소 확정|Confirm/i });
+        await expect(confirmButton).toBeEnabled();
+        const confirmButtonProbe = await confirmButton.evaluate((button) => {
+          const rect = button.getBoundingClientRect();
+          const elementAtCenter = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+          return {
+            tagName: elementAtCenter?.tagName || null,
+            text: elementAtCenter?.textContent || null,
+            clickable:
+              Boolean(elementAtCenter) &&
+              (button === elementAtCenter || button.contains(elementAtCenter)),
+          };
+        });
+        cancelButtonDiagnostics.push(JSON.stringify(confirmButtonProbe));
+        await confirmButton.evaluate((button: HTMLButtonElement) => button.click());
+        const cancelRequest = await cancelRequestPromise;
+        cancelNetworkEvents.push(`[request-observed] ${cancelRequest.method()} ${cancelRequest.url()}`);
+        const cancelResponse = await cancelResponsePromise;
+        const cancelResult = await cancelResponse.json().catch(() => null);
+        expect(cancelResponse.ok(), JSON.stringify(cancelResult)).toBeTruthy();
+        await expect(cancelModal).toBeHidden({ timeout: 20000 });
+
+        await expect(
+          page.getByText(/예약 취소가 완료되었습니다|예약이 취소되었습니다|Reservation cancellation is complete|予約のキャンセルが完了しました|预订取消完成/i)
+        ).toBeVisible({ timeout: 20000 });
+
+        await expect
+          .poll(async () => {
+            const booking = await findBookingByOrderId(bookingOrderId);
+            return booking?.status || '';
+          }, {
+            timeout: 15000,
+            intervals: [500, 1000, 1500],
+          })
+          .toBe('cancelled');
       });
 
+      await test.step('Capture final live state', async () => {
+        await page.screenshot({
+          path: testInfo.outputPath('live-guest-trip-cancel.png'),
+          fullPage: true,
+        });
+
+        await testInfo.attach('live-guest-trip-cancel-metadata.json', {
+          body: JSON.stringify(
+            {
+              guest,
+              experience: bookableExperience,
+              bookingOrderId,
+              cancelReason,
+            },
+            null,
+            2
+          ),
+          contentType: 'application/json',
+        });
+
+        if (browserIssues.length > 0) {
+          await testInfo.attach('browser-issues.txt', {
+            body: browserIssues.join('\n'),
+            contentType: 'text/plain',
+          });
+        }
+      });
+    } finally {
+      if (cancelNetworkEvents.length > 0) {
+        await testInfo.attach('cancel-network-events.txt', {
+          body: cancelNetworkEvents.join('\n'),
+          contentType: 'text/plain',
+        });
+      }
+      if (cancelButtonDiagnostics.length > 0) {
+        await testInfo.attach('cancel-button-diagnostics.txt', {
+          body: cancelButtonDiagnostics.join('\n'),
+          contentType: 'text/plain',
+        });
+      }
       if (browserIssues.length > 0) {
         await testInfo.attach('browser-issues.txt', {
           body: browserIssues.join('\n'),
           contentType: 'text/plain',
         });
       }
-    });
+      await cleanupAvailability(createdAvailabilityKeys);
+    }
   });
 });

@@ -1,56 +1,15 @@
-import { readFileSync } from 'fs';
-
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test, type Page } from '@playwright/test';
-import { reviewAllExperiencePaymentAgreements } from './helpers/experienceBooking';
+import {
+  cleanupAvailability,
+  getAdminClient,
+  prepareBookableExperience,
+  reviewAllExperiencePaymentAgreements,
+  type AvailabilityKey,
+} from './helpers/experienceBooking';
 import { requireLiveBaseUrl } from './helpers/liveBaseUrl';
+import { getPublicBankInfo } from '@/app/utils/publicBankInfo';
 
 const LIVE_BASE_URL = requireLiveBaseUrl();
-
-const HOST_USER_ID = 'cc84b331-7e78-4818-b9ba-f1a960017473';
-
-type EnvMap = Record<string, string>;
-type BookableExperience = {
-  experienceId: number;
-  title: string;
-  hostId: string;
-  date: string;
-  time: string;
-};
-
-let adminClient: SupabaseClient | null = null;
-
-function loadEnv(): EnvMap {
-  return readFileSync('.env.local', 'utf8')
-    .split(/\n/)
-    .reduce<EnvMap>((acc, line) => {
-      const match = line.match(/^([^=]+)=(.*)$/);
-      if (match) acc[match[1]] = match[2];
-      return acc;
-    }, {});
-}
-
-function getAdminClient() {
-  if (adminClient) return adminClient;
-
-  const env = loadEnv();
-  adminClient = createClient(
-    env.NEXT_PUBLIC_SUPABASE_URL,
-    env.SUPABASE_SERVICE_ROLE_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    {
-      auth: { persistSession: false, autoRefreshToken: false },
-    }
-  );
-
-  return adminClient;
-}
-
-function formatDate(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
 
 function createUniqueGuest() {
   const timestamp = Date.now();
@@ -60,91 +19,6 @@ function createUniqueGuest() {
     fullName: `Codex Guest ${timestamp}`,
     phone: `010${String(timestamp).slice(-8)}`,
     birthDate: '19940203',
-  };
-}
-
-async function prepareBookableExperience(): Promise<BookableExperience> {
-  const supabase = getAdminClient();
-
-  const { data: experience, error: experienceError } = await supabase
-    .from('experiences')
-    .select('id, title, status, host_id')
-    .eq('host_id', HOST_USER_ID)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (experienceError) throw experienceError;
-  if (!experience) {
-    throw new Error('No host experience found for the approved test host.');
-  }
-
-  if (experience.status !== 'approved' && experience.status !== 'active') {
-    const { error: updateError } = await supabase
-      .from('experiences')
-      .update({ status: 'approved' })
-      .eq('id', experience.id);
-
-    if (updateError) throw updateError;
-  }
-
-  let date = '';
-  const time = '10:00';
-
-  for (let offset = 14; offset <= 45; offset += 1) {
-    const candidateDate = new Date();
-    candidateDate.setDate(candidateDate.getDate() + offset);
-    const candidate = formatDate(candidateDate);
-
-    const { count, error: bookingCountError } = await supabase
-      .from('bookings')
-      .select('*', { count: 'exact', head: true })
-      .eq('experience_id', experience.id)
-      .eq('date', candidate)
-      .eq('time', time)
-      .in('status', ['PENDING', 'PAID', 'confirmed', 'pending', 'paid']);
-
-    if (bookingCountError) throw bookingCountError;
-
-    if (!count || count === 0) {
-      date = candidate;
-      break;
-    }
-  }
-
-  if (!date) {
-    throw new Error('Could not find an empty future booking slot for the test experience.');
-  }
-
-  const { data: existingSlots, error: slotFetchError } = await supabase
-    .from('experience_availability')
-    .select('experience_id')
-    .eq('experience_id', experience.id)
-    .eq('date', date)
-    .eq('start_time', time)
-    .limit(1);
-
-  if (slotFetchError) throw slotFetchError;
-
-  if (!existingSlots || existingSlots.length === 0) {
-    const { error: slotInsertError } = await supabase
-      .from('experience_availability')
-      .insert({
-        experience_id: experience.id,
-        date,
-        start_time: time,
-        is_booked: false,
-      });
-
-    if (slotInsertError) throw slotInsertError;
-  }
-
-  return {
-    experienceId: Number(experience.id),
-    title: String(experience.title),
-    hostId: String(experience.host_id),
-    date,
-    time,
   };
 }
 
@@ -170,7 +44,8 @@ async function signUpGuest(page: Page, guest: ReturnType<typeof createUniqueGues
   );
 
   await page.locator('input[type="email"]').fill(guest.email);
-  await page.locator('input[type="password"]').fill(guest.password);
+  await page.getByTestId('signup-password-input').fill(guest.password);
+  await page.getByTestId('signup-password-confirm-input').fill(guest.password);
   await page.locator('input[autocomplete="name"]').fill(guest.fullName);
   await page.locator('select').first().selectOption({ index: 1 });
   await page.locator('input[autocomplete="tel"]').fill(guest.phone);
@@ -250,7 +125,9 @@ test.describe.serial('Live guest post-booking experience flow', () => {
 
   test('creates a guest booking, verifies trips + receipt, and starts a host chat from trips', async ({ page }, testInfo) => {
     const guest = createUniqueGuest();
-    const bookableExperience = await prepareBookableExperience();
+    const createdAvailabilityKeys: AvailabilityKey[] = [];
+    const bankInfo = getPublicBankInfo();
+    const bankAccountPattern = new RegExp(bankInfo.accountDigits.split('').join('\\D*'));
     const guestTripMessage = `E2E trip follow-up message ${Date.now()}`;
     const browserIssues: string[] = [];
 
@@ -265,213 +142,242 @@ test.describe.serial('Live guest post-booking experience flow', () => {
 
     let guestUserId = '';
     let bookingOrderId = '';
+    let bookingId = '';
     let bookingAmount = 0;
     let generalInquiryId = '';
-    let paymentBankAccount = '';
-    let paymentBankName = '';
+    const getTripCard = () =>
+      page
+        .getByTestId('guest-trips-desktop-main')
+        .getByTestId(`guest-trip-card-${bookingId}`);
 
-    await test.step('Create a fresh guest account', async () => {
-      await signUpGuest(page, guest);
-      await page.waitForTimeout(5000);
+    try {
+      const bookableExperience = await prepareBookableExperience(createdAvailabilityKeys);
 
-      guestUserId = (await findGuestProfileIdByEmail(guest.email)) || '';
-      if (!guestUserId) {
-        throw new Error('Guest profile was not created after signup.');
-      }
-    });
+      await test.step('Create a fresh guest account', async () => {
+        await signUpGuest(page, guest);
+        await page.waitForTimeout(5000);
 
-    await test.step('Create a pending bank-transfer booking', async () => {
-      await page.goto(
-        `/experiences/${bookableExperience.experienceId}/payment?date=${bookableExperience.date}&time=${bookableExperience.time}&guests=1`,
-        { waitUntil: 'domcontentloaded' }
-      );
-      await expect(page.getByTestId('exp-payment-booker-name')).toBeVisible({ timeout: 30000 });
-
-      await page.getByTestId('exp-payment-booker-name').fill(guest.fullName);
-      await page.getByTestId('exp-payment-booker-phone').fill(guest.phone);
-
-      await page.getByTestId('exp-payment-method-bank').click();
-
-      const bankCard = page.locator('div').filter({ hasText: /입금하실 계좌/ }).last();
-      paymentBankAccount = (await bankCard.locator('span.font-black').textContent())?.trim() || '';
-      paymentBankName = (await bankCard.locator('span.bg-yellow-300').textContent())?.trim() || '';
-      expect(paymentBankAccount).not.toBe('');
-      expect(paymentBankName).not.toBe('');
-
-      const noOffPlatformAgreement = page.getByTestId('exp-payment-agree-off-platform');
-      const safetyAgreement = page.getByTestId('exp-payment-agree-safety');
-      const termsAgreement = page.getByTestId('exp-payment-agree-terms');
-
-      await expect(noOffPlatformAgreement).toBeVisible({ timeout: 15000 });
-      await expect(safetyAgreement).toBeVisible({ timeout: 15000 });
-      await expect(termsAgreement).toBeVisible({ timeout: 15000 });
-
-      await reviewAllExperiencePaymentAgreements(page);
-
-      await page.getByTestId('exp-payment-submit').click();
-      await page.waitForURL(/\/payment\/complete\?orderId=/, { timeout: 30000 });
-
-      const url = new URL(page.url());
-      bookingOrderId = url.searchParams.get('orderId') || '';
-      expect(bookingOrderId).not.toBe('');
-
-      await expect
-        .poll(async () => Boolean(await findBookingByOrderId(bookingOrderId)), {
-          timeout: 15000,
-          intervals: [500, 1000, 1500],
-        })
-        .toBe(true);
-
-      const bookingRow = await findBookingByOrderId(bookingOrderId);
-      if (!bookingRow) {
-        throw new Error(`Could not load booking row for order ${bookingOrderId}.`);
-      }
-      bookingAmount = Number(bookingRow.amount || 0);
-    });
-
-    await test.step('Move from payment complete page into guest trips', async () => {
-      await expect(page.getByText(/입금 대기 중입니다|입금 확인 중|Payment pending/i)).toBeVisible({
-        timeout: 15000,
-      });
-      await expect(page.getByText(paymentBankAccount)).toBeVisible({ timeout: 10000 });
-      await expect(page.getByText(new RegExp(paymentBankName))).toBeVisible({ timeout: 10000 });
-
-      await page
-        .getByRole('link', {
-          name: /예약 상세 내역 보기|View booking details|Booking details|予約詳細|预订详情/,
-        })
-        .click();
-
-      await page.waitForURL(/\/guest\/trips/, { timeout: 20000 });
-      await expect(
-        page.getByRole('heading', { name: bookableExperience.title, exact: true }).last()
-      ).toBeVisible({ timeout: 20000 });
-      await expect(page.getByText(new RegExp(`#${bookingOrderId}`)).last()).toBeVisible({ timeout: 20000 });
-      await expect(page.getByText(bookableExperience.date).last()).toBeVisible({ timeout: 20000 });
-      await expect(page.getByText(bookableExperience.time).last()).toBeVisible({ timeout: 20000 });
-    });
-
-    await test.step('Open the cancellation modal and verify refund policy copy', async () => {
-      await page.locator('button:has(svg.lucide-more-horizontal)').first().click();
-      await page.getByRole('button', { name: /취소 요청|취소 요청하기|Cancel/i }).click();
-
-      const cancelModal = page.getByTestId('guest-trip-cancel-modal');
-
-      await expect(cancelModal).toBeVisible({ timeout: 10000 });
-      await expect(cancelModal.getByText('결제 후 24시간 이내 철회(투어 2일 전까지): 100%')).toBeVisible({
-        timeout: 10000,
-      });
-      await expect(cancelModal.getByText('20일 전: 100% / 8~19일 전: 80%')).toBeVisible({
-        timeout: 10000,
-      });
-      await expect(cancelModal.getByText('2~7일 전: 70% / 1일 전: 40%')).toBeVisible({
-        timeout: 10000,
-      });
-      await expect(cancelModal.getByText('당일/지난 일정: 환불 불가')).toBeVisible({
-        timeout: 10000,
+        guestUserId = (await findGuestProfileIdByEmail(guest.email)) || '';
+        if (!guestUserId) {
+          throw new Error('Guest profile was not created after signup.');
+        }
       });
 
-      await cancelModal.getByRole('button', { name: /닫기|Close/i }).click();
-      await expect(cancelModal).toBeHidden({ timeout: 10000 });
-    });
+      await test.step('Create a pending bank-transfer booking', async () => {
+        await page.goto(
+          `/experiences/${bookableExperience.experienceId}/payment?date=${bookableExperience.date}&time=${bookableExperience.time}&guests=1`,
+          { waitUntil: 'domcontentloaded' }
+        );
+        await expect(page.getByTestId('exp-payment-booker-name')).toBeVisible({ timeout: 30000 });
 
-    await test.step('Open and verify the receipt modal from guest trips', async () => {
-      await page.getByRole('button', { name: /영수증|Receipt|領収書|收据/i }).last().click();
+        await page.getByTestId('exp-payment-booker-name').fill(guest.fullName);
+        await page.getByTestId('exp-payment-booker-phone').fill(guest.phone);
 
-      const receiptModal = page.getByTestId('guest-trip-receipt-modal');
-      await expect(receiptModal).toBeVisible({ timeout: 15000 });
-      await expect(receiptModal.getByText(String(bookingOrderId))).toBeVisible({ timeout: 10000 });
-      await expect(receiptModal.getByText(bookableExperience.title)).toBeVisible({ timeout: 10000 });
-      await expect(
-        receiptModal.getByText(`₩${bookingAmount.toLocaleString()}`)
-      ).toBeVisible({ timeout: 10000 });
+        await page.getByTestId('exp-payment-method-bank').click();
+        await expect(page.getByText(bankAccountPattern).first()).toBeVisible({ timeout: 10000 });
+        await expect(page.getByText(bankInfo.bankName).first()).toBeVisible({ timeout: 10000 });
 
-      await receiptModal.getByRole('button').first().click();
-      await expect(receiptModal).toBeHidden({ timeout: 10000 });
-    });
+        const noOffPlatformAgreement = page.getByTestId('exp-payment-agree-off-platform');
+        const safetyAgreement = page.getByTestId('exp-payment-agree-safety');
+        const termsAgreement = page.getByTestId('exp-payment-agree-terms');
 
-    await test.step('Start a host chat from the booked trip card', async () => {
-      await page.getByRole('button', { name: /메시지|Messages|Message|メッセージ|消息/i }).last().click();
-      await page.waitForURL(/\/guest\/inbox/, { timeout: 20000 });
+        await expect(noOffPlatformAgreement).toBeVisible({ timeout: 15000 });
+        await expect(safetyAgreement).toBeVisible({ timeout: 15000 });
+        await expect(termsAgreement).toBeVisible({ timeout: 15000 });
 
-      const guestInput = page
-        .locator('input[placeholder="메시지 입력..."], input[placeholder="Type a message..."]')
-        .first();
-      await expect(guestInput).toBeVisible({ timeout: 20000 });
-      await guestInput.fill(guestTripMessage);
-      await guestInput.press('Enter');
+        await reviewAllExperiencePaymentAgreements(page);
 
-      await expect
-        .poll(async () => {
-          const inquiry = await findLatestInquiry({
-            userId: guestUserId,
-            hostId: bookableExperience.hostId,
-            experienceId: bookableExperience.experienceId,
-            type: 'general',
-          });
-          return inquiry?.id ? String(inquiry.id) : '';
-        }, {
-          timeout: 15000,
-          intervals: [500, 1000, 1500],
-        })
-        .not.toBe('');
+        await page.getByTestId('exp-payment-submit').click();
+        await page.waitForURL(/\/payment\/complete\?orderId=/, { timeout: 30000 });
 
-      generalInquiryId = String(
-        (
-          await findLatestInquiry({
-            userId: guestUserId,
-            hostId: bookableExperience.hostId,
-            experienceId: bookableExperience.experienceId,
-            type: 'general',
+        const url = new URL(page.url());
+        bookingOrderId = url.searchParams.get('orderId') || '';
+        expect(bookingOrderId).not.toBe('');
+
+        await expect
+          .poll(async () => Boolean(await findBookingByOrderId(bookingOrderId)), {
+            timeout: 15000,
+            intervals: [500, 1000, 1500],
           })
-        )?.id || ''
-      );
+          .toBe(true);
 
-      await expect
-        .poll(async () => {
-          const message = await findInquiryMessage(generalInquiryId, guestTripMessage);
-          return message?.id ? String(message.id) : '';
-        }, {
+        const bookingRow = await findBookingByOrderId(bookingOrderId);
+        if (!bookingRow) {
+          throw new Error(`Could not load booking row for order ${bookingOrderId}.`);
+        }
+        bookingId = String(bookingRow.id || '');
+        expect(bookingId).not.toBe('');
+        bookingAmount = Number(bookingRow.amount || 0);
+      });
+
+      await test.step('Move from payment complete page into guest trips', async () => {
+        await expect(page.getByText(/입금 대기 중입니다|입금 확인 중|Your payment is pending/i)).toBeVisible({
           timeout: 15000,
-          intervals: [500, 1000, 1500],
-        })
-        .not.toBe('');
+        });
+        await expect(page.getByText(bankAccountPattern).first()).toBeVisible({ timeout: 10000 });
+        await expect(page.getByText(bankInfo.bankName).first()).toBeVisible({ timeout: 10000 });
 
-      await page.goto(`/guest/inbox?inquiryId=${generalInquiryId}`, { waitUntil: 'networkidle' });
-      await expect(
-        page.locator('div.bg-black.text-white.rounded-tr-sm').filter({ hasText: guestTripMessage }).last()
-      ).toBeVisible({ timeout: 20000 });
-    });
+        await page
+          .getByRole('link', {
+            name: /예약 상세 내역 보기|View booking details|Booking details|予約詳細|预订详情/,
+          })
+          .last()
+          .click();
 
-    await test.step('Capture final live state', async () => {
-      await page.screenshot({
-        path: testInfo.outputPath('live-guest-post-booking.png'),
-        fullPage: true,
+        await page.waitForURL(/\/guest\/trips/, { timeout: 20000 });
+        const tripCard = getTripCard();
+        await expect(tripCard).toBeVisible({ timeout: 20000 });
+        await expect(tripCard.getByRole('heading').first()).toBeVisible({ timeout: 20000 });
+        await expect(tripCard).toContainText(`#${bookingOrderId}`);
+        await expect(tripCard).toContainText(bookableExperience.date);
+        await expect(tripCard).toContainText(bookableExperience.time);
       });
 
-      await testInfo.attach('live-guest-post-booking-metadata.json', {
-        body: JSON.stringify(
-          {
-            guest,
-            guestUserId,
-            experience: bookableExperience,
-            bookingOrderId,
-            bookingAmount,
-            generalInquiryId,
-            guestTripMessage,
-          },
-          null,
-          2
-        ),
-        contentType: 'application/json',
+      await test.step('Open the cancellation modal and verify refund policy copy', async () => {
+        const tripCard = getTripCard();
+        await tripCard.locator('[data-testid^="guest-trip-menu-button-"]').click();
+        await tripCard.locator('[data-testid^="guest-trip-cancel-button-"]').click();
+
+        const cancelModal = page.getByTestId('guest-trip-cancel-modal');
+
+        await expect(cancelModal).toBeVisible({ timeout: 10000 });
+        await expect(
+          cancelModal.getByText(/결제 후 24시간 이내 철회\(투어 2일 전까지\): 100%|Cancellation on the payment day: 100%/)
+        ).toBeVisible({
+          timeout: 10000,
+        });
+        await expect(
+          cancelModal.getByText(/20일 전: 100% \/ 8~19일 전: 80%|20 days before: 100% \/ 8~19 days before: 80%/)
+        ).toBeVisible({
+          timeout: 10000,
+        });
+        await expect(
+          cancelModal.getByText(/2~7일 전: 70% \/ 1일 전: 40%|2~7 days before: 70% \/ 1 day before: 40%/)
+        ).toBeVisible({
+          timeout: 10000,
+        });
+        await expect(
+          cancelModal.getByText(/당일\/지난 일정: 환불 불가|Same day \/ Past date: Non-refundable/)
+        ).toBeVisible({
+          timeout: 10000,
+        });
+
+        const cancelCloseButton = page.getByTestId('guest-trip-cancel-close-button');
+        await expect(cancelCloseButton).toBeVisible({ timeout: 10000 });
+        await cancelCloseButton.evaluate((button: HTMLButtonElement) => button.click());
+        await expect(cancelModal).toBeHidden({ timeout: 10000 });
       });
 
+      await test.step('Open and verify the receipt modal from guest trips', async () => {
+        const tripTitleText = (await getTripCard().getByRole('heading').first().textContent())?.trim() || '';
+        expect(tripTitleText).not.toBe('');
+        await getTripCard().getByTestId('guest-trip-pending-receipt-button').click();
+
+        const receiptModal = page.getByTestId('guest-trip-receipt-modal');
+        await expect(receiptModal).toBeVisible({ timeout: 15000 });
+        await expect(receiptModal.getByText(String(bookingOrderId))).toBeVisible({ timeout: 10000 });
+        await expect(receiptModal.getByText(tripTitleText, { exact: false })).toBeVisible({ timeout: 10000 });
+        await expect(
+          receiptModal.getByText(`₩${bookingAmount.toLocaleString()}`)
+        ).toBeVisible({ timeout: 10000 });
+
+        await page
+          .getByTestId('guest-trip-receipt-close-button')
+          .evaluate((button: HTMLButtonElement) => button.click());
+        await expect(receiptModal).toBeHidden({ timeout: 10000 });
+      });
+
+      await test.step('Start a host chat from the booked trip card', async () => {
+        await getTripCard().getByRole('button', { name: /메시지|Messages|Message|メッセージ|消息/i }).click();
+        await page.waitForURL(/\/guest\/inbox/, { timeout: 20000 });
+
+        const guestInput = page
+          .locator('input[placeholder="메시지 입력..."], input[placeholder="Type a message..."]')
+          .first();
+        await expect(guestInput).toBeVisible({ timeout: 20000 });
+        await guestInput.fill(guestTripMessage);
+        await guestInput.press('Enter');
+
+        await expect
+          .poll(async () => {
+            const inquiry = await findLatestInquiry({
+              userId: guestUserId,
+              hostId: bookableExperience.hostId,
+              experienceId: bookableExperience.experienceId,
+              type: 'general',
+            });
+            return inquiry?.id ? String(inquiry.id) : '';
+          }, {
+            timeout: 15000,
+            intervals: [500, 1000, 1500],
+          })
+          .not.toBe('');
+
+        generalInquiryId = String(
+          (
+            await findLatestInquiry({
+              userId: guestUserId,
+              hostId: bookableExperience.hostId,
+              experienceId: bookableExperience.experienceId,
+              type: 'general',
+            })
+          )?.id || ''
+        );
+
+        await expect
+          .poll(async () => {
+            const message = await findInquiryMessage(generalInquiryId, guestTripMessage);
+            return message?.id ? String(message.id) : '';
+          }, {
+            timeout: 15000,
+            intervals: [500, 1000, 1500],
+          })
+          .not.toBe('');
+
+        await page.goto(`/guest/inbox?inquiryId=${generalInquiryId}`, { waitUntil: 'networkidle' });
+        await expect(
+          page.locator('div.bg-black.text-white.rounded-tr-sm').filter({ hasText: guestTripMessage }).last()
+        ).toBeVisible({ timeout: 20000 });
+      });
+
+      await test.step('Capture final live state', async () => {
+        await page.screenshot({
+          path: testInfo.outputPath('live-guest-post-booking.png'),
+          fullPage: true,
+        });
+
+        await testInfo.attach('live-guest-post-booking-metadata.json', {
+          body: JSON.stringify(
+            {
+              guest,
+              guestUserId,
+              experience: bookableExperience,
+              bookingOrderId,
+              bookingAmount,
+              generalInquiryId,
+              guestTripMessage,
+            },
+            null,
+            2
+          ),
+          contentType: 'application/json',
+        });
+
+        if (browserIssues.length > 0) {
+          await testInfo.attach('browser-issues.txt', {
+            body: browserIssues.join('\n'),
+            contentType: 'text/plain',
+          });
+        }
+      });
+    } finally {
       if (browserIssues.length > 0) {
         await testInfo.attach('browser-issues.txt', {
           body: browserIssues.join('\n'),
           contentType: 'text/plain',
         });
       }
-    });
+      await cleanupAvailability(createdAvailabilityKeys);
+    }
   });
 });
