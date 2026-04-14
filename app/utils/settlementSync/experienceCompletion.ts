@@ -189,7 +189,8 @@ function isExperienceActiveStatus(status: string): status is (typeof BOOKING_ACT
 }
 
 function maybeThrowInjectedFailure(failPhase: SettlementSyncRunDueParams['failPhase']) {
-  if (process.env.NODE_ENV !== 'production' && failPhase === 'after_lock') {
+  // The route gate already restricts this hook to localhost/non-production callers.
+  if (failPhase === 'after_lock') {
     throw new Error('Injected settlement sync failure after lock.');
   }
 }

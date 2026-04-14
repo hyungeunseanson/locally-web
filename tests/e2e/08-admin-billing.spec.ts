@@ -460,7 +460,7 @@ test.describe.serial('Admin billing smoke', () => {
     await page.getByTestId('sales-settlement-card').click();
     await expect(page.getByRole('button', { name: /정산 대기 \(Pending\)/ })).toHaveClass(/border-slate-900/);
     await expect(page.getByTestId('sales-settlement-panel')).toContainText(
-      '서비스는 완료 처리 후 바로 대기 목록에 반영됩니다.'
+      '실제 송금 후 정산 완료 처리하세요.'
     );
 
     const payoutQueue = await fetchPayoutQueue(page);

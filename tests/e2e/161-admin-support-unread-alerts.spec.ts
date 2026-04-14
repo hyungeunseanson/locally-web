@@ -34,7 +34,7 @@ const UNREAD_ALERT_IN_APP_AUDIT_ACTION = 'ADMIN_SUPPORT_UNREAD_ALERT_IN_APP_SENT
 const UNREAD_ALERT_EMAIL_AUDIT_ACTION = 'ADMIN_SUPPORT_UNREAD_ALERT_EMAIL_SENT';
 
 const TEST_PASSWORD = 'LocallyTest!2026';
-const CRON_SECRET = process.env.CRON_SECRET || 'codex-cron-secret';
+const CRON_SECRET = loadEnv().CRON_SECRET?.trim() || null;
 const ALERT_TITLE = '고객센터 1:1 문의 미읽음';
 const ALERT_SUBJECT = '[Locally Admin] 고객센터 1:1 문의 미읽음';
 const MAIL_CAPTURE_PATH = '/tmp/locally-mock-nodemailer.jsonl';
@@ -401,6 +401,7 @@ test.describe.serial('Admin support unread alerts', () => {
 
   test('sends one admin alert + team email after 10 minutes of unread customer support inquiry and resets after admin read', async ({ browser, request }) => {
     test.setTimeout(120000);
+    test.skip(!CRON_SECRET, 'CRON_SECRET is required to verify the success contract under next start.');
 
     const adminA = createUser('admin.support.alerts.a');
     const adminB = createUser('admin.support.alerts.b');
