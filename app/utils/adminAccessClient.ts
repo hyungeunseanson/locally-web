@@ -7,7 +7,14 @@ export type ClientAdminAccessResult = {
   displayName: string | null;
 };
 
-export async function fetchAdminAccess(): Promise<ClientAdminAccessResult> {
+const inflightAdminAccessRequests = new Map<string, Promise<ClientAdminAccessResult>>();
+
+function getAdminAccessRequestKey(userId?: string | null) {
+  const normalizedUserId = userId?.trim();
+  return normalizedUserId && normalizedUserId.length > 0 ? normalizedUserId : '__anonymous__';
+}
+
+async function requestAdminAccess(): Promise<ClientAdminAccessResult> {
   const response = await fetch('/api/admin/access', { cache: 'no-store' });
 
   if (!response.ok) {
@@ -42,4 +49,20 @@ export async function fetchAdminAccess(): Promise<ClientAdminAccessResult> {
     userId: typeof result.userId === 'string' ? result.userId : null,
     displayName: typeof result.displayName === 'string' ? result.displayName : null,
   };
+}
+
+export async function fetchAdminAccess(userId?: string | null): Promise<ClientAdminAccessResult> {
+  const requestKey = getAdminAccessRequestKey(userId);
+  const existingRequest = inflightAdminAccessRequests.get(requestKey);
+
+  if (existingRequest) {
+    return existingRequest;
+  }
+
+  const nextRequest = requestAdminAccess().finally(() => {
+    inflightAdminAccessRequests.delete(requestKey);
+  });
+
+  inflightAdminAccessRequests.set(requestKey, nextRequest);
+  return nextRequest;
 }

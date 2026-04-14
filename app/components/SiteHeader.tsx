@@ -114,7 +114,7 @@ function SiteHeaderContent() {
         return;
       }
 
-      const adminAccess = await fetchAdminAccess();
+      const adminAccess = await fetchAdminAccess(user.id);
       if (cancelled) {
         return;
       }

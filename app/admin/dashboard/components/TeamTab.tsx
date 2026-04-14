@@ -16,7 +16,6 @@ import { ko } from 'date-fns/locale';
 import { AdminTask, AdminComment } from '@/app/types/admin';
 import { useToast } from '@/app/context/ToastContext';
 import { useConfirmDialog } from '@/app/hooks/useConfirmDialog';
-import { useTeamWorkspaceAdminSession } from '@/app/admin/dashboard/hooks/useTeamWorkspaceAdminSession';
 import { ensureAdminTeamLastViewed, markAdminTeamViewed } from '@/app/utils/adminBadgeState';
 
 type TeamTabProps = {
@@ -45,8 +44,6 @@ const getErrorMessage = (error: unknown, fallback: string) =>
 export default function TeamTab({ initialInnerTab, initialProxyRequestId }: TeamTabProps) {
   const { showToast } = useToast();
   const { requestConfirm, ConfirmDialogElement } = useConfirmDialog();
-  const sessionState = useTeamWorkspaceAdminSession();
-  const realtimeReady = sessionState.status === 'ready';
   const [tasks, setTasks] = useState<AdminTask[]>([]);
   const [comments, setComments] = useState<AdminComment[]>([]);
   const [whitelist, setWhitelist] = useState<Array<{ id: string; email: string; created_at?: string }>>([]);
@@ -81,6 +78,13 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
   const workspaceErrorToastShownRef = useRef(false);
   const viewedStateSyncedUserIdRef = useRef<string | null>(null);
   const supabase = useMemo(() => createClient(), []);
+  const realtimeReady =
+    hasLoadedTasks &&
+    hasLoadedComments &&
+    hasLoadedWhitelist &&
+    !isLoading &&
+    !isWorkspaceUnauthorized &&
+    !workspaceErrorMessage;
 
   const autoResizeTextarea = useCallback((element: HTMLTextAreaElement | null, maxHeight: number) => {
     if (!element) return;

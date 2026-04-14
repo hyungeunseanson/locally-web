@@ -17,6 +17,7 @@ import { useLocallyMembership } from '@/app/hooks/useLocallyMembership';
 import LocallyMembershipBadgeTrigger from '@/app/components/LocallyMembershipBadgeTrigger';
 import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
 import { PROFILE_LANGUAGE_OPTIONS } from '@/app/constants/profile';
+import { fetchAdminAccess } from '@/app/utils/adminAccessClient';
 import { getProfileCompletion, normalizeLanguageList, normalizeProfileLanguageValue } from '@/app/utils/profile';
 import { validateImage, compressImage, sanitizeFileName, isHeicValidationResult } from '@/app/utils/image';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
@@ -70,6 +71,10 @@ export default function AccountPage() {
   const [activeLinkModal, setActiveLinkModal] = useState<null | 'notices' | 'community' | 'news' | 'social'>(null);
   const [signingOut, setSigningOut] = useState(false);
   const [pendingModalActionHref, setPendingModalActionHref] = useState<string | null>(null);
+  const [adminAccessState, setAdminAccessState] = useState<{ userId: string | null; isAdmin: boolean }>({
+    userId: null,
+    isAdmin: false,
+  });
   // 프로필 카드용 통계
   const [stats, setStats] = useState({ tripCount: 0, reviewCount: 0, joinMonths: 0 });
   const [hostBtnReady, setHostBtnReady] = useState(false);
@@ -134,6 +139,30 @@ export default function AccountPage() {
   }, [activeLinkModal]);
 
   useEffect(() => {
+    if (!authUser?.id || typeof window === 'undefined') {
+      return;
+    }
+
+    if (!window.matchMedia('(max-width: 767px)').matches || adminAccessState.userId === authUser.id) {
+      return;
+    }
+
+    let isMounted = true;
+
+    const resolveAdminAccess = async () => {
+      const adminAccess = await fetchAdminAccess(authUser.id);
+      if (!isMounted) return;
+      setAdminAccessState({ userId: authUser.id, isAdmin: adminAccess.isAdmin });
+    };
+
+    void resolveAdminAccess();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [adminAccessState.userId, authUser?.id]);
+
+  useEffect(() => {
     if (!activeLinkModal) {
       setPendingModalActionHref(null);
     }
@@ -171,6 +200,10 @@ export default function AccountPage() {
       ]
     }
   } as const;
+  const hasMobileAdminAccess =
+    authUser?.id != null &&
+    adminAccessState.userId === authUser.id &&
+    adminAccessState.isAdmin;
 
   useEffect(() => {
     if (loading) return;
@@ -592,6 +625,15 @@ export default function AccountPage() {
         {/* ── 메뉴 그룹 2: 설정 ── */}
         <div className="px-4">
           <MobileMenuItem icon={<Settings className="w-4 h-4" />} label={t('profile_menu_account')} onPress={() => setShowProfileView(true)} />
+          {hasMobileAdminAccess && (
+            <MobileMenuItem
+              icon={<ShieldCheck className="w-4 h-4" />}
+              label={t('footer_admin')}
+              onPress={() => navigate('/admin/dashboard')}
+              isPending={pendingHref === '/admin/dashboard'}
+              disabled={isNavigating}
+            />
+          )}
           <MobileMenuItem icon={<Users className="w-4 h-4" />} label={t('profile_menu_become_host')} onPress={() => navigate('/become-a-host')} isPending={pendingHref === '/become-a-host'} disabled={isNavigating} />
           <MobileMenuItem icon={<HelpCircle className="w-4 h-4" />} label={t('profile_menu_help')} onPress={() => navigate('/help')} isPending={pendingHref === '/help'} disabled={isNavigating} />
         </div>
