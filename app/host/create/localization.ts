@@ -202,6 +202,7 @@ type ExperienceFormCopy = {
   titleHelp: string;
   firstPhotoNotice: string;
   photoHelp: string;
+  popularityWishlistHelp: string;
   photoGuideTitle: string;
   photoGuideBody: string;
   photoGuideExamplesTitle: string;
@@ -348,6 +349,8 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     titleHelp: '게스트가 한눈에 이해할 수 있게 장소, 분위기, 핵심 경험이 드러나면 좋아요.',
     firstPhotoNotice: '첫 번째 대표사진이 체험 상세 페이지 상단에서 가장 먼저 보여집니다.',
     photoHelp: '대표사진에는 호스트 얼굴이 보이는 사진을 최소 1장 이상 반드시 포함해주세요.',
+    popularityWishlistHelp:
+      '인기 체험 노출은 게스트의 위시리스트 저장 수를 바탕으로 집계됩니다. 저장하고 싶은 체험이 되도록 사진, 소개, 후기 경험을 꾸준히 관리해보세요.',
     photoGuideTitle: '좋은 대표사진이란?',
     photoGuideBody: '장소 분위기와 실제 경험이 잘 보이고, 과도한 보정보다 현장감을 주는 사진이 좋습니다. 게스트가 “이 체험을 바로 상상할 수 있는지”를 기준으로 골라주세요.',
     photoGuideExamplesTitle: '이런 사진이 좋아요',
@@ -515,6 +518,8 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     titleHelp: 'A strong title quickly shows the place, mood, and core experience.',
     firstPhotoNotice: 'The first hero photo appears at the top of the experience detail page.',
     photoHelp: 'Please include at least one hero photo showing the host’s face.',
+    popularityWishlistHelp:
+      'Popular experience placement is based on how many times guests save your experience to their wishlist. Keep improving your photos, description, and review experience so your experience becomes one guests want to save.',
     photoGuideTitle: 'What makes a good hero photo?',
     photoGuideBody: 'Choose a photo that clearly shows the atmosphere and what guests will actually experience. Photos feel stronger when they help guests imagine the moment right away.',
     photoGuideExamplesTitle: 'Good example photos',
@@ -682,6 +687,8 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     titleHelp: '場所、雰囲気、体験の核がひと目で伝わるタイトルが理想です。',
     firstPhotoNotice: '最初の代表写真が体験詳細ページ上部に最初に表示されます。',
     photoHelp: '代表写真には、ホスト本人の顔が見える写真を最低1枚以上必ず含めてください。',
+    popularityWishlistHelp:
+      '人気体験の表示は、ゲストのウィッシュリスト保存数をもとに集計されます。保存したくなる体験になるよう、写真・紹介文・レビュー体験を継続的に整えてみてください。',
     photoGuideTitle: '良い代表写真とは？',
     photoGuideBody: '現場の雰囲気と実際の体験内容がよく伝わり、ゲストがすぐにその場面を想像できる写真がおすすめです。',
     photoGuideExamplesTitle: 'おすすめの写真例',
@@ -848,6 +855,8 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     titleHelp: '如果能一眼看出地点、氛围和核心体验，会更吸引游客。',
     firstPhotoNotice: '第一张代表照片会显示在体验详情页顶部。',
     photoHelp: '代表照片中请至少包含一张能看到房东本人脸部的照片。',
+    popularityWishlistHelp:
+      '热门体验展示会根据游客加入愿望清单的保存数量进行统计。请持续优化照片、介绍和评价体验，让你的体验成为游客愿意先收藏的内容。',
     photoGuideTitle: '什么样的代表照片更好？',
     photoGuideBody: '建议选择能清楚展示现场氛围和实际体验内容的照片，让游客一眼就能想象自己会经历什么。',
     photoGuideExamplesTitle: '推荐的照片示例',

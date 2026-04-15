@@ -1422,6 +1422,9 @@ const dictionary: Record<Locale, Record<string, string>> = {
     hg_policy3_item1: "국적, 성별, 장애, 종교를 이유로 한 차별적 언행 절대 금지",
     hg_policy3_item2: "체험 시 게스트 안전을 위한 Safety Briefing 진행 의무",
     hg_policy3_item3: "응급 상황 발생 시 즉시 119 및 플랫폼 지원 센터로 연락",
+    hg_popularity_title: "인기 체험 노출 안내",
+    hg_popularity_desc:
+      "인기 체험 노출은 게스트의 위시리스트 저장 수를 바탕으로 집계됩니다. 저장하고 싶은 체험이 되도록 사진, 소개, 후기 경험을 꾸준히 관리해보세요.",
     hg_footer_msg: "좋은 호스팅은 신뢰에서 시작됩니다",
     hg_footer_eyebrow: "Host Standard",
     hg_footer_title: "좋은 호스팅은 신뢰에서 시작됩니다",
@@ -2907,6 +2910,9 @@ const dictionary: Record<Locale, Record<string, string>> = {
     hg_policy3_item1: "Absolutely no discriminatory remarks based on nationality, gender, disability, or religion",
     hg_policy3_item2: "Mandatory Safety Briefing for guests during the experience",
     hg_policy3_item3: "Contact 119 and platform support immediately in case of emergency",
+    hg_popularity_title: "Popular Experience Placement",
+    hg_popularity_desc:
+      "Popular experience placement is based on how many times guests save your experience to their wishlist. Keep improving your photos, description, and review experience so your experience becomes one guests want to save.",
     hg_footer_msg: "Great hosting starts with trust",
     hg_footer_eyebrow: "Host Standard",
     hg_footer_title: "Great hosting starts with trust",
@@ -4393,6 +4399,9 @@ const dictionary: Record<Locale, Record<string, string>> = {
     hg_policy3_item1: "国籍、性別、障害、宗教を理由とした差別的言動の絶対禁止",
     hg_policy3_item2: "体験時にゲストの安全のためのSafety Briefingの実施義務",
     hg_policy3_item3: "緊急事態発生時は直ちに119番およびプラットフォームサポートセンターへ連絡",
+    hg_popularity_title: "人気体験の表示について",
+    hg_popularity_desc:
+      "人気体験の表示は、ゲストのウィッシュリスト保存数をもとに集計されます。保存したくなる体験になるよう、写真・紹介文・レビュー体験を継続的に整えてみてください。",
     hg_footer_msg: "良いホスティングは信頼から始まります",
     hg_footer_eyebrow: "Host Standard",
     hg_footer_title: "良いホスティングは信頼から始まります",
@@ -5878,6 +5887,9 @@ const dictionary: Record<Locale, Record<string, string>> = {
     hg_policy3_item1: "严禁以国籍、性别、残疾、宗教为由发表歧视性言论",
     hg_policy3_item2: "体验时有义务为房客进行安全宣导(Safety Briefing)",
     hg_policy3_item3: "发生紧急情况时，请立即拨打119和平台客服中心电话",
+    hg_popularity_title: "热门体验展示说明",
+    hg_popularity_desc:
+      "热门体验展示会根据游客加入愿望清单的保存数量进行统计。请持续优化照片、介绍和评价体验，让你的体验成为游客愿意先收藏的内容。",
     hg_footer_msg: "好的接待从信任开始",
     hg_footer_eyebrow: "Host Standard",
     hg_footer_title: "好的接待从信任开始",

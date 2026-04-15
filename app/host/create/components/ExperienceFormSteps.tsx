@@ -377,6 +377,7 @@ export default function ExperienceFormSteps({
             {copy.firstPhotoNotice}
           </p>
           <FieldHint className="ml-0">{copy.photoHelp}</FieldHint>
+          <FieldHint className="ml-0">{copy.popularityWishlistHelp}</FieldHint>
           <HelpDisclosure title={copy.photoGuideTitle}>
             <p>{copy.photoGuideBody}</p>
             <GuideExampleCard title={copy.photoGuideExamplesTitle} items={copy.photoGuideExamples} />

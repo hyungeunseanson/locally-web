@@ -225,6 +225,11 @@ test('host create shows structured primary language guidance and refund policy c
       /대표사진에는 호스트 얼굴이 보이는 사진을 최소 1장 이상 반드시 포함해주세요\.|Please include at least one hero photo showing the host’s face\.|代表写真には、ホスト本人の顔が見える写真を最低1枚以上必ず含めてください。|代表照片中请至少包含一张能看到房东本人脸部的照片。/
     )
   ).toBeVisible();
+  await expect(
+    page.getByText(
+      /인기 체험 노출은 게스트의 위시리스트 저장 수를 바탕으로 집계됩니다\. 저장하고 싶은 체험이 되도록 사진, 소개, 후기 경험을 꾸준히 관리해보세요\.|Popular experience placement is based on how many times guests save your experience to their wishlist\. Keep improving your photos, description, and review experience so your experience becomes one guests want to save\.|人気体験の表示は、ゲストのウィッシュリスト保存数をもとに集計されます。保存したくなる体験になるよう、写真・紹介文・レビュー体験を継続的に整えてみてください。|热门体验展示会根据游客加入愿望清单的保存数量进行统计。请持续优化照片、介绍和评价体验，让你的体验成为游客愿意先收藏的内容。/
+    )
+  ).toBeVisible();
 
   await page
     .locator(

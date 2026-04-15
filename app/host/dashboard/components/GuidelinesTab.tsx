@@ -1,5 +1,5 @@
 import React from 'react';
-import { Lock, User, ShieldCheck } from 'lucide-react';
+import { Heart, Lock, User, ShieldCheck } from 'lucide-react';
 import { useLanguage } from '@/app/context/LanguageContext';
 
 export default function GuidelinesTab() {
@@ -72,6 +72,21 @@ export default function GuidelinesTab() {
                             <li>{t('hg_policy3_item2')}</li>
                             <li>{t('hg_policy3_item3')}</li>
                         </ul>
+                    </div>
+                </div>
+
+                <div
+                    data-testid="host-guidelines-popularity-card"
+                    className="bg-white px-4 py-4 md:p-8 rounded-2xl md:rounded-3xl border border-amber-100 shadow-sm relative overflow-hidden md:hover:border-amber-300 transition-colors"
+                >
+                    <div className="absolute top-0 left-0 w-1 md:w-2 h-full bg-amber-500" />
+                    <h2 className="text-[13px] md:text-xl font-bold flex items-center gap-1.5 md:gap-2 mb-2.5 md:mb-4 text-slate-900">
+                        <Heart className="text-amber-500 shrink-0" size={18} /> {t('hg_popularity_title')}
+                    </h2>
+                    <div className="text-slate-600 space-y-2 md:space-y-4 text-[11px] md:text-sm leading-relaxed">
+                        <p className="font-medium text-slate-800 bg-amber-50 px-3 py-2 md:p-4 rounded-xl">
+                            {t('hg_popularity_desc')}
+                        </p>
                     </div>
                 </div>
 
