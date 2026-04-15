@@ -348,7 +348,7 @@ test.describe.serial('Proxy notification localization', () => {
       type: 'new_message',
       link: `/guest/inbox?inquiryId=${encodeURIComponent(replyRequest.linkedInquiryId || '')}`,
     });
-    expect(replyNotification.title).toBe(`💬 ${adminUser.fullName}さんから新しいメッセージ`);
+    expect(replyNotification.title).toBe('💬 Locally Supportから新しいメッセージ');
     expect(replyNotification.message).toBe(replyText);
   });
 

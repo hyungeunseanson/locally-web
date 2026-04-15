@@ -37,6 +37,13 @@ test.describe('Notification localization helpers', () => {
     expect(inquiryJa.title).toBe('💬 Soraさんから新しいメッセージ');
     expect(inquiryJa.message).toBe('集合場所を教えてください。');
 
+    const inquiryOfficialJa = buildNotificationCopy('inquiry.new_message', 'ja', {
+      actorDisplayName: 'Locally Support',
+      displayContent: '担当チームよりご案内します。',
+    });
+    expect(inquiryOfficialJa.title).toBe('💬 Locally Supportから新しいメッセージ');
+    expect(inquiryOfficialJa.message).toBe('担当チームよりご案内します。');
+
     const membershipEn = buildNotificationCopy('membership.member_welcome', 'en', {
       status: 'member',
     });

@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/app/utils/supabase/admin';
+import { isOfficialSupportSenderDisplayName } from '@/app/utils/officialSender';
 import {
   resolveRecipientLocale,
   type NotificationLocale,
@@ -838,6 +839,7 @@ function buildInquiryNewMessageCopy(
   params: InquiryNewMessageParams
 ): NotificationCopy {
   const { actorDisplayName, displayContent } = params;
+  const isOfficialSender = isOfficialSupportSenderDisplayName(actorDisplayName);
 
   switch (locale) {
     case 'en':
@@ -847,7 +849,9 @@ function buildInquiryNewMessageCopy(
       };
     case 'ja':
       return {
-        title: `💬 ${actorDisplayName}さんから新しいメッセージ`,
+        title: isOfficialSender
+          ? `💬 ${actorDisplayName}から新しいメッセージ`
+          : `💬 ${actorDisplayName}さんから新しいメッセージ`,
         message: displayContent,
       };
     case 'zh':

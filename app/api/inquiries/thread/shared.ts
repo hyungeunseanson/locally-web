@@ -11,6 +11,7 @@ import { insertAdminAlerts, sendAdminAlertEmails } from '@/app/utils/adminAlertC
 import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { sendTemplatedEmail } from '@/app/emails/delivery/sendTemplatedEmail';
+import { OFFICIAL_SUPPORT_SENDER_NAME } from '@/app/utils/officialSender';
 import { sanitizeText, sanitizeUrl } from '@/app/utils/sanitize';
 
 type AuthActor = {
@@ -168,6 +169,19 @@ async function getActorDisplayName(actorId: string) {
     console.warn('[inquiries/thread] actor name lookup failed:', error);
     return '상대방';
   }
+}
+
+async function resolveInquirySenderDisplayName(params: {
+  actorId: string;
+  useOfficialSenderName: boolean;
+}) {
+  const { actorId, useOfficialSenderName } = params;
+
+  if (useOfficialSenderName) {
+    return OFFICIAL_SUPPORT_SENDER_NAME;
+  }
+
+  return getActorDisplayName(actorId);
 }
 
 async function findRecipientEmail(recipientId: string) {
@@ -689,7 +703,10 @@ export async function createInquiryMessage(params: {
   const canonicalUpdatedAt = updatedInquiry?.updated_at || updatedAt;
   const canonicalMessageCreatedAt = insertedMessage.created_at || canonicalUpdatedAt;
 
-  const actorDisplayName = await getActorDisplayName(actor.id);
+  const actorDisplayName = await resolveInquirySenderDisplayName({
+    actorId: actor.id,
+    useOfficialSenderName: actorIsAdmin,
+  });
 
   if (isAdminSupport && String(actor.id) === String(inquiry.user_id)) {
     await startOrAdvanceAdminSupportUnreadBatch({
@@ -958,7 +975,10 @@ export async function upsertInquiryThread(params: {
       });
     }
 
-    const actorDisplayName = await getActorDisplayName(actor.id);
+    const actorDisplayName = await resolveInquirySenderDisplayName({
+      actorId: actor.id,
+      useOfficialSenderName: contextType === 'admin_initiated_support',
+    });
     const recipientId = actor.id === resolved.hostId ? resolved.guestId : resolved.hostId;
     const notificationLink = actor.id === resolved.hostId
       ? buildGuestInboxLink(inquiry.id)

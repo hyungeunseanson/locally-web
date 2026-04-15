@@ -198,6 +198,14 @@ test.describe('Email localization helpers', () => {
     expect(inquiryJa.subject).toBe('[Locally] Soraさんから新しいメッセージが届きました');
     expect(inquiryJa.ctaLabel).toBe('メッセージを確認');
 
+    const inquiryOfficialJa = buildEmailCopy('inquiry.new_message', 'ja', {
+      actorDisplayName: 'Locally Support',
+      displayContent: '担当チームよりご案内します。',
+    });
+    expect(inquiryOfficialJa.subject).toBe('[Locally] Locally Supportから新しいメッセージが届きました');
+    expect(inquiryOfficialJa.title).toBe('Locally Supportから新しいメッセージが届きました');
+    expect(inquiryOfficialJa.ctaLabel).toBe('メッセージを確認');
+
     const inquiryZh = buildEmailCopy('inquiry.new_message', 'zh', {
       actorDisplayName: 'Sora',
       displayContent: '可以告诉我集合地点吗？',

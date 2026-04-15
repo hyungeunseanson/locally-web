@@ -63,6 +63,20 @@ test.describe.serial('Inquiry email localization helper', () => {
     expect(hostRecipientCopy.message).toBe('集合場所を教えてください。');
     expect(hostRecipientCopy.ctaLabel).toBe('メッセージを確認');
 
+    const hostOfficialRecipientCopy = await resolveInquiryNotificationEmailCopy({
+      supabaseAdmin,
+      recipientId: hostId,
+      emailTitle: '💬 로컬리 팀의 새 메시지',
+      emailMessage: '担当チームよりご案内します。',
+      actorDisplayName: 'Locally Support',
+      displayContent: '担当チームよりご案内します。',
+      localizeEmailForRecipient: true,
+    });
+
+    expect(hostOfficialRecipientCopy.subject).toBe('[Locally] Locally Supportから新しいメッセージが届きました');
+    expect(hostOfficialRecipientCopy.message).toBe('担当チームよりご案内します。');
+    expect(hostOfficialRecipientCopy.ctaLabel).toBe('メッセージを確認');
+
     const guestRecipientCopy = await resolveInquiryNotificationEmailCopy({
       supabaseAdmin,
       recipientId: guestId,
