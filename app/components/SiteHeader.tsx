@@ -267,9 +267,6 @@ function SiteHeaderContent() {
                         <Link href={hostProfileHref} onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700 transition-colors">
                           <Settings size={18} /> {t('header_profile_settings')}
                         </Link>
-                        <Link href="/community" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700 transition-colors">
-                          <Users2 size={18} /> {t('header_community')}
-                        </Link>
                         {hasAdminAccess && (
                           <Link href="/admin/dashboard" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700 transition-colors">
                             <ShieldCheck size={18} /> Admin
