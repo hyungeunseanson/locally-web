@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import SiteHeader from '@/app/components/SiteHeader';
 import LoginModal from '@/app/components/LoginModal';
 import { Suspense } from 'react';
-import { createClient } from '@/app/utils/supabase/client';
 import Spinner from '@/app/components/ui/Spinner';
 import { useLanguage } from '@/app/context/LanguageContext';
+import { useAuth } from '@/app/context/AuthContext';
 
 function normalizeReturnUrl(rawValue: string | null | undefined) {
   if (typeof rawValue !== 'string') {
@@ -46,8 +46,7 @@ function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t } = useLanguage();
-  const [checking, setChecking] = useState(true);
-  const supabase = useMemo(() => createClient(), []);
+  const { user, isLoading } = useAuth();
 
   const returnUrl = useMemo(
     () => normalizeReturnUrl(searchParams.get('returnUrl') ?? searchParams.get('next')),
@@ -55,23 +54,10 @@ function LoginPageContent() {
   );
 
   useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
-        if (user) {
-          router.replace(returnUrl);
-          return;
-        }
-      } finally {
-        setChecking(false);
-      }
-    };
-    
-    checkSession();
-  }, [returnUrl, router, supabase]);
+    if (!isLoading && user) {
+      router.replace(returnUrl);
+    }
+  }, [isLoading, returnUrl, router, user]);
 
   const handleClose = () => {
     router.push(returnUrl || '/');
@@ -81,7 +67,7 @@ function LoginPageContent() {
     router.push(returnUrl || '/');
   };
 
-  if (checking) {
+  if (isLoading || user) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <Spinner size={34} variant="muted" />

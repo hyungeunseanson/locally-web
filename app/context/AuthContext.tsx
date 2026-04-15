@@ -187,7 +187,10 @@ export function AuthProvider({
         setHostStatusResolved(true);
         setIsLoading(false);
       } else if (session?.user) {
-        loadUser();
+        setUser(session.user as User);
+        setIsLoading(true);
+        setHostStatusResolved(false);
+        void loadUser();
       }
     });
 

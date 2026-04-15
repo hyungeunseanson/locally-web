@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Share, Heart, MapPin, Check, X, Grid, Copy, ArrowLeft, Star, Globe, Clock3 } from 'lucide-react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, usePathname, useSearchParams } from 'next/navigation';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useChat } from '@/app/hooks/useChat';
 import { useWishlist } from '@/app/hooks/useWishlist';
@@ -25,13 +25,9 @@ import {
 import { formatLocalizedExperienceLocation } from '@/app/utils/locationLocalization';
 import { getLocalizedLanguageLabel } from '@/app/utils/languageLevels';
 import { getExperienceDurationHours } from '@/app/utils/experienceCardDisplay';
-
-type AuthUser = {
-  id?: string;
-} | null;
+import { useAuth } from '@/app/context/AuthContext';
 
 type Props = {
-  initialUser: AuthUser;
   initialExperience: ExperienceDetail;
   initialHostProfile: HostProfileDetail;
   initialAvailabilitySummary: ExperienceAvailabilitySummary;
@@ -127,7 +123,6 @@ function readRouteParam(value: string | string[] | undefined): string {
 }
 
 export default function ExperienceClient({
-  initialUser,
   initialExperience,
   initialHostProfile,
   initialAvailabilitySummary,
@@ -136,13 +131,14 @@ export default function ExperienceClient({
   const { showToast } = useToast();
   const router = useRouter();
   const params = useParams();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { createInquiry } = useChat();
   const { lang, t } = useLanguage(); // 🟢 현재 언어 (LanguageContext는 lang 제공)
+  const { user, isLoading: isAuthLoading } = useAuth();
 
   const experienceId = readRouteParam(params?.id);
   const { isSaved, toggleWishlist, isLoading: isSaveLoading } = useWishlist(experienceId);
-
-  const [user] = useState(initialUser);
   const [experience] = useState(initialExperience);
   const [hostProfile] = useState(initialHostProfile);
   const [availabilitySummary, setAvailabilitySummary] = useState<ExperienceAvailabilitySummary>(initialAvailabilitySummary);
@@ -155,6 +151,15 @@ export default function ExperienceClient({
     calendarDayStatusMap,
     slotSummaryMap,
   } = availabilitySummary;
+  const currentPath = useMemo(() => {
+    const query = searchParams?.toString();
+    const basePath = pathname || `/experiences/${experienceId}`;
+    return `${basePath}${query ? `?${query}` : ''}`;
+  }, [experienceId, pathname, searchParams]);
+  const loginReturnUrl = useMemo(
+    () => `/login?returnUrl=${encodeURIComponent(currentPath)}`,
+    [currentPath]
+  );
 
   // 🟢 [핵심] 제목을 언어에 맞춰서 변환!
   const translatedTitle = getContent(experience, 'title', lang);
@@ -256,8 +261,11 @@ export default function ExperienceClient({
   };
 
   const handleInquiry = async (): Promise<boolean> => {
+    if (isAuthLoading) {
+      return false;
+    }
     if (!user) {
-      showToast(t('login_required'), 'error');
+      router.push(loginReturnUrl);
       return false;
     }
     if (!inquiryText.trim()) {
@@ -290,7 +298,11 @@ export default function ExperienceClient({
   };
 
   const handleReserve = (date: string, time: string, guests: number, isPrivate: boolean, isSoloGuaranteed: boolean) => {
-    if (!user) return showToast(t('login_required'), 'error');
+    if (isAuthLoading) return;
+    if (!user) {
+      router.push(loginReturnUrl);
+      return;
+    }
     if (!date) return showToast(t('exp_detail_select_date'), 'error');
     if (!time) return showToast(t('exp_detail_select_time'), 'error');
 

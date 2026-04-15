@@ -13,6 +13,7 @@ import { createClient } from '@/app/utils/supabase/client';
 import { sendAnalyticsEvent } from '@/app/utils/analytics/client';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext';
+import { useAuth } from '@/app/context/AuthContext';
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 import { SOLO_GUARANTEE_PRICE } from '@/app/constants/soloGuarantee';
 import { launchCardPayment } from '@/app/utils/payments/card/client';
@@ -209,6 +210,7 @@ function PaymentContent() {
   const supabase = useMemo(() => createClient(), []);
   const { showToast } = useToast();
   const { t, lang } = useLanguage();
+  const { user, isLoading: isAuthLoading } = useAuth();
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [experience, setExperience] = useState<PaymentExperience | null>(null);
@@ -254,6 +256,15 @@ function PaymentContent() {
   });
 
   const experienceId = params?.id as string;
+  const currentPath = useMemo(() => {
+    const query = searchParams?.toString();
+    const basePath = pathname || `/experiences/${experienceId}/payment`;
+    return `${basePath}${query ? `?${query}` : ''}`;
+  }, [experienceId, pathname, searchParams]);
+  const loginReturnUrl = useMemo(
+    () => `/login?returnUrl=${encodeURIComponent(currentPath)}`,
+    [currentPath]
+  );
   const date = searchParams?.get('date') || (t('exp_payment_date_tbd') as string);
   const time = searchParams?.get('time') || (t('exp_payment_time_tbd') as string);
   const guests = Number(searchParams?.get('guests')) || 1;
@@ -521,6 +532,12 @@ function PaymentContent() {
   }, [date, effectiveIsSoloGuarantee, experienceId, guests, isPrivate, paymentMethod, time]);
 
   useEffect(() => {
+    if (!isAuthLoading && !user) {
+      router.replace(loginReturnUrl);
+    }
+  }, [isAuthLoading, loginReturnUrl, router, user]);
+
+  useEffect(() => {
     const fetchExp = async () => {
       if (!experienceId) return;
 
@@ -530,22 +547,44 @@ function PaymentContent() {
         .eq('id', experienceId)
         .maybeSingle();
       if (expData) setExperience(expData as PaymentExperience);
+    };
+    void fetchExp();
+  }, [experienceId, supabase]);
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase.from('profiles').select('full_name, phone').eq('id', user.id).maybeSingle();
-        if (profile) {
-          setCustomerName(profile.full_name || '');
-          setCustomerPhone(profile.phone || '');
-        }
+  useEffect(() => {
+    if (!user?.id) {
+      return;
+    }
 
-        if (experienceId) {
-          sendAnalyticsEvent('payment_init', experienceId);
-        }
+    let isMounted = true;
+
+    const syncAuthenticatedPaymentContext = async () => {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name, phone')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (!isMounted) {
+        return;
+      }
+
+      if (profile) {
+        setCustomerName(profile.full_name || '');
+        setCustomerPhone(profile.phone || '');
+      }
+
+      if (experienceId) {
+        sendAnalyticsEvent('payment_init', experienceId);
       }
     };
-    fetchExp();
-  }, [experienceId, supabase]);
+
+    void syncAuthenticatedPaymentContext();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [experienceId, supabase, user?.id]);
 
   const checkAvailability = useCallback(async () => {
     const { data: bookings } = await supabase
@@ -582,12 +621,18 @@ function PaymentContent() {
       throw new Error(validationMessage);
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
+    if (isAuthLoading) {
+      const message = t('exp_payment_state_loading') as string;
+      setPaymentError(message);
+      showToast(message, 'error');
+      throw new Error(message);
+    }
+
     if (!user) {
       const message = t('login_required') as string;
       setPaymentError(message);
       showToast(message, 'error');
-      router.push('/login');
+      router.replace(loginReturnUrl);
       throw new Error(message);
     }
 
@@ -652,9 +697,11 @@ function PaymentContent() {
     payPalCheckoutSessionKey,
     router,
     showToast,
-    supabase.auth,
+    isAuthLoading,
+    loginReturnUrl,
     t,
     time,
+    user,
   ]);
 
   const createPayPalOrder = useCallback(async () => {
@@ -875,13 +922,20 @@ function PaymentContent() {
     setIsProcessing(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      if (isAuthLoading) {
+        const message = t('exp_payment_state_loading') as string;
+        setPaymentError(message);
+        showToast(message, 'error');
+        setIsProcessing(false);
+        return;
+      }
+
       if (!user) {
         const message = t('login_required') as string;
         setPaymentError(message);
         showToast(message, 'error');
         setIsProcessing(false);
-        router.push('/login');
+        router.replace(loginReturnUrl);
         return;
       }
 
@@ -1112,6 +1166,10 @@ function PaymentContent() {
     },
   ];
   const activeAgreementMeta = agreementRows.find((agreement) => agreement.key === activeAgreement) || null;
+
+  if (isAuthLoading || !user) {
+    return <Spinner fullScreen />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center py-6 md:py-10 font-sans px-3 md:px-4">

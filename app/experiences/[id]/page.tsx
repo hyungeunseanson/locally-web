@@ -310,10 +310,11 @@ export default async function Page({ params }: Props) {
   const supabase = await createClient();
 
   // 1. 병렬 데이터 페칭 (속도 최적화)
-  const [expResult, userResult] = await Promise.all([
-    supabase.from('experiences').select(EXPERIENCE_DETAIL_SELECT).eq('id', id).maybeSingle(),
-    supabase.auth.getUser()
-  ]);
+  const expResult = await supabase
+    .from('experiences')
+    .select(EXPERIENCE_DETAIL_SELECT)
+    .eq('id', id)
+    .maybeSingle();
 
   if (expResult.error) {
     console.error('[Experience detail] Failed to load experience:', {
@@ -471,7 +472,6 @@ export default async function Page({ params }: Props) {
         <JsonLd data={experienceJsonLd} />
       ) : null}
       <ExperienceClient
-        initialUser={userResult.data.user}
         initialExperience={experience}
         initialHostProfile={hostProfile}
         initialAvailabilitySummary={availabilitySummary}
