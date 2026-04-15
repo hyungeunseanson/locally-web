@@ -6,11 +6,12 @@ const sharedInquiryPath =
   '/Users/hyungeunseanson/Documents/서비스/locally-web/app/api/inquiries/thread/shared.ts';
 
 test.describe('Inquiry email provider contract', () => {
-  test('does not hardcode a shared Gmail env gate before delegating to the templated email delivery layer', () => {
+  test('delegates admin inquiry mail to the ops admin transport while leaving guest-facing mail transactional', () => {
     const source = readFileSync(sharedInquiryPath, 'utf8');
 
     expect(source).toContain("templateId: 'inquiry.new_message'");
-    expect(source).toContain("transportPolicy: 'transactional'");
+    expect(source).toContain("const audience = localizeEmailForRecipient ? 'guest' : 'admin';");
+    expect(source).toContain("transportPolicy: audience === 'admin' ? 'opsAdmin' : 'transactional'");
     expect(source).not.toContain('if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) return;');
   });
 });

@@ -269,10 +269,11 @@ async function notifyRecipient(params: {
       displayContent,
       localizeEmailForRecipient,
     });
+    const audience = localizeEmailForRecipient ? 'guest' : 'admin';
 
     void sendTemplatedEmail({
       templateId: 'inquiry.new_message',
-      audience: localizeEmailForRecipient ? 'guest' : 'admin',
+      audience,
       locale: localizeEmailForRecipient ? locale : 'ko',
       recipient: {
         userId: recipientId,
@@ -283,7 +284,7 @@ async function notifyRecipient(params: {
         messagePreview: emailCopy.message,
         ctaUrl: link,
       },
-      transportPolicy: 'transactional',
+      transportPolicy: audience === 'admin' ? 'opsAdmin' : 'transactional',
     }, {
       supabaseAdmin,
     })
