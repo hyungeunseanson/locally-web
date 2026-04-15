@@ -101,14 +101,37 @@ async function createAuthUser(user: TestUser) {
 }
 
 async function login(page: Page, user: TestUser) {
-  await page.goto('/login', { waitUntil: 'networkidle' });
+  await page.goto('/login', { waitUntil: 'domcontentloaded' });
 
-  await page.locator('input[type="email"]').fill(user.email);
-  await page.locator('input[type="password"]').fill(user.password);
-  await page.locator('button[type="submit"]').click();
+  await page.locator('input[type="email"]').waitFor({ state: 'visible', timeout: 30000 });
+  let completed = false;
 
-  await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 15000 });
-  await page.waitForLoadState('networkidle');
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await page.locator('input[type="email"]').fill(user.email);
+    await page.locator('input[type="password"]').fill(user.password);
+    await page.locator('button[type="submit"]').click();
+
+    const results = await Promise.allSettled([
+      page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 15000 }),
+      page.getByText('Welcome back. You are now logged in.', { exact: true }).waitFor({ state: 'visible', timeout: 15000 }),
+    ]);
+
+    if (results.some((result) => result.status === 'fulfilled')) {
+      completed = true;
+      break;
+    }
+
+    await page.waitForTimeout(1000);
+  }
+
+  if (!completed) {
+    throw new Error(`Login did not complete for ${user.email}`);
+  }
+
+  if (page.url().includes('/login')) {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+  }
+  await page.waitForLoadState('domcontentloaded');
 }
 
 test.afterAll(async () => {

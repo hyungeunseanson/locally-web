@@ -3,9 +3,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
-import { AlertCircle, CheckCircle, Clock, ExternalLink, Phone, Send, XCircle } from 'lucide-react';
+import { CheckCircle, Clock, ExternalLink, Phone, XCircle } from 'lucide-react';
 
-import type { PaymentStatus, ProxyComment, ProxyRequest, ProxyStatus } from '@/app/types/proxy';
+import type { PaymentStatus, ProxyRequest, ProxyStatus } from '@/app/types/proxy';
 import {
   getProxyCategoryLabel,
   getProxyFormDisplayEntries,
@@ -16,9 +16,7 @@ import {
   getProxyRequesterDisplayName,
 } from '@/app/utils/proxyBooking';
 
-type ProxyRequestDetail = ProxyRequest & {
-  comments?: ProxyComment[];
-};
+type ProxyRequestDetail = ProxyRequest;
 
 type ProxyListResponse = {
   success?: boolean;
@@ -62,79 +60,18 @@ function getPaymentStatusLabel(status: PaymentStatus) {
   }
 }
 
-function getProxyNextActionCopy(request: ProxyRequest) {
-  const paymentMethod = getProxyPaymentMethod(request.form_data);
-
-  if (request.payment_status === 'WAITING' && (request.payment_channel === 'NAVER' || paymentMethod === 'bank')) {
-    return {
-      text: '입금 확인 또는 결제 취소를 먼저 처리해야 실제 전화 진행을 시작할 수 있습니다.',
-      cls: 'text-amber-600',
-    };
-  }
-
-  if (request.payment_status === 'WAITING' && paymentMethod === 'card') {
-    return {
-      text: '카드 결제 완료를 기다리는 상태입니다. 완료 후 진행 중으로 바꿀 수 있습니다.',
-      cls: 'text-blue-600',
-    };
-  }
-
-  if (request.payment_status === 'COMPLETED' && request.status === 'PENDING') {
-    return {
-      text: '결제가 완료되었습니다. 전화 진행을 시작하거나 댓글로 진행 상황을 바로 안내해주세요.',
-      cls: 'text-emerald-600',
-    };
-  }
-
-  if (request.payment_status === 'COMPLETED' && request.status === 'IN_PROGRESS') {
-    return {
-      text: '고객에게 최신 진행 상황을 댓글로 남기고, 끝나면 완료 처리해주세요.',
-      cls: 'text-indigo-600',
-    };
-  }
-
-  if (request.payment_status === 'COMPLETED' && request.status === 'COMPLETED') {
-    return {
-      text: '전화 예약이 끝난 상태입니다. 필요하면 환불 처리 여부만 다시 확인해주세요.',
-      cls: 'text-slate-500',
-    };
-  }
-
-  if (request.payment_status === 'REFUNDED') {
-    return {
-      text: '환불이 끝났습니다. 고객 안내가 부족했다면 댓글이나 메시지함 기록도 함께 확인해주세요.',
-      cls: 'text-rose-600',
-    };
-  }
-
-  if (request.status === 'CANCELLED' || request.payment_status === 'FAILED') {
-    return {
-      text: '취소된 요청입니다. 필요하면 취소 사유와 댓글 기록을 다시 확인해주세요.',
-      cls: 'text-slate-400',
-    };
-  }
-
-  return {
-    text: '현재 결제 상태와 진행 상태를 함께 확인해주세요.',
-    cls: 'text-slate-400',
-  };
-}
-
 export default function PhoneReservationTab({ initialSelectedRequestId = null }: PhoneReservationTabProps) {
   const supabase = useMemo(() => createClient(), []);
   const { showToast } = useToast();
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const selectedIdRef = useRef<string | null>(null);
-  const selectedRequestRef = useRef<ProxyRequestDetail | null>(null);
 
   const [requests, setRequests] = useState<ProxyRequest[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<ProxyRequestDetail | null>(null);
   const [loadingList, setLoadingList] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
-  const [reply, setReply] = useState('');
-  const [submittingReply, setSubmittingReply] = useState(false);
   const [updating, setUpdating] = useState(false);
 
   const fetchRequests = useCallback(async () => {
@@ -169,10 +106,6 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
   useEffect(() => {
     selectedIdRef.current = selectedId;
   }, [selectedId]);
-
-  useEffect(() => {
-    selectedRequestRef.current = selectedRequest;
-  }, [selectedRequest]);
 
   const refreshSelectedRequest = useCallback(async (requestId?: string | null) => {
     const nextRequests = await fetchRequests();
@@ -235,13 +168,6 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
         .channel('team-phone-reservations')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'proxy_requests' }, () => {
           scheduleRefresh();
-        })
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'inquiry_messages' }, (payload) => {
-          const linkedInquiryId = getProxyLinkedInquiryId(selectedRequestRef.current?.form_data);
-          const payloadInquiryId = payload.new?.inquiry_id != null ? String(payload.new.inquiry_id) : null;
-          if (linkedInquiryId && payloadInquiryId && linkedInquiryId === payloadInquiryId) {
-            scheduleRefresh(selectedIdRef.current);
-          }
         })
         .subscribe();
     };
@@ -369,41 +295,6 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
     }
   }, [applyLocalPaymentState, refreshSelectedRequest, selectedId, showToast]);
 
-  const handleSubmitReply = useCallback(async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!selectedId || !reply.trim() || submittingReply) return;
-
-    setSubmittingReply(true);
-    try {
-      const response = await fetch(`/api/proxy-bookings/${selectedId}/comments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: reply.trim() }),
-      });
-      const result = await response.json().catch(() => null);
-
-      if (!response.ok || result?.success === false || !result?.data) {
-        throw new Error(result?.error || '답글 전송에 실패했습니다.');
-      }
-
-      setSelectedRequest((prev) => (
-        prev
-          ? {
-              ...prev,
-              comments: [...(prev.comments || []), result.data as ProxyComment],
-            }
-          : prev
-      ));
-      setReply('');
-      showToast('고객에게 답글을 보냈습니다.', 'success');
-    } catch (error) {
-      console.error('[PhoneReservationTab] submit reply failed:', error);
-      showToast(error instanceof Error ? error.message : '답글 전송에 실패했습니다.', 'error');
-    } finally {
-      setSubmittingReply(false);
-    }
-  }, [reply, selectedId, showToast, submittingReply]);
-
   const selectedServiceFee = selectedRequest
     ? getProxyRequestFeeKrw(selectedRequest.category, selectedRequest.form_data)
     : null;
@@ -428,13 +319,6 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
     selectedPaymentMethod === 'card'
   );
   const showRefundAction = Boolean(selectedRequest && selectedRequest.payment_status === 'COMPLETED');
-  const manualPaymentWaitingCount = requests.filter((item) => {
-    const paymentMethod = getProxyPaymentMethod(item.form_data);
-    return item.payment_status === 'WAITING' && (item.payment_channel === 'NAVER' || paymentMethod === 'bank');
-  }).length;
-  const cardWaitingCount = requests.filter((item) => getProxyPaymentMethod(item.form_data) === 'card' && item.payment_status === 'WAITING').length;
-  const inProgressCount = requests.filter((item) => item.status === 'IN_PROGRESS').length;
-  const refundableCount = requests.filter((item) => item.payment_status === 'COMPLETED').length;
 
   if (loadingList) {
     return (
@@ -463,42 +347,13 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
           <span className="text-xs font-semibold text-slate-500">{requests.length}건</span>
         </div>
 
-        <div className="mx-4 mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-          <div className="flex items-start gap-2.5">
-            <AlertCircle size={15} className="text-amber-600 mt-0.5 shrink-0" />
-            <div className="space-y-2">
-              <div>
-                <p className="text-[12px] font-black text-slate-900">운영 빠른 안내</p>
-                <p className="text-[11px] leading-relaxed text-slate-600 mt-0.5">
-                  무통장·네이버 결제 대기는 먼저 입금 확인을 해야 하고, 카드 결제 대기는 자동 반영을 기다리면 됩니다. 결제 완료 후에는 진행 상태와 댓글 안내를 함께 관리해주세요.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <span className="rounded-full border border-blue-100 bg-white px-2.5 py-1 text-[10px] font-bold text-blue-700">
-                  입금 확인 필요 {manualPaymentWaitingCount}건
-                </span>
-                <span className="rounded-full border border-indigo-100 bg-white px-2.5 py-1 text-[10px] font-bold text-indigo-700">
-                  카드 대기 {cardWaitingCount}건
-                </span>
-                <span className="rounded-full border border-emerald-100 bg-white px-2.5 py-1 text-[10px] font-bold text-emerald-700">
-                  진행 중 {inProgressCount}건
-                </span>
-                <span className="rounded-full border border-amber-100 bg-white px-2.5 py-1 text-[10px] font-bold text-amber-700">
-                  환불 가능 {refundableCount}건
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {requests.length === 0 ? (
           <div className="px-4 py-10 text-sm text-slate-500 text-center">아직 접수된 전화 예약이 없습니다.</div>
         ) : (
-          <div className="mt-4 max-h-[65vh] overflow-y-auto divide-y divide-slate-100">
+          <div className="max-h-[72vh] overflow-y-auto divide-y divide-slate-100">
             {requests.map((item) => {
               const paymentMethod = getProxyPaymentMethod(item.form_data);
               const isSelected = selectedId === item.id;
-              const nextActionCopy = getProxyNextActionCopy(item);
 
               return (
                 <button
@@ -519,9 +374,6 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
                     <span>{new Date(item.created_at).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                     <span>{item.payment_channel}{paymentMethod ? ` · ${paymentMethod === 'card' ? '카드' : '무통장'}` : ''}</span>
                   </div>
-                  <p className={`mt-2 text-[11px] font-medium leading-relaxed ${nextActionCopy.cls}`}>
-                    {nextActionCopy.text}
-                  </p>
                 </button>
               );
             })}
@@ -557,9 +409,9 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
               <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 space-y-3 text-sm">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <h4 className="font-bold text-slate-900">결제 정보</h4>
-                  <div className="text-xs font-semibold text-slate-500">
-                    현재 결제 상태: <span className="text-slate-900">{getPaymentStatusLabel(selectedRequest.payment_status)}</span>
-                  </div>
+                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 border border-slate-200">
+                    {getPaymentStatusLabel(selectedRequest.payment_status)}
+                  </span>
                 </div>
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                   <div className="flex justify-between gap-3"><span className="text-slate-500">결제 채널</span><span className="font-semibold">{selectedRequest.payment_channel}</span></div>
@@ -575,26 +427,11 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
-                <p className="font-bold text-slate-900">운영 판단 메모</p>
-                <p className="mt-1 text-[12px] leading-relaxed text-slate-600">
-                  {selectedRequest.payment_status === 'WAITING' && (selectedRequest.payment_channel === 'NAVER' || selectedPaymentMethod === 'bank')
-                    ? '무통장·네이버 결제 대기입니다. 입금 확인 후에만 실제 전화 진행을 시작하고, 취소 시에는 결제 취소부터 처리해주세요.'
-                    : selectedRequest.payment_status === 'WAITING' && selectedPaymentMethod === 'card'
-                    ? '카드 결제 대기 상태입니다. 결제가 자동 반영되기 전에는 진행 중으로 바꾸지 않는 것이 안전합니다.'
-                    : selectedRequest.payment_status === 'COMPLETED'
-                    ? '결제는 끝난 상태입니다. 이제 진행 상태를 갱신하고, 댓글로 고객에게 예약 진행 상황을 남겨주는 것이 가장 중요합니다.'
-                    : selectedRequest.payment_status === 'REFUNDED'
-                    ? '환불이 완료된 상태입니다. 추가 문의가 생기면 댓글 기록과 메시지함 안내를 함께 확인해주세요.'
-                    : '현재 결제 상태와 진행 상태를 함께 보고 다음 행동을 결정해주세요.'}
-                </p>
-              </div>
-
               <div className="rounded-2xl border border-slate-100 bg-white p-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h4 className="font-bold text-slate-900">결제 액션</h4>
-                    <p className="text-xs text-slate-500 mt-1">현재 결제 상태에서 가능한 작업만 노출됩니다.</p>
+                    <p className="text-xs text-slate-500 mt-1">현재 상태에서 가능한 작업만 표시됩니다.</p>
                   </div>
                 </div>
 
@@ -620,14 +457,14 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
                 )}
 
                 {showManualPaymentActions && (
-                  <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                    입금 확인은 결제 상태만 `완료`로 바꾸고, 이후 실제 전화 진행은 아래 `운영 액션`에서 시작해주세요.
+                  <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                    입금 확인 후에만 진행 상태를 바꿀 수 있습니다.
                   </div>
                 )}
 
                 {showCardWaitingHint && (
                   <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-                    고객 카드 결제 대기 중입니다. 카드 결제 완료 후 자동으로 반영됩니다.
+                    카드 결제 완료 전에는 진행 상태를 바꿀 수 없습니다.
                   </div>
                 )}
 
@@ -687,61 +524,24 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
               </div>
 
               <div className="rounded-2xl border border-slate-100 p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <AlertCircle size={16} className="text-slate-500" />
-                  <div>
-                    <h4 className="font-bold text-slate-900">전화 예약 (담당자 소통 스레드)</h4>
-                    <p className="text-xs text-slate-500 mt-1">문의 사항이나 예약 진행 상황에 대해 소통하세요. 여기 답글은 고객이 보는 예약 스레드에도 함께 남습니다.</p>
-                  </div>
+                <div>
+                  <h4 className="font-bold text-slate-900">고객 문의함</h4>
+                  <p className="text-xs text-slate-500 mt-1">대화와 진행 안내는 1:1 문의함에서 이어서 확인합니다.</p>
                 </div>
 
                 {linkedInquiryId ? (
                   <a
                     href={`/admin/dashboard?tab=CHATS&inquiryId=${encodeURIComponent(linkedInquiryId)}`}
-                    className="mb-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                    className="mt-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
                   >
                     <ExternalLink size={14} />
                     1:1 문의함에서 열기
                   </a>
-                ) : null}
-
-                <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1">
-                  {(selectedRequest.comments || []).length === 0 ? (
-                    <div className="text-sm text-slate-500 py-6 text-center">아직 댓글이 없습니다.</div>
-                  ) : (
-                    (selectedRequest.comments || []).map((comment) => (
-                      <div key={comment.id} className={`max-w-[90%] ${comment.is_admin ? 'ml-auto' : 'mr-auto'}`}>
-                        <div className={`rounded-2xl px-4 py-3 text-sm ${comment.is_admin ? 'bg-slate-900 text-white' : 'bg-slate-50 border border-slate-200 text-slate-800'}`}>
-                          <p className={`text-[10px] font-bold mb-1 ${comment.is_admin ? 'text-slate-300' : 'text-slate-400'}`}>
-                            {comment.is_admin ? 'Locally 운영팀' : getProxyRequesterDisplayName(comment.profiles)}
-                          </p>
-                          <p className="whitespace-pre-wrap">{comment.content}</p>
-                          <p className={`text-[10px] mt-2 ${comment.is_admin ? 'text-slate-300' : 'text-slate-400'}`}>
-                            {new Date(comment.created_at).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                          </p>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                <form onSubmit={handleSubmitReply} className="mt-4 flex gap-2">
-                  <input
-                    type="text"
-                    value={reply}
-                    onChange={(event) => setReply(event.target.value)}
-                    placeholder="고객에게 보낼 답글을 입력하세요."
-                    className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    disabled={submittingReply}
-                  />
-                  <button
-                    type="submit"
-                    disabled={!reply.trim() || submittingReply}
-                    className="shrink-0 rounded-xl bg-black px-4 text-white hover:bg-slate-800 disabled:bg-slate-300"
-                  >
-                    <Send size={16} />
-                  </button>
-                </form>
+                ) : (
+                  <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                    연결된 문의 스레드가 없습니다.
+                  </div>
+                )}
               </div>
             </div>
           </>

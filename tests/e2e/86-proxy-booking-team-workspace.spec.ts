@@ -181,10 +181,42 @@ async function login(page: Page, user: TestUser, locale: 'ko' | 'en' | 'ja' | 'z
   }, locale);
   await page.goto('/login', { waitUntil: 'domcontentloaded' });
   await page.locator('input[type="email"]').waitFor({ state: 'visible', timeout: 30000 });
-  await page.locator('input[type="email"]').fill(user.email);
-  await page.locator('input[type="password"]').fill(user.password);
-  await page.locator('button[type="submit"]').click();
-  await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 30000 });
+  const successMessage =
+    locale === 'en'
+      ? 'Welcome back. You are now logged in.'
+      : locale === 'ja'
+        ? 'ログインしました。ようこそ。'
+        : locale === 'zh'
+          ? '欢迎回来，您已登录。'
+          : '환영합니다! 로그인 되었습니다.';
+
+  let completed = false;
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await page.locator('input[type="email"]').fill(user.email);
+    await page.locator('input[type="password"]').fill(user.password);
+    await page.locator('button[type="submit"]').click();
+
+    const results = await Promise.allSettled([
+      page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 15000 }),
+      page.getByText(successMessage, { exact: true }).waitFor({ state: 'visible', timeout: 15000 }),
+    ]);
+
+    if (results.some((result) => result.status === 'fulfilled')) {
+      completed = true;
+      break;
+    }
+
+    await page.waitForTimeout(1000);
+  }
+
+  if (!completed) {
+    throw new Error(`Login did not complete for ${user.email}`);
+  }
+
+  if (page.url().includes('/login')) {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+  }
   await page.waitForLoadState('domcontentloaded');
 }
 
@@ -232,7 +264,7 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Proxy booking team workspace flow', () => {
-  test('routes from home service card and lets admin reply from TEAM phone reservation tab', async ({ browser }) => {
+  test('routes from home service card and lets admin manage the TEAM phone reservation board', async ({ browser }) => {
     test.setTimeout(120000);
 
     const adminUser = createTestUser('proxy.admin');
@@ -317,17 +349,13 @@ test.describe.serial('Proxy booking team workspace flow', () => {
 
       await adminPage.goto(`/admin/dashboard?tab=TEAM&teamTab=proxy&proxyRequestId=${createdRequest!.id}`, { waitUntil: 'networkidle' });
       await expect(adminPage.getByRole('heading', { name: '전화 예약', exact: true })).toBeVisible({ timeout: 15000 });
-      await expect(adminPage.getByText('운영 빠른 안내')).toBeVisible({ timeout: 15000 });
-      await expect(adminPage.getByText(/입금 확인 필요 \d+건/)).toBeVisible({ timeout: 15000 });
       await expect(adminPage.getByRole('heading', { name: restaurantName })).toBeVisible({ timeout: 15000 });
-      await expect(adminPage.getByText('입금 확인 또는 결제 취소를 먼저 처리해야 실제 전화 진행을 시작할 수 있습니다.').first()).toBeVisible({ timeout: 15000 });
       await expect(adminPage.getByRole('button', { name: '진행 중', exact: true })).toBeDisabled();
       await expect(adminPage.getByRole('button', { name: '완료', exact: true })).toBeDisabled();
+      await expect(adminPage.getByRole('link', { name: '1:1 문의함에서 열기' })).toBeVisible({ timeout: 15000 });
 
       await adminPage.getByRole('button', { name: '입금 확인', exact: true }).click();
-      await expect(adminPage.getByText('현재 결제 상태:')).toBeVisible({ timeout: 15000 });
       await expect(adminPage.getByText('결제 완료').first()).toBeVisible({ timeout: 15000 });
-      await expect(adminPage.getByText('결제는 끝난 상태입니다. 이제 진행 상태를 갱신하고, 댓글로 고객에게 예약 진행 상황을 남겨주는 것이 가장 중요합니다.')).toBeVisible({ timeout: 15000 });
       await expect(adminPage.getByRole('button', { name: '진행 중', exact: true })).toBeEnabled();
 
       await waitForNotification({
@@ -339,16 +367,8 @@ test.describe.serial('Proxy booking team workspace flow', () => {
 
       await adminPage.getByRole('button', { name: '진행 중', exact: true }).click();
       await expect(adminPage.locator('div').filter({ hasText: /현재 상태:\s*진행 중/ }).first()).toBeVisible({ timeout: 15000 });
-
-      const replyInput = adminPage.getByPlaceholder('고객에게 보낼 답글을 입력하세요.');
-      await expect(replyInput).toBeVisible({ timeout: 15000 });
-
-      const replyText = `예약이 완료되었습니다. 19:00로 확정되었습니다. ${Date.now()}`;
-      await replyInput.fill(replyText);
-      await adminPage.locator('form').filter({ has: replyInput }).getByRole('button').click();
-      await expect(adminPage.getByText(replyText)).toBeVisible({ timeout: 15000 });
-      await customerPage.reload({ waitUntil: 'domcontentloaded' });
-      await expect(customerPage.getByTestId('guest-inbox-message-thread').getByText(replyText)).toBeVisible({ timeout: 15000 });
+      const inquiryLink = adminPage.getByRole('link', { name: '1:1 문의함에서 열기' });
+      await expect(inquiryLink).toHaveAttribute('href', new RegExp(`tab=CHATS&inquiryId=${inquiryId}`));
 
     } finally {
     }
