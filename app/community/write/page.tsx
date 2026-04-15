@@ -39,10 +39,18 @@ export default async function WritePage({
         canWriteLocallyContent = adminAccess.isAdmin;
     }
 
-    const initialFormat = requestedFormat === 'all'
-        ? (requestedCategory === 'all' ? 'question' : requestedCategory === 'companion' ? 'companion' : requestedCategory === 'info' ? 'live_tip' : requestedCategory === 'locally_content' ? 'locally_pick' : 'question')
-        : requestedFormat;
-    const initialCategory: CommunityCategory = getCommunityCategoryFromFormat(initialFormat);
+    if (!COMMUNITY_OPEN && !canWriteLocallyContent) {
+        redirect('/community?format=locally_pick');
+    }
+
+    const initialFormat = !COMMUNITY_OPEN
+        ? 'locally_pick'
+        : requestedFormat === 'all'
+            ? (requestedCategory === 'all' ? 'question' : requestedCategory === 'companion' ? 'companion' : requestedCategory === 'info' ? 'live_tip' : requestedCategory === 'locally_content' ? 'locally_pick' : 'question')
+            : requestedFormat;
+    const initialCategory: CommunityCategory = !COMMUNITY_OPEN
+        ? 'locally_content'
+        : getCommunityCategoryFromFormat(initialFormat);
 
     if (initialCategory === 'locally_content' && !canWriteLocallyContent) {
         redirect('/community?format=locally_pick');

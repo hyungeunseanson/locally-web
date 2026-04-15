@@ -12,6 +12,7 @@ type TestUser = {
 };
 
 const TEST_PASSWORD = 'LocallyTest!2026';
+const TEST_IMAGE = 'tests/e2e/test-image.png';
 
 let adminClient: SupabaseClient | null = null;
 const createdAuthUserIds: string[] = [];
@@ -161,6 +162,9 @@ test.describe.serial('Community content layout and access', () => {
     await expect(page.getByText('로컬리 콘텐츠 허브 운영 중')).toBeVisible();
     await expect(page.getByText('도시별 루트, 맛집, 현지 추천 콘텐츠를 먼저 공개하고 있습니다.')).toBeVisible();
     await expect(page.getByRole('button', { name: '로컬리 콘텐츠 작성' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '질문' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '동행' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '여행 꿀팁' })).toHaveCount(0);
     await expect(page.getByTestId('community-list-sidebar-ad')).toBeVisible();
     await expect(page.getByTestId('community-list-bottom-ad')).toBeVisible();
 
@@ -177,6 +181,9 @@ test.describe.serial('Community content layout and access', () => {
     const box = await page.getByTestId('community-content-card').first().boundingBox();
     expect(box).not.toBeNull();
     expect(box!.height).toBeGreaterThan(box!.width * 1.15);
+
+    await page.goto('/community/write?category=qna', { waitUntil: 'networkidle' });
+    await expect.poll(() => page.url()).toContain('/community?format=locally_pick');
   });
 
   test('keeps only bottom ad visible on mobile content list', async ({ page }) => {
@@ -211,10 +218,23 @@ test.describe.serial('Community content layout and access', () => {
     await expect.poll(() => page.url()).toContain('/community/write?category=locally_content');
     await expect(page.getByRole('heading', { name: '로컬리 콘텐츠 작성' })).toBeVisible();
     await expect(page.getByTestId('community-content-editorial-checklist')).toBeVisible();
+    await expect(page.getByRole('button', { name: '질문' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '동행' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '여행 꿀팁' })).toHaveCount(0);
     await expect(page.getByText('대표 이미지 1장 이상')).toBeVisible();
     await expect(page.getByText('제목 8자 이상')).toBeVisible();
     await expect(page.getByText('본문 40자 이상')).toBeVisible();
     await expect(page.getByText('첫 문단 20자 이상')).toBeVisible();
     await expect(page.getByText('문단 2개 이상')).toBeVisible();
+    await expect(page.getByText('최대 3장 · 드래그해서 순서 변경 가능')).toBeVisible();
+
+    await page.locator('input[type="file"][multiple]').setInputFiles([
+      TEST_IMAGE,
+      TEST_IMAGE,
+      TEST_IMAGE,
+      TEST_IMAGE,
+    ]);
+    await expect(page.getByText('사진은 최대 3장까지만 업로드 가능합니다.')).toBeVisible();
+    await expect(page.getByText('0/3')).toBeVisible();
   });
 });

@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Loader2, Search } from 'lucide-react';
 
 import type { CommunityHubFilter, CommunityPostFormatFilter } from '@/app/types/community';
-import { COMMUNITY_FORMAT_FILTER_OPTIONS } from '../categoryMeta';
+import { COMMUNITY_FORMAT_FILTER_OPTIONS, COMMUNITY_OPEN } from '../categoryMeta';
 import { buildCommunityListHref } from '../queryParams';
 import { usePendingNavigation } from '../hooks/usePendingNavigation';
 
@@ -72,6 +72,12 @@ export default function CommunitySearchControls({
     const [sort, setSort] = useState<SortOption>(currentSort);
     const [openLayer, setOpenLayer] = useState<OpenLayer>(null);
     const { navigate, isNavigating } = usePendingNavigation();
+    const visibleFormatOptions = useMemo(
+        () => COMMUNITY_OPEN
+            ? COMMUNITY_FORMAT_FILTER_OPTIONS
+            : COMMUNITY_FORMAT_FILTER_OPTIONS.filter((item) => item.id === 'locally_pick'),
+        [],
+    );
 
     useEffect(() => {
         const handlePointerDown = (event: MouseEvent) => {
@@ -95,8 +101,8 @@ export default function CommunitySearchControls({
     }, []);
 
     const selectedFormatLabel = useMemo(
-        () => COMMUNITY_FORMAT_FILTER_OPTIONS.find((item) => item.id === format)?.label || '전체',
-        [format],
+        () => visibleFormatOptions.find((item) => item.id === format)?.label || '로컬리 콘텐츠',
+        [format, visibleFormatOptions],
     );
 
     const selectedSortLabel = useMemo(
@@ -136,37 +142,41 @@ export default function CommunitySearchControls({
             <div className="hidden md:block">
                 <div className="relative rounded-full border border-[#E7E7E7] bg-white p-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.06)] transition-shadow hover:shadow-[0_6px_18px_rgba(0,0,0,0.08)] focus-within:shadow-[0_10px_24px_rgba(0,0,0,0.10)]">
                     <div className="flex items-center">
-                        <div className="relative shrink-0">
-                            <TriggerButton
-                                label="포맷"
-                                value={selectedFormatLabel}
-                                isOpen={openLayer === 'format'}
-                                onClick={() => setOpenLayer((prev) => (prev === 'format' ? null : 'format'))}
-                            />
-                            {openLayer === 'format' && (
-                                <div className="absolute left-0 top-[calc(100%+10px)] z-20 w-44 rounded-[24px] border border-[#EBEBEB] bg-white p-2 shadow-[0_18px_40px_rgba(0,0,0,0.12)]">
-                                    <div className="space-y-1" role="listbox" aria-label="포맷 선택">
-                                        {COMMUNITY_FORMAT_FILTER_OPTIONS.map((item) => (
-                                            <button
-                                                key={item.id}
-                                                type="button"
-                                                onClick={() => handleFormatSelect(item.id)}
-                                                className={`flex w-full items-center justify-between rounded-2xl px-3 py-2.5 text-left text-[13px] font-medium transition-colors ${
-                                                    format === item.id
-                                                        ? 'bg-[#111111] text-white'
-                                                        : 'text-[#3B3B3B] hover:bg-[#F7F7F7]'
-                                                }`}
-                                            >
-                                                <span>{item.label}</span>
-                                                {format === item.id && <span className="text-[11px] font-semibold">선택됨</span>}
-                                            </button>
-                                        ))}
-                                    </div>
+                        {visibleFormatOptions.length > 1 && (
+                            <>
+                                <div className="relative shrink-0">
+                                    <TriggerButton
+                                        label="포맷"
+                                        value={selectedFormatLabel}
+                                        isOpen={openLayer === 'format'}
+                                        onClick={() => setOpenLayer((prev) => (prev === 'format' ? null : 'format'))}
+                                    />
+                                    {openLayer === 'format' && (
+                                        <div className="absolute left-0 top-[calc(100%+10px)] z-20 w-44 rounded-[24px] border border-[#EBEBEB] bg-white p-2 shadow-[0_18px_40px_rgba(0,0,0,0.12)]">
+                                            <div className="space-y-1" role="listbox" aria-label="포맷 선택">
+                                                {visibleFormatOptions.map((item) => (
+                                                    <button
+                                                        key={item.id}
+                                                        type="button"
+                                                        onClick={() => handleFormatSelect(item.id)}
+                                                        className={`flex w-full items-center justify-between rounded-2xl px-3 py-2.5 text-left text-[13px] font-medium transition-colors ${
+                                                            format === item.id
+                                                                ? 'bg-[#111111] text-white'
+                                                                : 'text-[#3B3B3B] hover:bg-[#F7F7F7]'
+                                                        }`}
+                                                    >
+                                                        <span>{item.label}</span>
+                                                        {format === item.id && <span className="text-[11px] font-semibold">선택됨</span>}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
-                            )}
-                        </div>
 
-                        <div className="h-8 w-px bg-[#ECECEC]" />
+                                <div className="h-8 w-px bg-[#ECECEC]" />
+                            </>
+                        )}
 
                         <div className="flex min-w-0 flex-1 items-center gap-3 px-4">
                             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#F7F7F7] text-[#6B6B6B]">

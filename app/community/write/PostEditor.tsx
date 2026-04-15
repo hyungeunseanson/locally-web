@@ -13,11 +13,11 @@ import DatePicker from '@/app/components/DatePicker';
 import { ArrowLeft, CalendarDays, ChevronRight, GripVertical, ImagePlus, Loader2, MapPin, Sparkles, X } from 'lucide-react';
 
 import type { CommunityCategory, CommunityHub, CommunityPostFormat, CommunitySourceLocale } from '@/app/types/community';
-import { getCommunityCategoryFromFormat, getCommunityFormatFromCategory, getCommunityFormatMeta } from '../categoryMeta';
+import { COMMUNITY_OPEN, getCommunityCategoryFromFormat, getCommunityFormatFromCategory, getCommunityFormatMeta } from '../categoryMeta';
 import { COMMUNITY_HUB_OPTIONS, getCommunityHubMeta } from '../hubMeta';
 import { buildCommunityDetailHref } from '../queryParams';
 
-const MAX_IMAGES = 10;
+const MAX_IMAGES = 3;
 const WRITABLE_FORMATS: CommunityPostFormat[] = ['question', 'companion', 'live_tip', 'locally_pick'];
 const LOCALE_OPTIONS: Array<{ id: CommunitySourceLocale; label: string }> = [
     { id: 'ko', label: '한국어' },
@@ -91,8 +91,10 @@ export default function PostEditor({
     const { t } = useLanguage();
     const supabase = createClient();
     const { showToast, showHeicUnsupportedToast } = useToast();
-    const availableFormats = useMemo(
-        () => WRITABLE_FORMATS.filter((item) => canWriteLocallyContent || item !== 'locally_pick'),
+    const availableFormats = useMemo<CommunityPostFormat[]>(
+        () => !COMMUNITY_OPEN
+            ? ['locally_pick']
+            : WRITABLE_FORMATS.filter((item) => canWriteLocallyContent || item !== 'locally_pick'),
         [canWriteLocallyContent],
     );
 
@@ -357,25 +359,27 @@ export default function PostEditor({
                     onSubmit={handleSubmit}
                     className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_14px_40px_rgba(15,23,42,0.06)]"
                 >
-                    <div className="border-b border-slate-100 px-5 py-5 md:px-8 md:py-6">
-                        <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400">포맷 선택</div>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                            {availableFormats.map((item) => (
-                                <button
-                                    key={item}
-                                    type="button"
-                                    onClick={() => setFormat(item)}
-                                    className={`rounded-full border px-4 py-2 text-[12px] font-semibold transition-colors md:text-[13px] ${
-                                        format === item
-                                            ? 'border-slate-900 bg-slate-900 text-white'
-                                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
-                                    }`}
-                                >
-                                    {getCommunityFormatMeta(item).label}
-                                </button>
-                            ))}
+                    {availableFormats.length > 1 && (
+                        <div className="border-b border-slate-100 px-5 py-5 md:px-8 md:py-6">
+                            <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400">포맷 선택</div>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                                {availableFormats.map((item) => (
+                                    <button
+                                        key={item}
+                                        type="button"
+                                        onClick={() => setFormat(item)}
+                                        className={`rounded-full border px-4 py-2 text-[12px] font-semibold transition-colors md:text-[13px] ${
+                                            format === item
+                                                ? 'border-slate-900 bg-slate-900 text-white'
+                                                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
+                                        }`}
+                                    >
+                                        {getCommunityFormatMeta(item).label}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     <div className="space-y-6 px-5 py-5 md:px-8 md:py-8">
                         <div className="rounded-[24px] border border-slate-200 bg-white px-5 py-4 md:px-6">
