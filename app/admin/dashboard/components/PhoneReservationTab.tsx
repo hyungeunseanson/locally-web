@@ -1,9 +1,8 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
-import { CheckCircle, Clock, ExternalLink, Phone, XCircle } from 'lucide-react';
+import { CheckCircle, Clock, ExternalLink, Phone, RefreshCw, XCircle } from 'lucide-react';
 
 import type { PaymentStatus, ProxyRequest, ProxyStatus } from '@/app/types/proxy';
 import {
@@ -16,11 +15,18 @@ import {
   getProxyRequesterDisplayName,
 } from '@/app/utils/proxyBooking';
 
-type ProxyRequestDetail = ProxyRequest;
+type ProxyRequestDetail = ProxyRequest & {
+  linked_inquiry_id?: string | null;
+};
 
 type ProxyListResponse = {
   success?: boolean;
   data?: ProxyRequest[];
+  pagination?: {
+    limit?: number;
+    offset?: number;
+    hasMore?: boolean;
+  };
 };
 
 type ProxyDetailResponse = {
@@ -31,6 +37,9 @@ type ProxyDetailResponse = {
 type PhoneReservationTabProps = {
   initialSelectedRequestId?: string | null;
 };
+
+const PAGE_SIZE = 10;
+const FORM_PREVIEW_COUNT = 6;
 
 function getStatusBadge(status: string) {
   switch (status) {
@@ -60,37 +69,56 @@ function getPaymentStatusLabel(status: PaymentStatus) {
   }
 }
 
+function buildProxyRequestsUrl(limit: number, offset: number) {
+  const searchParams = new URLSearchParams({
+    limit: String(limit),
+    offset: String(offset),
+  });
+
+  return `/api/proxy-bookings?${searchParams.toString()}`;
+}
+
 export default function PhoneReservationTab({ initialSelectedRequestId = null }: PhoneReservationTabProps) {
-  const supabase = useMemo(() => createClient(), []);
   const { showToast } = useToast();
-  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const selectedIdRef = useRef<string | null>(null);
+  const loadedCountRef = useRef<number>(PAGE_SIZE);
 
   const [requests, setRequests] = useState<ProxyRequest[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<ProxyRequestDetail | null>(null);
   const [loadingList, setLoadingList] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [nextOffset, setNextOffset] = useState(0);
+  const [showAllFormEntries, setShowAllFormEntries] = useState(false);
 
-  const fetchRequests = useCallback(async () => {
-    const response = await fetch('/api/proxy-bookings', { cache: 'no-store' });
+  const setActiveRequestId = useCallback((requestId: string | null) => {
+    selectedIdRef.current = requestId;
+    setSelectedId(requestId);
+    setShowAllFormEntries(false);
+  }, []);
+
+  const fetchRequestsPage = useCallback(async (limit: number, offset: number) => {
+    const response = await fetch(buildProxyRequestsUrl(limit, offset), { cache: 'no-store' });
     const result = (await response.json()) as ProxyListResponse;
 
     if (!response.ok || result.success === false) {
       throw new Error('전화 예약 목록을 불러오지 못했습니다.');
     }
 
-    const nextRequests = Array.isArray(result.data) ? result.data : [];
-    setRequests(nextRequests);
-    return nextRequests;
+    return {
+      data: Array.isArray(result.data) ? result.data : [],
+      hasMore: Boolean(result.pagination?.hasMore),
+    };
   }, []);
 
   const loadDetail = useCallback(async (requestId: string) => {
     setLoadingDetail(true);
     try {
-      const response = await fetch(`/api/proxy-bookings/${requestId}`, { cache: 'no-store' });
+      const response = await fetch(`/api/proxy-bookings/${requestId}?includeComments=false`, { cache: 'no-store' });
       const result = (await response.json()) as ProxyDetailResponse;
 
       if (!response.ok || result.success === false || !result.data) {
@@ -98,57 +126,64 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
       }
 
       setSelectedRequest(result.data);
+      return result.data;
     } finally {
       setLoadingDetail(false);
     }
   }, []);
 
-  useEffect(() => {
-    selectedIdRef.current = selectedId;
-  }, [selectedId]);
+  const selectRequest = useCallback(async (requestId: string) => {
+    setActiveRequestId(requestId);
 
-  const refreshSelectedRequest = useCallback(async (requestId?: string | null) => {
-    const nextRequests = await fetchRequests();
-    const preferredId = requestId || selectedIdRef.current || initialSelectedRequestId;
+    try {
+      await loadDetail(requestId);
+    } catch (error) {
+      console.error('[PhoneReservationTab] load detail failed:', error);
+      showToast('전화 예약 상세를 불러오지 못했습니다.', 'error');
+    }
+  }, [loadDetail, setActiveRequestId, showToast]);
 
-    if (preferredId && nextRequests.some((item) => item.id === preferredId)) {
-      setSelectedId(preferredId);
-      await loadDetail(preferredId);
-      return nextRequests;
+  const refreshSelectedRequest = useCallback(async (
+    requestId?: string | null,
+    options?: { loadedCount?: number }
+  ) => {
+    const requestedLimit = Math.max(options?.loadedCount ?? loadedCountRef.current, PAGE_SIZE);
+    const { data: nextRequests, hasMore: nextHasMore } = await fetchRequestsPage(requestedLimit, 0);
+
+    setRequests(nextRequests);
+    setHasMore(nextHasMore);
+    setNextOffset(nextRequests.length);
+    loadedCountRef.current = Math.max(nextRequests.length, PAGE_SIZE);
+
+    const preferredId = requestId ?? selectedIdRef.current;
+
+    if (preferredId) {
+      try {
+        setActiveRequestId(preferredId);
+        await loadDetail(preferredId);
+        return nextRequests;
+      } catch (error) {
+        console.error('[PhoneReservationTab] preferred detail load failed:', error);
+      }
     }
 
     if (nextRequests[0]?.id) {
-      setSelectedId(nextRequests[0].id);
+      setActiveRequestId(nextRequests[0].id);
       await loadDetail(nextRequests[0].id);
     } else {
-      setSelectedId(null);
+      setActiveRequestId(null);
       setSelectedRequest(null);
     }
 
     return nextRequests;
-  }, [fetchRequests, initialSelectedRequestId, loadDetail]);
-
-  const scheduleRefresh = useCallback((requestId?: string | null) => {
-    if (refreshTimerRef.current) {
-      clearTimeout(refreshTimerRef.current);
-    }
-
-    refreshTimerRef.current = setTimeout(async () => {
-      try {
-        await refreshSelectedRequest(requestId);
-      } catch (error) {
-        console.error('[PhoneReservationTab] refresh failed:', error);
-      }
-    }, 200);
-  }, [refreshSelectedRequest]);
+  }, [fetchRequestsPage, loadDetail, setActiveRequestId]);
 
   useEffect(() => {
     let isMounted = true;
 
     const init = async () => {
       try {
-        await refreshSelectedRequest(initialSelectedRequestId);
-        if (!isMounted) return;
+        await refreshSelectedRequest(initialSelectedRequestId, { loadedCount: PAGE_SIZE });
       } catch (error) {
         console.error('[PhoneReservationTab] init failed:', error);
         if (isMounted) {
@@ -159,57 +194,68 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
           setLoadingList(false);
         }
       }
-
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-      }
-
-      channelRef.current = supabase
-        .channel('team-phone-reservations')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'proxy_requests' }, () => {
-          scheduleRefresh();
-        })
-        .subscribe();
     };
 
-    init();
+    void init();
 
     return () => {
       isMounted = false;
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
-      if (refreshTimerRef.current) {
-        clearTimeout(refreshTimerRef.current);
-      }
     };
-  }, [initialSelectedRequestId, refreshSelectedRequest, scheduleRefresh, showToast, supabase]);
+  }, [initialSelectedRequestId, refreshSelectedRequest, showToast]);
 
   useEffect(() => {
-    if (initialSelectedRequestId && requests.some((item) => item.id === initialSelectedRequestId)) {
-      setSelectedId(initialSelectedRequestId);
-    }
-  }, [initialSelectedRequestId, requests]);
+    loadedCountRef.current = Math.max(requests.length, PAGE_SIZE);
+  }, [requests.length]);
 
-  useEffect(() => {
-    if (!selectedId) {
-      setSelectedRequest(null);
-      return;
+  const handleManualRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refreshSelectedRequest(undefined, { loadedCount: loadedCountRef.current });
+    } catch (error) {
+      console.error('[PhoneReservationTab] manual refresh failed:', error);
+      showToast('전화 예약 목록을 불러오지 못했습니다.', 'error');
+    } finally {
+      setRefreshing(false);
     }
+  }, [refreshSelectedRequest, showToast]);
 
-    loadDetail(selectedId).catch((error) => {
-      console.error('[PhoneReservationTab] load detail failed:', error);
-      showToast('전화 예약 상세를 불러오지 못했습니다.', 'error');
-    });
-  }, [loadDetail, selectedId, showToast]);
+  const handleLoadMore = useCallback(async () => {
+    if (!hasMore || loadingMore) return;
+
+    setLoadingMore(true);
+    try {
+      const { data: nextRequests, hasMore: nextHasMore } = await fetchRequestsPage(PAGE_SIZE, nextOffset);
+
+      setRequests((prev) => {
+        const seen = new Set(prev.map((item) => item.id));
+        const merged = [...prev];
+
+        for (const item of nextRequests) {
+          if (!seen.has(item.id)) {
+            seen.add(item.id);
+            merged.push(item);
+          }
+        }
+
+        loadedCountRef.current = Math.max(merged.length, PAGE_SIZE);
+        return merged;
+      });
+      setHasMore(nextHasMore);
+      setNextOffset((prev) => prev + nextRequests.length);
+    } catch (error) {
+      console.error('[PhoneReservationTab] load more failed:', error);
+      showToast('전화 예약 목록을 더 불러오지 못했습니다.', 'error');
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [fetchRequestsPage, hasMore, loadingMore, nextOffset, showToast]);
 
   const handleUpdateStatus = useCallback(async (nextStatus: ProxyStatus) => {
-    if (!selectedId) return;
+    if (!selectedIdRef.current) return;
 
     setUpdating(true);
     try {
-      const response = await fetch(`/api/proxy-bookings/${selectedId}`, {
+      const response = await fetch(`/api/proxy-bookings/${selectedIdRef.current}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: nextStatus }),
@@ -220,7 +266,7 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
         throw new Error(result?.error || '상태 변경에 실패했습니다.');
       }
 
-      await refreshSelectedRequest(selectedId);
+      await refreshSelectedRequest(selectedIdRef.current, { loadedCount: loadedCountRef.current });
       showToast('전화 예약 상태를 업데이트했습니다.', 'success');
     } catch (error) {
       console.error('[PhoneReservationTab] update status failed:', error);
@@ -228,7 +274,7 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
     } finally {
       setUpdating(false);
     }
-  }, [refreshSelectedRequest, selectedId, showToast]);
+  }, [refreshSelectedRequest, showToast]);
 
   const applyLocalPaymentState = useCallback((
     requestId: string,
@@ -260,14 +306,14 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
     endpoint: '/api/admin/proxy-bookings/confirm-payment' | '/api/admin/proxy-bookings/cancel-payment' | '/api/admin/proxy-bookings/refund-payment',
     successMessage: string
   ) => {
-    if (!selectedId) return;
+    if (!selectedIdRef.current) return;
 
     setUpdating(true);
     try {
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId: selectedId }),
+        body: JSON.stringify({ requestId: selectedIdRef.current }),
       });
 
       const result = await response.json().catch(() => null);
@@ -276,16 +322,14 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
       }
 
       if (endpoint === '/api/admin/proxy-bookings/confirm-payment') {
-        applyLocalPaymentState(selectedId, 'COMPLETED');
+        applyLocalPaymentState(selectedIdRef.current, 'COMPLETED');
       } else if (endpoint === '/api/admin/proxy-bookings/cancel-payment') {
-        applyLocalPaymentState(selectedId, 'FAILED', 'CANCELLED');
+        applyLocalPaymentState(selectedIdRef.current, 'FAILED', 'CANCELLED');
       } else {
-        applyLocalPaymentState(selectedId, 'REFUNDED');
+        applyLocalPaymentState(selectedIdRef.current, 'REFUNDED');
       }
 
-      void refreshSelectedRequest(selectedId).catch((error) => {
-        console.error('[PhoneReservationTab] refresh after payment action failed:', error);
-      });
+      await refreshSelectedRequest(selectedIdRef.current, { loadedCount: loadedCountRef.current });
       showToast(successMessage, 'success');
     } catch (error) {
       console.error('[PhoneReservationTab] update payment failed:', error);
@@ -293,7 +337,7 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
     } finally {
       setUpdating(false);
     }
-  }, [applyLocalPaymentState, refreshSelectedRequest, selectedId, showToast]);
+  }, [applyLocalPaymentState, refreshSelectedRequest, showToast]);
 
   const selectedServiceFee = selectedRequest
     ? getProxyRequestFeeKrw(selectedRequest.category, selectedRequest.form_data)
@@ -319,6 +363,28 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
     selectedPaymentMethod === 'card'
   );
   const showRefundAction = Boolean(selectedRequest && selectedRequest.payment_status === 'COMPLETED');
+  const visibleFormEntries = showAllFormEntries
+    ? selectedFormEntries
+    : selectedFormEntries.slice(0, FORM_PREVIEW_COUNT);
+  const hasExpandableFormEntries = selectedFormEntries.length > FORM_PREVIEW_COUNT;
+  const visibleRequests = useMemo(() => {
+    const seen = new Set<string>();
+    const nextVisibleRequests: ProxyRequest[] = [];
+
+    if (selectedRequest && !requests.some((item) => item.id === selectedRequest.id)) {
+      nextVisibleRequests.push(selectedRequest);
+      seen.add(selectedRequest.id);
+    }
+
+    for (const item of requests) {
+      if (!seen.has(item.id)) {
+        seen.add(item.id);
+        nextVisibleRequests.push(item);
+      }
+    }
+
+    return nextVisibleRequests;
+  }, [requests, selectedRequest]);
 
   if (loadingList) {
     return (
@@ -339,44 +405,81 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)] gap-4 md:gap-6 flex-1 min-h-0">
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-h-[320px]">
-        <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
-          <div>
-            <h3 className="text-sm font-bold text-slate-900">전화 예약</h3>
-            <p className="text-xs text-slate-500">새 요청과 진행 상태를 한 곳에서 확인합니다.</p>
+        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/70">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">전화 예약</h3>
+              <p className="text-xs text-slate-500">새 요청과 진행 상태를 한 곳에서 확인합니다.</p>
+            </div>
+            <button
+              type="button"
+              data-testid="admin-phone-reservation-refresh-button"
+              disabled={refreshing || loadingList}
+              onClick={() => {
+                void handleManualRefresh();
+              }}
+              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+            >
+              <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+              새로고침
+            </button>
           </div>
-          <span className="text-xs font-semibold text-slate-500">{requests.length}건</span>
+          <p className="mt-2 text-[11px] font-semibold text-slate-400">{visibleRequests.length}건 표시</p>
         </div>
 
-        {requests.length === 0 ? (
+        {visibleRequests.length === 0 ? (
           <div className="px-4 py-10 text-sm text-slate-500 text-center">아직 접수된 전화 예약이 없습니다.</div>
         ) : (
-          <div className="max-h-[72vh] overflow-y-auto divide-y divide-slate-100">
-            {requests.map((item) => {
-              const paymentMethod = getProxyPaymentMethod(item.form_data);
-              const isSelected = selectedId === item.id;
+          <div className="max-h-[72vh] overflow-y-auto" data-testid="admin-phone-reservation-list">
+            <div className="divide-y divide-slate-100">
+              {visibleRequests.map((item) => {
+                const paymentMethod = getProxyPaymentMethod(item.form_data);
+                const isSelected = selectedId === item.id;
 
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setSelectedId(item.id)}
-                  className={`w-full text-left px-4 py-4 transition-colors ${isSelected ? 'bg-blue-50' : 'bg-white hover:bg-slate-50'}`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{getProxyCategoryLabel(item.category)}</p>
-                      <p className="text-sm font-bold text-slate-900 truncate">{getProxyRequestTitle(item)}</p>
-                      <p className="text-xs text-slate-500 mt-1">{getProxyRequesterDisplayName(item.profiles)}</p>
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    data-testid="admin-phone-reservation-list-item"
+                    onClick={() => {
+                      if (item.id !== selectedId) {
+                        void selectRequest(item.id);
+                      }
+                    }}
+                    className={`w-full text-left px-4 py-4 transition-colors ${isSelected ? 'bg-blue-50' : 'bg-white hover:bg-slate-50'}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{getProxyCategoryLabel(item.category)}</p>
+                        <p className="text-sm font-bold text-slate-900 truncate">{getProxyRequestTitle(item)}</p>
+                        <p className="text-xs text-slate-500 mt-1">{getProxyRequesterDisplayName(item.profiles)}</p>
+                      </div>
+                      <div className="shrink-0">{getStatusBadge(item.status)}</div>
                     </div>
-                    <div className="shrink-0">{getStatusBadge(item.status)}</div>
-                  </div>
-                  <div className="flex items-center justify-between mt-3 text-[11px] text-slate-500">
-                    <span>{new Date(item.created_at).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                    <span>{item.payment_channel}{paymentMethod ? ` · ${paymentMethod === 'card' ? '카드' : '무통장'}` : ''}</span>
-                  </div>
+                    <div className="flex items-center justify-between mt-3 text-[11px] text-slate-500">
+                      <span>{new Date(item.created_at).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                      <span>{item.payment_channel}{paymentMethod ? ` · ${paymentMethod === 'card' ? '카드' : '무통장'}` : ''}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {hasMore && (
+              <div className="border-t border-slate-100 p-4">
+                <button
+                  type="button"
+                  data-testid="admin-phone-reservation-load-more-button"
+                  disabled={loadingMore}
+                  onClick={() => {
+                    void handleLoadMore();
+                  }}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+                >
+                  {loadingMore ? '불러오는 중...' : '더 보기'}
                 </button>
-              );
-            })}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -440,7 +543,9 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
                     <button
                       type="button"
                       disabled={updating}
-                      onClick={() => handlePaymentAction('/api/admin/proxy-bookings/confirm-payment', '결제 확인을 완료했습니다.')}
+                      onClick={() => {
+                        void handlePaymentAction('/api/admin/proxy-bookings/confirm-payment', '결제 확인을 완료했습니다.');
+                      }}
                       className="w-full rounded-xl border border-emerald-200 px-3 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-60"
                     >
                       입금 확인
@@ -448,7 +553,9 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
                     <button
                       type="button"
                       disabled={updating}
-                      onClick={() => handlePaymentAction('/api/admin/proxy-bookings/cancel-payment', '결제 취소 처리를 완료했습니다.')}
+                      onClick={() => {
+                        void handlePaymentAction('/api/admin/proxy-bookings/cancel-payment', '결제 취소 처리를 완료했습니다.');
+                      }}
                       className="w-full rounded-xl border border-rose-200 px-3 py-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-60"
                     >
                       결제 취소
@@ -473,7 +580,9 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
                     <button
                       type="button"
                       disabled={updating}
-                      onClick={() => handlePaymentAction('/api/admin/proxy-bookings/refund-payment', '환불 처리를 완료했습니다.')}
+                      onClick={() => {
+                        void handlePaymentAction('/api/admin/proxy-bookings/refund-payment', '환불 처리를 완료했습니다.');
+                      }}
                       className="w-full rounded-xl border border-amber-200 px-3 py-3 text-sm font-semibold text-amber-700 transition hover:bg-amber-50 disabled:opacity-60"
                     >
                       환불 처리
@@ -504,18 +613,30 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
                   </div>
                 )}
                 <div className="mt-4 grid grid-cols-2 gap-2 xl:grid-cols-4">
-                  <button type="button" disabled={updating} onClick={() => handleUpdateStatus('PENDING')} className="w-full rounded-xl bg-slate-900 px-3 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60">대기 중</button>
-                  <button type="button" disabled={updating || !canStartProcessing} onClick={() => handleUpdateStatus('IN_PROGRESS')} className="w-full rounded-xl bg-blue-600 px-3 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-60">진행 중</button>
-                  <button type="button" disabled={updating || !canStartProcessing} onClick={() => handleUpdateStatus('COMPLETED')} className="w-full rounded-xl bg-emerald-600 px-3 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-60">완료</button>
-                  <button type="button" disabled={updating} onClick={() => handleUpdateStatus('CANCELLED')} className="w-full rounded-xl bg-rose-600 px-3 py-3 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:opacity-60">취소</button>
+                  <button type="button" disabled={updating} onClick={() => { void handleUpdateStatus('PENDING'); }} className="w-full rounded-xl bg-slate-900 px-3 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60">대기 중</button>
+                  <button type="button" disabled={updating || !canStartProcessing} onClick={() => { void handleUpdateStatus('IN_PROGRESS'); }} className="w-full rounded-xl bg-blue-600 px-3 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-60">진행 중</button>
+                  <button type="button" disabled={updating || !canStartProcessing} onClick={() => { void handleUpdateStatus('COMPLETED'); }} className="w-full rounded-xl bg-emerald-600 px-3 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-60">완료</button>
+                  <button type="button" disabled={updating} onClick={() => { void handleUpdateStatus('CANCELLED'); }} className="w-full rounded-xl bg-rose-600 px-3 py-3 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:opacity-60">취소</button>
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-100 p-4">
-                <h4 className="font-bold text-slate-900 mb-3">폼 작성 내용</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                  {selectedFormEntries.map((entry) => (
-                    <div key={entry.key} className="rounded-xl bg-slate-50 px-3 py-2">
+              <div className="rounded-2xl border border-slate-100 p-4" data-testid="admin-phone-reservation-form-section">
+                <div className="flex items-center justify-between gap-3">
+                  <h4 className="font-bold text-slate-900">폼 작성 내용</h4>
+                  {hasExpandableFormEntries && (
+                    <button
+                      type="button"
+                      data-testid="admin-phone-reservation-form-toggle"
+                      onClick={() => setShowAllFormEntries((prev) => !prev)}
+                      className="text-xs font-semibold text-slate-600 transition hover:text-slate-900"
+                    >
+                      {showAllFormEntries ? '간단히 보기' : '전체 항목 보기'}
+                    </button>
+                  )}
+                </div>
+                <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                  {visibleFormEntries.map((entry) => (
+                    <div key={entry.key} data-testid="admin-phone-reservation-form-entry" className="rounded-xl bg-slate-50 px-3 py-2">
                       <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{entry.label}</p>
                       <p className="text-slate-800 mt-1 break-words whitespace-pre-wrap">{entry.value}</p>
                     </div>

@@ -30,6 +30,18 @@ type ProfileRow = {
     phone: string | null;
 };
 
+const DEFAULT_PROXY_REQUEST_LIMIT = 50;
+const MAX_PROXY_REQUEST_LIMIT = 50;
+
+function clampPositiveInteger(value: string | null, fallback: number) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+        return fallback;
+    }
+
+    return Math.max(0, Math.floor(parsed));
+}
+
 function getAdminAlertRequesterName(params: {
     fallbackEmail?: string | null;
     intakeFormData: Record<string, unknown>;
@@ -185,8 +197,9 @@ export async function POST(request: Request) {
     }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
     try {
+        const { searchParams } = new URL(request.url);
         const supabase = await createServerClient();
         const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -197,25 +210,36 @@ export async function GET() {
         // [Fix] resolveAdminAccess()로 교체 — users.role 기반 체크 포함, null email 안전
         const { isAdmin } = await resolveAdminAccess(supabase, { userId: user.id, email: user.email });
 
+        const hasCustomPagination = searchParams.has('limit') || searchParams.has('offset');
+        const requestedLimit = Math.min(
+            Math.max(clampPositiveInteger(searchParams.get('limit'), DEFAULT_PROXY_REQUEST_LIMIT), 1),
+            MAX_PROXY_REQUEST_LIMIT
+        );
+        const requestedOffset = clampPositiveInteger(searchParams.get('offset'), 0);
+
         let query = supabase
             .from('proxy_requests')
             .select('id, user_id, category, status, form_data, payment_channel, payment_status, naver_buyer_name, locally_order_id, agreed_to_terms, created_at, updated_at')
-            .order('created_at', { ascending: false })
-            .limit(50);
+            .order('created_at', { ascending: false });
 
         if (!isAdmin) {
             // Regular user can only fetch their own requests
             query = query.eq('user_id', user.id);
         }
 
-        const { data, error } = await query;
+        const fetchLimit = hasCustomPagination ? requestedLimit + 1 : DEFAULT_PROXY_REQUEST_LIMIT;
+        const rangeStart = hasCustomPagination ? requestedOffset : 0;
+        const rangeEnd = rangeStart + fetchLimit - 1;
+        const { data, error } = await query.range(rangeStart, rangeEnd);
 
         if (error) {
             console.error('Proxy Requests Fetch Error:', error);
             return NextResponse.json({ success: false, error: 'Failed to fetch requests' }, { status: 500 });
         }
 
-        const rows = (data ?? []) as ProxyRequestRow[];
+        const fetchedRows = (data ?? []) as ProxyRequestRow[];
+        const hasMore = hasCustomPagination && fetchedRows.length > requestedLimit;
+        const rows = hasCustomPagination ? fetchedRows.slice(0, requestedLimit) : fetchedRows;
         const profileIds = [...new Set(rows.map((item) => item.user_id).filter(Boolean))];
         const profilesById = new Map<string, ProfileRow>();
 
@@ -247,7 +271,20 @@ export async function GET() {
                 : undefined,
         }));
 
-        return NextResponse.json({ success: true, data: mergedRows, viewerIsAdmin: isAdmin });
+        return NextResponse.json({
+            success: true,
+            data: mergedRows,
+            viewerIsAdmin: isAdmin,
+            ...(hasCustomPagination
+                ? {
+                    pagination: {
+                        limit: requestedLimit,
+                        offset: requestedOffset,
+                        hasMore,
+                    },
+                }
+                : {}),
+        });
     } catch (error: unknown) {
         console.error('API Proxy Requests GET Error:', error);
         return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 });

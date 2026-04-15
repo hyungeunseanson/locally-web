@@ -45,9 +45,11 @@ type InquiryMessageRow = {
     created_at: string;
 };
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params;
+        const { searchParams } = new URL(request.url);
+        const includeComments = searchParams.get('includeComments') !== 'false';
         const supabase = await createServerClient();
         const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -92,6 +94,25 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         }
 
         const linkedInquiryId = getProxyLinkedInquiryId(requestRow.form_data);
+        if (!includeComments) {
+            return NextResponse.json({
+                success: true,
+                data: {
+                    ...requestRow,
+                    linked_inquiry_id: linkedInquiryId,
+                    profiles: profile
+                        ? {
+                            full_name: profile.full_name,
+                            email: profile.email,
+                            avatar_url: profile.avatar_url,
+                            phone: profile.phone,
+                        }
+                        : undefined,
+                },
+                viewerIsAdmin: isAdmin,
+            });
+        }
+
         if (!linkedInquiryId) {
             return NextResponse.json(
                 { success: false, error: '전화 예약 문의 스레드가 연결되어 있지 않습니다.' },

@@ -150,6 +150,57 @@ async function createAuthUser(user: TestUser, options?: { whitelistAdmin?: boole
   return data.user.id;
 }
 
+async function seedProxyRequest(params: {
+  userId: string;
+  user: TestUser;
+  restaurantName?: string;
+  linkedInquiryId?: string | number | null;
+  createdAt?: string;
+}) {
+  const restaurantName = params.restaurantName || `테스트 스시 ${Date.now()}`;
+  const createdAt = params.createdAt || new Date().toISOString();
+
+  const { data, error } = await getAdminClient()
+    .from('proxy_requests')
+    .insert({
+      user_id: params.userId,
+      category: 'RESTAURANT',
+      status: 'PENDING',
+      payment_channel: 'LOCALLY',
+      payment_status: 'WAITING',
+      locally_order_id: `LOCALLY-PROXY-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+      agreed_to_terms: true,
+      created_at: createdAt,
+      updated_at: createdAt,
+      form_data: {
+        restaurant_name: restaurantName,
+        preferred_slot_primary: '2026-01-15T19:00',
+        preferred_slot_secondary: '2026-01-15T19:30',
+        preferred_slot_tertiary: '2026-01-15T20:00',
+        reservation_name: params.user.fullName,
+        guest_number: 2,
+        korean_contact: params.user.phone,
+        payment_method: 'bank',
+        contact_name: params.user.fullName,
+        contact_phone: params.user.phone,
+        service_fee_krw: 4500,
+        ...(params.linkedInquiryId ? { linked_inquiry_id: params.linkedInquiryId } : {}),
+      },
+    })
+    .select('id, form_data')
+    .single();
+
+  if (error || !data?.id) {
+    throw error || new Error('Failed to seed proxy request.');
+  }
+
+  createdProxyRequestIds.push(String(data.id));
+  return {
+    requestId: String(data.id),
+    restaurantName: String((data.form_data as Record<string, unknown>)?.restaurant_name || restaurantName),
+  };
+}
+
 async function setPreferredLocale(userId: string, locale: 'ko' | 'en' | 'ja' | 'zh') {
   const supabase = getAdminClient();
   const { data, error } = await supabase.auth.admin.getUserById(userId);
@@ -279,7 +330,8 @@ test.describe.serial('Proxy booking team workspace flow', () => {
       const customerSession = await createIsolatedPage(browser, customerUser);
       const customerPage = customerSession.page;
 
-      const restaurantName = `테스트 스시 ${Date.now()}`;
+      const pagingPrefix = `전화예약 페이징 ${Date.now()}`;
+      const restaurantName = `${pagingPrefix} 본요청`;
       const today = new Date();
       const targetDay = Math.min(today.getDate() + 3, new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate());
       const targetDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}`;
@@ -369,6 +421,45 @@ test.describe.serial('Proxy booking team workspace flow', () => {
       await expect(adminPage.locator('div').filter({ hasText: /현재 상태:\s*진행 중/ }).first()).toBeVisible({ timeout: 15000 });
       const inquiryLink = adminPage.getByRole('link', { name: '1:1 문의함에서 열기' });
       await expect(inquiryLink).toHaveAttribute('href', new RegExp(`tab=CHATS&inquiryId=${inquiryId}`));
+
+      const pagingBaseTime = Date.now() + 60 * 60 * 1000;
+      const pagingBaseRequest = await seedProxyRequest({
+        userId: customerUserId,
+        user: customerUser,
+        restaurantName,
+        linkedInquiryId: inquiryId,
+        createdAt: new Date(pagingBaseTime).toISOString(),
+      });
+
+      for (let index = 0; index < 11; index += 1) {
+        await seedProxyRequest({
+          userId: customerUserId,
+          user: customerUser,
+          restaurantName: `${pagingPrefix} 추가 ${index + 1}`,
+          createdAt: new Date(pagingBaseTime + (11 - index) * 1000).toISOString(),
+        });
+      }
+
+      await adminPage.goto(`/admin/dashboard?tab=TEAM&teamTab=proxy&proxyRequestId=${pagingBaseRequest.requestId}`, { waitUntil: 'networkidle' });
+      await expect(adminPage.getByRole('heading', { name: restaurantName })).toBeVisible({ timeout: 15000 });
+      await expect(adminPage.getByTestId('admin-phone-reservation-refresh-button')).toBeVisible();
+      const pagedProxyRows = adminPage.getByTestId('admin-phone-reservation-list-item').filter({ hasText: pagingPrefix });
+      await expect(pagedProxyRows).toHaveCount(11, { timeout: 15000 });
+      await expect(adminPage.getByTestId('admin-phone-reservation-load-more-button')).toBeVisible();
+
+      const formEntries = adminPage.getByTestId('admin-phone-reservation-form-entry');
+      await expect(formEntries).toHaveCount(6);
+      await adminPage.getByTestId('admin-phone-reservation-form-toggle').click();
+      await expect(formEntries).toHaveCount(7, { timeout: 15000 });
+      await adminPage.getByTestId('admin-phone-reservation-form-toggle').click();
+      await expect(formEntries).toHaveCount(6, { timeout: 15000 });
+
+      await adminPage.getByTestId('admin-phone-reservation-load-more-button').click();
+      await expect(pagedProxyRows).toHaveCount(13, { timeout: 15000 });
+      await expect(adminPage.getByTestId('admin-phone-reservation-load-more-button')).toHaveCount(0);
+
+      await adminPage.getByTestId('admin-phone-reservation-refresh-button').click();
+      await expect(adminPage.getByRole('heading', { name: restaurantName })).toBeVisible({ timeout: 15000 });
 
     } finally {
     }

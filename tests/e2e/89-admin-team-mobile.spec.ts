@@ -175,5 +175,6 @@ test.describe.serial('Admin team mobile smoke', () => {
 
     await page.getByRole('button', { name: /전화 예약/ }).click();
     await expect(page.getByRole('heading', { name: '전화 예약', exact: true })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('admin-phone-reservation-refresh-button')).toBeVisible();
   });
 });
