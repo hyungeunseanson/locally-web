@@ -400,6 +400,9 @@ test.describe.serial('Host unified earnings summary', () => {
 
     await expect(page.getByTestId('host-earnings-tabs')).toBeVisible();
     await expect(page.getByTestId('host-earnings-experience-pending')).toContainText('₩36,000');
+    await expect(page.getByTestId('host-earnings-details-panel')).toHaveCount(0);
+    await page.getByTestId('host-earnings-details-toggle').click();
+    await expect(page.getByTestId('host-earnings-details-panel')).toBeVisible();
     await expect(page.getByTestId('host-earnings-summary-in-progress')).toContainText('₩32,000');
     await expect(page.getByTestId('host-earnings-summary-paid-payout')).toContainText('₩36,000');
 

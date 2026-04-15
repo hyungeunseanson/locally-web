@@ -294,6 +294,11 @@ test.describe.serial('Host earnings mobile layout', () => {
     await expect(page.getByTestId('host-earnings-unified-hero')).toHaveCount(0);
     await expect(page.getByTestId('host-earnings-breakdown-card')).toHaveCount(0);
     await expect(page.getByTestId('host-earnings-experience-pending')).toContainText('₩24,000');
+    await expect(page.getByTestId('host-earnings-details-toggle')).toBeVisible();
+    await expect(page.getByTestId('host-earnings-details-panel')).toHaveCount(0);
+    await page.getByTestId('host-earnings-details-toggle').click();
+    await expect(page.getByTestId('host-earnings-details-panel')).toBeVisible();
+    await expect(page.getByTestId('host-earnings-summary-in-progress')).toContainText('₩0');
     await expect(page.locator('[data-testid^="host-earnings-group-"]').first()).toBeVisible();
     await expect(page.getByTestId('host-service-earnings-item-list')).toHaveCount(0);
 

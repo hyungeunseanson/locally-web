@@ -426,10 +426,12 @@ test.describe.serial('Host earnings payout-focused policy', () => {
 
     await expect(page.getByRole('heading', { name: /호스팅 수입|Hosting Income|ホスティング収入|住宿收入/ })).toBeVisible();
     await expect(page.getByTestId('host-earnings-experience-pending')).toContainText('₩24,000');
-    await expect(page.getByText(/완료된 예약 건수|Completed Bookings|完了した予約件数|已完成预订数/)).toBeVisible();
-    await expect(page.getByText(/1\s*건|1 bookings|1件|1个/).first()).toBeVisible();
+    await expect(page.getByTestId('host-earnings-details-toggle')).toBeVisible();
+    await expect(page.getByTestId('host-earnings-details-panel')).toHaveCount(0);
+    await page.getByTestId('host-earnings-details-toggle').click();
+    await expect(page.getByTestId('host-earnings-details-panel')).toBeVisible();
+    await expect(page.getByTestId('host-earnings-summary-completed-count')).toContainText(/1/);
     await expect(page.getByTestId('host-earnings-summary-payout-items')).toContainText(/1/);
-    await expect(page.getByTestId('host-earnings-summary-pending-payout')).toContainText('₩24,000');
     await expect(page.getByTestId('host-earnings-summary-in-progress')).toContainText('₩0');
     await expect(page.getByTestId('host-earnings-summary-paid-payout')).toContainText('₩0');
     await expect(page.getByTestId('host-earnings-summary-last-paid')).toContainText(
@@ -465,12 +467,11 @@ test.describe.serial('Host earnings payout-focused policy', () => {
     await page.goto('/host/dashboard?tab=earnings', { waitUntil: 'networkidle' });
 
     await expect(page.getByTestId('host-earnings-experience-pending')).toContainText('₩36,000');
-    await expect(page.getByTestId('host-earnings-summary-last-paid-inline')).toContainText(
-      /아직 지급 완료 내역이 없어요|No completed payout yet|まだ支払い完了履歴がありません|暂时还没有已完成结算/
-    );
+    await expect(page.getByTestId('host-earnings-details-panel')).toHaveCount(0);
+    await page.getByTestId('host-earnings-details-toggle').click();
+    await expect(page.getByTestId('host-earnings-details-panel')).toBeVisible();
     await expect(page.getByTestId('host-earnings-summary-completed-count')).toContainText(/1/);
     await expect(page.getByTestId('host-earnings-summary-payout-items')).toContainText(/2/);
-    await expect(page.getByTestId('host-earnings-summary-pending-payout')).toContainText('₩36,000');
     await expect(page.getByTestId('host-earnings-summary-in-progress')).toContainText('₩0');
     await expect(page.getByTestId('host-earnings-summary-paid-payout')).toContainText('₩0');
     await expect(page.getByTestId('host-earnings-summary-net-payout')).toContainText('₩36,000');

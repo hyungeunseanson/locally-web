@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Info } from 'lucide-react';
+import { ChevronDown, Info } from 'lucide-react';
 
 import Skeleton from '@/app/components/ui/Skeleton';
 import { BOOKING_CONFIRMED_STATUSES, isCancelledOnlyBookingStatus } from '@/app/constants/bookingStatus';
@@ -131,9 +131,11 @@ export default function ExperienceEarningsPanel({ summary }: ExperienceEarningsP
   const [chartError, setChartError] = useState<string | null>(null);
   const [activeTooltipDate, setActiveTooltipDate] = useState<string | null>(null);
   const [experienceChartData, setExperienceChartData] = useState<ExperienceChartPoint[]>([]);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
   const totalPayout =
     summary.pending_payout_amount + summary.in_progress_amount + summary.paid_payout_amount;
+  const detailsPanelId = 'host-earnings-details-panel';
 
   useEffect(() => {
     let cancelled = false;
@@ -272,17 +274,6 @@ export default function ExperienceEarningsPanel({ summary }: ExperienceEarningsP
         <h1 data-testid="host-earnings-experience-pending" className="text-3xl font-black tracking-tight text-slate-900 md:text-5xl">
           ₩{summary.pending_payout_amount.toLocaleString()}
         </h1>
-        <p data-testid="host-earnings-summary-last-paid-inline" className="mt-1 text-[10px] font-medium text-slate-400 md:text-xs">
-          {t('hp_earn_last_paid_inline')}:{' '}
-          {formatLatestPayoutDate(summary.latest_paid_at, lang) || t('hp_earn_last_paid_empty')}
-        </p>
-
-        <div
-          data-testid="host-earnings-completed-booking-count"
-          className="mt-3 inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600"
-        >
-          {t('hp_earn_count_completed').replace('{count}', String(summary.completed_booking_count))}
-        </div>
       </div>
 
       {chartLoading ? (
@@ -352,66 +343,79 @@ export default function ExperienceEarningsPanel({ summary }: ExperienceEarningsP
       )}
 
       <div className="mt-6 rounded-3xl border border-slate-100 bg-slate-50 p-6 md:p-8">
-        <div className="mb-6 flex items-center justify-between">
-          <h3 className="text-base font-bold text-slate-800 md:text-lg">{t('hp_earn_details')}</h3>
-          <span className="rounded border bg-white px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
-            {t('hp_earn_ytd')}
-          </span>
-        </div>
-
-        <div className="space-y-4">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-slate-500">{t('hp_earn_count')}</span>
-            <span data-testid="host-earnings-summary-completed-count" className="font-bold text-slate-900">
-              {summary.completed_booking_count}
-              {t('unit_cases')}
-            </span>
+        <button
+          type="button"
+          data-testid="host-earnings-details-toggle"
+          aria-expanded={isDetailsOpen}
+          aria-controls={detailsPanelId}
+          className="flex w-full items-center justify-between gap-4 text-left"
+          onClick={() => setIsDetailsOpen((current) => !current)}
+        >
+          <div className="min-w-0">
+            <h3 className="text-base font-bold text-slate-800 md:text-lg">{t('hp_earn_details')}</h3>
+            <p className="mt-1 text-[11px] font-medium text-slate-400 md:text-xs">
+              {isDetailsOpen ? t('hp_earn_hide_summary') : t('hp_earn_show_summary')}
+            </p>
           </div>
-
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-slate-500">{t('hp_earn_payout_items')}</span>
-            <span data-testid="host-earnings-summary-payout-items" className="font-bold text-slate-900">
-              {summary.payout_item_count}
-              {t('unit_cases')}
+          <div className="flex items-center gap-3">
+            <span className="rounded border bg-white px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+              {t('hp_earn_ytd')}
             </span>
+            <ChevronDown
+              size={18}
+              className={`shrink-0 text-slate-400 transition-transform ${isDetailsOpen ? 'rotate-180' : ''}`}
+            />
           </div>
+        </button>
 
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-slate-500">{t('hp_earn_pending')}</span>
-            <span data-testid="host-earnings-summary-pending-payout" className="font-bold text-slate-900">
-              ₩{summary.pending_payout_amount.toLocaleString()}
-            </span>
-          </div>
+        {isDetailsOpen ? (
+          <div id={detailsPanelId} data-testid="host-earnings-details-panel" className="mt-6 space-y-4">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-slate-500">{t('hp_earn_count')}</span>
+              <span data-testid="host-earnings-summary-completed-count" className="font-bold text-slate-900">
+                {summary.completed_booking_count}
+                {t('unit_cases')}
+              </span>
+            </div>
 
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-slate-500">{t('hp_earn_in_progress')}</span>
-            <span data-testid="host-earnings-summary-in-progress" className="font-bold text-slate-900">
-              ₩{summary.in_progress_amount.toLocaleString()}
-            </span>
-          </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-slate-500">{t('hp_earn_payout_items')}</span>
+              <span data-testid="host-earnings-summary-payout-items" className="font-bold text-slate-900">
+                {summary.payout_item_count}
+                {t('unit_cases')}
+              </span>
+            </div>
 
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-slate-500">{t('hp_earn_completed')}</span>
-            <span data-testid="host-earnings-summary-paid-payout" className="font-bold text-slate-900">
-              ₩{summary.paid_payout_amount.toLocaleString()}
-            </span>
-          </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-slate-500">{t('hp_earn_in_progress')}</span>
+              <span data-testid="host-earnings-summary-in-progress" className="font-bold text-slate-900">
+                ₩{summary.in_progress_amount.toLocaleString()}
+              </span>
+            </div>
 
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-slate-500">{t('hp_earn_last_paid')}</span>
-            <span data-testid="host-earnings-summary-last-paid" className="font-bold text-slate-900">
-              {formatLatestPayoutDate(summary.latest_paid_at, lang) || t('hp_earn_last_paid_empty')}
-            </span>
-          </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-slate-500">{t('hp_earn_completed')}</span>
+              <span data-testid="host-earnings-summary-paid-payout" className="font-bold text-slate-900">
+                ₩{summary.paid_payout_amount.toLocaleString()}
+              </span>
+            </div>
 
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-black text-slate-900 md:text-base">{t('hp_earn_net')}</span>
-            <span data-testid="host-earnings-summary-net-payout" className="text-xl font-black text-slate-900 md:text-2xl">
-              ₩{totalPayout.toLocaleString()}
-            </span>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-slate-500">{t('hp_earn_last_paid')}</span>
+              <span data-testid="host-earnings-summary-last-paid" className="font-bold text-slate-900">
+                {formatLatestPayoutDate(summary.latest_paid_at, lang) || t('hp_earn_last_paid_empty')}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-black text-slate-900 md:text-base">{t('hp_earn_net')}</span>
+              <span data-testid="host-earnings-summary-net-payout" className="text-xl font-black text-slate-900 md:text-2xl">
+                ₩{totalPayout.toLocaleString()}
+              </span>
+            </div>
+            <p className="mt-1 text-right text-[10px] text-slate-400">{t('hp_earn_tax_note')}</p>
           </div>
-          <p className="mt-1 text-right text-[10px] text-slate-400">{t('hp_earn_tax_note')}</p>
-        </div>
+        ) : null}
       </div>
     </div>
   );

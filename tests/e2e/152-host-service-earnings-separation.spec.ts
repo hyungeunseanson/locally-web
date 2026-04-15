@@ -256,7 +256,10 @@ test.describe.serial('Host service earnings separation', () => {
     await login(page, hostAUser);
     await page.goto('/host/dashboard?tab=earnings', { waitUntil: 'networkidle' });
 
-    await expect(page.getByTestId('host-earnings-summary-pending-payout')).toContainText('₩0');
+    await expect(page.getByTestId('host-earnings-experience-pending')).toContainText('₩0');
+    await expect(page.getByTestId('host-earnings-details-panel')).toHaveCount(0);
+    await page.getByTestId('host-earnings-details-toggle').click();
+    await expect(page.getByTestId('host-earnings-details-panel')).toBeVisible();
     await expect(page.getByTestId('host-earnings-summary-in-progress')).toContainText('₩0');
 
     await page.getByTestId('host-earnings-tab-service').click();
