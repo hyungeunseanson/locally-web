@@ -5,6 +5,16 @@
 
 ---
 
+## v3.40.18 — [Admin Support] unread 관리자 ALERTS + 팀 메일 1시간 완화
+
+**작업일:** 2026-04-15
+
+| 항목 | 내용 |
+|------|------|
+| 🟢 unread 대기 시간 완화 | `app/utils/adminSupportUnreadAlerts.ts` — `admin_support/admin` 고객 unread batch의 `alert_due_at` 계산과 fallback due 판정을 `10분`에서 `1시간` 기준으로 완화 |
+| 🟢 운영 문구 정렬 | `app/utils/adminSupportUnreadAlerts.ts`, `docs/gemini.md`, `docs/email_notification_policy.md` — 고객 문의 미읽음 안내를 현재 운영 기준인 `1시간`으로 통일 |
+| 🟡 회귀 테스트 정렬 | `tests/e2e/161-admin-support-unread-alerts.spec.ts` — fallback helper와 스펙 설명을 `1시간` 기준으로 맞추고, 기존 unread wave 중복 방지 / read 후 재-arm 계약은 그대로 유지 |
+
 ## v3.40.17 — [Admin Support] unread 10분 1회 관리자 ALERTS + 팀 메일 복구
 
 **작업일:** 2026-04-10

@@ -32,6 +32,7 @@ type UnreadBatchRow = {
 
 const UNREAD_ALERT_IN_APP_AUDIT_ACTION = 'ADMIN_SUPPORT_UNREAD_ALERT_IN_APP_SENT';
 const UNREAD_ALERT_EMAIL_AUDIT_ACTION = 'ADMIN_SUPPORT_UNREAD_ALERT_EMAIL_SENT';
+const UNREAD_ALERT_DELAY_MINUTES = 60;
 
 const TEST_PASSWORD = 'LocallyTest!2026';
 const CRON_SECRET = loadEnv().CRON_SECRET?.trim() || null;
@@ -259,7 +260,9 @@ async function setBatchDueNow(params: {
     const { error } = await getAdminClient()
       .from('inquiry_messages')
       .update({
-        created_at: new Date(Date.now() - 11 * 60_000).toISOString(),
+        created_at: new Date(
+          Date.now() - (UNREAD_ALERT_DELAY_MINUTES + 1) * 60_000
+        ).toISOString(),
       })
       .eq('inquiry_id', params.inquiryId)
       .eq('sender_id', params.guestId)
@@ -399,7 +402,7 @@ test.describe.serial('Admin support unread alerts', () => {
     expect(wrongAuth.status()).toBe(401);
   });
 
-  test('sends one admin alert + team email after 10 minutes of unread customer support inquiry and resets after admin read', async ({ browser, request }) => {
+  test('sends one admin alert + team email after 1 hour of unread customer support inquiry and resets after admin read', async ({ browser, request }) => {
     test.setTimeout(120000);
     test.skip(!CRON_SECRET, 'CRON_SECRET is required to verify the success contract under next start.');
 

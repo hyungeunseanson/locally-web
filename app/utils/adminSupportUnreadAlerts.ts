@@ -72,6 +72,12 @@ const UNREAD_BATCH_TABLE = 'admin_support_unread_alert_batches';
 const UNREAD_BATCH_CLAIM_RPC = 'claim_due_admin_support_unread_alert_batches';
 const UNREAD_ALERT_IN_APP_AUDIT_ACTION = 'ADMIN_SUPPORT_UNREAD_ALERT_IN_APP_SENT';
 const UNREAD_ALERT_EMAIL_AUDIT_ACTION = 'ADMIN_SUPPORT_UNREAD_ALERT_EMAIL_SENT';
+const UNREAD_ALERT_DELAY_MINUTES = 60;
+const UNREAD_ALERT_DELAY_LABEL_KO =
+  UNREAD_ALERT_DELAY_MINUTES % 60 === 0
+    ? `${UNREAD_ALERT_DELAY_MINUTES / 60}시간`
+    : `${UNREAD_ALERT_DELAY_MINUTES}분`;
+const STALE_PROCESSING_WINDOW_MINUTES = 15;
 const UNREAD_ALERT_AUDIT_ACTIONS = [
   UNREAD_ALERT_IN_APP_AUDIT_ACTION,
   UNREAD_ALERT_EMAIL_AUDIT_ACTION,
@@ -192,7 +198,7 @@ function buildNewUnreadBatchWriteSet(params: {
     first_unread_message_at: params.messageCreatedAt,
     last_unread_message_id: params.messageId,
     last_unread_message_at: params.messageCreatedAt,
-    alert_due_at: addMinutes(params.messageCreatedAt, 10),
+    alert_due_at: addMinutes(params.messageCreatedAt, UNREAD_ALERT_DELAY_MINUTES),
     in_app_sent_at: null,
     email_sent_at: null,
     processing_started_at: null,
@@ -342,7 +348,9 @@ async function processDueAdminSupportUnreadAlertsFallback(params: {
 
   const dueCandidates = Array.from(fallbackCandidates.values())
     .filter((candidate) => {
-      const dueAt = new Date(candidate.firstUnreadMessageAt).getTime() + 10 * 60_000;
+      const dueAt =
+        new Date(candidate.firstUnreadMessageAt).getTime() +
+        UNREAD_ALERT_DELAY_MINUTES * 60_000;
       return dueAt <= now;
     })
     .slice(0, claimLimit);
@@ -509,7 +517,9 @@ async function claimDueAdminSupportUnreadAlertBatchesWithoutRpc(params: {
 }) {
   const { supabaseAdmin, claimLimit } = params;
   const nowIso = new Date().toISOString();
-  const staleProcessingThresholdIso = new Date(Date.now() - 15 * 60_000).toISOString();
+  const staleProcessingThresholdIso = new Date(
+    Date.now() - STALE_PROCESSING_WINDOW_MINUTES * 60_000
+  ).toISOString();
 
   const { data, error } = await supabaseAdmin
     .from('admin_support_unread_alert_batches')
@@ -582,7 +592,7 @@ export function buildAdminSupportUnreadAlertCopy(params: {
   return {
     subject: '[Locally Admin] 고객센터 1:1 문의 미읽음',
     title: '고객센터 1:1 문의 미읽음',
-    message: `${params.guestName} 고객 문의가 10분째 확인되지 않았습니다.${previewSuffix}`,
+    message: `${params.guestName} 고객 문의가 ${UNREAD_ALERT_DELAY_LABEL_KO}째 확인되지 않았습니다.${previewSuffix}`,
     link: buildAdminChatLink(params.inquiryId),
     ctaLabel: '문의 확인하기',
   };
