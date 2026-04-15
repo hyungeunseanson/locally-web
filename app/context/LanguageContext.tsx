@@ -3617,7 +3617,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     exp_payment_label_guests: "人数",
     exp_payment_label_type: "予約タイプ",
     exp_payment_private_type: "貸切",
-    exp_payment_solo_note: "1名出発保証オプションが適用されています。",
+    exp_payment_solo_note: "1名開催保証オプションが適用されています。",
     exp_payment_booker_title: "予約者情報",
     exp_payment_name_label: "お名前",
     exp_payment_name_placeholder: "予約者のお名前を入力してください",

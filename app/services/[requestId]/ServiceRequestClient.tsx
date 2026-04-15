@@ -22,6 +22,7 @@ import { normalizeLanguageLevels, formatLanguageLevelLabel, getLanguageNames } f
 import { getHostPublicProfile } from '@/app/utils/profile';
 import type { ServiceRequest, ServiceApplicationWithProfile } from '@/app/types/service';
 import HostProfileModal from '@/app/experiences/[id]/components/HostProfileModal';
+import { getJoinedYear } from '@/app/experiences/[id]/experienceRowHelpers';
 import { getHostDashboardHref } from '@/app/host/dashboard/navigation';
 
 // ── 매칭 스텝 정의 (v2 에스크로) ────────────────────────────────
@@ -673,7 +674,7 @@ export default function ServiceRequestDetailPage() {
               nationality: hostPublicProfile.location || undefined,
               reviewCount: app.review_count,
               rating: app.review_avg,
-              joinedYear: hostPublicProfile.createdAt ? new Date(hostPublicProfile.createdAt).getFullYear() : undefined,
+              joinedYear: getJoinedYear(hostPublicProfile.createdAt),
               job: hostPublicProfile.job || undefined,
               dreamDestination: hostPublicProfile.dreamDestination || undefined,
               favoriteSong: hostPublicProfile.favoriteSong || undefined,
