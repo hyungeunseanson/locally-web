@@ -62,6 +62,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, message: 'Already processed' });
     }
 
+    if (String(originalBooking.status || '').toUpperCase() !== 'PENDING') {
+      return NextResponse.json(
+        { success: false, error: `현재 상태(${originalBooking.status})에서는 PayPal 결제를 확정할 수 없습니다.` },
+        { status: 409 }
+      );
+    }
+
+    const normalizedPaymentMethod = String(originalBooking.payment_method || '').toLowerCase();
+    if (normalizedPaymentMethod && normalizedPaymentMethod !== 'paypal') {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            normalizedPaymentMethod === 'bank'
+              ? '무통장 입금 대기 예약에는 PayPal 결제를 확정할 수 없습니다.'
+              : 'PayPal 결제 대기 예약만 PayPal 결제를 확정할 수 있습니다.',
+        },
+        { status: 409 }
+      );
+    }
+
     const expectedOrderId = originalBooking.order_id || originalBooking.id;
     const expectedAmount = Number(originalBooking.amount || 0);
     const experienceMeta = Array.isArray(originalBooking.experiences)

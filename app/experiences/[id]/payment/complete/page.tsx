@@ -21,12 +21,12 @@ import { useLocallyMembership } from '@/app/hooks/useLocallyMembership';
 type BookingExperience = {
   id?: string | number;
   host_id?: string | null;
-  title?: string;
+  title?: string | null;
   title_ko?: string | null;
   title_en?: string | null;
   title_ja?: string | null;
   title_zh?: string | null;
-  location?: string;
+  location?: string | null;
   duration?: number;
   photos?: string[] | null;
   image_url?: string | null;
@@ -37,9 +37,79 @@ type BookingData = {
   date: string;
   time: string;
   order_id?: string;
-  user_id?: string | null;
   experiences?: BookingExperience | null;
 };
+
+const PAYMENT_COMPLETE_BOOKING_SELECT = [
+  'status',
+  'date',
+  'time',
+  'order_id',
+  'experiences(id, host_id, title, title_ko, title_en, title_ja, title_zh, location, duration, photos, image_url)',
+].join(', ');
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function readNullableString(value: unknown): string | null | undefined {
+  if (value == null) return null;
+  return typeof value === 'string' ? value : undefined;
+}
+
+function readNullableStringArray(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null;
+  return value.filter((entry): entry is string => typeof entry === 'string');
+}
+
+function readNullableNumber(value: unknown): number | undefined {
+  if (value == null) return undefined;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function normalizeBookingExperience(value: unknown): BookingExperience | null {
+  const record = Array.isArray(value) ? value[0] : value;
+  if (!isRecord(record)) return null;
+
+  const id = record.id;
+  return {
+    id: typeof id === 'string' || typeof id === 'number' ? id : undefined,
+    host_id: readNullableString(record.host_id),
+    title: readNullableString(record.title),
+    title_ko: readNullableString(record.title_ko),
+    title_en: readNullableString(record.title_en),
+    title_ja: readNullableString(record.title_ja),
+    title_zh: readNullableString(record.title_zh),
+    location: readNullableString(record.location),
+    duration: readNullableNumber(record.duration),
+    photos: readNullableStringArray(record.photos),
+    image_url: readNullableString(record.image_url),
+  };
+}
+
+function normalizePaymentCompleteBooking(row: unknown): BookingData | null {
+  if (!isRecord(row)) {
+    return null;
+  }
+
+  const date = readNullableString(row.date);
+  const time = readNullableString(row.time);
+
+  if (!date || !time) {
+    return null;
+  }
+
+  return {
+    status: readNullableString(row.status) || undefined,
+    date,
+    time,
+    order_id: readNullableString(row.order_id) || undefined,
+    experiences: normalizeBookingExperience(row.experiences),
+  };
+}
 
 function PaymentCompleteContent() {
   const params = useParams();
@@ -91,21 +161,23 @@ function PaymentCompleteContent() {
 
       const { data, error } = await supabase
         .from('bookings')
-        .select('*, experiences(*)')
+        .select(PAYMENT_COMPLETE_BOOKING_SELECT)
         .eq('order_id', orderId)
         .eq('user_id', user.id)
         .maybeSingle();
 
-      if (error || !data) {
+      const normalizedBooking = normalizePaymentCompleteBooking(data);
+
+      if (error || !normalizedBooking) {
         console.error('Booking fetch error:', error);
         showToast(t('pay_complete_fetch_error'), 'error');
       } else {
-        setBooking(data);
+        setBooking(normalizedBooking);
         // 🎉 결제 완료(PAID/confirmed) 상태일 때만 폭죽 + analytics 발사
         // — 무통장 대기(PENDING) 또는 취소 상태에서 재방문 시 중복 이벤트 방지
-        if (isConfirmedBookingStatus(data.status || '')) {
+        if (isConfirmedBookingStatus(normalizedBooking.status || '')) {
           fireConfetti();
-          const experienceId = data.experiences?.id;
+          const experienceId = normalizedBooking.experiences?.id;
           if (experienceId) {
             sendAnalyticsEvent('booking_confirmed', String(experienceId));
           }

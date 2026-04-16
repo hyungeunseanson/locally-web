@@ -211,6 +211,47 @@ test.describe.serial('Experience cancel error-safe flow', () => {
     expect(booking?.status).toBe('PENDING');
   });
 
+  test('rejects host-owned cancellation attempts without a pending guest request even without legacy payload', async ({ page }) => {
+    const host = createTestUser('exp.cancel.host-no-flag');
+    const guest = createTestUser('exp.cancel.host-no-flag-guest');
+    const hostId = await createAuthUser(host, createdAuthUserIds);
+    const guestId = await createAuthUser(guest, createdAuthUserIds);
+
+    const experienceId = await createHostOwnedExperience(hostId, host);
+    const bookingId = await createBookingForExperience({
+      guestId,
+      guest,
+      experienceId,
+      status: 'confirmed',
+      paymentMethod: 'bank',
+      amount: 32000,
+    });
+
+    await login(page, host);
+
+    const response = await page.request.post('/api/payment/cancel', {
+      data: {
+        bookingId,
+        reason: 'host approval without guest request',
+      },
+    });
+
+    expect(response.status()).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({
+      error: '호스트는 게스트 취소 요청 건만 승인할 수 있습니다.',
+    });
+
+    const { data: booking, error } = await getAdminClient()
+      .from('bookings')
+      .select('status, cancel_reason')
+      .eq('id', bookingId)
+      .maybeSingle();
+
+    if (error) throw error;
+    expect(booking?.status).toBe('confirmed');
+    expect(booking?.cancel_reason).toBeNull();
+  });
+
   test('allows admins to cancel another guest booking', async ({ page }) => {
     const host = createTestUser('exp.cancel.admin-host');
     const guest = createTestUser('exp.cancel.admin-guest');
@@ -251,6 +292,47 @@ test.describe.serial('Experience cancel error-safe flow', () => {
 
     if (error) throw error;
     expect(booking?.status).toBe('cancelled');
+  });
+
+  test('allows host owners to finalize an existing cancellation_requested booking', async ({ page }) => {
+    const host = createTestUser('exp.cancel.host-approval');
+    const guest = createTestUser('exp.cancel.host-approval-guest');
+    const hostId = await createAuthUser(host, createdAuthUserIds);
+    const guestId = await createAuthUser(guest, createdAuthUserIds);
+
+    const experienceId = await createHostOwnedExperience(hostId, host);
+    const bookingId = await createBookingForExperience({
+      guestId,
+      guest,
+      experienceId,
+      status: 'cancellation_requested',
+      paymentMethod: 'bank',
+      amount: 35000,
+    });
+
+    await login(page, host);
+
+    const response = await page.request.post('/api/payment/cancel', {
+      data: {
+        bookingId,
+        reason: 'host approved guest cancellation request',
+      },
+    });
+
+    expect(response.status()).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+    });
+
+    const { data: booking, error } = await getAdminClient()
+      .from('bookings')
+      .select('status, cancel_reason')
+      .eq('id', bookingId)
+      .maybeSingle();
+
+    if (error) throw error;
+    expect(booking?.status).toBe('cancelled');
+    expect(booking?.cancel_reason).toContain('host approved guest cancellation request');
   });
 
   test('routes host-unavailable guest cancellation into admin review without cancelling immediately', async ({ page }) => {

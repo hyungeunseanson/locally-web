@@ -3,21 +3,65 @@ import { NextResponse } from 'next/server';
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 import { getHostPublicProfile } from '@/app/utils/profile';
 
+const GUEST_TRIPS_BOOKING_SELECT = `
+  id,
+  order_id,
+  date,
+  time,
+  guests,
+  amount,
+  status,
+  cancel_reason,
+  created_at,
+  experiences (
+    id,
+    host_id,
+    title,
+    title_ko,
+    title_en,
+    title_ja,
+    title_zh,
+    image_url,
+    photos,
+    location,
+    meeting_point,
+    meeting_point_i18n
+  ),
+  reviews (id, rating, content, created_at)
+`;
+
 type HostProfileRow = {
   id: string;
   full_name?: string | null;
   avatar_url?: string | null;
-  email?: string | null;
 };
 
 type HostApplicationRow = {
   user_id: string;
   name?: string | null;
   profile_photo?: string | null;
-  self_intro?: string | null;
-  languages?: string[] | string | null;
-  host_nationality?: string | null;
 };
+
+type BookingExperienceRow = {
+  id?: string | number | null;
+  host_id?: string | null;
+  title?: string | null;
+  title_ko?: string | null;
+  title_en?: string | null;
+  title_ja?: string | null;
+  title_zh?: string | null;
+  image_url?: string | null;
+  photos?: string[] | null;
+  location?: string | null;
+  meeting_point?: string | null;
+  meeting_point_i18n?: Record<string, string> | null;
+};
+
+function normalizeBookingExperience(
+  experience: BookingExperienceRow | BookingExperienceRow[] | null | undefined
+) {
+  return Array.isArray(experience) ? experience[0] || null : experience || null;
+}
 
 export async function GET() {
   const supabase = await createClient();
@@ -30,24 +74,7 @@ export async function GET() {
     // 🟢 bookings 테이블과 reviews 테이블을 join해서 후기 작성 여부 확인
     const { data: bookings, error } = await supabase
       .from('bookings')
-      .select(`
-        *,
-        experiences (
-          id,
-          host_id,
-          title,
-          title_ko,
-          title_en,
-          title_ja,
-          title_zh,
-          image_url,
-          photos,
-          location,
-          meeting_point,
-          meeting_point_i18n
-        ),
-        reviews (id, rating, content, created_at)
-      `)
+      .select(GUEST_TRIPS_BOOKING_SELECT)
       .eq('user_id', user.id)
       .order('date', { ascending: false });
 
@@ -56,7 +83,7 @@ export async function GET() {
     const hostIds = Array.from(
       new Set(
         (bookings || [])
-          .map((booking) => booking.experiences?.host_id)
+          .map((booking) => normalizeBookingExperience(booking.experiences)?.host_id)
           .filter(Boolean)
       )
     ) as string[];
@@ -65,11 +92,11 @@ export async function GET() {
       ? await Promise.all([
         supabase
           .from('profiles')
-          .select('id, full_name, avatar_url, email')
+          .select('id, full_name, avatar_url')
           .in('id', hostIds),
         supabase
-          .from('host_applications')
-          .select('user_id, name, profile_photo, self_intro, languages, host_nationality')
+          .from('public_host_applications')
+          .select('user_id, name, profile_photo')
           .in('user_id', hostIds),
       ])
       : [{ data: [], error: null }, { data: [], error: null }];
@@ -89,12 +116,13 @@ export async function GET() {
     let syncCompletedNeeded = false;
 
     for (const booking of bookings || []) {
-      const expDate = new Date(`${booking.date}T${booking.time}`);
+      const experience = normalizeBookingExperience(booking.experiences);
+      const expDate = new Date(`${booking.date}T${booking.time || '00:00'}`);
       let status = booking.status;
-      const hostPublicProfile = booking.experiences?.host_id
+      const hostPublicProfile = experience?.host_id
         ? getHostPublicProfile(
-          hostProfileMap.get(String(booking.experiences.host_id)),
-          hostApplicationMap.get(String(booking.experiences.host_id)),
+          hostProfileMap.get(String(experience.host_id)),
+          hostApplicationMap.get(String(experience.host_id)),
           'Host'
         )
         : null;
@@ -111,17 +139,17 @@ export async function GET() {
       updatedTrips.push({
         id: booking.id,
         orderId: booking.order_id || booking.id.slice(0, 8),
-        expId: booking.experiences?.id,
-        title: booking.experiences?.title,
-        title_ko: booking.experiences?.title_ko || null,
-        title_en: booking.experiences?.title_en || null,
-        title_ja: booking.experiences?.title_ja || null,
-        title_zh: booking.experiences?.title_zh || null,
-        image: booking.experiences?.image_url,
-        photos: booking.experiences?.photos, // 🟢 누락되었던 체험 사진 배열 추가 매핑
-        location: booking.experiences?.location,
-        meetingPoint: booking.experiences?.meeting_point,
-        meetingPointI18n: booking.experiences?.meeting_point_i18n || null,
+        expId: experience?.id,
+        title: experience?.title,
+        title_ko: experience?.title_ko || null,
+        title_en: experience?.title_en || null,
+        title_ja: experience?.title_ja || null,
+        title_zh: experience?.title_zh || null,
+        image: experience?.image_url,
+        photos: experience?.photos, // 🟢 누락되었던 체험 사진 배열 추가 매핑
+        location: experience?.location,
+        meetingPoint: experience?.meeting_point,
+        meetingPointI18n: experience?.meeting_point_i18n || null,
         date: booking.date,
         time: booking.time,
         guests: booking.guests,
@@ -129,7 +157,7 @@ export async function GET() {
         status: status, // 업데이트된 상태 사용
         cancelReason: booking.cancel_reason || null,
         paymentDate: booking.created_at,
-        hostId: booking.experiences?.host_id, // 메시지 보내기용
+        hostId: experience?.host_id, // 메시지 보내기용
         hostName: hostPublicProfile?.name || 'Host',
         hostAvatarUrl: hostPublicProfile?.avatarUrl || null,
         hasReview: booking.reviews && booking.reviews.length > 0, // 🟢 후기 작성 여부 (배열 길이로 체크)

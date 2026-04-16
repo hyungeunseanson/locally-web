@@ -2,7 +2,10 @@ import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient } from '@/app/utils/supabase/server';
 import { NextResponse } from 'next/server';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
-import { isCancelledBookingStatus } from '@/app/constants/bookingStatus';
+import {
+  isCancelledBookingStatus,
+  isCancellationRequestedBookingStatus,
+} from '@/app/constants/bookingStatus';
 import { calculateBookingCancellationSettlement, getBookingPaidAmount } from '@/app/utils/bookingFinance';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
@@ -76,13 +79,14 @@ export async function POST(request: Request) {
       email: user.email,
     });
 
+    const isGuestOwner = booking.user_id === user.id;
+    const isHostOwner = booking.experiences?.host_id === user.id;
+    const isCancellationRequested = isCancellationRequestedBookingStatus(booking.status);
+
     // [C-3] Ownership Verification
-    if (!isAdmin && booking.user_id !== user.id && booking.experiences?.host_id !== user.id) {
+    if (!isAdmin && !isGuestOwner && !isHostOwner) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
-
-    // [CRITICAL Fix] 모든 terminal 상태(cancelled/declined/cancellation_requested) 차단 — 기존 isCancelledOnlyBookingStatus('cancelled' 단독)는 declined/cancellation_requested를 통과시킴
-    if (isCancelledBookingStatus(booking.status)) return NextResponse.json({ error: '이미 취소됨' }, { status: 400 });
 
     // 호스트 직접 취소는 더 이상 허용하지 않는다.
     // 운영팀이 검토 후 관리자 취소 경로를 사용해야 하므로 guest reason review flow로 유도한다.
@@ -90,7 +94,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '호스트 직접 취소는 지원하지 않습니다. 운영팀 검토 요청 경로를 이용해주세요.' }, { status: 403 });
     }
 
-    if (!isHostCancel && isBookingReviewPending(booking.cancel_reason)) {
+    if (!isAdmin && isHostOwner && !isCancellationRequested) {
+      return NextResponse.json(
+        { error: '호스트는 게스트 취소 요청 건만 승인할 수 있습니다.' },
+        { status: 403 }
+      );
+    }
+
+    if (!isAdmin && isGuestOwner && isCancellationRequested) {
+      return NextResponse.json({ error: '이미 취소 승인 대기 중입니다.' }, { status: 409 });
+    }
+
+    // [CRITICAL Fix] 취소 완료 상태는 caller와 무관하게 차단하되,
+    // 기존 host approval consumer가 사용하는 `cancellation_requested`는 별도 approval path로 유지한다.
+    if (!isCancellationRequested && isCancelledBookingStatus(booking.status)) {
+      return NextResponse.json({ error: '이미 취소됨' }, { status: 400 });
+    }
+
+    if (isGuestOwner && isBookingReviewPending(booking.cancel_reason)) {
       return NextResponse.json({ error: '이미 운영팀 검토가 진행 중입니다.' }, { status: 409 });
     }
 
@@ -98,7 +119,7 @@ export async function POST(request: Request) {
       ? REVIEW_PENDING_REASON_CODES[reasonCode]
       : null;
 
-    if (!isHostCancel && reviewType) {
+    if (isGuestOwner && reviewType) {
       const [year, month, day] = String(booking.date || '').split('-').map(Number);
       const bookingDate = new Date(year, (month || 1) - 1, day || 1);
       const today = new Date();
@@ -194,19 +215,21 @@ export async function POST(request: Request) {
     }
 
     // [Race Guard] Atomic lock: PG 환불 전에 DB 상태를 먼저 점유 — 동시 요청 이중 환불 방지
-    const { data: lockAcquired } = await supabaseAdmin
-      .from('bookings')
-      .update({ status: 'cancellation_requested' })
-      .eq('id', bookingId)
-      .eq('status', booking.status)
-      .select('id')
-      .maybeSingle();
+    if (!isCancellationRequested) {
+      const { data: lockAcquired } = await supabaseAdmin
+        .from('bookings')
+        .update({ status: 'cancellation_requested' })
+        .eq('id', bookingId)
+        .eq('status', booking.status)
+        .select('id')
+        .maybeSingle();
 
-    if (!lockAcquired) {
-      return NextResponse.json({ error: '이미 취소 처리 중이거나 취소된 예약입니다.' }, { status: 409 });
+      if (!lockAcquired) {
+        return NextResponse.json({ error: '이미 취소 처리 중이거나 취소된 예약입니다.' }, { status: 409 });
+      }
+
+      cancellationLockAcquired = true;
     }
-
-    cancellationLockAcquired = true;
 
     // 2. 환불액 및 정산액 계산
     let refundRate = 0;

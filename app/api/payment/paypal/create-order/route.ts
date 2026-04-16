@@ -49,10 +49,19 @@ export async function POST(request: Request) {
       );
     }
 
-    if ((booking.payment_method || '').toLowerCase() === 'bank') {
+    const normalizedPaymentMethod = String(booking.payment_method || '').toLowerCase();
+
+    if (normalizedPaymentMethod === 'bank') {
       return NextResponse.json(
         { success: false, error: '무통장 예약에는 PayPal 결제를 시작할 수 없습니다.' },
         { status: 400 }
+      );
+    }
+
+    if (normalizedPaymentMethod && normalizedPaymentMethod !== 'paypal') {
+      return NextResponse.json(
+        { success: false, error: 'PayPal 결제 대기 예약만 PayPal 주문을 생성할 수 있습니다.' },
+        { status: 409 }
       );
     }
 
