@@ -85,6 +85,61 @@ async function createAuthUser(user: TestUser) {
 
   createdAuthUserIds.push(data.user.id);
   await waitForProfile(data.user.id);
+
+  const { error: userRowError } = await supabase
+    .from('users')
+    .upsert(
+      {
+        id: data.user.id,
+        email: user.email,
+        role: 'guest',
+      },
+      { onConflict: 'id' }
+    );
+
+  if (userRowError) throw userRowError;
+
+  return data.user.id;
+}
+
+async function createApprovedHostApplication(userId: string, user: TestUser) {
+  const supabase = getAdminClient();
+  const { data, error } = await supabase
+    .from('host_applications')
+    .insert({
+      user_id: userId,
+      host_nationality: 'Korea',
+      languages: ['한국어'],
+      language_levels: [{ language: '한국어', level: 5 }],
+      name: user.fullName,
+      phone: user.phone,
+      dob: '1990.01.01',
+      email: user.email,
+      instagram: '@codex_host_register_visibility',
+      source: 'playwright',
+      language_cert: 'TOPIK 6',
+      profile_photo: 'https://example.com/profile.png',
+      self_intro: '승인된 호스트의 등록 페이지 직접 진입 가드를 검증하기 위한 테스트 지원서입니다. 충분한 길이의 소개문을 포함합니다.',
+      id_card_file: 'id_card/approved-host.png',
+      bank_name: '테스트은행',
+      account_number: '12345678901234',
+      account_holder: user.fullName,
+      motivation: '승인된 호스트는 등록 폼이 아니라 대시보드로 보내야 하는지 확인하기 위한 테스트 지원 동기입니다.',
+      status: 'approved',
+    })
+    .select('id')
+    .single();
+
+  if (error || !data?.id) {
+    throw error || new Error('Failed to create approved host application.');
+  }
+
+  const { error: roleError } = await supabase
+    .from('users')
+    .update({ role: 'host' })
+    .eq('id', userId);
+
+  if (roleError) throw roleError;
 }
 
 async function login(page: Page, user: TestUser) {
@@ -162,4 +217,20 @@ test('host register keeps previous button visible and shows self-intro language 
       /보여주고 싶은 게스트의 언어로 작성해주세요\.\s*예: 한국인 게스트에게 보여주고 싶다면 한국어로 작성하면 됩니다\.|Write this in the language of the guests you want to show it to\.\s*Example: if you want Korean guests to read it, write it in Korean\.|見せたいゲストの言語で作成してください。\s*例：韓国人ゲストに見せたい場合は韓国語で作成してください。|请使用你想展示给游客看的语言来填写。\s*例：如果你想给韩国游客看，就用韩语来写。/
     )
   ).toBeVisible();
+});
+
+test('approved host is redirected from /host/register to the host dashboard', async ({ page }) => {
+  const user = createUser('approved-redirect');
+  const userId = await createAuthUser(user);
+  await createApprovedHostApplication(userId, user);
+  await login(page, user);
+
+  await page.goto('/host/register', { waitUntil: 'domcontentloaded' });
+
+  await page.waitForURL('**/host/dashboard', { timeout: 15000 });
+  await expect(
+    page.getByRole('heading', {
+      name: /국적은|nationality|国籍|国籍|어떤 언어로 소통이|Which languages can|どの言語でコミュニケーション|可以使用哪些语言沟通/,
+    })
+  ).toHaveCount(0);
 });

@@ -59,19 +59,13 @@ export function AuthProvider({
     }
 
     try {
-      const [{ data: app }, { count }] = await Promise.all([
-        supabase
-          .from('host_applications')
-          .select('status')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-        supabase
-          .from('experiences')
-          .select('*', { count: 'exact', head: true })
-          .eq('host_id', userId),
-      ]);
+      const { data: app } = await supabase
+        .from('host_applications')
+        .select('status')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
       if (app) {
         setApplicationStatus(app.status);
@@ -81,11 +75,7 @@ export function AuthProvider({
 
       const normalizedStatus = normalizeApplicationStatus(app?.status);
 
-      if ((normalizedStatus && (normalizedStatus === 'approved' || normalizedStatus === 'active')) || (count && count > 0)) {
-        setIsHost(true);
-      } else {
-        setIsHost(false);
-      }
+      setIsHost(normalizedStatus === 'approved' || normalizedStatus === 'active');
     } finally {
       setHostStatusResolved(true);
     }

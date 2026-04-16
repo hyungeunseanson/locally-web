@@ -103,6 +103,11 @@ function getFallbackLevel(value: unknown): LanguageLevel {
   return 3;
 }
 
+function normalizeApplicationStatus(value: string | null | undefined) {
+  const normalized = value?.trim().toLowerCase();
+  return normalized || null;
+}
+
 class LocalizedSubmitError extends Error {}
 
 function reportHostRegisterStorageUploadFailure(
@@ -149,7 +154,13 @@ export default function HostRegisterPage() {
   const copy = getHostRegisterCopy(lang);
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
-  const { refreshAuth } = useAuth();
+  const {
+    user,
+    isHost,
+    applicationStatus,
+    hostStatusResolved,
+    refreshAuth,
+  } = useAuth();
   const { showToast, showHeicUnsupportedToast } = useToast();
 
   const [step, setStep] = useState(1);
@@ -157,9 +168,23 @@ export default function HostRegisterPage() {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<HostRegisterFormData>(INITIAL_FORM_DATA);
   const [files, setFiles] = useState<{ profile?: File; idCard?: File }>({});
+  const normalizedApplicationStatus = normalizeApplicationStatus(applicationStatus);
+  const shouldRedirectApprovedHost =
+    Boolean(user?.id)
+    && hostStatusResolved
+    && (isHost || normalizedApplicationStatus === 'approved' || normalizedApplicationStatus === 'active');
+
+  useEffect(() => {
+    if (!shouldRedirectApprovedHost) return;
+    router.replace('/host/dashboard');
+  }, [router, shouldRedirectApprovedHost]);
 
   useEffect(() => {
     const fetchExistingData = async () => {
+      if (shouldRedirectApprovedHost) {
+        return;
+      }
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -174,6 +199,12 @@ export default function HostRegisterPage() {
         .maybeSingle();
 
       if (!data) return;
+
+      const latestStatus = normalizeApplicationStatus(data.status);
+      if (latestStatus === 'approved' || latestStatus === 'active') {
+        router.replace('/host/dashboard');
+        return;
+      }
 
       setFormData((prev) => ({
         ...prev,
@@ -204,7 +235,7 @@ export default function HostRegisterPage() {
     };
 
     fetchExistingData();
-  }, [supabase]);
+  }, [router, shouldRedirectApprovedHost, supabase]);
 
   const updateData = (key: keyof HostRegisterFormData, value: HostRegisterFormData[keyof HostRegisterFormData]) => {
     setFormData((prev) => ({ ...prev, [key]: value }));

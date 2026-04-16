@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import LoginModal from '@/app/components/LoginModal';
@@ -24,13 +24,8 @@ export default function HostLandingActionBar({
 }: HostLandingActionBarProps) {
   const router = useRouter();
   const { t } = useLanguage();
-  const { user, isHost, applicationStatus, isLoading, refreshHostStatus } = useAuth();
+  const { user, isHost, applicationStatus, isLoading } = useAuth();
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
-
-  useEffect(() => {
-    if (!user?.id) return;
-    void refreshHostStatus();
-  }, [refreshHostStatus, user?.id]);
 
   const normalizedStatus = useMemo<ApplicationStatus>(() => {
     const status = applicationStatus?.toLowerCase().trim();
