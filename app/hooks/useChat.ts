@@ -130,6 +130,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   const realtimeMessageFollowUpTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasPrimedNotificationsRef = useRef(false);
   const latestNotificationIdRef = useRef<number | null>(null);
+  const lastRealtimeSignalAtRef = useRef(0);
 
   const secureUrl = (url: string | null | undefined) => {
     if (!url || url === '') return null;
@@ -249,18 +250,42 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
   const markAsRead = useCallback(async (inquiryId: number | string) => {
     if (!currentUser) return;
-    setInquiries((prev) => prev.map((inq) =>
-      inq.id === inquiryId ? { ...inq, unread_count: 0 } : inq
-    ));
+    const targetId = String(inquiryId);
+    const previousInquiries = inquiriesRef.current;
+    const previousSelected = selectedInquiryRef.current;
+    const nextInquiries = previousInquiries.map((inq) =>
+      String(inq.id) === targetId ? { ...inq, unread_count: 0 } : inq
+    );
+
+    inquiriesRef.current = nextInquiries;
+    setInquiries(nextInquiries);
+
+    if (previousSelected && String(previousSelected.id) === targetId) {
+      const nextSelected = { ...previousSelected, unread_count: 0 };
+      selectedInquiryRef.current = nextSelected;
+      setSelectedInquiry(nextSelected);
+    }
 
     try {
-      await fetch('/api/inquiries/read', {
+      const response = await fetch('/api/inquiries/read', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ inquiryId }),
       });
+      const result = await response.json();
+
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || '읽음 처리에 실패했습니다.');
+      }
     } catch (error) {
       console.error('[useChat] markAsRead failed:', error);
+      inquiriesRef.current = previousInquiries;
+      setInquiries(previousInquiries);
+
+      if (previousSelected && String(previousSelected.id) === targetId) {
+        selectedInquiryRef.current = previousSelected;
+        setSelectedInquiry(previousSelected);
+      }
     }
   }, [currentUser]);
 
@@ -521,7 +546,6 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
               : msg
           )
         );
-        void fetchInquiries(false);
       } else {
         const persistedMessage: InquiryMessageView = {
           id: result.messageId,
@@ -541,7 +565,6 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         };
 
         setMessages((prev) => [...prev, persistedMessage]);
-        void fetchInquiries(false);
       }
     } catch (err: unknown) {
       const dbError = err as { code?: string, message?: string };
@@ -688,7 +711,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
           if (processedEventRef.current.has(eventKey)) return;
           processedEventRef.current.add(eventKey);
           setTimeout(() => processedEventRef.current.delete(eventKey), 1500);
-
+          lastRealtimeSignalAtRef.current = Date.now();
           if (newPayload && newPayload.sender_id !== currentUser.id) {
             scheduleRealtimeInquiryRefresh();
             if (selectedInquiryRef.current && String(newPayload.inquiry_id) === String(selectedInquiryRef.current.id)) {
@@ -711,7 +734,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
           if (processedEventRef.current.has(eventKey)) return;
           processedEventRef.current.add(eventKey);
           setTimeout(() => processedEventRef.current.delete(eventKey), 1500);
-
+          lastRealtimeSignalAtRef.current = Date.now();
           const inquiryId = newPayload?.inquiry_id || oldPayload?.inquiry_id;
           if (!inquiryId) return;
 
@@ -785,11 +808,20 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     if (!latestMessageNotification) return;
     if (latestNotificationIdRef.current === latestMessageNotification.id) return;
     latestNotificationIdRef.current = latestMessageNotification.id;
+    const selected = selectedInquiryRef.current;
+    const linkedInquiryId = getInquiryIdFromNotificationLink(latestMessageNotification.link);
+    if (Date.now() - lastRealtimeSignalAtRef.current < 1500) {
+      if (selected && linkedInquiryId && String(linkedInquiryId) === String(selected.id)) {
+        scheduleRealtimeMessageRefresh(selected.id, {
+          primaryDelayMs: 700,
+          followUpDelayMs: 0,
+        });
+      }
+      return;
+    }
 
     scheduleRealtimeInquiryRefresh();
 
-    const selected = selectedInquiryRef.current;
-    const linkedInquiryId = getInquiryIdFromNotificationLink(latestMessageNotification.link);
     if (!selected || !linkedInquiryId) return;
     if (String(linkedInquiryId) !== String(selected.id)) return;
 
@@ -798,6 +830,25 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       followUpDelayMs: 700,
     });
   }, [notifications, scheduleRealtimeInquiryRefresh, scheduleRealtimeMessageRefresh]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return;
+
+      scheduleRealtimeInquiryRefresh();
+      if (selectedInquiryRef.current) {
+        scheduleRealtimeMessageRefresh(selectedInquiryRef.current.id, {
+          primaryDelayMs: 0,
+          followUpDelayMs: 700,
+        });
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [currentUser, scheduleRealtimeInquiryRefresh, scheduleRealtimeMessageRefresh]);
 
   const clearSelected = () => {
     selectedInquiryRef.current = null;

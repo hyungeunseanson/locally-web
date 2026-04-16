@@ -194,6 +194,38 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Admin chats smoke', () => {
+  test('opens admin inquiry detail without reloading the inquiry list', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const adminUser = createUser('admin.chats.detail');
+    const guestUser = createUser('guest.chats.detail');
+
+    await createAuthUser(adminUser, { whitelistAdmin: true });
+    const guestUserId = await createAuthUser(guestUser);
+
+    const inquiryMessage = `코덱스 관리자 상세 진입 문의 ${Date.now()}`;
+    const inquiryId = await seedAdminSupportInquiry(guestUserId, inquiryMessage);
+
+    await login(page, adminUser);
+
+    let listRequestCount = 0;
+    await page.route('**/api/admin/inquiries', async (route) => {
+      listRequestCount += 1;
+      await route.continue();
+    });
+
+    await page.goto(`/admin/dashboard?tab=CHATS&inquiryId=${inquiryId}`, { waitUntil: 'domcontentloaded' });
+
+    await expect(
+      page.locator('div.bg-white.border.border-slate-200.rounded-tl-none').filter({ hasText: inquiryMessage }).last()
+    ).toBeVisible({ timeout: 15000 });
+
+    await page.waitForTimeout(1000);
+    expect(listRequestCount).toBeLessThanOrEqual(2);
+
+    await page.unroute('**/api/admin/inquiries');
+  });
+
   test('updates admin support inquiry status through admin route', async ({ page }) => {
     test.setTimeout(90000);
 

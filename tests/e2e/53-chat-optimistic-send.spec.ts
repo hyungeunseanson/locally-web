@@ -340,7 +340,7 @@ test('guest inbox appends text messages optimistically before delayed send resol
   }).toBe(messageText);
 });
 
-test('guest inbox shows a host reply without reloading the page', async ({ browser }) => {
+test('guest inbox catches up to a host reply without a full reload after returning', async ({ browser }) => {
   test.setTimeout(90000);
 
   const host = createUser('host-reply');
@@ -380,6 +380,8 @@ test('guest inbox shows a host reply without reloading the page', async ({ brows
       return row?.content || null;
     }).toBe(hostReplyMessage);
 
+    await guestPage.bringToFront();
+    await guestPage.locator('div.cursor-pointer').filter({ hasText: host.fullName }).first().click();
     await expect(
       guestPage.locator('div.bg-white.border.border-gray-200.rounded-tl-sm').filter({ hasText: hostReplyMessage }).last()
     ).toBeVisible({ timeout: 8000 });
@@ -387,4 +389,48 @@ test('guest inbox shows a host reply without reloading the page', async ({ brows
     await guestContext.close();
     await hostContext.close();
   }
+});
+
+test('host inbox restores the unread badge when the read route fails', async ({ page }) => {
+  test.setTimeout(90000);
+
+  const host = createUser('host-read-fail');
+  const guest = createUser('guest-read-fail');
+  const hostId = await createAuthUser(host);
+  const guestId = await createAuthUser(guest);
+  await createApprovedHostApplication(hostId, host);
+  const experienceId = await createExperienceFixture(hostId);
+  const inquiryId = await createInquiry({ guestId, hostId, experienceId });
+  const unreadGuestMessage = `Unread guest message ${Date.now()}`;
+  await createInquiryMessage({
+    inquiryId,
+    senderId: guestId,
+    content: unreadGuestMessage,
+  });
+
+  await login(page, host);
+
+  let readRequestCount = 0;
+  await page.route('**/api/inquiries/read', async (route) => {
+    readRequestCount += 1;
+    await route.fulfill({
+      status: 500,
+      contentType: 'application/json',
+      body: JSON.stringify({ success: false, error: 'forced read failure' }),
+    });
+  });
+
+  await page.goto(`/host/dashboard?tab=inquiries&inquiryId=${inquiryId}`, { waitUntil: 'networkidle' });
+  await expect(page.getByText(unreadGuestMessage).last()).toBeVisible({ timeout: 15000 });
+
+  const inquiryRow = page.locator('div.cursor-pointer').filter({ hasText: guest.fullName }).first();
+  const unreadBadge = inquiryRow.locator('span.w-5.h-5.bg-rose-500');
+
+  await expect.poll(() => readRequestCount, {
+    timeout: 15000,
+    intervals: [300, 500, 1000],
+  }).toBeGreaterThan(0);
+  await expect(unreadBadge).toHaveText('1');
+
+  await page.unroute('**/api/inquiries/read');
 });

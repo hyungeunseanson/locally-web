@@ -53,6 +53,14 @@ type AdminSendMessageResult = {
 
 type InquiryPreviewPatch = Pick<MonitorInquiry, 'content' | 'updated_at'>;
 
+function isAdminSupportType(type?: string | null) {
+  return type === 'admin' || type === 'admin_support';
+}
+
+function sortMonitorInquiries(items: MonitorInquiry[]) {
+  return [...items].sort((a, b) => new Date(b.updated_at || '').getTime() - new Date(a.updated_at || '').getTime());
+}
+
 function mergeMonitorInquiry(
   base: MonitorInquiry | null | undefined,
   patch: Partial<MonitorInquiry> | null | undefined
@@ -138,18 +146,33 @@ export function useAdminChatQuery() {
     setSelectedInquiry(mergedSelected);
   }, []);
 
-  const patchInquiryPreview = useCallback((inquiryId: number | string, patch: InquiryPreviewPatch) => {
-    const targetId = String(inquiryId);
-    const nextInquiries = inquiriesRef.current.map((inquiry) =>
-      String(inquiry.id) === targetId
-        ? { ...inquiry, ...patch }
-        : inquiry
-    );
-
-    inquiriesRef.current = nextInquiries;
-    setInquiries(nextInquiries);
-    syncSelectedInquiryFromRows(nextInquiries);
+  const commitInquiries = useCallback((nextInquiries: MonitorInquiry[]) => {
+    const sortedInquiries = sortMonitorInquiries(nextInquiries);
+    inquiriesRef.current = sortedInquiries;
+    setInquiries(sortedInquiries);
+    syncSelectedInquiryFromRows(sortedInquiries);
   }, [syncSelectedInquiryFromRows]);
+
+  const patchInquiry = useCallback((inquiryId: number | string, patch: Partial<MonitorInquiry>) => {
+    const targetId = String(inquiryId);
+    let found = false;
+
+    const nextInquiries = inquiriesRef.current.map((inquiry) => {
+      if (String(inquiry.id) !== targetId) {
+        return inquiry;
+      }
+
+      found = true;
+      return mergeMonitorInquiry(inquiry, patch) ?? inquiry;
+    });
+
+    if (!found) return;
+    commitInquiries(nextInquiries);
+  }, [commitInquiries]);
+
+  const patchInquiryPreview = useCallback((inquiryId: number | string, patch: InquiryPreviewPatch) => {
+    patchInquiry(inquiryId, patch);
+  }, [patchInquiry]);
 
   const fetchInquiries = useCallback(async (showLoading = true) => {
     if (showLoading && inquiriesRef.current.length === 0) setIsLoading(true);
@@ -194,27 +217,41 @@ export function useAdminChatQuery() {
       setMessages(Array.isArray(result.data) ? result.data : []);
 
       const inquiryDetail = typeof result.inquiry === 'object' && result.inquiry !== null
-        ? result.inquiry as Partial<MonitorInquiry>
-        : null;
+          ? result.inquiry as Partial<MonitorInquiry>
+          : null;
       const selectedFromList = inquiriesRef.current.find((inquiry) => String(inquiry.id) === String(inquiryId));
-      const mergedSelected = mergeMonitorInquiry(
+      const nextSelected = mergeMonitorInquiry(
         selectedInquiryRef.current && String(selectedInquiryRef.current.id) === String(inquiryId)
           ? selectedInquiryRef.current
           : selectedFromList,
         inquiryDetail
       );
+      const shouldClearUnread =
+        isAdminSupportType(
+          inquiryDetail?.type ??
+          selectedFromList?.type ??
+          selectedInquiryRef.current?.type
+        );
+      const mergedSelected = nextSelected && shouldClearUnread
+        ? { ...nextSelected, unread_count: 0 }
+        : nextSelected;
 
       if (mergedSelected) {
         selectedInquiryRef.current = mergedSelected;
         setSelectedInquiry(mergedSelected);
       }
 
-      await fetchInquiries(false);
+      if (inquiryDetail || shouldClearUnread) {
+        patchInquiry(inquiryId, {
+          ...(inquiryDetail ?? {}),
+          ...(shouldClearUnread ? { unread_count: 0 } : {}),
+        });
+      }
     } catch (err: unknown) {
       console.error('[AdminChatQuery] loadMessages error:', err);
       showToast('메시지를 불러오지 못했습니다.', 'error');
     }
-  }, [fetchInquiries, showToast]);
+  }, [patchInquiry, showToast]);
 
   const sendMessage = async (inquiryId: number | string, content: string): Promise<AdminSendMessageResult> => {
     const cleanContent = sanitizeText(content);
@@ -258,7 +295,6 @@ export function useAdminChatQuery() {
         updated_at: result.updatedAt,
       });
       await loadMessages(inquiryId);
-      await fetchInquiries(false); // Update list snippet & timestamp
       return result;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.';
