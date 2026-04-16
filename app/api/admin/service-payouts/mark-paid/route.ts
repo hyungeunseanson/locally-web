@@ -10,6 +10,18 @@ type MarkServicePayoutsBody = {
 
 const ELIGIBLE_SERVICE_PAYOUT_STATUSES = ['completed'];
 
+type TargetServiceBooking = {
+  id: string;
+  order_id: string | null;
+  status: string;
+  payout_status: string | null;
+  host_id: string | null;
+};
+
+type UpdatedServiceBookingRow = {
+  id: string;
+};
+
 export async function POST(request: Request) {
   try {
     const supabaseServer = await createServerClient();
@@ -49,9 +61,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: '일부 서비스 예약을 찾을 수 없습니다.' }, { status: 404 });
     }
 
-    const invalidBookings = targetBookings.filter((booking) => {
+    const normalizedTargetBookings = targetBookings as TargetServiceBooking[];
+
+    const invalidBookings = normalizedTargetBookings.filter((booking) => {
       if (!booking.host_id) return true;
-      if (booking.payout_status === 'paid') return true;
+      if (booking.payout_status !== 'pending') return true;
       return !ELIGIBLE_SERVICE_PAYOUT_STATUSES.includes(booking.status);
     });
 
@@ -68,12 +82,16 @@ export async function POST(request: Request) {
 
     // [Race Guard] payout_status='pending' 조건부 UPDATE — 이중 정산 방지
     const paidAt = new Date().toISOString();
-    let { error: updateError } = await supabaseAdmin
+    let {
+      data: updatedRows,
+      error: updateError,
+    } = await supabaseAdmin
       .from('service_bookings')
       .update({ payout_status: 'paid', payout_paid_at: paidAt })
       .in('id', bookingIds)
       .eq('payout_status', 'pending')
-      .eq('status', 'completed');
+      .eq('status', 'completed')
+      .select('id');
 
     if (updateError && isMissingPayoutPaidAtColumnError(updateError)) {
       const fallbackResult = await supabaseAdmin
@@ -81,13 +99,28 @@ export async function POST(request: Request) {
         .update({ payout_status: 'paid' })
         .in('id', bookingIds)
         .eq('payout_status', 'pending')
-        .eq('status', 'completed');
+        .eq('status', 'completed')
+        .select('id');
 
+      updatedRows = fallbackResult.data;
       updateError = fallbackResult.error;
     }
 
     if (updateError) {
       throw updateError;
+    }
+
+    const updatedIds = ((updatedRows || []) as UpdatedServiceBookingRow[]).map((row) => row.id);
+
+    if (updatedIds.length !== bookingIds.length) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: '다른 관리자에 의해 정산 상태가 변경되었습니다. 새로고침 후 다시 확인해 주세요.',
+          conflictedIds: bookingIds.filter((bookingId) => !updatedIds.includes(bookingId)),
+        },
+        { status: 409 }
+      );
     }
 
     await recordAuditLog({
@@ -98,12 +131,12 @@ export async function POST(request: Request) {
       target_id: bookingIds.length === 1 ? bookingIds[0] : 'MULTIPLE',
       details: {
         booking_ids: bookingIds,
-        order_ids: targetBookings.map((booking) => booking.order_id),
+        order_ids: normalizedTargetBookings.map((booking) => booking.order_id),
         count: bookingIds.length,
       },
     });
 
-    return NextResponse.json({ success: true, updatedCount: bookingIds.length });
+    return NextResponse.json({ success: true, updatedCount: updatedIds.length });
   } catch (error: unknown) {
     console.error('[ADMIN] service-payouts/mark-paid error:', error);
     const message = error instanceof Error ? error.message : '서버 오류가 발생했습니다.';

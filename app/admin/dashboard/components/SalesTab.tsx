@@ -63,10 +63,19 @@ type ExperiencePayoutGuard = {
   message: string;
 };
 
+type ServicePayoutGuard = ExperiencePayoutGuard;
+
 const DEFAULT_EXPERIENCE_PAYOUT_GUARD: ExperiencePayoutGuard = {
   safe: false,
   tone: 'info',
   title: '정산 상태 확인 중',
+  message: '잠시 후 다시 확인하거나 점검판을 열어 상태를 확인하세요.',
+};
+
+const DEFAULT_SERVICE_PAYOUT_GUARD: ServicePayoutGuard = {
+  safe: false,
+  tone: 'info',
+  title: '서비스 정산 상태 확인 중',
   message: '잠시 후 다시 확인하거나 점검판을 열어 상태를 확인하세요.',
 };
 
@@ -250,6 +259,9 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
   const [settlementRows, setSettlementRows] = useState<AdminCombinedPayoutQueueRow[]>([]);
   const [experiencePayoutGuard, setExperiencePayoutGuard] = useState<ExperiencePayoutGuard>(
     DEFAULT_EXPERIENCE_PAYOUT_GUARD
+  );
+  const [servicePayoutGuard, setServicePayoutGuard] = useState<ServicePayoutGuard>(
+    DEFAULT_SERVICE_PAYOUT_GUARD
   );
   const [isSalesLoading, setIsSalesLoading] = useState(true);
   const [serviceCSVLoading, setServiceCSVLoading] = useState(false);
@@ -737,6 +749,7 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
       <SettlementSyncPanel
         onSyncApplied={fetchSalesData}
         onExperiencePayoutGuardChange={setExperiencePayoutGuard}
+        onServicePayoutGuardChange={setServicePayoutGuard}
       />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
@@ -855,6 +868,22 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
           >
             <p className="font-semibold">{experiencePayoutGuard.title}</p>
             <p className="mt-1">{experiencePayoutGuard.message}</p>
+          </div>
+        )}
+
+        {settlementTab === 'PENDING' && svcPendingHostPayout > 0 && !servicePayoutGuard.safe && (
+          <div
+            data-testid="sales-service-payout-guard"
+            className={`border-b px-4 py-3 text-sm md:px-6 ${
+              servicePayoutGuard.tone === 'info'
+                ? 'border-blue-100 bg-blue-50 text-blue-700'
+                : servicePayoutGuard.tone === 'warning'
+                  ? 'border-amber-100 bg-amber-50 text-amber-700'
+                  : 'border-red-100 bg-red-50 text-red-700'
+            }`}
+          >
+            <p className="font-semibold">{servicePayoutGuard.title}</p>
+            <p className="mt-1">{servicePayoutGuard.message}</p>
           </div>
         )}
 
@@ -996,9 +1025,15 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
                                           row.domains.service!.pending_entries.map((entry) => entry.id)
                                         )
                                       }
-                                      disabled={isProcessing || row.bank === '계좌 미등록'}
+                                      disabled={
+                                        isProcessing ||
+                                        row.bank === '계좌 미등록' ||
+                                        !servicePayoutGuard.safe
+                                      }
                                       className={`flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold text-white shadow-sm transition-colors sm:w-auto md:py-1.5 ${
-                                        isProcessing || row.bank === '계좌 미등록'
+                                        isProcessing ||
+                                        row.bank === '계좌 미등록' ||
+                                        !servicePayoutGuard.safe
                                           ? 'cursor-not-allowed bg-slate-300'
                                           : 'bg-emerald-600 hover:bg-emerald-500'
                                       }`}

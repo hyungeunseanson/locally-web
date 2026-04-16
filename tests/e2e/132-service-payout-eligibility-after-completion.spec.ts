@@ -52,11 +52,20 @@ async function createApprovedHostApplication(userId: string, host: E2ETestUser) 
   createdHostApplicationIds.push(data.id);
 }
 
-async function createPendingServiceFixture(params: { customerId: string; hostId: string }) {
+async function createPendingServiceFixture(params: {
+  customerId: string;
+  hostId: string;
+  serviceDate?: Date;
+  bookingStatus?: 'PENDING' | 'PAID' | 'confirmed' | 'completed';
+  payoutStatus?: string;
+}) {
   const supabase = getTestAdminClient();
   const timestamp = Date.now();
-  const futureDate = new Date();
-  futureDate.setDate(futureDate.getDate() + 5);
+  const serviceDate = params.serviceDate ?? (() => {
+    const date = new Date();
+    date.setDate(date.getDate() + 5);
+    return date;
+  })();
 
   const { data: requestRow, error: requestError } = await supabase
     .from('service_requests')
@@ -66,7 +75,7 @@ async function createPendingServiceFixture(params: { customerId: string; hostId:
       description: '서비스 완료 전 정산 차단 검증용 의뢰입니다.',
       city: 'Seoul',
       country: 'KR',
-      service_date: formatDate(futureDate),
+      service_date: formatDate(serviceDate),
       start_time: '10:00',
       duration_hours: 4,
       languages: ['한국어'],
@@ -109,8 +118,8 @@ async function createPendingServiceFixture(params: { customerId: string; hostId:
     amount: 180000,
     host_payout_amount: 110000,
     platform_revenue: 70000,
-    status: 'PAID',
-    payout_status: 'pending',
+    status: params.bookingStatus ?? 'PAID',
+    payout_status: params.payoutStatus ?? 'pending',
     payment_method: 'card',
   });
 
@@ -257,5 +266,53 @@ test.describe.serial('Service payout eligibility after completion', () => {
     expect(bookingRow?.status).toBe('completed');
     expect(bookingRow?.payout_status).toBe('paid');
     expect(bookingRow?.payout_paid_at).toBeTruthy();
+  });
+
+  test('fails closed when a completed service booking is no longer pending payout', async ({ page }) => {
+    test.setTimeout(120000);
+
+    const adminUser = createTestUser('service.payout.nonpending.admin');
+    const customerUser = createTestUser('service.payout.nonpending.customer');
+    const hostUser = createTestUser('service.payout.nonpending.host');
+
+    const adminId = await createAuthUser(adminUser, { isAdmin: true });
+    const customerId = await createAuthUser(customerUser);
+    const hostId = await createAuthUser(hostUser);
+    createdAuthUserIds.push(adminId, customerId, hostId);
+    createdWhitelistEmails.push(adminUser.email);
+
+    await createApprovedHostApplication(hostId, hostUser);
+
+    const completedDate = new Date();
+    completedDate.setDate(completedDate.getDate() - 3);
+
+    const fixture = await createPendingServiceFixture({
+      customerId,
+      hostId,
+      serviceDate: completedDate,
+      bookingStatus: 'completed',
+      payoutStatus: 'processing',
+    });
+
+    await login(page, adminUser);
+    await page.goto('/admin/dashboard?tab=SALES', { waitUntil: 'networkidle' });
+
+    const payoutAttempt = await markServicePayout(page, fixture.bookingId);
+    expect(payoutAttempt.status).toBe(409);
+    expect(payoutAttempt.body.success).toBeFalsy();
+    expect(payoutAttempt.body.error).toMatch(/정산 완료 처리할 수 없는 예약/);
+
+    const supabase = getTestAdminClient();
+    const { data: bookingRow, error: bookingError } = await supabase
+      .from('service_bookings')
+      .select('status, payout_status, payout_paid_at')
+      .eq('id', fixture.bookingId)
+      .maybeSingle();
+
+    if (bookingError) throw bookingError;
+
+    expect(bookingRow?.status).toBe('completed');
+    expect(bookingRow?.payout_status).toBe('processing');
+    expect(bookingRow?.payout_paid_at).toBeNull();
   });
 });

@@ -15,6 +15,7 @@ import { useToast } from '@/app/context/ToastContext';
 type SettlementSyncPanelProps = {
   onSyncApplied?: () => Promise<void> | void;
   onExperiencePayoutGuardChange?: (guard: ExperiencePayoutGuard) => void;
+  onServicePayoutGuardChange?: (guard: ServicePayoutGuard) => void;
 };
 
 type ActionResult = {
@@ -34,6 +35,8 @@ type ExperiencePayoutGuard = {
   title: string;
   message: string;
 };
+
+type ServicePayoutGuard = ExperiencePayoutGuard;
 
 type CollapsedSummary = {
   tone: 'success' | 'info' | 'warning' | 'error';
@@ -212,11 +215,103 @@ function getExperiencePayoutGuard(params: {
   };
 }
 
+function getServiceOperatorGuidance(
+  serviceJob: SettlementSyncJobHealth | null,
+  infraError: string | null
+): OperatorGuidance | null {
+  if (infraError || !serviceJob || serviceJob.health_state === 'healthy') {
+    return null;
+  }
+
+  switch (serviceJob.health_state) {
+    case 'delayed':
+      return {
+        tone: 'warning',
+        title: '서비스 최신 반영 확인 필요',
+        message:
+          '최근 완료된 서비스 의뢰가 정산 대기 목록에 아직 덜 반영됐을 수 있습니다. 서비스 정산 전 상태를 다시 확인하세요.',
+      };
+    case 'running':
+      return {
+        tone: 'info',
+        title: '서비스 업데이트 실행 중',
+        message:
+          '서비스 완료 동기화가 실행 중입니다. 서비스 정산은 완료 반영이 끝난 뒤 다시 확인하세요.',
+      };
+    case 'running_stale':
+    case 'failed':
+      return {
+        tone: 'error',
+        title: '서비스 점검 후 진행',
+        message:
+          '지금은 서비스 완료 반영이 덜 됐을 수 있습니다. 서비스 정산 전 점검판에서 상태를 먼저 확인하세요.',
+      };
+    default:
+      return null;
+  }
+}
+
+function getServicePayoutGuard(params: {
+  serviceJob: SettlementSyncJobHealth | null;
+  infraError: string | null;
+  isLoading: boolean;
+}): ServicePayoutGuard {
+  if (params.infraError) {
+    return {
+      safe: false,
+      tone: 'error',
+      title: '서비스 정산 전 확인 필요',
+      message: '지금은 서비스 완료 반영 상태를 확인할 수 없으니 점검판을 먼저 열어 확인하세요.',
+    };
+  }
+
+  if (params.isLoading && !params.serviceJob) {
+    return {
+      safe: false,
+      tone: 'info',
+      title: '서비스 정산 상태 확인 중',
+      message: '잠시 후 다시 확인하거나 점검판을 열어 상태를 확인하세요.',
+    };
+  }
+
+  if (!params.serviceJob) {
+    return {
+      safe: false,
+      tone: 'error',
+      title: '서비스 정산 전 확인 필요',
+      message: '지금은 서비스 완료 반영 상태를 확인할 수 없으니 점검판을 먼저 열어 확인하세요.',
+    };
+  }
+
+  if (params.serviceJob.health_state === 'healthy') {
+    return {
+      safe: true,
+      tone: 'success',
+      title: '서비스 정산 진행 가능',
+      message: '서비스 완료 동기화가 정상입니다. 서비스 정산 대기 목록에서 진행하시면 됩니다.',
+    };
+  }
+
+  return {
+    safe: false,
+    tone:
+      params.serviceJob.health_state === 'running'
+        ? 'info'
+        : params.serviceJob.health_state === 'delayed'
+          ? 'warning'
+          : 'error',
+    title: '서비스 정산 전 확인 필요',
+    message: '지금은 서비스 완료 반영이 덜 됐을 수 있으니 점검판을 먼저 열어 확인하세요.',
+  };
+}
+
 function getCollapsedSummary(params: {
   isLoading: boolean;
   infraError: string | null;
   experienceJob: SettlementSyncJobHealth | null;
+  serviceJob: SettlementSyncJobHealth | null;
   experiencePayoutGuard: ExperiencePayoutGuard;
+  servicePayoutGuard: ServicePayoutGuard;
 }): CollapsedSummary {
   if (params.isLoading && !params.experienceJob && !params.infraError) {
     return {
@@ -227,6 +322,33 @@ function getCollapsedSummary(params: {
   }
 
   if (params.experiencePayoutGuard.safe) {
+    if (!params.servicePayoutGuard.safe) {
+      if (params.serviceJob?.health_state === 'running') {
+        return {
+          tone: 'info',
+          title: '서비스 동기화 실행 중',
+          message:
+            '체험 정산은 진행할 수 있지만, 서비스 완료 반영은 실행 중입니다. 서비스 정산은 잠시 후 다시 확인하세요.',
+        };
+      }
+
+      if (params.serviceJob?.health_state === 'delayed') {
+        return {
+          tone: 'warning',
+          title: '서비스 최신 반영 확인 필요',
+          message:
+            '체험 정산은 진행할 수 있지만, 최근 완료된 서비스 의뢰가 정산 대기 목록에 아직 덜 반영됐을 수 있습니다.',
+        };
+      }
+
+      return {
+        tone: params.servicePayoutGuard.tone,
+        title: '서비스 정산 전 확인 필요',
+        message:
+          '체험 정산은 진행할 수 있지만, 서비스 완료 반영 상태는 점검판에서 먼저 확인한 뒤 진행하세요.',
+      };
+    }
+
     return {
       tone: 'success',
       title: '정산 진행 가능',
@@ -260,6 +382,7 @@ function getCollapsedSummary(params: {
 export default function SettlementSyncPanel({
   onSyncApplied,
   onExperiencePayoutGuardChange,
+  onServicePayoutGuardChange,
 }: SettlementSyncPanelProps) {
   const { showToast } = useToast();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -328,10 +451,18 @@ export default function SettlementSyncPanel({
     () => jobs.find((job) => job.job_name === 'experience_completion_sync') || null,
     [jobs]
   );
+  const serviceJob = useMemo(
+    () => jobs.find((job) => job.job_name === 'service_completion_sync') || null,
+    [jobs]
+  );
 
   const experienceOperatorGuidance = useMemo(
     () => getExperienceOperatorGuidance(experienceJob, infraError),
     [experienceJob, infraError]
+  );
+  const serviceOperatorGuidance = useMemo(
+    () => getServiceOperatorGuidance(serviceJob, infraError),
+    [infraError, serviceJob]
   );
   const experiencePayoutGuard = useMemo(
     () =>
@@ -342,20 +473,35 @@ export default function SettlementSyncPanel({
       }),
     [experienceJob, infraError, isLoading]
   );
+  const servicePayoutGuard = useMemo(
+    () =>
+      getServicePayoutGuard({
+        serviceJob,
+        infraError,
+        isLoading,
+      }),
+    [infraError, isLoading, serviceJob]
+  );
   const collapsedSummary = useMemo(
     () =>
       getCollapsedSummary({
         isLoading,
         infraError,
         experienceJob,
+        serviceJob,
         experiencePayoutGuard,
+        servicePayoutGuard,
       }),
-    [experienceJob, experiencePayoutGuard, infraError, isLoading]
+    [experienceJob, experiencePayoutGuard, infraError, isLoading, serviceJob, servicePayoutGuard]
   );
 
   useEffect(() => {
     onExperiencePayoutGuardChange?.(experiencePayoutGuard);
   }, [experiencePayoutGuard, onExperiencePayoutGuardChange]);
+
+  useEffect(() => {
+    onServicePayoutGuardChange?.(servicePayoutGuard);
+  }, [onServicePayoutGuardChange, servicePayoutGuard]);
 
   const executeTrigger = useCallback(
     async (body: Record<string, unknown>) => {
@@ -524,6 +670,24 @@ export default function SettlementSyncPanel({
             >
               <p className="font-semibold">{experienceOperatorGuidance.title}</p>
               <p className="mt-1">{experienceOperatorGuidance.message}</p>
+            </div>
+          ) : null}
+
+          {serviceOperatorGuidance ? (
+            <div
+              data-testid="settlement-sync-service-operator-banner"
+              className={`mt-4 rounded-xl border px-4 py-3 text-sm ${
+                serviceOperatorGuidance.tone === 'success'
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                  : serviceOperatorGuidance.tone === 'info'
+                    ? 'border-blue-200 bg-blue-50 text-blue-700'
+                    : serviceOperatorGuidance.tone === 'warning'
+                      ? 'border-amber-200 bg-amber-50 text-amber-700'
+                      : 'border-red-200 bg-red-50 text-red-700'
+              }`}
+            >
+              <p className="font-semibold">{serviceOperatorGuidance.title}</p>
+              <p className="mt-1">{serviceOperatorGuidance.message}</p>
             </div>
           ) : null}
 

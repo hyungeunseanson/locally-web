@@ -406,6 +406,12 @@ test.describe.serial('Admin settlement sync status visibility', () => {
     await expect(page.getByTestId('settlement-sync-operator-banner')).toContainText(
       '최근 완료 건 반영이 늦을 수 있습니다.'
     );
+    await expect(page.getByTestId('settlement-sync-service-operator-banner')).toContainText(
+      '서비스 점검 후 진행'
+    );
+    await expect(page.getByTestId('settlement-sync-service-operator-banner')).toContainText(
+      '서비스 완료 반영이 덜 됐을 수 있습니다.'
+    );
     await expect(page.getByTestId('settlement-sync-run-due-experience')).toBeEnabled();
 
     const status = await fetchStatus(page);
@@ -624,5 +630,204 @@ test.describe.serial('Admin settlement sync status visibility', () => {
     await page.getByTestId('sales-settlement-row-host-running-sync').click();
     await expect(page.getByTestId('sales-settle-experience-host-running-sync')).toBeDisabled();
     await expect(page.getByTestId('sales-settle-service-host-running-sync')).toBeEnabled();
+  });
+
+  test('surfaces service sync risk in summary and blocks only service payouts when service health is unhealthy', async ({
+    page,
+  }) => {
+    test.setTimeout(120000);
+
+    const adminUser = createTestUser('settlement.sync.serviceguard.admin');
+    const adminId = await createAuthUser(adminUser, { isAdmin: true });
+    createdAuthUserIds.push(adminId);
+
+    await page.route('**/api/admin/sales-summary**', async (route) => {
+      if (route.request().method() !== 'GET') {
+        await route.continue();
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: [],
+          serviceSummaryRows: [],
+        }),
+      });
+    });
+
+    await page.route('**/api/admin/payout-queue**', async (route) => {
+      if (route.request().method() !== 'GET') {
+        await route.continue();
+        return;
+      }
+
+      const now = new Date().toISOString();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          combinedHostTotals: [
+            {
+              host_id: 'host-service-guard',
+              host_name: 'Service Guard Host',
+              bank: '국민은행',
+              account_number: '12345678901234',
+              account_holder: 'Service Guard Host',
+              host_nationality: '대한민국',
+              pending_amount: 230000,
+              paid_amount: 0,
+              pending_count: 2,
+              paid_count: 0,
+              settlement_state: 'eligible',
+              domains: {
+                experience: {
+                  host_id: 'host-service-guard',
+                  host_name: 'Service Guard Host',
+                  bank: '국민은행',
+                  account_number: '12345678901234',
+                  account_holder: 'Service Guard Host',
+                  host_nationality: '대한민국',
+                  pending_amount: 90000,
+                  paid_amount: 0,
+                  pending_count: 1,
+                  paid_count: 0,
+                  oldest_pending_created_at: now,
+                  settlement_state: 'eligible',
+                  pending_entries: [
+                    {
+                      id: 'exp-service-guard-1',
+                      order_id: 'EXP-SERVICE-GUARD-1',
+                      domain: 'experience',
+                      created_at: now,
+                      payout_paid_at: null,
+                      date: '2026-04-10',
+                      time: '10:00',
+                      title: 'Guarded Experience',
+                      guest_name: 'Experience Guest',
+                      amount: 120000,
+                      payout_amount: 90000,
+                      platform_revenue: 30000,
+                      status: 'completed',
+                      payout_status: 'pending',
+                    },
+                  ],
+                  paid_entries: [],
+                },
+                service: {
+                  host_id: 'host-service-guard',
+                  host_name: 'Service Guard Host',
+                  bank: '국민은행',
+                  account_number: '12345678901234',
+                  account_holder: 'Service Guard Host',
+                  host_nationality: '대한민국',
+                  pending_amount: 140000,
+                  paid_amount: 0,
+                  pending_count: 1,
+                  paid_count: 0,
+                  oldest_pending_created_at: now,
+                  settlement_state: 'eligible',
+                  pending_entries: [
+                    {
+                      id: 'svc-service-guard-1',
+                      order_id: 'SVC-SERVICE-GUARD-1',
+                      domain: 'service',
+                      created_at: now,
+                      payout_paid_at: null,
+                      date: '2026-04-10',
+                      time: null,
+                      title: 'Guarded Service',
+                      guest_name: 'Service Guest',
+                      amount: 180000,
+                      payout_amount: 140000,
+                      platform_revenue: 40000,
+                      status: 'completed',
+                      payout_status: 'pending',
+                    },
+                  ],
+                  paid_entries: [],
+                },
+              },
+            },
+          ],
+        }),
+      });
+    });
+
+    await page.route('**/api/admin/settlement-sync', async (route) => {
+      if (route.request().method() !== 'GET') {
+        await route.continue();
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          generated_at: new Date().toISOString(),
+          jobs: [
+            {
+              job_name: 'experience_completion_sync',
+              health_state: 'healthy',
+              is_running: false,
+              running_since: null,
+              stale_running: false,
+              last_heartbeat_at: null,
+              last_success_at: new Date(Date.now() - 10 * 60_000).toISOString(),
+              last_failure_at: null,
+              last_failure_message: null,
+              last_processed_count: 1,
+              due_candidate_count: 0,
+              oldest_due_at: null,
+              lag_minutes: null,
+            },
+            {
+              job_name: 'service_completion_sync',
+              health_state: 'failed',
+              is_running: false,
+              running_since: null,
+              stale_running: false,
+              last_heartbeat_at: new Date(Date.now() - 20 * 60_000).toISOString(),
+              last_success_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+              last_failure_at: new Date(Date.now() - 5 * 60_000).toISOString(),
+              last_failure_message: '서비스 sync 실패 테스트',
+              last_processed_count: 0,
+              due_candidate_count: 2,
+              oldest_due_at: new Date(Date.now() - 90 * 60_000).toISOString(),
+              lag_minutes: 90,
+            },
+          ],
+        }),
+      });
+    });
+
+    await login(page, adminUser);
+    await page.goto('/admin/dashboard?tab=SALES', { waitUntil: 'networkidle' });
+
+    await expect(page.getByTestId('settlement-sync-summary')).toContainText(
+      '서비스 정산 전 확인 필요'
+    );
+    await expect(page.getByTestId('settlement-sync-summary')).toContainText(
+      '체험 정산은 진행할 수 있지만'
+    );
+
+    await openSettlementSyncPanel(page);
+    await expect(page.getByTestId('settlement-sync-operator-banner')).toContainText(
+      '목록 반영 정상'
+    );
+    await expect(page.getByTestId('settlement-sync-service-operator-banner')).toContainText(
+      '서비스 점검 후 진행'
+    );
+    await expect(page.getByTestId('sales-service-payout-guard')).toContainText(
+      '서비스 정산 전 확인 필요'
+    );
+
+    await page.getByTestId('sales-settlement-row-host-service-guard').click();
+    await expect(page.getByTestId('sales-settle-experience-host-service-guard')).toBeEnabled();
+    await expect(page.getByTestId('sales-settle-service-host-service-guard')).toBeDisabled();
   });
 });

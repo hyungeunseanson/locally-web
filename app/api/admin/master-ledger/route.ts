@@ -70,6 +70,7 @@ export async function GET(request: Request) {
 
     // 🔧 Issue #4 Phase A: 날짜 필터 없을 때 최대 500건으로 제한 (무제한 조회 방지)
     const LEDGER_MAX_ROWS = 500;
+    const hasDateFilter = Boolean(startDate || endDate);
     let bookingsQuery = supabaseAdmin
       .from('bookings')
       .select(
@@ -83,12 +84,12 @@ export async function GET(request: Request) {
       bookingsQuery = bookingsQuery.lte('date', endDate);
     }
     // 날짜 범위 없을 때만 limit 적용 (날짜 범위 지정 시엔 해당 기간 전체 조회)
-    if (!startDate && !endDate) {
+    if (!hasDateFilter) {
       bookingsQuery = bookingsQuery.limit(LEDGER_MAX_ROWS);
     }
 
     let filteredServiceRequestsPromise: Promise<{ data: ServiceRequestLedgerRow[] | null; error: unknown }> = Promise.resolve({ data: null, error: null });
-    if (startDate || endDate) {
+    if (hasDateFilter) {
       let serviceRequestsQuery = supabaseAdmin
         .from('service_requests')
         .select('id, title, service_date, start_time, guest_count, contact_name, contact_phone');
@@ -120,7 +121,7 @@ export async function GET(request: Request) {
     const filteredServiceRequestIds = Array.from(new Set((filteredServiceRequests || []).map((request) => request.id).filter(Boolean)));
 
     let serviceBookingsPromise: Promise<{ data: ServiceBookingLedgerRow[] | null; error: unknown }>;
-    if ((startDate || endDate) && filteredServiceRequests && filteredServiceRequestIds.length === 0) {
+    if (hasDateFilter && filteredServiceRequests && filteredServiceRequestIds.length === 0) {
       serviceBookingsPromise = Promise.resolve({ data: [], error: null });
     } else {
       let serviceBookingsQuery = supabaseAdmin
@@ -129,8 +130,11 @@ export async function GET(request: Request) {
           'id, order_id, request_id, application_id, customer_id, host_id, amount, created_at, status, host_payout_amount, platform_revenue, payout_status'
         )
         .order('created_at', { ascending: false });
-      if ((startDate || endDate) && filteredServiceRequests && filteredServiceRequestIds.length > 0) {
+      if (hasDateFilter && filteredServiceRequests && filteredServiceRequestIds.length > 0) {
         serviceBookingsQuery = serviceBookingsQuery.in('request_id', filteredServiceRequestIds);
+      }
+      if (!hasDateFilter) {
+        serviceBookingsQuery = serviceBookingsQuery.limit(LEDGER_MAX_ROWS);
       }
       serviceBookingsPromise = (async () => {
         const result = await serviceBookingsQuery;
