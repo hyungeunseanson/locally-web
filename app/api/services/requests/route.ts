@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import crypto from 'crypto';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
@@ -12,6 +11,7 @@ import {
   normalizeServiceCity,
   resolveServiceCountry,
 } from '@/app/utils/serviceRequestLocation';
+import { createAdminClient } from '@/app/utils/supabase/admin';
 
 function generateOrderId(): string {
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -33,7 +33,7 @@ type CreateRequestBody = {
   contact_phone?: string;
 };
 
-type ServiceAdminClient = SupabaseClient;
+type ServiceAdminClient = ReturnType<typeof createAdminClient>;
 type ServiceRpcErrorLike = {
   code?: string | null;
   message?: string | null;
@@ -217,9 +217,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Missing or invalid required fields' }, { status: 400 });
     }
 
-    const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_KEY);
+    const supabaseAdmin = createAdminClient();
     const shouldForceBookingCreateFailure =
       process.env.NODE_ENV !== 'production' &&
       request.headers.get('x-locally-test-force-booking-create-fail') === '1';
@@ -390,9 +388,7 @@ export async function GET(request: Request) {
     const { data: { user }, error: authError } = await supabaseServer.auth.getUser();
     const currentUser = authError ? null : user ?? null;
 
-    const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_KEY);
+    const supabaseAdmin = createAdminClient();
 
     if (requestId) {
       if (!currentUser) {

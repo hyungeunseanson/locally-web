@@ -267,4 +267,40 @@ test.describe.serial('analytics ingest routes', () => {
       error: 'Invalid JSON body',
     });
   });
+
+  test('blocks cross-site analytics writes before they reach privileged inserts', async ({ request }) => {
+    const crossSiteHeaders = {
+      Origin: 'https://evil.example',
+      'sec-fetch-site': 'cross-site',
+      'Content-Type': 'application/json',
+    };
+
+    const searchResponse = await request.post('/api/analytics/search', {
+      headers: crossSiteHeaders,
+      data: {
+        keyword: 'cross-site blocked keyword',
+        route: 'main',
+      },
+    });
+
+    expect(searchResponse.status()).toBe(403);
+    await expect(searchResponse.json()).resolves.toMatchObject({
+      success: false,
+      error: 'Forbidden',
+    });
+
+    const eventResponse = await request.post('/api/analytics/events', {
+      headers: crossSiteHeaders,
+      data: {
+        event_type: 'view',
+        target_id: `cross-site-${Date.now()}`,
+      },
+    });
+
+    expect(eventResponse.status()).toBe(403);
+    await expect(eventResponse.json()).resolves.toMatchObject({
+      success: false,
+      error: 'Forbidden',
+    });
+  });
 });

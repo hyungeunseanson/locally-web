@@ -1,16 +1,16 @@
 import { NextResponse } from 'next/server';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
+import { createAdminClient } from '@/app/utils/supabase/admin';
 
 type SelectHostBody = {
   request_id?: string;
   application_id?: string;
 };
 
-type ServiceAdminClient = SupabaseClient;
+type ServiceAdminClient = ReturnType<typeof createAdminClient>;
 type ServiceRpcErrorLike = {
   code?: string | null;
   message?: string | null;
@@ -362,9 +362,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: '필수 항목이 누락되었습니다.' }, { status: 400 });
     }
 
-    const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_KEY);
+    const supabaseAdmin = createAdminClient();
     const forcedFailureStage = getForcedSelectHostFailureStage(request);
 
     // 1. 의뢰 조회 + 소유자 검증

@@ -41,7 +41,30 @@ type HostExperienceCardData = {
   rating?: number | null;
   review_count?: number | null;
   price?: number | string | null;
+  duration?: number | string | null;
 };
+
+const PUBLIC_HOST_EXPERIENCE_SELECT = [
+  'id',
+  'title',
+  'title_en',
+  'title_ja',
+  'title_zh',
+  'category',
+  'category_en',
+  'category_ja',
+  'category_zh',
+  'city',
+  'country',
+  'location',
+  'languages',
+  'image_url',
+  'photos',
+  'rating',
+  'review_count',
+  'price',
+  'duration',
+].join(', ');
 
 export default function UserProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -78,7 +101,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
       if (isPublicHost) {
         const { data: expData } = await supabase
           .from('experiences')
-          .select('*')
+          .select(PUBLIC_HOST_EXPERIENCE_SELECT)
           .eq('host_id', resolvedParams.id)
           .eq('status', 'active');
 

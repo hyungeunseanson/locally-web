@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs';
+
 import { expect, test } from '@playwright/test';
 
 import {
@@ -13,7 +15,15 @@ const createdExperienceIds: number[] = [];
 const createdPostIds: string[] = [];
 const createdAvailabilityKeys: Array<{ experienceId: number; date: string; time: string }> = [];
 
-async function createApprovedHostApplication(userId: string, email: string, fullName: string, phone: string) {
+type HostApplicationStatus = 'approved' | 'active' | 'pending';
+
+async function createHostApplication(
+  userId: string,
+  email: string,
+  fullName: string,
+  phone: string,
+  status: HostApplicationStatus = 'approved'
+) {
   const { data, error } = await getAdminClient()
     .from('host_applications')
     .insert({
@@ -38,16 +48,17 @@ async function createApprovedHostApplication(userId: string, email: string, full
       account_number: '12345678901234',
       account_holder: fullName,
       motivation: 'public route contract 검증',
-      status: 'approved',
+      status,
     })
     .select('id')
     .single();
 
   if (error || !data?.id) {
-    throw error || new Error('Failed to create approved host application.');
+    throw error || new Error(`Failed to create ${status} host application.`);
   }
 
   createdApplicationIds.push(String(data.id));
+  return String(data.id);
 }
 
 async function createExperience(hostId: string) {
@@ -191,7 +202,7 @@ test.describe.serial('Public service-role route contracts', () => {
   test('keeps community author projection public-only and excludes anonymous posts', async ({ request }) => {
     const host = createTestUser('public.contract.host');
     const hostId = await createAuthUser(host, createdAuthUserIds);
-    await createApprovedHostApplication(hostId, host.email, host.fullName, host.phone);
+    await createHostApplication(hostId, host.email, host.fullName, host.phone);
     const visiblePostTitle = `[Playwright] Visible Post ${Date.now()}`;
     const anonymousPostTitle = `[Playwright] Anonymous Post ${Date.now()}`;
     await createCommunityPost(hostId, visiblePostTitle, false);
@@ -219,6 +230,53 @@ test.describe.serial('Public service-role route contracts', () => {
     if (supportsAnonymousColumn) {
       expect(recentTitles).not.toContain(anonymousPostTitle);
     }
+  });
+
+  test('pins public_host_applications source-of-truth to latest-row semantics and hides stale host approvals', async ({ request }) => {
+    const host = createTestUser('public.contract.latest-host');
+    const hostId = await createAuthUser(host, createdAuthUserIds);
+    await createHostApplication(hostId, host.email, host.fullName, host.phone, 'approved');
+    const latestPendingId = await createHostApplication(hostId, host.email, host.fullName, host.phone, 'pending');
+
+    for (const filePath of [
+      'supabase_public_host_applications_view.sql',
+      'docs/migrations/v3_39_14_live_security_patch_reconciliation.sql',
+      'docs/migrations/v3_39_16_public_host_applications_latest_row.sql',
+    ]) {
+      const contents = readFileSync(filePath, 'utf8');
+      expect(contents).toContain('SELECT DISTINCT ON (user_id)');
+      expect(contents).toContain('ORDER BY user_id, created_at DESC, id DESC');
+    }
+
+    const { data: viewRows, error: viewError } = await getAdminClient()
+      .from('public_host_applications')
+      .select('id, user_id, status, created_at')
+      .eq('user_id', hostId);
+
+    if (viewError) {
+      throw viewError;
+    }
+
+    const matchingPendingRow = (viewRows ?? []).find((row) => String(row.id) === latestPendingId);
+    expect(matchingPendingRow).toMatchObject({
+      user_id: hostId,
+      status: 'pending',
+    });
+
+    const response = await request.get(`/api/community/authors/${hostId}`);
+    expect(response.status()).toBe(200);
+
+    const body = await response.json() as {
+      profile?: {
+        role?: string;
+        displayName?: string;
+      } | null;
+    };
+
+    expect(body.profile).toMatchObject({
+      role: 'guest',
+      displayName: host.fullName,
+    });
   });
 
   test('keeps availability summary no-store and limited to summary fields', async ({ request }) => {

@@ -2,6 +2,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { getHostPublicProfile, getProfileDisplayName, normalizeLanguageList } from '@/app/utils/profile';
 import { isMissingAnonymousColumnError } from '@/app/community/anonymousColumn';
+import {
+  isPublicHostApplicationStatus,
+  pickLatestPublicHostApplication,
+} from '@/app/utils/hostVisibility';
+
+type PublicHostApplicationRow = {
+  id: string | number;
+  user_id: string | null;
+  status: string | null;
+  name?: string | null;
+  profile_photo?: string | null;
+  self_intro?: string | null;
+  languages?: string[] | null;
+  created_at?: string | null;
+};
 
 export async function GET(
   request: NextRequest,
@@ -19,21 +34,25 @@ export async function GET(
         .eq('id', id)
         .maybeSingle(),
       supabase
-        .from('host_applications')
-        .select('name, profile_photo, self_intro, languages, host_nationality, status')
+        .from('public_host_applications')
+        .select('id, user_id, status, name, profile_photo, self_intro, languages, created_at')
         .eq('user_id', id)
         .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle(),
+        .limit(2),
     ]);
 
     if (profileResult.error) {
       return NextResponse.json({ error: profileResult.error.message }, { status: 500 });
     }
+    if (hostResult.error) {
+      return NextResponse.json({ error: hostResult.error.message }, { status: 500 });
+    }
 
     const profileData = profileResult.data;
-    const hostData = hostResult.data;
-    const hostApproved = hostData?.status === 'approved' || hostData?.status === 'active';
+    const latestHostApplication = pickLatestPublicHostApplication(
+      (hostResult.data ?? []) as PublicHostApplicationRow[]
+    );
+    const hostApproved = isPublicHostApplicationStatus(latestHostApplication?.status);
 
     let recentQuery = supabase
       .from('community_posts')
@@ -87,7 +106,7 @@ export async function GET(
 
     const responseProfile = hostApproved
       ? (() => {
-          const hostPublicProfile = getHostPublicProfile(profileData, hostData, 'Locally Host');
+          const hostPublicProfile = getHostPublicProfile(profileData, latestHostApplication, 'Locally Host');
           return {
             joinedAt: profileData.created_at ?? null,
             displayName: hostPublicProfile.name,
