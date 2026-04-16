@@ -74,8 +74,8 @@ export default function DetailsPanel({
   const router = useRouter();
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [csLoading, setCsLoading] = useState(false);
-  const [appDetails, setAppDetails] = useState<AdminPanelSelectedItem | null>(null);
-  const [appDetailsLoading, setAppDetailsLoading] = useState(false);
+  const [detailItem, setDetailItem] = useState<AdminPanelSelectedItem | null>(null);
+  const [detailItemLoading, setDetailItemLoading] = useState(false);
   const [brokenSelectedAvatarSrc, setBrokenSelectedAvatarSrc] = useState<string | null>(null);
   const [brokenProfilePhotoSrc, setBrokenProfilePhotoSrc] = useState<string | null>(null);
   const [brokenExperiencePhotos, setBrokenExperiencePhotos] = useState<Record<string, true>>({});
@@ -108,48 +108,55 @@ export default function DetailsPanel({
   };
 
   useEffect(() => {
-    if (activeTab !== 'APPS' || !rawSelectedItem?.id) {
-      setAppDetails(null);
-      setAppDetailsLoading(false);
+    if ((activeTab !== 'APPS' && activeTab !== 'EXPS') || !rawSelectedItem?.id) {
+      setDetailItem(null);
+      setDetailItemLoading(false);
       return;
     }
 
     let isMounted = true;
 
-    const fetchAppDetails = async () => {
-      setAppDetailsLoading(true);
+    const detailEndpoint = activeTab === 'APPS'
+      ? `/api/admin/host-applications?id=${rawSelectedItem.id}`
+      : `/api/admin/experiences?id=${rawSelectedItem.id}`;
+
+    const fetchDetailItem = async () => {
+      setDetailItemLoading(true);
 
       try {
-        const response = await fetch(`/api/admin/host-applications?id=${rawSelectedItem.id}`);
+        const response = await fetch(detailEndpoint);
         const result = await response.json();
 
         if (!response.ok) {
-          throw new Error(result?.error || '지원서 상세를 불러오지 못했습니다.');
+          throw new Error(result?.error || '상세 정보를 불러오지 못했습니다.');
         }
 
         if (isMounted) {
-          setAppDetails(result?.data || null);
+          setDetailItem(result?.data || null);
         }
       } catch (error) {
-        console.error('Host application detail fetch error:', error);
+        console.error('Admin approval detail fetch error:', error);
         if (isMounted) {
-          setAppDetails(null);
+          setDetailItem(null);
         }
       } finally {
         if (isMounted) {
-          setAppDetailsLoading(false);
+          setDetailItemLoading(false);
         }
       }
     };
 
-    fetchAppDetails();
+    fetchDetailItem();
 
     return () => {
       isMounted = false;
     };
   }, [activeTab, rawSelectedItem?.id]);
 
-  const selectedItem = activeTab === 'APPS' ? (appDetails || rawSelectedItem) : rawSelectedItem;
+  const selectedItem =
+    activeTab === 'APPS' || activeTab === 'EXPS'
+      ? (detailItem || rawSelectedItem)
+      : rawSelectedItem;
   const applicationLanguageLevels = normalizeLanguageLevels(
     selectedItem?.language_levels,
     selectedItem?.languages,
@@ -182,7 +189,7 @@ export default function DetailsPanel({
   };
 
   const closePanel = () => {
-    setAppDetails(null);
+    setDetailItem(null);
     setSignedUrl(null);
     setSelectedItem?.(null);
   };
@@ -218,7 +225,7 @@ export default function DetailsPanel({
     setBrokenSelectedAvatarSrc(null);
     setBrokenProfilePhotoSrc(null);
     setBrokenExperiencePhotos({});
-  }, [activeTab, rawSelectedItem?.id, appDetails?.id, selectedAvatarSrc, selectedItem?.profile_photo]);
+  }, [activeTab, rawSelectedItem?.id, detailItem?.id, selectedAvatarSrc, selectedItem?.profile_photo]);
 
   if (!selectedItem) {
     return (
@@ -337,7 +344,7 @@ export default function DetailsPanel({
         {/* 🟠 [APPS] 호스트 지원서 상세 */}
         {activeTab === 'APPS' && (
           <div className="space-y-5 md:space-y-6">
-            {appDetailsLoading && !appDetails ? (
+            {detailItemLoading && !detailItem ? (
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm font-medium text-slate-500">
                 지원서 상세 정보를 불러오는 중입니다.
               </div>
@@ -509,6 +516,12 @@ export default function DetailsPanel({
         {/* 🟣 [EXPS] 체험 상세 정보 */}
         {activeTab === 'EXPS' && (
           <div className="space-y-8">
+            {detailItemLoading && !detailItem ? (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm font-medium text-slate-500">
+                체험 상세 정보를 불러오는 중입니다.
+              </div>
+            ) : (
+              <>
             {selectedItem.photos && (
               <div>
                 <h4 className="text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-2 md:mb-3">등록된 사진</h4>
@@ -627,6 +640,8 @@ export default function DetailsPanel({
               <button onClick={() => handleApprovalStatusUpdate('experiences', selectedItem.id, 'approved')} className="col-span-2 py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-white bg-slate-900 hover:bg-black shadow-lg transition-all">승인</button>
               <button onClick={() => handleApprovalDelete('experiences', selectedItem.id)} className="col-span-2 text-[10px] md:text-xs text-slate-400 hover:text-red-500 py-1.5 flex items-center justify-center gap-1"><Trash2 size={12} /> 체험 영구 삭제</button>
             </div>
+              </>
+            )}
           </div>
         )}
 

@@ -6,8 +6,6 @@ import { updateAdminStatus } from '@/app/actions/admin';
 
 import { AdminApprovalTable, AdminItemId, HostApplication, ExperienceApprovalItem } from '@/app/types/admin';
 
-const HOST_APPLICATION_SUMMARY_SELECT = 'id,user_id,created_at,name,status,host_nationality,profile_photo,languages,language_levels,target_language';
-
 type AdminApiPayload<T> = {
   data?: T;
   error?: string;
@@ -47,7 +45,7 @@ export function useAdminApprovalsData() {
     }
     try {
       const [appsResult, expsResult] = await Promise.all([
-        fetchAdminPayload<HostApplication[]>(`/api/admin/host-applications?select=${encodeURIComponent(HOST_APPLICATION_SUMMARY_SELECT)}`),
+        fetchAdminPayload<HostApplication[]>(`/api/admin/host-applications`),
         fetchAdminPayload<ExperienceApprovalItem[]>(`/api/admin/experiences`),
       ]);
 

@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import ListPanel from './ListPanel';
 import DetailsPanel from './DetailsPanel';
-import SettlementTab from './SettlementTab';
 import { Users, MapPin, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { AdminApprovalTable, AdminItemId, AdminManagementTabProps } from '@/app/types/admin';
 
@@ -44,10 +43,6 @@ export default function ManagementTab({
   const [commentInput, setCommentInput] = useState('');
 
   const isPendingApprovalStatus = (status?: string | null) => status === 'pending' || status === 'revision';
-
-  if (activeTab === 'SETTLEMENT') {
-    return <SettlementTab />;
-  }
 
   // 🟢 [통합 로직] APPROVALS 탭일 경우 subTab을 사용, 그 외에는 activeTab 사용
   const effectiveTab = activeTab === 'APPROVALS' ? subTab : activeTab;

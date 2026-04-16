@@ -22,8 +22,6 @@ type HostApplicationRow = {
   user_id: string;
   name?: string | null;
   profile_photo?: string | null;
-  email?: string | null;
-  phone?: string | null;
   status?: string | null;
 };
 
@@ -96,9 +94,9 @@ export async function GET() {
 
     // 3. 프로필, 애플리케이션, 그리고 안 읽은 메시지 수 조회
     const [profilesRes, appsRes, guestProfilesRes, unreadRes] = await Promise.all([
-      supabaseAdmin.from('profiles').select('id, full_name, email, avatar_url, phone').in('id', hostIds),
-      supabaseAdmin.from('host_applications').select('user_id, name, profile_photo, email, phone, status').in('user_id', hostIds),
-      supabaseAdmin.from('profiles').select('id, full_name, email, avatar_url, phone').in('id', guestIds),
+      supabaseAdmin.from('profiles').select('id, full_name, email, avatar_url').in('id', hostIds),
+      supabaseAdmin.from('host_applications').select('user_id, name, profile_photo, status').in('user_id', hostIds),
+      supabaseAdmin.from('profiles').select('id, full_name, email, avatar_url').in('id', guestIds),
       supabaseAdmin.from('inquiry_messages')
         .select('inquiry_id')
         .in('inquiry_id', inquiryIds)
@@ -152,15 +150,11 @@ export async function GET() {
           id: item.user_id,
           name: guestName,
           avatar_url: secureUrl(guestAvatar ?? null),
-          email: guestProfile?.email,
-          phone: guestProfile?.phone ?? null,
         },
         host: {
           id: item.host_id,
           name: hostPublicProfile.name,
           avatar_url: secureUrl(hostPublicProfile.avatarUrl ?? null),
-          email: hostProfile?.email || hostApp?.email || null,
-          phone: hostProfile?.phone || hostApp?.phone || null,
           status: hostApp?.status || null,
         },
         experiences: experience

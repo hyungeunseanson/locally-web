@@ -4,7 +4,18 @@ import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
-const ADMIN_EXPERIENCE_SELECT = `
+const ADMIN_EXPERIENCE_SUMMARY_SELECT = `
+  id,
+  created_at,
+  title,
+  status,
+  admin_comment,
+  price,
+  photos,
+  profiles!experiences_host_id_fkey(full_name)
+`;
+
+const ADMIN_EXPERIENCE_DETAIL_SELECT = `
   id,
   created_at,
   title,
@@ -29,7 +40,7 @@ const ADMIN_EXPERIENCE_SELECT = `
   rules,
   languages,
   language_levels,
-  profiles!experiences_host_id_fkey(full_name, email)
+  profiles!experiences_host_id_fkey(full_name)
 `;
 
 /**
@@ -72,12 +83,26 @@ export async function GET(request: Request) {
 
         // 2. service_role 키로 데이터 조회
         const { searchParams } = new URL(request.url);
+        const idParam = searchParams.get('id');
         const limitParam = searchParams.get('limit') ? parseInt(searchParams.get('limit') as string, 10) : 3000;
 
-        const { data, error } = await supabaseAdmin
+        let query = supabaseAdmin
             .from('experiences')
-            .select(ADMIN_EXPERIENCE_SELECT)
-            .order('created_at', { ascending: false })
+            .select(idParam ? ADMIN_EXPERIENCE_DETAIL_SELECT : ADMIN_EXPERIENCE_SUMMARY_SELECT)
+            .order('created_at', { ascending: false });
+
+        if (idParam) {
+            const { data, error } = await query.eq('id', idParam).maybeSingle();
+
+            if (error) {
+                console.error('[Admin experiences] Supabase Error:', error);
+                return NextResponse.json({ error: error.message }, { status: 500 });
+            }
+
+            return NextResponse.json({ data: data ?? null });
+        }
+
+        const { data, error } = await query
             .limit(limitParam);
 
         if (error) {

@@ -5,10 +5,6 @@ import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
 import { SERVICE_BOOKING_ACTIVE_STATUSES, SERVICE_BOOKING_COMPLETED_STATUSES } from '@/app/constants/serviceStatus';
 
-type ProfileIdRow = {
-  id: string;
-};
-
 type BookingSummaryRow = {
   user_id: string | null;
   amount: number | null;
@@ -61,7 +57,7 @@ function parseRequestedProfileIds(request: Request) {
   const url = new URL(request.url);
   const rawIds = url.searchParams.get('ids');
 
-  if (!rawIds) return [];
+  if (!rawIds) return null;
 
   return Array.from(
     new Set(rawIds.split(',').map((id) => id.trim()).filter(Boolean))
@@ -88,19 +84,15 @@ export async function GET(request: Request) {
     }
 
     const requestedProfileIds = parseRequestedProfileIds(request);
-    let profileIds: string[] = requestedProfileIds;
 
-    if (profileIds.length === 0) {
-      const { data: profileIdsData, error: profilesError } = await supabaseAdmin
-        .from('profiles')
-        .select('id')
-        .order('created_at', { ascending: false })
-        .limit(5000);
-
-      if (profilesError) throw profilesError;
-
-      profileIds = ((profileIdsData || []) as ProfileIdRow[]).map((profile) => profile.id).filter(Boolean);
+    if (requestedProfileIds === null) {
+      return NextResponse.json({
+        success: false,
+        error: 'ids query parameter is required',
+      }, { status: 400 });
     }
+
+    const profileIds = requestedProfileIds;
 
     if (profileIds.length === 0) {
       return NextResponse.json({ success: true, data: [] });

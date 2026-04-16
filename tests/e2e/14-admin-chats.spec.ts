@@ -209,6 +209,25 @@ test.describe.serial('Admin chats smoke', () => {
     await login(page, adminUser);
     await page.goto(`/admin/dashboard?tab=CHATS&inquiryId=${inquiryId}`, { waitUntil: 'domcontentloaded' });
 
+    const inquiriesResponse = await page.request.get('/api/admin/inquiries');
+    expect(inquiriesResponse.ok()).toBeTruthy();
+    const inquiriesPayload = await inquiriesResponse.json();
+    const inquiryListItem = Array.isArray(inquiriesPayload?.data)
+      ? inquiriesPayload.data.find((row: { id?: number | string }) => String(row.id) === String(inquiryId))
+      : null;
+
+    expect(inquiryListItem).toBeTruthy();
+    expect(inquiryListItem?.guest?.email).toBeUndefined();
+    expect(inquiryListItem?.guest?.phone).toBeUndefined();
+    expect(inquiryListItem?.host?.email).toBeUndefined();
+    expect(inquiryListItem?.host?.phone).toBeUndefined();
+
+    const messagesResponse = await page.request.get(`/api/admin/inquiries/${inquiryId}/messages`);
+    expect(messagesResponse.ok()).toBeTruthy();
+    const messagesPayload = await messagesResponse.json();
+    expect(messagesPayload?.inquiry?.guest?.email).toBe(guestUser.email);
+    expect(messagesPayload?.inquiry?.guest?.phone).toBe(guestUser.phone);
+
     await expect(
       page.locator('div.bg-white.border.border-slate-200.rounded-tl-none').filter({ hasText: inquiryMessage }).last()
     ).toBeVisible({ timeout: 15000 });

@@ -59,6 +59,14 @@ type HostProfileRow = {
   avatar_url: string | null;
 };
 
+type UserProfileDetailRow = {
+  id: string;
+  birth_date: string | null;
+  nationality: string | null;
+  kakao_id: string | null;
+  mbti: string | null;
+};
+
 type ServiceRequestRow = {
   id: string;
   title: string | null;
@@ -155,6 +163,7 @@ export async function GET(
     }
 
     const [
+      profileRes,
       bookingsRes,
       reviewsRes,
       guestReviewsRes,
@@ -162,6 +171,11 @@ export async function GET(
       serviceRequestsRes,
       serviceBookingsRes,
     ] = await Promise.all([
+      supabaseAdmin
+        .from('profiles')
+        .select('id, birth_date, nationality, kakao_id, mbti')
+        .eq('id', userId)
+        .maybeSingle(),
       supabaseAdmin
         .from('bookings')
         .select('id, created_at, amount, total_price, status, guests, date, time, experience_id')
@@ -200,6 +214,7 @@ export async function GET(
         .limit(PER_SOURCE_LIMIT),
     ]);
 
+    if (profileRes.error) throw profileRes.error;
     if (bookingsRes.error) throw bookingsRes.error;
     if (reviewsRes.error) throw reviewsRes.error;
     if (guestReviewsRes.error) throw guestReviewsRes.error;
@@ -207,6 +222,7 @@ export async function GET(
     if (serviceRequestsRes.error) throw serviceRequestsRes.error;
     if (serviceBookingsRes.error) throw serviceBookingsRes.error;
 
+    const profile = (profileRes.data || null) as UserProfileDetailRow | null;
     const bookingRows = (bookingsRes.data || []) as BookingRow[];
     const reviewRows = (reviewsRes.data || []) as ReviewRow[];
     const guestReviewRows = (guestReviewsRes.data || []) as GuestReviewRow[];
@@ -473,7 +489,22 @@ export async function GET(
       .sort((a, b) => new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime())
       .slice(0, TIMELINE_LIMIT);
 
-    return NextResponse.json({ success: true, data: { bookings, timeline, guestReviews } });
+    return NextResponse.json({
+      success: true,
+      data: {
+        profile: profile
+          ? {
+              birth_date: profile.birth_date,
+              nationality: profile.nationality,
+              kakao_id: profile.kakao_id,
+              mbti: profile.mbti,
+            }
+          : null,
+        bookings,
+        timeline,
+        guestReviews,
+      },
+    });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Server error';
     console.error('[ADMIN] /api/admin/users/[userId]/timeline error:', error);

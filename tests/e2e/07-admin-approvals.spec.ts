@@ -350,6 +350,24 @@ test.describe.serial('Admin approvals smoke', () => {
       await login(adminPage, adminUser);
       await openApprovals(adminPage);
 
+      const experienceListResponse = await adminPage.request.get('/api/admin/experiences');
+      expect(experienceListResponse.ok()).toBeTruthy();
+      const experienceListPayload = await experienceListResponse.json();
+      const summaryExperience = Array.isArray(experienceListPayload?.data)
+        ? experienceListPayload.data.find((row: { id?: number | string }) => Number(row.id) === experience.id)
+        : null;
+
+      expect(summaryExperience).toBeTruthy();
+      expect(summaryExperience).not.toHaveProperty('description');
+      expect(summaryExperience).not.toHaveProperty('meeting_point');
+      expect(summaryExperience).not.toHaveProperty('location');
+
+      const experienceDetailResponse = await adminPage.request.get(`/api/admin/experiences?id=${experience.id}`);
+      expect(experienceDetailResponse.ok()).toBeTruthy();
+      const experienceDetailPayload = await experienceDetailResponse.json();
+      expect(experienceDetailPayload?.data?.description).toContain('승인 관리 E2E 테스트용 체험 설명입니다.');
+      expect(experienceDetailPayload?.data?.meeting_point).toBe('홍대입구역 1번 출구');
+
       await test.step('Request revision for a pending host application and close the details panel', async () => {
         const hostListItem = adminPage.locator('div.cursor-pointer').filter({ hasText: applicantUser.fullName }).first();
         await expect(hostListItem).toBeVisible({ timeout: 15000 });

@@ -215,6 +215,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: {
       detailPanelRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
       let isMounted = true;
       const fetchActivity = async () => {
+        const targetUserId = selectedUser.id;
         setIsActivityLoading(true);
         setUserBookings([]);
         setUserGuestReviews([]);
@@ -228,6 +229,14 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: {
           }
 
           if (isMounted) {
+            const profile = result?.data?.profile as Partial<AdminUserDashboardRow> | null | undefined;
+            if (profile) {
+              setSelectedUser((prev) => (
+                prev?.id === targetUserId
+                  ? { ...prev, ...profile }
+                  : prev
+              ));
+            }
             setUserBookings(result?.data?.bookings || []);
             setUserGuestReviews(result?.data?.guestReviews || []);
             setUserTimeline(result?.data?.timeline || []);
@@ -649,10 +658,26 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: {
               <div className="space-y-3 md:space-y-4 text-xs md:text-sm">
                 <InfoRow icon={<Mail className="w-3.5 h-3.5 md:w-4 md:h-4" />} label="이메일" value={selectedUser.email || '-'} />
                 <InfoRow icon={<Phone className="w-3.5 h-3.5 md:w-4 md:h-4" />} label="연락처" value={selectedUser.phone || '미입력'} />
-                <InfoRow icon={<Calendar className="w-3.5 h-3.5 md:w-4 md:h-4" />} label="생년월일" value={selectedUser.birth_date || '미입력'} />
-                <InfoRow icon={<MapPin className="w-3.5 h-3.5 md:w-4 md:h-4" />} label="국적" value={selectedUser.nationality || '미입력'} />
-                <InfoRow icon={<MessageCircle className="w-3.5 h-3.5 md:w-4 md:h-4" />} label="카카오톡 ID" value={selectedUser.kakao_id || '미입력'} />
-                <InfoRow icon={<Smile className="w-3.5 h-3.5 md:w-4 md:h-4" />} label="MBTI" value={selectedUser.mbti || '미입력'} />
+                <InfoRow
+                  icon={<Calendar className="w-3.5 h-3.5 md:w-4 md:h-4" />}
+                  label="생년월일"
+                  value={selectedUser.birth_date || (isActivityLoading ? '불러오는 중...' : '미입력')}
+                />
+                <InfoRow
+                  icon={<MapPin className="w-3.5 h-3.5 md:w-4 md:h-4" />}
+                  label="국적"
+                  value={selectedUser.nationality || (isActivityLoading ? '불러오는 중...' : '미입력')}
+                />
+                <InfoRow
+                  icon={<MessageCircle className="w-3.5 h-3.5 md:w-4 md:h-4" />}
+                  label="카카오톡 ID"
+                  value={selectedUser.kakao_id || (isActivityLoading ? '불러오는 중...' : '미입력')}
+                />
+                <InfoRow
+                  icon={<Smile className="w-3.5 h-3.5 md:w-4 md:h-4" />}
+                  label="MBTI"
+                  value={selectedUser.mbti || (isActivityLoading ? '불러오는 중...' : '미입력')}
+                />
               </div>
             </div>
 

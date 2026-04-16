@@ -53,6 +53,38 @@ type AdminSendMessageResult = {
 
 type InquiryPreviewPatch = Pick<MonitorInquiry, 'content' | 'updated_at'>;
 
+function mergeMonitorInquiry(
+  base: MonitorInquiry | null | undefined,
+  patch: Partial<MonitorInquiry> | null | undefined
+): MonitorInquiry | null {
+  if (!base && !patch) {
+    return null;
+  }
+
+  const nextBase = base ?? null;
+  const nextPatch = patch ?? {};
+
+  const guest = nextBase?.guest || nextPatch.guest
+    ? { ...(nextBase?.guest ?? {}), ...(nextPatch.guest ?? {}) }
+    : undefined;
+  const host = nextBase?.host || nextPatch.host
+    ? { ...(nextBase?.host ?? {}), ...(nextPatch.host ?? {}) }
+    : undefined;
+  const experiences = nextPatch.experiences === null
+    ? null
+    : nextBase?.experiences || nextPatch.experiences
+      ? { ...(nextBase?.experiences ?? {}), ...(nextPatch.experiences ?? {}) }
+      : undefined;
+
+  return {
+    ...(nextBase ?? {}),
+    ...nextPatch,
+    guest,
+    host,
+    experiences,
+  } as MonitorInquiry;
+}
+
 function isAdminSendMessageResult(value: unknown): value is AdminSendMessageResult {
   if (typeof value !== 'object' || value === null) {
     return false;
@@ -99,8 +131,11 @@ export function useAdminChatQuery() {
 
     if (!nextSelected) return;
 
-    selectedInquiryRef.current = nextSelected;
-    setSelectedInquiry(nextSelected);
+    const mergedSelected = mergeMonitorInquiry(selectedInquiryRef.current, nextSelected);
+    if (!mergedSelected) return;
+
+    selectedInquiryRef.current = mergedSelected;
+    setSelectedInquiry(mergedSelected);
   }, []);
 
   const patchInquiryPreview = useCallback((inquiryId: number | string, patch: InquiryPreviewPatch) => {
@@ -156,12 +191,22 @@ export function useAdminChatQuery() {
         throw new Error(result.error || '메시지를 불러오지 못했습니다.');
       }
 
-      setMessages(result.data);
+      setMessages(Array.isArray(result.data) ? result.data : []);
 
-      const selected = inquiriesRef.current.find((i) => String(i.id) === String(inquiryId));
-      if (selected) {
-        selectedInquiryRef.current = selected;
-        setSelectedInquiry(selected);
+      const inquiryDetail = typeof result.inquiry === 'object' && result.inquiry !== null
+        ? result.inquiry as Partial<MonitorInquiry>
+        : null;
+      const selectedFromList = inquiriesRef.current.find((inquiry) => String(inquiry.id) === String(inquiryId));
+      const mergedSelected = mergeMonitorInquiry(
+        selectedInquiryRef.current && String(selectedInquiryRef.current.id) === String(inquiryId)
+          ? selectedInquiryRef.current
+          : selectedFromList,
+        inquiryDetail
+      );
+
+      if (mergedSelected) {
+        selectedInquiryRef.current = mergedSelected;
+        setSelectedInquiry(mergedSelected);
       }
 
       await fetchInquiries(false);

@@ -85,6 +85,10 @@ function formatDate(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
+async function sleep(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function waitForProfile(userId: string) {
   const supabase = getAdminClient();
 
@@ -106,42 +110,71 @@ async function waitForProfile(userId: string) {
 
 async function createAuthUser(user: TestUser, isAdmin = false, role: 'host' | 'admin' | null = null) {
   const supabase = getAdminClient();
-  const { data, error } = await supabase.auth.admin.createUser({
-    email: user.email,
-    password: user.password,
-    email_confirm: true,
-    user_metadata: {
-      full_name: user.fullName,
-      phone: user.phone,
-    },
-  });
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const { data, error } = await supabase.auth.admin.createUser({
+        email: user.email,
+        password: user.password,
+        email_confirm: true,
+        user_metadata: {
+          full_name: user.fullName,
+          phone: user.phone,
+        },
+      });
 
-  if (error || !data.user?.id) {
-    throw error || new Error(`Failed to create auth user for ${user.email}`);
+      if (error || !data.user?.id) {
+        throw error || new Error(`Failed to create auth user for ${user.email}`);
+      }
+
+      createdAuthUserIds.push(data.user.id);
+      await waitForProfile(data.user.id);
+
+      if (role) {
+        const { error: roleError } = await supabase
+          .from('users')
+          .update({ role })
+          .eq('id', data.user.id);
+
+        if (roleError) throw roleError;
+      }
+
+      if (isAdmin) {
+        const { error: whitelistError } = await supabase
+          .from('admin_whitelist')
+          .upsert({ email: user.email }, { onConflict: 'email' });
+
+        if (whitelistError) throw whitelistError;
+        createdWhitelistEmails.push(user.email);
+      }
+
+      return data.user.id;
+    } catch (error) {
+      if (attempt === 2) {
+        throw error;
+      }
+      await sleep(500 * (attempt + 1));
+    }
   }
 
-  createdAuthUserIds.push(data.user.id);
-  await waitForProfile(data.user.id);
+  throw new Error(`Failed to create auth user for ${user.email}`);
+}
 
-  if (role) {
-    const { error: roleError } = await supabase
-      .from('users')
-      .update({ role })
-      .eq('id', data.user.id);
-
-    if (roleError) throw roleError;
+async function updateProfileAdminDetails(
+  userId: string,
+  details: {
+    birth_date?: string | null;
+    nationality?: string | null;
+    kakao_id?: string | null;
+    mbti?: string | null;
   }
+) {
+  const supabase = getAdminClient();
+  const { error } = await supabase
+    .from('profiles')
+    .update(details)
+    .eq('id', userId);
 
-  if (isAdmin) {
-    const { error: whitelistError } = await supabase
-      .from('admin_whitelist')
-      .upsert({ email: user.email }, { onConflict: 'email' });
-
-    if (whitelistError) throw whitelistError;
-    createdWhitelistEmails.push(user.email);
-  }
-
-  return data.user.id;
+  if (error) throw error;
 }
 
 async function createActiveExperience(hostId: string) {
@@ -477,7 +510,14 @@ async function cleanupFixtures() {
   }
 
   for (const authUserId of createdAuthUserIds) {
-    await supabase.auth.admin.deleteUser(authUserId);
+    try {
+      const { error } = await supabase.auth.admin.deleteUser(authUserId);
+      if (error && !error.message.toLowerCase().includes('user not found')) {
+        console.warn('Ignoring auth cleanup delete error:', authUserId, error.message);
+      }
+    } catch (error) {
+      console.warn('Ignoring auth cleanup delete exception:', authUserId, error);
+    }
   }
 }
 
@@ -496,6 +536,14 @@ test.describe('Admin UsersTab smoke', () => {
     const adminId = await createAuthUser(adminUser, true);
     const customerId = await createAuthUser(customerUser);
     const hostId = await createAuthUser(hostUser, false, 'host');
+    const customerProfileDetails = {
+      birth_date: '1994-03-12',
+      nationality: 'KR',
+      kakao_id: 'codex-users-customer',
+      mbti: 'INFJ',
+    };
+
+    await updateProfileAdminDetails(customerId, customerProfileDetails);
 
     expect(adminId).toBeTruthy();
 
@@ -511,6 +559,24 @@ test.describe('Admin UsersTab smoke', () => {
 
     await login(page, adminUser);
     await page.goto('/admin/dashboard?tab=USERS', { waitUntil: 'networkidle' });
+
+    const summaryResponse = await page.request.get('/api/admin/users-summary');
+    expect(summaryResponse.ok()).toBeTruthy();
+    const summaryPayload = await summaryResponse.json();
+    const summaryUser = Array.isArray(summaryPayload?.data)
+      ? summaryPayload.data.find((row: { id?: string }) => row.id === customerId)
+      : null;
+
+    expect(summaryUser).toBeTruthy();
+    expect(summaryUser).not.toHaveProperty('birth_date');
+    expect(summaryUser).not.toHaveProperty('nationality');
+    expect(summaryUser).not.toHaveProperty('kakao_id');
+    expect(summaryUser).not.toHaveProperty('mbti');
+
+    const timelineResponse = await page.request.get(`/api/admin/users/${customerId}/timeline`);
+    expect(timelineResponse.ok()).toBeTruthy();
+    const timelinePayload = await timelineResponse.json();
+    expect(timelinePayload?.data?.profile).toMatchObject(customerProfileDetails);
 
     await expect(page.getByRole('combobox', { name: '회원 정렬' })).toBeVisible({ timeout: 15000 });
     await expect(page.getByText('전체 회원', { exact: false })).toBeVisible();
@@ -544,6 +610,8 @@ test.describe('Admin UsersTab smoke', () => {
     await expect(guestReviewsSection.getByText(fixture.guestReviewRating, { exact: true })).toBeVisible();
     await expect(guestReviewsSection).toContainText(fixture.guestReviewContent);
     await expect(guestReviewsSection.getByText(fixture.guestReviewDate, { exact: true })).toBeVisible();
+    await expect(page.getByText(customerProfileDetails.birth_date, { exact: false })).toBeVisible();
+    await expect(page.getByText(customerProfileDetails.kakao_id, { exact: true })).toBeVisible();
     await expect(page.getByText('회원 타임라인', { exact: false })).toBeVisible();
     await expect(page.getByText(`체험 예약 · ${fixture.experienceTitle}`)).toBeVisible();
     await expect(page.getByText(`리뷰 작성 · ${fixture.experienceTitle}`)).toBeVisible();
@@ -551,5 +619,78 @@ test.describe('Admin UsersTab smoke', () => {
     await expect(page.getByText(`문의 답변 도착 · ${fixture.experienceTitle}`)).toBeVisible();
     await expect(page.getByText(`맞춤 의뢰 결제 · ${fixture.serviceTitle}`)).toBeVisible();
     await expect(page.getByRole('button', { name: /이 회원 계정 영구 삭제/ })).toBeVisible();
+  });
+
+  test('rejects unsupported delete targets and cascades profile-owned inquiry/service records', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const adminUser = createAdminUser();
+    const customerUser = createCustomerUser();
+    const hostUser = createHostUser();
+
+    await createAuthUser(adminUser, true);
+    const customerId = await createAuthUser(customerUser);
+    const hostId = await createAuthUser(hostUser, false, 'host');
+
+    const experience = await createActiveExperience(hostId);
+    await createUserFixtures({
+      customerId,
+      customer: customerUser,
+      hostId,
+      hostName: hostUser.fullName,
+      experienceId: experience.id,
+      experienceTitle: experience.title,
+    });
+
+    await login(page, adminUser);
+
+    const invalidDeleteResponse = await page.request.post('/api/admin/delete', {
+      data: { table: 'notifications', id: customerId },
+    });
+    expect(invalidDeleteResponse.status()).toBe(400);
+
+    const deleteResponse = await page.request.post('/api/admin/delete', {
+      data: { table: 'profiles', id: customerId },
+    });
+    expect(deleteResponse.ok()).toBeTruthy();
+    const deletedCustomerIndex = createdAuthUserIds.indexOf(customerId);
+    if (deletedCustomerIndex >= 0) {
+      createdAuthUserIds.splice(deletedCustomerIndex, 1);
+    }
+
+    const supabase = getAdminClient();
+
+    const [
+      profileRes,
+      bookingRes,
+      inquiryRes,
+      inquiryMessageRes,
+      serviceRequestRes,
+      serviceApplicationRes,
+      serviceBookingAsCustomerRes,
+    ] = await Promise.all([
+      supabase.from('profiles').select('id').eq('id', customerId).maybeSingle(),
+      supabase.from('bookings').select('id').eq('user_id', customerId),
+      supabase.from('inquiries').select('id').eq('user_id', customerId),
+      supabase.from('inquiry_messages').select('id').eq('sender_id', customerId),
+      supabase.from('service_requests').select('id').eq('user_id', customerId),
+      supabase.from('service_applications').select('id').eq('host_id', customerId),
+      supabase.from('service_bookings').select('id').eq('customer_id', customerId),
+    ]);
+
+    expect(profileRes.error).toBeNull();
+    expect(profileRes.data).toBeNull();
+    expect(bookingRes.error).toBeNull();
+    expect(bookingRes.data).toEqual([]);
+    expect(inquiryRes.error).toBeNull();
+    expect(inquiryRes.data).toEqual([]);
+    expect(inquiryMessageRes.error).toBeNull();
+    expect(inquiryMessageRes.data).toEqual([]);
+    expect(serviceRequestRes.error).toBeNull();
+    expect(serviceRequestRes.data).toEqual([]);
+    expect(serviceApplicationRes.error).toBeNull();
+    expect(serviceApplicationRes.data).toEqual([]);
+    expect(serviceBookingAsCustomerRes.error).toBeNull();
+    expect(serviceBookingAsCustomerRes.data).toEqual([]);
   });
 });
