@@ -28,12 +28,18 @@ type TeamWorkspaceCurrentUser = {
   name: string;
 };
 
+type TeamWhitelistEntry = {
+  id: string;
+  email: string;
+  created_at?: string;
+};
+
 type TeamWorkspaceBootstrapResponse = {
   success: boolean;
   currentUser?: TeamWorkspaceCurrentUser;
   tasks?: AdminTask[];
   comments?: AdminComment[];
-  whitelist?: Array<{ id: string; email: string; created_at?: string }>;
+  whitelist?: TeamWhitelistEntry[];
   requestId?: string | null;
   error?: string;
 };
@@ -46,7 +52,7 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
   const { requestConfirm, ConfirmDialogElement } = useConfirmDialog();
   const [tasks, setTasks] = useState<AdminTask[]>([]);
   const [comments, setComments] = useState<AdminComment[]>([]);
-  const [whitelist, setWhitelist] = useState<Array<{ id: string; email: string; created_at?: string }>>([]);
+  const [whitelist, setWhitelist] = useState<TeamWhitelistEntry[]>([]);
   const [newWhitemail, setNewWhitemail] = useState('');
   const [showWhitelist, setShowWhitelist] = useState(false);
   const tasksRef = useRef<AdminTask[]>([]); // ⭐ 추가: stale closure 방지를 위한 ref
@@ -139,6 +145,57 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
     }
 
     return payload;
+  }, []);
+
+  const setTasksState = useCallback((updater: (prev: AdminTask[]) => AdminTask[]) => {
+    setTasks((prev) => {
+      const next = updater(prev);
+      tasksRef.current = next;
+      return next;
+    });
+  }, []);
+
+  const upsertRealtimeTask = useCallback((nextTask: AdminTask) => {
+    setTasksState((prev) => {
+      const filtered = prev.filter((task) => task.id !== nextTask.id);
+      const next = [nextTask, ...filtered].sort(
+        (left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime()
+      );
+
+      return next.slice(0, 100);
+    });
+  }, [setTasksState]);
+
+  const removeRealtimeTask = useCallback((taskId: string) => {
+    setTasksState((prev) => prev.filter((task) => task.id !== taskId));
+    setComments((prev) => prev.filter((comment) => comment.task_id !== taskId));
+  }, [setTasksState]);
+
+  const upsertRealtimeComment = useCallback((nextComment: AdminComment) => {
+    setComments((prev) => {
+      const filtered = prev.filter((comment) => comment.id !== nextComment.id);
+      return [...filtered, nextComment].sort(
+        (left, right) => new Date(left.created_at).getTime() - new Date(right.created_at).getTime()
+      );
+    });
+  }, []);
+
+  const removeRealtimeComment = useCallback((commentId: string) => {
+    setComments((prev) => prev.filter((comment) => comment.id !== commentId));
+  }, []);
+
+  const upsertRealtimeWhitelistEntry = useCallback((entry: TeamWhitelistEntry) => {
+    setWhitelist((prev) => {
+      const filtered = prev.filter((item) => item.id !== entry.id);
+      return [entry, ...filtered].sort(
+        (left, right) =>
+          new Date(right.created_at || 0).getTime() - new Date(left.created_at || 0).getTime()
+      );
+    });
+  }, []);
+
+  const removeRealtimeWhitelistEntry = useCallback((entryId: string) => {
+    setWhitelist((prev) => prev.filter((entry) => entry.id !== entryId));
   }, []);
 
   const fetchTeamWorkspaceState = useCallback(async () => {
@@ -288,38 +345,81 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
     if (!realtimeReady) return;
 
     const channel = supabase.channel('team_workspace_realtime_final')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_tasks' }, async () => {
-        try {
-          await fetchTeamWorkspaceState();
-        } catch (error) {
-          console.error('[TeamTab] realtime admin_tasks refresh failed:', error);
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_tasks' }, (payload) => {
+        const eventType = payload.eventType;
+        const nextTask = (payload.new ?? null) as AdminTask | null;
+        const previousTask = (payload.old ?? null) as Partial<AdminTask> | null;
+
+        if ((eventType === 'INSERT' || eventType === 'UPDATE') && nextTask?.id) {
+          upsertRealtimeTask(nextTask);
+          return;
         }
+
+        if (eventType === 'DELETE' && previousTask?.id) {
+          removeRealtimeTask(previousTask.id);
+          return;
+        }
+
+        scheduleFetchWorkspace();
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_task_comments' }, (payload) => {
         const taskId = payload.new?.task_id as string | undefined;
         if (!taskId) return;
         const currentTaskIds = new Set(tasksRef.current.map(task => task.id));
-        if (!currentTaskIds.has(taskId)) return;
-        scheduleFetchWorkspace();
+        if (!currentTaskIds.has(taskId)) {
+          scheduleFetchWorkspace();
+          return;
+        }
+        upsertRealtimeComment(payload.new as AdminComment);
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'admin_task_comments' }, (payload) => {
         const taskId = payload.old?.task_id as string | undefined;
         if (!taskId) return;
         const currentTaskIds = new Set(tasksRef.current.map(task => task.id));
-        if (!currentTaskIds.has(taskId)) return;
-        scheduleFetchWorkspace();
+        if (!currentTaskIds.has(taskId)) {
+          scheduleFetchWorkspace();
+          return;
+        }
+        const commentId = payload.old?.id as string | undefined;
+        if (!commentId) {
+          scheduleFetchWorkspace();
+          return;
+        }
+        removeRealtimeComment(commentId);
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_whitelist' }, () => {
-        fetchTeamWorkspaceState().catch((error) => {
-          console.error('[TeamTab] realtime admin_whitelist refresh failed:', error);
-        });
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_whitelist' }, (payload) => {
+        const eventType = payload.eventType;
+        const nextEntry = (payload.new ?? null) as TeamWhitelistEntry | null;
+        const previousEntry = (payload.old ?? null) as Partial<TeamWhitelistEntry> | null;
+
+        if ((eventType === 'INSERT' || eventType === 'UPDATE') && nextEntry?.id) {
+          upsertRealtimeWhitelistEntry(nextEntry);
+          return;
+        }
+
+        if (eventType === 'DELETE' && previousEntry?.id) {
+          removeRealtimeWhitelistEntry(previousEntry.id);
+          return;
+        }
+
+        scheduleFetchWorkspace();
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [fetchTeamWorkspaceState, realtimeReady, scheduleFetchWorkspace, supabase]);
+  }, [
+    realtimeReady,
+    removeRealtimeComment,
+    removeRealtimeTask,
+    removeRealtimeWhitelistEntry,
+    scheduleFetchWorkspace,
+    supabase,
+    upsertRealtimeComment,
+    upsertRealtimeTask,
+    upsertRealtimeWhitelistEntry,
+  ]);
 
   useEffect(() => {
     if (initialInnerTab === 'proxy') {

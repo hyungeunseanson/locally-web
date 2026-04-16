@@ -329,6 +329,9 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
         applyLocalPaymentState(selectedIdRef.current, 'REFUNDED');
       }
 
+      // Keep the operator flow responsive once the write succeeds; the follow-up
+      // detail refresh should not block the next valid status action.
+      setUpdating(false);
       await refreshSelectedRequest(selectedIdRef.current, { loadedCount: loadedCountRef.current });
       showToast(successMessage, 'success');
     } catch (error) {

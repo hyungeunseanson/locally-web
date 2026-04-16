@@ -222,6 +222,40 @@ test.describe.serial('Admin analytics smoke', () => {
       ).toBeVisible();
     });
 
+    await test.step('Change date preset without immediate fan-out until manual refresh', async () => {
+      const summaryCountsBeforeDateApply = {
+        business: countRouteHits(analyticsResponseUrls, '/api/admin/analytics-summary'),
+        searchIntent: countRouteHits(analyticsResponseUrls, '/api/admin/analytics-search-intent'),
+        customerComposition: countRouteHits(analyticsResponseUrls, '/api/admin/analytics-customer-composition'),
+      };
+
+      await page.getByRole('button', { name: '7D', exact: true }).click();
+      await page.waitForLoadState('networkidle');
+
+      expect(countRouteHits(analyticsResponseUrls, '/api/admin/analytics-summary')).toBe(summaryCountsBeforeDateApply.business);
+      expect(countRouteHits(analyticsResponseUrls, '/api/admin/analytics-search-intent')).toBe(summaryCountsBeforeDateApply.searchIntent);
+      expect(countRouteHits(analyticsResponseUrls, '/api/admin/analytics-customer-composition')).toBe(summaryCountsBeforeDateApply.customerComposition);
+
+      const analyticsSummaryRefreshPromise = page.waitForResponse((response) =>
+        response.url().includes('/api/admin/analytics-summary') && response.request().method() === 'GET'
+      );
+      const analyticsSearchIntentRefreshPromise = page.waitForResponse((response) =>
+        response.url().includes('/api/admin/analytics-search-intent') && response.request().method() === 'GET'
+      );
+      const analyticsCustomerCompositionRefreshPromise = page.waitForResponse((response) =>
+        response.url().includes('/api/admin/analytics-customer-composition') && response.request().method() === 'GET'
+      );
+
+      await page.getByRole('button', { name: '분석 갱신' }).click();
+      await analyticsSummaryRefreshPromise;
+      await analyticsSearchIntentRefreshPromise;
+      await analyticsCustomerCompositionRefreshPromise;
+
+      expect(countRouteHits(analyticsResponseUrls, '/api/admin/analytics-summary')).toBe(summaryCountsBeforeDateApply.business + 1);
+      expect(countRouteHits(analyticsResponseUrls, '/api/admin/analytics-search-intent')).toBe(summaryCountsBeforeDateApply.searchIntent + 1);
+      expect(countRouteHits(analyticsResponseUrls, '/api/admin/analytics-customer-composition')).toBe(summaryCountsBeforeDateApply.customerComposition + 1);
+    });
+
     await test.step('Open GMV modal with platform-wide explanation', async () => {
       await page.getByText('총 거래액 (GMV)').click();
       await expect(page.getByRole('heading', { name: '🔥 최고 매출 기록일' })).toBeVisible({ timeout: 10000 });

@@ -54,8 +54,8 @@ type UserActivitySummary = {
   recent_activity_at: string | null;
 };
 
-const BASE_PREFETCH_LIMIT = 20;
-const SUMMARY_SORT_PREFETCH_LIMIT = 40;
+const BASE_PREFETCH_LIMIT = 8;
+const SUMMARY_SORT_PREFETCH_LIMIT = 12;
 
 function getUserRoleLabel(role?: string | null) {
   if (role === 'admin') return 'Admin';

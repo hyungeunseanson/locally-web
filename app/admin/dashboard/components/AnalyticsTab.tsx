@@ -31,6 +31,35 @@ const ANALYTICS_MAIN_TABS: Array<{ id: AnalyticsMainTab; label: string }> = [
   { id: 'logs', label: '운영 감사 로그' },
 ];
 
+function createDefaultAnalyticsRange() {
+  const now = new Date();
+  return [{
+    startDate: subDays(now, 30),
+    endDate: now,
+    key: 'selection',
+  }] as Range[];
+}
+
+function cloneDateRange(ranges: Range[]) {
+  return ranges.map((range) => ({
+    ...range,
+    startDate: range.startDate ? new Date(range.startDate) : undefined,
+    endDate: range.endDate ? new Date(range.endDate) : undefined,
+  }));
+}
+
+function areDateRangesEqual(left: Range[], right: Range[]) {
+  const leftRange = left[0];
+  const rightRange = right[0];
+
+  const leftStart = leftRange?.startDate?.getTime() ?? 0;
+  const rightStart = rightRange?.startDate?.getTime() ?? 0;
+  const leftEnd = leftRange?.endDate?.getTime() ?? 0;
+  const rightEnd = rightRange?.endDate?.getTime() ?? 0;
+
+  return leftStart === rightStart && leftEnd === rightEnd;
+}
+
 export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
   const bookings = props.bookings ?? EMPTY_ANALYTICS_ITEMS;
   const users = props.users ?? EMPTY_ANALYTICS_ITEMS;
@@ -43,16 +72,19 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
   const inquiryMessages = props.inquiryMessages ?? EMPTY_ANALYTICS_ITEMS;
   const [selectedMetric, setSelectedMetric] = useState<AnalyticsMetricKey | null>(null);
   const [activeMainTab, setActiveMainTab] = useState<AnalyticsMainTab>('business');
+  const defaultDateRangeRef = useRef<Range[] | null>(null);
+
+  if (defaultDateRangeRef.current === null) {
+    defaultDateRangeRef.current = createDefaultAnalyticsRange();
+  }
 
   // 날짜 필터 상태 추가
-  const [dateRange, setDateRange] = useState<Range[]>([{
-    startDate: subDays(new Date(), 30),
-    endDate: new Date(),
-    key: 'selection'
-  }]);
+  const [dateRange, setDateRange] = useState<Range[]>(() => cloneDateRange(defaultDateRangeRef.current || createDefaultAnalyticsRange()));
+  const [appliedDateRange, setAppliedDateRange] = useState<Range[]>(() => cloneDateRange(defaultDateRangeRef.current || createDefaultAnalyticsRange()));
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [activePreset, setActivePreset] = useState<string>('30D');
   const datePickerRef = useRef<HTMLDivElement>(null);
+  const hasPendingDateChanges = !areDateRangesEqual(dateRange, appliedDateRange);
 
   // 달력 외부 클릭 시 닫기
   useEffect(() => {
@@ -76,6 +108,11 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
     else if (preset === 'ALL') setDateRange([{ startDate: new Date('2020-01-01'), endDate: now, key: 'selection' }]);
   };
 
+  const applyDateRange = () => {
+    setAppliedDateRange(cloneDateRange(dateRange));
+    setShowDatePicker(false);
+  };
+
   const {
     loading,
     stats,
@@ -95,7 +132,7 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
     inquiries,
     inquiryMessages,
     activeMainTab,
-    dateRange,
+    dateRange: appliedDateRange,
   });
 
   if (loading && (activeMainTab === 'business' || activeMainTab === 'host')) {
@@ -109,7 +146,12 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
       <div className="flex flex-col md:flex-row justify-between md:items-center mb-4 md:mb-6 gap-3 md:gap-0">
         <div className="flex items-center gap-2">
           <TrendingUp className="text-rose-500 w-5 h-5 md:w-6 md:h-6" />
-          <h2 className="text-xl md:text-2xl font-black text-slate-900">데이터 심층 분석</h2>
+          <div>
+            <h2 className="text-xl md:text-2xl font-black text-slate-900">데이터 심층 분석</h2>
+            <p className="text-[11px] md:text-xs text-slate-500 mt-1">
+              기간을 바꾼 뒤에는 조회 버튼으로만 집계를 다시 불러옵니다.
+            </p>
+          </div>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 md:gap-3 relative">
           <div className="bg-slate-100 p-1 rounded-lg flex text-[10px] md:text-xs font-bold overflow-x-auto scrollbar-hide shrink-0">
@@ -160,6 +202,19 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
               </div>
             )}
           </div>
+
+          <button
+            type="button"
+            onClick={applyDateRange}
+            disabled={!hasPendingDateChanges}
+            className={`w-full sm:w-auto rounded-lg px-3 md:px-4 py-2 text-xs md:text-sm font-semibold transition-colors ${
+              hasPendingDateChanges
+                ? 'bg-slate-900 text-white hover:bg-slate-800'
+                : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+            }`}
+          >
+            분석 갱신
+          </button>
         </div>
       </div>
 
