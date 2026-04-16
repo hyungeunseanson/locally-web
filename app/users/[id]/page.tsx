@@ -44,6 +44,78 @@ type HostExperienceCardData = {
   duration?: number | string | null;
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function readNullableString(value: unknown): string | null | undefined {
+  if (value == null) return null;
+  return typeof value === 'string' ? value : undefined;
+}
+
+function readNullableStringArray(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null;
+
+  return value.filter((entry): entry is string => typeof entry === 'string');
+}
+
+function readNullableNumber(value: unknown): number | null | undefined {
+  if (value == null) return null;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function readNullableNumberOrString(value: unknown): number | string | null | undefined {
+  if (value == null) return null;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') return value;
+  return undefined;
+}
+
+function normalizeHostExperienceRows(rows: unknown): HostExperienceCardData[] {
+  if (!Array.isArray(rows)) {
+    return [];
+  }
+
+  return rows.reduce<HostExperienceCardData[]>((acc, row) => {
+    if (!isRecord(row)) {
+      return acc;
+    }
+
+    const id = row.id;
+    if (typeof id !== 'string' && typeof id !== 'number') {
+      return acc;
+    }
+
+    acc.push({
+      id,
+      title: readNullableString(row.title),
+      title_en: readNullableString(row.title_en),
+      title_ja: readNullableString(row.title_ja),
+      title_zh: readNullableString(row.title_zh),
+      category: readNullableString(row.category),
+      category_en: readNullableString(row.category_en),
+      category_ja: readNullableString(row.category_ja),
+      category_zh: readNullableString(row.category_zh),
+      city: readNullableString(row.city),
+      subCity: readNullableString(row.subCity),
+      country: readNullableString(row.country),
+      location: readNullableString(row.location),
+      languages: readNullableStringArray(row.languages),
+      image_url: readNullableString(row.image_url),
+      photos: readNullableStringArray(row.photos),
+      rating: readNullableNumber(row.rating),
+      review_count: readNullableNumber(row.review_count),
+      price: readNullableNumberOrString(row.price),
+      duration: readNullableNumberOrString(row.duration),
+    });
+
+    return acc;
+  }, []);
+}
+
 const PUBLIC_HOST_EXPERIENCE_SELECT = [
   'id',
   'title',
@@ -105,7 +177,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
           .eq('host_id', resolvedParams.id)
           .eq('status', 'active');
 
-        if (expData) setHostExperiences(expData);
+        setHostExperiences(normalizeHostExperienceRows(expData));
       } else {
         setHostExperiences([]);
       }
