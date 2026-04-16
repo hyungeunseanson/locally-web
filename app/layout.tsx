@@ -18,6 +18,7 @@ import { buildAdSenseScriptUrl, getAdSenseClientId, isAdSenseEnabled } from '@/a
 import { buildAbsoluteUrl, buildLocalizedAbsoluteUrl, getSiteUrl } from '@/app/utils/siteUrl';
 import { IAB_ESCAPE_BYPASS_PARAM } from '@/app/utils/iab';
 import { createClient } from '@/app/utils/supabase/server';
+import { hasSupabaseSessionCookie } from '@/app/utils/supabase/authCookies';
 import { Analytics } from "@vercel/analytics/react";
 import { SplashProvider } from '@/app/context/SplashContext';
 import GlobalSplash from '@/app/components/GlobalSplash';
@@ -132,13 +133,16 @@ export default async function RootLayout({
     initialViewModeCookie === 'host' || initialViewModeCookie === 'guest'
       ? initialViewModeCookie
       : null;
+  const hasInitialSessionCookie = hasSupabaseSessionCookie(cookieStore.getAll());
 
-  // 🟢 [M-3] 서버 사이드에서 세션 가져오기 (FOUC 방지)
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const initialUser = user || null;
+  let initialUser = null;
+  if (hasInitialSessionCookie) {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    initialUser = user || null;
+  }
 
   const kakaoIabBootstrapScript = `
     (() => {
@@ -187,7 +191,7 @@ export default async function RootLayout({
         )}
         <KakaoIabEscapeGate enabled={kakaoIabEscapeEnabled} locale={locale} />
         <QueryProvider>
-          <AuthProvider initialUser={initialUser}>
+          <AuthProvider initialUser={initialUser} initialSessionResolved={true}>
             <ViewModeProvider initialViewMode={initialViewMode}>
               <ToastProvider>
                 <NotificationProvider>

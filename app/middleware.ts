@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { updateSession } from '@/app/utils/supabase/middleware';
+import { hasSupabaseSessionCookie } from '@/app/utils/supabase/authCookies';
 
 type Locale = 'ko' | 'en' | 'ja' | 'zh';
 
@@ -9,17 +10,18 @@ function extractLocaleFromPathname(pathname: string): Locale | null {
 }
 
 export async function middleware(request: NextRequest) {
-  // API 및 정적 파일 제외
   const pathname = request.nextUrl.pathname;
+  const originalPathname = new URL(request.url).pathname;
+  const hasSessionCookie = hasSupabaseSessionCookie(request.cookies.getAll());
+
+  // API 및 정적 파일 제외
   if (
     pathname.startsWith('/api') ||
     pathname.startsWith('/_next') ||
     pathname.includes('.')
   ) {
-    return await updateSession(request);
+    return NextResponse.next();
   }
-
-  const originalPathname = new URL(request.url).pathname;
 
   // 1. URL Path에서 locale 추출 (ko|en|ja|zh)
   // next.config rewrites가 prefix를 제거할 수 있으므로 original request URL을 우선 사용한다.
@@ -40,7 +42,11 @@ export async function middleware(request: NextRequest) {
       maxAge: 60 * 60 * 24 * 365,
       sameSite: 'lax',
     });
-    return await updateSession(request, redirectResponse);
+    return hasSessionCookie ? await updateSession(request, redirectResponse) : redirectResponse;
+  }
+
+  if (!resolvedLocale && !hasSessionCookie) {
+    return NextResponse.next();
   }
 
   // 2. 헤더 복사 — URL prefix 있을 때만 주입
@@ -48,30 +54,31 @@ export async function middleware(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   if (resolvedLocale) {
     requestHeaders.set('x-locally-locale', resolvedLocale);
-    request.cookies.set('app_lang', resolvedLocale);
   }
 
-  // 3. 수정한 request headers를 downstream 렌더링까지 전달
-  const forwardedResponse = NextResponse.next({
+  const downstreamResponse = NextResponse.next({
     request: {
       headers: requestHeaders,
     },
   });
 
-  // Supabase 세션 처리 및 헤더 병합
-  const finalResponse = await updateSession(request, forwardedResponse);
+  const finalResponse = hasSessionCookie
+    ? await updateSession(request, downstreamResponse)
+    : downstreamResponse;
 
-  if (resolvedLocale) {
-    finalResponse.cookies.set('app_lang', resolvedLocale, {
-      path: '/',
-      maxAge: 60 * 60 * 24 * 365,
-      sameSite: 'lax',
-    });
+  if (!resolvedLocale) {
+    return finalResponse;
   }
+
+  finalResponse.cookies.set('app_lang', resolvedLocale, {
+    path: '/',
+    maxAge: 60 * 60 * 24 * 365,
+    sameSite: 'lax',
+  });
 
   return finalResponse;
 }
 
 export const config = {
-  matcher: ['/', '/(ko|en|ja|zh)/:path*', '/((?!_next|_vercel|.*\\..*).*)']
+  matcher: ['/', '/(ko|en|ja|zh)/:path*', '/((?!api|_next|_vercel|.*\\..*).*)']
 };

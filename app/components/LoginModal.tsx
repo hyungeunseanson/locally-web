@@ -12,6 +12,7 @@ import {
   getLoginModalNationalityOptions,
 } from '@/app/components/loginModalLocalization';
 import { useModalClose } from '@/app/hooks/useModalClose';
+import { normalizeInternalReturnPath } from '@/app/utils/authRedirect';
 
 type Gender = 'Male' | 'Female' | '';
 
@@ -45,11 +46,6 @@ interface LoginModalProps {
 
 const AUTH_SUCCESS_TOAST_DURATION_MS = 4500;
 const AUTH_VERIFICATION_TOAST_DURATION_MS = 5000;
-
-const normalizeRedirectPath = (value?: string | null) => {
-  if (!value) return '/';
-  return /^\/(?!\/)/.test(value) ? value : '/';
-};
 
 export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPath }: LoginModalProps) {
   const { visible, closing, requestClose } = useModalClose(isOpen, onClose);
@@ -89,9 +85,9 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
     return `${basePath}${query ? `?${query}` : ''}`;
   }, [pathname, searchParams]);
   const resolvedRedirectPath = useMemo(() => {
-    if (redirectPath) return normalizeRedirectPath(redirectPath);
+    if (redirectPath) return normalizeInternalReturnPath(redirectPath);
     if (pathname === '/login') return '/';
-    return normalizeRedirectPath(currentPath);
+    return normalizeInternalReturnPath(currentPath);
   }, [currentPath, pathname, redirectPath]);
   const shouldShowReturnHint = resolvedRedirectPath !== '/';
 

@@ -39,16 +39,18 @@ function normalizeApplicationStatus(status: string | null | undefined) {
 
 export function AuthProvider({
   children,
-  initialUser = null
+  initialUser = null,
+  initialSessionResolved = false,
 }: {
   children: React.ReactNode;
   initialUser?: User | null;
+  initialSessionResolved?: boolean;
 }) {
   const [user, setUser] = useState<User | null>(initialUser);
   const [isHost, setIsHost] = useState(false);
   const [applicationStatus, setApplicationStatus] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(!initialUser); // 🟢 만약 initialUser가 있으면 로딩 없이 즉시 렌더링
-  const [hostStatusResolved, setHostStatusResolved] = useState(!initialUser);
+  const [isLoading, setIsLoading] = useState(!initialUser);
+  const [hostStatusResolved, setHostStatusResolved] = useState(Boolean(initialSessionResolved && !initialUser));
   const supabase = useMemo(() => createClient(), []);
 
   const resolveHostStatus = useCallback(async (userId: string, options?: { indicateLoading?: boolean }) => {
@@ -172,12 +174,18 @@ export function AuthProvider({
   };
 
   useEffect(() => {
-      if (initialUser) {
-        void resolveHostStatus(initialUser.id, { indicateLoading: true });
-      } else {
-        setHostStatusResolved(true);
-        void loadUser();
-      }
+    if (initialUser) {
+      void resolveHostStatus(initialUser.id, { indicateLoading: true });
+    } else if (initialSessionResolved) {
+      setUser(null);
+      setIsHost(false);
+      setApplicationStatus(null);
+      setHostStatusResolved(true);
+      setIsLoading(false);
+    } else {
+      setHostStatusResolved(true);
+      void loadUser();
+    }
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
@@ -195,7 +203,7 @@ export function AuthProvider({
     });
 
     return () => subscription.unsubscribe();
-  }, [initialUser, loadUser, resolveHostStatus, supabase]);
+  }, [initialSessionResolved, initialUser, loadUser, resolveHostStatus, supabase]);
 
   useEffect(() => {
     if (!user?.id) {
