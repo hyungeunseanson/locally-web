@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
-import { getProxyLinkedInquiryId } from '@/app/utils/proxyBooking';
+import { getProxyLinkedInquiryId, PROXY_LINKED_INQUIRY_REQUIRED_ERROR } from '@/app/utils/proxyBooking';
 
 type ProxyRequestRow = {
     id: string;
@@ -115,7 +115,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
         if (!linkedInquiryId) {
             return NextResponse.json(
-                { success: false, error: '전화 예약 문의 스레드가 연결되어 있지 않습니다.' },
+                { success: false, error: PROXY_LINKED_INQUIRY_REQUIRED_ERROR },
                 { status: 409 }
             );
         }
@@ -251,6 +251,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             }
             if (existingRequest.status === 'CANCELLED' || existingRequest.status === 'COMPLETED') {
                 return NextResponse.json({ success: false, error: 'Cannot cancel a request in this state' }, { status: 409 });
+            }
+            if (String(existingRequest.payment_status || '').toUpperCase() !== 'WAITING') {
+                return NextResponse.json(
+                    { success: false, error: '결제 대기 상태에서만 요청을 취소할 수 있습니다.' },
+                    { status: 409 }
+                );
             }
         }
 

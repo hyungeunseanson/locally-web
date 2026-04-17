@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { createInquiryMessage } from '@/app/api/inquiries/thread/shared';
-import { getProxyLinkedInquiryId } from '@/app/utils/proxyBooking';
+import { getProxyLinkedInquiryId, PROXY_LINKED_INQUIRY_REQUIRED_ERROR } from '@/app/utils/proxyBooking';
 
 type CommentAuthorProfile = { full_name?: string | null; avatar_url?: string | null } | null;
 
@@ -53,7 +53,7 @@ export async function POST(
 
         if (!linkedInquiryId) {
             return NextResponse.json(
-                { success: false, error: '전화 예약 문의 스레드가 연결되어 있지 않습니다.' },
+                { success: false, error: PROXY_LINKED_INQUIRY_REQUIRED_ERROR },
                 { status: 409 }
             );
         }

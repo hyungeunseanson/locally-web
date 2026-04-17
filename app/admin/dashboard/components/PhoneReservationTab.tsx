@@ -8,7 +8,7 @@ import type { PaymentStatus, ProxyRequest, ProxyStatus } from '@/app/types/proxy
 import {
   getProxyCategoryLabel,
   getProxyFormDisplayEntries,
-  getProxyLinkedInquiryId,
+  getProxyLinkedInquiryIdFromRequest,
   getProxyPaymentMethod,
   getProxyRequestFeeKrw,
   getProxyRequestTitle,
@@ -346,7 +346,7 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
     ? getProxyRequestFeeKrw(selectedRequest.category, selectedRequest.form_data)
     : null;
   const linkedInquiryId = selectedRequest
-    ? getProxyLinkedInquiryId(selectedRequest.form_data)
+    ? getProxyLinkedInquiryIdFromRequest(selectedRequest)
     : null;
   const selectedFormEntries = selectedRequest
     ? getProxyFormDisplayEntries(selectedRequest.form_data)

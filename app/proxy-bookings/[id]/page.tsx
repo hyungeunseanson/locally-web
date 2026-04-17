@@ -10,6 +10,7 @@ import type { ProxyComment, ProxyRequest, ProxyStatus } from '@/app/types/proxy'
 import {
     getProxyCategoryLabel,
     getProxyFormDisplayEntries,
+    getProxyLinkedInquiryIdFromRequest,
     getProxyPaymentMethod,
     getProxyRequestFeeKrw,
     getProxyRequestTitle,
@@ -156,7 +157,7 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
     const paymentMethod = getProxyPaymentMethod(request.form_data);
     const serviceFee = getProxyRequestFeeKrw(request.category, request.form_data);
     const formEntries = getProxyFormDisplayEntries(request.form_data);
-    const linkedInquiryId = typeof request.linked_inquiry_id === 'string' ? request.linked_inquiry_id : null;
+    const linkedInquiryId = getProxyLinkedInquiryIdFromRequest(request);
     const canStartProcessing = request.payment_status === 'COMPLETED';
     const paymentStatusLabel = request.payment_status === 'COMPLETED'
         ? '결제 완료'

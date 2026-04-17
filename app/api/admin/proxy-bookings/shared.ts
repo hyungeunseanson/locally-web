@@ -5,6 +5,18 @@ import { getProxyPaymentMethod } from '@/app/utils/proxyBooking';
 
 import type { ProxyCategory, ProxyFormData, ProxyPaymentMethod, ProxyStatus } from '@/app/types/proxy';
 
+const ADMIN_PROXY_BOOKING_SELECT = [
+  'id',
+  'user_id',
+  'category',
+  'status',
+  'form_data',
+  'payment_channel',
+  'payment_status',
+  'locally_order_id',
+  'tid',
+].join(', ');
+
 export type AdminProxyBookingRow = {
   id: string;
   user_id: string;
@@ -13,14 +25,8 @@ export type AdminProxyBookingRow = {
   form_data: ProxyFormData;
   payment_channel: 'NAVER' | 'LOCALLY';
   payment_status: 'WAITING' | 'COMPLETED' | 'FAILED' | 'REFUNDED';
-  naver_buyer_name: string | null;
   locally_order_id: string | null;
-  agreed_to_terms: boolean;
-  created_at: string;
-  updated_at: string;
   tid?: string | null;
-  paid_at?: string | null;
-  refunded_at?: string | null;
 };
 
 export async function requireAdminProxyBooking(requestId: string) {
@@ -46,9 +52,9 @@ export async function requireAdminProxyBooking(requestId: string) {
 
   const { data: proxyRequest, error: requestError } = await supabaseAdmin
     .from('proxy_requests')
-    .select('*')
+    .select(ADMIN_PROXY_BOOKING_SELECT)
     .eq('id', requestId)
-    .maybeSingle();
+    .maybeSingle<AdminProxyBookingRow>();
 
   if (requestError || !proxyRequest) {
     return { error: '전화 예약 요청을 찾을 수 없습니다.', status: 404 as const };
@@ -57,7 +63,7 @@ export async function requireAdminProxyBooking(requestId: string) {
   return {
     user,
     supabaseAdmin,
-    proxyRequest: proxyRequest as AdminProxyBookingRow,
+    proxyRequest,
   };
 }
 

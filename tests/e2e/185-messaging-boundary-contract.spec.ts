@@ -228,15 +228,22 @@ async function createServiceRequest(params: {
   return data.id;
 }
 
-async function createProxyRequestWithoutLinkedInquiry(userId: string, user: TestUser) {
+async function createProxyRequestWithoutLinkedInquiry(
+  userId: string,
+  user: TestUser,
+  options?: {
+    paymentStatus?: 'WAITING' | 'COMPLETED' | 'FAILED' | 'REFUNDED';
+    requestStatus?: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  }
+) {
   const { data, error } = await getAdminClient()
     .from('proxy_requests')
     .insert({
       user_id: userId,
       category: 'RESTAURANT',
-      status: 'PENDING',
+      status: options?.requestStatus || 'PENDING',
       payment_channel: 'LOCALLY',
-      payment_status: 'WAITING',
+      payment_status: options?.paymentStatus || 'WAITING',
       locally_order_id: `LOCALLY-PROXY-${Date.now()}`,
       agreed_to_terms: true,
       form_data: {
@@ -415,6 +422,71 @@ test.describe.serial('Messaging boundary contracts', () => {
     expect(json).toMatchObject({
       success: false,
       error: '전화 예약 문의 스레드가 연결되어 있지 않습니다.',
+    });
+  });
+
+  test('proxy booking detail keeps lightweight read available but fails closed for thread reads when linked inquiry is missing', async ({ page }) => {
+    const guestUser = createUser('proxy-detail-guest');
+    const guestId = await createAuthUser(guestUser);
+    const requestId = await createProxyRequestWithoutLinkedInquiry(guestId, guestUser);
+
+    await login(page, guestUser);
+
+    const lightweightResponse = await page.request.get(`/api/proxy-bookings/${requestId}?includeComments=false`);
+    expect(lightweightResponse.status()).toBe(200);
+
+    const lightweightJson = await lightweightResponse.json();
+    expect(lightweightJson).toMatchObject({
+      success: true,
+      data: {
+        id: requestId,
+        linked_inquiry_id: null,
+      },
+      viewerIsAdmin: false,
+    });
+
+    const threadedResponse = await page.request.get(`/api/proxy-bookings/${requestId}`);
+    expect(threadedResponse.status()).toBe(409);
+
+    const threadedJson = await threadedResponse.json();
+    expect(threadedJson).toMatchObject({
+      success: false,
+      error: '전화 예약 문의 스레드가 연결되어 있지 않습니다.',
+    });
+  });
+
+  test('proxy booking self-service cancel stays fail-closed once payment is already completed', async ({ page }) => {
+    const guestUser = createUser('proxy-paid-cancel');
+    const guestId = await createAuthUser(guestUser);
+    const requestId = await createProxyRequestWithoutLinkedInquiry(guestId, guestUser, {
+      paymentStatus: 'COMPLETED',
+    });
+
+    await login(page, guestUser);
+
+    const response = await page.request.patch(`/api/proxy-bookings/${requestId}`, {
+      data: {
+        status: 'CANCELLED',
+      },
+    });
+
+    expect(response.status()).toBe(409);
+    const json = await response.json();
+    expect(json).toMatchObject({
+      success: false,
+      error: '결제 대기 상태에서만 요청을 취소할 수 있습니다.',
+    });
+
+    const { data: currentRequest, error } = await getAdminClient()
+      .from('proxy_requests')
+      .select('status, payment_status')
+      .eq('id', requestId)
+      .maybeSingle();
+
+    if (error) throw error;
+    expect(currentRequest).toMatchObject({
+      status: 'PENDING',
+      payment_status: 'COMPLETED',
     });
   });
 });

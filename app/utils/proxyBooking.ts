@@ -23,6 +23,8 @@ export const PROXY_RESTAURANT_SERVICE_OPTION_PRICES: Record<RestaurantServiceOpt
   KUITEI: 9000,
 };
 
+export const PROXY_LINKED_INQUIRY_REQUIRED_ERROR = '전화 예약 문의 스레드가 연결되어 있지 않습니다.';
+
 const INTERNAL_PROXY_FORM_FIELDS = new Set(['payment_method', 'contact_name', 'contact_phone', 'service_fee_krw', 'linked_inquiry_id']);
 
 const PROXY_FORM_LABELS: Record<string, string> = {
@@ -129,6 +131,18 @@ function readNumber(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
+function normalizeProxyLinkedInquiryId(value: unknown) {
+  if (typeof value === 'string' && value.trim()) {
+    return value.trim();
+  }
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value);
+  }
+
+  return null;
+}
+
 function hasEmailProfile(
   profile: ProxyRequest['profiles'] | ProxyComment['profiles'] | null | undefined
 ): profile is { email?: string | null } {
@@ -166,17 +180,19 @@ export function getProxyPaymentMethod(
 export function getProxyLinkedInquiryId(
   formData: Record<string, unknown> | null | undefined
 ): string | null {
-  const inquiryId = formData?.linked_inquiry_id;
+  return normalizeProxyLinkedInquiryId(formData?.linked_inquiry_id);
+}
 
-  if (typeof inquiryId === 'string' && inquiryId.trim()) {
-    return inquiryId.trim();
-  }
-
-  if (typeof inquiryId === 'number' && Number.isFinite(inquiryId)) {
-    return String(inquiryId);
-  }
-
-  return null;
+export function getProxyLinkedInquiryIdFromRequest(
+  request:
+    | {
+        linked_inquiry_id?: string | number | null;
+        form_data?: Record<string, unknown> | null;
+      }
+    | null
+    | undefined
+) {
+  return normalizeProxyLinkedInquiryId(request?.linked_inquiry_id) ?? getProxyLinkedInquiryId(request?.form_data);
 }
 
 export function getProxyRestaurantServiceOption(
