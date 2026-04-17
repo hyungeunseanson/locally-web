@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Globe, Instagram, ChevronDown, ChevronUp, X } from 'lucide-react';
 import { getLegalDocument, type LegalDocType } from '@/app/constants/legalDocuments';
 import { useLanguage } from '@/app/context/LanguageContext';
+import { OFFICIAL_SUPPORT_EMAIL } from '@/app/utils/officialSender';
 
 export default function SiteFooter() {
   const { t, lang } = useLanguage();
@@ -168,7 +169,7 @@ export default function SiteFooter() {
 
           {/* 최하단: 사업자 정보 (아주 작게, 좌측 정렬) */}
           <div className="pt-3 text-[#aaaaaa] leading-normal" style={{ fontSize: '9px' }}>
-            로컬리 (Locally) | 대표자 : 손현근 | 개인정보보호책임자 : Nishimura Mayu | 사업자등록번호 : 367-53-00874 | 통신판매업 : 2024-제주일도일-0021 | 주소 : 제주특별자치도 제주시 동문로 16, 2층 31호(일도일동, 동문시장(주)) | 이메일 : locally.partners@gmail.com
+            로컬리 (Locally) | 대표자 : 손현근 | 개인정보보호책임자 : Nishimura Mayu | 사업자등록번호 : 367-53-00874 | 통신판매업 : 2024-제주일도일-0021 | 주소 : 제주특별자치도 제주시 동문로 16, 2층 31호(일도일동, 동문시장(주)) | 이메일 : {OFFICIAL_SUPPORT_EMAIL}
           </div>
         </div>
       </footer>

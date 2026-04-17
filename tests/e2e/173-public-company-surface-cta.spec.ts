@@ -9,6 +9,7 @@ test.describe('Public company surface CTA truth', () => {
     await expect(page.getByTestId('company-news-status-banner')).toBeVisible();
     await expect(page.getByTestId('company-news-notices-cta')).toHaveAttribute('href', '/company/notices');
     await expect(page.getByTestId('company-news-availability-note')).toBeVisible();
+    await expect(page.getByText(/Series A|유니콘/)).toHaveCount(0);
     await expect(page.locator('a[href="#"]')).toHaveCount(0);
   });
 
@@ -35,20 +36,29 @@ test.describe('Public company surface CTA truth', () => {
     await expect(page.getByTestId('company-investor-report-row')).toHaveCount(3);
     await expect(page.getByTestId('company-investor-report-status')).toHaveCount(3);
     await expect(page.getByTestId('company-investor-report-row').first()).not.toHaveClass(/cursor-pointer/);
+    await expect(page.getByText(/240%|1\.2M\+|45/)).toHaveCount(0);
     await expect(page.locator('a[href="#"]')).toHaveCount(0);
   });
 
   test('site-map page exposes legal documents without dead links', async ({ page }) => {
     await page.goto('/site-map', { waitUntil: 'networkidle' });
+    const siteMapMain = page.locator('main');
 
     await expect(page.locator('a[href="#"]')).toHaveCount(0);
+    await expect(siteMapMain.locator('a[href="/host/dashboard"]')).toHaveCount(0);
+    await expect(siteMapMain.locator('a[href="/community"]')).toHaveCount(1);
+    await expect(siteMapMain.getByRole('link', { name: '로컬리 콘텐츠' })).toHaveAttribute('href', '/community');
 
-    await page.getByTestId('site-map-legal-trigger-terms').click();
+    await page.getByTestId('site-map-legal-trigger-privacy').click();
 
     const legalModal = page.getByTestId('site-map-legal-modal');
 
     await expect(legalModal).toBeVisible();
     await expect(legalModal.getByRole('heading')).toBeVisible();
     await expect(legalModal.getByText(/\S+/).first()).toBeVisible();
+    await expect(legalModal).not.toContainText('OOO');
+    await expect(legalModal).not.toContainText('<예)');
+    await expect(legalModal).not.toContainText('〈例：');
+    await expect(legalModal).not.toContainText('e.g. OOO');
   });
 });

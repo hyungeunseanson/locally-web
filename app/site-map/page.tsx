@@ -33,8 +33,6 @@ const SITEMAP_LINKS: SitemapSection[] = [
     category: 'Hosting',
     links: [
       { name: '호스트 되기', href: '/become-a-host' },
-      { name: '커뮤니티', href: '/community' },
-      { name: '호스트 대시보드', href: '/host/dashboard' },
     ],
   },
   {
@@ -42,7 +40,7 @@ const SITEMAP_LINKS: SitemapSection[] = [
     links: [
       { name: '체험 검색', href: '/search' },
       { name: '현지 동행 서비스 소개', href: '/services/intro' },
-      { name: '커뮤니티', href: '/community' },
+      { name: '로컬리 콘텐츠', href: '/community' },
     ],
   },
   {

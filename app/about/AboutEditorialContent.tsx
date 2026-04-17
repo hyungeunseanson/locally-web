@@ -39,25 +39,24 @@ const tastePillars = [
   },
 ] as const;
 
-function AirbnbCounter({ end, suffix = '' }: { end: number; suffix?: string }) {
-  const [count, setCount] = useState(0);
-  React.useEffect(() => {
-    let start = 0;
-    const duration = 2000;
-    const increment = end / (duration / 20);
-    const timer = setInterval(() => {
-      start += increment;
-      if (start >= end) {
-        setCount(end);
-        clearInterval(timer);
-      } else {
-        setCount(Math.ceil(start));
-      }
-    }, 20);
-    return () => clearInterval(timer);
-  }, [end]);
-  return <span className="tabular-nums">{count.toLocaleString()}{suffix}</span>;
-}
+const trustPillars = [
+  {
+    title: '로컬 우선',
+    description: '관광지보다 생활에 가까운 체험을 먼저 보여줍니다.',
+  },
+  {
+    title: '호스트 기준',
+    description: '공개 전 운영 정보와 기본 안내 기준을 확인합니다.',
+  },
+  {
+    title: '다국어 안내',
+    description: '여행 전후 안내 문구와 도움말 흐름을 다국어로 맞춥니다.',
+  },
+  {
+    title: '문의 연결',
+    description: '예약 전후 메시지함과 도움말 경로를 함께 제공합니다.',
+  },
+] as const;
 
 function FAQItem({ question, answer }: { question: string; answer: string }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -95,7 +94,7 @@ export default function AboutEditorialContent() {
             </p>
             <p className="text-[13px] md:text-lg text-[#717171] font-medium leading-relaxed max-w-lg mx-0 mb-7 md:mb-10">
               유명한 관광지가 아닌, 현지인의 일상 속으로.<br />
-              전 세계의 이웃들이 당신을 기다립니다.
+              현지 호스트의 일상 가까이에서 여행을 경험해보세요.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3 md:gap-4 justify-start">
@@ -155,8 +154,8 @@ export default function AboutEditorialContent() {
                   </div>
                   <Heart size={24} />
                   <MessageCircle size={24} />
-                  <div className="w-6 h-6 rounded-full bg-slate-200 overflow-hidden border border-slate-100">
-                    <img src="https://i.pravatar.cc/150?u=user" className="w-full h-full object-cover opacity-80" alt="User profile preview" />
+                  <div className="w-6 h-6 rounded-full border border-slate-100 bg-gradient-to-br from-rose-400 to-slate-900 text-[9px] font-black text-white flex items-center justify-center">
+                    L
                   </div>
                 </div>
               </div>
@@ -169,21 +168,18 @@ export default function AboutEditorialContent() {
       <section className="py-12 md:py-20 bg-[#F7F7F7]">
         <div className="max-w-6xl mx-auto px-4 md:px-6">
           <div className="text-center mb-10 md:mb-16">
-            <h2 className="text-[18px] md:text-2xl font-bold mb-2 tracking-tight">가장 사랑받는 로컬 커뮤니티</h2>
-            <p className="text-[#717171] text-xs md:text-sm">전 세계 여행자와 호스트가 만들어가는 따뜻한 연결</p>
+            <h2 className="text-[18px] md:text-2xl font-bold mb-2 tracking-tight">Locally가 유지하는 공개 기준</h2>
+            <p className="text-[#717171] text-xs md:text-sm">과장된 지표 대신 운영 원칙을 중심으로 소개합니다.</p>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
-            {[
-              { label: 'Active Hosts', value: 800, suffix: '+' },
-              { label: 'Cities', value: 5, suffix: '' },
-              { label: 'Countries', value: 3, suffix: '' },
-              { label: 'Avg Rating', value: 4.9, suffix: '' },
-            ].map((stat, i) => (
+            {trustPillars.map((pillar, i) => (
               <div key={i} className="text-center p-4 md:p-6 bg-white rounded-[24px] shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-                <div className="text-[26px] md:text-4xl font-black text-[#222222] mb-1">
-                  <AirbnbCounter end={stat.value} suffix={stat.suffix} />
+                <div className="text-[20px] md:text-[28px] font-black text-[#222222] mb-2 tracking-tight">
+                  {pillar.title}
                 </div>
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{stat.label}</div>
+                <div className="text-[11px] md:text-[12px] font-medium leading-relaxed text-gray-500">
+                  {pillar.description}
+                </div>
               </div>
             ))}
           </div>
@@ -271,7 +267,7 @@ export default function AboutEditorialContent() {
             <div className="flex-1 order-2 md:order-1 flex justify-center">
               <div className="relative w-[292px] md:w-[320px] bg-white rounded-[34px] md:rounded-[40px] shadow-xl p-5 md:p-6 border border-slate-100 transform rotate-[-1deg] hover:rotate-0 transition-transform duration-500">
                 <div className="flex items-center gap-4 mb-6">
-                  <div className="w-12 h-12 rounded-full bg-slate-200 overflow-hidden border border-slate-100"><img src="https://i.pravatar.cc/150?u=host33" className="w-full h-full object-cover" alt="Host avatar preview" /></div>
+                  <div className="w-12 h-12 rounded-full border border-slate-100 bg-gradient-to-br from-[#222222] to-rose-500 text-sm font-black text-white flex items-center justify-center">K</div>
                   <div><div className="font-bold text-sm">Kana 호스트</div><div className="text-xs text-green-600 font-bold">● 온라인</div></div>
                 </div>
                 <div className="bg-slate-100 p-4 rounded-2xl rounded-tl-none text-sm text-slate-600 mb-3 font-medium">

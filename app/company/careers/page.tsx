@@ -23,8 +23,8 @@ export default function CareersPage() {
             Build the<br/>future of travel.
           </h1>
           <p className="text-xl text-[#717171] font-medium max-w-2xl leading-relaxed">
-            우리는 여행의 방식을 재정의하고 있습니다.<br/>
-            전 세계를 무대로 도전하고 싶은 분들을 기다립니다.
+            로컬 경험과 여행 운영을 더 단단하게 연결할 팀을 준비하고 있습니다.<br/>
+            공식 채용 공고는 오픈되는 역할만 순차적으로 공개합니다.
           </p>
         </div>
 
@@ -89,7 +89,7 @@ export default function CareersPage() {
             data-testid="company-careers-availability-note"
             className="mt-8 text-sm font-medium text-[#717171]"
           >
-            채용 공고와 지원 링크는 역할별 검토가 끝난 뒤 이 페이지에 순차적으로 공개됩니다.
+            채용 공고와 지원 링크는 역할별 검토와 운영 담당 확정이 끝난 뒤 이 페이지에 순차적으로 공개됩니다.
           </p>
         </div>
       </main>

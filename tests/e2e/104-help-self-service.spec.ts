@@ -5,7 +5,11 @@ test.describe('Help Center self-service copy', () => {
     await page.goto('/help', { waitUntil: 'networkidle' });
 
     await expect(page.getByTestId('help-inbox-reply-strip')).toBeVisible();
-    await expect(page.locator('a[href="mailto:locally.partners@gmail.com"]')).toBeVisible();
+    await expect(page.getByTestId('help-public-support-email')).toHaveAttribute(
+      'href',
+      /mailto:locally\.partners@gmail\.com\?subject=Locally%20Support/
+    );
+    await expect(page.getByTestId('help-public-support-email-note')).toContainText('locally.partners@gmail.com');
 
     await page.getByRole('textbox').fill('playwright-no-faq-match');
 

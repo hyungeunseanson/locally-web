@@ -158,31 +158,28 @@ However, in the following cases, until the relevant period ends:
 Article 3. (Provision of Personal Information to Third Parties)
 ① The Company processes personal information only within the scope specified in Article 1 (Purpose of Processing Personal Information), and provides personal information to third parties only when the data subject consents or in cases corresponding to Article 17 of the Personal Information Protection Act, such as special provisions of the law.
 ② The Company provides personal information to third parties as follows:
-- Recipients of personal information: <e.g. OOO Card Co., Ltd.>
-- Purpose of use of personal information by the recipient: <e.g. Business partnerships such as co-hosting events and issuance of affiliated credit cards>
-- Personal information items provided: <e.g. Name, address, phone number, email address, card payment account information>
-- Retention and use period of the recipient: <e.g. During the transaction period under the credit card issuance agreement>
+- Recipients of personal information: Partners and institutions required for payment processing, reservation fulfillment, identity verification, and compliance with legal obligations
+- Purpose of use by the recipient: Reservation confirmation, payment and settlement processing, identity verification, dispute response, and compliance with legal obligations
+- Personal information items provided: Name, contact details, and information required to process reservations and payments
+- Retention and use period of the recipient: For the period required by applicable law or contract
 
 Article 4. (Entrustment of Personal Information Processing)
 ① The Company entrusts personal information processing as follows for smooth personal information operations.
 
-- Trustee: Imweb Co., Ltd.
-- Content of entrusted work: System provision for shopping mall hosting services, mobile app services, marketing services and additional/affiliated service provision, KakaoTalk notification, friend message, and text message dispatch agency services, etc.
+- Trustee: Payment and escrow service providers
+- Content of entrusted work: Payment approval, payment security, and settlement linkage
 
-- Trustee: OOO PG
-- Content of entrusted work: Payment and escrow services
+- Trustee: Cloud and service infrastructure operators
+- Content of entrusted work: Service hosting, data storage, incident response, and log management
 
-- Trustee: OOO Delivery
-- Content of entrusted work: Product delivery services
+- Trustee: Messaging, email, and customer support partners
+- Content of entrusted work: Intake of customer inquiries, response guidance, and delivery of notifications
 
-- Trustee: OOO Customer Center
-- Content of entrusted work: Customer consultation services
-
-- Trustee: OOO
-- Content of entrusted work: Identity verification services
+- Trustee: Identity verification and authentication service providers
+- Content of entrusted work: Identity verification, account protection, and fraud prevention
 
 ② When entering into entrustment contracts, the Company specifies matters related to liability such as prohibition of personal information processing for purposes other than the entrusted work, technical and administrative protective measures, restrictions on re-entrustment, supervision and management of trustees, and damages compensation in contracts and other documents pursuant to Article 25 of the Personal Information Protection Act, and supervises whether trustees process personal information safely.
-③ If the content of the entrusted work or the trustee changes, it will be disclosed through this Personal Information Processing Policy without delay.
+③ If the actual content of entrusted work or the trustee changes, it will be disclosed through this Personal Information Processing Policy without delay.
 
 Article 5. (Rights and Methods of Exercise for Users and Legal Representatives)
 
@@ -200,12 +197,12 @@ Article 6. (Items of Personal Information Processed)
 The Company processes the following personal information items.
 
 1. Homepage membership registration and management
-Required items: <e.g. Name, date of birth, ID, password, address, phone number, gender, email address, i-PIN number>
-Optional items: <e.g. Marital status, areas of interest>
+Required items: Email address or social login identifier, password (for email sign-up), name or nickname, and default language preference
+Optional items: Profile photo, self-introduction, city of residence, and preference information
 
 2. Provision of goods or services
-Required items: <e.g. Name, date of birth, ID, password, address, phone number, email address, i-PIN number, credit card number, bank account information, and other payment information>
-Optional items: <areas of interest, past purchase history>
+Required items: Booker name, contact details, reservation and payment processing information, and settlement account information for hosts where applicable
+Optional items: Special requests, travel preferences, and receipt issuance information
 
 3. The following personal information items may be automatically generated and collected during internet service use.
 IP address, cookies, MAC address, service use records, visit records, improper use records, etc.
@@ -236,15 +233,15 @@ Article 10. (Personal Information Protection Officer)
 ① The Company designates a Personal Information Protection Officer as follows to take overall responsibility for personal information processing and to handle data subjects' complaints and damage relief related to personal information processing.
 
 ▶ Personal Information Protection Officer
-Name: OOO
-Position: OOO
-Contact: <Phone number>, <Email>, <Fax number>
+Name: Nishimura Mayu
+Position: Personal Information Protection Officer
+Contact: locally.partners@gmail.com / Help Center 1:1 inquiry
 ※ You will be connected to the Personal Information Protection department.
 
 ▶ Personal Information Protection Department
-Department name: OOO Team
-Person in charge: OOO
-Contact: <Phone number>, <Email>, <Fax number>
+Department name: Locally Operations
+Person in charge: Customer Support Manager
+Contact: locally.partners@gmail.com / Help Center 1:1 inquiry
 
 ② Data subjects may contact the Personal Information Protection Officer and the responsible department regarding all personal information protection-related inquiries, complaints processing, damage relief, etc. that arise while using the Company's services (or business). The Company will respond to and process data subjects' inquiries without delay.
 
@@ -252,9 +249,9 @@ Article 11. (Personal Information Access Requests)
 Data subjects may request access to personal information pursuant to Article 35 of the Personal Information Protection Act to the following department. The Company will endeavor to process data subjects' personal information access requests promptly.
 
 ▶ Department for receiving and processing personal information access requests
-Department name: OOO
-Person in charge: OOO
-Contact: <Phone number>, <Email>, <Fax number>
+Department name: Locally Operations
+Person in charge: Customer Support Manager
+Contact: locally.partners@gmail.com / Help Center 1:1 inquiry
 
 Article 12. (Methods of Remedying Rights Infringements)
 Data subjects may contact the following institutions regarding damage relief and consultation for personal information infringement.

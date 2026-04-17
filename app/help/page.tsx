@@ -12,6 +12,7 @@ import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 import { useViewMode } from '@/app/context/ViewModeContext';
 import { useAuth } from '@/app/context/AuthContext';
 import { useLocallyMembership } from '@/app/hooks/useLocallyMembership';
+import { OFFICIAL_SUPPORT_EMAIL } from '@/app/utils/officialSender';
 
 export default function HelpCenterPage() {
   const { t, lang } = useLanguage(); // 🟢 추가
@@ -31,6 +32,7 @@ export default function HelpCenterPage() {
         modalPlaceholder: 'Please enter your inquiry.',
         modalSubmitting: 'Sending...',
         modalSubmit: 'Send inquiry',
+        supportEmailNote: 'Official support inbox',
       };
     }
 
@@ -47,6 +49,7 @@ export default function HelpCenterPage() {
         modalPlaceholder: 'お問い合わせ内容を入力してください。',
         modalSubmitting: '送信中...',
         modalSubmit: 'お問い合わせ送信',
+        supportEmailNote: '公式サポート窓口',
       };
     }
 
@@ -63,6 +66,7 @@ export default function HelpCenterPage() {
         modalPlaceholder: '请输入咨询内容。',
         modalSubmitting: '发送中...',
         modalSubmit: '提交咨询',
+        supportEmailNote: '官方客服邮箱',
       };
     }
 
@@ -78,6 +82,7 @@ export default function HelpCenterPage() {
       modalPlaceholder: '문의하실 내용을 입력해주세요.',
       modalSubmitting: '전송 중...',
       modalSubmit: '문의 접수',
+      supportEmailNote: '공식 고객지원 메일',
     };
   })();
 
@@ -379,13 +384,20 @@ export default function HelpCenterPage() {
               <MessageCircle size={18} /> {hasLocallyCare ? t('locally_care_cta') : t('btn_chat_support')}
             </button>
             <a
-              href="mailto:locally.partners@gmail.com"
+              data-testid="help-public-support-email"
+              href={`mailto:${OFFICIAL_SUPPORT_EMAIL}?subject=${encodeURIComponent('Locally Support')}`}
               className="rounded-full bg-white border border-slate-200 text-slate-700 px-6 md:px-8 py-3 md:py-3.5 text-[12px] md:text-[13px] font-semibold hover:bg-slate-50 transition-colors flex items-center justify-center gap-2.5 md:gap-3 shadow-[0_6px_18px_rgba(15,23,42,0.04)]"
             >
               <Mail size={18} /> {t('btn_email_us')}
             </a>
           </div>
-          <p className="mt-4 text-[12px] font-medium text-slate-500">
+          <p
+            data-testid="help-public-support-email-note"
+            className="mt-4 text-[12px] font-medium text-slate-500"
+          >
+            {supportCopy.supportEmailNote}: {OFFICIAL_SUPPORT_EMAIL}
+          </p>
+          <p className="mt-2 text-[12px] font-medium text-slate-500">
             {t('help_inbox_reply_notice')}
           </p>
         </div>

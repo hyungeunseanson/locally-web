@@ -6,6 +6,11 @@ import SiteHeader from '@/app/components/SiteHeader';
 
 export default function InvestorsPage() {
   const reportYears = [2025, 2024, 2023];
+  const previewMetrics = [
+    { label: 'Metrics Pack', value: 'TBD' },
+    { label: 'User KPI', value: 'Draft' },
+    { label: 'Market Map', value: 'Review' },
+  ] as const;
 
   return (
     <div className="min-h-screen bg-white text-[#222222] font-sans selection:bg-black selection:text-white">
@@ -45,26 +50,22 @@ export default function InvestorsPage() {
             data-testid="company-investors-metrics-note"
             className="mb-6 text-sm font-medium text-[#717171]"
           >
-            Preview snapshot only. Verified investor-facing figures will replace this section when the
-            reporting package is published.
+            Preview snapshot only. Placeholder status cards stay here until verified investor-facing
+            figures are approved for publication.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12 border-t border-b border-black py-16">
-          {[
-            { label: 'YoY Growth', value: '240%' },
-            { label: 'Active Users', value: '1.2M+' },
-            { label: 'Global Cities', value: '45' },
-          ].map((metric, i) => (
-            <div key={i} className="text-center md:text-left">
-              <h3 className="text-6xl md:text-7xl font-black mb-2 tracking-tight">{metric.value}</h3>
-              <p className="text-sm font-bold uppercase tracking-widest text-[#717171]">{metric.label}</p>
-              <p
-                data-testid="company-investor-metric-status"
-                className="mt-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#94A3B8]"
-              >
-                Preview only
-              </p>
-            </div>
-          ))}
+            {previewMetrics.map((metric, i) => (
+              <div key={i} className="text-center md:text-left">
+                <h3 className="text-6xl md:text-7xl font-black mb-2 tracking-tight">{metric.value}</h3>
+                <p className="text-sm font-bold uppercase tracking-widest text-[#717171]">{metric.label}</p>
+                <p
+                  data-testid="company-investor-metric-status"
+                  className="mt-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#94A3B8]"
+                >
+                  Preview only
+                </p>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -76,7 +77,7 @@ export default function InvestorsPage() {
             className="mb-6 text-sm font-medium text-[#717171]"
           >
             Official downloadable annual reports will appear here only after each reporting package is
-            approved for publication.
+            approved for publication and linked by the operating owner.
           </p>
           <div className="border-t border-black">
             {reportYears.map((year) => (

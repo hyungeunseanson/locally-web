@@ -10,26 +10,26 @@ import { useLanguage } from '@/app/context/LanguageContext';
 const NEWS_ITEMS = [
   {
     id: 1,
-    source: 'TechCrunch',
-    title: 'Locally secures Series A funding to expand hyper-local experiences globally.',
+    source: 'Preview brief',
+    title: "Draft press angle for Locally's hyper-local experience roadmap.",
     date: '2026.02.14'
   },
   {
     id: 2,
-    source: 'The Korea Economic Daily',
-    title: '로컬리, "여행은 살아보는 것"... 현지 체험 시장의 새로운 유니콘',
+    source: 'Editorial draft',
+    title: '로컬리의 로컬 체험 운영 방향을 소개하는 인터뷰 초안',
     date: '2026.01.28'
   },
   {
     id: 3,
-    source: 'Fast Company',
-    title: 'How Locally is using AI to curate perfect travel itineraries.',
+    source: 'Preview brief',
+    title: 'Draft coverage note about curated local travel planning on Locally.',
     date: '2026.01.10'
   },
   {
     id: 4,
-    source: 'Maeil Business',
-    title: '서울관광재단 X 로컬리, 골목상권 활성화 캠페인 성료',
+    source: 'Campaign note',
+    title: '지역 파트너십 및 캠페인 업데이트 초안',
     date: '2025.12.20'
   }
 ];
@@ -86,11 +86,12 @@ export default function NewsPage() {
             Archive preview only
           </p>
           <h2 className="mt-3 text-xl font-bold tracking-tight text-[#111827] md:text-2xl">
-            External article links are published only after verification.
+            Preview headlines stay internal until external coverage is verified.
           </h2>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-[#64748B] md:text-base">
-            This page stays read-only until each outlet link is verified. If you need an official
-            company update right now, use the notices page instead of this preview archive.
+            This page shows draft headlines and positioning notes, not confirmed press coverage. If
+            you need an official company update right now, use the notices page instead of this
+            preview archive.
           </p>
           <Link
             href="/company/notices"
@@ -126,7 +127,7 @@ export default function NewsPage() {
                     data-testid="company-news-item-status"
                     className="mt-3 text-xs font-medium tracking-wide text-[#717171] md:text-sm"
                   >
-                    External link pending verification
+                    Preview copy only
                   </p>
                 </div>
 
@@ -148,7 +149,7 @@ export default function NewsPage() {
           data-testid="company-news-availability-note"
           className="mt-16 text-center text-sm font-medium text-[#717171]"
         >
-          Verified external article links will be added here one by one after review.
+          Only verified and published external article links will be added here after review.
         </p>
       </main>
     </div>
