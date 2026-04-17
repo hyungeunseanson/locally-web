@@ -29,6 +29,7 @@ type ServiceRequestMetaRow = {
 };
 
 const INCLUDED_SERVICE_EARNINGS_STATUSES = ['PAID', 'confirmed', 'completed'] as const;
+const MAX_SERVICE_EARNINGS_ITEMS = 5;
 
 export async function GET() {
   try {
@@ -73,8 +74,10 @@ export async function GET() {
       (booking) => booking.host_id === user.id && Number(booking.host_payout_amount || 0) > 0
     );
 
+    const recentServiceBookings = serviceBookings.slice(0, MAX_SERVICE_EARNINGS_ITEMS);
+
     const requestIds = Array.from(
-      new Set(serviceBookings.map((booking) => booking.request_id).filter(Boolean))
+      new Set(recentServiceBookings.map((booking) => booking.request_id).filter(Boolean))
     ) as string[];
 
     const { data: serviceRequestsRaw, error: serviceRequestsError } = requestIds.length
@@ -92,7 +95,7 @@ export async function GET() {
       ((serviceRequestsRaw || []) as ServiceRequestMetaRow[]).map((request) => [request.id, request])
     );
 
-    const items: HostServiceEarningsItem[] = serviceBookings.map((booking) => {
+    const items: HostServiceEarningsItem[] = recentServiceBookings.map((booking) => {
       const requestMeta = booking.request_id ? requestMap.get(booking.request_id) : null;
 
       return {

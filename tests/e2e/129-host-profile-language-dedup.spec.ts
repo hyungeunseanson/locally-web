@@ -240,6 +240,12 @@ test.describe.serial('Host profile language dedup', () => {
     await expect(englishChip).toBeVisible({ timeout: 15000 });
     await expect(englishChip).toHaveClass(/bg-slate-900/);
 
+    await page.getByRole('button', { name: /비공개 정보|Private Info|非公開情報|非公开信息/ }).click();
+    await expect(page.locator('input[name="phone"]')).toBeVisible();
+    await expect(page.locator('input[name="dob"]')).toBeVisible();
+    await expect(page.locator('input[name="bank_name"]')).toBeVisible();
+    await page.getByRole('button', { name: /공개 프로필|Public Profile|公開プロフィール|公开资料/ }).click();
+
     const saveButton = page.getByRole('button', { name: /변경사항 저장하기|Save Changes|保存/ }).last();
     const saveResponsePromise = page.waitForResponse(
       (response) =>

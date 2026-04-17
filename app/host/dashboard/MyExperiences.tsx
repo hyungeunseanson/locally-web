@@ -31,6 +31,19 @@ const CITY_MAP: Record<string, string> = {
   '삿포로': 'sapporo', '나고야': 'nagoya'
 };
 
+const HOST_EXPERIENCES_SELECT = `
+  id,
+  title,
+  city,
+  duration,
+  max_guests,
+  price,
+  photos,
+  status,
+  admin_comment,
+  bookings(count)
+`;
+
 export default function MyExperiences() {
   const { t } = useLanguage();
   const supabase = useMemo(() => createClient(), []);
@@ -47,7 +60,7 @@ export default function MyExperiences() {
 
     const { data } = await supabase
       .from('experiences')
-      .select('*, bookings(count)')
+      .select(HOST_EXPERIENCES_SELECT)
       .eq('host_id', user.id)
       .order('created_at', { ascending: false });
 

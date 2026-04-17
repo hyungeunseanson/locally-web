@@ -38,6 +38,43 @@ type ProcessedImageFile = File & {
 
 const asProcessedImageFile = (file: File): ProcessedImageFile => file as ProcessedImageFile;
 
+const HOST_EXPERIENCE_EDIT_SELECT = `
+  id,
+  host_id,
+  country,
+  city,
+  title,
+  category,
+  languages,
+  language_levels,
+  duration,
+  max_guests,
+  description,
+  itinerary,
+  spots,
+  meeting_point,
+  location,
+  photos,
+  price,
+  inclusions,
+  exclusions,
+  supplies,
+  rules,
+  status,
+  is_private_enabled,
+  private_price,
+  source_locale,
+  manual_locales,
+  title_ko,
+  title_en,
+  title_ja,
+  title_zh,
+  description_ko,
+  description_en,
+  description_ja,
+  description_zh
+`;
+
 export default function EditExperiencePage() {
   const { t, lang } = useLanguage(); // 🟢 2. Hook
   const copy = getExperienceFormCopy(lang);
@@ -72,7 +109,7 @@ export default function EditExperiencePage() {
           email: user.email,
         });
 
-        let query = supabase.from('experiences').select('*').eq('id', params.id);
+        let query = supabase.from('experiences').select(HOST_EXPERIENCE_EDIT_SELECT).eq('id', params.id);
         if (!isAdmin) {
           query = query.eq('host_id', user.id);
         }

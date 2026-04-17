@@ -60,7 +60,7 @@ export default function ServiceEarningsPanel({ summary }: ServiceEarningsPanelPr
 
         if (cancelled) return;
 
-        setServiceItems(json.items.slice(0, 5));
+        setServiceItems(json.items);
       } catch (error) {
         if (cancelled) return;
         console.error('[HOST] service earnings panel error:', error);

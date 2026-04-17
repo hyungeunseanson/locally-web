@@ -1057,6 +1057,11 @@ const dictionary: Record<Locale, Record<string, string>> = {
     exp_host_tip: "💡 호스트 팁",
     exp_host_tip_desc: "호스트님만 볼 수 있는 관리 페이지입니다. 게스트 화면을 보려면 로그아웃 후 접속해주세요.",
     exp_setting_info: "설정 정보",
+    exp_back_to_dashboard: "대시보드로 돌아가기",
+    exp_location_empty: "위치 정보 없음",
+    exp_intro_title: "체험 소개",
+    exp_status_hidden: "비공개",
+    label_status: "상태",
 
     // [Host Dashboard]
     menu_service_jobs: "서비스 매칭",
@@ -2545,6 +2550,11 @@ const dictionary: Record<Locale, Record<string, string>> = {
     exp_host_tip: "💡 Host Tip",
     exp_host_tip_desc: "This page is only visible to you. Log out to see what guests see.",
     exp_setting_info: "Settings Info",
+    exp_back_to_dashboard: "Back to Dashboard",
+    exp_location_empty: "No location information",
+    exp_intro_title: "About This Experience",
+    exp_status_hidden: "Hidden",
+    label_status: "Status",
 
     // [Host Dashboard]
     menu_service_jobs: "Service Matches",
@@ -4034,6 +4044,11 @@ const dictionary: Record<Locale, Record<string, string>> = {
     exp_host_tip: "💡 ホストのヒント",
     exp_host_tip_desc: "このページはホスト専用です。ゲストの画面を見るにはログアウトしてください。",
     exp_setting_info: "設定情報",
+    exp_back_to_dashboard: "ダッシュボードに戻る",
+    exp_location_empty: "位置情報がありません",
+    exp_intro_title: "体験紹介",
+    exp_status_hidden: "非公開",
+    label_status: "状態",
 
     // [Host Dashboard]
     menu_service_jobs: "サービスマッチング",
@@ -5522,6 +5537,11 @@ const dictionary: Record<Locale, Record<string, string>> = {
     exp_host_tip: "💡 房东小贴士",
     exp_host_tip_desc: "该页面仅限您查看。如需预览游客界面，请先退出登录。",
     exp_setting_info: "设置信息",
+    exp_back_to_dashboard: "返回仪表板",
+    exp_location_empty: "暂无位置信息",
+    exp_intro_title: "体验介绍",
+    exp_status_hidden: "未公开",
+    label_status: "状态",
 
     // [Host Dashboard]
     menu_service_jobs: "服务匹配",

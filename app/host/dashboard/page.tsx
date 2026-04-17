@@ -36,6 +36,41 @@ interface HostStatusSummary {
   id?: string | number | null;
   status?: string | null;
   admin_comment?: string | null;
+  name?: string | null;
+  profile_photo?: string | null;
+  self_intro?: string | null;
+  languages?: string[] | string | null;
+  profession?: string | null;
+  dream_destination?: string | null;
+  favorite_song?: string | null;
+  host_nationality?: string | null;
+  phone?: string | null;
+  dob?: string | null;
+  bank_name?: string | null;
+  account_number?: string | null;
+  account_holder?: string | null;
+  motivation?: string | null;
+}
+
+interface HostProfileSummary {
+  created_at?: string | null;
+  avatar_url?: string | null;
+  full_name?: string | null;
+  bio?: string | null;
+  introduction?: string | null;
+  languages?: string[] | string | null;
+  job?: string | null;
+  dream_destination?: string | null;
+  favorite_song?: string | null;
+  nationality?: string | null;
+  host_nationality?: string | null;
+  phone?: string | null;
+  birth_date?: string | null;
+  dob?: string | null;
+  bank_name?: string | null;
+  account_number?: string | null;
+  account_holder?: string | null;
+  motivation?: string | null;
 }
 
 interface ApprovalNotificationSummary {
@@ -53,6 +88,38 @@ const SERVICE_NOTIFICATION_TYPES = new Set([
   'service_payment_confirmed',
   'service_cancelled',
 ]);
+
+const HOST_APPLICATION_BOOTSTRAP_SELECT = 'id,status,admin_comment,name,profile_photo,self_intro,languages,profession,dream_destination,favorite_song,host_nationality,phone,dob,bank_name,account_number,account_holder,motivation';
+
+const HOST_PROFILE_SUMMARY_SELECT = 'created_at,avatar_url,full_name,bio,introduction,languages,job,dream_destination,favorite_song,nationality,host_nationality';
+
+function buildMergedHostProfile(
+  profileData: HostProfileSummary | null,
+  hostData: HostStatusSummary | null
+): HostProfile {
+  const hostPublicProfile = getHostPublicProfile(profileData, hostData, '호스트');
+  const resolvedBirthDate = profileData?.birth_date || profileData?.dob || hostData?.dob || '';
+
+  return {
+    ...(profileData ?? {}),
+    full_name: profileData?.full_name || hostPublicProfile.name,
+    name: hostPublicProfile.name,
+    avatar_url: hostPublicProfile.avatarUrl,
+    birth_date: resolvedBirthDate,
+    introduction: hostPublicProfile.bio,
+    languages: hostPublicProfile.languages,
+    phone: profileData?.phone || hostData?.phone || '',
+    dob: resolvedBirthDate,
+    host_nationality: hostPublicProfile.location || '',
+    bank_name: profileData?.bank_name || hostData?.bank_name || '',
+    account_number: profileData?.account_number || hostData?.account_number || '',
+    account_holder: profileData?.account_holder || hostData?.account_holder || '',
+    motivation: profileData?.motivation || hostData?.motivation || '',
+    job: hostPublicProfile.job || '',
+    dream_destination: hostPublicProfile.dreamDestination || '',
+    favorite_song: hostPublicProfile.favoriteSong || '',
+  };
+}
 
 // 실제 대시보드 로직
 function DashboardContent() {
@@ -73,6 +140,8 @@ function DashboardContent() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const searchParams = useSearchParams();
+  const requestedTab = normalizeHostDashboardTab(searchParams.get('tab'));
+  const initialLoadRef = useRef(false);
   const unreadServiceNotificationIds = useMemo(
     () =>
       notifications
@@ -95,34 +164,32 @@ function DashboardContent() {
     router.push('/host/menu');
   };
 
-  const fetchData = useCallback(async () => {
+  const fetchDashboardData = useCallback(async ({
+    preserveLoading = false,
+  }: {
+    preserveLoading?: boolean;
+  } = {}) => {
+    if (!preserveLoading) {
+      setLoading(true);
+    }
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/login'); return; }
 
-      const { data: hostData, error } = await supabase
-        .from('host_applications')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (!error) setHostStatus(hostData);
-
-      const { count: hostExperienceCount, error: experienceCountError } = await supabase
-        .from('experiences')
-        .select('id', { count: 'exact', head: true })
-        .eq('host_id', user.id);
-
-      if (!experienceCountError) {
-        setExperienceCount(hostExperienceCount ?? 0);
-      }
-
       const [
+        { data: hostData, error: hostError },
         { count: consumedApprovalCount, error: consumedApprovalError },
         { data: unreadApprovalNotification, error: unreadApprovalError },
+        { data: profileData, error: profileError },
       ] = await Promise.all([
+        supabase
+          .from('host_applications')
+          .select(HOST_APPLICATION_BOOTSTRAP_SELECT)
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
         supabase
           .from('notifications')
           .select('id', { count: 'exact', head: true })
@@ -139,7 +206,16 @@ function DashboardContent() {
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle(),
+        supabase
+          .from('profiles')
+          .select(HOST_PROFILE_SUMMARY_SELECT)
+          .eq('id', user.id)
+          .maybeSingle(),
       ]);
+
+      if (!hostError) {
+        setHostStatus(hostData);
+      }
 
       if (!consumedApprovalError) {
         setHasConsumedApprovalWelcome((consumedApprovalCount ?? 0) > 0);
@@ -149,48 +225,43 @@ function DashboardContent() {
         setApprovalNotificationToken(unreadApprovalNotification ?? null);
       }
 
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .maybeSingle();
-      const hostPublicProfile = getHostPublicProfile(profileData, hostData, '호스트');
-      const resolvedBirthDate = profileData?.birth_date || profileData?.dob || hostData?.dob || '';
+      const resolvedProfileData = profileData as HostProfileSummary | null;
 
-      // 정보 병합 (프로필 > 지원서)
-      const mergedProfile = {
-        ...profileData,
-        name: hostPublicProfile.name,
-        avatar_url: hostPublicProfile.avatarUrl,
-        birth_date: resolvedBirthDate,
-        introduction: hostPublicProfile.bio,
-        languages: hostPublicProfile.languages,
-        phone: profileData?.phone || hostData?.phone || '',
-        dob: resolvedBirthDate,
-        host_nationality: hostPublicProfile.location || '',
-        bank_name: profileData?.bank_name || hostData?.bank_name || '',
-        account_number: profileData?.account_number || hostData?.account_number || '',
-        account_holder: profileData?.account_holder || hostData?.account_holder || '',
-        motivation: profileData?.motivation || hostData?.motivation || '',
-        job: hostPublicProfile.job || '',
-        dream_destination: hostPublicProfile.dreamDestination || '',
-        favorite_song: hostPublicProfile.favoriteSong || '',
-      };
+      if (!profileError) {
+        setProfile(buildMergedHostProfile(resolvedProfileData, hostData));
+      }
 
-      setProfile(mergedProfile);
+      if ((consumedApprovalCount ?? 0) > 0 || !unreadApprovalNotification) {
+        setExperienceCount(null);
+      } else {
+        const { count: hostExperienceCount, error: experienceCountError } = await supabase
+          .from('experiences')
+          .select('id', { count: 'exact', head: true })
+          .eq('host_id', user.id);
 
+        if (!experienceCountError) {
+          setExperienceCount(hostExperienceCount ?? 0);
+        }
+      }
     } catch (error) {
       console.error(error);
     } finally {
-      setLoading(false);
+      if (!preserveLoading) {
+        setLoading(false);
+      }
     }
   }, [router, supabase]);
 
   useEffect(() => {
-    setActiveTab(normalizeHostDashboardTab(searchParams.get('tab')));
+    setActiveTab(requestedTab);
+  }, [requestedTab]);
 
-    void fetchData();
-  }, [fetchData, searchParams]);
+  useEffect(() => {
+    if (!initialLoadRef.current) {
+      initialLoadRef.current = true;
+      void fetchDashboardData();
+    }
+  }, [fetchDashboardData]);
 
   useEffect(() => {
     markAsReadRef.current = markAsRead;
@@ -245,8 +316,8 @@ function DashboardContent() {
       return;
     }
 
-    void fetchData();
-  }, [contextStatus, fetchData, hostRecordStatus]);
+    void fetchDashboardData({ preserveLoading: true });
+  }, [contextStatus, fetchDashboardData, hostRecordStatus]);
 
   const approvalNotification = approvalNotificationToken ?? notifications.find(
     (notification) =>
@@ -482,7 +553,14 @@ function DashboardContent() {
           {activeTab === 'service-jobs' && <ServiceJobsTab />}
           {activeTab === 'earnings' && <Earnings />}
           {activeTab === 'reviews' && <HostReviews />}
-          {activeTab === 'profile' && <ProfileEditor profile={profile} onUpdate={fetchData} />}
+          {activeTab === 'profile' && (
+            <ProfileEditor
+              profile={profile}
+              onUpdate={() => {
+                void fetchDashboardData({ preserveLoading: true });
+              }}
+            />
+          )}
           {activeTab === 'guidelines' && <GuidelinesTab />}
         </div>
       </main>

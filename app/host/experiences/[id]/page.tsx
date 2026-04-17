@@ -27,6 +27,22 @@ type HostExperienceDetail = {
   status?: string | null;
 };
 
+const HOST_EXPERIENCE_DETAIL_SELECT = `
+  id,
+  title,
+  description,
+  photos,
+  image_url,
+  location,
+  meeting_point,
+  country,
+  city,
+  rating,
+  price,
+  category,
+  status
+`;
+
 export default function HostExperienceDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -44,7 +60,7 @@ export default function HostExperienceDetailPage() {
 
       const { data: exp, error } = await supabase
         .from('experiences')
-        .select('*')
+        .select(HOST_EXPERIENCE_DETAIL_SELECT)
         .eq('id', params.id)
         .eq('host_id', user.id) // 내 것만 조회 가능
         .maybeSingle();
@@ -94,14 +110,14 @@ export default function HostExperienceDetailPage() {
   const locationText = experience.location || experience.meeting_point || [experience.country, experience.city].filter(Boolean).join(' ');
   const ratingText = typeof experience.rating === 'number' ? experience.rating.toFixed(1) : '-';
   const statusLabel = experience.status === 'active'
-    ? '공개 중'
+    ? t('exp_selling')
     : experience.status === 'pending'
-      ? '승인 대기'
+      ? t('exp_status_pending')
       : experience.status === 'revision'
-        ? '수정 요청'
+        ? t('exp_status_revision')
         : experience.status === 'rejected'
-          ? '반려'
-          : '비공개';
+          ? t('exp_status_rejected')
+          : t('exp_status_hidden');
   const statusColor = experience.status === 'active' ? 'text-green-600' : 'text-slate-500';
 
   return (
@@ -110,7 +126,7 @@ export default function HostExperienceDetailPage() {
 
       <main className="max-w-4xl mx-auto px-6 py-8">
         <Link href="/host/dashboard" className="flex items-center gap-2 text-slate-500 hover:text-black mb-6 font-bold text-sm">
-          <ChevronLeft size={16} /> 대시보드로 돌아가기
+          <ChevronLeft size={16} /> {t('exp_back_to_dashboard')}
         </Link>
 
         {/* 상단 액션 버튼 */}
@@ -150,12 +166,12 @@ export default function HostExperienceDetailPage() {
           {/* 상세 정보 */}
           <div className="md:col-span-2 space-y-8">
             <div className="flex items-center gap-4 text-sm text-slate-500">
-              <span className="flex items-center gap-1"><MapPin size={16} /> {locationText || '위치 정보 없음'}</span>
+              <span className="flex items-center gap-1"><MapPin size={16} /> {locationText || t('exp_location_empty')}</span>
               <span className="flex items-center gap-1"><Star size={16} className="text-black fill-black" /> {ratingText}</span>
             </div>
 
             <div>
-              <h3 className="text-xl font-bold mb-4">체험 소개</h3>
+              <h3 className="text-xl font-bold mb-4">{t('exp_intro_title')}</h3>
               <p className="text-slate-600 leading-relaxed whitespace-pre-wrap">{experience.description}</p>
             </div>
 
@@ -173,15 +189,15 @@ export default function HostExperienceDetailPage() {
               <h3 className="font-bold text-lg mb-4">{t('exp_setting_info')}</h3>
               <div className="space-y-4 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-slate-500">가격</span>
+                  <span className="text-slate-500">{t('label_price')}</span>
                   <span className="font-bold">₩{Number(experience.price).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">카테고리</span>
+                  <span className="text-slate-500">{t('label_category')}</span>
                   <span className="font-bold">{experience.category || '-'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">상태</span>
+                  <span className="text-slate-500">{t('label_status')}</span>
                   <span className={`font-bold ${statusColor}`}>{statusLabel}</span>
                 </div>
               </div>
