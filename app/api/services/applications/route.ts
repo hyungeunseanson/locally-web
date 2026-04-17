@@ -5,6 +5,12 @@ import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 import { isApprovedHostEligibleForServiceRequest } from '@/app/utils/serviceHostNotifications';
+import type { ServiceApplication } from '@/app/types/service';
+
+type ServiceApplicationReadRow = Pick<
+  ServiceApplication,
+  'id' | 'request_id' | 'host_id' | 'appeal_message' | 'status' | 'created_at' | 'updated_at'
+>;
 
 type ApplyBody = {
   request_id?: string;
@@ -209,7 +215,7 @@ export async function GET(request: Request) {
       // 전체 지원자 목록 조회
       const { data: apps, error } = await supabaseAdmin
         .from('service_applications')
-        .select('*')
+        .select('id, request_id, host_id, appeal_message, status, created_at, updated_at')
         .eq('request_id', requestId)
         .order('created_at', { ascending: true });
 
@@ -218,12 +224,14 @@ export async function GET(request: Request) {
         return NextResponse.json({ success: false, error: '목록 조회 중 오류가 발생했습니다.' }, { status: 500 });
       }
 
-      if (!apps || apps.length === 0) {
+      const applicationRows = Array.isArray(apps) ? (apps as ServiceApplicationReadRow[]) : [];
+
+      if (applicationRows.length === 0) {
         return NextResponse.json({ success: true, data: [], isOwner: true });
       }
 
       // profiles & host_applications 별도 조회 (nested join RLS 우회)
-      const hostIds = apps.map((a) => a.host_id);
+      const hostIds = applicationRows.map((a) => a.host_id);
       const [{ data: profiles }, { data: hostApps }] = await Promise.all([
         supabaseAdmin.from('profiles').select('id, full_name, avatar_url, bio, languages, created_at, job, dream_destination, favorite_song').in('id', hostIds),
         supabaseAdmin.from('host_applications').select('user_id, name, profile_photo, self_intro, languages, language_levels, dream_destination, favorite_song').in('user_id', hostIds),
@@ -253,7 +261,7 @@ export async function GET(request: Request) {
         reviewMap[hid].sum += Number(r.rating || 0);
       });
 
-      const enriched = apps.map((app) => {
+      const enriched = applicationRows.map((app) => {
         const rev = reviewMap[app.host_id];
         return {
           ...app,
@@ -269,10 +277,10 @@ export async function GET(request: Request) {
       // 본인 지원 내역만 반환
       const { data: myApp } = await supabaseAdmin
         .from('service_applications')
-        .select('*')
+        .select('id, request_id, host_id, appeal_message, status, created_at, updated_at')
         .eq('request_id', requestId)
         .eq('host_id', user.id)
-        .maybeSingle();
+        .maybeSingle<ServiceApplicationReadRow>();
 
       return NextResponse.json({
         success: true,

@@ -7,6 +7,7 @@ import {
   isApprovedHostEligibleForServiceRequest,
 } from '@/app/utils/serviceHostNotifications';
 import {
+  getServiceCityVariants,
   getServiceLocationKey,
   normalizeServiceCity,
   resolveServiceCountry,
@@ -465,15 +466,35 @@ export async function GET(request: Request) {
     }
 
     const selectedLocationKey = city && city !== 'all'
-      ? getServiceLocationKey({ city, country: resolveServiceCountry(city, null) })
+      ? getServiceLocationKey({
+          city: normalizeServiceCity(city),
+          country: resolveServiceCountry(city, null),
+        })
       : null;
 
-    const { data, error } = await supabaseAdmin
+    if (selectedLocationKey && !locationKeys.has(selectedLocationKey)) {
+      return NextResponse.json({ success: true, data: [] });
+    }
+
+    const baseBoardQuery = supabaseAdmin
       .from('service_requests')
       .select('id, title, city, country, service_date, start_time, duration_hours, languages, guest_count, total_customer_price, total_host_payout, status, created_at, user_id')
       .eq('status', 'open')
-      .order('created_at', { ascending: false })
-      .limit(200);
+      .order('created_at', { ascending: false });
+
+    const normalizedSelectedCity = city && city !== 'all' ? normalizeServiceCity(city) : null;
+    const selectedCityVariants = normalizedSelectedCity
+      ? getServiceCityVariants(normalizedSelectedCity, resolveServiceCountry(normalizedSelectedCity, null))
+      : [];
+
+    const boardQuery =
+      selectedCityVariants.length === 1
+        ? baseBoardQuery.eq('city', selectedCityVariants[0])
+        : selectedCityVariants.length > 1
+          ? baseBoardQuery.in('city', selectedCityVariants)
+          : baseBoardQuery;
+
+    const { data, error } = await boardQuery.limit(selectedCityVariants.length > 0 ? 100 : 200);
 
     if (error) {
       console.error('Service Requests Fetch Error:', error);

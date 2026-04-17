@@ -9,6 +9,30 @@ import { useLanguage } from '@/app/context/LanguageContext';
 import SiteHeader from '@/app/components/SiteHeader';
 import Spinner from '@/app/components/ui/Spinner';
 import type { ServiceRequest } from '@/app/types/service';
+import { getServiceLocationKey } from '@/app/utils/serviceRequestLocation';
+
+type ServiceApplyRequest = Pick<
+  ServiceRequest,
+  | 'id'
+  | 'user_id'
+  | 'title'
+  | 'description'
+  | 'city'
+  | 'country'
+  | 'duration_hours'
+  | 'guest_count'
+  | 'total_host_payout'
+  | 'status'
+>;
+
+type HostApplicationStatusRow = {
+  status: string | null;
+};
+
+type HostExperienceLocationRow = {
+  city: string | null;
+  country: string | null;
+};
 
 export default function ServiceApplyPage() {
   const { requestId } = useParams<{ requestId: string }>();
@@ -17,7 +41,7 @@ export default function ServiceApplyPage() {
   const { showToast } = useToast();
   const { t } = useLanguage();
 
-  const [request, setRequest] = useState<ServiceRequest | null>(null);
+  const [request, setRequest] = useState<ServiceApplyRequest | null>(null);
   const [appealMessage, setAppealMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -36,13 +60,15 @@ export default function ServiceApplyPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/login'); return; }
 
-      const { data: req } = await supabase
+      const { data: req, error: requestError } = await supabase
         .from('service_requests')
-        .select('*')
+        .select(
+          'id, user_id, title, description, city, country, duration_hours, guest_count, total_host_payout, status'
+        )
         .eq('id', requestId)
-        .maybeSingle();
+        .maybeSingle<ServiceApplyRequest>();
 
-      if (!req) { router.push('/services'); return; }
+      if (requestError || !req) { router.push('/services'); return; }
 
       if (req.user_id === user.id) {
         showToast('본인의 의뢰에는 지원할 수 없습니다.', 'error');
@@ -56,7 +82,47 @@ export default function ServiceApplyPage() {
         return;
       }
 
-      setRequest(req as ServiceRequest);
+      const [{ data: hostApp, error: hostAppError }, { data: experiences, error: experiencesError }] =
+        await Promise.all([
+          supabase
+            .from('host_applications')
+            .select('status')
+            .eq('user_id', user.id)
+            .maybeSingle<HostApplicationStatusRow>(),
+          supabase
+            .from('experiences')
+            .select('city, country')
+            .eq('host_id', user.id)
+            .eq('is_active', true),
+        ]);
+
+      const requestLocationKey = getServiceLocationKey({
+        city: req.city,
+        country: req.country,
+      });
+      const hostExperiences = Array.isArray(experiences)
+        ? (experiences as HostExperienceLocationRow[])
+        : [];
+      const isEligibleHost =
+        !hostAppError &&
+        !experiencesError &&
+        hostApp?.status === 'approved' &&
+        Boolean(requestLocationKey) &&
+        hostExperiences.some(
+          (experience) =>
+            getServiceLocationKey({
+              city: experience.city,
+              country: experience.country,
+            }) === requestLocationKey
+        );
+
+      if (!isEligibleHost) {
+        showToast('지원 가능한 의뢰가 아닙니다.', 'error');
+        router.replace('/services');
+        return;
+      }
+
+      setRequest(req);
     };
     void load();
   }, [requestId, router, showToast, supabase]);

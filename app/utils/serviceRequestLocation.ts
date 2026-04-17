@@ -45,6 +45,42 @@ export function normalizeServiceCity(city: unknown): string {
   return cityLookup.get(normalizeKey(rawCity))?.value || rawCity;
 }
 
+export function getServiceCityVariants(city: unknown, country?: unknown): string[] {
+  const rawCity = normalizeValue(city);
+  const normalizedCity = normalizeServiceCity(rawCity);
+  const resolvedCountry = resolveServiceCountry(normalizedCity || rawCity, country);
+  const variants = new Set<string>();
+
+  if (rawCity) {
+    variants.add(rawCity);
+  }
+
+  if (normalizedCity) {
+    variants.add(normalizedCity);
+  }
+
+  if (!normalizedCity || !resolvedCountry) {
+    return Array.from(variants);
+  }
+
+  const matchedOption = CITY_OPTIONS[resolvedCountry].find(
+    (option) => normalizeKey(option.value) === normalizeKey(normalizedCity)
+  );
+
+  if (!matchedOption) {
+    return Array.from(variants);
+  }
+
+  for (const label of Object.values(matchedOption.labels)) {
+    const normalizedLabel = normalizeValue(label);
+    if (normalizedLabel) {
+      variants.add(normalizedLabel);
+    }
+  }
+
+  return Array.from(variants);
+}
+
 export function normalizeServiceCountry(country: unknown): ServiceCountryCode | null {
   const rawCountry = normalizeValue(country);
   if (!rawCountry) return null;

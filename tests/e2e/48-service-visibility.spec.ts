@@ -236,6 +236,14 @@ async function login(page: Page, user: TestUser) {
   await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 15000 });
 }
 
+async function dismissAnnouncementIfVisible(page: Page) {
+  const announcement = page.getByTestId('global-site-announcement-modal');
+  if (await announcement.count()) {
+    await page.getByTestId('global-site-announcement-primary').click();
+    await expect(announcement).toHaveCount(0);
+  }
+}
+
 async function getJson(request: APIRequestContext, url: string) {
   const response = await request.get(url);
   return {
@@ -305,16 +313,31 @@ test.describe.serial('Service request visibility gating', () => {
     expect(customerDetail.response.status()).toBe(200);
     expect(customerDetail.json.data.contact_name).toBe(customerUser.fullName);
     expect(customerDetail.json.data.contact_phone).toBe(customerUser.phone);
+    const applyPath = `/services/${requestFixture.id}/apply`;
 
     const matchingBoard = await getJson(matchingHostPage.request, '/api/services/requests?mode=board');
     expect(matchingBoard.response.status()).toBe(200);
     expect(Array.isArray(matchingBoard.json.data)).toBeTruthy();
     expect(matchingBoard.json.data.some((item: { id: string }) => item.id === requestFixture.id)).toBeTruthy();
 
+    const matchingBoardByCity = await getJson(
+      matchingHostPage.request,
+      `/api/services/requests?mode=board&city=${encodeURIComponent('서울')}`
+    );
+    expect(matchingBoardByCity.response.status()).toBe(200);
+    expect(
+      matchingBoardByCity.json.data.some((item: { id: string }) => item.id === requestFixture.id)
+    ).toBeTruthy();
+
     const matchingDetail = await getJson(matchingHostPage.request, `/api/services/requests?requestId=${requestFixture.id}`);
     expect(matchingDetail.response.status()).toBe(200);
     expect(matchingDetail.json.data.contact_name).toBeNull();
     expect(matchingDetail.json.data.contact_phone).toBeNull();
+
+    await matchingHostPage.goto(applyPath, { waitUntil: 'domcontentloaded' });
+    await dismissAnnouncementIfVisible(matchingHostPage);
+    await expect(matchingHostPage).toHaveURL(new RegExp(`${applyPath}$`));
+    await expect(matchingHostPage.getByRole('heading', { name: /서비스 지원하기|Apply for Request/ })).toBeVisible();
 
     const otherBoard = await getJson(otherHostPage.request, '/api/services/requests?mode=board');
     expect(otherBoard.response.status()).toBe(200);
@@ -323,7 +346,15 @@ test.describe.serial('Service request visibility gating', () => {
     const otherDetail = await getJson(otherHostPage.request, `/api/services/requests?requestId=${requestFixture.id}`);
     expect(otherDetail.response.status()).toBe(404);
 
+    await otherHostPage.goto(applyPath, { waitUntil: 'domcontentloaded' });
+    await otherHostPage.waitForURL((url) => url.pathname !== applyPath, { timeout: 15000 });
+    expect(otherHostPage.url()).not.toContain(applyPath);
+
     const pendingBoard = await getJson(pendingHostPage.request, '/api/services/requests?mode=board');
     expect(pendingBoard.response.status()).toBe(403);
+
+    await pendingHostPage.goto(applyPath, { waitUntil: 'domcontentloaded' });
+    await pendingHostPage.waitForURL((url) => url.pathname !== applyPath, { timeout: 15000 });
+    expect(pendingHostPage.url()).not.toContain(applyPath);
   });
 });

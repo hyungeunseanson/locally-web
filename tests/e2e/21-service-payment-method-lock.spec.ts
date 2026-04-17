@@ -309,6 +309,138 @@ async function createLegacyUntouchedCardFixture(customerId: string, customer: Te
   };
 }
 
+async function createCancelledPayPalFixture(customerId: string, customer: TestUser) {
+  const supabase = getAdminClient();
+  const timestamp = Date.now();
+  const serviceDate = new Date();
+  serviceDate.setDate(serviceDate.getDate() + 10);
+  const createdAt = new Date();
+  createdAt.setMinutes(createdAt.getMinutes() - 12);
+
+  const { data: requestData, error: requestError } = await supabase
+    .from('service_requests')
+    .insert({
+      user_id: customerId,
+      title: `[Playwright] Service Cancelled PayPal ${timestamp}`,
+      description: '취소된 서비스 PayPal capture guard 검증용 의뢰입니다.',
+      city: 'Seoul',
+      country: 'KR',
+      service_date: formatDate(serviceDate),
+      start_time: '12:00',
+      duration_hours: 4,
+      languages: ['한국어'],
+      guest_count: 2,
+      contact_name: customer.fullName,
+      contact_phone: customer.phone,
+      status: 'cancelled',
+      created_at: createdAt.toISOString(),
+      updated_at: createdAt.toISOString(),
+    })
+    .select('id, total_customer_price')
+    .single();
+
+  if (requestError || !requestData?.id) {
+    throw requestError || new Error('Failed to create cancelled PayPal service request.');
+  }
+  createdServiceRequestIds.push(requestData.id);
+
+  const bookingId = `SVC-PAYPAL-CANCELLED-${timestamp}`;
+  const orderId = `SVC-PAYPAL-CANCELLED-ORD-${timestamp}`;
+  const { error: bookingError } = await supabase.from('service_bookings').insert({
+    id: bookingId,
+    order_id: orderId,
+    request_id: requestData.id,
+    application_id: null,
+    customer_id: customerId,
+    host_id: null,
+    amount: requestData.total_customer_price,
+    host_payout_amount: 80000,
+    platform_revenue: Number(requestData.total_customer_price || 0) - 80000,
+    status: 'cancelled',
+    payment_method: 'paypal',
+    tid: null,
+    payout_status: 'pending',
+    contact_name: customer.fullName,
+    contact_phone: customer.phone,
+    created_at: createdAt.toISOString(),
+    updated_at: createdAt.toISOString(),
+  });
+
+  if (bookingError) throw bookingError;
+  createdServiceBookingIds.push(bookingId);
+
+  return {
+    bookingId,
+    requestId: requestData.id,
+  };
+}
+
+async function createCardLockedPendingFixture(customerId: string, customer: TestUser) {
+  const supabase = getAdminClient();
+  const timestamp = Date.now();
+  const serviceDate = new Date();
+  serviceDate.setDate(serviceDate.getDate() + 11);
+  const createdAt = new Date();
+  createdAt.setMinutes(createdAt.getMinutes() - 11);
+
+  const { data: requestData, error: requestError } = await supabase
+    .from('service_requests')
+    .insert({
+      user_id: customerId,
+      title: `[Playwright] Service Card Locked PayPal ${timestamp}`,
+      description: '서비스 PayPal capture card placeholder guard 검증용 의뢰입니다.',
+      city: 'Seoul',
+      country: 'KR',
+      service_date: formatDate(serviceDate),
+      start_time: '17:00',
+      duration_hours: 4,
+      languages: ['한국어'],
+      guest_count: 2,
+      contact_name: customer.fullName,
+      contact_phone: customer.phone,
+      status: 'pending_payment',
+      created_at: createdAt.toISOString(),
+      updated_at: createdAt.toISOString(),
+    })
+    .select('id, total_customer_price')
+    .single();
+
+  if (requestError || !requestData?.id) {
+    throw requestError || new Error('Failed to create card locked PayPal service request.');
+  }
+  createdServiceRequestIds.push(requestData.id);
+
+  const bookingId = `SVC-PAYPAL-CARD-${timestamp}`;
+  const orderId = `SVC-PAYPAL-CARD-ORD-${timestamp}`;
+  const { error: bookingError } = await supabase.from('service_bookings').insert({
+    id: bookingId,
+    order_id: orderId,
+    request_id: requestData.id,
+    application_id: null,
+    customer_id: customerId,
+    host_id: null,
+    amount: requestData.total_customer_price,
+    host_payout_amount: 80000,
+    platform_revenue: Number(requestData.total_customer_price || 0) - 80000,
+    status: 'PENDING',
+    payment_method: 'card',
+    tid: null,
+    payout_status: 'pending',
+    contact_name: customer.fullName,
+    contact_phone: customer.phone,
+    created_at: createdAt.toISOString(),
+    updated_at: createdAt.toISOString(),
+  });
+
+  if (bookingError) throw bookingError;
+  createdServiceBookingIds.push(bookingId);
+
+  return {
+    bookingId,
+    requestId: requestData.id,
+  };
+}
+
 async function login(page: Page, user: TestUser) {
   await page.goto('/login', { waitUntil: 'networkidle' });
 
@@ -519,6 +651,98 @@ test.describe.serial('Service payment method lock', () => {
 
     expect(booking?.status).toBe('PENDING');
     expect(booking?.payment_method).toBe('bank');
+    expect(serviceRequest?.status).toBe('pending_payment');
+  });
+
+  test('rejects PayPal capture on cancelled service bookings before provider verification', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const customerUser = createCustomerUser();
+    const customerId = await createAuthUser(customerUser);
+    const fixture = await createCancelledPayPalFixture(customerId, customerUser);
+
+    await login(page, customerUser);
+
+    const paypalCaptureResponse = await page.request.post('/api/services/payment/paypal/capture-order', {
+      data: {
+        bookingId: fixture.bookingId,
+        paypalOrderId: 'PAYPAL-SVC-NON-PENDING',
+      },
+    });
+    expect(paypalCaptureResponse.status()).toBe(409);
+    await expect(paypalCaptureResponse.json()).resolves.toMatchObject({
+      success: false,
+      error: expect.stringContaining('현재 상태'),
+    });
+
+    const supabase = getAdminClient();
+    const { data: booking, error: bookingError } = await supabase
+      .from('service_bookings')
+      .select('status, payment_method, tid')
+      .eq('id', fixture.bookingId)
+      .maybeSingle();
+
+    if (bookingError) throw bookingError;
+
+    const { data: serviceRequest, error: requestError } = await supabase
+      .from('service_requests')
+      .select('status')
+      .eq('id', fixture.requestId)
+      .maybeSingle();
+
+    if (requestError) throw requestError;
+
+    expect(booking).toMatchObject({
+      status: 'cancelled',
+      payment_method: 'paypal',
+      tid: null,
+    });
+    expect(serviceRequest?.status).toBe('cancelled');
+  });
+
+  test('rejects non-paypal pending placeholders from PayPal capture routes', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const customerUser = createCustomerUser();
+    const customerId = await createAuthUser(customerUser);
+    const fixture = await createCardLockedPendingFixture(customerId, customerUser);
+
+    await login(page, customerUser);
+
+    const paypalCaptureResponse = await page.request.post('/api/services/payment/paypal/capture-order', {
+      data: {
+        bookingId: fixture.bookingId,
+        paypalOrderId: 'PAYPAL-SVC-CARD-LOCK',
+      },
+    });
+    expect(paypalCaptureResponse.status()).toBe(409);
+    await expect(paypalCaptureResponse.json()).resolves.toMatchObject({
+      success: false,
+      error: expect.stringContaining('PayPal 결제 대기 예약만'),
+    });
+
+    const supabase = getAdminClient();
+    const { data: booking, error: bookingError } = await supabase
+      .from('service_bookings')
+      .select('status, payment_method, tid')
+      .eq('id', fixture.bookingId)
+      .maybeSingle();
+
+    if (bookingError) throw bookingError;
+
+    const { data: serviceRequest, error: requestError } = await supabase
+      .from('service_requests')
+      .select('status')
+      .eq('id', fixture.requestId)
+      .maybeSingle();
+
+    if (requestError) throw requestError;
+
+    expect(booking).toMatchObject({
+      status: 'PENDING',
+      payment_method: 'card',
+      tid: null,
+    });
     expect(serviceRequest?.status).toBe('pending_payment');
   });
 

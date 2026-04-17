@@ -31,6 +31,17 @@ type PendingBooking = {
   payment_method: string | null;
 };
 
+type ServicePaymentRequest = Pick<
+  ServiceRequest,
+  | 'id'
+  | 'title'
+  | 'service_date'
+  | 'start_time'
+  | 'duration_hours'
+  | 'guest_count'
+  | 'total_customer_price'
+>;
+
 type PaymentMethod = 'card' | 'bank' | 'paypal';
 
 type ServiceCardReadyReason = CardPaymentReadiness['reason'];
@@ -91,7 +102,7 @@ function ServicePaymentContent() {
   const requestId = params.requestId;
 
   const [isProcessing, setIsProcessing] = useState(false);
-  const [request, setRequest] = useState<ServiceRequest | null>(null);
+  const [request, setRequest] = useState<ServicePaymentRequest | null>(null);
   const [pendingBooking, setPendingBooking] = useState<PendingBooking | null>(null);
   const [contactName, setContactName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
@@ -129,14 +140,14 @@ function ServicePaymentContent() {
     if (!user) { router.push('/login'); return; }
 
     // 의뢰 정보 조회
-    const { data: req } = await supabase
+    const { data: req, error: requestError } = await supabase
       .from('service_requests')
-      .select('*')
+      .select('id, title, service_date, start_time, duration_hours, guest_count, total_customer_price')
       .eq('id', requestId)
-      .maybeSingle();
+      .maybeSingle<ServicePaymentRequest>();
 
-    if (!req) { router.push('/services/my'); return; }
-    setRequest(req as ServiceRequest);
+    if (requestError || !req) { router.push('/services/my'); return; }
+    setRequest(req);
 
     // v2 에스크로: 사전 생성된 PENDING 예약 조회
     const { data: booking } = await supabase

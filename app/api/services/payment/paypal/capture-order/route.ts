@@ -43,7 +43,9 @@ export async function POST(request: Request) {
     const supabaseAdmin = createAdminClient();
     const { data: booking, error: bookingError } = await supabaseAdmin
       .from('service_bookings')
-      .select('*, service_requests(user_id, title, city, country, duration_hours, guest_count)')
+      .select(
+        'id, order_id, request_id, customer_id, amount, status, payment_method, tid, service_requests(title, city, country, duration_hours, guest_count)'
+      )
       .eq('id', bookingId)
       .maybeSingle();
 
@@ -58,13 +60,44 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
     }
 
+    const normalizedBookingStatus = String(booking.status || '').toUpperCase();
+    const normalizedPaymentMethod = String(booking.payment_method || '').toLowerCase();
+
     if (booking.status === 'PAID' || booking.status === 'confirmed') {
-      return NextResponse.json({ success: true, message: 'Already processed' });
+      if (normalizedPaymentMethod === 'paypal') {
+        return NextResponse.json({ success: true, message: 'Already processed' });
+      }
+
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            normalizedPaymentMethod === 'bank'
+              ? '무통장 입금 대기 예약에는 PayPal 결제를 확정할 수 없습니다.'
+              : normalizedPaymentMethod
+                ? 'PayPal 결제 대기 예약만 PayPal 결제를 확정할 수 있습니다.'
+                : `현재 상태(${booking.status})에서는 PayPal 결제를 확정할 수 없습니다.`,
+        },
+        { status: 409 }
+      );
     }
 
-    if ((booking.payment_method || '').toLowerCase() === 'bank') {
+    if (normalizedBookingStatus !== 'PENDING') {
       return NextResponse.json(
-        { success: false, error: '무통장 입금 대기 예약에는 PayPal 결제를 확정할 수 없습니다.' },
+        { success: false, error: `현재 상태(${booking.status})에서는 PayPal 결제를 확정할 수 없습니다.` },
+        { status: 409 }
+      );
+    }
+
+    if (normalizedPaymentMethod && normalizedPaymentMethod !== 'paypal') {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            normalizedPaymentMethod === 'bank'
+              ? '무통장 입금 대기 예약에는 PayPal 결제를 확정할 수 없습니다.'
+              : 'PayPal 결제 대기 예약만 PayPal 결제를 확정할 수 있습니다.',
+        },
         { status: 409 }
       );
     }
