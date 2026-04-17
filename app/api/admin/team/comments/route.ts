@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { resolveTeamAdminContext, teamError, TEAM_CHAT_ROOM_ID } from '@/app/api/admin/team/_shared';
+import { resolveTeamAdminContext, teamError } from '@/app/api/admin/team/_shared';
 import { pruneTeamWorkspaceComments } from '@/app/utils/teamWorkspaceRetention';
 
 function sanitizeCommentMetadata(rawMetadata: unknown) {
@@ -71,21 +71,19 @@ export async function POST(request: NextRequest) {
       return teamError('댓글은 5000자를 초과할 수 없습니다.', 400);
     }
 
-    if (taskId !== TEAM_CHAT_ROOM_ID) {
-      const { data: task, error: taskError } = await context.supabaseAdmin
-        .from('admin_tasks')
-        .select('id')
-        .eq('id', taskId)
-        .maybeSingle();
+    const { data: task, error: taskError } = await context.supabaseAdmin
+      .from('admin_tasks')
+      .select('id')
+      .eq('id', taskId)
+      .maybeSingle();
 
-      if (taskError) {
-        console.error('[admin/team/comments] task fetch error:', taskError);
-        return teamError('작업 정보를 불러오지 못했습니다.', 500);
-      }
+    if (taskError) {
+      console.error('[admin/team/comments] task fetch error:', taskError);
+      return teamError('작업 정보를 불러오지 못했습니다.', 500);
+    }
 
-      if (!task) {
-        return teamError('댓글을 남길 작업을 찾을 수 없습니다.', 404);
-      }
+    if (!task) {
+      return teamError('댓글을 남길 작업을 찾을 수 없습니다.', 404);
     }
 
     const { data, error } = await context.supabaseAdmin
@@ -111,17 +109,15 @@ export async function POST(request: NextRequest) {
       return teamError('댓글 작성에 실패했습니다.', 500);
     }
 
-    if (taskId !== TEAM_CHAT_ROOM_ID) {
-      try {
-        await pruneTeamWorkspaceComments(context.supabaseAdmin, taskId, {
-          adminId: context.user.id,
-          adminEmail: context.user.email,
-          reason: 'comment_retention',
-          targetTaskId: taskId,
-        });
-      } catch (pruneError) {
-        console.error('[admin/team/comments] comment retention prune failed:', pruneError);
-      }
+    try {
+      await pruneTeamWorkspaceComments(context.supabaseAdmin, taskId, {
+        adminId: context.user.id,
+        adminEmail: context.user.email,
+        reason: 'comment_retention',
+        targetTaskId: taskId,
+      });
+    } catch (pruneError) {
+      console.error('[admin/team/comments] comment retention prune failed:', pruneError);
     }
 
     return NextResponse.json({ success: true, data }, { status: 201 });

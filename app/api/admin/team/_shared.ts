@@ -3,6 +3,8 @@ import { createClient as createServerClient } from '@/app/utils/supabase/server'
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 
+// Legacy team-chat quarantine ID kept only to exclude historical chat rows
+// from current Team Workspace retention/count calculations.
 export const TEAM_CHAT_ROOM_ID = '00000000-0000-0000-0000-000000000000';
 
 export function createTeamRequestId(scope: string) {
