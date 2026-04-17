@@ -109,6 +109,7 @@ export default function CommunitySearchControls({
         () => SORT_OPTIONS.find((item) => item.id === sort)?.label || '최신순',
         [sort],
     );
+    const searchPlaceholder = COMMUNITY_OPEN ? '제목 또는 내용 검색' : '로컬리 콘텐츠 검색';
 
     const pushSearch = (nextFormat: CommunityPostFormatFilter, nextQuery: string, nextSort: SortOption) => {
         navigate(buildCommunityListHref({
@@ -185,7 +186,7 @@ export default function CommunitySearchControls({
                             <input
                                 value={query}
                                 onChange={(event) => setQuery(event.target.value)}
-                                placeholder="제목 또는 내용 검색"
+                                placeholder={searchPlaceholder}
                                 className="h-11 w-full min-w-0 bg-transparent text-[14px] font-medium text-[#222222] placeholder:text-[#9A9A9A] outline-none"
                             />
                         </div>

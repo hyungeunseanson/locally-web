@@ -2,29 +2,37 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/app/utils/supabase/server';
 import {
     buildCommunityFeedPosts,
+    COMMUNITY_FEED_POST_SELECT,
     COMMUNITY_FEED_EXPERIENCE_SELECT,
+    COMMUNITY_FEED_POST_SELECT_LEGACY,
+    COMMUNITY_FEED_PROFILE_SELECT,
     normalizeCommunityFeedPostRow,
     type CommunityFeedExperience,
-    type CommunityFeedPostRow,
-    COMMUNITY_FEED_POST_SELECT_LEGACY,
-    COMMUNITY_FEED_POST_SELECT,
-    COMMUNITY_FEED_PROFILE_SELECT,
     type CommunityFeedProfile,
+    type CommunityFeedPostRow,
 } from '@/app/community/feedSelect';
 import { isMissingAnonymousColumnError, isMissingCommunityModelColumnError } from '@/app/community/anonymousColumn';
-import { getCommunityCategoryFromFormat } from '@/app/community/categoryMeta';
-import { resolveCommunityCategory, resolveCommunityFormat, resolveCommunityHub, resolveCommunitySort } from '@/app/community/queryParams';
+import {
+    canUseLegacyCommunityFeedFallback,
+    resolvePublicCommunityFeedState,
+} from '@/app/community/queryParams';
 
 export async function GET(request: NextRequest) {
     try {
         const supabase = await createClient();
         const { searchParams } = new URL(request.url);
-        const requestedCategory = resolveCommunityCategory(searchParams.get('category'));
-        const format = resolveCommunityFormat(searchParams.get('format'), requestedCategory);
-        const category = format === 'all' ? requestedCategory : getCommunityCategoryFromFormat(format);
-        const hub = resolveCommunityHub(searchParams.get('hub'));
-        const queryText = (searchParams.get('q') || '').trim().replace(/,/g, ' ');
-        const sort = resolveCommunitySort(searchParams.get('sort'));
+        const {
+            category,
+            hub,
+            queryText,
+            sort,
+        } = resolvePublicCommunityFeedState({
+            category: searchParams.get('category'),
+            format: searchParams.get('format'),
+            hub: searchParams.get('hub'),
+            q: searchParams.get('q'),
+            sort: searchParams.get('sort'),
+        });
         const offset = parseInt(searchParams.get('offset') || '0', 10);
         const limit = 15;
 
@@ -64,12 +72,17 @@ export async function GET(request: NextRequest) {
         let postsData = (initialResult.data ?? null) as unknown as CommunityFeedPostRow[] | null;
 
         if (postsError && (isMissingAnonymousColumnError(postsError) || isMissingCommunityModelColumnError(postsError))) {
-            const legacyResult = await buildQuery(COMMUNITY_FEED_POST_SELECT_LEGACY);
-            postsData = ((legacyResult.data ?? []) as unknown as CommunityFeedPostRow[]).map((post) => normalizeCommunityFeedPostRow({
-                ...post,
-                is_anonymous: false,
-            }));
-            postsError = legacyResult.error;
+            if (!canUseLegacyCommunityFeedFallback(hub)) {
+                postsData = [];
+                postsError = null;
+            } else {
+                const legacyResult = await buildQuery(COMMUNITY_FEED_POST_SELECT_LEGACY);
+                postsData = ((legacyResult.data ?? []) as unknown as CommunityFeedPostRow[]).map((post) => normalizeCommunityFeedPostRow({
+                    ...post,
+                    is_anonymous: false,
+                }));
+                postsError = legacyResult.error;
+            }
         }
 
         if (postsError) {

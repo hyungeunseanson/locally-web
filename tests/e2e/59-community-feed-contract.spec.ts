@@ -133,14 +133,18 @@ async function createExperienceFixture(hostId: string) {
   return data;
 }
 
-async function createCommunityPost(authorId: string, linkedExpId: number) {
+async function createCommunityPost(
+  authorId: string,
+  linkedExpId: number | null,
+  options?: { category?: 'qna' | 'locally_content'; title?: string }
+) {
   const supabase = getAdminClient();
   const { data, error } = await supabase
     .from('community_posts')
     .insert({
       user_id: authorId,
-      category: 'qna',
-      title: `[Playwright] Community Feed Contract ${Date.now()}`,
+      category: options?.category || 'locally_content',
+      title: options?.title || `[Playwright] Community Feed Contract ${Date.now()}`,
       content: '커뮤니티 목록 계약 검증용 게시글입니다.',
       images: [],
       linked_exp_id: linkedExpId,
@@ -179,7 +183,9 @@ test.describe.serial('Community feed response contract', () => {
     const author = createUser('author');
     const authorId = await createAuthUser(author);
     const experience = await createExperienceFixture(authorId);
-    const post = await createCommunityPost(authorId, Number(experience.id));
+    const post = await createCommunityPost(authorId, Number(experience.id), {
+      category: 'locally_content',
+    });
 
     const response = await request.get(`/api/community?q=${encodeURIComponent(post.title)}`);
     expect(response.ok()).toBeTruthy();
@@ -199,5 +205,32 @@ test.describe.serial('Community feed response contract', () => {
       },
     });
     expect(matchedPost).toHaveProperty('profiles');
+  });
+
+  test('keeps paused community feed scoped to locally_content even when legacy forum params are requested', async ({ request }) => {
+    const author = createUser('paused');
+    const authorId = await createAuthUser(author);
+    const token = `${Date.now()}`;
+    const contentPost = await createCommunityPost(authorId, null, {
+      category: 'locally_content',
+      title: `[Playwright] Community Paused Content ${token}`,
+    });
+    const qnaPost = await createCommunityPost(authorId, null, {
+      category: 'qna',
+      title: `[Playwright] Community Paused Qna ${token}`,
+    });
+
+    const response = await request.get(
+      `/api/community?category=qna&format=question&q=${encodeURIComponent(token)}`
+    );
+    expect(response.ok()).toBeTruthy();
+
+    const payload = await response.json();
+    const returnedIds = Array.isArray(payload.data)
+      ? payload.data.map((entry: { id?: string }) => entry.id)
+      : [];
+
+    expect(returnedIds).toContain(contentPost.id);
+    expect(returnedIds).not.toContain(qnaPost.id);
   });
 });

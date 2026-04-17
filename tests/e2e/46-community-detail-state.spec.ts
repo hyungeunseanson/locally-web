@@ -204,9 +204,7 @@ test.describe.serial('Community detail state consistency', () => {
       waitUntil: 'networkidle',
     });
 
-    const likeButton = page.locator('button').filter({
-      has: page.locator('svg.lucide-heart'),
-    }).first();
+    const likeButton = page.getByTestId('community-like-button');
 
     await expect(likeButton).toContainText('1');
     const likeResponsePromise = page.waitForResponse((response) => {
@@ -256,12 +254,14 @@ test.describe.serial('Community detail state consistency', () => {
     const nextLink = page.getByTestId('community-detail-next-link');
     const nextHref = await nextLink.getAttribute('href');
     expect(nextHref).toBeTruthy();
-    expect(nextHref).toContain('category=qna');
+    expect(nextHref).toContain('category=locally_content');
+    expect(nextHref).toContain('format=locally_pick');
     expect(nextHref).toContain('sort=popular');
 
     await page.getByTestId('community-detail-list-button').first().click();
     await expect.poll(() => page.url()).toContain('/community?');
-    await expect.poll(() => page.url()).toContain('category=qna');
+    await expect.poll(() => page.url()).toContain('category=locally_content');
+    await expect.poll(() => page.url()).toContain('format=locally_pick');
     await expect.poll(() => page.url()).toContain('sort=popular');
 
     await page.goBack({ waitUntil: 'networkidle' });
@@ -273,7 +273,8 @@ test.describe.serial('Community detail state consistency', () => {
     const prevLink = page.getByTestId('community-detail-prev-link');
     const prevHref = await prevLink.getAttribute('href');
     expect(prevHref).toBeTruthy();
-    expect(prevHref).toContain('category=qna');
+    expect(prevHref).toContain('category=locally_content');
+    expect(prevHref).toContain('format=locally_pick');
     expect(prevHref).toContain('sort=popular');
   });
 

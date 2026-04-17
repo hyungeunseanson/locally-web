@@ -1,4 +1,5 @@
 import {
+  COMMUNITY_OPEN,
   getCommunityCategoryFromFormat,
   getCommunityFormatFromCategory,
 } from './categoryMeta';
@@ -11,6 +12,14 @@ import type {
 } from '@/app/types/community';
 
 export type CommunitySort = 'latest' | 'popular';
+export type PublicCommunityFeedState = {
+  hub: CommunityHubFilter;
+  requestedCategory: CommunityCategory | 'all';
+  category: CommunityCategory | 'all';
+  format: CommunityPostFormatFilter;
+  queryText: string;
+  sort: CommunitySort;
+};
 
 const HUB_SET = new Set<CommunityHub>(['tokyo', 'osaka_kyoto', 'fukuoka', 'jp_other', 'seoul', 'busan', 'jeju']);
 const FORMAT_SET = new Set<CommunityPostFormat>(['question', 'companion', 'live_tip', 'locally_pick']);
@@ -46,6 +55,41 @@ export function resolveCommunityFormat(
 
 export function resolveCommunitySort(value: string | null | undefined): CommunitySort {
   return value === 'popular' ? 'popular' : 'latest';
+}
+
+export function resolvePublicCommunityFeedState(input: {
+  hub?: string | null | undefined;
+  format?: string | null | undefined;
+  category?: string | null | undefined;
+  q?: string | null | undefined;
+  sort?: string | null | undefined;
+}): PublicCommunityFeedState {
+  const hub = resolveCommunityHub(input.hub);
+  const requestedCategory = resolveCommunityCategory(input.category);
+  let format = resolveCommunityFormat(input.format, requestedCategory);
+
+  if (!COMMUNITY_OPEN && format !== 'locally_pick') {
+    format = 'locally_pick';
+  }
+
+  const category = !COMMUNITY_OPEN
+    ? 'locally_content'
+    : format === 'all'
+      ? requestedCategory
+      : getCommunityCategoryFromFormat(format);
+
+  return {
+    hub,
+    requestedCategory,
+    category,
+    format,
+    queryText: (input.q || '').trim().replace(/,/g, ' '),
+    sort: resolveCommunitySort(input.sort),
+  };
+}
+
+export function canUseLegacyCommunityFeedFallback(hub: CommunityHubFilter): boolean {
+  return hub === 'all';
 }
 
 export function buildCommunitySearchParams(input: {

@@ -51,6 +51,7 @@ export default function LikeButton({ postId, initialCount, initialLiked, onOpenL
     return (
         <button
             onClick={handleLike}
+            data-testid="community-like-button"
             className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-[14px] transition-all border ${liked
                     ? 'bg-rose-50 border-rose-200 text-[#FF385C]'
                     : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'

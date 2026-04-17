@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
+import { COMMUNITY_OPEN } from '@/app/community/categoryMeta';
 import { getHostPublicProfile, getProfileDisplayName, normalizeLanguageList } from '@/app/utils/profile';
 import { isMissingAnonymousColumnError } from '@/app/community/anonymousColumn';
 import {
@@ -62,6 +63,10 @@ export async function GET(
       .order('created_at', { ascending: false })
       .limit(6);
 
+    if (!COMMUNITY_OPEN) {
+      recentQuery = recentQuery.eq('category', 'locally_content');
+    }
+
     if (excludePostId) {
       recentQuery = recentQuery.neq('id', excludePostId);
     }
@@ -82,6 +87,10 @@ export async function GET(
         .eq('user_id', id)
         .order('created_at', { ascending: false })
         .limit(6);
+
+      if (!COMMUNITY_OPEN) {
+        legacyQuery = legacyQuery.eq('category', 'locally_content');
+      }
 
       if (excludePostId) {
         legacyQuery = legacyQuery.neq('id', excludePostId);

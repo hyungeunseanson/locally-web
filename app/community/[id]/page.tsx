@@ -21,9 +21,64 @@ import { getCommunityAuthorAvatar, getCommunityAuthorInitial, getCommunityAuthor
 import { COMMUNITY_OPEN, getCommunityCategoryMeta, isLocallyContentCategory } from '../categoryMeta';
 import { getCommunityHubMeta } from '../hubMeta';
 import { getCommunityCategoryFromFormat } from '../categoryMeta';
+import { isMissingAnonymousColumnError, isMissingCommunityModelColumnError } from '../anonymousColumn';
 import { resolveCommunityCategory, resolveCommunityFormat, resolveCommunityHub, resolveCommunitySort } from '../queryParams';
 
 // Community detail avatars render stored public profile URLs directly and keep server-rendered article markup free of image transforms.
+type CommunityDetailPostRow = {
+    id: string;
+    user_id: string;
+    category: 'qna' | 'companion' | 'info' | 'locally_content';
+    destination_hub: 'tokyo' | 'osaka_kyoto' | 'fukuoka' | 'jp_other' | 'seoul' | 'busan' | 'jeju' | null;
+    title: string;
+    content: string;
+    images: string[] | null;
+    is_anonymous: boolean;
+    companion_date: string | null;
+    companion_city: string | null;
+    linked_exp_id: number | null;
+    view_count: number | null;
+    like_count: number | null;
+    comment_count: number | null;
+    created_at: string;
+    updated_at: string | null;
+};
+type CommunityDetailLegacyPostRow = Omit<CommunityDetailPostRow, 'destination_hub' | 'is_anonymous'>;
+
+const COMMUNITY_DETAIL_POST_SELECT = [
+    'id',
+    'user_id',
+    'category',
+    'destination_hub',
+    'title',
+    'content',
+    'images',
+    'is_anonymous',
+    'companion_date',
+    'companion_city',
+    'linked_exp_id',
+    'view_count',
+    'like_count',
+    'comment_count',
+    'created_at',
+    'updated_at',
+].join(', ');
+const COMMUNITY_DETAIL_POST_SELECT_LEGACY = [
+    'id',
+    'user_id',
+    'category',
+    'title',
+    'content',
+    'images',
+    'companion_date',
+    'companion_city',
+    'linked_exp_id',
+    'view_count',
+    'like_count',
+    'comment_count',
+    'created_at',
+    'updated_at',
+].join(', ');
 
 // 🚀 Dynamic Metadata (SSR SEO)
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -42,6 +97,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     const pagePath = `/community/${id}`;
     const canonicalUrl = buildLocalizedAbsoluteUrl(locale, pagePath);
     const isSearchIndexable = COMMUNITY_OPEN || isLocallyContentCategory(post.category);
+    const communitySurfaceLabel = COMMUNITY_OPEN ? 'Locally 커뮤니티' : 'Locally 콘텐츠';
 
     let prefix = '';
     if (post.category === 'qna') prefix = '[Q&A] ';
@@ -51,7 +107,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
         title: `${prefix}${post.title}`,
         description: snippet,
         openGraph: {
-            title: `${prefix}${post.title} | Locally 커뮤니티`,
+            title: `${prefix}${post.title} | ${communitySurfaceLabel}`,
             description: snippet,
             url: canonicalUrl,
             images: [defaultImage],
@@ -99,11 +155,28 @@ export default async function CommunityPostDetail({
     const { data: { user } } = await supabase.auth.getUser();
 
     // ① post 단독 조회 (SSR Join 분리 원칙)
-    const { data: post, error: postError } = await supabase
+    const buildPostQuery = (selectClause: string) => supabase
         .from('community_posts')
-        .select('*')
+        .select(selectClause)
         .eq('id', id)
         .maybeSingle();
+
+    const initialPostResult = await buildPostQuery(COMMUNITY_DETAIL_POST_SELECT);
+    let post = initialPostResult.data as CommunityDetailPostRow | null;
+    let postError = initialPostResult.error;
+
+    if (postError && (isMissingAnonymousColumnError(postError) || isMissingCommunityModelColumnError(postError))) {
+        const legacyPostResult = await buildPostQuery(COMMUNITY_DETAIL_POST_SELECT_LEGACY);
+        const legacyPost = legacyPostResult.data as unknown as CommunityDetailLegacyPostRow | null;
+        post = legacyPost
+            ? {
+                ...legacyPost,
+                destination_hub: null,
+                is_anonymous: false,
+            }
+            : null;
+        postError = legacyPostResult.error;
+    }
 
     if (postError) console.error('[Community Post Detail] Post query error:', postError);
     if (!post) notFound();
@@ -163,11 +236,15 @@ export default async function CommunityPostDetail({
         && new Date(post.updated_at).getTime() > new Date(post.created_at).getTime()
     );
     const fallbackHub = resolveCommunityHub(detailSearchParams?.hub as string);
-    const fallbackRequestedCategory = resolveCommunityCategory((detailSearchParams?.category as string) || post.category);
-    const fallbackFormat = resolveCommunityFormat(
-        detailSearchParams?.format as string,
-        fallbackRequestedCategory === 'all' ? post.category : fallbackRequestedCategory
-    );
+    const fallbackRequestedCategory = !COMMUNITY_OPEN
+        ? 'locally_content'
+        : resolveCommunityCategory((detailSearchParams?.category as string) || post.category);
+    const fallbackFormat = !COMMUNITY_OPEN
+        ? 'locally_pick'
+        : resolveCommunityFormat(
+            detailSearchParams?.format as string,
+            fallbackRequestedCategory === 'all' ? post.category : fallbackRequestedCategory
+        );
     const fallbackParams = new URLSearchParams();
     if (fallbackHub !== 'all') fallbackParams.set('hub', fallbackHub);
     if (fallbackFormat !== 'all') {
@@ -230,7 +307,7 @@ export default async function CommunityPostDetail({
                     ] : []),
                     buildBreadcrumbJsonLd([
                         { name: 'Home', item: buildAbsoluteUrl('/') },
-                        { name: '커뮤니티', item: buildAbsoluteUrl('/community') },
+                        { name: COMMUNITY_OPEN ? '커뮤니티' : '로컬리 콘텐츠', item: buildAbsoluteUrl('/community') },
                         { name: post.title, item: pageUrl },
                     ]),
                 ]}
@@ -299,7 +376,7 @@ export default async function CommunityPostDetail({
                                                     <span>{getTimeString(post.created_at)}</span>
                                                     {hasVisibleUpdatedAt && (
                                                         <span data-testid="community-detail-updated-at">
-                                                            수정됨 {getTimeString(post.updated_at)}
+                                                            수정됨 {getTimeString(post.updated_at || post.created_at)}
                                                         </span>
                                                     )}
                                                 </div>

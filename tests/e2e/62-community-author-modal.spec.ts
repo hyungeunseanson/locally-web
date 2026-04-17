@@ -166,11 +166,18 @@ test.describe.serial('Community author modal', () => {
 
     const currentPost = await createPost(authorId, {
       title: `[Playwright] Community Modal Current ${timestamp}`,
+      category: 'locally_content',
       createdAt: new Date(timestamp - 2 * 60 * 60 * 1000).toISOString(),
     });
     const recentPost = await createPost(authorId, {
       title: `[Playwright] Community Modal Recent ${timestamp}`,
+      category: 'locally_content',
       createdAt: new Date(timestamp - 60 * 60 * 1000).toISOString(),
+    });
+    const forumPost = await createPost(authorId, {
+      title: `[Playwright] Community Modal Forum ${timestamp}`,
+      category: 'qna',
+      createdAt: new Date(timestamp - 30 * 60 * 1000).toISOString(),
     });
     const anonymousPost = await createPost(authorId, {
       title: `[Playwright] Community Modal Anonymous ${timestamp}`,
@@ -178,15 +185,16 @@ test.describe.serial('Community author modal', () => {
       createdAt: new Date(timestamp).toISOString(),
     });
 
-    await page.goto(`/community/${currentPost.id}?category=qna`, { waitUntil: 'networkidle' });
+    await page.goto(`/community/${currentPost.id}?category=locally_content`, { waitUntil: 'networkidle' });
 
     await page.getByRole('button', { name: /프로필 보기/ }).first().click();
     await expect(page.getByTestId('community-author-modal')).toBeVisible();
-    await expect(page.getByTestId('community-author-modal')).toContainText('이 사용자가 쓴 글');
+    await expect(page.getByTestId('community-author-modal')).toContainText('이 작성자의 공개 콘텐츠');
     await expect(
       page.getByTestId('community-author-modal-post').filter({ hasText: recentPost.title })
     ).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId('community-author-modal-post').filter({ hasText: currentPost.title })).toHaveCount(0);
+    await expect(page.getByTestId('community-author-modal-post').filter({ hasText: forumPost.title })).toHaveCount(0);
     if (anonymousSupported) {
       await expect(page.getByTestId('community-author-modal-post').filter({ hasText: anonymousPost.title })).toHaveCount(0);
     }

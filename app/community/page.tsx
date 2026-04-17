@@ -32,7 +32,10 @@ import {
     type CommunityFeedProfile,
 } from './feedSelect';
 import { isMissingAnonymousColumnError, isMissingCommunityModelColumnError } from './anonymousColumn';
-import { resolveCommunityCategory, resolveCommunityFormat, resolveCommunityHub, resolveCommunitySort } from './queryParams';
+import {
+    canUseLegacyCommunityFeedFallback,
+    resolvePublicCommunityFeedState,
+} from './queryParams';
 import type { CommunityHighlightPost } from './highlights';
 
 const COMMUNITY_HIGHLIGHT_SELECT = 'id, category, post_format, destination_hub, title, created_at';
@@ -63,8 +66,11 @@ function normalizeHighlightPost(post: {
 export async function generateMetadata({ searchParams }: { searchParams: Promise<SearchParamMap> }): Promise<Metadata> {
     const params = await searchParams;
     const locale = await getCurrentLocale();
-    const currentHub = resolveCommunityHub(params?.hub as string);
-    const currentFormat = resolveCommunityFormat(params?.format as string, params?.category as string);
+    const { hub: currentHub, format: currentFormat } = resolvePublicCommunityFeedState({
+        hub: params?.hub as string,
+        category: params?.category as string,
+        format: params?.format as string,
+    });
 
     const hubTitle = currentHub !== 'all' ? getCommunityHubMeta(currentHub).label : '';
 
@@ -123,16 +129,19 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
     const params = await searchParams;
     const { data: { user } } = await supabase.auth.getUser();
 
-    const currentHub = resolveCommunityHub(params?.hub as string);
-    const requestedCategory = resolveCommunityCategory(params?.category as string);
-    let currentFormat = resolveCommunityFormat(params?.format as string, requestedCategory);
-    if (!COMMUNITY_OPEN && currentFormat !== 'locally_pick') {
-        currentFormat = 'locally_pick';
-    }
-    const currentCategory = !COMMUNITY_OPEN ? 'locally_content' as CommunityCategory
-        : currentFormat === 'all' ? requestedCategory : getCommunityCategoryFromFormat(currentFormat);
-    const queryText = ((params?.q as string) || '').trim().replace(/,/g, ' ');
-    const sort = resolveCommunitySort(params?.sort as string);
+    const {
+        category: currentCategory,
+        format: currentFormat,
+        hub: currentHub,
+        queryText,
+        sort,
+    } = resolvePublicCommunityFeedState({
+        hub: params?.hub as string,
+        category: params?.category as string,
+        format: params?.format as string,
+        q: params?.q as string,
+        sort: params?.sort as string,
+    });
     const limit = 15;
 
     const buildPostsQuery = ({
@@ -193,18 +202,23 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
     let postsData = (initialResult.data ?? null) as unknown as CommunityFeedPostRow[] | null;
 
     if (postsError && (isMissingAnonymousColumnError(postsError) || isMissingCommunityModelColumnError(postsError))) {
-        const legacyResult = await buildPostsQuery({
-            selectClause: COMMUNITY_FEED_POST_SELECT_LEGACY,
-            category: currentCategory,
-            hub: 'all',
-            q: queryText,
-            sortMode: sort,
-        });
-        postsData = ((legacyResult.data ?? []) as unknown as CommunityFeedPostRow[]).map((post) => normalizeCommunityFeedPostRow({
-            ...post,
-            is_anonymous: false,
-        }));
-        postsError = legacyResult.error;
+        if (!canUseLegacyCommunityFeedFallback(currentHub)) {
+            postsData = [];
+            postsError = null;
+        } else {
+            const legacyResult = await buildPostsQuery({
+                selectClause: COMMUNITY_FEED_POST_SELECT_LEGACY,
+                category: currentCategory,
+                hub: currentHub,
+                q: queryText,
+                sortMode: sort,
+            });
+            postsData = ((legacyResult.data ?? []) as unknown as CommunityFeedPostRow[]).map((post) => normalizeCommunityFeedPostRow({
+                ...post,
+                is_anonymous: false,
+            }));
+            postsError = legacyResult.error;
+        }
     }
 
     if (postsError) {
@@ -272,10 +286,14 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
             return [];
         }
 
+        if (!canUseLegacyCommunityFeedFallback(currentHub)) {
+            return [];
+        }
+
         const legacyResult = await buildPostsQuery({
             selectClause: COMMUNITY_HIGHLIGHT_SELECT_LEGACY,
             category,
-            hub: 'all',
+            hub: currentHub,
             q: '',
             sortMode,
             queryLimit: 3,

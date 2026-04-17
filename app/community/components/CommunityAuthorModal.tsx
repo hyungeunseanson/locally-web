@@ -7,7 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { useModalClose } from '@/app/hooks/useModalClose';
 import Link from 'next/link';
 import { ChevronRight, Globe, Languages, Loader2, PenSquare, User, X } from 'lucide-react';
-import { getCommunityCategoryMeta } from '../categoryMeta';
+import { COMMUNITY_OPEN, getCommunityCategoryMeta } from '../categoryMeta';
 import type { CommunityCategory } from '@/app/types/community';
 
 type RecentPostRow = {
@@ -102,6 +102,10 @@ export default function CommunityAuthorModal({
   isOpen,
   onClose,
 }: CommunityAuthorModalProps) {
+  const recentPostsHeading = COMMUNITY_OPEN ? '이 사용자가 쓴 글' : '이 작성자의 공개 콘텐츠';
+  const recentPostsEmptyCopy = COMMUNITY_OPEN
+    ? '공개된 최근 커뮤니티 글이 없습니다.'
+    : '공개된 로컬리 콘텐츠가 없습니다.';
   const { visible, closing, requestClose } = useModalClose(isOpen, onClose);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -285,12 +289,12 @@ export default function CommunityAuthorModal({
               <section>
                 <div className="mb-3 flex items-center gap-2">
                   <PenSquare size={16} className="text-slate-500" />
-                  <h3 className="text-[16px] font-bold text-slate-900">이 사용자가 쓴 글</h3>
+                  <h3 className="text-[16px] font-bold text-slate-900">{recentPostsHeading}</h3>
                 </div>
 
                 {recentPosts.length === 0 ? (
                   <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-center text-sm text-slate-400">
-                    공개된 최근 커뮤니티 글이 없습니다.
+                    {recentPostsEmptyCopy}
                   </div>
                 ) : (
                   <div className="space-y-3">
