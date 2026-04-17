@@ -22,7 +22,7 @@ import { useLanguage } from '@/app/context/LanguageContext';
 import { getContent } from '@/app/utils/contentHelper';
 import { CATEGORY_OPTIONS } from '@/app/host/create/config';
 import { formatLocalizedExperienceLocation } from '@/app/utils/locationLocalization';
-import { getExperienceLanguageBadges, getExperiencePriceParts } from '@/app/utils/experienceCardDisplay';
+import { formatExperiencePrice, getExperienceLanguageBadges, getExperiencePriceParts } from '@/app/utils/experienceCardDisplay';
 import ExperienceCardMeta from '@/app/components/ExperienceCardMeta';
 import { getExperienceCardImageUrl } from '@/app/utils/experienceImages';
 
@@ -111,6 +111,7 @@ export default function ExperienceCard({
   const location = formatLocalizedExperienceLocation(data, lang) || t('exp_card_location_fallback');
   const languageBadges = getExperienceLanguageBadges(data.languages, lang);
   const { prefix: pricePrefix, suffix: priceSuffix } = getExperiencePriceParts(lang);
+  const formattedPrice = formatExperiencePrice(data.price);
   const rating = Number(data.rating || 0);
   const reviewCount = Number(data.review_count || 0);
 
@@ -196,10 +197,18 @@ export default function ExperienceCard({
 
           {/* 3열: 가격 */}
           <div className="mt-0.5 md:mt-1">
-            <span className="text-[11px] md:text-[14px] text-slate-500 font-normal">{pricePrefix}</span>
-            <span className="font-black text-slate-900 text-[12px] md:text-[15px] tracking-tight">
-              ₩{Number(data.price).toLocaleString()}{priceSuffix}
-            </span>
+            {formattedPrice !== null ? (
+              <>
+                <span className="text-[11px] md:text-[14px] text-slate-500 font-normal">{pricePrefix}</span>
+                <span className="font-black text-slate-900 text-[12px] md:text-[15px] tracking-tight">
+                  ₩{formattedPrice}{priceSuffix}
+                </span>
+              </>
+            ) : (
+              <span className="font-semibold text-slate-900 text-[12px] md:text-[15px] tracking-tight">
+                {t('exp_card_price_unavailable')}
+              </span>
+            )}
           </div>
         </div>
       )}

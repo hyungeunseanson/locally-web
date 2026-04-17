@@ -68,6 +68,7 @@ export default function DatePicker({
       days.push(
         <button
           key={d}
+          data-testid={`date-picker-day-${year}-${month + 1}-${d}`}
           onClick={() => handleDateClick(d)}
           className={[
             'flex items-center justify-center transition-all rounded-full',
@@ -87,13 +88,19 @@ export default function DatePicker({
   return (
     <div>
       <div className={`flex justify-between items-center ${isMobile ? 'mb-3' : 'mb-4'}`}>
-        <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() - 1)))}>
+        <button
+          data-testid="date-picker-prev-month"
+          onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() - 1)))}
+        >
           <ChevronLeft size={isMobile ? 18 : 20} />
         </button>
         <span className={isMobile ? 'text-[13px] font-semibold' : 'font-bold'}>
           {currentDate.getFullYear()}{t('date_year')} {currentDate.getMonth() + 1}{t('date_month')}
         </span>
-        <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() + 1)))}>
+        <button
+          data-testid="date-picker-next-month"
+          onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() + 1)))}
+        >
           <ChevronRight size={isMobile ? 18 : 20} />
         </button>
       </div>

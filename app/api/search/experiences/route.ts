@@ -15,7 +15,7 @@ import {
   type SearchTimeId,
   type SearchTypeId,
 } from '@/app/search/searchContract';
-import { buildSearchHaystack, tokenizeSearchInput } from '@/app/search/searchText';
+import { buildSearchHaystack, buildSearchTypeHaystack, tokenizeSearchInput } from '@/app/search/searchText';
 
 const SEARCH_CACHE_HEADERS = {
   'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=600',
@@ -98,7 +98,7 @@ function matchesDateRange(item: SearchExperience, startDate: string | null, endD
 function matchesTypeSelection(item: SearchExperience, selectedTypes: SearchTypeId[]) {
   if (selectedTypes.length === 0) return true;
 
-  const haystack = buildSearchHaystack(item);
+  const haystack = buildSearchTypeHaystack(item);
   return selectedTypes.some((typeId) =>
     SEARCH_TYPE_KEYWORDS[typeId].some((keyword) => haystack.includes(keyword.toLowerCase()))
   );
@@ -195,9 +195,10 @@ export async function GET(request: NextRequest) {
       'landmark',
       'one_day_class',
     ]);
+    const visibleHostIdList = Array.from(visibleHostIds);
     const searchTerms = tokenizeSearchInput(location);
     const needsAvailability = Boolean(startDate || endDate || selectedTimes.length > 0);
-    const needsTextFilterFields = searchTerms.length > 0 || selectedTypes.length > 0;
+    const needsTextFilterFields = searchTerms.length > 0;
 
     let query = supabase
       .from('experiences')
@@ -206,6 +207,7 @@ export async function GET(request: NextRequest) {
           ? `${SEARCH_EXPERIENCE_SELECT}, host_id`
           : `${SEARCH_EXPERIENCE_CARD_SELECT}, host_id`
       )
+      .in('host_id', visibleHostIdList)
       .eq('status', 'active');
 
     if (city) {

@@ -2,7 +2,6 @@ import type { Experience } from '../../types';
 
 export const fetchActiveExperiences = async (): Promise<Experience[]> => {
   const response = await fetch('/api/home/experiences', {
-    cache: 'no-store',
     credentials: 'same-origin',
   });
 

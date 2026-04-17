@@ -29,6 +29,26 @@ async function stubSearchApi(page: Page) {
   });
 }
 
+function getNextMonthDateFixture() {
+  const nextMonth = new Date();
+  nextMonth.setMonth(nextMonth.getMonth() + 1, 1);
+
+  const year = nextMonth.getFullYear();
+  const month = nextMonth.getMonth() + 1;
+  const startDate = new Date(year, month - 1, 10);
+  const endDate = new Date(year, month - 1, 12);
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+  });
+
+  return {
+    startTestId: `date-picker-day-${year}-${month}-10`,
+    endTestId: `date-picker-day-${year}-${month}-12`,
+    expectedValue: `${formatter.format(startDate)} - ${formatter.format(endDate)}`,
+  };
+}
+
 test.describe('Home/search location localization', () => {
   test('localizes desktop home recommended places and preserves localized input display', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 960 });
@@ -49,6 +69,22 @@ test.describe('Home/search location localization', () => {
     await expect(page.getByTestId('home-desktop-popular-experiences-section')).toBeVisible();
     await expect(page.getByTestId('home-desktop-all-experiences-section')).toBeVisible();
     await expect(page.getByTestId('home-desktop-search-location-field').locator('input')).toHaveValue('Tokyo');
+  });
+
+  test('formats desktop home dates with the active locale instead of Korean-only tokens', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await prepareLocale(page, 'en', '/en');
+
+    const nextMonthDate = getNextMonthDateFixture();
+    const dateInput = page.getByTestId('home-desktop-search-date-field').locator('input');
+
+    await page.getByTestId('home-desktop-search-date-field').click();
+    await page.getByTestId('date-picker-next-month').click();
+    await page.getByTestId(nextMonthDate.startTestId).click();
+    await page.getByTestId(nextMonthDate.endTestId).click();
+
+    await expect(dateInput).toHaveValue(nextMonthDate.expectedValue);
+    expect(await dateInput.inputValue()).not.toMatch(/[월일]/);
   });
 
   test('localizes the mobile search modal and keeps the search route actionable', async ({ page }) => {

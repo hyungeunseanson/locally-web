@@ -2,6 +2,7 @@
 
 import { useLanguage } from '@/app/context/LanguageContext';
 import {
+  formatExperiencePrice,
   getExperienceDurationHours,
   getExperienceLanguageBadges,
 } from '@/app/utils/experienceCardDisplay';
@@ -31,8 +32,7 @@ export default function ExperienceCardMeta({
 }: ExperienceCardMetaProps) {
   const { lang, t } = useLanguage();
   const languageBadges = getExperienceLanguageBadges(languages, lang);
-  const rawPrice = typeof price === 'number' ? price : Number(price);
-  const formattedPrice = Number.isFinite(rawPrice) ? rawPrice.toLocaleString() : '45,000';
+  const formattedPrice = formatExperiencePrice(price);
   const durationHours = getExperienceDurationHours(duration);
   const durationText = durationHours ? t('exp_card_duration_hours', { hours: durationHours }) : '';
   const ratingValue = Number(rating || 0);
@@ -70,7 +70,9 @@ export default function ExperienceCardMeta({
         className="mt-0.5 flex flex-wrap items-center gap-x-1 gap-y-0.5 overflow-hidden text-[10px] text-slate-500 md:text-[14px]"
       >
         <span data-testid="experience-card-meta-price" className="shrink-0">
-          <span className="font-semibold text-slate-900">₩{formattedPrice}</span>
+          <span className="font-semibold text-slate-900">
+            {formattedPrice !== null ? `₩${formattedPrice}` : t('exp_card_price_unavailable')}
+          </span>
         </span>
         {durationText && (
           <>

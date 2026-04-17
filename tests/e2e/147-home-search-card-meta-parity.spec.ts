@@ -35,7 +35,7 @@ async function dismissAnnouncementIfVisible(page: Page) {
   }
 }
 
-async function stubHomeExperiences(page: Page) {
+async function stubHomeExperiences(page: Page, overrides: Record<string, unknown> = {}) {
   await page.route('**/api/home/experiences', async (route) => {
     await route.fulfill({
       status: 200,
@@ -47,6 +47,7 @@ async function stubHomeExperiences(page: Page) {
             tags: ['food', 'night'],
             available_dates: ['2025-05-02'],
             wishlist_count: 9,
+            ...overrides,
           },
         ],
       }),
@@ -54,7 +55,7 @@ async function stubHomeExperiences(page: Page) {
   });
 }
 
-async function stubSearchExperiences(page: Page) {
+async function stubSearchExperiences(page: Page, overrides: Record<string, unknown> = {}) {
   await page.route('**/api/search/experiences?**', async (route) => {
     await route.fulfill({
       status: 200,
@@ -83,6 +84,7 @@ async function stubSearchExperiences(page: Page) {
             duration: FIXTURE.duration,
             rating: FIXTURE.rating,
             review_count: FIXTURE.review_count,
+            ...overrides,
           },
         ],
       }),
@@ -206,6 +208,29 @@ test.describe('Home/search card meta parity', () => {
     await expect(mobileCard).toContainText(/도쿄 야시장 투어|Tokyo Night Market Tour/);
     await expectCompactPrice(mobileCard.getByTestId(`search-mobile-result-card-price-${FIXTURE.id}`));
     await expect(mobileCard).toContainText('★ 4.80');
+  });
+
+  test('shows a localized price fallback instead of a fake numeric default when price data is missing', async ({ page }) => {
+    await stubHomeExperiences(page, { price: null });
+    await stubSearchExperiences(page, { price: null });
+
+    await page.setViewportSize({ width: 1440, height: 1200 });
+    await page.goto('/en', { waitUntil: 'networkidle' });
+    await dismissAnnouncementIfVisible(page);
+
+    const homeCard = page.locator(`a[href="/experiences/${FIXTURE.id}"]:visible`).first();
+    await expect(homeCard).toBeVisible({ timeout: 15000 });
+    await expect(homeCard.getByTestId('experience-card-meta-price')).toHaveText('Check price');
+    await expect(homeCard.getByTestId('experience-card-meta-price')).not.toContainText('45,000');
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`/search?location=${encodeURIComponent(FIXTURE.title)}`, { waitUntil: 'networkidle' });
+    await dismissAnnouncementIfVisible(page);
+
+    const mobileCard = page.getByTestId(`search-mobile-result-card-${FIXTURE.id}`).first();
+    await expect(mobileCard).toBeVisible({ timeout: 15000 });
+    await expect(mobileCard.getByTestId(`search-mobile-result-card-price-${FIXTURE.id}`)).toContainText('Check price');
+    await expect(mobileCard.getByTestId(`search-mobile-result-card-price-${FIXTURE.id}`)).not.toContainText('45,000');
   });
 
   test('does not render inline wishlist toggles on home cards anymore', async ({ page }) => {

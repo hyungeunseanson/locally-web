@@ -22,6 +22,26 @@ export function getExperienceDurationHours(rawDuration: unknown): string | null 
   return Number.isInteger(duration) ? String(duration) : duration.toString();
 }
 
+export function getNormalizedExperiencePrice(rawPrice: unknown): number | null {
+  if (rawPrice == null) return null;
+
+  if (typeof rawPrice === 'string' && rawPrice.trim() === '') {
+    return null;
+  }
+
+  const price = typeof rawPrice === 'number' ? rawPrice : Number(rawPrice);
+  if (!Number.isFinite(price) || price < 0) {
+    return null;
+  }
+
+  return price;
+}
+
+export function formatExperiencePrice(rawPrice: unknown): string | null {
+  const price = getNormalizedExperiencePrice(rawPrice);
+  return price === null ? null : price.toLocaleString();
+}
+
 export function getExperienceLanguageBadges(rawLanguages: unknown, locale: string, maxVisible: number = 2) {
   const normalizedLocale = normalizeLocale(locale);
   const labels = Array.isArray(rawLanguages)

@@ -71,7 +71,7 @@ export const SEARCH_TYPE_KEYWORDS: Record<SearchTypeId, string[]> = {
   one_day_class: ['원데이 클래스', '클래스', 'class'],
 };
 
-export const SEARCH_EXPERIENCE_CARD_SELECT_FIELDS = [
+export const PUBLIC_EXPERIENCE_CARD_SELECT_FIELDS = [
   'id',
   'title',
   'city',
@@ -92,6 +92,10 @@ export const SEARCH_EXPERIENCE_CARD_SELECT_FIELDS = [
   'price',
   'duration',
   'location',
+ ] as const;
+
+export const SEARCH_EXPERIENCE_CARD_SELECT_FIELDS = [
+  ...PUBLIC_EXPERIENCE_CARD_SELECT_FIELDS,
   'meeting_point',
   'meeting_point_i18n',
 ] as const;

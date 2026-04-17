@@ -35,7 +35,7 @@ import { getContent } from '@/app/utils/contentHelper';
 import { getLocalizedExperienceText } from '@/app/utils/experienceTranslation';
 import { formatLocalizedExperienceLocation, getLocalizedCityLabel } from '@/app/utils/locationLocalization';
 import { getLocalizedSearchLocationLabel } from '@/app/utils/searchLocationCatalog';
-import { getExperienceLanguageBadges } from '@/app/utils/experienceCardDisplay';
+import { formatExperiencePrice, getExperienceLanguageBadges } from '@/app/utils/experienceCardDisplay';
 import { normalizeProfileLanguageValue } from '@/app/utils/profile';
 import { normalizeServiceCity } from '@/app/utils/serviceRequestLocation';
 import { getExperienceCardImageUrl } from '@/app/utils/experienceImages';
@@ -450,8 +450,7 @@ function SearchResults() {
       ) || t('exp_card_location_fallback');
     const languageBadges = getExperienceLanguageBadges(item.languages, lang);
     const rating = item.rating && item.rating > 0 ? item.rating.toFixed(2) : t('exp_card_new');
-    const rawPrice = typeof item.price === 'number' ? item.price : Number(item.price);
-    const price = Number.isFinite(rawPrice) ? Number(rawPrice).toLocaleString() : '45,000';
+    const price = formatExperiencePrice(item.price);
 
     return (
       <Link key={item.id} href={`/experiences/${item.id}`} data-testid={`search-mobile-result-card-${item.id}`} className="w-[168px] shrink-0">
@@ -484,7 +483,7 @@ function SearchResults() {
             data-testid={`search-mobile-result-card-price-${item.id}`}
             className="mt-0.5 text-[11px] text-[#3E3E3E]"
           >
-            <span className="font-semibold">₩{price}</span> · ★ {rating}
+            <span className="font-semibold">{price !== null ? `₩${price}` : t('exp_card_price_unavailable')}</span> · ★ {rating}
           </p>
         </div>
       </Link>

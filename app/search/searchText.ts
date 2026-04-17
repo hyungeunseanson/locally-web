@@ -67,3 +67,33 @@ export function buildSearchHaystack(item: SearchableExperienceText) {
     .join(' ')
     .toLowerCase();
 }
+
+type SearchableExperienceTypeText = Pick<
+  SearchableExperienceText,
+  | 'title'
+  | 'category'
+  | 'title_ko'
+  | 'title_en'
+  | 'category_en'
+  | 'title_ja'
+  | 'category_ja'
+  | 'title_zh'
+  | 'category_zh'
+>;
+
+export function buildSearchTypeHaystack(item: SearchableExperienceTypeText) {
+  return [
+    item.title,
+    item.category,
+    item.title_ko,
+    item.title_en,
+    item.category_en,
+    item.title_ja,
+    item.category_ja,
+    item.title_zh,
+    item.category_zh,
+  ]
+    .map(asSearchableString)
+    .join(' ')
+    .toLowerCase();
+}

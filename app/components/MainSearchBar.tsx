@@ -127,6 +127,12 @@ export default function MainSearchBar({
   const { t, lang } = useLanguage();
   const rootRef = useRef<HTMLDivElement>(null);
 
+  const searchLocale =
+    lang === 'en' ? 'en-US' :
+      lang === 'ja' ? 'ja-JP' :
+        lang === 'zh' ? 'zh-CN' :
+          'ko-KR';
+
   useEffect(() => {
     if (!activeSearchField) return;
 
@@ -151,11 +157,16 @@ export default function MainSearchBar({
     };
   }, [activeSearchField, setActiveSearchField]);
 
+  const formatDateLabel = (date: Date) => new Intl.DateTimeFormat(searchLocale, {
+    month: 'short',
+    day: 'numeric',
+  }).format(date);
+
   const formatDateRange = () => {
     if (dateRange.start && dateRange.end) {
-      return `${dateRange.start.getMonth() + 1}월 ${dateRange.start.getDate()}일 - ${dateRange.end.getMonth() + 1}월 ${dateRange.end.getDate()}일`;
+      return `${formatDateLabel(dateRange.start)} - ${formatDateLabel(dateRange.end)}`;
     }
-    if (dateRange.start) return `${dateRange.start.getMonth() + 1}월 ${dateRange.start.getDate()}일`;
+    if (dateRange.start) return formatDateLabel(dateRange.start);
     return '';
   };
 
@@ -212,6 +223,7 @@ export default function MainSearchBar({
 
         {/* 2. 날짜 입력 */}
         <div
+          data-testid="home-desktop-search-date-field"
           className={`flex-1 relative h-full flex flex-col justify-center px-6 rounded-full cursor-pointer transition-all duration-300 z-10 group
             ${activeSearchField === 'date' ? 'bg-white shadow-[var(--shadow-floating)]' : 'hover:bg-slate-100/80'}`}
           onClick={() => setActiveSearchField('date')}

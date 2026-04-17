@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 import { getVisiblePublicHostIdSet } from '@/app/utils/hostVisibility';
+import { PUBLIC_EXPERIENCE_CARD_SELECT_FIELDS } from '@/app/search/searchContract';
 
 type PublicHostApplicationRow = {
   id?: string | number | null;
@@ -44,29 +45,7 @@ type PopularitySnapshotRow = {
   wishlist_count: number | null;
 };
 
-const HOME_EXPERIENCE_SELECT = [
-  'id',
-  'host_id',
-  'title',
-  'title_en',
-  'title_ja',
-  'title_zh',
-  'category',
-  'category_en',
-  'category_ja',
-  'category_zh',
-  'city',
-  'country',
-  'location',
-  'languages',
-  'image_url',
-  'photos',
-  'rating',
-  'review_count',
-  'price',
-  'duration',
-  'created_at',
-].join(', ');
+const HOME_EXPERIENCE_SELECT = ['host_id', ...PUBLIC_EXPERIENCE_CARD_SELECT_FIELDS, 'created_at'].join(', ');
 
 const CACHE_HEADERS = {
   'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=3600',
@@ -99,9 +78,12 @@ export async function GET() {
       return NextResponse.json({ data: [] }, { headers: CACHE_HEADERS });
     }
 
+    const visibleHostIdList = Array.from(visibleHostIds);
+
     const { data: experiences, error: experiencesError } = await supabase
       .from('experiences')
       .select(HOME_EXPERIENCE_SELECT)
+      .in('host_id', visibleHostIdList)
       .eq('status', 'active')
       .order('created_at', { ascending: false });
 
