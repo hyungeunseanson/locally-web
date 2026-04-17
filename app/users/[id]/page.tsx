@@ -8,6 +8,7 @@ import { User, CheckCircle2, Star } from 'lucide-react';
 import ExperienceCard from '@/app/components/ExperienceCard';
 import PublicReviewSection from '@/app/components/reviews/PublicReviewSection';
 import { useLanguage } from '@/app/context/LanguageContext';
+import { PUBLIC_EXPERIENCE_CARD_SELECT_FIELDS } from '@/app/search/searchContract';
 import {
   isPublicHostApplicationStatus,
   pickLatestPublicHostApplication,
@@ -24,6 +25,7 @@ type PublicHostProfile = {
 type HostExperienceCardData = {
   id: number | string;
   title?: string | null;
+  title_ko?: string | null;
   title_en?: string | null;
   title_ja?: string | null;
   title_zh?: string | null;
@@ -42,6 +44,7 @@ type HostExperienceCardData = {
   review_count?: number | null;
   price?: number | string | null;
   duration?: number | string | null;
+  is_active?: boolean | null;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -74,6 +77,12 @@ function readNullableNumberOrString(value: unknown): number | string | null | un
   return undefined;
 }
 
+function readNullableBoolean(value: unknown): boolean | null | undefined {
+  if (value == null) return null;
+  if (typeof value === 'boolean') return value;
+  return undefined;
+}
+
 function normalizeHostExperienceRows(rows: unknown): HostExperienceCardData[] {
   if (!Array.isArray(rows)) {
     return [];
@@ -92,6 +101,7 @@ function normalizeHostExperienceRows(rows: unknown): HostExperienceCardData[] {
     acc.push({
       id,
       title: readNullableString(row.title),
+      title_ko: readNullableString(row.title_ko),
       title_en: readNullableString(row.title_en),
       title_ja: readNullableString(row.title_ja),
       title_zh: readNullableString(row.title_zh),
@@ -110,32 +120,16 @@ function normalizeHostExperienceRows(rows: unknown): HostExperienceCardData[] {
       review_count: readNullableNumber(row.review_count),
       price: readNullableNumberOrString(row.price),
       duration: readNullableNumberOrString(row.duration),
+      is_active: readNullableBoolean(row.is_active),
     });
 
     return acc;
-  }, []);
+  }, []).filter((row) => row.is_active !== false);
 }
 
-const PUBLIC_HOST_EXPERIENCE_SELECT = [
-  'id',
-  'title',
-  'title_en',
-  'title_ja',
-  'title_zh',
-  'category',
-  'category_en',
-  'category_ja',
-  'category_zh',
-  'city',
-  'country',
-  'location',
-  'languages',
-  'image_url',
-  'photos',
-  'rating',
-  'review_count',
-  'price',
-  'duration',
+const PUBLIC_HOST_PROFILE_EXPERIENCE_SELECT = [
+  ...PUBLIC_EXPERIENCE_CARD_SELECT_FIELDS,
+  'is_active',
 ].join(', ');
 
 export default function UserProfilePage({ params }: { params: Promise<{ id: string }> }) {
@@ -171,11 +165,16 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
 
       // 공개 상태 호스트의 경우에만 운영 중인 활성 체험 가져오기
       if (isPublicHost) {
-        const { data: expData } = await supabase
+        const { data: expData, error: expError } = await supabase
           .from('experiences')
-          .select(PUBLIC_HOST_EXPERIENCE_SELECT)
+          .select(PUBLIC_HOST_PROFILE_EXPERIENCE_SELECT)
           .eq('host_id', resolvedParams.id)
-          .eq('status', 'active');
+          .eq('status', 'active')
+          .or('is_active.is.true,is_active.is.null');
+
+        if (expError) {
+          console.error('[Public host profile] experience lookup failed:', expError);
+        }
 
         setHostExperiences(normalizeHostExperienceRows(expData));
       } else {
@@ -313,7 +312,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
               )}
             </section>
 
-            {/* 후기 (추후 구현) */}
+            {/* 후기 */}
             <section data-testid="public-host-reviews-section" className="pt-12 border-t border-slate-100">
               <h2 className="text-xl md:text-2xl font-bold mb-2 md:mb-3 flex items-center gap-2">
                 <Star className="fill-black" size={24} /> {t('public_host_profile_reviews_title')}

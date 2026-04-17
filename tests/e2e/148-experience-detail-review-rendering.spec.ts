@@ -327,6 +327,10 @@ test.describe.serial('Experience detail public reviews', () => {
     expect(apiResponse.status()).toBe(200);
     const apiPayload = await apiResponse.json();
     expect(apiPayload.success).toBe(true);
+    expect(apiPayload.summary).toMatchObject({
+      average_rating: 5,
+      review_count: 1,
+    });
     expect(apiPayload.data[0]).toMatchObject({
       content: reviewContent,
       reviewer: {

@@ -158,8 +158,14 @@ async function createHostApplication(
   createdApplicationIds.push(String(data.id));
 }
 
-async function createActiveExperience(hostId: string) {
-  const title = `[Playwright] Public Host Profile ${Date.now()}`;
+async function createActiveExperience(
+  hostId: string,
+  options: {
+    isActive?: boolean | null;
+    title?: string;
+  } = {}
+) {
+  const title = options.title || `[Playwright] Public Host Profile ${Date.now()}`;
   const { data, error } = await getAdminClient()
     .from('experiences')
     .insert({
@@ -187,6 +193,7 @@ async function createActiveExperience(hostId: string) {
         activity_level: '보통',
       },
       status: 'active',
+      is_active: options.isActive ?? null,
       is_private_enabled: false,
       private_price: 0,
       source_locale: 'ko',
@@ -366,6 +373,10 @@ test.describe.serial('Public host profile', () => {
     const apiPayload = await apiResponse.json();
     expect(apiPayload.success).toBe(true);
     expect(Array.isArray(apiPayload.data)).toBe(true);
+    expect(apiPayload.summary).toMatchObject({
+      average_rating: 5,
+      review_count: 1,
+    });
     expect(apiPayload.data[0]).toMatchObject({
       rating: 5,
       content: reviewContent,
@@ -430,5 +441,28 @@ test.describe.serial('Public host profile', () => {
     await expect(page.getByTestId('public-host-languages')).toBeVisible();
     await expect(page.getByTestId('public-host-languages').getByText('English')).toBeVisible();
     await expect(page.getByText(experience.title)).toBeVisible();
+  });
+
+  test('does not expose inactive-flagged experiences on the public host profile', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const host = createHostUser();
+    const hostId = await createAuthUser(host);
+    await createHostApplication(hostId, host, 'active');
+
+    const visibleExperience = await createActiveExperience(hostId, {
+      isActive: true,
+      title: `[Playwright] Public Host Visible ${Date.now()}`,
+    });
+    const hiddenExperience = await createActiveExperience(hostId, {
+      isActive: false,
+      title: `[Playwright] Public Host Hidden ${Date.now()}`,
+    });
+
+    await page.goto(`/users/${hostId}`, { waitUntil: 'networkidle' });
+
+    await expect(page.getByTestId('public-host-experiences-section')).toBeVisible();
+    await expect(page.getByText(visibleExperience.title)).toBeVisible();
+    await expect(page.getByText(hiddenExperience.title)).toHaveCount(0);
   });
 });

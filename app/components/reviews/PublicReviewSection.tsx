@@ -5,7 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { Star, User, X } from 'lucide-react';
 
 import { useLanguage } from '@/app/context/LanguageContext';
-import type { PublicReviewItem } from '@/app/utils/reviews/publicReview';
+import type { PublicReviewItem, PublicReviewSummary } from '@/app/utils/reviews/publicReview';
 
 type ReviewSourceProps =
   | {
@@ -26,6 +26,7 @@ type ReviewSectionProps = ReviewSourceProps & {
 type PublicReviewPayload = {
   success?: boolean;
   data?: PublicReviewItem[];
+  summary?: PublicReviewSummary;
   error?: string;
 };
 
@@ -39,6 +40,16 @@ function formatDate(dateString: string) {
   if (!dateString) return '';
   const date = new Date(dateString);
   return `${date.getFullYear()}. ${String(date.getMonth() + 1).padStart(2, '0')}. ${String(date.getDate()).padStart(2, '0')}.`;
+}
+
+function calculateAverageRating(reviews: PublicReviewItem[]) {
+  if (reviews.length === 0) return null;
+  const total = reviews.reduce((sum, review) => sum + review.rating, 0);
+  return Number((total / reviews.length).toFixed(2));
+}
+
+function sortReviewsLatest(reviews: PublicReviewItem[]) {
+  return [...reviews].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 }
 
 function ReviewAvatar({
@@ -136,6 +147,7 @@ export default function PublicReviewSection(props: ReviewSectionProps) {
   const reviewHostId = 'hostId' in props ? props.hostId : null;
   const reviewExperienceId = 'experienceId' in props ? props.experienceId : null;
   const [reviews, setReviews] = useState<PublicReviewItem[]>([]);
+  const [reviewSummary, setReviewSummary] = useState<PublicReviewSummary | null>(null);
   const [isReviewsExpanded, setIsReviewsExpanded] = useState(false);
   const [isPolicyOpen, setIsPolicyOpen] = useState(false);
   const [sortOrder, setSortOrder] = useState<'latest' | 'oldest'>('latest');
@@ -152,12 +164,15 @@ export default function PublicReviewSection(props: ReviewSectionProps) {
           ? `/api/public/hosts/${encodeURIComponent(reviewHostId)}/reviews?lang=${encodeURIComponent(lang)}`
           : `/api/public/experiences/${encodeURIComponent(String(reviewExperienceId))}/reviews?lang=${encodeURIComponent(lang)}`;
 
-        const response = await fetch(endpoint, { cache: 'no-store' });
+        const response = await fetch(endpoint);
         const result = (await response.json()) as PublicReviewPayload;
 
         if (!response.ok) {
           if (response.status === 404) {
-            if (isActive) setReviews([]);
+            if (isActive) {
+              setReviews([]);
+              setReviewSummary(null);
+            }
             return;
           }
 
@@ -166,10 +181,14 @@ export default function PublicReviewSection(props: ReviewSectionProps) {
 
         if (isActive) {
           setReviews(result.data || []);
+          setReviewSummary(result.summary || null);
         }
       } catch (error) {
         console.error('[PublicReviewSection] review lookup failed:', error);
-        if (isActive) setReviews([]);
+        if (isActive) {
+          setReviews([]);
+          setReviewSummary(null);
+        }
       } finally {
         if (isActive) setLoading(false);
       }
@@ -182,17 +201,12 @@ export default function PublicReviewSection(props: ReviewSectionProps) {
     };
   }, [lang, reviewExperienceId, reviewHostId]);
 
-  const averageRating = reviews.length > 0
-    ? (reviews.reduce((acc, cur) => acc + cur.rating, 0) / reviews.length).toFixed(1)
-    : '0.0';
-  const sortedReviews = [...reviews].sort((a, b) => {
-    const timeA = new Date(a.created_at).getTime();
-    const timeB = new Date(b.created_at).getTime();
-    return sortOrder === 'latest' ? timeB - timeA : timeA - timeB;
-  });
-  const previewReviews = [...reviews]
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    .slice(0, 4);
+  const latestSortedReviews = sortReviewsLatest(reviews);
+  const sortedReviews = sortOrder === 'latest' ? latestSortedReviews : [...latestSortedReviews].reverse();
+  const previewReviews = latestSortedReviews.slice(0, 4);
+  const reviewCount = reviewSummary?.review_count ?? reviews.length;
+  const averageRatingValue = reviewSummary?.average_rating ?? calculateAverageRating(reviews);
+  const averageRating = reviewCount > 0 && averageRatingValue !== null ? averageRatingValue.toFixed(1) : '0.0';
 
   if (loading) {
     return <div className="py-10 text-center text-slate-400">{t('exp_review_loading')}</div>;
@@ -201,7 +215,7 @@ export default function PublicReviewSection(props: ReviewSectionProps) {
   return (
     <div id={props.sectionId} data-testid={props.testId} className="scroll-mt-24 pb-8">
       <h3 className="mb-4 flex items-center gap-1.5 text-[17px] font-semibold tracking-[-0.01em] md:mb-[18px] md:text-[22px]">
-        <Star size={14} fill="black" className="md:h-4 md:w-4" /> {averageRating} · {t('exp_review_count', { count: reviews.length })}
+        <Star size={14} fill="black" className="md:h-4 md:w-4" /> {averageRating} · {t('exp_review_count', { count: reviewCount })}
       </h3>
 
       {reviews.length > 0 ? (
@@ -332,7 +346,7 @@ export default function PublicReviewSection(props: ReviewSectionProps) {
               </h3>
               <div className="mt-3 flex items-center justify-between gap-3">
                 <p className="text-[13px] font-medium tracking-[-0.01em] md:text-[14px]">
-                  {t('exp_review_count', { count: reviews.length })}
+                  {t('exp_review_count', { count: reviewCount })}
                 </p>
                 <div className="relative">
                   <select

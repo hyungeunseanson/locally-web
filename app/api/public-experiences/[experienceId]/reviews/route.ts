@@ -4,10 +4,12 @@ import { isPublicHostApplicationStatus, pickLatestPublicHostApplication } from '
 import { getCurrentLocale } from '@/app/utils/locale';
 import {
   buildPublicReviewItems,
+  buildPublicReviewSummary,
   resolvePublicReviewLocale,
   type PublicReviewItem,
   type PublicReviewProfileRow,
   type PublicReviewRow,
+  type PublicReviewSummary,
 } from '@/app/utils/reviews/publicReview';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 
@@ -23,11 +25,14 @@ type PublicExperienceRow = {
   host_id: string | null;
   status: string | null;
   is_active?: boolean | null;
+  rating?: number | null;
+  review_count?: number | null;
 };
 
 type PublicExperienceReviewPayload = {
   success: boolean;
   data?: PublicReviewItem[];
+  summary?: PublicReviewSummary;
   error?: string;
 };
 
@@ -47,7 +52,7 @@ export async function GET(
     const supabaseAdmin = createAdminClient();
     const { data: experienceRow, error: experienceError } = await supabaseAdmin
       .from('experiences')
-      .select('id, host_id, status, is_active')
+      .select('id, host_id, status, is_active, rating, review_count')
       .eq('id', experienceId)
       .maybeSingle();
 
@@ -111,6 +116,11 @@ export async function GET(
 
     return NextResponse.json<PublicExperienceReviewPayload>({
       success: true,
+      summary: buildPublicReviewSummary({
+        reviews,
+        averageRating: experience.rating,
+        reviewCount: experience.review_count,
+      }),
       data: buildPublicReviewItems({
         reviews,
         profiles: (profileRows as PublicReviewProfileRow[] | null) || [],

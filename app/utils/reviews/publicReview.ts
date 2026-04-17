@@ -30,6 +30,11 @@ export type PublicReviewItem = {
   };
 };
 
+export type PublicReviewSummary = {
+  average_rating: number | null;
+  review_count: number;
+};
+
 const PUBLIC_REVIEW_GUEST_LABELS: Record<PublicReviewLocale, string> = {
   ko: '게스트',
   en: 'Guest',
@@ -75,6 +80,64 @@ function getPublicReviewerSourceName(profile: PublicReviewProfileRow | undefined
 
   const name = typeof profile.name === 'string' ? profile.name.trim() : '';
   return name;
+}
+
+function normalizePublicReviewAverageRating(value: unknown) {
+  if (value == null) return null;
+
+  const normalized = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(normalized) || normalized < 0) {
+    return null;
+  }
+
+  return Number(normalized.toFixed(2));
+}
+
+function normalizePublicReviewCount(value: unknown) {
+  if (value == null) return null;
+
+  const normalized = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(normalized) || normalized < 0) {
+    return null;
+  }
+
+  return Math.trunc(normalized);
+}
+
+function calculateAverageRatingFromPublicReviews(reviews: PublicReviewRow[]) {
+  if (reviews.length === 0) return null;
+
+  const total = reviews.reduce((sum, review) => sum + review.rating, 0);
+  return Number((total / reviews.length).toFixed(2));
+}
+
+export function buildPublicReviewSummary(params: {
+  reviews: PublicReviewRow[] | null | undefined;
+  averageRating?: unknown;
+  reviewCount?: unknown;
+}): PublicReviewSummary {
+  const reviews = params.reviews || [];
+  const storedReviewCount = normalizePublicReviewCount(params.reviewCount);
+  const shouldUseStoredCount =
+    storedReviewCount !== null && !(storedReviewCount === 0 && reviews.length > 0);
+  const reviewCount = shouldUseStoredCount ? storedReviewCount : reviews.length;
+
+  if (reviewCount === 0) {
+    return {
+      average_rating: null,
+      review_count: 0,
+    };
+  }
+
+  const storedAverageRating = normalizePublicReviewAverageRating(params.averageRating);
+  const fallbackAverageRating = calculateAverageRatingFromPublicReviews(reviews);
+  const shouldUseStoredAverage =
+    shouldUseStoredCount && storedAverageRating !== null && storedAverageRating > 0;
+
+  return {
+    average_rating: shouldUseStoredAverage ? storedAverageRating : fallbackAverageRating,
+    review_count: reviewCount,
+  };
 }
 
 export function buildPublicReviewItems(params: {

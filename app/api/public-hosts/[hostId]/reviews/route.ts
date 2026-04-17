@@ -4,10 +4,12 @@ import { isPublicHostApplicationStatus, pickLatestPublicHostApplication } from '
 import { getCurrentLocale } from '@/app/utils/locale';
 import {
   buildPublicReviewItems,
+  buildPublicReviewSummary,
   resolvePublicReviewLocale,
   type PublicReviewItem,
   type PublicReviewProfileRow,
   type PublicReviewRow,
+  type PublicReviewSummary,
 } from '@/app/utils/reviews/publicReview';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 
@@ -21,6 +23,7 @@ type PublicHostApplicationRow = {
 type PublicHostReviewPayload = {
   success: boolean;
   data?: PublicReviewItem[];
+  summary?: PublicReviewSummary;
   error?: string;
 };
 
@@ -53,13 +56,21 @@ export async function GET(
       return NextResponse.json({ success: false, error: 'Host not found' }, { status: 404 });
     }
 
-    const { data: reviewRows, error: reviewsError } = await supabaseAdmin
-      .from('reviews')
-      .select('id, user_id, rating, content, created_at, reply, reply_at, experiences!inner(host_id)')
-      .eq('experiences.host_id', hostId)
-      .order('created_at', { ascending: false });
+    const [{ data: reviewRows, error: reviewsError }, { data: hostProfile, error: hostProfileError }] = await Promise.all([
+      supabaseAdmin
+        .from('reviews')
+        .select('id, user_id, rating, content, created_at, reply, reply_at, experiences!inner(host_id)')
+        .eq('experiences.host_id', hostId)
+        .order('created_at', { ascending: false }),
+      supabaseAdmin
+        .from('profiles')
+        .select('average_rating, total_review_count')
+        .eq('id', hostId)
+        .maybeSingle(),
+    ]);
 
     if (reviewsError) throw reviewsError;
+    if (hostProfileError) throw hostProfileError;
 
     const reviews = (reviewRows as PublicReviewRow[] | null) || [];
     const userIds = Array.from(
@@ -80,6 +91,11 @@ export async function GET(
 
     return NextResponse.json<PublicHostReviewPayload>({
       success: true,
+      summary: buildPublicReviewSummary({
+        reviews,
+        averageRating: hostProfile?.average_rating,
+        reviewCount: hostProfile?.total_review_count,
+      }),
       data: buildPublicReviewItems({
         reviews,
         profiles: (profileRows as PublicReviewProfileRow[] | null) || [],
