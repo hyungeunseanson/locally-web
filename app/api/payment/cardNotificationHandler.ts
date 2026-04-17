@@ -14,6 +14,16 @@ import { createAdminClient } from '@/app/utils/supabase/admin';
 
 type NotificationTarget = 'experience' | 'service' | 'proxy';
 
+function buildNotificationOkResponse() {
+  return new NextResponse('OK', {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Cache-Control': 'no-store',
+    },
+  });
+}
+
 function buildIgnoredResponse(params: {
   provider: string;
   idempotencyKey: string | null;
@@ -106,7 +116,7 @@ async function processExperienceNotification(params: {
   }
 
   if (['PAID', 'confirmed'].includes(String(booking.status || '').toUpperCase())) {
-    return NextResponse.json({ success: true, message: 'Already processed' });
+    return buildNotificationOkResponse();
   }
 
   if (String(booking.status || '').toUpperCase() !== 'PENDING') {
@@ -150,10 +160,10 @@ async function processExperienceNotification(params: {
   }
 
   if (confirmationResult.alreadyProcessed) {
-    return NextResponse.json({ success: true, message: 'Already processed' });
+    return buildNotificationOkResponse();
   }
 
-  return NextResponse.json({ success: true });
+  return buildNotificationOkResponse();
 }
 
 async function processServiceNotification(params: {
@@ -183,7 +193,7 @@ async function processServiceNotification(params: {
   }
 
   if (serviceBooking.status === 'PAID' || serviceBooking.status === 'confirmed') {
-    return NextResponse.json({ success: true, message: 'Already processed' });
+    return buildNotificationOkResponse();
   }
 
   if (serviceBooking.status !== 'PENDING') {
@@ -226,10 +236,10 @@ async function processServiceNotification(params: {
   }
 
   if (confirmationResult.alreadyProcessed) {
-    return NextResponse.json({ success: true, message: 'Already processed' });
+    return buildNotificationOkResponse();
   }
 
-  return NextResponse.json({ success: true });
+  return buildNotificationOkResponse();
 }
 
 async function processProxyNotification(params: {
@@ -267,7 +277,7 @@ async function processProxyNotification(params: {
   }
 
   if (String(proxyRequest.payment_status || '').toUpperCase() === 'COMPLETED') {
-    return NextResponse.json({ success: true, message: 'Already processed' });
+    return buildNotificationOkResponse();
   }
 
   const verificationResult = await verifyCardPaymentNotification({
@@ -293,10 +303,10 @@ async function processProxyNotification(params: {
   }
 
   if (confirmationResult.alreadyProcessed) {
-    return NextResponse.json({ success: true, message: 'Already processed' });
+    return buildNotificationOkResponse();
   }
 
-  return NextResponse.json({ success: true });
+  return buildNotificationOkResponse();
 }
 
 export async function handleNicePayCardNotification(

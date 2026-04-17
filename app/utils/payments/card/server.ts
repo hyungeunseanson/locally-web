@@ -22,7 +22,14 @@ const NICEPAY_NOTIFICATION_SUCCESS_STATE_CODES = new Set(['0']);
 const NICEPAY_STATUS_QUERY_SUCCESS_CODES = new Set(['0000']);
 const NICEPAY_STATUS_QUERY_SUCCESS_STATUS = new Set(['0']);
 const NICEPAY_STATUS_QUERY_URL = 'https://webapi.nicepay.co.kr/webapi/inquery/trans_status.jsp';
-const NICEPAY_ALLOWED_APPROVAL_HOSTS = new Set(['webapi.nicepay.co.kr', 'pg-api.nicepay.co.kr']);
+const NICEPAY_CANCEL_URL = 'https://pg-api.nicepay.co.kr/webapi/cancel_process.jsp';
+const NICEPAY_ALLOWED_APPROVAL_HOSTS = new Set([
+  'dc1-api.nicepay.co.kr',
+  'dc2-api.nicepay.co.kr',
+  'webapi.nicepay.co.kr',
+  'pg-api.nicepay.co.kr',
+]);
+const NICEPAY_NET_CANCEL_SUCCESS_CODES = new Set(['2001']);
 
 type NicePayRuntimeConfig = {
   mid: string;
@@ -246,7 +253,94 @@ function parseNicePayCancelResponse(raw: string) {
   return {
     resultCode: parsed.ResultCode || null,
     resultMessage: parsed.ResultMsg || null,
+    signature: parsed.Signature || null,
+    transactionId: parsed.TID || null,
+    cancelAmount: parsed.CancelAmt || null,
+    mid: parsed.MID || null,
   };
+}
+
+async function requestNicePayNetCancel(params: {
+  providerPayload: Record<string, string>;
+  amount: number;
+}) {
+  const config = getNicePayRuntimeConfig();
+  const authToken = getPayloadValue(params.providerPayload, ['AuthToken']);
+  const txTid =
+    getPayloadValue(params.providerPayload, ['TxTid', 'TID']) ||
+    getPayloadValue(params.providerPayload, ['approvalId']);
+  const netCancelUrl = getPayloadValue(params.providerPayload, ['NetCancelURL']);
+  const authMid = getPayloadValue(params.providerPayload, ['MID']) || config.mid;
+
+  if (!authToken || !txTid || !netCancelUrl) {
+    return {
+      attempted: false,
+      success: false,
+      reason: 'missing_net_cancel_context',
+    } as const;
+  }
+
+  if (authMid !== config.mid) {
+    return {
+      attempted: false,
+      success: false,
+      reason: 'mid_mismatch',
+    } as const;
+  }
+
+  if (!isAllowedNicePayApiUrl(netCancelUrl)) {
+    return {
+      attempted: false,
+      success: false,
+      reason: 'invalid_net_cancel_url',
+    } as const;
+  }
+
+  const ediDate = getNicePayEdiDate();
+  const signData = sha256Hex(`${authToken}${config.mid}${params.amount}${ediDate}${config.merchantKey}`);
+  const requestBody = new URLSearchParams({
+    TID: txTid,
+    AuthToken: authToken,
+    MID: config.mid,
+    Amt: String(params.amount),
+    EdiDate: ediDate,
+    NetCancel: '1',
+    SignData: signData,
+    CharSet: 'utf-8',
+  });
+
+  try {
+    const response = await fetch(netCancelUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: requestBody.toString(),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      return {
+        attempted: true,
+        success: false,
+        reason: `http_${response.status}`,
+      } as const;
+    }
+
+    const rawResponse = await response.text();
+    const parsed = parseNicePayCancelResponse(rawResponse);
+
+    return {
+      attempted: true,
+      success: Boolean(parsed.resultCode && NICEPAY_NET_CANCEL_SUCCESS_CODES.has(parsed.resultCode)),
+      resultCode: parsed.resultCode,
+      resultMessage: parsed.resultMessage,
+    } as const;
+  } catch (error) {
+    return {
+      attempted: true,
+      success: false,
+      reason: error instanceof Error ? error.message : 'unknown_net_cancel_error',
+    } as const;
+  }
 }
 
 async function verifyNicePayApprovedPayment(
@@ -261,6 +355,7 @@ async function verifyNicePayApprovedPayment(
   const moid = getPayloadValue(providerPayload, ['Moid', 'merchant_uid', 'orderId']);
   const amount = parseNumber(getPayloadValue(providerPayload, ['Amt', 'amount']));
   const nextAppUrl = getPayloadValue(providerPayload, ['NextAppURL']);
+  const netCancelUrl = getPayloadValue(providerPayload, ['NetCancelURL']);
   const signature = getPayloadValue(providerPayload, ['Signature']);
   const payMethod = getPayloadValue(providerPayload, ['PayMethod']);
 
@@ -296,6 +391,10 @@ async function verifyNicePayApprovedPayment(
     throw new Error('NICEPAY 승인 URL이 유효하지 않습니다.');
   }
 
+  if (netCancelUrl && !isAllowedNicePayApiUrl(netCancelUrl)) {
+    throw new Error('NICEPAY 망취소 URL이 유효하지 않습니다.');
+  }
+
   const approvalUrl = nextAppUrl as string;
 
   if (signature) {
@@ -318,19 +417,34 @@ async function verifyNicePayApprovedPayment(
     EdiType: 'JSON',
   });
 
-  const response = await fetch(approvalUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: approvalFormBody.toString(),
-    cache: 'no-store',
-  });
+  let parsed: Record<string, string> = {};
 
-  if (!response.ok) {
-    throw new Error(`NICEPAY 승인 API 오류: ${response.status} ${response.statusText}`);
+  try {
+    const response = await fetch(approvalUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: approvalFormBody.toString(),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      throw new Error(`NICEPAY 승인 API 오류: ${response.status} ${response.statusText}`);
+    }
+
+    parsed = parseNicePayApiResponse(await response.text());
+  } catch (error) {
+    const netCancelResult = await requestNicePayNetCancel({
+      providerPayload,
+      amount,
+    });
+
+    if (netCancelResult.attempted && !netCancelResult.success) {
+      console.error('NICEPAY net cancel fallback failed:', netCancelResult);
+    }
+
+    throw error;
   }
 
-  const rawResponse = await response.text();
-  const parsed = parseNicePayApiResponse(rawResponse);
   const resultCode = getPayloadValue(parsed, ['ResultCode']);
   const approvedTransactionId = getPayloadValue(parsed, ['TID']) || txTid;
   const approvedOrderId = getPayloadValue(parsed, ['Moid']);
@@ -600,8 +714,10 @@ export async function cancelCardPayment(
     formBody.set('EdiDate', ediDate);
     formBody.set('SignData', signData);
   }
+  formBody.set('CharSet', 'utf-8');
+  formBody.set('EdiType', 'JSON');
 
-  const response = await fetch('https://webapi.nicepay.co.kr/webapi/cancel_process.jsp', {
+  const response = await fetch(NICEPAY_CANCEL_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: formBody.toString(),
@@ -615,10 +731,28 @@ export async function cancelCardPayment(
   const parsed = parseNicePayCancelResponse(raw);
   const acceptedCodes = params.acceptedResultCodes || ['2001'];
 
+  if (parsed.mid && parsed.mid !== mid) {
+    throw new Error('PG Cancel Failed: NICEPAY MID mismatch');
+  }
+
   if (!parsed.resultCode || !acceptedCodes.includes(parsed.resultCode)) {
     throw new Error(
       `PG Cancel Failed: [${parsed.resultCode || 'unknown'}] ${parsed.resultMessage || '알 수 없는 오류'}`
     );
+  }
+
+  if (merchantKey) {
+    if (!parsed.transactionId || !parsed.cancelAmount || !parsed.signature) {
+      throw new Error('PG Cancel Failed: Missing NICEPAY cancel signature fields');
+    }
+
+    const expectedSignature = sha256Hex(
+      `${parsed.transactionId}${parsed.mid || mid}${parsed.cancelAmount}${merchantKey}`
+    );
+
+    if (parsed.signature !== expectedSignature) {
+      throw new Error('PG Cancel Failed: NICEPAY cancel signature mismatch');
+    }
   }
 
   return {

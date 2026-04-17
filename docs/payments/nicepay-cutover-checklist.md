@@ -53,8 +53,11 @@
 ## Official WebStd Endpoints Locked In Code
 - JS SDK: `https://pg-web.nicepay.co.kr/v3/common/js/nicepay-pgweb.js`
 - Approval follow-up: `NextAppURL` returned by NicePay auth response
+  latest official host family is `dc1-api.nicepay.co.kr` / `dc2-api.nicepay.co.kr`
+- Net cancel follow-up: `NetCancelURL` returned by NicePay auth response
+  latest official host family is `dc1-api.nicepay.co.kr` / `dc2-api.nicepay.co.kr`
 - Status query: `https://webapi.nicepay.co.kr/webapi/inquery/trans_status.jsp`
-- Cancel / refund: `https://webapi.nicepay.co.kr/webapi/cancel_process.jsp`
+- Cancel / refund: `https://pg-api.nicepay.co.kr/webapi/cancel_process.jsp`
 
 ## Cutover Day Checklist
 1. Rotate any exposed NicePay merchant key first.
@@ -66,6 +69,8 @@
 4. Register only the provider-facing URLs in the PG console.
    Relay return URL: `https://<domain>/api/payment/nicepay/relay`
    Primary notification URL: `https://<domain>/api/payment/card-notification`
+   If the merchant console exposes `OK 체크`, keep it enabled.
+   The primary notification route now returns literal `OK` on success and idempotent replay.
    Do not register the service / proxy compatibility routes as merchant console targets.
 5. Run the focused regression bundle before the final env flip.
    `tests/e2e/19-service-card-verification.spec.ts`
@@ -93,6 +98,7 @@
   Proxy: `/api/proxy-bookings/payment/nicepay-callback`
 - Merchant-facing notification ownership is now one primary route.
   Primary registration target: `/api/payment/card-notification`
+  Success response body: literal `OK`
   Dispatch rules:
   `SVC-*` order ids -> service bookings first
   `LOCALLY-PROXY-*` order ids -> proxy requests first
@@ -100,6 +106,9 @@
   missing order id -> `providerTransactionId` fallback across owners
 - Compatibility notification routes stay available for internal seams and legacy-safe testing.
 - Notification handling is idempotent by `orderId` first, then `providerTransactionId` fallback.
+- Approval transport / read failures after auth success now auto-attempt `NetCancelURL`.
+- `NetCancelURL` is only the auth-stage rollback seam.
+  If approval already completed and a later merchant-side write fails, use the standard cancel/refund path and operator review instead of treating that as a same-shape `NetCancelURL` case.
 - Proxy callback and proxy notification intentionally differ only at the entry boundary.
   Callback keeps owner/auth guard for the browser return.
   Notification is server-to-server and skips owner guard.

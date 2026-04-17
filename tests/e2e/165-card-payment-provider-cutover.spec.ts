@@ -20,6 +20,9 @@ import * as serviceNotificationFlows from '@/app/utils/serviceNotificationFlows'
 import * as supabaseServerModule from '@/app/utils/supabase/server';
 
 const NICEPAY_STATUS_QUERY_URL = 'https://webapi.nicepay.co.kr/webapi/inquery/trans_status.jsp';
+const NICEPAY_APPROVAL_URL = 'https://dc1-api.nicepay.co.kr/webapi/pay_process.jsp';
+const NICEPAY_NET_CANCEL_URL = 'https://dc2-api.nicepay.co.kr/webapi/netCancel.jsp';
+const NICEPAY_CANCEL_URL = 'https://pg-api.nicepay.co.kr/webapi/cancel_process.jsp';
 const TEST_PASSWORD = 'LocallyTest!2026';
 const ORIGINAL_ENV = {
   CARD_PAYMENT_PROVIDER: process.env.CARD_PAYMENT_PROVIDER,
@@ -504,7 +507,8 @@ test.describe('Card payment provider cutover contracts', () => {
       MID: process.env.NICEPAY_MID!,
       Moid: 'ORD-NICEPAY-VERIFY-001',
       Amt: String(amount),
-      NextAppURL: 'https://webapi.nicepay.co.kr/webapi/pay_process.jsp',
+      NextAppURL: NICEPAY_APPROVAL_URL,
+      NetCancelURL: NICEPAY_NET_CANCEL_URL,
       PayMethod: 'CARD',
       Signature: sha256Hex(
         `${authToken}${process.env.NICEPAY_MID}${amount}${process.env.NICEPAY_MERCHANT_KEY}`
@@ -513,7 +517,7 @@ test.describe('Card payment provider cutover contracts', () => {
 
     const originalFetch = global.fetch;
     global.fetch = (async (input, init) => {
-      expect(String(input)).toBe('https://webapi.nicepay.co.kr/webapi/pay_process.jsp');
+      expect(String(input)).toBe(NICEPAY_APPROVAL_URL);
       expect(init?.method).toBe('POST');
       const body = new URLSearchParams(String(init?.body || ''));
       expect(body.get('MID')).toBe(process.env.NICEPAY_MID);
@@ -550,6 +554,76 @@ test.describe('Card payment provider cutover contracts', () => {
         approvedAmount: amount,
         providerTransactionId: 'TX-TID-001',
       });
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  test('attempts NetCancelURL when the approval API fails after auth succeeds', async () => {
+    withNicePayEnv();
+
+    const authToken = 'AUTH-TOKEN-NET-CANCEL';
+    const amount = 62000;
+    const providerPayload = {
+      AuthResultCode: '0000',
+      AuthToken: authToken,
+      TxTid: 'TX-TID-NET-CANCEL',
+      MID: process.env.NICEPAY_MID!,
+      Moid: 'ORD-NICEPAY-NET-CANCEL-001',
+      Amt: String(amount),
+      NextAppURL: NICEPAY_APPROVAL_URL,
+      NetCancelURL: NICEPAY_NET_CANCEL_URL,
+      PayMethod: 'CARD',
+      Signature: sha256Hex(
+        `${authToken}${process.env.NICEPAY_MID}${amount}${process.env.NICEPAY_MERCHANT_KEY}`
+      ),
+    };
+
+    const originalFetch = global.fetch;
+    const requestedUrls: string[] = [];
+    global.fetch = (async (input, init) => {
+      const url = String(input);
+      requestedUrls.push(url);
+
+      if (url === NICEPAY_APPROVAL_URL) {
+        throw new Error('Approval transport timeout');
+      }
+
+      if (url === NICEPAY_NET_CANCEL_URL) {
+        const body = new URLSearchParams(String(init?.body || ''));
+        expect(body.get('MID')).toBe(process.env.NICEPAY_MID);
+        expect(body.get('AuthToken')).toBe(authToken);
+        expect(body.get('TID')).toBe('TX-TID-NET-CANCEL');
+        expect(body.get('Amt')).toBe(String(amount));
+        expect(body.get('NetCancel')).toBe('1');
+        expect(body.get('CharSet')).toBe('utf-8');
+        expect(body.get('SignData')).toBe(
+          sha256Hex(
+            `${authToken}${process.env.NICEPAY_MID}${amount}${body.get('EdiDate')}${process.env.NICEPAY_MERCHANT_KEY}`
+          )
+        );
+
+        return new Response('ResultCode=2001&ResultMsg=NetCancel+OK', {
+          status: 200,
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        });
+      }
+
+      throw new Error(`Unexpected fetch target: ${url}`);
+    }) as typeof fetch;
+
+    try {
+      await expect(
+        verifyApprovedCardPayment({
+          provider: 'nicepay',
+          approvalId: 'TX-TID-NET-CANCEL',
+          orderId: 'ORD-NICEPAY-NET-CANCEL-001',
+          expectedAmount: amount,
+          providerPayload,
+        })
+      ).rejects.toThrow('Approval transport timeout');
+
+      expect(requestedUrls).toEqual([NICEPAY_APPROVAL_URL, NICEPAY_NET_CANCEL_URL]);
     } finally {
       global.fetch = originalFetch;
     }
@@ -621,23 +695,32 @@ test.describe('Card payment provider cutover contracts', () => {
 
     const originalFetch = global.fetch;
     global.fetch = (async (input, init) => {
-      expect(String(input)).toBe('https://webapi.nicepay.co.kr/webapi/cancel_process.jsp');
+      expect(String(input)).toBe(NICEPAY_CANCEL_URL);
       expect(init?.method).toBe('POST');
 
       const body = new URLSearchParams(String(init?.body || ''));
       expect(body.get('MID')).toBe(process.env.NICEPAY_MID);
       expect(body.get('TID')).toBe('TX-TID-CANCEL-001');
       expect(body.get('CancelAmt')).toBe('77000');
+      expect(body.get('CharSet')).toBe('utf-8');
+      expect(body.get('EdiType')).toBe('JSON');
       expect(body.get('SignData')).toBe(
         sha256Hex(
           `${process.env.NICEPAY_MID}${body.get('CancelAmt')}${body.get('EdiDate')}${process.env.NICEPAY_MERCHANT_KEY}`
         )
       );
 
-      return new Response('ResultCode=2001&ResultMsg=Cancel+OK', {
-        status: 200,
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      });
+      const cancelSignature = sha256Hex(
+        `TX-TID-CANCEL-001${process.env.NICEPAY_MID}77000${process.env.NICEPAY_MERCHANT_KEY}`
+      );
+
+      return new Response(
+        `ResultCode=2001&ResultMsg=Cancel+OK&TID=TX-TID-CANCEL-001&MID=${process.env.NICEPAY_MID}&CancelAmt=77000&Signature=${cancelSignature}`,
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        }
+      );
     }) as typeof fetch;
 
     try {
@@ -723,7 +806,8 @@ test.describe('Card payment provider cutover contracts', () => {
 
       const response = await cardNotificationPost(request);
       expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toMatchObject({ success: true });
+      await expect(response.text()).resolves.toBe('OK');
+      expect(response.headers.get('content-type')).toContain('text/plain');
 
       const { data: updatedRow, error: updatedRowError } = await getAdminClient()
         .from('proxy_requests')
@@ -754,10 +838,7 @@ test.describe('Card payment provider cutover contracts', () => {
         })
       );
       expect(replayResponse.status).toBe(200);
-      await expect(replayResponse.json()).resolves.toMatchObject({
-        success: true,
-        message: 'Already processed',
-      });
+      await expect(replayResponse.text()).resolves.toBe('OK');
       expect(capturedEvents).toHaveLength(1);
     } finally {
       global.fetch = originalFetch;
@@ -828,7 +909,7 @@ test.describe('Card payment provider cutover contracts', () => {
 
       const response = await cardNotificationPost(request);
       expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toMatchObject({ success: true });
+      await expect(response.text()).resolves.toBe('OK');
 
       const { data: updatedRow, error: updatedRowError } = await getAdminClient()
         .from('proxy_requests')
@@ -920,7 +1001,7 @@ test.describe('Card payment provider cutover contracts', () => {
       );
 
       expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toMatchObject({ success: true });
+      await expect(response.text()).resolves.toBe('OK');
 
       const { data: updatedRow, error: updatedRowError } = await getAdminClient()
         .from('service_bookings')
@@ -978,7 +1059,8 @@ test.describe('Card payment provider cutover contracts', () => {
       MID: process.env.NICEPAY_MID!,
       Moid: fixture.orderId,
       Amt: String(amount),
-      NextAppURL: 'https://webapi.nicepay.co.kr/webapi/pay_process.jsp',
+      NextAppURL: NICEPAY_APPROVAL_URL,
+      NetCancelURL: NICEPAY_NET_CANCEL_URL,
       PayMethod: 'CARD',
       Signature: sha256Hex(
         `${authToken}${process.env.NICEPAY_MID}${amount}${process.env.NICEPAY_MERCHANT_KEY}`
@@ -991,7 +1073,7 @@ test.describe('Card payment provider cutover contracts', () => {
     const capturedEvents: Array<{ event: string; requestId: string }> = [];
 
     global.fetch = (async (input, init) => {
-      if (String(input) === 'https://webapi.nicepay.co.kr/webapi/pay_process.jsp') {
+      if (String(input) === NICEPAY_APPROVAL_URL) {
         expect(init?.method).toBe('POST');
         const body = new URLSearchParams(String(init?.body || ''));
         expect(body.get('MID')).toBe(process.env.NICEPAY_MID);
