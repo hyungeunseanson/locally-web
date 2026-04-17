@@ -18,7 +18,8 @@
     "test:e2e:live:domain-gate": "node scripts/check-live-domain-parity.mjs",
     "test:e2e:live:gate": "node scripts/run-live-smoke.mjs --bundle gate",
     "test:e2e:live:shared": "node scripts/run-live-smoke.mjs --bundle shared",
-    "test:e2e:live:noisy": "node scripts/run-live-smoke.mjs --bundle noisy"
+    "test:e2e:live:noisy": "node scripts/run-live-smoke.mjs --bundle noisy",
+    "test:e2e:journeys:release": "PLAYWRIGHT_SERVER_MODE=start playwright test -c playwright.contracts.config.ts tests/e2e/191-service-bank-open-match-chat-journey.spec.ts tests/e2e/192-proxy-self-service-admin-refund-linked-inquiry-journey.spec.ts tests/e2e/193-guest-review-host-reply-public-journey.spec.ts tests/e2e/194-admin-review-moderation-journey.spec.ts tests/e2e/195-admin-finance-operator-saga.spec.ts --project=chromium --workers=1"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

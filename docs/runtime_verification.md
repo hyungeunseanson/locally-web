@@ -65,6 +65,26 @@ npm run test:e2e:live:noisy -- --ack-noisy
   - 운영 노이즈가 남을 수 있으므로 명시 승인 없이는 실행하지 않는다.
   - 남은 예약/알림/이메일 영향은 실행 보고에 반드시 적는다.
 
+### `release-only journeys`
+
+- 목적: 기본 contract/live gate가 닫지 못하는 multi-actor full-journey를 배포 직전 수동으로 끝까지 확인한다.
+- 명령:
+```bash
+npm run test:e2e:journeys:release
+```
+- 대상:
+  - `tests/e2e/191-service-bank-open-match-chat-journey.spec.ts`
+  - `tests/e2e/192-proxy-self-service-admin-refund-linked-inquiry-journey.spec.ts`
+  - `tests/e2e/193-guest-review-host-reply-public-journey.spec.ts`
+  - `tests/e2e/194-admin-review-moderation-journey.spec.ts`
+  - `tests/e2e/195-admin-finance-operator-saga.spec.ts`
+- 규칙:
+  - default contracts gate에 포함하지 않는다.
+  - release-only manual bundle로만 운영한다.
+  - release bundle은 watch 기반 `next dev`가 아니라 built server(`next start`) 경로로 실행한다.
+  - 실제 사용자/운영자 여정, 상태 전이, UI 반영, DB side effect, audit/notification 반영을 함께 본다.
+  - flaky하면 억지로 확대하지 말고 단계 수나 검증면을 줄여 안정화한 뒤 유지한다.
+
 ## Execution Order
 
 1. 배포가 `Ready`인지 확인한다.
@@ -86,6 +106,8 @@ npm run test:e2e:live:noisy -- --ack-noisy
   - `npm run test:e2e:live:shared -- --ack-shared-surface`
 - live noisy check
   - `npm run test:e2e:live:noisy -- --ack-noisy`
+- release-only full-journey bundle
+  - `npm run test:e2e:journeys:release`
 - release-day 기준 밖
   - bare `npx playwright test`
   - `scripts/diagnostics/*`
