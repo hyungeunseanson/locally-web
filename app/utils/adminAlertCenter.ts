@@ -15,23 +15,20 @@ function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
-async function getAdminAlertRecipients(): Promise<AdminAlertRecipient[]> {
-  const supabaseAdmin = createAdminClient();
-
-  const { data: whitelistRows, error: whitelistError } = await supabaseAdmin
-    .from('admin_whitelist')
-    .select('email');
-
-  if (whitelistError) {
-    throw new Error(whitelistError.message);
-  }
-
-  const emails = Array.from(new Set(
-    (whitelistRows || [])
-      .map((row) => row.email)
-      .filter((email): email is string => Boolean(email))
+export function normalizeAdminAlertEmails(emails: Array<string | null | undefined>) {
+  return Array.from(new Set(
+    emails
+      .filter((email): email is string => typeof email === 'string' && Boolean(email.trim()))
       .map(normalizeEmail)
   ));
+}
+
+export async function resolveAdminAlertRecipientsForEmails(params: {
+  emails: Array<string | null | undefined>;
+  supabaseAdmin?: ReturnType<typeof createAdminClient>;
+}): Promise<AdminAlertRecipient[]> {
+  const supabaseAdmin = params.supabaseAdmin ?? createAdminClient();
+  const emails = normalizeAdminAlertEmails(params.emails);
 
   if (emails.length === 0) {
     return [];
@@ -39,16 +36,16 @@ async function getAdminAlertRecipients(): Promise<AdminAlertRecipient[]> {
 
   const emailToUserId = new Map<string, string>();
 
-  const { data: userRows, error: userError } = await supabaseAdmin
-    .from('users')
+  const { data: profileRows, error: profileError } = await supabaseAdmin
+    .from('profiles')
     .select('id, email')
     .in('email', emails);
 
-  if (userError) {
-    console.warn('[AdminAlertCenter] users email lookup failed, falling back to profiles:', userError.message);
+  if (profileError) {
+    console.warn('[AdminAlertCenter] profiles email lookup failed, falling back to users:', profileError.message);
   } else {
-    const safeUserRows = (userRows || []) as RecipientRow[];
-    safeUserRows.forEach((row) => {
+    const safeProfileRows = (profileRows || []) as RecipientRow[];
+    safeProfileRows.forEach((row) => {
       if (!row.id || !row.email) return;
       emailToUserId.set(normalizeEmail(row.email), row.id);
     });
@@ -57,16 +54,16 @@ async function getAdminAlertRecipients(): Promise<AdminAlertRecipient[]> {
   const unresolvedEmails = emails.filter((email) => !emailToUserId.has(email));
 
   if (unresolvedEmails.length > 0) {
-    const { data: profileRows, error: profileError } = await supabaseAdmin
-      .from('profiles')
+    const { data: userRows, error: userError } = await supabaseAdmin
+      .from('users')
       .select('id, email')
       .in('email', unresolvedEmails);
 
-    if (profileError) {
-      console.warn('[AdminAlertCenter] profiles email fallback failed:', profileError.message);
+    if (userError) {
+      console.warn('[AdminAlertCenter] users email fallback failed:', userError.message);
     } else {
-      const safeProfileRows = (profileRows || []) as RecipientRow[];
-      safeProfileRows.forEach((row) => {
+      const safeUserRows = (userRows || []) as RecipientRow[];
+      safeUserRows.forEach((row) => {
         if (!row.id || !row.email) return;
         emailToUserId.set(normalizeEmail(row.email), row.id);
       });
@@ -89,6 +86,23 @@ async function getAdminAlertRecipients(): Promise<AdminAlertRecipient[]> {
   }
 
   return recipients;
+}
+
+async function getAdminAlertRecipients(): Promise<AdminAlertRecipient[]> {
+  const supabaseAdmin = createAdminClient();
+
+  const { data: whitelistRows, error: whitelistError } = await supabaseAdmin
+    .from('admin_whitelist')
+    .select('email');
+
+  if (whitelistError) {
+    throw new Error(whitelistError.message);
+  }
+
+  return resolveAdminAlertRecipientsForEmails({
+    emails: (whitelistRows || []).map((row) => row.email),
+    supabaseAdmin,
+  });
 }
 
 export async function insertAdminAlerts(params: {

@@ -3,17 +3,13 @@ import { createClient as createServerClient } from '@/app/utils/supabase/server'
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { sendImmediateAdminEmail } from '@/app/utils/adminEmailProvider';
+import { resolveAdminAlertRecipientsForEmails } from '@/app/utils/adminAlertCenter';
 import {
     buildTeamEmailRecipients,
     shouldSendTeamEmail,
     isImmediateTeamEmail,
     type TeamEventType,
 } from '@/app/utils/teamNotificationPolicy';
-
-type TeamRecipient = {
-    email: string;
-    userId: string | null;
-};
 
 export async function POST(request: Request) {
     try {
@@ -71,40 +67,22 @@ export async function POST(request: Request) {
             .map((entry) => entry.email)
             .filter((email): email is string => Boolean(email));
 
-        const notificationTargetEmails = whitelistEmails.filter((email) => email !== user.email);
-        const emailTargetEmails = buildTeamEmailRecipients({
+        const recipientEmails = buildTeamEmailRecipients({
             eventType,
             whitelistEmails,
             actorEmail: user.email,
         });
 
-        if (notificationTargetEmails.length === 0 && emailTargetEmails.length === 0) {
+        if (recipientEmails.length === 0) {
             console.log('ℹ️ [Admin Notify API] 수신 대상자가 없어 발송을 스킵합니다.');
             return NextResponse.json({ success: true, count: 0, mode: 'skipped' });
         }
 
         const notificationLink = link || '/admin/dashboard?tab=TEAM';
-        const profileRows = notificationTargetEmails.length > 0
-            ? await supabaseAdmin
-                .from('profiles')
-                .select('id, email')
-                .in('email', notificationTargetEmails)
-            : { data: [], error: null };
-
-        if (profileRows.error) {
-            throw new Error(profileRows.error.message);
-        }
-
-        const recipientMap = new Map(
-            (profileRows.data || [])
-                .filter((row) => row.email)
-                .map((row) => [row.email as string, row.id as string])
-        );
-
-        const recipients: TeamRecipient[] = notificationTargetEmails.map((email) => ({
-            email,
-            userId: recipientMap.get(email) || null,
-        }));
+        const recipients = await resolveAdminAlertRecipientsForEmails({
+            emails: recipientEmails,
+            supabaseAdmin,
+        });
 
         const notificationRecipients = recipients
             .map((recipient) => recipient.userId)
@@ -124,6 +102,7 @@ export async function POST(request: Request) {
 
             if (notificationError) {
                 console.error('❌ [Admin Notify API] 인앱 알림 저장 실패:', notificationError);
+                return NextResponse.json({ error: 'Notification insert failed' }, { status: 500 });
             }
         }
 
@@ -139,12 +118,13 @@ export async function POST(request: Request) {
 
         let sentCount = 0;
         let skippedCount = 0;
+        let emailFailureCount = 0;
 
-        await Promise.all(emailTargetEmails.map(async (recipientEmail) => {
+        await Promise.all(recipients.map(async (recipient) => {
             try {
                 if (isImmediateTeamEmail(eventType)) {
                     const result = await sendImmediateAdminEmail({
-                        to: recipientEmail,
+                        to: recipient.email,
                         subject: '',
                         title: '',
                         message: '',
@@ -169,7 +149,8 @@ export async function POST(request: Request) {
                     return;
                 }
             } catch (emailError) {
-                console.error(`❌ [Admin Notify API] 이메일 발송 실패 (${recipientEmail}):`, emailError);
+                emailFailureCount += 1;
+                console.error(`❌ [Admin Notify API] 이메일 발송 실패 (${recipient.email}):`, emailError);
             }
         }));
 
@@ -177,7 +158,9 @@ export async function POST(request: Request) {
             success: true,
             count: sentCount,
             skipped: skippedCount,
-            mode: 'immediate',
+            emailFailures: emailFailureCount,
+            notifications: notificationRecipients.length,
+            mode: emailFailureCount > 0 || skippedCount > 0 ? 'partial_email' : 'immediate',
         });
 
     } catch (error: unknown) {

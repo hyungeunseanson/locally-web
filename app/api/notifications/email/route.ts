@@ -41,6 +41,19 @@ type BookingOwnershipRow = {
   experiences: HostOwnershipRow | HostOwnershipRow[] | null;
 };
 
+type ProfileEmailRow = {
+  id: string;
+  email: string | null;
+};
+
+type SendTemplatedEmailResult = Awaited<ReturnType<typeof sendTemplatedEmail>>;
+
+type MassEmailSummary = {
+  sentCount: number;
+  skippedCount: number;
+  failedCount: number;
+};
+
 function getRelatedHostId(relation: HostOwnershipRow | HostOwnershipRow[] | null | undefined) {
   if (Array.isArray(relation)) {
     return relation[0]?.host_id ?? null;
@@ -51,6 +64,40 @@ function getRelatedHostId(relation: HostOwnershipRow | HostOwnershipRow[] | null
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
+}
+
+export function normalizeRecipientIds(rawValue: unknown) {
+  if (!Array.isArray(rawValue)) return [];
+
+  return Array.from(new Set(
+    rawValue
+      .filter((value): value is string => typeof value === 'string')
+      .map((value) => value.trim())
+      .filter(Boolean)
+  ));
+}
+
+export function summarizeMassEmailResults(
+  results: Array<PromiseSettledResult<SendTemplatedEmailResult>>
+): MassEmailSummary {
+  return results.reduce<MassEmailSummary>((summary, result) => {
+    if (result.status === 'rejected') {
+      summary.failedCount += 1;
+      return summary;
+    }
+
+    if (result.value.sent) {
+      summary.sentCount += 1;
+      return summary;
+    }
+
+    summary.skippedCount += 1;
+    return summary;
+  }, {
+    sentCount: 0,
+    skippedCount: 0,
+    failedCount: 0,
+  });
 }
 
 function sanitizeNotificationTitle(rawValue: unknown) {
@@ -185,7 +232,7 @@ export function resolveLocalizedSingleRecipientCopy(params: {
   return null;
 }
 
-function resolveLocalizedSingleRecipientTemplatePayload(params: {
+export function resolveLocalizedSingleRecipientTemplatePayload(params: {
   type?: string;
   copyKey?: NotificationRequestBody['copy_key'];
   copyParams?: NotificationRequestBody['copy_params'];
@@ -309,7 +356,9 @@ export async function POST(request: Request) {
     const safeMassLink = hasExplicitLink ? safeLink : '/notifications';
 
     // 🚨 [보안 패치] 다중 발송은 관리자(Admin)만 가능하도록 제한
-    if (recipient_ids && Array.isArray(recipient_ids) && recipient_ids.length > 0) {
+    const normalizedRecipientIds = normalizeRecipientIds(recipient_ids);
+
+    if (normalizedRecipientIds.length > 0) {
       const { isAdmin } = await resolveAdminAccess(supabase, {
         userId: user.id,
         email: user.email,
@@ -319,10 +368,14 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Forbidden: Admin Access Required for mass email' }, { status: 403 });
       }
 
-      console.log(`🚀 [API] 다중 발송 시작: ${recipient_ids.length}명`);
+      if (!safeTitle || !safeMessage) {
+        return NextResponse.json({ error: 'title and message are required' }, { status: 400 });
+      }
+
+      console.log(`🚀 [API] 다중 발송 시작: ${normalizedRecipientIds.length}명`);
 
       // 1. DB 일괄 저장
-      const notificationsData = recipient_ids.map((id: string) => ({
+      const notificationsData = normalizedRecipientIds.map((id) => ({
         user_id: id,
         type: type || 'general',
         title: safeTitle,
@@ -333,23 +386,44 @@ export async function POST(request: Request) {
 
       const { error: dbError } = await supabase.from('notifications').insert(notificationsData);
 
-      if (dbError) console.error('🔥 [API] DB 일괄 저장 실패:', dbError);
-      else console.log('✅ [API] DB 일괄 저장 성공');
+      if (dbError) {
+        console.error('🔥 [API] DB 일괄 저장 실패:', dbError);
+        return NextResponse.json({ error: 'DB insert failed' }, { status: 500 });
+      }
+      console.log('✅ [API] DB 일괄 저장 성공');
 
       // 2. 이메일 대상 조회 (한 번에 조회)
-      const { data: profileRows } = await supabase
+      const { data: profileRows, error: profileError } = await supabase
         .from('profiles')
         .select('id, email')
-        .in('id', recipient_ids);
+        .in('id', normalizedRecipientIds);
 
-      const recipients = (profileRows as Array<{ id: string; email: string | null }> | null)?.map((profile) => ({
+      if (profileError) {
+        console.warn('⚠️ [Notification API] 이메일 대상 조회 실패 (인앱 알림은 저장됨):', profileError.message);
+        return NextResponse.json({
+          success: true,
+          count: normalizedRecipientIds.length,
+          notifications: normalizedRecipientIds.length,
+          emailsSent: 0,
+          emailsSkipped: normalizedRecipientIds.length,
+          emailFailures: 0,
+          mode: 'in_app_only',
+          warning: 'recipient_email_lookup_failed',
+        });
+      }
+
+      const recipients = ((profileRows as ProfileEmailRow[] | null) || []).map((profile) => ({
         userId: profile.id,
         email: profile.email || null,
-      })) || [];
+      }));
 
       // 3. 이메일 발송 (병렬 처리)
+      let emailsSent = 0;
+      let emailsSkipped = normalizedRecipientIds.length - recipients.length;
+      let emailFailures = 0;
+
       if (recipients.length > 0) {
-        await Promise.all(recipients.map((recipient) =>
+        const emailResults = await Promise.allSettled(recipients.map((recipient) =>
           sendTemplatedEmail({
             templateId: 'notice.custom',
             audience: 'guest',
@@ -362,15 +436,41 @@ export async function POST(request: Request) {
               title: safeTitle,
               message: safeMessage,
               ctaLabel: '확인하기',
-              ctaUrl: safeMassLink || '/notifications',
-            },
-          }).catch((e) => console.error(`❌ 이메일 발송 실패 (${recipient.email || recipient.userId}):`, e))
+                ctaUrl: safeMassLink || '/notifications',
+              },
+          })
         ));
+
+        const emailSummary = summarizeMassEmailResults(emailResults);
+        emailsSent += emailSummary.sentCount;
+        emailsSkipped += emailSummary.skippedCount;
+        emailFailures += emailSummary.failedCount;
+
+        emailResults.forEach((result, index) => {
+          if (result.status === 'rejected') {
+            const recipient = recipients[index];
+            console.error(`❌ 이메일 발송 실패 (${recipient?.email || recipient?.userId || 'unknown'}):`, result.reason);
+          }
+        });
+
         console.log(`📨 [API] 이메일 ${recipients.length}건 발송 시도 완료`);
       }
 
-      return NextResponse.json({ success: true, count: recipient_ids.length });
+      return NextResponse.json({
+        success: true,
+        count: normalizedRecipientIds.length,
+        notifications: normalizedRecipientIds.length,
+        emailsSent,
+        emailsSkipped,
+        emailFailures,
+        mode: emailFailures > 0 || emailsSkipped > 0 ? 'partial_email' : 'complete',
+      });
     }
+
+    if (Array.isArray(recipient_ids) && recipient_ids.length > 0) {
+      return NextResponse.json({ error: 'recipient_ids must include at least one valid user id' }, { status: 400 });
+    }
+
     // [Fix] 400 guard를 DB insert 전으로 이동 — insert 후 실패 시 이메일 발송 계속되는 문제 방지
     if (!recipient_id) {
       return NextResponse.json({ error: 'recipient_id is required' }, { status: 400 });

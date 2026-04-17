@@ -340,17 +340,33 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: {
     }
     setIsSending(true);
     try {
-      await sendNotification({
+      const result = await sendNotification({
         recipient_ids: selectedUserIds,
         type: 'admin_alert',
         title: notiTitle,
         message: notiMessage,
         link: '/notifications'
       });
-      showToast(`${selectedUserIds.length}명에게 전송 완료!`, 'success');
+      const notificationCount = typeof result.notifications === 'number'
+        ? result.notifications
+        : selectedUserIds.length;
+      const emailsSent = typeof result.emailsSent === 'number' ? result.emailsSent : 0;
+      const emailWarnings = (result.emailsSkipped || 0) + (result.emailFailures || 0);
+
+      if (emailWarnings > 0) {
+        showToast(
+          `${notificationCount}명 인앱 저장 완료, 이메일 ${emailsSent}건 전송 / ${emailWarnings}건 보류`,
+          'success'
+        );
+      } else {
+        showToast(`${notificationCount}명에게 인앱+이메일 전송 완료!`, 'success');
+      }
       setIsNotiModalOpen(false);
       setNotiTitle(''); setNotiMessage(''); setSelectedUserIds([]);
-    } catch (e) { console.error(e); showToast('전송 실패', 'error'); }
+    } catch (e) {
+      console.error(e);
+      showToast(e instanceof Error ? e.message : '전송 실패', 'error');
+    }
     finally { setIsSending(false); }
   };
 
