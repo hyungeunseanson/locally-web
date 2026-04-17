@@ -1,6 +1,11 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 
+import {
+  pickRepresentativePublicPaths,
+  resolveAdsTxtExpectation,
+} from './domain-parity-lib.mjs';
+
 const LEGACY_PROJECT_ALIAS = 'https://locally-web.vercel.app';
 const USER_AGENT = 'locally-cutover-domain-gate/1.0';
 
@@ -43,6 +48,10 @@ function extractOptionalByRegex(source, regex) {
   return match?.[1] || null;
 }
 
+function createSurfaceKey(label) {
+  return label.replace(/[^a-z0-9]+/gi, '_');
+}
+
 async function fetchText(url) {
   const response = await fetch(url, {
     headers: {
@@ -61,6 +70,54 @@ async function fetchText(url) {
   };
 }
 
+function validateHtmlSurface({
+  label,
+  response,
+  expectedUrl,
+  expectedOrigin,
+  legacyOrigin,
+  forbidLegacyAlias,
+  failures,
+}) {
+  if (!response.ok) {
+    failures.push(`${label} returned HTTP ${response.status}`);
+    return;
+  }
+
+  const canonical = extractByRegex(
+    response.text,
+    /<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']/i,
+    `${label} canonical`
+  );
+
+  if (canonical !== expectedUrl) {
+    failures.push(`${label} canonical mismatch: expected ${expectedUrl}, received ${canonical}`);
+  }
+
+  const ogUrl = extractOptionalByRegex(
+    response.text,
+    /<meta[^>]+property=["']og:url["'][^>]+content=["']([^"']+)["']/i
+  );
+  const ogImage = extractOptionalByRegex(
+    response.text,
+    /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i
+  );
+
+  if (ogUrl) {
+    if (ogUrl !== expectedUrl) {
+      failures.push(`${label} og:url mismatch: expected ${expectedUrl}, received ${ogUrl}`);
+    }
+  } else if (!ogImage?.startsWith(expectedOrigin)) {
+    failures.push(
+      `${label} og:image mismatch: expected an absolute URL under ${expectedOrigin}, received ${ogImage || 'missing'}`
+    );
+  }
+
+  if (forbidLegacyAlias && response.text.includes(legacyOrigin)) {
+    failures.push(`${label} HTML still references legacy alias ${legacyOrigin}`);
+  }
+}
+
 async function main() {
   const envFromFile = loadEnvFile(resolve('.env.local'));
   const env = { ...process.env, ...envFromFile };
@@ -76,8 +133,14 @@ async function main() {
   const legacyOrigin = new URL(LEGACY_PROJECT_ALIAS).origin;
   const forbidLegacyAlias = expectedOrigin !== legacyOrigin;
   const failures = [];
+  const surfaces = {};
 
   const robots = await fetchText(buildUrl(expectedOrigin, '/robots.txt'));
+  surfaces.robots = {
+    status: robots.status,
+    finalUrl: robots.finalUrl,
+    expectedUrl: `${expectedOrigin}/robots.txt`,
+  };
   if (!robots.ok) {
     failures.push(`robots.txt returned HTTP ${robots.status}`);
   } else {
@@ -91,6 +154,11 @@ async function main() {
   }
 
   const sitemap = await fetchText(buildUrl(expectedOrigin, '/sitemap.xml'));
+  surfaces.sitemap = {
+    status: sitemap.status,
+    finalUrl: sitemap.finalUrl,
+    expectedUrl: `${expectedOrigin}/sitemap.xml`,
+  };
   if (!sitemap.ok) {
     failures.push(`sitemap.xml returned HTTP ${sitemap.status}`);
   } else {
@@ -102,83 +170,77 @@ async function main() {
     }
   }
 
-  const home = await fetchText(buildUrl(expectedOrigin, '/'));
-  if (!home.ok) {
-    failures.push(`/ returned HTTP ${home.status}`);
-  } else {
-    const homeCanonical = extractByRegex(
-      home.text,
-      /<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']/i,
-      'home canonical'
-    );
-    if (homeCanonical !== expectedOrigin) {
-      failures.push(`home canonical mismatch: expected ${expectedOrigin}, received ${homeCanonical}`);
-    }
+  const representativeStaticSurfaces = [
+    { label: 'home', path: '/', expectedUrl: expectedOrigin },
+    { label: 'community', path: '/community', expectedUrl: `${expectedOrigin}/community` },
+    { label: 'search', path: '/search', expectedUrl: `${expectedOrigin}/search` },
+    {
+      label: 'services_intro',
+      path: '/services/intro',
+      expectedUrl: `${expectedOrigin}/services/intro`,
+    },
+  ];
 
-    const homeOgUrl = extractOptionalByRegex(
-      home.text,
-      /<meta[^>]+property=["']og:url["'][^>]+content=["']([^"']+)["']/i
-    );
-    const homeOgImage = extractOptionalByRegex(
-      home.text,
-      /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i
-    );
+  for (const surface of representativeStaticSurfaces) {
+    const response = await fetchText(buildUrl(expectedOrigin, surface.path));
+    surfaces[surface.label] = {
+      status: response.status,
+      finalUrl: response.finalUrl,
+      expectedUrl: surface.expectedUrl,
+    };
 
-    if (homeOgUrl) {
-      if (homeOgUrl !== expectedOrigin) {
-        failures.push(`home og:url mismatch: expected ${expectedOrigin}, received ${homeOgUrl}`);
-      }
-    } else if (!homeOgImage?.startsWith(expectedOrigin)) {
-      failures.push(
-        `home og:image mismatch: expected an absolute URL under ${expectedOrigin}, received ${homeOgImage || 'missing'}`
-      );
-    }
-
-    if (forbidLegacyAlias && home.text.includes(legacyOrigin)) {
-      failures.push(`home HTML still references legacy alias ${legacyOrigin}`);
-    }
+    validateHtmlSurface({
+      label: surface.label,
+      response,
+      expectedUrl: surface.expectedUrl,
+      expectedOrigin,
+      legacyOrigin,
+      forbidLegacyAlias,
+      failures,
+    });
   }
 
-  const community = await fetchText(buildUrl(expectedOrigin, '/community'));
-  if (!community.ok) {
-    failures.push(`/community returned HTTP ${community.status}`);
-  } else {
-    const expectedCommunityCanonical = `${expectedOrigin}/community`;
-    const communityCanonical = extractByRegex(
-      community.text,
-      /<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']/i,
-      'community canonical'
-    );
-    if (communityCanonical !== expectedCommunityCanonical) {
-      failures.push(
-        `community canonical mismatch: expected ${expectedCommunityCanonical}, received ${communityCanonical}`
-      );
-    }
+  const representativeDynamicPaths = sitemap.ok
+    ? pickRepresentativePublicPaths({
+        expectedOrigin,
+        sitemapText: sitemap.text,
+      }).filter((path) => !representativeStaticSurfaces.some((surface) => surface.path === path))
+    : [];
 
-    const communityOgUrl = extractOptionalByRegex(
-      community.text,
-      /<meta[^>]+property=["']og:url["'][^>]+content=["']([^"']+)["']/i
-    );
-    const communityOgImage = extractOptionalByRegex(
-      community.text,
-      /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i
-    );
+  for (const path of representativeDynamicPaths) {
+    const response = await fetchText(buildUrl(expectedOrigin, path));
+    const key = createSurfaceKey(`dynamic_${path}`);
+    surfaces[key] = {
+      status: response.status,
+      finalUrl: response.finalUrl,
+      expectedUrl: `${expectedOrigin}${path}`,
+    };
 
-    if (communityOgUrl) {
-      if (communityOgUrl !== expectedCommunityCanonical) {
-        failures.push(
-          `community og:url mismatch: expected ${expectedCommunityCanonical}, received ${communityOgUrl}`
-        );
-      }
-    } else if (!communityOgImage?.startsWith(expectedOrigin)) {
-      failures.push(
-        `community og:image mismatch: expected an absolute URL under ${expectedOrigin}, received ${communityOgImage || 'missing'}`
-      );
-    }
+    validateHtmlSurface({
+      label: path,
+      response,
+      expectedUrl: `${expectedOrigin}${path}`,
+      expectedOrigin,
+      legacyOrigin,
+      forbidLegacyAlias,
+      failures,
+    });
+  }
 
-    if (forbidLegacyAlias && community.text.includes(legacyOrigin)) {
-      failures.push(`community HTML still references legacy alias ${legacyOrigin}`);
-    }
+  const adsTxtExpectation = resolveAdsTxtExpectation(env);
+  const adsTxt = await fetchText(buildUrl(expectedOrigin, '/ads.txt'));
+  surfaces.ads_txt = {
+    status: adsTxt.status,
+    finalUrl: adsTxt.finalUrl,
+    expectedStatus: adsTxtExpectation.expectedStatus,
+  };
+
+  if (adsTxt.status !== adsTxtExpectation.expectedStatus) {
+    failures.push(
+      `ads.txt status mismatch: expected HTTP ${adsTxtExpectation.expectedStatus}, received ${adsTxt.status}`
+    );
+  } else if (adsTxtExpectation.expectedStatus === 200 && !adsTxt.text.includes('google.com,')) {
+    failures.push('ads.txt returned 200 but does not include a Google publisher entry');
   }
 
   const summary = {
@@ -187,24 +249,8 @@ async function main() {
     forbidLegacyAlias,
     pass: failures.length === 0,
     checkedAt: new Date().toISOString(),
-    surfaces: {
-      robots: {
-        status: robots.status,
-        finalUrl: robots.finalUrl,
-      },
-      sitemap: {
-        status: sitemap.status,
-        finalUrl: sitemap.finalUrl,
-      },
-      home: {
-        status: home.status,
-        finalUrl: home.finalUrl,
-      },
-      community: {
-        status: community.status,
-        finalUrl: community.finalUrl,
-      },
-    },
+    adsTxtExpectedStatus: adsTxtExpectation.expectedStatus,
+    surfaces,
     failures,
   };
 
@@ -228,7 +274,7 @@ async function main() {
     process.exit(1);
   }
 
-  console.log('[domain-gate] PASS robots/sitemap/canonical/og parity confirmed');
+  console.log('[domain-gate] PASS representative robots/sitemap/canonical/og parity confirmed');
 }
 
 main().catch((error) => {

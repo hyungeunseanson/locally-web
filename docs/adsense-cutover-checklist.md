@@ -44,7 +44,8 @@
 1. Vercel에 최종 도메인 `www.locally-travel.com`을 이 프로젝트로 연결합니다.
    아직 기존 사이트가 live라면 DNS cutover 전 preview/production 대상과 TTL 상태를 먼저 확인합니다.
 2. `NEXT_PUBLIC_SITE_URL`을 최종 도메인으로 바꿉니다.
-   기본 fallback은 `https://locally-web.vercel.app`이므로, 이 값이 바뀌지 않으면 canonical/robots/sitemap/ads.txt가 모두 임시 도메인을 계속 가리킵니다.
+   production runtime은 더 이상 legacy alias fallback을 허용하지 않으므로, cutover 전까지는 현재 운영 owner를 env에 그대로 두고 cutover 시점에만 `https://www.locally-travel.com`으로 교체합니다.
+   이 값이 잘못되거나 비어 있으면 production은 fail-closed 되므로, domain 연결과 env 저장, redeploy 반영을 같은 배치로 확인해야 합니다.
 3. AdSense에서 최종 도메인의 현재 상태를 먼저 확인합니다.
    - 이미 같은 AdSense 계정의 `Sites` 목록에 `www.locally-travel.com`이 있고 상태가 `Ready`면 새 site를 다시 만들지 않습니다
    - 없다면 그때만 새 site로 추가하고 검토를 요청합니다

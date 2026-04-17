@@ -15,6 +15,7 @@ import { AuthProvider } from '@/app/context/AuthContext';
 import { ViewModeProvider, type ViewMode } from '@/app/context/ViewModeContext';
 import { getCurrentLocale } from '@/app/utils/locale';
 import { buildAdSenseScriptUrl, getAdSenseClientId, isAdSenseEnabled } from '@/app/utils/adsense';
+import { shouldRenderVercelAnalytics } from '@/app/utils/analytics/runtime';
 import { buildAbsoluteUrl, buildLocalizedAbsoluteUrl, getSiteUrl } from '@/app/utils/siteUrl';
 import { IAB_ESCAPE_BYPASS_PARAM } from '@/app/utils/iab';
 import { createClient } from '@/app/utils/supabase/server';
@@ -126,6 +127,7 @@ export default async function RootLayout({
   const locale = await getCurrentLocale();
   const adSenseEnabled = isAdSenseEnabled(process.env);
   const adSenseScriptUrl = buildAdSenseScriptUrl(getAdSenseClientId(process.env));
+  const vercelAnalyticsEnabled = shouldRenderVercelAnalytics(process.env);
   const kakaoIabEscapeEnabled = process.env.NEXT_PUBLIC_ENABLE_KAKAO_IAB_ESCAPE === 'true';
   const cookieStore = await cookies();
   const initialViewModeCookie = cookieStore.get('locally_view_mode')?.value;
@@ -207,7 +209,7 @@ export default async function RootLayout({
                         <SiteFooter />
                         <BottomTabNavigation />
                       </div>
-                      <Analytics />
+                      {vercelAnalyticsEnabled && <Analytics />}
                     </SplashProvider>
                   </LanguageProvider>
                 </NotificationProvider>

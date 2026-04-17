@@ -58,7 +58,7 @@ const EXPECTED_META = [
 test.describe('Public metadata smoke', () => {
   for (const item of EXPECTED_META) {
     test(`serves page-level metadata for ${item.path}`, async ({ page }) => {
-      await page.goto(item.path, { waitUntil: 'networkidle' });
+      await page.goto(item.path, { waitUntil: 'domcontentloaded' });
 
       await expect(page).toHaveTitle(item.title);
 
@@ -81,7 +81,7 @@ test.describe('Public metadata smoke', () => {
     ] as const;
 
     for (const item of cases) {
-      await page.goto(item.path, { waitUntil: 'networkidle' });
+      await page.goto(item.path, { waitUntil: 'domcontentloaded' });
       await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
         'href',
         new RegExp(`${item.canonicalPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`)
