@@ -15,20 +15,18 @@ import type {
 
 const DEFAULT_CARD_PAYMENT_PROVIDER: CardPaymentProvider = 'portone';
 const PORTONE_SCRIPT_SRC = 'https://cdn.iamport.kr/v1/iamport.js';
-const NICEPAY_SCRIPT_SRC = 'https://web.nicepay.co.kr/v3/webstd/js/nicepay-pg-web.js';
+const NICEPAY_SCRIPT_SRC = 'https://pg-web.nicepay.co.kr/v3/common/js/nicepay-pgweb.js';
 const NICEPAY_APPROVAL_SUCCESS_CODES = new Set(['3001']);
 const NICEPAY_NOTIFICATION_SUCCESS_CODES = new Set(['3001', '0000']);
 const NICEPAY_NOTIFICATION_SUCCESS_STATE_CODES = new Set(['0']);
 const NICEPAY_STATUS_QUERY_SUCCESS_CODES = new Set(['0000']);
 const NICEPAY_STATUS_QUERY_SUCCESS_STATUS = new Set(['0']);
-const NICEPAY_STATUS_QUERY_URL = 'https://pg-api.nicepay.co.kr/webapi/common/trans_status.jsp';
+const NICEPAY_STATUS_QUERY_URL = 'https://webapi.nicepay.co.kr/webapi/inquery/trans_status.jsp';
 const NICEPAY_ALLOWED_APPROVAL_HOSTS = new Set(['webapi.nicepay.co.kr', 'pg-api.nicepay.co.kr']);
 
 type NicePayRuntimeConfig = {
   mid: string;
   merchantKey: string;
-  clientKey: string;
-  publicClientKey: string;
 };
 
 type NicePayStatusResponse = Record<string, string>;
@@ -153,8 +151,6 @@ function getPortOnePublicRuntime(): CardPaymentPublicRuntime | undefined {
 function getNicePayRuntimeConfig(): NicePayRuntimeConfig {
   const mid = String(process.env.NICEPAY_MID || '').trim();
   const merchantKey = String(process.env.NICEPAY_MERCHANT_KEY || '').trim();
-  const clientKey = String(process.env.NICEPAY_CLIENT_KEY || '').trim();
-  const publicClientKey = String(process.env.NEXT_PUBLIC_NICEPAY_CLIENT_KEY || '').trim();
 
   if (!mid) {
     throw new Error('Server Config Error: NICEPAY_MID missing');
@@ -164,19 +160,9 @@ function getNicePayRuntimeConfig(): NicePayRuntimeConfig {
     throw new Error('Server Config Error: NICEPAY_MERCHANT_KEY missing');
   }
 
-  if (!clientKey) {
-    throw new Error('Server Config Error: NICEPAY_CLIENT_KEY missing');
-  }
-
-  if (!publicClientKey) {
-    throw new Error('Server Config Error: NEXT_PUBLIC_NICEPAY_CLIENT_KEY missing');
-  }
-
   return {
     mid,
     merchantKey,
-    clientKey,
-    publicClientKey,
   };
 }
 
@@ -191,29 +177,19 @@ function getNicePayMissingConfig() {
     missing.push('NICEPAY_MERCHANT_KEY');
   }
 
-  if (!String(process.env.NICEPAY_CLIENT_KEY || '').trim()) {
-    missing.push('NICEPAY_CLIENT_KEY');
-  }
-
-  if (!String(process.env.NEXT_PUBLIC_NICEPAY_CLIENT_KEY || '').trim()) {
-    missing.push('NEXT_PUBLIC_NICEPAY_CLIENT_KEY');
-  }
-
   return missing;
 }
 
 function getNicePayPublicRuntime(): CardPaymentPublicRuntime | undefined {
   const mid = String(process.env.NICEPAY_MID || '').trim();
-  const publicClientKey = String(process.env.NEXT_PUBLIC_NICEPAY_CLIENT_KEY || '').trim();
 
-  if (!mid || !publicClientKey) {
+  if (!mid) {
     return undefined;
   }
 
   return {
     provider: 'nicepay',
     merchantCode: mid,
-    publicClientKey,
     scriptSrc: NICEPAY_SCRIPT_SRC,
   };
 }
@@ -403,7 +379,7 @@ async function queryNicePayTransactionStatus(
 ): Promise<NicePayStatusResponse> {
   const config = getNicePayRuntimeConfig();
   const ediDate = getNicePayEdiDate();
-  const signData = sha256Hex(`${config.mid}${providerTransactionId}${ediDate}${config.merchantKey}`);
+  const signData = sha256Hex(`${providerTransactionId}${config.mid}${ediDate}${config.merchantKey}`);
   const requestBody = new URLSearchParams({
     MID: config.mid,
     TID: providerTransactionId,
@@ -619,7 +595,7 @@ export async function cancelCardPayment(
 
   if (merchantKey) {
     const ediDate = getNicePayEdiDate();
-    const signData = sha256Hex(ediDate + mid + String(params.cancelAmount) + merchantKey);
+    const signData = sha256Hex(mid + String(params.cancelAmount) + ediDate + merchantKey);
 
     formBody.set('EdiDate', ediDate);
     formBody.set('SignData', signData);

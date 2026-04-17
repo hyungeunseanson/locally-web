@@ -4,31 +4,34 @@ import { readFileSync } from 'fs';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test, type Page } from '@playwright/test';
 
+import { POST as cardNotificationPost } from '@/app/api/payment/card-notification/route';
 import { POST as proxyNicePayCallbackPost } from '@/app/api/proxy-bookings/payment/nicepay-callback/route';
-import { POST as proxyCardNotificationPost } from '@/app/api/proxy-bookings/payment/card-notification/route';
+import * as adminAlertCenter from '@/app/utils/adminAlertCenter';
 import * as proxyBookingNotifications from '@/app/utils/proxyBookingNotifications';
 import {
   buildNicePayLaunchFields,
+  cancelCardPayment,
   getCardPaymentReadiness,
+  readCardPaymentNotificationRequest,
   verifyApprovedCardPayment,
   verifyCardPaymentNotification,
-  readCardPaymentNotificationRequest,
 } from '@/app/utils/payments/card/server';
+import * as serviceNotificationFlows from '@/app/utils/serviceNotificationFlows';
 import * as supabaseServerModule from '@/app/utils/supabase/server';
 
-const NICEPAY_STATUS_QUERY_URL = 'https://pg-api.nicepay.co.kr/webapi/common/trans_status.jsp';
+const NICEPAY_STATUS_QUERY_URL = 'https://webapi.nicepay.co.kr/webapi/inquery/trans_status.jsp';
 const TEST_PASSWORD = 'LocallyTest!2026';
 const ORIGINAL_ENV = {
   CARD_PAYMENT_PROVIDER: process.env.CARD_PAYMENT_PROVIDER,
   NICEPAY_MID: process.env.NICEPAY_MID,
   NICEPAY_MERCHANT_KEY: process.env.NICEPAY_MERCHANT_KEY,
-  NICEPAY_CLIENT_KEY: process.env.NICEPAY_CLIENT_KEY,
-  NEXT_PUBLIC_NICEPAY_CLIENT_KEY: process.env.NEXT_PUBLIC_NICEPAY_CLIENT_KEY,
 };
 let adminClient: SupabaseClient | null = null;
 const createdAuthUserIds: string[] = [];
 const createdProxyRequestIds: string[] = [];
 const createdInquiryIds: string[] = [];
+const createdServiceRequestIds: string[] = [];
+const createdServiceBookingIds: string[] = [];
 
 type EnvMap = Record<string, string>;
 type TestUser = {
@@ -233,6 +236,78 @@ async function createProxyRequestFixture(params: {
   };
 }
 
+async function createServicePaymentFixture(params: {
+  customerId: string;
+  customer: TestUser;
+}) {
+  const supabase = getAdminClient();
+  const timestamp = Date.now();
+  const requestDate = new Date();
+  requestDate.setDate(requestDate.getDate() + 7);
+  const createdAt = new Date();
+  createdAt.setMinutes(createdAt.getMinutes() - 15);
+
+  const { data: requestData, error: requestError } = await supabase
+    .from('service_requests')
+    .insert({
+      user_id: params.customerId,
+      title: `[Playwright] Service NicePay ${timestamp}`,
+      description: '서비스 NicePay direct notification routing fixture.',
+      city: 'Seoul',
+      country: 'KR',
+      service_date: requestDate.toISOString().slice(0, 10),
+      start_time: '14:00',
+      duration_hours: 4,
+      languages: ['한국어'],
+      guest_count: 2,
+      contact_name: params.customer.fullName,
+      contact_phone: params.customer.phone,
+      status: 'pending_payment',
+      created_at: createdAt.toISOString(),
+      updated_at: createdAt.toISOString(),
+    })
+    .select('id, total_customer_price')
+    .single();
+
+  if (requestError || !requestData?.id) {
+    throw requestError || new Error('Failed to create service request fixture.');
+  }
+
+  createdServiceRequestIds.push(String(requestData.id));
+
+  const bookingId = `SVC-NICEPAY-${timestamp}`;
+  const orderId = `SVC-NICEPAY-ORD-${timestamp}`;
+  const { error: bookingError } = await supabase.from('service_bookings').insert({
+    id: bookingId,
+    order_id: orderId,
+    request_id: requestData.id,
+    customer_id: params.customerId,
+    host_id: null,
+    application_id: null,
+    amount: requestData.total_customer_price,
+    host_payout_amount: 80000,
+    platform_revenue: Number(requestData.total_customer_price || 0) - 80000,
+    status: 'PENDING',
+    payment_method: 'card',
+    payout_status: 'pending',
+    contact_name: params.customer.fullName,
+    contact_phone: params.customer.phone,
+    created_at: createdAt.toISOString(),
+    updated_at: createdAt.toISOString(),
+  });
+
+  if (bookingError) throw bookingError;
+
+  createdServiceBookingIds.push(bookingId);
+
+  return {
+    bookingId,
+    orderId,
+    requestId: String(requestData.id),
+    amount: Number(requestData.total_customer_price || 0),
+  };
+}
+
 async function login(page: Page, user: TestUser) {
   await page.goto('/login', { waitUntil: 'networkidle' });
 
@@ -248,8 +323,6 @@ function withNicePayEnv() {
   process.env.CARD_PAYMENT_PROVIDER = 'nicepay';
   process.env.NICEPAY_MID = 'nicepay-test-mid';
   process.env.NICEPAY_MERCHANT_KEY = 'nicepay-test-merchant-key';
-  process.env.NICEPAY_CLIENT_KEY = 'nicepay-server-client-key';
-  process.env.NEXT_PUBLIC_NICEPAY_CLIENT_KEY = 'nicepay-public-client-key';
 }
 
 function resetEnv() {
@@ -280,6 +353,14 @@ test.afterAll(async () => {
 
   if (createdInquiryIds.length > 0) {
     await supabase.from('inquiries').delete().in('id', createdInquiryIds);
+  }
+
+  if (createdServiceBookingIds.length > 0) {
+    await supabase.from('service_bookings').delete().in('id', createdServiceBookingIds);
+  }
+
+  if (createdServiceRequestIds.length > 0) {
+    await supabase.from('service_requests').delete().in('id', createdServiceRequestIds);
   }
 
   for (const userId of createdAuthUserIds) {
@@ -361,8 +442,6 @@ test.describe('Card payment provider cutover contracts', () => {
     process.env.CARD_PAYMENT_PROVIDER = 'nicepay';
     delete process.env.NICEPAY_MID;
     delete process.env.NICEPAY_MERCHANT_KEY;
-    delete process.env.NICEPAY_CLIENT_KEY;
-    delete process.env.NEXT_PUBLIC_NICEPAY_CLIENT_KEY;
 
     const readiness = getCardPaymentReadiness();
 
@@ -371,15 +450,10 @@ test.describe('Card payment provider cutover contracts', () => {
       ready: false,
       reason: 'missing_nicepay_credentials',
     });
-    expect(readiness.missingConfig).toEqual([
-      'NICEPAY_MID',
-      'NICEPAY_MERCHANT_KEY',
-      'NICEPAY_CLIENT_KEY',
-      'NEXT_PUBLIC_NICEPAY_CLIENT_KEY',
-    ]);
+    expect(readiness.missingConfig).toEqual(['NICEPAY_MID', 'NICEPAY_MERCHANT_KEY']);
   });
 
-  test('exposes NicePay runtime and signed launch fields once the full bundle exists', () => {
+  test('exposes WebStd NicePay runtime and signed launch fields once MID and MerchantKey exist', () => {
     withNicePayEnv();
 
     const readiness = getCardPaymentReadiness();
@@ -389,10 +463,12 @@ test.describe('Card payment provider cutover contracts', () => {
       runtime: {
         provider: 'nicepay',
         merchantCode: 'nicepay-test-mid',
-        publicClientKey: 'nicepay-public-client-key',
       },
     });
-    expect(readiness.runtime?.scriptSrc).toContain('nicepay-pg-web.js');
+    expect(readiness.runtime).not.toHaveProperty('publicClientKey');
+    expect(readiness.runtime?.scriptSrc).toBe(
+      'https://pg-web.nicepay.co.kr/v3/common/js/nicepay-pgweb.js'
+    );
 
     const fields = buildNicePayLaunchFields({
       orderId: 'ORD-NICEPAY-001',
@@ -506,6 +582,11 @@ test.describe('Card payment provider cutover contracts', () => {
       const body = new URLSearchParams(String(init?.body || ''));
       expect(body.get('MID')).toBe(process.env.NICEPAY_MID);
       expect(body.get('TID')).toBe('TX-TID-NOTI-001');
+      expect(body.get('SignData')).toBe(
+        sha256Hex(
+          `TX-TID-NOTI-001${process.env.NICEPAY_MID}${body.get('EdiDate')}${process.env.NICEPAY_MERCHANT_KEY}`
+        )
+      );
 
       return new Response(
         JSON.stringify({
@@ -535,7 +616,50 @@ test.describe('Card payment provider cutover contracts', () => {
     }
   });
 
-  test('processes proxy NicePay notification routes by orderId and stays idempotent on replay', async () => {
+  test('uses the official WebStd cancel SignData order for server-side refunds', async () => {
+    withNicePayEnv();
+
+    const originalFetch = global.fetch;
+    global.fetch = (async (input, init) => {
+      expect(String(input)).toBe('https://webapi.nicepay.co.kr/webapi/cancel_process.jsp');
+      expect(init?.method).toBe('POST');
+
+      const body = new URLSearchParams(String(init?.body || ''));
+      expect(body.get('MID')).toBe(process.env.NICEPAY_MID);
+      expect(body.get('TID')).toBe('TX-TID-CANCEL-001');
+      expect(body.get('CancelAmt')).toBe('77000');
+      expect(body.get('SignData')).toBe(
+        sha256Hex(
+          `${process.env.NICEPAY_MID}${body.get('CancelAmt')}${body.get('EdiDate')}${process.env.NICEPAY_MERCHANT_KEY}`
+        )
+      );
+
+      return new Response('ResultCode=2001&ResultMsg=Cancel+OK', {
+        status: 200,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      });
+    }) as typeof fetch;
+
+    try {
+      const result = await cancelCardPayment({
+        providerTransactionId: 'TX-TID-CANCEL-001',
+        orderId: 'ORD-NICEPAY-CANCEL-001',
+        cancelAmount: 77000,
+        cancelReason: '테스트 취소',
+        totalAmount: 77000,
+        requireMerchantKey: true,
+      });
+
+      expect(result).toMatchObject({
+        resultCode: '2001',
+        resultMessage: 'Cancel OK',
+      });
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  test('dispatches the primary NicePay notification URL to proxy payments by orderId and stays idempotent on replay', async () => {
     ensureSupabaseEnv();
     withNicePayEnv();
 
@@ -589,7 +713,7 @@ test.describe('Card payment provider cutover contracts', () => {
         PayMethod: 'CARD',
       }).toString();
 
-      const request = new Request('https://locally.example/api/proxy-bookings/payment/card-notification', {
+      const request = new Request('https://locally.example/api/payment/card-notification', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -597,7 +721,7 @@ test.describe('Card payment provider cutover contracts', () => {
         body: requestBody,
       });
 
-      const response = await proxyCardNotificationPost(request);
+      const response = await cardNotificationPost(request);
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toMatchObject({ success: true });
 
@@ -620,8 +744,8 @@ test.describe('Card payment provider cutover contracts', () => {
         },
       ]);
 
-      const replayResponse = await proxyCardNotificationPost(
-        new Request('https://locally.example/api/proxy-bookings/payment/card-notification', {
+      const replayResponse = await cardNotificationPost(
+        new Request('https://locally.example/api/payment/card-notification', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -642,7 +766,7 @@ test.describe('Card payment provider cutover contracts', () => {
     }
   });
 
-  test('falls back to providerTransactionId lookup for proxy NicePay notifications', async () => {
+  test('dispatches the primary NicePay notification URL to proxy payments by providerTransactionId fallback', async () => {
     ensureSupabaseEnv();
     withNicePayEnv();
 
@@ -688,7 +812,7 @@ test.describe('Card payment provider cutover contracts', () => {
       }) as typeof proxyBookingNotifications.notifyProxyPaymentEvent;
 
     try {
-      const request = new Request('https://locally.example/api/proxy-bookings/payment/card-notification', {
+      const request = new Request('https://locally.example/api/payment/card-notification', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -702,7 +826,7 @@ test.describe('Card payment provider cutover contracts', () => {
         }).toString(),
       });
 
-      const response = await proxyCardNotificationPost(request);
+      const response = await cardNotificationPost(request);
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toMatchObject({ success: true });
 
@@ -727,6 +851,108 @@ test.describe('Card payment provider cutover contracts', () => {
       global.fetch = originalFetch;
       (proxyBookingNotifications as { notifyProxyPaymentEvent: typeof proxyBookingNotifications.notifyProxyPaymentEvent }).notifyProxyPaymentEvent =
         originalNotifyProxyPaymentEvent;
+    }
+  });
+
+  test('dispatches the primary NicePay notification URL to service payments by SVC order id', async () => {
+    ensureSupabaseEnv();
+    withNicePayEnv();
+
+    const customer = createUser('service-primary-noti');
+    const customerId = await createAuthUser(customer);
+    const fixture = await createServicePaymentFixture({
+      customerId,
+      customer,
+    });
+
+    const originalFetch = global.fetch;
+    const originalNotifyServicePaymentOpened = serviceNotificationFlows.notifyServicePaymentOpened;
+    const originalInsertAdminAlerts = adminAlertCenter.insertAdminAlerts;
+
+    global.fetch = (async (input, init) => {
+      if (String(input) === NICEPAY_STATUS_QUERY_URL) {
+        const body = new URLSearchParams(String(init?.body || ''));
+        expect(body.get('MID')).toBe(process.env.NICEPAY_MID);
+        expect(body.get('TID')).toBe('TX-TID-SERVICE-PRIMARY');
+
+        return new Response(
+          JSON.stringify({
+            ResultCode: '0000',
+            ResultMsg: 'OK',
+            Status: '0',
+            TID: 'TX-TID-SERVICE-PRIMARY',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      return originalFetch(input, init);
+    }) as typeof fetch;
+
+    (serviceNotificationFlows as {
+      notifyServicePaymentOpened: typeof serviceNotificationFlows.notifyServicePaymentOpened;
+    }).notifyServicePaymentOpened = (async () => undefined) as typeof serviceNotificationFlows.notifyServicePaymentOpened;
+
+    (adminAlertCenter as {
+      insertAdminAlerts: typeof adminAlertCenter.insertAdminAlerts;
+    }).insertAdminAlerts = (async () => ({
+      success: true,
+      count: 0,
+      targetCount: 0,
+    })) as typeof adminAlertCenter.insertAdminAlerts;
+
+    try {
+      const response = await cardNotificationPost(
+        new Request('https://locally.example/api/payment/card-notification', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            Moid: fixture.orderId,
+            TID: 'TX-TID-SERVICE-PRIMARY',
+            Amt: String(fixture.amount),
+            ResultCode: '3001',
+            StateCd: '0',
+            PayMethod: 'CARD',
+          }).toString(),
+        })
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({ success: true });
+
+      const { data: updatedRow, error: updatedRowError } = await getAdminClient()
+        .from('service_bookings')
+        .select('status, payment_method, tid')
+        .eq('id', fixture.bookingId)
+        .maybeSingle();
+
+      if (updatedRowError) throw updatedRowError;
+      expect(updatedRow).toMatchObject({
+        status: 'PAID',
+        payment_method: 'card',
+        tid: 'TX-TID-SERVICE-PRIMARY',
+      });
+
+      const { data: requestRow, error: requestRowError } = await getAdminClient()
+        .from('service_requests')
+        .select('status')
+        .eq('id', fixture.requestId)
+        .maybeSingle();
+
+      if (requestRowError) throw requestRowError;
+      expect(requestRow).toMatchObject({
+        status: 'open',
+      });
+    } finally {
+      global.fetch = originalFetch;
+      (serviceNotificationFlows as {
+        notifyServicePaymentOpened: typeof serviceNotificationFlows.notifyServicePaymentOpened;
+      }).notifyServicePaymentOpened = originalNotifyServicePaymentOpened;
+      (adminAlertCenter as {
+        insertAdminAlerts: typeof adminAlertCenter.insertAdminAlerts;
+      }).insertAdminAlerts = originalInsertAdminAlerts;
     }
   });
 

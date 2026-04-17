@@ -3,6 +3,7 @@
 ## Summary
 - Current live-safe default is `CARD_PAYMENT_PROVIDER=portone`.
 - NicePay direct code path now exists for `experience + service + proxy`, but it stays dormant until the provider env is flipped.
+- This cutover document is intentionally `WebStd`-only.
 - Cutover goal is "no code change on launch day": only env switch, PG console registration, and focused smoke verification.
 
 ## Decision Gate
@@ -11,25 +12,25 @@
   `developers.nicepay.co.kr` documents the legacy WebStd `goPay + AuthToken/NextAppURL + MerchantKey` flow.
 - The current app implementation matches the legacy WebStd family, not the newer `AUTHNICE` family.
   Evidence in code:
-  `nicepay-pg-web.js`
+  `https://pg-web.nicepay.co.kr/v3/common/js/nicepay-pgweb.js`
   `goPay(...)`
   `AuthToken`
   `NextAppURL`
   `MerchantKey`-based signature verification
-- Before any production flip, confirm which NicePay product / console flow your real merchant account actually uses.
-  If the real account is `AUTHNICE`-only, stop here and treat that as a separate implementation project instead of a same-day env cutover.
+- `AUTHNICE` is an explicit no-go condition for this path.
+  If the real merchant account is `AUTHNICE`-only, stop here and treat that as a separate implementation project instead of a same-day env cutover.
 
 ## Source Of Truth
 - Provider boundary: [app/utils/payments/card/server.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/utils/payments/card/server.ts)
 - Client launch boundary: [app/utils/payments/card/client.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/utils/payments/card/client.ts)
 - NicePay launch signing: [app/api/payment/card-launch/route.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/api/payment/card-launch/route.ts)
 - NicePay relay return URL: [app/api/payment/nicepay/relay/route.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/api/payment/nicepay/relay/route.ts)
+- NicePay notification dispatcher: [app/api/payment/cardNotificationHandler.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/api/payment/cardNotificationHandler.ts)
 - Experience callback: [app/api/payment/nicepay-callback/route.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/api/payment/nicepay-callback/route.ts)
 - Service callback: [app/api/services/payment/nicepay-callback/route.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/api/services/payment/nicepay-callback/route.ts)
 - Proxy callback: [app/api/proxy-bookings/payment/nicepay-callback/route.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/api/proxy-bookings/payment/nicepay-callback/route.ts)
-- Experience notification: [app/api/payment/card-notification/route.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/api/payment/card-notification/route.ts)
-- Service notification: [app/api/services/payment/card-notification/route.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/api/services/payment/card-notification/route.ts)
-- Proxy notification: [app/api/proxy-bookings/payment/card-notification/route.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/api/proxy-bookings/payment/card-notification/route.ts)
+- Primary merchant-facing notification URL: [app/api/payment/card-notification/route.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/api/payment/card-notification/route.ts)
+- Compatibility wrappers only: [app/api/services/payment/card-notification/route.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/api/services/payment/card-notification/route.ts), [app/api/proxy-bookings/payment/card-notification/route.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/api/proxy-bookings/payment/card-notification/route.ts)
 
 ## Env Contract
 ### Keep as-is for current live path
@@ -42,28 +43,30 @@
 - `CARD_PAYMENT_PROVIDER=nicepay`
 - `NICEPAY_MID`
 - `NICEPAY_MERCHANT_KEY`
-- `NICEPAY_CLIENT_KEY`
-- `NEXT_PUBLIC_NICEPAY_CLIENT_KEY`
 
 ### Mapping from the NicePay / Imweb side
 - `MID` -> `NICEPAY_MID`
 - `SIGN KEY` -> `NICEPAY_MERCHANT_KEY`
-- `MID + SIGN KEY` map to the current WebStd implementation.
-- `client key` and `secret key` belong to the newer `AUTHNICE` / Start NicePay guide and should not be treated as the same thing as `SIGN KEY`.
-- The current project still keeps `NICEPAY_CLIENT_KEY` and `NEXT_PUBLIC_NICEPAY_CLIENT_KEY` in the env contract as a cutover guardrail, but the active approval algorithm in code is still the WebStd `MerchantKey` path.
+- `MID + SIGN KEY` map to the current WebStd implementation and are the only code-required credentials in this path.
+- `client key` and `secret key` belong to the newer `AUTHNICE` / Start NicePay guide and are out of scope for this WebStd cutover.
+
+## Official WebStd Endpoints Locked In Code
+- JS SDK: `https://pg-web.nicepay.co.kr/v3/common/js/nicepay-pgweb.js`
+- Approval follow-up: `NextAppURL` returned by NicePay auth response
+- Status query: `https://webapi.nicepay.co.kr/webapi/inquery/trans_status.jsp`
+- Cancel / refund: `https://webapi.nicepay.co.kr/webapi/cancel_process.jsp`
 
 ## Cutover Day Checklist
 1. Rotate any exposed NicePay merchant key first.
    If the previously pasted `SIGN KEY` was real, rotate it before any live wiring.
-2. Fill the full NicePay env bundle in the target environment.
+2. Fill the WebStd NicePay env bundle in the target environment.
    Do not flip `CARD_PAYMENT_PROVIDER` yet.
 3. Verify readiness first.
    `GET /api/payment/card-ready` and `GET /api/services/payment/card-ready` must both return `provider: "nicepay"`, `ready: true`, and an empty `missingConfig`.
 4. Register only the provider-facing URLs in the PG console.
    Relay return URL: `https://<domain>/api/payment/nicepay/relay`
-   Notification URL: confirm the exact NicePay registration model first.
-   If NicePay supports flow-specific notification URLs, register the matching route.
-   If NicePay supports only one global notification URL, do not flip production until that routing model is explicitly settled.
+   Primary notification URL: `https://<domain>/api/payment/card-notification`
+   Do not register the service / proxy compatibility routes as merchant console targets.
 5. Run the focused regression bundle before the final env flip.
    `tests/e2e/19-service-card-verification.spec.ts`
    `tests/e2e/21-service-payment-method-lock.spec.ts`
@@ -88,7 +91,15 @@
   Experience: `/api/payment/nicepay-callback`
   Service: `/api/services/payment/nicepay-callback`
   Proxy: `/api/proxy-bookings/payment/nicepay-callback`
-- Notification routes are idempotent by `orderId` first, then `providerTransactionId` fallback.
+- Merchant-facing notification ownership is now one primary route.
+  Primary registration target: `/api/payment/card-notification`
+  Dispatch rules:
+  `SVC-*` order ids -> service bookings first
+  `LOCALLY-PROXY-*` order ids -> proxy requests first
+  all other order ids -> experience bookings first
+  missing order id -> `providerTransactionId` fallback across owners
+- Compatibility notification routes stay available for internal seams and legacy-safe testing.
+- Notification handling is idempotent by `orderId` first, then `providerTransactionId` fallback.
 - Proxy callback and proxy notification intentionally differ only at the entry boundary.
   Callback keeps owner/auth guard for the browser return.
   Notification is server-to-server and skips owner guard.
@@ -117,6 +128,7 @@
   proxy notification idempotent replay
 
 ## Open Operational Checks
-- Confirm the actual NicePay notification registration model before production flip.
-- Confirm the real NicePay direct client key issuance path; the code requires a real `NEXT_PUBLIC_NICEPAY_CLIENT_KEY`.
+- Confirm the merchant console / service-change process accepts the new production domain for the same business entity.
+- Confirm the production MID is enabled for the target card methods you plan to expose.
+- Confirm the production merchant console registration uses the single primary notification URL and relay return URL above.
 - PayPal remains intentionally out of scope for this cutover.
