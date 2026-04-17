@@ -4,8 +4,8 @@ import {
   createAuthUser,
   createTestUser,
   formatDate,
+  getExpectedTestCronSecret,
   getTestAdminClient,
-  loadTestEnv,
   login,
   type E2ETestUser,
 } from './helpers/testSupabase';
@@ -230,8 +230,7 @@ test.describe.serial('Service payout eligibility after completion', () => {
 
     if (requestDateError) throw requestDateError;
 
-    const env = loadTestEnv();
-    const cronSecret = env.CRON_SECRET || 'codex-cron-secret';
+    const cronSecret = getExpectedTestCronSecret();
     const cronResponse = await request.get('/api/cron/complete-services', {
       headers: {
         authorization: `Bearer ${cronSecret}`,

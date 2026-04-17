@@ -4,8 +4,8 @@ import {
   createAuthUser,
   createTestUser,
   formatDate,
+  getExpectedTestCronSecret,
   getTestAdminClient,
-  loadTestEnv,
 } from './helpers/testSupabase';
 
 const createdAuthUserIds: string[] = [];
@@ -115,8 +115,7 @@ test.describe.serial('Service completion cron', () => {
     test.setTimeout(120000);
 
     const fixture = await createPastServiceFixture();
-    const env = loadTestEnv();
-    const cronSecret = env.CRON_SECRET || 'codex-cron-secret';
+    const cronSecret = getExpectedTestCronSecret();
 
     const response = await request.get('/api/cron/complete-services', {
       headers: {

@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test';
 
-const CRON_SECRET = process.env.CRON_SECRET || '';
+import { getExpectedTestCronSecret } from './helpers/testSupabase';
+
+const CRON_SECRET = getExpectedTestCronSecret();
 
 test.describe('Cron secret guards', () => {
   test('rejects cron requests without an authorization header', async ({ request }) => {
@@ -10,6 +12,9 @@ test.describe('Cron secret guards', () => {
       request.get('/api/cron/complete-services'),
       request.get('/api/cron/experience-translations'),
       request.get('/api/cron/admin-support-unread-alerts'),
+      request.get('/api/cron/home-popularity-snapshot'),
+      request.get('/api/bot/auto-post'),
+      request.get('/api/bot/auto-comment'),
     ]);
 
     for (const response of responses) {
@@ -34,6 +39,15 @@ test.describe('Cron secret guards', () => {
       request.get('/api/cron/admin-support-unread-alerts', {
         headers: { authorization: 'Bearer wrong-secret' },
       }),
+      request.get('/api/cron/home-popularity-snapshot', {
+        headers: { authorization: 'Bearer wrong-secret' },
+      }),
+      request.get('/api/bot/auto-post', {
+        headers: { authorization: 'Bearer wrong-secret' },
+      }),
+      request.get('/api/bot/auto-comment', {
+        headers: { authorization: 'Bearer wrong-secret' },
+      }),
     ]);
 
     for (const response of responses) {
@@ -41,9 +55,7 @@ test.describe('Cron secret guards', () => {
     }
   });
 
-  test('allows a valid cron secret through the guard before business logic runs', async ({ request }) => {
-    test.skip(!CRON_SECRET, 'CRON_SECRET is required to verify the success contract.');
-
+  test('allows the configured cron secret or local dev fallback through the guard before business logic runs', async ({ request }) => {
     const response = await request.get('/api/cron/cancel-pending', {
       headers: {
         authorization: `Bearer ${CRON_SECRET}`,

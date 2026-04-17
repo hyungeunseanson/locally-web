@@ -20,18 +20,64 @@ on:
           - post
           - comment
 
+concurrency:
+  group: community-bot
+  cancel-in-progress: false
+
 jobs:
   run-bot:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
+      - name: Validate scheduler secrets
+        env:
+          PROD_URL: ${{ secrets.PROD_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${PROD_URL:-}" ]; then
+            echo "Missing GitHub secret: PROD_URL"
+            echo "Add your production URL in GitHub -> Settings -> Secrets and variables -> Actions"
+            exit 1
+          fi
+
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "Missing GitHub secret: CRON_SECRET"
+            echo "Add the same CRON_SECRET value used in Vercel"
+            exit 1
+          fi
+
+          case "$PROD_URL" in
+            http://*|https://*)
+              ;;
+            *)
+              echo "Invalid PROD_URL: must start with http:// or https://"
+              echo "Current PROD_URL value is malformed or empty."
+              exit 1
+              ;;
+          esac
+
+          echo "BASE_URL=${PROD_URL%/}" >> "$GITHUB_ENV"
+
       - name: Auto Post Job
         if: github.event.schedule == '0 3 * * *' || github.event.inputs.job_type == 'post'
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          curl -X GET "${{ secrets.PROD_URL }}/api/bot/auto-post" \
-          -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+          set -euo pipefail
+
+          curl --silent --show-error --fail-with-body \
+            -X GET "${BASE_URL}/api/bot/auto-post" \
+            -H "Authorization: Bearer ${CRON_SECRET}"
 
       - name: Auto Comment Job
         if: github.event.schedule == '30 3,11 * * *' || github.event.inputs.job_type == 'comment'
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          curl -X GET "${{ secrets.PROD_URL }}/api/bot/auto-comment" \
-          -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+          set -euo pipefail
+
+          curl --silent --show-error --fail-with-body \
+            -X GET "${BASE_URL}/api/bot/auto-comment" \
+            -H "Authorization: Bearer ${CRON_SECRET}"

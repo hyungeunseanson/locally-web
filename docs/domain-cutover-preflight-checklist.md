@@ -84,13 +84,11 @@
 
 ### 5. 라이브 검증 경계
 - `scripts/run-live-smoke.mjs`는 `PLAYWRIGHT_LIVE_BASE_URL` 또는 `NEXT_PUBLIC_SITE_URL`을 읽는다.
-- 하지만 일부 live E2E는 아직 `https://locally-web.vercel.app`를 하드코딩하고 있다.
-  - `tests/e2e/03-live-host-signup-registration.spec.ts`
-  - `tests/e2e/04-live-host-experience-create.spec.ts`
-  - `tests/e2e/05-live-guest-booking-messaging-support.spec.ts`
-  - `tests/e2e/23-live-guest-post-booking.spec.ts`
-  - `tests/e2e/31-live-guest-trip-cancel.spec.ts`
-- 따라서 cutover day에 live smoke를 돌릴 계획이면, 이 hardcoded base URL들을 먼저 정리하거나 이번 전환에는 `scripts/run-live-smoke.mjs` 기반 smoke만 공식 기준으로 쓴다.
+- 현재 live E2E 본체는 `tests/e2e/helpers/liveBaseUrl.ts` helper를 통해 base URL을 읽는다.
+- cutover day 공식 smoke 기준은 ad-hoc `npx playwright test`가 아니라 아래 2개다.
+  - `node scripts/check-live-domain-parity.mjs`
+  - `node scripts/run-live-smoke.mjs --bundle gate`
+- bare `playwright.config.ts`는 이미 떠 있는 로컬 서버를 가정하므로, release-day smoke 기준으로 삼지 않는다.
 
 ## Cutover Day Sequence
 1. Vercel에 `www.locally-travel.com`을 현재 project에 연결한다.

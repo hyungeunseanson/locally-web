@@ -1,9 +1,34 @@
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Page } from '@playwright/test';
 
 type EnvMap = Record<string, string>;
+type EnvLikeMap = Record<string, string | undefined>;
+
+const LOCAL_DEV_FALLBACK_CRON_SECRET = 'codex-cron-secret';
+
+function loadOptionalEnvFile(path: string): EnvMap {
+  if (!existsSync(path)) {
+    return {};
+  }
+
+  return readFileSync(path, 'utf8')
+    .split(/\n/)
+    .reduce<EnvMap>((acc, line) => {
+      const match = line.match(/^([^=]+)=(.*)$/);
+      if (match) acc[match[1]] = match[2];
+      return acc;
+    }, {});
+}
+
+function readTrimmedEnvValue(env: EnvLikeMap, key: string) {
+  const value = env[key];
+  if (typeof value !== 'string') return null;
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
 
 export type E2ETestUser = {
   email: string;
@@ -24,6 +49,31 @@ export function loadTestEnv(): EnvMap {
       if (match) acc[match[1]] = match[2];
       return acc;
     }, {});
+}
+
+function resolveCronEnv(env?: EnvLikeMap) {
+  if (env) {
+    return env;
+  }
+
+  return {
+    ...loadOptionalEnvFile('.env.local'),
+    ...process.env,
+  };
+}
+
+export function getConfiguredCronSecret(env?: EnvLikeMap) {
+  return readTrimmedEnvValue(resolveCronEnv(env), 'CRON_SECRET');
+}
+
+export function getExpectedTestCronSecret(options?: {
+  env?: EnvLikeMap;
+  productionLike?: boolean;
+}) {
+  const configuredSecret = getConfiguredCronSecret(options?.env);
+  if (configuredSecret) return configuredSecret;
+  if (options?.productionLike) return null;
+  return LOCAL_DEV_FALLBACK_CRON_SECRET;
 }
 
 export function getTestAdminClient() {

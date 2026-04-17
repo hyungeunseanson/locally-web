@@ -5,6 +5,17 @@
 
 ---
 
+## v3.40.19 — [Ops] cron guard contract / release gate naming / legacy workflow hardening
+
+**작업일:** 2026-04-17
+
+| 항목 | 내용 |
+|------|------|
+| 🟢 cron secret 계약 정렬 | `tests/e2e/helpers/testSupabase.ts`, `tests/e2e/81-cron-secret-guards.spec.ts`, `tests/e2e/131-service-completion-cron.spec.ts`, `tests/e2e/132-service-payout-eligibility-after-completion.spec.ts`, `tests/e2e/161-admin-support-unread-alerts.spec.ts` — dev 계약에서는 `CRON_SECRET`가 없을 때 로컬 fallback secret을 같은 방식으로 읽고, production-like 계약에서는 configured secret만 성공 경로로 보도록 helper 기준을 통일 |
+| 🟢 release gate / cleanup 용어 정리 | `docs/runtime_verification.md`, `package.json`, `scripts/diagnostics/README.md` — 공식 bundle 이름을 `gate/shared/noisy`로 맞추고, `cleanup:codex:execute:safe`를 운영 기본 명령으로 고정. diagnostics는 release-day 공식 절차 밖이라는 점을 문서로 잠금 |
+| 🟢 cutover smoke 진입점 정렬 | `docs/domain-cutover-preflight-checklist.md` — live E2E base URL이 helper 기반이라는 현재 코드 상태를 반영하고, cutover day 공식 smoke는 `check-live-domain-parity`와 `run-live-smoke --bundle gate`만 기준으로 명시 |
+| 🟢 legacy community bot workflow hardening | `.github/workflows/community-bot.yml` — `PROD_URL`/`CRON_SECRET` 검증, malformed URL 차단, `curl --fail-with-body`, concurrency/timebox를 추가해 false green 가능성을 줄임 |
+
 ## v3.40.18 — [Admin Support] unread 관리자 ALERTS + 팀 메일 1시간 완화
 
 **작업일:** 2026-04-15

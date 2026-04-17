@@ -3,14 +3,15 @@
 ## Goal
 
 - `production` 배포 직후 반복 가능한 런타임 검증 절차를 고정한다.
-- 기본 자동 게이트는 `gate-safe`만 사용한다.
+- 기본 자동 게이트는 package script / bundle 이름 기준 `gate`만 사용한다.
+- 이전 문서의 `gate-safe`, `shared-surface`는 각각 현재 `gate`, `shared` bundle을 뜻한다.
 - 운영 노이즈가 생길 수 있는 검증은 명시 승인 후에만 실행한다.
 
 ## Bundles
 
-### `gate-safe`
+### `gate`
 
-- 목적: 배포 게이트
+- 목적: 배포 게이트용 release-safe bundle
 - 명령:
 ```bash
 npm run test:e2e:live:gate
@@ -24,9 +25,9 @@ npm run test:e2e:live:gate
   - `tests/e2e/71-public-host-profile.spec.ts`
 - 규칙:
   - cleanup이 끝난 뒤 `codex.*` 잔여 데이터가 없어야 한다.
-  - shared-surface row를 남기면 실패로 본다.
+  - shared bundle row를 남기면 실패로 본다.
 
-### `shared-surface`
+### `shared`
 
 - 목적: 운영 공유 surface 확인
 - 명령:
@@ -67,11 +68,28 @@ npm run test:e2e:live:noisy -- --ack-noisy
 ## Execution Order
 
 1. 배포가 `Ready`인지 확인한다.
-2. `gate-safe` 실행.
+2. `gate` 실행.
 3. 실패 시 즉시 중단하고 drift/regression/data issue로 분류한다.
 4. 성공 시 아래 cleanup dry-run과 Supabase 쿼리로 최근 적재와 cleanup 상태를 본다.
-5. 필요할 때만 `shared-surface` 실행.
+5. 필요할 때만 `shared` 실행.
 6. 운영 노이즈가 허용된 상황에서만 `noisy` 실행.
+
+## Official Entry Points
+
+- local contract gate
+  - `npm run test:e2e:contracts`
+- live domain response gate
+  - `npm run test:e2e:live:domain-gate`
+- live release gate
+  - `npm run test:e2e:live:gate`
+- live shared-surface check
+  - `npm run test:e2e:live:shared -- --ack-shared-surface`
+- live noisy check
+  - `npm run test:e2e:live:noisy -- --ack-noisy`
+- release-day 기준 밖
+  - bare `npx playwright test`
+  - `scripts/diagnostics/*`
+  - ad-hoc `curl` or individual spec execution without the package-script wrappers
 
 ## Cleanup
 
@@ -117,6 +135,8 @@ npm run cleanup:codex:execute
 
 - 규칙:
   - 평시 기본 정리용이다.
+  - 운영 기준 기본 명령은 `cleanup:codex:execute:safe`다.
+  - `cleanup:codex:execute`는 기존 계약을 깨지 않기 위한 backward-compatible alias다.
   - dry-run 결과를 확인한 뒤에만 실행한다.
   - `codex` 계정에 직접 연결된 데이터만 삭제한다.
   - `notifications`는 `codex user_id`에 직접 연결된 row만 지우고, 내용에만 `codex/코덱스`가 들어간 알림은 기본값에서 제외한다.
@@ -140,7 +160,19 @@ npm run cleanup:codex:execute:full
 2. `npm run cleanup:codex:execute:full`
 3. `npm run cleanup:codex:dry`
 4. `npm run test:e2e:live:gate`
-5. 필요 시 `shared-surface`
+5. 필요 시 `shared`
+
+## Diagnostics Boundary
+
+- `scripts/diagnostics/*`는 임시 확인용 도구이며 release gate 일부가 아니다.
+- 배포 직전 공식 점검은 이 문서의 package script와 쿼리만 기준으로 삼는다.
+- diagnostics 중 일부는 데이터/스키마를 직접 바꿀 수 있으므로, release-day에는 별도 owner 판단 없이 실행하지 않는다.
+
+## Monitoring Boundary
+
+- Sentry는 sanitized exception capture만 담당한다.
+- breadcrumbs, tracing, replay, request URL/query/header/cookie는 현재 운영 기준에서 수집하지 않는다.
+- 따라서 release-day pass/fail 판정은 monitoring 단독이 아니라 smoke 결과, route status, DB cleanup 상태를 함께 본다.
 
 ## Supabase Queries
 

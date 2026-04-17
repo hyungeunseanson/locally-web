@@ -2,6 +2,7 @@ import { existsSync, readFileSync, rmSync } from 'fs';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test, type Page } from '@playwright/test';
+import { getConfiguredCronSecret } from './helpers/testSupabase';
 
 type EnvMap = Record<string, string>;
 type TestUser = {
@@ -35,7 +36,7 @@ const UNREAD_ALERT_EMAIL_AUDIT_ACTION = 'ADMIN_SUPPORT_UNREAD_ALERT_EMAIL_SENT';
 const UNREAD_ALERT_DELAY_MINUTES = 60;
 
 const TEST_PASSWORD = 'LocallyTest!2026';
-const CRON_SECRET = loadEnv().CRON_SECRET?.trim() || null;
+const CRON_SECRET = getConfiguredCronSecret();
 const ALERT_TITLE = '고객센터 1:1 문의 미읽음';
 const ALERT_SUBJECT = '[Locally Admin] 고객센터 1:1 문의 미읽음';
 const MAIL_CAPTURE_PATH = '/tmp/locally-mock-nodemailer.jsonl';
