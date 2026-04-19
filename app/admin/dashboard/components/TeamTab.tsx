@@ -116,13 +116,15 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
   );
 
   const getMemoCommentSectionClassName = useCallback((commentCount: number) => {
+    const maxHeightClassName = 'max-h-[30vh]';
+
     if (commentCount === 0) {
-      return 'min-h-[104px]';
+      return `min-h-[104px] ${maxHeightClassName}`;
     }
     if (commentCount <= 2) {
-      return 'min-h-[148px]';
+      return `min-h-[148px] ${maxHeightClassName}`;
     }
-    return 'min-h-[220px] max-h-[30vh]';
+    return `min-h-[220px] ${maxHeightClassName}`;
   }, []);
 
   const setMemoCommentTextareaRef = useCallback((taskId: string, element: HTMLTextAreaElement | null) => {
@@ -1004,7 +1006,11 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
                       {memos.map(memo => {
                         const memoComments = commentsByTaskId.get(memo.id) ?? [];
                         return (
-                          <div key={memo.id} className="bg-white p-3 md:p-6 rounded-2xl border border-slate-200 shadow-sm group hover:shadow-md transition-all relative flex flex-col h-auto max-h-[75vh] min-h-0 overflow-hidden">
+                          <div
+                            key={memo.id}
+                            data-testid="team-memo-card"
+                            className="bg-white p-3 md:p-6 rounded-2xl border border-slate-200 shadow-sm group hover:shadow-md transition-all relative flex flex-col h-auto max-h-[75vh] min-h-0 overflow-hidden"
+                          >
                             <div className="flex justify-between items-start mb-2 md:mb-4 pb-2 md:pb-4 border-b border-slate-100 shrink-0">
                               <div className="flex items-center gap-2 md:gap-3">
                                 {/* 🟢 이슈4-B: 메모 저자 아바타 모바일 축소 */}
@@ -1069,8 +1075,8 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
                             </div>
 
                             {/* 댓글 구역 */}
-                            <div className={`mt-4 pt-4 border-t border-slate-100 shrink-0 flex flex-col bg-slate-50/60 -mx-4 md:-mx-6 -mb-4 md:-mb-6 px-4 md:px-5 pb-4 md:pb-5 rounded-b-2xl shadow-inner ${getMemoCommentSectionClassName(memoComments.length)}`}>
-                              <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
+                            <div className={`mt-4 pt-4 border-t border-slate-100 shrink-0 flex flex-col overflow-hidden bg-slate-50/60 -mx-4 md:-mx-6 -mb-4 md:-mb-6 px-4 md:px-5 pb-4 md:pb-5 rounded-b-2xl shadow-inner ${getMemoCommentSectionClassName(memoComments.length)}`}>
+                              <div data-testid="team-memo-comment-list" className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
                                 {memoComments.length === 0 ? (
                                   <p className="text-[10px] md:text-[11px] text-slate-400/80 text-center py-1 font-medium">작성된 답글이 없습니다.</p>
                                 ) : (
@@ -1087,6 +1093,7 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
                               </div>
                               <div className="flex gap-2 pt-2 border-t border-slate-200/50 mt-2 shrink-0">
                                 <textarea
+                                  data-testid="team-memo-comment-input"
                                   ref={element => setMemoCommentTextareaRef(memo.id, element)}
                                   rows={2}
                                   placeholder="진행 상황이나 의견을 남겨주세요..."
@@ -1097,6 +1104,7 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
                                   className="flex-1 min-h-[40px] max-h-[144px] text-[10px] md:text-xs px-2.5 py-2 md:px-3 md:py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 bg-white placeholder:text-slate-400 shadow-sm transition-all disabled:bg-slate-100 disabled:text-slate-400 resize-none"
                                 />
                                 <button
+                                  data-testid="team-memo-comment-send"
                                   onClick={() => addMemoComment(memo.id)}
                                   disabled={Boolean(isSubmittingCommentByTaskId[memo.id])}
                                   className="bg-slate-900 text-white px-3 md:px-3.5 rounded-xl hover:bg-slate-800 transition-colors shadow-sm flex items-center justify-center disabled:bg-slate-300 disabled:cursor-not-allowed"
