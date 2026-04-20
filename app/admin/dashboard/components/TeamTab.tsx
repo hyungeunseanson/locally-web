@@ -9,7 +9,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
   ClipboardList, CheckSquare, FileText, Plus, Trash2,
-  Clock, CheckCircle2, Circle, X, NotebookPen, MessageCircle, Send, Settings, Edit2, Phone
+  Clock, CheckCircle2, Circle, X, NotebookPen, MessageCircle, Send, Settings, Edit2, Phone, RefreshCw
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -75,6 +75,7 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
   const [hasLoadedComments, setHasLoadedComments] = useState(false);
   const [hasLoadedWhitelist, setHasLoadedWhitelist] = useState(false);
   const [isSubmittingCommentByTaskId, setIsSubmittingCommentByTaskId] = useState<Record<string, boolean>>({});
+  const [isRefreshingWorkspace, setIsRefreshingWorkspace] = useState(false);
 
   const threadRef = useRef<HTMLDivElement>(null);
   const commentsFetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -200,7 +201,7 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
     setWhitelist((prev) => prev.filter((entry) => entry.id !== entryId));
   }, []);
 
-  const fetchTeamWorkspaceState = useCallback(async () => {
+  const fetchTeamWorkspaceState = useCallback(async (options?: { preserveOnError?: boolean }) => {
     const response = await fetch('/api/admin/team/bootstrap', {
       cache: 'no-store',
     });
@@ -214,7 +215,7 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
         requestId,
         error: nextError,
       });
-      if (response.status === 401 || response.status === 403) {
+      if (!options?.preserveOnError && (response.status === 401 || response.status === 403)) {
         setIsWorkspaceUnauthorized(true);
       }
       throw new Error(nextError);
@@ -236,6 +237,19 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
 
     return nextTasks;
   }, []);
+
+  const handleManualWorkspaceRefresh = useCallback(async () => {
+    if (isRefreshingWorkspace) return;
+
+    setIsRefreshingWorkspace(true);
+    try {
+      await fetchTeamWorkspaceState({ preserveOnError: true });
+    } catch (error: unknown) {
+      showToast(getErrorMessage(error, 'Team Workspace를 새로고침하지 못했습니다.'), 'error');
+    } finally {
+      setIsRefreshingWorkspace(false);
+    }
+  }, [fetchTeamWorkspaceState, isRefreshingWorkspace, showToast]);
 
   const scheduleFetchWorkspace = useCallback(() => {
     if (commentsFetchTimerRef.current) {
@@ -758,34 +772,51 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
           </p>
         </div>
 
-        {/* 🟢 구조 개편: Inner Tab Navigation */}
-        <div className="flex bg-slate-100 p-0.5 rounded-lg w-full md:w-auto">
-          <button
-            onClick={() => setInnerTab('todo')}
-            className={`flex-1 md:flex-initial px-2.5 md:px-6 py-1 rounded-md text-[9px] md:text-sm font-bold transition-all flex items-center justify-center gap-1 ${innerTab === 'todo' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            Daily Log & Tasks
-            {/* 🟢 이슈2: 탭 N 뱃지 — 새 할일/일지/댓글 있을 때 */}
-            {innerTab !== 'todo' && hasNewTodoIndicator && (
-              <span className="w-4 h-4 bg-rose-500 text-[8px] font-bold text-white rounded-full flex items-center justify-center shrink-0">N</span>
-            )}
-          </button>
-          <button
-            onClick={() => setInnerTab('memo')}
-            className={`flex-1 md:flex-initial px-2.5 md:px-6 py-1 rounded-md text-[9px] md:text-sm font-bold transition-all flex items-center justify-center gap-1 flex-nowrap whitespace-nowrap ${innerTab === 'memo' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            <NotebookPen size={11} /> 팀 메모장
-            {/* 🟢 이슈2: 탭 N 뱃지 — 새 메모/메모 댓글 있을 때 */}
-            {innerTab !== 'memo' && hasNewMemoIndicator && (
-              <span className="w-4 h-4 bg-rose-500 text-[8px] font-bold text-white rounded-full flex items-center justify-center shrink-0">N</span>
-            )}
-          </button>
-          <button
-            onClick={() => setInnerTab('proxy')}
-            className={`flex-1 md:flex-initial px-2.5 md:px-6 py-1 rounded-md text-[9px] md:text-sm font-bold transition-all flex items-center justify-center gap-1 flex-nowrap whitespace-nowrap ${innerTab === 'proxy' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            <Phone size={11} /> 전화 예약
-          </button>
+        <div className="flex flex-col-reverse gap-2 w-full md:w-auto md:flex-row md:items-center">
+          {/* 🟢 구조 개편: Inner Tab Navigation */}
+          <div className="flex bg-slate-100 p-0.5 rounded-lg w-full md:w-auto">
+            <button
+              onClick={() => setInnerTab('todo')}
+              className={`flex-1 md:flex-initial px-2.5 md:px-6 py-1 rounded-md text-[9px] md:text-sm font-bold transition-all flex items-center justify-center gap-1 ${innerTab === 'todo' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Daily Log & Tasks
+              {/* 🟢 이슈2: 탭 N 뱃지 — 새 할일/일지/댓글 있을 때 */}
+              {innerTab !== 'todo' && hasNewTodoIndicator && (
+                <span className="w-4 h-4 bg-rose-500 text-[8px] font-bold text-white rounded-full flex items-center justify-center shrink-0">N</span>
+              )}
+            </button>
+            <button
+              onClick={() => setInnerTab('memo')}
+              className={`flex-1 md:flex-initial px-2.5 md:px-6 py-1 rounded-md text-[9px] md:text-sm font-bold transition-all flex items-center justify-center gap-1 flex-nowrap whitespace-nowrap ${innerTab === 'memo' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              <NotebookPen size={11} /> 팀 메모장
+              {/* 🟢 이슈2: 탭 N 뱃지 — 새 메모/메모 댓글 있을 때 */}
+              {innerTab !== 'memo' && hasNewMemoIndicator && (
+                <span className="w-4 h-4 bg-rose-500 text-[8px] font-bold text-white rounded-full flex items-center justify-center shrink-0">N</span>
+              )}
+            </button>
+            <button
+              onClick={() => setInnerTab('proxy')}
+              className={`flex-1 md:flex-initial px-2.5 md:px-6 py-1 rounded-md text-[9px] md:text-sm font-bold transition-all flex items-center justify-center gap-1 flex-nowrap whitespace-nowrap ${innerTab === 'proxy' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              <Phone size={11} /> 전화 예약
+            </button>
+          </div>
+
+          {innerTab !== 'proxy' ? (
+            <button
+              type="button"
+              data-testid="admin-team-refresh-button"
+              onClick={() => {
+                void handleManualWorkspaceRefresh();
+              }}
+              disabled={isRefreshingWorkspace}
+              className="inline-flex items-center justify-center gap-2 self-end rounded-full border border-slate-200 bg-white px-3 py-2 text-[10px] font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60 md:self-auto md:text-xs"
+            >
+              <RefreshCw size={14} className={isRefreshingWorkspace ? 'animate-spin' : ''} />
+              새로고침
+            </button>
+          ) : null}
         </div>
       </div>
 
