@@ -31,11 +31,24 @@ test.describe('About image landing locale gate', () => {
     );
   });
 
-  test('keeps editorial about for incomplete non-Korean locales', async ({ page }, testInfo) => {
+  test('shows the Japanese image landing with a localized og:image', async ({ page }, testInfo) => {
+    const baseURL = testInfo.project.use.baseURL ?? 'http://127.0.0.1:3000';
+
+    await setLocaleCookie(page, 'ja', baseURL);
+    await page.goto('/ja/about', { waitUntil: 'domcontentloaded' });
+
+    await expect(page.locator('img[src*="/images/about/desktop/ja/1.png"]')).toBeVisible();
+    await expect(page.locator('img[src*="images.unsplash.com"]')).toHaveCount(0);
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
+      'content',
+      /\/images\/about\/desktop\/ja\/1\.png$/
+    );
+  });
+
+  test('keeps editorial about for locales without complete image sets', async ({ page }, testInfo) => {
     const baseURL = testInfo.project.use.baseURL ?? 'http://127.0.0.1:3000';
     const cases = [
       { locale: 'en' as const, pathname: '/en/about' },
-      { locale: 'ja' as const, pathname: '/ja/about' },
       { locale: 'zh' as const, pathname: '/zh/about' },
     ];
 
