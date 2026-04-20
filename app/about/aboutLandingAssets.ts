@@ -34,8 +34,8 @@ function isSupportedImage(fileName: string) {
   return SUPPORTED_EXTENSIONS.includes(path.extname(fileName).toLowerCase() as (typeof SUPPORTED_EXTENSIONS)[number]);
 }
 
-function getSortKey(fileName: string) {
-  const match = fileName.match(/^(\d+)/);
+function getSortKey(baseName: string) {
+  const match = baseName.match(/^(\d+)/);
   if (!match) return Number.MAX_SAFE_INTEGER;
   return Number.parseInt(match[1], 10);
 }
@@ -57,21 +57,28 @@ function readImageFileMap(device: AboutLandingDevice, locale: AboutLandingLocale
   return fileMap;
 }
 
-function buildResolvedImageMap(device: AboutLandingDevice, locale: AboutLandingLocale) {
-  const localized = readImageFileMap(device, locale);
-  if (locale === DEFAULT_LOCALE) {
-    return localized;
-  }
-
-  const fallback = readImageFileMap(device, DEFAULT_LOCALE);
-  const resolved = new Map(fallback);
-  for (const [baseName, fileName] of localized.entries()) {
-    resolved.set(baseName, fileName);
-  }
-  return resolved;
+function getSortedBaseNames(fileMap: Map<string, string>) {
+  return Array.from(fileMap.keys()).sort(
+    (left, right) => getSortKey(left) - getSortKey(right) || left.localeCompare(right)
+  );
 }
 
-function getResolvedImagePath(
+function haveSameBaseNameSet(left: string[], right: string[]) {
+  return left.length === right.length && left.every((baseName, index) => baseName === right[index]);
+}
+
+function getRequiredBaseNames() {
+  const defaultDesktopBaseNames = getSortedBaseNames(readImageFileMap('desktop', DEFAULT_LOCALE));
+  const defaultMobileBaseNames = getSortedBaseNames(readImageFileMap('mobile', DEFAULT_LOCALE));
+
+  if (!haveSameBaseNameSet(defaultDesktopBaseNames, defaultMobileBaseNames)) {
+    return [];
+  }
+
+  return defaultDesktopBaseNames;
+}
+
+function getLocalizedImagePath(
   device: AboutLandingDevice,
   locale: AboutLandingLocale,
   baseName: string
@@ -81,26 +88,36 @@ function getResolvedImagePath(
     return toPublicPath(device, locale, localized);
   }
 
-  const fallback = readImageFileMap(device, DEFAULT_LOCALE).get(baseName);
-  if (fallback) {
-    return toPublicPath(device, DEFAULT_LOCALE, fallback);
-  }
-
   return null;
 }
 
+export function hasCompleteAboutLandingLocale(locale: AboutLandingLocale) {
+  const requiredBaseNames = getRequiredBaseNames();
+
+  if (requiredBaseNames.length === 0) {
+    return false;
+  }
+
+  const localizedDesktopBaseNames = getSortedBaseNames(readImageFileMap('desktop', locale));
+  const localizedMobileBaseNames = getSortedBaseNames(readImageFileMap('mobile', locale));
+
+  return (
+    haveSameBaseNameSet(localizedDesktopBaseNames, requiredBaseNames) &&
+    haveSameBaseNameSet(localizedMobileBaseNames, requiredBaseNames)
+  );
+}
+
 export function getAboutLandingSections(locale: AboutLandingLocale): AboutLandingSection[] {
-  const desktopMap = buildResolvedImageMap('desktop', locale);
-  const mobileMap = buildResolvedImageMap('mobile', locale);
+  if (!hasCompleteAboutLandingLocale(locale)) {
+    return [];
+  }
 
-  const commonBaseNames = Array.from(desktopMap.keys())
-    .filter((baseName) => mobileMap.has(baseName))
-    .sort((left, right) => getSortKey(left) - getSortKey(right) || left.localeCompare(right));
+  const requiredBaseNames = getRequiredBaseNames();
 
-  return commonBaseNames
+  return requiredBaseNames
     .map((baseName) => {
-      const desktopSrc = getResolvedImagePath('desktop', locale, baseName);
-      const mobileSrc = getResolvedImagePath('mobile', locale, baseName);
+      const desktopSrc = getLocalizedImagePath('desktop', locale, baseName);
+      const mobileSrc = getLocalizedImagePath('mobile', locale, baseName);
 
       if (!desktopSrc || !mobileSrc) {
         return null;

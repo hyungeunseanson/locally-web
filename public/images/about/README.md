@@ -21,9 +21,9 @@ Put localized landing images in the folders below.
 
 ## Rendering rule
 
-- The page reads the folder and renders numbered images in ascending order.
-- If a locale-specific image is missing, the page falls back to the `ko` file with the same number.
-- If there are no image assets at all, the existing editorial `/about` page stays active.
+- The page renders image landing sections only when a locale has a complete numbered set for both `desktop/{locale}` and `mobile/{locale}`.
+- A locale is activated only when its numbered file set exactly matches the Korean reference set.
+- Partial uploads do not fall back to `ko`; the existing editorial `/about` page stays active until the locale is complete.
 
 ## Recommended workflow
 
@@ -31,3 +31,4 @@ Put localized landing images in the folders below.
 2. Put desktop slices in `desktop/{locale}`.
 3. Put mobile slices in `mobile/{locale}`.
 4. Keep the same numbering across every locale.
+5. Upload partial files if needed, then complete the full set to activate that locale automatically.

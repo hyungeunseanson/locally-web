@@ -1,14 +1,13 @@
 import AboutEditorialContent from './AboutEditorialContent';
 import AboutImageLandingContent from './AboutImageLandingContent';
-import { getAboutLandingSections } from './aboutLandingAssets';
+import { hasCompleteAboutLandingLocale } from './aboutLandingAssets';
 
 import { getCurrentLocale } from '@/app/utils/locale';
 
 export default async function AboutPage() {
   const locale = await getCurrentLocale();
-  const sections = getAboutLandingSections(locale);
 
-  if (sections.length > 0) {
+  if (hasCompleteAboutLandingLocale(locale)) {
     return <AboutImageLandingContent locale={locale} />;
   }
 

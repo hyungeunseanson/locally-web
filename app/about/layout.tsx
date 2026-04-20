@@ -1,7 +1,10 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 
-import { getAboutLandingOgImagePath } from '@/app/about/aboutLandingAssets';
+import {
+  getAboutLandingOgImagePath,
+  hasCompleteAboutLandingLocale,
+} from '@/app/about/aboutLandingAssets';
 import { getCurrentLocale } from '@/app/utils/locale';
 import { buildAbsoluteUrl } from '@/app/utils/siteUrl';
 import { buildLocalizedAbsoluteUrl } from '@/app/utils/siteUrl';
@@ -25,7 +28,9 @@ export async function generateMetadata(): Promise<Metadata> {
   const pageUrl = buildLocalizedAbsoluteUrl(locale, '/about');
   const title = TITLE_MAP[locale];
   const description = DESCRIPTION_MAP[locale];
-  const ogImagePath = getAboutLandingOgImagePath(locale);
+  const ogImagePath = hasCompleteAboutLandingLocale(locale)
+    ? getAboutLandingOgImagePath(locale)
+    : null;
   const images = ogImagePath
     ? [{ url: buildAbsoluteUrl(ogImagePath), alt: 'About Locally landing image' }]
     : undefined;
