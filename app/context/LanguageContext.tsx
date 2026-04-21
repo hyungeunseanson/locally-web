@@ -167,7 +167,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     // 👇 여기 추가
     saving: "저장 중...",
     account_withdrawal_notice_title: "회원 탈퇴",
-    account_withdrawal_notice_desc: "운영팀 문의로 진행됩니다.",
+    account_withdrawal_notice_desc: "탈퇴는 운영팀이 도와드리고 있어요. 문의로 접수해 주세요.",
     profile_photo_change_done: "프로필 사진이 변경되었습니다.",
     profile_photo_fail: "사진 업로드 실패:",
     profile_save_success: "프로필이 성공적으로 저장되었어요.",
@@ -179,7 +179,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     ph_mbti: "ex. ENFP",
     ph_bio: "호스트에게 자신을 간단히 소개해주세요. (취미, 여행 스타일 등)",
     help_phone: "* 국적 선택 시 국가번호가 자동 입력됩니다.",
-    help_email: "* 로그인 이메일은 현재 여기서 변경할 수 없습니다.",
+    help_email: "* 로그인 이메일은 현재 여기서 변경할 수 없어요.",
     gender_select: "선택하세요",
     host_honorific: " 호스트님",
     msg_select: "대화를 선택하세요.",
@@ -466,7 +466,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     q_g_account_2: "비밀번호를 잊어버렸어요.",
     a_g_account_2: "현재 비밀번호 재설정 기능은 지원하지 않습니다. 가입 시 사용한 로그인 정보 또는 소셜 로그인 수단을 다시 확인해 주세요.",
     q_g_account_3: "회원 탈퇴는 어떻게 하나요?",
-    a_g_account_3: "회원 탈퇴는 운영팀 문의로 진행됩니다.",
+    a_g_account_3: "회원 탈퇴는 운영팀이 도와드리고 있어요. 문의로 접수해 주세요.",
 
     // [FAQ Items - Host]
     // 호스트 시작
@@ -769,7 +769,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
 
     // Profile completion messages
     profile_completion_all_done: "게스트 공개 프로필이 모두 채워졌습니다.",
-    profile_completion_missing_guest: "{count}개 항목이 비어 있습니다. 예약 전 신뢰 형성과 대화 연결에 도움이 되는 정보입니다.",
+    profile_completion_missing_guest: "{count}개 항목이 비어 있습니다. 조금만 더 채우면, 호스트가 나를 더 잘 이해할 수 있어요.",
     profile_completion_missing_host: "{count}개 항목이 비어 있습니다. 노출 품질과 신뢰도에 영향을 줍니다.",
     no_reviews_yet_guest: "아직 받은 후기가 없습니다.",
     
@@ -1328,9 +1328,9 @@ const dictionary: Record<Locale, Record<string, string>> = {
     // [Host Dashboard & Profile - Missing Keys]
     he_profile_completion: "프로필 완성도",
     he_profile_done: "게스트 공개 프로필이 모두 채워졌습니다.",
-    he_profile_desc_1: "비어 있어도 저장은 가능하지만, 호스트가 예약 요청 전 먼저 확인하는 핵심 정보들입니다.",
-    he_profile_desc_2: "성향을 빠르게 파악할 수 있는 보조 정보입니다.",
-    he_profile_desc_3: "호스트와 대화가 자연스럽게 이어지는 공통 화제를 만들어 줍니다.",
+    he_profile_desc_1: "지금은 비워두어도 괜찮아요. 채워둘수록 호스트가 더 편하게 대화를 시작할 수 있어요.",
+    he_profile_desc_2: "MBTI는 내 성향을 가볍게 전하는 작은 힌트가 돼요.",
+    he_profile_desc_3: "직업이나 하는 일을 적고, 호스트와 공통 관심사를 만들어보세요.",
     he_profile_desc_4: "호스트가 예약 전 가장 먼저 보는 핵심 소개입니다. 여행 스타일과 기대를 짧게 적어두세요.",
     btn_complete: "완료",
     btn_edit_profile: "수정하기",
@@ -1686,7 +1686,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     // 👇 여기 추가
     saving: "Saving...",
     account_withdrawal_notice_title: "Account deletion",
-    account_withdrawal_notice_desc: "Please contact the operations team.",
+    account_withdrawal_notice_desc: "Our support team can help you delete your account. Please contact us to get started.",
     profile_photo_change_done: "Profile photo updated.",
     profile_photo_fail: "Upload failed:",
     profile_save_success: "Profile saved successfully.",
@@ -1698,7 +1698,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     ph_mbti: "e.g. ENFP",
     ph_bio: "Introduce yourself to the host (hobbies, travel style, etc.)",
     help_phone: "* Country code is auto-filled when selecting nationality.",
-    help_email: "* Your login email cannot be changed here right now.",
+    help_email: "* Your login email can't be changed here right now.",
     gender_select: "Select",
     host_honorific: " (Host)",
     msg_select: "Select a conversation",
@@ -1960,7 +1960,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     q_g_account_2: "I forgot my password.",
     a_g_account_2: "Password reset is not supported right now. Please check the login method or social sign-in option you originally used.",
     q_g_account_3: "How do I delete my account?",
-    a_g_account_3: "Please contact the operations team to delete your account. They will guide you through the required verification steps.",
+    a_g_account_3: "Our support team can help you delete your account. Please contact us to get started.",
 
     // [FAQ Items - Host]
     q_h_start_1: "Requirements to be a host?",
@@ -2261,7 +2261,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
 
     // Profile completion messages
     profile_completion_all_done: "Your guest profile is fully complete.",
-    profile_completion_missing_guest: "{count} field(s) are empty. This information helps build trust and start conversations before a booking.",
+    profile_completion_missing_guest: "{count} field(s) are empty. A little more information helps hosts get to know you better.",
     profile_completion_missing_host: "{count} field(s) are empty. This affects your listing quality and trustworthiness.",
     no_reviews_yet_guest: "No reviews received yet.",
     
@@ -2821,9 +2821,9 @@ const dictionary: Record<Locale, Record<string, string>> = {
     // [Host Dashboard & Profile - Missing Keys]
     he_profile_completion: "Profile Completion",
     he_profile_done: "Guest public profile is fully completed.",
-    he_profile_desc_1: "These are key details hosts check first before accepting a request, even though saving is possible when empty.",
-    he_profile_desc_2: "Secondary information to quickly understand personality.",
-    he_profile_desc_3: "Creates common topics for natural conversations with the host.",
+    he_profile_desc_1: "It's okay to leave this blank for now. The more you fill in, the easier it is for hosts to start a conversation.",
+    he_profile_desc_2: "Your MBTI gives hosts a quick hint about your personality.",
+    he_profile_desc_3: "Share what you do, and it may spark a common interest with your host.",
     he_profile_desc_4: "Core introduction hosts see first before booking. Briefly write your travel style and expectations.",
     btn_complete: "Complete",
     btn_edit_profile: "Edit",
@@ -3175,7 +3175,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     // 👇 여기 추가
     saving: "保存中...",
     account_withdrawal_notice_title: "退会",
-    account_withdrawal_notice_desc: "運営チームへお問い合わせください。",
+    account_withdrawal_notice_desc: "退会をご希望の場合は、運営チームがご案内します。お問い合わせください。",
     profile_photo_change_done: "プロフィール写真が変更されました。",
     profile_photo_fail: "アップロード失敗:",
     profile_save_success: "プロフィールが保存されました。",
@@ -3187,7 +3187,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     ph_mbti: "例: ENFP",
     ph_bio: "ホストに自己紹介してください（趣味、旅行スタイルなど）",
     help_phone: "* 国籍を選択すると国番号が自動入力されます。",
-    help_email: "* ログイン用メールアドレスは現在ここでは変更できません。",
+    help_email: "* ログイン用メールアドレスは現在この画面では変更できません。",
     gender_select: "選択してください",
     host_honorific: " ホスト",
     msg_select: "会話を選択してください",
@@ -3453,7 +3453,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     q_g_account_2: "パスワードを忘れました。",
     a_g_account_2: "現在、パスワード再設定機能は提供していません。登録時に利用したログイン方法またはソーシャルログイン手段をご確認ください。",
     q_g_account_3: "退会するにはどうすればよいですか？",
-    a_g_account_3: "退会をご希望の場合は、運営チームへお問い合わせください。本人確認後、必要な手続きをご案内します。",
+    a_g_account_3: "退会をご希望の場合は、運営チームがご案内します。お問い合わせください。",
 
     // [FAQ Items - Host]
     // ホスト開始
@@ -3756,7 +3756,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
 
     // Profile completion messages
     profile_completion_all_done: "ゲスト公開プロフィールが全て埋まりました。",
-    profile_completion_missing_guest: "{count}項目が空白です。予約前の信頼構築と会話のコネクションに役立つ情報です。",
+    profile_completion_missing_guest: "{count}項目が未入力です。少しだけ書き足すと、ホストがあなたのことをもっと理解しやすくなります。",
     profile_completion_missing_host: "{count}項目が空白です。掲載品質と信頼度に影響します。",
     no_reviews_yet_guest: "まだレビューが届いていません。",
     
@@ -4315,9 +4315,9 @@ const dictionary: Record<Locale, Record<string, string>> = {
     // [Host Dashboard & Profile - Missing Keys]
     he_profile_completion: "プロフィール完成度",
     he_profile_done: "ゲスト公開プロフィールがすべて入力されました。",
-    he_profile_desc_1: "空欄でも保存可能ですが、ホストが予約リクエストの前に確認する重要な情報です。",
-    he_profile_desc_2: "性格をすばやく把握するための補助情報です。",
-    he_profile_desc_3: "ホストとの会話が自然に弾む共通の話題を作ります。",
+    he_profile_desc_1: "今は空欄のままでも大丈夫です。書いておくほど、ホストが話しかけやすくなります。",
+    he_profile_desc_2: "MBTIは、あなたの人柄や雰囲気を気軽に伝える小さなヒントになります。",
+    he_profile_desc_3: "仕事や普段していることを書いて、ホストとの共通の話題を作ってみましょう。",
     he_profile_desc_4: "ホストが予約前に最初に確認する紹介文です。旅行のスタイルや期待を短く書いてください。",
     btn_complete: "完了",
     btn_edit_profile: "編集",
@@ -4668,7 +4668,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     btn_save_changes: "保存更改",
     saving: "保存中...",
     account_withdrawal_notice_title: "注销会员",
-    account_withdrawal_notice_desc: "请联系运营团队处理。",
+    account_withdrawal_notice_desc: "如需注销账号，请联系我们，运营团队会协助处理。",
     profile_photo_change_done: "头像已更改。",
     profile_photo_fail: "上传失败:",
     profile_save_success: "个人资料已保存。",
@@ -4680,7 +4680,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     ph_mbti: "例如 ENFP",
     ph_bio: "向房东简单介绍一下自己（爱好、旅行风格等）",
     help_phone: "* 选择国籍时会自动输入国家代码。",
-    help_email: "* 当前无法在此处更改登录邮箱。",
+    help_email: "* 当前暂不支持在这里更改登录邮箱。",
     gender_select: "请选择",
     host_honorific: " 房东",
     msg_select: "请选择对话",
@@ -4946,7 +4946,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     q_g_account_2: "忘记了密码。",
     a_g_account_2: "目前暂不支持密码重置功能。请确认您注册时使用的登录方式或社交登录方式。",
     q_g_account_3: "如何注销会员？",
-    a_g_account_3: "如需注销账号，请联系运营团队。完成身份确认后，我们会说明后续流程。",
+    a_g_account_3: "如需注销账号，请联系我们，运营团队会协助处理。",
 
     // [FAQ Items - Host]
     // 成为房东
@@ -5249,7 +5249,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
 
     // Profile completion messages
     profile_completion_all_done: "您的客人公开资料已全部完成。",
-    profile_completion_missing_guest: "{count}个项目为空。这些信息有助于预订前建立信任和连接对话。",
+    profile_completion_missing_guest: "还有{count}个项目空着。再补充一点，房东就能更好地了解你。",
     profile_completion_missing_host: "{count}个项目为空。这影响房源质量和信任度。",
     no_reviews_yet_guest: "尚无收到评价。",
 
@@ -5808,9 +5808,9 @@ const dictionary: Record<Locale, Record<string, string>> = {
     // [Host Dashboard & Profile - Missing Keys]
     he_profile_completion: "个人资料完整度",
     he_profile_done: "房客公开资料已全部填写完毕。",
-    he_profile_desc_1: "虽然留空也可以保存，但这些是房东在接受预订请求前会首先查看的核心信息。",
-    he_profile_desc_2: "能够快速了解性格的辅助信息。",
-    he_profile_desc_3: "制造与房东自然交流的共同话题。",
+    he_profile_desc_1: "现在先留空也没关系。填写得越完整，房东越容易自然地和你聊起来。",
+    he_profile_desc_2: "MBTI 能让房东更快了解你的性格和相处方式。",
+    he_profile_desc_3: "写下你的职业或正在做的事，也许能和房东找到共同话题。",
     he_profile_desc_4: "这是房东在预订前首先看到的核心介绍。请简要写下您的旅行风格和期望。",
     btn_complete: "完成",
     btn_edit_profile: "修改",

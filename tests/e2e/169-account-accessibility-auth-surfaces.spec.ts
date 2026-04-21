@@ -35,6 +35,20 @@ async function forceKoreanLocale(page: Page) {
   });
 }
 
+async function forceJapaneseLocale(page: Page) {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('app_lang', 'ja');
+    document.cookie = 'app_lang=ja; path=/';
+  });
+}
+
+async function forceChineseLocale(page: Page) {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('app_lang', 'zh');
+    document.cookie = 'app_lang=zh; path=/';
+  });
+}
+
 test.describe('Account accessibility auth surfaces', () => {
   test('requires password confirmation before signup submits', async ({ page }) => {
     let signupRequested = false;
@@ -74,8 +88,18 @@ test.describe('Account accessibility auth surfaces', () => {
     await login(page, user);
 
     await page.goto('/account', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByText('조금만 더 채우면, 호스트가 나를 더 잘 이해할 수 있어요.')).toBeVisible({ timeout: 15000 });
+    await expect(
+      page.getByText('지금은 비워두어도 괜찮아요. 채워둘수록 호스트가 더 편하게 대화를 시작할 수 있어요.')
+    ).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('MBTI는 내 성향을 가볍게 전하는 작은 힌트가 돼요.')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('직업이나 하는 일을 적고, 호스트와 공통 관심사를 만들어보세요.')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('* 로그인 이메일은 현재 여기서 변경할 수 없어요.')).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId('account-withdrawal-notice')).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId('account-withdrawal-notice')).toContainText(/회원 탈퇴/);
+    await expect(page.getByTestId('account-withdrawal-notice')).toContainText(
+      '탈퇴는 운영팀이 도와드리고 있어요. 문의로 접수해 주세요.'
+    );
   });
 
   test('signs out from the mobile account menu using the shared auth contract', async ({ page }) => {
@@ -126,6 +150,27 @@ test.describe('Account accessibility auth surfaces', () => {
     await expect(page.getByText('현재 비밀번호 재설정 기능은 지원하지 않습니다.')).toBeVisible({ timeout: 10000 });
 
     await page.getByRole('button', { name: '회원 탈퇴는 어떻게 하나요?' }).click();
-    await expect(page.getByText('회원 탈퇴는 운영팀 문의로 진행됩니다.')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('회원 탈퇴는 운영팀이 도와드리고 있어요. 문의로 접수해 주세요.')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('keeps account deletion FAQ localized across supported guest locales', async ({ page }) => {
+    await forceEnglishLocale(page);
+    await page.goto('/help', { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'How do I delete my account?' }).click();
+    await expect(
+      page.getByText('Our support team can help you delete your account. Please contact us to get started.')
+    ).toBeVisible({ timeout: 10000 });
+
+    await forceJapaneseLocale(page);
+    await page.goto('/help', { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: '退会するにはどうすればよいですか？' }).click();
+    await expect(
+      page.getByText('退会をご希望の場合は、運営チームがご案内します。お問い合わせください。')
+    ).toBeVisible({ timeout: 10000 });
+
+    await forceChineseLocale(page);
+    await page.goto('/help', { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: '如何注销会员？' }).click();
+    await expect(page.getByText('如需注销账号，请联系我们，运营团队会协助处理。')).toBeVisible({ timeout: 10000 });
   });
 });
