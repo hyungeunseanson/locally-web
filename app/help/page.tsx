@@ -1,21 +1,58 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
 import {
   Search, ChevronDown, ChevronUp, MessageCircle, Mail,
-  User, Briefcase, CreditCard, ShieldCheck, MapPin, Calendar, ArrowLeft
+  User, Briefcase, CreditCard, ShieldCheck, MapPin, Calendar, ArrowLeft, PhoneCall
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext';
-import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
+import { useLanguage } from '@/app/context/LanguageContext';
 import { useViewMode } from '@/app/context/ViewModeContext';
 import { useAuth } from '@/app/context/AuthContext';
 import { useLocallyMembership } from '@/app/hooks/useLocallyMembership';
 import { OFFICIAL_SUPPORT_EMAIL } from '@/app/utils/officialSender';
+import {
+  HELP_FAQ_CONTENT,
+  type HelpFaqIconKey,
+  type HelpTab,
+} from '@/app/help/faqContent';
+
+const getCategoryIcon = (iconKey: HelpFaqIconKey) => {
+  const size = 24;
+  const strokeWidth = 1.5;
+
+  switch (iconKey) {
+    case 'prebooking':
+      return <MapPin size={size} strokeWidth={strokeWidth} />;
+    case 'payment':
+    case 'payout':
+      return <CreditCard size={size} strokeWidth={strokeWidth} />;
+    case 'message':
+      return <MessageCircle size={size} strokeWidth={strokeWidth} />;
+    case 'cancellation':
+    case 'policy':
+      return <ShieldCheck size={size} strokeWidth={strokeWidth} />;
+    case 'service':
+    case 'review':
+    case 'jobs':
+      return <Briefcase size={size} strokeWidth={strokeWidth} />;
+    case 'matching':
+    case 'operation':
+      return <Calendar size={size} strokeWidth={strokeWidth} />;
+    case 'proxy':
+      return <PhoneCall size={size} strokeWidth={strokeWidth} />;
+    case 'care':
+    case 'account':
+    case 'profile':
+    default:
+      return <User size={size} strokeWidth={strokeWidth} />;
+  }
+};
 
 export default function HelpCenterPage() {
-  const { t, lang } = useLanguage(); // 🟢 추가
+  const { t, lang } = useLanguage();
   const { user } = useAuth();
   const { hasLocallyCare } = useLocallyMembership(user?.id);
   const supportCopy = (() => {
@@ -85,86 +122,8 @@ export default function HelpCenterPage() {
       supportEmailNote: '공식 고객지원 메일',
     };
   })();
-
-  // 🟢 FAQ 데이터 (t 함수 사용을 위해 컴포넌트 내부로 이동)
-  const FAQ_DATA = {
-    guest: [
-      {
-        category: t('faq_cat_booking'),
-        icon: <CreditCard size={24} strokeWidth={1.5} />,
-        items: [
-          { q: t('q_g_booking_1'), a: t('a_g_booking_1') },
-          { q: t('q_g_booking_2'), a: t('a_g_booking_2') },
-          { q: t('q_g_booking_3'), a: t('a_g_booking_3') },
-          { q: t('q_g_booking_4'), a: t('a_g_booking_4') },
-          { q: t('q_g_booking_5'), a: t('a_g_booking_5') }
-        ]
-      },
-      {
-        category: t('faq_cat_experience'),
-        icon: <MapPin size={24} strokeWidth={1.5} />,
-        items: [
-          { q: t('q_g_exp_1'), a: t('a_g_exp_1') },
-          { q: t('q_g_exp_2'), a: t('a_g_exp_2') },
-          { q: t('q_g_exp_3'), a: t('a_g_exp_3') },
-          { q: t('q_g_exp_4'), a: t('a_g_exp_4') },
-          { q: t('q_g_exp_5'), a: t('a_g_exp_5') },
-          { q: t('q_g_exp_6'), a: t('a_g_exp_6') },
-          { q: t('q_g_exp_7'), a: t('a_g_exp_7') }
-        ]
-      },
-      {
-        category: t('faq_cat_cancellation'),
-        icon: <ShieldCheck size={24} strokeWidth={1.5} />,
-        items: [
-          { q: t('q_g_cancel_1'), a: t('a_g_cancel_1') },
-          { q: t('q_g_cancel_2'), a: t('a_g_cancel_2') },
-          { q: t('q_g_cancel_3'), a: t('a_g_cancel_3') },
-          { q: t('q_g_cancel_4'), a: t('a_g_cancel_4') },
-          { q: t('q_g_cancel_5'), a: t('a_g_cancel_5') }
-        ]
-      },
-      {
-        category: t('faq_cat_account'),
-        icon: <User size={24} strokeWidth={1.5} />,
-        items: [
-          { q: t('q_g_account_1'), a: t('a_g_account_1') },
-          { q: t('q_g_account_2'), a: t('a_g_account_2') },
-          { q: t('q_g_account_3'), a: t('a_g_account_3') }
-        ]
-      }
-    ],
-    host: [
-      {
-        category: t('faq_cat_start'),
-        icon: <Briefcase size={24} strokeWidth={1.5} />,
-        items: [
-          { q: t('q_h_start_1'), a: t('a_h_start_1') },
-          { q: t('q_h_start_2'), a: t('a_h_start_2') },
-          { q: t('q_h_start_3'), a: t('a_h_start_3') },
-          { q: t('q_h_start_4'), a: t('a_h_start_4') },
-          { q: t('q_h_start_5'), a: t('a_h_start_5') },
-          { q: t('q_h_start_6'), a: t('a_h_start_6') },
-          { q: t('q_h_start_7'), a: t('a_h_start_7') },
-          { q: t('q_h_start_8'), a: t('a_h_start_8') },
-          { q: t('q_h_start_9'), a: t('a_h_start_9') }
-        ]
-      },
-      {
-        category: t('faq_cat_operation'),
-        icon: <Calendar size={24} strokeWidth={1.5} />,
-        items: [
-          { q: t('q_h_oper_1'), a: t('a_h_oper_1') },
-          { q: t('q_h_oper_2'), a: t('a_h_oper_2') },
-          { q: t('q_h_oper_3'), a: t('a_h_oper_3') },
-          { q: t('q_h_oper_4'), a: t('a_h_oper_4') },
-          { q: t('q_h_oper_5'), a: t('a_h_oper_5') }
-        ]
-      }
-    ]
-  };
   const { isHostView } = useViewMode();
-  const [activeTab, setActiveTab] = useState<'guest' | 'host'>(
+  const [activeTab, setActiveTab] = useState<HelpTab>(
     isHostView ? 'host' : 'guest'
   );
   const [searchTerm, setSearchTerm] = useState('');
@@ -180,18 +139,38 @@ export default function HelpCenterPage() {
     setActiveTab(isHostView ? 'host' : 'guest');
   }, [isHostView]);
 
-  const toggleItem = (catIdx: number, itemIdx: number) => {
-    const key = `${catIdx}-${itemIdx}`;
+  const faqContent = HELP_FAQ_CONTENT[lang];
+  const activeCategories = faqContent[activeTab];
+  const normalizedSearchTerm = searchTerm.trim().toLowerCase();
+
+  const toggleItem = (categoryId: string, itemId: string) => {
+    const key = `${categoryId}-${itemId}`;
     setOpenItems(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
-  // 검색 로직
-  const filteredData = FAQ_DATA[activeTab].map(category => ({
-    ...category,
-    items: category.items.filter(item =>
-      item.q.includes(searchTerm) || item.a.includes(searchTerm)
-    )
-  })).filter(category => category.items.length > 0);
+  useEffect(() => {
+    setOpenItems({});
+  }, [activeTab, normalizedSearchTerm]);
+
+  const filteredData = useMemo(() => {
+    return activeCategories
+      .map((category) => ({
+        ...category,
+        items: normalizedSearchTerm
+          ? category.items.filter((item) =>
+              [item.q, item.a, ...item.searchTerms].some((value) =>
+                value.toLowerCase().includes(normalizedSearchTerm)
+              )
+            )
+          : category.items,
+      }))
+      .filter((category) => category.items.length > 0);
+  }, [activeCategories, normalizedSearchTerm]);
+
+  const handleFeaturedTopicClick = (topic: { query: string; tab: HelpTab }) => {
+    setActiveTab(topic.tab);
+    setSearchTerm(topic.query);
+  };
 
   const handleMobileBack = () => {
     if (typeof window !== 'undefined' && window.history.length > 1) {
@@ -300,6 +279,38 @@ export default function HelpCenterPage() {
         </div>
 
         <div
+          data-testid="help-featured-topics"
+          className="mx-auto mb-8 max-w-4xl rounded-3xl border border-slate-200 bg-white px-4 py-4 md:mb-12 md:px-6 md:py-5"
+        >
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 md:text-[12px]">
+              {faqContent.featuredTitle}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {faqContent.featuredTopics.map((topic) => {
+                const isActive = activeTab === topic.tab && normalizedSearchTerm === topic.query.toLowerCase();
+
+                return (
+                  <button
+                    key={topic.id}
+                    type="button"
+                    data-testid={`help-featured-topic-${topic.id}`}
+                    onClick={() => handleFeaturedTopicClick(topic)}
+                    className={`rounded-full border px-3 py-2 text-[12px] font-semibold transition-colors md:text-[13px] ${
+                      isActive
+                        ? 'border-black bg-black text-white'
+                        : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-slate-100'
+                    }`}
+                  >
+                    {topic.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div
           data-testid="help-inbox-reply-strip"
           className="mx-auto mb-8 md:mb-12 max-w-3xl rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-center"
         >
@@ -331,22 +342,23 @@ export default function HelpCenterPage() {
           </div>
         ) : (
           <div className="space-y-9 md:space-y-20">
-            {filteredData.map((category, catIdx) => (
-              <div key={catIdx}>
+            {filteredData.map((category) => (
+              <div key={category.id} data-testid={`help-category-${category.id}`}>
                 {/* 카테고리 제목 */}
                 <div className="flex items-center gap-2 md:gap-3 mb-3 md:mb-8 border-b border-black pb-2.5 md:pb-4">
-                  <span className="p-1.5 md:p-2 border border-black rounded-full">{category.icon}</span>
-                  <h2 className="text-[16px] md:text-2xl font-bold tracking-tight">{category.category}</h2>
+                  <span className="p-1.5 md:p-2 border border-black rounded-full">{getCategoryIcon(category.icon)}</span>
+                  <h2 className="text-[16px] md:text-2xl font-bold tracking-tight">{category.label}</h2>
                 </div>
 
                 {/* 질문 목록 */}
                 <div className="space-y-0">
-                  {category.items.map((item, itemIdx) => {
-                    const isOpen = openItems[`${catIdx}-${itemIdx}`];
+                  {category.items.map((item) => {
+                    const itemKey = `${category.id}-${item.id}`;
+                    const isOpen = openItems[itemKey];
                     return (
-                      <div key={itemIdx} className="border-b border-gray-200">
+                      <div key={item.id} className="border-b border-gray-200">
                         <button
-                          onClick={() => toggleItem(catIdx, itemIdx)}
+                          onClick={() => toggleItem(category.id, item.id)}
                           className="w-full py-4 md:py-6 flex justify-between items-start text-left group hover:bg-gray-50 transition-colors px-4 -mx-4 rounded-lg"
                         >
                           <span className="text-[13px] md:text-lg font-medium text-[#222222] pr-6 md:pr-8 group-hover:underline decoration-2 underline-offset-4">{item.q}</span>
@@ -356,8 +368,8 @@ export default function HelpCenterPage() {
                         </button>
 
                         {/* 답변 내용 */}
-                        <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isOpen ? 'max-h-96 opacity-100 pb-6 md:pb-8' : 'max-h-0 opacity-0'}`}>
-                          <div className="px-4 text-[14px] md:text-base text-[#484848] leading-relaxed max-w-3xl font-light">
+                        <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isOpen ? 'max-h-[48rem] opacity-100 pb-6 md:pb-8' : 'max-h-0 opacity-0'}`}>
+                          <div className="max-w-3xl whitespace-pre-line px-4 text-[14px] font-light leading-relaxed text-[#484848] md:text-base">
                             {item.a}
                           </div>
                         </div>

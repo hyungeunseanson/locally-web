@@ -1,18 +1,71 @@
 import { expect, test } from '@playwright/test';
 
 test.describe('Help Center self-service copy', () => {
-  test('shows inbox reply guidance, support CTA, and the public support email owner', async ({ page }) => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('app_lang', 'ko');
+      document.cookie = 'app_lang=ko; path=/';
+    });
+  });
+
+  test('shows expanded guest help categories and support surfaces without legacy eSIM copy', async ({ page }) => {
     await page.goto('/help', { waitUntil: 'networkidle' });
 
+    await expect(page.getByTestId('help-featured-topics')).toBeVisible();
     await expect(page.getByTestId('help-inbox-reply-strip')).toBeVisible();
+    await expect(page.getByTestId('help-category-guest-service-request')).toBeVisible();
+    await expect(page.getByTestId('help-category-guest-service-matching')).toBeVisible();
+    await expect(page.getByTestId('help-category-guest-proxy')).toBeVisible();
+    await expect(page.getByTestId('help-category-guest-care')).toBeVisible();
+    await expect(page.getByTestId('help-category-guest-cancellation')).toBeVisible();
+    await expect(page.locator('body')).not.toContainText('eSIM');
+
     await expect(page.getByTestId('help-public-support-email')).toHaveAttribute(
       'href',
       /mailto:locally\.partners@gmail\.com\?subject=Locally%20Support/
     );
     await expect(page.getByTestId('help-public-support-email-note')).toContainText('locally.partners@gmail.com');
+  });
+
+  test('shows expanded host help categories', async ({ page }) => {
+    await page.goto('/help', { waitUntil: 'networkidle' });
+
+    await page.getByRole('button', { name: '호스트 (For Hosts)' }).click();
+
+    await expect(page.getByTestId('help-category-host-review')).toBeVisible();
+    await expect(page.getByTestId('help-category-host-profile')).toBeVisible();
+    await expect(page.getByTestId('help-category-host-operation')).toBeVisible();
+    await expect(page.getByTestId('help-category-host-jobs')).toBeVisible();
+    await expect(page.getByTestId('help-category-host-payout')).toBeVisible();
+    await expect(page.getByTestId('help-category-host-policy')).toBeVisible();
+  });
+
+  test('routes key search terms to FAQ results before falling back to inquiry empty state', async ({ page }) => {
+    await page.goto('/help', { waitUntil: 'networkidle' });
+
+    await page.getByRole('textbox').fill('입금');
+    await expect(page.getByText('무통장 입금은 언제까지 해야 하나요?')).toBeVisible();
+    await expect(page.getByTestId('help-search-empty-state')).toHaveCount(0);
+
+    await page.getByRole('textbox').fill('PayPal');
+    await expect(page.getByText('카드·무통장·PayPal 중 어떤 결제가 가능한가요?')).toBeVisible();
+
+    await page.getByRole('textbox').fill('1인 예약');
+    await expect(page.getByText('1인 출발 보장 옵션은 언제 필요한가요?')).toBeVisible();
+
+    await page.getByRole('textbox').fill('호스트 선택');
+    await expect(page.getByText('여러 지원자 중 누구를 어떻게 선택하나요?')).toBeVisible();
+
+    await page.getByRole('textbox').fill('전화예약');
+    await expect(page.getByText('전화예약으로 어떤 문의를 맡길 수 있나요?')).toBeVisible();
+
+    await page.getByRole('textbox').fill('Tier 2');
+    await expect(page.getByText('Tier 1과 Tier 2 차이는 무엇인가요?')).toBeVisible();
+
+    await page.getByRole('textbox').fill('노쇼');
+    await expect(page.getByText('당일 지각·노쇼는 어떻게 처리되나요?')).toBeVisible();
 
     await page.getByRole('textbox').fill('playwright-no-faq-match');
-
     await expect(page.getByTestId('help-search-empty-state')).toBeVisible();
     await expect(page.getByTestId('help-search-empty-cta')).toBeVisible();
   });
