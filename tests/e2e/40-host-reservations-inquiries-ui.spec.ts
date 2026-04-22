@@ -57,6 +57,24 @@ function createUser(prefix: string): TestUser {
   };
 }
 
+function formatKstDate(value: Date) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(value);
+}
+
+function formatKstTime(value: Date) {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Seoul',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(value);
+}
+
 async function waitForProfile(userId: string) {
   const supabase = getAdminClient();
 
@@ -232,6 +250,48 @@ async function createBooking(params: {
     guests: 1,
     date: bookingDate.toISOString().slice(0, 10),
     time: '10:00',
+    type: 'group',
+    contact_name: params.guest.fullName,
+    contact_phone: params.guest.phone,
+    message: '',
+    created_at: new Date().toISOString(),
+    payment_method: 'bank',
+    host_payout_amount: 24000,
+    platform_revenue: 9000,
+    payout_status: 'pending',
+    cancel_reason: params.cancelReason || null,
+    is_solo_guarantee: false,
+    solo_guarantee_price: 0,
+  });
+
+  if (error) throw error;
+  createdBookingIds.push(bookingId);
+  return bookingId;
+}
+
+async function createTimedBooking(params: {
+  guestId: string;
+  guest: TestUser;
+  experienceId: number;
+  status: 'PAID' | 'confirmed' | 'completed' | 'pending';
+  startsAt: Date;
+  cancelReason?: string;
+}) {
+  const supabase = getAdminClient();
+  const bookingId = `HOST-DASH-TIMED-${params.status}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+  const { error } = await supabase.from('bookings').insert({
+    id: bookingId,
+    order_id: bookingId,
+    user_id: params.guestId,
+    experience_id: params.experienceId,
+    amount: 33000,
+    total_price: 30000,
+    total_experience_price: 30000,
+    status: params.status,
+    guests: 1,
+    date: formatKstDate(params.startsAt),
+    time: formatKstTime(params.startsAt),
     type: 'group',
     contact_name: params.guest.fullName,
     contact_phone: params.guest.phone,
@@ -628,6 +688,85 @@ test.describe.serial('Host dashboard reservations and inquiries UI coverage', ()
     await expect(page.getByRole('heading', { name: pendingGuest.fullName })).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId('guest-profile-membership-badge')).toHaveCount(0);
     await expect(page.getByTestId('guest-profile-membership-desc')).toHaveCount(0);
+  });
+
+  test('moves same-day started reservations into past trips and unlocks host guest review after sync', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const host = createUser('host-same-day-complete');
+    const overdueGuest = createUser('guest-same-day-overdue');
+    const pendingGuest = createUser('guest-same-day-pending');
+
+    const hostId = await createAuthUser(host);
+    const overdueGuestId = await createAuthUser(overdueGuest);
+    const pendingGuestId = await createAuthUser(pendingGuest);
+
+    await createApprovedHostApplication(hostId, host);
+    await seedGuestProfile(overdueGuestId, overdueGuest, {
+      introduction: '같은 날 지난 예약 리뷰 동기화 검증용 게스트입니다.',
+    });
+    await seedGuestProfile(pendingGuestId, pendingGuest, {
+      introduction: '같은 날 시작된 pending 예약 경계조건 검증용 게스트입니다.',
+    });
+
+    const experience = await createExperienceFixture(hostId);
+    const overdueStartsAt = new Date(Date.now() - 70 * 60 * 1000);
+    const pendingStartsAt = new Date(Date.now() - 40 * 60 * 1000);
+    const overdueBookingId = await createTimedBooking({
+      guestId: overdueGuestId,
+      guest: overdueGuest,
+      experienceId: experience.id,
+      status: 'confirmed',
+      startsAt: overdueStartsAt,
+    });
+    const pendingBookingId = await createTimedBooking({
+      guestId: pendingGuestId,
+      guest: pendingGuest,
+      experienceId: experience.id,
+      status: 'pending',
+      startsAt: pendingStartsAt,
+    });
+
+    await login(page, host);
+    await page.goto('/host/dashboard?tab=reservations', { waitUntil: 'networkidle' });
+    await dismissAnnouncementIfVisible(page);
+
+    await expect(page.getByTestId(`reservation-card-${overdueBookingId}`)).toHaveCount(0);
+    const pendingCard = page.getByTestId(`reservation-card-${pendingBookingId}`);
+    await expect(pendingCard).toBeVisible({ timeout: 15000 });
+    await expect(pendingCard).not.toContainText(/종료|Ended|終了|已结束/);
+    await expect(pendingCard).not.toContainText('D-1');
+    await expect(pendingCard.getByRole('button', { name: /게스트 후기|Write Review/ })).toHaveCount(0);
+
+    await page.getByRole('button', { name: /지난 일정|Past Trips|Completed/ }).click();
+
+    const overdueCard = page.getByTestId(`reservation-card-${overdueBookingId}`);
+    await expect(overdueCard).toBeVisible({ timeout: 15000 });
+    await expect(overdueCard).toContainText(/종료|Ended|終了|已结束/);
+    await expect(overdueCard).not.toContainText('D-1');
+    await expect(page.getByTestId(`reservation-card-${pendingBookingId}`)).toHaveCount(0);
+
+    await overdueCard.getByRole('button', { name: /게스트 후기|Write Review/ }).click();
+    await expect(page.getByRole('heading', { name: /게스트 후기 작성|Write Guest Review|ゲストレビューを作成|撰写客房点评/ })).toBeVisible({
+      timeout: 15000,
+    });
+
+    const supabase = getAdminClient();
+    await expect
+      .poll(async () => {
+        const { data, error } = await supabase
+          .from('bookings')
+          .select('status')
+          .eq('id', overdueBookingId)
+          .maybeSingle();
+
+        if (error) throw error;
+        return data?.status || null;
+      }, {
+        timeout: 15000,
+        intervals: [500, 1000, 1500],
+      })
+      .toBe('completed');
   });
 
   test('opens inquiry chat from a reservation card and sends a host reply', async ({ page }) => {

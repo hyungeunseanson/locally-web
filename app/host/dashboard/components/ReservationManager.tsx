@@ -11,12 +11,16 @@ import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 1. import 추가
 import GuestReviewModal from './GuestReviewModal'; // 모달 추가
 import {
+  isCompletedBookingStatus,
   isCancellationRequestedBookingStatus,
   isCancelledBookingStatus,
-  isPendingBookingStatus,
 } from '@/app/constants/bookingStatus';
 import { getHostDashboardHref } from '@/app/host/dashboard/navigation';
 import type { LocallyMembershipStatus } from '@/app/utils/memberStatus';
+import {
+  getEffectiveCompletedStatus,
+  isOverdueActiveBooking,
+} from '@/app/utils/bookingStartTime';
 
 // 컴포넌트
 import ReservationCard from './ReservationCard';
@@ -61,6 +65,7 @@ type ReservationRecord = {
   cancel_reason?: string | null;
   refund_amount?: number | null;
   host_payout_amount?: number | null;
+  raw_status?: string | null;
   guest?: ReservationGuest | null;
   experiences?: ReservationExperience | null;
 };
@@ -92,6 +97,13 @@ type GuestReviewBookingIdRow = {
 type GuestMembershipResponse = {
   success?: boolean;
   memberships?: Record<string, LocallyMembershipStatus>;
+};
+
+type HostReservationCompletedSyncResponse = {
+  success?: boolean;
+  updatedCount?: number;
+  updatedIds?: Array<string | number>;
+  error?: string;
 };
 
 const RESERVATION_SELECT = `
@@ -154,6 +166,7 @@ export default function ReservationManager() {
   const hostUserIdRef = useRef<string | null>(null);
   const realtimeRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const membershipRequestSeqRef = useRef(0);
+  const backgroundCompletedSyncInFlightRef = useRef(false);
 
   const [activeTab, setActiveTab] = useState<'upcoming' | 'completed' | 'cancelled'>('upcoming');
   const [reservations, setReservations] = useState<ReservationRecord[]>([]);
@@ -256,6 +269,37 @@ export default function ReservationManager() {
     }
   }, []);
 
+  const syncCompletedReservations = useCallback(async (
+    bookingIds?: Array<string | number>,
+    options?: { silent?: boolean }
+  ) => {
+    try {
+      const response = await fetch('/api/host/reservations/sync-completed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bookingIds: bookingIds?.map((bookingId) => String(bookingId)),
+        }),
+      });
+
+      const payload = (await response.json()) as HostReservationCompletedSyncResponse;
+      if (!response.ok || !payload?.success) {
+        throw new Error(payload?.error || 'Failed to sync completed reservations.');
+      }
+
+      return {
+        updatedCount: typeof payload.updatedCount === 'number' ? payload.updatedCount : 0,
+        updatedIds: Array.isArray(payload.updatedIds) ? payload.updatedIds.map((bookingId) => String(bookingId)) : [],
+      };
+    } catch (error) {
+      console.error('[ReservationManager] completed reservation sync failed:', error);
+      if (!options?.silent) {
+        showToast(t('res_toast_error_load'), 'error');
+      }
+      return null;
+    }
+  }, [showToast, t]);
+
   const fetchReservations = useCallback(async (isBackground = false) => {
     try {
       if (!isBackground) setLoading(true);
@@ -277,11 +321,19 @@ export default function ReservationManager() {
         .eq('experiences.host_id', hostUserId);
 
       if (error) throw error;
-      const nextReservations = ((data as RawReservationRecord[] | null) || []).map((reservation) => ({
-        ...reservation,
-        guest: getSingleGuest(reservation.guest),
-        experiences: getSingleExperience(reservation.experiences),
-      }));
+      const now = new Date();
+      const nextReservations = ((data as RawReservationRecord[] | null) || []).map((reservation) => {
+        const rawStatus = reservation.status;
+        const effectiveStatus = getEffectiveCompletedStatus(rawStatus, reservation.date, reservation.time, now);
+
+        return {
+          ...reservation,
+          status: effectiveStatus,
+          raw_status: rawStatus,
+          guest: getSingleGuest(reservation.guest),
+          experiences: getSingleExperience(reservation.experiences),
+        };
+      });
       setReservations(nextReservations);
       void fetchGuestMembershipStatuses(nextReservations.map((reservation) => reservation.user_id));
 
@@ -309,6 +361,30 @@ export default function ReservationManager() {
         }
       }
 
+      const overdueActiveBookingIds = nextReservations
+        .filter((reservation) =>
+          isOverdueActiveBooking(
+            reservation.raw_status || '',
+            reservation.date,
+            reservation.time,
+            now
+          )
+        )
+        .map((reservation) => reservation.id);
+
+      if (overdueActiveBookingIds.length > 0 && !backgroundCompletedSyncInFlightRef.current) {
+        backgroundCompletedSyncInFlightRef.current = true;
+        void syncCompletedReservations(overdueActiveBookingIds, { silent: true })
+          .then((result) => {
+            if (result?.updatedCount) {
+              void fetchReservations(true);
+            }
+          })
+          .finally(() => {
+            backgroundCompletedSyncInFlightRef.current = false;
+          });
+      }
+
     } catch (error) {
       console.error(error);
       // ✅ [복구] 에러 메시지 설정
@@ -317,7 +393,7 @@ export default function ReservationManager() {
     } finally {
       if (!isBackground) setLoading(false);
     }
-  }, [fetchGuestMembershipStatuses, getHostUserId, showToast, supabase, t]);
+  }, [fetchGuestMembershipStatuses, getHostUserId, showToast, supabase, syncCompletedReservations, t]);
 
   const scheduleRealtimeRefresh = useCallback(() => {
     clearRealtimeRefresh();
@@ -398,21 +474,14 @@ export default function ReservationManager() {
   const isReservationInTab = useCallback((r: ReservationRecord, tab: 'upcoming' | 'completed' | 'cancelled') => {
     const isCancelled = isCancelledBookingStatus(r.status) && !isCancellationRequestedBookingStatus(r.status);
     const isRequesting = isCancellationRequestedBookingStatus(r.status);
-
-    const [year, month, day] = r.date.split('-').map(Number);
-    const tripDate = new Date(year, month - 1, day);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const isPending = isPendingBookingStatus(r.status); // 🟢 추가
+    const isCompleted = isCompletedBookingStatus(r.status);
 
     if (tab === 'cancelled') return isCancelled || isRequesting;
     if (isCancelled) return false;
 
-    // 🟢 [수정] PENDING 상태도 '예정된 예약'으로 취급
-    if (tab === 'upcoming') return tripDate >= today || isRequesting || isPending;
+    if (tab === 'upcoming') return !isCompleted && !isRequesting;
 
-    if (tab === 'completed') return tripDate < today && !isRequesting && !isPending;
+    if (tab === 'completed') return isCompleted && !isRequesting;
     return true;
   }, []);
 
@@ -429,14 +498,10 @@ export default function ReservationManager() {
   });
 
   const actionableReservationCount = reservations.filter((reservation) => {
-    const [year, month, day] = reservation.date.split('-').map(Number);
-    const tripDate = new Date(year, month - 1, day);
-    const baseToday = new Date();
-    baseToday.setHours(0, 0, 0, 0);
     return (
       !isCancelledBookingStatus(reservation.status) &&
       !isCancellationRequestedBookingStatus(reservation.status) &&
-      (tripDate >= baseToday || isPendingBookingStatus(reservation.status))
+      !isCompletedBookingStatus(reservation.status)
     );
   }).length;
   const cancellationRequestCount = reservations.filter((reservation) =>
@@ -583,18 +648,36 @@ export default function ReservationManager() {
                 // 🟢 [추가] 후기 관련 Props
                 hasReview={reviewedBookingIds.includes(String(res.id))}
                 onReview={() => {
-                  const [year, month, day] = res.date.split('-').map(Number);
-                  const tripDate = new Date(year, month - 1, day);
-                  const today = new Date();
-                  today.setHours(0, 0, 0, 0);
+                  const syncAndOpenReview = async () => {
+                    const shouldSyncBeforeReview = isOverdueActiveBooking(
+                      res.raw_status || '',
+                      res.date,
+                      res.time
+                    );
 
-                  if (tripDate >= today) {
-                    showToast(t('res_review_before_tour'), 'error');
-                    return;
-                  }
+                    if (!isCompletedBookingStatus(res.status) && !shouldSyncBeforeReview) {
+                      showToast(t('res_review_before_tour'), 'error');
+                      return;
+                    }
 
-                  setSelectedBookingForReview(res);
-                  setReviewModalOpen(true);
+                    if (shouldSyncBeforeReview) {
+                      const syncResult = await syncCompletedReservations([res.id]);
+                      if (!syncResult) {
+                        return;
+                      }
+
+                      void fetchReservations(true);
+                    }
+
+                    setSelectedBookingForReview({
+                      ...res,
+                      raw_status: 'completed',
+                      status: 'completed',
+                    });
+                    setReviewModalOpen(true);
+                  };
+
+                  void syncAndOpenReview();
                 }}
 
               />

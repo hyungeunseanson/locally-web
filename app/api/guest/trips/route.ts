@@ -1,6 +1,6 @@
 import { createClient } from '@/app/utils/supabase/server';
 import { NextResponse } from 'next/server';
-import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
+import { isOverdueActiveBooking } from '@/app/utils/bookingStartTime';
 import { getHostPublicProfile } from '@/app/utils/profile';
 
 const GUEST_TRIPS_BOOKING_SELECT = `
@@ -117,7 +117,6 @@ export async function GET() {
 
     for (const booking of bookings || []) {
       const experience = normalizeBookingExperience(booking.experiences);
-      const expDate = new Date(`${booking.date}T${booking.time || '00:00'}`);
       let status = booking.status;
       const hostPublicProfile = experience?.host_id
         ? getHostPublicProfile(
@@ -129,7 +128,7 @@ export async function GET() {
 
       // 시간이 지난 활성 예약(PAID, confirmed)은 응답에서만 completed로 계산한다.
       // 실제 DB sync는 별도 POST /api/guest/trips/sync-completed 에서 처리한다.
-      if (expDate < now && BOOKING_ACTIVE_STATUS_FOR_CAPACITY.includes(status)) {
+      if (isOverdueActiveBooking(status, booking.date, booking.time, now)) {
         status = 'completed';
         syncCompletedNeeded = true;
       }

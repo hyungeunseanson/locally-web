@@ -15,6 +15,11 @@ import {
   isConfirmedBookingStatus,
   isPendingBookingStatus,
 } from '@/app/constants/bookingStatus';
+import {
+  getBookingCalendarDate,
+  getBookingCalendarDayDiff,
+  hasBookingStarted,
+} from '@/app/utils/bookingStartTime';
 import { getBookingHostPayout } from '@/app/utils/bookingFinance';
 import {
   getBookingReviewDetail,
@@ -74,22 +79,16 @@ export default function ReservationCard({
   };
 
   const getDDay = (dateString: string) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const target = new Date(dateString);
-    const diff = Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    const dayDiff = getBookingCalendarDayDiff(dateString);
 
-    if (diff < 0) return t('res_card_ended'); // 🟢 번역
-    if (diff === 0) return t('res_card_today'); // 🟢 번역
-    return `D-${diff}`;
+    if (isCompletedBookingStatus(res.status)) return t('res_card_ended');
+    if (dayDiff == null) return '-';
+    if (dayDiff <= 0) return t('res_card_today');
+    return `D-${dayDiff}`;
   };
 
-  const renderStatusBadge = (status: string, date: string) => {
-    // 🟢 날짜 비교 (오늘 자정 기준)
-    const targetDate = new Date(date);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const isPast = targetDate < today;
+  const renderStatusBadge = (status: string, date: string, time?: string | null) => {
+    const hasStarted = hasBookingStarted(date, time);
 
     if (isCancellationRequestedBookingStatus(status))
       return <span className="bg-orange-100 text-orange-700 text-[10px] px-2 py-1 rounded-full font-bold animate-pulse flex items-center gap-1"><AlertTriangle size={10} /> {t('res_status_req')}</span>;
@@ -107,7 +106,7 @@ export default function ReservationCard({
 
     // 🟢 [수정] PENDING 제거됨 (확정된 상태만 남김)
     if (isConfirmedBookingStatus(status)) {
-      return isPast
+      return hasStarted
         ? <span className="bg-slate-100 text-slate-600 text-[10px] px-2 py-1 rounded-full font-bold">{t('res_status_completed')}</span> // 이용 완료
         : <span className="bg-green-100 text-green-700 text-[10px] px-2 py-1 rounded-full font-bold flex items-center gap-1"><CheckCircle2 size={10} /> {t('res_status_paid')}</span>; // 예약 확정
     }
@@ -117,11 +116,8 @@ export default function ReservationCard({
 
   const dDay = getDDay(res.date);
   const isConfirmed = isConfirmedBookingStatus(res.status);
-  const targetDate = new Date(res.date);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const isPast = targetDate < today;
-  const canReview = isPast && isCompletedBookingStatus(res.status) && !isCancelledBookingStatus(res.status);
+  const hasStarted = hasBookingStarted(res.date, res.time);
+  const canReview = hasStarted && isCompletedBookingStatus(res.status) && !isCancelledBookingStatus(res.status);
   const showDesktopReviewButton = canReview;
   const orderDisplay = String(res.order_id || res.id);
   const guestCount = res.guests ?? 0;
@@ -139,7 +135,11 @@ export default function ReservationCard({
   }) : '';
 
   // 🟢 월(Month) 이름도 언어에 맞게 변환
-  const monthName = new Date(res.date).toLocaleString(localeMap[lang], { month: 'short' });
+  const bookingCalendarDate = getBookingCalendarDate(res.date);
+  const monthName = bookingCalendarDate
+    ? bookingCalendarDate.toLocaleString(localeMap[lang], { month: 'short' })
+    : '-';
+  const bookingDay = bookingCalendarDate?.getDate() ?? '-';
 
   return (
     <div
@@ -177,7 +177,7 @@ export default function ReservationCard({
             </div>
           </div>
           <div className="shrink-0">
-            {renderStatusBadge(res.status, res.date)}
+            {renderStatusBadge(res.status, res.date, res.time)}
           </div>
         </div>
 
@@ -192,7 +192,7 @@ export default function ReservationCard({
               {dDay}
             </span>
             <span className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{monthName}</span>
-            <span className="mt-1 text-[24px] font-black leading-none text-slate-900">{new Date(res.date).getDate()}</span>
+            <span className="mt-1 text-[24px] font-black leading-none text-slate-900">{bookingDay}</span>
             <span className="mt-1 text-[10px] font-medium text-slate-300">{res.time || '-'}</span>
           </div>
 
@@ -288,7 +288,7 @@ export default function ReservationCard({
             }`}>
             {dDay}
           </span>
-          <div className="text-[30px] font-black text-slate-900 leading-none">{new Date(res.date).getDate()}</div>
+          <div className="text-[30px] font-black text-slate-900 leading-none">{bookingDay}</div>
           <div className="text-sm font-bold text-slate-500 uppercase mt-1">{monthName}</div>
           <div className="mt-2 text-xs font-medium text-slate-400 flex items-center gap-1">
             <Clock size={12} /> {res.time || '-'}
@@ -314,7 +314,7 @@ export default function ReservationCard({
                     N
                   </span>
                 )}
-                {renderStatusBadge(res.status, res.date)}
+                {renderStatusBadge(res.status, res.date, res.time)}
               </div>
             </div>
 
@@ -405,7 +405,7 @@ export default function ReservationCard({
         </div>
       )}
 
-      {isConfirmed && !isPast && !isCancellationRequestedBookingStatus(res.status) && !hasBookingReview && (
+      {isConfirmed && !hasStarted && !isCancellationRequestedBookingStatus(res.status) && !hasBookingReview && (
         <div className="mx-4 md:mx-6 mb-4 rounded-xl border border-amber-200/80 bg-amber-50 p-3 flex items-start gap-2">
           <AlertTriangle className="mt-0.5 shrink-0 text-amber-600" size={14} />
           <p className="text-[12px] leading-[1.45] text-amber-900 font-medium">

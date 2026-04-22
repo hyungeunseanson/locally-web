@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
+import { isOverdueActiveBooking } from '@/app/utils/bookingStartTime';
 import { createClient } from '@/app/utils/supabase/server';
 
 export async function POST() {
@@ -25,10 +26,7 @@ export async function POST() {
 
     const now = new Date();
     const bookingIdsToComplete = (bookings || [])
-      .filter((booking) => {
-        const experienceDate = new Date(`${booking.date}T${booking.time || '00:00'}`);
-        return experienceDate < now;
-      })
+      .filter((booking) => isOverdueActiveBooking(booking.status, booking.date, booking.time, now))
       .map((booking) => booking.id);
 
     if (bookingIdsToComplete.length === 0) {

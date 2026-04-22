@@ -336,6 +336,7 @@ export const DOMAIN_MATRIX: DomainMatrixEntry[] = [
       'tests/e2e/95-guest-inbox-empty-state.spec.ts',
       'tests/e2e/164-guest-inbox-support-profile-context.spec.ts',
       'tests/e2e/185-messaging-boundary-contract.spec.ts',
+      'tests/e2e/198-host-reservation-timing-contract.spec.ts',
     ],
     manualChecks: [
       ...COMMON_PUBLIC_MANUAL_CHECKS,
