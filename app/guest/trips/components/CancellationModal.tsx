@@ -145,6 +145,9 @@ export default function CancellationModal({ isOpen, onClose, onConfirm, isProces
             <p className={`mt-1 text-[11px] leading-5 ${isReviewReason ? 'text-orange-700' : 'text-slate-500'}`}>
               {followupDesc}
             </p>
+            <p className={`mt-1 text-[11px] leading-5 ${isReviewReason ? 'text-orange-700' : 'text-slate-500'}`}>
+              {t('modal_cancel_refund_account_support_note')}
+            </p>
           </div>
 
           <button

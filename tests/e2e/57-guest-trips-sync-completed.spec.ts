@@ -624,6 +624,7 @@ test.describe.serial('guest trips completed sync route', () => {
     await expect(cancelModal).toBeVisible({ timeout: 10000 });
     await expect(cancelModal.getByTestId('guest-trip-cancel-followup')).toContainText('취소 후 결과는 여기서 확인하세요');
     await expect(cancelModal.getByTestId('guest-trip-cancel-followup')).toContainText('취소 요청과 환불 진행 상태는 예약 내역과 알림에서 다시 확인할 수 있어요.');
+    await expect(cancelModal.getByTestId('guest-trip-cancel-followup')).toContainText('무통장 입금 예약의 환불 계좌 정보는 고객센터 1:1 문의에 남겨주세요.');
     await expect(cancelModal.getByRole('button', { name: '먼저 호스트에게 문의하기' })).toBeVisible();
 
     await cancelModal.getByRole('button', { name: '먼저 호스트에게 문의하기' }).click();
