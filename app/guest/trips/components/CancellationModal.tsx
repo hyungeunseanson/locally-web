@@ -56,10 +56,13 @@ export default function CancellationModal({ isOpen, onClose, onConfirm, isProces
       data-testid="guest-trip-cancel-modal"
       className={`fixed inset-0 z-[210] flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 md:p-4 transition-opacity duration-150 ${closing ? 'opacity-0' : 'animate-in fade-in duration-200'}`}
     >
-      <div className={`bg-white rounded-xl md:rounded-2xl w-full max-w-md overflow-hidden shadow-2xl transition-all duration-150 ${closing ? 'opacity-0 scale-95' : 'animate-in fade-in zoom-in duration-200'}`}>
+      <div
+        data-testid="guest-trip-cancel-dialog"
+        className={`flex max-h-[calc(100dvh-1.5rem)] w-full max-w-md flex-col overflow-hidden rounded-xl bg-white shadow-2xl transition-all duration-150 md:max-h-[90dvh] md:rounded-2xl ${closing ? 'opacity-0 scale-95' : 'animate-in fade-in zoom-in duration-200'}`}
+      >
         
         {/* 헤더 */}
-        <div className="p-4 md:p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+        <div className="shrink-0 p-4 md:p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
           <h3 className="font-bold text-[16px] md:text-lg text-slate-800">{t('modal_cancel_title')}</h3>
           <button
             data-testid="guest-trip-cancel-close-button"
@@ -71,7 +74,11 @@ export default function CancellationModal({ isOpen, onClose, onConfirm, isProces
         </div>
 
         {/* 본문 */}
-        <div className="p-4 md:p-6 space-y-5 md:space-y-6">
+        <div
+          data-testid="guest-trip-cancel-body"
+          className="custom-scrollbar flex-1 overflow-y-auto overscroll-contain px-4 py-4 md:px-6 md:py-6 space-y-5 md:space-y-6"
+          style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))' }}
+        >
           
           {/* 🟢 [핵심] 예상 환불 금액 카드 */}
           <div className={`border rounded-lg md:rounded-xl p-4 md:p-5 text-center ${resolvedRefundInfo.amount > 0 ? 'bg-blue-50 border-blue-100' : 'bg-slate-50 border-slate-200'}`}>
@@ -160,7 +167,7 @@ export default function CancellationModal({ isOpen, onClose, onConfirm, isProces
         </div>
 
         {/* 하단 버튼 */}
-        <div className="p-4 md:p-5 border-t border-slate-100 flex gap-2.5 md:gap-3 bg-slate-50">
+        <div className="shrink-0 p-4 md:p-5 border-t border-slate-100 flex gap-2.5 md:gap-3 bg-slate-50">
           <button
             onClick={requestClose}
             className="flex-1 py-2.5 md:py-3 rounded-lg md:rounded-xl border border-slate-200 font-bold text-[13px] md:text-sm text-slate-600 hover:bg-slate-50 transition-colors"

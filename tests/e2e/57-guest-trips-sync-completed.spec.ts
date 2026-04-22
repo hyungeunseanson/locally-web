@@ -756,6 +756,73 @@ test.describe.serial('guest trips completed sync route', () => {
     await expect(cancelModal).toBeHidden({ timeout: 10000 });
   });
 
+  test('keeps the desktop cancellation dialog within the viewport with a scrollable body', async ({ page }) => {
+    const host = createUser('host.cancel.desktop.scroll');
+    const guest = createUser('guest.cancel.desktop.scroll');
+    const desktopViewport = { width: 1440, height: 780 };
+
+    await page.addInitScript(() => {
+      window.localStorage.setItem('app_lang', 'ko');
+      document.cookie = 'app_lang=ko; path=/';
+    });
+    await page.setViewportSize(desktopViewport);
+
+    const hostId = await createAuthUser(host);
+    const guestId = await createAuthUser(guest);
+    await createApprovedHostApplication(hostId, host);
+
+    const supabase = getAdminClient();
+    const { error: hostProfileError } = await supabase
+      .from('profiles')
+      .update({
+        full_name: host.fullName,
+        avatar_url: '/images/logo.png',
+      })
+      .eq('id', hostId);
+
+    if (hostProfileError) throw hostProfileError;
+
+    const experienceId = await createHostExperience(hostId);
+    const bookingId = await createFuturePaidBooking({
+      guestId,
+      guest,
+      experienceId,
+    });
+
+    await login(page, guest);
+    await page.goto('/guest/trips', { waitUntil: 'domcontentloaded' });
+    await page.locator(`[data-testid="guest-trip-menu-button-${bookingId}"]:visible`).first().click();
+    await page.getByTestId(`guest-trip-cancel-button-${bookingId}`).click();
+
+    const cancelDialog = page.getByTestId('guest-trip-cancel-dialog');
+    const cancelBody = page.getByTestId('guest-trip-cancel-body');
+    const confirmButton = page.getByRole('button', { name: '취소 확정' });
+
+    await expect(cancelDialog).toBeVisible();
+    await cancelDialog.locator('select').selectOption('minimum_participants_unmet');
+    const cancelDialogBox = await cancelDialog.boundingBox();
+    expect(cancelDialogBox).not.toBeNull();
+    if (!cancelDialogBox) throw new Error('Cancellation dialog bounding box was not available.');
+    expect(cancelDialogBox.y).toBeGreaterThanOrEqual(0);
+    expect(cancelDialogBox.y + cancelDialogBox.height).toBeLessThanOrEqual(desktopViewport.height);
+
+    const bodyMetrics = await cancelBody.evaluate((element) => {
+      const styles = window.getComputedStyle(element);
+      return {
+        overflowY: styles.overflowY,
+        clientHeight: element.clientHeight,
+        scrollHeight: element.scrollHeight,
+      };
+    });
+    expect(['auto', 'scroll']).toContain(bodyMetrics.overflowY);
+    expect(bodyMetrics.scrollHeight).toBeGreaterThan(bodyMetrics.clientHeight);
+
+    const confirmButtonBox = await confirmButton.boundingBox();
+    expect(confirmButtonBox).not.toBeNull();
+    if (!confirmButtonBox) throw new Error('Cancellation confirm button bounding box was not available.');
+    expect(confirmButtonBox.y + confirmButtonBox.height).toBeLessThanOrEqual(desktopViewport.height);
+  });
+
   test('shows pending receipt follow-up guidance and support CTA', async ({ page }) => {
     const host = createUser('host.pending.receipt');
     const guest = createUser('guest.pending.receipt');
@@ -927,6 +994,74 @@ test.describe.serial('guest trips completed sync route', () => {
     await expect(page.getByText('최소 진행 인원 미달 사유를 운영팀이 검토 중입니다.').last()).toBeVisible();
     await expect(page.getByText('보통 영업일 기준 검토 후 알림으로 안내됩니다. 급한 경우 고객센터로 문의해주세요.').last()).toBeVisible();
     await expect(page.getByTestId('guest-trip-review-support-link').last()).toHaveAttribute('href', '/help');
+  });
+
+  test('keeps mobile cancellation CTA accessible when review-reason copy makes the body longer', async ({ page }) => {
+    const host = createUser('host.cancel.mobile.review');
+    const guest = createUser('guest.cancel.mobile.review');
+    const mobileViewport = { width: 390, height: 700 };
+
+    await page.addInitScript(() => {
+      window.localStorage.setItem('app_lang', 'ko');
+      document.cookie = 'app_lang=ko; path=/';
+    });
+    await page.setViewportSize(mobileViewport);
+
+    const hostId = await createAuthUser(host);
+    const guestId = await createAuthUser(guest);
+    await createApprovedHostApplication(hostId, host);
+
+    const supabase = getAdminClient();
+    const { error: hostProfileError } = await supabase
+      .from('profiles')
+      .update({
+        full_name: host.fullName,
+        avatar_url: '/images/logo.png',
+      })
+      .eq('id', hostId);
+
+    if (hostProfileError) throw hostProfileError;
+
+    const experienceId = await createHostExperience(hostId);
+    const bookingId = await createFuturePaidBooking({
+      guestId,
+      guest,
+      experienceId,
+    });
+
+    await login(page, guest);
+    await page.goto('/guest/trips', { waitUntil: 'domcontentloaded' });
+    await page.locator(`[data-testid="guest-trip-menu-button-${bookingId}"]:visible`).first().click();
+    await page.getByTestId(`guest-trip-cancel-button-${bookingId}`).click();
+
+    const cancelDialog = page.getByTestId('guest-trip-cancel-dialog');
+    const cancelBody = page.getByTestId('guest-trip-cancel-body');
+    const cancelCloseButton = page.getByTestId('guest-trip-cancel-close-button');
+    const confirmButton = page.getByRole('button', { name: '취소 확정' });
+
+    await expect(cancelDialog).toBeVisible();
+    await cancelDialog.locator('select').selectOption('minimum_participants_unmet');
+
+    const cancelDialogBox = await cancelDialog.boundingBox();
+    expect(cancelDialogBox).not.toBeNull();
+    if (!cancelDialogBox) throw new Error('Mobile cancellation dialog bounding box was not available.');
+    expect(cancelDialogBox.y).toBeGreaterThanOrEqual(0);
+    expect(cancelDialogBox.y + cancelDialogBox.height).toBeLessThanOrEqual(mobileViewport.height);
+
+    const bodyMetrics = await cancelBody.evaluate((element) => {
+      const styles = window.getComputedStyle(element);
+      return {
+        overflowY: styles.overflowY,
+        clientHeight: element.clientHeight,
+        scrollHeight: element.scrollHeight,
+      };
+    });
+    expect(['auto', 'scroll']).toContain(bodyMetrics.overflowY);
+    expect(bodyMetrics.scrollHeight).toBeGreaterThan(bodyMetrics.clientHeight);
+
+    await expect(cancelCloseButton).toBeVisible();
+    await expect(confirmButton).toBeVisible();
+    await expect(confirmButton).toBeEnabled();
   });
 
   test('renders payment complete copy in the selected locale', async ({ page }) => {
