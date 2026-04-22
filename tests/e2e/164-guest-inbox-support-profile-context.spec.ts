@@ -335,7 +335,7 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Guest inbox support profile context', () => {
-  test('keeps support threads non-profiled while general threads still open the host modal', async ({ page }) => {
+  test('keeps guest inbox host affordances non-profiled for both support and general threads', async ({ page }) => {
     test.setTimeout(90000);
 
     const guest = createUser('guest.support.context');
@@ -379,6 +379,10 @@ test.describe.serial('Guest inbox support profile context', () => {
     await expect(page.getByText(host.fullName).first()).toBeVisible({ timeout: 15000 });
 
     await page.getByTestId('guest-inbox-header-profile-trigger').click();
-    await expect(page.getByText('About Me')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('About Me')).toHaveCount(0);
+
+    const generalMessageTrigger = page.locator('[data-testid^="guest-inbox-message-sender-trigger-"]').first();
+    await generalMessageTrigger.click();
+    await expect(page.getByText('About Me')).toHaveCount(0);
   });
 });

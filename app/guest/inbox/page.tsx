@@ -6,7 +6,6 @@ import Link from 'next/link';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useChat } from '@/app/hooks/useChat';
 import Spinner from '@/app/components/ui/Spinner';
-import UserProfileModal from '@/app/components/UserProfileModal'; // 🟢 모달 임포트
 import { Send, User, Loader2, ImagePlus, ArrowLeft, MessageCircle } from 'lucide-react';
 import Image from 'next/image';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가 (import 맨 아래)
@@ -59,8 +58,6 @@ function InboxContent() {
   const previousMessageIdsRef = useRef<string[]>([]);
   const supabase = useMemo(() => createClient(), []);
 
-  // 🟢 프로필 모달 상태
-  const [modalUserId, setModalUserId] = useState<string | null>(null);
   const [hostBootstrapSummary, setHostBootstrapSummary] = useState<{ name: string; avatarUrl: string | null } | null>(null);
   const [isBootstrappingHost, setIsBootstrappingHost] = useState(false);
   const [animatedMessageIds, setAnimatedMessageIds] = useState<string[]>([]);
@@ -341,14 +338,6 @@ function InboxContent() {
   const currentHostDisplay = selectedInquiry ? getDisplayHost(selectedInquiry) : { name: '', avatar: null, id: null };
   const selectedIsAdminSupport = isAdminSupportInquiry(selectedInquiry?.type);
 
-  // 🟢 프로필 클릭 핸들러
-  const handleProfileClick = (id: string | null) => {
-    if (selectedIsAdminSupport) return;
-    if (id) {
-      setModalUserId(id);
-    }
-  };
-
   if ((isLoading && !currentUser) || shouldRedirectToLogin) {
     return <Spinner fullScreen />;
   }
@@ -356,14 +345,6 @@ function InboxContent() {
   return (
     <div className="h-[100dvh] bg-white text-slate-900 font-sans flex flex-col overflow-hidden">
       <SiteHeader />
-
-      {/* 일반 문의에서는 호스트 프로필 모달을 재사용하고, 고객센터 문의에서는 클릭 자체를 비활성화한다. */}
-      <UserProfileModal
-        userId={modalUserId || ''}
-        isOpen={!!modalUserId}
-        onClose={() => setModalUserId(null)}
-        role="host"
-      />
 
       {/* 🟢 데스크탑 제목 — main 밖에 위치해 flex-row 내부 첨범 방지 */}
       <div className="hidden md:block max-w-[1280px] w-full mx-auto px-6 pt-8 pb-0 shrink-0">
@@ -507,8 +488,7 @@ function InboxContent() {
                 </button>
                 <div
                   data-testid="guest-inbox-header-profile-trigger"
-                  className={`flex items-center gap-2 flex-1 min-w-0 ${selectedIsAdminSupport ? '' : 'cursor-pointer'}`}
-                  onClick={() => handleProfileClick(currentHostDisplay.id)}
+                  className="flex items-center gap-2 flex-1 min-w-0"
                 >
                   <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gray-100 overflow-hidden border border-gray-200 relative shrink-0">
                     {selectedIsAdminSupport ? (
@@ -541,8 +521,7 @@ function InboxContent() {
                       {!isMe && (
                         <div
                           data-testid={`guest-inbox-message-sender-trigger-${msg.id}`}
-                          className={`flex flex-col items-center mr-1.5 ${selectedIsAdminSupport ? '' : 'cursor-pointer'}`}
-                          onClick={() => handleProfileClick(msg.sender_id)}
+                          className="flex flex-col items-center mr-1.5"
                         >
                           <div className="w-[26px] h-[26px] md:w-7 md:h-7 rounded-full bg-gray-200 overflow-hidden relative border border-gray-200 shrink-0">
                             {selectedIsAdminSupport ? (
@@ -571,8 +550,7 @@ function InboxContent() {
                       <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[72%]`}>
                         {!isMe && (
                           <span
-                            className={`text-[10px] md:text-[11px] text-gray-500 mb-0.5 ml-0.5 ${selectedIsAdminSupport ? '' : 'cursor-pointer'}`}
-                            onClick={() => handleProfileClick(msg.sender_id)}
+                            className="text-[10px] md:text-[11px] text-gray-500 mb-0.5 ml-0.5"
                           >
                             {selectedIsAdminSupport ? t('admin_name') : (msg.sender?.name || currentHostDisplay.name)}
                           </span>
