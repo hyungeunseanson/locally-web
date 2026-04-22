@@ -109,7 +109,7 @@ test.describe('Notification localization helpers', () => {
     expect(proxyReplyZh.message).toBe('我们已经联系到店家了。');
   });
 
-  test('builds host application revision copy with localized reason text', () => {
+  test('builds host application and experience status copy with localized reason text', () => {
     const revisionEn = buildNotificationCopy('host_application.revision', 'en', {
       comment: 'Please upload a clearer ID card photo.',
     });
@@ -121,5 +121,20 @@ test.describe('Notification localization helpers', () => {
     });
     expect(rejectedJa.title).toBe('📌 ホスト申請結果をご確認ください');
     expect(rejectedJa.message).toContain('理由: 本人確認書類が一致しませんでした。');
+
+    const experienceApprovedKo = buildNotificationCopy('experience.approved', 'ko', {
+      experienceTitle: '서울 야경 산책',
+    });
+    expect(experienceApprovedKo).toEqual({
+      title: '🎉 체험 등록이 승인되었습니다',
+      message: "'서울 야경 산책' 체험이 승인되었습니다. 이제 상세 내용과 운영 상태를 확인할 수 있습니다.",
+    });
+
+    const experienceRevisionEn = buildNotificationCopy('experience.revision', 'en', {
+      experienceTitle: 'Seoul Night Walk',
+      comment: 'Please add a clearer meeting point photo.',
+    });
+    expect(experienceRevisionEn.title).toBe('🛠️ Your experience listing needs revision');
+    expect(experienceRevisionEn.message).toContain('Reason: Please add a clearer meeting point photo.');
   });
 });

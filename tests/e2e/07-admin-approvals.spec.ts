@@ -20,6 +20,7 @@ const createdAuthUserIds: string[] = [];
 const createdWhitelistEmails: string[] = [];
 const createdHostApplicationIds: string[] = [];
 const createdExperienceIds: number[] = [];
+const createdNotificationIds: number[] = [];
 
 function loadEnv(): EnvMap {
   return readFileSync('.env.local', 'utf8')
@@ -267,20 +268,43 @@ async function assertExperienceStatus(experienceId: number, expectedStatus: stri
   throw new Error(`Experience ${experienceId} did not reach ${expectedStatus}.`);
 }
 
+async function waitForNotification(params: {
+  userId: string;
+  type: string;
+  link: string;
+}) {
+  const supabase = getAdminClient();
+
+  for (let attempt = 0; attempt < 15; attempt += 1) {
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('id, type, title, message, link')
+      .eq('user_id', params.userId)
+      .eq('type', params.type)
+      .eq('link', params.link)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    if (data?.id) {
+      createdNotificationIds.push(Number(data.id));
+      return data;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
+  throw new Error(`Notification ${params.type} for ${params.userId} was not created.`);
+}
+
 async function openApprovals(page: Page) {
   await page.goto('/admin/dashboard?tab=APPROVALS', { waitUntil: 'networkidle' });
 }
 
 async function openApprovalsExperienceSubtab(page: Page) {
   await page.getByRole('button', { name: /체험 등록/ }).click();
-}
-
-async function openSelectedExperienceEditor(page: Page, experienceId: number) {
-  const editLink = page.locator(`a[href="/host/experiences/${experienceId}/edit"]`).last();
-  await expect(editLink).toBeVisible({ timeout: 15000 });
-  await editLink.scrollIntoViewIfNeeded();
-  await editLink.click();
-  await page.waitForURL(`**/host/experiences/${experienceId}/edit`, { timeout: 15000 });
 }
 
 async function updateExperienceTitleAndSave(page: Page, nextTitle: string) {
@@ -301,6 +325,10 @@ async function expectDirectImageSrc(locator: Locator, expectedPattern: RegExp) {
 
 test.afterAll(async () => {
   const supabase = getAdminClient();
+
+  if (createdNotificationIds.length > 0) {
+    await supabase.from('notifications').delete().in('id', createdNotificationIds);
+  }
 
   for (const experienceId of createdExperienceIds) {
     await supabase.from('experiences').delete().eq('id', experienceId);
@@ -340,6 +368,8 @@ test.describe.serial('Admin approvals smoke', () => {
     const hostRevisionReason = `Host application revision ${Date.now()}`;
     const experienceRevisionReason = `Experience revision ${Date.now()}`;
     const resubmittedTitle = `${experience.title} Resubmitted`;
+    let revisionNotificationTitle = '';
+    let approvedNotificationTitle = '';
 
     const adminContext = await browser.newContext();
     const hostContext = await browser.newContext();
@@ -408,6 +438,13 @@ test.describe.serial('Admin approvals smoke', () => {
         await adminPage.getByRole('button', { name: '보완 요청 전송' }).filter({ visible: true }).first().click();
 
         await assertExperienceStatus(experience.id, 'revision', experienceRevisionReason);
+        const revisionNotification = await waitForNotification({
+          userId: hostUserId,
+          type: 'experience_revision_requested',
+          link: `/host/experiences/${experience.id}/edit`,
+        });
+        revisionNotificationTitle = revisionNotification.title;
+        expect(revisionNotification.message).toContain(experienceRevisionReason);
         await expect(experienceApproveButton).not.toBeVisible({ timeout: 15000 });
         await adminPage.getByRole('button', { name: 'PENDING' }).click();
         await expect(adminPage.locator('div.cursor-pointer').filter({ hasText: experience.title }).first()).toBeVisible({ timeout: 15000 });
@@ -419,7 +456,10 @@ test.describe.serial('Admin approvals smoke', () => {
         await hostPage.goto('/host/dashboard?tab=experiences', { waitUntil: 'networkidle' });
 
         await expect(hostPage.getByText(experienceRevisionReason)).toBeVisible({ timeout: 15000 });
-        await openSelectedExperienceEditor(hostPage, experience.id);
+        await hostPage.goto('/host/notifications', { waitUntil: 'networkidle' });
+        await expect(hostPage.getByText(revisionNotificationTitle).first()).toBeVisible({ timeout: 15000 });
+        await hostPage.getByText(revisionNotificationTitle).first().click();
+        await hostPage.waitForURL(new RegExp(`/host/experiences/${experience.id}/edit$`), { timeout: 15000 });
         await updateExperienceTitleAndSave(hostPage, resubmittedTitle);
 
         await assertExperienceStatus(experience.id, 'pending');
@@ -441,7 +481,21 @@ test.describe.serial('Admin approvals smoke', () => {
         await adminPage.getByRole('button', { name: '승인 및 권한 부여' }).filter({ visible: true }).first().click();
 
         await assertExperienceStatus(experience.id, 'active');
+        const approvedNotification = await waitForNotification({
+          userId: hostUserId,
+          type: 'experience_approved',
+          link: `/host/experiences/${experience.id}`,
+        });
+        approvedNotificationTitle = approvedNotification.title;
+        expect(approvedNotification.message).toContain(resubmittedTitle);
         await expect(experienceApproveButton).not.toBeVisible({ timeout: 15000 });
+      });
+
+      await test.step('Host can open the approved experience from notifications', async () => {
+        await hostPage.goto('/host/notifications', { waitUntil: 'networkidle' });
+        await expect(hostPage.getByText(approvedNotificationTitle).first()).toBeVisible({ timeout: 15000 });
+        await hostPage.getByText(approvedNotificationTitle).first().click();
+        await hostPage.waitForURL(new RegExp(`/host/experiences/${experience.id}$`), { timeout: 15000 });
       });
     } finally {
       await adminContext.close();

@@ -13,6 +13,8 @@ export type NotificationType =
   | 'new_message'
   | 'message'                   // 채팅 메시지 알림 (NotificationContext 내부)
   | 'admin_alert'
+  | 'experience_approved'
+  | 'experience_revision_requested'
   // [서비스 매칭 시스템]
   | 'service_request_new'       // 호스트에게: 내 지역 새 의뢰 등록
   | 'service_application_new'   // 고객에게: 새 지원자 등록

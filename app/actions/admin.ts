@@ -77,6 +77,28 @@ function buildHostApplicationStatusNotification(status: string, comment?: string
   return null;
 }
 
+function buildExperienceStatusNotification(status: string, id: string | number) {
+  const normalizedStatus = status.trim().toLowerCase();
+
+  if (normalizedStatus === 'active' || normalizedStatus === 'approved') {
+    return {
+      type: 'experience_approved',
+      link: `/host/experiences/${id}`,
+      key: 'experience.approved' as const,
+    };
+  }
+
+  if (normalizedStatus === 'revision') {
+    return {
+      type: 'experience_revision_requested',
+      link: `/host/experiences/${id}/edit`,
+      key: 'experience.revision' as const,
+    };
+  }
+
+  return null;
+}
+
 // ✅ 상태 변경 (승인/거절)
 export async function updateAdminStatus(
   table: 'host_applications' | 'experiences',
@@ -170,6 +192,44 @@ export async function updateAdminStatus(
           });
         } catch (emailError) {
           console.error('Host application status email failed:', emailError);
+        }
+      }
+    }
+  }
+
+  if (table === 'experiences') {
+    const notification = buildExperienceStatusNotification(status, id);
+
+    if (notification) {
+      const { data: experience } = await supabaseAdmin
+        .from('experiences')
+        .select('host_id, title')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (experience?.host_id) {
+        const notificationRow = await buildLocalizedNotificationInsert({
+          supabaseAdmin,
+          userId: experience.host_id,
+          type: notification.type,
+          link: notification.link,
+          key: notification.key,
+          copyParams: notification.key === 'experience.revision'
+            ? {
+              experienceTitle: experience.title,
+              comment: trimmedComment,
+            }
+            : {
+              experienceTitle: experience.title,
+            },
+        });
+
+        const { error: notificationError } = await supabaseAdmin
+          .from('notifications')
+          .insert(notificationRow);
+
+        if (notificationError) {
+          console.error('Experience status notification insert failed:', notificationError);
         }
       }
     }
