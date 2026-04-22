@@ -183,7 +183,6 @@ export const INITIAL_FORM_DATA = {
 type ExperienceFormCopy = {
   step1Title: string;
   step1Desc: string;
-  step1SelectionHelp: string;
   customCityPlaceholder: string;
   categoryLabel: string;
   categoryHelp: string;
@@ -330,12 +329,11 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
   ko: {
     step1Title: '어떤 체험을 준비하셨나요?',
     step1Desc: '지역과 카테고리를 먼저 선택해주세요.',
-    step1SelectionHelp: '검색과 추천 노출에 영향을 주는 기본 정보예요.',
     customCityPlaceholder: '도시 이름 입력 (예: 가마쿠라)',
     categoryLabel: '카테고리',
     categoryHelp: '게스트가 체험을 찾을 때 가장 먼저 보는 분류입니다.',
     step2Title: '진행 가능한 언어',
-    step2Desc: '이 체험을 어떤 언어로 진행할 수 있나요?',
+    step2Desc: '이 체험을 어떤 언어로 진행할 예정인가요?',
     sourceLocaleLabel: '대표 언어',
     sourceLocaleHelp: '주로 받고 싶은 게스트의 언어로 대표 소개를 작성해주세요. 예: 한국인 게스트를 주로 받는다면 한국어를 선택해 작성하면 됩니다. 다른 언어는 이 대표 언어를 기준으로 AI 자동 번역 및 보정이 진행됩니다.',
     sourceLocaleHelpPrimary: '주로 받고 싶은 게스트의 언어로 대표 소개를 작성해주세요.',
@@ -499,7 +497,6 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
   en: {
     step1Title: 'What kind of experience are you preparing?',
     step1Desc: 'Choose the region and category first.',
-    step1SelectionHelp: 'This basic information affects search visibility and recommendations.',
     customCityPlaceholder: 'Enter city name (e.g. Kamakura)',
     categoryLabel: 'Category',
     categoryHelp: 'This is one of the first filters guests use when browsing.',
@@ -668,7 +665,6 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
   ja: {
     step1Title: 'どんな体験を準備していますか？',
     step1Desc: 'まず地域とカテゴリを選択してください。',
-    step1SelectionHelp: '検索表示やおすすめ表示に影響する基本情報です。',
     customCityPlaceholder: '都市名を入力してください（例: 鎌倉）',
     categoryLabel: 'カテゴリ',
     categoryHelp: 'ゲストが体験を探すときに最初に見る分類の一つです。',
@@ -836,7 +832,6 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
   zh: {
     step1Title: '你准备了什么样的体验？',
     step1Desc: '请先选择地区和类别。',
-    step1SelectionHelp: '这是会影响搜索和推荐展示的基础信息。',
     customCityPlaceholder: '输入城市名称（例如：镰仓）',
     categoryLabel: '类别',
     categoryHelp: '这是游客浏览时最先看到的分类之一。',

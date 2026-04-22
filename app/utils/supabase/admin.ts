@@ -1,3 +1,4 @@
+import 'server-only';
 import { createClient } from '@supabase/supabase-js';
 
 // 🔒 서버 전용 클라이언트 생성 (클라이언트 컴포넌트 사용 금지)

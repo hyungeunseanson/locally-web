@@ -221,7 +221,6 @@ export default function ExperienceFormSteps({
         <div className="space-y-2">
           <h1 className="text-[22px] md:text-[30px] font-black text-slate-900 leading-tight">{copy.step1Title}</h1>
           <p className="text-[13px] md:text-base text-slate-500">{copy.step1Desc}</p>
-          <p className="text-xs md:text-sm text-slate-500">{copy.step1SelectionHelp}</p>
         </div>
 
         <div className="space-y-5 md:space-y-6">
@@ -376,7 +375,18 @@ export default function ExperienceFormSteps({
           <p className="text-[12px] md:text-sm text-slate-500 leading-relaxed">
             {copy.firstPhotoNotice}
           </p>
-          <FieldHint className="ml-0">{copy.photoHelp}</FieldHint>
+          <div className="space-y-3">
+            {formData.photos.length < MAX_EXPERIENCE_PHOTOS && (
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                <label className="aspect-square rounded-2xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:border-black hover:bg-slate-50 transition-all">
+                  <Camera size={24} className="text-slate-400 mb-2" />
+                  <span className="text-xs font-bold text-slate-500">{copy.addHeroPhoto}</span>
+                  <input type="file" multiple accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+                </label>
+              </div>
+            )}
+            <FieldHint className="ml-0">{copy.photoHelp}</FieldHint>
+          </div>
           <FieldHint className="ml-0">{copy.popularityWishlistHelp}</FieldHint>
           <HelpDisclosure title={copy.photoGuideTitle}>
             <p>{copy.photoGuideBody}</p>
@@ -384,14 +394,6 @@ export default function ExperienceFormSteps({
           </HelpDisclosure>
 
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-            {formData.photos.length < MAX_EXPERIENCE_PHOTOS && (
-              <label className="aspect-square rounded-2xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:border-black hover:bg-slate-50 transition-all">
-                <Camera size={24} className="text-slate-400 mb-2" />
-                <span className="text-xs font-bold text-slate-500">{copy.addHeroPhoto}</span>
-                <input type="file" multiple accept="image/*" className="hidden" onChange={handlePhotoUpload} />
-              </label>
-            )}
-
             {formData.photos.map((url: string, idx: number) => (
               <div
                 key={idx}

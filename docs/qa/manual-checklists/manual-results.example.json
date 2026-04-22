@@ -1,0 +1,34 @@
+{
+  "generatedAt": "2026-04-20T12:00:00.000Z",
+  "domains": {
+    "4": {
+      "status": "pass",
+      "notes": [
+        "Desktop and tablet passed. Mobile payment CTA spacing needs observation but is not blocking."
+      ],
+      "artifacts": [
+        "test-results/domain-qa/example/experience-payment-mobile.png"
+      ],
+      "checks": [
+        {
+          "route": "/experiences/exp-123/payment",
+          "actor": "guest",
+          "locale": "en",
+          "viewport": "mobile",
+          "area": "tap-target",
+          "status": "pass",
+          "note": "Primary CTA and price summary stayed visible."
+        },
+        {
+          "route": "/guest/trips",
+          "actor": "guest",
+          "locale": "ja",
+          "viewport": "mobile",
+          "area": "translation",
+          "status": "pass",
+          "note": "No Korean fallback leak observed."
+        }
+      ]
+    }
+  }
+}

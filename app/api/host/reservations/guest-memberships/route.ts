@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { fetchLocallyMembershipSummary, type LocallyMembershipStatus } from '@/app/utils/memberStatus';
+import {
+  fetchLocallyMembershipSummaries,
+  fetchLocallyMembershipSummary,
+  type LocallyMembershipStatus,
+} from '@/app/utils/memberStatus';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 
@@ -41,6 +45,35 @@ function normalizeGuestIds(value: unknown) {
   )].slice(0, 50);
 }
 
+async function resolveMembershipStatusesWithFallback(
+  supabaseAdmin: ReturnType<typeof createAdminClient>,
+  guestIds: string[]
+) {
+  try {
+    const summaries = await fetchLocallyMembershipSummaries(supabaseAdmin, guestIds);
+
+    return Object.fromEntries(
+      guestIds.map((guestId) => [guestId, summaries[guestId]?.status ?? 'none'])
+    ) as Record<string, LocallyMembershipStatus>;
+  } catch (error) {
+    console.error('[host guest memberships] batch membership lookup failed, falling back:', error);
+
+    const membershipEntries = await Promise.all(
+      guestIds.map(async (guestId) => {
+        try {
+          const membership = await fetchLocallyMembershipSummary(supabaseAdmin, guestId);
+          return [guestId, membership.status] as const;
+        } catch (membershipError) {
+          console.error('[host guest memberships] failed to resolve membership:', guestId, membershipError);
+          return [guestId, 'none' as const] as const;
+        }
+      })
+    );
+
+    return Object.fromEntries(membershipEntries) as Record<string, LocallyMembershipStatus>;
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabaseServer = await createServerClient();
@@ -77,21 +110,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, memberships: {} as Record<string, LocallyMembershipStatus> });
     }
 
-    const membershipEntries = await Promise.all(
-      allowedGuestIds.map(async (guestId) => {
-        try {
-          const membership = await fetchLocallyMembershipSummary(supabaseAdmin, guestId);
-          return [guestId, membership.status] as const;
-        } catch (error) {
-          console.error('[host guest memberships] failed to resolve membership:', guestId, error);
-          return [guestId, 'none' as const] as const;
-        }
-      })
-    );
+    const memberships = await resolveMembershipStatusesWithFallback(supabaseAdmin, allowedGuestIds);
 
     return NextResponse.json({
       success: true,
-      memberships: Object.fromEntries(membershipEntries) as Record<string, LocallyMembershipStatus>,
+      memberships,
     });
   } catch (error) {
     console.error('Host guest memberships route error:', error);
