@@ -366,8 +366,8 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
                                         <MessageCircle size={18} className="text-slate-500" />
                                     </div>
                                     <div>
-                                        <p className="text-[12px] font-semibold text-slate-800 md:text-[14px]">로컬리 콘텐츠 허브 운영 중</p>
-                                        <p className="text-[11px] text-slate-500 md:text-[13px]">도시별 루트, 맛집, 현지 추천 콘텐츠를 먼저 공개하고 있습니다.</p>
+                                        <p className="text-[12px] font-semibold text-slate-800 md:text-[14px]">커뮤니티 오픈 준비 중</p>
+                                        <p className="text-[11px] text-slate-500 md:text-[13px]">현재 커뮤니티는 오픈 전입니다.</p>
                                     </div>
                                 </div>
                             )}

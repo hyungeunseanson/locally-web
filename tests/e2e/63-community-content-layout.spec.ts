@@ -159,8 +159,8 @@ test.describe.serial('Community content layout and access', () => {
     await page.setViewportSize({ width: 1440, height: 1200 });
     await page.goto('/community?category=locally_content', { waitUntil: 'networkidle' });
 
-    await expect(page.getByText('로컬리 콘텐츠 허브 운영 중')).toBeVisible();
-    await expect(page.getByText('도시별 루트, 맛집, 현지 추천 콘텐츠를 먼저 공개하고 있습니다.')).toBeVisible();
+    await expect(page.getByText('커뮤니티 오픈 준비 중')).toBeVisible();
+    await expect(page.getByText('현재 커뮤니티는 오픈 전입니다.')).toBeVisible();
     await expect(page.getByRole('button', { name: '로컬리 콘텐츠 작성' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: '질문' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: '동행' })).toHaveCount(0);
