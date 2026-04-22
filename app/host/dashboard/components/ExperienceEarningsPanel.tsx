@@ -413,7 +413,6 @@ export default function ExperienceEarningsPanel({ summary }: ExperienceEarningsP
                 ₩{totalPayout.toLocaleString()}
               </span>
             </div>
-            <p className="mt-1 text-right text-[10px] text-slate-400">{t('hp_earn_tax_note')}</p>
           </div>
         ) : null}
       </div>

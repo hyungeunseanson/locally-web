@@ -200,7 +200,11 @@ test.describe.serial('Host payout summary reflection', () => {
     await login(page, hostUser);
     await page.goto('/host/dashboard?tab=earnings', { waitUntil: 'networkidle' });
 
-    await expect(page.getByText(/완료 동기화.*정산|completion sync/i).first()).toBeVisible();
+    await expect(
+      page.getByText(
+        /체험이 종료되어도 정산 반영까지는 시간이 걸릴 수 있습니다|payout reflection can take time|精算の反映には時間がかかることがあります|结算反映也可能需要一些时间/
+      ).first()
+    ).toBeVisible();
     await expect(page.getByTestId('host-earnings-experience-pending')).toContainText('₩24,000');
     await expect(page.getByTestId('host-earnings-details-panel')).toHaveCount(0);
     await page.getByTestId('host-earnings-details-toggle').click();

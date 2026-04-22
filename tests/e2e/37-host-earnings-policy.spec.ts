@@ -438,6 +438,11 @@ test.describe.serial('Host earnings payout-focused policy', () => {
       /아직 지급 완료 내역이 없어요|No completed payout yet|まだ支払い完了履歴がありません|暂时还没有已完成结算/
     );
     await expect(page.getByTestId('host-earnings-summary-net-payout')).toContainText('₩24,000');
+    await expect(
+      page.getByText(
+        /세금 처리는 호스트 본인의 책임입니다|Tax processing is the host's responsibility|税金の処理はホストご自身の責任となります|税务处理由房东自行负责/
+      )
+    ).toHaveCount(0);
     await expect(page.getByText(/최종 지급액 \(Net\)|Net Payout|最終支払額 \(Net\)|最终支付额 \(Net\)/)).toBeVisible();
     await expect(page.getByTestId('host-earnings-today-marker-note')).toContainText(
       /빨간 점은 오늘 날짜 표시입니다\.|The red dot marks today\.|赤い点は今日の日付を示します。|红点表示今天。/
