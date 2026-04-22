@@ -326,8 +326,30 @@ test.describe.serial('service host flow guidance', () => {
     const customerSession = await createLoggedInPage(browser, customerUser);
     await customerSession.page.goto(`/services/${request.id}`, { waitUntil: 'domcontentloaded' });
     await dismissAnnouncementIfVisible(customerSession.page);
+    const applicationsResponse = await customerSession.page.request.get(`/api/services/applications?requestId=${request.id}`);
+    expect(applicationsResponse.ok()).toBeTruthy();
+    const applicationsPayload = await applicationsResponse.json();
+    expect(applicationsPayload).toMatchObject({
+      success: true,
+      isOwner: true,
+    });
+    expect(applicationsPayload.data?.[0]?.host_applications).toMatchObject({
+      name: hostUser.fullName,
+      self_intro: '서비스 호스트 지원 흐름 안내 테스트용 프로필입니다.',
+      host_nationality: 'Korea',
+    });
+    expect(applicationsPayload.data?.[0]?.host_applications?.language_levels).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          language: '日本語',
+          level: 4,
+        }),
+      ])
+    );
     await expect(customerSession.page.getByText('Compare the appeal message, languages, reviews, and introduction to choose the best-fit host. After selection, you can coordinate details in the inbox right away.')).toBeVisible();
     await expect(customerSession.page.getByText(hostUser.fullName)).toBeVisible();
+    await expect(customerSession.page.getByText('서비스 호스트 지원 흐름 안내 테스트용 프로필입니다.')).toBeVisible();
+    await expect(customerSession.page.getByText('日本語', { exact: true })).toBeVisible();
     await customerSession.context.close();
   });
 

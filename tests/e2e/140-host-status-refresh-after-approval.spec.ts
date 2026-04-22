@@ -214,6 +214,7 @@ test('refreshes an open host dashboard from revision to approved without a page 
   await expect(
     page.getByRole('heading', { name: /보완이 필요합니다|Revision Required|修正が必要です|需要补充信息/ })
   ).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText('사진을 조금 더 선명하게 업로드해 주세요.')).toBeVisible();
 
   await approveHostApplication(applicationId, userId);
 
@@ -226,4 +227,5 @@ test('refreshes an open host dashboard from revision to approved without a page 
   await expect(
     page.getByRole('heading', { name: /보완이 필요합니다|Revision Required|修正が必要です|需要补充信息/ })
   ).toHaveCount(0);
+  await expect(page.getByText('사진을 조금 더 선명하게 업로드해 주세요.')).toHaveCount(0);
 });

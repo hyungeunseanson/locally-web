@@ -40,9 +40,6 @@ interface HostStatusSummary {
   profile_photo?: string | null;
   self_intro?: string | null;
   languages?: string[] | string | null;
-  profession?: string | null;
-  dream_destination?: string | null;
-  favorite_song?: string | null;
   host_nationality?: string | null;
   phone?: string | null;
   dob?: string | null;
@@ -89,7 +86,7 @@ const SERVICE_NOTIFICATION_TYPES = new Set([
   'service_cancelled',
 ]);
 
-const HOST_APPLICATION_BOOTSTRAP_SELECT = 'id,status,admin_comment,name,profile_photo,self_intro,languages,profession,dream_destination,favorite_song,host_nationality,phone,dob,bank_name,account_number,account_holder,motivation';
+const HOST_APPLICATION_BOOTSTRAP_SELECT = 'id,status,admin_comment,name,profile_photo,self_intro,languages,host_nationality,phone,dob,bank_name,account_number,account_holder,motivation';
 
 const HOST_PROFILE_SUMMARY_SELECT = 'created_at,avatar_url,full_name,bio,introduction,languages,job,dream_destination,favorite_song,nationality,host_nationality';
 
@@ -213,7 +210,15 @@ function DashboardContent() {
           .maybeSingle(),
       ]);
 
-      if (!hostError) {
+      if (hostError) {
+        console.error('[HostDashboard] failed to load latest host application:', {
+          message: hostError.message,
+          details: hostError.details,
+          hint: hostError.hint,
+          code: hostError.code,
+        });
+        setHostStatus(null);
+      } else {
         setHostStatus(hostData);
       }
 
@@ -225,10 +230,17 @@ function DashboardContent() {
         setApprovalNotificationToken(unreadApprovalNotification ?? null);
       }
 
-      const resolvedProfileData = profileData as HostProfileSummary | null;
-
-      if (!profileError) {
-        setProfile(buildMergedHostProfile(resolvedProfileData, hostData));
+      if (profileError) {
+        console.error('[HostDashboard] failed to load host profile summary:', {
+          message: profileError.message,
+          details: profileError.details,
+          hint: profileError.hint,
+          code: profileError.code,
+        });
+        setProfile(null);
+      } else {
+        const resolvedProfileData = profileData as HostProfileSummary | null;
+        setProfile(buildMergedHostProfile(resolvedProfileData, hostError ? null : hostData));
       }
 
       if ((consumedApprovalCount ?? 0) > 0 || !unreadApprovalNotification) {

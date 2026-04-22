@@ -122,9 +122,7 @@ export type ServiceApplicationWithProfile = ServiceApplication & {
     self_intro: string | null;
     languages: string[] | null;
     language_levels?: unknown; // JSON: LanguageLevelEntry[]
-    profession?: string | null;
-    dream_destination: string | null;
-    favorite_song: string | null;
+    host_nationality?: string | null;
   } | null;
   // 후기 집계 (클라이언트에서 계산)
   review_count?: number;

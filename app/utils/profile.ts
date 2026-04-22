@@ -49,9 +49,6 @@ type HostApplicationPublicSource = {
   profile_photo?: string | null;
   self_intro?: string | null;
   languages?: string[] | string | null;
-  profession?: string | null;
-  dream_destination?: string | null;
-  favorite_song?: string | null;
   host_nationality?: string | null;
 };
 
@@ -204,9 +201,9 @@ export function getHostPublicProfile(
     avatarUrl: profile?.avatar_url || hostApplication?.profile_photo || null,
     bio: hostApplication?.self_intro || profile?.introduction || null,
     languages: profileLanguages.length > 0 ? profileLanguages : hostApplicationLanguages,
-    job: profile?.job || hostApplication?.profession || null,
-    dreamDestination: profile?.dream_destination || hostApplication?.dream_destination || null,
-    favoriteSong: profile?.favorite_song || hostApplication?.favorite_song || null,
+    job: profile?.job || null,
+    dreamDestination: profile?.dream_destination || null,
+    favoriteSong: profile?.favorite_song || null,
     location: profile?.host_nationality || profile?.nationality || hostApplication?.host_nationality || null,
     createdAt: profile?.created_at || null,
   };

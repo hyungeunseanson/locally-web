@@ -97,10 +97,20 @@ export default function MobileHostMenu() {
                         .maybeSingle(),
                     supabase
                         .from('host_applications')
-                        .select('user_id, name, profile_photo, self_intro, languages, profession, host_nationality, phone')
+                        .select('user_id, name, profile_photo, self_intro, languages, host_nationality, phone')
                         .eq('user_id', user.id)
+                        .order('created_at', { ascending: false })
+                        .limit(1)
                         .maybeSingle(),
                 ]);
+
+                if (profileRes.error) {
+                    console.error('[MobileHostMenu] profile summary load failed:', profileRes.error);
+                }
+
+                if (hostRes.error) {
+                    console.error('[MobileHostMenu] host application fallback load failed:', hostRes.error);
+                }
 
                 if (profileRes.data || hostRes.data) {
                     const hostPublicProfile = getHostPublicProfile(profileRes.data, hostRes.data, t('host_default_name_short'));
@@ -187,7 +197,7 @@ export default function MobileHostMenu() {
                             </span>
                         )}
                     </button>
-                    <div className="relative w-9 h-9 rounded-full bg-gray-200 overflow-hidden border border-gray-100">
+                    <div data-testid="host-menu-profile-avatar" className="relative w-9 h-9 rounded-full bg-gray-200 overflow-hidden border border-gray-100">
                         {profile?.avatar_url
                             ? <Image src={profile.avatar_url} fill sizes="36px" className="object-cover" alt="profile" />
                             : <div className="w-full h-full flex items-center justify-center">

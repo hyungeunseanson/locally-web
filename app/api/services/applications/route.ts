@@ -12,6 +12,29 @@ type ServiceApplicationReadRow = Pick<
   'id' | 'request_id' | 'host_id' | 'appeal_message' | 'status' | 'created_at' | 'updated_at'
 >;
 
+type ServiceHostProfileRow = {
+  id: string;
+  full_name?: string | null;
+  avatar_url?: string | null;
+  bio?: string | null;
+  languages?: string[] | null;
+  created_at?: string | null;
+  job?: string | null;
+  dream_destination?: string | null;
+  favorite_song?: string | null;
+};
+
+type ServiceHostApplicationRow = {
+  user_id: string;
+  name?: string | null;
+  profile_photo?: string | null;
+  self_intro?: string | null;
+  languages?: string[] | null;
+  language_levels?: unknown;
+  host_nationality?: string | null;
+  created_at?: string | null;
+};
+
 type ApplyBody = {
   request_id?: string;
   appeal_message?: string;
@@ -232,13 +255,32 @@ export async function GET(request: Request) {
 
       // profiles & host_applications 별도 조회 (nested join RLS 우회)
       const hostIds = applicationRows.map((a) => a.host_id);
-      const [{ data: profiles }, { data: hostApps }] = await Promise.all([
+      const [{ data: profiles, error: profilesError }, { data: hostApps, error: hostAppsError }] = await Promise.all([
         supabaseAdmin.from('profiles').select('id, full_name, avatar_url, bio, languages, created_at, job, dream_destination, favorite_song').in('id', hostIds),
-        supabaseAdmin.from('host_applications').select('user_id, name, profile_photo, self_intro, languages, language_levels, dream_destination, favorite_song').in('user_id', hostIds),
+        supabaseAdmin
+          .from('host_applications')
+          .select('user_id, name, profile_photo, self_intro, languages, language_levels, host_nationality, created_at')
+          .in('user_id', hostIds)
+          .order('created_at', { ascending: false }),
       ]);
 
-      const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
-      const hostAppMap = new Map((hostApps ?? []).map((h) => [h.user_id, h]));
+      if (profilesError) {
+        console.error('[Service applications] profile fallback load failed:', profilesError);
+      }
+
+      if (hostAppsError) {
+        console.error('[Service applications] host application fallback load failed:', hostAppsError);
+      }
+
+      const profileMap = new Map(((profiles ?? []) as ServiceHostProfileRow[]).map((profile) => [profile.id, profile]));
+      const hostAppMap = new Map<string, ServiceHostApplicationRow>();
+
+      for (const hostApplication of (hostApps ?? []) as ServiceHostApplicationRow[]) {
+        if (!hostApplication.user_id || hostAppMap.has(hostApplication.user_id)) {
+          continue;
+        }
+        hostAppMap.set(hostApplication.user_id, hostApplication);
+      }
 
       // reviews 조회 (체험 기반 후기수/평점)
       const { data: reviewRows } = await supabaseAdmin

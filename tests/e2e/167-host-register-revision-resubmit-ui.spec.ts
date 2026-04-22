@@ -177,7 +177,10 @@ test('revision host can reopen the application form and re-submit the same row a
   await expect(
     page.getByRole('heading', { name: /보완이 필요합니다|Revision Required|修正が必要です|需要补充信息/ })
   ).toBeVisible({ timeout: 15000 });
-  await expect(page.getByText(/자기소개와 지원 동기를 조금 더 구체적으로 보완해 주세요\./)).toBeVisible();
+  await expect(
+    page.getByText(/관리자 코멘트를 확인하고 신청서를 보완해주세요\.|Please check the admin comments and revise your application\.|管理者コメントを確認して申請内容を修正してください。|请查看管理员意见并补充完善申请信息。/)
+  ).toBeVisible();
+  await expect(page.getByText('자기소개와 지원 동기를 조금 더 구체적으로 보완해 주세요.')).toBeVisible();
 
   await page.getByRole('button', { name: /신청서 수정하기|Edit Application|申請書を修正|修改申请书/ }).click();
   await page.waitForURL('**/host/register', { timeout: 15000 });
@@ -209,7 +212,7 @@ test('revision host can reopen the application form and re-submit the same row a
   await page.locator('footer').getByRole('button', { name: /다음|Next|次へ|下一步/ }).click();
 
   const bankNameInput = page.locator(
-    'input[placeholder="예) 카카오뱅크, 신한은행 / みずほ銀行(渋谷支店)"], input[placeholder="e.g. KakaoBank, Shinhan Bank / Mizuho Bank (Shibuya Branch)"], input[placeholder="例）楽天銀行、三井住友銀行 / みずほ銀行（渋谷支店）"], input[placeholder="例如：KakaoBank、Shinhan Bank / 瑞穗银行（涩谷支店）"]'
+    'input[placeholder="예) 카카오뱅크, 신한은행 / みずほ銀行(渋谷支店)"], input[placeholder="e.g. KakaoBank, Shinhan Bank / Mizuho Bank (Shibuya Branch)"], input[placeholder="例）PayPay / カカオバンク、シンハン銀行 / みずほ銀行（渋谷支店）"], input[placeholder="例如：KakaoBank、Shinhan Bank / 瑞穗银行（涩谷支店）"]'
   ).first();
   const accountHolderInput = page.locator(
     'input[placeholder="본인 실명"], input[placeholder="Your legal name"], input[placeholder="本人の実名"], input[placeholder="本人实名"]'
