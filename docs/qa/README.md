@@ -36,6 +36,7 @@ npm run test:e2e:qa:live-gate-cross
 ## Typical Workflow
 1. Validate the matrix.
 2. Seed manual-results JSON for the target domain bundle.
+   The runner will auto-seed a missing `--manual-results` file, but pre-seeding keeps the artifact explicit before a long run.
 3. Run automated domain QA.
 4. Fill the manual results file while checking canonical routes.
 5. Re-run the domain report with `--manual-results` and optionally `--write-doc-report`.
@@ -55,6 +56,7 @@ npm run test:e2e:qa:live-gate-cross
 11. Cross-check with `npm run test:e2e:qa:release-cross` and, when needed, `npm run test:e2e:qa:live-gate-cross`
 
 `*:plan` variants generate a dry-run report only. Non-`plan` variants execute the linked external gate bundle.
+Only `--write-doc-report` writes markdown/archive artifacts under `docs/qa/runs`.
 
 ## Example
 ```bash

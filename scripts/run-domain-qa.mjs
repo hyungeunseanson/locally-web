@@ -44,6 +44,67 @@ function writeTextFile(path, content) {
   writeFileSync(path, content, 'utf8');
 }
 
+function pickRouteActors(domain, route) {
+  if (route.includes('/admin') && domain.actors.includes('admin')) return ['admin'];
+  if (route.includes('/host') && domain.actors.includes('host')) return ['host'];
+  if (route.includes('/guest') && domain.actors.includes('guest')) return ['guest'];
+  if (route.includes('/services') && domain.actors.includes('guest')) return ['guest'];
+  if (route.includes('/proxy') && domain.actors.includes('guest')) return ['guest'];
+  if (domain.actors.includes('public')) return ['public'];
+  return [domain.actors[0]];
+}
+
+function buildChecksForDomain(domain) {
+  const areas = ['copy', 'translation', 'ux', 'ui', 'a11y', 'tap-target', 'overflow', 'state'];
+  const checks = [];
+
+  for (const route of domain.canonicalRoutes) {
+    const actors = pickRouteActors(domain, route);
+    for (const actor of actors) {
+      for (const locale of domain.locales) {
+        for (const viewport of domain.viewports) {
+          for (const area of areas) {
+            checks.push({
+              route,
+              actor,
+              locale,
+              viewport,
+              area,
+              status: 'pending',
+              note: '',
+            });
+          }
+        }
+      }
+    }
+  }
+
+  return checks;
+}
+
+function buildManualResultsSeed({ domains, source }) {
+  return {
+    generatedAt: new Date().toISOString(),
+    source,
+    domains: Object.fromEntries(
+      domains.map((domain) => [
+        String(domain.id),
+        {
+          status: 'pending',
+          notes: [
+            `Canonical routes: ${domain.canonicalRoutes.join(', ')}`,
+            `Actors: ${domain.actors.join(', ')}`,
+            `Locales: ${domain.locales.join(', ')}`,
+            `Viewports: ${domain.viewports.join(', ')}`,
+          ],
+          artifacts: [],
+          checks: buildChecksForDomain(domain),
+        },
+      ])
+    ),
+  };
+}
+
 async function loadDomainMatrixModule() {
   const manifestPath = resolve('tests/e2e/domainMatrix.ts');
   const source = readFileSync(manifestPath, 'utf8');
@@ -215,10 +276,17 @@ function buildGateAssessment(domainReports) {
   };
 }
 
-function loadManualResults(path) {
+function loadManualResults(path, fallbackSeed = null) {
   if (!path) return null;
   if (!existsSync(path)) {
-    throw new Error(`Manual results file not found: ${path}`);
+    if (!fallbackSeed) {
+      throw new Error(`Manual results file not found: ${path}`);
+    }
+
+    const outputPath = resolve(path);
+    writeTextFile(outputPath, `${JSON.stringify(fallbackSeed, null, 2)}\n`);
+    console.warn(`[domain-qa] seeded missing manual results: ${outputPath}`);
+    return fallbackSeed;
   }
 
   return readJson(path);
@@ -424,13 +492,18 @@ async function main() {
     selectedDomainIds.includes(domain.id)
   ).sort((a, b) => selectedDomainIds.indexOf(a.id) - selectedDomainIds.indexOf(b.id));
 
-  const manualResults = loadManualResults(manualResultsPath);
+  const manualSeedSource = rawBundle
+    ? `bundle:${rawBundle}`
+    : `domains:${selectedDomainIds.join(',') || 'none'}`;
+  const manualResultsSeed =
+    manualResultsPath && selectedDomains.length > 0
+      ? buildManualResultsSeed({ domains: selectedDomains, source: manualSeedSource })
+      : null;
+  const manualResults = loadManualResults(manualResultsPath, manualResultsSeed);
   const generatedAt = new Date().toISOString();
   const reportStamp = timestampSlug(new Date());
   const reportDir = resolve(`test-results/domain-qa/${reportStamp}`);
-  const archiveDir = resolve(`docs/qa/runs/archive/${reportStamp}`);
   ensureDir(reportDir);
-  ensureDir(archiveDir);
 
   let externalBundleReport = null;
   if (selectedExternalBundle) {
@@ -520,18 +593,21 @@ async function main() {
 
   const markdown = buildMarkdownReport(report);
   writeTextFile(resolve(reportDir, 'summary.md'), markdown);
-  writeTextFile(resolve(archiveDir, 'summary.json'), `${JSON.stringify(report, null, 2)}\n`);
-  writeTextFile(resolve(archiveDir, 'summary.md'), markdown);
 
   if (writeDocReport) {
+    const archiveDir = resolve(`docs/qa/runs/archive/${reportStamp}`);
+    ensureDir(archiveDir);
+    writeTextFile(resolve(archiveDir, 'summary.json'), `${JSON.stringify(report, null, 2)}\n`);
+    writeTextFile(resolve(archiveDir, 'summary.md'), markdown);
+
     const dailyDocReportName = `${generatedAt.slice(0, 10)}-domain-signoff.md`;
     const stampedDocReportName = `${reportStamp}-domain-signoff.md`;
     writeTextFile(resolve(`docs/qa/runs/${dailyDocReportName}`), markdown);
     writeTextFile(resolve(`docs/qa/runs/${stampedDocReportName}`), markdown);
+    console.log(`[domain-qa] archiveDir=${archiveDir}`);
   }
 
   console.log(`[domain-qa] reportDir=${reportDir}`);
-  console.log(`[domain-qa] archiveDir=${archiveDir}`);
   console.log(`[domain-qa] domains=${selectedDomainIds.join(', ') || 'none'}`);
   if (selectedExternalBundle) {
     console.log(`[domain-qa] externalBundle=${selectedExternalBundle.id}`);
