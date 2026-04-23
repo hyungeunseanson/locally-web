@@ -263,8 +263,8 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
         </div>
 
         {/* 오른쪽: 정보 섹션 */}
-        <div className="flex-1 p-4 md:p-6 flex flex-col justify-between">
-          <div>
+        <div className="flex-1 p-4 md:p-6 flex min-h-0 flex-col">
+          <div className="min-h-0">
             <div className="flex justify-between items-start mb-1.5 md:mb-2">
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-1.5 md:gap-2 text-[10px] text-slate-400">
@@ -398,7 +398,7 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
           </div>
 
           {/* 하단 3버튼 */}
-          <div className="mt-3 md:mt-4 pt-3 md:pt-4 border-t border-slate-100 grid grid-cols-3 gap-1.5 md:gap-2">
+          <div className="mt-auto shrink-0 pt-3 md:pt-4 border-t border-slate-100 grid grid-cols-3 gap-1.5 md:gap-2">
             <button
               onClick={() => {
                 router.push(buildMessageHref());

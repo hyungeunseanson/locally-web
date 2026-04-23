@@ -672,9 +672,15 @@ test.describe.serial('guest trips completed sync route', () => {
       .getByTestId('guest-trips-desktop-main')
       .getByTestId(`guest-trip-card-${bookingId}`);
     const pendingReceiptButton = tripCard.getByTestId('guest-trip-pending-receipt-button');
+    const messageButton = tripCard.getByRole('button', { name: '메시지' });
+    const mapButton = tripCard.getByRole('button', { name: '지도' });
+    const receiptButton = tripCard.getByRole('button', { name: '영수증' });
     await expect(tripCard).toBeVisible();
     await expect(tripCard).toContainText('입금을 기다리고 있습니다. 영수증에서 계좌 정보와 입금 마감 시간을 다시 확인해주세요.');
     await expect(pendingReceiptButton).toBeVisible();
+    await expect(messageButton).toBeVisible();
+    await expect(mapButton).toBeVisible();
+    await expect(receiptButton).toBeVisible();
     await pendingReceiptButton.scrollIntoViewIfNeeded();
 
     const cardBox = await tripCard.boundingBox();
@@ -695,6 +701,13 @@ test.describe.serial('guest trips completed sync route', () => {
     await page.addInitScript(() => {
       window.localStorage.setItem('app_lang', 'ko');
       document.cookie = 'app_lang=ko; path=/';
+    });
+    await page.addInitScript(() => {
+      (window as typeof window & { __receiptPrintCalls?: number }).__receiptPrintCalls = 0;
+      window.print = () => {
+        (window as typeof window & { __receiptPrintCalls?: number }).__receiptPrintCalls =
+          ((window as typeof window & { __receiptPrintCalls?: number }).__receiptPrintCalls || 0) + 1;
+      };
     });
     await page.setViewportSize(desktopViewport);
 
@@ -738,6 +751,15 @@ test.describe.serial('guest trips completed sync route', () => {
       const elementAtCenter = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
       return Boolean(elementAtCenter) && (button === elementAtCenter || button.contains(elementAtCenter));
     })).toBe(true);
+    const saveReceiptButton = page.getByTestId('guest-trip-receipt-save-button');
+    await expect(saveReceiptButton).toBeVisible();
+    const downloadPromise = page.waitForEvent('download');
+    await saveReceiptButton.click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toContain('locally-receipt-');
+    await expect
+      .poll(async () => page.evaluate(() => (window as typeof window & { __receiptPrintCalls?: number }).__receiptPrintCalls || 0))
+      .toBe(0);
     await receiptCloseButton.click();
     await expect(receiptModal).toBeHidden({ timeout: 10000 });
 
