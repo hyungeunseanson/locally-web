@@ -242,7 +242,12 @@ test.describe.serial('Live guest post-booking experience flow', () => {
 
         await expect(cancelModal).toBeVisible({ timeout: 10000 });
         await expect(
-          cancelModal.getByText(/결제 후 24시간 이내 철회\(투어 2일 전까지\): 100%|Cancellation on the payment day: 100%/)
+          cancelModal.getByText(/체험일 당일\/지난 일정: 환불 불가|Experience day \/ Past date: Non-refundable/)
+        ).toBeVisible({
+          timeout: 10000,
+        });
+        await expect(
+          cancelModal.getByText(/그 외 결제 당일 취소: 100%|Otherwise, cancellation on the payment day: 100%/)
         ).toBeVisible({
           timeout: 10000,
         });
@@ -256,11 +261,7 @@ test.describe.serial('Live guest post-booking experience flow', () => {
         ).toBeVisible({
           timeout: 10000,
         });
-        await expect(
-          cancelModal.getByText(/당일\/지난 일정: 환불 불가|Same day \/ Past date: Non-refundable/)
-        ).toBeVisible({
-          timeout: 10000,
-        });
+        await expect(cancelModal).not.toContainText('24시간');
 
         const cancelCloseButton = page.getByTestId('guest-trip-cancel-close-button');
         await expect(cancelCloseButton).toBeVisible({ timeout: 10000 });

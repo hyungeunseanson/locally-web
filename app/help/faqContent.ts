@@ -183,7 +183,7 @@ const ko: HelpFaqLocaleContent = {
         {
           id: 'refund-rule',
           q: '취소 규정은 어떻게 계산되나요?',
-          a: '현재 기준으로 결제 당일 취소는 100%, 체험일 20일 전까지는 100%, 8~19일 전은 80%, 2~7일 전은 70%, 1일 전은 40% 환불됩니다. 당일이나 이미 지난 일정은 환불되지 않습니다.',
+          a: '현재 기준으로 체험일 당일이나 이미 지난 일정은 환불되지 않습니다. 그 외에는 결제 당일 취소 100%, 체험일 20일 전까지는 100%, 8~19일 전은 80%, 2~7일 전은 70%, 1일 전은 40% 환불됩니다. 호스트 사유 취소나 운영팀이 진행 불가를 확인한 취소는 전액 환불됩니다.',
           searchTerms: ['취소 규정', '환불 규정', '환불율', '환불률', 'policy'],
         },
         {
@@ -772,7 +772,7 @@ const en: HelpFaqLocaleContent = {
         {
           id: 'refund-rule',
           q: 'How is the cancellation policy calculated?',
-          a: 'At the moment, cancellations on the payment day are refunded 100%, up to 20 days before the trip are 100%, 8 to 19 days before are 80%, 2 to 7 days before are 70%, and 1 day before is 40%. Same-day or past-date cancellations are non-refundable.',
+          a: 'At the moment, experience-day or past-date cancellations are non-refundable. Otherwise, cancellations on the payment day are refunded 100%, up to 20 days before the experience are 100%, 8 to 19 days before are 80%, 2 to 7 days before are 70%, and 1 day before is 40%. If the host cancels or the team confirms the experience could not proceed, the booking is fully refunded.',
           searchTerms: ['refund policy', 'cancellation policy', 'refund rate', 'policy'],
         },
         {
@@ -1361,7 +1361,7 @@ const ja: HelpFaqLocaleContent = {
         {
           id: 'refund-rule',
           q: 'キャンセル規定はどのように計算されますか？',
-          a: '現在の基準では、決済当日のキャンセルは100%、体験日の20日前までは100%、8〜19日前は80%、2〜7日前は70%、1日前は40%返金です。当日や過ぎた日程は返金対象外です。',
+          a: '現在の基準では、体験当日や過ぎた日程は返金対象外です。それ以外は、決済当日のキャンセルは100%、体験日の20日前までは100%、8〜19日前は80%、2〜7日前は70%、1日前は40%返金です。ホスト都合のキャンセルや、運営チームが進行不可を確認した場合は全額返金されます。',
           searchTerms: ['返金規定', 'キャンセル規定', '返金率', 'policy'],
         },
         {
@@ -1950,7 +1950,7 @@ const zh: HelpFaqLocaleContent = {
         {
           id: 'refund-rule',
           q: '取消规则是怎么计算的？',
-          a: '当前规则是：支付当天取消退款100%，出发前20天及以上退款100%，8至19天前退款80%，2至7天前退款70%，前1天退款40%。当天或已过期的日程不可退款。',
+          a: '当前规则是：行程当天或已过期的日程不可退款。除此之外，支付当天取消退款100%，出发前20天及以上退款100%，8至19天前退款80%，2至7天前退款70%，前1天退款40%。如因房东原因取消，或运营团队确认行程无法进行，将全额退款。',
           searchTerms: ['退款规则', '取消规则', '退款比例', 'policy'],
         },
         {

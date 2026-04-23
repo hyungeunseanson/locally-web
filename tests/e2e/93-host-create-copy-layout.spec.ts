@@ -319,12 +319,12 @@ test('host create shows structured primary language guidance and refund policy c
   await expect(refundPolicyCard.getByTestId('host-create-refund-policy-chip-5')).toBeVisible();
   await expect(
     refundPolicyCard.getByText(
-      /결제 당일 취소 100%|100% on the payment day|決済当日のキャンセル100%|付款当日取消100%/
+      /결제 당일 취소: 100%|Cancellation on the payment day: 100%|決済当日のキャンセル: 100%|付款当日取消：100%/
     )
   ).toBeVisible();
   await expect(
     refundPolicyCard.getByText(
-      /당일 환불 불가|No refund on the day|当日返金不可|当天不可退款/
+      /체험일 당일\/지난 일정: 환불 불가|Experience day or past dates: Non-refundable|体験当日 \/ 過ぎた日程: 返金不可|行程当天\/已过日期：不可退款/
     )
   ).toBeVisible();
   await expect(

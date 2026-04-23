@@ -78,4 +78,21 @@ test.describe('Help Center self-service copy', () => {
     await expect(page.getByTestId('help-search-empty-state')).toBeVisible();
     await expect(page.getByTestId('help-search-empty-cta')).toBeVisible();
   });
+
+  test('shows the current experience refund matrix without legacy 24-hour withdrawal copy', async ({ page }) => {
+    await page.goto('/help', { waitUntil: 'networkidle' });
+
+    const cancellationCategory = page.getByTestId('help-category-guest-cancellation');
+
+    await page.getByRole('textbox').fill('환불 규정');
+    await page.getByRole('button', { name: '취소 규정은 어떻게 계산되나요?' }).click();
+
+    await expect(
+      page.getByText(
+        '현재 기준으로 체험일 당일이나 이미 지난 일정은 환불되지 않습니다. 그 외에는 결제 당일 취소 100%, 체험일 20일 전까지는 100%, 8~19일 전은 80%, 2~7일 전은 70%, 1일 전은 40% 환불됩니다. 호스트 사유 취소나 운영팀이 진행 불가를 확인한 취소는 전액 환불됩니다.'
+      )
+    ).toBeVisible();
+    await expect(cancellationCategory).not.toContainText('24시간');
+    await expect(cancellationCategory).not.toContainText('서비스 수수료 10%');
+  });
 });

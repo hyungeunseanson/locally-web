@@ -534,17 +534,16 @@ Article 20. Other Matters
 
 export const REFUND_POLICY_EN = `
 [Tour Cancellation and Refund]
-As set forth in Article 16, Paragraph 2 of the Partner Terms, if the travel contract is arbitrarily cancelled after travel fees have been paid and before the tour start date, the travel fees will be refunded according to the following standards regarding the timing of the cancellation notice.
+If the traveler cancels the travel contract before the experience starts after payment has been completed, the following standards apply based on when the cancellation notice is received.
 
-[For International Travel]
-- Notification by 20 days before travel start (~20 days): Full refund of travel fees
-- Notification by 8 days before travel start (19~8 days): Refund after deducting 10% of total product price and 10% service fee
-- Notification by 2 days before travel start (7~2 days): Refund after deducting 20% of total product price and 10% service fee
-- Notification by 1 day before travel start (~1 day): Refund after deducting 50% of total product price and 10% service fee
-- Notification on the day of the tour: No refund
-However, notwithstanding the above provisions, the following cases are exceptions:
-1) If the traveler cancels the travel contract within 24 hours of paying (completing payment of) the travel fees, or if the traveler cancels before the guide is confirmed after making a tour reservation, the full travel fees will be refunded. However, even if 24 hours have not passed since the traveler paid the travel fees, if the relevant time is 1 day before the travel date (from midnight of the day before the travel date) to the start of travel in local time (in the case of an Instant Booking reservation), it is excluded from the full refund target.
-2) If there is an amount that must be paid as a local deposit according to the characteristics of the product, the cancellation and refund terms separately notified in the detailed description of each product shall apply to the refund of the relevant deposit.
+- Cancellation on the experience day or for a past date: Non-refundable
+- Otherwise, cancellation on the same Korea Standard Time (KST) calendar day as payment: 100% refund
+- Notification by 20 days before the experience starts (~20 days): 100% refund
+- Notification by 8 days before the experience starts (19~8 days): 80% refund
+- Notification by 2 days before the experience starts (7~2 days): 70% refund
+- Notification by 1 day before the experience starts (~1 day): 40% refund
+
+If the host cancels or the company confirms that the experience could not proceed, the booking is fully refunded.
 
 [Service Provision Period]
 - Tour reservation confirmation period: Reservation confirmation and guidance will be provided within 1 business day after payment is completed.

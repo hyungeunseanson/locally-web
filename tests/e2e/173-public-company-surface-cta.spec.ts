@@ -60,5 +60,33 @@ test.describe('Public company surface CTA truth', () => {
     await expect(legalModal).not.toContainText('<예)');
     await expect(legalModal).not.toContainText('〈例：');
     await expect(legalModal).not.toContainText('e.g. OOO');
+    await legalModal.getByRole('button', { name: 'Close legal document' }).click();
+    await expect(legalModal).toBeHidden();
+
+    await page.getByTestId('site-map-legal-trigger-refund').click();
+
+    await expect(legalModal).toBeVisible();
+    await expect(legalModal).toContainText(
+      /체험일 당일 또는 이미 지난 일정 취소: 환불 불가|Cancellation on the experience day or for a past date: Non-refundable/
+    );
+    await expect(legalModal).toContainText(
+      /그 외 결제일과 동일한 한국 시간\(KST\) 기준 날짜에 취소한 경우: 여행요금 전액 환불|Otherwise, cancellation on the same Korea Standard Time \(KST\) calendar day as payment: 100% refund/
+    );
+    await expect(legalModal).toContainText(
+      /여행시작 8일 전까지 \(19~8일\) 통보 시: 여행요금의 80% 환불|Notification by 8 days before the experience starts \(19~8 days\): 80% refund/
+    );
+    await expect(legalModal).toContainText(
+      /여행시작 2일 전까지 \(7~2일\) 통보 시: 여행요금의 70% 환불|Notification by 2 days before the experience starts \(7~2 days\): 70% refund/
+    );
+    await expect(legalModal).toContainText(
+      /여행시작 1일 전까지 \(~1일\) 통보 시: 여행요금의 40% 환불|Notification by 1 day before the experience starts \(~1 day\): 40% refund/
+    );
+    await expect(legalModal).toContainText(
+      /호스트 사유로 투어가 취소되거나 회사가 진행 불가를 확인한 경우에는 여행요금을 전액 환불합니다\.|If the host cancels or the company confirms that the experience could not proceed, the booking is fully refunded\./
+    );
+    await expect(legalModal).not.toContainText(/24시간|within 24 hours of paying/);
+    await expect(legalModal).not.toContainText(/가이드가 확정되기 전에|before the guide is confirmed/);
+    await expect(legalModal).not.toContainText(/서비스 수수료 10%|service fee/);
+    await expect(legalModal).not.toContainText(/현지 예약금|local deposit/);
   });
 });

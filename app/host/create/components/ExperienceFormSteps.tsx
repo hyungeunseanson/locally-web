@@ -755,7 +755,7 @@ export default function ExperienceFormSteps({
             <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">{copy.refundPolicyLabel}</p>
             <div className="space-y-0 divide-y divide-slate-100">
               {copy.refundPolicyItems.map((item, index) => {
-                const isNoRefundRule = index === copy.refundPolicyItems.length - 1;
+                const isNoRefundRule = index === 0;
                 return (
                   <div
                     key={item}
