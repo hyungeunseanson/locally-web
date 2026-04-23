@@ -214,6 +214,25 @@ test.describe.serial('Community board layout and access', () => {
     await expect(page.getByRole('button', { name: '여행 꿀팁' })).toHaveCount(0);
     await expect(page.getByTestId('community-write-board-japan')).toBeVisible();
     await expect(page.getByTestId('community-write-board-korea')).toBeVisible();
+    await expect(page.getByText('최대 1장까지 첨부할 수 있어요.')).toBeVisible();
+
+    const imageInput = page.locator('input[type="file"]');
+    const hasMultiple = await imageInput.evaluate((element) => element.hasAttribute('multiple'));
+    expect(hasMultiple).toBe(false);
+
+    await imageInput.setInputFiles({
+      name: 'community-write-single.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from('community-write-single-image'),
+    });
+
+    await expect(page.getByAltText('업로드 이미지 1')).toBeVisible();
+    await expect(page.getByText('사진 추가')).toHaveCount(0);
+    await expect(page.getByText('1/1')).toBeVisible();
+
+    await page.getByRole('button', { name: '이미지 1 삭제' }).click();
+    await expect(page.getByText('사진 추가')).toBeVisible();
+    await expect(page.getByText('0/1')).toBeVisible();
 
     const title = `[Playwright] Community Board Write ${Date.now()}`;
     await page.getByPlaceholder('게시글 제목을 입력해 주세요').fill(title);

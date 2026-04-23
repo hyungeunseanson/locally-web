@@ -14,6 +14,8 @@ import { getLegacyHubSeedForBoard, resolveCommunityBoard } from '@/app/community
 import { getCommunityCategoryFromFormat } from '@/app/community/categoryMeta';
 import type { CommunityBoard, CommunityHub, CommunityPostFormat, CommunitySourceLocale } from '@/app/types/community';
 
+const MAX_COMMUNITY_POST_IMAGES = 1;
+
 async function cleanupUploadedImages(imagePaths: string[]) {
     if (imagePaths.length === 0) return;
 
@@ -27,6 +29,19 @@ async function cleanupUploadedImages(imagePaths: string[]) {
     } catch (error) {
         console.error('Community post image cleanup threw unexpectedly:', error);
     }
+}
+
+function isValidCommunityImagePath(imagePath: string) {
+    return imagePath.startsWith('community/')
+        && !imagePath.includes('..')
+        && !imagePath.startsWith('/')
+        && !imagePath.includes('?');
+}
+
+function resolveExpectedCommunityImageUrl(imagePath: string) {
+    const supabaseAdmin = createAdminClient();
+    const { data } = supabaseAdmin.storage.from('images').getPublicUrl(imagePath);
+    return data.publicUrl;
 }
 
 export async function POST(request: NextRequest) {
@@ -88,6 +103,18 @@ export async function POST(request: NextRequest) {
         // Validate Required Fields
         if (!title || !content || (!normalizedBoard && !category)) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+        }
+        if (normalizedImages.length > MAX_COMMUNITY_POST_IMAGES || normalizedImagePaths.length > MAX_COMMUNITY_POST_IMAGES) {
+            return NextResponse.json({ error: '이미지는 최대 1장까지만 첨부할 수 있습니다.' }, { status: 400 });
+        }
+        if (normalizedImages.length !== normalizedImagePaths.length) {
+            return NextResponse.json({ error: '이미지 정보가 올바르지 않습니다.' }, { status: 400 });
+        }
+        if (normalizedImagePaths.some((imagePath) => !isValidCommunityImagePath(imagePath))) {
+            return NextResponse.json({ error: '이미지 경로가 올바르지 않습니다.' }, { status: 400 });
+        }
+        if (normalizedImages.some((imageUrl, index) => imageUrl !== resolveExpectedCommunityImageUrl(normalizedImagePaths[index]))) {
+            return NextResponse.json({ error: '이미지 URL이 올바르지 않습니다.' }, { status: 400 });
         }
         // [Security] 제목/본문 길이 제한 — DB overflow 및 이메일 페이로드 블로팅 방지
         if (title.trim().length > 200) {

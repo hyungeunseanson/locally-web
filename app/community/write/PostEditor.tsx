@@ -1,9 +1,9 @@
 /* eslint-disable @next/next/no-img-element */
 'use client';
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, GripVertical, ImagePlus, Loader2, X } from 'lucide-react';
+import { ArrowLeft, ImagePlus, Loader2, X } from 'lucide-react';
 
 import { createClient } from '@/app/utils/supabase/client';
 import { useLanguage } from '@/app/context/LanguageContext';
@@ -12,7 +12,7 @@ import { compressImage, isHeicValidationResult, sanitizeFileName, validateImage 
 import type { CommunityBoard, CommunitySourceLocale } from '@/app/types/community';
 import { buildCommunityBoardDetailHref, buildCommunityBoardListHref } from '../queryParams';
 
-const MAX_IMAGES = 3;
+const MAX_IMAGES = 1;
 
 type UploadedImage = {
   path: string;
@@ -41,10 +41,7 @@ export default function PostEditor({ initialBoard, initialLocale }: PostEditorPr
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
-  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const dragSrcIdx = useRef<number | null>(null);
   const canSubmit = title.trim().length > 0 && content.trim().length > 0;
   const boardOptions = useMemo(
     () => [
@@ -54,11 +51,17 @@ export default function PostEditor({ initialBoard, initialLocale }: PostEditorPr
     [t]
   );
 
+  useEffect(() => {
+    return () => {
+      imageUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [imageUrls]);
+
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files) return;
     const files = Array.from(event.target.files);
 
-    if (imageFiles.length + files.length > MAX_IMAGES) {
+    if (files.length > MAX_IMAGES) {
       showToast(`사진은 최대 ${MAX_IMAGES}장까지만 업로드 가능합니다.`, 'error');
       event.target.value = '';
       return;
@@ -76,8 +79,14 @@ export default function PostEditor({ initialBoard, initialLocale }: PostEditorPr
       return false;
     });
 
-    setImageFiles((prev) => [...prev, ...validFiles]);
-    setImageUrls((prev) => [...prev, ...validFiles.map((file) => URL.createObjectURL(file))]);
+    const nextFile = validFiles[0];
+    if (!nextFile) {
+      event.target.value = '';
+      return;
+    }
+
+    setImageFiles([nextFile]);
+    setImageUrls([URL.createObjectURL(nextFile)]);
     event.target.value = '';
   };
 
@@ -89,33 +98,6 @@ export default function PostEditor({ initialBoard, initialLocale }: PostEditorPr
       nextUrls.splice(index, 1);
       return nextUrls;
     });
-  };
-
-  const handleDragStart = (idx: number) => {
-    dragSrcIdx.current = idx;
-  };
-
-  const handleDrop = (toIdx: number) => {
-    const fromIdx = dragSrcIdx.current;
-    if (fromIdx === null || fromIdx === toIdx) {
-      setDragOverIdx(null);
-      return;
-    }
-
-    setImageFiles((prev) => {
-      const next = [...prev];
-      const [item] = next.splice(fromIdx, 1);
-      next.splice(toIdx, 0, item);
-      return next;
-    });
-    setImageUrls((prev) => {
-      const next = [...prev];
-      const [item] = next.splice(fromIdx, 1);
-      next.splice(toIdx, 0, item);
-      return next;
-    });
-    dragSrcIdx.current = null;
-    setDragOverIdx(null);
   };
 
   const uploadImages = async (): Promise<UploadedImage[]> => {
@@ -249,26 +231,9 @@ export default function PostEditor({ initialBoard, initialLocale }: PostEditorPr
                 {imageUrls.map((url, index) => (
                   <div
                     key={url}
-                    draggable
-                    onDragStart={() => handleDragStart(index)}
-                    onDragOver={(event) => {
-                      event.preventDefault();
-                      setDragOverIdx(index);
-                    }}
-                    onDragLeave={() => setDragOverIdx((prev) => (prev === index ? null : prev))}
-                    onDrop={(event) => {
-                      event.preventDefault();
-                      handleDrop(index);
-                    }}
-                    onDragEnd={() => setDragOverIdx(null)}
-                    className={`relative aspect-square overflow-hidden rounded-2xl border bg-slate-50 ${
-                      dragOverIdx === index ? 'border-slate-900' : 'border-slate-200'
-                    }`}
+                    className="relative aspect-square overflow-hidden rounded-2xl border border-slate-200 bg-slate-50"
                   >
                     <img src={url} alt={`업로드 이미지 ${index + 1}`} className="h-full w-full object-cover" />
-                    <div className="absolute left-2 top-2 rounded-full bg-black/70 p-1 text-white">
-                      <GripVertical size={12} />
-                    </div>
                     <button
                       type="button"
                       onClick={() => removeImage(index)}
@@ -287,14 +252,13 @@ export default function PostEditor({ initialBoard, initialLocale }: PostEditorPr
                     <input
                       type="file"
                       accept="image/*"
-                      multiple
                       className="hidden"
                       onChange={handleImageChange}
                     />
                   </label>
                 )}
               </div>
-              <p className="mt-2 text-[12px] text-slate-400">최대 3장 · 드래그해서 순서를 바꿀 수 있어요.</p>
+              <p className="mt-2 text-[12px] text-slate-400">최대 1장까지 첨부할 수 있어요.</p>
             </div>
 
             <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">

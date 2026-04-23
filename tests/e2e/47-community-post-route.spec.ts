@@ -64,6 +64,29 @@ function createUser(prefix: string): TestUser {
   };
 }
 
+async function uploadCommunityImageFixture(suffix: string) {
+  const supabase = getAdminClient();
+  const imagePath = `community/playwright/${suffix}-${Date.now()}.png`;
+  createdStoragePaths.push(imagePath);
+
+  const uploadResult = await supabase.storage.from('images').upload(
+    imagePath,
+    Buffer.from('not-a-real-png-but-good-enough-for-storage'),
+    {
+      contentType: 'image/png',
+      upsert: false,
+    }
+  );
+
+  if (uploadResult.error) throw uploadResult.error;
+
+  const { data } = supabase.storage.from('images').getPublicUrl(imagePath);
+  return {
+    imagePath,
+    publicUrl: data.publicUrl,
+  };
+}
+
 async function waitForProfile(userId: string) {
   const supabase = getAdminClient();
 
@@ -293,6 +316,103 @@ test.describe.serial('Community post write boundary', () => {
     }
   });
 
+  test('accepts a single uploaded image and rejects malformed image payloads', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const user = createUser('single-image');
+    const userId = await createAuthUser(user);
+    await login(page, user);
+
+    const { imagePath, publicUrl } = await uploadCommunityImageFixture('community-post-single');
+
+    const successResponse = await page.request.post('/api/community/posts', {
+      data: {
+        category: 'qna',
+        title: `Single Image ${Date.now()}`,
+        content: '단일 이미지 저장 검증용 글입니다.',
+        images: [publicUrl],
+        image_paths: [imagePath],
+      },
+    });
+
+    expect(successResponse.status()).toBe(200);
+    const successPayload = await successResponse.json();
+    expect(successPayload.id).toBeTruthy();
+    createdPostIds.push(successPayload.id);
+
+    const { data: insertedPost } = await getAdminClient()
+      .from('community_posts')
+      .select('id, user_id, images')
+      .eq('id', successPayload.id)
+      .maybeSingle();
+
+    expect(insertedPost).toMatchObject({
+      id: successPayload.id,
+      user_id: userId,
+      images: [publicUrl],
+    });
+
+    const mismatchResponse = await page.request.post('/api/community/posts', {
+      data: {
+        category: 'qna',
+        title: `Image Mismatch ${Date.now()}`,
+        content: '이미지 개수 불일치 검증용 글입니다.',
+        images: [publicUrl],
+        image_paths: [],
+      },
+    });
+
+    expect(mismatchResponse.status()).toBe(400);
+    await expect(mismatchResponse.json()).resolves.toMatchObject({
+      error: '이미지 정보가 올바르지 않습니다.',
+    });
+
+    const tooManyResponse = await page.request.post('/api/community/posts', {
+      data: {
+        category: 'qna',
+        title: `Too Many Images ${Date.now()}`,
+        content: '다중 이미지 차단 검증용 글입니다.',
+        images: [publicUrl, publicUrl],
+        image_paths: ['community/playwright/first.png', 'community/playwright/second.png'],
+      },
+    });
+
+    expect(tooManyResponse.status()).toBe(400);
+    await expect(tooManyResponse.json()).resolves.toMatchObject({
+      error: '이미지는 최대 1장까지만 첨부할 수 있습니다.',
+    });
+
+    const invalidPathResponse = await page.request.post('/api/community/posts', {
+      data: {
+        category: 'qna',
+        title: `Invalid Image Path ${Date.now()}`,
+        content: '이미지 경로 차단 검증용 글입니다.',
+        images: [publicUrl],
+        image_paths: ['avatars/playwright-invalid.png'],
+      },
+    });
+
+    expect(invalidPathResponse.status()).toBe(400);
+    await expect(invalidPathResponse.json()).resolves.toMatchObject({
+      error: '이미지 경로가 올바르지 않습니다.',
+    });
+
+    const invalidUrlResponse = await page.request.post('/api/community/posts', {
+      data: {
+        category: 'qna',
+        title: `Invalid Image Url ${Date.now()}`,
+        content: '외부 이미지 URL 차단 검증용 글입니다.',
+        images: ['https://example.com/not-allowed.png'],
+        image_paths: [imagePath],
+      },
+    });
+
+    expect(invalidUrlResponse.status()).toBe(400);
+    await expect(invalidUrlResponse.json()).resolves.toMatchObject({
+      error: '이미지 URL이 올바르지 않습니다.',
+    });
+  });
+
   test('cleans up uploaded image paths when the DB insert fails', async ({ page }) => {
     test.setTimeout(90000);
 
@@ -301,29 +421,14 @@ test.describe.serial('Community post write boundary', () => {
     await login(page, user);
 
     const supabase = getAdminClient();
-    const timestamp = Date.now();
-    const imagePath = `community/playwright/community-post-rollback-${timestamp}.png`;
-    createdStoragePaths.push(imagePath);
-
-    const uploadResult = await supabase.storage.from('images').upload(
-      imagePath,
-      Buffer.from('not-a-real-png-but-good-enough-for-storage'),
-      {
-        contentType: 'image/png',
-        upsert: false,
-      }
-    );
-
-    if (uploadResult.error) throw uploadResult.error;
-
-    const { data: publicImage } = supabase.storage.from('images').getPublicUrl(imagePath);
+    const { imagePath, publicUrl } = await uploadCommunityImageFixture('community-post-rollback');
 
     const response = await page.request.post('/api/community/posts', {
       data: {
         category: 'qna',
-        title: `Rollback ${timestamp}`,
+        title: `Rollback ${Date.now()}`,
         content: 'DB insert 실패 시 업로드 이미지 cleanup 검증용 글입니다.',
-        images: [publicImage.publicUrl],
+        images: [publicUrl],
         image_paths: [imagePath],
         linked_exp_id: INVALID_LINKED_EXP_ID,
       },
