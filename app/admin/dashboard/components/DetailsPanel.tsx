@@ -157,6 +157,7 @@ export default function DetailsPanel({
     activeTab === 'APPS' || activeTab === 'EXPS'
       ? (detailItem || rawSelectedItem)
       : rawSelectedItem;
+  const isStaleHostApplication = activeTab === 'APPS' && selectedItem?.is_latest_for_user === false;
   const applicationLanguageLevels = normalizeLanguageLevels(
     selectedItem?.language_levels,
     selectedItem?.languages,
@@ -503,9 +504,35 @@ export default function DetailsPanel({
 
             {/* 승인/거절 버튼 */}
             <div className="pt-4 md:pt-6 mt-4 md:mt-6 border-t border-slate-100 grid grid-cols-2 gap-2 md:gap-3 sticky bottom-0 bg-white pb-3 md:pb-4 z-10">
-              <button onClick={() => handleApprovalStatusUpdate('host_applications', selectedItem.id, 'revision')} className="py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-orange-600 bg-orange-50 border border-orange-100 hover:bg-orange-100">보완 요청</button>
-              <button onClick={() => handleApprovalStatusUpdate('host_applications', selectedItem.id, 'rejected')} className="py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-red-600 bg-red-50 border border-red-100 hover:bg-red-100">거절</button>
-              <button onClick={() => handleApprovalStatusUpdate('host_applications', selectedItem.id, 'approved')} className="col-span-2 py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-white bg-slate-900 hover:bg-black shadow-lg flex items-center justify-center gap-2"><Check size={16} /> 승인 (호스트 권한 부여)</button>
+              {isStaleHostApplication && (
+                <div className="col-span-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] md:text-xs font-semibold text-amber-800">
+                  공개 노출은 최신 지원서 기준입니다. 이전 지원서는 상태를 변경할 수 없습니다.
+                </div>
+              )}
+              <div className="col-span-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-[11px] md:text-xs font-semibold text-slate-500">
+                호스트 보완 요청은 이 호스트의 공개 체험 노출을 차단합니다. 홈은 최대 5분, 검색은 최대 2분까지 반영이 지연될 수 있습니다.
+              </div>
+              <button
+                onClick={() => handleApprovalStatusUpdate('host_applications', selectedItem.id, 'revision')}
+                disabled={isStaleHostApplication}
+                className="py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-orange-600 bg-orange-50 border border-orange-100 hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                보완 요청
+              </button>
+              <button
+                onClick={() => handleApprovalStatusUpdate('host_applications', selectedItem.id, 'rejected')}
+                disabled={isStaleHostApplication}
+                className="py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                거절
+              </button>
+              <button
+                onClick={() => handleApprovalStatusUpdate('host_applications', selectedItem.id, 'approved')}
+                disabled={isStaleHostApplication}
+                className="col-span-2 py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-white bg-slate-900 hover:bg-black shadow-lg flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Check size={16} /> 승인 (호스트 권한 부여)
+              </button>
               <button onClick={() => handleApprovalDelete('host_applications', selectedItem.id)} className="col-span-2 text-[10px] md:text-xs text-slate-400 hover:text-red-500 py-1.5 flex items-center justify-center gap-1"><Trash2 size={12} /> 영구 삭제</button>
             </div>
               </>
@@ -635,6 +662,9 @@ export default function DetailsPanel({
             </div>
 
             <div className="pt-4 md:pt-6 mt-4 md:mt-6 border-t border-slate-100 grid grid-cols-2 gap-2 md:gap-3 sticky bottom-0 bg-white pb-3 md:pb-4 z-10">
+              <div className="col-span-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-[11px] md:text-xs font-semibold text-slate-500">
+                체험 보완 요청은 이 체험만 비공개 처리합니다. 같은 호스트의 다른 활성 체험은 계속 노출됩니다.
+              </div>
               <button onClick={() => handleApprovalStatusUpdate('experiences', selectedItem.id, 'revision')} className="py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-orange-600 bg-orange-50 border border-orange-100 hover:bg-orange-100 transition-colors">보완 요청</button>
               <button onClick={() => handleApprovalStatusUpdate('experiences', selectedItem.id, 'rejected')} className="py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 transition-colors">거절</button>
               <button onClick={() => handleApprovalStatusUpdate('experiences', selectedItem.id, 'approved')} className="col-span-2 py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-white bg-slate-900 hover:bg-black shadow-lg transition-all">승인</button>

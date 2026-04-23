@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-import { getVisiblePublicHostIdSet } from '@/app/utils/hostVisibility';
+import { getVisiblePublicHostIdSet, isPublicExperienceVisible } from '@/app/utils/hostVisibility';
 import { PUBLIC_EXPERIENCE_CARD_SELECT_FIELDS } from '@/app/search/searchContract';
 
 type PublicHostApplicationRow = {
@@ -14,6 +14,8 @@ type PublicHostApplicationRow = {
 type HomeExperienceRow = {
   id: number;
   host_id: string | null;
+  status?: string | null;
+  is_active?: boolean | null;
   title?: string | null;
   title_en?: string | null;
   title_ja?: string | null;
@@ -45,7 +47,7 @@ type PopularitySnapshotRow = {
   wishlist_count: number | null;
 };
 
-const HOME_EXPERIENCE_SELECT = ['host_id', ...PUBLIC_EXPERIENCE_CARD_SELECT_FIELDS, 'created_at'].join(', ');
+const HOME_EXPERIENCE_SELECT = ['host_id', 'status', 'is_active', ...PUBLIC_EXPERIENCE_CARD_SELECT_FIELDS, 'created_at'].join(', ');
 
 const CACHE_HEADERS = {
   'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=3600',
@@ -92,7 +94,7 @@ export async function GET() {
     }
 
     const visibleExperiences = ((experiences ?? []) as unknown as HomeExperienceRow[]).filter((experience) =>
-      visibleHostIds.has(String(experience.host_id || ''))
+      visibleHostIds.has(String(experience.host_id || '')) && isPublicExperienceVisible(experience)
     );
 
     if (visibleExperiences.length === 0) {
@@ -146,12 +148,18 @@ export async function GET() {
       );
     }
 
-    const data = visibleExperiences.map((experience) => ({
-      ...experience,
-      card_image_url: experience.image_url ?? null,
-      available_dates: availableDatesByExperienceId.get(String(experience.id)) ?? [],
-      wishlist_count: popularityByExperienceId.get(String(experience.id)) ?? 0,
-    }));
+    const data = visibleExperiences.map((experience) => {
+      const publicExperience = { ...experience };
+      delete publicExperience.status;
+      delete publicExperience.is_active;
+
+      return {
+        ...publicExperience,
+        card_image_url: experience.image_url ?? null,
+        available_dates: availableDatesByExperienceId.get(String(experience.id)) ?? [],
+        wishlist_count: popularityByExperienceId.get(String(experience.id)) ?? 0,
+      };
+    });
 
     return NextResponse.json({ data }, { headers: CACHE_HEADERS });
   } catch (error) {

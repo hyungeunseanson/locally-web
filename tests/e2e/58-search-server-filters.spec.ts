@@ -124,9 +124,15 @@ async function createHostApplication(
   createdApplicationIds.push(Number(data.id));
 }
 
-async function createExperienceFixture(hostId: string) {
+async function createExperienceFixture(
+  hostId: string,
+  options?: {
+    isActive?: boolean;
+    title?: string;
+  }
+) {
   const supabase = getAdminClient();
-  const title = `[Playwright] Search Evening Food ${Date.now()}`;
+  const title = options?.title || `[Playwright] Search Evening Food ${Date.now()}`;
   const futureDate = new Date();
   futureDate.setDate(futureDate.getDate() + 12);
   const date = futureDate.toISOString().slice(0, 10);
@@ -156,7 +162,7 @@ async function createExperienceFixture(hostId: string) {
       supplies: '편한 복장',
       rules: { age_limit: '만 19세 이상', activity_level: '보통' },
       status: 'active',
-      is_active: true,
+      is_active: options?.isActive ?? true,
       is_private_enabled: false,
       private_price: 0,
       source_locale: 'ko',
@@ -205,6 +211,60 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Public search server filters', () => {
+  test('excludes inactive-flagged active experiences from home and search APIs', async ({ request }) => {
+    const host = createUser('inactive-experience-host');
+    const hostId = await createAuthUser(host);
+    await createHostApplication(hostId, host, 'approved');
+    const visibleExperience = await createExperienceFixture(hostId, {
+      isActive: true,
+      title: `[Playwright] Search Active Visible ${Date.now()}`,
+    });
+    const hiddenExperience = await createExperienceFixture(hostId, {
+      isActive: false,
+      title: `[Playwright] Search Active Hidden ${Date.now()}`,
+    });
+
+    const searchResponse = await request.get(
+      `/api/search/experiences?location=${encodeURIComponent('[Playwright] Search Active')}&language=all`
+    );
+    expect(searchResponse.ok()).toBeTruthy();
+    const searchPayload = await searchResponse.json();
+    expect(searchPayload.data).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: visibleExperience.id,
+          title: visibleExperience.title,
+        }),
+      ])
+    );
+    expect(searchPayload.data).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: hiddenExperience.id,
+        }),
+      ])
+    );
+
+    const homeResponse = await request.get('/api/home/experiences');
+    expect(homeResponse.ok()).toBeTruthy();
+    const homePayload = await homeResponse.json();
+    expect(homePayload.data).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: visibleExperience.id,
+          title: visibleExperience.title,
+        }),
+      ])
+    );
+    expect(homePayload.data).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: hiddenExperience.id,
+        }),
+      ])
+    );
+  });
+
   test('applies type and time filters on the server route while excluding hidden hosts', async ({ request }) => {
     const visibleHost = createUser('visible-host');
     const visibleHostId = await createAuthUser(visibleHost);

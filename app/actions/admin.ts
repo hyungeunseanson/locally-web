@@ -7,6 +7,7 @@ import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { settleExperienceBookingPayouts } from '@/app/utils/adminPayouts';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
+import { isLatestPublicHostApplication, pickLatestPublicHostApplication } from '@/app/utils/hostVisibility';
 
 // 🔒 관리자 권한 확인
 async function getAdminClient() {
@@ -99,6 +100,42 @@ function buildExperienceStatusNotification(status: string, id: string | number) 
   return null;
 }
 
+async function assertLatestHostApplicationForStatusChange(
+  supabaseAdmin: ReturnType<typeof createAdminClient>,
+  id: string | number
+) {
+  const { data: targetApplication, error: targetApplicationError } = await supabaseAdmin
+    .from('host_applications')
+    .select('id, user_id, created_at, status')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (targetApplicationError) {
+    throw new Error(targetApplicationError.message);
+  }
+
+  if (!targetApplication?.user_id) {
+    throw new Error('호스트 지원서를 찾을 수 없습니다.');
+  }
+
+  const { data: latestApplications, error: latestApplicationsError } = await supabaseAdmin
+    .from('host_applications')
+    .select('id, user_id, created_at, status')
+    .eq('user_id', targetApplication.user_id)
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
+    .limit(2);
+
+  if (latestApplicationsError) {
+    throw new Error(latestApplicationsError.message);
+  }
+
+  const latestApplication = pickLatestPublicHostApplication(latestApplications || []);
+  if (!isLatestPublicHostApplication(targetApplication, latestApplication)) {
+    throw new Error('최신 호스트 지원서에서만 상태를 변경할 수 있습니다.');
+  }
+}
+
 // ✅ 상태 변경 (승인/거절)
 export async function updateAdminStatus(
   table: 'host_applications' | 'experiences',
@@ -127,6 +164,10 @@ export async function updateAdminStatus(
   const updateData: { status: string; admin_comment?: string } = { status };
   if ((table === 'host_applications' || table === 'experiences') && trimmedComment) {
     updateData.admin_comment = trimmedComment;
+  }
+
+  if (table === 'host_applications') {
+    await assertLatestHostApplicationForStatusChange(supabaseAdmin, id);
   }
 
   const { error } = await supabaseAdmin.from(table).update(updateData).eq('id', id);

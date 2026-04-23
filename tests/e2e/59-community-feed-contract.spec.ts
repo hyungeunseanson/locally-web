@@ -15,6 +15,7 @@ const TEST_PASSWORD = 'LocallyTest!2026';
 
 let adminClient: SupabaseClient | null = null;
 const createdAuthUserIds: string[] = [];
+const createdHostApplicationIds: string[] = [];
 const createdExperienceIds: number[] = [];
 const createdPostIds: string[] = [];
 
@@ -85,7 +86,43 @@ async function createAuthUser(user: TestUser) {
   return data.user.id;
 }
 
-async function createExperienceFixture(hostId: string) {
+async function createHostApplication(userId: string, user: TestUser, status: 'approved' | 'revision' = 'approved') {
+  const supabase = getAdminClient();
+  const { data, error } = await supabase
+    .from('host_applications')
+    .insert({
+      user_id: userId,
+      host_nationality: 'Korea',
+      languages: ['한국어'],
+      language_levels: [{ language: '한국어', level: 5 }],
+      name: user.fullName,
+      phone: user.phone,
+      dob: '1990.01.01',
+      email: user.email,
+      instagram: `@${user.fullName.replace(/\s+/g, '').toLowerCase()}`,
+      source: 'E2E community feed visibility test',
+      language_cert: 'TOPIK 6',
+      profile_photo: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=512',
+      self_intro: '커뮤니티 연동 체험 공개 노출 테스트용 호스트 지원서입니다.',
+      id_card_file: null,
+      bank_name: '테스트은행',
+      account_number: '12345678901234',
+      account_holder: user.fullName,
+      motivation: '커뮤니티 연동 체험 공개 노출 정책 검증용입니다.',
+      status,
+    })
+    .select('id')
+    .single();
+
+  if (error || !data?.id) {
+    throw error || new Error('Failed to create community feed host application fixture.');
+  }
+
+  createdHostApplicationIds.push(data.id);
+  return data.id;
+}
+
+async function createExperienceFixture(hostId: string, status: 'active' | 'revision' = 'active') {
   const supabase = getAdminClient();
   const title = `[Playwright] Community Feed Linked ${Date.now()}`;
 
@@ -113,7 +150,7 @@ async function createExperienceFixture(hostId: string) {
       exclusions: ['개인 경비'],
       supplies: '편한 복장',
       rules: { age_limit: '만 19세 이상', activity_level: '보통' },
-      status: 'active',
+      status,
       is_active: true,
       is_private_enabled: false,
       private_price: 0,
@@ -194,6 +231,10 @@ test.afterAll(async () => {
     await supabase.from('experiences').delete().in('id', createdExperienceIds);
   }
 
+  if (createdHostApplicationIds.length > 0) {
+    await supabase.from('host_applications').delete().in('id', createdHostApplicationIds);
+  }
+
   for (const userId of createdAuthUserIds) {
     await supabase.from('profiles').delete().eq('id', userId);
     await supabase.from('users').delete().eq('id', userId);
@@ -205,6 +246,7 @@ test.describe.serial('Community board feed response contract', () => {
   test('returns mapped profile and linked experience data for board feed cards', async ({ request }) => {
     const author = createUser('author');
     const authorId = await createAuthUser(author);
+    await createHostApplication(authorId, author, 'approved');
     const experience = await createExperienceFixture(authorId);
     const post = await createBoardPost(
       authorId,
@@ -231,6 +273,56 @@ test.describe.serial('Community board feed response contract', () => {
       },
     });
     expect(matchedPost).toHaveProperty('profiles');
+  });
+
+  test('hides linked experience data when the latest host application is not public', async ({ request }) => {
+    const author = createUser('hidden-host');
+    const authorId = await createAuthUser(author);
+    await createHostApplication(authorId, author, 'revision');
+    const experience = await createExperienceFixture(authorId);
+    const post = await createBoardPost(
+      authorId,
+      'japan',
+      Number(experience.id),
+      `[Playwright] Community Hidden Host Linked ${Date.now()}`
+    );
+
+    const response = await request.get('/api/community');
+    expect(response.ok()).toBeTruthy();
+
+    const payload = await response.json();
+    const matchedPost = Array.isArray(payload.data)
+      ? payload.data.find((entry: { id?: string }) => entry.id === post.id)
+      : null;
+
+    expect(matchedPost).toBeTruthy();
+    expect(matchedPost.linked_exp_id).toBe(Number(experience.id));
+    expect(matchedPost.linked_experience).toBeNull();
+  });
+
+  test('hides linked experience data when the linked experience is revision', async ({ request }) => {
+    const author = createUser('hidden-experience');
+    const authorId = await createAuthUser(author);
+    await createHostApplication(authorId, author, 'approved');
+    const experience = await createExperienceFixture(authorId, 'revision');
+    const post = await createBoardPost(
+      authorId,
+      'japan',
+      Number(experience.id),
+      `[Playwright] Community Hidden Experience Linked ${Date.now()}`
+    );
+
+    const response = await request.get('/api/community');
+    expect(response.ok()).toBeTruthy();
+
+    const payload = await response.json();
+    const matchedPost = Array.isArray(payload.data)
+      ? payload.data.find((entry: { id?: string }) => entry.id === post.id)
+      : null;
+
+    expect(matchedPost).toBeTruthy();
+    expect(matchedPost.linked_exp_id).toBe(Number(experience.id));
+    expect(matchedPost.linked_experience).toBeNull();
   });
 
   test('scopes board feeds so japan and korea posts do not mix', async ({ request }) => {

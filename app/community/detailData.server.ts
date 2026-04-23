@@ -5,6 +5,11 @@ import { unstable_cache } from 'next/cache';
 import type { CommunityBoard, CommunityHubFilter } from '@/app/types/community';
 import { createPublicServerClient } from '@/app/utils/supabase/public-server';
 import {
+  COMMUNITY_FEED_LINKED_EXPERIENCE_SELECT,
+  filterVisibleCommunityLinkedExperiences,
+  type CommunityFeedLinkedExperienceRow,
+} from './feedSelect';
+import {
   isMissingAnonymousColumnError,
   isMissingCommunityBoardColumnError,
   isMissingCommunityModelColumnError,
@@ -52,6 +57,13 @@ export type CommunityAdjacentPostRow = {
   title: string;
   created_at: string;
   destination_hub?: CommunityDetailPostRow['destination_hub'];
+};
+
+type PublicHostApplicationRow = {
+  id?: string | number | null;
+  user_id?: string | null;
+  status?: string | null;
+  created_at?: string | null;
 };
 
 const COMMUNITY_DETAIL_POST_SELECT = [
@@ -172,7 +184,7 @@ async function getCommunityDetailPostUncached(id: string) {
     post.linked_exp_id
       ? supabase
           .from('experiences')
-          .select('id, title, image_url, price')
+          .select(COMMUNITY_FEED_LINKED_EXPERIENCE_SELECT)
           .eq('id', post.linked_exp_id)
           .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
@@ -186,10 +198,29 @@ async function getCommunityDetailPostUncached(id: string) {
     throw experienceResult.error;
   }
 
+  let linkedExperience: CommunityDetailExperience = null;
+  const linkedExperienceRow = (experienceResult.data ?? null) as CommunityFeedLinkedExperienceRow | null;
+  if (linkedExperienceRow?.host_id) {
+    const { data: hostRows, error: hostRowsError } = await supabase
+      .from('public_host_applications')
+      .select('id, user_id, status, created_at')
+      .eq('user_id', linkedExperienceRow.host_id);
+
+    if (hostRowsError) {
+      throw hostRowsError;
+    }
+
+    const visibleLinkedExperiences = filterVisibleCommunityLinkedExperiences(
+      [linkedExperienceRow],
+      (hostRows ?? []) as PublicHostApplicationRow[]
+    );
+    linkedExperience = (visibleLinkedExperiences[0] ?? null) as CommunityDetailExperience;
+  }
+
   return {
     post,
     profile: (profileResult.data ?? null) as CommunityDetailProfile,
-    linkedExperience: (experienceResult.data ?? null) as CommunityDetailExperience,
+    linkedExperience,
     usedPreBoardFallback,
   };
 }

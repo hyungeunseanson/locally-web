@@ -117,20 +117,30 @@ async function createAuthUser(user: TestUser, isAdmin = false) {
   return data.user.id;
 }
 
-async function createHostApplication(userId: string, user: TestUser, status: 'pending' | 'approved' = 'pending') {
+async function createHostApplication(
+  userId: string,
+  user: TestUser,
+  status: 'pending' | 'approved' | 'rejected' | 'revision' = 'pending',
+  options?: {
+    createdAt?: string;
+    name?: string;
+  }
+) {
   const supabase = getAdminClient();
+  const applicantName = options?.name || user.fullName;
   const { data, error } = await supabase
     .from('host_applications')
     .insert({
       user_id: userId,
+      created_at: options?.createdAt,
       host_nationality: 'Korea',
       languages: ['한국어'],
       language_levels: [{ language: '한국어', level: 5 }],
-      name: user.fullName,
+      name: applicantName,
       phone: user.phone,
       dob: '1990.01.01',
       email: user.email,
-      instagram: `@${user.fullName.replace(/\s+/g, '').toLowerCase()}`,
+      instagram: `@${applicantName.replace(/\s+/g, '').toLowerCase()}`,
       source: 'E2E approvals test',
       language_cert: 'TOPIK 6',
       profile_photo: HOST_PROFILE_PHOTO_URL,
@@ -138,7 +148,7 @@ async function createHostApplication(userId: string, user: TestUser, status: 'pe
       id_card_file: null,
       bank_name: '테스트은행',
       account_number: '12345678901234',
-      account_holder: user.fullName,
+      account_holder: applicantName,
       motivation: '관리자 승인 관리 테스트를 위한 지원서입니다.',
       status,
     })
@@ -350,6 +360,82 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Admin approvals smoke', () => {
+  test('blocks status changes for non-latest host application rows', async ({ browser }: { browser: Browser }) => {
+    test.setTimeout(90000);
+
+    const adminUser = createAdminUser();
+    const applicantUser = createApplicantUser('applicant');
+    const adminUserId = await createAuthUser(adminUser, true);
+    expect(adminUserId).toBeTruthy();
+    const applicantUserId = await createAuthUser(applicantUser);
+    const timestamp = Date.now();
+    const oldApplicationName = `Approvals Stale Application ${timestamp}`;
+    const latestApplicationName = `Approvals Latest Application ${timestamp}`;
+    const oldApplicationId = await createHostApplication(applicantUserId, applicantUser, 'approved', {
+      createdAt: new Date(timestamp - 60_000).toISOString(),
+      name: oldApplicationName,
+    });
+    const latestApplicationId = await createHostApplication(applicantUserId, applicantUser, 'pending', {
+      createdAt: new Date(timestamp).toISOString(),
+      name: latestApplicationName,
+    });
+    const adminContext = await browser.newContext();
+    const adminPage = await adminContext.newPage();
+
+    try {
+      await login(adminPage, adminUser);
+
+      const oldDetailResponse = await adminPage.request.get(`/api/admin/host-applications?id=${oldApplicationId}`);
+      expect(oldDetailResponse.ok()).toBeTruthy();
+      await expect(oldDetailResponse.json()).resolves.toMatchObject({
+        data: {
+          id: oldApplicationId,
+          is_latest_for_user: false,
+        },
+      });
+
+      const latestDetailResponse = await adminPage.request.get(`/api/admin/host-applications?id=${latestApplicationId}`);
+      expect(latestDetailResponse.ok()).toBeTruthy();
+      await expect(latestDetailResponse.json()).resolves.toMatchObject({
+        data: {
+          id: latestApplicationId,
+          is_latest_for_user: true,
+        },
+      });
+
+      const listResponse = await adminPage.request.get('/api/admin/host-applications');
+      expect(listResponse.ok()).toBeTruthy();
+      const listPayload = await listResponse.json();
+      const listRows = Array.isArray(listPayload?.data) ? listPayload.data : [];
+      expect(listRows.find((row: { id?: string }) => row.id === oldApplicationId)).toMatchObject({
+        is_latest_for_user: false,
+      });
+      expect(listRows.find((row: { id?: string }) => row.id === latestApplicationId)).toMatchObject({
+        is_latest_for_user: true,
+      });
+
+      await openApprovals(adminPage);
+      await adminPage.getByRole('button', { name: 'ALL' }).click();
+
+      const oldListItem = adminPage.locator('div.cursor-pointer').filter({ hasText: oldApplicationName }).first();
+      await expect(oldListItem).toBeVisible({ timeout: 15000 });
+      await oldListItem.click();
+
+      await expect(adminPage.getByText('공개 노출은 최신 지원서 기준입니다. 이전 지원서는 상태를 변경할 수 없습니다.')).toBeVisible({
+        timeout: 15000,
+      });
+      const staleRevisionButton = adminPage.getByRole('button', { name: '보완 요청' }).first();
+      const staleRejectButton = adminPage.getByRole('button', { name: '거절' }).first();
+      const staleApproveButton = adminPage.getByRole('button', { name: /승인 \(호스트 권한 부여\)/ }).first();
+      await expect(staleRevisionButton).toBeDisabled();
+      await expect(staleRejectButton).toBeDisabled();
+      await expect(staleApproveButton).toBeDisabled();
+      await assertHostApplicationStatus(oldApplicationId, 'approved');
+    } finally {
+      await adminContext.close();
+    }
+  });
+
   test('handles host application revision, experience revision, host resubmission, and experience approval', async ({ browser }: { browser: Browser }) => {
     test.setTimeout(120000);
 

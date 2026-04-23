@@ -98,6 +98,7 @@ export interface HostApplication {
   id_card_file?: string | null;
   id_card_signed_url?: string | null;
   admin_comment?: string | null;
+  is_latest_for_user?: boolean;
   content: Record<string, unknown> | null;
 }
 
@@ -173,6 +174,7 @@ export type AdminPanelSelectedItem = Record<string, unknown> & {
   id_card_file?: string | null;
   id_card_signed_url?: string | null;
   admin_comment?: string | null;
+  is_latest_for_user?: boolean;
   languages?: string[] | null;
   language_levels?: LanguageLevelEntry[] | null;
   photos?: string[] | null;

@@ -67,6 +67,20 @@ export default function ManagementTab({
     setSelectedItem(null);
   };
 
+  const getStatusChangeDescription = (table: AdminApprovalTable, status: string) => {
+    const baseDescription = `호스트에게 전달할 ${status === 'rejected' ? '거절' : '보완'} 사유를 입력해주세요.`;
+
+    if (status !== 'revision') {
+      return baseDescription;
+    }
+
+    if (table === 'host_applications') {
+      return `${baseDescription}\n\n호스트 보완 요청은 이 호스트의 공개 체험 노출을 차단합니다. 홈은 최대 5분, 검색은 최대 2분까지 반영이 지연될 수 있습니다.`;
+    }
+
+    return `${baseDescription}\n\n체험 보완 요청은 이 체험만 비공개 처리합니다. 같은 호스트의 다른 활성 체험은 계속 노출됩니다.`;
+  };
+
   const handleUpdateStatusClick = async (table: AdminApprovalTable, id: AdminItemId, status: string) => {
     if (status === 'rejected' || status === 'revision') {
       setConfirmDialog({
@@ -75,7 +89,7 @@ export default function ManagementTab({
         id,
         status,
         title: status === 'rejected' ? '거절 사유 입력' : '보완 사유 입력',
-        description: `호스트에게 전달할 ${status === 'rejected' ? '거절' : '보완'} 사유를 입력해주세요.`,
+        description: getStatusChangeDescription(table, status),
         confirmLabel: status === 'rejected' ? '거절 처리' : '보완 요청 전송',
         tone: status === 'rejected' ? 'red' : 'orange',
         requireComment: true,

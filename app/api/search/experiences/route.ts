@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import {
   getVisiblePublicHostIdSet,
+  isPublicExperienceVisible,
 } from '@/app/utils/hostVisibility';
 import { createClient } from '@/app/utils/supabase/server';
 import { normalizeServiceCity } from '@/app/utils/serviceRequestLocation';
@@ -143,18 +144,32 @@ function hasVisibleHost(item: SearchExperience, visibleHostIds: Set<string>) {
   return Boolean(hostId) && visibleHostIds.has(hostId);
 }
 
+function hasPublicExperienceVisibility(item: SearchExperience) {
+  const record = item as Record<string, unknown>;
+  return isPublicExperienceVisible({
+    status: typeof record.status === 'string' ? record.status : null,
+    is_active: typeof record.is_active === 'boolean' ? record.is_active : null,
+  });
+}
+
 function stripInternalExperienceFields(item: SearchExperience) {
   const publicItem = {
     ...(item as SearchExperience & {
       host_id?: unknown;
+      is_active?: unknown;
+      status?: unknown;
       tags?: unknown;
     }),
   } as SearchExperience & {
     host_id?: unknown;
+    is_active?: unknown;
+    status?: unknown;
     tags?: unknown;
   };
 
   delete publicItem.host_id;
+  delete publicItem.is_active;
+  delete publicItem.status;
   delete publicItem.tags;
   return publicItem;
 }
@@ -204,8 +219,8 @@ export async function GET(request: NextRequest) {
       .from('experiences')
       .select(
         needsTextFilterFields
-          ? `${SEARCH_EXPERIENCE_SELECT}, host_id`
-          : `${SEARCH_EXPERIENCE_CARD_SELECT}, host_id`
+          ? `${SEARCH_EXPERIENCE_SELECT}, host_id, status, is_active`
+          : `${SEARCH_EXPERIENCE_CARD_SELECT}, host_id, status, is_active`
       )
       .in('host_id', visibleHostIdList)
       .eq('status', 'active');
@@ -254,7 +269,7 @@ export async function GET(request: NextRequest) {
     if (error) throw error;
 
     let filtered = ((data ?? []) as unknown as SearchExperience[]).filter((item) =>
-      hasVisibleHost(item, visibleHostIds)
+      hasVisibleHost(item, visibleHostIds) && hasPublicExperienceVisibility(item)
     );
 
     if (searchTerms.length > 0) {

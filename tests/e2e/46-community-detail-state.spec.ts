@@ -15,6 +15,8 @@ const TEST_PASSWORD = 'LocallyTest!2026';
 
 let adminClient: SupabaseClient | null = null;
 const createdAuthUserIds: string[] = [];
+const createdHostApplicationIds: string[] = [];
+const createdExperienceIds: number[] = [];
 const createdPostIds: string[] = [];
 
 function loadEnv(): EnvMap {
@@ -92,6 +94,93 @@ async function createAuthUser(user: TestUser) {
   return data.user.id;
 }
 
+async function createHostApplication(userId: string, user: TestUser, status: 'approved' | 'revision' = 'approved') {
+  const supabase = getAdminClient();
+  const { data, error } = await supabase
+    .from('host_applications')
+    .insert({
+      user_id: userId,
+      host_nationality: 'Korea',
+      languages: ['한국어'],
+      language_levels: [{ language: '한국어', level: 5 }],
+      name: user.fullName,
+      phone: user.phone,
+      dob: '1990.01.01',
+      email: user.email,
+      instagram: `@${user.fullName.replace(/\s+/g, '').toLowerCase()}`,
+      source: 'E2E community detail visibility test',
+      language_cert: 'TOPIK 6',
+      profile_photo: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=512',
+      self_intro: '커뮤니티 상세 연동 체험 공개 노출 테스트용 호스트 지원서입니다.',
+      id_card_file: null,
+      bank_name: '테스트은행',
+      account_number: '12345678901234',
+      account_holder: user.fullName,
+      motivation: '커뮤니티 상세 연동 체험 공개 노출 정책 검증용입니다.',
+      status,
+    })
+    .select('id')
+    .single();
+
+  if (error || !data?.id) {
+    throw error || new Error('Failed to create community detail host application fixture.');
+  }
+
+  createdHostApplicationIds.push(data.id);
+  return data.id;
+}
+
+async function createExperienceFixture(hostId: string, status: 'active' | 'revision' = 'active') {
+  const supabase = getAdminClient();
+  const title = `[Playwright] Community Detail Linked ${Date.now()}`;
+
+  const { data, error } = await supabase
+    .from('experiences')
+    .insert({
+      host_id: hostId,
+      country: '대한민국',
+      city: '서울',
+      title,
+      category: '맛집 탐방',
+      languages: ['한국어'],
+      language_levels: [{ language: '한국어', level: 5 }],
+      duration: 2,
+      max_guests: 4,
+      description: '커뮤니티 상세 연동 체험 공개 노출 검증용 체험입니다.',
+      itinerary: [{ title: '홍대입구역', description: '테스트 코스입니다.' }],
+      spots: '홍대입구역',
+      meeting_point: 'Hongdae Entrance Exit 3',
+      meeting_point_i18n: { ko: '홍대입구역 3번 출구' },
+      location: 'Hongdae Entrance Exit 3',
+      photos: ['https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200'],
+      price: 30000,
+      inclusions: ['가이드'],
+      exclusions: ['개인 경비'],
+      supplies: '편한 복장',
+      rules: { age_limit: '만 19세 이상', activity_level: '보통' },
+      status,
+      is_active: true,
+      is_private_enabled: false,
+      private_price: 0,
+      source_locale: 'ko',
+      manual_locales: ['ko'],
+      translation_version: 1,
+      translation_meta: {},
+    })
+    .select('id,title')
+    .single();
+
+  if (error || !data?.id) {
+    throw error || new Error('Failed to create community detail experience fixture.');
+  }
+
+  createdExperienceIds.push(Number(data.id));
+  return {
+    id: Number(data.id),
+    title: String(data.title),
+  };
+}
+
 async function createCommunityPost(
   authorId: string,
   options?: {
@@ -100,6 +189,7 @@ async function createCommunityPost(
     updatedAt?: string;
     category?: 'qna' | 'locally_content';
     board?: 'japan' | 'korea';
+    linkedExpId?: number | null;
   }
 ) {
   const supabase = getAdminClient();
@@ -111,7 +201,7 @@ async function createCommunityPost(
     title: options?.title || `[Playwright] Community Detail ${Date.now()}`,
     content: '좋아요/댓글 카운트 정합성 검증용 게시글입니다.',
     images: [],
-    linked_exp_id: null,
+    linked_exp_id: options?.linkedExpId ?? null,
     created_at: options?.createdAt,
     updated_at: options?.updatedAt,
   };
@@ -220,6 +310,14 @@ test.afterAll(async () => {
     await supabase.from('community_posts').delete().in('id', createdPostIds);
   }
 
+  if (createdExperienceIds.length > 0) {
+    await supabase.from('experiences').delete().in('id', createdExperienceIds);
+  }
+
+  if (createdHostApplicationIds.length > 0) {
+    await supabase.from('host_applications').delete().in('id', createdHostApplicationIds);
+  }
+
   for (const userId of createdAuthUserIds) {
     await supabase.from('profiles').delete().eq('id', userId);
     await supabase.from('users').delete().eq('id', userId);
@@ -228,6 +326,28 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Community detail state consistency', () => {
+  test('hides a linked experience chip when the linked experience is not publicly visible', async ({ page }) => {
+    const author = createUser('hidden-chip');
+    const authorId = await createAuthUser(author);
+    await createHostApplication(authorId, author, 'approved');
+    const experience = await createExperienceFixture(authorId, 'revision');
+    const postTitle = `[Playwright] Community Hidden Detail Chip ${Date.now()}`;
+    const postId = await createCommunityPost(authorId, {
+      board: 'japan',
+      title: postTitle,
+      linkedExpId: experience.id,
+    });
+
+    await page.goto(`/community/${postId}?board=japan`, {
+      waitUntil: 'networkidle',
+    });
+
+    await expect(page.getByRole('heading', { name: postTitle })).toBeVisible();
+    await expect(page.getByText('언급된 로컬리 체험')).toHaveCount(0);
+    await expect(page.getByText('연동 체험')).toHaveCount(0);
+    await expect(page.getByText(experience.title)).toHaveCount(0);
+  });
+
   test('keeps like/comment state aligned and preserves board-based list navigation', async ({ page, request }) => {
     test.setTimeout(90000);
 

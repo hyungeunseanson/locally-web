@@ -9,11 +9,13 @@ import {
   COMMUNITY_BOARD_FEED_POST_SELECT,
   COMMUNITY_BOARD_FEED_POST_SELECT_LEGACY,
   COMMUNITY_BOARD_FEED_POST_SELECT_PRE_BOARD,
-  COMMUNITY_FEED_EXPERIENCE_SELECT,
+  COMMUNITY_FEED_LINKED_EXPERIENCE_SELECT,
   COMMUNITY_FEED_PROFILE_SELECT,
+  filterVisibleCommunityLinkedExperiences,
   normalizeCommunityBoardFeedPostRow,
   type CommunityBoardFeedPostRow,
   type CommunityFeedExperience,
+  type CommunityFeedLinkedExperienceRow,
   type CommunityFeedProfile,
   type CommunityFeedResponse,
 } from './feedSelect';
@@ -27,6 +29,52 @@ import type { CommunitySort } from './queryParams';
 
 const DEFAULT_BOARD_PAGE_LIMIT = 15;
 const COMMUNITY_BOARD_FEED_REVALIDATE_SECONDS = 60;
+
+type PublicHostApplicationRow = {
+  id?: string | number | null;
+  user_id?: string | null;
+  status?: string | null;
+  created_at?: string | null;
+};
+
+async function loadVisibleLinkedExperiences(expIds: number[]): Promise<CommunityFeedExperience[]> {
+  if (expIds.length === 0) {
+    return [];
+  }
+
+  const supabase = createPublicServerClient();
+  const { data: experienceRows, error: experiencesError } = await supabase
+    .from('experiences')
+    .select(COMMUNITY_FEED_LINKED_EXPERIENCE_SELECT)
+    .in('id', expIds);
+
+  if (experiencesError) {
+    throw experiencesError;
+  }
+
+  const linkedExperiences = (experienceRows ?? []) as unknown as CommunityFeedLinkedExperienceRow[];
+  const hostIds = Array.from(
+    new Set(linkedExperiences.map((experience) => experience.host_id).filter((hostId): hostId is string => Boolean(hostId)))
+  );
+
+  if (hostIds.length === 0) {
+    return [];
+  }
+
+  const { data: hostRows, error: hostsError } = await supabase
+    .from('public_host_applications')
+    .select('id, user_id, status, created_at')
+    .in('user_id', hostIds);
+
+  if (hostsError) {
+    throw hostsError;
+  }
+
+  return filterVisibleCommunityLinkedExperiences(
+    linkedExperiences,
+    (hostRows ?? []) as PublicHostApplicationRow[]
+  );
+}
 
 function createBoardQuery({
   board,
@@ -143,9 +191,7 @@ async function fetchCommunityBoardFeedUncached({
     userIds.length > 0
       ? supabase.from('profiles').select(COMMUNITY_FEED_PROFILE_SELECT).in('id', userIds)
       : Promise.resolve({ data: [], error: null }),
-    expIds.length > 0
-      ? supabase.from('experiences').select(COMMUNITY_FEED_EXPERIENCE_SELECT).in('id', expIds)
-      : Promise.resolve({ data: [], error: null }),
+    loadVisibleLinkedExperiences(expIds).then((data) => ({ data, error: null })),
   ]);
 
   if (profilesResult.error) {

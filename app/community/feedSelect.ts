@@ -1,6 +1,10 @@
 import type { Experience, Profile } from '@/app/types';
 import type { CommunityPost } from '@/app/types/community';
 import {
+  getVisiblePublicHostIdSet,
+  isPublicExperienceVisible,
+} from '@/app/utils/hostVisibility';
+import {
   getCommunityCategoryFromFormat,
   getCommunityFormatFromCategory,
 } from './categoryMeta';
@@ -112,11 +116,24 @@ export const COMMUNITY_BOARD_FEED_POST_SELECT_LEGACY = [
 
 export const COMMUNITY_FEED_PROFILE_SELECT = 'id, full_name, avatar_url';
 export const COMMUNITY_FEED_EXPERIENCE_SELECT = 'id, title, image_url, price';
+export const COMMUNITY_FEED_LINKED_EXPERIENCE_SELECT = 'id, host_id, title, image_url, price, status, is_active';
+
+type CommunityFeedHostApplicationRow = {
+  id?: string | number | null;
+  user_id?: string | null;
+  status?: string | null;
+  created_at?: string | null;
+};
 
 export type CommunityFeedProfile = Pick<Profile, 'id' | 'full_name' | 'avatar_url'> & {
   name?: string | null;
 };
 export type CommunityFeedExperience = Pick<Experience, 'id' | 'title' | 'image_url' | 'price'>;
+export type CommunityFeedLinkedExperienceRow = CommunityFeedExperience & {
+  host_id?: string | null;
+  status?: string | null;
+  is_active?: boolean | null;
+};
 export type CommunityBoardFeedPostRow = Pick<
   CommunityPost,
   | 'id'
@@ -178,6 +195,29 @@ export type CommunityFeedResponse = {
   nextOffset: number | null;
 };
 
+function toPublicCommunityFeedExperience(experience: CommunityFeedLinkedExperienceRow): CommunityFeedExperience {
+  return {
+    id: experience.id,
+    title: experience.title,
+    image_url: experience.image_url,
+    price: experience.price,
+  };
+}
+
+export function filterVisibleCommunityLinkedExperiences(
+  experiences: CommunityFeedLinkedExperienceRow[],
+  hostApplications: CommunityFeedHostApplicationRow[]
+): CommunityFeedExperience[] {
+  const visibleHostIds = getVisiblePublicHostIdSet(hostApplications);
+
+  return experiences
+    .filter((experience) => {
+      const hostId = typeof experience.host_id === 'string' ? experience.host_id : '';
+      return Boolean(hostId) && visibleHostIds.has(hostId) && isPublicExperienceVisible(experience);
+    })
+    .map(toPublicCommunityFeedExperience);
+}
+
 export function parseCommunityFeedResponse(payload: unknown): CommunityFeedResponse {
   const record = payload as Record<string, unknown> | null;
   const data = Array.isArray(record?.data) ? (record?.data as CommunityFeedPost[]) : [];
@@ -195,7 +235,10 @@ export function buildCommunityFeedPosts(
   experiences: CommunityFeedExperience[]
 ): CommunityFeedPost[] {
   const profileMap = new Map(profiles.map((profile) => [profile.id, profile] as const));
-  const experienceMap = new Map(experiences.map((experience) => [experience.id, experience] as const));
+  const experienceMap = new Map(experiences.map((experience) => [
+    experience.id,
+    toPublicCommunityFeedExperience(experience as CommunityFeedLinkedExperienceRow),
+  ] as const));
 
   return posts.map((post) => {
     const normalizedPost = normalizeCommunityFeedPostRow(post);
@@ -227,7 +270,10 @@ export function buildCommunityBoardFeedPosts(
   experiences: CommunityFeedExperience[]
 ): CommunityFeedPost[] {
   const profileMap = new Map(profiles.map((profile) => [profile.id, profile] as const));
-  const experienceMap = new Map(experiences.map((experience) => [experience.id, experience] as const));
+  const experienceMap = new Map(experiences.map((experience) => [
+    experience.id,
+    toPublicCommunityFeedExperience(experience as CommunityFeedLinkedExperienceRow),
+  ] as const));
 
   return posts.map((post) => {
     const normalizedPost = normalizeCommunityBoardFeedPostRow(post);

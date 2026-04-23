@@ -3,6 +3,30 @@ import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import {
+    isLatestPublicHostApplication,
+    pickLatestPublicHostApplication,
+    pickLatestPublicHostApplicationsByUser,
+} from '@/app/utils/hostVisibility';
+
+type HostApplicationAdminRow = {
+    id?: string | number | null;
+    user_id?: string | null;
+    created_at?: string | null;
+    status?: string | null;
+};
+
+function annotateLatestHostApplicationRows<T extends HostApplicationAdminRow>(rows: T[]) {
+    const latestByUser = pickLatestPublicHostApplicationsByUser(rows);
+
+    return rows.map((row) => {
+        const latestRow = row.user_id ? latestByUser.get(row.user_id) : null;
+        return {
+            ...row,
+            is_latest_for_user: isLatestPublicHostApplication(row, latestRow),
+        };
+    });
+}
 
 /**
  * GET /api/admin/host-applications
@@ -60,7 +84,8 @@ export async function GET(request: Request) {
         let query = supabaseAdmin
             .from('host_applications')
             .select(selectParam)
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false })
+            .order('id', { ascending: false });
 
         if (idParam) {
             const { data, error } = await query.eq('id', idParam).maybeSingle();
@@ -74,7 +99,27 @@ export async function GET(request: Request) {
             }
 
             const detailRecord = data as unknown as Record<string, unknown>;
+            const detailRow = data as HostApplicationAdminRow;
             const responseData: Record<string, unknown> = { ...detailRecord };
+            responseData.is_latest_for_user = false;
+
+            if (detailRow.user_id) {
+                const { data: latestRows, error: latestRowsError } = await supabaseAdmin
+                    .from('host_applications')
+                    .select('id, user_id, created_at, status')
+                    .eq('user_id', detailRow.user_id)
+                    .order('created_at', { ascending: false })
+                    .order('id', { ascending: false })
+                    .limit(2);
+
+                if (latestRowsError) {
+                    return NextResponse.json({ error: latestRowsError.message }, { status: 500 });
+                }
+
+                const latestRow = pickLatestPublicHostApplication((latestRows || []) as HostApplicationAdminRow[]);
+                responseData.is_latest_for_user = isLatestPublicHostApplication(detailRow, latestRow);
+            }
+
             const idCardPath = typeof detailRecord.id_card_file === 'string' ? detailRecord.id_card_file : null;
 
             if (idCardPath) {
@@ -108,7 +153,9 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
-        return NextResponse.json({ data });
+        const responseData = annotateLatestHostApplicationRows((data || []) as HostApplicationAdminRow[]);
+
+        return NextResponse.json({ data: responseData });
     } catch (err: unknown) {
         console.error('[Admin host-applications API Error]', err);
         return NextResponse.json({ error: err instanceof Error ? err.message : 'Internal Server Error' }, { status: 500 });

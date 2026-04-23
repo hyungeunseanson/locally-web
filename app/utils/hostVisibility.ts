@@ -9,8 +9,17 @@ type PublicHostApplicationLike = {
   status?: string | null;
 };
 
+type PublicExperienceLike = {
+  status?: string | null;
+  is_active?: boolean | null;
+};
+
 export function isPublicHostApplicationStatus(status?: string | null): boolean {
   return typeof status === 'string' && PUBLIC_HOST_APPLICATION_VISIBLE_STATUS_SET.has(status);
+}
+
+export function isPublicExperienceVisible(experience?: PublicExperienceLike | null): boolean {
+  return experience?.status === 'active' && experience.is_active !== false;
 }
 
 function getComparableId(id?: string | number | null) {
@@ -37,6 +46,18 @@ function comparePublicHostApplicationRows(
 
 export function pickLatestPublicHostApplication<T extends PublicHostApplicationLike>(rows: T[]) {
   return [...rows].sort(comparePublicHostApplicationRows)[0] ?? null;
+}
+
+export function isLatestPublicHostApplication(
+  row?: PublicHostApplicationLike | null,
+  latestRow?: PublicHostApplicationLike | null
+) {
+  if (!row || !latestRow) return false;
+
+  const rowId = getComparableId(row.id);
+  const latestId = getComparableId(latestRow.id);
+
+  return Boolean(rowId) && rowId === latestId;
 }
 
 export function pickLatestPublicHostApplicationsByUser<T extends PublicHostApplicationLike>(rows: T[]) {
