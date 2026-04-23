@@ -34,10 +34,18 @@ export default function LikeButton({ postId, initialCount, initialLiked, onOpenL
             const res = await fetch('/api/community/likes', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ post_id: postId })
+                body: JSON.stringify({
+                    post_id: postId,
+                    knownLikeCount: previousCount,
+                })
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error);
+            const hasServerLikeState =
+                typeof data?.liked === 'boolean' && Number.isFinite(Number(data?.likeCount));
+
+            if (!res.ok && !(res.status === 409 && hasServerLikeState)) {
+                throw new Error(data.error);
+            }
             setLiked(data.liked);
             setCount(data.likeCount);
         } catch {

@@ -12,6 +12,7 @@ type TestUser = {
 };
 
 const TEST_PASSWORD = 'LocallyTest!2026';
+const COMMUNITY_VIEW_COOKIE_PREFIX = 'community_viewed_';
 
 let adminClient: SupabaseClient | null = null;
 const createdAuthUserIds: string[] = [];
@@ -126,6 +127,10 @@ async function readViewCount(postId: string) {
   return Number(data?.view_count || 0);
 }
 
+function buildViewCookieName(postId: string) {
+  return `${COMMUNITY_VIEW_COOKIE_PREFIX}${postId.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+}
+
 test.afterAll(async () => {
   const supabase = getAdminClient();
 
@@ -177,6 +182,45 @@ test.describe.serial('Community view count policy', () => {
 
     await page.reload({ waitUntil: 'networkidle' });
     await expect(page.getByTestId('community-view-summary-count')).toHaveText('조회 1');
+    expect(await readViewCount(postId)).toBe(1);
+  });
+
+  test('short-circuits duplicate route calls when the view cookie already exists', async ({ request }) => {
+    const author = createUser('route');
+    const authorId = await createAuthUser(author);
+    const postId = await createCommunityPost(authorId);
+
+    const firstResponse = await request.post('/api/community/views', {
+      data: {
+        postId,
+        knownViewCount: 0,
+      },
+    });
+
+    expect(firstResponse.status()).toBe(200);
+    await expect(firstResponse.json()).resolves.toMatchObject({
+      success: true,
+      counted: true,
+      viewCount: 1,
+    });
+    expect(await readViewCount(postId)).toBe(1);
+
+    const repeatResponse = await request.post('/api/community/views', {
+      headers: {
+        Cookie: `${buildViewCookieName(postId)}=1`,
+      },
+      data: {
+        postId,
+        knownViewCount: 1,
+      },
+    });
+
+    expect(repeatResponse.status()).toBe(200);
+    await expect(repeatResponse.json()).resolves.toMatchObject({
+      success: true,
+      counted: false,
+      viewCount: 1,
+    });
     expect(await readViewCount(postId)).toBe(1);
   });
 });

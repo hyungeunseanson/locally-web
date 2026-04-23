@@ -23,7 +23,8 @@ export default function CommunityCommentsPanel({
     onOpenLogin,
 }: CommunityCommentsPanelProps) {
     const [commentCount, setCommentCount] = useState(initialCommentCount);
-    const [currentViewCount, setCurrentViewCount] = useState(() => Math.max(Number(viewCount || 0), 1));
+    const initialViewCount = Math.max(Number(viewCount || 0), 1);
+    const [currentViewCount, setCurrentViewCount] = useState(initialViewCount);
 
     useEffect(() => {
         let isMounted = true;
@@ -33,7 +34,10 @@ export default function CommunityCommentsPanel({
             headers: { 'Content-Type': 'application/json' },
             cache: 'no-store',
             credentials: 'same-origin',
-            body: JSON.stringify({ postId }),
+            body: JSON.stringify({
+                postId,
+                knownViewCount: initialViewCount,
+            }),
         })
             .then(async (response) => {
                 const data = await response.json().catch(() => null);
@@ -52,11 +56,11 @@ export default function CommunityCommentsPanel({
         return () => {
             isMounted = false;
         };
-    }, [postId]);
+    }, [initialViewCount, postId]);
 
     return (
-        <>
-            <div className="flex items-center gap-4 text-slate-400 text-sm font-semibold border-t border-slate-100 pt-5 mt-5 px-5 flex-wrap">
+        <section data-testid="community-comments-panel" className="mt-5 px-5 pb-6 pt-5">
+            <div className="flex flex-wrap items-center gap-4 text-sm font-semibold text-slate-400">
                 <span data-testid="community-view-summary-count">조회 {currentViewCount || 0}</span>
                 <span data-testid="community-comment-summary-count">댓글 {commentCount || 0}</span>
                 <div className="ml-auto">
@@ -69,9 +73,7 @@ export default function CommunityCommentsPanel({
                 </div>
             </div>
 
-            <div className="w-full h-2 bg-slate-50 border-y border-slate-100" />
-
-            <section className="px-5 py-6">
+            <div className="pt-6">
                 <h3 data-testid="community-comment-heading-count" className="text-[17px] font-bold text-slate-900 mb-6">
                     댓글 {commentCount || 0}
                 </h3>
@@ -80,7 +82,7 @@ export default function CommunityCommentsPanel({
                     onOpenLogin={onOpenLogin}
                     onCountChange={setCommentCount}
                 />
-            </section>
-        </>
+            </div>
+        </section>
     );
 }

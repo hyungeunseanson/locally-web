@@ -395,22 +395,20 @@ export default function CommentSection({ postId, onOpenLogin, onCountChange }: C
     };
 
     return (
-        <div>
+        <div data-testid="community-comment-section">
             {isLoading ? (
                 <div className="flex justify-center py-6">
                     <Loader2 size={22} className="animate-spin text-slate-300" />
                 </div>
-            ) : comments.length === 0 ? (
-                <div className="rounded-2xl border border-slate-100 bg-slate-50 py-10 text-center text-sm text-slate-400">
-                    첫 번째 댓글을 남겨보세요! 💬
-                </div>
-            ) : (
-                <div className="space-y-6">
+            ) : comments.length > 0 ? (
+                <div data-testid="community-comment-list" className="space-y-6">
                     {comments.map((comment) => renderComment(comment))}
                 </div>
+            ) : (
+                <div data-testid="community-comment-list" />
             )}
 
-            <div className="mt-4 flex items-end gap-3 border-t border-slate-100 px-4 py-3">
+            <div data-testid="community-comment-composer" className="mt-4 flex items-end gap-3 px-4 py-3">
                 <div className="h-9 w-9 flex-shrink-0 overflow-hidden rounded-full border border-slate-100 bg-slate-100">
                     {user?.user_metadata?.avatar_url ? (
                         <img src={user.user_metadata.avatar_url} alt="me" className="h-full w-full object-cover" referrerPolicy="no-referrer" />

@@ -173,6 +173,18 @@ async function seedLike(postId: string, userId: string) {
   }
 }
 
+async function readPostLikeCount(postId: string) {
+  const supabase = getAdminClient();
+  const { data, error } = await supabase
+    .from('community_posts')
+    .select('like_count')
+    .eq('id', postId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return Number(data?.like_count || 0);
+}
+
 async function login(page: Page, user: TestUser) {
   await page.goto('/login', { waitUntil: 'networkidle' });
   await page.locator('input[type="email"]').fill(user.email);
@@ -240,9 +252,16 @@ test.describe.serial('Community detail state consistency', () => {
     expect(likeResponse.status()).toBe(200);
     await expect(likeResponse.json()).resolves.toMatchObject({ liked: false, likeCount: 0 });
     await expect(likeButton).toContainText('0');
+    expect(await readPostLikeCount(postId)).toBe(0);
 
     await expect(page.getByTestId('community-comment-summary-count')).toHaveText('댓글 0');
     await expect(page.getByTestId('community-comment-heading-count')).toHaveText('댓글 0');
+    await expect(page.getByText('첫 번째 댓글을 남겨보세요! 💬')).toHaveCount(0);
+
+    const commentsPanel = page.getByTestId('community-comments-panel');
+    await expect(commentsPanel.getByTestId('community-comment-heading-count')).toBeVisible();
+    await expect(commentsPanel.getByTestId('community-comment-composer')).toBeVisible();
+    await expect(commentsPanel.locator('.w-full.h-2.bg-slate-50.border-y.border-slate-100')).toHaveCount(0);
 
     await page.locator('textarea').fill(commentMessage);
     await page.locator('button').filter({
@@ -251,6 +270,7 @@ test.describe.serial('Community detail state consistency', () => {
 
     await expect(page.getByTestId('community-comment-summary-count')).toHaveText('댓글 1');
     await expect(page.getByTestId('community-comment-heading-count')).toHaveText('댓글 1');
+    await expect(page.getByTestId('community-comment-list')).toContainText(commentMessage);
     await expect(page.getByTestId('community-detail-bottom-ad')).toBeVisible();
     await expect(page.getByTestId('community-detail-sidebar-ad')).toHaveCount(0);
 

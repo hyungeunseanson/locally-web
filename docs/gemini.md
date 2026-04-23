@@ -133,11 +133,11 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 동기화는 100% DB 레벨의 Postgres Trigger (`on_auth_user_created`)가 담당한다.
 
 ### 3.5 커뮤니티 정합성 원칙
-- 커뮤니티 상세의 좋아요 상태는 SSR이 현재 사용자 `community_likes` 존재 여부를 읽어 초기화하고, `POST /api/community/likes`는 항상 `{ liked, likeCount }`를 반환해 optimistic UI를 서버 기준 값으로 다시 맞춘다. `likeCount`는 `community_likes` 실제 row 수를 기준으로 계산한다.
+- 커뮤니티 상세의 좋아요 상태는 SSR이 현재 사용자 `community_likes` 존재 여부를 읽어 초기화하고, `POST /api/community/likes`는 항상 `{ liked, likeCount }`를 반환해 optimistic UI를 서버 기준 값으로 다시 맞춘다. 기본 source는 `community_posts.like_count` 집계 컬럼이며, 집계값이 현재 클라이언트가 보던 count와 맞지 않을 때만 `community_likes` exact recount로 fail-safe 수렴한다.
 - 커뮤니티 상세의 댓글 수는 서버가 준 `post.comment_count`에만 고정하지 않는다. 클라이언트 wrapper가 현재 댓글 목록 길이를 source로 잡아 요약 행과 `댓글 N` 헤더를 함께 동기화한다.
 - 커뮤니티 글쓰기의 공식 category 집합은 `qna`, `companion`, `info`, `locally_content`다. `supabase_community_migration.sql`과 실운영 ALTER migration은 이 집합을 동일하게 유지해야 한다.
 - 커뮤니티 글쓰기는 계속 client→storage 업로드를 사용하지만, `POST /api/community/posts`에 `image_paths`를 함께 전달해 DB insert 실패 시 `images` bucket orphan 파일을 best-effort cleanup 한다. `companion` 글은 서버에서도 `companion_date`, `companion_city`를 필수로 검증한다.
-- 커뮤니티 `view_count`는 상세 페이지에서만 집계한다. `POST /api/community/views`가 6시간 httpOnly cookie 기준으로 한 브라우저당 한 번만 증가시키고, 상세 클라이언트 패널은 반환된 `viewCount`로 `조회 N` 표시를 보정한다. 목록 진입/새로고침을 과도하게 집계하지 않는다.
+- 커뮤니티 `view_count`는 상세 페이지에서만 집계한다. `POST /api/community/views`가 6시간 httpOnly cookie 기준으로 한 브라우저당 한 번만 증가시키고, 중복 방문은 요청 body의 `knownViewCount`를 그대로 돌려주며 DB를 다시 읽지 않는다. 증가 자체는 `increment_community_post_view_count` RPC를 우선 사용하고, migration 미적용 환경에서만 guarded fallback을 허용한다. 상세 클라이언트 패널은 반환된 `viewCount`로 `조회 N` 표시를 보정한다.
 
 ---
 
