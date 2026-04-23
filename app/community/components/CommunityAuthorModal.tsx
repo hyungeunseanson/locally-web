@@ -7,13 +7,15 @@ import React, { useEffect, useState } from 'react';
 import { useModalClose } from '@/app/hooks/useModalClose';
 import Link from 'next/link';
 import { ChevronRight, Globe, Languages, Loader2, PenSquare, User, X } from 'lucide-react';
-import { COMMUNITY_OPEN, getCommunityCategoryMeta } from '../categoryMeta';
-import type { CommunityCategory } from '@/app/types/community';
+import { getCommunityCategoryMeta } from '../categoryMeta';
+import { buildCommunityBoardDetailHref } from '../queryParams';
+import type { CommunityBoard, CommunityCategory } from '@/app/types/community';
 
 type RecentPostRow = {
   id: string;
   title: string;
   category: CommunityCategory;
+  board_country: CommunityBoard | null;
   created_at: string;
   is_anonymous: boolean;
 };
@@ -102,10 +104,8 @@ export default function CommunityAuthorModal({
   isOpen,
   onClose,
 }: CommunityAuthorModalProps) {
-  const recentPostsHeading = COMMUNITY_OPEN ? '이 사용자가 쓴 글' : '이 작성자의 공개 콘텐츠';
-  const recentPostsEmptyCopy = COMMUNITY_OPEN
-    ? '공개된 최근 커뮤니티 글이 없습니다.'
-    : '공개된 로컬리 콘텐츠가 없습니다.';
+  const recentPostsHeading = '이 사용자가 쓴 글';
+  const recentPostsEmptyCopy = '공개된 최근 글이 없습니다.';
   const { visible, closing, requestClose } = useModalClose(isOpen, onClose);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -299,17 +299,22 @@ export default function CommunityAuthorModal({
                 ) : (
                   <div className="space-y-3">
                     {recentPosts.map((post) => {
-                      const meta = getCommunityCategoryMeta(post.category);
+                      const meta = post.board_country ? null : getCommunityCategoryMeta(post.category);
+                      const href = post.board_country
+                        ? buildCommunityBoardDetailHref(post.id, { board: post.board_country })
+                        : `/community/${post.id}`;
                       return (
                         <Link
                           key={post.id}
-                          href={`/community/${post.id}?category=${post.category}`}
+                          href={href}
                           className="group flex items-start gap-3 rounded-3xl border border-slate-100 px-4 py-4 transition-colors hover:border-slate-200 hover:bg-slate-50"
                           data-testid="community-author-modal-post"
                         >
-                          <span className={`mt-0.5 rounded-full px-2.5 py-1 text-[10px] font-bold ${meta.badgeClassName}`}>
-                            {meta.shortLabel}
-                          </span>
+                          {meta && (
+                            <span className={`mt-0.5 rounded-full px-2.5 py-1 text-[10px] font-bold ${meta.badgeClassName}`}>
+                              {meta.shortLabel}
+                            </span>
+                          )}
                           <div className="min-w-0 flex-1">
                             <p className="line-clamp-2 break-words text-sm font-semibold text-slate-900 [overflow-wrap:anywhere]">
                               {post.title}

@@ -92,27 +92,52 @@ async function createAuthUser(user: TestUser) {
   return data.user.id;
 }
 
-async function createCommunityPost(authorId: string, category: 'locally_content' | 'qna') {
+async function createCommunityPost(
+  authorId: string,
+  options: { category: 'locally_content' | 'qna'; board?: 'japan' | 'korea' }
+) {
   const supabase = getAdminClient();
-  const { data, error } = await supabase
+  const basePayload = {
+    user_id: authorId,
+    category: options.category,
+    post_format: options.board ? 'question' : undefined,
+    source_locale: 'ko',
+    title: `[Playwright] Community Sitemap ${options.category} ${Date.now()}`,
+    content: `${options.category} sitemap 검증용 게시글입니다.`,
+    images: [],
+    linked_exp_id: null,
+  };
+
+  const attempt = await supabase
     .from('community_posts')
     .insert({
-      user_id: authorId,
-      category,
-      title: `[Playwright] Community Sitemap ${category} ${Date.now()}`,
-      content: `${category} sitemap 검증용 게시글입니다.`,
-      images: [],
-      linked_exp_id: null,
+      ...basePayload,
+      board_country: options.board ?? null,
+      destination_hub: options.board ? null : null,
     })
     .select('id')
     .single();
 
-  if (error || !data?.id) {
-    throw error || new Error(`Failed to create ${category} community post fixture.`);
+  if (!attempt.error && attempt.data?.id) {
+    createdPostIds.push(attempt.data.id);
+    return attempt.data.id;
   }
 
-  createdPostIds.push(data.id);
-  return data.id;
+  const fallback = await supabase
+    .from('community_posts')
+    .insert({
+      ...basePayload,
+      destination_hub: options.board === 'japan' ? 'tokyo' : options.board === 'korea' ? 'seoul' : null,
+    })
+    .select('id')
+    .single();
+
+  if (fallback.error || !fallback.data?.id) {
+    throw fallback.error || attempt.error || new Error(`Failed to create ${options.category} community post fixture.`);
+  }
+
+  createdPostIds.push(fallback.data.id);
+  return fallback.data.id;
 }
 
 test.afterAll(async () => {
@@ -146,21 +171,22 @@ test.describe('Sitemap route', () => {
     expect(xml).toMatch(/<lastmod>[^<]+<\/lastmod>/);
   });
 
-  test('includes only locally_content community details when community is content-only', async ({ request }) => {
+  test('includes board posts and locally_content, but excludes legacy qna details', async ({ request }) => {
     test.setTimeout(90000);
     const expectedSiteUrl = resolveConfiguredSiteUrl();
 
     const author = createUser('author');
     const authorId = await createAuthUser(author);
-    const locallyContentPostId = await createCommunityPost(authorId, 'locally_content');
-    const legacyPostId = await createCommunityPost(authorId, 'qna');
+    const boardPostId = await createCommunityPost(authorId, { category: 'qna', board: 'japan' });
+    const locallyContentPostId = await createCommunityPost(authorId, { category: 'locally_content' });
+    const legacyPostId = await createCommunityPost(authorId, { category: 'qna' });
 
     const response = await request.get('/sitemap.xml');
-
     expect(response.ok()).toBeTruthy();
 
     const xml = await response.text();
 
+    expect(xml).toContain(`<loc>${expectedSiteUrl}/community/${boardPostId}</loc>`);
     expect(xml).toContain(`<loc>${expectedSiteUrl}/community/${locallyContentPostId}</loc>`);
     expect(xml).not.toContain(`/community/${legacyPostId}</loc>`);
   });

@@ -11,6 +11,10 @@ export function isMissingAnonymousColumnError(error: unknown): boolean {
   return hasMissingColumnMessage(error, 'is_anonymous');
 }
 
+export function isMissingCommunityBoardColumnError(error: unknown): boolean {
+  return hasMissingColumnMessage(error, 'board_country');
+}
+
 export function isMissingCommunityModelColumnError(error: unknown): boolean {
   return (
     hasMissingColumnMessage(error, 'destination_hub')

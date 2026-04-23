@@ -18,11 +18,16 @@ import { getCurrentLocale } from '@/app/utils/locale';
 import { buildAbsoluteUrl, buildLocalizedAbsoluteUrl } from '@/app/utils/siteUrl';
 import { buildBreadcrumbJsonLd, buildCommunityArticleJsonLd } from '@/app/utils/structuredData';
 import { getCommunityAuthorAvatar, getCommunityAuthorInitial, getCommunityAuthorName } from '../authorDisplay';
-import { COMMUNITY_OPEN, getCommunityCategoryMeta, isLocallyContentCategory } from '../categoryMeta';
+import { getCommunityCategoryMeta, isLocallyContentCategory } from '../categoryMeta';
+import { getLegacyHubSeedForBoard, inferCommunityBoardFromLegacyHub, resolveCommunityBoard } from '../boardMeta';
 import { getCommunityHubMeta } from '../hubMeta';
 import { getCommunityCategoryFromFormat } from '../categoryMeta';
-import { isMissingAnonymousColumnError, isMissingCommunityModelColumnError } from '../anonymousColumn';
-import { resolveCommunityCategory, resolveCommunityFormat, resolveCommunityHub, resolveCommunitySort } from '../queryParams';
+import {
+    isMissingAnonymousColumnError,
+    isMissingCommunityBoardColumnError,
+    isMissingCommunityModelColumnError,
+} from '../anonymousColumn';
+import { buildCommunityBoardDetailHref, buildCommunityBoardListHref, resolveCommunityCategory, resolveCommunityFormat, resolveCommunityHub, resolveCommunitySort } from '../queryParams';
 
 // Community detail avatars render stored public profile URLs directly and keep server-rendered article markup free of image transforms.
 type CommunityDetailPostRow = {
@@ -30,6 +35,7 @@ type CommunityDetailPostRow = {
     user_id: string;
     category: 'qna' | 'companion' | 'info' | 'locally_content';
     destination_hub: 'tokyo' | 'osaka_kyoto' | 'fukuoka' | 'jp_other' | 'seoul' | 'busan' | 'jeju' | null;
+    board_country: 'japan' | 'korea' | null;
     title: string;
     content: string;
     images: string[] | null;
@@ -43,9 +49,29 @@ type CommunityDetailPostRow = {
     created_at: string;
     updated_at: string | null;
 };
-type CommunityDetailLegacyPostRow = Omit<CommunityDetailPostRow, 'destination_hub' | 'is_anonymous'>;
+type CommunityDetailPreBoardPostRow = Omit<CommunityDetailPostRow, 'board_country'>;
+type CommunityDetailLegacyPostRow = Omit<CommunityDetailPostRow, 'destination_hub' | 'is_anonymous' | 'board_country'>;
 
 const COMMUNITY_DETAIL_POST_SELECT = [
+    'id',
+    'user_id',
+    'category',
+    'destination_hub',
+    'board_country',
+    'title',
+    'content',
+    'images',
+    'is_anonymous',
+    'companion_date',
+    'companion_city',
+    'linked_exp_id',
+    'view_count',
+    'like_count',
+    'comment_count',
+    'created_at',
+    'updated_at',
+].join(', ');
+const COMMUNITY_DETAIL_POST_SELECT_PRE_BOARD = [
     'id',
     'user_id',
     'category',
@@ -81,11 +107,44 @@ const COMMUNITY_DETAIL_POST_SELECT_LEGACY = [
 ].join(', ');
 
 // 🚀 Dynamic Metadata (SSR SEO)
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+export async function generateMetadata({
+    params,
+    searchParams,
+}: {
+    params: Promise<{ id: string }>;
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}): Promise<Metadata> {
     const { id } = await params;
+    const detailSearchParams = await searchParams;
     const locale = await getCurrentLocale();
     const supabase = await createClient();
-    const { data: post } = await supabase.from('community_posts').select('title, content, images, category').eq('id', id).maybeSingle();
+    const initialResult = await supabase
+        .from('community_posts')
+        .select('title, content, images, category, board_country, destination_hub')
+        .eq('id', id)
+        .maybeSingle();
+    let post = initialResult.data as {
+        title: string;
+        content: string;
+        images: string[] | null;
+        category: 'qna' | 'companion' | 'info' | 'locally_content';
+        board_country?: 'japan' | 'korea' | null;
+        destination_hub?: 'tokyo' | 'osaka_kyoto' | 'fukuoka' | 'jp_other' | 'seoul' | 'busan' | 'jeju' | null;
+    } | null;
+
+    if (initialResult.error && isMissingCommunityBoardColumnError(initialResult.error)) {
+        const preBoardResult = await supabase
+            .from('community_posts')
+            .select('title, content, images, category, destination_hub')
+            .eq('id', id)
+            .maybeSingle();
+        post = preBoardResult.data
+            ? {
+                ...preBoardResult.data,
+                board_country: inferCommunityBoardFromLegacyHub(preBoardResult.data.destination_hub),
+              }
+            : null;
+    }
 
     if (!post) {
         return { title: '게시글을 찾을 수 없습니다' };
@@ -96,12 +155,18 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     const defaultImage = post.images && post.images.length > 0 ? post.images[0] : buildAbsoluteUrl('/images/logo.png');
     const pagePath = `/community/${id}`;
     const canonicalUrl = buildLocalizedAbsoluteUrl(locale, pagePath);
-    const isSearchIndexable = COMMUNITY_OPEN || isLocallyContentCategory(post.category);
-    const communitySurfaceLabel = COMMUNITY_OPEN ? 'Locally 커뮤니티' : 'Locally 콘텐츠';
+    const requestedBoard = typeof detailSearchParams?.board === 'string'
+        ? resolveCommunityBoard(detailSearchParams.board as string)
+        : null;
+    const boardContext = post.board_country ?? requestedBoard;
+    const isSearchIndexable = Boolean(boardContext) || isLocallyContentCategory(post.category);
+    const communitySurfaceLabel = 'Locally 커뮤니티';
 
     let prefix = '';
-    if (post.category === 'qna') prefix = '[Q&A] ';
-    else if (post.category === 'companion') prefix = '[동행] ';
+    if (!boardContext) {
+        if (post.category === 'qna') prefix = '[Q&A] ';
+        else if (post.category === 'companion') prefix = '[동행] ';
+    }
 
     return {
         title: `${prefix}${post.title}`,
@@ -153,6 +218,11 @@ export default async function CommunityPostDetail({
     const detailSearchParams = await searchParams;
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
+    const fallbackSort = resolveCommunitySort(detailSearchParams?.sort as string);
+    const requestedBoard = typeof detailSearchParams?.board === 'string'
+        ? resolveCommunityBoard(detailSearchParams.board as string)
+        : null;
+    let usedPreBoardFallback = false;
 
     // ① post 단독 조회 (SSR Join 분리 원칙)
     const buildPostQuery = (selectClause: string) => supabase
@@ -165,6 +235,19 @@ export default async function CommunityPostDetail({
     let post = initialPostResult.data as CommunityDetailPostRow | null;
     let postError = initialPostResult.error;
 
+    if (postError && isMissingCommunityBoardColumnError(postError)) {
+        const preBoardResult = await buildPostQuery(COMMUNITY_DETAIL_POST_SELECT_PRE_BOARD);
+        const preBoardPost = preBoardResult.data as unknown as CommunityDetailPreBoardPostRow | null;
+        post = preBoardPost
+            ? {
+                ...preBoardPost,
+                board_country: inferCommunityBoardFromLegacyHub(preBoardPost.destination_hub),
+            }
+            : null;
+        postError = preBoardResult.error;
+        usedPreBoardFallback = true;
+    }
+
     if (postError && (isMissingAnonymousColumnError(postError) || isMissingCommunityModelColumnError(postError))) {
         const legacyPostResult = await buildPostQuery(COMMUNITY_DETAIL_POST_SELECT_LEGACY);
         const legacyPost = legacyPostResult.data as unknown as CommunityDetailLegacyPostRow | null;
@@ -172,6 +255,7 @@ export default async function CommunityPostDetail({
             ? {
                 ...legacyPost,
                 destination_hub: null,
+                board_country: null,
                 is_anonymous: false,
             }
             : null;
@@ -218,7 +302,9 @@ export default async function CommunityPostDetail({
     // ④ 이전글/다음글 (같은 카테고리)
     const isCompanion = post.category === 'companion';
     const isLocallyContent = isLocallyContentCategory(post.category);
-    const isSearchIndexable = COMMUNITY_OPEN || isLocallyContent;
+    const boardContext = post.board_country ?? requestedBoard;
+    const isBoardPost = Boolean(boardContext);
+    const isSearchIndexable = isBoardPost || isLocallyContent;
     const authorName = getCommunityAuthorName(profile, post.is_anonymous);
     const authorInitial = getCommunityAuthorInitial(profile, post.is_anonymous);
     const authorAvatar = getCommunityAuthorAvatar(profile, post.is_anonymous);
@@ -236,35 +322,43 @@ export default async function CommunityPostDetail({
         && new Date(post.updated_at).getTime() > new Date(post.created_at).getTime()
     );
     const fallbackHub = resolveCommunityHub(detailSearchParams?.hub as string);
-    const fallbackRequestedCategory = !COMMUNITY_OPEN
-        ? 'locally_content'
-        : resolveCommunityCategory((detailSearchParams?.category as string) || post.category);
-    const fallbackFormat = !COMMUNITY_OPEN
-        ? 'locally_pick'
-        : resolveCommunityFormat(
-            detailSearchParams?.format as string,
-            fallbackRequestedCategory === 'all' ? post.category : fallbackRequestedCategory
-        );
+    const fallbackRequestedCategory = resolveCommunityCategory((detailSearchParams?.category as string) || post.category);
+    const fallbackFormat = resolveCommunityFormat(
+        detailSearchParams?.format as string,
+        fallbackRequestedCategory === 'all' ? post.category : fallbackRequestedCategory
+    );
     const fallbackParams = new URLSearchParams();
     if (fallbackHub !== 'all') fallbackParams.set('hub', fallbackHub);
     if (fallbackFormat !== 'all') {
         fallbackParams.set('format', fallbackFormat);
         fallbackParams.set('category', getCommunityCategoryFromFormat(fallbackFormat));
-    } else {
+    } else if ((detailSearchParams?.category as string) || post.category) {
         fallbackParams.set('category', (detailSearchParams?.category as string) || post.category);
     }
     const fallbackQuery = ((detailSearchParams?.q as string) || '').trim();
-    const fallbackSort = resolveCommunitySort(detailSearchParams?.sort as string);
     if (fallbackQuery) fallbackParams.set('q', fallbackQuery);
     if (fallbackSort !== 'latest') fallbackParams.set('sort', fallbackSort);
-    const fallbackHref = `/community?${fallbackParams.toString()}`;
+    const fallbackHref = isBoardPost && boardContext
+        ? buildCommunityBoardListHref({ board: boardContext, sort: fallbackSort })
+        : '/community';
 
     const buildAdjacentQuery = (direction: 'prev' | 'next') => {
         let query = supabase.from('community_posts')
-            .select('id, title, created_at')
-            .eq('category', post.category);
+            .select(usedPreBoardFallback ? 'id, title, created_at, destination_hub' : 'id, title, created_at');
 
-        if (fallbackHub !== 'all' && post.destination_hub) {
+        if (isBoardPost && boardContext) {
+            if (usedPreBoardFallback) {
+                query = query
+                    .eq('category', 'qna')
+                    .eq('destination_hub', getLegacyHubSeedForBoard(boardContext));
+            } else {
+                query = query.eq('board_country', boardContext);
+            }
+        } else {
+            query = query.eq('category', post.category);
+        }
+
+        if (!isBoardPost && fallbackHub !== 'all' && post.destination_hub) {
             query = query.eq('destination_hub', post.destination_hub);
         }
 
@@ -307,7 +401,7 @@ export default async function CommunityPostDetail({
                     ] : []),
                     buildBreadcrumbJsonLd([
                         { name: 'Home', item: buildAbsoluteUrl('/') },
-                        { name: COMMUNITY_OPEN ? '커뮤니티' : '로컬리 콘텐츠', item: buildAbsoluteUrl('/community') },
+                        { name: '커뮤니티', item: buildAbsoluteUrl('/community') },
                         { name: post.title, item: pageUrl },
                     ]),
                 ]}
@@ -337,16 +431,18 @@ export default async function CommunityPostDetail({
                                     </div>
                                 )}
 
-                                <div className="mb-3 flex flex-wrap items-center gap-2">
-                                    <span className={`rounded-full px-3 py-1 text-[11px] font-bold ${categoryMeta.detailChipClassName}`}>
-                                        {categoryMeta.shortLabel}
-                                    </span>
-                                    {hubMeta && (
-                                        <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-bold text-slate-600">
-                                            {hubMeta.label}
+                                {!isBoardPost && (
+                                    <div className="mb-3 flex flex-wrap items-center gap-2">
+                                        <span className={`rounded-full px-3 py-1 text-[11px] font-bold ${categoryMeta.detailChipClassName}`}>
+                                            {categoryMeta.shortLabel}
                                         </span>
-                                    )}
-                                </div>
+                                        {hubMeta && (
+                                            <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-bold text-slate-600">
+                                                {hubMeta.label}
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
 
                                 <h1 className="mb-4 break-words text-[18px] font-bold leading-snug text-slate-900 [overflow-wrap:anywhere] md:text-[24px]">
                                     {post.title}
@@ -432,7 +528,9 @@ export default async function CommunityPostDetail({
                                 <div className="grid grid-cols-3 gap-3">
                                     {prevPost ? (
                                         <Link
-                                            href={`/community/${prevPost.id}?${fallbackParams.toString()}`}
+                                            href={isBoardPost && boardContext
+                                                ? buildCommunityBoardDetailHref(prevPost.id, { board: boardContext, sort: fallbackSort })
+                                                : `/community/${prevPost.id}`}
                                             data-testid="community-detail-prev-link"
                                             className="flex items-center justify-center rounded-xl border border-slate-200 px-3 py-2 text-[12px] font-semibold text-slate-600 transition-colors hover:bg-slate-50"
                                         >
@@ -454,7 +552,9 @@ export default async function CommunityPostDetail({
 
                                     {nextPost ? (
                                         <Link
-                                            href={`/community/${nextPost.id}?${fallbackParams.toString()}`}
+                                            href={isBoardPost && boardContext
+                                                ? buildCommunityBoardDetailHref(nextPost.id, { board: boardContext, sort: fallbackSort })
+                                                : `/community/${nextPost.id}`}
                                             data-testid="community-detail-next-link"
                                             className="flex items-center justify-center rounded-xl border border-slate-200 px-3 py-2 text-[12px] font-semibold text-slate-600 transition-colors hover:bg-slate-50"
                                         >
@@ -468,31 +568,18 @@ export default async function CommunityPostDetail({
                                 </div>
                             </div>
 
-                            {isLocallyContent && (
+                            {(isBoardPost || isLocallyContent) && (
                                 <div className="mx-5 mb-6">
                                     <CommunityAdSlot
                                         testId="community-detail-bottom-ad"
                                         variant="bottom"
                                         placement="community-detail-bottom"
-                                        title="로컬리 콘텐츠 광고"
+                                        title="로컬리 커뮤니티 광고"
                                     />
                                 </div>
                             )}
                         </main>
                     </div>
-
-                    {isLocallyContent && (
-                        <div className="hidden lg:block lg:col-span-4">
-                            <div className="sticky top-8">
-                                <CommunityAdSlot
-                                    testId="community-detail-sidebar-ad"
-                                    variant="sidebar"
-                                    placement="community-detail-sidebar"
-                                    title="로컬리 콘텐츠 광고"
-                                />
-                            </div>
-                        </div>
-                    )}
 
                     </div>
                 </div>

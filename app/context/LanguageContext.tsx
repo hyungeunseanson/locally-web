@@ -741,6 +741,8 @@ const dictionary: Record<Locale, Record<string, string>> = {
     header_guidelines: "교육 및 가이드라인",
     header_profile_settings: "프로필 설정",
     header_community: "커뮤니티",
+    community_board_japan: "일본여행",
+    community_board_korea: "한국여행",
 
     // HostProfileCard
     host_intro_title: "호스트 {name}님 소개",
@@ -2232,6 +2234,8 @@ const dictionary: Record<Locale, Record<string, string>> = {
     header_guidelines: "Training & Guidelines",
     header_profile_settings: "Profile Settings",
     header_community: "Community",
+    community_board_japan: "Japan Travel",
+    community_board_korea: "Korea Travel",
 
     // HostProfileCard
     host_intro_title: "About Host {name}",
@@ -3726,6 +3730,8 @@ const dictionary: Record<Locale, Record<string, string>> = {
     header_guidelines: "研修・ガイドライン",
     header_profile_settings: "プロフィール設定",
     header_community: "コミュニティ",
+    community_board_japan: "日本旅行",
+    community_board_korea: "韓国旅行",
 
     // HostProfileCard
     host_intro_title: "ホスト{name}の紹介",
@@ -5218,6 +5224,8 @@ const dictionary: Record<Locale, Record<string, string>> = {
     header_guidelines: "培训与指南",
     header_profile_settings: "个人资料设置",
     header_community: "社区",
+    community_board_japan: "日本旅行",
+    community_board_korea: "韩国旅行",
 
     // HostProfileCard
     host_intro_title: "介绍房东{name}",

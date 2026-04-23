@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
-import { COMMUNITY_OPEN } from '@/app/community/categoryMeta';
 import { getHostPublicProfile, getProfileDisplayName, normalizeLanguageList } from '@/app/utils/profile';
-import { isMissingAnonymousColumnError } from '@/app/community/anonymousColumn';
+import {
+  isMissingAnonymousColumnError,
+  isMissingCommunityBoardColumnError,
+} from '@/app/community/anonymousColumn';
+import { inferCommunityBoardFromLegacyHub } from '@/app/community/boardMeta';
 import {
   isPublicHostApplicationStatus,
   pickLatestPublicHostApplication,
 } from '@/app/utils/hostVisibility';
+import type { CommunityBoard } from '@/app/types/community';
 
 type PublicHostApplicationRow = {
   id: string | number;
@@ -18,6 +22,23 @@ type PublicHostApplicationRow = {
   languages?: string[] | null;
   created_at?: string | null;
 };
+
+type RecentCommunityPostRow = {
+  id: string;
+  title: string;
+  category: string;
+  board_country?: CommunityBoard | null;
+  destination_hub?: string | null;
+  created_at: string;
+  is_anonymous?: boolean;
+};
+
+const RECENT_POST_LIMIT = 12;
+
+function isVisibleRecentPost(post: Pick<RecentCommunityPostRow, 'category' | 'board_country' | 'destination_hub'>) {
+  const inferredBoard = post.board_country ?? inferCommunityBoardFromLegacyHub(post.destination_hub);
+  return post.category === 'locally_content' || inferredBoard === 'japan' || inferredBoard === 'korea';
+}
 
 export async function GET(
   request: NextRequest,
@@ -57,51 +78,83 @@ export async function GET(
 
     let recentQuery = supabase
       .from('community_posts')
-      .select('id, title, category, created_at, is_anonymous')
+      .select('id, title, category, board_country, destination_hub, created_at, is_anonymous')
       .eq('user_id', id)
       .eq('is_anonymous', false)
       .order('created_at', { ascending: false })
-      .limit(6);
-
-    if (!COMMUNITY_OPEN) {
-      recentQuery = recentQuery.eq('category', 'locally_content');
-    }
+      .limit(RECENT_POST_LIMIT);
 
     if (excludePostId) {
       recentQuery = recentQuery.neq('id', excludePostId);
     }
 
     const recentResult = await recentQuery;
-    let recentPosts = (recentResult.data ?? []) as Array<{
-      id: string;
-      title: string;
-      category: string;
-      created_at: string;
-      is_anonymous?: boolean;
-    }>;
+    let recentPosts = (recentResult.data ?? []) as RecentCommunityPostRow[];
 
-    if (recentResult.error && isMissingAnonymousColumnError(recentResult.error)) {
+    if (recentResult.error && isMissingCommunityBoardColumnError(recentResult.error)) {
       let legacyQuery = supabase
         .from('community_posts')
-        .select('id, title, category, created_at')
+        .select('id, title, category, destination_hub, created_at, is_anonymous')
         .eq('user_id', id)
         .order('created_at', { ascending: false })
-        .limit(6);
-
-      if (!COMMUNITY_OPEN) {
-        legacyQuery = legacyQuery.eq('category', 'locally_content');
-      }
+        .limit(RECENT_POST_LIMIT);
 
       if (excludePostId) {
         legacyQuery = legacyQuery.neq('id', excludePostId);
       }
 
       const legacyResult = await legacyQuery;
-      if (legacyResult.error) {
+      if (legacyResult.error && isMissingAnonymousColumnError(legacyResult.error)) {
+        let legacyNoAnonymousQuery = supabase
+          .from('community_posts')
+          .select('id, title, category, destination_hub, created_at')
+          .eq('user_id', id)
+          .order('created_at', { ascending: false })
+          .limit(RECENT_POST_LIMIT);
+
+        if (excludePostId) {
+          legacyNoAnonymousQuery = legacyNoAnonymousQuery.neq('id', excludePostId);
+        }
+
+        const legacyNoAnonymousResult = await legacyNoAnonymousQuery;
+        if (legacyNoAnonymousResult.error) {
+          return NextResponse.json({ error: legacyNoAnonymousResult.error.message }, { status: 500 });
+        }
+
+        recentPosts = (legacyNoAnonymousResult.data ?? []).map((post) => ({
+          ...post,
+          board_country: null,
+          is_anonymous: false,
+        })) as RecentCommunityPostRow[];
+      } else if (legacyResult.error) {
         return NextResponse.json({ error: legacyResult.error.message }, { status: 500 });
+      } else {
+        recentPosts = (legacyResult.data ?? []).map((post) => ({
+          ...post,
+          board_country: null,
+        })) as RecentCommunityPostRow[];
+      }
+    } else if (recentResult.error && isMissingAnonymousColumnError(recentResult.error)) {
+      let legacyAnonymousQuery = supabase
+        .from('community_posts')
+        .select('id, title, category, board_country, destination_hub, created_at')
+        .eq('user_id', id)
+        .order('created_at', { ascending: false })
+        .limit(RECENT_POST_LIMIT);
+
+      if (excludePostId) {
+        legacyAnonymousQuery = legacyAnonymousQuery.neq('id', excludePostId);
       }
 
-      recentPosts = (legacyResult.data ?? []).map((post) => ({ ...post, is_anonymous: false }));
+      const legacyAnonymousResult = await legacyAnonymousQuery;
+      if (legacyAnonymousResult.error) {
+        return NextResponse.json({ error: legacyAnonymousResult.error.message }, { status: 500 });
+      }
+
+      recentPosts = (legacyAnonymousResult.data ?? []).map((post) => ({
+        ...post,
+        is_anonymous: false,
+      })) as RecentCommunityPostRow[];
     } else if (recentResult.error) {
       return NextResponse.json({ error: recentResult.error.message }, { status: 500 });
     }
@@ -138,7 +191,18 @@ export async function GET(
 
     return NextResponse.json({
       profile: responseProfile,
-      recentPosts: recentPosts.filter((post) => !post.is_anonymous),
+      recentPosts: recentPosts
+        .filter((post) => !post.is_anonymous)
+        .filter((post) => isVisibleRecentPost(post))
+        .slice(0, 6)
+        .map((post) => ({
+          id: post.id,
+          title: post.title,
+          category: post.category,
+          board_country: post.board_country ?? inferCommunityBoardFromLegacyHub(post.destination_hub),
+          created_at: post.created_at,
+          is_anonymous: false,
+        })),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';

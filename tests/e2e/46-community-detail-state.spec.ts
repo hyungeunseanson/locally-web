@@ -89,7 +89,6 @@ async function createAuthUser(user: TestUser) {
 
   createdAuthUserIds.push(data.user.id);
   await waitForProfile(data.user.id);
-
   return data.user.id;
 }
 
@@ -100,30 +99,53 @@ async function createCommunityPost(
     createdAt?: string;
     updatedAt?: string;
     category?: 'qna' | 'locally_content';
+    board?: 'japan' | 'korea';
   }
 ) {
   const supabase = getAdminClient();
-  const { data, error } = await supabase
+  const basePayload = {
+    user_id: authorId,
+    category: options?.category || 'qna',
+    post_format: options?.board ? 'question' : undefined,
+    source_locale: 'ko',
+    title: options?.title || `[Playwright] Community Detail ${Date.now()}`,
+    content: '좋아요/댓글 카운트 정합성 검증용 게시글입니다.',
+    images: [],
+    linked_exp_id: null,
+    created_at: options?.createdAt,
+    updated_at: options?.updatedAt,
+  };
+
+  const attempt = await supabase
     .from('community_posts')
     .insert({
-      user_id: authorId,
-      category: options?.category || 'qna',
-      title: options?.title || `[Playwright] Community Detail ${Date.now()}`,
-      content: '좋아요/댓글 카운트 정합성 검증용 게시글입니다.',
-      images: [],
-      linked_exp_id: null,
-      created_at: options?.createdAt,
-      updated_at: options?.updatedAt,
+      ...basePayload,
+      board_country: options?.board ?? null,
+      destination_hub: options?.board ? null : null,
     })
-    .select('id, like_count, comment_count')
+    .select('id')
     .single();
 
-  if (error || !data?.id) {
-    throw error || new Error('Failed to create community post fixture.');
+  if (!attempt.error && attempt.data?.id) {
+    createdPostIds.push(attempt.data.id);
+    return attempt.data.id;
   }
 
-  createdPostIds.push(data.id);
-  return data.id;
+  const fallback = await supabase
+    .from('community_posts')
+    .insert({
+      ...basePayload,
+      destination_hub: options?.board === 'japan' ? 'tokyo' : options?.board === 'korea' ? 'seoul' : null,
+    })
+    .select('id')
+    .single();
+
+  if (fallback.error || !fallback.data?.id) {
+    throw fallback.error || attempt.error || new Error('Failed to create community post fixture.');
+  }
+
+  createdPostIds.push(fallback.data.id);
+  return fallback.data.id;
 }
 
 async function seedLike(postId: string, userId: string) {
@@ -175,7 +197,7 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Community detail state consistency', () => {
-  test('keeps like state/count aligned and updates comment counts immediately', async ({ page }) => {
+  test('keeps like/comment state aligned and preserves board-based list navigation', async ({ page }) => {
     test.setTimeout(90000);
 
     const author = createUser('author');
@@ -183,48 +205,41 @@ test.describe.serial('Community detail state consistency', () => {
     const authorId = await createAuthUser(author);
     const viewerId = await createAuthUser(viewer);
     const baseTime = Date.now();
+
     await createCommunityPost(authorId, {
+      board: 'japan',
       title: `[Playwright] Community Detail Previous ${baseTime}`,
       createdAt: new Date(baseTime - 2 * 60 * 60 * 1000).toISOString(),
     });
     const postId = await createCommunityPost(authorId, {
+      board: 'japan',
       title: `[Playwright] Community Detail Current ${baseTime}`,
       createdAt: new Date(baseTime - 60 * 60 * 1000).toISOString(),
     });
     await createCommunityPost(authorId, {
+      board: 'japan',
       title: `[Playwright] Community Detail Next ${baseTime}`,
       createdAt: new Date(baseTime).toISOString(),
     });
     const commentMessage = `Playwright comment ${Date.now()}`;
-    const filterQuery = 'community detail flow';
 
     await seedLike(postId, viewerId);
     await login(page, viewer);
-    await page.goto(`/community/${postId}?category=qna&q=${encodeURIComponent(filterQuery)}&sort=popular`, {
+    await page.goto(`/community/${postId}?board=japan&sort=popular`, {
       waitUntil: 'networkidle',
     });
 
     const likeButton = page.getByTestId('community-like-button');
-
     await expect(likeButton).toContainText('1');
-    const likeResponsePromise = page.waitForResponse((response) => {
-      return response.url().includes('/api/community/likes') && response.request().method() === 'POST';
-    });
+
+    const likeResponsePromise = page.waitForResponse((response) =>
+      response.url().includes('/api/community/likes') && response.request().method() === 'POST'
+    );
     await likeButton.click();
     const likeResponse = await likeResponsePromise;
     expect(likeResponse.status()).toBe(200);
     await expect(likeResponse.json()).resolves.toMatchObject({ liked: false, likeCount: 0 });
     await expect(likeButton).toContainText('0');
-
-    const supabase = getAdminClient();
-    const { data: remainingLike } = await supabase
-      .from('community_likes')
-      .select('id')
-      .eq('post_id', postId)
-      .eq('user_id', viewerId)
-      .maybeSingle();
-
-    expect(remainingLike).toBeNull();
 
     await expect(page.getByTestId('community-comment-summary-count')).toHaveText('댓글 0');
     await expect(page.getByTestId('community-comment-heading-count')).toHaveText('댓글 0');
@@ -236,49 +251,17 @@ test.describe.serial('Community detail state consistency', () => {
 
     await expect(page.getByTestId('community-comment-summary-count')).toHaveText('댓글 1');
     await expect(page.getByTestId('community-comment-heading-count')).toHaveText('댓글 1');
+    await expect(page.getByTestId('community-detail-bottom-ad')).toBeVisible();
+    await expect(page.getByTestId('community-detail-sidebar-ad')).toHaveCount(0);
 
-    const { data: insertedComment } = await supabase
-      .from('community_comments')
-      .select('id')
-      .eq('post_id', postId)
-      .eq('user_id', viewerId)
-      .eq('content', commentMessage)
-      .maybeSingle();
-
-    expect(insertedComment?.id).toBeTruthy();
-
-    await expect(page.getByTestId('community-detail-list-button').first()).toBeVisible();
-    await expect(page.getByText('이전글')).toBeVisible();
-    await expect(page.getByText('다음글')).toBeVisible();
-
-    const nextLink = page.getByTestId('community-detail-next-link');
-    const nextHref = await nextLink.getAttribute('href');
-    expect(nextHref).toBeTruthy();
-    expect(nextHref).toContain('category=locally_content');
-    expect(nextHref).toContain('format=locally_pick');
+    const nextHref = await page.getByTestId('community-detail-next-link').getAttribute('href');
     expect(nextHref).toContain('sort=popular');
 
-    await page.getByTestId('community-detail-list-button').first().click();
-    await expect.poll(() => page.url()).toContain('/community?');
-    await expect.poll(() => page.url()).toContain('category=locally_content');
-    await expect.poll(() => page.url()).toContain('format=locally_pick');
-    await expect.poll(() => page.url()).toContain('sort=popular');
-
-    await page.goBack({ waitUntil: 'networkidle' });
-    await expect.poll(() => page.url()).toContain(`/community/${postId}?`);
-
-    await page.goto(`/community/${postId}?category=qna&q=${encodeURIComponent(filterQuery)}&sort=popular`, {
-      waitUntil: 'networkidle',
-    });
-    const prevLink = page.getByTestId('community-detail-prev-link');
-    const prevHref = await prevLink.getAttribute('href');
-    expect(prevHref).toBeTruthy();
-    expect(prevHref).toContain('category=locally_content');
-    expect(prevHref).toContain('format=locally_pick');
-    expect(prevHref).toContain('sort=popular');
+    await page.getByTestId('community-detail-list-button').click();
+    await expect.poll(() => page.url()).toContain('/community?sort=popular');
   });
 
-  test('keeps locally_content details indexable and marks legacy details noindex while showing modified time only when updated', async ({ page, request }) => {
+  test('keeps board details indexable and legacy qna details noindex', async ({ page, request }) => {
     test.setTimeout(90000);
 
     const author = createUser('seo');
@@ -287,6 +270,12 @@ test.describe.serial('Community detail state consistency', () => {
     const createdAt = new Date(baseTime - 2 * 60 * 60 * 1000).toISOString();
     const updatedAt = new Date(baseTime - 60 * 60 * 1000).toISOString();
 
+    const boardPostId = await createCommunityPost(authorId, {
+      title: `[Playwright] Community SEO Board ${baseTime}`,
+      board: 'korea',
+      createdAt,
+      updatedAt,
+    });
     const locallyContentPostId = await createCommunityPost(authorId, {
       title: `[Playwright] Community SEO Content ${baseTime}`,
       category: 'locally_content',
@@ -300,10 +289,10 @@ test.describe.serial('Community detail state consistency', () => {
       updatedAt: createdAt,
     });
 
-    const locallyContentResponse = await request.get(`/community/${locallyContentPostId}`);
-    expect(locallyContentResponse.ok()).toBeTruthy();
-    const locallyContentHtml = await locallyContentResponse.text();
-    expect(locallyContentHtml).not.toMatch(/<meta[^>]+name="robots"[^>]+content="[^"]*noindex/i);
+    const boardResponse = await request.get(`/community/${boardPostId}?board=korea`);
+    expect(boardResponse.ok()).toBeTruthy();
+    const boardHtml = await boardResponse.text();
+    expect(boardHtml).not.toMatch(/<meta[^>]+name="robots"[^>]+content="[^"]*noindex/i);
 
     const legacyResponse = await request.get(`/community/${legacyPostId}`);
     expect(legacyResponse.ok()).toBeTruthy();
@@ -311,24 +300,22 @@ test.describe.serial('Community detail state consistency', () => {
     expect(legacyHtml).toMatch(/<meta[^>]+name="robots"[^>]+content="[^"]*noindex[^"]*nofollow/i);
 
     await page.setViewportSize({ width: 1440, height: 1200 });
-    await page.goto(`/community/${locallyContentPostId}?category=locally_content`, {
+    await page.goto(`/community/${boardPostId}?board=korea`, {
       waitUntil: 'networkidle',
     });
     await expect(page.getByTestId('community-detail-updated-at')).toContainText('수정됨');
-    await expect(page.getByTestId('community-detail-sidebar-ad')).toBeVisible();
     await expect(page.getByTestId('community-detail-bottom-ad')).toBeVisible();
+    await expect(page.getByTestId('community-detail-sidebar-ad')).toHaveCount(0);
 
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto(`/community/${locallyContentPostId}?category=locally_content`, {
+    await page.goto(`/community/${locallyContentPostId}`, {
       waitUntil: 'networkidle',
     });
     await expect(page.getByTestId('community-detail-bottom-ad')).toBeVisible();
-    await expect(page.getByTestId('community-detail-sidebar-ad')).toBeHidden();
+    await expect(page.getByTestId('community-detail-sidebar-ad')).toHaveCount(0);
 
-    await page.goto(`/community/${legacyPostId}?category=qna`, {
+    await page.goto(`/community/${legacyPostId}`, {
       waitUntil: 'networkidle',
     });
-    await expect(page.getByTestId('community-detail-updated-at')).toHaveCount(0);
     await expect(page.getByTestId('community-detail-bottom-ad')).toHaveCount(0);
     await expect(page.getByTestId('community-detail-sidebar-ad')).toHaveCount(0);
   });

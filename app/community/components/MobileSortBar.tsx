@@ -2,8 +2,8 @@
 
 import React from 'react';
 import { Loader2 } from 'lucide-react';
-import type { CommunityHubFilter, CommunityPostFormatFilter } from '@/app/types/community';
-import { buildCommunityListHref } from '../queryParams';
+import type { CommunityBoard } from '@/app/types/community';
+import { buildCommunityBoardListHref } from '../queryParams';
 import { usePendingNavigation } from '../hooks/usePendingNavigation';
 
 const SORT_OPTIONS = [
@@ -12,9 +12,7 @@ const SORT_OPTIONS = [
 ];
 
 interface MobileSortBarProps {
-    currentHub: CommunityHubFilter;
-    currentFormat: CommunityPostFormatFilter;
-    currentQuery: string;
+    currentBoard: CommunityBoard;
     currentSort: 'latest' | 'popular';
 }
 
@@ -22,28 +20,18 @@ interface MobileSortBarProps {
  * 모바일 전용 최신순/인기순 정렬 버튼
  * MobileWidgetStrip 아래, 피드 리스트 바로 위에 렌더
  */
-export default function MobileSortBar({ currentHub, currentFormat, currentQuery, currentSort }: MobileSortBarProps) {
+export default function MobileSortBar({ currentBoard, currentSort }: MobileSortBarProps) {
     const { navigate, pendingHref } = usePendingNavigation();
 
     const handleSort = (nextSort: 'latest' | 'popular') => {
-        navigate(buildCommunityListHref({
-            hub: currentHub,
-            format: currentFormat,
-            q: currentQuery,
-            sort: nextSort,
-        }));
+        navigate(buildCommunityBoardListHref({ board: currentBoard, sort: nextSort }));
     };
 
     return (
         <div className="lg:hidden mb-4">
             <div className="grid grid-cols-2 gap-2 rounded-full border border-[#E7E7E7] bg-white p-1 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
                 {SORT_OPTIONS.map((item) => {
-                    const href = buildCommunityListHref({
-                        hub: currentHub,
-                        format: currentFormat,
-                        q: currentQuery,
-                        sort: item.id,
-                    });
+                    const href = buildCommunityBoardListHref({ board: currentBoard, sort: item.id });
                     const isNavigating = pendingHref === href;
 
                     return (

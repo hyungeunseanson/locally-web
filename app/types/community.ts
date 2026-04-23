@@ -7,6 +7,7 @@ export type CommunityPostFormatFilter = CommunityPostFormat | 'all';
 export type CommunityHub = 'tokyo' | 'osaka_kyoto' | 'fukuoka' | 'jp_other' | 'seoul' | 'busan' | 'jeju';
 export type CommunityHubFilter = CommunityHub | 'all';
 export type CommunitySourceLocale = 'ko' | 'ja' | 'en' | 'zh';
+export type CommunityBoard = 'japan' | 'korea';
 export type CommunityProfilePreview = Pick<Profile, 'id' | 'avatar_url'> & {
     full_name?: string | null;
     name?: string | null;
@@ -19,6 +20,7 @@ export interface CommunityPost {
     post_format: CommunityPostFormat;
     destination_hub: CommunityHub | null;
     source_locale: CommunitySourceLocale;
+    board_country: CommunityBoard | null;
     title: string;
     content: string;
     images: string[];

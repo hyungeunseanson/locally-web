@@ -1,30 +1,31 @@
 import { expect, test } from '@playwright/test';
 
 import {
-  canUseLegacyCommunityFeedFallback,
-  resolvePublicCommunityFeedState,
+  buildCommunityBoardDetailHref,
+  buildCommunityBoardListHref,
+  resolvePublicCommunityBoardState,
 } from '../../app/community/queryParams';
 
-test.describe('Community paused runtime contract', () => {
-  test('forces public feed state to locally_content while community is paused', () => {
-    const state = resolvePublicCommunityFeedState({
-      hub: 'tokyo',
-      category: 'qna',
-      format: 'question',
-      q: 'tokyo, brunch',
+test.describe('Community board runtime contract', () => {
+  test('normalizes board feed state with safe defaults', () => {
+    const defaultState = resolvePublicCommunityBoardState({});
+    expect(defaultState.board).toBe('japan');
+    expect(defaultState.sort).toBe('latest');
+
+    const koreaState = resolvePublicCommunityBoardState({
+      board: 'korea',
       sort: 'popular',
     });
-
-    expect(state.hub).toBe('tokyo');
-    expect(state.category).toBe('locally_content');
-    expect(state.format).toBe('locally_pick');
-    expect(state.queryText).toBe('tokyo  brunch');
-    expect(state.sort).toBe('popular');
+    expect(koreaState.board).toBe('korea');
+    expect(koreaState.sort).toBe('popular');
   });
 
-  test('fails closed instead of widening scoped legacy fallback queries', () => {
-    expect(canUseLegacyCommunityFeedFallback('all')).toBe(true);
-    expect(canUseLegacyCommunityFeedFallback('tokyo')).toBe(false);
-    expect(canUseLegacyCommunityFeedFallback('seoul')).toBe(false);
+  test('builds stable board list/detail hrefs', () => {
+    expect(buildCommunityBoardListHref({ board: 'japan', sort: 'latest' })).toBe('/community');
+    expect(buildCommunityBoardListHref({ board: 'korea', sort: 'latest' })).toBe('/community?board=korea');
+    expect(buildCommunityBoardListHref({ board: 'korea', sort: 'popular' })).toBe('/community?board=korea&sort=popular');
+
+    expect(buildCommunityBoardDetailHref('post-1', { board: 'japan', sort: 'latest' })).toBe('/community/post-1');
+    expect(buildCommunityBoardDetailHref('post-1', { board: 'korea', sort: 'popular' })).toBe('/community/post-1?board=korea&sort=popular');
   });
 });

@@ -4,8 +4,31 @@ import {
   getCommunityCategoryFromFormat,
   getCommunityFormatFromCategory,
 } from './categoryMeta';
+import { inferCommunityBoardFromLegacyHub, resolveCommunityBoard } from './boardMeta';
 
 export const COMMUNITY_FEED_POST_SELECT = [
+  'id',
+  'user_id',
+  'category',
+  'post_format',
+  'destination_hub',
+  'source_locale',
+  'board_country',
+  'title',
+  'content',
+  'images',
+  'is_anonymous',
+  'companion_date',
+  'companion_city',
+  'linked_exp_id',
+  'view_count',
+  'like_count',
+  'comment_count',
+  'created_at',
+  'updated_at',
+].join(', ');
+
+export const COMMUNITY_FEED_POST_SELECT_PRE_BOARD = [
   'id',
   'user_id',
   'category',
@@ -58,6 +81,7 @@ export type CommunityFeedPostRow = Pick<
   | 'post_format'
   | 'destination_hub'
   | 'source_locale'
+  | 'board_country'
   | 'title'
   | 'content'
   | 'images'
@@ -126,6 +150,7 @@ export function normalizeCommunityFeedPostRow(
     post_format: normalizedFormat,
     destination_hub: normalizeCommunityHub(post.destination_hub),
     source_locale: normalizeCommunityLocale(post.source_locale),
+    board_country: normalizeCommunityBoard(post.board_country, post.destination_hub),
     title: post.title,
     content: post.content,
     images: Array.isArray(post.images) ? post.images : [],
@@ -162,6 +187,11 @@ function normalizeCommunityLocale(value: unknown): CommunityPost['source_locale'
   return 'ko';
 }
 
+function normalizeCommunityBoard(value: unknown, legacyHub: unknown): CommunityPost['board_country'] {
+  if (value === 'japan' || value === 'korea') return value;
+  return inferCommunityBoardFromLegacyHub(legacyHub);
+}
+
 function normalizeCommunityPostFormat(value: unknown, category: CommunityPost['category']): CommunityPost['post_format'] {
   if (value === 'question' || value === 'companion' || value === 'live_tip' || value === 'locally_pick') {
     return value;
@@ -183,6 +213,7 @@ export function createCommunityInsertPayload(input: {
   destinationHub?: CommunityPost['destination_hub'];
   postFormat?: CommunityPost['post_format'];
   sourceLocale?: CommunityPost['source_locale'];
+  boardCountry?: CommunityPost['board_country'];
 }) {
   const postFormat = normalizeCommunityPostFormat(input.postFormat, input.category);
 
@@ -192,6 +223,7 @@ export function createCommunityInsertPayload(input: {
     post_format: postFormat,
     destination_hub: normalizeCommunityHub(input.destinationHub),
     source_locale: normalizeCommunityLocale(input.sourceLocale),
+    board_country: input.boardCountry ? resolveCommunityBoard(input.boardCountry) : null,
     title: input.title,
     content: input.content,
     images: input.images,

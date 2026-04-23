@@ -7,7 +7,8 @@ import {
   pickLatestPublicHostApplicationsByUser,
 } from '@/app/utils/hostVisibility';
 import { buildAbsoluteUrl } from '@/app/utils/siteUrl';
-import { COMMUNITY_OPEN } from '@/app/community/categoryMeta';
+import { isMissingCommunityBoardColumnError } from '@/app/community/anonymousColumn';
+import { inferCommunityBoardFromLegacyHub } from '@/app/community/boardMeta';
 
 // 1시간 캐시: 매 크롤러 요청마다 DB 조회하지 않도록
 export const revalidate = 3600;
@@ -142,28 +143,32 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     const supabase = createAdminClient();
 
-    const [{ data: experiences }, { data: communityPosts }, { data: publicHosts }] = await Promise.all([
+    const [{ data: experiences }, communityPostsResult, { data: publicHosts }] = await Promise.all([
       supabase
         .from('experiences')
         .select('id, host_id, updated_at, is_active')
         .eq('status', 'active'),
-      (() => {
-        let query = supabase
-          .from('community_posts')
-          .select('id, category, created_at, updated_at')
-          .order('created_at', { ascending: false });
-
-        if (!COMMUNITY_OPEN) {
-          query = query.eq('category', 'locally_content');
-        }
-
-        return query;
-      })(),
+      supabase
+        .from('community_posts')
+        .select('id, category, board_country, destination_hub, created_at, updated_at')
+        .order('created_at', { ascending: false }),
       supabase
         .from('public_host_applications')
         .select('id, user_id, status, created_at')
         .order('created_at', { ascending: false }),
     ]);
+
+    let communityPosts = communityPostsResult.data ?? [];
+    if (communityPostsResult.error && isMissingCommunityBoardColumnError(communityPostsResult.error)) {
+      const fallbackResult = await supabase
+        .from('community_posts')
+        .select('id, category, destination_hub, created_at, updated_at')
+        .order('created_at', { ascending: false });
+      communityPosts = (fallbackResult.data ?? []).map((post) => ({
+        ...post,
+        board_country: null,
+      }));
+    }
 
     const latestPublicHosts = Array.from(
       pickLatestPublicHostApplicationsByUser(publicHosts || []).values()
@@ -183,12 +188,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.9,
       }));
 
-    const communityUrls: MetadataRoute.Sitemap = (communityPosts || []).map((post) => ({
-      url: buildAbsoluteUrl(`/community/${post.id}`),
-      lastModified: new Date(post.updated_at || post.created_at || new Date()),
-      changeFrequency: 'weekly',
-      priority: 0.7,
-    }));
+    const communityUrls: MetadataRoute.Sitemap = (communityPosts || [])
+      .filter((post) => {
+        const inferredBoard = post.board_country ?? inferCommunityBoardFromLegacyHub(post.destination_hub);
+        return post.category === 'locally_content' || inferredBoard === 'japan' || inferredBoard === 'korea';
+      })
+      .map((post) => ({
+        url: buildAbsoluteUrl(`/community/${post.id}`),
+        lastModified: new Date(post.updated_at || post.created_at || new Date()),
+        changeFrequency: 'weekly',
+        priority: 0.7,
+      }));
 
     const publicHostUrls: MetadataRoute.Sitemap = latestPublicHosts
       .filter((host) => host.user_id && isPublicHostApplicationStatus(host.status))

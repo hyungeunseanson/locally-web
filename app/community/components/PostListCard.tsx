@@ -6,19 +6,15 @@
 import React from 'react';
 import { MessageSquare, Heart, Eye, Loader2 } from 'lucide-react';
 import type { CommunityFeedPost } from '../feedSelect';
-import { getCommunityCategoryMeta } from '../categoryMeta';
 import { getCommunityAuthorName } from '../authorDisplay';
 import CommunityAuthorTrigger from './CommunityAuthorTrigger';
-import type { CommunityHubFilter, CommunityPostFormatFilter } from '@/app/types/community';
-import { buildCommunityDetailHref } from '../queryParams';
-import { getCommunityHubMeta } from '../hubMeta';
+import type { CommunityBoard } from '@/app/types/community';
+import { buildCommunityBoardDetailHref } from '../queryParams';
 import { usePendingNavigation } from '../hooks/usePendingNavigation';
 
 interface PostListCardProps {
     post: CommunityFeedPost;
-    hub: CommunityHubFilter;
-    format: CommunityPostFormatFilter;
-    query: string;
+    board: CommunityBoard;
     sort: 'latest' | 'popular';
 }
 
@@ -35,19 +31,11 @@ const getTimeAgo = (dateStr: string) => {
     }
 };
 
-export default function PostListCard({ post, hub, format, query, sort }: PostListCardProps) {
-    const badge = getCommunityCategoryMeta(post.category);
+export default function PostListCard({ post, board, sort }: PostListCardProps) {
     const thumbnail = post.images?.[0] ?? null;
-    const hasCompanionDate = post.category === 'companion' && post.companion_date;
     const authorName = getCommunityAuthorName(post.profiles, post.is_anonymous);
     const { navigate, pendingHref } = usePendingNavigation();
-    const href = buildCommunityDetailHref(post.id, {
-        hub,
-        format,
-        category: post.category,
-        q: query,
-        sort,
-    });
+    const href = buildCommunityBoardDetailHref(post.id, { board, sort });
     const isNavigating = pendingHref === href;
 
     return (
@@ -83,28 +71,7 @@ export default function PostListCard({ post, hub, format, query, sort }: PostLis
                 )}
 
                 <div className="min-w-0 flex-1">
-                    <div className="mb-2 flex flex-wrap items-center gap-1.5">
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${badge.badgeClassName}`}>
-                            {badge.shortLabel}
-                        </span>
-                        {post.companion_city && (
-                            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-500 break-words [overflow-wrap:anywhere]">
-                                📍 {post.companion_city}
-                            </span>
-                        )}
-                        {post.destination_hub && (
-                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 break-words [overflow-wrap:anywhere]">
-                                {getCommunityHubMeta(post.destination_hub).shortLabel}
-                            </span>
-                        )}
-                        {hasCompanionDate && (
-                            <span className="text-[10px] font-semibold text-gray-400 break-words [overflow-wrap:anywhere]">
-                                {post.companion_date}
-                            </span>
-                        )}
-                    </div>
-
-                    <p className="mb-2 line-clamp-2 break-words text-[14px] font-semibold leading-snug text-gray-900 [overflow-wrap:anywhere]">
+                    <p className="mb-2 line-clamp-2 break-words text-[14px] font-semibold leading-snug text-gray-900 [overflow-wrap:anywhere] md:text-[15px]">
                         {post.title}
                     </p>
 

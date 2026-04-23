@@ -3,7 +3,9 @@ import {
   getCommunityCategoryFromFormat,
   getCommunityFormatFromCategory,
 } from './categoryMeta';
+import { resolveCommunityBoard } from './boardMeta';
 import type {
+  CommunityBoard,
   CommunityCategory,
   CommunityHub,
   CommunityHubFilter,
@@ -12,6 +14,10 @@ import type {
 } from '@/app/types/community';
 
 export type CommunitySort = 'latest' | 'popular';
+export type PublicCommunityBoardState = {
+  board: CommunityBoard;
+  sort: CommunitySort;
+};
 export type PublicCommunityFeedState = {
   hub: CommunityHubFilter;
   requestedCategory: CommunityCategory | 'all';
@@ -57,6 +63,16 @@ export function resolveCommunitySort(value: string | null | undefined): Communit
   return value === 'popular' ? 'popular' : 'latest';
 }
 
+export function resolvePublicCommunityBoardState(input: {
+  board?: string | null | undefined;
+  sort?: string | null | undefined;
+}): PublicCommunityBoardState {
+  return {
+    board: resolveCommunityBoard(input.board),
+    sort: resolveCommunitySort(input.sort),
+  };
+}
+
 export function resolvePublicCommunityFeedState(input: {
   hub?: string | null | undefined;
   format?: string | null | undefined;
@@ -90,6 +106,41 @@ export function resolvePublicCommunityFeedState(input: {
 
 export function canUseLegacyCommunityFeedFallback(hub: CommunityHubFilter): boolean {
   return hub === 'all';
+}
+
+export function buildCommunityBoardSearchParams(input: {
+  board?: CommunityBoard;
+  sort?: CommunitySort;
+}) {
+  const params = new URLSearchParams();
+  const board = resolveCommunityBoard(input.board);
+  const sort = input.sort ?? 'latest';
+
+  if (board !== 'japan') params.set('board', board);
+  if (sort !== 'latest') params.set('sort', sort);
+
+  return params;
+}
+
+export function buildCommunityBoardListHref(input: {
+  board?: CommunityBoard;
+  sort?: CommunitySort;
+}) {
+  const params = buildCommunityBoardSearchParams(input);
+  const queryString = params.toString();
+  return queryString ? `/community?${queryString}` : '/community';
+}
+
+export function buildCommunityBoardDetailHref(
+  postId: string,
+  input: {
+    board?: CommunityBoard;
+    sort?: CommunitySort;
+  }
+) {
+  const params = buildCommunityBoardSearchParams(input);
+  const queryString = params.toString();
+  return queryString ? `/community/${postId}?${queryString}` : `/community/${postId}`;
 }
 
 export function buildCommunitySearchParams(input: {

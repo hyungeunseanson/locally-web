@@ -133,31 +133,54 @@ async function createExperienceFixture(hostId: string) {
   return data;
 }
 
-async function createCommunityPost(
+async function createBoardPost(
   authorId: string,
+  board: 'japan' | 'korea',
   linkedExpId: number | null,
-  options?: { category?: 'qna' | 'locally_content'; title?: string }
+  title: string
 ) {
   const supabase = getAdminClient();
+  const basePayload = {
+    user_id: authorId,
+    category: 'qna',
+    post_format: 'question',
+    title,
+    content: `${title} 내용입니다.`,
+    images: [],
+    linked_exp_id: linkedExpId,
+    source_locale: 'ko',
+  };
+
   const { data, error } = await supabase
     .from('community_posts')
     .insert({
-      user_id: authorId,
-      category: options?.category || 'locally_content',
-      title: options?.title || `[Playwright] Community Feed Contract ${Date.now()}`,
-      content: '커뮤니티 목록 계약 검증용 게시글입니다.',
-      images: [],
-      linked_exp_id: linkedExpId,
+      ...basePayload,
+      board_country: board,
+      destination_hub: null,
     })
     .select('id,title')
     .single();
 
-  if (error || !data?.id) {
-    throw error || new Error('Failed to create community feed post fixture.');
+  if (!error && data?.id) {
+    createdPostIds.push(data.id);
+    return data;
   }
 
-  createdPostIds.push(data.id);
-  return data;
+  const fallback = await supabase
+    .from('community_posts')
+    .insert({
+      ...basePayload,
+      destination_hub: board === 'japan' ? 'tokyo' : 'seoul',
+    })
+    .select('id,title')
+    .single();
+
+  if (fallback.error || !fallback.data?.id) {
+    throw fallback.error || error || new Error('Failed to create board community post fixture.');
+  }
+
+  createdPostIds.push(fallback.data.id);
+  return fallback.data;
 }
 
 test.afterAll(async () => {
@@ -178,16 +201,19 @@ test.afterAll(async () => {
   }
 });
 
-test.describe.serial('Community feed response contract', () => {
-  test('returns mapped profile and linked experience data for feed cards', async ({ request }) => {
+test.describe.serial('Community board feed response contract', () => {
+  test('returns mapped profile and linked experience data for board feed cards', async ({ request }) => {
     const author = createUser('author');
     const authorId = await createAuthUser(author);
     const experience = await createExperienceFixture(authorId);
-    const post = await createCommunityPost(authorId, Number(experience.id), {
-      category: 'locally_content',
-    });
+    const post = await createBoardPost(
+      authorId,
+      'japan',
+      Number(experience.id),
+      `[Playwright] Community Board Feed ${Date.now()}`
+    );
 
-    const response = await request.get(`/api/community?q=${encodeURIComponent(post.title)}`);
+    const response = await request.get('/api/community');
     expect(response.ok()).toBeTruthy();
 
     const payload = await response.json();
@@ -207,30 +233,29 @@ test.describe.serial('Community feed response contract', () => {
     expect(matchedPost).toHaveProperty('profiles');
   });
 
-  test('keeps paused community feed scoped to locally_content even when legacy forum params are requested', async ({ request }) => {
-    const author = createUser('paused');
+  test('scopes board feeds so japan and korea posts do not mix', async ({ request }) => {
+    const author = createUser('boards');
     const authorId = await createAuthUser(author);
     const token = `${Date.now()}`;
-    const contentPost = await createCommunityPost(authorId, null, {
-      category: 'locally_content',
-      title: `[Playwright] Community Paused Content ${token}`,
-    });
-    const qnaPost = await createCommunityPost(authorId, null, {
-      category: 'qna',
-      title: `[Playwright] Community Paused Qna ${token}`,
-    });
+    const japanPost = await createBoardPost(authorId, 'japan', null, `[Playwright] Community Japan ${token}`);
+    const koreaPost = await createBoardPost(authorId, 'korea', null, `[Playwright] Community Korea ${token}`);
 
-    const response = await request.get(
-      `/api/community?category=qna&format=question&q=${encodeURIComponent(token)}`
-    );
-    expect(response.ok()).toBeTruthy();
-
-    const payload = await response.json();
-    const returnedIds = Array.isArray(payload.data)
-      ? payload.data.map((entry: { id?: string }) => entry.id)
+    const japanResponse = await request.get('/api/community');
+    expect(japanResponse.ok()).toBeTruthy();
+    const japanPayload = await japanResponse.json();
+    const japanReturnedIds = Array.isArray(japanPayload.data)
+      ? japanPayload.data.map((entry: { id?: string }) => entry.id)
       : [];
+    expect(japanReturnedIds).toContain(japanPost.id);
+    expect(japanReturnedIds).not.toContain(koreaPost.id);
 
-    expect(returnedIds).toContain(contentPost.id);
-    expect(returnedIds).not.toContain(qnaPost.id);
+    const koreaResponse = await request.get('/api/community?board=korea');
+    expect(koreaResponse.ok()).toBeTruthy();
+    const koreaPayload = await koreaResponse.json();
+    const koreaReturnedIds = Array.isArray(koreaPayload.data)
+      ? koreaPayload.data.map((entry: { id?: string }) => entry.id)
+      : [];
+    expect(koreaReturnedIds).toContain(koreaPost.id);
+    expect(koreaReturnedIds).not.toContain(japanPost.id);
   });
 });

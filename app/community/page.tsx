@@ -1,458 +1,283 @@
 import React from 'react';
 import { Metadata } from 'next';
 import Link from 'next/link';
-import { Edit3, MessageCircle } from 'lucide-react';
+import { Edit3 } from 'lucide-react';
 
 import { createClient } from '@/app/utils/supabase/server';
 import { getCurrentLocale } from '@/app/utils/locale';
 import { buildLocalizedAbsoluteUrl } from '@/app/utils/siteUrl';
-import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import SiteHeader from '@/app/components/SiteHeader';
-import type { CommunityCategory, CommunityHubFilter } from '@/app/types/community';
-import CommunityCategoryTabs from './components/CommunityCategoryTabs';
+import type { CommunityBoard } from '@/app/types/community';
 import CommunityFeed from './CommunityFeed';
-import RightSidebar from './components/RightSidebar';
-import MobileWidgetStrip from './components/MobileWidgetStrip';
-import MobileSortBar from './components/MobileSortBar';
-import CommunitySearchControls from './components/CommunitySearchControls';
-import CommunityHubTabs from './components/CommunityHubTabs';
 import CommunityAdSlot from './components/CommunityAdSlot';
-import { COMMUNITY_OPEN, getCommunityCategoryFromFormat, getCommunityFormatFromCategory, getCommunityFormatMeta } from './categoryMeta';
-import { getCommunityHubMeta } from './hubMeta';
+import CommunityBoardTabs from './components/CommunityBoardTabs';
+import MobileSortBar from './components/MobileSortBar';
+import { getCommunityBoardLabel, getCommunityBoardPageTitle, getLegacyHubSeedForBoard } from './boardMeta';
 import {
-    buildCommunityFeedPosts,
-    COMMUNITY_FEED_EXPERIENCE_SELECT,
-    COMMUNITY_FEED_POST_SELECT,
-    COMMUNITY_FEED_POST_SELECT_LEGACY,
-    COMMUNITY_FEED_PROFILE_SELECT,
-    normalizeCommunityFeedPostRow,
-    type CommunityFeedExperience,
-    type CommunityFeedPost,
-    type CommunityFeedPostRow,
-    type CommunityFeedProfile,
+  buildCommunityFeedPosts,
+  COMMUNITY_FEED_EXPERIENCE_SELECT,
+  COMMUNITY_FEED_POST_SELECT,
+  COMMUNITY_FEED_POST_SELECT_LEGACY,
+  COMMUNITY_FEED_POST_SELECT_PRE_BOARD,
+  COMMUNITY_FEED_PROFILE_SELECT,
+  normalizeCommunityFeedPostRow,
+  type CommunityFeedExperience,
+  type CommunityFeedPostRow,
+  type CommunityFeedProfile,
 } from './feedSelect';
-import { isMissingAnonymousColumnError, isMissingCommunityModelColumnError } from './anonymousColumn';
 import {
-    canUseLegacyCommunityFeedFallback,
-    resolvePublicCommunityFeedState,
-} from './queryParams';
-import type { CommunityHighlightPost } from './highlights';
+  isMissingAnonymousColumnError,
+  isMissingCommunityBoardColumnError,
+  isMissingCommunityModelColumnError,
+} from './anonymousColumn';
+import { resolvePublicCommunityBoardState, type CommunitySort } from './queryParams';
 
-const COMMUNITY_HIGHLIGHT_SELECT = 'id, category, post_format, destination_hub, title, created_at';
-const COMMUNITY_HIGHLIGHT_SELECT_LEGACY = 'id, category, title, created_at';
-
-export const dynamic = 'force-dynamic';
+const PAGE_LIMIT = 15;
 
 type SearchParamMap = { [key: string]: string | string[] | undefined };
 
-function normalizeHighlightPost(post: {
-    id: string;
-    category: CommunityCategory;
-    post_format?: CommunityHighlightPost['post_format'];
-    destination_hub?: CommunityHighlightPost['destination_hub'];
-    title: string;
-    created_at: string;
-}): CommunityHighlightPost {
-    return {
-        id: post.id,
-        title: post.title,
-        category: post.category,
-        post_format: post.post_format || getCommunityFormatFromCategory(post.category),
-        destination_hub: post.destination_hub ?? null,
-        created_at: post.created_at,
-    };
+export const dynamic = 'force-dynamic';
+
+function buildBoardCanonicalPath(board: CommunityBoard) {
+  return board === 'japan' ? '/community' : `/community?board=${board}`;
 }
 
 export async function generateMetadata({ searchParams }: { searchParams: Promise<SearchParamMap> }): Promise<Metadata> {
-    const params = await searchParams;
-    const locale = await getCurrentLocale();
-    const { hub: currentHub, format: currentFormat } = resolvePublicCommunityFeedState({
-        hub: params?.hub as string,
-        category: params?.category as string,
-        format: params?.format as string,
-    });
+  const params = await searchParams;
+  const locale = await getCurrentLocale();
+  const { board } = resolvePublicCommunityBoardState({
+    board: params?.board as string,
+    sort: params?.sort as string,
+  });
+  const boardLabel = getCommunityBoardLabel(board, locale);
+  const title = `${boardLabel} | ${getCommunityBoardPageTitle(locale)} | Locally`;
+  const description = `${boardLabel} 정보를 나누는 Locally 커뮤니티 게시판입니다.`;
+  const canonicalPath = buildBoardCanonicalPath(board);
+  const canonicalUrl = buildLocalizedAbsoluteUrl(locale, canonicalPath);
 
-    const hubTitle = currentHub !== 'all' ? getCommunityHubMeta(currentHub).label : '';
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      url: canonicalUrl,
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+    },
+    alternates: {
+      canonical: canonicalUrl,
+      languages: {
+        ko: buildLocalizedAbsoluteUrl('ko', canonicalPath),
+        en: buildLocalizedAbsoluteUrl('en', canonicalPath),
+        ja: buildLocalizedAbsoluteUrl('ja', canonicalPath),
+        zh: buildLocalizedAbsoluteUrl('zh', canonicalPath),
+      },
+    },
+  };
+}
 
-    let title: string;
-    let description: string;
+async function fetchBoardPosts({
+  supabase,
+  board,
+  sort,
+  offset = 0,
+  limit = PAGE_LIMIT,
+}: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  board: CommunityBoard;
+  sort: CommunitySort;
+  offset?: number;
+  limit?: number;
+}) {
+  const buildQuery = (selectClause: string, useLegacyBoardFallback = false) => {
+    let query = supabase
+      .from('community_posts')
+      .select(selectClause)
+      .range(offset, offset + limit - 1);
 
-    if (!COMMUNITY_OPEN) {
-        title = hubTitle
-            ? `${hubTitle} 로컬리 콘텐츠`
-            : '로컬리 콘텐츠';
-        description = hubTitle
-            ? `${hubTitle} 여행에 대한 Locally 오리지널 콘텐츠 — 루트, 맛집, 현지 추천 정보를 확인하세요.`
-            : '로컬이 직접 정리한 여행 콘텐츠 — 루트, 맛집, 현지 추천 정보를 확인하세요.';
+    if (useLegacyBoardFallback) {
+      query = query
+        .eq('category', 'qna')
+        .eq('destination_hub', getLegacyHubSeedForBoard(board));
     } else {
-        const formatTitle = currentFormat !== 'all' ? getCommunityFormatMeta(currentFormat).label : '커뮤니티';
-        title = hubTitle
-            ? `${hubTitle} ${formatTitle} - 커뮤니티`
-            : currentFormat === 'all'
-                ? '커뮤니티'
-                : `${formatTitle} - 커뮤니티`;
-        description = hubTitle
-            ? `${hubTitle} 여행자들이 묻고 답하는 Locally 도시 허브 커뮤니티`
-            : '여행자들이 도시별 질문, 동행, 여행 꿀팁을 이어보는 Locally 커뮤니티';
+      query = query.eq('board_country', board);
     }
-    const canonicalPath = '/community';
-    const canonicalUrl = buildLocalizedAbsoluteUrl(locale, canonicalPath);
 
-    return {
-        title,
-        description,
-        openGraph: {
-            title,
-            description,
-            url: canonicalUrl,
-            type: 'website',
-        },
-        twitter: {
-            card: 'summary_large_image',
-            title,
-            description,
-        },
-        alternates: {
-            canonical: canonicalUrl,
-            languages: {
-                ko: buildLocalizedAbsoluteUrl('ko', canonicalPath),
-                en: buildLocalizedAbsoluteUrl('en', canonicalPath),
-                ja: buildLocalizedAbsoluteUrl('ja', canonicalPath),
-                zh: buildLocalizedAbsoluteUrl('zh', canonicalPath),
-            },
-        },
-    };
+    if (sort === 'popular') {
+      query = query
+        .order('like_count', { ascending: false })
+        .order('comment_count', { ascending: false })
+        .order('created_at', { ascending: false });
+    } else {
+      query = query.order('created_at', { ascending: false });
+    }
+
+    return query;
+  };
+
+  const initialResult = await buildQuery(COMMUNITY_FEED_POST_SELECT);
+  let postsError = initialResult.error;
+  let postsData = (initialResult.data ?? null) as CommunityFeedPostRow[] | null;
+
+  if (postsError && isMissingCommunityBoardColumnError(postsError)) {
+    const preBoardResult = await buildQuery(COMMUNITY_FEED_POST_SELECT_PRE_BOARD, true);
+    postsError = preBoardResult.error;
+    postsData = (preBoardResult.data ?? null) as CommunityFeedPostRow[] | null;
+  }
+
+  if (postsError && (isMissingAnonymousColumnError(postsError) || isMissingCommunityModelColumnError(postsError))) {
+    const legacyResult = await buildQuery(COMMUNITY_FEED_POST_SELECT_LEGACY, true);
+    postsError = legacyResult.error;
+    postsData = ((legacyResult.data ?? []) as CommunityFeedPostRow[]).map((post) =>
+      normalizeCommunityFeedPostRow({
+        ...post,
+        is_anonymous: false,
+      })
+    );
+  }
+
+  if (postsError) {
+    console.error('[CommunityPage] feed query failed:', postsError);
+    return { data: [], nextOffset: null };
+  }
+
+  const typedPosts = (postsData ?? []).map((post) => normalizeCommunityFeedPostRow(post));
+  if (typedPosts.length === 0) {
+    return { data: [], nextOffset: null };
+  }
+
+  const userIds = [...new Set(typedPosts.filter((post) => !post.is_anonymous).map((post) => post.user_id))];
+  let typedProfiles: CommunityFeedProfile[] = [];
+  if (userIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select(COMMUNITY_FEED_PROFILE_SELECT)
+      .in('id', userIds);
+    typedProfiles = (profiles ?? []) as CommunityFeedProfile[];
+  }
+
+  const expIds = [...new Set(typedPosts.map((post) => post.linked_exp_id).filter((value): value is number => typeof value === 'number'))];
+  let typedExperiences: CommunityFeedExperience[] = [];
+  if (expIds.length > 0) {
+    const { data: experiences } = await supabase
+      .from('experiences')
+      .select(COMMUNITY_FEED_EXPERIENCE_SELECT)
+      .in('id', expIds);
+    typedExperiences = (experiences ?? []) as CommunityFeedExperience[];
+  }
+
+  return {
+    data: buildCommunityFeedPosts(typedPosts, typedProfiles, typedExperiences),
+    nextOffset: typedPosts.length === limit ? offset + limit : null,
+  };
 }
 
 export default async function CommunityPage({ searchParams }: { searchParams: Promise<SearchParamMap> }) {
-    const supabase = await createClient();
-    const params = await searchParams;
-    const { data: { user } } = await supabase.auth.getUser();
+  const supabase = await createClient();
+  const params = await searchParams;
+  const locale = await getCurrentLocale();
+  const { data: { user } } = await supabase.auth.getUser();
+  const { board, sort } = resolvePublicCommunityBoardState({
+    board: params?.board as string,
+    sort: params?.sort as string,
+  });
+  const boardLabel = getCommunityBoardLabel(board, locale);
+  const { data: initialData, nextOffset: initialNextOffset } = await fetchBoardPosts({
+    supabase,
+    board,
+    sort,
+  });
+  const canWrite = Boolean(user);
+  const writeHref = `/community/write?board=${board}`;
 
-    const {
-        category: currentCategory,
-        format: currentFormat,
-        hub: currentHub,
-        queryText,
-        sort,
-    } = resolvePublicCommunityFeedState({
-        hub: params?.hub as string,
-        category: params?.category as string,
-        format: params?.format as string,
-        q: params?.q as string,
-        sort: params?.sort as string,
-    });
-    const limit = 15;
+  return (
+    <>
+      <SiteHeader />
+      <div className="min-h-screen bg-[#F7F7F9]">
+        <div className="mx-auto max-w-4xl px-4 py-8">
+          <div className="mb-4 rounded-[28px] border border-slate-200 bg-white px-5 py-6 shadow-sm md:px-7">
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Community</p>
+            <h1 className="mt-2 text-[22px] font-black text-slate-900 md:text-[28px]">{boardLabel}</h1>
+            <p className="mt-2 text-[13px] leading-6 text-slate-500 md:text-[14px]">
+              여행자들이 정보를 나누고 질문을 남기는 단순 게시판입니다.
+            </p>
+          </div>
 
-    const buildPostsQuery = ({
-        selectClause,
-        category,
-        hub,
-        q,
-        sortMode,
-        offset = 0,
-        queryLimit = limit,
-    }: {
-        selectClause: string;
-        category: CommunityCategory | 'all';
-        hub: CommunityHubFilter;
-        q: string;
-        sortMode: 'latest' | 'popular';
-        offset?: number;
-        queryLimit?: number;
-    }) => {
-        let query = supabase
-            .from('community_posts')
-            .select(selectClause)
-            .range(offset, offset + queryLimit - 1);
+          <div className="mb-4">
+            <CommunityBoardTabs />
+          </div>
 
-        if (category !== 'all') {
-            query = query.eq('category', category);
-        }
+          <div className="mb-4 hidden md:flex items-center justify-between gap-3">
+            <div />
+            <div className="grid grid-cols-2 gap-2 rounded-full border border-[#E7E7E7] bg-white p-1 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+              {[
+                { id: 'latest' as const, label: '최신순' },
+                { id: 'popular' as const, label: '인기순' },
+              ].map((item) => {
+                const href = item.id === 'latest'
+                  ? (board === 'japan' ? '/community' : `/community?board=${board}`)
+                  : `${board === 'japan' ? '/community' : `/community?board=${board}`}${board === 'japan' ? '?' : '&'}sort=popular`;
 
-        if (hub !== 'all') {
-            query = query.eq('destination_hub', hub);
-        }
-
-        if (q) {
-            query = query.or(`title.ilike.%${q}%,content.ilike.%${q}%`);
-        }
-
-        if (sortMode === 'popular') {
-            query = query
-                .order('like_count', { ascending: false })
-                .order('comment_count', { ascending: false })
-                .order('created_at', { ascending: false });
-        } else {
-            query = query.order('created_at', { ascending: false });
-        }
-
-        return query;
-    };
-
-    const initialResult = await buildPostsQuery({
-        selectClause: COMMUNITY_FEED_POST_SELECT,
-        category: currentCategory,
-        hub: currentHub,
-        q: queryText,
-        sortMode: sort,
-    });
-
-    let postsError = initialResult.error;
-    let postsData = (initialResult.data ?? null) as unknown as CommunityFeedPostRow[] | null;
-
-    if (postsError && (isMissingAnonymousColumnError(postsError) || isMissingCommunityModelColumnError(postsError))) {
-        if (!canUseLegacyCommunityFeedFallback(currentHub)) {
-            postsData = [];
-            postsError = null;
-        } else {
-            const legacyResult = await buildPostsQuery({
-                selectClause: COMMUNITY_FEED_POST_SELECT_LEGACY,
-                category: currentCategory,
-                hub: currentHub,
-                q: queryText,
-                sortMode: sort,
-            });
-            postsData = ((legacyResult.data ?? []) as unknown as CommunityFeedPostRow[]).map((post) => normalizeCommunityFeedPostRow({
-                ...post,
-                is_anonymous: false,
-            }));
-            postsError = legacyResult.error;
-        }
-    }
-
-    if (postsError) {
-        console.error('[CommunityPage] feed query failed:', postsError);
-    }
-
-    const typedPosts = (postsData ?? []).map((post) => normalizeCommunityFeedPostRow(post));
-
-    let initialData: CommunityFeedPost[] = [];
-    if (typedPosts.length > 0) {
-        const userIds = [...new Set(typedPosts.filter((post) => !post.is_anonymous).map((post) => post.user_id))];
-        let typedProfiles: CommunityFeedProfile[] = [];
-        if (userIds.length > 0) {
-            const { data: profiles } = await supabase
-                .from('profiles')
-                .select(COMMUNITY_FEED_PROFILE_SELECT)
-                .in('id', userIds);
-            typedProfiles = profiles ?? [];
-        }
-
-        const expIds = [...new Set(typedPosts.map((post) => post.linked_exp_id).filter((value): value is number => typeof value === 'number'))];
-        let typedExperiences: CommunityFeedExperience[] = [];
-        if (expIds.length > 0) {
-            const { data: experiences } = await supabase
-                .from('experiences')
-                .select(COMMUNITY_FEED_EXPERIENCE_SELECT)
-                .in('id', expIds);
-            typedExperiences = experiences ?? [];
-        }
-
-        initialData = buildCommunityFeedPosts(typedPosts, typedProfiles, typedExperiences);
-    }
-
-    const initialNextOffset = typedPosts.length === limit ? limit : null;
-
-    const fetchHighlightPosts = async ({
-        category,
-        sortMode,
-    }: {
-        category: CommunityCategory;
-        sortMode: 'latest' | 'popular';
-    }): Promise<CommunityHighlightPost[]> => {
-        const result = await buildPostsQuery({
-            selectClause: COMMUNITY_HIGHLIGHT_SELECT,
-            category,
-            hub: currentHub,
-            q: '',
-            sortMode,
-            queryLimit: 3,
-        });
-
-        if (!result.error) {
-            return ((result.data ?? []) as unknown as Array<{
-                id: string;
-                category: CommunityCategory;
-                post_format?: CommunityHighlightPost['post_format'];
-                destination_hub?: CommunityHighlightPost['destination_hub'];
-                title: string;
-                created_at: string;
-            }>).map((post) => normalizeHighlightPost(post));
-        }
-
-        if (!(isMissingAnonymousColumnError(result.error) || isMissingCommunityModelColumnError(result.error))) {
-            console.error('[CommunityPage] highlight query failed:', result.error);
-            return [];
-        }
-
-        if (!canUseLegacyCommunityFeedFallback(currentHub)) {
-            return [];
-        }
-
-        const legacyResult = await buildPostsQuery({
-            selectClause: COMMUNITY_HIGHLIGHT_SELECT_LEGACY,
-            category,
-            hub: currentHub,
-            q: '',
-            sortMode,
-            queryLimit: 3,
-        });
-
-        if (legacyResult.error) {
-            console.error('[CommunityPage] legacy highlight query failed:', legacyResult.error);
-            return [];
-        }
-
-        return ((legacyResult.data ?? []) as unknown as Array<{
-            id: string;
-            category: CommunityCategory;
-            title: string;
-            created_at: string;
-        }>).map((post) => normalizeHighlightPost(post));
-    };
-
-    let weeklyQuestions: CommunityHighlightPost[] = [];
-    let companionPulse: CommunityHighlightPost[] = [];
-    let locallyPicks: CommunityHighlightPost[] = [];
-    if (!queryText) {
-        if (COMMUNITY_OPEN) {
-            [weeklyQuestions, companionPulse, locallyPicks] = await Promise.all([
-                fetchHighlightPosts({ category: 'qna', sortMode: 'popular' }),
-                fetchHighlightPosts({ category: 'companion', sortMode: 'latest' }),
-                fetchHighlightPosts({ category: 'locally_content', sortMode: 'latest' }),
-            ]);
-        } else {
-            locallyPicks = await fetchHighlightPosts({ category: 'locally_content', sortMode: 'latest' });
-        }
-    }
-
-    let canWriteLocallyContent = false;
-    if (user) {
-        const adminAccess = await resolveAdminAccess(supabase, {
-            userId: user.id,
-            email: user.email,
-        });
-        canWriteLocallyContent = adminAccess.isAdmin;
-    }
-
-    const writeCategory = currentFormat === 'all'
-        ? (currentCategory === 'all' ? 'qna' : currentCategory)
-        : getCommunityCategoryFromFormat(currentFormat);
-    const showFloatingWriteCta = COMMUNITY_OPEN
-        ? (writeCategory !== 'locally_content' || canWriteLocallyContent)
-        : canWriteLocallyContent;
-    const showContentAds = !COMMUNITY_OPEN;
-    const writeParams = new URLSearchParams();
-    writeParams.set('category', writeCategory);
-    if (currentHub !== 'all') writeParams.set('hub', currentHub);
-    if (currentFormat !== 'all') writeParams.set('format', currentFormat);
-    const writeHref = `/community/write?${writeParams.toString()}`;
-
-    return (
-        <>
-            <SiteHeader />
-            <div className="min-h-screen bg-[#F7F7F9]">
-                <div className="max-w-7xl mx-auto px-4 py-8">
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                        <div className="col-span-1 lg:col-span-8">
-                            <div className="mb-4">
-                                <CommunityHubTabs />
-                            </div>
-
-                            {!COMMUNITY_OPEN && (
-                                <div className="mb-4 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 md:px-5 md:py-4 shadow-sm">
-                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 md:h-10 md:w-10">
-                                        <MessageCircle size={18} className="text-slate-500" />
-                                    </div>
-                                    <div>
-                                        <p className="text-[12px] font-semibold text-slate-800 md:text-[14px]">커뮤니티 오픈 준비 중</p>
-                                        <p className="text-[11px] text-slate-500 md:text-[13px]">현재 커뮤니티는 오픈 전입니다.</p>
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="mb-4">
-                                <CommunityCategoryTabs />
-                            </div>
-
-                            <CommunitySearchControls
-                                key={`${currentHub}:${currentFormat}:${queryText}:${sort}`}
-                                currentHub={currentHub}
-                                currentFormat={currentFormat}
-                                currentQuery={queryText}
-                                currentSort={sort}
-                            />
-
-                            {!queryText && (
-                                <MobileWidgetStrip
-                                    weeklyQuestions={weeklyQuestions}
-                                    companionPulse={companionPulse}
-                                    locallyPicks={locallyPicks}
-                                />
-                            )}
-
-                            <MobileSortBar
-                                currentHub={currentHub}
-                                currentFormat={currentFormat}
-                                currentQuery={queryText}
-                                currentSort={sort}
-                            />
-
-                            <CommunityFeed
-                                initialData={initialData}
-                                initialNextOffset={initialNextOffset}
-                                hub={currentHub}
-                                format={currentFormat}
-                                query={queryText}
-                                sort={sort}
-                                canWriteLocallyContent={canWriteLocallyContent}
-                            />
-
-                            {showContentAds && (
-                                <div className="mt-6">
-                                    <CommunityAdSlot
-                                        testId="community-list-bottom-ad"
-                                        variant="bottom"
-                                        placement="community-list-bottom"
-                                        title="로컬리 콘텐츠 광고"
-                                    />
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="col-span-1 lg:col-span-4 hidden lg:flex flex-col">
-                            <RightSidebar
-                                category={writeCategory}
-                                hub={currentHub}
-                                format={currentFormat}
-                                canWriteLocallyContent={canWriteLocallyContent}
-                                weeklyQuestions={weeklyQuestions}
-                                companionPulse={companionPulse}
-                                locallyPicks={locallyPicks}
-                                footerSlot={showContentAds ? (
-                                    <CommunityAdSlot
-                                        testId="community-list-sidebar-ad"
-                                        variant="sidebar"
-                                        placement="community-list-sidebar"
-                                        title="로컬리 콘텐츠 광고"
-                                    />
-                                ) : null}
-                            />
-                        </div>
-                    </div>
-                </div>
+                return (
+                  <Link
+                    key={item.id}
+                    href={href}
+                    className={`flex h-10 min-w-[88px] items-center justify-center rounded-full px-4 text-[13px] font-semibold transition-all ${
+                      sort === item.id
+                        ? 'bg-[#111111] text-white shadow-[0_8px_16px_rgba(15,23,42,0.14)]'
+                        : 'text-[#4B4B4B]'
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
             </div>
+            {canWrite ? (
+              <Link
+                href={writeHref}
+                className="inline-flex items-center justify-center rounded-full bg-slate-900 px-5 py-3 text-[13px] font-semibold text-white transition-all hover:bg-black"
+              >
+                글쓰기
+              </Link>
+            ) : <div />}
+          </div>
 
-            {showFloatingWriteCta && (
-                <Link
-                    href={writeHref}
-                    className="fixed bottom-20 right-4 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-[#111111] text-white shadow-[0_14px_28px_rgba(15,23,42,0.18)] transition-all hover:bg-black active:scale-95 lg:hidden"
-                    aria-label={!COMMUNITY_OPEN ? '로컬리 콘텐츠 작성' : '글쓰기'}
-                >
-                    <Edit3 size={20} strokeWidth={2.5} />
-                </Link>
-            )}
-        </>
-    );
+          <MobileSortBar currentBoard={board} currentSort={sort} />
+
+          <CommunityFeed
+            initialData={initialData}
+            initialNextOffset={initialNextOffset}
+            board={board}
+            sort={sort}
+            canWrite={canWrite}
+          />
+
+          <div className="mt-6">
+            <CommunityAdSlot
+              testId="community-list-bottom-ad"
+              variant="bottom"
+              placement="community-list-bottom"
+              title="로컬리 커뮤니티 광고"
+            />
+          </div>
+        </div>
+      </div>
+
+      {canWrite && (
+        <Link
+          href={writeHref}
+          className="fixed bottom-20 right-4 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-[#111111] text-white shadow-[0_14px_28px_rgba(15,23,42,0.18)] transition-all hover:bg-black active:scale-95 md:hidden"
+          aria-label="글쓰기"
+        >
+          <Edit3 size={20} strokeWidth={2.5} />
+        </Link>
+      )}
+    </>
+  );
 }

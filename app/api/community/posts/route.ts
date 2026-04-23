@@ -5,9 +5,14 @@ import { sanitizeText } from '@/app/utils/sanitize';
 import { revalidatePath } from 'next/cache';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { createCommunityInsertPayload } from '@/app/community/feedSelect';
-import { isMissingAnonymousColumnError, isMissingCommunityModelColumnError } from '@/app/community/anonymousColumn';
+import {
+    isMissingAnonymousColumnError,
+    isMissingCommunityBoardColumnError,
+    isMissingCommunityModelColumnError,
+} from '@/app/community/anonymousColumn';
+import { getLegacyHubSeedForBoard, resolveCommunityBoard } from '@/app/community/boardMeta';
 import { getCommunityCategoryFromFormat } from '@/app/community/categoryMeta';
-import type { CommunityHub, CommunityPostFormat, CommunitySourceLocale } from '@/app/types/community';
+import type { CommunityBoard, CommunityHub, CommunityPostFormat, CommunitySourceLocale } from '@/app/types/community';
 
 async function cleanupUploadedImages(imagePaths: string[]) {
     if (imagePaths.length === 0) return;
@@ -32,6 +37,7 @@ export async function POST(request: NextRequest) {
         const allowedFormats = new Set(['question', 'companion', 'live_tip', 'locally_pick']);
         const allowedHubs = new Set(['tokyo', 'osaka_kyoto', 'fukuoka', 'jp_other', 'seoul', 'busan', 'jeju']);
         const allowedLocales = new Set(['ko', 'ja', 'en', 'zh']);
+        const allowedBoards = new Set(['japan', 'korea']);
 
         // Check Authentication
         const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -53,18 +59,34 @@ export async function POST(request: NextRequest) {
             destination_hub,
             post_format,
             source_locale,
+            board_country,
         } = body;
         const normalizedImages = Array.isArray(images) ? images.filter((image): image is string => typeof image === 'string' && image.length > 0) : [];
         const normalizedImagePaths = Array.isArray(image_paths) ? image_paths.filter((imagePath): imagePath is string => typeof imagePath === 'string' && imagePath.length > 0) : [];
         const normalizedCompanionCity = typeof companion_city === 'string' ? companion_city.trim() : '';
-        const normalizedHub = typeof destination_hub === 'string' && allowedHubs.has(destination_hub) ? destination_hub as CommunityHub : null;
-        const normalizedFormat = typeof post_format === 'string' && allowedFormats.has(post_format) ? post_format as CommunityPostFormat : undefined;
+        const normalizedBoard = typeof board_country === 'string' && allowedBoards.has(board_country)
+            ? resolveCommunityBoard(board_country) as CommunityBoard
+            : null;
+        const normalizedHub = normalizedBoard
+            ? null
+            : typeof destination_hub === 'string' && allowedHubs.has(destination_hub)
+                ? destination_hub as CommunityHub
+                : null;
+        const normalizedFormat = normalizedBoard
+            ? 'question'
+            : typeof post_format === 'string' && allowedFormats.has(post_format)
+                ? post_format as CommunityPostFormat
+                : undefined;
         const normalizedLocale = typeof source_locale === 'string' && allowedLocales.has(source_locale) ? source_locale as CommunitySourceLocale : 'ko';
-        const resolvedCategory = normalizedFormat ? getCommunityCategoryFromFormat(normalizedFormat) : category;
+        const resolvedCategory = normalizedBoard
+            ? 'qna'
+            : normalizedFormat
+                ? getCommunityCategoryFromFormat(normalizedFormat)
+                : category;
         const normalizedIsAnonymous = Boolean(is_anonymous) && anonymousAllowedCategories.has(resolvedCategory);
 
         // Validate Required Fields
-        if (!category || !title || !content) {
+        if (!title || !content || (!normalizedBoard && !category)) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
         // [Security] 제목/본문 길이 제한 — DB overflow 및 이메일 페이로드 블로팅 방지
@@ -105,6 +127,7 @@ export async function POST(request: NextRequest) {
             destinationHub: normalizedHub,
             postFormat: normalizedFormat,
             sourceLocale: normalizedLocale,
+            boardCountry: normalizedBoard,
         });
 
         const attemptInsert = async (payload: Record<string, unknown>) => supabase
@@ -115,6 +138,18 @@ export async function POST(request: NextRequest) {
 
         let currentPayload: Record<string, unknown> = insertPayload;
         let { data, error } = await attemptInsert(currentPayload);
+
+        if (error && isMissingCommunityBoardColumnError(error)) {
+            const preBoardPayload = { ...currentPayload };
+            delete preBoardPayload.board_country;
+            if (normalizedBoard && !preBoardPayload.destination_hub) {
+                preBoardPayload.destination_hub = getLegacyHubSeedForBoard(normalizedBoard);
+            }
+            currentPayload = preBoardPayload;
+            const retryResult = await attemptInsert(currentPayload);
+            data = retryResult.data;
+            error = retryResult.error;
+        }
 
         if (error && isMissingCommunityModelColumnError(error)) {
             const legacyCompatiblePayload = { ...currentPayload };

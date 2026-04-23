@@ -12,11 +12,9 @@ type TestUser = {
 };
 
 const TEST_PASSWORD = 'LocallyTest!2026';
-const TEST_IMAGE = 'tests/e2e/test-image.png';
 
 let adminClient: SupabaseClient | null = null;
 const createdAuthUserIds: string[] = [];
-const createdWhitelistEmails: string[] = [];
 const createdPostIds: string[] = [];
 
 function loadEnv(): EnvMap {
@@ -45,9 +43,9 @@ function getAdminClient() {
 function createUser(prefix: string): TestUser {
   const timestamp = Date.now();
   return {
-    email: `codex.community.content.${prefix}.${timestamp}@example.com`,
+    email: `codex.community.board.${prefix}.${timestamp}@example.com`,
     password: TEST_PASSWORD,
-    fullName: `Community Content ${prefix} ${timestamp}`,
+    fullName: `Community Board ${prefix} ${timestamp}`,
     phone: `010${String(timestamp).slice(-8)}`,
   };
 }
@@ -65,7 +63,7 @@ async function waitForProfile(userId: string) {
   throw new Error(`Profile was not created for auth user ${userId}.`);
 }
 
-async function createAuthUser(user: TestUser, options?: { whitelistAdmin?: boolean }) {
+async function createAuthUser(user: TestUser) {
   const supabase = getAdminClient();
   const { data, error } = await supabase.auth.admin.createUser({
     email: user.email,
@@ -83,39 +81,52 @@ async function createAuthUser(user: TestUser, options?: { whitelistAdmin?: boole
 
   createdAuthUserIds.push(data.user.id);
   await waitForProfile(data.user.id);
-
-  if (options?.whitelistAdmin) {
-    const { error: whitelistError } = await supabase
-      .from('admin_whitelist')
-      .upsert({ email: user.email }, { onConflict: 'email' });
-
-    if (whitelistError) throw whitelistError;
-    createdWhitelistEmails.push(user.email);
-  }
-
   return data.user.id;
 }
 
-async function createContentPost(userId: string, title: string) {
-  const { data, error } = await getAdminClient()
+async function createBoardPost(authorId: string, board: 'japan' | 'korea', title: string) {
+  const supabase = getAdminClient();
+  const basePayload = {
+    user_id: authorId,
+    category: 'qna',
+    post_format: 'question',
+    source_locale: 'ko',
+    title,
+    content: `${title} 내용입니다.`,
+    images: [],
+    linked_exp_id: null,
+  };
+
+  const { data, error } = await supabase
     .from('community_posts')
     .insert({
-      user_id: userId,
-      category: 'locally_content',
-      title,
-      content: `${title} 내용입니다.`,
-      images: [],
-      linked_exp_id: null,
+      ...basePayload,
+      board_country: board,
+      destination_hub: null,
     })
     .select('id')
     .single();
 
-  if (error || !data?.id) {
-    throw error || new Error('Failed to create locally_content fixture.');
+  if (!error && data?.id) {
+    createdPostIds.push(data.id);
+    return data.id;
   }
 
-  createdPostIds.push(data.id);
-  return data.id;
+  const fallback = await supabase
+    .from('community_posts')
+    .insert({
+      ...basePayload,
+      destination_hub: board === 'japan' ? 'tokyo' : 'seoul',
+    })
+    .select('id')
+    .single();
+
+  if (fallback.error || !fallback.data?.id) {
+    throw fallback.error || error || new Error('Failed to create board post fixture.');
+  }
+
+  createdPostIds.push(fallback.data.id);
+  return fallback.data.id;
 }
 
 async function login(page: Page, user: TestUser) {
@@ -134,10 +145,6 @@ test.afterAll(async () => {
     await supabase.from('community_posts').delete().in('id', createdPostIds);
   }
 
-  for (const email of createdWhitelistEmails) {
-    await supabase.from('admin_whitelist').delete().eq('email', email);
-  }
-
   for (const userId of createdAuthUserIds) {
     await supabase.from('profiles').delete().eq('id', userId);
     await supabase.from('users').delete().eq('id', userId);
@@ -145,96 +152,67 @@ test.afterAll(async () => {
   }
 });
 
-test.describe.serial('Community content layout and access', () => {
-  test('renders portrait content cards and hides content write CTA for non-admins', async ({ page }) => {
+test.describe.serial('Community board layout and access', () => {
+  test('renders only two board tabs and keeps only the inline list ad on desktop', async ({ page }) => {
     test.setTimeout(90000);
 
     const author = createUser('author');
     const viewer = createUser('viewer');
     const authorId = await createAuthUser(author);
     await createAuthUser(viewer);
-    await createContentPost(authorId, `[Playwright] Community Content Layout ${Date.now()}`);
+    const token = `${Date.now()}`;
+    await createBoardPost(authorId, 'japan', `[Playwright] Community Board Japan ${token}`);
+    await createBoardPost(authorId, 'korea', `[Playwright] Community Board Korea ${token}`);
 
     await login(page, viewer);
     await page.setViewportSize({ width: 1440, height: 1200 });
-    await page.goto('/community?category=locally_content', { waitUntil: 'networkidle' });
+    await page.goto('/community', { waitUntil: 'networkidle' });
 
-    await expect(page.getByText('커뮤니티 오픈 준비 중')).toBeVisible();
-    await expect(page.getByText('현재 커뮤니티는 오픈 전입니다.')).toBeVisible();
-    await expect(page.getByRole('button', { name: '로컬리 콘텐츠 작성' })).toHaveCount(0);
+    await expect(page.getByTestId('community-board-tab-japan')).toBeVisible();
+    await expect(page.getByTestId('community-board-tab-korea')).toBeVisible();
+    await expect(page.getByPlaceholder('로컬리 콘텐츠 검색')).toHaveCount(0);
+    await expect(page.getByTestId('community-list-sidebar-ad')).toHaveCount(0);
+    await expect(page.getByTestId('community-list-bottom-ad')).toBeVisible();
+    await expect(page.getByRole('link', { name: '글쓰기' })).toBeVisible();
+    await expect(page.getByText(`[Playwright] Community Board Japan ${token}`)).toBeVisible();
+    await expect(page.getByText(`[Playwright] Community Board Korea ${token}`)).toHaveCount(0);
+
+    await page.getByTestId('community-board-tab-korea').click();
+    await expect.poll(() => page.url()).toContain('board=korea');
+    await expect(page.getByText(`[Playwright] Community Board Korea ${token}`)).toBeVisible();
+  });
+
+  test('lets logged-in users open the simplified write page and publish a board post', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const writer = createUser('writer');
+    await createAuthUser(writer);
+
+    await login(page, writer);
+    await page.goto('/community/write?board=korea', { waitUntil: 'networkidle' });
+
+    await expect(page.getByRole('heading', { name: '커뮤니티 글쓰기' })).toBeVisible();
     await expect(page.getByRole('button', { name: '질문' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: '동행' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: '여행 꿀팁' })).toHaveCount(0);
-    await expect(page.getByTestId('community-list-sidebar-ad')).toBeVisible();
-    await expect(page.getByTestId('community-list-bottom-ad')).toBeVisible();
+    await expect(page.getByTestId('community-write-board-japan')).toBeVisible();
+    await expect(page.getByTestId('community-write-board-korea')).toBeVisible();
 
-    const communityDetailHrefs = await page.locator('a[href*="/community/"]').evaluateAll((elements) =>
-      elements
-        .map((element) => element.getAttribute('href'))
-        .filter((href): href is string => Boolean(href && href.includes('/community/')))
-    );
-    expect(communityDetailHrefs.some((href) => href.includes('format=question') || href.includes('category=qna'))).toBeFalsy();
-    expect(
-      communityDetailHrefs.some((href) => href.includes('format=locally_pick') && href.includes('category=locally_content'))
-    ).toBeTruthy();
+    const title = `[Playwright] Community Board Write ${Date.now()}`;
+    await page.getByPlaceholder('게시글 제목을 입력해 주세요').fill(title);
+    await page.getByPlaceholder('질문, 추천, 후기 등 자유롭게 남겨주세요.').fill('한국여행 게시판 글쓰기 검증용 본문입니다.');
+    await page.getByRole('button', { name: '게시하기' }).click();
 
-    const box = await page.getByTestId('community-content-card').first().boundingBox();
-    expect(box).not.toBeNull();
-    expect(box!.height).toBeGreaterThan(box!.width * 1.15);
-
-    await page.goto('/community/write?category=qna', { waitUntil: 'networkidle' });
-    await expect.poll(() => page.url()).toContain('/community?format=locally_pick');
+    await page.waitForURL((url) => url.pathname.startsWith('/community/') && url.searchParams.get('board') === 'korea', {
+      timeout: 15000,
+    });
+    await expect(page.getByRole('heading', { name: title })).toBeVisible();
+    await expect(page.getByTestId('community-detail-bottom-ad')).toBeVisible();
   });
 
-  test('keeps only bottom ad visible on mobile content list', async ({ page }) => {
-    test.setTimeout(90000);
-
-    const author = createUser('mobile-author');
-    const viewer = createUser('mobile-viewer');
-    const authorId = await createAuthUser(author);
-    await createAuthUser(viewer);
-    await createContentPost(authorId, `[Playwright] Community Content Mobile ${Date.now()}`);
-
-    await login(page, viewer);
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/community?category=locally_content', { waitUntil: 'networkidle' });
-
-    await expect(page.getByTestId('community-list-bottom-ad')).toBeVisible();
-    await expect(page.getByTestId('community-list-sidebar-ad')).toBeHidden();
-  });
-
-  test('shows content write CTA for admins', async ({ page }) => {
-    test.setTimeout(90000);
-
-    const adminUser = createUser('admin');
-    await createAuthUser(adminUser, { whitelistAdmin: true });
-
-    await login(page, adminUser);
-    await page.setViewportSize({ width: 1440, height: 1200 });
-    await page.goto('/community?category=locally_content', { waitUntil: 'networkidle' });
-
-    await expect(page.getByRole('button', { name: '로컬리 콘텐츠 작성' })).toBeVisible();
-    await page.getByRole('button', { name: '로컬리 콘텐츠 작성' }).click();
-    await expect.poll(() => page.url()).toContain('/community/write?category=locally_content');
-    await expect(page.getByRole('heading', { name: '로컬리 콘텐츠 작성' })).toBeVisible();
-    await expect(page.getByTestId('community-content-editorial-checklist')).toBeVisible();
-    await expect(page.getByRole('button', { name: '질문' })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: '동행' })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: '여행 꿀팁' })).toHaveCount(0);
-    await expect(page.getByText('대표 이미지 1장 이상')).toBeVisible();
-    await expect(page.getByText('제목 8자 이상')).toBeVisible();
-    await expect(page.getByText('본문 40자 이상')).toBeVisible();
-    await expect(page.getByText('첫 문단 20자 이상')).toBeVisible();
-    await expect(page.getByText('문단 2개 이상')).toBeVisible();
-    await expect(page.getByText('최대 3장 · 드래그해서 순서 변경 가능')).toBeVisible();
-
-    await page.locator('input[type="file"][multiple]').setInputFiles([
-      TEST_IMAGE,
-      TEST_IMAGE,
-      TEST_IMAGE,
-      TEST_IMAGE,
-    ]);
-    await expect(page.getByText('사진은 최대 3장까지만 업로드 가능합니다.')).toBeVisible();
-    await expect(page.getByText('0/3')).toBeVisible();
+  test('redirects unauthenticated write access to login with returnUrl', async ({ page }) => {
+    await page.goto('/community/write?board=korea', { waitUntil: 'networkidle' });
+    await expect.poll(() => page.url()).toContain('/login?returnUrl=');
+    await expect.poll(() => page.url()).toContain(encodeURIComponent('/community/write?board=korea'));
   });
 });

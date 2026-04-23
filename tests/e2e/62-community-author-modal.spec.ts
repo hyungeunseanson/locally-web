@@ -4,6 +4,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test } from '@playwright/test';
 
 import { resolveConfiguredSiteUrl } from './helpers/siteUrl';
+import { resolveCommunityBoard } from '@/app/community/boardMeta';
 
 type EnvMap = Record<string, string>;
 type TestUser = {
@@ -12,6 +13,8 @@ type TestUser = {
   fullName: string;
   phone: string;
 };
+
+type BoardOption = 'japan' | 'korea';
 
 const TEST_PASSWORD = 'LocallyTest!2026';
 
@@ -102,11 +105,16 @@ async function createPost(
     isAnonymous?: boolean;
     createdAt?: string;
     category?: 'qna' | 'locally_content';
+    board?: BoardOption;
   }
 ) {
   const insertPayload = {
     user_id: userId,
-    category: options.category || 'qna',
+    category: options.board ? 'qna' : options.category || 'qna',
+    post_format: options.board ? 'question' : undefined,
+    source_locale: options.board ? 'ko' : undefined,
+    destination_hub: options.board ? null : undefined,
+    board_country: options.board ? resolveCommunityBoard(options.board) : undefined,
     title: options.title,
     content: `${options.title} 내용입니다.`,
     images: [],
@@ -121,9 +129,40 @@ async function createPost(
     .select('id, title')
     .single();
 
+  if (!error && data?.id) {
+    createdPostIds.push(data.id);
+    return data;
+  }
+
+  if (options.board) {
+    const fallbackPayload: Record<string, unknown> = {
+      ...insertPayload,
+      destination_hub: options.board === 'japan' ? 'tokyo' : 'seoul',
+    };
+    delete fallbackPayload.board_country;
+
+    const boardFallbackResult = await getAdminClient()
+      .from('community_posts')
+      .insert(fallbackPayload)
+      .select('id, title')
+      .single();
+
+    if (!boardFallbackResult.error && boardFallbackResult.data?.id) {
+      createdPostIds.push(boardFallbackResult.data.id);
+      return boardFallbackResult.data;
+    }
+
+    error = boardFallbackResult.error ?? error;
+    data = boardFallbackResult.data;
+  }
+
   if (error && !(await hasAnonymousColumn())) {
     const legacyPayload: Record<string, unknown> = { ...insertPayload };
     delete legacyPayload.is_anonymous;
+    if (options.board) {
+      delete legacyPayload.board_country;
+      legacyPayload.destination_hub = options.board === 'japan' ? 'tokyo' : 'seoul';
+    }
     const retryResult = await getAdminClient()
       .from('community_posts')
       .insert(legacyPayload)
@@ -156,7 +195,7 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Community author modal', () => {
-  test('opens author modal, shows recent public posts, and keeps anonymous posts hidden', async ({ page }) => {
+  test('opens author modal, shows recent visible board posts, and keeps legacy qna plus anonymous posts hidden', async ({ page }) => {
     test.setTimeout(90000);
 
     const author = createUser('modal');
@@ -166,12 +205,12 @@ test.describe.serial('Community author modal', () => {
 
     const currentPost = await createPost(authorId, {
       title: `[Playwright] Community Modal Current ${timestamp}`,
-      category: 'locally_content',
+      board: 'korea',
       createdAt: new Date(timestamp - 2 * 60 * 60 * 1000).toISOString(),
     });
     const recentPost = await createPost(authorId, {
       title: `[Playwright] Community Modal Recent ${timestamp}`,
-      category: 'locally_content',
+      board: 'korea',
       createdAt: new Date(timestamp - 60 * 60 * 1000).toISOString(),
     });
     const forumPost = await createPost(authorId, {
@@ -185,11 +224,11 @@ test.describe.serial('Community author modal', () => {
       createdAt: new Date(timestamp).toISOString(),
     });
 
-    await page.goto(`/community/${currentPost.id}?category=locally_content`, { waitUntil: 'networkidle' });
+    await page.goto(`/community/${currentPost.id}?board=korea`, { waitUntil: 'networkidle' });
 
     await page.getByRole('button', { name: /프로필 보기/ }).first().click();
     await expect(page.getByTestId('community-author-modal')).toBeVisible();
-    await expect(page.getByTestId('community-author-modal')).toContainText('이 작성자의 공개 콘텐츠');
+    await expect(page.getByTestId('community-author-modal')).toContainText('이 사용자가 쓴 글');
     await expect(
       page.getByTestId('community-author-modal-post').filter({ hasText: recentPost.title })
     ).toBeVisible({ timeout: 15000 });
@@ -200,7 +239,7 @@ test.describe.serial('Community author modal', () => {
     }
 
     await page.getByTestId('community-author-modal-post').filter({ hasText: recentPost.title }).click();
-    await expect.poll(() => page.url()).toContain(`/community/${recentPost.id}`);
+    await expect.poll(() => page.url()).toContain(`/community/${recentPost.id}?board=korea`);
 
     if (anonymousSupported) {
       await page.goto(`/community/${anonymousPost.id}?category=qna`, { waitUntil: 'networkidle' });
@@ -210,19 +249,19 @@ test.describe.serial('Community author modal', () => {
     }
   });
 
-  test('adds author url to article json-ld for visible locally_content authors', async ({ request }) => {
+  test('adds author url to article json-ld for visible board post authors', async ({ request }) => {
     test.setTimeout(90000);
     const expectedSiteUrl = resolveConfiguredSiteUrl();
 
     const author = createUser('seo');
     const authorId = await createAuthUser(author);
     const timestamp = Date.now();
-    const contentPost = await createPost(authorId, {
+    const boardPost = await createPost(authorId, {
       title: `[Playwright] Community Author SEO ${timestamp}`,
-      category: 'locally_content',
+      board: 'japan',
     });
 
-    const response = await request.get(`/community/${contentPost.id}?category=locally_content`);
+    const response = await request.get(`/community/${boardPost.id}?board=japan`);
     expect(response.ok()).toBeTruthy();
 
     const html = await response.text();
