@@ -142,6 +142,9 @@ export async function POST(request: NextRequest) {
         throw atomicResult.error;
       }
     } else {
+      if (atomicResult.data === null) {
+        return NextResponse.json({ success: false, error: '게시글을 찾을 수 없습니다.' }, { status: 404 });
+      }
       nextViewCount = normalizeViewCount(atomicResult.data);
     }
 

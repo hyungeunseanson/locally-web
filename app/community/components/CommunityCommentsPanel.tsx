@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import CommentSection from './CommentSection';
 import LikeButton from './LikeButton';
@@ -25,8 +25,14 @@ export default function CommunityCommentsPanel({
     const [commentCount, setCommentCount] = useState(initialCommentCount);
     const initialViewCount = Math.max(Number(viewCount || 0), 1);
     const [currentViewCount, setCurrentViewCount] = useState(initialViewCount);
+    const trackedPostIdRef = useRef<string | null>(null);
 
     useEffect(() => {
+        if (trackedPostIdRef.current === postId) {
+            return;
+        }
+
+        trackedPostIdRef.current = postId;
         let isMounted = true;
 
         void fetch('/api/community/views', {

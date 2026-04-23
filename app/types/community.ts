@@ -52,7 +52,7 @@ export interface CommunityComment {
     user_id: string;
     parent_id: string | null;
     content: string;
-    like_count: number;
+    like_count?: number;
     is_liked?: boolean;
     created_at: string;
     updated_at: string;

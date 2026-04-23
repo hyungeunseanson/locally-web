@@ -306,7 +306,7 @@ export default function PostEditor({ initialBoard, initialLocale }: PostEditorPr
               />
               <div>
                 <p className="text-[13px] font-semibold text-slate-700">익명으로 게시하기</p>
-                <p className="text-[12px] text-slate-400">댓글과 좋아요 기능은 그대로 사용할 수 있어요.</p>
+                <p className="text-[12px] text-slate-400">댓글 기능은 그대로 사용할 수 있어요.</p>
               </div>
             </label>
           </div>

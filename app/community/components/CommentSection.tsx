@@ -4,7 +4,7 @@
 // Comment avatars render user-provided public profile URLs directly and avoid routing them through image transforms.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { CornerDownRight, Heart, Loader2, Send } from 'lucide-react';
+import { CornerDownRight, Loader2, Send } from 'lucide-react';
 
 import type { CommunityComment } from '@/app/types/community';
 import { useAuth } from '@/app/context/AuthContext';
@@ -37,27 +37,6 @@ const getTimeAgo = (dateStr: string) => {
 
 function countComments(items: CommunityComment[]) {
     return items.reduce((total, item) => total + 1 + (item.replies?.length || 0), 0);
-}
-
-function updateCommentTree(
-    items: CommunityComment[],
-    commentId: string,
-    updater: (comment: CommunityComment) => CommunityComment
-): CommunityComment[] {
-    return items.map((item) => {
-        if (item.id === commentId) {
-            return updater(item);
-        }
-
-        if (item.replies?.some((reply) => reply.id === commentId)) {
-            return {
-                ...item,
-                replies: item.replies.map((reply) => (reply.id === commentId ? updater(reply) : reply)),
-            };
-        }
-
-        return item;
-    });
 }
 
 function appendComment(items: CommunityComment[], nextComment: CommunityComment) {
@@ -104,37 +83,14 @@ function CommentAvatar({
 }
 
 function CommentActions({
-    comment,
-    likePending,
     replyLabel,
-    onLike,
     onReply,
 }: {
-    comment: CommunityComment;
-    likePending: boolean;
     replyLabel: string;
-    onLike: () => void;
     onReply: () => void;
 }) {
     return (
         <div className="mt-2 flex items-center gap-2 text-[12px] font-semibold text-slate-500">
-            <button
-                type="button"
-                onClick={onLike}
-                disabled={likePending}
-                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 transition-all ${
-                    comment.is_liked
-                        ? 'bg-rose-50 text-[#FF385C]'
-                        : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
-                } ${likePending ? 'cursor-progress opacity-80' : 'active:scale-[0.98]'} disabled:pointer-events-none`}
-            >
-                {likePending ? (
-                    <Loader2 size={12} className="animate-spin" />
-                ) : (
-                    <Heart size={12} fill={comment.is_liked ? '#FF385C' : 'none'} />
-                )}
-                좋아요 {comment.like_count || 0}
-            </button>
             <button
                 type="button"
                 onClick={onReply}
@@ -153,7 +109,6 @@ export default function CommentSection({ postId, onOpenLogin, onCountChange }: C
     const [isLoading, setIsLoading] = useState(true);
     const [isSendingRoot, setIsSendingRoot] = useState(false);
     const [sendingReplyTo, setSendingReplyTo] = useState<string | null>(null);
-    const [likePendingIds, setLikePendingIds] = useState<string[]>([]);
     const [inputText, setInputText] = useState('');
     const [replyingTo, setReplyingTo] = useState<string | null>(null);
     const [replyTargetName, setReplyTargetName] = useState<string>('');
@@ -266,47 +221,6 @@ export default function CommentSection({ postId, onOpenLogin, onCountChange }: C
         }
     };
 
-    const handleLike = async (comment: CommunityComment) => {
-        if (!ensureLogin()) return;
-        if (likePendingIds.includes(comment.id)) return;
-
-        setLikePendingIds((prev) => [...prev, comment.id]);
-        const previousLiked = Boolean(comment.is_liked);
-        const previousCount = comment.like_count || 0;
-        setComments((prev) => updateCommentTree(prev, comment.id, (current) => ({
-            ...current,
-            is_liked: !previousLiked,
-            like_count: previousLiked ? Math.max(0, previousCount - 1) : previousCount + 1,
-        })));
-
-        try {
-            const res = await fetch('/api/community/comment-likes', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ comment_id: comment.id }),
-            });
-            const payload = await res.json().catch(() => ({ error: '댓글 좋아요 처리에 실패했습니다.' }));
-            if (!res.ok) {
-                throw new Error(payload.error || '댓글 좋아요 처리에 실패했습니다.');
-            }
-
-            setComments((prev) => updateCommentTree(prev, comment.id, (current) => ({
-                ...current,
-                is_liked: Boolean(payload.liked),
-                like_count: Number(payload.likeCount || 0),
-            })));
-        } catch (e) {
-            console.error('Failed to toggle comment like', e);
-            setComments((prev) => updateCommentTree(prev, comment.id, (current) => ({
-                ...current,
-                is_liked: previousLiked,
-                like_count: previousCount,
-            })));
-        } finally {
-            setLikePendingIds((prev) => prev.filter((id) => id !== comment.id));
-        }
-    };
-
     const renderReplyComposer = (parentId: string) => {
         if (replyingTo !== parentId) return null;
 
@@ -358,7 +272,6 @@ export default function CommentSection({ postId, onOpenLogin, onCountChange }: C
 
     const renderComment = (comment: CommunityComment, isReply = false) => {
         const authorName = getProfileDisplayName(comment.profiles);
-        const isLikePending = likePendingIds.includes(comment.id);
 
         return (
             <div
@@ -376,10 +289,7 @@ export default function CommentSection({ postId, onOpenLogin, onCountChange }: C
                             {comment.content}
                         </p>
                         <CommentActions
-                            comment={comment}
-                            likePending={isLikePending}
                             replyLabel={isReply ? '이 댓글에 답글' : '답글 달기'}
-                            onLike={() => handleLike(comment)}
                             onReply={() => openReplyComposer(comment, isReply ? comment.parent_id : comment.id)}
                         />
                         {!isReply && renderReplyComposer(comment.id)}

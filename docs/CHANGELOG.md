@@ -5,6 +5,15 @@
 
 ---
 
+## v3.40.20 — [Community] comment-like UI/API removed
+
+**작업일:** 2026-04-23
+
+| 항목 | 내용 |
+|------|------|
+| 🟢 댓글 좋아요 종료 | `app/community/components/CommentSection.tsx`, `app/api/community/comments/route.ts`, `app/api/community/comment-likes/route.ts` — 댓글 좋아요 버튼/숫자와 토글 경로를 제거하고, 댓글 조회는 더 이상 `community_comment_likes`를 읽지 않도록 단순화. 종료된 route는 `410 Gone`으로 응답 |
+| 🟡 커뮤니티 작성 카피 정리 | `app/community/write/PostEditor.tsx`, `docs/gemini.md` — 게시글 작성 화면과 운영 기준 문구를 현재 정책인 “게시글 좋아요 유지, 댓글 좋아요 제거”에 맞게 정렬 |
+
 ## v3.40.19 — [Ops] cron guard contract / release gate naming / legacy workflow hardening
 
 **작업일:** 2026-04-17

@@ -20,10 +20,6 @@ function isMissingParentColumnError(error: { message?: string } | null) {
     return typeof error?.message === 'string' && error.message.includes('parent_id');
 }
 
-function isMissingCommentLikesTableError(error: { message?: string } | null) {
-    return typeof error?.message === 'string' && error.message.includes('community_comment_likes');
-}
-
 function buildNestedComments(rows: CommunityComment[]) {
     const commentsById = new Map<string, CommunityComment>();
     const rootComments: CommunityComment[] = [];
@@ -50,37 +46,6 @@ function buildNestedComments(rows: CommunityComment[]) {
     return rootComments;
 }
 
-async function fetchCommentLikeMaps(supabase: Awaited<ReturnType<typeof createClient>>, commentIds: string[], viewerId: string | null) {
-    const counts = new Map<string, number>();
-    const likedIds = new Set<string>();
-
-    if (commentIds.length === 0) {
-        return { counts, likedIds };
-    }
-
-    const { data: likes, error } = await supabase
-        .from('community_comment_likes')
-        .select('comment_id, user_id')
-        .in('comment_id', commentIds);
-
-    if (error) {
-        if (!isMissingCommentLikesTableError(error)) {
-            throw error;
-        }
-        return { counts, likedIds };
-    }
-
-    (likes || []).forEach((like) => {
-        const commentId = String(like.comment_id);
-        counts.set(commentId, (counts.get(commentId) || 0) + 1);
-        if (viewerId && like.user_id === viewerId) {
-            likedIds.add(commentId);
-        }
-    });
-
-    return { counts, likedIds };
-}
-
 // GET /api/community/comments?post_id=...
 export async function GET(request: NextRequest) {
     try {
@@ -91,10 +56,6 @@ export async function GET(request: NextRequest) {
         if (!postId) {
             return NextResponse.json({ error: 'Missing post_id' }, { status: 400 });
         }
-
-        const {
-            data: { user },
-        } = await supabase.auth.getUser();
 
         const { data: comments, error } = await supabase
             .from('community_comments')
@@ -115,8 +76,6 @@ export async function GET(request: NextRequest) {
 
         const typedProfiles = (profiles || []) as CommentProfileRow[];
         const profileMap = new Map(typedProfiles.map((profile) => [profile.id, profile] as const));
-        const commentIds = typedComments.map((comment) => comment.id);
-        const { counts, likedIds } = await fetchCommentLikeMaps(supabase, commentIds, user?.id ?? null);
 
         const mappedComments: CommunityComment[] = typedComments.map((comment) => ({
             id: comment.id,
@@ -124,8 +83,6 @@ export async function GET(request: NextRequest) {
             user_id: comment.user_id,
             parent_id: typeof comment.parent_id === 'string' ? comment.parent_id : null,
             content: comment.content,
-            like_count: counts.get(comment.id) || 0,
-            is_liked: likedIds.has(comment.id),
             created_at: comment.created_at,
             updated_at: comment.updated_at,
             profiles: profileMap.get(comment.user_id) ?? null,
@@ -226,8 +183,6 @@ export async function POST(request: NextRequest) {
             user_id: inserted.user_id,
             parent_id: typeof inserted.parent_id === 'string' ? inserted.parent_id : null,
             content: inserted.content,
-            like_count: 0,
-            is_liked: false,
             created_at: inserted.created_at,
             updated_at: inserted.updated_at,
             profiles: profile ?? null,

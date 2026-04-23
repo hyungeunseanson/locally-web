@@ -148,6 +148,25 @@ async function createCommunityPost(
   return fallback.data.id;
 }
 
+async function createCommunityComment(postId: string, userId: string, content: string) {
+  const supabase = getAdminClient();
+  const { data, error } = await supabase
+    .from('community_comments')
+    .insert({
+      post_id: postId,
+      user_id: userId,
+      content,
+    })
+    .select('id')
+    .single();
+
+  if (error || !data?.id) {
+    throw error || new Error('Failed to create community comment fixture.');
+  }
+
+  return data.id;
+}
+
 async function seedLike(postId: string, userId: string) {
   const supabase = getAdminClient();
   const { error } = await supabase.from('community_likes').insert({
@@ -271,6 +290,7 @@ test.describe.serial('Community detail state consistency', () => {
     await expect(page.getByTestId('community-comment-summary-count')).toHaveText('댓글 1');
     await expect(page.getByTestId('community-comment-heading-count')).toHaveText('댓글 1');
     await expect(page.getByTestId('community-comment-list')).toContainText(commentMessage);
+    await expect(commentsPanel.getByRole('button', { name: /좋아요/i })).toHaveCount(0);
     await expect(page.getByTestId('community-detail-bottom-ad')).toBeVisible();
     await expect(page.getByTestId('community-detail-sidebar-ad')).toHaveCount(0);
 
@@ -338,5 +358,38 @@ test.describe.serial('Community detail state consistency', () => {
     });
     await expect(page.getByTestId('community-detail-bottom-ad')).toHaveCount(0);
     await expect(page.getByTestId('community-detail-sidebar-ad')).toHaveCount(0);
+  });
+
+  test('omits comment-like metadata from comments payload and disables the comment-like route', async ({ request }) => {
+    const author = createUser('comments-api');
+    const authorId = await createAuthUser(author);
+    const postId = await createCommunityPost(authorId, {
+      board: 'japan',
+      title: `[Playwright] Community Comment API ${Date.now()}`,
+    });
+    const commentId = await createCommunityComment(postId, authorId, `Comment payload ${Date.now()}`);
+
+    const commentsResponse = await request.get(`/api/community/comments?post_id=${postId}`);
+    expect(commentsResponse.ok()).toBeTruthy();
+    const commentsPayload = await commentsResponse.json();
+    expect(Array.isArray(commentsPayload.data)).toBeTruthy();
+    expect(commentsPayload.totalCount).toBe(1);
+    expect(commentsPayload.data[0]).toMatchObject({
+      id: commentId,
+      post_id: postId,
+      user_id: authorId,
+    });
+    expect(commentsPayload.data[0]).not.toHaveProperty('like_count');
+    expect(commentsPayload.data[0]).not.toHaveProperty('is_liked');
+
+    const likeRouteResponse = await request.post('/api/community/comment-likes', {
+      data: {
+        comment_id: commentId,
+      },
+    });
+    expect(likeRouteResponse.status()).toBe(410);
+    await expect(likeRouteResponse.json()).resolves.toMatchObject({
+      error: '댓글 좋아요 기능이 종료되었습니다.',
+    });
   });
 });
