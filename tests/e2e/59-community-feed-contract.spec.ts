@@ -258,4 +258,27 @@ test.describe.serial('Community board feed response contract', () => {
     expect(koreaReturnedIds).toContain(koreaPost.id);
     expect(koreaReturnedIds).not.toContain(japanPost.id);
   });
+
+  test('keeps legacy public feed params working without affecting board feed responses', async ({ request }) => {
+    const author = createUser('legacy');
+    const authorId = await createAuthUser(author);
+    const token = `${Date.now()}`;
+    const japanPost = await createBoardPost(authorId, 'japan', null, `[Playwright] Legacy Feed Japan ${token}`);
+    await createBoardPost(authorId, 'korea', null, `[Playwright] Legacy Feed Korea ${token}`);
+
+    const legacyResponse = await request.get('/api/community?category=qna');
+    expect(legacyResponse.ok()).toBeTruthy();
+    const legacyPayload = await legacyResponse.json();
+    expect(Array.isArray(legacyPayload.data)).toBeTruthy();
+    expect(typeof legacyPayload.nextOffset === 'number' || legacyPayload.nextOffset === null).toBeTruthy();
+
+    const boardResponse = await request.get('/api/community');
+    expect(boardResponse.ok()).toBeTruthy();
+    const boardPayload = await boardResponse.json();
+    const boardReturnedIds = Array.isArray(boardPayload.data)
+      ? boardPayload.data.map((entry: { id?: string }) => entry.id)
+      : [];
+
+    expect(boardReturnedIds).toContain(japanPost.id);
+  });
 });

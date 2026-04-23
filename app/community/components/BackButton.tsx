@@ -6,7 +6,7 @@ import { ArrowLeft, Loader2 } from 'lucide-react';
 import { useLanguage } from '@/app/context/LanguageContext';
 
 /** 뒤로가기 버튼 — 클릭 시 로딩 스피너로 시각 피드백 */
-export default function BackButton({ href = '/community?category=all' }: { href?: string }) {
+export default function BackButton({ href = '/community' }: { href?: string }) {
     const router = useRouter();
     const { t } = useLanguage();
     const [isPending, startTransition] = useTransition();

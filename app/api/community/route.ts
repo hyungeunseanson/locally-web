@@ -1,67 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { createPublicServerClient } from '@/app/utils/supabase/public-server';
-import {
-    buildCommunityFeedPosts,
-    COMMUNITY_FEED_EXPERIENCE_SELECT,
-    COMMUNITY_FEED_POST_SELECT,
-    COMMUNITY_FEED_POST_SELECT_LEGACY,
-    COMMUNITY_FEED_POST_SELECT_PRE_BOARD,
-    COMMUNITY_FEED_PROFILE_SELECT,
-    normalizeCommunityFeedPostRow,
-    type CommunityFeedExperience,
-    type CommunityFeedProfile,
-    type CommunityFeedPostRow,
-} from '@/app/community/feedSelect';
-import {
-    isMissingAnonymousColumnError,
-    isMissingCommunityBoardColumnError,
-    isMissingCommunityModelColumnError,
-} from '@/app/community/anonymousColumn';
 import { resolveCommunityBoard } from '@/app/community/boardMeta';
 import {
     resolveCommunitySort,
 } from '@/app/community/queryParams';
-import {
-    canUseLegacyCommunityFeedFallback,
-    resolvePublicCommunityFeedState,
-} from '@/app/community/legacyQueryParams';
 import { fetchCommunityBoardFeed } from '@/app/community/boardFeed.server';
+import { fetchLegacyCommunityFeed } from '@/app/community/legacyFeed.server';
 
 const PAGE_LIMIT = 15;
-
-async function buildFeedResponse(postsData: CommunityFeedPostRow[] | null, offset: number) {
-    const supabase = createPublicServerClient();
-
-    if (!postsData || postsData.length === 0) {
-        return NextResponse.json({ data: [], nextOffset: null });
-    }
-
-    const typedPosts = postsData.map((post) => normalizeCommunityFeedPostRow(post));
-    const userIds = [...new Set(typedPosts.filter((post) => !post.is_anonymous).map((post) => post.user_id))];
-    let typedProfiles: CommunityFeedProfile[] = [];
-    if (userIds.length > 0) {
-        const { data: profiles } = await supabase
-            .from('profiles')
-            .select(COMMUNITY_FEED_PROFILE_SELECT)
-            .in('id', userIds);
-        typedProfiles = (profiles ?? []) as unknown as CommunityFeedProfile[];
-    }
-
-    const expIds = [...new Set(typedPosts.map((post) => post.linked_exp_id).filter((value): value is number => typeof value === 'number'))];
-    let typedExperiences: CommunityFeedExperience[] = [];
-    if (expIds.length > 0) {
-        const { data: experiences } = await supabase
-            .from('experiences')
-            .select(COMMUNITY_FEED_EXPERIENCE_SELECT)
-            .in('id', expIds);
-        typedExperiences = (experiences ?? []) as unknown as CommunityFeedExperience[];
-    }
-
-    const data = buildCommunityFeedPosts(typedPosts, typedProfiles, typedExperiences);
-    const nextOffset = data.length === PAGE_LIMIT ? offset + PAGE_LIMIT : null;
-    return NextResponse.json({ data, nextOffset });
-}
 
 async function handleBoardFeed(request: NextRequest) {
     const { searchParams } = new URL(request.url);
@@ -87,82 +33,27 @@ async function handleBoardFeed(request: NextRequest) {
 }
 
 async function handleLegacyFeed(request: NextRequest) {
-    const supabase = createPublicServerClient();
     const { searchParams } = new URL(request.url);
-    const {
-        category,
-        hub,
-        queryText,
-        sort,
-    } = resolvePublicCommunityFeedState({
-        category: searchParams.get('category'),
-        format: searchParams.get('format'),
-        hub: searchParams.get('hub'),
-        q: searchParams.get('q'),
-        sort: searchParams.get('sort'),
-    });
     const offset = parseInt(searchParams.get('offset') || '0', 10);
 
-    const buildQuery = (selectClause: string) => {
-        let query = supabase
-            .from('community_posts')
-            .select(selectClause)
-            .range(offset, offset + PAGE_LIMIT - 1);
-
-        if (category && category !== 'all') {
-            query = query.eq('category', category);
-        }
-
-        if (hub !== 'all') {
-            query = query.eq('destination_hub', hub);
-        }
-
-        if (queryText) {
-            query = query.or(`title.ilike.%${queryText}%,content.ilike.%${queryText}%`);
-        }
-
-        if (sort === 'popular') {
-            query = query
-                .order('like_count', { ascending: false })
-                .order('comment_count', { ascending: false })
-                .order('created_at', { ascending: false });
-        } else {
-            query = query.order('created_at', { ascending: false });
-        }
-
-        return query;
-    };
-
-    const initialResult = await buildQuery(COMMUNITY_FEED_POST_SELECT);
-    let postsError = initialResult.error;
-    let postsData = (initialResult.data ?? null) as unknown as CommunityFeedPostRow[] | null;
-
-    if (postsError && isMissingCommunityBoardColumnError(postsError)) {
-        const preBoardResult = await buildQuery(COMMUNITY_FEED_POST_SELECT_PRE_BOARD);
-        postsError = preBoardResult.error;
-        postsData = (preBoardResult.data ?? null) as unknown as CommunityFeedPostRow[] | null;
-    }
-
-    if (postsError && (isMissingAnonymousColumnError(postsError) || isMissingCommunityModelColumnError(postsError))) {
-        if (!canUseLegacyCommunityFeedFallback(hub)) {
-            postsData = [];
-            postsError = null;
-        } else {
-            const legacyResult = await buildQuery(COMMUNITY_FEED_POST_SELECT_LEGACY);
-            postsData = ((legacyResult.data ?? []) as unknown as CommunityFeedPostRow[]).map((post) => normalizeCommunityFeedPostRow({
-                ...post,
-                is_anonymous: false,
-            }));
-            postsError = legacyResult.error;
-        }
-    }
-
-    if (postsError) {
+    try {
+        const payload = await fetchLegacyCommunityFeed({
+            category: searchParams.get('category'),
+            format: searchParams.get('format'),
+            hub: searchParams.get('hub'),
+            q: searchParams.get('q'),
+            sort: searchParams.get('sort'),
+            offset,
+            limit: PAGE_LIMIT,
+        });
+        return NextResponse.json(payload);
+    } catch (postsError) {
         console.error('API Error fetching legacy community posts:', postsError);
-        return NextResponse.json({ error: postsError.message }, { status: 500 });
+        return NextResponse.json(
+            { error: postsError instanceof Error ? postsError.message : 'Failed to load community feed' },
+            { status: 500 }
+        );
     }
-
-    return buildFeedResponse(postsData, offset);
 }
 
 export async function GET(request: NextRequest) {
