@@ -621,10 +621,24 @@ test.describe.serial('guest trips completed sync route', () => {
     await page.getByTestId(`guest-trip-cancel-button-${bookingId}`).click();
 
     const cancelModal = page.getByTestId('guest-trip-cancel-modal');
+    const acknowledgeCheckbox = cancelModal.getByTestId('guest-trip-cancel-acknowledge-checkbox');
+    const confirmButton = cancelModal.getByRole('button', { name: '취소 확정' });
     await expect(cancelModal).toBeVisible({ timeout: 10000 });
-    await expect(cancelModal.getByTestId('guest-trip-cancel-followup')).toContainText('취소 후 결과는 여기서 확인하세요');
+    await expect(cancelModal).toContainText('호스트에게 전달할 취소 사유');
+    await expect(cancelModal.getByTestId('guest-trip-cancel-followup')).toContainText('예약 취소');
     await expect(cancelModal.getByTestId('guest-trip-cancel-followup')).toContainText('취소 요청과 환불 진행 상태는 예약 내역과 알림에서 다시 확인할 수 있어요.');
     await expect(cancelModal.getByTestId('guest-trip-cancel-followup')).toContainText('무통장 입금 예약의 환불 계좌 정보는 고객센터 1:1 문의에 남겨주세요.');
+    await expect(cancelModal.getByTestId('guest-trip-cancel-followup')).toContainText('안내 내용을 확인했습니다.');
+    await expect(confirmButton).toBeDisabled();
+
+    await acknowledgeCheckbox.check();
+    await expect(confirmButton).toBeEnabled();
+
+    await cancelModal.locator('select').selectOption('other');
+    await expect(confirmButton).toBeDisabled();
+
+    await cancelModal.locator('textarea').fill('개인 사정으로 참여가 어려워졌습니다.');
+    await expect(confirmButton).toBeEnabled();
     await expect(cancelModal.getByRole('button', { name: '먼저 호스트에게 문의하기' })).toBeVisible();
 
     await cancelModal.getByRole('button', { name: '먼저 호스트에게 문의하기' }).click();
@@ -819,9 +833,13 @@ test.describe.serial('guest trips completed sync route', () => {
     const cancelDialog = page.getByTestId('guest-trip-cancel-dialog');
     const cancelBody = page.getByTestId('guest-trip-cancel-body');
     const confirmButton = page.getByRole('button', { name: '취소 확정' });
+    const acknowledgeCheckbox = page.getByTestId('guest-trip-cancel-acknowledge-checkbox');
 
     await expect(cancelDialog).toBeVisible();
     await cancelDialog.locator('select').selectOption('minimum_participants_unmet');
+    await expect(confirmButton).toBeDisabled();
+    await acknowledgeCheckbox.check();
+    await expect(confirmButton).toBeEnabled();
     const cancelDialogBox = await cancelDialog.boundingBox();
     expect(cancelDialogBox).not.toBeNull();
     if (!cancelDialogBox) throw new Error('Cancellation dialog bounding box was not available.');
@@ -1060,6 +1078,7 @@ test.describe.serial('guest trips completed sync route', () => {
     const cancelBody = page.getByTestId('guest-trip-cancel-body');
     const cancelCloseButton = page.getByTestId('guest-trip-cancel-close-button');
     const confirmButton = page.getByRole('button', { name: '취소 확정' });
+    const acknowledgeCheckbox = page.getByTestId('guest-trip-cancel-acknowledge-checkbox');
 
     await expect(cancelDialog).toBeVisible();
     await cancelDialog.locator('select').selectOption('minimum_participants_unmet');
@@ -1083,6 +1102,8 @@ test.describe.serial('guest trips completed sync route', () => {
 
     await expect(cancelCloseButton).toBeVisible();
     await expect(confirmButton).toBeVisible();
+    await expect(confirmButton).toBeDisabled();
+    await acknowledgeCheckbox.check();
     await expect(confirmButton).toBeEnabled();
   });
 

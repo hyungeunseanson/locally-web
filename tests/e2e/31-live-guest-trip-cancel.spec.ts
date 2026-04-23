@@ -157,6 +157,7 @@ test.describe.serial('Live guest trip cancellation flow', () => {
         const cancelModal = page.getByTestId('guest-trip-cancel-modal');
         await expect(cancelModal).toBeVisible({ timeout: 10000 });
         await cancelModal.locator('textarea').fill(cancelReason);
+        await cancelModal.getByTestId('guest-trip-cancel-acknowledge-checkbox').check();
 
         const cancelRequestPromise = page.waitForRequest(
           (request) =>

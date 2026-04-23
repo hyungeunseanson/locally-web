@@ -27,6 +27,7 @@ export default function CancellationModal({ isOpen, onClose, onConfirm, isProces
   const { t } = useLanguage();
   const [reasonCode, setReasonCode] = useState<GuestTripCancelReasonCode>('personal_change');
   const [reason, setReason] = useState('');
+  const [hasAcknowledgedFollowup, setHasAcknowledgedFollowup] = useState(false);
 
   if (!visible) return null;
 
@@ -44,12 +45,7 @@ export default function CancellationModal({ isOpen, onClose, onConfirm, isProces
     }
     : refundInfo;
   const reasonRequired = isOtherReason;
-  const followupTitle = isReviewReason
-    ? t('modal_cancel_followup_review_title')
-    : t('modal_cancel_followup_title');
-  const followupDesc = isReviewReason
-    ? t('modal_cancel_followup_review_desc')
-    : t('modal_cancel_followup_desc');
+  const confirmDisabled = !hasAcknowledgedFollowup || (reasonRequired && !reason.trim()) || isProcessing;
 
   return (
     <div
@@ -131,7 +127,7 @@ export default function CancellationModal({ isOpen, onClose, onConfirm, isProces
           {/* 취소 사유 입력 */}
           <div className="space-y-1.5 md:space-y-2">
             <label className="text-[13px] md:text-sm font-bold text-slate-700">
-              {t('modal_cancel_reason_detail_label')} {reasonRequired ? '' : <span className="text-slate-400 font-medium">({t('modal_cancel_reason_detail_optional')})</span>}
+              {t('modal_cancel_reason_detail_label')}
             </label>
             <textarea 
               className="w-full border border-slate-300 rounded-lg md:rounded-xl p-2.5 md:p-3 text-[13px] md:text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all resize-none"
@@ -147,14 +143,33 @@ export default function CancellationModal({ isOpen, onClose, onConfirm, isProces
             className={`rounded-lg border px-3.5 py-3 text-left ${isReviewReason ? 'border-orange-100 bg-orange-50' : 'border-slate-200 bg-slate-50'}`}
           >
             <p className={`text-[11px] md:text-xs font-bold ${isReviewReason ? 'text-orange-800' : 'text-slate-700'}`}>
-              {followupTitle}
+              {t('modal_cancel_followup_title')}
             </p>
             <p className={`mt-1 text-[11px] leading-5 ${isReviewReason ? 'text-orange-700' : 'text-slate-500'}`}>
-              {followupDesc}
+              {t('modal_cancel_followup_desc')}
             </p>
             <p className={`mt-1 text-[11px] leading-5 ${isReviewReason ? 'text-orange-700' : 'text-slate-500'}`}>
               {t('modal_cancel_refund_account_support_note')}
             </p>
+            <label
+              data-testid="guest-trip-cancel-acknowledge-label"
+              className={`mt-3 flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2.5 transition-colors ${
+                isReviewReason
+                  ? 'border-orange-200 bg-white/70 hover:bg-white'
+                  : 'border-slate-200 bg-white hover:bg-slate-50'
+              }`}
+            >
+              <input
+                data-testid="guest-trip-cancel-acknowledge-checkbox"
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                checked={hasAcknowledgedFollowup}
+                onChange={(e) => setHasAcknowledgedFollowup(e.target.checked)}
+              />
+              <span className={`text-[11px] leading-5 ${isReviewReason ? 'text-orange-800' : 'text-slate-700'}`}>
+                {t('modal_cancel_followup_acknowledge')}
+              </span>
+            </label>
           </div>
 
           <button
@@ -176,8 +191,8 @@ export default function CancellationModal({ isOpen, onClose, onConfirm, isProces
           </button>
           <button 
             onClick={() => onConfirm({ reasonCode, reason: reason.trim() })}
-            disabled={(reasonRequired && !reason.trim()) || isProcessing}
-            className={`flex-1 py-2.5 md:py-3 rounded-lg md:rounded-xl font-bold text-[13px] md:text-sm text-white transition-all ${(reasonRequired && !reason.trim()) ? 'bg-slate-300 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700 shadow-lg shadow-red-200'}`}
+            disabled={confirmDisabled}
+            className={`flex-1 py-2.5 md:py-3 rounded-lg md:rounded-xl font-bold text-[13px] md:text-sm text-white transition-all ${confirmDisabled ? 'bg-slate-300 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700 shadow-lg shadow-red-200'}`}
           >
             {isProcessing ? t('status_processing') : t('button_confirm_cancel')}
           </button>
