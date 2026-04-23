@@ -51,6 +51,12 @@ type CommunityDetailPostRow = {
 };
 type CommunityDetailPreBoardPostRow = Omit<CommunityDetailPostRow, 'board_country'>;
 type CommunityDetailLegacyPostRow = Omit<CommunityDetailPostRow, 'destination_hub' | 'is_anonymous' | 'board_country'>;
+type CommunityAdjacentPostRow = {
+    id: string;
+    title: string;
+    created_at: string;
+    destination_hub?: CommunityDetailPostRow['destination_hub'];
+};
 
 const COMMUNITY_DETAIL_POST_SELECT = [
     'id',
@@ -232,7 +238,7 @@ export default async function CommunityPostDetail({
         .maybeSingle();
 
     const initialPostResult = await buildPostQuery(COMMUNITY_DETAIL_POST_SELECT);
-    let post = initialPostResult.data as CommunityDetailPostRow | null;
+    let post = initialPostResult.data as unknown as CommunityDetailPostRow | null;
     let postError = initialPostResult.error;
 
     if (postError && isMissingCommunityBoardColumnError(postError)) {
@@ -342,7 +348,7 @@ export default async function CommunityPostDetail({
         ? buildCommunityBoardListHref({ board: boardContext, sort: fallbackSort })
         : '/community';
 
-    const buildAdjacentQuery = (direction: 'prev' | 'next') => {
+    const buildAdjacentQuery = async (direction: 'prev' | 'next') => {
         let query = supabase.from('community_posts')
             .select(usedPreBoardFallback ? 'id, title, created_at, destination_hub' : 'id, title, created_at');
 
@@ -363,18 +369,26 @@ export default async function CommunityPostDetail({
         }
 
         if (direction === 'prev') {
-            return query
+            const result = await query
                 .lt('created_at', post.created_at)
                 .order('created_at', { ascending: false })
                 .limit(1)
                 .maybeSingle();
+            return {
+                data: result.data as unknown as CommunityAdjacentPostRow | null,
+                error: result.error,
+            };
         }
 
-        return query
+        const result = await query
             .gt('created_at', post.created_at)
             .order('created_at', { ascending: true })
             .limit(1)
             .maybeSingle();
+        return {
+            data: result.data as unknown as CommunityAdjacentPostRow | null,
+            error: result.error,
+        };
     };
 
     const [{ data: prevPost }, { data: nextPost }] = await Promise.all([

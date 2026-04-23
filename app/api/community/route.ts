@@ -92,18 +92,18 @@ async function handleBoardFeed(request: NextRequest) {
 
     const initialResult = await buildQuery(COMMUNITY_FEED_POST_SELECT);
     let postsError = initialResult.error;
-    let postsData = (initialResult.data ?? null) as CommunityFeedPostRow[] | null;
+    let postsData = (initialResult.data ?? null) as unknown as CommunityFeedPostRow[] | null;
 
     if (postsError && isMissingCommunityBoardColumnError(postsError)) {
         const preBoardResult = await buildQuery(COMMUNITY_FEED_POST_SELECT_PRE_BOARD, true);
         postsError = preBoardResult.error;
-        postsData = (preBoardResult.data ?? null) as CommunityFeedPostRow[] | null;
+        postsData = (preBoardResult.data ?? null) as unknown as CommunityFeedPostRow[] | null;
     }
 
     if (postsError && (isMissingAnonymousColumnError(postsError) || isMissingCommunityModelColumnError(postsError))) {
         const legacyResult = await buildQuery(COMMUNITY_FEED_POST_SELECT_LEGACY, true);
         postsError = legacyResult.error;
-        postsData = ((legacyResult.data ?? []) as CommunityFeedPostRow[]).map((post) => normalizeCommunityFeedPostRow({
+        postsData = ((legacyResult.data ?? []) as unknown as CommunityFeedPostRow[]).map((post) => normalizeCommunityFeedPostRow({
             ...post,
             is_anonymous: false,
         }));
@@ -166,12 +166,12 @@ async function handleLegacyFeed(request: NextRequest) {
 
     const initialResult = await buildQuery(COMMUNITY_FEED_POST_SELECT);
     let postsError = initialResult.error;
-    let postsData = (initialResult.data ?? null) as CommunityFeedPostRow[] | null;
+    let postsData = (initialResult.data ?? null) as unknown as CommunityFeedPostRow[] | null;
 
     if (postsError && isMissingCommunityBoardColumnError(postsError)) {
         const preBoardResult = await buildQuery(COMMUNITY_FEED_POST_SELECT_PRE_BOARD);
         postsError = preBoardResult.error;
-        postsData = (preBoardResult.data ?? null) as CommunityFeedPostRow[] | null;
+        postsData = (preBoardResult.data ?? null) as unknown as CommunityFeedPostRow[] | null;
     }
 
     if (postsError && (isMissingAnonymousColumnError(postsError) || isMissingCommunityModelColumnError(postsError))) {
@@ -180,7 +180,7 @@ async function handleLegacyFeed(request: NextRequest) {
             postsError = null;
         } else {
             const legacyResult = await buildQuery(COMMUNITY_FEED_POST_SELECT_LEGACY);
-            postsData = ((legacyResult.data ?? []) as CommunityFeedPostRow[]).map((post) => normalizeCommunityFeedPostRow({
+            postsData = ((legacyResult.data ?? []) as unknown as CommunityFeedPostRow[]).map((post) => normalizeCommunityFeedPostRow({
                 ...post,
                 is_anonymous: false,
             }));
