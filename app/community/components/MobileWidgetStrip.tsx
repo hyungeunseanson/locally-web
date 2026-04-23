@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-import { buildCommunityDetailHref } from '../queryParams';
+import { buildCommunityDetailHref } from '../legacyQueryParams';
 import { getCommunityHubMeta } from '../hubMeta';
 import { COMMUNITY_OPEN } from '../categoryMeta';
 import type { CommunityHighlightPost } from '../highlights';

@@ -2,36 +2,26 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { Loader2, MessageSquareDashed } from 'lucide-react';
-import Link from 'next/link';
 
 import type { CommunityBoard } from '@/app/types/community';
 import { parseCommunityFeedResponse, type CommunityFeedPost } from './feedSelect';
 import PostListCard from './components/PostListCard';
+import CommunityWriteCta from './components/CommunityWriteCta';
 
 interface CommunityFeedProps {
   initialData: CommunityFeedPost[];
   initialNextOffset: number | null;
   board: CommunityBoard;
   sort: 'latest' | 'popular';
-  canWrite: boolean;
 }
 
-function EmptyState({ board, canWrite }: { board: CommunityBoard; canWrite: boolean }) {
-  const writeHref = `/community/write?board=${board}`;
-
+function EmptyState({ board }: { board: CommunityBoard }) {
   return (
     <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-12 text-center">
       <MessageSquareDashed className="mx-auto mb-4 h-12 w-12 text-gray-300" strokeWidth={1.5} />
       <p className="mb-1 text-[16px] font-semibold text-gray-500">아직 게시글이 없어요</p>
       <p className="mb-6 text-sm text-gray-400">첫 글의 주인공이 되어보세요.</p>
-      {canWrite && (
-        <Link
-          href={writeHref}
-          className="inline-flex rounded-full bg-[#111111] px-6 py-2.5 text-[14px] font-bold text-white shadow-[0_10px_22px_rgba(15,23,42,0.14)] transition-all hover:bg-black active:scale-95"
-        >
-          글 작성하기
-        </Link>
-      )}
+      <CommunityWriteCta board={board} variant="empty" />
     </div>
   );
 }
@@ -41,7 +31,6 @@ export default function CommunityFeed({
   initialNextOffset,
   board,
   sort,
-  canWrite,
 }: CommunityFeedProps) {
   const [posts, setPosts] = useState<CommunityFeedPost[]>(initialData);
   const [nextOffset, setNextOffset] = useState<number | null>(initialNextOffset);
@@ -90,7 +79,7 @@ export default function CommunityFeed({
           ))}
         </div>
       ) : (
-        <EmptyState board={board} canWrite={canWrite} />
+        <EmptyState board={board} />
       )}
 
       {nextOffset !== null && (

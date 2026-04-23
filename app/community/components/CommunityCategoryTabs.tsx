@@ -4,7 +4,8 @@ import React from 'react';
 import { Loader2 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { COMMUNITY_FORMAT_FILTER_OPTIONS, COMMUNITY_OPEN } from '../categoryMeta';
-import { buildCommunityListHref, resolveCommunityFormat, resolveCommunityHub, resolveCommunitySort } from '../queryParams';
+import { resolveCommunitySort } from '../queryParams';
+import { buildCommunityListHref, resolveCommunityFormat, resolveCommunityHub } from '../legacyQueryParams';
 import { usePendingNavigation } from '../hooks/usePendingNavigation';
 
 export default function CommunityCategoryTabs() {

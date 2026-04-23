@@ -10,7 +10,7 @@ import { getCommunityCategoryMeta } from '../categoryMeta';
 import { getCommunityAuthorInitial, getCommunityAuthorName } from '../authorDisplay';
 import CommunityAuthorTrigger from './CommunityAuthorTrigger';
 import type { CommunityHubFilter, CommunityPostFormatFilter } from '@/app/types/community';
-import { buildCommunityDetailHref } from '../queryParams';
+import { buildCommunityDetailHref } from '../legacyQueryParams';
 import { getCommunityHubMeta } from '../hubMeta';
 import { usePendingNavigation } from '../hooks/usePendingNavigation';
 

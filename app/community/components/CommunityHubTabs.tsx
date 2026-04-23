@@ -5,7 +5,8 @@ import { Loader2 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 
 import { COMMUNITY_HUB_OPTIONS, getCommunityHubMeta } from '../hubMeta';
-import { buildCommunityListHref, resolveCommunityFormat, resolveCommunityHub, resolveCommunitySort } from '../queryParams';
+import { resolveCommunitySort } from '../queryParams';
+import { buildCommunityListHref, resolveCommunityFormat, resolveCommunityHub } from '../legacyQueryParams';
 import { usePendingNavigation } from '../hooks/usePendingNavigation';
 
 export default function CommunityHubTabs() {

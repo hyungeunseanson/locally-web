@@ -173,13 +173,30 @@ test.describe.serial('Community board layout and access', () => {
     await expect(page.getByPlaceholder('로컬리 콘텐츠 검색')).toHaveCount(0);
     await expect(page.getByTestId('community-list-sidebar-ad')).toHaveCount(0);
     await expect(page.getByTestId('community-list-bottom-ad')).toBeVisible();
-    await expect(page.getByRole('link', { name: '글쓰기' })).toBeVisible();
+    await expect(page.getByTestId('community-write-cta-desktop')).toBeVisible();
     await expect(page.getByText(`[Playwright] Community Board Japan ${token}`)).toBeVisible();
     await expect(page.getByText(`[Playwright] Community Board Korea ${token}`)).toHaveCount(0);
 
     await page.getByTestId('community-board-tab-korea').click();
     await expect.poll(() => page.url()).toContain('board=korea');
     await expect(page.getByText(`[Playwright] Community Board Korea ${token}`)).toBeVisible();
+  });
+
+  test('hides write CTA for unauthenticated visitors while keeping the board feed public', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const author = createUser('public');
+    const authorId = await createAuthUser(author);
+    const token = `${Date.now()}`;
+    await createBoardPost(authorId, 'japan', `[Playwright] Community Board Public ${token}`);
+
+    await page.goto('/community', { waitUntil: 'networkidle' });
+
+    await expect(page.getByTestId('community-board-tab-japan')).toBeVisible();
+    await expect(page.getByText(`[Playwright] Community Board Public ${token}`)).toBeVisible();
+    await expect(page.getByTestId('community-write-cta-desktop')).toHaveCount(0);
+    await expect(page.getByTestId('community-write-cta-mobile')).toHaveCount(0);
+    await expect(page.getByTestId('community-write-cta-empty')).toHaveCount(0);
   });
 
   test('lets logged-in users open the simplified write page and publish a board post', async ({ page }) => {

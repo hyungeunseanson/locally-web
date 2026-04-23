@@ -5,7 +5,7 @@ import { ChevronDown, Loader2, Search } from 'lucide-react';
 
 import type { CommunityHubFilter, CommunityPostFormatFilter } from '@/app/types/community';
 import { COMMUNITY_FORMAT_FILTER_OPTIONS, COMMUNITY_OPEN } from '../categoryMeta';
-import { buildCommunityListHref } from '../queryParams';
+import { buildCommunityListHref } from '../legacyQueryParams';
 import { usePendingNavigation } from '../hooks/usePendingNavigation';
 
 type SortOption = 'latest' | 'popular';

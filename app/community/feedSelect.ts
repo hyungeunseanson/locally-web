@@ -66,6 +66,50 @@ export const COMMUNITY_FEED_POST_SELECT_LEGACY = [
   'updated_at',
 ].join(', ');
 
+export const COMMUNITY_BOARD_FEED_POST_SELECT = [
+  'id',
+  'user_id',
+  'category',
+  'board_country',
+  'title',
+  'images',
+  'is_anonymous',
+  'linked_exp_id',
+  'view_count',
+  'like_count',
+  'comment_count',
+  'created_at',
+].join(', ');
+
+export const COMMUNITY_BOARD_FEED_POST_SELECT_PRE_BOARD = [
+  'id',
+  'user_id',
+  'category',
+  'destination_hub',
+  'title',
+  'images',
+  'is_anonymous',
+  'linked_exp_id',
+  'view_count',
+  'like_count',
+  'comment_count',
+  'created_at',
+].join(', ');
+
+export const COMMUNITY_BOARD_FEED_POST_SELECT_LEGACY = [
+  'id',
+  'user_id',
+  'category',
+  'destination_hub',
+  'title',
+  'images',
+  'linked_exp_id',
+  'view_count',
+  'like_count',
+  'comment_count',
+  'created_at',
+].join(', ');
+
 export const COMMUNITY_FEED_PROFILE_SELECT = 'id, full_name, avatar_url';
 export const COMMUNITY_FEED_EXPERIENCE_SELECT = 'id, title, image_url, price';
 
@@ -73,6 +117,22 @@ export type CommunityFeedProfile = Pick<Profile, 'id' | 'full_name' | 'avatar_ur
   name?: string | null;
 };
 export type CommunityFeedExperience = Pick<Experience, 'id' | 'title' | 'image_url' | 'price'>;
+export type CommunityBoardFeedPostRow = Pick<
+  CommunityPost,
+  | 'id'
+  | 'user_id'
+  | 'category'
+  | 'destination_hub'
+  | 'board_country'
+  | 'title'
+  | 'images'
+  | 'is_anonymous'
+  | 'linked_exp_id'
+  | 'view_count'
+  | 'like_count'
+  | 'comment_count'
+  | 'created_at'
+>;
 export type CommunityFeedPostRow = Pick<
   CommunityPost,
   | 'id'
@@ -95,8 +155,20 @@ export type CommunityFeedPostRow = Pick<
   | 'created_at'
   | 'updated_at'
 >;
-export type CommunityFeedPost = Omit<CommunityFeedPostRow, 'user_id'> & {
+export type CommunityFeedPost = {
+  id: string;
   user_id: string | null;
+  category: CommunityPost['category'];
+  destination_hub?: CommunityPost['destination_hub'];
+  board_country: CommunityPost['board_country'];
+  title: string;
+  images: string[];
+  is_anonymous: boolean;
+  linked_exp_id: number | null;
+  view_count: number;
+  like_count: number;
+  comment_count: number;
+  created_at: string;
   profiles?: CommunityFeedProfile | null;
   linked_experience?: CommunityFeedExperience | null;
 };
@@ -130,12 +202,75 @@ export function buildCommunityFeedPosts(
     const publicUserId = normalizedPost.is_anonymous ? null : normalizedPost.user_id;
 
     return {
-      ...normalizedPost,
+      id: normalizedPost.id,
       user_id: publicUserId,
+      category: normalizedPost.category,
+      destination_hub: normalizedPost.destination_hub,
+      board_country: normalizedPost.board_country,
+      title: normalizedPost.title,
+      images: normalizedPost.images,
+      is_anonymous: normalizedPost.is_anonymous,
+      linked_exp_id: normalizedPost.linked_exp_id ?? null,
+      view_count: normalizedPost.view_count,
+      like_count: normalizedPost.like_count,
+      comment_count: normalizedPost.comment_count,
+      created_at: normalizedPost.created_at,
       profiles: normalizedPost.is_anonymous ? null : profileMap.get(normalizedPost.user_id) ?? null,
       linked_experience: normalizedPost.linked_exp_id ? experienceMap.get(normalizedPost.linked_exp_id) ?? null : null,
     };
   });
+}
+
+export function buildCommunityBoardFeedPosts(
+  posts: CommunityBoardFeedPostRow[],
+  profiles: CommunityFeedProfile[],
+  experiences: CommunityFeedExperience[]
+): CommunityFeedPost[] {
+  const profileMap = new Map(profiles.map((profile) => [profile.id, profile] as const));
+  const experienceMap = new Map(experiences.map((experience) => [experience.id, experience] as const));
+
+  return posts.map((post) => {
+    const normalizedPost = normalizeCommunityBoardFeedPostRow(post);
+    const publicUserId = normalizedPost.is_anonymous ? null : normalizedPost.user_id;
+
+    return {
+      id: normalizedPost.id,
+      user_id: publicUserId,
+      category: normalizedPost.category,
+      destination_hub: normalizedPost.destination_hub,
+      board_country: normalizedPost.board_country,
+      title: normalizedPost.title,
+      images: normalizedPost.images,
+      is_anonymous: normalizedPost.is_anonymous,
+      linked_exp_id: normalizedPost.linked_exp_id ?? null,
+      view_count: normalizedPost.view_count,
+      like_count: normalizedPost.like_count,
+      comment_count: normalizedPost.comment_count,
+      created_at: normalizedPost.created_at,
+      profiles: normalizedPost.is_anonymous ? null : profileMap.get(normalizedPost.user_id) ?? null,
+      linked_experience: normalizedPost.linked_exp_id ? experienceMap.get(normalizedPost.linked_exp_id) ?? null : null,
+    };
+  });
+}
+
+export function normalizeCommunityBoardFeedPostRow(
+  post: Partial<CommunityBoardFeedPostRow> & Pick<CommunityBoardFeedPostRow, 'id' | 'user_id' | 'category' | 'title'>
+): CommunityBoardFeedPostRow {
+  return {
+    id: post.id,
+    user_id: post.user_id,
+    category: post.category,
+    destination_hub: normalizeCommunityHub(post.destination_hub),
+    board_country: normalizeCommunityBoard(post.board_country, post.destination_hub),
+    title: post.title,
+    images: Array.isArray(post.images) ? post.images : [],
+    is_anonymous: Boolean(post.is_anonymous),
+    linked_exp_id: typeof post.linked_exp_id === 'number' ? post.linked_exp_id : null,
+    view_count: Number(post.view_count || 0),
+    like_count: Number(post.like_count || 0),
+    comment_count: Number(post.comment_count || 0),
+    created_at: post.created_at || new Date(0).toISOString(),
+  };
 }
 
 export function normalizeCommunityFeedPostRow(

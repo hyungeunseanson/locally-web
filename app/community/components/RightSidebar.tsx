@@ -5,7 +5,7 @@ import { Edit3, ChevronRight } from 'lucide-react';
 import type { CommunityCategory, CommunityHubFilter, CommunityPostFormatFilter } from '@/app/types/community';
 import type { CommunityHighlightPost } from '../highlights';
 import { getCommunityHubMeta } from '../hubMeta';
-import { buildCommunityDetailHref, buildCommunityListHref } from '../queryParams';
+import { buildCommunityDetailHref, buildCommunityListHref } from '../legacyQueryParams';
 import { COMMUNITY_OPEN, isLocallyContentCategory } from '../categoryMeta';
 
 interface RightSidebarProps {

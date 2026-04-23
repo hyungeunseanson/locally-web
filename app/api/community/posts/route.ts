@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { sanitizeText } from '@/app/utils/sanitize';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { createCommunityInsertPayload } from '@/app/community/feedSelect';
 import {
@@ -180,6 +180,10 @@ export async function POST(request: NextRequest) {
         // ✅ 핵심: 글 등록 후 /community 라우터 캐시 무효화
         // 이 호출이 없으면 피드로 돌아가도 Next.js가 구 버전 캐시를 서빙함
         revalidatePath('/community');
+        revalidateTag('community-board-feed', 'max');
+        if (normalizedBoard) {
+            revalidateTag(`community-board-feed-${normalizedBoard}`, 'max');
+        }
 
         return NextResponse.json({ id: data?.id });
     } catch (err) {
