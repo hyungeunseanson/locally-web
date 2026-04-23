@@ -9,7 +9,6 @@ interface CommunityCommentsPanelProps {
     postId: string;
     viewCount: number;
     initialLikeCount: number;
-    initialLiked: boolean;
     initialCommentCount: number;
     onOpenLogin?: () => void;
 }
@@ -18,7 +17,6 @@ export default function CommunityCommentsPanel({
     postId,
     viewCount,
     initialLikeCount,
-    initialLiked,
     initialCommentCount,
     onOpenLogin,
 }: CommunityCommentsPanelProps) {
@@ -73,7 +71,6 @@ export default function CommunityCommentsPanel({
                     <LikeButton
                         postId={postId}
                         initialCount={initialLikeCount}
-                        initialLiked={initialLiked}
                         onOpenLogin={onOpenLogin}
                     />
                 </div>

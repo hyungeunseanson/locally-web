@@ -4,7 +4,6 @@ import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { MapPin, CalendarCheck } from 'lucide-react';
-import { createClient } from '@/app/utils/supabase/server';
 import LinkedExperienceChip from '../components/LinkedExperienceChip';
 import PostImages from '../components/PostImages';
 import CommunityCommentsPanel from '../components/CommunityCommentsPanel';
@@ -100,30 +99,12 @@ export default async function CommunityPostDetail({
 }) {
     const { id } = await params;
     const detailSearchParams = await searchParams;
-    const authSupabase = await createClient();
-    const { data: { user } } = await authSupabase.auth.getUser();
     const fallbackSort = resolveCommunitySort(detailSearchParams?.sort as string);
     const requestedBoard = typeof detailSearchParams?.board === 'string'
         ? resolveCommunityBoard(detailSearchParams.board as string)
         : null;
     const { post, profile, linkedExperience, usedPreBoardFallback } = await getCommunityDetailPost(id);
     if (!post) notFound();
-
-    let initialLiked = false;
-    if (user) {
-        const { data: existingLike, error: existingLikeError } = await authSupabase
-            .from('community_likes')
-            .select('id')
-            .eq('post_id', post.id)
-            .eq('user_id', user.id)
-            .maybeSingle();
-
-        if (existingLikeError) {
-            console.error('[Community Post Detail] Like state query error:', existingLikeError);
-        } else {
-            initialLiked = Boolean(existingLike);
-        }
-    }
 
     // ④ 이전글/다음글 (같은 카테고리)
     const isCompanion = post.category === 'companion';
@@ -297,7 +278,6 @@ export default async function CommunityPostDetail({
                                 postId={post.id}
                                 viewCount={post.view_count || 0}
                                 initialLikeCount={post.like_count || 0}
-                                initialLiked={initialLiked}
                                 initialCommentCount={post.comment_count || 0}
                             />
 

@@ -228,7 +228,7 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Community detail state consistency', () => {
-  test('keeps like/comment state aligned and preserves board-based list navigation', async ({ page }) => {
+  test('keeps like/comment state aligned and preserves board-based list navigation', async ({ page, request }) => {
     test.setTimeout(90000);
 
     const author = createUser('author');
@@ -255,6 +255,14 @@ test.describe.serial('Community detail state consistency', () => {
     const commentMessage = `Playwright comment ${Date.now()}`;
 
     await seedLike(postId, viewerId);
+
+    const unauthenticatedLikeState = await request.get(`/api/community/likes?post_id=${postId}`);
+    expect(unauthenticatedLikeState.ok()).toBeTruthy();
+    await expect(unauthenticatedLikeState.json()).resolves.toMatchObject({
+      liked: false,
+      authenticated: false,
+    });
+
     await login(page, viewer);
     await page.goto(`/community/${postId}?board=japan&sort=popular`, {
       waitUntil: 'networkidle',
@@ -262,6 +270,21 @@ test.describe.serial('Community detail state consistency', () => {
 
     const likeButton = page.getByTestId('community-like-button');
     await expect(likeButton).toContainText('1');
+
+    await expect
+      .poll(async () => {
+        return page.evaluate(async (currentPostId) => {
+          const response = await fetch(`/api/community/likes?post_id=${currentPostId}`, {
+            credentials: 'same-origin',
+            cache: 'no-store',
+          });
+          return response.json();
+        }, postId);
+      })
+      .toMatchObject({
+        liked: true,
+        authenticated: true,
+      });
 
     const likeResponsePromise = page.waitForResponse((response) =>
       response.url().includes('/api/community/likes') && response.request().method() === 'POST'
@@ -272,6 +295,24 @@ test.describe.serial('Community detail state consistency', () => {
     await expect(likeResponse.json()).resolves.toMatchObject({ liked: false, likeCount: 0 });
     await expect(likeButton).toContainText('0');
     expect(await readPostLikeCount(postId)).toBe(0);
+
+    await page.reload({ waitUntil: 'networkidle' });
+    await expect(page.getByTestId('community-like-button')).toContainText('0');
+
+    await expect
+      .poll(async () => {
+        return page.evaluate(async (currentPostId) => {
+          const response = await fetch(`/api/community/likes?post_id=${currentPostId}`, {
+            credentials: 'same-origin',
+            cache: 'no-store',
+          });
+          return response.json();
+        }, postId);
+      })
+      .toMatchObject({
+        liked: false,
+        authenticated: true,
+      });
 
     await expect(page.getByTestId('community-comment-summary-count')).toHaveText('댓글 0');
     await expect(page.getByTestId('community-comment-heading-count')).toHaveText('댓글 0');
@@ -293,6 +334,11 @@ test.describe.serial('Community detail state consistency', () => {
     await expect(commentsPanel.getByRole('button', { name: /좋아요/i })).toHaveCount(0);
     await expect(page.getByTestId('community-detail-bottom-ad')).toBeVisible();
     await expect(page.getByTestId('community-detail-sidebar-ad')).toHaveCount(0);
+
+    await page.reload({ waitUntil: 'networkidle' });
+    await expect(page.getByTestId('community-comment-summary-count')).toHaveText('댓글 1');
+    await expect(page.getByTestId('community-comment-heading-count')).toHaveText('댓글 1');
+    await expect(page.getByTestId('community-comment-list')).toContainText(commentMessage);
 
     const nextHref = await page.getByTestId('community-detail-next-link').getAttribute('href');
     expect(nextHref).toContain('sort=popular');

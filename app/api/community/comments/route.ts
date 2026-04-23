@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidateTag } from 'next/cache';
 
 import type { CommunityComment, CommunityProfilePreview } from '@/app/types/community';
 import { createClient } from '@/app/utils/supabase/server';
@@ -188,6 +189,8 @@ export async function POST(request: NextRequest) {
             profiles: profile ?? null,
             replies: [],
         };
+
+        revalidateTag(`community-detail-${post_id}`, 'max');
 
         return NextResponse.json({ data });
     } catch (err: unknown) {

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidateTag } from 'next/cache';
 
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient } from '@/app/utils/supabase/server';
@@ -57,6 +58,43 @@ async function resolveLikeCount(postId: string, optimisticLikeCount: number | nu
     return exactLikeCount;
 }
 
+export async function GET(request: NextRequest) {
+    try {
+        const { searchParams } = new URL(request.url);
+        const postId = searchParams.get('post_id');
+
+        if (!postId) {
+            return NextResponse.json({ error: 'Missing post_id' }, { status: 400 });
+        }
+
+        const supabase = await createClient();
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+        if (authError || !user) {
+            return NextResponse.json({ liked: false, authenticated: false });
+        }
+
+        const { data: existing, error: existingError } = await supabase
+            .from('community_likes')
+            .select('id')
+            .eq('post_id', postId)
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+        if (existingError) {
+            return NextResponse.json({ error: existingError.message }, { status: 500 });
+        }
+
+        return NextResponse.json({
+            liked: Boolean(existing),
+            authenticated: true,
+        });
+    } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        return NextResponse.json({ error: message }, { status: 500 });
+    }
+}
+
 export async function POST(request: NextRequest) {
     try {
         const supabase = await createClient();
@@ -93,6 +131,7 @@ export async function POST(request: NextRequest) {
                 ? null
                 : Math.max(normalizedKnownLikeCount - 1, 0);
             const likeCount = await resolveLikeCount(post_id, optimisticLikeCount);
+            revalidateTag(`community-detail-${post_id}`, 'max');
             return NextResponse.json({ liked: false, likeCount });
         } else {
             const { error: insertError } = await supabase.from('community_likes').insert({ post_id, user_id: user.id });
@@ -103,6 +142,7 @@ export async function POST(request: NextRequest) {
                         ? null
                         : normalizedKnownLikeCount + 1;
                     const likeCount = await resolveLikeCount(post_id, optimisticLikeCount);
+                    revalidateTag(`community-detail-${post_id}`, 'max');
                     return NextResponse.json({ liked: true, likeCount }, { status: 409 });
                 }
                 return NextResponse.json({ error: insertError.message }, { status: 500 });
@@ -112,6 +152,7 @@ export async function POST(request: NextRequest) {
                 ? null
                 : normalizedKnownLikeCount + 1;
             const likeCount = await resolveLikeCount(post_id, optimisticLikeCount);
+            revalidateTag(`community-detail-${post_id}`, 'max');
             return NextResponse.json({ liked: true, likeCount });
         }
     } catch (err) {

@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { unstable_cache } from 'next/cache';
+
 import type { CommunityBoard, CommunityHubFilter } from '@/app/types/community';
 import { createPublicServerClient } from '@/app/utils/supabase/public-server';
 import {
@@ -108,7 +110,9 @@ const COMMUNITY_DETAIL_POST_SELECT_LEGACY = [
   'updated_at',
 ].join(', ');
 
-export async function getCommunityDetailPost(id: string) {
+const COMMUNITY_DETAIL_REVALIDATE_SECONDS = 300;
+
+async function getCommunityDetailPostUncached(id: string) {
   const supabase = createPublicServerClient();
 
   const buildPostQuery = (selectClause: string) =>
@@ -188,6 +192,21 @@ export async function getCommunityDetailPost(id: string) {
     linkedExperience: (experienceResult.data ?? null) as CommunityDetailExperience,
     usedPreBoardFallback,
   };
+}
+
+export async function getCommunityDetailPost(id: string) {
+  if (process.env.NODE_ENV !== 'production') {
+    return getCommunityDetailPostUncached(id);
+  }
+
+  return unstable_cache(
+    () => getCommunityDetailPostUncached(id),
+    ['community-detail', id],
+    {
+      revalidate: COMMUNITY_DETAIL_REVALIDATE_SECONDS,
+      tags: ['community-detail', `community-detail-${id}`],
+    }
+  )();
 }
 
 export async function getAdjacentCommunityPosts({
