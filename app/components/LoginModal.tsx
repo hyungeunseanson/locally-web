@@ -64,6 +64,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
 
   const [termsAgreed, setTermsAgreed] = useState(false);
   const [privacyAgreed, setPrivacyAgreed] = useState(false);
+  const [emailAccuracyAgreed, setEmailAccuracyAgreed] = useState(false);
   const [termsError, setTermsError] = useState(false);
   const [showLegalText, setShowLegalText] = useState<'terms' | 'privacy' | null>(null);
 
@@ -79,6 +80,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
   const copy = getLoginModalCopy(lang);
   const nationalityOptions = getLoginModalNationalityOptions(lang);
   const legalDocument = showLegalText ? getLegalDocument(lang, showLegalText) : null;
+  const allSignupAgreementsChecked = termsAgreed && privacyAgreed && emailAccuracyAgreed;
   const currentPath = useMemo(() => {
     const query = searchParams.toString();
     const basePath = pathname || '/';
@@ -134,7 +136,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
         showToast(copy.phoneInvalid, 'error');
         return;
       }
-      if (!termsAgreed || !privacyAgreed) {
+      if (!termsAgreed || !privacyAgreed || !emailAccuracyAgreed) {
         setTermsError(true);
         showToast(copy.agreementsRequired, 'error');
         return;
@@ -420,13 +422,14 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
                     <div
                       className="flex items-center p-3.5 md:p-4 border-b border-gray-200 cursor-pointer select-none group"
                       onClick={() => {
-                        const newValue = !(termsAgreed && privacyAgreed);
+                        const newValue = !allSignupAgreementsChecked;
                         setTermsAgreed(newValue);
                         setPrivacyAgreed(newValue);
+                        setEmailAccuracyAgreed(newValue);
                       }}
                     >
-                      <div className={`w-5 h-5 rounded flex items-center justify-center border transition-colors ${termsAgreed && privacyAgreed ? 'bg-black border-black text-white' : 'bg-white border-gray-300 group-hover:border-gray-400'}`}>
-                        {(termsAgreed && privacyAgreed) && <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                      <div className={`w-5 h-5 rounded flex items-center justify-center border transition-colors ${allSignupAgreementsChecked ? 'bg-black border-black text-white' : 'bg-white border-gray-300 group-hover:border-gray-400'}`}>
+                        {allSignupAgreementsChecked && <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
                       </div>
                       <span className="ml-3 font-bold text-[13px] md:text-sm text-gray-900">{copy.selectAll}</span>
                     </div>
@@ -456,6 +459,20 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
                           <span className="ml-2.5 text-gray-700 font-medium text-xs">{copy.privacyAgreement}</span>
                         </div>
                         <button type="button" onClick={() => setShowLegalText('privacy')} className="text-[11px] md:text-[12px] text-gray-400 hover:text-black underline font-medium">{copy.viewLabel}</button>
+                      </div>
+
+                      <div
+                        className="flex cursor-pointer select-none group"
+                        onClick={() => setEmailAccuracyAgreed(!emailAccuracyAgreed)}
+                        data-testid="signup-email-accuracy-agreement"
+                      >
+                        <div className={`mt-0.5 w-4 h-4 flex-shrink-0 rounded flex items-center justify-center border transition-colors ${emailAccuracyAgreed ? 'bg-black border-black text-white' : 'bg-white border-gray-300 group-hover:border-gray-400'}`}>
+                          {emailAccuracyAgreed && <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                        </div>
+                        <div className="ml-2.5">
+                          <p className="text-gray-700 font-medium text-xs">{copy.emailAccuracyAgreement}</p>
+                          <p className="mt-1 text-[11px] leading-4 text-gray-500">{copy.emailAccuracyAgreementHint}</p>
+                        </div>
                       </div>
                     </div>
                   </div>

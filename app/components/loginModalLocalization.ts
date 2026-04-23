@@ -26,6 +26,8 @@ type LoginModalCopy = {
   selectAll: string;
   termsAgreement: string;
   privacyAgreement: string;
+  emailAccuracyAgreement: string;
+  emailAccuracyAgreementHint: string;
   viewLabel: string;
   switchToLogin: string;
   returnAfterLogin: string;
@@ -60,7 +62,7 @@ const COPY: Record<LoginModalLocale, LoginModalCopy> = {
     signupFieldsRequired: '이름, 국적, 연락처, 생년월일, 성별을 모두 입력해주세요.',
     birthDateInvalid: '생년월일 8자리(YYYYMMDD)를 올바르게 입력해주세요.',
     phoneInvalid: '올바른 연락처를 입력해주세요.',
-    agreementsRequired: '필수 약관에 동의해주세요.',
+    agreementsRequired: '필수 항목에 동의/확인해주세요.',
     signupSuccess: '환영합니다! 회원가입이 완료되었어요. 체험을 둘러보세요!',
     signupVerificationSent: '인증 메일을 보냈어요! 이메일을 확인하면 모든 기능을 사용할 수 있습니다.',
     invalidCredentials: '이메일 또는 비밀번호가 일치하지 않습니다.',
@@ -74,6 +76,8 @@ const COPY: Record<LoginModalLocale, LoginModalCopy> = {
     selectAll: '전체 동의',
     termsAgreement: '[필수] 서비스 이용약관 동의',
     privacyAgreement: '[필수] 개인정보 수집 및 이용 동의',
+    emailAccuracyAgreement: '[필수] 입력한 이메일 주소가 정확함을 확인합니다.',
+    emailAccuracyAgreementHint: '이메일이 잘못 입력되면 예약 확정, 변경, 취소 등 중요한 안내를 받지 못할 수 있어요.',
     viewLabel: '보기',
     switchToLogin: '이미 계정이 있으신가요? 로그인',
     returnAfterLogin: '로그인 후 지금 보던 화면으로 돌아가 바로 이어서 진행해요.',
@@ -95,7 +99,7 @@ const COPY: Record<LoginModalLocale, LoginModalCopy> = {
     signupFieldsRequired: 'Please fill in your name, nationality, phone number, birth date, and gender.',
     birthDateInvalid: 'Please enter a valid 8-digit birth date (YYYYMMDD).',
     phoneInvalid: 'Please enter a valid phone number.',
-    agreementsRequired: 'Please agree to the required terms.',
+    agreementsRequired: 'Please complete all required confirmations.',
     signupSuccess: 'Welcome! Your account is ready. Start exploring experiences!',
     signupVerificationSent: 'Verification email sent! Confirm your email to unlock all features.',
     invalidCredentials: 'Your email or password is incorrect.',
@@ -109,6 +113,8 @@ const COPY: Record<LoginModalLocale, LoginModalCopy> = {
     selectAll: 'Agree to all',
     termsAgreement: '[Required] Agree to Terms of Service',
     privacyAgreement: '[Required] Agree to Privacy Policy',
+    emailAccuracyAgreement: '[Required] I confirm that the email address I entered is correct.',
+    emailAccuracyAgreementHint: 'If the email is incorrect, you may miss important reservation confirmations, changes, or cancellation notices.',
     viewLabel: 'View',
     switchToLogin: 'Already have an account? Log in',
     returnAfterLogin: 'After login, you will return to the screen you were viewing and continue right away.',
@@ -130,7 +136,7 @@ const COPY: Record<LoginModalLocale, LoginModalCopy> = {
     signupFieldsRequired: '氏名、国籍、連絡先、生年月日、性別をすべて入力してください。',
     birthDateInvalid: '生年月日8桁（YYYYMMDD）を正しく入力してください。',
     phoneInvalid: '有効な連絡先を入力してください。',
-    agreementsRequired: '必須規約への同意が必要です。',
+    agreementsRequired: '必須項目への同意・確認が必要です。',
     signupSuccess: 'ようこそ！登録が完了しました。体験を探してみましょう！',
     signupVerificationSent: '認証メールを送信しました！確認するとすべての機能が使えます。',
     invalidCredentials: 'メールアドレスまたはパスワードが一致しません。',
@@ -144,6 +150,8 @@ const COPY: Record<LoginModalLocale, LoginModalCopy> = {
     selectAll: 'すべて同意',
     termsAgreement: '[必須] 利用規約に同意する',
     privacyAgreement: '[必須] 個人情報の収集および利用に同意する',
+    emailAccuracyAgreement: '[必須] 入力したメールアドレスが正しいことを確認します。',
+    emailAccuracyAgreementHint: 'メールアドレスが間違っていると、予約確定・変更・キャンセルなど重要なお知らせを受け取れない場合があります。',
     viewLabel: '表示',
     switchToLogin: 'すでにアカウントをお持ちですか？ ログイン',
     returnAfterLogin: 'ログイン後は、今見ていた画面に戻ってそのまま続けられます。',
@@ -165,7 +173,7 @@ const COPY: Record<LoginModalLocale, LoginModalCopy> = {
     signupFieldsRequired: '请填写姓名、国籍、联系方式、出生日期和性别。',
     birthDateInvalid: '请输入正确的 8 位出生日期（YYYYMMDD）。',
     phoneInvalid: '请输入有效的联系电话。',
-    agreementsRequired: '请同意必选条款。',
+    agreementsRequired: '请完成所有必选同意/确认项。',
     signupSuccess: '欢迎！注册已完成，快来探索体验吧！',
     signupVerificationSent: '验证邮件已发送！确认后即可使用所有功能。',
     invalidCredentials: '邮箱或密码不正确。',
@@ -179,6 +187,8 @@ const COPY: Record<LoginModalLocale, LoginModalCopy> = {
     selectAll: '全部同意',
     termsAgreement: '[必选] 同意服务条款',
     privacyAgreement: '[必选] 同意隐私政策',
+    emailAccuracyAgreement: '[必选] 我确认填写的邮箱地址准确无误。',
+    emailAccuracyAgreementHint: '如果邮箱填写错误，可能无法收到预约确认、变更或取消等重要通知。',
     viewLabel: '查看',
     switchToLogin: '已有账号？去登录',
     returnAfterLogin: '登录后会回到刚才的页面，直接继续操作。',
