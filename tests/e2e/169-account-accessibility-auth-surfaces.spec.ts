@@ -147,10 +147,14 @@ test.describe('Account accessibility auth surfaces', () => {
     await page.goto('/help', { waitUntil: 'domcontentloaded' });
 
     await page.getByRole('button', { name: '비밀번호를 잊어버렸어요.' }).click();
-    await expect(page.getByText('현재 비밀번호 재설정 기능은 지원하지 않습니다.')).toBeVisible({ timeout: 10000 });
+    await expect(
+      page.getByText('현재는 비밀번호 재설정 기능이 별도로 열려 있지 않습니다. 처음 가입할 때 사용한 로그인 방식이나 소셜 로그인 수단을 다시 확인해주세요.')
+    ).toBeVisible({ timeout: 10000 });
 
     await page.getByRole('button', { name: '회원 탈퇴는 어떻게 하나요?' }).click();
-    await expect(page.getByText('회원 탈퇴는 운영팀이 도와드리고 있어요. 문의로 접수해 주세요.')).toBeVisible({ timeout: 10000 });
+    await expect(
+      page.getByText('회원 탈퇴는 운영팀이 도와드리고 있습니다. 도움말센터나 계정 화면에서 문의를 남기면 메시지함으로 이어서 안내받을 수 있습니다.')
+    ).toBeVisible({ timeout: 10000 });
   });
 
   test('keeps account deletion FAQ localized across supported guest locales', async ({ page }) => {
@@ -158,19 +162,42 @@ test.describe('Account accessibility auth surfaces', () => {
     await page.goto('/help', { waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: 'How do I delete my account?' }).click();
     await expect(
-      page.getByText('Our support team can help you delete your account. Please contact us to get started.')
+      page.getByText('Our support team handles account deletion. Leave an inquiry from Help Center or the account page, and the follow-up will continue in your inbox.')
     ).toBeVisible({ timeout: 10000 });
 
     await forceJapaneseLocale(page);
     await page.goto('/help', { waitUntil: 'domcontentloaded' });
-    await page.getByRole('button', { name: '退会するにはどうすればよいですか？' }).click();
+    await page.getByRole('button', { name: '退会するにはどうすればいいですか？' }).click();
     await expect(
-      page.getByText('退会をご希望の場合は、運営チームがご案内します。お問い合わせください。')
+      page.getByText('退会は運営チームが案内しています。ヘルプセンターやアカウント画面から問い合わせを送ると、メッセージボックスで続きが案内されます。')
     ).toBeVisible({ timeout: 10000 });
 
     await forceChineseLocale(page);
     await page.goto('/help', { waitUntil: 'domcontentloaded' });
-    await page.getByRole('button', { name: '如何注销会员？' }).click();
-    await expect(page.getByText('如需注销账号，请联系我们，运营团队会协助处理。')).toBeVisible({ timeout: 10000 });
+    await page.getByRole('button', { name: '如何注销账号？' }).click();
+    await expect(page.getByText('账号注销由运营团队协助处理。你可以从帮助中心或账号页面提交咨询，后续说明会继续发到消息箱。')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('keeps tip FAQ localized across supported locales', async ({ page }) => {
+    await forceEnglishLocale(page);
+    await page.goto('/help', { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'Can I tip the host?' }).click();
+    await expect(
+      page.getByText('Tipping is voluntary and not required or expected.')
+    ).toBeVisible({ timeout: 10000 });
+
+    await forceJapaneseLocale(page);
+    await page.goto('/help', { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'ホストにチップを渡しても大丈夫ですか？' }).click();
+    await expect(
+      page.getByText('チップはあくまで任意で、必須でも期待される慣習でもありません。')
+    ).toBeVisible({ timeout: 10000 });
+
+    await forceChineseLocale(page);
+    await page.goto('/help', { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: '可以给房东小费吗？' }).click();
+    await expect(
+      page.getByText('小费可以出于自愿表达感谢，但并不是必须，也不是默认会被期待的做法。')
+    ).toBeVisible({ timeout: 10000 });
   });
 });

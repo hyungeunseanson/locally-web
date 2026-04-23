@@ -18,6 +18,7 @@ test.describe('Help Center self-service copy', () => {
     await expect(page.getByTestId('help-category-guest-proxy')).toBeVisible();
     await expect(page.getByTestId('help-category-guest-care')).toBeVisible();
     await expect(page.getByTestId('help-category-guest-cancellation')).toBeVisible();
+    await expect(page.getByRole('button', { name: '호스트에게 팁을 드려도 되나요?' })).toBeVisible();
     await expect(page.locator('body')).not.toContainText('eSIM');
 
     await expect(page.getByTestId('help-public-support-email')).toHaveAttribute(
@@ -38,6 +39,7 @@ test.describe('Help Center self-service copy', () => {
     await expect(page.getByTestId('help-category-host-jobs')).toBeVisible();
     await expect(page.getByTestId('help-category-host-payout')).toBeVisible();
     await expect(page.getByTestId('help-category-host-policy')).toBeVisible();
+    await expect(page.getByRole('button', { name: '게스트가 팁을 주겠다고 하면 받아도 되나요?' })).toBeVisible();
   });
 
   test('routes key search terms to FAQ results before falling back to inquiry empty state', async ({ page }) => {
@@ -64,6 +66,13 @@ test.describe('Help Center self-service copy', () => {
 
     await page.getByRole('textbox').fill('노쇼');
     await expect(page.getByText('당일 지각·노쇼는 어떻게 처리되나요?')).toBeVisible();
+
+    await page.getByRole('textbox').fill('커피');
+    await expect(page.getByText('호스트에게 팁을 드려도 되나요?')).toBeVisible();
+
+    await page.getByRole('button', { name: '호스트 (For Hosts)' }).click();
+    await page.getByRole('textbox').fill('추가 금액');
+    await expect(page.getByText('게스트가 팁을 주겠다고 하면 받아도 되나요?')).toBeVisible();
 
     await page.getByRole('textbox').fill('playwright-no-faq-match');
     await expect(page.getByTestId('help-search-empty-state')).toBeVisible();
