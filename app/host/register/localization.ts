@@ -526,7 +526,7 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     step3Desc: '正確な基本情報は審査と重要なお知らせの案内に使われます。',
     nameLabel: '氏名（実名）',
     namePlaceholder: '山田 太郎',
-    nameHelp: '本人確認と精算に使われる名前です。身分証の情報と一致させてください。',
+    nameHelp: '本人確認と精算に使われる名前です。身分証の情報と一致させてください。ゲストに表示される名前は、承認後にプロフィール設定で「마유」のようなニックネームに変更できます。',
     dobLabel: '生年月日',
     dobPlaceholder: '例）19900115',
     dobHelp: '成人確認と基本的な本人確認に使用されます。',
