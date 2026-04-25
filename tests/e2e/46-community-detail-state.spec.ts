@@ -467,6 +467,44 @@ test.describe.serial('Community detail state consistency', () => {
     await expect.poll(() => page.url()).toContain('/community?sort=popular');
   });
 
+  test('shows comment post errors without clearing the composer', async ({ page }) => {
+    const author = createUser('comment-post-fail-author');
+    const viewer = createUser('comment-post-fail-viewer');
+    const authorId = await createAuthUser(author);
+    await createAuthUser(viewer);
+    const postId = await createCommunityPost(authorId, {
+      board: 'japan',
+      title: `[Playwright] Community Comment Failure ${Date.now()}`,
+    });
+    const failedComment = `Playwright failed comment ${Date.now()}`;
+
+    await login(page, viewer);
+    await page.goto(`/community/${postId}?board=japan`, {
+      waitUntil: 'networkidle',
+    });
+    await page.route('**/api/community/comments', async (route) => {
+      if (route.request().method() === 'POST') {
+        await route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: '테스트 댓글 실패' }),
+        });
+        return;
+      }
+
+      await route.continue();
+    });
+
+    await page.locator('textarea').first().fill(failedComment);
+    await page.locator('button').filter({
+      has: page.locator('svg.lucide-send'),
+    }).click();
+
+    await expect(page.getByText('테스트 댓글 실패')).toBeVisible();
+    await expect(page.locator('textarea').first()).toHaveValue(failedComment);
+    await expect(page.getByTestId('community-comment-summary-count')).toHaveText('댓글 0');
+  });
+
   test('keeps board details indexable and legacy qna details noindex', async ({ page, request }) => {
     test.setTimeout(90000);
 

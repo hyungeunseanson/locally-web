@@ -1,3 +1,11 @@
+const BODY_SKELETON_WIDTHS = [
+  'w-full',
+  'w-11/12',
+  'w-10/12',
+  'w-4/5',
+  'w-2/3',
+] as const;
+
 export default function CommunityDetailLoading() {
   return (
     <div className="min-h-screen bg-[#F7F7F9]">
@@ -38,8 +46,8 @@ export default function CommunityDetailLoading() {
 
                 {/* 본문 텍스트 */}
                 <div className="space-y-3 mb-8">
-                  {[100, 90, 95, 80, 70].map((w, i) => (
-                    <div key={i} className={`h-4 w-[${w}%] rounded-full bg-slate-100 animate-pulse`} />
+                  {BODY_SKELETON_WIDTHS.map((widthClass) => (
+                    <div key={widthClass} className={`h-4 ${widthClass} rounded-full bg-slate-100 animate-pulse`} />
                   ))}
                   <div className="h-4 w-3/5 rounded-full bg-slate-100 animate-pulse" />
                 </div>

@@ -8,6 +8,7 @@ import { CornerDownRight, Loader2, Send } from 'lucide-react';
 
 import type { CommunityComment } from '@/app/types/community';
 import { useAuth } from '@/app/context/AuthContext';
+import { useToast } from '@/app/context/ToastContext';
 import { getProfileDisplayName, getProfileInitial } from '@/app/utils/profile';
 import CommunityAuthorTrigger from './CommunityAuthorTrigger';
 
@@ -20,7 +21,12 @@ interface CommentSectionProps {
 type CommentResponse = {
     data?: CommunityComment[];
     totalCount?: number;
+    error?: string;
 };
+
+function getErrorMessage(error: unknown, fallback: string) {
+    return error instanceof Error && error.message ? error.message : fallback;
+}
 
 const getTimeAgo = (dateStr: string) => {
     try {
@@ -105,6 +111,7 @@ function CommentActions({
 
 export default function CommentSection({ postId, onOpenLogin, onCountChange }: CommentSectionProps) {
     const { user } = useAuth();
+    const { showToast } = useToast();
     const [comments, setComments] = useState<CommunityComment[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSendingRoot, setIsSendingRoot] = useState(false);
@@ -128,18 +135,19 @@ export default function CommentSection({ postId, onOpenLogin, onCountChange }: C
                 const res = await fetch(`/api/community/comments?post_id=${postId}`);
                 const payload = (await res.json()) as CommentResponse;
                 if (!res.ok) {
-                    throw new Error('댓글을 불러오지 못했습니다.');
+                    throw new Error(payload.error || '댓글을 불러오지 못했습니다.');
                 }
                 setComments(payload.data || []);
                 onCountChange?.(payload.totalCount ?? countComments(payload.data || []));
             } catch (e) {
                 console.error('Failed to load comments', e);
+                showToast('댓글을 불러오지 못했습니다.', 'error');
             } finally {
                 setIsLoading(false);
             }
         };
         fetchComments();
-    }, [postId, onCountChange]);
+    }, [postId, onCountChange, showToast]);
 
     useEffect(() => {
         if (replyingTo && replyInputRef.current) {
@@ -177,6 +185,7 @@ export default function CommentSection({ postId, onOpenLogin, onCountChange }: C
             }
         } catch (e) {
             console.error('Failed to post comment', e);
+            showToast(getErrorMessage(e, '댓글 등록에 실패했습니다.'), 'error');
         } finally {
             setIsSendingRoot(false);
         }
@@ -216,6 +225,7 @@ export default function CommentSection({ postId, onOpenLogin, onCountChange }: C
             }
         } catch (e) {
             console.error('Failed to post reply', e);
+            showToast(getErrorMessage(e, '답글 등록에 실패했습니다.'), 'error');
         } finally {
             setSendingReplyTo(null);
         }
