@@ -200,29 +200,49 @@ async function createActiveExperienceFixture(hostId: string) {
 async function createCommunityPostFixture(authorId: string) {
   const supabase = getAdminClient();
   const title = `[Playwright] JSON-LD Community Post ${Date.now()}`;
+  const basePayload = {
+    user_id: authorId,
+    category: 'qna',
+    title,
+    content: 'JSON-LD 검증용 커뮤니티 게시글입니다. 구조화 데이터가 Article로 내려오는지 확인합니다.',
+    images: ['https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=1200'],
+    companion_date: null,
+    companion_city: null,
+    linked_exp_id: null,
+  };
 
   const { data, error } = await supabase
     .from('community_posts')
     .insert({
-      user_id: authorId,
-      category: 'qna',
-      title,
-      content: 'JSON-LD 검증용 커뮤니티 게시글입니다. 구조화 데이터가 Article로 내려오는지 확인합니다.',
-      images: ['https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=1200'],
-      companion_date: null,
-      companion_city: null,
-      linked_exp_id: null,
+      ...basePayload,
+      board_country: 'japan',
+      destination_hub: null,
+      post_format: 'question',
+      source_locale: 'ko',
     })
     .select('id')
     .single();
 
-  if (error || !data?.id) {
-    throw error || new Error('Failed to create JSON-LD community post fixture.');
+  if (!error && data?.id) {
+    createdCommunityPostIds.push(data.id);
+    return { id: data.id, title };
   }
 
-  createdCommunityPostIds.push(data.id);
+  const fallback = await supabase
+    .from('community_posts')
+    .insert({
+      ...basePayload,
+      destination_hub: 'tokyo',
+    })
+    .select('id')
+    .single();
 
-  return { id: data.id, title };
+  if (fallback.error || !fallback.data?.id) {
+    throw fallback.error || error || new Error('Failed to create JSON-LD community post fixture.');
+  }
+
+  createdCommunityPostIds.push(fallback.data.id);
+  return { id: fallback.data.id, title };
 }
 
 test.afterAll(async () => {
@@ -283,9 +303,9 @@ test.describe('JSON-LD smoke', () => {
       new RegExp(`/experiences/${experience.id}$`)
     );
 
-    await page.goto(`/community/${communityPost.id}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/community/${communityPost.id}?board=japan`, { waitUntil: 'domcontentloaded' });
 
-    await expect(page).toHaveTitle(`[Q&A] ${communityPost.title} | Locally`);
+    await expect(page).toHaveTitle(`${communityPost.title} | Locally`);
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
       'href',
       new RegExp(`/community/${communityPost.id}$`)
@@ -297,7 +317,7 @@ test.describe('JSON-LD smoke', () => {
     expect(articleJsonLd.some((content) => content.includes('"@type":"BreadcrumbList"'))).toBeTruthy();
     expect(articleJsonLd.some((content) => content.includes('"name":"커뮤니티"'))).toBeTruthy();
 
-    await page.goto(`/ja/community/${communityPost.id}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/ja/community/${communityPost.id}?board=japan`, { waitUntil: 'domcontentloaded' });
 
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
       'href',

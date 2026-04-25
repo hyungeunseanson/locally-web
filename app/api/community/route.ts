@@ -9,11 +9,17 @@ import { fetchLegacyCommunityFeed } from '@/app/community/legacyFeed.server';
 
 const PAGE_LIMIT = 15;
 
+function normalizeOffset(value: string | null) {
+    const parsed = Number(value || 0);
+    if (!Number.isFinite(parsed) || parsed < 0) return 0;
+    return Math.trunc(parsed);
+}
+
 async function handleBoardFeed(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const board = resolveCommunityBoard(searchParams.get('board'));
     const sort = resolveCommunitySort(searchParams.get('sort'));
-    const offset = parseInt(searchParams.get('offset') || '0', 10);
+    const offset = normalizeOffset(searchParams.get('offset'));
 
     try {
         const payload = await fetchCommunityBoardFeed({
@@ -34,7 +40,7 @@ async function handleBoardFeed(request: NextRequest) {
 
 async function handleLegacyFeed(request: NextRequest) {
     const { searchParams } = new URL(request.url);
-    const offset = parseInt(searchParams.get('offset') || '0', 10);
+    const offset = normalizeOffset(searchParams.get('offset'));
 
     try {
         const payload = await fetchLegacyCommunityFeed({

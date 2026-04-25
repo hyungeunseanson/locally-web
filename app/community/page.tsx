@@ -31,7 +31,7 @@ export async function generateMetadata({ searchParams }: { searchParams: Promise
     sort: params?.sort as string,
   });
   const boardLabel = getCommunityBoardLabel(board, 'ko');
-  const title = `${boardLabel} | ${getCommunityBoardPageTitle('ko')} | Locally`;
+  const title = `${boardLabel} | ${getCommunityBoardPageTitle('ko')}`;
   const description = `${boardLabel} 정보를 나누는 Locally 커뮤니티 게시판입니다.`;
   const canonicalPath = buildBoardCanonicalPath(board);
   const canonicalUrl = buildAbsoluteUrl(canonicalPath);

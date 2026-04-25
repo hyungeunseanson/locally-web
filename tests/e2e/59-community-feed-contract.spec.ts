@@ -373,4 +373,25 @@ test.describe.serial('Community board feed response contract', () => {
 
     expect(boardReturnedIds).toContain(japanPost.id);
   });
+
+  test('normalizes invalid and negative offsets to the first board page', async ({ request }) => {
+    const author = createUser('offset');
+    const authorId = await createAuthUser(author);
+    const post = await createBoardPost(
+      authorId,
+      'japan',
+      null,
+      `[Playwright] Community Offset Guard ${Date.now()}`
+    );
+
+    for (const offset of ['not-a-number', '-10']) {
+      const response = await request.get(`/api/community?offset=${offset}`);
+      expect(response.ok()).toBeTruthy();
+
+      const payload = await response.json();
+      expect(Array.isArray(payload.data)).toBeTruthy();
+      const returnedIds = payload.data.map((entry: { id?: string }) => entry.id);
+      expect(returnedIds).toContain(post.id);
+    }
+  });
 });

@@ -25,8 +25,8 @@ const EXPECTED_META = [
   },
   {
     path: '/community',
-    title: '로컬리 콘텐츠 | Locally',
-    description: '로컬이 직접 정리한 여행 콘텐츠 — 루트, 맛집, 현지 추천 정보를 확인하세요.',
+    title: '일본여행 | 여행 커뮤니티 | Locally',
+    description: '일본여행 정보를 나누는 Locally 커뮤니티 게시판입니다.',
   },
   {
     path: '/company/news',
