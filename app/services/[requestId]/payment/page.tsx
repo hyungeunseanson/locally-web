@@ -117,6 +117,7 @@ function ServicePaymentContent() {
   const [isPayPalSdkReady, setIsPayPalSdkReady] = useState(false);
   const [paypalSdkError, setPaypalSdkError] = useState('');
   const paypalButtonRef = useRef<HTMLDivElement | null>(null);
+  const paypalPanelRef = useRef<HTMLDivElement | null>(null);
   const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '';
   const isPayPalEnabled = Boolean(paypalClientId);
   const isBankLockedBooking = (pendingBooking?.payment_method || '').toLowerCase() === 'bank';
@@ -518,6 +519,10 @@ function ServicePaymentContent() {
     }
   }, [cardProvider, cardRuntime, contactName, contactPhone, getCheckoutValidationError, isCardReady, paymentMethod, pendingBooking, releaseCardSelection, request, requestId, router, showToast, supabase, t]);
 
+  const scrollToPayPalButton = useCallback(() => {
+    paypalPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, []);
+
   if (!request || !pendingBooking) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -551,7 +556,7 @@ function ServicePaymentContent() {
           }}
         />
       )}
-      <div className="max-w-lg mx-auto px-4 py-6 md:py-10 pb-28 md:pb-12">
+      <div className="max-w-lg mx-auto px-4 py-6 md:py-10 pb-44 md:pb-12">
         {/* 헤더 */}
         <div className="flex items-center gap-3 mb-6">
           <button onClick={() => router.back()} className="w-9 h-9 flex items-center justify-center rounded-full border border-slate-200 hover:bg-slate-50">
@@ -690,7 +695,10 @@ function ServicePaymentContent() {
         )}
 
         {paymentMethod === 'paypal' && (
-          <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3 md:rounded-xl md:p-4 mb-5 animate-in fade-in zoom-in-95">
+          <div
+            ref={paypalPanelRef}
+            className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3 md:rounded-xl md:p-4 mb-5 animate-in fade-in zoom-in-95"
+          >
             <div className="text-[11px] md:text-xs text-slate-500 leading-relaxed">
               {t('sp_paypal_desc')}
             </div>
@@ -735,7 +743,7 @@ function ServicePaymentContent() {
           <button
             onClick={handlePayment}
             disabled={isProcessing || (paymentMethod === 'card' && (!isCardReadyResolved || !isCardReady))}
-            className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-[14px] md:text-base hover:bg-slate-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed shadow-lg flex items-center justify-center gap-2"
+            className="hidden w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-[14px] md:flex md:text-base hover:bg-slate-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed shadow-lg items-center justify-center gap-2"
           >
             {isProcessing ? (
               <><Loader2 size={18} className="animate-spin" /> {t('processing')}</>
@@ -750,6 +758,49 @@ function ServicePaymentContent() {
             {t('sp_paypal_hint')}
           </div>
         )}
+      </div>
+      <div
+        data-testid="service-payment-mobile-cta"
+        className="fixed inset-x-0 bottom-0 z-[120] border-t border-slate-200 bg-white/95 px-4 py-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur-md md:hidden"
+        style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom, 0px))' }}
+      >
+        <div className="mx-auto flex max-w-lg items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">{t('sp_payment_amount')}</p>
+            <p className="truncate text-[16px] font-black text-slate-900">₩{request.total_customer_price.toLocaleString()}</p>
+          </div>
+          {paymentMethod !== 'paypal' ? (
+            <button
+              onClick={handlePayment}
+              disabled={isProcessing || (paymentMethod === 'card' && (!isCardReadyResolved || !isCardReady))}
+              data-testid="service-payment-mobile-submit"
+              className="min-w-[180px] rounded-2xl bg-slate-900 px-4 py-3.5 text-[13px] font-black text-white shadow-lg transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isProcessing ? (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <Loader2 size={16} className="animate-spin" /> {t('processing')}
+                </span>
+              ) : paymentMethod === 'bank' ? (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <Landmark size={16} /> {t('sp_btn_bank')}
+                </span>
+              ) : (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <CreditCard size={16} /> {(t('sp_btn_card') as string).replace('{price}', `₩${request.total_customer_price.toLocaleString()}`)}
+                </span>
+              )}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={scrollToPayPalButton}
+              data-testid="service-payment-mobile-paypal-jump"
+              className="min-w-[180px] rounded-2xl bg-slate-900 px-4 py-3.5 text-[13px] font-black text-white shadow-lg transition-colors hover:bg-slate-800"
+            >
+              PayPal
+            </button>
+          )}
+        </div>
       </div>
     </>
   );

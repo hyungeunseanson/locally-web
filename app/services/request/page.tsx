@@ -190,7 +190,7 @@ function ServiceRequestForm() {
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <SiteHeader />
-      <div className="max-w-6xl mx-auto px-4 py-6 md:py-10 pb-28 md:pb-12">
+      <div className="max-w-6xl mx-auto px-4 py-6 md:py-10 pb-44 md:pb-12">
         {/* 헤더 */}
         <div className="flex items-center gap-3 mb-6 md:mb-8">
           <button onClick={() => router.back()} className="w-9 h-9 flex items-center justify-center rounded-full border border-slate-200 hover:bg-slate-50 transition-colors">
@@ -415,6 +415,26 @@ function ServiceRequestForm() {
               </p>
             </div>
           </aside>
+        </div>
+      </div>
+      <div
+        data-testid="service-request-mobile-cta"
+        className="fixed inset-x-0 bottom-0 z-[120] border-t border-slate-200 bg-white/95 px-4 py-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur-md md:hidden"
+        style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom, 0px))' }}
+      >
+        <div className="mx-auto flex max-w-lg items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">{t('srf_summary_total')}</p>
+            <p className="truncate text-[16px] font-black text-slate-900">₩{totalPrice.toLocaleString()}</p>
+          </div>
+          <button
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            data-testid="service-request-mobile-submit"
+            className="min-w-[180px] rounded-2xl bg-slate-900 px-4 py-3.5 text-[13px] font-black text-white shadow-lg transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSubmitting ? t('processing') : t('srf_btn_submit')}
+          </button>
         </div>
       </div>
     </div>

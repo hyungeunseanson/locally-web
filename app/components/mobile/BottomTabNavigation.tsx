@@ -17,15 +17,12 @@ import {
     getHostDashboardHref,
     normalizeHostDashboardTab,
 } from '@/app/host/dashboard/navigation';
+import { shouldHideMobileBottomTab } from '@/app/components/mobile/bottomTabVisibility';
 
 export default function BottomTabNavigation() {
     const pathname = usePathname();
     const searchParams = useSearchParams();
     const { isHostView } = useViewMode();
-    const shouldHideForHostPath =
-        pathname?.startsWith('/host/create') ||
-        pathname?.startsWith('/host/register') ||
-        pathname?.startsWith('/host/experiences/');
     const activeHostTab = normalizeHostDashboardTab(searchParams?.get('tab'));
     const { user } = useAuth();
     const { unreadCount, notifications } = useNotification();
@@ -34,15 +31,8 @@ export default function BottomTabNavigation() {
     const { pendingHref, isNavigating, navigate } = usePendingNavigation();
     const { t } = useLanguage();
 
-    // 어드민/인증/결제 플로우에서는 하단 탭바 숨김
-    // 호스트 모드에서는 dashboard/menu에서만 노출해 생성/수정 화면과 충돌 방지
-    if (
-        pathname?.startsWith('/admin') ||
-        pathname?.startsWith('/login') ||
-        pathname?.startsWith('/signup') ||
-        pathname?.includes('/payment') ||
-        (isHostView && shouldHideForHostPath)
-    ) {
+    // 모바일 CTA가 있는 플로우와 어드민/인증/호스트 편집 화면에서는 하단 탭바를 숨긴다.
+    if (shouldHideMobileBottomTab(pathname, isHostView)) {
         return null;
     }
 

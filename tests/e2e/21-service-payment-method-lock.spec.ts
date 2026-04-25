@@ -590,6 +590,8 @@ test.describe.serial('Service payment method lock', () => {
   test('keeps bank-marked pending booking locked to bank across UI and payment routes', async ({ page }) => {
     test.setTimeout(90000);
 
+    await page.setViewportSize({ width: 375, height: 667 });
+
     const customerUser = createCustomerUser();
     const customerId = await createAuthUser(customerUser);
     const fixture = await createBankLockedPendingFixture(customerId, customerUser);
@@ -600,6 +602,10 @@ test.describe.serial('Service payment method lock', () => {
     await expect(
       page.getByText(/입금하실 계좌|Bank Account for Deposit|お振込先口座|存款账户/)
     ).toBeVisible();
+    await expect(page.getByTestId('service-payment-mobile-cta')).toBeVisible();
+    await expect(page.getByTestId('service-payment-mobile-cta')).toBeInViewport();
+    await expect(page.getByTestId('service-payment-mobile-submit')).toBeInViewport();
+    await expect(page.getByTestId('mobile-tab-home')).toHaveCount(0);
 
     const markBankResponse = await page.request.post('/api/services/payment/mark-bank', {
       data: { orderId: fixture.orderId },

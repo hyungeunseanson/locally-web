@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import {
@@ -75,24 +75,6 @@ export default function ServiceIntroAirbnbStylePage() {
         const min = i % 2 === 0 ? '00' : '30';
         return `${String(hour).padStart(2, '0')}:${min}`;
     });
-
-    // 모바일 예약 바 스크롤 감지 (기존 sticky action sheet 효과)
-    const [isMobileBarVisible, setIsMobileBarVisible] = useState(true);
-    const [lastScrollY, setLastScrollY] = useState(0);
-
-    useEffect(() => {
-        const handleScroll = () => {
-            const currentScrollY = window.scrollY;
-            if (currentScrollY > lastScrollY && currentScrollY > 100) {
-                setIsMobileBarVisible(false); // 아래로 스크롤 시 숨김
-            } else {
-                setIsMobileBarVisible(true); // 위로 스크롤 시 표시
-            }
-            setLastScrollY(currentScrollY);
-        };
-        window.addEventListener('scroll', handleScroll, { passive: true });
-        return () => window.removeEventListener('scroll', handleScroll);
-    }, [lastScrollY]);
 
     const handleShare = () => {
         navigator.clipboard.writeText(window.location.href);
@@ -436,8 +418,9 @@ export default function ServiceIntroAirbnbStylePage() {
 
             {/* ────── 모바일 하단 스티키 예약 폼 바 ────── */}
             <div
-                className={`md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 px-4 py-3 pb-8 transition-transform duration-300 shadow-[0_-4px_16px_rgba(0,0,0,0.05)] ${isMobileBarVisible ? 'translate-y-0' : 'translate-y-[120%]'
-                    }`}
+                data-testid="service-intro-mobile-cta"
+                className="md:hidden fixed bottom-0 left-0 right-0 z-[120] bg-white/95 border-t border-slate-200 px-4 py-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur-md"
+                style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom, 0px))' }}
             >
                 <div className="flex justify-between items-center gap-4">
                     <div>
@@ -446,10 +429,10 @@ export default function ServiceIntroAirbnbStylePage() {
                     </div>
                     <button
                         onClick={() => {
-                            window.scrollTo({ top: 0, behavior: 'smooth' });
                             const params = new URLSearchParams({ duration: '4', guests: '1' });
                             router.push(`/services/request?${params.toString()}`);
                         }}
+                        data-testid="service-intro-mobile-request-button"
                         className="flex-1 max-w-[160px] py-3 bg-gradient-to-r from-rose-600 to-rose-500 text-white rounded-xl font-bold text-[15px] hover:opacity-90 transition-opacity flex justify-center items-center shadow-md"
                     >
                         {t('si_mobile_btn_reserve')}
