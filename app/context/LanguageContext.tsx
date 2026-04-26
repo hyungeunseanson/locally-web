@@ -3862,7 +3862,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     nav_reservations: "予約",
     nav_manage: "ツアー管理",
     nav_education: "教育",
-    nav_more: "もっと見る",
+    nav_more: "マイページ",
     profile_menu_messages: "メッセージ",
     profile_menu_my_trips: "旅のまとめ",
     profile_menu_wishlist: "ウィッシュリスト",
