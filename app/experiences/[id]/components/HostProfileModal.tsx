@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { X, Star, Briefcase, Globe, Music, MessageCircle, User } from 'lucide-react';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { formatLanguageLevelLabel, getLocalizedLanguageLabel } from '@/app/utils/languageLevels';
+import SuperhostBadgeTrigger from '@/app/components/SuperhostBadgeTrigger';
 
 type HostModalData = {
   name: string;
@@ -16,6 +17,7 @@ type HostModalData = {
   job?: string;
   dreamDestination?: string;
   favoriteSong?: string;
+  isSuperhost?: boolean;
   languages?: string[];
   languageLevel?: number | null;
   intro?: string;
@@ -202,7 +204,16 @@ export default function HostProfileModal({ isOpen, onClose, host }: HostProfileM
                 )}
               </div>
             </div>
-            <h2 className="text-[22px] md:text-3xl font-black text-slate-900 mb-1">{host.name}</h2>
+            <div className="mb-1 flex items-center justify-center gap-1.5">
+              <h2 className="text-[22px] md:text-3xl font-black text-slate-900">{host.name}</h2>
+              {host.isSuperhost ? (
+                <SuperhostBadgeTrigger
+                  iconSize={20}
+                  showLabel={false}
+                  testIdPrefix="host-profile-modal-superhost-badge"
+                />
+              ) : null}
+            </div>
             <div className="flex items-center gap-2 text-[12px] md:text-sm font-bold text-slate-500">
               <span>{host.joinedYear ? t('exp_host_active_since', { year: host.joinedYear }) : t('exp_host_default_status')}</span>
             </div>

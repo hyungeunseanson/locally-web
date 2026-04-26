@@ -293,6 +293,57 @@ export async function updateAdminStatus(
   return { success: true };
 }
 
+export async function updateAdminHostSuperhost(
+  id: string | number,
+  isSuperhost: boolean
+) {
+  const supabase = await getAdminClient();
+  const { data: { user: adminUser } } = await supabase.auth.getUser();
+  const supabaseAdmin = createAdminClient();
+  const targetId = String(id);
+
+  await assertLatestHostApplicationForStatusChange(supabaseAdmin, id);
+
+  const { data: hostApplication, error: hostApplicationError } = await supabaseAdmin
+    .from('host_applications')
+    .select('id, user_id, name, status')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (hostApplicationError) {
+    throw new Error(hostApplicationError.message);
+  }
+
+  if (!hostApplication) {
+    throw new Error('호스트 지원서를 찾을 수 없습니다.');
+  }
+
+  if (!['approved', 'active'].includes(String(hostApplication.status || '').toLowerCase())) {
+    throw new Error('승인된 호스트에게만 슈퍼호스트 배지를 부여할 수 있습니다.');
+  }
+
+  const { error } = await supabaseAdmin
+    .from('host_applications')
+    .update({ is_superhost: isSuperhost })
+    .eq('id', id);
+
+  if (error) throw new Error(error.message);
+
+  await recordAuditLog({
+    admin_id: adminUser?.id,
+    admin_email: adminUser?.email,
+    action_type: 'UPDATE_HOST_APPLICATION_SUPERHOST',
+    target_type: 'host_applications',
+    target_id: targetId,
+    details: {
+      target_info: hostApplication.name || targetId,
+      is_superhost: isSuperhost,
+    },
+  });
+
+  return { success: true };
+}
+
 // [Security] 삭제 가능한 테이블 허용 목록 — service-role 클라이언트로 임의 테이블 삭제 방지
 const ADMIN_DELETABLE_TABLES = [
   'profiles', 'experiences', 'host_applications', 'bookings',

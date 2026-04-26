@@ -25,6 +25,7 @@ export type PublicHostApplicationViewModel = {
   profile_photo: string | null;
   self_intro: string | null;
   languages: string[];
+  is_superhost: boolean;
 };
 
 export type HostProfileSourceViewModel = {
@@ -371,6 +372,7 @@ export function normalizePublicHostApplicationRow(
     profile_photo: readTrimmedStringField(row, 'profile_photo'),
     self_intro: readStringField(row, 'self_intro'),
     languages: readStringArrayField(row, 'languages'),
+    is_superhost: readBooleanField(row, 'is_superhost') ?? false,
   };
 }
 
@@ -511,6 +513,7 @@ export function buildHostProfileDetail(params: {
     job: publicProfile.job ?? undefined,
     dream_destination: publicProfile.dreamDestination ?? undefined,
     favorite_song: publicProfile.favoriteSong ?? undefined,
+    is_superhost: Boolean(params.publicHostApplication?.is_superhost),
     joined_year: getJoinedYear(publicProfile.createdAt),
     review_count: params.reviewAggregate.reviewCount,
     rating: params.reviewAggregate.averageRating,

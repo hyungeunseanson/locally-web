@@ -130,6 +130,7 @@ const PUBLIC_HOST_APPLICATION_SELECT = [
   'profile_photo',
   'self_intro',
   'languages',
+  'is_superhost',
 ].join(', ');
 
 async function loadPublicHostApplication(supabase: ServerSupabaseClient, hostId: string | null | undefined) {

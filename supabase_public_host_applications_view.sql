@@ -15,7 +15,8 @@ SELECT DISTINCT ON (user_id)
   profile_photo,
   languages,
   self_intro,
-  created_at
+  created_at,
+  is_superhost
 FROM public.host_applications
 ORDER BY user_id, created_at DESC, id DESC;
 

@@ -174,6 +174,7 @@ export default function ExpMainContent({
         job={hostProfile?.job}
         dreamDestination={hostProfile?.dream_destination}
         favoriteSong={hostProfile?.favorite_song}
+        isSuperhost={hostProfile?.is_superhost}
         languages={hostProfile?.languages || []}
         intro={hostProfile?.introduction}
         joinedYear={hostProfile?.joined_year}

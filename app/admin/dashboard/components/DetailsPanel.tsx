@@ -9,6 +9,7 @@ import {
   MapPin, Cake, CheckCircle2, ShoppingBag, Trash2, Edit,
   CreditCard, FileText, Shield, Download, Check, X, ImageOff
 } from 'lucide-react';
+import { updateAdminHostSuperhost } from '@/app/actions/admin';
 import { formatLanguageLevelSummary, getLanguageNames, normalizeLanguageLevels, LanguageLevelEntry } from '@/app/utils/languageLevels';
 import {
   AdminApprovalTable,
@@ -79,6 +80,8 @@ export default function DetailsPanel({
   const [brokenSelectedAvatarSrc, setBrokenSelectedAvatarSrc] = useState<string | null>(null);
   const [brokenProfilePhotoSrc, setBrokenProfilePhotoSrc] = useState<string | null>(null);
   const [brokenExperiencePhotos, setBrokenExperiencePhotos] = useState<Record<string, true>>({});
+  const [superhostSaving, setSuperhostSaving] = useState(false);
+  const [superhostError, setSuperhostError] = useState<string | null>(null);
 
   const handleStartCSChat = async () => {
     if (!rawSelectedItem?.id) return;
@@ -203,6 +206,25 @@ export default function DetailsPanel({
     void onRequestDeleteItem(table, id);
   };
 
+  const handleSuperhostToggle = async () => {
+    if (!selectedItem || superhostSaving) return;
+
+    const nextValue = !Boolean(selectedItem.is_superhost);
+    setSuperhostSaving(true);
+    setSuperhostError(null);
+
+    try {
+      await updateAdminHostSuperhost(selectedItem.id, nextValue);
+      setDetailItem((prev) => (prev ? { ...prev, is_superhost: nextValue } : prev));
+      setSelectedItem?.({ ...selectedItem, is_superhost: nextValue });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '슈퍼호스트 배지 변경에 실패했습니다.';
+      setSuperhostError(message);
+    } finally {
+      setSuperhostSaving(false);
+    }
+  };
+
   useEffect(() => {
     if (activeTab !== 'APPS') {
       setSignedUrl(null);
@@ -226,6 +248,7 @@ export default function DetailsPanel({
     setBrokenSelectedAvatarSrc(null);
     setBrokenProfilePhotoSrc(null);
     setBrokenExperiencePhotos({});
+    setSuperhostError(null);
   }, [activeTab, rawSelectedItem?.id, detailItem?.id, selectedAvatarSrc, selectedItem?.profile_photo]);
 
   if (!selectedItem) {
@@ -246,6 +269,9 @@ export default function DetailsPanel({
     if (today.getMonth() < birth.getMonth() || (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate())) age--;
     return `(만 ${age}세)`;
   };
+  const canToggleSuperhost = activeTab === 'APPS' &&
+    !isStaleHostApplication &&
+    ['approved', 'active'].includes(String(selectedItem.status || '').toLowerCase());
 
   return (
     <div className="flex-[1.5] w-full bg-white md:rounded-2xl md:border md:border-slate-200 overflow-hidden flex flex-col p-3 md:p-6 overflow-y-auto shadow-sm">
@@ -381,6 +407,49 @@ export default function DetailsPanel({
                 <div className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mb-0.5">프로필 사진</div>
                 {selectedItem.profile_photo ? <a href={selectedItem.profile_photo} rel="noreferrer" className="text-blue-600 underline text-[10px] md:text-xs font-bold">원본 보기</a> : <span className="text-slate-400 text-[10px]">사진 없음</span>}
               </div>
+            </div>
+
+            <div className="rounded-xl border border-sky-100 bg-sky-50/60 p-3 md:p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <Image
+                    src="/images/badges/superhost-blue-check.png"
+                    alt=""
+                    width={28}
+                    height={28}
+                    aria-hidden="true"
+                    className="shrink-0 drop-shadow-[0_2px_6px_rgba(14,165,233,0.28)]"
+                  />
+                  <div>
+                    <div id="admin-superhost-badge-label" className="text-xs md:text-sm font-black text-slate-900">슈퍼호스트 배지</div>
+                    <p id="admin-superhost-badge-description" className="text-[10px] md:text-xs font-medium text-slate-500">
+                      승인된 최신 호스트에게만 수동 부여됩니다.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={Boolean(selectedItem.is_superhost)}
+                  aria-labelledby="admin-superhost-badge-label"
+                  aria-describedby="admin-superhost-badge-description"
+                  onClick={handleSuperhostToggle}
+                  disabled={!canToggleSuperhost || superhostSaving}
+                  className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${selectedItem.is_superhost ? 'bg-sky-500' : 'bg-slate-300'}`}
+                >
+                  <span
+                    className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${selectedItem.is_superhost ? 'translate-x-6' : 'translate-x-1'}`}
+                  />
+                </button>
+              </div>
+              {!canToggleSuperhost && (
+                <p className="mt-2 text-[10px] md:text-xs font-semibold text-slate-500">
+                  최신 승인 호스트가 아니면 배지를 변경할 수 없습니다.
+                </p>
+              )}
+              {superhostError && (
+                <p className="mt-2 text-[10px] md:text-xs font-semibold text-red-600">{superhostError}</p>
+              )}
             </div>
 
             {/* 언어 */}

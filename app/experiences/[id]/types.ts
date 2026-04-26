@@ -78,6 +78,7 @@ export type HostProfileDetail = {
   job?: string;
   dream_destination?: string;
   favorite_song?: string;
+  is_superhost?: boolean;
   joined_year: number | null;
   review_count: number;
   rating: number | null;

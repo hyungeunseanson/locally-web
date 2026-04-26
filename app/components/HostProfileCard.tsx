@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { User, Briefcase, Globe, Music, MessageCircle } from 'lucide-react';
 import { useLanguage } from '@/app/context/LanguageContext';
+import SuperhostBadgeTrigger from '@/app/components/SuperhostBadgeTrigger';
 
 interface HostProfileProps {
   hostId: string;
@@ -14,6 +15,7 @@ interface HostProfileProps {
   favoriteSong?: string;
   languages?: string[];
   intro?: string;
+  isSuperhost?: boolean;
 }
 
 export default function HostProfileCard({
@@ -24,7 +26,8 @@ export default function HostProfileCard({
   dreamDestination,
   favoriteSong,
   languages = [],
-  intro
+  intro,
+  isSuperhost = false
 }: HostProfileProps) {
   const { t } = useLanguage();
   return (
@@ -48,8 +51,12 @@ export default function HostProfileCard({
                 </div>
               )}
             </div>
-            <h2 className="text-2xl font-bold mb-1">{name}</h2>
-            <p className="text-sm text-slate-500 mb-4">{t('host_superhost')}</p>
+            <div className="mb-4 flex items-center justify-center gap-1.5">
+              <h2 className="text-2xl font-bold">{name}</h2>
+              {isSuperhost ? (
+                <SuperhostBadgeTrigger iconSize={18} showLabel={false} testIdPrefix="host-card-superhost-badge" />
+              ) : null}
+            </div>
 
             <Link href={`/users/${hostId}`}>
               <button className="w-full py-3 rounded-xl border border-black font-bold hover:bg-slate-50 active:scale-95 transition-all">

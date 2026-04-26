@@ -751,6 +751,8 @@ const dictionary: Record<Locale, Record<string, string>> = {
     // HostProfileCard
     host_intro_title: "호스트 {name}님 소개",
     host_superhost: "슈퍼호스트",
+    host_superhost_verified_desc: "로컬리가 검증한 슈퍼호스트입니다.",
+    host_superhost_info_aria: "슈퍼호스트 인증 설명 보기",
     host_view_profile: "프로필 보기",
     host_label_job: "직업/직장",
     host_label_dream_destination: "꼭 여행해 보고 싶은 장소",
@@ -2253,6 +2255,8 @@ const dictionary: Record<Locale, Record<string, string>> = {
     // HostProfileCard
     host_intro_title: "About Host {name}",
     host_superhost: "Superhost",
+    host_superhost_verified_desc: "This is a Superhost verified by Locally.",
+    host_superhost_info_aria: "Show Superhost verification details",
     host_view_profile: "View Profile",
     host_label_job: "Job / Workplace",
     host_label_dream_destination: "Dream Travel Destination",
@@ -3758,6 +3762,8 @@ const dictionary: Record<Locale, Record<string, string>> = {
     // HostProfileCard
     host_intro_title: "ホスト{name}の紹介",
     host_superhost: "スーパーホスト",
+    host_superhost_verified_desc: "Locallyが認証したスーパーホストです。",
+    host_superhost_info_aria: "スーパーホスト認証の説明を見る",
     host_view_profile: "プロフィールを見る",
     host_label_job: "職業/職場",
     host_label_dream_destination: "必ず行ってみたい場所",
@@ -5261,6 +5267,8 @@ const dictionary: Record<Locale, Record<string, string>> = {
     // HostProfileCard
     host_intro_title: "介绍房东{name}",
     host_superhost: "超级房东",
+    host_superhost_verified_desc: "这是 Locally 已认证的超级房东。",
+    host_superhost_info_aria: "查看超级房东认证说明",
     host_view_profile: "查看资料",
     host_label_job: "职业 / 工作单位",
     host_label_dream_destination: "梦想旅游目的地",
