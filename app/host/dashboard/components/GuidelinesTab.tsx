@@ -1,5 +1,5 @@
 import React from 'react';
-import { Heart, Lock, User, ShieldCheck } from 'lucide-react';
+import { Heart, Lock, MessageCircle, User, ShieldCheck } from 'lucide-react';
 import { useLanguage } from '@/app/context/LanguageContext';
 
 export default function GuidelinesTab() {
@@ -53,6 +53,24 @@ export default function GuidelinesTab() {
                             <li>{t('hg_policy2_item1')}</li>
                             <li>{t('hg_policy2_item2')}</li>
                             <li>{t('hg_policy2_item3')}</li>
+                        </ul>
+                    </div>
+                </div>
+
+                {/* Guest warm-up guidance */}
+                <div className="bg-white px-4 py-4 md:p-8 rounded-2xl md:rounded-3xl border border-cyan-100 shadow-sm relative overflow-hidden md:hover:border-cyan-300 transition-colors">
+                    <div className="absolute top-0 left-0 w-1 md:w-2 h-full bg-cyan-500" />
+                    <h2 className="text-[13px] md:text-xl font-bold flex items-center gap-1.5 md:gap-2 mb-2.5 md:mb-4 text-slate-900">
+                        <MessageCircle className="text-cyan-500 shrink-0" size={18} /> {t('hg_guest_warmup_title')}
+                    </h2>
+                    <div className="text-slate-600 space-y-2 md:space-y-4 text-[11px] md:text-sm leading-relaxed">
+                        <p className="font-medium text-slate-800 bg-cyan-50 px-3 py-2 md:p-4 rounded-xl">
+                            {t('hg_guest_warmup_desc')}
+                        </p>
+                        <ul className="list-disc pl-4 md:pl-5 space-y-1 md:space-y-2">
+                            <li>{t('hg_guest_warmup_item1')}</li>
+                            <li>{t('hg_guest_warmup_item2')}</li>
+                            <li>{t('hg_guest_warmup_item3')}</li>
                         </ul>
                     </div>
                 </div>
