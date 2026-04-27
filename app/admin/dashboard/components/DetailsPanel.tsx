@@ -438,7 +438,7 @@ export default function DetailsPanel({
                   className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${selectedItem.is_superhost ? 'bg-sky-500' : 'bg-slate-300'}`}
                 >
                   <span
-                    className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${selectedItem.is_superhost ? 'translate-x-6' : 'translate-x-1'}`}
+                    className={`absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${selectedItem.is_superhost ? 'translate-x-5' : 'translate-x-0'}`}
                   />
                 </button>
               </div>
