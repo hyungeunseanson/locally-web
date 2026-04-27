@@ -92,7 +92,7 @@ export default function ExpMainContent({
   return (
     <div className="flex-1 space-y-8 md:space-y-14">
       {/* 체험 내용 */}
-      <div className="border-b border-slate-200 pb-8 md:pb-10">
+      <div id="experience-content" className="scroll-mt-24 border-b border-slate-200 pb-8 md:scroll-mt-28 md:pb-10">
         <h3 className="text-[18px] md:text-[27px] font-semibold tracking-[-0.01em] mb-5">{t('exp_content_title')}</h3>
         <div className="space-y-4">
           {itinerary.length > 0 ? itinerary.map((item, idx: number) => {

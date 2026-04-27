@@ -414,6 +414,13 @@ export default function ExperienceClient({
               </div>
             </div>
             <p className="mt-4 text-[16px] leading-[1.65] text-slate-500 whitespace-pre-wrap line-clamp-3">{translatedDescription}</p>
+            <button
+              type="button"
+              onClick={() => scrollToSection('experience-content')}
+              className="mt-2 text-[14px] font-semibold text-slate-900 underline underline-offset-4 transition-colors hover:text-slate-600"
+            >
+              {t('exp_detail_read_more')}
+            </button>
 
             <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-medium text-slate-800">
               <button onClick={() => scrollToSection('reviews')} className="flex items-center gap-1 hover:underline underline-offset-4">
@@ -492,7 +499,14 @@ export default function ExperienceClient({
 
           <div className="text-center px-2">
             <h1 className="text-[24px] leading-[1.2] font-semibold tracking-[-0.01em] mb-3">{translatedTitle}</h1>
-            <p className="text-[13px] leading-[1.42] text-slate-500 font-normal mb-4 whitespace-pre-wrap line-clamp-3">{translatedDescription}</p>
+            <p className="text-[13px] leading-[1.42] text-slate-500 font-normal whitespace-pre-wrap line-clamp-2">{translatedDescription}</p>
+            <button
+              type="button"
+              onClick={() => scrollToSection('experience-content')}
+              className="mb-4 mt-2 text-[12px] font-semibold text-slate-900 underline underline-offset-4 active:text-slate-500"
+            >
+              {t('exp_detail_read_more')}
+            </button>
             <div className="mb-4 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 text-[11px] font-medium">
               <Star size={11} fill="black" className="mb-[1px]" />
               <span>{ratingText}</span>
