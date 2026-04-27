@@ -62,5 +62,6 @@ const bodyStyle = {
   fontSize: emailTypography.body,
   lineHeight: emailTypography.bodyLineHeight,
   margin: '0',
-  whiteSpace: 'pre-wrap' as const,
+  textAlign: 'left' as const,
+  whiteSpace: 'pre-line' as const,
 };

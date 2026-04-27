@@ -41,10 +41,24 @@ Module._resolveFilename = function patchedResolve(request, parent, isMain, optio
   return originalResolveFilename.call(this, request, parent, isMain, options);
 };
 
+const originalLoad = Module._load;
+Module._load = function patchedLoad(request, parent, isMain) {
+  if (request === 'server-only') {
+    return {};
+  }
+  return originalLoad.call(this, request, parent, isMain);
+};
+
 const { renderEmailTemplate } = require(path.join(cwd, 'app/emails/render/renderEmailTemplate.ts'));
 
 function extractAccentLine(html) {
   return /height:\s*2px;[^"]*line-height:\s*2px/i.test(html);
+}
+
+function extractMobileFirstCta(html) {
+  return /background-color:\s*#111111/i.test(html)
+    && /min-height:\s*48px/i.test(html)
+    && /width:\s*100%/i.test(html);
 }
 
 async function renderCase(name, request, markers = []) {
@@ -63,6 +77,7 @@ async function renderCase(name, request, markers = []) {
     preheader: rendered.preheader,
     htmlLength: rendered.html.length,
     accentLine2px: extractAccentLine(rendered.html),
+    mobileFirstCta: extractMobileFirstCta(rendered.html),
     markers: markerResults,
   };
 }
@@ -107,6 +122,39 @@ async function renderCase(name, request, markers = []) {
       },
     },
     ['예약 정보', '예약 취소', '예약이 취소되었습니다', '내 여행 보기']
+  ));
+
+  results.push(await renderCase(
+    'email_inquiry_new_message_after',
+    {
+      templateId: 'inquiry.new_message',
+      audience: 'guest',
+      locale: 'en',
+      recipient: {},
+      payload: {
+        actorName: 'Locally Support',
+        threadTitle: 'Airport pickup request',
+        messagePreview: 'We checked your request and shared the pickup details.',
+        ctaUrl: '/inbox',
+      },
+    },
+    ['Conversation details', 'Latest message', 'Check message']
+  ));
+
+  results.push(await renderCase(
+    'email_service_payment_confirmed_after',
+    {
+      templateId: 'service.payment_confirmed',
+      audience: 'guest',
+      locale: 'ja',
+      recipient: {},
+      payload: {
+        requestTitle: '東京通訳サポート',
+        amount: 98000,
+        ctaUrl: '/services/req-1',
+      },
+    },
+    ['依頼情報', '決済完了', '依頼を見る']
   ));
 
   results.push(await renderCase(

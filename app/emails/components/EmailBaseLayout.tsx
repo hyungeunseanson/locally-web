@@ -47,15 +47,17 @@ export default function EmailBaseLayout({
 
   return (
     <Html>
-      <Head />
+      <Head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <style>{responsiveEmailStyles}</style>
+      </Head>
       <Preview>{previewText}</Preview>
-      <Body style={body}>
-        <Container style={container}>
+      <Body className="locally-email-body" style={body}>
+        <Container className="locally-email-container" style={container}>
           <EmailHeader />
-          <Section style={accentBar} />
-          <Section style={content}>{children}</Section>
+          <Section className="locally-email-content" style={content}>{children}</Section>
           {hasHelp ? (
-            <Section style={helpSection} data-skip-in-text="true">
+            <Section className="locally-email-help" style={helpSection} data-skip-in-text="true">
               <Text style={helpText}>
                 {helpPrompt}
               </Text>
@@ -66,7 +68,7 @@ export default function EmailBaseLayout({
               </Text>
             </Section>
           ) : null}
-          <Hr style={footerDivider} data-skip-in-text="true" />
+          <Hr className="locally-email-footer-divider" style={footerDivider} data-skip-in-text="true" />
           <EmailFooter variant={footerVariant} locale={locale} />
         </Container>
       </Body>
@@ -77,40 +79,35 @@ export default function EmailBaseLayout({
 const body = {
   backgroundColor: emailColors.canvas,
   fontFamily: EMAIL_FONT_STACK,
-  padding: `${emailSpacing.outerDesktop} 12px`,
+  margin: '0',
+  padding: emailSpacing.outerMobile,
+  width: '100%',
+  WebkitTextSizeAdjust: '100%',
 };
 
 const container = {
   backgroundColor: emailColors.surface,
-  borderRadius: emailRadii.container,
-  boxShadow: emailShadows.container,
+  borderRadius: '0',
+  boxShadow: 'none',
   margin: '0 auto',
   maxWidth: `${EMAIL_MAX_WIDTH}px`,
   overflow: 'hidden',
-};
-
-const accentBar = {
-  backgroundColor: emailColors.brandPrimary,
-  height: '2px',
-  lineHeight: '2px',
-  fontSize: '0',
+  width: '100%',
 };
 
 const content = {
-  padding: `${emailSpacing.contentDesktop} ${emailSpacing.contentDesktop} ${emailSpacing.sectionDesktop}`,
+  padding: `24px ${emailSpacing.contentMobile} ${emailSpacing.sectionMobile}`,
 };
 
 const helpSection = {
-  backgroundColor: emailColors.subtle,
-  border: `1px solid ${emailColors.border}`,
-  borderRadius: emailRadii.card,
-  margin: `0 ${emailSpacing.contentDesktop} ${emailSpacing.sectionDesktop}`,
-  padding: '12px 14px',
+  backgroundColor: emailColors.surface,
+  margin: `0 ${emailSpacing.contentMobile} ${emailSpacing.sectionMobile}`,
+  padding: '2px 0 16px',
 };
 
 const footerDivider = {
   borderColor: emailColors.border,
-  margin: `0 ${emailSpacing.contentDesktop} 0`,
+  margin: `0 ${emailSpacing.contentMobile} 0`,
 };
 
 const helpText = {
@@ -128,7 +125,59 @@ const helpLinkRow = {
 };
 
 const helpLink = {
-  color: emailColors.brandPrimary,
+  color: emailColors.strongText,
   fontWeight: '600',
   textDecoration: 'none',
 };
+
+const responsiveEmailStyles = `
+@media screen and (min-width: 640px) {
+  .locally-email-body {
+    background-color: ${emailColors.desktopCanvas} !important;
+    padding: ${emailSpacing.outerDesktop} 12px !important;
+  }
+
+  .locally-email-container {
+    border-radius: ${emailRadii.container} !important;
+    box-shadow: ${emailShadows.container} !important;
+  }
+
+  .locally-email-header {
+    padding: 24px ${emailSpacing.contentDesktop} 0 !important;
+  }
+
+  .locally-email-wordmark {
+    font-size: 18px !important;
+  }
+
+  .locally-email-content {
+    padding: 28px ${emailSpacing.contentDesktop} ${emailSpacing.sectionDesktop} !important;
+  }
+
+  .locally-email-title {
+    font-size: ${emailTypography.titleDesktop} !important;
+  }
+
+  .locally-email-help {
+    margin: 0 ${emailSpacing.contentDesktop} ${emailSpacing.sectionDesktop} !important;
+  }
+
+  .locally-email-footer-divider {
+    margin: 0 ${emailSpacing.contentDesktop} !important;
+  }
+
+  .locally-email-footer {
+    padding: 20px ${emailSpacing.contentDesktop} 28px !important;
+  }
+
+  .locally-email-cta {
+    display: inline-block !important;
+    width: auto !important;
+    min-width: 0 !important;
+  }
+
+  .locally-email-panel {
+    padding: 18px !important;
+  }
+}
+`;

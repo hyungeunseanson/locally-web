@@ -48,6 +48,7 @@ export default function ServicePaymentConfirmedEmail({
               label={item.label}
               value={item.value}
               emphasis={item.emphasis}
+              featured={index === 0}
               isLast={index === summaryItems.length - 1}
             />
           ))}

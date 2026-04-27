@@ -30,7 +30,7 @@ function formatCurrency(amount: number | undefined, locale: EmailLocale) {
 }
 
 function buildScheduleValue(date: string, time?: string) {
-  return [date, time].filter(Boolean).join('\n');
+  return [date, time].filter(Boolean).join(' ');
 }
 
 function buildBookingLabels(locale: EmailLocale) {
@@ -182,7 +182,7 @@ function buildNoticeBodyCardTitle(locale: EmailLocale, audience: 'guest' | 'host
     case 'en':
       return 'Details';
     case 'ja':
-      return '안내 내용';
+      return 'ご案内内容';
     case 'zh':
       return '详细内容';
     case 'ko':
@@ -360,6 +360,10 @@ export function buildBookingConfirmedTemplateProps({
     ctaUrl: buildAbsoluteUrl(payload.ctaUrl),
     summaryItems: buildSummaryItems([
       { label: labels.experience, value: payload.experienceTitle, emphasis: true },
+      {
+        label: copy.bookingDateLabel,
+        value: buildScheduleValue(payload.bookingDate, payload.bookingTime),
+      },
       payload.guestName ? { label: labels.guest, value: payload.guestName } : null,
       {
         label: copy.guestCountLabel,
@@ -369,10 +373,6 @@ export function buildBookingConfirmedTemplateProps({
         label: copy.totalAmountLabel,
         value: formatCurrency(payload.amount, locale),
         emphasis: true,
-      },
-      {
-        label: copy.bookingDateLabel,
-        value: buildScheduleValue(payload.bookingDate, payload.bookingTime),
       },
     ]),
     helperText: copy.helperText,

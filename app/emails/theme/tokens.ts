@@ -2,19 +2,26 @@ export const EMAIL_FONT_STACK =
   '-apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", Arial, sans-serif';
 
 export const emailColors = {
-  canvas: '#F7F7F7',
+  canvas: '#FFFFFF',
+  desktopCanvas: '#F7F7F7',
   surface: '#FFFFFF',
-  subtle: '#F8FAFC',
+  subtle: '#FAFAFA',
+  glassSurface: '#FFFFFF',
+  glassBorder: '#E8E8E8',
+  glassHighlight: '#FFFFFF',
   softAccent: '#FFF3F5',
   strongText: '#222222',
-  defaultText: '#374151',
-  mutedText: '#6B7280',
-  softText: '#94A3B8',
-  border: '#E5E7EB',
+  defaultText: '#333333',
+  mutedText: '#767676',
+  softText: '#9CA3AF',
+  border: '#E8E8E8',
+  rowBorder: '#F0F0F0',
   brandPrimary: '#FF385C',
   brandPrimaryHover: '#D90B3E',
-  successBg: '#ECFDF5',
-  successText: '#166534',
+  ctaBackground: '#111111',
+  ctaBackgroundHover: '#222222',
+  successBg: '#F5F5F5',
+  successText: '#222222',
   warningBg: '#FFFBEB',
   warningText: '#92400E',
   dangerBg: '#FEF2F2',
@@ -23,33 +30,34 @@ export const emailColors = {
 
 export const emailSpacing = {
   outerDesktop: '24px',
-  outerMobile: '16px',
-  contentDesktop: '24px',
-  contentMobile: '18px',
-  sectionDesktop: '18px',
-  sectionMobile: '14px',
-  itemDesktop: '10px',
-  itemMobile: '8px',
+  outerMobile: '0',
+  contentDesktop: '32px',
+  contentMobile: '20px',
+  sectionDesktop: '24px',
+  sectionMobile: '20px',
+  itemDesktop: '14px',
+  itemMobile: '14px',
 } as const;
 
 export const emailTypography = {
   titleDesktop: '24px',
-  titleMobile: '22px',
+  titleMobile: '24px',
   body: '14px',
-  label: '12px',
+  label: '11px',
   footer: '11px',
-  bodyLineHeight: '1.62',
+  bodyLineHeight: '1.6',
 } as const;
 
 export const emailRadii = {
-  container: '18px',
+  container: '20px',
   card: '14px',
   button: '10px',
   pill: '999px',
 } as const;
 
 export const emailShadows = {
-  container: '0 8px 24px rgba(15, 23, 42, 0.06)',
+  container: '0 12px 36px rgba(15, 23, 42, 0.05)',
+  panel: 'none',
 } as const;
 
 export const EMAIL_MAX_WIDTH = 600;

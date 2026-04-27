@@ -17,7 +17,7 @@ export default function EmailPrimaryCTA({
 }: EmailPrimaryCTAProps) {
   return (
     <Section style={buttonWrap}>
-      <Button href={href} style={buttonStyle}>
+      <Button href={href} className="locally-email-cta" style={buttonStyle}>
         {children}
       </Button>
     </Section>
@@ -25,19 +25,23 @@ export default function EmailPrimaryCTA({
 }
 
 const buttonWrap = {
-  margin: '4px 0 0',
+  margin: '16px 0 0',
   textAlign: 'left' as const,
 };
 
 const buttonStyle = {
-  backgroundColor: emailColors.brandPrimary,
-  borderRadius: emailRadii.button,
+  backgroundColor: emailColors.ctaBackground,
+  borderRadius: emailRadii.pill,
+  boxSizing: 'border-box' as const,
   color: '#ffffff',
-  display: 'inline-block',
+  display: 'block',
   fontFamily: EMAIL_FONT_STACK,
-  fontSize: '13px',
+  fontSize: '14px',
   fontWeight: '700',
-  padding: '11px 18px',
+  lineHeight: '20px',
+  minHeight: '48px',
+  padding: '14px 22px',
   textAlign: 'center' as const,
   textDecoration: 'none',
+  width: '100%',
 };

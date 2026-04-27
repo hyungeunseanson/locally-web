@@ -5,7 +5,6 @@ import { emailStatusStyles } from '@/app/emails/theme/variants';
 import {
   emailColors,
   EMAIL_FONT_STACK,
-  emailRadii,
   emailTypography,
 } from '@/app/emails/theme/tokens';
 
@@ -30,18 +29,12 @@ export default function EmailTitleBlock({
     <Section style={section}>
       {eyebrow ? <Text style={eyebrowStyle}>{eyebrow}</Text> : null}
       {statusLabel ? (
-        <Text
-          style={{
-            ...statusPill,
-            backgroundColor: statusStyle.backgroundColor,
-            borderColor: statusStyle.borderColor,
-            color: statusStyle.color,
-          }}
-        >
+        <Text style={{ ...statusRow, color: statusStyle.color }}>
+          <span style={{ ...statusDot, backgroundColor: statusStyle.color }} />
           {statusLabel}
         </Text>
       ) : null}
-      <Heading as="h1" style={titleStyle}>
+      <Heading as="h1" className="locally-email-title" style={titleStyle}>
         {title}
       </Heading>
       {description ? <Text style={descriptionStyle}>{description}</Text> : null}
@@ -50,7 +43,7 @@ export default function EmailTitleBlock({
 }
 
 const section = {
-  marginBottom: '18px',
+  marginBottom: '20px',
 };
 
 const eyebrowStyle = {
@@ -66,11 +59,11 @@ const eyebrowStyle = {
 const titleStyle = {
   color: emailColors.strongText,
   fontFamily: EMAIL_FONT_STACK,
-  fontSize: emailTypography.titleDesktop,
-  fontWeight: '700',
-  letterSpacing: '-0.02em',
-  lineHeight: '1.24',
-  margin: '0 0 8px',
+  fontSize: emailTypography.titleMobile,
+  fontWeight: '800',
+  letterSpacing: '0',
+  lineHeight: '1.22',
+  margin: '0 0 10px',
 };
 
 const descriptionStyle = {
@@ -79,15 +72,24 @@ const descriptionStyle = {
   fontSize: emailTypography.body,
   lineHeight: emailTypography.bodyLineHeight,
   margin: '0',
+  textAlign: 'left' as const,
 };
 
-const statusPill = {
-  border: '1px solid transparent',
-  borderRadius: emailRadii.pill,
+const statusRow = {
   display: 'inline-block',
   fontFamily: EMAIL_FONT_STACK,
   fontSize: emailTypography.label,
-  fontWeight: '600',
+  fontWeight: '700',
+  lineHeight: '1.3',
   margin: '0 0 10px',
-  padding: '5px 9px',
+  padding: '0',
+};
+
+const statusDot = {
+  borderRadius: '999px',
+  display: 'inline-block',
+  height: '6px',
+  marginRight: '7px',
+  verticalAlign: '1px',
+  width: '6px',
 };

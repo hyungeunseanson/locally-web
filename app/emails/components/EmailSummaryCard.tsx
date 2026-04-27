@@ -4,6 +4,7 @@ import {
   emailColors,
   EMAIL_FONT_STACK,
   emailRadii,
+  emailShadows,
   emailTypography,
 } from '@/app/emails/theme/tokens';
 
@@ -17,7 +18,7 @@ export default function EmailSummaryCard({
   children,
 }: EmailSummaryCardProps) {
   return (
-    <Section style={card}>
+    <Section className="locally-email-panel" style={card}>
       {title ? <Text style={titleStyle}>{title}</Text> : null}
       {children}
     </Section>
@@ -25,18 +26,20 @@ export default function EmailSummaryCard({
 }
 
 const card = {
-  backgroundColor: emailColors.subtle,
-  border: `1px solid ${emailColors.border}`,
+  backgroundColor: emailColors.glassSurface,
+  border: `1px solid ${emailColors.glassBorder}`,
   borderRadius: emailRadii.card,
-  padding: '14px 14px 2px',
-  marginBottom: '16px',
+  boxShadow: emailShadows.panel,
+  padding: '16px',
+  marginBottom: '18px',
 };
 
 const titleStyle = {
-  color: emailColors.strongText,
+  color: emailColors.mutedText,
   fontFamily: EMAIL_FONT_STACK,
   fontSize: emailTypography.label,
-  fontWeight: '700',
-  letterSpacing: '0',
+  fontWeight: '600',
+  letterSpacing: '0.01em',
+  lineHeight: '1.4',
   margin: '0 0 10px',
 };

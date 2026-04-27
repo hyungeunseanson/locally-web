@@ -135,6 +135,20 @@ test.describe('Templated email system phase 2 contracts', () => {
     expect(copyNotice.bodyCardTitle).toBe('안내 내용');
     expect(copyNotice.ctaLabel).toBe('후기 확인하기');
 
+    const jaCopyNotice = buildNoticeCopyTemplateProps({
+      audience: 'host',
+      locale: 'ja',
+      payload: {
+        copyKey: 'review.new.host',
+        copyParams: {
+          experienceTitle: '東京夜景ツアー',
+        },
+        ctaUrl: '/trips',
+      },
+    });
+
+    expect(jaCopyNotice.bodyCardTitle).toBe('ご案内内容');
+
     const customNotice = buildNoticeCustomTemplateProps({
       audience: 'admin',
       locale: 'ko',

@@ -22,7 +22,7 @@ export default function EmailFooter({
 
   if (variant === 'opsAdmin') {
     return (
-      <Section style={footerSection} data-skip-in-text="true">
+      <Section className="locally-email-footer" style={footerSection} data-skip-in-text="true">
         <Text style={metaText}>{copy.heading}</Text>
         <Text style={legalText}>{copy.description}</Text>
         <Text style={finePrint}>{copy.finePrint}</Text>
@@ -31,7 +31,7 @@ export default function EmailFooter({
   }
 
   return (
-    <Section style={footerSection} data-skip-in-text="true">
+    <Section className="locally-email-footer" style={footerSection} data-skip-in-text="true">
       <Text style={metaText}>{copy.heading}</Text>
       <Text style={legalText}>{copy.description}</Text>
       <Text style={legalText}>
@@ -118,7 +118,7 @@ function buildFooterCopy(locale: EmailLocale, variant: EmailFooterVariant) {
 }
 
 const footerSection = {
-  padding: '18px 24px 22px',
+  padding: '20px 20px 28px',
   textAlign: 'left' as const,
 };
 
@@ -126,8 +126,8 @@ const metaText = {
   color: emailColors.strongText,
   fontFamily: EMAIL_FONT_STACK,
   fontSize: emailTypography.footer,
-  fontWeight: '600',
-  margin: '0 0 6px',
+  fontWeight: '700',
+  margin: '0 0 8px',
 };
 
 const legalText = {

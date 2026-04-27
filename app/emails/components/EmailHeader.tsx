@@ -1,31 +1,30 @@
-import { Img, Section } from '@react-email/components';
+import { Section, Text } from '@react-email/components';
 import * as React from 'react';
-import { getSiteUrl } from '@/app/utils/siteUrl';
 import {
   emailColors,
+  EMAIL_FONT_STACK,
 } from '@/app/emails/theme/tokens';
 
 export default function EmailHeader() {
   return (
-    <Section style={header}>
-      <Img
-        src={`${getSiteUrl()}/images/logo-black-transparent.png`}
-        alt="Locally"
-        width="88"
-        height="32"
-        style={logo}
-      />
+    <Section className="locally-email-header" style={header}>
+      <Text className="locally-email-wordmark" style={wordmark}>Locally</Text>
     </Section>
   );
 }
 
 const header = {
   backgroundColor: emailColors.surface,
-  padding: '18px 24px 0',
-  textAlign: 'center' as const,
+  padding: '24px 20px 0',
+  textAlign: 'left' as const,
 };
 
-const logo = {
-  objectFit: 'contain' as const,
-  margin: '0 auto',
+const wordmark = {
+  color: emailColors.strongText,
+  fontFamily: EMAIL_FONT_STACK,
+  fontSize: '20px',
+  fontWeight: '800',
+  letterSpacing: '0',
+  lineHeight: '1',
+  margin: '0',
 };

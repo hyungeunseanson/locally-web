@@ -81,7 +81,7 @@ export default function BookingConfirmationEmail({
         },
         {
           label: templateCopy.bookingDateLabel,
-          value: [resolvedBookingDate, bookingTime].filter(Boolean).join('\n'),
+          value: [resolvedBookingDate, bookingTime].filter(Boolean).join(' '),
         },
       ]}
       helperText={templateCopy.helperText}

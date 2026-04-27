@@ -4,6 +4,7 @@ import {
   emailColors,
   EMAIL_FONT_STACK,
   emailRadii,
+  emailShadows,
   emailTypography,
 } from '@/app/emails/theme/tokens';
 
@@ -17,7 +18,7 @@ export default function EmailMessagePreviewCard({
   message,
 }: EmailMessagePreviewCardProps) {
   return (
-    <Section style={card}>
+    <Section className="locally-email-panel" style={card}>
       {title ? <Text style={titleStyle}>{title}</Text> : null}
       <Text style={messageStyle}>{message}</Text>
     </Section>
@@ -25,19 +26,22 @@ export default function EmailMessagePreviewCard({
 }
 
 const card = {
-  backgroundColor: emailColors.surface,
-  border: `1px solid ${emailColors.border}`,
+  backgroundColor: emailColors.glassSurface,
+  border: `1px solid ${emailColors.glassBorder}`,
   borderRadius: emailRadii.card,
-  padding: '14px',
-  marginBottom: '16px',
+  boxShadow: emailShadows.panel,
+  padding: '16px',
+  marginBottom: '18px',
 };
 
 const titleStyle = {
   color: emailColors.mutedText,
   fontFamily: EMAIL_FONT_STACK,
   fontSize: emailTypography.label,
-  fontWeight: '700',
+  fontWeight: '600',
+  lineHeight: '1.4',
   margin: '0 0 8px',
+  textAlign: 'left' as const,
 };
 
 const messageStyle = {
@@ -46,5 +50,6 @@ const messageStyle = {
   fontSize: emailTypography.body,
   lineHeight: emailTypography.bodyLineHeight,
   margin: '0',
-  whiteSpace: 'pre-wrap' as const,
+  textAlign: 'left' as const,
+  whiteSpace: 'pre-line' as const,
 };

@@ -55,6 +55,7 @@ export default function BookingConfirmedEmail({
               label={item.label}
               value={item.value}
               emphasis={item.emphasis}
+              featured={index === 0}
               isLast={index === summaryItems.length - 1}
             />
           ))}
@@ -72,6 +73,7 @@ const helperStyle = {
   color: emailColors.mutedText,
   fontFamily: EMAIL_FONT_STACK,
   fontSize: emailTypography.body,
-  lineHeight: '1.6',
-  margin: '0 0 14px',
+  lineHeight: '1.68',
+  margin: '0 0 16px',
+  textAlign: 'left' as const,
 };

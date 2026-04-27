@@ -39,9 +39,9 @@ export const emailStatusStyles: Record<
     borderColor: emailColors.border,
   },
   success: {
-    backgroundColor: emailColors.successBg,
-    color: emailColors.successText,
-    borderColor: '#BBF7D0',
+    backgroundColor: emailColors.softAccent,
+    color: emailColors.brandPrimary,
+    borderColor: '#FFD2DC',
   },
   warning: {
     backgroundColor: emailColors.warningBg,
