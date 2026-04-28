@@ -86,7 +86,7 @@ export async function GET(request: Request) {
         const idParam = searchParams.get('id');
         const limitParam = searchParams.get('limit') ? parseInt(searchParams.get('limit') as string, 10) : 3000;
 
-        let query = supabaseAdmin
+        const query = supabaseAdmin
             .from('experiences')
             .select(idParam ? ADMIN_EXPERIENCE_DETAIL_SELECT : ADMIN_EXPERIENCE_SUMMARY_SELECT)
             .order('created_at', { ascending: false });

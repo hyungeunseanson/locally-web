@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { TrendingUp, Calendar as CalendarIcon, ChevronDown } from 'lucide-react';
 import Skeleton from '@/app/components/ui/Skeleton';
 import dynamic from 'next/dynamic';
@@ -72,15 +72,11 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
   const inquiryMessages = props.inquiryMessages ?? EMPTY_ANALYTICS_ITEMS;
   const [selectedMetric, setSelectedMetric] = useState<AnalyticsMetricKey | null>(null);
   const [activeMainTab, setActiveMainTab] = useState<AnalyticsMainTab>('business');
-  const defaultDateRangeRef = useRef<Range[] | null>(null);
-
-  if (defaultDateRangeRef.current === null) {
-    defaultDateRangeRef.current = createDefaultAnalyticsRange();
-  }
+  const initialDateRange = useMemo(() => createDefaultAnalyticsRange(), []);
 
   // 날짜 필터 상태 추가
-  const [dateRange, setDateRange] = useState<Range[]>(() => cloneDateRange(defaultDateRangeRef.current || createDefaultAnalyticsRange()));
-  const [appliedDateRange, setAppliedDateRange] = useState<Range[]>(() => cloneDateRange(defaultDateRangeRef.current || createDefaultAnalyticsRange()));
+  const [dateRange, setDateRange] = useState<Range[]>(() => cloneDateRange(initialDateRange));
+  const [appliedDateRange, setAppliedDateRange] = useState<Range[]>(() => cloneDateRange(initialDateRange));
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [activePreset, setActivePreset] = useState<string>('30D');
   const datePickerRef = useRef<HTMLDivElement>(null);
