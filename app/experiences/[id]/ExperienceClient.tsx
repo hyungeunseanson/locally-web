@@ -510,7 +510,7 @@ export default function ExperienceClient({
             <h1 className="text-[24px] leading-[1.2] font-semibold tracking-[-0.01em] mb-3">{translatedTitle}</h1>
             <p
               data-testid="experience-summary-description-mobile"
-              className={`text-[13px] leading-[1.42] text-slate-500 font-normal whitespace-pre-wrap ${isDescriptionExpanded ? 'mb-4' : 'line-clamp-2'}`}
+              className={`text-[13px] leading-[1.42] text-slate-500 font-normal whitespace-pre-wrap [word-break:keep-all] [overflow-wrap:anywhere] ${isDescriptionExpanded ? 'mb-4 text-left' : 'line-clamp-2 text-center'}`}
             >
               {translatedDescription}
             </p>

@@ -18,7 +18,7 @@ const TEST_PASSWORD = 'LocallyTest!2026';
 const LONG_SUMMARY_DESCRIPTION = [
   '홍대 골목에서 시작해 작은 로컬 카페와 숨은 식당을 천천히 둘러보는 체험입니다.',
   '처음 방문하는 분도 길을 헤매지 않도록 만나는 장소부터 이동 동선까지 차분하게 안내합니다.',
-  '취향에 맞는 메뉴를 고르고 동네 이야기를 나누며 서울의 일상적인 분위기를 가까이 느낄 수 있습니다.',
+  '취향에 맞는 메뉴를 고르고 동네 이야기를 나누며 서울의 일상적인 분위기를 깊이 있게 느껴볼 수 있는 투어입니다.',
   '사진을 찍기 좋은 골목, 조용히 쉬어갈 수 있는 공간, 현지인이 자주 가는 가게를 함께 연결합니다.',
   'SUMMARY_EXPANSION_SENTINEL 마지막 문장까지 상단 소개글 안에서 보여야 합니다.',
 ].join('\n');
@@ -209,9 +209,41 @@ async function getSummaryMetrics(page: Page, testId: string) {
       clientHeight: element.clientHeight,
       height: element.getBoundingClientRect().height,
       lineClamp: style.getPropertyValue('-webkit-line-clamp'),
+      overflowWrap: style.overflowWrap,
       scrollHeight: element.scrollHeight,
+      textAlign: style.textAlign,
+      wordBreak: style.wordBreak,
     };
   });
+}
+
+async function getTokenLineTops(page: Page, testId: string, token: string) {
+  return page.getByTestId(testId).evaluate(
+    (element, targetToken) => {
+      const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+      let textNode = walker.nextNode() as Text | null;
+
+      while (textNode) {
+        const source = textNode.textContent || '';
+        const tokenStart = source.indexOf(targetToken);
+        if (tokenStart >= 0) {
+          return Array.from(targetToken).map((_, index) => {
+            const range = document.createRange();
+            range.setStart(textNode, tokenStart + index);
+            range.setEnd(textNode, tokenStart + index + 1);
+            const rect = range.getBoundingClientRect();
+            range.detach();
+            return Math.round(rect.top);
+          });
+        }
+
+        textNode = walker.nextNode() as Text | null;
+      }
+
+      return [];
+    },
+    token
+  );
 }
 
 async function expectSummaryReadMoreExpandsInPlace(params: {
@@ -220,8 +252,11 @@ async function expectSummaryReadMoreExpandsInPlace(params: {
   title: string;
   viewport: { width: number; height: number };
   descriptionTestId: string;
+  expectedExpandedTextAlign?: string;
   readMoreTestId: string;
   expectedCollapsedClamp: string;
+  expectedWordBreak?: string;
+  unbrokenToken?: string;
 }) {
   const {
     page,
@@ -229,8 +264,11 @@ async function expectSummaryReadMoreExpandsInPlace(params: {
     title,
     viewport,
     descriptionTestId,
+    expectedExpandedTextAlign,
     readMoreTestId,
     expectedCollapsedClamp,
+    expectedWordBreak,
+    unbrokenToken,
   } = params;
 
   await page.setViewportSize(viewport);
@@ -258,6 +296,18 @@ async function expectSummaryReadMoreExpandsInPlace(params: {
   expect(after.height).toBeGreaterThan(before.height + 20);
   expect(after.scrollHeight - after.clientHeight).toBeLessThanOrEqual(2);
   expect(Math.abs(afterScrollY - beforeScrollY)).toBeLessThanOrEqual(2);
+
+  if (expectedExpandedTextAlign) {
+    expect(after.textAlign).toBe(expectedExpandedTextAlign);
+  }
+  if (expectedWordBreak) {
+    expect(after.wordBreak).toBe(expectedWordBreak);
+  }
+  if (unbrokenToken) {
+    const tokenLineTops = await getTokenLineTops(page, descriptionTestId, unbrokenToken);
+    expect(tokenLineTops.length).toBe(Array.from(unbrokenToken).length);
+    expect(new Set(tokenLineTops).size).toBe(1);
+  }
 }
 
 async function createCompletedBooking(params: {
@@ -379,8 +429,11 @@ test.describe.serial('Experience detail public reviews', () => {
       title: experience.title,
       viewport: { width: 390, height: 844 },
       descriptionTestId: 'experience-summary-description-mobile',
+      expectedExpandedTextAlign: 'left',
       readMoreTestId: 'experience-summary-read-more-mobile',
       expectedCollapsedClamp: '2',
+      expectedWordBreak: 'keep-all',
+      unbrokenToken: '투어입니다',
     });
   });
 
