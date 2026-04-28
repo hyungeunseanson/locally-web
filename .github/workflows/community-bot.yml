@@ -1,14 +1,7 @@
 name: Locally Community Bot
 
 on:
-  schedule:
-    # 매일 한국 시간 낮 12시 0분 (UTC 03:00)에 자동 게시물 작성
-    - cron: '0 3 * * *'
-    
-    # 한국 시간 낮 12시 30분, 밤 8시 30분 두 번 자동 댓글 작성 스캔 (UTC 03:30, 11:30)
-    - cron: '30 3,11 * * *'
-  
-  # 수동 트리거 지원
+  # 커뮤니티 봇 미사용 중에는 자동 크론을 비활성화하고 수동 실행만 유지합니다.
   workflow_dispatch:
     inputs:
       job_type:
@@ -61,7 +54,7 @@ jobs:
           echo "BASE_URL=${PROD_URL%/}" >> "$GITHUB_ENV"
 
       - name: Auto Post Job
-        if: github.event.schedule == '0 3 * * *' || github.event.inputs.job_type == 'post'
+        if: github.event.inputs.job_type == 'post'
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
@@ -72,7 +65,7 @@ jobs:
             -H "Authorization: Bearer ${CRON_SECRET}"
 
       - name: Auto Comment Job
-        if: github.event.schedule == '30 3,11 * * *' || github.event.inputs.job_type == 'comment'
+        if: github.event.inputs.job_type == 'comment'
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
