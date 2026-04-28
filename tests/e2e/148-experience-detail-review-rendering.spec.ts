@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 type EnvMap = Record<string, string>;
 type TestUser = {
@@ -10,8 +10,18 @@ type TestUser = {
   fullName: string;
   phone: string;
 };
+type ActiveExperienceOptions = {
+  description?: string;
+};
 
 const TEST_PASSWORD = 'LocallyTest!2026';
+const LONG_SUMMARY_DESCRIPTION = [
+  '홍대 골목에서 시작해 작은 로컬 카페와 숨은 식당을 천천히 둘러보는 체험입니다.',
+  '처음 방문하는 분도 길을 헤매지 않도록 만나는 장소부터 이동 동선까지 차분하게 안내합니다.',
+  '취향에 맞는 메뉴를 고르고 동네 이야기를 나누며 서울의 일상적인 분위기를 가까이 느낄 수 있습니다.',
+  '사진을 찍기 좋은 골목, 조용히 쉬어갈 수 있는 공간, 현지인이 자주 가는 가게를 함께 연결합니다.',
+  'SUMMARY_EXPANSION_SENTINEL 마지막 문장까지 상단 소개글 안에서 보여야 합니다.',
+].join('\n');
 
 let adminClient: SupabaseClient | null = null;
 const createdAuthUserIds: string[] = [];
@@ -139,8 +149,9 @@ async function createHostApplication(userId: string, user: TestUser) {
   createdApplicationIds.push(String(data.id));
 }
 
-async function createActiveExperience(hostId: string) {
+async function createActiveExperience(hostId: string, options: ActiveExperienceOptions = {}) {
   const title = `[Playwright] Experience Review ${Date.now()}`;
+  const description = options.description || '체험 상세 후기 렌더링 검증용 체험입니다.';
   const { data, error } = await getAdminClient()
     .from('experiences')
     .insert({
@@ -153,7 +164,7 @@ async function createActiveExperience(hostId: string) {
       language_levels: [{ language: '한국어', level: 5 }],
       duration: 2,
       max_guests: 4,
-      description: '체험 상세 후기 렌더링 검증용 체험입니다.',
+      description,
       itinerary: [{ title: '홍대입구역', description: '체험 상세 후기 렌더링 코스입니다.' }],
       spots: '홍대입구역',
       meeting_point: '홍대입구역 1번 출구',
@@ -187,7 +198,66 @@ async function createActiveExperience(hostId: string) {
   return {
     experienceId: Number(data.id),
     title: String(data.title),
+    description,
   };
+}
+
+async function getSummaryMetrics(page: Page, testId: string) {
+  return page.getByTestId(testId).evaluate((element) => {
+    const style = window.getComputedStyle(element);
+    return {
+      clientHeight: element.clientHeight,
+      height: element.getBoundingClientRect().height,
+      lineClamp: style.getPropertyValue('-webkit-line-clamp'),
+      scrollHeight: element.scrollHeight,
+    };
+  });
+}
+
+async function expectSummaryReadMoreExpandsInPlace(params: {
+  page: Page;
+  experienceId: number;
+  title: string;
+  viewport: { width: number; height: number };
+  descriptionTestId: string;
+  readMoreTestId: string;
+  expectedCollapsedClamp: string;
+}) {
+  const {
+    page,
+    experienceId,
+    title,
+    viewport,
+    descriptionTestId,
+    readMoreTestId,
+    expectedCollapsedClamp,
+  } = params;
+
+  await page.setViewportSize(viewport);
+  await page.goto(`/experiences/${experienceId}`, { waitUntil: 'networkidle' });
+  await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible({ timeout: 15000 });
+
+  const description = page.getByTestId(descriptionTestId);
+  const readMore = page.getByTestId(readMoreTestId);
+  await expect(description).toBeVisible();
+  await expect(readMore).toBeVisible();
+  await expect(description).toContainText('SUMMARY_EXPANSION_SENTINEL');
+
+  const before = await getSummaryMetrics(page, descriptionTestId);
+  expect(before.lineClamp).toBe(expectedCollapsedClamp);
+  expect(before.scrollHeight).toBeGreaterThan(before.clientHeight);
+
+  const beforeScrollY = await page.evaluate(() => window.scrollY);
+  await readMore.click();
+
+  await expect(readMore).toHaveCount(0);
+  const after = await getSummaryMetrics(page, descriptionTestId);
+  const afterScrollY = await page.evaluate(() => window.scrollY);
+
+  expect(after.lineClamp === 'none' || after.lineClamp === '').toBe(true);
+  expect(after.height).toBeGreaterThan(before.height + 20);
+  expect(after.scrollHeight - after.clientHeight).toBeLessThanOrEqual(2);
+  expect(Math.abs(afterScrollY - beforeScrollY)).toBeLessThanOrEqual(2);
 }
 
 async function createCompletedBooking(params: {
@@ -283,6 +353,37 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Experience detail public reviews', () => {
+  test('expands the summary read more in place on desktop and mobile', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const host = createUser('summary.host');
+    const hostId = await createAuthUser(host);
+    await createHostApplication(hostId, host);
+    const experience = await createActiveExperience(hostId, {
+      description: LONG_SUMMARY_DESCRIPTION,
+    });
+
+    await expectSummaryReadMoreExpandsInPlace({
+      page,
+      experienceId: experience.experienceId,
+      title: experience.title,
+      viewport: { width: 1440, height: 960 },
+      descriptionTestId: 'experience-summary-description-desktop',
+      readMoreTestId: 'experience-summary-read-more-desktop',
+      expectedCollapsedClamp: '3',
+    });
+
+    await expectSummaryReadMoreExpandsInPlace({
+      page,
+      experienceId: experience.experienceId,
+      title: experience.title,
+      viewport: { width: 390, height: 844 },
+      descriptionTestId: 'experience-summary-description-mobile',
+      readMoreTestId: 'experience-summary-read-more-mobile',
+      expectedCollapsedClamp: '2',
+    });
+  });
+
   test('renders masked reviewer identity without exposing review photos on detail and modal', async ({ page }) => {
     test.setTimeout(90000);
 

@@ -145,6 +145,7 @@ export default function ExperienceClient({
 
   const [inquiryText, setInquiryText] = useState('');
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const {
     availableDates,
     dateToTimeMap,
@@ -413,14 +414,22 @@ export default function ExperienceClient({
                 </button>
               </div>
             </div>
-            <p className="mt-4 text-[16px] leading-[1.65] text-slate-500 whitespace-pre-wrap line-clamp-3">{translatedDescription}</p>
-            <button
-              type="button"
-              onClick={() => scrollToSection('experience-content')}
-              className="mt-2 text-[14px] font-semibold text-slate-900 underline underline-offset-4 transition-colors hover:text-slate-600"
+            <p
+              data-testid="experience-summary-description-desktop"
+              className={`mt-4 text-[16px] leading-[1.65] text-slate-500 whitespace-pre-wrap ${isDescriptionExpanded ? '' : 'line-clamp-3'}`}
             >
-              {t('exp_detail_read_more')}
-            </button>
+              {translatedDescription}
+            </p>
+            {translatedDescription && !isDescriptionExpanded && (
+              <button
+                type="button"
+                data-testid="experience-summary-read-more-desktop"
+                onClick={() => setIsDescriptionExpanded(true)}
+                className="mt-2 text-[14px] font-semibold text-slate-900 underline underline-offset-4 transition-colors hover:text-slate-600"
+              >
+                {t('exp_detail_read_more')}
+              </button>
+            )}
 
             <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-medium text-slate-800">
               <button onClick={() => scrollToSection('reviews')} className="flex items-center gap-1 hover:underline underline-offset-4">
@@ -499,14 +508,22 @@ export default function ExperienceClient({
 
           <div className="text-center px-2">
             <h1 className="text-[24px] leading-[1.2] font-semibold tracking-[-0.01em] mb-3">{translatedTitle}</h1>
-            <p className="text-[13px] leading-[1.42] text-slate-500 font-normal whitespace-pre-wrap line-clamp-2">{translatedDescription}</p>
-            <button
-              type="button"
-              onClick={() => scrollToSection('experience-content')}
-              className="mb-4 mt-2 text-[12px] font-semibold text-slate-900 underline underline-offset-4 active:text-slate-500"
+            <p
+              data-testid="experience-summary-description-mobile"
+              className={`text-[13px] leading-[1.42] text-slate-500 font-normal whitespace-pre-wrap ${isDescriptionExpanded ? 'mb-4' : 'line-clamp-2'}`}
             >
-              {t('exp_detail_read_more')}
-            </button>
+              {translatedDescription}
+            </p>
+            {translatedDescription && !isDescriptionExpanded && (
+              <button
+                type="button"
+                data-testid="experience-summary-read-more-mobile"
+                onClick={() => setIsDescriptionExpanded(true)}
+                className="mb-4 mt-2 text-[12px] font-semibold text-slate-900 underline underline-offset-4 active:text-slate-500"
+              >
+                {t('exp_detail_read_more')}
+              </button>
+            )}
             <div className="mb-4 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 text-[11px] font-medium">
               <Star size={11} fill="black" className="mb-[1px]" />
               <span>{ratingText}</span>
