@@ -64,6 +64,13 @@ function buildProfilePayload(name: string) {
   };
 }
 
+function buildProfilePayloadWithEmail(name: string, email: string) {
+  return {
+    ...buildProfilePayload(name),
+    email,
+  };
+}
+
 async function waitForProfile(userId: string) {
   const supabase = getAdminClient();
 
@@ -233,5 +240,86 @@ test.describe.serial('Host profile save route', () => {
     expect(application).toMatchObject({
       self_intro: '호스트 프로필 저장 route 검증용 자기소개입니다.',
     });
+  });
+
+  test('updates host notification email without changing auth login email', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const user = createUser('email');
+    const userId = await createAuthUser(user);
+    await createHostApplication(userId, user);
+
+    await login(page, user);
+
+    const nextName = `${user.fullName} Email Updated`;
+    const nextEmail = `codex.host.profile.save.notification.${Date.now()}@example.com`;
+    const response = await page.request.post('/api/host/profile', {
+      data: buildProfilePayloadWithEmail(nextName, `  ${nextEmail.toUpperCase()}  `),
+    });
+
+    expect(response.status()).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ success: true });
+
+    const supabase = getAdminClient();
+    const [
+      { data: profile, error: profileError },
+      { data: application, error: applicationError },
+      { data: authUser, error: authUserError },
+    ] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select('email, full_name')
+        .eq('id', userId)
+        .maybeSingle(),
+      supabase
+        .from('host_applications')
+        .select('email, self_intro')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase.auth.admin.getUserById(userId),
+    ]);
+
+    if (profileError) throw profileError;
+    if (applicationError) throw applicationError;
+    if (authUserError) throw authUserError;
+
+    expect(profile).toMatchObject({
+      email: nextEmail,
+      full_name: nextName,
+    });
+    expect(application).toMatchObject({
+      email: nextEmail,
+      self_intro: '호스트 프로필 저장 route 검증용 자기소개입니다.',
+    });
+    expect(authUser.user?.email).toBe(user.email);
+  });
+
+  test('rejects invalid, blank, and duplicate notification emails', async ({ page }) => {
+    test.setTimeout(120000);
+
+    const owner = createUser('email-guard-owner');
+    const duplicateHolder = createUser('email-guard-duplicate');
+    const ownerId = await createAuthUser(owner);
+    await createAuthUser(duplicateHolder);
+    await createHostApplication(ownerId, owner);
+
+    await login(page, owner);
+
+    const invalidResponse = await page.request.post('/api/host/profile', {
+      data: buildProfilePayloadWithEmail(owner.fullName, 'not-an-email'),
+    });
+    expect(invalidResponse.status()).toBe(400);
+
+    const blankResponse = await page.request.post('/api/host/profile', {
+      data: buildProfilePayloadWithEmail(owner.fullName, '   '),
+    });
+    expect(blankResponse.status()).toBe(400);
+
+    const duplicateResponse = await page.request.post('/api/host/profile', {
+      data: buildProfilePayloadWithEmail(owner.fullName, duplicateHolder.email),
+    });
+    expect(duplicateResponse.status()).toBe(409);
   });
 });

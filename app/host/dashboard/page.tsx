@@ -37,6 +37,7 @@ interface HostStatusSummary {
   status?: string | null;
   admin_comment?: string | null;
   name?: string | null;
+  email?: string | null;
   profile_photo?: string | null;
   self_intro?: string | null;
   languages?: string[] | string | null;
@@ -52,6 +53,7 @@ interface HostStatusSummary {
 interface HostProfileSummary {
   created_at?: string | null;
   avatar_url?: string | null;
+  email?: string | null;
   full_name?: string | null;
   bio?: string | null;
   introduction?: string | null;
@@ -86,9 +88,9 @@ const SERVICE_NOTIFICATION_TYPES = new Set([
   'service_cancelled',
 ]);
 
-const HOST_APPLICATION_BOOTSTRAP_SELECT = 'id,status,admin_comment,name,profile_photo,self_intro,languages,host_nationality,phone,dob,bank_name,account_number,account_holder,motivation';
+const HOST_APPLICATION_BOOTSTRAP_SELECT = 'id,status,admin_comment,name,email,profile_photo,self_intro,languages,host_nationality,phone,dob,bank_name,account_number,account_holder,motivation';
 
-const HOST_PROFILE_SUMMARY_SELECT = 'created_at,avatar_url,full_name,bio,introduction,languages,job,dream_destination,favorite_song,nationality,host_nationality';
+const HOST_PROFILE_SUMMARY_SELECT = 'created_at,avatar_url,email,full_name,bio,introduction,languages,job,dream_destination,favorite_song,nationality,host_nationality';
 
 function buildMergedHostProfile(
   profileData: HostProfileSummary | null,
@@ -99,6 +101,7 @@ function buildMergedHostProfile(
 
   return {
     ...(profileData ?? {}),
+    email: profileData?.email || hostData?.email || '',
     full_name: profileData?.full_name || hostPublicProfile.name,
     name: hostPublicProfile.name,
     avatar_url: hostPublicProfile.avatarUrl,

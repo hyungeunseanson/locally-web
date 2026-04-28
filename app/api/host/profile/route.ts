@@ -6,6 +6,7 @@ import { createClient as createServerClient } from '@/app/utils/supabase/server'
 
 type HostProfileUpdateBody = {
   fullName?: unknown;
+  email?: unknown;
   job?: unknown;
   dreamDestination?: unknown;
   favoriteSong?: unknown;
@@ -18,6 +19,10 @@ type HostApplicationRef = {
   id: string;
 };
 
+type SupabaseErrorLike = {
+  code?: string;
+};
+
 function asTrimmedString(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -25,6 +30,23 @@ function asTrimmedString(value: unknown) {
 function asNullableTrimmedString(value: unknown) {
   const normalized = asTrimmedString(value);
   return normalized || null;
+}
+
+function hasOwn(object: object, key: string) {
+  return Object.prototype.hasOwnProperty.call(object, key);
+}
+
+function normalizeEmail(value: unknown) {
+  return asTrimmedString(value).toLowerCase();
+}
+
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function isUniqueViolation(error: unknown) {
+  const maybeError = error as SupabaseErrorLike | null;
+  return maybeError?.code === '23505';
 }
 
 export async function POST(request: NextRequest) {
@@ -58,8 +80,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Host application not found' }, { status: 404 });
     }
 
-    const MAX = { name: 80, job: 80, place: 120, song: 120, url: 500, intro: 2000 };
-    const profileUpdates = {
+    const emailProvided = hasOwn(body, 'email');
+    const normalizedEmail = emailProvided ? normalizeEmail(body.email) : '';
+    const MAX = { name: 80, email: 254, job: 80, place: 120, song: 120, url: 500, intro: 2000 };
+
+    if (emailProvided) {
+      if (!normalizedEmail) {
+        return NextResponse.json({ success: false, error: 'Notification email is required.' }, { status: 400 });
+      }
+
+      if (normalizedEmail.length > MAX.email || !isValidEmail(normalizedEmail)) {
+        return NextResponse.json({ success: false, error: 'Invalid notification email.' }, { status: 400 });
+      }
+
+      const { data: duplicateProfile, error: duplicateProfileError } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .ilike('email', normalizedEmail)
+        .neq('id', user.id)
+        .limit(1)
+        .maybeSingle<{ id: string }>();
+
+      if (duplicateProfileError) {
+        throw duplicateProfileError;
+      }
+
+      if (duplicateProfile?.id) {
+        return NextResponse.json({ success: false, error: 'Notification email is already in use.' }, { status: 409 });
+      }
+    }
+
+    const profileUpdates: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
       full_name: asTrimmedString(body.fullName).slice(0, MAX.name),
       job: asNullableTrimmedString(body.job)?.slice(0, MAX.job) ?? null,
@@ -69,20 +120,34 @@ export async function POST(request: NextRequest) {
       avatar_url: asNullableTrimmedString(body.avatarUrl)?.slice(0, MAX.url) ?? null,
     };
 
-    const [profileUpdateRes, hostApplicationUpdateRes] = await Promise.all([
-      supabaseAdmin
-        .from('profiles')
-        .update(profileUpdates)
-        .eq('id', user.id),
-      supabaseAdmin
-        .from('host_applications')
-        .update({ self_intro: asTrimmedString(body.introduction).slice(0, MAX.intro) })
-        .eq('id', latestApplication.id),
-    ]);
+    if (emailProvided) {
+      profileUpdates.email = normalizedEmail;
+    }
+
+    const hostApplicationUpdates: Record<string, unknown> = {
+      self_intro: asTrimmedString(body.introduction).slice(0, MAX.intro),
+    };
+
+    if (emailProvided) {
+      hostApplicationUpdates.email = normalizedEmail;
+    }
+
+    const profileUpdateRes = await supabaseAdmin
+      .from('profiles')
+      .update(profileUpdates)
+      .eq('id', user.id);
 
     if (profileUpdateRes.error) {
+      if (isUniqueViolation(profileUpdateRes.error)) {
+        return NextResponse.json({ success: false, error: 'Notification email is already in use.' }, { status: 409 });
+      }
       throw profileUpdateRes.error;
     }
+
+    const hostApplicationUpdateRes = await supabaseAdmin
+      .from('host_applications')
+      .update(hostApplicationUpdates)
+      .eq('id', latestApplication.id);
 
     if (hostApplicationUpdateRes.error) {
       throw hostApplicationUpdateRes.error;

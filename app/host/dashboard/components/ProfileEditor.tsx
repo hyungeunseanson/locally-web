@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { User, Briefcase, Globe, Music, MessageCircle, Save, Camera, Lock, CreditCard, FileText, AlertTriangle } from 'lucide-react';
+import { User, Briefcase, Globe, Music, MessageCircle, Save, Camera, Lock, CreditCard, FileText, AlertTriangle, Mail } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 import { PROFILE_LANGUAGE_OPTIONS } from '@/app/constants/profile';
@@ -12,6 +12,7 @@ import { compressImage, validateImage, isHeicValidationResult } from '@/app/util
 export interface HostProfile {
   full_name?: string | null;
   name?: string | null;
+  email?: string | null;
   job?: string | null;
   dream_destination?: string | null;
   favorite_song?: string | null;
@@ -42,10 +43,15 @@ interface InputGroupProps {
   icon?: React.ReactNode;
   placeholder?: string;
   disabled?: boolean;
+  type?: React.HTMLInputTypeAttribute;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode'];
+  autoComplete?: string;
+  description?: string;
 }
 
 interface HostProfileFormData {
   name: string;
+  email: string;
   job: string;
   dream_destination: string;
   favorite_song: string;
@@ -67,6 +73,7 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
 
   const [formData, setFormData] = useState<HostProfileFormData>({
     name: '',
+    email: '',
     job: '',
     dream_destination: '',
     favorite_song: '',
@@ -90,6 +97,7 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
     if (profile) {
       setFormData({
         name: profile.full_name || '',
+        email: profile.email || '',
         job: profile.job || '',
         dream_destination: profile.dream_destination || '',
         favorite_song: profile.favorite_song || '',
@@ -172,6 +180,7 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
           favoriteSong: formData.favorite_song,
           languages: formData.languages,
           introduction: formData.introduction,
+          email: formData.email,
           avatarUrl,
         }),
       });
@@ -332,9 +341,23 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
               </div>
             </div>
 
-            <div className="bg-slate-50 p-3.5 md:p-6 rounded-2xl border border-slate-100 opacity-90">
+            <div className="bg-slate-50 p-3.5 md:p-6 rounded-2xl border border-slate-100">
               <h3 className="font-bold text-sm md:text-base text-slate-900 mb-3 md:mb-4 flex items-center gap-2"><User size={16} className="md:w-[18px] md:h-[18px]" /> {t('hp_private_info')}</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6">
+                <div className="md:col-span-2">
+                  <InputGroup
+                    label={t('hp_notification_email_label')}
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    icon={<Mail size={16} />}
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    placeholder="host@example.com"
+                    description={t('hp_notification_email_desc')}
+                  />
+                </div>
                 {/* ✅ [수정] 모든 필드 disabled 처리 */}
                 <InputGroup label={t('hp_phone_label')} name="phone" value={formData.phone} disabled={true} placeholder={t('hp_no_content')} />
                 <InputGroup label={t('hp_dob_label')} name="dob" value={formData.dob} disabled={true} placeholder={t('hp_no_content')} />
@@ -365,7 +388,7 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
           </div>
         )}
 
-        {activeTab === 'public' && (
+        {(activeTab === 'public' || activeTab === 'private') && (
           <div className="flex justify-end pt-6 md:pt-8 mt-4 border-t border-slate-100">
             <button onClick={handleSave} disabled={loading} className="bg-black text-white px-4 py-2.5 md:px-8 md:py-4 rounded-xl font-bold hover:bg-slate-800 transition-all flex items-center gap-2 shadow-lg active:scale-95 disabled:opacity-50 text-xs md:text-base">
               <Save size={18} /> {loading ? t('hp_btn_saving') : t('hp_btn_save')}
@@ -377,20 +400,37 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
   );
 }
 
-function InputGroup({ label, name, value, onChange, icon, placeholder, disabled }: InputGroupProps) {
+function InputGroup({
+  label,
+  name,
+  value,
+  onChange,
+  icon,
+  placeholder,
+  disabled,
+  type = 'text',
+  inputMode,
+  autoComplete,
+  description,
+}: InputGroupProps) {
   return (
     <div>
       <label className="block text-[11px] md:text-xs font-bold text-slate-500 mb-2 uppercase flex items-center gap-1.5">{icon} {label}</label>
       <input
-        type="text"
+        type={type}
         name={name}
         value={value || ''}
         onChange={onChange}
         disabled={disabled}
+        inputMode={inputMode}
+        autoComplete={autoComplete}
         className={`w-full p-3 md:p-3.5 border border-slate-200 rounded-xl focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all font-medium text-[13px] md:text-sm ${disabled ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-white'
           }`}
         placeholder={placeholder}
       />
+      {description ? (
+        <p className="mt-2 text-[11px] md:text-xs text-slate-400">{description}</p>
+      ) : null}
     </div>
   );
 }
