@@ -163,6 +163,124 @@ function buildServiceSummaryTitle(locale: EmailLocale) {
   }
 }
 
+function buildHostNotificationSummaryTitle(locale: EmailLocale) {
+  switch (locale) {
+    case 'en':
+      return 'Notification details';
+    case 'ja':
+      return '通知内容';
+    case 'zh':
+      return '通知详情';
+    case 'ko':
+    default:
+      return '알림 정보';
+  }
+}
+
+function buildHostActionLabels(locale: EmailLocale) {
+  switch (locale) {
+    case 'en':
+      return {
+        experience: 'Experience',
+        request: 'Request',
+        status: 'Status',
+        city: 'Area',
+        duration: 'Duration',
+        guestCount: 'Guests',
+      };
+    case 'ja':
+      return {
+        experience: '体験',
+        request: '依頼',
+        status: '状態',
+        city: 'エリア',
+        duration: '時間',
+        guestCount: '人数',
+      };
+    case 'zh':
+      return {
+        experience: '体验',
+        request: '请求',
+        status: '状态',
+        city: '地区',
+        duration: '时长',
+        guestCount: '人数',
+      };
+    case 'ko':
+    default:
+      return {
+        experience: '체험',
+        request: '의뢰',
+        status: '상태',
+        city: '지역',
+        duration: '진행 시간',
+        guestCount: '인원',
+      };
+  }
+}
+
+function buildDurationValue(locale: EmailLocale, durationHours: number) {
+  switch (locale) {
+    case 'en':
+      return `${durationHours}h`;
+    case 'ja':
+      return `${durationHours}時間`;
+    case 'zh':
+      return `${durationHours}小时`;
+    case 'ko':
+    default:
+      return `${durationHours}시간`;
+  }
+}
+
+function buildGuestCountValue(locale: EmailLocale, guestCount: number) {
+  switch (locale) {
+    case 'en':
+      return `${guestCount} ${guestCount === 1 ? 'guest' : 'guests'}`;
+    case 'ja':
+      return `${guestCount}名`;
+    case 'zh':
+      return `${guestCount}人`;
+    case 'ko':
+    default:
+      return `${guestCount}명`;
+  }
+}
+
+function buildHostStatusLabel(
+  locale: EmailLocale,
+  key: 'review' | 'bankConfirmed' | 'newRequest' | 'selected'
+) {
+  const labels = {
+    review: {
+      ko: '후기 알림',
+      en: 'New review',
+      ja: 'レビュー通知',
+      zh: '评价通知',
+    },
+    bankConfirmed: {
+      ko: '입금 확인',
+      en: 'Payment confirmed',
+      ja: '入金確認',
+      zh: '收款确认',
+    },
+    newRequest: {
+      ko: '새 의뢰',
+      en: 'New request',
+      ja: '新規依頼',
+      zh: '新请求',
+    },
+    selected: {
+      ko: '선택됨',
+      en: 'Selected',
+      ja: '選択済み',
+      zh: '已选中',
+    },
+  } as const;
+
+  return labels[key][locale];
+}
+
 function buildNoticeBodyCardTitle(locale: EmailLocale, audience: 'guest' | 'host' | 'admin') {
   if (audience === 'admin') {
     switch (locale) {
@@ -676,6 +794,139 @@ export function buildServicePaymentConfirmedTemplateProps({
       payload.amount != null
         ? { label: labels.nextStep, value: `${labels.nextStepValue}\n${formatCurrency(payload.amount, locale)}` }
         : { label: labels.nextStep, value: labels.nextStepValue },
+    ]),
+    helpPrompt: helpCopy.helpPrompt,
+    helpLinkLabel: helpCopy.helpLinkLabel,
+    helpLinkHref: helpCopy.helpLinkHref,
+    footerVariant: 'transactional',
+  };
+}
+
+export function buildReviewNewHostTemplateProps({
+  locale,
+  payload,
+}: EmailBuilderContext<'review.new_host'>): BookingConfirmedTemplateProps {
+  const helpCopy = defaultHelpCopyByLocale[locale];
+  const labels = buildHostActionLabels(locale);
+  const copy = buildEmailCopy('review.new.host', locale, {
+    experienceTitle: payload.experienceTitle,
+  });
+
+  return {
+    locale,
+    subject: copy.subject,
+    preheader: copy.message,
+    title: copy.title,
+    description: copy.message,
+    summaryTitle: buildHostNotificationSummaryTitle(locale),
+    statusLabel: buildHostStatusLabel(locale, 'review'),
+    statusTone: 'success',
+    ctaLabel: copy.ctaLabel,
+    ctaUrl: buildAbsoluteUrl(payload.ctaUrl),
+    summaryItems: buildSummaryItems([
+      { label: labels.experience, value: payload.experienceTitle, emphasis: true },
+      { label: labels.status, value: copy.title },
+    ]),
+    helpPrompt: helpCopy.helpPrompt,
+    helpLinkLabel: helpCopy.helpLinkLabel,
+    helpLinkHref: helpCopy.helpLinkHref,
+    footerVariant: 'transactional',
+  };
+}
+
+export function buildBookingBankConfirmedHostTemplateProps({
+  locale,
+  payload,
+}: EmailBuilderContext<'booking.bank_confirmed_host'>): BookingConfirmedTemplateProps {
+  const helpCopy = defaultHelpCopyByLocale[locale];
+  const labels = buildHostActionLabels(locale);
+  const copy = buildEmailCopy('booking.bank_confirmed.host', locale, {
+    experienceTitle: payload.experienceTitle,
+  });
+
+  return {
+    locale,
+    subject: copy.subject,
+    preheader: copy.message,
+    title: copy.title,
+    description: copy.message,
+    summaryTitle: buildBookingSummaryTitle(locale),
+    statusLabel: buildHostStatusLabel(locale, 'bankConfirmed'),
+    statusTone: 'success',
+    ctaLabel: copy.ctaLabel,
+    ctaUrl: buildAbsoluteUrl(payload.ctaUrl),
+    summaryItems: buildSummaryItems([
+      { label: labels.experience, value: payload.experienceTitle, emphasis: true },
+      { label: labels.status, value: copy.title },
+    ]),
+    helpPrompt: helpCopy.helpPrompt,
+    helpLinkLabel: helpCopy.helpLinkLabel,
+    helpLinkHref: helpCopy.helpLinkHref,
+    footerVariant: 'transactional',
+  };
+}
+
+export function buildServiceRequestNewHostTemplateProps({
+  locale,
+  payload,
+}: EmailBuilderContext<'service.request_new_host'>): ServicePaymentConfirmedTemplateProps {
+  const helpCopy = defaultHelpCopyByLocale[locale];
+  const labels = buildHostActionLabels(locale);
+  const copy = buildEmailCopy('service.request_new.host', locale, {
+    requestTitle: payload.requestTitle,
+    requestCity: payload.requestCity,
+    durationHours: payload.durationHours,
+    guestCount: payload.guestCount,
+  });
+
+  return {
+    locale,
+    subject: copy.subject,
+    preheader: copy.message,
+    title: copy.title,
+    description: copy.message,
+    summaryTitle: buildServiceSummaryTitle(locale),
+    statusLabel: buildHostStatusLabel(locale, 'newRequest'),
+    statusTone: 'success',
+    ctaLabel: copy.ctaLabel,
+    ctaUrl: buildAbsoluteUrl(payload.ctaUrl),
+    summaryItems: buildSummaryItems([
+      { label: labels.request, value: payload.requestTitle, emphasis: true },
+      { label: labels.city, value: payload.requestCity },
+      { label: labels.duration, value: buildDurationValue(locale, payload.durationHours) },
+      { label: labels.guestCount, value: buildGuestCountValue(locale, payload.guestCount) },
+    ]),
+    helpPrompt: helpCopy.helpPrompt,
+    helpLinkLabel: helpCopy.helpLinkLabel,
+    helpLinkHref: helpCopy.helpLinkHref,
+    footerVariant: 'transactional',
+  };
+}
+
+export function buildServiceHostSelectedTemplateProps({
+  locale,
+  payload,
+}: EmailBuilderContext<'service.host_selected'>): ServicePaymentConfirmedTemplateProps {
+  const helpCopy = defaultHelpCopyByLocale[locale];
+  const labels = buildHostActionLabels(locale);
+  const copy = buildEmailCopy('service.host_selected', locale, {
+    requestTitle: payload.requestTitle,
+  });
+
+  return {
+    locale,
+    subject: copy.subject,
+    preheader: copy.message,
+    title: copy.title,
+    description: copy.message,
+    summaryTitle: buildServiceSummaryTitle(locale),
+    statusLabel: buildHostStatusLabel(locale, 'selected'),
+    statusTone: 'success',
+    ctaLabel: copy.ctaLabel,
+    ctaUrl: buildAbsoluteUrl(payload.ctaUrl),
+    summaryItems: buildSummaryItems([
+      { label: labels.request, value: payload.requestTitle, emphasis: true },
+      { label: labels.status, value: copy.title },
     ]),
     helpPrompt: helpCopy.helpPrompt,
     helpLinkLabel: helpCopy.helpLinkLabel,

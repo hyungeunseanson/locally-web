@@ -5,13 +5,17 @@ import InquiryNewMessageEmail from '@/app/emails/templates/inquiry/InquiryNewMes
 import NoticeEmail from '@/app/emails/templates/notice/NoticeEmail';
 import ServicePaymentConfirmedEmail from '@/app/emails/templates/service/ServicePaymentConfirmedEmail';
 import {
+  buildBookingBankConfirmedHostTemplateProps,
   buildBookingCancelledTemplateProps,
   buildBookingConfirmedTemplateProps,
   buildHostApplicationStatusTemplateProps,
   buildInquiryNewMessageTemplateProps,
   buildNoticeCopyTemplateProps,
   buildNoticeCustomTemplateProps,
+  buildReviewNewHostTemplateProps,
   buildServicePaymentConfirmedTemplateProps,
+  buildServiceHostSelectedTemplateProps,
+  buildServiceRequestNewHostTemplateProps,
 } from './emailContentBuilders';
 import type {
   EmailTemplateRegistration,
@@ -29,6 +33,10 @@ export const emailTemplateRegistry: {
     component: BookingCancelledEmail,
     buildProps: buildBookingCancelledTemplateProps,
   },
+  'booking.bank_confirmed_host': {
+    component: BookingConfirmedEmail,
+    buildProps: buildBookingBankConfirmedHostTemplateProps,
+  },
   'inquiry.new_message': {
     component: InquiryNewMessageEmail,
     buildProps: buildInquiryNewMessageTemplateProps,
@@ -37,9 +45,21 @@ export const emailTemplateRegistry: {
     component: HostApplicationStatusEmail,
     buildProps: buildHostApplicationStatusTemplateProps,
   },
+  'review.new_host': {
+    component: BookingConfirmedEmail,
+    buildProps: buildReviewNewHostTemplateProps,
+  },
   'service.payment_confirmed': {
     component: ServicePaymentConfirmedEmail,
     buildProps: buildServicePaymentConfirmedTemplateProps,
+  },
+  'service.request_new_host': {
+    component: ServicePaymentConfirmedEmail,
+    buildProps: buildServiceRequestNewHostTemplateProps,
+  },
+  'service.host_selected': {
+    component: ServicePaymentConfirmedEmail,
+    buildProps: buildServiceHostSelectedTemplateProps,
   },
   'notice.copy': {
     component: NoticeEmail,

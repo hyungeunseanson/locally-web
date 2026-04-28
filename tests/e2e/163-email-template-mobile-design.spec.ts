@@ -140,6 +140,33 @@ test.describe('Templated email mobile and desktop design contracts', () => {
     expect(html).toContain('font-size:14px');
   });
 
+  test('dedicated host action render uses compact ticket rows', async ({ page }) => {
+    const result = getResult(results, 'email_service_request_new_host_after');
+    const html = readFileSync(result.outputPath, 'utf8');
+
+    expect(result.accentLine2px).toBe(false);
+    expect(result.markers['요청 정보']).toBe(true);
+    expect(result.markers['새 의뢰']).toBe(true);
+    expect(result.markers['새로운 맞춤 서비스 의뢰가 도착했습니다']).toBe(true);
+    expect(result.markers['의뢰 확인하기']).toBe(true);
+    expect(result.mobileFirstCta).toBe(true);
+    expect(html).toContain('background-color:#FFFFFF;border:1px solid #E8E8E8;border-radius:14px');
+    expect(html).toContain('도쿄 통역 서포트');
+    expect(html).toContain('4시간');
+    expect(html).toContain('2명');
+    expect(html).not.toContain('locally-email-accent');
+
+    await page.setViewportSize({ width: 390, height: 1100 });
+
+    const metrics = await getViewportMetrics(page, path.resolve(result.outputPath));
+
+    expect(metrics.containerBox).toEqual({ width: 390, x: 0 });
+    expect(metrics.ctaBox).toEqual({ width: 350, height: 48, x: 20 });
+    expect(metrics.panelBox?.width).toBe(350);
+    expect(metrics.compactRowHeights).toHaveLength(3);
+    expect(metrics.compactRowHeights.every((height) => height >= 33 && height <= 34)).toBe(true);
+  });
+
   test('booking confirmed mobile viewport is edge-to-edge with full-width CTA', async ({ page }) => {
     const result = getResult(results, 'email_booking_confirmed_after');
     await page.setViewportSize({ width: 390, height: 1100 });

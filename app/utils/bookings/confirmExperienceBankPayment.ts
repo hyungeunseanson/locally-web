@@ -268,13 +268,10 @@ export async function runExperienceBankConfirmSideEffects(
         title: '',
         message: '',
         templatedEmail: {
-          templateId: 'notice.copy',
+          templateId: 'booking.bank_confirmed_host',
           audience: 'host',
           payload: {
-            copyKey: 'booking.bank_confirmed.host',
-            copyParams: {
-              experienceTitle,
-            },
+            experienceTitle,
             ctaUrl: '/host/dashboard',
           },
         },

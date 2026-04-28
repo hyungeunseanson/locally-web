@@ -125,13 +125,10 @@ export async function POST(request: Request) {
         title: '',
         message: '',
         templatedEmail: {
-          templateId: 'notice.copy',
+          templateId: 'review.new_host',
           audience: 'host',
           payload: {
-            copyKey: 'review.new.host',
-            copyParams: {
-              experienceTitle: experience.title || 'Locally Experience',
-            },
+            experienceTitle: experience.title || 'Locally Experience',
             ctaUrl: '/host/dashboard?tab=reviews',
           },
         },

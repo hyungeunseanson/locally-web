@@ -159,22 +159,19 @@ function notifyServiceHostSelection(params: {
   });
 
   sendImmediateGenericEmail({
-      recipientUserId: selectedHostId,
-      subject: '',
-      title: '',
-      message: '',
-      templatedEmail: {
-        templateId: 'notice.copy',
-        audience: 'host',
-        payload: {
-          copyKey: 'service.host_selected',
-          copyParams: {
-            requestTitle,
-          },
-          ctaUrl: `/services/${requestId}`,
-        },
+    recipientUserId: selectedHostId,
+    subject: '',
+    title: '',
+    message: '',
+    templatedEmail: {
+      templateId: 'service.host_selected',
+      audience: 'host',
+      payload: {
+        requestTitle,
+        ctaUrl: `/services/${requestId}`,
       },
-    }).catch((emailError) => {
+    },
+  }).catch((emailError) => {
     console.error('Select Host Email Error:', emailError);
   });
 

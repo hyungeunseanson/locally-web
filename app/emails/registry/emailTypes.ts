@@ -8,9 +8,13 @@ export type EmailAudience = 'guest' | 'host' | 'admin';
 export type EmailTemplateId =
   | 'booking.confirmed'
   | 'booking.cancelled'
+  | 'booking.bank_confirmed_host'
   | 'inquiry.new_message'
   | 'host_application.status'
+  | 'review.new_host'
   | 'service.payment_confirmed'
+  | 'service.request_new_host'
+  | 'service.host_selected'
   | 'notice.copy'
   | 'notice.custom';
 export type EmailTransportPolicy = 'transactional' | 'opsAdmin';
@@ -57,6 +61,10 @@ export type EmailPayloadMap = {
     variant: 'standard' | 'admin_force' | 'host_fault';
     reviewType?: HostFaultReviewType;
   };
+  'booking.bank_confirmed_host': {
+    experienceTitle: string;
+    ctaUrl: string;
+  };
   'inquiry.new_message': {
     actorName: string;
     threadTitle?: string;
@@ -73,6 +81,21 @@ export type EmailPayloadMap = {
     amount?: number;
     ctaUrl: string;
     recipientName?: string;
+  };
+  'review.new_host': {
+    experienceTitle: string;
+    ctaUrl: string;
+  };
+  'service.request_new_host': {
+    requestTitle: string;
+    requestCity: string;
+    durationHours: number;
+    guestCount: number;
+    ctaUrl: string;
+  };
+  'service.host_selected': {
+    requestTitle: string;
+    ctaUrl: string;
   };
   'notice.copy': {
     copyKey: EmailCopyKey;
@@ -151,9 +174,13 @@ export type NoticeTemplateProps = BaseTemplateProps & {
 export type EmailTemplatePropsMap = {
   'booking.confirmed': BookingConfirmedTemplateProps;
   'booking.cancelled': BookingCancelledTemplateProps;
+  'booking.bank_confirmed_host': BookingConfirmedTemplateProps;
   'inquiry.new_message': InquiryNewMessageTemplateProps;
   'host_application.status': HostApplicationStatusTemplateProps;
+  'review.new_host': BookingConfirmedTemplateProps;
   'service.payment_confirmed': ServicePaymentConfirmedTemplateProps;
+  'service.request_new_host': ServicePaymentConfirmedTemplateProps;
+  'service.host_selected': ServicePaymentConfirmedTemplateProps;
   'notice.copy': NoticeTemplateProps;
   'notice.custom': NoticeTemplateProps;
 };

@@ -84,16 +84,13 @@ export async function notifyServicePaymentOpened(params: ServicePaymentOpenedPar
             title: '',
             message: '',
             templatedEmail: {
-              templateId: 'notice.copy',
+              templateId: 'service.request_new_host',
               audience: 'host',
               payload: {
-                copyKey: 'service.request_new.host',
-                copyParams: {
-                  requestTitle,
-                  requestCity,
-                  durationHours,
-                  guestCount,
-                },
+                requestTitle,
+                requestCity,
+                durationHours,
+                guestCount,
                 ctaUrl: `/services/${requestId}`,
               },
             },

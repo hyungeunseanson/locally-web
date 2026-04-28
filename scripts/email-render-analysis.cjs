@@ -158,6 +158,69 @@ async function renderCase(name, request, markers = []) {
   ));
 
   results.push(await renderCase(
+    'email_review_new_host_after',
+    {
+      templateId: 'review.new_host',
+      audience: 'host',
+      locale: 'ko',
+      recipient: {},
+      payload: {
+        experienceTitle: '도쿄 야경 투어',
+        ctaUrl: '/host/dashboard?tab=reviews',
+      },
+    },
+    ['알림 정보', '후기 알림', '새 후기가 등록되었습니다', '후기 확인하기']
+  ));
+
+  results.push(await renderCase(
+    'email_booking_bank_confirmed_host_after',
+    {
+      templateId: 'booking.bank_confirmed_host',
+      audience: 'host',
+      locale: 'ko',
+      recipient: {},
+      payload: {
+        experienceTitle: '도쿄 야경 투어',
+        ctaUrl: '/host/dashboard',
+      },
+    },
+    ['예약 정보', '입금 확인', '입금 확인 완료', '호스트 대시보드 열기']
+  ));
+
+  results.push(await renderCase(
+    'email_service_request_new_host_after',
+    {
+      templateId: 'service.request_new_host',
+      audience: 'host',
+      locale: 'ko',
+      recipient: {},
+      payload: {
+        requestTitle: '도쿄 통역 서포트',
+        requestCity: '도쿄',
+        durationHours: 4,
+        guestCount: 2,
+        ctaUrl: '/services/req-2',
+      },
+    },
+    ['요청 정보', '새 의뢰', '새로운 맞춤 서비스 의뢰가 도착했습니다', '의뢰 확인하기']
+  ));
+
+  results.push(await renderCase(
+    'email_service_host_selected_after',
+    {
+      templateId: 'service.host_selected',
+      audience: 'host',
+      locale: 'ko',
+      recipient: {},
+      payload: {
+        requestTitle: '도쿄 통역 서포트',
+        ctaUrl: '/services/req-2',
+      },
+    },
+    ['요청 정보', '선택됨', '고객에게 선택되었습니다', '의뢰 확인하기']
+  ));
+
+  results.push(await renderCase(
     'email_notice_custom_after',
     {
       templateId: 'notice.custom',

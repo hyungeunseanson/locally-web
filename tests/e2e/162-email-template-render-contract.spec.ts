@@ -3,13 +3,17 @@ import { expect, test } from '@playwright/test';
 import { sendImmediateAdminEmail } from '@/app/utils/adminEmailProvider';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import {
+  buildBookingBankConfirmedHostTemplateProps,
   buildBookingCancelledTemplateProps,
   buildBookingConfirmedTemplateProps,
   buildHostApplicationStatusTemplateProps,
   buildInquiryNewMessageTemplateProps,
   buildNoticeCopyTemplateProps,
   buildNoticeCustomTemplateProps,
+  buildReviewNewHostTemplateProps,
+  buildServiceHostSelectedTemplateProps,
   buildServicePaymentConfirmedTemplateProps,
+  buildServiceRequestNewHostTemplateProps,
 } from '@/app/emails/registry/emailContentBuilders';
 import { emailTemplateRegistry } from '@/app/emails/registry/emailTemplates';
 import {
@@ -72,14 +76,85 @@ test.describe('Templated email system phase 2 contracts', () => {
     expect(rendered.messagePreview).toContain('pickup details');
     expect(rendered.ctaLabel).toBe('Check message');
     expect(Object.keys(emailTemplateRegistry).sort()).toEqual([
+      'booking.bank_confirmed_host',
       'booking.cancelled',
       'booking.confirmed',
       'host_application.status',
       'inquiry.new_message',
       'notice.copy',
       'notice.custom',
+      'review.new_host',
+      'service.host_selected',
       'service.payment_confirmed',
+      'service.request_new_host',
     ]);
+  });
+
+  test('builds dedicated host action templates without falling back to notice copy', () => {
+    const reviewNewHost = buildReviewNewHostTemplateProps({
+      audience: 'host',
+      locale: 'ko',
+      payload: {
+        experienceTitle: '도쿄 야경 투어',
+        ctaUrl: '/host/dashboard?tab=reviews',
+      },
+    });
+
+    expect(reviewNewHost.subject).toBe('[Locally] 새 후기가 등록되었습니다');
+    expect(reviewNewHost.summaryTitle).toBe('알림 정보');
+    expect(reviewNewHost.statusLabel).toBe('후기 알림');
+    expect(reviewNewHost.summaryItems?.[0]).toEqual({
+      label: '체험',
+      value: '도쿄 야경 투어',
+      emphasis: true,
+    });
+
+    const bankConfirmedHost = buildBookingBankConfirmedHostTemplateProps({
+      audience: 'host',
+      locale: 'ko',
+      payload: {
+        experienceTitle: '도쿄 야경 투어',
+        ctaUrl: '/host/dashboard',
+      },
+    });
+
+    expect(bankConfirmedHost.subject).toBe('[Locally] 💰 입금 확인 완료!');
+    expect(bankConfirmedHost.summaryTitle).toBe('예약 정보');
+    expect(bankConfirmedHost.statusLabel).toBe('입금 확인');
+
+    const serviceRequestHost = buildServiceRequestNewHostTemplateProps({
+      audience: 'host',
+      locale: 'ko',
+      payload: {
+        requestTitle: '도쿄 통역 서포트',
+        requestCity: '도쿄',
+        durationHours: 4,
+        guestCount: 2,
+        ctaUrl: '/services/req-2',
+      },
+    });
+
+    expect(serviceRequestHost.subject).toBe('[Locally] 새로운 맞춤 서비스 의뢰가 도착했습니다');
+    expect(serviceRequestHost.statusLabel).toBe('새 의뢰');
+    expect(serviceRequestHost.summaryItems?.map((item) => item.value)).toEqual([
+      '도쿄 통역 서포트',
+      '도쿄',
+      '4시간',
+      '2명',
+    ]);
+
+    const serviceHostSelected = buildServiceHostSelectedTemplateProps({
+      audience: 'host',
+      locale: 'ko',
+      payload: {
+        requestTitle: '도쿄 통역 서포트',
+        ctaUrl: '/services/req-2',
+      },
+    });
+
+    expect(serviceHostSelected.subject).toBe('[Locally] 고객에게 선택되었습니다');
+    expect(serviceHostSelected.statusLabel).toBe('선택됨');
+    expect(serviceHostSelected.ctaLabel).toBe('의뢰 확인하기');
   });
 
   test('builds host application and service payment template props with preserved localized CTA', () => {
