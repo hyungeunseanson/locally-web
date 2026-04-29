@@ -30,6 +30,12 @@ type MainContentProps = {
   translatedCategory?: string;
 };
 
+function normalizeItineraryDescriptionForDisplay(value: string) {
+  return value
+    .replace(/\r\n?/g, '\n')
+    .replace(/\n[ \t]*\n(?:[ \t]*\n)*/g, '\n');
+}
+
 export default function ExpMainContent({
   experience, hostProfile, handleInquiry, inquiryText, setInquiryText, translatedDescription, translatedCategory
 }: MainContentProps) {
@@ -97,6 +103,7 @@ export default function ExpMainContent({
         <div className="space-y-4">
           {itinerary.length > 0 ? itinerary.map((item, idx: number) => {
             const imageSrc = item?.image_url || heroPhotos[idx % heroPhotos.length];
+            const itineraryDescription = normalizeItineraryDescriptionForDisplay(item?.description || '');
             return (
               <div key={`${item?.title || 'step'}-${idx}`} className="flex items-center gap-3 md:gap-5">
                 <div className="w-[72px] h-[72px] md:w-[100px] md:h-[100px] rounded-[14px] md:rounded-[20px] overflow-hidden shrink-0 bg-slate-100 border border-slate-200">
@@ -106,7 +113,7 @@ export default function ExpMainContent({
                 </div>
                 <div className="min-h-[72px] md:min-h-[100px] flex-1 flex flex-col justify-center overflow-hidden">
                   <h4 className="text-[12px] md:text-[15px] font-medium leading-[1.3] mb-1">{item?.title || t('exp_itinerary_fallback_title', { index: idx + 1 })}</h4>
-                  <p className="text-[11px] md:text-[13px] leading-[1.45] text-slate-500 whitespace-pre-wrap line-clamp-4">{item?.description || ''}</p>
+                  <p data-testid={`experience-itinerary-description-${idx}`} className="text-[11px] md:text-[13px] leading-[1.45] text-slate-500 whitespace-pre-wrap line-clamp-4">{itineraryDescription}</p>
                 </div>
               </div>
             );

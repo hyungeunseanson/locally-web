@@ -12,6 +12,12 @@ type TestUser = {
 };
 type ActiveExperienceOptions = {
   description?: string;
+  itinerary?: Array<{
+    title: string;
+    description: string;
+    type?: string;
+    image_url?: string;
+  }>;
 };
 
 const TEST_PASSWORD = 'LocallyTest!2026';
@@ -22,6 +28,7 @@ const LONG_SUMMARY_DESCRIPTION = [
   '사진을 찍기 좋은 골목, 조용히 쉬어갈 수 있는 공간, 현지인이 자주 가는 가게를 함께 연결합니다.',
   'SUMMARY_EXPANSION_SENTINEL 마지막 문장까지 상단 소개글 안에서 보여야 합니다.',
 ].join('\n');
+const ITINERARY_DESCRIPTION_WITH_EXTRA_BREAKS = '사카이시청 전망대 방문\n\n사카이시청 전망대에 올라가고 사카이의 전경을 한눈에 감상하실 수 있습니다.';
 
 let adminClient: SupabaseClient | null = null;
 const createdAuthUserIds: string[] = [];
@@ -152,6 +159,7 @@ async function createHostApplication(userId: string, user: TestUser) {
 async function createActiveExperience(hostId: string, options: ActiveExperienceOptions = {}) {
   const title = `[Playwright] Experience Review ${Date.now()}`;
   const description = options.description || '체험 상세 후기 렌더링 검증용 체험입니다.';
+  const itinerary = options.itinerary || [{ title: '홍대입구역', description: '체험 상세 후기 렌더링 코스입니다.' }];
   const { data, error } = await getAdminClient()
     .from('experiences')
     .insert({
@@ -165,7 +173,7 @@ async function createActiveExperience(hostId: string, options: ActiveExperienceO
       duration: 2,
       max_guests: 4,
       description,
-      itinerary: [{ title: '홍대입구역', description: '체험 상세 후기 렌더링 코스입니다.' }],
+      itinerary,
       spots: '홍대입구역',
       meeting_point: '홍대입구역 1번 출구',
       location: '서울 마포구 양화로 160',
@@ -403,6 +411,54 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Experience detail public reviews', () => {
+  test('normalizes extra blank lines in itinerary descriptions only for detail display', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const host = createUser('itinerary.spacing.host');
+    const hostId = await createAuthUser(host);
+    await createHostApplication(hostId, host);
+    const experience = await createActiveExperience(hostId, {
+      itinerary: [
+        {
+          title: '사카이시청 전망대',
+          description: ITINERARY_DESCRIPTION_WITH_EXTRA_BREAKS,
+          type: 'spot',
+          image_url: '',
+        },
+      ],
+    });
+
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await page.goto(`/experiences/${experience.experienceId}`, { waitUntil: 'networkidle' });
+    await expect(page.getByRole('heading', { name: experience.title, exact: true })).toBeVisible({ timeout: 15000 });
+
+    const itineraryDescription = page.getByTestId('experience-itinerary-description-0');
+    await expect(itineraryDescription).toBeVisible();
+
+    const renderedText = await itineraryDescription.evaluate((element) => element.textContent || '');
+    expect(renderedText).toContain('사카이시청 전망대 방문\n사카이시청 전망대에 올라가고');
+    expect(renderedText).not.toContain('\n\n');
+
+    const metrics = await itineraryDescription.evaluate((element) => {
+      const style = window.getComputedStyle(element);
+      return {
+        clientHeight: element.clientHeight,
+        lineClamp: style.getPropertyValue('-webkit-line-clamp'),
+        scrollHeight: element.scrollHeight,
+      };
+    });
+    expect(metrics.lineClamp).toBe('4');
+    expect(metrics.scrollHeight - metrics.clientHeight).toBeLessThanOrEqual(2);
+
+    const { data, error } = await getAdminClient()
+      .from('experiences')
+      .select('itinerary')
+      .eq('id', experience.experienceId)
+      .single();
+    if (error) throw error;
+    expect(data?.itinerary?.[0]?.description).toBe(ITINERARY_DESCRIPTION_WITH_EXTRA_BREAKS);
+  });
+
   test('expands the summary read more in place on desktop and mobile', async ({ page }) => {
     test.setTimeout(90000);
 
