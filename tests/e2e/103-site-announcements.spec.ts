@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import type { SiteAnnouncement } from '../../app/config/siteAnnouncements';
+import { SITE_ANNOUNCEMENTS } from '../../app/config/siteAnnouncements';
 import {
   getAnnouncementCopy,
   normalizeAnnouncementPathname,
@@ -37,6 +38,14 @@ const buildAnnouncement = (overrides: Partial<SiteAnnouncement>): SiteAnnounceme
 });
 
 test.describe('site announcement utilities', () => {
+  test('keeps the expired bank-only global popup disabled in current config', () => {
+    const expiredBankOnlyAnnouncement = SITE_ANNOUNCEMENTS.find(
+      (announcement) => announcement.id === 'bank-only-template-2026-04-01'
+    );
+
+    expect(expiredBankOnlyAnnouncement?.enabled).toBe(false);
+  });
+
   test('normalizes locale-prefixed paths before matching exclusions', () => {
     expect(normalizeAnnouncementPathname('/en/admin/dashboard')).toBe('/admin/dashboard');
     expect(normalizeAnnouncementPathname('/ja/company/notices')).toBe('/company/notices');

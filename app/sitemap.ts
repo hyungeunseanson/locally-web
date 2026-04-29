@@ -79,7 +79,7 @@ const STATIC_ROUTE_CONFIGS: StaticRouteConfig[] = [
     pathname: '/company/notices',
     changeFrequency: 'daily',
     priority: 0.8,
-    sourcePaths: ['app/company/notices/layout.tsx', 'app/company/notices/page.tsx'],
+    sourcePaths: ['app/company/notices/layout.tsx', 'app/company/notices/page.tsx', 'app/config/companyNotices.ts'],
   },
   {
     pathname: '/company/news',

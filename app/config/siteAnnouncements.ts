@@ -37,6 +37,7 @@ export type SiteAnnouncement = {
 // - 전체 방문자에게 뜹니다.
 // - /admin 에서는 기본적으로 안 뜹니다.
 // - 여러 개가 있어도 우선순위(priority)가 가장 높은 1개만 뜹니다.
+// - 전역 팝업을 다시 켤 때는 /company/notices 에도 같은 내용의 공지를 함께 등록합니다.
 export const SITE_ANNOUNCEMENTS: SiteAnnouncement[] = [
   {
     // 공지 고유 이름입니다.
@@ -44,7 +45,7 @@ export const SITE_ANNOUNCEMENTS: SiteAnnouncement[] = [
     id: 'bank-only-template-2026-04-01',
 
     // true 로 바꾸면 팝업이 실제로 뜹니다.
-    enabled: true,
+    enabled: false,
 
     // 숫자가 클수록 더 먼저 뜹니다.
     priority: 100,

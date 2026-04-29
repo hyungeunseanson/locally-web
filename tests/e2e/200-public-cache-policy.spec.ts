@@ -14,12 +14,15 @@ test.describe('Public cache policy contract', () => {
   });
 
   test('keeps community and sitemap revalidation windows stable in source', () => {
+    const sitemapSource = readFileSync('app/sitemap.ts', 'utf8');
+
     expect(readFileSync('app/community/boardFeed.server.ts', 'utf8')).toContain(
       'const COMMUNITY_BOARD_FEED_REVALIDATE_SECONDS = 60;'
     );
     expect(readFileSync('app/community/detailData.server.ts', 'utf8')).toContain(
       'const COMMUNITY_DETAIL_REVALIDATE_SECONDS = 300;'
     );
-    expect(readFileSync('app/sitemap.ts', 'utf8')).toContain('export const revalidate = 3600;');
+    expect(sitemapSource).toContain('export const revalidate = 3600;');
+    expect(sitemapSource).toContain("'app/config/companyNotices.ts'");
   });
 });
