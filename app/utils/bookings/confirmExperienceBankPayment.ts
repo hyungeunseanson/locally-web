@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { getBookingSettlementSnapshot } from '@/app/utils/bookingFinance';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
+import { getHostBookingMessageHref } from '@/app/utils/hostBookingMessageLink';
 import { notifyMembershipMilestone } from '@/app/utils/memberMilestoneNotifications';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 import { isPendingBookingStatus } from '@/app/constants/bookingStatus';
@@ -215,6 +216,10 @@ export async function runExperienceBankConfirmSideEffects(
 
   const hostId = experience.host_id;
   const experienceTitle = experience.title || 'Locally 체험';
+  const hostMessageHref = getHostBookingMessageHref({
+    guestId: booking.user_id,
+    experienceId: booking.experience_id,
+  });
 
   try {
     const notifications = [];
@@ -225,7 +230,7 @@ export async function runExperienceBankConfirmSideEffects(
           supabaseAdmin,
           userId: hostId,
           type: 'booking_confirmed',
-          link: '/host/dashboard',
+          link: hostMessageHref,
           key: 'booking.bank_confirmed.host',
           copyParams: {
             experienceTitle,
@@ -272,7 +277,8 @@ export async function runExperienceBankConfirmSideEffects(
           audience: 'host',
           payload: {
             experienceTitle,
-            ctaUrl: '/host/dashboard',
+            ctaUrl: hostMessageHref,
+            guestName: guestDisplayName,
           },
         },
       });

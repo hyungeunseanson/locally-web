@@ -1,4 +1,5 @@
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
+import { getHostBookingMessageHref } from '@/app/utils/hostBookingMessageLink';
 import { notifyMembershipMilestone } from '@/app/utils/memberMilestoneNotifications';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 import { createAdminClient } from '@/app/utils/supabase/admin';
@@ -9,6 +10,7 @@ type ExperiencePaymentConfirmedParams = {
   supabaseAdmin: AdminClient;
   guestId: string | null;
   hostId: string | null;
+  experienceId: string | number | null;
   experienceTitle: string;
   guestName: string;
   guestsCount: number;
@@ -24,6 +26,7 @@ export async function notifyExperiencePaymentConfirmed(
     supabaseAdmin,
     guestId,
     hostId,
+    experienceId,
     experienceTitle,
     guestName,
     guestsCount,
@@ -43,6 +46,11 @@ export async function notifyExperiencePaymentConfirmed(
     if (guestProfile?.full_name) displayName = guestProfile.full_name;
   }
 
+  const hostMessageHref = getHostBookingMessageHref({
+    guestId,
+    experienceId,
+  });
+
   try {
     const notifications = [];
 
@@ -52,7 +60,7 @@ export async function notifyExperiencePaymentConfirmed(
           supabaseAdmin,
           userId: hostId,
           type: 'new_booking',
-          link: '/host/dashboard',
+          link: hostMessageHref,
           key: 'booking.confirmed.host',
           copyParams: {
             experienceTitle,
@@ -102,7 +110,7 @@ export async function notifyExperiencePaymentConfirmed(
           bookingTime: bookingTime || undefined,
           partySize: guestsCount,
           amount: totalAmount,
-          ctaUrl: '/host/dashboard',
+          ctaUrl: hostMessageHref,
           guestName: displayName,
         },
       },

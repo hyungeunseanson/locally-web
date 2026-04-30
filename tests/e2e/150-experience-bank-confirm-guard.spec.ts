@@ -298,5 +298,20 @@ test.describe.serial('Experience bank confirm guards', () => {
       platform_revenue: 20000,
       payout_status: 'pending',
     });
+
+    const { data: hostNotificationRows, error: hostNotificationError } = await getTestAdminClient()
+      .from('notifications')
+      .select('title, message, link')
+      .eq('user_id', hostId)
+      .eq('type', 'booking_confirmed')
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (hostNotificationError) throw hostNotificationError;
+    expect(hostNotificationRows?.[0]?.title).toContain('바로 메시지');
+    expect(hostNotificationRows?.[0]?.message).toContain('준비 안내');
+    expect(hostNotificationRows?.[0]?.link).toContain('/host/dashboard?tab=inquiries');
+    expect(hostNotificationRows?.[0]?.link).toContain(`guestId=${encodeURIComponent(guestId)}`);
+    expect(hostNotificationRows?.[0]?.link).toContain(`expId=${experienceId}`);
   });
 });

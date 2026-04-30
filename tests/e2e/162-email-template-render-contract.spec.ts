@@ -46,13 +46,14 @@ test.describe('Templated email system phase 2 contracts', () => {
       },
     });
 
-    expect(rendered.subject).toBe('[Locally] 🎉 새로운 예약이 도착했습니다!');
+    expect(rendered.subject).toBe('[Locally] 🎉 예약 확정. 게스트에게 메시지를 보내주세요');
     expect(rendered.preheader).toContain('도쿄 야경 투어');
-    expect(rendered.title).toBe('새 예약이 접수되었습니다');
+    expect(rendered.title).toBe('예약 확정. 게스트에게 메시지를 보내주세요');
     expect(rendered.summaryTitle).toBe('예약 정보');
     expect(rendered.statusLabel).toBe('예약 접수');
     expect(rendered.summaryItems?.map((item) => item.value)).toContain('Sora');
-    expect(rendered.ctaLabel).toBe('예약 상세 확인하기');
+    expect(rendered.description).toContain('지금 게스트에게 인사와 준비 안내를 보내주세요');
+    expect(rendered.ctaLabel).toBe('예약 확인하고 메시지 보내기');
     expect(rendered.ctaUrl).toContain('/host/dashboard');
   });
 
@@ -115,10 +116,13 @@ test.describe('Templated email system phase 2 contracts', () => {
       payload: {
         experienceTitle: '도쿄 야경 투어',
         ctaUrl: '/host/dashboard',
+        guestName: 'Sora',
       },
     });
 
-    expect(bankConfirmedHost.subject).toBe('[Locally] 💰 입금 확인 완료!');
+    expect(bankConfirmedHost.subject).toBe('[Locally] 💰 입금 확인 완료. 게스트에게 메시지를 보내주세요');
+    expect(bankConfirmedHost.description).toContain('Sora님에게 인사와 준비 안내');
+    expect(bankConfirmedHost.ctaLabel).toBe('예약 확인하고 메시지 보내기');
     expect(bankConfirmedHost.summaryTitle).toBe('예약 정보');
     expect(bankConfirmedHost.statusLabel).toBe('입금 확인');
 

@@ -71,9 +71,12 @@ test.describe('Email localization helpers', () => {
 
     const bookingBankConfirmedHostEn = buildEmailCopy('booking.bank_confirmed.host', 'en', {
       experienceTitle: 'Seoul Night Walk',
+      guestName: 'Sora',
     });
-    expect(bookingBankConfirmedHostEn.subject).toBe('[Locally] 💰 Bank transfer confirmed');
-    expect(bookingBankConfirmedHostEn.ctaLabel).toBe('Open host dashboard');
+    expect(bookingBankConfirmedHostEn.subject).toBe('[Locally] 💰 Payment confirmed. Please message the guest');
+    expect(bookingBankConfirmedHostEn.message).toContain('Sora is waiting');
+    expect(bookingBankConfirmedHostEn.message).toContain('Send a quick hello');
+    expect(bookingBankConfirmedHostEn.ctaLabel).toBe('View booking and message the guest');
 
     const bookingBankConfirmedGuestZh = buildEmailCopy('booking.bank_confirmed.guest', 'zh', {
       experienceTitle: '首尔夜景散步',

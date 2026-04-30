@@ -361,24 +361,24 @@ function buildBookingConfirmedHostCopy(
   switch (locale) {
     case 'en':
       return {
-        title: '🎉 New booking confirmed!',
-        message: `The booking from ${guestName} for '${experienceTitle}' has been confirmed.`,
+        title: '🎉 Booking confirmed! Message the guest now',
+        message: `The booking from ${guestName} for '${experienceTitle}' is confirmed. Send a quick hello and preparation details now.`,
       };
     case 'ja':
       return {
-        title: '🎉 新しい予約が確定しました！',
-        message: `「${experienceTitle}」の${guestName}さんの予約が確定しました。`,
+        title: '🎉 予約確定！ゲストに今すぐメッセージを',
+        message: `「${experienceTitle}」の${guestName}さんの予約が確定しました。今すぐ挨拶と準備案内をメッセージで送りましょう。`,
       };
     case 'zh':
       return {
-        title: '🎉 新预约已确认！',
-        message: `「${experienceTitle}」中来自${guestName}的预约已确认。`,
+        title: '🎉 预订已确认！请立即给客人发消息',
+        message: `「${experienceTitle}」中来自${guestName}的预订已确认。请现在发送问候和准备说明。`,
       };
     case 'ko':
     default:
       return {
-        title: '🎉 새로운 예약 도착!',
-        message: `[${experienceTitle}] 체험에 ${guestName}님의 예약이 확정되었습니다.`,
+        title: '🎉 예약 확정! 게스트에게 바로 메시지를 보내주세요',
+        message: `'${experienceTitle}' 예약이 확정되었습니다. ${guestName}님이 기다리고 있어요. 지금 메시지로 인사와 준비 안내를 보내주세요.`,
       };
   }
 }
@@ -392,24 +392,24 @@ function buildBookingBankConfirmedHostCopy(
   switch (locale) {
     case 'en':
       return {
-        title: '💰 Payment received',
-        message: `The bank transfer from ${guestName} for '${experienceTitle}' has been confirmed.`,
+        title: '💰 Payment confirmed! Message the guest now',
+        message: `The bank transfer from ${guestName} for '${experienceTitle}' is confirmed. Send a quick hello and preparation details now.`,
       };
     case 'ja':
       return {
-        title: '💰 入金確認完了',
-        message: `「${experienceTitle}」の${guestName}さんの入金確認が完了しました。`,
+        title: '💰 入金確認完了！ゲストに今すぐメッセージを',
+        message: `「${experienceTitle}」の${guestName}さんの入金確認が完了しました。今すぐ挨拶と準備案内をメッセージで送りましょう。`,
       };
     case 'zh':
       return {
-        title: '💰 已确认收款',
-        message: `已确认「${experienceTitle}」中来自${guestName}的转账。`,
+        title: '💰 收款已确认！请立即给客人发消息',
+        message: `已确认「${experienceTitle}」中来自${guestName}的转账。请现在发送问候和准备说明。`,
       };
     case 'ko':
     default:
       return {
-        title: '💰 입금 확인 완료!',
-        message: `'${experienceTitle}' ${guestName}님의 입금 확인이 완료되었습니다.`,
+        title: '💰 입금 확인 완료! 게스트에게 바로 메시지를 보내주세요',
+        message: `'${experienceTitle}' ${guestName}님의 입금 확인이 완료되었습니다. 지금 메시지로 인사와 준비 안내를 보내주세요.`,
       };
   }
 }

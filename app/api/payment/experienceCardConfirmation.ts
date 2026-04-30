@@ -120,6 +120,7 @@ export async function finalizeExperienceCardPayment(params: {
     supabaseAdmin,
     guestId: bookingData.user_id || null,
     hostId: resolvedHostId || null,
+    experienceId: bookingData.experience_id || originalBooking.experience_id || null,
     experienceTitle: expTitle,
     guestName,
     guestsCount: Number(bookingData.guests || 1),

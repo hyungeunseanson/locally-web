@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 
+import { getHostBookingMessageHref } from '@/app/utils/hostBookingMessageLink';
 import {
   buildNotificationCopy,
 } from '@/app/utils/notificationCopy';
@@ -107,6 +108,32 @@ test.describe('Notification localization helpers', () => {
     });
     expect(proxyReplyZh.title).toBe('你的电话预约请求有新回复。');
     expect(proxyReplyZh.message).toBe('我们已经联系到店家了。');
+  });
+
+  test('nudges hosts to message guests after booking confirmation', () => {
+    const confirmedKo = buildNotificationCopy('booking.confirmed.host', 'ko', {
+      experienceTitle: '도쿄 야경 투어',
+      guestName: '민지',
+    });
+    expect(confirmedKo.title).toContain('바로 메시지');
+    expect(confirmedKo.message).toContain('민지님이 기다리고 있어요');
+    expect(confirmedKo.message).toContain('준비 안내');
+
+    const bankConfirmedEn = buildNotificationCopy('booking.bank_confirmed.host', 'en', {
+      experienceTitle: 'Seoul Night Walk',
+      guestName: 'Sora',
+    });
+    expect(bankConfirmedEn.title).toContain('Message the guest now');
+    expect(bankConfirmedEn.message).toContain('Send a quick hello');
+    expect(bankConfirmedEn.message).not.toContain('게스트');
+  });
+
+  test('builds host booking message deep links with a reservations fallback', () => {
+    expect(getHostBookingMessageHref({ guestId: 'guest-1', experienceId: 42 })).toBe(
+      '/host/dashboard?tab=inquiries&guestId=guest-1&expId=42'
+    );
+    expect(getHostBookingMessageHref({ guestId: '', experienceId: 42 })).toBe('/host/dashboard?tab=reservations');
+    expect(getHostBookingMessageHref({ guestId: 'guest-1', experienceId: null })).toBe('/host/dashboard?tab=reservations');
   });
 
   test('builds host application and experience status copy with localized reason text', () => {

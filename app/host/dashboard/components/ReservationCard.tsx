@@ -126,6 +126,13 @@ export default function ReservationCard({
   const hasBookingReview = isBookingReviewPending(res.cancel_reason);
   const bookingReviewDetail = getBookingReviewDetail(res.cancel_reason);
   const showMembershipBadge = res.membershipStatus === 'member' || res.membershipStatus === 'circle';
+  const showConfirmedMessageNudge =
+    isConfirmed &&
+    !hasStarted &&
+    !isCompletedBookingStatus(res.status) &&
+    !isCancellationRequestedBookingStatus(res.status) &&
+    !hasBookingReview;
+  const messageButtonLabel = showConfirmedMessageNudge ? t('res_message_btn_confirmed') : t('res_message_btn');
 
   // 🟢 결제 시간 다국어 포맷팅
   const localeMap: Record<string, string> = { ko: 'ko-KR', en: 'en-US', ja: 'ja-JP', zh: 'zh-CN' };
@@ -250,10 +257,23 @@ export default function ReservationCard({
           </div>
         </div>
 
+        {showConfirmedMessageNudge && (
+          <div
+            data-testid={`reservation-message-nudge-mobile-${String(res.id)}`}
+            className="mt-3 flex items-start gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2.5 text-blue-900"
+          >
+            <MessageSquare size={14} className="mt-0.5 shrink-0 text-blue-600" />
+            <div className="min-w-0">
+              <p className="text-[11px] font-bold leading-snug">{t('res_confirmed_message_nudge_title')}</p>
+              <p className="mt-0.5 text-[11px] leading-[1.35] text-blue-800">{t('res_confirmed_message_nudge_body')}</p>
+            </div>
+          </div>
+        )}
+
         <div className="mt-3 grid grid-cols-2 gap-2">
           <MobileActionButton
             icon={<MessageSquare size={15} />}
-            label={t('res_message_btn')}
+            label={messageButtonLabel}
             onClick={onMessage}
             primary
           />
@@ -353,6 +373,19 @@ export default function ReservationCard({
               </div>
             </button>
           </div>
+
+          {showConfirmedMessageNudge && (
+            <div
+              data-testid={`reservation-message-nudge-desktop-${String(res.id)}`}
+              className="mt-4 flex items-start gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2.5 text-blue-900"
+            >
+              <MessageSquare size={15} className="mt-0.5 shrink-0 text-blue-600" />
+              <div className="min-w-0">
+                <p className="text-[12px] font-bold leading-snug">{t('res_confirmed_message_nudge_title')}</p>
+                <p className="mt-0.5 text-[12px] leading-[1.4] text-blue-800">{t('res_confirmed_message_nudge_body')}</p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 우측 액션 영역 */}
@@ -368,7 +401,7 @@ export default function ReservationCard({
             onClick={(e) => { e.stopPropagation(); onMessage(); }}
             className="w-full bg-slate-900 text-white px-4 py-3 rounded-xl text-sm font-bold hover:bg-black transition-colors flex items-center justify-center gap-2 shadow-sm"
           >
-            <MessageSquare size={16} /> {t('res_message_btn')}
+            <MessageSquare size={16} /> {messageButtonLabel}
           </button>
 
           {showDesktopReviewButton && (

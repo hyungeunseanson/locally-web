@@ -90,19 +90,19 @@ export function buildBookingConfirmationTemplateEmailCopy(
         const fallbackExperienceTitle = 'Locally experience';
         const resolvedExperienceTitle = params.experienceTitle || fallbackExperienceTitle;
       return {
-        subject: '[Locally] 🎉 A new booking has arrived!',
-        previewText: `A new guest is waiting for you 🎉 ${resolvedExperienceTitle}`,
+        subject: '[Locally] 🎉 Booking confirmed. Please message the guest',
+        previewText: `A guest is waiting for your message 🎉 ${resolvedExperienceTitle}`,
         greetingPrefix: 'Hi, ',
         greetingSuffix: '! 👋',
-        introText: 'A new guest booked this experience. It looks like a special moment is about to begin 🎉',
+        introText: 'A new booking is confirmed. Please send the guest a quick hello and preparation details now.',
         guestNameLabel: 'Guest name',
         guestCountLabel: 'Guests',
         guestCountSuffix: '',
         totalAmountLabel: 'Total paid',
         bookingDateLabel: 'Booking date',
         helperText:
-          'Your guest is already looking forward to it. Send a quick hello in chat and start getting ready for the experience.',
-        ctaLabel: 'View booking details',
+          'A fast first message helps the guest feel confident before the experience.',
+        ctaLabel: 'View booking and message the guest',
         fallbackHostName: 'Locally host',
         fallbackGuestName: 'Guest',
         fallbackExperienceTitle,
@@ -115,19 +115,19 @@ export function buildBookingConfirmationTemplateEmailCopy(
         const fallbackExperienceTitle = 'Locally体験';
         const resolvedExperienceTitle = params.experienceTitle || fallbackExperienceTitle;
       return {
-        subject: '[Locally] 🎉 新しい予約が届きました！',
-        previewText: `新しいゲストが待っています 🎉 ${resolvedExperienceTitle}`,
+        subject: '[Locally] 🎉 予約確定。ゲストにメッセージを送ってください',
+        previewText: `ゲストがメッセージを待っています 🎉 ${resolvedExperienceTitle}`,
         greetingPrefix: 'こんにちは、',
         greetingSuffix: 'さん 👋',
-        introText: 'この体験に新しいゲストの予約が入りました。いよいよ特別な時間が始まります 🎉',
+        introText: '予約が確定しました。今すぐゲストへ挨拶と準備案内を送ってください。',
         guestNameLabel: 'ゲスト名',
         guestCountLabel: '参加人数',
         guestCountSuffix: '名',
         totalAmountLabel: '決済金額合計',
         bookingDateLabel: '予約日程',
         helperText:
-          'ゲストはすでに楽しみにしています。チャットで先にあいさつを送り、体験の準備を始めてください。',
-        ctaLabel: '予約詳細を見る',
+          '最初のメッセージが早いほど、ゲストは安心して体験を待つことができます。',
+        ctaLabel: '予約を確認してメッセージを送る',
         fallbackHostName: 'Locallyホスト',
         fallbackGuestName: 'ゲスト',
         fallbackExperienceTitle,
@@ -140,19 +140,19 @@ export function buildBookingConfirmationTemplateEmailCopy(
         const fallbackExperienceTitle = 'Locally 体验';
         const resolvedExperienceTitle = params.experienceTitle || fallbackExperienceTitle;
       return {
-        subject: '[Locally] 🎉 你收到了新的预订！',
-        previewText: `有新客人正在等你 🎉 ${resolvedExperienceTitle}`,
+        subject: '[Locally] 🎉 预订已确认，请给客人发消息',
+        previewText: `客人正在等待你的消息 🎉 ${resolvedExperienceTitle}`,
         greetingPrefix: '你好，',
         greetingSuffix: ' 👋',
-        introText: '这场体验迎来了新的客人，一段特别的同行时光即将开始 🎉',
+        introText: '新的预订已确认。请现在向客人发送问候和准备说明。',
         guestNameLabel: '客人姓名',
         guestCountLabel: '参与人数',
         guestCountSuffix: '人',
         totalAmountLabel: '支付总额',
         bookingDateLabel: '预订日期',
         helperText:
-          '客人已经满怀期待。先通过聊天打个招呼，然后开始准备这次体验吧。',
-        ctaLabel: '查看预订详情',
+          '越早发送第一条消息，客人在体验前就越安心。',
+        ctaLabel: '查看预订并发送消息',
         fallbackHostName: 'Locally 房东',
         fallbackGuestName: '客人',
         fallbackExperienceTitle,
@@ -166,19 +166,19 @@ export function buildBookingConfirmationTemplateEmailCopy(
         const fallbackExperienceTitle = '로컬라이프 체험';
         const resolvedExperienceTitle = params.experienceTitle || fallbackExperienceTitle;
       return {
-        subject: '[Locally] 🎉 새로운 예약이 도착했습니다!',
-        previewText: `새 게스트가 찾아왔어요 🎉 ${resolvedExperienceTitle}`,
+        subject: '[Locally] 🎉 예약 확정. 게스트에게 메시지를 보내주세요',
+        previewText: `게스트가 호스트님의 메시지를 기다리고 있어요 🎉 ${resolvedExperienceTitle}`,
         greetingPrefix: '안녕하세요, ',
         greetingSuffix: '님 👋',
-        introText: '체험에 새 게스트가 찾아왔어요! 함께하는 시간이 정말 특별해질 거예요 🎉',
+        introText: '예약이 확정되었습니다. 지금 게스트에게 인사와 준비 안내를 보내주세요.',
         guestNameLabel: '게스트명',
         guestCountLabel: '참여 인원',
         guestCountSuffix: '명',
         totalAmountLabel: '총 결제 금액',
         bookingDateLabel: '예약 일자',
         helperText:
-          '게스트가 설레는 마음으로 기다리고 있어요. 채팅으로 먼저 인사를 건네보시고, 멋진 체험 준비해주세요 🙌',
-        ctaLabel: '예약 상세 확인하기',
+          '첫 메시지가 빠를수록 게스트가 체험 전 더 안심할 수 있어요.',
+        ctaLabel: '예약 확인하고 메시지 보내기',
         fallbackHostName: '로컬리 호스트',
         fallbackGuestName: '게스트',
         fallbackExperienceTitle,

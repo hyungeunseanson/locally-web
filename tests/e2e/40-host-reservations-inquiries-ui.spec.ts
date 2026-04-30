@@ -644,6 +644,10 @@ test.describe.serial('Host dashboard reservations and inquiries UI coverage', ()
     await expect(memberCard.locator('[data-testid="host-reservation-membership-badge"]').first()).toContainText('Tier 1');
     await expect(circleCard.locator('[data-testid="host-reservation-membership-badge"]').first()).toContainText('Tier 2');
     await expect(pendingCard.locator('[data-testid="host-reservation-membership-badge"]')).toHaveCount(0);
+    await expect(memberCard.getByTestId(`reservation-message-nudge-desktop-${memberBookingId}`)).toBeVisible();
+    await expect(memberCard).toContainText(/게스트에게 먼저 메시지|Send the guest a first message/);
+    await expect(memberCard.getByRole('button', { name: /메시지 보내기|Message guest/ })).toBeVisible();
+    await expect(pendingCard.getByTestId(`reservation-message-nudge-desktop-${pendingBookingId}`)).toHaveCount(0);
     await expect(memberCard.getByRole('button', { name: /게스트 후기|Write Review/ })).toHaveCount(0);
     await expect(circleCard.getByRole('button', { name: /게스트 후기|Write Review/ })).toHaveCount(0);
     await expect(page.getByRole('button', { name: /취소\/환불|Cancelled/ })).toBeVisible();
@@ -651,6 +655,7 @@ test.describe.serial('Host dashboard reservations and inquiries UI coverage', ()
     await page.getByRole('button', { name: /취소\/환불|Cancelled/ }).click();
     await expect(page.getByRole('heading', { name: `#${cancelBookingId}` })).toBeVisible({ timeout: 15000 });
     await expect(page.getByText(/취소 요청이 접수되었습니다.|Cancellation Request Received/)).toBeVisible();
+    await expect(page.getByTestId(`reservation-message-nudge-desktop-${cancelBookingId}`)).toHaveCount(0);
 
     await page.getByRole('button', { name: /다가오는 일정|Upcoming/ }).click();
     await memberCard.getByRole('button', { name: new RegExp(`${memberGuest.fullName}.*(프로필|Profile)`) }).click();
@@ -682,6 +687,7 @@ test.describe.serial('Host dashboard reservations and inquiries UI coverage', ()
     const completedCircleCard = page.getByTestId(`reservation-card-${circlePastBookingId}`);
     await expect(completedCircleCard).toBeVisible({ timeout: 15000 });
     await expect(completedCircleCard.getByRole('button', { name: /후기 작성됨|Review Written/ })).toBeVisible();
+    await expect(completedCircleCard.getByTestId(`reservation-message-nudge-desktop-${circlePastBookingId}`)).toHaveCount(0);
 
     await page.getByRole('button', { name: /다가오는 일정|Upcoming/ }).click();
     await pendingCard.getByRole('button', { name: new RegExp(`${pendingGuest.fullName}.*(프로필|Profile)`) }).click();
@@ -806,7 +812,8 @@ test.describe.serial('Host dashboard reservations and inquiries UI coverage', ()
       { timeout: 20000 }
     );
 
-    await page.getByRole('button', { name: /메시지|Message/ }).click();
+    await expect(page.getByTestId(`reservation-message-nudge-desktop-${bookingId}`)).toBeVisible();
+    await page.getByRole('button', { name: /메시지 보내기|Message guest/ }).click();
     await startChatResponsePromise;
     await page.waitForURL(/\/host\/dashboard\?tab=inquiries/, { timeout: 15000 });
 

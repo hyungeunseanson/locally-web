@@ -464,12 +464,12 @@ export function buildBookingConfirmedTemplateProps({
     preheader: copy.previewText,
     title:
       locale === 'ko'
-        ? '새 예약이 접수되었습니다'
+        ? '예약 확정. 게스트에게 메시지를 보내주세요'
         : locale === 'ja'
-          ? '新しい予約が入りました'
+          ? '予約確定。ゲストにメッセージを送ってください'
           : locale === 'zh'
-            ? '你收到了一笔新预订'
-            : 'A new booking has arrived',
+            ? '预订已确认，请给客人发消息'
+            : 'Booking confirmed. Please message the guest',
     description: `${copy.greetingPrefix}${resolvedRecipientName}${copy.greetingSuffix} ${copy.introText}`,
     summaryTitle: buildBookingSummaryTitle(locale),
     statusLabel: buildBookingConfirmedStatusLabel(locale, audience),
@@ -842,6 +842,7 @@ export function buildBookingBankConfirmedHostTemplateProps({
   const labels = buildHostActionLabels(locale);
   const copy = buildEmailCopy('booking.bank_confirmed.host', locale, {
     experienceTitle: payload.experienceTitle,
+    guestName: payload.guestName,
   });
 
   return {

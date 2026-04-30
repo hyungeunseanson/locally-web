@@ -64,6 +64,7 @@ export type EmailPayloadMap = {
   'booking.bank_confirmed_host': {
     experienceTitle: string;
     ctaUrl: string;
+    guestName?: string;
   };
   'inquiry.new_message': {
     actorName: string;

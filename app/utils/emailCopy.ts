@@ -59,6 +59,7 @@ type BookingCancellationApprovedGuestParams = {
 
 type BookingBankConfirmedHostParams = {
   experienceTitle: string;
+  guestName?: string;
 };
 
 type BookingBankConfirmedGuestParams = {
@@ -559,37 +560,38 @@ function buildBookingBankConfirmedEmailCopy(
   params: BookingBankConfirmedHostParams | BookingBankConfirmedGuestParams
 ): EmailCopy {
   const { experienceTitle } = params;
+  const guestName = 'guestName' in params ? params.guestName?.trim() : '';
 
   if (key === 'booking.bank_confirmed.host') {
     switch (locale) {
       case 'en':
         return {
-          subject: '[Locally] 💰 Bank transfer confirmed',
-          title: 'Bank transfer confirmed',
-          message: `The bank transfer for '${experienceTitle}' has been confirmed.`,
-          ctaLabel: 'Open host dashboard',
+          subject: '[Locally] 💰 Payment confirmed. Please message the guest',
+          title: 'Payment confirmed. Message the guest now',
+          message: `${guestName || 'The guest'} is waiting after the bank transfer for '${experienceTitle}' was confirmed. Send a quick hello and preparation details now.`,
+          ctaLabel: 'View booking and message the guest',
         };
       case 'ja':
         return {
-          subject: '[Locally] 💰 入金確認が完了しました',
-          title: '入金確認が完了しました',
-          message: `「${experienceTitle}」予約の入金確認が完了しました。`,
-          ctaLabel: 'ホストダッシュボードを開く',
+          subject: '[Locally] 💰 入金確認完了。ゲストにメッセージを送ってください',
+          title: '入金確認完了。今すぐゲストにメッセージを',
+          message: `「${experienceTitle}」予約の入金確認が完了しました。${guestName || 'ゲスト'}さんへ挨拶と準備案内を送ってください。`,
+          ctaLabel: '予約を確認してメッセージを送る',
         };
       case 'zh':
         return {
-          subject: '[Locally] 💰 已确认收款',
-          title: '已确认收款',
-          message: `「${experienceTitle}」预订的收款确认已完成。`,
-          ctaLabel: '打开房东后台',
+          subject: '[Locally] 💰 收款已确认，请给客人发消息',
+          title: '收款已确认。请立即给客人发消息',
+          message: `「${experienceTitle}」预订的收款确认已完成。请现在向${guestName || '客人'}发送问候和准备说明。`,
+          ctaLabel: '查看预订并发送消息',
         };
       case 'ko':
       default:
         return {
-          subject: '[Locally] 💰 입금 확인 완료!',
-          title: '입금 확인 완료!',
-          message: `'${experienceTitle}' 예약의 입금 확인이 완료되었습니다.`,
-          ctaLabel: '호스트 대시보드 열기',
+          subject: '[Locally] 💰 입금 확인 완료. 게스트에게 메시지를 보내주세요',
+          title: '입금 확인 완료. 지금 게스트에게 메시지를 보내주세요',
+          message: `'${experienceTitle}' 예약의 입금 확인이 완료되었습니다. ${guestName || '게스트'}님에게 인사와 준비 안내를 보내주세요.`,
+          ctaLabel: '예약 확인하고 메시지 보내기',
         };
     }
   }
