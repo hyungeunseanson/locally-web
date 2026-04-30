@@ -136,6 +136,9 @@ async function createExperienceFixture(
   const futureDate = new Date();
   futureDate.setDate(futureDate.getDate() + 12);
   const date = futureDate.toISOString().slice(0, 10);
+  const pastDate = new Date();
+  pastDate.setDate(pastDate.getDate() - 12);
+  const expiredDate = pastDate.toISOString().slice(0, 10);
 
   const { data, error } = await supabase
     .from('experiences')
@@ -179,16 +182,24 @@ async function createExperienceFixture(
 
   createdExperienceIds.push(Number(data.id));
 
-  const { error: availabilityError } = await supabase.from('experience_availability').insert({
-    experience_id: data.id,
-    date,
-    start_time: '18:00',
-    is_booked: false,
-  });
+  const { error: availabilityError } = await supabase.from('experience_availability').insert([
+    {
+      experience_id: data.id,
+      date,
+      start_time: '18:00',
+      is_booked: false,
+    },
+    {
+      experience_id: data.id,
+      date: expiredDate,
+      start_time: '18:00',
+      is_booked: false,
+    },
+  ]);
 
   if (availabilityError) throw availabilityError;
 
-  return { id: Number(data.id), title: String(data.title), date };
+  return { id: Number(data.id), title: String(data.title), date, expiredDate };
 }
 
 test.afterAll(async () => {
@@ -253,9 +264,14 @@ test.describe.serial('Public search server filters', () => {
         expect.objectContaining({
           id: visibleExperience.id,
           title: visibleExperience.title,
+          available_dates: expect.arrayContaining([visibleExperience.date]),
         }),
       ])
     );
+    const visibleHomeExperience = homePayload.data.find(
+      (experience: { id: number }) => experience.id === visibleExperience.id
+    );
+    expect(visibleHomeExperience?.available_dates).not.toContain(visibleExperience.expiredDate);
     expect(homePayload.data).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({

@@ -57,6 +57,14 @@ function asComparableId(value: number | string | null | undefined) {
   return typeof value === 'number' || typeof value === 'string' ? String(value) : '';
 }
 
+function toIsoDateString(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function getTodayIsoDate() {
+  return toIsoDateString(new Date());
+}
+
 export async function GET() {
   try {
     const supabase = createClient(
@@ -108,7 +116,8 @@ export async function GET() {
         supabase
           .from('experience_availability')
           .select('experience_id, date')
-          .in('experience_id', experienceIds),
+          .in('experience_id', experienceIds)
+          .gte('date', getTodayIsoDate()),
         supabase
           .from('experience_popularity_snapshot')
           .select('experience_id, wishlist_count')
