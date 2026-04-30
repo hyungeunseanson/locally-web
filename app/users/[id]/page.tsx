@@ -212,6 +212,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                         src={profile.avatar_url}
                         alt={profile?.full_name || 'Host profile'}
                         fill
+                        loading="eager"
                         sizes="(max-width: 768px) 96px, 128px"
                         className="object-cover"
                       />
@@ -313,8 +314,8 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
 
               {hostExperiences.length > 0 ? (
                 <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  {hostExperiences.map(exp => (
-                    <ExperienceCard key={exp.id} data={exp} />
+                  {hostExperiences.map((exp, index) => (
+                    <ExperienceCard key={exp.id} data={exp} eager={index === 0} />
                   ))}
                 </div>
               ) : (

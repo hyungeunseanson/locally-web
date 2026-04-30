@@ -91,10 +91,12 @@ function renderCategoryIcon(categoryLabel: string) {
 
 export default function ExperienceCard({
   data,
+  eager = false,
   showImageCategoryBadge = false,
   metaLayout = 'legacy',
 }: {
   data: ExperienceCardData;
+  eager?: boolean;
   showImageCategoryBadge?: boolean;
   metaLayout?: 'legacy' | 'home';
 }) {
@@ -124,6 +126,7 @@ export default function ExperienceCard({
           alt={title}
           fill
           quality={65}
+          loading={eager ? 'eager' : 'lazy'}
           className="object-cover transition-transform duration-700 ease-out group-hover:scale-110"
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
         />
