@@ -235,10 +235,11 @@ async function getTokenLineTops(page: Page, testId: string, token: string) {
         const source = textNode.textContent || '';
         const tokenStart = source.indexOf(targetToken);
         if (tokenStart >= 0) {
+          const matchingTextNode = textNode;
           return Array.from(targetToken).map((_, index) => {
             const range = document.createRange();
-            range.setStart(textNode, tokenStart + index);
-            range.setEnd(textNode, tokenStart + index + 1);
+            range.setStart(matchingTextNode, tokenStart + index);
+            range.setEnd(matchingTextNode, tokenStart + index + 1);
             const rect = range.getBoundingClientRect();
             range.detach();
             return Math.round(rect.top);

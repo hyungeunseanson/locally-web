@@ -53,13 +53,14 @@ test.describe('Live domain parity helper contract', () => {
   });
 
   test('drives ads.txt expectation from publisher id presence, not the global ad toggle', () => {
-    expect(resolveAdsTxtExpectation({})).toEqual({
+    expect(resolveAdsTxtExpectation({ NODE_ENV: 'test' })).toEqual({
       clientId: null,
       expectedStatus: 404,
     });
 
     expect(
       resolveAdsTxtExpectation({
+        NODE_ENV: 'test',
         NEXT_PUBLIC_ADSENSE_ENABLED: 'false',
         NEXT_PUBLIC_ADSENSE_CLIENT_ID: 'ca-pub-1234567890',
       })
