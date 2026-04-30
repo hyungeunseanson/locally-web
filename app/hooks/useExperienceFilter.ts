@@ -17,9 +17,11 @@ const cityMap: Record<string, string> = {
   jeju: '제주'
 };
 
+const EMPTY_EXPERIENCES: Experience[] = [];
+
 export function useExperienceFilter() {
   const {
-    data: allExperiences = [],
+    data: allExperiences = EMPTY_EXPERIENCES,
     isLoading: loading,
     isSuccess,
     isError,
