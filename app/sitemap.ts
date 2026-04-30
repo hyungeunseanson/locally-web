@@ -1,6 +1,5 @@
 import { MetadataRoute } from 'next';
 import { stat } from 'fs/promises';
-import path from 'path';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import {
   isPublicHostApplicationStatus,
@@ -107,11 +106,16 @@ const STATIC_ROUTE_CONFIGS: StaticRouteConfig[] = [
   },
 ];
 
+function resolveAppFileUrl(sourcePath: string) {
+  const appRelativePath = sourcePath.startsWith('app/') ? sourcePath.slice(4) : sourcePath;
+  return new URL(`./${appRelativePath}`, import.meta.url);
+}
+
 async function getRouteLastModified(sourcePaths: string[]): Promise<Date> {
   const timestamps = await Promise.all(
     sourcePaths.map(async (sourcePath) => {
       try {
-        const fileStat = await stat(path.join(process.cwd(), sourcePath));
+        const fileStat = await stat(resolveAppFileUrl(sourcePath));
         return fileStat.mtime;
       } catch {
         return null;
@@ -122,7 +126,7 @@ async function getRouteLastModified(sourcePaths: string[]): Promise<Date> {
   const validTimestamps = timestamps.filter((value): value is Date => value instanceof Date);
 
   if (validTimestamps.length === 0) {
-    const sitemapStat = await stat(path.join(process.cwd(), 'app/sitemap.ts'));
+    const sitemapStat = await stat(resolveAppFileUrl('app/sitemap.ts'));
     return sitemapStat.mtime;
   }
 
