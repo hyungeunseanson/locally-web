@@ -4,6 +4,7 @@ const nextConfig: NextConfig = {
   // ✅ 이미지 최적화 설정
   images: {
     formats: ['image/webp'],
+    qualities: [65, 75],
     minimumCacheTTL: 86400,
     remotePatterns: [
       {
