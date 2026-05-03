@@ -32,6 +32,19 @@ const matchesExcludedPrefix = (pathname: string, prefixes?: string[]) => {
 
   return prefixes.some((prefix) => {
     const normalizedPrefix = normalizeAnnouncementPathname(prefix);
+    if (normalizedPrefix === '/') {
+      return pathname === '/';
+    }
+
+    return pathname === normalizedPrefix || pathname.startsWith(`${normalizedPrefix}/`);
+  });
+};
+
+const matchesIncludedPrefix = (pathname: string, prefixes?: string[]) => {
+  if (!prefixes || prefixes.length === 0) return true;
+
+  return prefixes.some((prefix) => {
+    const normalizedPrefix = normalizeAnnouncementPathname(prefix);
     return pathname === normalizedPrefix || pathname.startsWith(`${normalizedPrefix}/`);
   });
 };
@@ -51,6 +64,7 @@ export function pickActiveSiteAnnouncement(
 
   const activeAnnouncements = announcements
     .filter((announcement) => announcement.enabled)
+    .filter((announcement) => matchesIncludedPrefix(normalizedPathname, announcement.includePathPrefixes))
     .filter((announcement) => {
       const startAt = parseAnnouncementDate(announcement.startAt);
       const endAt = parseAnnouncementDate(announcement.endAt);
@@ -82,6 +96,7 @@ export function getAnnouncementCopy(
 ) {
   return {
     title: announcement.title[locale] || announcement.title.ko,
+    badgeLabel: announcement.badgeLabel?.[locale] || announcement.badgeLabel?.ko,
     body: announcement.body[locale] || announcement.body.ko,
     primaryLabel: announcement.primaryLabel[locale] || announcement.primaryLabel.ko,
     secondaryLabel: announcement.secondaryLabel

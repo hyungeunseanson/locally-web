@@ -9,10 +9,13 @@ export type SiteAnnouncement = {
   startAt: string | null;
   endAt: string | null;
   audience: SiteAnnouncementAudience;
+  includePathPrefixes?: string[];
   excludePathPrefixes?: string[];
+  badgeLabel?: Record<SiteAnnouncementLocale, string>;
   title: Record<SiteAnnouncementLocale, string>;
   body: Record<SiteAnnouncementLocale, string>;
   primaryLabel: Record<SiteAnnouncementLocale, string>;
+  primaryHref?: string | null;
   secondaryLabel?: Record<SiteAnnouncementLocale, string>;
   href?: string | null;
   variant?: 'info' | 'warning';
@@ -39,6 +42,60 @@ export type SiteAnnouncement = {
 // - 여러 개가 있어도 우선순위(priority)가 가장 높은 1개만 뜹니다.
 // - 전역 팝업을 다시 켤 때는 /company/notices 에도 같은 내용의 공지를 함께 등록합니다.
 export const SITE_ANNOUNCEMENTS: SiteAnnouncement[] = [
+  {
+    id: 'host-create-experience-reminder-2026-05-03',
+    enabled: true,
+    priority: 200,
+    startAt: '2026-05-03T00:00:00+09:00',
+    endAt: null,
+    audience: 'host',
+    includePathPrefixes: ['/'],
+    excludePathPrefixes: [
+      '/admin',
+      '/host',
+      '/experiences',
+      '/services',
+      '/search',
+      '/company',
+      '/login',
+      '/account',
+      '/messages',
+      '/notifications',
+    ],
+    title: {
+      ko: 'ホスト承認が完了しました。次は体験登録です。',
+      en: 'ホスト承認が完了しました。次は体験登録です。',
+      ja: 'ホスト承認が完了しました。次は体験登録です。',
+      zh: 'ホスト承認が完了しました。次は体験登録です。',
+    },
+    badgeLabel: {
+      ko: 'お知らせ',
+      en: 'お知らせ',
+      ja: 'お知らせ',
+      zh: 'お知らせ',
+    },
+    body: {
+      ko: '以前のサイトで登録済みの体験も、新しいLocallyではもう一度体験ページを作成する必要があります。体験を登録すると、ゲストが予約できる状態になります。',
+      en: '以前のサイトで登録済みの体験も、新しいLocallyではもう一度体験ページを作成する必要があります。体験を登録すると、ゲストが予約できる状態になります。',
+      ja: '以前のサイトで登録済みの体験も、新しいLocallyではもう一度体験ページを作成する必要があります。体験を登録すると、ゲストが予約できる状態になります。',
+      zh: '以前のサイトで登録済みの体験も、新しいLocallyではもう一度体験ページを作成する必要があります。体験を登録すると、ゲストが予約できる状態になります。',
+    },
+    primaryLabel: {
+      ko: '体験を登録する',
+      en: '体験を登録する',
+      ja: '体験を登録する',
+      zh: '体験を登録する',
+    },
+    primaryHref: '/host/create',
+    secondaryLabel: {
+      ko: 'お知らせを見る',
+      en: 'お知らせを見る',
+      ja: 'お知らせを見る',
+      zh: 'お知らせを見る',
+    },
+    href: '/company/notices',
+    variant: 'info',
+  },
   {
     // 공지 고유 이름입니다.
     // 문구를 새로 띄우고 싶으면 이 이름을 바꾸세요.

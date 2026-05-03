@@ -45,11 +45,20 @@ test.describe('Public company notices surface', () => {
       await expect(page.getByRole('heading', { name: testCase.heading, exact: true })).toBeVisible();
       await expect(page.getByText(testCase.description, { exact: true })).toBeVisible();
 
-      await expect(page.getByTestId('company-notice-item')).toHaveCount(1);
+      await expect(page.getByTestId('company-notice-item')).toHaveCount(2);
+      await expect(page.getByTestId('company-notice-type-2')).toHaveText(testCase.type);
+      await expect(page.getByTestId('company-notice-date-2')).toHaveText('May 3, 2026');
+      await expect(page.getByTestId('company-notice-title-2')).toHaveText('ホスト承認が完了しました。次は体験登録です。');
+
+      await page.getByTestId('company-notice-toggle-2').click();
+      await expect(page.getByTestId('company-notice-content-2')).toContainText('新しいLocallyではもう一度体験ページを作成する必要があります');
+      await expect(page.getByTestId('company-notice-content-2')).toContainText('ゲストが予約できる状態になります');
+
       await expect(page.getByTestId('company-notice-type-1')).toHaveText(testCase.type);
       await expect(page.getByTestId('company-notice-date-1')).toHaveText('Apr 29, 2026');
       await expect(page.getByTestId('company-notice-title-1')).toHaveText(testCase.title);
 
+      await page.getByTestId('company-notice-toggle-2').click();
       await page.getByTestId('company-notice-toggle-1').click();
 
       const content = page.getByTestId('company-notice-content-1');

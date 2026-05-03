@@ -7,7 +7,9 @@ import { createPortal } from 'react-dom';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { type SiteAnnouncement } from '@/app/config/siteAnnouncements';
+import { useAuth } from '@/app/context/AuthContext';
 import { useLanguage } from '@/app/context/LanguageContext';
+import { createClient } from '@/app/utils/supabase/client';
 import {
   getActiveSiteAnnouncement,
   getAnnouncementCopy,
@@ -39,18 +41,36 @@ const CLOSE_LABELS = {
 export default function GlobalAnnouncementModal() {
   const pathname = usePathname();
   const { lang } = useLanguage();
+  const { user, isHost, hostStatusResolved } = useAuth();
   const [dismissedId, setDismissedId] = useState<string | null>(null);
+  const [hostExperienceGate, setHostExperienceGate] = useState<{
+    key: string;
+    count: number | null;
+    resolved: boolean;
+  }>({ key: '', count: null, resolved: false });
   const canUseDom = typeof window !== 'undefined' && typeof document !== 'undefined';
+  const supabase = useMemo(() => createClient(), []);
+  const audience = user && hostStatusResolved && isHost ? 'host' : user ? 'guest' : 'all';
 
   const announcement = useMemo(
     () =>
       getActiveSiteAnnouncement({
         pathname: pathname || '/',
         locale: lang,
-        audience: 'all',
+        audience,
       }),
-    [lang, pathname]
+    [audience, lang, pathname]
   );
+  const needsHostExperienceGate = Boolean(
+    announcement?.audience === 'host' &&
+      user?.id &&
+      hostStatusResolved &&
+      isHost
+  );
+  const hostExperienceGateKey =
+    needsHostExperienceGate && announcement && user?.id
+      ? `${announcement.id}:${user.id}`
+      : '';
 
   const isDismissed =
     Boolean(announcement && dismissedId === announcement.id) ||
@@ -61,7 +81,50 @@ export default function GlobalAnnouncementModal() {
     );
 
   useEffect(() => {
-    if (!canUseDom || !announcement || isDismissed) return;
+    if (!needsHostExperienceGate || !user?.id) {
+      return;
+    }
+
+    let isActive = true;
+    const currentGateKey = hostExperienceGateKey;
+
+    const loadHostExperienceCount = async () => {
+      const { count, error } = await supabase
+        .from('experiences')
+        .select('id', { count: 'exact', head: true })
+        .eq('host_id', user.id);
+
+      if (!isActive) return;
+
+      if (error) {
+        console.error('[GlobalAnnouncementModal] failed to load host experience count:', error);
+        setHostExperienceGate({ key: currentGateKey, count: null, resolved: true });
+      } else {
+        setHostExperienceGate({ key: currentGateKey, count: count ?? 0, resolved: true });
+      }
+    };
+
+    void loadHostExperienceCount();
+
+    return () => {
+      isActive = false;
+    };
+  }, [hostExperienceGateKey, needsHostExperienceGate, supabase, user?.id]);
+
+  const currentHostExperienceGateResolved =
+    Boolean(hostExperienceGateKey) &&
+    hostExperienceGate.key === hostExperienceGateKey &&
+    hostExperienceGate.resolved;
+  const currentHostExperienceCount = currentHostExperienceGateResolved
+    ? hostExperienceGate.count
+    : null;
+
+  const isHostAnnouncementEligible =
+    announcement?.audience !== 'host' ||
+    (currentHostExperienceGateResolved && currentHostExperienceCount === 0);
+
+  useEffect(() => {
+    if (!canUseDom || !announcement || isDismissed || !isHostAnnouncementEligible) return;
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -69,7 +132,7 @@ export default function GlobalAnnouncementModal() {
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [announcement, canUseDom, isDismissed]);
+  }, [announcement, canUseDom, isDismissed, isHostAnnouncementEligible]);
 
   // 닫힘 애니메이션
   const [closing, setClosing] = useState(false);
@@ -93,13 +156,13 @@ export default function GlobalAnnouncementModal() {
     }, 150);
   }, [closing]);
 
-  if (!canUseDom || !announcement || isDismissed) {
+  if (!canUseDom || !announcement || isDismissed || !isHostAnnouncementEligible) {
     return null;
   }
 
   const copy = getAnnouncementCopy(announcement, lang);
   const badgeVariant = announcement.variant === 'warning' ? 'warning' : 'info';
-  const badgeLabel = BADGE_LABELS[badgeVariant][lang];
+  const badgeLabel = copy.badgeLabel || BADGE_LABELS[badgeVariant][lang];
   const closeLabel = CLOSE_LABELS[lang];
 
   return createPortal(
@@ -139,14 +202,25 @@ export default function GlobalAnnouncementModal() {
           </div>
 
           <div className="space-y-3 pt-1">
-            <button
-              type="button"
-              onClick={() => dismissAnnouncement(announcement)}
-              className="w-full rounded-2xl bg-slate-900 px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-slate-300 transition-transform hover:scale-[1.01]"
-              data-testid="global-site-announcement-primary"
-            >
-              {copy.primaryLabel}
-            </button>
+            {announcement.primaryHref ? (
+              <Link
+                href={announcement.primaryHref}
+                onClick={() => dismissAnnouncement(announcement)}
+                className="block w-full rounded-2xl bg-slate-900 px-5 py-3.5 text-center text-sm font-bold text-white shadow-lg shadow-slate-300 transition-transform hover:scale-[1.01]"
+                data-testid="global-site-announcement-primary"
+              >
+                {copy.primaryLabel}
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => dismissAnnouncement(announcement)}
+                className="w-full rounded-2xl bg-slate-900 px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-slate-300 transition-transform hover:scale-[1.01]"
+                data-testid="global-site-announcement-primary"
+              >
+                {copy.primaryLabel}
+              </button>
+            )}
             {announcement.href && copy.secondaryLabel ? (
               <Link
                 href={announcement.href}

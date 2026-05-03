@@ -49,6 +49,7 @@ test.describe('site announcement utilities', () => {
   test('normalizes locale-prefixed paths before matching exclusions', () => {
     expect(normalizeAnnouncementPathname('/en/admin/dashboard')).toBe('/admin/dashboard');
     expect(normalizeAnnouncementPathname('/ja/company/notices')).toBe('/company/notices');
+    expect(normalizeAnnouncementPathname('/ja')).toBe('/');
     expect(normalizeAnnouncementPathname('/')).toBe('/');
   });
 
@@ -105,6 +106,55 @@ test.describe('site announcement utilities', () => {
     });
 
     expect(active).toBeNull();
+  });
+
+  test('respects host audience and home-only includes for targeted announcements', () => {
+    const now = new Date('2026-05-03T12:00:00+09:00');
+    const announcements = [
+      buildAnnouncement({
+        id: 'host-home-reminder',
+        priority: 100,
+        audience: 'host',
+        includePathPrefixes: ['/'],
+        endAt: null,
+      }),
+    ];
+
+    expect(
+      pickActiveSiteAnnouncement(announcements, {
+        pathname: '/ja',
+        locale: 'ja',
+        audience: 'host',
+        now,
+      })?.id
+    ).toBe('host-home-reminder');
+
+    expect(
+      pickActiveSiteAnnouncement(announcements, {
+        pathname: '/ja/search',
+        locale: 'ja',
+        audience: 'host',
+        now,
+      })
+    ).toBeNull();
+
+    expect(
+      pickActiveSiteAnnouncement(announcements, {
+        pathname: '/ja/unknown',
+        locale: 'ja',
+        audience: 'host',
+        now,
+      })
+    ).toBeNull();
+
+    expect(
+      pickActiveSiteAnnouncement(announcements, {
+        pathname: '/ja',
+        locale: 'ja',
+        audience: 'guest',
+        now,
+      })
+    ).toBeNull();
   });
 
   test('returns locale-specific copy with korean fallback', () => {
