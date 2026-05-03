@@ -171,12 +171,12 @@ export default function HostProfileModal({ isOpen, onClose, host }: HostProfileM
   };
 
   return (
-    <div className="fixed inset-0 z-[150] flex items-end md:items-center justify-center p-0 md:p-4">
+    <div className="fixed inset-0 z-[150] flex items-end justify-center px-3 pb-[calc(env(safe-area-inset-bottom,0px)+12px)] pt-4 md:items-center md:p-4">
       {/* 배경 오버레이 */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={onClose}></div>
 
       {/* 모달 컨텐츠 */}
-      <div className="bg-white w-full max-w-full md:max-w-5xl max-h-[88dvh] md:max-h-[85vh] rounded-t-[28px] md:rounded-3xl overflow-hidden shadow-2xl relative z-10 flex flex-col md:flex-row animate-in zoom-in-95 duration-200">
+      <div className="bg-white w-full max-w-[366px] md:max-w-5xl max-h-[80dvh] md:max-h-[85vh] rounded-[24px] md:rounded-3xl overflow-hidden shadow-2xl relative z-10 flex flex-col md:flex-row animate-in zoom-in-95 duration-200">
 
         {/* 닫기 버튼 */}
         <button onClick={onClose} className="absolute top-3 md:top-4 left-3 md:left-4 p-1.5 md:p-2 bg-white rounded-full hover:bg-slate-100 transition-colors z-20 shadow-sm border border-slate-100">
@@ -184,10 +184,10 @@ export default function HostProfileModal({ isOpen, onClose, host }: HostProfileM
         </button>
 
         {/* 🟢 왼쪽: 호스트 카드 (고정 영역) */}
-        <div className="w-full md:w-[360px] bg-white p-5 md:p-10 flex flex-col items-start border-b md:border-b-0 md:border-r border-slate-100 overflow-y-auto shadow-none md:shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-10">
-          <div className={`flex flex-col items-center w-full text-center ${nationalityDisplay ? 'mb-[18px] md:mb-6' : 'mb-5 md:mb-8'}`}>
-            <div className="relative mb-3 md:mb-4">
-              <div className="relative w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden shadow-lg border-4 border-white">
+        <div className="w-full md:w-[360px] bg-white p-4 md:p-10 flex flex-col items-start border-b md:border-b-0 md:border-r border-slate-100 overflow-y-auto shadow-none md:shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-10">
+          <div className={`flex flex-col items-center w-full text-center ${nationalityDisplay ? 'mb-3 md:mb-6' : 'mb-3 md:mb-8'}`}>
+            <div className="relative mb-2.5 md:mb-4">
+              <div className="relative w-20 h-20 md:w-32 md:h-32 rounded-full overflow-hidden shadow-lg border-4 border-white">
                 {host.avatarUrl ? (
                   <Image
                     src={host.avatarUrl}
@@ -205,7 +205,7 @@ export default function HostProfileModal({ isOpen, onClose, host }: HostProfileM
               </div>
             </div>
             <div className="mb-1 flex items-center justify-center gap-1.5">
-              <h2 className="text-[22px] md:text-3xl font-black text-slate-900">{host.name}</h2>
+              <h2 className="text-[20px] md:text-3xl font-black text-slate-900">{host.name}</h2>
               {host.isSuperhost ? (
                 <SuperhostBadgeTrigger
                   iconSize={20}
@@ -220,7 +220,7 @@ export default function HostProfileModal({ isOpen, onClose, host }: HostProfileM
             {nationalityDisplay && (
               <div
                 data-testid="host-profile-nationality-chip"
-                className="mt-2.5 md:mt-3 inline-flex h-[26px] md:h-[30px] items-center gap-1.5 md:gap-[7px] rounded-full border border-slate-200/80 bg-slate-50/95 px-2.5 md:px-3 text-[12px] md:text-[13px] font-medium md:font-semibold text-slate-600 shadow-sm"
+                className="mt-2 md:mt-3 inline-flex h-[26px] md:h-[30px] items-center gap-1.5 md:gap-[7px] rounded-full border border-slate-200/80 bg-slate-50/95 px-2.5 md:px-3 text-[12px] md:text-[13px] font-medium md:font-semibold text-slate-600 shadow-sm"
               >
                 {nationalityDisplay.flag ? (
                   <span className="text-[14px] md:text-[16px] leading-none" aria-hidden="true">
@@ -233,7 +233,7 @@ export default function HostProfileModal({ isOpen, onClose, host }: HostProfileM
           </div>
 
           {hasStats && (
-            <div className="flex justify-around w-full border-y border-slate-100 py-4 md:py-6 mb-5 md:mb-8">
+            <div className="flex justify-around w-full border-y border-slate-100 py-2 md:py-6 mb-2 md:mb-8">
               {host.reviewCount !== undefined && (
                 <div className="text-center">
                   <div className="font-black text-[16px] md:text-lg">{host.reviewCount}</div>
@@ -257,13 +257,13 @@ export default function HostProfileModal({ isOpen, onClose, host }: HostProfileM
         </div>
 
         {/* 🟢 오른쪽: 상세 소개 (스크롤 영역) */}
-        <div className="flex-1 p-5 md:p-12 overflow-y-auto bg-white">
-          <h3 className="text-[20px] md:text-2xl font-bold mb-6 md:mb-8">{t('exp_host_modal_title')}</h3>
+        <div className="flex-1 p-4 md:p-12 overflow-y-auto bg-white">
+          <h3 className="text-[18px] md:text-2xl font-bold mb-4 md:mb-8">{t('exp_host_modal_title')}</h3>
 
           {hasInterestingFacts && (
-            <div className="bg-slate-50 p-4 md:p-6 rounded-xl md:rounded-2xl mb-6 md:mb-8">
-              <h4 className="font-bold text-[14px] md:text-base mb-3 md:mb-4 text-slate-900 flex items-center gap-2">{t('exp_host_fun_facts_title', { name: host.name })}</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3 md:gap-y-4 gap-x-4 md:gap-x-8">
+            <div className="bg-slate-50 p-3.5 md:p-6 rounded-xl md:rounded-2xl mb-5 md:mb-8">
+              <h4 className="font-bold text-[13px] md:text-base mb-3 md:mb-4 text-slate-900 flex items-center gap-2">{t('exp_host_fun_facts_title', { name: host.name })}</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-2.5 md:gap-y-4 gap-x-4 md:gap-x-8">
                 {host.job && (
                   <div className="flex items-start gap-3">
                     <Briefcase className="text-slate-400 mt-0.5" size={18} />
@@ -295,14 +295,14 @@ export default function HostProfileModal({ isOpen, onClose, host }: HostProfileM
             </div>
           )}
 
-          <div className="space-y-3 md:space-y-4">
+          <div className="space-y-2.5 md:space-y-4">
             <h4 className="font-bold text-[15px] md:text-lg">{t('exp_host_about_title')}</h4>
-            <p className="text-slate-600 leading-relaxed md:leading-loose text-[13px] md:text-base whitespace-pre-wrap">
+            <p className="text-slate-600 leading-relaxed md:leading-loose text-[12px] md:text-base whitespace-pre-wrap">
               {host.intro || t('exp_host_default_intro_long')}
             </p>
           </div>
 
-          <div className="mt-8 md:mt-12 pt-5 md:pt-8 border-t border-slate-100">
+          <div className="mt-6 md:mt-12 pt-4 md:pt-8 border-t border-slate-100">
             <button onClick={handleContactHost} className="w-full md:w-auto bg-black text-white px-6 md:px-8 py-3 md:py-4 rounded-lg md:rounded-xl text-[14px] md:text-base font-bold hover:scale-105 transition-transform shadow-lg">
               {t('exp_host_contact_button')}
             </button>
