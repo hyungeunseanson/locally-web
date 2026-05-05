@@ -278,7 +278,6 @@ function PaymentContent() {
   const expPrice = Number(experience?.price || 50000);
   const baseHostPrice = isPrivate ? Number(experience?.private_price || 300000) : expPrice * guests;
   const soloGuaranteePrice = effectiveIsSoloGuarantee ? SOLO_GUARANTEE_PRICE : 0;
-  const hostPrice = baseHostPrice + soloGuaranteePrice;
 
   const getLocalizedBookingApiError = useCallback((result?: Pick<BookingApiResponse, 'errorCode' | 'error'>) => {
     if (!result) return t('exp_payment_booking_error') as string;
@@ -308,10 +307,10 @@ function PaymentContent() {
 
     return t('exp_payment_booking_error') as string;
   }, [isPrivate, lang, t]);
-  const guestFee = Math.floor(hostPrice * 0.1);
-  const finalAmount = hostPrice + guestFee;
+  const guestFee = Math.floor(baseHostPrice * 0.1);
+  const finalAmount = baseHostPrice + guestFee + soloGuaranteePrice;
   const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '';
-  const isPayPalEnabled = Boolean(paypalClientId);
+  const isPayPalEnabled = false;
   const hostNotice = experience
     ? (getLocalizedExperienceRules(experience, lang).host_notice || '').trim()
     : '';
@@ -1416,7 +1415,7 @@ function PaymentContent() {
                       : 'border-slate-100 text-slate-400 hover:border-slate-200'
                   )}
                 >
-                  <div className="rounded bg-[#0070ba] px-2 py-0.5 text-[10px] font-black text-white">PayPal</div>
+                  <div className="rounded bg-[#0070ba] px-2 py-0.5 text-[10px] font-black text-white">PAY</div>
                   <span className="text-[12px] font-bold md:text-sm">{t('exp_payment_method_paypal')}</span>
                 </button>
               )}

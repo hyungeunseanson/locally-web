@@ -64,6 +64,11 @@ export interface AdminSalesBooking extends AdminBooking {
   total_experience_price?: number | null;
   price_at_booking?: number | null;
   solo_guarantee_price?: number | null;
+  solo_guarantee_refund_status?: string | null;
+  solo_guarantee_refund_amount?: number | null;
+  solo_guarantee_refunded_at?: string | null;
+  solo_guarantee_refund_error?: string | null;
+  solo_guarantee_refund_trigger_booking_id?: string | null;
   host_application: {
     name: string | null;
     bank_name: string | null;
@@ -285,7 +290,7 @@ export interface AdminServiceSalesSummary {
   payout_paid_at: string | null;
 }
 
-export type AdminPayoutQueueState = 'eligible' | 'hold' | 'long_hold' | 'completed';
+export type AdminPayoutQueueState = 'eligible' | 'hold' | 'long_hold' | 'refund_hold' | 'completed';
 
 export interface AdminPayoutQueueEntry {
   id: string;
@@ -302,6 +307,8 @@ export interface AdminPayoutQueueEntry {
   platform_revenue: number;
   status: string;
   payout_status: string | null;
+  solo_guarantee_refund_status?: string | null;
+  solo_guarantee_refund_amount?: number | null;
 }
 
 export interface AdminPayoutQueueDomainGroup {
@@ -431,6 +438,11 @@ export interface AdminMasterLedgerEntry {
   refund_amount: number | null;
   cancel_reason: string | null;
   solo_guarantee_price?: number | null;
+  solo_guarantee_refund_status?: string | null;
+  solo_guarantee_refund_amount?: number | null;
+  solo_guarantee_refunded_at?: string | null;
+  solo_guarantee_refund_error?: string | null;
+  solo_guarantee_refund_trigger_booking_id?: string | null;
   experiences: {
     title: string;
     host_id?: string | null;

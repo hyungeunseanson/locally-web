@@ -37,6 +37,11 @@ type SalesBookingBase = {
   total_experience_price?: number | null;
   price_at_booking?: number | null;
   solo_guarantee_price?: number | null;
+  solo_guarantee_refund_status?: string | null;
+  solo_guarantee_refund_amount?: number | null;
+  solo_guarantee_refunded_at?: string | null;
+  solo_guarantee_refund_error?: string | null;
+  solo_guarantee_refund_trigger_booking_id?: string | null;
 };
 
 type SalesExperienceRow = {
@@ -111,6 +116,11 @@ function normalizeSalesBookingBase(row: AdminRawRow): SalesBookingBase | null {
     total_experience_price: readNumberField(row, 'total_experience_price'),
     price_at_booking: readNumberField(row, 'price_at_booking'),
     solo_guarantee_price: readNumberField(row, 'solo_guarantee_price'),
+    solo_guarantee_refund_status: readStringField(row, 'solo_guarantee_refund_status'),
+    solo_guarantee_refund_amount: readNumberField(row, 'solo_guarantee_refund_amount'),
+    solo_guarantee_refunded_at: readStringField(row, 'solo_guarantee_refunded_at'),
+    solo_guarantee_refund_error: readStringField(row, 'solo_guarantee_refund_error'),
+    solo_guarantee_refund_trigger_booking_id: readStringField(row, 'solo_guarantee_refund_trigger_booking_id'),
   };
 }
 
@@ -211,9 +221,36 @@ export async function GET(request: Request) {
     }
 
     const buildBookingsQuery = (includePaidAt: boolean) => {
-      const selectColumns = includePaidAt
-        ? 'id, order_id, created_at, experience_id, user_id, amount, status, date, time, contact_name, contact_phone, guests, payout_status, payout_paid_at, host_payout_amount, platform_revenue, refund_amount, payment_method, total_price, total_experience_price, price_at_booking, solo_guarantee_price'
-        : 'id, order_id, created_at, experience_id, user_id, amount, status, date, time, contact_name, contact_phone, guests, payout_status, host_payout_amount, platform_revenue, refund_amount, payment_method, total_price, total_experience_price, price_at_booking, solo_guarantee_price';
+      const bookingColumns = [
+        'id',
+        'order_id',
+        'created_at',
+        'experience_id',
+        'user_id',
+        'amount',
+        'status',
+        'date',
+        'time',
+        'contact_name',
+        'contact_phone',
+        'guests',
+        'payout_status',
+        ...(includePaidAt ? ['payout_paid_at'] : []),
+        'host_payout_amount',
+        'platform_revenue',
+        'refund_amount',
+        'payment_method',
+        'total_price',
+        'total_experience_price',
+        'price_at_booking',
+        'solo_guarantee_price',
+        'solo_guarantee_refund_status',
+        'solo_guarantee_refund_amount',
+        'solo_guarantee_refunded_at',
+        'solo_guarantee_refund_error',
+        'solo_guarantee_refund_trigger_booking_id',
+      ];
+      const selectColumns = bookingColumns.join(', ');
 
       let query = supabaseAdmin
         .from('bookings')

@@ -10,6 +10,7 @@ import { cancelCardPayment } from '@/app/utils/payments/card/server';
 import { refundPayPalCapture } from '@/app/utils/paypal/server';
 import { getBookingReviewType, isBookingReviewPending } from '@/app/utils/hostUnavailableReview';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
+import { isSoloGuaranteeRefundUnresolvedStatus } from '@/app/utils/soloGuaranteeRefundStatus';
 
 type ForceCancelBody = {
   bookingId?: string;
@@ -52,6 +53,10 @@ export async function POST(request: Request) {
         amount,
         total_price,
         total_experience_price,
+        solo_guarantee_price,
+        solo_guarantee_refund_status,
+        solo_guarantee_refund_amount,
+        refund_amount,
         status,
         cancel_reason,
         date,
@@ -70,6 +75,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: '이미 취소 또는 거절된 예약입니다.' }, { status: 409 });
     }
 
+    if (isSoloGuaranteeRefundUnresolvedStatus(booking.solo_guarantee_refund_status)) {
+      return NextResponse.json(
+        { success: false, error: '1인 진행 추가금 환불 확인이 끝난 뒤 취소할 수 있습니다.' },
+        { status: 409 }
+      );
+    }
+
     const isHostFaultRequest = source === 'host_fault_request';
     const reviewType = getBookingReviewType(booking.cancel_reason);
 
@@ -82,7 +94,7 @@ export async function POST(request: Request) {
       : '관리자 직권 취소')).trim();
     const totalAmount = getBookingPaidAmount(booking);
     const settlement = isPendingBookingStatus(booking.status)
-      ? { refundAmount: 0, hostPayout: 0, platformRevenue: 0 }
+      ? { refundAmount: 0, cumulativeRefundAmount: 0, hostPayout: 0, platformRevenue: 0 }
       : calculateBookingCancellationSettlement(booking, 100);
 
     if (settlement.refundAmount > 0 && booking.tid) {
@@ -129,7 +141,7 @@ export async function POST(request: Request) {
         cancel_reason: isHostFaultRequest
           ? `${cancelReason} (${reviewType === 'minimum_participants_unmet' ? '최소 진행 인원 미달 확인 취소' : '호스트 진행 불가 확인 취소'})`
           : `${cancelReason} (관리자 강제 취소)`,
-        refund_amount: settlement.refundAmount,
+        refund_amount: settlement.cumulativeRefundAmount,
         host_payout_amount: settlement.hostPayout,
         platform_revenue: settlement.platformRevenue,
       })

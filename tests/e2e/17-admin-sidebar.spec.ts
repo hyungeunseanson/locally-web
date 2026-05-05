@@ -167,7 +167,7 @@ test.describe.serial('Admin sidebar smoke', () => {
     await expect(alertsButton).toHaveText('Admin Alerts', { timeout: 15000 });
   });
 
-  test('normalizes the legacy SETTLEMENT tab query to the official SALES tab', async ({ page }) => {
+  test('normalizes legacy payout tab queries to the official SALES tab', async ({ page }) => {
     test.setTimeout(90000);
 
     const adminUser = createAdminUser();
@@ -175,6 +175,16 @@ test.describe.serial('Admin sidebar smoke', () => {
 
     await login(page, adminUser);
     await page.goto('/admin/dashboard?tab=SETTLEMENT', { waitUntil: 'domcontentloaded' });
+
+    await expect
+      .poll(() => new URL(page.url()).searchParams.get('tab'))
+      .toBe('SALES');
+
+    await expect
+      .poll(() => page.evaluate(() => window.localStorage.getItem('admin_active_tab')))
+      .toBe('SALES');
+
+    await page.goto('/admin/dashboard?tab=PAYOUTS', { waitUntil: 'domcontentloaded' });
 
     await expect
       .poll(() => new URL(page.url()).searchParams.get('tab'))

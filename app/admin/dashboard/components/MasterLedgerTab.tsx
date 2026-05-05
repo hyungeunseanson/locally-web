@@ -38,6 +38,11 @@ import {
   getBookingPaidAmount,
   getBookingPlatformRevenue,
 } from '@/app/utils/bookingFinance';
+import {
+  isSoloGuaranteeRefundUnresolvedStatus,
+  normalizeSoloGuaranteeRefundStatus,
+} from '@/app/utils/soloGuaranteeRefundStatus';
+import { getSoloManualRefundCompletionGuard } from '@/app/utils/bookings/soloGuaranteeRefundPolicy';
 import { markAdminBookingViewed } from '@/app/utils/adminBadgeState';
 import { AdminMasterLedgerEntry } from '@/app/types/admin';
 import {
@@ -107,7 +112,7 @@ const STATUS_TABS = [
 
 type ConfirmDialogState =
   | {
-      kind: 'confirm-payment' | 'force-cancel' | 'approve-host-unavailable' | 'reject-host-unavailable';
+      kind: 'confirm-payment' | 'force-cancel' | 'approve-host-unavailable' | 'reject-host-unavailable' | 'solo-manual-refund';
       bookingId: string;
       title: string;
       description: string;
@@ -138,6 +143,45 @@ function getReviewApproveReason(reviewType: BookingReviewRequestType | null) {
   }
 
   return '호스트 진행 불가 확인 취소';
+}
+
+function getSoloRefundAdminLabel(booking: AdminMasterLedgerEntry) {
+  const status = normalizeSoloGuaranteeRefundStatus(booking.solo_guarantee_refund_status);
+  const amount = Number(booking.solo_guarantee_refund_amount || 0);
+
+  if (status === 'refunded') {
+    return `환불 완료 ${amount > 0 ? `₩${amount.toLocaleString()}` : ''}`.trim();
+  }
+
+  if (status === 'pending_manual') {
+    return `수동 환불 필요 ${amount > 0 ? `₩${amount.toLocaleString()}` : ''}`.trim();
+  }
+
+  if (status === 'processing') {
+    return '자동 환불 처리 중';
+  }
+
+  if (status === 'failed') {
+    return '환불 확인 필요';
+  }
+
+  return null;
+}
+
+function canCompleteSoloManualRefund(booking: AdminMasterLedgerEntry) {
+  return getSoloManualRefundCompletionGuard(booking).ok;
+}
+
+function getSoloManualRefundBlockedLabel(booking: AdminMasterLedgerEntry) {
+  const completionGuard = getSoloManualRefundCompletionGuard(booking);
+
+  if (completionGuard.ok || completionGuard.reason === 'not_waiting') {
+    return null;
+  }
+
+  return completionGuard.reason === 'already_paid'
+    ? '이미 정산 완료된 예약입니다. 별도 정산 조정이 필요합니다.'
+    : '정산 대기 상태가 아니어서 수동 환불 완료 처리를 막았습니다.';
 }
 
 export default function MasterLedgerTab({
@@ -384,6 +428,11 @@ export default function MasterLedgerTab({
       return;
     }
 
+    if (confirmDialog.kind === 'solo-manual-refund') {
+      await performSoloManualRefundComplete(confirmDialog.bookingId);
+      return;
+    }
+
     await performForceCancel(confirmDialog.bookingId);
   };
 
@@ -420,6 +469,38 @@ export default function MasterLedgerTab({
       title: '입금 확인',
       description: '입금이 확인되었습니까? 예약을 확정합니다.',
       confirmLabel: '입금 확인',
+      tone: 'blue',
+    });
+  };
+
+  const performSoloManualRefundComplete = async (bookingId: string) => {
+    setIsProcessing(true);
+    try {
+      const res = await fetch('/api/admin/bookings/solo-guarantee-refund/mark-manual-refunded', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingId }),
+      });
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || '환불 완료 처리 실패');
+      showToast('1인 진행 추가금 수동 환불 완료로 기록했습니다.', 'success');
+      await refreshAfterMutation();
+      setSelectedBooking(null);
+      setConfirmDialog(null);
+    } catch (error: unknown) {
+      showToast(getErrorMessage(error, '환불 완료 처리 실패'), 'error');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleSoloManualRefundComplete = async (bookingId: string) => {
+    setConfirmDialog({
+      kind: 'solo-manual-refund',
+      bookingId,
+      title: '1인 추가금 환불 완료',
+      description: '게스트에게 30,000원 수동 환불을 완료한 뒤에만 확정하세요. 완료 처리 후 호스트 정산 보류가 해제됩니다.',
+      confirmLabel: '환불 완료 처리',
       tone: 'blue',
     });
   };
@@ -722,6 +803,15 @@ export default function MasterLedgerTab({
                               <span className="hidden md:inline">{getReviewTitle(getBookingReviewType(b.cancel_reason)).replace(' 취소 검토 요청', ' 검토')}</span>
                             </span>
                           )}
+                          {b._type !== 'service' && getSoloRefundAdminLabel(b) && (
+                            <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-bold md:px-2 md:text-[10px] ${
+                              isSoloGuaranteeRefundUnresolvedStatus(b.solo_guarantee_refund_status)
+                                ? 'bg-orange-100 text-orange-700'
+                                : 'bg-emerald-100 text-emerald-700'
+                            }`}>
+                              {getSoloRefundAdminLabel(b)}
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="hidden md:table-cell px-2 md:px-4 py-2.5 md:py-4">
@@ -877,6 +967,23 @@ export default function MasterLedgerTab({
                     {getLedgerRevenue(selectedBooking) != null ? `₩${getLedgerRevenue(selectedBooking)?.toLocaleString()}` : '-'}
                   </span>
                 </div>
+                {selectedBooking._type !== 'service' && getSoloRefundAdminLabel(selectedBooking) && (
+                  <div className="flex justify-between items-center rounded-lg bg-white px-2 py-1.5">
+                    <span className="text-[10px] md:text-xs text-slate-500">1인 추가금 환불</span>
+                    <span className={`text-[10px] md:text-xs font-bold ${
+                      isSoloGuaranteeRefundUnresolvedStatus(selectedBooking.solo_guarantee_refund_status)
+                        ? 'text-orange-600'
+                        : 'text-emerald-600'
+                    }`}>
+                      {getSoloRefundAdminLabel(selectedBooking)}
+                    </span>
+                  </div>
+                )}
+                {selectedBooking._type !== 'service' && selectedBooking.solo_guarantee_refund_error && (
+                  <p className="rounded-lg bg-orange-50 px-2 py-1.5 text-[10px] leading-4 text-orange-700">
+                    {selectedBooking.solo_guarantee_refund_error}
+                  </p>
+                )}
               </div>
               <p className="hidden md:flex text-[8px] md:text-[9px] text-slate-400 mt-1.5 md:mt-2 text-right justify-end gap-1 items-center"><Info size={10} /> Order ID: {selectedBooking.order_id || selectedBooking.id}</p>
             </div>
@@ -932,6 +1039,25 @@ export default function MasterLedgerTab({
                       </>
                     )}
                   </button>
+                )}
+
+                {canCompleteSoloManualRefund(selectedBooking) && (
+                  <button
+                    data-testid="admin-master-ledger-solo-manual-refund-action"
+                    onClick={() => handleSoloManualRefundComplete(selectedBooking.id)}
+                    disabled={isProcessing}
+                    className="w-full py-2.5 md:py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] md:text-xs font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center gap-2"
+                  >
+                    {isProcessing ? '처리 중...' : '1인 추가금 수동 환불 완료'}
+                  </button>
+                )}
+                {getSoloManualRefundBlockedLabel(selectedBooking) && (
+                  <p
+                    data-testid="admin-master-ledger-solo-manual-refund-blocked"
+                    className="rounded-xl border border-orange-100 bg-orange-50 p-3 text-center text-[10px] font-bold leading-5 text-orange-700 md:text-xs"
+                  >
+                    {getSoloManualRefundBlockedLabel(selectedBooking)}
+                  </p>
                 )}
               </div>
             )}

@@ -12,6 +12,9 @@ const GUEST_TRIPS_BOOKING_SELECT = `
   amount,
   status,
   cancel_reason,
+  solo_guarantee_refund_status,
+  solo_guarantee_refund_amount,
+  solo_guarantee_refunded_at,
   created_at,
   experiences (
     id,
@@ -155,6 +158,9 @@ export async function GET() {
         price: booking.amount,
         status: status, // 업데이트된 상태 사용
         cancelReason: booking.cancel_reason || null,
+        soloGuaranteeRefundStatus: booking.solo_guarantee_refund_status || null,
+        soloGuaranteeRefundAmount: booking.solo_guarantee_refund_amount || 0,
+        soloGuaranteeRefundedAt: booking.solo_guarantee_refunded_at || null,
         paymentDate: booking.created_at,
         hostId: experience?.host_id, // 메시지 보내기용
         hostName: hostPublicProfile?.name || 'Host',

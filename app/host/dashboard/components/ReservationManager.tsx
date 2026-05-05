@@ -65,6 +65,8 @@ type ReservationRecord = {
   cancel_reason?: string | null;
   refund_amount?: number | null;
   host_payout_amount?: number | null;
+  solo_guarantee_refund_status?: string | null;
+  solo_guarantee_refund_amount?: number | null;
   raw_status?: string | null;
   guest?: ReservationGuest | null;
   experiences?: ReservationExperience | null;
@@ -123,6 +125,8 @@ const RESERVATION_SELECT = `
   cancel_reason,
   refund_amount,
   host_payout_amount,
+  solo_guarantee_refund_status,
+  solo_guarantee_refund_amount,
   experiences!inner (
     title
   ),

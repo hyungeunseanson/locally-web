@@ -5,11 +5,10 @@ export function normalizeAdminDashboardTab(tab: string | null | undefined): stri
     return null;
   }
 
-  // Legacy admin payout screen now lives under the official SALES tab.
-  if (normalized === 'SETTLEMENT') {
+  // Legacy/admin payout query aliases now live under the official SALES tab.
+  if (normalized === 'SETTLEMENT' || normalized === 'PAYOUTS') {
     return 'SALES';
   }
 
   return normalized;
 }
-

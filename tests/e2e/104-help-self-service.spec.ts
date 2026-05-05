@@ -49,8 +49,9 @@ test.describe('Help Center self-service copy', () => {
     await expect(page.getByText('무통장 입금은 언제까지 해야 하나요?')).toBeVisible();
     await expect(page.getByTestId('help-search-empty-state')).toHaveCount(0);
 
-    await page.getByRole('textbox').fill('PayPal');
-    await expect(page.getByText('카드·무통장·PayPal 중 어떤 결제가 가능한가요?')).toBeVisible();
+    await page.getByRole('textbox').fill('결제 수단');
+    await expect(page.getByText('카드·무통장 중 어떤 결제가 가능한가요?')).toBeVisible();
+    await expect(page.locator('body')).not.toContainText(new RegExp(`pay${'pal'}`, 'i'));
 
     await page.getByRole('textbox').fill('1인 예약');
     await expect(page.getByText('1인 출발 보장 옵션은 언제 필요한가요?')).toBeVisible();

@@ -13,6 +13,10 @@ import { getContent } from '@/app/utils/contentHelper';
 import { calculateGuestCancellationRefundRate } from '@/app/utils/bookingCancellationPolicy';
 import { getBookingReviewType, isBookingReviewPending } from '@/app/utils/hostUnavailableReview';
 import type { GuestTripCancelReasonCode } from '@/app/utils/api/trips';
+import {
+  getSoloGuaranteeRefundGuestLabel,
+  normalizeSoloGuaranteeRefundStatus,
+} from '@/app/utils/soloGuaranteeRefundStatus';
 
 export interface GuestTrip {
   id: number;
@@ -42,6 +46,9 @@ export interface GuestTrip {
   totalPrice?: number;
   total_price?: number;
   price?: number;
+  soloGuaranteeRefundStatus?: string | null;
+  soloGuaranteeRefundAmount?: number | null;
+  soloGuaranteeRefundedAt?: string | null;
   hostName?: string;
   hostAvatarUrl?: string | null;
 }
@@ -76,6 +83,8 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
   const guestCount = Number(trip.guests || 1);
   const isPendingDeposit = (trip.status || '').toLowerCase() === 'pending';
   const needsExpandedDesktopLayout = isPendingDeposit || isReviewPending;
+  const soloRefundStatus = normalizeSoloGuaranteeRefundStatus(trip.soloGuaranteeRefundStatus);
+  const soloRefundLabel = getSoloGuaranteeRefundGuestLabel(soloRefundStatus);
 
   const buildMessageHref = () => {
     const messageParams = new URLSearchParams({
@@ -387,6 +396,19 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
                       {t('trip_review_pending_support_cta')}
                     </Link>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {soloRefundLabel && (
+              <div className={`mt-3 rounded-xl border px-3 py-2.5 text-[11px] leading-5 ${
+                soloRefundStatus === 'refunded'
+                  ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
+                  : 'border-orange-100 bg-orange-50 text-orange-700'
+              }`}>
+                <div className="flex items-start gap-2">
+                  <Receipt className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <p>{soloRefundLabel}</p>
                 </div>
               </div>
             )}

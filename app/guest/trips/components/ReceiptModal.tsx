@@ -9,6 +9,10 @@ import { useToast } from '@/app/context/ToastContext';
 import { getContent } from '@/app/utils/contentHelper';
 import { isPendingBookingStatus } from '@/app/constants/bookingStatus';
 import { getPublicBankInfo } from '@/app/utils/publicBankInfo';
+import {
+  getSoloGuaranteeRefundGuestLabel,
+  normalizeSoloGuaranteeRefundStatus,
+} from '@/app/utils/soloGuaranteeRefundStatus';
 
 interface ReceiptTrip {
   id: number;
@@ -27,6 +31,9 @@ interface ReceiptTrip {
   price?: number;
   amount?: number;
   status?: string;
+  soloGuaranteeRefundStatus?: string | null;
+  soloGuaranteeRefundAmount?: number | null;
+  soloGuaranteeRefundedAt?: string | null;
 }
 
 export default function ReceiptModal({ trip, onClose }: { trip: ReceiptTrip, onClose: () => void }) {
@@ -57,6 +64,8 @@ export default function ReceiptModal({ trip, onClose }: { trip: ReceiptTrip, onC
   const localizedTitle = getContent(trip, 'title', lang) || trip.title;
   const bankInfo = getPublicBankInfo();
   const isPending = isPendingBookingStatus(trip.status || '');
+  const soloRefundStatus = normalizeSoloGuaranteeRefundStatus(trip.soloGuaranteeRefundStatus);
+  const soloRefundLabel = getSoloGuaranteeRefundGuestLabel(soloRefundStatus);
   const orderDisplay = trip.orderId || String(trip.id || '-').slice(0, 15);
   const guestCount = Number(trip.guests || 1);
   const safeOrderDisplay = String(orderDisplay).replace(/[^a-zA-Z0-9_-]/g, '-');
@@ -232,6 +241,25 @@ export default function ReceiptModal({ trip, onClose }: { trip: ReceiptTrip, onC
                 <span className="text-[13px] md:text-sm font-bold text-slate-900">{t('receipt_amount')}</span>
                 <span className="text-[22px] md:text-2xl font-black text-rose-500">₩{Number(trip.price || trip.amount || 0).toLocaleString()}</span>
               </div>
+
+              {soloRefundLabel && (
+                <div className={`rounded-xl border px-4 py-3 text-left ${
+                  soloRefundStatus === 'refunded'
+                    ? 'border-emerald-100 bg-emerald-50'
+                    : 'border-orange-100 bg-orange-50'
+                }`}>
+                  <p className={`text-[11px] md:text-xs font-bold ${
+                    soloRefundStatus === 'refunded' ? 'text-emerald-700' : 'text-orange-700'
+                  }`}>
+                    {soloRefundLabel}
+                  </p>
+                  {trip.soloGuaranteeRefundedAt && (
+                    <p className="mt-1 text-[10px] md:text-[11px] text-slate-500">
+                      {safeDate(trip.soloGuaranteeRefundedAt)}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>

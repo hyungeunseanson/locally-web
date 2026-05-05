@@ -119,7 +119,7 @@ function ServicePaymentContent() {
   const paypalButtonRef = useRef<HTMLDivElement | null>(null);
   const paypalPanelRef = useRef<HTMLDivElement | null>(null);
   const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '';
-  const isPayPalEnabled = Boolean(paypalClientId);
+  const isPayPalEnabled = false;
   const isBankLockedBooking = (pendingBooking?.payment_method || '').toLowerCase() === 'bank';
   const bankInfo = getPublicBankInfo();
 
@@ -670,8 +670,8 @@ function ServicePaymentContent() {
                       : 'border-slate-200 hover:border-slate-300'
                   }`}
               >
-                <div className="rounded bg-[#0070ba] px-2 py-0.5 text-[10px] font-black text-white">PayPal</div>
-                <span className={`text-[12px] md:text-[13px] font-bold ${paymentMethod === 'paypal' ? 'text-slate-900' : 'text-slate-400'}`}>PayPal</span>
+                <div className="rounded bg-[#0070ba] px-2 py-0.5 text-[10px] font-black text-white">PAY</div>
+                <span className={`text-[12px] md:text-[13px] font-bold ${paymentMethod === 'paypal' ? 'text-slate-900' : 'text-slate-400'}`}>대체 결제</span>
               </button>
             )}
           </div>
@@ -797,7 +797,7 @@ function ServicePaymentContent() {
               data-testid="service-payment-mobile-paypal-jump"
               className="min-w-[180px] rounded-2xl bg-slate-900 px-4 py-3.5 text-[13px] font-black text-white shadow-lg transition-colors hover:bg-slate-800"
             >
-              PayPal
+              결제
             </button>
           )}
         </div>

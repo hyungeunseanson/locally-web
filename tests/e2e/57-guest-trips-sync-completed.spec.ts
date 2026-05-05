@@ -497,6 +497,54 @@ test.describe.serial('guest trips completed sync route', () => {
     expect(afterSync?.status).toBe('completed');
   });
 
+  test('shows completed solo add-on refund status on past trip cards', async ({ page }) => {
+    const host = createUser('host.solo.refund.past');
+    const guest = createUser('guest.solo.refund.past');
+    const hostId = await createAuthUser(host);
+    const guestId = await createAuthUser(guest);
+    await createApprovedHostApplication(hostId, host);
+    const supabase = getAdminClient();
+    const { error: hostProfileError } = await supabase
+      .from('profiles')
+      .update({
+        full_name: host.fullName,
+        avatar_url: '/images/logo.png',
+        languages: ['한국어'],
+      })
+      .eq('id', hostId);
+
+    if (hostProfileError) throw hostProfileError;
+    const experienceId = await createHostExperience(hostId);
+    const bookingId = await createPastPaidBooking({ guestId, guest, experienceId });
+    const refundedAt = new Date().toISOString();
+    const { error: refundStatusError } = await supabase
+      .from('bookings')
+      .update({
+        status: 'completed',
+        amount: 85000,
+        total_price: 50000,
+        total_experience_price: 50000,
+        host_payout_amount: 40000,
+        platform_revenue: 15000,
+        solo_guarantee_price: 30000,
+        solo_guarantee_refund_status: 'refunded',
+        solo_guarantee_refund_amount: 30000,
+        solo_guarantee_refunded_at: refundedAt,
+        refund_amount: 30000,
+      })
+      .eq('id', bookingId);
+
+    if (refundStatusError) throw refundStatusError;
+
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await login(page, guest);
+    await page.goto('/guest/trips', { waitUntil: 'networkidle' });
+
+    const refundBadge = page.getByTestId(`guest-past-trip-solo-refund-status-${bookingId}`).last();
+    await expect(refundBadge).toBeVisible({ timeout: 15000 });
+    await expect(refundBadge).toContainText('1인 진행 추가금 30,000원 환불 완료');
+  });
+
   test('renders localized Korean titles on guest trips and payment complete', async ({ page }) => {
     const host = createUser('host.localized');
     const guest = createUser('guest.localized');

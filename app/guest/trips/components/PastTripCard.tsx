@@ -2,11 +2,15 @@
 
 import Image from 'next/image';
 import React from 'react';
-import { ChevronRight, CheckCircle, Mountain } from 'lucide-react'; // 🟢 아이콘 추가
+import { ChevronRight, CheckCircle, Mountain, Receipt } from 'lucide-react'; // 🟢 아이콘 추가
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 import { useRouter } from 'next/navigation';
 import type { GuestTrip } from './TripCard';
 import { getContent } from '@/app/utils/contentHelper';
+import {
+  getSoloGuaranteeRefundGuestLabel,
+  normalizeSoloGuaranteeRefundStatus,
+} from '@/app/utils/soloGuaranteeRefundStatus';
 
 type PastGuestTrip = GuestTrip & {
   hasReview?: boolean;
@@ -23,6 +27,8 @@ export default function PastTripCard({ trip, onOpenReview }: PastTripCardProps) 
   const router = useRouter();
   const thumbnailSrc = trip.photos && trip.photos.length > 0 ? trip.photos[0] : trip.image || null;
   const localizedTitle = getContent(trip, 'title', lang) || trip.title;
+  const soloRefundStatus = normalizeSoloGuaranteeRefundStatus(trip.soloGuaranteeRefundStatus);
+  const soloRefundLabel = getSoloGuaranteeRefundGuestLabel(soloRefundStatus);
 
   const handleCardClick = () => {
     if (trip.expId) {
@@ -58,6 +64,20 @@ export default function PastTripCard({ trip, onOpenReview }: PastTripCardProps) 
       <div className="flex-1 min-w-0">
         <h4 className="font-bold text-[13px] md:text-sm text-slate-900 truncate">{localizedTitle}</h4>
         <div className="text-[11px] md:text-xs text-slate-500 mt-0.5">{trip.date}</div>
+
+        {soloRefundLabel && (
+          <div
+            data-testid={`guest-past-trip-solo-refund-status-${trip.id}`}
+            className={`mt-1.5 inline-flex items-start gap-1 rounded-md border px-1.5 py-1 text-[10px] font-bold leading-4 md:text-[11px] ${
+              soloRefundStatus === 'refunded'
+                ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
+                : 'border-orange-100 bg-orange-50 text-orange-700'
+            }`}
+          >
+            <Receipt className="mt-0.5 h-3 w-3 shrink-0" />
+            <span>{soloRefundLabel}</span>
+          </div>
+        )}
 
         {trip.status !== 'cancelled' ? (
           // 🟢 [수정] 후기 작성 여부에 따라 UI 분기

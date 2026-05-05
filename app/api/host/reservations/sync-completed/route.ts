@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
+import { processSoloGuaranteeRefundsForCompletedBookings } from '@/app/utils/bookings/soloGuaranteeRefund';
 import { isOverdueActiveBooking } from '@/app/utils/bookingStartTime';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
@@ -94,6 +95,15 @@ export async function POST(request: NextRequest) {
       .in('status', [...BOOKING_ACTIVE_STATUS_FOR_CAPACITY]);
 
     if (updateError) throw updateError;
+
+    try {
+      await processSoloGuaranteeRefundsForCompletedBookings({
+        supabaseAdmin,
+        completedBookingIds: bookingIdsToComplete,
+      });
+    } catch (refundError) {
+      console.error('[host/reservations/sync-completed] solo guarantee refund processing failed:', refundError);
+    }
 
     return NextResponse.json({
       success: true,

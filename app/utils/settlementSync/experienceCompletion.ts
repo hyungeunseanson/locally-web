@@ -1,4 +1,5 @@
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
+import { processSoloGuaranteeRefundsForCompletedBookings } from '@/app/utils/bookings/soloGuaranteeRefund';
 
 import {
   finishSettlementSyncRunFailure,
@@ -264,6 +265,22 @@ async function sendReviewRequestNotifications(
   }
 }
 
+async function processSoloGuaranteeRefundSideEffects(
+  supabaseAdmin: SettlementSyncAdminClient,
+  bookingIds: string[]
+) {
+  if (bookingIds.length === 0) return;
+
+  try {
+    await processSoloGuaranteeRefundsForCompletedBookings({
+      supabaseAdmin,
+      completedBookingIds: bookingIds,
+    });
+  } catch (error) {
+    console.error('[settlement sync] solo guarantee refund processing failed:', error);
+  }
+}
+
 export async function resolveExperienceCompletionTarget(
   supabaseAdmin: SettlementSyncAdminClient,
   identifier: string
@@ -364,6 +381,7 @@ export async function runExperienceCompletionSync(
       .filter((row): row is ExperienceCompletionRow => row !== undefined);
 
     await sendReviewRequestNotifications(params.supabaseAdmin, updatedRows);
+    await processSoloGuaranteeRefundSideEffects(params.supabaseAdmin, updatedIds);
     await renewLease();
 
     await finishSettlementSyncRunSuccess({
@@ -557,6 +575,7 @@ export async function forceExperienceCompletionSync(
           experiences: target.experiences,
         },
       ]);
+      await processSoloGuaranteeRefundSideEffects(params.supabaseAdmin, [target.booking_id]);
       await finishSettlementSyncRunSuccess({
         supabaseAdmin: params.supabaseAdmin,
         runId: started.runId,

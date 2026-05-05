@@ -102,14 +102,14 @@ const ko: HelpFaqLocaleContent = {
       items: [
         {
           id: 'methods-supported',
-          q: '카드·무통장·PayPal 중 어떤 결제가 가능한가요?',
-          a: '현재 흐름에 따라 카드, 무통장 입금, PayPal 중 가능한 수단이 다르게 열립니다. 결제 페이지에 보이는 수단이 해당 예약이나 의뢰에 바로 사용할 수 있는 방식입니다.',
-          searchTerms: ['카드', '무통장', 'paypal', '결제 수단', 'pay'],
+          q: '카드·무통장 중 어떤 결제가 가능한가요?',
+          a: '현재 흐름에 따라 카드 또는 무통장 입금 중 가능한 수단이 다르게 열립니다. 결제 페이지에 보이는 수단이 해당 예약이나 의뢰에 바로 사용할 수 있는 방식입니다.',
+          searchTerms: ['카드', '무통장', '결제 수단', 'pay'],
         },
         {
           id: 'card-unavailable',
           q: '카드 결제가 안 될 때는 어떻게 하나요?',
-          a: '카드 결제가 준비 중이거나 일시적으로 열리지 않으면 무통장 입금이나 PayPal로 바로 이어서 결제할 수 있습니다. 결제 페이지에 뜨는 안내 문구와 대체 수단을 그대로 따라주시면 됩니다.',
+          a: '카드 결제가 준비 중이거나 일시적으로 열리지 않으면 무통장 입금으로 이어서 결제할 수 있습니다. 결제 페이지에 뜨는 안내 문구와 대체 수단을 그대로 따라주시면 됩니다.',
           searchTerms: ['카드 오류', '카드 결제', '결제 실패', '대체 결제', 'card unavailable'],
         },
         {
@@ -121,7 +121,7 @@ const ko: HelpFaqLocaleContent = {
         {
           id: 'when-confirmed',
           q: '결제 후 예약은 언제 확정되나요?',
-          a: '카드나 PayPal은 결제 검증이 끝나면 바로 다음 단계로 넘어가고, 무통장 입금은 입금 확인 뒤 상태가 바뀝니다. 체험은 예약 확정으로, 맞춤 서비스는 호스트 모집 시작으로 이어집니다.',
+          a: '카드 결제는 결제 검증이 끝나면 바로 다음 단계로 넘어가고, 무통장 입금은 입금 확인 뒤 상태가 바뀝니다. 체험은 예약 확정으로, 맞춤 서비스는 호스트 모집 시작으로 이어집니다.',
           searchTerms: ['예약 확정', '결제 후', '상태 변경', '입금 확인', 'confirmed'],
         },
         {
@@ -691,14 +691,14 @@ const en: HelpFaqLocaleContent = {
       items: [
         {
           id: 'methods-supported',
-          q: 'Which payment methods are available: card, bank transfer, or PayPal?',
+          q: 'Which payment methods are available: card or bank transfer?',
           a: 'The available methods depend on the current flow. The methods shown on your payment page are the ones you can use for that booking or request right away.',
-          searchTerms: ['card', 'bank transfer', 'paypal', 'payment method'],
+          searchTerms: ['card', 'bank transfer', 'payment method'],
         },
         {
           id: 'card-unavailable',
           q: 'What should I do if card payment is unavailable?',
-          a: 'If card payment is still being prepared or is temporarily unavailable, you can continue with bank transfer or PayPal. Follow the fallback message shown on the payment page.',
+          a: 'If card payment is still being prepared or is temporarily unavailable, you can continue with bank transfer. Follow the fallback message shown on the payment page.',
           searchTerms: ['card unavailable', 'payment failed', 'fallback payment', 'card error'],
         },
         {
@@ -710,7 +710,7 @@ const en: HelpFaqLocaleContent = {
         {
           id: 'when-confirmed',
           q: 'When is my booking confirmed after payment?',
-          a: 'Card and PayPal flows move to the next step once payment verification finishes, while bank transfer moves after the deposit is confirmed. Experiences become confirmed bookings, and custom services move into host recruitment.',
+          a: 'Card payments move to the next step once payment verification finishes, while bank transfer moves after the deposit is confirmed. Experiences become confirmed bookings, and custom services move into host recruitment.',
           searchTerms: ['confirmed', 'after payment', 'status', 'payment confirmed'],
         },
         {
@@ -1280,14 +1280,14 @@ const ja: HelpFaqLocaleContent = {
       items: [
         {
           id: 'methods-supported',
-          q: 'カード・銀行振込・PayPal のうち、どの支払い方法が使えますか？',
+          q: 'カード・銀行振込のうち、どの支払い方法が使えますか？',
           a: '利用できる支払い方法は、今のフローによって変わります。決済ページに表示されている方法が、その予約または依頼で今すぐ使える方法です。',
-          searchTerms: ['カード', '銀行振込', 'PayPal', '支払い方法'],
+          searchTerms: ['カード', '銀行振込', '支払い方法'],
         },
         {
           id: 'card-unavailable',
           q: 'カード決済が使えないときはどうすればいいですか？',
-          a: 'カード決済の準備中だったり一時的に使えない場合は、銀行振込や PayPal でそのまま続けられます。決済ページの案内に出る代替手段に沿って進めてください。',
+          a: 'カード決済の準備中だったり一時的に使えない場合は、銀行振込でそのまま続けられます。決済ページの案内に出る代替手段に沿って進めてください。',
           searchTerms: ['カード決済', '使えない', '代替', 'fallback'],
         },
         {
@@ -1299,7 +1299,7 @@ const ja: HelpFaqLocaleContent = {
         {
           id: 'when-confirmed',
           q: '決済後、予約はいつ確定しますか？',
-          a: 'カードや PayPal は決済確認が終わると次の段階へ進み、銀行振込は入金確認後に状態が変わります。体験は予約確定に、カスタムサービスはホスト募集開始へつながります。',
+          a: 'カード決済は決済確認が終わると次の段階へ進み、銀行振込は入金確認後に状態が変わります。体験は予約確定に、カスタムサービスはホスト募集開始へつながります。',
           searchTerms: ['予約確定', '決済後', '状態変更', '確認'],
         },
         {
@@ -1869,14 +1869,14 @@ const zh: HelpFaqLocaleContent = {
       items: [
         {
           id: 'methods-supported',
-          q: '银行卡、银行转账和 PayPal 中，哪些支付方式可以用？',
+          q: '银行卡和银行转账中，哪些支付方式可以用？',
           a: '可用的支付方式会因当前流程而不同。支付页面上显示出来的方式，就是你这笔预订或需求当前可以直接使用的方式。',
-          searchTerms: ['银行卡', '银行转账', 'PayPal', '支付方式'],
+          searchTerms: ['银行卡', '银行转账', '支付方式'],
         },
         {
           id: 'card-unavailable',
           q: '如果银行卡支付不可用怎么办？',
-          a: '如果银行卡支付还在准备中，或者暂时不可用，可以直接改用银行转账或 PayPal。按支付页上的替代支付提示继续即可。',
+          a: '如果银行卡支付还在准备中，或者暂时不可用，可以直接改用银行转账。按支付页上的替代支付提示继续即可。',
           searchTerms: ['银行卡支付', '支付失败', '替代支付', 'card unavailable'],
         },
         {
@@ -1888,7 +1888,7 @@ const zh: HelpFaqLocaleContent = {
         {
           id: 'when-confirmed',
           q: '支付后预订什么时候算确认？',
-          a: '银行卡和 PayPal 在支付验证完成后会进入下一步，银行转账则会在确认入金后更新状态。体验会变成“预订确认”，定制服务则会进入“招募房东”。',
+          a: '银行卡支付在支付验证完成后会进入下一步，银行转账则会在确认入金后更新状态。体验会变成“预订确认”，定制服务则会进入“招募房东”。',
           searchTerms: ['预订确认', '支付后', '状态更新', 'confirmed'],
         },
         {

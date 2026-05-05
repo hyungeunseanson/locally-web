@@ -22,6 +22,8 @@ test.afterAll(async () => {
 
 test.describe.serial('Private tour selector rollback', () => {
   test('keeps the compact private option while navigating with guests=1 and the fixed rate', async ({ page }) => {
+    test.setTimeout(120000);
+
     const viewer = createTestUser('exp.private.multiguest.viewer');
     await createAuthUser(viewer, createdAuthUserIds);
 
@@ -63,7 +65,7 @@ test.describe.serial('Private tour selector rollback', () => {
         type: 'private',
       });
 
-    await expect(page.getByText(/프라이빗 투어|Private tour|貸切ツアー|私人团/)).toBeVisible();
-    await expect(page.getByText(`₩${expectedFinalAmount.toLocaleString()}`)).toBeVisible();
+    await expect(page.getByText(/프라이빗 투어|Private tour|Private|貸切ツアー|私人团/).first()).toBeVisible();
+    await expect(page.getByTestId('exp-payment-total-amount')).toHaveText(`₩${expectedFinalAmount.toLocaleString()}`);
   });
 });

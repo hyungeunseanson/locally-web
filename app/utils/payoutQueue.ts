@@ -1,7 +1,7 @@
 export const EXPERIENCE_PAYOUT_THRESHOLD_KRW = 100000;
 export const EXPERIENCE_PAYOUT_LONG_HOLD_DAYS = 90;
 
-export type ExperiencePayoutQueueState = 'eligible' | 'hold' | 'long_hold' | 'completed';
+export type ExperiencePayoutQueueState = 'eligible' | 'hold' | 'long_hold' | 'refund_hold' | 'completed';
 
 export function getExperiencePayoutQueueState(params: {
   pendingAmount: number;

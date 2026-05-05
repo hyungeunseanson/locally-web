@@ -39,6 +39,7 @@ import {
   EXPERIENCE_PAYOUT_LONG_HOLD_DAYS,
 } from '@/app/utils/payoutQueue';
 import { getBookingPaidAmount, getBookingPlatformRevenue } from '@/app/utils/bookingFinance';
+import { isSoloGuaranteeRefundUnresolvedStatus } from '@/app/utils/soloGuaranteeRefundStatus';
 import SettlementSyncPanel from './SettlementSyncPanel';
 
 const DateRange = dynamic(() => import('react-date-range').then((mod) => mod.DateRange), { ssr: false });
@@ -83,14 +84,16 @@ const SETTLEMENT_STATE_META: Record<AdminPayoutQueueState, { label: string; clas
   eligible: { label: '정산 가능', className: 'bg-emerald-100 text-emerald-700' },
   hold: { label: '10만원 미만', className: 'bg-slate-100 text-slate-500' },
   long_hold: { label: '장기 보류', className: 'bg-amber-100 text-amber-700' },
+  refund_hold: { label: '환불 확인중', className: 'bg-orange-100 text-orange-700' },
   completed: { label: '지급 완료', className: 'bg-blue-100 text-blue-700' },
 };
 
 const PENDING_SETTLEMENT_STATE_ORDER: Record<AdminPayoutQueueState, number> = {
   eligible: 0,
   long_hold: 1,
-  hold: 2,
-  completed: 3,
+  refund_hold: 2,
+  hold: 3,
+  completed: 4,
 };
 
 type StatCardProps = {
@@ -117,6 +120,8 @@ function getPendingPolicyNotes(row: AdminCombinedPayoutQueueRow) {
       notes.push(
         `체험 정산은 누적 ₩${EXPERIENCE_PAYOUT_THRESHOLD_KRW.toLocaleString()} 이상부터 이체 대상입니다.`
       );
+    } else if (row.domains.experience.settlement_state === 'refund_hold') {
+      notes.push('1인 진행 추가금 환불 확인이 끝난 뒤 체험 정산을 처리할 수 있습니다.');
     }
   }
 
@@ -134,6 +139,10 @@ function formatEntryId(entry: AdminPayoutQueueEntry) {
 
 function getEntryStatusLabel(entry: AdminPayoutQueueEntry) {
   if (entry.domain === 'experience') {
+    if (isSoloGuaranteeRefundUnresolvedStatus(entry.solo_guarantee_refund_status)) {
+      return '환불 확인중';
+    }
+
     return isCompletedBookingStatus(entry.status) ? '완료' : '위약금';
   }
 
@@ -145,6 +154,10 @@ function getEntryStatusLabel(entry: AdminPayoutQueueEntry) {
 
 function getEntryStatusClass(entry: AdminPayoutQueueEntry) {
   if (entry.domain === 'experience') {
+    if (isSoloGuaranteeRefundUnresolvedStatus(entry.solo_guarantee_refund_status)) {
+      return 'bg-orange-50 text-orange-700';
+    }
+
     return isCompletedBookingStatus(entry.status)
       ? 'bg-blue-50 text-blue-600'
       : 'bg-red-50 text-red-600';
@@ -514,7 +527,7 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
         const refundPenaltyAmount =
           entry.status === 'cancelled'
             ? Math.max(0, getBookingPaidAmount({ amount: entry.amount }) - entry.payout_amount - entry.platform_revenue)
-            : 0;
+            : Number(entry.solo_guarantee_refund_amount || 0);
 
         return [
           escapeCSV(format(new Date(entry.created_at), 'yyyy-MM-dd HH:mm')),
@@ -675,8 +688,8 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
 
   return (
     <div className="animate-in fade-in zoom-in-95 duration-300 flex-1 space-y-4 overflow-y-auto p-1 md:space-y-8 md:p-2">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between md:gap-0">
-        <div>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
+        <div className="min-w-0 flex-1">
           <h2 className="flex items-center gap-2 text-xl font-black text-slate-900 md:text-2xl">
             <Wallet className="h-5 w-5 text-yellow-500 md:h-6 md:w-6" /> 매출 및 재무 현황
           </h2>
@@ -685,13 +698,13 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
             Billing 기간은 결제 생성일 기준입니다. 체험일 또는 서비스일 기준 비교는 Master Ledger에서 확인하세요.
           </p>
         </div>
-        <div className="relative flex flex-col items-stretch gap-2 sm:flex-row sm:items-center md:gap-3">
+        <div className="relative flex w-full flex-col items-stretch gap-2 sm:flex-row sm:items-center md:gap-3 lg:w-auto lg:flex-none">
           <div className="flex shrink-0 overflow-x-auto rounded-lg bg-slate-100 p-1 text-[10px] font-bold scrollbar-hide md:text-xs">
             {['1D', '7D', '30D', '3M', '1Y', 'ALL'].map((preset) => (
               <button
                 key={preset}
                 onClick={() => handlePresetClick(preset)}
-                className={`flex-1 whitespace-nowrap rounded-md px-2 py-1.5 transition-all md:flex-none md:px-3 md:py-2 ${
+                className={`flex-1 whitespace-nowrap rounded-md px-2 py-1.5 transition-all lg:flex-none lg:px-3 lg:py-2 ${
                   activePreset === preset
                     ? 'bg-white text-slate-900 shadow'
                     : 'text-slate-400 hover:text-slate-600'
@@ -708,7 +721,7 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
               className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium transition-colors hover:bg-slate-50 md:px-4 md:text-sm"
             >
               <CalendarIcon size={14} className="text-slate-400 md:h-4 md:w-4" />
-              <span className="text-center text-slate-700 md:min-w-[170px]">
+              <span className="text-center text-slate-700 lg:min-w-[170px]">
                 {dateRange[0].startDate && dateRange[0].endDate
                   ? `${format(dateRange[0].startDate, 'yyyy.MM.dd')} ~ ${format(dateRange[0].endDate, 'yyyy.MM.dd')}`
                   : '기간 선택'}
@@ -752,7 +765,7 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
         onServicePayoutGuardChange={setServicePayoutGuard}
       />
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 md:gap-4">
         <StatCard
           title="총 거래액 (GMV)"
           value={`₩${totalRevenue.toLocaleString()}`}
@@ -1098,7 +1111,7 @@ function StatCard({
   actionLabel,
   testId,
 }: StatCardProps) {
-  const cardClassName = `group relative flex h-28 w-full flex-col justify-between overflow-hidden rounded-xl border bg-white p-4 shadow-sm md:h-32 md:rounded-2xl md:p-5 ${
+  const cardClassName = `group relative flex h-28 w-full min-w-0 flex-col justify-between overflow-hidden rounded-xl border bg-white p-4 shadow-sm md:h-32 md:rounded-2xl md:p-5 ${
     onClick
       ? 'cursor-pointer border-purple-100 text-left transition-all hover:border-purple-200 hover:shadow-md'
       : 'border-slate-100'
@@ -1111,7 +1124,7 @@ function StatCard({
       </div>
       <div className="pr-10 text-[9px] font-bold uppercase tracking-wider text-slate-400 md:text-xs">{title}</div>
       <div>
-        <div className={`truncate pr-8 text-lg font-black tracking-tight md:text-2xl ${text === 'text-white' ? 'text-slate-900' : text}`}>
+        <div className={`truncate pr-8 text-lg font-black tracking-tight md:text-xl xl:text-2xl ${text === 'text-white' ? 'text-slate-900' : text}`}>
           {value}
         </div>
         <div className="mt-0.5 text-[9px] font-medium text-slate-400 md:mt-1 md:text-[10px]">{sub}</div>

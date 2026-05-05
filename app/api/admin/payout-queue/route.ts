@@ -17,6 +17,7 @@ import {
 import { getBookingHostPayout, getBookingPlatformRevenue } from '@/app/utils/bookingFinance';
 import { attachNullPayoutPaidAt, isMissingPayoutPaidAtColumnError } from '@/app/utils/payoutPaidAt';
 import { getExperiencePayoutQueueState } from '@/app/utils/payoutQueue';
+import { isSoloGuaranteeRefundUnresolvedStatus } from '@/app/utils/soloGuaranteeRefundStatus';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 
@@ -34,6 +35,8 @@ type ExperienceQueueRow = {
   platform_revenue: number | null;
   experience_id: number | null;
   user_id: string | null;
+  solo_guarantee_refund_status: string | null;
+  solo_guarantee_refund_amount: number | null;
 };
 
 type ExperienceMetaRow = {
@@ -120,6 +123,8 @@ function normalizeExperienceQueueRow(row: AdminRawRow): ExperienceQueueRow | nul
     platform_revenue: readNumberField(row, 'platform_revenue'),
     experience_id: readNumberField(row, 'experience_id'),
     user_id: readStringField(row, 'user_id'),
+    solo_guarantee_refund_status: readStringField(row, 'solo_guarantee_refund_status'),
+    solo_guarantee_refund_amount: readNumberField(row, 'solo_guarantee_refund_amount'),
   };
 }
 
@@ -274,8 +279,8 @@ export async function GET(request: Request) {
 
     const buildExperienceQuery = (includePaidAt: boolean) => {
       const selectColumns = includePaidAt
-        ? 'id, order_id, created_at, date, time, amount, status, payout_status, payout_paid_at, host_payout_amount, platform_revenue, experience_id, user_id'
-        : 'id, order_id, created_at, date, time, amount, status, payout_status, host_payout_amount, platform_revenue, experience_id, user_id';
+        ? 'id, order_id, created_at, date, time, amount, status, payout_status, payout_paid_at, host_payout_amount, platform_revenue, experience_id, user_id, solo_guarantee_refund_status, solo_guarantee_refund_amount'
+        : 'id, order_id, created_at, date, time, amount, status, payout_status, host_payout_amount, platform_revenue, experience_id, user_id, solo_guarantee_refund_status, solo_guarantee_refund_amount';
 
       let query = supabaseAdmin
         .from('bookings')
@@ -498,6 +503,8 @@ export async function GET(request: Request) {
         platform_revenue: getBookingPlatformRevenue(booking),
         status: booking.status,
         payout_status: booking.payout_status,
+        solo_guarantee_refund_status: booking.solo_guarantee_refund_status,
+        solo_guarantee_refund_amount: booking.solo_guarantee_refund_amount,
       };
 
       if (booking.payout_status === 'paid') {
@@ -590,13 +597,18 @@ export async function GET(request: Request) {
       .map((group) => {
         const pending_entries = [...group.pending_entries].sort(sortEntriesDesc);
         const paid_entries = [...group.paid_entries].sort(sortEntriesDesc);
+        const hasUnresolvedSoloRefund = pending_entries.some((entry) =>
+          isSoloGuaranteeRefundUnresolvedStatus(entry.solo_guarantee_refund_status)
+        );
 
         return {
           ...group,
           pending_entries,
           paid_entries,
           settlement_state:
-            group.pending_count > 0
+            hasUnresolvedSoloRefund
+              ? 'refund_hold'
+              : group.pending_count > 0
               ? getExperiencePayoutQueueState({
                   pendingAmount: group.pending_amount,
                   oldestPendingCreatedAt: group.oldest_pending_created_at,

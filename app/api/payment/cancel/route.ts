@@ -14,6 +14,7 @@ import { refundPayPalCapture } from '@/app/utils/paypal/server';
 import { captureServerException } from '@/app/utils/monitoring/sentry';
 import { calculateGuestCancellationRefundRate } from '@/app/utils/bookingCancellationPolicy';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
+import { isSoloGuaranteeRefundUnresolvedStatus } from '@/app/utils/soloGuaranteeRefundStatus';
 import {
   formatBookingReviewMarker,
   isBookingReviewPending,
@@ -109,6 +110,13 @@ export async function POST(request: Request) {
     // 기존 host approval consumer가 사용하는 `cancellation_requested`는 별도 approval path로 유지한다.
     if (!isCancellationRequested && isCancelledBookingStatus(booking.status)) {
       return NextResponse.json({ error: '이미 취소됨' }, { status: 400 });
+    }
+
+    if (isSoloGuaranteeRefundUnresolvedStatus(booking.solo_guarantee_refund_status)) {
+      return NextResponse.json(
+        { error: '1인 진행 추가금 환불 확인이 끝난 뒤 취소할 수 있습니다.' },
+        { status: 409 }
+      );
     }
 
     if (isGuestOwner && isBookingReviewPending(booking.cancel_reason)) {
@@ -253,7 +261,12 @@ export async function POST(request: Request) {
     }
 
     const totalAmount = getBookingPaidAmount(booking);
-    const { refundAmount, hostPayout, platformRevenue } = calculateBookingCancellationSettlement(booking, refundRate);
+    const {
+      refundAmount,
+      cumulativeRefundAmount,
+      hostPayout,
+      platformRevenue,
+    } = calculateBookingCancellationSettlement(booking, refundRate);
 
     // 3. PG사 취소 요청
     if (refundAmount > 0 && booking.tid) {
@@ -278,7 +291,7 @@ export async function POST(request: Request) {
     const { error: updateError } = await supabaseAdmin.from('bookings').update({
       status: 'cancelled',
       cancel_reason: `${normalizedUserReason} (${reasonText})`,
-      refund_amount: refundAmount,
+      refund_amount: cumulativeRefundAmount,
       host_payout_amount: hostPayout,
       platform_revenue: platformRevenue
     }).eq('id', bookingId).eq('status', 'cancellation_requested');

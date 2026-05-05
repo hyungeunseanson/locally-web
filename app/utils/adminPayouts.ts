@@ -1,10 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { isMissingPayoutPaidAtColumnError } from '@/app/utils/payoutPaidAt';
+import { isSoloGuaranteeRefundUnresolvedStatus } from '@/app/utils/soloGuaranteeRefundStatus';
 
 type BookingPayoutRow = {
   id: string;
   payout_status: string | null;
+  solo_guarantee_refund_status?: string | null;
 };
 
 type SettleHostPayoutSuccess = {
@@ -34,7 +36,7 @@ export async function settleExperienceBookingPayouts(
 
   const { data: targetBookings, error: fetchError } = await supabaseAdmin
     .from('bookings')
-    .select('id, payout_status')
+    .select('id, payout_status, solo_guarantee_refund_status')
     .in('id', uniqueBookingIds);
 
   if (fetchError) {
@@ -74,6 +76,18 @@ export async function settleExperienceBookingPayouts(
       success: false,
       error: '정산 대기 상태인 예약만 처리할 수 있습니다.',
       invalidStatusIds,
+    };
+  }
+
+  const unresolvedSoloRefundIds = rows
+    .filter((row) => isSoloGuaranteeRefundUnresolvedStatus(row.solo_guarantee_refund_status))
+    .map((row) => row.id);
+
+  if (unresolvedSoloRefundIds.length > 0) {
+    return {
+      success: false,
+      error: '1인 진행 추가금 환불 확인이 끝난 예약만 정산 완료 처리할 수 있습니다.',
+      invalidStatusIds: unresolvedSoloRefundIds,
     };
   }
 

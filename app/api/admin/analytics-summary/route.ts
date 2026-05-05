@@ -19,6 +19,9 @@ type AnalyticsBookingRow = {
   host_payout_amount: number | null;
   platform_revenue: number | null;
   solo_guarantee_price: number | null;
+  solo_guarantee_refund_status: string | null;
+  solo_guarantee_refund_amount: number | null;
+  refund_amount: number | null;
 };
 
 type AnalyticsExperienceTitleRow = {
@@ -171,7 +174,7 @@ export async function GET(request: Request) {
 
     let bookingsQuery = supabaseAdmin
       .from('bookings')
-      .select('id, created_at, experience_id, user_id, amount, status, total_price, total_experience_price, host_payout_amount, platform_revenue, solo_guarantee_price')
+      .select('id, created_at, experience_id, user_id, amount, status, total_price, total_experience_price, host_payout_amount, platform_revenue, solo_guarantee_price, solo_guarantee_refund_status, solo_guarantee_refund_amount, refund_amount')
       .in('status', ['PAID', 'confirmed', 'completed', 'cancelled', 'declined', 'cancellation_requested']);
 
     let reviewsQuery = supabaseAdmin

@@ -442,8 +442,16 @@ test.describe.serial('Admin billing smoke', () => {
     await createHostApplication(hostId, hostUser);
     const fixtures = await createServiceFixtures(customerId, hostId);
 
+    await page.setViewportSize({ width: 900, height: 900 });
     await openBilling(page, adminUser);
     await expect(page.getByRole('button', { name: /맞춤 의뢰 명세서/ })).toBeVisible({ timeout: 15000 });
+    const billingHeadingBox = await page.getByRole('heading', { name: '매출 및 재무 현황' }).boundingBox();
+    const billingNoteBox = await page.getByTestId('sales-date-basis-note').boundingBox();
+    expect(billingHeadingBox).not.toBeNull();
+    expect(billingNoteBox).not.toBeNull();
+    if (!billingHeadingBox || !billingNoteBox) throw new Error('Billing header bounding boxes were not available.');
+    expect(billingHeadingBox.height).toBeLessThan(48);
+    expect(billingNoteBox.height).toBeLessThan(64);
 
     const recentSummary = await fetchSalesSummary(page, fixtures.recentCreatedAt, fixtures.recentCreatedAt);
     expect(recentSummary.status).toBe(200);

@@ -22,6 +22,9 @@ type ExperienceSummaryBookingRow = {
   platform_revenue?: number | null;
   price_at_booking?: number | null;
   solo_guarantee_price?: number | null;
+  solo_guarantee_refund_status?: string | null;
+  solo_guarantee_refund_amount?: number | null;
+  refund_amount?: number | null;
   payout_status?: string | null;
   payout_paid_at?: string | null;
 };
@@ -79,6 +82,9 @@ export async function GET(request: Request) {
         platform_revenue,
         price_at_booking,
         solo_guarantee_price,
+        solo_guarantee_refund_status,
+        solo_guarantee_refund_amount,
+        refund_amount,
         payout_status,
         payout_paid_at,
         experiences!inner ( host_id )
@@ -100,6 +106,9 @@ export async function GET(request: Request) {
           platform_revenue,
           price_at_booking,
           solo_guarantee_price,
+          solo_guarantee_refund_status,
+          solo_guarantee_refund_amount,
+          refund_amount,
           payout_status,
           experiences!inner ( host_id )
         `)

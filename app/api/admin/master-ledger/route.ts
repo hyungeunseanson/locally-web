@@ -74,7 +74,7 @@ export async function GET(request: Request) {
     let bookingsQuery = supabaseAdmin
       .from('bookings')
       .select(
-        'id, order_id, user_id, experience_id, status, amount, total_price, total_experience_price, price_at_booking, solo_guarantee_price, host_payout_amount, platform_revenue, payment_method, date, time, guests, contact_name, contact_phone, created_at, cancel_reason, refund_amount, tid, payout_status'
+        'id, order_id, user_id, experience_id, status, amount, total_price, total_experience_price, price_at_booking, solo_guarantee_price, solo_guarantee_refund_status, solo_guarantee_refund_amount, solo_guarantee_refunded_at, solo_guarantee_refund_error, solo_guarantee_refund_trigger_booking_id, host_payout_amount, platform_revenue, payment_method, date, time, guests, contact_name, contact_phone, created_at, cancel_reason, refund_amount, tid, payout_status'
       )
       .order('created_at', { ascending: false });
     if (startDate) {

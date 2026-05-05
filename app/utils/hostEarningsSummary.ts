@@ -19,6 +19,9 @@ type ExperienceSummaryBookingRow = {
   platform_revenue?: number | null;
   price_at_booking?: number | null;
   solo_guarantee_price?: number | null;
+  solo_guarantee_refund_status?: string | null;
+  solo_guarantee_refund_amount?: number | null;
+  refund_amount?: number | null;
   payout_status?: string | null;
   payout_paid_at?: string | null;
 };

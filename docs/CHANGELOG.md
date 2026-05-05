@@ -5,6 +5,28 @@
 
 ---
 
+## v3.40.22 — [Experience Payments] 1인 진행 추가금 자동환불
+
+**작업일:** 2026-05-05
+
+| 항목 | 내용 |
+|------|------|
+| 🟢 완료 시점 자동환불 worker | `app/utils/bookings/soloGuaranteeRefund.ts`, `app/utils/settlementSync/experienceCompletion.ts`, `app/api/guest/trips/sync-completed/route.ts`, `app/api/host/reservations/sync-completed/route.ts` — 같은 체험/날짜/시간에 다른 유효 참여자가 남아 완료된 경우 1인 진행 추가금 30,000원을 환불 대상으로 처리 |
+| 🟢 환불 추적 migration | `docs/migrations/v3_40_19_experience_solo_guarantee_refund.sql` — `solo_guarantee_refund_status/amount/refunded_at/error/trigger_booking_id`를 추가해 자동/수동/실패 상태를 장부에 남김 |
+| 🟡 정산 보류 및 중복 환불 방지 | `app/utils/bookingFinance.ts`, `app/utils/adminPayouts.ts`, `app/api/admin/payout-queue/route.ts` — 환불 대기/실패 건은 정산 완료를 막고, 이미 환불된 30,000원은 이후 전체 취소에서 다시 환불하지 않도록 보정 |
+| 🟡 관리자/게스트 표시 및 수동 완료 | `app/api/admin/bookings/solo-guarantee-refund/mark-manual-refunded/route.ts`, `app/admin/dashboard/components/MasterLedgerTab.tsx`, `app/guest/trips/components/*` — 관리자 장부에서 수동 환불 완료 처리, 게스트 영수증/예약 카드에 환불 상태 표시 |
+| 🟡 회귀 테스트 보강 | `tests/e2e/142-booking-finance-fallback.spec.ts`, `tests/e2e/199-solo-guarantee-refund-contract.spec.ts` — 단독 예약/추가자 취소/추가자 완료 후보 판정, 정산 fallback, 중복 환불 방지 계산을 검증 |
+
+## v3.40.21 — [Experience Payments] 1인 진행 추가금 게스트 수수료 제외
+
+**작업일:** 2026-05-05
+
+| 항목 | 내용 |
+|------|------|
+| 🟢 결제 표시 산식 정렬 | `app/experiences/[id]/payment/page.tsx` — 신규 체험 예약에서 게스트 10% 플랫폼 수수료를 기본 체험가에만 적용하고, 1인 진행 추가금 30,000원은 총액에 그대로 더하도록 정렬 |
+| 🟢 예약 생성 RPC forward migration | `docs/migrations/v3_40_18_experience_solo_fee_guest_fee_base.sql` — `create_booking_atomic`의 보안/좌석/1인 옵션 guard는 유지하면서 금액 계산부만 같은 산식으로 교체 |
+| 🟡 회귀 테스트 보강 | `tests/e2e/198-experience-solo-pricing-contract.spec.ts`, `tests/e2e/142-booking-finance-fallback.spec.ts` — 1인/2인/프라이빗 예약 금액 계약과 1인 옵션 선택 시 총액 증가분 30,000원 고정을 검증 |
+
 ## v3.40.20 — [Community] comment-like UI/API removed
 
 **작업일:** 2026-04-23
