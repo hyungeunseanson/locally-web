@@ -36,6 +36,7 @@ type BookingPricingSnapshot = {
 const createdAuthUserIds: string[] = [];
 const createdBookingIds: string[] = [];
 const createdAvailabilityKeys: AvailabilityKey[] = [];
+const soloVisibilityRestoreExperienceIds: number[] = [];
 
 function getPlatformFee(baseHostPrice: number) {
   return Math.floor(baseHostPrice * 0.1);
@@ -96,6 +97,12 @@ async function createAtomicExperienceBooking({
 }
 
 test.afterAll(async () => {
+  if (soloVisibilityRestoreExperienceIds.length > 0) {
+    await getAdminClient()
+      .from('experiences')
+      .update({ solo_guarantee_option_visible: true })
+      .in('id', soloVisibilityRestoreExperienceIds);
+  }
   await cleanupBookings(createdBookingIds);
   await cleanupAvailability(createdAvailabilityKeys);
   await cleanupAuthUsers(createdAuthUserIds);
@@ -252,5 +259,78 @@ test.describe('Experience solo pricing contract', () => {
     if (legacySoloFeeOnFullHostPrice !== platformFee) {
       await expect(page.getByText(`+ ₩${legacySoloFeeOnFullHostPrice.toLocaleString()}`)).toHaveCount(0);
     }
+  });
+
+  test('hides the solo guarantee option and ignores solo deep links when admin disables visibility', async ({ page }) => {
+    test.setTimeout(120000);
+
+    const user = createTestUser('exp.solo.pricing.hidden');
+    await createAuthUser(user, createdAuthUserIds);
+    const experience = await prepareBookableExperience(createdAvailabilityKeys, {
+      searchAnyHost: true,
+      time: '10:30',
+    });
+    const baseHostPrice = experience.price;
+    const platformFee = getPlatformFee(baseHostPrice);
+    const expectedTotal = baseHostPrice + platformFee;
+
+    expect(baseHostPrice).toBeGreaterThan(0);
+
+    const { error: visibilityError } = await getAdminClient()
+      .from('experiences')
+      .update({ solo_guarantee_option_visible: false })
+      .eq('id', experience.experienceId);
+    if (visibilityError) throw visibilityError;
+    soloVisibilityRestoreExperienceIds.push(experience.experienceId);
+
+    await login(page, user);
+    await page.goto(`/experiences/${experience.experienceId}`, { waitUntil: 'domcontentloaded' });
+
+    await expect(page.getByTestId('reservation-next-month')).toBeVisible({ timeout: 30000 });
+    const currentMonth = new Date();
+    const targetMonth = new Date(`${experience.date}T00:00:00`);
+    const monthDelta =
+      (targetMonth.getFullYear() - currentMonth.getFullYear()) * 12 +
+      (targetMonth.getMonth() - currentMonth.getMonth());
+
+    for (let i = 0; i < monthDelta; i += 1) {
+      await page.getByTestId('reservation-next-month').click();
+    }
+    for (let i = 0; i > monthDelta; i -= 1) {
+      await page.getByTestId('reservation-prev-month').click();
+    }
+
+    const targetDay = page.getByTestId(`reservation-day-${experience.date}`);
+    await expect(targetDay).toBeVisible({ timeout: 30000 });
+    await targetDay.click();
+    await page.getByTestId(`reservation-time-${experience.time}`).click();
+    await expect(page.getByTestId('reservation-solo-option')).toHaveCount(0);
+
+    await page.goto(
+      `/experiences/${experience.experienceId}/payment?date=${experience.date}&time=${experience.time}&guests=1&solo=1`,
+      { waitUntil: 'domcontentloaded' }
+    );
+
+    const totalAmount = page.getByTestId('exp-payment-total-amount');
+    await expect(totalAmount).toHaveText(`₩${expectedTotal.toLocaleString()}`, { timeout: 30000 });
+    await expect(page.getByText(`+ ₩${SOLO_GUARANTEE_PRICE.toLocaleString()}`)).toHaveCount(0);
+    await expect.poll(() => new URL(page.url()).searchParams.get('solo')).toBeNull();
+
+    const response = await page.request.post('/api/bookings', {
+      data: {
+        experienceId: experience.experienceId,
+        date: experience.date,
+        time: experience.time,
+        guests: 1,
+        isPrivate: false,
+        isSoloGuarantee: true,
+        customerName: user.fullName,
+        customerPhone: user.phone,
+        paymentMethod: 'bank',
+      },
+    });
+    const result = await response.json();
+    expect(response.status()).toBe(400);
+    expect(result.errorCode).toBe('solo_guarantee_option_hidden');
   });
 });

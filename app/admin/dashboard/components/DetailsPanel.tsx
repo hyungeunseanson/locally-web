@@ -82,6 +82,8 @@ export default function DetailsPanel({
   const [brokenExperiencePhotos, setBrokenExperiencePhotos] = useState<Record<string, true>>({});
   const [superhostSaving, setSuperhostSaving] = useState(false);
   const [superhostError, setSuperhostError] = useState<string | null>(null);
+  const [soloOptionSaving, setSoloOptionSaving] = useState(false);
+  const [soloOptionError, setSoloOptionError] = useState<string | null>(null);
 
   const handleStartCSChat = async () => {
     if (!rawSelectedItem?.id) return;
@@ -160,6 +162,7 @@ export default function DetailsPanel({
     activeTab === 'APPS' || activeTab === 'EXPS'
       ? (detailItem || rawSelectedItem)
       : rawSelectedItem;
+  const soloGuaranteeOptionVisible = selectedItem?.solo_guarantee_option_visible !== false;
   const isStaleHostApplication = activeTab === 'APPS' && selectedItem?.is_latest_for_user === false;
   const applicationLanguageLevels = normalizeLanguageLevels(
     selectedItem?.language_levels,
@@ -222,6 +225,39 @@ export default function DetailsPanel({
       setSuperhostError(message);
     } finally {
       setSuperhostSaving(false);
+    }
+  };
+
+  const handleSoloOptionVisibilityToggle = async () => {
+    if (!selectedItem || activeTab !== 'EXPS' || soloOptionSaving) return;
+
+    const nextValue = !soloGuaranteeOptionVisible;
+    setSoloOptionSaving(true);
+    setSoloOptionError(null);
+
+    try {
+      const response = await fetch(`/api/admin/experiences/${selectedItem.id}/solo-guarantee-option`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visible: nextValue }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || '1인 출발 확정 옵션 노출 상태 변경에 실패했습니다.');
+      }
+
+      const nextItem = {
+        ...selectedItem,
+        solo_guarantee_option_visible: nextValue,
+      };
+      setDetailItem((prev) => (prev ? { ...prev, solo_guarantee_option_visible: nextValue } : prev));
+      setSelectedItem?.(nextItem);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '1인 출발 확정 옵션 노출 상태 변경에 실패했습니다.';
+      setSoloOptionError(message);
+    } finally {
+      setSoloOptionSaving(false);
     }
   };
 
@@ -661,6 +697,43 @@ export default function DetailsPanel({
               <InfoBox label="최대 인원" value={selectedItem.max_guests ? `${selectedItem.max_guests}명` : '-'} />
               <InfoBox label="지역" value={selectedItem.city ? `${selectedItem.country || ''} > ${selectedItem.city}${selectedItem.subCity ? `, ${selectedItem.subCity}` : ''}` : '-'} />
               <InfoBox label="단독 투어" value={selectedItem.is_private_enabled ? `가능 (₩${selectedItem.private_price?.toLocaleString() || 0})` : '불가'} />
+            </div>
+
+            <div
+              className="rounded-xl border border-slate-100 bg-slate-50 p-3 md:p-4"
+              data-testid="admin-experience-solo-visibility-control"
+            >
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                    <Shield size={14} />
+                    1인 출발 확정 옵션
+                  </div>
+                  <p className="mt-1 text-xs font-bold text-slate-900">
+                    {soloGuaranteeOptionVisible ? '게스트 화면에 노출 중' : '게스트 화면에서 비노출'}
+                  </p>
+                  <p className="mt-1 text-[11px] leading-5 text-slate-500">
+                    이 스위치는 옵션 박스 노출만 제어하며 가격, 환불, 정산 계산은 변경하지 않습니다.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  aria-pressed={soloGuaranteeOptionVisible}
+                  disabled={soloOptionSaving}
+                  onClick={handleSoloOptionVisibilityToggle}
+                  data-testid="admin-experience-solo-visibility-toggle"
+                  className={`inline-flex shrink-0 items-center justify-center rounded-lg px-3 py-2 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                    soloGuaranteeOptionVisible
+                      ? 'bg-slate-900 text-white hover:bg-black'
+                      : 'border border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                  }`}
+                >
+                  {soloOptionSaving ? '저장 중...' : soloGuaranteeOptionVisible ? '비노출로 변경' : '노출로 변경'}
+                </button>
+              </div>
+              {soloOptionError && (
+                <p className="mt-2 text-[11px] font-semibold text-rose-600">{soloOptionError}</p>
+              )}
             </div>
 
             {/* 언어 */}

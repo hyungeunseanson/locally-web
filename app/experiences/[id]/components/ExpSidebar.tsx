@@ -29,6 +29,7 @@ export default function ExpSidebar({
         slotSummaryMap={slotSummaryMap}
         privatePrice={experience.private_price ?? 0}
         isPrivateEnabled={experience.is_private_enabled}
+        soloGuaranteeOptionVisible={experience.solo_guarantee_option_visible !== false}
         duration={experience.duration ?? 2}
         availableDates={availableDates}
         dateToTimeMap={dateToTimeMap}

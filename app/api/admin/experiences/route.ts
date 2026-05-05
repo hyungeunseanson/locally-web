@@ -11,6 +11,7 @@ const ADMIN_EXPERIENCE_SUMMARY_SELECT = `
   status,
   admin_comment,
   price,
+  solo_guarantee_option_visible,
   photos,
   profiles!experiences_host_id_fkey(full_name)
 `;
@@ -28,6 +29,7 @@ const ADMIN_EXPERIENCE_DETAIL_SELECT = `
   country,
   is_private_enabled,
   private_price,
+  solo_guarantee_option_visible,
   category,
   meeting_point,
   location,

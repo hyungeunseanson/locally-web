@@ -87,6 +87,7 @@ const EXPERIENCE_DETAIL_SELECT = [
   'price',
   'private_price',
   'is_private_enabled',
+  'solo_guarantee_option_visible',
   'photos',
   'image_url',
   'max_guests',

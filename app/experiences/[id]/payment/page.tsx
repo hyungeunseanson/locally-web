@@ -36,6 +36,7 @@ type PaymentExperience = {
   private_price?: number | null;
   max_guests?: number | null;
   host_id?: string | null;
+  solo_guarantee_option_visible?: boolean | null;
   rules?: Record<string, unknown> | null;
   rules_i18n?: Record<string, unknown> | null;
 };
@@ -60,6 +61,7 @@ type BookingErrorCode =
   | 'customer_name_too_long'
   | 'customer_phone_invalid'
   | 'solo_guarantee_invalid'
+  | 'solo_guarantee_option_hidden'
   | 'invalid_payment_method'
   | 'max_guests_exceeded'
   | 'booking_conflict'
@@ -269,7 +271,9 @@ function PaymentContent() {
   const time = searchParams?.get('time') || (t('exp_payment_time_tbd') as string);
   const guests = Number(searchParams?.get('guests')) || 1;
   const isPrivate = searchParams?.get('type') === 'private';
-  const requestedSoloGuarantee = searchParams?.get('solo') === '1' && guests === 1 && !isPrivate;
+  const urlRequestedSoloGuarantee = searchParams?.get('solo') === '1' && guests === 1 && !isPrivate;
+  const isSoloGuaranteeOptionVisible = experience?.solo_guarantee_option_visible !== false;
+  const requestedSoloGuarantee = urlRequestedSoloGuarantee && isSoloGuaranteeOptionVisible;
   const effectiveIsSoloGuarantee =
     requestedSoloGuarantee &&
     hasSlotSummaryLoaded &&
@@ -291,6 +295,10 @@ function PaymentContent() {
           : (t('exp_payment_capacity_conflict') as string);
       case 'server_error':
         return t('server_error') as string;
+      case 'solo_guarantee_option_hidden':
+        return lang === 'ko'
+          ? '이 체험에는 1인 출발 확정 옵션을 사용할 수 없습니다.'
+          : (t('exp_payment_booking_error') as string);
       default:
         break;
     }
@@ -476,12 +484,16 @@ function PaymentContent() {
   }, [refreshSlotSummary]);
 
   useEffect(() => {
-    if (!requestedSoloGuarantee) {
+    if (!urlRequestedSoloGuarantee) {
       soloOptionNoticeShownRef.current = false;
       return;
     }
 
-    if (!isSlotSummaryResolved || !hasSlotSummaryLoaded || effectiveIsSoloGuarantee || !searchParams) {
+    if (!searchParams) {
+      return;
+    }
+
+    if (isSoloGuaranteeOptionVisible && (!isSlotSummaryResolved || !hasSlotSummaryLoaded || effectiveIsSoloGuarantee)) {
       return;
     }
 
@@ -498,13 +510,14 @@ function PaymentContent() {
   }, [
     effectiveIsSoloGuarantee,
     hasSlotSummaryLoaded,
+    isSoloGuaranteeOptionVisible,
     isSlotSummaryResolved,
     pathname,
-    requestedSoloGuarantee,
     router,
     searchParams,
     showToast,
     t,
+    urlRequestedSoloGuarantee,
   ]);
 
   useEffect(() => {
@@ -542,7 +555,7 @@ function PaymentContent() {
 
       const { data: expData } = await supabase
         .from('experiences')
-        .select('title, image_url, photos, location, price, private_price, max_guests, host_id, rules, rules_i18n')
+        .select('title, image_url, photos, location, price, private_price, max_guests, host_id, solo_guarantee_option_visible, rules, rules_i18n')
         .eq('id', experienceId)
         .maybeSingle();
       if (expData) setExperience(expData as PaymentExperience);

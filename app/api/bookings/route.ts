@@ -30,6 +30,7 @@ type BookingErrorCode =
     | 'customer_name_too_long'
     | 'customer_phone_invalid'
     | 'solo_guarantee_invalid'
+    | 'solo_guarantee_option_hidden'
     | 'invalid_payment_method'
     | 'max_guests_exceeded'
     | 'booking_conflict'
@@ -99,7 +100,7 @@ export async function POST(request: Request) {
 
         const { data: experienceMeta, error: experienceLookupError } = await supabaseAdmin
             .from('experiences')
-            .select('max_guests')
+            .select('max_guests, solo_guarantee_option_visible')
             .eq('id', normalizedExperienceId)
             .maybeSingle();
 
@@ -112,6 +113,14 @@ export async function POST(request: Request) {
                     400,
                     'max_guests_exceeded',
                     `최대 예약 가능 인원은 ${effectiveMaxGuests}명입니다.`
+                );
+            }
+
+            if (normalizedIsSoloGuarantee && experienceMeta.solo_guarantee_option_visible === false) {
+                return createErrorResponse(
+                    400,
+                    'solo_guarantee_option_hidden',
+                    '이 체험에는 1인 출발 확정 옵션을 사용할 수 없습니다.'
                 );
             }
         }

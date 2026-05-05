@@ -141,6 +141,7 @@ export interface ExperienceApprovalItem {
   subCity?: string;
   is_private_enabled?: boolean;
   private_price?: number;
+  solo_guarantee_option_visible?: boolean | null;
   category?: string;
   languages?: string[];
   language_levels?: LanguageLevelEntry[];
@@ -193,6 +194,7 @@ export type AdminPanelSelectedItem = Record<string, unknown> & {
   subCity?: string | null;
   is_private_enabled?: boolean | null;
   private_price?: number | null;
+  solo_guarantee_option_visible?: boolean | null;
   category?: string | null;
   meeting_point?: string | null;
   location?: string | null;

@@ -14,6 +14,7 @@ interface ReservationCardProps {
   price: number;
   privatePrice?: number;
   isPrivateEnabled?: boolean;
+  soloGuaranteeOptionVisible?: boolean;
   duration: number;
   availableDates: string[];
   dateToTimeMap: Record<string, string[]>;
@@ -25,6 +26,7 @@ interface ReservationCardProps {
 
 export default function ReservationCard({
   price, privatePrice = 0, isPrivateEnabled = false,
+  soloGuaranteeOptionVisible = true,
   duration, availableDates, dateToTimeMap, calendarDayStatusMap = {}, onReserve,
   maxGuests = 10, slotSummaryMap = {}
 }: ReservationCardProps) {
@@ -128,6 +130,7 @@ export default function ReservationCard({
       : guestSelection;
   const guestCount = isPrivate ? 1 : Number(resolvedGuestSelection);
   const isSoloEligible =
+    soloGuaranteeOptionVisible &&
     !isPrivate &&
     guestCount === 1 &&
     Boolean(currentSlotSummary?.soloGuaranteeEligible);
