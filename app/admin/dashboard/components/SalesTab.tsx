@@ -688,7 +688,7 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
 
   return (
     <div className="animate-in fade-in zoom-in-95 duration-300 flex-1 space-y-4 overflow-y-auto p-1 md:space-y-8 md:p-2">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between xl:gap-4">
         <div className="min-w-0 flex-1">
           <h2 className="flex items-center gap-2 text-xl font-black text-slate-900 md:text-2xl">
             <Wallet className="h-5 w-5 text-yellow-500 md:h-6 md:w-6" /> 매출 및 재무 현황
@@ -698,13 +698,13 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
             Billing 기간은 결제 생성일 기준입니다. 체험일 또는 서비스일 기준 비교는 Master Ledger에서 확인하세요.
           </p>
         </div>
-        <div className="relative flex w-full flex-col items-stretch gap-2 sm:flex-row sm:items-center md:gap-3 lg:w-auto lg:flex-none">
+        <div className="relative flex w-full flex-col items-stretch gap-2 sm:flex-row sm:items-center md:gap-3 xl:w-auto xl:flex-none">
           <div className="flex shrink-0 overflow-x-auto rounded-lg bg-slate-100 p-1 text-[10px] font-bold scrollbar-hide md:text-xs">
             {['1D', '7D', '30D', '3M', '1Y', 'ALL'].map((preset) => (
               <button
                 key={preset}
                 onClick={() => handlePresetClick(preset)}
-                className={`flex-1 whitespace-nowrap rounded-md px-2 py-1.5 transition-all lg:flex-none lg:px-3 lg:py-2 ${
+                className={`flex-1 whitespace-nowrap rounded-md px-2 py-1.5 transition-all xl:flex-none xl:px-3 xl:py-2 ${
                   activePreset === preset
                     ? 'bg-white text-slate-900 shadow'
                     : 'text-slate-400 hover:text-slate-600'
@@ -721,7 +721,7 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
               className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium transition-colors hover:bg-slate-50 md:px-4 md:text-sm"
             >
               <CalendarIcon size={14} className="text-slate-400 md:h-4 md:w-4" />
-              <span className="text-center text-slate-700 lg:min-w-[170px]">
+              <span className="text-center text-slate-700 xl:min-w-[170px]">
                 {dateRange[0].startDate && dateRange[0].endDate
                   ? `${format(dateRange[0].startDate, 'yyyy.MM.dd')} ~ ${format(dateRange[0].endDate, 'yyyy.MM.dd')}`
                   : '기간 선택'}
