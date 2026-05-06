@@ -13,6 +13,7 @@ test.describe('Cron secret guards', () => {
       request.get('/api/cron/experience-translations'),
       request.get('/api/cron/admin-support-unread-alerts'),
       request.get('/api/cron/home-popularity-snapshot'),
+      request.get('/api/cron/notification-retention-cleanup'),
       request.get('/api/bot/auto-post'),
       request.get('/api/bot/auto-comment'),
     ]);
@@ -40,6 +41,9 @@ test.describe('Cron secret guards', () => {
         headers: { authorization: 'Bearer wrong-secret' },
       }),
       request.get('/api/cron/home-popularity-snapshot', {
+        headers: { authorization: 'Bearer wrong-secret' },
+      }),
+      request.get('/api/cron/notification-retention-cleanup', {
         headers: { authorization: 'Bearer wrong-secret' },
       }),
       request.get('/api/bot/auto-post', {

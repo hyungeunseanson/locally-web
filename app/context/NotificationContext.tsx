@@ -20,6 +20,7 @@ interface NotificationDB {
 }
 
 type NotificationUI = NotificationDB;
+type RealtimeNotificationRow = Partial<NotificationDB> & Pick<NotificationDB, 'id'>;
 
 interface ToastData {
   title: string;
@@ -187,25 +188,45 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         .channel('global-alerts')
         .on(
           'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${currentUserId}` },
+          { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${currentUserId}` },
           (payload) => {
-            const newNoti = payload.new as NotificationDB;
-            if (newNoti.user_id !== currentUserId) return;
+            const newNoti = payload.new as NotificationDB | undefined;
+            const oldNoti = payload.old as RealtimeNotificationRow | undefined;
 
-            setNotifications((prev) => {
-              if (prev.some((notification) => notification.id === newNoti.id)) {
-                return prev;
+            if (payload.eventType === 'INSERT' && newNoti) {
+              if (newNoti.user_id !== currentUserId) return;
+
+              setNotifications((prev) => {
+                if (prev.some((notification) => notification.id === newNoti.id)) {
+                  return prev;
+                }
+                return [newNoti, ...prev].slice(0, 20);
+              });
+
+              lastSyncAtRef.current = Date.now();
+              sessionStorage.setItem('lastSeenNotiCreatedAt', newNoti.created_at);
+              showToast(newNoti);
+              refreshHostStatusIfNeeded(newNoti.type);
+
+              if (newNoti.type === 'booking_confirmed' && newNoti.link === '/guest/trips') {
+                queryClient.invalidateQueries({ queryKey: ['guestTrips'] });
               }
-              return [newNoti, ...prev];
-            });
+              return;
+            }
 
-            lastSyncAtRef.current = Date.now();
-            sessionStorage.setItem('lastSeenNotiCreatedAt', newNoti.created_at);
-            showToast(newNoti);
-            refreshHostStatusIfNeeded(newNoti.type);
+            if (payload.eventType === 'UPDATE' && newNoti) {
+              if (newNoti.user_id !== currentUserId) return;
+              setNotifications((prev) => prev.map((notification) => (
+                notification.id === newNoti.id ? newNoti : notification
+              )));
+              lastSyncAtRef.current = Date.now();
+              refreshHostStatusIfNeeded(newNoti.type);
+              return;
+            }
 
-            if (newNoti.type === 'booking_confirmed' && newNoti.link === '/guest/trips') {
-              queryClient.invalidateQueries({ queryKey: ['guestTrips'] });
+            if (payload.eventType === 'DELETE' && oldNoti?.id) {
+              setNotifications((prev) => prev.filter((notification) => notification.id !== oldNoti.id));
+              lastSyncAtRef.current = Date.now();
             }
           }
         )
