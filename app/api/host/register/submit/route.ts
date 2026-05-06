@@ -33,7 +33,6 @@ type HostApplicationRow = {
 
 type ProfileSeedRow = {
   full_name: string | null;
-  avatar_url: string | null;
   languages: string[] | null;
 };
 
@@ -272,7 +271,7 @@ export async function POST(request: NextRequest) {
 
     const { data: currentProfile, error: profileLoadError } = await supabaseAdmin
       .from('profiles')
-      .select('full_name, avatar_url, languages')
+      .select('full_name, languages')
       .eq('id', user.id)
       .maybeSingle<ProfileSeedRow>();
 
@@ -284,10 +283,6 @@ export async function POST(request: NextRequest) {
 
     if (!hasTextValue(currentProfile?.full_name) && hasTextValue(body.name)) {
       profileSeedUpdates.full_name = asTrimmedString(body.name);
-    }
-
-    if (!hasTextValue(currentProfile?.avatar_url) && normalizedProfilePhoto) {
-      profileSeedUpdates.avatar_url = normalizedProfilePhoto;
     }
 
     if (!hasLanguageValues(currentProfile?.languages) && languageNames.length > 0) {

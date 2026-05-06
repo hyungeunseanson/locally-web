@@ -218,7 +218,7 @@ test.describe.serial('Host profile save route', () => {
         .maybeSingle(),
       supabase
         .from('host_applications')
-        .select('self_intro')
+        .select('self_intro, profile_photo')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(1)
@@ -234,11 +234,12 @@ test.describe.serial('Host profile save route', () => {
       dream_destination: 'Lisbon',
       favorite_song: 'Ocean Eyes',
       languages: ['Korean', 'English'],
-      avatar_url: 'https://example.com/host-avatar.png',
+      avatar_url: null,
     });
 
     expect(application).toMatchObject({
       self_intro: '호스트 프로필 저장 route 검증용 자기소개입니다.',
+      profile_photo: 'https://example.com/host-avatar.png',
     });
   });
 

@@ -117,7 +117,6 @@ export async function POST(request: NextRequest) {
       dream_destination: asNullableTrimmedString(body.dreamDestination)?.slice(0, MAX.place) ?? null,
       favorite_song: asNullableTrimmedString(body.favoriteSong)?.slice(0, MAX.song) ?? null,
       languages: normalizeProfileLanguageList(body.languages),
-      avatar_url: asNullableTrimmedString(body.avatarUrl)?.slice(0, MAX.url) ?? null,
     };
 
     if (emailProvided) {
@@ -126,6 +125,7 @@ export async function POST(request: NextRequest) {
 
     const hostApplicationUpdates: Record<string, unknown> = {
       self_intro: asTrimmedString(body.introduction).slice(0, MAX.intro),
+      profile_photo: asNullableTrimmedString(body.avatarUrl)?.slice(0, MAX.url) ?? null,
     };
 
     if (emailProvided) {

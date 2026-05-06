@@ -3,6 +3,7 @@ import { createClient as createServerClient } from '@/app/utils/supabase/server'
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { isAdminSupportInquiry } from '@/app/utils/inquiry';
+import { getHostPublicProfile } from '@/app/utils/profile';
 import { getServiceBookingStatusLabel, getServiceRequestStatusLabel } from '@/app/constants/serviceStatus';
 import type {
   AdminUserActivityBooking,
@@ -57,6 +58,14 @@ type HostProfileRow = {
   id: string;
   full_name: string | null;
   avatar_url: string | null;
+};
+
+type HostApplicationRow = {
+  user_id: string;
+  name: string | null;
+  profile_photo: string | null;
+  self_intro: string | null;
+  languages: string[] | string | null;
 };
 
 type UserProfileDetailRow = {
@@ -252,7 +261,7 @@ export async function GET(
       new Set(guestReviewRows.map((row) => row.host_id).filter(Boolean))
     ) as string[];
 
-    const [experiencesRes, serviceRequestLookupRes, inquiryMessagesRes, hostProfilesRes] = await Promise.all([
+    const [experiencesRes, serviceRequestLookupRes, inquiryMessagesRes, hostProfilesRes, hostApplicationsRes] = await Promise.all([
       experienceIds.length > 0
         ? supabaseAdmin.from('experiences').select('id, title').in('id', experienceIds)
         : Promise.resolve({ data: [] as ExperienceTitleRow[], error: null }),
@@ -269,12 +278,19 @@ export async function GET(
       hostIds.length > 0
         ? supabaseAdmin.from('profiles').select('id, full_name, avatar_url').in('id', hostIds)
         : Promise.resolve({ data: [] as HostProfileRow[], error: null }),
+      hostIds.length > 0
+        ? supabaseAdmin
+            .from('public_host_applications')
+            .select('user_id, name, profile_photo, self_intro, languages')
+            .in('user_id', hostIds)
+        : Promise.resolve({ data: [] as HostApplicationRow[], error: null }),
     ]);
 
     if (experiencesRes.error) throw experiencesRes.error;
     if (serviceRequestLookupRes.error) throw serviceRequestLookupRes.error;
     if (inquiryMessagesRes.error) throw inquiryMessagesRes.error;
     if (hostProfilesRes.error) throw hostProfilesRes.error;
+    if (hostApplicationsRes.error) throw hostApplicationsRes.error;
 
     const inquiryMessageRows = (inquiryMessagesRes.data || []) as InquiryMessageRow[];
 
@@ -288,6 +304,9 @@ export async function GET(
 
     const hostProfileMap = new Map<string, HostProfileRow>(
       ((hostProfilesRes.data || []) as HostProfileRow[]).map((row) => [row.id, row])
+    );
+    const hostApplicationMap = new Map<string, HostApplicationRow>(
+      ((hostApplicationsRes.data || []) as HostApplicationRow[]).map((row) => [row.user_id, row])
     );
 
     inquiryMessageRows.forEach((row) => {
@@ -311,14 +330,19 @@ export async function GET(
 
     const guestReviews: AdminUserGuestReviewItem[] = guestReviewRows.map((row) => {
       const hostProfile = row.host_id ? hostProfileMap.get(row.host_id) ?? null : null;
+      const hostApplication = row.host_id ? hostApplicationMap.get(row.host_id) ?? null : null;
+      const hostPublicProfile = row.host_id
+        ? getHostPublicProfile(hostProfile, hostApplication, '호스트')
+        : null;
+
       return {
         id: row.id,
         created_at: row.created_at,
         rating: row.rating,
         content: row.content,
         host_id: row.host_id,
-        host_name: hostProfile?.full_name ?? null,
-        host_avatar_url: hostProfile?.avatar_url ?? null,
+        host_name: hostPublicProfile?.name ?? null,
+        host_avatar_url: hostPublicProfile?.avatarUrl ?? null,
       };
     });
 
@@ -351,13 +375,17 @@ export async function GET(
         };
       }),
       ...guestReviewRows.map((row) => {
-        const hostName = row.host_id ? hostProfileMap.get(row.host_id)?.full_name ?? null : null;
+        const hostProfile = row.host_id ? hostProfileMap.get(row.host_id) ?? null : null;
+        const hostApplication = row.host_id ? hostApplicationMap.get(row.host_id) ?? null : null;
+        const hostPublicProfile = row.host_id
+          ? getHostPublicProfile(hostProfile, hostApplication, '호스트')
+          : null;
         const reviewSummary = truncateText(row.content);
         return {
           id: `guest_review:${row.id}`,
           occurred_at: row.created_at,
           kind: 'review' as const,
-          title: `호스트 평가 수신 · ${hostName || '알 수 없는 호스트'}`,
+          title: `호스트 평가 수신 · ${hostPublicProfile?.name || '알 수 없는 호스트'}`,
           description: reviewSummary ? `평점 ${(row.rating || 0).toFixed(1)}점 · ${reviewSummary}` : `평점 ${(row.rating || 0).toFixed(1)}점`,
           status: null,
           status_label: null,

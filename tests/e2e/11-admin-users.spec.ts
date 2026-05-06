@@ -10,6 +10,10 @@ type TestUser = {
   fullName: string;
   phone: string;
 };
+type UserSummaryRoleRow = {
+  id: string;
+  role?: string | null;
+};
 
 const TEST_PASSWORD = 'LocallyTest!2026';
 
@@ -25,6 +29,13 @@ const createdInquiryMessageIds: string[] = [];
 const createdServiceRequestIds: string[] = [];
 const createdServiceApplicationIds: string[] = [];
 const createdServiceBookingIds: string[] = [];
+const createdHostApplicationIds: number[] = [];
+let testUserCounter = 0;
+
+function createUserToken() {
+  testUserCounter += 1;
+  return `${Date.now()}${testUserCounter}`;
+}
 
 function loadEnv(): EnvMap {
   return readFileSync('.env.local', 'utf8')
@@ -52,7 +63,7 @@ function getAdminClient() {
 }
 
 function createAdminUser(): TestUser {
-  const timestamp = Date.now();
+  const timestamp = createUserToken();
   return {
     email: `codex.users.admin.${timestamp}@example.com`,
     password: TEST_PASSWORD,
@@ -62,7 +73,7 @@ function createAdminUser(): TestUser {
 }
 
 function createCustomerUser(): TestUser {
-  const timestamp = Date.now();
+  const timestamp = createUserToken();
   return {
     email: `codex.users.customer.${timestamp}@example.com`,
     password: TEST_PASSWORD,
@@ -72,7 +83,7 @@ function createCustomerUser(): TestUser {
 }
 
 function createHostUser(): TestUser {
-  const timestamp = Date.now();
+  const timestamp = createUserToken();
   return {
     email: `codex.users.host.${timestamp}@example.com`,
     password: TEST_PASSWORD,
@@ -132,8 +143,14 @@ async function createAuthUser(user: TestUser, isAdmin = false, role: 'host' | 'a
       if (role) {
         const { error: roleError } = await supabase
           .from('users')
-          .update({ role })
-          .eq('id', data.user.id);
+          .upsert(
+            {
+              id: data.user.id,
+              email: user.email,
+              role,
+            },
+            { onConflict: 'id' }
+          );
 
         if (roleError) throw roleError;
       }
@@ -227,6 +244,46 @@ async function createActiveExperience(hostId: string) {
     id: Number(data.id),
     title: String(data.title),
   };
+}
+
+async function createHostApplication(
+  userId: string,
+  user: TestUser,
+  status: 'approved' | 'active' | 'pending' | 'revision' | 'rejected' = 'approved'
+) {
+  const supabase = getAdminClient();
+  const { data, error } = await supabase
+    .from('host_applications')
+    .insert({
+      user_id: userId,
+      host_nationality: 'Korea',
+      languages: ['한국어'],
+      language_levels: [{ language: '한국어', level: 5 }],
+      name: user.fullName,
+      phone: user.phone,
+      dob: '1990.01.01',
+      email: user.email,
+      instagram: '@codex_users_host',
+      source: 'playwright',
+      language_cert: 'TOPIK 6',
+      profile_photo: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=512',
+      self_intro: 'User Management 호스트 필터 계약 검증을 위한 충분한 길이의 호스트 소개문입니다.',
+      id_card_file: null,
+      bank_name: '테스트은행',
+      account_number: '12345678901234',
+      account_holder: user.fullName,
+      motivation: 'User Management 호스트 필터 계약 검증을 위한 테스트 지원 동기입니다.',
+      status,
+    })
+    .select('id')
+    .single();
+
+  if (error || !data?.id) {
+    throw error || new Error('Failed to create host application.');
+  }
+
+  createdHostApplicationIds.push(Number(data.id));
+  return Number(data.id);
 }
 
 async function createUserFixtures(params: {
@@ -505,6 +562,10 @@ async function cleanupFixtures() {
     await supabase.from('experiences').delete().eq('id', experienceId);
   }
 
+  for (const hostApplicationId of createdHostApplicationIds) {
+    await supabase.from('host_applications').delete().eq('id', hostApplicationId);
+  }
+
   for (const email of createdWhitelistEmails) {
     await supabase.from('admin_whitelist').delete().eq('email', email);
   }
@@ -524,6 +585,55 @@ async function cleanupFixtures() {
 test.describe('Admin UsersTab smoke', () => {
   test.afterAll(async () => {
     await cleanupFixtures();
+  });
+
+  test('resolves dashboard roles from admin roles and latest host approval status', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const supabase = getAdminClient();
+    const adminUser = createAdminUser();
+    const approvedHostUser = createHostUser();
+    const adminHostUser = createHostUser();
+    const pendingHostUser = createHostUser();
+    const legacyHostUser = createHostUser();
+
+    await createAuthUser(adminUser, true);
+    const approvedHostId = await createAuthUser(approvedHostUser);
+    const adminHostId = await createAuthUser(adminHostUser);
+    const pendingHostId = await createAuthUser(pendingHostUser);
+    const legacyHostId = await createAuthUser(legacyHostUser, false, 'host');
+
+    await createHostApplication(approvedHostId, approvedHostUser, 'approved');
+    await createHostApplication(adminHostId, adminHostUser, 'approved');
+    await createHostApplication(pendingHostId, pendingHostUser, 'pending');
+
+    const { error: adminRoleError } = await supabase
+      .from('users')
+      .upsert(
+        {
+          id: adminHostId,
+          email: adminHostUser.email,
+          role: 'admin',
+        },
+        { onConflict: 'id' }
+      );
+
+    if (adminRoleError) throw adminRoleError;
+
+    await login(page, adminUser);
+
+    const summaryResponse = await page.request.get('/api/admin/users-summary');
+    expect(summaryResponse.ok()).toBeTruthy();
+    const summaryPayload = await summaryResponse.json();
+    const summaryRows = (Array.isArray(summaryPayload?.data) ? summaryPayload.data : []) as UserSummaryRoleRow[];
+    const rowsById = new Map<string, UserSummaryRoleRow>(
+      summaryRows.map((row) => [row.id, row])
+    );
+
+    expect(rowsById.get(approvedHostId)?.role).toBe('host');
+    expect(rowsById.get(adminHostId)?.role).toBe('admin');
+    expect(rowsById.get(pendingHostId)?.role ?? null).toBeNull();
+    expect(rowsById.get(legacyHostId)?.role).toBe('host');
   });
 
   test('renders user summary columns and activity timeline for a seeded member', async ({ page }) => {

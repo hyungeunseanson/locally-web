@@ -40,7 +40,14 @@ type UserRoleRow = {
   role: string | null;
 };
 
+type HostApplicationStatusRow = {
+  user_id: string;
+  status: string | null;
+};
+
 const USER_ROLE_BATCH_SIZE = 100;
+const HOST_APPLICATION_BATCH_SIZE = 100;
+const HOST_APPROVED_STATUSES = new Set(['approved', 'active']);
 
 function chunkIds(ids: string[], size: number) {
   const chunks: string[][] = [];
@@ -83,6 +90,35 @@ function normalizeUserRoleRow(row: AdminRawRow): UserRoleRow | null {
   };
 }
 
+function normalizeHostApplicationStatusRow(row: AdminRawRow): HostApplicationStatusRow | null {
+  const userId = readStringField(row, 'user_id');
+  if (!userId) {
+    return null;
+  }
+
+  return {
+    user_id: userId,
+    status: readStringField(row, 'status'),
+  };
+}
+
+function resolveDashboardRole(userRole: string | null, hostStatus: string | null) {
+  if (userRole === 'admin') {
+    return 'admin';
+  }
+
+  const normalizedHostStatus = hostStatus?.trim().toLowerCase() || null;
+  if (normalizedHostStatus && HOST_APPROVED_STATUSES.has(normalizedHostStatus)) {
+    return 'host';
+  }
+
+  if (userRole === 'host') {
+    return 'host';
+  }
+
+  return userRole;
+}
+
 export async function GET() {
   try {
     const supabaseServer = await createServerClient();
@@ -116,29 +152,47 @@ export async function GET() {
     const profileIds = profileRows.map((profile) => profile.id).filter(Boolean);
 
     const roleMap = new Map<string, string | null>();
+    const hostStatusMap = new Map<string, string | null>();
 
     if (profileIds.length > 0) {
-      const userRoleChunks = await Promise.all(
-        chunkIds(profileIds, USER_ROLE_BATCH_SIZE).map(async (batchIds) => {
-          const { data: userRows, error: usersError } = await supabaseAdmin
-            .from('users')
-            .select('id, role')
-            .in('id', batchIds);
+      const [userRoleChunks, hostApplicationChunks] = await Promise.all([
+        Promise.all(
+          chunkIds(profileIds, USER_ROLE_BATCH_SIZE).map(async (batchIds) => {
+            const { data: userRows, error: usersError } = await supabaseAdmin
+              .from('users')
+              .select('id, role')
+              .in('id', batchIds);
 
-          if (usersError) throw usersError;
-          return toAdminRawRows(userRows).map(normalizeUserRoleRow).filter(isPresent);
-        })
-      );
+            if (usersError) throw usersError;
+            return toAdminRawRows(userRows).map(normalizeUserRoleRow).filter(isPresent);
+          })
+        ),
+        Promise.all(
+          chunkIds(profileIds, HOST_APPLICATION_BATCH_SIZE).map(async (batchIds) => {
+            const { data: hostApplicationRows, error: hostApplicationsError } = await supabaseAdmin
+              .from('public_host_applications')
+              .select('user_id, status')
+              .in('user_id', batchIds);
+
+            if (hostApplicationsError) throw hostApplicationsError;
+            return toAdminRawRows(hostApplicationRows).map(normalizeHostApplicationStatusRow).filter(isPresent);
+          })
+        ),
+      ]);
 
       userRoleChunks.flat().forEach((userRow) => {
         roleMap.set(userRow.id, userRow.role);
+      });
+
+      hostApplicationChunks.flat().forEach((hostApplicationRow) => {
+        hostStatusMap.set(hostApplicationRow.user_id, hostApplicationRow.status);
       });
     }
 
     const mergedProfiles = profileRows.map((profile) => ({
       ...profile,
       name: profile.name ?? profile.full_name ?? null,
-      role: roleMap.get(profile.id) ?? null,
+      role: resolveDashboardRole(roleMap.get(profile.id) ?? null, hostStatusMap.get(profile.id) ?? null),
     }));
 
     return NextResponse.json({ success: true, data: mergedProfiles });

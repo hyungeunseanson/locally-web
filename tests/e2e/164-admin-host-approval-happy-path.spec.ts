@@ -329,3 +329,58 @@ test('admin approval grants host role and surfaces the welcome overlay to the ap
     await applicantContext.close();
   }
 });
+
+test('admin approval preserves an existing admin role on the applicant account', async ({ browser }: { browser: Browser }) => {
+  test.setTimeout(120000);
+
+  const adminUser = createUser('admin-preserve');
+  const applicantUser = createUser('admin-applicant');
+
+  await createAuthUser(adminUser, true);
+  const applicantUserId = await createAuthUser(applicantUser, true);
+  const applicationId = await createPendingHostApplication(applicantUserId, applicantUser);
+
+  const adminContext = await browser.newContext();
+  const adminPage = await adminContext.newPage();
+
+  try {
+    await login(adminPage, adminUser);
+    await adminPage.goto('/admin/dashboard?tab=APPROVALS', { waitUntil: 'networkidle' });
+
+    const hostListItem = adminPage.locator('div.cursor-pointer').filter({ hasText: applicantUser.fullName }).first();
+    await expect(hostListItem).toBeVisible({ timeout: 15000 });
+    await hostListItem.click();
+
+    const approveButton = adminPage.getByRole('button', { name: /승인 \(호스트 권한 부여\)/ });
+    await expect(approveButton).toBeVisible({ timeout: 15000 });
+    await approveButton.click();
+
+    await expect(adminPage.locator('h4', { hasText: '승인 확인' }).filter({ visible: true }).first()).toBeVisible({ timeout: 5000 });
+    await adminPage.getByRole('button', { name: '승인 및 권한 부여' }).filter({ visible: true }).first().click();
+
+    await waitForHostApplicationStatus(applicationId, 'approved');
+    await adminPage.waitForTimeout(1000);
+
+    const { data: userRole, error: userRoleError } = await getAdminClient()
+      .from('users')
+      .select('role')
+      .eq('id', applicantUserId)
+      .maybeSingle();
+
+    if (userRoleError) throw userRoleError;
+    expect(userRole?.role).toBe('admin');
+
+    const { data: approvalNotifications, error: approvalNotificationsError } = await getAdminClient()
+      .from('notifications')
+      .select('id')
+      .eq('user_id', applicantUserId)
+      .eq('type', 'host_application_approved');
+
+    if (approvalNotificationsError) throw approvalNotificationsError;
+    for (const notification of approvalNotifications || []) {
+      createdNotificationIds.push(Number(notification.id));
+    }
+  } finally {
+    await adminContext.close();
+  }
+});

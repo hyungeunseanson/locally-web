@@ -211,7 +211,7 @@ test.describe.serial('Host register submit route', () => {
     });
   });
 
-  test('creates a pending application and seeds missing profile fields for a new host', async ({ page }) => {
+  test('creates a pending application and keeps host photo out of the guest profile avatar', async ({ page }) => {
     test.setTimeout(90000);
 
     const user = createUser('new');
@@ -258,7 +258,7 @@ test.describe.serial('Host register submit route', () => {
     if (profileError) throw profileError;
 
     expect(profile).toMatchObject({
-      avatar_url: 'https://example.com/profile.png',
+      avatar_url: null,
       languages: ['한국어'],
     });
   });

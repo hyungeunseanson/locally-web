@@ -18,7 +18,7 @@ import LocallyMembershipBadgeTrigger from '@/app/components/LocallyMembershipBad
 import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
 import { PROFILE_LANGUAGE_OPTIONS } from '@/app/constants/profile';
 import { fetchAdminAccess } from '@/app/utils/adminAccessClient';
-import { getProfileCompletion, normalizeLanguageList, normalizeProfileLanguageValue } from '@/app/utils/profile';
+import { getHostPublicProfile, getProfileCompletion, normalizeLanguageList, normalizeProfileLanguageValue } from '@/app/utils/profile';
 import { validateImage, compressImage, sanitizeFileName, isHeicValidationResult } from '@/app/utils/image';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import { useNotification } from '@/app/context/NotificationContext';
@@ -30,14 +30,27 @@ type GuestReview = {
   rating: number;
   content: string;
   created_at: string;
+  host_id?: string | null;
   host?: {
     full_name?: string | null;
     avatar_url?: string | null;
   } | null;
 };
 
-type GuestReviewQueryRow = Omit<GuestReview, 'host'> & {
-  host?: GuestReview['host'] | GuestReview['host'][];
+type GuestReviewQueryRow = Omit<GuestReview, 'host'>;
+
+type HostReviewProfileRow = {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+};
+
+type HostReviewApplicationRow = {
+  user_id: string;
+  name: string | null;
+  profile_photo: string | null;
+  self_intro?: string | null;
+  languages?: string[] | string | null;
 };
 
 export default function AccountPage() {
@@ -261,20 +274,62 @@ export default function AccountPage() {
       // 🟢 [추가] 게스트 리뷰 불러오기
       const { data: reviewData } = await supabase
         .from('guest_reviews')
-        .select(`
-          id,
-          rating,
-          content,
-          created_at,
-          host:profiles!guest_reviews_host_id_fkey ( full_name, avatar_url )
-        `)
+        .select('id, rating, content, created_at, host_id')
         .eq('guest_id', user.id)
         .order('created_at', { ascending: false });
 
-      const normalizedReviews = ((reviewData || []) as GuestReviewQueryRow[]).map((review) => ({
-        ...review,
-        host: Array.isArray(review.host) ? review.host[0] ?? null : review.host ?? null,
-      }));
+      const reviewRows = (reviewData || []) as GuestReviewQueryRow[];
+      const hostIds = Array.from(new Set(reviewRows.map((review) => review.host_id).filter(Boolean))) as string[];
+      const [hostProfilesRes, hostApplicationsRes] = hostIds.length > 0
+        ? await Promise.all([
+          supabase
+            .from('profiles')
+            .select('id, full_name, avatar_url')
+            .in('id', hostIds),
+          supabase
+            .from('public_host_applications')
+            .select('user_id, name, profile_photo, self_intro, languages')
+            .in('user_id', hostIds),
+        ])
+        : [
+          { data: [] as HostReviewProfileRow[], error: null },
+          { data: [] as HostReviewApplicationRow[], error: null },
+        ];
+
+      if (hostProfilesRes.error) {
+        console.error('[account] failed to load guest review host profiles:', hostProfilesRes.error);
+      }
+
+      if (hostApplicationsRes.error) {
+        console.error('[account] failed to load guest review host applications:', hostApplicationsRes.error);
+      }
+
+      const hostProfileMap = new Map(
+        ((hostProfilesRes.data || []) as HostReviewProfileRow[]).map((hostProfile) => [hostProfile.id, hostProfile])
+      );
+      const hostApplicationMap = new Map(
+        ((hostApplicationsRes.data || []) as HostReviewApplicationRow[]).map((hostApplication) => [hostApplication.user_id, hostApplication])
+      );
+
+      const normalizedReviews = reviewRows.map((review) => {
+        const hostPublicProfile = review.host_id
+          ? getHostPublicProfile(
+            hostProfileMap.get(review.host_id),
+            hostApplicationMap.get(review.host_id),
+            'Host'
+          )
+          : null;
+
+        return {
+          ...review,
+          host: hostPublicProfile
+            ? {
+              full_name: hostPublicProfile.name,
+              avatar_url: hostPublicProfile.avatarUrl,
+            }
+            : null,
+        };
+      });
 
       setGuestReviews(normalizedReviews);
 

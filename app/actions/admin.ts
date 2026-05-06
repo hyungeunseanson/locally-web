@@ -100,6 +100,10 @@ function buildExperienceStatusNotification(status: string, id: string | number) 
   return null;
 }
 
+function asNonEmptyString(value: unknown) {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+}
+
 async function assertLatestHostApplicationForStatusChange(
   supabaseAdmin: ReturnType<typeof createAdminClient>,
   id: string | number
@@ -176,19 +180,55 @@ export async function updateAdminStatus(
   if (table === 'host_applications' && ['approved', 'revision', 'rejected'].includes(status)) {
     const { data: app } = await supabaseAdmin
       .from('host_applications')
-      .select('user_id')
+      .select('user_id, email')
       .eq('id', id)
       .maybeSingle();
 
     if (app) {
       if (status === 'approved') {
-        const userRoleResult = await supabaseAdmin
+        const { data: existingUserRole, error: existingUserRoleError } = await supabaseAdmin
           .from('users')
-          .update({ role: 'host' })
-          .eq('id', app.user_id);
+          .select('role, email')
+          .eq('id', app.user_id)
+          .maybeSingle();
 
-        if (userRoleResult.error) {
-          console.error('Host application users.role update failed:', userRoleResult.error);
+        if (existingUserRoleError) {
+          console.error('Host application users.role lookup failed:', existingUserRoleError);
+        }
+
+        let userRoleEmail = asNonEmptyString(app.email) || asNonEmptyString(existingUserRole?.email);
+
+        if (!userRoleEmail && existingUserRole?.role !== 'admin') {
+          const { data: profileForRole, error: profileForRoleError } = await supabaseAdmin
+            .from('profiles')
+            .select('email')
+            .eq('id', app.user_id)
+            .maybeSingle();
+
+          if (profileForRoleError) {
+            console.error('Host application users.role profile email lookup failed:', profileForRoleError);
+          }
+
+          userRoleEmail = asNonEmptyString(profileForRole?.email);
+        }
+
+        if (existingUserRole?.role !== 'admin') {
+          const userRolePayload: { id: string; role: string; email?: string } = {
+            id: app.user_id,
+            role: 'host',
+          };
+
+          if (userRoleEmail) {
+            userRolePayload.email = userRoleEmail;
+          }
+
+          const userRoleResult = await supabaseAdmin
+            .from('users')
+            .upsert(userRolePayload, { onConflict: 'id' });
+
+          if (userRoleResult.error) {
+            console.error('Host application users.role upsert failed:', userRoleResult.error);
+          }
         }
       }
 

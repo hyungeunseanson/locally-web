@@ -417,6 +417,23 @@ test.describe.serial('Host review routes', () => {
     const experienceId = await createExperienceFixture(hostId);
     const bookingId = await createBooking({ hostId, guestId, guest, experienceId });
     const reviewId = await createReview({ guestId, experienceId, bookingId });
+    const hostApplicationPhoto = 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=512';
+    const hostAccountAvatar = 'https://lh3.googleusercontent.com/a/default-google-avatar=s96-c';
+    const supabase = getAdminClient();
+
+    const [{ error: profileAvatarError }, { error: hostPhotoError }] = await Promise.all([
+      supabase
+        .from('profiles')
+        .update({ avatar_url: hostAccountAvatar })
+        .eq('id', hostId),
+      supabase
+        .from('host_applications')
+        .update({ profile_photo: hostApplicationPhoto })
+        .eq('user_id', hostId),
+    ]);
+
+    if (profileAvatarError) throw profileAvatarError;
+    if (hostPhotoError) throw hostPhotoError;
 
     await login(page, host);
 
@@ -426,7 +443,6 @@ test.describe.serial('Host review routes', () => {
     expect(guestReviewResponse.status()).toBe(200);
     await expect(guestReviewResponse.json()).resolves.toMatchObject({ success: true, guestId });
 
-    const supabase = getAdminClient();
     const { data: guestReview, error: guestReviewError } = await supabase
       .from('guest_reviews')
       .select('id, booking_id, host_id, guest_id, rating, content')
@@ -452,7 +468,10 @@ test.describe.serial('Host review routes', () => {
         expect.objectContaining({
           content: '호스트가 남긴 게스트 후기입니다.',
           rating: 4,
-          host: expect.anything(),
+          host: expect.objectContaining({
+            full_name: host.fullName,
+            avatar_url: hostApplicationPhoto,
+          }),
         }),
       ],
     });

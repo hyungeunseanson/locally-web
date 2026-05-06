@@ -198,7 +198,7 @@ export function getHostPublicProfile(
 
   return {
     name,
-    avatarUrl: profile?.avatar_url || hostApplication?.profile_photo || null,
+    avatarUrl: hostApplication?.profile_photo || profile?.avatar_url || null,
     bio: hostApplication?.self_intro || profile?.introduction || null,
     languages: profileLanguages.length > 0 ? profileLanguages : hostApplicationLanguages,
     job: profile?.job || null,
