@@ -85,7 +85,7 @@ export const HOST_LANDING_FAQ: Record<HostLandingLocale, HostLandingFaqContent> 
                     {
                         question: "정산은 언제 확인할 수 있나요?",
                         answer:
-                            "예약 확정과 체험 완료를 기준으로 정산 흐름이 잡히며, 호스트는 대시보드에서 진행 상태를 확인할 수 있습니다. 운영 초기에는 일정 관리와 취소 정책을 명확히 해두는 것이 정산 안정성에도 중요합니다.",
+                            "예약이나 결제 직후 바로 정산되는 것이 아니라, 체험이 완료된 뒤 정산 대기 흐름으로 반영됩니다. 호스트는 대시보드에서 진행 중 예상 수익과 정산 대기 상태를 구분해 확인할 수 있습니다.",
                     },
                     {
                         question: "수수료는 어떻게 적용되나요?",
@@ -170,7 +170,7 @@ export const HOST_LANDING_FAQ: Record<HostLandingLocale, HostLandingFaqContent> 
                     {
                         question: "When can I see payout details?",
                         answer:
-                            "Payouts are tied to confirmed bookings and completed experiences, and hosts can follow the status from the dashboard. Early on, it helps to keep your schedule and cancellation guidance clearly set, since that also supports smoother operations on the payout side.",
+                            "Payouts are not reflected immediately when a booking is made or paid. They move into the payout-waiting flow after the experience is completed, and hosts can separate in-progress expected earnings from pending payouts in the dashboard.",
                     },
                     {
                         question: "How are platform fees applied?",
@@ -255,7 +255,7 @@ export const HOST_LANDING_FAQ: Record<HostLandingLocale, HostLandingFaqContent> 
                     {
                         question: "精算の状況はいつ確認できますか？",
                         answer:
-                            "精算の流れは予約確定と体験完了を基準に進み、ホストはダッシュボードで進行状況を確認できます。運営初期は、日程管理やキャンセル方針を明確にしておくことが、精算の安定にもつながります。",
+                            "精算は予約や決済の直後に反映されるのではなく、体験完了後に精算待ちの流れへ反映されます。ホストはダッシュボードで、進行中の見込み収益と精算待ちの状態を分けて確認できます。",
                     },
                     {
                         question: "手数料はどのように適用されますか？",
@@ -340,7 +340,7 @@ export const HOST_LANDING_FAQ: Record<HostLandingLocale, HostLandingFaqContent> 
                     {
                         question: "什么时候可以查看结算进度？",
                         answer:
-                            "结算会根据预订确认和体验完成的状态推进，房东可以在后台查看当前进度。刚开始运营时，把日程管理和取消规则写清楚，也会让后续结算更稳定、更顺畅。",
+                            "结算不会在预订或付款后立刻反映，而是在体验完成后进入待结算流程。房东可以在后台区分查看进行中预计收入和待结算状态。",
                     },
                     {
                         question: "平台费用是怎么计算的？",

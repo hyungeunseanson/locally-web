@@ -39,6 +39,7 @@ test.describe('Help Center self-service copy', () => {
     await expect(page.getByTestId('help-category-host-jobs')).toBeVisible();
     await expect(page.getByTestId('help-category-host-payout')).toBeVisible();
     await expect(page.getByTestId('help-category-host-policy')).toBeVisible();
+    await expect(page.getByRole('button', { name: '1인 출발 확정 옵션은 어떻게 운영되나요?' })).toBeVisible();
     await expect(page.getByRole('button', { name: '게스트가 팁을 주겠다고 하면 받아도 되나요?' })).toBeVisible();
   });
 
@@ -74,6 +75,11 @@ test.describe('Help Center self-service copy', () => {
     await page.getByRole('button', { name: '호스트 (For Hosts)' }).click();
     await page.getByRole('textbox').fill('추가 금액');
     await expect(page.getByText('게스트가 팁을 주겠다고 하면 받아도 되나요?')).toBeVisible();
+
+    await page.getByRole('textbox').fill('최소 2인');
+    await expect(page.getByText('1인 출발 확정 옵션은 어떻게 운영되나요?')).toBeVisible();
+    await page.getByRole('button', { name: '1인 출발 확정 옵션은 어떻게 운영되나요?' }).click();
+    await expect(page.getByText('해당 30,000원은 게스트에게 환불되며 호스트 정산 기준에서도 제외됩니다.')).toBeVisible();
 
     await page.getByRole('textbox').fill('playwright-no-faq-match');
     await expect(page.getByTestId('help-search-empty-state')).toBeVisible();

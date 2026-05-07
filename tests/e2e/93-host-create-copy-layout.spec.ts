@@ -365,6 +365,11 @@ test('host create shows structured primary language guidance and refund policy c
       /\*추가 인원 모객 시 게스트에게 자동 환불|\*Automatically refunded to the guest if more people join later|\*後から参加者が増えた場合はゲストへ自動返金|\*后续有更多游客加入时，会自动退还给游客/
     )
   ).toBeVisible();
+  await expect(
+    page.getByText(
+      /1인 출발 확정 옵션은 기본 30,000원 추가금으로 운영됩니다\.|The guaranteed solo departure option uses a fixed 30,000 KRW add-on\.|1名出発確定オプションは、基本30,000ウォンの追加料金で運用されます。|1人出发保障选项默认按 30,000 韩元附加费运营。/
+    )
+  ).toBeVisible();
   await expect(page.getByText('+ ₩30,000')).toBeVisible();
 
   const basePriceInput = page.locator('input[inputmode="numeric"]').first();

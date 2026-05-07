@@ -472,6 +472,12 @@ const ko: HelpFaqLocaleContent = {
           searchTerms: ['포함 불포함', '준비물', '일정 작성', '상세 설명'],
         },
         {
+          id: 'solo-guarantee-host',
+          q: '1인 출발 확정 옵션은 어떻게 운영되나요?',
+          a: '1인 출발 확정 옵션은 기본 30,000원 추가금으로 운영됩니다. 최소 2인 예약 기준으로만 운영하고 싶은 체험은 관리자에게 요청하면 게스트 화면에서 이 옵션을 숨길 수 있습니다. 추가 참여자가 실제로 남고 체험이 완료되면, 해당 30,000원은 게스트에게 환불되며 호스트 정산 기준에서도 제외됩니다.',
+          searchTerms: ['1인 출발 확정', '30,000원', '최소 2인', '옵션 비노출', '정산 제외'],
+        },
+        {
           id: 'not-too-many-dates',
           q: '너무 많은 날짜를 열지 않아도 되나요?',
           a: '네. 실제로 운영 가능한 날짜만 열어두는 편이 후기와 응대 안정성에 더 좋습니다. 무리해서 많이 열기보다 확실히 진행할 수 있는 일정으로 시작하는 것이 안전합니다.',
@@ -1059,6 +1065,12 @@ const en: HelpFaqLocaleContent = {
           q: 'How should I write included items, exclusions, supplies, and timing?',
           a: 'Write them as clearly as possible so guests can decide without sending extra questions. Guests should be able to understand what is included, what they need to bring, how much movement there is, and how the time flows.',
           searchTerms: ['included', 'excluded', 'supplies', 'timing', 'details'],
+        },
+        {
+          id: 'solo-guarantee-host',
+          q: 'How does the guaranteed solo departure option work?',
+          a: 'The guaranteed solo departure option uses a fixed 30,000 KRW add-on. If you want to run an experience only from a two-person booking standard, ask the admin team to hide this option from the guest screen. If another participant actually remains in the same slot and the experience is completed, that 30,000 KRW is refunded to the guest and excluded from your payout basis.',
+          searchTerms: ['solo departure guarantee', '30,000 KRW', 'two-person booking', 'hide option', 'payout excluded'],
         },
         {
           id: 'not-too-many-dates',
@@ -1650,6 +1662,12 @@ const ja: HelpFaqLocaleContent = {
           searchTerms: ['含まれるもの', '持ち物', '流れ', '詳細説明'],
         },
         {
+          id: 'solo-guarantee-host',
+          q: '1名出発確定オプションはどのように運用されますか？',
+          a: '1名出発確定オプションは、基本30,000ウォンの追加料金で運用されます。最低2名予約を基準に運営したい体験は、管理者に依頼するとゲスト画面でこのオプションを非表示にできます。追加参加者が実際に同じ枠に残った状態で体験が完了すると、その30,000ウォンはゲストへ返金され、ホスト精算基準からも除外されます。',
+          searchTerms: ['1名出発確定', '30,000ウォン', '最低2名', '非表示', '精算除外'],
+        },
+        {
           id: 'not-too-many-dates',
           q: 'たくさん日程を開けなくても大丈夫ですか？',
           a: 'はい。実際に安定して運営できる日だけ開けるほうが、レビューや運営の安定につながりやすいです。無理のないカレンダーのほうが結果的に安全です。',
@@ -2237,6 +2255,12 @@ const zh: HelpFaqLocaleContent = {
           q: '包含项目、不包含项目、准备物品和流程应该怎么写？',
           a: '最重要的是让客人在不额外发问的情况下也能判断是否适合自己。写清楚包含与否、需要带什么、移动量和整体流程，通常就能明显减少咨询。',
           searchTerms: ['包含项目', '准备物品', '流程', '详细说明'],
+        },
+        {
+          id: 'solo-guarantee-host',
+          q: '1人出发保障选项如何运营？',
+          a: '1人出发保障选项默认按 30,000 韩元附加费运营。如果你只想按至少 2 人预订标准运营体验，可以联系管理员，让该选项在游客页面隐藏。若后续有其他参与者实际留在同一场次并完成体验，这 30,000 韩元会退还给游客，并从房东结算基准中扣除。',
+          searchTerms: ['1人出发保障', '30,000 韩元', '至少2人', '隐藏选项', '结算扣除'],
         },
         {
           id: 'not-too-many-dates',

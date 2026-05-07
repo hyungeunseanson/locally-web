@@ -48,18 +48,24 @@ test.describe('Host landing guidance', () => {
         title: 'Become a Host | Locally',
         faqHeading: 'Frequently asked questions',
         cta: 'Apply to host',
+        payoutGroup: 'Payouts and operations',
+        payoutCopy: 'Payouts are not reflected immediately when a booking is made or paid.',
       },
       {
         path: '/ja/become-a-host',
         title: 'ホストになる | Locally',
         faqHeading: 'よくあるご質問',
         cta: 'ホストに応募する',
+        payoutGroup: '精算と運営',
+        payoutCopy: '精算は予約や決済の直後に反映されるのではなく、体験完了後に精算待ちの流れへ反映されます。',
       },
       {
         path: '/zh/become-a-host',
         title: '成为房东 | Locally',
         faqHeading: '常见问题解答',
         cta: '申请成为房东',
+        payoutGroup: '结算与运营',
+        payoutCopy: '结算不会在预订或付款后立刻反映，而是在体验完成后进入待结算流程。',
       },
     ] as const;
 
@@ -69,6 +75,8 @@ test.describe('Host landing guidance', () => {
       await expect(page).toHaveTitle(testCase.title, { timeout: 15000 });
       await expect(page.getByRole('heading', { name: testCase.faqHeading, exact: true })).toBeVisible({ timeout: 15000 });
       await expect(page.getByTestId('host-landing-primary-cta').first()).toHaveText(testCase.cta);
+      await page.getByRole('heading', { name: testCase.payoutGroup, exact: true }).click();
+      await expect(page.getByText(testCase.payoutCopy)).toBeVisible({ timeout: 15000 });
     }
   });
 });
