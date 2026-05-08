@@ -252,6 +252,7 @@ type ExperienceFormCopy = {
   step6Desc: string;
   durationLabel: string;
   durationUnit: string;
+  durationEditHelp: string;
   maxGuestsLabel: string;
   maxGuestsUnit: string;
   ageLimitLabel: string;
@@ -312,6 +313,7 @@ type ExperienceFormCopy = {
   validationSuppliesQuality: string;
   validationAgeLimit: string;
   validationPrice: string;
+  validationDuration: string;
   validationSoloGuaranteePrice: string;
   validationPrivatePrice: string;
   imageValidationFallback: string;
@@ -415,6 +417,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step6Desc: '소요 시간과 참여 기준을 정리해주세요.',
     durationLabel: '소요 시간',
     durationUnit: '시간',
+    durationEditHelp: '변경 후 체험 상세와 예약 안내에 표시되는 소요 시간이 함께 변경됩니다.',
     maxGuestsLabel: '최대 인원',
     maxGuestsUnit: '명',
     ageLimitLabel: '참가 연령',
@@ -486,6 +489,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     validationSuppliesQuality: '준비물은 네 글자 이상으로 구체적으로 적어주세요.',
     validationAgeLimit: '참가 연령 기준을 입력해주세요.',
     validationPrice: '기본 가격을 올바르게 입력해주세요.',
+    validationDuration: '소요 시간을 1시간 이상, 1시간 단위로 입력해주세요.',
     validationPrivatePrice: '단독 투어 가격을 입력해주세요.',
     validationSoloGuaranteePrice: '1인 출발 확정 추가금은 20,000원~100,000원 사이에서 1,000원 단위로 입력해주세요.',
     imageValidationFallback: '이미지 형식이 올바르지 않습니다.',
@@ -587,6 +591,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step6Desc: 'Set the duration and participation guidelines.',
     durationLabel: 'Duration',
     durationUnit: 'hr',
+    durationEditHelp: 'After saving, the duration shown on the experience detail and booking guide will also change.',
     maxGuestsLabel: 'Max guests',
     maxGuestsUnit: 'guests',
     ageLimitLabel: 'Age requirement',
@@ -658,6 +663,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     validationSuppliesQuality: 'If you add supplies, describe them in at least 4 characters.',
     validationAgeLimit: 'Enter the age requirement.',
     validationPrice: 'Enter a valid base price.',
+    validationDuration: 'Please enter a duration of at least 1 hour in whole-hour increments.',
     validationPrivatePrice: 'Enter the private tour price.',
     validationSoloGuaranteePrice: 'Enter a guaranteed solo departure add-on from 20,000 KRW to 100,000 KRW in 1,000 KRW steps.',
     imageValidationFallback: 'Invalid image format.',
@@ -759,6 +765,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step6Desc: '所要時間と参加条件を整理してください。',
     durationLabel: '所要時間',
     durationUnit: '時間',
+    durationEditHelp: '保存後、体験詳細と予約案内に表示される所要時間も一緒に変更されます。',
     maxGuestsLabel: '最大人数',
     maxGuestsUnit: '名',
     ageLimitLabel: '参加年齢',
@@ -829,6 +836,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     validationSuppliesQuality: '持ち物を書く場合は4文字以上で具体的に入力してください。',
     validationAgeLimit: '参加年齢条件を入力してください。',
     validationPrice: '基本価格を正しく入力してください。',
+    validationDuration: '所要時間は1時間以上、1時間単位で入力してください。',
     validationPrivatePrice: 'プライベートツアー価格を入力してください。',
     validationSoloGuaranteePrice: '1名出発確定の追加料金は20,000ウォン〜100,000ウォンの間で、1,000ウォン単位で入力してください。',
     imageValidationFallback: '画像形式が正しくありません。',
@@ -930,6 +938,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step6Desc: '请整理所需时间和参与条件。',
     durationLabel: '所需时间',
     durationUnit: '小时',
+    durationEditHelp: '保存后，体验详情和预订说明中显示的所需时间也会一起更新。',
     maxGuestsLabel: '最大人数',
     maxGuestsUnit: '人',
     ageLimitLabel: '参加年龄',
@@ -1001,6 +1010,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     validationSuppliesQuality: '如果填写需准备物品，请至少写4个字并尽量具体。',
     validationAgeLimit: '请输入参加年龄条件。',
     validationPrice: '请输入正确的基础价格。',
+    validationDuration: '请输入至少1小时的所需时间，并以整小时为单位。',
     validationPrivatePrice: '请输入私人团价格。',
     validationSoloGuaranteePrice: '1人出发保障附加费需在 20,000 韩元至 100,000 韩元之间，并以 1,000 韩元为单位输入。',
     imageValidationFallback: '图片格式不正确。',

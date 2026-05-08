@@ -197,6 +197,10 @@ export default function EditExperiencePage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error(t('login_required'));
 
+      const duration = Number(formData.duration);
+      if (!Number.isFinite(duration) || duration < 1 || !Number.isInteger(duration)) {
+        throw new Error(copy.validationDuration);
+      }
       if (formData.is_private_enabled && (!Number(formData.private_price) || Number(formData.private_price) <= 0)) {
         throw new Error(copy.validationPrivatePrice);
       }
@@ -213,6 +217,7 @@ export default function EditExperiencePage() {
         languages: getLanguageNames(normalizedLanguageLevels),
         inclusions: cleanedInclusions,
         exclusions: cleanedExclusions,
+        duration,
         meeting_point: formData.meeting_point || formData.itinerary?.[0]?.title || '',
         maxGuests: Number(formData.max_guests || formData.maxGuests || 0),
         rules: {
@@ -675,6 +680,26 @@ export default function EditExperiencePage() {
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-2">{t('label_max_guests')}</label>
                 <input type="number" className="w-full p-4 bg-white border border-slate-200 rounded-xl font-bold focus:border-black outline-none" value={formData.max_guests} onChange={(e) => setFormData({ ...formData, max_guests: e.target.value })} />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold text-slate-500 mb-2">{copy.durationLabel}</label>
+                <div className="relative">
+                  <input
+                    data-testid="host-edit-duration-input"
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    step={1}
+                    className="w-full rounded-xl border border-slate-200 bg-white p-4 pr-14 font-bold outline-none focus:border-black"
+                    value={formData.duration ?? ''}
+                    onChange={(e) => {
+                      const nextDuration = e.target.value === '' ? '' : Number(e.target.value);
+                      setFormData((prev: any) => ({ ...prev, duration: nextDuration }));
+                    }}
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">{copy.durationUnit}</span>
+                </div>
+                <p className="mt-2 text-[11px] leading-5 text-slate-500">{copy.durationEditHelp}</p>
               </div>
             </div>
             <div className="w-full rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5">
