@@ -732,6 +732,7 @@ export default function EditExperiencePage() {
                       onChange={(e) => setFormData({ ...formData, private_price: Number(e.target.value) })}
                     />
                   </div>
+                  <p className="mt-2 text-xs leading-5 text-slate-500">{copy.privatePriceHelp}</p>
                 </div>
               )}
             </div>

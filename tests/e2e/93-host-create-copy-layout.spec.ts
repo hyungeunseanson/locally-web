@@ -18,6 +18,8 @@ const STEP1_SELECTION_HELP_REGEX =
 const PHOTO_HELP_REGEX =
   /대표사진에는 호스트 얼굴이 보이는 사진을 최소 1장 이상 반드시 포함해주세요\.|Please include at least one hero photo showing the host’s face\.|代表写真には、ホスト本人の顔が見える写真を最低1枚以上必ず含めてください。|代表照片中请至少包含一张能看到房东本人脸部的照片。/;
 const ADD_HERO_PHOTO_REGEX = /대표사진 추가|Add hero photo|代表写真を追加|添加代表照片/;
+const PRIVATE_PRICE_HELP_REGEX =
+  /단독 투어 가격은 한 팀 기준 고정가입니다\. 처음 설정할 때는 3인 예약 총액을 기준으로 잡는 것을 권장합니다\.|Private tour pricing is a fixed price for one booking group\. For your first setup, we recommend using the total price of a 3-person booking as the reference\.|プライベートツアー料金は1組あたりの固定料金です。初めて設定する場合は、3名予約の合計金額を基準にすることをおすすめします。|私人团价格是按一个预订团队计算的固定总价。首次设置时，建议以3人预订的总额作为参考。/;
 
 let adminClient: SupabaseClient | null = null;
 const createdAuthUserIds: string[] = [];
@@ -376,6 +378,7 @@ test('host create shows structured primary language guidance and refund policy c
     )
   ).toBeVisible();
   await expect(page.getByText('+ ₩30,000')).toBeVisible();
+  await expect(page.getByText(PRIVATE_PRICE_HELP_REGEX)).toBeVisible();
 
   const basePriceInput = page.locator('input[inputmode="numeric"]').first();
   await basePriceInput.fill('');
