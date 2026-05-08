@@ -5,6 +5,8 @@ import {
   cleanupAvailability,
   createAuthUser,
   createTestUser,
+  ensureAvailabilitySlot,
+  getVisibleReservationCard,
   login,
   prepareBookableExperience,
   selectReservationDate,
@@ -67,5 +69,55 @@ test.describe.serial('Private tour selector rollback', () => {
 
     await expect(page.getByText(/프라이빗 투어|Private tour|Private|貸切ツアー|私人团/).first()).toBeVisible();
     await expect(page.getByTestId('exp-payment-total-amount')).toHaveText(`₩${expectedFinalAmount.toLocaleString()}`);
+  });
+
+  test('keeps the desktop sticky reservation card internally scrollable after date selection', async ({ page }) => {
+    test.setTimeout(120000);
+
+    const viewer = createTestUser('exp.private.sidebar.scroll');
+    await createAuthUser(viewer, createdAuthUserIds);
+
+    const experience = await prepareBookableExperience(createdAvailabilityKeys, {
+      requirePrivateEnabled: true,
+      minimumMaxGuests: 2,
+      searchAnyHost: true,
+      time: '10:00',
+    });
+
+    for (const time of ['10:30', '11:00', '11:30', '12:00']) {
+      await ensureAvailabilitySlot(
+        {
+          experienceId: experience.experienceId,
+          date: experience.date,
+          time,
+        },
+        createdAvailabilityKeys
+      );
+    }
+
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await login(page, viewer);
+    await page.goto(`/experiences/${experience.experienceId}`, { waitUntil: 'domcontentloaded' });
+
+    await selectReservationDate(page, experience.date);
+    await selectReservationTime(page, experience.time);
+
+    const reservationCard = getVisibleReservationCard(page).locator(':scope > div');
+    await expect(reservationCard).toHaveCount(1);
+    await expect(page.getByTestId('reservation-submit')).toBeVisible();
+
+    const stickyScrollContract = await reservationCard.evaluate((element) => {
+      const style = window.getComputedStyle(element);
+
+      return {
+        maxHeight: style.maxHeight,
+        overflowY: style.overflowY,
+        overscrollBehaviorY: style.overscrollBehaviorY,
+      };
+    });
+
+    expect(stickyScrollContract.overflowY).toBe('auto');
+    expect(stickyScrollContract.overscrollBehaviorY).toBe('contain');
+    expect(Number.parseFloat(stickyScrollContract.maxHeight)).toBeGreaterThan(0);
   });
 });
