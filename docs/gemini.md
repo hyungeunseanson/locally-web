@@ -126,8 +126,8 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 클라이언트 직접 결제 상태 변경 금지
 - **[이메일 결합도 무관찰 원칙]** 결제 콜백(`route.ts`) 라우트 내부에서는 절대 `nodemailer`나 서버 사이드 UI 렌더링(`@react-email`)을 돌리지 않는다. 결제가 확정되면 무조건 `200 OK`를 내어주고, 이메일은 비동기 Fetch(`api/notifications/send-email`)로 백그라운드로 넘긴다.
 - **[체험 예약 금액 의미 원칙]** `bookings.amount`는 게스트 실결제액, `bookings.total_price`/`total_experience_price`는 투어 금액(호스트 기준 원가), `host_payout_amount`는 투어 금액의 80%, `platform_revenue`는 `amount - host_payout_amount`를 기준으로 유지한다. 취소 정산도 이 의미 체계를 깨지 않는다.
-- **[체험 1인 진행 추가금 수수료 원칙]** 신규 체험 예약의 1인 진행 추가금(`solo_guarantee_price=30000`)은 `bookings.total_price`에는 포함하지만, 게스트 10% 플랫폼 수수료 산정에서는 제외한다. 호스트 정산은 계속 `total_price/total_experience_price` 기준 80%로 계산한다.
-- **[체험 1인 진행 추가금 자동환불 원칙]** 1인 진행 추가금을 낸 예약과 같은 `experience_id/date/time` 슬롯에 본인 외 유효 참여자(`PAID/confirmed/completed`)가 남아 투어가 `completed`가 되면 30,000원을 환불 대상으로 잡는다. 카드 결제는 부분 자동 환불을 시도하고, 카드 외 결제수단은 `pending_manual`로 보류해 관리자 수동 환불 완료 전까지 호스트 정산 완료를 막는다. 이미 환불된 30,000원은 이후 취소 정산에서 중복 환불하지 않는다.
+- **[체험 1인 진행 추가금 수수료 원칙]** 신규 체험 예약의 1인 진행 추가금(`bookings.solo_guarantee_price`)은 `bookings.total_price`에는 포함하지만, 게스트 10% 플랫폼 수수료 산정에서는 제외한다. 호스트 정산은 계속 `total_price/total_experience_price` 기준 80%로 계산한다.
+- **[체험 1인 진행 추가금 자동환불 원칙]** 1인 진행 추가금을 낸 예약과 같은 `experience_id/date/time` 슬롯에 본인 외 유효 참여자(`PAID/confirmed/completed`)가 남아 투어가 `completed`가 되면 예약 당시 저장된 `bookings.solo_guarantee_price`를 환불 대상으로 잡는다. 카드 결제는 부분 자동 환불을 시도하고, 카드 외 결제수단은 `pending_manual`로 보류해 관리자 수동 환불 완료 전까지 호스트 정산 완료를 막는다. 이미 환불된 추가금은 이후 취소 정산에서 중복 환불하지 않는다.
 
 ### 3.4 프로필 동기화 원칙 (v3.21.0+)
 - `auth.users`에 레코드가 생성되는 즉시 `profiles` 테이블에 1:1로 레코드가 보장되어야 한다.

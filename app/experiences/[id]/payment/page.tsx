@@ -15,7 +15,7 @@ import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { useAuth } from '@/app/context/AuthContext';
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
-import { SOLO_GUARANTEE_PRICE } from '@/app/constants/soloGuarantee';
+import { normalizeSoloGuaranteePrice } from '@/app/constants/soloGuarantee';
 import { launchCardPayment } from '@/app/utils/payments/card/client';
 import { buildCardPaymentCallbackRequestBody } from '@/app/utils/payments/card/public';
 import type {
@@ -36,6 +36,7 @@ type PaymentExperience = {
   private_price?: number | null;
   max_guests?: number | null;
   host_id?: string | null;
+  solo_guarantee_price?: number | null;
   solo_guarantee_option_visible?: boolean | null;
   rules?: Record<string, unknown> | null;
   rules_i18n?: Record<string, unknown> | null;
@@ -281,7 +282,8 @@ function PaymentContent() {
 
   const expPrice = Number(experience?.price || 50000);
   const baseHostPrice = isPrivate ? Number(experience?.private_price || 300000) : expPrice * guests;
-  const soloGuaranteePrice = effectiveIsSoloGuarantee ? SOLO_GUARANTEE_PRICE : 0;
+  const configuredSoloGuaranteePrice = normalizeSoloGuaranteePrice(experience?.solo_guarantee_price);
+  const soloGuaranteePrice = effectiveIsSoloGuarantee ? configuredSoloGuaranteePrice : 0;
 
   const getLocalizedBookingApiError = useCallback((result?: Pick<BookingApiResponse, 'errorCode' | 'error'>) => {
     if (!result) return t('exp_payment_booking_error') as string;
@@ -555,7 +557,7 @@ function PaymentContent() {
 
       const { data: expData } = await supabase
         .from('experiences')
-        .select('title, image_url, photos, location, price, private_price, max_guests, host_id, solo_guarantee_option_visible, rules, rules_i18n')
+        .select('title, image_url, photos, location, price, private_price, max_guests, host_id, solo_guarantee_price, solo_guarantee_option_visible, rules, rules_i18n')
         .eq('id', experienceId)
         .maybeSingle();
       if (expData) setExperience(expData as PaymentExperience);

@@ -36,19 +36,25 @@ function buildSlotKey(row: Pick<CompletedSlotRow, 'experience_id' | 'date' | 'ti
   return [String(row.experience_id ?? ''), row.date || '', row.time || ''].join('|');
 }
 
+function formatWon(amount: number) {
+  return `${Math.max(0, Math.floor(amount)).toLocaleString('ko-KR')}원`;
+}
+
 async function notifyGuestSoloRefundStatus(params: {
   supabaseAdmin: SupabaseClient;
   booking: SoloGuaranteeRefundSlotBooking;
   status: 'refunded' | 'pending_manual';
+  refundAmount: number;
 }) {
   if (!params.booking.user_id) return;
 
   const title = params.status === 'refunded'
     ? '1인 진행 추가금 환불 완료'
     : '1인 진행 추가금 환불 확인 중';
+  const refundAmountLabel = formatWon(params.refundAmount);
   const message = params.status === 'refunded'
-    ? '다른 참여자가 함께 확정되어 1인 진행 추가금 30,000원이 환불 처리되었습니다.'
-    : '다른 참여자가 함께 확정되어 1인 진행 추가금 30,000원 환불을 운영팀이 확인 중입니다.';
+    ? `다른 참여자가 함께 확정되어 1인 진행 추가금 ${refundAmountLabel}이 환불 처리되었습니다.`
+    : `다른 참여자가 함께 확정되어 1인 진행 추가금 ${refundAmountLabel} 환불을 운영팀이 확인 중입니다.`;
 
   const { error } = await params.supabaseAdmin.from('notifications').insert({
     user_id: params.booking.user_id,
@@ -146,11 +152,12 @@ async function processManualSoloRefund(params: {
     supabaseAdmin: params.supabaseAdmin,
     booking: params.booking,
     status: 'pending_manual',
+    refundAmount: params.refundAmount,
   });
   await alertAdminSoloRefundRequired({
     title: '1인 진행 추가금 수동 환불 필요',
     booking: params.booking,
-    message: '카드 외 결제수단 예약입니다. 30,000원 수동 환불 후 장부에서 완료 처리해 주세요.',
+    message: `카드 외 결제수단 예약입니다. ${formatWon(params.refundAmount)} 수동 환불 후 장부에서 완료 처리해 주세요.`,
   });
 
   return 'pending_manual' as const;
@@ -245,6 +252,7 @@ async function processCardSoloRefund(params: {
       supabaseAdmin: params.supabaseAdmin,
       booking: params.booking,
       status: 'refunded',
+      refundAmount: params.refundAmount,
     });
 
     return 'refunded' as const;
@@ -456,6 +464,7 @@ export async function markSoloGuaranteeManualRefundCompleted(params: {
     supabaseAdmin: params.supabaseAdmin,
     booking: row,
     status: 'refunded',
+    refundAmount,
   });
 
   return {

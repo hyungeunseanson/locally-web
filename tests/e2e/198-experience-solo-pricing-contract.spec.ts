@@ -37,6 +37,8 @@ const createdAuthUserIds: string[] = [];
 const createdBookingIds: string[] = [];
 const createdAvailabilityKeys: AvailabilityKey[] = [];
 const soloVisibilityRestoreExperienceIds: number[] = [];
+const soloPriceRestoreRows: { experienceId: number; price: number }[] = [];
+const CUSTOM_SOLO_GUARANTEE_PRICE = 40_000;
 
 function getPlatformFee(baseHostPrice: number) {
   return Math.floor(baseHostPrice * 0.1);
@@ -96,7 +98,47 @@ async function createAtomicExperienceBooking({
   return { result: data, booking };
 }
 
+async function updateSoloGuaranteePriceForTest(experienceId: number, price: number) {
+  const supabase = getAdminClient();
+  const { data: previous, error: previousError } = await supabase
+    .from('experiences')
+    .select('solo_guarantee_price')
+    .eq('id', experienceId)
+    .maybeSingle<{ solo_guarantee_price: number | null }>();
+
+  if (previousError) throw previousError;
+
+  const previousPrice = Number(previous?.solo_guarantee_price || SOLO_GUARANTEE_PRICE);
+  soloPriceRestoreRows.push({
+    experienceId,
+    price: previousPrice,
+  });
+
+  const { error } = await supabase
+    .from('experiences')
+    .update({ solo_guarantee_price: price })
+    .eq('id', experienceId);
+
+  if (error) throw error;
+  return previousPrice;
+}
+
+async function restoreSoloGuaranteePriceForTest(experienceId: number, price: number) {
+  const { error } = await getAdminClient()
+    .from('experiences')
+    .update({ solo_guarantee_price: price })
+    .eq('id', experienceId);
+
+  if (error) throw error;
+}
+
 test.afterAll(async () => {
+  for (const row of soloPriceRestoreRows) {
+    await getAdminClient()
+      .from('experiences')
+      .update({ solo_guarantee_price: row.price })
+      .eq('id', row.experienceId);
+  }
   if (soloVisibilityRestoreExperienceIds.length > 0) {
     await getAdminClient()
       .from('experiences')
@@ -141,26 +183,34 @@ test.describe('Experience solo pricing contract', () => {
     const experience = await prepareBookableExperience(createdAvailabilityKeys, {
       searchAnyHost: true,
     });
+    const previousSoloGuaranteePrice = await updateSoloGuaranteePriceForTest(
+      experience.experienceId,
+      CUSTOM_SOLO_GUARANTEE_PRICE
+    );
     const baseHostPrice = experience.price;
-    const hostPrice = baseHostPrice + SOLO_GUARANTEE_PRICE;
+    const hostPrice = baseHostPrice + CUSTOM_SOLO_GUARANTEE_PRICE;
     const expectedFinalAmount = hostPrice + getPlatformFee(baseHostPrice);
 
     expect(baseHostPrice).toBeGreaterThan(0);
 
-    const { result, booking } = await createAtomicExperienceBooking({
-      user,
-      userId,
-      experience,
-      guests: 1,
-      isSoloGuarantee: true,
-    });
+    try {
+      const { result, booking } = await createAtomicExperienceBooking({
+        user,
+        userId,
+        experience,
+        guests: 1,
+        isSoloGuarantee: true,
+      });
 
-    expect(Number(result.final_amount)).toBe(expectedFinalAmount);
-    expect(Number(booking.amount)).toBe(expectedFinalAmount);
-    expect(Number(booking.total_price)).toBe(hostPrice);
-    expect(Number(booking.solo_guarantee_price)).toBe(SOLO_GUARANTEE_PRICE);
-    expect(booking.is_solo_guarantee).toBe(true);
-    expect(getBookingHostPayout(booking)).toBe(Math.floor(hostPrice * 0.8));
+      expect(Number(result.final_amount)).toBe(expectedFinalAmount);
+      expect(Number(booking.amount)).toBe(expectedFinalAmount);
+      expect(Number(booking.total_price)).toBe(hostPrice);
+      expect(Number(booking.solo_guarantee_price)).toBe(CUSTOM_SOLO_GUARANTEE_PRICE);
+      expect(booking.is_solo_guarantee).toBe(true);
+      expect(getBookingHostPayout(booking)).toBe(Math.floor(hostPrice * 0.8));
+    } finally {
+      await restoreSoloGuaranteePriceForTest(experience.experienceId, previousSoloGuaranteePrice);
+    }
   });
 
   test('keeps shared multi-guest pricing based on the full guest-count base price', async () => {
@@ -226,6 +276,7 @@ test.describe('Experience solo pricing contract', () => {
       searchAnyHost: true,
       time: '10:30',
     });
+    await updateSoloGuaranteePriceForTest(experience.experienceId, SOLO_GUARANTEE_PRICE);
     const baseHostPrice = experience.price;
     const platformFee = getPlatformFee(baseHostPrice);
     const noSoloTotal = baseHostPrice + platformFee;

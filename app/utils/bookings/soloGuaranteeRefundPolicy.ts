@@ -3,8 +3,9 @@ import {
   type SoloGuaranteeRefundStatus,
 } from '@/app/utils/soloGuaranteeRefundStatus';
 import { getBookingExperienceAmount } from '@/app/utils/bookingFinance';
+import { DEFAULT_SOLO_GUARANTEE_PRICE } from '@/app/constants/soloGuarantee';
 
-export const SOLO_GUARANTEE_REFUND_AMOUNT = 30_000;
+export const SOLO_GUARANTEE_REFUND_AMOUNT = DEFAULT_SOLO_GUARANTEE_PRICE;
 
 export type SoloGuaranteeRefundSlotBooking = {
   id: string;
@@ -47,6 +48,12 @@ const SOLO_REFUND_AUTO_PROCESSABLE_STATUS_SET = new Set<SoloGuaranteeRefundStatu
 export function toSoloGuaranteeRefundNumber(value: number | string | null | undefined) {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export function getSoloGuaranteeRefundTargetAmount(
+  booking: Pick<SoloGuaranteeRefundSlotBooking, 'solo_guarantee_price'>
+) {
+  return Math.max(0, Math.floor(toSoloGuaranteeRefundNumber(booking.solo_guarantee_price)));
 }
 
 export function buildSoloRefundSettlementSnapshot(
@@ -106,10 +113,7 @@ function isConfirmedParticipant(row: Pick<SoloGuaranteeRefundSlotBooking, 'statu
 }
 
 function isRefundableSoloCandidate(row: SoloGuaranteeRefundSlotBooking) {
-  const targetRefundAmount = Math.min(
-    SOLO_GUARANTEE_REFUND_AMOUNT,
-    toSoloGuaranteeRefundNumber(row.solo_guarantee_price)
-  );
+  const targetRefundAmount = getSoloGuaranteeRefundTargetAmount(row);
   const currentRefundAmount = toSoloGuaranteeRefundNumber(row.solo_guarantee_refund_amount);
   const refundStatus = normalizeSoloGuaranteeRefundStatus(row.solo_guarantee_refund_status);
 
@@ -137,10 +141,7 @@ export function findSoloGuaranteeRefundCandidatesInSlot(
     acc.push({
       bookingId: row.id,
       triggerBookingId: trigger.id,
-      refundAmount: Math.min(
-        SOLO_GUARANTEE_REFUND_AMOUNT,
-        toSoloGuaranteeRefundNumber(row.solo_guarantee_price)
-      ),
+      refundAmount: getSoloGuaranteeRefundTargetAmount(row),
     });
     return acc;
   }, []);

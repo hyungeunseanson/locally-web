@@ -79,7 +79,8 @@ test.describe('Help Center self-service copy', () => {
     await page.getByRole('textbox').fill('최소 2인');
     await expect(page.getByText('1인 출발 확정 옵션은 어떻게 운영되나요?')).toBeVisible();
     await page.getByRole('button', { name: '1인 출발 확정 옵션은 어떻게 운영되나요?' }).click();
-    await expect(page.getByText('해당 30,000원은 게스트에게 환불되며 호스트 정산 기준에서도 제외됩니다.')).toBeVisible();
+    await expect(page.getByText('체험 등록/수정 화면에서 금액을 조정할 수 있습니다.')).toBeVisible();
+    await expect(page.getByText('해당 추가금은 게스트에게 환불되며 호스트 정산 기준에서도 제외됩니다.')).toBeVisible();
 
     await page.getByRole('textbox').fill('playwright-no-faq-match');
     await expect(page.getByTestId('help-search-empty-state')).toBeVisible();

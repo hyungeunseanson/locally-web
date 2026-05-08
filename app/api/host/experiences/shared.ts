@@ -1,4 +1,8 @@
 import { NextResponse } from 'next/server';
+import {
+  DEFAULT_SOLO_GUARANTEE_PRICE,
+  isValidSoloGuaranteePrice,
+} from '@/app/constants/soloGuarantee';
 import { FIXED_REFUND_POLICY, MAX_EXPERIENCE_PHOTOS } from '@/app/host/create/config';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { createAdminClient } from '@/app/utils/supabase/admin';
@@ -52,6 +56,7 @@ type ExperienceWriteBody = {
   meeting_point?: unknown;
   rules?: unknown;
   price?: unknown;
+  solo_guarantee_price?: unknown;
   is_private_enabled?: unknown;
   private_price?: unknown;
 };
@@ -88,6 +93,7 @@ type NormalizedExperienceWriteInput = {
     host_notice: string;
   };
   price: number;
+  soloGuaranteePrice: number;
   isPrivateEnabled: boolean;
   privatePrice: number;
 };
@@ -251,7 +257,10 @@ function didManualContentChange(
   });
 }
 
-function normalizeExperienceWriteBody(body: ExperienceWriteBody): NormalizedExperienceWriteInput {
+function normalizeExperienceWriteBody(
+  body: ExperienceWriteBody,
+  defaults: { soloGuaranteePrice?: unknown } = {}
+): NormalizedExperienceWriteInput {
   const country = asTrimmedString(body.country);
   const city = asTrimmedString(body.city);
   const category = asTrimmedString(body.category);
@@ -277,6 +286,9 @@ function normalizeExperienceWriteBody(body: ExperienceWriteBody): NormalizedExpe
   const activityLevel = asTrimmedString(rules.activity_level);
   const hostNotice = asTrimmedString(rules.host_notice);
   const price = asNumber(body.price);
+  const soloGuaranteePrice = asNumber(
+    body.solo_guarantee_price ?? defaults.soloGuaranteePrice ?? DEFAULT_SOLO_GUARANTEE_PRICE
+  );
   const isPrivateEnabled = Boolean(body.is_private_enabled);
   const privatePrice = isPrivateEnabled ? asNumber(body.private_price) : 0;
 
@@ -321,6 +333,9 @@ function normalizeExperienceWriteBody(body: ExperienceWriteBody): NormalizedExpe
   }
   if (!Number.isFinite(price) || price <= 0) {
     throw new ApiError(400, '기본 가격을 올바르게 입력해주세요.');
+  }
+  if (!isValidSoloGuaranteePrice(soloGuaranteePrice)) {
+    throw new ApiError(400, '1인 출발 확정 추가금은 20,000원~100,000원 사이에서 1,000원 단위로 입력해주세요.');
   }
   if (isPrivateEnabled && (!Number.isFinite(privatePrice) || privatePrice <= 0)) {
     throw new ApiError(400, '단독 투어 가격을 입력해주세요.');
@@ -374,6 +389,7 @@ function normalizeExperienceWriteBody(body: ExperienceWriteBody): NormalizedExpe
       host_notice: hostNotice,
     },
     price,
+    soloGuaranteePrice,
     isPrivateEnabled,
     privatePrice: isPrivateEnabled ? privatePrice : 0,
   };
@@ -517,6 +533,7 @@ export async function createExperienceFromBody(body: ExperienceWriteBody, actor:
       location: input.location,
       photos: input.photos,
       price: input.price,
+      solo_guarantee_price: input.soloGuaranteePrice,
       inclusions: input.inclusions,
       exclusions: input.exclusions,
       supplies: input.supplies,
@@ -582,12 +599,11 @@ export async function updateExperienceFromBody(params: {
   actor: RouteActor;
 }) {
   const { experienceId, body, actor } = params;
-  const input = normalizeExperienceWriteBody(body);
   const supabaseAdmin = createAdminClient();
 
   const { data: existing, error: existingError } = await supabaseAdmin
     .from('experiences')
-    .select('id, host_id, status, translation_version, source_locale, manual_locales, title, description, title_ko, title_en, title_ja, title_zh, description_ko, description_en, description_ja, description_zh, category, meeting_point, meeting_point_i18n, supplies, supplies_i18n, inclusions, inclusions_i18n, exclusions, exclusions_i18n, itinerary, itinerary_i18n, rules, rules_i18n')
+    .select('id, host_id, status, translation_version, source_locale, manual_locales, title, description, title_ko, title_en, title_ja, title_zh, description_ko, description_en, description_ja, description_zh, category, meeting_point, meeting_point_i18n, supplies, supplies_i18n, inclusions, inclusions_i18n, exclusions, exclusions_i18n, itinerary, itinerary_i18n, rules, rules_i18n, solo_guarantee_price')
     .eq('id', experienceId)
     .maybeSingle();
 
@@ -599,6 +615,9 @@ export async function updateExperienceFromBody(params: {
     throw new ApiError(403, '수정 권한이 없습니다.');
   }
 
+  const input = normalizeExperienceWriteBody(body, {
+    soloGuaranteePrice: existing.solo_guarantee_price,
+  });
   const existingSourceLocale = isExperienceLocale(existing.source_locale) ? existing.source_locale : 'ko';
   const existingManualLocales = mergeExperienceLocales(normalizeExperienceLocaleArray(existing.manual_locales));
   const mergedManualLocales = mergeExperienceLocales(existingManualLocales, input.requestedManualLocales);
@@ -660,6 +679,7 @@ export async function updateExperienceFromBody(params: {
     location: input.location,
     photos: input.photos,
     price: input.price,
+    solo_guarantee_price: input.soloGuaranteePrice,
     inclusions: input.inclusions,
     exclusions: input.exclusions,
     supplies: input.supplies,

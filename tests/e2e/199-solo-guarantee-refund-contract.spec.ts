@@ -7,7 +7,12 @@ import {
   SOLO_GUARANTEE_REFUND_AMOUNT,
   type SoloGuaranteeRefundSlotBooking,
 } from '@/app/utils/bookings/soloGuaranteeRefundPolicy';
-import { isSoloGuaranteeRefundUnresolvedStatus } from '@/app/utils/soloGuaranteeRefundStatus';
+import {
+  getSoloGuaranteeRefundGuestLabel,
+  isSoloGuaranteeRefundUnresolvedStatus,
+} from '@/app/utils/soloGuaranteeRefundStatus';
+
+const CUSTOM_SOLO_REFUND_AMOUNT = 40_000;
 
 function booking(
   overrides: Partial<SoloGuaranteeRefundSlotBooking>
@@ -71,6 +76,27 @@ test.describe('Solo guarantee refund contract', () => {
     ]);
   });
 
+  test('refunds the booking snapshot add-on amount instead of a fixed default cap', () => {
+    expect(
+      findSoloGuaranteeRefundCandidatesInSlot([
+        booking({
+          id: 'custom-solo-booking',
+          solo_guarantee_price: CUSTOM_SOLO_REFUND_AMOUNT,
+        }),
+        booking({
+          id: 'second-booking',
+          status: 'completed',
+        }),
+      ])
+    ).toEqual([
+      {
+        bookingId: 'custom-solo-booking',
+        triggerBookingId: 'second-booking',
+        refundAmount: CUSTOM_SOLO_REFUND_AMOUNT,
+      },
+    ]);
+  });
+
   test('does not automatically retry a failed solo refund candidate', () => {
     expect(
       findSoloGuaranteeRefundCandidatesInSlot([
@@ -94,6 +120,12 @@ test.describe('Solo guarantee refund contract', () => {
     expect(isSoloGuaranteeRefundUnresolvedStatus('failed')).toBe(true);
     expect(isSoloGuaranteeRefundUnresolvedStatus('refunded')).toBe(false);
     expect(isSoloGuaranteeRefundUnresolvedStatus('not_applicable')).toBe(false);
+  });
+
+  test('shows the refunded guest label with the booking snapshot amount', () => {
+    expect(getSoloGuaranteeRefundGuestLabel('refunded', CUSTOM_SOLO_REFUND_AMOUNT)).toBe(
+      '1인 진행 추가금 40,000원 환불 완료'
+    );
   });
 
   test('deducts solo add-on from settlement when a failed refund is manually completed', () => {

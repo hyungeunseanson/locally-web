@@ -494,12 +494,14 @@ export default function MasterLedgerTab({
     }
   };
 
-  const handleSoloManualRefundComplete = async (bookingId: string) => {
+  const handleSoloManualRefundComplete = async (booking: AdminMasterLedgerEntry) => {
+    const refundAmount = Number(booking.solo_guarantee_refund_amount || booking.solo_guarantee_price || 0);
+    const refundAmountLabel = refundAmount > 0 ? `₩${refundAmount.toLocaleString()}` : '해당 1인 추가금';
     setConfirmDialog({
       kind: 'solo-manual-refund',
-      bookingId,
+      bookingId: booking.id,
       title: '1인 추가금 환불 완료',
-      description: '게스트에게 30,000원 수동 환불을 완료한 뒤에만 확정하세요. 완료 처리 후 호스트 정산 보류가 해제됩니다.',
+      description: `게스트에게 ${refundAmountLabel} 수동 환불을 완료한 뒤에만 확정하세요. 완료 처리 후 호스트 정산 보류가 해제됩니다.`,
       confirmLabel: '환불 완료 처리',
       tone: 'blue',
     });
@@ -1044,7 +1046,7 @@ export default function MasterLedgerTab({
                 {canCompleteSoloManualRefund(selectedBooking) && (
                   <button
                     data-testid="admin-master-ledger-solo-manual-refund-action"
-                    onClick={() => handleSoloManualRefundComplete(selectedBooking.id)}
+                    onClick={() => handleSoloManualRefundComplete(selectedBooking)}
                     disabled={isProcessing}
                     className="w-full py-2.5 md:py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] md:text-xs font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center gap-2"
                   >

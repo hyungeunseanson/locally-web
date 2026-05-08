@@ -24,7 +24,14 @@ import {
   Palette,
 } from 'lucide-react';
 import Link from 'next/link';
-import { SOLO_GUARANTEE_PRICE } from '@/app/constants/soloGuarantee';
+import {
+  DEFAULT_SOLO_GUARANTEE_PRICE,
+  isValidSoloGuaranteePrice,
+  MAX_SOLO_GUARANTEE_PRICE,
+  MIN_SOLO_GUARANTEE_PRICE,
+  normalizeSoloGuaranteePrice,
+  SOLO_GUARANTEE_PRICE_STEP,
+} from '@/app/constants/soloGuarantee';
 import {
   ACTIVITY_LEVEL_OPTIONS,
   CATEGORY_OPTIONS,
@@ -188,7 +195,8 @@ export default function ExperienceFormSteps({
 }: ExperienceFormStepsProps) {
   const { lang } = useLanguage();
   const copy = getExperienceFormCopy(lang);
-  const soloGuaranteePriceLabel = `+ ₩${SOLO_GUARANTEE_PRICE.toLocaleString('en-US')}`;
+  const soloGuaranteePrice = normalizeSoloGuaranteePrice(formData.solo_guarantee_price);
+  const soloGuaranteePriceLabel = `+ ₩${soloGuaranteePrice.toLocaleString('en-US')}`;
   const manualLocales = getManualLocalesFromLanguageLevels(formData.language_levels || []);
   const selectedLanguageOptions = EXPERIENCE_LANGUAGE_OPTIONS.filter((option) => manualLocales.includes(option.code));
   const normalizedTempInclusion = normalizeListItem(tempInclusion);
@@ -200,6 +208,7 @@ export default function ExperienceFormSteps({
   const exclusionLooksDuplicate = normalizedTempExclusion.length >= 2 && formData.exclusions.some((item: string) => normalizeListItem(item).toLocaleLowerCase() === normalizedTempExclusion.toLocaleLowerCase());
   const suppliesLooksShort = trimmedSupplies.length > 0 && trimmedSupplies.length < 4;
   const priceMissing = !Number(formData.price) || Number(formData.price) <= 0;
+  const soloGuaranteePriceInvalid = !isValidSoloGuaranteePrice(formData.solo_guarantee_price);
   const privatePriceMissing = Boolean(formData.is_private_enabled) && (!Number(formData.private_price) || Number(formData.private_price) <= 0);
   const categoryIconMap: Record<string, React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>> = {
     utensils: Utensils,
@@ -823,15 +832,37 @@ export default function ExperienceFormSteps({
           </div>
 
           <div className="w-full rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5 md:p-6">
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div className="space-y-2">
                 <p className="text-sm md:text-base font-bold text-slate-900">{copy.soloGuaranteeTitle}</p>
                 <p className="text-sm text-slate-700 leading-6">{copy.soloGuaranteeDesc}</p>
                 <p className="text-xs md:text-sm font-semibold text-emerald-700">{copy.soloGuaranteeRefundNote}</p>
                 <p className="text-xs md:text-sm text-slate-500">{copy.soloGuaranteeHostNote}</p>
               </div>
-              <div className="shrink-0 rounded-full border border-emerald-300 bg-white px-4 py-2 text-base md:text-lg font-black text-emerald-700">
-                {soloGuaranteePriceLabel}
+              <div className="w-full md:w-56 shrink-0 rounded-2xl border border-emerald-200 bg-white p-4">
+                <label className="block text-[11px] font-bold text-slate-500 mb-2">{copy.soloGuaranteePriceLabel}</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-slate-400">₩</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={formatPriceInputValue(formData.solo_guarantee_price ?? DEFAULT_SOLO_GUARANTEE_PRICE)}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/[^0-9]/g, '');
+                      updateData('solo_guarantee_price', v ? Number(v) : 0);
+                    }}
+                    min={MIN_SOLO_GUARANTEE_PRICE}
+                    max={MAX_SOLO_GUARANTEE_PRICE}
+                    step={SOLO_GUARANTEE_PRICE_STEP}
+                    className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-8 pr-3 text-right text-base font-black text-emerald-700 outline-none focus:border-emerald-500"
+                    placeholder={copy.soloGuaranteePricePlaceholder}
+                  />
+                </div>
+                <div className="mt-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-center text-sm font-black text-emerald-700">
+                  {soloGuaranteePriceLabel}
+                </div>
+                <FieldHint className="ml-0 mt-2">{copy.soloGuaranteePriceHelp}</FieldHint>
+                {soloGuaranteePriceInvalid && <FieldHint className="ml-0 mt-2 text-amber-600">{copy.validationSoloGuaranteePrice}</FieldHint>}
               </div>
             </div>
           </div>

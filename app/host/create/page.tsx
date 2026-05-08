@@ -19,6 +19,7 @@ import { useLanguage } from '@/app/context/LanguageContext';
 import { buildExperienceWritePayload, syncManualContentWithLocales, type ExperienceFormState, type ItineraryItem } from './experienceFormState';
 import { getManualLocalesFromLanguageLevels, isExperienceLocale } from '@/app/utils/experienceTranslation';
 import HostPhotoActionSheet from '@/app/host/components/HostPhotoActionSheet';
+import { isValidSoloGuaranteePrice } from '@/app/constants/soloGuarantee';
 
 type ProcessedImageFile = File & {
   readonly __processedImage: true;
@@ -181,6 +182,10 @@ export default function CreateExperiencePage() {
     if (targetStep === 7) {
       if (!Number(formData.price) || Number(formData.price) <= 0) {
         showToast(copy.validationPrice, 'error');
+        return false;
+      }
+      if (!isValidSoloGuaranteePrice(formData.solo_guarantee_price)) {
+        showToast(copy.validationSoloGuaranteePrice, 'error');
         return false;
       }
       if (formData.is_private_enabled && (!Number(formData.private_price) || Number(formData.private_price) <= 0)) {

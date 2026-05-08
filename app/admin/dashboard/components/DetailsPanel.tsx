@@ -18,6 +18,14 @@ import {
   type AdminPanelSelectedItem,
   type ExperienceApprovalItem,
 } from '@/app/types/admin';
+import {
+  DEFAULT_SOLO_GUARANTEE_PRICE,
+  isValidSoloGuaranteePrice,
+  MAX_SOLO_GUARANTEE_PRICE,
+  MIN_SOLO_GUARANTEE_PRICE,
+  normalizeSoloGuaranteePrice,
+  SOLO_GUARANTEE_PRICE_STEP,
+} from '@/app/constants/soloGuarantee';
 
 type ExperienceItineraryItem = NonNullable<ExperienceApprovalItem['itinerary']>[number];
 
@@ -84,6 +92,9 @@ export default function DetailsPanel({
   const [superhostError, setSuperhostError] = useState<string | null>(null);
   const [soloOptionSaving, setSoloOptionSaving] = useState(false);
   const [soloOptionError, setSoloOptionError] = useState<string | null>(null);
+  const [soloPriceDraft, setSoloPriceDraft] = useState(String(DEFAULT_SOLO_GUARANTEE_PRICE));
+  const [soloPriceSaving, setSoloPriceSaving] = useState(false);
+  const [soloPriceError, setSoloPriceError] = useState<string | null>(null);
 
   const handleStartCSChat = async () => {
     if (!rawSelectedItem?.id) return;
@@ -163,6 +174,7 @@ export default function DetailsPanel({
       ? (detailItem || rawSelectedItem)
       : rawSelectedItem;
   const soloGuaranteeOptionVisible = selectedItem?.solo_guarantee_option_visible !== false;
+  const soloGuaranteePrice = normalizeSoloGuaranteePrice(selectedItem?.solo_guarantee_price);
   const isStaleHostApplication = activeTab === 'APPS' && selectedItem?.is_latest_for_user === false;
   const applicationLanguageLevels = normalizeLanguageLevels(
     selectedItem?.language_levels,
@@ -258,6 +270,53 @@ export default function DetailsPanel({
       setSoloOptionError(message);
     } finally {
       setSoloOptionSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'EXPS' && selectedItem?.id) {
+      setSoloPriceDraft(String(soloGuaranteePrice));
+      setSoloPriceError(null);
+    }
+  }, [activeTab, selectedItem?.id, soloGuaranteePrice]);
+
+  const handleSoloPriceSave = async () => {
+    if (!selectedItem || activeTab !== 'EXPS' || soloPriceSaving) return;
+
+    const price = Number(String(soloPriceDraft).replace(/[^0-9]/g, ''));
+    if (!isValidSoloGuaranteePrice(price)) {
+      setSoloPriceError('1인 출발 확정 추가금은 20,000원~100,000원 사이에서 1,000원 단위로 입력해주세요.');
+      return;
+    }
+
+    setSoloPriceSaving(true);
+    setSoloPriceError(null);
+
+    try {
+      const response = await fetch(`/api/admin/experiences/${selectedItem.id}/solo-guarantee-price`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ price }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || '1인 출발 확정 추가금 변경에 실패했습니다.');
+      }
+
+      const nextPrice = Number(result?.data?.solo_guarantee_price ?? price);
+      const nextItem = {
+        ...selectedItem,
+        solo_guarantee_price: nextPrice,
+      };
+      setDetailItem((prev) => (prev ? { ...prev, solo_guarantee_price: nextPrice } : prev));
+      setSelectedItem?.(nextItem);
+      setSoloPriceDraft(String(nextPrice));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '1인 출발 확정 추가금 변경에 실패했습니다.';
+      setSoloPriceError(message);
+    } finally {
+      setSoloPriceSaving(false);
     }
   };
 
@@ -697,6 +756,7 @@ export default function DetailsPanel({
               <InfoBox label="최대 인원" value={selectedItem.max_guests ? `${selectedItem.max_guests}명` : '-'} />
               <InfoBox label="지역" value={selectedItem.city ? `${selectedItem.country || ''} > ${selectedItem.city}${selectedItem.subCity ? `, ${selectedItem.subCity}` : ''}` : '-'} />
               <InfoBox label="단독 투어" value={selectedItem.is_private_enabled ? `가능 (₩${selectedItem.private_price?.toLocaleString() || 0})` : '불가'} />
+              <InfoBox label="1인 추가금" value={`₩${soloGuaranteePrice.toLocaleString()}`} />
             </div>
 
             <div
@@ -713,7 +773,7 @@ export default function DetailsPanel({
                     {soloGuaranteeOptionVisible ? '게스트 화면에 노출 중' : '게스트 화면에서 비노출'}
                   </p>
                   <p className="mt-1 text-[11px] leading-5 text-slate-500">
-                    이 스위치는 옵션 박스 노출만 제어하며 가격, 환불, 정산 계산은 변경하지 않습니다.
+                    이 스위치는 옵션 박스 노출만 제어합니다. 금액은 아래 입력값으로 별도 저장합니다.
                   </p>
                 </div>
                 <button
@@ -734,6 +794,40 @@ export default function DetailsPanel({
               {soloOptionError && (
                 <p className="mt-2 text-[11px] font-semibold text-rose-600">{soloOptionError}</p>
               )}
+              <div className="mt-4 border-t border-slate-200 pt-4">
+                <label className="mb-2 block text-[11px] font-bold text-slate-500">
+                  1인 출발 확정 추가금
+                </label>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <div className="relative sm:max-w-[220px]">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-slate-400">₩</span>
+                    <input
+                      type="number"
+                      min={MIN_SOLO_GUARANTEE_PRICE}
+                      max={MAX_SOLO_GUARANTEE_PRICE}
+                      step={SOLO_GUARANTEE_PRICE_STEP}
+                      value={soloPriceDraft}
+                      onChange={(event) => setSoloPriceDraft(event.target.value)}
+                      className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-8 pr-3 text-right text-sm font-bold text-slate-900 outline-none focus:border-slate-900"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    disabled={soloPriceSaving}
+                    onClick={handleSoloPriceSave}
+                    data-testid="admin-experience-solo-price-save"
+                    className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {soloPriceSaving ? '저장 중...' : '금액 저장'}
+                  </button>
+                </div>
+                <p className="mt-2 text-[11px] leading-5 text-slate-500">
+                  20,000원~100,000원 사이에서 1,000원 단위로 설정합니다. 기존 예약 금액은 변경하지 않습니다.
+                </p>
+                {soloPriceError && (
+                  <p className="mt-2 text-[11px] font-semibold text-rose-600">{soloPriceError}</p>
+                )}
+              </div>
             </div>
 
             {/* 언어 */}

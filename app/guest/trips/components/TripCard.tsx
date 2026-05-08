@@ -84,7 +84,7 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
   const isPendingDeposit = (trip.status || '').toLowerCase() === 'pending';
   const needsExpandedDesktopLayout = isPendingDeposit || isReviewPending;
   const soloRefundStatus = normalizeSoloGuaranteeRefundStatus(trip.soloGuaranteeRefundStatus);
-  const soloRefundLabel = getSoloGuaranteeRefundGuestLabel(soloRefundStatus);
+  const soloRefundLabel = getSoloGuaranteeRefundGuestLabel(soloRefundStatus, trip.soloGuaranteeRefundAmount);
 
   const buildMessageHref = () => {
     const messageParams = new URLSearchParams({

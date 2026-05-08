@@ -1,3 +1,4 @@
+import { DEFAULT_SOLO_GUARANTEE_PRICE } from '@/app/constants/soloGuarantee';
 import type { ExperienceLocale, LocalizedField, ManualContent } from '@/app/utils/experienceTranslation';
 import { mergeManualContent } from '@/app/utils/experienceTranslation';
 import type { LanguageLevelEntry } from '@/app/utils/languageLevels';
@@ -34,6 +35,7 @@ export type ExperienceFormState = {
     host_notice?: string;
   };
   price: number;
+  solo_guarantee_price?: number;
   is_private_enabled?: boolean;
   private_price?: number;
 };
@@ -94,6 +96,7 @@ export function buildExperienceWritePayload(formData: ExperienceFormState) {
       host_notice: hostNotice,
     },
     price: formData.price,
+    solo_guarantee_price: formData.solo_guarantee_price ?? DEFAULT_SOLO_GUARANTEE_PRICE,
     is_private_enabled: Boolean(formData.is_private_enabled),
     private_price: formData.private_price ?? 0,
   };

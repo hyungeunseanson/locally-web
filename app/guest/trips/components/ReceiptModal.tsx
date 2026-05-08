@@ -65,7 +65,7 @@ export default function ReceiptModal({ trip, onClose }: { trip: ReceiptTrip, onC
   const bankInfo = getPublicBankInfo();
   const isPending = isPendingBookingStatus(trip.status || '');
   const soloRefundStatus = normalizeSoloGuaranteeRefundStatus(trip.soloGuaranteeRefundStatus);
-  const soloRefundLabel = getSoloGuaranteeRefundGuestLabel(soloRefundStatus);
+  const soloRefundLabel = getSoloGuaranteeRefundGuestLabel(soloRefundStatus, trip.soloGuaranteeRefundAmount);
   const orderDisplay = trip.orderId || String(trip.id || '-').slice(0, 15);
   const guestCount = Number(trip.guests || 1);
   const safeOrderDisplay = String(orderDisplay).replace(/[^a-zA-Z0-9_-]/g, '-');

@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { useLanguage } from '@/app/context/LanguageContext';
-import { SOLO_GUARANTEE_PRICE } from '@/app/constants/soloGuarantee';
+import { normalizeSoloGuaranteePrice } from '@/app/constants/soloGuarantee';
 import {
   ExperienceCalendarDayStatus,
   ExperienceSlotSoldOutReason,
@@ -14,6 +14,7 @@ interface ReservationCardProps {
   price: number;
   privatePrice?: number;
   isPrivateEnabled?: boolean;
+  soloGuaranteePrice?: number;
   soloGuaranteeOptionVisible?: boolean;
   duration: number;
   availableDates: string[];
@@ -25,12 +26,13 @@ interface ReservationCardProps {
 }
 
 export default function ReservationCard({
-  price, privatePrice = 0, isPrivateEnabled = false,
+  price, privatePrice = 0, isPrivateEnabled = false, soloGuaranteePrice: soloGuaranteePriceProp,
   soloGuaranteeOptionVisible = true,
   duration, availableDates, dateToTimeMap, calendarDayStatusMap = {}, onReserve,
   maxGuests = 10, slotSummaryMap = {}
 }: ReservationCardProps) {
   const { t } = useLanguage();
+  const soloGuaranteePrice = normalizeSoloGuaranteePrice(soloGuaranteePriceProp);
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState("");
@@ -135,7 +137,7 @@ export default function ReservationCard({
     guestCount === 1 &&
     Boolean(currentSlotSummary?.soloGuaranteeEligible);
   const basePrice = isPrivate ? privatePrice : (price * guestCount);
-  const optionPrice = (isSoloEligible && isSoloGuaranteed) ? SOLO_GUARANTEE_PRICE : 0;
+  const optionPrice = (isSoloEligible && isSoloGuaranteed) ? soloGuaranteePrice : 0;
   const totalPrice = basePrice + optionPrice;
 
   useEffect(() => {
@@ -337,7 +339,7 @@ export default function ReservationCard({
             <div>
               <div className="font-semibold text-[13px] md:text-sm mb-1">{t('exp_reservation_solo_option_title')}</div>
               <div className="text-[11px] md:text-xs text-slate-500 leading-tight">{t('exp_reservation_solo_option_desc')} <br/><span className="text-rose-500 font-semibold">{t('exp_reservation_solo_option_refund_note')}</span></div>
-              <div className="font-semibold text-[13px] md:text-sm mt-2 text-slate-900">+ ₩{SOLO_GUARANTEE_PRICE.toLocaleString()}</div>
+              <div className="font-semibold text-[13px] md:text-sm mt-2 text-slate-900">+ ₩{soloGuaranteePrice.toLocaleString()}</div>
             </div>
           </div>
         </div>

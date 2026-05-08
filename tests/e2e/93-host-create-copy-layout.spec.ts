@@ -367,7 +367,12 @@ test('host create shows structured primary language guidance and refund policy c
   ).toBeVisible();
   await expect(
     page.getByText(
-      /1인 출발 확정 옵션은 기본 30,000원 추가금으로 운영됩니다\.|The guaranteed solo departure option uses a fixed 30,000 KRW add-on\.|1名出発確定オプションは、基本30,000ウォンの追加料金で運用されます。|1人出发保障选项默认按 30,000 韩元附加费运营。/
+      /1인 출발 확정 옵션은 기본 30,000원 추가금으로 시작하며 체험 특성에 맞게 조정할 수 있습니다\.|The guaranteed solo departure option starts from the default 30,000 KRW add-on and can be adjusted for each experience\.|1名出発確定オプションは、基本30,000ウォンの追加料金から始まり、体験ごとに調整できます。|1人出发保障选项默认从 30,000 韩元附加费开始，并可按体验调整。/
+    )
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      /1인 출발 확정 추가금|Guaranteed solo departure add-on|1名出発確定の追加料金|1人出发保障附加费/
     )
   ).toBeVisible();
   await expect(page.getByText('+ ₩30,000')).toBeVisible();

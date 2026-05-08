@@ -1,3 +1,5 @@
+import { DEFAULT_SOLO_GUARANTEE_PRICE } from '@/app/constants/soloGuarantee';
+
 export type FormLocale = 'ko' | 'en' | 'ja' | 'zh';
 
 export type LocalizedText = Record<FormLocale, string>;
@@ -178,6 +180,7 @@ export const INITIAL_FORM_DATA = {
   },
 
   price: 50000,
+  solo_guarantee_price: DEFAULT_SOLO_GUARANTEE_PRICE,
 };
 
 type ExperienceFormCopy = {
@@ -274,6 +277,9 @@ type ExperienceFormCopy = {
   soloGuaranteeDesc: string;
   soloGuaranteeRefundNote: string;
   soloGuaranteeHostNote: string;
+  soloGuaranteePriceLabel: string;
+  soloGuaranteePriceHelp: string;
+  soloGuaranteePricePlaceholder: string;
   privateOptionLabel: string;
   privateOptionDesc: string;
   privatePriceHelp: string;
@@ -306,6 +312,7 @@ type ExperienceFormCopy = {
   validationSuppliesQuality: string;
   validationAgeLimit: string;
   validationPrice: string;
+  validationSoloGuaranteePrice: string;
   validationPrivatePrice: string;
   imageValidationFallback: string;
   imageProcessingError: string;
@@ -443,7 +450,10 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     soloGuaranteeTitle: '1인 출발 확정 옵션',
     soloGuaranteeDesc: '혼자 예약한 게스트가 이 옵션을 선택하면 최소 인원 미달이어도 취소 없이 출발합니다.',
     soloGuaranteeRefundNote: '*추가 인원 모객 시 게스트에게 자동 환불',
-    soloGuaranteeHostNote: '1인 출발 확정 옵션은 기본 30,000원 추가금으로 운영됩니다. 최소 2인 예약 기준으로만 운영하고 싶은 체험은 관리자에게 요청하면 게스트 화면에서 이 옵션을 숨길 수 있습니다. 추가 참여자가 실제로 합류한 상태로 체험이 완료되면, 해당 30,000원은 게스트에게 환불되며 정산 기준에서도 제외됩니다.',
+    soloGuaranteeHostNote: '1인 출발 확정 옵션은 기본 30,000원 추가금으로 시작하며 체험 특성에 맞게 조정할 수 있습니다. 최소 2인 예약 기준으로만 운영하고 싶은 체험은 관리자에게 요청하면 게스트 화면에서 이 옵션을 숨길 수 있습니다. 추가 참여자가 실제로 합류한 상태로 체험이 완료되면, 해당 추가금은 게스트에게 환불되며 정산 기준에서도 제외됩니다.',
+    soloGuaranteePriceLabel: '1인 출발 확정 추가금',
+    soloGuaranteePriceHelp: '20,000원~100,000원 사이에서 1,000원 단위로 설정합니다. 기본값은 30,000원입니다.',
+    soloGuaranteePricePlaceholder: '30,000',
     privateOptionLabel: '단독 투어 옵션',
     privateOptionDesc: '다른 게스트 없이 우리 그룹만 참여하는 프라이빗 투어 가격을 설정합니다.',
     privatePriceHelp: '기본 가격과 별도로, 우리 그룹만 참여할 때의 고정 가격을 정하는 옵션입니다.',
@@ -477,6 +487,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     validationAgeLimit: '참가 연령 기준을 입력해주세요.',
     validationPrice: '기본 가격을 올바르게 입력해주세요.',
     validationPrivatePrice: '단독 투어 가격을 입력해주세요.',
+    validationSoloGuaranteePrice: '1인 출발 확정 추가금은 20,000원~100,000원 사이에서 1,000원 단위로 입력해주세요.',
     imageValidationFallback: '이미지 형식이 올바르지 않습니다.',
     imageProcessingError: '이미지 처리 중 오류가 발생했습니다.',
     loginRequired: '로그인이 필요합니다.',
@@ -611,7 +622,10 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     soloGuaranteeTitle: 'Guaranteed solo departure option',
     soloGuaranteeDesc: 'If a solo guest buys this option, the experience can go ahead without cancellation even when the minimum group size is not met.',
     soloGuaranteeRefundNote: '*Automatically refunded to the guest if more people join later',
-    soloGuaranteeHostNote: 'The guaranteed solo departure option uses a fixed 30,000 KRW add-on. If you want to run an experience only from a two-person booking standard, ask the admin team to hide this option from the guest screen. If another participant actually remains in the same slot and the experience is completed, that 30,000 KRW is refunded to the guest and excluded from your payout basis.',
+    soloGuaranteeHostNote: 'The guaranteed solo departure option starts from the default 30,000 KRW add-on and can be adjusted for each experience. If you want to run an experience only from a two-person booking standard, ask the admin team to hide this option from the guest screen. If another participant actually remains in the same slot and the experience is completed, the add-on is refunded to the guest and excluded from your payout basis.',
+    soloGuaranteePriceLabel: 'Guaranteed solo departure add-on',
+    soloGuaranteePriceHelp: 'Set an amount from 20,000 KRW to 100,000 KRW in 1,000 KRW steps. The default is 30,000 KRW.',
+    soloGuaranteePricePlaceholder: '30,000',
     privateOptionLabel: 'Private tour option',
     privateOptionDesc: 'Set a fixed price for a private tour where only the booking group participates.',
     privatePriceHelp: 'Use this when you want a separate fixed price for one booking group only.',
@@ -645,6 +659,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     validationAgeLimit: 'Enter the age requirement.',
     validationPrice: 'Enter a valid base price.',
     validationPrivatePrice: 'Enter the private tour price.',
+    validationSoloGuaranteePrice: 'Enter a guaranteed solo departure add-on from 20,000 KRW to 100,000 KRW in 1,000 KRW steps.',
     imageValidationFallback: 'Invalid image format.',
     imageProcessingError: 'An error occurred while processing the image.',
     loginRequired: 'Login is required.',
@@ -778,7 +793,10 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     soloGuaranteeTitle: '1名出発確定オプション',
     soloGuaranteeDesc: '1名予約のゲストがこのオプションを選ぶと、最少人数に満たなくてもキャンセルなしで出発できます。',
     soloGuaranteeRefundNote: '*後から参加者が増えた場合はゲストへ自動返金',
-    soloGuaranteeHostNote: '1名出発確定オプションは、基本30,000ウォンの追加料金で運用されます。最低2名予約を基準に運営したい体験は、管理者に依頼するとゲスト画面でこのオプションを非表示にできます。追加参加者が実際に同じ枠に残った状態で体験が完了すると、その30,000ウォンはゲストへ返金され、精算基準からも除外されます。',
+    soloGuaranteeHostNote: '1名出発確定オプションは、基本30,000ウォンの追加料金から始まり、体験ごとに調整できます。最低2名予約を基準に運営したい体験は、管理者に依頼するとゲスト画面でこのオプションを非表示にできます。追加参加者が実際に同じ枠に残った状態で体験が完了すると、その追加料金はゲストへ返金され、精算基準からも除外されます。',
+    soloGuaranteePriceLabel: '1名出発確定の追加料金',
+    soloGuaranteePriceHelp: '20,000ウォン〜100,000ウォンの間で、1,000ウォン単位で設定します。基本値は30,000ウォンです。',
+    soloGuaranteePricePlaceholder: '30,000',
     privateOptionLabel: 'プライベートツアーオプション',
     privateOptionDesc: '他のゲストなしで、グループだけが参加するプライベートツアーの価格を設定します。',
     privatePriceHelp: '1組だけで参加する場合の固定価格を別で設定したいときに使います。',
@@ -812,6 +830,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     validationAgeLimit: '参加年齢条件を入力してください。',
     validationPrice: '基本価格を正しく入力してください。',
     validationPrivatePrice: 'プライベートツアー価格を入力してください。',
+    validationSoloGuaranteePrice: '1名出発確定の追加料金は20,000ウォン〜100,000ウォンの間で、1,000ウォン単位で入力してください。',
     imageValidationFallback: '画像形式が正しくありません。',
     imageProcessingError: '画像処理中にエラーが発生しました。',
     loginRequired: 'ログインが必要です。',
@@ -946,7 +965,10 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     soloGuaranteeTitle: '1人出发保障选项',
     soloGuaranteeDesc: '如果单人游客购买这个选项，即使未达到最低成团人数，也可以不取消直接出发。',
     soloGuaranteeRefundNote: '*后续有更多游客加入时，会自动退还给游客',
-    soloGuaranteeHostNote: '1人出发保障选项默认按 30,000 韩元附加费运营。如果你只想按至少 2 人预订标准运营体验，可以联系管理员，让该选项在游客页面隐藏。若后续有其他参与者实际留在同一场次并完成体验，这 30,000 韩元会退还给游客，并从房东结算基准中扣除。',
+    soloGuaranteeHostNote: '1人出发保障选项默认从 30,000 韩元附加费开始，并可按体验调整。如果你只想按至少 2 人预订标准运营体验，可以联系管理员，让该选项在游客页面隐藏。若后续有其他参与者实际留在同一场次并完成体验，该附加费会退还给游客，并从房东结算基准中扣除。',
+    soloGuaranteePriceLabel: '1人出发保障附加费',
+    soloGuaranteePriceHelp: '请在 20,000 韩元至 100,000 韩元之间，以 1,000 韩元为单位设置。默认值为 30,000 韩元。',
+    soloGuaranteePricePlaceholder: '30,000',
     privateOptionLabel: '私人团选项',
     privateOptionDesc: '设置仅预订团体参加、无其他游客的私人团价格。',
     privatePriceHelp: '如果想为单独一组游客设置固定价格，可以开启这个选项。',
@@ -980,6 +1002,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     validationAgeLimit: '请输入参加年龄条件。',
     validationPrice: '请输入正确的基础价格。',
     validationPrivatePrice: '请输入私人团价格。',
+    validationSoloGuaranteePrice: '1人出发保障附加费需在 20,000 韩元至 100,000 韩元之间，并以 1,000 韩元为单位输入。',
     imageValidationFallback: '图片格式不正确。',
     imageProcessingError: '图片处理时发生错误。',
     loginRequired: '需要登录。',

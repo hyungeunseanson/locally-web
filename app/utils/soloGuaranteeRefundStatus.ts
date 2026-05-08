@@ -1,3 +1,5 @@
+import { DEFAULT_SOLO_GUARANTEE_PRICE } from '@/app/constants/soloGuarantee';
+
 export type SoloGuaranteeRefundStatus =
   | 'not_applicable'
   | 'processing'
@@ -34,11 +36,19 @@ export function isSoloGuaranteeRefundUnresolvedStatus(status?: string | null) {
   );
 }
 
-export function getSoloGuaranteeRefundGuestLabel(status?: string | null) {
+function formatRefundAmount(amount?: number | string | null) {
+  const parsed = Number(amount ?? DEFAULT_SOLO_GUARANTEE_PRICE);
+  const safeAmount = Number.isFinite(parsed) && parsed > 0
+    ? parsed
+    : DEFAULT_SOLO_GUARANTEE_PRICE;
+  return safeAmount.toLocaleString('ko-KR');
+}
+
+export function getSoloGuaranteeRefundGuestLabel(status?: string | null, amount?: number | string | null) {
   const normalized = normalizeSoloGuaranteeRefundStatus(status);
 
   if (normalized === 'refunded') {
-    return '1인 진행 추가금 30,000원 환불 완료';
+    return `1인 진행 추가금 ${formatRefundAmount(amount)}원 환불 완료`;
   }
 
   if (normalized === 'pending_manual') {

@@ -28,7 +28,7 @@ export default function PastTripCard({ trip, onOpenReview }: PastTripCardProps) 
   const thumbnailSrc = trip.photos && trip.photos.length > 0 ? trip.photos[0] : trip.image || null;
   const localizedTitle = getContent(trip, 'title', lang) || trip.title;
   const soloRefundStatus = normalizeSoloGuaranteeRefundStatus(trip.soloGuaranteeRefundStatus);
-  const soloRefundLabel = getSoloGuaranteeRefundGuestLabel(soloRefundStatus);
+  const soloRefundLabel = getSoloGuaranteeRefundGuestLabel(soloRefundStatus, trip.soloGuaranteeRefundAmount);
 
   const handleCardClick = () => {
     if (trip.expId) {

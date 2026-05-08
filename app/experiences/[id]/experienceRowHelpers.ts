@@ -7,6 +7,7 @@ import {
   normalizeLanguageLevels,
   type LanguageLevelEntry,
 } from '@/app/utils/languageLevels';
+import { normalizeSoloGuaranteePrice } from '@/app/constants/soloGuarantee';
 import type {
   ExperienceDetail,
   ExperienceItineraryItem,
@@ -421,6 +422,7 @@ export function normalizeExperienceDetailRow(raw: unknown): ExperienceDetail | n
     price: readNumberField(row, 'price') ?? 0,
     private_price: readNumberField(row, 'private_price'),
     is_private_enabled: readBooleanField(row, 'is_private_enabled') ?? false,
+    solo_guarantee_price: normalizeSoloGuaranteePrice(readNumberField(row, 'solo_guarantee_price')),
     solo_guarantee_option_visible: readBooleanField(row, 'solo_guarantee_option_visible') ?? true,
     max_guests: readNumberField(row, 'max_guests') ?? 10,
     duration: readNumberField(row, 'duration'),

@@ -50,6 +50,7 @@ export type ExperienceDetail = {
   price: number;
   private_price: number | null;
   is_private_enabled: boolean;
+  solo_guarantee_price: number;
   solo_guarantee_option_visible: boolean;
   photos: string[];
   image_url: string | null;

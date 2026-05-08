@@ -24,6 +24,14 @@ import { getLanguageNames, normalizeLanguageLevels } from '@/app/utils/languageL
 import { buildExperienceWritePayload, getManualFieldValue, setManualFieldValue, syncManualContentWithLocales } from '@/app/host/create/experienceFormState';
 import HostPhotoActionSheet from '@/app/host/components/HostPhotoActionSheet';
 import {
+  DEFAULT_SOLO_GUARANTEE_PRICE,
+  isValidSoloGuaranteePrice,
+  MAX_SOLO_GUARANTEE_PRICE,
+  MIN_SOLO_GUARANTEE_PRICE,
+  normalizeSoloGuaranteePrice,
+  SOLO_GUARANTEE_PRICE_STEP,
+} from '@/app/constants/soloGuarantee';
+import {
   buildManualContentFromExperience,
   getManualLocalesFromLanguageLevels,
   getManualLocalesFromManualContent,
@@ -63,6 +71,7 @@ const HOST_EXPERIENCE_EDIT_SELECT = `
   status,
   is_private_enabled,
   private_price,
+  solo_guarantee_price,
   source_locale,
   manual_locales,
   title_ko,
@@ -147,6 +156,7 @@ export default function EditExperiencePage() {
             ...item,
             image_url: item?.image_url || '',
           })),
+          solo_guarantee_price: normalizeSoloGuaranteePrice(data.solo_guarantee_price),
           rules: {
             ...(data.rules || {}),
             age_limit: data.rules?.age_limit || '',
@@ -189,6 +199,9 @@ export default function EditExperiencePage() {
 
       if (formData.is_private_enabled && (!Number(formData.private_price) || Number(formData.private_price) <= 0)) {
         throw new Error(copy.validationPrivatePrice);
+      }
+      if (!isValidSoloGuaranteePrice(formData.solo_guarantee_price)) {
+        throw new Error(copy.validationSoloGuaranteePrice);
       }
 
       const cleanedInclusions = (formData.inclusions || []).map((item: string) => item.trim()).filter(Boolean);
@@ -662,6 +675,33 @@ export default function EditExperiencePage() {
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-2">{t('label_max_guests')}</label>
                 <input type="number" className="w-full p-4 bg-white border border-slate-200 rounded-xl font-bold focus:border-black outline-none" value={formData.max_guests} onChange={(e) => setFormData({ ...formData, max_guests: e.target.value })} />
+              </div>
+            </div>
+            <div className="w-full rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_220px] md:items-start">
+                <div className="space-y-2">
+                  <p className="text-sm font-bold text-slate-900">{copy.soloGuaranteeTitle}</p>
+                  <p className="text-sm leading-6 text-slate-700">{copy.soloGuaranteeDesc}</p>
+                  <p className="text-xs font-semibold text-emerald-700">{copy.soloGuaranteeRefundNote}</p>
+                  <p className="text-xs leading-5 text-slate-500">{copy.soloGuaranteeHostNote}</p>
+                </div>
+                <div className="rounded-2xl border border-emerald-200 bg-white p-4">
+                  <label className="mb-2 block text-[11px] font-bold text-slate-500">{copy.soloGuaranteePriceLabel}</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-slate-400">₩</span>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={MIN_SOLO_GUARANTEE_PRICE}
+                      max={MAX_SOLO_GUARANTEE_PRICE}
+                      step={SOLO_GUARANTEE_PRICE_STEP}
+                      className="w-full rounded-xl border border-slate-200 bg-white p-4 pl-9 text-right font-bold text-emerald-700 outline-none focus:border-emerald-500"
+                      value={formData.solo_guarantee_price ?? DEFAULT_SOLO_GUARANTEE_PRICE}
+                      onChange={(e) => setFormData({ ...formData, solo_guarantee_price: Number(e.target.value) })}
+                    />
+                  </div>
+                  <p className="mt-2 text-[11px] leading-5 text-slate-500">{copy.soloGuaranteePriceHelp}</p>
+                </div>
               </div>
             </div>
             <div className="w-full bg-slate-50 p-5 rounded-2xl border border-slate-200">
