@@ -3254,7 +3254,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     host_approval_welcome_cta: "最初の体験を登録する",
     host_approval_welcome_dismiss: "あとで見る",
     menu_reservation: "予約管理",
-    menu_my_exp: "体験管理",
+    menu_my_exp: "ツアー管理",
     menu_inquiry: "お問い合わせ",
     menu_earnings: "収益・精算",
     menu_reviews: "レビュー",
@@ -3776,7 +3776,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
 
     // SiteHeader host menu items
     header_reservations: "予約管理",
-    header_my_experiences: "体験管理",
+    header_my_experiences: "ツアー管理",
     header_inquiries: "問い合わせ箱",
     header_service_matching: "サービスマッチング",
     header_earnings: "収益・精算",
