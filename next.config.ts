@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   // ✅ 이미지 최적화 설정
@@ -79,4 +80,37 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+const shouldUploadSentrySourceMaps = Boolean(
+  process.env.SENTRY_AUTH_TOKEN &&
+  process.env.SENTRY_ORG &&
+  process.env.SENTRY_PROJECT
+);
+
+export default shouldUploadSentrySourceMaps
+  ? withSentryConfig(nextConfig, {
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      silent: !process.env.CI,
+      telemetry: false,
+      widenClientFileUpload: true,
+      sourcemaps: {
+        deleteSourcemapsAfterUpload: true,
+      },
+      routeManifestInjection: false,
+      suppressOnRouterTransitionStartWarning: true,
+      webpack: {
+        autoInstrumentServerFunctions: false,
+        autoInstrumentMiddleware: false,
+        autoInstrumentAppDirectory: false,
+        automaticVercelMonitors: false,
+        treeshake: {
+          removeDebugLogging: true,
+          removeTracing: true,
+        },
+      },
+      errorHandler(error) {
+        console.warn('[Sentry] Source map upload failed:', error);
+      },
+    })
+  : nextConfig;

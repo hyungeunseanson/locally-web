@@ -4,6 +4,7 @@ import type { HostRegisterSubmitErrorCode } from '@/app/host/register/localizati
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { normalizeDateOfBirth } from '@/app/utils/dateOfBirth';
 import { getLanguageNames, normalizeLanguageLevels, type LanguageLevelEntry } from '@/app/utils/languageLevels';
+import { captureServerException } from '@/app/utils/monitoring/sentry';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 
@@ -323,6 +324,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Host register submit route error:', error);
+    captureServerException(error, { route: '/api/host/register/submit', method: 'POST' });
     return createErrorResponse(500, 'unexpected_error', 'Failed to submit host application.');
   }
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { hasValidCronAuthorization } from '@/app/utils/cronAuth';
+import { captureServerException } from '@/app/utils/monitoring/sentry';
 import { runServiceCompletionSync } from '@/app/utils/settlementSync/serviceCompletion';
 import { isSettlementSyncInfrastructureError } from '@/app/utils/settlementSync/types';
 import { createAdminClient } from '@/app/utils/supabase/admin';
@@ -117,6 +118,7 @@ export async function GET(request: Request) {
 
     const message = error instanceof Error ? error.message : 'Internal Server Error';
     console.error('[CRON complete-services] error:', error);
+    captureServerException(error, { route: '/api/cron/complete-services', method: 'GET' });
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

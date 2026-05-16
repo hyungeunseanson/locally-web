@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
+import { captureServerException } from '@/app/utils/monitoring/sentry';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 
 type ServiceRequestLedgerRow = {
@@ -287,6 +288,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ success: true, data });
   } catch (error: unknown) {
     console.error('[ADMIN] /api/admin/master-ledger error:', error);
+    captureServerException(error, { route: '/api/admin/master-ledger', method: 'GET' });
     const message = error instanceof Error ? error.message : 'Server error';
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }

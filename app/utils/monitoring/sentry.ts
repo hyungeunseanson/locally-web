@@ -65,7 +65,7 @@ export function getSentryEnvironment() {
     return process.env.SENTRY_ENVIRONMENT || process.env.VERCEL_ENV || process.env.NODE_ENV || 'development';
   }
 
-  return process.env.NODE_ENV || 'development';
+  return process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT || process.env.NODE_ENV || 'development';
 }
 
 export function getClientSentryDsn() {
@@ -95,6 +95,7 @@ export function getClientSentryInitOptions() {
     dsn: dsn || undefined,
     enabled: Boolean(dsn),
     environment: getSentryEnvironment(),
+    enableLogs: false,
     sendDefaultPii: false,
     beforeBreadcrumb() {
       return null;
@@ -112,6 +113,7 @@ export function getServerSentryInitOptions() {
     dsn: dsn || undefined,
     enabled: Boolean(dsn),
     environment: getSentryEnvironment(),
+    enableLogs: false,
     sendDefaultPii: false,
     beforeBreadcrumb() {
       return null;

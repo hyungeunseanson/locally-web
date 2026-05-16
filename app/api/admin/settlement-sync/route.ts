@@ -6,6 +6,7 @@ import type {
   SettlementSyncTriggerResponse,
 } from '@/app/types/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
+import { captureServerException } from '@/app/utils/monitoring/sentry';
 import { forceExperienceCompletionSync, resolveExperienceCompletionTarget, runExperienceCompletionSync } from '@/app/utils/settlementSync/experienceCompletion';
 import { getSettlementSyncHealthSnapshot } from '@/app/utils/settlementSync/health';
 import { forceServiceCompletionSync, resolveServiceCompletionTarget, runServiceCompletionSync } from '@/app/utils/settlementSync/serviceCompletion';
@@ -195,6 +196,7 @@ export async function GET(request: Request) {
     }
 
     console.error('[ADMIN] settlement-sync GET error:', error);
+    captureServerException(error, { route: '/api/admin/settlement-sync', method: 'GET' });
     const message = error instanceof Error ? error.message : '서버 오류가 발생했습니다.';
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
@@ -435,6 +437,7 @@ export async function POST(request: Request) {
     }
 
     console.error('[ADMIN] settlement-sync POST error:', error);
+    captureServerException(error, { route: '/api/admin/settlement-sync', method: 'POST' });
     const message = error instanceof Error ? error.message : '서버 오류가 발생했습니다.';
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }

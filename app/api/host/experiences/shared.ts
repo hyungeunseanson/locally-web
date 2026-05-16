@@ -4,6 +4,7 @@ import {
   isValidSoloGuaranteePrice,
 } from '@/app/constants/soloGuarantee';
 import { FIXED_REFUND_POLICY, MAX_EXPERIENCE_PHOTOS } from '@/app/host/create/config';
+import { captureServerException } from '@/app/utils/monitoring/sentry';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
@@ -401,6 +402,7 @@ export function toApiErrorResponse(error: unknown) {
   }
 
   console.error('[Experience API] Unexpected error:', error);
+  captureServerException(error, { route: '/api/host/experiences', method: 'WRITE' });
   return NextResponse.json({ success: false, error: '서버 오류가 발생했습니다.' }, { status: 500 });
 }
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { hasValidCronAuthorization } from '@/app/utils/cronAuth';
+import { captureServerException } from '@/app/utils/monitoring/sentry';
 import {
   buildSourceTranslationContentFromExperience,
   getLocalizedColumnName,
@@ -561,6 +562,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('[Cron Experience Translations] Error:', error);
+    captureServerException(error, { route: '/api/cron/experience-translations', method: 'GET' });
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Internal Server Error' },
       { status: 500 }

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
+import { captureServerException } from '@/app/utils/monitoring/sentry';
 import {
   confirmExperienceBankPayment,
   runExperienceBankConfirmSideEffects,
@@ -61,6 +62,7 @@ export async function POST(request: Request) {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal Server Error';
     console.error('[ADMIN] booking confirm-payment error:', error);
+    captureServerException(error, { route: '/api/admin/bookings/confirm-payment', method: 'POST' });
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

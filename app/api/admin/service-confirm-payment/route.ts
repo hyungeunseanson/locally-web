@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
+import { captureServerException } from '@/app/utils/monitoring/sentry';
 import {
   confirmServiceBankPayment,
   runServiceBankConfirmSideEffects,
@@ -66,6 +67,7 @@ export async function POST(request: Request) {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[ADMIN] service-confirm-payment error:', msg);
+    captureServerException(err, { route: '/api/admin/service-confirm-payment', method: 'POST' });
     return NextResponse.json({ success: false, error: '서버 오류가 발생했습니다.' }, { status: 500 });
   }
 }
