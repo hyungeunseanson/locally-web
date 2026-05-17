@@ -126,22 +126,36 @@ export function getServerSentryInitOptions() {
 
 export function captureClientException(error: unknown, context?: LocallySentryContext) {
   if (!isClientSentryEnabled()) {
-    return;
+    return undefined;
   }
 
+  let eventId: string | undefined;
   Sentry.withScope((scope) => {
     applyLocallyContext(scope, context);
-    Sentry.captureException(error);
+    eventId = Sentry.captureException(error);
   });
+
+  return eventId;
 }
 
 export function captureServerException(error: unknown, context?: LocallySentryContext) {
   if (!isServerSentryEnabled()) {
-    return;
+    return undefined;
   }
 
+  let eventId: string | undefined;
   Sentry.withScope((scope) => {
     applyLocallyContext(scope, context);
-    Sentry.captureException(error);
+    eventId = Sentry.captureException(error);
   });
+
+  return eventId;
+}
+
+export async function flushServerSentry(timeoutMs = 2000) {
+  if (!isServerSentryEnabled()) {
+    return true;
+  }
+
+  return Sentry.flush(timeoutMs);
 }
