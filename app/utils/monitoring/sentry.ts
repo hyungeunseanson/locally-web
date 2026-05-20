@@ -3,6 +3,7 @@ import * as Sentry from '@sentry/nextjs';
 type PrimitiveContextValue = string | number | boolean | null | undefined;
 
 export type LocallySentryContext = Record<string, PrimitiveContextValue>;
+type SentryException = NonNullable<NonNullable<Sentry.ErrorEvent['exception']>['values']>[number];
 
 function sanitizeContext(context?: LocallySentryContext) {
   if (!context) {
@@ -36,6 +37,46 @@ function stripSensitiveData(event: Sentry.ErrorEvent) {
   }
 
   return sanitizedEvent;
+}
+
+function getExceptionText(exception: SentryException) {
+  return [exception.type, exception.value].filter(Boolean).join(' ');
+}
+
+function getFrameSearchText(exception: SentryException) {
+  return (exception.stacktrace?.frames ?? [])
+    .flatMap((frame) => [frame.filename, frame.abs_path, frame.module, frame.function])
+    .filter(Boolean)
+    .join(' ');
+}
+
+function shouldDropAndroidNativePostMessageNoise(event: Sentry.ErrorEvent) {
+  return (event.exception?.values ?? []).some((exception) => {
+    const exceptionText = getExceptionText(exception);
+    const frameText = getFrameSearchText(exception);
+
+    return (
+      exceptionText.includes('Error invoking postMessage: Java object is gone') &&
+      frameText.includes('navigation_performance_logger_android')
+    );
+  });
+}
+
+function shouldDropSupabaseLockAbortNoise(event: Sentry.ErrorEvent) {
+  return (event.exception?.values ?? []).some((exception) => {
+    const exceptionText = getExceptionText(exception);
+    const frameText = getFrameSearchText(exception);
+
+    return (
+      exceptionText.includes('AbortError') &&
+      exceptionText.includes('signal is aborted without reason') &&
+      (frameText.includes('@supabase/auth-js') || frameText.includes('locks.ts'))
+    );
+  });
+}
+
+function shouldDropClientNoise(event: Sentry.ErrorEvent) {
+  return shouldDropAndroidNativePostMessageNoise(event) || shouldDropSupabaseLockAbortNoise(event);
 }
 
 function applyLocallyContext(scope: Sentry.Scope, context?: LocallySentryContext) {
@@ -101,6 +142,10 @@ export function getClientSentryInitOptions() {
       return null;
     },
     beforeSend(event: Sentry.ErrorEvent) {
+      if (shouldDropClientNoise(event)) {
+        return null;
+      }
+
       return stripSensitiveData(event);
     },
   };
