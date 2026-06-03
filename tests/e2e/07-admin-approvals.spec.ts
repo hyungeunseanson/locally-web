@@ -425,11 +425,22 @@ test.describe.serial('Admin approvals smoke', () => {
         timeout: 15000,
       });
       const staleRevisionButton = adminPage.getByRole('button', { name: '보완 요청' }).first();
-      const staleRejectButton = adminPage.getByRole('button', { name: '거절' }).first();
       const staleApproveButton = adminPage.getByRole('button', { name: /승인 \(호스트 권한 부여\)/ }).first();
       await expect(staleRevisionButton).toBeDisabled();
-      await expect(staleRejectButton).toBeDisabled();
+      await expect(adminPage.getByRole('button', { name: '거절' })).toHaveCount(0);
       await expect(staleApproveButton).toBeDisabled();
+
+      await adminPage.getByRole('button', { name: '영구 삭제' }).click();
+      await expect(adminPage.locator('h4', { hasText: '영구 삭제 확인' }).filter({ visible: true }).first()).toBeVisible();
+      const deleteConfirmButton = adminPage.getByRole('button', { name: '영구 삭제' }).filter({ visible: true }).last();
+      await expect(deleteConfirmButton).toBeDisabled();
+      const deleteConfirmInput = adminPage.locator('input[placeholder="영구삭제"]').filter({ visible: true }).first();
+      await deleteConfirmInput.fill('삭제');
+      await expect(deleteConfirmButton).toBeDisabled();
+      await deleteConfirmInput.fill('영구삭제');
+      await expect(deleteConfirmButton).toBeEnabled();
+      await adminPage.getByRole('button', { name: '취소' }).filter({ visible: true }).click();
+
       await assertHostApplicationStatus(oldApplicationId, 'approved');
     } finally {
       await adminContext.close();

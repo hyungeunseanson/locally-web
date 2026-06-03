@@ -6,6 +6,8 @@ import DetailsPanel from './DetailsPanel';
 import { Users, MapPin, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { AdminApprovalTable, AdminItemId, AdminManagementTabProps } from '@/app/types/admin';
 
+const DELETE_CONFIRMATION_TEXT = '영구삭제';
+
 type ConfirmDialogState =
   | {
       kind: 'update-status';
@@ -41,6 +43,7 @@ export default function ManagementTab({
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [commentInput, setCommentInput] = useState('');
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
 
   const isPendingApprovalStatus = (status?: string | null) => status === 'pending' || status === 'revision';
 
@@ -64,6 +67,7 @@ export default function ManagementTab({
   const handleSuccessfulMutation = () => {
     setConfirmDialog(null);
     setCommentInput('');
+    setDeleteConfirmInput('');
     setSelectedItem(null);
   };
 
@@ -113,6 +117,7 @@ export default function ManagementTab({
       }
     }
     setCommentInput('');
+    setDeleteConfirmInput('');
   };
 
   const handleDeleteItemClick = (table: string, id: AdminItemId) => {
@@ -121,14 +126,17 @@ export default function ManagementTab({
       table,
       id,
       title: '영구 삭제 확인',
-      description: '정말 영구 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.',
+      description: `정말 영구 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.\n\n계속하려면 아래에 '${DELETE_CONFIRMATION_TEXT}'를 입력해주세요.`,
       confirmLabel: '영구 삭제',
       tone: 'red',
     });
+    setCommentInput('');
+    setDeleteConfirmInput('');
   };
 
   const confirmDialogAction = async () => {
     if (!confirmDialog) return;
+    if (confirmDialog.kind === 'delete-item' && deleteConfirmInput.trim() !== DELETE_CONFIRMATION_TEXT) return;
     setIsProcessing(true);
 
     let success = false;
@@ -147,6 +155,9 @@ export default function ManagementTab({
       }
     }
   };
+
+  const isDeleteDialog = confirmDialog?.kind === 'delete-item';
+  const isDeleteConfirmationSatisfied = !isDeleteDialog || deleteConfirmInput.trim() === DELETE_CONFIRMATION_TEXT;
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden">
@@ -229,10 +240,26 @@ export default function ManagementTab({
               </div>
             )}
 
+            {isDeleteDialog && (
+              <div className="mt-4">
+                <label className="mb-2 block text-[11px] font-bold text-slate-500">
+                  삭제 확인 문구
+                </label>
+                <input
+                  type="text"
+                  value={deleteConfirmInput}
+                  onChange={(e) => setDeleteConfirmInput(e.target.value)}
+                  placeholder={DELETE_CONFIRMATION_TEXT}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-[13px] font-bold text-slate-900 outline-none focus:ring-2 focus:ring-red-500/40"
+                  autoComplete="off"
+                />
+              </div>
+            )}
+
             <div className="mt-4 flex gap-2 flex-shrink-0">
               <button
                 type="button"
-                onClick={() => { setConfirmDialog(null); setCommentInput(''); }}
+                onClick={() => { setConfirmDialog(null); setCommentInput(''); setDeleteConfirmInput(''); }}
                 disabled={isProcessing}
                 className="flex-[0.5] rounded-xl border border-slate-200 bg-white px-2 py-3 text-xs font-bold text-slate-600"
               >
@@ -241,7 +268,7 @@ export default function ManagementTab({
               <button
                 type="button"
                 onClick={confirmDialogAction}
-                disabled={isProcessing || (confirmDialog.requireComment && !commentInput.trim())}
+                disabled={isProcessing || (confirmDialog.requireComment && !commentInput.trim()) || !isDeleteConfirmationSatisfied}
                 className={`flex-1 rounded-xl px-2 py-3 text-xs font-bold text-white disabled:opacity-50 disabled:cursor-not-allowed ${confirmDialog.tone === 'red' ? 'bg-red-600' : confirmDialog.tone === 'orange' ? 'bg-orange-500' : 'bg-blue-600'}`}
               >
                 {isProcessing ? '처리 중...' : confirmDialog.confirmLabel}
@@ -282,10 +309,27 @@ export default function ManagementTab({
              </div>
            )}
 
+           {isDeleteDialog && (
+             <div className="mt-5">
+               <label className="mb-2 block text-xs font-bold text-slate-500">
+                 삭제 확인 문구
+               </label>
+               <input
+                 type="text"
+                 value={deleteConfirmInput}
+                 onChange={(e) => setDeleteConfirmInput(e.target.value)}
+                 placeholder={DELETE_CONFIRMATION_TEXT}
+                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-red-500/40"
+                 autoComplete="off"
+                 autoFocus
+               />
+             </div>
+           )}
+
            <div className="mt-6 flex justify-end gap-3 flex-shrink-0">
              <button
                type="button"
-               onClick={() => { setConfirmDialog(null); setCommentInput(''); }}
+               onClick={() => { setConfirmDialog(null); setCommentInput(''); setDeleteConfirmInput(''); }}
                disabled={isProcessing}
                className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors"
              >
@@ -294,7 +338,7 @@ export default function ManagementTab({
              <button
                type="button"
                onClick={confirmDialogAction}
-               disabled={isProcessing || (confirmDialog.requireComment && !commentInput.trim())}
+               disabled={isProcessing || (confirmDialog.requireComment && !commentInput.trim()) || !isDeleteConfirmationSatisfied}
                className={`rounded-xl px-5 py-2.5 text-sm font-bold text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${confirmDialog.tone === 'red' ? 'bg-red-600 hover:bg-red-700' : confirmDialog.tone === 'orange' ? 'bg-orange-500 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'}`}
              >
                {isProcessing ? '처리 중...' : confirmDialog.confirmLabel}

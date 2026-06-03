@@ -666,7 +666,7 @@ export default function DetailsPanel({
               )}
             </div>
 
-            {/* 승인/거절 버튼 */}
+            {/* 승인/보완 버튼 */}
             <div className="pt-4 md:pt-6 mt-4 md:mt-6 border-t border-slate-100 grid grid-cols-2 gap-2 md:gap-3 sticky bottom-0 bg-white pb-3 md:pb-4 z-10">
               {isStaleHostApplication && (
                 <div className="col-span-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] md:text-xs font-semibold text-amber-800">
@@ -679,16 +679,9 @@ export default function DetailsPanel({
               <button
                 onClick={() => handleApprovalStatusUpdate('host_applications', selectedItem.id, 'revision')}
                 disabled={isStaleHostApplication}
-                className="py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-orange-600 bg-orange-50 border border-orange-100 hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-50"
+                className="col-span-2 py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-orange-600 bg-orange-50 border border-orange-100 hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 보완 요청
-              </button>
-              <button
-                onClick={() => handleApprovalStatusUpdate('host_applications', selectedItem.id, 'rejected')}
-                disabled={isStaleHostApplication}
-                className="py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                거절
               </button>
               <button
                 onClick={() => handleApprovalStatusUpdate('host_applications', selectedItem.id, 'approved')}
@@ -901,8 +894,7 @@ export default function DetailsPanel({
               <div className="col-span-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-[11px] md:text-xs font-semibold text-slate-500">
                 체험 보완 요청은 이 체험만 비공개 처리합니다. 같은 호스트의 다른 활성 체험은 계속 노출됩니다.
               </div>
-              <button onClick={() => handleApprovalStatusUpdate('experiences', selectedItem.id, 'revision')} className="py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-orange-600 bg-orange-50 border border-orange-100 hover:bg-orange-100 transition-colors">보완 요청</button>
-              <button onClick={() => handleApprovalStatusUpdate('experiences', selectedItem.id, 'rejected')} className="py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 transition-colors">거절</button>
+              <button onClick={() => handleApprovalStatusUpdate('experiences', selectedItem.id, 'revision')} className="col-span-2 py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-orange-600 bg-orange-50 border border-orange-100 hover:bg-orange-100 transition-colors">보완 요청</button>
               <button onClick={() => handleApprovalStatusUpdate('experiences', selectedItem.id, 'approved')} className="col-span-2 py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-white bg-slate-900 hover:bg-black shadow-lg transition-all">승인</button>
               <button onClick={() => handleApprovalDelete('experiences', selectedItem.id)} className="col-span-2 text-[10px] md:text-xs text-slate-400 hover:text-red-500 py-1.5 flex items-center justify-center gap-1"><Trash2 size={12} /> 체험 영구 삭제</button>
             </div>
