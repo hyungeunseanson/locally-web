@@ -126,4 +126,126 @@ test.describe.serial('Guest wishlist/account continuity', () => {
       })
       .toBe(0);
   });
+
+  test('handles wishlist load network failure without an unhandled browser error', async ({ page }) => {
+    test.setTimeout(90000);
+
+    await prepareEnglishLocale(page);
+
+    const pageErrors: string[] = [];
+    page.on('pageerror', (error) => {
+      pageErrors.push(error.message);
+    });
+
+    const user = createTestUser('guest.wishlist.load.failure');
+    await createAuthUser(user, createdAuthUserIds);
+
+    await login(page, user);
+
+    await page.route('**/api/guest/wishlists**', async (route) => {
+      const request = route.request();
+      const requestUrl = new URL(request.url());
+      if (request.method() === 'GET' && !requestUrl.searchParams.has('experienceId')) {
+        await route.abort('failed');
+        return;
+      }
+
+      await route.continue();
+    });
+
+    await page.goto('/guest/wishlists', { waitUntil: 'domcontentloaded' });
+    await dismissAnnouncementIfVisible(page);
+
+    await expect(page.getByText('An error occurred while loading the wishlist.')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('No saved experiences yet')).toBeVisible({ timeout: 15000 });
+    expect(pageErrors).toEqual([]);
+  });
+
+  test('restores wishlist card when inline removal request fails', async ({ page }) => {
+    test.setTimeout(90000);
+
+    await prepareEnglishLocale(page);
+
+    const pageErrors: string[] = [];
+    page.on('pageerror', (error) => {
+      pageErrors.push(error.message);
+    });
+
+    const user = createTestUser('guest.wishlist.remove.failure');
+    const userId = await createAuthUser(user, createdAuthUserIds);
+    const experience = await seedWishlist(userId);
+    let failDelete = false;
+
+    await page.route('**/api/guest/wishlists**', async (route) => {
+      if (failDelete && route.request().method() === 'DELETE') {
+        await route.abort('failed');
+        return;
+      }
+
+      await route.continue();
+    });
+
+    await login(page, user);
+    await page.goto('/guest/wishlists', { waitUntil: 'networkidle' });
+    await dismissAnnouncementIfVisible(page);
+
+    const experienceCard = page.locator(`a[href="/experiences/${experience.experienceId}"]`).first();
+    await expect(experienceCard).toBeVisible({ timeout: 15000 });
+
+    failDelete = true;
+    await experienceCard.getByRole('button', { name: 'Save to wishlist' }).click();
+
+    await expect(page.getByText('Failed to remove from wishlist. Please try again later.')).toBeVisible({ timeout: 15000 });
+    await expect(experienceCard).toBeVisible({ timeout: 15000 });
+    expect(pageErrors).toEqual([]);
+
+    await expect
+      .poll(async () => {
+        const { count, error } = await getAdminClient()
+          .from('wishlists')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .eq('experience_id', experience.experienceId);
+
+        if (error) throw error;
+        return count ?? 0;
+      })
+      .toBe(1);
+  });
+
+  test('handles wishlist status network failure on experience detail without an unhandled browser error', async ({ page }) => {
+    test.setTimeout(90000);
+
+    await prepareEnglishLocale(page);
+
+    const pageErrors: string[] = [];
+    page.on('pageerror', (error) => {
+      pageErrors.push(error.message);
+    });
+
+    const user = createTestUser('guest.wishlist.status.failure');
+    await createAuthUser(user, createdAuthUserIds);
+    const experience = await getLatestHostExperienceWithOptions({ searchAnyHost: true });
+    let statusRequestAborted = false;
+
+    await page.route('**/api/guest/wishlists**', async (route) => {
+      const request = route.request();
+      const requestUrl = new URL(request.url());
+      if (request.method() === 'GET' && requestUrl.searchParams.has('experienceId')) {
+        statusRequestAborted = true;
+        await route.abort('failed');
+        return;
+      }
+
+      await route.continue();
+    });
+
+    await login(page, user);
+    await page.goto(`/experiences/${experience.experienceId}`, { waitUntil: 'domcontentloaded' });
+    await dismissAnnouncementIfVisible(page);
+
+    await expect.poll(() => statusRequestAborted, { timeout: 15000 }).toBe(true);
+    await expect(page.getByRole('button', { name: 'Save' }).first()).toBeVisible({ timeout: 15000 });
+    expect(pageErrors).toEqual([]);
+  });
 });

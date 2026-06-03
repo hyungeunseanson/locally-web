@@ -97,22 +97,30 @@ export function useWishlist(experienceId: string) {
     }
 
     const checkStatus = async () => {
-      const response = await fetch(
-        `/api/guest/wishlists?experienceId=${encodeURIComponent(experienceId)}`,
-        { cache: 'no-store' }
-      );
+      try {
+        const response = await fetch(
+          `/api/guest/wishlists?experienceId=${encodeURIComponent(experienceId)}`,
+          { cache: 'no-store' }
+        );
 
-      if (cancelled || requestId !== statusRequestRef.current || isPendingRef.current) {
-        return;
+        if (cancelled || requestId !== statusRequestRef.current || isPendingRef.current) {
+          return;
+        }
+
+        if (!response.ok) {
+          console.error('Wishlist status check failed:', response.status);
+          return;
+        }
+
+        const result = (await response.json()) as { isSaved?: boolean };
+        setIsSaved(Boolean(result.isSaved));
+      } catch (error) {
+        if (cancelled || requestId !== statusRequestRef.current || isPendingRef.current) {
+          return;
+        }
+
+        console.error('Wishlist status check failed:', error);
       }
-
-      if (!response.ok) {
-        console.error('Wishlist status check failed:', response.status);
-        return;
-      }
-
-      const result = (await response.json()) as { isSaved?: boolean };
-      setIsSaved(Boolean(result.isSaved));
     };
 
     void checkStatus();

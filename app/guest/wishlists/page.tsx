@@ -96,6 +96,18 @@ const normalizeWishlistRows = (rows: unknown[]): WishlistItem[] => {
     .filter((item): item is NonNullable<typeof item> => item !== null);
 };
 
+const isAbortError = (error: unknown) => error instanceof DOMException && error.name === 'AbortError';
+
+const loadWishlistItems = async (signal?: AbortSignal): Promise<WishlistItem[]> => {
+  const response = await fetch('/api/guest/wishlists', { cache: 'no-store', signal });
+  if (!response.ok) {
+    throw new Error(`wishlist-load-failed:${response.status}`);
+  }
+
+  const payload = (await response.json()) as { data?: unknown[] };
+  return normalizeWishlistRows((payload.data ?? []) as unknown[]);
+};
+
 export default function WishlistsPage() {
   const { lang, t } = useLanguage(); // 🟢 추가
   const router = useRouter();
@@ -113,6 +125,9 @@ export default function WishlistsPage() {
   };
 
   useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+
     const fetchWishlists = async () => {
       if (isAuthLoading) {
         return;
@@ -123,20 +138,26 @@ export default function WishlistsPage() {
         return;
       }
 
-      const response = await fetch('/api/guest/wishlists', { cache: 'no-store' });
-      if (!response.ok) {
-        console.error('위시리스트 로딩 실패:', response.status);
+      try {
+        const nextWishlists = await loadWishlistItems(controller.signal);
+        if (cancelled) return;
+        setWishlists(nextWishlists);
+      } catch (error) {
+        if (cancelled || isAbortError(error)) return;
+        console.error('위시리스트 로딩 실패:', error);
         showToast(t('msg_wishlist_load_error'), 'error');
+      } finally {
+        if (cancelled) return;
         setLoading(false);
-        return;
       }
-
-      const payload = (await response.json()) as { data?: unknown[] };
-      setWishlists(normalizeWishlistRows((payload.data ?? []) as unknown[]));
-      setLoading(false);
     };
 
     void fetchWishlists();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [isAuthLoading, router, showToast, t, user]);
 
   // 🟢 [추가] 찜 해제 기능 (화면에서 바로 사라지게)
@@ -145,24 +166,34 @@ export default function WishlistsPage() {
     e.stopPropagation();
 
     // 낙관적 업데이트 (UI 먼저 삭제)
+    const previousWishlists = wishlists;
     setWishlists(prev => prev.filter(item => item.id !== wishlistId));
 
-    const response = await fetch('/api/guest/wishlists', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ wishlistId }),
-    });
+    try {
+      const response = await fetch('/api/guest/wishlists', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wishlistId }),
+      });
 
-    if (!response.ok) {
-      console.error('wishlist remove failed:', response.status);
-      showToast(t('msg_wishlist_remove_error'), 'error');
-      if (user) {
-        const retryResponse = await fetch('/api/guest/wishlists', { cache: 'no-store' });
-        if (retryResponse.ok) {
-          const retryPayload = (await retryResponse.json()) as { data?: unknown[] };
-          setWishlists(normalizeWishlistRows((retryPayload.data ?? []) as unknown[]));
-        }
+      if (!response.ok) {
+        throw new Error(`wishlist-remove-failed:${response.status}`);
       }
+    } catch (error) {
+      console.error('wishlist remove failed:', error);
+      showToast(t('msg_wishlist_remove_error'), 'error');
+
+      if (user) {
+        try {
+          setWishlists(await loadWishlistItems());
+        } catch (reloadError) {
+          console.error('wishlist reload after remove failed:', reloadError);
+          setWishlists(previousWishlists);
+        }
+        return;
+      }
+
+      setWishlists(previousWishlists);
     }
   };
 
