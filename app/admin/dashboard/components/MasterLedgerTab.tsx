@@ -23,6 +23,7 @@ import 'react-date-range/dist/styles.css'; // main style file
 import 'react-date-range/dist/theme/default.css'; // theme css file
 import { Range } from 'react-date-range';
 import { createClient } from '@/app/utils/supabase/client';
+import { isAbortError } from '@/app/utils/errors';
 import {
   BOOKING_CANCELLED_STATUSES_UPPER,
   BOOKING_CONFIRMED_STATUSES_UPPER,
@@ -247,9 +248,14 @@ export default function MasterLedgerTab({
     let isActive = true;
 
     const loadCurrentAdmin = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!isActive) return;
-      setCurrentAdminId(user?.id || null);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!isActive) return;
+        setCurrentAdminId(user?.id || null);
+      } catch (error) {
+        if (isAbortError(error)) return;
+        console.error('[MasterLedgerTab] load current admin failed:', error);
+      }
     };
 
     void loadCurrentAdmin();
@@ -283,10 +289,16 @@ export default function MasterLedgerTab({
 
     let adminId = currentAdminId;
     if (!adminId) {
-      const { data: { user } } = await supabase.auth.getUser();
-      adminId = user?.id || null;
-      if (adminId) {
-        setCurrentAdminId(adminId);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        adminId = user?.id || null;
+        if (adminId) {
+          setCurrentAdminId(adminId);
+        }
+      } catch (error) {
+        if (!isAbortError(error)) {
+          console.error('[MasterLedgerTab] resolve current admin failed:', error);
+        }
       }
     }
 

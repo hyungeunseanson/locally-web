@@ -7,6 +7,7 @@ import { Bell, Briefcase, Check, ClipboardList, CreditCard, MessageSquare, Trash
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 import { getAdminNotificationCategory, isAdminAlertNotification } from '@/app/utils/adminNotifications';
+import { isAbortError } from '@/app/utils/errors';
 
 type AdminNotificationItem = {
   id: number;
@@ -55,19 +56,54 @@ export default function AdminAlertsTab() {
     let isMounted = true;
 
     const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-
-      if (!isMounted) return;
-
-      if (!user) {
-        setNotifications([]);
-        setIsLoading(false);
-        return;
-      }
-
       try {
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (!isMounted) return;
+
+        if (!user) {
+          setNotifications([]);
+          setIsLoading(false);
+          return;
+        }
+
         await fetchNotifications();
+
+        if (channelRef.current) {
+          supabase.removeChannel(channelRef.current);
+        }
+
+        channelRef.current = supabase
+          .channel(`admin-alerts-tab-${user.id}`)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, (payload) => {
+            const nextRow = payload.new as AdminNotificationItem | undefined;
+            const prevRow = payload.old as AdminNotificationItem | undefined;
+            const targetRow = nextRow || prevRow;
+
+            if (!targetRow || targetRow.user_id !== user.id || !isAdminAlertNotification(targetRow)) {
+              return;
+            }
+
+            if (payload.eventType === 'INSERT' && nextRow) {
+              setNotifications((prev) => [nextRow, ...prev.filter((item) => item.id !== nextRow.id)].slice(0, 100));
+              return;
+            }
+
+            if (payload.eventType === 'UPDATE' && nextRow) {
+              setNotifications((prev) => prev.map((item) => (item.id === nextRow.id ? nextRow : item)));
+              return;
+            }
+
+            if (payload.eventType === 'DELETE' && prevRow) {
+              setNotifications((prev) => prev.filter((item) => item.id !== prevRow.id));
+            }
+          })
+          .subscribe();
       } catch (error) {
+        if (isAbortError(error)) {
+          return;
+        }
+
         console.error('[AdminAlertsTab] fetch notifications failed:', error);
         if (isMounted) {
           setNotifications([]);
@@ -78,40 +114,9 @@ export default function AdminAlertsTab() {
           setIsLoading(false);
         }
       }
-
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-      }
-
-      channelRef.current = supabase
-        .channel(`admin-alerts-tab-${user.id}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, (payload) => {
-          const nextRow = payload.new as AdminNotificationItem | undefined;
-          const prevRow = payload.old as AdminNotificationItem | undefined;
-          const targetRow = nextRow || prevRow;
-
-          if (!targetRow || targetRow.user_id !== user.id || !isAdminAlertNotification(targetRow)) {
-            return;
-          }
-
-          if (payload.eventType === 'INSERT' && nextRow) {
-            setNotifications((prev) => [nextRow, ...prev.filter((item) => item.id !== nextRow.id)].slice(0, 100));
-            return;
-          }
-
-          if (payload.eventType === 'UPDATE' && nextRow) {
-            setNotifications((prev) => prev.map((item) => (item.id === nextRow.id ? nextRow : item)));
-            return;
-          }
-
-          if (payload.eventType === 'DELETE' && prevRow) {
-            setNotifications((prev) => prev.filter((item) => item.id !== prevRow.id));
-          }
-        })
-        .subscribe();
     };
 
-    init();
+    void init();
 
     return () => {
       isMounted = false;

@@ -132,6 +132,57 @@ async function login(page: Page, user: TestUser) {
   await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 15000 });
 }
 
+async function installUnhandledRejectionTracker(page: Page) {
+  await page.addInitScript(() => {
+    const trackedWindow = window as Window & { __codexUnhandledRejections?: string[] };
+    trackedWindow.__codexUnhandledRejections = [];
+    window.addEventListener('unhandledrejection', (event) => {
+      const reason = event.reason;
+      trackedWindow.__codexUnhandledRejections?.push(
+        reason instanceof Error ? reason.message : String(reason)
+      );
+    });
+  });
+}
+
+async function installAuthUserAbortPatch(page: Page) {
+  await page.addInitScript(() => {
+    const trackedWindow = window as Window & { __codexAbortedAuthUserRequests?: number };
+    const originalFetch = window.fetch.bind(window);
+
+    trackedWindow.__codexAbortedAuthUserRequests = 0;
+    window.fetch = async (input, init) => {
+      const url =
+        typeof input === 'string'
+          ? input
+          : input instanceof Request
+            ? input.url
+            : input instanceof URL
+              ? input.toString()
+              : String(input);
+
+      if (url.includes('/auth/v1/user')) {
+        trackedWindow.__codexAbortedAuthUserRequests = (trackedWindow.__codexAbortedAuthUserRequests ?? 0) + 1;
+        throw new DOMException('The operation was aborted.', 'AbortError');
+      }
+
+      return originalFetch(input, init);
+    };
+  });
+
+  return () => page.evaluate(() => {
+    const trackedWindow = window as Window & { __codexAbortedAuthUserRequests?: number };
+    return trackedWindow.__codexAbortedAuthUserRequests ?? 0;
+  });
+}
+
+async function getUnhandledRejections(page: Page) {
+  return page.evaluate(() => {
+    const trackedWindow = window as Window & { __codexUnhandledRejections?: string[] };
+    return trackedWindow.__codexUnhandledRejections ?? [];
+  });
+}
+
 test.afterAll(async () => {
   const supabase = getAdminClient();
 
@@ -210,5 +261,53 @@ test.describe.serial('Admin sidebar smoke', () => {
     await page.goto('/admin/dashboard?tab=EXPS', { waitUntil: 'domcontentloaded' });
     await expect(page.getByText('등록된 체험')).toBeVisible({ timeout: 15000 });
     await expect(page.getByRole('button', { name: '승인완료' })).toBeVisible();
+  });
+
+  test('handles aborted Admin Alerts auth bootstrap without browser regressions', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const adminUser = createAdminUser();
+    await createAuthUser(adminUser);
+    await login(page, adminUser);
+
+    const pageErrors: string[] = [];
+    page.on('pageerror', (error) => {
+      pageErrors.push(error.message);
+    });
+    await installUnhandledRejectionTracker(page);
+    const getAbortedRequestCount = await installAuthUserAbortPatch(page);
+
+    await page.goto('/admin/dashboard?tab=ALERTS', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { name: 'Admin Alerts' })).toBeVisible({ timeout: 15000 });
+    await expect.poll(getAbortedRequestCount, { timeout: 15000 }).toBeGreaterThan(0);
+    await expect(page.getByText('운영 알림이 여기에 쌓입니다.')).toBeVisible({ timeout: 15000 });
+    await page.waitForTimeout(500);
+
+    expect(pageErrors).toEqual([]);
+    expect(await getUnhandledRejections(page)).toEqual([]);
+  });
+
+  test('handles aborted Master Ledger auth bootstrap without browser regressions', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const adminUser = createAdminUser();
+    await createAuthUser(adminUser);
+    await login(page, adminUser);
+
+    const pageErrors: string[] = [];
+    page.on('pageerror', (error) => {
+      pageErrors.push(error.message);
+    });
+    await installUnhandledRejectionTracker(page);
+    const getAbortedRequestCount = await installAuthUserAbortPatch(page);
+
+    await page.goto('/admin/dashboard?tab=LEDGER', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByText('Total Sales')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByPlaceholder('검색 (이름, 예약번호)')).toBeVisible({ timeout: 15000 });
+    await expect.poll(getAbortedRequestCount, { timeout: 15000 }).toBeGreaterThan(0);
+    await page.waitForTimeout(500);
+
+    expect(pageErrors).toEqual([]);
+    expect(await getUnhandledRejections(page)).toEqual([]);
   });
 });

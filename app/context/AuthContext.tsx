@@ -9,6 +9,7 @@ import React, {
   useState,
 } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
+import { isAbortError } from '@/app/utils/errors';
 import { User } from '@supabase/supabase-js';
 
 interface AuthContextType {
@@ -139,6 +140,8 @@ export function AuthProvider({
         setUser(null);
         setIsHost(false);
         setApplicationStatus(null);
+        setHostStatusResolved(true);
+      } else if (isAbortError(error)) {
         setHostStatusResolved(true);
       } else {
         console.error('Auth Load Error:', error);
