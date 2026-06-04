@@ -575,7 +575,7 @@ test.describe.serial('Admin approvals smoke', () => {
         await experienceApproveButton.click();
 
         await expect(adminPage.locator('h4', { hasText: '승인 확인' }).filter({ visible: true }).first()).toBeVisible({ timeout: 5000 });
-        await adminPage.getByRole('button', { name: '승인 및 권한 부여' }).filter({ visible: true }).first().click();
+        await adminPage.getByRole('button', { name: '체험 승인' }).filter({ visible: true }).first().click();
 
         await assertExperienceStatus(experience.id, 'active');
         const approvedNotification = await waitForNotification({

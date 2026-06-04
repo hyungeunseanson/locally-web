@@ -99,14 +99,17 @@ export default function ManagementTab({
         requireComment: true,
       });
     } else if (status === 'approved') {
+      const isExperienceApproval = table === 'experiences';
       setConfirmDialog({
         kind: 'update-status',
         table,
         id,
         status,
         title: '승인 확인',
-        description: '정말로 승인하시겠습니까? 승인 시 호스트 권한이 부여됩니다.',
-        confirmLabel: '승인 및 권한 부여',
+        description: isExperienceApproval
+          ? '이 체험을 승인해 게스트 화면에 노출하시겠습니까?'
+          : '정말로 승인하시겠습니까? 승인 시 호스트 권한이 부여됩니다.',
+        confirmLabel: isExperienceApproval ? '체험 승인' : '승인 및 권한 부여',
         tone: 'blue',
         requireComment: false,
       });
