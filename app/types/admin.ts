@@ -105,11 +105,41 @@ export interface HostApplication {
   admin_comment?: string | null;
   is_superhost?: boolean | null;
   is_latest_for_user?: boolean;
+  experience_summary?: AdminExperienceSummary;
+  recent_experiences?: AdminRecentExperience[];
   content: Record<string, unknown> | null;
 }
 
 export type AdminApprovalTable = 'host_applications' | 'experiences';
 export type AdminItemId = string | number;
+
+export interface AdminExperienceSummary {
+  total: number;
+  active: number;
+  pending: number;
+  revision: number;
+  other: number;
+}
+
+export interface AdminRecentExperience {
+  id: AdminItemId;
+  title?: string | null;
+  status?: string | null;
+  created_at?: string | null;
+}
+
+export interface AdminExperienceHostContext {
+  host_id: string | null;
+  profile_name: string | null;
+  application_id: AdminItemId | null;
+  application_name: string | null;
+  application_status: string | null;
+  application_profile_photo: string | null;
+  application_languages: string[] | null;
+  application_language_levels: LanguageLevelEntry[] | null;
+  application_nationality: string | null;
+  is_latest_application: boolean;
+}
 
 export type AdminStatusChangeExecutor = (
   table: AdminApprovalTable,
@@ -131,6 +161,7 @@ export interface ExperienceApprovalItem {
   id: AdminItemId;
   created_at: string;
   title: string;
+  host_id?: string | null;
   status: 'pending' | 'active' | 'rejected' | 'revision';
   admin_comment?: string | null;
   price?: number;
@@ -156,6 +187,7 @@ export interface ExperienceApprovalItem {
   photos?: string[];
   rules?: { age_limit?: string; activity_level?: string };
   profiles?: { full_name: string | null; email: string | null };
+  host_context?: AdminExperienceHostContext | null;
 }
 
 export type AdminPanelSelectedItem = Record<string, unknown> & {
@@ -184,6 +216,10 @@ export type AdminPanelSelectedItem = Record<string, unknown> & {
   admin_comment?: string | null;
   is_superhost?: boolean | null;
   is_latest_for_user?: boolean;
+  experience_summary?: AdminExperienceSummary;
+  recent_experiences?: AdminRecentExperience[];
+  host_id?: string | null;
+  host_context?: AdminExperienceHostContext | null;
   languages?: string[] | null;
   language_levels?: LanguageLevelEntry[] | null;
   photos?: string[] | null;

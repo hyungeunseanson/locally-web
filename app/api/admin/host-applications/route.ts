@@ -16,6 +16,29 @@ type HostApplicationAdminRow = {
     status?: string | null;
 };
 
+type HostApplicationExperienceRow = {
+    id?: string | number | null;
+    title?: string | null;
+    status?: string | null;
+    created_at?: string | null;
+};
+
+function buildExperienceSummary(rows: HostApplicationExperienceRow[]) {
+    return rows.reduce(
+        (summary, row) => {
+            summary.total += 1;
+
+            if (row.status === 'active') summary.active += 1;
+            else if (row.status === 'pending') summary.pending += 1;
+            else if (row.status === 'revision') summary.revision += 1;
+            else summary.other += 1;
+
+            return summary;
+        },
+        { total: 0, active: 0, pending: 0, revision: 0, other: 0 }
+    );
+}
+
 function annotateLatestHostApplicationRows<T extends HostApplicationAdminRow>(rows: T[]) {
     const latestByUser = pickLatestPublicHostApplicationsByUser(rows);
 
@@ -118,6 +141,23 @@ export async function GET(request: Request) {
 
                 const latestRow = pickLatestPublicHostApplication((latestRows || []) as HostApplicationAdminRow[]);
                 responseData.is_latest_for_user = isLatestPublicHostApplication(detailRow, latestRow);
+
+                const { data: experienceRows, error: experienceRowsError } = await supabaseAdmin
+                    .from('experiences')
+                    .select('id,title,status,created_at')
+                    .eq('host_id', detailRow.user_id)
+                    .order('created_at', { ascending: false });
+
+                if (experienceRowsError) {
+                    return NextResponse.json({ error: experienceRowsError.message }, { status: 500 });
+                }
+
+                const normalizedExperienceRows = (experienceRows || []) as HostApplicationExperienceRow[];
+                responseData.experience_summary = buildExperienceSummary(normalizedExperienceRows);
+                responseData.recent_experiences = normalizedExperienceRows.slice(0, 5);
+            } else {
+                responseData.experience_summary = buildExperienceSummary([]);
+                responseData.recent_experiences = [];
             }
 
             const idCardPath = typeof detailRecord.id_card_file === 'string' ? detailRecord.id_card_file : null;

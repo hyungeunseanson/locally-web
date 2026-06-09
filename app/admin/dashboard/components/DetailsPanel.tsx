@@ -73,6 +73,12 @@ function getVerificationDocumentPath(value: unknown) {
   return trimmed;
 }
 
+function formatHostNationality(value?: string | null) {
+  if (value === 'Korea') return '🇰🇷 한국인';
+  if (value === 'Japan') return '🇯🇵 일본인';
+  return value || '-';
+}
+
 export default function DetailsPanel({
   activeTab,
   selectedItem: rawSelectedItem,
@@ -182,6 +188,22 @@ export default function DetailsPanel({
     3
   );
   const applicationLanguageNames = getLanguageNames(applicationLanguageLevels);
+  const hostContext = selectedItem?.host_context ?? null;
+  const hostContextLanguageLevels = normalizeLanguageLevels(
+    hostContext?.application_language_levels,
+    hostContext?.application_languages,
+    3
+  );
+  const hostContextLanguageNames = getLanguageNames(hostContextLanguageLevels);
+  const experienceSummary = selectedItem?.experience_summary;
+  const recentExperiences = Array.isArray(selectedItem?.recent_experiences)
+    ? selectedItem.recent_experiences
+    : [];
+  const hostContextApplicationPhoto =
+    typeof hostContext?.application_profile_photo === 'string' && hostContext.application_profile_photo
+      ? hostContext.application_profile_photo
+      : null;
+  const showHostContextApplicationPhoto = Boolean(hostContextApplicationPhoto) && brokenProfilePhotoSrc !== hostContextApplicationPhoto;
   const useRawApprovalImages = activeTab === 'APPS' || activeTab === 'EXPS';
   const storageDashboardUrl = getSupabaseStorageDashboardUrl();
   const verificationDocumentPath = getVerificationDocumentPath(selectedItem?.id_card_file);
@@ -202,6 +224,7 @@ export default function DetailsPanel({
       ? selectedItem.profile_photo
       : null;
   const getApprovalStatusClass = (status?: string | null) => {
+    if (!status) return 'bg-slate-100 text-slate-500';
     if (status === 'pending') return 'bg-yellow-100 text-yellow-700';
     if (status === 'revision') return 'bg-orange-100 text-orange-700';
     return 'bg-green-100 text-green-700';
@@ -547,6 +570,50 @@ export default function DetailsPanel({
               )}
             </div>
 
+            <div
+              className="rounded-xl border border-slate-100 bg-white p-3 md:p-4"
+              data-testid="admin-host-application-experience-summary"
+            >
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                  <MapPin size={14} />
+                  등록 체험 현황
+                </div>
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                  총 {experienceSummary?.total ?? 0}개
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5 md:grid-cols-5 md:gap-2">
+                <StatSmall label="활성" value={experienceSummary?.active ?? 0} color="bg-emerald-50 text-emerald-700" />
+                <StatSmall label="대기" value={experienceSummary?.pending ?? 0} color="bg-yellow-50 text-yellow-700" />
+                <StatSmall label="보완" value={experienceSummary?.revision ?? 0} color="bg-orange-50 text-orange-700" />
+                <StatSmall label="기타" value={experienceSummary?.other ?? 0} color="bg-slate-50 text-slate-700" />
+                <StatSmall label="전체" value={experienceSummary?.total ?? 0} color="bg-blue-50 text-blue-700" />
+              </div>
+              <div className="mt-3 space-y-1.5">
+                {recentExperiences.length > 0 ? (
+                  recentExperiences.map((experience) => (
+                    <div
+                      key={String(experience.id)}
+                      className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2"
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate text-[11px] font-bold text-slate-900">{experience.title || '제목 없음'}</div>
+                        <div className="text-[10px] font-mono text-slate-400">ID: {experience.id}</div>
+                      </div>
+                      <span className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${getApprovalStatusClass(experience.status)}`}>
+                        {experience.status || '-'}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-center text-[11px] font-semibold text-slate-400">
+                    등록된 체험이 없습니다.
+                  </p>
+                )}
+              </div>
+            </div>
+
             {/* 언어 */}
             <div className="bg-slate-50 p-2.5 md:p-3 rounded-lg border border-slate-100">
               <div className="flex items-center gap-1.5 text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mb-1.5"><MessageCircle size={12} /> 언어</div>
@@ -750,6 +817,68 @@ export default function DetailsPanel({
               <InfoBox label="지역" value={selectedItem.city ? `${selectedItem.country || ''} > ${selectedItem.city}${selectedItem.subCity ? `, ${selectedItem.subCity}` : ''}` : '-'} />
               <InfoBox label="단독 투어" value={selectedItem.is_private_enabled ? `가능 (₩${selectedItem.private_price?.toLocaleString() || 0})` : '불가'} />
               <InfoBox label="1인 추가금" value={`₩${soloGuaranteePrice.toLocaleString()}`} />
+            </div>
+
+            <div
+              className="rounded-xl border border-blue-100 bg-blue-50/40 p-3 md:p-4"
+              data-testid="admin-experience-host-context"
+            >
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full border border-blue-100 bg-white">
+                    {showHostContextApplicationPhoto && hostContextApplicationPhoto ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={hostContextApplicationPhoto}
+                        alt="Linked host application profile photo"
+                        className="h-full w-full object-cover"
+                        onError={() => setBrokenProfilePhotoSrc(hostContextApplicationPhoto)}
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-blue-200">
+                        <User size={22} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-bold uppercase tracking-wide text-blue-500">연결된 호스트 지원서</div>
+                    <div className="truncate text-sm font-black text-slate-900">
+                      {hostContext?.application_name || '지원서 정보 없음'}
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-400">ID: {hostContext?.application_id || '-'}</div>
+                  </div>
+                </div>
+                <span className={`shrink-0 rounded px-2 py-1 text-[10px] font-bold uppercase ${getApprovalStatusClass(hostContext?.application_status)}`}>
+                  {hostContext?.application_status || '-'}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 md:gap-3">
+                <InfoBox label="프로필명" value={hostContext?.profile_name || selectedItem.profiles?.full_name || '-'} />
+                <InfoBox label="지원서명" value={hostContext?.application_name || '-'} />
+                <InfoBox label="호스트 ID" value={hostContext?.host_id || selectedItem.host_id || '-'} />
+                <InfoBox label="국적" value={formatHostNationality(hostContext?.application_nationality)} />
+              </div>
+              <div className="mt-3 rounded-lg border border-blue-100 bg-white/70 p-2.5">
+                <div className="mb-1.5 flex items-center gap-1.5 text-[9px] font-bold uppercase text-slate-400">
+                  <MessageCircle size={12} />
+                  지원서 언어
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {hostContextLanguageLevels.length > 0
+                    ? hostContextLanguageLevels.map((entry: LanguageLevelEntry) => (
+                      <span key={`${entry.language}-${entry.level}`} className="rounded border border-blue-100 bg-white px-1.5 py-0.5 text-[10px] font-bold">
+                        {entry.language} · Lv.{entry.level}
+                      </span>
+                    ))
+                    : hostContextLanguageNames.length > 0
+                      ? hostContextLanguageNames.map((language: string) => (
+                        <span key={language} className="rounded border border-blue-100 bg-white px-1.5 py-0.5 text-[10px] font-bold">
+                          {language}
+                        </span>
+                      ))
+                      : <span className="text-[11px] font-semibold text-slate-400">등록된 언어 정보가 없습니다.</span>}
+                </div>
+              </div>
             </div>
 
             <div

@@ -424,6 +424,7 @@ test.describe.serial('Admin approvals smoke', () => {
       await expect(adminPage.getByText('공개 노출은 최신 지원서 기준입니다. 이전 지원서는 상태를 변경할 수 없습니다.')).toBeVisible({
         timeout: 15000,
       });
+      await expect(adminPage.getByTestId('admin-host-application-experience-summary')).toContainText('총 0개');
       const staleRevisionButton = adminPage.getByRole('button', { name: '보완 요청' }).first();
       const staleApproveButton = adminPage.getByRole('button', { name: /승인 \(호스트 권한 부여\)/ }).first();
       await expect(staleRevisionButton).toBeDisabled();
@@ -459,7 +460,10 @@ test.describe.serial('Admin approvals smoke', () => {
     const hostUserId = await createAuthUser(hostUser);
 
     const hostApplicationId = await createHostApplication(applicantUserId, applicantUser, 'pending');
-    await createHostApplication(hostUserId, hostUser, 'approved');
+    const approvedHostApplicationName = `${hostUser.fullName} 지원서명`;
+    const approvedHostApplicationId = await createHostApplication(hostUserId, hostUser, 'approved', {
+      name: approvedHostApplicationName,
+    });
     const experience = await createPendingExperience(hostUserId);
 
     const hostRevisionReason = `Host application revision ${Date.now()}`;
@@ -485,6 +489,18 @@ test.describe.serial('Admin approvals smoke', () => {
         : null;
 
       expect(summaryExperience).toBeTruthy();
+      expect(summaryExperience).toMatchObject({
+        host_id: hostUserId,
+        host_context: {
+          host_id: hostUserId,
+          profile_name: hostUser.fullName,
+          application_id: approvedHostApplicationId,
+          application_name: approvedHostApplicationName,
+          application_status: 'approved',
+          application_nationality: 'Korea',
+          is_latest_application: true,
+        },
+      });
       expect(summaryExperience).not.toHaveProperty('description');
       expect(summaryExperience).not.toHaveProperty('meeting_point');
       expect(summaryExperience).not.toHaveProperty('location');
@@ -494,6 +510,28 @@ test.describe.serial('Admin approvals smoke', () => {
       const experienceDetailPayload = await experienceDetailResponse.json();
       expect(experienceDetailPayload?.data?.description).toContain('승인 관리 E2E 테스트용 체험 설명입니다.');
       expect(experienceDetailPayload?.data?.meeting_point).toBe('홍대입구역 1번 출구');
+      expect(experienceDetailPayload?.data?.host_context).toMatchObject({
+        host_id: hostUserId,
+        profile_name: hostUser.fullName,
+        application_id: approvedHostApplicationId,
+        application_name: approvedHostApplicationName,
+      });
+
+      const hostApplicationDetailResponse = await adminPage.request.get(`/api/admin/host-applications?id=${approvedHostApplicationId}`);
+      expect(hostApplicationDetailResponse.ok()).toBeTruthy();
+      const hostApplicationDetailPayload = await hostApplicationDetailResponse.json();
+      expect(hostApplicationDetailPayload?.data?.experience_summary).toMatchObject({
+        total: 1,
+        active: 0,
+        pending: 1,
+        revision: 0,
+        other: 0,
+      });
+      expect(hostApplicationDetailPayload?.data?.recent_experiences?.[0]).toMatchObject({
+        id: experience.id,
+        title: experience.title,
+        status: 'pending',
+      });
 
       await test.step('Request revision for a pending host application and close the details panel', async () => {
         const hostListItem = adminPage.locator('div.cursor-pointer').filter({ hasText: applicantUser.fullName }).first();
@@ -504,6 +542,7 @@ test.describe.serial('Admin approvals smoke', () => {
         const hostApproveButton = adminPage.getByRole('button', { name: /승인 \(호스트 권한 부여\)/ });
         await expect(hostApproveButton).toBeVisible({ timeout: 15000 });
         await expectDirectImageSrc(adminPage.getByAltText('Host application profile photo'), /images\.unsplash\.com/);
+        await expect(adminPage.getByTestId('admin-host-application-experience-summary')).toContainText('총 0개');
 
         await adminPage.getByRole('button', { name: '보완 요청' }).click();
         await expect(adminPage.locator('h4', { hasText: '보완 사유 입력' }).filter({ visible: true }).first()).toBeVisible({ timeout: 5000 });
@@ -528,6 +567,9 @@ test.describe.serial('Admin approvals smoke', () => {
         const experienceApproveButton = adminPage.locator('button').filter({ hasText: /^승인$/ }).first();
         await expect(experienceApproveButton).toBeVisible({ timeout: 15000 });
         await expectDirectImageSrc(adminPage.locator('img[alt$="photo 1"]').first(), /images\.unsplash\.com/);
+        await expect(adminPage.getByTestId('admin-experience-host-context')).toContainText('연결된 호스트 지원서');
+        await expect(adminPage.getByTestId('admin-experience-host-context')).toContainText(approvedHostApplicationName);
+        await expect(adminPage.getByTestId('admin-experience-host-context')).toContainText(hostUser.fullName);
 
         await adminPage.getByRole('button', { name: '보완 요청' }).click();
         await expect(adminPage.locator('h4', { hasText: '보완 사유 입력' }).filter({ visible: true }).first()).toBeVisible({ timeout: 5000 });
