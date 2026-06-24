@@ -289,20 +289,22 @@ export async function updateAdminStatus(
         .maybeSingle();
 
       if (experience?.host_id) {
+        const copyParams = notification.key === 'experience.revision'
+          ? {
+            experienceTitle: experience.title,
+            comment: trimmedComment,
+          }
+          : {
+            experienceTitle: experience.title,
+          };
+
         const notificationRow = await buildLocalizedNotificationInsert({
           supabaseAdmin,
           userId: experience.host_id,
           type: notification.type,
           link: notification.link,
           key: notification.key,
-          copyParams: notification.key === 'experience.revision'
-            ? {
-              experienceTitle: experience.title,
-              comment: trimmedComment,
-            }
-            : {
-              experienceTitle: experience.title,
-            },
+          copyParams,
         });
 
         const { error: notificationError } = await supabaseAdmin
@@ -311,6 +313,26 @@ export async function updateAdminStatus(
 
         if (notificationError) {
           console.error('Experience status notification insert failed:', notificationError);
+        }
+
+        try {
+          await sendImmediateGenericEmail({
+            recipientUserId: experience.host_id,
+            subject: '',
+            title: '',
+            message: '',
+            templatedEmail: {
+              templateId: 'notice.copy',
+              audience: 'host',
+              payload: {
+                copyKey: notification.key,
+                copyParams,
+                ctaUrl: notification.link,
+              },
+            },
+          });
+        } catch (emailError) {
+          console.error('Experience status email failed:', emailError);
         }
       }
     }

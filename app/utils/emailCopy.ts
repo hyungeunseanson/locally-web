@@ -23,6 +23,11 @@ type HostApplicationStatusParams = {
   comment?: string;
 };
 
+type ExperienceStatusParams = {
+  experienceTitle: string;
+  comment?: string;
+};
+
 type ServiceRequestNewHostParams = {
   requestTitle: string;
   requestCity: string;
@@ -116,6 +121,8 @@ export type EmailCopyKey =
   | 'host_application.approved'
   | 'host_application.revision'
   | 'host_application.rejected'
+  | 'experience.approved'
+  | 'experience.revision'
   | 'booking.confirmed.guest'
   | 'booking.cancellation_approved.guest'
   | 'booking.bank_confirmed.host'
@@ -144,6 +151,8 @@ type EmailCopyParams = {
   'host_application.approved': HostApplicationStatusParams;
   'host_application.revision': HostApplicationStatusParams;
   'host_application.rejected': HostApplicationStatusParams;
+  'experience.approved': ExperienceStatusParams;
+  'experience.revision': ExperienceStatusParams;
   'booking.confirmed.guest': BookingConfirmedGuestParams;
   'booking.cancellation_approved.guest': BookingCancellationApprovedGuestParams;
   'booking.bank_confirmed.host': BookingBankConfirmedHostParams;
@@ -449,6 +458,89 @@ function buildHostApplicationStatusEmailCopy(
           ? `이번 호스트 신청은 승인되지 않았습니다.\n\n사유: ${trimmedComment}`
           : '이번 호스트 신청은 승인되지 않았습니다.',
         ctaLabel: '호스트 대시보드 열기',
+      };
+  }
+}
+
+function buildExperienceStatusEmailCopy(
+  locale: NotificationLocale,
+  key: 'experience.approved' | 'experience.revision',
+  params: ExperienceStatusParams
+): EmailCopy {
+  const { experienceTitle } = params;
+  const trimmedComment = params.comment?.trim();
+
+  if (key === 'experience.approved') {
+    switch (locale) {
+      case 'en':
+        return {
+          subject: '[Locally] 🎉 Your experience listing was approved',
+          title: '🎉 Your experience listing was approved',
+          message: `'${experienceTitle}' was approved. You can now review the details and operating status.`,
+          ctaLabel: 'View experience',
+        };
+      case 'ja':
+        return {
+          subject: '[Locally] 🎉 体験登録が承認されました',
+          title: '🎉 体験登録が承認されました',
+          message: `「${experienceTitle}」が承認されました。これから詳細内容と運営状態を確認できます。`,
+          ctaLabel: '体験を確認',
+        };
+      case 'zh':
+        return {
+          subject: '[Locally] 🎉 体验已通过审核',
+          title: '🎉 体验已通过审核',
+          message: `「${experienceTitle}」已通过审核，现在可以查看详情和运营状态。`,
+          ctaLabel: '查看体验',
+        };
+      case 'ko':
+      default:
+        return {
+          subject: '[Locally] 🎉 체험 등록이 승인되었습니다',
+          title: '🎉 체험 등록이 승인되었습니다',
+          message: `'${experienceTitle}' 체험이 승인되었습니다. 이제 상세 내용과 운영 상태를 확인할 수 있습니다.`,
+          ctaLabel: '체험 확인하기',
+        };
+    }
+  }
+
+  switch (locale) {
+    case 'en':
+      return {
+        subject: '[Locally] 🛠️ Your experience listing needs revision',
+        title: '🛠️ Your experience listing needs revision',
+        message: trimmedComment
+          ? `'${experienceTitle}' needs revision. Please review the admin comment and update it.\n\nReason: ${trimmedComment}`
+          : `'${experienceTitle}' needs revision. Please review the admin comment and update it.`,
+        ctaLabel: 'Edit experience',
+      };
+    case 'ja':
+      return {
+        subject: '[Locally] 🛠️ 体験登録の補完が必要です',
+        title: '🛠️ 体験登録の補完が必要です',
+        message: trimmedComment
+          ? `「${experienceTitle}」に補完が必要です。管理者コメントを確認し、修正してください。\n\n補完理由: ${trimmedComment}`
+          : `「${experienceTitle}」に補完が必要です。管理者コメントを確認し、修正してください。`,
+        ctaLabel: '体験を修正',
+      };
+    case 'zh':
+      return {
+        subject: '[Locally] 🛠️ 体验内容需要补充',
+        title: '🛠️ 体验内容需要补充',
+        message: trimmedComment
+          ? `「${experienceTitle}」需要补充。请查看管理员备注并修改。\n\n补充原因：${trimmedComment}`
+          : `「${experienceTitle}」需要补充。请查看管理员备注并修改。`,
+        ctaLabel: '修改体验',
+      };
+    case 'ko':
+    default:
+      return {
+        subject: '[Locally] 🛠️ 체험 등록 보완이 필요합니다',
+        title: '🛠️ 체험 등록 보완이 필요합니다',
+        message: trimmedComment
+          ? `'${experienceTitle}' 체험에 보완이 필요합니다. 관리자 코멘트를 확인하고 수정해 주세요.\n\n보완 사유: ${trimmedComment}`
+          : `'${experienceTitle}' 체험에 보완이 필요합니다. 관리자 코멘트를 확인하고 수정해 주세요.`,
+        ctaLabel: '체험 보완하기',
       };
   }
 }
@@ -1346,6 +1438,13 @@ export function buildEmailCopy<K extends EmailCopyKey>(
         locale,
         key,
         copyParams as EmailCopyParams['host_application.approved']
+      );
+    case 'experience.approved':
+    case 'experience.revision':
+      return buildExperienceStatusEmailCopy(
+        locale,
+        key,
+        copyParams as EmailCopyParams['experience.approved']
       );
     case 'booking.confirmed.guest':
       return buildBookingConfirmedGuestEmailCopy(

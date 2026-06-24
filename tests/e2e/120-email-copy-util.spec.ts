@@ -126,6 +126,21 @@ test.describe('Email localization helpers', () => {
     expect(rejectedJa.subject).toBe('[Locally] 📌 ホスト申請結果をご確認ください');
     expect(rejectedJa.message).toContain('理由: 本人確認書類が一致しませんでした。');
 
+    const experienceApprovedKo = buildEmailCopy('experience.approved', 'ko', {
+      experienceTitle: '서울 야경 산책',
+    });
+    expect(experienceApprovedKo.subject).toBe('[Locally] 🎉 체험 등록이 승인되었습니다');
+    expect(experienceApprovedKo.message).toContain("'서울 야경 산책' 체험이 승인되었습니다.");
+    expect(experienceApprovedKo.ctaLabel).toBe('체험 확인하기');
+
+    const experienceRevisionEn = buildEmailCopy('experience.revision', 'en', {
+      experienceTitle: 'Seoul Night Walk',
+      comment: 'Please add a clearer meeting point photo.',
+    });
+    expect(experienceRevisionEn.subject).toBe('[Locally] 🛠️ Your experience listing needs revision');
+    expect(experienceRevisionEn.message).toContain('Reason: Please add a clearer meeting point photo.');
+    expect(experienceRevisionEn.ctaLabel).toBe('Edit experience');
+
     const serviceHostEn = buildEmailCopy('service.request_new.host', 'en', {
       requestTitle: 'Airport pickup',
       requestCity: 'Seoul',
