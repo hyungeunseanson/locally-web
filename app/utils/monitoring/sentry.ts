@@ -4,6 +4,12 @@ type PrimitiveContextValue = string | number | boolean | null | undefined;
 
 export type LocallySentryContext = Record<string, PrimitiveContextValue>;
 type SentryException = NonNullable<NonNullable<Sentry.ErrorEvent['exception']>['values']>[number];
+type NextRequestErrorContextLike = {
+  routerKind?: string;
+  routeType?: string;
+};
+const NEXT_ROUTER_STATE_HEADER_PARSE_ERROR_MESSAGE =
+  'The router state header was sent but could not be parsed.';
 
 function sanitizeContext(context?: LocallySentryContext) {
   if (!context) {
@@ -43,6 +49,26 @@ function getExceptionText(exception: SentryException) {
   return [exception.type, exception.value].filter(Boolean).join(' ');
 }
 
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === 'string') {
+    return error;
+  }
+
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    const message = (error as { message?: unknown }).message;
+
+    if (typeof message === 'string') {
+      return message;
+    }
+  }
+
+  return '';
+}
+
 function getFrameSearchText(exception: SentryException) {
   return (exception.stacktrace?.frames ?? [])
     .flatMap((frame) => [frame.filename, frame.abs_path, frame.module, frame.function])
@@ -75,8 +101,41 @@ function shouldDropSupabaseLockAbortNoise(event: Sentry.ErrorEvent) {
   });
 }
 
+function shouldDropNextRouterStateHeaderParseNoise(event: Sentry.ErrorEvent) {
+  return (event.exception?.values ?? []).some((exception) => {
+    const exceptionText = getExceptionText(exception);
+    const frameText = getFrameSearchText(exception);
+
+    return (
+      exceptionText.includes(NEXT_ROUTER_STATE_HEADER_PARSE_ERROR_MESSAGE) &&
+      (frameText.includes('next-server/app-page') ||
+        frameText.includes('app-page-turbo.runtime') ||
+        frameText.includes('app-page.js'))
+    );
+  });
+}
+
 function shouldDropClientNoise(event: Sentry.ErrorEvent) {
   return shouldDropAndroidNativePostMessageNoise(event) || shouldDropSupabaseLockAbortNoise(event);
+}
+
+function shouldDropServerNoise(event: Sentry.ErrorEvent) {
+  return shouldDropNextRouterStateHeaderParseNoise(event);
+}
+
+export function isNextRouterStateHeaderParseError(
+  error: unknown,
+  context?: NextRequestErrorContextLike
+) {
+  if (!getErrorMessage(error).includes(NEXT_ROUTER_STATE_HEADER_PARSE_ERROR_MESSAGE)) {
+    return false;
+  }
+
+  if (!context) {
+    return true;
+  }
+
+  return context.routerKind === 'App Router' && context.routeType === 'render';
 }
 
 function applyLocallyContext(scope: Sentry.Scope, context?: LocallySentryContext) {
@@ -164,6 +223,10 @@ export function getServerSentryInitOptions() {
       return null;
     },
     beforeSend(event: Sentry.ErrorEvent) {
+      if (shouldDropServerNoise(event)) {
+        return null;
+      }
+
       return stripSensitiveData(event);
     },
   };

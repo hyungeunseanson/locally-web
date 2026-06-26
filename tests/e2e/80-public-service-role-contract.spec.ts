@@ -134,6 +134,7 @@ async function createCommunityPost(userId: string, title: string, isAnonymous: b
     category: 'qna',
     title,
     content: 'public contract route 검증용 커뮤니티 글입니다.',
+    destination_hub: 'seoul',
     images: [],
     linked_exp_id: null,
     view_count: 0,

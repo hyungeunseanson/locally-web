@@ -1,6 +1,10 @@
 import * as Sentry from '@sentry/nextjs';
 
-import { getServerSentryInitOptions, isServerSentryEnabled } from '@/app/utils/monitoring/sentry';
+import {
+  getServerSentryInitOptions,
+  isNextRouterStateHeaderParseError,
+  isServerSentryEnabled,
+} from '@/app/utils/monitoring/sentry';
 
 export async function register() {
   const options = getServerSentryInitOptions();
@@ -14,6 +18,10 @@ export async function register() {
 
 export const onRequestError = (...args: Parameters<typeof Sentry.captureRequestError>) => {
   if (!isServerSentryEnabled()) {
+    return;
+  }
+
+  if (isNextRouterStateHeaderParseError(args[0], args[2])) {
     return;
   }
 
