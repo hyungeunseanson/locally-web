@@ -53,6 +53,8 @@ type HostReviewApplicationRow = {
   languages?: string[] | string | null;
 };
 
+const ACCOUNT_LOGIN_RETURN_URL = '/login?returnUrl=%2Faccount';
+
 export default function AccountPage() {
   const { t } = useLanguage(); // 🟢 2. t 함수 추가
   const supabase = useMemo(() => createClient(), []);
@@ -74,6 +76,7 @@ export default function AccountPage() {
   const router = useRouter();
   const { showToast, showHeicUnsupportedToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const redirectedToLoginRef = useRef(false);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -94,7 +97,7 @@ export default function AccountPage() {
   const { pendingHref, isNavigating, navigate } = usePendingNavigation();
   const { unreadCount } = useNotification();
   const { canUseHostView, setHostView } = useViewMode();
-  const { user: authUser, hostStatusResolved, signOut } = useAuth();
+  const { user: authUser, isLoading: authLoading, hostStatusResolved, signOut } = useAuth();
   const { membership } = useLocallyMembership(authUser?.id);
   const memberTierDescription = t('membership_member_info_desc') as string;
   const circleTierDescription = t('membership_circle_info_desc') as string;
@@ -225,12 +228,37 @@ export default function AccountPage() {
   }, [loading]);
 
   useEffect(() => {
-    const getProfile = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.replace('/login?returnUrl=%2Faccount');
-        return;
+    if (authLoading) {
+      return;
+    }
+
+    let isMounted = true;
+
+    if (!authUser) {
+      setUser(null);
+      setGuestReviews([]);
+
+      if (!redirectedToLoginRef.current) {
+        redirectedToLoginRef.current = true;
+        const currentPath =
+          typeof window === 'undefined'
+            ? ''
+            : `${window.location.pathname}${window.location.search}`;
+
+        if (currentPath !== ACCOUNT_LOGIN_RETURN_URL) {
+          router.replace(ACCOUNT_LOGIN_RETURN_URL);
+        }
       }
+
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    redirectedToLoginRef.current = false;
+
+    const getProfile = async () => {
+      const user = authUser;
       setUser(user);
 
       const fallbackProfile = {
@@ -239,127 +267,149 @@ export default function AccountPage() {
         avatar_url: user.user_metadata?.avatar_url || '',
       };
 
-      const { data, error: profileError } = await supabase
-        .from('profiles')
-        .select('full_name, email, nationality, birth_date, gender, bio, phone, mbti, kakao_id, avatar_url, languages, job')
-        .eq('id', user.id)
-        .maybeSingle();
+      try {
+        const { data, error: profileError } = await supabase
+          .from('profiles')
+          .select('full_name, email, nationality, birth_date, gender, bio, phone, mbti, kakao_id, avatar_url, languages, job')
+          .eq('id', user.id)
+          .maybeSingle();
 
-      if (profileError) {
-        console.error('[account] failed to load profile:', profileError);
-      }
+        if (!isMounted) return;
 
-      if (data && !profileError) {
-        setProfile({
-          full_name: data.full_name || '',
-          email: user.email || data.email || '',
-          nationality: data.nationality || '',
-          birth_date: data.birth_date || '',
-          gender: data.gender || '',
-          bio: data.bio || '',
-          phone: data.phone || '',
-          mbti: data.mbti || '',
-          kakao_id: data.kakao_id || '',
-          avatar_url: data.avatar_url || user.user_metadata?.avatar_url || '',
-          languages: normalizeLanguageList(data.languages).map((language) => normalizeProfileLanguageValue(language)),
-          job: data.job || '',
+        if (profileError) {
+          console.error('[account] failed to load profile:', profileError);
+        }
+
+        if (data && !profileError) {
+          setProfile({
+            full_name: data.full_name || '',
+            email: user.email || data.email || '',
+            nationality: data.nationality || '',
+            birth_date: data.birth_date || '',
+            gender: data.gender || '',
+            bio: data.bio || '',
+            phone: data.phone || '',
+            mbti: data.mbti || '',
+            kakao_id: data.kakao_id || '',
+            avatar_url: data.avatar_url || user.user_metadata?.avatar_url || '',
+            languages: normalizeLanguageList(data.languages).map((language) => normalizeProfileLanguageValue(language)),
+            job: data.job || '',
+          });
+        } else {
+          setProfile(prev => ({
+            ...prev,
+            ...fallbackProfile,
+          }));
+        }
+
+        // 🟢 [추가] 게스트 리뷰 불러오기
+        const { data: reviewData } = await supabase
+          .from('guest_reviews')
+          .select('id, rating, content, created_at, host_id')
+          .eq('guest_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (!isMounted) return;
+
+        const reviewRows = (reviewData || []) as GuestReviewQueryRow[];
+        const hostIds = Array.from(new Set(reviewRows.map((review) => review.host_id).filter(Boolean))) as string[];
+        const [hostProfilesRes, hostApplicationsRes] = hostIds.length > 0
+          ? await Promise.all([
+            supabase
+              .from('profiles')
+              .select('id, full_name, avatar_url')
+              .in('id', hostIds),
+            supabase
+              .from('public_host_applications')
+              .select('user_id, name, profile_photo, self_intro, languages')
+              .in('user_id', hostIds),
+          ])
+          : [
+            { data: [] as HostReviewProfileRow[], error: null },
+            { data: [] as HostReviewApplicationRow[], error: null },
+          ];
+
+        if (!isMounted) return;
+
+        if (hostProfilesRes.error) {
+          console.error('[account] failed to load guest review host profiles:', hostProfilesRes.error);
+        }
+
+        if (hostApplicationsRes.error) {
+          console.error('[account] failed to load guest review host applications:', hostApplicationsRes.error);
+        }
+
+        const hostProfileMap = new Map(
+          ((hostProfilesRes.data || []) as HostReviewProfileRow[]).map((hostProfile) => [hostProfile.id, hostProfile])
+        );
+        const hostApplicationMap = new Map(
+          ((hostApplicationsRes.data || []) as HostReviewApplicationRow[]).map((hostApplication) => [hostApplication.user_id, hostApplication])
+        );
+
+        const normalizedReviews = reviewRows.map((review) => {
+          const hostPublicProfile = review.host_id
+            ? getHostPublicProfile(
+              hostProfileMap.get(review.host_id),
+              hostApplicationMap.get(review.host_id),
+              'Host'
+            )
+            : null;
+
+          return {
+            ...review,
+            host: hostPublicProfile
+              ? {
+                full_name: hostPublicProfile.name,
+                avatar_url: hostPublicProfile.avatarUrl,
+              }
+              : null,
+          };
         });
-      } else {
-        setProfile(prev => ({
-          ...prev,
-          ...fallbackProfile,
-        }));
-      }
 
-      // 🟢 [추가] 게스트 리뷰 불러오기
-      const { data: reviewData } = await supabase
-        .from('guest_reviews')
-        .select('id, rating, content, created_at, host_id')
-        .eq('guest_id', user.id)
-        .order('created_at', { ascending: false });
+        setGuestReviews(normalizedReviews);
 
-      const reviewRows = (reviewData || []) as GuestReviewQueryRow[];
-      const hostIds = Array.from(new Set(reviewRows.map((review) => review.host_id).filter(Boolean))) as string[];
-      const [hostProfilesRes, hostApplicationsRes] = hostIds.length > 0
-        ? await Promise.all([
+        // 📊 통계: 여행 횟수, 후기 수, 가입 기간
+        const [{ count: tripCount }, { count: reviewCount }] = await Promise.all([
           supabase
-            .from('profiles')
-            .select('id, full_name, avatar_url')
-            .in('id', hostIds),
+            .from('bookings')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+            .in('status', [...BOOKING_CONFIRMED_STATUSES]),
           supabase
-            .from('public_host_applications')
-            .select('user_id, name, profile_photo, self_intro, languages')
-            .in('user_id', hostIds),
-        ])
-        : [
-          { data: [] as HostReviewProfileRow[], error: null },
-          { data: [] as HostReviewApplicationRow[], error: null },
-        ];
+            .from('guest_reviews')
+            .select('id', { count: 'exact', head: true })
+            .eq('guest_id', user.id),
+        ]);
 
-      if (hostProfilesRes.error) {
-        console.error('[account] failed to load guest review host profiles:', hostProfilesRes.error);
+        if (!isMounted) return;
+
+        const createdAt = new Date(user.created_at);
+        const now = new Date();
+        const totalMonths = (now.getFullYear() - createdAt.getFullYear()) * 12 + (now.getMonth() - createdAt.getMonth());
+        const joinMonths = Math.max(1, totalMonths);
+
+        setStats({
+          tripCount: tripCount || 0,
+          reviewCount: reviewCount || normalizedReviews.length,
+          joinMonths,
+        });
+      } catch (error) {
+        if (isMounted) {
+          console.error('[account] failed to load account data:', error);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
-
-      if (hostApplicationsRes.error) {
-        console.error('[account] failed to load guest review host applications:', hostApplicationsRes.error);
-      }
-
-      const hostProfileMap = new Map(
-        ((hostProfilesRes.data || []) as HostReviewProfileRow[]).map((hostProfile) => [hostProfile.id, hostProfile])
-      );
-      const hostApplicationMap = new Map(
-        ((hostApplicationsRes.data || []) as HostReviewApplicationRow[]).map((hostApplication) => [hostApplication.user_id, hostApplication])
-      );
-
-      const normalizedReviews = reviewRows.map((review) => {
-        const hostPublicProfile = review.host_id
-          ? getHostPublicProfile(
-            hostProfileMap.get(review.host_id),
-            hostApplicationMap.get(review.host_id),
-            'Host'
-          )
-          : null;
-
-        return {
-          ...review,
-          host: hostPublicProfile
-            ? {
-              full_name: hostPublicProfile.name,
-              avatar_url: hostPublicProfile.avatarUrl,
-            }
-            : null,
-        };
-      });
-
-      setGuestReviews(normalizedReviews);
-
-      // 📊 통계: 여행 횟수, 후기 수, 가입 기간
-      const { count: tripCount } = await supabase
-        .from('bookings')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .in('status', [...BOOKING_CONFIRMED_STATUSES]);
-
-      const { count: reviewCount } = await supabase
-        .from('guest_reviews')
-        .select('id', { count: 'exact', head: true })
-        .eq('guest_id', user.id);
-
-      const createdAt = new Date(user.created_at);
-      const now = new Date();
-      const totalMonths = (now.getFullYear() - createdAt.getFullYear()) * 12 + (now.getMonth() - createdAt.getMonth());
-      const joinMonths = Math.max(1, totalMonths);
-
-      setStats({
-        tripCount: tripCount || 0,
-        reviewCount: reviewCount || normalizedReviews.length,
-        joinMonths,
-      });
-
-      setLoading(false);
     };
-    getProfile();
-  }, [router, supabase]);
+
+    void getProfile();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [authLoading, authUser, router, supabase]);
 
   // 📞 전화번호 입력 핸들러
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {

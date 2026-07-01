@@ -10,6 +10,10 @@ type NextRequestErrorContextLike = {
 };
 const NEXT_ROUTER_STATE_HEADER_PARSE_ERROR_MESSAGE =
   'The router state header was sent but could not be parsed.';
+const HISTORY_REPLACE_STATE_THROTTLE_MESSAGE =
+  'Attempt to use history.replaceState() more than 100 times per 10 seconds';
+const WEBKIT_MESSAGE_HANDLERS_ERROR_MESSAGE =
+  "undefined is not an object (evaluating 'window.webkit.messageHandlers')";
 
 function sanitizeContext(context?: LocallySentryContext) {
   if (!context) {
@@ -76,6 +80,10 @@ function getFrameSearchText(exception: SentryException) {
     .join(' ');
 }
 
+function hasTransaction(event: Sentry.ErrorEvent, transaction: string) {
+  return event.transaction === transaction;
+}
+
 function shouldDropAndroidNativePostMessageNoise(event: Sentry.ErrorEvent) {
   return (event.exception?.values ?? []).some((exception) => {
     const exceptionText = getExceptionText(exception);
@@ -115,8 +123,47 @@ function shouldDropNextRouterStateHeaderParseNoise(event: Sentry.ErrorEvent) {
   });
 }
 
+function shouldDropHistoryReplaceStateThrottleNoise(event: Sentry.ErrorEvent) {
+  if (!hasTransaction(event, '/account')) {
+    return false;
+  }
+
+  return (event.exception?.values ?? []).some((exception) => {
+    const frameText = getFrameSearchText(exception);
+
+    return (
+      exception.type === 'SecurityError' &&
+      exception.value === HISTORY_REPLACE_STATE_THROTTLE_MESSAGE &&
+      frameText.includes('next') &&
+      frameText.includes('app-router')
+    );
+  });
+}
+
+function shouldDropWebkitMessageHandlersNoise(event: Sentry.ErrorEvent) {
+  if (!hasTransaction(event, '/become-a-host')) {
+    return false;
+  }
+
+  return (event.exception?.values ?? []).some((exception) => {
+    const frameText = getFrameSearchText(exception);
+
+    return (
+      exception.type === 'TypeError' &&
+      exception.value === WEBKIT_MESSAGE_HANDLERS_ERROR_MESSAGE &&
+      frameText.includes('app:///') &&
+      (frameText.includes('sendDataToNative') || frameText.includes('sendPageHideMessage'))
+    );
+  });
+}
+
 function shouldDropClientNoise(event: Sentry.ErrorEvent) {
-  return shouldDropAndroidNativePostMessageNoise(event) || shouldDropSupabaseLockAbortNoise(event);
+  return (
+    shouldDropAndroidNativePostMessageNoise(event) ||
+    shouldDropSupabaseLockAbortNoise(event) ||
+    shouldDropHistoryReplaceStateThrottleNoise(event) ||
+    shouldDropWebkitMessageHandlersNoise(event)
+  );
 }
 
 function shouldDropServerNoise(event: Sentry.ErrorEvent) {
