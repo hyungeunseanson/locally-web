@@ -121,6 +121,81 @@ function getNicePayApprovalId(payload: Record<string, string>) {
   return String(payload.TxTid || payload.TID || '').trim();
 }
 
+function isPaymentArtifactDescriptor(value: string) {
+  const normalized = value.toLowerCase();
+  return (
+    normalized.includes('nicepay') ||
+    normalized.includes('nice_pay') ||
+    normalized.includes('pgweb') ||
+    normalized.includes('nicepay-relay')
+  );
+}
+
+function parseZIndex(value: string) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export function cleanupCardPaymentBrowserArtifacts() {
+  if (typeof window === 'undefined' || typeof document === 'undefined' || !document.body) {
+    return;
+  }
+
+  const artifacts = new Set<Element>();
+  const selectors = [
+    'iframe[name^="nicepay-relay-"]',
+    'form[name="payForm"]',
+    'iframe[src*="nicepay.co.kr"]',
+    'iframe[src*="nicevan.co.kr"]',
+    'iframe[id*="nicepay" i]',
+    'iframe[class*="nicepay" i]',
+    '[id*="nicepay" i]',
+    '[class*="nicepay" i]',
+    '[id*="pgweb" i]',
+    '[class*="pgweb" i]',
+  ];
+
+  for (const selector of selectors) {
+    try {
+      document.querySelectorAll(selector).forEach((element) => artifacts.add(element));
+    } catch {
+      // Ignore selector support differences in older WebViews.
+    }
+  }
+
+  Array.from(document.body.children).forEach((element) => {
+    if (element.id === '__next') return;
+
+    const descriptor = [
+      element.id,
+      typeof element.className === 'string' ? element.className : '',
+      element.getAttribute('name') || '',
+      element.getAttribute('src') || '',
+    ].join(' ');
+    const text = (element.textContent || '').trim().toLowerCase();
+    const style = window.getComputedStyle(element);
+    const isBlockingLayer =
+      (style.position === 'fixed' || style.position === 'absolute') &&
+      parseZIndex(style.zIndex) >= 100;
+
+    if (
+      isPaymentArtifactDescriptor(descriptor) ||
+      (isBlockingLayer && text.includes('please, wait'))
+    ) {
+      artifacts.add(element);
+    }
+  });
+
+  artifacts.forEach((element) => {
+    if (element.parentElement) {
+      element.remove();
+    }
+  });
+
+  document.body.style.removeProperty('overflow');
+  document.documentElement.style.removeProperty('overflow');
+}
+
 function hasNicePayAuthResponse(payload: Record<string, string>) {
   return Boolean(
     payload.AuthResultCode ||
@@ -164,6 +239,8 @@ function requestNicePayCardPayment(params: CardPaymentLaunchParams): Promise<Car
       return;
     }
 
+    cleanupCardPaymentBrowserArtifacts();
+
     const cleanupCallbacks = {
       submit: window.nicepaySubmit,
       close: window.nicepayClose,
@@ -191,6 +268,7 @@ function requestNicePayCardPayment(params: CardPaymentLaunchParams): Promise<Car
       window.nicepayClose = cleanupCallbacks.close;
       form.remove();
       iframe.remove();
+      cleanupCardPaymentBrowserArtifacts();
     };
 
     const rejectWithCleanup = (error: Error) => {

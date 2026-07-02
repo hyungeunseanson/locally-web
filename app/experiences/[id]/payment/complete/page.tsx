@@ -17,6 +17,7 @@ import { getPublicBankInfo } from '@/app/utils/publicBankInfo';
 import { getContent } from '@/app/utils/contentHelper';
 import { useAuth } from '@/app/context/AuthContext';
 import { useLocallyMembership } from '@/app/hooks/useLocallyMembership';
+import { cleanupCardPaymentBrowserArtifacts } from '@/app/utils/payments/card/client';
 
 type BookingExperience = {
   id?: string | number;
@@ -124,6 +125,10 @@ function PaymentCompleteContent() {
   const [booking, setBooking] = useState<BookingData | null>(null);
   const [loading, setLoading] = useState(true);
   const bankInfo = getPublicBankInfo();
+
+  useEffect(() => {
+    cleanupCardPaymentBrowserArtifacts();
+  }, []);
 
   // 🎉 폭죽 효과 함수
   const fireConfetti = () => {

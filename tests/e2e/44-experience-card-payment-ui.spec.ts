@@ -5,9 +5,9 @@ import { expect, test, type Page } from '@playwright/test';
 
 import {
   prepareBookableExperience as prepareSharedBookableExperience,
+  getVisibleReservationByTestId,
   reviewAllExperiencePaymentAgreements,
   selectReservationDate,
-  selectReservationTime,
 } from './helpers/experienceBooking';
 
 type EnvMap = Record<string, string>;
@@ -289,6 +289,17 @@ test.describe.serial('Experience card payment UI smoke', () => {
 
       if (updateError) throw updateError;
 
+      await page.evaluate(() => {
+        const overlay = document.createElement('div');
+        overlay.id = 'nicepay-stale-overlay-test';
+        overlay.textContent = 'Please, wait...';
+        overlay.style.position = 'fixed';
+        overlay.style.inset = '0';
+        overlay.style.zIndex = '2147483647';
+        overlay.style.background = 'rgba(0, 0, 0, 0.6)';
+        document.body.appendChild(overlay);
+      });
+
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -336,6 +347,8 @@ test.describe.serial('Experience card payment UI smoke', () => {
     );
 
     expect(callbackSeen).toBe(true);
+    await expect(page.locator('#nicepay-stale-overlay-test')).toHaveCount(0);
+    await expect(page.getByText('Please, wait...')).toHaveCount(0);
     await expect(
       page.getByRole('heading', { name: /예약이 확정되었습니다!|Your booking is confirmed!|予約が確定しました！|预订已确认！/ })
     ).toBeVisible();
@@ -346,7 +359,11 @@ test.describe.serial('Experience card payment UI smoke', () => {
 
     await page.goto(`/experiences/${experience.experienceId}`, { waitUntil: 'domcontentloaded' });
     await selectReservationDate(page, experience.date);
-    await selectReservationTime(page, experience.time);
+    const bookedTime = getVisibleReservationByTestId(
+      page,
+      `reservation-time-${experience.time.slice(0, 5)}`
+    );
+    await expect(bookedTime).toBeDisabled();
     await expect(page.getByTestId('reservation-solo-option')).toHaveCount(0);
   });
 });
