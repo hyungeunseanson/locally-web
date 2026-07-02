@@ -82,7 +82,6 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
   const isReviewPending = isBookingReviewPending(trip.cancelReason);
   const guestCount = Number(trip.guests || 1);
   const isPendingDeposit = (trip.status || '').toLowerCase() === 'pending';
-  const needsExpandedDesktopLayout = isPendingDeposit || isReviewPending;
   const soloRefundStatus = normalizeSoloGuaranteeRefundStatus(trip.soloGuaranteeRefundStatus);
   const soloRefundLabel = getSoloGuaranteeRefundGuestLabel(soloRefundStatus, trip.soloGuaranteeRefundAmount);
 
@@ -225,16 +224,12 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
     <>
       <div
         data-testid={`guest-trip-card-${trip.id}`}
-        className={`bg-white rounded-2xl md:rounded-3xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow group flex flex-col md:flex-row h-auto relative ${
-          needsExpandedDesktopLayout ? 'md:min-h-64 md:h-auto' : 'md:h-64'
-        }`}
+        className="bg-white rounded-2xl md:rounded-3xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow group flex flex-col md:flex-row h-auto md:min-h-64 relative"
       >
 
         {/* 왼쪽: 이미지 섹션 */}
         <div
-          className={`w-full md:w-72 h-48 relative bg-slate-200 shrink-0 cursor-pointer overflow-hidden group/slide flex items-center justify-center ${
-            needsExpandedDesktopLayout ? 'md:self-stretch md:min-h-64' : 'md:h-full'
-          }`}
+          className="w-full md:w-72 h-48 md:h-auto md:min-h-64 md:self-stretch relative bg-slate-200 shrink-0 cursor-pointer overflow-hidden group/slide flex items-center justify-center"
         >
           <Link href={`/experiences/${trip.expId}`} className="block w-full h-full relative">
             {photos.length > 0 ? (
@@ -413,7 +408,10 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
               </div>
             )}
 
-            <div className="mt-3 flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] md:text-[11px] leading-5 text-slate-600">
+            <div
+              data-testid="guest-trip-message-hint"
+              className="mt-3 flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] md:text-[11px] leading-5 text-slate-600"
+            >
               <MessageSquare className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
               <p>{t('trip_message_hint')}</p>
             </div>
@@ -425,21 +423,24 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
               onClick={() => {
                 router.push(buildMessageHref());
               }}
-              className="py-2 rounded-lg md:rounded-xl border border-slate-200 font-bold text-[11px] md:text-xs text-slate-600 hover:border-black hover:text-black hover:bg-slate-50 transition-all flex items-center justify-center gap-1"
+              className="min-w-0 min-h-10 px-2 py-2 rounded-lg md:rounded-xl border border-slate-200 font-bold text-[11px] md:text-xs text-slate-600 hover:border-black hover:text-black hover:bg-slate-50 transition-all flex items-center justify-center gap-1 overflow-hidden"
             >
-              <MessageSquare className="w-[13px] h-[13px] md:w-[14px] md:h-[14px]" /> {t('messages')} {/* 🟢 교체 */}
+              <MessageSquare className="w-[13px] h-[13px] md:w-[14px] md:h-[14px] shrink-0" />
+              <span className="min-w-0 truncate">{t('messages')}</span>
             </button>
             <button
               onClick={() => openExternalLink(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(localizedMeetingPoint || '')}`)}
-              className="py-2 rounded-lg md:rounded-xl border border-slate-200 font-bold text-[11px] md:text-xs text-slate-600 hover:border-black hover:text-black hover:bg-slate-50 transition-all flex items-center justify-center gap-1"
+              className="min-w-0 min-h-10 px-2 py-2 rounded-lg md:rounded-xl border border-slate-200 font-bold text-[11px] md:text-xs text-slate-600 hover:border-black hover:text-black hover:bg-slate-50 transition-all flex items-center justify-center gap-1 overflow-hidden"
             >
-              <Map className="w-[13px] h-[13px] md:w-[14px] md:h-[14px]" /> {t('trip_map')} {/* 🟢 교체 */}
+              <Map className="w-[13px] h-[13px] md:w-[14px] md:h-[14px] shrink-0" />
+              <span className="min-w-0 truncate">{t('trip_map')}</span>
             </button>
             <button
               onClick={() => onOpenReceipt(trip)}
-              className="py-2 rounded-lg md:rounded-xl border border-slate-200 font-bold text-[11px] md:text-xs text-slate-600 hover:border-black hover:text-black hover:bg-slate-50 transition-all flex items-center justify-center gap-1"
+              className="min-w-0 min-h-10 px-2 py-2 rounded-lg md:rounded-xl border border-slate-200 font-bold text-[11px] md:text-xs text-slate-600 hover:border-black hover:text-black hover:bg-slate-50 transition-all flex items-center justify-center gap-1 overflow-hidden"
             >
-              <Receipt className="w-[13px] h-[13px] md:w-[14px] md:h-[14px]" /> {t('receipt')} {/* 🟢 교체 */}
+              <Receipt className="w-[13px] h-[13px] md:w-[14px] md:h-[14px] shrink-0" />
+              <span className="min-w-0 truncate">{t('receipt')}</span>
             </button>
           </div>
         </div>

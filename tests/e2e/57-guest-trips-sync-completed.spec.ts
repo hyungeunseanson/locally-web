@@ -755,6 +755,77 @@ test.describe.serial('guest trips completed sync route', () => {
     expect(buttonBox.y + buttonBox.height).toBeLessThanOrEqual(cardBox.y + cardBox.height);
   });
 
+  test('keeps the desktop confirmed card action row below the message hint', async ({ page }) => {
+    const host = createUser('host.confirmed.desktop');
+    const guest = createUser('guest.confirmed.desktop');
+    const desktopViewport = { width: 1440, height: 1200 };
+
+    await page.addInitScript(() => {
+      window.localStorage.setItem('app_lang', 'ko');
+      document.cookie = 'app_lang=ko; path=/';
+    });
+    await page.setViewportSize(desktopViewport);
+
+    const hostId = await createAuthUser(host);
+    const guestId = await createAuthUser(guest);
+    await createApprovedHostApplication(hostId, host);
+
+    const supabase = getAdminClient();
+    const { error: hostProfileError } = await supabase
+      .from('profiles')
+      .update({
+        full_name: host.fullName,
+        avatar_url: '/images/logo.png',
+      })
+      .eq('id', hostId);
+
+    if (hostProfileError) throw hostProfileError;
+
+    const experienceId = await createHostExperience(hostId);
+    const bookingId = await createFuturePaidBooking({
+      guestId,
+      guest,
+      experienceId,
+    });
+
+    await login(page, guest);
+    await page.goto('/guest/trips', { waitUntil: 'domcontentloaded' });
+
+    const tripCard = page
+      .getByTestId('guest-trips-desktop-main')
+      .getByTestId(`guest-trip-card-${bookingId}`);
+    const messageHint = tripCard.getByTestId('guest-trip-message-hint');
+    const messageButton = tripCard.getByRole('button', { name: '메시지' });
+    const mapButton = tripCard.getByRole('button', { name: '지도' });
+    const receiptButton = tripCard.getByRole('button', { name: '영수증' });
+
+    await expect(tripCard).toBeVisible();
+    await expect(messageHint).toBeVisible();
+    await expect(messageButton).toBeVisible();
+    await expect(mapButton).toBeVisible();
+    await expect(receiptButton).toBeVisible();
+
+    const cardBox = await tripCard.boundingBox();
+    const hintBox = await messageHint.boundingBox();
+    const messageButtonBox = await messageButton.boundingBox();
+    const mapButtonBox = await mapButton.boundingBox();
+    const receiptButtonBox = await receiptButton.boundingBox();
+
+    expect(cardBox).not.toBeNull();
+    expect(hintBox).not.toBeNull();
+    expect(messageButtonBox).not.toBeNull();
+    expect(mapButtonBox).not.toBeNull();
+    expect(receiptButtonBox).not.toBeNull();
+    if (!cardBox || !hintBox || !messageButtonBox || !mapButtonBox || !receiptButtonBox) {
+      throw new Error('Desktop confirmed trip layout bounding boxes were not available.');
+    }
+
+    expect(hintBox.y + hintBox.height).toBeLessThanOrEqual(messageButtonBox.y);
+    expect(hintBox.y + hintBox.height).toBeLessThanOrEqual(mapButtonBox.y);
+    expect(hintBox.y + hintBox.height).toBeLessThanOrEqual(receiptButtonBox.y);
+    expect(receiptButtonBox.y + receiptButtonBox.height).toBeLessThanOrEqual(cardBox.y + cardBox.height);
+  });
+
   test('keeps desktop receipt and cancellation modals clickable above the sticky header', async ({ page }) => {
     const host = createUser('host.pending.desktop.modal');
     const guest = createUser('guest.pending.desktop.modal');
