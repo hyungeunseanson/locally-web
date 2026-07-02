@@ -501,18 +501,19 @@ test.describe('Card payment provider cutover contracts', () => {
 
     const authToken = 'AUTH-TOKEN-001';
     const amount = 88000;
+    const nicePayAmount = String(amount).padStart(12, '0');
     const providerPayload = {
       AuthResultCode: '0000',
       AuthToken: authToken,
       TxTid: 'TX-TID-001',
       MID: process.env.NICEPAY_MID!,
       Moid: 'ORD-NICEPAY-VERIFY-001',
-      Amt: String(amount),
+      Amt: nicePayAmount,
       NextAppURL: NICEPAY_APPROVAL_URL,
       NetCancelURL: NICEPAY_NET_CANCEL_URL,
       PayMethod: 'CARD',
       Signature: sha256Hex(
-        `${authToken}${process.env.NICEPAY_MID}${amount}${process.env.NICEPAY_MERCHANT_KEY}`
+        `${authToken}${process.env.NICEPAY_MID}${nicePayAmount}${process.env.NICEPAY_MERCHANT_KEY}`
       ),
     };
 
@@ -523,7 +524,7 @@ test.describe('Card payment provider cutover contracts', () => {
       const body = new URLSearchParams(String(init?.body || ''));
       expect(body.get('MID')).toBe(process.env.NICEPAY_MID);
       expect(body.get('AuthToken')).toBe(authToken);
-      expect(body.get('Amt')).toBe(String(amount));
+      expect(body.get('Amt')).toBe(nicePayAmount);
 
       return new Response(
         JSON.stringify({
@@ -531,10 +532,10 @@ test.describe('Card payment provider cutover contracts', () => {
           ResultMsg: 'Approval complete',
           TID: 'TX-TID-001',
           Moid: 'ORD-NICEPAY-VERIFY-001',
-          Amt: String(amount),
+          Amt: nicePayAmount,
           PayMethod: 'CARD',
           Signature: sha256Hex(
-            `TX-TID-001${process.env.NICEPAY_MID}${amount}${process.env.NICEPAY_MERCHANT_KEY}`
+            `TX-TID-001${process.env.NICEPAY_MID}${nicePayAmount}${process.env.NICEPAY_MERCHANT_KEY}`
           ),
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }

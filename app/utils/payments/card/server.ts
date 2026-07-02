@@ -354,7 +354,9 @@ async function verifyNicePayApprovedPayment(
   const txTid = getPayloadValue(providerPayload, ['TxTid', 'TID']) || params.approvalId;
   const authMid = getPayloadValue(providerPayload, ['MID']) || config.mid;
   const moid = getPayloadValue(providerPayload, ['Moid', 'merchant_uid', 'orderId']);
-  const amount = parseNumber(getPayloadValue(providerPayload, ['Amt', 'amount']));
+  const rawAmount = getPayloadValue(providerPayload, ['Amt', 'amount']);
+  const amount = parseNumber(rawAmount);
+  const signatureAmount = rawAmount || String(amount);
   const nextAppUrl = getPayloadValue(providerPayload, ['NextAppURL']);
   const netCancelUrl = getPayloadValue(providerPayload, ['NetCancelURL']);
   const signature = getPayloadValue(providerPayload, ['Signature']);
@@ -399,19 +401,23 @@ async function verifyNicePayApprovedPayment(
   const approvalUrl = nextAppUrl as string;
 
   if (signature) {
-    const expectedSignature = sha256Hex(`${authToken}${config.mid}${amount}${config.merchantKey}`);
+    const expectedSignature = sha256Hex(
+      `${authToken}${config.mid}${signatureAmount}${config.merchantKey}`
+    );
     if (signature !== expectedSignature) {
       throw new Error('NICEPAY 인증 응답 서명이 올바르지 않습니다.');
     }
   }
 
   const ediDate = getNicePayEdiDate();
-  const signData = sha256Hex(`${authToken}${config.mid}${amount}${ediDate}${config.merchantKey}`);
+  const signData = sha256Hex(
+    `${authToken}${config.mid}${signatureAmount}${ediDate}${config.merchantKey}`
+  );
   const approvalFormBody = new URLSearchParams({
     TID: txTid,
     AuthToken: authToken,
     MID: config.mid,
-    Amt: String(amount),
+    Amt: signatureAmount,
     EdiDate: ediDate,
     SignData: signData,
     CharSet: 'utf-8',
@@ -449,7 +455,9 @@ async function verifyNicePayApprovedPayment(
   const resultCode = getPayloadValue(parsed, ['ResultCode']);
   const approvedTransactionId = getPayloadValue(parsed, ['TID']) || txTid;
   const approvedOrderId = getPayloadValue(parsed, ['Moid']);
-  const approvedAmount = parseNumber(getPayloadValue(parsed, ['Amt']));
+  const rawApprovedAmount = getPayloadValue(parsed, ['Amt']);
+  const approvedAmount = parseNumber(rawApprovedAmount);
+  const approvalSignatureAmount = rawApprovedAmount || String(approvedAmount);
   const approvalSignature = getPayloadValue(parsed, ['Signature']);
   const approvedPayMethod = getPayloadValue(parsed, ['PayMethod']);
 
@@ -473,7 +481,7 @@ async function verifyNicePayApprovedPayment(
 
   if (approvalSignature) {
     const expectedApprovalSignature = sha256Hex(
-      `${approvedTransactionId}${config.mid}${approvedAmount}${config.merchantKey}`
+      `${approvedTransactionId}${config.mid}${approvalSignatureAmount}${config.merchantKey}`
     );
 
     if (approvalSignature !== expectedApprovalSignature) {
