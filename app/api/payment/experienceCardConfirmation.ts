@@ -2,7 +2,7 @@ import { revalidatePath } from 'next/cache';
 
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
-import { getBookingSettlementSnapshot } from '@/app/utils/bookingFinance';
+import { getBookingSettlementSnapshotForConfirmation } from '@/app/utils/bookingFinance';
 import { notifyExperiencePaymentConfirmed } from '@/app/utils/experienceNotificationFlows';
 import type { VerifiedCardPayment } from '@/app/utils/payments/card/types';
 import { createAdminClient } from '@/app/utils/supabase/admin';
@@ -23,6 +23,14 @@ export type ExperienceCardBookingRow = {
   status: string;
   payment_method: string | null;
   amount: number | null;
+  total_price?: number | null;
+  total_experience_price?: number | null;
+  price_at_booking?: number | null;
+  host_payout_amount?: number | null;
+  platform_revenue?: number | null;
+  refund_amount?: number | null;
+  solo_guarantee_price?: number | null;
+  solo_guarantee_refund_amount?: number | null;
   guests: number | null;
   type: string | null;
   date: string;
@@ -79,7 +87,7 @@ export async function finalizeExperienceCardPayment(params: {
     };
   }
 
-  const snapshot = getBookingSettlementSnapshot({
+  const snapshot = getBookingSettlementSnapshotForConfirmation({
     ...originalBooking,
     amount: Number(originalBooking.amount || 0),
   });

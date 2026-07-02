@@ -66,6 +66,7 @@ type BookingErrorCode =
   | 'invalid_payment_method'
   | 'max_guests_exceeded'
   | 'booking_conflict'
+  | 'booking_pending_hold'
   | 'booking_not_found'
   | 'booking_bad_request'
   | 'solo_guarantee_unavailable_existing_booking'
@@ -294,6 +295,10 @@ function PaymentContent() {
       case 'booking_conflict':
         return isPrivate
           ? (t('exp_payment_private_conflict') as string)
+          : (t('exp_payment_capacity_conflict') as string);
+      case 'booking_pending_hold':
+        return lang === 'ko'
+          ? '다른 결제 대기 예약이 좌석을 임시 보유 중입니다. 잠시 후 다시 시도해주세요.'
           : (t('exp_payment_capacity_conflict') as string);
       case 'server_error':
         return t('server_error') as string;

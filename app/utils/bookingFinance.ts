@@ -1,4 +1,5 @@
 type BookingFinanceInput = {
+  status?: string | null;
   amount?: number | string | null;
   total_price?: number | string | null;
   total_experience_price?: number | string | null;
@@ -141,6 +142,35 @@ export function getBookingSettlementSnapshot(booking: BookingFinanceInput) {
     hostPayout,
     platformRevenue,
   };
+}
+
+export function getBookingSettlementSnapshotForConfirmation(booking: BookingFinanceInput) {
+  const paidAmount = getBookingPaidAmount(booking);
+  const totalPrice = toNullableNumber(booking.total_price);
+  const totalExperiencePrice = toNullableNumber(booking.total_experience_price);
+  const isPendingConfirmation = String(booking.status || '').toLowerCase() === 'pending';
+  const shouldNormalizeZeroPlaceholders =
+    isPendingConfirmation && paidAmount > 0 && totalPrice != null && totalPrice > 0;
+
+  if (!shouldNormalizeZeroPlaceholders) {
+    return getBookingSettlementSnapshot(booking);
+  }
+
+  const normalizeZeroPlaceholder = (value: number | string | null | undefined) => {
+    const parsed = toNullableNumber(value);
+    return parsed === 0 ? null : value;
+  };
+
+  return getBookingSettlementSnapshot({
+    ...booking,
+    total_experience_price:
+      totalExperiencePrice == null || totalExperiencePrice <= 0
+        ? totalPrice
+        : booking.total_experience_price,
+    price_at_booking: normalizeZeroPlaceholder(booking.price_at_booking),
+    host_payout_amount: normalizeZeroPlaceholder(booking.host_payout_amount),
+    platform_revenue: normalizeZeroPlaceholder(booking.platform_revenue),
+  });
 }
 
 export function calculateBookingCancellationSettlement(

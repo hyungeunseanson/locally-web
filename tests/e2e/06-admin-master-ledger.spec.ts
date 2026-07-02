@@ -379,7 +379,7 @@ test.describe.serial('Scenario 6: Admin Master Ledger Smoke', () => {
     const sales = parseNumber(salesText);
 
     expect(basePrice).toBeGreaterThanOrEqual(0);
-    expect(basePrice).toBeLessThanOrEqual(sales);
+    expect(sales).toBe(0);
 
     await setOutOfRangeDateFilter(adminPage);
     await expect(adminPage.getByText('데이터가 없습니다.')).toBeVisible({ timeout: 10000 });

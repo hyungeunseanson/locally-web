@@ -100,6 +100,10 @@ function getLedgerExperiencePrice(booking: AdminMasterLedgerEntry) {
   return getBookingExperienceAmount(booking) || getBookingPaidAmount(booking);
 }
 
+function getLedgerPaidAmountForDisplay(booking: AdminMasterLedgerEntry) {
+  return isPendingBookingStatus(booking.status) ? 0 : getBookingPaidAmount(booking);
+}
+
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
 }
@@ -370,11 +374,9 @@ export default function MasterLedgerTab({
     (booking) => isBookingReviewPending(booking.cancel_reason)
   ).length;
 
-  // 2. 통합 합계 계산 (KPI) - 취소된 건은 제외
+  // 2. 통합 합계 계산 (KPI) - 결제/입금 확정 전 예약은 매출에서 제외
   const totals = ledgerData.reduce((acc, curr) => {
-    if (isCancelledBookingStatus(curr.status)) return acc;
-    // 서비스의뢰: PENDING 상태는 KPI에서 제외 (결제 미확정)
-    if (curr._type === 'service' && curr.status === 'PENDING') return acc;
+    if (!isConfirmedBookingStatus(curr.status)) return acc;
 
     const paidAmount = getBookingPaidAmount(curr);
     const payout = getLedgerPayout(curr) ?? 0;
@@ -400,7 +402,7 @@ export default function MasterLedgerTab({
       getLedgerBasePrice(b) ?? '',
       getLedgerExperiencePrice(b),
       getLedgerPayout(b) ?? '',
-      getBookingPaidAmount(b),
+      getLedgerPaidAmountForDisplay(b),
       getLedgerRevenue(b) ?? ''
     ]);
 
@@ -851,7 +853,7 @@ export default function MasterLedgerTab({
                         {getLedgerPayout(b) != null ? getLedgerPayout(b)?.toLocaleString() : '-'}
                       </td>
                       <td className="px-1.5 md:px-4 py-2 md:py-4 text-right font-mono text-[9px] md:text-sm font-black text-slate-900 bg-slate-100/50">
-                        {getBookingPaidAmount(b).toLocaleString()}
+                        {getLedgerPaidAmountForDisplay(b).toLocaleString()}
                       </td>
                       <td className="px-1.5 md:px-4 py-2 md:py-4 text-right font-mono text-[9px] md:text-sm font-black text-blue-600">
                         {getLedgerRevenue(b) != null ? getLedgerRevenue(b)?.toLocaleString() : '-'}

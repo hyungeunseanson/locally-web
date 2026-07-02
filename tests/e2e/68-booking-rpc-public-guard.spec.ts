@@ -150,4 +150,76 @@ test.describe.serial('booking RPC public guard', () => {
 
     createdBookingIds.push(String(apiResult.body.newOrderId));
   });
+
+  test('reports a pending hold when a PENDING booking temporarily blocks the slot', async ({ page }) => {
+    const holder = createTestUser('exp.rpc.pending.holder');
+    const requester = createTestUser('exp.rpc.pending.requester');
+    await createAuthUser(holder, createdAuthUserIds);
+    await createAuthUser(requester, createdAuthUserIds);
+    const experience = await prepareBookableExperience(createdAvailabilityKeys, {
+      minimumMaxGuests: 1,
+    });
+
+    await login(page, holder);
+    const firstBooking = await page.evaluate(
+      async ({ experience, holder }) => {
+        const response = await fetch('/api/bookings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            experienceId: experience.experienceId,
+            date: experience.date,
+            time: experience.time,
+            guests: experience.maxGuests,
+            isPrivate: false,
+            isSoloGuarantee: false,
+            customerName: holder.fullName,
+            customerPhone: holder.phone,
+            paymentMethod: 'bank',
+          }),
+        });
+
+        return {
+          status: response.status,
+          body: await response.json(),
+        };
+      },
+      { experience, holder }
+    );
+
+    expect(firstBooking.status).toBe(200);
+    expect(firstBooking.body.success).toBe(true);
+    createdBookingIds.push(String(firstBooking.body.newOrderId));
+
+    await login(page, requester);
+    const blockedBooking = await page.evaluate(
+      async ({ experience, requester }) => {
+        const response = await fetch('/api/bookings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            experienceId: experience.experienceId,
+            date: experience.date,
+            time: experience.time,
+            guests: 1,
+            isPrivate: false,
+            isSoloGuarantee: false,
+            customerName: requester.fullName,
+            customerPhone: requester.phone,
+            paymentMethod: 'bank',
+          }),
+        });
+
+        return {
+          status: response.status,
+          body: await response.json(),
+        };
+      },
+      { experience, requester }
+    );
+
+    expect(blockedBooking.status).toBe(409);
+    expect(blockedBooking.body.success).toBe(false);
+    expect(blockedBooking.body.errorCode).toBe('booking_pending_hold');
+  });
 });

@@ -5,7 +5,7 @@ import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatu
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
-import { getBookingSettlementSnapshot } from '@/app/utils/bookingFinance';
+import { getBookingSettlementSnapshotForConfirmation } from '@/app/utils/bookingFinance';
 import { notifyExperiencePaymentConfirmed } from '@/app/utils/experienceNotificationFlows';
 import { capturePayPalOrder, getPayPalOrder } from '@/app/utils/paypal/server';
 import { captureServerException } from '@/app/utils/monitoring/sentry';
@@ -144,7 +144,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const snapshot = getBookingSettlementSnapshot({
+    const snapshot = getBookingSettlementSnapshotForConfirmation({
       ...originalBooking,
       amount: expectedAmount,
     });

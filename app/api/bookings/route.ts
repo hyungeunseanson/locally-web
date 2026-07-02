@@ -34,6 +34,7 @@ type BookingErrorCode =
     | 'invalid_payment_method'
     | 'max_guests_exceeded'
     | 'booking_conflict'
+    | 'booking_pending_hold'
     | 'booking_not_found'
     | 'booking_bad_request'
     | 'solo_guarantee_unavailable_existing_booking'
@@ -145,6 +146,23 @@ export async function POST(request: Request) {
         if (bookingError || !bookingData) {
             const errorMessage = bookingError?.message || '예약 처리 중 오류가 발생했습니다.';
             if (errorMessage.includes('BOOKING_CONFLICT')) {
+                const { data: pendingHolds } = await supabaseAdmin
+                    .from('bookings')
+                    .select('id')
+                    .eq('experience_id', normalizedExperienceId)
+                    .eq('date', date)
+                    .eq('time', normalizedTime)
+                    .in('status', ['PENDING', 'pending'])
+                    .limit(1);
+
+                if (pendingHolds && pendingHolds.length > 0) {
+                    return createErrorResponse(
+                        409,
+                        'booking_pending_hold',
+                        '다른 결제 대기 예약이 좌석을 임시 보유 중입니다. 잠시 후 다시 시도해주세요.'
+                    );
+                }
+
                 return createErrorResponse(409, 'booking_conflict', '해당 시간대에 남은 좌석이 부족합니다.');
             }
             if (errorMessage.includes('BOOKING_NOT_FOUND')) {

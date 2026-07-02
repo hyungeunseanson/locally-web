@@ -4,6 +4,7 @@ import {
   calculateBookingCancellationSettlement,
   getBookingHostPayout,
   getBookingPlatformRevenue,
+  getBookingSettlementSnapshotForConfirmation,
 } from '@/app/utils/bookingFinance';
 
 test.describe('Booking finance payout fallback', () => {
@@ -62,5 +63,55 @@ test.describe('Booking finance payout fallback', () => {
     expect(settlement.cumulativeRefundAmount).toBe(85000);
     expect(settlement.hostPayout).toBe(0);
     expect(settlement.platformRevenue).toBe(0);
+  });
+
+  test('normalizes zero settlement placeholders only while confirming a paid pending booking', () => {
+    const snapshot = getBookingSettlementSnapshotForConfirmation({
+      status: 'PENDING',
+      amount: 110,
+      total_price: 100,
+      total_experience_price: 0,
+      price_at_booking: 0,
+      host_payout_amount: 0,
+      platform_revenue: 0,
+    });
+
+    expect(snapshot.basePrice).toBe(100);
+    expect(snapshot.paidAmount).toBe(110);
+    expect(snapshot.totalExperiencePrice).toBe(100);
+    expect(snapshot.hostPayout).toBe(80);
+    expect(snapshot.platformRevenue).toBe(30);
+  });
+
+  test('does not overwrite non-zero settlement values during confirmation', () => {
+    const snapshot = getBookingSettlementSnapshotForConfirmation({
+      status: 'PENDING',
+      amount: 110,
+      total_price: 100,
+      total_experience_price: 100,
+      price_at_booking: 100,
+      host_payout_amount: 70,
+      platform_revenue: 40,
+    });
+
+    expect(snapshot.basePrice).toBe(100);
+    expect(snapshot.hostPayout).toBe(70);
+    expect(snapshot.platformRevenue).toBe(40);
+  });
+
+  test('keeps zero settlement values outside pending confirmation', () => {
+    const snapshot = getBookingSettlementSnapshotForConfirmation({
+      status: 'PAID',
+      amount: 110,
+      total_price: 100,
+      total_experience_price: 100,
+      price_at_booking: 100,
+      host_payout_amount: 0,
+      platform_revenue: 0,
+    });
+
+    expect(snapshot.basePrice).toBe(100);
+    expect(snapshot.hostPayout).toBe(0);
+    expect(snapshot.platformRevenue).toBe(0);
   });
 });

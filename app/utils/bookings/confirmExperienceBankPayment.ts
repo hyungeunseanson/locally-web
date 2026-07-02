@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
 
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
-import { getBookingSettlementSnapshot } from '@/app/utils/bookingFinance';
+import { getBookingSettlementSnapshotForConfirmation } from '@/app/utils/bookingFinance';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { getHostBookingMessageHref } from '@/app/utils/hostBookingMessageLink';
 import { notifyMembershipMilestone } from '@/app/utils/memberMilestoneNotifications';
@@ -22,7 +22,11 @@ type ConfirmExperienceBankPaymentBookingRow = {
   total_price: number | null;
   total_experience_price: number | null;
   price_at_booking: number | null;
+  host_payout_amount?: number | null;
+  platform_revenue?: number | null;
+  refund_amount?: number | null;
   solo_guarantee_price: number | null;
+  solo_guarantee_refund_amount?: number | null;
   status: string;
   payment_method: string | null;
   contact_name: string | null;
@@ -40,7 +44,7 @@ type ConfirmedExperienceBankPaymentBooking = Omit<ConfirmExperienceBankPaymentBo
   experiences: BookingExperienceMetaRow | null;
 };
 
-type ConfirmExperienceBankPaymentSnapshot = ReturnType<typeof getBookingSettlementSnapshot>;
+type ConfirmExperienceBankPaymentSnapshot = ReturnType<typeof getBookingSettlementSnapshotForConfirmation>;
 
 type ConfirmExperienceBankPaymentFailure = {
   success: false;
@@ -119,7 +123,9 @@ export async function confirmExperienceBankPayment(
       total_price,
       total_experience_price,
       price_at_booking,
+      refund_amount,
       solo_guarantee_price,
+      solo_guarantee_refund_amount,
       status,
       payment_method,
       contact_name,
@@ -154,7 +160,7 @@ export async function confirmExperienceBankPayment(
   }
 
   const experience = normalizeExperienceMeta(booking.experiences);
-  const snapshot = getBookingSettlementSnapshot({
+  const snapshot = getBookingSettlementSnapshotForConfirmation({
     ...booking,
     amount: Number(booking.amount || 0),
   });
