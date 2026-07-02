@@ -241,6 +241,7 @@ export function buildNicePayLaunchFields(params: {
     GoodsCl: '1',
     TransType: '0',
     CharSet: 'utf-8',
+    ConnWithIframe: 'Y',
     ReqReserved: '',
     EdiDate: ediDate,
     SignData: signData,

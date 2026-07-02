@@ -489,6 +489,7 @@ test.describe('Card payment provider cutover contracts', () => {
       Amt: '55000',
       ReturnURL: 'https://locally.example/api/payment/nicepay/relay',
       PayMethod: 'CARD',
+      ConnWithIframe: 'Y',
     });
     expect(fields.SignData).toBe(
       sha256Hex(`${fields.EdiDate}${fields.MID}${fields.Amt}${process.env.NICEPAY_MERCHANT_KEY}`)

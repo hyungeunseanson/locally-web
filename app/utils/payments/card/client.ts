@@ -111,6 +111,26 @@ function createHiddenInput(form: HTMLFormElement, name: string, value: string) {
   form.appendChild(input);
 }
 
+function formDataToStringRecord(form: HTMLFormElement) {
+  return Object.fromEntries(
+    Array.from(new FormData(form).entries()).map(([key, value]) => [key, String(value)])
+  );
+}
+
+function getNicePayApprovalId(payload: Record<string, string>) {
+  return String(payload.TxTid || payload.TID || '').trim();
+}
+
+function hasNicePayAuthResponse(payload: Record<string, string>) {
+  return Boolean(
+    payload.AuthResultCode ||
+      payload.AuthToken ||
+      payload.TxTid ||
+      payload.TID ||
+      payload.NextAppURL
+  );
+}
+
 async function requestNicePayLaunchEnvelope(
   params: CardPaymentLaunchParams
 ): Promise<NicePayLaunchEnvelope> {
@@ -191,7 +211,7 @@ function requestNicePayCardPayment(params: CardPaymentLaunchParams): Promise<Car
         return;
       }
 
-      const approvalId = String(data.payload.TxTid || data.payload.TID || '').trim();
+      const approvalId = getNicePayApprovalId(data.payload);
       if (!approvalId) {
         rejectWithCleanup(new Error('결제 확인용 approval id를 받지 못했습니다. 다시 시도해주세요.'));
         return;
@@ -218,6 +238,33 @@ function requestNicePayCardPayment(params: CardPaymentLaunchParams): Promise<Car
         }
 
         window.nicepaySubmit = () => {
+          const payload = formDataToStringRecord(form);
+
+          if (hasNicePayAuthResponse(payload)) {
+            if (payload.AuthResultCode && payload.AuthResultCode !== '0000') {
+              rejectWithCleanup(
+                new Error(payload.AuthResultMsg || '결제가 취소되었거나 승인에 실패했습니다.')
+              );
+              return;
+            }
+
+            const approvalId = getNicePayApprovalId(payload);
+            if (!approvalId) {
+              rejectWithCleanup(
+                new Error('결제 확인용 approval id를 받지 못했습니다. 다시 시도해주세요.')
+              );
+              return;
+            }
+
+            cleanup();
+            resolve({
+              provider: 'nicepay',
+              approvalId,
+              raw: payload,
+            });
+            return;
+          }
+
           form.submit();
         };
         window.nicepayClose = () => {
