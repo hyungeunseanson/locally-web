@@ -93,6 +93,40 @@ const MOCK_NICEPAY_SDK = `
     }, 0);
   };
 `;
+const MOCK_NICEPAY_LAUNCH_PAGE = (title: string) => `<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>Locally NICEPAY Test</title>
+    <script>
+      window.__LOCALLY_OPENER_ORIGIN__ = window.location.origin;
+      function nicepayStart() {
+        window.goPay(document.payForm);
+      }
+      function nicepaySubmit() {
+        document.payForm.submit();
+      }
+      function nicepayClose() {
+        if (window.opener) {
+          window.opener.postMessage({
+            type: 'locally:nicepay-result',
+            success: false,
+            cancelled: true,
+            message: '결제가 취소되었습니다.'
+          }, window.__LOCALLY_OPENER_ORIGIN__);
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <form name="payForm" method="post" action="/api/payment/nicepay/relay" accept-charset="euc-kr" style="overflow:hidden;height:0">
+      <input type="hidden" name="Moid" value="MOCK-NICEPAY-ORDER" />
+      <input type="hidden" name="Amt" value="110" />
+      <input type="hidden" name="GoodsName" value="${title.replace(/"/g, '&quot;')}" />
+    </form>
+    <script src="https://pg-web.nicepay.co.kr/v3/common/js/nicepay-pgweb.js" onload="nicepayStart()"></script>
+  </body>
+</html>`;
 
 let adminClient: SupabaseClient | null = null;
 const createdAuthUserIds: string[] = [];
@@ -457,20 +491,14 @@ test.describe.serial('Experience card payment UI smoke', () => {
       }
     );
 
-    await page.route('**/api/payment/card-launch', async (route) => {
+    await page.context().route('**/api/payment/card-launch-page', async (route) => {
+      expect(route.request().method()).toBe('POST');
+      expect(route.request().postData() || '').toContain('provider=nicepay');
+
       await route.fulfill({
         status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          provider: 'nicepay',
-          formAction: 'https://web.nicepay.test/pay',
-          fields: {
-            Moid: 'MOCK-NICEPAY-ORDER',
-            Amt: '110',
-            GoodsName: experience.title,
-          },
-        }),
+        contentType: 'text/html; charset=utf-8',
+        body: MOCK_NICEPAY_LAUNCH_PAGE(experience.title),
       });
     });
 
