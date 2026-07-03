@@ -1185,6 +1185,8 @@ function PaymentContent() {
     },
   ];
   const activeAgreementMeta = agreementRows.find((agreement) => agreement.key === activeAgreement) || null;
+  const shouldLoadCardRuntimeScript =
+    Boolean(cardRuntime?.scriptSrc) && cardRuntime?.provider !== 'nicepay';
 
   if (isAuthLoading || !user) {
     return <Spinner fullScreen />;
@@ -1192,7 +1194,7 @@ function PaymentContent() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center py-6 md:py-10 font-sans px-3 md:px-4">
-      {cardRuntime?.scriptSrc && (
+      {shouldLoadCardRuntimeScript && cardRuntime?.scriptSrc && (
         <Script
           id={`card-sdk-${cardRuntime.provider}`}
           src={cardRuntime.scriptSrc}

@@ -39,6 +39,7 @@ type NicePayRelayMessage = {
 };
 
 const NICEPAY_RESULT_MESSAGE_TYPE = 'locally:nicepay-result';
+const NICEPAY_SCRIPT_SRC = 'https://pg-web.nicepay.co.kr/v3/common/js/nicepay-pgweb.js';
 
 declare global {
   interface Window {
@@ -103,18 +104,150 @@ function requestPortOneCardPayment(params: CardPaymentLaunchParams): Promise<Car
   });
 }
 
-function createHiddenInput(form: HTMLFormElement, name: string, value: string) {
-  const input = document.createElement('input');
-  input.type = 'hidden';
-  input.name = name;
-  input.value = value;
-  form.appendChild(input);
+function escapeHtmlAttribute(value: string) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
-function formDataToStringRecord(form: HTMLFormElement) {
-  return Object.fromEntries(
-    Array.from(new FormData(form).entries()).map(([key, value]) => [key, String(value)])
-  );
+function escapeJsonForInlineScript(value: unknown) {
+  return JSON.stringify(value).replace(/</g, '\\u003c');
+}
+
+function buildNicePayPopupHtml(envelope: NicePayLaunchEnvelope, openerOrigin: string) {
+  const fieldInputs = Object.entries(envelope.fields || {})
+    .map(
+      ([key, value]) =>
+        `<input type="hidden" name="${escapeHtmlAttribute(key)}" value="${escapeHtmlAttribute(
+          value
+        )}" />`
+    )
+    .join('\n');
+  const resultTypeJson = escapeJsonForInlineScript(NICEPAY_RESULT_MESSAGE_TYPE);
+  const openerOriginJson = escapeJsonForInlineScript(openerOrigin);
+  const scriptSrcJson = escapeJsonForInlineScript(NICEPAY_SCRIPT_SRC);
+  const formAction = escapeHtmlAttribute(envelope.formAction || '');
+
+  return `<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Locally NICEPAY</title>
+    <style>
+      html, body { height: 100%; margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f8fafc; color: #0f172a; }
+      .fallback { min-height: 100%; display: grid; place-items: center; text-align: center; padding: 24px; box-sizing: border-box; }
+      .fallback strong { display: block; font-size: 17px; margin-bottom: 8px; }
+      .fallback span { color: #64748b; font-size: 14px; }
+      form { overflow: hidden; height: 0; }
+    </style>
+    <script>
+      const LOCALLY_RESULT_MESSAGE_TYPE = ${resultTypeJson};
+      window.__LOCALLY_OPENER_ORIGIN__ = ${openerOriginJson};
+
+      function postToOpener(message) {
+        if (window.opener && typeof window.opener.postMessage === 'function') {
+          window.opener.postMessage(message, window.__LOCALLY_OPENER_ORIGIN__);
+        }
+      }
+
+      window.addEventListener('message', function receiveNicePayRelay(event) {
+        if (event.origin !== window.__LOCALLY_OPENER_ORIGIN__) return;
+        const data = event.data || {};
+        if (data.type !== LOCALLY_RESULT_MESSAGE_TYPE) return;
+        postToOpener(data);
+        window.setTimeout(function () {
+          window.close();
+        }, 120);
+      });
+
+      function nicepayStart() {
+        if (typeof window.goPay !== 'function') {
+          postToOpener({
+            type: LOCALLY_RESULT_MESSAGE_TYPE,
+            success: false,
+            message: 'NICEPAY 결제 모듈을 불러오지 못했습니다.'
+          });
+          return;
+        }
+        window.goPay(document.payForm);
+      }
+
+      function nicepaySubmit() {
+        document.payForm.submit();
+      }
+
+      function nicepayClose() {
+        postToOpener({
+          type: LOCALLY_RESULT_MESSAGE_TYPE,
+          success: false,
+          cancelled: true,
+          message: '결제가 취소되었습니다.'
+        });
+        window.setTimeout(function () {
+          window.close();
+        }, 120);
+      }
+    </script>
+  </head>
+  <body>
+    <div class="fallback">
+      <div>
+        <strong>NICEPAY 결제창을 여는 중입니다.</strong>
+        <span>창을 닫지 말고 잠시만 기다려 주세요.</span>
+      </div>
+    </div>
+    <form name="payForm" method="post" action="${formAction}" accept-charset="euc-kr">
+      ${fieldInputs}
+    </form>
+    <script>
+      (function loadNicePayScript() {
+        const script = document.createElement('script');
+        script.src = ${scriptSrcJson};
+        script.onload = function () {
+          nicepayStart();
+        };
+        script.onerror = function () {
+          postToOpener({
+            type: LOCALLY_RESULT_MESSAGE_TYPE,
+            success: false,
+            message: 'NICEPAY 결제 모듈을 불러오지 못했습니다.'
+          });
+        };
+        document.body.appendChild(script);
+      })();
+    </script>
+  </body>
+</html>`;
+}
+
+function writeNicePayPopupLoading(popup: Window) {
+  try {
+    popup.document.open();
+    popup.document.write(`<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>Locally NICEPAY</title>
+    <style>
+      html, body { height: 100%; margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f8fafc; color: #0f172a; }
+      body { display: grid; place-items: center; text-align: center; }
+      span { color: #64748b; font-size: 14px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <strong>NICEPAY 결제 준비 중입니다.</strong><br />
+      <span>잠시만 기다려 주세요.</span>
+    </main>
+  </body>
+</html>`);
+    popup.document.close();
+  } catch {
+    // The popup may already be navigating or blocked from document access.
+  }
 }
 
 function getNicePayApprovalId(payload: Record<string, string>) {
@@ -204,22 +337,6 @@ function scheduleCardPaymentBrowserArtifactCleanup() {
   }, 250);
 }
 
-function removeElementIfAttached(element: Element) {
-  if (element.parentElement) {
-    element.remove();
-  }
-}
-
-function hasNicePayAuthResponse(payload: Record<string, string>) {
-  return Boolean(
-    payload.AuthResultCode ||
-      payload.AuthToken ||
-      payload.TxTid ||
-      payload.TID ||
-      payload.NextAppURL
-  );
-}
-
 async function requestNicePayLaunchEnvelope(
   params: CardPaymentLaunchParams
 ): Promise<NicePayLaunchEnvelope> {
@@ -247,28 +364,24 @@ async function requestNicePayLaunchEnvelope(
 
 function requestNicePayCardPayment(params: CardPaymentLaunchParams): Promise<CardPaymentLaunchResult> {
   return new Promise((resolve, reject) => {
-    const goPay = window.goPay;
-    if (typeof goPay !== 'function') {
-      reject(new Error('결제 모듈을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.'));
+    const popup = window.open(
+      '',
+      `locally-nicepay-${Date.now()}`,
+      'popup=yes,width=720,height=860,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes'
+    );
+
+    if (!popup) {
+      reject(new Error('결제창 팝업이 차단되었습니다. 팝업 허용 후 다시 시도해주세요.'));
       return;
     }
 
+    writeNicePayPopupLoading(popup);
     cleanupCardPaymentBrowserArtifacts();
 
-    const cleanupCallbacks = {
-      submit: window.nicepaySubmit,
-      close: window.nicepayClose,
-    };
-
-    const form = document.createElement('form');
-    form.name = 'payForm';
-    form.method = 'post';
-    form.acceptCharset = 'euc-kr';
-    form.style.overflow = 'hidden';
-    form.style.height = '0';
-
     let pollTimer = 0;
+    let closePollTimer = 0;
     let hasCleanedUp = false;
+    let popupObjectUrl: string | null = null;
 
     const cleanup = () => {
       if (hasCleanedUp) return;
@@ -276,9 +389,18 @@ function requestNicePayCardPayment(params: CardPaymentLaunchParams): Promise<Car
 
       window.removeEventListener('message', handleMessage);
       window.clearTimeout(pollTimer);
-      window.nicepaySubmit = cleanupCallbacks.submit;
-      window.nicepayClose = cleanupCallbacks.close;
-      removeElementIfAttached(form);
+      window.clearInterval(closePollTimer);
+      if (popupObjectUrl) {
+        URL.revokeObjectURL(popupObjectUrl);
+        popupObjectUrl = null;
+      }
+      try {
+        if (!popup.closed) {
+          popup.close();
+        }
+      } catch {
+        // Ignore popup lifecycle differences between browsers.
+      }
       scheduleCardPaymentBrowserArtifactCleanup();
     };
 
@@ -315,57 +437,37 @@ function requestNicePayCardPayment(params: CardPaymentLaunchParams): Promise<Car
     };
 
     window.addEventListener('message', handleMessage);
-    document.body.appendChild(form);
 
     requestNicePayLaunchEnvelope(params)
       .then((envelope) => {
-        form.action = envelope.formAction!;
-
-        for (const [key, value] of Object.entries(envelope.fields || {})) {
-          createHiddenInput(form, key, value);
+        if (popup.closed) {
+          rejectWithCleanup(new Error('결제창이 닫혔습니다. 다시 시도해주세요.'));
+          return;
         }
 
-        window.nicepaySubmit = () => {
-          const payload = formDataToStringRecord(form);
-
-          if (hasNicePayAuthResponse(payload)) {
-            if (payload.AuthResultCode && payload.AuthResultCode !== '0000') {
-              rejectWithCleanup(
-                new Error(payload.AuthResultMsg || '결제가 취소되었거나 승인에 실패했습니다.')
-              );
-              return;
-            }
-
-            const approvalId = getNicePayApprovalId(payload);
-            if (!approvalId) {
-              rejectWithCleanup(
-                new Error('결제 확인용 approval id를 받지 못했습니다. 다시 시도해주세요.')
-              );
-              return;
-            }
-
-            cleanup();
-            resolve({
-              provider: 'nicepay',
-              approvalId,
-              raw: payload,
-            });
-            return;
-          }
-
-          form.submit();
-        };
-        window.nicepayClose = () => {
-          rejectWithCleanup(new Error('결제가 취소되었습니다.'));
-        };
-
-        goPay(form);
+        try {
+          popupObjectUrl = URL.createObjectURL(
+            new Blob([buildNicePayPopupHtml(envelope, window.location.origin)], {
+              type: 'text/html;charset=utf-8',
+            })
+          );
+          popup.location.href = popupObjectUrl;
+          popup.focus();
+        } catch {
+          rejectWithCleanup(new Error('결제창을 열지 못했습니다. 다시 시도해주세요.'));
+        }
       })
       .catch((error: unknown) => {
         rejectWithCleanup(
           error instanceof Error ? error : new Error('NICEPAY 결제 준비에 실패했습니다.')
         );
       });
+
+    closePollTimer = window.setInterval(() => {
+      if (popup.closed) {
+        rejectWithCleanup(new Error('결제창이 닫혔습니다. 다시 시도해주세요.'));
+      }
+    }, 1000);
 
     pollTimer = window.setTimeout(() => {
       rejectWithCleanup(new Error('결제 응답이 지연되고 있습니다. 다시 시도해주세요.'));

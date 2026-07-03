@@ -49,10 +49,11 @@ const MOCK_IAMPORT_SDK = `
 `;
 const MOCK_NICEPAY_SDK = `
   window.goPay = function goPay(form) {
+    var openerOrigin = window.__LOCALLY_OPENER_ORIGIN__ || window.location.origin;
     window.__nicepayFormTargetWasBlank = Boolean(form && !form.target);
     window.__nicepayFormAcceptCharset = form ? form.acceptCharset : '';
     window.__nicepayFormDisplay = form ? window.getComputedStyle(form).display : '';
-    window.__nicepayFormHeight = form ? form.style.height : '';
+    window.__nicepayFormHeight = form ? window.getComputedStyle(form).height : '';
 
     var parent = document.createElement('div');
     parent.id = 'nicepay-pgweb-test-container';
@@ -61,22 +62,34 @@ const MOCK_NICEPAY_SDK = `
     parent.appendChild(child);
     document.body.appendChild(parent);
 
-    window.addEventListener('message', function handleNicePayMessage(event) {
-      if (!event.data || event.data.type !== 'locally:nicepay-result') return;
+    function postDebugToOpener() {
       window.__nicepayDeletePaymentParentWasPresent = Boolean(child.parentElement);
       child.parentElement.removeChild(child);
       parent.remove();
-    }, { once: true });
+      if (window.opener && typeof window.opener.postMessage === 'function') {
+        window.opener.postMessage({
+          type: 'locally:nicepay-test-debug',
+          formTargetWasBlank: window.__nicepayFormTargetWasBlank,
+          formAcceptCharset: window.__nicepayFormAcceptCharset,
+          formDisplay: window.__nicepayFormDisplay,
+          formHeight: window.__nicepayFormHeight,
+          deletePaymentParentWasPresent: window.__nicepayDeletePaymentParentWasPresent,
+        }, openerOrigin);
+      }
+    }
 
     window.setTimeout(function sendNicePayResult() {
-      window.postMessage({
-        type: 'locally:nicepay-result',
-        success: true,
-        payload: {
-          AuthResultCode: '0000',
-          TxTid: '${MOCK_TID}'
-        }
-      }, window.location.origin);
+      postDebugToOpener();
+      if (window.opener && typeof window.opener.postMessage === 'function') {
+        window.opener.postMessage({
+          type: 'locally:nicepay-result',
+          success: true,
+          payload: {
+            AuthResultCode: '0000',
+            TxTid: '${MOCK_TID}'
+          }
+        }, openerOrigin);
+      }
     }, 0);
   };
 `;
@@ -433,13 +446,16 @@ test.describe.serial('Experience card payment UI smoke', () => {
       });
     });
 
-    await page.route('https://pg-web.nicepay.co.kr/v3/common/js/nicepay-pgweb.js', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/javascript',
-        body: MOCK_NICEPAY_SDK,
-      });
-    });
+    await page.context().route(
+      'https://pg-web.nicepay.co.kr/v3/common/js/nicepay-pgweb.js',
+      async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/javascript',
+          body: MOCK_NICEPAY_SDK,
+        });
+      }
+    );
 
     await page.route('**/api/payment/card-launch', async (route) => {
       await route.fulfill({
@@ -531,11 +547,37 @@ test.describe.serial('Experience card payment UI smoke', () => {
     await page.locator('input[type="text"]').fill(customerUser.fullName);
     await page.locator('input[type="tel"]').fill(customerUser.phone);
     await reviewAllExperiencePaymentAgreements(page);
+    await page.evaluate(() => {
+      window.addEventListener('message', (event) => {
+        const data = event.data as {
+          type?: string;
+          formTargetWasBlank?: boolean;
+          formAcceptCharset?: string;
+          formDisplay?: string;
+          formHeight?: string;
+          deletePaymentParentWasPresent?: boolean;
+        };
+
+        if (!data || data.type !== 'locally:nicepay-test-debug') return;
+
+        Object.assign(window, {
+          __nicepayFormTargetWasBlank: data.formTargetWasBlank,
+          __nicepayFormAcceptCharset: data.formAcceptCharset,
+          __nicepayFormDisplay: data.formDisplay,
+          __nicepayFormHeight: data.formHeight,
+          __nicepayDeletePaymentParentWasPresent: data.deletePaymentParentWasPresent,
+        });
+      });
+    });
 
     await expect(page.getByRole('button', { name: /카드|Card|カード|银行卡/ }).first()).toBeEnabled({
       timeout: 15000,
     });
     await page.getByRole('button', { name: /결제하기|Pay|決済する|支付/ }).last().click();
+
+    await expect
+      .poll(() => observedOrderId || null, { timeout: 15000 })
+      .toBeTruthy();
 
     await page.waitForURL(
       new RegExp(`/experiences/${experience.experienceId}/payment/complete\\?orderId=${observedOrderId}`),
