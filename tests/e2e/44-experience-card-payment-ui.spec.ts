@@ -47,6 +47,34 @@ const MOCK_IAMPORT_SDK = `
     }
   };
 `;
+const MOCK_NICEPAY_SDK = `
+  window.goPay = function goPay() {
+    var parent = document.createElement('div');
+    parent.id = 'nicepay-pgweb-test-container';
+    var child = document.createElement('div');
+    child.id = 'nicepay-pgweb-test-child';
+    parent.appendChild(child);
+    document.body.appendChild(parent);
+
+    window.addEventListener('message', function handleNicePayMessage(event) {
+      if (!event.data || event.data.type !== 'locally:nicepay-result') return;
+      window.__nicepayDeletePaymentParentWasPresent = Boolean(child.parentElement);
+      child.parentElement.removeChild(child);
+      parent.remove();
+    }, { once: true });
+
+    window.setTimeout(function sendNicePayResult() {
+      window.postMessage({
+        type: 'locally:nicepay-result',
+        success: true,
+        payload: {
+          AuthResultCode: '0000',
+          TxTid: '${MOCK_TID}'
+        }
+      }, window.location.origin);
+    }, 0);
+  };
+`;
 
 let adminClient: SupabaseClient | null = null;
 const createdAuthUserIds: string[] = [];
@@ -365,5 +393,164 @@ test.describe.serial('Experience card payment UI smoke', () => {
     );
     await expect(bookedTime).toBeDisabled();
     await expect(page.getByTestId('reservation-solo-option')).toHaveCount(0);
+  });
+
+  test('lets NicePay finish its own DOM cleanup before removing stale payment artifacts', async ({
+    page,
+  }) => {
+    test.setTimeout(120000);
+
+    const customerUser = createCustomerUser();
+    const customerId = await createAuthUser(customerUser);
+    const experience = await prepareBookableExperience();
+    const pageErrors: string[] = [];
+
+    let callbackSeen = false;
+    let observedOrderId = '';
+
+    page.on('pageerror', (error) => {
+      pageErrors.push(error.message);
+    });
+
+    await page.route('**/api/payment/card-ready', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ready: true,
+          provider: 'nicepay',
+          runtime: {
+            provider: 'nicepay',
+            merchantCode: 'nicepay-test-mid',
+            scriptSrc: 'https://pg-web.nicepay.co.kr/v3/common/js/nicepay-pgweb.js',
+          },
+        }),
+      });
+    });
+
+    await page.route('https://pg-web.nicepay.co.kr/v3/common/js/nicepay-pgweb.js', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/javascript',
+        body: MOCK_NICEPAY_SDK,
+      });
+    });
+
+    await page.route('**/api/payment/card-launch', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          provider: 'nicepay',
+          formAction: 'https://web.nicepay.test/pay',
+          fields: {
+            Moid: 'MOCK-NICEPAY-ORDER',
+            Amt: '110',
+            GoodsName: experience.title,
+          },
+        }),
+      });
+    });
+
+    await page.route('**/api/payment/nicepay-callback', async (route) => {
+      const payload = route.request().postDataJSON() as {
+        TxTid?: string;
+        approvalId?: string;
+        merchant_uid?: string;
+        orderId?: string;
+      };
+
+      expect(payload.TxTid).toBe(MOCK_TID);
+      expect(payload.approvalId).toBe(MOCK_TID);
+
+      observedOrderId = String(payload.orderId || payload.merchant_uid || '');
+      expect(observedOrderId).toBeTruthy();
+      callbackSeen = true;
+
+      const { data: booking, error: bookingError } = await getAdminClient()
+        .from('bookings')
+        .select('id, status, payment_method, user_id')
+        .eq('order_id', observedOrderId)
+        .maybeSingle();
+
+      if (bookingError) throw bookingError;
+
+      expect(booking).toMatchObject({
+        status: 'PENDING',
+        payment_method: 'card',
+        user_id: customerId,
+      });
+
+      if (!booking) {
+        throw new Error(`Expected booking row for order_id=${observedOrderId}`);
+      }
+
+      const { error: updateError } = await getAdminClient()
+        .from('bookings')
+        .update({
+          status: 'PAID',
+          payment_method: 'card',
+          tid: MOCK_TID,
+        })
+        .eq('id', booking.id);
+
+      if (updateError) throw updateError;
+
+      await page.evaluate(() => {
+        const overlay = document.createElement('div');
+        overlay.id = 'nicepay-stale-overlay-test';
+        overlay.textContent = 'Please, wait...';
+        overlay.style.position = 'fixed';
+        overlay.style.inset = '0';
+        overlay.style.zIndex = '2147483647';
+        overlay.style.background = 'rgba(0, 0, 0, 0.6)';
+        document.body.appendChild(overlay);
+      });
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+        }),
+      });
+    });
+
+    await login(page, customerUser);
+    await page.goto(
+      `/experiences/${experience.experienceId}/payment?date=${experience.date}&time=${experience.time}&guests=1`,
+      { waitUntil: 'networkidle' }
+    );
+
+    await page.locator('input[type="text"]').fill(customerUser.fullName);
+    await page.locator('input[type="tel"]').fill(customerUser.phone);
+    await reviewAllExperiencePaymentAgreements(page);
+
+    await expect(page.getByRole('button', { name: /카드|Card|カード|银行卡/ }).first()).toBeEnabled({
+      timeout: 15000,
+    });
+    await page.getByRole('button', { name: /결제하기|Pay|決済する|支付/ }).last().click();
+
+    await page.waitForURL(
+      new RegExp(`/experiences/${experience.experienceId}/payment/complete\\?orderId=${observedOrderId}`),
+      { timeout: 15000 }
+    );
+
+    expect(callbackSeen).toBe(true);
+    expect(
+      await page.evaluate(() =>
+        Boolean((window as { __nicepayDeletePaymentParentWasPresent?: boolean })
+          .__nicepayDeletePaymentParentWasPresent)
+      )
+    ).toBe(true);
+    expect(pageErrors.filter((message) => message.includes('removeChild'))).toEqual([]);
+    await expect(page.locator('#nicepay-stale-overlay-test')).toHaveCount(0);
+    await expect(page.getByText('Please, wait...')).toHaveCount(0);
+    await expect(
+      page.getByRole('heading', {
+        name: /예약이 확정되었습니다!|Your booking is confirmed!|予約が確定しました！|预订已确认！/,
+      })
+    ).toBeVisible();
   });
 });

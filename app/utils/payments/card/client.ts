@@ -196,6 +196,20 @@ export function cleanupCardPaymentBrowserArtifacts() {
   document.documentElement.style.removeProperty('overflow');
 }
 
+function scheduleCardPaymentBrowserArtifactCleanup() {
+  if (typeof window === 'undefined') return;
+
+  window.setTimeout(() => {
+    cleanupCardPaymentBrowserArtifacts();
+  }, 250);
+}
+
+function removeElementIfAttached(element: Element) {
+  if (element.parentElement) {
+    element.remove();
+  }
+}
+
 function hasNicePayAuthResponse(payload: Record<string, string>) {
   return Boolean(
     payload.AuthResultCode ||
@@ -260,15 +274,19 @@ function requestNicePayCardPayment(params: CardPaymentLaunchParams): Promise<Car
     form.className = 'hidden';
 
     let pollTimer = 0;
+    let hasCleanedUp = false;
 
     const cleanup = () => {
+      if (hasCleanedUp) return;
+      hasCleanedUp = true;
+
       window.removeEventListener('message', handleMessage);
       window.clearTimeout(pollTimer);
       window.nicepaySubmit = cleanupCallbacks.submit;
       window.nicepayClose = cleanupCallbacks.close;
-      form.remove();
-      iframe.remove();
-      cleanupCardPaymentBrowserArtifacts();
+      removeElementIfAttached(form);
+      removeElementIfAttached(iframe);
+      scheduleCardPaymentBrowserArtifactCleanup();
     };
 
     const rejectWithCleanup = (error: Error) => {
