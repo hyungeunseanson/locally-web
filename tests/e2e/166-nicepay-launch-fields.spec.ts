@@ -52,6 +52,7 @@ test('keeps NicePay launch display fields inside WebStd limits', () => {
   expect(Buffer.byteLength(fields.BuyerTel, 'utf8')).toBeLessThanOrEqual(20);
   expect(Buffer.byteLength(fields.BuyerEmail, 'utf8')).toBeLessThanOrEqual(60);
   expect(fields.GoodsName).not.toMatch(/[\[\]{}"']/);
+  expect(fields).not.toHaveProperty('ConnWithIframe');
   expect(fields.BuyerName).toBe('Locally Guest Test 20260703210');
   expect(fields.BuyerTel).toBe('821041101230');
   expect(fields.SignData).toBe(
