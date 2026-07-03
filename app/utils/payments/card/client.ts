@@ -263,8 +263,9 @@ function requestNicePayCardPayment(params: CardPaymentLaunchParams): Promise<Car
     const form = document.createElement('form');
     form.name = 'payForm';
     form.method = 'post';
-    form.acceptCharset = 'utf-8';
-    form.className = 'hidden';
+    form.acceptCharset = 'euc-kr';
+    form.style.overflow = 'hidden';
+    form.style.height = '0';
 
     let pollTimer = 0;
     let hasCleanedUp = false;

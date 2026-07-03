@@ -50,6 +50,9 @@ const MOCK_IAMPORT_SDK = `
 const MOCK_NICEPAY_SDK = `
   window.goPay = function goPay(form) {
     window.__nicepayFormTargetWasBlank = Boolean(form && !form.target);
+    window.__nicepayFormAcceptCharset = form ? form.acceptCharset : '';
+    window.__nicepayFormDisplay = form ? window.getComputedStyle(form).display : '';
+    window.__nicepayFormHeight = form ? form.style.height : '';
 
     var parent = document.createElement('div');
     parent.id = 'nicepay-pgweb-test-container';
@@ -551,6 +554,21 @@ test.describe.serial('Experience card payment UI smoke', () => {
         Boolean((window as { __nicepayFormTargetWasBlank?: boolean }).__nicepayFormTargetWasBlank)
       )
     ).toBe(true);
+    expect(
+      await page.evaluate(() =>
+        String((window as { __nicepayFormAcceptCharset?: string }).__nicepayFormAcceptCharset)
+      )
+    ).toBe('euc-kr');
+    expect(
+      await page.evaluate(() =>
+        String((window as { __nicepayFormDisplay?: string }).__nicepayFormDisplay)
+      )
+    ).not.toBe('none');
+    expect(
+      await page.evaluate(() =>
+        String((window as { __nicepayFormHeight?: string }).__nicepayFormHeight)
+      )
+    ).toBe('0px');
     expect(pageErrors.filter((message) => message.includes('removeChild'))).toEqual([]);
     await expect(page.locator('#nicepay-stale-overlay-test')).toHaveCount(0);
     await expect(page.getByText('Please, wait...')).toHaveCount(0);
