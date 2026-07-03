@@ -43,6 +43,39 @@ function parseNumber(value: number | string | undefined | null) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function truncateUtf8Bytes(value: string, maxBytes: number) {
+  let output = '';
+  let byteLength = 0;
+
+  for (const char of value) {
+    const charBytes = Buffer.byteLength(char, 'utf8');
+    if (byteLength + charBytes > maxBytes) break;
+    output += char;
+    byteLength += charBytes;
+  }
+
+  return output.trim();
+}
+
+function normalizeNicePayTextField(value: string, fallback: string, maxBytes: number) {
+  const cleaned = String(value || '')
+    .normalize('NFKC')
+    .replace(/[\u0000-\u001f\u007f<>"'\[\]{}]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const normalized = truncateUtf8Bytes(cleaned || fallback, maxBytes);
+
+  return normalized || truncateUtf8Bytes(fallback, maxBytes);
+}
+
+function normalizeNicePayPhone(value: string) {
+  return truncateUtf8Bytes(String(value || '').replace(/\D/g, ''), 20);
+}
+
+function normalizeNicePayEmail(value: string | undefined) {
+  return truncateUtf8Bytes(String(value || '').trim(), 60);
+}
+
 function sha256Hex(value: string) {
   return crypto.createHash('sha256').update(value).digest('hex');
 }
@@ -230,13 +263,13 @@ export function buildNicePayLaunchFields(params: {
 
   return {
     PayMethod: 'CARD',
-    GoodsName: params.productName.trim(),
+    GoodsName: normalizeNicePayTextField(params.productName, 'Locally Experience', 40),
     Amt: String(amount),
     MID: config.mid,
     Moid: params.orderId.trim(),
-    BuyerName: params.buyerName.trim(),
-    BuyerTel: params.buyerTel.trim(),
-    BuyerEmail: String(params.buyerEmail || '').trim(),
+    BuyerName: normalizeNicePayTextField(params.buyerName, 'Locally Guest', 30),
+    BuyerTel: normalizeNicePayPhone(params.buyerTel),
+    BuyerEmail: normalizeNicePayEmail(params.buyerEmail),
     ReturnURL: params.returnUrl,
     GoodsCl: '1',
     TransType: '0',
