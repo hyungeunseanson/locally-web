@@ -48,7 +48,9 @@ const MOCK_IAMPORT_SDK = `
   };
 `;
 const MOCK_NICEPAY_SDK = `
-  window.goPay = function goPay() {
+  window.goPay = function goPay(form) {
+    window.__nicepayFormTargetWasBlank = Boolean(form && !form.target);
+
     var parent = document.createElement('div');
     parent.id = 'nicepay-pgweb-test-container';
     var child = document.createElement('div');
@@ -542,6 +544,11 @@ test.describe.serial('Experience card payment UI smoke', () => {
       await page.evaluate(() =>
         Boolean((window as { __nicepayDeletePaymentParentWasPresent?: boolean })
           .__nicepayDeletePaymentParentWasPresent)
+      )
+    ).toBe(true);
+    expect(
+      await page.evaluate(() =>
+        Boolean((window as { __nicepayFormTargetWasBlank?: boolean }).__nicepayFormTargetWasBlank)
       )
     ).toBe(true);
     expect(pageErrors.filter((message) => message.includes('removeChild'))).toEqual([]);

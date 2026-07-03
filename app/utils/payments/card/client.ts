@@ -260,17 +260,10 @@ function requestNicePayCardPayment(params: CardPaymentLaunchParams): Promise<Car
       close: window.nicepayClose,
     };
 
-    const iframe = document.createElement('iframe');
-    const iframeName = `nicepay-relay-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-    iframe.name = iframeName;
-    iframe.setAttribute('aria-hidden', 'true');
-    iframe.className = 'hidden';
-
     const form = document.createElement('form');
     form.name = 'payForm';
     form.method = 'post';
     form.acceptCharset = 'utf-8';
-    form.target = iframeName;
     form.className = 'hidden';
 
     let pollTimer = 0;
@@ -285,7 +278,6 @@ function requestNicePayCardPayment(params: CardPaymentLaunchParams): Promise<Car
       window.nicepaySubmit = cleanupCallbacks.submit;
       window.nicepayClose = cleanupCallbacks.close;
       removeElementIfAttached(form);
-      removeElementIfAttached(iframe);
       scheduleCardPaymentBrowserArtifactCleanup();
     };
 
@@ -322,7 +314,6 @@ function requestNicePayCardPayment(params: CardPaymentLaunchParams): Promise<Car
     };
 
     window.addEventListener('message', handleMessage);
-    document.body.appendChild(iframe);
     document.body.appendChild(form);
 
     requestNicePayLaunchEnvelope(params)
