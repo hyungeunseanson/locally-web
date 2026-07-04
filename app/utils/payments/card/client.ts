@@ -96,10 +96,33 @@ function requestPortOneCardPayment(params: CardPaymentLaunchParams): Promise<Car
   });
 }
 
-function writeNicePayPopupLoading(popup: Window) {
-  try {
-    popup.document.open();
-    popup.document.write(`<!doctype html>
+function escapeHtmlAttribute(value: string | number | undefined) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function buildHiddenInputHtml(name: string, value: string | number | undefined) {
+  return `<input type="hidden" name="${escapeHtmlAttribute(name)}" value="${escapeHtmlAttribute(
+    value
+  )}" />`;
+}
+
+function submitNicePayLaunchPageInPopup(popup: Window, params: CardPaymentLaunchParams) {
+  const fields = [
+    buildHiddenInputHtml('provider', params.provider),
+    buildHiddenInputHtml('orderId', params.orderId),
+    buildHiddenInputHtml('productName', params.productName),
+    buildHiddenInputHtml('amount', params.amount),
+    buildHiddenInputHtml('buyerName', params.buyerName),
+    buildHiddenInputHtml('buyerTel', params.buyerTel),
+    buildHiddenInputHtml('buyerEmail', params.buyerEmail),
+  ].join('\n');
+
+  popup.document.open();
+  popup.document.write(`<!doctype html>
 <html lang="ko">
   <head>
     <meta charset="utf-8" />
@@ -108,6 +131,7 @@ function writeNicePayPopupLoading(popup: Window) {
       html, body { height: 100%; margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f8fafc; color: #0f172a; }
       body { display: grid; place-items: center; text-align: center; }
       span { color: #64748b; font-size: 14px; }
+      form { overflow: hidden; height: 0; }
     </style>
   </head>
   <body>
@@ -115,47 +139,17 @@ function writeNicePayPopupLoading(popup: Window) {
       <strong>NICEPAY 결제 준비 중입니다.</strong><br />
       <span>잠시만 기다려 주세요.</span>
     </main>
+    <form id="locally-nicepay-launch" method="post" action="${escapeHtmlAttribute(
+      NICEPAY_LAUNCH_PAGE_PATH
+    )}" accept-charset="utf-8">
+      ${fields}
+    </form>
+    <script>
+      document.getElementById('locally-nicepay-launch').submit();
+    </script>
   </body>
 </html>`);
-    popup.document.close();
-  } catch {
-    // The popup may already be navigating or blocked from document access.
-  }
-}
-
-function appendHiddenInput(form: HTMLFormElement, name: string, value: string | number | undefined) {
-  const input = document.createElement('input');
-  input.type = 'hidden';
-  input.name = name;
-  input.value = String(value || '');
-  form.appendChild(input);
-}
-
-function submitNicePayLaunchPageToPopup(popupName: string, params: CardPaymentLaunchParams) {
-  const form = document.createElement('form');
-  form.id = `locally-nicepay-launch-${Date.now()}`;
-  form.method = 'post';
-  form.action = NICEPAY_LAUNCH_PAGE_PATH;
-  form.target = popupName;
-  form.acceptCharset = 'utf-8';
-  form.style.display = 'none';
-
-  appendHiddenInput(form, 'provider', params.provider);
-  appendHiddenInput(form, 'orderId', params.orderId);
-  appendHiddenInput(form, 'productName', params.productName);
-  appendHiddenInput(form, 'amount', params.amount);
-  appendHiddenInput(form, 'buyerName', params.buyerName);
-  appendHiddenInput(form, 'buyerTel', params.buyerTel);
-  appendHiddenInput(form, 'buyerEmail', params.buyerEmail);
-
-  document.body.appendChild(form);
-  form.submit();
-
-  window.setTimeout(() => {
-    if (form.parentElement) {
-      form.remove();
-    }
-  }, 1000);
+  popup.document.close();
 }
 
 function getNicePayApprovalId(payload: Record<string, string>) {
@@ -259,7 +253,6 @@ function requestNicePayCardPayment(params: CardPaymentLaunchParams): Promise<Car
       return;
     }
 
-    writeNicePayPopupLoading(popup);
     cleanupCardPaymentBrowserArtifacts();
 
     let pollTimer = 0;
@@ -318,7 +311,7 @@ function requestNicePayCardPayment(params: CardPaymentLaunchParams): Promise<Car
     window.addEventListener('message', handleMessage);
 
     try {
-      submitNicePayLaunchPageToPopup(popupName, params);
+      submitNicePayLaunchPageInPopup(popup, params);
       popup.focus();
     } catch {
       rejectWithCleanup(new Error('결제창을 열지 못했습니다. 다시 시도해주세요.'));
