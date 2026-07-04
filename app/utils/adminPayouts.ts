@@ -1,13 +1,42 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+import { isCancelledOnlyBookingStatus, isCompletedBookingStatus } from '@/app/constants/bookingStatus';
+import { getBookingHostPayout } from '@/app/utils/bookingFinance';
 import { isMissingPayoutPaidAtColumnError } from '@/app/utils/payoutPaidAt';
 import { isSoloGuaranteeRefundUnresolvedStatus } from '@/app/utils/soloGuaranteeRefundStatus';
 
 type BookingPayoutRow = {
   id: string;
+  status: string | null;
+  amount?: number | null;
+  total_price?: number | null;
+  total_experience_price?: number | null;
+  host_payout_amount?: number | null;
+  platform_revenue?: number | null;
+  price_at_booking?: number | null;
+  solo_guarantee_price?: number | null;
+  solo_guarantee_refund_amount?: number | null;
+  refund_amount?: number | null;
   payout_status: string | null;
   solo_guarantee_refund_status?: string | null;
 };
+
+const EXPERIENCE_PAYOUT_SETTLE_STATUSES = ['completed', 'COMPLETED', 'cancelled', 'CANCELLED'];
+
+function canSettleExperienceBooking(row: BookingPayoutRow) {
+  const status = String(row.status || '');
+  const payoutAmount = getBookingHostPayout(row);
+
+  if (payoutAmount <= 0) {
+    return false;
+  }
+
+  if (isCompletedBookingStatus(status)) {
+    return true;
+  }
+
+  return isCancelledOnlyBookingStatus(status) && row.host_payout_amount != null;
+}
 
 type SettleHostPayoutSuccess = {
   success: true;
@@ -36,14 +65,30 @@ export async function settleExperienceBookingPayouts(
 
   const { data: targetBookings, error: fetchError } = await supabaseAdmin
     .from('bookings')
-    .select('id, payout_status, solo_guarantee_refund_status')
+    .select(
+      [
+        'id',
+        'status',
+        'amount',
+        'total_price',
+        'total_experience_price',
+        'host_payout_amount',
+        'platform_revenue',
+        'price_at_booking',
+        'solo_guarantee_price',
+        'solo_guarantee_refund_amount',
+        'refund_amount',
+        'payout_status',
+        'solo_guarantee_refund_status',
+      ].join(', ')
+    )
     .in('id', uniqueBookingIds);
 
   if (fetchError) {
     throw new Error(fetchError.message);
   }
 
-  const rows = (targetBookings || []) as BookingPayoutRow[];
+  const rows = ((targetBookings || []) as unknown) as BookingPayoutRow[];
   const foundIds = new Set(rows.map((row) => row.id));
   const missingIds = uniqueBookingIds.filter((bookingId) => !foundIds.has(bookingId));
 
@@ -79,6 +124,18 @@ export async function settleExperienceBookingPayouts(
     };
   }
 
+  const invalidSettlementIds = rows
+    .filter((row) => !canSettleExperienceBooking(row))
+    .map((row) => row.id);
+
+  if (invalidSettlementIds.length > 0) {
+    return {
+      success: false,
+      error: '정산 완료 처리할 수 없는 예약이 포함되어 있습니다.',
+      invalidStatusIds: invalidSettlementIds,
+    };
+  }
+
   const unresolvedSoloRefundIds = rows
     .filter((row) => isSoloGuaranteeRefundUnresolvedStatus(row.solo_guarantee_refund_status))
     .map((row) => row.id);
@@ -97,6 +154,7 @@ export async function settleExperienceBookingPayouts(
     .update({ payout_status: 'paid', payout_paid_at: paidAt })
     .in('id', uniqueBookingIds)
     .eq('payout_status', 'pending')
+    .in('status', EXPERIENCE_PAYOUT_SETTLE_STATUSES)
     .select('id');
 
   if (updateError && isMissingPayoutPaidAtColumnError(updateError)) {
@@ -105,6 +163,7 @@ export async function settleExperienceBookingPayouts(
       .update({ payout_status: 'paid' })
       .in('id', uniqueBookingIds)
       .eq('payout_status', 'pending')
+      .in('status', EXPERIENCE_PAYOUT_SETTLE_STATUSES)
       .select('id');
 
     updatedRows = fallbackResult.data;

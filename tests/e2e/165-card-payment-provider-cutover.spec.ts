@@ -1,13 +1,13 @@
+import './helpers/serverOnlyTestShim';
+
 import crypto from 'crypto';
 import { readFileSync } from 'fs';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test, type Page } from '@playwright/test';
 
-import { POST as cardNotificationPost } from '@/app/api/payment/card-notification/route';
+import { handleNicePayCardNotification as cardNotificationPost } from '@/app/api/payment/cardNotificationHandler';
 import { POST as proxyNicePayCallbackPost } from '@/app/api/proxy-bookings/payment/nicepay-callback/route';
-import * as adminAlertCenter from '@/app/utils/adminAlertCenter';
-import * as proxyBookingNotifications from '@/app/utils/proxyBookingNotifications';
 import {
   buildNicePayLaunchFields,
   cancelCardPayment,
@@ -16,6 +16,8 @@ import {
   verifyApprovedCardPayment,
   verifyCardPaymentNotification,
 } from '@/app/utils/payments/card/server';
+import * as adminAlertCenter from '@/app/utils/adminAlertCenter';
+import * as proxyBookingNotifications from '@/app/utils/proxyBookingNotifications';
 import * as serviceNotificationFlows from '@/app/utils/serviceNotificationFlows';
 import * as supabaseServerModule from '@/app/utils/supabase/server';
 
@@ -43,7 +45,6 @@ type TestUser = {
   fullName: string;
   phone: string;
 };
-
 function sha256Hex(value: string) {
   return crypto.createHash('sha256').update(value).digest('hex');
 }

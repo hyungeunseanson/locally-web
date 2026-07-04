@@ -12,6 +12,13 @@ type TestUser = {
   fullName: string;
   phone: string;
 };
+type PayoutBookingOverrides = {
+  status?: string;
+  hostPayoutAmount?: number | null;
+  platformRevenue?: number | null;
+  amount?: number;
+  totalPrice?: number;
+};
 
 const TEST_PASSWORD = 'LocallyTest!2026';
 
@@ -144,21 +151,35 @@ async function createExperienceFixture(hostId: string) {
   return Number(data.id);
 }
 
-async function createPendingPayoutBooking(userId: string, experienceId: number, fullName: string, phone: string) {
+async function createPendingPayoutBooking(
+  userId: string,
+  experienceId: number,
+  fullName: string,
+  phone: string,
+  overrides: PayoutBookingOverrides = {}
+) {
   const supabase = getAdminClient();
-  const bookingId = `PAYOUT-GUARD-${Date.now()}`;
+  const bookingId = `PAYOUT-GUARD-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
   const bookingDate = new Date();
   bookingDate.setDate(bookingDate.getDate() - 2);
+  const amount = overrides.amount ?? 55000;
+  const totalPrice = overrides.totalPrice ?? 50000;
+  const hasHostPayoutOverride = Object.prototype.hasOwnProperty.call(overrides, 'hostPayoutAmount');
+  const hasPlatformRevenueOverride = Object.prototype.hasOwnProperty.call(overrides, 'platformRevenue');
+  const hostPayoutAmount = hasHostPayoutOverride ? overrides.hostPayoutAmount : 40000;
+  const platformRevenue = hasPlatformRevenueOverride
+    ? overrides.platformRevenue
+    : amount - Number(hostPayoutAmount ?? 0);
 
   const { error } = await supabase.from('bookings').insert({
     id: bookingId,
     order_id: bookingId,
     user_id: userId,
     experience_id: experienceId,
-    amount: 55000,
-    total_price: 50000,
-    total_experience_price: 50000,
-    status: 'completed',
+    amount,
+    total_price: totalPrice,
+    total_experience_price: totalPrice,
+    status: overrides.status ?? 'completed',
     guests: 1,
     date: bookingDate.toISOString().slice(0, 10),
     time: '10:00',
@@ -168,8 +189,8 @@ async function createPendingPayoutBooking(userId: string, experienceId: number, 
     message: '',
     created_at: bookingDate.toISOString(),
     payment_method: 'card',
-    host_payout_amount: 40000,
-    platform_revenue: 15000,
+    host_payout_amount: hostPayoutAmount,
+    platform_revenue: platformRevenue,
     payout_status: 'pending',
     is_solo_guarantee: false,
     solo_guarantee_price: 0,
@@ -199,6 +220,163 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Admin host payout guard contract', () => {
+  test('settles a completed experience payout once', async () => {
+    const user = createUser();
+    const userId = await createAuthUser(user);
+    const experienceId = await createExperienceFixture(userId);
+    const bookingId = await createPendingPayoutBooking(userId, experienceId, user.fullName, user.phone);
+    const supabase = getAdminClient();
+
+    const result = await settleExperienceBookingPayouts(supabase, [bookingId]);
+    expect(result).toMatchObject({ success: true });
+
+    const { data: bookingRow, error: bookingError } = await supabase
+      .from('bookings')
+      .select('payout_status, payout_paid_at')
+      .eq('id', bookingId)
+      .maybeSingle();
+
+    if (bookingError) throw bookingError;
+
+    expect(bookingRow?.payout_status).toBe('paid');
+    expect(bookingRow?.payout_paid_at).toBeTruthy();
+  });
+
+  test('keeps cancelled bookings with retained host payout eligible', async () => {
+    const user = createUser();
+    const userId = await createAuthUser(user);
+    const experienceId = await createExperienceFixture(userId);
+    const bookingId = await createPendingPayoutBooking(
+      userId,
+      experienceId,
+      user.fullName,
+      user.phone,
+      {
+        status: 'cancelled',
+        hostPayoutAmount: 12000,
+        platformRevenue: 3000,
+      }
+    );
+    const supabase = getAdminClient();
+
+    const result = await settleExperienceBookingPayouts(supabase, [bookingId]);
+    expect(result).toMatchObject({ success: true });
+
+    const { data: bookingRow, error: bookingError } = await supabase
+      .from('bookings')
+      .select('payout_status, payout_paid_at')
+      .eq('id', bookingId)
+      .maybeSingle();
+
+    if (bookingError) throw bookingError;
+
+    expect(bookingRow?.payout_status).toBe('paid');
+    expect(bookingRow?.payout_paid_at).toBeTruthy();
+  });
+
+  test('rejects active bookings before payout settlement', async () => {
+    const user = createUser();
+    const userId = await createAuthUser(user);
+    const experienceId = await createExperienceFixture(userId);
+    const bookingId = await createPendingPayoutBooking(
+      userId,
+      experienceId,
+      user.fullName,
+      user.phone,
+      { status: 'PAID' }
+    );
+    const supabase = getAdminClient();
+
+    const result = await settleExperienceBookingPayouts(supabase, [bookingId]);
+    expect(result).toMatchObject({
+      success: false,
+      error: '정산 완료 처리할 수 없는 예약이 포함되어 있습니다.',
+      invalidStatusIds: [bookingId],
+    });
+
+    const { data: bookingRow, error: bookingError } = await supabase
+      .from('bookings')
+      .select('payout_status, payout_paid_at')
+      .eq('id', bookingId)
+      .maybeSingle();
+
+    if (bookingError) throw bookingError;
+
+    expect(bookingRow?.payout_status).toBe('pending');
+    expect(bookingRow?.payout_paid_at).toBeFalsy();
+  });
+
+  test('rejects zero amount experience payouts', async () => {
+    const user = createUser();
+    const userId = await createAuthUser(user);
+    const experienceId = await createExperienceFixture(userId);
+    const bookingId = await createPendingPayoutBooking(
+      userId,
+      experienceId,
+      user.fullName,
+      user.phone,
+      {
+        hostPayoutAmount: 0,
+        platformRevenue: 55000,
+      }
+    );
+    const supabase = getAdminClient();
+
+    const result = await settleExperienceBookingPayouts(supabase, [bookingId]);
+    expect(result).toMatchObject({
+      success: false,
+      error: '정산 완료 처리할 수 없는 예약이 포함되어 있습니다.',
+      invalidStatusIds: [bookingId],
+    });
+
+    const { data: bookingRow, error: bookingError } = await supabase
+      .from('bookings')
+      .select('payout_status, payout_paid_at')
+      .eq('id', bookingId)
+      .maybeSingle();
+
+    if (bookingError) throw bookingError;
+
+    expect(bookingRow?.payout_status).toBe('pending');
+    expect(bookingRow?.payout_paid_at).toBeFalsy();
+  });
+
+  test('rejects cancelled bookings without an explicit retained host payout snapshot', async () => {
+    const user = createUser();
+    const userId = await createAuthUser(user);
+    const experienceId = await createExperienceFixture(userId);
+    const bookingId = await createPendingPayoutBooking(
+      userId,
+      experienceId,
+      user.fullName,
+      user.phone,
+      {
+        status: 'cancelled',
+        hostPayoutAmount: null,
+        platformRevenue: null,
+      }
+    );
+    const supabase = getAdminClient();
+
+    const result = await settleExperienceBookingPayouts(supabase, [bookingId]);
+    expect(result).toMatchObject({
+      success: false,
+      error: '정산 완료 처리할 수 없는 예약이 포함되어 있습니다.',
+      invalidStatusIds: [bookingId],
+    });
+
+    const { data: bookingRow, error: bookingError } = await supabase
+      .from('bookings')
+      .select('payout_status, payout_paid_at')
+      .eq('id', bookingId)
+      .maybeSingle();
+
+    if (bookingError) throw bookingError;
+
+    expect(bookingRow?.payout_status).toBe('pending');
+    expect(bookingRow?.payout_paid_at).toBeFalsy();
+  });
+
   test('allows only one concurrent settlement update for the same booking', async () => {
     const user = createUser();
     const userId = await createAuthUser(user);
