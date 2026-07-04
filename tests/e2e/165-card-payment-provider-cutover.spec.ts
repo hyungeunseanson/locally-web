@@ -849,6 +849,53 @@ test.describe('Card payment provider cutover contracts', () => {
     }
   });
 
+  test('treats refunded proxy card notifications for the stored TID as idempotent OK', async () => {
+    ensureSupabaseEnv();
+    withNicePayEnv();
+
+    const guest = createUser('proxy-refunded-idempotent');
+    const guestId = await createAuthUser(guest);
+
+    const fixture = await createProxyRequestFixture({
+      userId: guestId,
+      user: guest,
+      paymentStatus: 'REFUNDED',
+      tid: 'TX-TID-PROXY-REFUNDED',
+    });
+
+    const response = await cardNotificationPost(
+      new Request('https://locally.example/api/payment/card-notification', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          Moid: fixture.orderId,
+          TID: 'TX-TID-PROXY-REFUNDED',
+          Amt: '4500',
+          ResultCode: '3001',
+          StateCd: '0',
+          PayMethod: 'CARD',
+        }).toString(),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.text()).resolves.toBe('OK');
+
+    const { data: proxyRequest, error } = await getAdminClient()
+      .from('proxy_requests')
+      .select('payment_status, tid')
+      .eq('id', fixture.requestId)
+      .maybeSingle();
+
+    if (error) throw error;
+    expect(proxyRequest).toMatchObject({
+      payment_status: 'REFUNDED',
+      tid: 'TX-TID-PROXY-REFUNDED',
+    });
+  });
+
   test('dispatches the primary NicePay notification URL to proxy payments by providerTransactionId fallback', async () => {
     ensureSupabaseEnv();
     withNicePayEnv();

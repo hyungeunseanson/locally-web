@@ -3,7 +3,8 @@ import { NextResponse } from 'next/server';
 import { finalizeExperienceCardPayment } from '@/app/api/payment/experienceCardConfirmation';
 import { finalizeProxyCardPayment } from '@/app/api/proxy-bookings/payment/proxyCardConfirmation';
 import { finalizeServiceCardPayment } from '@/app/api/services/payment/serviceCardConfirmation';
-import { isConfirmedBookingStatus } from '@/app/constants/bookingStatus';
+import { isCancelledBookingStatus, isConfirmedBookingStatus } from '@/app/constants/bookingStatus';
+import { isCancelledServiceBooking } from '@/app/constants/serviceStatus';
 import type { ProxyCategory } from '@/app/types/proxy';
 import { getProxyRequestFeeKrw } from '@/app/utils/proxyBooking';
 import {
@@ -15,6 +16,10 @@ import { createAdminClient } from '@/app/utils/supabase/admin';
 
 type NotificationTarget = 'experience' | 'service' | 'proxy';
 
+type StoredCardTransactionRow = {
+  tid?: unknown;
+};
+
 function buildNotificationOkResponse() {
   return new NextResponse('OK', {
     status: 200,
@@ -23,6 +28,17 @@ function buildNotificationOkResponse() {
       'Cache-Control': 'no-store',
     },
   });
+}
+
+function hasMatchingStoredTransaction(
+  row: StoredCardTransactionRow,
+  notification: Awaited<ReturnType<typeof readCardPaymentNotificationRequest>>
+) {
+  const storedTid = String(row.tid || '').trim();
+  if (!storedTid) return false;
+
+  const notifiedTid = String(notification.providerTransactionId || '').trim();
+  return notifiedTid === storedTid;
 }
 
 function buildIgnoredResponse(params: {
@@ -120,6 +136,13 @@ async function processExperienceNotification(params: {
     return buildNotificationOkResponse();
   }
 
+  if (
+    isCancelledBookingStatus(String(booking.status || '')) &&
+    hasMatchingStoredTransaction(booking, notification)
+  ) {
+    return buildNotificationOkResponse();
+  }
+
   if (String(booking.status || '').toUpperCase() !== 'PENDING') {
     return NextResponse.json(
       {
@@ -194,6 +217,13 @@ async function processServiceNotification(params: {
   }
 
   if (isConfirmedBookingStatus(String(serviceBooking.status || ''))) {
+    return buildNotificationOkResponse();
+  }
+
+  if (
+    isCancelledServiceBooking(String(serviceBooking.status || '')) &&
+    hasMatchingStoredTransaction(serviceBooking, notification)
+  ) {
     return buildNotificationOkResponse();
   }
 
@@ -277,7 +307,15 @@ async function processProxyNotification(params: {
     );
   }
 
-  if (String(proxyRequest.payment_status || '').toUpperCase() === 'COMPLETED') {
+  const normalizedProxyPaymentStatus = String(proxyRequest.payment_status || '').toUpperCase();
+  if (normalizedProxyPaymentStatus === 'COMPLETED') {
+    return buildNotificationOkResponse();
+  }
+
+  if (
+    normalizedProxyPaymentStatus === 'REFUNDED' &&
+    hasMatchingStoredTransaction(proxyRequest, notification)
+  ) {
     return buildNotificationOkResponse();
   }
 

@@ -253,6 +253,100 @@ test.describe.serial('Card callback contract', () => {
     await expect(response.text()).resolves.toBe('OK');
   });
 
+  test('treats cancelled experience card notifications for the stored TID as idempotent OK', async ({ request }) => {
+    const owner = createTestUser('exp.notification.cancelled');
+    const ownerId = await createAuthUser(owner, createdAuthUserIds);
+    const { experienceId } = await getLatestHostExperience();
+
+    const bookingId = await createPaidExperienceBooking({
+      experienceId,
+      customerId: ownerId,
+      customerName: owner.fullName,
+      customerPhone: owner.phone,
+    });
+
+    const { error: cancelError } = await getAdminClient()
+      .from('bookings')
+      .update({
+        status: 'cancelled',
+        tid: 'TX-TID-CANCELLED-NOTI',
+        refund_amount: 47000,
+        host_payout_amount: 0,
+        platform_revenue: 0,
+      })
+      .eq('id', bookingId);
+
+    if (cancelError) throw cancelError;
+
+    const response = await request.post('/api/payment/card-notification', {
+      form: {
+        Moid: bookingId,
+        TID: 'TX-TID-CANCELLED-NOTI',
+        Amt: '47000',
+        ResultCode: '3001',
+        StateCd: '0',
+        PayMethod: 'CARD',
+      },
+    });
+
+    expect(response.status()).toBe(200);
+    await expect(response.text()).resolves.toBe('OK');
+
+    const { data: booking, error } = await getAdminClient()
+      .from('bookings')
+      .select('status, tid, refund_amount, host_payout_amount, platform_revenue')
+      .eq('id', bookingId)
+      .maybeSingle();
+
+    if (error) throw error;
+    expect(booking).toMatchObject({
+      status: 'cancelled',
+      tid: 'TX-TID-CANCELLED-NOTI',
+      refund_amount: 47000,
+      host_payout_amount: 0,
+      platform_revenue: 0,
+    });
+  });
+
+  test('keeps mismatched cancelled experience notifications non-idempotent', async ({ request }) => {
+    const owner = createTestUser('exp.notification.cancelled.mismatch');
+    const ownerId = await createAuthUser(owner, createdAuthUserIds);
+    const { experienceId } = await getLatestHostExperience();
+
+    const bookingId = await createPaidExperienceBooking({
+      experienceId,
+      customerId: ownerId,
+      customerName: owner.fullName,
+      customerPhone: owner.phone,
+    });
+
+    const { error: cancelError } = await getAdminClient()
+      .from('bookings')
+      .update({
+        status: 'cancelled',
+        tid: 'TX-TID-CANCELLED-STORED',
+        refund_amount: 47000,
+        host_payout_amount: 0,
+        platform_revenue: 0,
+      })
+      .eq('id', bookingId);
+
+    if (cancelError) throw cancelError;
+
+    const response = await request.post('/api/payment/card-notification', {
+      form: {
+        Moid: bookingId,
+        TID: 'TX-TID-CANCELLED-DIFFERENT',
+        Amt: '47000',
+        ResultCode: '3001',
+        StateCd: '0',
+        PayMethod: 'CARD',
+      },
+    });
+
+    expect(response.status()).toBe(409);
+  });
+
   test('blocks service callback confirmation from a different logged-in user', async ({ page }) => {
     const owner = createTestUser('svc.callback.owner');
     const other = createTestUser('svc.callback.other');
@@ -294,6 +388,54 @@ test.describe.serial('Card callback contract', () => {
     await expect(response.json()).resolves.toMatchObject({
       success: true,
       message: 'Already processed',
+    });
+  });
+
+  test('treats cancelled service card notifications for the stored TID as idempotent OK', async ({ request }) => {
+    const owner = createTestUser('svc.notification.cancelled');
+    const ownerId = await createAuthUser(owner, createdAuthUserIds);
+    const fixture = await createPendingServiceFixture(ownerId, owner.fullName, owner.phone);
+
+    const { error: cancelError } = await getAdminClient()
+      .from('service_bookings')
+      .update({
+        status: 'cancelled',
+        tid: 'SVC-TID-CANCELLED-NOTI',
+        refund_amount: 90000,
+        host_payout_amount: 0,
+        platform_revenue: 0,
+      })
+      .eq('id', fixture.bookingId);
+
+    if (cancelError) throw cancelError;
+
+    const response = await request.post('/api/payment/card-notification', {
+      form: {
+        Moid: fixture.orderId,
+        TID: 'SVC-TID-CANCELLED-NOTI',
+        Amt: '90000',
+        ResultCode: '3001',
+        StateCd: '0',
+        PayMethod: 'CARD',
+      },
+    });
+
+    expect(response.status()).toBe(200);
+    await expect(response.text()).resolves.toBe('OK');
+
+    const { data: serviceBooking, error } = await getAdminClient()
+      .from('service_bookings')
+      .select('status, tid, refund_amount, host_payout_amount, platform_revenue')
+      .eq('id', fixture.bookingId)
+      .maybeSingle();
+
+    if (error) throw error;
+    expect(serviceBooking).toMatchObject({
+      status: 'cancelled',
+      tid: 'SVC-TID-CANCELLED-NOTI',
+      refund_amount: 90000,
+      host_payout_amount: 0,
+      platform_revenue: 0,
     });
   });
 });
