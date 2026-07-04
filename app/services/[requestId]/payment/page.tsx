@@ -531,9 +531,12 @@ function ServicePaymentContent() {
     );
   }
 
+  const shouldLoadCardRuntimeScript =
+    Boolean(cardRuntime?.scriptSrc) && cardRuntime?.provider !== 'nicepay';
+
   return (
     <>
-      {cardRuntime?.scriptSrc && (
+      {shouldLoadCardRuntimeScript && cardRuntime?.scriptSrc && (
         <Script
           id={`service-card-sdk-${cardRuntime.provider}`}
           src={cardRuntime.scriptSrc}

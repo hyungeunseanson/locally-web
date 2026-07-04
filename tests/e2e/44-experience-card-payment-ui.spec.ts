@@ -456,12 +456,18 @@ test.describe.serial('Experience card payment UI smoke', () => {
     const customerId = await createAuthUser(customerUser);
     const experience = await prepareBookableExperience();
     const pageErrors: string[] = [];
+    const mainFrameNavigations: string[] = [];
 
     let callbackSeen = false;
     let observedOrderId = '';
 
     page.on('pageerror', (error) => {
       pageErrors.push(error.message);
+    });
+    page.on('framenavigated', (frame) => {
+      if (frame === page.mainFrame()) {
+        mainFrameNavigations.push(frame.url());
+      }
     });
 
     await page.route('**/api/payment/card-ready', async (route) => {
@@ -575,6 +581,13 @@ test.describe.serial('Experience card payment UI smoke', () => {
     await page.locator('input[type="text"]').fill(customerUser.fullName);
     await page.locator('input[type="tel"]').fill(customerUser.phone);
     await reviewAllExperiencePaymentAgreements(page);
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          Boolean(document.querySelector('script[src*="nicepay-pgweb.js"]'))
+        )
+      )
+      .toBe(false);
     await page.evaluate(() => {
       window.addEventListener('message', (event) => {
         const data = event.data as {
@@ -640,6 +653,7 @@ test.describe.serial('Experience card payment UI smoke', () => {
       )
     ).toBe('0px');
     expect(pageErrors.filter((message) => message.includes('removeChild'))).toEqual([]);
+    expect(mainFrameNavigations.filter((url) => url.includes('nicepay.co.kr'))).toEqual([]);
     await expect(page.locator('#nicepay-stale-overlay-test')).toHaveCount(0);
     await expect(page.getByText('Please, wait...')).toHaveCount(0);
     await expect(

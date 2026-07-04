@@ -14,6 +14,8 @@ const HISTORY_REPLACE_STATE_THROTTLE_MESSAGE =
   'Attempt to use history.replaceState() more than 100 times per 10 seconds';
 const WEBKIT_MESSAGE_HANDLERS_ERROR_MESSAGE =
   "undefined is not an object (evaluating 'window.webkit.messageHandlers')";
+const NICEPAY_REMOVE_CHILD_CLEANUP_MESSAGE =
+  "Cannot read properties of null (reading 'removeChild')";
 
 function sanitizeContext(context?: LocallySentryContext) {
   if (!context) {
@@ -157,12 +159,26 @@ function shouldDropWebkitMessageHandlersNoise(event: Sentry.ErrorEvent) {
   });
 }
 
+function shouldDropNicePayWebStdCleanupNoise(event: Sentry.ErrorEvent) {
+  return (event.exception?.values ?? []).some((exception) => {
+    const frameText = getFrameSearchText(exception);
+
+    return (
+      exception.type === 'TypeError' &&
+      exception.value === NICEPAY_REMOVE_CHILD_CLEANUP_MESSAGE &&
+      frameText.includes('nicepay-pgweb.js') &&
+      frameText.includes('NicePayStd.deletePayment')
+    );
+  });
+}
+
 function shouldDropClientNoise(event: Sentry.ErrorEvent) {
   return (
     shouldDropAndroidNativePostMessageNoise(event) ||
     shouldDropSupabaseLockAbortNoise(event) ||
     shouldDropHistoryReplaceStateThrottleNoise(event) ||
-    shouldDropWebkitMessageHandlersNoise(event)
+    shouldDropWebkitMessageHandlersNoise(event) ||
+    shouldDropNicePayWebStdCleanupNoise(event)
   );
 }
 

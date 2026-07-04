@@ -1383,9 +1383,12 @@ export default function NewProxyBooking() {
     }
   };
 
+  const shouldLoadCardRuntimeScript =
+    Boolean(cardRuntime?.scriptSrc) && cardRuntime?.provider !== 'nicepay';
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-5 sm:px-5 sm:py-8">
-      {cardRuntime?.scriptSrc && (
+      {shouldLoadCardRuntimeScript && cardRuntime?.scriptSrc && (
         <Script
           id={`proxy-card-sdk-${cardRuntime.provider}`}
           src={cardRuntime.scriptSrc}
