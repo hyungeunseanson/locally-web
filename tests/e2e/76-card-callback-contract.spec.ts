@@ -216,6 +216,43 @@ test.describe.serial('Card callback contract', () => {
     });
   });
 
+  test('treats completed experience card notifications as idempotent OK', async ({ request }) => {
+    const owner = createTestUser('exp.notification.completed');
+    const ownerId = await createAuthUser(owner, createdAuthUserIds);
+    const { experienceId } = await getLatestHostExperience();
+
+    const bookingId = await createPaidExperienceBooking({
+      experienceId,
+      customerId: ownerId,
+      customerName: owner.fullName,
+      customerPhone: owner.phone,
+    });
+
+    const { error: completeError } = await getAdminClient()
+      .from('bookings')
+      .update({
+        status: 'completed',
+        tid: 'TX-TID-COMPLETED-NOTI',
+      })
+      .eq('id', bookingId);
+
+    if (completeError) throw completeError;
+
+    const response = await request.post('/api/payment/card-notification', {
+      form: {
+        Moid: bookingId,
+        TID: 'TX-TID-COMPLETED-NOTI',
+        Amt: '47000',
+        ResultCode: '3001',
+        StateCd: '0',
+        PayMethod: 'CARD',
+      },
+    });
+
+    expect(response.status()).toBe(200);
+    await expect(response.text()).resolves.toBe('OK');
+  });
+
   test('blocks service callback confirmation from a different logged-in user', async ({ page }) => {
     const owner = createTestUser('svc.callback.owner');
     const other = createTestUser('svc.callback.other');

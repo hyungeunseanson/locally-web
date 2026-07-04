@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { finalizeExperienceCardPayment } from '@/app/api/payment/experienceCardConfirmation';
 import { finalizeProxyCardPayment } from '@/app/api/proxy-bookings/payment/proxyCardConfirmation';
 import { finalizeServiceCardPayment } from '@/app/api/services/payment/serviceCardConfirmation';
+import { isConfirmedBookingStatus } from '@/app/constants/bookingStatus';
 import type { ProxyCategory } from '@/app/types/proxy';
 import { getProxyRequestFeeKrw } from '@/app/utils/proxyBooking';
 import {
@@ -115,7 +116,7 @@ async function processExperienceNotification(params: {
     return null;
   }
 
-  if (['PAID', 'confirmed'].includes(String(booking.status || '').toUpperCase())) {
+  if (isConfirmedBookingStatus(String(booking.status || ''))) {
     return buildNotificationOkResponse();
   }
 
@@ -192,7 +193,7 @@ async function processServiceNotification(params: {
     return null;
   }
 
-  if (serviceBooking.status === 'PAID' || serviceBooking.status === 'confirmed') {
+  if (isConfirmedBookingStatus(String(serviceBooking.status || ''))) {
     return buildNotificationOkResponse();
   }
 
