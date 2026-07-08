@@ -19,8 +19,8 @@ type HomeExperience = HomeExperienceCardData & {
   languages?: string[] | null;
 };
 
-function isHomeCategoryIconId(id: HomeMobileCityShortcutId): id is 'seoul' | 'busan' {
-  return id === 'seoul' || id === 'busan';
+function isHomeCategoryIconId(id: HomeMobileCityShortcutId): id is 'seoul' | 'busan' | 'jeju' {
+  return id === 'seoul' || id === 'busan' || id === 'jeju';
 }
 
 function getDesktopPopularVisibilityClass(index: number) {

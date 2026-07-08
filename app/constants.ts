@@ -16,12 +16,13 @@ export type HomeMobileCityShortcutId =
   | 'osaka'
   | 'fukuoka'
   | 'seoul'
-  | 'busan';
+  | 'busan'
+  | 'jeju';
 
 export type HomeMobileCityShortcut = {
   id: HomeMobileCityShortcutId;
-  label: 'city_all' | 'city_tokyo' | 'city_osaka' | 'city_fukuoka' | 'city_seoul' | 'city_busan';
-  cityValue?: '도쿄' | '오사카' | '후쿠오카' | '서울' | '부산';
+  label: 'city_all' | 'city_tokyo' | 'city_osaka' | 'city_fukuoka' | 'city_seoul' | 'city_busan' | 'city_jeju';
+  cityValue?: '도쿄' | '오사카' | '후쿠오카' | '서울' | '부산' | '제주';
   visual: 'emoji' | 'special';
   emoji?: '🌏' | '🗼' | '🏯' | '🍜';
 };
@@ -33,6 +34,7 @@ export const HOME_MOBILE_CITY_SHORTCUTS: HomeMobileCityShortcut[] = [
   { id: 'fukuoka', label: 'city_fukuoka', cityValue: '후쿠오카', visual: 'emoji', emoji: '🍜' },
   { id: 'seoul', label: 'city_seoul', cityValue: '서울', visual: 'special' },
   { id: 'busan', label: 'city_busan', cityValue: '부산', visual: 'special' },
+  { id: 'jeju', label: 'city_jeju', cityValue: '제주', visual: 'special' },
 ];
 
 export const SERVICE_TYPES = [

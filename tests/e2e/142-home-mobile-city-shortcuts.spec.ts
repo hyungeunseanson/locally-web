@@ -44,6 +44,26 @@ async function stubSearchApi(page: Page) {
             price: 79000,
           },
         ]
+      : city === '제주'
+        ? [
+            {
+              id: '9402',
+              title: '제주 오름 산책',
+              title_en: 'Jeju Oreum Walk',
+              category: 'walking_healing',
+              category_en: 'Walking & Healing',
+              city: '제주',
+              country: 'Korea',
+              location: '성산일출봉 입구',
+              meeting_point: '성산일출봉 입구',
+              meeting_point_i18n: { en: 'Seongsan Ilchulbong Entrance' },
+              languages: ['English', 'Korean'],
+              image_url: '/images/company/partnership-media-kit/1.png',
+              rating: 4.7,
+              review_count: 15,
+              price: 69000,
+            },
+          ]
       : [
           {
             id: '9400',
@@ -84,8 +104,10 @@ test.describe('Home mobile city shortcuts', () => {
     await expect(page.getByTestId('home-mobile-city-shortcut-fukuoka')).toContainText('Fukuoka');
     await expect(page.getByTestId('home-mobile-city-shortcut-seoul')).toContainText('Seoul');
     await expect(page.getByTestId('home-mobile-city-shortcut-busan')).toContainText('Busan');
+    await expect(page.getByTestId('home-mobile-city-shortcut-jeju')).toContainText('Jeju');
     await expect(page.getByTestId('home-mobile-city-shortcut-seoul-visual')).toBeVisible();
     await expect(page.getByTestId('home-mobile-city-shortcut-busan-visual')).toBeVisible();
+    await expect(page.getByTestId('home-mobile-city-shortcut-jeju-visual')).toBeVisible();
 
     await page.locator('[data-testid="home-tab-service"]:visible').first().click();
     await expect(page.getByTestId('home-mobile-city-shortcuts')).toHaveCount(0);
@@ -110,5 +132,13 @@ test.describe('Home mobile city shortcuts', () => {
     await expect(page).toHaveURL(/location=%EC%84%9C%EC%9A%B8/);
     await expect(page).toHaveURL(/city=%EC%84%9C%EC%9A%B8/);
     await expect(page.getByTestId('search-mobile-header-title')).toContainText('Seoul');
+
+    await page.goto('/en', { waitUntil: 'networkidle' });
+    await dismissAnnouncementIfVisible(page);
+
+    await page.getByTestId('home-mobile-city-shortcut-jeju').click();
+    await expect(page).toHaveURL(/location=%EC%A0%9C%EC%A3%BC/);
+    await expect(page).toHaveURL(/city=%EC%A0%9C%EC%A3%BC/);
+    await expect(page.getByTestId('search-mobile-header-title')).toContainText('Jeju');
   });
 });
