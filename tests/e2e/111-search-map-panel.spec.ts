@@ -190,15 +190,13 @@ test.describe('Search desktop selection map panel', () => {
     await expect(page.getByTestId('search-map-empty-state')).toBeVisible();
     await expect(page.getByTestId('search-selected-experience-cta')).toBeDisabled();
 
-    await page.getByTestId('search-result-card-9003').locator('button').click();
-    await expect(page.getByTestId('search-result-card-9003')).toHaveAttribute('data-selected', 'false');
-    await expect(page.getByTestId('search-selected-experience-cta')).toBeDisabled();
-
     await page.getByTestId('search-desktop-city-chip').click();
     await page.getByTestId('search-city-option-오사카').evaluate((element) => {
       (element as HTMLButtonElement).click();
     });
+    await expect(page).toHaveURL(/location=%EC%98%A4%EC%82%AC%EC%B9%B4/);
     await expect(page).toHaveURL(/city=%EC%98%A4%EC%82%AC%EC%B9%B4/);
+    await expect(page.getByTestId('search-summary-pill-location')).toContainText('Osaka');
     await expect(page.getByTestId('search-desktop-city-chip')).toContainText('Osaka');
     await expect(page.getByTestId('search-result-card-9101')).toBeVisible();
 

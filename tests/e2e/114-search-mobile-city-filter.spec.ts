@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 async function dismissAnnouncementIfVisible(page: import('@playwright/test').Page) {
   const announcement = page.getByTestId('global-site-announcement-modal');
@@ -31,30 +31,41 @@ function createExperienceFixture(id: string, overrides: Record<string, unknown> 
   };
 }
 
-test.describe('Search mobile city filter', () => {
-  test('shows city as the third chip and updates results from the city sheet', async ({ page }) => {
-    await page.route('**/api/search/experiences?**', async (route) => {
-      const url = new URL(route.request().url());
-      const city = url.searchParams.get('city');
+async function stubSearchApi(page: Page) {
+  await page.route('**/api/search/experiences?**', async (route) => {
+    const url = new URL(route.request().url());
+    const city = url.searchParams.get('city');
 
-      const data =
-        city === '오사카'
+    const data =
+      city === '오사카'
+        ? [
+            createExperienceFixture('9201', {
+              title_en: 'Osaka Backstreet Dinner Walk',
+              city: '오사카',
+              location: 'Namba Station Exit 5',
+              meeting_point: '난바역 5번 출구',
+              meeting_point_i18n: { en: 'Namba Station Exit 5' },
+            }),
+            createExperienceFixture('9202', {
+              title_en: 'Osaka Cafe Morning',
+              category: 'cafe_dessert',
+              category_en: 'Cafe & Dessert',
+              city: '오사카',
+              location: 'Umeda Station Central Gate',
+              meeting_point: '우메다역 중앙 개찰구',
+              meeting_point_i18n: { en: 'Umeda Station Central Gate' },
+            }),
+          ]
+        : city === '제주'
           ? [
-              createExperienceFixture('9201', {
-                title_en: 'Osaka Backstreet Dinner Walk',
-                city: '오사카',
-                location: 'Namba Station Exit 5',
-                meeting_point: '난바역 5번 출구',
-                meeting_point_i18n: { en: 'Namba Station Exit 5' },
-              }),
-              createExperienceFixture('9202', {
-                title_en: 'Osaka Cafe Morning',
-                category: 'cafe_dessert',
-                category_en: 'Cafe & Dessert',
-                city: '오사카',
-                location: 'Umeda Station Central Gate',
-                meeting_point: '우메다역 중앙 개찰구',
-                meeting_point_i18n: { en: 'Umeda Station Central Gate' },
+              createExperienceFixture('9204', {
+                title: '제주 오름 산책',
+                title_en: 'Jeju Oreum Walk',
+                city: '제주',
+                country: 'Korea',
+                location: 'Seongsan Ilchulbong Entrance',
+                meeting_point: '성산일출봉 입구',
+                meeting_point_i18n: { en: 'Seongsan Ilchulbong Entrance' },
               }),
             ]
           : [
@@ -69,13 +80,17 @@ test.describe('Search mobile city filter', () => {
               }),
             ];
 
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ data }),
-      });
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ data }),
     });
+  });
+}
 
+test.describe('Search mobile city filter', () => {
+  test('shows city as the third chip and updates results from the city sheet', async ({ page }) => {
+    await stubSearchApi(page);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/en/search?location=tokyo&language=en', { waitUntil: 'networkidle' });
     await dismissAnnouncementIfVisible(page);
@@ -91,13 +106,77 @@ test.describe('Search mobile city filter', () => {
     await expect(page.getByTestId('search-mobile-city-option-오사카')).toContainText('Osaka');
 
     await page.getByTestId('search-mobile-city-option-오사카').click();
-    await expect(page).toHaveURL(/location=tokyo/);
+    await expect(page).toHaveURL(/location=%EC%98%A4%EC%82%AC%EC%B9%B4/);
     await expect(page).toHaveURL(/city=%EC%98%A4%EC%82%AC%EC%B9%B4/);
     await page.getByRole('button', { name: 'Show results' }).click();
 
-    await expect(page.getByTestId('search-mobile-header-title')).toContainText('Tokyo');
+    await expect(page.getByTestId('search-mobile-header-title')).toContainText('Osaka');
     await expect(page.getByTestId('search-mobile-city-chip')).toContainText('Osaka');
     await expect(page.getByTestId('search-mobile-result-card-9201').first()).toBeVisible();
     await expect(page.getByTestId('search-mobile-result-card-9201').first()).toContainText('Osaka Backstreet Dinner Walk');
+  });
+
+  test('keeps the header and city chip in sync when changing from a city search', async ({ page }) => {
+    await stubSearchApi(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/ko/search?location=%EC%A0%9C%EC%A3%BC&city=%EC%A0%9C%EC%A3%BC', { waitUntil: 'networkidle' });
+    await dismissAnnouncementIfVisible(page);
+
+    await expect(page.getByTestId('search-mobile-header-title')).toContainText('제주 체험');
+    await expect(page.getByTestId('search-mobile-city-chip')).toContainText('제주');
+    await expect(page.getByTestId('search-mobile-result-card-9204').first()).toBeVisible();
+
+    await page.getByTestId('search-mobile-city-chip').click();
+    await expect(page.getByTestId('search-mobile-city-sheet')).toBeVisible();
+    await page.getByTestId('search-mobile-city-option-도쿄').click();
+
+    await expect(page).toHaveURL(/location=%EB%8F%84%EC%BF%84/);
+    await expect(page).toHaveURL(/city=%EB%8F%84%EC%BF%84/);
+    await page.getByRole('button', { name: '결과 보기' }).click();
+
+    await expect(page.getByTestId('search-mobile-header-title')).toContainText('도쿄 체험');
+    await expect(page.getByTestId('search-mobile-city-chip')).toContainText('도쿄');
+    await expect(page.getByTestId('search-empty-state')).toHaveCount(0);
+    await expect(page.getByTestId('search-mobile-result-card-9200').first()).toBeVisible();
+  });
+
+  test('clears location and city together from the city filter sheet when the search is city-based', async ({ page }) => {
+    await stubSearchApi(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/ko/search?location=%EC%A0%9C%EC%A3%BC&city=%EC%A0%9C%EC%A3%BC', { waitUntil: 'networkidle' });
+    await dismissAnnouncementIfVisible(page);
+
+    await page.getByTestId('search-mobile-city-chip').click();
+    await expect(page.getByTestId('search-mobile-city-sheet')).toBeVisible();
+    await page.getByTestId('search-mobile-city-option-all').click();
+
+    await expect.poll(() => page.url()).not.toContain('location=');
+    await expect.poll(() => page.url()).not.toContain('city=');
+    await page.getByRole('button', { name: '결과 보기' }).click();
+
+    await expect(page.getByTestId('search-mobile-header-title')).toContainText('체험 검색');
+    await expect(page.getByTestId('search-mobile-city-chip')).toContainText('도시');
+    await expect(page.getByTestId('search-mobile-result-card-9200').first()).toBeVisible();
+  });
+
+  test('keeps keyword searches intact when applying a city filter', async ({ page }) => {
+    await stubSearchApi(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/en/search?location=izakaya&language=en', { waitUntil: 'networkidle' });
+    await dismissAnnouncementIfVisible(page);
+
+    await expect(page.getByTestId('search-mobile-header-title')).toContainText('Izakaya');
+
+    await page.getByTestId('search-mobile-city-chip').click();
+    await expect(page.getByTestId('search-mobile-city-sheet')).toBeVisible();
+    await page.getByTestId('search-mobile-city-option-오사카').click();
+
+    await expect(page).toHaveURL(/location=izakaya/);
+    await expect(page).toHaveURL(/city=%EC%98%A4%EC%82%AC%EC%B9%B4/);
+    await page.getByRole('button', { name: 'Show results' }).click();
+
+    await expect(page.getByTestId('search-mobile-header-title')).toContainText('Izakaya');
+    await expect(page.getByTestId('search-mobile-city-chip')).toContainText('Osaka');
+    await expect(page.getByTestId('search-mobile-result-card-9201').first()).toBeVisible();
   });
 });

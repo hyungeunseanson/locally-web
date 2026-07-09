@@ -37,7 +37,7 @@ import { formatLocalizedExperienceLocation, getLocalizedCityLabel } from '@/app/
 import { getLocalizedSearchLocationLabel } from '@/app/utils/searchLocationCatalog';
 import { formatExperiencePrice, getExperienceLanguageBadges } from '@/app/utils/experienceCardDisplay';
 import { normalizeProfileLanguageValue } from '@/app/utils/profile';
-import { normalizeServiceCity } from '@/app/utils/serviceRequestLocation';
+import { getServiceCountryFromCity, normalizeServiceCity } from '@/app/utils/serviceRequestLocation';
 import { getExperienceCardImageUrl } from '@/app/utils/experienceImages';
 import type {
   SearchExperience,
@@ -360,12 +360,21 @@ function SearchResults() {
   const handleCityFilterChange = (value: string) => {
     setDesktopPopover(null);
     replaceSearchParams((params) => {
+      const currentLocation = params.get('location') || '';
+      const currentLocationIsCity = Boolean(currentLocation.trim() && getServiceCountryFromCity(currentLocation));
+
       if (!value) {
         params.delete('city');
+        if (currentLocationIsCity) {
+          params.delete('location');
+        }
         return;
       }
 
       params.set('city', value);
+      if (!currentLocation || currentLocationIsCity) {
+        params.set('location', value);
+      }
     });
   };
 
@@ -437,7 +446,7 @@ function SearchResults() {
     : '';
   const desktopGridClassName = 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-4';
 
-  const renderMobileCard = (item: SearchExperience) => {
+  const renderMobileCard = (item: SearchExperience, key: string = String(item.id)) => {
     const imageUrl = getExperienceCardImageUrl(
       item,
       'https://images.unsplash.com/photo-1527631746610-bca00a040d60?auto=format&fit=crop&w=800&q=80'
@@ -453,7 +462,7 @@ function SearchResults() {
     const price = formatExperiencePrice(item.price);
 
     return (
-      <Link key={item.id} href={`/experiences/${item.id}`} data-testid={`search-mobile-result-card-${item.id}`} className="w-[168px] shrink-0">
+      <Link key={key} href={`/experiences/${item.id}`} data-testid={`search-mobile-result-card-${item.id}`} className="w-[168px] shrink-0">
         <div className="relative w-full aspect-[0.95] rounded-[16px] overflow-hidden bg-slate-200">
           <Image
             src={imageUrl}
@@ -632,7 +641,9 @@ function SearchResults() {
               {mobileSections.filter((section) => section.items.length > 0).map((section) => (
                 <section key={section.id}>
                   <h3 className="text-[17px] font-semibold text-[#202020] tracking-[-0.01em] leading-tight mb-3">{section.title}</h3>
-                  <div className="flex gap-3 overflow-x-auto no-scrollbar pr-4">{section.items.map((item) => renderMobileCard(item))}</div>
+                  <div className="flex gap-3 overflow-x-auto no-scrollbar pr-4">
+                    {section.items.map((item, index) => renderMobileCard(item, `${section.id}-${item.id}-${index}`))}
+                  </div>
                 </section>
               ))}
             </div>
