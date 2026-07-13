@@ -15,6 +15,31 @@ export const CARD_APPROVAL_RELEASE_RACE_LOCK_REASON =
 export const CARD_APPROVAL_RELEASE_RACE_REFUNDED_REASON =
   '카드 결제창 취소와 승인 응답이 겹쳐 자동 승인취소 완료';
 
+type BookingPaymentAttemptRow = {
+  status?: unknown;
+  payment_method?: unknown;
+  tid?: unknown;
+  cancel_reason?: unknown;
+};
+
+const PRE_APPROVAL_CARD_CANCEL_REASONS = new Set([
+  EXPLICIT_CARD_CHECKOUT_CANCEL_REASON,
+  STALE_CARD_CHECKOUT_CANCEL_REASON,
+]);
+
+export function isUnapprovedCardPaymentAttempt(booking: BookingPaymentAttemptRow) {
+  if (String(booking.payment_method || '').toLowerCase() !== 'card') return false;
+  if (String(booking.tid || '').trim()) return false;
+
+  const status = String(booking.status || '').toLowerCase();
+  if (status === 'pending') return true;
+
+  return (
+    status === 'cancelled' &&
+    PRE_APPROVAL_CARD_CANCEL_REASONS.has(String(booking.cancel_reason || ''))
+  );
+}
+
 export function getPendingBookingExpiryCutoff(now = Date.now()) {
   return new Date(now - PENDING_BOOKING_EXPIRY_MS).toISOString();
 }

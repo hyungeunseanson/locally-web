@@ -2,6 +2,7 @@ import { createClient } from '@/app/utils/supabase/server';
 import { NextResponse } from 'next/server';
 import { isOverdueActiveBooking } from '@/app/utils/bookingStartTime';
 import { getHostPublicProfile } from '@/app/utils/profile';
+import { isUnapprovedCardPaymentAttempt } from '@/app/utils/bookings/pendingBookingHolds';
 
 const GUEST_TRIPS_BOOKING_SELECT = `
   id,
@@ -11,6 +12,8 @@ const GUEST_TRIPS_BOOKING_SELECT = `
   guests,
   amount,
   status,
+  payment_method,
+  tid,
   cancel_reason,
   solo_guarantee_refund_status,
   solo_guarantee_refund_amount,
@@ -118,7 +121,9 @@ export async function GET() {
     // 2. 데이터 가공 및 '자동 완료' 계산
     let syncCompletedNeeded = false;
 
-    for (const booking of bookings || []) {
+    for (const booking of (bookings || []).filter(
+      (row) => !isUnapprovedCardPaymentAttempt(row)
+    )) {
       const experience = normalizeBookingExperience(booking.experiences);
       let status = booking.status;
       const hostPublicProfile = experience?.host_id

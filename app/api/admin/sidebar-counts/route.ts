@@ -33,7 +33,11 @@ export async function GET() {
         ] = await Promise.all([
             supabaseAdmin.from('host_applications').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
             supabaseAdmin.from('experiences').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-            supabaseAdmin.from('bookings').select('id').eq('status', 'PENDING'),
+            supabaseAdmin
+                .from('bookings')
+                .select('id')
+                .eq('status', 'PENDING')
+                .eq('payment_method', 'bank'),
             supabaseAdmin.from('service_bookings').select('id', { count: 'exact', head: true }).eq('status', 'PENDING').eq('payment_method', 'bank'),
             supabaseAdmin.from('inquiries').select('id').or('type.eq.admin_support,type.eq.admin'),
             supabaseAdmin

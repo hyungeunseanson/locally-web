@@ -2,7 +2,10 @@ import { readFileSync } from 'fs';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test, type Page } from '@playwright/test';
-import { reviewAllExperiencePaymentAgreements } from './helpers/experienceBooking';
+import {
+  insertTestBooking,
+  reviewAllExperiencePaymentAgreements,
+} from './helpers/experienceBooking';
 
 type EnvMap = Record<string, string>;
 type TestUser = {
@@ -353,13 +356,27 @@ test.describe.serial('Scenario 6: Admin Master Ledger Smoke', () => {
     const adminUser = createAdminUser();
     const experience = await prepareBookableExperience();
 
-    await createAuthUser(guest);
+    const guestId = await createAuthUser(guest);
     await createAuthUser(adminUser, true);
 
     const guestContext = await browser.newContext();
     const guestPage = await guestContext.newPage();
     const orderId = await createBankTransferBooking(guestPage, guest, experience);
     await guestContext.close();
+
+    const pendingCardAttemptId = await insertTestBooking({
+      userId: guestId,
+      experienceId: experience.experienceId,
+      date: experience.date,
+      time: '11:00',
+      guests: 1,
+      status: 'PENDING',
+      paymentMethod: 'card',
+      amount: 110,
+      totalPrice: 110,
+      contactName: guest.fullName,
+      contactPhone: guest.phone,
+    });
 
     const targetPendingBookingId = await getPendingBookingIdByOrderId(orderId);
     const allPendingBookingIds = await getAllPendingBookingIds();
@@ -371,6 +388,14 @@ test.describe.serial('Scenario 6: Admin Master Ledger Smoke', () => {
     }, preViewedBookingIds);
     const adminPage = await adminContext.newPage();
     await openMasterLedger(adminPage, adminUser);
+
+    const ledgerResponse = await adminPage.request.get('/api/admin/master-ledger');
+    expect(ledgerResponse.ok()).toBe(true);
+    const ledgerBody = await ledgerResponse.json() as {
+      data?: Array<{ id?: string; order_id?: string }>;
+    };
+    expect((ledgerBody.data || []).some((entry) => entry.id === pendingCardAttemptId)).toBe(false);
+    expect((ledgerBody.data || []).some((entry) => entry.order_id === orderId)).toBe(true);
 
     let row = await searchByOrderId(adminPage, orderId);
     const basePriceText = await row.locator('td').nth(6).textContent();
@@ -417,5 +442,6 @@ test.describe.serial('Scenario 6: Admin Master Ledger Smoke', () => {
     await expect(row.locator('td').first()).toContainText(/취소/, { timeout: 30000 });
 
     await adminContext.close();
+    await getAdminClient().from('bookings').delete().eq('id', pendingCardAttemptId);
   });
 });

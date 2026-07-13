@@ -2,8 +2,10 @@ import { NextResponse } from 'next/server';
 import { hasValidCronAuthorization } from '@/app/utils/cronAuth';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import {
+  EXPLICIT_CARD_CHECKOUT_CANCEL_REASON,
   getExpiredPendingBookingCancelReason,
   getPendingBookingExpiryCutoff,
+  STALE_CARD_CHECKOUT_CANCEL_REASON,
 } from '@/app/utils/bookings/pendingBookingHolds';
 
 export async function GET(request: Request) {
@@ -17,21 +19,76 @@ export async function GET(request: Request) {
   try {
     const supabase = createAdminClient();
 
-    // Find pending bookings older than 2 hours
+    const expiryCutoff = getPendingBookingExpiryCutoff();
+
+    // Find pending bookings older than 2 hours. Card rows are temporary payment
+    // holds, while bank transfers remain real pending bookings with an audit trail.
     const { data: expiredBookings, error } = await supabase
       .from('bookings')
       .select('id, created_at, payment_method')
       .eq('status', 'PENDING')
       .is('tid', null)
-      .lt('created_at', getPendingBookingExpiryCutoff());
+      .lt('created_at', expiryCutoff);
 
     if (error) throw error;
 
-    if (!expiredBookings || expiredBookings.length === 0) {
+    const { data: releasedCardBookings, error: releasedCardBookingsError } = await supabase
+      .from('bookings')
+      .select('id')
+      .eq('status', 'cancelled')
+      .eq('payment_method', 'card')
+      .is('tid', null)
+      .in('cancel_reason', [
+        EXPLICIT_CARD_CHECKOUT_CANCEL_REASON,
+        STALE_CARD_CHECKOUT_CANCEL_REASON,
+      ])
+      .lt('created_at', expiryCutoff);
+
+    if (releasedCardBookingsError) throw releasedCardBookingsError;
+
+    const expiredCardIds = (expiredBookings || [])
+      .filter((booking) => String(booking.payment_method || '').toLowerCase() === 'card')
+      .map((booking) => booking.id);
+    const releasedCardIds = (releasedCardBookings || []).map((booking) => booking.id);
+    const cardAttemptIds = Array.from(new Set([...expiredCardIds, ...releasedCardIds]));
+
+    if (expiredCardIds.length > 0) {
+      const { error: deletePendingCardError } = await supabase
+        .from('bookings')
+        .delete()
+        .in('id', expiredCardIds)
+        .eq('status', 'PENDING')
+        .eq('payment_method', 'card')
+        .is('tid', null);
+
+      if (deletePendingCardError) throw deletePendingCardError;
+    }
+
+    if (releasedCardIds.length > 0) {
+      const { error: deleteReleasedCardError } = await supabase
+        .from('bookings')
+        .delete()
+        .in('id', releasedCardIds)
+        .eq('status', 'cancelled')
+        .eq('payment_method', 'card')
+        .is('tid', null)
+        .in('cancel_reason', [
+          EXPLICIT_CARD_CHECKOUT_CANCEL_REASON,
+          STALE_CARD_CHECKOUT_CANCEL_REASON,
+        ]);
+
+      if (deleteReleasedCardError) throw deleteReleasedCardError;
+    }
+
+    const nonCardExpiredBookings = (expiredBookings || []).filter(
+      (booking) => String(booking.payment_method || '').toLowerCase() !== 'card'
+    );
+
+    if (nonCardExpiredBookings.length === 0 && cardAttemptIds.length === 0) {
       return NextResponse.json({ message: 'No expired bookings found' });
     }
 
-    const expiredIdsByReason = expiredBookings.reduce<Map<string, Array<string | number>>>(
+    const expiredIdsByReason = nonCardExpiredBookings.reduce<Map<string, Array<string | number>>>(
       (groups, booking) => {
         const reason = getExpiredPendingBookingCancelReason(booking.payment_method);
         const ids = groups.get(reason) || [];
@@ -63,11 +120,20 @@ export async function GET(request: Request) {
       await cancelExpiredBookings(ids, cancelReason);
     }
 
-    const expiredIds = expiredBookings.map((booking) => booking.id);
+    const cancelledIds = nonCardExpiredBookings.map((booking) => booking.id);
+    const affectedIds = [...cardAttemptIds, ...cancelledIds];
 
-    console.log(`[CRON] Auto-cancelled ${expiredIds.length} pending bookings.`);
+    console.log(
+      `[CRON] Removed ${cardAttemptIds.length} expired card attempts and cancelled ${cancelledIds.length} pending bookings.`
+    );
 
-    return NextResponse.json({ success: true, count: expiredIds.length, ids: expiredIds });
+    return NextResponse.json({
+      success: true,
+      count: affectedIds.length,
+      ids: affectedIds,
+      deletedCardAttemptCount: cardAttemptIds.length,
+      cancelledBookingCount: cancelledIds.length,
+    });
   } catch (err: unknown) {
     console.error('[CRON] Error:', err);
     const message = err instanceof Error ? err.message : 'Unknown cron error';

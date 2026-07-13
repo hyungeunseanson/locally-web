@@ -6,7 +6,6 @@ import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 import { captureServerException } from '@/app/utils/monitoring/sentry';
 import {
     getPendingBookingExpiryCutoff,
-    STALE_CARD_CHECKOUT_CANCEL_REASON,
 } from '@/app/utils/bookings/pendingBookingHolds';
 
 type BookingRequestBody = {
@@ -133,11 +132,7 @@ export async function POST(request: Request) {
         // GitHub cron이 지연돼도 기존 2시간 정책을 넘긴 카드 홀드가 슬롯을 계속 막지 않게 한다.
         const { error: staleCardHoldCleanupError } = await supabaseAdmin
             .from('bookings')
-            .update({
-                status: 'cancelled',
-                cancel_reason: STALE_CARD_CHECKOUT_CANCEL_REASON,
-                refund_amount: 0,
-            })
+            .delete()
             .eq('experience_id', normalizedExperienceId)
             .eq('date', date)
             .eq('time', normalizedTime)

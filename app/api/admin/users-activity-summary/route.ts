@@ -4,12 +4,16 @@ import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
 import { SERVICE_BOOKING_ACTIVE_STATUSES, SERVICE_BOOKING_COMPLETED_STATUSES } from '@/app/constants/serviceStatus';
+import { isUnapprovedCardPaymentAttempt } from '@/app/utils/bookings/pendingBookingHolds';
 
 type BookingSummaryRow = {
   user_id: string | null;
   amount: number | null;
   created_at: string;
   status: string | null;
+  payment_method: string | null;
+  tid: string | null;
+  cancel_reason: string | null;
 };
 
 type ServiceRequestSummaryRow = {
@@ -107,7 +111,7 @@ export async function GET(request: Request) {
     ] = await Promise.all([
       supabaseAdmin
         .from('bookings')
-        .select('user_id, amount, created_at, status')
+        .select('user_id, amount, created_at, status, payment_method, tid, cancel_reason')
         .in('user_id', profileIds),
       supabaseAdmin
         .from('service_requests')
@@ -138,13 +142,15 @@ export async function GET(request: Request) {
     const serviceRequestCountMap = new Map<string, number>();
     const recentActivityMap = new Map<string, string>();
 
-    ((bookingRows || []) as BookingSummaryRow[]).forEach((row) => {
-      increment(experienceBookingCountMap, row.user_id);
-      updateLatest(recentActivityMap, row.user_id, row.created_at);
-      if (row.status && BOOKING_CONFIRMED_STATUSES.includes(row.status as never)) {
-        addAmount(totalSpentMap, row.user_id, row.amount);
-      }
-    });
+    ((bookingRows || []) as BookingSummaryRow[])
+      .filter((row) => !isUnapprovedCardPaymentAttempt(row))
+      .forEach((row) => {
+        increment(experienceBookingCountMap, row.user_id);
+        updateLatest(recentActivityMap, row.user_id, row.created_at);
+        if (row.status && BOOKING_CONFIRMED_STATUSES.includes(row.status as never)) {
+          addAmount(totalSpentMap, row.user_id, row.amount);
+        }
+      });
 
     ((serviceRequestRows || []) as ServiceRequestSummaryRow[]).forEach((row) => {
       increment(serviceRequestCountMap, row.user_id);

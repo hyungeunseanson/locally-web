@@ -268,6 +268,14 @@ async function login(page: Page, user: TestUser) {
   await page.waitForLoadState('domcontentloaded');
 }
 
+async function expectGuestTripsToExcludeOrder(page: Page, orderId: string) {
+  const response = await page.request.get('/api/guest/trips');
+  expect(response.ok()).toBe(true);
+
+  const body = await response.json() as { trips?: Array<{ orderId?: string }> };
+  expect((body.trips || []).some((trip) => trip.orderId === orderId)).toBe(false);
+}
+
 test.afterAll(async () => {
   const supabase = getAdminClient();
 
@@ -740,7 +748,7 @@ test.describe.serial('Experience card payment UI smoke', () => {
     await login(page, customerUser);
     await page.goto(
       `/experiences/${experience.experienceId}/payment?date=${experience.date}&time=${experience.time}&guests=1`,
-      { waitUntil: 'networkidle' }
+      { waitUntil: 'domcontentloaded' }
     );
 
     await page.locator('input[type="text"]').fill(customerUser.fullName);
@@ -775,6 +783,7 @@ test.describe.serial('Experience card payment UI smoke', () => {
       new RegExp(`/experiences/${experience.experienceId}/payment\\?`)
     );
     await expect(page.getByText('결제가 취소되었습니다.').first()).toBeVisible();
+    await expectGuestTripsToExcludeOrder(page, observedOrderId);
 
     const repeatedRelease = await page.request.post('/api/payment/release-card', {
       data: { orderId: observedOrderId },
@@ -825,7 +834,7 @@ test.describe.serial('Experience card payment UI smoke', () => {
     await login(page, customerUser);
     await page.goto(
       `/experiences/${experience.experienceId}/payment?date=${experience.date}&time=${experience.time}&guests=1`,
-      { waitUntil: 'networkidle' }
+      { waitUntil: 'domcontentloaded' }
     );
 
     await page.locator('input[type="text"]').fill(customerUser.fullName);
@@ -850,6 +859,7 @@ test.describe.serial('Experience card payment UI smoke', () => {
       tid: null,
       user_id: customerId,
     });
+    await expectGuestTripsToExcludeOrder(page, observedOrderId);
   });
 
   test('guards card hold release from unauthenticated, cross-user, bank, and paid mutations', async ({

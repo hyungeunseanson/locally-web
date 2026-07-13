@@ -3,6 +3,7 @@ import { createClient as createServerClient } from '@/app/utils/supabase/server'
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { captureServerException } from '@/app/utils/monitoring/sentry';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
+import { isUnapprovedCardPaymentAttempt } from '@/app/utils/bookings/pendingBookingHolds';
 
 type ServiceRequestLedgerRow = {
   id: string;
@@ -151,7 +152,9 @@ export async function GET(request: Request) {
     if (bookingsError) throw bookingsError;
     if (serviceBookingsError) throw serviceBookingsError;
 
-    const bookingRows = bookings || [];
+    const bookingRows = (bookings || []).filter(
+      (booking) => !isUnapprovedCardPaymentAttempt(booking)
+    );
     const serviceBookingRows = serviceBookings || [];
 
     const experienceIds = Array.from(new Set(bookingRows.map((booking) => booking.experience_id).filter(Boolean)));

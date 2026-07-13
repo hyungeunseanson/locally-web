@@ -3,6 +3,7 @@ import { createClient as createServerClient } from '@/app/utils/supabase/server'
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { isCancelledBookingStatus, isConfirmedBookingStatus } from '@/app/constants/bookingStatus';
+import { isUnapprovedCardPaymentAttempt } from '@/app/utils/bookings/pendingBookingHolds';
 
 type HostApplicationRow = {
   id: string;
@@ -27,6 +28,9 @@ type BookingRow = {
   created_at: string | null;
   experience_id: number | null;
   status: string | null;
+  payment_method: string | null;
+  tid: string | null;
+  cancel_reason: string | null;
 };
 
 type ReviewRow = {
@@ -106,7 +110,7 @@ export async function GET(request: Request) {
 
     let bookingsQuery = supabaseAdmin
       .from('bookings')
-      .select('created_at, experience_id, status')
+      .select('created_at, experience_id, status, payment_method, tid, cancel_reason')
       .in('status', ['PAID', 'confirmed', 'completed', 'cancelled', 'cancellation_requested', 'declined']);
 
     let reviewsQuery = supabaseAdmin
@@ -149,7 +153,9 @@ export async function GET(request: Request) {
     if (inquiriesError) throw inquiriesError;
 
     const apps = (appRows || []) as HostApplicationRow[];
-    const bookings = (bookingRows || []) as BookingRow[];
+    const bookings = ((bookingRows || []) as BookingRow[]).filter(
+      (booking) => !isUnapprovedCardPaymentAttempt(booking)
+    );
     const reviews = (reviewRows || []) as ReviewRow[];
     const inquiries = (inquiryRows || []) as InquiryRow[];
 

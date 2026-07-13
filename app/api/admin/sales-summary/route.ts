@@ -13,6 +13,7 @@ import {
 import { attachNullPayoutPaidAt, isMissingPayoutPaidAtColumnError } from '@/app/utils/payoutPaidAt';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
+import { isUnapprovedCardPaymentAttempt } from '@/app/utils/bookings/pendingBookingHolds';
 
 type SalesBookingBase = {
   id: string;
@@ -33,6 +34,8 @@ type SalesBookingBase = {
   platform_revenue: number | null;
   refund_amount: number | null;
   payment_method: string | null;
+  tid: string | null;
+  cancel_reason: string | null;
   total_price?: number | null;
   total_experience_price?: number | null;
   price_at_booking?: number | null;
@@ -112,6 +115,8 @@ function normalizeSalesBookingBase(row: AdminRawRow): SalesBookingBase | null {
     platform_revenue: readNumberField(row, 'platform_revenue'),
     refund_amount: readNumberField(row, 'refund_amount'),
     payment_method: readStringField(row, 'payment_method'),
+    tid: readStringField(row, 'tid'),
+    cancel_reason: readStringField(row, 'cancel_reason'),
     total_price: readNumberField(row, 'total_price'),
     total_experience_price: readNumberField(row, 'total_experience_price'),
     price_at_booking: readNumberField(row, 'price_at_booking'),
@@ -240,6 +245,8 @@ export async function GET(request: Request) {
         'platform_revenue',
         'refund_amount',
         'payment_method',
+        'tid',
+        'cancel_reason',
         'total_price',
         'total_experience_price',
         'price_at_booking',
@@ -317,7 +324,10 @@ export async function GET(request: Request) {
     if (bookingsError) throw bookingsError;
     if (serviceSummaryError) throw serviceSummaryError;
 
-    const bookingRows = salesBookingsRaw.map(normalizeSalesBookingBase).filter(isPresent);
+    const bookingRows = salesBookingsRaw
+      .map(normalizeSalesBookingBase)
+      .filter(isPresent)
+      .filter((booking) => !isUnapprovedCardPaymentAttempt(booking));
     const serviceRows = serviceSummaryRowsRaw
       .map(normalizeServiceSalesSummary)
       .filter(isPresent);

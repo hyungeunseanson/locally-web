@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
+import { isUnapprovedCardPaymentAttempt } from '@/app/utils/bookings/pendingBookingHolds';
 
 /**
  * GET /api/admin/bookings
@@ -47,7 +48,12 @@ export async function GET(request: Request) {
 
         if (error) throw error;
 
-        return NextResponse.json({ success: true, data: bookings || [] });
+        return NextResponse.json({
+            success: true,
+            data: (bookings || []).filter(
+                (booking) => !isUnapprovedCardPaymentAttempt(booking)
+            ),
+        });
     } catch (error: unknown) {
         const message = error instanceof Error ? error.message : 'Server error';
         console.error('[ADMIN] /api/admin/bookings error:', error);

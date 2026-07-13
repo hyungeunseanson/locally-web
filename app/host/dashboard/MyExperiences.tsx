@@ -6,6 +6,7 @@ import { Calendar, Edit, Trash2, MapPin, Clock, AlertCircle, Users } from 'lucid
 import { createClient } from '@/app/utils/supabase/client';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { useToast } from '@/app/context/ToastContext';
+import { isUnapprovedCardPaymentAttempt } from '@/app/utils/bookings/pendingBookingHolds';
 import ConfirmModal from '@/app/components/ui/ConfirmModal';
 
 interface ExperienceBookingCount {
@@ -24,6 +25,14 @@ interface ExperienceRecord {
   admin_comment?: string | null;
   bookings?: ExperienceBookingCount[] | null;
 }
+
+type HiddenBookingAttemptRow = {
+  experience_id: string | number | null;
+  status: string | null;
+  payment_method: string | null;
+  tid: string | null;
+  cancel_reason: string | null;
+};
 
 const CITY_MAP: Record<string, string> = {
   '서울': 'seoul', '부산': 'busan', '제주': 'jeju',
@@ -58,13 +67,45 @@ export default function MyExperiences() {
       return null;
     }
 
-    const { data } = await supabase
-      .from('experiences')
-      .select(HOST_EXPERIENCES_SELECT)
-      .eq('host_id', user.id)
-      .order('created_at', { ascending: false });
+    const [{ data }, { data: hiddenAttemptRows, error: hiddenAttemptError }] = await Promise.all([
+      supabase
+        .from('experiences')
+        .select(HOST_EXPERIENCES_SELECT)
+        .eq('host_id', user.id)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('bookings')
+        .select('experience_id, status, payment_method, tid, cancel_reason, experiences!inner(host_id)')
+        .eq('experiences.host_id', user.id)
+        .eq('payment_method', 'card')
+        .is('tid', null)
+        .in('status', ['PENDING', 'pending', 'cancelled']),
+    ]);
 
-    return data ?? [];
+    if (hiddenAttemptError) {
+      console.warn('[HOST] hidden card attempt count lookup failed:', hiddenAttemptError.message);
+      return data ?? [];
+    }
+
+    const hiddenCountByExperience = new Map<string, number>();
+    for (const row of (hiddenAttemptRows || []) as unknown as HiddenBookingAttemptRow[]) {
+      if (!isUnapprovedCardPaymentAttempt(row) || row.experience_id == null) continue;
+      const experienceId = String(row.experience_id);
+      hiddenCountByExperience.set(
+        experienceId,
+        (hiddenCountByExperience.get(experienceId) || 0) + 1
+      );
+    }
+
+    return ((data ?? []) as ExperienceRecord[]).map((experience) => {
+      const totalCount = Number(experience.bookings?.[0]?.count || 0);
+      const hiddenCount = hiddenCountByExperience.get(String(experience.id)) || 0;
+
+      return {
+        ...experience,
+        bookings: [{ count: Math.max(0, totalCount - hiddenCount) }],
+      };
+    });
   }, [supabase]);
 
   const refreshMyExperiences = useCallback(async () => {

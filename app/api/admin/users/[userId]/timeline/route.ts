@@ -11,6 +11,7 @@ import type {
   AdminUserTimelineItem,
 } from '@/app/types/admin';
 import type { ServiceBookingStatus, ServiceRequestStatus } from '@/app/types/service';
+import { isUnapprovedCardPaymentAttempt } from '@/app/utils/bookings/pendingBookingHolds';
 
 type BookingRow = {
   id: string;
@@ -22,6 +23,9 @@ type BookingRow = {
   date: string | null;
   time: string | null;
   experience_id: number | null;
+  payment_method: string | null;
+  tid: string | null;
+  cancel_reason: string | null;
 };
 
 type ReviewRow = {
@@ -187,7 +191,7 @@ export async function GET(
         .maybeSingle(),
       supabaseAdmin
         .from('bookings')
-        .select('id, created_at, amount, total_price, status, guests, date, time, experience_id')
+        .select('id, created_at, amount, total_price, status, guests, date, time, experience_id, payment_method, tid, cancel_reason')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(PER_SOURCE_LIMIT),
@@ -232,7 +236,9 @@ export async function GET(
     if (serviceBookingsRes.error) throw serviceBookingsRes.error;
 
     const profile = (profileRes.data || null) as UserProfileDetailRow | null;
-    const bookingRows = (bookingsRes.data || []) as BookingRow[];
+    const bookingRows = ((bookingsRes.data || []) as BookingRow[]).filter(
+      (booking) => !isUnapprovedCardPaymentAttempt(booking)
+    );
     const reviewRows = (reviewsRes.data || []) as ReviewRow[];
     const guestReviewRows = (guestReviewsRes.data || []) as GuestReviewRow[];
     const inquiryRows = (inquiriesRes.data || []) as InquiryRow[];

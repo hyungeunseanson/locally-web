@@ -6,6 +6,7 @@ import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { isCancelledBookingStatus, isConfirmedBookingStatus } from '@/app/constants/bookingStatus';
 import { isCompletedServiceBooking, isPaidServiceBooking } from '@/app/constants/serviceStatus';
 import { getBookingPlatformRevenue } from '@/app/utils/bookingFinance';
+import { isUnapprovedCardPaymentAttempt } from '@/app/utils/bookings/pendingBookingHolds';
 
 type AnalyticsBookingRow = {
   id: string;
@@ -22,6 +23,9 @@ type AnalyticsBookingRow = {
   solo_guarantee_refund_status: string | null;
   solo_guarantee_refund_amount: number | null;
   refund_amount: number | null;
+  payment_method: string | null;
+  tid: string | null;
+  cancel_reason: string | null;
 };
 
 type AnalyticsExperienceTitleRow = {
@@ -174,7 +178,7 @@ export async function GET(request: Request) {
 
     let bookingsQuery = supabaseAdmin
       .from('bookings')
-      .select('id, created_at, experience_id, user_id, amount, status, total_price, total_experience_price, host_payout_amount, platform_revenue, solo_guarantee_price, solo_guarantee_refund_status, solo_guarantee_refund_amount, refund_amount')
+      .select('id, created_at, experience_id, user_id, amount, status, total_price, total_experience_price, host_payout_amount, platform_revenue, solo_guarantee_price, solo_guarantee_refund_status, solo_guarantee_refund_amount, refund_amount, payment_method, tid, cancel_reason')
       .in('status', ['PAID', 'confirmed', 'completed', 'cancelled', 'declined', 'cancellation_requested']);
 
     let reviewsQuery = supabaseAdmin
@@ -271,7 +275,9 @@ export async function GET(request: Request) {
     if (paymentInitEventsError) throw paymentInitEventsError;
     if (serviceBookingsError) throw serviceBookingsError;
 
-    const bookings = (bookingRows || []) as AnalyticsBookingRow[];
+    const bookings = ((bookingRows || []) as AnalyticsBookingRow[]).filter(
+      (booking) => !isUnapprovedCardPaymentAttempt(booking)
+    );
     const reviews = (reviewRows || []) as AnalyticsReviewRow[];
     const newUsers = (newUserPreviewRows || []) as AnalyticsProfileRow[];
     const totalUsers = totalUsersCount || 0;

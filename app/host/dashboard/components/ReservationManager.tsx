@@ -21,6 +21,7 @@ import {
   getEffectiveCompletedStatus,
   isOverdueActiveBooking,
 } from '@/app/utils/bookingStartTime';
+import { isUnapprovedCardPaymentAttempt } from '@/app/utils/bookings/pendingBookingHolds';
 
 // 컴포넌트
 import ReservationCard from './ReservationCard';
@@ -61,6 +62,8 @@ type ReservationRecord = {
   total_price?: number | null;
   total_experience_price?: number | null;
   status: string;
+  payment_method?: string | null;
+  tid?: string | null;
   contact_name?: string | null;
   cancel_reason?: string | null;
   refund_amount?: number | null;
@@ -121,6 +124,8 @@ const RESERVATION_SELECT = `
   total_price,
   total_experience_price,
   status,
+  payment_method,
+  tid,
   contact_name,
   cancel_reason,
   refund_amount,
@@ -326,18 +331,25 @@ export default function ReservationManager() {
 
       if (error) throw error;
       const now = new Date();
-      const nextReservations = ((data as RawReservationRecord[] | null) || []).map((reservation) => {
-        const rawStatus = reservation.status;
-        const effectiveStatus = getEffectiveCompletedStatus(rawStatus, reservation.date, reservation.time, now);
+      const nextReservations = ((data as RawReservationRecord[] | null) || [])
+        .filter((reservation) => !isUnapprovedCardPaymentAttempt(reservation))
+        .map((reservation) => {
+          const rawStatus = reservation.status;
+          const effectiveStatus = getEffectiveCompletedStatus(
+            rawStatus,
+            reservation.date,
+            reservation.time,
+            now
+          );
 
-        return {
-          ...reservation,
-          status: effectiveStatus,
-          raw_status: rawStatus,
-          guest: getSingleGuest(reservation.guest),
-          experiences: getSingleExperience(reservation.experiences),
-        };
-      });
+          return {
+            ...reservation,
+            status: effectiveStatus,
+            raw_status: rawStatus,
+            guest: getSingleGuest(reservation.guest),
+            experiences: getSingleExperience(reservation.experiences),
+          };
+        });
       setReservations(nextReservations);
       void fetchGuestMembershipStatuses(nextReservations.map((reservation) => reservation.user_id));
 
