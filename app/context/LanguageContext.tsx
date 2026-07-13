@@ -659,7 +659,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     exp_payment_label_guests: "인원",
     exp_payment_label_type: "예약 유형",
     exp_payment_private_type: "프라이빗",
-    exp_payment_solo_note: "혼자 출발 보장 옵션이 적용되었습니다.",
+    exp_payment_solo_note: "1인 출발 보장 옵션이 적용되었습니다.",
     exp_payment_booker_title: "예약자 정보",
     exp_payment_name_label: "이름",
     exp_payment_name_placeholder: "예약자 이름을 입력해주세요",
