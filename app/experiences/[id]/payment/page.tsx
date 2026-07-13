@@ -16,7 +16,10 @@ import { useLanguage } from '@/app/context/LanguageContext';
 import { useAuth } from '@/app/context/AuthContext';
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 import { normalizeSoloGuaranteePrice } from '@/app/constants/soloGuarantee';
-import { launchCardPayment } from '@/app/utils/payments/card/client';
+import {
+  isCardPaymentCancelledError,
+  launchCardPayment,
+} from '@/app/utils/payments/card/client';
 import { buildCardPaymentCallbackRequestBody } from '@/app/utils/payments/card/public';
 import type {
   CardPaymentProvider,
@@ -1048,6 +1051,22 @@ function PaymentContent() {
 
         router.push(`/experiences/${experienceId}/payment/complete?orderId=${newOrderId}`);
       } catch (err: unknown) {
+        if (isCardPaymentCancelledError(err)) {
+          try {
+            const releaseResponse = await fetch('/api/payment/release-card', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ orderId: newOrderId }),
+            });
+
+            if (!releaseResponse.ok) {
+              console.warn('[EXPERIENCE] Card hold release was not applied:', releaseResponse.status);
+            }
+          } catch (releaseError) {
+            console.error('[EXPERIENCE] Card hold release request failed:', releaseError);
+          }
+        }
+
         const message =
           err instanceof Error ? err.message : (t('exp_payment_card_process_error') as string);
         setPaymentError(message);

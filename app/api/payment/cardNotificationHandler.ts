@@ -6,6 +6,7 @@ import { finalizeServiceCardPayment } from '@/app/api/services/payment/serviceCa
 import { isCancelledBookingStatus, isConfirmedBookingStatus } from '@/app/constants/bookingStatus';
 import { isCancelledServiceBooking } from '@/app/constants/serviceStatus';
 import type { ProxyCategory } from '@/app/types/proxy';
+import { EXPLICIT_CARD_CHECKOUT_CANCEL_REASON } from '@/app/utils/bookings/pendingBookingHolds';
 import { getProxyRequestFeeKrw } from '@/app/utils/proxyBooking';
 import {
   getCurrentCardPaymentProvider,
@@ -143,7 +144,15 @@ async function processExperienceNotification(params: {
     return buildNotificationOkResponse();
   }
 
-  if (String(booking.status || '').toUpperCase() !== 'PENDING') {
+  const isExplicitReleasedCardHold =
+    isCancelledBookingStatus(String(booking.status || '')) &&
+    !booking.tid &&
+    booking.cancel_reason === EXPLICIT_CARD_CHECKOUT_CANCEL_REASON;
+
+  if (
+    String(booking.status || '').toUpperCase() !== 'PENDING' &&
+    !isExplicitReleasedCardHold
+  ) {
     return NextResponse.json(
       {
         success: false,

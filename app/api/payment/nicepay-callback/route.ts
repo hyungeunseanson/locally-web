@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { finalizeExperienceCardPayment } from '@/app/api/payment/experienceCardConfirmation';
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
+import { EXPLICIT_CARD_CHECKOUT_CANCEL_REASON } from '@/app/utils/bookings/pendingBookingHolds';
 import { getCurrentCardPaymentProvider, verifyApprovedCardPayment } from '@/app/utils/payments/card/server';
 import { captureServerException } from '@/app/utils/monitoring/sentry';
 import { createAdminClient } from '@/app/utils/supabase/admin';
@@ -91,7 +92,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, message: 'Already processed' });
     }
 
-    if (String(originalBooking.status || '').toUpperCase() !== 'PENDING') {
+    const isExplicitReleasedCardHold =
+      String(originalBooking.status || '').toLowerCase() === 'cancelled' &&
+      !originalBooking.tid &&
+      originalBooking.cancel_reason === EXPLICIT_CARD_CHECKOUT_CANCEL_REASON;
+
+    if (
+      String(originalBooking.status || '').toUpperCase() !== 'PENDING' &&
+      !isExplicitReleasedCardHold
+    ) {
       return NextResponse.json(
         { success: false, error: '이미 처리된 예약이거나 결제 대기 상태가 아닙니다.' },
         { status: 409 }
@@ -140,7 +149,20 @@ export async function POST(request: Request) {
     }
 
     if (confirmationResult.alreadyProcessed) {
+      if (confirmationResult.cancelledAndRefunded) {
+        return NextResponse.json(
+          { success: false, error: '결제가 취소되어 승인 금액을 자동 환불했습니다.' },
+          { status: 409 }
+        );
+      }
       return NextResponse.json({ success: true, message: 'Already processed' });
+    }
+
+    if (confirmationResult.cancelledAndRefunded) {
+      return NextResponse.json(
+        { success: false, error: '결제가 취소되어 승인 금액을 자동 환불했습니다.' },
+        { status: 409 }
+      );
     }
 
     return NextResponse.json({ success: true });

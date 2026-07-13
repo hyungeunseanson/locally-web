@@ -9,6 +9,10 @@ import { expect, test, type Page } from '@playwright/test';
 import { handleNicePayCardNotification as cardNotificationPost } from '@/app/api/payment/cardNotificationHandler';
 import { POST as proxyNicePayCallbackPost } from '@/app/api/proxy-bookings/payment/nicepay-callback/route';
 import {
+  CARD_APPROVAL_RELEASE_RACE_REFUNDED_REASON,
+  EXPLICIT_CARD_CHECKOUT_CANCEL_REASON,
+} from '@/app/utils/bookings/pendingBookingHolds';
+import {
   buildNicePayLaunchFields,
   cancelCardPayment,
   getCardPaymentReadiness,
@@ -37,6 +41,7 @@ const createdProxyRequestIds: string[] = [];
 const createdInquiryIds: string[] = [];
 const createdServiceRequestIds: string[] = [];
 const createdServiceBookingIds: string[] = [];
+const createdExperienceBookingIds: string[] = [];
 
 type EnvMap = Record<string, string>;
 type TestUser = {
@@ -365,6 +370,10 @@ test.afterAll(async () => {
 
   if (createdServiceRequestIds.length > 0) {
     await supabase.from('service_requests').delete().in('id', createdServiceRequestIds);
+  }
+
+  if (createdExperienceBookingIds.length > 0) {
+    await supabase.from('bookings').delete().in('id', createdExperienceBookingIds);
   }
 
   for (const userId of createdAuthUserIds) {
@@ -740,6 +749,164 @@ test.describe('Card payment provider cutover contracts', () => {
         resultCode: '2001',
         resultMessage: 'Cancel OK',
       });
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  test('auto-refunds a verified NicePay approval that races with an explicit checkout release', async () => {
+    ensureSupabaseEnv();
+    withNicePayEnv();
+
+    const guest = createUser('experience-release-race');
+    const guestId = await createAuthUser(guest);
+    const { data: experience, error: experienceError } = await getAdminClient()
+      .from('experiences')
+      .select('id')
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (experienceError || !experience?.id) {
+      throw experienceError || new Error('No active experience for release-race fixture.');
+    }
+
+    const timestamp = Date.now();
+    const bookingId = `EXP-NICEPAY-RELEASE-RACE-${timestamp}`;
+    const orderId = `ORD-NICEPAY-RELEASE-RACE-${timestamp}`;
+    const transactionId = `TX-NICEPAY-RELEASE-RACE-${timestamp}`;
+    const amount = 47000;
+    const bookingDate = new Date();
+    bookingDate.setDate(bookingDate.getDate() + 60);
+    const { error: bookingError } = await getAdminClient().from('bookings').insert({
+      id: bookingId,
+      order_id: orderId,
+      user_id: guestId,
+      experience_id: experience.id,
+      amount,
+      total_price: amount,
+      status: 'cancelled',
+      guests: 1,
+      date: bookingDate.toISOString().slice(0, 10),
+      time: '09:30',
+      type: 'group',
+      contact_name: guest.fullName,
+      contact_phone: guest.phone,
+      payment_method: 'card',
+      tid: null,
+      cancel_reason: EXPLICIT_CARD_CHECKOUT_CANCEL_REASON,
+      refund_amount: 0,
+      host_payout_amount: 0,
+      platform_revenue: 0,
+      payout_status: 'pending',
+      created_at: new Date().toISOString(),
+    });
+    if (bookingError) throw bookingError;
+    createdExperienceBookingIds.push(bookingId);
+
+    const competingBookingId = `EXP-NICEPAY-RELEASE-RACE-COMPETING-${timestamp}`;
+    const { error: competingBookingError } = await getAdminClient().from('bookings').insert({
+      id: competingBookingId,
+      order_id: `ORD-NICEPAY-RELEASE-RACE-COMPETING-${timestamp}`,
+      user_id: guestId,
+      experience_id: experience.id,
+      amount,
+      total_price: amount,
+      status: 'PAID',
+      guests: 1,
+      date: bookingDate.toISOString().slice(0, 10),
+      time: '09:30',
+      type: 'private',
+      contact_name: guest.fullName,
+      contact_phone: guest.phone,
+      payment_method: 'card',
+      tid: `TX-NICEPAY-RELEASE-RACE-COMPETING-${timestamp}`,
+      refund_amount: 0,
+      host_payout_amount: Math.floor(amount * 0.8),
+      platform_revenue: amount - Math.floor(amount * 0.8),
+      payout_status: 'pending',
+      created_at: new Date().toISOString(),
+    });
+    if (competingBookingError) throw competingBookingError;
+    createdExperienceBookingIds.push(competingBookingId);
+
+    const originalFetch = global.fetch;
+    const requestedUrls: string[] = [];
+    global.fetch = (async (input, init) => {
+      const url = String(input);
+
+      if (url === NICEPAY_STATUS_QUERY_URL) {
+        requestedUrls.push(url);
+        return new Response(
+          JSON.stringify({
+            ResultCode: '0000',
+            ResultMsg: 'OK',
+            Status: '0',
+            TID: transactionId,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (url === NICEPAY_CANCEL_URL) {
+        requestedUrls.push(url);
+        const body = new URLSearchParams(String(init?.body || ''));
+        expect(body.get('TID')).toBe(transactionId);
+        expect(body.get('Moid')).toBe(orderId);
+        expect(body.get('CancelAmt')).toBe(String(amount));
+        expect(body.get('PartialCancelCode')).toBe('0');
+
+        const cancelSignature = sha256Hex(
+          `${transactionId}${process.env.NICEPAY_MID}${amount}${process.env.NICEPAY_MERCHANT_KEY}`
+        );
+        return new Response(
+          `ResultCode=2001&ResultMsg=Cancel+OK&TID=${transactionId}&MID=${process.env.NICEPAY_MID}&CancelAmt=${amount}&Signature=${cancelSignature}`,
+          { status: 200, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+        );
+      }
+
+      return originalFetch(input, init);
+    }) as typeof fetch;
+
+    try {
+      const buildNotificationRequest = () =>
+        new Request('https://locally.example/api/payment/card-notification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            Moid: orderId,
+            TID: transactionId,
+            Amt: String(amount),
+            ResultCode: '3001',
+            StateCd: '0',
+            PayMethod: 'CARD',
+          }).toString(),
+        });
+
+      const firstResponse = await cardNotificationPost(buildNotificationRequest());
+      const firstResponseBody = await firstResponse.text();
+      expect(firstResponse.status, firstResponseBody).toBe(200);
+      expect(firstResponseBody).toBe('OK');
+
+      const { data: reconciledBooking, error: reconciledBookingError } = await getAdminClient()
+        .from('bookings')
+        .select('status, tid, cancel_reason, refund_amount, host_payout_amount, platform_revenue')
+        .eq('id', bookingId)
+        .maybeSingle();
+      if (reconciledBookingError) throw reconciledBookingError;
+      expect(reconciledBooking).toMatchObject({
+        status: 'cancelled',
+        tid: transactionId,
+        cancel_reason: CARD_APPROVAL_RELEASE_RACE_REFUNDED_REASON,
+        refund_amount: amount,
+        host_payout_amount: 0,
+        platform_revenue: 0,
+      });
+
+      const replayResponse = await cardNotificationPost(buildNotificationRequest());
+      expect(replayResponse.status).toBe(200);
+      await expect(replayResponse.text()).resolves.toBe('OK');
+      expect(requestedUrls).toEqual([NICEPAY_STATUS_QUERY_URL, NICEPAY_CANCEL_URL]);
     } finally {
       global.fetch = originalFetch;
     }

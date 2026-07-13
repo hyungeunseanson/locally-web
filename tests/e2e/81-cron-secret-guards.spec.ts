@@ -1,10 +1,37 @@
 import { expect, test } from '@playwright/test';
 
+import {
+  BANK_TRANSFER_EXPIRED_CANCEL_REASON,
+  getExpiredPendingBookingCancelReason,
+  getPendingBookingExpiryCutoff,
+  PENDING_BOOKING_EXPIRY_MS,
+  STALE_CARD_CHECKOUT_CANCEL_REASON,
+  STALE_PAYPAL_CHECKOUT_CANCEL_REASON,
+  STALE_PAYMENT_CHECKOUT_CANCEL_REASON,
+} from '@/app/utils/bookings/pendingBookingHolds';
 import { getExpectedTestCronSecret } from './helpers/testSupabase';
 
 const CRON_SECRET = getExpectedTestCronSecret();
 
 test.describe('Cron secret guards', () => {
+  test('keeps the two-hour expiry policy while recording the correct payment reason', () => {
+    const now = Date.UTC(2026, 6, 13, 12, 0, 0);
+
+    expect(Date.parse(getPendingBookingExpiryCutoff(now))).toBe(now - PENDING_BOOKING_EXPIRY_MS);
+    expect(getExpiredPendingBookingCancelReason('bank')).toBe(
+      BANK_TRANSFER_EXPIRED_CANCEL_REASON
+    );
+    expect(getExpiredPendingBookingCancelReason('card')).toBe(
+      STALE_CARD_CHECKOUT_CANCEL_REASON
+    );
+    expect(getExpiredPendingBookingCancelReason('paypal')).toBe(
+      STALE_PAYPAL_CHECKOUT_CANCEL_REASON
+    );
+    expect(getExpiredPendingBookingCancelReason(null)).toBe(
+      STALE_PAYMENT_CHECKOUT_CANCEL_REASON
+    );
+  });
+
   test('rejects cron requests without an authorization header', async ({ request }) => {
     const responses = await Promise.all([
       request.get('/api/cron/cancel-pending'),

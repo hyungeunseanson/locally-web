@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { hasValidCronAuthorization } from '@/app/utils/cronAuth';
 import { createAdminClient } from '@/app/utils/supabase/admin';
+import {
+  getExpiredPendingBookingCancelReason,
+  getPendingBookingExpiryCutoff,
+} from '@/app/utils/bookings/pendingBookingHolds';
 
 export async function GET(request: Request) {
   // [M-2] Auto Cancel Scheduler
@@ -13,15 +17,13 @@ export async function GET(request: Request) {
   try {
     const supabase = createAdminClient();
 
-    // 2 hours ago
-    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
-
     // Find pending bookings older than 2 hours
     const { data: expiredBookings, error } = await supabase
       .from('bookings')
-      .select('id, created_at')
+      .select('id, created_at, payment_method')
       .eq('status', 'PENDING')
-      .lt('created_at', twoHoursAgo);
+      .is('tid', null)
+      .lt('created_at', getPendingBookingExpiryCutoff());
 
     if (error) throw error;
 
@@ -29,22 +31,43 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: 'No expired bookings found' });
     }
 
-    // Cancel them
-    const expiredIds = expiredBookings.map(b => b.id);
-    const { error: updateError } = await supabase
-      .from('bookings')
-      .update({
-        status: 'cancelled',
-        cancel_reason: '입금 기한 만료 (2시간 경과 자동 취소)'
-      })
-      .in('id', expiredIds)
-      .eq('status', 'PENDING');
+    const expiredIdsByReason = expiredBookings.reduce<Map<string, Array<string | number>>>(
+      (groups, booking) => {
+        const reason = getExpiredPendingBookingCancelReason(booking.payment_method);
+        const ids = groups.get(reason) || [];
+        ids.push(booking.id);
+        groups.set(reason, ids);
+        return groups;
+      },
+      new Map()
+    );
 
-    if (updateError) throw updateError;
+    const cancelExpiredBookings = async (ids: Array<string | number>, cancelReason: string) => {
+      if (ids.length === 0) return;
 
-    console.log(`[CRON] Auto-cancelled ${expiredBookings.length} pending bookings.`);
+      const { error: updateError } = await supabase
+        .from('bookings')
+        .update({
+          status: 'cancelled',
+          cancel_reason: cancelReason,
+          refund_amount: 0,
+        })
+        .in('id', ids)
+        .eq('status', 'PENDING')
+        .is('tid', null);
 
-    return NextResponse.json({ success: true, count: expiredBookings.length, ids: expiredIds });
+      if (updateError) throw updateError;
+    };
+
+    for (const [cancelReason, ids] of expiredIdsByReason) {
+      await cancelExpiredBookings(ids, cancelReason);
+    }
+
+    const expiredIds = expiredBookings.map((booking) => booking.id);
+
+    console.log(`[CRON] Auto-cancelled ${expiredIds.length} pending bookings.`);
+
+    return NextResponse.json({ success: true, count: expiredIds.length, ids: expiredIds });
   } catch (err: unknown) {
     console.error('[CRON] Error:', err);
     const message = err instanceof Error ? err.message : 'Unknown cron error';

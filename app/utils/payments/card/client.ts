@@ -33,6 +33,19 @@ type NicePayRelayMessage = {
 const NICEPAY_RESULT_MESSAGE_TYPE = 'locally:nicepay-result';
 const NICEPAY_LAUNCH_PAGE_PATH = '/api/payment/card-launch-page';
 
+export class CardPaymentCancelledError extends Error {
+  readonly cancelled = true;
+
+  constructor(message = '결제가 취소되었습니다.') {
+    super(message);
+    this.name = 'CardPaymentCancelledError';
+  }
+}
+
+export function isCardPaymentCancelledError(error: unknown): error is CardPaymentCancelledError {
+  return error instanceof CardPaymentCancelledError;
+}
+
 declare global {
   interface Window {
     IMP?: {
@@ -283,6 +296,7 @@ function requestNicePayCardPayment(params: CardPaymentLaunchParams): Promise<Car
 
     const handleMessage = (event: MessageEvent<NicePayRelayMessage>) => {
       if (event.origin !== window.location.origin) return;
+      if (event.source !== popup) return;
 
       const data = event.data;
       if (!data || data.type !== NICEPAY_RESULT_MESSAGE_TYPE) {
@@ -290,7 +304,11 @@ function requestNicePayCardPayment(params: CardPaymentLaunchParams): Promise<Car
       }
 
       if (!data.success || !data.payload) {
-        rejectWithCleanup(new Error(data.message || '결제가 취소되었거나 승인에 실패했습니다.'));
+        rejectWithCleanup(
+          data.cancelled
+            ? new CardPaymentCancelledError(data.message)
+            : new Error(data.message || '결제가 취소되었거나 승인에 실패했습니다.')
+        );
         return;
       }
 

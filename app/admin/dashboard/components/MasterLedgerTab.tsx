@@ -110,7 +110,7 @@ function getErrorMessage(error: unknown, fallback: string) {
 
 const STATUS_TABS = [
   { id: 'ALL', label: '전체' },
-  { id: 'PENDING', label: '입금대기' },
+  { id: 'PENDING', label: '대기중' },
   { id: 'PAID', label: '확정됨' },
   { id: 'CANCELLED', label: '취소됨' },
 ] as const;
@@ -625,10 +625,14 @@ export default function MasterLedgerTab({
     showToast('복사되었습니다.', 'success');
   };
 
-  const renderStatusBadge = (status: string) => {
+  const renderStatusBadge = (booking: AdminMasterLedgerEntry) => {
+    const status = booking.status;
     const s = status?.toLowerCase();
     if (isConfirmedBookingStatus(status)) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700">확정</span>;
-    if (s === 'pending') return <span className="inline-flex items-center gap-1 rounded bg-yellow-100 px-1.5 py-0.5 text-[9px] font-bold text-yellow-700 animate-pulse md:px-2 md:text-[10px]"><span className="md:hidden">입금</span><span className="hidden md:inline">입금 대기</span></span>;
+    if (s === 'pending') {
+      const isBankTransfer = String(booking.payment_method || '').toLowerCase() === 'bank';
+      return <span className="inline-flex items-center gap-1 rounded bg-yellow-100 px-1.5 py-0.5 text-[9px] font-bold text-yellow-700 animate-pulse md:px-2 md:text-[10px]"><span className="md:hidden">{isBankTransfer ? '입금' : '결제'}</span><span className="hidden md:inline">{isBankTransfer ? '입금 대기' : '결제 대기'}</span></span>;
+    }
     if (isCancelledBookingStatus(status)) return <span className="inline-flex items-center gap-1 rounded bg-red-100 px-1.5 py-0.5 text-[9px] font-bold text-red-700 md:px-2 md:text-[10px]"><span className="md:hidden">취소</span><span className="hidden md:inline">취소됨</span></span>;
     return <span className="text-xs text-slate-500">{status}</span>;
   };
@@ -811,7 +815,7 @@ export default function MasterLedgerTab({
                     >
                       <td className="px-1.5 md:px-4 py-2 md:py-4">
                         <div className="flex flex-col items-start gap-1">
-                          {renderStatusBadge(b.status)}
+                          {renderStatusBadge(b)}
                           {isBookingReviewPending(b.cancel_reason) && (
                             <span className="inline-flex items-center gap-1 rounded bg-orange-100 px-1.5 py-0.5 text-[9px] font-bold text-orange-700 md:px-2 md:text-[10px]">
                               <AlertTriangle size={10} />

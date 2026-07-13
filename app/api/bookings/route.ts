@@ -4,6 +4,10 @@ import { createAdminClient } from '@/app/utils/supabase/admin';
 import { insertAdminAlerts, sendAdminAlertEmails } from '@/app/utils/adminAlertCenter';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 import { captureServerException } from '@/app/utils/monitoring/sentry';
+import {
+    getPendingBookingExpiryCutoff,
+    STALE_CARD_CHECKOUT_CANCEL_REASON,
+} from '@/app/utils/bookings/pendingBookingHolds';
 
 type BookingRequestBody = {
     experienceId?: string | number;
@@ -126,6 +130,26 @@ export async function POST(request: Request) {
             }
         }
 
+        // GitHub cron이 지연돼도 기존 2시간 정책을 넘긴 카드 홀드가 슬롯을 계속 막지 않게 한다.
+        const { error: staleCardHoldCleanupError } = await supabaseAdmin
+            .from('bookings')
+            .update({
+                status: 'cancelled',
+                cancel_reason: STALE_CARD_CHECKOUT_CANCEL_REASON,
+                refund_amount: 0,
+            })
+            .eq('experience_id', normalizedExperienceId)
+            .eq('date', date)
+            .eq('time', normalizedTime)
+            .eq('status', 'PENDING')
+            .eq('payment_method', 'card')
+            .is('tid', null)
+            .lt('created_at', getPendingBookingExpiryCutoff());
+
+        if (staleCardHoldCleanupError) {
+            console.warn('[api/bookings] stale card hold cleanup skipped:', staleCardHoldCleanupError.message);
+        }
+
         // 3. 예약 원자화 RPC 호출 (슬롯 잠금 + 검증 + 삽입)
         // [Note] solo-guarantee 사전 DB 조회(TOCTOU 취약)는 제거. RPC가 atomic하게 동일 조건 검증함.
         const { data: bookingData, error: bookingError } = await supabaseAdmin
@@ -196,7 +220,7 @@ export async function POST(request: Request) {
 
         // 7. 호스트 알림 발송 (클라이언트 인젝션 완벽 차단)
         // - 에러가 나더라도 예약 진행을 막지 않도록 비동기로 별도 에러 로깅만 처리
-        if (hostId) {
+        if (hostId && isBankTransferPending) {
             const guestUserId = user.id;
             (async () => {
                 let guestDisplayName = customerName || '게스트';
@@ -216,7 +240,7 @@ export async function POST(request: Request) {
                     copyParams: {
                         experienceTitle,
                         guestName: guestDisplayName,
-                        state: isBankTransferPending ? 'pending' : 'processing',
+                        state: 'pending',
                     },
                 });
 
@@ -229,14 +253,12 @@ export async function POST(request: Request) {
         const adminAlertMessage = `'${experienceTitle}' 예약이 ${isBankTransferPending ? '무통장 입금 대기 상태로' : '결제 진행 상태로'} 생성되었습니다.`;
         const adminAlertLink = '/admin/dashboard?tab=LEDGER';
 
-        void (async () => {
+        if (isBankTransferPending) void (async () => {
             await insertAdminAlerts({
                 title: adminAlertTitle,
                 message: adminAlertMessage,
                 link: adminAlertLink,
             });
-
-            if (!isBankTransferPending) return;
 
             await sendAdminAlertEmails({
                 subject: `[Locally Admin] ${adminAlertTitle}`,

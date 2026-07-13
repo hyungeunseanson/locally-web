@@ -4,6 +4,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test, type Page } from '@playwright/test';
 
 import {
+  insertTestBooking,
   prepareBookableExperience as prepareSharedBookableExperience,
   getVisibleReservationByTestId,
   reviewAllExperiencePaymentAgreements,
@@ -23,6 +24,7 @@ type BookableExperience = {
   title: string;
   date: string;
   time: string;
+  maxGuests: number;
 };
 
 type AvailabilityKey = {
@@ -127,6 +129,26 @@ const MOCK_NICEPAY_LAUNCH_PAGE = (title: string) => `<!doctype html>
     <script src="https://pg-web.nicepay.co.kr/v3/common/js/nicepay-pgweb.js" onload="nicepayStart()"></script>
   </body>
 </html>`;
+const MOCK_NICEPAY_CANCEL_LAUNCH_PAGE = `<!doctype html>
+<html lang="ko">
+  <head><meta charset="utf-8" /><title>Locally NICEPAY Cancel Test</title></head>
+  <body>
+    <script>
+      window.opener.postMessage({
+        type: 'locally:nicepay-result',
+        success: false,
+        cancelled: true,
+        message: '결제가 취소되었습니다.'
+      }, window.location.origin);
+      window.setTimeout(function () { window.close(); }, 50);
+    </script>
+  </body>
+</html>`;
+const MOCK_NICEPAY_ABRUPT_CLOSE_LAUNCH_PAGE = `<!doctype html>
+<html lang="ko">
+  <head><meta charset="utf-8" /><title>Locally NICEPAY Close Test</title></head>
+  <body><script>window.setTimeout(function () { window.close(); }, 50);</script></body>
+</html>`;
 
 let adminClient: SupabaseClient | null = null;
 const createdAuthUserIds: string[] = [];
@@ -159,10 +181,11 @@ function getAdminClient() {
 
 function createCustomerUser(): TestUser {
   const timestamp = Date.now();
+  const uniqueSuffix = `${timestamp}-${Math.random().toString(36).slice(2, 8)}`;
   return {
-    email: `codex.exp.card.ui.${timestamp}@example.com`,
+    email: `codex.exp.card.ui.${uniqueSuffix}@example.com`,
     password: TEST_PASSWORD,
-    fullName: `Experience Card UI Customer ${timestamp}`,
+    fullName: `Experience Card UI Customer ${uniqueSuffix}`,
     phone: `010${String(timestamp).slice(-8)}`,
   };
 }
@@ -229,6 +252,7 @@ async function prepareBookableExperience(): Promise<BookableExperience> {
     title: experience.title,
     date: experience.date,
     time: experience.time,
+    maxGuests: experience.maxGuests,
   };
 }
 
@@ -443,7 +467,11 @@ test.describe.serial('Experience card payment UI smoke', () => {
       page,
       `reservation-time-${experience.time.slice(0, 5)}`
     );
-    await expect(bookedTime).toBeDisabled();
+    if (experience.maxGuests === 1) {
+      await expect(bookedTime).toBeDisabled();
+    } else {
+      await expect(bookedTime).toBeEnabled();
+    }
     await expect(page.getByTestId('reservation-solo-option')).toHaveCount(0);
   });
 
@@ -661,5 +689,282 @@ test.describe.serial('Experience card payment UI smoke', () => {
         name: /예약이 확정되었습니다!|Your booking is confirmed!|予約が確定しました！|预订已确认！/,
       })
     ).toBeVisible();
+  });
+
+  test('releases only an explicitly cancelled NicePay card hold before approval', async ({ page }) => {
+    test.setTimeout(120000);
+
+    const customerUser = createCustomerUser();
+    const customerId = await createAuthUser(customerUser);
+    const experience = await prepareBookableExperience();
+    let observedOrderId = '';
+    let callbackSeen = false;
+
+    await page.route('**/api/payment/card-ready', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ready: true,
+          provider: 'nicepay',
+          runtime: {
+            provider: 'nicepay',
+            merchantCode: 'nicepay-test-mid',
+            scriptSrc: 'https://pg-web.nicepay.co.kr/v3/common/js/nicepay-pgweb.js',
+          },
+        }),
+      });
+    });
+
+    await page.context().route('**/api/payment/card-launch-page', async (route) => {
+      const form = new URLSearchParams(route.request().postData() || '');
+      observedOrderId = form.get('orderId') || '';
+      expect(observedOrderId).toBeTruthy();
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/html; charset=utf-8',
+        body: MOCK_NICEPAY_CANCEL_LAUNCH_PAGE,
+      });
+    });
+
+    await page.route('**/api/payment/nicepay-callback', async (route) => {
+      callbackSeen = true;
+      await route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: false, error: 'Callback must not run after cancellation.' }),
+      });
+    });
+
+    await login(page, customerUser);
+    await page.goto(
+      `/experiences/${experience.experienceId}/payment?date=${experience.date}&time=${experience.time}&guests=1`,
+      { waitUntil: 'networkidle' }
+    );
+
+    await page.locator('input[type="text"]').fill(customerUser.fullName);
+    await page.locator('input[type="tel"]').fill(customerUser.phone);
+    await reviewAllExperiencePaymentAgreements(page);
+    await page.getByRole('button', { name: /결제하기|Pay|決済する|支付/ }).last().click();
+
+    await expect
+      .poll(async () => {
+        if (!observedOrderId) return null;
+
+        const { data, error } = await getAdminClient()
+          .from('bookings')
+          .select('status, payment_method, tid, cancel_reason, refund_amount, user_id')
+          .eq('order_id', observedOrderId)
+          .maybeSingle();
+
+        if (error) throw error;
+        return data;
+      })
+      .toMatchObject({
+        status: 'cancelled',
+        payment_method: 'card',
+        tid: null,
+        cancel_reason: '카드 결제창에서 결제를 취소함 (승인 전)',
+        refund_amount: 0,
+        user_id: customerId,
+      });
+
+    expect(callbackSeen).toBe(false);
+    await expect(page).toHaveURL(
+      new RegExp(`/experiences/${experience.experienceId}/payment\\?`)
+    );
+    await expect(page.getByText('결제가 취소되었습니다.').first()).toBeVisible();
+
+    const repeatedRelease = await page.request.post('/api/payment/release-card', {
+      data: { orderId: observedOrderId },
+    });
+    expect(repeatedRelease.status()).toBe(200);
+    await expect(repeatedRelease.json()).resolves.toMatchObject({
+      success: true,
+      alreadyReleased: true,
+    });
+  });
+
+  test('keeps an abruptly closed card hold pending for delayed-approval safety', async ({ page }) => {
+    test.setTimeout(120000);
+
+    const customerUser = createCustomerUser();
+    const customerId = await createAuthUser(customerUser);
+    const experience = await prepareBookableExperience();
+    let observedOrderId = '';
+
+    await page.route('**/api/payment/card-ready', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ready: true,
+          provider: 'nicepay',
+          runtime: {
+            provider: 'nicepay',
+            merchantCode: 'nicepay-test-mid',
+            scriptSrc: 'https://pg-web.nicepay.co.kr/v3/common/js/nicepay-pgweb.js',
+          },
+        }),
+      });
+    });
+
+    await page.context().route('**/api/payment/card-launch-page', async (route) => {
+      const form = new URLSearchParams(route.request().postData() || '');
+      observedOrderId = form.get('orderId') || '';
+      expect(observedOrderId).toBeTruthy();
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/html; charset=utf-8',
+        body: MOCK_NICEPAY_ABRUPT_CLOSE_LAUNCH_PAGE,
+      });
+    });
+
+    await login(page, customerUser);
+    await page.goto(
+      `/experiences/${experience.experienceId}/payment?date=${experience.date}&time=${experience.time}&guests=1`,
+      { waitUntil: 'networkidle' }
+    );
+
+    await page.locator('input[type="text"]').fill(customerUser.fullName);
+    await page.locator('input[type="tel"]').fill(customerUser.phone);
+    await reviewAllExperiencePaymentAgreements(page);
+    await page.getByRole('button', { name: /결제하기|Pay|決済する|支付/ }).last().click();
+
+    await expect(page.getByText('결제창이 닫혔습니다. 다시 시도해주세요.').first()).toBeVisible({
+      timeout: 15000,
+    });
+
+    const { data: booking, error } = await getAdminClient()
+      .from('bookings')
+      .select('status, payment_method, tid, user_id')
+      .eq('order_id', observedOrderId)
+      .maybeSingle();
+
+    if (error) throw error;
+    expect(booking).toMatchObject({
+      status: 'PENDING',
+      payment_method: 'card',
+      tid: null,
+      user_id: customerId,
+    });
+  });
+
+  test('guards card hold release from unauthenticated, cross-user, bank, and paid mutations', async ({
+    browser,
+    request,
+  }) => {
+    test.setTimeout(120000);
+
+    const owner = createCustomerUser();
+    const other = createCustomerUser();
+    const ownerId = await createAuthUser(owner);
+    await createAuthUser(other);
+    const experience = await prepareBookableExperience();
+
+    const pendingCardId = await insertTestBooking({
+      userId: ownerId,
+      experienceId: experience.experienceId,
+      date: experience.date,
+      time: experience.time,
+      guests: 1,
+      status: 'PENDING',
+      paymentMethod: 'card',
+      amount: 110,
+      totalPrice: 110,
+      contactName: owner.fullName,
+      contactPhone: owner.phone,
+    });
+    const pendingBankId = await insertTestBooking({
+      userId: ownerId,
+      experienceId: experience.experienceId,
+      date: experience.date,
+      time: experience.time,
+      guests: 1,
+      status: 'PENDING',
+      paymentMethod: 'bank',
+      amount: 110,
+      totalPrice: 110,
+      contactName: owner.fullName,
+      contactPhone: owner.phone,
+    });
+    const paidCardId = await insertTestBooking({
+      userId: ownerId,
+      experienceId: experience.experienceId,
+      date: experience.date,
+      time: experience.time,
+      guests: 1,
+      status: 'PAID',
+      paymentMethod: 'card',
+      amount: 110,
+      totalPrice: 110,
+      contactName: owner.fullName,
+      contactPhone: owner.phone,
+    });
+    const { error: paidTidError } = await getAdminClient()
+      .from('bookings')
+      .update({ tid: `NICEPAY-PAID-${Date.now()}` })
+      .eq('id', paidCardId);
+    if (paidTidError) throw paidTidError;
+
+    const unauthenticated = await request.post('/api/payment/release-card', {
+      data: { orderId: pendingCardId },
+    });
+    expect(unauthenticated.status()).toBe(401);
+
+    const otherContext = await browser.newContext();
+    const otherPage = await otherContext.newPage();
+    await login(otherPage, other);
+    const crossUser = await otherPage.request.post('/api/payment/release-card', {
+      data: { orderId: pendingCardId },
+    });
+    expect(crossUser.status()).toBe(404);
+    await otherContext.close();
+
+    const ownerContext = await browser.newContext();
+    const ownerPage = await ownerContext.newPage();
+    await login(ownerPage, owner);
+
+    const bankRelease = await ownerPage.request.post('/api/payment/release-card', {
+      data: { orderId: pendingBankId },
+    });
+    expect(bankRelease.status()).toBe(409);
+
+    const paidRelease = await ownerPage.request.post('/api/payment/release-card', {
+      data: { orderId: paidCardId },
+    });
+    expect(paidRelease.status()).toBe(409);
+    await ownerContext.close();
+
+    const { data: guardedBookings, error: guardedBookingsError } = await getAdminClient()
+      .from('bookings')
+      .select('id, status, payment_method, tid, cancel_reason, refund_amount')
+      .in('id', [pendingCardId, pendingBankId, paidCardId]);
+    if (guardedBookingsError) throw guardedBookingsError;
+
+    expect(guardedBookings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: pendingCardId,
+          status: 'PENDING',
+          payment_method: 'card',
+          tid: null,
+        }),
+        expect.objectContaining({
+          id: pendingBankId,
+          status: 'PENDING',
+          payment_method: 'bank',
+          tid: null,
+        }),
+        expect.objectContaining({
+          id: paidCardId,
+          status: 'PAID',
+          payment_method: 'card',
+          tid: expect.stringContaining('NICEPAY-PAID-'),
+        }),
+      ])
+    );
   });
 });
