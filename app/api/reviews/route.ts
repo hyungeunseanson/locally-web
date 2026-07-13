@@ -93,7 +93,13 @@ export async function POST(request: Request) {
       created_at: new Date().toISOString()
     });
 
-    if (insertError) throw insertError;
+    if (insertError) {
+      // DB unique index is the final guard when two review requests race.
+      if ((insertError as { code?: string }).code === '23505') {
+        return NextResponse.json({ error: '이미 후기를 작성하셨습니다.' }, { status: 409 });
+      }
+      throw insertError;
+    }
 
     const supabaseAdmin = createAdminClient();
     await syncReviewAggregates({

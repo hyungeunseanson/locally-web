@@ -180,6 +180,25 @@ async function postReviewFromBrowser(page: Page, payload: Record<string, unknown
   }, payload);
 }
 
+async function postReviewConcurrentlyFromBrowser(page: Page, payload: Record<string, unknown>) {
+  return page.evaluate(async (requestPayload) => {
+    const execute = async () => {
+      const response = await fetch('/api/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestPayload),
+      });
+
+      return {
+        status: response.status,
+        body: await response.json(),
+      };
+    };
+
+    return Promise.all([execute(), execute()]);
+  }, payload);
+}
+
 async function patchReviewFromBrowser(page: Page, reviewId: number, payload: Record<string, unknown>) {
   return page.evaluate(async ({ targetReviewId, requestPayload }) => {
     const response = await fetch(`/api/reviews/${targetReviewId}`, {
@@ -360,6 +379,125 @@ test.describe.serial('Review route contract', () => {
       title: '새 후기가 등록되었습니다',
       message: `'${experience.title}' 체험에 새 후기가 작성되었습니다.`,
     });
+  });
+
+  test('allows only one concurrent review per booking and blocks later duplicate writes', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const { userId: hostId } = await createRegularUser('host.concurrent');
+    const { user: guest, userId: guestId } = await createRegularUser('guest.concurrent');
+    const experience = await createExperienceFixture(hostId, 'concurrent');
+    const bookingId = await createCompletedBooking({
+      guestId,
+      guestName: guest.fullName,
+      guestPhone: guest.phone,
+      experienceId: experience.id,
+      suffix: 'concurrent',
+    });
+
+    await login(page, guest);
+
+    const reviewContent = `동시 리뷰 생성 계약 검증 ${Date.now()}`;
+    const responses = await postReviewConcurrentlyFromBrowser(page, {
+      experienceId: experience.id,
+      bookingId,
+      rating: 5,
+      content: reviewContent,
+    });
+
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
+    expect(responses.find((response) => response.status === 409)?.body).toMatchObject({
+      error: '이미 후기를 작성하셨습니다.',
+    });
+
+    const sequentialDuplicateResponse = await postReviewFromBrowser(page, {
+      experienceId: experience.id,
+      bookingId,
+      rating: 5,
+      content: reviewContent,
+    });
+    expect(sequentialDuplicateResponse).toMatchObject({
+      status: 409,
+      body: { error: '이미 후기를 작성하셨습니다.' },
+    });
+
+    await expect
+      .poll(async () => {
+        const [reviewsResult, experienceResult, profileResult, notificationsResult] = await Promise.all([
+          getTestAdminClient()
+            .from('reviews')
+            .select('id, rating, content')
+            .eq('booking_id', bookingId)
+            .eq('user_id', guestId),
+          getTestAdminClient()
+            .from('experiences')
+            .select('rating, review_count')
+            .eq('id', experience.id)
+            .maybeSingle(),
+          getTestAdminClient()
+            .from('profiles')
+            .select('average_rating, total_review_count')
+            .eq('id', hostId)
+            .maybeSingle(),
+          getTestAdminClient()
+            .from('notifications')
+            .select('id')
+            .eq('user_id', hostId)
+            .eq('type', 'new_review')
+            .eq('link', '/host/dashboard?tab=reviews'),
+        ]);
+
+        if (reviewsResult.error) throw reviewsResult.error;
+        if (experienceResult.error) throw experienceResult.error;
+        if (profileResult.error) throw profileResult.error;
+        if (notificationsResult.error) throw notificationsResult.error;
+
+        return {
+          reviews: reviewsResult.data || [],
+          experience: experienceResult.data,
+          profile: profileResult.data,
+          notificationIds: (notificationsResult.data || []).map((notification) => Number(notification.id)),
+        };
+      }, { timeout: 15000 })
+      .toEqual({
+        reviews: [{ id: expect.any(Number), rating: 5, content: reviewContent }],
+        experience: { rating: 5, review_count: 1 },
+        profile: { average_rating: 5, total_review_count: 1 },
+        notificationIds: [expect.any(Number)],
+      });
+
+    const [reviewRowsResult, notificationRowsResult, adminAlertRowsResult] = await Promise.all([
+      getTestAdminClient()
+        .from('reviews')
+        .select('id')
+        .eq('booking_id', bookingId),
+      getTestAdminClient()
+        .from('notifications')
+        .select('id')
+        .eq('user_id', hostId)
+        .eq('type', 'new_review')
+        .eq('link', '/host/dashboard?tab=reviews'),
+      getTestAdminClient()
+        .from('notifications')
+        .select('id')
+        .eq('type', 'admin_alert')
+        .eq('title', '새 후기가 등록되었습니다')
+        .eq('message', `'${experience.title}' 체험에 새 후기가 작성되었습니다.`),
+    ]);
+
+    if (reviewRowsResult.error) throw reviewRowsResult.error;
+    if (notificationRowsResult.error) throw notificationRowsResult.error;
+    if (adminAlertRowsResult.error) throw adminAlertRowsResult.error;
+
+    for (const row of reviewRowsResult.data || []) {
+      createdReviewIds.push(Number(row.id));
+    }
+    for (const row of notificationRowsResult.data || []) {
+      createdNotificationIds.push(Number(row.id));
+    }
+    for (const row of adminAlertRowsResult.data || []) {
+      createdAdminAlertIds.push(Number(row.id));
+    }
   });
 
   test('rejects mismatched experience, invalid content, and invalid rating on create', async ({ page }) => {
