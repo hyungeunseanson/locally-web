@@ -191,7 +191,8 @@ export async function POST(request: Request) {
       guestsCount: Number(bookingData.guests || 1),
       bookingDate: bookingData.date,
       bookingTime: bookingData.time || null,
-      totalAmount: Number(bookingData.amount || expectedAmount || 0),
+      guestPaidAmount: Number(bookingData.amount || expectedAmount || 0),
+      hostBookingAmount: snapshot.totalExperiencePrice,
     });
 
     insertAdminAlerts({

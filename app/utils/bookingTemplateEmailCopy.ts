@@ -98,7 +98,7 @@ export function buildBookingConfirmationTemplateEmailCopy(
         guestNameLabel: 'Guest name',
         guestCountLabel: 'Guests',
         guestCountSuffix: '',
-        totalAmountLabel: 'Total paid',
+        totalAmountLabel: 'Experience booking amount',
         bookingDateLabel: 'Booking date',
         helperText:
           'A fast first message helps the guest feel confident before the experience.',
@@ -123,7 +123,7 @@ export function buildBookingConfirmationTemplateEmailCopy(
         guestNameLabel: 'ゲスト名',
         guestCountLabel: '参加人数',
         guestCountSuffix: '名',
-        totalAmountLabel: '決済金額合計',
+        totalAmountLabel: '体験予約金額',
         bookingDateLabel: '予約日程',
         helperText:
           '最初のメッセージが早いほど、ゲストは安心して体験を待つことができます。',
@@ -148,7 +148,7 @@ export function buildBookingConfirmationTemplateEmailCopy(
         guestNameLabel: '客人姓名',
         guestCountLabel: '参与人数',
         guestCountSuffix: '人',
-        totalAmountLabel: '支付总额',
+        totalAmountLabel: '体验预订金额',
         bookingDateLabel: '预订日期',
         helperText:
           '越早发送第一条消息，客人在体验前就越安心。',
@@ -174,7 +174,7 @@ export function buildBookingConfirmationTemplateEmailCopy(
         guestNameLabel: '게스트명',
         guestCountLabel: '참여 인원',
         guestCountSuffix: '명',
-        totalAmountLabel: '총 결제 금액',
+        totalAmountLabel: '체험 예약 금액',
         bookingDateLabel: '예약 일자',
         helperText:
           '첫 메시지가 빠를수록 게스트가 체험 전 더 안심할 수 있어요.',

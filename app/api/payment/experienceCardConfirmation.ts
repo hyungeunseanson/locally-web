@@ -289,7 +289,8 @@ export async function finalizeExperienceCardPayment(params: {
     guestsCount: Number(bookingData.guests || 1),
     bookingDate: bookingData.date,
     bookingTime: bookingData.time || null,
-    totalAmount: Number(bookingData.amount || originalBooking.amount || 0),
+    guestPaidAmount: Number(bookingData.amount || originalBooking.amount || 0),
+    hostBookingAmount: snapshot.totalExperiencePrice,
   });
 
   insertAdminAlerts({

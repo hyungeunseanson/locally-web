@@ -52,6 +52,11 @@ test.describe('Templated email system phase 2 contracts', () => {
     expect(rendered.summaryTitle).toBe('예약 정보');
     expect(rendered.statusLabel).toBe('예약 접수');
     expect(rendered.summaryItems?.map((item) => item.value)).toContain('Sora');
+    expect(rendered.summaryItems).toContainEqual({
+      label: '체험 예약 금액',
+      value: '₩58,000',
+      emphasis: true,
+    });
     expect(rendered.description).toContain('지금 게스트에게 인사와 준비 안내를 보내주세요');
     expect(rendered.ctaLabel).toBe('예약 확인하고 메시지 보내기');
     expect(rendered.ctaUrl).toContain('/host/dashboard');

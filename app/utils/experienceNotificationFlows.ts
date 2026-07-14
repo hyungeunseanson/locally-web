@@ -16,7 +16,8 @@ type ExperiencePaymentConfirmedParams = {
   guestsCount: number;
   bookingDate: string;
   bookingTime: string | null;
-  totalAmount: number;
+  guestPaidAmount: number;
+  hostBookingAmount: number;
 };
 
 export async function notifyExperiencePaymentConfirmed(
@@ -32,7 +33,8 @@ export async function notifyExperiencePaymentConfirmed(
     guestsCount,
     bookingDate,
     bookingTime,
-    totalAmount,
+    guestPaidAmount,
+    hostBookingAmount,
   } = params;
 
   // Resolve actual profile name (fallback to passed guestName)
@@ -109,7 +111,7 @@ export async function notifyExperiencePaymentConfirmed(
           bookingDate,
           bookingTime: bookingTime || undefined,
           partySize: guestsCount,
-          amount: totalAmount,
+          amount: hostBookingAmount,
           ctaUrl: hostMessageHref,
           guestName: displayName,
         },
@@ -133,7 +135,7 @@ export async function notifyExperiencePaymentConfirmed(
           bookingDate,
           bookingTime: bookingTime || undefined,
           partySize: guestsCount,
-          amount: totalAmount,
+          amount: guestPaidAmount,
           ctaUrl: '/guest/trips',
         },
       },
