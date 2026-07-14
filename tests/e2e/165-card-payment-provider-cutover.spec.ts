@@ -1166,6 +1166,7 @@ test.describe('Card payment provider cutover contracts', () => {
     const originalFetch = global.fetch;
     const originalNotifyServicePaymentOpened = serviceNotificationFlows.notifyServicePaymentOpened;
     const originalInsertAdminAlerts = adminAlertCenter.insertAdminAlerts;
+    const originalSendAdminPaymentConfirmedEmail = adminAlertCenter.sendAdminPaymentConfirmedEmail;
 
     global.fetch = (async (input, init) => {
       if (String(input) === NICEPAY_STATUS_QUERY_URL) {
@@ -1198,6 +1199,14 @@ test.describe('Card payment provider cutover contracts', () => {
       count: 0,
       targetCount: 0,
     })) as typeof adminAlertCenter.insertAdminAlerts;
+
+    (adminAlertCenter as {
+      sendAdminPaymentConfirmedEmail: typeof adminAlertCenter.sendAdminPaymentConfirmedEmail;
+    }).sendAdminPaymentConfirmedEmail = (async () => ({
+      success: true,
+      count: 0,
+      targetCount: 0,
+    })) as typeof adminAlertCenter.sendAdminPaymentConfirmedEmail;
 
     try {
       const response = await cardNotificationPost(
@@ -1251,6 +1260,9 @@ test.describe('Card payment provider cutover contracts', () => {
       (adminAlertCenter as {
         insertAdminAlerts: typeof adminAlertCenter.insertAdminAlerts;
       }).insertAdminAlerts = originalInsertAdminAlerts;
+      (adminAlertCenter as {
+        sendAdminPaymentConfirmedEmail: typeof adminAlertCenter.sendAdminPaymentConfirmedEmail;
+      }).sendAdminPaymentConfirmedEmail = originalSendAdminPaymentConfirmedEmail;
     }
   });
 

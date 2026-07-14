@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
-import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
+import { insertAdminAlerts, sendAdminPaymentConfirmedEmail } from '@/app/utils/adminAlertCenter';
 import { getBookingSettlementSnapshotForConfirmation } from '@/app/utils/bookingFinance';
 import { notifyExperiencePaymentConfirmed } from '@/app/utils/experienceNotificationFlows';
 import { capturePayPalOrder, getPayPalOrder } from '@/app/utils/paypal/server';
@@ -202,6 +202,20 @@ export async function POST(request: Request) {
     }).catch((adminAlertError) => {
       console.error('[PAYPAL] booking admin alert failed:', adminAlertError);
     });
+
+    try {
+      await sendAdminPaymentConfirmedEmail({
+        domain: 'experience',
+        title: expTitle,
+        orderId: bookingData.order_id || bookingData.id,
+        amount: Number(bookingData.amount || expectedAmount || 0),
+        paymentMethod: 'paypal',
+        link: '/admin/dashboard?tab=LEDGER',
+        customerName: guestName,
+      });
+    } catch (adminEmailError) {
+      console.error('[PAYPAL] booking admin email failed:', adminEmailError);
+    }
 
     revalidatePath(`/experiences/${originalBooking.experience_id}`);
 

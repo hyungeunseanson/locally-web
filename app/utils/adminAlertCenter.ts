@@ -1,5 +1,12 @@
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { sendImmediateAdminEmail } from '@/app/utils/adminEmailProvider';
+import {
+  buildAdminPaymentConfirmedEmail,
+  normalizeAdminAlertEmails,
+  type AdminPaymentConfirmedEmailParams,
+} from '@/app/utils/adminOperationalEmail';
+
+export { normalizeAdminAlertEmails } from '@/app/utils/adminOperationalEmail';
 
 type AdminAlertRecipient = {
   userId: string | null;
@@ -10,18 +17,6 @@ type RecipientRow = {
   id: string | null;
   email: string | null;
 };
-
-function normalizeEmail(email: string) {
-  return email.trim().toLowerCase();
-}
-
-export function normalizeAdminAlertEmails(emails: Array<string | null | undefined>) {
-  return Array.from(new Set(
-    emails
-      .filter((email): email is string => typeof email === 'string' && Boolean(email.trim()))
-      .map(normalizeEmail)
-  ));
-}
 
 export async function resolveAdminAlertRecipientsForEmails(params: {
   emails: Array<string | null | undefined>;
@@ -47,7 +42,7 @@ export async function resolveAdminAlertRecipientsForEmails(params: {
     const safeProfileRows = (profileRows || []) as RecipientRow[];
     safeProfileRows.forEach((row) => {
       if (!row.id || !row.email) return;
-      emailToUserId.set(normalizeEmail(row.email), row.id);
+      emailToUserId.set(row.email.trim().toLowerCase(), row.id);
     });
   }
 
@@ -65,7 +60,7 @@ export async function resolveAdminAlertRecipientsForEmails(params: {
       const safeUserRows = (userRows || []) as RecipientRow[];
       safeUserRows.forEach((row) => {
         if (!row.id || !row.email) return;
-        emailToUserId.set(normalizeEmail(row.email), row.id);
+        emailToUserId.set(row.email.trim().toLowerCase(), row.id);
       });
     }
   }
@@ -181,4 +176,10 @@ export async function sendAdminAlertEmails(params: {
   }));
 
   return { success: true, count: sentCount, targetCount: recipients.length };
+}
+
+export async function sendAdminPaymentConfirmedEmail(
+  params: AdminPaymentConfirmedEmailParams
+) {
+  return sendAdminAlertEmails(buildAdminPaymentConfirmedEmail(params));
 }

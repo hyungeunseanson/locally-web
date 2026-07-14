@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
+import { insertAdminAlerts, sendAdminPaymentConfirmedEmail } from '@/app/utils/adminAlertCenter';
 import { notifyServicePaymentOpened } from '@/app/utils/serviceNotificationFlows';
 
 type ServiceRequestMetaRow = {
@@ -465,5 +465,18 @@ export async function runServiceBankConfirmSideEffects(
     });
   } catch (error) {
     console.error('[service bank confirm] admin alert failed:', error);
+  }
+
+  try {
+    await sendAdminPaymentConfirmedEmail({
+      domain: 'service',
+      title: payment.requestTitle,
+      orderId: payment.orderId,
+      amount: payment.amount,
+      paymentMethod: 'bank',
+      link: '/admin/dashboard?tab=SERVICE_REQUESTS',
+    });
+  } catch (error) {
+    console.error('[service bank confirm] admin email failed:', error);
   }
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
-import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
+import { insertAdminAlerts, sendAdminAlertEmails } from '@/app/utils/adminAlertCenter';
 
 const ADMIN_ALERT_LINK = '/admin/dashboard?tab=APPROVALS';
 const COMPATIBILITY_DEDUPE_WINDOW_MS = 10 * 60 * 1000;
@@ -65,6 +65,18 @@ export async function POST() {
       message,
       link: ADMIN_ALERT_LINK,
     });
+
+    try {
+      await sendAdminAlertEmails({
+        subject: '[Locally Admin][신청] 새 호스트 신청이 접수되었습니다',
+        title,
+        message: `${message}\n지원서 ID: ${application.id}`,
+        link: ADMIN_ALERT_LINK,
+        ctaLabel: '지원서 검토하기',
+      });
+    } catch (emailError) {
+      console.error('Host Register Admin Alert Email Error:', emailError);
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -1,7 +1,7 @@
 import { revalidatePath } from 'next/cache';
 
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
-import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
+import { insertAdminAlerts, sendAdminPaymentConfirmedEmail } from '@/app/utils/adminAlertCenter';
 import { getBookingSettlementSnapshotForConfirmation } from '@/app/utils/bookingFinance';
 import {
   CARD_APPROVAL_RELEASE_RACE_LOCK_REASON,
@@ -300,6 +300,20 @@ export async function finalizeExperienceCardPayment(params: {
   }).catch((adminAlertError) => {
     console.error('Booking Payment Admin Alert Error:', adminAlertError);
   });
+
+  try {
+    await sendAdminPaymentConfirmedEmail({
+      domain: 'experience',
+      title: expTitle,
+      orderId: bookingData.order_id || bookingData.id,
+      amount: Number(bookingData.amount || originalBooking.amount || 0),
+      paymentMethod: 'card',
+      link: '/admin/dashboard?tab=LEDGER',
+      customerName: guestName,
+    });
+  } catch (adminEmailError) {
+    console.error('Booking Payment Admin Email Error:', adminEmailError);
+  }
 
   revalidatePath(`/experiences/${originalBooking.experience_id}`);
 

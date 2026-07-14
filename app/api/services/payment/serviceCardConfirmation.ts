@@ -1,4 +1,4 @@
-import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
+import { insertAdminAlerts, sendAdminPaymentConfirmedEmail } from '@/app/utils/adminAlertCenter';
 import type { VerifiedCardPayment } from '@/app/utils/payments/card/types';
 import { notifyServicePaymentOpened } from '@/app/utils/serviceNotificationFlows';
 import { createAdminClient } from '@/app/utils/supabase/admin';
@@ -100,6 +100,19 @@ export async function finalizeServiceCardPayment(params: {
   }).catch((adminAlertError) => {
     console.error('[SERVICE] Payment Admin Alert Error:', adminAlertError);
   });
+
+  try {
+    await sendAdminPaymentConfirmedEmail({
+      domain: 'service',
+      title: requestTitle,
+      orderId: serviceBooking.order_id,
+      amount: Number(serviceBooking.amount || 0),
+      paymentMethod: 'card',
+      link: '/admin/dashboard?tab=SERVICE_REQUESTS',
+    });
+  } catch (adminEmailError) {
+    console.error('[SERVICE] Payment Admin Email Error:', adminEmailError);
+  }
 
   return { success: true };
 }

@@ -7,7 +7,7 @@ import { FIXED_REFUND_POLICY, MAX_EXPERIENCE_PHOTOS } from '@/app/host/create/co
 import { captureServerException } from '@/app/utils/monitoring/sentry';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { createAdminClient } from '@/app/utils/supabase/admin';
-import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
+import { insertAdminAlerts, sendAdminAlertEmails } from '@/app/utils/adminAlertCenter';
 import { normalizeLanguageLevels, getLanguageNames, type LanguageLevelEntry } from '@/app/utils/languageLevels';
 import {
   areExperienceLocaleArraysEqual,
@@ -587,6 +587,18 @@ export async function createExperienceFromBody(body: ExperienceWriteBody, actor:
     }).catch((adminAlertError) => {
       console.error('[Experience API] Failed to insert admin alert:', adminAlertError);
     });
+
+    try {
+      await sendAdminAlertEmails({
+        subject: '[Locally Admin][신청] 새 체험 신청이 접수되었습니다',
+        title: '새 체험 신청이 접수되었습니다',
+        message: `'${translationState.canonicalTitle}' 체험이 신규 제출되었습니다.\n체험 ID: ${data.id}`,
+        link: '/admin/dashboard?tab=APPROVALS',
+        ctaLabel: '체험 검토하기',
+      });
+    } catch (adminEmailError) {
+      console.error('[Experience API] Failed to send admin email:', adminEmailError);
+    }
   }
 
   return {
@@ -753,6 +765,18 @@ export async function updateExperienceFromBody(params: {
     }).catch((adminAlertError) => {
       console.error('[Experience API] Failed to insert admin alert on resubmission:', adminAlertError);
     });
+
+    try {
+      await sendAdminAlertEmails({
+        subject: '[Locally Admin][신청] 보완 요청 체험이 재제출되었습니다',
+        title: '보완 요청 체험이 재제출되었습니다',
+        message: `'${translationState.canonicalTitle}' 체험이 다시 제출되었습니다.\n체험 ID: ${experienceId}`,
+        link: '/admin/dashboard?tab=APPROVALS',
+        ctaLabel: '체험 검토하기',
+      });
+    } catch (adminEmailError) {
+      console.error('[Experience API] Failed to send resubmission admin email:', adminEmailError);
+    }
   }
 
   return {

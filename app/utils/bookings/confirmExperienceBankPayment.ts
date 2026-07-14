@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
 
-import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
+import { insertAdminAlerts, sendAdminPaymentConfirmedEmail } from '@/app/utils/adminAlertCenter';
 import { getBookingSettlementSnapshotForConfirmation } from '@/app/utils/bookingFinance';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { getHostBookingMessageHref } from '@/app/utils/hostBookingMessageLink';
@@ -16,6 +16,7 @@ type BookingExperienceMetaRow = {
 
 type ConfirmExperienceBankPaymentBookingRow = {
   id: string;
+  order_id: string | null;
   experience_id: number | null;
   user_id: string | null;
   amount: number | null;
@@ -117,6 +118,7 @@ export async function confirmExperienceBankPayment(
     .from('bookings')
     .select(`
       id,
+      order_id,
       experience_id,
       user_id,
       amount,
@@ -334,6 +336,20 @@ export async function runExperienceBankConfirmSideEffects(
     });
   } catch (error) {
     console.error('[experience bank confirm] admin alert failed:', error);
+  }
+
+  try {
+    await sendAdminPaymentConfirmedEmail({
+      domain: 'experience',
+      title: experienceTitle,
+      orderId: booking.order_id || booking.id,
+      amount: Number(booking.amount || 0),
+      paymentMethod: 'bank',
+      link: '/admin/dashboard?tab=LEDGER',
+      customerName: guestDisplayName,
+    });
+  } catch (error) {
+    console.error('[experience bank confirm] admin email failed:', error);
   }
 
   if (booking.experience_id != null) {

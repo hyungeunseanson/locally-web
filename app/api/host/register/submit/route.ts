@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import type { HostRegisterSubmitErrorCode } from '@/app/host/register/localization';
-import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
+import { insertAdminAlerts, sendAdminAlertEmails } from '@/app/utils/adminAlertCenter';
 import { normalizeDateOfBirth } from '@/app/utils/dateOfBirth';
 import { getLanguageNames, normalizeLanguageLevels, type LanguageLevelEntry } from '@/app/utils/languageLevels';
 import { captureServerException } from '@/app/utils/monitoring/sentry';
@@ -304,8 +304,13 @@ export async function POST(request: NextRequest) {
     const notifyAdmin = shouldNotifyAdmin(latestApplication?.status ?? null, Boolean(latestApplication));
 
     if (notifyAdmin && nextStatus === 'pending') {
+      const applicantName = payload.name || user.email || '새 호스트';
+      const isResubmission = Boolean(latestApplication);
+      const emailTitle = isResubmission
+        ? '호스트 지원서가 재제출되었습니다'
+        : '새 호스트 신청이 접수되었습니다';
+
       try {
-        const applicantName = payload.name || user.email || '새 호스트';
         await insertAdminAlerts({
           title: '새 호스트 신청이 접수되었습니다',
           message: `${applicantName}님의 호스트 신청이 접수되었습니다.`,
@@ -313,6 +318,18 @@ export async function POST(request: NextRequest) {
         });
       } catch (notifyError) {
         console.error('Host Register Admin Alert Error:', notifyError);
+      }
+
+      try {
+        await sendAdminAlertEmails({
+          subject: `[Locally Admin][신청] ${emailTitle}`,
+          title: emailTitle,
+          message: `${applicantName}님의 호스트 지원서가 ${isResubmission ? '재제출' : '접수'}되었습니다.\n지원서 ID: ${applicationId || '-'}`,
+          link: '/admin/dashboard?tab=APPROVALS',
+          ctaLabel: '지원서 검토하기',
+        });
+      } catch (emailError) {
+        console.error('Host Register Admin Email Error:', emailError);
       }
     }
 

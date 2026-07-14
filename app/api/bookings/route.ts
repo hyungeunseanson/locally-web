@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
-import { insertAdminAlerts, sendAdminAlertEmails } from '@/app/utils/adminAlertCenter';
+import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 import { captureServerException } from '@/app/utils/monitoring/sentry';
 import {
@@ -248,23 +248,15 @@ export async function POST(request: Request) {
         const adminAlertMessage = `'${experienceTitle}' 예약이 ${isBankTransferPending ? '무통장 입금 대기 상태로' : '결제 진행 상태로'} 생성되었습니다.`;
         const adminAlertLink = '/admin/dashboard?tab=LEDGER';
 
-        if (isBankTransferPending) void (async () => {
-            await insertAdminAlerts({
+        if (isBankTransferPending) {
+            void insertAdminAlerts({
                 title: adminAlertTitle,
                 message: adminAlertMessage,
                 link: adminAlertLink,
+            }).catch((adminAlertError) => {
+                console.error('Booking Admin Alert Error:', adminAlertError);
             });
-
-            await sendAdminAlertEmails({
-                subject: `[Locally Admin] ${adminAlertTitle}`,
-                title: adminAlertTitle,
-                message: `${adminAlertMessage}\n\nLEDGER 탭에서 예약을 확인해주세요.`,
-                link: adminAlertLink,
-                ctaLabel: '예약 보기',
-            });
-        })().catch((adminAlertError) => {
-            console.error('Booking Admin Alert Error:', adminAlertError);
-        });
+        }
 
         // 8. 성공 시 생성된 OrderId 및 검증된 최종 금액 반환
         return NextResponse.json({ success: true, newOrderId, finalAmount });

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
-import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
+import { insertAdminAlerts, sendAdminPaymentConfirmedEmail } from '@/app/utils/adminAlertCenter';
 import { capturePayPalOrder, getPayPalOrder } from '@/app/utils/paypal/server';
 import { notifyServicePaymentOpened } from '@/app/utils/serviceNotificationFlows';
 import { captureServerException } from '@/app/utils/monitoring/sentry';
@@ -191,6 +191,19 @@ export async function POST(request: Request) {
     }).catch((adminAlertError) => {
       console.error('[SERVICE][PAYPAL] Payment Admin Alert Error:', adminAlertError);
     });
+
+    try {
+      await sendAdminPaymentConfirmedEmail({
+        domain: 'service',
+        title: requestTitle,
+        orderId: booking.order_id || booking.id,
+        amount: Number(booking.amount || 0),
+        paymentMethod: 'paypal',
+        link: '/admin/dashboard?tab=SERVICE_REQUESTS',
+      });
+    } catch (adminEmailError) {
+      console.error('[SERVICE][PAYPAL] Payment Admin Email Error:', adminEmailError);
+    }
 
     return NextResponse.json({
       success: true,
