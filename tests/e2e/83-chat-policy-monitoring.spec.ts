@@ -23,18 +23,8 @@ type SeededChatFixture = {
 };
 
 const TEST_PASSWORD = 'LocallyTest!2026';
-const GUEST_CHAT_INPUT_SELECTOR = [
-  'input[placeholder="메시지 입력..."]',
-  'input[placeholder="Type a message..."]',
-  'input[placeholder="メッセージを入力..."]',
-  'input[placeholder="输入消息..."]',
-].join(', ');
-const HOST_CHAT_INPUT_SELECTOR = [
-  'input[placeholder="답장 입력..."]',
-  'input[placeholder="Type a reply..."]',
-  'input[placeholder="返信を入力..."]',
-  'input[placeholder="输入回复..."]',
-].join(', ');
+const GUEST_CHAT_INPUT_SELECTOR = '[data-testid="guest-chat-composer"]';
+const HOST_CHAT_INPUT_SELECTOR = '[data-testid="host-chat-composer"]';
 const WARNING_BANNER_TEXT =
   /연락처·외부 링크 공유는 제재 대상입니다|Sharing contact details or external links may lead to penalties|連絡先や外部リンクの共有は制裁対象となる場合があります|分享联系方式或外部链接可能会导致处罚/;
 const SOFT_DELETE_PLACEHOLDER = '[운영 정책에 의해 삭제된 메시지입니다.]';
@@ -386,7 +376,7 @@ test.describe.serial('Chat policy monitoring flow', () => {
   test('creates admin alerts and shows policy badges in the admin monitor', async ({ browser }) => {
     test.setTimeout(90000);
 
-    const flaggedMessage = `연락은 010-2222-3333 또는 https://open.kakao.com/o/policyflow 로 부탁드려요 ${Date.now()}`;
+    const flaggedMessage = `연락은\n010-2222-3333 또는\nhttps://open.kakao.com/o/policyflow 로 부탁드려요 ${Date.now()}`;
 
     const guestSession = await withLoggedInPage(browser, fixture.guest);
     await openGuestInquiry(guestSession.page, fixture.inquiryId);

@@ -10,6 +10,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { detectChatPolicySignals } from '@/app/utils/chatPolicySignals';
 import { isDeletedInquiryMessage } from '@/app/utils/inquiry';
+import { useAutoResizeTextarea } from '@/app/hooks/useAutoResizeTextarea';
 
 const CHAT_POLICY_WARNING_COPY = {
   ko: {
@@ -49,6 +50,7 @@ export default function InquiryChat() {
   const [isSending, setIsSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const composerRef = useAutoResizeTextarea(replyText);
   const activeMessageThreadRef = useRef<string | null>(null);
   const hasPrimedThreadMessagesRef = useRef(false);
   const previousMessageIdsRef = useRef<string[]>([]);
@@ -412,7 +414,7 @@ export default function InquiryChat() {
                           </div>
                         )}
 
-                        <div className={`px-3 py-2 md:px-4 md:py-2.5 rounded-2xl text-[13px] md:text-[14px] leading-relaxed shadow-sm break-words ${isDeletedMessage
+                        <div className={`px-3 py-2 md:px-4 md:py-2.5 rounded-2xl text-[13px] md:text-[14px] leading-relaxed shadow-sm whitespace-pre-wrap break-words ${isDeletedMessage
                           ? 'bg-slate-100 border border-dashed border-slate-300 text-slate-500 italic'
                           : isMe
                             ? 'bg-black text-white rounded-tr-sm'
@@ -455,7 +457,7 @@ export default function InquiryChat() {
                   <div className="mt-0.5 text-[10px] md:text-[11px] text-rose-600">{chatPolicyWarningCopy.body}</div>
                 </div>
               )}
-              <div className="flex items-center gap-2 md:gap-3">
+              <div className="flex items-end gap-2 md:gap-3">
               <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
               <button
                 onClick={() => fileInputRef.current?.click()}
@@ -465,15 +467,18 @@ export default function InquiryChat() {
                 <ImagePlus size={16} />
               </button>
 
-              <input
-                className="flex-1 h-10 md:h-11 border border-gray-200 rounded-full px-4 md:px-5 text-[13px] md:text-[14px] focus:outline-none focus:border-gray-400 transition-colors bg-gray-50 disabled:cursor-not-allowed"
+              <textarea
+                ref={composerRef}
+                rows={1}
+                data-testid="host-chat-composer"
+                className="flex-1 min-h-10 md:min-h-11 max-h-28 resize-none overflow-y-hidden border border-gray-200 rounded-[20px] md:rounded-[22px] px-4 md:px-5 py-2 md:py-2.5 text-[13px] md:text-[14px] leading-5 md:leading-6 focus:outline-none focus:border-gray-400 transition-colors bg-gray-50 disabled:cursor-not-allowed"
                 placeholder={t('hp_inbox_reply_ph')}
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
                 disabled={isSending}
                 onKeyDown={(e) => {
                   if (e.nativeEvent.isComposing) return;
-                  if (e.key === 'Enter') { e.preventDefault(); handleSend(); }
+                  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
                 }}
               />
               <button

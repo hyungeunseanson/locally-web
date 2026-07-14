@@ -9,6 +9,7 @@ import { isAdminSupportInquiry, isDeletedInquiryMessage } from '@/app/utils/inqu
 import { useToast } from '@/app/context/ToastContext';
 import { useConfirmDialog } from '@/app/hooks/useConfirmDialog';
 import ChatParticipantProfileModal, { type ChatParticipantProfile } from './ChatParticipantProfileModal';
+import { useAutoResizeTextarea } from '@/app/hooks/useAutoResizeTextarea';
 
 type CSStatus = 'open' | 'in_progress' | 'resolved';
 type CSStatusFilter = 'ALL' | CSStatus;
@@ -84,6 +85,7 @@ export default function ChatMonitor() {
   const [replyText, setReplyText] = useState('');
   const [profileModal, setProfileModal] = useState<ChatParticipantProfile | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const composerRef = useAutoResizeTextarea(replyText);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -575,7 +577,7 @@ export default function ChatMonitor() {
                         </button>
                       )}
                     </div>
-                    <div className={`p-2.5 md:p-3 rounded-lg md:rounded-xl max-w-[85%] md:max-w-[70%] text-xs md:text-sm shadow-sm leading-relaxed ${isDeletedMessage
+                    <div className={`p-2.5 md:p-3 rounded-lg md:rounded-xl max-w-[85%] md:max-w-[70%] text-xs md:text-sm shadow-sm leading-relaxed whitespace-pre-wrap break-words ${isDeletedMessage
                       ? 'border border-slate-200 border-dashed bg-slate-100 text-slate-500 italic'
                       : msg.has_policy_signal
                         ? 'border border-rose-200 bg-rose-50 text-rose-900'
@@ -590,15 +592,18 @@ export default function ChatMonitor() {
               })}
             </div>
 
-            <div className="p-2 md:p-4 bg-white border-t border-slate-100 flex gap-1.5 md:gap-2 shrink-0 pb-2 md:pb-4">
-              <input
-                className="flex-1 border border-slate-200 bg-slate-50 rounded-lg md:rounded-xl px-2.5 md:px-4 py-2 md:py-3 focus:outline-none focus:border-black focus:bg-white transition-all text-[11px] md:text-sm"
+            <div className="p-2 md:p-4 bg-white border-t border-slate-100 flex items-end gap-1.5 md:gap-2 shrink-0 pb-2 md:pb-4">
+              <textarea
+                ref={composerRef}
+                rows={1}
+                data-testid="admin-chat-composer"
+                className="flex-1 min-h-9 md:min-h-11 max-h-28 resize-none overflow-y-hidden border border-slate-200 bg-slate-50 rounded-lg md:rounded-xl px-2.5 md:px-4 py-2 md:py-3 focus:outline-none focus:border-black focus:bg-white transition-all text-[11px] md:text-sm leading-5"
                 placeholder={activeTab === 'monitor' ? "관리자 권한 메시지 전송..." : "답변을 입력하세요..."}
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.nativeEvent.isComposing) return;
-                  if (e.key === 'Enter') {
+                  if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     handleSend();
                   }

@@ -292,9 +292,7 @@ test.describe.serial('Live guest post-booking experience flow', () => {
         await getTripCard().getByRole('button', { name: /메시지|Messages|Message|メッセージ|消息/i }).click();
         await page.waitForURL(/\/guest\/inbox/, { timeout: 20000 });
 
-        const guestInput = page
-          .locator('input[placeholder="메시지 입력..."], input[placeholder="Type a message..."]')
-          .first();
+        const guestInput = page.getByTestId('guest-chat-composer');
         await expect(guestInput).toBeVisible({ timeout: 20000 });
         await guestInput.fill(guestTripMessage);
         await guestInput.press('Enter');

@@ -509,7 +509,7 @@ test.describe.serial('Live guest booking, host messaging, and support inquiry fl
         await page.locator('a[href^="/guest/inbox"]').last().click();
         await page.waitForURL(/\/guest\/inbox/, { timeout: 20000 });
 
-        const guestInput = page.locator('input[placeholder="메시지 입력..."], input[placeholder="Type a message..."]').first();
+        const guestInput = page.getByTestId('guest-chat-composer');
         await guestInput.fill(guestToHostMessage);
         await guestInput.press('Enter');
 
@@ -551,9 +551,7 @@ test.describe.serial('Live guest booking, host messaging, and support inquiry fl
 
           await expect(hostPage.getByText(guestToHostMessage).first()).toBeVisible({ timeout: 20000 });
 
-          const replyInput = hostPage.locator(
-            'input[placeholder="답장 입력..."], input[placeholder="Type a reply..."], input[placeholder="返信を入力..."], input[placeholder="输入回复..."]'
-          ).first();
+          const replyInput = hostPage.getByTestId('host-chat-composer');
           await replyInput.fill(hostReplyMessage);
           await replyInput.press('Enter');
 

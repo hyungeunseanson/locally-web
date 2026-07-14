@@ -13,6 +13,7 @@ import { detectChatPolicySignals } from '@/app/utils/chatPolicySignals';
 import { isAdminSupportInquiry, isDeletedInquiryMessage } from '@/app/utils/inquiry';
 import { createClient } from '@/app/utils/supabase/client';
 import { getHostPublicProfile } from '@/app/utils/profile';
+import { useAutoResizeTextarea } from '@/app/hooks/useAutoResizeTextarea';
 
 const ADMIN_SUPPORT_AVATAR_SRC = '/images/logos/Frame%201545423142.png';
 const CHAT_POLICY_WARNING_COPY = {
@@ -53,6 +54,7 @@ function InboxContent() {
   const [isSending, setIsSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const composerRef = useAutoResizeTextarea(inputText);
   const activeMessageThreadRef = useRef<string | null>(null);
   const hasPrimedThreadMessagesRef = useRef(false);
   const previousMessageIdsRef = useRef<string[]>([]);
@@ -572,7 +574,7 @@ function InboxContent() {
                             </div>
                           )}
 
-                          <div className={`px-2.5 md:px-4 py-1.5 md:py-2.5 rounded-2xl text-[12px] md:text-[14px] leading-[1.45] md:leading-relaxed shadow-sm break-words ${isDeletedMessage
+                          <div className={`px-2.5 md:px-4 py-1.5 md:py-2.5 rounded-2xl text-[12px] md:text-[14px] leading-[1.45] md:leading-relaxed shadow-sm whitespace-pre-wrap break-words ${isDeletedMessage
                             ? 'bg-slate-100 border border-dashed border-slate-300 text-slate-500 italic'
                             : isMe
                               ? 'bg-black text-white rounded-tr-sm'
@@ -606,7 +608,7 @@ function InboxContent() {
                     <div className="mt-0.5 text-[10px] md:text-[11px] text-rose-600">{chatPolicyWarningCopy.body}</div>
                   </div>
                 )}
-                <div className="flex items-center gap-1.5 md:gap-3">
+                <div className="flex items-end gap-1.5 md:gap-3">
                 <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
                 <button
                   onClick={() => fileInputRef.current?.click()}
@@ -616,15 +618,18 @@ function InboxContent() {
                   <ImagePlus className="w-[14px] h-[14px] md:w-4 md:h-4" />
                 </button>
 
-                <input
-                  className="flex-1 h-9 md:h-11 border border-gray-200 rounded-full px-3.5 md:px-5 text-[12px] md:text-[14px] focus:outline-none focus:border-gray-400 transition-colors bg-gray-50 disabled:cursor-not-allowed"
+                <textarea
+                  ref={composerRef}
+                  rows={1}
+                  data-testid="guest-chat-composer"
+                  className="flex-1 min-h-9 max-h-28 resize-none overflow-y-hidden border border-gray-200 rounded-[18px] md:rounded-[22px] px-3.5 md:px-5 py-2 md:py-2.5 text-[12px] md:text-[14px] leading-5 md:leading-6 focus:outline-none focus:border-gray-400 transition-colors bg-gray-50 disabled:cursor-not-allowed"
                   placeholder={t('msg_placeholder')}
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   disabled={isSending}
                   onKeyDown={(e) => {
                     if (e.nativeEvent.isComposing) return;
-                    if (e.key === 'Enter') { e.preventDefault(); handleSend(); }
+                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
                   }}
                 />
                 <button

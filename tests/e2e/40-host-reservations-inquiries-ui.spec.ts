@@ -841,7 +841,7 @@ test.describe.serial('Host dashboard reservations and inquiries UI coverage', ()
     await expect(page.getByText(guest.fullName).first()).toBeVisible({ timeout: 15000 });
     await expect(page.getByText(experience.title).first()).toBeVisible({ timeout: 15000 });
 
-    const replyInput = page.locator('input[placeholder="답장 입력..."], input[placeholder="Type a reply..."]').first();
+    const replyInput = page.getByTestId('host-chat-composer');
     await replyInput.fill(replyMessage);
     await replyInput.press('Enter');
 

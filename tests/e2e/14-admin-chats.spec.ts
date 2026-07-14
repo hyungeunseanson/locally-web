@@ -287,27 +287,27 @@ test.describe.serial('Admin chats smoke', () => {
     await createAuthUser(adminUser, { whitelistAdmin: true });
     const guestUserId = await createAuthUser(guestUser);
 
-    const inquiryMessage = `코덱스 관리자 첫 답변 문의 ${Date.now()}`;
-    const adminReply = `관리자 첫 답변 ${Date.now()}`;
+    const inquiryMessage = `코덱스 관리자 첫 답변 문의 ${Date.now()}\n게스트 둘째 줄`;
+    const adminReply = `관리자 첫 답변 ${Date.now()}\n관리자 둘째 줄`;
     const inquiryId = await seedAdminSupportInquiry(guestUserId, inquiryMessage);
 
     await login(page, adminUser);
     await page.goto(`/admin/dashboard?tab=CHATS&inquiryId=${inquiryId}`, { waitUntil: 'domcontentloaded' });
 
-    await expect(
-      page.locator('div.bg-white.border.border-slate-200.rounded-tl-none').filter({ hasText: inquiryMessage }).last()
-    ).toBeVisible({ timeout: 15000 });
+    const guestMessageBubble = page.locator('div.bg-white.border.border-slate-200.rounded-tl-none').filter({ hasText: inquiryMessage }).last();
+    await expect(guestMessageBubble).toBeVisible({ timeout: 15000 });
+    await expect(guestMessageBubble).toHaveCSS('white-space', 'pre-wrap');
 
     await page.getByPlaceholder('답변을 입력하세요...').fill(adminReply);
     await page.getByPlaceholder('답변을 입력하세요...').press('Enter');
 
-    await expect(
-      page
-        .locator('div[data-message-id]')
-        .filter({ hasText: adminReply })
-        .last()
-        .locator('div.bg-black.text-white')
-    ).toBeVisible({ timeout: 15000 });
+    const adminMessageBubble = page
+      .locator('div[data-message-id]')
+      .filter({ hasText: adminReply })
+      .last()
+      .locator('div.bg-black.text-white');
+    await expect(adminMessageBubble).toBeVisible({ timeout: 15000 });
+    await expect(adminMessageBubble).toHaveCSS('white-space', 'pre-wrap');
 
     await expect.poll(async () => {
       const inquiry = await readInquiryStatus(inquiryId);
@@ -362,7 +362,9 @@ test.describe.serial('Admin chats smoke', () => {
     const detailStatusGroup = page.locator('div.absolute.top-2.right-2');
     await detailStatusGroup.getByRole('button', { name: '처리중', exact: true }).click();
 
-    await expect(page.getByText(FALSE_CONFLICT_TOAST)).toBeVisible({ timeout: 15000 });
+    await expect(
+      page.getByRole('paragraph').filter({ hasText: FALSE_CONFLICT_TOAST }).first()
+    ).toBeVisible({ timeout: 15000 });
 
     await expect.poll(async () => {
       const inquiry = await readInquiryStatus(inquiryId);

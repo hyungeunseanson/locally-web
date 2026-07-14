@@ -315,29 +315,61 @@ test('guest inbox appends text messages optimistically before delayed send resol
   await page.goto(`/guest/inbox?inquiryId=${inquiryId}`, { waitUntil: 'networkidle' });
   await expect(page.getByText('기존 호스트 메시지')).toBeVisible();
 
-  const messageText = `Optimistic guest message ${Date.now()}`;
+  const firstLine = `Optimistic guest message ${Date.now()}`;
+  const messageText = `${firstLine}\n둘째 줄\n\n넷째 줄`;
   let responseResolved = false;
+  let sendRequestCount = 0;
 
   await page.route('**/api/inquiries/message', async (route) => {
+    sendRequestCount += 1;
     await new Promise((resolve) => setTimeout(resolve, 1500));
     const response = await route.fetch();
     responseResolved = true;
     await route.fulfill({ response });
   });
 
-  await page.getByPlaceholder(/메시지 입력|Type a message|メッセージを入力|输入消息/).fill(messageText);
+  const composer = page.getByTestId('guest-chat-composer');
+  const singleLineHeight = await composer.evaluate((element) => element.getBoundingClientRect().height);
+  await composer.fill(firstLine);
+  await composer.press('Shift+Enter');
+  await expect(composer).toHaveValue(`${firstLine}\n`);
+  await page.waitForTimeout(200);
+  expect(sendRequestCount).toBe(0);
+
+  await composer.fill(messageText);
+  await expect.poll(() => composer.evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThan(singleLineHeight);
   await page.getByRole('button').filter({ has: page.locator('svg.lucide-send') }).click();
 
-  await expect(page.getByPlaceholder(/메시지 입력|Type a message|メッセージを入力|输入消息/)).toHaveValue('');
+  await expect(composer).toHaveValue('');
+  await expect.poll(() => composer.evaluate((element) => element.getBoundingClientRect().height)).toBeLessThanOrEqual(singleLineHeight);
   await page.waitForTimeout(300);
   expect(responseResolved).toBe(false);
-  await expect(page.getByText(messageText).first()).toBeVisible({ timeout: 700 });
+  const optimisticBubble = page.getByText(messageText, { exact: true }).first();
+  await expect(optimisticBubble).toBeVisible({ timeout: 700 });
+  await expect(optimisticBubble).toHaveCSS('white-space', 'pre-wrap');
 
   await expect.poll(() => responseResolved).toBe(true);
+  expect(sendRequestCount).toBe(1);
   await expect.poll(async () => {
     const row = await findInquiryMessage(inquiryId, messageText);
     return row?.content || null;
   }).toBe(messageText);
+
+  await page.unroute('**/api/inquiries/message');
+  await page.route('**/api/inquiries/message', async (route) => {
+    await route.fulfill({
+      status: 500,
+      contentType: 'application/json',
+      body: JSON.stringify({ success: false, error: 'forced multiline send failure' }),
+    });
+  });
+
+  const failedDraft = `복원할 첫째 줄\n복원할 둘째 줄\n복원할 셋째 줄`;
+  await composer.fill(failedDraft);
+  const expandedHeight = await composer.evaluate((element) => element.getBoundingClientRect().height);
+  await page.getByRole('button').filter({ has: page.locator('svg.lucide-send') }).click();
+  await expect(composer).toHaveValue(failedDraft);
+  await expect.poll(() => composer.evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(expandedHeight);
 });
 
 test('guest inbox catches up to a host reply without a full reload after returning', async ({ browser }) => {
@@ -371,9 +403,13 @@ test('guest inbox catches up to a host reply without a full reload after returni
     await hostPage.goto(`/host/dashboard?tab=inquiries&inquiryId=${inquiryId}`, { waitUntil: 'networkidle' });
     await expect(hostPage.getByText(initialGuestMessage).last()).toBeVisible({ timeout: 15000 });
 
-    const hostReplyMessage = `Host realtime reply ${Date.now()}`;
-    await hostPage.locator('input[placeholder="답장 입력..."], input[placeholder="Type a reply..."]').first().fill(hostReplyMessage);
+    const hostReplyMessage = `Host realtime reply ${Date.now()}\n둘째 줄\n\n넷째 줄`;
+    await hostPage.getByTestId('host-chat-composer').fill(hostReplyMessage);
     await hostPage.locator('button.bg-black.text-white.rounded-full').last().click();
+
+    const hostBubble = hostPage.getByText(hostReplyMessage, { exact: true }).last();
+    await expect(hostBubble).toBeVisible({ timeout: 15000 });
+    await expect(hostBubble).toHaveCSS('white-space', 'pre-wrap');
 
     await expect.poll(async () => {
       const row = await findInquiryMessage(inquiryId, hostReplyMessage);
@@ -382,9 +418,9 @@ test('guest inbox catches up to a host reply without a full reload after returni
 
     await guestPage.bringToFront();
     await guestPage.locator('div.cursor-pointer').filter({ hasText: host.fullName }).first().click();
-    await expect(
-      guestPage.locator('div.bg-white.border.border-gray-200.rounded-tl-sm').filter({ hasText: hostReplyMessage }).last()
-    ).toBeVisible({ timeout: 8000 });
+    const guestBubble = guestPage.locator('div.bg-white.border.border-gray-200.rounded-tl-sm').filter({ hasText: hostReplyMessage }).last();
+    await expect(guestBubble).toBeVisible({ timeout: 8000 });
+    await expect(guestBubble).toHaveCSS('white-space', 'pre-wrap');
   } finally {
     await guestContext.close();
     await hostContext.close();
