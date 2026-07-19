@@ -405,13 +405,12 @@ CREATE POLICY "sb_delete_deny" ON public.service_bookings
 -- [6] RPC 실행 권한 설정
 -- =============================================================================
 
--- 인증된 사용자(authenticated role)가 원자적 예약 함수를 호출할 수 있도록 허용
+-- 예약 생성은 서버 API의 service_role 클라이언트에서만 호출
 GRANT EXECUTE ON FUNCTION public.create_service_booking_atomic(UUID, UUID, UUID, TEXT, TEXT)
-  TO authenticated;
+  TO service_role;
 
--- anon은 호출 불가
 REVOKE EXECUTE ON FUNCTION public.create_service_booking_atomic(UUID, UUID, UUID, TEXT, TEXT)
-  FROM anon;
+  FROM PUBLIC, anon, authenticated;
 
 
 -- =============================================================================
