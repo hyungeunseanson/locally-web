@@ -18,6 +18,7 @@ const createdAuthUserIds: string[] = [];
 const createdApplicationIds: number[] = [];
 const createdExperienceIds: number[] = [];
 const createdBookingIds: string[] = [];
+const createdGuestReviewIds: number[] = [];
 
 function loadEnv(): EnvMap {
   return readFileSync('.env.local', 'utf8')
@@ -271,6 +272,10 @@ async function dismissAnnouncementIfVisible(page: Page) {
 test.afterAll(async () => {
   const supabase = getAdminClient();
 
+  if (createdGuestReviewIds.length > 0) {
+    await supabase.from('guest_reviews').delete().in('id', createdGuestReviewIds);
+  }
+
   if (createdBookingIds.length > 0) {
     await supabase.from('bookings').delete().in('id', createdBookingIds);
   }
@@ -289,6 +294,73 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('locally membership care experience', () => {
+  test('mobile profile expands all received reviews and shows ratings', async ({ page }) => {
+    test.setTimeout(120000);
+
+    const host = createUser('host.review-list');
+    const guest = createUser('guest.review-list');
+    const hostId = await createAuthUser(host);
+    const guestId = await createAuthUser(guest);
+    await createApprovedHostApplication(hostId, host);
+    const experienceId = await createExperienceFixture(hostId);
+    const supabase = getAdminClient();
+    const bookingIds: string[] = [];
+
+    for (let index = 0; index < 6; index += 1) {
+      bookingIds.push(await createPaidBooking({
+        guestId,
+        guest,
+        experienceId,
+        offsetDays: index + 1,
+      }));
+    }
+
+    const { error: completedError } = await supabase
+      .from('bookings')
+      .update({ status: 'completed' })
+      .in('id', bookingIds);
+
+    if (completedError) throw completedError;
+
+    const { data: guestReviewRows, error: guestReviewError } = await supabase
+      .from('guest_reviews')
+      .insert(bookingIds.map((bookingId, index) => ({
+        booking_id: bookingId,
+        host_id: hostId,
+        guest_id: guestId,
+        rating: (index % 5) + 1,
+        content: `모바일 전체 평가 표시 검증 ${index + 1}`,
+        created_at: new Date(Date.now() + index * 1000).toISOString(),
+      })))
+      .select('id');
+
+    if (guestReviewError) throw guestReviewError;
+    createdGuestReviewIds.push(...(guestReviewRows || []).map((row) => Number(row.id)));
+
+    await page.addInitScript(() => {
+      window.localStorage.setItem('app_lang', 'ko');
+      document.cookie = 'app_lang=ko; path=/';
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await login(page, guest);
+    await page.goto('/account', { waitUntil: 'domcontentloaded' });
+    await dismissAnnouncementIfVisible(page);
+    await page.getByTestId('account-mobile-profile-card').dispatchEvent('click');
+
+    await expect(page.getByTestId('mobile-guest-review')).toHaveCount(5, { timeout: 15000 });
+    await expect(page.getByTestId('mobile-guest-review-rating')).toHaveCount(5);
+    await expect(page.getByTestId('mobile-show-all-guest-reviews')).toContainText('후기 표시하기');
+
+    await page.getByTestId('mobile-show-all-guest-reviews').click();
+
+    await expect(page.getByTestId('mobile-guest-review')).toHaveCount(6);
+    await expect(page.getByTestId('mobile-guest-review-rating')).toHaveCount(6);
+    await expect(page.getByTestId('mobile-show-all-guest-reviews')).toHaveCount(0);
+    for (const rating of [1, 2, 3, 4, 5]) {
+      await expect(page.getByLabel(`${rating} / 5`).first()).toBeVisible();
+    }
+  });
+
   test('first purchase customer sees Tier 1 across key guest pages', async ({ page }) => {
     test.slow();
     const host = createUser('host.member');

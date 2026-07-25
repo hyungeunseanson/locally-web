@@ -495,6 +495,111 @@ test.describe.serial('guest trips completed sync route', () => {
 
     if (afterSyncError) throw afterSyncError;
     expect(afterSync?.status).toBe('completed');
+
+    const { data: reviewRequests, error: reviewRequestsError } = await supabase
+      .from('notifications')
+      .select('id, booking_id')
+      .eq('user_id', guestId)
+      .eq('type', 'review_request')
+      .eq('booking_id', bookingId);
+
+    if (reviewRequestsError) throw reviewRequestsError;
+    expect(reviewRequests || []).toHaveLength(1);
+
+    const repeatedSyncResult = await page.evaluate(async () => {
+      const response = await fetch('/api/guest/trips/sync-completed', {
+        method: 'POST',
+      });
+      return {
+        status: response.status,
+        body: await response.json(),
+      };
+    });
+
+    expect(repeatedSyncResult.status).toBe(200);
+    expect(repeatedSyncResult.body).toMatchObject({
+      success: true,
+      updatedCount: 0,
+      updatedIds: [],
+    });
+
+    const { count: repeatedReviewRequestCount, error: repeatedReviewRequestError } = await supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', guestId)
+      .eq('type', 'review_request')
+      .eq('booking_id', bookingId);
+
+    if (repeatedReviewRequestError) throw repeatedReviewRequestError;
+    expect(repeatedReviewRequestCount).toBe(1);
+  });
+
+  test('guest and host completion sync race creates one keyed review request', async ({ browser }, testInfo) => {
+    const host = createUser('host.completion.race');
+    const guest = createUser('guest.completion.race');
+    const hostId = await createAuthUser(host);
+    const guestId = await createAuthUser(guest);
+    await createApprovedHostApplication(hostId, host);
+    const experienceId = await createHostExperience(hostId);
+    const bookingId = await createPastPaidBooking({ guestId, guest, experienceId });
+
+    const baseURL = String(testInfo.project.use.baseURL || '');
+    const guestContext = await browser.newContext({ baseURL });
+    const hostContext = await browser.newContext({ baseURL });
+    const guestPage = await guestContext.newPage();
+    const hostPage = await hostContext.newPage();
+
+    try {
+      await Promise.all([
+        login(guestPage, guest),
+        login(hostPage, host),
+      ]);
+
+      const [guestSync, hostSync] = await Promise.all([
+        guestPage.evaluate(async () => {
+          const response = await fetch('/api/guest/trips/sync-completed', {
+            method: 'POST',
+          });
+          return {
+            status: response.status,
+            body: await response.json(),
+          };
+        }),
+        hostPage.evaluate(async (targetBookingId) => {
+          const response = await fetch('/api/host/reservations/sync-completed', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bookingIds: [targetBookingId] }),
+          });
+          return {
+            status: response.status,
+            body: await response.json(),
+          };
+        }, bookingId),
+      ]);
+
+      expect(guestSync.status).toBe(200);
+      expect(hostSync.status).toBe(200);
+      expect([guestSync.body.updatedCount, hostSync.body.updatedCount].sort()).toEqual([0, 1]);
+
+      const supabase = getAdminClient();
+      const [bookingResult, notificationResult] = await Promise.all([
+        supabase.from('bookings').select('status').eq('id', bookingId).maybeSingle(),
+        supabase
+          .from('notifications')
+          .select('id, booking_id')
+          .eq('user_id', guestId)
+          .eq('type', 'review_request')
+          .eq('booking_id', bookingId),
+      ]);
+
+      if (bookingResult.error) throw bookingResult.error;
+      if (notificationResult.error) throw notificationResult.error;
+      expect(bookingResult.data?.status).toBe('completed');
+      expect(notificationResult.data || []).toHaveLength(1);
+    } finally {
+      await Promise.all([guestContext.close(), hostContext.close()]);
+    }
   });
 
   test('shows completed solo add-on refund status on past trip cards', async ({ page }) => {

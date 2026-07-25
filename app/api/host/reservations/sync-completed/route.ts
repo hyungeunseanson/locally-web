@@ -1,20 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
+import { completeExperienceBookingsIfDueAtomic } from '@/app/utils/bookings/completeExperienceBooking';
 import { processSoloGuaranteeRefundsForCompletedBookings } from '@/app/utils/bookings/soloGuaranteeRefund';
-import { isOverdueActiveBooking } from '@/app/utils/bookingStartTime';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 
 type HostReservationSyncBody = {
   bookingIds?: unknown;
-};
-
-type HostReservationSyncRow = {
-  id: string | number;
-  date: string;
-  time?: string | null;
-  status: string;
 };
 
 function normalizeBookingIds(value: unknown) {
@@ -25,29 +18,6 @@ function normalizeBookingIds(value: unknown) {
       .map((entry) => (typeof entry === 'string' || typeof entry === 'number' ? String(entry).trim() : ''))
       .filter(Boolean)
   )].slice(0, 50);
-}
-
-function normalizeReservationRows(value: unknown): HostReservationSyncRow[] {
-  if (!Array.isArray(value)) return [];
-
-  return value.reduce<HostReservationSyncRow[]>((acc, entry) => {
-    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
-      return acc;
-    }
-
-    const candidate = entry as Record<string, unknown>;
-    const id = typeof candidate.id === 'string' || typeof candidate.id === 'number' ? candidate.id : null;
-    const date = typeof candidate.date === 'string' ? candidate.date.trim() : '';
-    const status = typeof candidate.status === 'string' ? candidate.status.trim() : '';
-    const time = typeof candidate.time === 'string' ? candidate.time.trim() : null;
-
-    if (!id || !date || !status) {
-      return acc;
-    }
-
-    acc.push({ id, date, time, status });
-    return acc;
-  }, []);
 }
 
 export async function POST(request: NextRequest) {
@@ -68,7 +38,7 @@ export async function POST(request: NextRequest) {
     const supabaseAdmin = createAdminClient();
     let query = supabaseAdmin
       .from('bookings')
-      .select('id, date, time, status, experiences!inner(host_id)')
+      .select('id, experiences!inner(host_id)')
       .eq('experiences.host_id', user.id)
       .in('status', [...BOOKING_ACTIVE_STATUS_FOR_CAPACITY]);
 
@@ -79,36 +49,35 @@ export async function POST(request: NextRequest) {
     const { data: bookingRows, error: bookingRowsError } = await query;
     if (bookingRowsError) throw bookingRowsError;
 
-    const now = new Date();
-    const bookingIdsToComplete = normalizeReservationRows(bookingRows)
-      .filter((booking) => isOverdueActiveBooking(booking.status, booking.date, booking.time, now))
-      .map((booking) => String(booking.id));
-
-    if (bookingIdsToComplete.length === 0) {
+    if (!bookingRows || bookingRows.length === 0) {
       return NextResponse.json({ success: true, updatedCount: 0, updatedIds: [] as string[] });
     }
 
-    const { error: updateError } = await supabaseAdmin
-      .from('bookings')
-      .update({ status: 'completed' })
-      .in('id', bookingIdsToComplete)
-      .in('status', [...BOOKING_ACTIVE_STATUS_FOR_CAPACITY]);
-
-    if (updateError) throw updateError;
+    const completionBatch = await completeExperienceBookingsIfDueAtomic(
+      supabaseAdmin,
+      bookingRows.map((booking) => String(booking.id))
+    );
+    const completedBookingIds = completionBatch.results
+      .filter((result) => result.completed)
+      .map((result) => result.bookingId);
 
     try {
       await processSoloGuaranteeRefundsForCompletedBookings({
         supabaseAdmin,
-        completedBookingIds: bookingIdsToComplete,
+        completedBookingIds,
       });
     } catch (refundError) {
       console.error('[host/reservations/sync-completed] solo guarantee refund processing failed:', refundError);
     }
 
+    if (completionBatch.failures.length > 0) {
+      throw completionBatch.failures[0].error;
+    }
+
     return NextResponse.json({
       success: true,
-      updatedCount: bookingIdsToComplete.length,
-      updatedIds: bookingIdsToComplete,
+      updatedCount: completedBookingIds.length,
+      updatedIds: completedBookingIds,
     });
   } catch (error) {
     console.error('[host/reservations/sync-completed] error:', error);

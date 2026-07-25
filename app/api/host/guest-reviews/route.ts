@@ -42,7 +42,14 @@ export async function POST(request: NextRequest) {
     const content = asTrimmedString(body.content);
     const rating = Number(body.rating);
 
-    if (!bookingId || !content || !Number.isFinite(rating) || rating < 1 || rating > 5) {
+    if (
+      !bookingId ||
+      !content ||
+      !Number.isFinite(rating) ||
+      !Number.isInteger(rating) ||
+      rating < 1 ||
+      rating > 5
+    ) {
       return NextResponse.json({ success: false, error: 'Invalid payload' }, { status: 400 });
     }
 

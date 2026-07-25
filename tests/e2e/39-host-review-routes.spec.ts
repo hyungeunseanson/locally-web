@@ -377,6 +377,7 @@ test.describe.serial('Host review routes', () => {
   test('reject host guest reviews for incomplete bookings', async ({ page }) => {
     test.setTimeout(90000);
 
+    const supabase = getAdminClient();
     const host = createUser('host-incomplete');
     const guest = createUser('guest-incomplete');
     const hostId = await createAuthUser(host);
@@ -393,6 +394,24 @@ test.describe.serial('Host review routes', () => {
     });
 
     await login(page, host);
+
+    const fractionalGuestReviewResponse = await page.request.post('/api/host/guest-reviews', {
+      data: { bookingId, rating: 4.5, content: '소수 평점은 저장되면 안 됩니다.' },
+    });
+    expect(fractionalGuestReviewResponse.status()).toBe(400);
+    await expect(fractionalGuestReviewResponse.json()).resolves.toMatchObject({
+      success: false,
+      error: 'Invalid payload',
+    });
+
+    const { count: fractionalGuestReviewCount, error: fractionalGuestReviewError } = await supabase
+      .from('guest_reviews')
+      .select('id', { count: 'exact', head: true })
+      .eq('booking_id', bookingId)
+      .eq('host_id', hostId);
+
+    if (fractionalGuestReviewError) throw fractionalGuestReviewError;
+    expect(fractionalGuestReviewCount).toBe(0);
 
     const guestReviewResponse = await page.request.post('/api/host/guest-reviews', {
       data: { bookingId, rating: 4, content: '완료 전 리뷰는 막혀야 합니다.' },

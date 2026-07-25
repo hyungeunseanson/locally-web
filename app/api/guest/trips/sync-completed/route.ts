@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
+import { completeExperienceBookingsIfDueAtomic } from '@/app/utils/bookings/completeExperienceBooking';
 import { processSoloGuaranteeRefundsForCompletedBookings } from '@/app/utils/bookings/soloGuaranteeRefund';
-import { isOverdueActiveBooking } from '@/app/utils/bookingStartTime';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient } from '@/app/utils/supabase/server';
 
@@ -20,44 +20,42 @@ export async function POST() {
 
     const { data: bookings, error } = await supabase
       .from('bookings')
-      .select('id, date, time, status')
+      .select('id')
       .eq('user_id', user.id)
       .in('status', [...BOOKING_ACTIVE_STATUS_FOR_CAPACITY]);
 
     if (error) throw error;
 
-    const now = new Date();
-    const bookingIdsToComplete = (bookings || [])
-      .filter((booking) => isOverdueActiveBooking(booking.status, booking.date, booking.time, now))
-      .map((booking) => booking.id);
-
-    if (bookingIdsToComplete.length === 0) {
+    if (!bookings || bookings.length === 0) {
       return NextResponse.json({ success: true, updatedCount: 0, updatedIds: [] });
     }
 
-    // [Safety] status precondition: SELECT와 UPDATE 사이에 취소된 예약을 completed로 덮어쓰지 않도록 방어
-    const { error: updateError } = await supabase
-      .from('bookings')
-      .update({ status: 'completed' })
-      .eq('user_id', user.id)
-      .in('id', bookingIdsToComplete)
-      .in('status', [...BOOKING_ACTIVE_STATUS_FOR_CAPACITY]);
-
-    if (updateError) throw updateError;
+    const supabaseAdmin = createAdminClient();
+    const completionBatch = await completeExperienceBookingsIfDueAtomic(
+      supabaseAdmin,
+      bookings.map((booking) => String(booking.id))
+    );
+    const completedBookingIds = completionBatch.results
+      .filter((result) => result.completed)
+      .map((result) => result.bookingId);
 
     try {
       await processSoloGuaranteeRefundsForCompletedBookings({
-        supabaseAdmin: createAdminClient(),
-        completedBookingIds: bookingIdsToComplete,
+        supabaseAdmin,
+        completedBookingIds,
       });
     } catch (refundError) {
       console.error('[guest/trips/sync-completed] solo guarantee refund processing failed:', refundError);
     }
 
+    if (completionBatch.failures.length > 0) {
+      throw completionBatch.failures[0].error;
+    }
+
     return NextResponse.json({
       success: true,
-      updatedCount: bookingIdsToComplete.length,
-      updatedIds: bookingIdsToComplete,
+      updatedCount: completedBookingIds.length,
+      updatedIds: completedBookingIds,
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Internal Server Error';

@@ -425,9 +425,10 @@ test.describe.serial('Settlement sync race guard', () => {
       supabase.from('bookings').select('status').eq('id', experienceRaceBookingId).maybeSingle(),
       supabase
         .from('notifications')
-        .select('id')
+        .select('id, booking_id')
         .eq('user_id', customerId)
-        .eq('type', 'review_request'),
+        .eq('type', 'review_request')
+        .eq('booking_id', experienceRaceBookingId),
     ]);
 
     if (experienceRow.error) throw experienceRow.error;
@@ -435,6 +436,7 @@ test.describe.serial('Settlement sync race guard', () => {
 
     expect(experienceRow.data?.status).toBe('completed');
     expect(reviewRequestRows.data || []).toHaveLength(1);
+    expect(reviewRequestRows.data?.[0]?.booking_id).toBe(experienceRaceBookingId);
 
     const completionServicePromise = triggerCompletionRunDue({
       page,

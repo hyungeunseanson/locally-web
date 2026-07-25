@@ -6,6 +6,7 @@ import { syncReviewAggregates } from '@/app/utils/reviews/reviewAggregates';
 function parseReviewRating(value: unknown) {
   const normalized = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(normalized)) return null;
+  if (!Number.isInteger(normalized)) return null;
   if (normalized < 1 || normalized > 5) return null;
   return normalized;
 }

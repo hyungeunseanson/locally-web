@@ -18,6 +18,7 @@ import LocallyMembershipBadgeTrigger from '@/app/components/LocallyMembershipBad
 
 type GuestReview = {
     id: string | number;
+    rating: number;
     content: string;
     created_at: string;
     host?: {
@@ -84,6 +85,7 @@ export default function MobileProfileView({
     const [editData, setEditData] = useState({ ...profile });
     const [saving, setSaving] = useState(false);
     const [uploading, setUploading] = useState(false);
+    const [showAllReviews, setShowAllReviews] = useState(false);
     const [stats, setStats] = useState({ tripCount: 0, reviewCount: 0, joinMonths: 1 });
     const supabase = useMemo(() => createClient(), []);
     const { showToast, showHeicUnsupportedToast } = useToast();
@@ -586,8 +588,8 @@ export default function MobileProfileView({
                         <p className="text-[11px] text-slate-400 text-center py-5">{t('no_reviews_yet')}</p>
                     ) : (
                         <div className="space-y-3">
-                            {guestReviews.slice(0, 5).map((review) => (
-                                <div key={review.id} className="flex gap-2.5">
+                            {(showAllReviews ? guestReviews : guestReviews.slice(0, 5)).map((review) => (
+                                <div key={review.id} className="flex gap-2.5" data-testid="mobile-guest-review">
                                     <div className="w-7 h-7 rounded-full bg-slate-200 overflow-hidden shrink-0">
                                         {review.host?.avatar_url
                                             ? (
@@ -602,6 +604,22 @@ export default function MobileProfileView({
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-[11px] font-bold text-slate-800">{review.host?.full_name || 'Host'}</p>
+                                        <div
+                                            className="flex items-center gap-0.5 text-amber-500"
+                                            data-testid="mobile-guest-review-rating"
+                                            aria-label={`${review.rating} / 5`}
+                                        >
+                                            {Array.from({ length: 5 }, (_, index) => (
+                                                <Star
+                                                    key={index}
+                                                    className="w-3 h-3"
+                                                    fill={index < review.rating ? 'currentColor' : 'none'}
+                                                />
+                                            ))}
+                                            <span className="ml-1 text-[10px] font-semibold text-slate-600">
+                                                {review.rating}
+                                            </span>
+                                        </div>
                                         <p className="text-[10px] text-slate-400 mb-1">
                                             {new Date(review.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' })}
                                         </p>
@@ -612,8 +630,13 @@ export default function MobileProfileView({
                         </div>
                     )}
 
-                    {guestReviews.length > 0 && (
-                        <button className="w-full mt-4 py-2.5 border border-slate-200 rounded-lg md:rounded-xl text-[12px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
+                    {guestReviews.length > 5 && !showAllReviews && (
+                        <button
+                            type="button"
+                            onClick={() => setShowAllReviews(true)}
+                            data-testid="mobile-show-all-guest-reviews"
+                            className="w-full mt-4 py-2.5 border border-slate-200 rounded-lg md:rounded-xl text-[12px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                        >
                             {t('btn_show_reviews')}
                         </button>
                     )}

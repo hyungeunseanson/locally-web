@@ -544,7 +544,7 @@ test.describe.serial('Review route contract', () => {
     expect(shortContentResponse.status).toBe(400);
     expect(shortContentResponse.body.error).toBe('후기는 10자 이상 작성해주세요.');
 
-    for (const invalidRating of [0, 6, Number.NaN]) {
+    for (const invalidRating of [0, 4.5, 6, Number.NaN]) {
       const invalidRatingResponse = await postReviewFromBrowser(page, {
         experienceId: experience.id,
         bookingId,
@@ -565,7 +565,7 @@ test.describe.serial('Review route contract', () => {
     expect(reviewRows || []).toHaveLength(0);
   });
 
-  test('rejects out-of-range rating on patch without mutating the stored review', async ({ page }) => {
+  test('rejects invalid rating on patch without mutating the stored review', async ({ page }) => {
     test.setTimeout(90000);
 
     const { userId: hostId } = await createRegularUser('host.patch');
@@ -589,13 +589,15 @@ test.describe.serial('Review route contract', () => {
 
     await login(page, guest);
 
-    const patchResponse = await patchReviewFromBrowser(page, reviewId, {
-      rating: 0,
-      content: `변경 시도 내용 ${Date.now()}`,
-    });
+    for (const invalidRating of [0, 4.5]) {
+      const patchResponse = await patchReviewFromBrowser(page, reviewId, {
+        rating: invalidRating,
+        content: `변경 시도 내용 ${Date.now()}`,
+      });
 
-    expect(patchResponse.status).toBe(400);
-    expect(patchResponse.body.error).toBe('평점은 1점부터 5점까지 입력해주세요.');
+      expect(patchResponse.status).toBe(400);
+      expect(patchResponse.body.error).toBe('평점은 1점부터 5점까지 입력해주세요.');
+    }
 
     const { data: reviewRow, error: reviewError } = await getTestAdminClient()
       .from('reviews')
