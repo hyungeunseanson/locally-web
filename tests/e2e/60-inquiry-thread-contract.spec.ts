@@ -15,7 +15,7 @@ const TEST_PASSWORD = 'LocallyTest!2026';
 
 let adminClient: SupabaseClient | null = null;
 const createdAuthUserIds: string[] = [];
-const createdApplicationIds: number[] = [];
+const createdApplicationIds: string[] = [];
 const createdExperienceIds: number[] = [];
 const createdInquiryIds: number[] = [];
 const createdMessageIds: number[] = [];
@@ -138,7 +138,7 @@ async function createApprovedHostApplication(userId: string, user: TestUser) {
     throw error || new Error('Failed to create approved host application.');
   }
 
-  createdApplicationIds.push(Number(data.id));
+  createdApplicationIds.push(String(data.id));
 }
 
 async function createExperienceFixture(hostId: string) {

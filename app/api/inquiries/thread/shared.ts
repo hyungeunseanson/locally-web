@@ -11,6 +11,7 @@ import { insertAdminAlerts, sendAdminAlertEmails } from '@/app/utils/adminAlertC
 import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { sendTemplatedEmail } from '@/app/emails/delivery/sendTemplatedEmail';
+import type { EmailAudience } from '@/app/emails/registry/emailTypes';
 import { OFFICIAL_SUPPORT_SENDER_NAME } from '@/app/utils/officialSender';
 import { sanitizeText, sanitizeUrl } from '@/app/utils/sanitize';
 
@@ -184,19 +185,6 @@ async function resolveInquirySenderDisplayName(params: {
   return getActorDisplayName(actorId);
 }
 
-async function findRecipientEmail(recipientId: string) {
-  const supabaseAdmin = createAdminClient();
-  const { data: profile } = await supabaseAdmin
-    .from('profiles')
-    .select('email')
-    .eq('id', recipientId)
-    .maybeSingle();
-
-  if (profile?.email) return profile.email;
-
-  const { data: authData } = await supabaseAdmin.auth.admin.getUserById(recipientId);
-  return authData?.user?.email || '';
-}
 export async function resolveInquiryNotificationEmailCopy(params: {
   supabaseAdmin: ReturnType<typeof createAdminClient>;
   recipientId: string;
@@ -236,6 +224,22 @@ export async function resolveInquiryNotificationEmailCopy(params: {
   });
 }
 
+export function resolveInquiryEmailAudience(params: {
+  isAdminSupport: boolean;
+  recipientId: string;
+  hostId: string | null;
+}): EmailAudience {
+  const recipientIsHost = Boolean(
+    params.hostId && String(params.recipientId) === String(params.hostId)
+  );
+
+  if (params.isAdminSupport && recipientIsHost) {
+    return 'admin';
+  }
+
+  return recipientIsHost ? 'host' : 'guest';
+}
+
 async function notifyRecipient(params: {
   recipientId: string;
   emailTitle: string;
@@ -243,7 +247,7 @@ async function notifyRecipient(params: {
   actorDisplayName: string;
   displayContent: string;
   link: string;
-  localizeEmailForRecipient?: boolean;
+  audience: EmailAudience;
 }) {
   try {
     const supabaseAdmin = createAdminClient();
@@ -254,8 +258,9 @@ async function notifyRecipient(params: {
       actorDisplayName,
       displayContent,
       link,
-      localizeEmailForRecipient = false,
+      audience,
     } = params;
+    const localizeEmailForRecipient = audience !== 'admin';
     const locale = await resolveRecipientLocale(supabaseAdmin, recipientId);
     const inAppCopy = buildNotificationCopy('inquiry.new_message', locale, {
       actorDisplayName,
@@ -271,9 +276,6 @@ async function notifyRecipient(params: {
       is_read: false,
     });
 
-    const email = await findRecipientEmail(recipientId);
-    if (!email) return;
-
     const emailCopy = await resolveInquiryNotificationEmailCopy({
       supabaseAdmin,
       recipientId,
@@ -283,7 +285,6 @@ async function notifyRecipient(params: {
       displayContent,
       localizeEmailForRecipient,
     });
-    const audience = localizeEmailForRecipient ? 'guest' : 'admin';
 
     void sendTemplatedEmail({
       templateId: 'inquiry.new_message',
@@ -291,7 +292,6 @@ async function notifyRecipient(params: {
       locale: localizeEmailForRecipient ? locale : 'ko',
       recipient: {
         userId: recipientId,
-        email,
       },
       payload: {
         actorName: actorDisplayName,
@@ -749,7 +749,11 @@ export async function createInquiryMessage(params: {
       actorDisplayName,
       displayContent,
       link: notificationLink,
-      localizeEmailForRecipient: !(isAdminSupport && String(actor.id) === String(inquiry.user_id)),
+      audience: resolveInquiryEmailAudience({
+        isAdminSupport,
+        recipientId,
+        hostId: inquiry.host_id,
+      }),
     });
   }
 
@@ -994,10 +998,11 @@ export async function upsertInquiryThread(params: {
         actorDisplayName,
         displayContent: cleanMessage,
         link: notificationLink,
-        localizeEmailForRecipient: !(
-          resolved.inquiryType === 'admin_support' &&
-          String(actor.id) === String(resolved.guestId)
-        ),
+        audience: resolveInquiryEmailAudience({
+          isAdminSupport: resolved.inquiryType === 'admin_support',
+          recipientId,
+          hostId: resolved.hostId,
+        }),
       });
     }
 

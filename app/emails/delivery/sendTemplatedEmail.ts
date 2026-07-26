@@ -2,6 +2,7 @@ import { appendFile } from 'fs/promises';
 import nodemailer from 'nodemailer';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import type {
+  EmailAudience,
   EmailSendRequest,
   EmailTemplateId,
   EmailTransportPolicy,
@@ -89,10 +90,40 @@ function getMockCapturePath() {
   return null;
 }
 
-async function resolveRecipientEmail(
-  supabaseAdmin: AdminClient,
-  userId: string
-) {
+export async function resolveRecipientEmail(params: {
+  supabaseAdmin: AdminClient;
+  userId: string;
+  audience: EmailAudience;
+  explicitEmail?: string | null;
+}) {
+  const {
+    supabaseAdmin,
+    userId,
+    audience,
+    explicitEmail,
+  } = params;
+
+  if (audience === 'host') {
+    const { data: hostApplication, error: hostApplicationError } =
+      await supabaseAdmin
+        .from('host_applications')
+        .select('email')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    if (hostApplicationError) {
+      throw hostApplicationError;
+    }
+
+    const hostNotificationEmail = hostApplication?.email?.trim();
+    if (hostNotificationEmail) return hostNotificationEmail;
+  }
+
+  const normalizedExplicitEmail = explicitEmail?.trim();
+  if (normalizedExplicitEmail) return normalizedExplicitEmail;
+
   const { data: profile } = await supabaseAdmin
     .from('profiles')
     .select('email')
@@ -203,16 +234,21 @@ export async function sendTemplatedEmail<T extends EmailTemplateId>(
   }
 
   const needsAdminClient = Boolean(
-    (request.recipient.userId && !request.recipient.email) ||
+    (request.recipient.userId && request.audience === 'host') ||
+      (request.recipient.userId && !request.recipient.email) ||
       (request.recipient.userId && !request.locale)
   );
   const supabaseAdmin =
     options?.supabaseAdmin || (needsAdminClient ? createAdminClient() : null);
   const recipientEmail =
-    request.recipient.email ||
-    (request.recipient.userId && supabaseAdmin
-      ? await resolveRecipientEmail(supabaseAdmin, request.recipient.userId)
-      : '');
+    request.recipient.userId && supabaseAdmin
+      ? await resolveRecipientEmail({
+          supabaseAdmin,
+          userId: request.recipient.userId,
+          audience: request.audience,
+          explicitEmail: request.recipient.email,
+        })
+      : request.recipient.email || '';
 
   const rendered = await renderEmailTemplate(request, {
     supabaseAdmin,
