@@ -424,6 +424,58 @@ test.describe.serial('Host review routes', () => {
     });
   });
 
+  test('serializes concurrent guest review creation into one review and one notification', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const host = createUser('host-concurrent-review');
+    const guest = createUser('guest-concurrent-review');
+    const hostId = await createAuthUser(host);
+    const guestId = await createAuthUser(guest);
+    await createApprovedHostApplication(hostId, host);
+
+    const experienceId = await createExperienceFixture(hostId);
+    const bookingId = await createBooking({ hostId, guestId, guest, experienceId });
+    await login(page, host);
+
+    const responses = await Promise.all([
+      page.request.post('/api/host/guest-reviews', {
+        data: { bookingId, rating: 5, content: '동시 요청 첫 번째 게스트 평가입니다.' },
+      }),
+      page.request.post('/api/host/guest-reviews', {
+        data: { bookingId, rating: 4, content: '동시 요청 두 번째 게스트 평가입니다.' },
+      }),
+    ]);
+
+    expect(responses.map((response) => response.status()).sort()).toEqual([200, 409]);
+
+    const supabase = getAdminClient();
+    const [reviewsResult, notificationsResult] = await Promise.all([
+      supabase
+        .from('guest_reviews')
+        .select('id, booking_id')
+        .eq('booking_id', bookingId)
+        .eq('host_id', hostId),
+      supabase
+        .from('notifications')
+        .select('id, booking_id')
+        .eq('user_id', guestId)
+        .eq('type', 'guest_review_received')
+        .eq('booking_id', bookingId),
+    ]);
+
+    if (reviewsResult.error) throw reviewsResult.error;
+    if (notificationsResult.error) throw notificationsResult.error;
+    expect(reviewsResult.data || []).toHaveLength(1);
+    expect(notificationsResult.data || []).toHaveLength(1);
+
+    if (reviewsResult.data?.[0]?.id) {
+      createdGuestReviewIds.push(Number(reviewsResult.data[0].id));
+    }
+    if (notificationsResult.data?.[0]?.id) {
+      createdNotificationIds.push(Number(notificationsResult.data[0].id));
+    }
+  });
+
   test('allow owner guest review creation and review reply writes', async ({ page }) => {
     test.setTimeout(90000);
 
@@ -479,6 +531,27 @@ test.describe.serial('Host review routes', () => {
     });
     if (guestReview?.id) createdGuestReviewIds.push(Number(guestReview.id));
 
+    const { data: guestReviewNotification, error: guestReviewNotificationError } = await supabase
+      .from('notifications')
+      .select('id, user_id, type, title, message, link, booking_id')
+      .eq('user_id', guestId)
+      .eq('type', 'guest_review_received')
+      .eq('booking_id', bookingId)
+      .maybeSingle();
+
+    if (guestReviewNotificationError) throw guestReviewNotificationError;
+    expect(guestReviewNotification).toMatchObject({
+      user_id: guestId,
+      type: 'guest_review_received',
+      title: '호스트가 평가를 남겼습니다',
+      link: '/account',
+      booking_id: bookingId,
+    });
+    expect(guestReviewNotification?.message).toContain('Host Review Routes');
+    if (guestReviewNotification?.id) {
+      createdNotificationIds.push(Number(guestReviewNotification.id));
+    }
+
     const guestReviewsResponse = await page.request.get(`/api/host/guests/${guestId}/reviews`);
     expect(guestReviewsResponse.status()).toBe(200);
     await expect(guestReviewsResponse.json()).resolves.toMatchObject({
@@ -499,6 +572,16 @@ test.describe.serial('Host review routes', () => {
       data: { bookingId, rating: 4, content: '중복 후기' },
     });
     expect(duplicateGuestReviewResponse.status()).toBe(409);
+
+    const { count: duplicateNotificationCount, error: duplicateNotificationError } = await supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', guestId)
+      .eq('type', 'guest_review_received')
+      .eq('booking_id', bookingId);
+
+    if (duplicateNotificationError) throw duplicateNotificationError;
+    expect(duplicateNotificationCount).toBe(1);
 
     const replyResponse = await page.request.post('/api/host/reviews/reply', {
       data: { reviewId, reply: '호스트 답글 route 검증용 답글입니다.' },

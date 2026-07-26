@@ -16,6 +16,10 @@ const guardMigrationSource = readFileSync(
   'docs/migrations/v3_40_28_experience_completion_review_request_conflict_guard.sql',
   'utf8'
 );
+const hostRequestMigrationSource = readFileSync(
+  'docs/migrations/v3_40_29_experience_completion_host_guest_review_request.sql',
+  'utf8'
+);
 
 test.describe('Experience completion review request atomic contract', () => {
   test('keeps completion and the keyed review request in one locked function', () => {
@@ -47,6 +51,27 @@ test.describe('Experience completion review request atomic contract', () => {
     );
     expect(guardMigrationSource).toMatch(
       /REVOKE\s+EXECUTE\s+ON\s+FUNCTION\s+public\.complete_experience_booking_if_due_atomic\(TEXT\)\s+FROM\s+anon,\s*authenticated/i
+    );
+  });
+
+  test('adds the host guest-review request without changing the completion RPC contract', () => {
+    expect(hostRequestMigrationSource).toMatch(
+      /CREATE\s+UNIQUE\s+INDEX[\s\S]*ON\s+public\.notifications\s*\(\s*booking_id\s*\)[\s\S]*WHERE\s+type\s*=\s*'guest_review_request'[\s\S]*booking_id\s+IS\s+NOT\s+NULL/i
+    );
+    expect(hostRequestMigrationSource).toMatch(
+      /RETURNS\s+TABLE\s*\(\s*booking_id\s+TEXT,\s*order_id\s+TEXT,\s*user_id\s+UUID,\s*already_processed\s+BOOLEAN,\s*not_due\s+BOOLEAN,\s*completed\s+BOOLEAN,\s*notification_created\s+BOOLEAN\s*\)/i
+    );
+    expect(hostRequestMigrationSource).not.toMatch(
+      /DROP\s+FUNCTION[\s\S]*complete_experience_booking_if_due_atomic/i
+    );
+    expect(hostRequestMigrationSource).toMatch(
+      /v_booking\.user_id\s+IS\s+NOT\s+NULL[\s\S]*v_experience_host_id\s+IS\s+NOT\s+NULL[\s\S]*NOT\s+EXISTS\s*\([\s\S]*FROM\s+public\.guest_reviews/i
+    );
+    expect(hostRequestMigrationSource).toMatch(
+      /INSERT\s+INTO\s+public\.notifications[\s\S]*'guest_review_request'[\s\S]*'\/host\/dashboard\?tab=reservations'/i
+    );
+    expect(hostRequestMigrationSource).toMatch(
+      /GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+public\.complete_experience_booking_if_due_atomic\(TEXT\)\s+TO\s+service_role/i
     );
   });
 
@@ -145,11 +170,15 @@ test.describe('Experience completion review request atomic contract', () => {
       const source = readFileSync(routePath, 'utf8');
       const batchIndex = source.indexOf('const completionBatch = await');
       const refundIndex = source.indexOf('processSoloGuaranteeRefundsForCompletedBookings({');
+      const hostRequestIndex = source.indexOf(
+        'deliverHostGuestReviewRequestsForCompletedBookings({'
+      );
       const failureIndex = source.indexOf('if (completionBatch.failures.length > 0)');
 
       expect(batchIndex).toBeGreaterThanOrEqual(0);
       expect(refundIndex).toBeGreaterThan(batchIndex);
-      expect(failureIndex).toBeGreaterThan(refundIndex);
+      expect(hostRequestIndex).toBeGreaterThan(refundIndex);
+      expect(failureIndex).toBeGreaterThan(hostRequestIndex);
     }
 
     const settlementSource = readFileSync(
@@ -162,12 +191,17 @@ test.describe('Experience completion review request atomic contract', () => {
     );
     const batchIndex = runDueSource.indexOf('const completionBatch = await');
     const refundIndex = runDueSource.indexOf('processSoloGuaranteeRefundSideEffects');
-    const renewIndex = runDueSource.indexOf('await renewLease();', refundIndex);
+    const hostRequestIndex = runDueSource.indexOf(
+      'processHostGuestReviewRequestSideEffects',
+      refundIndex
+    );
+    const renewIndex = runDueSource.indexOf('await renewLease();', hostRequestIndex);
     const failureIndex = runDueSource.indexOf('if (completionBatch.failures.length > 0)');
 
     expect(batchIndex).toBeGreaterThanOrEqual(0);
     expect(refundIndex).toBeGreaterThan(batchIndex);
-    expect(renewIndex).toBeGreaterThan(refundIndex);
+    expect(hostRequestIndex).toBeGreaterThan(refundIndex);
+    expect(renewIndex).toBeGreaterThan(hostRequestIndex);
     expect(failureIndex).toBeGreaterThan(renewIndex);
     expect(runDueSource).toContain('candidate_count: candidateCount');
     expect(runDueSource).toContain('booking_ids: completedBookingIds');
@@ -188,9 +222,13 @@ test.describe('Experience completion review request atomic contract', () => {
       forceSource.indexOf('if (completionResult.completed)')
     );
     const refundIndex = completedBranch.indexOf('processSoloGuaranteeRefundSideEffects');
+    const hostRequestIndex = completedBranch.indexOf(
+      'processHostGuestReviewRequestSideEffects'
+    );
     const renewIndex = completedBranch.indexOf('await renewLease();');
 
     expect(refundIndex).toBeGreaterThanOrEqual(0);
-    expect(renewIndex).toBeGreaterThan(refundIndex);
+    expect(hostRequestIndex).toBeGreaterThan(refundIndex);
+    expect(renewIndex).toBeGreaterThan(hostRequestIndex);
   });
 });

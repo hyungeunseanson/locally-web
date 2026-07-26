@@ -506,6 +506,21 @@ test.describe.serial('guest trips completed sync route', () => {
     if (reviewRequestsError) throw reviewRequestsError;
     expect(reviewRequests || []).toHaveLength(1);
 
+    const { data: hostReviewRequests, error: hostReviewRequestsError } = await supabase
+      .from('notifications')
+      .select('id, booking_id, link')
+      .eq('user_id', hostId)
+      .eq('type', 'guest_review_request')
+      .eq('booking_id', bookingId);
+
+    if (hostReviewRequestsError) throw hostReviewRequestsError;
+    expect(hostReviewRequests || []).toEqual([
+      expect.objectContaining({
+        booking_id: bookingId,
+        link: '/host/dashboard?tab=reservations',
+      }),
+    ]);
+
     const repeatedSyncResult = await page.evaluate(async () => {
       const response = await fetch('/api/guest/trips/sync-completed', {
         method: 'POST',
@@ -532,6 +547,16 @@ test.describe.serial('guest trips completed sync route', () => {
 
     if (repeatedReviewRequestError) throw repeatedReviewRequestError;
     expect(repeatedReviewRequestCount).toBe(1);
+
+    const { count: repeatedHostReviewRequestCount, error: repeatedHostReviewRequestError } = await supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', hostId)
+      .eq('type', 'guest_review_request')
+      .eq('booking_id', bookingId);
+
+    if (repeatedHostReviewRequestError) throw repeatedHostReviewRequestError;
+    expect(repeatedHostReviewRequestCount).toBe(1);
   });
 
   test('guest and host completion sync race creates one keyed review request', async ({ browser }, testInfo) => {
@@ -583,7 +608,7 @@ test.describe.serial('guest trips completed sync route', () => {
       expect([guestSync.body.updatedCount, hostSync.body.updatedCount].sort()).toEqual([0, 1]);
 
       const supabase = getAdminClient();
-      const [bookingResult, notificationResult] = await Promise.all([
+      const [bookingResult, guestNotificationResult, hostNotificationResult] = await Promise.all([
         supabase.from('bookings').select('status').eq('id', bookingId).maybeSingle(),
         supabase
           .from('notifications')
@@ -591,12 +616,20 @@ test.describe.serial('guest trips completed sync route', () => {
           .eq('user_id', guestId)
           .eq('type', 'review_request')
           .eq('booking_id', bookingId),
+        supabase
+          .from('notifications')
+          .select('id, booking_id')
+          .eq('user_id', hostId)
+          .eq('type', 'guest_review_request')
+          .eq('booking_id', bookingId),
       ]);
 
       if (bookingResult.error) throw bookingResult.error;
-      if (notificationResult.error) throw notificationResult.error;
+      if (guestNotificationResult.error) throw guestNotificationResult.error;
+      if (hostNotificationResult.error) throw hostNotificationResult.error;
       expect(bookingResult.data?.status).toBe('completed');
-      expect(notificationResult.data || []).toHaveLength(1);
+      expect(guestNotificationResult.data || []).toHaveLength(1);
+      expect(hostNotificationResult.data || []).toHaveLength(1);
     } finally {
       await Promise.all([guestContext.close(), hostContext.close()]);
     }

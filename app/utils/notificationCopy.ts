@@ -63,6 +63,14 @@ type ReviewNewHostParams = {
   experienceTitle: string;
 };
 
+type ReviewGuestRequestHostParams = {
+  experienceTitle: string;
+};
+
+type ReviewGuestReceivedGuestParams = {
+  experienceTitle: string;
+};
+
 type ServiceRequestNewHostParams = {
   requestTitle: string;
   requestCity: string;
@@ -125,6 +133,8 @@ export type NotificationCopyKey =
   | 'booking.review_rejected'
   | 'inquiry.new_message'
   | 'review.new.host'
+  | 'review.guest_request.host'
+  | 'review.guest_received.guest'
   | 'service.request_new.host'
   | 'service.payment_confirmed.customer'
   | 'service.application_new.customer'
@@ -157,6 +167,8 @@ type NotificationCopyParams = {
   'booking.review_rejected': BookingReviewRejectedParams;
   'inquiry.new_message': InquiryNewMessageParams;
   'review.new.host': ReviewNewHostParams;
+  'review.guest_request.host': ReviewGuestRequestHostParams;
+  'review.guest_received.guest': ReviewGuestReceivedGuestParams;
   'service.request_new.host': ServiceRequestNewHostParams;
   'service.payment_confirmed.customer': ServicePaymentConfirmedCustomerParams;
   'service.application_new.customer': ServiceApplicationNewCustomerParams;
@@ -908,6 +920,68 @@ function buildReviewNewHostCopy(
   }
 }
 
+function buildReviewGuestRequestHostCopy(
+  locale: NotificationLocale,
+  params: ReviewGuestRequestHostParams
+): NotificationCopy {
+  const { experienceTitle } = params;
+
+  switch (locale) {
+    case 'en':
+      return {
+        title: 'Please review your guest',
+        message: `Please leave a guest review for '${experienceTitle}'.`,
+      };
+    case 'ja':
+      return {
+        title: 'ゲストを評価してください',
+        message: `「${experienceTitle}」のゲスト評価を投稿してください。`,
+      };
+    case 'zh':
+      return {
+        title: '请评价您的客人',
+        message: `请为“${experienceTitle}”的客人留下评价。`,
+      };
+    case 'ko':
+    default:
+      return {
+        title: '게스트 평가를 남겨주세요',
+        message: `'${experienceTitle}' 체험의 게스트 평가를 남겨주세요.`,
+      };
+  }
+}
+
+function buildReviewGuestReceivedGuestCopy(
+  locale: NotificationLocale,
+  params: ReviewGuestReceivedGuestParams
+): NotificationCopy {
+  const { experienceTitle } = params;
+
+  switch (locale) {
+    case 'en':
+      return {
+        title: 'Your host left you a review',
+        message: `Your host left you a guest review for '${experienceTitle}'.`,
+      };
+    case 'ja':
+      return {
+        title: 'ホストから評価が届きました',
+        message: `「${experienceTitle}」のホストからゲスト評価が届きました。`,
+      };
+    case 'zh':
+      return {
+        title: '您的体验达人留下了评价',
+        message: `“${experienceTitle}”的体验达人为您留下了评价。`,
+      };
+    case 'ko':
+    default:
+      return {
+        title: '호스트가 평가를 남겼습니다',
+        message: `'${experienceTitle}' 체험의 호스트가 회원님에 대한 평가를 남겼습니다.`,
+      };
+  }
+}
+
 function buildServiceRequestNewHostCopy(
   locale: NotificationLocale,
   params: ServiceRequestNewHostParams
@@ -1494,6 +1568,16 @@ export function buildNotificationCopy<K extends NotificationCopyKey>(
       return buildInquiryNewMessageCopy(locale, copyParams as NotificationCopyParams['inquiry.new_message']);
     case 'review.new.host':
       return buildReviewNewHostCopy(locale, copyParams as NotificationCopyParams['review.new.host']);
+    case 'review.guest_request.host':
+      return buildReviewGuestRequestHostCopy(
+        locale,
+        copyParams as NotificationCopyParams['review.guest_request.host']
+      );
+    case 'review.guest_received.guest':
+      return buildReviewGuestReceivedGuestCopy(
+        locale,
+        copyParams as NotificationCopyParams['review.guest_received.guest']
+      );
     case 'service.request_new.host':
       return buildServiceRequestNewHostCopy(locale, copyParams as NotificationCopyParams['service.request_new.host']);
     case 'service.payment_confirmed.customer':

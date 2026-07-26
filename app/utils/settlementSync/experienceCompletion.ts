@@ -4,6 +4,7 @@ import {
   completeExperienceBookingsIfDueAtomic,
 } from '@/app/utils/bookings/completeExperienceBooking';
 import { processSoloGuaranteeRefundsForCompletedBookings } from '@/app/utils/bookings/soloGuaranteeRefund';
+import { deliverHostGuestReviewRequestsForCompletedBookings } from '@/app/utils/reviews/hostGuestReviewRequestNotification';
 
 import {
   finishSettlementSyncRunFailure,
@@ -227,6 +228,22 @@ async function processSoloGuaranteeRefundSideEffects(
   }
 }
 
+async function processHostGuestReviewRequestSideEffects(
+  supabaseAdmin: SettlementSyncAdminClient,
+  bookingIds: string[]
+) {
+  if (bookingIds.length === 0) return;
+
+  try {
+    await deliverHostGuestReviewRequestsForCompletedBookings({
+      supabaseAdmin,
+      completedBookingIds: bookingIds,
+    });
+  } catch (error) {
+    console.error('[settlement sync] host guest review request delivery failed:', error);
+  }
+}
+
 export async function resolveExperienceCompletionTarget(
   supabaseAdmin: SettlementSyncAdminClient,
   identifier: string
@@ -325,6 +342,7 @@ export async function runExperienceCompletionSync(
     failedBookingIds = completionBatch.failures.map((failure) => failure.bookingId);
 
     await processSoloGuaranteeRefundSideEffects(params.supabaseAdmin, completedBookingIds);
+    await processHostGuestReviewRequestSideEffects(params.supabaseAdmin, completedBookingIds);
     await renewLease();
 
     if (completionBatch.failures.length > 0) {
@@ -522,6 +540,7 @@ export async function forceExperienceCompletionSync(
 
     if (completionResult.completed) {
       await processSoloGuaranteeRefundSideEffects(params.supabaseAdmin, [target.booking_id]);
+      await processHostGuestReviewRequestSideEffects(params.supabaseAdmin, [target.booking_id]);
       await renewLease();
       await finishSettlementSyncRunSuccess({
         supabaseAdmin: params.supabaseAdmin,

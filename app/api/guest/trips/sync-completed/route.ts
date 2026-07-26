@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 import { completeExperienceBookingsIfDueAtomic } from '@/app/utils/bookings/completeExperienceBooking';
 import { processSoloGuaranteeRefundsForCompletedBookings } from '@/app/utils/bookings/soloGuaranteeRefund';
+import { deliverHostGuestReviewRequestsForCompletedBookings } from '@/app/utils/reviews/hostGuestReviewRequestNotification';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient } from '@/app/utils/supabase/server';
 
@@ -46,6 +47,18 @@ export async function POST() {
       });
     } catch (refundError) {
       console.error('[guest/trips/sync-completed] solo guarantee refund processing failed:', refundError);
+    }
+
+    try {
+      await deliverHostGuestReviewRequestsForCompletedBookings({
+        supabaseAdmin,
+        completedBookingIds,
+      });
+    } catch (notificationError) {
+      console.error(
+        '[guest/trips/sync-completed] host guest review request delivery failed:',
+        notificationError
+      );
     }
 
     if (completionBatch.failures.length > 0) {

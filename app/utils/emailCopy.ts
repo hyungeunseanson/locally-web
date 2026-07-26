@@ -11,6 +11,14 @@ type ReviewNewHostParams = {
   experienceTitle: string;
 };
 
+type ReviewGuestRequestHostParams = {
+  experienceTitle: string;
+};
+
+type ReviewGuestReceivedGuestParams = {
+  experienceTitle: string;
+};
+
 type ReviewReplyGuestParams = {
   replyPreview: string;
 };
@@ -116,6 +124,8 @@ export type EmailCopy = {
 export type EmailCopyKey =
   | 'review.new.host'
   | 'review.reply.guest'
+  | 'review.guest_request.host'
+  | 'review.guest_received.guest'
   | 'membership.member_welcome'
   | 'membership.circle_welcome'
   | 'host_application.approved'
@@ -146,6 +156,8 @@ export type EmailCopyKey =
 type EmailCopyParams = {
   'review.new.host': ReviewNewHostParams;
   'review.reply.guest': ReviewReplyGuestParams;
+  'review.guest_request.host': ReviewGuestRequestHostParams;
+  'review.guest_received.guest': ReviewGuestReceivedGuestParams;
   'membership.member_welcome': MembershipParams;
   'membership.circle_welcome': MembershipParams;
   'host_application.approved': HostApplicationStatusParams;
@@ -255,6 +267,84 @@ function buildReviewReplyGuestEmailCopy(
         title: '호스트님이 후기에 답글을 남겼습니다',
         message: `후기에 답글이 달렸습니다: "${replyPreview}"`,
         ctaLabel: '후기 확인하기',
+      };
+  }
+}
+
+function buildReviewGuestRequestHostEmailCopy(
+  locale: NotificationLocale,
+  params: ReviewGuestRequestHostParams
+): EmailCopy {
+  const { experienceTitle } = params;
+
+  switch (locale) {
+    case 'en':
+      return {
+        subject: '[Locally] Please review your guest',
+        title: 'Please review your guest',
+        message: `Please leave a guest review for '${experienceTitle}'.`,
+        ctaLabel: 'Write guest review',
+      };
+    case 'ja':
+      return {
+        subject: '[Locally] ゲストを評価してください',
+        title: 'ゲストを評価してください',
+        message: `「${experienceTitle}」のゲスト評価を投稿してください。`,
+        ctaLabel: 'ゲストを評価',
+      };
+    case 'zh':
+      return {
+        subject: '[Locally] 请评价您的客人',
+        title: '请评价您的客人',
+        message: `请为“${experienceTitle}”的客人留下评价。`,
+        ctaLabel: '评价客人',
+      };
+    case 'ko':
+    default:
+      return {
+        subject: '[Locally] 게스트 평가를 남겨주세요',
+        title: '게스트 평가를 남겨주세요',
+        message: `'${experienceTitle}' 체험의 게스트 평가를 남겨주세요.`,
+        ctaLabel: '게스트 평가하기',
+      };
+  }
+}
+
+function buildReviewGuestReceivedGuestEmailCopy(
+  locale: NotificationLocale,
+  params: ReviewGuestReceivedGuestParams
+): EmailCopy {
+  const { experienceTitle } = params;
+
+  switch (locale) {
+    case 'en':
+      return {
+        subject: '[Locally] Your host left you a review',
+        title: 'Your host left you a review',
+        message: `Your host left you a guest review for '${experienceTitle}'.`,
+        ctaLabel: 'View my reviews',
+      };
+    case 'ja':
+      return {
+        subject: '[Locally] ホストから評価が届きました',
+        title: 'ホストから評価が届きました',
+        message: `「${experienceTitle}」のホストからゲスト評価が届きました。`,
+        ctaLabel: '評価を確認',
+      };
+    case 'zh':
+      return {
+        subject: '[Locally] 您的体验达人留下了评价',
+        title: '您的体验达人留下了评价',
+        message: `“${experienceTitle}”的体验达人为您留下了评价。`,
+        ctaLabel: '查看我的评价',
+      };
+    case 'ko':
+    default:
+      return {
+        subject: '[Locally] 호스트가 평가를 남겼습니다',
+        title: '호스트가 평가를 남겼습니다',
+        message: `'${experienceTitle}' 체험의 호스트가 회원님에 대한 평가를 남겼습니다.`,
+        ctaLabel: '받은 평가 확인하기',
       };
   }
 }
@@ -1424,6 +1514,16 @@ export function buildEmailCopy<K extends EmailCopyKey>(
       return buildReviewReplyGuestEmailCopy(
         locale,
         copyParams as EmailCopyParams['review.reply.guest']
+      );
+    case 'review.guest_request.host':
+      return buildReviewGuestRequestHostEmailCopy(
+        locale,
+        copyParams as EmailCopyParams['review.guest_request.host']
+      );
+    case 'review.guest_received.guest':
+      return buildReviewGuestReceivedGuestEmailCopy(
+        locale,
+        copyParams as EmailCopyParams['review.guest_received.guest']
       );
     case 'membership.member_welcome':
     case 'membership.circle_welcome':
