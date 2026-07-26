@@ -140,7 +140,7 @@ async function waitForNotification(params: {
   for (let attempt = 0; attempt < 20; attempt += 1) {
     let query = supabase
       .from('notifications')
-      .select('id, type, title, message, link')
+      .select('id, type, title, message, link, booking_id')
       .eq('user_id', params.userId)
       .eq('title', params.title)
       .order('created_at', { ascending: false })
@@ -273,6 +273,30 @@ test.describe.serial('Notification localization runtime', () => {
     const bookingId = String(bookingBody.newOrderId);
     createdBookingIds.push(bookingId);
 
+    const guestPendingNotification = await waitForNotification({
+      userId: guestId,
+      type: 'booking_pending',
+      title: '⏳ Booking received (payment confirmation pending)',
+    });
+    expect(guestPendingNotification.message).toContain('confirmed after payment is verified');
+    expect(guestPendingNotification.link).toBe('/guest/trips');
+    expect(guestPendingNotification.booking_id).toBe(bookingId);
+
+    const { data: pendingBooking, error: pendingBookingError } = await getAdminClient()
+      .from('bookings')
+      .select('status, amount, total_price, guests, payment_method, is_solo_guarantee')
+      .eq('id', bookingId)
+      .maybeSingle();
+    if (pendingBookingError) throw pendingBookingError;
+    expect(pendingBooking).toMatchObject({
+      status: 'PENDING',
+      amount: Number(bookingBody.finalAmount),
+      guests: 1,
+      payment_method: 'bank',
+      is_solo_guarantee: false,
+    });
+    expect(Number(pendingBooking?.total_price)).toBeGreaterThan(0);
+
     const hostPendingNotification = await waitForNotification({
       userId: hostId,
       type: 'new_booking',
@@ -289,7 +313,7 @@ test.describe.serial('Notification localization runtime', () => {
     const hostConfirmedNotification = await waitForNotification({
       userId: hostId,
       type: 'booking_confirmed',
-      title: '💰 入金確認完了',
+      title: '💰 入金確認完了！ゲストに今すぐメッセージを',
     });
     expect(hostConfirmedNotification.message).toContain('入金確認が完了しました');
 

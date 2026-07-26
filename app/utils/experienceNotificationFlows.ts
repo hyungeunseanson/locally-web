@@ -130,6 +130,7 @@ export async function notifyExperiencePaymentConfirmed(
       templatedEmail: {
         templateId: 'booking.confirmed',
         audience: 'guest',
+        transportPolicy: 'opsAdmin',
         payload: {
           experienceTitle,
           bookingDate,
@@ -139,9 +140,15 @@ export async function notifyExperiencePaymentConfirmed(
           ctaUrl: '/guest/trips',
         },
       },
-    }).catch((emailError) => {
-      console.error('[ExperienceNotificationFlows] guest booking email failed:', emailError);
-    });
+    })
+      .then((emailResult) => {
+        if (!emailResult.sent) {
+          console.error('[ExperienceNotificationFlows] guest booking email skipped:', emailResult.skipped);
+        }
+      })
+      .catch((emailError) => {
+        console.error('[ExperienceNotificationFlows] guest booking email failed:', emailError);
+      });
 
     void notifyMembershipMilestone({
       supabaseAdmin,

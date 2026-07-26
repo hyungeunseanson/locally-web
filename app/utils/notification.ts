@@ -3,6 +3,7 @@ export type NotificationType =
   | 'member_welcome'
   | 'circle_welcome'
   | 'booking_request'
+  | 'booking_pending'
   | 'booking_confirmed'
   | 'booking_cancelled'
   | 'booking_cancel_request'

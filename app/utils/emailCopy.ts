@@ -135,6 +135,7 @@ export type EmailCopyKey =
   | 'experience.revision'
   | 'booking.confirmed.guest'
   | 'booking.cancellation_approved.guest'
+  | 'booking.bank_pending.guest'
   | 'booking.bank_confirmed.host'
   | 'booking.bank_confirmed.guest'
   | 'booking.cancelled.host'
@@ -167,6 +168,7 @@ type EmailCopyParams = {
   'experience.revision': ExperienceStatusParams;
   'booking.confirmed.guest': BookingConfirmedGuestParams;
   'booking.cancellation_approved.guest': BookingCancellationApprovedGuestParams;
+  'booking.bank_pending.guest': BookingBankConfirmedGuestParams;
   'booking.bank_confirmed.host': BookingBankConfirmedHostParams;
   'booking.bank_confirmed.guest': BookingBankConfirmedGuestParams;
   'booking.cancelled.host': BookingCancelledHostParams;
@@ -806,6 +808,45 @@ function buildBookingBankConfirmedEmailCopy(
         subject: '[Locally] ✅ 예약이 확정되었습니다',
         title: '예약 확정 알림',
         message: `'${experienceTitle}' 입금이 확인되어 예약이 확정되었습니다.`,
+        ctaLabel: '내 여행 보기',
+      };
+  }
+}
+
+function buildBookingBankPendingGuestEmailCopy(
+  locale: NotificationLocale,
+  params: BookingBankConfirmedGuestParams
+): EmailCopy {
+  const { experienceTitle } = params;
+
+  switch (locale) {
+    case 'en':
+      return {
+        subject: '[Locally] Your bank transfer booking was received',
+        title: 'Booking received · Payment confirmation pending',
+        message: `Your bank transfer booking for '${experienceTitle}' was received. It will be confirmed after payment is verified.`,
+        ctaLabel: 'View my trips',
+      };
+    case 'ja':
+      return {
+        subject: '[Locally] 銀行振込予約を受け付けました',
+        title: '予約受付完了 · 入金確認待ち',
+        message: `「${experienceTitle}」の銀行振込予約を受け付けました。入金確認後に予約が確定します。`,
+        ctaLabel: '旅行を見る',
+      };
+    case 'zh':
+      return {
+        subject: '[Locally] 已受理你的银行转账预订',
+        title: '预订已受理 · 等待确认转账',
+        message: `已受理「${experienceTitle}」的银行转账预订。确认到账后，预订将正式确认。`,
+        ctaLabel: '查看我的行程',
+      };
+    case 'ko':
+    default:
+      return {
+        subject: '[Locally] 무통장 입금 대기 예약이 접수되었습니다',
+        title: '예약 접수 완료 · 입금 확인 대기',
+        message: `'${experienceTitle}' 무통장 입금 예약이 접수되었습니다. 입금 확인 후 예약이 확정됩니다.`,
         ctaLabel: '내 여행 보기',
       };
   }
@@ -1555,6 +1596,11 @@ export function buildEmailCopy<K extends EmailCopyKey>(
       return buildBookingCancellationApprovedGuestEmailCopy(
         locale,
         copyParams as EmailCopyParams['booking.cancellation_approved.guest']
+      );
+    case 'booking.bank_pending.guest':
+      return buildBookingBankPendingGuestEmailCopy(
+        locale,
+        copyParams as EmailCopyParams['booking.bank_pending.guest']
       );
     case 'booking.bank_confirmed.host':
     case 'booking.bank_confirmed.guest':

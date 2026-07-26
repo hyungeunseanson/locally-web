@@ -297,7 +297,7 @@ export async function runExperienceBankConfirmSideEffects(
 
   if (booking.user_id) {
     try {
-      await sendImmediateGenericEmail({
+      const guestEmailResult = await sendImmediateGenericEmail({
         recipientUserId: booking.user_id,
         subject: '',
         title: '',
@@ -305,6 +305,7 @@ export async function runExperienceBankConfirmSideEffects(
         templatedEmail: {
           templateId: 'notice.copy',
           audience: 'guest',
+          transportPolicy: 'opsAdmin',
           payload: {
             copyKey: 'booking.bank_confirmed.guest',
             copyParams: {
@@ -314,6 +315,9 @@ export async function runExperienceBankConfirmSideEffects(
           },
         },
       });
+      if (!guestEmailResult.sent) {
+        console.error('[experience bank confirm] guest email skipped:', guestEmailResult.skipped);
+      }
     } catch (error) {
       console.error('[experience bank confirm] guest email failed:', error);
     }

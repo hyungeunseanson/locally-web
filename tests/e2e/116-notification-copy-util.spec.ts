@@ -128,6 +128,32 @@ test.describe('Notification localization helpers', () => {
     expect(bankConfirmedEn.message).not.toContain('게스트');
   });
 
+  test('labels bank transfer bookings as received but not confirmed in every locale', () => {
+    const copies = {
+      ko: buildNotificationCopy('booking.bank_pending.guest', 'ko', {
+        experienceTitle: '서울 야경 산책',
+      }),
+      en: buildNotificationCopy('booking.bank_pending.guest', 'en', {
+        experienceTitle: 'Seoul Night Walk',
+      }),
+      ja: buildNotificationCopy('booking.bank_pending.guest', 'ja', {
+        experienceTitle: '東京ナイトツアー',
+      }),
+      zh: buildNotificationCopy('booking.bank_pending.guest', 'zh', {
+        experienceTitle: '首尔夜景散步',
+      }),
+    };
+
+    expect(copies.ko.title).toContain('입금 확인 대기');
+    expect(copies.ko.message).toContain('입금 확인 후 예약이 확정');
+    expect(copies.en.title).toContain('confirmation pending');
+    expect(copies.en.message).toContain('confirmed after payment is verified');
+    expect(copies.ja.title).toContain('入金確認待ち');
+    expect(copies.ja.message).toContain('入金確認後に予約が確定');
+    expect(copies.zh.title).toContain('等待确认转账');
+    expect(copies.zh.message).toContain('确认到账后');
+  });
+
   test('builds host booking message deep links with a reservations fallback', () => {
     expect(getHostBookingMessageHref({ guestId: 'guest-1', experienceId: 42 })).toBe(
       '/host/dashboard?tab=inquiries&guestId=guest-1&expId=42'

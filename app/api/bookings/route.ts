@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
+import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 import { captureServerException } from '@/app/utils/monitoring/sentry';
 import {
@@ -212,6 +213,64 @@ export async function POST(request: Request) {
         const hostId = bookingData.host_id;
         const experienceTitle = bookingData.experience_title || 'Locally 체험';
         const isBankTransferPending = paymentMethod === 'bank';
+
+        if (isBankTransferPending) {
+            try {
+                const guestNotification = await buildLocalizedNotificationInsert({
+                    supabaseAdmin,
+                    userId: user.id,
+                    type: 'booking_pending',
+                    link: '/guest/trips',
+                    key: 'booking.bank_pending.guest',
+                    copyParams: {
+                        experienceTitle,
+                    },
+                });
+
+                const { error: guestNotificationError } = await supabaseAdmin
+                    .from('notifications')
+                    .insert({
+                        ...guestNotification,
+                        booking_id: newOrderId,
+                    });
+
+                if (guestNotificationError) {
+                    console.error('[api/bookings] guest bank pending notification failed:', guestNotificationError);
+                }
+            } catch (guestNotificationError) {
+                console.error('[api/bookings] guest bank pending notification threw:', guestNotificationError);
+            }
+
+            try {
+                after(async () => {
+                    try {
+                        const emailResult = await sendImmediateGenericEmail({
+                            recipientUserId: user.id,
+                            templatedEmail: {
+                                templateId: 'notice.copy',
+                                audience: 'guest',
+                                transportPolicy: 'opsAdmin',
+                                payload: {
+                                    copyKey: 'booking.bank_pending.guest',
+                                    copyParams: {
+                                        experienceTitle,
+                                    },
+                                    ctaUrl: '/guest/trips',
+                                },
+                            },
+                        });
+
+                        if (!emailResult.sent) {
+                            console.error('[api/bookings] guest bank pending email skipped:', emailResult.skipped);
+                        }
+                    } catch (guestEmailError) {
+                        console.error('[api/bookings] guest bank pending email failed:', guestEmailError);
+                    }
+                });
+            } catch (guestEmailScheduleError) {
+                console.error('[api/bookings] guest bank pending email scheduling failed:', guestEmailScheduleError);
+            }
+        }
 
         // 7. 호스트 알림 발송 (클라이언트 인젝션 완벽 차단)
         // - 에러가 나더라도 예약 진행을 막지 않도록 비동기로 별도 에러 로깅만 처리

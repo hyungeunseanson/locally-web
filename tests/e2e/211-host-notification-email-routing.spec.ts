@@ -1,3 +1,5 @@
+import './helpers/serverOnlyTestShim';
+
 import { expect, test } from '@playwright/test';
 
 import { resolveInquiryEmailAudience } from '@/app/api/inquiries/thread/shared';

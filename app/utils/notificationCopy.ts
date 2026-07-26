@@ -124,6 +124,7 @@ export type NotificationCopyKey =
   | 'booking.new.host'
   | 'booking.confirmed.host'
   | 'booking.confirmed.guest'
+  | 'booking.bank_pending.guest'
   | 'booking.bank_confirmed.host'
   | 'booking.bank_confirmed.guest'
   | 'booking.review_pending'
@@ -158,6 +159,7 @@ type NotificationCopyParams = {
   'booking.new.host': BookingNewHostParams;
   'booking.confirmed.host': BookingConfirmedHostParams;
   'booking.confirmed.guest': BookingConfirmedGuestParams;
+  'booking.bank_pending.guest': BookingConfirmedGuestParams;
   'booking.bank_confirmed.host': BookingConfirmedHostParams;
   'booking.bank_confirmed.guest': BookingConfirmedGuestParams;
   'booking.review_pending': BookingReviewPendingParams;
@@ -453,6 +455,37 @@ function buildBookingConfirmedGuestCopy(
       return {
         title: '✅ 예약이 확정되었습니다',
         message: `'${experienceTitle}' 결제가 완료되어 예약이 확정되었습니다.`,
+      };
+  }
+}
+
+function buildBookingBankPendingGuestCopy(
+  locale: NotificationLocale,
+  params: BookingConfirmedGuestParams
+): NotificationCopy {
+  const { experienceTitle } = params;
+
+  switch (locale) {
+    case 'en':
+      return {
+        title: '⏳ Booking received (payment confirmation pending)',
+        message: `Your bank transfer booking for '${experienceTitle}' was received. It will be confirmed after payment is verified.`,
+      };
+    case 'ja':
+      return {
+        title: '⏳ 予約受付完了（入金確認待ち）',
+        message: `「${experienceTitle}」の銀行振込予約を受け付けました。入金確認後に予約が確定します。`,
+      };
+    case 'zh':
+      return {
+        title: '⏳ 预订已受理（等待确认转账）',
+        message: `已受理「${experienceTitle}」的银行转账预订。确认到账后，预订将正式确认。`,
+      };
+    case 'ko':
+    default:
+      return {
+        title: '⏳ 예약 접수 완료 (입금 확인 대기)',
+        message: `'${experienceTitle}' 무통장 입금 예약이 접수되었습니다. 입금 확인 후 예약이 확정됩니다.`,
       };
   }
 }
@@ -1547,6 +1580,8 @@ export function buildNotificationCopy<K extends NotificationCopyKey>(
       return buildBookingConfirmedHostCopy(locale, copyParams as NotificationCopyParams['booking.confirmed.host']);
     case 'booking.confirmed.guest':
       return buildBookingConfirmedGuestCopy(locale, copyParams as NotificationCopyParams['booking.confirmed.guest']);
+    case 'booking.bank_pending.guest':
+      return buildBookingBankPendingGuestCopy(locale, copyParams as NotificationCopyParams['booking.bank_pending.guest']);
     case 'booking.bank_confirmed.host':
       return buildBookingBankConfirmedHostCopy(locale, copyParams as NotificationCopyParams['booking.bank_confirmed.host']);
     case 'booking.bank_confirmed.guest':

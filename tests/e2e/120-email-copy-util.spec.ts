@@ -62,6 +62,25 @@ test.describe('Email localization helpers', () => {
     expect(bookingConfirmedJa.subject).toBe('[Locally] 予約が確定しました');
     expect(bookingConfirmedJa.message).toContain('決済が完了し、予約が確定しました');
 
+    const bankPendingCopies = {
+      ko: buildEmailCopy('booking.bank_pending.guest', 'ko', {
+        experienceTitle: '서울 야경 산책',
+      }),
+      en: buildEmailCopy('booking.bank_pending.guest', 'en', {
+        experienceTitle: 'Seoul Night Walk',
+      }),
+      ja: buildEmailCopy('booking.bank_pending.guest', 'ja', {
+        experienceTitle: '東京ナイトツアー',
+      }),
+      zh: buildEmailCopy('booking.bank_pending.guest', 'zh', {
+        experienceTitle: '首尔夜景散步',
+      }),
+    };
+    expect(bankPendingCopies.ko.title).toBe('예약 접수 완료 · 입금 확인 대기');
+    expect(bankPendingCopies.en.message).toContain('confirmed after payment is verified');
+    expect(bankPendingCopies.ja.subject).toContain('銀行振込予約を受け付けました');
+    expect(bankPendingCopies.zh.ctaLabel).toBe('查看我的行程');
+
     const cancellationApprovedZh = buildEmailCopy('booking.cancellation_approved.guest', 'zh', {
       experienceTitle: '首尔夜景散步',
     });
