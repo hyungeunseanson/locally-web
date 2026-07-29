@@ -1,6 +1,41 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
+const LEGACY_IMWEB_ORIGIN = 'https://locally2.imweb.me';
+
+const legacyExactPaths = [
+  '/programs',
+  '/esim',
+  '/event',
+  '/rss',
+  '/32',
+  '/38',
+  '/51',
+  '/52',
+  '/57',
+  '/59',
+  '/62',
+  '/64',
+  '/73',
+  '/75',
+  '/1523756371',
+  '/shop_cart',
+  '/site_join',
+  '/site_join_agree',
+  '/site_join_pattern_choice',
+  '/logout.cm',
+];
+
+const legacyWildcardPaths = [
+  '/archive/:path*',
+  '/shop_view/:path*',
+  '/shop_mypage/:path*',
+  '/shop_payment/:path*',
+  '/shop/:path*',
+  '/backpg/:path*',
+  '/partner/:path*',
+];
+
 const nextConfig: NextConfig = {
   // ✅ 이미지 최적화 설정
   images: {
@@ -44,6 +79,53 @@ const nextConfig: NextConfig = {
 
   async redirects() {
     return [
+      ...legacyExactPaths.map((source) => ({
+        source,
+        destination: `${LEGACY_IMWEB_ORIGIN}${source}`,
+        permanent: true,
+      })),
+      ...legacyWildcardPaths.map((source) => ({
+        source,
+        destination: `${LEGACY_IMWEB_ORIGIN}${source}`,
+        permanent: true,
+      })),
+      {
+        source: '/login',
+        has: [{ type: 'query', key: 'back_url' }],
+        destination: `${LEGACY_IMWEB_ORIGIN}/login`,
+        permanent: true,
+      },
+      {
+        source: '/login',
+        has: [{ type: 'query', key: 'used_login_btn' }],
+        destination: `${LEGACY_IMWEB_ORIGIN}/login`,
+        permanent: true,
+      },
+      {
+        source: '/',
+        has: [{
+          type: 'query',
+          key: 'mode',
+          value: 'policy|privacy|domesticoverseas',
+        }],
+        destination: `${LEGACY_IMWEB_ORIGIN}/`,
+        permanent: true,
+      },
+      {
+        source: '/home',
+        destination: '/',
+        permanent: true,
+      },
+      {
+        source: '/apply',
+        destination: '/become-a-host',
+        permanent: true,
+      },
+      {
+        source: '/partners',
+        destination: '/company/partnership',
+        permanent: true,
+      },
       {
         source: '/become-a-host2',
         destination: '/become-a-host',
