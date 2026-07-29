@@ -140,6 +140,7 @@ test.describe('Legacy Imweb domain cutover redirects', () => {
       '/shop/change_password?return_url=%2Fshop_mypage',
       '/backpg/login.cm?back_url=%2Fshop_cart',
       '/site_join?back_url=%2Fprograms',
+      '/site_join_type_choice?back_url=%2Fprograms',
       '/logout.cm?back_url=%2Fhome',
     ] as const;
 

@@ -30,6 +30,7 @@ const legacyExactPaths = [
   '/site_join',
   '/site_join_agree',
   '/site_join_pattern_choice',
+  '/site_join_type_choice',
   '/logout.cm',
 ];
 
