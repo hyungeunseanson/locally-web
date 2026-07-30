@@ -6,6 +6,13 @@ export type CommunityAdPlacement =
   | 'community-detail-sidebar'
   | 'community-detail-bottom';
 
+export interface AdSenseSlotConfig {
+  clientId: string | null;
+  slotId: string | null;
+  globallyEnabled: boolean;
+  enabled: boolean;
+}
+
 const COMMUNITY_SLOT_ENV_KEY: Record<CommunityAdPlacement, keyof AdSenseEnv> = {
   'community-list-sidebar': 'NEXT_PUBLIC_ADSENSE_COMMUNITY_LIST_SIDEBAR_SLOT',
   'community-list-bottom': 'NEXT_PUBLIC_ADSENSE_COMMUNITY_LIST_BOTTOM_SLOT',
@@ -54,9 +61,24 @@ export function buildAdSenseScriptUrl(value?: string | null): string | null {
 export function resolveCommunityAdSlotConfig(
   placement: CommunityAdPlacement,
   env: AdSenseEnv = process.env,
-) {
+): AdSenseSlotConfig {
   const clientId = getAdSenseClientId(env);
   const slotId = readTrimmedEnvValue(env, COMMUNITY_SLOT_ENV_KEY[placement]);
+  const globallyEnabled = isAdSenseEnabled(env);
+
+  return {
+    clientId,
+    slotId,
+    globallyEnabled,
+    enabled: globallyEnabled && Boolean(slotId),
+  };
+}
+
+export function resolveDesktopFooterAdSlotConfig(
+  env: AdSenseEnv = process.env,
+): AdSenseSlotConfig {
+  const clientId = getAdSenseClientId(env);
+  const slotId = readTrimmedEnvValue(env, 'NEXT_PUBLIC_ADSENSE_DESKTOP_FOOTER_SLOT');
   const globallyEnabled = isAdSenseEnabled(env);
 
   return {

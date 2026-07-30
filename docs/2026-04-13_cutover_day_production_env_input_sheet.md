@@ -43,10 +43,7 @@
 | key | target value | note |
 | --- | --- | --- |
 | `NEXT_PUBLIC_ADSENSE_CLIENT_ID` | `ca-pub-...` | 기존 AdSense publisher 기준 |
-| `NEXT_PUBLIC_ADSENSE_COMMUNITY_LIST_SIDEBAR_SLOT` | slot id | 숫자 문자열 |
-| `NEXT_PUBLIC_ADSENSE_COMMUNITY_LIST_BOTTOM_SLOT` | slot id | 숫자 문자열 |
-| `NEXT_PUBLIC_ADSENSE_COMMUNITY_DETAIL_SIDEBAR_SLOT` | slot id | 숫자 문자열 |
-| `NEXT_PUBLIC_ADSENSE_COMMUNITY_DETAIL_BOTTOM_SLOT` | slot id | 숫자 문자열 |
+| `NEXT_PUBLIC_ADSENSE_DESKTOP_FOOTER_SLOT` | slot id | 새 데스크탑 전역 하단 광고 단위의 숫자 문자열 |
 | `NEXT_PUBLIC_ADSENSE_ENABLED` | `true` | 항상 마지막에만 저장 |
 
 ### 3. 이번 cutover에서 건드리지 않는 값
@@ -70,10 +67,10 @@
 1. `NEXT_PUBLIC_SITE_URL=https://www.locally-travel.com`
 2. 필요 시 `PLAYWRIGHT_LIVE_BASE_URL=https://www.locally-travel.com`
 3. `NEXT_PUBLIC_ADSENSE_CLIENT_ID`
-4. 4개 community slot env
+4. `NEXT_PUBLIC_ADSENSE_DESKTOP_FOOTER_SLOT`
 5. 마지막에만 `NEXT_PUBLIC_ADSENSE_ENABLED=true`
 6. production redeploy
-7. `ads.txt`와 community 슬롯 smoke
+7. `ads.txt`와 공개 데스크탑 footer 슬롯 smoke
 
 ## Copy Blocks
 ### 1. No-AdSense Cutover
@@ -87,10 +84,7 @@ PLAYWRIGHT_LIVE_BASE_URL=https://www.locally-travel.com
 NEXT_PUBLIC_SITE_URL=https://www.locally-travel.com
 PLAYWRIGHT_LIVE_BASE_URL=https://www.locally-travel.com
 NEXT_PUBLIC_ADSENSE_CLIENT_ID=ca-pub-REPLACE_ME
-NEXT_PUBLIC_ADSENSE_COMMUNITY_LIST_SIDEBAR_SLOT=REPLACE_ME
-NEXT_PUBLIC_ADSENSE_COMMUNITY_LIST_BOTTOM_SLOT=REPLACE_ME
-NEXT_PUBLIC_ADSENSE_COMMUNITY_DETAIL_SIDEBAR_SLOT=REPLACE_ME
-NEXT_PUBLIC_ADSENSE_COMMUNITY_DETAIL_BOTTOM_SLOT=REPLACE_ME
+NEXT_PUBLIC_ADSENSE_DESKTOP_FOOTER_SLOT=REPLACE_ME
 NEXT_PUBLIC_ADSENSE_ENABLED=true
 ```
 
@@ -112,7 +106,7 @@ NEXT_PUBLIC_ADSENSE_ENABLED=true
 - apex는 `https://www.locally-travel.com`으로 redirect 된다.
 - `scripts/run-live-smoke.mjs`가 새 도메인을 base URL로 읽는다.
 - `node scripts/check-live-domain-parity.mjs`가 통과한다.
-- 광고를 연 날이면 `/ads.txt`가 `200`이고, community slot이 실제 AdSense branch를 탄다.
+- 광고를 연 날이면 `/ads.txt`가 `200`이고, 공개 데스크탑 페이지의 공통 푸터 아래 슬롯이 실제 AdSense branch를 탄다.
 
 ## Operator Note
 - 이 시트는 “입력값”만 정리한 문서다.

@@ -12,7 +12,8 @@
   - Vercel project: `locally-web`
   - project id: `prj_bUhlyw1uuWD3Uxl01Kv4ut5jeFrz`
   - team id: `team_GFZxhmQVWml3ox1z4NyBTSLo`
-  - custom domain은 아직 연결되지 않았고, 현재 project domain은 `*.vercel.app`만 존재한다
+  - `www.locally-travel.com`과 apex `locally-travel.com`은 Vercel project에 사전 등록됐다
+  - apex는 `www`로 `308` redirect가 설정됐지만, DNS는 계속 아임웹 IP를 가리키므로 아직 Vercel 트래픽 전환은 일어나지 않았다
   - latest production deployment는 `READY` 상태다
 
 ## Source Of Truth
@@ -56,26 +57,29 @@
   - 이번 전환은 Google의 `Change of Address` 대상이 아니다
   - 이유는 최종 공개 URL을 `www.locally-travel.com`으로 계속 유지할 계획이기 때문이다
   - 즉 검색엔진에는 “새 도메인으로 이사”를 알리는 것이 아니라, 새 배포가 같은 canonical URL을 계속 안정적으로 응답한다는 사실이 더 중요하다
-  - `www`와 apex를 함께 쓰더라도, 공식 primary는 `www` 하나로 잠그고 apex는 `301` redirect만 둔다
+  - `www`와 apex를 함께 쓰더라도, 공식 primary는 `www` 하나로 잠그고 apex는 Vercel의 영구 `308` redirect만 둔다
 
 ### 3. 광고 / AdSense 준비
-- AdSense는 현재 `로컬리 콘텐츠 수동 슬롯`만 준비돼 있다.
+- AdSense는 현재 공개 페이지의 `데스크탑 전역 하단 수동 슬롯`을 기준으로 준비돼 있다.
+- AdSense 계정의 Auto ads는 OFF로 유지하고, 검색·사이트맵·커뮤니티·회원/결제 화면에는 광고를 노출하지 않는다.
 - cutover 직전까지는 다음 기본값 유지가 안전하다.
   - `NEXT_PUBLIC_ADSENSE_ENABLED` 비활성
   - 또는 client/slot env 미입력
 - cutover day에는 아래 순서만 허용한다.
   1. 도메인 연결
   2. `NEXT_PUBLIC_SITE_URL` 변경
-  3. `NEXT_PUBLIC_ADSENSE_CLIENT_ID`와 slot env 입력
+  3. `NEXT_PUBLIC_ADSENSE_CLIENT_ID`와 `NEXT_PUBLIC_ADSENSE_DESKTOP_FOOTER_SLOT` 입력
   4. 마지막에 `NEXT_PUBLIC_ADSENSE_ENABLED=true`
   5. redeploy
 - `/ads.txt`는 client id가 없으면 404이므로, 광고 cutover 전에는 숨겨져 있어도 정상으로 본다.
 
 ### 4. 결제 / 외부 연동 경계
-- 현재 카드결제는 운영 기준 `portone` default이고, NicePay direct는 cutover checklist가 별도로 있다.
+- 현재 운영 카드결제 provider는 `nicepay`다.
+- NicePay 결제데이터통보 URL은 `https://locally-web.vercel.app/api/payment/card-notification`으로 고정 등록돼 있다.
+- 이 Vercel alias는 DNS 전환과 무관하게 유지되므로 cutover 중에는 변경하지 않고, 새 `www` 도메인과 SSL이 24시간 안정화된 뒤에만 변경 여부를 판단한다.
 - 도메인 전환 전 반드시 확인할 것
   - PG 콘솔에 등록된 return/notification URL이 이전 사이트 도메인에 묶여 있지 않은지
-  - PortOne / NicePay / PayPal 운영 계정에서 도메인 allowlist 또는 callback 등록이 필요한지
+  - NicePay 운영 계정에서 추가 도메인 allowlist 또는 callback 등록이 필요한지
   - 현재 클라이언트 결제 페이지는 `window.location.origin` 또는 `new URL(request.url).origin`을 쓰는 경로가 섞여 있으므로, production 도메인 실제 응답 origin이 새 도메인으로 바뀌는지만 확인하면 된다
 - 특히 확인할 경계
   - experience card launch / relay
@@ -91,9 +95,8 @@
 - bare `playwright.config.ts`는 이미 떠 있는 로컬 서버를 가정하므로, release-day smoke 기준으로 삼지 않는다.
 
 ## Cutover Day Sequence
-1. Vercel에 `www.locally-travel.com`을 현재 project에 연결한다.
-2. apex `locally-travel.com` 처리 정책을 확정한다.
-   기본값은 `www` redirect다.
+1. Vercel에 사전 등록된 `www.locally-travel.com`과 apex `locally-travel.com`의 최신 권장 DNS 값을 다시 확인한다.
+2. apex의 `www` 영구 `308` redirect 설정이 유지되는지 확인한다.
 3. DNS propagation과 verification 상태를 확인한다.
 4. production env를 아래 순서로 갱신한다.
    - `NEXT_PUBLIC_SITE_URL=https://www.locally-travel.com`
@@ -118,7 +121,7 @@
 - `robots.txt`의 sitemap 링크가 새 도메인이다.
 - `sitemap.xml` 내부 URL이 새 도메인이다.
 - `node scripts/check-live-domain-parity.mjs`가 성공한다.
-- AdSense를 열었다면 `/ads.txt`가 200이고, 커뮤니티 슬롯에 `<ins class="adsbygoogle">`가 들어간다.
+- AdSense를 열었다면 `/ads.txt`가 200이고, 공개 데스크탑 페이지의 공통 푸터 아래에 `<ins class="adsbygoogle">`가 정확히 1개 들어간다.
 - payment / auth redirect가 이전 `vercel.app`로 튀지 않는다.
 - sample email CTA absolute link가 새 도메인이다.
 
@@ -132,8 +135,8 @@
   - redeploy 반영 여부
 
 ## Follow-up Recommended
-- Vercel project에 apex / `www` 중 무엇을 primary로 둘지 운영 결론 확정
-- PortOne / NicePay / PayPal / AdSense 콘솔의 production domain 등록 상태 재확인
+- 실제 cutover 직전에 Vercel이 제시하는 apex / `www` DNS 값을 다시 기록
+- NicePay / AdSense 콘솔의 production domain 상태 재확인
 
 ## Official References
 - Vercel custom domain setup
