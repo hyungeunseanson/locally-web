@@ -14,12 +14,7 @@ import QueryProvider from '@/app/providers/QueryProvider';
 import { AuthProvider } from '@/app/context/AuthContext';
 import { ViewModeProvider, type ViewMode } from '@/app/context/ViewModeContext';
 import { getCurrentLocale } from '@/app/utils/locale';
-import {
-  buildAdSenseScriptUrl,
-  getAdSenseClientId,
-  isAdSenseEnabled,
-  resolveDesktopFooterAdSlotConfig,
-} from '@/app/utils/adsense';
+import { resolveDesktopFooterAdSlotConfig } from '@/app/utils/adsense';
 import { shouldRenderVercelAnalytics } from '@/app/utils/analytics/runtime';
 import { buildAbsoluteUrl, buildLocalizedAbsoluteUrl, getSiteUrl } from '@/app/utils/siteUrl';
 import { IAB_ESCAPE_BYPASS_PARAM } from '@/app/utils/iab';
@@ -131,8 +126,6 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const locale = await getCurrentLocale();
-  const adSenseEnabled = isAdSenseEnabled(process.env);
-  const adSenseScriptUrl = buildAdSenseScriptUrl(getAdSenseClientId(process.env));
   const desktopFooterAdConfig = resolveDesktopFooterAdSlotConfig(process.env);
   const vercelAnalyticsEnabled = shouldRenderVercelAnalytics(process.env);
   const kakaoIabEscapeEnabled = process.env.NEXT_PUBLIC_ENABLE_KAKAO_IAB_ESCAPE === 'true';
@@ -188,14 +181,6 @@ export default async function RootLayout({
           <Script
             src={`//dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY}&libraries=services,clusterer&autoload=false`}
             strategy="beforeInteractive"
-          />
-        )}
-        {adSenseEnabled && adSenseScriptUrl && (
-          <Script
-            id="locally-google-adsense"
-            src={adSenseScriptUrl}
-            strategy="afterInteractive"
-            crossOrigin="anonymous"
           />
         )}
         <KakaoIabEscapeGate enabled={kakaoIabEscapeEnabled} locale={locale} />

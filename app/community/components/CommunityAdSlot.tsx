@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import Script from 'next/script';
 
 import {
+    buildAdSenseScriptUrl,
     resolveCommunityAdSlotConfig,
     type CommunityAdPlacement,
 } from '@/app/utils/adsense';
@@ -29,11 +31,11 @@ export default function CommunityAdSlot({
     testId,
     variant,
     placement,
-    title = '광고 영역',
 }: CommunityAdSlotProps) {
     const adRef = useRef<HTMLModElement | null>(null);
     const { clientId, slotId, enabled } = resolveCommunityAdSlotConfig(placement);
     const shouldRenderLiveAd = enabled && Boolean(clientId) && Boolean(slotId);
+    const scriptUrl = buildAdSenseScriptUrl(clientId);
 
     useEffect(() => {
         if (!shouldRenderLiveAd || !adRef.current) return;
@@ -47,8 +49,16 @@ export default function CommunityAdSlot({
         }
     }, [placement, shouldRenderLiveAd]);
 
-    if (shouldRenderLiveAd && clientId && slotId) {
-        return (
+    if (!shouldRenderLiveAd || !clientId || !slotId || !scriptUrl) return null;
+
+    return (
+        <>
+            <Script
+                id="locally-google-adsense"
+                src={scriptUrl}
+                strategy="afterInteractive"
+                crossOrigin="anonymous"
+            />
             <div
                 data-testid={testId}
                 className={`overflow-hidden rounded-2xl bg-white shadow-sm ${VARIANT_CLASSNAME[variant]}`}
@@ -63,22 +73,6 @@ export default function CommunityAdSlot({
                     data-full-width-responsive="true"
                 />
             </div>
-        );
-    }
-
-    return (
-        <div
-            data-testid={testId}
-            className={`flex items-center justify-center rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 px-4 text-center shadow-sm ${VARIANT_CLASSNAME[variant]}`}
-        >
-            <div>
-                <div className="text-[10px] font-black uppercase tracking-[0.16em] text-gray-400">
-                    Sponsored
-                </div>
-                <div className="mt-1 text-[12px] font-semibold text-gray-500 md:text-[13px]">
-                    {title}
-                </div>
-            </div>
-        </div>
+        </>
     );
 }

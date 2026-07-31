@@ -228,6 +228,10 @@ Article 9. (Matters Concerning the Installation, Operation, and Refusal of Autom
 a. Purpose of using cookies: Used to provide optimized information to users by identifying visit and usage patterns for each service and website visited by the user, popular search terms, whether secure connections are used, etc.
 b. Installation, operation, and refusal of cookies: You can refuse to store cookies by selecting options in the menu Tools > Internet Options > Privacy in your web browser.
 c. If you refuse to store cookies, you may have difficulty using customized services.
+d. Third-party vendors, including Google, may use cookies to serve ads based on a user's prior visits to this website or other websites.
+e. Google's use of advertising cookies enables Google and its partners to serve personalized ads based on users' visits to this website and/or other sites on the Internet.
+f. Users may opt out of personalized advertising through Google Ads Settings (https://adssettings.google.com/). Where regional laws apply, users may also change their consent and advertising choices through the consent management message displayed on the site.
+g. If consent is declined or personalized advertising is disabled, non-personalized ads may be shown or ad serving may be limited. More information about Google's privacy practices is available at https://policies.google.com/privacy.
 
 Article 10. (Personal Information Protection Officer)
 ① The Company designates a Personal Information Protection Officer as follows to take overall responsibility for personal information processing and to handle data subjects' complaints and damage relief related to personal information processing.

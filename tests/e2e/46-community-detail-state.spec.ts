@@ -452,7 +452,7 @@ test.describe.serial('Community detail state consistency', () => {
     await expect(page.getByTestId('community-comment-heading-count')).toHaveText('댓글 1');
     await expect(page.getByTestId('community-comment-list')).toContainText(commentMessage);
     await expect(commentsPanel.getByRole('button', { name: /좋아요/i })).toHaveCount(0);
-    await expect(page.getByTestId('community-detail-bottom-ad')).toBeVisible();
+    await expect(page.getByTestId('community-detail-bottom-ad')).toHaveCount(0);
     await expect(page.getByTestId('community-detail-sidebar-ad')).toHaveCount(0);
 
     await page.reload({ waitUntil: 'networkidle' });
@@ -548,13 +548,13 @@ test.describe.serial('Community detail state consistency', () => {
       waitUntil: 'networkidle',
     });
     await expect(page.getByTestId('community-detail-updated-at')).toContainText('수정됨');
-    await expect(page.getByTestId('community-detail-bottom-ad')).toBeVisible();
+    await expect(page.getByTestId('community-detail-bottom-ad')).toHaveCount(0);
     await expect(page.getByTestId('community-detail-sidebar-ad')).toHaveCount(0);
 
     await page.goto(`/community/${locallyContentPostId}`, {
       waitUntil: 'networkidle',
     });
-    await expect(page.getByTestId('community-detail-bottom-ad')).toBeVisible();
+    await expect(page.getByTestId('community-detail-bottom-ad')).toHaveCount(0);
     await expect(page.getByTestId('community-detail-sidebar-ad')).toHaveCount(0);
 
     await page.goto(`/community/${legacyPostId}`, {

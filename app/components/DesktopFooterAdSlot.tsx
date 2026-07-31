@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
+import Script from 'next/script';
 
+import { buildAdSenseScriptUrl } from '@/app/utils/adsense';
 import {
   hasNoIndexDirective,
   shouldShowDesktopFooterAd,
@@ -41,6 +43,7 @@ export default function DesktopFooterAdSlot({
     isDesktop &&
     pageHasEligibleMetadata &&
     shouldShowDesktopFooterAd(pathname);
+  const scriptUrl = buildAdSenseScriptUrl(clientId);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia(DESKTOP_MEDIA_QUERY);
@@ -91,25 +94,33 @@ export default function DesktopFooterAdSlot({
     }
   }, [shouldRender]);
 
-  if (!shouldRender || !clientId || !slotId) return null;
+  if (!shouldRender || !clientId || !slotId || !scriptUrl) return null;
 
   return (
-    <aside
-      aria-label="Advertisement"
-      data-testid="desktop-footer-ad"
-      className="hidden min-h-[100px] w-full border-t border-gray-100 bg-white px-6 py-1 md:block"
-    >
-      <div className="mx-auto min-h-[90px] w-full max-w-[1280px]">
-        <ins
-          ref={adRef}
-          className="adsbygoogle block min-h-[90px] w-full"
-          style={{ display: 'block' }}
-          data-ad-client={clientId}
-          data-ad-slot={slotId}
-          data-ad-format="horizontal"
-          data-full-width-responsive="false"
-        />
-      </div>
-    </aside>
+    <>
+      <Script
+        id="locally-google-adsense"
+        src={scriptUrl}
+        strategy="afterInteractive"
+        crossOrigin="anonymous"
+      />
+      <aside
+        aria-label="Advertisement"
+        data-testid="desktop-footer-ad"
+        className="hidden min-h-[100px] w-full border-t border-gray-100 bg-white px-6 py-1 md:block"
+      >
+        <div className="mx-auto min-h-[90px] w-full max-w-[1280px]">
+          <ins
+            ref={adRef}
+            className="adsbygoogle block min-h-[90px] w-full"
+            style={{ display: 'block' }}
+            data-ad-client={clientId}
+            data-ad-slot={slotId}
+            data-ad-format="horizontal"
+            data-full-width-responsive="false"
+          />
+        </div>
+      </aside>
+    </>
   );
 }

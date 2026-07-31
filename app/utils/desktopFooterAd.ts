@@ -3,9 +3,6 @@ const LOCALE_PREFIX_PATTERN = /^\/(ko|en|ja|zh)(?=\/|$)/;
 const PUBLIC_EXACT_PATHS = new Set([
   '/',
   '/about',
-  '/become-a-host',
-  '/help',
-  '/services/intro',
 ]);
 
 const PUBLIC_PATH_PREFIXES = [

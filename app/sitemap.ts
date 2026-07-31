@@ -75,6 +75,18 @@ const STATIC_ROUTE_CONFIGS: StaticRouteConfig[] = [
     sourcePaths: ['app/site-map/layout.tsx', 'app/site-map/page.tsx'],
   },
   {
+    pathname: '/privacy',
+    changeFrequency: 'yearly',
+    priority: 0.4,
+    sourcePaths: [
+      'app/privacy/page.tsx',
+      'app/constants/legalText.ts',
+      'app/constants/legalText_en.ts',
+      'app/constants/legalText_ja.ts',
+      'app/constants/legalText_zh.ts',
+    ],
+  },
+  {
     pathname: '/company/notices',
     changeFrequency: 'daily',
     priority: 0.8,

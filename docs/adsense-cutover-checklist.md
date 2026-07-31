@@ -3,9 +3,12 @@
 ## Summary
 - 현재 프로젝트는 공개 페이지의 `데스크탑 전역 하단` 광고 슬롯을 AdSense에 연결할 수 있게 준비된 상태입니다.
 - 기본값은 안전하게 비활성입니다.
-  - `NEXT_PUBLIC_ADSENSE_ENABLED`가 없거나 `true`가 아니면 전역 스크립트가 로드되지 않습니다.
+  - `NEXT_PUBLIC_ADSENSE_ENABLED`가 없거나 `true`가 아니면 광고 스크립트가 로드되지 않습니다.
   - footer slot env가 비어 있으면 광고와 빈 공간이 모두 나타나지 않습니다.
   - `/ads.txt`도 AdSense client id가 없으면 `404`로 숨겨집니다.
+- 2026-07-31 AdSense 콘솔 확인 결과 `자동 광고`와 `자동 최적화`가 켜져 있습니다.
+  - DNS가 Vercel로 완전히 안정화되기 전에는 기존 아임웹 광고에 영향을 줄 수 있으므로 변경하지 않습니다.
+  - 신규 사이트 광고를 활성화하기 직전에 두 설정을 모두 끄고 수동 footer 슬롯만 사용합니다.
 - cutover 목표는 `코드 수정 없이` 아래 4가지만 바꾸는 것입니다.
   - 최종 도메인 연결
   - Vercel env 입력
@@ -16,7 +19,7 @@
   - 반대로 현재 AdSense 계정에 그 도메인이 없거나 `Ready` 상태가 아니라면, 그때만 새 site 추가/검토 요청이 필요합니다
 
 ## Source Of Truth
-- 전역 AdSense 로드 경계: [app/layout.tsx](/Users/hyungeunseanson/Documents/서비스/locally-web/app/layout.tsx:126)
+- 조건부 AdSense 로드 경계: [DesktopFooterAdSlot.tsx](/Users/hyungeunseanson/Documents/서비스/locally-web/app/components/DesktopFooterAdSlot.tsx)
 - env / slot 해석 helper: [app/utils/adsense.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/utils/adsense.ts:1)
 - 데스크탑 전역 하단 슬롯: [app/components/DesktopFooterAdSlot.tsx](/Users/hyungeunseanson/Documents/서비스/locally-web/app/components/DesktopFooterAdSlot.tsx:1)
 - 공개 경로 판정: [app/utils/desktopFooterAd.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/utils/desktopFooterAd.ts:1)
@@ -41,6 +44,8 @@
 - 현재 제품 의미
   - 콘텐츠가 충분한 공개 페이지 데스크탑: 공통 푸터 아래 가로형 1개
   - 검색, 사이트맵, 커뮤니티, 모바일, 관리자, 회원 전용, 작성, 예약·결제, `noindex` 화면: 0개
+  - 광고가 없는 커뮤니티 화면에는 placeholder나 빈 광고 공간도 표시하지 않음
+  - 공개 개인정보처리방침: `https://www.locally-travel.com/privacy`
 
 ## Cutover Day Checklist
 1. Vercel에 최종 도메인 `www.locally-travel.com`을 이 프로젝트로 연결합니다.
@@ -52,7 +57,8 @@
    - 이미 같은 AdSense 계정의 `Sites` 목록에 `www.locally-travel.com`이 있고 상태가 `Ready`면 새 site를 다시 만들지 않습니다
    - 없다면 그때만 새 site로 추가하고 검토를 요청합니다
    - 핵심은 `vercel.app`를 광고 사이트 owner로 삼는 것이 아니라 최종 운영 도메인만 owner로 두는 것입니다
-   - 계정의 Auto ads는 OFF로 유지합니다. 이번 구현은 수동 footer 슬롯만 관리합니다
+   - 계정의 Auto ads와 자동 최적화를 모두 OFF로 바꿉니다. 이번 구현은 수동 footer 슬롯만 관리합니다
+   - Google 인증 CMP의 유럽 규정 메시지와 미국 주 규정 메시지를 게시하고 개인정보처리방침 URL을 `/privacy`로 설정합니다
 4. Vercel production env에 AdSense env를 입력합니다.
    먼저 `NEXT_PUBLIC_ADSENSE_CLIENT_ID`와 `NEXT_PUBLIC_ADSENSE_DESKTOP_FOOTER_SLOT`을 넣고, 마지막에만 `NEXT_PUBLIC_ADSENSE_ENABLED=true`를 켭니다.
 5. redeploy 합니다.
@@ -62,6 +68,7 @@
 7. 페이지 소스와 슬롯 초기화를 확인합니다.
    홈, 회사 페이지, 공개 체험 상세에서 AdSense 스크립트와 `<ins class="adsbygoogle">`가 정확히 1개 들어가는지 확인합니다.
    검색, 사이트맵, 커뮤니티, 모바일, 로그인·결제·`noindex` 화면에는 광고 DOM이 없어야 합니다.
+   직접 접속 기준으로 광고 제외 화면에는 AdSense script도 없어야 합니다.
 8. 실제 노출 smoke를 합니다.
    광고가 즉시 안 보이더라도, DOM 주입과 콘솔 오류 유무를 먼저 봅니다.
    AdSense 승인은 즉시 반영되지 않을 수 있으므로 `스크립트 로드 성공`과 `slot 초기화 오류 없음`을 우선 통과 기준으로 둡니다.
@@ -104,7 +111,7 @@
 
 ## Defaults Locked
 - 이번 cutover는 `자동 광고`가 아니라 `수동 슬롯`만 기준입니다.
-- AdSense 계정의 Auto ads는 OFF로 유지합니다.
+- AdSense 계정의 Auto ads와 자동 최적화는 OFF로 유지합니다.
 - 광고 surface는 콘텐츠가 충분한 공개 페이지의 데스크탑 공통 푸터 아래로 한정합니다.
 - 사용하지 않는 커뮤니티 광고 슬롯은 활성화하지 않습니다.
 - 커뮤니티 데이터, 댓글/좋아요/조회수, SEO 메타 구조는 이번 cutover에서 건드리지 않습니다.

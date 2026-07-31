@@ -172,7 +172,7 @@ test.describe.serial('Community board layout and access', () => {
     await expect(page.getByTestId('community-board-tab-korea')).toBeVisible();
     await expect(page.getByPlaceholder('로컬리 콘텐츠 검색')).toHaveCount(0);
     await expect(page.getByTestId('community-list-sidebar-ad')).toHaveCount(0);
-    await expect(page.getByTestId('community-list-bottom-ad')).toBeVisible();
+    await expect(page.getByTestId('community-list-bottom-ad')).toHaveCount(0);
     await expect(page.getByTestId('community-write-cta-desktop')).toBeVisible();
     await expect(page.getByText(`[Playwright] Community Board Japan ${token}`)).toBeVisible();
     await expect(page.getByText(`[Playwright] Community Board Korea ${token}`)).toHaveCount(0);
@@ -243,7 +243,7 @@ test.describe.serial('Community board layout and access', () => {
       timeout: 15000,
     });
     await expect(page.getByRole('heading', { name: title })).toBeVisible();
-    await expect(page.getByTestId('community-detail-bottom-ad')).toBeVisible();
+    await expect(page.getByTestId('community-detail-bottom-ad')).toHaveCount(0);
   });
 
   test('redirects unauthenticated write access to login with returnUrl', async ({ page }) => {

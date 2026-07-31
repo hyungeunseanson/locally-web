@@ -20,6 +20,9 @@ const COMMUNITY_SLOT_ENV_KEY: Record<CommunityAdPlacement, keyof AdSenseEnv> = {
   'community-detail-bottom': 'NEXT_PUBLIC_ADSENSE_COMMUNITY_DETAIL_BOTTOM_SLOT',
 };
 
+const ADSENSE_CLIENT_ID_PATTERN = /^ca-pub-\d+$/;
+const ADSENSE_SLOT_ID_PATTERN = /^\d+$/;
+
 function readTrimmedEnvValue(env: AdSenseEnv, key: keyof AdSenseEnv): string | null {
   const rawValue = env[key];
   if (typeof rawValue !== 'string') return null;
@@ -33,9 +36,13 @@ export function normalizeAdSenseClientId(value?: string | null): string | null {
 
   const trimmed = value.trim();
   if (!trimmed) return null;
-  if (trimmed.startsWith('ca-pub-')) return trimmed;
-  if (trimmed.startsWith('pub-')) return `ca-${trimmed}`;
-  return trimmed;
+  const normalized = trimmed.startsWith('pub-') ? `ca-${trimmed}` : trimmed;
+  return ADSENSE_CLIENT_ID_PATTERN.test(normalized) ? normalized : null;
+}
+
+function readAdSenseSlotId(env: AdSenseEnv, key: keyof AdSenseEnv): string | null {
+  const slotId = readTrimmedEnvValue(env, key);
+  return slotId && ADSENSE_SLOT_ID_PATTERN.test(slotId) ? slotId : null;
 }
 
 export function getAdSenseClientId(env: AdSenseEnv = process.env): string | null {
@@ -63,7 +70,7 @@ export function resolveCommunityAdSlotConfig(
   env: AdSenseEnv = process.env,
 ): AdSenseSlotConfig {
   const clientId = getAdSenseClientId(env);
-  const slotId = readTrimmedEnvValue(env, COMMUNITY_SLOT_ENV_KEY[placement]);
+  const slotId = readAdSenseSlotId(env, COMMUNITY_SLOT_ENV_KEY[placement]);
   const globallyEnabled = isAdSenseEnabled(env);
 
   return {
@@ -78,7 +85,7 @@ export function resolveDesktopFooterAdSlotConfig(
   env: AdSenseEnv = process.env,
 ): AdSenseSlotConfig {
   const clientId = getAdSenseClientId(env);
-  const slotId = readTrimmedEnvValue(env, 'NEXT_PUBLIC_ADSENSE_DESKTOP_FOOTER_SLOT');
+  const slotId = readAdSenseSlotId(env, 'NEXT_PUBLIC_ADSENSE_DESKTOP_FOOTER_SLOT');
   const globallyEnabled = isAdSenseEnabled(env);
 
   return {
