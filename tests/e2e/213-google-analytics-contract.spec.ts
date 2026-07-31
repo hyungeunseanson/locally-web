@@ -127,6 +127,10 @@ test.describe('Google Analytics privacy-first contracts', () => {
       path.join(root, 'app/components/GoogleAnalyticsGate.tsx'),
       'utf8',
     );
+    const analyticsSource = fs.readFileSync(
+      path.join(root, 'app/utils/analytics/google.ts'),
+      'utf8',
+    );
     const detailSource = fs.readFileSync(
       path.join(root, 'app/experiences/[id]/ExperienceClient.tsx'),
       'utf8',
@@ -144,6 +148,18 @@ test.describe('Google Analytics privacy-first contracts', () => {
     expect(gateSource).toContain('CONSENT_MODE_DATA_READY');
     expect(gateSource).toContain('isGoogleAnalyticsConsentGranted');
     expect(gateSource).toContain('buildSanitizedGoogleAnalyticsLocation');
+
+    const consentDefaultIndex = analyticsSource.indexOf("window.gtag('consent', 'default'");
+    const tagInitializationIndex = analyticsSource.indexOf("window.gtag('js', new Date())");
+    const consentUpdateIndex = analyticsSource.indexOf("window.gtag('consent', 'update'");
+    const analyticsConfigIndex = analyticsSource.indexOf("window.gtag('config'");
+    expect(consentDefaultIndex).toBeGreaterThan(-1);
+    expect(consentDefaultIndex).toBeLessThan(tagInitializationIndex);
+    expect(tagInitializationIndex).toBeLessThan(consentUpdateIndex);
+    expect(consentUpdateIndex).toBeLessThan(analyticsConfigIndex);
+    expect(analyticsSource).toContain("analytics_storage: 'denied'");
+    expect(analyticsSource).toContain("ad_storage: 'denied'");
+
     expect(detailSource).toContain("sendGoogleAnalyticsEvent('view_item'");
     expect(detailSource).toContain("sendGoogleAnalyticsEvent('select_item'");
     expect(paymentSource).toContain("sendGoogleAnalyticsEvent('begin_checkout'");

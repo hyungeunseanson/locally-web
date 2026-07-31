@@ -211,6 +211,12 @@ export function initializeGoogleAnalytics(measurementId: string) {
   window.gtag = window.gtag || ((...args: unknown[]) => {
     window.dataLayer?.push(args);
   });
+  window.gtag('consent', 'default', {
+    analytics_storage: 'denied',
+    ad_storage: 'denied',
+    ad_user_data: 'denied',
+    ad_personalization: 'denied',
+  });
   window.gtag('js', new Date());
   window.gtag('consent', 'update', {
     analytics_storage: 'granted',
