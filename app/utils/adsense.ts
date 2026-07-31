@@ -96,6 +96,21 @@ export function resolveDesktopFooterAdSlotConfig(
   };
 }
 
+export function resolveDesktopRightRailAdSlotConfig(
+  env: AdSenseEnv = process.env,
+): AdSenseSlotConfig {
+  const clientId = getAdSenseClientId(env);
+  const slotId = readAdSenseSlotId(env, 'NEXT_PUBLIC_ADSENSE_DESKTOP_RIGHT_RAIL_SLOT');
+  const globallyEnabled = isAdSenseEnabled(env);
+
+  return {
+    clientId,
+    slotId,
+    globallyEnabled,
+    enabled: globallyEnabled && Boolean(slotId),
+  };
+}
+
 export function buildAdsTxtEntry(env: AdSenseEnv = process.env): string | null {
   const publisherId = getAdSensePublisherId(getAdSenseClientId(env));
   if (!publisherId) return null;

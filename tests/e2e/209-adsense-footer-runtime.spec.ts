@@ -5,6 +5,10 @@ const ADSENSE_RUNTIME_CONFIGURED =
   && /^ca-pub-\d+$/.test(process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID || '')
   && /^\d+$/.test(process.env.NEXT_PUBLIC_ADSENSE_DESKTOP_FOOTER_SLOT || '');
 
+const RIGHT_RAIL_RUNTIME_CONFIGURED =
+  ADSENSE_RUNTIME_CONFIGURED
+  && /^\d+$/.test(process.env.NEXT_PUBLIC_ADSENSE_DESKTOP_RIGHT_RAIL_SLOT || '');
+
 test.describe('AdSense desktop footer runtime', () => {
   test.skip(!ADSENSE_RUNTIME_CONFIGURED, 'Run with an enabled test AdSense client and footer slot.');
 
@@ -57,11 +61,135 @@ test.describe('AdSense desktop footer runtime', () => {
   test('does not render ads on excluded product routes', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
 
-    for (const pathname of ['/login', '/search', '/guest/trips']) {
+    for (const pathname of [
+      '/login',
+      '/search',
+      '/guest/inbox',
+      '/guest/trips',
+      '/guest/wishlists',
+      '/account',
+      '/host/dashboard',
+    ]) {
       await page.goto(pathname);
       await expect(page.getByTestId('desktop-footer-ad'), pathname).toHaveCount(0);
+      await expect(page.getByTestId('desktop-right-rail-ad'), pathname).toHaveCount(0);
       await expect(page.locator('script#locally-google-adsense'), pathname).toHaveCount(0);
       await expect(page.locator('ins.adsbygoogle'), pathname).toHaveCount(0);
     }
+  });
+
+  test('adds the footer to help and become-a-host without a narrow right rail', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+
+    for (const pathname of ['/help', '/become-a-host']) {
+      await page.goto(pathname);
+      await expect(page.getByTestId('desktop-footer-ad'), pathname).toHaveCount(1);
+      await expect(page.getByTestId('desktop-right-rail-ad'), pathname).toHaveCount(0);
+      await expect(page.locator('script#locally-google-adsense'), pathname).toHaveCount(1);
+      await expect(page.locator('ins.adsbygoogle'), pathname).toHaveCount(1);
+    }
+  });
+
+  test('does not reserve a right rail column when its slot is not configured', async ({ page }) => {
+    test.skip(RIGHT_RAIL_RUNTIME_CONFIGURED, 'Run without a configured right rail slot.');
+    await page.setViewportSize({ width: 1536, height: 1000 });
+    await page.goto('/help');
+
+    await expect(page.getByTestId('desktop-footer-ad')).toHaveCount(1);
+    await expect(page.getByTestId('desktop-right-rail-layout')).toHaveCount(0);
+    await expect(page.getByTestId('desktop-right-rail-ad')).toHaveCount(0);
+
+    const centered = await page.getByTestId('help-main-content').evaluate((main) => {
+      const rect = main.getBoundingClientRect();
+      return Math.abs(rect.left - (window.innerWidth - rect.right)) <= 1;
+    });
+    expect(centered).toBeTruthy();
+  });
+
+  test('renders one static 300x600 rail beside help and notices on wide desktop', async ({ page }) => {
+    test.skip(!RIGHT_RAIL_RUNTIME_CONFIGURED, 'Run with a configured right rail slot.');
+    await page.setViewportSize({ width: 1536, height: 1000 });
+
+    for (const pathname of ['/help', '/company/notices']) {
+      await page.goto(pathname);
+
+      const footerAd = page.getByTestId('desktop-footer-ad');
+      const rightRailAd = page.getByTestId('desktop-right-rail-ad');
+
+      await expect(footerAd, pathname).toHaveCount(1);
+      await expect(rightRailAd, pathname).toHaveCount(1);
+      await expect(page.locator('script#locally-google-adsense'), pathname).toHaveCount(1);
+      await expect(page.locator('ins.adsbygoogle'), pathname).toHaveCount(2);
+
+      const layout = await page.evaluate((currentPathname) => {
+        const mainTestId = currentPathname === '/help'
+          ? 'help-main-content'
+          : 'company-notices-main-content';
+        const main = document.querySelector(`[data-testid="${mainTestId}"]`);
+        const rail = document.querySelector<HTMLElement>('[data-testid="desktop-right-rail-ad"]');
+        const railIns = rail?.querySelector<HTMLElement>('ins.adsbygoogle');
+        const mainRect = main?.getBoundingClientRect();
+        const railRect = rail?.getBoundingClientRect();
+
+        return {
+          gap: mainRect && railRect ? railRect.left - mainRect.right : null,
+          railPosition: rail ? window.getComputedStyle(rail).position : null,
+          railWidth: railIns?.getBoundingClientRect().width ?? null,
+          railHeight: railIns?.getBoundingClientRect().height ?? null,
+          horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth,
+        };
+      }, pathname);
+
+      expect(layout.gap).toBeGreaterThanOrEqual(32);
+      expect(layout.railPosition).toBe('static');
+      expect(layout.railWidth).toBe(300);
+      expect(layout.railHeight).toBe(600);
+      expect(layout.horizontalOverflow).toBeFalsy();
+    }
+  });
+
+  test('keeps the help modal above and isolated from the right rail ad', async ({ page }) => {
+    test.skip(!RIGHT_RAIL_RUNTIME_CONFIGURED, 'Run with a configured right rail slot.');
+    await page.setViewportSize({ width: 1536, height: 1000 });
+    await page.goto('/help');
+
+    await page.getByTestId('help-contact-modal-trigger').click();
+
+    const modalBackdrop = page.getByTestId('help-contact-modal');
+    const rail = page.getByTestId('desktop-right-rail-ad');
+    await expect(modalBackdrop).toBeVisible();
+    await expect(rail).toHaveCount(1);
+
+    const coverage = await page.evaluate(() => {
+      const rail = document.querySelector<HTMLElement>('[data-testid="desktop-right-rail-ad"]');
+      const backdrop = document.querySelector<HTMLElement>('[data-testid="help-contact-modal"]');
+      if (!rail || !backdrop) return null;
+      const rect = rail.getBoundingClientRect();
+      const topElement = document.elementFromPoint(
+        rect.left + rect.width / 2,
+        Math.min(window.innerHeight - 1, rect.top + Math.min(rect.height / 2, 200)),
+      );
+      const backdropRect = backdrop.getBoundingClientRect();
+
+      return {
+        railContainsTopElement: Boolean(topElement && rail.contains(topElement)),
+        backdropCoversViewport:
+          backdropRect.left === 0
+          && backdropRect.top === 0
+          && backdropRect.right === window.innerWidth
+          && backdropRect.bottom === window.innerHeight,
+        backdropPointerEvents: window.getComputedStyle(backdrop).pointerEvents,
+        backdropZIndex: Number(window.getComputedStyle(backdrop).zIndex),
+        railZIndex: window.getComputedStyle(rail).zIndex,
+      };
+    });
+
+    expect(coverage).toEqual({
+      railContainsTopElement: false,
+      backdropCoversViewport: true,
+      backdropPointerEvents: 'auto',
+      backdropZIndex: 210,
+      railZIndex: 'auto',
+    });
   });
 });

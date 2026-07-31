@@ -11,11 +11,13 @@ import {
   normalizeAdSenseClientId,
   resolveCommunityAdSlotConfig,
   resolveDesktopFooterAdSlotConfig,
+  resolveDesktopRightRailAdSlotConfig,
 } from '@/app/utils/adsense';
 import {
   hasNoIndexDirective,
   normalizeDesktopFooterAdPathname,
   shouldShowDesktopFooterAd,
+  shouldShowDesktopRightRailAd,
 } from '@/app/utils/desktopFooterAd';
 import { getLegalDocument } from '@/app/constants/legalDocuments';
 
@@ -119,6 +121,30 @@ test.describe('AdSense preparation contracts', () => {
     });
   });
 
+  test('enables the desktop right rail only with a numeric dedicated slot id', () => {
+    expect(resolveDesktopRightRailAdSlotConfig({
+      NEXT_PUBLIC_ADSENSE_ENABLED: 'true',
+      NEXT_PUBLIC_ADSENSE_CLIENT_ID: 'ca-pub-1234567890',
+      NEXT_PUBLIC_ADSENSE_DESKTOP_RIGHT_RAIL_SLOT: '3333333333',
+    })).toEqual({
+      clientId: 'ca-pub-1234567890',
+      slotId: '3333333333',
+      globallyEnabled: true,
+      enabled: true,
+    });
+
+    expect(resolveDesktopRightRailAdSlotConfig({
+      NEXT_PUBLIC_ADSENSE_ENABLED: 'true',
+      NEXT_PUBLIC_ADSENSE_CLIENT_ID: 'ca-pub-1234567890',
+      NEXT_PUBLIC_ADSENSE_DESKTOP_RIGHT_RAIL_SLOT: 'right-rail',
+    })).toEqual({
+      clientId: 'ca-pub-1234567890',
+      slotId: null,
+      globallyEnabled: true,
+      enabled: false,
+    });
+  });
+
   test('shows the desktop footer ad only on public, non-transactional routes', () => {
     const publicPaths = [
       '/',
@@ -126,6 +152,8 @@ test.describe('AdSense preparation contracts', () => {
       '/about',
       '/experiences/experience-id',
       '/company/notices',
+      '/help',
+      '/become-a-host',
       '/users/user-id',
     ];
     const excludedPaths = [
@@ -153,8 +181,6 @@ test.describe('AdSense preparation contracts', () => {
       '/services/request',
       '/services/request-id/apply',
       '/services/request-id/payment',
-      '/become-a-host',
-      '/help',
       '/unknown',
     ];
 
@@ -167,6 +193,33 @@ test.describe('AdSense preparation contracts', () => {
     }
 
     expect(normalizeDesktopFooterAdPathname('/en/company/notices/')).toBe('/company/notices');
+  });
+
+  test('limits the desktop right rail to help and notices', () => {
+    for (const pathname of [
+      '/help',
+      '/en/help',
+      '/company/notices',
+      '/ja/company/notices/',
+    ]) {
+      expect(shouldShowDesktopRightRailAd(pathname), pathname).toBeTruthy();
+    }
+
+    for (const pathname of [
+      '/',
+      '/about',
+      '/become-a-host',
+      '/experiences/experience-id',
+      '/users/user-id',
+      '/guest/inbox',
+      '/guest/trips',
+      '/guest/wishlists',
+      '/account',
+      '/host/dashboard',
+      '/company/news',
+    ]) {
+      expect(shouldShowDesktopRightRailAd(pathname), pathname).toBeFalsy();
+    }
   });
 
   test('suppresses ads when page metadata marks the screen as noindex', () => {
@@ -197,6 +250,31 @@ test.describe('AdSense preparation contracts', () => {
     expect(layoutSource).not.toContain('id="locally-google-adsense"');
     expect(desktopAdSource).toContain('id="locally-google-adsense"');
     expect(desktopAdSource).toContain('buildAdSenseScriptUrl(clientId)');
+  });
+
+  test('keeps the right rail static, fixed-size, wide-desktop-only, and script-free', () => {
+    const rightRailSource = fs.readFileSync(
+      path.join(process.cwd(), 'app/components/DesktopRightRailAdSlot.tsx'),
+      'utf8',
+    );
+    const helpSource = fs.readFileSync(path.join(process.cwd(), 'app/help/page.tsx'), 'utf8');
+    const noticesSource = fs.readFileSync(
+      path.join(process.cwd(), 'app/company/notices/page.tsx'),
+      'utf8',
+    );
+
+    expect(rightRailSource).toContain("const RIGHT_RAIL_MEDIA_QUERY = '(min-width: 1536px)'");
+    expect(rightRailSource).toContain('data-testid="desktop-right-rail-ad"');
+    expect(rightRailSource).toContain('className="hidden w-[300px] self-start 2xl:block"');
+    expect(rightRailSource).toContain('style={{ display: \'block\', width: 300, height: 600 }}');
+    expect(rightRailSource).not.toContain('<Script');
+    expect(rightRailSource).not.toContain('sticky');
+    expect(rightRailSource).not.toContain('fixed');
+    expect(rightRailSource).toContain('data-testid="desktop-right-rail-layout"');
+    expect(rightRailSource).toContain('2xl:grid-cols-[minmax(0,1040px)_300px] 2xl:gap-8');
+    expect(rightRailSource).toContain('if (!layoutEnabled) return children;');
+    expect(helpSource).toContain('<DesktopRightRailAdLayout>');
+    expect(noticesSource).toContain('<DesktopRightRailAdLayout>');
   });
 
   test('does not render a community placeholder when its ad slot is disabled', () => {

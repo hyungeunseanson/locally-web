@@ -6,6 +6,7 @@ import { Plus, Minus, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { COMPANY_NOTICES, getCompanyNoticeCopy } from '@/app/config/companyNotices';
+import { DesktopRightRailAdLayout } from '@/app/components/DesktopRightRailAdSlot';
 
 export default function NoticesPage() {
   const [openId, setOpenId] = useState<number | null>(null);
@@ -29,7 +30,11 @@ export default function NoticesPage() {
     <div className="min-h-screen bg-white text-[#222222] font-sans selection:bg-black selection:text-white">
       <SiteHeader />
       
-      <main className="max-w-[1040px] mx-auto px-4 md:px-6 py-12 md:py-24">
+      <DesktopRightRailAdLayout>
+        <main
+          data-testid="company-notices-main-content"
+          className="max-w-[1040px] mx-auto w-full px-4 md:px-6 py-12 md:py-24"
+        >
         <div className="md:hidden mb-6">
           <button
             data-testid="company-notices-back-button"
@@ -115,7 +120,8 @@ export default function NoticesPage() {
             );
           })}
         </div>
-      </main>
+        </main>
+      </DesktopRightRailAdLayout>
     </div>
   );
 }

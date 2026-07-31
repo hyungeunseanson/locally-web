@@ -3,6 +3,13 @@ const LOCALE_PREFIX_PATTERN = /^\/(ko|en|ja|zh)(?=\/|$)/;
 const PUBLIC_EXACT_PATHS = new Set([
   '/',
   '/about',
+  '/become-a-host',
+  '/help',
+]);
+
+const RIGHT_RAIL_EXACT_PATHS = new Set([
+  '/company/notices',
+  '/help',
 ]);
 
 const PUBLIC_PATH_PREFIXES = [
@@ -54,6 +61,12 @@ export function shouldShowDesktopFooterAd(pathname: string | null | undefined): 
   if (PUBLIC_EXACT_PATHS.has(normalizedPathname)) return true;
 
   return PUBLIC_PATH_PREFIXES.some((prefix) => matchesPathPrefix(normalizedPathname, prefix));
+}
+
+export function shouldShowDesktopRightRailAd(pathname: string | null | undefined): boolean {
+  if (!pathname) return false;
+
+  return RIGHT_RAIL_EXACT_PATHS.has(normalizeDesktopFooterAdPathname(pathname));
 }
 
 export function hasNoIndexDirective(contents: Array<string | null | undefined>): boolean {

@@ -18,6 +18,7 @@ import {
   type HelpFaqIconKey,
   type HelpTab,
 } from '@/app/help/faqContent';
+import { DesktopRightRailAdLayout } from '@/app/components/DesktopRightRailAdSlot';
 
 const getCategoryIcon = (iconKey: HelpFaqIconKey) => {
   const size = 24;
@@ -228,7 +229,11 @@ export default function HelpCenterPage() {
     <div className="min-h-screen bg-white text-[#222222] font-sans selection:bg-black selection:text-white">
       <SiteHeader />
 
-      <main className="max-w-[1040px] mx-auto px-4 md:px-6 py-9 md:py-24">
+      <DesktopRightRailAdLayout>
+        <main
+          data-testid="help-main-content"
+          className="max-w-[1040px] mx-auto w-full px-4 md:px-6 py-9 md:py-24"
+        >
         <div className="md:hidden mb-4">
           <button
             onClick={handleMobileBack}
@@ -391,6 +396,7 @@ export default function HelpCenterPage() {
           <div className="flex flex-col sm:flex-row justify-center gap-3 md:gap-6">
             <button
               onClick={() => setHelpModalOpen(true)}
+              data-testid="help-contact-modal-trigger"
               className="rounded-full bg-slate-900 px-6 md:px-8 py-3 md:py-3.5 text-[12px] md:text-[13px] font-semibold text-white hover:bg-slate-800 transition-colors flex items-center justify-center gap-2.5 md:gap-3 shadow-[0_10px_24px_rgba(15,23,42,0.08)]"
             >
               <MessageCircle size={18} /> {hasLocallyCare ? t('locally_care_cta') : t('btn_chat_support')}
@@ -413,11 +419,13 @@ export default function HelpCenterPage() {
             {t('help_inbox_reply_notice')}
           </p>
         </div>
-      </main>
+        </main>
+      </DesktopRightRailAdLayout>
 
       {/* ── 1:1 문의 모달 ── */}
       {helpModalOpen && (
         <div
+          data-testid="help-contact-modal"
           className="fixed inset-0 z-[210] bg-black/35 backdrop-blur-[1px] flex items-end md:items-center md:justify-center md:p-4"
           onClick={() => { setHelpModalOpen(false); setHelpContent(''); }}
         >
