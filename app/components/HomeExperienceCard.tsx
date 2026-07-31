@@ -43,6 +43,7 @@ export interface HomeExperienceCardData {
   rating?: number | null;
   review_count?: number | null;
   wishlist_count?: number | null;
+  is_superhost?: boolean | null;
   card_image_url?: string | null;
   photos?: string[] | null;
   image_url?: string | null;
@@ -94,6 +95,7 @@ export default function HomeExperienceCard({ data }: { data: HomeExperienceCardD
   const category = getContent(data, 'category', lang) || data.category || t('cat_exp');
   const location = formatLocalizedExperienceLocation(data, lang) || t('exp_card_location_fallback');
   const imageUrl = getExperienceCardImageUrl(data);
+  const isSuperhost = data.is_superhost === true;
   return (
     <Link
       href={`/experiences/${data.id}`}
@@ -110,7 +112,10 @@ export default function HomeExperienceCard({ data }: { data: HomeExperienceCardD
         />
 
         <div className="absolute inset-x-3 top-3 z-10 flex items-center justify-start md:hidden">
-          <div className="max-w-[66%] rounded-full bg-white px-2.5 py-1 text-[9px] font-semibold tracking-[-0.01em] text-[#2B2B2B] shadow-[0_2px_6px_rgba(0,0,0,0.08)]">
+          <div
+            data-testid="home-experience-category-badge"
+            className={`${isSuperhost ? 'max-w-[calc(100%-2.25rem)]' : 'max-w-[66%]'} rounded-full bg-white px-2.5 py-1 text-[9px] font-semibold tracking-[-0.01em] text-[#2B2B2B] shadow-[0_2px_6px_rgba(0,0,0,0.08)]`}
+          >
             <span className="flex items-center gap-1.5">
               {renderCategoryIcon(String(category))}
               <span className="block truncate">{category}</span>
@@ -118,12 +123,33 @@ export default function HomeExperienceCard({ data }: { data: HomeExperienceCardD
           </div>
         </div>
 
-        <div className="absolute left-4 top-4 z-10 hidden max-w-[70%] rounded-full bg-white px-3 py-[5px] text-[10px] font-semibold tracking-[-0.01em] text-[#2B2B2B] shadow-[0_2px_6px_rgba(0,0,0,0.08)] md:block">
+        <div
+          data-testid="home-experience-category-badge"
+          className={`absolute left-4 top-4 z-10 hidden ${isSuperhost ? 'max-w-[calc(100%-4.5rem)]' : 'max-w-[70%]'} rounded-full bg-white px-3 py-[5px] text-[10px] font-semibold tracking-[-0.01em] text-[#2B2B2B] shadow-[0_2px_6px_rgba(0,0,0,0.08)] md:block`}
+        >
           <span className="flex items-center gap-1.5">
             {renderCategoryIcon(String(category))}
             <span className="block truncate">{category}</span>
           </span>
         </div>
+
+        {isSuperhost ? (
+          <span
+            role="img"
+            aria-label={t('host_superhost')}
+            data-testid="home-experience-superhost-badge"
+            className="absolute right-3 top-3 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-[0_2px_8px_rgba(15,23,42,0.14)] md:right-4 md:top-4 md:h-8 md:w-8"
+          >
+            <Image
+              src="/images/badges/superhost-blue-check.png"
+              alt=""
+              width={20}
+              height={20}
+              aria-hidden="true"
+              className="h-[18px] w-[18px] object-contain drop-shadow-[0_1px_3px_rgba(14,165,233,0.3)] md:h-5 md:w-5"
+            />
+          </span>
+        ) : null}
 
       </div>
 

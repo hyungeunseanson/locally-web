@@ -33,6 +33,7 @@ type StubExperience = {
   review_count: number;
   rating: number;
   wishlist_count: number;
+  is_superhost: boolean;
 };
 
 const HOME_FIXTURES: StubExperience[] = [
@@ -75,6 +76,7 @@ const HOME_FIXTURES: StubExperience[] = [
     createdAt: '2025-04-08T09:00:00.000Z',
     wishlistCount: 12,
     reviewCount: 20,
+    isSuperhost: true,
   }),
   buildHomeExperience({
     id: 9006,
@@ -109,6 +111,7 @@ function buildHomeExperience(input: {
   createdAt: string;
   wishlistCount: number;
   reviewCount: number;
+  isSuperhost?: boolean;
 }): StubExperience {
   return {
     id: input.id,
@@ -143,6 +146,7 @@ function buildHomeExperience(input: {
     review_count: input.reviewCount,
     rating: 4.8,
     wishlist_count: input.wishlistCount,
+    is_superhost: input.isSuperhost === true,
   };
 }
 
@@ -233,6 +237,54 @@ test.describe('Home experience sections', () => {
     await expect(allCards.nth(0)).toContainText('Seoul Gamma');
     await expect(allCards.nth(1)).toContainText('Busan Delta');
     await expect(allCards.nth(2)).toContainText('Tokyo Alpha');
+  });
+
+  test('shows a compact localized superhost mark without overlapping the category', async ({ page }) => {
+    await stubHomeExperiences(page);
+    await page.setViewportSize({ width: 320, height: 844 });
+    await prepareLocale(page, 'en', '/en');
+
+    const mobilePopularSection = page.getByTestId('home-mobile-popular-experiences-section');
+    const superhostCard = mobilePopularSection.getByTestId('home-popular-experience-card-9005');
+    const regularCard = mobilePopularSection.getByTestId('home-popular-experience-card-9002');
+    const superhostBadge = superhostCard.getByTestId('home-experience-superhost-badge');
+    const categoryBadge = superhostCard.locator('[data-testid="home-experience-category-badge"]:visible');
+
+    await expect(superhostBadge).toBeVisible();
+    await expect(superhostBadge).toHaveAttribute('aria-label', 'Superhost');
+    await expect(superhostBadge.locator('button')).toHaveCount(0);
+    await expect(regularCard.getByTestId('home-experience-superhost-badge')).toHaveCount(0);
+
+    const [superhostBox, categoryBox] = await Promise.all([
+      superhostBadge.boundingBox(),
+      categoryBadge.boundingBox(),
+    ]);
+    expect(superhostBox).not.toBeNull();
+    expect(categoryBox).not.toBeNull();
+    if (superhostBox && categoryBox) {
+      expect(categoryBox.x + categoryBox.width).toBeLessThanOrEqual(superhostBox.x);
+    }
+
+    const viewportWidths = await page.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+    }));
+    expect(viewportWidths.scrollWidth).toBeLessThanOrEqual(viewportWidths.clientWidth);
+    await expect(superhostCard).toHaveAttribute('data-testid', 'home-popular-experience-card-9005');
+    await expect(superhostCard.locator('a[href="/experiences/9005"]')).toHaveCount(1);
+
+    for (const localeCase of [
+      { locale: 'ko', path: '/', label: '슈퍼호스트' },
+      { locale: 'ja', path: '/ja', label: 'スーパーホスト' },
+      { locale: 'zh', path: '/zh', label: '超级房东' },
+    ] as const) {
+      await prepareLocale(page, localeCase.locale, localeCase.path);
+      const localizedBadge = page
+        .getByTestId('home-mobile-popular-experiences-section')
+        .getByTestId('home-popular-experience-card-9005')
+        .getByTestId('home-experience-superhost-badge');
+      await expect(localizedBadge).toHaveAttribute('aria-label', localeCase.label);
+    }
   });
 
   test('recomputes popular and all sections inside the filtered city result set', async ({ page }) => {

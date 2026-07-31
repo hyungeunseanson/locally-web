@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-import { getVisiblePublicHostIdSet, isPublicExperienceVisible } from '@/app/utils/hostVisibility';
+import {
+  getVisiblePublicHostIdSet,
+  isPublicExperienceVisible,
+  pickLatestPublicHostApplicationsByUser,
+} from '@/app/utils/hostVisibility';
 import { PUBLIC_EXPERIENCE_CARD_SELECT_FIELDS } from '@/app/search/searchContract';
 
 type PublicHostApplicationRow = {
@@ -9,6 +13,7 @@ type PublicHostApplicationRow = {
   user_id?: string | null;
   status?: string | null;
   created_at?: string | null;
+  is_superhost?: boolean | null;
 };
 
 type HomeExperienceRow = {
@@ -74,14 +79,19 @@ export async function GET() {
 
     const { data: publicHostApplications, error: applicationsError } = await supabase
       .from('public_host_applications')
-      .select('id, user_id, status, created_at');
+      .select('id, user_id, status, created_at, is_superhost');
 
     if (applicationsError) {
       throw applicationsError;
     }
 
-    const visibleHostIds = getVisiblePublicHostIdSet(
-      ((publicHostApplications ?? []) as PublicHostApplicationRow[])
+    const publicHostApplicationRows = (publicHostApplications ?? []) as PublicHostApplicationRow[];
+    const visibleHostIds = getVisiblePublicHostIdSet(publicHostApplicationRows);
+    const latestHostApplications = pickLatestPublicHostApplicationsByUser(publicHostApplicationRows);
+    const superhostIds = new Set(
+      Array.from(latestHostApplications.entries())
+        .filter(([hostId, application]) => visibleHostIds.has(hostId) && application.is_superhost === true)
+        .map(([hostId]) => hostId)
     );
 
     if (visibleHostIds.size === 0) {
@@ -164,6 +174,7 @@ export async function GET() {
 
       return {
         ...publicExperience,
+        is_superhost: superhostIds.has(String(experience.host_id || '')),
         card_image_url: experience.image_url ?? null,
         available_dates: availableDatesByExperienceId.get(String(experience.id)) ?? [],
         wishlist_count: popularityByExperienceId.get(String(experience.id)) ?? 0,

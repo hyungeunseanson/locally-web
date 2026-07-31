@@ -35,6 +35,7 @@ export interface Experience {
     rating?: number | null;
     review_count?: number | null;
     wishlist_count?: number | null;
+    is_superhost?: boolean | null;
   }
   
   export interface Profile {
