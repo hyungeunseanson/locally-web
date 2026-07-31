@@ -13,6 +13,7 @@ import {
 } from '@/app/components/loginModalLocalization';
 import { useModalClose } from '@/app/hooks/useModalClose';
 import { normalizeInternalReturnPath } from '@/app/utils/authRedirect';
+import { sendGoogleAnalyticsEvent } from '@/app/utils/analytics/google';
 
 type Gender = 'Male' | 'Female' | '';
 
@@ -162,6 +163,10 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
         });
 
         if (error) throw error;
+
+        if (data.user) {
+          sendGoogleAnalyticsEvent('sign_up', { method: 'email' });
+        }
 
         if (data.user && data.session) {
           showToast(copy.signupSuccess, 'success', { durationMs: AUTH_SUCCESS_TOAST_DURATION_MS });

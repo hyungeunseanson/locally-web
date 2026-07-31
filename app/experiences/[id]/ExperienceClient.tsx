@@ -15,6 +15,7 @@ import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 import { getContent } from '@/app/utils/contentHelper'; // 🟢 추가
 import { getLocalizedExperienceText } from '@/app/utils/experienceTranslation';
 import { sendAnalyticsEvent } from '@/app/utils/analytics/client';
+import { sendGoogleAnalyticsEvent } from '@/app/utils/analytics/google';
 import {
   ExperienceAvailabilitySummary,
   ExperienceCalendarDayStatus,
@@ -218,6 +219,9 @@ export default function ExperienceClient({
   useEffect(() => {
     if (experience?.id) {
       sendAnalyticsEvent('view', String(experience.id));
+      sendGoogleAnalyticsEvent('view_item', {
+        items: [{ item_id: String(experience.id) }],
+      });
     }
   }, [experience?.id]);
 
@@ -309,6 +313,9 @@ export default function ExperienceClient({
 
     // 🟢 결제하기 버튼 클릭 기록 (퍼널 2단계: 클릭)
     sendAnalyticsEvent('click', String(experience.id));
+    sendGoogleAnalyticsEvent('select_item', {
+      items: [{ item_id: String(experience.id) }],
+    });
 
     const query = new URLSearchParams({
       date,

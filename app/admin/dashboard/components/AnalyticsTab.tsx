@@ -1,7 +1,12 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { TrendingUp, Calendar as CalendarIcon, ChevronDown } from 'lucide-react';
+import {
+  TrendingUp,
+  Calendar as CalendarIcon,
+  ChevronDown,
+  ExternalLink,
+} from 'lucide-react';
 import Skeleton from '@/app/components/ui/Skeleton';
 import dynamic from 'next/dynamic';
 import 'react-date-range/dist/styles.css';
@@ -14,6 +19,7 @@ import AnalyticsBusinessSection from './analytics/AnalyticsBusinessSection';
 import AnalyticsHostSection from './analytics/AnalyticsHostSection';
 import AnalyticsMetricModal from './analytics/AnalyticsMetricModal';
 import { useAnalyticsSummaryData } from '../hooks/useAnalyticsSummaryData';
+import { buildGoogleAnalyticsAdminUrl } from '@/app/utils/analytics/google';
 import type {
   AnalyticsMainTab,
   AnalyticsMetricKey,
@@ -23,6 +29,13 @@ import type {
 const DateRange = dynamic(() => import('react-date-range').then(mod => mod.DateRange), { ssr: false });
 
 const EMPTY_ANALYTICS_ITEMS: never[] = [];
+
+const VERCEL_ANALYTICS_URL =
+  'https://vercel.com/locallys-projects-b062321b/locally-web/analytics';
+const GOOGLE_ANALYTICS_URL = buildGoogleAnalyticsAdminUrl(
+  process.env.NEXT_PUBLIC_GOOGLE_ANALYTICS_PROPERTY_ID,
+  process.env.NEXT_PUBLIC_GOOGLE_ANALYTICS_ACCOUNT_ID,
+);
 
 const ANALYTICS_MAIN_TABS: Array<{ id: AnalyticsMainTab; label: string }> = [
   { id: 'business', label: 'Business & Guest' },
@@ -147,6 +160,32 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
             <p className="text-[11px] md:text-xs text-slate-500 mt-1">
               기간을 바꾼 뒤에는 조회 버튼으로만 집계를 다시 불러옵니다.
             </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <a
+                href={VERCEL_ANALYTICS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Vercel Analytics 새 탭에서 열기"
+                aria-label="Vercel Analytics 새 탭에서 열기"
+                data-testid="admin-vercel-analytics-link"
+                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+              >
+                Vercel Analytics
+                <ExternalLink size={13} aria-hidden="true" />
+              </a>
+              <a
+                href={GOOGLE_ANALYTICS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Google Analytics 새 탭에서 열기"
+                aria-label="Google Analytics 새 탭에서 열기"
+                data-testid="admin-google-analytics-link"
+                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+              >
+                Google Analytics
+                <ExternalLink size={13} aria-hidden="true" />
+              </a>
+            </div>
           </div>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 md:gap-3 relative">

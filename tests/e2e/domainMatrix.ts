@@ -737,6 +737,7 @@ export const DOMAIN_MATRIX: DomainMatrixEntry[] = [
       'tests/e2e/67-analytics-ingest-routes.spec.ts',
       'tests/e2e/170-adsense-contract.spec.ts',
       'tests/e2e/188-vercel-analytics-runtime-contract.spec.ts',
+      'tests/e2e/213-google-analytics-contract.spec.ts',
     ],
     manualChecks: [
       ...COMMON_PUBLIC_MANUAL_CHECKS,

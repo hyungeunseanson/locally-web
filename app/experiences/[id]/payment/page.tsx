@@ -11,6 +11,7 @@ import Image from 'next/image';
 import { flushSync } from 'react-dom';
 import { createClient } from '@/app/utils/supabase/client';
 import { sendAnalyticsEvent } from '@/app/utils/analytics/client';
+import { sendGoogleAnalyticsEvent } from '@/app/utils/analytics/google';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { useAuth } from '@/app/context/AuthContext';
@@ -598,6 +599,9 @@ function PaymentContent() {
 
       if (experienceId) {
         sendAnalyticsEvent('payment_init', experienceId);
+        sendGoogleAnalyticsEvent('begin_checkout', {
+          items: [{ item_id: experienceId }],
+        });
       }
     };
 

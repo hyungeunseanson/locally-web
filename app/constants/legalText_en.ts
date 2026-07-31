@@ -232,6 +232,7 @@ d. Third-party vendors, including Google, may use cookies to serve ads based on 
 e. Google's use of advertising cookies enables Google and its partners to serve personalized ads based on users' visits to this website and/or other sites on the Internet.
 f. Users may opt out of personalized advertising through Google Ads Settings (https://adssettings.google.com/). Where regional laws apply, users may also change their consent and advertising choices through the consent management message displayed on the site.
 g. If consent is declined or personalized advertising is disabled, non-personalized ads may be shown or ad serving may be limited. More information about Google's privacy practices is available at https://policies.google.com/privacy.
+h. The Company uses Google Analytics only when the user consents to analytics cookies, in order to measure page visits and the experience search and booking funnel in aggregate. Names, email addresses, phone numbers, and free-form search terms are not sent to Google Analytics. Users may change analytics consent through the consent management message on the site.
 
 Article 10. (Personal Information Protection Officer)
 ① The Company designates a Personal Information Protection Officer as follows to take overall responsibility for personal information processing and to handle data subjects' complaints and damage relief related to personal information processing.

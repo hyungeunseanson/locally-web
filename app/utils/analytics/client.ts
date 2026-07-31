@@ -1,3 +1,8 @@
+import {
+  normalizeGoogleAnalyticsSearchTerm,
+  sendGoogleAnalyticsEvent,
+} from '@/app/utils/analytics/google';
+
 export type AnalyticsTrackingMetadata = {
   session_id: string | null;
   referrer: string | null;
@@ -156,5 +161,10 @@ export function sendSearchLog(keyword: string, route = 'main') {
     keyword: normalizedKeyword,
     route: normalizeValue(route) || 'main',
     ...getAnalyticsTrackingMetadata(),
+  });
+
+  sendGoogleAnalyticsEvent('search', {
+    search_term: normalizeGoogleAnalyticsSearchTerm(normalizedKeyword),
+    search_surface: normalizeValue(route) || 'main',
   });
 }

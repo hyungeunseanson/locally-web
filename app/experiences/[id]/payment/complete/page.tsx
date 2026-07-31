@@ -13,6 +13,7 @@ import Spinner from '@/app/components/ui/Spinner';
 import confetti from 'canvas-confetti'; // 🎉 폭죽 효과
 import { isPendingBookingStatus, isConfirmedBookingStatus, isCancelledBookingStatus } from '@/app/constants/bookingStatus';
 import { sendAnalyticsEvent } from '@/app/utils/analytics/client';
+import { sendGoogleAnalyticsPurchase } from '@/app/utils/analytics/google';
 import { getPublicBankInfo } from '@/app/utils/publicBankInfo';
 import { getContent } from '@/app/utils/contentHelper';
 import { useAuth } from '@/app/context/AuthContext';
@@ -38,6 +39,8 @@ type BookingData = {
   date: string;
   time: string;
   order_id?: string;
+  amount?: number;
+  total_price?: number;
   experiences?: BookingExperience | null;
 };
 
@@ -46,6 +49,8 @@ const PAYMENT_COMPLETE_BOOKING_SELECT = [
   'date',
   'time',
   'order_id',
+  'amount',
+  'total_price',
   'experiences(id, host_id, title, title_ko, title_en, title_ja, title_zh, location, duration, photos, image_url)',
 ].join(', ');
 
@@ -108,6 +113,8 @@ function normalizePaymentCompleteBooking(row: unknown): BookingData | null {
     date,
     time,
     order_id: readNullableString(row.order_id) || undefined,
+    amount: readNullableNumber(row.amount),
+    total_price: readNullableNumber(row.total_price),
     experiences: normalizeBookingExperience(row.experiences),
   };
 }
@@ -185,6 +192,13 @@ function PaymentCompleteContent() {
           const experienceId = normalizedBooking.experiences?.id;
           if (experienceId) {
             sendAnalyticsEvent('booking_confirmed', String(experienceId));
+            if (normalizedBooking.order_id) {
+              sendGoogleAnalyticsPurchase({
+                transactionId: normalizedBooking.order_id,
+                value: normalizedBooking.amount ?? normalizedBooking.total_price ?? 0,
+                itemId: String(experienceId),
+              });
+            }
           }
         }
       }
