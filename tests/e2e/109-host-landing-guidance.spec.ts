@@ -11,6 +11,76 @@ async function dismissAnnouncementIfVisible(page: Page) {
 }
 
 test.describe('Host landing guidance', () => {
+  test('shows the localized mobile header without affecting desktop or about', async ({ page }) => {
+    await page.addInitScript((storageKey) => {
+      window.localStorage.setItem(storageKey, '1');
+    }, ANNOUNCEMENT_DISMISS_KEY);
+
+    await page.setViewportSize({ width: 320, height: 844 });
+
+    const cases = [
+      { path: '/become-a-host', locale: 'ko', label: '호스트 지원', homeHref: '/' },
+      { path: '/en/become-a-host', locale: 'en', label: 'Become a Host', homeHref: '/en' },
+      { path: '/ja/become-a-host', locale: 'ja', label: 'ホストになる', homeHref: '/ja' },
+      { path: '/zh/become-a-host', locale: 'zh', label: '成为房东', homeHref: '/zh' },
+    ] as const;
+
+    for (const testCase of cases) {
+      await page.goto('/', { waitUntil: 'domcontentloaded' });
+      await page.evaluate((locale) => {
+        window.localStorage.setItem('app_lang', locale);
+        document.cookie = `app_lang=${locale}; path=/; samesite=lax`;
+      }, testCase.locale);
+      await page.goto(testCase.path, { waitUntil: 'networkidle' });
+      await dismissAnnouncementIfVisible(page);
+
+      const mobileHeader = page.getByTestId('host-landing-mobile-header');
+      const desktopHeader = page.getByTestId('host-landing-desktop-header').locator('header');
+      await expect(mobileHeader).toBeVisible({ timeout: 15000 });
+      await expect(mobileHeader).toContainText(testCase.label);
+      await expect(page.getByTestId('host-landing-mobile-home-link')).toHaveAttribute(
+        'href',
+        testCase.homeHref
+      );
+      await expect(desktopHeader).toBeHidden();
+      await expect(page.locator(`img[src*="/images/become-a-host/mobile/${testCase.locale}/1.png"]`)).toBeVisible();
+
+      const layout = await page.evaluate(() => ({
+        clientWidth: document.documentElement.clientWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+      }));
+      expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth);
+      expect(await mobileHeader.evaluate((element) => getComputedStyle(element).position)).toBe('sticky');
+    }
+
+    await page.goto('/about', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('host-landing-mobile-header')).toHaveCount(0);
+
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto('/become-a-host', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('host-landing-mobile-header')).toBeHidden();
+    await expect(page.getByTestId('host-landing-desktop-header').locator('header')).toBeVisible();
+  });
+
+  test('reuses the existing globe switcher and keeps the host landing query', async ({ page }) => {
+    await page.addInitScript((storageKey) => {
+      window.localStorage.setItem(storageKey, '1');
+    }, ANNOUNCEMENT_DISMISS_KEY);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/become-a-host?utm_source=mobile_header', { waitUntil: 'networkidle' });
+    await dismissAnnouncementIfVisible(page);
+
+    const mobileHeader = page.getByTestId('host-landing-mobile-header');
+    await mobileHeader.getByRole('button', { name: '모바일 언어 전환' }).click();
+    await mobileHeader.getByRole('button', { name: 'English', exact: true }).click();
+
+    await expect(page).toHaveURL(/\/en\/become-a-host\?utm_source=mobile_header$/);
+    await expect(page).toHaveTitle('Become a Host | Locally');
+    await expect(page.locator('img[src*="/images/become-a-host/mobile/en/1.png"]')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Frequently asked questions', exact: true })).toBeVisible();
+    await expect(page.getByTestId('host-landing-primary-cta').first()).toHaveText('Apply to host');
+  });
+
   test('shows status hint and opens login modal with return guidance', async ({ page }) => {
     await page.addInitScript((storageKey) => {
       window.localStorage.setItem(storageKey, '1');

@@ -8,6 +8,7 @@ import SiteHeader from "@/app/components/SiteHeader";
 import { useLanguage } from "@/app/context/LanguageContext";
 
 import HostLandingActionBar from "./HostLandingActionBar";
+import HostLandingMobileHeader from "./HostLandingMobileHeader";
 
 type HostLandingLocale = "ko" | "en" | "ja" | "zh";
 
@@ -148,7 +149,10 @@ export default function BecomeHostLandingContentClient({
 
   return (
     <div className="min-h-screen bg-white text-[#222222] font-sans">
-      <SiteHeader />
+      <div data-testid="host-landing-desktop-header" className="hidden md:contents">
+        <SiteHeader />
+      </div>
+      <HostLandingMobileHeader />
 
       <main>
         <div className="mx-auto w-full max-w-[1440px]">
