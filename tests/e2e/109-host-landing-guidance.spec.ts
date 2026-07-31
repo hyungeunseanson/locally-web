@@ -19,10 +19,10 @@ test.describe('Host landing guidance', () => {
     await page.setViewportSize({ width: 320, height: 844 });
 
     const cases = [
-      { path: '/become-a-host', locale: 'ko', label: '호스트 지원', homeHref: '/' },
-      { path: '/en/become-a-host', locale: 'en', label: 'Become a Host', homeHref: '/en' },
-      { path: '/ja/become-a-host', locale: 'ja', label: 'ホストになる', homeHref: '/ja' },
-      { path: '/zh/become-a-host', locale: 'zh', label: '成为房东', homeHref: '/zh' },
+      { path: '/become-a-host', locale: 'ko' },
+      { path: '/en/become-a-host', locale: 'en' },
+      { path: '/ja/become-a-host', locale: 'ja' },
+      { path: '/zh/become-a-host', locale: 'zh' },
     ] as const;
 
     for (const testCase of cases) {
@@ -37,11 +37,9 @@ test.describe('Host landing guidance', () => {
       const mobileHeader = page.getByTestId('host-landing-mobile-header');
       const desktopHeader = page.getByTestId('host-landing-desktop-header').locator('header');
       await expect(mobileHeader).toBeVisible({ timeout: 15000 });
-      await expect(mobileHeader).toContainText(testCase.label);
-      await expect(page.getByTestId('host-landing-mobile-home-link')).toHaveAttribute(
-        'href',
-        testCase.homeHref
-      );
+      await expect(mobileHeader.getByRole('button', { name: '모바일 언어 전환' })).toBeVisible();
+      await expect(page.getByTestId('host-landing-mobile-home-link')).toHaveCount(0);
+      await expect(mobileHeader.locator('img')).toHaveCount(0);
       await expect(desktopHeader).toBeHidden();
       await expect(page.locator(`img[src*="/images/become-a-host/mobile/${testCase.locale}/1.png"]`)).toBeVisible();
 
