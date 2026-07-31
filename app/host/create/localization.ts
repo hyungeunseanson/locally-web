@@ -184,6 +184,11 @@ export const INITIAL_FORM_DATA = {
 };
 
 type ExperienceFormCopy = {
+  requiredLabel: string;
+  cityLabel: string;
+  languagesLabel: string;
+  photosLabel: string;
+  descriptionCount: (count: number) => string;
   step1Title: string;
   step1Desc: string;
   customCityPlaceholder: string;
@@ -314,6 +319,7 @@ type ExperienceFormCopy = {
   validationAgeLimit: string;
   validationPrice: string;
   validationDuration: string;
+  validationMaxGuests: string;
   validationSoloGuaranteePrice: string;
   validationPrivatePrice: string;
   imageValidationFallback: string;
@@ -336,6 +342,11 @@ type ExperienceFormCopy = {
 
 const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
   ko: {
+    requiredLabel: '필수',
+    cityLabel: '도시',
+    languagesLabel: '진행 언어',
+    photosLabel: '대표사진',
+    descriptionCount: (count) => `${count}자 / 최소 30자 · 50자 이상 권장`,
     step1Title: '어떤 체험을 준비하셨나요?',
     step1Desc: '지역과 카테고리를 먼저 선택해주세요.',
     customCityPlaceholder: '도시 이름 입력 (예: 가마쿠라)',
@@ -393,7 +404,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     addStop: '경유지 추가하기',
     step5Title: '상세 소개 및 포함 사항',
     step5Desc: '체험을 더 설득력 있게 설명하고, 게스트가 받는 혜택을 정리해주세요.',
-    descriptionPlaceholder: '상세 소개글을 입력하세요. (최소 50자 이상)',
+    descriptionPlaceholder: '상세 소개글을 입력하세요. (최소 30자, 50자 이상 권장)',
     descriptionSectionLabel: '언어별 소개글',
     descriptionHelp: '게스트가 왜 이 체험을 예약해야 하는지 자연스럽게 이해할 수 있게 적어주세요.',
     step5GuideTitle: '좋은 소개글은 무엇이 다른가요?',
@@ -490,6 +501,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     validationAgeLimit: '참가 연령 기준을 입력해주세요.',
     validationPrice: '기본 가격을 올바르게 입력해주세요.',
     validationDuration: '소요 시간을 1시간 이상, 1시간 단위로 입력해주세요.',
+    validationMaxGuests: '최대 인원을 1명 이상으로 설정해주세요.',
     validationPrivatePrice: '단독 투어 가격을 입력해주세요.',
     validationSoloGuaranteePrice: '1인 출발 확정 추가금은 20,000원~100,000원 사이에서 1,000원 단위로 입력해주세요.',
     imageValidationFallback: '이미지 형식이 올바르지 않습니다.',
@@ -510,6 +522,11 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     editPrivatePriceLabel: '단독 투어 금액',
   },
   en: {
+    requiredLabel: 'Required',
+    cityLabel: 'City',
+    languagesLabel: 'Hosting languages',
+    photosLabel: 'Hero photos',
+    descriptionCount: (count) => `${count} characters / 30 minimum · 50+ recommended`,
     step1Title: 'What kind of experience are you preparing?',
     step1Desc: 'Choose the region and category first.',
     customCityPlaceholder: 'Enter city name (e.g. Kamakura)',
@@ -567,7 +584,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     addStop: 'Add stop',
     step5Title: 'Detailed intro & inclusions',
     step5Desc: 'Explain the experience clearly and summarize what guests receive.',
-    descriptionPlaceholder: 'Enter a detailed description. (At least 50 characters)',
+    descriptionPlaceholder: 'Enter a detailed description. (30 minimum, 50+ recommended)',
     descriptionSectionLabel: 'Descriptions by language',
     descriptionHelp: 'Write this so guests naturally understand why this experience is worth booking.',
     step5GuideTitle: 'What makes a strong description?',
@@ -664,6 +681,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     validationAgeLimit: 'Enter the age requirement.',
     validationPrice: 'Enter a valid base price.',
     validationDuration: 'Please enter a duration of at least 1 hour in whole-hour increments.',
+    validationMaxGuests: 'Set the maximum guest count to at least 1.',
     validationPrivatePrice: 'Enter the private tour price.',
     validationSoloGuaranteePrice: 'Enter a guaranteed solo departure add-on from 20,000 KRW to 100,000 KRW in 1,000 KRW steps.',
     imageValidationFallback: 'Invalid image format.',
@@ -684,6 +702,11 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     editPrivatePriceLabel: 'Private tour price',
   },
   ja: {
+    requiredLabel: '必須',
+    cityLabel: '都市',
+    languagesLabel: '対応言語',
+    photosLabel: '代表写真',
+    descriptionCount: (count) => `${count}文字 / 最低30文字 · 50文字以上推奨`,
     step1Title: 'どんな体験を準備していますか？',
     step1Desc: 'まず地域とカテゴリを選択してください。',
     customCityPlaceholder: '都市名を入力してください（例: 鎌倉）',
@@ -741,7 +764,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     addStop: '経由地を追加',
     step5Title: '詳細紹介と含まれる内容',
     step5Desc: '体験をより魅力的に説明し、ゲストが受け取る内容を整理してください。',
-    descriptionPlaceholder: '詳細紹介文を入力してください。（50文字以上推奨）',
+    descriptionPlaceholder: '詳細紹介文を入力してください。（最低30文字、50文字以上推奨）',
     descriptionSectionLabel: '言語別紹介文',
     descriptionHelp: 'ゲストが「なぜこの体験を予約したいのか」を自然に理解できる説明が理想です。',
     step5GuideTitle: '良い紹介文のポイント',
@@ -837,6 +860,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     validationAgeLimit: '参加年齢条件を入力してください。',
     validationPrice: '基本価格を正しく入力してください。',
     validationDuration: '所要時間は1時間以上、1時間単位で入力してください。',
+    validationMaxGuests: '最大人数を1名以上に設定してください。',
     validationPrivatePrice: 'プライベートツアー価格を入力してください。',
     validationSoloGuaranteePrice: '1名出発確定の追加料金は20,000ウォン〜100,000ウォンの間で、1,000ウォン単位で入力してください。',
     imageValidationFallback: '画像形式が正しくありません。',
@@ -857,6 +881,11 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     editPrivatePriceLabel: 'プライベートツアー料金',
   },
   zh: {
+    requiredLabel: '必填',
+    cityLabel: '城市',
+    languagesLabel: '可使用语言',
+    photosLabel: '代表照片',
+    descriptionCount: (count) => `${count}字 / 至少30字 · 建议50字以上`,
     step1Title: '你准备了什么样的体验？',
     step1Desc: '请先选择地区和类别。',
     customCityPlaceholder: '输入城市名称（例如：镰仓）',
@@ -914,7 +943,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     addStop: '添加途经点',
     step5Title: '详细介绍与包含内容',
     step5Desc: '更有说服力地介绍体验，并整理房客可获得的内容。',
-    descriptionPlaceholder: '请输入详细介绍。（建议至少50字）',
+    descriptionPlaceholder: '请输入详细介绍。（至少30字，建议50字以上）',
     descriptionSectionLabel: '按语言填写介绍',
     descriptionHelp: '请写成让游客自然理解“为什么值得预订”的介绍。',
     step5GuideTitle: '好的介绍文通常会包含什么？',
@@ -1011,6 +1040,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     validationAgeLimit: '请输入参加年龄条件。',
     validationPrice: '请输入正确的基础价格。',
     validationDuration: '请输入至少1小时的所需时间，并以整小时为单位。',
+    validationMaxGuests: '请将最大人数设置为至少1人。',
     validationPrivatePrice: '请输入私人团价格。',
     validationSoloGuaranteePrice: '1人出发保障附加费需在 20,000 韩元至 100,000 韩元之间，并以 1,000 韩元为单位输入。',
     imageValidationFallback: '图片格式不正确。',

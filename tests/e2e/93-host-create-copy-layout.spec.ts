@@ -186,7 +186,20 @@ test('host create shows structured primary language guidance and refund policy c
 
   await login(page, host);
 
+  await page.setViewportSize({ width: 320, height: 720 });
   await page.goto('/host/create', { waitUntil: 'networkidle' });
+
+  await clickFooterButton(page, /다음|Next|次へ|下一步/);
+  const cityValidationGroup = page.locator('[data-validation-field="city"]').first();
+  await expect(page.locator('#host-create-error-city')).toBeVisible();
+  await expect(cityValidationGroup).toHaveAttribute('aria-invalid', 'true');
+  await expect(cityValidationGroup.locator('button').first()).toBeFocused();
+  const narrowDimensions = await page.evaluate(() => ({
+    viewportWidth: window.innerWidth,
+    contentWidth: document.documentElement.scrollWidth,
+  }));
+  expect(narrowDimensions.contentWidth).toBeLessThanOrEqual(narrowDimensions.viewportWidth);
+  await page.setViewportSize({ width: 390, height: 844 });
 
   const cityButton = page.getByRole('button', { name: /^(서울|Seoul|ソウル|首尔)$/ }).first();
   const categoryButton = page.getByRole('button', { name: /^(맛집 탐방|Food Tour|グルメ巡り|美食探索)$/ }).first();
@@ -195,6 +208,7 @@ test('host create shows structured primary language guidance and refund policy c
   await expect(cityButton).toBeVisible();
   await cityButton.click();
   await expect(cityButton).toHaveClass(/bg-black/);
+  await expect(page.locator('#host-create-error-city')).toHaveCount(0);
   await expect(categoryButton).toBeVisible();
   await categoryButton.click();
   await expect(categoryButton).toHaveClass(/border-\[#222\]/);
@@ -292,7 +306,7 @@ test('host create shows structured primary language guidance and refund policy c
 
   await page
     .locator(
-      'textarea[placeholder="상세 소개글을 입력하세요. (최소 50자 이상)"], textarea[placeholder="Enter a detailed description. (At least 50 characters)"], textarea[placeholder="詳細紹介文を入力してください。（50文字以上推奨）"], textarea[placeholder="请输入详细介绍。（建议至少50字）"]'
+      'textarea[placeholder="상세 소개글을 입력하세요. (최소 30자, 50자 이상 권장)"], textarea[placeholder="Enter a detailed description. (30 minimum, 50+ recommended)"], textarea[placeholder="詳細紹介文を入力してください。（最低30文字、50文字以上推奨）"], textarea[placeholder="请输入详细介绍。（至少30字，建议50字以上）"]'
     )
     .fill('This is a long enough description to move through the host create flow and verify the structured copy layout in the rules step.');
   const inclusionInput = page.locator(
@@ -304,8 +318,12 @@ test('host create shows structured primary language guidance and refund policy c
       /포함 사항은 두 글자 이상으로 구체적으로 입력해주세요\.|Make each inclusion specific and at least 2 characters long\.|含まれるものは2文字以上で具体的に入力してください。|包含内容请至少填写2个字并尽量具体。/
     )
   ).toBeVisible();
+  await clickFooterButton(page, /다음|Next|次へ|下一步/);
+  await expect(page.locator('#host-create-error-inclusion-draft')).toBeVisible();
+  await expect(inclusionInput).toBeFocused();
   await inclusionInput.fill('Welcome drink');
-  await inclusionInput.press('Enter');
+  await expect(page.locator('#host-create-error-inclusion-draft')).toHaveCount(0);
+  await expect(page.locator('#host-create-error-inclusions')).toHaveCount(0);
 
   await expect(
     page.getByText(
@@ -313,6 +331,12 @@ test('host create shows structured primary language guidance and refund policy c
     )
   ).toBeVisible();
 
+  await clickFooterButton(page, /다음|Next|次へ|下一步/);
+  await expect(page.getByTestId('host-create-refund-policy-card')).toBeVisible();
+  await page.locator('footer').getByRole('button', { name: /이전|Back|戻る|上一步/ }).evaluate((button) => {
+    (button as HTMLButtonElement).click();
+  });
+  await expect(page.getByText('Welcome drink', { exact: true })).toBeVisible();
   await clickFooterButton(page, /다음|Next|次へ|下一步/);
 
   const refundPolicyCard = page.getByTestId('host-create-refund-policy-card');

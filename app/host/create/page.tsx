@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { X, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { createClient } from '@/app/utils/supabase/client';
@@ -19,7 +19,14 @@ import { useLanguage } from '@/app/context/LanguageContext';
 import { buildExperienceWritePayload, syncManualContentWithLocales, type ExperienceFormState, type ItineraryItem } from './experienceFormState';
 import { getManualLocalesFromLanguageLevels, isExperienceLocale } from '@/app/utils/experienceTranslation';
 import HostPhotoActionSheet from '@/app/host/components/HostPhotoActionSheet';
-import { isValidSoloGuaranteePrice } from '@/app/constants/soloGuarantee';
+import {
+  normalizeExperienceListItem,
+  prepareExperienceListDrafts,
+  validateExperienceForm,
+  validateExperienceStep,
+  type ExperienceFormIssue,
+  type ExperienceFormIssueCode,
+} from './experienceFormValidation';
 
 type ProcessedImageFile = File & {
   readonly __processedImage: true;
@@ -27,13 +34,38 @@ type ProcessedImageFile = File & {
 
 const asProcessedImageFile = (file: File): ProcessedImageFile => file as ProcessedImageFile;
 
-function normalizeListItem(value: string) {
-  return value.trim().replace(/\s+/g, ' ');
-}
+type ExperienceFormCopy = ReturnType<typeof getExperienceFormCopy>;
+type ResolvedExperienceFormIssue = ExperienceFormIssue & { message: string };
 
-function hasDuplicateItems(items: string[]) {
-  const normalized = items.map((item) => normalizeListItem(item).toLocaleLowerCase());
-  return new Set(normalized).size !== normalized.length;
+function getExperienceIssueMessage(code: ExperienceFormIssueCode, copy: ExperienceFormCopy) {
+  const messages: Record<ExperienceFormIssueCode, string> = {
+    city_required: copy.validationCity,
+    category_required: copy.validationCategory,
+    languages_required: copy.validationLanguages,
+    language_level_invalid: copy.validationLanguageLevels,
+    source_locale_invalid: copy.validationSourceLocale,
+    title_too_short: copy.validationTitle,
+    photos_required: copy.validationPhotos,
+    photos_too_many: copy.validationPhotoLimit(MAX_EXPERIENCE_PHOTOS),
+    meeting_point_required: copy.validationMeetingPoint,
+    location_required: copy.validationLocation,
+    itinerary_title_required: copy.validationItineraryTitles,
+    description_too_short: copy.validationDescription,
+    inclusions_required: copy.validationInclusions,
+    inclusion_too_short: copy.validationInclusionItemQuality,
+    inclusion_duplicate: copy.validationDuplicateListItem,
+    exclusion_too_short: copy.validationExclusionItemQuality,
+    exclusion_duplicate: copy.validationDuplicateListItem,
+    supplies_too_short: copy.validationSuppliesQuality,
+    duration_invalid: copy.validationDuration,
+    max_guests_invalid: copy.validationMaxGuests,
+    age_limit_required: copy.validationAgeLimit,
+    price_invalid: copy.validationPrice,
+    solo_guarantee_price_invalid: copy.validationSoloGuaranteePrice,
+    private_price_required: copy.validationPrivatePrice,
+  };
+
+  return messages[code];
 }
 
 export default function CreateExperiencePage() {
@@ -61,147 +93,89 @@ export default function CreateExperiencePage() {
   const [tempInclusion, setTempInclusion] = useState('');
   const [tempExclusion, setTempExclusion] = useState('');
   const [activePhotoIndex, setActivePhotoIndex] = useState<number | null>(null);
+  const [validatedSteps, setValidatedSteps] = useState<number[]>([]);
+  const [focusRequest, setFocusRequest] = useState<{ field: string; requestId: number } | null>(null);
   const replacePhotoInputRef = useRef<HTMLInputElement>(null);
 
-  const validateCurrentStep = (targetStep: number) => {
-    const manualLocales = getManualLocalesFromLanguageLevels(formData.language_levels || []);
+  const resolveIssues = (issues: ExperienceFormIssue[]): ResolvedExperienceFormIssue[] =>
+    issues.map((issue) => ({ ...issue, message: getExperienceIssueMessage(issue.code, copy) }));
 
-    if (targetStep === 1) {
-      if (!formData.city?.trim()) {
-        showToast(copy.validationCity, 'error');
-        return false;
-      }
-      if (!formData.category?.trim()) {
-        showToast(copy.validationCategory, 'error');
-        return false;
-      }
-      return true;
+  const currentIssues = (() => {
+    if (!validatedSteps.includes(step)) return [];
+
+    if (step === 5) {
+      const draftResult = prepareExperienceListDrafts(formData, tempInclusion, tempExclusion);
+      const validationData = draftResult.issues.length === 0 ? draftResult.formData : formData;
+      return resolveIssues([...draftResult.issues, ...validateExperienceStep(validationData, step)]);
     }
 
-    if (targetStep === 2) {
-      if (!formData.language_levels || formData.language_levels.length === 0) {
-        showToast(copy.validationLanguages, 'error');
-        return false;
-      }
-      if (formData.language_levels.some((entry: { level?: number }) => !entry?.level || entry.level < 1 || entry.level > 5)) {
-        showToast(copy.validationLanguageLevels, 'error');
-        return false;
-      }
-      if (!formData.source_locale || !manualLocales.includes(formData.source_locale)) {
-        showToast(copy.validationSourceLocale, 'error');
-        return false;
-      }
-      return true;
-    }
+    return resolveIssues(validateExperienceStep(formData, step));
+  })();
 
-    if (targetStep === 3) {
-      const hasInvalidTitle = manualLocales.some((locale) => {
-        const title = formData.manual_content?.[locale]?.title || '';
-        return title.trim().length < 6;
-      });
-      if (hasInvalidTitle) {
-        showToast(copy.validationTitle, 'error');
-        return false;
-      }
-      if (!formData.photos || formData.photos.length < 1) {
-        showToast(copy.validationPhotos, 'error');
-        return false;
-      }
-      if (formData.photos.length > MAX_EXPERIENCE_PHOTOS) {
-        showToast(copy.validationPhotoLimit(MAX_EXPERIENCE_PHOTOS), 'error');
-        return false;
-      }
-      return true;
-    }
+  const revealIssues = (issues: ExperienceFormIssue[], targetStep: number) => {
+    if (issues.length === 0) return;
 
-    if (targetStep === 4) {
-      if (!formData.meeting_point?.trim()) {
-        showToast(copy.validationMeetingPoint, 'error');
-        return false;
-      }
-      if (!formData.location?.trim()) {
-        showToast(copy.validationLocation, 'error');
-        return false;
-      }
-      const hasEmptyItinerary = (formData.itinerary || []).some((item: { title?: string }) => !item.title?.trim());
-      if (hasEmptyItinerary) {
-        showToast(copy.validationItineraryTitles, 'error');
-        return false;
-      }
-      return true;
-    }
-
-    if (targetStep === 5) {
-      const hasInvalidDescription = manualLocales.some((locale) => {
-        const description = formData.manual_content?.[locale]?.description || '';
-        return description.trim().length < 30;
-      });
-      if (hasInvalidDescription) {
-        showToast(copy.validationDescription, 'error');
-        return false;
-      }
-      const cleanedInclusions = (formData.inclusions || []).map((item: string) => normalizeListItem(item)).filter(Boolean);
-      const cleanedExclusions = (formData.exclusions || []).map((item: string) => normalizeListItem(item)).filter(Boolean);
-      const cleanedSupplies = (formData.supplies || '').trim();
-
-      if (cleanedInclusions.length === 0) {
-        showToast(copy.validationInclusions, 'error');
-        return false;
-      }
-      if (cleanedInclusions.some((item: string) => item.length < 2)) {
-        showToast(copy.validationInclusionItemQuality, 'error');
-        return false;
-      }
-      if (hasDuplicateItems(cleanedInclusions)) {
-        showToast(copy.validationDuplicateListItem, 'error');
-        return false;
-      }
-      if (cleanedExclusions.some((item: string) => item.length < 2)) {
-        showToast(copy.validationExclusionItemQuality, 'error');
-        return false;
-      }
-      if (cleanedExclusions.length > 0 && hasDuplicateItems(cleanedExclusions)) {
-        showToast(copy.validationDuplicateListItem, 'error');
-        return false;
-      }
-      if (cleanedSupplies && cleanedSupplies.length < 4) {
-        showToast(copy.validationSuppliesQuality, 'error');
-        return false;
-      }
-      return true;
-    }
-
-    if (targetStep === 6) {
-      if (!formData.rules?.age_limit?.trim()) {
-        showToast(copy.validationAgeLimit, 'error');
-        return false;
-      }
-      return true;
-    }
-
-    if (targetStep === 7) {
-      if (!Number(formData.price) || Number(formData.price) <= 0) {
-        showToast(copy.validationPrice, 'error');
-        return false;
-      }
-      if (!isValidSoloGuaranteePrice(formData.solo_guarantee_price)) {
-        showToast(copy.validationSoloGuaranteePrice, 'error');
-        return false;
-      }
-      if (formData.is_private_enabled && (!Number(formData.private_price) || Number(formData.private_price) <= 0)) {
-        showToast(copy.validationPrivatePrice, 'error');
-        return false;
-      }
-      return true;
-    }
-
-    return true;
+    const firstIssue = issues[0];
+    setValidatedSteps((prev) => Array.from(new Set([...prev, ...issues.map((issue) => issue.step)])));
+    setStep(targetStep);
+    setFocusRequest({ field: firstIssue.field, requestId: Date.now() });
+    showToast(getExperienceIssueMessage(firstIssue.code, copy), 'error');
   };
+
+  useEffect(() => {
+    if (!focusRequest) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      const field = document.querySelector<HTMLElement>(`[data-validation-field="${focusRequest.field}"]`);
+      if (!field) return;
+
+      field.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const focusTarget = field.matches('input, textarea, select, button')
+        ? field
+        : field.querySelector<HTMLElement>('input:not([type="hidden"]):not(.hidden), textarea, select, button, [tabindex]:not([tabindex="-1"])');
+
+      if (focusTarget) {
+        focusTarget.focus({ preventScroll: true });
+      } else {
+        field.setAttribute('tabindex', '-1');
+        field.focus({ preventScroll: true });
+      }
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [focusRequest, step]);
 
   // --- 네비게이션 함수 ---
   const nextStep = () => {
     if (step >= TOTAL_STEPS) return;
-    if (!validateCurrentStep(step)) return;
+
+    if (step === 5) {
+      const draftResult = prepareExperienceListDrafts(formData, tempInclusion, tempExclusion);
+      if (draftResult.issues.length > 0) {
+        revealIssues(draftResult.issues, step);
+        return;
+      }
+
+      if (draftResult.formData !== formData) {
+        setFormData(draftResult.formData);
+        setTempInclusion(draftResult.tempInclusion);
+        setTempExclusion(draftResult.tempExclusion);
+      }
+
+      const issues = validateExperienceStep(draftResult.formData, step);
+      if (issues.length > 0) {
+        revealIssues(issues, step);
+        return;
+      }
+    } else {
+      const issues = validateExperienceStep(formData, step);
+      if (issues.length > 0) {
+        revealIssues(issues, step);
+        return;
+      }
+    }
+
+    setValidatedSteps((prev) => prev.filter((validatedStep) => validatedStep !== step));
     setStep(step + 1);
   };
   const prevStep = () => { if (step > 1) setStep(step - 1); };
@@ -254,7 +228,7 @@ export default function CreateExperiencePage() {
     value: string,
     setter: React.Dispatch<React.SetStateAction<string>>
   ) => {
-    const normalizedValue = normalizeListItem(value);
+    const normalizedValue = normalizeExperienceListItem(value);
     if (!normalizedValue) return;
 
     if (normalizedValue.length < 2) {
@@ -262,7 +236,7 @@ export default function CreateExperiencePage() {
       return;
     }
 
-    const existingItems = (formData[field] || []).map((item) => normalizeListItem(item).toLocaleLowerCase());
+    const existingItems = (formData[field] || []).map((item) => normalizeExperienceListItem(item).toLocaleLowerCase());
     if (existingItems.includes(normalizedValue.toLocaleLowerCase())) {
       showToast(copy.validationDuplicateListItem, 'error');
       return;
@@ -436,7 +410,11 @@ export default function CreateExperiencePage() {
 
   // 🚀 최종 제출 함수 수정 (파일명 최적화 및 버킷 명칭 확인)
   const handleSubmit = async () => {
-    if (!validateCurrentStep(TOTAL_STEPS - 1)) return;
+    const issues = validateExperienceForm(formData);
+    if (issues.length > 0) {
+      revealIssues(issues, issues[0].step);
+      return;
+    }
 
     setLoading(true);
     try {
@@ -467,8 +445,8 @@ export default function CreateExperiencePage() {
         })
       );
 
-      const cleanedInclusions = (formData.inclusions || []).map((item: string) => normalizeListItem(item)).filter(Boolean);
-      const cleanedExclusions = (formData.exclusions || []).map((item: string) => normalizeListItem(item)).filter(Boolean);
+      const cleanedInclusions = (formData.inclusions || []).map((item: string) => normalizeExperienceListItem(item)).filter(Boolean);
+      const cleanedExclusions = (formData.exclusions || []).map((item: string) => normalizeExperienceListItem(item)).filter(Boolean);
       const cleanedSupplies = (formData.supplies || '').trim();
       const payload = buildExperienceWritePayload({
         ...formData,
@@ -573,6 +551,7 @@ export default function CreateExperiencePage() {
           tempExclusion={tempExclusion}
           setTempExclusion={setTempExclusion}
           createdExperienceId={createdExperienceId}
+          issues={currentIssues}
         />
       </main>
 
