@@ -86,7 +86,7 @@ test.describe('Sentry client noise guards', () => {
     expect(options.beforeSend(wrongTypeEvent)).not.toBeNull();
   });
 
-  test('drops only the /become-a-host injected native bridge webkit noise', () => {
+  test('drops only known injected native bridge webkit noise', () => {
     const options = getClientSentryInitOptions();
     const exactEvent = createClientErrorEvent({
       type: 'TypeError',
@@ -108,6 +108,16 @@ test.describe('Sentry client noise guards', () => {
 
     expect(options.beforeSend(pageHideEvent)).toBeNull();
 
+    const homePageShowEvent = createClientErrorEvent({
+      type: 'TypeError',
+      value: WEBKIT_MESSAGE_HANDLERS_ERROR_MESSAGE,
+      transaction: '/',
+      frameFilename: 'app:///',
+      frameFunction: 'sendPageShowMessage',
+    });
+
+    expect(options.beforeSend(homePageShowEvent)).toBeNull();
+
     const appFrameEvent = createClientErrorEvent({
       type: 'TypeError',
       value: WEBKIT_MESSAGE_HANDLERS_ERROR_MESSAGE,
@@ -125,6 +135,15 @@ test.describe('Sentry client noise guards', () => {
       frameFunction: 'sendDataToNative',
     });
     expect(options.beforeSend(wrongRouteEvent)).not.toBeNull();
+
+    const unverifiedRouteEvent = createClientErrorEvent({
+      type: 'TypeError',
+      value: WEBKIT_MESSAGE_HANDLERS_ERROR_MESSAGE,
+      transaction: '/search',
+      frameFilename: 'app:///search',
+      frameFunction: 'sendPageShowMessage',
+    });
+    expect(options.beforeSend(unverifiedRouteEvent)).not.toBeNull();
 
     const extendedMessageEvent = createClientErrorEvent({
       type: 'TypeError',

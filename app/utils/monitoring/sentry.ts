@@ -143,7 +143,7 @@ function shouldDropHistoryReplaceStateThrottleNoise(event: Sentry.ErrorEvent) {
 }
 
 function shouldDropWebkitMessageHandlersNoise(event: Sentry.ErrorEvent) {
-  if (!hasTransaction(event, '/become-a-host')) {
+  if (!hasTransaction(event, '/') && !hasTransaction(event, '/become-a-host')) {
     return false;
   }
 
@@ -154,7 +154,9 @@ function shouldDropWebkitMessageHandlersNoise(event: Sentry.ErrorEvent) {
       exception.type === 'TypeError' &&
       exception.value === WEBKIT_MESSAGE_HANDLERS_ERROR_MESSAGE &&
       frameText.includes('app:///') &&
-      (frameText.includes('sendDataToNative') || frameText.includes('sendPageHideMessage'))
+      (frameText.includes('sendDataToNative') ||
+        frameText.includes('sendPageShowMessage') ||
+        frameText.includes('sendPageHideMessage'))
     );
   });
 }
