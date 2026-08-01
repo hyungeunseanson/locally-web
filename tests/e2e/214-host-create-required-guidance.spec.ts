@@ -187,3 +187,196 @@ test('runs the complete preflight before loading, storage uploads, or the create
   expect(loading).toBeLessThan(upload);
   expect(upload).toBeLessThan(request);
 });
+
+test('keeps validation guidance while removing only the red field outlines', () => {
+  const source = readFileSync(join(process.cwd(), 'app/host/create/components/ExperienceFormSteps.tsx'), 'utf8');
+
+  expect(source).not.toContain('invalidBorder');
+  expect(source).not.toContain('border-rose-500');
+  expect(source).not.toContain('ring-rose-200');
+  expect(source).toContain("'aria-invalid': message ? true : undefined");
+  expect(source).toContain("'aria-describedby': message ? `host-create-error-${field}` : undefined");
+  expect(source).toContain('data-validation-field');
+  expect(source).toContain('<ValidationMessage');
+});
+
+test('expands the pricing layout only at the desktop breakpoint', () => {
+  const source = readFileSync(join(process.cwd(), 'app/host/create/components/ExperienceFormSteps.tsx'), 'utf8');
+  const pageSource = readFileSync(join(process.cwd(), 'app/host/create/page.tsx'), 'utf8');
+
+  expect(source).toContain('max-w-md flex-col items-center space-y-6 lg:max-w-[720px]');
+  expect(source).toContain('grid grid-cols-1 gap-4 lg:grid-cols-[minmax(360px,1fr)_240px] lg:items-start lg:gap-6');
+  expect(source).toContain('host-create-solo-guarantee-price-panel');
+  expect(source).toContain('w-full rounded-2xl border border-emerald-200 bg-white p-4 lg:w-60');
+  expect(source).not.toContain('md:flex-row md:items-start md:justify-between');
+  expect(source).not.toContain('md:w-56 shrink-0');
+  expect(pageSource).toContain("step === TOTAL_STEPS - 1 ? '' : 'max-w-2xl lg:max-w-3xl'");
+  expect(pageSource).toContain('style={step === TOTAL_STEPS - 1 ? { maxWidth: 768 } : undefined}');
+});
+
+test('keeps mobile pricing stacked and expands the solo option safely on desktop', async ({ page }) => {
+  const nextButtonName = /다음|Next|次へ|下一步/;
+  const clickNext = async () => {
+    await page.locator('footer').getByRole('button', { name: nextButtonName }).evaluate((button) => {
+      (button as HTMLButtonElement).click();
+    });
+  };
+
+  await page.setViewportSize({ width: 320, height: 720 });
+  await page.goto('/host/create', { waitUntil: 'networkidle' });
+
+  await clickNext();
+  const cityValidationGroup = page.locator('[data-validation-field="city"]');
+  await expect(page.locator('#host-create-error-city')).toBeVisible();
+  await expect(cityValidationGroup).toHaveAttribute('aria-invalid', 'true');
+  const validationVisuals = await cityValidationGroup.evaluate((element) => ({
+    className: element.className,
+    boxShadow: getComputedStyle(element).boxShadow,
+  }));
+  expect(validationVisuals.className).not.toContain('border-rose-500');
+  expect(validationVisuals.className).not.toContain('ring-rose-200');
+  expect(validationVisuals.boxShadow).toBe('none');
+
+  const completeToPricing = async () => {
+    await page.getByRole('button', { name: /^(서울|Seoul|ソウル|首尔)$/ }).click();
+    await page.getByRole('button', { name: /^(맛집 탐방|Food Tour|グルメ巡り|美食探索)$/ }).click();
+    await clickNext();
+
+    await page.getByRole('button', { name: /^(한국어|Korean|韓国語|韩语)$/ }).click();
+    await page.locator('button:not([disabled])').filter({ hasText: /^Lv\.?5$/ }).click();
+    await clickNext();
+
+    await page
+      .locator(
+        'input[placeholder="체험 제목을 입력하세요"], input[placeholder="Enter experience title"], input[placeholder="体験タイトルを入力してください"], input[placeholder="请输入体验标题"]'
+      )
+      .fill('Host pricing layout check');
+    await page.locator('main input[type="file"][multiple]').setInputFiles('tests/e2e/test-image.png');
+    await expect(page.locator('img[alt="preview 0"]')).toBeVisible({ timeout: 15000 });
+    await clickNext();
+
+    await page
+      .locator(
+        'input[placeholder="예) 스타벅스 홍대역점"], input[placeholder="e.g. Starbucks Hongdae Station"], input[placeholder="例）スターバックス弘大駅店"], input[placeholder="例如：弘大站星巴克"]'
+      )
+      .fill('Locally meeting point');
+    await page
+      .locator(
+        'input[placeholder="예) 서울특별시 마포구 양화로 165"], input[placeholder="e.g. 165 Yanghwa-ro, Mapo-gu, Seoul"], input[placeholder="例）ソウル特別市 麻浦区 楊花路 165"], input[placeholder="例如：首尔特别市麻浦区杨花路165"]'
+      )
+      .fill('165 Yanghwa-ro, Mapo-gu, Seoul');
+    await page
+      .locator(
+        'input[placeholder="장소 이름"], input[placeholder="Place name"], input[placeholder="Location name"], input[placeholder="場所名"], input[placeholder="地点名称"]'
+      )
+      .fill('Local neighborhood walk');
+    await clickNext();
+
+    await page
+      .locator(
+        'textarea[placeholder="상세 소개글을 입력하세요. (최소 30자, 50자 이상 권장)"], textarea[placeholder="Enter a detailed description. (30 minimum, 50+ recommended)"], textarea[placeholder="詳細紹介文を入力してください。（最低30文字、50文字以上推奨）"], textarea[placeholder="请输入详细介绍。（至少30字，建议50字以上）"]'
+      )
+      .fill('This description is long enough to verify the responsive host pricing layout without submitting any operational data.');
+    await page
+      .locator(
+        'input[placeholder="예) 음료"], input[placeholder="e.g. Drink"], input[placeholder="例）ドリンク"], input[placeholder="例如：饮品"]'
+      )
+      .fill('Welcome drink');
+    await clickNext();
+
+    await page
+      .locator(
+        'input[placeholder="예) 만 7세 이상"], input[placeholder="e.g. Ages 7 and up"], input[placeholder="例）満7歳以上"], input[placeholder="例如：满7岁以上"]'
+      )
+      .fill('Ages 10 and up');
+    await clickNext();
+  };
+
+  await completeToPricing();
+
+  const pricingContent = page.getByTestId('host-create-step-7-content');
+  const soloLayout = page.getByTestId('host-create-solo-guarantee-layout');
+  const pricePanel = page.getByTestId('host-create-solo-guarantee-price-panel');
+  await expect(pricingContent).toBeVisible();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mobileLayout = await soloLayout.evaluate((element) => {
+    const panel = element.querySelector<HTMLElement>('[data-testid="host-create-solo-guarantee-price-panel"]')!;
+    const copy = element.firstElementChild as HTMLElement;
+    const elementRect = element.getBoundingClientRect();
+    const panelRect = panel.getBoundingClientRect();
+    const copyRect = copy.getBoundingClientRect();
+    return {
+      elementWidth: elementRect.width,
+      panelWidth: panelRect.width,
+      panelTop: panelRect.top,
+      copyBottom: copyRect.bottom,
+      columns: getComputedStyle(element).gridTemplateColumns,
+      scrollWidth: document.documentElement.scrollWidth,
+      viewportWidth: window.innerWidth,
+    };
+  });
+  expect(mobileLayout.panelTop).toBeGreaterThanOrEqual(mobileLayout.copyBottom);
+  expect(mobileLayout.panelWidth).toBeCloseTo(mobileLayout.elementWidth, 0);
+  expect(mobileLayout.scrollWidth).toBeLessThanOrEqual(mobileLayout.viewportWidth);
+  await page.waitForTimeout(3500);
+  await page.screenshot({ path: '/tmp/locally-host-create-pricing-mobile-2026-08-01.png', fullPage: true });
+
+  await page.setViewportSize({ width: 834, height: 1000 });
+  const tabletLayout = await soloLayout.evaluate((element) => {
+    const panel = element.querySelector<HTMLElement>('[data-testid="host-create-solo-guarantee-price-panel"]')!;
+    const copy = element.firstElementChild as HTMLElement;
+    return {
+      panelTop: panel.getBoundingClientRect().top,
+      copyBottom: copy.getBoundingClientRect().bottom,
+    };
+  });
+  expect(tabletLayout.panelTop).toBeGreaterThanOrEqual(tabletLayout.copyBottom);
+
+  await page.setViewportSize({ width: 1024, height: 900 });
+  const breakpointLayout = await soloLayout.evaluate((element) => {
+    const panel = element.querySelector<HTMLElement>('[data-testid="host-create-solo-guarantee-price-panel"]')!;
+    const copy = element.firstElementChild as HTMLElement;
+    return {
+      panelLeft: panel.getBoundingClientRect().left,
+      copyRight: copy.getBoundingClientRect().right,
+    };
+  });
+  expect(breakpointLayout.panelLeft).toBeGreaterThan(breakpointLayout.copyRight);
+
+  await page.setViewportSize({ width: 1536, height: 1000 });
+  await page.goto('/host/create', { waitUntil: 'networkidle' });
+  await completeToPricing();
+  await expect(pricingContent).toBeVisible();
+
+  const desktopLayout = await soloLayout.evaluate((element) => {
+    const panel = element.querySelector<HTMLElement>('[data-testid="host-create-solo-guarantee-price-panel"]')!;
+    const copy = element.firstElementChild as HTMLElement;
+    const content = element.closest<HTMLElement>('[data-testid="host-create-step-7-content"]')!;
+    const card = element.closest<HTMLElement>('[data-testid="host-create-solo-guarantee-card"]')!;
+    const main = content.closest<HTMLElement>('main')!;
+    return {
+      contentWidth: content.getBoundingClientRect().width,
+      cardWidth: card.getBoundingClientRect().width,
+      cardRight: card.getBoundingClientRect().right,
+      gridWidth: element.getBoundingClientRect().width,
+      mainWidth: main.getBoundingClientRect().width,
+      copyWidth: copy.getBoundingClientRect().width,
+      panelWidth: panel.getBoundingClientRect().width,
+      panelRight: panel.getBoundingClientRect().right,
+      columnGap: Number.parseFloat(getComputedStyle(element).columnGap),
+      scrollWidth: document.documentElement.scrollWidth,
+      viewportWidth: window.innerWidth,
+    };
+  });
+  await page.screenshot({ path: '/tmp/locally-host-create-pricing-desktop-2026-08-01.png', fullPage: true });
+  expect(desktopLayout.mainWidth).toBeGreaterThanOrEqual(760);
+  expect(desktopLayout.contentWidth).toBeGreaterThanOrEqual(700);
+  expect(desktopLayout.gridWidth).toBeGreaterThanOrEqual(624);
+  expect(desktopLayout.copyWidth).toBeGreaterThanOrEqual(360);
+  expect(desktopLayout.panelWidth).toBeCloseTo(240, 0);
+  expect(desktopLayout.panelRight).toBeLessThanOrEqual(desktopLayout.cardRight);
+  expect(desktopLayout.columnGap).toBeGreaterThanOrEqual(24);
+  expect(desktopLayout.scrollWidth).toBeLessThanOrEqual(desktopLayout.viewportWidth);
+  await expect(pricePanel).toBeVisible();
+});

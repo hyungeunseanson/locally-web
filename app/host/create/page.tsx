@@ -528,7 +528,10 @@ export default function CreateExperiencePage() {
       )}
 
       {/* 메인 컨텐츠 */}
-      <main className="flex-1 flex flex-col items-center pt-[calc(env(safe-area-inset-top,0px)+4.75rem)] md:pt-24 pb-28 md:pb-36 px-4 md:px-6 w-full max-w-2xl lg:max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <main
+        className={`flex-1 flex flex-col items-center pt-[calc(env(safe-area-inset-top,0px)+4.75rem)] md:pt-24 pb-28 md:pb-36 px-4 md:px-6 w-full mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 ${step === TOTAL_STEPS - 1 ? '' : 'max-w-2xl lg:max-w-3xl'}`}
+        style={step === TOTAL_STEPS - 1 ? { maxWidth: 768 } : undefined}
+      >
         <ExperienceFormSteps
           step={step}
           formData={formData}

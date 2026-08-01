@@ -236,7 +236,6 @@ export default function ExperienceFormSteps({
       'aria-describedby': message ? `host-create-error-${field}` : undefined,
     };
   };
-  const invalidBorder = (field: string) => getIssue(field) ? 'border-rose-500 ring-1 ring-rose-200' : '';
   const inclusionIssueField = getIssue('inclusion-draft') ? 'inclusion-draft' : 'inclusions';
   const exclusionIssueField = getIssue('exclusion-draft') ? 'exclusion-draft' : 'exclusions';
   const inclusionIssue = getIssue(inclusionIssueField);
@@ -283,7 +282,7 @@ export default function ExperienceFormSteps({
           <div
             {...(!isCustomCity ? validationAttributes('city') : {})}
             role="group"
-            className={`grid grid-cols-3 sm:grid-cols-4 gap-2.5 md:gap-3 rounded-2xl ${!isCustomCity ? invalidBorder('city') : ''}`}
+            className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 md:gap-3 rounded-2xl"
           >
             {CITY_OPTIONS[formData.country as 'Korea' | 'Japan'].map((cityOption) => (
               <button
@@ -307,12 +306,12 @@ export default function ExperienceFormSteps({
               placeholder={copy.customCityPlaceholder}
               value={formData.city}
               onChange={(e) => updateData('city', e.target.value)}
-              className={`w-full p-3.5 md:p-4 text-base md:text-lg font-bold border-b-2 border-slate-200 focus:border-black outline-none bg-transparent ${invalidBorder('city')}`}
+              className="w-full p-3.5 md:p-4 text-base md:text-lg font-bold border-b-2 border-slate-200 focus:border-black outline-none bg-transparent"
             />
           )}
           <ValidationMessage field="city" message={getIssue('city')} />
 
-          <div {...validationAttributes('category')} role="group" className={`rounded-2xl ${invalidBorder('category')}`}>
+          <div {...validationAttributes('category')} role="group" className="rounded-2xl">
             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 block">
               {copy.categoryLabel}<RequiredBadge label={copy.requiredLabel} />
             </label>
@@ -349,7 +348,7 @@ export default function ExperienceFormSteps({
           <h1 className="text-[22px] md:text-[30px] font-black text-slate-900 leading-tight">{copy.step2Title}</h1>
           <p className="text-[13px] md:text-base text-slate-500">{copy.step2Desc}</p>
         </div>
-        <div {...validationAttributes('languages')} role="group" className={`rounded-2xl ${invalidBorder('languages')}`}>
+        <div {...validationAttributes('languages')} role="group" className="rounded-2xl">
           <label className="mb-3 block text-xs font-bold uppercase tracking-wider text-slate-400">
             {copy.languagesLabel}<RequiredBadge label={copy.requiredLabel} />
           </label>
@@ -359,7 +358,7 @@ export default function ExperienceFormSteps({
         <div
           {...validationAttributes('source-locale')}
           data-testid="host-create-source-locale-card"
-          className={`space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:p-5 ${invalidBorder('source-locale')}`}
+          className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:p-5"
         >
           <div className="space-y-3">
             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
@@ -432,7 +431,7 @@ export default function ExperienceFormSteps({
                       placeholder={copy.titlePlaceholder}
                       value={inputValue}
                       onChange={(e) => updateData('manual_content', setManualFieldValue(formData.manual_content, option.code, 'title', e.target.value))}
-                      className={`w-full py-2 text-lg md:text-xl font-black border-b-2 border-slate-200 focus:border-black outline-none bg-transparent placeholder:text-slate-300 ${invalidBorder(`title-${option.code}`)}`}
+                      className="w-full py-2 text-lg md:text-xl font-black border-b-2 border-slate-200 focus:border-black outline-none bg-transparent placeholder:text-slate-300"
                     />
                     <ValidationMessage field={`title-${option.code}`} message={getIssue(`title-${option.code}`)} />
                   </div>
@@ -441,7 +440,7 @@ export default function ExperienceFormSteps({
             </div>
           </div>
 
-          <div {...validationAttributes('photos')} className={`space-y-3 rounded-2xl ${invalidBorder('photos')}`}>
+          <div {...validationAttributes('photos')} className="space-y-3 rounded-2xl">
             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
               {copy.photosLabel}<RequiredBadge label={copy.requiredLabel} />
             </label>
@@ -526,7 +525,7 @@ export default function ExperienceFormSteps({
             placeholder={copy.meetingPointPlaceholder}
             value={formData.meeting_point || ''}
             onChange={(e) => updateData('meeting_point', e.target.value)}
-            className={`w-full p-3.5 md:p-4 bg-white rounded-xl border border-slate-200 focus:border-black outline-none font-bold text-sm md:text-base ${invalidBorder('meeting-point')}`}
+            className="w-full p-3.5 md:p-4 bg-white rounded-xl border border-slate-200 focus:border-black outline-none font-bold text-sm md:text-base"
           />
           <FieldHint className="ml-0">{copy.meetingPointHelp}</FieldHint>
           <ValidationMessage field="meeting-point" message={getIssue('meeting-point')} />
@@ -539,7 +538,7 @@ export default function ExperienceFormSteps({
             placeholder={copy.addressPlaceholder}
             value={formData.location || ''}
             onChange={(e) => updateData('location', e.target.value)}
-            className={`w-full p-3.5 md:p-4 bg-white rounded-xl border border-slate-200 focus:border-black outline-none font-medium text-sm md:text-base ${invalidBorder('location')}`}
+            className="w-full p-3.5 md:p-4 bg-white rounded-xl border border-slate-200 focus:border-black outline-none font-medium text-sm md:text-base"
           />
           <p className="text-xs text-slate-400">{copy.addressHelp}</p>
           <ValidationMessage field="location" message={getIssue('location')} />
@@ -579,7 +578,7 @@ export default function ExperienceFormSteps({
                       placeholder={copy.itineraryTitlePlaceholder}
                       value={item.title}
                       onChange={(e) => updateItineraryItem(idx, 'title', e.target.value)}
-                      className={`w-full rounded-lg border border-transparent bg-transparent px-2 py-1 text-base md:text-lg font-bold outline-none ${invalidBorder(`itinerary-${idx}-title`)}`}
+                      className="w-full rounded-lg border border-transparent bg-transparent px-2 py-1 text-base md:text-lg font-bold outline-none"
                     />
                     <ValidationMessage field={`itinerary-${idx}-title`} message={getIssue(`itinerary-${idx}-title`)} />
                     <textarea
@@ -676,7 +675,7 @@ export default function ExperienceFormSteps({
                     placeholder={copy.descriptionPlaceholder}
                     value={inputValue}
                     onChange={(e) => updateData('manual_content', setManualFieldValue(formData.manual_content, option.code, 'description', e.target.value))}
-                    className={`w-full p-4 h-32 md:h-36 bg-slate-50 rounded-2xl outline-none resize-none text-sm md:text-base border border-slate-200 focus:border-black ${invalidBorder(`description-${option.code}`)}`}
+                    className="w-full p-4 h-32 md:h-36 bg-slate-50 rounded-2xl outline-none resize-none text-sm md:text-base border border-slate-200 focus:border-black"
                   />
                   <p className={`text-[11px] mt-1 ml-1 ${(inputValue?.length || 0) >= 50 ? 'text-green-500' : (inputValue?.length || 0) >= 30 ? 'text-amber-600' : 'text-slate-400'}`}>
                     {copy.descriptionCount(inputValue?.length || 0)}
@@ -689,7 +688,7 @@ export default function ExperienceFormSteps({
 
           <div
             {...(getIssue('inclusion-draft') ? { 'data-validation-field': 'inclusions' } : validationAttributes('inclusions'))}
-            className={`rounded-2xl ${!getIssue('inclusion-draft') ? invalidBorder('inclusions') : ''}`}
+            className="rounded-2xl"
           >
             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">
               {copy.inclusionsLabel}<RequiredBadge label={copy.requiredLabel} />
@@ -708,7 +707,7 @@ export default function ExperienceFormSteps({
                     addItem('inclusions', tempInclusion, setTempInclusion);
                   }
                 }}
-                className={`flex-1 bg-slate-50 rounded-xl px-4 py-3 text-sm outline-none border border-slate-200 ${invalidBorder('inclusion-draft')}`}
+                className="flex-1 bg-slate-50 rounded-xl px-4 py-3 text-sm outline-none border border-slate-200"
               />
               <button type="button" onClick={() => addItem('inclusions', tempInclusion, setTempInclusion)} className="bg-black text-white p-3 rounded-xl">
                 <Plus size={20} />
@@ -731,7 +730,7 @@ export default function ExperienceFormSteps({
 
           <div
             {...(getIssue('exclusion-draft') ? { 'data-validation-field': 'exclusions' } : validationAttributes('exclusions'))}
-            className={`rounded-2xl ${!getIssue('exclusion-draft') ? invalidBorder('exclusions') : ''}`}
+            className="rounded-2xl"
           >
             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">{copy.exclusionsLabel}</label>
             <FieldHint className="mb-2 ml-0">{copy.exclusionsHelp}</FieldHint>
@@ -748,7 +747,7 @@ export default function ExperienceFormSteps({
                     addItem('exclusions', tempExclusion, setTempExclusion);
                   }
                 }}
-                className={`flex-1 bg-slate-50 rounded-xl px-4 py-3 text-sm outline-none border border-slate-200 ${invalidBorder('exclusion-draft')}`}
+                className="flex-1 bg-slate-50 rounded-xl px-4 py-3 text-sm outline-none border border-slate-200"
               />
               <button type="button" onClick={() => addItem('exclusions', tempExclusion, setTempExclusion)} className="bg-black text-white p-3 rounded-xl">
                 <Plus size={20} />
@@ -777,7 +776,7 @@ export default function ExperienceFormSteps({
               placeholder={copy.suppliesPlaceholder}
               value={formData.supplies}
               onChange={(e) => updateData('supplies', e.target.value)}
-              className={`w-full p-4 h-24 bg-slate-50 rounded-2xl outline-none resize-none text-sm border border-slate-200 focus:border-black ${invalidBorder('supplies')}`}
+              className="w-full p-4 h-24 bg-slate-50 rounded-2xl outline-none resize-none text-sm border border-slate-200 focus:border-black"
             />
             {!getIssue('supplies') && suppliesLooksShort && <FieldHint className="ml-0 text-amber-600">{copy.validationSuppliesQuality}</FieldHint>}
             <ValidationMessage field="supplies" message={getIssue('supplies')} />
@@ -802,7 +801,7 @@ export default function ExperienceFormSteps({
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">
                   {copy.durationLabel}<RequiredBadge label={copy.requiredLabel} />
                 </label>
-                <div className={`flex items-center gap-4 bg-white p-3 rounded-xl border border-slate-200 ${invalidBorder('duration')}`}>
+                <div className="flex items-center gap-4 bg-white p-3 rounded-xl border border-slate-200">
                   <button type="button" onClick={() => handleCounter('duration', 'dec')} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
                     <Minus size={14} />
                   </button>
@@ -818,7 +817,7 @@ export default function ExperienceFormSteps({
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">
                   {copy.maxGuestsLabel}<RequiredBadge label={copy.requiredLabel} />
                 </label>
-                <div className={`flex items-center gap-4 bg-white p-3 rounded-xl border border-slate-200 ${invalidBorder('max-guests')}`}>
+                <div className="flex items-center gap-4 bg-white p-3 rounded-xl border border-slate-200">
                   <button type="button" onClick={() => handleCounter('maxGuests', 'dec')} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
                     <Minus size={14} />
                   </button>
@@ -840,7 +839,7 @@ export default function ExperienceFormSteps({
                   placeholder={copy.ageLimitPlaceholder}
                   value={formData.rules.age_limit}
                   onChange={(e) => updateData('rules', { ...formData.rules, age_limit: e.target.value })}
-                  className={`w-full p-3 bg-white rounded-xl text-sm border border-slate-200 focus:border-black outline-none ${invalidBorder('age-limit')}`}
+                  className="w-full p-3 bg-white rounded-xl text-sm border border-slate-200 focus:border-black outline-none"
                 />
                 <FieldHint className="ml-0">{copy.ageLimitHelp}</FieldHint>
                 <ValidationMessage field="age-limit" message={getIssue('age-limit')} />
@@ -909,8 +908,11 @@ export default function ExperienceFormSteps({
           <p className="text-[13px] md:text-base text-slate-500">{copy.step7Desc}</p>
         </div>
 
-        <div className="flex flex-col items-center w-full max-w-md mx-auto space-y-6">
-          <div className="w-full">
+        <div
+          data-testid="host-create-step-7-content"
+          className="mx-auto flex w-full max-w-md flex-col items-center space-y-6 lg:max-w-[720px]"
+        >
+          <div className="w-full max-w-md mx-auto">
             <label className="text-xs font-bold text-slate-400 uppercase mb-2 block text-center">
               {copy.priceLabel}<RequiredBadge label={copy.requiredLabel} />
             </label>
@@ -925,7 +927,7 @@ export default function ExperienceFormSteps({
                   const v = e.target.value.replace(/[^0-9]/g, '');
                   updateData('price', v ? Number(v) : 0);
                 }}
-                className={`w-full pl-12 pr-4 py-3 md:py-4 text-3xl md:text-5xl font-black text-center border-b-2 border-slate-200 focus:border-black outline-none bg-transparent ${invalidBorder('price')}`}
+                className="w-full pl-12 pr-4 py-3 md:py-4 text-3xl md:text-5xl font-black text-center border-b-2 border-slate-200 focus:border-black outline-none bg-transparent"
                 placeholder={copy.pricePlaceholder}
               />
             </div>
@@ -938,15 +940,24 @@ export default function ExperienceFormSteps({
             </HelpDisclosure>
           </div>
 
-          <div className="w-full rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5 md:p-6">
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-              <div className="space-y-2">
+          <div
+            data-testid="host-create-solo-guarantee-card"
+            className="w-full rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5 md:p-6"
+          >
+            <div
+              data-testid="host-create-solo-guarantee-layout"
+              className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(360px,1fr)_240px] lg:items-start lg:gap-6"
+            >
+              <div className="min-w-0 space-y-2">
                 <p className="text-sm md:text-base font-bold text-slate-900">{copy.soloGuaranteeTitle}</p>
                 <p className="text-sm text-slate-700 leading-6">{copy.soloGuaranteeDesc}</p>
                 <p className="text-xs md:text-sm font-semibold text-emerald-700">{copy.soloGuaranteeRefundNote}</p>
-                <p className="text-xs md:text-sm text-slate-500">{copy.soloGuaranteeHostNote}</p>
+                <p className="text-xs text-slate-500 md:text-sm lg:leading-6">{copy.soloGuaranteeHostNote}</p>
               </div>
-              <div className="w-full md:w-56 shrink-0 rounded-2xl border border-emerald-200 bg-white p-4">
+              <div
+                data-testid="host-create-solo-guarantee-price-panel"
+                className="w-full rounded-2xl border border-emerald-200 bg-white p-4 lg:w-60"
+              >
                 <label className="block text-[11px] font-bold text-slate-500 mb-2">
                   {copy.soloGuaranteePriceLabel}<RequiredBadge label={copy.requiredLabel} />
                 </label>
@@ -964,7 +975,7 @@ export default function ExperienceFormSteps({
                     min={MIN_SOLO_GUARANTEE_PRICE}
                     max={MAX_SOLO_GUARANTEE_PRICE}
                     step={SOLO_GUARANTEE_PRICE_STEP}
-                    className={`w-full rounded-xl border border-slate-200 bg-white py-3 pl-8 pr-3 text-right text-base font-black text-emerald-700 outline-none focus:border-emerald-500 ${invalidBorder('solo-guarantee-price')}`}
+                    className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-8 pr-3 text-right text-base font-black text-emerald-700 outline-none focus:border-emerald-500"
                     placeholder={copy.soloGuaranteePricePlaceholder}
                   />
                 </div>
@@ -1013,7 +1024,7 @@ export default function ExperienceFormSteps({
                       const v = e.target.value.replace(/[^0-9]/g, '');
                       updateData('private_price', v ? Number(v) : 0);
                     }}
-                    className={`w-full pl-10 pr-4 py-3 text-xl font-bold bg-white border border-slate-300 rounded-xl focus:border-black outline-none ${invalidBorder('private-price')}`}
+                    className="w-full pl-10 pr-4 py-3 text-xl font-bold bg-white border border-slate-300 rounded-xl focus:border-black outline-none"
                     placeholder={copy.privatePricePlaceholder}
                   />
                 </div>
