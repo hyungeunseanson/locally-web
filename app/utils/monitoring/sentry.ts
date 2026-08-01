@@ -82,6 +82,14 @@ function getFrameSearchText(exception: SentryException) {
     .join(' ');
 }
 
+function hasOnlyInjectedAppSchemeFrames(exception: SentryException) {
+  const frameLocations = (exception.stacktrace?.frames ?? [])
+    .flatMap((frame) => [frame.filename, frame.abs_path])
+    .filter((location): location is string => typeof location === 'string' && location.length > 0);
+
+  return frameLocations.length > 0 && frameLocations.every((location) => location.startsWith('app:///'));
+}
+
 function hasTransaction(event: Sentry.ErrorEvent, transaction: string) {
   return event.transaction === transaction;
 }
@@ -148,15 +156,10 @@ function shouldDropWebkitMessageHandlersNoise(event: Sentry.ErrorEvent) {
   }
 
   return (event.exception?.values ?? []).some((exception) => {
-    const frameText = getFrameSearchText(exception);
-
     return (
       exception.type === 'TypeError' &&
       exception.value === WEBKIT_MESSAGE_HANDLERS_ERROR_MESSAGE &&
-      frameText.includes('app:///') &&
-      (frameText.includes('sendDataToNative') ||
-        frameText.includes('sendPageShowMessage') ||
-        frameText.includes('sendPageHideMessage'))
+      hasOnlyInjectedAppSchemeFrames(exception)
     );
   });
 }

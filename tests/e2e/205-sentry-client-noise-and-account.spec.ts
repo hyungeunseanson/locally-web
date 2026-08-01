@@ -14,6 +14,7 @@ function createClientErrorEvent(params: {
   transaction: string;
   frameFilename: string;
   frameFunction?: string;
+  frames?: Array<{ filename?: string; abs_path?: string; function?: string }>;
 }): Sentry.ErrorEvent {
   return {
     transaction: params.transaction,
@@ -23,7 +24,7 @@ function createClientErrorEvent(params: {
           type: params.type,
           value: params.value,
           stacktrace: {
-            frames: [
+            frames: params.frames ?? [
               {
                 filename: params.frameFilename,
                 function: params.frameFunction,
@@ -118,6 +119,20 @@ test.describe('Sentry client noise guards', () => {
 
     expect(options.beforeSend(homePageShowEvent)).toBeNull();
 
+    const minifiedHomeEvent = createClientErrorEvent({
+      type: 'TypeError',
+      value: WEBKIT_MESSAGE_HANDLERS_ERROR_MESSAGE,
+      transaction: '/',
+      frameFilename: 'app:///',
+      frames: [
+        { filename: 'app:///:1:770', function: 'T' },
+        { filename: 'app:///:1:2510', function: 'M' },
+        { filename: 'app:///:1:3759' },
+      ],
+    });
+
+    expect(options.beforeSend(minifiedHomeEvent)).toBeNull();
+
     const appFrameEvent = createClientErrorEvent({
       type: 'TypeError',
       value: WEBKIT_MESSAGE_HANDLERS_ERROR_MESSAGE,
@@ -167,10 +182,25 @@ test.describe('Sentry client noise guards', () => {
       type: 'TypeError',
       value: WEBKIT_MESSAGE_HANDLERS_ERROR_MESSAGE,
       transaction: '/become-a-host',
-      frameFilename: 'app:///become-a-host',
+      frameFilename: 'https://www.locally-travel.com/_next/static/chunks/app.js',
       frameFunction: 'renderHostLanding',
     });
     expect(options.beforeSend(unrelatedNativeFrameEvent)).not.toBeNull();
+
+    const mixedFrameEvent = createClientErrorEvent({
+      type: 'TypeError',
+      value: WEBKIT_MESSAGE_HANDLERS_ERROR_MESSAGE,
+      transaction: '/',
+      frameFilename: 'app:///',
+      frames: [
+        { filename: 'app:///:1:770', function: 'T' },
+        {
+          filename: 'https://www.locally-travel.com/_next/static/chunks/app.js',
+          function: 'renderHome',
+        },
+      ],
+    });
+    expect(options.beforeSend(mixedFrameEvent)).not.toBeNull();
   });
 });
 
