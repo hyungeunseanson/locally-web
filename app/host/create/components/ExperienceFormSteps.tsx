@@ -910,9 +910,9 @@ export default function ExperienceFormSteps({
 
         <div
           data-testid="host-create-step-7-content"
-          className="mx-auto flex w-full max-w-md flex-col items-center space-y-6 lg:max-w-[720px]"
+          className="mx-auto flex w-full max-w-md flex-col items-center space-y-6"
         >
-          <div className="w-full max-w-md mx-auto">
+          <div className="w-full">
             <label className="text-xs font-bold text-slate-400 uppercase mb-2 block text-center">
               {copy.priceLabel}<RequiredBadge label={copy.requiredLabel} />
             </label>
@@ -946,17 +946,17 @@ export default function ExperienceFormSteps({
           >
             <div
               data-testid="host-create-solo-guarantee-layout"
-              className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(360px,1fr)_240px] lg:items-start lg:gap-6"
+              className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between"
             >
-              <div className="min-w-0 space-y-2">
+              <div className="space-y-2">
                 <p className="text-sm md:text-base font-bold text-slate-900">{copy.soloGuaranteeTitle}</p>
                 <p className="text-sm text-slate-700 leading-6">{copy.soloGuaranteeDesc}</p>
                 <p className="text-xs md:text-sm font-semibold text-emerald-700">{copy.soloGuaranteeRefundNote}</p>
-                <p className="text-xs text-slate-500 md:text-sm lg:leading-6">{copy.soloGuaranteeHostNote}</p>
+                <p className="text-xs md:text-sm text-slate-500">{copy.soloGuaranteeHostNote}</p>
               </div>
               <div
                 data-testid="host-create-solo-guarantee-price-panel"
-                className="w-full rounded-2xl border border-emerald-200 bg-white p-4 lg:w-60"
+                className="w-full md:w-56 shrink-0 rounded-2xl border border-emerald-200 bg-white p-4"
               >
                 <label className="block text-[11px] font-bold text-slate-500 mb-2">
                   {copy.soloGuaranteePriceLabel}<RequiredBadge label={copy.requiredLabel} />

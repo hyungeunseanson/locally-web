@@ -200,21 +200,23 @@ test('keeps validation guidance while removing only the red field outlines', () 
   expect(source).toContain('<ValidationMessage');
 });
 
-test('expands the pricing layout only at the desktop breakpoint', () => {
+test('keeps the original compact pricing layout at desktop widths', () => {
   const source = readFileSync(join(process.cwd(), 'app/host/create/components/ExperienceFormSteps.tsx'), 'utf8');
   const pageSource = readFileSync(join(process.cwd(), 'app/host/create/page.tsx'), 'utf8');
 
-  expect(source).toContain('max-w-md flex-col items-center space-y-6 lg:max-w-[720px]');
-  expect(source).toContain('grid grid-cols-1 gap-4 lg:grid-cols-[minmax(360px,1fr)_240px] lg:items-start lg:gap-6');
+  expect(source).toContain('max-w-md flex-col items-center space-y-6');
+  expect(source).not.toContain('lg:max-w-[720px]');
+  expect(source).toContain('flex flex-col gap-4 md:flex-row md:items-start md:justify-between');
   expect(source).toContain('host-create-solo-guarantee-price-panel');
-  expect(source).toContain('w-full rounded-2xl border border-emerald-200 bg-white p-4 lg:w-60');
-  expect(source).not.toContain('md:flex-row md:items-start md:justify-between');
-  expect(source).not.toContain('md:w-56 shrink-0');
-  expect(pageSource).toContain("step === TOTAL_STEPS - 1 ? '' : 'max-w-2xl lg:max-w-3xl'");
-  expect(pageSource).toContain('style={step === TOTAL_STEPS - 1 ? { maxWidth: 768 } : undefined}');
+  expect(source).toContain('w-full md:w-56 shrink-0 rounded-2xl border border-emerald-200 bg-white p-4');
+  expect(source).not.toContain('lg:grid-cols-[minmax(360px,1fr)_240px]');
+  expect(source).not.toContain('lg:w-60');
+  expect(pageSource).toContain('w-full max-w-2xl lg:max-w-3xl mx-auto');
+  expect(pageSource).not.toContain("step === TOTAL_STEPS - 1 ? '' : 'max-w-2xl lg:max-w-3xl'");
+  expect(pageSource).not.toContain('style={step === TOTAL_STEPS - 1 ? { maxWidth: 768 } : undefined}');
 });
 
-test('keeps mobile pricing stacked and expands the solo option safely on desktop', async ({ page }) => {
+test('keeps mobile pricing stacked and restores the compact desktop pricing layout', async ({ page }) => {
   const nextButtonName = /다음|Next|次へ|下一步/;
   const clickNext = async () => {
     await page.locator('footer').getByRole('button', { name: nextButtonName }).evaluate((button) => {
@@ -311,7 +313,6 @@ test('keeps mobile pricing stacked and expands the solo option safely on desktop
       panelWidth: panelRect.width,
       panelTop: panelRect.top,
       copyBottom: copyRect.bottom,
-      columns: getComputedStyle(element).gridTemplateColumns,
       scrollWidth: document.documentElement.scrollWidth,
       viewportWidth: window.innerWidth,
     };
@@ -321,28 +322,6 @@ test('keeps mobile pricing stacked and expands the solo option safely on desktop
   expect(mobileLayout.scrollWidth).toBeLessThanOrEqual(mobileLayout.viewportWidth);
   await page.waitForTimeout(3500);
   await page.screenshot({ path: '/tmp/locally-host-create-pricing-mobile-2026-08-01.png', fullPage: true });
-
-  await page.setViewportSize({ width: 834, height: 1000 });
-  const tabletLayout = await soloLayout.evaluate((element) => {
-    const panel = element.querySelector<HTMLElement>('[data-testid="host-create-solo-guarantee-price-panel"]')!;
-    const copy = element.firstElementChild as HTMLElement;
-    return {
-      panelTop: panel.getBoundingClientRect().top,
-      copyBottom: copy.getBoundingClientRect().bottom,
-    };
-  });
-  expect(tabletLayout.panelTop).toBeGreaterThanOrEqual(tabletLayout.copyBottom);
-
-  await page.setViewportSize({ width: 1024, height: 900 });
-  const breakpointLayout = await soloLayout.evaluate((element) => {
-    const panel = element.querySelector<HTMLElement>('[data-testid="host-create-solo-guarantee-price-panel"]')!;
-    const copy = element.firstElementChild as HTMLElement;
-    return {
-      panelLeft: panel.getBoundingClientRect().left,
-      copyRight: copy.getBoundingClientRect().right,
-    };
-  });
-  expect(breakpointLayout.panelLeft).toBeGreaterThan(breakpointLayout.copyRight);
 
   await page.setViewportSize({ width: 1536, height: 1000 });
   await page.goto('/host/create', { waitUntil: 'networkidle' });
@@ -359,24 +338,26 @@ test('keeps mobile pricing stacked and expands the solo option safely on desktop
       contentWidth: content.getBoundingClientRect().width,
       cardWidth: card.getBoundingClientRect().width,
       cardRight: card.getBoundingClientRect().right,
-      gridWidth: element.getBoundingClientRect().width,
+      layoutWidth: element.getBoundingClientRect().width,
       mainWidth: main.getBoundingClientRect().width,
       copyWidth: copy.getBoundingClientRect().width,
       panelWidth: panel.getBoundingClientRect().width,
+      panelLeft: panel.getBoundingClientRect().left,
+      copyRight: copy.getBoundingClientRect().right,
       panelRight: panel.getBoundingClientRect().right,
-      columnGap: Number.parseFloat(getComputedStyle(element).columnGap),
       scrollWidth: document.documentElement.scrollWidth,
       viewportWidth: window.innerWidth,
     };
   });
   await page.screenshot({ path: '/tmp/locally-host-create-pricing-desktop-2026-08-01.png', fullPage: true });
   expect(desktopLayout.mainWidth).toBeGreaterThanOrEqual(760);
-  expect(desktopLayout.contentWidth).toBeGreaterThanOrEqual(700);
-  expect(desktopLayout.gridWidth).toBeGreaterThanOrEqual(624);
-  expect(desktopLayout.copyWidth).toBeGreaterThanOrEqual(360);
-  expect(desktopLayout.panelWidth).toBeCloseTo(240, 0);
+  expect(desktopLayout.contentWidth).toBeGreaterThanOrEqual(440);
+  expect(desktopLayout.contentWidth).toBeLessThanOrEqual(448);
+  expect(desktopLayout.layoutWidth).toBeLessThanOrEqual(400);
+  expect(desktopLayout.copyWidth).toBeGreaterThan(0);
+  expect(desktopLayout.panelWidth).toBeCloseTo(224, 0);
+  expect(desktopLayout.panelLeft).toBeGreaterThanOrEqual(desktopLayout.copyRight);
   expect(desktopLayout.panelRight).toBeLessThanOrEqual(desktopLayout.cardRight);
-  expect(desktopLayout.columnGap).toBeGreaterThanOrEqual(24);
   expect(desktopLayout.scrollWidth).toBeLessThanOrEqual(desktopLayout.viewportWidth);
   await expect(pricePanel).toBeVisible();
 });
