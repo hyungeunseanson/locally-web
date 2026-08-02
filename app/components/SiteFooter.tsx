@@ -2,12 +2,14 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Globe, Instagram, ChevronDown, ChevronUp, X } from 'lucide-react';
 import { getLegalDocument, type LegalDocType } from '@/app/constants/legalDocuments';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { OFFICIAL_SUPPORT_EMAIL } from '@/app/utils/officialSender';
 
 export default function SiteFooter() {
+  const pathname = usePathname();
   const { t, lang } = useLanguage();
   const [instaOpen, setInstaOpen] = useState(false);
 
@@ -23,6 +25,10 @@ export default function SiteFooter() {
   }, [activeModal]);
 
   const modalData = activeModal ? getLegalDocument(lang, activeModal) : null;
+
+  if (pathname?.startsWith('/open-browser')) {
+    return null;
+  }
 
   const getLanguageLabel = () => {
     switch (lang) {

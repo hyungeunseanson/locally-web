@@ -16,6 +16,7 @@ export function shouldHideMobileBottomTab(pathname: string | null | undefined, i
     pathname.startsWith('/admin') ||
     pathname.startsWith('/login') ||
     pathname.startsWith('/signup') ||
+    pathname.startsWith('/open-browser') ||
     isServicePaymentFlow ||
     isHostEditingFlow
   );

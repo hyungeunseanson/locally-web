@@ -34,6 +34,7 @@ const EXCLUDED_PATH_PREFIXES = [
   '/guest',
   '/host',
   '/notifications',
+  '/open-browser',
   '/payment',
   '/proxy-bookings',
 ];
