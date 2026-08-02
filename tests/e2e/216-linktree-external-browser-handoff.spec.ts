@@ -2,24 +2,27 @@ import { expect, test } from '@playwright/test';
 
 const IOS_INSTAGRAM_USER_AGENT =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Instagram 392.0.0.0.1';
-const ANDROID_INSTAGRAM_USER_AGENT =
-  'Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 Chrome/131.0 Mobile Safari/537.36 Instagram 392.0.0.0.1';
 const IOS_SAFARI_USER_AGENT =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1';
 
+const HOME_LINKTREE_URL =
+  '/?locally_external_prompt=instagram&utm_source=instagram&utm_medium=social&utm_campaign=linktree_home';
+const HOST_LINKTREE_URL =
+  '/become-a-host?locally_external_prompt=instagram&utm_source=instagram&utm_medium=social&utm_campaign=linktree_host';
+
 test.describe('Linktree external browser handoff', () => {
-  test('redirects normal browsers directly to the selected destination', async ({ browser }) => {
+  test('keeps normal browsers on the destination and removes the prompt marker', async ({ browser }) => {
     const context = await browser.newContext({ userAgent: IOS_SAFARI_USER_AGENT });
     const page = await context.newPage();
 
-    await page.goto('/open-browser/home');
+    await page.goto(HOME_LINKTREE_URL);
 
     await expect(page).toHaveURL(/\/?utm_source=instagram&utm_medium=social&utm_campaign=linktree_home$/);
-    await expect(page.getByTestId('external-browser-handoff')).toHaveCount(0);
+    await expect(page.getByTestId('instagram-iab-prompt')).toHaveCount(0);
     await context.close();
   });
 
-  test('shows explicit iPhone instructions inside the Instagram browser', async ({ browser }) => {
+  test('shows the glass prompt over the actual home page inside Instagram', async ({ browser }) => {
     const context = await browser.newContext({
       locale: 'ko-KR',
       userAgent: IOS_INSTAGRAM_USER_AGENT,
@@ -27,54 +30,49 @@ test.describe('Linktree external browser handoff', () => {
     });
     const page = await context.newPage();
 
-    await page.goto('/open-browser/home');
+    await page.goto(HOME_LINKTREE_URL);
 
-    await expect(page).toHaveURL(/\/open-browser\/home$/);
-    await expect(page.getByTestId('external-browser-handoff')).toBeVisible();
-    await expect(page.getByTestId('external-browser-ios-instructions')).toBeVisible();
-    await expect(page.getByTestId('external-browser-android-action')).toHaveCount(0);
-    await expect(page.getByText('외부 브라우저에서 열어주세요')).toBeVisible();
-    await expect(page.getByTestId('mobile-tab-home')).toHaveCount(0);
-    await expect(page.getByTestId('desktop-footer-ad')).toHaveCount(0);
-    await page.setViewportSize({ width: 834, height: 1112 });
-    await expect(page.locator('footer')).toHaveCount(0);
+    await expect(page.getByTestId('instagram-iab-prompt')).toBeVisible();
+    await expect(page.locator('#locally-app-shell')).toBeVisible();
+    await expect(page.getByRole('dialog').getByRole('button')).toHaveCount(2);
+    await expect(page.getByRole('button', { name: '현재 창에서 계속하기' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '링크 복사' })).toBeVisible();
+
+    const panelBox = await page.getByTestId('instagram-iab-prompt-panel').boundingBox();
+    expect(panelBox).not.toBeNull();
+    expect(panelBox!.x).toBeGreaterThanOrEqual(16);
+    expect(panelBox!.x + panelBox!.width).toBeLessThanOrEqual(374);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 
     await context.close();
   });
 
-  test('offers an Android Chrome intent with an HTTPS fallback', async ({ browser }) => {
+  test('continues on the loaded page without losing Linktree attribution', async ({ browser }) => {
     const context = await browser.newContext({
       locale: 'ko-KR',
-      userAgent: ANDROID_INSTAGRAM_USER_AGENT,
+      userAgent: IOS_INSTAGRAM_USER_AGENT,
       viewport: { width: 390, height: 844 },
     });
     const page = await context.newPage();
 
-    await page.goto('/open-browser/host');
+    await page.goto(HOST_LINKTREE_URL);
+    await expect(page.getByTestId('instagram-iab-prompt')).toBeVisible();
 
-    const action = page.getByTestId('external-browser-android-action');
-    await expect(action).toBeVisible();
-    await expect(action).toHaveAttribute(
-      'href',
-      /^intent:\/\/[^/]+\/become-a-host\?utm_source=instagram.*package=com\.android\.chrome;.*browser_fallback_url=/,
-    );
-    const continueHref = await page
-      .getByRole('link', { name: '현재 창에서 계속하기' })
-      .getAttribute('href');
-    const continueUrl = new URL(continueHref || '');
-    expect(continueUrl.pathname).toBe('/become-a-host');
-    expect(continueUrl.searchParams.get('utm_source')).toBe('instagram');
-    expect(continueUrl.searchParams.get('utm_medium')).toBe('social');
-    expect(continueUrl.searchParams.get('utm_campaign')).toBe('linktree_host');
+    await page.getByTestId('instagram-iab-continue').click();
+
+    await expect(page.getByTestId('instagram-iab-prompt')).toHaveCount(0);
+    await expect(page).toHaveURL(/\/become-a-host\?utm_source=instagram&utm_medium=social&utm_campaign=linktree_host$/);
 
     await context.close();
   });
 
-  test('rejects targets outside the fixed allowlist', async ({ request }) => {
-    const response = await request.get('/open-browser/https:%2F%2Fevil.example', {
-      maxRedirects: 0,
-    });
+  test('does not render from an unmarked Instagram visit', async ({ browser }) => {
+    const context = await browser.newContext({ userAgent: IOS_INSTAGRAM_USER_AGENT });
+    const page = await context.newPage();
 
-    expect(response.status()).toBe(404);
+    await page.goto('/');
+
+    await expect(page.getByTestId('instagram-iab-prompt')).toHaveCount(0);
+    await context.close();
   });
 });

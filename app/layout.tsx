@@ -27,6 +27,7 @@ import GlobalSplash from '@/app/components/GlobalSplash';
 import GlobalAnnouncementModal from '@/app/components/GlobalAnnouncementModal';
 import DesktopFooterAdSlot from '@/app/components/DesktopFooterAdSlot';
 import GoogleAnalyticsGate from '@/app/components/GoogleAnalyticsGate';
+import InstagramIabPrompt from '@/app/components/InstagramIabPrompt';
 
 const inter = localFont({
   src: [
@@ -196,6 +197,7 @@ export default async function RootLayout({
                     <SplashProvider>
                       <GlobalSplash />
                       <GlobalAnnouncementModal />
+                      <InstagramIabPrompt />
 
                       <div className="flex flex-col min-h-screen" id="locally-app-shell">
                         <ClientMainWrapper>
