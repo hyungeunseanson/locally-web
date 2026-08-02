@@ -1,6 +1,7 @@
 import React from 'react';
 import { Metadata } from 'next';
 import HomePageClient from '@/app/components/HomePageClient';
+import LegacyExperiencePopup from '@/app/components/LegacyExperiencePopup';
 import JsonLd from '@/app/components/seo/JsonLd';
 import { getCurrentLocale } from '@/app/utils/locale';
 import { buildLocalizedAbsoluteUrl } from '@/app/utils/siteUrl';
@@ -50,6 +51,7 @@ export default async function Page() {
     <>
       <JsonLd data={[buildOrganizationJsonLd(locale), buildWebsiteJsonLd(locale)]} />
       <HomePageClient />
+      <LegacyExperiencePopup />
     </>
   );
 }
