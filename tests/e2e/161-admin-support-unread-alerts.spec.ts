@@ -37,6 +37,7 @@ const UNREAD_ALERT_DELAY_MINUTES = 60;
 
 const TEST_PASSWORD = 'LocallyTest!2026';
 const CRON_SECRET = getConfiguredCronSecret();
+const IMMEDIATE_ALERT_TITLE = '새 고객센터 1:1 문의';
 const ALERT_TITLE = '고객센터 1:1 문의 미읽음';
 const ALERT_SUBJECT = '[Locally Admin] 고객센터 1:1 문의 미읽음';
 const MAIL_CAPTURE_PATH = '/tmp/locally-mock-nodemailer.jsonl';
@@ -285,13 +286,13 @@ async function setBatchDueNow(params: {
   if (error) throw error;
 }
 
-async function countAdminAlerts(userIds: string[]) {
+async function countAdminAlerts(userIds: string[], title = ALERT_TITLE) {
   const { count, error } = await getAdminClient()
     .from('notifications')
     .select('id', { count: 'exact', head: true })
     .in('user_id', userIds)
     .eq('type', 'admin_alert')
-    .eq('title', ALERT_TITLE);
+    .eq('title', title);
 
   if (error) throw error;
   return count || 0;
@@ -358,6 +359,14 @@ test.afterAll(async () => {
   const supabase = getAdminClient();
 
   if (createdInquiryIds.length > 0) {
+    await supabase
+      .from('notifications')
+      .delete()
+      .eq('type', 'admin_alert')
+      .in(
+        'link',
+        createdInquiryIds.map((inquiryId) => `/admin/dashboard?tab=CHATS&inquiryId=${inquiryId}`)
+      );
     await supabase.from('inquiry_messages').delete().in('inquiry_id', createdInquiryIds);
     if (await supportsUnreadBatchTable()) {
       await supabase.from('admin_support_unread_alert_batches').delete().in('inquiry_id', createdInquiryIds);
@@ -403,6 +412,42 @@ test.describe.serial('Admin support unread alerts', () => {
     expect(wrongAuth.status()).toBe(401);
   });
 
+  test('creates one immediate in-app alert per admin only for the first support message', async ({ browser }) => {
+    test.setTimeout(90000);
+
+    const adminA = createUser('admin.support.immediate.a');
+    const adminB = createUser('admin.support.immediate.b');
+    const guest = createUser('guest.support.immediate');
+
+    const adminAId = await createAuthUser(adminA, { whitelistAdmin: true });
+    const adminBId = await createAuthUser(adminB, { whitelistAdmin: true });
+    await createAuthUser(guest);
+    const recipientIds = [adminAId, adminBId];
+    const recipientEmails = [adminA.email, adminB.email];
+
+    resetMailCapture();
+    const guestPage = await browser.newPage();
+
+    try {
+      await login(guestPage, guest);
+      const inquiryId = await createAdminSupportInquiry(
+        guestPage,
+        `즉시 고객센터 문의 ${Date.now()}`
+      );
+      createdInquiryIds.push(inquiryId);
+
+      expect(await countAdminAlerts(recipientIds, IMMEDIATE_ALERT_TITLE)).toBe(2);
+      expect(await countAdminAlerts(recipientIds)).toBe(0);
+      expect(countCapturedAdminSupportAlertEmailsForRecipients(recipientEmails)).toBe(0);
+
+      await sendInquiryMessage(guestPage, inquiryId, `같은 문의 추가 메시지 ${Date.now()}`);
+      expect(await countAdminAlerts(recipientIds, IMMEDIATE_ALERT_TITLE)).toBe(2);
+      expect(countCapturedAdminSupportAlertEmailsForRecipients(recipientEmails)).toBe(0);
+    } finally {
+      await guestPage.close();
+    }
+  });
+
   test('sends one admin alert + team email after 1 hour of unread customer support inquiry and resets after admin read', async ({ browser, request }) => {
     test.setTimeout(120000);
     test.skip(!CRON_SECRET, 'CRON_SECRET is required to verify the success contract under next start.');
@@ -430,6 +475,7 @@ test.describe.serial('Admin support unread alerts', () => {
       const inquiryId = await createAdminSupportInquiry(guestPage, firstMessage);
       createdInquiryIds.push(inquiryId);
 
+      expect(await countAdminAlerts(recipientIds, IMMEDIATE_ALERT_TITLE)).toBe(2);
       expect(await countAdminAlerts(recipientIds)).toBe(0);
       expect(countCapturedAdminSupportAlertEmailsForRecipients(recipientEmails)).toBe(0);
 
@@ -476,6 +522,7 @@ test.describe.serial('Admin support unread alerts', () => {
 
       const secondMessage = `같은 unread 배치 추가 메시지 ${Date.now()}`;
       await sendInquiryMessage(guestPage, inquiryId, secondMessage);
+      expect(await countAdminAlerts(recipientIds, IMMEDIATE_ALERT_TITLE)).toBe(2);
 
       if (hasBatchTable) {
         const batchAfterSecondCustomerMessage = await readUnreadBatch(inquiryId);
@@ -524,6 +571,7 @@ test.describe.serial('Admin support unread alerts', () => {
 
       const thirdMessage = `읽은 뒤 새 unread 배치 ${Date.now()}`;
       await sendInquiryMessage(guestPage, inquiryId, thirdMessage);
+      expect(await countAdminAlerts(recipientIds, IMMEDIATE_ALERT_TITLE)).toBe(2);
 
       if (hasBatchTable) {
         await expect.poll(async () => {

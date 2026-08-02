@@ -303,6 +303,27 @@ async function withLoggedInPage(browser: Browser, user: TestUser) {
   return { context, page };
 }
 
+async function countAdminNotifications(params: {
+  adminId: string;
+  title: string;
+  inquiryId?: number;
+}) {
+  let query = getAdminClient()
+    .from('notifications')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', params.adminId)
+    .eq('type', 'admin_alert')
+    .eq('title', params.title);
+
+  if (params.inquiryId != null) {
+    query = query.eq('link', `/admin/dashboard?tab=CHATS&inquiryId=${params.inquiryId}`);
+  }
+
+  const { count, error } = await query;
+  if (error) throw error;
+  return count || 0;
+}
+
 test.describe.serial('Chat policy monitoring flow', () => {
   let fixture: SeededChatFixture;
 
@@ -329,6 +350,14 @@ test.describe.serial('Chat policy monitoring flow', () => {
     }
 
     if (createdInquiryIds.length > 0) {
+      await supabase
+        .from('notifications')
+        .delete()
+        .eq('type', 'admin_alert')
+        .in(
+          'link',
+          createdInquiryIds.map((inquiryId) => `/admin/dashboard?tab=CHATS&inquiryId=${inquiryId}`)
+        );
       await supabase.from('inquiries').delete().in('id', createdInquiryIds);
     }
 
@@ -370,6 +399,90 @@ test.describe.serial('Chat policy monitoring flow', () => {
     await expect(hostSession.page.getByText(WARNING_BANNER_TEXT)).toBeVisible();
     await hostInput.fill('일정 확인 부탁드립니다.');
     await expect(hostSession.page.getByText(WARNING_BANNER_TEXT)).toHaveCount(0);
+    await hostSession.context.close();
+  });
+
+  test('creates one Admin Alert only for a newly created guest inquiry', async ({ browser }) => {
+    test.setTimeout(90000);
+
+    const guestExperienceId = await createExperienceFixture(fixture.hostId);
+    const guestSession = await withLoggedInPage(browser, fixture.guest);
+    const firstMessage = `새 게스트 문의 알림 ${Date.now()}`;
+
+    const createResponse = await guestSession.page.request.post('/api/inquiries/thread', {
+      data: {
+        contextType: 'experience_general',
+        hostId: fixture.hostId,
+        experienceId: String(guestExperienceId),
+        message: firstMessage,
+      },
+    });
+
+    expect(createResponse.status()).toBe(200);
+    const createBody = await createResponse.json() as {
+      inquiryId: number | string;
+      messageId: number | string;
+      createdThread: boolean;
+      createdMessage: boolean;
+    };
+    expect(createBody.createdThread).toBe(true);
+    expect(createBody.createdMessage).toBe(true);
+
+    const inquiryId = Number(createBody.inquiryId);
+    createdInquiryIds.push(inquiryId);
+    createdMessageIds.push(Number(createBody.messageId));
+
+    await expect.poll(() => countAdminNotifications({
+      adminId: fixture.adminId,
+      title: '새 게스트 문의',
+      inquiryId,
+    }), {
+      timeout: 15000,
+      intervals: [500, 1000, 1500],
+    }).toBe(1);
+
+    const followUp = `기존 문의 추가 메시지 ${Date.now()}`;
+    const followUpResponse = await guestSession.page.request.post('/api/inquiries/message', {
+      data: { inquiryId, content: followUp, type: 'text' },
+    });
+    expect(followUpResponse.status()).toBe(200);
+    const followUpBody = await followUpResponse.json() as { messageId: number | string };
+    createdMessageIds.push(Number(followUpBody.messageId));
+    expect(await countAdminNotifications({
+      adminId: fixture.adminId,
+      title: '새 게스트 문의',
+      inquiryId,
+    })).toBe(1);
+
+    await guestSession.context.close();
+
+    const hostExperienceId = await createExperienceFixture(fixture.hostId);
+    const hostSession = await withLoggedInPage(browser, fixture.host);
+    const hostCreateResponse = await hostSession.page.request.post('/api/inquiries/thread', {
+      data: {
+        contextType: 'host_experience',
+        guestId: fixture.guestId,
+        experienceId: String(hostExperienceId),
+        message: `호스트 시작 문의 ${Date.now()}`,
+      },
+    });
+
+    expect(hostCreateResponse.status()).toBe(200);
+    const hostCreateBody = await hostCreateResponse.json() as {
+      inquiryId: number | string;
+      messageId: number | string;
+      createdThread: boolean;
+    };
+    expect(hostCreateBody.createdThread).toBe(true);
+    const hostInquiryId = Number(hostCreateBody.inquiryId);
+    createdInquiryIds.push(hostInquiryId);
+    createdMessageIds.push(Number(hostCreateBody.messageId));
+    expect(await countAdminNotifications({
+      adminId: fixture.adminId,
+      title: '새 게스트 문의',
+      inquiryId: hostInquiryId,
+    })).toBe(0);
+
     await hostSession.context.close();
   });
 
@@ -450,6 +563,134 @@ test.describe.serial('Chat policy monitoring flow', () => {
     await expect(adminSession.page.getByText(fixture.host.phone, { exact: true }).first()).toBeVisible();
 
     await adminSession.context.close();
+  });
+
+  test('sends one official admin intervention without self-reporting policy signals', async ({ browser }) => {
+    test.setTimeout(90000);
+
+    const adminMessage = `Locally Support 안내 https://pf.kakao.com/_PtvSG/chat ${Date.now()}`;
+    const policyAlertCountBefore = await countAdminNotifications({
+      adminId: fixture.adminId,
+      title: '채팅 정책위반 의심 메시지 감지',
+      inquiryId: fixture.inquiryId,
+    });
+
+    const { count: policyAuditCountBefore, error: policyAuditBeforeError } = await getAdminClient()
+      .from('admin_audit_logs')
+      .select('id', { count: 'exact', head: true })
+      .eq('action_type', 'CHAT_POLICY_SIGNAL_DETECTED')
+      .eq('target_id', String(fixture.inquiryId));
+    if (policyAuditBeforeError) throw policyAuditBeforeError;
+
+    const adminSession = await withLoggedInPage(browser, fixture.admin);
+    await adminSession.page.goto(`/admin/dashboard?tab=CHATS&inquiryId=${fixture.inquiryId}`, { waitUntil: 'domcontentloaded' });
+
+    const composer = adminSession.page.getByTestId('admin-chat-composer');
+    const sendButton = adminSession.page.getByRole('button', { name: '메시지 전송' });
+    await expect(composer).toBeVisible({ timeout: 15000 });
+    await composer.fill(adminMessage);
+
+    let messagePostCount = 0;
+    await adminSession.page.route('**/api/inquiries/message', async (route) => {
+      messagePostCount += 1;
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      await route.continue();
+    });
+
+    await composer.press('Enter');
+    await expect(sendButton).toBeDisabled();
+    await composer.evaluate((element) => {
+      element.dispatchEvent(new KeyboardEvent('keydown', {
+        key: 'Enter',
+        bubbles: true,
+      }));
+    });
+
+    await expect.poll(() => messagePostCount, {
+      timeout: 15000,
+      intervals: [200, 500, 1000],
+    }).toBe(1);
+    await expect(composer).toBeEnabled({ timeout: 15000 });
+    await expect(composer).toHaveValue('');
+    await expect(sendButton).toBeDisabled();
+    await adminSession.page.unroute('**/api/inquiries/message');
+
+    const { data: insertedMessages, error: insertedMessagesError } = await getAdminClient()
+      .from('inquiry_messages')
+      .select('id')
+      .eq('inquiry_id', fixture.inquiryId)
+      .eq('sender_id', fixture.adminId)
+      .eq('content', adminMessage);
+    if (insertedMessagesError) throw insertedMessagesError;
+    expect(insertedMessages).toHaveLength(1);
+
+    const adminMessageId = Number(insertedMessages?.[0]?.id);
+    createdMessageIds.push(adminMessageId);
+    auditLogTargetIds.push(String(fixture.inquiryId));
+
+    await expect.poll(async () => {
+      const { data, error } = await getAdminClient()
+        .from('admin_audit_logs')
+        .select('details')
+        .eq('action_type', 'ADMIN_MONITORED_CHAT_MESSAGE_SEND')
+        .eq('target_id', String(fixture.inquiryId))
+        .eq('details->>message_id', String(adminMessageId))
+        .maybeSingle();
+      if (error) throw error;
+      return data?.details || null;
+    }, {
+      timeout: 15000,
+      intervals: [500, 1000, 1500],
+    }).toMatchObject({
+      message_id: adminMessageId,
+      content_length: adminMessage.length,
+    });
+
+    expect(await countAdminNotifications({
+      adminId: fixture.adminId,
+      title: '채팅 정책위반 의심 메시지 감지',
+      inquiryId: fixture.inquiryId,
+    })).toBe(policyAlertCountBefore);
+
+    const { count: policyAuditCountAfter, error: policyAuditAfterError } = await getAdminClient()
+      .from('admin_audit_logs')
+      .select('id', { count: 'exact', head: true })
+      .eq('action_type', 'CHAT_POLICY_SIGNAL_DETECTED')
+      .eq('target_id', String(fixture.inquiryId));
+    if (policyAuditAfterError) throw policyAuditAfterError;
+    expect(policyAuditCountAfter).toBe(policyAuditCountBefore);
+
+    const adminMessageRow = adminSession.page.locator(`[data-message-id="${adminMessageId}"]`);
+    await expect(adminMessageRow).toHaveAttribute('data-official-support', 'true', { timeout: 15000 });
+    await expect(adminMessageRow.getByText('Locally Support', { exact: true })).toBeVisible();
+    await expect(adminMessageRow.getByTestId('admin-chat-message-policy-badge')).toHaveCount(0);
+    await expect(adminSession.page.getByTestId(`admin-chat-inquiry-row-${fixture.inquiryId}`))
+      .toHaveAttribute('data-has-policy-signal', 'false', { timeout: 15000 });
+
+    const inquiryListResponse = await adminSession.page.request.get('/api/admin/inquiries');
+    expect(inquiryListResponse.status()).toBe(200);
+    const inquiryListBody = await inquiryListResponse.json() as {
+      data?: Array<{ id?: number | string; has_policy_signal?: boolean }>;
+    };
+    expect(inquiryListBody.data?.find((row) => String(row.id) === String(fixture.inquiryId)))
+      .toMatchObject({ has_policy_signal: false });
+    await adminSession.context.close();
+
+    const guestSession = await withLoggedInPage(browser, fixture.guest);
+    await openGuestInquiry(guestSession.page, fixture.inquiryId);
+    const guestMessageRow = guestSession.page.locator(`[data-message-id="${adminMessageId}"]`);
+    await expect(guestMessageRow).toHaveAttribute('data-official-support', 'true', { timeout: 15000 });
+    await expect(guestMessageRow.getByText('Locally Support', { exact: true })).toBeVisible();
+    await guestSession.context.close();
+
+    const hostSession = await withLoggedInPage(browser, fixture.host);
+    await openHostInquiry(hostSession.page, fixture.inquiryId);
+    const hostMessageRow = hostSession.page.locator(`[data-message-id="${adminMessageId}"]`);
+    await expect(hostMessageRow).toHaveAttribute('data-official-support', 'true', { timeout: 15000 });
+    await expect(hostMessageRow.getByText('Locally Support', { exact: true })).toBeVisible();
+    await hostMessageRow.getByTestId(`host-inquiry-message-sender-${adminMessageId}`).click();
+    await expect(hostSession.page.getByRole('dialog')).toHaveCount(0);
+    await hostSession.context.close();
   });
 
   test('soft deletes a flagged message without breaking preview or participant views', async ({ browser }) => {

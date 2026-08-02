@@ -51,7 +51,10 @@ type AdminSendMessageResult = {
   updatedAt: string;
 };
 
-type InquiryPreviewPatch = Pick<MonitorInquiry, 'content' | 'updated_at'>;
+type InquiryPreviewPatch = Partial<Pick<
+  MonitorInquiry,
+  'content' | 'updated_at' | 'has_policy_signal' | 'policy_signal_categories'
+>>;
 
 function isAdminSupportType(type?: string | null) {
   return type === 'admin' || type === 'admin_support';
@@ -293,6 +296,8 @@ export function useAdminChatQuery() {
       patchInquiryPreview(inquiryId, {
         content: result.displayContent,
         updated_at: result.updatedAt,
+        has_policy_signal: false,
+        policy_signal_categories: [],
       });
       await loadMessages(inquiryId);
       return result;

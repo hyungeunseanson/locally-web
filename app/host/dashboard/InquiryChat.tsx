@@ -9,8 +9,15 @@ import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { detectChatPolicySignals } from '@/app/utils/chatPolicySignals';
-import { isDeletedInquiryMessage } from '@/app/utils/inquiry';
+import {
+  isDeletedInquiryMessage,
+  isOfficialInquirySupportMessage,
+} from '@/app/utils/inquiry';
 import { useAutoResizeTextarea } from '@/app/hooks/useAutoResizeTextarea';
+import {
+  OFFICIAL_SUPPORT_AVATAR_SRC,
+  OFFICIAL_SUPPORT_SENDER_NAME,
+} from '@/app/utils/officialSender';
 
 const CHAT_POLICY_WARNING_COPY = {
   ko: {
@@ -371,16 +378,30 @@ export default function InquiryChat() {
               {messages.map((msg) => {
                 const isMe = String(msg.sender_id) === String(currentUser?.id);
                 const isDeletedMessage = isDeletedInquiryMessage(msg.type);
-                  const shouldAnimateMessage = animatedMessageIds.includes(String(msg.id));
+                const isOfficialSupport = isOfficialInquirySupportMessage({
+                  inquiryType: selectedInquiry.type,
+                  senderId: msg.sender_id,
+                  guestId: selectedInquiry.user_id,
+                  hostId: selectedInquiry.host_id,
+                });
+                const shouldAnimateMessage = animatedMessageIds.includes(String(msg.id));
                 return (
-                  <div key={msg.id} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} ${shouldAnimateMessage ? `animate-in fade-in duration-300 ${isMe ? 'slide-in-from-right-2' : 'slide-in-from-left-2'}` : ''}`}>
+                  <div
+                    key={msg.id}
+                    data-message-id={String(msg.id)}
+                    data-official-support={isOfficialSupport ? 'true' : 'false'}
+                    className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} ${shouldAnimateMessage ? `animate-in fade-in duration-300 ${isMe ? 'slide-in-from-right-2' : 'slide-in-from-left-2'}` : ''}`}
+                  >
                     {!isMe && (
                       <div
-                        className="flex flex-col items-center mr-1.5 cursor-pointer"
-                        onClick={() => setModalUserId(msg.sender_id)}
+                        data-testid={`host-inquiry-message-sender-${msg.id}`}
+                        className={`flex flex-col items-center mr-1.5 ${isOfficialSupport ? '' : 'cursor-pointer'}`}
+                        onClick={isOfficialSupport ? undefined : () => setModalUserId(msg.sender_id)}
                       >
                         <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gray-200 overflow-hidden relative border border-gray-200 shrink-0">
-                          {selectedInquiry.guest?.avatar_url
+                          {isOfficialSupport
+                            ? <Image src={OFFICIAL_SUPPORT_AVATAR_SRC} alt="Locally support" fill sizes="(max-width: 768px) 28px, 32px" unoptimized className="object-cover" />
+                            : selectedInquiry.guest?.avatar_url
                             ? <Image src={secureUrl(selectedInquiry.guest.avatar_url)!} alt="guest" fill sizes="(max-width: 768px) 28px, 32px" unoptimized className="object-cover" />
                             : <div className="w-full h-full flex items-center justify-center"><User size={12} className="text-slate-400" /></div>
                           }
@@ -391,10 +412,10 @@ export default function InquiryChat() {
                     <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[72%] md:max-w-[76%]`}>
                       {!isMe && (
                         <span
-                          className="text-[10px] md:text-[11px] text-gray-500 mb-0.5 ml-0.5 cursor-pointer"
-                          onClick={() => setModalUserId(msg.sender_id)}
+                          className={`text-[10px] md:text-[11px] text-gray-500 mb-0.5 ml-0.5 ${isOfficialSupport ? '' : 'cursor-pointer'}`}
+                          onClick={isOfficialSupport ? undefined : () => setModalUserId(msg.sender_id)}
                         >
-                          {selectedInquiry.guest?.name || '게스트'}
+                          {isOfficialSupport ? OFFICIAL_SUPPORT_SENDER_NAME : (selectedInquiry.guest?.name || '게스트')}
                         </span>
                       )}
 

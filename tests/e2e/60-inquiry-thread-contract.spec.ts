@@ -203,6 +203,14 @@ test.afterAll(async () => {
   }
 
   if (createdInquiryIds.length > 0) {
+    await supabase
+      .from('notifications')
+      .delete()
+      .eq('type', 'admin_alert')
+      .in(
+        'link',
+        createdInquiryIds.map((inquiryId) => `/admin/dashboard?tab=CHATS&inquiryId=${inquiryId}`)
+      );
     await supabase.from('inquiries').delete().in('id', createdInquiryIds);
   }
 

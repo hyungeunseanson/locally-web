@@ -3,7 +3,10 @@ import {
   ACTIVE_CHAT_POLICY_SIGNAL_CATEGORIES,
   detectChatPolicySignals,
 } from '@/app/utils/chatPolicySignals';
-import { SOFT_DELETED_INQUIRY_MESSAGE_TYPE } from '@/app/utils/inquiry';
+import {
+  isOfficialInquirySupportMessage,
+  SOFT_DELETED_INQUIRY_MESSAGE_TYPE,
+} from '@/app/utils/inquiry';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
@@ -45,6 +48,10 @@ type InquiryListRow = {
   content?: string | null;
   updated_at?: string | null;
   experiences?: InquiryExperienceRelation;
+  inquiry_messages?: Array<{
+    sender_id?: string | null;
+    created_at?: string | null;
+  }> | null;
 };
 
 function normalizeInquiryExperience(experience: InquiryExperienceRelation): InquiryExperience | null {
@@ -75,8 +82,10 @@ export async function GET() {
     // 1. 최근 문의 100건 조회
     const { data: inquiriesData, error: inquiriesError } = await supabaseAdmin
       .from('inquiries')
-      .select('id, user_id, host_id, experience_id, type, status, content, updated_at, experiences (id, title, photos, image_url, host_id)')
+      .select('id, user_id, host_id, experience_id, type, status, content, updated_at, experiences (id, title, photos, image_url, host_id), inquiry_messages (sender_id, created_at)')
       .order('updated_at', { ascending: false })
+      .order('created_at', { referencedTable: 'inquiry_messages', ascending: false })
+      .limit(1, { referencedTable: 'inquiry_messages' })
       .limit(100);
 
     if (inquiriesError) throw inquiriesError;
@@ -128,6 +137,7 @@ export async function GET() {
 
     // 4. 최종 JSON 데이터 조립
     const safeData = inquiryRows.map((item) => {
+      const { inquiry_messages: latestMessages, ...publicItem } = item;
       const experience = normalizeInquiryExperience(item.experiences);
       const hostApp = appsMap.get(item.host_id || '');
       const hostProfile = profilesMap.get(item.host_id || '');
@@ -136,12 +146,21 @@ export async function GET() {
       const guestProfile = guestMap.get(item.user_id);
       const guestName = guestProfile?.full_name || guestProfile?.email?.split('@')[0] || '게스트';
       const guestAvatar = guestProfile?.avatar_url;
-      const signal = detectChatPolicySignals(String(item.content || ''), {
-        activeCategories: ACTIVE_CHAT_POLICY_SIGNAL_CATEGORIES,
+      const latestSenderId = latestMessages?.[0]?.sender_id ?? null;
+      const latestIsOfficialSupport = isOfficialInquirySupportMessage({
+        inquiryType: item.type,
+        senderId: latestSenderId,
+        guestId: item.user_id,
+        hostId: item.host_id,
       });
+      const signal = latestIsOfficialSupport
+        ? { matched: false, categories: [] }
+        : detectChatPolicySignals(String(item.content || ''), {
+            activeCategories: ACTIVE_CHAT_POLICY_SIGNAL_CATEGORIES,
+          });
 
       return {
-        ...item,
+        ...publicItem,
         experience_id: item.experience_id ?? '',
         unread_count: unreadCounts[String(item.id)] || 0,
         has_policy_signal: signal.matched,

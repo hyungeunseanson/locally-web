@@ -543,12 +543,13 @@ async function emitChatPolicySignal(params: {
   messageId: number | string;
   inquiryType?: string | null;
   actor: AuthActor;
+  actorIsAdmin: boolean;
   content: string;
   hasImage: boolean;
 }) {
-  const { inquiryId, messageId, inquiryType, actor, content, hasImage } = params;
+  const { inquiryId, messageId, inquiryType, actor, actorIsAdmin, content, hasImage } = params;
 
-  if (!shouldDetectPolicySignals(inquiryType)) return;
+  if (actorIsAdmin || !shouldDetectPolicySignals(inquiryType)) return;
 
   const signal = detectChatPolicySignals(content, {
     activeCategories: ACTIVE_CHAT_POLICY_SIGNAL_CATEGORIES,
@@ -602,6 +603,29 @@ async function emitChatPolicySignal(params: {
       content_preview_length: content.length,
     },
   });
+}
+
+type InsertAdminAlerts = typeof insertAdminAlerts;
+
+export async function notifyAdminsOfNewGuestInquiry(params: {
+  inquiryId: number | string;
+  inquiryType: 'general' | 'admin_support';
+  insertAlerts?: InsertAdminAlerts;
+}) {
+  const { inquiryId, inquiryType, insertAlerts = insertAdminAlerts } = params;
+  const isAdminSupport = inquiryType === 'admin_support';
+
+  try {
+    await insertAlerts({
+      title: isAdminSupport ? '새 고객센터 1:1 문의' : '새 게스트 문의',
+      message: `문의방 ${inquiryId}에 새 문의가 접수되었습니다.`,
+      link: buildAdminChatLink(inquiryId),
+    });
+    return { success: true } as const;
+  } catch (error) {
+    console.warn('[inquiries/thread] new inquiry admin alert failed:', error);
+    return { success: false } as const;
+  }
 }
 
 async function resolveInquiryMessageAccess(params: {
@@ -762,6 +786,7 @@ export async function createInquiryMessage(params: {
     messageId: insertedMessage.id,
     inquiryType: inquiry.type,
     actor,
+    actorIsAdmin,
     content: displayContent,
     hasImage: Boolean(imageUrl),
   });
@@ -785,6 +810,21 @@ export async function createInquiryMessage(params: {
     } catch (e) {
       console.warn('[inquiries/thread] audit log failed:', e);
     }
+  }
+
+  if (actorIsAdmin && !isAdminSupport) {
+    await recordAuditLog({
+      admin_id: actor.id,
+      admin_email: actor.email || '',
+      action_type: 'ADMIN_MONITORED_CHAT_MESSAGE_SEND',
+      target_type: 'inquiries',
+      target_id: String(inquiry.id),
+      details: {
+        inquiry_type: inquiry.type,
+        message_id: insertedMessage.id,
+        content_length: cleanContent.length,
+      },
+    });
   }
 
   return {
@@ -967,6 +1007,13 @@ export async function upsertInquiryThread(params: {
     createdMessageDisplayContent = cleanMessage;
     createdMessageUpdatedAt = updatedAt;
 
+    if (createdThread && String(actor.id) === String(resolved.guestId)) {
+      await notifyAdminsOfNewGuestInquiry({
+        inquiryId: inquiry.id,
+        inquiryType: resolved.inquiryType,
+      });
+    }
+
     if (
       resolved.inquiryType === 'admin_support' &&
       String(actor.id) === String(resolved.guestId)
@@ -1011,6 +1058,7 @@ export async function upsertInquiryThread(params: {
       messageId: insertedMessage.id,
       inquiryType: inquiry.type,
       actor,
+      actorIsAdmin: contextType === 'admin_initiated_support',
       content: cleanMessage,
       hasImage: false,
     });

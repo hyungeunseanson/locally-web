@@ -7,6 +7,22 @@ export function isAdminSupportInquiry(type?: InquiryType | string | null): boole
   return type === 'admin' || type === 'admin_support';
 }
 
+export function isOfficialInquirySupportMessage(params: {
+  inquiryType?: InquiryType | string | null;
+  senderId?: string | number | null;
+  guestId?: string | number | null;
+  hostId?: string | number | null;
+}): boolean {
+  const { inquiryType, senderId, guestId, hostId } = params;
+
+  if (senderId == null || guestId == null) return false;
+  if (String(senderId) === String(guestId)) return false;
+  if (isAdminSupportInquiry(inquiryType)) return true;
+  if (hostId != null && String(senderId) === String(hostId)) return false;
+
+  return true;
+}
+
 export function isDeletedInquiryMessage(type?: string | null): boolean {
   return type === SOFT_DELETED_INQUIRY_MESSAGE_TYPE;
 }

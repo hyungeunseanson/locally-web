@@ -4,12 +4,20 @@ import {
   detectChatPolicySignals,
 } from '@/app/utils/chatPolicySignals';
 import { clearAdminSupportUnreadBatch } from '@/app/utils/adminSupportUnreadAlerts';
-import { getInquiryMessageDisplayContent, isAdminSupportInquiry } from '@/app/utils/inquiry';
+import {
+  getInquiryMessageDisplayContent,
+  isAdminSupportInquiry,
+  isOfficialInquirySupportMessage,
+} from '@/app/utils/inquiry';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { markInquiryMessagesRead } from '@/app/api/inquiries/thread/shared';
 import { getHostPublicProfile } from '@/app/utils/profile';
+import {
+  OFFICIAL_SUPPORT_AVATAR_SRC,
+  OFFICIAL_SUPPORT_SENDER_NAME,
+} from '@/app/utils/officialSender';
 
 type ProfileRow = {
   id: string;
@@ -206,11 +214,19 @@ export async function GET(
       const profile = profileMap.get(msg.sender_id);
       const app = appMap.get(msg.sender_id);
       const hostPublicProfile = getHostPublicProfile(profile, app, '알 수 없음');
-      const name = hostPublicProfile.name;
-      const avatar = hostPublicProfile.avatarUrl;
-      const signal = detectChatPolicySignals(String(msg.content || ''), {
-        activeCategories: ACTIVE_CHAT_POLICY_SIGNAL_CATEGORIES,
+      const isOfficialSupport = isOfficialInquirySupportMessage({
+        inquiryType: inquiryRow?.type,
+        senderId: msg.sender_id,
+        guestId: inquiryRow?.user_id,
+        hostId: inquiryRow?.host_id,
       });
+      const name = isOfficialSupport ? OFFICIAL_SUPPORT_SENDER_NAME : hostPublicProfile.name;
+      const avatar = isOfficialSupport ? OFFICIAL_SUPPORT_AVATAR_SRC : hostPublicProfile.avatarUrl;
+      const signal = isOfficialSupport
+        ? { matched: false, categories: [] }
+        : detectChatPolicySignals(String(msg.content || ''), {
+            activeCategories: ACTIVE_CHAT_POLICY_SIGNAL_CATEGORIES,
+          });
 
       return {
         ...msg,

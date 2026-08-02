@@ -5,11 +5,16 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import Image from 'next/image';
 import { MessageCircle, User, Send, RefreshCw, Loader2, AlertTriangle, Eye, Shield, Trash2 } from 'lucide-react';
 import { useAdminChatQuery } from '../hooks/useAdminChatQuery';
-import { isAdminSupportInquiry, isDeletedInquiryMessage } from '@/app/utils/inquiry';
+import {
+  isAdminSupportInquiry,
+  isDeletedInquiryMessage,
+  isOfficialInquirySupportMessage,
+} from '@/app/utils/inquiry';
 import { useToast } from '@/app/context/ToastContext';
 import { useConfirmDialog } from '@/app/hooks/useConfirmDialog';
 import ChatParticipantProfileModal, { type ChatParticipantProfile } from './ChatParticipantProfileModal';
 import { useAutoResizeTextarea } from '@/app/hooks/useAutoResizeTextarea';
+import { OFFICIAL_SUPPORT_SENDER_NAME } from '@/app/utils/officialSender';
 
 type CSStatus = 'open' | 'in_progress' | 'resolved';
 type CSStatusFilter = 'ALL' | CSStatus;
@@ -83,8 +88,10 @@ export default function ChatMonitor() {
   const [activeTab, setActiveTab] = useState<'monitor' | 'admin'>('admin');
   const [csStatusFilter, setCsStatusFilter] = useState<CSStatusFilter>('ALL');
   const [replyText, setReplyText] = useState('');
+  const [isSending, setIsSending] = useState(false);
   const [profileModal, setProfileModal] = useState<ChatParticipantProfile | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const sendingRef = useRef(false);
   const composerRef = useAutoResizeTextarea(replyText);
 
   useEffect(() => {
@@ -144,25 +151,35 @@ export default function ChatMonitor() {
   };
 
   const handleSend = async () => {
-    if (selectedInquiry && replyText.trim()) {
-      try {
-        const messageResult = await sendMessage(selectedInquiry.id, replyText);
-        setReplyText('');
+    if (sendingRef.current || !selectedInquiry || !replyText.trim()) return;
 
-        // 🟢 첫 번째 답변 시: '대기(open)' 상태를 '처리중(in_progress)'으로 자동 전환
-        if (activeTab === 'admin' && isAdminSupportInquiry(selectedInquiry.type)) {
-          const currentStatus = selectedInquiry.status;
-          if (!currentStatus || currentStatus === 'open') {
-            await handleUpdateCSStatus(selectedInquiry.id, 'in_progress', {
-              updatedAt: messageResult.updatedAt,
-            });
-          }
+    const inquiryId = selectedInquiry.id;
+    const inquiryType = selectedInquiry.type;
+    const inquiryStatus = selectedInquiry.status;
+    const submittedText = replyText;
+
+    sendingRef.current = true;
+    setIsSending(true);
+
+    try {
+      const messageResult = await sendMessage(inquiryId, submittedText);
+      setReplyText((current) => (current === submittedText ? '' : current));
+
+      // 🟢 첫 번째 답변 시: '대기(open)' 상태를 '처리중(in_progress)'으로 자동 전환
+      if (activeTab === 'admin' && isAdminSupportInquiry(inquiryType)) {
+        if (!inquiryStatus || inquiryStatus === 'open') {
+          await handleUpdateCSStatus(inquiryId, 'in_progress', {
+            updatedAt: messageResult.updatedAt,
+          });
         }
-      } catch (error) {
-        console.error('[ChatMonitor] sendMessage failed:', error);
-        const message = error instanceof Error ? error.message : '메시지 전송 실패';
-        showToast(message, 'error');
       }
+    } catch (error) {
+      console.error('[ChatMonitor] sendMessage failed:', error);
+      const message = error instanceof Error ? error.message : '메시지 전송 실패';
+      showToast(message, 'error');
+    } finally {
+      sendingRef.current = false;
+      setIsSending(false);
     }
   };
 
@@ -535,14 +552,25 @@ export default function ChatMonitor() {
                 const isGuest = String(msg.sender_id) === String(selectedInquiry.user_id);
                 const alignRight = !isGuest;
                 const isDeletedMessage = isDeletedInquiryMessage(msg.type);
+                const isOfficialSupport = isOfficialInquirySupportMessage({
+                  inquiryType: selectedInquiry.type,
+                  senderId: msg.sender_id,
+                  guestId: selectedInquiry.user_id,
+                  hostId: selectedInquiry.host?.id,
+                });
                 // 🟢 관리자 탭 한정: 관리자가 답변 시 "로컬리 (실명)" 형식으로 표출하여 팀 내 추적성 확보
                 const isAdminReply = alignRight && isAdminSupportInquiry(selectedInquiry.type);
-                const displayName = isAdminReply ? `로컬리 (${msg.sender?.name || '알 수 없음'})` : (msg.sender?.name || '알 수 없음');
+                const displayName = isOfficialSupport
+                  ? OFFICIAL_SUPPORT_SENDER_NAME
+                  : isAdminReply
+                    ? `로컬리 (${msg.sender?.name || '알 수 없음'})`
+                    : (msg.sender?.name || '알 수 없음');
 
                 return (
                   <div
                     key={msg.id}
                     data-message-id={String(msg.id)}
+                    data-official-support={isOfficialSupport ? 'true' : 'false'}
                     className={`flex flex-col ${alignRight ? 'items-end' : 'items-start'}`}
                   >
                     <div className="mb-0.5 md:mb-1 flex items-center gap-2 px-1">
@@ -600,6 +628,7 @@ export default function ChatMonitor() {
                 className="flex-1 min-h-9 md:min-h-11 max-h-28 resize-none overflow-y-hidden border border-slate-200 bg-slate-50 rounded-lg md:rounded-xl px-2.5 md:px-4 py-2 md:py-3 focus:outline-none focus:border-black focus:bg-white transition-all text-[11px] md:text-sm leading-5"
                 placeholder={activeTab === 'monitor' ? "관리자 권한 메시지 전송..." : "답변을 입력하세요..."}
                 value={replyText}
+                disabled={isSending}
                 onChange={(e) => setReplyText(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.nativeEvent.isComposing) return;
@@ -609,8 +638,15 @@ export default function ChatMonitor() {
                   }
                 }}
               />
-              <button onClick={handleSend} className="bg-black text-white px-3 md:px-5 py-2 rounded-lg md:rounded-xl hover:bg-slate-800 transition-colors shrink-0 flex items-center justify-center">
-                <Send className="w-3.5 h-3.5 md:w-[18px] md:h-[18px]" />
+              <button
+                onClick={handleSend}
+                disabled={isSending || !replyText.trim()}
+                aria-label="메시지 전송"
+                className="bg-black text-white px-3 md:px-5 py-2 rounded-lg md:rounded-xl hover:bg-slate-800 transition-colors shrink-0 flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isSending
+                  ? <Loader2 className="w-3.5 h-3.5 md:w-[18px] md:h-[18px] animate-spin" />
+                  : <Send className="w-3.5 h-3.5 md:w-[18px] md:h-[18px]" />}
               </button>
             </div>
           </>

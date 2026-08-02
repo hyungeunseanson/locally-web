@@ -10,12 +10,19 @@ import { Send, User, Loader2, ImagePlus, ArrowLeft, MessageCircle } from 'lucide
 import Image from 'next/image';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가 (import 맨 아래)
 import { detectChatPolicySignals } from '@/app/utils/chatPolicySignals';
-import { isAdminSupportInquiry, isDeletedInquiryMessage } from '@/app/utils/inquiry';
+import {
+  isAdminSupportInquiry,
+  isDeletedInquiryMessage,
+  isOfficialInquirySupportMessage,
+} from '@/app/utils/inquiry';
 import { createClient } from '@/app/utils/supabase/client';
 import { getHostPublicProfile } from '@/app/utils/profile';
 import { useAutoResizeTextarea } from '@/app/hooks/useAutoResizeTextarea';
+import {
+  OFFICIAL_SUPPORT_AVATAR_SRC,
+  OFFICIAL_SUPPORT_SENDER_NAME,
+} from '@/app/utils/officialSender';
 
-const ADMIN_SUPPORT_AVATAR_SRC = '/images/logos/Frame%201545423142.png';
 const CHAT_POLICY_WARNING_COPY = {
   ko: {
     title: '연락처·외부 링크 공유는 제재 대상입니다.',
@@ -316,7 +323,7 @@ function InboxContent() {
     if (isAdminSupportInquiry(inqOrSelected?.type)) {
       return {
         name: t('admin_name'),
-        avatar: ADMIN_SUPPORT_AVATAR_SRC,
+        avatar: OFFICIAL_SUPPORT_AVATAR_SRC,
         id: null,
       };
     }
@@ -432,7 +439,7 @@ function InboxContent() {
                   {/* 아바타 */}
                   <div className={`w-11 h-11 md:w-12 md:h-12 rounded-full flex items-center justify-center shrink-0 overflow-hidden relative ${isAdminSupport ? 'bg-white border border-slate-200' : 'bg-gray-100'}`}>
                     {isAdminSupport ? (
-                      <Image src={ADMIN_SUPPORT_AVATAR_SRC} alt="Locally support" fill sizes="(max-width: 768px) 44px, 48px" unoptimized className="object-cover" />
+                      <Image src={OFFICIAL_SUPPORT_AVATAR_SRC} alt="Locally support" fill sizes="(max-width: 768px) 44px, 48px" unoptimized className="object-cover" />
                     ) : (
                       <Image src={secureUrl(display.avatar)} alt="host" fill sizes="(max-width: 768px) 44px, 48px" unoptimized className="object-cover" />
                     )}
@@ -494,7 +501,7 @@ function InboxContent() {
                 >
                   <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gray-100 overflow-hidden border border-gray-200 relative shrink-0">
                     {selectedIsAdminSupport ? (
-                      <Image src={ADMIN_SUPPORT_AVATAR_SRC} alt="Locally support" fill sizes="(max-width: 768px) 28px, 32px" unoptimized className="object-cover" />
+                      <Image src={OFFICIAL_SUPPORT_AVATAR_SRC} alt="Locally support" fill sizes="(max-width: 768px) 28px, 32px" unoptimized className="object-cover" />
                     ) : (
                       <Image src={secureUrl(currentHostDisplay.avatar)} alt="host" fill sizes="(max-width: 768px) 28px, 32px" unoptimized className="object-cover" />
                     )}
@@ -517,18 +524,29 @@ function InboxContent() {
                 {messages.map((msg) => {
                   const isMe = String(msg.sender_id) === String(currentUser?.id);
                   const isDeletedMessage = isDeletedInquiryMessage(msg.type);
+                  const isOfficialSupport = isOfficialInquirySupportMessage({
+                    inquiryType: selectedInquiry.type,
+                    senderId: msg.sender_id,
+                    guestId: selectedInquiry.user_id,
+                    hostId: selectedInquiry.host_id,
+                  });
                   const shouldAnimateMessage = animatedMessageIds.includes(String(msg.id));
                   return (
-                    <div key={msg.id} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} ${shouldAnimateMessage ? `animate-in fade-in duration-300 ${isMe ? 'slide-in-from-right-2' : 'slide-in-from-left-2'}` : ''}`}>
+                    <div
+                      key={msg.id}
+                      data-message-id={String(msg.id)}
+                      data-official-support={isOfficialSupport ? 'true' : 'false'}
+                      className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} ${shouldAnimateMessage ? `animate-in fade-in duration-300 ${isMe ? 'slide-in-from-right-2' : 'slide-in-from-left-2'}` : ''}`}
+                    >
                       {!isMe && (
                         <div
                           data-testid={`guest-inbox-message-sender-trigger-${msg.id}`}
                           className="flex flex-col items-center mr-1.5"
                         >
                           <div className="w-[26px] h-[26px] md:w-7 md:h-7 rounded-full bg-gray-200 overflow-hidden relative border border-gray-200 shrink-0">
-                            {selectedIsAdminSupport ? (
+                            {selectedIsAdminSupport || isOfficialSupport ? (
                               <Image
-                                src={ADMIN_SUPPORT_AVATAR_SRC}
+                                src={OFFICIAL_SUPPORT_AVATAR_SRC}
                                 alt="Locally support"
                                 fill
                                 sizes="(max-width: 768px) 26px, 28px"
@@ -554,7 +572,11 @@ function InboxContent() {
                           <span
                             className="text-[10px] md:text-[11px] text-gray-500 mb-0.5 ml-0.5"
                           >
-                            {selectedIsAdminSupport ? t('admin_name') : (msg.sender?.name || currentHostDisplay.name)}
+                            {isOfficialSupport
+                              ? OFFICIAL_SUPPORT_SENDER_NAME
+                              : selectedIsAdminSupport
+                                ? t('admin_name')
+                                : (msg.sender?.name || currentHostDisplay.name)}
                           </span>
                         )}
 

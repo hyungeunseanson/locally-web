@@ -253,6 +253,7 @@ test.describe.serial('Admin chats smoke', () => {
     expect(inquiryListItem?.guest?.phone).toBeUndefined();
     expect(inquiryListItem?.host?.email).toBeUndefined();
     expect(inquiryListItem?.host?.phone).toBeUndefined();
+    expect(inquiryListItem?.inquiry_messages).toBeUndefined();
 
     const messagesResponse = await page.request.get(`/api/admin/inquiries/${inquiryId}/messages`);
     expect(messagesResponse.ok()).toBeTruthy();
