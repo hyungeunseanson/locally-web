@@ -4,11 +4,18 @@ const PUBLIC_EXACT_PATHS = new Set([
   '/',
   '/about',
   '/become-a-host',
+  '/community',
   '/help',
+  '/search',
 ]);
 
 const RIGHT_RAIL_EXACT_PATHS = new Set([
+  '/community',
+  '/company/careers',
+  '/company/investors',
+  '/company/news',
   '/company/notices',
+  '/company/partnership',
   '/help',
 ]);
 

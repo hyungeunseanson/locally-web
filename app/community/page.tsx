@@ -6,7 +6,6 @@ import { buildAbsoluteUrl } from '@/app/utils/siteUrl';
 import SiteHeader from '@/app/components/SiteHeader';
 import type { CommunityBoard } from '@/app/types/community';
 import CommunityFeed from './CommunityFeed';
-import CommunityAdSlot from './components/CommunityAdSlot';
 import CommunityBoardTabs from './components/CommunityBoardTabs';
 import MobileSortBar from './components/MobileSortBar';
 import { getCommunityBoardLabel, getCommunityBoardPageTitle } from './boardMeta';
@@ -15,6 +14,7 @@ import { resolvePublicCommunityBoardState } from './queryParams';
 import { fetchCommunityBoardFeed } from './boardFeed.server';
 import CommunityWriteCta from './components/CommunityWriteCta';
 import CommunityPageHero from './components/CommunityPageHero';
+import { DesktopRightRailAdLayout } from '@/app/components/DesktopRightRailAdSlot';
 
 type SearchParamMap = { [key: string]: string | string[] | undefined };
 
@@ -76,7 +76,11 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
   return (
     <>
       <SiteHeader />
-      <div className="min-h-screen bg-[#F7F7F9]">
+      <DesktopRightRailAdLayout>
+      <div
+        data-testid="community-main-content"
+        className="min-h-screen bg-[#F7F7F9]"
+      >
         <div className="mx-auto max-w-4xl px-4 py-8">
           <CommunityPageHero board={board} />
 
@@ -121,17 +125,9 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
             board={board}
             sort={sort}
           />
-
-          <div className="mt-6">
-            <CommunityAdSlot
-              testId="community-list-bottom-ad"
-              variant="bottom"
-              placement="community-list-bottom"
-              title="로컬리 커뮤니티 광고"
-            />
-          </div>
         </div>
       </div>
+      </DesktopRightRailAdLayout>
 
       <CommunityWriteCta board={board} variant="mobile" />
     </>

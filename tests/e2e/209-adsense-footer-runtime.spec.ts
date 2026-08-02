@@ -63,7 +63,8 @@ test.describe('AdSense desktop footer runtime', () => {
 
     for (const pathname of [
       '/login',
-      '/search',
+      '/community/00000000-0000-0000-0000-000000000000',
+      '/community/write',
       '/guest/inbox',
       '/guest/trips',
       '/guest/wishlists',
@@ -78,21 +79,22 @@ test.describe('AdSense desktop footer runtime', () => {
     }
   });
 
-  test('adds the footer to help and become-a-host without a narrow right rail', async ({ page }) => {
-    await page.setViewportSize({ width: 1440, height: 1000 });
+  test('adds the footer to public content without a right rail below 1440px', async ({ page }) => {
+    await page.setViewportSize({ width: 1439, height: 1000 });
 
-    for (const pathname of ['/help', '/become-a-host']) {
+    for (const pathname of ['/help', '/become-a-host', '/search', '/community']) {
       await page.goto(pathname);
       await expect(page.getByTestId('desktop-footer-ad'), pathname).toHaveCount(1);
       await expect(page.getByTestId('desktop-right-rail-ad'), pathname).toHaveCount(0);
       await expect(page.locator('script#locally-google-adsense'), pathname).toHaveCount(1);
       await expect(page.locator('ins.adsbygoogle'), pathname).toHaveCount(1);
+      await expect(page.locator('footer'), pathname).toHaveCount(1);
     }
   });
 
   test('does not reserve a right rail column when its slot is not configured', async ({ page }) => {
     test.skip(RIGHT_RAIL_RUNTIME_CONFIGURED, 'Run without a configured right rail slot.');
-    await page.setViewportSize({ width: 1536, height: 1000 });
+    await page.setViewportSize({ width: 1440, height: 1000 });
     await page.goto('/help');
 
     await expect(page.getByTestId('desktop-footer-ad')).toHaveCount(1);
@@ -106,11 +108,21 @@ test.describe('AdSense desktop footer runtime', () => {
     expect(centered).toBeTruthy();
   });
 
-  test('renders one static 300x600 rail beside help and notices on wide desktop', async ({ page }) => {
+  test('renders one static 300x600 rail on approved public pages at 1440px', async ({ page }) => {
     test.skip(!RIGHT_RAIL_RUNTIME_CONFIGURED, 'Run with a configured right rail slot.');
-    await page.setViewportSize({ width: 1536, height: 1000 });
+    await page.setViewportSize({ width: 1440, height: 1000 });
 
-    for (const pathname of ['/help', '/company/notices']) {
+    const approvedPages = [
+      { pathname: '/help', mainTestId: 'help-main-content' },
+      { pathname: '/community', mainTestId: 'community-main-content' },
+      { pathname: '/company/careers', mainTestId: 'company-careers-main-content' },
+      { pathname: '/company/investors', mainTestId: 'company-investors-main-content' },
+      { pathname: '/company/news', mainTestId: 'company-news-main-content' },
+      { pathname: '/company/notices', mainTestId: 'company-notices-main-content' },
+      { pathname: '/company/partnership', mainTestId: 'company-partnership-main-content' },
+    ] as const;
+
+    for (const { pathname, mainTestId } of approvedPages) {
       await page.goto(pathname);
 
       const footerAd = page.getByTestId('desktop-footer-ad');
@@ -121,11 +133,8 @@ test.describe('AdSense desktop footer runtime', () => {
       await expect(page.locator('script#locally-google-adsense'), pathname).toHaveCount(1);
       await expect(page.locator('ins.adsbygoogle'), pathname).toHaveCount(2);
 
-      const layout = await page.evaluate((currentPathname) => {
-        const mainTestId = currentPathname === '/help'
-          ? 'help-main-content'
-          : 'company-notices-main-content';
-        const main = document.querySelector(`[data-testid="${mainTestId}"]`);
+      const layout = await page.evaluate((currentMainTestId) => {
+        const main = document.querySelector(`[data-testid="${currentMainTestId}"]`);
         const rail = document.querySelector<HTMLElement>('[data-testid="desktop-right-rail-ad"]');
         const railIns = rail?.querySelector<HTMLElement>('ins.adsbygoogle');
         const mainRect = main?.getBoundingClientRect();
@@ -136,21 +145,24 @@ test.describe('AdSense desktop footer runtime', () => {
           railPosition: rail ? window.getComputedStyle(rail).position : null,
           railWidth: railIns?.getBoundingClientRect().width ?? null,
           railHeight: railIns?.getBoundingClientRect().height ?? null,
+          railRightDistance: railRect ? window.innerWidth - railRect.right : null,
           horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth,
         };
-      }, pathname);
+      }, mainTestId);
 
-      expect(layout.gap).toBeGreaterThanOrEqual(32);
+      expect(layout.gap).toBeGreaterThanOrEqual(8);
       expect(layout.railPosition).toBe('static');
       expect(layout.railWidth).toBe(300);
       expect(layout.railHeight).toBe(600);
+      expect(layout.railRightDistance).toBeGreaterThanOrEqual(0);
+      expect(layout.railRightDistance).toBeLessThanOrEqual(8);
       expect(layout.horizontalOverflow).toBeFalsy();
     }
   });
 
   test('keeps the help modal above and isolated from the right rail ad', async ({ page }) => {
     test.skip(!RIGHT_RAIL_RUNTIME_CONFIGURED, 'Run with a configured right rail slot.');
-    await page.setViewportSize({ width: 1536, height: 1000 });
+    await page.setViewportSize({ width: 1440, height: 1000 });
     await page.goto('/help');
 
     await page.getByTestId('help-contact-modal-trigger').click();

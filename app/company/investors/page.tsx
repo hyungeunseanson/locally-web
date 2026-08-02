@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import SiteHeader from '@/app/components/SiteHeader';
+import { DesktopRightRailAdLayout } from '@/app/components/DesktopRightRailAdSlot';
 
 export default function InvestorsPage() {
   const reportYears = [2025, 2024, 2023];
@@ -15,8 +16,12 @@ export default function InvestorsPage() {
   return (
     <div className="min-h-screen bg-white text-[#222222] font-sans selection:bg-black selection:text-white">
       <SiteHeader />
-      
-      <main className="max-w-[1040px] mx-auto px-6 py-24">
+
+      <DesktopRightRailAdLayout>
+      <main
+        data-testid="company-investors-main-content"
+        className="max-w-[1040px] mx-auto w-full px-6 py-24"
+      >
         <h1 className="text-6xl md:text-8xl font-black tracking-tighter mb-12">
           Investors
         </h1>
@@ -101,6 +106,7 @@ export default function InvestorsPage() {
           </div>
         </div>
       </main>
+      </DesktopRightRailAdLayout>
     </div>
   );
 }

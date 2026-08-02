@@ -6,6 +6,7 @@
 import React, { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import SiteHeader from '@/app/components/SiteHeader';
+import { DesktopRightRailAdLayout } from '@/app/components/DesktopRightRailAdSlot';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { useToast } from '@/app/context/ToastContext';
 
@@ -333,7 +334,11 @@ export default function PartnershipPage() {
     <div className="min-h-screen bg-white text-[#222222] font-sans selection:bg-black selection:text-white">
       <SiteHeader />
 
-      <main className="mx-auto flex w-full max-w-[1120px] flex-col gap-16 px-4 py-12 md:px-6 md:py-24">
+      <DesktopRightRailAdLayout>
+      <main
+        data-testid="company-partnership-main-content"
+        className="mx-auto flex w-full max-w-[1120px] flex-col gap-16 px-4 py-12 md:px-6 md:py-24"
+      >
         <section className="max-w-[820px]">
           <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#7a7a7a]">
             {copy.eyebrow}
@@ -444,6 +449,7 @@ export default function PartnershipPage() {
           </form>
         </section>
       </main>
+      </DesktopRightRailAdLayout>
 
       {isMediaKitModalOpen && (
         <div

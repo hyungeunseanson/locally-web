@@ -6,6 +6,7 @@ import SiteHeader from '@/app/components/SiteHeader';
 import { ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/app/context/LanguageContext';
+import { DesktopRightRailAdLayout } from '@/app/components/DesktopRightRailAdSlot';
 
 const NEWS_ITEMS = [
   {
@@ -54,8 +55,12 @@ export default function NewsPage() {
   return (
     <div className="min-h-screen bg-white text-[#222222] font-sans selection:bg-black selection:text-white">
       <SiteHeader />
-      
-      <main className="max-w-[1040px] mx-auto px-4 md:px-6 py-12 md:py-24">
+
+      <DesktopRightRailAdLayout>
+      <main
+        data-testid="company-news-main-content"
+        className="max-w-[1040px] mx-auto w-full px-4 md:px-6 py-12 md:py-24"
+      >
         <div className="md:hidden mb-6">
           <button
             data-testid="company-news-back-button"
@@ -152,6 +157,7 @@ export default function NewsPage() {
           Only verified and published external article links will be added here after review.
         </p>
       </main>
+      </DesktopRightRailAdLayout>
     </div>
   );
 }

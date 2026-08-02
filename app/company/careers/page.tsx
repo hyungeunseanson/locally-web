@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import SiteHeader from '@/app/components/SiteHeader';
+import { DesktopRightRailAdLayout } from '@/app/components/DesktopRightRailAdSlot';
 
 const JOBS = [
   { title: 'Senior Product Designer', team: 'Design', loc: 'Seoul' },
@@ -15,8 +16,12 @@ export default function CareersPage() {
   return (
     <div className="min-h-screen bg-white text-[#222222] font-sans selection:bg-black selection:text-white">
       <SiteHeader />
-      
-      <main className="max-w-[1040px] mx-auto px-6 py-24">
+
+      <DesktopRightRailAdLayout>
+      <main
+        data-testid="company-careers-main-content"
+        className="max-w-[1040px] mx-auto w-full px-6 py-24"
+      >
         <div className="mb-32">
           <span className="block text-sm font-bold uppercase tracking-widest mb-4">Careers at Locally</span>
           <h1 className="text-6xl md:text-8xl font-black tracking-tighter mb-8 leading-[0.9]">
@@ -93,6 +98,7 @@ export default function CareersPage() {
           </p>
         </div>
       </main>
+      </DesktopRightRailAdLayout>
     </div>
   );
 }

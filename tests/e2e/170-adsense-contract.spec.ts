@@ -150,9 +150,13 @@ test.describe('AdSense preparation contracts', () => {
       '/',
       '/en',
       '/about',
+      '/community',
+      '/zh/community/',
       '/experiences/experience-id',
       '/company/notices',
       '/help',
+      '/search',
+      '/ja/search/',
       '/become-a-host',
       '/users/user-id',
     ];
@@ -165,10 +169,7 @@ test.describe('AdSense preparation contracts', () => {
       '/notifications',
       '/payment/success',
       '/proxy-bookings/new',
-      '/search',
-      '/ja/search/',
       '/site-map',
-      '/community',
       '/zh/community/post-id',
       '/community/write',
       '/ko/community/write',
@@ -195,11 +196,17 @@ test.describe('AdSense preparation contracts', () => {
     expect(normalizeDesktopFooterAdPathname('/en/company/notices/')).toBe('/company/notices');
   });
 
-  test('limits the desktop right rail to help and notices', () => {
+  test('limits the desktop right rail to the approved public content pages', () => {
     for (const pathname of [
       '/help',
       '/en/help',
+      '/community',
+      '/zh/community/',
+      '/company/careers',
+      '/company/investors',
+      '/company/news',
       '/company/notices',
+      '/company/partnership',
       '/ja/company/notices/',
     ]) {
       expect(shouldShowDesktopRightRailAd(pathname), pathname).toBeTruthy();
@@ -216,7 +223,8 @@ test.describe('AdSense preparation contracts', () => {
       '/guest/wishlists',
       '/account',
       '/host/dashboard',
-      '/company/news',
+      '/community/post-id',
+      '/community/write',
     ]) {
       expect(shouldShowDesktopRightRailAd(pathname), pathname).toBeFalsy();
     }
@@ -252,29 +260,35 @@ test.describe('AdSense preparation contracts', () => {
     expect(desktopAdSource).toContain('buildAdSenseScriptUrl(clientId)');
   });
 
-  test('keeps the right rail static, fixed-size, wide-desktop-only, and script-free', () => {
+  test('keeps the right rail static, fixed-size, 1440px-only, and script-free', () => {
     const rightRailSource = fs.readFileSync(
       path.join(process.cwd(), 'app/components/DesktopRightRailAdSlot.tsx'),
       'utf8',
     );
-    const helpSource = fs.readFileSync(path.join(process.cwd(), 'app/help/page.tsx'), 'utf8');
-    const noticesSource = fs.readFileSync(
-      path.join(process.cwd(), 'app/company/notices/page.tsx'),
-      'utf8',
-    );
+    const eligiblePageSources = [
+      'app/help/page.tsx',
+      'app/community/page.tsx',
+      'app/company/careers/page.tsx',
+      'app/company/investors/page.tsx',
+      'app/company/news/page.tsx',
+      'app/company/notices/page.tsx',
+      'app/company/partnership/page.tsx',
+    ].map((sourcePath) => fs.readFileSync(path.join(process.cwd(), sourcePath), 'utf8'));
 
-    expect(rightRailSource).toContain("const RIGHT_RAIL_MEDIA_QUERY = '(min-width: 1536px)'");
+    expect(rightRailSource).toContain("const RIGHT_RAIL_MEDIA_QUERY = '(min-width: 1440px)'");
     expect(rightRailSource).toContain('data-testid="desktop-right-rail-ad"');
-    expect(rightRailSource).toContain('className="hidden w-[300px] self-start 2xl:block"');
+    expect(rightRailSource).toContain('className="hidden w-[300px] self-start min-[1440px]:block"');
     expect(rightRailSource).toContain('style={{ display: \'block\', width: 300, height: 600 }}');
     expect(rightRailSource).not.toContain('<Script');
     expect(rightRailSource).not.toContain('sticky');
     expect(rightRailSource).not.toContain('fixed');
     expect(rightRailSource).toContain('data-testid="desktop-right-rail-layout"');
-    expect(rightRailSource).toContain('2xl:grid-cols-[minmax(0,1040px)_300px] 2xl:gap-8');
+    expect(rightRailSource).toContain('min-[1440px]:grid-cols-[minmax(0,1fr)_300px]');
+    expect(rightRailSource).toContain('min-[1440px]:gap-2 min-[1440px]:pr-2');
     expect(rightRailSource).toContain('if (!layoutEnabled) return children;');
-    expect(helpSource).toContain('<DesktopRightRailAdLayout>');
-    expect(noticesSource).toContain('<DesktopRightRailAdLayout>');
+    for (const source of eligiblePageSources) {
+      expect(source).toContain('<DesktopRightRailAdLayout>');
+    }
   });
 
   test('does not render a community placeholder when its ad slot is disabled', () => {
@@ -282,11 +296,27 @@ test.describe('AdSense preparation contracts', () => {
       path.join(process.cwd(), 'app/community/components/CommunityAdSlot.tsx'),
       'utf8',
     );
+    const communityPageSource = fs.readFileSync(
+      path.join(process.cwd(), 'app/community/page.tsx'),
+      'utf8',
+    );
 
     expect(communityAdSource).toContain(
       'if (!shouldRenderLiveAd || !clientId || !slotId || !scriptUrl) return null;',
     );
     expect(communityAdSource).not.toContain('Sponsored');
+    expect(communityPageSource).not.toContain('<CommunityAdSlot');
+    expect(communityPageSource).not.toContain("from './components/CommunityAdSlot'");
+  });
+
+  test('uses only the global footer on search', () => {
+    const searchSource = fs.readFileSync(
+      path.join(process.cwd(), 'app/search/page.tsx'),
+      'utf8',
+    );
+
+    expect(searchSource).not.toContain("import SiteFooter from '@/app/components/SiteFooter'");
+    expect(searchSource).not.toContain('<SiteFooter />');
   });
 
   test('publishes a localized privacy page with the required Google advertising disclosure', async ({ request }) => {

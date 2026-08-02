@@ -153,7 +153,7 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Community board layout and access', () => {
-  test('renders only two board tabs and keeps only the inline list ad on desktop', async ({ page }) => {
+  test('renders only two board tabs without legacy inline ad slots on desktop', async ({ page }) => {
     test.setTimeout(90000);
 
     const author = createUser('author');

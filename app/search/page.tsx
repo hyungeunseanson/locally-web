@@ -5,7 +5,6 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import SiteHeader from '@/app/components/SiteHeader';
-import SiteFooter from '@/app/components/SiteFooter';
 import ExperienceCard from '@/app/components/ExperienceCard';
 import {
   Map,
@@ -1017,9 +1016,6 @@ function SearchResults() {
           </div>
         </div>
 
-        <div className="px-5 md:px-6 xl:px-8 2xl:px-10 pt-4">
-          <SiteFooter />
-        </div>
       </div>
 
       {activeSheet && (

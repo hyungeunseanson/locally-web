@@ -10,7 +10,7 @@ import {
   shouldShowDesktopRightRailAd,
 } from '@/app/utils/desktopFooterAd';
 
-const RIGHT_RAIL_MEDIA_QUERY = '(min-width: 1536px)';
+const RIGHT_RAIL_MEDIA_QUERY = '(min-width: 1440px)';
 
 const rightRailConfig = resolveDesktopRightRailAdSlotConfig({
   NEXT_PUBLIC_ADSENSE_ENABLED: process.env.NEXT_PUBLIC_ADSENSE_ENABLED,
@@ -29,10 +29,10 @@ export function DesktopRightRailAdLayout({ children }: { children: ReactNode }) 
   return (
     <div
       data-testid="desktop-right-rail-layout"
-      className="mx-auto w-full 2xl:grid 2xl:max-w-[1420px] 2xl:grid-cols-[minmax(0,1040px)_300px] 2xl:gap-8 2xl:px-6"
+      className="w-full min-[1440px]:grid min-[1440px]:grid-cols-[minmax(0,1fr)_300px] min-[1440px]:gap-2 min-[1440px]:pr-2"
     >
       {children}
-      <div className="hidden pt-24 2xl:block">
+      <div className="hidden pt-24 min-[1440px]:block">
         <DesktopRightRailAdSlot />
       </div>
     </div>
@@ -115,7 +115,7 @@ export default function DesktopRightRailAdSlot() {
     <aside
       aria-label="Advertisement"
       data-testid="desktop-right-rail-ad"
-      className="hidden w-[300px] self-start 2xl:block"
+      className="hidden w-[300px] self-start min-[1440px]:block"
     >
       <ins
         ref={adRef}
