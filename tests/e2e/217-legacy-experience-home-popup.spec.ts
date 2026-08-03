@@ -27,8 +27,14 @@ test.describe('Legacy experience home popup', () => {
 
     const legacyBox = await legacyLink.boundingBox();
     const continueBox = await continueButton.boundingBox();
+    const dialogBox = await dialog.boundingBox();
     expect(legacyBox).not.toBeNull();
     expect(continueBox).not.toBeNull();
+    expect(dialogBox).not.toBeNull();
+    expect(dialogBox?.width).toBeLessThanOrEqual(720);
+    expect(dialogBox?.height).toBeLessThan(620);
+    expect(dialogBox?.x).toBeGreaterThanOrEqual(32);
+    expect(dialogBox?.y).toBeGreaterThanOrEqual(32);
     expect(Math.abs((legacyBox?.y ?? 0) - (continueBox?.y ?? 0))).toBeLessThan(4);
     expect((continueBox?.x ?? 0)).toBeGreaterThan((legacyBox?.x ?? 0) + (legacyBox?.width ?? 0));
 
@@ -66,7 +72,10 @@ test.describe('Legacy experience home popup', () => {
     const continueBox = await continueButton.boundingBox();
 
     expect(dialogBox).not.toBeNull();
-    expect(Math.abs(((dialogBox?.y ?? 0) + (dialogBox?.height ?? 0)) - 844)).toBeLessThan(2);
+    expect(Math.abs(((dialogBox?.y ?? 0) + (dialogBox?.height ?? 0)) - 832)).toBeLessThan(2);
+    expect(dialogBox?.x).toBeGreaterThanOrEqual(12);
+    expect(dialogBox?.width).toBeLessThanOrEqual(366);
+    expect(dialogBox?.height).toBeLessThan(650);
     expect((continueBox?.y ?? 0)).toBeGreaterThan((legacyBox?.y ?? 0) + (legacyBox?.height ?? 0));
     await expect(dialog).toContainText('以前の体験を見る');
     await expect(page.locator('body')).not.toHaveCSS('overflow-x', 'scroll');

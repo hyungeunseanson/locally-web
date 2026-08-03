@@ -177,7 +177,7 @@ export default function LegacyExperiencePopup() {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[170] flex items-end justify-center bg-black/35 md:items-center md:p-6"
+      className="fixed inset-0 z-[170] flex items-end justify-center bg-black/35 p-3 md:items-center md:p-8"
       data-testid="legacy-experience-popup-overlay"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) dismiss();
@@ -189,7 +189,7 @@ export default function LegacyExperiencePopup() {
         aria-modal="true"
         aria-labelledby="legacy-experience-popup-title"
         aria-describedby="legacy-experience-popup-description"
-        className="relative max-h-[94dvh] w-full overflow-y-auto rounded-t-[22px] bg-white px-5 pb-6 pt-7 shadow-[0_24px_80px_rgba(0,0,0,0.16)] md:max-h-[calc(100dvh-48px)] md:max-w-[1180px] md:rounded-[24px] md:p-14"
+        className="relative max-h-[calc(100dvh-24px)] w-full overflow-y-auto rounded-[22px] bg-white px-5 pb-5 pt-6 shadow-[0_24px_80px_rgba(0,0,0,0.16)] md:max-h-[calc(100dvh-64px)] md:max-w-[720px] md:rounded-[20px] md:p-10"
         data-testid="legacy-experience-popup"
         onMouseDown={(event) => event.stopPropagation()}
       >
@@ -198,37 +198,37 @@ export default function LegacyExperiencePopup() {
           type="button"
           onClick={dismiss}
           aria-label={copy.closeLabel}
-          className="absolute right-[18px] top-5 flex size-[42px] items-center justify-center text-[#111111] transition-colors hover:bg-neutral-100 focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-blue-500 md:right-9 md:top-[34px] md:size-12"
+          className="absolute right-4 top-4 flex size-10 items-center justify-center rounded-full text-[#111111] transition-colors hover:bg-neutral-100 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-blue-500 md:right-7 md:top-7"
           data-testid="legacy-experience-popup-close"
         >
-          <X aria-hidden="true" className="size-8 md:size-10" strokeWidth={1.8} />
+          <X aria-hidden="true" className="size-6" strokeWidth={1.8} />
         </button>
 
-        <span className="mb-[34px] inline-flex min-h-[38px] items-center justify-center rounded-[9px] bg-[#f1f1f1] px-3.5 text-base font-semibold text-[#111111] md:mb-[54px] md:min-h-12 md:rounded-xl md:px-5 md:text-[22px]">
+        <span className="mb-5 inline-flex min-h-8 items-center justify-center rounded-lg bg-[#f1f1f1] px-3 text-sm font-semibold text-[#111111] md:mb-6">
           {copy.badge}
         </span>
 
         <h2
           id="legacy-experience-popup-title"
-          className="mb-6 mr-11 break-keep text-[34px] font-extrabold leading-[1.25] text-[#111111] md:mb-[46px] md:mr-[72px] md:text-[clamp(42px,5vw,72px)] md:leading-[1.16]"
+          className="mb-4 mr-10 break-keep text-[27px] font-extrabold leading-[1.3] text-[#111111] md:mb-5 md:mr-12 md:text-[36px] md:leading-[1.25]"
         >
           {copy.title}
         </h2>
 
         <p
           id="legacy-experience-popup-description"
-          className="whitespace-pre-line break-keep text-lg leading-[1.65] text-[#3d3d3d] md:text-[clamp(20px,2.3vw,32px)] md:leading-[1.75]"
+          className="whitespace-pre-line break-keep text-[15px] leading-[1.65] text-[#3d3d3d] md:text-lg md:leading-[1.7]"
         >
           {copy.body}
         </p>
 
-        <div aria-hidden="true" className="my-6 h-px bg-[#dedede] md:mb-10 md:mt-12" />
+        <div aria-hidden="true" className="my-5 h-px bg-[#dedede] md:my-7" />
 
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-7">
+        <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 md:gap-3">
           <a
             href={LEGACY_EXPERIENCE_URL}
             onClick={rememberDismissal}
-            className="inline-flex min-h-[58px] items-center justify-center rounded-xl border border-[#111111] bg-[#111111] px-[18px] py-4 text-center text-[17px] font-bold text-white no-underline transition-colors hover:bg-[#2a2a2a] focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-blue-500 md:min-h-[116px] md:rounded-2xl md:px-8 md:py-6 md:text-[clamp(20px,2vw,29px)]"
+            className="inline-flex min-h-[52px] items-center justify-center rounded-xl border border-[#111111] bg-[#111111] px-4 py-3 text-center text-base font-bold text-white no-underline transition-colors hover:bg-[#2a2a2a] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-blue-500 md:min-h-[60px] md:px-5 md:text-[17px]"
             data-testid="legacy-experience-popup-legacy-link"
           >
             {copy.legacyAction}
@@ -236,7 +236,7 @@ export default function LegacyExperiencePopup() {
           <button
             type="button"
             onClick={dismiss}
-            className="inline-flex min-h-[58px] items-center justify-center rounded-xl border-2 border-[#111111] bg-white px-[18px] py-4 text-center text-[17px] font-bold text-[#111111] transition-colors hover:bg-[#f5f5f5] focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-blue-500 md:min-h-[116px] md:rounded-2xl md:px-8 md:py-6 md:text-[clamp(20px,2vw,29px)]"
+            className="inline-flex min-h-[52px] items-center justify-center rounded-xl border-2 border-[#111111] bg-white px-4 py-3 text-center text-base font-bold text-[#111111] transition-colors hover:bg-[#f5f5f5] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-blue-500 md:min-h-[60px] md:px-5 md:text-[17px]"
             data-testid="legacy-experience-popup-continue"
           >
             {copy.continueAction}
