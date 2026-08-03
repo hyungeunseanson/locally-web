@@ -175,7 +175,7 @@ export async function GET() {
       return {
         ...publicExperience,
         is_superhost: superhostIds.has(String(experience.host_id || '')),
-        card_image_url: experience.image_url ?? null,
+        card_image_url: experience.photos?.[0] ?? experience.image_url ?? null,
         available_dates: availableDatesByExperienceId.get(String(experience.id)) ?? [],
         wishlist_count: popularityByExperienceId.get(String(experience.id)) ?? 0,
       };

@@ -4,7 +4,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { ChevronLeft, Save, MapPin, Plus, Trash2, X, Camera, Check, Globe, Loader2, Type, FileText, Lock } from 'lucide-react';
 import {
   ACTIVITY_LEVEL_OPTIONS,
@@ -39,6 +39,7 @@ import {
   mergeExperienceLocales,
   normalizeExperienceLocaleArray,
 } from '@/app/utils/experienceTranslation';
+import { getAdminExperienceReturnPath } from '@/app/utils/adminExperienceEditReturn';
 
 type ProcessedImageFile = File & {
   readonly __processedImage: true;
@@ -90,6 +91,7 @@ export default function EditExperiencePage() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const { showToast, showHeicUnsupportedToast } = useToast();
 
   const [formData, setFormData] = useState<any>(null);
@@ -99,7 +101,11 @@ export default function EditExperiencePage() {
   const [uploadingItineraryIndex, setUploadingItineraryIndex] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'basic' | 'detail' | 'course'>('basic');
   const [activePhotoIndex, setActivePhotoIndex] = useState<number | null>(null);
+  const [isAdminEditor, setIsAdminEditor] = useState(false);
   const replacePhotoInputRef = React.useRef<HTMLInputElement>(null);
+  const experienceId = String(params.id || '');
+  const adminReturnPath = getAdminExperienceReturnPath(searchParams.get('returnTo'), experienceId);
+  const dashboardReturnPath = isAdminEditor ? adminReturnPath : '/host/dashboard?tab=experiences';
 
   // 데이터 불러오기
   useEffect(() => {
@@ -117,6 +123,7 @@ export default function EditExperiencePage() {
           userId: user.id,
           email: user.email,
         });
+        setIsAdminEditor(isAdmin);
 
         let query = supabase.from('experiences').select(HOST_EXPERIENCE_EDIT_SELECT).eq('id', params.id);
         if (!isAdmin) {
@@ -127,7 +134,9 @@ export default function EditExperiencePage() {
 
         if (error || !data) {
           showToast(t('msg_load_fail'), 'error');
-          router.push('/host/dashboard?tab=experiences');
+          router.push(isAdmin
+            ? getAdminExperienceReturnPath(searchParams.get('returnTo'), String(params.id || ''))
+            : '/host/dashboard?tab=experiences');
           return;
         }
 
@@ -170,7 +179,7 @@ export default function EditExperiencePage() {
       }
     };
     fetchExp();
-  }, [params.id, router, showToast, supabase, t]);
+  }, [params.id, router, searchParams, showToast, supabase, t]);
 
   const uploadImageFile = async (file: File, folder: 'hero' | 'itinerary') => {
     const validation = validateImage(file);
@@ -453,16 +462,16 @@ export default function EditExperiencePage() {
         onChange={handleReplacePhotoInput}
       />
 
-      <SiteHeader />
+      {!isAdminEditor && <SiteHeader />}
 
       <main className="max-w-4xl mx-auto px-3 md:px-6 py-5 md:py-8">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 md:mb-6">
           <button
-            onClick={() => router.replace('/host/dashboard?tab=experiences')}
+            onClick={() => router.replace(dashboardReturnPath)}
             className="flex items-center gap-2 text-slate-500 hover:text-black font-bold text-sm"
             type="button"
           >
-            <ChevronLeft size={16} /> {t('nav_dashboard')}
+            <ChevronLeft size={16} /> {isAdminEditor ? '관리자 화면으로 돌아가기' : t('nav_dashboard')}
           </button>
           <button onClick={handleUpdate} disabled={saving} className="px-4 md:px-6 py-2 bg-black text-white rounded-full font-bold text-xs md:text-sm hover:scale-105 transition-transform flex items-center gap-1.5 md:gap-2 shadow-lg disabled:opacity-50">
             {saving ? <><Loader2 className="animate-spin" size={16} /> {t('btn_save_loading')}</> : <><Save size={16} /> {t('btn_save')}</>} {/* 🟢 번역 */}

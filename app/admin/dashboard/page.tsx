@@ -60,14 +60,22 @@ function DataDrivenAdminTab({
   setFilter,
   selectedItem,
   setSelectedItem,
+  initialExperienceId,
 }: {
   activeTab: string;
   filter: string;
   setFilter: React.Dispatch<React.SetStateAction<string>>;
   selectedItem: AdminPanelSelectedItem | null;
   setSelectedItem: React.Dispatch<React.SetStateAction<AdminPanelSelectedItem | null>>;
+  initialExperienceId?: string | null;
 }) {
-  const { apps, exps, isLoading, updateStatus, deleteItem } = useAdminApprovalsData();
+  const { apps, exps, isLoading, updateStatus, deleteItem, updateExperiencePhotos } = useAdminApprovalsData();
+
+  useEffect(() => {
+    if (isLoading || activeTab !== 'EXPS' || !initialExperienceId) return;
+    const target = exps.find((experience) => String(experience.id) === initialExperienceId);
+    if (target) setSelectedItem({ ...target } as AdminPanelSelectedItem);
+  }, [activeTab, exps, initialExperienceId, isLoading, setSelectedItem]);
 
   if (isLoading) return <DataLoadingSkeleton />;
 
@@ -84,6 +92,7 @@ function DataDrivenAdminTab({
       setSelectedItem={setSelectedItem}
       updateStatus={updateStatus}
       deleteItem={deleteItem}
+      onExperiencePhotosUpdated={updateExperiencePhotos}
     />
   );
 }
@@ -146,6 +155,7 @@ function AdminDashboardContent() {
   const activeTab = urlTab || savedTab || 'APPROVALS';
   const teamTab = searchParams.get('teamTab');
   const proxyRequestId = searchParams.get('proxyRequestId');
+  const experienceId = searchParams.get('experienceId');
 
   useEffect(() => {
     if (urlTab && rawUrlTab?.toUpperCase() !== urlTab) {
@@ -197,6 +207,7 @@ function AdminDashboardContent() {
           setFilter={setFilter}
           selectedItem={selectedItem}
           setSelectedItem={setSelectedItem}
+          initialExperienceId={experienceId}
         />
       )}
       </div>

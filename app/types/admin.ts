@@ -274,6 +274,7 @@ export interface AdminManagementTabProps {
   setSelectedItem: (item: AdminPanelSelectedItem | null) => void;
   updateStatus: AdminStatusChangeExecutor;
   deleteItem: AdminDeleteExecutor;
+  onExperiencePhotosUpdated?: (id: AdminItemId, photos: string[]) => void;
 }
 
 export interface AdminDetailsPanelProps {
@@ -282,6 +283,7 @@ export interface AdminDetailsPanelProps {
   setSelectedItem: (item: AdminPanelSelectedItem | null) => void;
   onRequestStatusChange: AdminStatusChangeRequestHandler;
   onRequestDeleteItem: AdminDeleteRequestHandler;
+  onExperiencePhotosUpdated?: (id: AdminItemId, photos: string[]) => void;
 }
 
 export interface AdminServiceBooking {

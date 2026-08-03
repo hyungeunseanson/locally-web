@@ -7,7 +7,8 @@ import { useRouter } from 'next/navigation';
 import {
   Search, User, Mail, Globe, MessageCircle, Phone, Smile, Clock,
   MapPin, Cake, CheckCircle2, ShoppingBag, Trash2, Edit,
-  CreditCard, FileText, Shield, Download, Check, X, ImageOff
+  CreditCard, FileText, Shield, Download, Check, X, ImageOff,
+  ArrowLeft, ArrowRight, RotateCcw
 } from 'lucide-react';
 import { updateAdminHostSuperhost } from '@/app/actions/admin';
 import { formatLanguageLevelSummary, getLanguageNames, normalizeLanguageLevels, LanguageLevelEntry } from '@/app/utils/languageLevels';
@@ -26,6 +27,7 @@ import {
   normalizeSoloGuaranteePrice,
   SOLO_GUARANTEE_PRICE_STEP,
 } from '@/app/constants/soloGuarantee';
+import { arePhotoOrdersEqual } from '@/app/utils/experiencePhotoOrder';
 
 type ExperienceItineraryItem = NonNullable<ExperienceApprovalItem['itinerary']>[number];
 
@@ -85,6 +87,7 @@ export default function DetailsPanel({
   setSelectedItem,
   onRequestStatusChange,
   onRequestDeleteItem,
+  onExperiencePhotosUpdated,
 }: AdminDetailsPanelProps) {
   const router = useRouter();
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
@@ -101,6 +104,10 @@ export default function DetailsPanel({
   const [soloPriceDraft, setSoloPriceDraft] = useState(String(DEFAULT_SOLO_GUARANTEE_PRICE));
   const [soloPriceSaving, setSoloPriceSaving] = useState(false);
   const [soloPriceError, setSoloPriceError] = useState<string | null>(null);
+  const [photoBaseline, setPhotoBaseline] = useState<string[]>([]);
+  const [photoDraft, setPhotoDraft] = useState<string[]>([]);
+  const [photoSaving, setPhotoSaving] = useState(false);
+  const [photoOrderError, setPhotoOrderError] = useState<string | null>(null);
 
   const handleStartCSChat = async () => {
     if (!rawSelectedItem?.id) return;
@@ -179,6 +186,76 @@ export default function DetailsPanel({
     activeTab === 'APPS' || activeTab === 'EXPS'
       ? (detailItem || rawSelectedItem)
       : rawSelectedItem;
+  useEffect(() => {
+    if (activeTab !== 'EXPS') {
+      setPhotoBaseline([]);
+      setPhotoDraft([]);
+      setPhotoOrderError(null);
+      return;
+    }
+
+    const photos = Array.isArray(selectedItem?.photos) ? selectedItem.photos : [];
+    setPhotoBaseline([...photos]);
+    setPhotoDraft([...photos]);
+    setPhotoOrderError(null);
+  }, [activeTab, selectedItem?.id, selectedItem?.photos]);
+
+  const movePhoto = (fromIndex: number, toIndex: number) => {
+    if (photoSaving || toIndex < 0 || toIndex >= photoDraft.length) return;
+    setPhotoDraft((current) => {
+      const next = [...current];
+      const [photo] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, photo);
+      return next;
+    });
+    setPhotoOrderError(null);
+  };
+
+  const setMainPhoto = (index: number) => {
+    if (index <= 0 || photoSaving) return;
+    setPhotoDraft((current) => [current[index], ...current.filter((_, photoIndex) => photoIndex !== index)]);
+    setPhotoOrderError(null);
+  };
+
+  const resetPhotoOrder = () => {
+    if (photoSaving) return;
+    setPhotoDraft([...photoBaseline]);
+    setPhotoOrderError(null);
+  };
+
+  const savePhotoOrder = async () => {
+    if (!selectedItem || photoSaving || arePhotoOrdersEqual(photoBaseline, photoDraft)) return;
+
+    setPhotoSaving(true);
+    setPhotoOrderError(null);
+    try {
+      const response = await fetch(`/api/admin/experiences/${selectedItem.id}/photos`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expectedPhotos: photoBaseline, photos: photoDraft }),
+      });
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok || !result?.success || !Array.isArray(result?.data?.photos)) {
+        if (response.status === 409) {
+          throw new Error('사진이 변경되었습니다. 새로고침 후 다시 시도해주세요.');
+        }
+        throw new Error(result?.error || '사진 순서를 저장하지 못했습니다.');
+      }
+
+      const savedPhotos = result.data.photos as string[];
+      const nextItem = { ...selectedItem, photos: savedPhotos };
+      setPhotoBaseline(savedPhotos);
+      setPhotoDraft(savedPhotos);
+      setDetailItem(nextItem);
+      setSelectedItem(nextItem);
+      onExperiencePhotosUpdated?.(selectedItem.id, savedPhotos);
+    } catch (error) {
+      setPhotoOrderError(error instanceof Error ? error.message : '사진 순서를 저장하지 못했습니다.');
+    } finally {
+      setPhotoSaving(false);
+    }
+  };
   const soloGuaranteeOptionVisible = selectedItem?.solo_guarantee_option_visible !== false;
   const soloGuaranteePrice = normalizeSoloGuaranteePrice(selectedItem?.solo_guarantee_price);
   const isStaleHostApplication = activeTab === 'APPS' && selectedItem?.is_latest_for_user === false;
@@ -773,38 +850,95 @@ export default function DetailsPanel({
               </div>
             ) : (
               <>
-            {selectedItem.photos && (
+            {photoDraft.length > 0 && (
               <div>
-                <h4 className="text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-2 md:mb-3">등록된 사진</h4>
-                <div className="grid grid-cols-4 gap-1.5 md:gap-2">
-                  {selectedItem.photos.map((url: string, i: number) => {
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2 md:mb-3">
+                  <div>
+                    <h4 className="text-[10px] font-bold uppercase text-slate-400 md:text-xs">등록된 사진</h4>
+                    <p className="mt-1 text-[10px] text-slate-500 md:text-[11px]">첫 번째 사진이 홈·검색·상세의 대표 사진입니다.</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={resetPhotoOrder}
+                      disabled={photoSaving || arePhotoOrdersEqual(photoBaseline, photoDraft)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-[10px] font-bold text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <RotateCcw size={13} /> 초기화
+                    </button>
+                    <button
+                      type="button"
+                      onClick={savePhotoOrder}
+                      disabled={photoSaving || arePhotoOrdersEqual(photoBaseline, photoDraft)}
+                      data-testid="admin-experience-photo-order-save"
+                      className="rounded-lg bg-slate-900 px-3 py-2 text-[10px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {photoSaving ? '저장 중...' : '사진 순서 저장'}
+                    </button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                  {photoDraft.map((url: string, i: number) => {
                     const photoKey = `${String(selectedItem.id)}:${i}:${url}`;
                     const isBrokenPhoto = Boolean(brokenExperiencePhotos[photoKey]);
 
                     return (
-                      <div key={photoKey} className="relative aspect-square rounded-lg overflow-hidden border border-slate-100">
-                        {isBrokenPhoto ? (
-                          <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-slate-50 px-2 text-center text-slate-400">
-                            <ImageOff size={16} />
-                            <span className="text-[10px] font-medium">사진 로드 실패</span>
-                          </div>
-                        ) : (
-                          <>
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <div key={photoKey} className="rounded-lg border border-slate-200 bg-white p-1.5" data-testid={`admin-experience-photo-${i}`}>
+                        <div className="relative aspect-square overflow-hidden rounded-md bg-slate-50">
+                          {i === 0 && (
+                            <span className="absolute left-2 top-2 z-10 rounded bg-slate-900 px-2 py-1 text-[9px] font-black text-white">대표</span>
+                          )}
+                          {isBrokenPhoto ? (
+                            <div className="flex h-full w-full flex-col items-center justify-center gap-1 px-2 text-center text-slate-400">
+                              <ImageOff size={16} />
+                              <span className="text-[10px] font-medium">사진 로드 실패</span>
+                            </div>
+                          ) : (
+                            // eslint-disable-next-line @next/next/no-img-element
                             <img
                               src={url}
                               alt={`${selectedItem.title || 'Experience'} photo ${i + 1}`}
-                              className="w-full h-full object-cover"
-                              onError={() => {
-                                setBrokenExperiencePhotos((prev) => ({ ...prev, [photoKey]: true }));
-                              }}
+                              className="h-full w-full object-cover"
+                              onError={() => setBrokenExperiencePhotos((prev) => ({ ...prev, [photoKey]: true }))}
                             />
-                          </>
-                        )}
+                          )}
+                        </div>
+                        <div className="mt-1.5 flex items-center gap-1">
+                          <button
+                            type="button"
+                            aria-label={`${i + 1}번 사진 왼쪽으로 이동`}
+                            onClick={() => movePhoto(i, i - 1)}
+                            disabled={photoSaving || i === 0}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded border border-slate-200 text-slate-600 disabled:opacity-30"
+                          >
+                            <ArrowLeft size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={`${i + 1}번 사진 오른쪽으로 이동`}
+                            onClick={() => movePhoto(i, i + 1)}
+                            disabled={photoSaving || i === photoDraft.length - 1}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded border border-slate-200 text-slate-600 disabled:opacity-30"
+                          >
+                            <ArrowRight size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setMainPhoto(i)}
+                            disabled={photoSaving || i === 0}
+                            className="min-w-0 flex-1 rounded bg-slate-100 px-1.5 py-2 text-[9px] font-bold text-slate-700 disabled:opacity-40"
+                          >
+                            {i === 0 ? '대표 사진' : '대표로 설정'}
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
                 </div>
+                {photoOrderError && <p className="mt-2 text-[11px] font-semibold text-rose-600">{photoOrderError}</p>}
+                {!arePhotoOrdersEqual(photoBaseline, photoDraft) && (
+                  <p className="mt-2 text-[10px] font-semibold text-amber-700">저장 전 변경사항입니다. 공개 화면은 저장 후 홈 최대 5분, 검색 최대 2분 뒤 반영될 수 있습니다.</p>
+                )}
               </div>
             )}
 
@@ -994,7 +1128,7 @@ export default function DetailsPanel({
               </div>
             )}
 
-            <Link href={`/host/experiences/${selectedItem.id}/edit`}>
+            <Link href={`/host/experiences/${selectedItem.id}/edit?returnTo=${encodeURIComponent(`/admin/dashboard?tab=EXPS&experienceId=${selectedItem.id}`)}`}>
               <button className="w-full py-2.5 md:py-3 bg-black text-white rounded-xl text-xs md:text-sm font-bold flex items-center justify-center gap-1.5 hover:bg-slate-800 transition-colors mb-2 md:mb-4">
                 <Edit size={14} /> 관리자 권한으로 수정하기
               </button>

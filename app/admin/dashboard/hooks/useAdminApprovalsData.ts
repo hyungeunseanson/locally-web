@@ -126,12 +126,19 @@ export function useAdminApprovalsData() {
     }
   }, [fetchApprovals, showToast]);
 
+  const updateExperiencePhotos = useCallback((id: AdminItemId, photos: string[]) => {
+    setExps((current) => current.map((experience) => (
+      String(experience.id) === String(id) ? { ...experience, photos } : experience
+    )));
+  }, []);
+
   return {
     apps,
     exps,
     isLoading,
     updateStatus,
     deleteItem,
+    updateExperiencePhotos,
     refresh: fetchApprovals,
   };
 }

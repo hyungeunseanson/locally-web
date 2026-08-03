@@ -36,7 +36,7 @@ export default function ManagementTab({
   activeTab, filter, setFilter,
   apps, exps, users, messages,
   selectedItem, setSelectedItem,
-  updateStatus, deleteItem
+  updateStatus, deleteItem, onExperiencePhotosUpdated
 }: AdminManagementTabProps) {
 
   const [subTab, setSubTab] = useState<'APPS' | 'EXPS'>('APPS');
@@ -208,6 +208,7 @@ export default function ManagementTab({
               setSelectedItem={setSelectedItem}
               onRequestStatusChange={handleUpdateStatusClick}
               onRequestDeleteItem={handleDeleteItemClick}
+              onExperiencePhotosUpdated={onExperiencePhotosUpdated}
             />
           </div>
         )}

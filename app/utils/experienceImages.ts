@@ -17,9 +17,9 @@ export function getExperienceCardImageUrl(
 ) {
   return (
     firstNonEmptyString([
+      experience.photos?.[0],
       experience.card_image_url,
       experience.image_url,
-      experience.photos?.[0],
     ]) ?? fallbackImageUrl
   );
 }
