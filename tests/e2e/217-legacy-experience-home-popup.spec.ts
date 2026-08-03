@@ -73,9 +73,9 @@ test.describe('Legacy experience home popup', () => {
 
     expect(dialogBox).not.toBeNull();
     expect(Math.abs(((dialogBox?.y ?? 0) + (dialogBox?.height ?? 0)) - 832)).toBeLessThan(2);
-    expect(dialogBox?.x).toBeGreaterThanOrEqual(12);
-    expect(dialogBox?.width).toBeLessThanOrEqual(366);
-    expect(dialogBox?.height).toBeLessThan(650);
+    expect(dialogBox?.x).toBeGreaterThanOrEqual(35);
+    expect(dialogBox?.width).toBeLessThanOrEqual(320);
+    expect(dialogBox?.height).toBeLessThan(390);
     expect((continueBox?.y ?? 0)).toBeGreaterThan((legacyBox?.y ?? 0) + (legacyBox?.height ?? 0));
     await expect(dialog).toContainText('以前の体験を見る');
     await expect(page.locator('body')).not.toHaveCSS('overflow-x', 'scroll');
