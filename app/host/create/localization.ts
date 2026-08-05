@@ -299,6 +299,18 @@ type ExperienceFormCopy = {
   nextButton: string;
   submitButton: string;
   submittingButton: string;
+  draftSaveButton: string;
+  draftSaving: string;
+  draftSavedAt: (time: string) => string;
+  draftRetention: string;
+  draftSaveFailed: string;
+  draftTextOnlySaved: string;
+  draftConflict: string;
+  draftUnavailable: string;
+  draftRestoreTitle: string;
+  draftRestoreDescription: string;
+  draftContinue: string;
+  draftStartNew: string;
   validationCity: string;
   validationCategory: string;
   validationLanguages: string;
@@ -481,6 +493,18 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     nextButton: '다음',
     submitButton: '체험 등록하기',
     submittingButton: '등록 중...',
+    draftSaveButton: '저장',
+    draftSaving: '저장 중',
+    draftSavedAt: (time) => `저장됨 · ${time}`,
+    draftRetention: '이 기기에 최대 30일간 보관',
+    draftSaveFailed: '저장 실패 · 다시 시도해주세요',
+    draftTextOnlySaved: '글은 저장됨 · 사진은 다시 선택 필요',
+    draftConflict: '다른 탭에서 변경된 초안이 있습니다. 화면을 새로고침해주세요.',
+    draftUnavailable: '이 브라우저에서는 임시저장을 사용할 수 없습니다.',
+    draftRestoreTitle: '작성 중인 체험이 있어요',
+    draftRestoreDescription: '이 기기에 저장된 내용을 이어서 작성하거나 새로 시작할 수 있습니다.',
+    draftContinue: '이어서 작성',
+    draftStartNew: '새로 시작',
     validationCity: '도시를 선택하거나 직접 입력해주세요.',
     validationCategory: '카테고리를 선택해주세요.',
     validationLanguages: '진행 가능한 언어를 1개 이상 선택해주세요.',
@@ -661,6 +685,18 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     nextButton: 'Next',
     submitButton: 'Submit experience',
     submittingButton: 'Submitting...',
+    draftSaveButton: 'Save',
+    draftSaving: 'Saving',
+    draftSavedAt: (time) => `Saved · ${time}`,
+    draftRetention: 'Kept on this device for up to 30 days',
+    draftSaveFailed: 'Save failed · Try again',
+    draftTextOnlySaved: 'Text saved · Please select photos again',
+    draftConflict: 'This draft was changed in another tab. Please refresh this page.',
+    draftUnavailable: 'Draft saving is unavailable in this browser.',
+    draftRestoreTitle: 'You have an unfinished experience',
+    draftRestoreDescription: 'Continue with the draft saved on this device or start again.',
+    draftContinue: 'Continue writing',
+    draftStartNew: 'Start new',
     validationCity: 'Choose a city or enter one directly.',
     validationCategory: 'Choose a category.',
     validationLanguages: 'Select at least one available language.',
@@ -840,6 +876,18 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     nextButton: '次へ',
     submitButton: '体験を登録する',
     submittingButton: '登録中...',
+    draftSaveButton: '保存',
+    draftSaving: '保存中',
+    draftSavedAt: (time) => `保存済み · ${time}`,
+    draftRetention: 'この端末に最大30日間保存',
+    draftSaveFailed: '保存できませんでした · もう一度お試しください',
+    draftTextOnlySaved: '文章は保存済み · 写真は再選択が必要です',
+    draftConflict: '別のタブで下書きが変更されました。ページを再読み込みしてください。',
+    draftUnavailable: 'このブラウザでは下書き保存を利用できません。',
+    draftRestoreTitle: '作成中の体験があります',
+    draftRestoreDescription: 'この端末に保存された内容を続けるか、新しく始めるか選べます。',
+    draftContinue: '続きから作成',
+    draftStartNew: '新しく始める',
     validationCity: '都市を選択するか直接入力してください。',
     validationCategory: 'カテゴリを選択してください。',
     validationLanguages: '対応可能な言語を1つ以上選択してください。',
@@ -1020,6 +1068,18 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     nextButton: '下一步',
     submitButton: '提交体验',
     submittingButton: '提交中...',
+    draftSaveButton: '保存',
+    draftSaving: '正在保存',
+    draftSavedAt: (time) => `已保存 · ${time}`,
+    draftRetention: '在此设备上最多保留30天',
+    draftSaveFailed: '保存失败 · 请重试',
+    draftTextOnlySaved: '文字已保存 · 需重新选择照片',
+    draftConflict: '草稿已在其他标签页中更改。请刷新本页。',
+    draftUnavailable: '此浏览器无法使用草稿保存功能。',
+    draftRestoreTitle: '你有尚未完成的体验',
+    draftRestoreDescription: '可以继续编辑保存在此设备上的草稿，也可以重新开始。',
+    draftContinue: '继续编辑',
+    draftStartNew: '重新开始',
     validationCity: '请选择城市或直接输入城市。',
     validationCategory: '请选择类别。',
     validationLanguages: '请至少选择一种可使用语言。',

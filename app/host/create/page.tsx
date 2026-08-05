@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { X, ChevronRight } from 'lucide-react';
-import Link from 'next/link';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { X, ChevronRight, Save } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext'; // 🟢 알림 기능 사용
+import { useAuth } from '@/app/context/AuthContext';
 import {
   TOTAL_STEPS,
   INITIAL_FORM_DATA,
@@ -27,6 +28,9 @@ import {
   type ExperienceFormIssue,
   type ExperienceFormIssueCode,
 } from './experienceFormValidation';
+import ExperienceDraftRestoreDialog from './components/ExperienceDraftRestoreDialog';
+import { useExperienceDraft } from './useExperienceDraft';
+import type { LoadedExperienceDraft } from './experienceDraftStorage';
 
 type ProcessedImageFile = File & {
   readonly __processedImage: true;
@@ -69,8 +73,10 @@ function getExperienceIssueMessage(code: ExperienceFormIssueCode, copy: Experien
 }
 
 export default function CreateExperiencePage() {
+  const router = useRouter();
   const { lang } = useLanguage();
   const copy = getExperienceFormCopy(lang);
+  const { user, isLoading: authLoading } = useAuth();
   const supabase = useMemo(() => createClient(), []);
   const { showToast, showHeicUnsupportedToast } = useToast(); // 🟢 토스트 훅 가져오기
 
@@ -96,6 +102,86 @@ export default function CreateExperiencePage() {
   const [validatedSteps, setValidatedSteps] = useState<number[]>([]);
   const [focusRequest, setFocusRequest] = useState<{ field: string; requestId: number } | null>(null);
   const replacePhotoInputRef = useRef<HTMLInputElement>(null);
+
+  const draftData = useMemo(() => ({
+    step,
+    formData,
+    isCustomCity,
+    tempInclusion,
+    tempExclusion,
+  }), [formData, isCustomCity, step, tempExclusion, tempInclusion]);
+  const draftMedia = useMemo(() => ({
+    heroFiles: imageFiles as File[],
+    itineraryFiles: itineraryImageFiles as (File | null)[],
+  }), [imageFiles, itineraryImageFiles]);
+
+  const restoreDraft = useCallback((
+    draft: LoadedExperienceDraft,
+    previewUrls: { hero: string[]; itinerary: (string | null)[] }
+  ) => {
+    const restoredPhotos = draft.data.formData.photos.length > 0
+      ? draft.data.formData.photos
+        .map((photo, index) => photo || previewUrls.hero[index] || '')
+        .filter(Boolean)
+      : previewUrls.hero;
+    const restoredItinerary = draft.data.formData.itinerary.map((item, index) => ({
+      ...item,
+      image_url: item.image_url || previewUrls.itinerary[index] || '',
+    }));
+
+    setStep(Math.min(Math.max(draft.data.step, 1), TOTAL_STEPS - 1));
+    setFormData({
+      ...draft.data.formData,
+      photos: restoredPhotos,
+      itinerary: restoredItinerary,
+    });
+    setIsCustomCity(draft.data.isCustomCity);
+    setTempInclusion(draft.data.tempInclusion);
+    setTempExclusion(draft.data.tempExclusion);
+    setImageFiles(draft.media.heroFiles.map(asProcessedImageFile));
+    setItineraryImageFiles(
+      draft.media.itineraryFiles.map((file) => (file ? asProcessedImageFile(file) : null))
+    );
+    setValidatedSteps([]);
+    setFocusRequest(null);
+  }, []);
+
+  const {
+    status: draftStatus,
+    savedAt: draftSavedAt,
+    pendingDraft,
+    ready: draftReady,
+    saveNow: saveDraftNow,
+    saveBeforeExit,
+    continueDraft,
+    startNew: startNewDraft,
+    clearDraft,
+    releaseDraftObjectUrl,
+  } = useExperienceDraft({
+    data: draftData,
+    media: draftMedia,
+    enabled: step < TOTAL_STEPS,
+    ownerId: user?.id ?? null,
+    authResolved: !authLoading,
+    onRestore: restoreDraft,
+  });
+
+  const savedTime = draftSavedAt
+    ? new Intl.DateTimeFormat(
+      lang === 'ja' ? 'ja-JP' : lang === 'zh' ? 'zh-CN' : lang === 'en' ? 'en-US' : 'ko-KR',
+      { hour: 'numeric', minute: '2-digit' }
+    ).format(draftSavedAt)
+    : null;
+
+  const draftStatusLabel = (() => {
+    if (draftStatus === 'saving') return copy.draftSaving;
+    if (draftStatus === 'saved' && savedTime) return copy.draftSavedAt(savedTime);
+    if (draftStatus === 'text-only') return copy.draftTextOnlySaved;
+    if (draftStatus === 'error') return copy.draftSaveFailed;
+    if (draftStatus === 'conflict') return copy.draftConflict;
+    if (draftStatus === 'unavailable') return copy.draftUnavailable;
+    return null;
+  })();
 
   const resolveIssues = (issues: ExperienceFormIssue[]): ResolvedExperienceFormIssue[] =>
     issues.map((issue) => ({ ...issue, message: getExperienceIssueMessage(issue.code, copy) }));
@@ -272,6 +358,7 @@ export default function CreateExperiencePage() {
   };
 
   const handleRemoveImage = (index: number) => {
+    releaseDraftObjectUrl(formData.photos[index]);
     setImageFiles(prev => prev.filter((_, i) => i !== index));
     const newPhotos = formData.photos.filter((_, i) => i !== index);
     updateData('photos', newPhotos);
@@ -283,6 +370,8 @@ export default function CreateExperiencePage() {
     if (previewUrls.length === 0 || processedFiles.length === 0) {
       return;
     }
+
+    releaseDraftObjectUrl(formData.photos[index]);
 
     updateData(
       'photos',
@@ -380,6 +469,7 @@ export default function CreateExperiencePage() {
   };
 
   const handleRemoveItineraryImage = (index: number) => {
+    releaseDraftObjectUrl(formData.itinerary[index]?.image_url);
     const newItinerary = [...(formData.itinerary as ItineraryItem[])];
     newItinerary[index] = {
       ...newItinerary[index],
@@ -475,6 +565,12 @@ export default function CreateExperiencePage() {
         throw new Error(result?.error || copy.unknownError);
       }
 
+      try {
+        await clearDraft();
+      } catch (draftError) {
+        console.error('Experience draft cleanup failed:', draftError);
+      }
+
       // 🟢 [수정됨] 등록 성공 시 알림 띄우고 완료 화면(Step 8) 표시
       showToast(copy.submitSuccess, 'success');
       setCreatedExperienceId(result.id);
@@ -491,6 +587,16 @@ export default function CreateExperiencePage() {
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans flex flex-col">
+      {pendingDraft && (
+        <ExperienceDraftRestoreDialog
+          title={copy.draftRestoreTitle}
+          description={copy.draftRestoreDescription}
+          continueLabel={copy.draftContinue}
+          startNewLabel={copy.draftStartNew}
+          onContinue={continueDraft}
+          onStartNew={() => void startNewDraft()}
+        />
+      )}
       <HostPhotoActionSheet
         isOpen={activePhotoIndex !== null}
         photoLabel={
@@ -518,17 +624,50 @@ export default function CreateExperiencePage() {
 
       {/* 헤더 */}
       {step < TOTAL_STEPS && (
-        <header className="fixed top-0 left-0 right-0 h-14 md:h-20 bg-white/80 backdrop-blur-md z-50 px-4 md:px-6 flex items-center justify-between pt-[env(safe-area-inset-top,0px)]">
-          <Link href="/host/dashboard?tab=experiences" className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={24} className="text-slate-900" /></Link>
-          <div className="w-1/3 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-            <div className="h-full bg-black transition-all duration-500 ease-out" style={{ width: `${(step / (TOTAL_STEPS - 1)) * 100}%` }} />
+        <header className="fixed left-0 right-0 top-0 z-50 bg-white/90 px-3 pt-[env(safe-area-inset-top,0px)] backdrop-blur-md md:px-6">
+          <div className="grid h-14 grid-cols-[auto_minmax(72px,1fr)_auto] items-center gap-3 md:h-16 md:gap-6">
+            <button
+              type="button"
+              aria-label="Close"
+              onClick={async () => {
+                const saved = await saveBeforeExit();
+                if (saved) {
+                  router.push('/host/dashboard?tab=experiences');
+                } else {
+                  showToast(draftStatus === 'conflict' ? copy.draftConflict : copy.draftSaveFailed, 'error');
+                }
+              }}
+              className="flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-slate-100"
+            >
+              <X size={24} className="text-slate-900" />
+            </button>
+            <div className="mx-auto h-1.5 w-full max-w-48 overflow-hidden rounded-full bg-slate-100">
+              <div className="h-full bg-black transition-all duration-500 ease-out" style={{ width: `${(step / (TOTAL_STEPS - 1)) * 100}%` }} />
+            </div>
+            <button
+              type="button"
+              onClick={() => void saveDraftNow()}
+              disabled={!draftReady || draftStatus === 'saving' || draftStatus === 'conflict' || draftStatus === 'unavailable'}
+              className="flex h-9 min-w-12 items-center justify-center gap-1 rounded-md px-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 md:min-w-16 md:text-sm"
+            >
+              <Save size={15} aria-hidden="true" />
+              {copy.draftSaveButton}
+            </button>
           </div>
-          <div className="w-10"></div>
+          <div
+            aria-live="polite"
+            className={`flex min-h-7 flex-wrap items-center justify-center gap-x-1 px-2 pb-2 text-center text-[10px] leading-4 md:text-xs ${draftStatus === 'error' || draftStatus === 'conflict' || draftStatus === 'text-only' ? 'text-rose-600' : 'text-slate-500'}`}
+          >
+            {draftStatusLabel && <span>{draftStatusLabel}</span>}
+            {draftStatus !== 'unavailable' && draftStatus !== 'conflict' && (
+              <span>{draftStatusLabel ? '· ' : ''}{copy.draftRetention}</span>
+            )}
+          </div>
         </header>
       )}
 
       {/* 메인 컨텐츠 */}
-      <main className="flex-1 flex flex-col items-center pt-[calc(env(safe-area-inset-top,0px)+4.75rem)] md:pt-24 pb-28 md:pb-36 px-4 md:px-6 w-full max-w-2xl lg:max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <main className="flex-1 flex flex-col items-center pt-[calc(env(safe-area-inset-top,0px)+6.25rem)] md:pt-32 pb-28 md:pb-36 px-4 md:px-6 w-full max-w-2xl lg:max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
         <ExperienceFormSteps
           step={step}
           formData={formData}
