@@ -80,7 +80,7 @@ test.describe('Cron secret guards', () => {
     })).toBe(false);
   });
 
-  test('deletes expired card attempts but preserves the bank-transfer audit trail', async ({ request }) => {
+  test('catches up every expired pending booking, preserves approved cards, and is repeat-safe', async ({ request }) => {
     const supabase = getTestAdminClient();
     const user = createTestUser('cron.card.attempt.cleanup');
     const userId = await createAuthUser(user);
@@ -131,7 +131,16 @@ test.describe('Cron secret guards', () => {
         status: 'PENDING',
         paymentMethod: 'bank',
       });
-      createdBookingIds.push(pendingCardId, releasedCardId, pendingBankId);
+      const approvedCardId = await insertTestBooking({
+        userId,
+        experienceId: Number(experience.id),
+        date,
+        time: '10:00',
+        guests: 1,
+        status: 'PENDING',
+        paymentMethod: 'card',
+      });
+      createdBookingIds.push(pendingCardId, releasedCardId, pendingBankId, approvedCardId);
 
       const { error: fixtureUpdateError } = await supabase
         .from('bookings')
@@ -145,6 +154,12 @@ test.describe('Cron secret guards', () => {
         .eq('id', releasedCardId);
       if (releaseReasonError) throw releaseReasonError;
 
+      const { error: approvedCardError } = await supabase
+        .from('bookings')
+        .update({ status: 'PAID', tid: `NICEPAY-APPROVED-${Date.now()}` })
+        .eq('id', approvedCardId);
+      if (approvedCardError) throw approvedCardError;
+
       const response = await request.get('/api/cron/cancel-pending', {
         headers: { authorization: `Bearer ${CRON_SECRET}` },
       });
@@ -152,18 +167,42 @@ test.describe('Cron secret guards', () => {
 
       const { data: remainingRows, error: remainingRowsError } = await supabase
         .from('bookings')
-        .select('id, status, payment_method, cancel_reason')
+        .select('id, status, payment_method, cancel_reason, tid')
         .in('id', createdBookingIds);
       if (remainingRowsError) throw remainingRowsError;
 
-      expect(remainingRows).toEqual([
+      expect(remainingRows).toHaveLength(2);
+      expect(remainingRows).toEqual(expect.arrayContaining([
         expect.objectContaining({
           id: pendingBankId,
           status: 'cancelled',
           payment_method: 'bank',
           cancel_reason: BANK_TRANSFER_EXPIRED_CANCEL_REASON,
+          tid: null,
         }),
-      ]);
+        expect.objectContaining({
+          id: approvedCardId,
+          status: 'PAID',
+          payment_method: 'card',
+        }),
+      ]));
+
+      const repeatResponse = await request.get('/api/cron/cancel-pending', {
+        headers: { authorization: `Bearer ${CRON_SECRET}` },
+      });
+      expect(repeatResponse.status()).toBe(200);
+      expect(await repeatResponse.json()).toMatchObject({
+        message: 'No expired bookings found',
+      });
+
+      const { data: rowsAfterRepeat, error: rowsAfterRepeatError } = await supabase
+        .from('bookings')
+        .select('id, status, payment_method, cancel_reason, tid')
+        .in('id', createdBookingIds);
+      if (rowsAfterRepeatError) throw rowsAfterRepeatError;
+
+      expect(rowsAfterRepeat).toEqual(expect.arrayContaining(remainingRows));
+      expect(rowsAfterRepeat).toHaveLength(remainingRows.length);
     } finally {
       if (createdBookingIds.length > 0) {
         await supabase.from('bookings').delete().in('id', createdBookingIds);

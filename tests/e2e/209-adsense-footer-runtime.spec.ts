@@ -160,21 +160,21 @@ test.describe('AdSense desktop footer runtime', () => {
     }
   });
 
-  test('keeps the help modal above and isolated from the right rail ad', async ({ page }) => {
+  test('keeps the support login modal above and isolated from the right rail ad', async ({ page }) => {
     test.skip(!RIGHT_RAIL_RUNTIME_CONFIGURED, 'Run with a configured right rail slot.');
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.goto('/help');
 
     await page.getByTestId('help-contact-modal-trigger').click();
 
-    const modalBackdrop = page.getByTestId('help-contact-modal');
+    const modalBackdrop = page.getByTestId('login-modal');
     const rail = page.getByTestId('desktop-right-rail-ad');
     await expect(modalBackdrop).toBeVisible();
     await expect(rail).toHaveCount(1);
 
     const coverage = await page.evaluate(() => {
       const rail = document.querySelector<HTMLElement>('[data-testid="desktop-right-rail-ad"]');
-      const backdrop = document.querySelector<HTMLElement>('[data-testid="help-contact-modal"]');
+      const backdrop = document.querySelector<HTMLElement>('[data-testid="login-modal"]');
       if (!rail || !backdrop) return null;
       const rect = rail.getBoundingClientRect();
       const topElement = document.elementFromPoint(
@@ -200,7 +200,7 @@ test.describe('AdSense desktop footer runtime', () => {
       railContainsTopElement: false,
       backdropCoversViewport: true,
       backdropPointerEvents: 'auto',
-      backdropZIndex: 210,
+      backdropZIndex: 200,
       railZIndex: 'auto',
     });
   });

@@ -235,7 +235,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
   if (!visible) return null;
 
   return (
-    <div className={`fixed inset-0 z-[200] flex items-center justify-center p-4 md:p-4 transition-opacity duration-150 ${closing ? 'opacity-0' : 'animate-in fade-in duration-200'}`}>
+    <div data-testid="login-modal" className={`fixed inset-0 z-[200] flex items-center justify-center p-4 md:p-4 transition-opacity duration-150 ${closing ? 'opacity-0' : 'animate-in fade-in duration-200'}`}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleCloseRequest}></div>
 
       <div className={`bg-white w-full ${mode === 'SIGNUP' ? 'max-w-[356px] md:max-w-[480px]' : 'max-w-[328px] md:max-w-[420px]'} rounded-[22px] md:rounded-2xl shadow-2xl overflow-hidden relative z-10 transition-all duration-150 ${closing ? 'opacity-0 scale-95' : 'animate-in zoom-in-95 duration-200'}`}>

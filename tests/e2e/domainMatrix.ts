@@ -337,6 +337,7 @@ export const DOMAIN_MATRIX: DomainMatrixEntry[] = [
       'tests/e2e/164-guest-inbox-support-profile-context.spec.ts',
       'tests/e2e/185-messaging-boundary-contract.spec.ts',
       'tests/e2e/198-host-reservation-timing-contract.spec.ts',
+      'tests/e2e/222-global-support-report.spec.ts',
     ],
     manualChecks: [
       ...COMMON_PUBLIC_MANUAL_CHECKS,
@@ -811,6 +812,7 @@ export const DOMAIN_MATRIX: DomainMatrixEntry[] = [
       'tests/e2e/81-cron-secret-guards.spec.ts',
       'tests/e2e/171-live-base-url-contract.spec.ts',
       'tests/e2e/189-live-domain-parity-contract.spec.ts',
+      'tests/e2e/221-scheduled-cron-workflow-contract.spec.ts',
     ],
     manualChecks: [
       'Runbook, smoke scripts, and cron auth inputs match the live environment contract.',

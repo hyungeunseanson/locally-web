@@ -7,7 +7,6 @@ import {
   User, Briefcase, CreditCard, ShieldCheck, MapPin, Calendar, ArrowLeft, PhoneCall
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { useViewMode } from '@/app/context/ViewModeContext';
 import { useAuth } from '@/app/context/AuthContext';
@@ -19,6 +18,8 @@ import {
   type HelpTab,
 } from '@/app/help/faqContent';
 import { DesktopRightRailAdLayout } from '@/app/components/DesktopRightRailAdSlot';
+import SupportInquiryFlow from '@/app/components/support/SupportInquiryFlow';
+import { getSupportInquiryCopy } from '@/app/components/support/supportInquiryCopy';
 
 const getCategoryIcon = (iconKey: HelpFaqIconKey) => {
   const size = 24;
@@ -56,87 +57,18 @@ export default function HelpCenterPage() {
   const { t, lang } = useLanguage();
   const { user } = useAuth();
   const { hasLocallyCare } = useLocallyMembership(user?.id);
-  const supportCopy = (() => {
-    if (lang === 'en') {
-      return {
-        noAdmin: 'There is no available support manager right now.',
-        submitSuccess: 'Your inquiry has been received.',
-        submitFailPrefix: 'Failed to submit inquiry: ',
-        profileSyncDelay: 'Account sync is delayed. Please try again in 5 seconds.',
-        unknownError: 'Unknown error',
-        closeSr: 'Close',
-        modalTitle: 'Contact Support',
-        modalDesc: 'Our team will review it and reply in your inbox.',
-        modalPlaceholder: 'Please enter your inquiry.',
-        modalSubmitting: 'Sending...',
-        modalSubmit: 'Send inquiry',
-        supportEmailNote: 'Official support inbox',
-      };
-    }
-
-    if (lang === 'ja') {
-      return {
-        noAdmin: '現在対応可能なサポート担当者がいません。',
-        submitSuccess: 'お問い合わせを受け付けました。',
-        submitFailPrefix: 'お問い合わせ受付失敗: ',
-        profileSyncDelay: 'アカウント同期が遅れています。5秒後にもう一度お試しください。',
-        unknownError: '不明なエラー',
-        closeSr: '閉じる',
-        modalTitle: '1:1 お問い合わせ',
-        modalDesc: '担当者が確認後、メッセージボックスで返信します。',
-        modalPlaceholder: 'お問い合わせ内容を入力してください。',
-        modalSubmitting: '送信中...',
-        modalSubmit: 'お問い合わせ送信',
-        supportEmailNote: '公式サポート窓口',
-      };
-    }
-
-    if (lang === 'zh') {
-      return {
-        noAdmin: '当前没有可处理咨询的客服人员。',
-        submitSuccess: '咨询已提交。',
-        submitFailPrefix: '咨询提交失败：',
-        profileSyncDelay: '账号同步稍有延迟，请在 5 秒后重试。',
-        unknownError: '未知错误',
-        closeSr: '关闭',
-        modalTitle: '1:1 咨询',
-        modalDesc: '管理员确认后会在消息箱中回复您。',
-        modalPlaceholder: '请输入咨询内容。',
-        modalSubmitting: '发送中...',
-        modalSubmit: '提交咨询',
-        supportEmailNote: '官方客服邮箱',
-      };
-    }
-
-    return {
-      noAdmin: '현재 상담 가능한 관리자가 없습니다.',
-      submitSuccess: '문의가 접수되었습니다.',
-      submitFailPrefix: '문의 접수 실패: ',
-      profileSyncDelay: '계정 동기화에 지연이 발생했습니다. 5초 뒤 다시 시도해 주시기 바랍니다.',
-      unknownError: '알 수 없는 오류',
-      closeSr: '닫기',
-      modalTitle: '1:1 문의하기',
-      modalDesc: '관리자가 확인 후 메시지함으로 답변드립니다.',
-      modalPlaceholder: '문의하실 내용을 입력해주세요.',
-      modalSubmitting: '전송 중...',
-      modalSubmit: '문의 접수',
-      supportEmailNote: '공식 고객지원 메일',
-    };
-  })();
+  const supportCopy = getSupportInquiryCopy(lang);
   const { isHostView } = useViewMode();
   const [activeTab, setActiveTab] = useState<HelpTab>(
     isHostView ? 'host' : 'guest'
   );
   const [searchTerm, setSearchTerm] = useState('');
   const [openItems, setOpenItems] = useState<Record<string, boolean>>({});
-  const [helpModalOpen, setHelpModalOpen] = useState(false);
-  const [helpContent, setHelpContent] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const router = useRouter();
-  const { showToast } = useToast();
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- view-mode changes intentionally reset the FAQ audience.
     setActiveTab(isHostView ? 'host' : 'guest');
   }, [isHostView]);
 
@@ -150,6 +82,7 @@ export default function HelpCenterPage() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- filter changes intentionally collapse stale FAQ disclosures.
     setOpenItems({});
   }, [activeTab, normalizedSearchTerm]);
 
@@ -181,52 +114,10 @@ export default function HelpCenterPage() {
     router.push(isHostView ? '/host/menu' : '/account');
   };
 
-  // 1:1 문의 제출
-  const handleHelpSubmit = async () => {
-    if (!helpContent.trim()) return;
-    setIsSubmitting(true);
-    try {
-      const response = await fetch('/api/inquiries/thread', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contextType: 'admin_support',
-          message: helpContent.trim(),
-        }),
-      });
-
-      const result = await response.json();
-
-      if (response.status === 401) {
-        router.push('/login');
-        return;
-      }
-
-      if (!response.ok || !result?.success || !result?.inquiryId) {
-        throw new Error(result?.error || supportCopy.noAdmin);
-      }
-
-      setHelpModalOpen(false);
-      setHelpContent('');
-      showToast(supportCopy.submitSuccess, 'success');
-      router.push(result.redirectUrl || `/guest/inbox?inquiryId=${result.inquiryId}`);
-    } catch (e: unknown) {
-      console.error("문의 접수 실패:", e);
-      const dbError = e as { code?: string, message?: string };
-      let message = e instanceof Error ? e.message : supportCopy.unknownError;
-
-      if (dbError.code === '23503' && dbError.message?.includes('profiles')) {
-        message = supportCopy.profileSyncDelay;
-      }
-
-      showToast(supportCopy.submitFailPrefix + message, 'error');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-white text-[#222222] font-sans selection:bg-black selection:text-white">
+    <SupportInquiryFlow>
+      {({ openInquiry }) => (
+      <div className="min-h-screen bg-white text-[#222222] font-sans selection:bg-black selection:text-white">
       <SiteHeader />
 
       <DesktopRightRailAdLayout>
@@ -338,7 +229,7 @@ export default function HelpCenterPage() {
             </p>
             <button
               type="button"
-              onClick={() => setHelpModalOpen(true)}
+              onClick={openInquiry}
               data-testid="help-search-empty-cta"
               className="mt-5 inline-flex items-center justify-center rounded-full bg-black px-5 py-3 text-[12px] font-bold uppercase tracking-[0.14em] text-white transition-colors hover:bg-slate-800"
             >
@@ -395,7 +286,8 @@ export default function HelpCenterPage() {
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-3 md:gap-6">
             <button
-              onClick={() => setHelpModalOpen(true)}
+              type="button"
+              onClick={openInquiry}
               data-testid="help-contact-modal-trigger"
               className="rounded-full bg-slate-900 px-6 md:px-8 py-3 md:py-3.5 text-[12px] md:text-[13px] font-semibold text-white hover:bg-slate-800 transition-colors flex items-center justify-center gap-2.5 md:gap-3 shadow-[0_10px_24px_rgba(15,23,42,0.08)]"
             >
@@ -422,54 +314,8 @@ export default function HelpCenterPage() {
         </main>
       </DesktopRightRailAdLayout>
 
-      {/* ── 1:1 문의 모달 ── */}
-      {helpModalOpen && (
-        <div
-          data-testid="help-contact-modal"
-          className="fixed inset-0 z-[210] bg-black/35 backdrop-blur-[1px] flex items-end md:items-center md:justify-center md:p-4"
-          onClick={() => { setHelpModalOpen(false); setHelpContent(''); }}
-        >
-          <div
-            className="w-full h-[88dvh] bg-[#fcfcfc] rounded-t-[28px] px-5 pt-5 pb-[calc(max(env(safe-area-inset-bottom,0px),0px)+16px)] flex flex-col md:h-auto md:max-h-[78dvh] md:max-w-[560px] md:rounded-[28px] md:px-7 md:pt-6 md:pb-6 md:shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex justify-end mb-1">
-              <button onClick={() => { setHelpModalOpen(false); setHelpContent(''); }} className="p-1.5 text-slate-600">
-                <span className="sr-only">{supportCopy.closeSr}</span>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                </svg>
-              </button>
-            </div>
-            <h3 className="text-[19px] md:text-[24px] font-medium leading-tight tracking-[-0.01em] mb-1.5">{supportCopy.modalTitle}</h3>
-            <p className="text-[11px] md:text-[13px] text-slate-500 leading-snug md:leading-relaxed mb-4 md:mb-5">
-              {supportCopy.modalDesc}
-            </p>
-            <textarea
-              value={helpContent}
-              onChange={(e) => setHelpContent(e.target.value)}
-              placeholder={supportCopy.modalPlaceholder}
-              className="w-full h-[122px] md:h-[170px] rounded-2xl border border-slate-300 bg-white px-4 py-3 md:px-5 md:py-4 text-[12px] md:text-[14px] font-normal text-slate-700 placeholder:text-slate-300 resize-none focus:outline-none focus:border-slate-500"
-            />
-            <p className="mt-3 text-[11px] leading-relaxed text-slate-500 md:text-[12px]">
-              {t('help_modal_inbox_hint')}
-            </p>
-            <div className="mt-auto md:mt-5">
-              <button
-                onClick={handleHelpSubmit}
-                disabled={!helpContent.trim() || isSubmitting}
-                className={`w-full rounded-2xl py-3 md:py-3.5 text-[13px] md:text-[15px] font-medium ${
-                  !helpContent.trim() || isSubmitting
-                    ? 'bg-slate-300 text-slate-50'
-                    : 'bg-[#111827] text-white'
-                }`}
-              >
-                {isSubmitting ? supportCopy.modalSubmitting : supportCopy.modalSubmit}
-              </button>
-            </div>
-          </div>
-        </div>
+      </div>
       )}
-    </div>
+    </SupportInquiryFlow>
   );
 }

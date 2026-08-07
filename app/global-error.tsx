@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import Link from 'next/link';
 import { captureClientException } from '@/app/utils/monitoring/sentry';
 
 export default function GlobalError({
@@ -34,6 +35,12 @@ export default function GlobalError({
             >
               다시 시도하기
             </button>
+            <Link
+              href="/help"
+              className="mt-4 text-sm font-semibold text-slate-600 underline underline-offset-4"
+            >
+              고객센터 문의
+            </Link>
           </div>
         </main>
       </body>

@@ -278,6 +278,17 @@ test.afterAll(async () => {
   }
 
   if (createdInquiryIds.length > 0) {
+    await supabase
+      .from('notifications')
+      .delete()
+      .in(
+        'link',
+        createdInquiryIds.map((inquiryId) => `/admin/dashboard?tab=CHATS&inquiryId=${inquiryId}`)
+      );
+    await supabase
+      .from('admin_support_unread_alert_batches')
+      .delete()
+      .in('inquiry_id', createdInquiryIds);
     await supabase.from('inquiry_messages').delete().in('inquiry_id', createdInquiryIds);
     await supabase.from('inquiries').delete().in('id', createdInquiryIds);
   }
@@ -298,6 +309,47 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Messaging boundary contracts', () => {
+  test('creates a separate admin support inquiry for every user report', async ({ page }) => {
+    const guestUser = createUser('separate-support-reports');
+    const guestId = await createAuthUser(guestUser);
+    await login(page, guestUser);
+
+    const firstMessage = `첫 오류 신고 ${Date.now()}`;
+    const secondMessage = `두 번째 불편 신고 ${Date.now()}`;
+    const [firstResponse, secondResponse] = await Promise.all([
+      page.request.post('/api/inquiries/thread', {
+        data: { contextType: 'admin_support', message: firstMessage },
+      }),
+      page.request.post('/api/inquiries/thread', {
+        data: { contextType: 'admin_support', message: secondMessage },
+      }),
+    ]);
+
+    expect(firstResponse.status()).toBe(200);
+    expect(secondResponse.status()).toBe(200);
+    const first = await firstResponse.json();
+    const second = await secondResponse.json();
+
+    expect(first).toMatchObject({
+      success: true,
+      inquiryType: 'admin_support',
+      guestId,
+      hostId: null,
+      createdThread: true,
+      createdMessage: true,
+    });
+    expect(second).toMatchObject({
+      success: true,
+      inquiryType: 'admin_support',
+      guestId,
+      hostId: null,
+      createdThread: true,
+      createdMessage: true,
+    });
+    expect(String(first.inquiryId)).not.toBe(String(second.inquiryId));
+    createdInquiryIds.push(first.inquiryId, second.inquiryId);
+  });
+
   test('admin_initiated_support openOnly does not reuse a resolved support thread', async ({ page }) => {
     const adminUser = createUser('admin');
     const guestUser = createUser('guest');

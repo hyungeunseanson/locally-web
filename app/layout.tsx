@@ -28,6 +28,7 @@ import GlobalAnnouncementModal from '@/app/components/GlobalAnnouncementModal';
 import DesktopFooterAdSlot from '@/app/components/DesktopFooterAdSlot';
 import GoogleAnalyticsGate from '@/app/components/GoogleAnalyticsGate';
 import InstagramIabPrompt from '@/app/components/InstagramIabPrompt';
+import GlobalSupportReportButton from '@/app/components/support/GlobalSupportReportButton';
 
 const inter = localFont({
   src: [
@@ -211,6 +212,7 @@ export default async function RootLayout({
                         />
                         <BottomTabNavigation />
                       </div>
+                      <GlobalSupportReportButton />
                       {vercelAnalyticsEnabled && <Analytics />}
                       <GoogleAnalyticsGate
                         enabled={googleAnalyticsConfig.enabled}

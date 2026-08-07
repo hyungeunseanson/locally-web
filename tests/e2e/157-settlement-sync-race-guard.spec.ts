@@ -438,6 +438,40 @@ test.describe.serial('Settlement sync race guard', () => {
     expect(reviewRequestRows.data || []).toHaveLength(1);
     expect(reviewRequestRows.data?.[0]?.booking_id).toBe(experienceRaceBookingId);
 
+    const catchUpRepeat = await triggerCompletionRunDue({
+      page,
+      request,
+      domain: 'experience',
+    });
+    expect(catchUpRepeat.status).toBe(200);
+    expect(catchUpRepeat.body.success).toBeTruthy();
+
+    const [experienceRowAfterRepeat, reviewRequestsAfterRepeat, latestExperienceRun] = await Promise.all([
+      supabase.from('bookings').select('status').eq('id', experienceRaceBookingId).maybeSingle(),
+      supabase
+        .from('notifications')
+        .select('id, booking_id')
+        .eq('user_id', customerId)
+        .eq('type', 'review_request')
+        .eq('booking_id', experienceRaceBookingId),
+      supabase
+        .from('admin_job_runs')
+        .select('status, finished_at')
+        .eq('job_name', 'experience_completion_sync')
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+
+    if (experienceRowAfterRepeat.error) throw experienceRowAfterRepeat.error;
+    if (reviewRequestsAfterRepeat.error) throw reviewRequestsAfterRepeat.error;
+    if (latestExperienceRun.error) throw latestExperienceRun.error;
+
+    expect(experienceRowAfterRepeat.data?.status).toBe('completed');
+    expect(reviewRequestsAfterRepeat.data || []).toHaveLength(1);
+    expect(latestExperienceRun.data).toMatchObject({ status: 'success' });
+    expect(latestExperienceRun.data?.finished_at).toBeTruthy();
+
     const completionServicePromise = triggerCompletionRunDue({
       page,
       request,

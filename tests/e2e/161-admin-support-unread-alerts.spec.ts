@@ -257,6 +257,7 @@ async function setBatchDueNow(params: {
   inquiryId: number;
   guestId: string;
   mode: 'table' | 'message';
+  staleProcessingClaim?: boolean;
 }) {
   if (params.mode === 'message') {
     const { error } = await getAdminClient()
@@ -278,7 +279,9 @@ async function setBatchDueNow(params: {
     .from('admin_support_unread_alert_batches')
     .update({
       alert_due_at: new Date(Date.now() - 60_000).toISOString(),
-      processing_started_at: null,
+      processing_started_at: params.staleProcessingClaim
+        ? new Date(Date.now() - 20 * 60_000).toISOString()
+        : null,
       updated_at: new Date().toISOString(),
     })
     .eq('inquiry_id', params.inquiryId);
@@ -448,7 +451,7 @@ test.describe.serial('Admin support unread alerts', () => {
     }
   });
 
-  test('sends one admin alert + team email after 1 hour of unread customer support inquiry and resets after admin read', async ({ browser, request }) => {
+  test('catches up overdue and stale-claimed unread batches once, then resets after admin read', async ({ browser, request }) => {
     test.setTimeout(120000);
     test.skip(!CRON_SECRET, 'CRON_SECRET is required to verify the success contract under next start.');
 
@@ -491,7 +494,13 @@ test.describe.serial('Admin support unread alerts', () => {
         inquiryId,
         guestId,
         mode: hasBatchTable ? 'table' : 'message',
+        staleProcessingClaim: hasBatchTable,
       });
+
+      if (hasBatchTable) {
+        const staleClaimedBatch = await readUnreadBatch(inquiryId);
+        expect(staleClaimedBatch?.processing_started_at).toBeTruthy();
+      }
 
       const firstCronResponse = await request.get('/api/cron/admin-support-unread-alerts', {
         headers: { authorization: `Bearer ${CRON_SECRET}` },
