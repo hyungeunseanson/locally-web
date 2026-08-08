@@ -6,11 +6,12 @@ import Script from 'next/script';
 
 import { buildAdSenseScriptUrl } from '@/app/utils/adsense';
 import {
+  hasMatchingCanonicalPathname,
   hasNoIndexDirective,
+  normalizeDesktopFooterAdPathname,
+  requiresCanonicalMatchForDesktopFooterAd,
   shouldShowDesktopFooterAd,
 } from '@/app/utils/desktopFooterAd';
-
-const DESKTOP_MEDIA_QUERY = '(min-width: 768px)';
 
 declare global {
   interface Window {
@@ -31,7 +32,6 @@ export default function DesktopFooterAdSlot({
 }: DesktopFooterAdSlotProps) {
   const pathname = usePathname();
   const adRef = useRef<HTMLModElement | null>(null);
-  const [isDesktop, setIsDesktop] = useState(false);
   const [pageEligibility, setPageEligibility] = useState<{
     pathname: string | null;
     eligible: boolean;
@@ -40,20 +40,18 @@ export default function DesktopFooterAdSlot({
     pageEligibility.pathname === pathname && pageEligibility.eligible;
   const shouldRender =
     enabled &&
-    isDesktop &&
     pageHasEligibleMetadata &&
     shouldShowDesktopFooterAd(pathname);
   const scriptUrl = buildAdSenseScriptUrl(clientId);
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia(DESKTOP_MEDIA_QUERY);
-    const updateViewport = () => setIsDesktop(mediaQuery.matches);
-
-    updateViewport();
-    mediaQuery.addEventListener('change', updateViewport);
-
-    return () => mediaQuery.removeEventListener('change', updateViewport);
-  }, []);
+  const normalizedPathname = normalizeDesktopFooterAdPathname(pathname || '/');
+  const mobileClearance = normalizedPathname.startsWith('/community')
+    ? 200
+    : normalizedPathname === '/services/intro'
+      ? 176
+      : normalizedPathname === '/help'
+        ? 88
+        : 152;
+  const shouldReserveDesktopSupportSpace = normalizedPathname !== '/help';
 
   useEffect(() => {
     const updateEligibility = () => {
@@ -62,10 +60,16 @@ export default function DesktopFooterAdSlot({
           'meta[name="robots"], meta[name="googlebot"]'
         )
       ).map((meta) => meta.content);
+      const canonicalHrefs = Array.from(
+        document.head.querySelectorAll<HTMLLinkElement>('link[rel="canonical"]')
+      ).map((link) => link.href);
+      const requiresCanonicalMatch = requiresCanonicalMatchForDesktopFooterAd(pathname);
 
       setPageEligibility({
         pathname,
-        eligible: !hasNoIndexDirective(robotsMetaContents),
+        eligible:
+          !hasNoIndexDirective(robotsMetaContents) &&
+          (!requiresCanonicalMatch || hasMatchingCanonicalPathname(pathname, canonicalHrefs)),
       });
     };
 
@@ -76,7 +80,7 @@ export default function DesktopFooterAdSlot({
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ['content'],
+      attributeFilter: ['content', 'href'],
     });
 
     return () => observer.disconnect();
@@ -107,19 +111,33 @@ export default function DesktopFooterAdSlot({
       <aside
         aria-label="Advertisement"
         data-testid="desktop-footer-ad"
-        className="hidden min-h-[100px] w-full border-t border-gray-100 bg-white px-6 py-1 md:block"
+        className="min-h-[100px] w-full border-t border-gray-100 bg-white px-3 pt-1 md:px-6"
       >
-        <div className="mx-auto min-h-[90px] w-full max-w-[1280px]">
+        <div
+          className={
+            shouldReserveDesktopSupportSpace
+              ? 'mx-auto min-h-[90px] w-full md:ml-auto md:mr-[196px] md:w-[calc(100%_-_220px)] md:max-w-[1280px]'
+              : 'mx-auto min-h-[90px] w-full max-w-[1280px]'
+          }
+        >
           <ins
             ref={adRef}
             className="adsbygoogle block min-h-[90px] w-full"
             style={{ display: 'block' }}
             data-ad-client={clientId}
             data-ad-slot={slotId}
-            data-ad-format="horizontal"
-            data-full-width-responsive="false"
+            data-ad-format="auto"
+            data-full-width-responsive="true"
           />
         </div>
+        <div
+          aria-hidden="true"
+          className="md:hidden"
+          data-testid="footer-ad-mobile-clearance"
+          style={{
+            height: `calc(${mobileClearance}px + env(safe-area-inset-bottom, 0px))`,
+          }}
+        />
       </aside>
     </>
   );

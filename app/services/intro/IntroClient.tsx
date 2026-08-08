@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import {
@@ -11,6 +12,7 @@ import {
 import SiteHeader from '@/app/components/SiteHeader';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext';
+import { useHydrated } from '@/app/hooks/useHydrated';
 
 // ── 사진 데이터 ───────────────────────────────────────────────
 const PHOTOS = [
@@ -25,6 +27,7 @@ export default function ServiceIntroAirbnbStylePage() {
     const router = useRouter();
     const { showToast } = useToast();
     const { t } = useLanguage();
+    const hydrated = useHydrated();
 
     const [isSaved, setIsSaved] = useState(false);
     const [isCopySuccess, setIsCopySuccess] = useState(false);
@@ -417,7 +420,7 @@ export default function ServiceIntroAirbnbStylePage() {
             </main>
 
             {/* ────── 모바일 하단 스티키 예약 폼 바 ────── */}
-            <div
+            {hydrated && createPortal(<div
                 data-testid="service-intro-mobile-cta"
                 className="md:hidden fixed bottom-0 left-0 right-0 z-[120] bg-white/95 border-t border-slate-200 px-4 py-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur-md"
                 style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom, 0px))' }}
@@ -438,7 +441,7 @@ export default function ServiceIntroAirbnbStylePage() {
                         {t('si_mobile_btn_reserve')}
                     </button>
                 </div>
-            </div>
+            </div>, document.body)}
 
             {/* 사진 모달 갤러리 */}
             {isGalleryOpen && (

@@ -2,8 +2,10 @@
 
 import Link from 'next/link';
 import { Edit3 } from 'lucide-react';
+import { createPortal } from 'react-dom';
 
 import { useAuth } from '@/app/context/AuthContext';
+import { useHydrated } from '@/app/hooks/useHydrated';
 import type { CommunityBoard } from '@/app/types/community';
 
 type CommunityWriteCtaVariant = 'desktop' | 'mobile' | 'empty';
@@ -15,6 +17,7 @@ interface CommunityWriteCtaProps {
 
 export default function CommunityWriteCta({ board, variant }: CommunityWriteCtaProps) {
   const { user, isLoading } = useAuth();
+  const hydrated = useHydrated();
 
   if (isLoading || !user) {
     return null;
@@ -23,7 +26,9 @@ export default function CommunityWriteCta({ board, variant }: CommunityWriteCtaP
   const href = `/community/write?board=${board}`;
 
   if (variant === 'mobile') {
-    return (
+    if (!hydrated) return null;
+
+    return createPortal(
       <Link
         href={href}
         data-testid="community-write-cta-mobile"
@@ -31,7 +36,8 @@ export default function CommunityWriteCta({ board, variant }: CommunityWriteCtaP
         aria-label="글쓰기"
       >
         <Edit3 size={20} strokeWidth={2.5} />
-      </Link>
+      </Link>,
+      document.body
     );
   }
 

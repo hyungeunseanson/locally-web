@@ -6,7 +6,9 @@ const PUBLIC_EXACT_PATHS = new Set([
   '/become-a-host',
   '/community',
   '/help',
+  '/privacy',
   '/search',
+  '/services/intro',
 ]);
 
 const RIGHT_RAIL_EXACT_PATHS = new Set([
@@ -21,8 +23,6 @@ const RIGHT_RAIL_EXACT_PATHS = new Set([
 
 const PUBLIC_PATH_PREFIXES = [
   '/company',
-  '/experiences',
-  '/users',
 ];
 
 const EXCLUDED_PATH_PREFIXES = [
@@ -37,6 +37,8 @@ const EXCLUDED_PATH_PREFIXES = [
   '/payment',
   '/proxy-bookings',
 ];
+
+const DYNAMIC_PUBLIC_DETAIL_PATTERN = /^\/(community|experiences|users)\/[^/]+$/;
 
 function matchesPathPrefix(pathname: string, prefix: string): boolean {
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
@@ -63,11 +65,41 @@ export function shouldShowDesktopFooterAd(pathname: string | null | undefined): 
     return false;
   }
 
+  if (normalizedPathname === '/community/write') return false;
   if (/^\/experiences\/[^/]+\/payment(?:\/|$)/.test(normalizedPathname)) return false;
 
   if (PUBLIC_EXACT_PATHS.has(normalizedPathname)) return true;
 
+  if (DYNAMIC_PUBLIC_DETAIL_PATTERN.test(normalizedPathname)) return true;
+
   return PUBLIC_PATH_PREFIXES.some((prefix) => matchesPathPrefix(normalizedPathname, prefix));
+}
+
+export function requiresCanonicalMatchForDesktopFooterAd(
+  pathname: string | null | undefined
+): boolean {
+  if (!pathname) return false;
+  return DYNAMIC_PUBLIC_DETAIL_PATTERN.test(normalizeDesktopFooterAdPathname(pathname));
+}
+
+export function hasMatchingCanonicalPathname(
+  pathname: string | null | undefined,
+  canonicalHrefs: Array<string | null | undefined>
+): boolean {
+  if (!pathname) return false;
+
+  const expectedPathname = normalizeDesktopFooterAdPathname(pathname);
+
+  return canonicalHrefs.some((href) => {
+    if (!href) return false;
+
+    try {
+      const canonicalUrl = new URL(href, 'https://locally.invalid');
+      return normalizeDesktopFooterAdPathname(canonicalUrl.pathname) === expectedPathname;
+    } catch {
+      return false;
+    }
+  });
 }
 
 export function shouldShowDesktopRightRailAd(pathname: string | null | undefined): boolean {

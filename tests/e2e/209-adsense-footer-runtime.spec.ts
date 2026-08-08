@@ -9,7 +9,7 @@ const RIGHT_RAIL_RUNTIME_CONFIGURED =
   ADSENSE_RUNTIME_CONFIGURED
   && /^\d+$/.test(process.env.NEXT_PUBLIC_ADSENSE_DESKTOP_RIGHT_RAIL_SLOT || '');
 
-test.describe('AdSense desktop footer runtime', () => {
+test.describe('AdSense responsive footer runtime', () => {
   test.skip(!ADSENSE_RUNTIME_CONFIGURED, 'Run with an enabled test AdSense client and footer slot.');
 
   test.beforeEach(async ({ page }) => {
@@ -49,13 +49,30 @@ test.describe('AdSense desktop footer runtime', () => {
     });
   });
 
-  test('does not render the script or slot on mobile', async ({ page }) => {
+  test('renders the same responsive footer slot on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/about');
 
-    await expect(page.getByTestId('desktop-footer-ad')).toHaveCount(0);
-    await expect(page.locator('script#locally-google-adsense')).toHaveCount(0);
-    await expect(page.locator('ins.adsbygoogle')).toHaveCount(0);
+    await expect(page.getByTestId('desktop-footer-ad')).toHaveCount(1);
+    await expect(page.locator('script#locally-google-adsense')).toHaveCount(1);
+    await expect(page.locator('ins.adsbygoogle')).toHaveCount(1);
+    await expect(page.locator('footer')).toBeHidden();
+    await expect(page.getByTestId('footer-ad-mobile-clearance')).toBeVisible();
+  });
+
+  test('keeps one responsive footer slot across the supported width matrix', async ({ page }) => {
+    for (const width of [390, 430, 768, 1024, 1280, 1366, 1439, 1440, 1920]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto('/about');
+
+      await expect(page.getByTestId('desktop-footer-ad'), `${width}px`).toHaveCount(1);
+      await expect(page.locator('ins.adsbygoogle'), `${width}px`).toHaveCount(1);
+
+      const hasHorizontalOverflow = await page.evaluate(
+        () => document.documentElement.scrollWidth > window.innerWidth
+      );
+      expect(hasHorizontalOverflow, `${width}px`).toBeFalsy();
+    }
   });
 
   test('does not render ads on excluded product routes', async ({ page }) => {
@@ -82,7 +99,14 @@ test.describe('AdSense desktop footer runtime', () => {
   test('adds the footer to public content without a right rail below 1440px', async ({ page }) => {
     await page.setViewportSize({ width: 1439, height: 1000 });
 
-    for (const pathname of ['/help', '/become-a-host', '/search', '/community']) {
+    for (const pathname of [
+      '/help',
+      '/become-a-host',
+      '/search',
+      '/community',
+      '/privacy',
+      '/services/intro',
+    ]) {
       await page.goto(pathname);
       await expect(page.getByTestId('desktop-footer-ad'), pathname).toHaveCount(1);
       await expect(page.getByTestId('desktop-right-rail-ad'), pathname).toHaveCount(0);
@@ -90,6 +114,104 @@ test.describe('AdSense desktop footer runtime', () => {
       await expect(page.locator('ins.adsbygoogle'), pathname).toHaveCount(1);
       await expect(page.locator('footer'), pathname).toHaveCount(1);
     }
+  });
+
+  test('keeps the mobile ad creative clear of fixed navigation and actions', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const hydrationErrors: string[] = [];
+    page.on('pageerror', (error) => {
+      if (error.message.includes('Hydration failed')) hydrationErrors.push(error.message);
+    });
+
+    for (const { pathname, fixedTestIds } of [
+      {
+        pathname: '/about',
+        fixedTestIds: ['mobile-bottom-tab', 'global-support-report-trigger'],
+      },
+      {
+        pathname: '/community',
+        fixedTestIds: ['mobile-bottom-tab', 'global-support-report-trigger'],
+      },
+      {
+        pathname: '/services/intro',
+        fixedTestIds: ['service-intro-mobile-cta', 'global-support-report-trigger'],
+      },
+      {
+        pathname: '/help',
+        fixedTestIds: ['mobile-bottom-tab'],
+      },
+    ] as const) {
+      await page.goto(pathname);
+      const creative = page.locator('[data-testid="desktop-footer-ad"] ins.adsbygoogle');
+      await expect(creative, pathname).toHaveCount(1);
+      await page.evaluate(() => {
+        document.documentElement.style.scrollBehavior = 'auto';
+        window.scrollTo(0, document.documentElement.scrollHeight);
+      });
+      await expect.poll(
+        () => page.evaluate(
+          () => Math.ceil(window.scrollY + window.innerHeight) >= document.documentElement.scrollHeight
+        ),
+        { message: `${pathname} reaches the document bottom` }
+      ).toBeTruthy();
+
+      for (const testId of fixedTestIds) {
+        const fixedElement = page.getByTestId(testId);
+        await expect(fixedElement, `${pathname} ${testId}`).toBeVisible();
+
+        const measurement = await page.evaluate(([adTestId, controlTestId]) => {
+          const ad = document.querySelector<HTMLElement>(
+            `[data-testid="${adTestId}"] ins.adsbygoogle`
+          );
+          const control = document.querySelector<HTMLElement>(`[data-testid="${controlTestId}"]`);
+          if (!ad || !control) return null;
+          const adRect = ad.getBoundingClientRect();
+          const controlRect = control.getBoundingClientRect();
+          const clearance = document.querySelector<HTMLElement>(
+            '[data-testid="footer-ad-mobile-clearance"]'
+          );
+          return {
+            gap: controlRect.top - adRect.bottom,
+            adBottom: adRect.bottom,
+            controlTop: controlRect.top,
+            clearanceHeight: clearance?.getBoundingClientRect().height ?? null,
+            scrollY: window.scrollY,
+            scrollHeight: document.documentElement.scrollHeight,
+            viewportHeight: window.innerHeight,
+          };
+        }, ['desktop-footer-ad', testId]);
+
+        expect(measurement, `${pathname} ${testId}`).not.toBeNull();
+        expect(measurement?.gap, `${pathname} ${testId}: ${JSON.stringify(measurement)}`)
+          .toBeGreaterThanOrEqual(12);
+      }
+    }
+
+    expect(hydrationErrors).toEqual([]);
+  });
+
+  test('keeps the desktop support report button clear of the footer creative', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto('/about');
+
+    const creative = page.locator('[data-testid="desktop-footer-ad"] ins.adsbygoogle');
+    const supportButton = page.getByTestId('global-support-report-trigger');
+    await creative.scrollIntoViewIfNeeded();
+    await expect(supportButton).toBeVisible();
+
+    const horizontalGap = await page.evaluate(() => {
+      const ad = document.querySelector<HTMLElement>(
+        '[data-testid="desktop-footer-ad"] ins.adsbygoogle'
+      );
+      const support = document.querySelector<HTMLElement>(
+        '[data-testid="global-support-report-trigger"]'
+      );
+      if (!ad || !support) return null;
+      return support.getBoundingClientRect().left - ad.getBoundingClientRect().right;
+    });
+
+    expect(horizontalGap).not.toBeNull();
+    expect(horizontalGap as number).toBeGreaterThanOrEqual(12);
   });
 
   test('does not reserve a right rail column when its slot is not configured', async ({ page }) => {

@@ -7,7 +7,6 @@ import { MapPin, CalendarCheck } from 'lucide-react';
 import LinkedExperienceChip from '../components/LinkedExperienceChip';
 import PostImages from '../components/PostImages';
 import CommunityCommentsPanel from '../components/CommunityCommentsPanel';
-import CommunityAdSlot from '../components/CommunityAdSlot';
 import BackButton from '../components/BackButton';
 import ShareButton from '../components/ShareButton';
 import SiteHeader from '@/app/components/SiteHeader';
@@ -325,16 +324,6 @@ export default async function CommunityPostDetail({
                                 </div>
                             </div>
 
-                            {(isBoardPost || isLocallyContent) && (
-                                <div className="mx-5 mb-6">
-                                    <CommunityAdSlot
-                                        testId="community-detail-bottom-ad"
-                                        variant="bottom"
-                                        placement="community-detail-bottom"
-                                        title="로컬리 커뮤니티 광고"
-                                    />
-                                </div>
-                            )}
                         </main>
                     </div>
 

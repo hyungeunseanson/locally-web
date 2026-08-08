@@ -14,8 +14,10 @@ import {
   resolveDesktopRightRailAdSlotConfig,
 } from '@/app/utils/adsense';
 import {
+  hasMatchingCanonicalPathname,
   hasNoIndexDirective,
   normalizeDesktopFooterAdPathname,
+  requiresCanonicalMatchForDesktopFooterAd,
   shouldShowDesktopFooterAd,
   shouldShowDesktopRightRailAd,
 } from '@/app/utils/desktopFooterAd';
@@ -151,12 +153,17 @@ test.describe('AdSense preparation contracts', () => {
       '/en',
       '/about',
       '/community',
+      '/community/post-id',
+      '/ko/community/post-id/',
       '/zh/community/',
       '/experiences/experience-id',
       '/company/notices',
       '/help',
+      '/privacy',
       '/search',
       '/ja/search/',
+      '/services/intro',
+      '/en/services/intro/',
       '/become-a-host',
       '/users/user-id',
     ];
@@ -170,19 +177,20 @@ test.describe('AdSense preparation contracts', () => {
       '/payment/success',
       '/proxy-bookings/new',
       '/site-map',
-      '/zh/community/post-id',
       '/community/write',
       '/ko/community/write',
       '/experiences/experience-id/payment',
       '/experiences/experience-id/payment/complete',
       '/services',
-      '/services/intro',
+      '/services/intro/extra',
       '/services/request-id',
       '/services/my',
       '/services/request',
       '/services/request-id/apply',
       '/services/request-id/payment',
       '/unknown',
+      '/experiences/experience-id/unknown',
+      '/users/user-id/unknown',
     ];
 
     for (const pathname of publicPaths) {
@@ -237,6 +245,35 @@ test.describe('AdSense preparation contracts', () => {
     expect(hasNoIndexDirective([null, 'max-image-preview:large', 'noindex'])).toBeTruthy();
   });
 
+  test('requires a current canonical pathname on dynamic public detail routes', () => {
+    for (const pathname of [
+      '/community/post-id',
+      '/experiences/experience-id',
+      '/users/user-id',
+      '/ja/community/post-id/',
+    ]) {
+      expect(requiresCanonicalMatchForDesktopFooterAd(pathname), pathname).toBeTruthy();
+    }
+
+    for (const pathname of ['/', '/community', '/services/intro', '/company/notices']) {
+      expect(requiresCanonicalMatchForDesktopFooterAd(pathname), pathname).toBeFalsy();
+    }
+
+    expect(hasMatchingCanonicalPathname(
+      '/community/current-post',
+      ['https://www.locally-travel.com/community/current-post'],
+    )).toBeTruthy();
+    expect(hasMatchingCanonicalPathname(
+      '/community/current-post',
+      ['https://www.locally-travel.com/community/previous-post'],
+    )).toBeFalsy();
+    expect(hasMatchingCanonicalPathname(
+      '/ja/experiences/current-id/',
+      ['https://www.locally-travel.com/experiences/current-id?lang=ja'],
+    )).toBeTruthy();
+    expect(hasMatchingCanonicalPathname('/users/current-id', ['not a valid canonical'])).toBeFalsy();
+  });
+
   test('places one server-configured desktop ad directly after the global footer', () => {
     const layoutSource = fs.readFileSync(path.join(process.cwd(), 'app/layout.tsx'), 'utf8');
     const desktopAdSource = fs.readFileSync(
@@ -258,6 +295,10 @@ test.describe('AdSense preparation contracts', () => {
     expect(layoutSource).not.toContain('id="locally-google-adsense"');
     expect(desktopAdSource).toContain('id="locally-google-adsense"');
     expect(desktopAdSource).toContain('buildAdSenseScriptUrl(clientId)');
+    expect(desktopAdSource).not.toContain("const DESKTOP_MEDIA_QUERY = '(min-width: 768px)'");
+    expect(desktopAdSource).toContain('data-ad-format="auto"');
+    expect(desktopAdSource).toContain('data-full-width-responsive="true"');
+    expect(desktopAdSource).toContain('data-testid="footer-ad-mobile-clearance"');
   });
 
   test('keeps the right rail static, fixed-size, 1440px-only, and script-free', () => {
@@ -300,6 +341,10 @@ test.describe('AdSense preparation contracts', () => {
       path.join(process.cwd(), 'app/community/page.tsx'),
       'utf8',
     );
+    const communityDetailSource = fs.readFileSync(
+      path.join(process.cwd(), 'app/community/[id]/page.tsx'),
+      'utf8',
+    );
 
     expect(communityAdSource).toContain(
       'if (!shouldRenderLiveAd || !clientId || !slotId || !scriptUrl) return null;',
@@ -307,6 +352,8 @@ test.describe('AdSense preparation contracts', () => {
     expect(communityAdSource).not.toContain('Sponsored');
     expect(communityPageSource).not.toContain('<CommunityAdSlot');
     expect(communityPageSource).not.toContain("from './components/CommunityAdSlot'");
+    expect(communityDetailSource).not.toContain('<CommunityAdSlot');
+    expect(communityDetailSource).not.toContain("from '../components/CommunityAdSlot'");
   });
 
   test('uses only the global footer on search', () => {
@@ -336,8 +383,15 @@ test.describe('AdSense preparation contracts', () => {
     expect(body).toContain('https://policies.google.com/privacy');
   });
 
-  test('keeps ads.txt hidden by default when no AdSense client id is configured', async ({ request }) => {
+  test('matches ads.txt visibility to the current AdSense client configuration', async ({ request }) => {
     const response = await request.get('/ads.txt');
+    const expectedEntry = buildAdsTxtEntry(process.env);
+
+    if (expectedEntry) {
+      expect(response.status()).toBe(200);
+      await expect(response.text()).resolves.toContain(expectedEntry);
+      return;
+    }
 
     expect(response.status()).toBe(404);
     await expect(response.text()).resolves.toContain('Not Found');

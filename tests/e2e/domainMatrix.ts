@@ -738,6 +738,7 @@ export const DOMAIN_MATRIX: DomainMatrixEntry[] = [
       'tests/e2e/30-robots-policy.spec.ts',
       'tests/e2e/67-analytics-ingest-routes.spec.ts',
       'tests/e2e/170-adsense-contract.spec.ts',
+      'tests/e2e/209-adsense-footer-runtime.spec.ts',
       'tests/e2e/188-vercel-analytics-runtime-contract.spec.ts',
       'tests/e2e/213-google-analytics-contract.spec.ts',
     ],
@@ -745,6 +746,7 @@ export const DOMAIN_MATRIX: DomainMatrixEntry[] = [
       ...COMMON_PUBLIC_MANUAL_CHECKS,
       'Canonical, hreflang, and metadata do not visibly contradict the current locale or domain.',
       'Public ad or analytics surfaces do not intrude on basic page usability.',
+      'Responsive footer ads remain clear of mobile navigation, support, writing, booking, and service request controls.',
     ],
     blockerCriteria: [
       'Metadata, analytics, or public domain behavior is materially wrong.',

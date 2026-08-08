@@ -1,7 +1,7 @@
 # AdSense Cutover Checklist
 
 ## Summary
-- 현재 프로젝트는 공개 페이지의 `데스크탑 전역 하단` 광고 슬롯을 AdSense에 연결할 수 있게 준비된 상태입니다.
+- 현재 프로젝트는 공개 페이지의 `데스크탑·모바일 반응형 전역 하단` 광고 슬롯을 AdSense에 연결할 수 있게 준비된 상태입니다.
 - 기본값은 안전하게 비활성입니다.
   - `NEXT_PUBLIC_ADSENSE_ENABLED`가 없거나 `true`가 아니면 광고 스크립트가 로드되지 않습니다.
   - footer slot env가 비어 있으면 광고와 빈 공간이 모두 나타나지 않습니다.
@@ -21,12 +21,10 @@
 ## Source Of Truth
 - 조건부 AdSense 로드 경계: [DesktopFooterAdSlot.tsx](/Users/hyungeunseanson/Documents/서비스/locally-web/app/components/DesktopFooterAdSlot.tsx)
 - env / slot 해석 helper: [app/utils/adsense.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/utils/adsense.ts:1)
-- 데스크탑 전역 하단 슬롯: [app/components/DesktopFooterAdSlot.tsx](/Users/hyungeunseanson/Documents/서비스/locally-web/app/components/DesktopFooterAdSlot.tsx:1)
+- 반응형 전역 하단 슬롯: [app/components/DesktopFooterAdSlot.tsx](/Users/hyungeunseanson/Documents/서비스/locally-web/app/components/DesktopFooterAdSlot.tsx:1)
 - 공개 경로 판정: [app/utils/desktopFooterAd.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/utils/desktopFooterAd.ts:1)
 - `ads.txt` 공개 경로: [app/ads.txt/route.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/ads.txt/route.ts:1)
-- 목록/상세 광고 슬롯 owner: [app/community/components/CommunityAdSlot.tsx](/Users/hyungeunseanson/Documents/서비스/locally-web/app/community/components/CommunityAdSlot.tsx:1)
-- 목록 광고 배치: [app/community/page.tsx](/Users/hyungeunseanson/Documents/서비스/locally-web/app/community/page.tsx:396)
-- 상세 광고 배치: [app/community/[id]/page.tsx](/Users/hyungeunseanson/Documents/서비스/locally-web/app/community/%5Bid%5D/page.tsx:392)
+- 롤백용 legacy 커뮤니티 슬롯 owner: [app/community/components/CommunityAdSlot.tsx](/Users/hyungeunseanson/Documents/서비스/locally-web/app/community/components/CommunityAdSlot.tsx:1)
 - 현재 site URL single source: [app/utils/siteUrl.ts](/Users/hyungeunseanson/Documents/서비스/locally-web/app/utils/siteUrl.ts:1)
 
 ## Env Contract
@@ -42,8 +40,9 @@
   - `NEXT_PUBLIC_ADSENSE_COMMUNITY_DETAIL_SIDEBAR_SLOT`
   - `NEXT_PUBLIC_ADSENSE_COMMUNITY_DETAIL_BOTTOM_SLOT`
 - 현재 제품 의미
-  - 콘텐츠가 충분한 공개 페이지 데스크탑: 공통 푸터 아래 가로형 1개
-  - 검색, 사이트맵, 커뮤니티, 모바일, 관리자, 회원 전용, 작성, 예약·결제, `noindex` 화면: 0개
+  - 콘텐츠가 충분한 공개 페이지 데스크탑·모바일: 공통 푸터 아래 반응형 1개
+  - 공개 커뮤니티 목록·indexable 상세와 `/services/intro`도 공통 슬롯 사용
+  - 사이트맵, 관리자, 회원 전용, 작성, 예약·결제, `noindex` 화면: 0개
   - 광고가 없는 커뮤니티 화면에는 placeholder나 빈 광고 공간도 표시하지 않음
   - 공개 개인정보처리방침: `https://www.locally-travel.com/privacy`
 
@@ -66,8 +65,8 @@
 6. `ads.txt`를 먼저 확인합니다.
    `https://www.locally-travel.com/ads.txt`가 `google.com, pub-..., DIRECT, f08c47fec0942fa0` 한 줄로 열려야 합니다.
 7. 페이지 소스와 슬롯 초기화를 확인합니다.
-   홈, 회사 페이지, 공개 체험 상세에서 AdSense 스크립트와 `<ins class="adsbygoogle">`가 정확히 1개 들어가는지 확인합니다.
-   검색, 사이트맵, 커뮤니티, 모바일, 로그인·결제·`noindex` 화면에는 광고 DOM이 없어야 합니다.
+   홈, 회사 페이지, 공개 체험·커뮤니티 상세, 서비스 소개에서 AdSense 스크립트와 전역 `<ins class="adsbygoogle">`가 정확히 1개 들어가는지 확인합니다.
+   사이트맵, 로그인·결제·작성·회원 전용·`noindex` 화면에는 광고 DOM이 없어야 합니다.
    직접 접속 기준으로 광고 제외 화면에는 AdSense script도 없어야 합니다.
 8. 실제 노출 smoke를 합니다.
    광고가 즉시 안 보이더라도, DOM 주입과 콘솔 오류 유무를 먼저 봅니다.
@@ -94,8 +93,8 @@
   - `GET /ads.txt`가 200이어야 합니다.
   - `robots.txt`, `sitemap.xml`, canonical이 모두 `www.locally-travel.com` 기준으로 보이는지 확인합니다.
 - 화면 확인
-  - 콘텐츠가 충분한 공개 페이지 데스크탑: 공통 푸터 아래 1개
-  - 검색, 사이트맵, 커뮤니티, 모바일, 관리자, 회원 전용, 작성, 예약·결제, `noindex` 화면: 0개
+  - 콘텐츠가 충분한 공개 페이지 데스크탑·모바일: 공통 푸터 아래 1개
+  - 사이트맵, 관리자, 회원 전용, 작성, 예약·결제, `noindex` 화면: 0개
 - DOM/콘솔 확인
   - `view-source:` 또는 devtools에서 `pagead2.googlesyndication.com/pagead/js/adsbygoogle.js` 스크립트가 로드되는지
   - 각 광고 슬롯 내부에 `<ins class="adsbygoogle">`가 있는지
@@ -112,7 +111,7 @@
 ## Defaults Locked
 - 이번 cutover는 `자동 광고`가 아니라 `수동 슬롯`만 기준입니다.
 - AdSense 계정의 Auto ads와 자동 최적화는 OFF로 유지합니다.
-- 광고 surface는 콘텐츠가 충분한 공개 페이지의 데스크탑 공통 푸터 아래로 한정합니다.
+- 광고 surface는 콘텐츠가 충분한 공개 페이지의 데스크탑·모바일 공통 푸터 아래로 한정합니다.
 - 사용하지 않는 커뮤니티 광고 슬롯은 활성화하지 않습니다.
 - 커뮤니티 데이터, 댓글/좋아요/조회수, SEO 메타 구조는 이번 cutover에서 건드리지 않습니다.
 

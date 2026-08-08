@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useLanguage } from '@/app/context/LanguageContext';
+import { useHydrated } from '@/app/hooks/useHydrated';
 
 type StickyActionSheetProps = {
     experience: {
@@ -12,6 +14,7 @@ type StickyActionSheetProps = {
 export default function StickyActionSheet({ experience }: StickyActionSheetProps) {
     const [isVisible, setIsVisible] = useState(true);
     const { t } = useLanguage();
+    const hydrated = useHydrated();
 
     // IntersectionObserver to hide the sticky bar when the actual ReservationCard is in view.
     useEffect(() => {
@@ -46,10 +49,11 @@ export default function StickyActionSheet({ experience }: StickyActionSheetProps
         }
     };
 
-    if (!isVisible) return null;
+    if (!isVisible || !hydrated) return null;
 
-    return (
+    return createPortal(
         <div
+            data-testid="experience-mobile-sticky-action"
             className="md:hidden fixed left-0 right-0 z-[105] px-4"
             style={{
                 bottom: 'calc(max(env(safe-area-inset-bottom, 0px), 0px) + 76px)'
@@ -73,6 +77,7 @@ export default function StickyActionSheet({ experience }: StickyActionSheetProps
                     {t('exp_reservation_show_dates')}
                 </button>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }
