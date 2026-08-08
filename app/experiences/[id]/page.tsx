@@ -4,6 +4,7 @@ import { createAdminClient } from '@/app/utils/supabase/admin';
 import ExperienceClient from './ExperienceClient';
 import JsonLd from '@/app/components/seo/JsonLd';
 import { notFound } from 'next/navigation';
+import { ADSENSE_PUBLIC_PATH_META_NAME } from '@/app/utils/desktopFooterAd';
 import { getCurrentLocale } from '@/app/utils/locale';
 import { buildAbsoluteUrl, buildLocalizedAbsoluteUrl } from '@/app/utils/siteUrl';
 import { getContent } from '@/app/utils/contentHelper';
@@ -303,7 +304,12 @@ export async function generateMetadata(
     };
   }
 
-  return metadata;
+  return {
+    ...metadata,
+    other: {
+      [ADSENSE_PUBLIC_PATH_META_NAME]: `/experiences/${id}`,
+    },
+  };
 }
 
 // 🟢 메인 페이지 컴포넌트 (Server Side Rendering)

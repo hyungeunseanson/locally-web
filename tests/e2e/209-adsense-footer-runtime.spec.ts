@@ -96,6 +96,87 @@ test.describe('AdSense responsive footer runtime', () => {
     }
   });
 
+  test('tracks streamed dynamic metadata in the body without trusting stale or noindex tags', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto('/about');
+    await expect(page.getByTestId('desktop-footer-ad')).toHaveCount(1);
+
+    const replaceMetadata = async ({
+      pathname,
+      canonicalPathname,
+      publicPathname,
+      noindex = false,
+      target = 'body',
+    }: {
+      pathname: string;
+      canonicalPathname: string;
+      publicPathname: string;
+      noindex?: boolean;
+      target?: 'head' | 'body';
+    }) => {
+      await page.evaluate((metadata) => {
+        window.history.pushState({}, '', metadata.pathname);
+        document.querySelectorAll(
+          'link[rel="canonical"], meta[name="robots"], meta[name="googlebot"], meta[name="locally-adsense-public-path"]'
+        ).forEach((element) => element.remove());
+
+        const root = metadata.target === 'head' ? document.head : document.body;
+        const canonical = document.createElement('link');
+        canonical.rel = 'canonical';
+        canonical.href = `${window.location.origin}${metadata.canonicalPathname}`;
+        root.appendChild(canonical);
+
+        const publicPath = document.createElement('meta');
+        publicPath.name = 'locally-adsense-public-path';
+        publicPath.content = metadata.publicPathname;
+        root.appendChild(publicPath);
+
+        if (metadata.noindex) {
+          const robots = document.createElement('meta');
+          robots.name = 'robots';
+          robots.content = 'noindex, nofollow';
+          root.appendChild(robots);
+        }
+      }, {
+        pathname,
+        canonicalPathname,
+        publicPathname,
+        noindex,
+        target,
+      });
+    };
+
+    await replaceMetadata({
+      pathname: '/experiences/body-public',
+      canonicalPathname: '/experiences/body-public',
+      publicPathname: '/experiences/body-public',
+    });
+    await expect(page.getByTestId('desktop-footer-ad')).toHaveCount(1);
+
+    await replaceMetadata({
+      pathname: '/experiences/body-private',
+      canonicalPathname: '/experiences/body-private',
+      publicPathname: '/experiences/body-private',
+      noindex: true,
+    });
+    await expect(page.getByTestId('desktop-footer-ad')).toHaveCount(0);
+
+    await replaceMetadata({
+      pathname: '/users/stale-public-path',
+      canonicalPathname: '/users/stale-public-path',
+      publicPathname: '/users/previous-path',
+    });
+    await expect(page.getByTestId('desktop-footer-ad')).toHaveCount(0);
+
+    await replaceMetadata({
+      pathname: '/community/head-public',
+      canonicalPathname: '/community/head-public',
+      publicPathname: '/community/head-public',
+      target: 'head',
+    });
+    await expect(page.getByTestId('desktop-footer-ad')).toHaveCount(1);
+  });
+
   test('adds the footer to public content without a right rail below 1440px', async ({ page }) => {
     await page.setViewportSize({ width: 1439, height: 1000 });
 

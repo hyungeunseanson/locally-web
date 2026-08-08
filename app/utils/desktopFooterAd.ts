@@ -40,6 +40,8 @@ const EXCLUDED_PATH_PREFIXES = [
 
 const DYNAMIC_PUBLIC_DETAIL_PATTERN = /^\/(community|experiences|users)\/[^/]+$/;
 
+export const ADSENSE_PUBLIC_PATH_META_NAME = 'locally-adsense-public-path';
+
 function matchesPathPrefix(pathname: string, prefix: string): boolean {
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
 }
@@ -99,6 +101,20 @@ export function hasMatchingCanonicalPathname(
     } catch {
       return false;
     }
+  });
+}
+
+export function hasMatchingPublicAdPathname(
+  pathname: string | null | undefined,
+  publicPathValues: Array<string | null | undefined>
+): boolean {
+  if (!pathname) return false;
+
+  const expectedPathname = normalizeDesktopFooterAdPathname(pathname);
+
+  return publicPathValues.some((value) => {
+    if (!value) return false;
+    return normalizeDesktopFooterAdPathname(value) === expectedPathname;
   });
 }
 

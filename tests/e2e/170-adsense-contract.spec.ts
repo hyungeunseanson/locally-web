@@ -14,7 +14,9 @@ import {
   resolveDesktopRightRailAdSlotConfig,
 } from '@/app/utils/adsense';
 import {
+  ADSENSE_PUBLIC_PATH_META_NAME,
   hasMatchingCanonicalPathname,
+  hasMatchingPublicAdPathname,
   hasNoIndexDirective,
   normalizeDesktopFooterAdPathname,
   requiresCanonicalMatchForDesktopFooterAd,
@@ -272,6 +274,20 @@ test.describe('AdSense preparation contracts', () => {
       ['https://www.locally-travel.com/experiences/current-id?lang=ja'],
     )).toBeTruthy();
     expect(hasMatchingCanonicalPathname('/users/current-id', ['not a valid canonical'])).toBeFalsy();
+
+    expect(ADSENSE_PUBLIC_PATH_META_NAME).toBe('locally-adsense-public-path');
+    expect(hasMatchingPublicAdPathname(
+      '/experiences/current-id',
+      ['/experiences/current-id'],
+    )).toBeTruthy();
+    expect(hasMatchingPublicAdPathname(
+      '/experiences/current-id',
+      ['/experiences/previous-id'],
+    )).toBeFalsy();
+    expect(hasMatchingPublicAdPathname(
+      '/ja/users/current-id/',
+      ['/users/current-id'],
+    )).toBeTruthy();
   });
 
   test('places one server-configured desktop ad directly after the global footer', () => {

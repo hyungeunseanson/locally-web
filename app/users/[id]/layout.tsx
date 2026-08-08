@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { PRIVATE_NOINDEX_METADATA } from '@/app/utils/seo';
+import { ADSENSE_PUBLIC_PATH_META_NAME } from '@/app/utils/desktopFooterAd';
 import {
   isPublicHostApplicationStatus,
   pickLatestPublicHostApplication,
@@ -83,6 +84,9 @@ export async function generateMetadata(
         ja: buildLocalizedAbsoluteUrl('ja', pagePath),
         zh: buildLocalizedAbsoluteUrl('zh', pagePath),
       },
+    },
+    other: {
+      [ADSENSE_PUBLIC_PATH_META_NAME]: pagePath,
     },
   };
 }

@@ -6,12 +6,39 @@ import Script from 'next/script';
 
 import { buildAdSenseScriptUrl } from '@/app/utils/adsense';
 import {
+  ADSENSE_PUBLIC_PATH_META_NAME,
   hasMatchingCanonicalPathname,
+  hasMatchingPublicAdPathname,
   hasNoIndexDirective,
   normalizeDesktopFooterAdPathname,
   requiresCanonicalMatchForDesktopFooterAd,
   shouldShowDesktopFooterAd,
 } from '@/app/utils/desktopFooterAd';
+
+const AD_ELIGIBILITY_METADATA_SELECTOR = [
+  'link[rel="canonical"]',
+  'meta[name="robots"]',
+  'meta[name="googlebot"]',
+  `meta[name="${ADSENSE_PUBLIC_PATH_META_NAME}"]`,
+].join(',');
+
+function containsAdEligibilityMetadata(node: Node): boolean {
+  if (!(node instanceof Element)) return false;
+  return node.matches(AD_ELIGIBILITY_METADATA_SELECTOR)
+    || Boolean(node.querySelector(AD_ELIGIBILITY_METADATA_SELECTOR));
+}
+
+function mutationTouchesAdEligibilityMetadata(records: MutationRecord[]): boolean {
+  return records.some((record) => {
+    if (record.type === 'attributes') {
+      return record.target instanceof Element
+        && record.target.matches(AD_ELIGIBILITY_METADATA_SELECTOR);
+    }
+
+    return [...record.addedNodes, ...record.removedNodes]
+      .some(containsAdEligibilityMetadata);
+  });
+}
 
 declare global {
   interface Window {
@@ -56,32 +83,44 @@ export default function DesktopFooterAdSlot({
   useEffect(() => {
     const updateEligibility = () => {
       const robotsMetaContents = Array.from(
-        document.head.querySelectorAll<HTMLMetaElement>(
+        document.querySelectorAll<HTMLMetaElement>(
           'meta[name="robots"], meta[name="googlebot"]'
         )
       ).map((meta) => meta.content);
       const canonicalHrefs = Array.from(
-        document.head.querySelectorAll<HTMLLinkElement>('link[rel="canonical"]')
+        document.querySelectorAll<HTMLLinkElement>('link[rel="canonical"]')
       ).map((link) => link.href);
+      const publicAdPathValues = Array.from(
+        document.querySelectorAll<HTMLMetaElement>(
+          `meta[name="${ADSENSE_PUBLIC_PATH_META_NAME}"]`
+        )
+      ).map((meta) => meta.content);
       const requiresCanonicalMatch = requiresCanonicalMatchForDesktopFooterAd(pathname);
+      const eligible =
+        !hasNoIndexDirective(robotsMetaContents) &&
+        (!requiresCanonicalMatch || (
+          hasMatchingCanonicalPathname(pathname, canonicalHrefs)
+          && hasMatchingPublicAdPathname(pathname, publicAdPathValues)
+        ));
 
-      setPageEligibility({
-        pathname,
-        eligible:
-          !hasNoIndexDirective(robotsMetaContents) &&
-          (!requiresCanonicalMatch || hasMatchingCanonicalPathname(pathname, canonicalHrefs)),
-      });
+      setPageEligibility((current) => (
+        current.pathname === pathname && current.eligible === eligible
+          ? current
+          : { pathname, eligible }
+      ));
     };
 
-    updateEligibility();
-
-    const observer = new MutationObserver(updateEligibility);
-    observer.observe(document.head, {
+    const observer = new MutationObserver((records) => {
+      if (mutationTouchesAdEligibilityMetadata(records)) updateEligibility();
+    });
+    observer.observe(document.documentElement, {
       childList: true,
       subtree: true,
       attributes: true,
       attributeFilter: ['content', 'href'],
     });
+
+    updateEligibility();
 
     return () => observer.disconnect();
   }, [pathname]);

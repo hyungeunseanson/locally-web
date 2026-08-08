@@ -13,6 +13,7 @@ import SiteHeader from '@/app/components/SiteHeader';
 import CommunityAuthorTrigger from '../components/CommunityAuthorTrigger';
 import JsonLd from '@/app/components/seo/JsonLd';
 import { buildAbsoluteUrl } from '@/app/utils/siteUrl';
+import { ADSENSE_PUBLIC_PATH_META_NAME } from '@/app/utils/desktopFooterAd';
 import { buildBreadcrumbJsonLd, buildCommunityArticleJsonLd } from '@/app/utils/structuredData';
 import { getCommunityAuthorAvatar, getCommunityAuthorInitial, getCommunityAuthorName } from '../authorDisplay';
 import { getCommunityCategoryMeta, isLocallyContentCategory } from '../categoryMeta';
@@ -79,6 +80,9 @@ export async function generateMetadata({
             index: false,
             follow: false,
         },
+        other: isSearchIndexable ? {
+            [ADSENSE_PUBLIC_PATH_META_NAME]: pagePath,
+        } : undefined,
     };
 }
 
