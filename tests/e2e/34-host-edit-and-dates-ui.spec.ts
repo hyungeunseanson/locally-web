@@ -19,6 +19,7 @@ let adminClient: SupabaseClient | null = null;
 const createdAuthUserIds: string[] = [];
 const createdExperienceIds: number[] = [];
 const createdApplicationIds: number[] = [];
+const createdAdminWhitelistEmails: string[] = [];
 
 function loadEnv(): EnvMap {
   return readFileSync('.env.local', 'utf8')
@@ -81,7 +82,7 @@ async function waitForProfile(userId: string) {
   throw new Error(`Profile was not created for auth user ${userId}.`);
 }
 
-async function createAuthUser(user: TestUser) {
+async function createAuthUser(user: TestUser, options: { isAdmin?: boolean } = {}) {
   const supabase = getAdminClient();
   const { data, error } = await supabase.auth.admin.createUser({
     email: user.email,
@@ -109,6 +110,15 @@ async function createAuthUser(user: TestUser) {
     .eq('id', data.user.id);
 
   if (profileError) throw profileError;
+
+  if (options.isAdmin) {
+    const { error: whitelistError } = await supabase
+      .from('admin_whitelist')
+      .upsert({ email: user.email }, { onConflict: 'email' });
+
+    if (whitelistError) throw whitelistError;
+    createdAdminWhitelistEmails.push(user.email);
+  }
 
   return data.user.id;
 }
@@ -236,6 +246,43 @@ function titleInput(page: Page) {
   ).first();
 }
 
+function descriptionInput(page: Page) {
+  return page.locator(
+    'textarea[placeholder^="상세 소개글을 입력하세요"], textarea[placeholder^="Enter a detailed description"], textarea[placeholder^="詳細紹介文を入力してください"], textarea[placeholder^="请输入详细介绍"]'
+  ).first();
+}
+
+async function prepareLocaleRerenderRace(page: Page, experienceId: number) {
+  await page.evaluate(() => {
+    window.localStorage.setItem('app_lang', 'en');
+    document.cookie = 'app_lang=ko; path=/; samesite=lax';
+  });
+
+  let matchingReadCount = 0;
+  await page.route('**/rest/v1/experiences*', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const isMatchingRead =
+      request.method() === 'GET' &&
+      url.searchParams.get('id') === `eq.${experienceId}`;
+
+    if (!isMatchingRead) {
+      await route.continue();
+      return;
+    }
+
+    matchingReadCount += 1;
+    if (matchingReadCount === 1) {
+      await route.continue();
+      return;
+    }
+
+    const response = await route.fetch();
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await route.fulfill({ response });
+  });
+}
+
 function saveButton(page: Page) {
   return page.getByRole('button', { name: /저장하기|Save|保存する|保存/ }).first();
 }
@@ -302,6 +349,10 @@ test.afterAll(async () => {
     await supabase.from('host_applications').delete().eq('id', applicationId);
   }
 
+  for (const email of createdAdminWhitelistEmails) {
+    await supabase.from('admin_whitelist').delete().eq('email', email);
+  }
+
   for (const userId of createdAuthUserIds) {
     await supabase.from('profiles').delete().eq('id', userId);
     await supabase.from('users').delete().eq('id', userId);
@@ -321,6 +372,7 @@ test.describe.serial('Host dashboard edit and dates UI coverage', () => {
 
     await login(page, hostUser);
     await openExperienceTab(page, experience.id);
+    await prepareLocaleRerenderRace(page, experience.id);
 
     await page.locator(`a[href="/host/experiences/${experience.id}/edit"]:visible`).first().click();
     await page.waitForURL(new RegExp(`/host/experiences/${experience.id}/edit`), { timeout: 15000 });
@@ -334,6 +386,9 @@ test.describe.serial('Host dashboard edit and dates UI coverage', () => {
 
     await titleInput(page).fill(nextTitle);
     await page.getByTestId('host-edit-duration-input').fill('4');
+    await page.waitForTimeout(1800);
+    await expect(titleInput(page)).toHaveValue(nextTitle);
+    await expect(page.getByTestId('host-edit-duration-input')).toHaveValue('4');
 
     const updateResponsePromise = page.waitForResponse(
       (response) =>
@@ -357,6 +412,74 @@ test.describe.serial('Host dashboard edit and dates UI coverage', () => {
 
     expect(data.title).toBe(nextTitle);
     expect(data.duration).toBe(4);
+  });
+
+  test('preserves an admin draft across delayed auth and locale rerenders', async ({ page }) => {
+    test.setTimeout(120000);
+
+    const hostUser = createUser('admin-edit-owner');
+    const hostId = await createAuthUser(hostUser);
+    await createApprovedHostApplication(hostId, hostUser);
+    const experience = await createExperienceFixture(hostId);
+    const adminUser = createUser('admin-editor');
+    await createAuthUser(adminUser, { isAdmin: true });
+    const nextTitle = `${experience.title} Admin Updated`;
+    const nextDescription = `관리자 편집값 원복 방지 검증 설명 ${Date.now()}입니다. 지연된 조회 이후에도 이 내용이 그대로 유지되어야 합니다.`;
+    let patchCount = 0;
+
+    page.on('request', (request) => {
+      if (
+        request.method() === 'PATCH' &&
+        request.url().includes(`/api/host/experiences/${experience.id}`)
+      ) {
+        patchCount += 1;
+      }
+    });
+
+    await login(page, adminUser);
+    await prepareLocaleRerenderRace(page, experience.id);
+    await page.goto(
+      `/host/experiences/${experience.id}/edit?returnTo=${encodeURIComponent(`/admin/dashboard?tab=EXPS&experienceId=${experience.id}`)}`,
+      { waitUntil: 'domcontentloaded' }
+    );
+
+    await expect(titleInput(page)).toHaveValue(experience.title, { timeout: 15000 });
+    await titleInput(page).fill(nextTitle);
+    await page.getByRole('button', { name: /상세 설명|Details|詳細|详情/ }).click();
+    await expect(descriptionInput(page)).toBeVisible({ timeout: 10000 });
+    await descriptionInput(page).fill(nextDescription);
+
+    await page.waitForTimeout(1800);
+    expect(patchCount).toBe(0);
+    await expect(descriptionInput(page)).toHaveValue(nextDescription);
+    await page.getByRole('button', { name: /기본 정보|Basic|基本|基本信息/ }).click();
+    await expect(titleInput(page)).toHaveValue(nextTitle);
+
+    const updateResponsePromise = page.waitForResponse(
+      (response) =>
+        response.url().includes(`/api/host/experiences/${experience.id}`) &&
+        response.request().method() === 'PATCH' &&
+        response.status() === 200,
+      { timeout: 15000 }
+    );
+
+    await saveButton(page).click();
+    await updateResponsePromise;
+    expect(patchCount).toBe(1);
+    await page.waitForTimeout(500);
+    await expect(titleInput(page)).toHaveValue(nextTitle);
+
+    const { data, error } = await getAdminClient()
+      .from('experiences')
+      .select('title,description')
+      .eq('id', experience.id)
+      .single();
+
+    if (error) throw error;
+    expect(data).toMatchObject({
+      title: nextTitle,
+      description: nextDescription,
+    });
   });
 
   test('updates schedule availability from the host dashboard experiences tab', async ({ page }) => {

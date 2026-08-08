@@ -1,7 +1,7 @@
 'use client';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
@@ -102,18 +102,35 @@ export default function EditExperiencePage() {
   const [activeTab, setActiveTab] = useState<'basic' | 'detail' | 'course'>('basic');
   const [activePhotoIndex, setActivePhotoIndex] = useState<number | null>(null);
   const [isAdminEditor, setIsAdminEditor] = useState(false);
+  const [loadedExperienceId, setLoadedExperienceId] = useState<string | null>(null);
   const replacePhotoInputRef = React.useRef<HTMLInputElement>(null);
   const experienceId = String(params.id || '');
   const adminReturnPath = getAdminExperienceReturnPath(searchParams.get('returnTo'), experienceId);
   const dashboardReturnPath = isAdminEditor ? adminReturnPath : '/host/dashboard?tab=experiences';
+  const initializedExperienceIdRef = useRef<string | null>(null);
+  const loadGenerationRef = useRef(0);
+  const loadUiRef = useRef({ t, adminReturnPath });
+  loadUiRef.current = { t, adminReturnPath };
 
   // 데이터 불러오기
   useEffect(() => {
+    if (!experienceId || initializedExperienceIdRef.current === experienceId) {
+      return;
+    }
+
+    const generation = ++loadGenerationRef.current;
+    let cancelled = false;
+    const isCurrentRequest = () => !cancelled && loadGenerationRef.current === generation;
+
     const fetchExp = async () => {
+      setLoading(true);
+
       try {
         const { data: { user } } = await supabase.auth.getUser();
+        if (!isCurrentRequest()) return;
+
         if (!user) {
-          showToast(t('msg_load_fail'), 'error');
+          showToast(loadUiRef.current.t('msg_load_fail'), 'error');
           router.push('/login');
           return;
         }
@@ -123,19 +140,22 @@ export default function EditExperiencePage() {
           userId: user.id,
           email: user.email,
         });
+        if (!isCurrentRequest()) return;
+
         setIsAdminEditor(isAdmin);
 
-        let query = supabase.from('experiences').select(HOST_EXPERIENCE_EDIT_SELECT).eq('id', params.id);
+        let query = supabase.from('experiences').select(HOST_EXPERIENCE_EDIT_SELECT).eq('id', experienceId);
         if (!isAdmin) {
           query = query.eq('host_id', user.id);
         }
 
         const { data, error } = await query.maybeSingle();
+        if (!isCurrentRequest()) return;
 
         if (error || !data) {
-          showToast(t('msg_load_fail'), 'error');
+          showToast(loadUiRef.current.t('msg_load_fail'), 'error');
           router.push(isAdmin
-            ? getAdminExperienceReturnPath(searchParams.get('returnTo'), String(params.id || ''))
+            ? loadUiRef.current.adminReturnPath
             : '/host/dashboard?tab=experiences');
           return;
         }
@@ -150,6 +170,7 @@ export default function EditExperiencePage() {
           : (manualLocales[0] || 'ko');
         const manualContent = buildManualContentFromExperience(data, manualLocales, sourceLocale);
 
+        initializedExperienceIdRef.current = experienceId;
         setFormData({
           ...data,
           // ✅ 기존 데이터 초기화 (Null 방지)
@@ -174,12 +195,19 @@ export default function EditExperiencePage() {
             host_notice: data.rules?.host_notice || '',
           },
         });
+        setLoadedExperienceId(experienceId);
       } finally {
-        setLoading(false);
+        if (isCurrentRequest()) {
+          setLoading(false);
+        }
       }
     };
-    fetchExp();
-  }, [params.id, router, searchParams, showToast, supabase, t]);
+    void fetchExp();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [experienceId, router, showToast, supabase]);
 
   const uploadImageFile = async (file: File, folder: 'hero' | 'itinerary') => {
     const validation = validateImage(file);
@@ -425,7 +453,7 @@ export default function EditExperiencePage() {
   const addItineraryItem = () => setFormData({ ...formData, itinerary: [...formData.itinerary, { title: '', description: '', type: 'spot', image_url: '' }] });
   const removeItineraryItem = (idx: number) => setFormData({ ...formData, itinerary: formData.itinerary.filter((_: any, i: number) => i !== idx) });
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin w-8 h-8 text-slate-300" /></div>;
+  if (loading || (formData && loadedExperienceId !== experienceId)) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin w-8 h-8 text-slate-300" /></div>;
   if (!formData) return <div className="p-10 text-center">{t('msg_load_fail')}</div>; // 🟢 번역
 
   const manualLocales = mergeExperienceLocales(
