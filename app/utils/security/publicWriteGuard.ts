@@ -61,7 +61,7 @@ function getRequestOriginCandidates(request: Request) {
   return candidates;
 }
 
-function isCrossSiteBrowserRequest(request: Request) {
+export function isCrossSiteBrowserRequest(request: Request) {
   const secFetchSite = String(request.headers.get('sec-fetch-site') || '').toLowerCase();
   if (secFetchSite === 'cross-site') {
     return true;

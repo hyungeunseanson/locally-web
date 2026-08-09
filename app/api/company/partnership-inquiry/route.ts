@@ -1,15 +1,18 @@
 import { NextResponse } from 'next/server';
 
 import { sendImmediateAdminEmail } from '@/app/utils/adminEmailProvider';
+import { isCrossSiteBrowserRequest } from '@/app/utils/security/publicWriteGuard';
 
 type PartnershipInquiryBody = {
   companyName?: string;
   email?: string;
   message?: string;
+  website?: string;
 };
 
 const DEFAULT_PARTNERSHIP_INQUIRY_EMAIL = 'locally.partners@gmail.com';
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const UNICODE_LETTER_PATTERN = /\p{L}/u;
 
 function readString(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
@@ -25,10 +28,19 @@ function getPartnershipInquiryRecipientEmail() {
 
 export async function POST(request: Request) {
   try {
+    if (isCrossSiteBrowserRequest(request)) {
+      return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+    }
+
     const body = (await request.json()) as PartnershipInquiryBody;
     const companyName = readString(body.companyName);
     const email = readString(body.email).toLowerCase();
     const message = readString(body.message);
+    const website = readString(body.website);
+
+    if (website) {
+      return NextResponse.json({ success: true });
+    }
 
     if (!companyName || !email || !message) {
       return NextResponse.json(
@@ -54,6 +66,13 @@ export async function POST(request: Request) {
     if (message.length < 10 || message.length > 4000) {
       return NextResponse.json(
         { success: false, error: '문의 내용은 10자 이상 4000자 이하로 입력해주세요.' },
+        { status: 400 }
+      );
+    }
+
+    if (!UNICODE_LETTER_PATTERN.test(message)) {
+      return NextResponse.json(
+        { success: false, error: '문의 내용을 확인해주세요.' },
         { status: 400 }
       );
     }

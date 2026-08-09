@@ -234,6 +234,7 @@ export default function PartnershipPage() {
   const [companyName, setCompanyName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [proposal, setProposal] = useState('');
+  const [website, setWebsite] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -307,6 +308,7 @@ export default function PartnershipPage() {
           companyName: companyName.trim(),
           email: contactEmail.trim(),
           message: proposal.trim(),
+          website,
         }),
       });
 
@@ -319,6 +321,7 @@ export default function PartnershipPage() {
       setCompanyName('');
       setContactEmail('');
       setProposal('');
+      setWebsite('');
       showToast(copy.submitSuccess, 'success');
     } catch (error) {
       const message = error instanceof Error ? error.message : copy.submitFail;
@@ -390,6 +393,22 @@ export default function PartnershipPage() {
           </div>
 
           <form className="mt-10 space-y-12" onSubmit={handleSubmit}>
+            <div
+              aria-hidden="true"
+              className="absolute left-[-10000px] top-auto h-px w-px overflow-hidden"
+            >
+              <label htmlFor="partnership-website">Website</label>
+              <input
+                id="partnership-website"
+                name="website"
+                type="text"
+                value={website}
+                onChange={(event) => setWebsite(event.target.value)}
+                tabIndex={-1}
+                autoComplete="off"
+              />
+            </div>
+
             <div className="grid gap-12 md:grid-cols-2">
               <div className="group">
                 <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500 group-focus-within:text-black">
