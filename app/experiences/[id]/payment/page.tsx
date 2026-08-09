@@ -307,7 +307,7 @@ function PaymentContent() {
         return t('login_required') as string;
       case 'profile_demographics_required':
         return lang === 'ko'
-          ? '예약 전에 계정관리에서 생년월일과 성별을 입력해 주세요.'
+          ? '예약 전에 계정관리에서 출생연도(연령)와 성별을 입력해 주세요.'
           : 'Please complete your birth date and gender before booking.';
       case 'booking_conflict':
         return isPrivate
@@ -686,7 +686,7 @@ function PaymentContent() {
 
     if (demographicsState !== 'complete') {
       const message = lang === 'ko'
-        ? '예약 전에 계정관리에서 생년월일과 성별을 입력해 주세요.'
+        ? '예약 전에 계정관리에서 출생연도(연령)와 성별을 입력해 주세요.'
         : 'Please complete your birth date and gender before booking.';
       setPaymentError(message);
       showToast(message, 'error');
@@ -1000,7 +1000,7 @@ function PaymentContent() {
 
       if (demographicsState !== 'complete') {
         const message = lang === 'ko'
-          ? '예약 전에 계정관리에서 생년월일과 성별을 입력해 주세요.'
+          ? '예약 전에 계정관리에서 출생연도(연령)와 성별을 입력해 주세요.'
           : 'Please complete your birth date and gender before booking.';
         setPaymentError(message);
         showToast(message, 'error');
@@ -1194,7 +1194,7 @@ function PaymentContent() {
     if (demographicsState === 'loading') return t('exp_payment_state_loading') as string;
     if (demographicsState !== 'complete') {
       return lang === 'ko'
-        ? '계정관리에서 생년월일과 성별을 입력한 뒤 예약할 수 있습니다.'
+        ? '계정관리에서 출생연도(연령)와 성별을 입력한 뒤 예약할 수 있습니다.'
         : 'Complete your birth date and gender in account settings before booking.';
     }
     if (!areRequiredAgreementsComplete) return t('exp_payment_validation_agreements') as string;
@@ -1446,7 +1446,7 @@ function PaymentContent() {
                   <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <span>
                       {lang === 'ko'
-                        ? '호스트의 체험 준비를 위해 예약 대표자의 생년월일과 성별이 필요합니다.'
+                        ? '호스트의 체험 준비를 위해 예약 대표자의 출생연도(연령)와 성별이 필요합니다.'
                         : 'The host needs the booker\'s age range and gender to prepare the experience.'}
                     </span>
                     <button
