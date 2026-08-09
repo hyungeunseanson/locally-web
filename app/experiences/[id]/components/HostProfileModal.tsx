@@ -1,13 +1,16 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { X, Star, Briefcase, Globe, Music, MessageCircle, User } from 'lucide-react';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { formatLanguageLevelLabel, getLocalizedLanguageLabel } from '@/app/utils/languageLevels';
 import SuperhostBadgeTrigger from '@/app/components/SuperhostBadgeTrigger';
+import { formatAgeBand, formatDemographicGender } from '@/app/utils/demographics';
+import { fetchPublicDemographics, type PublicDemographics } from '@/app/utils/publicDemographicsClient';
 
 type HostModalData = {
+  hostId?: string;
   name: string;
   avatarUrl?: string;
   nationality?: string;
@@ -146,7 +149,29 @@ function getNationalityDisplay(nationality: string | undefined, locale: string) 
 
 export default function HostProfileModal({ isOpen, onClose, host }: HostProfileModalProps) {
   const { lang, t } = useLanguage();
+  const [demographicsResult, setDemographicsResult] = useState<{
+    userId: string;
+    value: PublicDemographics | null;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!isOpen || !host.hostId) return;
+
+    let cancelled = false;
+    void fetchPublicDemographics(host.hostId).then((value) => {
+      if (!cancelled && host.hostId) {
+        setDemographicsResult({ userId: host.hostId, value });
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [host.hostId, isOpen]);
+
   if (!isOpen) return null;
+  const demographics = demographicsResult && demographicsResult.userId === host.hostId
+    ? demographicsResult.value
+    : null;
   const hasStats = host.reviewCount !== undefined || host.rating !== undefined;
   const hasInterestingFacts = Boolean(
     host.job || host.dreamDestination || host.favoriteSong || (host.languages && host.languages.length > 0)
@@ -162,6 +187,9 @@ export default function HostProfileModal({ isOpen, onClose, host }: HostProfileM
       )
     : [];
   const nationalityDisplay = getNationalityDisplay(host.nationality, lang);
+  const ageBandLabel = formatAgeBand(demographics?.age_band, lang);
+  const genderLabel = formatDemographicGender(demographics?.gender, lang);
+  const demographicsLabel = [ageBandLabel, genderLabel].filter(Boolean).join(' · ');
 
   const handleContactHost = () => {
     onClose();
@@ -228,6 +256,14 @@ export default function HostProfileModal({ isOpen, onClose, host }: HostProfileM
                   </span>
                 ) : null}
                 <span className="leading-none">{nationalityDisplay.label}</span>
+              </div>
+            )}
+            {demographicsLabel && (
+              <div
+                data-testid="host-profile-demographics"
+                className="mt-2 inline-flex h-[26px] items-center rounded-full border border-slate-200/80 bg-slate-50/95 px-3 text-[12px] font-semibold text-slate-600 shadow-sm md:h-[30px] md:text-[13px]"
+              >
+                {demographicsLabel}
               </div>
             )}
           </div>

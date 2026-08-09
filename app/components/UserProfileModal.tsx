@@ -7,6 +7,12 @@ import { X, Languages, Smile, User, Globe, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { formatProfileLanguages, getHostPublicProfile, normalizeLanguageList } from '@/app/utils/profile';
+import {
+  formatAgeBand,
+  formatDemographicGender,
+  isDemographicGender,
+} from '@/app/utils/demographics';
+import { fetchPublicDemographics } from '@/app/utils/publicDemographicsClient';
 
 interface UserProfileModalProps {
   userId: string;
@@ -23,13 +29,15 @@ interface UserProfileModalState {
   location?: string | null;
   mbti?: string | null;
   languages?: string[];
+  age_band?: string | null;
+  gender?: string | null;
 }
 
 export default function UserProfileModal({ userId, isOpen, onClose, role }: UserProfileModalProps) {
   const { visible, closing, requestClose } = useModalClose(isOpen, onClose);
   const [displayProfile, setDisplayProfile] = useState<UserProfileModalState | null>(null);
   const [loading, setLoading] = useState(true);
-  const { t } = useLanguage();
+  const { lang, t } = useLanguage();
   const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
@@ -40,11 +48,14 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
     const loadProfile = async () => {
       setLoading(true);
 
-      const { data: baseProfile } = await supabase
-        .from('profiles')
-        .select('created_at, full_name, avatar_url, bio, introduction, nationality, mbti, languages')
-        .eq('id', userId)
-        .maybeSingle();
+      const [{ data: baseProfile }, publicDemographics] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('created_at, full_name, avatar_url, bio, introduction, nationality, mbti, languages')
+          .eq('id', userId)
+          .maybeSingle(),
+        fetchPublicDemographics(userId),
+      ]);
 
       if (!baseProfile) {
         if (!cancelled) {
@@ -57,6 +68,12 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
       let finalData: UserProfileModalState = {
         created_at: baseProfile.created_at,
       };
+      const ageBand = typeof publicDemographics?.age_band === 'string'
+        ? publicDemographics.age_band
+        : null;
+      const gender = isDemographicGender(publicDemographics?.gender)
+        ? publicDemographics.gender
+        : null;
 
       if (role === 'host') {
         const { data: hostData } = await supabase
@@ -74,6 +91,8 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
           location: hostPublicProfile.location,
           mbti: baseProfile.mbti,
           languages: hostPublicProfile.languages,
+          age_band: ageBand,
+          gender,
         };
       } else {
         finalData = {
@@ -84,6 +103,8 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
           location: baseProfile.nationality,
           mbti: baseProfile.mbti,
           languages: normalizeLanguageList(baseProfile.languages),
+          age_band: ageBand,
+          gender,
         };
       }
 
@@ -112,6 +133,18 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
     return `${String(date.getFullYear()).slice(2)}.${String(date.getMonth() + 1).padStart(2, '0')}${t('joined_suffix')}`;
   };
   const displayAvatarUrl = secureUrl(displayProfile?.display_avatar);
+  const ageBandLabel = formatAgeBand(displayProfile?.age_band, lang);
+  const genderLabel = isDemographicGender(displayProfile?.gender)
+    ? formatDemographicGender(displayProfile.gender, lang)
+    : null;
+  const demographicsLabel = [ageBandLabel, genderLabel].filter(Boolean).join(' · ');
+  const demographicsHeading = lang === 'ko'
+    ? '연령대 · 성별'
+    : lang === 'ja'
+      ? '年代・性別'
+      : lang === 'zh'
+        ? '年龄段 · 性别'
+        : 'Age · Gender';
 
   if (!visible) return null;
 
@@ -190,6 +223,17 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
                     <div className="text-[10px] text-slate-400 font-bold uppercase">Language</div>
                     <div className="text-[12px] md:text-sm font-semibold text-slate-700 truncate">
                       {formatProfileLanguages(displayProfile?.languages, role === 'host' ? t('private_info') : t('not_entered'))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 공개용 연령대·성별. 정확한 생년월일은 서버 응답에 포함하지 않습니다. */}
+                <div className="bg-slate-50 p-2.5 md:p-3 rounded-xl md:rounded-2xl flex items-center gap-2 md:gap-3">
+                  <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center shrink-0"><User size={14} className="md:w-4 md:h-4" /></div>
+                  <div className="min-w-0">
+                    <div className="text-[10px] text-slate-400 font-bold uppercase">{demographicsHeading}</div>
+                    <div className="text-[12px] md:text-sm font-semibold text-slate-700 truncate">
+                      {demographicsLabel || t('not_entered')}
                     </div>
                   </div>
                 </div>

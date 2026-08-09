@@ -46,12 +46,22 @@ test.describe('Private profile demographics contract', () => {
     expect(route).toContain('422');
   });
 
-  test('does not fetch or render gender on the public profile modal', () => {
+  test('publishes only derived age band and gender on the public profile modal', () => {
     const modal = read('app/components/UserProfileModal.tsx');
+    const hostModal = read('app/experiences/[id]/components/HostProfileModal.tsx');
+    const publicHostPage = read('app/users/[id]/page.tsx');
+    const route = read('app/api/public/profiles/[userId]/demographics/route.ts');
 
     expect(modal).not.toContain(".select('*')");
-    expect(modal).not.toContain('formatGenderLabel');
-    expect(modal).not.toContain('displayProfile?.gender');
+    expect(modal).toContain('fetchPublicDemographics(userId)');
+    expect(modal).toContain('formatAgeBand');
+    expect(modal).toContain('formatDemographicGender');
+    expect(hostModal).toContain('host-profile-demographics');
+    expect(publicHostPage).toContain('public-host-demographics');
+    expect(route).toContain('readPrivateDemographics(createAdminClient(), userId)');
+    expect(route).toContain('age_band: getAgeBandFromBirthDate(demographics.birth_date)');
+    expect(route).toContain('gender: demographics.gender');
+    expect(route).not.toContain('birth_date: demographics.birth_date');
   });
 
   test('preserves OAuth return navigation when reminder delivery fails', () => {

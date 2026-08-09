@@ -36,6 +36,31 @@ export function isDemographicsComplete(value: Partial<Demographics> | null | und
   return getMissingDemographics(value).length === 0;
 }
 
+export function getAgeBandFromBirthDate(
+  birthDate: string | null | undefined,
+  referenceDate = new Date()
+): string | null {
+  if (!birthDate || !isValidBirthDate(birthDate)) return null;
+
+  const birth = new Date(`${birthDate}T00:00:00Z`);
+  const referenceYear = referenceDate.getUTCFullYear();
+  const referenceMonth = referenceDate.getUTCMonth();
+  const referenceDay = referenceDate.getUTCDate();
+  let age = referenceYear - birth.getUTCFullYear();
+
+  if (
+    referenceMonth < birth.getUTCMonth()
+    || (referenceMonth === birth.getUTCMonth() && referenceDay < birth.getUTCDate())
+  ) {
+    age -= 1;
+  }
+
+  if (age < 0) return null;
+  if (age < 10) return 'under_10';
+  if (age >= 80) return '80_plus';
+  return `${Math.floor(age / 10) * 10}s`;
+}
+
 export function formatAgeBand(ageBand: string | null | undefined, locale: string): string | null {
   if (!ageBand) return null;
   if (ageBand === 'under_10') {

@@ -14,6 +14,8 @@ import {
   isPublicHostApplicationStatus,
   pickLatestPublicHostApplication,
 } from '@/app/utils/hostVisibility';
+import { formatAgeBand, formatDemographicGender } from '@/app/utils/demographics';
+import { fetchPublicDemographics } from '@/app/utils/publicDemographicsClient';
 
 type PublicHostProfile = {
   full_name: string | null;
@@ -22,6 +24,8 @@ type PublicHostProfile = {
   introduction: string | null;
   languages: string[];
   is_superhost: boolean;
+  age_band: string | null;
+  gender: 'Male' | 'Female' | 'Other' | null;
 };
 
 type HostExperienceCardData = {
@@ -136,7 +140,7 @@ const PUBLIC_HOST_PROFILE_EXPERIENCE_SELECT = [
 
 export default function UserProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
-  const { t } = useLanguage();
+  const { lang, t } = useLanguage();
   const [profile, setProfile] = useState<PublicHostProfile | null>(null);
   const [hostExperiences, setHostExperiences] = useState<HostExperienceCardData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -145,11 +149,14 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
   useEffect(() => {
     const fetchProfile = async () => {
       // 공개 호스트 프로필은 safe projection view만 사용한다.
-      const { data: hostApp } = await supabase
-        .from('public_host_applications')
-        .select('id, status, name, profile_photo, self_intro, languages, is_superhost, created_at')
-        .eq('user_id', resolvedParams.id)
-        .order('created_at', { ascending: false });
+      const [{ data: hostApp }, publicDemographics] = await Promise.all([
+        supabase
+          .from('public_host_applications')
+          .select('id, status, name, profile_photo, self_intro, languages, is_superhost, created_at')
+          .eq('user_id', resolvedParams.id)
+          .order('created_at', { ascending: false }),
+        fetchPublicDemographics(resolvedParams.id),
+      ]);
 
       const latestHostApp = pickLatestPublicHostApplication(hostApp || []);
 
@@ -164,6 +171,8 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
           ? latestHostApp.languages.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
           : [],
         is_superhost: Boolean(latestHostApp.is_superhost),
+        age_band: publicDemographics?.age_band || null,
+        gender: publicDemographics?.gender || null,
       } : null);
 
       // 공개 상태 호스트의 경우에만 운영 중인 활성 체험 가져오기
@@ -193,6 +202,9 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
 
   const displayName = profile?.full_name || t('public_host_profile_name_fallback');
   const activeExperienceCountLabel = t('public_host_profile_meta_active_count').replace('{count}', String(hostExperiences.length));
+  const ageBandLabel = formatAgeBand(profile?.age_band, lang);
+  const genderLabel = formatDemographicGender(profile?.gender, lang);
+  const demographicsLabel = [ageBandLabel, genderLabel].filter(Boolean).join(' · ');
 
   return (
     <div className="min-h-screen bg-white font-sans text-slate-900">
@@ -238,6 +250,14 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                   <div className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600">
                     {activeExperienceCountLabel}
                   </div>
+                  {demographicsLabel && (
+                    <div
+                      data-testid="public-host-demographics"
+                      className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600"
+                    >
+                      {demographicsLabel}
+                    </div>
+                  )}
                 </div>
 
                 {profile?.languages && profile.languages.length > 0 && (
