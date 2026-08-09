@@ -15,6 +15,8 @@ import { useLanguage } from '@/app/context/LanguageContext';
 import { compressImage, validateImage, isHeicValidationResult } from '@/app/utils/image';
 import type { LocallyMembershipStatus } from '@/app/utils/memberStatus';
 import LocallyMembershipBadgeTrigger from '@/app/components/LocallyMembershipBadgeTrigger';
+import { saveOwnDemographics } from '@/app/utils/demographicsClient';
+import { isDemographicGender, isValidBirthDate } from '@/app/utils/demographics';
 
 type GuestReview = {
     id: string | number;
@@ -160,13 +162,18 @@ export default function MobileProfileView({
     };
 
     const handleSave = async () => {
+        const hasAnyDemographics = Boolean(editData.birth_date || editData.gender);
+        const normalizedGender = isDemographicGender(editData.gender) ? editData.gender : null;
+        const hasCompleteDemographics = isValidBirthDate(editData.birth_date) && normalizedGender !== null;
+        if (hasAnyDemographics && !hasCompleteDemographics) {
+            showToast(t('profile_save_fail'), 'error');
+            return;
+        }
         setSaving(true);
         const updates = {
             id: userId,
             full_name: editData.full_name,
             nationality: editData.nationality,
-            birth_date: editData.birth_date || null,
-            gender: editData.gender,
             phone: editData.phone,
             kakao_id: editData.kakao_id,
             bio: editData.bio,
@@ -177,7 +184,7 @@ export default function MobileProfileView({
         };
         const { data: existingProfile, error: loadError } = await supabase
             .from('profiles')
-            .select('*')
+            .select('id, full_name, nationality, phone, kakao_id, bio, mbti, languages, job, updated_at')
             .eq('id', userId)
             .maybeSingle();
 
@@ -200,6 +207,17 @@ export default function MobileProfileView({
             .update(filteredUpdates)
             .eq('id', userId);
         error = updateRes.error;
+
+        if (!error && isValidBirthDate(editData.birth_date) && normalizedGender) {
+            try {
+                await saveOwnDemographics({
+                    birth_date: editData.birth_date,
+                    gender: normalizedGender,
+                });
+            } catch {
+                error = { message: 'Failed to save demographics' };
+            }
+        }
 
         if (error) {
             showToast('저장 실패: ' + error.message, 'error');

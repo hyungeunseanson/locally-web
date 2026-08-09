@@ -14,6 +14,7 @@ import {
 import { useModalClose } from '@/app/hooks/useModalClose';
 import { normalizeInternalReturnPath } from '@/app/utils/authRedirect';
 import { sendGoogleAnalyticsEvent } from '@/app/utils/analytics/google';
+import { compactBirthDateToIso } from '@/app/utils/demographics';
 
 type Gender = 'Male' | 'Female' | '';
 
@@ -116,6 +117,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
       return;
     }
 
+    let normalizedBirthDate = '';
     if (mode === 'SIGNUP') {
       if (!passwordConfirm) {
         showToast(copy.passwordConfirmRequired, 'error');
@@ -129,7 +131,8 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
         showToast(copy.signupFieldsRequired, 'error');
         return;
       }
-      if (!birthDate.match(/^(19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])$/)) {
+      normalizedBirthDate = compactBirthDateToIso(birthDate) || '';
+      if (!normalizedBirthDate) {
         showToast(copy.birthDateInvalid, 'error');
         return;
       }
@@ -154,7 +157,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
             data: {
               full_name: fullName,
               phone: phone,
-              birth_date: birthDate,
+              birth_date: normalizedBirthDate,
               gender: gender,
               nationality: nationality,
               preferred_locale: lang,

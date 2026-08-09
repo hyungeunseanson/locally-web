@@ -5,7 +5,7 @@ import React, { useEffect, useMemo, useState, useRef } from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
 import { createClient } from '@/app/utils/supabase/client';
 import { User, ShieldCheck, Heart, Star, Save, Smile, Camera, Loader2, Calendar, ChevronLeft, ChevronRight, X, ChevronDown, Settings, HelpCircle, Bell, FileText, BookOpen, Users, Globe, MessageSquare } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext';
 import Spinner from '@/app/components/ui/Spinner';
@@ -24,6 +24,9 @@ import type { User as SupabaseUser } from '@supabase/supabase-js';
 import { useNotification } from '@/app/context/NotificationContext';
 import { useViewMode } from '@/app/context/ViewModeContext';
 import { useAuth } from '@/app/context/AuthContext';
+import { fetchOwnDemographics, saveOwnDemographics } from '@/app/utils/demographicsClient';
+import { isDemographicGender, isValidBirthDate } from '@/app/utils/demographics';
+import { normalizeInternalReturnPath } from '@/app/utils/authRedirect';
 
 type GuestReview = {
   id: string | number;
@@ -74,9 +77,11 @@ export default function AccountPage() {
     return days;
   };
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { showToast, showHeicUnsupportedToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const redirectedToLoginRef = useRef(false);
+  const demographicsSectionRef = useRef<HTMLDivElement>(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -121,6 +126,8 @@ export default function AccountPage() {
   const profileMissingLabels = profileCompletion.missingFields
     .slice(0, 5)
     .map((field) => t(`field_label_${field}` as Parameters<typeof t>[0]));
+  const shouldCompleteDemographics = searchParams?.get('complete') === 'demographics';
+  const completionReturnUrl = normalizeInternalReturnPath(searchParams?.get('returnUrl'));
 
   // 국가 리스트 & 국가번호 매핑
   const countries = [
@@ -228,6 +235,15 @@ export default function AccountPage() {
   }, [loading]);
 
   useEffect(() => {
+    if (!shouldCompleteDemographics || loading) return;
+    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) {
+      setShowProfileView(true);
+      return;
+    }
+    demographicsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [loading, shouldCompleteDemographics]);
+
+  useEffect(() => {
     if (authLoading) {
       return;
     }
@@ -270,9 +286,11 @@ export default function AccountPage() {
       try {
         const { data, error: profileError } = await supabase
           .from('profiles')
-          .select('full_name, email, nationality, birth_date, gender, bio, phone, mbti, kakao_id, avatar_url, languages, job')
+          .select('full_name, email, nationality, bio, phone, mbti, kakao_id, avatar_url, languages, job')
           .eq('id', user.id)
           .maybeSingle();
+
+        const demographics = await fetchOwnDemographics().catch(() => ({ birth_date: null, gender: null }));
 
         if (!isMounted) return;
 
@@ -285,8 +303,8 @@ export default function AccountPage() {
             full_name: data.full_name || '',
             email: user.email || data.email || '',
             nationality: data.nationality || '',
-            birth_date: data.birth_date || '',
-            gender: data.gender || '',
+            birth_date: demographics.birth_date || '',
+            gender: demographics.gender || '',
             bio: data.bio || '',
             phone: data.phone || '',
             mbti: data.mbti || '',
@@ -480,12 +498,17 @@ export default function AccountPage() {
 
   const handleSave = async () => {
     if (!user) return;
+    const hasAnyDemographics = Boolean(profile.birth_date || profile.gender);
+    const normalizedGender = isDemographicGender(profile.gender) ? profile.gender : null;
+    const hasCompleteDemographics = isValidBirthDate(profile.birth_date) && normalizedGender !== null;
+    if (hasAnyDemographics && !hasCompleteDemographics) {
+      showToast(t('profile_save_fail'), 'error');
+      return;
+    }
     setSaving(true);
     const updates: Record<string, unknown> = {
       full_name: profile.full_name,
       nationality: profile.nationality,
-      birth_date: profile.birth_date || null,
-      gender: profile.gender,
       bio: profile.bio,
       phone: profile.phone,
       mbti: profile.mbti,
@@ -498,7 +521,7 @@ export default function AccountPage() {
 
     const { data: existingProfile, error: loadError } = await supabase
       .from('profiles')
-      .select('id, full_name, nationality, birth_date, gender, bio, phone, mbti, kakao_id, avatar_url, languages, job, updated_at')
+      .select('id, full_name, nationality, bio, phone, mbti, kakao_id, avatar_url, languages, job, updated_at')
       .eq('id', user.id)
       .maybeSingle();
 
@@ -523,12 +546,27 @@ export default function AccountPage() {
       .eq('id', user.id);
     error = updateRes.error;
 
+    if (!error && isValidBirthDate(profile.birth_date) && normalizedGender) {
+      try {
+        await saveOwnDemographics({
+          birth_date: profile.birth_date,
+          gender: normalizedGender,
+        });
+      } catch {
+        error = { message: 'Failed to save demographics' };
+      }
+    }
+
     if (error) {
       console.error('Save error:', error);
       showToast(t('profile_save_fail'), 'error'); // 🟢 번역
     } else {
       showToast(t('profile_save_success'), 'success'); // 🟢 번역
-      router.refresh();
+      if (hasCompleteDemographics && shouldCompleteDemographics && completionReturnUrl !== '/') {
+        router.push(completionReturnUrl);
+      } else {
+        router.refresh();
+      }
     }
     setSaving(false);
   };
@@ -573,6 +611,14 @@ export default function AccountPage() {
           onProfileUpdate={(updated) => {
             setProfile(prev => ({ ...prev, ...updated }));
             setShowProfileView(false);
+            if (
+              isValidBirthDate(updated.birth_date)
+              && isDemographicGender(updated.gender)
+              && shouldCompleteDemographics
+              && completionReturnUrl !== '/'
+            ) {
+              router.push(completionReturnUrl);
+            }
           }}
         />
       )}
@@ -969,7 +1015,7 @@ export default function AccountPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="relative">
+                <div ref={demographicsSectionRef} className="relative scroll-mt-24">
                   <label className="block text-sm font-bold mb-2">{t('label_birth')}</label>
 
                   {/* 🟢 입력창 (Placeholder 추가) */}

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/app/utils/supabase/server';
 import { normalizeInternalReturnPath, resolveAuthCallbackOrigin } from '@/app/utils/authRedirect';
+import { ensureDemographicsReminder } from '@/app/utils/demographicsReminder';
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
@@ -13,9 +14,17 @@ export async function GET(request: Request) {
     const supabase = await createClient();
 
     // 인증 코드 교환 (세션 생성)
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
+      const userId = data.session?.user?.id;
+      if (userId) {
+        try {
+          await ensureDemographicsReminder(userId);
+        } catch {
+          console.warn('[auth/callback] demographics reminder delivery failed');
+        }
+      }
       // 성공 시 원래 가려던 페이지로 이동
       return NextResponse.redirect(`${redirectOrigin}${next}`);
     }

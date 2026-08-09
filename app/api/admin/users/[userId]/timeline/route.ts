@@ -12,6 +12,7 @@ import type {
 } from '@/app/types/admin';
 import type { ServiceBookingStatus, ServiceRequestStatus } from '@/app/types/service';
 import { isUnapprovedCardPaymentAttempt } from '@/app/utils/bookings/pendingBookingHolds';
+import { readPrivateDemographics } from '@/app/utils/demographicsServer';
 
 type BookingRow = {
   id: string;
@@ -177,6 +178,7 @@ export async function GET(
 
     const [
       profileRes,
+      demographicsRes,
       bookingsRes,
       reviewsRes,
       guestReviewsRes,
@@ -186,9 +188,10 @@ export async function GET(
     ] = await Promise.all([
       supabaseAdmin
         .from('profiles')
-        .select('id, birth_date, nationality, kakao_id, mbti')
+        .select('id, nationality, kakao_id, mbti')
         .eq('id', userId)
         .maybeSingle(),
+      readPrivateDemographics(supabaseAdmin, userId),
       supabaseAdmin
         .from('bookings')
         .select('id, created_at, amount, total_price, status, guests, date, time, experience_id, payment_method, tid, cancel_reason')
@@ -528,7 +531,7 @@ export async function GET(
       data: {
         profile: profile
           ? {
-              birth_date: profile.birth_date,
+              birth_date: demographicsRes.birth_date || null,
               nationality: profile.nationality,
               kakao_id: profile.kakao_id,
               mbti: profile.mbti,

@@ -30,6 +30,8 @@ import type {
 import { getPublicBankInfo } from '@/app/utils/publicBankInfo';
 import { getLocalizedExperienceRules } from '@/app/utils/experienceTranslation';
 import { ExperienceAvailabilitySummary, ExperienceSlotSummary } from '../types';
+import { fetchOwnDemographics } from '@/app/utils/demographicsClient';
+import { getMissingDemographics } from '@/app/utils/demographics';
 
 type PaymentExperience = {
   title?: string;
@@ -57,6 +59,7 @@ type BookingApiResponse = {
   finalAmount?: number;
   errorCode?: string;
   error?: string;
+  missingFields?: string[];
 };
 
 type PaymentMethod = 'card' | 'bank' | 'paypal';
@@ -75,6 +78,7 @@ type BookingErrorCode =
   | 'booking_bad_request'
   | 'solo_guarantee_unavailable_existing_booking'
   | 'profile_sync_in_progress'
+  | 'profile_demographics_required'
   | 'server_error';
 type ExperienceCardReadyReason = CardPaymentReadiness['reason'];
 type ExperienceCardReadyResponse = CardPaymentReadiness;
@@ -224,6 +228,7 @@ function PaymentContent() {
   const [experience, setExperience] = useState<PaymentExperience | null>(null);
   const [paymentError, setPaymentError] = useState('');
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
+  const [demographicsState, setDemographicsState] = useState<'loading' | 'complete' | 'missing' | 'error'>('loading');
 
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -273,6 +278,10 @@ function PaymentContent() {
     () => `/login?returnUrl=${encodeURIComponent(currentPath)}`,
     [currentPath]
   );
+  const demographicsReturnUrl = useMemo(
+    () => `/account?complete=demographics&returnUrl=${encodeURIComponent(currentPath)}`,
+    [currentPath]
+  );
   const date = searchParams?.get('date') || (t('exp_payment_date_tbd') as string);
   const time = searchParams?.get('time') || (t('exp_payment_time_tbd') as string);
   const guests = Number(searchParams?.get('guests')) || 1;
@@ -296,6 +305,10 @@ function PaymentContent() {
     switch (result.errorCode as BookingErrorCode | undefined) {
       case 'unauthorized':
         return t('login_required') as string;
+      case 'profile_demographics_required':
+        return lang === 'ko'
+          ? '예약 전에 계정관리에서 생년월일과 성별을 입력해 주세요.'
+          : 'Please complete your birth date and gender before booking.';
       case 'booking_conflict':
         return isPrivate
           ? (t('exp_payment_private_conflict') as string)
@@ -597,6 +610,15 @@ function PaymentContent() {
         setCustomerPhone(profile.phone || '');
       }
 
+      try {
+        const demographics = await fetchOwnDemographics();
+        if (isMounted) {
+          setDemographicsState(getMissingDemographics(demographics).length === 0 ? 'complete' : 'missing');
+        }
+      } catch {
+        if (isMounted) setDemographicsState('error');
+      }
+
       if (experienceId) {
         sendAnalyticsEvent('payment_init', experienceId);
         sendGoogleAnalyticsEvent('begin_checkout', {
@@ -662,6 +684,15 @@ function PaymentContent() {
       throw new Error(message);
     }
 
+    if (demographicsState !== 'complete') {
+      const message = lang === 'ko'
+        ? '예약 전에 계정관리에서 생년월일과 성별을 입력해 주세요.'
+        : 'Please complete your birth date and gender before booking.';
+      setPaymentError(message);
+      showToast(message, 'error');
+      throw new Error(message);
+    }
+
     const sessionKey = payPalCheckoutSessionKey;
     const existingSession = paypalSessionRef.current;
     if (existingSession && existingSession.key === sessionKey) {
@@ -714,6 +745,7 @@ function PaymentContent() {
   }, [
     checkAvailability,
     date,
+    demographicsState,
     experienceId,
     getCheckoutValidationError,
     getLocalizedBookingApiError,
@@ -725,6 +757,7 @@ function PaymentContent() {
     showToast,
     isAuthLoading,
     loginReturnUrl,
+    lang,
     t,
     time,
     user,
@@ -965,6 +998,16 @@ function PaymentContent() {
         return;
       }
 
+      if (demographicsState !== 'complete') {
+        const message = lang === 'ko'
+          ? '예약 전에 계정관리에서 생년월일과 성별을 입력해 주세요.'
+          : 'Please complete your birth date and gender before booking.';
+        setPaymentError(message);
+        showToast(message, 'error');
+        setIsProcessing(false);
+        return;
+      }
+
       const isAvailable = await checkAvailability();
       if (!isAvailable) {
         const message = isPrivate
@@ -1108,6 +1151,7 @@ function PaymentContent() {
   const isPayPalMethodError = paymentMethod === 'paypal' && Boolean(paypalSdkError);
   const isSubmitDisabled =
     isProcessing ||
+    demographicsState !== 'complete' ||
     !isSlotSummaryResolved ||
     (paymentMethod === 'card' && (!isCardReadyResolved || !isCardReady));
   const summaryStatus: CheckoutSectionState = isSummaryLoading
@@ -1147,6 +1191,12 @@ function PaymentContent() {
     if (isProcessing) return t('status_processing') as string;
     if (!isSlotSummaryResolved) return t('exp_payment_slot_loading') as string;
     if (!isBookerComplete) return t('exp_payment_validation_customer') as string;
+    if (demographicsState === 'loading') return t('exp_payment_state_loading') as string;
+    if (demographicsState !== 'complete') {
+      return lang === 'ko'
+        ? '계정관리에서 생년월일과 성별을 입력한 뒤 예약할 수 있습니다.'
+        : 'Complete your birth date and gender in account settings before booking.';
+    }
     if (!areRequiredAgreementsComplete) return t('exp_payment_validation_agreements') as string;
     if (paymentMethod === 'card' && !isCardReadyResolved) {
       return t('exp_payment_card_loading') as string;
@@ -1387,6 +1437,28 @@ function PaymentContent() {
                   </p>
                 )}
               </div>
+              {demographicsState !== 'complete' && demographicsState !== 'loading' && (
+                <StatusNotice
+                  tone={demographicsState === 'error' ? 'error' : 'warning'}
+                  size="sm"
+                  testId="exp-payment-demographics-required"
+                >
+                  <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <span>
+                      {lang === 'ko'
+                        ? '호스트의 체험 준비를 위해 예약 대표자의 생년월일과 성별이 필요합니다.'
+                        : 'The host needs the booker\'s age range and gender to prepare the experience.'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => router.push(demographicsReturnUrl)}
+                      className="shrink-0 rounded-lg border border-current px-3 py-1.5 text-[11px] font-bold"
+                    >
+                      {lang === 'ko' ? '계정관리에서 입력' : 'Complete profile'}
+                    </button>
+                  </div>
+                </StatusNotice>
+              )}
             </div>
           </PaymentSectionCard>
 

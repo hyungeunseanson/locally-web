@@ -1,6 +1,11 @@
--- Superseded by docs/migrations/v3_40_31_private_profile_demographics.sql.
--- Keep this entry point safe for operators who previously used this file.
--- Birth date and gender must never be written back to the public profiles table.
+-- v3.40.34
+-- Cleanup only: apply after every application consumer has moved to
+-- profile_private_demographics and the compatibility release is verified.
+
+BEGIN;
+
+DROP TRIGGER IF EXISTS sync_profile_private_demographics ON public.profiles;
+DROP FUNCTION IF EXISTS public.sync_profile_private_demographics_from_profile();
 
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
@@ -30,16 +35,14 @@ BEGIN
 
   BEGIN
     INSERT INTO public.profiles (
-      id, email, full_name, avatar_url, phone, nationality, birth_date, gender
+      id, email, full_name, avatar_url, phone, nationality
     ) VALUES (
       NEW.id,
       NEW.email,
       COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', 'User'),
       NULLIF(NEW.raw_user_meta_data->>'avatar_url', ''),
       NULLIF(NEW.raw_user_meta_data->>'phone', ''),
-      NULLIF(NEW.raw_user_meta_data->>'nationality', ''),
-      v_birth_date,
-      v_gender
+      NULLIF(NEW.raw_user_meta_data->>'nationality', '')
     );
   EXCEPTION WHEN others THEN
     INSERT INTO public.profiles (id, email, full_name, avatar_url)
@@ -52,11 +55,7 @@ BEGIN
   END;
 
   INSERT INTO public.profile_private_demographics (user_id, birth_date, gender)
-  VALUES (
-    NEW.id,
-    v_birth_date,
-    v_gender
-  )
+  VALUES (NEW.id, v_birth_date, v_gender)
   ON CONFLICT (user_id) DO UPDATE
   SET birth_date = COALESCE(profile_private_demographics.birth_date, EXCLUDED.birth_date),
       gender = COALESCE(profile_private_demographics.gender, EXCLUDED.gender),
@@ -65,3 +64,11 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+
+ALTER TABLE public.profiles
+  DROP COLUMN IF EXISTS birth_date,
+  DROP COLUMN IF EXISTS gender;
+
+NOTIFY pgrst, 'reload schema';
+
+COMMIT;

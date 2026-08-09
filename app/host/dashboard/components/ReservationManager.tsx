@@ -38,6 +38,7 @@ type ReservationGuest = {
   languages?: string[] | string | null;
   nationality?: string | null;
   gender?: string | null;
+  age_band?: string | null;
   mbti?: string | null;
   created_at?: string | null;
 };
@@ -70,6 +71,8 @@ type ReservationRecord = {
   host_payout_amount?: number | null;
   solo_guarantee_refund_status?: string | null;
   solo_guarantee_refund_amount?: number | null;
+  guest_age_band?: string | null;
+  guest_gender?: string | null;
   raw_status?: string | null;
   guest?: ReservationGuest | null;
   experiences?: ReservationExperience | null;
@@ -132,6 +135,8 @@ const RESERVATION_SELECT = `
   host_payout_amount,
   solo_guarantee_refund_status,
   solo_guarantee_refund_amount,
+  guest_age_band,
+  guest_gender,
   experiences!inner (
     title
   ),
@@ -146,7 +151,6 @@ const RESERVATION_SELECT = `
     job,
     languages,
     nationality,
-    gender,
     mbti
   )
 `;
@@ -650,7 +654,11 @@ export default function ReservationManager() {
                 isNew={isNew(res.created_at, res.id)}
                 isProcessing={processingId === res.id}
                 onApproveCancel={() => setPendingRefundBooking(res)}
-                onShowProfile={() => setSelectedGuest(res.guest || null)}
+                onShowProfile={() => setSelectedGuest(res.guest ? {
+                  ...res.guest,
+                  gender: res.guest_gender || null,
+                  age_band: res.guest_age_band || null,
+                } : null)}
                 onCheck={() => markAsRead(res.id)}
                 onMessage={() =>
                   router.push(

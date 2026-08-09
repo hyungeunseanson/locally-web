@@ -147,6 +147,8 @@ export async function createAuthUser(user: TestUser, createdAuthUserIds: string[
     user_metadata: {
       full_name: user.fullName,
       phone: user.phone,
+      birth_date: '1990-01-01',
+      gender: 'Other',
     },
   });
 

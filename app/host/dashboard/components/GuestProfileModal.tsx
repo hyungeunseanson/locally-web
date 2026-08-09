@@ -3,11 +3,12 @@
 import Image from 'next/image';
 import React, { useEffect, useState } from 'react';
 import { useModalClose } from '@/app/hooks/useModalClose';
-import { User, X, Star, Globe, Smile, MessageCircle, Briefcase, Users } from 'lucide-react';
+import { User, X, Star, Globe, Smile, MessageCircle, Briefcase, Users, Calendar } from 'lucide-react';
 import { useLanguage } from '@/app/context/LanguageContext';
-import { formatGenderLabel, normalizeLanguageList, normalizeProfileLanguageValue } from '@/app/utils/profile';
+import { normalizeLanguageList, normalizeProfileLanguageValue } from '@/app/utils/profile';
 import type { LocallyMembershipStatus } from '@/app/utils/memberStatus';
 import HostGuestMembershipBadge from './HostGuestMembershipBadge';
+import { formatAgeBand, formatDemographicGender, isDemographicGender } from '@/app/utils/demographics';
 
 interface GuestModalProfile {
   id: string | number;
@@ -16,6 +17,7 @@ interface GuestModalProfile {
   nationality?: string | null;
   job?: string | null;
   gender?: string | null;
+  age_band?: string | null;
   mbti?: string | null;
   languages?: string[] | string | null;
   introduction?: string | null;
@@ -141,7 +143,17 @@ export default function GuestProfileModal({ guest, membershipStatus = 'none', on
     ? t('joined_date').replace('{date}', new Date(guest.created_at).toLocaleDateString(lang === 'ko' ? 'ko-KR' : lang === 'ja' ? 'ja-JP' : lang === 'zh' ? 'zh-CN' : 'en-US', { year: 'numeric', month: 'long' }))
     : t('joined_date_unknown');
 
-  const genderLabel = guest.gender ? formatGenderLabel(guest.gender) : null;
+  const genderLabel = isDemographicGender(guest.gender)
+    ? formatDemographicGender(guest.gender, lang)
+    : null;
+  const ageBandLabel = formatAgeBand(guest.age_band, lang);
+  const ageBandHeading = lang === 'ko'
+    ? '예약 대표자 연령대'
+    : lang === 'ja'
+      ? '予約代表者の年代'
+      : lang === 'zh'
+        ? '预订代表年龄段'
+        : 'Booker age range';
   const languageDisplay = languages.length > 0
     ? languages.map((lang: string) => t(`lang_${normalizeProfileLanguageValue(lang)}`)).join(', ')
     : null;
@@ -155,6 +167,7 @@ export default function GuestProfileModal({ guest, membershipStatus = 'none', on
 
   // 2×2 attribute grid items — only render non-empty ones
   const gridItems = [
+    ageBandLabel ? { icon: <Calendar size={14} />, label: ageBandHeading, value: ageBandLabel } : null,
     genderLabel ? { icon: <Users size={14} />, label: t('label_gender'), value: genderLabel } : null,
     languageDisplay ? { icon: <Globe size={14} />, label: t('profile_lang'), value: languageDisplay } : null,
     guest.mbti ? { icon: <Smile size={14} />, label: t('label_mbti'), value: guest.mbti } : null,

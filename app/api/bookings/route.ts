@@ -8,6 +8,7 @@ import { captureServerException } from '@/app/utils/monitoring/sentry';
 import {
     getPendingBookingExpiryCutoff,
 } from '@/app/utils/bookings/pendingBookingHolds';
+import { readPrivateDemographics } from '@/app/utils/demographicsServer';
 
 type BookingRequestBody = {
     experienceId?: string | number;
@@ -43,12 +44,18 @@ type BookingErrorCode =
     | 'booking_bad_request'
     | 'solo_guarantee_unavailable_existing_booking'
     | 'profile_sync_in_progress'
+    | 'profile_demographics_required'
     | 'server_error';
 
 const FALLBACK_MAX_GUESTS = 10;
 
-function createErrorResponse(status: number, errorCode: BookingErrorCode, error: string) {
-    return NextResponse.json({ success: false, errorCode, error }, { status });
+function createErrorResponse(
+    status: number,
+    errorCode: BookingErrorCode,
+    error: string,
+    extra?: Record<string, unknown>
+) {
+    return NextResponse.json({ success: false, errorCode, error, ...extra }, { status });
 }
 
 export async function POST(request: Request) {
@@ -102,6 +109,22 @@ export async function POST(request: Request) {
 
         // 2. 관리자 권한 클라이언트 생성 (DB 제어용)
         const supabaseAdmin = createAdminClient();
+
+        const demographics = await readPrivateDemographics(supabaseAdmin, user.id);
+
+        const missingDemographicFields = [
+            !demographics?.birth_date ? 'birth_date' : null,
+            !demographics?.gender?.trim() ? 'gender' : null,
+        ].filter((field): field is string => Boolean(field));
+
+        if (missingDemographicFields.length > 0) {
+            return createErrorResponse(
+                422,
+                'profile_demographics_required',
+                '예약 전에 생년월일과 성별을 입력해 주세요.',
+                { code: 'PROFILE_DEMOGRAPHICS_REQUIRED', missingFields: missingDemographicFields }
+            );
+        }
 
         const { data: experienceMeta, error: experienceLookupError } = await supabaseAdmin
             .from('experiences')

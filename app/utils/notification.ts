@@ -1,5 +1,6 @@
 // app/utils/notification.ts
 export type NotificationType =
+  | 'profile_demographics_required'
   | 'member_welcome'
   | 'circle_welcome'
   | 'booking_request'

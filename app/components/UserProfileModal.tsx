@@ -6,7 +6,7 @@ import { createClient } from '@/app/utils/supabase/client';
 import { X, Languages, Smile, User, Globe, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { useLanguage } from '@/app/context/LanguageContext';
-import { formatGenderLabel, formatProfileLanguages, getHostPublicProfile, normalizeLanguageList } from '@/app/utils/profile';
+import { formatProfileLanguages, getHostPublicProfile, normalizeLanguageList } from '@/app/utils/profile';
 
 interface UserProfileModalProps {
   userId: string;
@@ -23,7 +23,6 @@ interface UserProfileModalState {
   location?: string | null;
   mbti?: string | null;
   languages?: string[];
-  gender?: string | null;
 }
 
 export default function UserProfileModal({ userId, isOpen, onClose, role }: UserProfileModalProps) {
@@ -43,7 +42,7 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
 
       const { data: baseProfile } = await supabase
         .from('profiles')
-        .select('*')
+        .select('created_at, full_name, avatar_url, bio, introduction, nationality, mbti, languages')
         .eq('id', userId)
         .maybeSingle();
 
@@ -75,7 +74,6 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
           location: hostPublicProfile.location,
           mbti: baseProfile.mbti,
           languages: hostPublicProfile.languages,
-          gender: baseProfile.gender,
         };
       } else {
         finalData = {
@@ -86,7 +84,6 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
           location: baseProfile.nationality,
           mbti: baseProfile.mbti,
           languages: normalizeLanguageList(baseProfile.languages),
-          gender: baseProfile.gender,
         };
       }
 
@@ -197,16 +194,6 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
                   </div>
                 </div>
 
-                {/* 성별 */}
-                <div className="bg-slate-50 p-2.5 md:p-3 rounded-xl md:rounded-2xl flex items-center gap-2 md:gap-3">
-                  <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center shrink-0"><User size={14} className="md:w-4 md:h-4" /></div>
-                  <div className="min-w-0">
-                    <div className="text-[10px] text-slate-400 font-bold uppercase">Gender</div>
-                    <div className="text-[12px] md:text-sm font-semibold text-slate-700 truncate">
-                      {formatGenderLabel(displayProfile?.gender)}
-                    </div>
-                  </div>
-                </div>
               </div>
 
               <div>

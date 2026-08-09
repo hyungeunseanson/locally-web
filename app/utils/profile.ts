@@ -7,6 +7,8 @@ export type ProfileCompletionFieldKey =
   | 'languages'
   | 'nationality'
   | 'phone'
+  | 'birth_date'
+  | 'gender'
   | 'job'
   | 'mbti';
 
@@ -26,6 +28,8 @@ type AnyProfile = {
   nationality?: string | null;
   host_nationality?: string | null;
   phone?: string | null;
+  birth_date?: string | null;
+  gender?: string | null;
   job?: string | null;
   mbti?: string | null;
 };
@@ -63,6 +67,8 @@ const COMPLETION_FIELDS: Record<
     { key: 'languages', required: true, getValue: (profile) => profile.languages },
     { key: 'nationality', required: true, getValue: (profile) => profile.nationality },
     { key: 'phone', required: true, getValue: (profile) => profile.phone },
+    { key: 'birth_date', required: true, getValue: (profile) => profile.birth_date },
+    { key: 'gender', required: true, getValue: (profile) => profile.gender },
     { key: 'job', required: false, getValue: (profile) => profile.job },
     { key: 'mbti', required: false, getValue: (profile) => profile.mbti },
   ],
@@ -82,6 +88,8 @@ export const PROFILE_COMPLETION_FIELD_LABELS: Record<ProfileCompletionFieldKey, 
   languages: '구사 언어',
   nationality: '국적',
   phone: '연락처',
+  birth_date: '생년월일',
+  gender: '성별',
   job: '직업',
   mbti: 'MBTI',
 };

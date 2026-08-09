@@ -7,6 +7,7 @@ import { isCancelledBookingStatus, isConfirmedBookingStatus } from '@/app/consta
 import { isCompletedServiceBooking, isPaidServiceBooking } from '@/app/constants/serviceStatus';
 import { getBookingPlatformRevenue } from '@/app/utils/bookingFinance';
 import { isUnapprovedCardPaymentAttempt } from '@/app/utils/bookings/pendingBookingHolds';
+import { readPrivateDemographicsBatch } from '@/app/utils/demographicsServer';
 
 type AnalyticsBookingRow = {
   id: string;
@@ -300,13 +301,20 @@ export async function GET(request: Request) {
 
     let guestProfiles: AnalyticsProfileRow[] = [];
     if (paidCustomerIds.length > 0) {
-      const { data: guestProfileRows, error: guestProfilesError } = await supabaseAdmin
-        .from('profiles')
-        .select('id, nationality, gender, birth_date, dob')
-        .in('id', paidCustomerIds);
+      const [profileResult, demographicsByUserId] = await Promise.all([
+        supabaseAdmin
+          .from('profiles')
+          .select('id, nationality, dob')
+          .in('id', paidCustomerIds),
+        readPrivateDemographicsBatch(supabaseAdmin, paidCustomerIds),
+      ]);
 
-      if (guestProfilesError) throw guestProfilesError;
-      guestProfiles = (guestProfileRows || []) as AnalyticsProfileRow[];
+      if (profileResult.error) throw profileResult.error;
+      guestProfiles = (profileResult.data || []).map((profile) => ({
+        ...profile,
+        gender: demographicsByUserId.get(profile.id)?.gender || null,
+        birth_date: demographicsByUserId.get(profile.id)?.birth_date || null,
+      })) as AnalyticsProfileRow[];
     }
 
     let gmv = 0;
