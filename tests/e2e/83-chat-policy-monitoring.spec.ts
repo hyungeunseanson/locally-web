@@ -402,6 +402,71 @@ test.describe.serial('Chat policy monitoring flow', () => {
     await hostSession.context.close();
   });
 
+  test('keeps guest-authored admin support contact details outside policy monitoring', async ({ browser }) => {
+    test.setTimeout(150000);
+
+    const flaggedSupportMessage = `전화 예약 요청서 010-3333-4444 https://open.kakao.com/o/support-${Date.now()}`;
+    const guestSession = await withLoggedInPage(browser, fixture.guest);
+    const createResponse = await guestSession.page.request.post('/api/inquiries/thread', {
+      data: {
+        contextType: 'admin_support',
+        message: flaggedSupportMessage,
+      },
+    });
+
+    expect(createResponse.status()).toBe(200);
+    const createBody = await createResponse.json() as {
+      inquiryId: number | string;
+      messageId: number | string;
+    };
+    const inquiryId = Number(createBody.inquiryId);
+    const messageId = Number(createBody.messageId);
+    createdInquiryIds.push(inquiryId);
+    createdMessageIds.push(messageId);
+
+    await openGuestInquiry(guestSession.page, inquiryId);
+    const guestInput = guestSession.page.locator(GUEST_CHAT_INPUT_SELECTOR).first();
+    await guestInput.fill('010-5555-6666 https://open.kakao.com/o/support-followup');
+    await expect(guestSession.page.getByText(WARNING_BANNER_TEXT)).toHaveCount(0);
+    await guestSession.context.close();
+
+    expect(await countAdminNotifications({
+      adminId: fixture.adminId,
+      title: '채팅 정책위반 의심 메시지 감지',
+      inquiryId,
+    })).toBe(0);
+
+    const { count: auditCount, error: auditError } = await getAdminClient()
+      .from('admin_audit_logs')
+      .select('id', { count: 'exact', head: true })
+      .eq('action_type', 'CHAT_POLICY_SIGNAL_DETECTED')
+      .eq('target_id', String(inquiryId));
+    if (auditError) throw auditError;
+    expect(auditCount || 0).toBe(0);
+
+    const adminSession = await withLoggedInPage(browser, fixture.admin);
+    const inquiryListResponse = await adminSession.page.request.get('/api/admin/inquiries');
+    expect(inquiryListResponse.status()).toBe(200);
+    const inquiryListBody = await inquiryListResponse.json() as {
+      data?: Array<{ id?: number | string; has_policy_signal?: boolean; policy_signal_categories?: string[] }>;
+    };
+    expect(inquiryListBody.data?.find((row) => String(row.id) === String(inquiryId))).toMatchObject({
+      has_policy_signal: false,
+      policy_signal_categories: [],
+    });
+
+    const messagesResponse = await adminSession.page.request.get(`/api/admin/inquiries/${inquiryId}/messages`);
+    expect(messagesResponse.status()).toBe(200);
+    const messagesBody = await messagesResponse.json() as {
+      data?: Array<{ id?: number | string; has_policy_signal?: boolean; policy_signal_categories?: string[] }>;
+    };
+    expect(messagesBody.data?.find((row) => String(row.id) === String(messageId))).toMatchObject({
+      has_policy_signal: false,
+      policy_signal_categories: [],
+    });
+    await adminSession.context.close();
+  });
+
   test('creates one Admin Alert only for a newly created guest inquiry', async ({ browser }) => {
     test.setTimeout(90000);
 

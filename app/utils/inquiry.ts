@@ -7,6 +7,12 @@ export function isAdminSupportInquiry(type?: InquiryType | string | null): boole
   return type === 'admin' || type === 'admin_support';
 }
 
+export function shouldApplyChatPolicySignals(
+  inquiryType?: InquiryType | string | null
+): boolean {
+  return !isAdminSupportInquiry(inquiryType);
+}
+
 export function isOfficialInquirySupportMessage(params: {
   inquiryType?: InquiryType | string | null;
   senderId?: string | number | null;

@@ -162,7 +162,7 @@ export async function POST(request: Request) {
             const categoryLabel = getProxyCategoryLabel(data.category_data.category);
             const paymentLabel = isNaver
                 ? 'NAVER'
-                : `LOCALLY · ${data.payment_method === 'card' ? '카드' : '무통장'}`;
+                : `LOCALLY · ${data.payment_method === 'card' ? '카드 · 결제 미완료' : '무통장 · 입금 대기'}`;
             const alertLink = `/admin/dashboard?tab=TEAM&teamTab=proxy&proxyRequestId=${newRequest.id}`;
             const alertMessage = `${categoryLabel} · ${requesterName} · ${paymentLabel} · ₩${finalAmount.toLocaleString()}`;
 

@@ -284,7 +284,10 @@ export default function ChatMonitor() {
 
   const selectedIsAdminSupport = isAdminSupportInquiry(selectedInquiry?.type);
   const hasWarning = selectedInquiry
-    ? Boolean(selectedInquiry.has_policy_signal || messages.some((message) => message.has_policy_signal))
+    ? Boolean(
+        !selectedIsAdminSupport &&
+        (selectedInquiry.has_policy_signal || messages.some((message) => message.has_policy_signal))
+      )
     : false;
   const guestProfile = buildGuestProfile(selectedInquiry);
   const hostProfile = selectedIsAdminSupport ? null : buildHostProfile(selectedInquiry);
@@ -362,7 +365,9 @@ export default function ChatMonitor() {
               <div
                 key={inq.id}
                 data-testid={`admin-chat-inquiry-row-${inq.id}`}
-                data-has-policy-signal={inq.has_policy_signal ? 'true' : 'false'}
+                data-has-policy-signal={
+                  inq.has_policy_signal && !isAdminSupportInquiry(inq.type) ? 'true' : 'false'
+                }
                 onClick={() => loadMessages(inq.id)}
                 className={`p-3 md:px-3 md:py-2.5 border-b border-slate-100 cursor-pointer transition-colors hover:bg-slate-50 md:min-h-[76px] ${selectedInquiry?.id === inq.id ? 'bg-blue-50 border-l-[3px] md:border-l-4 border-l-blue-500' : 'border-l-[3px] md:border-l-4 border-l-transparent'}`}
               >
@@ -384,7 +389,7 @@ export default function ChatMonitor() {
                 </div>
                 <div className="flex items-start gap-1.5">
                   <p className="text-[11px] md:text-[12px] text-slate-600 line-clamp-2 leading-4 flex-1">{inq.content || '(내용 없음)'}</p>
-                  {inq.has_policy_signal && (
+                  {inq.has_policy_signal && !isAdminSupportInquiry(inq.type) && (
                     <span
                       data-testid="admin-chat-list-policy-badge"
                       className="mt-0.5 shrink-0 inline-flex items-center gap-1 rounded-full bg-rose-100 px-1.5 py-0.5 text-[8px] md:text-[9px] font-bold text-rose-700 border border-rose-200 leading-none"
@@ -560,6 +565,7 @@ export default function ChatMonitor() {
                 });
                 // 🟢 관리자 탭 한정: 관리자가 답변 시 "로컬리 (실명)" 형식으로 표출하여 팀 내 추적성 확보
                 const isAdminReply = alignRight && isAdminSupportInquiry(selectedInquiry.type);
+                const hasPolicySignal = !selectedIsAdminSupport && Boolean(msg.has_policy_signal);
                 const displayName = isOfficialSupport
                   ? OFFICIAL_SUPPORT_SENDER_NAME
                   : isAdminReply
@@ -577,7 +583,7 @@ export default function ChatMonitor() {
                       <span className="text-[9px] md:text-[10px] text-slate-400">
                         {displayName}
                       </span>
-                      {msg.has_policy_signal && !isDeletedMessage && (
+                      {hasPolicySignal && !isDeletedMessage && (
                         <div
                           data-testid="admin-chat-message-policy-badge"
                           className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[8px] md:text-[10px] font-bold text-rose-700 border border-rose-200"
@@ -592,7 +598,7 @@ export default function ChatMonitor() {
                           운영 삭제
                         </div>
                       )}
-                      {activeTab === 'monitor' && !selectedIsAdminSupport && msg.has_policy_signal && !isDeletedMessage && (
+                      {activeTab === 'monitor' && hasPolicySignal && !isDeletedMessage && (
                         <button
                           type="button"
                           onClick={() => handleSoftDeleteMessage(msg.id)}
@@ -607,7 +613,7 @@ export default function ChatMonitor() {
                     </div>
                     <div className={`p-2.5 md:p-3 rounded-lg md:rounded-xl max-w-[85%] md:max-w-[70%] text-xs md:text-sm shadow-sm leading-relaxed whitespace-pre-wrap break-words ${isDeletedMessage
                       ? 'border border-slate-200 border-dashed bg-slate-100 text-slate-500 italic'
-                      : msg.has_policy_signal
+                      : hasPolicySignal
                         ? 'border border-rose-200 bg-rose-50 text-rose-900'
                         : alignRight
                           ? 'bg-black text-white rounded-tr-none'

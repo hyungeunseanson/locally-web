@@ -12,6 +12,7 @@ import {
     getProxyFormDisplayEntries,
     getProxyLinkedInquiryIdFromRequest,
     getProxyPaymentMethod,
+    getProxyPaymentStatusLabel,
     getProxyRequestFeeKrw,
     getProxyRequestTitle,
     getProxyRequesterDisplayName,
@@ -159,13 +160,7 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
     const formEntries = getProxyFormDisplayEntries(request.form_data);
     const linkedInquiryId = getProxyLinkedInquiryIdFromRequest(request);
     const canStartProcessing = request.payment_status === 'COMPLETED';
-    const paymentStatusLabel = request.payment_status === 'COMPLETED'
-        ? '결제 완료'
-        : request.payment_status === 'FAILED'
-            ? '결제 실패'
-            : request.payment_status === 'REFUNDED'
-                ? '환불 완료'
-                : '결제 대기';
+    const paymentStatusLabel = getProxyPaymentStatusLabel(request);
 
     const nextActionMessage = (() => {
         if (request.payment_status === 'WAITING' && paymentMethod === 'bank') {
@@ -173,7 +168,7 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
         }
 
         if (request.payment_status === 'WAITING') {
-            return '결제 확인이 완료되면 운영팀이 메시지함 스레드에서 진행 여부와 통화 결과를 안내합니다.';
+            return '카드 결제가 완료되지 않아 아직 운영을 시작하지 않습니다.';
         }
 
         if (request.status === 'IN_PROGRESS') {
@@ -221,7 +216,19 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
 
                 {paymentState === 'failed' && (
                     <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
-                        카드 결제가 완료되지 않았습니다. 요청은 접수되어 있으며, 필요하면 운영팀 답변을 기다리거나 새로 다시 접수해 주세요.
+                        카드 결제가 완료되지 않았습니다. 중복 요청을 만들지 말고 이 요청의 결제 상태를 확인해주세요.
+                    </div>
+                )}
+
+                {paymentState === 'review' && (
+                    <div
+                        data-testid="proxy-card-payment-review-required"
+                        className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm leading-6 text-rose-800"
+                    >
+                        <p className="font-bold">결제 확인이 필요합니다.</p>
+                        <p className="mt-1">
+                            승인 확인 과정에서 응답이 완료되지 않아 자동 재결제를 막았습니다. 중복 결제를 피하기 위해 새 요청을 만들지 말고, 메시지함에서 운영팀에 주문번호 확인을 요청해주세요.
+                        </p>
                     </div>
                 )}
 
@@ -403,7 +410,7 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
                                     <button disabled={updating} onClick={() => handlePaymentAction('/api/admin/proxy-bookings/cancel-payment')} className="px-3 py-2 text-xs font-semibold rounded bg-slate-800 hover:bg-slate-700 transition-colors border border-slate-700 text-rose-400">결제 취소</button>
                                 </div>
                             ) : request.payment_status === 'WAITING' && paymentMethod === 'card' ? (
-                                <p className="text-xs text-slate-400">고객 카드 결제 대기 중입니다.</p>
+                                <p className="text-xs text-amber-300">카드 결제 미완료로 운영 시작 금지 상태입니다.</p>
                             ) : request.payment_status === 'COMPLETED' ? (
                                 <button disabled={updating} onClick={() => handlePaymentAction('/api/admin/proxy-bookings/refund-payment')} className="px-3 py-2 text-xs font-semibold rounded bg-slate-800 hover:bg-slate-700 transition-colors border border-slate-700 text-amber-300">환불 처리</button>
                             ) : (

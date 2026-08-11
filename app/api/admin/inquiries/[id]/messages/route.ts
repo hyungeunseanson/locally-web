@@ -8,6 +8,7 @@ import {
   getInquiryMessageDisplayContent,
   isAdminSupportInquiry,
   isOfficialInquirySupportMessage,
+  shouldApplyChatPolicySignals,
 } from '@/app/utils/inquiry';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
@@ -222,7 +223,7 @@ export async function GET(
       });
       const name = isOfficialSupport ? OFFICIAL_SUPPORT_SENDER_NAME : hostPublicProfile.name;
       const avatar = isOfficialSupport ? OFFICIAL_SUPPORT_AVATAR_SRC : hostPublicProfile.avatarUrl;
-      const signal = isOfficialSupport
+      const signal = isOfficialSupport || !shouldApplyChatPolicySignals(inquiryRow?.type)
         ? { matched: false, categories: [] }
         : detectChatPolicySignals(String(msg.content || ''), {
             activeCategories: ACTIVE_CHAT_POLICY_SIGNAL_CATEGORIES,

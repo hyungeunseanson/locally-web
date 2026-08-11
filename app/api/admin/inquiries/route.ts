@@ -5,6 +5,7 @@ import {
 } from '@/app/utils/chatPolicySignals';
 import {
   isOfficialInquirySupportMessage,
+  shouldApplyChatPolicySignals,
   SOFT_DELETED_INQUIRY_MESSAGE_TYPE,
 } from '@/app/utils/inquiry';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
@@ -153,7 +154,7 @@ export async function GET() {
         guestId: item.user_id,
         hostId: item.host_id,
       });
-      const signal = latestIsOfficialSupport
+      const signal = latestIsOfficialSupport || !shouldApplyChatPolicySignals(item.type)
         ? { matched: false, categories: [] }
         : detectChatPolicySignals(String(item.content || ''), {
             activeCategories: ACTIVE_CHAT_POLICY_SIGNAL_CATEGORIES,

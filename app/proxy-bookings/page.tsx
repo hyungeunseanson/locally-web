@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { createClient } from '@/app/utils/supabase/client';
 import { Plus, Phone, Clock, CheckCircle, XCircle } from 'lucide-react';
 import type { ProxyRequest } from '@/app/types/proxy';
-import { getProxyPaymentMethod, getProxyRequestTitle, getProxyRequesterDisplayName } from '@/app/utils/proxyBooking';
+import { getProxyPaymentMethod, getProxyPaymentStatusLabel, getProxyRequestTitle, getProxyRequesterDisplayName } from '@/app/utils/proxyBooking';
 
 export default function ProxyBookingsBoard() {
     const supabase = useMemo(() => createClient(), []);
@@ -51,19 +51,6 @@ export default function ProxyBookingsBoard() {
         }
     };
 
-    const getPaymentStatusLabel = (request: ProxyRequest) => {
-        switch (request.payment_status) {
-            case 'COMPLETED':
-                return '결제 완료';
-            case 'FAILED':
-                return '결제 취소';
-            case 'REFUNDED':
-                return '환불 완료';
-            default:
-                return getProxyPaymentMethod(request.form_data) === 'bank' ? '입금 대기' : '결제 대기';
-        }
-    };
-
     const getRequestDateSummary = (request: ProxyRequest) => {
         if (request.category === 'RESTAURANT') {
             const slot = typeof request.form_data?.preferred_slot_primary === 'string'
@@ -88,7 +75,7 @@ export default function ProxyBookingsBoard() {
         }
 
         if (request.payment_status === 'WAITING') {
-            return '결제 확인이 끝나면 운영팀이 메시지함 스레드에서 진행 상황을 안내합니다.';
+            return '카드 결제가 완료되지 않아 아직 운영을 시작하지 않습니다.';
         }
 
         if (request.status === 'IN_PROGRESS') {
@@ -175,7 +162,7 @@ export default function ProxyBookingsBoard() {
                                 <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 px-3 py-3">
                                     <div className="flex items-center justify-between gap-2 text-[11px] font-bold">
                                         <span className="text-slate-500">결제/처리 상태</span>
-                                        <span className="text-slate-700">{getPaymentStatusLabel(req)}</span>
+                                        <span className="text-slate-700">{getProxyPaymentStatusLabel(req)}</span>
                                     </div>
                                     <p className="mt-2 text-[12px] leading-5 text-slate-600">
                                         {getNextStepCopy(req)}

@@ -12,6 +12,7 @@ import { detectChatPolicySignals } from '@/app/utils/chatPolicySignals';
 import {
   isDeletedInquiryMessage,
   isOfficialInquirySupportMessage,
+  shouldApplyChatPolicySignals,
 } from '@/app/utils/inquiry';
 import { useAutoResizeTextarea } from '@/app/hooks/useAutoResizeTextarea';
 import {
@@ -69,7 +70,12 @@ export default function InquiryChat() {
   const guestIdFromUrl = searchParams.get('guestId');
   const expIdFromUrl = searchParams.get('expId');
   const [pendingChatCreated, setPendingChatCreated] = useState(false);
-  const chatPolicySignals = useMemo(() => detectChatPolicySignals(replyText), [replyText]);
+  const chatPolicySignals = useMemo(
+    () => shouldApplyChatPolicySignals(selectedInquiry?.type)
+      ? detectChatPolicySignals(replyText)
+      : { matched: false, categories: [] },
+    [replyText, selectedInquiry?.type]
+  );
   const chatPolicyWarningCopy = CHAT_POLICY_WARNING_COPY[lang] ?? CHAT_POLICY_WARNING_COPY.ko;
 
   const [modalUserId, setModalUserId] = useState<string | null>(null);

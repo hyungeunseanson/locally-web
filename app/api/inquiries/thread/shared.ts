@@ -14,6 +14,7 @@ import { sendTemplatedEmail } from '@/app/emails/delivery/sendTemplatedEmail';
 import type { EmailAudience } from '@/app/emails/registry/emailTypes';
 import { OFFICIAL_SUPPORT_SENDER_NAME } from '@/app/utils/officialSender';
 import { sanitizeText, sanitizeUrl } from '@/app/utils/sanitize';
+import { isAdminSupportInquiry, shouldApplyChatPolicySignals } from '@/app/utils/inquiry';
 
 type AuthActor = {
   id: string;
@@ -531,11 +532,7 @@ async function resolveAdminInitiatedSupportThread(params: {
 }
 
 function isAdminSupportType(type?: string | null) {
-  return type === 'admin' || type === 'admin_support';
-}
-
-function shouldDetectPolicySignals(type?: string | null) {
-  return !isAdminSupportType(type);
+  return isAdminSupportInquiry(type);
 }
 
 async function emitChatPolicySignal(params: {
@@ -549,7 +546,7 @@ async function emitChatPolicySignal(params: {
 }) {
   const { inquiryId, messageId, inquiryType, actor, actorIsAdmin, content, hasImage } = params;
 
-  if (actorIsAdmin || !shouldDetectPolicySignals(inquiryType)) return;
+  if (actorIsAdmin || !shouldApplyChatPolicySignals(inquiryType)) return;
 
   const signal = detectChatPolicySignals(content, {
     activeCategories: ACTIVE_CHAT_POLICY_SIGNAL_CATEGORIES,

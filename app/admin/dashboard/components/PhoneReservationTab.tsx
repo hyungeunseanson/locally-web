@@ -10,6 +10,7 @@ import {
   getProxyFormDisplayEntries,
   getProxyLinkedInquiryIdFromRequest,
   getProxyPaymentMethod,
+  getProxyPaymentStatusLabel,
   getProxyRequestFeeKrw,
   getProxyRequestTitle,
   getProxyRequesterDisplayName,
@@ -53,19 +54,6 @@ function getStatusBadge(status: string) {
       return <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-semibold flex items-center gap-1"><XCircle size={12} /> 취소됨</span>;
     default:
       return <span className="px-2 py-1 bg-slate-100 text-slate-700 rounded-full text-xs font-semibold">{status}</span>;
-  }
-}
-
-function getPaymentStatusLabel(status: PaymentStatus) {
-  switch (status) {
-    case 'COMPLETED':
-      return '결제 완료';
-    case 'FAILED':
-      return '결제 취소';
-    case 'REFUNDED':
-      return '환불 완료';
-    default:
-      return '결제 대기';
   }
 }
 
@@ -461,7 +449,11 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
                     </div>
                     <div className="flex items-center justify-between mt-3 text-[11px] text-slate-500">
                       <span>{new Date(item.created_at).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                      <span>{item.payment_channel}{paymentMethod ? ` · ${paymentMethod === 'card' ? '카드' : '무통장'}` : ''}</span>
+                      <span>
+                        {paymentMethod === 'card' && item.payment_status === 'WAITING'
+                          ? '카드 · 결제 미완료'
+                          : `${item.payment_channel}${paymentMethod ? ` · ${paymentMethod === 'card' ? '카드' : '무통장'}` : ''}`}
+                      </span>
                     </div>
                   </button>
                 );
@@ -516,14 +508,14 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <h4 className="font-bold text-slate-900">결제 정보</h4>
                   <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 border border-slate-200">
-                    {getPaymentStatusLabel(selectedRequest.payment_status)}
+                    {getProxyPaymentStatusLabel(selectedRequest)}
                   </span>
                 </div>
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                   <div className="flex justify-between gap-3"><span className="text-slate-500">결제 채널</span><span className="font-semibold">{selectedRequest.payment_channel}</span></div>
                   <div className="flex justify-between gap-3"><span className="text-slate-500">결제 수단</span><span className="font-semibold">{selectedPaymentMethod === 'card' ? '카드' : selectedPaymentMethod === 'bank' ? '무통장' : '미지정'}</span></div>
                   <div className="flex justify-between gap-3"><span className="text-slate-500">서비스 수수료</span><span className="font-semibold">₩{selectedServiceFee?.toLocaleString()}</span></div>
-                  <div className="flex justify-between gap-3"><span className="text-slate-500">결제 상태</span><span className="font-semibold">{getPaymentStatusLabel(selectedRequest.payment_status)}</span></div>
+                  <div className="flex justify-between gap-3"><span className="text-slate-500">결제 상태</span><span className="font-semibold">{getProxyPaymentStatusLabel(selectedRequest)}</span></div>
                   {selectedRequest.locally_order_id && (
                     <div className="flex justify-between gap-3 md:col-span-2"><span className="text-slate-500">주문번호</span><span className="font-mono text-xs">{selectedRequest.locally_order_id}</span></div>
                   )}
@@ -574,7 +566,7 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
 
                 {showCardWaitingHint && (
                   <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-                    카드 결제 완료 전에는 진행 상태를 바꿀 수 없습니다.
+                    카드 결제 미완료로 운영 시작 금지 상태입니다. 결제 완료 전에는 진행 상태를 바꿀 수 없습니다.
                   </div>
                 )}
 

@@ -14,6 +14,7 @@ import {
   isAdminSupportInquiry,
   isDeletedInquiryMessage,
   isOfficialInquirySupportMessage,
+  shouldApplyChatPolicySignals,
 } from '@/app/utils/inquiry';
 import { createClient } from '@/app/utils/supabase/client';
 import { getHostPublicProfile } from '@/app/utils/profile';
@@ -96,7 +97,12 @@ function InboxContent() {
   const expTitle = searchParams.get('expTitle');
 
   const [isUrlProcessed, setIsUrlProcessed] = useState(false);
-  const chatPolicySignals = useMemo(() => detectChatPolicySignals(inputText), [inputText]);
+  const chatPolicySignals = useMemo(
+    () => shouldApplyChatPolicySignals(selectedInquiry?.type)
+      ? detectChatPolicySignals(inputText)
+      : { matched: false, categories: [] },
+    [inputText, selectedInquiry?.type]
+  );
   const chatPolicyWarningCopy = CHAT_POLICY_WARNING_COPY[lang] ?? CHAT_POLICY_WARNING_COPY.ko;
 
   // 🟢 [헬퍼] 보안 이미지 및 시간 포맷

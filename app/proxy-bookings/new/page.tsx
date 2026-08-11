@@ -33,6 +33,18 @@ type PaymentChannel = 'NAVER' | 'LOCALLY';
 
 type CardReadyResponse = CardPaymentReadiness;
 
+type PendingProxyCardPayment = {
+  requestId: string;
+  inquiryRedirectUrl: string;
+  locallyOrderId: string;
+  finalAmount: number;
+  runtime: CardPaymentPublicRuntime;
+  buyerEmail?: string;
+  buyerName: string;
+  buyerTel: string;
+  productName: string;
+};
+
 type CategoryOption = {
   id: ProxyCategory;
   label: string;
@@ -578,6 +590,8 @@ export default function NewProxyBooking() {
   const [paymentChannel, setPaymentChannel] = useState<PaymentChannel>('NAVER');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
   const [cardRuntime, setCardRuntime] = useState<CardPaymentPublicRuntime | null>(null);
+  const [pendingCardPayment, setPendingCardPayment] = useState<PendingProxyCardPayment | null>(null);
+  const [cardRetryAvailable, setCardRetryAvailable] = useState(false);
   const [naverBuyerName, setNaverBuyerName] = useState('');
   const [contactName, setContactName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
@@ -741,8 +755,87 @@ export default function NewProxyBooking() {
     [categoryData]
   );
 
+  const runProxyCardPayment = async (pending: PendingProxyCardPayment) => {
+    let paymentSession;
+
+    try {
+      paymentSession = await launchCardPayment({
+        provider: pending.runtime.provider,
+        merchantCode: pending.runtime.merchantCode,
+        publicClientKey: pending.runtime.publicClientKey,
+        orderId: pending.locallyOrderId,
+        productName: pending.productName,
+        amount: pending.finalAmount,
+        buyerEmail: pending.buyerEmail,
+        buyerName: pending.buyerName,
+        buyerTel: pending.buyerTel,
+        redirectUrl: pending.inquiryRedirectUrl
+          ? `${window.location.origin}${pending.inquiryRedirectUrl}`
+          : `${window.location.origin}/guest/inbox`,
+      });
+    } catch (paymentError) {
+      console.error('[proxy-bookings/new] card payment launch failed:', paymentError);
+
+      if (pending.runtime.provider === 'nicepay') {
+        setPendingCardPayment(pending);
+        setCardRetryAvailable(true);
+        setError('요청은 저장됐지만 카드 결제는 완료되지 않았습니다. 새 요청을 만들지 말고 같은 요청으로 다시 결제해주세요.');
+        return;
+      }
+
+      setPendingCardPayment(null);
+      setCardRetryAvailable(false);
+      router.push(`/proxy-bookings/${encodeURIComponent(pending.requestId)}?payment=review`);
+      return;
+    }
+
+    setCardRetryAvailable(false);
+
+    const callbackRes = await fetch('/api/proxy-bookings/payment/nicepay-callback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(
+        buildCardPaymentCallbackRequestBody({
+          orderId: pending.locallyOrderId,
+          paymentSession,
+        })
+      ),
+    });
+
+    const callbackResult = await callbackRes.json().catch(() => null);
+    if (!callbackRes.ok || !callbackResult?.success) {
+      setPendingCardPayment(null);
+      router.push(`/proxy-bookings/${encodeURIComponent(pending.requestId)}?payment=review`);
+      return;
+    }
+
+    setPendingCardPayment(null);
+    router.push(pending.inquiryRedirectUrl || '/guest/inbox');
+  };
+
+  const handleCardPaymentRetry = async () => {
+    if (!pendingCardPayment || !cardRetryAvailable || loading) return;
+
+    setLoading(true);
+    setError(null);
+    try {
+      await runProxyCardPayment(pendingCardPayment);
+    } catch (paymentError) {
+      console.error('[proxy-bookings/new] card payment retry callback failed:', paymentError);
+      setPendingCardPayment(null);
+      setCardRetryAvailable(false);
+      router.push(`/proxy-bookings/${encodeURIComponent(pendingCardPayment.requestId)}?payment=review`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (pendingCardPayment) {
+      setError('이미 저장된 요청이 있습니다. 새로 제출하지 말고 같은 요청으로 카드 결제를 다시 시도해주세요.');
+      return;
+    }
     setLoading(true);
     setError(null);
 
@@ -818,46 +911,30 @@ export default function NewProxyBooking() {
         return;
       }
 
-      if (!locallyOrderId) {
-        router.push(inquiryRedirectUrl || `/guest/inbox`);
+      if (!locallyOrderId || !readiness?.runtime) {
+        router.push(`/proxy-bookings/${encodeURIComponent(requestId)}?payment=review`);
         return;
       }
 
       try {
-        const paymentSession = await launchCardPayment({
-          provider: readiness?.provider || 'portone',
-          merchantCode: readiness?.runtime?.merchantCode || cardRuntime?.merchantCode || '',
-          publicClientKey: readiness?.runtime?.publicClientKey || cardRuntime?.publicClientKey,
-          orderId: locallyOrderId,
-          productName: `Locally ${getProxyCategoryLabel(category)}`,
-          amount: finalAmount,
+        const pendingPayment: PendingProxyCardPayment = {
+          requestId,
+          inquiryRedirectUrl,
+          locallyOrderId,
+          finalAmount,
+          runtime: readiness.runtime,
           buyerEmail: user.email,
           buyerName: contactName.trim(),
           buyerTel: contactPhone.trim(),
-          redirectUrl: inquiryRedirectUrl ? `${window.location.origin}${inquiryRedirectUrl}` : `${window.location.origin}/guest/inbox`,
-        });
-
-        const callbackRes = await fetch('/api/proxy-bookings/payment/nicepay-callback', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(
-            buildCardPaymentCallbackRequestBody({
-              orderId: locallyOrderId,
-              paymentSession,
-            })
-          ),
-        });
-
-        const callbackResult = await callbackRes.json();
-        if (!callbackRes.ok || !callbackResult?.success) {
-          router.push(inquiryRedirectUrl || `/guest/inbox`);
-          return;
-        }
-
-        router.push(inquiryRedirectUrl || `/guest/inbox`);
+          productName: `Locally ${getProxyCategoryLabel(category)}`,
+        };
+        setPendingCardPayment(pendingPayment);
+        await runProxyCardPayment(pendingPayment);
       } catch (paymentError) {
-        console.error('[proxy-bookings/new] card payment failed:', paymentError);
-        router.push(inquiryRedirectUrl || `/guest/inbox`);
+        console.error('[proxy-bookings/new] card payment callback failed:', paymentError);
+        setPendingCardPayment(null);
+        setCardRetryAvailable(false);
+        router.push(`/proxy-bookings/${encodeURIComponent(requestId)}?payment=review`);
       }
     } catch (submitError: unknown) {
       setError(submitError instanceof Error ? submitError.message : '전화 예약 요청 생성에 실패했습니다.');
@@ -1519,8 +1596,22 @@ export default function NewProxyBooking() {
       </div>
 
       {error ? (
-        <div className="mb-6 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
-          {error}
+        <div className={`mb-6 rounded-2xl px-4 py-3 text-sm ${cardRetryAvailable ? 'border border-amber-200 bg-amber-50 text-amber-900' : 'border border-red-100 bg-red-50 text-red-600'}`}>
+          <p>{error}</p>
+          {cardRetryAvailable && pendingCardPayment ? (
+            <button
+              type="button"
+              data-testid="proxy-card-payment-retry"
+              disabled={loading}
+              onClick={() => {
+                void handleCardPaymentRetry();
+              }}
+              className="mt-3 inline-flex items-center justify-center gap-2 rounded-xl bg-black px-4 py-2.5 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+            >
+              {loading ? <Loader2 size={16} className="animate-spin" /> : null}
+              같은 요청으로 다시 결제
+            </button>
+          ) : null}
         </div>
       ) : null}
 
@@ -1698,7 +1789,7 @@ export default function NewProxyBooking() {
         </section>
 
         <button
-          disabled={loading || !agreedToTerms}
+          disabled={loading || !agreedToTerms || Boolean(pendingCardPayment)}
           type="submit"
           className="flex w-full items-center justify-center gap-2 rounded-2xl bg-black py-4 text-lg font-bold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
         >

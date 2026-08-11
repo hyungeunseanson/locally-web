@@ -177,6 +177,27 @@ export function getProxyPaymentMethod(
   return null;
 }
 
+export function getProxyPaymentStatusLabel(
+  request: Pick<ProxyRequest, 'payment_channel' | 'payment_status' | 'form_data'>
+) {
+  switch (request.payment_status) {
+    case 'COMPLETED':
+      return '결제 완료';
+    case 'FAILED':
+      return '결제 취소';
+    case 'REFUNDED':
+      return '환불 완료';
+    default:
+      if (request.payment_channel === 'NAVER') {
+        return '결제 확인 대기';
+      }
+
+      return getProxyPaymentMethod(request.form_data) === 'bank'
+        ? '입금 대기'
+        : '카드 결제 미완료';
+  }
+}
+
 export function getProxyLinkedInquiryId(
   formData: Record<string, unknown> | null | undefined
 ): string | null {
