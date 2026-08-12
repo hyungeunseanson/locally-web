@@ -68,9 +68,9 @@ export default function GlobalSupportReportButton() {
           data-testid="global-support-report-trigger"
           onClick={openInquiry}
           aria-label={copy.reportButtonLabel}
-          className={`fixed right-4 z-[90] inline-flex min-h-11 items-center gap-1.5 rounded-full border border-slate-200 bg-white/95 px-3 py-2 text-[11px] font-semibold text-slate-800 shadow-[0_10px_28px_rgba(15,23,42,0.18)] backdrop-blur transition hover:bg-slate-50 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 md:bottom-6 md:right-6 md:min-h-12 md:px-4 md:text-[13px] ${mobilePosition}`}
+          className={`fixed right-4 z-[90] inline-flex min-h-9 items-center gap-1 rounded-full border border-slate-700 bg-slate-900/95 px-2.5 py-1.5 text-[10px] font-semibold text-white shadow-[0_8px_22px_rgba(15,23,42,0.28)] backdrop-blur transition after:absolute after:-inset-1 after:content-[''] hover:bg-slate-950 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 md:bottom-6 md:right-6 md:min-h-10 md:px-3 md:text-[11px] ${mobilePosition}`}
         >
-          <AlertCircle size={17} aria-hidden="true" />
+          <AlertCircle size={14} aria-hidden="true" />
           <span>{copy.reportButtonLabel}</span>
         </button>
       )}
