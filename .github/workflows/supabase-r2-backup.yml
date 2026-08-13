@@ -130,6 +130,11 @@ jobs:
             --exclude-table-data=storage.buckets_vectors \
             --exclude-table-data=storage.vector_indexes \
             > "$backup_dir/database.dump"
+          docker run --rm --interactive \
+            public.ecr.aws/supabase/postgres:17.6.1.158 \
+            pg_restore --data-only --file - \
+            < "$backup_dir/database.dump" \
+            > "$backup_dir/database-data-for-counts.sql"
 
           psql "$SUPABASE_DB_URL" --variable ON_ERROR_STOP=1 --tuples-only --no-align <<'SQL' \
             > "$backup_dir/realtime.sql"
@@ -145,8 +150,8 @@ jobs:
             --file scripts/backup/catalog.sql > "$backup_dir/source-catalog.json"
 
           python3 scripts/backup/count-copy-rows.py \
-            "$backup_dir/data.sql" "$backup_dir/dump-counts.json"
-
+            "$backup_dir/database-data-for-counts.sql" "$backup_dir/dump-counts.json"
+          rm "$backup_dir/database-data-for-counts.sql"
 
           test -s "$backup_dir/roles.sql"
           test -s "$backup_dir/schema.sql"

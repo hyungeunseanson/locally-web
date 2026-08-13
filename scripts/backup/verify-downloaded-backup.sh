@@ -12,10 +12,10 @@ identity="$3"
 
 test -f "$identity"
 test "$(stat -f '%Lp' "$identity")" = "600"
-(
-  cd "$(dirname "$ciphertext")"
-  shasum -a 256 -c "$(basename "$ciphertext_checksum")"
-)
+expected_ciphertext_sha="$(awk 'NR == 1 { print $1 }' "$ciphertext_checksum")"
+actual_ciphertext_sha="$(shasum -a 256 "$ciphertext" | awk '{ print $1 }')"
+[[ "$expected_ciphertext_sha" == "$actual_ciphertext_sha" ]]
+echo "R2_CIPHERTEXT_CHECKSUM_PASS"
 
 verification_dir="$(mktemp -d)"
 trap 'rm -rf "$verification_dir"' EXIT
