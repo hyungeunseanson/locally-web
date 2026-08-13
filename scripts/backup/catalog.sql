@@ -50,11 +50,20 @@ SELECT jsonb_build_object(
   ), '')),
   'table_grants_digest', md5(COALESCE((
     SELECT string_agg(
-      concat_ws('|', table_schema, table_name, grantee, privilege_type, is_grantable),
-      E'\n' ORDER BY table_schema, table_name, grantee, privilege_type
+      concat_ws('|', namespace.nspname, relation.relname,
+        COALESCE(pg_get_userbyid(grant_entry.grantee), 'PUBLIC'),
+        grant_entry.privilege_type, grant_entry.is_grantable),
+      E'\n' ORDER BY namespace.nspname, relation.relname,
+        COALESCE(pg_get_userbyid(grant_entry.grantee), 'PUBLIC'),
+        grant_entry.privilege_type
     )
-    FROM information_schema.role_table_grants
-    WHERE table_schema IN ('public', 'auth', 'storage')
+    FROM pg_class AS relation
+    JOIN pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+    CROSS JOIN LATERAL aclexplode(
+      COALESCE(relation.relacl, acldefault('r', relation.relowner))
+    ) AS grant_entry
+    WHERE namespace.nspname IN ('public', 'auth', 'storage')
+      AND relation.relkind IN ('r', 'p', 'v', 'm', 'f')
   ), '')),
   'realtime_tables', COALESCE((
     SELECT jsonb_agg(jsonb_build_object('schema', schemaname, 'table', tablename)
