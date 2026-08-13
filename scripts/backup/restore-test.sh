@@ -32,6 +32,17 @@ docker exec "$restore_container" pg_isready -U postgres -d postgres >/dev/null
 docker cp "$backup_dir/database.dump" "$restore_container:/tmp/database.dump"
 docker cp "$backup_dir/roles.sql" "$restore_container:/tmp/roles.sql"
 
+docker exec --interactive "$restore_container" \
+  psql --username supabase_admin --dbname postgres --variable ON_ERROR_STOP=1 <<'SQL'
+DO $$
+BEGIN
+  CREATE ROLE supabase_realtime_admin NOLOGIN;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END
+$$;
+SQL
+
 docker exec "$restore_container" \
   createdb --username supabase_admin --template template0 locally_restore
 docker exec "$restore_container" \
