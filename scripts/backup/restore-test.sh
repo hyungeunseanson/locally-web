@@ -32,6 +32,11 @@ docker exec "$restore_container" pg_isready -U postgres -d postgres >/dev/null
 restore_url="postgresql://postgres:postgres@127.0.0.1:${restore_port}/postgres"
 
 psql "$restore_url" --variable ON_ERROR_STOP=1 <<'SQL'
+DROP SCHEMA IF EXISTS auth CASCADE;
+DROP SCHEMA IF EXISTS storage CASCADE;
+SQL
+
+psql "$restore_url" --variable ON_ERROR_STOP=1 <<'SQL'
 DO $$ BEGIN CREATE ROLE anon NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE ROLE authenticated NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE ROLE service_role NOLOGIN BYPASSRLS; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
