@@ -112,14 +112,18 @@ jobs:
             : > "$backup_dir/history_data.sql"
           fi
 
-          pg_dump "$SUPABASE_DB_URL" --schema-only --no-owner \
+          docker run --rm \
+            public.ecr.aws/supabase/postgres:17.6.1.158 \
+            pg_dump "$SUPABASE_DB_URL" --schema-only --no-owner \
             --schema=auth --schema=storage \
             --section=pre-data \
-            --file "$backup_dir/managed-auth-storage-pre.sql"
-          pg_dump "$SUPABASE_DB_URL" --schema-only --no-owner \
+            > "$backup_dir/managed-auth-storage-pre.sql"
+          docker run --rm \
+            public.ecr.aws/supabase/postgres:17.6.1.158 \
+            pg_dump "$SUPABASE_DB_URL" --schema-only --no-owner \
             --schema=auth --schema=storage \
             --section=post-data \
-            --file "$backup_dir/managed-auth-storage.sql"
+            > "$backup_dir/managed-auth-storage.sql"
 
           psql "$SUPABASE_DB_URL" --variable ON_ERROR_STOP=1 --tuples-only --no-align <<'SQL' \
             > "$backup_dir/realtime.sql"
