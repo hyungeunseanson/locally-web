@@ -1,0 +1,211 @@
+name: Supabase Production R2 Backup
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-production-r2-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: production-backup
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+      R2_ENDPOINT: ${{ vars.R2_ENDPOINT }}
+      R2_BUCKET: ${{ vars.R2_BUCKET }}
+      AGE_RECIPIENT: ${{ vars.AGE_RECIPIENT }}
+      SUPABASE_CLI_VERSION: 2.114.0
+      AGE_VERSION: 1.3.1
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Validate configuration
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for name in SUPABASE_DB_URL AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY R2_ENDPOINT R2_BUCKET AGE_RECIPIENT; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "Missing production-backup configuration: $name" >&2
+              exit 1
+            fi
+          done
+          [[ "$SUPABASE_DB_URL" == postgresql://* ]]
+          [[ "$R2_ENDPOINT" == https://*.r2.cloudflarestorage.com ]]
+          [[ "$R2_BUCKET" == locally-production-db-backups ]]
+          [[ "$AGE_RECIPIENT" == age1* ]]
+
+      - name: Install pinned tools
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client awscli
+
+          curl --fail --silent --show-error --location \
+            "https://github.com/supabase/cli/releases/download/v${SUPABASE_CLI_VERSION}/checksums.txt" \
+            --output /tmp/supabase-checksums.txt
+          curl --fail --silent --show-error --location \
+            "https://github.com/supabase/cli/releases/download/v${SUPABASE_CLI_VERSION}/supabase_linux_amd64.tar.gz" \
+            --output /tmp/supabase.tar.gz
+          expected_supabase_sha="$(awk '$2 == "supabase_linux_amd64.tar.gz" { print $1 }' /tmp/supabase-checksums.txt)"
+          actual_supabase_sha="$(sha256sum /tmp/supabase.tar.gz | awk '{ print $1 }')"
+          [[ -n "$expected_supabase_sha" && "$expected_supabase_sha" == "$actual_supabase_sha" ]]
+          tar -xzf /tmp/supabase.tar.gz -C /tmp supabase
+          sudo install -m 0755 /tmp/supabase /usr/local/bin/supabase
+
+          curl --fail --silent --show-error --location \
+            "https://github.com/FiloSottile/age/releases/download/v${AGE_VERSION}/age-v${AGE_VERSION}-linux-amd64.tar.gz" \
+            --output /tmp/age.tar.gz
+          echo "bdc69c09cbdd6cf8b1f333d372a1f58247b3a33146406333e30c0f26e8f51377  /tmp/age.tar.gz" \
+            | sha256sum --check --strict
+          tar -xzf /tmp/age.tar.gz -C /tmp
+          sudo install -m 0755 "/tmp/age/age" /usr/local/bin/age
+          supabase --version
+          age --version
+
+      - name: Create logical backup
+        id: backup
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          backup_id="$(date -u +'%Y-%m-%dT%H-%M-%SZ')-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          backup_dir="${RUNNER_TEMP}/locally-backup-${backup_id}"
+          mkdir -p "$backup_dir"
+          cp scripts/backup/catalog.sql "$backup_dir/catalog.sql"
+
+          supabase db dump --db-url "$SUPABASE_DB_URL" --file "$backup_dir/roles.sql" --role-only
+          supabase db dump --db-url "$SUPABASE_DB_URL" --file "$backup_dir/schema.sql"
+          supabase db dump --db-url "$SUPABASE_DB_URL" --file "$backup_dir/data.sql" \
+            --use-copy --data-only \
+            --exclude "storage.buckets_vectors" \
+            --exclude "storage.vector_indexes"
+          supabase db dump --db-url "$SUPABASE_DB_URL" \
+            --file "$backup_dir/history_schema.sql" --schema supabase_migrations
+          supabase db dump --db-url "$SUPABASE_DB_URL" \
+            --file "$backup_dir/history_data.sql" --use-copy --data-only --schema supabase_migrations
+
+          pg_dump "$SUPABASE_DB_URL" --schema-only --no-owner \
+            --schema=auth --schema=storage \
+            --section=pre-data \
+            --file "$backup_dir/managed-auth-storage-pre.sql"
+          pg_dump "$SUPABASE_DB_URL" --schema-only --no-owner \
+            --schema=auth --schema=storage \
+            --section=post-data \
+            --file "$backup_dir/managed-auth-storage.sql"
+
+          psql "$SUPABASE_DB_URL" --variable ON_ERROR_STOP=1 --tuples-only --no-align <<'SQL' \
+            > "$backup_dir/realtime.sql"
+          SELECT 'DROP PUBLICATION IF EXISTS supabase_realtime;';
+          SELECT 'CREATE PUBLICATION supabase_realtime;';
+          SELECT format('ALTER PUBLICATION supabase_realtime ADD TABLE %I.%I;', schemaname, tablename)
+          FROM pg_publication_tables
+          WHERE pubname = 'supabase_realtime'
+          ORDER BY schemaname, tablename;
+          SQL
+
+          psql "$SUPABASE_DB_URL" --variable ON_ERROR_STOP=1 \
+            --file scripts/backup/catalog.sql > "$backup_dir/source-catalog.json"
+
+          python3 scripts/backup/count-copy-rows.py \
+            "$backup_dir/data.sql" "$backup_dir/dump-counts.json"
+
+
+          test -s "$backup_dir/roles.sql"
+          test -s "$backup_dir/schema.sql"
+          test -s "$backup_dir/data.sql"
+          test -s "$backup_dir/source-catalog.json"
+          test -s "$backup_dir/dump-counts.json"
+
+          echo "backup_id=$backup_id" >> "$GITHUB_OUTPUT"
+          echo "backup_dir=$backup_dir" >> "$GITHUB_OUTPUT"
+          echo "object_key=daily/${backup_id}/locally-supabase-production-${backup_id}.tar.gz.age" >> "$GITHUB_OUTPUT"
+
+      - name: Restore into isolated Postgres and validate security boundaries
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          scripts/backup/restore-test.sh \
+            "${{ steps.backup.outputs.backup_dir }}" \
+            scripts/backup/assert-locally-security.sql
+
+      - name: Create checksums and encrypt before upload
+        id: encrypt
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          backup_dir="${{ steps.backup.outputs.backup_dir }}"
+          ciphertext="${RUNNER_TEMP}/locally-supabase-production-${{ steps.backup.outputs.backup_id }}.tar.gz.age"
+
+          (
+            cd "$backup_dir"
+            find . -type f ! -name SHA256SUMS -print0 \
+              | sort -z \
+              | xargs -0 sha256sum > SHA256SUMS
+          )
+
+          tar -C "$backup_dir" -czf - . \
+            | age --recipient "$AGE_RECIPIENT" --output "$ciphertext"
+          (
+            cd "$(dirname "$ciphertext")"
+            sha256sum "$(basename "$ciphertext")" > "$(basename "$ciphertext").sha256"
+          )
+
+          rm -rf "$backup_dir"
+          echo "ciphertext=$ciphertext" >> "$GITHUB_OUTPUT"
+
+      - name: Upload encrypted backup and checksum to private R2
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          object_key="${{ steps.backup.outputs.object_key }}"
+          ciphertext="${{ steps.encrypt.outputs.ciphertext }}"
+          aws s3 cp "$ciphertext" "s3://${R2_BUCKET}/${object_key}" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --no-progress \
+            --only-show-errors
+          aws s3 cp "${ciphertext}.sha256" "s3://${R2_BUCKET}/${object_key}.sha256" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --no-progress \
+            --only-show-errors
+
+      - name: Re-download and verify ciphertext integrity
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          object_key="${{ steps.backup.outputs.object_key }}"
+          verify_dir="${RUNNER_TEMP}/r2-verify"
+          mkdir -p "$verify_dir"
+          aws s3 cp "s3://${R2_BUCKET}/${object_key}" "$verify_dir/backup.tar.gz.age" \
+            --endpoint-url "$R2_ENDPOINT" --no-progress --only-show-errors
+          aws s3 cp "s3://${R2_BUCKET}/${object_key}.sha256" "$verify_dir/backup.tar.gz.age.sha256" \
+            --endpoint-url "$R2_ENDPOINT" --no-progress --only-show-errors
+          expected="$(awk '{ print $1 }' "$verify_dir/backup.tar.gz.age.sha256")"
+          actual="$(sha256sum "$verify_dir/backup.tar.gz.age" | awk '{ print $1 }')"
+          [[ "$expected" == "$actual" ]]
+          echo "R2_CIPHERTEXT_CHECKSUM_PASS"
+
+      - name: Publish non-sensitive summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### Supabase production backup"
+            echo "- Backup object prefix: daily/"
+            echo "- Encrypted before upload: age X25519 recipient"
+            echo "- Restore target: isolated disposable Postgres container"
+            echo "- Storage object bytes: not included"
+            echo "- Workflow result: ${{ job.status }}"
+          } >> "$GITHUB_STEP_SUMMARY"
