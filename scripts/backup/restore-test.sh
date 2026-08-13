@@ -19,7 +19,7 @@ trap cleanup EXIT
 docker run --detach --name "$restore_container" \
   -e POSTGRES_PASSWORD=postgres \
   -p "127.0.0.1:${restore_port}:5432" \
-  supabase/postgres:15.8.1.085 >/dev/null
+  public.ecr.aws/supabase/postgres:17.6.1.158 >/dev/null
 
 for _ in {1..90}; do
   if docker exec "$restore_container" pg_isready -U postgres -d postgres >/dev/null 2>&1; then
