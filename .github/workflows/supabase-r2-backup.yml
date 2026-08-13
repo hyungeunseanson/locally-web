@@ -28,7 +28,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
 
       - name: Validate configuration
         shell: bash
@@ -50,7 +50,8 @@ jobs:
         run: |
           set -Eeuo pipefail
           sudo apt-get update
-          sudo apt-get install --yes postgresql-client awscli
+          sudo apt-get install --yes postgresql-client
+          command -v aws >/dev/null
 
           curl --fail --silent --show-error --location \
             "https://github.com/supabase/cli/releases/download/v${SUPABASE_CLI_VERSION}/checksums.txt" \
@@ -73,6 +74,7 @@ jobs:
           sudo install -m 0755 "/tmp/age/age" /usr/local/bin/age
           supabase --version
           age --version
+          aws --version
 
       - name: Create logical backup
         id: backup
