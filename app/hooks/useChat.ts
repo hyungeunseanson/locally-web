@@ -17,7 +17,6 @@ import { getHostPublicProfile } from '@/app/utils/profile';
 type ProfileRow = {
   id: string;
   full_name?: string | null;
-  email?: string | null;
   avatar_url?: string | null;
 };
 
@@ -56,7 +55,6 @@ type InquiryListItem = InquiryRow & {
     id: string;
     name: string;
     avatar_url: string | null;
-    email?: string | null;
   };
   host?: {
     id: string | null;
@@ -175,9 +173,9 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         const guestIds = Array.from(new Set(inquiryRows.map((item) => item.user_id).filter(Boolean))) as string[];
 
         const [profilesRes, appsRes, guestProfilesRes, unreadRes] = await Promise.all([
-          supabase.from('profiles').select('id, full_name, email, avatar_url').in('id', hostIds),
+          supabase.from('public_profiles').select('id, full_name, avatar_url').in('id', hostIds),
           supabase.from('host_applications').select('user_id, name, profile_photo').in('user_id', hostIds),
-          supabase.from('profiles').select('id, full_name, email, avatar_url').in('id', guestIds),
+          supabase.from('public_profiles').select('id, full_name, avatar_url').in('id', guestIds),
           supabase.from('inquiry_messages')
             .select('inquiry_id')
             .in('inquiry_id', inquiryIds)
@@ -208,7 +206,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
           const hostPublicProfile = getHostPublicProfile(hostProfile, hostApp, '호스트');
 
           const guestProfile = guestMap.get(item.user_id);
-          const guestName = guestProfile?.full_name || guestProfile?.email?.split('@')[0] || '게스트';
+          const guestName = guestProfile?.full_name || '게스트';
           const guestAvatar = guestProfile?.avatar_url;
 
           return {
@@ -219,7 +217,6 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
               id: item.user_id,
               name: guestName,
               avatar_url: secureUrl(guestAvatar ?? null),
-              email: guestProfile?.email
             },
             host: {
               id: item.host_id,
@@ -307,7 +304,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         const rawMessages = data as InquiryMessageRow[];
         const senderIds = Array.from(new Set(rawMessages.map((m) => m.sender_id)));
         const [proRes, appRes] = await Promise.all([
-          supabase.from('profiles').select('id, full_name, email, avatar_url').in('id', senderIds),
+          supabase.from('public_profiles').select('id, full_name, avatar_url').in('id', senderIds),
           supabase.from('host_applications').select('user_id, name, profile_photo').in('user_id', senderIds)
         ]);
 

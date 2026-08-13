@@ -334,7 +334,7 @@ export default function AccountPage() {
         const [hostProfilesRes, hostApplicationsRes] = hostIds.length > 0
           ? await Promise.all([
             supabase
-              .from('profiles')
+              .from('public_profiles')
               .select('id, full_name, avatar_url')
               .in('id', hostIds),
             supabase

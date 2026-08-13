@@ -378,7 +378,7 @@ export default async function Page({ params }: Props) {
       }
 
       const [{ data: profile }, app] = await Promise.all([
-        supabase.from('profiles').select(HOST_PROFILE_SELECT).eq('id', experience.host_id).maybeSingle(),
+        supabase.from('public_profiles').select(HOST_PROFILE_SELECT).eq('id', experience.host_id).maybeSingle(),
         visibleHostApplication ? Promise.resolve(visibleHostApplication) : loadPublicHostApplication(supabase, experience.host_id),
       ]);
       const publicHostApplication = isPublicHostApplicationStatus(app?.status) ? app : null;

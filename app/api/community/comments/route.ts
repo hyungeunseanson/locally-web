@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
         const typedComments = comments as CommentRow[];
         const userIds = [...new Set(typedComments.map((comment) => comment.user_id))];
         const { data: profiles } = await supabase
-            .from('profiles')
+            .from('public_profiles')
             .select('id, full_name, avatar_url')
             .in('id', userIds);
 
@@ -173,7 +173,7 @@ export async function POST(request: NextRequest) {
         inserted = insertResult.data as CommentRow;
 
         const { data: profile } = await supabase
-            .from('profiles')
+            .from('public_profiles')
             .select('id, full_name, avatar_url')
             .eq('id', user.id)
             .maybeSingle();

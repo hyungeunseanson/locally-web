@@ -50,7 +50,7 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
 
       const [{ data: baseProfile }, publicDemographics] = await Promise.all([
         supabase
-          .from('profiles')
+          .from('public_profiles')
           .select('created_at, full_name, avatar_url, bio, introduction, nationality, mbti, languages')
           .eq('id', userId)
           .maybeSingle(),

@@ -179,8 +179,8 @@ function InboxContent() {
       try {
         const [profileRes, hostAppRes] = await Promise.all([
           supabase
-            .from('profiles')
-            .select('id, full_name, avatar_url, email')
+            .from('public_profiles')
+            .select('id, full_name, avatar_url')
             .eq('id', hostId)
             .maybeSingle(),
           supabase

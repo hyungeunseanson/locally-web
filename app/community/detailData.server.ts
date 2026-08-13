@@ -177,7 +177,7 @@ async function getCommunityDetailPostUncached(id: string) {
 
   const [profileResult, experienceResult] = await Promise.all([
     supabase
-      .from('profiles')
+      .from('public_profiles')
       .select('id, full_name, avatar_url')
       .eq('id', post.user_id)
       .maybeSingle(),

@@ -189,7 +189,7 @@ async function fetchCommunityBoardFeedUncached({
 
   const [profilesResult, experiencesResult] = await Promise.all([
     userIds.length > 0
-      ? supabase.from('profiles').select(COMMUNITY_FEED_PROFILE_SELECT).in('id', userIds)
+      ? supabase.from('public_profiles').select(COMMUNITY_FEED_PROFILE_SELECT).in('id', userIds)
       : Promise.resolve({ data: [], error: null }),
     loadVisibleLinkedExperiences(expIds).then((data) => ({ data, error: null })),
   ]);

@@ -47,7 +47,6 @@ type ReservationExperience = {
   title?: string | null;
 };
 
-type ReservationGuestRelation = ReservationGuest | ReservationGuest[] | null;
 type ReservationExperienceRelation = ReservationExperience | ReservationExperience[] | null;
 
 type ReservationRecord = {
@@ -66,6 +65,7 @@ type ReservationRecord = {
   payment_method?: string | null;
   tid?: string | null;
   contact_name?: string | null;
+  contact_phone?: string | null;
   cancel_reason?: string | null;
   refund_amount?: number | null;
   host_payout_amount?: number | null;
@@ -79,7 +79,6 @@ type ReservationRecord = {
 };
 
 type RawReservationRecord = Omit<ReservationRecord, 'guest' | 'experiences'> & {
-  guest?: ReservationGuestRelation;
   experiences?: ReservationExperienceRelation;
 };
 
@@ -130,6 +129,7 @@ const RESERVATION_SELECT = `
   payment_method,
   tid,
   contact_name,
+  contact_phone,
   cancel_reason,
   refund_amount,
   host_payout_amount,
@@ -139,28 +139,10 @@ const RESERVATION_SELECT = `
   guest_gender,
   experiences!inner (
     title
-  ),
-  guest:profiles!bookings_user_id_fkey (
-    id,
-    full_name,
-    avatar_url,
-    phone,
-    created_at,
-    introduction,
-    bio,
-    job,
-    languages,
-    nationality,
-    mbti
   )
 `;
 
 const REALTIME_REFRESH_DEBOUNCE_MS = 350;
-
-function getSingleGuest(guest?: ReservationGuestRelation) {
-  if (Array.isArray(guest)) return guest[0] ?? null;
-  return guest ?? null;
-}
 
 function getSingleExperience(experience?: ReservationExperienceRelation) {
   if (Array.isArray(experience)) return experience[0] ?? null;
@@ -335,25 +317,41 @@ export default function ReservationManager() {
 
       if (error) throw error;
       const now = new Date();
-      const nextReservations = ((data as RawReservationRecord[] | null) || [])
-        .filter((reservation) => !isUnapprovedCardPaymentAttempt(reservation))
-        .map((reservation) => {
-          const rawStatus = reservation.status;
-          const effectiveStatus = getEffectiveCompletedStatus(
-            rawStatus,
-            reservation.date,
-            reservation.time,
-            now
-          );
+      const reservationRows = ((data as RawReservationRecord[] | null) || [])
+        .filter((reservation) => !isUnapprovedCardPaymentAttempt(reservation));
+      const guestIds = Array.from(new Set(reservationRows.map((reservation) => reservation.user_id)));
+      const { data: guestRows, error: guestError } = guestIds.length > 0
+        ? await supabase
+          .from('public_profiles')
+          .select('id, full_name, avatar_url, created_at, introduction, bio, job, languages, nationality, mbti')
+          .in('id', guestIds)
+        : { data: [], error: null };
 
-          return {
-            ...reservation,
-            status: effectiveStatus,
-            raw_status: rawStatus,
-            guest: getSingleGuest(reservation.guest),
-            experiences: getSingleExperience(reservation.experiences),
-          };
-        });
+      if (guestError) throw guestError;
+      const guestById = new Map(
+        ((guestRows as ReservationGuest[] | null) || []).map((guest) => [String(guest.id), guest])
+      );
+      const nextReservations = reservationRows.map((reservation) => {
+        const rawStatus = reservation.status;
+        const effectiveStatus = getEffectiveCompletedStatus(
+          rawStatus,
+          reservation.date,
+          reservation.time,
+          now
+        );
+
+        return {
+          ...reservation,
+          status: effectiveStatus,
+          raw_status: rawStatus,
+          guest: {
+            ...(guestById.get(String(reservation.user_id)) || {}),
+            id: reservation.user_id,
+            phone: reservation.contact_phone || null,
+          },
+          experiences: getSingleExperience(reservation.experiences),
+        };
+      });
       setReservations(nextReservations);
       void fetchGuestMembershipStatuses(nextReservations.map((reservation) => reservation.user_id));
 

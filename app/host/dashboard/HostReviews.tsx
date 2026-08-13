@@ -9,6 +9,7 @@ import Skeleton from '@/app/components/ui/Skeleton';
 import { useLanguage } from '@/app/context/LanguageContext';
 
 type HostReviewGuest = {
+  id: string;
   full_name: string | null;
   avatar_url: string | null;
 };
@@ -66,14 +67,32 @@ export default function HostReviews() {
         .from('reviews')
         .select(`
           *,
-          experiences!inner ( id, title, host_id ),
-          guest:profiles!reviews_user_id_fkey ( full_name, avatar_url )
+          experiences!inner ( id, title, host_id )
         `)
         .eq('experiences.host_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setReviews((data as HostReview[]) || []);
+      const reviewRows = ((data as Array<Omit<HostReview, 'guest'>> | null) || []);
+      const guestIds = Array.from(
+        new Set(reviewRows.map((review) => review.user_id).filter((id): id is string => Boolean(id)))
+      );
+      const { data: guestRows, error: guestError } = guestIds.length > 0
+        ? await supabase
+          .from('public_profiles')
+          .select('id, full_name, avatar_url')
+          .in('id', guestIds)
+        : { data: [], error: null };
+
+      if (guestError) throw guestError;
+      const guestById = new Map(
+        ((guestRows as HostReviewGuest[] | null) || []).map((guest) => [guest.id, guest])
+      );
+
+      setReviews(reviewRows.map((review) => ({
+        ...review,
+        guest: review.user_id ? guestById.get(review.user_id) || null : null,
+      })));
 
     } catch (error) {
       console.error(error);
