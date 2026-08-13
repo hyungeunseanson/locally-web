@@ -1,6 +1,8 @@
 name: Supabase Production R2 Backup
 
 on:
+  schedule:
+    - cron: '17 18 * * *'
   workflow_dispatch:
 
 permissions:

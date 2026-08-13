@@ -4,6 +4,9 @@ Phase 1 stores a daily logical database backup in the private Cloudflare R2
 bucket `locally-production-db-backups`. The production application does not read
 from or write to this bucket.
 
+The GitHub Actions schedule runs daily at 18:17 UTC (03:17 KST on the following
+calendar day). Manual dispatch remains available for recovery rehearsals.
+
 ## Recovery coverage
 
 Included:
