@@ -70,6 +70,11 @@ and selective-recovery aids, not as the automated full-restore path. Run
 `scripts/backup/assert-locally-security.sql` before directing any traffic to the
 recovered database.
 
+The isolated rehearsal omits only ACL entries for the platform-managed
+`extensions` schema because a Supabase target owns those privileges. Grants in
+`public`, `auth`, and `storage` remain in the restore and are compared with the
+source catalog.
+
 The isolated CI restore is a recovery rehearsal, not authorization to overwrite
 Production. A real disaster recovery event also requires manually restoring the
 project-level settings and Storage object bytes listed above.

@@ -48,9 +48,12 @@ docker exec "$restore_container" \
 docker exec "$restore_container" \
   psql --username supabase_admin --dbname locally_restore \
   --variable ON_ERROR_STOP=1 --file /tmp/roles.sql
+docker exec "$restore_container" sh -c \
+  "pg_restore --list /tmp/database.dump | grep -Ev '; .* ACL - .* extensions([ .]|$)' > /tmp/restore.list"
 docker exec "$restore_container" \
   pg_restore --username supabase_admin --dbname locally_restore \
-  --single-transaction --exit-on-error /tmp/database.dump
+  --single-transaction --exit-on-error \
+  --use-list /tmp/restore.list /tmp/database.dump
 
 restore_url="postgresql://supabase_admin:postgres@127.0.0.1:${restore_port}/locally_restore"
 
