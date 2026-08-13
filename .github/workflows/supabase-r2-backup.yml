@@ -25,6 +25,7 @@ jobs:
       AGE_RECIPIENT: ${{ vars.AGE_RECIPIENT }}
       SUPABASE_CLI_VERSION: 2.114.0
       AGE_VERSION: 1.3.1
+      BOTO3_VERSION: 1.43.70
 
     steps:
       - name: Check out repository
@@ -50,8 +51,12 @@ jobs:
         run: |
           set -Eeuo pipefail
           sudo apt-get update
-          sudo apt-get install --yes postgresql-client
-          command -v aws >/dev/null
+          sudo apt-get install --yes postgresql-client python3-venv
+
+          python3 -m venv "${RUNNER_TEMP}/r2-venv"
+          "${RUNNER_TEMP}/r2-venv/bin/python" -m pip install \
+            --disable-pip-version-check --no-input "boto3==${BOTO3_VERSION}"
+          echo "${RUNNER_TEMP}/r2-venv/bin" >> "$GITHUB_PATH"
 
           curl --fail --silent --show-error --location \
             "https://github.com/supabase/cli/releases/download/v${SUPABASE_CLI_VERSION}/checksums.txt" \
@@ -74,7 +79,8 @@ jobs:
           sudo install -m 0755 "/tmp/age/age" /usr/local/bin/age
           supabase --version
           age --version
-          aws --version
+          "${RUNNER_TEMP}/r2-venv/bin/python" -c \
+            'import boto3; print("boto3", boto3.__version__)'
 
       - name: Create logical backup
         id: backup
@@ -174,14 +180,9 @@ jobs:
           set -Eeuo pipefail
           object_key="${{ steps.backup.outputs.object_key }}"
           ciphertext="${{ steps.encrypt.outputs.ciphertext }}"
-          aws s3 cp "$ciphertext" "s3://${R2_BUCKET}/${object_key}" \
-            --endpoint-url "$R2_ENDPOINT" \
-            --no-progress \
-            --only-show-errors
-          aws s3 cp "${ciphertext}.sha256" "s3://${R2_BUCKET}/${object_key}.sha256" \
-            --endpoint-url "$R2_ENDPOINT" \
-            --no-progress \
-            --only-show-errors
+          python3 scripts/backup/r2-object.py put "$ciphertext" "$object_key"
+          python3 scripts/backup/r2-object.py put \
+            "${ciphertext}.sha256" "${object_key}.sha256"
 
       - name: Re-download and verify ciphertext integrity
         shell: bash
@@ -190,10 +191,10 @@ jobs:
           object_key="${{ steps.backup.outputs.object_key }}"
           verify_dir="${RUNNER_TEMP}/r2-verify"
           mkdir -p "$verify_dir"
-          aws s3 cp "s3://${R2_BUCKET}/${object_key}" "$verify_dir/backup.tar.gz.age" \
-            --endpoint-url "$R2_ENDPOINT" --no-progress --only-show-errors
-          aws s3 cp "s3://${R2_BUCKET}/${object_key}.sha256" "$verify_dir/backup.tar.gz.age.sha256" \
-            --endpoint-url "$R2_ENDPOINT" --no-progress --only-show-errors
+          python3 scripts/backup/r2-object.py get \
+            "$verify_dir/backup.tar.gz.age" "$object_key"
+          python3 scripts/backup/r2-object.py get \
+            "$verify_dir/backup.tar.gz.age.sha256" "${object_key}.sha256"
           expected="$(awk '{ print $1 }' "$verify_dir/backup.tar.gz.age.sha256")"
           actual="$(sha256sum "$verify_dir/backup.tar.gz.age" | awk '{ print $1 }')"
           [[ "$expected" == "$actual" ]]
