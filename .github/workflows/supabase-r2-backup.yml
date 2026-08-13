@@ -64,7 +64,9 @@ jobs:
           curl --fail --silent --show-error --location \
             "https://github.com/supabase/cli/releases/download/v${SUPABASE_CLI_VERSION}/supabase_linux_amd64.tar.gz" \
             --output /tmp/supabase.tar.gz
-          expected_supabase_sha="$(awk '$2 == "supabase_linux_amd64.tar.gz" { print $1 }' /tmp/supabase-checksums.txt)"
+          expected_supabase_sha="$(awk -v version="$SUPABASE_CLI_VERSION" \
+            '$2 == "supabase_" version "_linux_amd64.tar.gz" { print $1 }' \
+            /tmp/supabase-checksums.txt)"
           actual_supabase_sha="$(sha256sum /tmp/supabase.tar.gz | awk '{ print $1 }')"
           [[ -n "$expected_supabase_sha" && "$expected_supabase_sha" == "$actual_supabase_sha" ]]
           tar -xzf /tmp/supabase.tar.gz -C /tmp supabase
