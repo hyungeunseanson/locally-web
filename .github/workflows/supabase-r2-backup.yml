@@ -127,8 +127,8 @@ jobs:
           docker run --rm \
             public.ecr.aws/supabase/postgres:17.6.1.158 \
             pg_dump "$SUPABASE_DB_URL" --format=custom \
-            --exclude-table=storage.buckets_vectors \
-            --exclude-table=storage.vector_indexes \
+            --exclude-table-data=storage.buckets_vectors \
+            --exclude-table-data=storage.vector_indexes \
             > "$backup_dir/database.dump"
 
           psql "$SUPABASE_DB_URL" --variable ON_ERROR_STOP=1 --tuples-only --no-align <<'SQL' \
