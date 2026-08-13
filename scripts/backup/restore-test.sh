@@ -83,6 +83,14 @@ for key in (
     "table_grants_digest",
 ):
     if source[key] != restored[key]:
+        if key == "policies_definition_digest":
+            source_policies = {item["key"]: item["digest"] for item in source["policies"]}
+            restored_policies = {item["key"]: item["digest"] for item in restored["policies"]}
+            differing = sorted(
+                policy for policy in source_policies.keys() | restored_policies.keys()
+                if source_policies.get(policy) != restored_policies.get(policy)
+            )
+            print("policy entries differing: " + ", ".join(differing), file=sys.stderr)
         raise SystemExit(f"{key} mismatch")
 
 source_realtime = source.get("realtime_tables", [])

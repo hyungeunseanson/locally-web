@@ -23,14 +23,25 @@ SELECT jsonb_build_object(
     FROM pg_policies
     WHERE schemaname IN ('public', 'auth', 'storage')
   ), '')),
+  'policies', COALESCE((
+    SELECT jsonb_agg(jsonb_build_object(
+      'key', concat_ws('.', schemaname, tablename, policyname),
+      'digest', md5(concat_ws('|', permissive, roles::text, cmd,
+        COALESCE(qual, ''), COALESCE(with_check, '')))
+    ) ORDER BY schemaname, tablename, policyname)
+    FROM pg_policies
+    WHERE schemaname IN ('public', 'auth', 'storage')
+  ), '[]'::jsonb),
   'functions_definition_digest', md5(COALESCE((
-    SELECT string_agg(pg_get_functiondef(proc.oid), E'\n' ORDER BY namespace.nspname, proc.proname, proc.oid)
+    SELECT string_agg(pg_get_functiondef(proc.oid), E'\n' ORDER BY
+      namespace.nspname, proc.proname, pg_get_function_identity_arguments(proc.oid))
     FROM pg_proc AS proc
     JOIN pg_namespace AS namespace ON namespace.oid = proc.pronamespace
     WHERE namespace.nspname IN ('public', 'auth', 'storage')
   ), '')),
   'triggers_definition_digest', md5(COALESCE((
-    SELECT string_agg(pg_get_triggerdef(trigger.oid, true), E'\n' ORDER BY trigger.oid)
+    SELECT string_agg(pg_get_triggerdef(trigger.oid, true), E'\n' ORDER BY
+      namespace.nspname, relation.relname, trigger.tgname)
     FROM pg_trigger AS trigger
     JOIN pg_class AS relation ON relation.oid = trigger.tgrelid
     JOIN pg_namespace AS namespace ON namespace.oid = relation.relnamespace
