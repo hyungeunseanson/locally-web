@@ -9,6 +9,8 @@ from or write to this bucket.
 Included:
 
 - PostgreSQL roles needed by the logical restore.
+- A dependency-ordered PostgreSQL custom-format archive (`database.dump`) used
+  by the automated isolated restore rehearsal.
 - Application schema, data, functions, RPCs, triggers, grants, RLS policies,
   views, and indexes captured by the Supabase CLI logical dump.
 - Supabase-managed data, including `auth.users`, `storage.buckets`, and
@@ -61,11 +63,12 @@ Successful output includes both the ciphertext checksum result and
 
 ## Full recovery requirements
 
-Restore only into a new or disposable project first. Use `psql` with
-`ON_ERROR_STOP=1` and a single transaction for the main roles/schema/data files.
-Then apply `managed-auth-storage.sql`, `realtime.sql`, and migration history.
-Run `scripts/backup/assert-locally-security.sql` before directing any traffic to
-the recovered database.
+Restore only into a new or disposable project first. Apply `roles.sql`, then
+restore `database.dump` with `pg_restore --single-transaction --exit-on-error`.
+The split schema/data and managed-schema SQL files are retained as inspection
+and selective-recovery aids, not as the automated full-restore path. Run
+`scripts/backup/assert-locally-security.sql` before directing any traffic to the
+recovered database.
 
 The isolated CI restore is a recovery rehearsal, not authorization to overwrite
 Production. A real disaster recovery event also requires manually restoring the

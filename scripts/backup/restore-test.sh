@@ -29,35 +29,19 @@ for _ in {1..90}; do
 done
 docker exec "$restore_container" pg_isready -U postgres -d postgres >/dev/null
 
-restore_url="postgresql://supabase_admin:postgres@127.0.0.1:${restore_port}/postgres"
+docker cp "$backup_dir/database.dump" "$restore_container:/tmp/database.dump"
+docker cp "$backup_dir/roles.sql" "$restore_container:/tmp/roles.sql"
 
-psql "$restore_url" --variable ON_ERROR_STOP=1 <<'SQL'
-DROP SCHEMA IF EXISTS auth CASCADE;
-DROP SCHEMA IF EXISTS storage CASCADE;
-SQL
+docker exec "$restore_container" \
+  createdb --username supabase_admin --template template0 locally_restore
+docker exec "$restore_container" \
+  psql --username supabase_admin --dbname locally_restore \
+  --variable ON_ERROR_STOP=1 --file /tmp/roles.sql
+docker exec "$restore_container" \
+  pg_restore --username supabase_admin --dbname locally_restore \
+  --single-transaction --exit-on-error /tmp/database.dump
 
-psql "$restore_url" --variable ON_ERROR_STOP=1 <<'SQL'
-DO $$ BEGIN CREATE ROLE anon NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE ROLE authenticated NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE ROLE service_role NOLOGIN BYPASSRLS; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-SQL
-
-psql "$restore_url" --single-transaction --variable ON_ERROR_STOP=1 \
-  --file "$backup_dir/roles.sql" \
-  --file "$backup_dir/managed-auth-storage-pre.sql" \
-  --file "$backup_dir/schema.sql" \
-  --command 'SET session_replication_role = replica' \
-  --file "$backup_dir/data.sql" \
-  --file "$backup_dir/managed-auth-storage.sql"
-
-psql "$restore_url" --single-transaction --variable ON_ERROR_STOP=1 \
-  --file "$backup_dir/realtime.sql"
-
-if [[ -s "$backup_dir/history_schema.sql" ]]; then
-  psql "$restore_url" --single-transaction --variable ON_ERROR_STOP=1 \
-    --file "$backup_dir/history_schema.sql" \
-    --file "$backup_dir/history_data.sql"
-fi
+restore_url="postgresql://supabase_admin:postgres@127.0.0.1:${restore_port}/locally_restore"
 
 psql "$restore_url" --variable ON_ERROR_STOP=1 --file "$assertions_sql"
 psql "$restore_url" --variable ON_ERROR_STOP=1 --file "$backup_dir/catalog.sql" \

@@ -124,6 +124,12 @@ jobs:
             --schema=auth --schema=storage \
             --section=post-data \
             > "$backup_dir/managed-auth-storage.sql"
+          docker run --rm \
+            public.ecr.aws/supabase/postgres:17.6.1.158 \
+            pg_dump "$SUPABASE_DB_URL" --format=custom \
+            --exclude-table=storage.buckets_vectors \
+            --exclude-table=storage.vector_indexes \
+            > "$backup_dir/database.dump"
 
           psql "$SUPABASE_DB_URL" --variable ON_ERROR_STOP=1 --tuples-only --no-align <<'SQL' \
             > "$backup_dir/realtime.sql"
@@ -145,6 +151,7 @@ jobs:
           test -s "$backup_dir/roles.sql"
           test -s "$backup_dir/schema.sql"
           test -s "$backup_dir/data.sql"
+          test -s "$backup_dir/database.dump"
           test -s "$backup_dir/source-catalog.json"
           test -s "$backup_dir/dump-counts.json"
 
