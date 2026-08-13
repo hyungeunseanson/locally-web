@@ -55,7 +55,7 @@ docker exec "$restore_container" \
 restore_url="postgresql://supabase_admin:postgres@127.0.0.1:${restore_port}/locally_restore"
 
 psql "$restore_url" --variable ON_ERROR_STOP=1 --file "$assertions_sql"
-psql "$restore_url" --variable ON_ERROR_STOP=1 --file "$backup_dir/catalog.sql" \
+psql "$restore_url" --quiet --variable ON_ERROR_STOP=1 --file "$backup_dir/catalog.sql" \
   > "$backup_dir/restored-catalog.json"
 
 python3 - "$backup_dir/source-catalog.json" "$backup_dir/restored-catalog.json" <<'PY'

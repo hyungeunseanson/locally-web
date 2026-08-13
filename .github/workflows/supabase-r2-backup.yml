@@ -141,7 +141,7 @@ jobs:
           ORDER BY schemaname, tablename;
           SQL
 
-          psql "$SUPABASE_DB_URL" --variable ON_ERROR_STOP=1 \
+          psql "$SUPABASE_DB_URL" --quiet --variable ON_ERROR_STOP=1 \
             --file scripts/backup/catalog.sql > "$backup_dir/source-catalog.json"
 
           python3 scripts/backup/count-copy-rows.py \
