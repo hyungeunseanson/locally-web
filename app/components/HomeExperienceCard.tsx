@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
@@ -23,6 +24,7 @@ import { CATEGORY_OPTIONS } from '@/app/host/create/config';
 import { formatLocalizedExperienceLocation } from '@/app/utils/locationLocalization';
 import ExperienceCardMeta from '@/app/components/ExperienceCardMeta';
 import { getExperienceCardImageUrl } from '@/app/utils/experienceImages';
+import { getCloudflareImageCanary } from '@/app/utils/cloudflareImageCanary';
 
 export interface HomeExperienceCardData {
   id: number | string;
@@ -94,20 +96,44 @@ export default function HomeExperienceCard({ data }: { data: HomeExperienceCardD
   const category = getContent(data, 'category', lang) || data.category || t('cat_exp');
   const location = formatLocalizedExperienceLocation(data, lang) || t('exp_card_location_fallback');
   const imageUrl = getExperienceCardImageUrl(data);
+  const canaryImage = getCloudflareImageCanary(data.id, imageUrl);
+  const [failedCanaryUrl, setFailedCanaryUrl] = useState<string | null>(null);
+  const canaryFailed = canaryImage?.largeUrl === failedCanaryUrl;
+
   return (
     <Link
       href={`/experiences/${data.id}`}
       className="group block transition-transform duration-200 active:scale-[0.985] md:hover:-translate-y-[2px] md:active:scale-100"
     >
       <div className="relative mb-2.5 overflow-hidden rounded-[22px] bg-slate-200 aspect-square border border-black/5 md:mb-3 md:rounded-[24px] shadow-[0_4px_12px_rgba(15,23,42,0.06)] md:shadow-[0_8px_18px_rgba(15,23,42,0.08)]">
-        <Image
-          src={imageUrl}
-          alt={title}
-          fill
-          quality={65}
-          className="object-cover transition-transform duration-500 ease-out md:group-hover:scale-[1.04]"
-          sizes="(max-width: 768px) 42vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 18vw"
-        />
+        {canaryImage && !canaryFailed ? (
+          <picture>
+            <source
+              srcSet={`${canaryImage.smallUrl} 384w, ${canaryImage.largeUrl} 640w`}
+              sizes="(max-width: 768px) 42vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 18vw"
+              type="image/webp"
+            />
+            <img
+              src={canaryImage.largeUrl}
+              alt={title}
+              loading="lazy"
+              decoding="async"
+              onError={() => setFailedCanaryUrl(canaryImage.largeUrl)}
+              className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-out md:group-hover:scale-[1.04]"
+              data-image-canary="cloudflare-r2"
+            />
+          </picture>
+        ) : (
+          <Image
+            src={imageUrl}
+            alt={title}
+            fill
+            quality={65}
+            className="object-cover transition-transform duration-500 ease-out md:group-hover:scale-[1.04]"
+            sizes="(max-width: 768px) 42vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 18vw"
+            data-image-canary={canaryImage ? 'supabase-fallback' : undefined}
+          />
+        )}
 
         <div className="absolute inset-x-3 top-3 z-10 flex items-center justify-start md:hidden">
           <div className="max-w-[66%] rounded-full bg-white px-2.5 py-1 text-[9px] font-semibold tracking-[-0.01em] text-[#2B2B2B] shadow-[0_2px_6px_rgba(0,0,0,0.08)]">
