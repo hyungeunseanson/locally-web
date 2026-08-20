@@ -5,6 +5,7 @@ import { User } from '@supabase/supabase-js';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 import { sanitizeText } from '@/app/utils/sanitize';
+import { SOFT_DELETED_INQUIRY_MESSAGE_TYPE } from '@/app/utils/inquiry';
 
 type MonitorInquiry = {
   id: number | string;
@@ -25,6 +26,7 @@ type MonitorMessage = {
   id: number | string;
   sender_id: string;
   content: string;
+  image_url?: string | null;
   type?: string | null;
   sender?: { name?: string | null };
   has_policy_signal?: boolean;
@@ -35,6 +37,9 @@ type InquiryMessageRealtimeRow = {
   id?: number | string;
   sender_id?: string;
   inquiry_id?: number | string;
+  content?: string | null;
+  image_url?: string | null;
+  type?: string | null;
 };
 
 type InquiryRealtimeRow = {
@@ -61,7 +66,16 @@ function isAdminSupportType(type?: string | null) {
 }
 
 function sortMonitorInquiries(items: MonitorInquiry[]) {
-  return [...items].sort((a, b) => new Date(b.updated_at || '').getTime() - new Date(a.updated_at || '').getTime());
+  return [...items].sort((a, b) => {
+    const aIsResolvedSupport = isAdminSupportType(a.type) && a.status === 'resolved';
+    const bIsResolvedSupport = isAdminSupportType(b.type) && b.status === 'resolved';
+
+    if (aIsResolvedSupport !== bIsResolvedSupport) {
+      return aIsResolvedSupport ? 1 : -1;
+    }
+
+    return new Date(b.updated_at || '').getTime() - new Date(a.updated_at || '').getTime();
+  });
 }
 
 function mergeMonitorInquiry(
@@ -117,22 +131,26 @@ export function useAdminChatQuery() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | undefined>();
+  const [isMessagesLoading, setIsMessagesLoading] = useState(false);
+  const [messageError, setMessageError] = useState<string | undefined>();
 
   const supabase = useMemo(() => createClient(), []);
   const { showToast } = useToast();
 
   const inquiriesRef = useRef<MonitorInquiry[]>([]);
   const selectedInquiryRef = useRef<MonitorInquiry | null>(null);
+  const messagesRef = useRef<MonitorMessage[]>([]);
   const processedEventRef = useRef<Set<string>>(new Set());
   const fetchInquiriesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const messageRequestVersionRef = useRef(0);
 
   const getAuthenticatedUser = useCallback(async (): Promise<User | null> => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (user && (!currentUser || currentUser.id !== user.id)) {
-      setCurrentUser(user);
+    if (user) {
+      setCurrentUser((previousUser) => previousUser?.id === user.id ? previousUser : user);
     }
     return user;
-  }, [supabase, currentUser]);
+  }, [supabase]);
 
   const syncSelectedInquiryFromRows = useCallback((nextInquiries: MonitorInquiry[]) => {
     if (!selectedInquiryRef.current) return;
@@ -196,9 +214,7 @@ export function useAdminChatQuery() {
       }
 
       const nextInquiries = Array.isArray(result.data) ? result.data as MonitorInquiry[] : [];
-      setInquiries(nextInquiries);
-      inquiriesRef.current = nextInquiries;
-      syncSelectedInquiryFromRows(nextInquiries);
+      commitInquiries(nextInquiries);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '로딩 오류';
       console.error('[AdminChatQuery] fetchInquiries error:', err);
@@ -206,9 +222,33 @@ export function useAdminChatQuery() {
     } finally {
       setIsLoading(false);
     }
-  }, [getAuthenticatedUser, syncSelectedInquiryFromRows]);
+  }, [commitInquiries, getAuthenticatedUser]);
 
-  const loadMessages = useCallback(async (inquiryId: number | string) => {
+  const loadMessages = useCallback(async (
+    inquiryId: number | string,
+    options: { select?: boolean } = {}
+  ) => {
+    const shouldSelect = options.select === true;
+    const targetId = String(inquiryId);
+
+    if (!shouldSelect && String(selectedInquiryRef.current?.id ?? '') !== targetId) {
+      return false;
+    }
+
+    if (shouldSelect) {
+      const selectedFromList = inquiriesRef.current.find((inquiry) => String(inquiry.id) === targetId);
+      if (!selectedFromList) return false;
+
+      selectedInquiryRef.current = selectedFromList;
+      setSelectedInquiry(selectedFromList);
+      messagesRef.current = [];
+      setMessages([]);
+      setMessageError(undefined);
+      setIsMessagesLoading(true);
+    }
+
+    const requestVersion = ++messageRequestVersionRef.current;
+
     try {
       const response = await fetch(`/api/admin/inquiries/${inquiryId}/messages`);
       const result = await response.json();
@@ -217,12 +257,21 @@ export function useAdminChatQuery() {
         throw new Error(result.error || '메시지를 불러오지 못했습니다.');
       }
 
-      setMessages(Array.isArray(result.data) ? result.data : []);
+      if (
+        requestVersion !== messageRequestVersionRef.current ||
+        String(selectedInquiryRef.current?.id ?? '') !== targetId
+      ) {
+        return false;
+      }
+
+      const nextMessages = Array.isArray(result.data) ? result.data as MonitorMessage[] : [];
+      messagesRef.current = nextMessages;
+      setMessages(nextMessages);
 
       const inquiryDetail = typeof result.inquiry === 'object' && result.inquiry !== null
           ? result.inquiry as Partial<MonitorInquiry>
           : null;
-      const selectedFromList = inquiriesRef.current.find((inquiry) => String(inquiry.id) === String(inquiryId));
+      const selectedFromList = inquiriesRef.current.find((inquiry) => String(inquiry.id) === targetId);
       const nextSelected = mergeMonitorInquiry(
         selectedInquiryRef.current && String(selectedInquiryRef.current.id) === String(inquiryId)
           ? selectedInquiryRef.current
@@ -250,11 +299,40 @@ export function useAdminChatQuery() {
           ...(shouldClearUnread ? { unread_count: 0 } : {}),
         });
       }
+
+      return true;
     } catch (err: unknown) {
       console.error('[AdminChatQuery] loadMessages error:', err);
-      showToast('메시지를 불러오지 못했습니다.', 'error');
+      if (
+        requestVersion === messageRequestVersionRef.current &&
+        String(selectedInquiryRef.current?.id ?? '') === targetId
+      ) {
+        if (shouldSelect) {
+          setMessageError('메시지를 불러오지 못했습니다. 다시 시도해주세요.');
+        } else {
+          showToast('메시지를 불러오지 못했습니다.', 'error');
+        }
+      }
+      return false;
+    } finally {
+      if (
+        shouldSelect &&
+        requestVersion === messageRequestVersionRef.current &&
+        String(selectedInquiryRef.current?.id ?? '') === targetId
+      ) {
+        setIsMessagesLoading(false);
+      }
     }
   }, [patchInquiry, showToast]);
+
+  const selectInquiry = useCallback((inquiryId: number | string) => {
+    return loadMessages(inquiryId, { select: true });
+  }, [loadMessages]);
+
+  const retrySelectedInquiry = useCallback(() => {
+    if (!selectedInquiryRef.current) return Promise.resolve(false);
+    return loadMessages(selectedInquiryRef.current.id, { select: true });
+  }, [loadMessages]);
 
   const sendMessage = async (inquiryId: number | string, content: string): Promise<AdminSendMessageResult> => {
     const cleanContent = sanitizeText(content);
@@ -308,11 +386,15 @@ export function useAdminChatQuery() {
     }
   };
 
-  const clearSelected = () => {
+  const clearSelected = useCallback(() => {
+    messageRequestVersionRef.current += 1;
     selectedInquiryRef.current = null;
+    messagesRef.current = [];
     setSelectedInquiry(null);
     setMessages([]);
-  };
+    setIsMessagesLoading(false);
+    setMessageError(undefined);
+  }, []);
 
   const scheduleFetchInquiries = useCallback((delay = 250) => {
     if (fetchInquiriesTimerRef.current) {
@@ -367,8 +449,23 @@ export function useAdminChatQuery() {
           const inquiryId = newPayload?.inquiry_id || oldPayload?.inquiry_id;
           if (!inquiryId || !selectedInquiryRef.current) return;
 
-          if (String(inquiryId) === String(selectedInquiryRef.current.id)) {
-            loadMessages(selectedInquiryRef.current.id);
+          if (
+            String(inquiryId) === String(selectedInquiryRef.current.id)
+          ) {
+            const currentMessage = messagesRef.current.find(
+              (message) => String(message.id) === String(newPayload?.id ?? oldPayload?.id ?? '')
+            );
+            const displayContentChanged =
+              newPayload?.type === SOFT_DELETED_INQUIRY_MESSAGE_TYPE ||
+              Boolean(currentMessage && (
+                (newPayload?.type !== undefined && newPayload.type !== currentMessage.type) ||
+                (newPayload?.content !== undefined && newPayload.content !== currentMessage.content) ||
+                (newPayload?.image_url !== undefined && newPayload.image_url !== currentMessage.image_url)
+              ));
+
+            if (displayContentChanged) {
+              loadMessages(selectedInquiryRef.current.id);
+            }
           }
         }
       )
@@ -382,7 +479,11 @@ export function useAdminChatQuery() {
           scheduleFetchInquiries();
           // 열려있는 문의가 업데이트 된 경우 객체 갱신
           if (selectedInquiryRef.current && String(newPayload.id) === String(selectedInquiryRef.current.id)) {
-             setSelectedInquiry((prev) => prev ? { ...prev, ...newPayload } : prev);
+             const nextSelected = mergeMonitorInquiry(selectedInquiryRef.current, newPayload);
+             if (nextSelected) {
+               selectedInquiryRef.current = nextSelected;
+               setSelectedInquiry(nextSelected);
+             }
           }
         }
       )
@@ -402,7 +503,11 @@ export function useAdminChatQuery() {
     messages,
     isLoading,
     error,
+    isMessagesLoading,
+    messageError,
     loadMessages,
+    selectInquiry,
+    retrySelectedInquiry,
     sendMessage,
     clearSelected,
     refresh: fetchInquiries,

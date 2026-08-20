@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import Image from 'next/image';
 import { MessageCircle, User, Send, RefreshCw, Loader2, AlertTriangle, Eye, Shield, Trash2 } from 'lucide-react';
@@ -76,27 +76,55 @@ export default function ChatMonitor() {
     selectedInquiry,
     messages,
     loadMessages,
+    selectInquiry,
+    retrySelectedInquiry,
     clearSelected,
     sendMessage,
     refresh,
     isLoading,
-    error
+    error,
+    isMessagesLoading,
+    messageError,
   } = useAdminChatQuery();
 
   const { showToast } = useToast();
   const { requestConfirm, ConfirmDialogElement } = useConfirmDialog();
   const [activeTab, setActiveTab] = useState<'monitor' | 'admin'>('admin');
   const [csStatusFilter, setCsStatusFilter] = useState<CSStatusFilter>('ALL');
-  const [replyText, setReplyText] = useState('');
+  const [draftsByInquiryId, setDraftsByInquiryId] = useState<Record<string, string>>({});
   const [isSending, setIsSending] = useState(false);
   const [profileModal, setProfileModal] = useState<ChatParticipantProfile | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const sendingRef = useRef(false);
+  const appliedDeepLinkIdRef = useRef<string | null>(null);
+  const pendingUrlSelectionIdRef = useRef<string | null>(null);
+  const lastSelectedInquiryIdRef = useRef<string | null>(null);
+  const pendingInitialScrollInquiryIdRef = useRef<string | null>(null);
+  const isNearBottomRef = useRef(true);
+  const selectedInquiryId = selectedInquiry ? String(selectedInquiry.id) : null;
+  const replyText = selectedInquiryId ? draftsByInquiryId[selectedInquiryId] || '' : '';
   const composerRef = useAutoResizeTextarea(replyText);
 
-  useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages]);
+  useLayoutEffect(() => {
+    if (selectedInquiryId !== lastSelectedInquiryIdRef.current) {
+      lastSelectedInquiryIdRef.current = selectedInquiryId;
+      pendingInitialScrollInquiryIdRef.current = selectedInquiryId;
+    }
+
+    const scrollContainer = scrollRef.current;
+    if (!scrollContainer || !selectedInquiryId || messages.length === 0) return;
+
+    const shouldScrollToBottom =
+      pendingInitialScrollInquiryIdRef.current === selectedInquiryId ||
+      isNearBottomRef.current;
+
+    if (!shouldScrollToBottom) return;
+
+    scrollContainer.scrollTop = scrollContainer.scrollHeight;
+    if (pendingInitialScrollInquiryIdRef.current === selectedInquiryId) {
+      pendingInitialScrollInquiryIdRef.current = null;
+    }
+  }, [messages, selectedInquiryId]);
 
   useEffect(() => {
     setProfileModal(null);
@@ -104,18 +132,72 @@ export default function ChatMonitor() {
 
   // URL ?inquiryId=X 파라미터로 특정 1:1 문의 자동 선택 (DetailsPanel에서 CS 개시 후 이동)
   useEffect(() => {
-    if (!targetInquiryId || !inquiries?.length) return;
-    const target = inquiries.find((inq: MonitorInquiry) => String(inq.id) === String(targetInquiryId));
-    if (target) {
-      setActiveTab(isAdminSupportInquiry(target.type) ? 'admin' : 'monitor');
-      loadMessages(target.id);
+    if (!targetInquiryId) {
+      appliedDeepLinkIdRef.current = null;
+      pendingUrlSelectionIdRef.current = null;
+      return;
     }
-  }, [targetInquiryId, inquiries, loadMessages]);
 
-  const handleClearSelected = () => {
+    const targetId = String(targetInquiryId);
+    if (pendingUrlSelectionIdRef.current && pendingUrlSelectionIdRef.current !== targetId) {
+      return;
+    }
+    if (!inquiries?.length) return;
+
+    const target = inquiries.find((inq: MonitorInquiry) => String(inq.id) === String(targetInquiryId));
+    if (!target) return;
+
+    if (pendingUrlSelectionIdRef.current === targetId) {
+      pendingUrlSelectionIdRef.current = null;
+    }
+    if (appliedDeepLinkIdRef.current === targetId) return;
+
+    appliedDeepLinkIdRef.current = targetId;
+    setActiveTab(isAdminSupportInquiry(target.type) ? 'admin' : 'monitor');
+    if (String(selectedInquiry?.id ?? '') !== targetId) {
+      void selectInquiry(target.id);
+    }
+  }, [targetInquiryId, inquiries, selectInquiry, selectedInquiry?.id]);
+
+  const replaceInquiryInUrl = useCallback((inquiryId?: number | string) => {
+    const nextParams = new URLSearchParams(searchParams.toString());
+    if (inquiryId == null) {
+      nextParams.delete('inquiryId');
+    } else {
+      nextParams.set('inquiryId', String(inquiryId));
+    }
+    const query = nextParams.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }, [pathname, router, searchParams]);
+
+  const handleClearSelected = useCallback(() => {
     clearSelected();
-    if (targetInquiryId) {
-      router.replace(pathname, { scroll: false });
+    appliedDeepLinkIdRef.current = targetInquiryId ? String(targetInquiryId) : null;
+    pendingUrlSelectionIdRef.current = null;
+    replaceInquiryInUrl();
+  }, [clearSelected, replaceInquiryInUrl, targetInquiryId]);
+
+  const handleSelectInquiry = (inquiryId: number | string) => {
+    const targetId = String(inquiryId);
+    pendingUrlSelectionIdRef.current = targetId;
+    appliedDeepLinkIdRef.current = targetId;
+    void selectInquiry(inquiryId);
+    replaceInquiryInUrl(inquiryId);
+  };
+
+  const handleActiveTabChange = (nextTab: 'monitor' | 'admin') => {
+    if (nextTab === activeTab) return;
+    setActiveTab(nextTab);
+    handleClearSelected();
+  };
+
+  const handleCSStatusFilterChange = (nextFilter: CSStatusFilter) => {
+    setCsStatusFilter(nextFilter);
+    if (!selectedInquiry || !isAdminSupportInquiry(selectedInquiry.type)) return;
+
+    const selectedStatus = selectedInquiry.status || 'open';
+    if (nextFilter !== 'ALL' && selectedStatus !== nextFilter) {
+      handleClearSelected();
     }
   };
 
@@ -151,7 +233,7 @@ export default function ChatMonitor() {
   };
 
   const handleSend = async () => {
-    if (sendingRef.current || !selectedInquiry || !replyText.trim()) return;
+    if (sendingRef.current || isMessagesLoading || messageError || !selectedInquiry || !replyText.trim()) return;
 
     const inquiryId = selectedInquiry.id;
     const inquiryType = selectedInquiry.type;
@@ -163,7 +245,15 @@ export default function ChatMonitor() {
 
     try {
       const messageResult = await sendMessage(inquiryId, submittedText);
-      setReplyText((current) => (current === submittedText ? '' : current));
+      setDraftsByInquiryId((current) => {
+        if (current[String(inquiryId)] !== submittedText) return current;
+        const remainingDrafts = { ...current };
+        delete remainingDrafts[String(inquiryId)];
+        return remainingDrafts;
+      });
+      if (lastSelectedInquiryIdRef.current === String(inquiryId) && scrollRef.current) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      }
 
       // 🟢 첫 번째 답변 시: '대기(open)' 상태를 '처리중(in_progress)'으로 자동 전환
       if (activeTab === 'admin' && isAdminSupportInquiry(inquiryType)) {
@@ -282,6 +372,22 @@ export default function ChatMonitor() {
     return inq.status === csStatusFilter;
   });
 
+  useEffect(() => {
+    if (!selectedInquiry) return;
+
+    const selectedIsAdmin = isAdminSupportInquiry(selectedInquiry.type);
+    const belongsToActiveTab = activeTab === 'admin' ? selectedIsAdmin : !selectedIsAdmin;
+    const selectedStatus = selectedInquiry.status || 'open';
+    const belongsToStatusFilter =
+      activeTab !== 'admin' ||
+      csStatusFilter === 'ALL' ||
+      selectedStatus === csStatusFilter;
+
+    if (!belongsToActiveTab || !belongsToStatusFilter) {
+      handleClearSelected();
+    }
+  }, [activeTab, csStatusFilter, handleClearSelected, selectedInquiry]);
+
   const selectedIsAdminSupport = isAdminSupportInquiry(selectedInquiry?.type);
   const hasWarning = selectedInquiry
     ? Boolean(
@@ -308,13 +414,13 @@ export default function ChatMonitor() {
 
           <div className="flex bg-slate-200/50 p-1 rounded-lg md:rounded-xl">
             <button
-              onClick={() => setActiveTab('admin')}
+              onClick={() => handleActiveTabChange('admin')}
               className={`flex-1 flex items-center justify-center gap-1.5 md:gap-2 py-1.5 md:py-1.5 text-[10px] md:text-[11px] font-bold rounded-md md:rounded-lg transition-all ${activeTab === 'admin' ? 'bg-white text-green-600 shadow-sm' : 'text-slate-500 hover:bg-slate-200/50'}`}
             >
               <Shield size={12} className="md:w-3.5 md:h-3.5" /> 1:1 문의
             </button>
             <button
-              onClick={() => setActiveTab('monitor')}
+              onClick={() => handleActiveTabChange('monitor')}
               className={`flex-1 flex items-center justify-center gap-1.5 md:gap-2 py-1.5 md:py-1.5 text-[10px] md:text-[11px] font-bold rounded-md md:rounded-lg transition-all ${activeTab === 'monitor' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:bg-slate-200/50'}`}
             >
               <Eye size={12} className="md:w-3.5 md:h-3.5" /> 실시간 모니터링
@@ -327,7 +433,7 @@ export default function ChatMonitor() {
               {(['ALL', 'open', 'in_progress', 'resolved'] as CSStatusFilter[]).map((s) => (
                 <button
                   key={s}
-                  onClick={() => setCsStatusFilter(s)}
+                  onClick={() => handleCSStatusFilterChange(s)}
                   className={`px-2 md:px-2 py-0.5 md:py-0.5 rounded-full text-[9px] md:text-[10px] font-bold border transition-colors ${csStatusFilter === s
                     ? 'bg-slate-800 text-white border-slate-800'
                     : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100'
@@ -368,7 +474,7 @@ export default function ChatMonitor() {
                 data-has-policy-signal={
                   inq.has_policy_signal && !isAdminSupportInquiry(inq.type) ? 'true' : 'false'
                 }
-                onClick={() => loadMessages(inq.id)}
+                onClick={() => handleSelectInquiry(inq.id)}
                 className={`p-3 md:px-3 md:py-2.5 border-b border-slate-100 cursor-pointer transition-colors hover:bg-slate-50 md:min-h-[76px] ${selectedInquiry?.id === inq.id ? 'bg-blue-50 border-l-[3px] md:border-l-4 border-l-blue-500' : 'border-l-[3px] md:border-l-4 border-l-transparent'}`}
               >
                 <div className="flex items-start justify-between gap-2 mb-1.5">
@@ -543,7 +649,15 @@ export default function ChatMonitor() {
               </div>
             </div>
 
-            <div className="flex-1 p-3 md:p-6 overflow-y-auto bg-slate-50 space-y-3 md:space-y-4 relative custom-scrollbar" ref={scrollRef}>
+            <div
+              className="flex-1 p-3 md:p-6 overflow-y-auto bg-slate-50 space-y-3 md:space-y-4 relative custom-scrollbar"
+              ref={scrollRef}
+              data-testid="admin-chat-message-list"
+              onScroll={(event) => {
+                const { scrollTop, scrollHeight, clientHeight } = event.currentTarget;
+                isNearBottomRef.current = scrollHeight - scrollTop - clientHeight <= 64;
+              }}
+            >
               {hasWarning && (
                 <div className="sticky top-0 z-10 mx-auto max-w-[80%] mb-4 animate-in slide-in-from-top-2">
                   <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-2 rounded-xl shadow-sm flex items-center gap-2 text-xs font-bold justify-center">
@@ -553,7 +667,22 @@ export default function ChatMonitor() {
                 </div>
               )}
 
-              {messages.map((msg) => {
+              {isMessagesLoading ? (
+                <div className="flex h-full items-center justify-center text-xs text-slate-400" data-testid="admin-chat-messages-loading">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 메시지를 불러오는 중...
+                </div>
+              ) : messageError ? (
+                <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-xs text-slate-500" data-testid="admin-chat-messages-error">
+                  <span>{messageError}</span>
+                  <button
+                    type="button"
+                    onClick={() => void retrySelectedInquiry()}
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-bold text-slate-700 hover:bg-slate-50"
+                  >
+                    다시 시도
+                  </button>
+                </div>
+              ) : messages.map((msg) => {
                 const isGuest = String(msg.sender_id) === String(selectedInquiry.user_id);
                 const alignRight = !isGuest;
                 const isDeletedMessage = isDeletedInquiryMessage(msg.type);
@@ -634,8 +763,12 @@ export default function ChatMonitor() {
                 className="flex-1 min-h-9 md:min-h-11 max-h-28 resize-none overflow-y-hidden border border-slate-200 bg-slate-50 rounded-lg md:rounded-xl px-2.5 md:px-4 py-2 md:py-3 focus:outline-none focus:border-black focus:bg-white transition-all text-[11px] md:text-sm leading-5"
                 placeholder={activeTab === 'monitor' ? "관리자 권한 메시지 전송..." : "답변을 입력하세요..."}
                 value={replyText}
-                disabled={isSending}
-                onChange={(e) => setReplyText(e.target.value)}
+                disabled={isSending || isMessagesLoading || Boolean(messageError)}
+                onChange={(e) => {
+                  if (!selectedInquiryId) return;
+                  const nextValue = e.target.value;
+                  setDraftsByInquiryId((current) => ({ ...current, [selectedInquiryId]: nextValue }));
+                }}
                 onKeyDown={(e) => {
                   if (e.nativeEvent.isComposing) return;
                   if (e.key === 'Enter' && !e.shiftKey) {
@@ -646,7 +779,7 @@ export default function ChatMonitor() {
               />
               <button
                 onClick={handleSend}
-                disabled={isSending || !replyText.trim()}
+                disabled={isSending || isMessagesLoading || Boolean(messageError) || !replyText.trim()}
                 aria-label="메시지 전송"
                 className="bg-black text-white px-3 md:px-5 py-2 rounded-lg md:rounded-xl hover:bg-slate-800 transition-colors shrink-0 flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-50"
               >
