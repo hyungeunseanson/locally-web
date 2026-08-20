@@ -78,22 +78,33 @@ export async function PATCH(
     }
 
     // 동시성 방어 (Optimistic Locking)
-    if (clientUpdatedAt && inquiry.updated_at && clientUpdatedAt !== inquiry.updated_at) {
+    if (inquiry.updated_at && clientUpdatedAt !== inquiry.updated_at) {
       return NextResponse.json({ success: false, error: '다른 관리자에 의해 이미 상태가 변경되었습니다. 최신 상태를 확인해주세요.' }, { status: 409 });
     }
 
-    const newUpdatedAt = new Date().toISOString();
+    const currentUpdatedAtMs = inquiry.updated_at ? new Date(inquiry.updated_at).getTime() : 0;
+    const newUpdatedAt = new Date(Math.max(Date.now(), currentUpdatedAtMs + 1)).toISOString();
 
-    const { data: updatedInquiry, error: updateError } = await supabaseAdmin
+    let updateQuery = supabaseAdmin
       .from('inquiries')
       .update({ status: nextStatus, updated_at: newUpdatedAt })
-      .eq('id', inquiryId)
+      .eq('id', inquiryId);
+
+    updateQuery = clientUpdatedAt
+      ? updateQuery.eq('updated_at', clientUpdatedAt)
+      : updateQuery.is('updated_at', null);
+
+    const { data: updatedInquiry, error: updateError } = await updateQuery
       .select('id, status, updated_at')
       .maybeSingle();
 
     if (updateError) {
       console.error('[admin/inquiries/[id]/status] update error:', updateError);
       return NextResponse.json({ success: false, error: '문의 상태 변경에 실패했습니다.' }, { status: 500 });
+    }
+
+    if (!updatedInquiry) {
+      return NextResponse.json({ success: false, error: '다른 관리자에 의해 이미 상태가 변경되었습니다. 최신 상태를 확인해주세요.' }, { status: 409 });
     }
 
     await recordAuditLog({

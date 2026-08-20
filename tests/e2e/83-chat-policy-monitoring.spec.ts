@@ -986,6 +986,45 @@ test.describe.serial('Chat policy monitoring flow', () => {
     if (afterInquiryError) throw afterInquiryError;
     expect(afterInquiry).toEqual(beforeInquiry);
 
+    const stalePreview = `stale moderation preview ${Date.now()}`;
+    const { error: stalePreviewError } = await getAdminClient()
+      .from('inquiries')
+      .update({ content: stalePreview })
+      .eq('id', fixture.inquiryId);
+    if (stalePreviewError) throw stalePreviewError;
+
+    const retryResponse = await adminSession.page.request.patch(
+      `/api/admin/inquiries/messages/${softDeletedMessageId}`,
+      {
+        data: {
+          action: 'soft_delete',
+          inquiryId: fixture.inquiryId,
+          reason: 'policy_violation',
+        },
+      }
+    );
+    expect(retryResponse.status()).toBe(200);
+    await expect(retryResponse.json()).resolves.toMatchObject({
+      success: true,
+      data: {
+        messageId: softDeletedMessageId,
+        inquiryId: fixture.inquiryId,
+        alreadyDeleted: true,
+        inquiryPreview: fillerContents.at(-1),
+        previewSynced: true,
+      },
+    });
+
+    await expect.poll(async () => {
+      const { data, error } = await getAdminClient()
+        .from('inquiries')
+        .select('content')
+        .eq('id', fixture.inquiryId)
+        .maybeSingle();
+      if (error) throw error;
+      return data?.content || null;
+    }).toBe(fillerContents.at(-1));
+
     auditLogTargetIds.push(String(softDeletedMessageId));
 
     await adminSession.context.close();

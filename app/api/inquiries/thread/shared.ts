@@ -101,6 +101,8 @@ type InquiryMessageAccessRow = {
   user_id: string;
   host_id: string | null;
   type?: string | null;
+  content?: string | null;
+  updated_at?: string | null;
 };
 
 type InquiryMessageInsertRow = {
@@ -634,7 +636,7 @@ async function resolveInquiryMessageAccess(params: {
 
   const { data: inquiry } = await supabaseAdmin
     .from('inquiries')
-    .select('id, user_id, host_id, type')
+    .select('id, user_id, host_id, type, content, updated_at')
     .eq('id', inquiryId)
     .maybeSingle<InquiryMessageAccessRow>();
 
@@ -707,21 +709,74 @@ export async function createInquiryMessage(params: {
     throw new InquiryThreadError(500, '메시지 저장에 실패했습니다.');
   }
 
-  const { data: updatedInquiry, error: updateError } = await supabaseAdmin
-    .from('inquiries')
-    .update({
-      content: displayContent,
-      updated_at: updatedAt,
-    })
-    .eq('id', inquiry.id)
-    .select('updated_at')
-    .maybeSingle<InquiryUpdatedAtRow>();
-
-  if (updateError) {
-    throw new InquiryThreadError(500, '문의방 갱신에 실패했습니다.');
+  let updatedInquiry: InquiryUpdatedAtRow | null = null;
+  let updateError: unknown = null;
+  try {
+    const updateResult = await supabaseAdmin
+      .from('inquiries')
+      .update({
+        content: displayContent,
+        updated_at: updatedAt,
+      })
+      .eq('id', inquiry.id)
+      .select('updated_at')
+      .maybeSingle<InquiryUpdatedAtRow>();
+    updatedInquiry = updateResult.data;
+    updateError = updateResult.error;
+  } catch (error) {
+    updateError = error;
   }
 
-  const canonicalUpdatedAt = updatedInquiry?.updated_at || updatedAt;
+  let canonicalUpdatedAt = updatedInquiry?.updated_at || updatedAt;
+  if (updateError || !updatedInquiry) {
+    let reconciledInquiry: { content?: string | null; updated_at?: string | null } | null = null;
+    try {
+      const reconcileResult = await supabaseAdmin
+        .from('inquiries')
+        .select('content, updated_at')
+        .eq('id', inquiry.id)
+        .maybeSingle<{ content?: string | null; updated_at?: string | null }>();
+      reconciledInquiry = reconcileResult.data;
+    } catch (error) {
+      console.error('[inquiries/thread] inquiry update reconciliation failed:', error);
+    }
+
+    const reconciledAt = reconciledInquiry?.updated_at
+      ? new Date(reconciledInquiry.updated_at).getTime()
+      : Number.NaN;
+    if (
+      reconciledInquiry?.content === displayContent &&
+      reconciledInquiry.updated_at &&
+      reconciledAt === new Date(updatedAt).getTime()
+    ) {
+      canonicalUpdatedAt = reconciledInquiry.updated_at;
+    } else {
+      let rollbackError: unknown = null;
+      try {
+        const rollbackResult = await supabaseAdmin
+          .from('inquiry_messages')
+          .delete()
+          .eq('id', insertedMessage.id)
+          .eq('inquiry_id', inquiry.id);
+        rollbackError = rollbackResult.error;
+      } catch (error) {
+        rollbackError = error;
+      }
+
+      if (!rollbackError) {
+        throw new InquiryThreadError(500, '문의방 갱신에 실패했습니다.');
+      }
+
+      console.error('[inquiries/thread] inquiry update and message rollback failed:', {
+        inquiryId: inquiry.id,
+        messageId: insertedMessage.id,
+        updateError,
+        rollbackError,
+      });
+      canonicalUpdatedAt = inquiry.updated_at || insertedMessage.created_at || updatedAt;
+    }
+  }
+
   const canonicalMessageCreatedAt = insertedMessage.created_at || canonicalUpdatedAt;
 
   const actorDisplayName = await resolveInquirySenderDisplayName({

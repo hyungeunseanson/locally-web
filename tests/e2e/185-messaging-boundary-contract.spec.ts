@@ -309,6 +309,24 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Messaging boundary contracts', () => {
+  test('reconciles or rolls back a persisted message before reporting an inquiry update failure', () => {
+    const source = readFileSync('app/api/inquiries/thread/shared.ts', 'utf8');
+    const messageInsert = source.indexOf(".from('inquiry_messages')\n    .insert({");
+    const inquiryUpdate = source.indexOf("const updateResult = await supabaseAdmin", messageInsert);
+    const reconciliation = source.indexOf("const reconcileResult = await supabaseAdmin", inquiryUpdate);
+    const messageRollback = source.indexOf(".from('inquiry_messages')\n          .delete()", reconciliation);
+    const recipientSideEffects = source.indexOf('const actorDisplayName = await', messageRollback);
+
+    expect(messageInsert).toBeGreaterThan(-1);
+    expect(inquiryUpdate).toBeGreaterThan(messageInsert);
+    expect(reconciliation).toBeGreaterThan(inquiryUpdate);
+    expect(messageRollback).toBeGreaterThan(reconciliation);
+    expect(recipientSideEffects).toBeGreaterThan(messageRollback);
+    expect(source.slice(reconciliation, recipientSideEffects)).toContain(".eq('id', insertedMessage.id)");
+    expect(source.slice(reconciliation, recipientSideEffects)).toContain(".eq('inquiry_id', inquiry.id)");
+    expect(source.slice(reconciliation, recipientSideEffects)).toContain('if (!rollbackError)');
+  });
+
   test('creates a separate admin support inquiry for every user report', async ({ page }) => {
     const guestUser = createUser('separate-support-reports');
     const guestId = await createAuthUser(guestUser);

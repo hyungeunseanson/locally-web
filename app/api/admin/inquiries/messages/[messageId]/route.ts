@@ -36,6 +36,7 @@ async function getLatestInquiryPreview(inquiryId: number | string) {
     .select('type, content')
     .eq('inquiry_id', inquiryId)
     .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
     .limit(1)
     .maybeSingle<{ type?: string | null; content?: string | null }>();
 
@@ -49,6 +50,26 @@ async function getLatestInquiryPreview(inquiryId: number | string) {
     type: data.type,
     content: data.content,
   });
+}
+
+async function syncInquiryPreview(inquiry: InquiryRow) {
+  try {
+    const latestPreview = await getLatestInquiryPreview(inquiry.id);
+    if (latestPreview !== (inquiry.content || '')) {
+      const supabaseAdmin = createAdminClient();
+      const { error } = await supabaseAdmin
+        .from('inquiries')
+        .update({ content: latestPreview })
+        .eq('id', inquiry.id);
+
+      if (error) throw error;
+    }
+
+    return { latestPreview, synced: true };
+  } catch (error) {
+    console.error('[admin/inquiries/messages/[messageId]] inquiry preview sync error:', error);
+    return { latestPreview: inquiry.content || '', synced: false };
+  }
 }
 
 export async function PATCH(
@@ -140,12 +161,15 @@ export async function PATCH(
     }
 
     if (isDeletedInquiryMessage(message.type)) {
+      const previewSync = await syncInquiryPreview(inquiry);
       return NextResponse.json({
         success: true,
         data: {
           messageId: message.id,
           inquiryId: message.inquiry_id,
           alreadyDeleted: true,
+          inquiryPreview: previewSync.latestPreview,
+          previewSynced: previewSync.synced,
         },
       });
     }
@@ -167,18 +191,7 @@ export async function PATCH(
       return NextResponse.json({ success: false, error: '메시지 삭제에 실패했습니다.' }, { status: 500 });
     }
 
-    const latestPreview = await getLatestInquiryPreview(message.inquiry_id);
-    if (latestPreview !== (inquiry.content || '')) {
-      const { error: inquiryUpdateError } = await supabaseAdmin
-        .from('inquiries')
-        .update({ content: latestPreview })
-        .eq('id', inquiry.id);
-
-      if (inquiryUpdateError) {
-        console.error('[admin/inquiries/messages/[messageId]] inquiry preview sync error:', inquiryUpdateError);
-        return NextResponse.json({ success: false, error: '문의방 미리보기 갱신에 실패했습니다.' }, { status: 500 });
-      }
-    }
+    const previewSync = await syncInquiryPreview(inquiry);
 
     await recordAuditLog({
       admin_id: user.id,
@@ -203,7 +216,8 @@ export async function PATCH(
         inquiryId: message.inquiry_id,
         type: SOFT_DELETED_INQUIRY_MESSAGE_TYPE,
         content: SOFT_DELETED_INQUIRY_MESSAGE_PLACEHOLDER,
-        inquiryPreview: latestPreview,
+        inquiryPreview: previewSync.latestPreview,
+        previewSynced: previewSync.synced,
       },
     });
   } catch (error) {

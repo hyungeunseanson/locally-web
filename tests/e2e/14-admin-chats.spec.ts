@@ -294,6 +294,71 @@ test.describe.serial('Admin chats smoke', () => {
     await page.unroute('**/api/admin/inquiries');
   });
 
+  test('ignores an older inquiry list response that arrives after a newer refresh', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const adminUser = createUser('admin.chats.list-race');
+    const guestUser = createUser('guest.chats.list-race');
+
+    await createAuthUser(adminUser, { whitelistAdmin: true });
+    const guestUserId = await createAuthUser(guestUser);
+    const inquiryId = await seedAdminSupportInquiry(
+      guestUserId,
+      `코덱스 목록 응답 역전 ${Date.now()}`,
+      { status: 'open' }
+    );
+
+    await login(page, adminUser);
+    await page.goto('/admin/dashboard?tab=CHATS', { waitUntil: 'domcontentloaded' });
+    const inquiryRow = page.getByTestId(`admin-chat-inquiry-row-${inquiryId}`);
+    await expect(inquiryRow).toBeVisible({ timeout: 15000 });
+    await expect(inquiryRow.getByText('대기', { exact: true })).toBeVisible();
+
+    let requestCount = 0;
+    let releaseOlderResponse = () => {};
+    let markOlderResponseCaptured = () => {};
+    const olderResponseGate = new Promise<void>((resolve) => {
+      releaseOlderResponse = resolve;
+    });
+    const olderResponseCaptured = new Promise<void>((resolve) => {
+      markOlderResponseCaptured = resolve;
+    });
+
+    await page.route('**/api/admin/inquiries', async (route) => {
+      requestCount += 1;
+      if (requestCount !== 1) {
+        await route.continue();
+        return;
+      }
+
+      const response = await route.fetch();
+      markOlderResponseCaptured();
+      await olderResponseGate;
+      await route.fulfill({ response });
+    });
+
+    try {
+      await page.getByTitle('새로고침').click();
+      await olderResponseCaptured;
+
+      const { error: statusUpdateError } = await getAdminClient()
+        .from('inquiries')
+        .update({ status: 'resolved', updated_at: new Date().toISOString() })
+        .eq('id', inquiryId);
+      if (statusUpdateError) throw statusUpdateError;
+
+      await page.getByTitle('새로고침').click();
+      await expect(inquiryRow.getByText('완료', { exact: true })).toBeVisible({ timeout: 15000 });
+
+      releaseOlderResponse();
+      await page.waitForTimeout(750);
+      await expect(inquiryRow.getByText('완료', { exact: true })).toBeVisible();
+    } finally {
+      releaseOlderResponse();
+      await page.unroute('**/api/admin/inquiries');
+    }
+  });
+
   test('ignores a slower response from an inquiry selected before the current one', async ({ page }) => {
     test.setTimeout(90000);
 
@@ -670,6 +735,55 @@ test.describe.serial('Admin chats smoke', () => {
     }).toBe('in_progress');
   });
 
+  test('allows only one of two concurrent status changes with the same version', async ({ browser }) => {
+    test.setTimeout(90000);
+
+    const firstAdmin = createUser('admin.chats.concurrent.first');
+    const secondAdmin = createUser('admin.chats.concurrent.second');
+    const guestUser = createUser('guest.chats.concurrent');
+
+    await createAuthUser(firstAdmin, { whitelistAdmin: true });
+    await createAuthUser(secondAdmin, { whitelistAdmin: true });
+    const guestUserId = await createAuthUser(guestUser);
+    const inquiryId = await seedAdminSupportInquiry(
+      guestUserId,
+      `코덱스 관리자 상태 경쟁 ${Date.now()}`
+    );
+    const initialInquiry = await readInquiryStatus(inquiryId);
+    expect(initialInquiry?.updated_at).toBeTruthy();
+
+    const firstContext = await browser.newContext();
+    const secondContext = await browser.newContext();
+    const firstPage = await firstContext.newPage();
+    const secondPage = await secondContext.newPage();
+
+    try {
+      await login(firstPage, firstAdmin);
+      await login(secondPage, secondAdmin);
+
+      const [firstResponse, secondResponse] = await Promise.all([
+        firstPage.request.patch(`/api/admin/inquiries/${inquiryId}/status`, {
+          data: { status: 'in_progress', updated_at: initialInquiry?.updated_at },
+        }),
+        secondPage.request.patch(`/api/admin/inquiries/${inquiryId}/status`, {
+          data: { status: 'resolved', updated_at: initialInquiry?.updated_at },
+        }),
+      ]);
+
+      const responses = [firstResponse, secondResponse];
+      expect(responses.map((response) => response.status()).sort()).toEqual([200, 409]);
+
+      const successfulIndex = responses.findIndex((response) => response.status() === 200);
+      const successfulBody = await responses[successfulIndex].json();
+      const finalInquiry = await readInquiryStatus(inquiryId);
+      expect(finalInquiry?.status).toBe(successfulBody.data.status);
+      expect(finalInquiry?.updated_at).toBe(successfulBody.data.updated_at);
+    } finally {
+      await firstContext.close();
+      await secondContext.close();
+    }
+  });
+
   test('promotes first admin reply to in_progress without showing false conflict toast', async ({ page }) => {
     test.setTimeout(90000);
 
@@ -710,6 +824,57 @@ test.describe.serial('Admin chats smoke', () => {
     }).toBe('in_progress');
 
     await expect(page.getByText(FALSE_CONFLICT_TOAST)).toHaveCount(0);
+  });
+
+  test('promotes a pending admin inquiry even when the operator changes tabs during send', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const adminUser = createUser('admin.chats.reply-tab-switch');
+    const guestUser = createUser('guest.chats.reply-tab-switch');
+
+    await createAuthUser(adminUser, { whitelistAdmin: true });
+    const guestUserId = await createAuthUser(guestUser);
+
+    const inquiryMessage = `코덱스 탭 전환 중 관리자 답변 ${Date.now()}`;
+    const adminReply = `탭 전환 중 답변 ${Date.now()}`;
+    const inquiryId = await seedAdminSupportInquiry(guestUserId, inquiryMessage);
+
+    await login(page, adminUser);
+    await page.goto(`/admin/dashboard?tab=CHATS&inquiryId=${inquiryId}`, { waitUntil: 'domcontentloaded' });
+    await expect(adminMessageRow(page, inquiryMessage)).toBeVisible({ timeout: 15000 });
+
+    let releaseSend = () => {};
+    let markSendStarted = () => {};
+    const sendGate = new Promise<void>((resolve) => {
+      releaseSend = resolve;
+    });
+    const sendStarted = new Promise<void>((resolve) => {
+      markSendStarted = resolve;
+    });
+
+    await page.route('**/api/inquiries/message', async (route) => {
+      markSendStarted();
+      await sendGate;
+      await route.continue();
+    });
+
+    try {
+      await page.getByTestId('admin-chat-composer').fill(adminReply);
+      await page.getByTestId('admin-chat-composer').press('Enter');
+      await sendStarted;
+
+      await page.getByRole('button', { name: '실시간 모니터링', exact: true }).click();
+      await expect(page).not.toHaveURL(/inquiryId=/);
+
+      releaseSend();
+      await expect.poll(async () => (await readInquiryStatus(inquiryId))?.status || null, {
+        timeout: 15000,
+        intervals: [500, 1000, 1500],
+      }).toBe('in_progress');
+    } finally {
+      releaseSend();
+      await page.unroute('**/api/inquiries/message');
+    }
   });
 
   test('still shows the conflict toast when inquiry status really changed elsewhere', async ({ page }) => {
@@ -765,6 +930,8 @@ test.describe.serial('Admin chats smoke', () => {
       timeout: 15000,
       intervals: [500, 1000, 1500],
     }).toBe('resolved');
+
+    await expect(detailStatusGroup.getByRole('button', { name: '완료', exact: true })).toHaveClass(/bg-green-100/);
 
     await page.unroute(`**/api/admin/inquiries/${inquiryId}/status`);
   });

@@ -219,6 +219,9 @@ export default function ChatMonitor() {
       const result = await response.json();
 
       if (!response.ok || result?.success === false) {
+        if (response.status === 409) {
+          await refresh();
+        }
         throw new Error(result?.error || '문의 상태 변경 실패');
       }
 
@@ -256,7 +259,7 @@ export default function ChatMonitor() {
       }
 
       // 🟢 첫 번째 답변 시: '대기(open)' 상태를 '처리중(in_progress)'으로 자동 전환
-      if (activeTab === 'admin' && isAdminSupportInquiry(inquiryType)) {
+      if (isAdminSupportInquiry(inquiryType)) {
         if (!inquiryStatus || inquiryStatus === 'open') {
           await handleUpdateCSStatus(inquiryId, 'in_progress', {
             updatedAt: messageResult.updatedAt,

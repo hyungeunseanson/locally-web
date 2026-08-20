@@ -142,6 +142,7 @@ export function useAdminChatQuery() {
   const messagesRef = useRef<MonitorMessage[]>([]);
   const processedEventRef = useRef<Set<string>>(new Set());
   const fetchInquiriesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inquiryRequestVersionRef = useRef(0);
   const messageRequestVersionRef = useRef(0);
 
   const getAuthenticatedUser = useCallback(async (): Promise<User | null> => {
@@ -196,13 +197,16 @@ export function useAdminChatQuery() {
   }, [patchInquiry]);
 
   const fetchInquiries = useCallback(async (showLoading = true) => {
+    const requestVersion = ++inquiryRequestVersionRef.current;
     if (showLoading && inquiriesRef.current.length === 0) setIsLoading(true);
     setError(undefined);
 
     try {
       const user = await getAuthenticatedUser();
       if (!user) {
-        setIsLoading(false);
+        if (requestVersion === inquiryRequestVersionRef.current) {
+          setIsLoading(false);
+        }
         return;
       }
 
@@ -214,13 +218,18 @@ export function useAdminChatQuery() {
       }
 
       const nextInquiries = Array.isArray(result.data) ? result.data as MonitorInquiry[] : [];
+      if (requestVersion !== inquiryRequestVersionRef.current) return;
       commitInquiries(nextInquiries);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '로딩 오류';
       console.error('[AdminChatQuery] fetchInquiries error:', err);
-      setError(msg);
+      if (requestVersion === inquiryRequestVersionRef.current) {
+        setError(msg);
+      }
     } finally {
-      setIsLoading(false);
+      if (requestVersion === inquiryRequestVersionRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [commitInquiries, getAuthenticatedUser]);
 
