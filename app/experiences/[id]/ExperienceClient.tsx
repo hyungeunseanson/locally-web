@@ -10,6 +10,7 @@ import ExpMainContent from './components/ExpMainContent';
 import ExpSidebar from './components/ExpSidebar';
 import StickyActionSheet from './components/StickyActionSheet';
 import Image from 'next/image';
+import PublicExperienceDetailImage from '@/app/components/PublicExperienceDetailImage';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 import { getContent } from '@/app/utils/contentHelper'; // 🟢 추가
@@ -379,10 +380,10 @@ export default function ExperienceClient({
         <section className="hidden md:block relative rounded-2xl overflow-hidden h-[480px] mb-12 bg-slate-100 group border border-slate-200 shadow-sm select-none">
           {photos.length === 1 && (
             <div className="w-full h-full relative cursor-pointer" onClick={() => setIsGalleryOpen(true)}>
-              <Image src={photos[0]} alt="Background" fill sizes="100vw" unoptimized className="object-cover blur-xl opacity-50 scale-110" />
+              <PublicExperienceDetailImage experienceId={experience.id} originImageUrl={photos[0]} alt="Background" sizes="100vw" className="object-cover blur-xl opacity-50 scale-110" />
               <div className="absolute inset-0 flex items-center justify-center p-4">
                 <div className="relative w-full h-full max-w-[800px] shadow-2xl rounded-lg overflow-hidden transition-transform duration-500 group-hover:scale-[1.01]">
-                  <Image src={photos[0]} alt="Main" fill sizes="(max-width: 768px) 100vw, 800px" unoptimized className="object-contain" />
+                  <PublicExperienceDetailImage experienceId={experience.id} originImageUrl={photos[0]} alt="Main" sizes="(max-width: 768px) 100vw, 800px" className="object-contain" />
                 </div>
               </div>
             </div>
@@ -390,11 +391,11 @@ export default function ExperienceClient({
           {photos.length >= 2 && (
             <div className="grid grid-cols-4 grid-rows-2 gap-2 h-full cursor-pointer" onClick={() => setIsGalleryOpen(true)}>
               <div className="col-span-2 row-span-2 relative overflow-hidden">
-                <Image src={photos[0]} alt="Main" fill sizes="(max-width: 768px) 100vw, 560px" unoptimized className="object-cover hover:scale-105 transition-transform duration-700" />
+                <PublicExperienceDetailImage experienceId={experience.id} originImageUrl={photos[0]} alt="Main" sizes="(max-width: 768px) 100vw, 560px" className="object-cover hover:scale-105 transition-transform duration-700" />
               </div>
               {photos.slice(1, 5).map((photo: string, i: number) => (
                 <div key={i} className={`relative overflow-hidden ${photos.length === 2 ? 'col-span-2 row-span-2' : 'col-span-1 row-span-1'}`}>
-                  <Image src={photo} alt={`Sub ${i}`} fill sizes="(max-width: 768px) 100vw, 280px" unoptimized className="object-cover hover:scale-105 transition-transform duration-700" />
+                  <PublicExperienceDetailImage experienceId={experience.id} originImageUrl={photo} alt={`Sub ${i}`} sizes="(max-width: 768px) 100vw, 280px" className="object-cover hover:scale-105 transition-transform duration-700" />
                 </div>
               ))}
             </div>
@@ -496,16 +497,16 @@ export default function ExperienceClient({
           >
             <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-[5px] bg-white">
               <div className="relative overflow-hidden w-full h-full rounded-tl-[24px]">
-                <Image src={photos[0]} alt="Main" fill sizes="50vw" unoptimized className="object-cover" />
+                <PublicExperienceDetailImage experienceId={experience.id} originImageUrl={photos[0]} alt="Main" sizes="50vw" className="object-cover" />
               </div>
               <div className="relative overflow-hidden w-full h-full rounded-tr-[24px]">
-                <Image src={photos[1] || photos[0]} alt="Sub 1" fill sizes="50vw" unoptimized className="object-cover" />
+                <PublicExperienceDetailImage experienceId={experience.id} originImageUrl={photos[1] || photos[0]} alt="Sub 1" sizes="50vw" className="object-cover" />
               </div>
               <div className="relative overflow-hidden w-full h-full rounded-bl-[24px]">
-                <Image src={photos[2] || photos[0]} alt="Sub 2" fill sizes="50vw" unoptimized className="object-cover" />
+                <PublicExperienceDetailImage experienceId={experience.id} originImageUrl={photos[2] || photos[0]} alt="Sub 2" sizes="50vw" className="object-cover" />
               </div>
               <div className="relative overflow-hidden w-full h-full rounded-br-[24px]">
-                <Image src={photos[3] || photos[0]} alt="Sub 3" fill sizes="50vw" unoptimized className="object-cover" />
+                <PublicExperienceDetailImage experienceId={experience.id} originImageUrl={photos[3] || photos[0]} alt="Sub 3" sizes="50vw" className="object-cover" />
               </div>
             </div>
             <div className="absolute bottom-4 right-4 bg-white p-2.5 rounded-full shadow-[0_3px_10px_rgba(0,0,0,0.15)] border border-slate-200 z-10 text-slate-800">
@@ -625,7 +626,7 @@ export default function ExperienceClient({
             <div className="max-w-4xl mx-auto space-y-4">
               {photos.map((photo: string, index: number) => (
                 <div key={index} className="relative w-full aspect-[3/2] md:aspect-[16/10] bg-slate-200 rounded-xl overflow-hidden shadow-sm">
-                  <Image src={photo} alt={`Gallery ${index}`} fill sizes="(max-width: 768px) 100vw, 896px" unoptimized className="object-contain bg-black/5" />
+                  <PublicExperienceDetailImage experienceId={experience.id} originImageUrl={photo} alt={`Gallery ${index}`} sizes="(max-width: 768px) 100vw, 896px" className="object-contain bg-black/5" />
                 </div>
               ))}
             </div>
