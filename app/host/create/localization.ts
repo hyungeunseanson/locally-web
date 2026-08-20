@@ -336,6 +336,8 @@ type ExperienceFormCopy = {
   validationPrivatePrice: string;
   imageValidationFallback: string;
   imageProcessingError: string;
+  imageEmptyError: string;
+  imageUploadError: string;
   loginRequired: string;
   submitSuccess: string;
   submitFailPrefix: string;
@@ -530,6 +532,8 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     validationSoloGuaranteePrice: '1인 출발 확정 추가금은 20,000원~100,000원 사이에서 1,000원 단위로 입력해주세요.',
     imageValidationFallback: '이미지 형식이 올바르지 않습니다.',
     imageProcessingError: '이미지 처리 중 오류가 발생했습니다.',
+    imageEmptyError: '사진 데이터를 읽을 수 없습니다. 해당 사진을 다시 선택해주세요.',
+    imageUploadError: '사진을 업로드하지 못했습니다. 잠시 후 다시 시도해주세요.',
     loginRequired: '로그인이 필요합니다.',
     submitSuccess: '체험이 성공적으로 등록되었습니다! 🎉',
     submitFailPrefix: '등록 실패: ',
@@ -722,6 +726,8 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     validationSoloGuaranteePrice: 'Enter a guaranteed solo departure add-on from 20,000 KRW to 100,000 KRW in 1,000 KRW steps.',
     imageValidationFallback: 'Invalid image format.',
     imageProcessingError: 'An error occurred while processing the image.',
+    imageEmptyError: 'This photo could not be read. Please select it again.',
+    imageUploadError: 'The photo could not be uploaded. Please try again shortly.',
     loginRequired: 'Login is required.',
     submitSuccess: 'The experience has been submitted successfully! 🎉',
     submitFailPrefix: 'Submission failed: ',
@@ -913,6 +919,8 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     validationSoloGuaranteePrice: '1名出発確定の追加料金は20,000ウォン〜100,000ウォンの間で、1,000ウォン単位で入力してください。',
     imageValidationFallback: '画像形式が正しくありません。',
     imageProcessingError: '画像処理中にエラーが発生しました。',
+    imageEmptyError: '写真データを読み取れませんでした。この写真をもう一度選択してください。',
+    imageUploadError: '写真をアップロードできませんでした。しばらくしてからもう一度お試しください。',
     loginRequired: 'ログインが必要です。',
     submitSuccess: '体験が正常に登録されました！ 🎉',
     submitFailPrefix: '登録失敗: ',
@@ -1105,6 +1113,8 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     validationSoloGuaranteePrice: '1人出发保障附加费需在 20,000 韩元至 100,000 韩元之间，并以 1,000 韩元为单位输入。',
     imageValidationFallback: '图片格式不正确。',
     imageProcessingError: '图片处理时发生错误。',
+    imageEmptyError: '无法读取该照片，请重新选择。',
+    imageUploadError: '照片上传失败，请稍后重试。',
     loginRequired: '需要登录。',
     submitSuccess: '体验已成功提交！ 🎉',
     submitFailPrefix: '提交失败：',

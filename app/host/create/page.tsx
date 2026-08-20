@@ -31,6 +31,10 @@ import {
 import ExperienceDraftRestoreDialog from './components/ExperienceDraftRestoreDialog';
 import { useExperienceDraft } from './useExperienceDraft';
 import type { LoadedExperienceDraft } from './experienceDraftStorage';
+import {
+  ExperienceImageUploadError,
+  materializeExperienceImage,
+} from './experienceImageUpload';
 
 type ProcessedImageFile = File & {
   readonly __processedImage: true;
@@ -487,15 +491,33 @@ export default function CreateExperiencePage() {
   const uploadImageToStorage = async (userId: string, file: ProcessedImageFile, folder: 'hero' | 'itinerary') => {
     const safeName = sanitizeFileName(file.name);
     const fileName = `experience/${userId}/${folder}/${Date.now()}_${safeName}`;
+    const { bytes, contentType } = await materializeExperienceImage(file);
 
-    const { error: uploadError } = await supabase.storage.from('experiences').upload(fileName, file);
+    const { error: uploadError } = await supabase.storage.from('experiences').upload(fileName, bytes, {
+      contentType,
+      cacheControl: '3600',
+    });
 
     if (uploadError) {
-      throw uploadError;
+      throw new ExperienceImageUploadError('upload_failed');
     }
 
     const { data } = supabase.storage.from('experiences').getPublicUrl(fileName);
-    return data.publicUrl;
+    return { path: fileName, publicUrl: data.publicUrl };
+  };
+
+  const cleanupUploadedImages = async (paths: string[]) => {
+    if (paths.length === 0) return;
+
+    const response = await fetch('/api/host/experience-images/cleanup', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paths }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Experience image cleanup failed.');
+    }
   };
 
   // 🚀 최종 제출 함수 수정 (파일명 최적화 및 버킷 명칭 확인)
@@ -507,23 +529,28 @@ export default function CreateExperiencePage() {
     }
 
     setLoading(true);
+    const uploadedPaths: string[] = [];
+    let creationRequestStarted = false;
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error(copy.loginRequired);
 
       const photoUrls: string[] = [];
       for (const file of imageFiles) {
-        const publicUrl = await uploadImageToStorage(user.id, file, 'hero');
+        const { path, publicUrl } = await uploadImageToStorage(user.id, file, 'hero');
+        uploadedPaths.push(path);
         photoUrls.push(publicUrl);
       }
 
-      const itineraryWithPhotos = await Promise.all(
+      const itineraryUploadResults = await Promise.allSettled(
         (formData.itinerary as ItineraryItem[]).map(async (item, index) => {
           const itineraryFile = itineraryImageFiles[index];
           let imageUrl = '';
 
           if (itineraryFile) {
-            imageUrl = await uploadImageToStorage(user.id, itineraryFile, 'itinerary');
+            const upload = await uploadImageToStorage(user.id, itineraryFile, 'itinerary');
+            uploadedPaths.push(upload.path);
+            imageUrl = upload.publicUrl;
           } else if (item.image_url && !item.image_url.startsWith('blob:')) {
             imageUrl = item.image_url;
           }
@@ -533,6 +560,17 @@ export default function CreateExperiencePage() {
             image_url: imageUrl,
           };
         })
+      );
+      const failedItineraryUpload = itineraryUploadResults.find(
+        (result): result is PromiseRejectedResult => result.status === 'rejected'
+      );
+
+      if (failedItineraryUpload) {
+        throw failedItineraryUpload.reason;
+      }
+
+      const itineraryWithPhotos = itineraryUploadResults.map(
+        (result) => (result as PromiseFulfilledResult<ItineraryItem>).value
       );
 
       const cleanedInclusions = (formData.inclusions || []).map((item: string) => normalizeExperienceListItem(item)).filter(Boolean);
@@ -552,6 +590,7 @@ export default function CreateExperiencePage() {
         },
       });
 
+      creationRequestStarted = true;
       const response = await fetch('/api/host/experiences', {
         method: 'POST',
         headers: {
@@ -577,7 +616,21 @@ export default function CreateExperiencePage() {
       setStep(TOTAL_STEPS);
 
     } catch (error) {
-      const message = error instanceof Error ? error.message : copy.unknownError;
+      if (!creationRequestStarted && uploadedPaths.length > 0) {
+        try {
+          await cleanupUploadedImages(uploadedPaths);
+        } catch (cleanupError) {
+          console.error('Experience image cleanup failed:', cleanupError);
+        }
+      }
+
+      const message = error instanceof ExperienceImageUploadError
+        ? error.code === 'empty_image' || error.code === 'unreadable_image'
+          ? copy.imageEmptyError
+          : copy.imageUploadError
+        : error instanceof Error
+          ? error.message
+          : copy.unknownError;
       console.error(error);
       showToast(copy.submitFailPrefix + message, 'error'); // 🟢 에러도 토스트로 표시
     } finally {
