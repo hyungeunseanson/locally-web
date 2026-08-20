@@ -1,13 +1,6 @@
-const CANARY_EXPERIENCE_ID = '4523';
-const CANARY_ORIGIN_IMAGE_URL =
-  'https://uhinvcydgzqlpnvieyal.supabase.co/storage/v1/object/public/experiences/experience/0288da66-8322-447c-bf80-bff314ee7299/hero/1786530514581_1786530514581-xj0z0lli.png';
+import { PUBLIC_EXPERIENCE_CARD_IMAGES } from '@/app/data/publicExperienceCardImages';
 
-const CANARY_IMAGE_KEYS = {
-  small: 'experience-4523-primary-w384-q65.webp',
-  large: 'experience-4523-primary-w640-q65.webp',
-} as const;
-
-export type CloudflareImageCanary = {
+export type CloudflareExperienceCardImage = {
   smallUrl: string;
   largeUrl: string;
 };
@@ -16,22 +9,23 @@ function getCanaryBaseUrl() {
   return process.env.NEXT_PUBLIC_CLOUDFLARE_IMAGE_CANARY_BASE_URL?.trim().replace(/\/$/, '');
 }
 
-export function getCloudflareImageCanary(
+export function getCloudflareExperienceCardImage(
   experienceId: number | string,
   originImageUrl: string
-): CloudflareImageCanary | null {
+): CloudflareExperienceCardImage | null {
   const baseUrl = getCanaryBaseUrl();
+  const image = PUBLIC_EXPERIENCE_CARD_IMAGES[
+    String(experienceId) as keyof typeof PUBLIC_EXPERIENCE_CARD_IMAGES
+  ];
 
-  if (
-    !baseUrl ||
-    String(experienceId) !== CANARY_EXPERIENCE_ID ||
-    originImageUrl !== CANARY_ORIGIN_IMAGE_URL
-  ) {
+  if (!baseUrl || !image || originImageUrl !== image.originUrl) {
     return null;
   }
 
   return {
-    smallUrl: `${baseUrl}/${CANARY_IMAGE_KEYS.small}`,
-    largeUrl: `${baseUrl}/${CANARY_IMAGE_KEYS.large}`,
+    smallUrl: `${baseUrl}/${image.smallKey}`,
+    largeUrl: `${baseUrl}/${image.largeKey}`,
   };
 }
+
+export const getCloudflareImageCanary = getCloudflareExperienceCardImage;

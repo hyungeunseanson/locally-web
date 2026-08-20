@@ -81,9 +81,9 @@ test.describe('Cloudflare public image canary boundary', () => {
 
     const card = page.locator('a[href="/experiences/4523"]:visible').first();
     await expect(card).toBeVisible({ timeout: 15_000 });
-    await expect(card.locator('[data-image-canary="supabase-fallback"]')).toBeVisible({
+    await expect(card.locator('[data-image-delivery="supabase-fallback"]')).toBeVisible({
       timeout: 15_000,
     });
-    await expect(card.locator('[data-image-canary="cloudflare-r2"]')).toHaveCount(0);
+    await expect(card.locator('[data-image-delivery="cloudflare-r2"]')).toHaveCount(0);
   });
 });

@@ -2,10 +2,10 @@
 
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, Suspense } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import SiteHeader from '@/app/components/SiteHeader';
 import ExperienceCard from '@/app/components/ExperienceCard';
+import PublicExperienceCardImage from '@/app/components/PublicExperienceCardImage';
 import {
   Map,
   List,
@@ -463,12 +463,11 @@ function SearchResults() {
     return (
       <Link key={key} href={`/experiences/${item.id}`} data-testid={`search-mobile-result-card-${item.id}`} className="w-[168px] shrink-0">
         <div className="relative w-full aspect-[0.95] rounded-[16px] overflow-hidden bg-slate-200">
-          <Image
-            src={imageUrl}
+          <PublicExperienceCardImage
+            experienceId={item.id}
+            originImageUrl={imageUrl}
             alt={title}
-            fill
             sizes="168px"
-            quality={65}
             className="object-cover"
           />
         </div>

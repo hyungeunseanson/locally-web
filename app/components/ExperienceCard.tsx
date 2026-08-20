@@ -2,7 +2,6 @@
 
 import React from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import {
   Star,
   Utensils,
@@ -24,6 +23,7 @@ import { CATEGORY_OPTIONS } from '@/app/host/create/config';
 import { formatLocalizedExperienceLocation } from '@/app/utils/locationLocalization';
 import { formatExperiencePrice, getExperienceLanguageBadges, getExperiencePriceParts } from '@/app/utils/experienceCardDisplay';
 import ExperienceCardMeta from '@/app/components/ExperienceCardMeta';
+import PublicExperienceCardImage from '@/app/components/PublicExperienceCardImage';
 import { getExperienceCardImageUrl } from '@/app/utils/experienceImages';
 
 type ExperienceCardData = {
@@ -121,12 +121,11 @@ export default function ExperienceCard({
     <Link href={`/experiences/${data.id}`} className="block group active:scale-[0.98] transition-transform duration-200">
       {/* 🖼️ 이미지 영역 (프리미엄 쉐도우 및 Lift 애니메이션 적용) */}
       <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-slate-200 mb-2 md:mb-3 border border-transparent [box-shadow:var(--shadow-card)] group-hover:[box-shadow:var(--shadow-card-hover)] group-hover:-translate-y-1 transition-all duration-500 ease-out">
-        <Image
-          src={imageUrl}
+        <PublicExperienceCardImage
+          experienceId={data.id}
+          originImageUrl={imageUrl}
           alt={title}
-          fill
-          quality={65}
-          loading={eager ? 'eager' : 'lazy'}
+          eager={eager}
           className="object-cover transition-transform duration-700 ease-out group-hover:scale-110"
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
         />

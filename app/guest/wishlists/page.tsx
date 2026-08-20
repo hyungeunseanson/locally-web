@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Heart, Share2, ArrowRight, ArrowLeft } from 'lucide-react';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
+import PublicExperienceCardImage from '@/app/components/PublicExperienceCardImage';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 import Spinner from '@/app/components/ui/Spinner';
@@ -288,11 +288,10 @@ export default function WishlistsPage() {
                     className="group block transition-transform duration-200 active:scale-[0.985] md:hover:-translate-y-[2px] md:active:scale-100"
                   >
                     <div className="relative mb-2.5 overflow-hidden rounded-[22px] bg-slate-200 aspect-square border border-black/5 md:mb-3 md:rounded-[24px] shadow-[0_4px_12px_rgba(15,23,42,0.06)] md:shadow-[0_8px_18px_rgba(15,23,42,0.08)]">
-                      <Image
-                        src={imageUrl}
+                      <PublicExperienceCardImage
+                        experienceId={exp.id}
+                        originImageUrl={imageUrl}
                         alt={title}
-                        fill
-                        quality={65}
                         className="object-cover transition-transform duration-500 ease-out md:group-hover:scale-[1.04]"
                         sizes="(max-width: 768px) 42vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 18vw"
                       />
