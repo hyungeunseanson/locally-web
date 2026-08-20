@@ -60,16 +60,25 @@ test.describe('Global support report contracts', () => {
   });
 
   test('keeps route exclusions and mobile offsets explicit', () => {
-    for (const pathname of ['/help', '/admin/dashboard', '/login', '/signup', '/auth/callback']) {
+    for (const pathname of [
+      '/help',
+      '/admin/dashboard',
+      '/login',
+      '/signup',
+      '/auth/callback',
+      '/host/create',
+      '/host/register',
+      '/host/experiences/example/edit',
+    ]) {
       expect(shouldHideGlobalSupportReport(pathname), pathname).toBe(true);
     }
     expect(shouldHideGlobalSupportReport('/privacy')).toBe(false);
-    expect(getGlobalSupportReportMobilePosition('/privacy')).toBe('bottom-[88px]');
+    expect(getGlobalSupportReportMobilePosition('/privacy')).toBe('bottom-[96px]');
     expect(getGlobalSupportReportMobilePosition('/community')).toBe('bottom-[144px]');
     expect(getGlobalSupportReportMobilePosition('/guest/inbox')).toBe('bottom-[156px]');
     expect(getGlobalSupportReportMobilePosition('/host/dashboard', 'inquiries')).toBe('bottom-[156px]');
-    expect(getGlobalSupportReportMobilePosition('/services/request')).toBe('bottom-[112px]');
-    expect(getGlobalSupportReportMobilePosition('/experiences/1/payment')).toBe('bottom-[112px]');
+    expect(getGlobalSupportReportMobilePosition('/services/request')).toBe('bottom-[120px]');
+    expect(getGlobalSupportReportMobilePosition('/experiences/1/payment')).toBe('bottom-[120px]');
 
     const communityCtaSource = readFileSync(
       'app/community/components/CommunityWriteCta.tsx',
