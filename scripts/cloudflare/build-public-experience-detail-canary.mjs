@@ -21,10 +21,18 @@ function requireValue(name, value) {
   return value;
 }
 
-const ids = requireValue('ids', readArgument('ids', ''))
+const allPublic = process.argv.includes('--all-public');
+const ids = readArgument('ids', '')
   .split(',')
   .map((value) => value.trim())
   .filter(Boolean);
+
+if (allPublic && ids.length > 0) {
+  throw new Error('Use either --all-public or --ids, not both.');
+}
+if (!allPublic && ids.length === 0) {
+  throw new Error('Pass --all-public or a comma-separated --ids list.');
+}
 const outputDirectory = path.resolve(readArgument('output', '.tmp/cloudflare-detail-canary'));
 const manifestPath = path.resolve(
   readArgument('manifest', 'app/data/publicExperienceDetailImages.generated.json')
@@ -38,14 +46,22 @@ const supabase = createClient(
   { auth: { persistSession: false } }
 );
 
-const { data: experiences, error } = await supabase
+let experienceQuery = supabase
   .from('experiences')
   .select('id, photos, image_url, itinerary, status, is_active')
-  .in('id', ids)
   .order('id');
 
+experienceQuery = allPublic
+  ? experienceQuery.eq('status', 'active').eq('is_active', true)
+  : experienceQuery.in('id', ids);
+
+const { data: experiences, error } = await experienceQuery;
+
 if (error) throw error;
-if (!experiences || experiences.length !== ids.length) {
+if (allPublic && (!experiences || experiences.length === 0)) {
+  throw new Error('No public active experiences were returned.');
+}
+if (!allPublic && (!experiences || experiences.length !== ids.length)) {
   throw new Error(`Expected ${ids.length} public experiences, received ${experiences?.length || 0}.`);
 }
 
@@ -110,6 +126,7 @@ for (const experience of experiences) {
 await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
 console.log(JSON.stringify({
+  scope: allPublic ? 'all-public-active' : 'selected-ids',
   experienceCount: experiences.length,
   imageCount: Object.values(manifest).reduce((total, images) => total + Object.keys(images).length, 0),
   objectCount: generatedKeys.size,

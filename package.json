@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "cloudflare:build-public-experience-details": "node scripts/cloudflare/build-public-experience-detail-canary.mjs --all-public --output=.tmp/cloudflare-public-experience-details",
     "audit:e2e:host-app-cleanup": "node scripts/audit-e2e-host-application-cleanup.mjs",
     "cleanup:codex:dry": "node scripts/cleanup-codex-runtime-data.mjs",
     "cleanup:codex:execute:safe": "node scripts/cleanup-codex-runtime-data.mjs --execute",
