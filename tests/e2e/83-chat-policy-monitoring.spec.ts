@@ -611,6 +611,8 @@ test.describe.serial('Chat policy monitoring flow', () => {
 
     await expect(guestCard).toBeVisible({ timeout: 15000 });
     await expect(hostCard).toBeVisible({ timeout: 15000 });
+    await expect(guestCard).toBeEnabled({ timeout: 15000 });
+    await expect(hostCard).toBeEnabled({ timeout: 15000 });
     await expect(inquiryRow).toHaveAttribute('data-has-policy-signal', 'true', { timeout: 15000 });
 
     await guestCard.evaluate((node: HTMLButtonElement) => node.click());
@@ -758,105 +760,231 @@ test.describe.serial('Chat policy monitoring flow', () => {
     await hostSession.context.close();
   });
 
-  test('soft deletes a flagged message without breaking preview or participant views', async ({ browser }) => {
-    test.setTimeout(90000);
+  test('soft deletes only the selected monitored message with server-side access and inquiry guards', async ({ browser }) => {
+    test.setTimeout(120000);
 
-    const flaggedMessage = `soft delete target 010-4444-5555 ${Date.now()}`;
+    const targetMessage = `manual moderation target ${Date.now()}`;
+    const preservedMessage = `message that must remain ${Date.now()}`;
 
     const guestSession = await withLoggedInPage(browser, fixture.guest);
     await openGuestInquiry(guestSession.page, fixture.inquiryId);
 
     const guestInput = guestSession.page.locator(GUEST_CHAT_INPUT_SELECTOR).first();
-    await guestInput.fill(flaggedMessage);
+    await guestInput.fill(targetMessage);
+    await guestInput.press('Enter');
+    await guestInput.fill(preservedMessage);
     await guestInput.press('Enter');
 
-    await expect.poll(async () => {
+    const resolveMessageId = async (content: string) => {
       const { data, error } = await getAdminClient()
         .from('inquiry_messages')
         .select('id')
         .eq('inquiry_id', fixture.inquiryId)
-        .eq('content', flaggedMessage)
+        .eq('content', content)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
       if (error) throw error;
       return data?.id ? Number(data.id) : null;
-    }, {
+    };
+
+    await expect.poll(() => resolveMessageId(targetMessage), {
+      timeout: 15000,
+      intervals: [500, 1000, 1500],
+    }).not.toBeNull();
+    await expect.poll(() => resolveMessageId(preservedMessage), {
       timeout: 15000,
       intervals: [500, 1000, 1500],
     }).not.toBeNull();
 
-    const { data: softDeletedMessageRow, error: softDeletedMessageError } = await getAdminClient()
-      .from('inquiry_messages')
-      .select('id')
-      .eq('inquiry_id', fixture.inquiryId)
-      .eq('content', flaggedMessage)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (softDeletedMessageError || !softDeletedMessageRow?.id) {
-      throw softDeletedMessageError || new Error('Failed to resolve soft delete target message id.');
+    const softDeletedMessageId = await resolveMessageId(targetMessage);
+    const preservedMessageId = await resolveMessageId(preservedMessage);
+    if (!softDeletedMessageId || !preservedMessageId) {
+      throw new Error('Failed to resolve moderation test message ids.');
     }
 
-    const softDeletedMessageId = Number(softDeletedMessageRow.id);
+    createdMessageIds.push(softDeletedMessageId, preservedMessageId);
 
-    createdMessageIds.push(softDeletedMessageId);
+    const fillerContents = Array.from(
+      { length: 18 },
+      (_, index) => `moderation scroll filler ${index + 1} ${'content '.repeat(10)}`
+    );
+    const { data: fillerRows, error: fillerError } = await getAdminClient()
+      .from('inquiry_messages')
+      .insert(fillerContents.map((content) => ({
+        inquiry_id: fixture.inquiryId,
+        sender_id: fixture.guestId,
+        content,
+        type: 'text',
+        is_read: false,
+      })))
+      .select('id');
+    if (fillerError || !fillerRows) {
+      throw fillerError || new Error('Failed to seed moderation scroll messages.');
+    }
+    createdMessageIds.push(...fillerRows.map((row) => Number(row.id)));
 
+    const guestForbiddenResponse = await guestSession.page.request.patch(
+      `/api/admin/inquiries/messages/${softDeletedMessageId}`,
+      {
+        data: {
+          action: 'soft_delete',
+          inquiryId: fixture.inquiryId,
+          reason: 'policy_violation',
+        },
+      }
+    );
+    expect(guestForbiddenResponse.status()).toBe(403);
     await guestSession.context.close();
 
+    const hostSession = await withLoggedInPage(browser, fixture.host);
+    const hostForbiddenResponse = await hostSession.page.request.patch(
+      `/api/admin/inquiries/messages/${softDeletedMessageId}`,
+      {
+        data: {
+          action: 'soft_delete',
+          inquiryId: fixture.inquiryId,
+          reason: 'policy_violation',
+        },
+      }
+    );
+    expect(hostForbiddenResponse.status()).toBe(403);
+    await hostSession.context.close();
+
+    const anonymousContext = await browser.newContext();
+    const anonymousResponse = await anonymousContext.request.patch(
+      `http://localhost:3000/api/admin/inquiries/messages/${softDeletedMessageId}`,
+      {
+        data: {
+          action: 'soft_delete',
+          inquiryId: fixture.inquiryId,
+          reason: 'policy_violation',
+        },
+      }
+    );
+    expect(anonymousResponse.status()).toBe(401);
+    await anonymousContext.close();
+
+    const otherInquiryId = await createInquiryFixture({
+      guestId: fixture.guestId,
+      hostId: fixture.hostId,
+      experienceId: fixture.experienceId,
+    });
+
     const adminSession = await withLoggedInPage(browser, fixture.admin);
+    const mismatchedInquiryResponse = await adminSession.page.request.patch(
+      `/api/admin/inquiries/messages/${softDeletedMessageId}`,
+      {
+        data: {
+          action: 'soft_delete',
+          inquiryId: otherInquiryId,
+          reason: 'policy_violation',
+        },
+      }
+    );
+    expect(mismatchedInquiryResponse.status()).toBe(409);
+
+    const { data: beforeInquiry, error: beforeInquiryError } = await getAdminClient()
+      .from('inquiries')
+      .select('id, status')
+      .eq('id', fixture.inquiryId)
+      .maybeSingle();
+    if (beforeInquiryError || !beforeInquiry) {
+      throw beforeInquiryError || new Error('Failed to read inquiry before moderation.');
+    }
+
     await adminSession.page.goto(`/admin/dashboard?tab=CHATS&inquiryId=${fixture.inquiryId}`, { waitUntil: 'domcontentloaded' });
     await expect(adminSession.page.locator('[data-participant-card="guest"]')).toBeVisible({ timeout: 15000 });
 
+    const adminTargetRow = adminSession.page.locator(`[data-message-id="${softDeletedMessageId}"]`);
+    const adminPreservedRow = adminSession.page.locator(`[data-message-id="${preservedMessageId}"]`);
     const deleteButton = adminSession.page.locator(`[data-delete-message-id="${softDeletedMessageId}"]`);
     await expect(deleteButton).toBeVisible({ timeout: 15000 });
+    await expect(adminTargetRow.getByTestId('admin-chat-message-policy-badge')).toHaveCount(0);
+    await expect(adminPreservedRow.getByText(preservedMessage, { exact: true })).toBeVisible();
+
+    await adminSession.page.route(`**/api/admin/inquiries/messages/${softDeletedMessageId}`, async (route) => {
+      await route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: false, error: 'Intentional moderation failure' }),
+      });
+    });
+    await deleteButton.click();
+    await adminSession.page.getByRole('button', { name: '삭제', exact: true }).last().click();
+    await expect(
+      adminSession.page.getByRole('paragraph').filter({ hasText: 'Intentional moderation failure' }).first()
+    ).toBeVisible({ timeout: 15000 });
+    await expect(adminTargetRow.getByText(targetMessage, { exact: true })).toBeVisible();
+    await expect(adminPreservedRow.getByText(preservedMessage, { exact: true })).toBeVisible();
+    await adminSession.page.unroute(`**/api/admin/inquiries/messages/${softDeletedMessageId}`);
+
     await deleteButton.click();
     await expect(adminSession.page.getByText('메시지 삭제')).toBeVisible({ timeout: 15000 });
+    await expect(adminSession.page.getByText(targetMessage, { exact: false }).last()).toBeVisible();
+
+    const messageList = adminSession.page.getByTestId('admin-chat-message-list');
+    await expect.poll(() => messageList.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
+    await messageList.evaluate((element) => {
+      element.scrollTop = 0;
+      element.dispatchEvent(new Event('scroll'));
+    });
+    const historyScrollTop = await messageList.evaluate((element) => element.scrollTop);
     await adminSession.page.getByRole('button', { name: '삭제', exact: true }).last().click();
 
-    await expect(adminSession.page.getByText('운영 삭제').first()).toBeVisible({ timeout: 15000 });
-    await expect(adminSession.page.getByText(SOFT_DELETE_PLACEHOLDER).first()).toBeVisible({ timeout: 15000 });
+    await expect(adminTargetRow.getByText('운영 삭제', { exact: true })).toBeVisible({ timeout: 15000 });
+    await expect(adminTargetRow.getByText(SOFT_DELETE_PLACEHOLDER, { exact: true })).toBeVisible({ timeout: 15000 });
+    await expect(adminPreservedRow.getByText(preservedMessage, { exact: true })).toBeVisible();
+    await expect(adminSession.page).toHaveURL(new RegExp(`inquiryId=${fixture.inquiryId}(?:&|$)`));
+    await expect(adminSession.page.getByTestId(`admin-chat-inquiry-row-${fixture.inquiryId}`)).toHaveClass(/bg-blue-50/);
+    await expect.poll(() => messageList.evaluate((element) => element.scrollTop)).toBe(historyScrollTop);
 
     await expect.poll(async () => {
       const { data, error } = await getAdminClient()
         .from('inquiry_messages')
-        .select('type, content, is_read, read_at')
-        .eq('id', softDeletedMessageId)
-        .maybeSingle();
+        .select('id, type, content, is_read, read_at')
+        .in('id', [softDeletedMessageId, preservedMessageId]);
 
       if (error) throw error;
 
+      const deleted = data?.find((row) => Number(row.id) === softDeletedMessageId);
+      const preserved = data?.find((row) => Number(row.id) === preservedMessageId);
       return {
-        type: data?.type || null,
-        content: data?.content || null,
-        is_read: Boolean(data?.is_read),
-        hasReadAt: Boolean(data?.read_at),
+        deleted: {
+          type: deleted?.type || null,
+          content: deleted?.content || null,
+          is_read: Boolean(deleted?.is_read),
+          hasReadAt: Boolean(deleted?.read_at),
+        },
+        preserved: {
+          type: preserved?.type || null,
+          content: preserved?.content || null,
+        },
       };
     }, {
       timeout: 15000,
       intervals: [500, 1000, 1500],
     }).toEqual({
-      type: 'deleted',
-      content: SOFT_DELETE_PLACEHOLDER,
-      is_read: true,
-      hasReadAt: true,
+      deleted: {
+        type: 'deleted',
+        content: SOFT_DELETE_PLACEHOLDER,
+        is_read: true,
+        hasReadAt: true,
+      },
+      preserved: {
+        type: 'text',
+        content: preservedMessage,
+      },
     });
 
-    await expect.poll(async () => {
-      const { data, error } = await getAdminClient()
-        .from('inquiries')
-        .select('content')
-        .eq('id', fixture.inquiryId)
-        .maybeSingle();
-
-      if (error) throw error;
-      return data?.content || null;
-    }, {
-      timeout: 15000,
-      intervals: [500, 1000, 1500],
-    }).toBe(SOFT_DELETE_PLACEHOLDER);
+    const { data: afterInquiry, error: afterInquiryError } = await getAdminClient()
+      .from('inquiries')
+      .select('id, status')
+      .eq('id', fixture.inquiryId)
+      .maybeSingle();
+    if (afterInquiryError) throw afterInquiryError;
+    expect(afterInquiry).toEqual(beforeInquiry);
 
     auditLogTargetIds.push(String(softDeletedMessageId));
 
@@ -864,12 +992,22 @@ test.describe.serial('Chat policy monitoring flow', () => {
 
     const guestVerifySession = await withLoggedInPage(browser, fixture.guest);
     await openGuestInquiry(guestVerifySession.page, fixture.inquiryId);
-    await expect(guestVerifySession.page.getByText(SOFT_DELETE_PLACEHOLDER).first()).toBeVisible({ timeout: 15000 });
+    await expect(
+      guestVerifySession.page.locator(`[data-message-id="${softDeletedMessageId}"]`).getByText(SOFT_DELETE_PLACEHOLDER, { exact: true })
+    ).toBeVisible({ timeout: 15000 });
+    await expect(
+      guestVerifySession.page.locator(`[data-message-id="${preservedMessageId}"]`).getByText(preservedMessage, { exact: true })
+    ).toBeVisible();
     await guestVerifySession.context.close();
 
     const hostVerifySession = await withLoggedInPage(browser, fixture.host);
     await openHostInquiry(hostVerifySession.page, fixture.inquiryId);
-    await expect(hostVerifySession.page.getByText(SOFT_DELETE_PLACEHOLDER).first()).toBeVisible({ timeout: 15000 });
+    await expect(
+      hostVerifySession.page.locator(`[data-message-id="${softDeletedMessageId}"]`).getByText(SOFT_DELETE_PLACEHOLDER, { exact: true })
+    ).toBeVisible({ timeout: 15000 });
+    await expect(
+      hostVerifySession.page.locator(`[data-message-id="${preservedMessageId}"]`).getByText(preservedMessage, { exact: true })
+    ).toBeVisible();
     await hostVerifySession.context.close();
   });
 });

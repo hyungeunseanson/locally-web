@@ -273,32 +273,38 @@ export default function ChatMonitor() {
     }
   };
 
-  const handleSoftDeleteMessage = (messageId: number | string) => {
+  const handleSoftDeleteMessage = (messageId: number | string, messageContent?: string | null) => {
     if (!selectedInquiry) return;
+    const inquiryId = selectedInquiry.id;
+    const normalizedPreview = (messageContent || '').replace(/\s+/g, ' ').trim();
+    const targetDescription = normalizedPreview
+      ? `“${normalizedPreview.slice(0, 60)}${normalizedPreview.length > 60 ? '…' : ''}” 메시지만 운영 정책에 따라 삭제하시겠습니까?`
+      : '선택한 메시지 하나만 운영 정책에 따라 삭제하시겠습니까?';
     requestConfirm({
       title: '메시지 삭제',
-      description: '이 메시지를 운영 정책 위반으로 삭제하시겠습니까?',
+      description: targetDescription,
       confirmLabel: '삭제',
       tone: 'red',
     }, async () => {
       try {
-      const response = await fetch(`/api/admin/inquiries/messages/${messageId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'soft_delete',
-          reason: 'policy_violation',
-        }),
-      });
+        const response = await fetch(`/api/admin/inquiries/messages/${messageId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'soft_delete',
+            inquiryId,
+            reason: 'policy_violation',
+          }),
+        });
 
-      const result = await response.json();
-      if (!response.ok || result?.success === false) {
-        throw new Error(result?.error || '메시지 삭제 실패');
-      }
+        const result = await response.json();
+        if (!response.ok || result?.success === false) {
+          throw new Error(result?.error || '메시지 삭제 실패');
+        }
 
-      await refresh(false);
-      await loadMessages(selectedInquiry.id);
-      showToast('메시지가 운영 정책 기준으로 삭제되었습니다.', 'success');
+        await refresh(false);
+        await loadMessages(inquiryId);
+        showToast('메시지가 운영 정책 기준으로 삭제되었습니다.', 'success');
       } catch (error) {
         console.error('[ChatMonitor] soft delete failed:', error);
         const message = error instanceof Error ? error.message : '메시지 삭제 실패';
@@ -583,7 +589,8 @@ export default function ChatMonitor() {
                   data-participant-card="guest"
                   aria-label="게스트 프로필 열기"
                   onClick={openGuestProfile}
-                  className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-left transition-colors hover:border-blue-200 hover:bg-blue-50/70"
+                  disabled={isMessagesLoading || Boolean(messageError)}
+                  className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-left transition-colors hover:border-blue-200 hover:bg-blue-50/70 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <div className="flex items-center gap-3">
                     <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm">
@@ -614,7 +621,7 @@ export default function ChatMonitor() {
                     data-participant-card="host"
                     aria-label="호스트 프로필 열기"
                     onClick={openHostProfile}
-                    disabled={!hostProfile}
+                    disabled={isMessagesLoading || Boolean(messageError) || !hostProfile}
                     className={`rounded-xl border p-3 text-left transition-colors ${
                       hostProfile
                         ? 'border-slate-200 bg-slate-50 hover:border-emerald-200 hover:bg-emerald-50/70'
@@ -727,13 +734,13 @@ export default function ChatMonitor() {
                           운영 삭제
                         </div>
                       )}
-                      {activeTab === 'monitor' && hasPolicySignal && !isDeletedMessage && (
+                      {activeTab === 'monitor' && !isDeletedMessage && (
                         <button
                           type="button"
-                          onClick={() => handleSoftDeleteMessage(msg.id)}
+                          onClick={() => handleSoftDeleteMessage(msg.id, msg.content)}
                           data-delete-message-id={String(msg.id)}
                           className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[8px] md:text-[10px] font-bold text-rose-600 border border-rose-200 hover:bg-rose-50"
-                          title="정책위반 메시지 삭제"
+                          title="이 메시지만 운영 삭제"
                         >
                           <Trash2 size={10} />
                           삭제

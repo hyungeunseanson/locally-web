@@ -79,12 +79,20 @@ export async function PATCH(
     const { messageId } = await params;
     const body = await request.json().catch(() => ({}));
     const action = typeof body?.action === 'string' ? body.action : '';
+    const requestedInquiryId =
+      typeof body?.inquiryId === 'string' || typeof body?.inquiryId === 'number'
+        ? String(body.inquiryId)
+        : '';
     const reason = typeof body?.reason === 'string' && body.reason.trim()
       ? body.reason.trim()
       : 'policy_violation';
 
     if (action !== 'soft_delete') {
       return NextResponse.json({ success: false, error: '유효하지 않은 액션입니다.' }, { status: 400 });
+    }
+
+    if (!requestedInquiryId) {
+      return NextResponse.json({ success: false, error: '문의 ID가 필요합니다.' }, { status: 400 });
     }
 
     const { data: message, error: messageError } = await supabaseAdmin
@@ -100,6 +108,13 @@ export async function PATCH(
 
     if (!message) {
       return NextResponse.json({ success: false, error: '메시지를 찾을 수 없습니다.' }, { status: 404 });
+    }
+
+    if (String(message.inquiry_id) !== requestedInquiryId) {
+      return NextResponse.json(
+        { success: false, error: '선택한 문의에 속한 메시지가 아닙니다.' },
+        { status: 409 }
+      );
     }
 
     const { data: inquiry, error: inquiryError } = await supabaseAdmin
