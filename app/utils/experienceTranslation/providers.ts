@@ -171,19 +171,94 @@ function asStringArray(value: unknown) {
     .filter(Boolean);
 }
 
+function asRecord(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function addMissingField(missingFields: string[], field: string) {
+  if (!missingFields.includes(field)) {
+    missingFields.push(field);
+  }
+}
+
+function parseTranslatedText(
+  value: unknown,
+  source: string,
+  field: string,
+  missingFields: string[]
+) {
+  const translated = asTrimmedString(value);
+
+  if (source.trim() && !translated) {
+    addMissingField(missingFields, field);
+  }
+
+  return translated || source;
+}
+
+function parseTranslatedStringArray(
+  value: unknown,
+  source: string[],
+  field: string,
+  missingFields: string[]
+) {
+  if (source.length === 0) {
+    const translated = asStringArray(value);
+    return translated.length > 0 ? translated : source;
+  }
+
+  if (!Array.isArray(value)) {
+    addMissingField(missingFields, field);
+    return source;
+  }
+
+  if (value.length !== source.length) {
+    addMissingField(missingFields, field);
+  }
+
+  return value.map((entry, index) => {
+    const translated = asTrimmedString(entry);
+
+    if (!translated) {
+      addMissingField(missingFields, `${field}[${index}]`);
+    }
+
+    return translated;
+  });
+}
+
 function parseItinerary(
   value: unknown,
-  source: ExperienceItineraryTranslationItem[]
+  source: ExperienceItineraryTranslationItem[],
+  missingFields: string[]
 ) {
   const rawItems = Array.isArray(value) ? value : [];
 
+  if (source.length > 0 && rawItems.length !== source.length) {
+    addMissingField(missingFields, 'itinerary');
+  }
+
   return source.map((sourceItem, index) => {
     const raw = rawItems[index];
-    const next = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+    const next = asRecord(raw) ?? {};
 
     return {
-      title: asTrimmedString(next.title) || sourceItem.title,
-      description: asTrimmedString(next.description) || sourceItem.description,
+      title: parseTranslatedText(
+        next.title,
+        sourceItem.title,
+        `itinerary[${index}].title`,
+        missingFields
+      ),
+      description: parseTranslatedText(
+        next.description,
+        sourceItem.description,
+        `itinerary[${index}].description`,
+        missingFields
+      ),
       type: sourceItem.type,
       image_url: sourceItem.image_url,
     };
@@ -192,18 +267,28 @@ function parseItinerary(
 
 function parseRules(
   value: unknown,
-  source: ExperienceRulesTranslationInput
+  source: ExperienceRulesTranslationInput,
+  missingFields: string[]
 ): ExperienceRulesTranslationInput {
-  const raw = value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {};
+  const raw = asRecord(value) ?? {};
 
   return {
-    age_limit: asTrimmedString(raw.age_limit) || source.age_limit,
-    activity_level: asTrimmedString(raw.activity_level) || source.activity_level,
-    refund_policy: asTrimmedString(raw.refund_policy) || source.refund_policy,
-    host_notice: asTrimmedString(raw.host_notice) || source.host_notice,
+    age_limit: parseTranslatedText(raw.age_limit, source.age_limit, 'rules.age_limit', missingFields),
+    activity_level: parseTranslatedText(raw.activity_level, source.activity_level, 'rules.activity_level', missingFields),
+    refund_policy: parseTranslatedText(raw.refund_policy, source.refund_policy, 'rules.refund_policy', missingFields),
+    host_notice: parseTranslatedText(raw.host_notice, source.host_notice, 'rules.host_notice', missingFields),
   };
+}
+
+function invalidTranslationResponseError(
+  provider: 'gemini' | 'grok',
+  message: string
+) {
+  return new TranslationProviderError({
+    provider,
+    message,
+    retryable: true,
+  });
 }
 
 function parseTranslationJson(
@@ -212,33 +297,70 @@ function parseTranslationJson(
   request: TranslationRequest
 ) {
   const text = stripJsonCodeFence(rawText);
+  let parsedValue: unknown;
 
   try {
-    const parsed = JSON.parse(text) as Record<string, unknown>;
-    const title = asTrimmedString(parsed.title);
-    const description = asTrimmedString(parsed.description);
-
-    if (!title || !description) {
-      throw new Error('Missing translated title or description');
-    }
-
-    return {
-      title,
-      description,
-      meetingPoint: asTrimmedString(parsed.meeting_point) || request.meetingPoint,
-      supplies: asTrimmedString(parsed.supplies) || request.supplies,
-      inclusions: asStringArray(parsed.inclusions).length > 0 ? asStringArray(parsed.inclusions) : request.inclusions,
-      exclusions: asStringArray(parsed.exclusions).length > 0 ? asStringArray(parsed.exclusions) : request.exclusions,
-      itinerary: parseItinerary(parsed.itinerary, request.itinerary),
-      rules: parseRules(parsed.rules, request.rules),
-    };
+    parsedValue = JSON.parse(text);
   } catch {
-    throw new TranslationProviderError({
-      provider,
-      message: `${provider} returned invalid JSON`,
-      retryable: true,
-    });
+    throw invalidTranslationResponseError(provider, `${provider} returned invalid JSON`);
   }
+
+  const parsed = asRecord(parsedValue);
+  if (!parsed) {
+    throw invalidTranslationResponseError(provider, `${provider} returned invalid translation response`);
+  }
+
+  const missingFields: string[] = [];
+  const title = asTrimmedString(parsed.title);
+  const description = asTrimmedString(parsed.description);
+
+  if (!title) {
+    addMissingField(missingFields, 'title');
+  }
+
+  if (!description) {
+    addMissingField(missingFields, 'description');
+  }
+
+  const translation = {
+    title,
+    description,
+    meetingPoint: parseTranslatedText(
+      parsed.meeting_point,
+      request.meetingPoint,
+      'meeting_point',
+      missingFields
+    ),
+    supplies: parseTranslatedText(
+      parsed.supplies,
+      request.supplies,
+      'supplies',
+      missingFields
+    ),
+    inclusions: parseTranslatedStringArray(
+      parsed.inclusions,
+      request.inclusions,
+      'inclusions',
+      missingFields
+    ),
+    exclusions: parseTranslatedStringArray(
+      parsed.exclusions,
+      request.exclusions,
+      'exclusions',
+      missingFields
+    ),
+    itinerary: parseItinerary(parsed.itinerary, request.itinerary, missingFields),
+    rules: parseRules(parsed.rules, request.rules, missingFields),
+  };
+
+  if (missingFields.length > 0) {
+    throw invalidTranslationResponseError(
+      provider,
+      `${provider} returned incomplete translation: ${missingFields.join(', ')}`
+    );
+  }
+
+  return translation;
 }
 
 function parseRetryAfterSeconds(value: string | null): number | null {
