@@ -27,6 +27,7 @@ import {
   type ExperienceLocale,
   type ManualContent,
   type ExperienceSourceTranslationContent,
+  type ExperienceTranslationState,
   type TranslationMetaEntry,
 } from '@/app/utils/experienceTranslation';
 
@@ -203,7 +204,7 @@ function buildFailedTranslationMeta(
   return meta;
 }
 
-function getQueuedTranslationLocales(params: {
+export function getQueuedTranslationLocales(params: {
   sourceLocale: ExperienceLocale;
   manualLocales: ExperienceLocale[];
   existingManualLocales?: ExperienceLocale[];
@@ -220,6 +221,26 @@ function getQueuedTranslationLocales(params: {
   return mergeExperienceLocales(autoLocales, manualContentTargets).filter(
     (locale) => locale !== params.sourceLocale
   );
+}
+
+export function buildExperienceTranslationUpdateFields(params: {
+  sourceLocale: ExperienceLocale;
+  translationVersion: number;
+  translationState: ExperienceTranslationState;
+  sourceContentDirty: boolean;
+}) {
+  const { sourceLocale, translationVersion, translationState, sourceContentDirty } = params;
+
+  return {
+    title: translationState.canonicalTitle,
+    description: translationState.canonicalDescription,
+    source_locale: sourceLocale,
+    manual_locales: translationState.manualLocales,
+    translation_version: translationVersion,
+    translation_meta: translationState.translationMeta,
+    ...translationState.localizedColumns,
+    ...(sourceContentDirty ? translationState.localizedContentColumns : {}),
+  };
 }
 
 function mergeManualContentWithExisting(params: {
@@ -707,16 +728,12 @@ export async function updateExperienceFromBody(params: {
   }
 
   if (translationDirty) {
-    Object.assign(updatePayload, {
-      title: translationState.canonicalTitle,
-      description: translationState.canonicalDescription,
-      source_locale: input.sourceLocale,
-      manual_locales: translationState.manualLocales,
-      translation_version: translationVersion,
-      translation_meta: translationState.translationMeta,
-      ...translationState.localizedColumns,
-      ...translationState.localizedContentColumns,
-    });
+    Object.assign(updatePayload, buildExperienceTranslationUpdateFields({
+      sourceLocale: input.sourceLocale,
+      translationVersion,
+      translationState,
+      sourceContentDirty,
+    }));
   }
 
   let updateQuery = supabaseAdmin
