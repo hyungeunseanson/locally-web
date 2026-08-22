@@ -5,6 +5,8 @@ import json
 import os
 import re
 import sys
+import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -62,16 +64,25 @@ def sha256_file(path):
 
 
 def verify_public_object(base_url, key, expected_size):
-    request = urllib.request.Request(f"{base_url}/{key}", method="HEAD")
-    with urllib.request.urlopen(request, timeout=30) as response:
-        if response.status != 200:
-            raise RuntimeError(f"Public R2 verification failed for {key}: HTTP {response.status}")
-        content_type = response.headers.get("Content-Type", "").split(";", 1)[0]
-        if content_type != "image/webp":
-            raise RuntimeError(f"Unexpected public content type for {key}: {content_type}")
-        content_length = response.headers.get("Content-Length")
-        if content_length and int(content_length) != expected_size:
-            raise RuntimeError(f"Public object size mismatch for {key}")
+    last_error = None
+    for attempt in range(6):
+        try:
+            request = urllib.request.Request(f"{base_url}/{key}", method="HEAD")
+            with urllib.request.urlopen(request, timeout=30) as response:
+                if response.status != 200:
+                    raise RuntimeError(f"HTTP {response.status}")
+                content_type = response.headers.get("Content-Type", "").split(";", 1)[0]
+                if content_type != "image/webp":
+                    raise RuntimeError(f"unexpected content type {content_type}")
+                content_length = response.headers.get("Content-Length")
+                if content_length and int(content_length) != expected_size:
+                    raise RuntimeError("content length mismatch")
+                return
+        except (RuntimeError, urllib.error.HTTPError, urllib.error.URLError, OSError) as error:
+            last_error = error
+            if attempt < 5:
+                time.sleep(2 ** attempt)
+    raise RuntimeError(f"Public R2 verification failed for {key}: {last_error}")
 
 
 def main():

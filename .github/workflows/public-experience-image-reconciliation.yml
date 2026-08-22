@@ -87,6 +87,34 @@ jobs:
           [[ "$R2_BUCKET" == "locally-public-experience-canary" ]]
           [[ "$R2_PUBLIC_BASE_URL" == "https://media-canary.locally-travel.com" ]]
 
+      - name: Install pinned R2 client
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -m venv "${RUNNER_TEMP}/r2-venv"
+          "${RUNNER_TEMP}/r2-venv/bin/python" -m pip install --disable-pip-version-check --no-input "boto3==${BOTO3_VERSION}"
+          echo "${RUNNER_TEMP}/r2-venv/bin" >> "$GITHUB_PATH"
+
+      - name: Verify R2 credentials before expensive work
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import os
+          import boto3
+          from botocore.config import Config
+
+          client = boto3.client(
+              "s3",
+              endpoint_url=os.environ["R2_ENDPOINT"],
+              aws_access_key_id=os.environ["R2_ACCESS_KEY_ID"],
+              aws_secret_access_key=os.environ["R2_SECRET_ACCESS_KEY"],
+              region_name="auto",
+              config=Config(signature_version="s3v4"),
+          )
+          client.list_objects_v2(Bucket=os.environ["R2_BUCKET"], MaxKeys=1)
+          PY
+
       - name: Install pinned project dependencies
         run: npm ci --ignore-scripts=false
 
@@ -95,14 +123,6 @@ jobs:
         run: |
           set -Eeuo pipefail
           node scripts/cloudflare/reconcile-public-experience-images.mjs prepare --output="${RUNNER_TEMP}/public-image-sync"
-
-      - name: Install pinned R2 client
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          python3 -m venv "${RUNNER_TEMP}/r2-venv"
-          "${RUNNER_TEMP}/r2-venv/bin/python" -m pip install --disable-pip-version-check --no-input "boto3==${BOTO3_VERSION}"
-          echo "${RUNNER_TEMP}/r2-venv/bin" >> "$GITHUB_PATH"
 
       - name: Upload only missing R2 objects and verify integrity
         shell: bash
