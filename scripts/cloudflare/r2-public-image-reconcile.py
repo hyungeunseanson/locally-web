@@ -63,6 +63,13 @@ def sha256_file(path):
     return digest.hexdigest()
 
 
+def append_github_output(name, value):
+    output = os.environ.get("GITHUB_OUTPUT")
+    if output:
+        with open(output, "a", encoding="utf-8") as destination:
+            destination.write(f"{name}={value}\n")
+
+
 def verify_public_object(base_url, key, expected_size):
     last_error = None
     for attempt in range(6):
@@ -87,21 +94,63 @@ def verify_public_object(base_url, key, expected_size):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--mode", choices=("plan", "upload"), default="upload")
     parser.add_argument("--plan", required=True)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--expected")
+    parser.add_argument("--missing")
     args = parser.parse_args()
     plan_path = Path(args.plan).resolve()
     root = plan_path.parent
-    objects = json.loads(plan_path.read_text())
-    if not isinstance(objects, list) or not objects:
-        raise RuntimeError("Object plan is empty")
-    expected_keys = {item["key"] for item in objects}
-    if len(expected_keys) != len(objects):
+    plan = json.loads(plan_path.read_text())
+    if not isinstance(plan, list):
+        raise RuntimeError("Object plan must be an array")
+    plan_keys = {item["key"] for item in plan}
+    if len(plan_keys) != len(plan):
         raise RuntimeError("Object plan contains duplicate keys")
     client, bucket, base_url = load_configuration()
     before = list_keys(client, bucket)
+
+    if args.mode == "plan":
+        if not plan:
+            raise RuntimeError("Expected object specification plan is empty")
+        missing_keys = sorted(plan_keys - before)
+        result = {
+            "expectedObjectCount": len(plan_keys),
+            "existingObjectCount": len(plan_keys & before),
+            "missingObjectCount": len(missing_keys),
+            "missingKeys": missing_keys,
+        }
+        Path(args.output).write_text(json.dumps(result, indent=2) + "\n")
+        append_github_output("expected_count", result["expectedObjectCount"])
+        append_github_output("existing_count", result["existingObjectCount"])
+        append_github_output("missing_count", result["missingObjectCount"])
+        print(json.dumps(result, indent=2))
+        return
+
+    if not args.expected or not args.missing:
+        raise RuntimeError("--expected and --missing are required in upload mode")
+    expected_plan = json.loads(Path(args.expected).resolve().read_text())
+    missing_plan = json.loads(Path(args.missing).resolve().read_text())
+    if not isinstance(expected_plan, list) or not expected_plan:
+        raise RuntimeError("Expected object specification plan is empty")
+    expected_keys = {item["key"] for item in expected_plan}
+    if len(expected_keys) != len(expected_plan):
+        raise RuntimeError("Expected object specification plan contains duplicate keys")
+    planned_missing_keys = missing_plan.get("missingKeys")
+    if not isinstance(planned_missing_keys, list) or any(not isinstance(key, str) for key in planned_missing_keys):
+        raise RuntimeError("Missing R2 object plan must contain a string array")
+    if len(set(planned_missing_keys)) != len(planned_missing_keys):
+        raise RuntimeError("Missing R2 object plan contains duplicate keys")
+    if set(planned_missing_keys) - expected_keys:
+        raise RuntimeError("Missing R2 object plan contains unexpected keys")
+    if plan_keys != set(planned_missing_keys):
+        raise RuntimeError("Transformed object plan does not match the planned missing R2 keys")
+    newly_missing = (expected_keys - before) - plan_keys
+    if newly_missing:
+        raise RuntimeError(f"R2 changed during reconciliation; {len(newly_missing)} unplanned objects are now missing")
     uploaded = []
-    for item in objects:
+    for item in plan:
         key = item["key"]
         source = (root / item["path"]).resolve()
         if root not in source.parents or not source.is_file():
@@ -144,6 +193,9 @@ def main():
         "parity": True,
     }
     Path(args.output).write_text(json.dumps(result, indent=2) + "\n")
+    append_github_output("uploaded_count", result["uploadedObjectCount"])
+    append_github_output("verified_uploaded_count", result["verifiedUploadedObjectCount"])
+    append_github_output("parity", str(result["parity"]).lower())
     print(json.dumps(result, indent=2))
 
 

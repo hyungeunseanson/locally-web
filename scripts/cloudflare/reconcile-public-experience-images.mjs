@@ -14,7 +14,12 @@ function parseArgs() {
     const [key, ...parts] = value.slice(2).split('=');
     return [key, parts.join('=') || 'true'];
   }));
-  return { command, output: path.resolve(values.output || '.tmp/cloudflare-public-image-reconciliation'), plan: values.plan ? path.resolve(values.plan) : null };
+  return {
+    command,
+    output: path.resolve(values.output || '.tmp/cloudflare-public-image-reconciliation'),
+    plan: values.plan ? path.resolve(values.plan) : null,
+    missing: values.missing ? path.resolve(values.missing) : null,
+  };
 }
 
 async function loadLocalPublicEnvironment() {
@@ -164,7 +169,7 @@ async function downloadSource(url) {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const bytes = Buffer.from(await response.arrayBuffer());
       if (bytes.length === 0) throw new Error('empty response body');
-      return bytes;
+      return { bytes, attempts: attempt };
     } catch (error) {
       lastError = error;
       if (attempt < 4) await new Promise((resolve) => setTimeout(resolve, 500 * (2 ** (attempt - 1))));
@@ -173,15 +178,12 @@ async function downloadSource(url) {
   throw new Error(`Failed to download ${url}: ${lastError instanceof Error ? lastError.message : String(lastError)}`);
 }
 
-async function prepare(state, outputDirectory) {
-  const { default: sharp } = await import('sharp');
-  const objectsDirectory = path.join(outputDirectory, 'objects');
-  await mkdir(objectsDirectory, { recursive: true });
+export function buildSpecifications(inventory, expected) {
   const specifications = [];
-  for (const experience of state.inventory) {
-    const card = state.expected.cards[experience.id];
+  for (const experience of inventory) {
+    const card = expected.cards[experience.id];
     specifications.push({ originUrl: card.originUrl, key: card.smallKey, width: 384, quality: 65 }, { originUrl: card.originUrl, key: card.largeKey, width: 640, quality: 65 });
-    for (const [originUrl, entry] of Object.entries(state.expected.details[experience.id])) {
+    for (const [originUrl, entry] of Object.entries(expected.details[experience.id])) {
       specifications.push(
         { originUrl, key: entry.smallKey, width: 480, quality: 75 },
         { originUrl, key: entry.mediumKey, width: 960, quality: 75 },
@@ -191,12 +193,57 @@ async function prepare(state, outputDirectory) {
   }
   const keys = specifications.map((item) => item.key);
   if (new Set(keys).size !== keys.length) throw new Error('Duplicate expected R2 object key.');
+  return specifications;
+}
+
+export function selectMissingSpecifications(specifications, missingKeys) {
+  if (!Array.isArray(missingKeys) || missingKeys.some((key) => typeof key !== 'string')) throw new Error('Missing R2 object plan must contain a string array.');
+  if (new Set(missingKeys).size !== missingKeys.length) throw new Error('Missing R2 object plan contains duplicate keys.');
+  const expectedKeys = new Set(specifications.map((item) => item.key));
+  const unexpectedKeys = missingKeys.filter((key) => !expectedKeys.has(key));
+  if (unexpectedKeys.length > 0) throw new Error(`Missing R2 object plan contains ${unexpectedKeys.length} unexpected keys.`);
+  const missingSet = new Set(missingKeys);
+  return specifications.filter((item) => missingSet.has(item.key));
+}
+
+async function plan(state, outputDirectory) {
+  const specifications = buildSpecifications(state.inventory, state.expected);
+  const previousKeys = new Set([
+    ...Object.values(state.currentCards).flatMap((entry) => [entry.smallKey, entry.largeKey]),
+    ...Object.values(state.currentDetails).flatMap((images) => Object.values(images).flatMap((entry) => [entry.smallKey, entry.mediumKey, entry.largeKey])),
+  ]);
+  const expectedKeys = new Set(specifications.map((item) => item.key));
+  const retainedStaleKeys = [...previousKeys].filter((key) => !expectedKeys.has(key)).sort();
+  await Promise.all([
+    writeFile(path.join(outputDirectory, 'publicExperienceCardImages.ts'), renderCardManifest(state.expected.cards)),
+    writeFile(path.join(outputDirectory, 'publicExperienceDetailImages.generated.json'), stableJson(state.expected.details)),
+    writeFile(path.join(outputDirectory, 'specifications.json'), stableJson(specifications)),
+    writeFile(path.join(outputDirectory, 'plan.json'), stableJson({ version: 2, createdAt: new Date().toISOString(), snapshotHash: state.summary.snapshotHash, summary: state.summary, expectedObjectCount: specifications.length, retainedStaleKeys })),
+  ]);
+  return { ...state.summary, expectedObjectCount: specifications.length, retainedStaleObjectCount: retainedStaleKeys.length, outputDirectory };
+}
+
+async function transform(specificationsPath, missingPath, outputDirectory) {
+  const [specifications, missingPlan] = await Promise.all([
+    readFile(specificationsPath, 'utf8').then(JSON.parse),
+    readFile(missingPath, 'utf8').then(JSON.parse),
+  ]);
+  if (!Array.isArray(specifications) || specifications.length === 0) throw new Error('Expected object specification plan is empty.');
+  const selected = selectMissingSpecifications(specifications, missingPlan.missingKeys);
+  const sharp = selected.length > 0 ? (await import('sharp')).default : null;
+  const objectsDirectory = path.join(outputDirectory, 'objects');
+  await mkdir(objectsDirectory, { recursive: true });
   const sourceCache = new Map();
   const objects = [];
-  for (const specification of specifications) {
+  let sourceDownloadBytes = 0;
+  let sourceDownloadAttempts = 0;
+  for (const specification of selected) {
     let source = sourceCache.get(specification.originUrl);
     if (!source) {
-      source = await downloadSource(specification.originUrl);
+      const downloaded = await downloadSource(specification.originUrl);
+      source = downloaded.bytes;
+      sourceDownloadBytes += source.length;
+      sourceDownloadAttempts += downloaded.attempts;
       sourceCache.set(specification.originUrl, source);
     }
     const destination = path.join(objectsDirectory, specification.key);
@@ -205,23 +252,35 @@ async function prepare(state, outputDirectory) {
     const bytes = await readFile(destination);
     objects.push({ key: specification.key, path: path.relative(outputDirectory, destination), bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex'), contentType: 'image/webp' });
   }
-  const previousKeys = new Set([
-    ...Object.values(state.currentCards).flatMap((entry) => [entry.smallKey, entry.largeKey]),
-    ...Object.values(state.currentDetails).flatMap((images) => Object.values(images).flatMap((entry) => [entry.smallKey, entry.mediumKey, entry.largeKey])),
-  ]);
-  const expectedKeys = new Set(objects.map((item) => item.key));
-  const retainedStaleKeys = [...previousKeys].filter((key) => !expectedKeys.has(key)).sort();
+  const result = {
+    sourceDownloadCount: sourceCache.size,
+    sourceDownloadBytes,
+    sourceDownloadAttempts,
+    transformedObjectCount: objects.length,
+    transformedObjectBytes: objects.reduce((total, item) => total + item.bytes, 0),
+  };
   await Promise.all([
-    writeFile(path.join(outputDirectory, 'publicExperienceCardImages.ts'), renderCardManifest(state.expected.cards)),
-    writeFile(path.join(outputDirectory, 'publicExperienceDetailImages.generated.json'), stableJson(state.expected.details)),
     writeFile(path.join(outputDirectory, 'objects.json'), stableJson(objects)),
-    writeFile(path.join(outputDirectory, 'plan.json'), stableJson({ version: 1, createdAt: new Date().toISOString(), snapshotHash: state.summary.snapshotHash, summary: state.summary, expectedObjectCount: objects.length, retainedStaleKeys })),
+    writeFile(path.join(outputDirectory, 'transform-result.json'), stableJson(result)),
   ]);
-  return { ...state.summary, expectedObjectCount: objects.length, retainedStaleObjectCount: retainedStaleKeys.length, outputDirectory };
+  for (const [name, value] of Object.entries({
+    source_download_count: result.sourceDownloadCount,
+    source_download_bytes: result.sourceDownloadBytes,
+    source_download_attempts: result.sourceDownloadAttempts,
+    transformed_object_count: result.transformedObjectCount,
+    transformed_object_bytes: result.transformedObjectBytes,
+  })) await appendGithubOutput(name, value);
+  return result;
 }
 
 async function main() {
   const args = parseArgs();
+  if (args.command === 'transform') {
+    if (!args.plan || !args.missing) throw new Error('--plan and --missing are required for transform.');
+    await mkdir(args.output, { recursive: true });
+    console.log(stableJson(await transform(args.plan, args.missing, args.output)));
+    return;
+  }
   if (args.command === 'verify-snapshot') {
     if (!args.plan) throw new Error('--plan is required for verify-snapshot.');
     const [state, plan] = await Promise.all([loadState(), readFile(args.plan, 'utf8').then(JSON.parse)]);
@@ -238,12 +297,12 @@ async function main() {
     console.log(stableJson(state.summary));
     return;
   }
-  if (args.command !== 'prepare') throw new Error(`Unknown command: ${args.command}`);
+  if (args.command !== 'plan') throw new Error(`Unknown command: ${args.command}`);
   if (!state.summary.drift) {
     console.log(stableJson({ ...state.summary, skipped: 'no-drift' }));
     return;
   }
-  console.log(stableJson(await prepare(state, args.output)));
+  console.log(stableJson(await plan(state, args.output)));
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {

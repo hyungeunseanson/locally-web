@@ -26,6 +26,9 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
 
+      - name: Test incremental reconciliation boundaries
+        run: node --test scripts/cloudflare/reconcile-public-experience-images.test.mjs
+
       - name: Audit Production image drift
         id: audit
         shell: bash
@@ -115,21 +118,45 @@ jobs:
           client.list_objects_v2(Bucket=os.environ["R2_BUCKET"], MaxKeys=1)
           PY
 
-      - name: Install pinned project dependencies
-        run: npm ci --ignore-scripts=false
-
-      - name: Prepare immutable image variants and candidate manifests
+      - name: Plan candidate manifests without downloading images
         shell: bash
         run: |
           set -Eeuo pipefail
-          node scripts/cloudflare/reconcile-public-experience-images.mjs prepare --output="${RUNNER_TEMP}/public-image-sync"
+          node scripts/cloudflare/reconcile-public-experience-images.mjs plan --output="${RUNNER_TEMP}/public-image-sync"
 
-      - name: Upload only missing R2 objects and verify integrity
+      - name: Identify only missing R2 objects
+        id: r2_plan
         shell: bash
         run: |
           set -Eeuo pipefail
           python3 scripts/cloudflare/r2-public-image-reconcile.py \
+            --mode plan \
+            --plan "${RUNNER_TEMP}/public-image-sync/specifications.json" \
+            --output "${RUNNER_TEMP}/public-image-sync/missing-objects.json"
+
+      - name: Install pinned project dependencies
+        run: npm ci --ignore-scripts=false
+
+      - name: Download and transform only missing R2 objects
+        id: transform
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          node scripts/cloudflare/reconcile-public-experience-images.mjs transform \
+            --plan="${RUNNER_TEMP}/public-image-sync/specifications.json" \
+            --missing="${RUNNER_TEMP}/public-image-sync/missing-objects.json" \
+            --output="${RUNNER_TEMP}/public-image-sync"
+
+      - name: Upload only missing R2 objects and verify integrity
+        id: r2_sync
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 scripts/cloudflare/r2-public-image-reconcile.py \
+            --mode upload \
             --plan "${RUNNER_TEMP}/public-image-sync/objects.json" \
+            --expected "${RUNNER_TEMP}/public-image-sync/specifications.json" \
+            --missing "${RUNNER_TEMP}/public-image-sync/missing-objects.json" \
             --output "${RUNNER_TEMP}/public-image-sync/r2-result.json"
 
       - name: Reject Production changes during reconciliation
@@ -198,5 +225,11 @@ jobs:
             echo "- Object deletion: disabled"
             echo "- Supabase credential: public anon only"
             echo "- R2 scope: fixed single bucket"
+            echo "- Source images downloaded: ${{ steps.transform.outputs.source_download_count || '0' }}"
+            echo "- Source bytes downloaded: ${{ steps.transform.outputs.source_download_bytes || '0' }}"
+            echo "- Image variants generated: ${{ steps.transform.outputs.transformed_object_count || '0' }}"
+            echo "- R2 objects uploaded: ${{ steps.r2_sync.outputs.uploaded_count || '0' }}"
+            echo "- Expected R2 parity objects: ${{ steps.r2_plan.outputs.expected_count || '0' }}"
+            echo "- R2 parity: ${{ steps.r2_sync.outputs.parity || 'not-run' }}"
             echo "- Result: ${{ job.status }}"
           } >> "$GITHUB_STEP_SUMMARY"
