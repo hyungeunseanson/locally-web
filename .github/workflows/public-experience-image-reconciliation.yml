@@ -147,6 +147,9 @@ jobs:
           cp "${RUNNER_TEMP}/public-image-sync/publicExperienceDetailImages.generated.json" app/data/publicExperienceDetailImages.generated.json
           git diff --check
 
+      - name: Install pinned Chromium for image boundary tests
+        run: npx playwright install --with-deps chromium
+
       - name: Run Cloudflare image boundary tests
         run: >-
           npx playwright test -c playwright.cloudflare-images.config.ts
