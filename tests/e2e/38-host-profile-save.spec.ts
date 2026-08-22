@@ -170,6 +170,114 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Host profile save route', () => {
+  test('rejects unauthenticated guest notification email updates', async ({ page }) => {
+    const response = await page.request.post('/api/account/notification-email', {
+      data: { email: 'guest-notification@example.com' },
+    });
+
+    expect(response.status()).toBe(401);
+  });
+
+  test('updates only the guest profile notification email and keeps the Auth login email', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const user = createUser('guest-notification-email');
+    const otherUser = createUser('guest-notification-email-other');
+    const userId = await createAuthUser(user);
+    const otherUserId = await createAuthUser(otherUser);
+    await login(page, user);
+
+    const nextEmail = `codex.guest.notification.${Date.now()}@example.com`;
+    const response = await page.request.post('/api/account/notification-email', {
+      data: {
+        email: `  ${nextEmail.toUpperCase()}  `,
+        userId: otherUserId,
+      },
+    });
+
+    expect(response.status()).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      notificationEmail: nextEmail,
+    });
+
+    const supabase = getAdminClient();
+    const [
+      { data: profile, error: profileError },
+      { data: authUser, error: authUserError },
+      { data: otherProfile, error: otherProfileError },
+      { count: hostApplicationCount, error: hostApplicationError },
+    ] = await Promise.all([
+      supabase.from('profiles').select('email').eq('id', userId).maybeSingle(),
+      supabase.auth.admin.getUserById(userId),
+      supabase.from('profiles').select('email').eq('id', otherUserId).maybeSingle(),
+      supabase
+        .from('host_applications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId),
+    ]);
+
+    if (profileError) throw profileError;
+    if (authUserError) throw authUserError;
+    if (otherProfileError) throw otherProfileError;
+    if (hostApplicationError) throw hostApplicationError;
+
+    expect(profile?.email).toBe(nextEmail);
+    expect(authUser.user?.email).toBe(user.email);
+    expect(otherProfile?.email).toBe(otherUser.email);
+    expect(hostApplicationCount).toBe(0);
+
+    let notificationEmailRequestCount = 0;
+    page.on('request', (request) => {
+      if (request.url().includes('/api/account/notification-email')) {
+        notificationEmailRequestCount += 1;
+      }
+    });
+
+    await page.goto('/account', { waitUntil: 'networkidle' });
+    await expect(page.getByTestId('guest-notification-email-input')).toHaveValue(nextEmail);
+    await page.getByRole('button', { name: /변경사항 저장|Save Changes|変更を保存|保存更改/ }).click();
+    await expect.poll(() => notificationEmailRequestCount).toBe(0);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.getByTestId('account-mobile-profile-card').click();
+    await page.getByTestId('mobile-profile-edit-save').click();
+    await expect(page.getByTestId('mobile-guest-notification-email-input')).toHaveValue(nextEmail);
+    await page.getByTestId('mobile-profile-edit-save').click();
+    await expect.poll(() => notificationEmailRequestCount).toBe(0);
+  });
+
+  test('applies the existing invalid, blank, and duplicate profile email policy to guests', async ({ page }) => {
+    test.setTimeout(120000);
+
+    const owner = createUser('guest-email-guard-owner');
+    const duplicateHolder = createUser('guest-email-guard-duplicate');
+    await createAuthUser(owner);
+    await createAuthUser(duplicateHolder);
+    await login(page, owner);
+
+    const invalidResponse = await page.request.post('/api/account/notification-email', {
+      data: { email: 'not-an-email' },
+    });
+    expect(invalidResponse.status()).toBe(400);
+
+    const tooLongResponse = await page.request.post('/api/account/notification-email', {
+      data: { email: `${'a'.repeat(244)}@example.com` },
+    });
+    expect(tooLongResponse.status()).toBe(400);
+
+    const blankResponse = await page.request.post('/api/account/notification-email', {
+      data: { email: '   ' },
+    });
+    expect(blankResponse.status()).toBe(400);
+
+    const duplicateResponse = await page.request.post('/api/account/notification-email', {
+      data: { email: duplicateHolder.email.toUpperCase() },
+    });
+    expect(duplicateResponse.status()).toBe(409);
+  });
+
   test('rejects unauthenticated save attempts', async ({ page }) => {
     const response = await page.request.post('/api/host/profile', {
       data: buildProfilePayload('Unauthenticated Host'),
@@ -249,8 +357,17 @@ test.describe.serial('Host profile save route', () => {
     const user = createUser('email');
     const userId = await createAuthUser(user);
     await createHostApplication(userId, user);
+    const { error: divergentProfileEmailError } = await getAdminClient()
+      .from('profiles')
+      .update({ email: `guest-mode.${Date.now()}@example.com` })
+      .eq('id', userId);
+    if (divergentProfileEmailError) throw divergentProfileEmailError;
 
     await login(page, user);
+
+    await page.goto('/host/dashboard?tab=profile', { waitUntil: 'networkidle' });
+    await expect(page.getByTestId('host-notification-email-card')).toBeVisible();
+    await expect(page.getByTestId('host-notification-email-card').locator('input')).toHaveValue(user.email);
 
     const nextName = `${user.fullName} Email Updated`;
     const nextEmail = `codex.host.profile.save.notification.${Date.now()}@example.com`;

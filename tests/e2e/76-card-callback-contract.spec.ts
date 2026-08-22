@@ -216,7 +216,7 @@ test.describe.serial('Card callback contract', () => {
     });
   });
 
-  test('treats completed experience card notifications as idempotent OK', async ({ request }) => {
+  test('keeps completed experience card notifications inert under PortOne', async ({ request }) => {
     const owner = createTestUser('exp.notification.completed');
     const ownerId = await createAuthUser(owner, createdAuthUserIds);
     const { experienceId } = await getLatestHostExperience();
@@ -249,11 +249,15 @@ test.describe.serial('Card callback contract', () => {
       },
     });
 
-    expect(response.status()).toBe(200);
-    await expect(response.text()).resolves.toBe('OK');
+    expect(response.status()).toBe(202);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      ignored: true,
+      orderId: bookingId,
+    });
   });
 
-  test('treats cancelled experience card notifications for the stored TID as idempotent OK', async ({ request }) => {
+  test('keeps cancelled experience card notifications inert under PortOne', async ({ request }) => {
     const owner = createTestUser('exp.notification.cancelled');
     const ownerId = await createAuthUser(owner, createdAuthUserIds);
     const { experienceId } = await getLatestHostExperience();
@@ -289,8 +293,12 @@ test.describe.serial('Card callback contract', () => {
       },
     });
 
-    expect(response.status()).toBe(200);
-    await expect(response.text()).resolves.toBe('OK');
+    expect(response.status()).toBe(202);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      ignored: true,
+      orderId: bookingId,
+    });
 
     const { data: booking, error } = await getAdminClient()
       .from('bookings')
@@ -308,7 +316,7 @@ test.describe.serial('Card callback contract', () => {
     });
   });
 
-  test('keeps mismatched cancelled experience notifications non-idempotent', async ({ request }) => {
+  test('keeps mismatched cancelled experience notifications inert under PortOne', async ({ request }) => {
     const owner = createTestUser('exp.notification.cancelled.mismatch');
     const ownerId = await createAuthUser(owner, createdAuthUserIds);
     const { experienceId } = await getLatestHostExperience();
@@ -344,7 +352,12 @@ test.describe.serial('Card callback contract', () => {
       },
     });
 
-    expect(response.status()).toBe(409);
+    expect(response.status()).toBe(202);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      ignored: true,
+      orderId: bookingId,
+    });
   });
 
   test('blocks service callback confirmation from a different logged-in user', async ({ page }) => {
@@ -391,7 +404,7 @@ test.describe.serial('Card callback contract', () => {
     });
   });
 
-  test('treats cancelled service card notifications for the stored TID as idempotent OK', async ({ request }) => {
+  test('keeps cancelled service card notifications inert under PortOne', async ({ request }) => {
     const owner = createTestUser('svc.notification.cancelled');
     const ownerId = await createAuthUser(owner, createdAuthUserIds);
     const fixture = await createPendingServiceFixture(ownerId, owner.fullName, owner.phone);
@@ -420,8 +433,12 @@ test.describe.serial('Card callback contract', () => {
       },
     });
 
-    expect(response.status()).toBe(200);
-    await expect(response.text()).resolves.toBe('OK');
+    expect(response.status()).toBe(202);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      ignored: true,
+      orderId: fixture.orderId,
+    });
 
     const { data: serviceBooking, error } = await getAdminClient()
       .from('service_bookings')

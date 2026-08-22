@@ -125,6 +125,22 @@ test.describe('Host notification email routing', () => {
     expect(admin.requestedTables).not.toContain('host_applications');
   });
 
+  test('uses the guest profile notification email before the Auth login fallback', async () => {
+    const guest = createResolverClient({
+      hostApplicationEmail: 'host-notification@example.com',
+      profileEmail: 'guest-notification@example.com',
+      authEmail: 'guest-login@example.com',
+    });
+
+    await expect(resolveRecipientEmail({
+      supabaseAdmin: guest.client,
+      userId: 'guest-id',
+      audience: 'guest',
+    })).resolves.toBe('guest-notification@example.com');
+
+    expect(guest.requestedTables).toEqual(['profiles']);
+  });
+
   test('preserves profile and auth fallbacks when a host application email is absent', async () => {
     const profileFallback = createResolverClient({
       hostApplicationEmail: null,

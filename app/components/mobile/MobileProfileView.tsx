@@ -17,6 +17,7 @@ import type { LocallyMembershipStatus } from '@/app/utils/memberStatus';
 import LocallyMembershipBadgeTrigger from '@/app/components/LocallyMembershipBadgeTrigger';
 import { saveOwnDemographics } from '@/app/utils/demographicsClient';
 import { isDemographicGender, isValidBirthDate } from '@/app/utils/demographics';
+import { updateOwnNotificationEmail } from '@/app/utils/notificationEmailClient';
 
 type GuestReview = {
     id: string | number;
@@ -49,6 +50,7 @@ interface MobileProfileViewProps {
     userId: string;
     guestReviews: GuestReview[];
     membershipStatus: LocallyMembershipStatus;
+    isKakaoUser: boolean;
     onBack: () => void;
     onProfileUpdate: (updatedProfile: MobileProfileData) => void;
 }
@@ -58,6 +60,7 @@ export default function MobileProfileView({
     userId,
     guestReviews,
     membershipStatus,
+    isKakaoUser,
     onBack,
     onProfileUpdate,
 }: MobileProfileViewProps) {
@@ -162,6 +165,7 @@ export default function MobileProfileView({
     };
 
     const handleSave = async () => {
+        let savedEmail = editData.email;
         const hasAnyDemographics = Boolean(editData.birth_date || editData.gender);
         const normalizedGender = isDemographicGender(editData.gender) ? editData.gender : null;
         const hasCompleteDemographics = isValidBirthDate(editData.birth_date) && normalizedGender !== null;
@@ -219,11 +223,28 @@ export default function MobileProfileView({
             }
         }
 
+        if (
+            !error
+            && editData.email.trim().toLowerCase() !== profile.email.trim().toLowerCase()
+        ) {
+            try {
+                const notificationEmail = await updateOwnNotificationEmail(editData.email);
+                setEditData((current) => ({ ...current, email: notificationEmail }));
+                savedEmail = notificationEmail;
+            } catch (notificationEmailError) {
+                error = {
+                    message: notificationEmailError instanceof Error
+                        ? notificationEmailError.message
+                        : 'Failed to save notification email',
+                };
+            }
+        }
+
         if (error) {
             showToast('저장 실패: ' + error.message, 'error');
         } else {
             showToast('프로필이 저장되었습니다.', 'success');
-            onProfileUpdate({ ...profile, ...editData });
+            onProfileUpdate({ ...profile, ...editData, email: savedEmail });
             setIsEditing(false);
         }
         setSaving(false);
@@ -242,6 +263,7 @@ export default function MobileProfileView({
                     <ArrowLeft className="w-[18px] h-[18px] md:w-5 md:h-5" strokeWidth={2} />
                 </button>
                 <button
+                    data-testid="mobile-profile-edit-save"
                     onClick={() => isEditing ? handleSave() : setIsEditing(true)}
                     disabled={saving}
                     className="rounded-full border border-gray-200 px-3.5 py-1.5 text-[12px] font-semibold text-gray-800 transition-all hover:bg-gray-50 active:scale-[0.96] disabled:opacity-50"
@@ -462,12 +484,37 @@ export default function MobileProfileView({
                     )}
                 </div>
 
-                {/* 이메일 */}
-                <div className="flex items-center gap-2.5 py-3 border-b border-slate-100">
-                    <Mail className="w-4 h-4 text-slate-500 shrink-0" />
-                    <span className="text-[12px] text-slate-700">
-                        {t('label_email')}: <span className="font-medium">{displayProfile.email || t('not_entered')}</span>
-                    </span>
+                {/* 알림 수신 이메일 */}
+                <div className="flex items-start gap-2.5 border-b border-slate-100 py-3" data-testid="mobile-guest-notification-email">
+                    <Mail className="mt-1 w-4 h-4 text-amber-700 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                        {isEditing ? (
+                            <input
+                                data-testid="mobile-guest-notification-email-input"
+                                type="email"
+                                inputMode="email"
+                                autoComplete="email"
+                                value={editData.email || ''}
+                                onChange={e => setEditData(prev => ({ ...prev, email: e.target.value }))}
+                                className="w-full rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-[12px] font-medium text-slate-700 outline-none focus:border-amber-500"
+                            />
+                        ) : (
+                            <span className="text-[12px] text-slate-700">
+                                {t('guest_notification_email_label')}: <span className="font-medium">{displayProfile.email || t('not_entered')}</span>
+                            </span>
+                        )}
+                        <p className="mt-1.5 text-[10px] leading-relaxed text-slate-500">
+                            {t('notification_email_guidance')}
+                        </p>
+                        <p className="mt-1 text-[10px] text-slate-400">
+                            {t('guest_notification_email_login_unchanged')}
+                        </p>
+                        {isKakaoUser && (
+                            <p className="mt-1.5 rounded-lg bg-amber-50 px-2 py-1.5 text-[10px] font-medium leading-relaxed text-amber-800">
+                                {t('notification_email_kakao_guidance')}
+                            </p>
+                        )}
+                    </div>
                 </div>
 
                 {/* 카카오 ID */}

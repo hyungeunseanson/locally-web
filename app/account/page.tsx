@@ -4,7 +4,7 @@ import Image from 'next/image';
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
 import { createClient } from '@/app/utils/supabase/client';
-import { User, ShieldCheck, Heart, Star, Save, Smile, Camera, Loader2, Calendar, ChevronLeft, ChevronRight, X, ChevronDown, Settings, HelpCircle, Bell, FileText, BookOpen, Users, Globe, MessageSquare } from 'lucide-react';
+import { User, ShieldCheck, Heart, Star, Save, Smile, Camera, Loader2, Calendar, ChevronLeft, ChevronRight, X, ChevronDown, Settings, HelpCircle, Bell, FileText, BookOpen, Users, Globe, MessageSquare, Mail } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext';
@@ -27,6 +27,7 @@ import { useAuth } from '@/app/context/AuthContext';
 import { fetchOwnDemographics, saveOwnDemographics } from '@/app/utils/demographicsClient';
 import { isDemographicGender, isValidBirthDate } from '@/app/utils/demographics';
 import { normalizeInternalReturnPath } from '@/app/utils/authRedirect';
+import { updateOwnNotificationEmail } from '@/app/utils/notificationEmailClient';
 
 type GuestReview = {
   id: string | number;
@@ -86,6 +87,7 @@ export default function AccountPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [savedNotificationEmail, setSavedNotificationEmail] = useState('');
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [showProfileView, setShowProfileView] = useState(false);
   const [showHostTransition, setShowHostTransition] = useState(false);
@@ -103,6 +105,11 @@ export default function AccountPage() {
   const { unreadCount } = useNotification();
   const { canUseHostView, setHostView } = useViewMode();
   const { user: authUser, isLoading: authLoading, hostStatusResolved, signOut } = useAuth();
+  const isKakaoUser = Boolean(
+    authUser?.app_metadata?.provider === 'kakao'
+    || (Array.isArray(authUser?.app_metadata?.providers)
+      && authUser.app_metadata.providers.includes('kakao'))
+  );
   const { membership } = useLocallyMembership(authUser?.id);
   const memberTierDescription = t('membership_member_info_desc') as string;
   const circleTierDescription = t('membership_circle_info_desc') as string;
@@ -299,9 +306,10 @@ export default function AccountPage() {
         }
 
         if (data && !profileError) {
+          const notificationEmail = data.email || user.email || '';
           setProfile({
             full_name: data.full_name || '',
-            email: user.email || data.email || '',
+            email: notificationEmail,
             nationality: data.nationality || '',
             birth_date: demographics.birth_date || '',
             gender: demographics.gender || '',
@@ -313,11 +321,13 @@ export default function AccountPage() {
             languages: normalizeLanguageList(data.languages).map((language) => normalizeProfileLanguageValue(language)),
             job: data.job || '',
           });
+          setSavedNotificationEmail(notificationEmail);
         } else {
           setProfile(prev => ({
             ...prev,
             ...fallbackProfile,
           }));
+          setSavedNotificationEmail(fallbackProfile.email);
         }
 
         // 🟢 [추가] 게스트 리뷰 불러오기
@@ -557,6 +567,21 @@ export default function AccountPage() {
       }
     }
 
+    const normalizedNotificationEmail = profile.email.trim().toLowerCase();
+    if (!error && normalizedNotificationEmail !== savedNotificationEmail.trim().toLowerCase()) {
+      try {
+        const notificationEmail = await updateOwnNotificationEmail(profile.email);
+        setProfile((current) => ({ ...current, email: notificationEmail }));
+        setSavedNotificationEmail(notificationEmail);
+      } catch (notificationEmailError) {
+        error = {
+          message: notificationEmailError instanceof Error
+            ? notificationEmailError.message
+            : 'Failed to save notification email',
+        };
+      }
+    }
+
     if (error) {
       console.error('Save error:', error);
       showToast(t('profile_save_fail'), 'error'); // 🟢 번역
@@ -607,9 +632,11 @@ export default function AccountPage() {
           userId={user?.id || ''}
           guestReviews={guestReviews}
           membershipStatus={membership?.status ?? 'none'}
+          isKakaoUser={isKakaoUser}
           onBack={() => setShowProfileView(false)}
           onProfileUpdate={(updated) => {
             setProfile(prev => ({ ...prev, ...updated }));
+            setSavedNotificationEmail(updated.email);
             setShowProfileView(false);
             if (
               isValidBirthDate(updated.birth_date)
@@ -989,6 +1016,38 @@ export default function AccountPage() {
                 </p>
               </div>
 
+              <div className="rounded-3xl border border-amber-200 bg-amber-50/70 p-5" data-testid="guest-notification-email-card">
+                <div className="flex items-start gap-3">
+                  <Mail className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
+                  <div className="min-w-0 flex-1">
+                    <label className="block text-sm font-bold text-slate-900" htmlFor="guest-notification-email">
+                      {t('guest_notification_email_label')}
+                    </label>
+                    <input
+                      id="guest-notification-email"
+                      data-testid="guest-notification-email-input"
+                      type="email"
+                      inputMode="email"
+                      autoComplete="email"
+                      value={profile.email}
+                      onChange={(event) => setProfile({ ...profile, email: event.target.value })}
+                      className="mt-2 w-full rounded-xl border border-amber-200 bg-white p-3 text-sm font-medium outline-none transition-colors focus:border-black"
+                    />
+                    <p className="mt-2 text-xs leading-relaxed text-slate-600">
+                      {t('notification_email_guidance')}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {t('notification_email_login_unchanged').replace('{email}', authUser?.email || '-')}
+                    </p>
+                    {isKakaoUser && (
+                      <p className="mt-2 rounded-lg bg-amber-100 px-3 py-2 text-xs font-medium leading-relaxed text-amber-900">
+                        {t('notification_email_kakao_guidance')}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-bold mb-2">{t('label_name')}</label> {/* 🟢 번역 */}
@@ -1221,16 +1280,6 @@ export default function AccountPage() {
                     ))}
                   </div>
                   <p className="text-xs text-slate-400">{t('help_languages_spoken')}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold mb-2">{t('label_email')}</label> {/* 🟢 번역 */}
-                  <input
-                    type="email"
-                    value={profile.email}
-                    readOnly
-                    className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-500 outline-none"
-                  />
-                  <p className="text-xs text-slate-400 mt-1">{t('help_email')}</p> {/* 🟢 번역 */}
                 </div>
               </div>
 

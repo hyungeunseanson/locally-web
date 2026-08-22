@@ -283,6 +283,24 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
               </p>
             </div>
 
+            <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 md:p-5" data-testid="host-notification-email-card">
+              <InputGroup
+                label={t('hp_notification_email_label')}
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                icon={<Mail size={16} />}
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                placeholder="host@example.com"
+                description={t('hp_notification_email_desc')}
+              />
+              <p className="mt-2 text-[11px] leading-relaxed text-slate-600 md:text-xs">
+                {t('notification_email_guidance')}
+              </p>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <InputGroup label={t('hp_name_label')} name="name" value={formData.name} onChange={handleChange} icon={<User size={16} />} />
               <InputGroup label={t('hp_job_label')} name="job" value={formData.job} onChange={handleChange} icon={<Briefcase size={16} />} placeholder={t('hp_job_ph')} />
@@ -329,35 +347,17 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
 
         {activeTab === 'private' && (
           <div className="space-y-5 md:space-y-8 animate-in fade-in">
-            {/* ✅ [수정] 통합된 안내 문구 (요청하신 내용 반영) */}
+            {/* 비공개 정보는 운영팀을 통해 안전하게 변경 */}
             <div className="bg-yellow-50 border border-yellow-100 p-4 md:p-5 rounded-xl flex gap-2.5 md:gap-3 text-yellow-800 text-xs md:text-sm leading-relaxed">
               <AlertTriangle className="flex-shrink-0 mt-0.5" size={16} />
               <div>
-                <p className="font-bold mb-1">{t('hp_private_warn_title')}</p>
-                <p className="opacity-90">
-                  {t('hp_private_warn_desc1')}<br />
-                  {t('hp_private_warn_desc2')}
-                </p>
+                <p className="opacity-90">{t('hp_private_warn_desc2')}</p>
               </div>
             </div>
 
             <div className="bg-slate-50 p-3.5 md:p-6 rounded-2xl border border-slate-100">
               <h3 className="font-bold text-sm md:text-base text-slate-900 mb-3 md:mb-4 flex items-center gap-2"><User size={16} className="md:w-[18px] md:h-[18px]" /> {t('hp_private_info')}</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6">
-                <div className="md:col-span-2">
-                  <InputGroup
-                    label={t('hp_notification_email_label')}
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    icon={<Mail size={16} />}
-                    type="email"
-                    inputMode="email"
-                    autoComplete="email"
-                    placeholder="host@example.com"
-                    description={t('hp_notification_email_desc')}
-                  />
-                </div>
                 {/* ✅ [수정] 모든 필드 disabled 처리 */}
                 <InputGroup label={t('hp_phone_label')} name="phone" value={formData.phone} disabled={true} placeholder={t('hp_no_content')} />
                 <InputGroup label={t('hp_dob_label')} name="dob" value={formData.dob} disabled={true} placeholder={t('hp_no_content')} />

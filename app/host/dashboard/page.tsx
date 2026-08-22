@@ -101,7 +101,7 @@ function buildMergedHostProfile(
 
   return {
     ...(profileData ?? {}),
-    email: profileData?.email || hostData?.email || '',
+    email: hostData?.email || profileData?.email || '',
     full_name: profileData?.full_name || hostPublicProfile.name,
     name: hostPublicProfile.name,
     avatar_url: hostPublicProfile.avatarUrl,
