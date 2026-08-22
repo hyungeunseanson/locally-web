@@ -2,6 +2,8 @@ name: Public Experience Image Reconciliation
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '48 5 * * *'
 
 permissions:
   contents: read
