@@ -164,4 +164,14 @@ export const PUBLIC_EXPERIENCE_CARD_IMAGES = {
     smallKey: "cards/experience-4597-primary-d2137a739c1e-w384-q65.webp",
     largeKey: "cards/experience-4597-primary-d2137a739c1e-w640-q65.webp",
   },
+  "4659": {
+    originUrl: "https://uhinvcydgzqlpnvieyal.supabase.co/storage/v1/object/public/experiences/experience/aa54a660-6b38-47c5-bac3-d79f3aa46064/hero/1787282127234_1787282127234-k9mm865f.jpg",
+    smallKey: "cards/experience-4659-primary-d73652d96505-w384-q65.webp",
+    largeKey: "cards/experience-4659-primary-d73652d96505-w640-q65.webp",
+  },
+  "4660": {
+    originUrl: "https://uhinvcydgzqlpnvieyal.supabase.co/storage/v1/object/public/experiences/experience/89aa4dba-4cc1-43a1-b15a-79a4de42822b/hero/1787272877005_1787272877005-2osff2ks.jpeg",
+    smallKey: "cards/experience-4660-primary-d1ab8583b864-w384-q65.webp",
+    largeKey: "cards/experience-4660-primary-d1ab8583b864-w640-q65.webp",
+  },
 } as const;
