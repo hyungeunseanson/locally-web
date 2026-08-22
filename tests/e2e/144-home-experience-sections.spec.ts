@@ -104,6 +104,17 @@ const HOME_FIXTURES: StubExperience[] = [
   }),
 ];
 
+const HOME_PAGINATION_FIXTURES = Array.from({ length: 35 }, (_, index) =>
+  buildHomeExperience({
+    id: 9100 + index,
+    title: `Paged Experience ${index + 1}`,
+    city: index < 30 ? '도쿄' : '오사카',
+    createdAt: new Date(Date.UTC(2025, 4, 1, index)).toISOString(),
+    wishlistCount: index,
+    reviewCount: index,
+  })
+);
+
 function buildHomeExperience(input: {
   id: number;
   title: string;
@@ -169,12 +180,13 @@ async function prepareLocale(page: Page, locale: 'ko' | 'en' | 'ja' | 'zh', path
   await dismissAnnouncementIfVisible(page);
 }
 
-async function stubHomeExperiences(page: Page) {
+async function stubHomeExperiences(page: Page, fixtures = HOME_FIXTURES, onRequest?: () => void) {
   await page.route('**/api/home/experiences', async (route) => {
+    onRequest?.();
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ data: HOME_FIXTURES }),
+      body: JSON.stringify({ data: fixtures }),
     });
   });
 }
@@ -263,5 +275,74 @@ test.describe('Home experience sections', () => {
     await expect(allCards.nth(1)).toContainText('Tokyo Beta');
     await expect(allCards.nth(2)).toContainText('Tokyo Epsilon');
     await expect(allCards.nth(3)).toContainText('Tokyo Theta');
+  });
+
+  test('desktop progressively reveals every all-experience card without another API request', async ({ page }) => {
+    let homeExperienceRequestCount = 0;
+    await stubHomeExperiences(page, HOME_PAGINATION_FIXTURES, () => {
+      homeExperienceRequestCount += 1;
+    });
+    await page.setViewportSize({ width: 1440, height: 1400 });
+    await prepareLocale(page, 'en', '/en');
+
+    const allSection = page.getByTestId('home-desktop-all-experiences-section');
+    const allCards = allSection.locator('[data-testid^="home-all-experience-card-"]');
+    const loadMore = page.getByTestId('home-desktop-all-experiences-load-more');
+
+    await expect(allCards).toHaveCount(24);
+    const requestCountBeforeLoadMore = homeExperienceRequestCount;
+
+    await loadMore.click();
+
+    await expect(allCards).toHaveCount(35);
+    await expect(loadMore).toHaveCount(0);
+    await expect.poll(() => homeExperienceRequestCount).toBe(requestCountBeforeLoadMore);
+
+    const cardIds = await allCards.evaluateAll((cards) => cards.map((card) => card.getAttribute('data-testid')));
+    expect(new Set(cardIds).size).toBe(35);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    const mobileAllSection = page.getByTestId('home-mobile-all-experiences-section');
+    const mobileAllCards = mobileAllSection.locator('[data-testid^="home-all-experience-card-"]');
+    await expect(mobileAllCards).toHaveCount(35);
+    await expect(page.getByTestId('home-mobile-all-experiences-load-more')).toHaveCount(0);
+
+    await page.setViewportSize({ width: 1440, height: 1400 });
+    await page.getByTestId('home-desktop-category-tokyo').click();
+
+    await expect(allCards).toHaveCount(24);
+    await expect(loadMore).toBeVisible();
+    await loadMore.click();
+    await expect(allCards).toHaveCount(30);
+    await expect(loadMore).toHaveCount(0);
+    await expect.poll(() => homeExperienceRequestCount).toBe(requestCountBeforeLoadMore);
+  });
+
+  test('mobile progressively reveals every all-experience card without another API request', async ({ page }) => {
+    let homeExperienceRequestCount = 0;
+    await stubHomeExperiences(page, HOME_PAGINATION_FIXTURES, () => {
+      homeExperienceRequestCount += 1;
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await prepareLocale(page, 'en', '/en');
+
+    const allSection = page.getByTestId('home-mobile-all-experiences-section');
+    const allCards = allSection.locator('[data-testid^="home-all-experience-card-"]');
+    const loadMore = page.getByTestId('home-mobile-all-experiences-load-more');
+
+    await expect(allCards).toHaveCount(12);
+    const requestCountBeforeLoadMore = homeExperienceRequestCount;
+
+    await loadMore.click();
+    await expect(allCards).toHaveCount(24);
+    await expect.poll(() => homeExperienceRequestCount).toBe(requestCountBeforeLoadMore);
+
+    await loadMore.click();
+    await expect(allCards).toHaveCount(35);
+    await expect(loadMore).toHaveCount(0);
+    await expect.poll(() => homeExperienceRequestCount).toBe(requestCountBeforeLoadMore);
+
+    const cardIds = await allCards.evaluateAll((cards) => cards.map((card) => card.getAttribute('data-testid')));
+    expect(new Set(cardIds).size).toBe(35);
   });
 });

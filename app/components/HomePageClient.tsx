@@ -19,6 +19,9 @@ type HomeExperience = HomeExperienceCardData & {
   languages?: string[] | null;
 };
 
+const MOBILE_ALL_EXPERIENCES_PAGE_SIZE = 12;
+const DESKTOP_ALL_EXPERIENCES_PAGE_SIZE = 24;
+
 function isHomeCategoryIconId(id: HomeMobileCityShortcutId): id is 'seoul' | 'busan' | 'jeju' {
   return id === 'seoul' || id === 'busan' || id === 'jeju';
 }
@@ -56,6 +59,7 @@ export default function HomePageClient() {
   const [activeTab, setActiveTab] = useState<'experience' | 'service'>('experience');
   const [activeSearchField, setActiveSearchField] = useState<'location' | 'date' | 'language' | null>(null);
   const [scrollY, setScrollY] = useState(0);
+  const [revealedAllExperiencesCount, setRevealedAllExperiencesCount] = useState(0);
   const searchRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -92,10 +96,25 @@ export default function HomePageClient() {
     () => buildHomeExperienceSections(filteredExperiences as HomeExperience[]),
     [filteredExperiences]
   );
+  const allExperiencesResultKey = React.useMemo(
+    () => allExperiencesLatest.map((experience) => experience.id).join(','),
+    [allExperiencesLatest]
+  );
+
+  useEffect(() => {
+    setRevealedAllExperiencesCount(0);
+  }, [allExperiencesResultKey]);
+
   const mobilePopularExperiences = popularExperiences.slice(0, 10);
   const desktopPopularExperiences = popularExperiences.slice(0, 6);
-  const mobileLatestExperiences = allExperiencesLatest.slice(0, 12);
-  const desktopLatestExperiences = allExperiencesLatest.slice(0, 24);
+  const mobileLatestExperiences = allExperiencesLatest.slice(0, Math.max(revealedAllExperiencesCount, MOBILE_ALL_EXPERIENCES_PAGE_SIZE));
+  const desktopLatestExperiences = allExperiencesLatest.slice(0, Math.max(revealedAllExperiencesCount, DESKTOP_ALL_EXPERIENCES_PAGE_SIZE));
+  const hasMoreMobileLatestExperiences = mobileLatestExperiences.length < allExperiencesLatest.length;
+  const hasMoreDesktopLatestExperiences = desktopLatestExperiences.length < allExperiencesLatest.length;
+
+  const revealMoreAllExperiences = (pageSize: number) => {
+    setRevealedAllExperiencesCount((visibleCount) => Math.max(visibleCount, pageSize) + pageSize);
+  };
   const showLoadError = loadError && allExperiences.length === 0 && filteredExperiences.length === 0;
 
   const getMobileCityShortcutHref = (cityValue?: string) => {
@@ -388,6 +407,18 @@ export default function HomePageClient() {
                       </div>
                     ))}
                   </div>
+                  {hasMoreMobileLatestExperiences && (
+                    <div className="px-5 pb-3">
+                      <button
+                        type="button"
+                        data-testid="home-mobile-all-experiences-load-more"
+                        onClick={() => revealMoreAllExperiences(MOBILE_ALL_EXPERIENCES_PAGE_SIZE)}
+                        className="flex h-11 w-full items-center justify-center rounded-lg border border-slate-300 text-sm font-semibold text-slate-900 transition-colors active:bg-slate-50"
+                      >
+                        {t('home_section_all_experiences_more')}
+                      </button>
+                    </div>
+                  )}
                 </section>
               </div>
 
@@ -434,6 +465,18 @@ export default function HomePageClient() {
                       </div>
                     ))}
                   </div>
+                  {hasMoreDesktopLatestExperiences && (
+                    <div className="mt-8 flex justify-center">
+                      <button
+                        type="button"
+                        data-testid="home-desktop-all-experiences-load-more"
+                        onClick={() => revealMoreAllExperiences(DESKTOP_ALL_EXPERIENCES_PAGE_SIZE)}
+                        className="flex h-11 min-w-40 items-center justify-center rounded-lg border border-slate-300 px-5 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50"
+                      >
+                        {t('home_section_all_experiences_more')}
+                      </button>
+                    </div>
+                  )}
                 </section>
               </div>
             </>
