@@ -149,7 +149,7 @@ jobs:
 
       - name: Run Cloudflare image boundary tests
         run: >-
-          npx playwright test -c playwright.contracts.config.ts
+          npx playwright test -c playwright.cloudflare-images.config.ts
           tests/e2e/226-cloudflare-image-canary.spec.ts
           tests/e2e/227-cloudflare-public-card-images.spec.ts
           tests/e2e/228-cloudflare-public-detail-images.spec.ts
