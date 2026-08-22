@@ -1,0 +1,179 @@
+name: Public Experience Image Reconciliation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-experience-image-reconciliation
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: production-media-sync
+    outputs:
+      drift: ${{ steps.audit.outputs.drift }}
+      snapshot_hash: ${{ steps.audit.outputs.snapshot_hash }}
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+
+      - name: Audit Production image drift
+        id: audit
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          node scripts/cloudflare/reconcile-public-experience-images.mjs audit --output="${RUNNER_TEMP}/public-image-sync"
+
+      - name: Finish without R2 credentials when no drift exists
+        if: steps.audit.outputs.drift != 'true'
+        shell: bash
+        run: |
+          {
+            echo "### Public experience image reconciliation"
+            echo "- Drift: none"
+            echo "- R2 credentials: not loaded"
+            echo "- R2 writes: skipped"
+            echo "- Pull request: skipped"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  reconcile:
+    needs: audit
+    if: needs.audit.outputs.drift == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: production-media-sync
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ENDPOINT: ${{ vars.R2_ENDPOINT }}
+      R2_BUCKET: locally-public-experience-canary
+      R2_PUBLIC_BASE_URL: https://media-canary.locally-travel.com
+      NEXT_PUBLIC_CLOUDFLARE_IMAGE_CANARY_BASE_URL: https://media-canary.locally-travel.com
+      BOTO3_VERSION: 1.43.70
+      SYNC_BRANCH: automation/public-experience-image-reconciliation
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          fetch-depth: 0
+
+      - name: Validate fixed configuration
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for name in NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_ENDPOINT; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "Missing production-media-sync configuration: $name" >&2
+              exit 1
+            fi
+          done
+          [[ "$NEXT_PUBLIC_SUPABASE_URL" == "https://uhinvcydgzqlpnvieyal.supabase.co" ]]
+          [[ "$R2_ENDPOINT" == "https://d56f5f850c6f7dc5779a7c2054aca5a5.r2.cloudflarestorage.com" ]]
+          [[ "$R2_BUCKET" == "locally-public-experience-canary" ]]
+          [[ "$R2_PUBLIC_BASE_URL" == "https://media-canary.locally-travel.com" ]]
+
+      - name: Install pinned project dependencies
+        run: npm ci --ignore-scripts=false
+
+      - name: Prepare immutable image variants and candidate manifests
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          node scripts/cloudflare/reconcile-public-experience-images.mjs prepare --output="${RUNNER_TEMP}/public-image-sync"
+
+      - name: Install pinned R2 client
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -m venv "${RUNNER_TEMP}/r2-venv"
+          "${RUNNER_TEMP}/r2-venv/bin/python" -m pip install --disable-pip-version-check --no-input "boto3==${BOTO3_VERSION}"
+          echo "${RUNNER_TEMP}/r2-venv/bin" >> "$GITHUB_PATH"
+
+      - name: Upload only missing R2 objects and verify integrity
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 scripts/cloudflare/r2-public-image-reconcile.py \
+            --plan "${RUNNER_TEMP}/public-image-sync/objects.json" \
+            --output "${RUNNER_TEMP}/public-image-sync/r2-result.json"
+
+      - name: Reject Production changes during reconciliation
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          node scripts/cloudflare/reconcile-public-experience-images.mjs verify-snapshot \
+            --plan="${RUNNER_TEMP}/public-image-sync/plan.json"
+
+      - name: Apply verified candidate manifests
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          cp "${RUNNER_TEMP}/public-image-sync/publicExperienceCardImages.ts" app/data/publicExperienceCardImages.ts
+          cp "${RUNNER_TEMP}/public-image-sync/publicExperienceDetailImages.generated.json" app/data/publicExperienceDetailImages.generated.json
+          git diff --check
+
+      - name: Run Cloudflare image boundary tests
+        run: >-
+          npx playwright test -c playwright.contracts.config.ts
+          tests/e2e/226-cloudflare-image-canary.spec.ts
+          tests/e2e/227-cloudflare-public-card-images.spec.ts
+          tests/e2e/228-cloudflare-public-detail-images.spec.ts
+          --project=chromium --workers=1
+
+      - name: Create or update one manifest pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if git diff --quiet -- app/data/publicExperienceCardImages.ts app/data/publicExperienceDetailImages.generated.json; then
+            echo "Verified drift produced no manifest change; refusing an empty PR." >&2
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -C "$SYNC_BRANCH"
+          git add app/data/publicExperienceCardImages.ts app/data/publicExperienceDetailImages.generated.json
+          git commit -m "chore: reconcile public experience image manifests"
+          git fetch origin "${SYNC_BRANCH}:refs/remotes/origin/${SYNC_BRANCH}" || true
+          git push --force-with-lease origin "HEAD:refs/heads/${SYNC_BRANCH}"
+          existing_pr="$(gh pr list --state open --head "$SYNC_BRANCH" --json number --jq '.[0].number // empty')"
+          if [[ -n "$existing_pr" ]]; then
+            gh pr comment "$existing_pr" --body "Updated from verified Production image reconciliation run ${GITHUB_RUN_ID}."
+            echo "Updated existing PR #${existing_pr}."
+          else
+            gh pr create \
+              --base main \
+              --head "$SYNC_BRANCH" \
+              --title "chore: reconcile public experience image manifests" \
+              --body "Automated, verified manifest-only update. R2 objects were uploaded and checked before this PR was created. Production continues to use Supabase fallback until this PR is manually merged."
+          fi
+
+      - name: Publish non-sensitive summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### Reconciliation safety"
+            echo "- Direct push to main: disabled"
+            echo "- Automatic Production deployment: disabled"
+            echo "- Object deletion: disabled"
+            echo "- Supabase credential: public anon only"
+            echo "- R2 scope: fixed single bucket"
+            echo "- Result: ${{ job.status }}"
+          } >> "$GITHUB_STEP_SUMMARY"
