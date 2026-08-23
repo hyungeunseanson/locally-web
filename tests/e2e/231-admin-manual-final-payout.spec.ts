@@ -4,6 +4,10 @@ import { expect, test } from '@playwright/test';
 
 const migration = readFileSync('docs/migrations/v3_40_39_admin_manual_final_payout.sql', 'utf8');
 const normalizedMigration = migration.replace(/\s+/g, ' ').trim();
+const hardeningMigration = readFileSync(
+  'docs/migrations/v3_40_40_admin_manual_payout_privilege_hardening.sql',
+  'utf8'
+).replace(/\s+/g, ' ').trim();
 const completeRoute = readFileSync('app/api/admin/manual-payouts/complete/route.ts', 'utf8');
 const previewRoute = readFileSync('app/api/admin/manual-payouts/preview/route.ts', 'utf8');
 const payoutQueueRoute = readFileSync('app/api/admin/payout-queue/route.ts', 'utf8');
@@ -52,6 +56,12 @@ test.describe('admin manual final payout contract', () => {
     );
     expect(normalizedMigration).toContain('FROM PUBLIC, anon, authenticated; GRANT EXECUTE');
     expect(normalizedMigration).toContain('TO service_role;');
+    expect(hardeningMigration).toContain(
+      'REVOKE ALL ON TABLE public.admin_manual_payouts FROM service_role;'
+    );
+    expect(hardeningMigration).toContain(
+      'GRANT SELECT, INSERT ON TABLE public.admin_manual_payouts TO service_role;'
+    );
     for (const source of [completeRoute, previewRoute]) {
       expect(source).toContain('auth.getUser()');
       expect(source).toContain('resolveAdminAccess');
