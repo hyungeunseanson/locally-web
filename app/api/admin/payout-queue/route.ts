@@ -349,7 +349,10 @@ export async function GET(request: Request) {
         }
 
         const result = await executeRowQuery(
-          query.order(dateColumn, { ascending: false }).range(offset, offset + PAYOUT_PAGE_SIZE - 1)
+          query
+            .order(dateColumn, { ascending: false })
+            .order('id', { ascending: false })
+            .range(offset, offset + PAYOUT_PAGE_SIZE - 1)
         );
         if (result.error) return { data: rows, error: result.error };
         rows.push(...result.data);
@@ -386,7 +389,10 @@ export async function GET(request: Request) {
         }
 
         const result = await executeRowQuery(
-          query.order(dateColumn, { ascending: false }).range(offset, offset + PAYOUT_PAGE_SIZE - 1)
+          query
+            .order(dateColumn, { ascending: false })
+            .order('id', { ascending: false })
+            .range(offset, offset + PAYOUT_PAGE_SIZE - 1)
         );
         if (result.error) return { data: rows, error: result.error };
         rows.push(...result.data);
@@ -429,6 +435,7 @@ export async function GET(request: Request) {
 
         const { data, error } = await manualQuery
           .order('paid_at', { ascending: false })
+          .order('id', { ascending: false })
           .range(offset, offset + PAYOUT_PAGE_SIZE - 1);
         if (error) {
           if (isMissingManualPayoutTableError(error)) {

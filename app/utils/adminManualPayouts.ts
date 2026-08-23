@@ -74,7 +74,9 @@ export async function getAdminManualPayoutPreview(
       .from('service_bookings')
       .select('id, status, payout_status')
       .eq('host_id', hostId)
-      .in('status', ['PAID', 'confirmed', 'completed'])
+      .or(
+        'status.in.(PAID,confirmed),and(status.eq.completed,payout_status.neq.paid),and(status.eq.completed,payout_status.is.null)'
+      )
       .limit(1),
     supabaseAdmin
       .from('host_applications')

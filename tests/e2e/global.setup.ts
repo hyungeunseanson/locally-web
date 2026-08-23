@@ -4,6 +4,9 @@ import { createClient } from '@supabase/supabase-js';
 
 type EnvMap = Record<string, string>;
 
+const PRODUCTION_SUPABASE_PROJECT_REF = 'uhinvcydgzqlpnvieyal';
+const ADMIN_WHITELIST_CLEANUP_OPT_IN = 'E2E_ALLOW_ADMIN_WHITELIST_CLEANUP';
+
 function loadEnv(): EnvMap {
   return readFileSync('.env.local', 'utf8')
     .split(/\n/)
@@ -16,8 +19,23 @@ function loadEnv(): EnvMap {
 
 async function cleanupStaleCodexAdminWhitelist() {
   const env = loadEnv();
+  const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl) {
+    throw new Error('[playwright globalSetup] NEXT_PUBLIC_SUPABASE_URL is required.');
+  }
+
+  const projectRef = new URL(supabaseUrl).hostname.split('.')[0];
+  if (projectRef === PRODUCTION_SUPABASE_PROJECT_REF) {
+    throw new Error('[playwright globalSetup] Refusing to mutate the Production Supabase project.');
+  }
+
+  if (env[ADMIN_WHITELIST_CLEANUP_OPT_IN] !== 'true') {
+    console.log(`[playwright globalSetup] cleanup skipped; set ${ADMIN_WHITELIST_CLEANUP_OPT_IN}=true to opt in.`);
+    return;
+  }
+
   const supabase = createClient(
-    env.NEXT_PUBLIC_SUPABASE_URL,
+    supabaseUrl,
     env.SUPABASE_SERVICE_ROLE_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     {
       auth: { persistSession: false, autoRefreshToken: false },

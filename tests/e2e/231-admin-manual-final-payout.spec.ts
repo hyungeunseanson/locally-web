@@ -14,6 +14,9 @@ const payoutQueueRoute = readFileSync('app/api/admin/payout-queue/route.ts', 'ut
 const salesTab = readFileSync('app/admin/dashboard/components/SalesTab.tsx', 'utf8');
 const dialog = readFileSync('app/admin/dashboard/components/ManualFinalPayoutDialog.tsx', 'utf8');
 const hostEarningsRoute = readFileSync('app/api/host/earnings/summary/route.ts', 'utf8');
+const manualPayoutPreview = readFileSync('app/utils/adminManualPayouts.ts', 'utf8');
+const contractsConfig = readFileSync('playwright.contracts.config.ts', 'utf8');
+const globalSetup = readFileSync('tests/e2e/global.setup.ts', 'utf8');
 
 test.describe('admin manual final payout contract', () => {
   test('keeps booking transition and financial record in one database transaction', () => {
@@ -77,12 +80,16 @@ test.describe('admin manual final payout contract', () => {
     expect(normalizedMigration).toContain("b.status IN ('PAID', 'confirmed')");
     expect(normalizedMigration).toContain("sb.status IN ('PAID', 'confirmed')");
     expect(normalizedMigration).toContain("sb.status = 'completed' AND sb.payout_status IS DISTINCT FROM 'paid'");
+    expect(manualPayoutPreview).toContain(
+      'status.in.(PAID,confirmed),and(status.eq.completed,payout_status.neq.paid),and(status.eq.completed,payout_status.is.null)'
+    );
   });
 
   test('separates all-time pending from paid-at history and fails closed on truncation', () => {
     expect(payoutQueueRoute).toContain("view === 'pending'");
     expect(payoutQueueRoute).toContain("view === 'history' ? 'payout_paid_at' : 'created_at'");
     expect(payoutQueueRoute).toContain('.range(offset, offset + PAYOUT_PAGE_SIZE - 1)');
+    expect(payoutQueueRoute.match(/\.order\('id', \{ ascending: false \}\)/g)).toHaveLength(3);
     expect(payoutQueueRoute).toContain('PAYOUT_MAX_ROWS');
     expect(payoutQueueRoute).toContain('안전 조회 한도를 초과했습니다');
     expect(salesTab).toContain("fetch('/api/admin/payout-queue?view=pending')");
@@ -93,6 +100,13 @@ test.describe('admin manual final payout contract', () => {
     expect(payoutQueueRoute).toContain('manualPayoutsAvailable = false');
     expect(salesTab).toContain('manualPayoutsAvailable &&');
     expect(previewRoute).toContain('getAdminManualPayoutPreview');
+  });
+
+  test('keeps contract tests and cleanup away from Production mutations', () => {
+    expect(contractsConfig).toContain('globalSetup: undefined');
+    expect(globalSetup).toContain("const PRODUCTION_SUPABASE_PROJECT_REF = 'uhinvcydgzqlpnvieyal'");
+    expect(globalSetup).toContain('Refusing to mutate the Production Supabase project.');
+    expect(globalSetup).toContain("env[ADMIN_WHITELIST_CLEANUP_OPT_IN] !== 'true'");
   });
 
   test('does not double-count current booking payout and preserves CSV semantics', () => {

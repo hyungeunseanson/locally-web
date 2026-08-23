@@ -10,6 +10,7 @@ const webServerCommand =
 
 export default defineConfig({
   ...baseConfig,
+  globalSetup: undefined,
   use: {
     ...baseConfig.use,
     baseURL: 'http://127.0.0.1:3000',
