@@ -605,6 +605,7 @@ export const DOMAIN_MATRIX: DomainMatrixEntry[] = [
       'tests/e2e/159-experience-completion-kst-boundary.spec.ts',
       'tests/e2e/160-settlement-sync-job-name-recording.spec.ts',
       'tests/e2e/195-admin-finance-operator-saga.spec.ts',
+      'tests/e2e/231-admin-manual-final-payout.spec.ts',
     ],
     manualChecks: [
       ...COMMON_INTERNAL_MANUAL_CHECKS,

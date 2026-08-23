@@ -110,7 +110,7 @@ async function createExperiencePayoutFixture(params: {
   const supabase = getTestAdminClient();
   const bookingId = `EXP-UNIFIED-PAYOUT-${Date.now()}`;
   const completedAt = new Date();
-  completedAt.setDate(completedAt.getDate() - 4);
+  completedAt.setDate(completedAt.getDate() - 120);
 
   const { error } = await supabase.from('bookings').insert({
     id: bookingId,
@@ -216,7 +216,11 @@ async function createCompletedServicePayoutFixture(params: {
 
 async function fetchPayoutQueue(page: Page) {
   return page.evaluate(async () => {
-    const response = await fetch('/api/admin/payout-queue');
+    const startAt = new Date();
+    startAt.setDate(startAt.getDate() - 30);
+    const response = await fetch(
+      `/api/admin/payout-queue?view=pending&startAt=${encodeURIComponent(startAt.toISOString())}`
+    );
     return {
       status: response.status,
       body: await response.json(),

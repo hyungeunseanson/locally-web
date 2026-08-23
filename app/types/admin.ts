@@ -370,6 +370,39 @@ export interface AdminPayoutQueueDomainGroup {
   paid_entries: AdminPayoutQueueEntry[];
 }
 
+export type AdminManualPayoutType = 'host_exit_final' | 'legacy_carryover';
+
+export interface AdminManualPayoutHistoryRecord {
+  id: string;
+  request_key: string;
+  host_id: string;
+  settlement_type: AdminManualPayoutType;
+  booking_ids: string[];
+  current_booking_amount: number;
+  legacy_amount: number;
+  total_paid_amount: number;
+  reason: string;
+  legacy_source_reference: string | null;
+  transfer_reference: string;
+  paid_by_admin_email: string;
+  paid_at: string;
+}
+
+export interface AdminManualPayoutPreview {
+  host_id: string;
+  host_name: string;
+  current_booking_amount: number;
+  booking_count: number;
+  booking_ids: string[];
+  bank_name: string;
+  account_number: string;
+  account_holder: string;
+  has_bank_account: boolean;
+  blockers: string[];
+  warnings: string[];
+  host_exit_blockers: string[];
+}
+
 export interface AdminCombinedPayoutQueueRow {
   host_id: string;
   host_name: string;
@@ -381,6 +414,9 @@ export interface AdminCombinedPayoutQueueRow {
   paid_amount: number;
   pending_count: number;
   paid_count: number;
+  legacy_paid_amount: number;
+  actual_disbursed_amount: number;
+  manual_payouts: AdminManualPayoutHistoryRecord[];
   settlement_state: AdminPayoutQueueState;
   domains: {
     experience: AdminPayoutQueueDomainGroup | null;

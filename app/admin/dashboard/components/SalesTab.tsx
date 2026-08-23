@@ -41,6 +41,7 @@ import {
 import { getBookingPaidAmount, getBookingPlatformRevenue } from '@/app/utils/bookingFinance';
 import { isSoloGuaranteeRefundUnresolvedStatus } from '@/app/utils/soloGuaranteeRefundStatus';
 import SettlementSyncPanel from './SettlementSyncPanel';
+import ManualFinalPayoutDialog from './ManualFinalPayoutDialog';
 
 const DateRange = dynamic(() => import('react-date-range').then((mod) => mod.DateRange), { ssr: false });
 
@@ -55,6 +56,7 @@ type PayoutQueueResponse = {
   success: boolean;
   error?: string;
   combinedHostTotals?: AdminCombinedPayoutQueueRow[];
+  manualPayoutsAvailable?: boolean;
 };
 
 type ExperiencePayoutGuard = {
@@ -65,6 +67,7 @@ type ExperiencePayoutGuard = {
 };
 
 type ServicePayoutGuard = ExperiencePayoutGuard;
+type PendingFilter = 'ALL' | 'ELIGIBLE' | 'UNDER_THRESHOLD' | 'REFUND_HOLD';
 
 const DEFAULT_EXPERIENCE_PAYOUT_GUARD: ExperiencePayoutGuard = {
   safe: false,
@@ -269,7 +272,13 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [salesBookings, setSalesBookings] = useState<AdminSalesBooking[]>([]);
   const [serviceBookings, setServiceBookings] = useState<AdminServiceSalesSummary[]>([]);
-  const [settlementRows, setSettlementRows] = useState<AdminCombinedPayoutQueueRow[]>([]);
+  const [pendingSettlementRows, setPendingSettlementRows] = useState<AdminCombinedPayoutQueueRow[]>([]);
+  const [historySettlementRows, setHistorySettlementRows] = useState<AdminCombinedPayoutQueueRow[]>([]);
+  const [pendingFilter, setPendingFilter] = useState<PendingFilter>('ALL');
+  const [manualPayoutRow, setManualPayoutRow] = useState<AdminCombinedPayoutQueueRow | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [manualPayoutsAvailable, setManualPayoutsAvailable] = useState(false);
   const [experiencePayoutGuard, setExperiencePayoutGuard] = useState<ExperiencePayoutGuard>(
     DEFAULT_EXPERIENCE_PAYOUT_GUARD
   );
@@ -280,6 +289,7 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
   const [serviceCSVLoading, setServiceCSVLoading] = useState(false);
   const datePickerRef = useRef<HTMLDivElement>(null);
   const settlementSectionRef = useRef<HTMLDivElement>(null);
+  const historyRequestIdRef = useRef(0);
   const { showToast } = useToast();
   const { requestConfirm, ConfirmDialogElement } = useConfirmDialog();
 
@@ -297,7 +307,7 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
 
       const [salesRes, payoutQueueRes] = await Promise.all([
         fetch(`/api/admin/sales-summary${query}`),
-        fetch(`/api/admin/payout-queue${query}`),
+        fetch('/api/admin/payout-queue?view=pending'),
       ]);
 
       const salesJson = (await salesRes.json()) as SalesSummaryResponse;
@@ -312,7 +322,8 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
 
       setSalesBookings(salesJson.data ?? []);
       setServiceBookings(salesJson.serviceSummaryRows ?? []);
-      setSettlementRows(payoutQueueJson.combinedHostTotals ?? []);
+      setPendingSettlementRows(payoutQueueJson.combinedHostTotals ?? []);
+      setManualPayoutsAvailable(Boolean(payoutQueueJson.manualPayoutsAvailable));
     } catch (error: unknown) {
       console.error('Sales summary fetch error:', error);
       showToast(error instanceof Error ? error.message : '매출 데이터를 불러오지 못했습니다.', 'error');
@@ -321,9 +332,36 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
     }
   }, [salesEndAt, salesStartAt, showToast]);
 
+  const fetchPayoutHistory = useCallback(async () => {
+    const requestId = ++historyRequestIdRef.current;
+    setHistoryLoading(true);
+    setHistoryError(null);
+    setHistorySettlementRows([]);
+    try {
+      const params = new URLSearchParams({ view: 'history' });
+      if (salesStartAt) params.set('startAt', salesStartAt);
+      if (salesEndAt) params.set('endAt', salesEndAt);
+      const response = await fetch(`/api/admin/payout-queue?${params.toString()}`);
+      const json = (await response.json()) as PayoutQueueResponse;
+      if (!response.ok || !json.success) throw new Error(json.error || '정산 이력을 불러오지 못했습니다.');
+      if (requestId === historyRequestIdRef.current) {
+        setHistorySettlementRows(json.combinedHostTotals ?? []);
+      }
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : '정산 이력을 불러오지 못했습니다.';
+      if (requestId === historyRequestIdRef.current) setHistoryError(message);
+    } finally {
+      if (requestId === historyRequestIdRef.current) setHistoryLoading(false);
+    }
+  }, [salesEndAt, salesStartAt]);
+
   useEffect(() => {
     void fetchSalesData();
   }, [fetchSalesData]);
+
+  useEffect(() => {
+    if (settlementTab === 'COMPLETED') void fetchPayoutHistory();
+  }, [fetchPayoutHistory, settlementTab]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -390,7 +428,7 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
   const allCount = validBookings.length + validServiceBookings.length;
   const averageOrderValue = allCount > 0 ? totalRevenue / allCount : 0;
 
-  const pendingSettlementList = [...settlementRows]
+  const allPendingSettlementList = [...pendingSettlementRows]
     .filter((row) => row.pending_amount > 0)
     .sort((left, right) => {
       const orderDiff =
@@ -400,20 +438,28 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
       return right.pending_amount - left.pending_amount;
     });
 
-  const completedSettlementList = [...settlementRows]
-    .filter((row) => row.paid_amount > 0)
-    .sort((left, right) => right.paid_amount - left.paid_amount);
+  const pendingSettlementList = allPendingSettlementList.filter((row) => {
+    const experienceState = row.domains.experience?.settlement_state;
+    if (pendingFilter === 'ELIGIBLE') return row.settlement_state === 'eligible';
+    if (pendingFilter === 'UNDER_THRESHOLD') return experienceState === 'hold' || experienceState === 'long_hold';
+    if (pendingFilter === 'REFUND_HOLD') return experienceState === 'refund_hold';
+    return true;
+  });
+
+  const completedSettlementList = [...historySettlementRows]
+    .filter((row) => row.actual_disbursed_amount > 0)
+    .sort((left, right) => right.actual_disbursed_amount - left.actual_disbursed_amount);
 
   const settlementList = settlementTab === 'PENDING' ? pendingSettlementList : completedSettlementList;
-  const eligibleSettlementList = pendingSettlementList.filter((row) => row.settlement_state === 'eligible');
-  const holdSettlementList = pendingSettlementList.filter((row) => row.settlement_state !== 'eligible');
+  const eligibleSettlementList = allPendingSettlementList.filter((row) => row.settlement_state === 'eligible');
+  const holdSettlementList = allPendingSettlementList.filter((row) => row.settlement_state !== 'eligible');
   const eligibleSettlementAmount = eligibleSettlementList.reduce((sum, row) => sum + row.pending_amount, 0);
   const holdSettlementAmount = holdSettlementList.reduce(
     (sum, row) => sum + (row.domains.experience?.pending_amount || 0),
     0
   );
-  const longHoldCount = pendingSettlementList.filter((row) => row.settlement_state === 'long_hold').length;
-  const svcPendingHostPayout = pendingSettlementList.reduce(
+  const longHoldCount = allPendingSettlementList.filter((row) => row.settlement_state === 'long_hold').length;
+  const svcPendingHostPayout = allPendingSettlementList.reduce(
     (sum, row) => sum + (row.domains.service?.pending_amount || 0),
     0
   );
@@ -524,6 +570,7 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
 
       const escapeCSV = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
       const rows = entries.map((entry) => {
+        const manualRecord = row.manual_payouts.find((record) => record.booking_ids.includes(entry.id));
         const refundPenaltyAmount =
           entry.status === 'cancelled'
             ? Math.max(0, getBookingPaidAmount({ amount: entry.amount }) - entry.payout_amount - entry.platform_revenue)
@@ -542,11 +589,35 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
           refundPenaltyAmount,
           entry.platform_revenue,
           entry.payout_amount,
-          '""',
+          escapeCSV(
+            manualRecord
+              ? `수동 정산 · ${manualRecord.settlement_type === 'host_exit_final' ? '활동 종료' : '이전 사이트 이월'} · 이체참조 ${manualRecord.transfer_reference}`
+              : ''
+          ),
         ];
       });
 
-      const csvContent = [headers.join(','), ...rows.map((item) => item.join(','))].join('\n');
+      const legacyRows = settlementTab === 'COMPLETED'
+        ? row.manual_payouts
+            .filter((record) => record.legacy_amount > 0)
+            .map((record) => [
+              escapeCSV(format(new Date(record.paid_at), 'yyyy-MM-dd HH:mm')),
+              escapeCSV(`LEGACY-${record.id}`),
+              escapeCSV(row.account_holder),
+              escapeCSV(row.host_nationality),
+              escapeCSV(row.bank),
+              escapeCSV(row.account_number),
+              escapeCSV('이전 사이트 이월 정산'),
+              escapeCSV('-'),
+              0,
+              0,
+              0,
+              record.legacy_amount,
+              escapeCSV(`출처 ${record.legacy_source_reference || '-'} · 이체참조 ${record.transfer_reference}`),
+            ])
+        : [];
+
+      const csvContent = [headers.join(','), ...[...rows, ...legacyRows].map((item) => item.join(','))].join('\n');
       const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -868,6 +939,41 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
           </div>
         )}
 
+        {settlementTab === 'PENDING' && (
+          <div className="flex flex-wrap gap-2 border-b border-slate-100 bg-white px-4 py-3 md:px-6">
+            {([
+              ['ALL', '전체'],
+              ['ELIGIBLE', '정산 가능'],
+              ['UNDER_THRESHOLD', '10만원 미만'],
+              ['REFUND_HOLD', '환불 확인'],
+            ] as const).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setPendingFilter(value)}
+                className={`rounded-full px-3 py-1.5 text-xs font-bold ${
+                  pendingFilter === value ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {settlementTab === 'COMPLETED' && (
+          <div className="border-b border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-700 md:px-6">
+            정산 완료 내역은 예약 생성일이 아니라 실제 지급 완료일 기준으로 표시됩니다. 지급일이 없는 기존 기록은 누락 방지를 위해 함께 표시됩니다.
+          </div>
+        )}
+
+        {settlementTab === 'COMPLETED' && historyError && (
+          <div className="flex items-center justify-between border-b border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700 md:px-6">
+            <span>{historyError}</span>
+            <button type="button" onClick={() => void fetchPayoutHistory()} className="font-bold underline">다시 시도</button>
+          </div>
+        )}
+
         {settlementTab === 'PENDING' && !experiencePayoutGuard.safe && (
           <div
             data-testid="sales-experience-payout-guard"
@@ -915,7 +1021,7 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
               {settlementList.length > 0 ? (
                 settlementList.map((row) => {
                   const totalAmount =
-                    settlementTab === 'PENDING' ? row.pending_amount : row.paid_amount;
+                    settlementTab === 'PENDING' ? row.pending_amount : row.actual_disbursed_amount;
                   const totalCount =
                     settlementTab === 'PENDING' ? row.pending_count : row.paid_count;
                   const notes = settlementTab === 'PENDING' ? getPendingPolicyNotes(row) : [];
@@ -925,6 +1031,11 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
                     row.domains.experience.settlement_state === 'eligible';
                   const canSettleService =
                     settlementTab === 'PENDING' && row.domains.service?.pending_count;
+                  const canManualSettleExperience =
+                    settlementTab === 'PENDING' &&
+                    Boolean(row.domains.experience?.pending_count) &&
+                    manualPayoutsAvailable &&
+                    ['hold', 'long_hold'].includes(row.domains.experience?.settlement_state || '');
 
                   return (
                     <React.Fragment key={row.host_id}>
@@ -950,6 +1061,11 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
                         </td>
                         <td className="px-4 py-3 font-mono text-xs font-bold text-purple-600 md:px-6 md:py-4 md:text-sm">
                           ₩{totalAmount.toLocaleString()}
+                          {settlementTab === 'COMPLETED' && row.legacy_paid_amount > 0 && (
+                            <div className="mt-1 text-[10px] font-medium text-slate-500">
+                              신규 ₩{row.paid_amount.toLocaleString()} + legacy ₩{row.legacy_paid_amount.toLocaleString()}
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-[10px] text-slate-500 md:px-6 md:py-4 md:text-xs">
                           <div className="flex items-center gap-1">
@@ -1030,6 +1146,21 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
                                       <Check size={14} /> 체험 정산 완료
                                     </button>
                                   ) : null}
+                                  {canManualSettleExperience ? (
+                                    <button
+                                      data-testid={`sales-manual-payout-${row.host_id}`}
+                                      type="button"
+                                      onClick={() => setManualPayoutRow(row)}
+                                      disabled={
+                                        isProcessing ||
+                                        row.bank === '계좌 미등록' ||
+                                        !experiencePayoutGuard.safe
+                                      }
+                                      className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-amber-500 disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-auto md:py-1.5"
+                                    >
+                                      <Check size={14} /> 수동 최종 정산
+                                    </button>
+                                  ) : null}
                                   {canSettleService ? (
                                     <button
                                       data-testid={`sales-settle-service-${row.host_id}`}
@@ -1065,6 +1196,25 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
                                 </div>
                               )}
 
+                              {settlementTab === 'COMPLETED' && row.manual_payouts.length > 0 && (
+                                <div className="mb-4 space-y-2">
+                                  {row.manual_payouts.map((record) => (
+                                    <div key={record.id} className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-slate-700">
+                                      <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <span className="font-bold text-amber-800">
+                                          수동 · {record.settlement_type === 'host_exit_final' ? '활동 종료' : '이전 사이트 이월'}
+                                        </span>
+                                        <span>{format(new Date(record.paid_at), 'yyyy.MM.dd HH:mm')}</span>
+                                      </div>
+                                      <p className="mt-2">신규 ₩{record.current_booking_amount.toLocaleString()} · legacy ₩{record.legacy_amount.toLocaleString()} · 실제 지급 ₩{record.total_paid_amount.toLocaleString()}</p>
+                                      <p className="mt-1">사유: {record.reason}</p>
+                                      {record.legacy_source_reference && <p>Legacy 출처: {record.legacy_source_reference}</p>}
+                                      <p>이체 참조: {record.transfer_reference} · 처리: {record.paid_by_admin_email}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
                               {row.domains.experience &&
                                 renderDomainSection({
                                   domainLabel: '체험 예약',
@@ -1087,7 +1237,11 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
               ) : (
                 <tr>
                   <td colSpan={5} className="px-4 py-8 text-center text-xs text-slate-400 md:px-6 md:py-10 md:text-sm">
-                    {isSalesLoading ? '정산 데이터를 불러오는 중입니다.' : '내역이 없습니다.'}
+                    {settlementTab === 'COMPLETED' && historyLoading
+                      ? '지급일 기준 정산 이력을 불러오는 중입니다.'
+                      : isSalesLoading
+                        ? '정산 데이터를 불러오는 중입니다.'
+                        : '내역이 없습니다.'}
                   </td>
                 </tr>
               )}
@@ -1095,6 +1249,17 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
           </table>
         </div>
       </div>
+      {manualPayoutRow && (
+        <ManualFinalPayoutDialog
+          row={manualPayoutRow}
+          onClose={() => setManualPayoutRow(null)}
+          onCompleted={async () => {
+            showToast('수동 최종 정산이 완료 처리되었습니다.', 'success');
+            setHistorySettlementRows([]);
+            await Promise.all([fetchSalesData(), Promise.resolve(onRefresh?.())]);
+          }}
+        />
+      )}
       {ConfirmDialogElement}
     </div>
   );

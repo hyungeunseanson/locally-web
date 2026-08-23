@@ -89,6 +89,31 @@ type RowQueryResult = {
   error: PostgrestError | null;
 };
 
+type PayoutQueueView = 'all' | 'pending' | 'history';
+
+type ManualPayoutRow = {
+  id: string;
+  request_key: string;
+  host_id: string;
+  settlement_type: 'host_exit_final' | 'legacy_carryover';
+  booking_ids: string[];
+  current_booking_amount: number;
+  legacy_amount: number;
+  total_paid_amount: number;
+  reason: string;
+  legacy_source_reference: string | null;
+  transfer_reference: string;
+  paid_by_admin_email: string;
+  paid_at: string;
+};
+
+const PAYOUT_PAGE_SIZE = 500;
+const PAYOUT_MAX_ROWS = 10000;
+
+function isMissingManualPayoutTableError(error: { code?: string; message?: string }) {
+  return error.code === '42P01' || error.code === 'PGRST205' || /admin_manual_payouts.*not find/i.test(error.message || '');
+}
+
 async function executeRowQuery(
   query: PromiseLike<{ data: unknown; error: PostgrestError | null }>
 ): Promise<RowQueryResult> {
@@ -248,6 +273,12 @@ export async function GET(request: Request) {
     const requestUrl = new URL(request.url);
     const startAt = requestUrl.searchParams.get('startAt');
     const endAt = requestUrl.searchParams.get('endAt');
+    const requestedView = requestUrl.searchParams.get('view') || 'all';
+
+    if (!['all', 'pending', 'history'].includes(requestedView)) {
+      return NextResponse.json({ success: false, error: 'Invalid view' }, { status: 400 });
+    }
+    const view = requestedView as PayoutQueueView;
 
     if (startAt && Number.isNaN(Date.parse(startAt))) {
       return NextResponse.json({ success: false, error: 'Invalid startAt' }, { status: 400 });
@@ -256,6 +287,8 @@ export async function GET(request: Request) {
     if (endAt && Number.isNaN(Date.parse(endAt))) {
       return NextResponse.json({ success: false, error: 'Invalid endAt' }, { status: 400 });
     }
+    const normalizedStartAt = startAt ? new Date(startAt).toISOString() : null;
+    const normalizedEndAt = endAt ? new Date(endAt).toISOString() : null;
 
     const supabaseServer = await createServerClient();
     const {
@@ -277,69 +310,102 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
     }
 
-    const buildExperienceQuery = (includePaidAt: boolean) => {
+    let manualPayoutsAvailable = true;
+    if (view === 'pending') {
+      const availability = await supabaseAdmin
+        .from('admin_manual_payouts')
+        .select('id', { count: 'exact', head: true });
+      if (availability.error) {
+        if (!isMissingManualPayoutTableError(availability.error)) throw availability.error;
+        manualPayoutsAvailable = false;
+      }
+    }
+
+    const fetchExperienceRows = async (includePaidAt: boolean) => {
       const selectColumns = includePaidAt
         ? 'id, order_id, created_at, date, time, amount, status, payout_status, payout_paid_at, host_payout_amount, platform_revenue, experience_id, user_id, solo_guarantee_refund_status, solo_guarantee_refund_amount'
         : 'id, order_id, created_at, date, time, amount, status, payout_status, host_payout_amount, platform_revenue, experience_id, user_id, solo_guarantee_refund_status, solo_guarantee_refund_amount';
 
-      let query = supabaseAdmin
-        .from('bookings')
-        .select(selectColumns)
-        .in('status', ['completed', 'cancelled'])
-        .order('created_at', { ascending: false });
+      const rows: AdminRawRow[] = [];
+      for (let offset = 0; offset < PAYOUT_MAX_ROWS; offset += PAYOUT_PAGE_SIZE) {
+        let query = supabaseAdmin
+          .from('bookings')
+          .select(selectColumns)
+          .in('status', ['completed', 'COMPLETED', 'cancelled', 'CANCELLED']);
 
-      if (startAt) {
-        query = query.gte('created_at', startAt);
+        if (view === 'pending') query = query.or('payout_status.eq.pending,payout_status.is.null');
+        if (view === 'history') query = query.eq('payout_status', 'paid');
+
+        const dateColumn = view === 'history' ? 'payout_paid_at' : 'created_at';
+        if (view === 'history' && normalizedStartAt && normalizedEndAt) {
+          query = query.or(`payout_paid_at.is.null,and(payout_paid_at.gte.${normalizedStartAt},payout_paid_at.lte.${normalizedEndAt})`);
+        } else if (view === 'history' && normalizedStartAt) {
+          query = query.or(`payout_paid_at.is.null,payout_paid_at.gte.${normalizedStartAt}`);
+        } else if (view === 'history' && normalizedEndAt) {
+          query = query.or(`payout_paid_at.is.null,payout_paid_at.lte.${normalizedEndAt}`);
+        } else {
+          if (view !== 'pending' && normalizedStartAt) query = query.gte(dateColumn, normalizedStartAt);
+          if (view !== 'pending' && normalizedEndAt) query = query.lte(dateColumn, normalizedEndAt);
+        }
+
+        const result = await executeRowQuery(
+          query.order(dateColumn, { ascending: false }).range(offset, offset + PAYOUT_PAGE_SIZE - 1)
+        );
+        if (result.error) return { data: rows, error: result.error };
+        rows.push(...result.data);
+        if (result.data.length < PAYOUT_PAGE_SIZE) return { data: rows, error: null };
       }
-
-      if (endAt) {
-        query = query.lte('created_at', endAt);
-      }
-
-      if (!startAt && !endAt) {
-        query = query.limit(1500);
-      }
-
-      return executeRowQuery(query);
+      throw new Error('체험 정산 데이터가 안전 조회 한도를 초과했습니다. 범위를 점검해 주세요.');
     };
 
-    const buildServiceQuery = (includePaidAt: boolean) => {
+    const fetchServiceRows = async (includePaidAt: boolean) => {
       const selectColumns = includePaidAt
         ? 'id, order_id, request_id, customer_id, host_id, amount, status, payout_status, payout_paid_at, host_payout_amount, platform_revenue, created_at'
         : 'id, order_id, request_id, customer_id, host_id, amount, status, payout_status, host_payout_amount, platform_revenue, created_at';
 
-      let query = supabaseAdmin
-        .from('service_bookings')
-        .select(selectColumns)
-        .in('status', ['PAID', 'confirmed', 'completed'])
-        .order('created_at', { ascending: false });
+      const rows: AdminRawRow[] = [];
+      for (let offset = 0; offset < PAYOUT_MAX_ROWS; offset += PAYOUT_PAGE_SIZE) {
+        let query = supabaseAdmin
+          .from('service_bookings')
+          .select(selectColumns)
+          .in('status', view === 'pending' ? ['completed'] : ['PAID', 'confirmed', 'completed']);
 
-      if (startAt) {
-        query = query.gte('created_at', startAt);
+        if (view === 'pending') query = query.or('payout_status.eq.pending,payout_status.is.null');
+        if (view === 'history') query = query.eq('payout_status', 'paid');
+
+        const dateColumn = view === 'history' ? 'payout_paid_at' : 'created_at';
+        if (view === 'history' && normalizedStartAt && normalizedEndAt) {
+          query = query.or(`payout_paid_at.is.null,and(payout_paid_at.gte.${normalizedStartAt},payout_paid_at.lte.${normalizedEndAt})`);
+        } else if (view === 'history' && normalizedStartAt) {
+          query = query.or(`payout_paid_at.is.null,payout_paid_at.gte.${normalizedStartAt}`);
+        } else if (view === 'history' && normalizedEndAt) {
+          query = query.or(`payout_paid_at.is.null,payout_paid_at.lte.${normalizedEndAt}`);
+        } else {
+          if (view !== 'pending' && normalizedStartAt) query = query.gte(dateColumn, normalizedStartAt);
+          if (view !== 'pending' && normalizedEndAt) query = query.lte(dateColumn, normalizedEndAt);
+        }
+
+        const result = await executeRowQuery(
+          query.order(dateColumn, { ascending: false }).range(offset, offset + PAYOUT_PAGE_SIZE - 1)
+        );
+        if (result.error) return { data: rows, error: result.error };
+        rows.push(...result.data);
+        if (result.data.length < PAYOUT_PAGE_SIZE) return { data: rows, error: null };
       }
-
-      if (endAt) {
-        query = query.lte('created_at', endAt);
-      }
-
-      if (!startAt && !endAt) {
-        query = query.limit(1500);
-      }
-
-      return executeRowQuery(query);
+      throw new Error('서비스 정산 데이터가 안전 조회 한도를 초과했습니다. 범위를 점검해 주세요.');
     };
 
     let [{ data: experienceRowsRaw, error: experienceError }, { data: serviceRowsRaw, error: serviceError }] =
-      await Promise.all([buildExperienceQuery(true), buildServiceQuery(true)]);
+      await Promise.all([fetchExperienceRows(true), fetchServiceRows(true)]);
 
     if (experienceError && isMissingPayoutPaidAtColumnError(experienceError)) {
-      const fallbackResult = await buildExperienceQuery(false);
+      const fallbackResult = await fetchExperienceRows(false);
       experienceRowsRaw = attachNullPayoutPaidAt(fallbackResult.data);
       experienceError = fallbackResult.error;
     }
 
     if (serviceError && isMissingPayoutPaidAtColumnError(serviceError)) {
-      const fallbackResult = await buildServiceQuery(false);
+      const fallbackResult = await fetchServiceRows(false);
       serviceRowsRaw = attachNullPayoutPaidAt(fallbackResult.data);
       serviceError = fallbackResult.error;
     }
@@ -349,6 +415,36 @@ export async function GET(request: Request) {
 
     const experienceRows = experienceRowsRaw.map(normalizeExperienceQueueRow).filter(isPresent);
     const serviceRows = serviceRowsRaw.map(normalizeServiceQueueRow).filter(isPresent);
+
+    const manualPayoutRows: ManualPayoutRow[] = [];
+    if (view === 'history') {
+      for (let offset = 0; offset < PAYOUT_MAX_ROWS; offset += PAYOUT_PAGE_SIZE) {
+        let manualQuery = supabaseAdmin
+          .from('admin_manual_payouts')
+          .select(
+            'id, request_key, host_id, settlement_type, booking_ids, current_booking_amount, legacy_amount, total_paid_amount, reason, legacy_source_reference, transfer_reference, paid_by_admin_email, paid_at'
+          );
+        if (normalizedStartAt) manualQuery = manualQuery.gte('paid_at', normalizedStartAt);
+        if (normalizedEndAt) manualQuery = manualQuery.lte('paid_at', normalizedEndAt);
+
+        const { data, error } = await manualQuery
+          .order('paid_at', { ascending: false })
+          .range(offset, offset + PAYOUT_PAGE_SIZE - 1);
+        if (error) {
+          if (isMissingManualPayoutTableError(error)) {
+            manualPayoutsAvailable = false;
+            break;
+          }
+          throw error;
+        }
+        const page = ((data || []) as unknown) as ManualPayoutRow[];
+        manualPayoutRows.push(...page);
+        if (page.length < PAYOUT_PAGE_SIZE) break;
+        if (offset + PAYOUT_PAGE_SIZE >= PAYOUT_MAX_ROWS) {
+          throw new Error('수동 정산 이력이 안전 조회 한도를 초과했습니다. 범위를 좁혀 주세요.');
+        }
+      }
+    }
 
     const experienceIds = Array.from(
       new Set(experienceRows.map((row) => row.experience_id).filter(isPresent))
@@ -408,6 +504,7 @@ export async function GET(request: Request) {
         [
           ...Array.from(experienceMap.values()).map((row) => row.host_id),
           ...serviceRows.map((row) => row.host_id),
+          ...manualPayoutRows.map((row) => row.host_id),
         ].filter(isPresent)
       )
     );
@@ -634,12 +731,23 @@ export async function GET(request: Request) {
 
     const experienceGroupMap = new Map(experienceGroups.map((group) => [group.host_id, group]));
     const serviceGroupMap = new Map(serviceGroups.map((group) => [group.host_id, group]));
-    const allHostIds = Array.from(new Set([...experienceGroupMap.keys(), ...serviceGroupMap.keys()]));
+    const manualPayoutMap = new Map<string, ManualPayoutRow[]>();
+    for (const record of manualPayoutRows) {
+      const records = manualPayoutMap.get(record.host_id) ?? [];
+      records.push(record);
+      manualPayoutMap.set(record.host_id, records);
+    }
+
+    const allHostIds = Array.from(
+      new Set([...experienceGroupMap.keys(), ...serviceGroupMap.keys(), ...manualPayoutMap.keys()])
+    );
 
     const combinedHostTotals: AdminCombinedPayoutQueueRow[] = allHostIds.map((hostId) => {
       const experienceGroup = experienceGroupMap.get(hostId) ?? null;
       const serviceGroup = serviceGroupMap.get(hostId) ?? null;
       const fallbackGroup = experienceGroup ?? serviceGroup;
+      const hostProfile = hostProfileMap.get(hostId);
+      const hostApplication = hostApplicationMap.get(hostId);
 
       const pending_amount =
         (experienceGroup?.pending_amount ?? 0) + (serviceGroup?.pending_amount ?? 0);
@@ -647,6 +755,8 @@ export async function GET(request: Request) {
       const pending_count =
         (experienceGroup?.pending_count ?? 0) + (serviceGroup?.pending_count ?? 0);
       const paid_count = (experienceGroup?.paid_count ?? 0) + (serviceGroup?.paid_count ?? 0);
+      const manual_payouts = manualPayoutMap.get(hostId) ?? [];
+      const legacy_paid_amount = manual_payouts.reduce((sum, record) => sum + record.legacy_amount, 0);
 
       let settlement_state: AdminCombinedPayoutQueueRow['settlement_state'] = 'completed';
       if ((serviceGroup?.pending_count ?? 0) > 0) {
@@ -657,15 +767,18 @@ export async function GET(request: Request) {
 
       return {
         host_id: hostId,
-        host_name: fallbackGroup?.host_name || '알 수 없는 호스트',
-        bank: fallbackGroup?.bank || '계좌 미등록',
-        account_number: fallbackGroup?.account_number || '',
-        account_holder: fallbackGroup?.account_holder || '-',
-        host_nationality: fallbackGroup?.host_nationality || '-',
+        host_name: fallbackGroup?.host_name || hostApplication?.name || hostProfile?.full_name || '알 수 없는 호스트',
+        bank: fallbackGroup?.bank || hostApplication?.bank_name || '계좌 미등록',
+        account_number: fallbackGroup?.account_number || hostApplication?.account_number || '',
+        account_holder: fallbackGroup?.account_holder || hostApplication?.account_holder || '-',
+        host_nationality: fallbackGroup?.host_nationality || hostApplication?.host_nationality || '-',
         pending_amount,
         paid_amount,
         pending_count,
         paid_count,
+        legacy_paid_amount,
+        actual_disbursed_amount: paid_amount + legacy_paid_amount,
+        manual_payouts,
         settlement_state,
         domains: {
           experience: experienceGroup,
@@ -679,6 +792,7 @@ export async function GET(request: Request) {
       experienceGroups,
       serviceGroups,
       combinedHostTotals,
+      manualPayoutsAvailable,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Server error';
