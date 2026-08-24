@@ -12,6 +12,11 @@ test.describe('Inquiry email provider contract', () => {
     expect(source).toContain("templateId: 'inquiry.new_message'");
     expect(source).toContain('audience: resolveInquiryEmailAudience({');
     expect(source).toContain("transportPolicy: audience === 'admin' ? 'opsAdmin' : 'transactional'");
+    expect(source).toContain("import { after } from 'next/server';");
+    expect(source).toContain('after(async () => {');
+    expect(source).toContain('const result = await sendTemplatedEmail({');
+    expect(source).toContain("console.warn('[inquiries/thread] message notification email failed:', error);");
+    expect(source).not.toContain('void sendTemplatedEmail({');
     expect(source).not.toContain("const audience = localizeEmailForRecipient ? 'guest' : 'admin';");
     expect(source).not.toContain('findRecipientEmail');
     expect(source).not.toContain('if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) return;');

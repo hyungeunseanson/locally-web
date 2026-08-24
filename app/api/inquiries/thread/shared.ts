@@ -1,3 +1,5 @@
+import { after } from 'next/server';
+
 import {
   ACTIVE_CHAT_POLICY_SIGNAL_CATEGORIES,
   CHAT_POLICY_SIGNAL_LABELS,
@@ -289,32 +291,34 @@ async function notifyRecipient(params: {
       localizeEmailForRecipient,
     });
 
-    void sendTemplatedEmail({
-      templateId: 'inquiry.new_message',
-      audience,
-      locale: localizeEmailForRecipient ? locale : 'ko',
-      recipient: {
-        userId: recipientId,
-      },
-      payload: {
-        actorName: actorDisplayName,
-        messagePreview: emailCopy.message,
-        ctaUrl: link,
-      },
-      transportPolicy: audience === 'admin' ? 'opsAdmin' : 'transactional',
-    }, {
-      supabaseAdmin,
-    })
-      .then((result) => {
+    after(async () => {
+      try {
+        const result = await sendTemplatedEmail({
+          templateId: 'inquiry.new_message',
+          audience,
+          locale: localizeEmailForRecipient ? locale : 'ko',
+          recipient: {
+            userId: recipientId,
+          },
+          payload: {
+            actorName: actorDisplayName,
+            messagePreview: emailCopy.message,
+            ctaUrl: link,
+          },
+          transportPolicy: audience === 'admin' ? 'opsAdmin' : 'transactional',
+        }, {
+          supabaseAdmin,
+        });
+
         if (!result.sent) {
           console.warn(
             `[inquiries/thread] message notification email skipped: ${result.skipped || 'unknown'}`
           );
         }
-      })
-      .catch((error) => {
+      } catch (error) {
         console.warn('[inquiries/thread] message notification email failed:', error);
-      });
+      }
+    });
   } catch (error) {
     console.warn('[inquiries/thread] message notification email failed:', error);
   }
