@@ -2,6 +2,7 @@ import { readFileSync } from 'fs';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test, type Page } from '@playwright/test';
+import { formatBookingReviewMarker } from '@/app/utils/hostUnavailableReview';
 
 type EnvMap = Record<string, string>;
 type TestUser = {
@@ -238,6 +239,50 @@ async function createPendingBankBooking(params: {
   return bookingId;
 }
 
+async function createCancellationReasonBooking(params: {
+  guestId: string;
+  guest: TestUser;
+  experienceId: number;
+  status: 'cancelled' | 'confirmed';
+  cancelReason: string | null;
+}) {
+  const supabase = getAdminClient();
+  const bookingId = `ADMIN-LEDGER-CANCEL-REASON-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  const bookingDate = new Date();
+  bookingDate.setDate(bookingDate.getDate() + 5);
+
+  const { error } = await supabase.from('bookings').insert({
+    id: bookingId,
+    order_id: bookingId,
+    user_id: params.guestId,
+    experience_id: params.experienceId,
+    amount: 33000,
+    total_price: 30000,
+    total_experience_price: 30000,
+    status: params.status,
+    guests: 1,
+    date: bookingDate.toISOString().slice(0, 10),
+    time: '11:00',
+    type: 'group',
+    contact_name: params.guest.fullName,
+    contact_phone: params.guest.phone,
+    message: '',
+    created_at: new Date().toISOString(),
+    payment_method: 'card',
+    host_payout_amount: 24000,
+    platform_revenue: 9000,
+    refund_amount: params.status === 'cancelled' ? 33000 : null,
+    cancel_reason: params.cancelReason,
+    payout_status: 'pending',
+    is_solo_guarantee: false,
+    solo_guarantee_price: 0,
+  });
+
+  if (error) throw error;
+  createdBookingIds.push(bookingId);
+  return bookingId;
+}
+
 async function login(page: Page, user: TestUser) {
   await page.goto('/login', { waitUntil: 'networkidle' });
   await page.locator('input[type="email"]').fill(user.email);
@@ -277,7 +322,7 @@ test.afterAll(async () => {
   }
 });
 
-test.describe.serial('Admin master ledger desktop confirm modal regression', () => {
+test.describe.serial('Admin master ledger regressions', () => {
   test('opens the desktop confirm modal and confirms a pending bank booking', async ({ page }) => {
     test.setTimeout(120000);
 
@@ -348,5 +393,79 @@ test.describe.serial('Admin master ledger desktop confirm modal regression', () 
         platform_revenue: 9000,
         payout_status: 'pending',
       });
+  });
+
+  test('shows only host-visible cancellation reasons in desktop and mobile details', async ({ page }) => {
+    test.setTimeout(180000);
+
+    const adminUser = createUser('cancel-reason-admin');
+    const hostUser = createUser('cancel-reason-host');
+    const guestUser = createUser('cancel-reason-guest');
+
+    await createAuthUser(adminUser, true);
+    const hostId = await createAuthUser(hostUser);
+    const guestId = await createAuthUser(guestUser);
+    await createApprovedHostApplication(hostId, hostUser);
+    const experienceId = await createExperience(hostId);
+
+    const longCancelReason = '고객 일정이 갑자기 변경되어 예약한 날짜에 참여할 수 없습니다. 호스트에게 상황을 전달해 주세요. (8~19일 전 취소)';
+    const reviewDetail = '최소 진행 인원이 충족되지 않았다고 안내받았습니다.';
+    const reviewMarker = formatBookingReviewMarker('minimum_participants_unmet', reviewDetail);
+
+    const cancelledBookingId = await createCancellationReasonBooking({
+      guestId,
+      guest: guestUser,
+      experienceId,
+      status: 'cancelled',
+      cancelReason: longCancelReason,
+    });
+    const noReasonBookingId = await createCancellationReasonBooking({
+      guestId,
+      guest: guestUser,
+      experienceId,
+      status: 'cancelled',
+      cancelReason: null,
+    });
+    const reviewBookingId = await createCancellationReasonBooking({
+      guestId,
+      guest: guestUser,
+      experienceId,
+      status: 'confirmed',
+      cancelReason: reviewMarker,
+    });
+
+    await login(page, adminUser);
+
+    for (const viewport of [
+      { width: 1440, height: 960 },
+      { width: 390, height: 700 },
+    ]) {
+      await page.setViewportSize(viewport);
+
+      await page.goto('/admin/dashboard?tab=LEDGER', { waitUntil: 'networkidle' });
+      await page.getByPlaceholder('검색 (이름, 예약번호)').fill(cancelledBookingId);
+      await page.locator('tbody tr').first().click();
+
+      const cancelReasonSection = page.getByTestId('admin-master-ledger-cancel-reason');
+      const cancelReasonValue = page.getByTestId('admin-master-ledger-cancel-reason-value');
+      await expect(cancelReasonSection).toBeVisible();
+      await expect(cancelReasonSection).toContainText('호스트에게 표시되는 취소 사유');
+      await expect(cancelReasonValue).toHaveText(longCancelReason);
+      await expect(cancelReasonValue).toHaveCSS('white-space', 'pre-wrap');
+      await expect(cancelReasonValue).toHaveCSS('overflow-wrap', 'break-word');
+
+      await page.goto('/admin/dashboard?tab=LEDGER', { waitUntil: 'networkidle' });
+      await page.getByPlaceholder('검색 (이름, 예약번호)').fill(noReasonBookingId);
+      await page.locator('tbody tr').first().click();
+      await expect(page.getByTestId('admin-master-ledger-cancel-reason')).toHaveCount(0);
+
+      await page.goto('/admin/dashboard?tab=LEDGER', { waitUntil: 'networkidle' });
+      await page.getByPlaceholder('검색 (이름, 예약번호)').fill(reviewBookingId);
+      await page.locator('tbody tr').first().click();
+      await expect(page.getByText('최소 진행 인원 미달 취소 검토 요청')).toBeVisible();
+      await expect(page.getByText(`고객 메모: ${reviewDetail}`)).toBeVisible();
+      await expect(page.getByTestId('admin-master-ledger-cancel-reason')).toHaveCount(0);
+      await expect(page.getByText(reviewMarker, { exact: true })).toHaveCount(0);
+    }
   });
 });

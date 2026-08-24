@@ -1008,6 +1008,25 @@ export default function MasterLedgerTab({
               <p className="hidden md:flex text-[8px] md:text-[9px] text-slate-400 mt-1.5 md:mt-2 text-right justify-end gap-1 items-center"><Info size={10} /> Order ID: {selectedBooking.order_id || selectedBooking.id}</p>
             </div>
 
+            {selectedBooking._type !== 'service' &&
+              selectedBooking.cancel_reason?.trim() &&
+              !isBookingReviewPending(selectedBooking.cancel_reason) && (
+                <div data-testid="admin-master-ledger-cancel-reason">
+                  <h4 className="mb-1.5 flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-slate-400 md:mb-2 md:text-[10px]">
+                    <AlertTriangle size={10} /> 취소 정보
+                  </h4>
+                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5 md:p-3">
+                    <p className="text-[10px] font-bold text-slate-500 md:text-xs">호스트에게 표시되는 취소 사유</p>
+                    <p
+                      data-testid="admin-master-ledger-cancel-reason-value"
+                      className="mt-1 whitespace-pre-wrap break-words text-[11px] leading-5 text-slate-700 md:text-xs"
+                    >
+                      {selectedBooking.cancel_reason}
+                    </p>
+                  </div>
+                </div>
+              )}
+
             {/* 관리자 액션 — 일반 예약만 */}
             {selectedBooking._type !== 'service' && (
               <div className="pt-1 md:pt-2">
