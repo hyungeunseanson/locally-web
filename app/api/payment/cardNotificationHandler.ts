@@ -21,6 +21,13 @@ type StoredCardTransactionRow = {
   tid?: unknown;
 };
 
+type CompletedCancellationMatch = {
+  orderId: unknown;
+  refundAmount: unknown;
+  status: unknown;
+  cancelledStatus: string;
+};
+
 function buildNotificationOkResponse() {
   return new NextResponse('OK', {
     status: 200,
@@ -40,6 +47,48 @@ function hasMatchingStoredTransaction(
 
   const notifiedTid = String(notification.providerTransactionId || '').trim();
   return notifiedTid === storedTid;
+}
+
+function isNicePayPostCancellationNotification(
+  notification: Awaited<ReturnType<typeof readCardPaymentNotificationRequest>>
+) {
+  return String(notification.payload.StateCd || '').trim() === '2';
+}
+
+export function isMatchingCompletedNicePayCancellation(params: {
+  notification: Awaited<ReturnType<typeof readCardPaymentNotificationRequest>>;
+  record: CompletedCancellationMatch;
+}) {
+  const { notification, record } = params;
+  if (!isNicePayPostCancellationNotification(notification)) return false;
+
+  const notifiedOrderId = String(notification.orderId || '').trim();
+  const storedOrderId = String(record.orderId || '').trim();
+  if (!notifiedOrderId || notifiedOrderId !== storedOrderId) return false;
+
+  const payMethod = String(notification.payload.PayMethod || '').trim().toUpperCase();
+  if (payMethod && payMethod !== 'CARD') return false;
+
+  if (String(record.status || '').trim() !== record.cancelledStatus) return false;
+
+  const notifiedAmount = notification.amount;
+  const storedRefundAmount = Number(record.refundAmount);
+  return (
+    notifiedAmount != null &&
+    notifiedAmount > 0 &&
+    Number.isFinite(storedRefundAmount) &&
+    storedRefundAmount === notifiedAmount
+  );
+}
+
+function buildRejectedPostCancellationResponse() {
+  return NextResponse.json(
+    {
+      success: false,
+      error: 'NICEPAY 후취소 통보가 저장된 취소·환불 내역과 일치하지 않습니다.',
+    },
+    { status: 409 }
+  );
 }
 
 function buildIgnoredResponse(params: {
@@ -131,6 +180,20 @@ async function processExperienceNotification(params: {
 
   if (!booking) {
     return null;
+  }
+
+  if (isNicePayPostCancellationNotification(notification)) {
+    return isMatchingCompletedNicePayCancellation({
+      notification,
+      record: {
+        orderId: booking.order_id || booking.id,
+        refundAmount: booking.refund_amount,
+        status: booking.status,
+        cancelledStatus: 'cancelled',
+      },
+    })
+      ? buildNotificationOkResponse()
+      : buildRejectedPostCancellationResponse();
   }
 
   if (isConfirmedBookingStatus(String(booking.status || ''))) {
@@ -225,6 +288,20 @@ async function processServiceNotification(params: {
     return null;
   }
 
+  if (isNicePayPostCancellationNotification(notification)) {
+    return isMatchingCompletedNicePayCancellation({
+      notification,
+      record: {
+        orderId: serviceBooking.order_id,
+        refundAmount: serviceBooking.refund_amount,
+        status: serviceBooking.status,
+        cancelledStatus: 'cancelled',
+      },
+    })
+      ? buildNotificationOkResponse()
+      : buildRejectedPostCancellationResponse();
+  }
+
   if (isConfirmedBookingStatus(String(serviceBooking.status || ''))) {
     return buildNotificationOkResponse();
   }
@@ -317,6 +394,23 @@ async function processProxyNotification(params: {
   }
 
   const normalizedProxyPaymentStatus = String(proxyRequest.payment_status || '').toUpperCase();
+  if (isNicePayPostCancellationNotification(notification)) {
+    return isMatchingCompletedNicePayCancellation({
+      notification,
+      record: {
+        orderId: proxyRequest.locally_order_id || proxyRequest.id,
+        refundAmount: getProxyRequestFeeKrw(
+          String(proxyRequest.category || 'RESTAURANT') as ProxyCategory,
+          (proxyRequest.form_data as Record<string, unknown> | null | undefined) ?? undefined
+        ),
+        status: normalizedProxyPaymentStatus,
+        cancelledStatus: 'REFUNDED',
+      },
+    })
+      ? buildNotificationOkResponse()
+      : buildRejectedPostCancellationResponse();
+  }
+
   if (normalizedProxyPaymentStatus === 'COMPLETED') {
     return buildNotificationOkResponse();
   }

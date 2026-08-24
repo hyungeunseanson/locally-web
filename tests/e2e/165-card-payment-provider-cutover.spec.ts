@@ -6,7 +6,10 @@ import { readFileSync } from 'fs';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test, type Page } from '@playwright/test';
 
-import { handleNicePayCardNotification as cardNotificationPost } from '@/app/api/payment/cardNotificationHandler';
+import {
+  handleNicePayCardNotification as cardNotificationPost,
+  isMatchingCompletedNicePayCancellation,
+} from '@/app/api/payment/cardNotificationHandler';
 import { POST as proxyNicePayCallbackPost } from '@/app/api/proxy-bookings/payment/nicepay-callback/route';
 import {
   CARD_APPROVAL_RELEASE_RACE_REFUNDED_REASON,
@@ -23,6 +26,7 @@ import {
 import * as adminAlertCenter from '@/app/utils/adminAlertCenter';
 import * as proxyBookingNotifications from '@/app/utils/proxyBookingNotifications';
 import * as serviceNotificationFlows from '@/app/utils/serviceNotificationFlows';
+import * as supabaseAdminModule from '@/app/utils/supabase/admin';
 import * as supabaseServerModule from '@/app/utils/supabase/server';
 
 const NICEPAY_STATUS_QUERY_URL = 'https://webapi.nicepay.co.kr/webapi/inquery/trans_status.jsp';
@@ -344,6 +348,37 @@ function resetEnv() {
   }
 }
 
+function createReadOnlyNotificationAdminClient(params: {
+  expectedTable: 'bookings' | 'service_bookings' | 'proxy_requests';
+  expectedOrderColumn: 'order_id' | 'locally_order_id';
+  orderId: string;
+  row: Record<string, unknown>;
+}) {
+  const queriedColumns: Array<{ column: string; value: unknown }> = [];
+  const query = {
+    select: () => query,
+    eq: (column: string, value: unknown) => {
+      queriedColumns.push({ column, value });
+      return query;
+    },
+    maybeSingle: async () => ({ data: params.row, error: null }),
+  };
+
+  return {
+    client: {
+      from: (table: string) => {
+        expect(table).toBe(params.expectedTable);
+        return query;
+      },
+    },
+    assertReadByOrderId: () => {
+      expect(queriedColumns).toEqual([
+        { column: params.expectedOrderColumn, value: params.orderId },
+      ]);
+    },
+  };
+}
+
 test.afterEach(() => {
   resetEnv();
 });
@@ -384,6 +419,181 @@ test.afterAll(async () => {
 });
 
 test.describe('Card payment provider cutover contracts', () => {
+  const completedCancellationDomains = [
+    {
+      name: 'experience',
+      target: 'experience' as const,
+      table: 'bookings' as const,
+      orderColumn: 'order_id' as const,
+      completedStatus: 'cancelled',
+      wrongStatus: 'PAID',
+      buildRow: (orderId: string, status: string, refundAmount: number) => ({
+        id: orderId,
+        order_id: orderId,
+        status,
+        refund_amount: refundAmount,
+        tid: 'TX-TID-ORIGINAL-APPROVAL',
+      }),
+    },
+    {
+      name: 'service',
+      target: 'service' as const,
+      table: 'service_bookings' as const,
+      orderColumn: 'order_id' as const,
+      completedStatus: 'cancelled',
+      wrongStatus: 'PAID',
+      buildRow: (orderId: string, status: string, refundAmount: number) => ({
+        id: orderId,
+        order_id: orderId,
+        status,
+        refund_amount: refundAmount,
+        tid: 'TX-TID-ORIGINAL-APPROVAL',
+      }),
+    },
+    {
+      name: 'proxy',
+      target: 'proxy' as const,
+      table: 'proxy_requests' as const,
+      orderColumn: 'locally_order_id' as const,
+      completedStatus: 'REFUNDED',
+      wrongStatus: 'COMPLETED',
+      buildRow: (orderId: string, status: string, refundAmount: number) => ({
+        id: orderId,
+        locally_order_id: orderId,
+        payment_channel: 'LOCALLY',
+        payment_status: status,
+        category: 'RESTAURANT',
+        form_data: { service_fee_krw: refundAmount },
+        tid: 'TX-TID-ORIGINAL-APPROVAL',
+      }),
+    },
+  ];
+
+  for (const domain of completedCancellationDomains) {
+    test(`${domain.name} acknowledges a completed post-cancellation notification when the cancellation TID differs from the stored approval TID`, async () => {
+      withNicePayEnv();
+
+      const orderId = `${domain.target === 'service' ? 'SVC-' : domain.target === 'proxy' ? 'LOCALLY-PROXY-' : 'ORD-'}NICEPAY-CANCEL-ACK`;
+      const refundAmount = 32339;
+      const stub = createReadOnlyNotificationAdminClient({
+        expectedTable: domain.table,
+        expectedOrderColumn: domain.orderColumn,
+        orderId,
+        row: domain.buildRow(orderId, domain.completedStatus, refundAmount),
+      });
+      const originalCreateAdminClient = supabaseAdminModule.createAdminClient;
+      (supabaseAdminModule as {
+        createAdminClient: typeof supabaseAdminModule.createAdminClient;
+      }).createAdminClient = (() => stub.client) as unknown as typeof supabaseAdminModule.createAdminClient;
+
+      try {
+        const response = await cardNotificationPost(
+          new Request('https://locally.example/api/payment/card-notification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              Moid: orderId,
+              TID: 'TX-TID-POST-CANCELLATION',
+              Amt: String(refundAmount),
+              ResultCode: '2001',
+              StateCd: '2',
+              PayMethod: 'CARD',
+            }).toString(),
+          }),
+          { target: domain.target }
+        );
+
+        expect(response.status).toBe(200);
+        expect(response.headers.get('content-type')).toBe('text/plain; charset=utf-8');
+        await expect(response.text()).resolves.toBe('OK');
+        stub.assertReadByOrderId();
+      } finally {
+        (supabaseAdminModule as {
+          createAdminClient: typeof supabaseAdminModule.createAdminClient;
+        }).createAdminClient = originalCreateAdminClient;
+      }
+    });
+
+    test(`${domain.name} rejects post-cancellation notifications with a wrong amount or incomplete DB status`, async () => {
+      withNicePayEnv();
+
+      const orderId = `${domain.target === 'service' ? 'SVC-' : domain.target === 'proxy' ? 'LOCALLY-PROXY-' : 'ORD-'}NICEPAY-CANCEL-REJECT`;
+      const refundAmount = 32339;
+      const originalCreateAdminClient = supabaseAdminModule.createAdminClient;
+
+      try {
+        for (const invalidCase of [
+          { status: domain.completedStatus, notifiedAmount: refundAmount - 1 },
+          { status: domain.wrongStatus, notifiedAmount: refundAmount },
+        ]) {
+          const stub = createReadOnlyNotificationAdminClient({
+            expectedTable: domain.table,
+            expectedOrderColumn: domain.orderColumn,
+            orderId,
+            row: domain.buildRow(orderId, invalidCase.status, refundAmount),
+          });
+          (supabaseAdminModule as {
+            createAdminClient: typeof supabaseAdminModule.createAdminClient;
+          }).createAdminClient = (() => stub.client) as unknown as typeof supabaseAdminModule.createAdminClient;
+
+          const response = await cardNotificationPost(
+            new Request('https://locally.example/api/payment/card-notification', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: new URLSearchParams({
+                Moid: orderId,
+                TID: 'TX-TID-POST-CANCELLATION',
+                Amt: String(invalidCase.notifiedAmount),
+                ResultCode: '2001',
+                StateCd: '2',
+                PayMethod: 'CARD',
+              }).toString(),
+            }),
+            { target: domain.target }
+          );
+
+          expect(response.status).toBe(409);
+          await expect(response.json()).resolves.toMatchObject({ success: false });
+          stub.assertReadByOrderId();
+        }
+      } finally {
+        (supabaseAdminModule as {
+          createAdminClient: typeof supabaseAdminModule.createAdminClient;
+        }).createAdminClient = originalCreateAdminClient;
+      }
+    });
+  }
+
+  test('completed post-cancellation matching requires StateCd=2', async () => {
+    withNicePayEnv();
+    const notification = await readCardPaymentNotificationRequest(
+      new Request('https://locally.example/api/payment/card-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          Moid: 'ORD-NICEPAY-CANCEL-STATE',
+          TID: 'TX-TID-POST-CANCELLATION',
+          Amt: '32339',
+          ResultCode: '2001',
+          StateCd: '0',
+          PayMethod: 'CARD',
+        }).toString(),
+      })
+    );
+
+    expect(
+      isMatchingCompletedNicePayCancellation({
+        notification,
+        record: {
+          orderId: 'ORD-NICEPAY-CANCEL-STATE',
+          refundAmount: 32339,
+          status: 'cancelled',
+          cancelledStatus: 'cancelled',
+        },
+      })
+    ).toBe(false);
+  });
+
   test('rejects unauthenticated proxy callback attempts', async ({ request }) => {
     const response = await request.post('/api/proxy-bookings/payment/nicepay-callback', {
       data: {
