@@ -18,6 +18,8 @@ test.describe('Proxy booking request form schema', () => {
           category: 'RESTAURANT' as const,
           form_data: {
             restaurant_name: '테스트 식당',
+            google_map_url: 'https://maps.example.test/restaurant',
+            restaurant_phone: '03-1234-5678',
             preferred_slot_primary: '2026-09-21T19:00',
             preferred_slot_secondary: '2026-09-21T19:30',
             preferred_slot_tertiary: '2026-09-21T20:00',
@@ -37,6 +39,8 @@ test.describe('Proxy booking request form schema', () => {
           category: 'HOTEL' as const,
           form_data: {
             property_name: '테스트 호텔',
+            property_link: 'https://maps.example.test/hotel',
+            property_phone: '03-1234-5678',
             reservation_name: '테스트 예약자',
             checkin_date: '2026-09-21',
             checkout_date: '2026-09-22',
@@ -54,6 +58,8 @@ test.describe('Proxy booking request form schema', () => {
           category: 'TRANSPORT' as const,
           form_data: {
             reservation_type: 'TAXI' as const,
+            business_link: 'https://maps.example.test/transport',
+            business_phone: '03-1234-5678',
             service_area: '도쿄',
             reservation_name: '테스트 예약자',
             korean_contact: '01012345678',
@@ -72,6 +78,8 @@ test.describe('Proxy booking request form schema', () => {
           category: 'GENERAL' as const,
           form_data: {
             business_name: '테스트 매장',
+            business_link: 'https://maps.example.test/business',
+            business_phone: '03-1234-5678',
             general_inquiry_type: 'STOCK_CHECK' as const,
             inquiry_content: '재고를 확인해주세요.',
             korean_contact: '01012345678',
@@ -85,6 +93,8 @@ test.describe('Proxy booking request form schema', () => {
           category: 'LOST_AND_FOUND' as const,
           form_data: {
             location_name: '테스트 호텔',
+            location_link: 'https://maps.example.test/lost-and-found',
+            location_phone: '03-1234-5678',
             lost_date: '2026-09-21',
             lost_time_window: '18:00~19:00',
             item_type: '지갑',
@@ -98,8 +108,61 @@ test.describe('Proxy booking request form schema', () => {
       },
     ];
 
+    const businessFieldKeysByCategory = {
+      RESTAURANT: { link: 'google_map_url', phone: 'restaurant_phone' },
+      HOTEL: { link: 'property_link', phone: 'property_phone' },
+      TRANSPORT: { link: 'business_link', phone: 'business_phone' },
+      GENERAL: { link: 'business_link', phone: 'business_phone' },
+      LOST_AND_FOUND: { link: 'location_link', phone: 'location_phone' },
+    } as const;
+
     for (const payload of payloads) {
       expect(ProxyRequestValidationSchema.safeParse(payload).success, payload.category_data.category).toBe(true);
+
+      const { link, phone } = businessFieldKeysByCategory[payload.category_data.category];
+
+      for (const field of [link, phone]) {
+        const incompletePayload = JSON.parse(JSON.stringify(payload)) as typeof payload;
+        delete (incompletePayload.category_data.form_data as Record<string, unknown>)[field];
+        expect(
+          ProxyRequestValidationSchema.safeParse(incompletePayload).success,
+          `${payload.category_data.category}:${field}`
+        ).toBe(false);
+      }
+
+      for (const invalidLink of ['', '   ', 'abc', '123', 'ftp://example.com', 'javascript:alert(1)']) {
+        const invalidPayload = JSON.parse(JSON.stringify(payload)) as typeof payload;
+        (invalidPayload.category_data.form_data as Record<string, unknown>)[link] = invalidLink;
+        expect(
+          ProxyRequestValidationSchema.safeParse(invalidPayload).success,
+          `${payload.category_data.category}:${invalidLink}`
+        ).toBe(false);
+      }
+
+      const mapsShortUrlPayload = JSON.parse(JSON.stringify(payload)) as typeof payload;
+      (mapsShortUrlPayload.category_data.form_data as Record<string, unknown>)[link] = 'https://maps.app.goo.gl/Example';
+      expect(
+        ProxyRequestValidationSchema.safeParse(mapsShortUrlPayload).success,
+        `${payload.category_data.category}:maps-short-url`
+      ).toBe(true);
+
+      for (const invalidPhone of ['', '   ', 'abc', '------']) {
+        const invalidPayload = JSON.parse(JSON.stringify(payload)) as typeof payload;
+        (invalidPayload.category_data.form_data as Record<string, unknown>)[phone] = invalidPhone;
+        expect(
+          ProxyRequestValidationSchema.safeParse(invalidPayload).success,
+          `${payload.category_data.category}:${invalidPhone}`
+        ).toBe(false);
+      }
+
+      for (const validPhone of ['03-1234-5678', '+81 3 1234 5678']) {
+        const validPayload = JSON.parse(JSON.stringify(payload)) as typeof payload;
+        (validPayload.category_data.form_data as Record<string, unknown>)[phone] = validPhone;
+        expect(
+          ProxyRequestValidationSchema.safeParse(validPayload).success,
+          `${payload.category_data.category}:${validPhone}`
+        ).toBe(true);
+      }
     }
   });
 
@@ -108,6 +171,8 @@ test.describe('Proxy booking request form schema', () => {
       category: 'RESTAURANT' as const,
       form_data: {
         restaurant_name: '테스트 식당',
+        google_map_url: 'https://maps.example.test/restaurant',
+        restaurant_phone: '03-1234-5678',
         preferred_slot_primary: '2026-09-21T19:00',
         preferred_slot_secondary: '2026-09-21T19:30',
         preferred_slot_tertiary: '2026-09-21T20:00',
@@ -145,6 +210,8 @@ test.describe('Proxy booking request form schema', () => {
         category: 'HOTEL' as const,
         form_data: {
           property_name: '테스트 호텔',
+          property_link: 'https://maps.example.test/hotel',
+          property_phone: '03-1234-5678',
           reservation_name: '테스트 예약자',
           checkin_date: '2026-09-21',
           checkout_date: '2026-09-22',

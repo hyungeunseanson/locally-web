@@ -118,6 +118,7 @@ const DEFAULT_RESTAURANT_FORM: RestaurantFormData = {
 
 const DEFAULT_HOTEL_FORM: HotelFormData = {
   property_name: '',
+  property_link: '',
   property_phone: '',
   booking_platform: '',
   reservation_number: '',
@@ -135,6 +136,8 @@ const DEFAULT_HOTEL_FORM: HotelFormData = {
 
 const DEFAULT_TRANSPORT_FORM: TransportFormData = {
   reservation_type: 'TAXI',
+  business_link: '',
+  business_phone: '',
   service_area: '',
   reservation_name: '',
   korean_contact: '',
@@ -164,6 +167,7 @@ const DEFAULT_GENERAL_FORM: GeneralInquiryFormData = {
 
 const DEFAULT_LOST_FORM: LostAndFoundFormData = {
   location_name: '',
+  location_link: '',
   location_phone: '',
   lost_date: '',
   lost_time_window: '',
@@ -648,8 +652,8 @@ export default function NewProxyBooking() {
           category: 'RESTAURANT' as const,
           form_data: {
             restaurant_name: restaurantForm.restaurant_name.trim(),
-            google_map_url: normalizeOptionalText(restaurantForm.google_map_url || ''),
-            restaurant_phone: normalizeOptionalText(restaurantForm.restaurant_phone || ''),
+            google_map_url: restaurantForm.google_map_url.trim(),
+            restaurant_phone: restaurantForm.restaurant_phone.trim(),
             preferred_slot_primary: restaurantForm.preferred_slot_primary,
             preferred_slot_secondary: restaurantForm.preferred_slot_secondary,
             preferred_slot_tertiary: restaurantForm.preferred_slot_tertiary,
@@ -670,7 +674,8 @@ export default function NewProxyBooking() {
           category: 'HOTEL' as const,
           form_data: {
             property_name: hotelForm.property_name.trim(),
-            property_phone: normalizeOptionalText(hotelForm.property_phone || ''),
+            property_link: hotelForm.property_link.trim(),
+            property_phone: hotelForm.property_phone.trim(),
             booking_platform: normalizeOptionalText(hotelForm.booking_platform || ''),
             reservation_number: normalizeOptionalText(hotelForm.reservation_number || ''),
             reservation_name: hotelForm.reservation_name.trim(),
@@ -693,6 +698,8 @@ export default function NewProxyBooking() {
           category: 'TRANSPORT' as const,
           form_data: {
             reservation_type: transportForm.reservation_type,
+            business_link: transportForm.business_link.trim(),
+            business_phone: transportForm.business_phone.trim(),
             service_area: transportForm.service_area.trim(),
             reservation_name: transportForm.reservation_name.trim(),
             korean_contact: transportForm.korean_contact.trim(),
@@ -713,8 +720,8 @@ export default function NewProxyBooking() {
           category: 'GENERAL' as const,
           form_data: {
             business_name: generalForm.business_name.trim(),
-            business_phone: normalizeOptionalText(generalForm.business_phone || ''),
-            business_link: normalizeOptionalText(generalForm.business_link || ''),
+            business_phone: generalForm.business_phone.trim(),
+            business_link: generalForm.business_link.trim(),
             general_inquiry_type: generalForm.general_inquiry_type,
             inquiry_content: generalForm.inquiry_content.trim(),
             preferred_check_time: normalizeOptionalText(generalForm.preferred_check_time || ''),
@@ -729,7 +736,8 @@ export default function NewProxyBooking() {
           category: 'LOST_AND_FOUND' as const,
           form_data: {
             location_name: lostForm.location_name.trim(),
-            location_phone: normalizeOptionalText(lostForm.location_phone || ''),
+            location_link: lostForm.location_link.trim(),
+            location_phone: lostForm.location_phone.trim(),
             lost_date: lostForm.lost_date,
             lost_time_window: lostForm.lost_time_window.trim(),
             item_type: lostForm.item_type.trim(),
@@ -975,6 +983,23 @@ export default function NewProxyBooking() {
                   onChange={(event) => updateRestaurantField('restaurant_name', event.target.value)}
                   className="md:col-span-2"
                 />
+                <InputField
+                  label="업장 링크 주소"
+                  required
+                  type="url"
+                  inputMode="url"
+                  placeholder="예: Google Maps 또는 공식 홈페이지 링크"
+                  value={restaurantForm.google_map_url}
+                  onChange={(event) => updateRestaurantField('google_map_url', event.target.value)}
+                />
+                <InputField
+                  label="업장 전화번호"
+                  required
+                  type="tel"
+                  placeholder="예: 03-1234-5678"
+                  value={restaurantForm.restaurant_phone}
+                  onChange={(event) => updateRestaurantField('restaurant_phone', event.target.value)}
+                />
               </div>
             </FormSubsection>
 
@@ -1068,18 +1093,6 @@ export default function NewProxyBooking() {
               </div>
               <OptionalFields>
                 <InputField
-                  label="식당 링크 또는 지도"
-                  placeholder="https://maps.google.com/..."
-                  value={restaurantForm.google_map_url || ''}
-                  onChange={(event) => updateRestaurantField('google_map_url', event.target.value)}
-                />
-                <InputField
-                  label="식당 전화번호"
-                  placeholder="예: 03-1234-5678"
-                  value={restaurantForm.restaurant_phone || ''}
-                  onChange={(event) => updateRestaurantField('restaurant_phone', event.target.value)}
-                />
-                <InputField
                   label="현지 숙소 이름 또는 연락처"
                   placeholder="예: 호텔명 / 전화번호"
                   value={restaurantForm.local_hotel_contact || ''}
@@ -1102,6 +1115,23 @@ export default function NewProxyBooking() {
                   placeholder="예: 오리엔탈 호텔 도쿄 베이"
                   value={hotelForm.property_name}
                   onChange={(event) => updateHotelField('property_name', event.target.value)}
+                />
+                <InputField
+                  label="업장 링크 주소"
+                  required
+                  type="url"
+                  inputMode="url"
+                  placeholder="예: Google Maps 또는 공식 홈페이지 링크"
+                  value={hotelForm.property_link}
+                  onChange={(event) => updateHotelField('property_link', event.target.value)}
+                />
+                <InputField
+                  label="업장 전화번호"
+                  required
+                  type="tel"
+                  placeholder="예: 03-1234-5678"
+                  value={hotelForm.property_phone}
+                  onChange={(event) => updateHotelField('property_phone', event.target.value)}
                 />
                 <InputField
                   label="예약자 이름"
@@ -1191,11 +1221,6 @@ export default function NewProxyBooking() {
                 />
               </div>
               <OptionalFields>
-                <InputField
-                  label="숙소 전화번호"
-                  value={hotelForm.property_phone || ''}
-                  onChange={(event) => updateHotelField('property_phone', event.target.value)}
-                />
                 <TextareaField
                   label="기타 요청사항"
                   rows={3}
@@ -1209,6 +1234,27 @@ export default function NewProxyBooking() {
       case 'TRANSPORT':
         return (
           <div className="space-y-6">
+            <FormSubsection title="업장 정보를 알려주세요">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <InputField
+                  label="업장 링크 주소"
+                  required
+                  type="url"
+                  inputMode="url"
+                  placeholder="예: Google Maps 또는 공식 홈페이지 링크"
+                  value={transportForm.business_link}
+                  onChange={(event) => updateTransportField('business_link', event.target.value)}
+                />
+                <InputField
+                  label="업장 전화번호"
+                  required
+                  type="tel"
+                  placeholder="예: 03-1234-5678"
+                  value={transportForm.business_phone}
+                  onChange={(event) => updateTransportField('business_phone', event.target.value)}
+                />
+              </div>
+            </FormSubsection>
             <FormSubsection title="이용 정보를 알려주세요">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <SelectField
@@ -1330,6 +1376,23 @@ export default function NewProxyBooking() {
                   value={generalForm.business_name}
                   onChange={(event) => updateGeneralField('business_name', event.target.value)}
                 />
+                <InputField
+                  label="업장 링크 주소"
+                  required
+                  type="url"
+                  inputMode="url"
+                  placeholder="예: Google Maps 또는 공식 홈페이지 링크"
+                  value={generalForm.business_link}
+                  onChange={(event) => updateGeneralField('business_link', event.target.value)}
+                />
+                <InputField
+                  label="업장 전화번호"
+                  required
+                  type="tel"
+                  placeholder="예: 03-1234-5678"
+                  value={generalForm.business_phone}
+                  onChange={(event) => updateGeneralField('business_phone', event.target.value)}
+                />
               </div>
             </FormSubsection>
 
@@ -1377,16 +1440,6 @@ export default function NewProxyBooking() {
                 />
               </div>
               <OptionalFields>
-                <InputField
-                  label="업체 전화번호"
-                  value={generalForm.business_phone || ''}
-                  onChange={(event) => updateGeneralField('business_phone', event.target.value)}
-                />
-                <InputField
-                  label="업체 정보 링크"
-                  value={generalForm.business_link || ''}
-                  onChange={(event) => updateGeneralField('business_link', event.target.value)}
-                />
                 <TextareaField
                   label="추가 요청사항"
                   rows={3}
@@ -1411,6 +1464,23 @@ export default function NewProxyBooking() {
                   placeholder="예: ○○ 호텔 로비"
                   value={lostForm.location_name}
                   onChange={(event) => updateLostField('location_name', event.target.value)}
+                />
+                <InputField
+                  label="업장 링크 주소"
+                  required
+                  type="url"
+                  inputMode="url"
+                  placeholder="예: Google Maps 또는 공식 홈페이지 링크"
+                  value={lostForm.location_link}
+                  onChange={(event) => updateLostField('location_link', event.target.value)}
+                />
+                <InputField
+                  label="업장 전화번호"
+                  required
+                  type="tel"
+                  placeholder="예: 03-1234-5678"
+                  value={lostForm.location_phone}
+                  onChange={(event) => updateLostField('location_phone', event.target.value)}
                 />
                 <InputField
                   label="분실 날짜"
@@ -1476,11 +1546,6 @@ export default function NewProxyBooking() {
                 />
               </div>
               <OptionalFields>
-                <InputField
-                  label="업체 전화번호"
-                  value={lostForm.location_phone || ''}
-                  onChange={(event) => updateLostField('location_phone', event.target.value)}
-                />
                 <InputField
                   label="현지 체류 숙소명"
                   value={lostForm.local_stay_name || ''}
@@ -1556,7 +1621,7 @@ export default function NewProxyBooking() {
             </span>
           </h2>
           <p className="mt-2.5 max-w-3xl text-sm leading-6 text-emerald-900 sm:mt-3 sm:text-base">
-            번역만 대신 전달하는 방식이 아닙니다. 일본 현지인 팀원이 직접 일본어로 전화합니다.
+            일본인이 직접 전화하여, 일본 식당 및 업체에서도 신뢰도 UP!
           </p>
         </section>
 

@@ -2,10 +2,31 @@ import { z } from 'zod';
 
 const OptionalText = (max: number) => z.string().max(max).optional();
 
+const RequiredBusinessLink = z
+  .string()
+  .trim()
+  .min(1, '업장 링크 주소를 입력해주세요.')
+  .max(500, '업장 링크 주소는 500자 이하로 입력해주세요.')
+  .refine((value) => {
+    try {
+      const url = new URL(value);
+      return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }, 'http 또는 https로 시작하는 올바른 업장 링크 주소를 입력해주세요.');
+
+const RequiredBusinessPhone = z
+  .string()
+  .trim()
+  .min(1, '업장 전화번호를 입력해주세요.')
+  .max(100, '업장 전화번호는 100자 이하로 입력해주세요.')
+  .refine((value) => value.replace(/\D/g, '').length >= 6, '업장 전화번호를 입력해주세요.');
+
 export const RestaurantFormSchema = z.object({
   restaurant_name: z.string().min(1, '식당 이름을 입력해주세요.').max(200, '식당 이름은 200자 이하로 입력해주세요.'),
-  google_map_url: OptionalText(500),
-  restaurant_phone: OptionalText(100),
+  google_map_url: RequiredBusinessLink,
+  restaurant_phone: RequiredBusinessPhone,
   preferred_slot_primary: z.string().min(1, '예약 희망 일시 1지망을 입력해주세요.'),
   preferred_slot_secondary: z.string().min(1, '예약 희망 일시 2지망을 입력해주세요.'),
   preferred_slot_tertiary: z.string().min(1, '예약 희망 일시 3지망을 입력해주세요.'),
@@ -25,7 +46,8 @@ export type RestaurantFormData = z.infer<typeof RestaurantFormSchema>;
 
 export const HotelFormSchema = z.object({
   property_name: z.string().min(1, '숙소 이름을 입력해주세요.').max(200, '숙소 이름은 200자 이하로 입력해주세요.'),
-  property_phone: OptionalText(100),
+  property_link: RequiredBusinessLink,
+  property_phone: RequiredBusinessPhone,
   booking_platform: OptionalText(100),
   reservation_number: OptionalText(100),
   reservation_name: z.string().min(1, '예약자 성함을 입력해주세요.').max(100, '예약자 성함은 100자 이하로 입력해주세요.'),
@@ -44,6 +66,8 @@ export type HotelFormData = z.infer<typeof HotelFormSchema>;
 
 export const TransportFormSchema = z.object({
   reservation_type: z.enum(['TAXI', 'HOTEL_TAXI', 'SHUTTLE_BUS', 'OTHER']),
+  business_link: RequiredBusinessLink,
+  business_phone: RequiredBusinessPhone,
   service_area: z.string().min(1, '이용 지역을 입력해주세요.').max(200, '이용 지역은 200자 이하로 입력해주세요.'),
   reservation_name: z.string().min(1, '예약자 성함을 입력해주세요.').max(100, '예약자 성함은 100자 이하로 입력해주세요.'),
   korean_contact: z.string().min(7, '한국 연락처를 입력해주세요.').max(100, '한국 연락처는 100자 이하로 입력해주세요.'),
@@ -63,8 +87,8 @@ export type TransportFormData = z.infer<typeof TransportFormSchema>;
 
 export const GeneralInquiryFormSchema = z.object({
   business_name: z.string().min(1, '업장명을 입력해주세요.').max(200, '업장명은 200자 이하로 입력해주세요.'),
-  business_phone: OptionalText(100),
-  business_link: OptionalText(500),
+  business_phone: RequiredBusinessPhone,
+  business_link: RequiredBusinessLink,
   general_inquiry_type: z.enum(['STOCK_CHECK', 'BUSINESS_HOURS', 'RESERVATION_AVAILABILITY', 'OTHER']),
   inquiry_content: z.string().min(1, '문의 내용을 입력해주세요.').max(2000, '문의 내용은 2000자 이하로 입력해주세요.'),
   preferred_check_time: OptionalText(200),
@@ -77,7 +101,8 @@ export type GeneralInquiryFormData = z.infer<typeof GeneralInquiryFormSchema>;
 
 export const LostAndFoundFormSchema = z.object({
   location_name: z.string().min(1, '분실 장소를 입력해주세요.').max(200, '분실 장소는 200자 이하로 입력해주세요.'),
-  location_phone: OptionalText(100),
+  location_link: RequiredBusinessLink,
+  location_phone: RequiredBusinessPhone,
   lost_date: z.string().min(1, '분실 날짜를 입력해주세요.'),
   lost_time_window: z.string().min(1, '분실 시간대를 입력해주세요.').max(200, '분실 시간대는 200자 이하로 입력해주세요.'),
   item_type: z.string().min(1, '분실물 종류를 입력해주세요.').max(100, '분실물 종류는 100자 이하로 입력해주세요.'),

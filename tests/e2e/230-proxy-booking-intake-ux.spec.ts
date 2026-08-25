@@ -15,12 +15,21 @@ test.describe('Proxy booking intake UX', () => {
 
     await expect(page.getByRole('heading', { name: '일본 현지 전화, 로컬리가 대신해드려요' })).toBeVisible();
     await expect(page.getByRole('heading', { name: /한국인 ❌\s+일본 현지인 ✅/ })).toBeVisible();
+    await expect(page.getByText('일본인이 직접 전화하여, 일본 식당 및 업체에서도 신뢰도 UP!')).toBeVisible();
+    await expect(page.getByText('번역만 대신 전달하는 방식이 아닙니다. 일본 현지인 팀원이 직접 일본어로 전화합니다.')).toHaveCount(0);
     await expect(page.getByText('① 요청 작성 → ② 결제 확인 → ③ 현지 전화 → ④ 결과 안내')).toBeVisible();
     await expect(page.getByText('리뷰 확인은')).toHaveCount(0);
     await expect(page.getByRole('heading', { name: '서비스 안내' })).toHaveCount(0);
 
     for (const category of ['식당 예약', '숙소 문의', '교통 문의', '현지 업체 문의', '분실물 문의']) {
       await expect(page.getByText(category, { exact: true })).toBeVisible();
+    }
+
+    for (const category of ['식당 예약', '숙소 문의', '교통 문의', '현지 업체 문의', '분실물 문의']) {
+      await page.getByText(category, { exact: true }).click();
+      await expect(page.getByLabel('업장 링크 주소')).toHaveAttribute('required', '');
+      await expect(page.getByLabel('업장 링크 주소')).toHaveAttribute('type', 'url');
+      await expect(page.getByLabel('업장 전화번호')).toHaveAttribute('required', '');
     }
 
     await page.getByText('숙소 문의', { exact: true }).click();
