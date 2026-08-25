@@ -1154,6 +1154,8 @@ function PaymentContent() {
     demographicsState !== 'complete' ||
     !isSlotSummaryResolved ||
     (paymentMethod === 'card' && (!isCardReadyResolved || !isCardReady));
+  const needsDemographicsAction =
+    demographicsState === 'missing' || demographicsState === 'error';
   const summaryStatus: CheckoutSectionState = isSummaryLoading
     ? 'loading'
     : hasAvailabilityConflict
@@ -1440,19 +1442,26 @@ function PaymentContent() {
               {demographicsState !== 'complete' && demographicsState !== 'loading' && (
                 <StatusNotice
                   tone={demographicsState === 'error' ? 'error' : 'warning'}
-                  size="sm"
+                  size="md"
                   testId="exp-payment-demographics-required"
                 >
-                  <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <span>
-                      {lang === 'ko'
-                        ? '호스트의 체험 준비를 위해 예약 대표자의 출생연도(연령)와 성별이 필요합니다.'
-                        : 'The host needs the booker\'s age range and gender to prepare the experience.'}
-                    </span>
+                  <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="font-bold">
+                        {lang === 'ko'
+                          ? '결제 전 필수 정보가 남아 있어요'
+                          : 'Required information is missing before payment'}
+                      </p>
+                      <p className="mt-1">
+                        {lang === 'ko'
+                          ? '계정관리에서 예약 대표자의 출생연도(연령)와 성별을 입력해 주세요.'
+                          : 'Enter the booker\'s birth date and gender in account settings.'}
+                      </p>
+                    </div>
                     <button
                       type="button"
                       onClick={() => router.push(demographicsReturnUrl)}
-                      className="shrink-0 rounded-lg border border-current px-3 py-1.5 text-[11px] font-bold"
+                      className="shrink-0 rounded-lg border border-current px-3 py-2 text-[11px] font-bold"
                     >
                       {lang === 'ko' ? '계정관리에서 입력' : 'Complete profile'}
                     </button>
@@ -1717,7 +1726,24 @@ function PaymentContent() {
                 )}
               </div>
 
-              {paymentMethod !== 'paypal' ? (
+              {needsDemographicsAction ? (
+                <Button
+                  data-testid="exp-payment-demographics-cta"
+                  type="button"
+                  onClick={() => router.push(demographicsReturnUrl)}
+                  interaction="app"
+                  size="lg"
+                  variant="primary"
+                  className={cn(
+                    'h-12 w-full px-4 text-[14px] md:h-14 md:rounded-2xl md:text-base',
+                    'bg-black text-white hover:bg-slate-800'
+                  )}
+                >
+                  {lang === 'ko'
+                    ? '출생연도·성별 입력하고 결제 계속하기'
+                    : 'Enter birth date and gender to continue'}
+                </Button>
+              ) : paymentMethod !== 'paypal' ? (
                 <Button
                   data-testid="exp-payment-submit"
                   type="button"
@@ -1746,7 +1772,16 @@ function PaymentContent() {
                 </StatusNotice>
               )}
 
-              {checkoutHelperText && (
+              {needsDemographicsAction ? (
+                <p
+                  data-testid="exp-payment-demographics-return-hint"
+                  className="text-center text-[11px] font-medium leading-relaxed text-slate-600 md:text-xs"
+                >
+                  {lang === 'ko'
+                    ? '입력 후 현재 결제 화면으로 자동으로 돌아옵니다.'
+                    : 'You will automatically return to this payment page after saving.'}
+                </p>
+              ) : checkoutHelperText ? (
                 <p
                   data-testid="exp-payment-submit-helper"
                   className={cn(
@@ -1756,7 +1791,7 @@ function PaymentContent() {
                 >
                   {checkoutHelperText}
                 </p>
-              )}
+              ) : null}
             </div>
           </PaymentSectionCard>
         </div>

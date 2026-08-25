@@ -43,6 +43,53 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Experience payment inline feedback', () => {
+  test('replaces the disabled payment button with a clear demographics action and preserves checkout params', async ({ page }) => {
+    const guest = createTestUser('exp.payment.demographics.missing');
+    await createAuthUser(guest, createdAuthUserIds);
+
+    const experience = await prepareBookableExperience(createdAvailabilityKeys, {
+      searchAnyHost: true,
+    });
+
+    await page.route('**/api/account/demographics', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          demographics: { birth_date: null, gender: null },
+        }),
+      });
+    });
+
+    await login(page, guest);
+    await page.goto(
+      `/experiences/${experience.experienceId}/payment?date=${experience.date}&time=${experience.time}&guests=1&type=group&solo=0`,
+      { waitUntil: 'domcontentloaded' }
+    );
+
+    const demographicsAction = page.getByTestId('exp-payment-demographics-cta');
+    await expect(page.getByTestId('exp-payment-demographics-required')).toBeVisible({ timeout: 30000 });
+    await expect(demographicsAction).toBeVisible();
+    await expect(demographicsAction).toBeEnabled();
+    await expect(page.getByTestId('exp-payment-submit')).toHaveCount(0);
+    await expect(page.getByTestId('exp-payment-demographics-return-hint')).toBeVisible();
+
+    await page.getByTestId('exp-payment-method-bank').click({ force: true });
+    await expect(demographicsAction).toBeVisible();
+    await expect(page.getByTestId('exp-payment-submit')).toHaveCount(0);
+
+    const checkoutUrl = new URL(page.url());
+    await demographicsAction.click();
+    await page.waitForURL('**/account?complete=demographics&returnUrl=*');
+
+    const accountUrl = new URL(page.url());
+    expect(accountUrl.searchParams.get('complete')).toBe('demographics');
+    const returnUrl = new URL(accountUrl.searchParams.get('returnUrl') as string, accountUrl.origin);
+    expect(returnUrl.pathname).toBe(checkoutUrl.pathname);
+    expect(returnUrl.search).toBe(checkoutUrl.search);
+  });
+
   test('shows inline feedback for missing customer fields and agreements without changing checkout params', async ({ page }) => {
     const guest = createTestUser('exp.payment.feedback.guest');
     await createAuthUser(guest, createdAuthUserIds);
