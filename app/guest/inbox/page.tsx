@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, Suspense, useMemo } from 'react';
+import React, { useState, useEffect, useRef, Suspense, useMemo, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SiteHeader from '@/app/components/SiteHeader';
@@ -23,6 +23,7 @@ import {
   OFFICIAL_SUPPORT_AVATAR_SRC,
   OFFICIAL_SUPPORT_SENDER_NAME,
 } from '@/app/utils/officialSender';
+import { ProxyBankTransferNotice } from '@/app/components/proxy/ProxyBankTransferNotice';
 
 const CHAT_POLICY_WARNING_COPY = {
   ko: {
@@ -42,6 +43,11 @@ const CHAT_POLICY_WARNING_COPY = {
     body: '包含电话号码、邮箱或 URL 的消息可能会被运营团队审核。',
   },
 } as const;
+
+type ProxyBankTransferGuidance = {
+  requestId: string;
+  serviceFeeKrw: number;
+};
 
 function InboxContent() {
   const { t, lang } = useLanguage(); // 🟢 lang 추가 필수!
@@ -71,6 +77,7 @@ function InboxContent() {
   const [hostBootstrapSummary, setHostBootstrapSummary] = useState<{ name: string; avatarUrl: string | null } | null>(null);
   const [isBootstrappingHost, setIsBootstrappingHost] = useState(false);
   const [animatedMessageIds, setAnimatedMessageIds] = useState<string[]>([]);
+  const [proxyBankTransferGuidance, setProxyBankTransferGuidance] = useState<ProxyBankTransferGuidance | null>(null);
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -105,6 +112,22 @@ function InboxContent() {
   );
   const chatPolicyWarningCopy = CHAT_POLICY_WARNING_COPY[lang] ?? CHAT_POLICY_WARNING_COPY.ko;
 
+  const loadProxyBankTransferGuidance = useCallback(async (targetInquiryId: string | number) => {
+    const response = await fetch(`/api/proxy-bookings/inquiry/${encodeURIComponent(String(targetInquiryId))}`, {
+      cache: 'no-store',
+    });
+    const result = await response.json().catch(() => null) as {
+      success?: boolean;
+      data?: ProxyBankTransferGuidance | null;
+    } | null;
+
+    if (!response.ok || !result?.success) {
+      return null;
+    }
+
+    return result.data || null;
+  }, []);
+
   // 🟢 [헬퍼] 보안 이미지 및 시간 포맷
   const secureUrl = (url: string | null | undefined) => {
     if (!url) return "/images/logo.png";
@@ -122,6 +145,47 @@ function InboxContent() {
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
+
+  useEffect(() => {
+    const targetInquiryId = selectedInquiry?.id;
+    let cancelled = false;
+
+    if (!targetInquiryId) {
+      setProxyBankTransferGuidance(null);
+      return;
+    }
+
+    setProxyBankTransferGuidance(null);
+    void loadProxyBankTransferGuidance(targetInquiryId)
+      .then((guidance) => {
+        if (!cancelled) setProxyBankTransferGuidance(guidance);
+      })
+      .catch(() => {
+        if (!cancelled) setProxyBankTransferGuidance(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loadProxyBankTransferGuidance, selectedInquiry?.id]);
+
+  useEffect(() => {
+    const targetInquiryId = selectedInquiry?.id;
+    if (!proxyBankTransferGuidance || !targetInquiryId) return;
+
+    const refreshGuidance = () => {
+      void loadProxyBankTransferGuidance(targetInquiryId)
+        .then(setProxyBankTransferGuidance)
+        .catch(() => setProxyBankTransferGuidance(null));
+    };
+    const intervalId = window.setInterval(refreshGuidance, 30000);
+    window.addEventListener('focus', refreshGuidance);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', refreshGuidance);
+    };
+  }, [loadProxyBankTransferGuidance, proxyBankTransferGuidance, selectedInquiry?.id]);
 
   useEffect(() => {
     const currentThreadId = selectedInquiry?.id ? String(selectedInquiry.id) : null;
@@ -527,6 +591,12 @@ function InboxContent() {
                 className="flex-1 overflow-y-auto px-2.5 md:px-5 py-2.5 md:py-4 space-y-2.5 md:space-y-4 bg-gray-50"
                 ref={scrollRef}
               >
+                {proxyBankTransferGuidance && (
+                  <ProxyBankTransferNotice
+                    amount={proxyBankTransferGuidance.serviceFeeKrw}
+                    mode="pending"
+                  />
+                )}
                 {messages.map((msg) => {
                   const isMe = String(msg.sender_id) === String(currentUser?.id);
                   const isDeletedMessage = isDeletedInquiryMessage(msg.type);

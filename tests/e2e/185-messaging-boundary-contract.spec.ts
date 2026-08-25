@@ -491,7 +491,7 @@ test.describe.serial('Messaging boundary contracts', () => {
     const json = await response.json();
     expect(json).toMatchObject({
       success: false,
-      error: '전화 예약 문의 스레드가 연결되어 있지 않습니다.',
+      error: '연결된 1:1 문의를 찾을 수 없습니다.',
     });
   });
 
@@ -521,7 +521,7 @@ test.describe.serial('Messaging boundary contracts', () => {
     const threadedJson = await threadedResponse.json();
     expect(threadedJson).toMatchObject({
       success: false,
-      error: '전화 예약 문의 스레드가 연결되어 있지 않습니다.',
+      error: '연결된 1:1 문의를 찾을 수 없습니다.',
     });
   });
 

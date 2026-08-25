@@ -55,6 +55,7 @@ export default function GlobalSupportReportButton() {
   if (shouldHideGlobalSupportReport(pathname)) return null;
 
   const copy = getSupportInquiryCopy(lang);
+  const isProxyBookingIntake = pathname === '/proxy-bookings/new';
   const mobilePosition = getGlobalSupportReportMobilePosition(
     pathname || '/',
     searchParams.get('tab')
@@ -68,10 +69,17 @@ export default function GlobalSupportReportButton() {
           data-testid="global-support-report-trigger"
           onClick={openInquiry}
           aria-label={copy.reportButtonLabel}
-          className={`fixed right-4 z-[90] inline-flex min-h-[30px] items-center gap-1 rounded-full border border-slate-700 bg-slate-900/95 px-2 py-1 text-[9px] font-semibold text-white shadow-[0_8px_22px_rgba(15,23,42,0.28)] backdrop-blur transition after:absolute after:-inset-1 after:content-[''] hover:bg-slate-950 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 md:bottom-7 md:right-5 md:min-h-8 md:px-2.5 md:py-1 md:text-[10px] ${mobilePosition}`}
+          className={`${isProxyBookingIntake ? 'absolute top-3 md:fixed md:top-auto md:bottom-7' : 'fixed'} right-4 z-[90] inline-flex items-center border border-slate-700 bg-slate-900/95 font-semibold text-white shadow-[0_8px_22px_rgba(15,23,42,0.28)] backdrop-blur transition after:absolute after:-inset-1 after:content-[''] hover:bg-slate-950 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 ${
+            isProxyBookingIntake
+              ? 'h-11 w-11 min-h-11 justify-center rounded-full p-0 md:right-5 md:h-auto md:w-auto md:min-h-8 md:gap-1 md:px-2.5 md:py-1 md:text-[10px]'
+              : `min-h-[30px] gap-1 rounded-full px-2 py-1 text-[9px] md:bottom-7 md:right-5 md:min-h-8 md:px-2.5 md:py-1 md:text-[10px] ${mobilePosition}`
+          }`}
         >
-          <AlertCircle size={12} aria-hidden="true" />
-          <span>{copy.reportButtonLabel}</span>
+          <AlertCircle
+            aria-hidden="true"
+            className={isProxyBookingIntake ? 'h-[18px] w-[18px] md:h-3 md:w-3' : 'h-3 w-3'}
+          />
+          <span className={isProxyBookingIntake ? 'sr-only md:not-sr-only' : undefined}>{copy.reportButtonLabel}</span>
         </button>
       )}
     </SupportInquiryFlow>

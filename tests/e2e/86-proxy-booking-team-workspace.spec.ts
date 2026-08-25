@@ -342,7 +342,7 @@ test.describe.serial('Proxy booking team workspace flow', () => {
       await customerPage.getByRole('link', { name: /일본 전화 예약 · 문의 대행/ }).click();
       await customerPage.waitForURL(/\/proxy-bookings\/new/, { timeout: 15000 });
       await dismissAnnouncementIfVisible(customerPage);
-      await expect(customerPage.getByRole('heading', { name: '일본인이 대신 전화 예약을 도와드립니다' })).toBeVisible({ timeout: 15000 });
+      await expect(customerPage.getByRole('heading', { name: '일본 현지 전화, 로컬리가 대신해드려요' })).toBeVisible({ timeout: 15000 });
 
       await customerPage.getByPlaceholder('예: 스시 지로').fill(restaurantName);
       await customerPage.getByTestId('preferred-slot-primary-trigger').click();
@@ -365,10 +365,9 @@ test.describe.serial('Proxy booking team workspace flow', () => {
       await customerPage.getByPlaceholder('예: 홍길동').first().fill(customerUser.fullName);
       await customerPage.locator('input[type="number"]').first().fill('2');
       await customerPage.getByPlaceholder('예: 01012345678').first().fill(customerUser.phone);
-      await customerPage.getByPlaceholder('결제 시 입력한 구매자 성함을 입력해주세요.').fill(customerUser.fullName);
-      await customerPage.locator('input[type="checkbox"]').nth(0).check();
-      await customerPage.locator('input[type="checkbox"]').nth(1).check();
-      await customerPage.getByRole('button', { name: '요청 제출하기' }).click();
+      await customerPage.getByPlaceholder('결제 시 입력한 이름을 입력해주세요.').fill(customerUser.fullName);
+      await customerPage.getByRole('checkbox', { name: '서비스 이용 및 환불 규정에 동의합니다. (필수)' }).check();
+      await customerPage.getByRole('button', { name: '요청 접수하기' }).click();
 
       await customerPage.waitForURL(/\/guest\/inbox\?inquiryId=/, { timeout: 15000 });
       const inboxUrl = new URL(customerPage.url());

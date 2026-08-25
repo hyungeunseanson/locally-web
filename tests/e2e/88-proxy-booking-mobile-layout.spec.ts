@@ -15,7 +15,7 @@ test.describe('Proxy booking mobile layout', () => {
     await page.goto('/proxy-bookings/new', { waitUntil: 'networkidle' });
     await dismissAnnouncementIfVisible(page);
 
-    await expect(page.getByRole('heading', { name: '일본인이 대신 전화 예약을 도와드립니다' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '일본 현지 전화, 로컬리가 대신해드려요' })).toBeVisible();
 
     const trigger = page.getByTestId('preferred-slot-primary-trigger');
     await trigger.click();

@@ -71,7 +71,7 @@ export default function ProxyBookingsBoard() {
         const paymentMethod = getProxyPaymentMethod(request.form_data);
 
         if (request.payment_status === 'WAITING' && paymentMethod === 'bank') {
-            return '입금 전이라면 상세에서 계좌를 확인하고, 입금 후에는 메시지함 답변을 기다려주세요.';
+            return '입금 전에는 1:1 문의함에서 계좌 안내를 확인해 주세요. 입금이 확인되면 운영팀이 다음 안내를 드립니다.';
         }
 
         if (request.payment_status === 'WAITING') {
@@ -79,18 +79,18 @@ export default function ProxyBookingsBoard() {
         }
 
         if (request.status === 'IN_PROGRESS') {
-            return '현재 전화 진행 중입니다. 추가 답변은 메시지함과 상세 스레드에서 확인할 수 있습니다.';
+            return '현재 전화 진행 중입니다. 진행 상황은 1:1 문의함에서 확인할 수 있습니다.';
         }
 
         if (request.status === 'COMPLETED') {
-            return '통화 결과와 다음 안내는 메시지함에 남겨둔 답변을 확인해주세요.';
+            return '전화 결과와 후속 안내는 1:1 문의함에서 확인할 수 있습니다.';
         }
 
         if (request.status === 'CANCELLED') {
             return '취소 또는 반려된 요청입니다. 필요한 경우 새 요청을 다시 접수해주세요.';
         }
 
-        return '운영팀이 요청을 확인 중이며, 다음 안내는 메시지함과 상세 스레드로 이어집니다.';
+        return '운영팀이 요청을 확인하고 있습니다. 진행 상황과 추가 안내는 1:1 문의함에서 확인할 수 있습니다.';
     };
 
     return (
@@ -112,7 +112,7 @@ export default function ProxyBookingsBoard() {
 
             {!isAdmin && (
                 <div className="mb-6 rounded-2xl border border-blue-100 bg-blue-50/70 px-4 py-3 text-sm leading-6 text-blue-900">
-                    요청 접수 후 운영팀 답변은 메시지함과 상세 스레드에서 함께 확인할 수 있습니다. 무통장 입금 요청은 상세에서 계좌 안내를 다시 볼 수 있습니다.
+                    전화 진행 상황과 결과는 1:1 문의함에서 확인할 수 있습니다. 무통장 입금 요청의 계좌 안내도 같은 곳에서 다시 확인할 수 있습니다.
                 </div>
             )}
 

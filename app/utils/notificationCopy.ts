@@ -1261,7 +1261,7 @@ function buildProxyPaymentCopy(
       default:
         return {
           title: '전화 예약 결제가 확인되었습니다',
-          message: `'${requestTitle}' 요청의 결제가 확인되었습니다. 담당자가 예약 진행을 이어갑니다.`,
+          message: `'${requestTitle}' 요청의 결제가 확인되었습니다. 운영팀이 요청을 진행하며, 자세한 안내는 1:1 문의함에서 드립니다.`,
         };
     }
   }
@@ -1312,7 +1312,7 @@ function buildProxyPaymentCopy(
     default:
       return {
         title: '전화 예약 결제가 환불 처리되었습니다',
-        message: `'${requestTitle}' 요청의 결제가 환불 처리되었습니다. 세부 내용은 담당자 스레드에서 확인해주세요.`,
+        message: `'${requestTitle}' 요청의 결제가 환불 처리되었습니다. 자세한 내용은 1:1 문의함에서 확인해 주세요.`,
       };
   }
 }

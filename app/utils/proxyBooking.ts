@@ -6,6 +6,7 @@ import type {
   ProxyRequest,
   RestaurantServiceOption,
 } from '@/app/types/proxy';
+import type { HotelFormData } from '@/app/schemas/proxyRequestSchema';
 
 export const PROXY_REQUEST_PRICE_KRW = 4500;
 
@@ -23,7 +24,7 @@ export const PROXY_RESTAURANT_SERVICE_OPTION_PRICES: Record<RestaurantServiceOpt
   KUITEI: 9000,
 };
 
-export const PROXY_LINKED_INQUIRY_REQUIRED_ERROR = '전화 예약 문의 스레드가 연결되어 있지 않습니다.';
+export const PROXY_LINKED_INQUIRY_REQUIRED_ERROR = '연결된 1:1 문의를 찾을 수 없습니다.';
 
 const INTERNAL_PROXY_FORM_FIELDS = new Set(['payment_method', 'contact_name', 'contact_phone', 'service_fee_krw', 'linked_inquiry_id']);
 
@@ -125,6 +126,13 @@ const PROXY_FORM_VALUE_LABELS: Record<string, Record<string, string>> = {
 
 function readString(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+export function normalizeProxyHotelDesiredChange(
+  hotelInquiryType: HotelFormData['hotel_inquiry_type'],
+  desiredChange: string | null | undefined
+) {
+  return hotelInquiryType === 'CHANGE' ? readString(desiredChange) : '';
 }
 
 function readNumber(value: unknown) {
@@ -335,7 +343,7 @@ export function buildProxyInquiryInitialMessage(request: {
     '[고객 입력 내용]',
     entries || '- 입력 내용 없음',
     '',
-    '담당자 소통 스레드에서 추가 문의나 진행 상황을 이어서 안내드립니다.',
+    '전화 진행 상황과 결과는 1:1 문의함에서 안내드립니다.',
   ].join('\n');
 }
 

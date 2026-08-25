@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/app/utils/supabase/client';
+import { ProxyBankTransferNotice } from '@/app/components/proxy/ProxyBankTransferNotice';
 import { ArrowLeft, Send, CheckCircle, Clock, XCircle, AlertCircle, Phone } from 'lucide-react';
 import type { ProxyComment, ProxyRequest, ProxyStatus } from '@/app/types/proxy';
 import {
@@ -164,7 +165,7 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
 
     const nextActionMessage = (() => {
         if (request.payment_status === 'WAITING' && paymentMethod === 'bank') {
-            return '아직 입금 대기 상태입니다. 아래 계좌 안내를 확인하고 입금이 완료되면 운영팀이 메시지함 스레드에서 다음 답변을 남깁니다.';
+            return '아직 입금 대기 상태입니다. 아래 계좌로 입금해 주세요. 입금이 확인되면 운영팀이 1:1 문의함으로 안내드립니다.';
         }
 
         if (request.payment_status === 'WAITING') {
@@ -172,18 +173,18 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
         }
 
         if (request.status === 'IN_PROGRESS') {
-            return '현재 운영팀이 실제 전화를 진행 중입니다. 추가 확인이 필요하면 이 스레드나 메시지함에 이어서 답변이 남습니다.';
+            return '현재 운영팀이 전화를 진행하고 있습니다. 진행 상황은 1:1 문의함에서 안내드립니다.';
         }
 
         if (request.status === 'COMPLETED') {
-            return '전화 진행이 완료된 요청입니다. 마지막 답변과 후속 안내를 메시지함 또는 아래 스레드에서 다시 확인해주세요.';
+            return '전화 진행이 완료되었습니다. 결과와 후속 안내는 1:1 문의함에서 확인할 수 있습니다.';
         }
 
         if (request.status === 'CANCELLED') {
             return '취소 또는 반려된 요청입니다. 필요하면 내용을 수정해 새 요청으로 다시 접수할 수 있습니다.';
         }
 
-        return '운영팀이 요청을 확인 중입니다. 진행 결과와 추가 질문 답변은 메시지함과 아래 스레드로 이어집니다.';
+        return '운영팀이 요청을 확인하고 있습니다. 진행 상황과 추가 안내는 1:1 문의함에서 확인할 수 있습니다.';
     })();
 
     return (
@@ -210,7 +211,7 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
 
                 {paymentState === 'completed' && (
                     <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-800">
-                        카드 결제가 확인되었습니다. 운영팀이 요청 내용을 확인한 뒤 답변을 남겨드립니다.
+                        카드 결제가 확인되었습니다. 운영팀이 요청 내용을 확인한 뒤 1:1 문의함으로 안내드립니다.
                     </div>
                 )}
 
@@ -227,7 +228,7 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
                     >
                         <p className="font-bold">결제 확인이 필요합니다.</p>
                         <p className="mt-1">
-                            승인 확인 과정에서 응답이 완료되지 않아 자동 재결제를 막았습니다. 중복 결제를 피하기 위해 새 요청을 만들지 말고, 메시지함에서 운영팀에 주문번호 확인을 요청해주세요.
+                            승인 확인 과정에서 응답이 완료되지 않아 자동 재결제를 막았습니다. 중복 결제를 피하려면 새 요청을 만들지 말고 1:1 문의함에서 주문번호 확인을 요청해 주세요.
                         </p>
                     </div>
                 )}
@@ -236,7 +237,7 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
                     <div className="rounded-2xl border border-blue-100 bg-blue-50/80 px-5 py-4">
                         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                             <div className="min-w-0">
-                                <p className="text-sm font-bold text-blue-900">다음 안내는 메시지함과 이 화면에서 함께 확인할 수 있어요.</p>
+                                <p className="text-sm font-bold text-blue-900">진행 상황과 결과는 1:1 문의함에서 확인할 수 있어요.</p>
                                 <p className="mt-1 text-sm leading-6 text-blue-800">
                                     {nextActionMessage}
                                 </p>
@@ -246,7 +247,7 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
                                     href={`/guest/inbox?inquiryId=${encodeURIComponent(linkedInquiryId)}`}
                                     className="shrink-0 rounded-full bg-white px-4 py-2 text-xs font-bold text-blue-700 ring-1 ring-blue-100 transition-colors hover:bg-blue-100/40"
                                 >
-                                    메시지함 열기
+                                    1:1 문의함 열기
                                 </Link>
                             ) : null}
                         </div>
@@ -258,13 +259,17 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
                     <div className="p-4 border-b border-slate-200 bg-white">
                         <h2 className="font-bold flex items-center gap-2">
                             <Phone size={18} className="text-slate-500" />
-                            담당자 소통 스레드
+                            {isAdmin ? '담당자 소통 스레드' : '전화 진행 안내'}
                         </h2>
-                        <p className="text-xs text-slate-500 mt-1">문의 사항이나 예약 진행 상황에 대해 소통하세요. 메시지함에서도 같은 답변을 확인할 수 있습니다.</p>
+                        <p className="text-xs text-slate-500 mt-1">
+                            {isAdmin
+                                ? '문의 사항이나 예약 진행 상황에 대해 소통하세요. 메시지함에서도 같은 답변을 확인할 수 있습니다.'
+                                : '진행 상황과 결과는 1:1 문의함에서 확인할 수 있습니다.'}
+                        </p>
                     </div>
 
                     <div className="flex-1 p-6 overflow-y-auto space-y-6">
-                        <div className="text-center text-xs text-slate-400 my-4">요청이 접수되었습니다. 담당자가 확인 후 답변드립니다.</div>
+                        <div className="text-center text-xs text-slate-400 my-4">요청이 접수되었습니다. 운영팀이 확인 후 1:1 문의함으로 안내드립니다.</div>
 
                         {comments.map(comment => {
                             const fromMe = comment.author_id === userId;
@@ -358,17 +363,12 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
                     </div>
 
                     {request.payment_channel === 'LOCALLY' && request.payment_status === 'WAITING' && paymentMethod === 'bank' && !isAdmin && (
-                        <div className="mt-4 pt-4 border-t border-slate-100">
-                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                                <div className="text-sm font-bold text-slate-800 mb-2">무통장 입금 안내</div>
-                                <div className="text-xs text-slate-600 mb-3 leading-relaxed">
-                                    서비스 수수료 <span className="font-bold text-blue-600">₩{serviceFee.toLocaleString()}</span>을 아래 계좌로 입금해 주시면, 확인 후 담당자가 전화를 진행합니다.
-                                </div>
-                                <div className="bg-white p-3 rounded text-sm font-mono text-center font-bold border border-slate-200 cursor-text select-all">
-                                    {process.env.NEXT_PUBLIC_BANK_NAME || '카카오뱅크'} {process.env.NEXT_PUBLIC_BANK_ACCOUNT || '3333-01-1234567'}
-                                </div>
-                            </div>
-                        </div>
+                        <ProxyBankTransferNotice
+                            amount={serviceFee}
+                            mode="pending"
+                            title="무통장 입금 안내"
+                            className="mt-4 border-t border-slate-100"
+                        />
                     )}
                 </div>
 

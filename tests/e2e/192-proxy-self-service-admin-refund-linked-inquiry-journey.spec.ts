@@ -91,7 +91,7 @@ test.describe.serial('Release journey 192: proxy self-service -> admin refund ->
       await customerPage.waitForURL(/\/proxy-bookings\/new/, { timeout: 20000 });
       await dismissAnnouncementIfVisible(customerPage);
       await expect(
-        customerPage.getByRole('heading', { name: '일본인이 대신 전화 예약을 도와드립니다' })
+        customerPage.getByRole('heading', { name: '일본 현지 전화, 로컬리가 대신해드려요' })
       ).toBeVisible({ timeout: 20000 });
 
       await customerPage.getByPlaceholder('예: 스시 지로').fill(restaurantName);
@@ -113,28 +113,20 @@ test.describe.serial('Release journey 192: proxy self-service -> admin refund ->
       await customerPage.getByPlaceholder('예: 홍길동').first().fill(customerUser.fullName);
       await customerPage.locator('input[type="number"]').first().fill('2');
       await customerPage.getByPlaceholder('예: 01012345678').first().fill(customerUser.phone);
-      await customerPage.getByRole('radio', { name: /로컬리 자체 결제/ }).check();
       await customerPage.locator('input[type="radio"][value="bank"]').check();
       const paymentSection = customerPage
         .locator('section')
-        .filter({ has: customerPage.getByRole('heading', { name: '결제 방식 선택' }) });
+        .filter({ has: customerPage.getByRole('heading', { name: '결제 방법' }) });
       const paymentContactInputs = paymentSection.locator('input:not([type="radio"])');
       await paymentContactInputs.nth(0).fill(customerUser.fullName);
       await paymentContactInputs.nth(1).fill(customerUser.phone);
 
-      const noticeLabel = customerPage.locator('label').filter({
-        hasText:
-          '유의사항을 확인했고, 예약 가능 여부와 업장 사정에 따라 진행이 제한될 수 있음을 이해했습니다.',
-      });
-      const noticeCheckbox = noticeLabel.locator('input[type="checkbox"]');
       const termsLabel = customerPage.locator('label').filter({
-        hasText: '서비스 기준 및 환불 규정을 확인했고 동의합니다. (필수)',
+        hasText: '서비스 이용 및 환불 규정에 동의합니다. (필수)',
       });
       const termsCheckbox = termsLabel.locator('input[type="checkbox"]');
-      const submitButton = customerPage.getByRole('button', { name: '요청 제출하기' });
+      const submitButton = customerPage.getByRole('button', { name: '요청 접수하기' });
 
-      await noticeLabel.click();
-      await expect(noticeCheckbox).toBeChecked();
       await termsLabel.click();
       await expect(termsCheckbox).toBeChecked();
       await expect(submitButton).toBeEnabled({ timeout: 10000 });
@@ -176,7 +168,7 @@ test.describe.serial('Release journey 192: proxy self-service -> admin refund ->
         timeout: 20000,
       });
       await expect(customerPage.getByText('무통장 입금 안내')).toBeVisible();
-      await expect(customerPage.getByRole('link', { name: '메시지함 열기' })).toHaveAttribute(
+      await expect(customerPage.getByRole('link', { name: '1:1 문의함 열기' })).toHaveAttribute(
         'href',
         new RegExp(`inquiryId=${inquiryId}`)
       );
@@ -251,7 +243,7 @@ test.describe.serial('Release journey 192: proxy self-service -> admin refund ->
       });
       await expect(customerPage.getByText(adminComment)).toBeVisible({ timeout: 15000 });
       await expect(customerPage.getByText('환불 완료')).toBeVisible();
-      await expect(customerPage.getByRole('link', { name: '메시지함 열기' })).toHaveAttribute(
+      await expect(customerPage.getByRole('link', { name: '1:1 문의함 열기' })).toHaveAttribute(
         'href',
         new RegExp(`inquiryId=${inquiryId}`)
       );
