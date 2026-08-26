@@ -105,9 +105,9 @@ export const PUBLIC_EXPERIENCE_CARD_IMAGES = {
     largeKey: "cards/experience-3664-primary-8fd9a9a7c26a-w640-q65.webp",
   },
   "3861": {
-    originUrl: "https://uhinvcydgzqlpnvieyal.supabase.co/storage/v1/object/public/experiences/experience/3fcbedfc-7158-469b-b3ac-5fdfa3ca5ab5/hero/1784023503185_1784023503185-0ndsokia.JPG",
-    smallKey: "cards/experience-3861-primary-ba4fbe63b796-w384-q65.webp",
-    largeKey: "cards/experience-3861-primary-ba4fbe63b796-w640-q65.webp",
+    originUrl: "https://uhinvcydgzqlpnvieyal.supabase.co/storage/v1/object/public/experiences/experience/3fcbedfc-7158-469b-b3ac-5fdfa3ca5ab5/hero/1787639548730_1787639548730-xz6pvcc4.JPG",
+    smallKey: "cards/experience-3861-primary-9fdbcd3739c5-w384-q65.webp",
+    largeKey: "cards/experience-3861-primary-9fdbcd3739c5-w640-q65.webp",
   },
   "3905": {
     originUrl: "https://uhinvcydgzqlpnvieyal.supabase.co/storage/v1/object/public/experiences/experience/f10179e2-567a-416e-956a-67e194ced1ff/hero/1784706273419_1784706273419-fszpdp6t.jpeg",
