@@ -1,7 +1,11 @@
 import { expect, test } from '@playwright/test';
 
 import { ProxyRequestValidationSchema } from '@/app/schemas/proxyRequestSchema';
-import { getProxyFormDisplayEntries, normalizeProxyHotelDesiredChange } from '@/app/utils/proxyBooking';
+import {
+  buildProxyInquiryInitialMessage,
+  getProxyFormDisplayEntries,
+  normalizeProxyHotelDesiredChange,
+} from '@/app/utils/proxyBooking';
 
 const NAVER_PAYMENT = {
   agreed_to_terms: true,
@@ -58,6 +62,7 @@ test.describe('Proxy booking request form schema', () => {
           category: 'TRANSPORT' as const,
           form_data: {
             reservation_type: 'TAXI' as const,
+            business_name: '테스트 택시 업체',
             business_link: 'https://maps.example.test/transport',
             business_phone: '03-1234-5678',
             service_area: '도쿄',
@@ -109,19 +114,19 @@ test.describe('Proxy booking request form schema', () => {
     ];
 
     const businessFieldKeysByCategory = {
-      RESTAURANT: { link: 'google_map_url', phone: 'restaurant_phone' },
-      HOTEL: { link: 'property_link', phone: 'property_phone' },
-      TRANSPORT: { link: 'business_link', phone: 'business_phone' },
-      GENERAL: { link: 'business_link', phone: 'business_phone' },
-      LOST_AND_FOUND: { link: 'location_link', phone: 'location_phone' },
+      RESTAURANT: { link: 'google_map_url', phone: 'restaurant_phone', name: 'restaurant_name' },
+      HOTEL: { link: 'property_link', phone: 'property_phone', name: 'property_name' },
+      TRANSPORT: { link: 'business_link', phone: 'business_phone', name: 'business_name' },
+      GENERAL: { link: 'business_link', phone: 'business_phone', name: 'business_name' },
+      LOST_AND_FOUND: { link: 'location_link', phone: 'location_phone', name: 'location_name' },
     } as const;
 
     for (const payload of payloads) {
       expect(ProxyRequestValidationSchema.safeParse(payload).success, payload.category_data.category).toBe(true);
 
-      const { link, phone } = businessFieldKeysByCategory[payload.category_data.category];
+      const { link, phone, name } = businessFieldKeysByCategory[payload.category_data.category];
 
-      for (const field of [link, phone]) {
+      for (const field of [name, link, phone]) {
         const incompletePayload = JSON.parse(JSON.stringify(payload)) as typeof payload;
         delete (incompletePayload.category_data.form_data as Record<string, unknown>)[field];
         expect(
@@ -238,5 +243,22 @@ test.describe('Proxy booking request form schema', () => {
         hotelInquiryType
       ).toBe(false);
     }
+  });
+
+  test('includes the transport business name in the initial operator inquiry', () => {
+    const message = buildProxyInquiryInitialMessage({
+      category: 'TRANSPORT',
+      formData: {
+        reservation_type: 'TAXI',
+        business_name: '테스트 택시 업체',
+        business_link: 'https://maps.example.test/transport',
+        business_phone: '03-1234-5678',
+      },
+      paymentChannel: 'NAVER',
+      finalAmount: 6000,
+      naverBuyerName: '테스트 구매자',
+    });
+
+    expect(message).toContain('- 업장명: 테스트 택시 업체');
   });
 });

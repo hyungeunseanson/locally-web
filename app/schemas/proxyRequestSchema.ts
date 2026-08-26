@@ -66,6 +66,7 @@ export type HotelFormData = z.infer<typeof HotelFormSchema>;
 
 export const TransportFormSchema = z.object({
   reservation_type: z.enum(['TAXI', 'HOTEL_TAXI', 'SHUTTLE_BUS', 'OTHER']),
+  business_name: z.string().min(1, '업체 이름을 입력해주세요.').max(200, '업체 이름은 200자 이하로 입력해주세요.'),
   business_link: RequiredBusinessLink,
   business_phone: RequiredBusinessPhone,
   service_area: z.string().min(1, '이용 지역을 입력해주세요.').max(200, '이용 지역은 200자 이하로 입력해주세요.'),

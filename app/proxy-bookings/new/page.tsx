@@ -14,6 +14,7 @@ import type {
 } from '@/app/schemas/proxyRequestSchema';
 import type { ProxyCategory, RestaurantServiceOption } from '@/app/types/proxy';
 import { ProxyRequestValidationSchema } from '@/app/schemas/proxyRequestSchema';
+import { useAuth } from '@/app/context/AuthContext';
 import { createClient } from '@/app/utils/supabase/client';
 import { ProxyBankTransferNotice } from '@/app/components/proxy/ProxyBankTransferNotice';
 import { launchCardPayment } from '@/app/utils/payments/card/client';
@@ -88,6 +89,12 @@ const CATEGORY_OPTIONS: CategoryOption[] = [
   },
 ];
 
+const PROXY_BOOKING_LOGIN_CATEGORY_STORAGE_KEY = 'proxy-bookings:new:login-category';
+
+function isProxyCategory(value: string | null): value is ProxyCategory {
+  return CATEGORY_OPTIONS.some((item) => item.id === value);
+}
+
 const SERVICE_POLICY_ITEMS = [
   '업체와 정상적으로 통화가 연결되면 예약이나 문의 결과와 관계없이 서비스가 진행된 것으로 처리될 수 있습니다.',
   '만석, 휴무, 업체 사정 등에 따라 요청이 완료되지 않을 수 있습니다.',
@@ -136,6 +143,7 @@ const DEFAULT_HOTEL_FORM: HotelFormData = {
 
 const DEFAULT_TRANSPORT_FORM: TransportFormData = {
   reservation_type: 'TAXI',
+  business_name: '',
   business_link: '',
   business_phone: '',
   service_area: '',
@@ -579,9 +587,11 @@ function TextareaField({
 export default function NewProxyBooking() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
+  const { user, isLoading: isAuthLoading } = useAuth();
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isLoginRequiredDialogOpen, setIsLoginRequiredDialogOpen] = useState(false);
   const [category, setCategory] = useState<ProxyCategory>('RESTAURANT');
   const [paymentChannel, setPaymentChannel] = useState<PaymentChannel>('NAVER');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
@@ -598,6 +608,17 @@ export default function NewProxyBooking() {
   const [transportForm, setTransportForm] = useState<TransportFormData>(DEFAULT_TRANSPORT_FORM);
   const [generalForm, setGeneralForm] = useState<GeneralInquiryFormData>(DEFAULT_GENERAL_FORM);
   const [lostForm, setLostForm] = useState<LostAndFoundFormData>(DEFAULT_LOST_FORM);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const savedCategory = window.sessionStorage.getItem(PROXY_BOOKING_LOGIN_CATEGORY_STORAGE_KEY);
+    window.sessionStorage.removeItem(PROXY_BOOKING_LOGIN_CATEGORY_STORAGE_KEY);
+
+    if (isProxyCategory(savedCategory)) {
+      setCategory(savedCategory);
+    }
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -643,6 +664,43 @@ export default function NewProxyBooking() {
 
   const updateLostField = <K extends keyof LostAndFoundFormData>(key: K, value: LostAndFoundFormData[K]) => {
     setLostForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const openLoginRequiredDialog = async () => {
+    if (user) return;
+
+    if (isAuthLoading) {
+      const {
+        data: { user: resolvedUser },
+      } = await supabase.auth.getUser();
+
+      if (resolvedUser) return;
+    }
+
+    setIsLoginRequiredDialogOpen(true);
+  };
+
+  const moveToLogin = () => {
+    if (typeof window !== 'undefined') {
+      try {
+        window.sessionStorage.setItem(PROXY_BOOKING_LOGIN_CATEGORY_STORAGE_KEY, category);
+      } catch {
+        // 로그인 이동 자체는 저장소를 사용할 수 없는 환경에서도 계속합니다.
+      }
+    }
+
+    router.push(`/login?returnUrl=${encodeURIComponent('/proxy-bookings/new')}`);
+  };
+
+  const handleBusinessNameFocus = () => {
+    void openLoginRequiredDialog();
+  };
+
+  const handleUnauthenticatedSubmitClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (user) return;
+
+    event.preventDefault();
+    void openLoginRequiredDialog();
   };
 
   const categoryData = useMemo(() => {
@@ -698,6 +756,7 @@ export default function NewProxyBooking() {
           category: 'TRANSPORT' as const,
           form_data: {
             reservation_type: transportForm.reservation_type,
+            business_name: transportForm.business_name.trim(),
             business_link: transportForm.business_link.trim(),
             business_phone: transportForm.business_phone.trim(),
             service_area: transportForm.service_area.trim(),
@@ -852,39 +911,38 @@ export default function NewProxyBooking() {
     setError(null);
 
     const requiresLocallyPayment = paymentChannel === 'LOCALLY';
-    const payload = {
-      agreed_to_terms: agreedToTerms,
-      payment_channel: paymentChannel,
-      ...(paymentChannel === 'NAVER' ? { naver_buyer_name: naverBuyerName.trim() } : {}),
-      ...(requiresLocallyPayment
-        ? {
-            payment_method: paymentMethod,
-            contact_name: contactName.trim(),
-            contact_phone: contactPhone.trim(),
-          }
-        : {}),
-      category_data: categoryData,
-    };
-
-    const validation = ProxyRequestValidationSchema.safeParse(payload);
-    if (!validation.success) {
-      const firstError = validation.error.issues[0];
-      setError(firstError?.message || '입력값을 다시 확인해주세요.');
-      setLoading(false);
-      return;
-    }
-
-    let readiness: CardReadyResponse | null = null;
-
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
       if (!user) {
-        router.push('/login');
+        setIsLoginRequiredDialogOpen(true);
         return;
       }
+
+      const payload = {
+        agreed_to_terms: agreedToTerms,
+        payment_channel: paymentChannel,
+        ...(paymentChannel === 'NAVER' ? { naver_buyer_name: naverBuyerName.trim() } : {}),
+        ...(requiresLocallyPayment
+          ? {
+              payment_method: paymentMethod,
+              contact_name: contactName.trim(),
+              contact_phone: contactPhone.trim(),
+            }
+          : {}),
+        category_data: categoryData,
+      };
+
+      const validation = ProxyRequestValidationSchema.safeParse(payload);
+      if (!validation.success) {
+        const firstError = validation.error.issues[0];
+        setError(firstError?.message || '입력값을 다시 확인해주세요.');
+        return;
+      }
+
+      let readiness: CardReadyResponse | null = null;
 
       if (requiresLocallyPayment && paymentMethod === 'card') {
         const readinessRes = await fetch('/api/payment/card-ready', { cache: 'no-store' });
@@ -978,8 +1036,10 @@ export default function NewProxyBooking() {
                 <InputField
                   label="식당 이름"
                   required
+                  readOnly={!user}
                   placeholder="예: 스시 지로"
                   value={restaurantForm.restaurant_name}
+                  onFocus={handleBusinessNameFocus}
                   onChange={(event) => updateRestaurantField('restaurant_name', event.target.value)}
                   className="md:col-span-2"
                 />
@@ -1111,9 +1171,11 @@ export default function NewProxyBooking() {
                 <InputField
                   label="숙소 이름"
                   required
+                  readOnly={!user}
                   className="md:col-span-2"
                   placeholder="예: 오리엔탈 호텔 도쿄 베이"
                   value={hotelForm.property_name}
+                  onFocus={handleBusinessNameFocus}
                   onChange={(event) => updateHotelField('property_name', event.target.value)}
                 />
                 <InputField
@@ -1236,6 +1298,16 @@ export default function NewProxyBooking() {
           <div className="space-y-6">
             <FormSubsection title="업장 정보를 알려주세요">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <InputField
+                  label="업체 이름"
+                  required
+                  readOnly={!user}
+                  className="md:col-span-2"
+                  placeholder="예: 도쿄 MK 택시"
+                  value={transportForm.business_name}
+                  onFocus={handleBusinessNameFocus}
+                  onChange={(event) => updateTransportField('business_name', event.target.value)}
+                />
                 <InputField
                   label="업장 링크 주소"
                   required
@@ -1372,8 +1444,10 @@ export default function NewProxyBooking() {
                 <InputField
                   label="업체 이름"
                   required
+                  readOnly={!user}
                   className="md:col-span-2"
                   value={generalForm.business_name}
+                  onFocus={handleBusinessNameFocus}
                   onChange={(event) => updateGeneralField('business_name', event.target.value)}
                 />
                 <InputField
@@ -1460,9 +1534,11 @@ export default function NewProxyBooking() {
                 <InputField
                   label="분실 장소"
                   required
+                  readOnly={!user}
                   className="md:col-span-2"
                   placeholder="예: ○○ 호텔 로비"
                   value={lostForm.location_name}
+                  onFocus={handleBusinessNameFocus}
                   onChange={(event) => updateLostField('location_name', event.target.value)}
                 />
                 <InputField
@@ -1577,6 +1653,41 @@ export default function NewProxyBooking() {
           strategy="afterInteractive"
         />
       )}
+
+      {isLoginRequiredDialogOpen ? (
+        <div className="fixed inset-0 z-[210] flex items-center justify-center bg-slate-900/45 p-4" data-testid="proxy-login-required-dialog">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="proxy-login-required-title"
+            className="w-full max-w-sm rounded-[24px] border border-slate-200 bg-white p-5 shadow-2xl sm:p-6"
+          >
+            <h2 id="proxy-login-required-title" className="text-lg font-black text-slate-900">
+              로그인이 필요합니다
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              전화 대행 신청은 로그인 후 이용할 수 있습니다.
+            </p>
+            <div className="mt-5 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setIsLoginRequiredDialogOpen(false)}
+                className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                autoFocus
+                onClick={moveToLogin}
+                className="flex-1 rounded-xl bg-black px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-800"
+              >
+                로그인/회원가입하기
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <button
         onClick={() => router.back()}
@@ -1848,6 +1959,7 @@ export default function NewProxyBooking() {
           <button
             disabled={loading || !agreedToTerms || Boolean(pendingCardPayment)}
             type="submit"
+            onClick={handleUnauthenticatedSubmitClick}
             className="flex w-full items-center justify-center gap-2 rounded-2xl bg-black py-4 text-lg font-bold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
           >
             {loading ? <Loader2 size={20} className="animate-spin" /> : null}

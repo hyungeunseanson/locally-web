@@ -21,6 +21,12 @@ test.describe('Proxy booking intake UX', () => {
     await expect(page.getByText('리뷰 확인은')).toHaveCount(0);
     await expect(page.getByRole('heading', { name: '서비스 안내' })).toHaveCount(0);
 
+    await page.getByLabel('서비스 이용 및 환불 규정에 동의합니다. (필수)').check();
+    await page.getByRole('button', { name: '요청 접수하기' }).click();
+    await expect(page.getByTestId('proxy-login-required-dialog')).toBeVisible();
+    await expect(page.getByText('식당 이름을 입력해주세요.')).toHaveCount(0);
+    await page.getByRole('button', { name: '취소' }).click();
+
     for (const category of ['식당 예약', '숙소 문의', '교통 문의', '현지 업체 문의', '분실물 문의']) {
       await expect(page.getByText(category, { exact: true })).toBeVisible();
     }
@@ -30,6 +36,24 @@ test.describe('Proxy booking intake UX', () => {
       await expect(page.getByLabel('업장 링크 주소')).toHaveAttribute('required', '');
       await expect(page.getByLabel('업장 링크 주소')).toHaveAttribute('type', 'url');
       await expect(page.getByLabel('업장 전화번호')).toHaveAttribute('required', '');
+    }
+
+    await page.getByText('교통 문의', { exact: true }).click();
+    await expect(page.getByLabel('업체 이름')).toHaveAttribute('required', '');
+
+    for (const [category, fieldLabel] of [
+      ['식당 예약', '식당 이름'],
+      ['숙소 문의', '숙소 이름'],
+      ['교통 문의', '업체 이름'],
+      ['현지 업체 문의', '업체 이름'],
+      ['분실물 문의', '분실 장소'],
+    ] as const) {
+      await page.getByText(category, { exact: true }).click();
+      await page.getByLabel(fieldLabel).focus();
+      await expect(page.getByTestId('proxy-login-required-dialog')).toBeVisible();
+      await expect(page.getByRole('heading', { name: '로그인이 필요합니다' })).toBeVisible();
+      await page.getByRole('button', { name: '취소' }).click();
+      await expect(page.getByTestId('proxy-login-required-dialog')).toHaveCount(0);
     }
 
     await page.getByText('숙소 문의', { exact: true }).click();
@@ -54,5 +78,16 @@ test.describe('Proxy booking intake UX', () => {
     await page.locator('input[value="NAVER"]').check();
     await expect(page.getByTestId('proxy-bank-transfer-notice')).toHaveCount(0);
     await expect(page.getByLabel('구매자 이름')).toBeVisible();
+
+    await page.getByText('교통 문의', { exact: true }).click();
+    await page.getByLabel('업체 이름').focus();
+    await Promise.all([
+      page.waitForURL(/\/login\?returnUrl=/),
+      page.getByRole('button', { name: '로그인/회원가입하기' }).click(),
+    ]);
+
+    await page.goto('/proxy-bookings/new', { waitUntil: 'networkidle' });
+    await dismissAnnouncementIfVisible(page);
+    await expect(page.getByRole('heading', { name: '교통 문의 신청 정보' })).toBeVisible();
   });
 });
