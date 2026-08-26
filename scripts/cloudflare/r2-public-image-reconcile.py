@@ -17,6 +17,11 @@ from botocore.exceptions import ClientError
 
 EXPECTED_BUCKET = "locally-public-experience-canary"
 EXPECTED_BASE_URL = "https://media-canary.locally-travel.com"
+PUBLIC_VERIFICATION_RETRY_DELAYS_SECONDS = (2, 4, 8, 16, 30, 30, 30, 30, 30, 30, 30, 30)
+
+
+def is_retryable_public_status(status):
+    return status in (403, 404, 429) or 500 <= status <= 599
 
 
 def require_environment(name):
@@ -71,12 +76,15 @@ def append_github_output(name, value):
 
 
 def verify_public_object(base_url, key, expected_size):
-    last_error = None
-    for attempt in range(6):
+    attempts = len(PUBLIC_VERIFICATION_RETRY_DELAYS_SECONDS) + 1
+    for attempt in range(attempts):
         try:
             request = urllib.request.Request(f"{base_url}/{key}", method="HEAD")
             with urllib.request.urlopen(request, timeout=30) as response:
                 if response.status != 200:
+                    if is_retryable_public_status(response.status) and attempt < attempts - 1:
+                        time.sleep(PUBLIC_VERIFICATION_RETRY_DELAYS_SECONDS[attempt])
+                        continue
                     raise RuntimeError(f"HTTP {response.status}")
                 content_type = response.headers.get("Content-Type", "").split(";", 1)[0]
                 if content_type != "image/webp":
@@ -85,11 +93,14 @@ def verify_public_object(base_url, key, expected_size):
                 if content_length and int(content_length) != expected_size:
                     raise RuntimeError("content length mismatch")
                 return
-        except (RuntimeError, urllib.error.HTTPError, urllib.error.URLError, OSError) as error:
-            last_error = error
-            if attempt < 5:
-                time.sleep(2 ** attempt)
-    raise RuntimeError(f"Public R2 verification failed for {key}: {last_error}")
+        except urllib.error.HTTPError as error:
+            if is_retryable_public_status(error.code) and attempt < attempts - 1:
+                time.sleep(PUBLIC_VERIFICATION_RETRY_DELAYS_SECONDS[attempt])
+                continue
+            raise RuntimeError(f"Public R2 verification failed for {key}: HTTP {error.code}") from error
+        except (urllib.error.URLError, OSError) as error:
+            raise RuntimeError(f"Public R2 verification failed for {key}: {error}") from error
+    raise RuntimeError(f"Public R2 verification failed for {key}: retry limit exceeded")
 
 
 def main():
