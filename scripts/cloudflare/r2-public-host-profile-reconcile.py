@@ -25,7 +25,7 @@ ACTIVE_KEY_PATTERN = re.compile(
     r"hosts/(?P<host_id>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/"
     r"(?P<url_hash>[a-f0-9]{12})/avatar-w(?P<width>128|256)-q80\.webp"
 )
-PUBLIC_RETRY_DELAYS = (2, 4, 8, 16, 30, 30, 30, 30, 30, 30, 30, 30)
+PUBLIC_RETRY_DELAYS = (2, 4, 8, 16, 30, 30, 30, 30, 30, 30, 30, 30, 30)
 
 
 def require_environment(name):
