@@ -1,0 +1,246 @@
+name: Public Host Profile Image Reconciliation
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_visible_hosts:
+        description: Initial Production visible host guard
+        required: true
+        default: "48"
+      expected_eligible_hosts:
+        description: Initial Production eligible profile image guard
+        required: true
+        default: "45"
+      expected_missing_photos:
+        description: Initial Production missing photo guard
+        required: true
+        default: "3"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-host-profile-image-reconciliation
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: production-profile-media-sync
+    outputs:
+      drift: ${{ steps.audit.outputs.drift }}
+      snapshot_hash: ${{ steps.audit.outputs.snapshot_hash }}
+      eligible_host_count: ${{ steps.audit.outputs.eligible_host_count }}
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+
+      - name: Test fail-closed inventory boundaries
+        run: node --test scripts/cloudflare/reconcile-public-host-profile-images.test.mjs
+
+      - name: Audit Production public host profile drift
+        id: audit
+        run: node scripts/cloudflare/reconcile-public-host-profile-images.mjs audit --output="${RUNNER_TEMP}/public-host-profile-sync"
+
+      - name: Enforce initial Production target counts
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "${{ steps.audit.outputs.visible_host_count }}" == "${{ inputs.expected_visible_hosts }}" ]]
+          [[ "${{ steps.audit.outputs.eligible_host_count }}" == "${{ inputs.expected_eligible_hosts }}" ]]
+          [[ "${{ steps.audit.outputs.missing_photo_count }}" == "${{ inputs.expected_missing_photos }}" ]]
+          [[ "${{ steps.audit.outputs.unexpected_photo_count }}" == "0" ]]
+          [[ "${{ steps.audit.outputs.excluded_host_count }}" == "0" ]]
+
+      - name: Finish without R2 credentials when no drift exists
+        if: steps.audit.outputs.drift != 'true'
+        shell: bash
+        run: |
+          {
+            echo "### Public host profile image reconciliation"
+            echo "- Drift: none"
+            echo "- R2 credentials: not loaded"
+            echo "- Downloads, transforms, uploads, stale moves: skipped"
+            echo "- Pull request: skipped"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  reconcile:
+    needs: audit
+    if: needs.audit.outputs.drift == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: production-profile-media-sync
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      R2_ENDPOINT: ${{ vars.R2_ENDPOINT }}
+      ACTIVE_R2_BUCKET: locally-public-host-profiles
+      STALE_R2_BUCKET: locally-private-host-profile-stale
+      R2_PUBLIC_BASE_URL: https://profiles-media.locally-travel.com
+      ACTIVE_R2_ACCESS_KEY_ID: ${{ secrets.ACTIVE_R2_ACCESS_KEY_ID }}
+      ACTIVE_R2_SECRET_ACCESS_KEY: ${{ secrets.ACTIVE_R2_SECRET_ACCESS_KEY }}
+      STALE_R2_ACCESS_KEY_ID: ${{ secrets.STALE_R2_ACCESS_KEY_ID }}
+      STALE_R2_SECRET_ACCESS_KEY: ${{ secrets.STALE_R2_SECRET_ACCESS_KEY }}
+      BOTO3_VERSION: 1.43.70
+      SYNC_BRANCH: automation/public-host-profile-image-reconciliation
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          fetch-depth: 0
+
+      - name: Validate fixed configuration
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for name in NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY R2_ENDPOINT ACTIVE_R2_ACCESS_KEY_ID ACTIVE_R2_SECRET_ACCESS_KEY STALE_R2_ACCESS_KEY_ID STALE_R2_SECRET_ACCESS_KEY; do
+            [[ -n "${!name:-}" ]]
+          done
+          [[ "$NEXT_PUBLIC_SUPABASE_URL" == "https://uhinvcydgzqlpnvieyal.supabase.co" ]]
+          [[ "$R2_ENDPOINT" == "https://d56f5f850c6f7dc5779a7c2054aca5a5.r2.cloudflarestorage.com" ]]
+          [[ "$ACTIVE_R2_BUCKET" == "locally-public-host-profiles" ]]
+          [[ "$STALE_R2_BUCKET" == "locally-private-host-profile-stale" ]]
+          [[ "$R2_PUBLIC_BASE_URL" == "https://profiles-media.locally-travel.com" ]]
+
+      - name: Install pinned R2 client
+        shell: bash
+        run: |
+          python3 -m venv "${RUNNER_TEMP}/r2-venv"
+          "${RUNNER_TEMP}/r2-venv/bin/python" -m pip install --disable-pip-version-check --no-input "boto3==${BOTO3_VERSION}"
+          echo "${RUNNER_TEMP}/r2-venv/bin" >> "$GITHUB_PATH"
+
+      - name: Verify credentials are confined to both profile buckets
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os
+          import boto3
+          from botocore.config import Config
+          from botocore.exceptions import ClientError
+          endpoint = os.environ['R2_ENDPOINT']
+          clients = {}
+          for prefix, bucket in [('ACTIVE', os.environ['ACTIVE_R2_BUCKET']), ('STALE', os.environ['STALE_R2_BUCKET'])]:
+              client = boto3.client('s3', endpoint_url=endpoint, aws_access_key_id=os.environ[f'{prefix}_R2_ACCESS_KEY_ID'], aws_secret_access_key=os.environ[f'{prefix}_R2_SECRET_ACCESS_KEY'], region_name='auto', config=Config(signature_version='s3v4'))
+              client.list_objects_v2(Bucket=bucket, MaxKeys=1)
+              clients[prefix] = client
+          for prefix, forbidden in [('ACTIVE', os.environ['STALE_R2_BUCKET']), ('STALE', os.environ['ACTIVE_R2_BUCKET'])]:
+              try:
+                  clients[prefix].list_objects_v2(Bucket=forbidden, MaxKeys=1)
+              except ClientError as error:
+                  if error.response.get('Error', {}).get('Code') not in {'AccessDenied', '403'}:
+                      raise
+              else:
+                  raise RuntimeError(f'{prefix} credential has cross-bucket access')
+          PY
+
+      - name: Plan candidate manifest without downloading images
+        run: node scripts/cloudflare/reconcile-public-host-profile-images.mjs plan --output="${RUNNER_TEMP}/public-host-profile-sync"
+
+      - name: Identify missing, restorable, and stale active objects
+        id: r2_plan
+        shell: bash
+        run: |
+          python3 scripts/cloudflare/r2-public-host-profile-reconcile.py \
+            --mode plan \
+            --plan "${RUNNER_TEMP}/public-host-profile-sync/specifications.json" \
+            --output "${RUNNER_TEMP}/public-host-profile-sync/r2-plan.json"
+
+      - name: Install pinned project dependencies
+        run: npm ci --ignore-scripts=false
+
+      - name: Download and transform only missing variants
+        id: transform
+        shell: bash
+        run: |
+          node scripts/cloudflare/reconcile-public-host-profile-images.mjs transform \
+            --plan="${RUNNER_TEMP}/public-host-profile-sync/specifications.json" \
+            --missing="${RUNNER_TEMP}/public-host-profile-sync/r2-plan.json" \
+            --output="${RUNNER_TEMP}/public-host-profile-sync"
+
+      - name: Reject Production changes before R2 mutation
+        run: node scripts/cloudflare/reconcile-public-host-profile-images.mjs verify-snapshot --plan="${RUNNER_TEMP}/public-host-profile-sync/plan.json"
+
+      - name: Restore, upload, verify, and privately quarantine stale objects
+        id: r2_apply
+        shell: bash
+        run: |
+          python3 scripts/cloudflare/r2-public-host-profile-reconcile.py \
+            --mode apply \
+            --plan "${RUNNER_TEMP}/public-host-profile-sync/specifications.json" \
+            --expected "${RUNNER_TEMP}/public-host-profile-sync/specifications.json" \
+            --objects "${RUNNER_TEMP}/public-host-profile-sync/objects.json" \
+            --r2-plan "${RUNNER_TEMP}/public-host-profile-sync/r2-plan.json" \
+            --output "${RUNNER_TEMP}/public-host-profile-sync/r2-result.json"
+
+      - name: Reject Production changes after R2 mutation
+        run: node scripts/cloudflare/reconcile-public-host-profile-images.mjs verify-snapshot --plan="${RUNNER_TEMP}/public-host-profile-sync/plan.json"
+
+      - name: Apply verified candidate manifest
+        shell: bash
+        run: |
+          cp "${RUNNER_TEMP}/public-host-profile-sync/publicHostProfileImages.generated.json" app/data/publicHostProfileImages.generated.json
+          git diff --check
+
+      - name: Install pinned Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run profile and existing Cloudflare image boundary tests
+        run: >-
+          npx playwright test -c playwright.cloudflare-images.config.ts
+          tests/e2e/226-cloudflare-image-canary.spec.ts
+          tests/e2e/227-cloudflare-public-card-images.spec.ts
+          tests/e2e/228-cloudflare-public-detail-images.spec.ts
+          tests/e2e/233-cloudflare-public-host-profile-images.spec.ts
+          tests/e2e/234-cloudflare-public-host-profile-purge-boundary.spec.ts
+          --project=chromium --workers=1
+
+      - name: Create or update one manifest pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if git diff --quiet -- app/data/publicHostProfileImages.generated.json; then
+            echo "Verified drift produced no profile manifest change." >&2
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -C "$SYNC_BRANCH"
+          git add app/data/publicHostProfileImages.generated.json
+          git commit -m "chore: reconcile public host profile image manifest"
+          git fetch origin "${SYNC_BRANCH}:refs/remotes/origin/${SYNC_BRANCH}" || true
+          git push --force-with-lease origin "HEAD:refs/heads/${SYNC_BRANCH}"
+          existing_pr="$(gh pr list --state open --head "$SYNC_BRANCH" --json number --jq '.[0].number // empty')"
+          if [[ -n "$existing_pr" ]]; then
+            gh pr comment "$existing_pr" --body "Updated from verified public host profile reconciliation run ${GITHUB_RUN_ID}."
+          else
+            gh pr create --base main --head "$SYNC_BRANCH" --title "chore: reconcile public host profile image manifest" --body "Verified manifest-only update. Production keeps exact-URL Supabase fallback until this PR is manually merged."
+          fi
+
+      - name: Publish non-sensitive summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### Public host profile reconciliation"
+            echo "- Eligible hosts: ${{ needs.audit.outputs.eligible_host_count }}"
+            echo "- Expected active objects: ${{ steps.r2_plan.outputs.expected_count || '0' }}"
+            echo "- Source images downloaded: ${{ steps.transform.outputs.source_download_count || '0' }}"
+            echo "- Variants generated: ${{ steps.transform.outputs.transformed_object_count || '0' }}"
+            echo "- Active objects uploaded: ${{ steps.r2_apply.outputs.uploaded_count || '0' }}"
+            echo "- Objects restored from private stale: ${{ steps.r2_apply.outputs.restored_count || '0' }}"
+            echo "- Objects moved to private stale: ${{ steps.r2_apply.outputs.quarantined_count || '0' }}"
+            echo "- Active parity: ${{ steps.r2_apply.outputs.parity || 'not-run' }}"
+            echo "- Direct push to main: disabled"
+            echo "- Automatic Production deploy: disabled"
+            echo "- Result: ${{ job.status }}"
+          } >> "$GITHUB_STEP_SUMMARY"

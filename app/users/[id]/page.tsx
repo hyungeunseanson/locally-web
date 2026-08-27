@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import React, { use, useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
@@ -16,6 +15,7 @@ import {
 } from '@/app/utils/hostVisibility';
 import { formatAgeBand, formatDemographicGender } from '@/app/utils/demographics';
 import { fetchPublicDemographics } from '@/app/utils/publicDemographicsClient';
+import PublicHostProfileImage from '@/app/components/PublicHostProfileImage';
 
 type PublicHostProfile = {
   full_name: string | null;
@@ -220,10 +220,10 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                 <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden bg-slate-100 mb-4 md:mb-6">
                   {profile?.avatar_url ? (
                     <div className="relative w-full h-full">
-                      <Image
-                        src={profile.avatar_url}
+                      <PublicHostProfileImage
+                        hostId={resolvedParams.id}
+                        originImageUrl={profile.avatar_url}
                         alt={profile?.full_name || 'Host profile'}
-                        fill
                         loading="eager"
                         sizes="(max-width: 768px) 96px, 128px"
                         className="object-cover"

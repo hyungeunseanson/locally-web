@@ -1,13 +1,13 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import Image from 'next/image';
 import { X, Star, Briefcase, Globe, Music, MessageCircle, User } from 'lucide-react';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { formatLanguageLevelLabel, getLocalizedLanguageLabel } from '@/app/utils/languageLevels';
 import SuperhostBadgeTrigger from '@/app/components/SuperhostBadgeTrigger';
 import { formatAgeBand, formatDemographicGender } from '@/app/utils/demographics';
 import { fetchPublicDemographics, type PublicDemographics } from '@/app/utils/publicDemographicsClient';
+import PublicHostProfileImage from '@/app/components/PublicHostProfileImage';
 
 type HostModalData = {
   hostId?: string;
@@ -217,12 +217,11 @@ export default function HostProfileModal({ isOpen, onClose, host }: HostProfileM
             <div className="relative mb-2.5 md:mb-4">
               <div className="relative w-20 h-20 md:w-32 md:h-32 rounded-full overflow-hidden shadow-lg border-4 border-white">
                 {host.avatarUrl ? (
-                  <Image
-                    src={host.avatarUrl}
+                  <PublicHostProfileImage
+                    hostId={host.hostId}
+                    originImageUrl={host.avatarUrl}
                     className="object-cover"
-                    fill
                     sizes="(max-width: 768px) 96px, 128px"
-                    unoptimized
                     alt={`${host.name} ${t('exp_host_modal_title')}`}
                   />
                 ) : (
