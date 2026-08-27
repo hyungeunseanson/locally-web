@@ -9,8 +9,8 @@ import { useWishlist } from '@/app/hooks/useWishlist';
 import ExpMainContent from './components/ExpMainContent';
 import ExpSidebar from './components/ExpSidebar';
 import StickyActionSheet from './components/StickyActionSheet';
-import Image from 'next/image';
 import PublicExperienceDetailImage from '@/app/components/PublicExperienceDetailImage';
+import PublicHostProfileImage from '@/app/components/PublicHostProfileImage';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 import { getContent } from '@/app/utils/contentHelper'; // 🟢 추가
@@ -463,7 +463,7 @@ export default function ExperienceClient({
               <div className="w-12 h-12 rounded-full overflow-hidden bg-slate-200 border border-slate-200 flex items-center justify-center">
                 {hostProfile?.avatar_url ? (
                   <div className="relative w-full h-full">
-                    <Image src={hostProfile.avatar_url} fill sizes="(max-width: 768px) 40px, 48px" unoptimized className="object-cover" alt="Host avatar" />
+                    <PublicHostProfileImage hostId={hostProfile.id} originImageUrl={hostProfile.avatar_url} sizes="(max-width: 768px) 40px, 48px" className="object-cover" alt="Host avatar" />
                   </div>
                 ) : (
                   <span className="text-slate-400 text-sm font-bold">{(hostProfile?.name || 'H').slice(0, 1)}</span>
@@ -557,7 +557,7 @@ export default function ExperienceClient({
               <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-200 border border-slate-200 flex items-center justify-center">
                 {hostProfile?.avatar_url ? (
                   <div className="relative w-full h-full">
-                    <Image src={hostProfile.avatar_url} fill sizes="(max-width: 768px) 40px, 48px" unoptimized className="object-cover" alt="Host avatar" />
+                    <PublicHostProfileImage hostId={hostProfile.id} originImageUrl={hostProfile.avatar_url} sizes="(max-width: 768px) 40px, 48px" className="object-cover" alt="Host avatar" />
                   </div>
                 ) : (
                   <span className="text-slate-400 text-xs font-bold">{(hostProfile?.name || 'H').slice(0, 1)}</span>

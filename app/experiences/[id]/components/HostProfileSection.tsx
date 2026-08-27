@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import Image from 'next/image';
 import { User, Globe } from 'lucide-react';
 import HostProfileModal from './HostProfileModal';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { getLocalizedLanguageLabel } from '@/app/utils/languageLevels';
 import SuperhostBadgeTrigger from '@/app/components/SuperhostBadgeTrigger';
+import PublicHostProfileImage from '@/app/components/PublicHostProfileImage';
 
 interface HostProfileProps {
   hostId?: string;
@@ -48,7 +48,7 @@ export default function HostProfileSection(props: HostProfileProps) {
           <div className="pointer-events-none relative z-10">
             <div className="relative w-[80px] h-[80px] md:w-[96px] md:h-[96px] rounded-full overflow-hidden bg-slate-200 border border-slate-200 mx-auto mb-3 md:mb-4 flex items-center justify-center">
               {props.avatarUrl ? (
-                <Image src={props.avatarUrl} className="object-cover" alt={props.name} fill sizes="(max-width: 768px) 80px, 96px" unoptimized />
+                <PublicHostProfileImage hostId={props.hostId} originImageUrl={props.avatarUrl} className="object-cover" alt={props.name} sizes="(max-width: 768px) 80px, 96px" />
               ) : (
                 <User className="text-slate-300 w-10 h-10 md:w-12 md:h-12" />
               )}

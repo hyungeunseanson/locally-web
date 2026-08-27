@@ -1,0 +1,93 @@
+name: Purge One Host R2 Profile Namespace
+
+on:
+  workflow_dispatch:
+    inputs:
+      host_id:
+        description: Canonical public host UUID
+        required: true
+      confirmation:
+        description: Type DELETE ALL R2 PROFILE COPIES
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-host-profile-image-reconciliation
+  cancel-in-progress: false
+
+jobs:
+  purge:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: production-profile-media-sync
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      R2_ENDPOINT: ${{ vars.R2_ENDPOINT }}
+      ACTIVE_R2_BUCKET: locally-public-host-profiles
+      STALE_R2_BUCKET: locally-private-host-profile-stale
+      R2_PUBLIC_BASE_URL: https://profiles-media.locally-travel.com
+      ACTIVE_R2_ACCESS_KEY_ID: ${{ secrets.ACTIVE_R2_ACCESS_KEY_ID }}
+      ACTIVE_R2_SECRET_ACCESS_KEY: ${{ secrets.ACTIVE_R2_SECRET_ACCESS_KEY }}
+      STALE_R2_ACCESS_KEY_ID: ${{ secrets.STALE_R2_ACCESS_KEY_ID }}
+      STALE_R2_SECRET_ACCESS_KEY: ${{ secrets.STALE_R2_SECRET_ACCESS_KEY }}
+      CLOUDFLARE_ZONE_ID: ${{ vars.CLOUDFLARE_ZONE_ID }}
+      CLOUDFLARE_CACHE_PURGE_TOKEN: ${{ secrets.CLOUDFLARE_CACHE_PURGE_TOKEN }}
+      BOTO3_VERSION: 1.43.70
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+
+      - name: Validate confirmation and current Production eligibility
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "${{ inputs.confirmation }}" == "DELETE ALL R2 PROFILE COPIES" ]]
+          node scripts/cloudflare/reconcile-public-host-profile-images.mjs purge-check --host-id="${{ inputs.host_id }}" --output="${RUNNER_TEMP}/purge-first"
+
+      - name: Install pinned R2 client
+        shell: bash
+        run: |
+          python3 -m venv "${RUNNER_TEMP}/r2-venv"
+          "${RUNNER_TEMP}/r2-venv/bin/python" -m pip install --disable-pip-version-check --no-input "boto3==${BOTO3_VERSION}"
+          echo "${RUNNER_TEMP}/r2-venv/bin" >> "$GITHUB_PATH"
+
+      - name: Verify credentials are confined to both profile buckets
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os
+          import boto3
+          from botocore.config import Config
+          from botocore.exceptions import ClientError
+          endpoint = os.environ['R2_ENDPOINT']
+          clients = {}
+          for prefix, bucket in [('ACTIVE', os.environ['ACTIVE_R2_BUCKET']), ('STALE', os.environ['STALE_R2_BUCKET'])]:
+              client = boto3.client('s3', endpoint_url=endpoint, aws_access_key_id=os.environ[f'{prefix}_R2_ACCESS_KEY_ID'], aws_secret_access_key=os.environ[f'{prefix}_R2_SECRET_ACCESS_KEY'], region_name='auto', config=Config(signature_version='s3v4'))
+              client.list_objects_v2(Bucket=bucket, MaxKeys=1)
+              clients[prefix] = client
+          for prefix, forbidden in [('ACTIVE', os.environ['STALE_R2_BUCKET']), ('STALE', os.environ['ACTIVE_R2_BUCKET'])]:
+              try:
+                  clients[prefix].list_objects_v2(Bucket=forbidden, MaxKeys=1)
+              except ClientError as error:
+                  if error.response.get('Error', {}).get('Code') not in {'AccessDenied', '403'}:
+                      raise
+              else:
+                  raise RuntimeError(f'{prefix} credential has cross-bucket access')
+          PY
+
+      - name: Revalidate Production immediately before deletion
+        shell: bash
+        run: |
+          node scripts/cloudflare/reconcile-public-host-profile-images.mjs purge-check --host-id="${{ inputs.host_id }}" --output="${RUNNER_TEMP}/purge-second"
+          node -e "const fs=require('fs');const a=JSON.parse(fs.readFileSync(process.argv[1]));const b=JSON.parse(fs.readFileSync(process.argv[2]));if(a.snapshotHash!==b.snapshotHash||a.hostId!==b.hostId||!b.purgeAllowed)process.exit(1)" "${RUNNER_TEMP}/purge-first/purge-check.json" "${RUNNER_TEMP}/purge-second/purge-check.json"
+
+      - name: Delete exact host namespace from active and private stale buckets
+        shell: bash
+        run: |
+          python3 scripts/cloudflare/r2-public-host-profile-reconcile.py \
+            --mode purge \
+            --host-id "${{ inputs.host_id }}" \
+            --confirm "${{ inputs.confirmation }}" \
+            --output "${RUNNER_TEMP}/purge-result.json"
