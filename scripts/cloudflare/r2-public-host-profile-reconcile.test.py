@@ -3,8 +3,10 @@ import sys
 import tempfile
 import types
 import unittest
+import urllib.error
 from pathlib import Path
 from types import SimpleNamespace
+from unittest import mock
 
 
 sys.modules.setdefault("boto3", types.SimpleNamespace(client=lambda *args, **kwargs: None))
@@ -21,6 +23,85 @@ MODULE_PATH = Path(__file__).with_name("r2-public-host-profile-reconcile.py")
 SPEC = importlib.util.spec_from_file_location("profile_r2", MODULE_PATH)
 profile_r2 = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(profile_r2)
+
+
+class PublicResponse:
+    def __init__(self, status=200, content_type="image/webp", content_length="123"):
+        self.status = status
+        self.headers = {
+            "Content-Type": content_type,
+            "Content-Length": content_length,
+        }
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        return False
+
+
+def public_http_error(status):
+    return urllib.error.HTTPError("https://profiles.example/object", status, "error", {}, None)
+
+
+class PublicVerificationTests(unittest.TestCase):
+    def test_retries_only_transient_http_statuses(self):
+        for status in (403, 404, 429, 500, 503, 599):
+            with self.subTest(status=status), mock.patch.object(
+                profile_r2.urllib.request,
+                "urlopen",
+                side_effect=[public_http_error(status), PublicResponse()],
+            ) as urlopen, mock.patch.object(profile_r2.time, "sleep") as sleep:
+                profile_r2.verify_public_object("hosts/host/avatar.webp", 123)
+                self.assertEqual(urlopen.call_count, 2)
+                sleep.assert_called_once_with(profile_r2.PUBLIC_RETRY_DELAYS[0])
+
+    def test_non_transient_http_status_fails_immediately(self):
+        with mock.patch.object(
+            profile_r2.urllib.request,
+            "urlopen",
+            side_effect=public_http_error(401),
+        ) as urlopen, mock.patch.object(profile_r2.time, "sleep") as sleep:
+            with self.assertRaisesRegex(RuntimeError, "HTTP 401"):
+                profile_r2.verify_public_object("hosts/host/avatar.webp", 123)
+            self.assertEqual(urlopen.call_count, 1)
+            sleep.assert_not_called()
+
+    def test_content_type_mismatch_fails_immediately(self):
+        with mock.patch.object(
+            profile_r2.urllib.request,
+            "urlopen",
+            return_value=PublicResponse(content_type="text/html"),
+        ) as urlopen, mock.patch.object(profile_r2.time, "sleep") as sleep:
+            with self.assertRaisesRegex(RuntimeError, "unexpected content type"):
+                profile_r2.verify_public_object("hosts/host/avatar.webp", 123)
+            self.assertEqual(urlopen.call_count, 1)
+            sleep.assert_not_called()
+
+    def test_content_length_mismatch_fails_immediately(self):
+        with mock.patch.object(
+            profile_r2.urllib.request,
+            "urlopen",
+            return_value=PublicResponse(content_length="122"),
+        ) as urlopen, mock.patch.object(profile_r2.time, "sleep") as sleep:
+            with self.assertRaisesRegex(RuntimeError, "content length mismatch"):
+                profile_r2.verify_public_object("hosts/host/avatar.webp", 123)
+            self.assertEqual(urlopen.call_count, 1)
+            sleep.assert_not_called()
+
+    def test_retry_limit_is_bounded(self):
+        with mock.patch.object(profile_r2, "PUBLIC_RETRY_DELAYS", (0, 0)), mock.patch.object(
+            profile_r2.urllib.request,
+            "urlopen",
+            side_effect=public_http_error(403),
+        ) as urlopen, mock.patch.object(profile_r2.time, "sleep") as sleep:
+            with self.assertRaisesRegex(RuntimeError, "HTTP 403"):
+                profile_r2.verify_public_object("hosts/host/avatar.webp", 123)
+            self.assertEqual(urlopen.call_count, 3)
+            self.assertEqual(sleep.call_count, 2)
+
+    def test_production_retry_window_is_five_minutes(self):
+        self.assertEqual(sum(profile_r2.PUBLIC_RETRY_DELAYS), 300)
 
 
 class FakePaginator:
