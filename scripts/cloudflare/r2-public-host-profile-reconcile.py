@@ -26,6 +26,7 @@ ACTIVE_KEY_PATTERN = re.compile(
     r"(?P<url_hash>[a-f0-9]{12})/avatar-w(?P<width>128|256)-q80\.webp"
 )
 PUBLIC_RETRY_DELAYS = (2, 4, 8, 16, 30, 30, 30, 30, 30, 30, 30, 30, 30)
+PUBLIC_VERIFY_USER_AGENT = "Locally-R2-Reconciliation/1.0"
 
 
 def require_environment(name):
@@ -103,7 +104,11 @@ def verify_public_object(key, expected_size):
     attempts = len(PUBLIC_RETRY_DELAYS) + 1
     for attempt in range(attempts):
         try:
-            request = urllib.request.Request(f"{PUBLIC_BASE_URL}/{key}", method="HEAD")
+            request = urllib.request.Request(
+                f"{PUBLIC_BASE_URL}/{key}",
+                headers={"User-Agent": PUBLIC_VERIFY_USER_AGENT},
+                method="HEAD",
+            )
             with urllib.request.urlopen(request, timeout=30) as response:
                 if response.status != 200:
                     if is_retryable_public_status(response.status) and attempt < attempts - 1:

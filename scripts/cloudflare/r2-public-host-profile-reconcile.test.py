@@ -45,6 +45,22 @@ def public_http_error(status):
 
 
 class PublicVerificationTests(unittest.TestCase):
+    def test_uses_explicit_reconciliation_user_agent(self):
+        captured = []
+
+        def open_request(request, timeout):
+            captured.append((request, timeout))
+            return PublicResponse()
+
+        with mock.patch.object(profile_r2.urllib.request, "urlopen", side_effect=open_request):
+            profile_r2.verify_public_object("hosts/host/avatar.webp", 123)
+
+        self.assertEqual(len(captured), 1)
+        request, timeout = captured[0]
+        self.assertEqual(request.get_method(), "HEAD")
+        self.assertEqual(request.get_header("User-agent"), "Locally-R2-Reconciliation/1.0")
+        self.assertEqual(timeout, 30)
+
     def test_retries_only_transient_http_statuses(self):
         for status in (403, 404, 429, 500, 503, 599):
             with self.subTest(status=status), mock.patch.object(
