@@ -15,6 +15,8 @@ on:
         description: Initial Production missing photo guard
         required: true
         default: "3"
+  schedule:
+    - cron: '47 14 * * *'
 
 permissions:
   contents: read
@@ -51,9 +53,9 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          [[ "${{ steps.audit.outputs.visible_host_count }}" == "${{ inputs.expected_visible_hosts }}" ]]
-          [[ "${{ steps.audit.outputs.eligible_host_count }}" == "${{ inputs.expected_eligible_hosts }}" ]]
-          [[ "${{ steps.audit.outputs.missing_photo_count }}" == "${{ inputs.expected_missing_photos }}" ]]
+          [[ "${{ steps.audit.outputs.visible_host_count }}" == "${{ inputs.expected_visible_hosts || '48' }}" ]]
+          [[ "${{ steps.audit.outputs.eligible_host_count }}" == "${{ inputs.expected_eligible_hosts || '45' }}" ]]
+          [[ "${{ steps.audit.outputs.missing_photo_count }}" == "${{ inputs.expected_missing_photos || '3' }}" ]]
           [[ "${{ steps.audit.outputs.unexpected_photo_count }}" == "0" ]]
           [[ "${{ steps.audit.outputs.excluded_host_count }}" == "0" ]]
 
