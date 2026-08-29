@@ -5,7 +5,12 @@ import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { upsertInquiryThread } from '@/app/api/inquiries/thread/shared';
 import { ProxyRequestValidationSchema } from '@/app/schemas/proxyRequestSchema';
 import { insertAdminAlerts, sendAdminAlertEmails } from '@/app/utils/adminAlertCenter';
-import { buildProxyInquiryInitialMessage, getProxyCategoryLabel, getProxyRequestFeeKrw } from '@/app/utils/proxyBooking';
+import {
+    buildProxyInquiryInitialMessage,
+    getProxyCategoryLabel,
+    getProxyRequestFeeKrw,
+    PROXY_OPERATIONAL_STATUS_ORDER,
+} from '@/app/utils/proxyBooking';
 
 type ProxyRequestRow = {
     id: string;
@@ -217,29 +222,90 @@ export async function GET(request: Request) {
         );
         const requestedOffset = clampPositiveInteger(searchParams.get('offset'), 0);
 
-        let query = supabase
-            .from('proxy_requests')
-            .select('id, user_id, category, status, form_data, payment_channel, payment_status, naver_buyer_name, locally_order_id, agreed_to_terms, created_at, updated_at')
-            .order('created_at', { ascending: false });
+        const shouldUseOperationalSort = isAdmin && searchParams.get('sort') === 'operational';
+        let rows: ProxyRequestRow[];
+        let hasMore = false;
 
-        if (!isAdmin) {
-            // Regular user can only fetch their own requests
-            query = query.eq('user_id', user.id);
+        if (shouldUseOperationalSort) {
+            const statusCounts = await Promise.all(
+                PROXY_OPERATIONAL_STATUS_ORDER.map(async (status) => {
+                    const { count, error } = await supabase
+                        .from('proxy_requests')
+                        .select('id', { count: 'exact', head: true })
+                        .eq('status', status);
+
+                    if (error) {
+                        throw error;
+                    }
+
+                    return count ?? 0;
+                })
+            );
+
+            const totalCount = statusCounts.reduce((total, count) => total + count, 0);
+            let remainingOffset = requestedOffset;
+            let remainingLimit = requestedLimit;
+            const operationalRows: ProxyRequestRow[] = [];
+
+            for (const [index, status] of PROXY_OPERATIONAL_STATUS_ORDER.entries()) {
+                const statusCount = statusCounts[index] ?? 0;
+
+                if (remainingOffset >= statusCount) {
+                    remainingOffset -= statusCount;
+                    continue;
+                }
+
+                if (remainingLimit <= 0) {
+                    break;
+                }
+
+                const rowsToFetch = Math.min(statusCount - remainingOffset, remainingLimit);
+                const { data, error } = await supabase
+                    .from('proxy_requests')
+                    .select('id, user_id, category, status, form_data, payment_channel, payment_status, naver_buyer_name, locally_order_id, agreed_to_terms, created_at, updated_at')
+                    .eq('status', status)
+                    .order('created_at', { ascending: false })
+                    .order('id', { ascending: false })
+                    .range(remainingOffset, remainingOffset + rowsToFetch - 1);
+
+                if (error) {
+                    console.error('Proxy Requests Operational Fetch Error:', error);
+                    return NextResponse.json({ success: false, error: 'Failed to fetch requests' }, { status: 500 });
+                }
+
+                const fetchedRows = (data ?? []) as ProxyRequestRow[];
+                operationalRows.push(...fetchedRows);
+                remainingLimit -= fetchedRows.length;
+                remainingOffset = 0;
+            }
+
+            rows = operationalRows;
+            hasMore = hasCustomPagination && totalCount > requestedOffset + rows.length;
+        } else {
+            let query = supabase
+                .from('proxy_requests')
+                .select('id, user_id, category, status, form_data, payment_channel, payment_status, naver_buyer_name, locally_order_id, agreed_to_terms, created_at, updated_at')
+                .order('created_at', { ascending: false });
+
+            if (!isAdmin) {
+                // Regular user can only fetch their own requests
+                query = query.eq('user_id', user.id);
+            }
+
+            const fetchLimit = hasCustomPagination ? requestedLimit + 1 : DEFAULT_PROXY_REQUEST_LIMIT;
+            const rangeStart = hasCustomPagination ? requestedOffset : 0;
+            const rangeEnd = rangeStart + fetchLimit - 1;
+            const { data, error } = await query.range(rangeStart, rangeEnd);
+
+            if (error) {
+                console.error('Proxy Requests Fetch Error:', error);
+                return NextResponse.json({ success: false, error: 'Failed to fetch requests' }, { status: 500 });
+            }
+
+            const fetchedRows = (data ?? []) as ProxyRequestRow[];
+            hasMore = hasCustomPagination && fetchedRows.length > requestedLimit;
+            rows = hasCustomPagination ? fetchedRows.slice(0, requestedLimit) : fetchedRows;
         }
-
-        const fetchLimit = hasCustomPagination ? requestedLimit + 1 : DEFAULT_PROXY_REQUEST_LIMIT;
-        const rangeStart = hasCustomPagination ? requestedOffset : 0;
-        const rangeEnd = rangeStart + fetchLimit - 1;
-        const { data, error } = await query.range(rangeStart, rangeEnd);
-
-        if (error) {
-            console.error('Proxy Requests Fetch Error:', error);
-            return NextResponse.json({ success: false, error: 'Failed to fetch requests' }, { status: 500 });
-        }
-
-        const fetchedRows = (data ?? []) as ProxyRequestRow[];
-        const hasMore = hasCustomPagination && fetchedRows.length > requestedLimit;
-        const rows = hasCustomPagination ? fetchedRows.slice(0, requestedLimit) : fetchedRows;
         const profileIds = [...new Set(rows.map((item) => item.user_id).filter(Boolean))];
         const profilesById = new Map<string, ProfileRow>();
 

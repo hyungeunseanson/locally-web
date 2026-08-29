@@ -2,6 +2,7 @@ import { readFileSync } from 'fs';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test, type Browser, type Page } from '@playwright/test';
+import type { ProxyStatus } from '@/app/types/proxy';
 
 type EnvMap = Record<string, string>;
 type TestUser = {
@@ -9,6 +10,18 @@ type TestUser = {
   password: string;
   fullName: string;
   phone: string;
+};
+
+type ProxyListResponse = {
+  success?: boolean;
+  data?: Array<{
+    id: string;
+    status: ProxyStatus;
+    form_data?: Record<string, unknown> | null;
+  }>;
+  pagination?: {
+    hasMore?: boolean;
+  };
 };
 
 const TEST_PASSWORD = 'LocallyTest!2026';
@@ -156,6 +169,7 @@ async function seedProxyRequest(params: {
   restaurantName?: string;
   linkedInquiryId?: string | number | null;
   createdAt?: string;
+  status?: ProxyStatus;
 }) {
   const restaurantName = params.restaurantName || `테스트 스시 ${Date.now()}`;
   const createdAt = params.createdAt || new Date().toISOString();
@@ -165,7 +179,7 @@ async function seedProxyRequest(params: {
     .insert({
       user_id: params.userId,
       category: 'RESTAURANT',
-      status: 'PENDING',
+      status: params.status || 'PENDING',
       payment_channel: 'LOCALLY',
       payment_status: 'WAITING',
       locally_order_id: `LOCALLY-PROXY-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
@@ -279,6 +293,21 @@ async function dismissAnnouncementIfVisible(page: Page) {
   }
 }
 
+async function fetchOperationalProxyPage(page: Page, limit: number, offset: number) {
+  const result = await page.evaluate(async ({ pageLimit, pageOffset }) => {
+    const response = await fetch(`/api/proxy-bookings?limit=${pageLimit}&offset=${pageOffset}&sort=operational`, {
+      cache: 'no-store',
+    });
+
+    return {
+      ok: response.ok,
+      body: await response.json(),
+    };
+  }, { pageLimit: limit, pageOffset: offset });
+
+  return result as { ok: boolean; body: ProxyListResponse };
+}
+
 async function createIsolatedPage(browser: Browser, user: TestUser) {
   const context = await browser.newContext();
   const page = await context.newPage();
@@ -345,6 +374,8 @@ test.describe.serial('Proxy booking team workspace flow', () => {
       await expect(customerPage.getByRole('heading', { name: '일본 현지 전화, 로컬리가 대신해드려요' })).toBeVisible({ timeout: 15000 });
 
       await customerPage.getByPlaceholder('예: 스시 지로').fill(restaurantName);
+      await customerPage.getByPlaceholder('예: Google Maps 또는 공식 홈페이지 링크').first().fill('https://maps.example.test/proxy-team-workspace');
+      await customerPage.getByPlaceholder('예: 03-1234-5678').first().fill('03-1234-5678');
       await customerPage.getByTestId('preferred-slot-primary-trigger').click();
       await customerPage.getByTestId(`preferred-slot-primary-day-${targetDate}`).click();
       await customerPage.getByTestId('preferred-slot-primary-time-19:00').click();
@@ -459,6 +490,68 @@ test.describe.serial('Proxy booking team workspace flow', () => {
 
       await adminPage.getByTestId('admin-phone-reservation-refresh-button').click();
       await expect(adminPage.getByRole('heading', { name: restaurantName })).toBeVisible({ timeout: 15000 });
+
+      const statusSortPrefix = `전화예약 상태정렬 ${Date.now()}`;
+      const statusSortBaseTime = Date.now() + (2 * 60 * 60 * 1000);
+      const statusSortFixtures = await Promise.all([
+        { status: 'CANCELLED' as const, suffix: '취소', createdAt: statusSortBaseTime + 4000 },
+        { status: 'COMPLETED' as const, suffix: '완료', createdAt: statusSortBaseTime + 3000 },
+        { status: 'IN_PROGRESS' as const, suffix: '진행', createdAt: statusSortBaseTime + 2000 },
+        { status: 'PENDING' as const, suffix: '대기', createdAt: statusSortBaseTime + 1000 },
+      ].map(({ status, suffix, createdAt }) => seedProxyRequest({
+        userId: customerUserId,
+        user: customerUser,
+        restaurantName: `${statusSortPrefix} ${suffix}`,
+        status,
+        createdAt: new Date(createdAt).toISOString(),
+      })));
+
+      const getStatusRank = (status: ProxyStatus) => ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'].indexOf(status);
+      const firstOperationalPage = await fetchOperationalProxyPage(adminPage, 2, 0);
+      const secondOperationalPage = await fetchOperationalProxyPage(adminPage, 2, 2);
+
+      expect(firstOperationalPage.ok).toBe(true);
+      expect(firstOperationalPage.body.success).toBe(true);
+      expect(secondOperationalPage.ok).toBe(true);
+      expect(secondOperationalPage.body.success).toBe(true);
+
+      const firstTwoPages = [
+        ...(firstOperationalPage.body.data || []),
+        ...(secondOperationalPage.body.data || []),
+      ];
+      const firstTwoPageRanks = firstTwoPages.map((row) => getStatusRank(row.status));
+      expect(firstTwoPageRanks).toEqual([...firstTwoPageRanks].sort((left, right) => left - right));
+
+      const statusFixtureIds = new Set(statusSortFixtures.map((fixture) => fixture.requestId));
+      const sortedStatusFixtures: Array<{ id: string; status: ProxyStatus }> = [];
+      let pageOffset = 0;
+
+      for (let pageIndex = 0; pageIndex < 20 && sortedStatusFixtures.length < statusFixtureIds.size; pageIndex += 1) {
+        const operationalPage = await fetchOperationalProxyPage(adminPage, 50, pageOffset);
+        expect(operationalPage.ok).toBe(true);
+        expect(operationalPage.body.success).toBe(true);
+
+        const rows = operationalPage.body.data || [];
+        for (const row of rows) {
+          if (statusFixtureIds.has(row.id)) {
+            sortedStatusFixtures.push({ id: row.id, status: row.status });
+          }
+        }
+
+        if (!operationalPage.body.pagination?.hasMore || rows.length === 0) {
+          break;
+        }
+
+        pageOffset += rows.length;
+      }
+
+      expect(sortedStatusFixtures).toHaveLength(statusSortFixtures.length);
+      expect(sortedStatusFixtures.map((row) => row.status)).toEqual([
+        'PENDING',
+        'IN_PROGRESS',
+        'COMPLETED',
+        'CANCELLED',
+      ]);
 
     } finally {
     }

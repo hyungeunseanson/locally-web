@@ -14,6 +14,7 @@ import {
   getProxyRequestFeeKrw,
   getProxyRequestTitle,
   getProxyRequesterDisplayName,
+  compareProxyRequestsForOperations,
 } from '@/app/utils/proxyBooking';
 
 type ProxyRequestDetail = ProxyRequest & {
@@ -61,6 +62,7 @@ function buildProxyRequestsUrl(limit: number, offset: number) {
   const searchParams = new URLSearchParams({
     limit: String(limit),
     offset: String(offset),
+    sort: 'operational',
   });
 
   return `/api/proxy-bookings?${searchParams.toString()}`;
@@ -374,7 +376,7 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
       }
     }
 
-    return nextVisibleRequests;
+    return nextVisibleRequests.sort(compareProxyRequestsForOperations);
   }, [requests, selectedRequest]);
 
   if (loadingList) {

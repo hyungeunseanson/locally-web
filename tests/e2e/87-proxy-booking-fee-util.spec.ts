@@ -1,6 +1,10 @@
 import { expect, test } from '@playwright/test';
 
-import { getProxyRequestFeeKrw, getProxyRequestTitle } from '@/app/utils/proxyBooking';
+import {
+  compareProxyRequestsForOperations,
+  getProxyRequestFeeKrw,
+  getProxyRequestTitle,
+} from '@/app/utils/proxyBooking';
 
 test.describe('Proxy booking pricing helpers', () => {
   test('maps the active service fees conservatively', () => {
@@ -48,5 +52,25 @@ test.describe('Proxy booking pricing helpers', () => {
         form_data: { business_name: '도쿄 약국' },
       } as never)
     ).toBe('도쿄 약국');
+  });
+});
+
+test.describe('Proxy booking operational ordering', () => {
+  test('keeps active work above completed and cancelled requests', () => {
+    const requests = [
+      { id: 'cancelled-newest', status: 'CANCELLED' as const, created_at: '2026-08-30T04:00:00.000Z' },
+      { id: 'completed-newest', status: 'COMPLETED' as const, created_at: '2026-08-30T03:00:00.000Z' },
+      { id: 'in-progress', status: 'IN_PROGRESS' as const, created_at: '2026-08-30T02:00:00.000Z' },
+      { id: 'pending-older', status: 'PENDING' as const, created_at: '2026-08-30T00:00:00.000Z' },
+      { id: 'pending-newer', status: 'PENDING' as const, created_at: '2026-08-30T01:00:00.000Z' },
+    ];
+
+    expect([...requests].sort(compareProxyRequestsForOperations).map((request) => request.id)).toEqual([
+      'pending-newer',
+      'pending-older',
+      'in-progress',
+      'completed-newest',
+      'cancelled-newest',
+    ]);
   });
 });

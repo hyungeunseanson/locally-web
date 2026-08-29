@@ -4,6 +4,7 @@ import type {
   ProxyFormData,
   ProxyPaymentMethod,
   ProxyRequest,
+  ProxyStatus,
   RestaurantServiceOption,
 } from '@/app/types/proxy';
 import type { HotelFormData } from '@/app/schemas/proxyRequestSchema';
@@ -25,6 +26,20 @@ export const PROXY_RESTAURANT_SERVICE_OPTION_PRICES: Record<RestaurantServiceOpt
 };
 
 export const PROXY_LINKED_INQUIRY_REQUIRED_ERROR = '연결된 1:1 문의를 찾을 수 없습니다.';
+
+export const PROXY_OPERATIONAL_STATUS_ORDER: readonly ProxyStatus[] = [
+  'PENDING',
+  'IN_PROGRESS',
+  'COMPLETED',
+  'CANCELLED',
+];
+
+const PROXY_OPERATIONAL_STATUS_PRIORITY: Record<ProxyStatus, number> = {
+  PENDING: 0,
+  IN_PROGRESS: 1,
+  COMPLETED: 2,
+  CANCELLED: 3,
+};
 
 const INTERNAL_PROXY_FORM_FIELDS = new Set(['payment_method', 'contact_name', 'contact_phone', 'service_fee_krw', 'linked_inquiry_id']);
 
@@ -135,6 +150,23 @@ export function normalizeProxyHotelDesiredChange(
   desiredChange: string | null | undefined
 ) {
   return hotelInquiryType === 'CHANGE' ? readString(desiredChange) : '';
+}
+
+export function compareProxyRequestsForOperations(
+  left: Pick<ProxyRequest, 'id' | 'status' | 'created_at'>,
+  right: Pick<ProxyRequest, 'id' | 'status' | 'created_at'>
+) {
+  const statusDifference = PROXY_OPERATIONAL_STATUS_PRIORITY[left.status] - PROXY_OPERATIONAL_STATUS_PRIORITY[right.status];
+  if (statusDifference !== 0) {
+    return statusDifference;
+  }
+
+  const createdAtDifference = Date.parse(right.created_at) - Date.parse(left.created_at);
+  if (Number.isFinite(createdAtDifference) && createdAtDifference !== 0) {
+    return createdAtDifference;
+  }
+
+  return right.id.localeCompare(left.id);
 }
 
 function readNumber(value: unknown) {
