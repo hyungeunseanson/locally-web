@@ -6,15 +6,12 @@ on:
       expected_visible_hosts:
         description: Initial Production visible host guard
         required: true
-        default: "48"
       expected_eligible_hosts:
         description: Initial Production eligible profile image guard
         required: true
-        default: "45"
       expected_missing_photos:
         description: Initial Production missing photo guard
         required: true
-        default: "3"
   schedule:
     - cron: '47 14 * * *'
 
@@ -49,15 +46,40 @@ jobs:
         id: audit
         run: node scripts/cloudflare/reconcile-public-host-profile-images.mjs audit --output="${RUNNER_TEMP}/public-host-profile-sync"
 
-      - name: Enforce initial Production target counts
+      - name: Enforce Production inventory safety boundaries
         shell: bash
         run: |
           set -Eeuo pipefail
-          [[ "${{ steps.audit.outputs.visible_host_count }}" == "${{ inputs.expected_visible_hosts || '48' }}" ]]
-          [[ "${{ steps.audit.outputs.eligible_host_count }}" == "${{ inputs.expected_eligible_hosts || '45' }}" ]]
-          [[ "${{ steps.audit.outputs.missing_photo_count }}" == "${{ inputs.expected_missing_photos || '3' }}" ]]
-          [[ "${{ steps.audit.outputs.unexpected_photo_count }}" == "0" ]]
-          [[ "${{ steps.audit.outputs.excluded_host_count }}" == "0" ]]
+          latest="${{ steps.audit.outputs.latest_host_count }}"
+          visible="${{ steps.audit.outputs.visible_host_count }}"
+          eligible="${{ steps.audit.outputs.eligible_host_count }}"
+          missing="${{ steps.audit.outputs.missing_photo_count }}"
+          unexpected="${{ steps.audit.outputs.unexpected_photo_count }}"
+          excluded="${{ steps.audit.outputs.excluded_host_count }}"
+          for count in "$latest" "$visible" "$eligible" "$missing" "$unexpected" "$excluded"; do
+            [[ "$count" =~ ^[0-9]+$ ]]
+          done
+          (( latest >= visible ))
+          (( visible == eligible + missing + unexpected + excluded ))
+          (( eligible > 0 ))
+          (( unexpected == 0 ))
+          (( excluded == 0 ))
+
+      - name: Enforce manually supplied exact target counts
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          EXPECTED_VISIBLE_HOSTS: ${{ inputs.expected_visible_hosts }}
+          EXPECTED_ELIGIBLE_HOSTS: ${{ inputs.expected_eligible_hosts }}
+          EXPECTED_MISSING_PHOTOS: ${{ inputs.expected_missing_photos }}
+        run: |
+          set -Eeuo pipefail
+          for count in "$EXPECTED_VISIBLE_HOSTS" "$EXPECTED_ELIGIBLE_HOSTS" "$EXPECTED_MISSING_PHOTOS"; do
+            [[ "$count" =~ ^[0-9]+$ ]]
+          done
+          [[ "${{ steps.audit.outputs.visible_host_count }}" == "$EXPECTED_VISIBLE_HOSTS" ]]
+          [[ "${{ steps.audit.outputs.eligible_host_count }}" == "$EXPECTED_ELIGIBLE_HOSTS" ]]
+          [[ "${{ steps.audit.outputs.missing_photo_count }}" == "$EXPECTED_MISSING_PHOTOS" ]]
 
       - name: Finish without R2 credentials when no drift exists
         if: steps.audit.outputs.drift != 'true'
