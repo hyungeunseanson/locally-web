@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import { expect, test } from '@playwright/test';
 
 import { PUBLIC_EXPERIENCE_CARD_IMAGES } from '../../app/data/publicExperienceCardImages';
@@ -50,5 +52,19 @@ test.describe('Cloudflare public experience card image manifest', () => {
         'https://uhinvcydgzqlpnvieyal.supabase.co/storage/v1/object/public/experiences/unknown.jpg'
       )
     ).toBeNull();
+  });
+
+  test('bypasses Vercel optimization for the canonical Supabase fallback', () => {
+    const componentSource = readFileSync(
+      'app/components/PublicExperienceCardImage.tsx',
+      'utf8'
+    );
+    const fallbackImage = componentSource.match(
+      /<Image[\s\S]*?src=\{originImageUrl\}[\s\S]*?\/>/
+    )?.[0];
+
+    expect(fallbackImage).toBeTruthy();
+    expect(fallbackImage).toMatch(/\bunoptimized\b/);
+    expect(componentSource).toContain('data-image-delivery="cloudflare-r2"');
   });
 });

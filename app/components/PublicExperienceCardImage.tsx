@@ -53,6 +53,7 @@ export default function PublicExperienceCardImage({
       alt={alt}
       fill
       quality={65}
+      unoptimized
       loading={eager ? 'eager' : 'lazy'}
       className={className}
       sizes={sizes}
