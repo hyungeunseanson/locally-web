@@ -32,10 +32,10 @@ import GlobalSupportReportButton from '@/app/components/support/GlobalSupportRep
 
 const inter = localFont({
   src: [
-    { path: "./fonts/Inter/Inter_18pt-Regular.ttf", weight: "400", style: "normal" },
-    { path: "./fonts/Inter/Inter_18pt-Medium.ttf", weight: "500", style: "normal" },
-    { path: "./fonts/Inter/Inter_18pt-SemiBold.ttf", weight: "600", style: "normal" },
-    { path: "./fonts/Inter/Inter_18pt-Bold.ttf", weight: "700", style: "normal" },
+    { path: "./fonts/Inter/Inter_18pt-Regular.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/Inter/Inter_18pt-Medium.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/Inter/Inter_18pt-SemiBold.woff2", weight: "600", style: "normal" },
+    { path: "./fonts/Inter/Inter_18pt-Bold.woff2", weight: "700", style: "normal" },
   ],
   display: "swap",
   variable: "--font-inter",
@@ -43,13 +43,14 @@ const inter = localFont({
 
 const ibmPlexSansKr = localFont({
   src: [
-    { path: "./fonts/ibm-plex-sans-kr/IBMPlexSansKR-Light.ttf", weight: "300", style: "normal" },
-    { path: "./fonts/ibm-plex-sans-kr/IBMPlexSansKR-Regular.ttf", weight: "400", style: "normal" },
-    { path: "./fonts/ibm-plex-sans-kr/IBMPlexSansKR-Medium.ttf", weight: "500", style: "normal" },
-    { path: "./fonts/ibm-plex-sans-kr/IBMPlexSansKR-SemiBold.ttf", weight: "600", style: "normal" },
-    { path: "./fonts/ibm-plex-sans-kr/IBMPlexSansKR-Bold.ttf", weight: "700", style: "normal" },
+    { path: "./fonts/ibm-plex-sans-kr/IBMPlexSansKR-Light.woff2", weight: "300", style: "normal" },
+    { path: "./fonts/ibm-plex-sans-kr/IBMPlexSansKR-Regular.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/ibm-plex-sans-kr/IBMPlexSansKR-Medium.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/ibm-plex-sans-kr/IBMPlexSansKR-SemiBold.woff2", weight: "600", style: "normal" },
+    { path: "./fonts/ibm-plex-sans-kr/IBMPlexSansKR-Bold.woff2", weight: "700", style: "normal" },
   ],
   display: "swap",
+  preload: false,
   variable: "--font-ibm-plex-sans-kr",
 });
 

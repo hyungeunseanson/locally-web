@@ -15,6 +15,7 @@ type HostLandingSectionDefinition = {
 };
 
 const DEFAULT_HOST_LANDING_LOCALE: HostLandingLocale = 'ko';
+const HOST_LANDING_ASSET_EXTENSIONS = ['.webp', '.png'] as const;
 
 const HOST_LANDING_SECTION_DEFINITIONS: HostLandingSectionDefinition[] = [
   {
@@ -99,16 +100,27 @@ const HOST_LANDING_SECTION_DEFINITIONS: HostLandingSectionDefinition[] = [
 function getHostLandingAssetPath(
   device: HostLandingDevice,
   locale: HostLandingLocale,
-  fileName: string
+  baseName: string
 ) {
-  const localizedRelativePath = `/images/become-a-host/${device}/${locale}/${fileName}`;
-  const localizedAbsolutePath = path.join(process.cwd(), 'public', localizedRelativePath);
+  for (const extension of HOST_LANDING_ASSET_EXTENSIONS) {
+    const localizedRelativePath = `/images/become-a-host/${device}/${locale}/${baseName}${extension}`;
+    const localizedAbsolutePath = path.join(process.cwd(), 'public', localizedRelativePath);
 
-  if (fs.existsSync(localizedAbsolutePath)) {
-    return localizedRelativePath;
+    if (fs.existsSync(localizedAbsolutePath)) {
+      return localizedRelativePath;
+    }
   }
 
-  return `/images/become-a-host/${device}/${DEFAULT_HOST_LANDING_LOCALE}/${fileName}`;
+  for (const extension of HOST_LANDING_ASSET_EXTENSIONS) {
+    const fallbackRelativePath = `/images/become-a-host/${device}/${DEFAULT_HOST_LANDING_LOCALE}/${baseName}${extension}`;
+    const fallbackAbsolutePath = path.join(process.cwd(), 'public', fallbackRelativePath);
+
+    if (fs.existsSync(fallbackAbsolutePath)) {
+      return fallbackRelativePath;
+    }
+  }
+
+  return `/images/become-a-host/${device}/${DEFAULT_HOST_LANDING_LOCALE}/${baseName}.png`;
 }
 
 export function getHostLandingSections(locale: HostLandingLocale) {
@@ -116,15 +128,15 @@ export function getHostLandingSections(locale: HostLandingLocale) {
     alt: section.alt[locale],
     desktop: {
       ...section.desktop,
-      src: getHostLandingAssetPath('desktop', locale, `${section.id}.png`),
+      src: getHostLandingAssetPath('desktop', locale, section.id),
     },
     mobile: {
       ...section.mobile,
-      src: getHostLandingAssetPath('mobile', locale, `${section.id}.png`),
+      src: getHostLandingAssetPath('mobile', locale, section.id),
     },
   }));
 }
 
 export function getHostLandingOgImagePath(locale: HostLandingLocale) {
-  return getHostLandingAssetPath('desktop', locale, '1.png');
+  return getHostLandingAssetPath('desktop', locale, '1');
 }
