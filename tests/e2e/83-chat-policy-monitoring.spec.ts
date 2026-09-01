@@ -26,7 +26,7 @@ const TEST_PASSWORD = 'LocallyTest!2026';
 const GUEST_CHAT_INPUT_SELECTOR = '[data-testid="guest-chat-composer"]';
 const HOST_CHAT_INPUT_SELECTOR = '[data-testid="host-chat-composer"]';
 const WARNING_BANNER_TEXT =
-  /연락처·외부 링크 공유는 제재 대상입니다|Sharing contact details or external links may lead to penalties|連絡先や外部リンクの共有は制裁対象となる場合があります|分享联系方式或外部链接可能会导致处罚/;
+  /외부 연락처가 감지됐어요|External contact details detected|外部連絡先が検出されました|检测到外部联系方式/;
 const SOFT_DELETE_PLACEHOLDER = '[운영 정책에 의해 삭제된 메시지입니다.]';
 
 let adminClient: SupabaseClient | null = null;
@@ -380,9 +380,13 @@ test.describe.serial('Chat policy monitoring flow', () => {
     }
   });
 
-  test('shows inline warnings in guest and host chat composers', async ({ browser }) => {
+  test('shows the persistent safety notice and inline warnings in guest and host chats', async ({ browser }) => {
     const guestSession = await withLoggedInPage(browser, fixture.guest);
     await openGuestInquiry(guestSession.page, fixture.inquiryId);
+
+    await expect(guestSession.page.getByTestId('chat-safety-notice')).toBeVisible();
+    await expect(guestSession.page.getByTestId('chat-safety-notification-link'))
+      .toHaveAttribute('href', '/account');
 
     const guestInput = guestSession.page.locator(GUEST_CHAT_INPUT_SELECTOR).first();
     await guestInput.fill('제 번호는 010-1234-5678 입니다.');
@@ -393,6 +397,10 @@ test.describe.serial('Chat policy monitoring flow', () => {
 
     const hostSession = await withLoggedInPage(browser, fixture.host);
     await openHostInquiry(hostSession.page, fixture.inquiryId);
+
+    await expect(hostSession.page.getByTestId('chat-safety-notice')).toBeVisible();
+    await expect(hostSession.page.getByTestId('chat-safety-notification-link'))
+      .toHaveAttribute('href', '/host/dashboard?tab=profile');
 
     const hostInput = hostSession.page.locator(HOST_CHAT_INPUT_SELECTOR).first();
     await hostInput.fill('contact me at policy.host@example.com');
@@ -428,6 +436,7 @@ test.describe.serial('Chat policy monitoring flow', () => {
     const guestInput = guestSession.page.locator(GUEST_CHAT_INPUT_SELECTOR).first();
     await guestInput.fill('010-5555-6666 https://open.kakao.com/o/support-followup');
     await expect(guestSession.page.getByText(WARNING_BANNER_TEXT)).toHaveCount(0);
+    await expect(guestSession.page.getByTestId('chat-safety-notice')).toHaveCount(0);
     await guestSession.context.close();
 
     expect(await countAdminNotifications({

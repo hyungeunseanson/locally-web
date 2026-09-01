@@ -516,8 +516,8 @@ const ko: HelpFaqLocaleContent = {
         },
         {
           id: 'no-contact-before-booking',
-          q: '예약 전 외부 연락처 교환이 왜 금지되나요?',
-          a: '예약 전 외부 연락으로 빠지면 결제 보호와 분쟁 대응 기록이 끊기기 때문입니다. 현재 가이드라인상 카카오톡, 이메일 등 외부 연락처 교환은 예약 확정 전 허용되지 않습니다.',
+          q: '외부 연락처 교환이 왜 제한되나요?',
+          a: '예약·결제·대화 기록을 로컬리에 남겨야 노쇼나 분쟁이 생겼을 때 호스트와 게스트를 보호할 수 있기 때문입니다. 카카오톡, LINE, 이메일 등 외부 연락처를 반복적으로 공유하거나 우회해 공유하면 운영 조치 대상이 될 수 있습니다.',
           searchTerms: ['외부 연락처', '카카오톡', '이메일 교환', '오프플랫폼'],
         },
         {
@@ -1111,8 +1111,8 @@ const en: HelpFaqLocaleContent = {
         },
         {
           id: 'no-contact-before-booking',
-          q: 'Why can’t I exchange outside contact details before booking?',
-          a: 'Once the conversation leaves the platform too early, the payment protection and dispute record are broken. That is why KakaoTalk, email, and other outside contact methods are not allowed before the booking is confirmed.',
+          q: 'Why is exchanging external contact information restricted?',
+          a: 'Keeping booking, payment, and conversation records on Locally helps protect hosts and guests in no-show or dispute cases. Repeatedly sharing or attempting to bypass the restriction with KakaoTalk, LINE, email, or other external contact details may lead to policy action.',
           searchTerms: ['outside contact', 'kakaotalk', 'email exchange', 'off-platform'],
         },
         {
@@ -1706,8 +1706,8 @@ const ja: HelpFaqLocaleContent = {
         },
         {
           id: 'no-contact-before-booking',
-          q: '予約前に外部連絡先を交換してはいけないのはなぜですか？',
-          a: '予約前に会話が外へ出ると、決済保護やトラブル対応の記録が切れてしまうためです。カカオトークやメールなどの外部連絡先交換は、予約確定前は許可されていません。',
+          q: '外部連絡先の交換が制限されているのはなぜですか？',
+          a: '予約・決済・会話の記録をLocallyに残すことで、無断キャンセルやトラブル時にホストとゲストを保護できるためです。KakaoTalk、LINE、メールなどの外部連絡先を繰り返し共有したり、制限を回避して共有したりすると、運営対応の対象となる場合があります。',
           searchTerms: ['外部連絡先', 'カカオトーク', 'メール交換', 'off-platform'],
         },
         {
@@ -2301,8 +2301,8 @@ const zh: HelpFaqLocaleContent = {
         },
         {
           id: 'no-contact-before-booking',
-          q: '为什么预订前不能交换站外联系方式？',
-          a: '如果在预订前就把对话带到平台外，支付保护和争议记录都会中断。因此在预订确认前，KakaoTalk、邮件等站外联系方式都不允许交换。',
+          q: '为什么平台限制交换外部联系方式？',
+          a: '将预订、付款和聊天记录保留在 Locally，有助于在爽约或纠纷发生时保护房东和房客。反复分享 KakaoTalk、LINE、邮箱等外部联系方式，或试图绕过限制进行分享，可能会触发平台处理。',
           searchTerms: ['站外联系方式', 'KakaoTalk', '邮箱交换', 'off-platform'],
         },
         {

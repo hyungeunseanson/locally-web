@@ -19,25 +19,7 @@ import {
   OFFICIAL_SUPPORT_AVATAR_SRC,
   OFFICIAL_SUPPORT_SENDER_NAME,
 } from '@/app/utils/officialSender';
-
-const CHAT_POLICY_WARNING_COPY = {
-  ko: {
-    title: '연락처·외부 링크 공유는 제재 대상입니다.',
-    body: '전화번호, 이메일, URL 등이 포함된 메시지는 운영팀에 전달될 수 있습니다.',
-  },
-  en: {
-    title: 'Sharing contact details or external links may lead to penalties.',
-    body: 'Messages containing phone numbers, emails, or URLs may be reviewed by the team.',
-  },
-  ja: {
-    title: '連絡先や外部リンクの共有は制裁対象となる場合があります。',
-    body: '電話番号、メールアドレス、URL を含むメッセージは運営チームが確認することがあります。',
-  },
-  zh: {
-    title: '分享联系方式或外部链接可能会导致处罚。',
-    body: '包含电话号码、邮箱或 URL 的消息可能会被运营团队审核。',
-  },
-} as const;
+import ChatSafetyNotice from '@/app/components/chat/ChatSafetyNotice';
 
 export default function InquiryChat() {
   const {
@@ -52,7 +34,7 @@ export default function InquiryChat() {
     refresh,
   } = useChat('host');
 
-  const { t, lang } = useLanguage();
+  const { t } = useLanguage();
 
   const [replyText, setReplyText] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -76,7 +58,6 @@ export default function InquiryChat() {
       : { matched: false, categories: [] },
     [replyText, selectedInquiry?.type]
   );
-  const chatPolicyWarningCopy = CHAT_POLICY_WARNING_COPY[lang] ?? CHAT_POLICY_WARNING_COPY.ko;
 
   const [modalUserId, setModalUserId] = useState<string | null>(null);
   const [animatedMessageIds, setAnimatedMessageIds] = useState<string[]>([]);
@@ -379,8 +360,12 @@ export default function InquiryChat() {
               </div>
             </div>
 
+            {shouldApplyChatPolicySignals(selectedInquiry.type) && (
+              <ChatSafetyNotice emailSettingsHref="/host/dashboard?tab=profile" />
+            )}
+
             {/* 메시지 영역 */}
-            <div className="flex-1 overflow-y-auto px-3 py-3 md:px-5 md:py-4 space-y-3 md:space-y-4 bg-gray-50" ref={scrollRef}>
+            <div data-testid="host-inquiry-message-thread" className="flex-1 overflow-y-auto px-3 py-3 md:px-5 md:py-4 space-y-3 md:space-y-4 bg-gray-50" ref={scrollRef}>
               {messages.map((msg) => {
                 const isMe = String(msg.sender_id) === String(currentUser?.id);
                 const isDeletedMessage = isDeletedInquiryMessage(msg.type);
@@ -480,8 +465,8 @@ export default function InquiryChat() {
             <div className="px-3 py-2.5 md:px-5 md:py-3 bg-white border-t border-gray-100 shrink-0">
               {chatPolicySignals.matched && (
                 <div className="mb-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2">
-                  <div className="text-[11px] md:text-[12px] font-bold text-rose-700">{chatPolicyWarningCopy.title}</div>
-                  <div className="mt-0.5 text-[10px] md:text-[11px] text-rose-600">{chatPolicyWarningCopy.body}</div>
+                  <div className="text-[11px] md:text-[12px] font-bold text-rose-700">{t('chat_policy_detected_title')}</div>
+                  <div className="mt-0.5 text-[10px] md:text-[11px] text-rose-600">{t('chat_policy_detected_body')}</div>
                 </div>
               )}
               <div className="flex items-end gap-2 md:gap-3">

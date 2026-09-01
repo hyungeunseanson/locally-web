@@ -18,6 +18,7 @@ export const ACTIVE_CHAT_POLICY_SIGNAL_CATEGORIES = [
   'phone',
   'email',
   'external_url',
+  'external_handle',
 ] as const satisfies readonly ChatPolicySignalCategory[];
 
 export const CHAT_POLICY_SIGNAL_LABELS: Record<ChatPolicySignalCategory, string> = {
@@ -34,7 +35,7 @@ const EMAIL_REGEX = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
 const EXTERNAL_URL_REGEX =
   /(?:https?:\/\/|www\.)?[^\s]*?(?:open\.kakao\.com|t\.me|telegram\.me|line\.me|wa\.me|discord\.gg|instagram\.com)[^\s]*/i;
 const EXTERNAL_HANDLE_REGEX =
-  /(?:카톡|카카오톡|텔레그램|텔레|라인|위챗|wechat|discord|인스타|instagram|insta|오픈채팅)\s*(?:id|아이디|handle)?\s*[:\-]?\s*@?[A-Z0-9._-]{4,}/i;
+  /(?:^|[\s([{\"'“‘])(?:카톡|카카오톡|kakaotalk|텔레그램|텔레|라인|line|위챗|wechat|discord|인스타그램|인스타|instagram|insta|오픈채팅)\s+(?:id|아이디|handle)(?:(?:은|는)|(?:\s+is))?\s*[:：=\-]?\s*@?[A-Z0-9][A-Z0-9._-]{3,31}(?![A-Z0-9._-])/i;
 const BANK_CONTEXT_REGEX =
   /(?:계좌|입금|송금|예금주|국민|신한|농협|우리|하나|기업|카카오뱅크|토스뱅크|새마을|우체국|수협|부산|대구|광주|전북|경남|SC제일|씨티).{0,12}\b\d[\d\s-]{6,22}\b/i;
 

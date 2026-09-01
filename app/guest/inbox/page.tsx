@@ -24,25 +24,7 @@ import {
   OFFICIAL_SUPPORT_SENDER_NAME,
 } from '@/app/utils/officialSender';
 import { ProxyBankTransferNotice } from '@/app/components/proxy/ProxyBankTransferNotice';
-
-const CHAT_POLICY_WARNING_COPY = {
-  ko: {
-    title: '연락처·외부 링크 공유는 제재 대상입니다.',
-    body: '전화번호, 이메일, URL 등이 포함된 메시지는 운영팀에 전달될 수 있습니다.',
-  },
-  en: {
-    title: 'Sharing contact details or external links may lead to penalties.',
-    body: 'Messages containing phone numbers, emails, or URLs may be reviewed by the team.',
-  },
-  ja: {
-    title: '連絡先や外部リンクの共有は制裁対象となる場合があります。',
-    body: '電話番号、メールアドレス、URL を含むメッセージは運営チームが確認することがあります。',
-  },
-  zh: {
-    title: '分享联系方式或外部链接可能会导致处罚。',
-    body: '包含电话号码、邮箱或 URL 的消息可能会被运营团队审核。',
-  },
-} as const;
+import ChatSafetyNotice from '@/app/components/chat/ChatSafetyNotice';
 
 type ProxyBankTransferGuidance = {
   requestId: string;
@@ -110,7 +92,6 @@ function InboxContent() {
       : { matched: false, categories: [] },
     [inputText, selectedInquiry?.type]
   );
-  const chatPolicyWarningCopy = CHAT_POLICY_WARNING_COPY[lang] ?? CHAT_POLICY_WARNING_COPY.ko;
 
   const loadProxyBankTransferGuidance = useCallback(async (targetInquiryId: string | number) => {
     const response = await fetch(`/api/proxy-bookings/inquiry/${encodeURIComponent(String(targetInquiryId))}`, {
@@ -585,6 +566,10 @@ function InboxContent() {
                 </div>
               </div>
 
+              {shouldApplyChatPolicySignals(selectedInquiry.type) && (
+                <ChatSafetyNotice emailSettingsHref="/account" />
+              )}
+
               {/* 메시지 영역 */}
               <div
                 data-testid="guest-inbox-message-thread"
@@ -702,8 +687,8 @@ function InboxContent() {
               <div className="px-2.5 md:px-5 py-2 md:py-3 bg-white border-t border-gray-100 shrink-0">
                 {chatPolicySignals.matched && (
                   <div className="mb-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2">
-                    <div className="text-[11px] md:text-[12px] font-bold text-rose-700">{chatPolicyWarningCopy.title}</div>
-                    <div className="mt-0.5 text-[10px] md:text-[11px] text-rose-600">{chatPolicyWarningCopy.body}</div>
+                    <div className="text-[11px] md:text-[12px] font-bold text-rose-700">{t('chat_policy_detected_title')}</div>
+                    <div className="mt-0.5 text-[10px] md:text-[11px] text-rose-600">{t('chat_policy_detected_body')}</div>
                   </div>
                 )}
                 <div className="flex items-end gap-1.5 md:gap-3">
