@@ -146,6 +146,7 @@ export default function ExperienceClient({
   const [availabilitySummary, setAvailabilitySummary] = useState<ExperienceAvailabilitySummary>(initialAvailabilitySummary);
 
   const [inquiryText, setInquiryText] = useState('');
+  const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const {
@@ -599,6 +600,9 @@ export default function ExperienceClient({
             handleInquiry={handleInquiry}
             inquiryText={inquiryText}
             setInquiryText={setInquiryText}
+            isMessageModalOpen={isMessageModalOpen}
+            onOpenHostMessage={() => setIsMessageModalOpen(true)}
+            onCloseHostMessage={() => setIsMessageModalOpen(false)}
             translatedDescription={translatedDescription}
             translatedCategory={category}
           />
@@ -609,6 +613,7 @@ export default function ExperienceClient({
             calendarDayStatusMap={calendarDayStatusMap}
             slotSummaryMap={slotSummaryMap}
             handleReserve={handleReserve}
+            onContactHost={() => setIsMessageModalOpen(true)}
           />
         </div>
       </main>

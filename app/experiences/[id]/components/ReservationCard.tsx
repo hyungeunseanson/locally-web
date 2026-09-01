@@ -23,13 +23,14 @@ interface ReservationCardProps {
   maxGuests?: number;
   slotSummaryMap?: Record<string, ExperienceSlotSummary>;
   onReserve: (date: string, time: string, guests: number, isPrivate: boolean, isSoloGuaranteed: boolean) => void;
+  onContactHost?: () => void;
 }
 
 export default function ReservationCard({
   price, privatePrice = 0, isPrivateEnabled = false, soloGuaranteePrice: soloGuaranteePriceProp,
   soloGuaranteeOptionVisible = true,
   duration, availableDates, dateToTimeMap, calendarDayStatusMap = {}, onReserve,
-  maxGuests = 10, slotSummaryMap = {}
+  onContactHost, maxGuests = 10, slotSummaryMap = {}
 }: ReservationCardProps) {
   const { t } = useLanguage();
   const soloGuaranteePrice = normalizeSoloGuaranteePrice(soloGuaranteePriceProp);
@@ -200,16 +201,30 @@ export default function ReservationCard({
 
   return (
     <div className="sticky top-28 border border-slate-200 shadow-[0_6px_16px_rgba(0,0,0,0.12)] rounded-2xl p-5 md:p-6 bg-white md:max-h-[calc(100dvh-8rem)] md:overflow-y-auto md:overscroll-contain">
-      <div className="flex justify-between items-end mb-5">
-        <div>
+      <div data-testid="reservation-price-row" className="relative mb-5 flex items-end">
+        <div className="min-w-0 pr-[118px]">
           <span className="text-xl md:text-2xl font-semibold">₩{isPrivate ? privatePrice.toLocaleString() : price.toLocaleString()}</span> 
           <span className="text-slate-500 text-xs md:text-sm"> {isPrivate ? t('exp_reservation_price_team_private') : t('exp_reservation_price_per_person')}</span>
         </div>
+        <button
+          type="button"
+          data-testid="reservation-date-inquiry"
+          onClick={onContactHost}
+          disabled={!onContactHost}
+          className="reservation-date-inquiry absolute right-0 top-1/2 z-20 flex min-h-[50px] w-[108px] -translate-y-1/2 items-center rounded-xl border border-white/80 bg-white/70 px-2.5 py-1.5 text-left text-[9px] font-medium leading-[1.35] tracking-[-0.025em] text-slate-700 shadow-[0_5px_14px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/55 backdrop-blur-lg transition-colors hover:bg-white/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-800 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:w-[112px] md:text-[9.5px]"
+        >
+          <span className="whitespace-pre-line [word-break:keep-all]">
+            {t('exp_reservation_date_inquiry_message')}
+          </span>
+        </button>
       </div>
 
-      <div className="border border-slate-300 rounded-xl mb-4 overflow-hidden">
-        {/* 달력 헤더 */}
-        <div className="p-3.5 md:p-4 border-b border-slate-200 bg-white">
+      <div
+        data-testid="reservation-calendar-panel"
+        className="mb-4 overflow-hidden rounded-xl border border-slate-300"
+      >
+          {/* 달력 헤더 */}
+          <div className="p-3.5 md:p-4 border-b border-slate-200 bg-white">
           <div className="flex justify-between items-center mb-3">
             <button
               data-testid="reservation-prev-month"

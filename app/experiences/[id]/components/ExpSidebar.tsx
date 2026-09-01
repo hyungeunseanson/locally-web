@@ -11,6 +11,7 @@ type ExpSidebarProps = {
   calendarDayStatusMap: Record<string, ExperienceCalendarDayStatus>;
   slotSummaryMap: Record<string, ExperienceSlotSummary>;
   handleReserve: (date: string, time: string, guests: number, isPrivate: boolean, isSoloGuaranteed: boolean) => void;
+  onContactHost: () => void;
 };
 
 export default function ExpSidebar({
@@ -19,7 +20,8 @@ export default function ExpSidebar({
   dateToTimeMap,
   calendarDayStatusMap,
   slotSummaryMap,
-  handleReserve
+  handleReserve,
+  onContactHost,
 }: ExpSidebarProps) {
   return (
     <div id="reservation-card" className="w-full md:w-[380px] scroll-mt-24 md:-mt-[150px]">
@@ -36,6 +38,7 @@ export default function ExpSidebar({
         dateToTimeMap={dateToTimeMap}
         calendarDayStatusMap={calendarDayStatusMap}
         onReserve={handleReserve}
+        onContactHost={onContactHost}
       />
     </div>
   );

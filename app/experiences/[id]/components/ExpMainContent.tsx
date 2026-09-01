@@ -26,6 +26,9 @@ type MainContentProps = {
   handleInquiry: () => Promise<boolean>;
   inquiryText: string;
   setInquiryText: React.Dispatch<React.SetStateAction<string>>;
+  isMessageModalOpen: boolean;
+  onOpenHostMessage: () => void;
+  onCloseHostMessage: () => void;
   translatedDescription?: string;
   translatedCategory?: string;
 };
@@ -37,12 +40,12 @@ function normalizeItineraryDescriptionForDisplay(value: string) {
 }
 
 export default function ExpMainContent({
-  experience, hostProfile, handleInquiry, inquiryText, setInquiryText, translatedDescription, translatedCategory
+  experience, hostProfile, handleInquiry, inquiryText, setInquiryText, isMessageModalOpen,
+  onOpenHostMessage, onCloseHostMessage, translatedDescription, translatedCategory
 }: MainContentProps) {
   const { lang, t } = useLanguage();
   const fixedRefundPolicy = getLocalizedRefundPolicyLabel(lang);
   const { showToast } = useToast();
-  const [isMessageModalOpen, setIsMessageModalOpen] = React.useState(false);
   const [isSubmittingMessage, setIsSubmittingMessage] = React.useState(false);
   const meetingPoint = getLocalizedExperienceText(experience, 'meeting_point', lang).trim();
   const addressLine = (experience.location || '').trim();
@@ -83,16 +86,12 @@ export default function ExpMainContent({
     showToast(t('trip_copy_address_done'), 'success');
   };
 
-  const openHostMessage = () => {
-    setIsMessageModalOpen(true);
-  };
-
   const handleSubmitMessage = async () => {
     if (!inquiryText.trim()) return;
     setIsSubmittingMessage(true);
     const success = await handleInquiry();
     setIsSubmittingMessage(false);
-    if (success) setIsMessageModalOpen(false);
+    if (success) onCloseHostMessage();
   };
 
   return (
@@ -192,7 +191,7 @@ export default function ExpMainContent({
         intro={hostProfile?.introduction}
         joinedYear={hostProfile?.joined_year}
         category={translatedCategory || experience.category || t('cat_exp')}
-        onMessageHost={openHostMessage}
+        onMessageHost={onOpenHostMessage}
       />
 
       {/* 알아두어야 할 사항 */}
@@ -295,14 +294,14 @@ export default function ExpMainContent({
       {isMessageModalOpen && (
         <div
           className="fixed inset-0 z-[210] flex items-end bg-black/35 px-[7px] pb-[calc(max(env(safe-area-inset-bottom,0px),0px)+7px)] pt-4 backdrop-blur-[1px] md:items-center md:justify-center md:p-4"
-          onClick={() => setIsMessageModalOpen(false)}
+          onClick={onCloseHostMessage}
         >
           <div
             className="flex max-h-[68dvh] w-full max-w-[430px] flex-col overflow-y-auto rounded-[24px] bg-[#fcfcfc] px-4 pt-4 pb-[calc(max(env(safe-area-inset-bottom,0px),0px)+14px)] shadow-[0_18px_48px_rgba(15,23,42,0.22)] md:max-h-[78dvh] md:max-w-[560px] md:rounded-[28px] md:px-7 md:pt-6 md:pb-6 md:shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-1 flex justify-end">
-              <button onClick={() => setIsMessageModalOpen(false)} className="rounded-full p-1.5 text-slate-600 transition-colors hover:bg-slate-100">
+              <button onClick={onCloseHostMessage} className="rounded-full p-1.5 text-slate-600 transition-colors hover:bg-slate-100">
                 <span className="sr-only">{t('common_close')}</span>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
