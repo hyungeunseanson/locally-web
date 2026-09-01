@@ -31,6 +31,10 @@ import {
   toExperienceRawRows,
   type PublicHostApplicationViewModel,
 } from './experienceRowHelpers';
+import {
+  EXPERIENCE_DETAIL_SELECT,
+  getPublicExperienceDetail,
+} from './publicDetailData.server';
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -55,55 +59,6 @@ const EXPERIENCE_METADATA_SELECT = [
   'description_zh',
   'photos',
   'image_url',
-  'status',
-  'is_active',
-].join(', ');
-
-const EXPERIENCE_DETAIL_SELECT = [
-  'id',
-  'host_id',
-  'title',
-  'description',
-  'title_ko',
-  'description_ko',
-  'title_en',
-  'description_en',
-  'title_ja',
-  'description_ja',
-  'title_zh',
-  'description_zh',
-  'city',
-  'country',
-  'category',
-  'category_en',
-  'category_ja',
-  'category_zh',
-  'languages',
-  'language_levels',
-  'meeting_point',
-  'meeting_point_i18n',
-  'location',
-  'rating',
-  'review_count',
-  'price',
-  'private_price',
-  'is_private_enabled',
-  'solo_guarantee_price',
-  'solo_guarantee_option_visible',
-  'photos',
-  'image_url',
-  'max_guests',
-  'duration',
-  'supplies',
-  'supplies_i18n',
-  'inclusions',
-  'inclusions_i18n',
-  'exclusions',
-  'exclusions_i18n',
-  'itinerary',
-  'itinerary_i18n',
-  'rules',
-  'rules_i18n',
   'status',
   'is_active',
 ].join(', ');
@@ -223,16 +178,18 @@ export async function generateMetadata(
 ): Promise<Metadata> {
   const { id } = await params;
   const locale = await getCurrentLocale(); // 현재 언어 감지
-  const supabase = await createClient();
+  const publicSnapshot = await getPublicExperienceDetail(id);
+  const supabase = publicSnapshot ? null : await createClient();
+  const { data: experience } = supabase
+    ? await supabase
+        .from('experiences')
+        .select(EXPERIENCE_METADATA_SELECT)
+        .eq('id', id)
+        .maybeSingle()
+    : { data: null };
 
-  // 모든 다국어 컬럼 조회
-  const { data: experience } = await supabase
-    .from('experiences')
-    .select(EXPERIENCE_METADATA_SELECT)
-    .eq('id', id)
-    .maybeSingle();
-
-  const normalizedExperience = normalizeExperienceMetadataRow(experience);
+  const normalizedExperience =
+    publicSnapshot?.experience ?? normalizeExperienceMetadataRow(experience);
   if (!normalizedExperience) {
     const rawExperience = toExperienceRawRow(experience);
     if (rawExperience) {
@@ -293,10 +250,11 @@ export async function generateMetadata(
     };
   }
 
-  const publicHostApplication = await loadPublicHostApplication(
-    supabase,
-    normalizedExperience.host_id
-  );
+  const publicHostApplication =
+    publicSnapshot?.publicHostApplication ??
+    (supabase
+      ? await loadPublicHostApplication(supabase, normalizedExperience.host_id)
+      : null);
   if (!isPublicHostApplicationStatus(publicHostApplication?.status)) {
     return {
       ...metadata,
@@ -316,14 +274,18 @@ export async function generateMetadata(
 export default async function Page({ params }: Props) {
   const { id } = await params;
   const locale = await getCurrentLocale();
-  const supabase = await createClient();
+  const publicSnapshot = await getPublicExperienceDetail(id);
+  const supabase = publicSnapshot ? null : await createClient();
 
-  // 1. 병렬 데이터 페칭 (속도 최적화)
-  const expResult = await supabase
-    .from('experiences')
-    .select(EXPERIENCE_DETAIL_SELECT)
-    .eq('id', id)
-    .maybeSingle();
+  // Public rows use a locale-neutral shared cache. Non-public rows retain the
+  // existing cookie-aware read so host/admin preview behavior does not change.
+  const expResult = supabase
+    ? await supabase
+        .from('experiences')
+        .select(EXPERIENCE_DETAIL_SELECT)
+        .eq('id', id)
+        .maybeSingle()
+    : { data: null, error: null };
 
   if (expResult.error) {
     console.error('[Experience detail] Failed to load experience:', {
@@ -335,7 +297,8 @@ export default async function Page({ params }: Props) {
     });
   }
 
-  const experience = normalizeExperienceDetailRow(expResult.data);
+  const experience =
+    publicSnapshot?.experience ?? normalizeExperienceDetailRow(expResult.data);
   if (!experience) {
     const rawExperience = toExperienceRawRow(expResult.data);
     if (rawExperience) {
@@ -353,10 +316,13 @@ export default async function Page({ params }: Props) {
   }
 
   const isPublicExperience = isPublicExperienceViewModel(experience);
-  let visibleHostApplication: PublicHostApplicationViewModel | null = null;
+  let visibleHostApplication: PublicHostApplicationViewModel | null =
+    publicSnapshot?.publicHostApplication ?? null;
 
   if (isPublicExperience) {
-    visibleHostApplication = await loadPublicHostApplication(supabase, experience.host_id);
+    visibleHostApplication =
+      visibleHostApplication ??
+      (supabase ? await loadPublicHostApplication(supabase, experience.host_id) : null);
 
     if (!isPublicHostApplicationStatus(visibleHostApplication?.status)) {
       return notFound();
@@ -364,7 +330,7 @@ export default async function Page({ params }: Props) {
   }
 
   // 2. 호스트 프로필 데이터 가져오기
-  let hostProfile: HostProfileDetail = null;
+  let hostProfile: HostProfileDetail = publicSnapshot?.hostProfile ?? null;
   const adminSupabase = createAdminClient();
   const [availabilitySummary, hostProfileResult] = await Promise.all([
     fetchExperienceAvailabilitySummary(
@@ -377,11 +343,14 @@ export default async function Page({ params }: Props) {
         return null;
       }
 
-      const [{ data: profile }, app] = await Promise.all([
-        supabase.from('public_profiles').select(HOST_PROFILE_SELECT).eq('id', experience.host_id).maybeSingle(),
-        visibleHostApplication ? Promise.resolve(visibleHostApplication) : loadPublicHostApplication(supabase, experience.host_id),
-      ]);
+      const app =
+        visibleHostApplication ??
+        (supabase ? await loadPublicHostApplication(supabase, experience.host_id) : null);
       const publicHostApplication = isPublicHostApplicationStatus(app?.status) ? app : null;
+      if (publicSnapshot?.hostProfile?.nationality) {
+        return publicSnapshot.hostProfile;
+      }
+
       const hostApplicationNationality =
         publicHostApplication?.id
           ? await adminSupabase
@@ -406,6 +375,26 @@ export default async function Page({ params }: Props) {
               })
           : null;
 
+      if (publicSnapshot) {
+        const cachedHostProfile = publicSnapshot.hostProfile;
+        if (cachedHostProfile && !cachedHostProfile.nationality && hostApplicationNationality) {
+          return {
+            ...cachedHostProfile,
+            nationality: hostApplicationNationality,
+          };
+        }
+        return cachedHostProfile;
+      }
+
+      if (!supabase) {
+        return null;
+      }
+
+      const { data: profile } = await supabase
+        .from('public_profiles')
+        .select(HOST_PROFILE_SELECT)
+        .eq('id', experience.host_id)
+        .maybeSingle();
       const normalizedProfile = normalizeHostProfileRow(profile);
       const cachedReviewCount = normalizedProfile?.total_review_count;
       const cachedAverageRating = normalizedProfile?.average_rating;
