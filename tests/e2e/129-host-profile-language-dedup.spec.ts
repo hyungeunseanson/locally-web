@@ -301,5 +301,16 @@ test.describe.serial('Host profile language dedup', () => {
     await expect(
       page.getByText(/영어, 영어|English, English|英語, 英語|英语, 英语/)
     ).toHaveCount(0);
+
+    await expect(page.getByRole('button', { name: /호스트에게 연락하기|Contact host|ホストに連絡する|联系房东/ })).toBeVisible();
+
+    const fullProfileLink = page.getByTestId('host-profile-full-link');
+    await expect(fullProfileLink).toBeVisible();
+    await expect(fullProfileLink).toHaveAttribute('href', `/users/${userId}`);
+    await fullProfileLink.click();
+
+    await expect(page).toHaveURL(new RegExp(`/users/${userId}$`));
+    await expect(page.getByRole('heading', { name: user.fullName, exact: true })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('public-host-experiences-section')).toBeVisible();
   });
 });

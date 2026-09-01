@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { X, Star, Briefcase, Globe, Music, MessageCircle, User } from 'lucide-react';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { formatLanguageLevelLabel, getLocalizedLanguageLabel } from '@/app/utils/languageLevels';
@@ -337,10 +338,19 @@ export default function HostProfileModal({ isOpen, onClose, host }: HostProfileM
             </p>
           </div>
 
-          <div className="mt-6 md:mt-12 pt-4 md:pt-8 border-t border-slate-100">
+          <div className="mt-6 flex flex-col gap-3 border-t border-slate-100 pt-4 md:mt-12 md:flex-row md:items-center md:pt-8">
             <button onClick={handleContactHost} className="w-full md:w-auto bg-black text-white px-6 md:px-8 py-3 md:py-4 rounded-lg md:rounded-xl text-[14px] md:text-base font-bold hover:scale-105 transition-transform shadow-lg">
               {t('exp_host_contact_button')}
             </button>
+            {host.hostId ? (
+              <Link
+                href={`/users/${host.hostId}`}
+                data-testid="host-profile-full-link"
+                className="w-full rounded-lg border border-slate-300 bg-white px-6 py-3 text-center text-[14px] font-bold text-slate-900 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2 md:w-auto md:rounded-xl md:px-8 md:py-4 md:text-base"
+              >
+                {t('exp_host_full_profile_link')}
+              </Link>
+            ) : null}
           </div>
         </div>
       </div>
