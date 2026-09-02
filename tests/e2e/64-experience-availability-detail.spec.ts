@@ -105,7 +105,9 @@ test.describe.serial('Experience detail availability summary', () => {
         },
       },
     };
-    await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow')));
+    await page.evaluate(() =>
+      window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))
+    );
 
     await expect(getVisibleReservationByTestId(page, `reservation-day-${experience.date}`)).toBeEnabled();
     await expect(inquiry).toBeVisible();
