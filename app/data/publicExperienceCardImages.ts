@@ -1,8 +1,8 @@
 export const PUBLIC_EXPERIENCE_CARD_IMAGES = {
   "3071": {
-    originUrl: "https://uhinvcydgzqlpnvieyal.supabase.co/storage/v1/object/public/experiences/experience/d52cf65d-db72-4496-8c79-8cc716c76304/hero/1777271489883_1777271489883-7eg21sl5.jpeg",
-    smallKey: "cards/experience-3071-primary-cda75822c64b-w384-q65.webp",
-    largeKey: "cards/experience-3071-primary-cda75822c64b-w640-q65.webp",
+    originUrl: "https://uhinvcydgzqlpnvieyal.supabase.co/storage/v1/object/public/experiences/experience/d52cf65d-db72-4496-8c79-8cc716c76304/hero/1788228174785_1788228174785-0ufavu39.jpg",
+    smallKey: "cards/experience-3071-primary-bdeebdcd9f1e-w384-q65.webp",
+    largeKey: "cards/experience-3071-primary-bdeebdcd9f1e-w640-q65.webp",
   },
   "3081": {
     originUrl: "https://uhinvcydgzqlpnvieyal.supabase.co/storage/v1/object/public/experiences/experience/12d2d745-c10a-4a64-bdd4-74fa7bd4bb3c/hero/1777386951281_1777386951281-ba1rmxt4.jpg",
@@ -109,11 +109,6 @@ export const PUBLIC_EXPERIENCE_CARD_IMAGES = {
     smallKey: "cards/experience-3861-primary-9fdbcd3739c5-w384-q65.webp",
     largeKey: "cards/experience-3861-primary-9fdbcd3739c5-w640-q65.webp",
   },
-  "3905": {
-    originUrl: "https://uhinvcydgzqlpnvieyal.supabase.co/storage/v1/object/public/experiences/experience/f10179e2-567a-416e-956a-67e194ced1ff/hero/1784706273419_1784706273419-fszpdp6t.jpeg",
-    smallKey: "cards/experience-3905-primary-9c71a967362e-w384-q65.webp",
-    largeKey: "cards/experience-3905-primary-9c71a967362e-w640-q65.webp",
-  },
   "4262": {
     originUrl: "https://uhinvcydgzqlpnvieyal.supabase.co/storage/v1/object/public/experiences/experience/92e78ae8-34af-44ea-a89b-a8c54fbb97f3/hero/1785030414524_1785030414524-iwg715bg.jpeg",
     smallKey: "cards/experience-4262-primary-18bc984f7583-w384-q65.webp",
@@ -129,11 +124,6 @@ export const PUBLIC_EXPERIENCE_CARD_IMAGES = {
     smallKey: "cards/experience-4397-primary-1a708cc13d44-w384-q65.webp",
     largeKey: "cards/experience-4397-primary-1a708cc13d44-w640-q65.webp",
   },
-  "4412": {
-    originUrl: "https://uhinvcydgzqlpnvieyal.supabase.co/storage/v1/object/public/experiences/experience/86a2ec04-943a-49ce-aca5-fbee2e0fac52/hero/1785771243477_1785771243477-41do49jw.jpeg",
-    smallKey: "cards/experience-4412-primary-dab49a2b74de-w384-q65.webp",
-    largeKey: "cards/experience-4412-primary-dab49a2b74de-w640-q65.webp",
-  },
   "4413": {
     originUrl: "https://uhinvcydgzqlpnvieyal.supabase.co/storage/v1/object/public/experiences/experience/6851a5b0-9ef4-4c87-af67-de7976beb5b7/hero/1785846018127_1785846018127-5eamcvwf.jpeg",
     smallKey: "cards/experience-4413-primary-50a06fae01bc-w384-q65.webp",
@@ -143,11 +133,6 @@ export const PUBLIC_EXPERIENCE_CARD_IMAGES = {
     originUrl: "https://uhinvcydgzqlpnvieyal.supabase.co/storage/v1/object/public/experiences/experience/c95498f8-aa1f-4d50-8a04-d53b484c0287/hero/1786024564803_1786024564803-msa6q9a7.jpg",
     smallKey: "cards/experience-4414-primary-35b627809d3c-w384-q65.webp",
     largeKey: "cards/experience-4414-primary-35b627809d3c-w640-q65.webp",
-  },
-  "4415": {
-    originUrl: "https://uhinvcydgzqlpnvieyal.supabase.co/storage/v1/object/public/experiences/experience/86a2ec04-943a-49ce-aca5-fbee2e0fac52/hero/1786064914432_1786064914432-ivleeuim.jpeg",
-    smallKey: "cards/experience-4415-primary-3df24f344eb7-w384-q65.webp",
-    largeKey: "cards/experience-4415-primary-3df24f344eb7-w640-q65.webp",
   },
   "4424": {
     originUrl: "https://uhinvcydgzqlpnvieyal.supabase.co/storage/v1/object/public/experiences/experience/6851a5b0-9ef4-4c87-af67-de7976beb5b7/hero/1786111809560_1786111809560-zqe8mgzq.jpeg",
@@ -173,5 +158,10 @@ export const PUBLIC_EXPERIENCE_CARD_IMAGES = {
     originUrl: "https://uhinvcydgzqlpnvieyal.supabase.co/storage/v1/object/public/experiences/experience/89aa4dba-4cc1-43a1-b15a-79a4de42822b/hero/1787272877005_1787272877005-2osff2ks.jpeg",
     smallKey: "cards/experience-4660-primary-d1ab8583b864-w384-q65.webp",
     largeKey: "cards/experience-4660-primary-d1ab8583b864-w640-q65.webp",
+  },
+  "4811": {
+    originUrl: "https://uhinvcydgzqlpnvieyal.supabase.co/storage/v1/object/public/experiences/experience/06672b87-3a70-40c9-88e9-d382ee393b6b/hero/1788018086681_1788018086681-56ohxq7o.jpeg",
+    smallKey: "cards/experience-4811-primary-ede2e8717aac-w384-q65.webp",
+    largeKey: "cards/experience-4811-primary-ede2e8717aac-w640-q65.webp",
   },
 } as const;
