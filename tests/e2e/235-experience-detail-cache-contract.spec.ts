@@ -8,6 +8,7 @@ const cacheSource = readFileSync(
   'utf8'
 );
 const clientSource = readFileSync('app/experiences/[id]/ExperienceClient.tsx', 'utf8');
+const bookingSource = readFileSync('app/api/bookings/route.ts', 'utf8');
 const paymentSource = readFileSync('app/experiences/[id]/payment/page.tsx', 'utf8');
 
 test.describe('experience detail public cache contract', () => {
@@ -64,9 +65,18 @@ test.describe('experience detail public cache contract', () => {
 
     expect(clientSource).toContain(`/api/experiences/${'${experienceId}'}/availability-summary`);
     expect(clientSource).toContain("cache: 'no-store'");
+    expect(clientSource).not.toMatch(
+      /useEffect\(\(\) => \{\s*void refreshAvailability\(\);\s*\}, \[refreshAvailability\]\);/
+    );
+    expect(clientSource).toContain('const handlePageShow = (event: PageTransitionEvent) => {');
+    expect(clientSource).toContain('if (!event.persisted)');
+    expect(clientSource).toContain("window.addEventListener('pageshow', handlePageShow)");
     expect(clientSource).toContain('useAuth()');
     expect(clientSource).toContain('useWishlist(experienceId)');
 
+    expect(bookingSource).toContain(".from('experiences')");
+    expect(bookingSource).toContain(".from('bookings')");
+    expect(bookingSource).toContain(".rpc('create_booking_atomic'");
     expect(paymentSource).toContain(".from('experiences')");
     expect(paymentSource).toContain(
       ".select('title, image_url, photos, location, price, private_price, max_guests, host_id, solo_guarantee_price, solo_guarantee_option_visible, rules, rules_i18n')"

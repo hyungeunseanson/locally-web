@@ -213,10 +213,6 @@ export default function ExperienceClient({
     }
   }, [experienceId]);
 
-  useEffect(() => {
-    void refreshAvailability();
-  }, [refreshAvailability]);
-
   // 🟢 체험 상세페이지 진입 시 조회(view) 이벤트 기록
   useEffect(() => {
     if (experience?.id) {
@@ -228,7 +224,11 @@ export default function ExperienceClient({
   }, [experience?.id]);
 
   useEffect(() => {
-    const handlePageShow = () => {
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (!event.persisted) {
+        return;
+      }
+
       void refreshAvailability();
     };
 
