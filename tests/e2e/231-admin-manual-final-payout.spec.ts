@@ -8,6 +8,10 @@ const hardeningMigration = readFileSync(
   'docs/migrations/v3_40_40_admin_manual_payout_privilege_hardening.sql',
   'utf8'
 ).replace(/\s+/g, ' ').trim();
+const zeroCancellationMigration = readFileSync(
+  'docs/migrations/v3_40_41_admin_manual_payout_zero_cancellation.sql',
+  'utf8'
+).replace(/\s+/g, ' ').trim();
 const completeRoute = readFileSync('app/api/admin/manual-payouts/complete/route.ts', 'utf8');
 const previewRoute = readFileSync('app/api/admin/manual-payouts/preview/route.ts', 'utf8');
 const payoutQueueRoute = readFileSync('app/api/admin/payout-queue/route.ts', 'utf8');
@@ -83,6 +87,30 @@ test.describe('admin manual final payout contract', () => {
     expect(manualPayoutPreview).toContain(
       'status.in.(PAID,confirmed),and(status.eq.completed,payout_status.neq.paid),and(status.eq.completed,payout_status.is.null)'
     );
+  });
+
+  test('ignores only resolved zero-payout cancellations and preserves every other blocker', () => {
+    expect(manualPayoutPreview).toContain('isIgnorableZeroPayoutCancellation');
+    expect(manualPayoutPreview).toContain("String(row.status || '').toLowerCase() === 'cancelled'");
+    expect(manualPayoutPreview).toContain('row.host_payout_amount === 0');
+    expect(manualPayoutPreview).toContain('!isSoloGuaranteeRefundUnresolvedStatus');
+    expect(manualPayoutPreview).toContain('settlementRows');
+    expect(zeroCancellationMigration).toContain('b.host_payout_amount = 0');
+    expect(zeroCancellationMigration).toContain("b.solo_guarantee_refund_status IN ('processing', 'pending_manual', 'failed')");
+    expect(zeroCancellationMigration).toContain('b.host_payout_amount IS NULL');
+    expect(zeroCancellationMigration).toContain("b.status NOT IN ('cancelled', 'CANCELLED')");
+    expect(zeroCancellationMigration).toContain('FROM PUBLIC, anon, authenticated');
+    expect(zeroCancellationMigration).toContain('TO service_role');
+  });
+
+  test('explains missing manual payout inputs and invalidates stale transfer confirmation', () => {
+    expect(dialog).toContain('manual-payout-missing-requirements');
+    expect(dialog).toContain('Legacy 이월액 입력 후 총 지급액이 계산됩니다.');
+    expect(dialog).toContain('changeSettlementType');
+    expect(dialog).toContain('changeLegacyAmount');
+    expect(dialog.match(/setConfirmedTransfer\(false\)/g)).toHaveLength(2);
+    expect(dialog).toContain('disabled={!hasCalculatedTotal}');
+    expect(dialog).toContain('border border-slate-300 px-3 py-2');
   });
 
   test('separates all-time pending from paid-at history and fails closed on truncation', () => {

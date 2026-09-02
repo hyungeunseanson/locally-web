@@ -8,10 +8,19 @@ import { isSoloGuaranteeRefundUnresolvedStatus } from '@/app/utils/soloGuarantee
 
 type ExperienceBookingRow = {
   id: string;
+  status: string | null;
   payout_status: string | null;
   host_payout_amount: number | null;
   solo_guarantee_refund_status: string | null;
 };
+
+function isIgnorableZeroPayoutCancellation(row: ExperienceBookingRow) {
+  return (
+    String(row.status || '').toLowerCase() === 'cancelled' &&
+    row.host_payout_amount === 0 &&
+    !isSoloGuaranteeRefundUnresolvedStatus(row.solo_guarantee_refund_status)
+  );
+}
 
 export async function getAdminManualPayoutPreview(
   supabaseAdmin: SupabaseClient,
@@ -45,7 +54,7 @@ export async function getAdminManualPayoutPreview(
     for (let offset = 0; offset < 10000; offset += 500) {
       const { data, error } = await supabaseAdmin
         .from('bookings')
-        .select('id, payout_status, host_payout_amount, solo_guarantee_refund_status')
+        .select('id, status, payout_status, host_payout_amount, solo_guarantee_refund_status')
         .in('experience_id', experienceIds)
         .or('payout_status.eq.pending,payout_status.is.null')
         .in('status', ['completed', 'COMPLETED', 'cancelled', 'CANCELLED'])
@@ -95,30 +104,31 @@ export async function getAdminManualPayoutPreview(
   if (availabilityResult.error) throw new Error('수동 정산 DB migration이 아직 적용되지 않았습니다.');
 
   const pendingRows = (pendingResult.data || []) as ExperienceBookingRow[];
+  const settlementRows = pendingRows.filter((row) => !isIgnorableZeroPayoutCancellation(row));
   const blockers: string[] = [];
   const warnings: string[] = [];
   const hostExitBlockers: string[] = [];
 
-  const invalidPayoutStatusCount = pendingRows.filter((row) => row.payout_status !== 'pending').length;
+  const invalidPayoutStatusCount = settlementRows.filter((row) => row.payout_status !== 'pending').length;
   if (invalidPayoutStatusCount > 0) {
     blockers.push(`정산 상태를 pending으로 확인해야 하는 예약이 ${invalidPayoutStatusCount}건 있습니다.`);
   }
 
-  const missingSnapshotCount = pendingRows.filter(
+  const missingSnapshotCount = settlementRows.filter(
     (row) => row.host_payout_amount == null || row.host_payout_amount <= 0
   ).length;
   if (missingSnapshotCount > 0) {
     blockers.push(`지급액 스냅샷 확인이 필요한 예약이 ${missingSnapshotCount}건 있습니다.`);
   }
 
-  const unresolvedRefundCount = pendingRows.filter((row) =>
+  const unresolvedRefundCount = settlementRows.filter((row) =>
     isSoloGuaranteeRefundUnresolvedStatus(row.solo_guarantee_refund_status)
   ).length;
   if (unresolvedRefundCount > 0) {
     blockers.push(`환불 확인이 끝나지 않은 예약이 ${unresolvedRefundCount}건 있습니다.`);
   }
 
-  const currentBookingAmount = pendingRows.reduce(
+  const currentBookingAmount = settlementRows.reduce(
     (sum, row) => sum + Math.max(0, row.host_payout_amount ?? 0),
     0
   );
@@ -159,8 +169,8 @@ export async function getAdminManualPayoutPreview(
     host_id: hostId,
     host_name: application?.name || profile?.full_name || '알 수 없는 호스트',
     current_booking_amount: currentBookingAmount,
-    booking_count: pendingRows.length,
-    booking_ids: pendingRows.map((row) => row.id),
+    booking_count: settlementRows.length,
+    booking_ids: settlementRows.map((row) => row.id),
     bank_name: application?.bank_name || '',
     account_number: application?.account_number || '',
     account_holder: application?.account_holder || '',

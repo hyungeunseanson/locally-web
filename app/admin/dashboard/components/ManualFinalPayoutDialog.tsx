@@ -64,6 +64,8 @@ export default function ManualFinalPayoutDialog({ row, onClose, onCompleted }: P
   }, [row.host_id]);
 
   const legacyAmount = settlementType === 'legacy_carryover' ? Number(legacyAmountInput || 0) : 0;
+  const hasValidLegacyAmount = Number.isInteger(legacyAmount) && legacyAmount > 0;
+  const hasCalculatedTotal = settlementType !== 'legacy_carryover' || hasValidLegacyAmount;
   const totalPaidAmount = (preview?.current_booking_amount ?? 0) + (Number.isFinite(legacyAmount) ? legacyAmount : 0);
   const activeBlockers = useMemo(() => {
     if (!preview) return [];
@@ -72,17 +74,47 @@ export default function ManualFinalPayoutDialog({ row, onClose, onCompleted }: P
       : preview.blockers;
   }, [preview, settlementType]);
 
+  const missingRequirements = useMemo(() => {
+    if (!preview) return [];
+    const items: string[] = [];
+    if (settlementType === 'legacy_carryover') {
+      if (!hasValidLegacyAmount) items.push('Legacy 이월액을 1원 이상의 정수로 입력해 주세요.');
+      if (!legacySourceReference.trim()) items.push('Legacy 출처/참조를 입력해 주세요.');
+    }
+    if (!reason.trim()) items.push('정산 사유를 입력해 주세요.');
+    if (!transferReference.trim()) items.push('은행 이체 참조값을 입력해 주세요.');
+    if (settlementType === 'host_exit_final' && !confirmedHostExit) {
+      items.push('호스트 활동 종료 확인에 동의해 주세요.');
+    }
+    if (!confirmedTransfer) items.push('실제 은행 이체 완료를 확인해 주세요.');
+    return items;
+  }, [
+    confirmedHostExit,
+    confirmedTransfer,
+    hasValidLegacyAmount,
+    legacySourceReference,
+    preview,
+    reason,
+    settlementType,
+    transferReference,
+  ]);
+
   const canSubmit = Boolean(
     preview &&
       requestKey &&
       activeBlockers.length === 0 &&
-      reason.trim() &&
-      transferReference.trim() &&
-      confirmedTransfer &&
-      (settlementType !== 'host_exit_final' || confirmedHostExit) &&
-      (settlementType !== 'legacy_carryover' ||
-        (Number.isInteger(legacyAmount) && legacyAmount > 0 && legacySourceReference.trim()))
+      missingRequirements.length === 0
   );
+
+  const changeSettlementType = (nextType: AdminManualPayoutType) => {
+    setSettlementType(nextType);
+    setConfirmedTransfer(false);
+  };
+
+  const changeLegacyAmount = (nextValue: string) => {
+    setLegacyAmountInput(nextValue);
+    setConfirmedTransfer(false);
+  };
 
   const submit = async () => {
     if (!preview || !canSubmit || submitting) return;
@@ -142,31 +174,38 @@ export default function ManualFinalPayoutDialog({ row, onClose, onCompleted }: P
 
               <fieldset className="space-y-2">
                 <legend className="text-sm font-bold text-slate-800">정산 유형</legend>
-                <label className="flex gap-2 rounded-lg border p-3 text-sm"><input type="radio" checked={settlementType === 'host_exit_final'} onChange={() => setSettlementType('host_exit_final')} /> 활동 종료 최종 정산</label>
-                <label className="flex gap-2 rounded-lg border p-3 text-sm"><input type="radio" checked={settlementType === 'legacy_carryover'} onChange={() => setSettlementType('legacy_carryover')} /> 이전 사이트 이월</label>
+                <label className="flex gap-2 rounded-lg border p-3 text-sm"><input type="radio" checked={settlementType === 'host_exit_final'} onChange={() => changeSettlementType('host_exit_final')} /> 활동 종료 최종 정산</label>
+                <label className="flex gap-2 rounded-lg border p-3 text-sm"><input type="radio" checked={settlementType === 'legacy_carryover'} onChange={() => changeSettlementType('legacy_carryover')} /> 이전 사이트 이월</label>
               </fieldset>
 
               {settlementType === 'legacy_carryover' && (
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="text-sm font-medium text-slate-700">Legacy 이월액<input type="number" min="1" step="1" value={legacyAmountInput} onChange={(event) => setLegacyAmountInput(event.target.value)} className="mt-1 w-full rounded-lg border-slate-300" /></label>
-                  <label className="text-sm font-medium text-slate-700">Legacy 출처/참조<input value={legacySourceReference} onChange={(event) => setLegacySourceReference(event.target.value)} maxLength={500} className="mt-1 w-full rounded-lg border-slate-300" placeholder="이전 사이트 주문/정산 참조" /></label>
+                  <label className="text-sm font-medium text-slate-700">Legacy 이월액 <span className="text-red-600">필수</span><input type="number" min="1" step="1" value={legacyAmountInput} onChange={(event) => changeLegacyAmount(event.target.value)} aria-invalid={!hasValidLegacyAmount} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-600 focus:ring-2 focus:ring-slate-200" placeholder="이전 사이트 미정산액" /></label>
+                  <label className="text-sm font-medium text-slate-700">Legacy 출처/참조 <span className="text-red-600">필수</span><input value={legacySourceReference} onChange={(event) => setLegacySourceReference(event.target.value)} maxLength={500} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-600 focus:ring-2 focus:ring-slate-200" placeholder="이전 사이트 주문/정산 참조" /></label>
                 </div>
               )}
 
               <div className="rounded-xl border border-purple-200 bg-purple-50 p-4">
                 <p className="text-xs font-medium text-purple-700">실제 지급액</p>
-                <p className="text-2xl font-black text-purple-900">₩{totalPaidAmount.toLocaleString()}</p>
-                {settlementType === 'legacy_carryover' && <p className="text-xs text-purple-700">신규 ₩{preview.current_booking_amount.toLocaleString()} + legacy ₩{Math.max(0, legacyAmount).toLocaleString()}</p>}
+                {hasCalculatedTotal ? (
+                  <>
+                    <p className="text-2xl font-black text-purple-900">₩{totalPaidAmount.toLocaleString()}</p>
+                    {settlementType === 'legacy_carryover' && <p className="text-xs text-purple-700">신규 ₩{preview.current_booking_amount.toLocaleString()} + legacy ₩{legacyAmount.toLocaleString()}</p>}
+                  </>
+                ) : (
+                  <p className="mt-1 text-sm font-bold text-purple-900">Legacy 이월액 입력 후 총 지급액이 계산됩니다.</p>
+                )}
               </div>
 
-              <label className="block text-sm font-medium text-slate-700">정산 사유<textarea value={reason} onChange={(event) => setReason(event.target.value)} maxLength={1000} rows={3} className="mt-1 w-full rounded-lg border-slate-300" /></label>
-              <label className="block text-sm font-medium text-slate-700">은행 이체 참조값<input value={transferReference} onChange={(event) => setTransferReference(event.target.value)} maxLength={500} className="mt-1 w-full rounded-lg border-slate-300" placeholder="이체일시/메모/거래 참조" /></label>
+              <label className="block text-sm font-medium text-slate-700">정산 사유 <span className="text-red-600">필수</span><textarea value={reason} onChange={(event) => setReason(event.target.value)} maxLength={1000} rows={3} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-600 focus:ring-2 focus:ring-slate-200" placeholder="정산 사유를 입력해 주세요." /></label>
+              <label className="block text-sm font-medium text-slate-700">은행 이체 참조값 <span className="text-red-600">필수</span><input value={transferReference} onChange={(event) => setTransferReference(event.target.value)} maxLength={500} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-600 focus:ring-2 focus:ring-slate-200" placeholder="이체일시/메모/거래 참조" /></label>
 
               {activeBlockers.length > 0 && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"><p className="mb-1 flex items-center gap-1 font-bold"><AlertTriangle size={15} /> 처리 불가</p>{activeBlockers.map((item) => <p key={item}>• {item}</p>)}</div>}
+              {activeBlockers.length === 0 && missingRequirements.length > 0 && <div data-testid="manual-payout-missing-requirements" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"><p className="mb-1 font-bold">필수 항목 확인</p>{missingRequirements.map((item) => <p key={item}>• {item}</p>)}</div>}
               {preview.warnings.map((warning) => <p key={warning} className="rounded-lg bg-amber-50 p-3 text-xs text-amber-700">{warning}</p>)}
 
               {settlementType === 'host_exit_final' && <label className="flex gap-2 text-sm text-slate-700"><input type="checkbox" checked={confirmedHostExit} onChange={(event) => setConfirmedHostExit(event.target.checked)} /> 호스트의 향후 활동과 지급 가능성을 최종 확인했습니다.</label>}
-              <label className="flex gap-2 text-sm font-bold text-slate-800"><input type="checkbox" checked={confirmedTransfer} onChange={(event) => setConfirmedTransfer(event.target.checked)} /> 위 계좌로 ₩{totalPaidAmount.toLocaleString()}을 실제 이체했습니다.</label>
+              <label className="flex gap-2 text-sm font-bold text-slate-800"><input type="checkbox" checked={confirmedTransfer} disabled={!hasCalculatedTotal} onChange={(event) => setConfirmedTransfer(event.target.checked)} /> {hasCalculatedTotal ? `위 계좌로 ₩${totalPaidAmount.toLocaleString()}을 실제 이체했습니다.` : 'Legacy 이월액 입력 후 실제 이체 금액을 확인할 수 있습니다.'}</label>
             </>
           ) : null}
 
