@@ -2,9 +2,10 @@ import { readFileSync } from 'fs';
 
 import { createClient } from '@supabase/supabase-js';
 
+import { assertNonProductionSupabaseTarget } from './helpers/productionSupabaseGuard';
+
 type EnvMap = Record<string, string>;
 
-const PRODUCTION_SUPABASE_PROJECT_REF = 'uhinvcydgzqlpnvieyal';
 const ADMIN_WHITELIST_CLEANUP_OPT_IN = 'E2E_ALLOW_ADMIN_WHITELIST_CLEANUP';
 
 function loadEnv(): EnvMap {
@@ -18,15 +19,11 @@ function loadEnv(): EnvMap {
 }
 
 async function cleanupStaleCodexAdminWhitelist() {
+  assertNonProductionSupabaseTarget();
   const env = loadEnv();
   const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
   if (!supabaseUrl) {
     throw new Error('[playwright globalSetup] NEXT_PUBLIC_SUPABASE_URL is required.');
-  }
-
-  const projectRef = new URL(supabaseUrl).hostname.split('.')[0];
-  if (projectRef === PRODUCTION_SUPABASE_PROJECT_REF) {
-    throw new Error('[playwright globalSetup] Refusing to mutate the Production Supabase project.');
   }
 
   if (env[ADMIN_WHITELIST_CLEANUP_OPT_IN] !== 'true') {
@@ -73,5 +70,6 @@ async function cleanupStaleCodexAdminWhitelist() {
 }
 
 export default async function globalSetup() {
+  assertNonProductionSupabaseTarget();
   await cleanupStaleCodexAdminWhitelist();
 }

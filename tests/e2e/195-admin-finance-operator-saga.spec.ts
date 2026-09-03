@@ -16,7 +16,7 @@ import {
 
 const createdAuthUserIds: string[] = [];
 const createdWhitelistEmails: string[] = [];
-const createdHostApplicationIds: number[] = [];
+const createdHostApplicationIds: string[] = [];
 const createdExperienceIds: number[] = [];
 const createdBookingIds: string[] = [];
 const createdServiceRequestIds: string[] = [];
@@ -55,7 +55,7 @@ async function createApprovedHostApplication(userId: string, host: E2ETestUser) 
     throw error || new Error('Failed to create approved host application.');
   }
 
-  createdHostApplicationIds.push(Number(data.id));
+  createdHostApplicationIds.push(String(data.id));
 }
 
 async function createExperienceFixture(hostId: string) {
@@ -260,8 +260,13 @@ async function confirmDialogAction(page: Page, title: string, confirmLabel: stri
 test.afterAll(async () => {
   const supabase = getTestAdminClient();
 
+  const assertCleanupSucceeded = (label: string, error: { message?: string } | null) => {
+    if (error) throw new Error(`${label}: ${error.message || 'cleanup failed'}`);
+  };
+
   if (createdAuthUserIds.length > 0) {
-    await supabase.from('notifications').delete().in('user_id', createdAuthUserIds);
+    const { error } = await supabase.from('notifications').delete().in('user_id', createdAuthUserIds);
+    assertCleanupSucceeded('notifications cleanup', error);
   }
 
   const auditTargetIds = [
@@ -270,42 +275,57 @@ test.afterAll(async () => {
     ...createdServiceRequestIds,
   ];
   if (auditTargetIds.length > 0) {
-    await supabase.from('admin_audit_logs').delete().in('target_id', auditTargetIds);
+    const { error } = await supabase.from('admin_audit_logs').delete().in('target_id', auditTargetIds);
+    assertCleanupSucceeded('admin audit logs cleanup', error);
   }
 
   for (const bookingId of createdServiceBookingIds) {
-    await supabase.from('service_bookings').delete().eq('id', bookingId);
+    const { error } = await supabase.from('service_bookings').delete().eq('id', bookingId);
+    assertCleanupSucceeded(`service booking cleanup ${bookingId}`, error);
   }
 
   for (const applicationId of createdServiceApplicationIds) {
-    await supabase.from('service_applications').delete().eq('id', applicationId);
+    const { error } = await supabase.from('service_applications').delete().eq('id', applicationId);
+    assertCleanupSucceeded(`service application cleanup ${applicationId}`, error);
   }
 
   for (const requestId of createdServiceRequestIds) {
-    await supabase.from('service_requests').delete().eq('id', requestId);
+    const { error } = await supabase.from('service_requests').delete().eq('id', requestId);
+    assertCleanupSucceeded(`service request cleanup ${requestId}`, error);
   }
 
   for (const bookingId of createdBookingIds) {
-    await supabase.from('bookings').delete().eq('id', bookingId);
+    const { error } = await supabase.from('bookings').delete().eq('id', bookingId);
+    assertCleanupSucceeded(`booking cleanup ${bookingId}`, error);
   }
 
   for (const experienceId of createdExperienceIds) {
-    await supabase.from('experience_availability').delete().eq('experience_id', experienceId);
-    await supabase.from('experiences').delete().eq('id', experienceId);
+    const availabilityResult = await supabase
+      .from('experience_availability')
+      .delete()
+      .eq('experience_id', experienceId);
+    assertCleanupSucceeded(`experience availability cleanup ${experienceId}`, availabilityResult.error);
+    const experienceResult = await supabase.from('experiences').delete().eq('id', experienceId);
+    assertCleanupSucceeded(`experience cleanup ${experienceId}`, experienceResult.error);
   }
 
   for (const applicationId of createdHostApplicationIds) {
-    await supabase.from('host_applications').delete().eq('id', applicationId);
+    const { error } = await supabase.from('host_applications').delete().eq('id', applicationId);
+    assertCleanupSucceeded(`host application cleanup ${applicationId}`, error);
   }
 
   for (const email of createdWhitelistEmails) {
-    await supabase.from('admin_whitelist').delete().eq('email', email);
+    const { error } = await supabase.from('admin_whitelist').delete().eq('email', email);
+    assertCleanupSucceeded(`admin whitelist cleanup ${email}`, error);
   }
 
   for (const userId of createdAuthUserIds) {
-    await supabase.from('profiles').delete().eq('id', userId);
-    await supabase.from('users').delete().eq('id', userId);
-    await supabase.auth.admin.deleteUser(userId);
+    const profileResult = await supabase.from('profiles').delete().eq('id', userId);
+    assertCleanupSucceeded(`profile cleanup ${userId}`, profileResult.error);
+    const userResult = await supabase.from('users').delete().eq('id', userId);
+    assertCleanupSucceeded(`public user cleanup ${userId}`, userResult.error);
+    const authResult = await supabase.auth.admin.deleteUser(userId);
+    assertCleanupSucceeded(`auth user cleanup ${userId}`, authResult.error);
   }
 });
 

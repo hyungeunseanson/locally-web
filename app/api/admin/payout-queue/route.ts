@@ -561,7 +561,7 @@ export async function GET(request: Request) {
       if (!hostId) continue;
 
       const payoutAmount = getBookingHostPayout(booking);
-      if (booking.status === 'cancelled' && payoutAmount <= 0) {
+      if (String(booking.status || '').toLowerCase() === 'cancelled' && payoutAmount <= 0) {
         continue;
       }
 

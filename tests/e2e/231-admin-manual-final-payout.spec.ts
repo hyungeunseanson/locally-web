@@ -19,8 +19,16 @@ const salesTab = readFileSync('app/admin/dashboard/components/SalesTab.tsx', 'ut
 const dialog = readFileSync('app/admin/dashboard/components/ManualFinalPayoutDialog.tsx', 'utf8');
 const hostEarningsRoute = readFileSync('app/api/host/earnings/summary/route.ts', 'utf8');
 const manualPayoutPreview = readFileSync('app/utils/adminManualPayouts.ts', 'utf8');
+const basePlaywrightConfig = readFileSync('playwright.config.ts', 'utf8');
 const contractsConfig = readFileSync('playwright.contracts.config.ts', 'utf8');
+const cloudflareImagesConfig = readFileSync('playwright.cloudflare-images.config.ts', 'utf8');
+const livePlaywrightConfig = readFileSync('playwright.live.config.ts', 'utf8');
+const adsensePlaywrightConfig = readFileSync('playwright.adsense.config.ts', 'utf8');
+const domainQaPlaywrightConfig = readFileSync('playwright.domain-qa.config.ts', 'utf8');
 const globalSetup = readFileSync('tests/e2e/global.setup.ts', 'utf8');
+const productionGuard = readFileSync('tests/e2e/helpers/productionSupabaseGuard.ts', 'utf8');
+const testSupabase = readFileSync('tests/e2e/helpers/testSupabase.ts', 'utf8');
+const financeOperatorSaga = readFileSync('tests/e2e/195-admin-finance-operator-saga.spec.ts', 'utf8');
 
 test.describe('admin manual final payout contract', () => {
   test('keeps booking transition and financial record in one database transaction', () => {
@@ -92,6 +100,7 @@ test.describe('admin manual final payout contract', () => {
   test('ignores only resolved zero-payout cancellations and preserves every other blocker', () => {
     expect(manualPayoutPreview).toContain('isIgnorableZeroPayoutCancellation');
     expect(manualPayoutPreview).toContain("String(row.status || '').toLowerCase() === 'cancelled'");
+    expect(manualPayoutPreview).toContain("row.payout_status === 'pending'");
     expect(manualPayoutPreview).toContain('row.host_payout_amount === 0');
     expect(manualPayoutPreview).toContain('!isSoloGuaranteeRefundUnresolvedStatus');
     expect(manualPayoutPreview).toContain('settlementRows');
@@ -101,6 +110,9 @@ test.describe('admin manual final payout contract', () => {
     expect(zeroCancellationMigration).toContain("b.status NOT IN ('cancelled', 'CANCELLED')");
     expect(zeroCancellationMigration).toContain('FROM PUBLIC, anon, authenticated');
     expect(zeroCancellationMigration).toContain('TO service_role');
+    expect(payoutQueueRoute).toContain(
+      "String(booking.status || '').toLowerCase() === 'cancelled'"
+    );
   });
 
   test('explains missing manual payout inputs and invalidates stale transfer confirmation', () => {
@@ -131,10 +143,26 @@ test.describe('admin manual final payout contract', () => {
   });
 
   test('keeps contract tests and cleanup away from Production mutations', () => {
-    expect(contractsConfig).toContain('globalSetup: undefined');
-    expect(globalSetup).toContain("const PRODUCTION_SUPABASE_PROJECT_REF = 'uhinvcydgzqlpnvieyal'");
-    expect(globalSetup).toContain('Refusing to mutate the Production Supabase project.');
+    expect(basePlaywrightConfig).toContain("globalSetup: './tests/e2e/global.setup.ts'");
+    expect(contractsConfig).toContain("globalSetup: './tests/e2e/production.guard.ts'");
+    expect(cloudflareImagesConfig).toContain("globalSetup: './tests/e2e/production.guard.ts'");
+    expect(livePlaywrightConfig).toContain("globalSetup: './tests/e2e/global.setup.ts'");
+    expect(adsensePlaywrightConfig).toContain("from './playwright.config'");
+    expect(domainQaPlaywrightConfig).toContain("from './playwright.config'");
+    expect(contractsConfig).not.toContain('globalSetup: undefined');
+    expect(cloudflareImagesConfig).not.toContain('globalSetup: undefined');
+    expect(productionGuard).toContain("const PRODUCTION_SUPABASE_PROJECT_REF = 'uhinvcydgzqlpnvieyal'");
+    expect(productionGuard).toContain('Refusing to run tests against the Production Supabase project.');
+    expect(globalSetup).toContain('assertNonProductionSupabaseTarget();');
+    expect(testSupabase).toContain('assertNonProductionSupabaseTarget();');
     expect(globalSetup).toContain("env[ADMIN_WHITELIST_CLEANUP_OPT_IN] !== 'true'");
+  });
+
+  test('keeps finance journey cleanup UUID-safe and fail-closed', () => {
+    expect(financeOperatorSaga).toContain('const createdHostApplicationIds: string[] = [];');
+    expect(financeOperatorSaga).toContain('createdHostApplicationIds.push(String(data.id));');
+    expect(financeOperatorSaga).not.toContain('createdHostApplicationIds.push(Number(data.id));');
+    expect(financeOperatorSaga).toContain('assertCleanupSucceeded');
   });
 
   test('does not double-count current booking payout and preserves CSV semantics', () => {

@@ -3,6 +3,8 @@ import { existsSync, readFileSync } from 'fs';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Page } from '@playwright/test';
 
+import { assertNonProductionSupabaseTarget } from './productionSupabaseGuard';
+
 type EnvMap = Record<string, string>;
 type EnvLikeMap = Record<string, string | undefined>;
 
@@ -77,6 +79,7 @@ export function getExpectedTestCronSecret(options?: {
 }
 
 export function getTestAdminClient() {
+  assertNonProductionSupabaseTarget();
   if (adminClient) return adminClient;
 
   const env = loadTestEnv();

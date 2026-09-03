@@ -17,6 +17,7 @@ type ExperienceBookingRow = {
 function isIgnorableZeroPayoutCancellation(row: ExperienceBookingRow) {
   return (
     String(row.status || '').toLowerCase() === 'cancelled' &&
+    row.payout_status === 'pending' &&
     row.host_payout_amount === 0 &&
     !isSoloGuaranteeRefundUnresolvedStatus(row.solo_guarantee_refund_status)
   );
