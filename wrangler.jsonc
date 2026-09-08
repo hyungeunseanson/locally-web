@@ -2,7 +2,7 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "locally-web-opennext-foundation",
   "main": "./cloudflare-worker.ts",
-  "compatibility_date": "2026-09-09",
+  "compatibility_date": "2026-09-08",
   "compatibility_flags": [
     "nodejs_compat",
     "global_fetch_strictly_public"
