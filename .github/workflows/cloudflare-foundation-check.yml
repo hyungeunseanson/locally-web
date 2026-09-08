@@ -1,0 +1,65 @@
+name: Cloudflare OpenNext Foundation
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-opennext-foundation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CI: 'true'
+      NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54329
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: local-auth-regression-anon-key
+      SUPABASE_SERVICE_ROLE_KEY: local-auth-regression-service-role-key
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+
+      - name: Set up Node.js 24.20.0
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.20.0
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Verify pinned runtime dependencies
+        run: npm ls @opennextjs/cloudflare@1.19.6 wrangler@4.129.1 next@16.2.4 react@19.2.3 react-dom@19.2.3 --depth=0
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Auth regression gate
+        run: npm run test:e2e:auth-regression
+
+      - name: Verify the existing Next.js build path
+        run: npm run build
+
+      - name: Build OpenNext worker
+        run: npm run cloudflare:build
+
+      - name: Generate binding types
+        run: npm run cloudflare:typegen
+
+      - name: Run Wrangler dry-run
+        run: npm run cloudflare:dry-run
+
+      - name: Enforce Worker bundle and static asset limits
+        run: npm run cloudflare:artifacts:check
+
+      - name: Verify patch integrity
+        run: git diff --check

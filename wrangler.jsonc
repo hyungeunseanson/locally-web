@@ -1,0 +1,88 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "locally-web-opennext-foundation",
+  "main": "./cloudflare-worker.ts",
+  "compatibility_date": "2026-09-09",
+  "compatibility_flags": [
+    "nodejs_compat",
+    "global_fetch_strictly_public"
+  ],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "env": {
+    "canary": {
+      "name": "locally-web-opennext-canary",
+      "services": [
+        {
+          "binding": "WORKER_SELF_REFERENCE",
+          "service": "locally-web-opennext-canary"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "NEXT_INC_CACHE_R2_BUCKET",
+          "bucket_name": "locally-opennext-incremental-cache-canary"
+        }
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "NEXT_CACHE_DO_QUEUE",
+            "class_name": "DOQueueHandler"
+          },
+          {
+            "name": "NEXT_TAG_CACHE_DO_SHARDED",
+            "class_name": "DOShardedTagCache"
+          }
+        ]
+      },
+      "migrations": [
+        {
+          "tag": "opennext-cache-v1",
+          "new_sqlite_classes": [
+            "DOQueueHandler",
+            "DOShardedTagCache"
+          ]
+        }
+      ]
+    },
+    "production": {
+      "name": "locally-web-opennext-production",
+      "services": [
+        {
+          "binding": "WORKER_SELF_REFERENCE",
+          "service": "locally-web-opennext-production"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "NEXT_INC_CACHE_R2_BUCKET",
+          "bucket_name": "locally-opennext-incremental-cache-production"
+        }
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "NEXT_CACHE_DO_QUEUE",
+            "class_name": "DOQueueHandler"
+          },
+          {
+            "name": "NEXT_TAG_CACHE_DO_SHARDED",
+            "class_name": "DOShardedTagCache"
+          }
+        ]
+      },
+      "migrations": [
+        {
+          "tag": "opennext-cache-v1",
+          "new_sqlite_classes": [
+            "DOQueueHandler",
+            "DOShardedTagCache"
+          ]
+        }
+      ]
+    }
+  }
+}

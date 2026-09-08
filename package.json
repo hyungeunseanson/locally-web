@@ -7,6 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "cloudflare:build": "opennextjs-cloudflare build",
+    "precloudflare:typegen": "node -e \"require('node:fs').mkdirSync('.wrangler', { recursive: true })\"",
+    "cloudflare:typegen": "WRANGLER_LOG_PATH=.wrangler/logs wrangler types --env canary --env-interface CloudflareEnv --include-runtime false .wrangler/cloudflare-env.d.ts",
+    "cloudflare:dry-run": "WRANGLER_LOG_PATH=.wrangler/logs wrangler deploy --env canary --dry-run --outdir .wrangler/deploy --metafile .wrangler/deploy/metafile.json --autoconfig=false",
+    "cloudflare:artifacts:check": "node scripts/check-cloudflare-build-output.mjs",
+    "cloudflare:check": "npm run cloudflare:build && npm run cloudflare:typegen && npm run cloudflare:dry-run && npm run cloudflare:artifacts:check",
     "cloudflare:build-public-experience-details": "node scripts/cloudflare/build-public-experience-detail-canary.mjs --all-public --output=.tmp/cloudflare-public-experience-details",
     "audit:e2e:host-app-cleanup": "node scripts/audit-e2e-host-application-cleanup.mjs",
     "cleanup:codex:dry": "node scripts/cleanup-codex-runtime-data.mjs",
@@ -71,6 +77,7 @@
     "server-only": "^0.0.1"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "1.19.6",
     "@playwright/test": "^1.58.2",
     "@tailwindcss/forms": "^0.5.11",
     "@tailwindcss/postcss": "^4",
@@ -83,7 +90,8 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wrangler": "4.129.1"
   },
   "overrides": {
     "next": {
