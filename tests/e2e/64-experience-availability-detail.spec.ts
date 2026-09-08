@@ -1,14 +1,19 @@
 import { expect, test } from '@playwright/test';
 
+import { getVisiblePublicHostIdSet } from '@/app/utils/hostVisibility';
+
 import {
   cleanupAuthUsers,
   cleanupAvailability,
   cleanupBookings,
   createAuthUser,
   createTestUser,
+  ensureAvailabilitySlot,
+  formatDate,
   getVisibleReservationByTestId,
   getVisibleReservationCard,
   getAdminClient,
+  insertTestBooking,
   login,
   prepareBookableExperience,
   selectReservationDate,
@@ -19,10 +24,85 @@ import {
 const createdAuthUserIds: string[] = [];
 const createdBookingIds: string[] = [];
 const createdAvailabilityKeys: AvailabilityKey[] = [];
+const createdExperienceIds: number[] = [];
+
+async function createLargePartyExperienceFixture(time = '10:00') {
+  const supabase = getAdminClient();
+  const { data: hostApplications, error: hostApplicationsError } = await supabase
+    .from('public_host_applications')
+    .select('id, user_id, status, created_at');
+
+  if (hostApplicationsError) throw hostApplicationsError;
+
+  const [hostId] = [...getVisiblePublicHostIdSet(hostApplications || [])];
+  if (!hostId) {
+    throw new Error('No publicly visible host found for the large-party experience fixture.');
+  }
+
+  const price = 50000;
+  const maxGuests = 8;
+  const { data: experience, error: experienceError } = await supabase
+    .from('experiences')
+    .insert({
+      host_id: hostId,
+      country: '대한민국',
+      city: 'Seoul',
+      title: `[Playwright] Large Party ${Date.now()}`,
+      category: '맛집 탐방',
+      languages: ['한국어'],
+      language_levels: [{ language: '한국어', level: 5 }],
+      duration: 2,
+      max_guests: maxGuests,
+      description: '6인 초과 예약 인원 선택 검증용 체험입니다.',
+      itinerary: [{ title: '서울역', description: '대규모 인원 예약 검증 코스입니다.' }],
+      spots: '서울역',
+      meeting_point: '서울역 1번 출구',
+      location: '서울역 1번 출구',
+      photos: ['https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200'],
+      price,
+      inclusions: ['가이드'],
+      exclusions: ['개인 경비'],
+      supplies: '편한 복장',
+      rules: {
+        age_limit: '만 19세 이상',
+        activity_level: '보통',
+      },
+      status: 'active',
+      is_active: true,
+      is_private_enabled: false,
+      private_price: 0,
+      source_locale: 'ko',
+      manual_locales: ['ko'],
+      translation_version: 1,
+      translation_meta: {},
+    })
+    .select('id')
+    .single();
+
+  if (experienceError || !experience?.id) {
+    throw experienceError || new Error('Failed to create a large-party experience fixture.');
+  }
+
+  const experienceId = Number(experience.id);
+  createdExperienceIds.push(experienceId);
+  const futureDate = new Date();
+  futureDate.setDate(futureDate.getDate() + 21);
+  const date = formatDate(futureDate);
+
+  await ensureAvailabilitySlot(
+    { experienceId, date, time },
+    createdAvailabilityKeys
+  );
+
+  return { experienceId, date, time, price, maxGuests };
+}
 
 test.afterAll(async () => {
   await cleanupBookings(createdBookingIds);
   await cleanupAvailability(createdAvailabilityKeys);
+  if (createdExperienceIds.length > 0) {
+    await getAdminClient().from('experiences').delete().in('id', createdExperienceIds);
+  }
   await cleanupAuthUsers(createdAuthUserIds);
 });
 
@@ -156,6 +236,74 @@ test.describe.serial('Experience detail availability summary', () => {
     await expect(page.getByTestId('experience-mobile-sticky-action')).toHaveCount(0);
   });
 
+  test('shows guest counts above six and forwards an eight-guest selection to payment', async ({ page }) => {
+    const viewer = createTestUser('exp.detail.large.party');
+    await createAuthUser(viewer, createdAuthUserIds);
+    const experience = await createLargePartyExperienceFixture();
+    const expectedFinalAmount = experience.price * 8 + Math.floor(experience.price * 8 * 0.1);
+
+    await login(page, viewer);
+    await page.goto(`/experiences/${experience.experienceId}`, { waitUntil: 'domcontentloaded' });
+    await selectReservationDate(page, experience.date);
+    await selectReservationTime(page, experience.time);
+
+    const reservationCard = getVisibleReservationCard(page);
+    const guestSelect = reservationCard.locator('[data-testid="reservation-guest-select"]:visible');
+    const guestOptions = guestSelect.locator('option:not([value="private"])');
+
+    await expect(guestOptions).toHaveCount(experience.maxGuests);
+    await expect(guestSelect.locator('option[value="8"]')).toHaveCount(1);
+    await guestSelect.selectOption('8');
+    await reservationCard.getByTestId('reservation-submit').click();
+
+    await expect
+      .poll(() => {
+        const currentUrl = new URL(page.url());
+        return {
+          pathname: currentUrl.pathname,
+          guests: currentUrl.searchParams.get('guests'),
+        };
+      })
+      .toEqual({
+        pathname: `/experiences/${experience.experienceId}/payment`,
+        guests: '8',
+      });
+    await expect(page.getByText(/예약 8명|8 guest\(s\)|予約8名|预订8人/)).toBeVisible();
+    await expect(page.getByTestId('exp-payment-total-amount')).toHaveText(`₩${expectedFinalAmount.toLocaleString()}`);
+  });
+
+  test('limits a large-party selector to seven remaining seats', async ({ page }) => {
+    const viewer = createTestUser('exp.detail.seven.remaining.viewer');
+    const existingGuest = createTestUser('exp.detail.seven.remaining.existing');
+    await createAuthUser(viewer, createdAuthUserIds);
+    const existingGuestId = await createAuthUser(existingGuest, createdAuthUserIds);
+    const experience = await createLargePartyExperienceFixture('11:00');
+    const bookingId = await insertTestBooking({
+      userId: existingGuestId,
+      experienceId: experience.experienceId,
+      date: experience.date,
+      time: experience.time,
+      guests: experience.maxGuests - 7,
+      status: 'PAID',
+      contactName: existingGuest.fullName,
+      contactPhone: existingGuest.phone,
+    });
+    createdBookingIds.push(bookingId);
+
+    await login(page, viewer);
+    await page.goto(`/experiences/${experience.experienceId}`, { waitUntil: 'domcontentloaded' });
+    await selectReservationDate(page, experience.date);
+    await selectReservationTime(page, experience.time);
+
+    const guestSelect = getVisibleReservationCard(page)
+      .locator('[data-testid="reservation-guest-select"]:visible');
+    const guestOptions = guestSelect.locator('option:not([value="private"])');
+
+    await expect(guestOptions).toHaveCount(7);
+    await expect(guestSelect.locator('option[value="7"]')).toHaveCount(1);
+    await expect(guestSelect.locator('option[value="8"]')).toHaveCount(0);
+  });
+
   test('reduces selectable guest count and hides solo option when confirmed shared bookings exist', async ({ page }) => {
     const viewer = createTestUser('exp.detail.availability.viewer');
     const existingGuest = createTestUser('exp.detail.availability.existing');
@@ -204,7 +352,7 @@ test.describe.serial('Experience detail availability summary', () => {
       .locator('[data-testid="reservation-guest-select"]:visible')
       .locator('option:not([value="private"])');
 
-    await expect(guestOptions).toHaveCount(Math.min(expectedRemainingSeats, 6));
+    await expect(guestOptions).toHaveCount(expectedRemainingSeats);
   });
 
   test('keeps a private-booked sold-out date visible and explains why it is closed', async ({ page }) => {

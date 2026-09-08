@@ -279,7 +279,7 @@ export default function ReservationCard({
               className="text-[13px] md:text-sm outline-none bg-transparent font-semibold w-full cursor-pointer py-1"
             >
               <optgroup label={t('exp_reservation_regular_booking')}>
-                {Array.from({ length: Math.min(maxSelectable, 6) }, (_, i) => i + 1).map(n => (
+                {Array.from({ length: maxSelectable }, (_, i) => i + 1).map(n => (
                   <option key={n} value={String(n)}>{t('exp_reservation_guest_option', { count: n })}</option>
                 ))}
               </optgroup>
