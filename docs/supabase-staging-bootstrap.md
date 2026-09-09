@@ -36,10 +36,12 @@ The canary minimum is:
 - views: `public_profiles`, `public_host_applications`;
 - functions: `handle_new_user`, `is_admin_reader`, `ensure_profile_demographics_reminder`, `create_booking_atomic`;
 - trigger: `on_auth_user_created` on `auth.users`;
-- Realtime:lk publication: `profiles`, `bookings`, `inquiries`, `inquiry_messages`, `notifications` for the functional gate. The full runtime additionally subscribes to `host_applications`, `proxy_requests`, `service_bookings`, `admin_whitelist`, `admin_tasks`, `admin_task_comments`, and `admin_audit_logs`;
+- Realtime publication: reproduce the exact Production membership: `admin_audit_logs`, `admin_task_comments`, `admin_tasks`, `admin_whitelist`, `inquiry_messages`, `notifications`, and `profiles`. The functional canary exercises `inquiry_messages`, `notifications`, and `profiles`; it does not add `bookings` or `inquiries` to the publication;
 - Storage: public `admin_files`, `avatars`, `chat-images`, `experiences`, `images`; private `verification-docs`.
 
 The public flags above are the current runtime contract, not approval of broad object-listing policies. Preserve final Production RLS semantics. In particular, `profiles`/`users` must not be anon-readable, inquiry reads must be participant/admin scoped, direct client inserts to `inquiry_messages` must remain disabled, and `verification-docs` must remain owner/admin private. Production Storage files are never copied.
+
+The current clients register `postgres_changes` handlers for `inquiries` and `bookings`, but those tables are not members of the Production `supabase_realtime` publication. Chat correctness already treats an `inquiry_messages` event as a signal to refetch inquiry/message state and performs a catch-up refetch after subscribe/reconnect. The canary must validate that Production behavior: create or update a message through the server path, observe the published `inquiry_messages` event, and verify the subsequent inquiry/message refetch. Booking correctness remains request/response based in this canary. Do not change publication membership merely to make the unused handlers fire.
 
 ## Auth and OAuth configuration
 

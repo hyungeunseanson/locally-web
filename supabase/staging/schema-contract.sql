@@ -68,21 +68,46 @@ BEGIN
     RAISE EXCEPTION 'RLS disabled on protected tables: %', missing;
   END IF;
 
-  SELECT array_agg(name ORDER BY name)
+  SELECT array_agg(difference ORDER BY difference)
   INTO missing
-  FROM unnest(ARRAY[
-    'bookings', 'inquiries', 'inquiry_messages', 'notifications', 'profiles'
-  ]) AS required(name)
-  WHERE NOT EXISTS (
+  FROM (
+    SELECT 'missing:public.' || required.name AS difference
+    FROM unnest(ARRAY[
+      'admin_audit_logs', 'admin_task_comments', 'admin_tasks',
+      'admin_whitelist', 'inquiry_messages', 'notifications', 'profiles'
+    ]) AS required(name)
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM pg_publication_tables publication
+      WHERE publication.pubname = 'supabase_realtime'
+        AND publication.schemaname = 'public'
+        AND publication.tablename = required.name
+    )
+    UNION ALL
+    SELECT 'unexpected:' || publication.schemaname || '.' || publication.tablename
+    FROM pg_publication_tables publication
+    WHERE publication.pubname = 'supabase_realtime'
+      AND NOT (
+        publication.schemaname = 'public'
+        AND publication.tablename = ANY (ARRAY[
+          'admin_audit_logs', 'admin_task_comments', 'admin_tasks',
+          'admin_whitelist', 'inquiry_messages', 'notifications', 'profiles'
+        ]::text[])
+      )
+  ) AS publication_difference;
+
+  IF missing IS NOT NULL THEN
+    RAISE EXCEPTION 'supabase_realtime differs from Production parity: %', missing;
+  END IF;
+
+  IF NOT EXISTS (
     SELECT 1
     FROM pg_publication_tables publication
     WHERE publication.pubname = 'supabase_realtime'
       AND publication.schemaname = 'public'
-      AND publication.tablename = required.name
-  );
-
-  IF missing IS NOT NULL THEN
-    RAISE EXCEPTION 'Missing supabase_realtime tables: %', missing;
+      AND publication.tablename = 'inquiry_messages'
+  ) THEN
+    RAISE EXCEPTION 'Functional canary requires Production-published inquiry_messages';
   END IF;
 
   IF EXISTS (

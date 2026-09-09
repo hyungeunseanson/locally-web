@@ -40,6 +40,51 @@ test.describe('Supabase staging bootstrap contract', () => {
     expect(inventory).not.toMatch(/\b(insert|update|delete|alter|create|drop|truncate)\s+/i);
   });
 
+  test('captures every metadata class required for a schema-only baseline', () => {
+    for (const requiredFragment of [
+      "'owner', pg_get_userbyid(relation.relowner)",
+      "'rls_enabled', relation.relrowsecurity",
+      "'rls_forced', relation.relforcerowsecurity",
+      "'security_invoker'",
+      "'sequences'",
+      "'owned_by'",
+      "'function_execute_grants'",
+      "'sequence_grants'",
+      "acldefault('s', sequence.relowner)",
+      "'table_and_view_grants'",
+      "pg_get_function_identity_arguments",
+      "'realtime_publication'",
+      "'realtime_tables'",
+      "'replica_identity'",
+      "'storage_buckets'",
+      "schemaname IN ('public', 'storage')",
+      "'extensions'",
+      "'custom_types'",
+    ]) {
+      expect(inventory).toContain(requiredFragment);
+    }
+    expect(inventory).toContain("to_jsonb(bucket) - 'owner' - 'owner_id'");
+  });
+
+  test('reproduces the exact seven-table Production Realtime publication', () => {
+    expect(manifest.realtimePublicationTables).toEqual([
+      'admin_audit_logs',
+      'admin_task_comments',
+      'admin_tasks',
+      'admin_whitelist',
+      'inquiry_messages',
+      'notifications',
+      'profiles',
+    ]);
+    expect(manifest.functionalCanaryMinimum.realtimePublicationTables).toEqual([
+      'inquiry_messages',
+      'notifications',
+      'profiles',
+    ]);
+    expect(schemaContract).toContain('supabase_realtime differs from Production parity');
+    expect(schemaContract).toContain("'unexpected:' || publication.schemaname");
+  });
+
   test('rejects the known Production project before any fixture write', () => {
     const result = fixtureGuard({
       SUPABASE_STAGING_URL: 'https://uhinvcydgzqlpnvieyal.supabase.co',

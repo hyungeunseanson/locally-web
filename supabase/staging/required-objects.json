@@ -101,14 +101,9 @@
     "admin_task_comments",
     "admin_tasks",
     "admin_whitelist",
-    "bookings",
-    "host_applications",
-    "inquiries",
     "inquiry_messages",
     "notifications",
-    "profiles",
-    "proxy_requests",
-    "service_bookings"
+    "profiles"
   ],
   "storageBuckets": [
     { "name": "admin_files", "public": true },
@@ -145,8 +140,6 @@
       "on_auth_user_created"
     ],
     "realtimePublicationTables": [
-      "bookings",
-      "inquiries",
       "inquiry_messages",
       "notifications",
       "profiles"
