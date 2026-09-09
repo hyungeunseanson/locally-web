@@ -14,6 +14,12 @@
   "env": {
     "canary": {
       "name": "locally-web-opennext-canary",
+      "vars": {
+        "CLOUDFLARE_FUNCTIONAL_CANARY_ENABLED": "true"
+      },
+      "images": {
+        "binding": "IMAGES"
+      },
       "services": [
         {
           "binding": "WORKER_SELF_REFERENCE",

@@ -46,6 +46,9 @@ jobs:
       - name: Run Auth regression gate
         run: npm run test:e2e:auth-regression
 
+      - name: Validate the functional canary safety contract
+        run: npm run cloudflare:functional:contract
+
       - name: Verify the existing Next.js build path
         run: npm run build
 
