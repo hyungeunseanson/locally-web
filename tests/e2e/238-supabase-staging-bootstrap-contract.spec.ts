@@ -5,6 +5,10 @@ import { expect, test } from '@playwright/test';
 
 const packageJson = JSON.parse(readFileSync('package.json', 'utf8'));
 const manifest = JSON.parse(readFileSync('supabase/staging/required-objects.json', 'utf8'));
+const baselineManifest = JSON.parse(
+  readFileSync('supabase/staging/production-baseline.manifest.json', 'utf8')
+);
+const baselineContract = readFileSync('supabase/staging/baseline-contract.sql', 'utf8');
 const schemaContract = readFileSync('supabase/staging/schema-contract.sql', 'utf8');
 const inventory = readFileSync('supabase/staging/schema-only-inventory.sql', 'utf8');
 const fixtures = readFileSync('scripts/supabase/staging-fixtures.mjs', 'utf8');
@@ -18,7 +22,7 @@ function fixtureGuard(env: Record<string, string>) {
 }
 
 test.describe('Supabase staging bootstrap contract', () => {
-  test('records the missing base schema instead of claiming migrations are replayable', () => {
+  test('uses the canonical baseline without treating historical patches as replayable', () => {
     expect(manifest.repoBaselineMissing).toEqual(expect.arrayContaining([
       'profiles',
       'users',
@@ -28,6 +32,9 @@ test.describe('Supabase staging bootstrap contract', () => {
       'inquiry_messages',
       'notifications',
     ]));
+    expect(baselineManifest.objects.publicTables).toHaveLength(36);
+    expect(baselineManifest.historicalSql.applyAfterBaseline).toEqual([]);
+    expect(packageJson.scripts['supabase:staging:baseline:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:contract']).toBeTruthy();
   });
 
@@ -35,6 +42,9 @@ test.describe('Supabase staging bootstrap contract', () => {
     expect(schemaContract).toContain('BEGIN READ ONLY;');
     expect(schemaContract).toContain('ROLLBACK;');
     expect(schemaContract).toContain('LOCALLY_STAGING_SCHEMA_CONTRACT_PASS');
+    expect(baselineContract).toContain('BEGIN READ ONLY;');
+    expect(baselineContract).toContain('ROLLBACK;');
+    expect(baselineContract).toContain('LOCALLY_PRODUCTION_BASELINE_CATALOG_PASS');
     expect(inventory).toContain('BEGIN READ ONLY;');
     expect(inventory).toContain('pg_get_functiondef');
     expect(inventory).not.toMatch(/\b(insert|update|delete|alter|create|drop|truncate)\s+/i);

@@ -49,6 +49,9 @@ jobs:
       - name: Validate the functional canary safety contract
         run: npm run cloudflare:functional:contract
 
+      - name: Validate the Supabase staging baseline
+        run: npm run supabase:staging:baseline:check
+
       - name: Verify the existing Next.js build path
         run: npm run build
 
