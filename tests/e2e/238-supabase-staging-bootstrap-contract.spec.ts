@@ -42,15 +42,15 @@ test.describe('Supabase staging bootstrap contract', () => {
 
   test('captures every metadata class required for a schema-only baseline', () => {
     for (const requiredFragment of [
-      "'owner', pg_get_userbyid(relation.relowner)",
-      "'rls_enabled', relation.relrowsecurity",
-      "'rls_forced', relation.relforcerowsecurity",
+      "'owner', pg_get_userbyid(cls.relowner)",
+      "'rls_enabled', cls.relrowsecurity",
+      "'rls_forced', cls.relforcerowsecurity",
       "'security_invoker'",
       "'sequences'",
       "'owned_by'",
       "'function_execute_grants'",
       "'sequence_grants'",
-      "acldefault('s', sequence.relowner)",
+      "acldefault('s', grant_seq.relowner)",
       "'table_and_view_grants'",
       "pg_get_function_identity_arguments",
       "'realtime_publication'",
@@ -63,7 +63,25 @@ test.describe('Supabase staging bootstrap contract', () => {
     ]) {
       expect(inventory).toContain(requiredFragment);
     }
-    expect(inventory).toContain("to_jsonb(bucket) - 'owner' - 'owner_id'");
+    expect(inventory).toContain("to_jsonb(bucket_meta) - 'owner' - 'owner_id'");
+
+    for (const unsafeAlias of [
+      'constraint',
+      'sequence',
+      'trigger',
+      'type',
+      'range',
+      'procedure',
+      'language',
+      'extension',
+      'publication',
+      'namespace',
+      'relation',
+    ]) {
+      expect(inventory).not.toMatch(
+        new RegExp(`\\b(?:from|join)\\s+[a-z0-9_.]+\\s+(?:as\\s+)?${unsafeAlias}\\b`, 'i')
+      );
+    }
   });
 
   test('reproduces the exact seven-table Production Realtime publication', () => {
