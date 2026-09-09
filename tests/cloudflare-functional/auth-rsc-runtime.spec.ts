@@ -1,8 +1,12 @@
 import { expect, test } from '@playwright/test';
 
-import { isRscRequest, loginWithPassword } from './helpers';
+import { isRscRequest, loginWithPassword, protectCanaryBrowserContext } from './helpers';
 
 test.describe.serial('Auth and Next.js RSC navigation regression', () => {
+  test.beforeEach(async ({ context }) => {
+    await protectCanaryBrowserContext(context);
+  });
+
   test('persists and clears the Supabase session on the Worker origin', async ({ browser, context, page }) => {
     await loginWithPassword(page);
     const storageState = await context.storageState();
@@ -13,6 +17,7 @@ test.describe.serial('Auth and Next.js RSC navigation regression', () => {
 
     const restored = await browser.newContext({ storageState });
     try {
+      await protectCanaryBrowserContext(restored);
       const restoredPage = await restored.newPage();
       await restoredPage.goto(`${process.env.CLOUDFLARE_CANARY_BASE_URL}/account`);
       await expect(restoredPage).toHaveURL(/\/account$/);
@@ -74,6 +79,9 @@ test.describe.serial('Auth and Next.js RSC navigation regression', () => {
         name: provider === 'google' ? /Continue with Google|Google/i : /Continue with Kakao|Kakao/i,
       }).click();
       const request = await authorization;
+      const requestHeaders = request.headers();
+      expect(requestHeaders['cf-access-client-id']).toBeUndefined();
+      expect(requestHeaders['cf-access-client-secret']).toBeUndefined();
       const callback = new URL(new URL(request.url()).searchParams.get('redirect_to') || '');
       expect(callback.origin).toBe(new URL(process.env.CLOUDFLARE_CANARY_BASE_URL!).origin);
       expect(callback.pathname).toBe('/auth/callback');

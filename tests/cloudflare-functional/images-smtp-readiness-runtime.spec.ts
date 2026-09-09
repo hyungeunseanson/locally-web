@@ -1,11 +1,12 @@
 import { expect, test } from '@playwright/test';
 
-import { canaryHeaders, requiredEnv } from './helpers';
+import { canaryAccessHeaders, canaryHeaders, requiredEnv } from './helpers';
 
 test.describe.serial('Worker image, SMTP, and runtime readiness', () => {
   test('uses the Cloudflare Images binding for the unchanged /_next/image contract', async ({ request }) => {
     const local = await request.get('/_next/image?url=%2Fimages%2Flogo.png&w=64&q=75', {
-      headers: { accept: 'image/webp' },
+      headers: { ...canaryAccessHeaders(), accept: 'image/webp' },
+      maxRedirects: 0,
     });
     expect(local.status()).toBe(200);
     expect(local.headers()['content-type']).toMatch(/^image\/webp/);
@@ -13,7 +14,7 @@ test.describe.serial('Worker image, SMTP, and runtime readiness', () => {
     const stagingSupabaseImage = requiredEnv('CLOUDFLARE_CANARY_STAGING_SUPABASE_IMAGE_URL');
     const optimized = await request.get(
       `/_next/image?url=${encodeURIComponent(stagingSupabaseImage)}&w=256&q=75`,
-      { headers: { accept: 'image/webp' } }
+      { headers: { ...canaryAccessHeaders(), accept: 'image/webp' }, maxRedirects: 0 }
     );
     expect(optimized.status()).toBe(200);
     expect(optimized.headers()['content-type']).toMatch(/^image\/webp/);
@@ -24,9 +25,10 @@ test.describe.serial('Worker image, SMTP, and runtime readiness', () => {
     expect(directR2.headers()['content-type']).toMatch(/^image\//);
   });
 
-  test('reports only a non-Production Supabase and sandbox payment configuration as safe', async ({ request }) => {
+  test('reports only an explicitly verified staging write target and gate as safe', async ({ request }) => {
     const response = await request.get('/api/canary/cloudflare/readiness', {
       headers: canaryHeaders(),
+      maxRedirects: 0,
     });
     expect(response.status()).toBe(200);
     const readiness = await response.json();
@@ -35,8 +37,14 @@ test.describe.serial('Worker image, SMTP, and runtime readiness', () => {
       runtime: { canaryEnabled: true },
       supabase: {
         configured: true,
-        nonProduction: true,
+        stagingTargetMatches: true,
+        stagingTierDeclared: true,
+        stagingProjectVerified: true,
         stagingWritesExplicitlyEnabled: true,
+      },
+      safety: {
+        activeWriteGate: expect.any(String),
+        activeWriteGateConfigured: true,
       },
       payments: {
         sandbox: true,
@@ -51,6 +59,7 @@ test.describe.serial('Worker image, SMTP, and runtime readiness', () => {
         const response = await request.post('/api/canary/cloudflare/smtp', {
           headers: canaryHeaders(),
           data: { profile, port },
+          maxRedirects: 0,
         });
         expect(response.status()).toBe(200);
         expect(await response.json()).toMatchObject({

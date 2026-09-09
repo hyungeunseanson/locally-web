@@ -1,13 +1,17 @@
-const PRODUCTION_SUPABASE_PROJECT_REF = 'uhinvcydgzqlpnvieyal';
 const PRODUCTION_HOSTS = new Set([
   'locally-travel.com',
   'www.locally-travel.com',
 ]);
+const WRITE_GATES = new Set(['auth', 'realtime', 'storage', 'portone', 'nicepay', 'paypal']);
 
 function projectRef(value: string | undefined) {
   if (!value) return null;
   try {
-    return new URL(value).hostname.split('.')[0] || null;
+    const hostname = new URL(value).hostname.toLowerCase();
+    const suffix = '.supabase.co';
+    if (!hostname.endsWith(suffix)) return null;
+    const ref = hostname.slice(0, -suffix.length);
+    return /^[a-z0-9]{20}$/.test(ref) ? ref : null;
   } catch {
     return null;
   }
@@ -17,9 +21,11 @@ export default async function globalSetup() {
   const rawBaseUrl = process.env.CLOUDFLARE_CANARY_BASE_URL;
   const allowedHost = process.env.CLOUDFLARE_CANARY_ALLOWED_HOST;
   const secret = process.env.CLOUDFLARE_FUNCTIONAL_CANARY_SECRET;
-  if (!rawBaseUrl || !allowedHost || !secret) {
+  const accessClientId = process.env.CLOUDFLARE_ACCESS_CLIENT_ID;
+  const accessClientSecret = process.env.CLOUDFLARE_ACCESS_CLIENT_SECRET;
+  if (!rawBaseUrl || !allowedHost || !secret || !accessClientId || !accessClientSecret) {
     throw new Error(
-      'CLOUDFLARE_CANARY_BASE_URL, CLOUDFLARE_CANARY_ALLOWED_HOST, and CLOUDFLARE_FUNCTIONAL_CANARY_SECRET are required.'
+      'The canary URL/host, app secret, and Cloudflare Access service-token credentials are required.'
     );
   }
 
@@ -56,8 +62,46 @@ export default async function globalSetup() {
     }
   }
 
-  if (projectRef(process.env.NEXT_PUBLIC_SUPABASE_URL) === PRODUCTION_SUPABASE_PROJECT_REF) {
-    throw new Error('Refusing to run the functional canary against Production Supabase.');
+  const activeSupabaseProjectRef = projectRef(process.env.NEXT_PUBLIC_SUPABASE_URL);
+  const declaredStagingProjectRef =
+    process.env.CLOUDFLARE_FUNCTIONAL_CANARY_STAGING_SUPABASE_PROJECT_REF?.trim() || null;
+  const activeWriteGate =
+    process.env.CLOUDFLARE_FUNCTIONAL_CANARY_ACTIVE_WRITE_GATE?.trim() || null;
+  const hasStagingConfiguration = Boolean(
+    activeSupabaseProjectRef || declaredStagingProjectRef || activeWriteGate
+  );
+
+  if (hasStagingConfiguration) {
+    if (
+      !activeSupabaseProjectRef ||
+      !declaredStagingProjectRef ||
+      !/^[a-z0-9]{20}$/.test(declaredStagingProjectRef) ||
+      activeSupabaseProjectRef !== declaredStagingProjectRef ||
+      process.env.CLOUDFLARE_FUNCTIONAL_CANARY_SUPABASE_TIER !== 'staging' ||
+      process.env.CLOUDFLARE_FUNCTIONAL_CANARY_STAGING_PROJECT_VERIFIED !== 'true'
+    ) {
+      throw new Error(
+        'Remote writes require an explicitly verified staging Supabase ref that exactly matches NEXT_PUBLIC_SUPABASE_URL.'
+      );
+    }
+  }
+
+  if (activeWriteGate) {
+    if (!WRITE_GATES.has(activeWriteGate)) {
+      throw new Error('CLOUDFLARE_FUNCTIONAL_CANARY_ACTIVE_WRITE_GATE is invalid.');
+    }
+    if (process.env.CLOUDFLARE_FUNCTIONAL_CANARY_ALLOW_STAGING_WRITES !== 'true') {
+      throw new Error('The selected remote write gate requires explicit staging-write enablement.');
+    }
+    if (process.env.CLOUDFLARE_FUNCTIONAL_CANARY_PAYMENT_MODE !== 'sandbox') {
+      throw new Error('Every remote write gate requires explicit sandbox payment mode.');
+    }
+    if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      throw new Error('The selected remote write gate requires the staging Supabase anon key.');
+    }
+    if (activeWriteGate !== 'auth' && !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error('This remote write gate requires a runner-scoped staging service-role key.');
+    }
   }
   if (process.env.PAYPAL_ENV && process.env.PAYPAL_ENV !== 'sandbox') {
     throw new Error('Remote functional canary requires PAYPAL_ENV=sandbox.');

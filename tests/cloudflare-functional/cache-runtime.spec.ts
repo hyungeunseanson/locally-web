@@ -17,7 +17,7 @@ type CacheProbe = {
 async function readProbe(request: APIRequestContext, slot: string) {
   const response = await request.get(
     `/api/canary/cloudflare/cache?slot=${encodeURIComponent(slot)}&request=${crypto.randomUUID()}`,
-    { headers: canaryHeaders() }
+    { headers: canaryHeaders(), maxRedirects: 0 }
   );
   expect(response.status()).toBe(200);
   return (await response.json()) as CacheProbe;
@@ -64,6 +64,7 @@ test.describe.serial('OpenNext remote cache semantics', () => {
     const invalidation = await request.post('/api/canary/cloudflare/cache', {
       headers: canaryHeaders(),
       data: { action: 'revalidate-tag' },
+      maxRedirects: 0,
     });
     expect(invalidation.status()).toBe(200);
     expect(await invalidation.json()).toMatchObject({
@@ -89,7 +90,7 @@ test.describe.serial('OpenNext remote cache semantics', () => {
     const results = await Promise.all(urls.map(async (baseUrl) => {
       const response = await request.get(
         `${baseUrl.replace(/\/$/, '')}/api/canary/cloudflare/cache?slot=${slot}`,
-        { headers: canaryHeaders() }
+        { headers: canaryHeaders(), maxRedirects: 0 }
       );
       expect(response.status()).toBe(200);
       return {

@@ -14,6 +14,8 @@
   "env": {
     "canary": {
       "name": "locally-web-opennext-canary",
+      "workers_dev": false,
+      "preview_urls": false,
       "vars": {
         "CLOUDFLARE_FUNCTIONAL_CANARY_ENABLED": "true"
       },
