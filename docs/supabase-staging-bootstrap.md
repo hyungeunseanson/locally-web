@@ -12,7 +12,7 @@ Repository migrations alone cannot recreate the current Production schema. No tr
 
 There is also no canonical `supabase/config.toml`, no ordered `supabase/migrations` ledger, and no tracked final definition for most legacy bucket policies. Several functions have multiple historical definitions, so filename order is not a reliable way to select the Production version.
 
-The read-only Production inventory was captured and reconciled on 2026-09-09. The resulting canonical migration is `supabase/migrations/20260909211131_production_schema_baseline.sql`; its review contract and exact counts are in `supabase/staging/production-baseline.manifest.json`. See `docs/supabase-staging-baseline.md` for the application order and exclusions.
+The read-only Production inventory was captured and reconciled on 2026-09-09. The resulting canonical migration is `supabase/migrations/20260912034545_production_schema_baseline.sql`; its review contract and exact counts are in `supabase/staging/production-baseline.manifest.json`. See `docs/supabase-staging-baseline.md` for the application order and exclusions.
 
 Required schema-only material:
 
