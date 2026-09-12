@@ -11,6 +11,10 @@ const baselineManifest = JSON.parse(
 const baselineContract = readFileSync('supabase/staging/baseline-contract.sql', 'utf8');
 const schemaContract = readFileSync('supabase/staging/schema-contract.sql', 'utf8');
 const inventory = readFileSync('supabase/staging/schema-only-inventory.sql', 'utf8');
+const branchParityBootstrap = readFileSync(
+  'supabase/staging/branch-parity-bootstrap.sql',
+  'utf8'
+);
 const fixtures = readFileSync('scripts/supabase/staging-fixtures.mjs', 'utf8');
 
 function fixtureGuard(env: Record<string, string>) {
@@ -124,6 +128,17 @@ test.describe('Supabase staging bootstrap contract', () => {
     });
     expect(result.status).not.toBe(0);
     expect(`${result.stdout}${result.stderr}`).toContain('known Production Supabase project');
+  });
+
+  test('keeps disposable-branch parity repair outside Production migrations and fail-closed', () => {
+    expect(packageJson.scripts['supabase:staging:branch-parity:check']).toBeTruthy();
+    expect(branchParityBootstrap).toContain("target_ref <> 'ekfwkplibbqvbgqjumml'");
+    expect(branchParityBootstrap).toContain("target_ref = 'uhinvcydgzqlpnvieyal'");
+    expect(branchParityBootstrap.indexOf('$target_guard$')).toBeLessThan(
+      branchParityBootstrap.indexOf('CREATE TRIGGER')
+    );
+    expect(branchParityBootstrap.match(/CREATE POLICY /g)).toHaveLength(16);
+    expect(branchParityBootstrap).toContain('LOCALLY_STAGING_BRANCH_PARITY_BOOTSTRAP_PASS');
   });
 
   test('requires an exact verified staging ref and explicit write opt-in', () => {
