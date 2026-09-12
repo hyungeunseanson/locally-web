@@ -85,7 +85,8 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'uhinvcydgzqlpnvieyal.supabase.co', // Supabase Storage
+        hostname: '*.supabase.co',
+        pathname: '/storage/v1/object/public/**',
       }
     ],
     dangerouslyAllowSVG: true,
@@ -105,18 +106,6 @@ const nextConfig: NextConfig = {
         destination: `${LEGACY_IMWEB_ORIGIN}${source}`,
         permanent: true,
       })),
-      {
-        source: '/login',
-        has: [{ type: 'query', key: 'back_url' }],
-        destination: `${LEGACY_IMWEB_ORIGIN}/login`,
-        permanent: true,
-      },
-      {
-        source: '/login',
-        has: [{ type: 'query', key: 'used_login_btn' }],
-        destination: `${LEGACY_IMWEB_ORIGIN}/login`,
-        permanent: true,
-      },
       {
         source: '/',
         has: [{
@@ -155,7 +144,7 @@ const nextConfig: NextConfig = {
     ];
   },
 
-  // 🟢 [핵심] Vercel 배포 시 파일 구조 없는 다국어 지원을 위한 명시적 Rewrite
+  // File-system independent locale rewrites shared by both hosting runtimes.
   async rewrites() {
     return [
       {

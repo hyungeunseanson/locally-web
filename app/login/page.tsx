@@ -1,95 +1,32 @@
-'use client';
+import { permanentRedirect } from 'next/navigation';
 
-import React, { useEffect, useMemo } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import SiteHeader from '@/app/components/SiteHeader';
-import LoginModal from '@/app/components/LoginModal';
-import { Suspense } from 'react';
-import Spinner from '@/app/components/ui/Spinner';
-import { useLanguage } from '@/app/context/LanguageContext';
-import { useAuth } from '@/app/context/AuthContext';
-import { normalizeInternalReturnPath } from '@/app/utils/authRedirect';
+import LoginPageClient from './LoginPageClient';
 
-/**
- * 로그인 전용 페이지
- * - 이미 로그인된 사용자는 returnUrl 또는 메인으로 리다이렉트
- * - returnUrl 쿼리가 있으면 로그인 성공 후 해당 경로로 이동
- */
-function LoginPageContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const { t } = useLanguage();
-  const { user, isLoading } = useAuth();
+const LEGACY_IMWEB_LOGIN = 'https://locally2.imweb.me/login';
 
-  const returnUrl = useMemo(
-    () => normalizeInternalReturnPath(searchParams.get('returnUrl') ?? searchParams.get('next')),
-    [searchParams]
-  );
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
-  useEffect(() => {
-    if (!isLoading && user) {
-      router.replace(returnUrl);
+function appendSearchParams(
+  target: URLSearchParams,
+  searchParams: Record<string, string | string[] | undefined>
+) {
+  for (const [key, value] of Object.entries(searchParams)) {
+    if (Array.isArray(value)) {
+      for (const item of value) target.append(key, item);
+    } else if (value !== undefined) {
+      target.append(key, value);
     }
-  }, [isLoading, returnUrl, router, user]);
-
-  const handleClose = () => {
-    router.push(returnUrl || '/');
-  };
-
-  const handleLoginSuccess = () => {
-    router.push(returnUrl || '/');
-  };
-
-  if (isLoading || user) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <Spinner size={34} variant="muted" />
-      </div>
-    );
   }
-
-  return (
-    <div className="min-h-screen bg-white text-slate-900">
-      <SiteHeader />
-      <main className="min-h-[calc(100vh-80px)] flex flex-col items-center justify-center px-6 py-12 bg-slate-50/50">
-        <div className="w-full max-w-md text-center mb-6">
-          <h1 className="text-2xl font-black text-slate-900 mb-2">{t('login')}</h1>
-          <p className="text-slate-500 text-sm">
-            {returnUrl !== '/' ? t('login_return_page_desc') : t('login_default_page_desc')}
-          </p>
-          <div data-testid="login-page-help" className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
-            <p className="text-[12px] font-semibold text-slate-900">{t('login_help_title')}</p>
-            <p className="mt-1 text-[12px] leading-5 text-slate-500">
-              {returnUrl !== '/' ? t('login_help_return_hint') : t('login_help_default_hint')}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={handleClose}
-            className="mt-4 text-sm font-semibold text-slate-600 hover:text-slate-900 underline"
-          >
-            {t('login_back_home')}
-          </button>
-        </div>
-        <LoginModal
-          isOpen={true}
-          onClose={handleClose}
-          onLoginSuccess={handleLoginSuccess}
-          redirectPath={returnUrl}
-        />
-      </main>
-    </div>
-  );
 }
 
-export default function LoginPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <Spinner size={34} variant="muted" />
-      </div>
-    }>
-      <LoginPageContent />
-    </Suspense>
-  );
+export default async function LoginPage({ searchParams }: { searchParams: SearchParams }) {
+  const params = await searchParams;
+
+  if (params.back_url !== undefined || params.used_login_btn !== undefined) {
+    const query = new URLSearchParams();
+    appendSearchParams(query, params);
+    permanentRedirect(`${LEGACY_IMWEB_LOGIN}${query.size ? `?${query}` : ''}`);
+  }
+
+  return <LoginPageClient />;
 }

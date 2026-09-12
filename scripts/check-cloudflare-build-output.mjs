@@ -4,7 +4,7 @@ import path from 'node:path';
 
 const PROJECT_ROOT = process.cwd();
 const ASSETS_DIRECTORY = path.join(PROJECT_ROOT, '.open-next', 'assets');
-const BUNDLE_DIRECTORY = path.join(PROJECT_ROOT, '.wrangler', 'deploy');
+const BUNDLE_DIRECTORY = path.join(PROJECT_ROOT, '.wrangler', 'deploy', 'canary');
 const METAFILE_PATH = path.join(BUNDLE_DIRECTORY, 'metafile.json');
 const METRICS_PATH = path.join(PROJECT_ROOT, '.wrangler', 'artifact-metrics.json');
 

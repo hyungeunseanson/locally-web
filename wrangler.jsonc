@@ -7,6 +7,7 @@
     "nodejs_compat",
     "global_fetch_strictly_public"
   ],
+  "keep_vars": true,
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
@@ -17,7 +18,13 @@
       "workers_dev": false,
       "preview_urls": false,
       "vars": {
-        "CLOUDFLARE_FUNCTIONAL_CANARY_ENABLED": "true"
+        "CLOUDFLARE_FUNCTIONAL_CANARY_ENABLED": "true",
+        "CLOUDFLARE_DEPLOYMENT_ENV": "canary"
+      },
+      "observability": {
+        "enabled": true,
+        "head_sampling_rate": 1,
+        "redact_query_string": true
       },
       "images": {
         "binding": "IMAGES"
@@ -58,6 +65,19 @@
     },
     "production": {
       "name": "locally-web-opennext-production",
+      "workers_dev": false,
+      "preview_urls": false,
+      "vars": {
+        "CLOUDFLARE_DEPLOYMENT_ENV": "production"
+      },
+      "observability": {
+        "enabled": true,
+        "head_sampling_rate": 0.1,
+        "redact_query_string": true
+      },
+      "images": {
+        "binding": "IMAGES"
+      },
       "services": [
         {
           "binding": "WORKER_SELF_REFERENCE",

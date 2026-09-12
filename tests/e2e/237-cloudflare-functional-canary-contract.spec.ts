@@ -35,12 +35,11 @@ test.describe('Cloudflare functional canary contract', () => {
     expect(globalSetup).toContain('CLOUDFLARE_ACCESS_CLIENT_ID');
     expect(globalSetup).toContain('CLOUDFLARE_ACCESS_CLIENT_SECRET');
     expect(helpers).toContain('(url) => url.origin === canaryOrigin');
-    expect(helpers).toContain('const response = await route.fetch({');
-    expect(helpers).toContain('maxRedirects: 0');
-    expect(helpers).toContain('await route.fulfill({ response })');
-    expect(helpers).not.toContain('route.continue({');
+    expect(helpers).toContain('await route.continue({');
+    expect(helpers).not.toContain('route.fetch({');
     expect(helpers).not.toContain('extraHTTPHeaders');
     expect(remoteConfig).not.toContain('extraHTTPHeaders');
+    expect(remoteConfig).toContain("trace: 'off'");
     expect(authRuntime).toContain("requestHeaders['cf-access-client-id']");
     expect(authRuntime).toContain("requestHeaders['cf-access-client-secret']");
     expect(accessRuntime).toContain('maxRedirects: 0');
@@ -65,9 +64,9 @@ test.describe('Cloudflare functional canary contract', () => {
     expect(cacheRoute).toContain('const ISOLATE_ID = crypto.randomUUID()');
   });
 
-  test('uses Cloudflare Images only in canary and preserves current image application behavior', () => {
+  test('uses Cloudflare Images in both deployment environments and preserves image behavior', () => {
     expect(wrangler.env.canary.images).toEqual({ binding: 'IMAGES' });
-    expect(wrangler.env.production.images).toBeUndefined();
+    expect(wrangler.env.production.images).toEqual({ binding: 'IMAGES' });
     expect(nextConfig).not.toContain("loader: 'custom'");
     expect(readFileSync('app/components/PublicExperienceCardImage.tsx', 'utf8')).toContain('unoptimized');
     expect(readFileSync('app/components/PublicExperienceDetailImage.tsx', 'utf8')).toContain('supabase-fallback');
@@ -83,8 +82,10 @@ test.describe('Cloudflare functional canary contract', () => {
     expect(readinessRoute).toContain('CLOUDFLARE_FUNCTIONAL_CANARY_STAGING_PROJECT_VERIFIED');
     expect(readinessRoute).toContain('CLOUDFLARE_FUNCTIONAL_CANARY_ALLOW_STAGING_WRITES');
     expect(readinessRoute).toContain('activeWriteGateConfigured');
-    expect(readinessRoute).not.toContain('PRODUCTION_SUPABASE_PROJECT_REF');
-    expect(globalSetup).not.toContain('PRODUCTION_SUPABASE_PROJECT_REF');
+    expect(readinessRoute).toContain('KNOWN_PRODUCTION_SUPABASE_PROJECT_REFS');
+    expect(readinessRoute).toContain("'uhinvcydgzqlpnvieyal'");
+    expect(globalSetup).toContain('KNOWN_PRODUCTION_SUPABASE_PROJECT_REFS');
+    expect(globalSetup).toContain("'uhinvcydgzqlpnvieyal'");
     expect(readinessRoute).toContain("serverProbeRoute: '/api/admin/sentry-test'");
   });
 
@@ -94,5 +95,7 @@ test.describe('Cloudflare functional canary contract', () => {
     expect(packageJson.scripts['cloudflare:functional:contract']).toBeTruthy();
     expect(packageJson.scripts['cloudflare:functional:remote']).toBeTruthy();
     expect(packageJson.scripts['cloudflare:functional:remote:access']).toBeTruthy();
+    expect(packageJson.scripts['cloudflare:functional:remote:public']).toBeTruthy();
+    expect(packageJson.scripts['cloudflare:functional:remote:storage']).toBeTruthy();
   });
 });

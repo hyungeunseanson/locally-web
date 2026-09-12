@@ -1,0 +1,193 @@
+{
+  "schemaVersion": 1,
+  "application": "locally-web",
+  "runtimePins": {
+    "node": "24.20.0",
+    "next": "16.2.4",
+    "react": "19.2.3",
+    "reactDom": "19.2.3",
+    "openNextCloudflare": "1.19.6",
+    "wrangler": "4.129.1",
+    "compatibilityDate": "2026-09-08"
+  },
+  "limits": {
+    "workerMemoryMiB": 128,
+    "workerBundleUncompressedMiB": 64,
+    "staticAssetCount": 20000,
+    "staticAssetBytes": 26214400
+  },
+  "environments": {
+    "canary": {
+      "worker": "locally-web-opennext-canary",
+      "incrementalCacheR2": "locally-opennext-incremental-cache-canary",
+      "accessRequired": true,
+      "workersDev": false,
+      "previewUrls": false
+    },
+    "production": {
+      "worker": "locally-web-opennext-production",
+      "incrementalCacheR2": "locally-opennext-incremental-cache-production",
+      "workersDev": false,
+      "previewUrls": false
+    }
+  },
+  "bindings": {
+    "staticAssets": "ASSETS",
+    "images": "IMAGES",
+    "incrementalCacheR2": "NEXT_INC_CACHE_R2_BUCKET",
+    "queueDurableObject": {
+      "binding": "NEXT_CACHE_DO_QUEUE",
+      "className": "DOQueueHandler"
+    },
+    "tagCacheDurableObject": {
+      "binding": "NEXT_TAG_CACHE_DO_SHARDED",
+      "className": "DOShardedTagCache"
+    },
+    "selfService": "WORKER_SELF_REFERENCE"
+  },
+  "forbiddenR2Buckets": [
+    "locally-public-experience-canary",
+    "locally-public-host-profiles",
+    "locally-private-host-profile-stale",
+    "locally-production-db-backups"
+  ],
+  "cachePolicy": {
+    "incrementalCache": "r2IncrementalCache",
+    "queue": "doQueue",
+    "tagCache": "doShardedTagCache",
+    "baseShardSize": 12,
+    "regionalCache": false,
+    "enableCacheInterception": false,
+    "automaticPurge": false
+  },
+  "environmentVariables": {
+    "buildRequired": [
+      "NEXT_PUBLIC_SITE_URL",
+      "NEXT_PUBLIC_SUPABASE_URL",
+      "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+    ],
+    "buildOptional": [
+      "CI",
+      "SENTRY_ORG",
+      "SENTRY_PROJECT"
+    ],
+    "workerCoreRequired": [
+      "NEXT_PUBLIC_SITE_URL",
+      "NEXT_PUBLIC_SUPABASE_URL",
+      "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+      "CLOUDFLARE_DEPLOYMENT_ENV"
+    ],
+    "workerFeatureVariables": [
+      "CARD_PAYMENT_PROVIDER",
+      "NICEPAY_MID",
+      "PAYPAL_ENV",
+      "PAYPAL_CLIENT_ID",
+      "RESEND_FROM_EMAIL",
+      "NEXT_PUBLIC_PORTONE_IMP_CODE",
+      "NEXT_PUBLIC_PAYPAL_CLIENT_ID",
+      "NEXT_PUBLIC_KAKAO_MAP_API_KEY",
+      "NEXT_PUBLIC_ENABLE_KAKAO_IAB_ESCAPE",
+      "NEXT_PUBLIC_GOOGLE_ANALYTICS_ACCOUNT_ID",
+      "NEXT_PUBLIC_GOOGLE_ANALYTICS_PROPERTY_ID",
+      "NEXT_PUBLIC_ADSENSE_ENABLED",
+      "NEXT_PUBLIC_ADSENSE_CLIENT_ID",
+      "NEXT_PUBLIC_ADSENSE_DESKTOP_RIGHT_RAIL_SLOT",
+      "NEXT_PUBLIC_BANK_ACCOUNT",
+      "NEXT_PUBLIC_BANK_ACCOUNT_HOLDER",
+      "NEXT_PUBLIC_BANK_NAME",
+      "NEXT_PUBLIC_BANK_OWNER",
+      "NEXT_PUBLIC_SERVICE_OG_IMAGE",
+      "NEXT_PUBLIC_CLOUDFLARE_IMAGE_CANARY_BASE_URL",
+      "NEXT_PUBLIC_CLOUDFLARE_HOST_PROFILE_BASE_URL",
+      "NEXT_PUBLIC_SENTRY_DSN",
+      "NEXT_PUBLIC_SENTRY_ENVIRONMENT",
+      "SENTRY_ENVIRONMENT",
+      "PARTNERSHIP_INQUIRY_EMAIL",
+      "TRANSLATION_GEMINI_MODEL",
+      "TRANSLATION_GEMINI_FALLBACK_MODEL",
+      "TRANSLATION_GROK_MODEL",
+      "TRANSLATION_WORKER_BATCH_SIZE",
+      "TRANSLATION_TASK_LEASE_SECONDS",
+      "TRANSLATION_MAX_ATTEMPTS",
+      "TRANSLATION_GEMINI_RESERVED_TOKENS",
+      "TRANSLATION_GROK_RESERVED_TOKENS",
+      "SETTLEMENT_SYNC_RUNNING_STALE_MINUTES",
+      "SETTLEMENT_SYNC_DELAY_WARNING_MINUTES",
+      "SETTLEMENT_SYNC_LEASE_SECONDS"
+    ],
+    "canarySafetyVariables": [
+      "CLOUDFLARE_FUNCTIONAL_CANARY_ENABLED",
+      "CLOUDFLARE_FUNCTIONAL_CANARY_ALLOW_STAGING_WRITES",
+      "CLOUDFLARE_FUNCTIONAL_CANARY_SUPABASE_TIER",
+      "CLOUDFLARE_FUNCTIONAL_CANARY_STAGING_SUPABASE_PROJECT_REF",
+      "CLOUDFLARE_FUNCTIONAL_CANARY_STAGING_PROJECT_VERIFIED",
+      "CLOUDFLARE_FUNCTIONAL_CANARY_ACTIVE_WRITE_GATE",
+      "CLOUDFLARE_FUNCTIONAL_CANARY_PAYMENT_MODE",
+      "CLOUDFLARE_FUNCTIONAL_CANARY_GOOGLE_OAUTH",
+      "CLOUDFLARE_FUNCTIONAL_CANARY_KAKAO_OAUTH"
+    ]
+  },
+  "secrets": {
+    "workerAlways": [
+      "SUPABASE_SERVICE_ROLE_KEY"
+    ],
+    "workerCanaryAlways": [
+      "CLOUDFLARE_FUNCTIONAL_CANARY_SECRET"
+    ],
+    "workerFeatureStaged": {
+      "cron": ["CRON_SECRET"],
+      "gmail": [
+        "GMAIL_USER",
+        "GMAIL_APP_PASSWORD",
+        "ADMIN_GMAIL_USER",
+        "ADMIN_GMAIL_APP_PASSWORD"
+      ],
+      "resendFallback": ["RESEND_API_KEY"],
+      "portone": ["PORTONE_API_KEY", "PORTONE_API_SECRET"],
+      "nicepay": ["NICEPAY_MERCHANT_KEY"],
+      "paypal": ["PAYPAL_CLIENT_SECRET"],
+      "sentryRuntime": ["SENTRY_DSN"],
+      "translation": ["GEMINI_API_KEY", "XAI_API_KEY"]
+    },
+    "buildOnly": [
+      "SENTRY_AUTH_TOKEN"
+    ],
+    "runnerOnly": [
+      "CLOUDFLARE_ACCESS_CLIENT_ID",
+      "CLOUDFLARE_ACCESS_CLIENT_SECRET",
+      "CLOUDFLARE_CANARY_GUEST_EMAIL",
+      "CLOUDFLARE_CANARY_GUEST_PASSWORD",
+      "CLOUDFLARE_CANARY_GUEST_USER_ID",
+      "CLOUDFLARE_CANARY_HOST_EMAIL",
+      "CLOUDFLARE_CANARY_HOST_PASSWORD",
+      "CLOUDFLARE_CANARY_HOST_USER_ID",
+      "CLOUDFLARE_CANARY_INQUIRY_ID",
+      "CLOUDFLARE_CANARY_EXPERIENCE_ID",
+      "CLOUDFLARE_CANARY_STAGING_SUPABASE_IMAGE_URL",
+      "CLOUDFLARE_CANARY_PUBLIC_R2_IMAGE_URL",
+      "SUPABASE_SERVICE_ROLE_KEY"
+    ]
+  },
+  "placementProfiles": {
+    "default": null,
+    "smart": { "mode": "smart" },
+    "supabase-hint": { "mode": "targeted", "hostnameSource": "NEXT_PUBLIC_SUPABASE_URL.hostname" }
+  },
+  "publicReadPerformanceRoutes": [
+    "/",
+    "/search",
+    "/experiences/{experienceId}",
+    "/users/{userId}",
+    "/api/home/experiences"
+  ],
+  "externalConfiguration": {
+    "supabaseStagingRequiredBeforeCanaryWrites": true,
+    "authCallbacks": [
+      "/auth/callback"
+    ],
+    "oauthProviders": ["google", "kakao"],
+    "paymentProviders": ["portone", "nicepay", "paypal"],
+    "realtimeTransport": "browser-direct-to-supabase",
+    "cronOwner": "github-actions"
+  }
+}

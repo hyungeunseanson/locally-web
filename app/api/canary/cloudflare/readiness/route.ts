@@ -9,6 +9,7 @@ export const runtime = 'nodejs';
 
 const WRITE_GATES = ['auth', 'realtime', 'storage', 'portone', 'nicepay', 'paypal'] as const;
 type WriteGate = (typeof WRITE_GATES)[number];
+const KNOWN_PRODUCTION_SUPABASE_PROJECT_REFS = new Set(['uhinvcydgzqlpnvieyal']);
 
 function getSupabaseProjectRef() {
   try {
@@ -43,7 +44,8 @@ export async function GET(request: Request) {
     supabaseProjectRef &&
       declaredStagingProjectRef &&
       /^[a-z0-9]{20}$/.test(declaredStagingProjectRef) &&
-      supabaseProjectRef === declaredStagingProjectRef
+      supabaseProjectRef === declaredStagingProjectRef &&
+      !KNOWN_PRODUCTION_SUPABASE_PROJECT_REFS.has(supabaseProjectRef)
   );
   const stagingWritesExplicitlyEnabled =
     process.env.CLOUDFLARE_FUNCTIONAL_CANARY_ALLOW_STAGING_WRITES === 'true';

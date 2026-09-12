@@ -1,0 +1,85 @@
+'use client';
+
+import React, { Suspense, useEffect, useMemo } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+
+import SiteHeader from '@/app/components/SiteHeader';
+import LoginModal from '@/app/components/LoginModal';
+import Spinner from '@/app/components/ui/Spinner';
+import { useLanguage } from '@/app/context/LanguageContext';
+import { useAuth } from '@/app/context/AuthContext';
+import { normalizeInternalReturnPath } from '@/app/utils/authRedirect';
+
+function LoginPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { t } = useLanguage();
+  const { user, isLoading } = useAuth();
+
+  const returnUrl = useMemo(
+    () => normalizeInternalReturnPath(searchParams.get('returnUrl') ?? searchParams.get('next')),
+    [searchParams]
+  );
+
+  useEffect(() => {
+    if (!isLoading && user) router.replace(returnUrl);
+  }, [isLoading, returnUrl, router, user]);
+
+  const handleClose = () => router.push(returnUrl || '/');
+  const handleLoginSuccess = () => router.push(returnUrl || '/');
+
+  if (isLoading || user) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <Spinner size={34} variant="muted" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-white text-slate-900">
+      <SiteHeader />
+      <main className="min-h-[calc(100vh-80px)] flex flex-col items-center justify-center px-6 py-12 bg-slate-50/50">
+        <div className="w-full max-w-md text-center mb-6">
+          <h1 className="text-2xl font-black text-slate-900 mb-2">{t('login')}</h1>
+          <p className="text-slate-500 text-sm">
+            {returnUrl !== '/' ? t('login_return_page_desc') : t('login_default_page_desc')}
+          </p>
+          <div data-testid="login-page-help" className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
+            <p className="text-[12px] font-semibold text-slate-900">{t('login_help_title')}</p>
+            <p className="mt-1 text-[12px] leading-5 text-slate-500">
+              {returnUrl !== '/' ? t('login_help_return_hint') : t('login_help_default_hint')}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleClose}
+            className="mt-4 text-sm font-semibold text-slate-600 hover:text-slate-900 underline"
+          >
+            {t('login_back_home')}
+          </button>
+        </div>
+        <LoginModal
+          isOpen={true}
+          onClose={handleClose}
+          onLoginSuccess={handleLoginSuccess}
+          redirectPath={returnUrl}
+        />
+      </main>
+    </div>
+  );
+}
+
+export default function LoginPageClient() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-white flex items-center justify-center">
+          <Spinner size={34} variant="muted" />
+        </div>
+      }
+    >
+      <LoginPageContent />
+    </Suspense>
+  );
+}

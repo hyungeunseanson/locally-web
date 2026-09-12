@@ -1,5 +1,4 @@
 import { MetadataRoute } from 'next';
-import { stat } from 'fs/promises';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import {
   isPublicHostApplicationStatus,
@@ -16,7 +15,6 @@ type StaticRouteConfig = {
   pathname: string;
   changeFrequency: NonNullable<MetadataRoute.Sitemap[number]['changeFrequency']>;
   priority: number;
-  sourcePaths: string[];
 };
 
 const STATIC_ROUTE_CONFIGS: StaticRouteConfig[] = [
@@ -24,136 +22,85 @@ const STATIC_ROUTE_CONFIGS: StaticRouteConfig[] = [
     pathname: '/',
     changeFrequency: 'daily',
     priority: 1,
-    sourcePaths: ['app/page.tsx', 'app/layout.tsx'],
   },
   {
     pathname: '/about',
     changeFrequency: 'monthly',
     priority: 0.8,
-    sourcePaths: ['app/about/layout.tsx', 'app/about/page.tsx'],
   },
   {
     pathname: '/become-a-host',
     changeFrequency: 'weekly',
     priority: 0.9,
-    sourcePaths: ['app/become-a-host/page.tsx', 'app/become-a-host2/BecomeHostLandingContent.tsx'],
   },
   {
     pathname: '/help',
     changeFrequency: 'weekly',
     priority: 0.7,
-    sourcePaths: ['app/help/layout.tsx', 'app/help/page.tsx'],
   },
   {
     pathname: '/search',
     changeFrequency: 'daily',
     priority: 0.9,
-    sourcePaths: ['app/search/layout.tsx', 'app/search/page.tsx'],
   },
   {
     pathname: '/community',
     changeFrequency: 'daily',
     priority: 0.8,
-    sourcePaths: ['app/community/page.tsx'],
   },
   {
     pathname: '/services/intro',
     changeFrequency: 'weekly',
     priority: 0.8,
-    sourcePaths: ['app/services/intro/page.tsx'],
   },
   {
     pathname: '/proxy-bookings/new',
     changeFrequency: 'weekly',
     priority: 0.7,
-    sourcePaths: ['app/proxy-bookings/new/layout.tsx', 'app/proxy-bookings/new/page.tsx'],
   },
   {
     pathname: '/site-map',
     changeFrequency: 'monthly',
     priority: 0.5,
-    sourcePaths: ['app/site-map/layout.tsx', 'app/site-map/page.tsx'],
   },
   {
     pathname: '/privacy',
     changeFrequency: 'yearly',
     priority: 0.4,
-    sourcePaths: [
-      'app/privacy/page.tsx',
-      'app/constants/legalText.ts',
-      'app/constants/legalText_en.ts',
-      'app/constants/legalText_ja.ts',
-      'app/constants/legalText_zh.ts',
-    ],
   },
   {
     pathname: '/company/notices',
     changeFrequency: 'daily',
     priority: 0.8,
-    sourcePaths: ['app/company/notices/layout.tsx', 'app/company/notices/page.tsx', 'app/config/companyNotices.ts'],
   },
   {
     pathname: '/company/news',
     changeFrequency: 'daily',
     priority: 0.8,
-    sourcePaths: ['app/company/news/layout.tsx', 'app/company/news/page.tsx'],
   },
   {
     pathname: '/company/careers',
     changeFrequency: 'monthly',
     priority: 0.6,
-    sourcePaths: ['app/company/careers/layout.tsx', 'app/company/careers/page.tsx'],
   },
   {
     pathname: '/company/investors',
     changeFrequency: 'monthly',
     priority: 0.5,
-    sourcePaths: ['app/company/investors/layout.tsx', 'app/company/investors/page.tsx'],
   },
   {
     pathname: '/company/partnership',
     changeFrequency: 'monthly',
     priority: 0.5,
-    sourcePaths: ['app/company/partnership/layout.tsx', 'app/company/partnership/page.tsx'],
   },
 ];
 
-function resolveAppFileUrl(sourcePath: string) {
-  const appRelativePath = sourcePath.startsWith('app/') ? sourcePath.slice(4) : sourcePath;
-  return new URL(`./${appRelativePath}`, import.meta.url);
-}
-
-async function getRouteLastModified(sourcePaths: string[]): Promise<Date> {
-  const timestamps = await Promise.all(
-    sourcePaths.map(async (sourcePath) => {
-      try {
-        const fileStat = await stat(resolveAppFileUrl(sourcePath));
-        return fileStat.mtime;
-      } catch {
-        return null;
-      }
-    })
-  );
-
-  const validTimestamps = timestamps.filter((value): value is Date => value instanceof Date);
-
-  if (validTimestamps.length === 0) {
-    const sitemapStat = await stat(resolveAppFileUrl('app/sitemap.ts'));
-    return sitemapStat.mtime;
-  }
-
-  return validTimestamps.reduce((latest, current) => (current > latest ? current : latest));
-}
-
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const staticUrls: MetadataRoute.Sitemap = await Promise.all(
-    STATIC_ROUTE_CONFIGS.map(async (routeConfig) => ({
-      url: buildAbsoluteUrl(routeConfig.pathname),
-      lastModified: await getRouteLastModified(routeConfig.sourcePaths),
-      changeFrequency: routeConfig.changeFrequency,
-      priority: routeConfig.priority,
-    }))
-  );
+  const staticUrls: MetadataRoute.Sitemap = STATIC_ROUTE_CONFIGS.map((routeConfig) => ({
+    url: buildAbsoluteUrl(routeConfig.pathname),
+    changeFrequency: routeConfig.changeFrequency,
+    priority: routeConfig.priority,
+  }));
 
   // 동적 체험 URL — Supabase에서 active 체험 조회
   try {

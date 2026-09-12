@@ -230,7 +230,13 @@ function applyLocallyContext(scope: Sentry.Scope, context?: LocallySentryContext
 
 export function getSentryEnvironment() {
   if (typeof window === 'undefined') {
-    return process.env.SENTRY_ENVIRONMENT || process.env.VERCEL_ENV || process.env.NODE_ENV || 'development';
+    return (
+      process.env.SENTRY_ENVIRONMENT ||
+      process.env.CLOUDFLARE_DEPLOYMENT_ENV ||
+      process.env.VERCEL_ENV ||
+      process.env.NODE_ENV ||
+      'development'
+    );
   }
 
   return process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT || process.env.NODE_ENV || 'development';

@@ -2,6 +2,7 @@ const PRODUCTION_HOSTS = new Set([
   'locally-travel.com',
   'www.locally-travel.com',
 ]);
+const KNOWN_PRODUCTION_SUPABASE_PROJECT_REFS = new Set(['uhinvcydgzqlpnvieyal']);
 const WRITE_GATES = new Set(['auth', 'realtime', 'storage', 'portone', 'nicepay', 'paypal']);
 
 function projectRef(value: string | undefined) {
@@ -77,11 +78,12 @@ export default async function globalSetup() {
       !declaredStagingProjectRef ||
       !/^[a-z0-9]{20}$/.test(declaredStagingProjectRef) ||
       activeSupabaseProjectRef !== declaredStagingProjectRef ||
+      KNOWN_PRODUCTION_SUPABASE_PROJECT_REFS.has(activeSupabaseProjectRef) ||
       process.env.CLOUDFLARE_FUNCTIONAL_CANARY_SUPABASE_TIER !== 'staging' ||
       process.env.CLOUDFLARE_FUNCTIONAL_CANARY_STAGING_PROJECT_VERIFIED !== 'true'
     ) {
       throw new Error(
-        'Remote writes require an explicitly verified staging Supabase ref that exactly matches NEXT_PUBLIC_SUPABASE_URL.'
+        'Remote writes require a non-Production, explicitly verified staging Supabase ref that exactly matches NEXT_PUBLIC_SUPABASE_URL.'
       );
     }
   }

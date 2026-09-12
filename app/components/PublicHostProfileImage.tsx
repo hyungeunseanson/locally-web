@@ -48,7 +48,7 @@ export default function PublicHostProfileImage({
   }
 
   return (
-    // The immutable R2 variants bypass Vercel Image Optimization.
+    // Immutable public R2 variants bypass framework image transformation.
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={cloudflareImage.largeUrl}

@@ -23,6 +23,7 @@ test.describe('Public cache policy contract', () => {
       'const COMMUNITY_DETAIL_REVALIDATE_SECONDS = 300;'
     );
     expect(sitemapSource).toContain('export const revalidate = 3600;');
-    expect(sitemapSource).toContain("'app/config/companyNotices.ts'");
+    expect(sitemapSource).not.toContain("from 'fs/promises'");
+    expect(sitemapSource).not.toContain('import.meta.url');
   });
 });

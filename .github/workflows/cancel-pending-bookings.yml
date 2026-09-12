@@ -31,7 +31,7 @@ jobs:
 
           if [ -z "${CRON_SECRET:-}" ]; then
             echo "Missing GitHub secret: CRON_SECRET"
-            echo "Add the same CRON_SECRET value used in Vercel"
+            echo "Add the same CRON_SECRET value used by the production runtime"
             exit 1
           fi
 
