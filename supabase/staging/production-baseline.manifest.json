@@ -7,7 +7,7 @@
     "containsRows": false,
     "containsStorageObjects": false
   },
-  "baselineMigration": "supabase/migrations/20260909211131_production_schema_baseline.sql",
+  "baselineMigration": "supabase/migrations/20260912034545_production_schema_baseline.sql",
   "objects": {
     "publicTables": [
       "admin_audit_logs",

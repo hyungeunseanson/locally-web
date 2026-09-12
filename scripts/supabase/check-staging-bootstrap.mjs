@@ -22,7 +22,7 @@ async function sqlFiles(directory = root) {
   return files;
 }
 
-const canonicalBaseline = resolve(root, 'supabase/migrations/20260909211131_production_schema_baseline.sql');
+const canonicalBaseline = resolve(root, 'supabase/migrations/20260912034545_production_schema_baseline.sql');
 const legacySqlFiles = (await sqlFiles()).filter((path) => path !== canonicalBaseline);
 const definitions = (await Promise.all(legacySqlFiles.map((path) => readFile(path, 'utf8')))).join('\n');
 const createdTables = new Set(

@@ -2,7 +2,7 @@
 
 ## Decision
 
-`supabase/migrations/20260909211131_production_schema_baseline.sql` is the canonical, schema-only starting point for a **new empty Supabase-managed staging project** and the review contract for a data-less persistent Supabase branch. It was reconstructed from the PostgreSQL 17 catalog inventory captured read-only on 2026-09-09. It contains no Production application rows, Auth users, Storage objects, credentials, project refs, URLs, or owner UUIDs. A persistent branch already clones its parent schema, so the baseline is validated there but is not replayed over the cloned schema.
+`supabase/migrations/20260912034545_production_schema_baseline.sql` is the canonical, schema-only starting point for a **new empty Supabase-managed staging project** and the review contract for a data-less persistent Supabase branch. It was reconstructed from the PostgreSQL 17 catalog inventory captured read-only on 2026-09-09. It contains no Production application rows, Auth users, Storage objects, credentials, project refs, URLs, or owner UUIDs. A persistent branch already clones its parent schema, so the baseline is validated there but is not replayed over the cloned schema.
 
 The root `supabase_*.sql` files and `docs/migrations/*.sql` remain historical evidence. Do not run them before or after the baseline: the baseline already folds in their final Production effects through `docs/migrations/v3_40_41_admin_manual_payout_zero_cancellation.sql`. There are no post-baseline migrations at this point in time.
 
@@ -33,7 +33,7 @@ Bucket `created_at`, `updated_at`, `type`, `versioning_status`, and `avif_autode
 
 1. Prefer a persistent branch with **Include data disabled**, or create a new empty Supabase staging project through the separately approved platform workflow. Its ref must not be the Production ref and it must start with Supabase-managed Auth, Storage, roles, and `supabase_realtime`.
 2. Review `production-baseline.manifest.json` and run `npm run supabase:staging:baseline:check`.
-3. For a persistent branch, do not replay the baseline: the branch creation workflow already clones the parent schema. For a genuinely empty separate project, apply **only** `supabase/migrations/20260909211131_production_schema_baseline.sql`. Do not apply historical patches.
+3. For a persistent branch, do not replay the baseline: the branch creation workflow already clones the parent schema. For a genuinely empty separate project, apply **only** `supabase/migrations/20260912034545_production_schema_baseline.sql`. Do not apply historical patches.
 4. Run both read-only catalog gates:
    - `psql "$SUPABASE_STAGING_DB_URL" -f supabase/staging/baseline-contract.sql`
    - `psql "$SUPABASE_STAGING_DB_URL" -f supabase/staging/schema-contract.sql`
