@@ -6,13 +6,9 @@ This change intentionally does not create a Supabase branch/project, connect to 
 
 ## Reproducibility decision
 
-Repository migrations alone cannot recreate the current Production schema. No tracked `CREATE TABLE` exists for these application-owned base tables:
+The repository now has an explicit two-layer contract. The immutable `20260912034545_production_schema_baseline.sql` and `production-baseline.manifest.json` reconstruct the 2026-09-09 checkpoint. The current Production contract is that baseline plus `20260912050655_service_concierge_assignment.sql` and the separately approved chat-image INSERT policy removal. `production-current-state.manifest.json` records the current 39-table/44-function catalog without changing the checkpoint artifacts.
 
-`admin_audit_logs`, `admin_task_comments`, `admin_tasks`, `admin_whitelist`, `bookings`, `experience_availability`, `experiences`, `guest_reviews`, `host_applications`, `inquiries`, `inquiry_messages`, `notifications`, `profiles`, `reviews`, `users`, and `wishlists`.
-
-There is also no canonical `supabase/config.toml`, no ordered `supabase/migrations` ledger, and no tracked final definition for most legacy bucket policies. Several functions have multiple historical definitions, so filename order is not a reliable way to select the Production version.
-
-The read-only Production inventory was captured and reconciled on 2026-09-09. The resulting canonical migration is `supabase/migrations/20260912034545_production_schema_baseline.sql`; its review contract and exact counts are in `supabase/staging/production-baseline.manifest.json`. See `docs/supabase-staging-baseline.md` for the application order and exclusions.
+The root `supabase_*.sql` files and `docs/migrations/*.sql` remain historical evidence, not an ordered bootstrap. A new empty project uses only the explicit order below. A branch cloned from current Production receives its parent schema and must not replay any migration SQL.
 
 Required schema-only material:
 
@@ -24,17 +20,17 @@ Required schema-only material:
 - Storage bucket names/public flags/file limits/allowed MIME types plus final `storage.objects` policies;
 - extensions and types referenced by the above objects.
 
-The older root SQL files remain evidence and patch history, not a fresh-project bootstrap. Their final effects through `docs/migrations/v3_40_41_admin_manual_payout_zero_cancellation.sql` are folded into the baseline. No historical patch is applied after the baseline.
+The baseline folds in historical effects through `docs/migrations/v3_40_41_admin_manual_payout_zero_cancellation.sql`. After that checkpoint, apply only the ordered concierge migration and staging-only current Storage overlay described below. Do not alphabetically replay historical patches.
 
 ## Required application objects
 
-`supabase/staging/required-objects.json` is the source of truth generated from current `.from()`, `.rpc()`, trigger, Realtime, and Storage execution paths. It separates the whole application inventory from the functional-canary minimum.
+`supabase/staging/required-objects.json` is the current application object contract derived from `.from()`, `.rpc()`, trigger, Realtime, and Storage execution paths. It separates active concierge dependencies from legacy marketplace compatibility and from the functional-canary minimum.
 
 The canary minimum is:
 
-- tables: `profiles`, `profile_private_demographics`, `users`, `host_applications`, `experiences`, `experience_availability`, `bookings`, `inquiries`, `inquiry_messages`, `notifications`;
+- tables: the existing Auth/experience/booking/inquiry set plus `service_requests`, `service_bookings`, `service_request_schedule_items`, `service_assignment_history`, and `service_refund_operations`;
 - views: `public_profiles`, `public_host_applications`;
-- functions: `handle_new_user`, `is_admin_reader`, `ensure_profile_demographics_reminder`, `create_booking_atomic`;
+- functions: the existing Auth/booking functions plus all eight active concierge RPCs;
 - trigger: `on_auth_user_created` on `auth.users`;
 - Realtime publication: reproduce the exact Production membership: `admin_audit_logs`, `admin_task_comments`, `admin_tasks`, `admin_whitelist`, `inquiry_messages`, `notifications`, and `profiles`. The functional canary exercises `inquiry_messages`, `notifications`, and `profiles`; it does not add `bookings` or `inquiries` to the publication;
 - Storage: public `admin_files`, `avatars`, `chat-images`, `experiences`, `images`; private `verification-docs`.
@@ -61,14 +57,15 @@ References: [Supabase Google login](https://supabase.com/docs/guides/auth/social
 
 Platform work remains separate and requires explicit approval:
 
-1. Prefer a persistent branch of the Production Supabase project with **Include data disabled**, or create a separate staging project. Record its branch/project ref and branch-specific credentials. Never use `uhinvcydgzqlpnvieyal` as staging.
-2. Review the canonical schema-only baseline and manifest. Do not export or copy application rows or Storage objects.
-3. A Supabase branch already clones its parent application schema, so do not manually replay the non-idempotent baseline over that non-empty branch. Managed Auth/Storage objects and default ACLs can still differ. For the disposable branch `ekfwkplibbqvbgqjumml` only, `supabase/staging/branch-parity-bootstrap.sql` restores the live-verified Production trigger, empty bucket metadata, Storage policies, and exact non-owner grants. It requires an explicit session target-ref marker and denies the Production ref before any write. It is staging-only operational SQL and must never move into `supabase/migrations` or be merged back through Supabase Branching.
-4. Configure branch/project-specific Auth providers/redirects and verify the six empty Storage buckets and policies.
-5. Keep both schema contracts as read-only gates after any staging configuration change.
-6. Run `npm run supabase:staging:seed` with explicit staging-only environment variables.
-7. Feed the printed guest/host IDs, inquiry ID, and image URL into the PR-2 functional canary runner. The fixture password remains runner-only and is never written to the state file.
-8. After all provider sandbox journeys, run `npm run supabase:staging:cleanup -- <state-file>` and verify no `locally.staging.*@example.com`, `STAGING-*`, or `staging-canary/<run-id>/` artifacts remain.
+1. Obtain separate approval for an empty staging project or a data-less branch. Record its exact ref and branch-specific credentials. Never use `uhinvcydgzqlpnvieyal` as staging.
+2. Run the immutable baseline and current-state static checkers. Do not export or copy application rows or Storage objects.
+3. **New empty project:** apply the immutable baseline, run `baseline-contract.sql`, apply `20260912050655_service_concierge_assignment.sql`, set `locally.staging_target_ref` to the exact staging ref, then apply `post-baseline-current-state-overlay.sql`.
+4. **Branch cloned from current Production:** do not replay the baseline, post-baseline migration, or overlay. Run only the read-only current-state contracts.
+5. Run `current-state-contract.sql` and `schema-contract.sql`. The former verifies the exact two-entry migration ledger, 39-table/44-function catalog, security boundaries, Realtime membership, buckets, and 15-policy Storage state.
+6. Configure branch/project-specific Auth providers/redirects and verify the six empty Storage buckets and policies.
+7. Run `npm run supabase:staging:seed` with explicit staging-only environment variables.
+8. Feed the printed guest/host IDs, inquiry ID, and image URL into the functional canary runner. The fixture password remains runner-only and is never written to the state file.
+9. After testing, run `npm run supabase:staging:cleanup -- <state-file>` and verify no synthetic artifacts remain.
 
 Seed and cleanup require all of:
 

@@ -58,8 +58,11 @@ jobs:
       - name: Validate placement profile generation
         run: npm run cloudflare:placement:contract
 
-      - name: Validate the Supabase staging baseline
+      - name: Validate the immutable Supabase staging baseline
         run: npm run supabase:staging:baseline:check
+
+      - name: Validate the Supabase Production current-state contract
+        run: npm run supabase:staging:current:check
 
       - name: Verify the existing Next.js build path
         run: npm run build

@@ -240,8 +240,9 @@ for (const surface of ['guest', 'host', 'support']) {
   });
 }
 
-test('Storage OFF SQL stays manual and only drops the audited chat INSERT policy', () => {
+test('Storage OFF SQL stays a do-not-rerun historical record of the single audited policy drop', () => {
   const sql = readFileSync('docs/ops/chat-attachments/disable-chat-image-inserts.sql', 'utf8');
+  expect(sql).toContain('Applied to Production on 2026-09-12; do not rerun');
   expect(sql.match(/^DROP POLICY.*$/gm)).toEqual(['DROP POLICY "Authenticated users can upload chat images" ON storage.objects;']);
   expect(sql).not.toMatch(/\b(?:DELETE FROM|UPDATE storage|ALTER TABLE|ALTER POLICY|CREATE POLICY|TRUNCATE|REVOKE)\b/i);
   expect(sql).toContain("cmd IN ('INSERT', 'ALL')");

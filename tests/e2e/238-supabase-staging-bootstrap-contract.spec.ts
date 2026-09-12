@@ -8,11 +8,15 @@ const manifest = JSON.parse(readFileSync('supabase/staging/required-objects.json
 const baselineManifest = JSON.parse(
   readFileSync('supabase/staging/production-baseline.manifest.json', 'utf8')
 );
+const currentManifest = JSON.parse(
+  readFileSync('supabase/staging/production-current-state.manifest.json', 'utf8')
+);
 const baselineContract = readFileSync('supabase/staging/baseline-contract.sql', 'utf8');
+const currentContract = readFileSync('supabase/staging/current-state-contract.sql', 'utf8');
 const schemaContract = readFileSync('supabase/staging/schema-contract.sql', 'utf8');
 const inventory = readFileSync('supabase/staging/schema-only-inventory.sql', 'utf8');
-const branchParityBootstrap = readFileSync(
-  'supabase/staging/branch-parity-bootstrap.sql',
+const currentStateOverlay = readFileSync(
+  'supabase/staging/post-baseline-current-state-overlay.sql',
   'utf8'
 );
 const fixtures = readFileSync('scripts/supabase/staging-fixtures.mjs', 'utf8');
@@ -27,18 +31,20 @@ function fixtureGuard(env: Record<string, string>) {
 
 test.describe('Supabase staging bootstrap contract', () => {
   test('uses the canonical baseline without treating historical patches as replayable', () => {
-    expect(manifest.repoBaselineMissing).toEqual(expect.arrayContaining([
-      'profiles',
-      'users',
-      'experiences',
-      'bookings',
-      'inquiries',
-      'inquiry_messages',
-      'notifications',
-    ]));
     expect(baselineManifest.objects.publicTables).toHaveLength(36);
+    expect(currentManifest.objects.publicTables).toHaveLength(39);
     expect(baselineManifest.historicalSql.applyAfterBaseline).toEqual([]);
+    expect(currentManifest.migrationLedger.map(({ version }: { version: string }) => version)).toEqual([
+      '20260912034545',
+      '20260912050655',
+    ]);
+    expect(manifest.freshProjectApplyOrder).toEqual([
+      'supabase/migrations/20260912034545_production_schema_baseline.sql',
+      'supabase/migrations/20260912050655_service_concierge_assignment.sql',
+      'supabase/staging/post-baseline-current-state-overlay.sql',
+    ]);
     expect(packageJson.scripts['supabase:staging:baseline:check']).toBeTruthy();
+    expect(packageJson.scripts['supabase:staging:current:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:contract']).toBeTruthy();
   });
 
@@ -49,6 +55,9 @@ test.describe('Supabase staging bootstrap contract', () => {
     expect(baselineContract).toContain('BEGIN READ ONLY;');
     expect(baselineContract).toContain('ROLLBACK;');
     expect(baselineContract).toContain('LOCALLY_PRODUCTION_BASELINE_CATALOG_PASS');
+    expect(currentContract).toContain('BEGIN READ ONLY;');
+    expect(currentContract).toContain('ROLLBACK;');
+    expect(currentContract).toContain('LOCALLY_PRODUCTION_CURRENT_STATE_CONTRACT_PASS');
     expect(inventory).toContain('BEGIN READ ONLY;');
     expect(inventory).toContain('pg_get_functiondef');
     expect(inventory).not.toMatch(/\b(insert|update|delete|alter|create|drop|truncate)\s+/i);
@@ -130,15 +139,93 @@ test.describe('Supabase staging bootstrap contract', () => {
     expect(`${result.stdout}${result.stderr}`).toContain('known Production Supabase project');
   });
 
-  test('keeps disposable-branch parity repair outside Production migrations and fail-closed', () => {
-    expect(packageJson.scripts['supabase:staging:branch-parity:check']).toBeTruthy();
-    expect(branchParityBootstrap).toContain("target_ref <> 'ekfwkplibbqvbgqjumml'");
-    expect(branchParityBootstrap).toContain("target_ref = 'uhinvcydgzqlpnvieyal'");
-    expect(branchParityBootstrap.indexOf('$target_guard$')).toBeLessThan(
-      branchParityBootstrap.indexOf('CREATE TRIGGER')
+  test('models the exact Production current-state inventory and concierge boundary', () => {
+    expect(currentManifest.objects.publicTables).toHaveLength(39);
+    expect(currentManifest.objects.publicViews).toHaveLength(2);
+    expect(currentManifest.objects.publicTableColumns).toBe(510);
+    expect(currentManifest.objects.publicViewColumns).toBe(27);
+    expect(currentManifest.objects.functionOverloads).toHaveLength(44);
+    expect(currentManifest.objects.applicationTriggers).toHaveLength(11);
+    expect(currentManifest.objects.indexes).toBe(113);
+    expect(currentManifest.objects.constraints).toEqual({
+      total: 179,
+      primaryKey: 39,
+      foreignKey: 59,
+      unique: 14,
+      check: 67,
+    });
+    expect(currentManifest.objects.rls.enabled).toHaveLength(37);
+    expect(currentManifest.objects.rls.disabled).toEqual([
+      'admin_job_runs',
+      'admin_support_unread_alert_batches',
+    ]);
+    expect(currentManifest.objects.rls.forced).toEqual([]);
+    expect(currentManifest.objects.rls.publicPolicies).toBe(111);
+    expect(currentManifest.objects.storageObjectPolicies).toHaveLength(15);
+    expect(currentManifest.securityFingerprints).toMatchObject({
+      storageBuckets: 'c3ff5767c8e4934ae05b3d96550441c8',
+      storagePolicies: '38c973a52a0bebe8fa78b3f53089e427',
+      publicRlsPolicies: '8e2720ce969cfa4252ec20069000fc4c',
+      publicRelationGrants: '21aa717aae9fd797e1e51053688ddac3',
+      stagingOverlayBaselineStoragePolicies: 'd6b381fd629405acfdd615593031de5c',
+    });
+    for (const fingerprint of [
+      currentManifest.securityFingerprints.storageBuckets,
+      currentManifest.securityFingerprints.storagePolicies,
+      currentManifest.securityFingerprints.publicRlsPolicies,
+      currentManifest.securityFingerprints.publicRelationGrants,
+    ]) {
+      expect(currentContract).toContain(fingerprint);
+    }
+    expect(currentManifest.activeConcierge.tables).toEqual([
+      'service_request_schedule_items',
+      'service_assignment_history',
+      'service_refund_operations',
+    ]);
+    expect(currentManifest.activeConcierge.functionOverloads).toHaveLength(8);
+    expect(currentManifest.activeConcierge.directExecuteRoles).toEqual(['service_role']);
+    expect(currentManifest.legacyCompatibility.disabledRoutes).toEqual([
+      'app/api/services/applications/route.ts',
+      'app/api/services/select-host/route.ts',
+    ]);
+    expect(currentManifest.legacyCompatibility.status).toBe(410);
+  });
+
+  test('keeps the staging-only current-state overlay outside migrations and fail-closed', () => {
+    expect(currentStateOverlay).toContain("target_ref = 'uhinvcydgzqlpnvieyal'");
+    expect(currentStateOverlay).toContain("current_setting('locally.staging_target_ref', true)");
+    expect(currentStateOverlay.indexOf('$target_guard$')).toBeLessThan(
+      currentStateOverlay.indexOf('DROP POLICY "Authenticated users can upload chat images"')
     );
-    expect(branchParityBootstrap.match(/CREATE POLICY /g)).toHaveLength(16);
-    expect(branchParityBootstrap).toContain('LOCALLY_STAGING_BRANCH_PARITY_BOOTSTRAP_PASS');
+    expect(currentStateOverlay).not.toContain('DROP POLICY IF EXISTS');
+    expect(currentStateOverlay.match(/^DROP POLICY .*$/gm)).toEqual([
+      'DROP POLICY "Authenticated users can upload chat images" ON storage.objects;',
+    ]);
+    expect(currentStateOverlay).toContain('Authenticated users can upload chat images');
+    expect(currentStateOverlay).toContain('policy_count <> 16');
+    expect(currentStateOverlay).toContain('d6b381fd629405acfdd615593031de5c');
+    expect(currentStateOverlay).toContain('policy_count <> 15');
+    expect(currentStateOverlay).toContain('38c973a52a0bebe8fa78b3f53089e427');
+    expect(currentStateOverlay.match(/c3ff5767c8e4934ae05b3d96550441c8/g)).toHaveLength(2);
+    expect(currentStateOverlay).toContain('IF NOT EXISTS (');
+    expect(currentStateOverlay).toContain('LOCALLY_STAGING_CURRENT_STATE_OVERLAY_PASS');
+  });
+
+  test('does not require retired comment-like objects in the current state', () => {
+    for (const staleName of [
+      'community_comment_likes',
+      'increment_comment_like_count',
+      'decrement_comment_like_count',
+      'on_comment_like_added',
+      'on_comment_like_removed',
+    ]) {
+      expect(manifest.applicationTables).not.toContain(staleName);
+      expect(manifest.applicationFunctions).not.toContain(staleName);
+      expect(manifest.applicationTriggers).not.toContain(staleName);
+    }
+    expect(manifest.forbiddenCurrentObjects.storagePolicies).toEqual([
+      'Authenticated users can upload chat images',
+    ]);
   });
 
   test('requires an exact verified staging ref and explicit write opt-in', () => {
