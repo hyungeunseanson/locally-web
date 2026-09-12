@@ -35,12 +35,11 @@ test.describe('Cloudflare functional canary contract', () => {
     expect(globalSetup).toContain('CLOUDFLARE_ACCESS_CLIENT_ID');
     expect(globalSetup).toContain('CLOUDFLARE_ACCESS_CLIENT_SECRET');
     expect(helpers).toContain('(url) => url.origin === canaryOrigin');
-    expect(helpers).toContain('const response = await route.fetch({');
-    expect(helpers).toContain('maxRedirects: 0');
-    expect(helpers).toContain('await route.fulfill({ response })');
-    expect(helpers).not.toContain('route.continue({');
+    expect(helpers).toContain('await route.continue({');
+    expect(helpers).not.toContain('route.fetch({');
     expect(helpers).not.toContain('extraHTTPHeaders');
     expect(remoteConfig).not.toContain('extraHTTPHeaders');
+    expect(remoteConfig).toContain("trace: 'off'");
     expect(authRuntime).toContain("requestHeaders['cf-access-client-id']");
     expect(authRuntime).toContain("requestHeaders['cf-access-client-secret']");
     expect(accessRuntime).toContain('maxRedirects: 0');
@@ -96,5 +95,7 @@ test.describe('Cloudflare functional canary contract', () => {
     expect(packageJson.scripts['cloudflare:functional:contract']).toBeTruthy();
     expect(packageJson.scripts['cloudflare:functional:remote']).toBeTruthy();
     expect(packageJson.scripts['cloudflare:functional:remote:access']).toBeTruthy();
+    expect(packageJson.scripts['cloudflare:functional:remote:public']).toBeTruthy();
+    expect(packageJson.scripts['cloudflare:functional:remote:storage']).toBeTruthy();
   });
 });

@@ -3,6 +3,8 @@ import { expect, test } from '@playwright/test';
 import { isRscRequest, loginWithPassword, protectCanaryBrowserContext } from './helpers';
 
 test.describe.serial('Auth and Next.js RSC navigation regression', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
   test.beforeEach(async ({ context }) => {
     await protectCanaryBrowserContext(context);
   });
@@ -50,6 +52,7 @@ test.describe.serial('Auth and Next.js RSC navigation regression', () => {
     await expect(page).toHaveURL(/\/services\/my/);
 
     await page.goto('/account', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('button', { name: /Sign Out|로그아웃/i })).toBeVisible();
     await page.getByTestId('mobile-tab-guest-inbox').click();
     await expect(page).toHaveURL(/\/guest\/inbox/);
     await page.goBack({ waitUntil: 'domcontentloaded' });
@@ -70,15 +73,32 @@ test.describe.serial('Auth and Next.js RSC navigation regression', () => {
 
   for (const provider of ['google', 'kakao'] as const) {
     test(`${provider} OAuth starts with the Worker callback origin`, async ({ page }) => {
+      test.setTimeout(45_000);
+      const observedOrigins = new Set<string>();
+      page.on('request', (request) => {
+        const url = new URL(request.url());
+        if (url.origin !== new URL(process.env.CLOUDFLARE_CANARY_BASE_URL!).origin) {
+          observedOrigins.add(`${url.origin}${url.pathname}`);
+        }
+      });
       await page.goto('/login?returnUrl=%2Fguest%2Ftrips', { waitUntil: 'domcontentloaded' });
+      const dismiss = page.getByTestId('global-site-announcement-dismiss');
+      if (await dismiss.isVisible().catch(() => false)) await dismiss.click();
       const authorization = page.waitForRequest((request) => {
         const url = new URL(request.url());
         return url.pathname.endsWith('/auth/v1/authorize') && url.searchParams.get('provider') === provider;
-      });
+      }, { timeout: 30_000 });
       await page.getByRole('button', {
         name: provider === 'google' ? /Continue with Google|Google/i : /Continue with Kakao|Kakao/i,
-      }).click();
-      const request = await authorization;
+      }).click({ noWaitAfter: true });
+      const request = await authorization.catch((error) => {
+        throw new Error(
+          `${provider} OAuth authorization request was not observed. External requests: ${[
+            ...observedOrigins,
+          ].join(', ') || 'none'}`,
+          { cause: error }
+        );
+      });
       const requestHeaders = request.headers();
       expect(requestHeaders['cf-access-client-id']).toBeUndefined();
       expect(requestHeaders['cf-access-client-secret']).toBeUndefined();

@@ -31,6 +31,8 @@
     "cloudflare:functional:remote": "playwright test -c playwright.cloudflare-functional.config.ts",
     "cloudflare:functional:remote:access": "playwright test -c playwright.cloudflare-functional.config.ts tests/cloudflare-functional/access-runtime.spec.ts",
     "cloudflare:functional:remote:cache": "playwright test -c playwright.cloudflare-functional.config.ts tests/cloudflare-functional/cache-runtime.spec.ts",
+    "cloudflare:functional:remote:public": "playwright test -c playwright.cloudflare-functional.config.ts tests/cloudflare-functional/public-runtime.spec.ts",
+    "cloudflare:functional:remote:storage": "playwright test -c playwright.cloudflare-functional.config.ts tests/cloudflare-functional/storage-runtime.spec.ts",
     "cloudflare:functional:remote:runtime": "playwright test -c playwright.cloudflare-functional.config.ts tests/cloudflare-functional/access-runtime.spec.ts tests/cloudflare-functional/auth-rsc-runtime.spec.ts tests/cloudflare-functional/images-smtp-readiness-runtime.spec.ts tests/cloudflare-functional/realtime-runtime.spec.ts",
     "supabase:staging:baseline:check": "node scripts/supabase/check-production-baseline.mjs",
     "supabase:staging:branch-parity:check": "node scripts/supabase/check-branch-parity-bootstrap.mjs",

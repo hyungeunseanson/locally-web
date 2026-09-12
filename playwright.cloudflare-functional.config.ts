@@ -21,7 +21,8 @@ export default defineConfig({
   outputDir: 'test-results/cloudflare-functional',
   use: {
     baseURL,
-    trace: 'retain-on-failure',
+    // Access service-token headers must never be persisted in Playwright traces.
+    trace: 'off',
     viewport: { width: 390, height: 844 },
   },
   projects: [

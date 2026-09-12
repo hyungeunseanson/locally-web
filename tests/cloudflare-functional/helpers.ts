@@ -30,14 +30,16 @@ export async function protectCanaryBrowserContext(context: BrowserContext) {
   await context.route(
     (url) => url.origin === canaryOrigin,
     async (route) => {
-      const response = await route.fetch({
-        headers: {
-          ...route.request().headers(),
-          ...canaryAccessHeaders(),
-        },
-        maxRedirects: 0,
-      });
-      await route.fulfill({ response });
+      try {
+        await route.continue({
+          headers: {
+            ...route.request().headers(),
+            ...canaryAccessHeaders(),
+          },
+        });
+      } catch {
+        // Navigation teardown can abandon prefetches; never print Access headers in diagnostics.
+      }
     }
   );
   accessProtectedContexts.add(context);
