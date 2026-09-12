@@ -107,18 +107,6 @@ const nextConfig: NextConfig = {
         permanent: true,
       })),
       {
-        source: '/login',
-        has: [{ type: 'query', key: 'back_url' }],
-        destination: `${LEGACY_IMWEB_ORIGIN}/login`,
-        permanent: true,
-      },
-      {
-        source: '/login',
-        has: [{ type: 'query', key: 'used_login_btn' }],
-        destination: `${LEGACY_IMWEB_ORIGIN}/login`,
-        permanent: true,
-      },
-      {
         source: '/',
         has: [{
           type: 'query',
