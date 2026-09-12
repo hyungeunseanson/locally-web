@@ -8,6 +8,14 @@ const requiredPath = resolve(root, 'supabase/staging/required-objects.json');
 const contractPath = resolve(root, 'supabase/staging/current-state-contract.sql');
 const overlayPath = resolve(root, 'supabase/staging/post-baseline-current-state-overlay.sql');
 
+const expectedFingerprints = {
+  storageBuckets: 'c3ff5767c8e4934ae05b3d96550441c8',
+  storagePolicies: '38c973a52a0bebe8fa78b3f53089e427',
+  publicRlsPolicies: '8e2720ce969cfa4252ec20069000fc4c',
+  publicRelationGrants: '21aa717aae9fd797e1e51053688ddac3',
+  stagingOverlayBaselineStoragePolicies: 'd6b381fd629405acfdd615593031de5c',
+};
+
 const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
 const required = JSON.parse(await readFile(requiredPath, 'utf8'));
 const contract = await readFile(contractPath, 'utf8');
@@ -91,6 +99,10 @@ const migrationFiles = (await readdir(resolve(root, 'supabase/migrations')))
 exact('repository migration files', migrationFiles, expectedLedger.map(({ repositoryFile }) => repositoryFile.split('/').at(-1)));
 
 const objects = manifest.objects;
+for (const [name, fingerprint] of Object.entries(expectedFingerprints)) {
+  assert(manifest.securityFingerprints[name] === fingerprint,
+    `security fingerprint differs: ${name}`);
+}
 assert(objects.publicTables.length === 39, 'expected 39 public tables');
 assert(objects.publicViews.length === 2, 'expected 2 public views');
 assert(objects.publicTableColumns === 510, 'expected 510 public table columns');
@@ -167,6 +179,22 @@ assert(contract.includes('BEGIN READ ONLY;'), 'current-state contract is not rea
 assert(contract.trimEnd().endsWith('ROLLBACK;'), 'current-state contract must end with ROLLBACK');
 assert(contract.includes('LOCALLY_PRODUCTION_CURRENT_STATE_CONTRACT_PASS'),
   'current-state contract pass marker is missing');
+for (const [name, fingerprint] of Object.entries(expectedFingerprints)) {
+  if (name !== 'stagingOverlayBaselineStoragePolicies') {
+    assert(contract.includes(fingerprint), `current-state contract omits ${name} fingerprint`);
+  }
+}
+for (const canonicalField of [
+  'policy_def.schemaname', 'policy_def.tablename', 'policy_def.policyname',
+  'policy_def.permissive', 'policy_def.cmd', 'array_to_string(policy_def.roles',
+  'policy_def.qual', 'policy_def.with_check', 'class_def.relkind',
+  'acl_entry.grantee', 'acl_entry.privilege_type', 'acl_entry.is_grantable',
+  'bucket_def.id', 'bucket_def.name', 'bucket_def.public',
+  'bucket_def.file_size_limit', 'bucket_def.allowed_mime_types',
+]) {
+  assert(contract.includes(canonicalField),
+    `current-state contract omits canonical security field: ${canonicalField}`);
+}
 assert(!/^\s*(?:INSERT\s+INTO|UPDATE\s+|DELETE\s+FROM|ALTER\s+|CREATE\s+|DROP\s+|TRUNCATE\s+)/gim.test(contract),
   'current-state contract contains a mutating statement');
 
@@ -174,8 +202,19 @@ const overlayWithoutComments = overlay.replace(/^\s*--.*$/gm, '');
 assert(overlay.includes("target_ref = 'uhinvcydgzqlpnvieyal'"), 'overlay Production ref deny is missing');
 assert(overlay.indexOf('$target_guard$') < overlay.indexOf('DROP POLICY'), 'overlay guard must precede the write');
 assert((overlayWithoutComments.match(/DROP POLICY/g) ?? []).length === 1, 'overlay must drop exactly one policy');
-assert(overlayWithoutComments.includes('DROP POLICY IF EXISTS "Authenticated users can upload chat images" ON storage.objects;'),
+assert(!overlayWithoutComments.includes('DROP POLICY IF EXISTS'), 'overlay must fail when the one-time policy is absent');
+assert(overlayWithoutComments.includes('DROP POLICY "Authenticated users can upload chat images" ON storage.objects;'),
   'overlay targets the wrong policy');
+for (const fingerprint of [
+  expectedFingerprints.storageBuckets,
+  expectedFingerprints.stagingOverlayBaselineStoragePolicies,
+  expectedFingerprints.storagePolicies,
+]) {
+  assert(overlay.includes(fingerprint), `overlay omits required fingerprint: ${fingerprint}`);
+}
+assert(overlay.includes('policy_count <> 16'), 'overlay does not require the 16-policy baseline');
+assert(overlay.includes('policy_count <> 15'), 'overlay does not require the 15-policy current state');
+assert(overlay.includes('IF NOT EXISTS ('), 'overlay does not require the exact policy before writing');
 assert(!/^\s*(?:INSERT\s+INTO|UPDATE\s+|DELETE\s+FROM|ALTER\s+|CREATE\s+|TRUNCATE\s+)/gim.test(overlayWithoutComments),
   'overlay contains an unrelated mutation');
 

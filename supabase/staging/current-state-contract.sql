@@ -11,6 +11,7 @@ DECLARE
   foreign_key_count bigint;
   unique_count bigint;
   check_count bigint;
+  actual_fingerprint text;
 BEGIN
   SELECT array_agg(version || ':' || name ORDER BY version)
     INTO actual
@@ -231,6 +232,46 @@ BEGIN
     RAISE EXCEPTION 'public RLS policy count %, expected 111', actual_count;
   END IF;
 
+  SELECT md5(string_agg(
+           policy_def.schemaname || '|' || policy_def.tablename || '|' ||
+           policy_def.policyname || '|' || policy_def.permissive || '|' ||
+           policy_def.cmd || '|' || array_to_string(policy_def.roles, ',') || '|' ||
+           coalesce(policy_def.qual, '') || '|' || coalesce(policy_def.with_check, ''),
+           E'\n' ORDER BY policy_def.schemaname, policy_def.tablename, policy_def.policyname
+         ))
+    INTO actual_fingerprint
+    FROM pg_policies AS policy_def
+   WHERE policy_def.schemaname = 'public';
+  IF actual_fingerprint IS DISTINCT FROM '8e2720ce969cfa4252ec20069000fc4c' THEN
+    RAISE EXCEPTION 'public RLS policy fingerprint mismatch: %', actual_fingerprint;
+  END IF;
+
+  SELECT md5(string_agg(
+           namespace_def.nspname || '|' || class_def.relname || '|' ||
+           class_def.relkind::text || '|' ||
+           CASE WHEN acl_entry.grantee = 0
+             THEN 'PUBLIC' ELSE pg_get_userbyid(acl_entry.grantee)
+           END || '|' || acl_entry.privilege_type || '|' || acl_entry.is_grantable::text,
+           E'\n' ORDER BY namespace_def.nspname, class_def.relname,
+             class_def.relkind::text,
+             CASE WHEN acl_entry.grantee = 0
+               THEN 'PUBLIC' ELSE pg_get_userbyid(acl_entry.grantee)
+             END,
+             acl_entry.privilege_type, acl_entry.is_grantable
+         ))
+    INTO actual_fingerprint
+    FROM pg_class AS class_def
+    JOIN pg_namespace AS namespace_def ON namespace_def.oid = class_def.relnamespace
+    CROSS JOIN LATERAL aclexplode(coalesce(
+      class_def.relacl,
+      acldefault('r', class_def.relowner)
+    )) AS acl_entry
+   WHERE namespace_def.nspname = 'public'
+     AND class_def.relkind IN ('r', 'p', 'v', 'm', 'f');
+  IF actual_fingerprint IS DISTINCT FROM '21aa717aae9fd797e1e51053688ddac3' THEN
+    RAISE EXCEPTION 'public relation grant fingerprint mismatch: %', actual_fingerprint;
+  END IF;
+
   SELECT array_agg(publication_def.tablename ORDER BY publication_def.tablename)
     INTO actual
     FROM pg_publication_tables AS publication_def
@@ -257,6 +298,18 @@ BEGIN
     RAISE EXCEPTION 'Storage bucket contract mismatch: %', actual;
   END IF;
 
+  SELECT md5(string_agg(
+           bucket_def.id || '|' || bucket_def.name || '|' || bucket_def.public::text || '|' ||
+           coalesce(bucket_def.file_size_limit::text, '') || '|' ||
+           coalesce(array_to_string(bucket_def.allowed_mime_types, ','), ''),
+           E'\n' ORDER BY bucket_def.id
+         ))
+    INTO actual_fingerprint
+    FROM storage.buckets AS bucket_def;
+  IF actual_fingerprint IS DISTINCT FROM 'c3ff5767c8e4934ae05b3d96550441c8' THEN
+    RAISE EXCEPTION 'Storage bucket fingerprint mismatch: %', actual_fingerprint;
+  END IF;
+
   SELECT array_agg(policy_def.policyname ORDER BY policy_def.policyname)
     INTO actual
     FROM pg_policies AS policy_def
@@ -280,6 +333,20 @@ BEGIN
   ]::text[];
   IF actual IS DISTINCT FROM expected THEN
     RAISE EXCEPTION 'Storage object policy inventory mismatch: %', actual;
+  END IF;
+
+  SELECT md5(string_agg(
+           policy_def.schemaname || '|' || policy_def.tablename || '|' ||
+           policy_def.policyname || '|' || policy_def.permissive || '|' ||
+           policy_def.cmd || '|' || array_to_string(policy_def.roles, ',') || '|' ||
+           coalesce(policy_def.qual, '') || '|' || coalesce(policy_def.with_check, ''),
+           E'\n' ORDER BY policy_def.schemaname, policy_def.tablename, policy_def.policyname
+         ))
+    INTO actual_fingerprint
+    FROM pg_policies AS policy_def
+   WHERE policy_def.schemaname = 'storage' AND policy_def.tablename = 'objects';
+  IF actual_fingerprint IS DISTINCT FROM '38c973a52a0bebe8fa78b3f53089e427' THEN
+    RAISE EXCEPTION 'Storage policy fingerprint mismatch: %', actual_fingerprint;
   END IF;
 
   IF to_regclass('public.community_comment_likes') IS NOT NULL

@@ -162,6 +162,21 @@ test.describe('Supabase staging bootstrap contract', () => {
     expect(currentManifest.objects.rls.forced).toEqual([]);
     expect(currentManifest.objects.rls.publicPolicies).toBe(111);
     expect(currentManifest.objects.storageObjectPolicies).toHaveLength(15);
+    expect(currentManifest.securityFingerprints).toMatchObject({
+      storageBuckets: 'c3ff5767c8e4934ae05b3d96550441c8',
+      storagePolicies: '38c973a52a0bebe8fa78b3f53089e427',
+      publicRlsPolicies: '8e2720ce969cfa4252ec20069000fc4c',
+      publicRelationGrants: '21aa717aae9fd797e1e51053688ddac3',
+      stagingOverlayBaselineStoragePolicies: 'd6b381fd629405acfdd615593031de5c',
+    });
+    for (const fingerprint of [
+      currentManifest.securityFingerprints.storageBuckets,
+      currentManifest.securityFingerprints.storagePolicies,
+      currentManifest.securityFingerprints.publicRlsPolicies,
+      currentManifest.securityFingerprints.publicRelationGrants,
+    ]) {
+      expect(currentContract).toContain(fingerprint);
+    }
     expect(currentManifest.activeConcierge.tables).toEqual([
       'service_request_schedule_items',
       'service_assignment_history',
@@ -180,10 +195,19 @@ test.describe('Supabase staging bootstrap contract', () => {
     expect(currentStateOverlay).toContain("target_ref = 'uhinvcydgzqlpnvieyal'");
     expect(currentStateOverlay).toContain("current_setting('locally.staging_target_ref', true)");
     expect(currentStateOverlay.indexOf('$target_guard$')).toBeLessThan(
-      currentStateOverlay.indexOf('DROP POLICY IF EXISTS')
+      currentStateOverlay.indexOf('DROP POLICY "Authenticated users can upload chat images"')
     );
-    expect(currentStateOverlay.match(/DROP POLICY IF EXISTS/g)).toHaveLength(1);
+    expect(currentStateOverlay).not.toContain('DROP POLICY IF EXISTS');
+    expect(currentStateOverlay.match(/^DROP POLICY .*$/gm)).toEqual([
+      'DROP POLICY "Authenticated users can upload chat images" ON storage.objects;',
+    ]);
     expect(currentStateOverlay).toContain('Authenticated users can upload chat images');
+    expect(currentStateOverlay).toContain('policy_count <> 16');
+    expect(currentStateOverlay).toContain('d6b381fd629405acfdd615593031de5c');
+    expect(currentStateOverlay).toContain('policy_count <> 15');
+    expect(currentStateOverlay).toContain('38c973a52a0bebe8fa78b3f53089e427');
+    expect(currentStateOverlay.match(/c3ff5767c8e4934ae05b3d96550441c8/g)).toHaveLength(2);
+    expect(currentStateOverlay).toContain('IF NOT EXISTS (');
     expect(currentStateOverlay).toContain('LOCALLY_STAGING_CURRENT_STATE_OVERLAY_PASS');
   });
 

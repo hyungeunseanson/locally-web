@@ -68,7 +68,7 @@ if (!currentContract.includes('LOCALLY_PRODUCTION_CURRENT_STATE_CONTRACT_PASS'))
 }
 
 const guardIndex = overlay.indexOf('$target_guard$');
-const writeIndex = overlay.indexOf('DROP POLICY IF EXISTS');
+const writeIndex = overlay.indexOf('DROP POLICY "Authenticated users can upload chat images"');
 if (guardIndex < 0 || writeIndex < 0 || guardIndex >= writeIndex) {
   fail('staging overlay target guard must run before its single policy change');
 }
@@ -77,6 +77,32 @@ if (!overlay.includes("target_ref = 'uhinvcydgzqlpnvieyal'")) {
 }
 if (!overlay.includes('Authenticated users can upload chat images')) {
   fail('staging overlay does not target the reviewed chat-image INSERT policy');
+}
+if (overlay.includes('DROP POLICY IF EXISTS')) {
+  fail('staging overlay must fail closed when its one-time policy is absent');
+}
+for (const requiredFragment of [
+  'c3ff5767c8e4934ae05b3d96550441c8',
+  'd6b381fd629405acfdd615593031de5c',
+  '38c973a52a0bebe8fa78b3f53089e427',
+  'policy_count <> 16',
+  'policy_count <> 15',
+  'IF NOT EXISTS (',
+]) {
+  if (!overlay.includes(requiredFragment)) {
+    fail(`staging overlay omits fail-closed condition: ${requiredFragment}`);
+  }
+}
+
+for (const [name, fingerprint] of Object.entries({
+  storageBuckets: 'c3ff5767c8e4934ae05b3d96550441c8',
+  storagePolicies: '38c973a52a0bebe8fa78b3f53089e427',
+  publicRlsPolicies: '8e2720ce969cfa4252ec20069000fc4c',
+  publicRelationGrants: '21aa717aae9fd797e1e51053688ddac3',
+})) {
+  if (current.securityFingerprints[name] !== fingerprint || !currentContract.includes(fingerprint)) {
+    fail(`current-state security fingerprint differs: ${name}`);
+  }
 }
 
 for (const staleName of [
