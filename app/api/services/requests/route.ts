@@ -1,379 +1,160 @@
 import { NextResponse } from 'next/server';
-import { createClient as createServerClient } from '@/app/utils/supabase/server';
-import crypto from 'crypto';
-import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
-import {
-  getApprovedHostServiceLocationKeys,
-  isApprovedHostEligibleForServiceRequest,
-} from '@/app/utils/serviceHostNotifications';
-import {
-  getServiceCityVariants,
-  getServiceLocationKey,
-  normalizeServiceCity,
-  resolveServiceCountry,
-} from '@/app/utils/serviceRequestLocation';
-import { createAdminClient } from '@/app/utils/supabase/admin';
 
-function generateOrderId(): string {
-  const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  const rand = crypto.randomBytes(4).toString('hex');
-  return `SVC-${date}-${rand}`;
-}
+import {
+  calculateServicePricing,
+  isServiceType,
+  SERVICE_COUNTRY,
+  SERVICE_LANGUAGE_OPTIONS,
+  SERVICE_MAX_GUESTS,
+  validateServiceSchedule,
+} from '@/app/utils/services/concierge';
+import { createAdminClient } from '@/app/utils/supabase/admin';
+import { createClient as createServerClient } from '@/app/utils/supabase/server';
 
 type CreateRequestBody = {
-  title?: string;
-  description?: string;
-  city?: string;
-  country?: string;
-  service_date?: string;
-  start_time?: string;
-  duration_hours?: number | string;
-  languages?: string[];
-  guest_count?: number | string;
-  contact_name?: string;
-  contact_phone?: string;
+  serviceType?: unknown;
+  description?: unknown;
+  city?: unknown;
+  schedule?: unknown;
+  languages?: unknown;
+  guestCount?: unknown;
+  contactName?: unknown;
+  contactPhone?: unknown;
+  idempotencyKey?: unknown;
 };
 
-type ServiceAdminClient = ReturnType<typeof createAdminClient>;
-type ServiceRpcErrorLike = {
+type AtomicCreateResult = {
+  request_id: string;
+  booking_id: string;
+  order_id: string;
+  amount: number;
+  hourly_rate: number;
+  pricing_reason: string;
+};
+
+type ServiceRpcError = {
   code?: string | null;
   message?: string | null;
   details?: string | null;
   hint?: string | null;
 };
-type CreateServiceRequestAtomicResult = {
-  request_id: string;
-  booking_id: string;
-  order_id: string;
-  amount: number;
-};
 
-function isMissingServiceRpcError(error: ServiceRpcErrorLike | null | undefined, functionName: string) {
-  if (!error) return false;
-
-  const combinedMessage = `${error.message || ''} ${error.details || ''} ${error.hint || ''}`;
-  return (
-    error.code === 'PGRST202' ||
-    (combinedMessage.includes(functionName) &&
-      (combinedMessage.includes('Could not find the function') ||
-        combinedMessage.includes('No function matches') ||
-        combinedMessage.includes('does not exist')))
-  );
+function normalizeText(value: unknown, maxLength: number) {
+  return typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
 }
 
-async function tryCreateServiceRequestAtomic(
-  supabaseAdmin: ServiceAdminClient,
-  params: {
-    userId: string;
-    title: string;
-    description: string;
-    city: string;
-    country: string;
-    serviceDate: string;
-    startTime: string;
-    durationHours: number;
-    languages: string[];
-    guestCount: number;
-    contactName: string;
-    contactPhone: string;
-  }
-) {
-  const rpcName = 'create_service_request_with_booking_atomic';
-  const { data, error } = await supabaseAdmin
-    .rpc(rpcName, {
-      p_user_id: params.userId,
-      p_title: params.title,
-      p_description: params.description,
-      p_city: params.city,
-      p_country: params.country,
-      p_service_date: params.serviceDate,
-      p_start_time: params.startTime,
-      p_duration_hours: params.durationHours,
-      p_languages: params.languages,
-      p_guest_count: params.guestCount,
-      p_contact_name: params.contactName,
-      p_contact_phone: params.contactPhone,
-    })
-    .maybeSingle<CreateServiceRequestAtomicResult>();
-
-  if (error) {
-    if (isMissingServiceRpcError(error, rpcName)) {
-      return { kind: 'missing' as const };
-    }
-
-    console.error('Service Request Atomic RPC Error:', error);
-    return {
-      kind: 'error' as const,
-      status: 500,
-      error: '의뢰 생성 중 오류가 발생했습니다.',
-    };
-  }
-
-  if (!data?.request_id || !data.order_id) {
-    return {
-      kind: 'error' as const,
-      status: 500,
-      error: '의뢰 생성 중 오류가 발생했습니다.',
-    };
-  }
-
-  return {
-    kind: 'success' as const,
-    data,
-  };
-}
-
-async function cleanupCreatedServiceRequestState(
-  supabaseAdmin: ServiceAdminClient,
-  params: {
-    requestId: string;
-    bookingId?: string;
-  }
-) {
-  const { requestId, bookingId } = params;
-
-  if (bookingId) {
-    const { error: bookingDeleteError } = await supabaseAdmin
-      .from('service_bookings')
-      .delete()
-      .eq('id', bookingId)
-      .eq('request_id', requestId);
-
-    if (bookingDeleteError) {
-      console.error('Service Request Cleanup Booking Delete Error:', bookingDeleteError);
-    }
-  }
-
-  const { error: deleteError } = await supabaseAdmin
-    .from('service_requests')
-    .delete()
-    .eq('id', requestId)
-    .eq('status', 'pending_payment');
-
-  if (!deleteError) {
-    return;
-  }
-
-  console.error('Service Request Cleanup Delete Error:', deleteError);
-
-  const { error: cancelError } = await supabaseAdmin
-    .from('service_requests')
-    .update({ status: 'cancelled' })
-    .eq('id', requestId);
-
-  if (cancelError) {
-    console.error('Service Request Cleanup Cancel Error:', cancelError);
-  }
-}
-
-async function normalizePendingServiceBookingPaymentMethod(
-  supabaseAdmin: ServiceAdminClient,
-  params: {
-    bookingId: string;
-    requestId: string;
-  }
-) {
-  const { bookingId, requestId } = params;
-
-  const { error } = await supabaseAdmin
-    .from('service_bookings')
-    .update({ payment_method: null })
-    .eq('id', bookingId)
-    .eq('request_id', requestId)
-    .eq('status', 'PENDING')
-    .is('tid', null)
-    .eq('payment_method', 'card');
-
-  return { error };
+function mapCreateError(error: ServiceRpcError | null) {
+  const detail = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`;
+  if (detail.includes('SVC_INVALID_SERVICE_TYPE')) return '서비스 유형을 확인해주세요.';
+  if (detail.includes('SVC_INVALID_GUEST_COUNT')) return '인원은 1~10명으로 입력해주세요.';
+  if (detail.includes('SVC_INVALID_LANGUAGES')) return '필요 언어를 하나 이상 선택해주세요.';
+  if (detail.includes('SVC_INVALID_SCHEDULE')) return '일정을 다시 확인해주세요.';
+  if (detail.includes('SVC_IDEMPOTENCY_KEY_REQUIRED')) return '요청 식별자가 누락되었습니다.';
+  return '의뢰 생성 중 오류가 발생했습니다.';
 }
 
 export async function POST(request: Request) {
   try {
     const supabaseServer = await createServerClient();
     const { data: { user }, error: authError } = await supabaseServer.auth.getUser();
-
     if (authError || !user) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = (await request.json()) as CreateRequestBody;
-    const {
-      title, description, city, country,
-      service_date, start_time, duration_hours,
-      languages, guest_count, contact_name, contact_phone
-    } = body;
+    if (!isServiceType(body.serviceType)) {
+      return NextResponse.json({ success: false, error: '서비스 유형을 선택해주세요.' }, { status: 400 });
+    }
 
-    const durationNum = Number(duration_hours);
-    const guestNum = Number(guest_count);
-
-    const resolvedCountry = resolveServiceCountry(city, country);
+    const description = normalizeText(body.description, 4_000);
+    const city = normalizeText(body.city, 100);
+    const contactName = normalizeText(body.contactName, 100);
+    const contactPhone = normalizeText(body.contactPhone, 50);
+    const guestCount = Number(body.guestCount);
+    const idempotencyKey = normalizeText(
+      request.headers.get('Idempotency-Key') || body.idempotencyKey,
+      128
+    );
+    const scheduleValidation = validateServiceSchedule(body.schedule);
+    const languages = Array.isArray(body.languages)
+      ? Array.from(new Set(body.languages.map((value) => normalizeText(value, 30))))
+        .filter((value) => (SERVICE_LANGUAGE_OPTIONS as readonly string[]).includes(value))
+      : [];
 
     if (
-      !title || !description || !city || !service_date || !start_time ||
-      !Number.isFinite(durationNum) || durationNum < 4 || durationNum > 168 ||
-      !Number.isFinite(guestNum) || guestNum < 1 || guestNum > 100 ||
-      !contact_name || !contact_phone ||
-      !resolvedCountry
+      !description || !city || !contactName || !contactPhone || languages.length === 0 ||
+      !Number.isInteger(guestCount) || guestCount < 1 || guestCount > SERVICE_MAX_GUESTS ||
+      !/^[A-Za-z0-9:_-]{16,128}$/.test(idempotencyKey)
     ) {
-      return NextResponse.json({ success: false, error: 'Missing or invalid required fields' }, { status: 400 });
+      return NextResponse.json({ success: false, error: '필수 항목을 올바르게 입력해주세요.' }, { status: 400 });
+    }
+    if (!scheduleValidation.success) {
+      return NextResponse.json({ success: false, error: scheduleValidation.error }, { status: 400 });
     }
 
     const supabaseAdmin = createAdminClient();
-    const shouldForceBookingCreateFailure =
-      process.env.NODE_ENV !== 'production' &&
-      request.headers.get('x-locally-test-force-booking-create-fail') === '1';
-    const normalizedTitle = title.trim();
-    const normalizedDescription = description.trim();
-    const normalizedCity = normalizeServiceCity(city);
-    const normalizedContactName = contact_name.trim();
-    const normalizedContactPhone = contact_phone.trim();
-    const normalizedLanguages = languages ?? [];
+    const { data: duplicateRequest } = await supabaseAdmin
+      .from('service_requests')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('client_request_key', idempotencyKey)
+      .maybeSingle();
 
-    if (!shouldForceBookingCreateFailure) {
-      const atomicCreateResult = await tryCreateServiceRequestAtomic(supabaseAdmin, {
-        userId: user.id,
-        title: normalizedTitle,
-        description: normalizedDescription,
-        city: normalizedCity,
-        country: resolvedCountry,
-        serviceDate: service_date,
-        startTime: start_time,
-        durationHours: durationNum,
-        languages: normalizedLanguages,
-        guestCount: guestNum,
-        contactName: normalizedContactName,
-        contactPhone: normalizedContactPhone,
-      });
-
-      if (atomicCreateResult.kind === 'success') {
-        const normalizationResult = await normalizePendingServiceBookingPaymentMethod(supabaseAdmin, {
-          bookingId: atomicCreateResult.data.booking_id,
-          requestId: atomicCreateResult.data.request_id,
-        });
-
-        if (normalizationResult.error) {
-          console.error('Service Booking Payment Method Normalize Error:', normalizationResult.error);
-          await cleanupCreatedServiceRequestState(supabaseAdmin, {
-            requestId: atomicCreateResult.data.request_id,
-            bookingId: atomicCreateResult.data.booking_id,
-          });
-          return NextResponse.json(
-            { success: false, error: '예약 생성 중 오류가 발생했습니다.' },
-            { status: 500 }
-          );
-        }
-
-        insertAdminAlerts({
-          title: '새 맞춤 의뢰가 생성되었습니다',
-          message: `'${normalizedTitle}' 맞춤 의뢰가 생성되었습니다.`,
-          link: '/admin/dashboard?tab=SERVICE_REQUESTS',
-        }).catch((adminAlertError) => {
-          console.error('Service Request Admin Alert Error:', adminAlertError);
-        });
-
-        return NextResponse.json({
-          success: true,
-          requestId: atomicCreateResult.data.request_id,
-          orderId: atomicCreateResult.data.order_id,
-          amount: atomicCreateResult.data.amount,
-        });
-      }
-
-      if (atomicCreateResult.kind === 'error') {
+    if (!duplicateRequest) {
+      const oneMinuteAgo = new Date(Date.now() - 60_000).toISOString();
+      const { count } = await supabaseAdmin
+        .from('service_requests')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .gte('created_at', oneMinuteAgo);
+      if ((count || 0) >= 5) {
         return NextResponse.json(
-          { success: false, error: atomicCreateResult.error },
-          { status: atomicCreateResult.status }
+          { success: false, error: '요청이 너무 빠릅니다. 잠시 후 다시 시도해주세요.' },
+          { status: 429 }
         );
       }
     }
 
-    // 1. service_requests 생성 (v2 에스크로: pending_payment 상태로 시작)
+    const pricing = calculateServicePricing({
+      serviceType: body.serviceType,
+      guestCount,
+      totalHours: scheduleValidation.totalHours,
+    });
     const { data, error } = await supabaseAdmin
-      .from('service_requests')
-      .insert({
-        user_id: user.id,
-        title: normalizedTitle,
-        description: normalizedDescription,
-        city: normalizedCity,
-        country: resolvedCountry,
-        service_date,
-        start_time,
-        duration_hours: durationNum,
-        languages: normalizedLanguages,
-        guest_count: guestNum,
-        contact_name: normalizedContactName,
-        contact_phone: normalizedContactPhone,
-        status: 'pending_payment',  // v2 에스크로: 결제 후 open 전환
+      .rpc('create_service_concierge_request_atomic', {
+        p_user_id: user.id,
+        p_service_type: body.serviceType,
+        p_description: description,
+        p_city: city,
+        p_schedule: scheduleValidation.schedule,
+        p_languages: languages,
+        p_guest_count: guestCount,
+        p_contact_name: contactName,
+        p_contact_phone: contactPhone,
+        p_client_request_key: idempotencyKey,
       })
-      .select('id, total_customer_price, total_host_payout, duration_hours')
-      .single();
+      .maybeSingle<AtomicCreateResult>();
 
     if (error || !data) {
-      console.error('Service Request Create Error:', error);
-      return NextResponse.json({ success: false, error: '의뢰 생성 중 오류가 발생했습니다.' }, { status: 500 });
+      console.error('[service concierge] create RPC failed:', error);
+      return NextResponse.json({ success: false, error: mapCreateError(error) }, { status: 500 });
     }
-
-    // 2. 에스크로 예약 사전 생성 (PENDING, 호스트 미정)
-    const bookingId = crypto.randomUUID();
-    const orderId = generateOrderId();
-    const bookingPayload = {
-      id: bookingId,
-      order_id: orderId,
-      request_id: data.id,
-      customer_id: user.id,
-      host_id: null,          // v2: 호스트 선택 전이므로 null
-      application_id: null,   // v2: 호스트 선택 후 채워짐
-      amount: data.total_customer_price,
-      host_payout_amount: data.total_host_payout,
-      platform_revenue: data.total_customer_price - data.total_host_payout,
-      status: 'PENDING' as const,
-      contact_name: normalizedContactName,
-      contact_phone: normalizedContactPhone,
-      payment_method: null,
-      payout_status: 'pending',
-    };
-
-    let bookingError: unknown = null;
-
-    if (shouldForceBookingCreateFailure) {
-      bookingError = new Error('Forced service booking pre-create failure');
-    } else {
-      const bookingInsertResult = await supabaseAdmin
-        .from('service_bookings')
-        .insert(bookingPayload);
-
-      bookingError = bookingInsertResult.error;
+    if (Number(data.amount) !== pricing.totalPrice || Number(data.hourly_rate) !== pricing.hourlyRate) {
+      console.error('[service concierge] server pricing mismatch:', { data, pricing });
+      return NextResponse.json({ success: false, error: '가격 검증에 실패했습니다.' }, { status: 500 });
     }
-
-    if (bookingError) {
-      console.error('Service Booking Pre-create Error:', bookingError);
-      // 예약 생성 실패 시 방금 만든 pending_payment 의뢰를 우선 삭제하고,
-      // 삭제 실패 시에만 cancelled fallback으로 남긴다.
-      await cleanupCreatedServiceRequestState(supabaseAdmin, {
-        requestId: data.id,
-        bookingId,
-      });
-      return NextResponse.json({ success: false, error: '예약 생성 중 오류가 발생했습니다.' }, { status: 500 });
-    }
-
-    // 3. 호스트 알림은 결제 완료(open 전환) 시점에 발송 — 여기서는 생략
-    insertAdminAlerts({
-      title: '새 맞춤 의뢰가 생성되었습니다',
-      message: `'${normalizedTitle}' 맞춤 의뢰가 생성되었습니다.`,
-      link: '/admin/dashboard?tab=SERVICE_REQUESTS',
-    }).catch((adminAlertError) => {
-      console.error('Service Request Admin Alert Error:', adminAlertError);
-    });
 
     return NextResponse.json({
       success: true,
-      requestId: data.id,
-      orderId,
-      amount: data.total_customer_price,
+      requestId: data.request_id,
+      orderId: data.order_id,
+      amount: data.amount,
+      hourlyRate: data.hourly_rate,
+      pricingReason: data.pricing_reason,
+      country: SERVICE_COUNTRY,
     });
-
-  } catch (error: unknown) {
-    console.error('API Service Request Create Error:', error);
+  } catch (error) {
+    console.error('[service concierge] request creation failed:', error);
     return NextResponse.json({ success: false, error: '서버 오류가 발생했습니다.' }, { status: 500 });
   }
 }
@@ -382,148 +163,106 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const requestId = searchParams.get('requestId');
-    const mode = searchParams.get('mode'); // 'my' | 'board'
-    const city = searchParams.get('city');
+    const mode = searchParams.get('mode');
+    if (!requestId && mode !== 'my') {
+      return NextResponse.json(
+        { success: false, code: 'SERVICE_MARKETPLACE_DISABLED', error: '호스트 공개 모집이 종료되었습니다.' },
+        { status: 410 }
+      );
+    }
 
     const supabaseServer = await createServerClient();
     const { data: { user }, error: authError } = await supabaseServer.auth.getUser();
-    const currentUser = authError ? null : user ?? null;
-
+    if (authError || !user) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
     const supabaseAdmin = createAdminClient();
 
     if (requestId) {
-      if (!currentUser) {
-        return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-      }
-
-      const { data, error } = await supabaseAdmin
+      const { data: serviceRequest, error } = await supabaseAdmin
         .from('service_requests')
-        .select('id, user_id, title, description, city, country, service_date, start_time, duration_hours, languages, guest_count, hourly_rate_customer, hourly_rate_host, total_customer_price, total_host_payout, status, selected_application_id, selected_host_id, contact_name, contact_phone, created_at, updated_at, expires_at')
+        .select('id, user_id, title, description, city, country, service_date, start_time, duration_hours, languages, guest_count, service_type, pricing_tier, pricing_reason, service_end_at, hourly_rate_customer, total_customer_price, status, selected_host_id, contact_name, contact_phone, created_at, updated_at')
         .eq('id', requestId)
         .maybeSingle();
-
-      if (error || !data) {
-        console.error('Service Request Detail Fetch Error:', error);
+      if (error || !serviceRequest) {
         return NextResponse.json({ success: false, error: '의뢰를 찾을 수 없습니다.' }, { status: 404 });
       }
 
-      const isOwner = currentUser?.id === data.user_id;
-      const isSelectedHost = currentUser?.id === data.selected_host_id;
-      const isEligibleHost =
-        !isOwner &&
-        !isSelectedHost &&
-        currentUser?.id
-          ? await isApprovedHostEligibleForServiceRequest(supabaseAdmin, {
-              hostId: currentUser.id,
-              requestCity: data.city,
-              requestCountry: data.country,
-            })
-          : false;
-
-      const canRead = isOwner || isSelectedHost || (data.status === 'open' && isEligibleHost);
-
-      if (!canRead) {
+      const isOwner = serviceRequest.user_id === user.id;
+      const isAssignedHost = serviceRequest.selected_host_id === user.id;
+      if (!isOwner && !isAssignedHost) {
         return NextResponse.json({ success: false, error: '의뢰를 찾을 수 없습니다.' }, { status: 404 });
       }
+
+      const [scheduleResult, bookingResult, inquiryResult] = await Promise.all([
+        supabaseAdmin
+          .from('service_request_schedule_items')
+          .select('id, service_date, start_time, duration_hours, sort_order')
+          .eq('request_id', requestId)
+          .order('sort_order', { ascending: true }),
+        isOwner
+          ? supabaseAdmin
+            .from('service_bookings')
+            .select('id, order_id, amount, status, payment_method, refund_amount, host_compensation_amount')
+            .eq('request_id', requestId)
+            .order('created_at', { ascending: true })
+            .limit(1)
+            .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+        supabaseAdmin
+          .from('inquiries')
+          .select('id, type, host_id')
+          .eq('service_request_id', requestId)
+          .or(isOwner ? `user_id.eq.${user.id},host_id.eq.${user.id}` : `host_id.eq.${user.id}`),
+      ]);
+
+      if (scheduleResult.error || bookingResult.error || inquiryResult.error) {
+        console.error('[service concierge] detail relation fetch failed:', {
+          schedule: scheduleResult.error,
+          booking: bookingResult.error,
+          inquiry: inquiryResult.error,
+        });
+        return NextResponse.json({ success: false, error: '의뢰 상세를 불러오지 못했습니다.' }, { status: 500 });
+      }
+
+      const supportInquiry = (inquiryResult.data || []).find((row) => row.type === 'admin_support' && !row.host_id);
+      const hostInquiry = (inquiryResult.data || []).find((row) => row.type === 'general' && row.host_id);
 
       return NextResponse.json({
         success: true,
         data: {
-          ...data,
-          contact_name: isOwner || isSelectedHost ? data.contact_name : null,
-          contact_phone: isOwner || isSelectedHost ? data.contact_phone : null,
+          ...serviceRequest,
+          user_id: undefined,
+          selected_host_id: undefined,
+          contact_name: isOwner ? serviceRequest.contact_name : null,
+          contact_phone: isOwner ? serviceRequest.contact_phone : null,
+          viewerRole: isOwner ? 'owner' : 'host',
+          schedule: (scheduleResult.data || []).map((item) => ({
+            id: item.id,
+            serviceDate: item.service_date,
+            startTime: String(item.start_time).slice(0, 5),
+            durationHours: item.duration_hours,
+            sortOrder: item.sort_order,
+          })),
+          booking: bookingResult.data,
+          supportInquiryId: isOwner ? supportInquiry?.id || null : null,
+          hostInquiryId: hostInquiry?.id || null,
         },
       });
     }
 
-    if (!currentUser) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    }
-
-    if (mode === 'my') {
-      const { data, error } = await supabaseAdmin
-        .from('service_requests')
-        .select('id, title, city, country, service_date, start_time, duration_hours, languages, guest_count, total_customer_price, total_host_payout, status, created_at, user_id')
-        .eq('user_id', currentUser.id)
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (error) {
-        console.error('Service Requests Fetch Error:', error);
-        return NextResponse.json({ success: false, error: '목록 조회 중 오류가 발생했습니다.' }, { status: 500 });
-      }
-
-      return NextResponse.json({ success: true, data: data ?? [] });
-    }
-
-    const { isApproved, locationKeys } = await getApprovedHostServiceLocationKeys(supabaseAdmin, currentUser.id);
-    if (!isApproved) {
-      return NextResponse.json({ success: false, error: '승인된 호스트만 의뢰를 열람할 수 있습니다.' }, { status: 403 });
-    }
-
-    if (locationKeys.size === 0) {
-      return NextResponse.json({ success: true, data: [] });
-    }
-
-    const selectedLocationKey = city && city !== 'all'
-      ? getServiceLocationKey({
-          city: normalizeServiceCity(city),
-          country: resolveServiceCountry(city, null),
-        })
-      : null;
-
-    if (selectedLocationKey && !locationKeys.has(selectedLocationKey)) {
-      return NextResponse.json({ success: true, data: [] });
-    }
-
-    const baseBoardQuery = supabaseAdmin
+    const { data, error } = await supabaseAdmin
       .from('service_requests')
-      .select('id, title, city, country, service_date, start_time, duration_hours, languages, guest_count, total_customer_price, total_host_payout, status, created_at, user_id')
-      .eq('status', 'open')
-      .order('created_at', { ascending: false });
-
-    const normalizedSelectedCity = city && city !== 'all' ? normalizeServiceCity(city) : null;
-    const selectedCityVariants = normalizedSelectedCity
-      ? getServiceCityVariants(normalizedSelectedCity, resolveServiceCountry(normalizedSelectedCity, null))
-      : [];
-
-    const boardQuery =
-      selectedCityVariants.length === 1
-        ? baseBoardQuery.eq('city', selectedCityVariants[0])
-        : selectedCityVariants.length > 1
-          ? baseBoardQuery.in('city', selectedCityVariants)
-          : baseBoardQuery;
-
-    const { data, error } = await boardQuery.limit(selectedCityVariants.length > 0 ? 100 : 200);
-
+      .select('id, title, city, country, service_date, start_time, duration_hours, guest_count, service_type, pricing_reason, service_end_at, hourly_rate_customer, total_customer_price, status, selected_host_id, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(50);
     if (error) {
-      console.error('Service Requests Fetch Error:', error);
       return NextResponse.json({ success: false, error: '목록 조회 중 오류가 발생했습니다.' }, { status: 500 });
     }
-
-    const filtered = (data ?? [])
-      .filter((requestRow) => {
-        const requestLocationKey = getServiceLocationKey({
-          city: requestRow.city,
-          country: requestRow.country,
-        });
-
-        if (!requestLocationKey || !locationKeys.has(requestLocationKey)) {
-          return false;
-        }
-
-        if (selectedLocationKey) {
-          return requestLocationKey === selectedLocationKey;
-        }
-
-        return true;
-      })
-      .slice(0, 50);
-
-    return NextResponse.json({ success: true, data: filtered });
-
-  } catch (error: unknown) {
-    console.error('API Service Requests GET Error:', error);
+    return NextResponse.json({ success: true, data: data || [] });
+  } catch (error) {
+    console.error('[service concierge] request read failed:', error);
     return NextResponse.json({ success: false, error: '서버 오류가 발생했습니다.' }, { status: 500 });
   }
 }

@@ -1056,23 +1056,23 @@ function buildServicePaymentConfirmedCustomerCopy(
     case 'en':
       return {
         title: '✅ Payment completed',
-        message: `Payment for '${requestTitle}' is complete, and host recruitment is now starting.`,
+        message: `Payment for '${requestTitle}' is complete. Your private local coordinator chat is ready and host assignment is starting.`,
       };
     case 'ja':
       return {
         title: '✅ 決済が完了しました',
-        message: `「${requestTitle}」の決済が完了し、現地ホストの募集が始まります。`,
+        message: `「${requestTitle}」の決済が完了しました。1:1お問い合わせが開き、ホスト手配が始まります。`,
       };
     case 'zh':
       return {
         title: '✅ 付款已完成',
-        message: `「${requestTitle}」的付款已完成，现已开始招募当地房东。`,
+        message: `「${requestTitle}」的付款已完成。当地负责人一对一咨询已打开，并开始安排向导。`,
       };
     case 'ko':
     default:
       return {
         title: '✅ 결제가 완료되었습니다',
-        message: `'${requestTitle}' 결제가 완료되어 현지 호스트 모집이 시작됩니다.`,
+        message: `'${requestTitle}' 결제가 완료되었습니다. 현지 담당자 1:1 문의가 열리고 호스트 배정이 시작됩니다.`,
       };
   }
 }
@@ -1117,24 +1117,24 @@ function buildServiceHostSelectedCopy(
   switch (locale) {
     case 'en':
       return {
-        title: '🎉 You were selected by the guest',
-        message: `You were selected for '${requestTitle}'. Payment is already complete, so you can start right away.`,
+        title: '🎉 Your Locally host has been assigned',
+        message: `Locally assigned a host for '${requestTitle}'. Open the private thread to confirm the details.`,
       };
     case 'ja':
       return {
-        title: '🎉 ゲストに選ばれました！',
-        message: `「${requestTitle}」で選ばれました。決済はすでに完了しているため、そのまま進行できます。`,
+        title: '🎉 Locallyがホストを手配しました',
+        message: `「${requestTitle}」のホスト手配が完了しました。専用のお問い合わせで詳細をご確認ください。`,
       };
     case 'zh':
       return {
-        title: '🎉 你已被游客选中',
-        message: `你已在「${requestTitle}」中被选中。付款已完成，可以立即开始准备。`,
+        title: '🎉 Locally已安排向导',
+        message: `「${requestTitle}」的向导已安排完成。请在专属咨询中确认详情。`,
       };
     case 'ko':
     default:
       return {
-        title: '🎉 고객에게 선택되었습니다!',
-        message: `'${requestTitle}' 의뢰에서 선택되셨습니다. 결제는 이미 완료되어 바로 진행됩니다.`,
+        title: '🎉 로컬리가 호스트 배정을 완료했습니다',
+        message: `'${requestTitle}' 의뢰의 호스트가 배정되었습니다. 전용 문의에서 일정과 세부 내용을 확인해주세요.`,
       };
   }
 }
@@ -1196,7 +1196,7 @@ function buildServiceCancelRequestedCopy(
     default:
       return {
         title: '취소 요청이 접수되었습니다.',
-        message: `'${requestTitle}' 서비스 취소 요청이 접수되었습니다. 관리자가 검토 후 처리합니다.`,
+        message: `'${requestTitle}' 서비스 취소 요청이 접수되었습니다. 현지 담당자가 검토 후 처리합니다.`,
       };
   }
 }

@@ -302,6 +302,7 @@ export interface AdminServiceBooking {
   payment_method: string | null;
   cancel_reason: string | null;
   refund_amount: number | null;
+  host_compensation_amount: number | null;
   created_at: string;
   // Assembled via manual JOIN
   service_request: {
@@ -309,8 +310,28 @@ export interface AdminServiceBooking {
     description: string;
     city: string;
     service_date: string;
+    start_time: string;
     duration_hours: number;
+    guest_count: number;
+    languages: string[];
+    service_type: 'general' | 'business';
+    pricing_tier: 'standard' | 'premium';
+    pricing_reason: string;
+    service_end_at: string | null;
+    hourly_rate_customer: number;
+    hourly_rate_host: number | null;
+    total_customer_price: number;
+    total_host_payout: number | null;
+    selected_host_id: string | null;
     status: string;
+    schedule: Array<{
+      id: string;
+      request_id: string;
+      service_date: string;
+      start_time: string;
+      duration_hours: number;
+      sort_order: number;
+    }>;
   } | null;
   customer_profile: { full_name: string | null; email: string | null } | null;
   host_profile: { full_name: string | null } | null;
@@ -320,11 +341,25 @@ export interface AdminServiceBooking {
     account_number: string | null;
     account_holder: string | null;
   } | null;
+  refund_operations: Array<{
+    id: string;
+    booking_id: string;
+    status: 'started' | 'succeeded' | 'failed' | 'unknown' | 'applied';
+    refund_amount: number;
+    host_compensation_amount: number;
+    provider_reference: string | null;
+    error_message: string | null;
+    created_at: string;
+    updated_at: string;
+    completed_at: string | null;
+  }>;
 }
 
 export interface AdminServiceSalesSummary {
   amount: number;
   host_payout_amount: number | null;
+  host_compensation_amount: number | null;
+  refund_amount: number | null;
   platform_revenue: number | null;
   status: string;
   created_at: string;

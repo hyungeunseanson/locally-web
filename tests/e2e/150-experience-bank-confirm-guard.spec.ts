@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import {
   createAuthUser,
+  cleanupTestUsers,
   createTestUser,
   formatDate,
   getTestAdminClient,
@@ -10,7 +11,6 @@ import {
 } from './helpers/testSupabase';
 
 const createdAuthUserIds: string[] = [];
-const createdWhitelistEmails: string[] = [];
 const createdExperienceIds: number[] = [];
 const createdBookingIds: string[] = [];
 
@@ -138,15 +138,7 @@ test.afterAll(async () => {
     await supabase.from('experiences').delete().eq('id', experienceId);
   }
 
-  for (const email of createdWhitelistEmails) {
-    await supabase.from('admin_whitelist').delete().eq('email', email);
-  }
-
-  for (const userId of createdAuthUserIds) {
-    await supabase.from('profiles').delete().eq('id', userId);
-    await supabase.from('users').delete().eq('id', userId);
-    await supabase.auth.admin.deleteUser(userId);
-  }
+  await cleanupTestUsers(createdAuthUserIds);
 });
 
 test.describe.serial('Experience bank confirm guards', () => {
@@ -194,7 +186,6 @@ test.describe.serial('Experience bank confirm guards', () => {
     const hostId = await createAuthUser(hostUser);
     const guestId = await createAuthUser(guestUser);
     createdAuthUserIds.push(adminId, hostId, guestId);
-    createdWhitelistEmails.push(adminUser.email);
 
     const experienceId = await createExperienceFixture(hostId);
     const bookingId = `BANK-CONFIRM-CARD-${Date.now()}`;
@@ -243,7 +234,6 @@ test.describe.serial('Experience bank confirm guards', () => {
     const hostId = await createAuthUser(hostUser);
     const guestId = await createAuthUser(guestUser);
     createdAuthUserIds.push(adminId, hostId, guestId);
-    createdWhitelistEmails.push(adminUser.email);
 
     const experienceId = await createExperienceFixture(hostId);
     const bookingId = `BANK-CONFIRM-RACE-${Date.now()}`;

@@ -684,21 +684,21 @@ function buildServiceLabels(locale: EmailLocale) {
         request: 'Request',
         status: 'Status',
         nextStep: 'Next step',
-        nextStepValue: 'Local host recruitment is starting now.',
+        nextStepValue: 'Your private manager chat is ready and host assignment is starting.',
       };
     case 'ja':
       return {
         request: '依頼',
         status: '状態',
         nextStep: '次のステップ',
-        nextStepValue: 'これから現地ホストの募集が始まります。',
+        nextStepValue: '1:1お問い合わせが開き、ホスト手配が始まります。',
       };
     case 'zh':
       return {
         request: '请求',
         status: '状态',
         nextStep: '下一步',
-        nextStepValue: '现在将开始招募当地房东。',
+        nextStepValue: '管理员一对一咨询已打开，并开始安排向导。',
       };
     case 'ko':
     default:
@@ -706,7 +706,7 @@ function buildServiceLabels(locale: EmailLocale) {
         request: '의뢰',
         status: '상태',
         nextStep: '다음 단계',
-        nextStepValue: '이제 현지 호스트 모집이 시작됩니다.',
+        nextStepValue: '현지 담당자 1:1 문의가 열리고 호스트 배정이 시작됩니다.',
       };
   }
 }

@@ -10,7 +10,8 @@ type ServiceAdminBookingApiRow = {
   host?: AdminServiceBooking['host_profile'];
   host_application?: AdminServiceBooking['host_application'];
   application?: AdminServiceBooking['host_application'];
-} & Omit<AdminServiceBooking, 'service_request' | 'customer_profile' | 'host_profile' | 'host_application'>;
+  refund_operations?: AdminServiceBooking['refund_operations'];
+} & Omit<AdminServiceBooking, 'service_request' | 'customer_profile' | 'host_profile' | 'host_application' | 'refund_operations'>;
 
 export function useServiceAdminData() {
   const { showToast } = useToast();
@@ -33,7 +34,8 @@ export function useServiceAdminData() {
         service_request: b.request ?? null,
         customer_profile: b.customer ?? null,
         host_profile: b.host ?? null,
-        host_application: b.host_application ?? b.application ?? null
+        host_application: b.host_application ?? b.application ?? null,
+        refund_operations: b.refund_operations ?? [],
       }));
 
       setBookings(mappedBookings);

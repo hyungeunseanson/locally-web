@@ -1,9 +1,8 @@
-import { readFileSync } from 'fs';
-
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test, type Page } from '@playwright/test';
 
-type EnvMap = Record<string, string>;
+import { cleanupTestUsers, loadTestEnv } from './helpers/testSupabase';
+
 type TestUser = {
   email: string;
   password: string;
@@ -20,20 +19,10 @@ const createdExperienceIds: number[] = [];
 const createdInquiryIds: number[] = [];
 const createdMessageIds: number[] = [];
 
-function loadEnv(): EnvMap {
-  return readFileSync('.env.local', 'utf8')
-    .split(/\n/)
-    .reduce<EnvMap>((acc, line) => {
-      const match = line.match(/^([^=]+)=(.*)$/);
-      if (match) acc[match[1]] = match[2];
-      return acc;
-    }, {});
-}
-
 function getAdminClient() {
   if (adminClient) return adminClient;
 
-  const env = loadEnv();
+  const env = loadTestEnv();
   adminClient = createClient(
     env.NEXT_PUBLIC_SUPABASE_URL,
     env.SUPABASE_SERVICE_ROLE_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -290,9 +279,7 @@ test.afterAll(async () => {
     await supabase.from('host_applications').delete().eq('id', applicationId);
   }
 
-  for (const userId of createdAuthUserIds) {
-    await supabase.auth.admin.deleteUser(userId);
-  }
+  await cleanupTestUsers(createdAuthUserIds);
 });
 
 test('guest inbox appends text messages optimistically before delayed send resolves', async ({ page }) => {

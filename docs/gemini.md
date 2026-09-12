@@ -73,16 +73,16 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - PayPal 체험 결제 4단계는 `/api/payment/cancel`, `/api/admin/bookings/force-cancel`에서 `payment_method='paypal'`인 예약만 PayPal capture refund를 호출한다. 기존 NicePay 카드/무통장 취소 흐름은 유지한다.
 - 체험 NicePay 카드결제는 `/api/payment/nicepay-callback`에서 브라우저 성공 payload를 신뢰하지 않고, PortOne REST API 재조회(`imp_uid`)로 `status=paid`, `merchant_uid=bookings.order_id`, `amount=bookings.amount`를 모두 확인한 뒤에만 `bookings.status='PAID'`, `payment_method='card'`로 확정한다. 기존 좌석 재검증, 정산 스냅샷 저장, 호스트/관리자 알림 의미는 유지한다.
 - `/api/payment/card-ready`는 체험 카드결제 검증 준비 상태를 반환한다. `NEXT_PUBLIC_PORTONE_IMP_CODE`, `PORTONE_API_KEY`, `PORTONE_API_SECRET`가 모두 있어야 `ready=true`이며, 체험 결제 페이지는 readiness가 false일 때 카드 결제를 비활성화하고 무통장/PayPal만 허용한다.
-- PayPal 서비스 결제 1단계는 `/api/services/payment/paypal/create-order`, `/api/services/payment/paypal/capture-order` 서버 route만 추가하고, 기존 서비스 NicePay UI/무통장/취소 환불 경로는 건드리지 않는다. `capture-order`는 `service_bookings.status='PAID'`, `payment_method='paypal'`, `tid=<captureId>`를 저장하고 `service_requests.status='open'`으로 전환한다.
+- PayPal 서비스 결제는 `/api/services/payment/paypal/create-order`, `/api/services/payment/paypal/capture-order` 서버 route를 사용한다. `capture-order`는 결제 검증 후 `service_bookings.status='PAID'`, `payment_method='paypal'`, `tid=<captureId>`, `service_requests.status='assigning'`을 원자적으로 저장하고 현지 담당자 문의를 생성한다.
 - PayPal 서비스 결제 2단계는 `app/services/[requestId]/payment/page.tsx`에만 `PayPal` 결제수단과 SDK 버튼을 연결한다. 기존 서비스 NicePay 카드 CTA와 무통장 입금 CTA는 유지하고, PayPal은 기존 pending `service_bookings`를 재사용해 `/api/services/payment/paypal/create-order`와 `/api/services/payment/paypal/capture-order`를 별도 버튼에서만 사용한다.
-- PayPal 서비스 결제 3단계는 `/api/services/cancel`, `/api/admin/service-cancel`에서 `payment_method='paypal'`인 서비스 예약만 PayPal capture refund endpoint를 호출한다. 기존 NicePay 카드 취소/무통장 취소 의미는 유지하고, `PAID + open` 상태의 서비스 고객 취소는 관리자 강제취소와 같은 error-safe 기준으로 PG 환불 성공 시에만 DB 상태를 `cancelled`로 바꾼다.
-- 서비스 NicePay 카드결제는 `/api/services/payment/nicepay-callback`에서 브라우저 성공 payload를 신뢰하지 않고, PortOne REST API 재조회(`imp_uid`)로 `status=paid`, `merchant_uid=service_bookings.order_id`, `amount=service_bookings.amount`를 모두 확인한 뒤에만 `service_bookings.status='PAID'`, `payment_method='card'`, `service_requests.status='open'`으로 확정한다.
+- PayPal 서비스 환불은 `/api/services/cancel`, `/api/admin/service-cancel`에서 `payment_method='paypal'`인 예약만 PayPal capture refund endpoint를 호출한다. `PAID + assigning` 취소는 provider 결과를 확인한 뒤에만 DB 상태를 확정하고, 배정 후 취소는 현지 담당자 검토 흐름으로 보낸다.
+- 서비스 NicePay 카드결제는 `/api/services/payment/nicepay-callback`에서 브라우저 성공 payload를 신뢰하지 않는다. PortOne REST API로 `status=paid`, `merchant_uid=service_bookings.order_id`, `amount=service_bookings.amount`를 확인한 뒤에만 `service_bookings.status='PAID'`, `payment_method='card'`, `service_requests.status='assigning'`과 현지 담당자 문의 생성을 확정한다.
 - 서비스 결제 페이지는 pending `service_bookings.payment_method`를 함께 읽는다. 이미 `payment_method='bank'`로 표시된 `PENDING` 예약은 UI에서 무통장으로 고정되고, `/api/services/payment/nicepay-callback` 및 `/api/services/payment/paypal/capture-order`도 같은 예약에 대한 카드/PayPal 확정을 거부한다.
-- 서비스 결제 완료 후 호스트 모집 알림(`service_request_new`)은 카드/NicePay, PayPal, 무통장 입금 확인 모두 같은 helper로 대상을 고른다. 기준은 `host_applications.status='approved'` + `service_requests.country/city`와 같은 위치에 활성 체험(`experiences.is_active=true`)이 등록된 호스트만 대상으로 하며, 고객 본인은 제외한다. 잡보드(`/services`)와 서비스 상세 읽기 권한도 같은 eligible-host 기준을 사용한다.
-- 서비스 관리자 무통장 입금 확인은 `service_bookings.status='PAID'`와 `service_requests.status='open'`를 같은 DB 확정 단위로 취급한다. 기본 경로는 `confirm_service_bank_payment_atomic` RPC이며, migration 미적용 환경에서만 route helper의 compare-and-set + rollback fallback을 허용한다. 알림/메일/관리자 alert/audit log 실패는 이미 확정된 DB 상태를 되돌리지 않는다.
-- `/api/services/requests`는 `service_requests(status='pending_payment')`와 사전 생성 `service_bookings(status='PENDING')`를 같은 요청 안에서 만들고, booking 생성 실패 시 방금 만든 의뢰를 즉시 삭제(실패 시 `cancelled` fallback)해 orphan `pending_payment` 의뢰를 남기지 않는다.
-- `/api/services/select-host`는 `service_bookings.host_id/application_id`, 선택 지원서 `selected`, 나머지 지원서 `rejected`, `service_requests.status='matched'`를 순차 적용하되, 중간 실패 시 현재 request 최종 상태에 맞춰 rollback/alignment를 수행해 부분 성공 상태를 남기지 않는다.
-- 서비스 매칭 write 경계는 RPC 우선으로 강화한다. `/api/services/requests`는 `create_service_request_with_booking_atomic`, `/api/services/select-host`는 `select_service_host_atomic`을 먼저 시도하고, 해당 함수가 아직 없는 환경에서만 기존 JS cleanup/rollback 경로로 fallback 한다. non-production 실패 주입 헤더 검증은 계속 legacy 경로를 사용한다.
+- 서비스 결제 완료 후에는 공개 모집 알림을 보내지 않는다. 카드/NicePay, PayPal, 무통장 입금 확인 모두 고객 신청서를 담은 현지 담당자 1:1 문의를 만들고 관리자 직접 배정 단계로 전환한다.
+- 서비스 무통장 입금 확인은 `confirm_service_concierge_payment_atomic`에서 `service_bookings.status='PAID'`, `service_requests.status='assigning'`, 현지 담당자 문의 생성을 하나의 원자적 단위로 처리한다. 저장된 결제수단이 bank가 아니면 `SVC_INVALID_PAYMENT_METHOD`로 거부한다.
+- `/api/services/requests`는 `create_service_concierge_request_atomic`으로 요청, 날짜별 일정, `PENDING` 예약을 원자적으로 생성하며 `client_request_key` 재호출을 멱등 처리한다.
+- `/api/services/select-host`와 `/api/services/applications`의 mutation은 `410 Gone`이다. 호스트는 `/api/admin/service-requests/[requestId]/assign-host`와 `assign_service_concierge_host_atomic`을 통해 관리자만 직접 배정한다.
+- 서비스 읽기·쓰기 경계는 서버 DTO/API와 8개 service-role 전용 concierge RPC를 사용한다. 브라우저에서 서비스 테이블을 직접 읽거나 쓰는 경로는 두지 않는다.
 - `/api/services/payment/card-ready`는 서비스 카드결제 검증 준비 상태를 반환한다. `NEXT_PUBLIC_PORTONE_IMP_CODE`, `PORTONE_API_KEY`, `PORTONE_API_SECRET`가 모두 있어야 `ready=true`이며, 서비스 결제 페이지는 readiness가 false일 때 카드 결제를 비활성화하고 무통장/PayPal만 허용한다.
 - Data Analytics `Business & Guest`는 `useAdminData`의 최근 20건 예약 캐시를 재사용하지 않고 `/api/admin/analytics-summary`를 단일 집계 source로 사용한다. 현재 플랫폼 전체화 범위는 상단 비즈니스 KPI(GMV/순수익/AOV/결제건수), 반복 결제 고객 비율, 결제 고객 인구통계이며, `Host Ecosystem`, `Review Management`, `Audit Logs`, `Top 체험`, `검색 트렌드`는 기존 구조를 유지한다.
 - Data Analytics의 `Review Quality`, `운영 감사 로그`는 이제 브라우저 직접 select 대신 각각 `/api/admin/reviews`, `/api/admin/audit-logs`를 초기 읽기 source로 사용한다. 현재 실시간성은 감사 로그 INSERT 구독만 클라이언트에 남겨둔다.
@@ -111,6 +111,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 기본: 인증 사용자 + 본인 데이터 범위
 - 관리자: `users.role='admin'` 또는 `admin_whitelist` 매칭
 - 민감 API는 반드시 서버에서 권한 확인 후 처리
+- **[Supabase Data API 결정]** 신규 `public` schema 테이블/뷰/RPC는 `supabase-js`/PostgREST/GraphQL에서 쓰기 전에 migration 안에 명시적 `GRANT`를 함께 넣는다. RLS는 row 단위 접근을 제한하고, `GRANT`는 Data API가 객체에 닿을 수 있는지를 정하므로 둘 다 필요하다. 작성 기준은 `docs/supabase-data-api-grants.md`를 따른다.
 - **[팀 알림 아키텍처 결정]** `/api/admin/notify-team`의 수신자 수집은 `admin_whitelist` 단일 소스만 사용한다. `users.role='admin'`을 병행 소스로 쓰면 whitelist에서 삭제된 관리자에게 계속 발송되는 버그 발생. 팀원 추가/제거는 반드시 `admin_whitelist` 테이블만 통해 관리한다.
 - **[권한 Source 결정]** 관리자 권한 판정 source는 `users.role + admin_whitelist`다. `profiles`는 표시/프로필 데이터용이며, `profiles.role`을 권한 판정에 사용하지 않는다.
 - **[관리자 읽기 경계 결정]** `admin_tasks`, `admin_task_comments`, `admin_whitelist`, `admin_audit_logs`는 쓰기(write)가 아니라 읽기(select)만 admin-only client 경로를 허용한다. TEAM/감사 로그의 목록·realtime 읽기는 유지하되, mutation은 서버 경계 또는 service-role 정책으로만 처리한다.
@@ -158,7 +159,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - `/guest/inbox`는 `hostId`만 있는 deep link에서도 caller query에 `hostName/hostAvatar`가 없으면 `profiles + host_applications`를 직접 조회해 host summary를 복구한다. 결제 완료 페이지나 예약카드에서 host summary를 못 넘긴 진입도 초기 `?` 아바타가 뜨지 않아야 한다.
 - `GET /api/guest/trips`는 읽기 전용이어야 한다. 지난 `PAID/confirmed` 예약의 `completed` 표시는 응답에서만 계산하고, 실제 DB 상태 동기화는 별도 `POST /api/guest/trips/sync-completed`에서 처리한다. `useGuestTrips()`는 `syncCompletedNeeded`가 있을 때만 한 번 background sync 후 query invalidate를 수행한다.
 - `POST /api/services/requests`는 `service_requests` 생성 후 `service_bookings` 사전 생성에 실패하면, 같은 `request_id`/`bookingId` 기준으로 partial booking을 먼저 best-effort cleanup한 뒤 `pending_payment` request를 삭제해야 한다. non-production에서만 `x-locally-test-force-booking-create-fail: 1` 헤더로 이 경로를 강제 검증할 수 있다.
-- `POST /api/services/select-host`의 rollback은 non-production에서만 `x-locally-test-select-host-fail-stage` 헤더(`after-booking-update`, `after-selected-application-update`, `after-rejected-applications-update`)로 강제 검증한다. 이 경로에서 실패하면 `service_requests=open`, 모든 `service_applications=pending`, `service_bookings.host_id/application_id=null`로 원복되어야 한다.
+- `POST /api/services/select-host`는 폐기된 고객 선택 경로이며 항상 `410 Gone`과 `SERVICE_MARKETPLACE_DISABLED`를 반환한다. 테스트도 이 계약을 검증하고 과거 rollback 경로를 복원하지 않는다.
 - 공개 목록 화면은 `select('*')`를 기본으로 쓰지 않는다. `/search`는 검색/카드 렌더에 필요한 experience 필드만, `/community`와 `/api/community`는 feed 카드에 필요한 `community_posts`/`profiles`/`linked experience` 필드만 선택한다. 실제 DB에 없는 drift 컬럼(`experiences.tags`, `experiences.available_dates`)은 목록 select에 넣지 않는다.
 - Admin 맞춤 의뢰 관리 통합(v3.9.0): `service_bookings` 테이블 결제 흐름을 Admin이 통제할 수 있도록 별도 탭 `SERVICE_REQUESTS`를 신설하고, `useServiceAdminData.ts` 독립 훅·`ServiceAdminTab.tsx` 3-서브탭 컴포넌트·`/api/admin/service-cancel` 강제 취소 API를 추가. NicePay cancel 실패 시 DB 상태 미변경(에러 안전) 보장. `SalesTab` KPI에 service_bookings GMV/정산액 합산(수수료율 % 미노출). 관리자 탭 데이터는 공통 eager load 대신 탭별 전용 훅/API를 기준으로 유지한다.
 - `Billing & Revenue` 탭은 `/api/admin/sales-summary`를 전용 source로 사용하므로, `page.tsx`에서 공통 로딩 게이트 밖에서 직접 렌더링한다.
@@ -191,7 +192,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 체험 analytics 수집은 `POST /api/analytics/events`, `POST /api/analytics/search` 서버 ingest 경로를 단일 source로 사용한다. 브라우저는 tracking metadata만 전송하고 `analytics_events`, `search_logs` direct insert를 하지 않는다.
 - `create_booking_atomic` RPC는 public execute를 허용하지 않는다. 브라우저는 직접 RPC를 호출하지 않고 `/api/bookings`만 사용하며, service-role 경계에서만 예약 원자화 함수를 실행한다.
 - 맞춤 의뢰 결제 무통장 입금 추가(v3.9.1): `/services/[requestId]/payment`에 결제 수단 선택 UI(카드 결제 / 무통장 입금)를 추가. 무통장 선택 시 IMP 호출 없이 계좌번호 안내 후 `/payment/complete?method=bank`로 직접 이동. 계좌 정보는 `NEXT_PUBLIC_BANK_ACCOUNT`/`NEXT_PUBLIC_BANK_NAME` 환경변수로 관리.
-- 맞춤 의뢰 무통장 백엔드 연동(v3.9.2): 무통장 선택 시 `/api/services/payment/mark-bank` 호출로 `service_bookings.payment_method='bank'` 저장(service_role 전용 쓰기 → 서버 API 경유). Admin `ServiceAdminTab`에 "결제수단" 컬럼(🏛️ 무통장/💳 카드) 및 PENDING+무통장 행에 "💰 입금 확인" 버튼 추가 → `/api/admin/service-confirm-payment` 호출 → PENDING→PAID, pending_payment→open + 호스트 알림 + 감사 로그.
+- 맞춤 의뢰 무통장 연동: `/api/services/payment/mark-bank`가 `service_bookings.payment_method='bank'`를 잠그고, Admin `ServiceAdminTab`의 입금 확인은 `/api/admin/service-confirm-payment`를 호출한다. 성공 시 PENDING→PAID, pending_payment→assigning, 현지 담당자 문의 생성과 감사 로그를 처리하며 호스트 공개 모집은 하지 않는다.
 - 어드민 대시보드 권한 및 무통장 버그 수정(v3.9.3): `service_bookings` 영역의 RLS 권한 누락으로 인한 관리자 데이터 블락/사이드바 카운트 증발 현상을 우회하기 위해 `createAdminClient`를 쓰는 전용 백엔드 API 신설 (`/api/admin/service-bookings`, `/api/admin/sidebar-counts`). 또한, 일반 `bookings` 테이블에 `payment_method` 컬럼을 신규 추가하고 `create_booking_atomic` 함수에서 이를 저장하도록 수정.
 
 - 인증·알림 버그 수정(v3.39.22): 1) **자동 로그아웃 방지**: `AuthContext.onAuthStateChange`에서 `_event` 무시로 인해 TOKEN_REFRESHED 등 정상 이벤트에서도 session=null이면 강제 로그아웃되던 버그 수정 → `event === 'SIGNED_OUT'`일 때만 상태 초기화. 2) **메시지 알림 이름 오표시 수정**: `inquiries/thread/shared.ts getActorDisplayName()`에서 `host_applications.name`이 1순위였던 것을 `profiles.full_name` 우선으로 변경(호스트 신청서 작성 이력이 있는 게스트가 메시지 보낼 때 신청서 이름이 표시되던 버그 해소). 3) **예약 알림 게스트 이름 정확화**: 카드결제(`experienceNotificationFlows.ts`), 무통장 접수(`bookings/route.ts`), 무통장 입금 확인(`admin/bookings/confirm-payment/route.ts`) 알림 모두 `contact_name` 대신 `profiles.full_name` 조회 후 사용. 4) **레거시 confirm-payment 중복 알림 방지**: `bookings/confirm-payment/route.ts`(LEGACY)에 `isPendingBookingStatus` 체크 추가 — 이미 confirmed인 예약에 대한 중복 알림·이메일 발송 차단.
@@ -281,7 +282,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 호스트 대시보드 `ProfileEditor` 저장은 `POST /api/host/profile` 서버 route가 맡는다. 이 route는 공개 프로필 필드(`full_name`, `job`, `dream_destination`, `favorite_song`, `languages`, `avatar_url`)와 latest `host_applications.self_intro`만 갱신하며, 정산/국적/지원서 private 필드는 계속 읽기 전용으로 유지한다.
 - 호스트 대시보드 리뷰 탭 쓰기는 `POST /api/host/guest-reviews`, `POST /api/host/reviews/reply` 서버 route가 맡는다. 게스트 후기 생성은 `booking -> experiences.host_id` 소유권과 중복 여부를, 후기 답글 저장은 `review -> experiences.host_id` 소유권을 서버에서 검증한 뒤 반영한다.
 - `useChat`의 문의 읽음 처리도 `POST /api/inquiries/read` 서버 route가 맡는다. 이 route는 문의 참여자(게스트/호스트) 또는 관리자만 접근할 수 있고, 상대방이 보낸 `read_at IS NULL` 메시지만 `is_read=true`, `read_at=now()`로 갱신한다.
-- 결제/취소 메일 기준은 도메인 owner route가 직접 통제한다. 체험 카드/PayPal 결제 완료는 게스트/호스트 모두 인앱 + 메일, 체험 취소 완료는 게스트/호스트 모두 인앱 + 메일, 서비스 결제 완료는 고객 + eligible host 인앱 + 메일, 서비스 취소 요청/완료는 고객/호스트 인앱 + 메일을 기본으로 하고 관리자 메일은 `adminAlertCenter` 기준으로 유지한다.
+- 결제/취소 메일 기준은 도메인 owner route가 직접 통제한다. 체험 카드/PayPal 결제 완료는 게스트/호스트 모두 인앱 + 메일, 체험 취소 완료는 게스트/호스트 모두 인앱 + 메일, 맞춤 서비스 결제 완료는 고객과 관리자에게 알리고 배정 호스트에게는 배정 확정 시점에 알린다. 서비스 취소 요청/완료는 관계자에게 인앱 + 메일을 기본으로 하고 관리자 메일은 `adminAlertCenter` 기준으로 유지한다.
 - 호스트 지원서의 `language_cert`는 입력/저장을 유지하며, 관리자 상세에서만 텍스트로 노출한다.
 - 호스트 지원서 상태의 `idCardType`은 로컬 상태만 존재하고, 렌더/저장/조회 경로가 없다.
 - 체험 등록의 `spots`는 생성 시 저장되지만 현재 런타임 읽기 경로가 없다.
@@ -292,78 +293,81 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 
 ---
 
-## 10. 서비스 매칭 시스템 (역경매, v3.3.0)
+## 10. 맞춤 동행·통역 콘시어지 시스템
 
 ### 10.1 개요
 
-고객이 맞춤 동행/통역 서비스를 의뢰하면 해당 지역 호스트들이 지원하고, 고객이 선택 후 결제하는 **역경매 매칭 플로우**. 기존 `experiences` / `bookings` 테이블/로직과 **완전 독립**.
+고객이 맞춤 동행/통역 신청서를 작성하고 결제하면, 신청서 전체가 현지 담당자 1:1 문의로 자동 제출된다. 로컬리 현지 담당자가 승인된 호스트와 일정·보수를 먼저 합의한 뒤 직접 배정하며, 이때 고객-호스트 전용 대화방이 열린다. 공개 잡보드, 호스트 지원, 고객의 호스트 선택은 사용하지 않는다.
 
-**가격 구조 (수수료율 절대 노출 금지):**
-- 고객 결제: ₩35,000/hr × duration_hours (최소 4시간)
-- 호스트 수익: ₩20,000/hr × duration_hours
-- 플랫폼 마진: ₩15,000/hr (비공개)
+**고객 가격:**
+- 일반 동행·생활 통역, 1~5인: 시간당 35,000원
+- 비즈니스 통역 또는 6인 이상: 시간당 55,000원(조건이 둘 다여도 중복 할증 없음)
+- 하루 3~24시간, 전체 3~168시간. 40시간 신청 지원
+- 표준 호스트 보수는 시간당 20,000원, 프리미엄 보수는 관리자가 호스트와 합의한 금액을 배정 시 저장
 
 ### 10.2 DB 테이블 (Supabase)
 
 | 테이블 | 용도 |
 |--------|------|
 | `service_requests` | 고객 의뢰. `total_customer_price`, `total_host_payout`은 GENERATED ALWAYS 컬럼 |
-| `service_applications` | 호스트 지원. UNIQUE(request_id, host_id) |
+| `service_request_schedule_items` | 여러 날짜·시간 일정의 단일 소스 |
 | `service_bookings` | 결제/정산. `SVC-` 접두사 주문번호. service_role 전용 쓰기 |
+| `service_assignment_history` | 관리자 배정, 호스트 보수, 사전 합의 이력 |
+| `service_refund_operations` | 환불 시작·결과·재확인 저널 |
 
-**마이그레이션 파일:** `supabase_service_matching_migration.sql` (초기), `supabase_service_matching_v2_escrow_migration.sql` (v2 에스크로), `docs/migrations/v3_37_35_service_request_inquiry_key.sql` (서비스 매칭 채팅 request 키)
+**현재 feature migration:** `supabase/migrations/20260912050655_service_concierge_assignment.sql`. 기존 서비스 테이블의 직접 Data API 권한을 제거하는 contract migration은 신규 앱 배포와 smoke가 끝난 뒤 별도 rollout으로 진행하며, 이 feature migration과 함께 자동 적용하지 않는다.
 
-**상태 플로우 (v2 에스크로):**
+**상태 플로우:**
 ```
-service_requests: pending_payment → (결제) → open → (호스트 선택) → matched → completed
-                  pending_payment → cancelled (결제 포기)
-                  open → cancelled (결제 후 호스트 미선택 상태에서 취소 + PG 환불)
-                  matched → cancelled (관리자 검토)
-service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_requested
+service_requests: pending_payment → (결제 확인 + 관리자 1:1) → assigning
+                  assigning → (관리자 직접 배정) → matched → completed
+                  pending_payment → cancelled
+                  assigning/matched → cancellation_requested → cancelled
+service_bookings: PENDING → PAID → confirmed → completed
+                  PENDING/PAID/confirmed → cancellation_requested/cancelled
 ```
 
 ### 10.3 라우팅
 
 **고객:**
-- `/services/request` — 의뢰 작성 폼 (₩35,000/hr 고정 표시)
-- `/services/my` — 내 의뢰 목록
-- `/services/[requestId]` — 의뢰 상세 (지원자 선택 포함)
+- `/services/request` — 유형·일정·총시간·인원을 입력하는 신청서
+- `/services/my` — `/guest/trips#custom-services`로 이동
+- `/services/[requestId]` — 상태, 관리자 1:1, 배정 후 호스트 대화 진입
 - `/services/[requestId]/payment` — NicePay 결제 (기존 결제 callback과 완전 분리)
 - `/services/[requestId]/payment/complete` — 결제 완료
 
 **호스트:**
-- `/services` — 잡보드 (승인 호스트 중 의뢰 `country/city`와 같은 위치에 활성 체험이 있는 경우에만 열린 의뢰 노출)
-- `/services/[requestId]/apply` — 지원 폼 (저장된 `total_host_payout` 기준 예상 수입 표시, 비율 미노출)
-- 호스트 대시보드 `?tab=service-jobs` — ServiceJobsTab (열린 의뢰 / 내 지원 / 진행중)
+- `/services`, `/services/[requestId]/apply` — 공개 의뢰·지원 기능 없음. 호스트 대시보드 안내로 이동
+- 호스트 대시보드 `?tab=service-jobs` — 관리자 개별 배정 방식 안내와 문의함 진입만 제공
 
 ### 10.4 API 라우트
 
 | 엔드포인트 | 용도 |
 |------------|------|
-| `POST /api/services/requests` | 의뢰 생성(pending_payment) + 에스크로 예약 사전 생성(PENDING, host_id=null), city 기준 country 자동 정규화, booking 실패 시 request cleanup |
-| `GET /api/services/requests?mode=board\|my` | 의뢰 목록 조회 (`board`: 승인 호스트 중 의뢰 위치와 같은 국가/도시에 활성 체험이 있는 경우만 open 노출) |
-| `POST /api/services/applications` | 호스트 지원 (중복/재지원 처리) |
-| `POST /api/services/select-host` | 고객의 호스트 선택 → matched + 기존 예약에 host_id/application_id 채워넣기 + 중간 실패 시 rollback/alignment |
-| `POST /api/services/payment/nicepay-callback` | 결제 확정 → request.status: open 전환 + 호스트 전체 알림 |
-| `POST /api/services/cancel` | PENDING: DB 취소 / open+PAID: PG 환불 성공 시에만 취소 확정 / matched: 관리자 검토 |
+| `POST /api/services/requests` | 멱등성 키를 포함한 신청서·일정·PENDING 예약의 원자적 생성 |
+| `GET /api/services/requests?requestId=...\|mode=my` | 소유자/배정 호스트에게만 서버 DTO로 상세 또는 내 의뢰 반환 |
+| `POST /api/services/applications`, `POST /api/services/select-host` | `410 Gone`. 레거시 공개 지원/고객 선택 차단 |
+| `POST /api/services/payment/*`, `POST /api/admin/service-confirm-payment` | 결제 확인과 관리자 1:1 문의 자동 생성을 하나의 원자적 함수로 처리 |
+| `POST /api/admin/service-requests/[requestId]/assign-host` | 승인 호스트, 일정 충돌, 보수 합의를 검증한 뒤 직접 배정하고 고객-호스트 전용 문의 생성 |
+| `POST /api/services/cancel` | 미결제 즉시 취소, 결제 후 환불/검토를 상태별로 분리하고 멱등성 유지 |
 
 ### 10.5 타입 & 상수
 
-- `app/types/service.ts` — ServiceRequest, ServiceApplication, ServiceBooking 등
-- `app/constants/serviceStatus.ts` — 상태 유틸 함수 (`isOpenServiceRequest`, `getServiceRequestStatusLabel` 등)
-- `app/utils/notification.ts` — NotificationType에 `service_request_new`, `service_application_new`, `service_host_selected`, `service_host_rejected`, `service_payment_confirmed`, `service_cancelled` 추가
+- `app/utils/services/concierge.ts` — 가격·시간·인원·일정 검증 단일 소스
+- `app/types/service.ts`, `app/constants/serviceStatus.ts` — 콘시어지 상태·DTO 계약
 
 ### 10.6 네비게이션 연동
 
 - **홈 서비스 탭:** `LOCALLY_SERVICES` 5번째 항목(id=5) → 클릭 시 `/services/intro` 라우팅
-- **호스트 대시보드:** `service-jobs` 탭 추가 (Briefcase 아이콘) → ServiceJobsTab 렌더
-- **MobileHostMenu:** "서비스 매칭" 메뉴 항목 추가 → `/host/dashboard?tab=service-jobs`
+- **호스트 대시보드:** `service-jobs` 탭은 공개 모집 대신 관리자 직접 배정 방식을 안내
 - **ViewModeContext:** 호스트/게스트 UI 모드는 `pathname.startsWith('/host')` 단독 판정이 아니라 `locally_view_mode` cookie/localStorage + `useAuth()` host 접근 가능 여부로 유지한다.
 - **BottomTabNavigation / SiteHeader / HelpCenter:** 공용 페이지(`/community`, `/about`, `/become-a-host`, `/services`, `/help`)에서도 host view를 유지하고, `payment/login/signup` 및 host form/edit 경로만 하단 탭을 숨긴다. 모바일 `HostModeTransition`은 dev Strict Mode에서도 cleanup으로 즉시 닫히지 않는 타이머 구조를 유지한다.
 
 ### 10.7 주요 제약사항
 
-- 수수료 비율(₩15,000/hr) 어디에도 노출 금지 — Generated 컬럼 기반으로 UI에서 계산 불필요
+- 수수료·마진 비율은 고객/호스트 UI에 노출하지 않음
+- 관리자가 호스트와 모든 일정·총보수를 합의한 후에만 배정 확정
+- 코드·DB 모두에서 고객의 호스트 선택과 호스트 공개 지원을 허용하지 않음
 - 기존 `/api/payment/nicepay-callback` 수정 금지 — 서비스 결제는 `/api/services/payment/nicepay-callback` 전용
 - 기존 `experiences` / `bookings` 테이블/API 변경 금지
 - 주문번호 `SVC-` 접두사: 기존 예약과 충돌 방지 + callback 라우팅 가드
@@ -374,15 +378,14 @@ service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_req
 
 ### 11.1 배경 — 노쇼 문제 해결
 
-**v2 에스크로 플로우:** 의뢰 등록 → **즉시 결제(에스크로)** → open 공개 → 호스트 지원 → 선택 → 확정
-- 고객 결제 완료 후 잡보드 공개 → 호스트 선택 → 이미 결제된 금액으로 바로 확정
+**현재 콘시어지 플로우:** 의뢰 등록 → **선결제** → 관리자 1:1 문의 자동 생성 → 관리자가 호스트와 조건 합의 → 직접 배정 → 고객-호스트 전용 대화방
 
 ### 11.2 DB 변경사항 (v3.8.0)
 
-- **`service_requests.status`:** `pending_payment` 상태 추가 (결제 전 잡보드 미노출)
+- **`service_requests.status`:** `pending_payment` → `assigning` → `matched` → `completed`
 - **`service_bookings.host_id`:** NOT NULL → nullable (에스크로 단계에서 호스트 미정)
 - **`service_bookings.application_id`:** NOT NULL → nullable (호스트 선택 후 채워짐)
-- **마이그레이션:** `supabase_service_matching_v2_escrow_migration.sql` 실행 필요
+- **마이그레이션:** 기존 에스크로 구조 위에 `20260912050655_service_concierge_assignment.sql`만 먼저 적용한다. 기존 서비스 테이블 lockdown은 신규 앱 배포·smoke 뒤 별도 contract 단계로 분리한다.
 
 ### 11.3 결제 플로우
 
@@ -394,18 +397,17 @@ service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_req
    → service_bookings INSERT (status=PENDING, host_id=null, application_id=null)
    → 반환: { requestId, orderId, amount }
 3. 프론트: /services/${requestId}/payment 리다이렉트
-4. 결제 페이지: DB에서 PENDING 예약 조회 (request_id + customer_id)
+4. 결제 페이지: 고객 소유권을 서버 API에서 검증하고 PENDING 예약 DTO 조회
 5. [카드] IMP.request_pay() → NicePay 결제
 6. POST /api/services/payment/nicepay-callback
    → service_bookings.status = PAID
-   → service_requests.status = open
-   → 승인 호스트 전체 알림 발송
-7. 잡보드(/services): 승인 호스트 중 의뢰 `country/city`와 같은 위치에 활성 체험이 있는 경우에만 open 의뢰 표시
-8. 호스트: 지원서 제출 → 고객이 선택
-9. POST /api/services/select-host
+   → service_requests.status = assigning
+   → 신청서 전체를 담은 관리자 1:1 문의 자동 생성
+7. 관리자: 승인 호스트와 일정·보수를 합의한 후 직접 배정
+8. POST /api/admin/service-requests/[requestId]/assign-host
    → service_requests.status = matched
-   → service_bookings.host_id, application_id 채워넣기
-10. 매칭 확정 — 별도 결제 불필요
+   → service_bookings.status = confirmed, host_id/호스트 보수 저장
+   → 고객-호스트 전용 대화방 생성
 ```
 
 **무통장 입금 (v3.9.2 완성):**
@@ -419,8 +421,8 @@ service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_req
 7. Admin: ServiceAdminTab → "💰 입금 확인" 버튼
    → POST /api/admin/service-confirm-payment
    → service_bookings: PENDING → PAID
-   → service_requests: pending_payment → open (잡보드 공개)
-   → 호스트 전체 알림 + 고객 알림 + 감사 로그
+   → service_requests: pending_payment → assigning
+   → 관리자 1:1 문의 + 고객/관리자 알림 + 감사 로그
 ```
 
 **PayPal 결제 (v3.38.48 추가):**
@@ -433,8 +435,8 @@ service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_req
 7. POST /api/services/payment/paypal/capture-order
    → PayPal order/custom_id/금액 재검증 + capture
    → service_bookings: PENDING → PAID, payment_method='paypal', tid=<captureId>
-   → service_requests: pending_payment → open
-   → 승인 호스트 전체 알림 + 고객 알림 + 관리자 알림
+   → service_requests: pending_payment → assigning
+   → 관리자 1:1 문의 + 고객/관리자 알림
 ```
 
 **결제 수단 환경 변수:**
@@ -446,13 +448,13 @@ service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_req
 | 예약 상태 | 의뢰 상태 | 처리 방식 |
 |-----------|-----------|-----------|
 | PENDING | pending_payment | DB 취소만 (PG 미결제) |
-| PAID | open | NicePay PG 전액 환불 + DB 취소 |
-| PAID | matched / confirmed | cancellation_requested (관리자 검토) |
+| PAID | assigning | 호스트 배정 전 전액 환불 원칙 |
+| confirmed | matched / confirmed | cancellation_requested (고객 환불·호스트 보상 관리자 검토) |
 
 ### 11.5 주의사항
 
 - `isPendingPaymentServiceRequest` 유틸 사용 — raw 문자열 비교 금지
-- 잡보드 GET API: `status='open'` 필터 고정 — `pending_payment` 절대 노출 금지
+- 브라우저에서 `service_requests`, `service_bookings`, `service_applications`를 직접 읽거나 쓰지 않고 소유권을 검증하는 서버 DTO/API만 사용
 - 체험 카드결제는 `signData`/`ediDate`를 신뢰하지 않는다. 브라우저는 `imp_uid`, `merchant_uid`, `orderId`만 보내고 `/api/payment/nicepay-callback`이 PortOne REST API 재조회로 실제 결제를 검증한 뒤에만 예약을 확정한다.
 - 체험 카드결제 준비 상태는 `/api/payment/card-ready`가 단일 source다. readiness가 false인 환경에서는 카드 버튼을 비활성화하고 무통장/PayPal만 허용한다.
 
@@ -462,7 +464,7 @@ service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_req
 - 메타데이터(`metadataBase`, canonical, `alternates.languages`, OG URL), `robots`, `sitemap`, 이메일 기본 링크는 모두 `app/utils/siteUrl.ts` helper를 통해 생성한다.
 - `locally.vercel.app`, `locally-web.vercel.app`, `www.locally-travel.com` 같은 배포 도메인을 개별 파일에 하드코딩하지 않는다.
 - staging/transition 기간에는 `NEXT_PUBLIC_SITE_URL`만 현재 배포 도메인으로 유지하고, 최종 도메인 전환 시에는 env만 교체한다.
-- `/about`, `/search`, `/become-a-host`, `/help`, `/site-map`, `company/*`, `/services/intro` 같은 공개 랜딩/정보 페이지는 route-level metadata를 직접 가진다. 반대로 로그인 리다이렉트가 있는 `/services` 잡보드류는 공개 SEO 보강 대상이 아니라 private `noindex` 정리 대상으로 본다.
+- `/about`, `/search`, `/become-a-host`, `/help`, `/site-map`, `company/*`, `/services/intro` 같은 공개 랜딩/정보 페이지는 route-level metadata를 직접 가진다. 서비스 신청·상세·결제는 private `noindex`를 유지한다.
 - `/become-a-host` 랜딩 이미지는 `public/images/become-a-host/{desktop|mobile}/{ko|en|ja|zh}/1.png~7.png` 규칙을 단일 source로 쓰고, 현재 locale 이미지가 없으면 서버에서 자동으로 `ko` asset으로 fallback한다.
 - `/about`은 현재 코드 기반 에디토리얼 페이지를 기본값으로 유지하되, `public/images/about/{desktop|mobile}/{ko|en|ja|zh}/1.png...` 자산이 들어오면 숫자 순서대로 이미지 랜딩을 우선 렌더한다. locale 파일이 비어 있으면 같은 번호의 `ko` 이미지로 fallback한다.
 - 호스트 체험 등록/수정의 대표 사진은 모바일 hover를 전제하지 않는다. 썸네일 탭 시 `HostPhotoActionSheet`로 `사진 변경 / 사진 삭제 / 취소`를 제공하고, 데스크탑에서만 hover quick delete를 유지한다. 이번 범위는 hero photo만 해당하며 itinerary photo 액션은 기존 구조를 유지한다.

@@ -412,7 +412,10 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
   );
 
   const validServiceBookings = serviceBookings.filter((booking) => filterDate(booking.created_at));
-  const svcRevenue = validServiceBookings.reduce((sum, booking) => sum + (booking.amount || 0), 0);
+  const svcRevenue = validServiceBookings.reduce(
+    (sum, booking) => sum + Math.max((booking.amount || 0) - (booking.refund_amount || 0), 0),
+    0
+  );
   const svcPlatformFee = validServiceBookings.reduce(
     (sum, booking) => sum + (booking.platform_revenue || 0),
     0

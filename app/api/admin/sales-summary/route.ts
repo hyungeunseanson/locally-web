@@ -141,6 +141,8 @@ function normalizeServiceSalesSummary(row: AdminRawRow): AdminServiceSalesSummar
   return {
     amount,
     host_payout_amount: readNumberField(row, 'host_payout_amount'),
+    host_compensation_amount: readNumberField(row, 'host_compensation_amount'),
+    refund_amount: readNumberField(row, 'refund_amount'),
     platform_revenue: readNumberField(row, 'platform_revenue'),
     status,
     created_at: createdAt,
@@ -282,13 +284,13 @@ export async function GET(request: Request) {
 
     const buildServiceSummaryQuery = (includePaidAt: boolean) => {
       const selectColumns = includePaidAt
-        ? 'amount, host_payout_amount, platform_revenue, status, created_at, payout_status, payout_paid_at'
-        : 'amount, host_payout_amount, platform_revenue, status, created_at, payout_status';
+        ? 'amount, host_payout_amount, host_compensation_amount, refund_amount, platform_revenue, status, created_at, payout_status, payout_paid_at'
+        : 'amount, host_payout_amount, host_compensation_amount, refund_amount, platform_revenue, status, created_at, payout_status';
 
       let query = supabaseAdmin
         .from('service_bookings')
         .select(selectColumns)
-        .in('status', ['PAID', 'confirmed', 'completed'])
+        .in('status', ['PAID', 'confirmed', 'completed', 'cancelled'])
         .order('created_at', { ascending: false });
 
       if (startAt) {

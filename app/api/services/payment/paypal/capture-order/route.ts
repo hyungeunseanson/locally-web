@@ -65,7 +65,22 @@ export async function POST(request: Request) {
 
     if (booking.status === 'PAID' || booking.status === 'confirmed') {
       if (normalizedPaymentMethod === 'paypal') {
-        return NextResponse.json({ success: true, message: 'Already processed' });
+        const { data: healed, error: healError } = await supabaseAdmin
+          .rpc('confirm_service_concierge_payment_atomic', {
+            p_order_id: booking.order_id,
+            p_payment_method: 'paypal',
+            p_tid: booking.tid,
+          })
+          .maybeSingle<{ support_inquiry_id: string }>();
+        if (healError || !healed?.support_inquiry_id) {
+          return NextResponse.json({ success: false, error: '현지 담당자 문의 연결을 복구하지 못했습니다.' }, { status: 500 });
+        }
+        return NextResponse.json({
+          success: true,
+          message: 'Already processed',
+          supportInquiryId: healed.support_inquiry_id,
+          redirectUrl: `/guest/inbox?inquiryId=${encodeURIComponent(healed.support_inquiry_id)}`,
+        });
       }
 
       return NextResponse.json(
@@ -144,33 +159,28 @@ export async function POST(request: Request) {
     const reqDuration = requestInfo?.duration_hours ?? 0;
     const reqGuests = requestInfo?.guest_count ?? 0;
 
-    // [Race Guard] PENDING 상태일 때만 업데이트 — 중복 처리 방지
-    const { data: updatedBooking, error: bookingUpdateErr } = await supabaseAdmin
-      .from('service_bookings')
-      .update({
-        status: 'PAID',
-        payment_method: 'paypal',
-        tid: captured.captureId,
+    const { data: confirmation, error: confirmationError } = await supabaseAdmin
+      .rpc('confirm_service_concierge_payment_atomic', {
+        p_order_id: booking.order_id,
+        p_payment_method: 'paypal',
+        p_tid: captured.captureId,
       })
-      .eq('id', bookingId)
-      .eq('status', 'PENDING')
-      .select('id')
-      .maybeSingle();
+      .maybeSingle<{ already_processed: boolean; support_inquiry_id: string }>();
 
-    if (bookingUpdateErr) {
-      throw new Error(`[SERVICE][PAYPAL] Booking update failed: ${bookingUpdateErr.message}`);
-    }
-    if (!updatedBooking) {
-      return NextResponse.json({ success: true, message: 'Already processed' });
+    if (confirmationError || !confirmation) {
+      throw new Error(`[SERVICE][PAYPAL] Atomic confirmation failed: ${confirmationError?.message || 'empty result'}`);
     }
 
-    const { error: requestUpdateErr } = await supabaseAdmin
-      .from('service_requests')
-      .update({ status: 'open' })
-      .eq('id', booking.request_id);
-
-    if (requestUpdateErr) {
-      console.error('[SERVICE][PAYPAL] Request status update failed:', requestUpdateErr);
+    if (confirmation.already_processed) {
+      return NextResponse.json({
+        success: true,
+        alreadyProcessed: true,
+        captureId: captured.captureId,
+        bookingId,
+        paypalOrderId: captured.orderId,
+        supportInquiryId: confirmation.support_inquiry_id,
+        redirectUrl: `/guest/inbox?inquiryId=${encodeURIComponent(confirmation.support_inquiry_id)}`,
+      });
     }
 
     await notifyServicePaymentOpened({
@@ -182,11 +192,12 @@ export async function POST(request: Request) {
       durationHours: reqDuration,
       guestCount: reqGuests,
       customerId: booking.customer_id,
+      supportInquiryId: confirmation.support_inquiry_id,
     });
 
     insertAdminAlerts({
       title: '서비스 PayPal 결제가 완료되었습니다',
-      message: `'${requestTitle}' 서비스 결제가 완료되어 호스트 모집이 시작되었습니다.`,
+      message: `'${requestTitle}' 서비스 결제가 완료되어 현지 담당자 배정 대기로 전환되었습니다.`,
       link: '/admin/dashboard?tab=SERVICE_REQUESTS',
     }).catch((adminAlertError) => {
       console.error('[SERVICE][PAYPAL] Payment Admin Alert Error:', adminAlertError);
@@ -210,6 +221,8 @@ export async function POST(request: Request) {
       captureId: captured.captureId,
       bookingId,
       paypalOrderId: captured.orderId,
+      supportInquiryId: confirmation.support_inquiry_id,
+      redirectUrl: `/guest/inbox?inquiryId=${encodeURIComponent(confirmation.support_inquiry_id)}`,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal Server Error';

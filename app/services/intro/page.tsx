@@ -12,17 +12,17 @@ export async function generateMetadata(): Promise<Metadata> {
   const locale = await getCurrentLocale();
 
   const TITLE_MAP: Record<'ko' | 'en' | 'ja' | 'zh', string> = {
-    ko: '일본 현지인 동행 가이드 맞춤 의뢰',
-    en: 'Custom Requests for Local Japanese Companion Guides',
-    ja: '日本人ローカルガイド同行のカスタム依頼',
-    zh: '日本本地向导陪同定制委托',
+    ko: '일본 현지 동행·통역 맞춤 서비스',
+    en: 'Custom Companion & Interpreting in Japan',
+    ja: '日本現地の同行・通訳オーダーメイドサービス',
+    zh: '日本当地陪同与口译定制服务',
   };
 
   const DESCRIPTION_MAP: Record<'ko' | 'en' | 'ja' | 'zh', string> = {
-    ko: '도쿄·오사카·후쿠오카에서 검증된 현지인 호스트와 단둘이 떠나는 맞춤 여행. 시간당 ₩35,000, 최소 4시간부터 의뢰 가능.',
-    en: 'Request a verified local host in Tokyo, Osaka, or Fukuoka for a personalized companion trip starting from 4 hours.',
-    ja: '東京・大阪・福岡で、認証済みの現地ホストと一緒に楽しむオーダーメイド同行サービス。4時間から依頼できます。',
-    zh: '在东京、大阪、福冈委托经过验证的本地房东陪同出行，支持 4 小时起的定制服务。',
+    ko: '일본 전역 현지 동행·통역 맞춤 서비스. 일반 1~5인은 시간당 ₩35,000, 비즈니스 또는 6인 이상은 ₩55,000이며 날짜별 3~24시간·총 168시간까지 신청할 수 있습니다.',
+    en: 'Custom companion and interpreting support across Japan: KRW 35,000/hour for general 1–5 guest requests and KRW 55,000/hour for business or 6+ guests, up to 168 hours total.',
+    ja: '日本各地の同行・通訳サービス。一般1～5名は1時間35,000ウォン、ビジネスまたは6名以上は55,000ウォンで、合計168時間まで申請できます。',
+    zh: '覆盖日本各地的陪同与口译定制服务：普通1–5人每小时35,000韩元，商务或6人以上每小时55,000韩元，总计最多168小时。',
   };
 
   const title = TITLE_MAP[locale];
@@ -41,7 +41,7 @@ export async function generateMetadata(): Promise<Metadata> {
       title,
       description,
       url: canonicalUrl,
-      images: [{ url: ogImageUrl, width: 1200, height: 800, alt: '일본 현지인 동행 가이드 서비스 | Locally' }],
+      images: [{ url: ogImageUrl, width: 1200, height: 800, alt: '일본 현지 동행·통역 맞춤 서비스 | Locally' }],
       type: 'website',
     },
     twitter: {

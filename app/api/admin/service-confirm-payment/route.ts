@@ -63,7 +63,11 @@ export async function POST(request: Request) {
       console.error('[ADMIN] service-confirm-payment audit log failed:', auditError);
     }
 
-    return NextResponse.json({ success: true, message: '입금 확인 완료. 의뢰가 공개되었습니다.' });
+    return NextResponse.json({
+      success: true,
+      message: '입금 확인 완료. 현지 담당자 1:1 문의와 호스트 배정 대기가 시작되었습니다.',
+      supportInquiryId: result.payment.supportInquiryId,
+    });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[ADMIN] service-confirm-payment error:', msg);

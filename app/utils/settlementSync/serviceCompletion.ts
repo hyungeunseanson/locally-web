@@ -31,7 +31,7 @@ import {
 
 type ServiceCompletionRequestRow = {
   id: string;
-  service_date: string | null;
+  service_end_at: string | null;
   status: string;
   selected_host_id: string | null;
 };
@@ -45,7 +45,7 @@ type ServiceCompletionBookingRow = {
 };
 
 type ServiceCompletionCandidate = ServiceCompletionBookingRow & {
-  service_date: string | null;
+  service_end_at: string | null;
   request_status: string;
 };
 
@@ -55,7 +55,7 @@ type ServiceCompletionTarget = {
   request_id: string | null;
   status: string;
   host_id: string | null;
-  service_date: string | null;
+  service_end_at: string | null;
   request_status: string | null;
 };
 
@@ -64,7 +64,7 @@ type AtomicCompleteServiceBookingRow = {
   order_id: string;
   request_id: string;
   host_id: string;
-  service_date: string | null;
+  service_end_at: string | null;
   already_processed: boolean;
   not_due: boolean;
   completed: boolean;
@@ -89,17 +89,6 @@ type ServiceCompletionAttemptResult =
 
 const SERVICE_SYNC_JOB_NAME = 'service_completion_sync';
 const SERVICE_FORCE_ONE_JOB_NAME = 'service_completion_sync_force_one';
-
-function getTodayKSTDateString() {
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Seoul',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-
-  return formatter.format(new Date());
-}
 
 function delay(ms?: number) {
   if (!ms || ms <= 0) return Promise.resolve();
@@ -158,7 +147,7 @@ function normalizeServiceCompletionRequestRows(value: unknown): ServiceCompletio
 
     acc.push({
       id,
-      service_date: readSettlementSyncString(row, 'service_date'),
+      service_end_at: readSettlementSyncString(row, 'service_end_at'),
       status,
       selected_host_id: readSettlementSyncTrimmedString(row, 'selected_host_id'),
     });
@@ -207,7 +196,7 @@ function normalizeServiceCompletionTargetRow(value: unknown): ServiceCompletionT
     request_id: readSettlementSyncTrimmedString(row, 'request_id'),
     status,
     host_id: readSettlementSyncTrimmedString(row, 'host_id'),
-    service_date: requestMeta ? readSettlementSyncString(requestMeta, 'service_date') : null,
+    service_end_at: requestMeta ? readSettlementSyncString(requestMeta, 'service_end_at') : null,
     request_status: requestMeta ? readSettlementSyncTrimmedString(requestMeta, 'status') : null,
   };
 }
@@ -264,7 +253,7 @@ async function tryCompleteServiceBookingAtomic(
     throw new SettlementSyncInfrastructureError();
   }
 
-  const rpcName = 'complete_service_booking_if_due_atomic';
+  const rpcName = 'complete_service_concierge_booking_if_due_atomic';
   const { data, error } = await supabaseAdmin
     .rpc(rpcName, { p_booking_id: bookingId })
     .maybeSingle<AtomicCompleteServiceBookingRow>();
@@ -291,13 +280,13 @@ async function tryCompleteServiceBookingAtomic(
 async function fetchServiceCompletionCandidates(
   supabaseAdmin: SettlementSyncAdminClient
 ) {
-  const todayKST = getTodayKSTDateString();
   const requestStatuses = [...SERVICE_REQUEST_ACTIVE_STATUSES, ...SERVICE_REQUEST_COMPLETED_STATUSES];
 
   const { data: requestRowsRaw, error: requestError } = await supabaseAdmin
     .from('service_requests')
-    .select('id, service_date, status, selected_host_id')
-    .lt('service_date', todayKST)
+    .select('id, service_end_at, status, selected_host_id')
+    .not('service_end_at', 'is', null)
+    .lte('service_end_at', new Date().toISOString())
     .in('status', requestStatuses);
 
   if (requestError) throw requestError;
@@ -323,7 +312,7 @@ async function fetchServiceCompletionCandidates(
       const request = row.request_id ? requestMap.get(row.request_id) : null;
       return {
         ...row,
-        service_date: request?.service_date || null,
+        service_end_at: request?.service_end_at || null,
         request_status: request?.status || '',
       };
     });
@@ -345,7 +334,7 @@ export async function resolveServiceCompletionTarget(
         request_id,
         status,
         host_id,
-        service_requests(id, service_date, status)
+        service_requests(id, service_end_at, status)
       `)
       .eq(column, trimmed)
       .maybeSingle();

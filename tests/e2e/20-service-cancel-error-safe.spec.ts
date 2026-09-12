@@ -1,9 +1,8 @@
-import { readFileSync } from 'fs';
-
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test, type Page } from '@playwright/test';
 
-type EnvMap = Record<string, string>;
+import { loadTestEnv } from './helpers/testSupabase';
+
 type TestUser = {
   email: string;
   password: string;
@@ -19,20 +18,10 @@ const createdServiceRequestIds: string[] = [];
 const createdServiceBookingIds: string[] = [];
 const createdNotificationIds: number[] = [];
 
-function loadEnv(): EnvMap {
-  return readFileSync('.env.local', 'utf8')
-    .split(/\n/)
-    .reduce<EnvMap>((acc, line) => {
-      const match = line.match(/^([^=]+)=(.*)$/);
-      if (match) acc[match[1]] = match[2];
-      return acc;
-    }, {});
-}
-
 function getAdminClient() {
   if (adminClient) return adminClient;
 
-  const env = loadEnv();
+  const env = loadTestEnv();
   adminClient = createClient(
     env.NEXT_PUBLIC_SUPABASE_URL,
     env.SUPABASE_SERVICE_ROLE_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -398,7 +387,7 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Service customer cancel error-safe flow', () => {
-  test('keeps PAID open service booking unchanged when refund cannot start', async ({ page }) => {
+  test('keeps PAID assigning service booking unchanged when refund cannot start', async ({ page }) => {
     test.setTimeout(90000);
 
     const customerUser = createCustomerUser('paid');
@@ -438,7 +427,7 @@ test.describe.serial('Service customer cancel error-safe flow', () => {
 
     expect(booking?.status).toBe('PAID');
     expect(booking?.refund_amount).toBeNull();
-    expect(serviceRequest?.status).toBe('open');
+    expect(serviceRequest?.status).toBe('assigning');
   });
 
   test('still cancels PENDING service booking immediately', async ({ page }) => {

@@ -83,13 +83,13 @@
   - Save/delete actions are never hidden by sticky UI.
   - Earnings cards and tabs do not overflow.
 
-## 9. Service Marketplace
+## 9. Service Concierge
 - Canonical routes: service request create, service request detail, service payment
 - Actors: `guest`, `host`, `admin`
 - Required checks:
-  - Request -> match -> payment flow copy stays consistent.
-  - Host selection and payment method state are visually obvious.
-  - Chat or completion transitions are reflected in UI quickly.
+  - Request -> payment -> manager inquiry -> direct admin assignment copy stays consistent.
+  - Pricing tier, payment method, manager inquiry, and assignment state are visually obvious.
+  - Customer-host chat, cancellation, refund, or completion transitions are reflected in UI quickly.
 
 ## 10. Proxy Booking / Linked Inquiry
 - Canonical routes: `/proxy-bookings/new`, guest proxy detail, admin proxy workspace

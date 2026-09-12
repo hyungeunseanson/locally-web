@@ -1,205 +1,29 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { Clock, MapPin, Users, Calendar, ChevronRight } from 'lucide-react';
-import { createClient } from '@/app/utils/supabase/client';
-import { useLanguage } from '@/app/context/LanguageContext';
-import {
-  getServiceRequestStatusLabel,
-  getServiceApplicationStatusLabel,
-  isOpenServiceRequest,
-} from '@/app/constants/serviceStatus';
-import type { ServiceRequestCard, ServiceApplication } from '@/app/types/service';
-import { normalizeHostServiceJobsTab } from '@/app/host/dashboard/navigation';
+import { CheckCircle2, MessageCircle, ShieldCheck } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
-type SubTab = 'open' | 'applications';
+import { useLanguage, type Locale } from '@/app/context/LanguageContext';
 
-type ApplicationWithRequest = ServiceApplication & {
-  service_requests?: Pick<ServiceRequestCard, 'id' | 'title' | 'city' | 'service_date' | 'duration_hours' | 'total_host_payout' | 'status'> | null;
+const COPY: Record<Locale, { title: string; desc: string; items: string[]; inbox: string }> = {
+  ko: { title: '현지 담당자 배정 방식으로 변경되었습니다', desc: '공개 의뢰 목록과 호스트 지원 기능은 더 이상 사용하지 않습니다. 로컬리 현지 담당자가 일정, 언어, 경력을 확인한 뒤 적합한 호스트에게 개별 연락합니다.', items: ['배정 전 일정과 보수를 현지 담당자가 먼저 확인합니다.', '수락과 조건은 현지 담당자와 협의합니다.', '배정 완료 후 고객 전용 문의가 생성됩니다.'], inbox: '문의함 확인' },
+  en: { title: 'Services are now assigned by Locally', desc: 'The public job board and host applications are no longer used. A manager reviews schedule, language, and experience before contacting a suitable host.', items: ['Schedule and payout are confirmed before assignment.', 'Acceptance and conditions are discussed with a manager.', 'A private customer thread opens after assignment.'], inbox: 'Open inbox' },
+  ja: { title: 'スタッフによる個別手配に変更されました', desc: '公開依頼一覧とホスト応募機能は終了しました。日程・言語・経験を確認後、専任スタッフが適切なホストへ個別に連絡します。', items: ['手配前に日程と報酬を確認します。', '受諾と条件はスタッフと相談します。', '手配完了後にお客様との専用お問い合わせが作成されます。'], inbox: 'お問い合わせを確認' },
+  zh: { title: '现由管理员直接安排服务', desc: '公开需求列表和向导申请功能已停用。管理员会核对日程、语言与经验后单独联系合适的向导。', items: ['安排前会先确认日程与报酬。', '接受与服务条件由管理员沟通。', '安排完成后会创建客户专属咨询。'], inbox: '查看咨询' },
 };
 
 export default function ServiceJobsTab() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const supabase = useMemo(() => createClient(), []);
-  const { t } = useLanguage();
-  const [requests, setRequests] = useState<ServiceRequestCard[]>([]);
-  const [myApplications, setMyApplications] = useState<ApplicationWithRequest[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
-  const subTab = normalizeHostServiceJobsTab(searchParams.get('serviceTab')) as SubTab;
-
-  const handleSubTabChange = (nextTab: SubTab) => {
-    if (nextTab === subTab) return;
-
-    const params = new URLSearchParams(searchParams.toString());
-    params.set('tab', 'service-jobs');
-    params.set('serviceTab', nextTab);
-    router.replace(`/host/dashboard?${params.toString()}`, { scroll: false });
-  };
-
-  useEffect(() => {
-    const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUserId(user?.id ?? null);
-    };
-    void init();
-  }, [supabase]);
-
-  useEffect(() => {
-    if (!userId) return;
-    const load = async () => {
-      setLoading(true);
-      if (subTab === 'open') {
-        const res = await fetch('/api/services/requests?mode=board');
-        const data = await res.json();
-        setRequests(data.success ? data.data ?? [] : []);
-      } else {
-        const { data: apps } = await supabase
-          .from('service_applications')
-          .select(`
-            *,
-            service_requests:request_id (id, title, city, service_date, duration_hours, total_host_payout, status)
-          `)
-          .eq('host_id', userId)
-          .order('created_at', { ascending: false });
-
-        setMyApplications((apps ?? []) as ApplicationWithRequest[]);
-      }
-      setLoading(false);
-    };
-    void load();
-  }, [subTab, userId, supabase]);
-
-  const subTabClass = (tab: SubTab) =>
-    `px-3 py-1.5 rounded-full text-[11px] md:text-xs font-semibold border transition-colors ${subTab === tab
-      ? 'bg-slate-900 text-white border-slate-900'
-      : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
-    }`;
-
-  const statusColor: Record<string, string> = {
-    pending: 'bg-amber-100 text-amber-700',
-    selected: 'bg-blue-100 text-blue-700',
-    rejected: 'bg-red-100 text-red-600',
-    withdrawn: 'bg-slate-100 text-slate-400',
-  };
-
-  const cardStyle: Record<string, string> = {
-    selected: 'border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-md',
-    pending: 'border-amber-200 bg-amber-50/40',
-    rejected: 'border-slate-100 bg-slate-50 opacity-60',
-    withdrawn: 'border-slate-100 bg-slate-50 opacity-40',
-  };
+  const { lang } = useLanguage();
+  const copy = COPY[lang];
 
   return (
-    <div className="space-y-4">
-      {/* 서브탭 */}
-      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-        <button
-          data-testid="service-jobs-open-tab"
-          aria-pressed={subTab === 'open'}
-          className={subTabClass('open')}
-          onClick={() => handleSubTabChange('open')}
-        >
-          {t('tab_open_reqs')}
-        </button>
-        <button
-          data-testid="service-jobs-applications-tab"
-          aria-pressed={subTab === 'applications'}
-          className={subTabClass('applications')}
-          onClick={() => handleSubTabChange('applications')}
-        >
-          {t('tab_my_apps')}
-        </button>
-      </div>
-
-      {loading ? (
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => <div key={i} className="animate-pulse h-24 bg-slate-100 rounded-2xl" />)}
-        </div>
-      ) : (
-        <>
-          {/* 열린 의뢰 탭 */}
-          {subTab === 'open' && (
-            requests.length === 0 ? (
-              <div className="text-center py-16 text-slate-400 text-[13px] md:text-sm">
-                {t('empty_open_reqs')}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {requests.map((req) => (
-                  <Link key={req.id} href={`/services/${req.id}`}>
-                    <div className="border border-slate-100 rounded-2xl p-4 hover:shadow-md transition-all cursor-pointer bg-white [box-shadow:0_1px_3px_rgba(0,0,0,0.05)] group">
-                      <div className="flex items-start justify-between gap-2 mb-1.5">
-                        <h3 className="font-bold text-[13px] md:text-[14px] text-slate-900 line-clamp-2 flex-1">{req.title}</h3>
-                        <ChevronRight size={15} className="text-slate-300 shrink-0 group-hover:text-slate-500" />
-                      </div>
-                      <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-[11px] md:text-[12px] text-slate-500 mb-2">
-                        <span className="flex items-center gap-1.5"><MapPin size={11} />{req.city}</span>
-                        <span className="flex items-center gap-1.5"><Calendar size={11} />{req.service_date}</span>
-                        <span className="flex items-center gap-1.5"><Clock size={11} />{req.duration_hours}h</span>
-                        <span className="flex items-center gap-1.5"><Users size={11} />{req.guest_count}명</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[9px] md:text-[10px] text-slate-400">{new Date(req.created_at).toLocaleDateString('ko-KR')}</span>
-                        <span className="font-black text-[13px] md:text-[14px] text-emerald-600">₩{req.total_host_payout.toLocaleString()}</span>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )
-          )}
-
-          {/* 내 지원 현황 탭 */}
-          {subTab === 'applications' && (
-            myApplications.length === 0 ? (
-              <div className="text-center py-16 text-slate-400 text-[13px] md:text-sm">
-                {t('empty_my_apps')}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {myApplications.map((app) => {
-                  const req = app.service_requests;
-                  return (
-                    <Link key={app.id} href={`/services/${app.request_id}`}>
-                      <div className={`border rounded-2xl p-4 transition-all cursor-pointer ${cardStyle[app.status] ?? 'border-slate-100 bg-white [box-shadow:0_1px_3px_rgba(0,0,0,0.05)]'}`}>
-                        <div className="flex items-start justify-between gap-2 mb-1.5">
-                          <h3 className="font-bold text-[13px] md:text-[14px] text-slate-900 line-clamp-2 flex-1">
-                            {req?.title ?? t('req_default')}
-                          </h3>
-                          <span className={`shrink-0 text-[9px] md:text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${statusColor[app.status] ?? 'bg-slate-100 text-slate-500'}`}>
-                            {getServiceApplicationStatusLabel(app.status)}
-                          </span>
-                        </div>
-                        {req && (
-                          <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-[11px] md:text-[12px] text-slate-500 mb-2.5">
-                            <span className="flex items-center gap-1.5"><MapPin size={11} />{req.city}</span>
-                            <span className="flex items-center gap-1.5"><Calendar size={11} />{req.service_date}</span>
-                            <span className="flex items-center gap-1.5"><Clock size={11} />{req.duration_hours}h</span>
-                          </div>
-                        )}
-                        <div className="flex items-center justify-between">
-                          <span className={`text-[9px] md:text-[10px] px-1.5 py-0.5 rounded text-slate-400 ${req && isOpenServiceRequest(req.status) ? 'text-emerald-600' : ''}`}>
-                            {req ? getServiceRequestStatusLabel(req.status) : ''}
-                          </span>
-                          {req && (
-                            <span className="font-black text-[13px] md:text-[14px] text-emerald-600">
-                              ₩{req.total_host_payout.toLocaleString()} {t('hd_match_expected')}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            )
-          )}
-        </>
-      )}
+    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:p-7">
+      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50"><ShieldCheck className="text-emerald-600" size={24} /></div>
+      <h2 className="mt-5 text-lg font-black">{copy.title}</h2>
+      <p className="mt-2 text-sm leading-7 text-slate-600">{copy.desc}</p>
+      <div className="mt-5 space-y-3">{copy.items.map((item) => <p key={item} className="flex items-start gap-2 text-sm font-semibold leading-6 text-slate-700"><CheckCircle2 className="mt-1 shrink-0 text-emerald-500" size={16} />{item}</p>)}</div>
+      <button type="button" onClick={() => router.push('/host/dashboard?tab=inquiries')} className="mt-6 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-black text-white"><MessageCircle size={16} />{copy.inbox}</button>
     </div>
   );
 }

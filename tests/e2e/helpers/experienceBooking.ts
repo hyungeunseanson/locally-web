@@ -1,11 +1,8 @@
-import { readFileSync } from 'fs';
-
 import { expect, type Page } from '@playwright/test';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 import { getVisiblePublicHostIdSet } from '@/app/utils/hostVisibility';
-
-type EnvMap = Record<string, string>;
+import { cleanupTestUsers, loadTestEnv } from './testSupabase';
 
 export type TestUser = {
   email: string;
@@ -30,6 +27,12 @@ export type BookableExperience = {
   price: number;
   privatePrice: number;
   isPrivateEnabled: boolean;
+};
+
+export type SyntheticExperienceFixture = {
+  hostId: string;
+  hostApplicationId: number;
+  experienceId: number;
 };
 
 type PrepareBookableExperienceOptions = {
@@ -80,20 +83,10 @@ export const HOST_USER_ID = 'cc84b331-7e78-4818-b9ba-f1a960017473';
 
 let adminClient: SupabaseClient | null = null;
 
-function loadEnv(): EnvMap {
-  return readFileSync('.env.local', 'utf8')
-    .split(/\n/)
-    .reduce<EnvMap>((acc, line) => {
-      const match = line.match(/^([^=]+)=(.*)$/);
-      if (match) acc[match[1]] = match[2];
-      return acc;
-    }, {});
-}
-
 export function getAdminClient() {
   if (adminClient) return adminClient;
 
-  const env = loadEnv();
+  const env = loadTestEnv();
   adminClient = createClient(
     env.NEXT_PUBLIC_SUPABASE_URL,
     env.SUPABASE_SERVICE_ROLE_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -172,6 +165,105 @@ export async function createAuthUser(user: TestUser, createdAuthUserIds: string[
   return data.user.id;
 }
 
+export async function createSyntheticHostExperienceFixture(
+  createdAuthUserIds: string[]
+): Promise<SyntheticExperienceFixture> {
+  const supabase = getAdminClient();
+  const host = createTestUser('exp.synthetic.host');
+  const hostId = await createAuthUser(host, createdAuthUserIds);
+
+  const { data: hostApplication, error: hostApplicationError } = await supabase
+    .from('host_applications')
+    .insert({
+      user_id: hostId,
+      host_nationality: '대한민국',
+      languages: ['한국어', 'English'],
+      language_levels: [
+        { language: '한국어', level: 5 },
+        { language: 'English', level: 4 },
+      ],
+      name: host.fullName,
+      phone: host.phone,
+      dob: '1991-01-01',
+      email: host.email,
+      instagram: '@codex_synthetic_host',
+      source: 'playwright',
+      language_cert: '',
+      profile_photo: '',
+      self_intro: 'Clean staging 예약 계약 검증용 합성 호스트입니다.',
+      id_card_file: '',
+      bank_name: '국민은행',
+      account_number: '12345678901234',
+      account_holder: host.fullName,
+      motivation: 'Playwright clean staging fixture',
+      status: 'approved',
+    })
+    .select('id')
+    .single();
+
+  if (hostApplicationError || !hostApplication?.id) {
+    throw hostApplicationError || new Error('Failed to create synthetic host application.');
+  }
+
+  const { data: experience, error: experienceError } = await supabase
+    .from('experiences')
+    .insert({
+      host_id: hostId,
+      country: 'Korea',
+      city: 'Seoul',
+      title: `[Playwright] Synthetic Booking Experience ${Date.now()}`,
+      category: '맛집 탐방',
+      languages: ['한국어', 'English'],
+      language_levels: [
+        { language: '한국어', level: 5 },
+        { language: 'English', level: 4 },
+      ],
+      duration: 2,
+      max_guests: 6,
+      description: 'Clean staging 예약 및 결제 회귀 검증용 합성 체험입니다.',
+      itinerary: [{ title: '서울역', description: '합성 회귀 검증 코스입니다.' }],
+      spots: '서울역',
+      meeting_point: '서울역 1번 출구',
+      meeting_point_i18n: { ko: '서울역 1번 출구', en: 'Seoul Station Exit 1' },
+      location: '서울역 1번 출구',
+      photos: ['https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200'],
+      price: 55000,
+      inclusions: ['가이드'],
+      exclusions: ['개인 경비'],
+      supplies: '편한 복장',
+      rules: { age_limit: '만 19세 이상', activity_level: '보통' },
+      status: 'approved',
+      is_active: true,
+      is_private_enabled: false,
+      private_price: 0,
+      source_locale: 'ko',
+      manual_locales: ['ko', 'en'],
+      translation_version: 1,
+      translation_meta: {},
+    })
+    .select('id')
+    .single();
+
+  if (experienceError || !experience?.id) {
+    await supabase.from('host_applications').delete().eq('id', hostApplication.id);
+    throw experienceError || new Error('Failed to create synthetic booking experience.');
+  }
+
+  return {
+    hostId,
+    hostApplicationId: Number(hostApplication.id),
+    experienceId: Number(experience.id),
+  };
+}
+
+export async function cleanupSyntheticHostExperience(fixture: SyntheticExperienceFixture | null) {
+  if (!fixture) return;
+
+  const supabase = getAdminClient();
+  await supabase.from('experiences').delete().eq('id', fixture.experienceId);
+  await supabase.from('host_applications').delete().eq('id', fixture.hostApplicationId);
+}
+
 export async function cleanupAuthUsers(createdAuthUserIds: string[]) {
   const supabase = getAdminClient();
 
@@ -179,11 +271,7 @@ export async function cleanupAuthUsers(createdAuthUserIds: string[]) {
     await supabase.from('bookings').delete().eq('user_id', userId);
   }
 
-  for (const userId of createdAuthUserIds) {
-    await supabase.from('profiles').delete().eq('id', userId);
-    await supabase.from('users').delete().eq('id', userId);
-    await supabase.auth.admin.deleteUser(userId);
-  }
+  await cleanupTestUsers(createdAuthUserIds);
 }
 
 export async function cleanupAvailability(createdAvailabilityKeys: AvailabilityKey[]) {

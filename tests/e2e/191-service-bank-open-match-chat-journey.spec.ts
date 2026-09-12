@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import {
   createAuthUser,
+  cleanupTestUsers,
   createTestUser,
   formatDate,
   getTestAdminClient,
@@ -17,7 +18,6 @@ import {
 } from './helpers/releaseJourney';
 
 const createdAuthUserIds: string[] = [];
-const createdWhitelistEmails: string[] = [];
 const createdHostApplicationIds: number[] = [];
 const createdExperienceIds: number[] = [];
 const createdServiceRequestIds: string[] = [];
@@ -79,7 +79,7 @@ async function createActiveExperience(hostId: string) {
       ],
       duration: 2,
       max_guests: 4,
-      description: '서비스 host apply full journey 검증용 활성 체험입니다.',
+      description: '서비스 관리자 직접 배정 여정 검증용 활성 체험입니다.',
       itinerary: [{ title: '서울역', description: '서비스 여정 검증 코스입니다.' }],
       spots: '서울역',
       meeting_point: '서울역 1번 출구',
@@ -125,63 +125,60 @@ async function createPendingBankServiceFixture(params: {
   const timestamp = Date.now();
   const serviceDate = new Date();
   serviceDate.setDate(serviceDate.getDate() + 9);
-  const title = `[Playwright] Release Service Journey ${timestamp}`;
-
-  const { data: requestRow, error: requestError } = await supabase
-    .from('service_requests')
-    .insert({
-      user_id: params.customerId,
-      title,
-      description: 'release full journey 서비스 의뢰입니다. 입금 확인 후 모집을 열고 매칭 후 채팅까지 이어집니다.',
-      city: 'Seoul',
-      country: 'Korea',
-      service_date: formatDate(serviceDate),
-      start_time: '10:00',
-      duration_hours: 4,
-      languages: ['한국어', 'English'],
-      guest_count: 2,
-      contact_name: params.customer.fullName,
-      contact_phone: params.customer.phone,
-      status: 'pending_payment',
+  const clientRequestKey = `release-service-${timestamp}-${Math.random().toString(16).slice(2, 8)}`;
+  const { data: rpcRow, error: requestError } = await supabase
+    .rpc('create_service_concierge_request_atomic', {
+      p_user_id: params.customerId,
+      p_service_type: 'general',
+      p_description:
+        'release full journey 맞춤 서비스 의뢰입니다. 결제 확인 후 현지 담당자 1:1 문의와 직접 호스트 배정, 전용 대화방까지 검증합니다.',
+      p_city: 'Tokyo',
+      p_schedule: [
+        {
+          serviceDate: formatDate(serviceDate),
+          startTime: '10:00',
+          durationHours: 4,
+        },
+      ],
+      p_languages: ['한국어', 'English'],
+      p_guest_count: 2,
+      p_contact_name: params.customer.fullName,
+      p_contact_phone: params.customer.phone,
+      p_client_request_key: clientRequestKey,
     })
-    .select('id, title, total_customer_price, total_host_payout')
     .single();
 
-  if (requestError || !requestRow?.id) {
-    throw requestError || new Error('Failed to create service request fixture.');
+  const created = rpcRow as
+    | { request_id: string; booking_id: string; order_id: string; amount: number }
+    | null;
+  if (requestError || !created?.request_id || !created.order_id) {
+    throw requestError || new Error('Failed to create concierge service request fixture.');
+  }
+
+  const { error: bookingError } = await supabase
+    .from('service_bookings')
+    .update({ payment_method: 'bank' })
+    .eq('id', created.booking_id);
+  if (bookingError) throw bookingError;
+
+  const { data: requestRow, error: requestReadError } = await supabase
+    .from('service_requests')
+    .select('id, title')
+    .eq('id', created.request_id)
+    .single();
+  if (requestReadError || !requestRow?.id) {
+    throw requestReadError || new Error('Failed to read concierge service request fixture.');
   }
 
   createdServiceRequestIds.push(requestRow.id);
-
-  const orderId = `REL-SVC-BANK-${timestamp}-${Math.random().toString(16).slice(2, 8)}`;
-  const { error: bookingError } = await supabase.from('service_bookings').insert({
-    id: orderId,
-    order_id: orderId,
-    request_id: requestRow.id,
-    application_id: null,
-    customer_id: params.customerId,
-    host_id: null,
-    amount: Number(requestRow.total_customer_price || 0),
-    host_payout_amount: Number(requestRow.total_host_payout || 0),
-    platform_revenue:
-      Number(requestRow.total_customer_price || 0) - Number(requestRow.total_host_payout || 0),
-    status: 'PENDING',
-    payment_method: 'bank',
-    payout_status: 'pending',
-    contact_name: params.customer.fullName,
-    contact_phone: params.customer.phone,
-  });
-
-  if (bookingError) {
-    throw bookingError;
-  }
+  const orderId = created.order_id;
 
   createdAuditTargetIds.push(orderId);
 
   return {
     requestId: requestRow.id,
     orderId,
-    title: String(requestRow.title || title),
+    title: String(requestRow.title || `Tokyo · ${formatDate(serviceDate)}`),
   };
 }
 
@@ -234,19 +231,11 @@ test.afterAll(async () => {
     await supabase.from('host_applications').delete().eq('id', applicationId);
   }
 
-  for (const email of createdWhitelistEmails) {
-    await supabase.from('admin_whitelist').delete().eq('email', email);
-  }
-
-  for (const userId of createdAuthUserIds) {
-    await supabase.from('profiles').delete().eq('id', userId);
-    await supabase.from('users').delete().eq('id', userId);
-    await supabase.auth.admin.deleteUser(userId);
-  }
+  await cleanupTestUsers(createdAuthUserIds);
 });
 
-test.describe.serial('Release journey 191: service bank open -> match -> chat', () => {
-  test('covers admin confirm, host apply, customer select, and shared inquiry handoff', async ({
+test.describe.serial('Release journey 191: service bank -> manager inquiry -> admin assignment -> chat', () => {
+  test('covers admin confirm, manager inquiry, direct host assignment, and dedicated chat', async ({
     browser,
   }) => {
     test.setTimeout(240000);
@@ -260,7 +249,6 @@ test.describe.serial('Release journey 191: service bank open -> match -> chat', 
     const customerId = await createAuthUser(customerUser);
     const hostId = await createAuthUser(hostUser);
     createdAuthUserIds.push(adminId, customerId, hostId);
-    createdWhitelistEmails.push(adminUser.email);
 
     await Promise.all([
       setPreferredLocale(adminId, 'ko'),
@@ -288,7 +276,9 @@ test.describe.serial('Release journey 191: service bank open -> match -> chat', 
       await expect(adminPage.getByRole('heading', { name: '맞춤 의뢰 관리' })).toBeVisible({
         timeout: 20000,
       });
-      await expect(adminPage.getByText(fixture.title)).toBeVisible({ timeout: 20000 });
+      await expect(adminPage.getByText(fixture.title, { exact: true })).toBeVisible({
+        timeout: 20000,
+      });
 
       const confirmPaymentResponsePromise = adminPage.waitForResponse(
         (response) =>
@@ -300,7 +290,7 @@ test.describe.serial('Release journey 191: service bank open -> match -> chat', 
       await confirmDialogAction(adminPage, '입금 확인', '입금 확인');
       const confirmPaymentResponse = await confirmPaymentResponsePromise;
       expect(confirmPaymentResponse.ok()).toBeTruthy();
-      await expect(adminPage.getByText('입금 확인 완료. 의뢰가 공개되었습니다.')).toBeVisible({
+      await expect(adminPage.getByText('입금 확인 완료. 현지 담당자 1:1 문의가 생성되었습니다.')).toBeVisible({
         timeout: 20000,
       });
       logStep('admin confirmed bank payment');
@@ -322,50 +312,75 @@ test.describe.serial('Release journey 191: service bank open -> match -> chat', 
           if (error) throw error;
           return data?.status ?? null;
         })
-        .toBe('open');
+        .toBe('assigning');
 
-      await hostPage.goto(`/services/${fixture.requestId}/apply`, { waitUntil: 'networkidle' });
-      await dismissAnnouncementIfVisible(hostPage);
-      await expect(
-        hostPage.getByRole('heading', { name: /서비스 지원하기|Apply for Request/ })
-      ).toBeVisible({
-        timeout: 20000,
-      });
-      await hostPage
-        .locator('textarea')
-        .fill('서울 현지 진행 경험과 통역 경험이 있어 이번 서비스 의뢰를 안정적으로 끝까지 진행할 수 있습니다.');
-      await hostPage.getByRole('button', { name: '지원 완료하기' }).click();
-      await hostPage.waitForURL(new RegExp(`/services/${fixture.requestId}$`), { timeout: 20000 });
-      await expect(hostPage.getByText('지원이 완료되었습니다! 고객의 선택을 기다려주세요.')).toBeVisible({
-        timeout: 15000,
-      });
-      logStep('host application submitted');
-
-      await waitForNotification({
-        userId: customerId,
-        type: 'service_application_new',
-        linkIncludes: `/services/${fixture.requestId}`,
-      });
-      logStep('customer received application notification');
+      const { data: supportInquiry, error: supportInquiryError } = await getTestAdminClient()
+        .from('inquiries')
+        .select('id, user_id, host_id, service_request_id, type')
+        .eq('service_request_id', fixture.requestId)
+        .eq('type', 'admin_support')
+        .maybeSingle();
+      if (supportInquiryError || !supportInquiry?.id) {
+        throw supportInquiryError || new Error('Payment confirmation did not create manager inquiry.');
+      }
+      expect(supportInquiry).toMatchObject({ user_id: customerId, host_id: null });
+      createdInquiryIds.push(supportInquiry.id);
 
       await customerPage.goto(`/services/${fixture.requestId}`, { waitUntil: 'networkidle' });
       await dismissAnnouncementIfVisible(customerPage);
-      await expect(customerPage.getByRole('heading', { name: fixture.title })).toBeVisible({
+      await expect(customerPage.getByRole('button', { name: '현지 담당자에게 1:1 문의' })).toBeVisible({
         timeout: 20000,
       });
-      await customerPage.getByRole('button', { name: '이 호스트 선택' }).first().click();
-      await confirmDialogAction(customerPage, '이 호스트를 선택하시겠습니까?', '이 호스트 선택');
-      await expect(customerPage.getByText('호스트 선택 완료! 매칭이 확정되었습니다.')).toBeVisible({
+      await customerPage.getByRole('button', { name: '현지 담당자에게 1:1 문의' }).click();
+      await customerPage.waitForURL(
+        new RegExp(`/guest/inbox\\?inquiryId=${supportInquiry.id}`),
+        { timeout: 20000 }
+      );
+      await expect(customerPage.getByText('맞춤 동행·통역 신청서')).toBeVisible({ timeout: 20000 });
+      logStep('customer opened auto-submitted manager inquiry');
+
+      const serviceRow = adminPage.locator('tbody tr').filter({ hasText: fixture.title });
+      await expect(serviceRow.getByRole('button', { name: '호스트 배정' })).toBeVisible({
         timeout: 20000,
       });
-      logStep('customer selected host');
+      await serviceRow.getByRole('button', { name: '호스트 배정' }).click();
+      await expect(adminPage.getByRole('heading', { name: '호스트 직접 배정' })).toBeVisible({
+        timeout: 20000,
+      });
+      await adminPage.getByRole('button', { name: new RegExp(hostUser.fullName) }).click();
+      await expect(adminPage.getByLabel('호스트 시간당 보수')).toHaveValue('20000');
+      await adminPage.getByRole('checkbox').check();
+
+      const assignHostResponsePromise = adminPage.waitForResponse(
+        (response) =>
+          response.url().includes(`/api/admin/service-requests/${fixture.requestId}/assign-host`) &&
+          response.request().method() === 'POST',
+        { timeout: 60000 }
+      );
+      await adminPage.getByRole('button', { name: '배정 확정' }).click();
+      const assignHostResponse = await assignHostResponsePromise;
+      expect(assignHostResponse.ok()).toBeTruthy();
+      const assignHostPayload = (await assignHostResponse.json()) as {
+        data?: { hostInquiryId?: string };
+      };
+      expect(assignHostPayload.data?.hostInquiryId).toBeTruthy();
+      await expect(
+        adminPage.getByText('호스트 배정과 고객-호스트 문의 생성이 완료되었습니다.')
+      ).toBeVisible({ timeout: 20000 });
+      logStep('admin assigned approved host directly');
+
+      await waitForAuditLog({
+        actionType: 'ADMIN_SERVICE_HOST_ASSIGN',
+        targetType: 'service_request',
+        targetId: fixture.requestId,
+      });
 
       await waitForNotification({
         userId: hostId,
         type: 'service_host_selected',
-        linkIncludes: `/services/${fixture.requestId}`,
+        linkIncludes: `inquiryId=${assignHostPayload.data?.hostInquiryId}`,
       });
-      logStep('host received selected notification');
+      logStep('host received assignment notification');
 
       await expect
         .poll(async () => {
@@ -383,9 +398,23 @@ test.describe.serial('Release journey 191: service bank open -> match -> chat', 
           selected_host_id: hostId,
         });
 
-      await customerPage.reload({ waitUntil: 'networkidle' });
+      const { data: hostInquiry, error: hostInquiryError } = await getTestAdminClient()
+        .from('inquiries')
+        .select('id, user_id, host_id, service_request_id, type')
+        .eq('service_request_id', fixture.requestId)
+        .eq('host_id', hostId)
+        .eq('type', 'general')
+        .maybeSingle();
+      if (hostInquiryError || !hostInquiry?.id) {
+        throw hostInquiryError || new Error('Direct assignment did not create dedicated host inquiry.');
+      }
+      expect(hostInquiry).toMatchObject({ user_id: customerId, host_id: hostId });
+      expect(String(hostInquiry.id)).toBe(assignHostPayload.data?.hostInquiryId);
+      createdInquiryIds.push(hostInquiry.id);
+
+      await customerPage.goto(`/services/${fixture.requestId}`, { waitUntil: 'networkidle' });
       await dismissAnnouncementIfVisible(customerPage);
-      await customerPage.getByRole('button', { name: '호스트에게 메시지' }).click();
+      await customerPage.getByRole('button', { name: '호스트와 대화' }).click();
       await customerPage.waitForURL(/\/guest\/inbox\?inquiryId=/, { timeout: 20000 });
       const customerInboxUrl = new URL(customerPage.url());
       const inquiryId = customerInboxUrl.searchParams.get('inquiryId');
@@ -416,7 +445,7 @@ test.describe.serial('Release journey 191: service bank open -> match -> chat', 
 
       await hostPage.goto(`/services/${fixture.requestId}`, { waitUntil: 'networkidle' });
       await dismissAnnouncementIfVisible(hostPage);
-      await hostPage.getByRole('button', { name: '고객에게 메시지' }).click();
+      await hostPage.getByRole('button', { name: '고객과 대화' }).click();
       await hostPage.waitForURL(new RegExp(`/host/dashboard\\?tab=inquiries&inquiryId=${inquiryId}`), {
         timeout: 20000,
       });

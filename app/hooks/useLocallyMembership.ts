@@ -1,14 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { createClient } from '@/app/utils/supabase/client';
-import {
-  fetchLocallyMembershipSummary,
-  type LocallyMembershipSummary,
-} from '@/app/utils/memberStatus';
+import { useEffect, useState } from 'react';
+import type { LocallyMembershipSummary } from '@/app/utils/memberStatus';
 
 export function useLocallyMembership(userId: string | null | undefined) {
-  const supabase = useMemo(() => createClient(), []);
   const [membership, setMembership] = useState<LocallyMembershipSummary | null>(null);
   const [resolvedUserId, setResolvedUserId] = useState<string | null>(null);
 
@@ -19,7 +14,14 @@ export function useLocallyMembership(userId: string | null | undefined) {
       return;
     }
 
-    void fetchLocallyMembershipSummary(supabase, userId)
+    void fetch('/api/account/membership', { cache: 'no-store' })
+      .then(async (response) => {
+        const result = await response.json() as { success?: boolean; membership?: LocallyMembershipSummary; error?: string };
+        if (!response.ok || !result.success || !result.membership) {
+          throw new Error(result.error || 'Failed to resolve membership.');
+        }
+        return result.membership;
+      })
       .then((summary) => {
         if (!cancelled) {
           setMembership(summary);
@@ -36,7 +38,7 @@ export function useLocallyMembership(userId: string | null | undefined) {
     return () => {
       cancelled = true;
     };
-  }, [supabase, userId]);
+  }, [userId]);
 
   return {
     membership: resolvedUserId === userId ? membership : null,
