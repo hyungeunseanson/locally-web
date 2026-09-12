@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useChat } from '@/app/hooks/useChat';
+import { CHAT_IMAGE_ATTACHMENTS_ENABLED } from '@/app/utils/chatAttachmentPolicy';
 import Spinner from '@/app/components/ui/Spinner';
 import { Send, User, Loader2, ImagePlus, ArrowLeft, MessageCircle } from 'lucide-react';
 import Image from 'next/image';
@@ -692,14 +693,18 @@ function InboxContent() {
                   </div>
                 )}
                 <div className="flex items-end gap-1.5 md:gap-3">
-                <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isSending || selectedInquiry.id === 'new'}
-                  className="h-8 w-8 md:h-10 md:w-10 flex items-center justify-center bg-gray-100 text-gray-500 rounded-full hover:bg-gray-200 transition-colors shrink-0 disabled:opacity-30"
-                >
-                  <ImagePlus className="w-[14px] h-[14px] md:w-4 md:h-4" />
-                </button>
+                {CHAT_IMAGE_ATTACHMENTS_ENABLED && (
+                  <>
+                    <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isSending || selectedInquiry.id === 'new'}
+                      className="h-8 w-8 md:h-10 md:w-10 flex items-center justify-center bg-gray-100 text-gray-500 rounded-full hover:bg-gray-200 transition-colors shrink-0 disabled:opacity-30"
+                    >
+                      <ImagePlus className="w-[14px] h-[14px] md:w-4 md:h-4" />
+                    </button>
+                  </>
+                )}
 
                 <textarea
                   ref={composerRef}

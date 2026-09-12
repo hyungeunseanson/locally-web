@@ -1,6 +1,12 @@
 import { after } from 'next/server';
 
 import {
+  CHAT_IMAGE_ATTACHMENTS_ENABLED,
+  CHAT_IMAGE_ATTACHMENTS_UNAVAILABLE_MESSAGE,
+  isChatImageAttachmentRequest,
+} from '@/app/utils/chatAttachmentPolicy';
+
+import {
   ACTIVE_CHAT_POLICY_SIGNAL_CATEGORIES,
   CHAT_POLICY_SIGNAL_LABELS,
   detectChatPolicySignals,
@@ -670,6 +676,9 @@ export async function createInquiryMessage(params: {
   body: InquiryMessageRequestBody;
 }) {
   const { actor, body } = params;
+  if (!CHAT_IMAGE_ATTACHMENTS_ENABLED && isChatImageAttachmentRequest(body)) {
+    throw new InquiryThreadError(400, CHAT_IMAGE_ATTACHMENTS_UNAVAILABLE_MESSAGE);
+  }
   const supabaseAdmin = createAdminClient();
   const inquiryId = body.inquiryId != null ? String(body.inquiryId) : '';
   const cleanContent = sanitizeText(body.content || '').trim();
@@ -938,6 +947,9 @@ export async function upsertInquiryThread(params: {
   body: InquiryThreadRequestBody;
 }) {
   const { actor, body } = params;
+  if (!CHAT_IMAGE_ATTACHMENTS_ENABLED && isChatImageAttachmentRequest(body)) {
+    throw new InquiryThreadError(400, CHAT_IMAGE_ATTACHMENTS_UNAVAILABLE_MESSAGE);
+  }
   const supabaseAdmin = createAdminClient();
   const contextType = body.contextType;
   const cleanMessage = sanitizeText(body.message || '').trim();

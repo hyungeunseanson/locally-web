@@ -6,6 +6,7 @@ import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 import { useNotification } from '@/app/context/NotificationContext';
 import { sanitizeText } from '@/app/utils/sanitize';
+import { CHAT_IMAGE_ATTACHMENTS_ENABLED, CHAT_IMAGE_ATTACHMENTS_UNAVAILABLE_MESSAGE } from '@/app/utils/chatAttachmentPolicy';
 import { compressImage, sanitizeFileName, validateImage, isHeicValidationResult } from '@/app/utils/image';
 import {
   getInquiryMessageDisplayContent,
@@ -396,6 +397,11 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   }, [refreshSelectedInquiryMessages]);
 
   const sendMessage = async (inquiryId: number | string, content: string, file?: File, senderId?: string) => {
+    if (!CHAT_IMAGE_ATTACHMENTS_ENABLED && file) {
+      showToast(CHAT_IMAGE_ATTACHMENTS_UNAVAILABLE_MESSAGE, 'error');
+      return;
+    }
+
     const cleanContent = sanitizeText(content);
     if (!cleanContent.trim() && !file) return;
 
