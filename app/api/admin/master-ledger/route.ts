@@ -129,7 +129,7 @@ export async function GET(request: Request) {
       let serviceBookingsQuery = supabaseAdmin
         .from('service_bookings')
         .select(
-          'id, order_id, request_id, application_id, customer_id, host_id, amount, created_at, status, host_payout_amount, platform_revenue, payout_status'
+          'id, order_id, request_id, application_id, customer_id, host_id, amount, created_at, status, host_payout_amount, host_compensation_amount, refund_amount, platform_revenue, payout_status'
         )
         .order('created_at', { ascending: false });
       if (hasDateFilter && filteredServiceRequests && filteredServiceRequestIds.length > 0) {

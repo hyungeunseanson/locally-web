@@ -115,13 +115,13 @@ const ko: HelpFaqLocaleContent = {
         {
           id: 'bank-deadline',
           q: '무통장 입금은 언제까지 해야 하나요?',
-          a: '입금 마감 시간은 주문별 결제 페이지에 표시된 시간이 기준입니다. 체험은 보통 예약 후 2시간, 맞춤 서비스는 보통 1시간 안에 입금하지 않으면 자동 취소됩니다.',
+          a: '입금 마감 시간은 주문별 결제 페이지에 표시된 시간이 기준입니다. 체험은 보통 예약 후 2시간 안에 입금하지 않으면 자동 취소됩니다. 맞춤 서비스는 1시간 이내 입금을 요청드리며, 미입금 건은 현지 담당자가 확인 후 안내합니다.',
           searchTerms: ['입금', '무통장', '입금 마감', '입금 대기', '은행 이체'],
         },
         {
           id: 'when-confirmed',
           q: '결제 후 예약은 언제 확정되나요?',
-          a: '카드 결제는 결제 검증이 끝나면 바로 다음 단계로 넘어가고, 무통장 입금은 입금 확인 뒤 상태가 바뀝니다. 체험은 예약 확정으로, 맞춤 서비스는 호스트 모집 시작으로 이어집니다.',
+          a: '카드 결제는 검증 직후, 무통장 입금은 입금 확인 후 다음 단계로 넘어갑니다. 맞춤 서비스는 현지 담당자 1:1 문의가 자동으로 생성되고 호스트 배정이 시작됩니다.',
           searchTerms: ['예약 확정', '결제 후', '상태 변경', '입금 확인', 'confirmed'],
         },
         {
@@ -146,7 +146,7 @@ const ko: HelpFaqLocaleContent = {
         {
           id: 'when-chat-opens',
           q: '호스트와는 언제부터 메시지를 주고받나요?',
-          a: '체험은 예약이 확정되면 호스트와의 메시지방이 열립니다. 맞춤 서비스는 매칭이 완료된 뒤 선택한 호스트와 메시지함에서 바로 조율할 수 있습니다.',
+          a: '체험은 예약이 확정되면 호스트와의 메시지방이 열립니다. 맞춤 서비스는 결제 후 현지 담당자 1:1 문의가 먼저 열리고, 현지 담당자가 호스트를 배정하면 별도의 고객-호스트 메시지방이 열립니다.',
           searchTerms: ['메시지', '채팅', '호스트 연락', '대화방', 'inbox'],
         },
         {
@@ -226,31 +226,31 @@ const ko: HelpFaqLocaleContent = {
         {
           id: 'service-flow',
           q: '맞춤 서비스는 어떤 순서로 진행되나요?',
-          a: '의뢰서를 작성하고 결제를 마치면 호스트 모집이 시작되고, 지원자를 비교한 뒤 한 명을 선택하면 매칭이 확정됩니다. 이후 세부 조율은 메시지함에서 이어집니다.',
+          a: '일정과 요청 내용을 작성하고 결제하면 현지 담당자 1:1 문의로 그대로 전달됩니다. 로컬리가 조건을 확인해 호스트를 직접 배정하고, 배정 후 호스트 전용 문의에서 조율합니다.',
           searchTerms: ['맞춤 서비스', '의뢰 순서', '서비스 흐름', 'request flow'],
         },
         {
           id: 'pay-right-away',
           q: '왜 의뢰 등록 직후 바로 결제해야 하나요?',
-          a: '결제가 완료된 의뢰만 실제 모집이 열리기 때문입니다. 호스트 입장에서도 결제된 요청이라는 전제가 있어야 일정과 시간을 들여 지원할 수 있습니다.',
+          a: '결제가 완료되면 현지 담당자가 실제 요청으로 확인하고 1:1 문의에서 호스트 배정을 시작할 수 있기 때문입니다.',
           searchTerms: ['바로 결제', '즉시 결제', '의뢰 등록', '선결제'],
         },
         {
           id: 'what-to-write',
-          q: '어떤 내용을 써야 호스트 지원이 잘 모이나요?',
-          a: '도시, 날짜, 시작 시간, 필요한 언어, 목적, 원하는 동행 범위를 구체적으로 적어주세요. 병원 통역인지 쇼핑 동행인지처럼 상황이 분명할수록 더 잘 맞는 호스트가 빨리 모입니다.',
+          q: '정확한 배정을 위해 어떤 내용을 써야 하나요?',
+          a: '도시, 날짜별 시작 시각과 이용 시간, 필요 언어, 목적, 원하는 동행·통역 범위를 구체적으로 적어 주세요. 현지 담당자가 조건에 맞는 호스트를 배정하는 데 사용합니다.',
           searchTerms: ['상세 설명', '지원 메시지', '호스트 지원', '의뢰 내용', 'description'],
         },
         {
           id: 'why-min-4h',
-          q: '최소 이용시간 4시간 규칙은 왜 있나요?',
-          a: '현재 맞춤 서비스의 가격 계산과 매칭 기준이 4시간 이상 단위로 설계되어 있기 때문입니다. 너무 짧은 요청보다 실제 이동과 조율이 가능한 단위로 맞추려는 운영 기준이라고 보시면 됩니다.',
-          searchTerms: ['4시간', '최소 이용시간', 'minimum 4h', '서비스 시간'],
+          q: '이용시간은 어떻게 입력하나요?',
+          a: '날짜별 3~24시간으로 입력하고 여러 날짜를 추가할 수 있습니다. 총 168시간까지 가능하므로 40시간 이용도 그대로 신청하면 됩니다.',
+          searchTerms: ['3시간', '24시간', '40시간', '168시간', '최소 이용시간', '서비스 시간'],
         },
         {
           id: 'request-private-before-pay',
           q: '결제 전까지 내 의뢰는 공개되나요?',
-          a: '아니요. 결제가 확인되기 전에는 모집이 열리지 않고, 의뢰 상세에서도 결제가 필요하다는 상태로 보입니다. 결제 완료 뒤에야 호스트들이 지원할 수 있습니다.',
+          a: '아니요. 의뢰는 공개 목록에 노출되지 않습니다. 결제 후에도 현지 담당자가 1:1 문의에서 확인한 뒤 적합한 호스트에게만 개별 연락합니다.',
           searchTerms: ['공개', '모집 시작', '결제 전', 'request private'],
         },
       ],
@@ -263,7 +263,7 @@ const ko: HelpFaqLocaleContent = {
         {
           id: 'escrow-protection',
           q: '에스크로 선결제는 어떻게 보호되나요?',
-          a: '서비스 결제금은 바로 호스트에게 넘어가지 않고, 매칭 전까지 안전하게 보관됩니다. 호스트를 선택하지 않으면 전액 환불 기준이 적용됩니다.',
+          a: '서비스 결제금은 바로 호스트에게 넘어가지 않습니다. 호스트 배정 전 취소는 전액 환불을 원칙으로 하고, 배정 후에는 고객 환불과 호스트 보상을 따로 검토합니다.',
           searchTerms: ['에스크로', '선결제', '보호', 'escrow', '안전 결제'],
         },
         {
@@ -274,20 +274,20 @@ const ko: HelpFaqLocaleContent = {
         },
         {
           id: 'no-hosts-apply',
-          q: '호스트가 아무도 지원하지 않으면 어떻게 되나요?',
-          a: '결제가 끝난 의뢰는 열린 상태로 유지되며, 지원자가 들어오면 이 화면에서 바로 비교할 수 있습니다. 끝까지 호스트를 선택하지 않으면 결제금은 에스크로 기준에 따라 보호됩니다.',
+          q: '호스트 배정이 늦어지면 어떻게 되나요?',
+          a: '현지 담당자가 1:1 문의에서 진행 상태와 대안을 안내합니다. 호스트 배정 전에 취소하면 전액 환불을 원칙으로 합니다.',
           searchTerms: ['지원자 없음', '호스트 없음', '아무도 지원 안 함', 'no applicants'],
         },
         {
           id: 'how-to-choose-host',
-          q: '여러 지원자 중 누구를 어떻게 선택하나요?',
-          a: '지원 메시지, 가능한 언어, 후기, 소개를 함께 비교하면 됩니다. 가장 잘 맞는 한 명을 선택하면 매칭이 확정되고 그다음 조율은 바로 메시지함으로 이어집니다.',
+          q: '호스트는 누가 선정하나요?',
+          a: '로컬리 현지 담당자가 지역, 언어, 일정, 인원, 요청 내용과 호스트의 경력·기존 예약을 확인해 직접 배정합니다. 고객이 지원자 목록을 비교할 필요는 없습니다.',
           searchTerms: ['호스트 선택', '지원자 비교', '후기 비교', 'select host'],
         },
         {
           id: 'refund-without-selection',
-          q: '호스트를 선택하지 않으면 환불은 어떻게 되나요?',
-          a: '선택이 끝나지 않은 상태에서는 결제금이 바로 소진되지 않습니다. 결국 호스트를 선택하지 않기로 하면, 현재 서비스 결제 흐름 기준으로 전액 환불이 가능합니다.',
+          q: '호스트 배정 전에 취소하면 환불은 어떻게 되나요?',
+          a: '호스트 배정 전에는 전액 환불을 원칙으로 합니다. 카드·PayPal은 결제사 결과를 확인하고, 무통장 입금은 담당자가 이체를 완료한 뒤 상태를 마감합니다.',
           searchTerms: ['전액 환불', '호스트 미선택', '선택 안 함', 'refund without host'],
         },
         {
@@ -530,31 +530,31 @@ const ko: HelpFaqLocaleContent = {
     },
     {
       id: 'host-jobs',
-      label: '서비스 잡보드',
+      label: '맞춤 서비스 배정',
       icon: 'jobs',
       items: [
         {
           id: 'which-requests-show',
-          q: '어떤 의뢰만 잡보드에 보이나요?',
-          a: '현재 열려 있고 실제 지원 가능한 의뢰만 잡보드에 표시됩니다. 날짜, 지역, 언어 조건이 맞지 않거나 이미 닫힌 요청은 여기서 보이지 않습니다.',
+          q: '호스트가 공개 의뢰를 보고 지원하나요?',
+          a: '아니요. 공개 잡보드와 지원 기능은 운영하지 않습니다. 현지 담당자가 고객 조건과 호스트 일정을 확인한 뒤 적합한 호스트에게 개별적으로 연락합니다.',
           searchTerms: ['잡보드', '열린 의뢰', '서비스 의뢰', 'open requests'],
         },
         {
           id: 'what-to-write-appeal',
-          q: '지원 메시지엔 무엇을 써야 하나요?',
-          a: '비슷한 경험, 가능한 언어, 지금 바로 도와줄 수 있는 이유를 짧고 분명하게 적는 편이 좋습니다. 막연한 인사보다 실제로 어떤 도움을 줄 수 있는지가 보이는 메시지가 더 잘 읽힙니다.',
+          q: '배정 연락을 받으면 무엇을 확인해야 하나요?',
+          a: '모든 날짜와 시간, 지역, 요청 범위, 필요 언어와 총 보수를 확인해 주세요. 현지 담당자는 이 내용을 호스트와 합의한 뒤에만 배정을 확정합니다.',
           searchTerms: ['지원 메시지', '어필', 'apply message', '서비스 지원'],
         },
         {
           id: 'after-selected',
-          q: '고객이 나를 선택하면 다음 단계는 무엇인가요?',
-          a: '선택되는 순간 매칭이 확정되고, 그다음 조율은 해당 의뢰 화면과 메시지함에서 이어집니다. 일정과 세부 요청을 확인하면서 실제 서비스 준비 단계로 넘어가면 됩니다.',
+          q: '현지 담당자가 배정을 확정하면 다음 단계는 무엇인가요?',
+          a: '고객과 호스트 전용 메시지가 열립니다. 그곳에서 만날 장소, 준비물, 세부 동선을 확인하고 서비스를 준비하면 됩니다.',
           searchTerms: ['선택됨', '매칭 확정', 'selected', 'next step'],
         },
         {
           id: 'not-selected',
-          q: '선택되지 않으면 어떻게 표시되나요?',
-          a: '이번에는 선택되지 않았다는 상태로 정리됩니다. 이미 남긴 지원 메시지는 기록으로 남지만, 그 의뢰에 대한 다음 단계는 더 이어지지 않습니다.',
+          q: '일정이나 조건이 맞지 않으면 어떻게 하나요?',
+          a: '배정 확정 전에 현지 담당자에게 어렵다고 알려 주세요. 합의 없이 배정하지 않으며, 현지 담당자가 다른 호스트를 확인합니다.',
           searchTerms: ['선택되지 않음', 'rejected', '미선택', 'not selected'],
         },
         {
@@ -710,13 +710,13 @@ const en: HelpFaqLocaleContent = {
         {
           id: 'bank-deadline',
           q: 'How long do I have to complete a bank transfer?',
-          a: 'The deadline shown on your payment page is the rule for that order. Experiences are usually canceled after about 2 hours without payment, and custom services usually after about 1 hour.',
+          a: 'The deadline shown on your payment page is the rule for that order. Experiences are usually canceled after about 2 hours without payment. For custom services, please pay within 1 hour; if payment is not received, your local coordinator will review the request and contact you.',
           searchTerms: ['deposit deadline', 'bank transfer deadline', 'payment pending', 'deposit'],
         },
         {
           id: 'when-confirmed',
           q: 'When is my booking confirmed after payment?',
-          a: 'Card payments move to the next step once payment verification finishes, while bank transfer moves after the deposit is confirmed. Experiences become confirmed bookings, and custom services move into host recruitment.',
+          a: 'Card payments move on after verification, while bank transfers move on after the deposit is confirmed. For custom services, a private local coordinator chat opens and host assignment begins.',
           searchTerms: ['confirmed', 'after payment', 'status', 'payment confirmed'],
         },
         {
@@ -741,7 +741,7 @@ const en: HelpFaqLocaleContent = {
         {
           id: 'when-chat-opens',
           q: 'When can I start messaging the host?',
-          a: 'For experiences, the chat opens once the booking is confirmed. For custom services, the direct coordination starts after you choose a host and the match is complete.',
+          a: 'For experiences, chat opens once the booking is confirmed. For custom services, private local coordinator support opens after payment, followed by a separate customer-host chat once the local coordinator assigns a host.',
           searchTerms: ['message host', 'chat', 'inbox', 'when chat opens'],
         },
         {
@@ -821,31 +821,31 @@ const en: HelpFaqLocaleContent = {
         {
           id: 'service-flow',
           q: 'What is the flow for a custom service request?',
-          a: 'You write the request, complete payment, wait for host applications, compare applicants, and choose one host to confirm the match. After that, the detailed coordination continues in the inbox.',
+          a: 'Enter your schedule and needs, then complete payment. The form is delivered to a private local coordinator chat, and Locally reviews the conditions and directly assigns a suitable host.',
           searchTerms: ['custom service', 'flow', 'service request', 'matching flow'],
         },
         {
           id: 'pay-right-away',
           q: 'Why do I need to pay right after submitting the request?',
-          a: 'Only paid requests are opened to hosts for real applications. That payment step signals that the schedule and request are ready for hosts to review seriously.',
+          a: 'Payment confirms that the request is ready for the operations team to review. It opens the private local coordinator chat and starts direct host coordination.',
           searchTerms: ['pay right away', 'submit request', 'upfront payment'],
         },
         {
           id: 'what-to-write',
-          q: 'What should I include so hosts are more likely to apply?',
-          a: 'Be specific about the city, date, start time, required languages, your goal, and the kind of support you need. The clearer the situation is, the easier it is for the right host to apply quickly.',
+          q: 'What should I include for an accurate assignment?',
+          a: 'Be specific about the city, every date and start time, required languages, your goal, and the kind of support you need. This helps the local coordinator assign the best-fit host.',
           searchTerms: ['what to write', 'description', 'host applications', 'request details'],
         },
         {
           id: 'why-min-4h',
-          q: 'Why is there a 4-hour minimum?',
-          a: 'The current pricing and matching flow for custom services is designed around requests of at least 4 hours. It keeps the request realistic for travel time, coordination, and host availability.',
-          searchTerms: ['4 hours', 'minimum', 'minimum duration'],
+          q: 'How do I enter service hours?',
+          a: 'Enter 3–24 hours for each date and add as many dates as needed, up to 168 hours total. A 40-hour request is fully supported.',
+          searchTerms: ['3 hours', '24 hours', '40 hours', '168 hours', 'minimum duration'],
         },
         {
           id: 'request-private-before-pay',
           q: 'Is my request public before I pay?',
-          a: 'No. Before payment is confirmed, the request stays closed and appears as waiting for payment. Hosts can only apply after the payment is complete.',
+          a: 'No. Requests are never published on a public job board. After payment, a local coordinator contacts only suitable hosts individually.',
           searchTerms: ['public before payment', 'closed request', 'payment required'],
         },
       ],
@@ -858,7 +858,7 @@ const en: HelpFaqLocaleContent = {
         {
           id: 'escrow-protection',
           q: 'How does the escrow payment protect me?',
-          a: 'The payment does not move directly to the host before matching is complete. It stays protected in the custom-service flow, and if you do not choose a host, the payment can be fully refunded.',
+          a: 'The payment does not move directly to the host. Cancellations before host assignment are fully refundable in principle; after assignment, customer refund and host compensation are reviewed separately.',
           searchTerms: ['escrow', 'protected payment', 'safe payment'],
         },
         {
@@ -869,20 +869,20 @@ const en: HelpFaqLocaleContent = {
         },
         {
           id: 'no-hosts-apply',
-          q: 'What happens if no hosts apply?',
-          a: 'A paid request stays open for applications, and you can return to the request page to track progress. If no host is ultimately chosen, the payment remains protected under the escrow rule.',
+          q: 'What if host assignment takes longer?',
+          a: 'The local coordinator shares progress and alternatives in private chat. Cancellations before host assignment are fully refundable in principle.',
           searchTerms: ['no hosts apply', 'no applicants', 'no applications'],
         },
         {
           id: 'how-to-choose-host',
-          q: 'How should I choose between multiple applicants?',
-          a: 'Compare their application message, languages, reviews, and introduction together. Once you choose the best fit, the match is confirmed and the next conversation continues in the inbox.',
+          q: 'Who chooses the host?',
+          a: 'Locally reviews the location, languages, schedule, group size, request details, host experience, and existing bookings, then directly assigns the best fit.',
           searchTerms: ['choose host', 'compare applicants', 'select host'],
         },
         {
           id: 'refund-without-selection',
-          q: 'What happens to the refund if I do not choose a host?',
-          a: 'If no host is selected, the payment is not treated as a completed host match. In the current custom-service flow, that means the payment remains eligible for a full refund.',
+          q: 'What happens if I cancel before host assignment?',
+          a: 'Cancellations before host assignment are fully refundable in principle. Card and PayPal results are verified with the provider; bank refunds are closed after an admin confirms the transfer.',
           searchTerms: ['refund without host', 'no host selected', 'full refund'],
         },
         {
@@ -1125,31 +1125,31 @@ const en: HelpFaqLocaleContent = {
     },
     {
       id: 'host-jobs',
-      label: 'Service job board',
+      label: 'Custom service assignments',
       icon: 'jobs',
       items: [
         {
           id: 'which-requests-show',
-          q: 'Which requests appear in the job board?',
-          a: 'Only requests that are currently open and realistically available to apply for are shown. If the timing, area, or language needs do not fit, or the request is already closed, it will not show here.',
+          q: 'Do hosts browse and apply to public requests?',
+          a: 'No. There is no public job board or host application flow. A local coordinator reviews the customer’s needs and host schedules, then contacts suitable hosts individually.',
           searchTerms: ['job board', 'open requests', 'service jobs'],
         },
         {
           id: 'what-to-write-appeal',
-          q: 'What should I include in my application message?',
-          a: 'It helps to mention similar experience, the languages you can support, and why you can help right now. A concrete message usually works better than a generic greeting.',
+          q: 'What should I confirm when a local coordinator contacts me?',
+          a: 'Confirm every date and time, location, service scope, required languages, and total compensation. The local coordinator finalizes the assignment only after agreement.',
           searchTerms: ['application message', 'appeal', 'apply', 'service application'],
         },
         {
           id: 'after-selected',
-          q: 'What happens after the guest selects me?',
-          a: 'The match becomes confirmed, and the next stage continues through the request detail and inbox. From there, you can move into the real coordination and delivery stage.',
+          q: 'What happens after the local coordinator confirms my assignment?',
+          a: 'A dedicated customer-host conversation opens. Use it to confirm the meeting point, preparation, and detailed itinerary.',
           searchTerms: ['selected', 'matched', 'next step'],
         },
         {
           id: 'not-selected',
-          q: 'How is it shown if I am not selected?',
-          a: 'It is shown as not selected for that request. Your application history remains there, but no further service step continues for that request.',
+          q: 'What if the schedule or terms do not work for me?',
+          a: 'Tell the local coordinator before assignment is confirmed. You will not be assigned without agreement, and the local coordinator will contact another host.',
           searchTerms: ['not selected', 'rejected', 'application result'],
         },
         {
@@ -1305,13 +1305,13 @@ const ja: HelpFaqLocaleContent = {
         {
           id: 'bank-deadline',
           q: '銀行振込はいつまでに行えばいいですか？',
-          a: '振込期限は、その注文の決済ページに表示された時間が基準です。体験は通常予約後2時間ほど、カスタムサービスは通常1時間ほどで未入金なら自動キャンセルになります。',
+          a: '振込期限は、その注文の決済ページに表示された時間が基準です。体験は通常予約後2時間ほどで未入金なら自動キャンセルになります。カスタムサービスは1時間以内にお振り込みください。未入金の場合は現地担当者が確認のうえご案内します。',
           searchTerms: ['入金', '振込期限', '入金待ち', '銀行振込'],
         },
         {
           id: 'when-confirmed',
           q: '決済後、予約はいつ確定しますか？',
-          a: 'カード決済は決済確認が終わると次の段階へ進み、銀行振込は入金確認後に状態が変わります。体験は予約確定に、カスタムサービスはホスト募集開始へつながります。',
+          a: 'カード決済は確認直後、銀行振込は入金確認後に次の段階へ進みます。カスタムサービスは1:1お問い合わせが自動作成され、ホスト手配が始まります。',
           searchTerms: ['予約確定', '決済後', '状態変更', '確認'],
         },
         {
@@ -1336,7 +1336,7 @@ const ja: HelpFaqLocaleContent = {
         {
           id: 'when-chat-opens',
           q: 'ホストとはいつからメッセージできますか？',
-          a: '体験は予約が確定するとメッセージルームが開きます。カスタムサービスは、ホストを選んでマッチングが確定したあとに本格的な調整が始まります。',
+          a: '体験は予約確定後にメッセージルームが開きます。カスタムサービスは決済後に現地担当者との1:1お問い合わせが開き、ホスト手配後に別のお客様・ホスト用メッセージが開きます。',
           searchTerms: ['メッセージ', 'チャット', 'ホスト連絡', 'inbox'],
         },
         {
@@ -1416,31 +1416,31 @@ const ja: HelpFaqLocaleContent = {
         {
           id: 'service-flow',
           q: 'カスタムサービスはどんな順番で進みますか？',
-          a: '依頼を書いて決済を済ませるとホスト募集が始まり、応募者を比較して1人選ぶとマッチング確定になります。その後の細かい調整はメッセージボックスで続きます。',
+          a: '日程と依頼内容を入力して決済すると、内容が現地担当者との1:1お問い合わせへ送られます。Locallyが条件を確認してホストを直接手配します。',
           searchTerms: ['カスタムサービス', '流れ', '依頼', 'matching'],
         },
         {
           id: 'pay-right-away',
           q: 'なぜ依頼登録の直後に決済が必要なのですか？',
-          a: '実際にホスト募集が開くのは、決済済みの依頼だけだからです。ホスト側も、決済された依頼であることが分かって初めて本気で応募しやすくなります。',
+          a: '決済によって運営チームが依頼確認を開始できます。現地担当者との1:1お問い合わせが開き、ホストの個別手配が始まります。',
           searchTerms: ['すぐ決済', '依頼登録', '先払い'],
         },
         {
           id: 'what-to-write',
-          q: 'どんな内容を書けばホストが集まりやすいですか？',
-          a: '都市、日付、開始時間、必要な言語、目的、どこまで同行や通訳が必要かを具体的に書いてください。状況がはっきりしているほど、合うホストが早く集まりやすくなります。',
+          q: '正確な手配のために何を書けばいいですか？',
+          a: '都市、各日の日付と開始時間、必要な言語、目的、同行や通訳の範囲を具体的に書いてください。現地担当者が最適なホストを手配しやすくなります。',
           searchTerms: ['詳細説明', '応募が集まる', '依頼内容', 'description'],
         },
         {
           id: 'why-min-4h',
-          q: '最低4時間ルールがあるのはなぜですか？',
-          a: '現在のカスタムサービスは、価格計算とマッチング基準が4時間以上の依頼を前提に設計されています。移動や調整を含めて、現実的に成立しやすい単位にそろえるためです。',
-          searchTerms: ['4時間', '最低時間', 'minimum'],
+          q: '利用時間はどのように入力しますか？',
+          a: '1日3～24時間で複数の日付を追加でき、合計168時間まで申請できます。40時間の長期利用にも対応しています。',
+          searchTerms: ['3時間', '24時間', '40時間', '168時間', '最低時間'],
         },
         {
           id: 'request-private-before-pay',
           q: '決済前の依頼は公開されますか？',
-          a: 'いいえ。決済が確認されるまでは募集が開かず、依頼詳細でも支払いが必要な状態として表示されます。ホストが応募できるのは決済完了後です。',
+          a: 'いいえ。依頼は公開一覧に掲載されません。決済後も現地担当者が内容を確認し、適切なホストだけに個別に連絡します。',
           searchTerms: ['公開', '決済前', '募集開始'],
         },
       ],
@@ -1453,7 +1453,7 @@ const ja: HelpFaqLocaleContent = {
         {
           id: 'escrow-protection',
           q: 'エスクロー事前決済はどう守られていますか？',
-          a: 'サービス代金は、マッチング完了前にそのままホストへ渡るわけではありません。ホストを選ばなければ、現在のフローでは全額返金の対象になります。',
+          a: 'サービス代金はそのままホストへ渡りません。ホスト手配前のキャンセルは原則全額返金で、手配後はお客様への返金とホスト補償を分けて確認します。',
           searchTerms: ['エスクロー', '事前決済', '保護', '安全決済'],
         },
         {
@@ -1464,20 +1464,20 @@ const ja: HelpFaqLocaleContent = {
         },
         {
           id: 'no-hosts-apply',
-          q: 'ホストが誰も応募しない場合はどうなりますか？',
-          a: '決済済みの依頼は募集が開いた状態で維持され、応募が来ればこの画面で比較できます。最終的にホストを選ばなければ、支払いはエスクロー基準で保護されます。',
+          q: 'ホスト手配に時間がかかる場合はどうなりますか？',
+          a: '現地担当者が1:1お問い合わせで進捗と代替案をご案内します。ホスト手配前にキャンセルする場合は原則全額返金です。',
           searchTerms: ['応募者なし', 'ホストなし', 'no applicants'],
         },
         {
           id: 'how-to-choose-host',
-          q: '複数の応募者からどう選べばいいですか？',
-          a: '応募メッセージ、対応言語、レビュー、紹介文を一緒に比較するのがおすすめです。相性の良い1人を選ぶとマッチングが確定し、その後の会話はメッセージボックスへ続きます。',
+          q: 'ホストは誰が選びますか？',
+          a: 'Locallyが地域、言語、日程、人数、依頼内容、ホストの経験と既存予約を確認して直接手配します。お客様が応募者を比較する必要はありません。',
           searchTerms: ['ホスト選択', '応募者比較', 'select host'],
         },
         {
           id: 'refund-without-selection',
-          q: 'ホストを選ばなかった場合、返金はどうなりますか？',
-          a: 'ホスト選択が完了していない状態では、支払いが確定マッチングとして消化されません。現在のカスタムサービス基準では、ホスト未選択なら全額返金が可能です。',
+          q: 'ホスト手配前にキャンセルした場合、返金はどうなりますか？',
+          a: '原則全額返金です。カード・PayPalは決済会社の結果を確認し、銀行振込はスタッフが実際の返金振込を完了してから状態を確定します。',
           searchTerms: ['全額返金', 'ホスト未選択', 'refund'],
         },
         {
@@ -1720,31 +1720,31 @@ const ja: HelpFaqLocaleContent = {
     },
     {
       id: 'host-jobs',
-      label: 'サービスジョブボード',
+      label: 'カスタムサービスの手配',
       icon: 'jobs',
       items: [
         {
           id: 'which-requests-show',
-          q: 'ジョブボードにはどんな依頼だけが表示されますか？',
-          a: '現在開いていて、実際に応募可能な依頼だけが表示されます。日程、地域、言語条件が合わないものや、すでに閉じた依頼はここには出ません。',
+          q: 'ホストが公開依頼を見て応募する仕組みですか？',
+          a: 'いいえ。公開ジョブボードと応募機能はありません。現地担当者がお客様の条件とホストの日程を確認し、適切なホストへ個別に連絡します。',
           searchTerms: ['ジョブボード', '開いている依頼', 'service jobs'],
         },
         {
           id: 'what-to-write-appeal',
-          q: '応募メッセージには何を書けばいいですか？',
-          a: '似た経験、対応できる言語、今すぐどう役立てるかを具体的に書くのが効果的です。一般的なあいさつだけより、できることが見える文章のほうが選ばれやすいです。',
+          q: '手配の連絡を受けたら何を確認しますか？',
+          a: 'すべての日付と時間、地域、依頼範囲、必要な言語、合計報酬を確認してください。合意後にのみ手配が確定します。',
           searchTerms: ['応募メッセージ', 'アピール', 'apply message'],
         },
         {
           id: 'after-selected',
-          q: 'ゲストに選ばれたあとは何が起こりますか？',
-          a: '選ばれた瞬間にマッチングが確定し、その後は依頼詳細とメッセージボックスで次のやり取りが続きます。そこから実際の調整と準備へ進んでいきます。',
+          q: 'スタッフが手配を確定した後はどうなりますか？',
+          a: 'お客様とホスト専用のメッセージが開きます。集合場所、準備物、詳しい行程をそこで確認してください。',
           searchTerms: ['選ばれた', 'マッチング確定', 'next step'],
         },
         {
           id: 'not-selected',
-          q: '選ばれなかった場合はどう表示されますか？',
-          a: 'その依頼に対して今回は選ばれなかった状態として表示されます。応募履歴は残りますが、その依頼で次のサービス段階へは進みません。',
+          q: '日程や条件が合わない場合はどうしますか？',
+          a: '手配確定前に現地担当者へお知らせください。合意なく手配されることはなく、現地担当者が別のホストを確認します。',
           searchTerms: ['選ばれない', '不採用', 'not selected'],
         },
         {
@@ -1900,13 +1900,13 @@ const zh: HelpFaqLocaleContent = {
         {
           id: 'bank-deadline',
           q: '银行转账最晚什么时候要完成？',
-          a: '以该订单支付页面显示的截止时间为准。体验通常是预订后约2小时未入金自动取消，定制服务通常是约1小时未入金自动取消。',
+          a: '以该订单支付页面显示的截止时间为准。体验通常在预订后约2小时未入金时自动取消。定制服务请在1小时内完成转账；若未到账，当地负责人确认后会与您联系。',
           searchTerms: ['入金', '银行转账', '截止时间', '等待入金'],
         },
         {
           id: 'when-confirmed',
           q: '支付后预订什么时候算确认？',
-          a: '银行卡支付在支付验证完成后会进入下一步，银行转账则会在确认入金后更新状态。体验会变成“预订确认”，定制服务则会进入“招募房东”。',
+          a: '银行卡支付验证后、银行转账确认入金后会进入下一步。定制服务会自动创建当地负责人一对一咨询并开始安排向导。',
           searchTerms: ['预订确认', '支付后', '状态更新', 'confirmed'],
         },
         {
@@ -1931,7 +1931,7 @@ const zh: HelpFaqLocaleContent = {
         {
           id: 'when-chat-opens',
           q: '什么时候可以开始和房东发消息？',
-          a: '体验会在预订确认后打开和房东的消息对话。定制服务则是在你选择房东、匹配完成后，才会进入真正的协调阶段。',
+          a: '体验预订确认后会打开向导对话。定制服务付款后先打开当地负责人一对一咨询，当地负责人安排向导后再打开独立的客户与向导对话。',
           searchTerms: ['消息', '聊天', '联系房东', 'inbox'],
         },
         {
@@ -2011,31 +2011,31 @@ const zh: HelpFaqLocaleContent = {
         {
           id: 'service-flow',
           q: '定制服务会按照什么顺序进行？',
-          a: '提交需求并完成支付后，会开始招募房东；你比较申请者并选择1位后，匹配才正式确认。之后的细节沟通会继续在消息箱里进行。',
+          a: '填写日程与需求并付款后，内容会直接发送到当地负责人一对一咨询。Locally核对条件后会直接安排合适的向导。',
           searchTerms: ['定制服务', '流程', '服务需求', 'matching'],
         },
         {
           id: 'pay-right-away',
           q: '为什么提交需求后要立刻支付？',
-          a: '因为只有已支付的需求才会真正对房东开放招募。对房东来说，确认这是一笔已付款的真实需求后，才更容易认真投入申请。',
+          a: '付款代表需求已准备好由运营团队审核，同时会打开当地负责人一对一咨询并开始单独协调向导。',
           searchTerms: ['立刻支付', '先支付', '提交需求'],
         },
         {
           id: 'what-to-write',
-          q: '写哪些内容更容易让房东来申请？',
-          a: '建议明确写出城市、日期、开始时间、需要语言、目的，以及希望房东提供到什么范围的帮助。情况越具体，越容易更快匹配到合适的人。',
+          q: '为了准确安排向导，应填写哪些内容？',
+          a: '请明确填写城市、每个日期与开始时间、所需语言、目的和帮助范围，以便当地负责人安排最合适的向导。',
           searchTerms: ['写什么', '详细说明', '房东申请', 'description'],
         },
         {
           id: 'why-min-4h',
-          q: '为什么最少要4小时？',
-          a: '目前定制服务的价格计算和匹配逻辑，都是以至少4小时的需求为基础设计的。这样更符合实际移动、协调和房东安排的成本。',
-          searchTerms: ['4小时', '最少时长', 'minimum'],
+          q: '服务时长如何填写？',
+          a: '每天可填写3–24小时，并可添加多个日期，总计最多168小时。支持40小时的长期服务。',
+          searchTerms: ['3小时', '24小时', '40小时', '168小时', '最少时长'],
         },
         {
           id: 'request-private-before-pay',
           q: '付款前，我的需求会公开吗？',
-          a: '不会。在支付确认前，需求不会开启招募，在详情页里也只会显示为“需要支付”的状态。只有支付完成后，房东才可以申请。',
+          a: '不会。需求不会出现在公开列表中。付款后，当地负责人也只会单独联系合适的向导。',
           searchTerms: ['公开', '支付前', '招募开始'],
         },
       ],
@@ -2048,7 +2048,7 @@ const zh: HelpFaqLocaleContent = {
         {
           id: 'escrow-protection',
           q: '担保预支付是怎么保护我的？',
-          a: '这笔服务费用不会在匹配完成前直接转给房东。在当前流程里，如果你最终没有选择房东，款项可以按全额退款处理。',
+          a: '服务费不会直接转给向导。安排向导前取消原则上全额退款；安排后会分别审核客户退款与向导补偿。',
           searchTerms: ['担保支付', '托管', '保护', 'escrow'],
         },
         {
@@ -2059,20 +2059,20 @@ const zh: HelpFaqLocaleContent = {
         },
         {
           id: 'no-hosts-apply',
-          q: '如果一直没有房东申请，会怎么样？',
-          a: '已付款的需求会继续保持开放招募，你可以回到需求详情页查看进展。如果最终没有选定房东，付款仍会按担保规则受到保护。',
+          q: '如果安排向导需要更长时间怎么办？',
+          a: '当地负责人会在一对一咨询中说明进度和替代方案。安排向导前取消原则上全额退款。',
           searchTerms: ['没人申请', '房东没有申请', 'no applicants'],
         },
         {
           id: 'how-to-choose-host',
-          q: '多个申请者中应该怎么选？',
-          a: '可以一起比较申请留言、可用语言、评价和自我介绍。选定最合适的一位后，匹配会正式确认，后续沟通也会马上继续到消息箱。',
+          q: '由谁选择向导？',
+          a: 'Locally会核对地区、语言、日程、人数、需求、向导经验与现有预订后直接安排，无需客户比较申请者。',
           searchTerms: ['选择房东', '比较申请者', 'select host'],
         },
         {
           id: 'refund-without-selection',
-          q: '如果不选择房东，退款会怎么处理？',
-          a: '在没有完成房东选择之前，这笔付款不会被视为已完成匹配的服务支出。按照当前定制服务规则，未选择房东时可以全额退款。',
+          q: '安排向导前取消，退款如何处理？',
+          a: '原则上全额退款。银行卡和PayPal会核对支付方结果，银行转账则由当地负责人确认实际退款转账后结案。',
           searchTerms: ['未选择房东', '全额退款', 'refund'],
         },
         {
@@ -2315,31 +2315,31 @@ const zh: HelpFaqLocaleContent = {
     },
     {
       id: 'host-jobs',
-      label: '服务任务墙',
+      label: '定制服务安排',
       icon: 'jobs',
       items: [
         {
           id: 'which-requests-show',
-          q: '任务墙里只会显示哪些需求？',
-          a: '这里只会显示当前开放、而且你现实中确实还能申请的需求。时间、地区、语言条件不匹配，或已经关闭的需求，都不会继续出现在这里。',
+          q: '向导需要浏览并申请公开需求吗？',
+          a: '不需要。系统不再提供公开任务墙和申请流程。当地负责人会核对客户需求与向导日程，再单独联系合适的向导。',
           searchTerms: ['任务墙', '开放需求', 'service jobs'],
         },
         {
           id: 'what-to-write-appeal',
-          q: '申请留言里应该写什么？',
-          a: '建议写清楚类似经验、可支持的语言，以及你为什么现在就能帮上忙。比起泛泛打招呼，更具体的说明通常更容易被选中。',
+          q: '收到安排联系时要确认什么？',
+          a: '请确认所有日期和时间、地区、服务范围、所需语言及总报酬。双方同意后，当地负责人才会确认安排。',
           searchTerms: ['申请留言', '自荐', 'apply message'],
         },
         {
           id: 'after-selected',
-          q: '被客人选中后，接下来会发生什么？',
-          a: '一旦被选中，匹配就会正式确认，之后的流程会继续在需求详情页和消息箱里进行。接着就进入真正的沟通和服务准备阶段。',
+          q: '当地负责人确认安排后会发生什么？',
+          a: '系统会打开客户与向导的专属对话。请在其中确认集合地点、准备事项和详细行程。',
           searchTerms: ['被选中', '匹配确认', 'next step'],
         },
         {
           id: 'not-selected',
-          q: '如果没有被选中，会怎么显示？',
-          a: '系统会把该需求标记为本次未被选中。申请记录仍会保留，但不会再继续进入下一步服务流程。',
+          q: '如果日程或条件不合适怎么办？',
+          a: '请在确认安排前告知当地负责人。未经同意不会安排，当地负责人会联系其他向导。',
           searchTerms: ['未被选中', '落选', 'not selected'],
         },
         {

@@ -167,7 +167,21 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       const { data: inquiriesData, error } = await query;
       if (error) throw error;
 
-      const inquiryRows = (inquiriesData || []) as InquiryRow[];
+      const inquiryRows = [...((inquiriesData || []) as InquiryRow[])];
+      const deepLinkedInquiryId = typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('inquiryId')
+        : null;
+      if (deepLinkedInquiryId && !inquiryRows.some((item) => String(item.id) === deepLinkedInquiryId)) {
+        let exactQuery = supabase
+          .from('inquiries')
+          .select('id, user_id, host_id, experience_id, type, status, content, updated_at, experiences (id, title, photos, image_url, host_id)')
+          .eq('id', deepLinkedInquiryId);
+        exactQuery = role === 'guest'
+          ? exactQuery.eq('user_id', user.id)
+          : exactQuery.eq('host_id', user.id).eq('type', 'general');
+        const { data: exactInquiry } = await exactQuery.maybeSingle();
+        if (exactInquiry) inquiryRows.unshift(exactInquiry as InquiryRow);
+      }
       if (inquiryRows.length > 0) {
         const inquiryIds = inquiryRows.map((i) => i.id);
         const hostIds = Array.from(new Set(inquiryRows.map((item) => item.host_id).filter(Boolean))) as string[];

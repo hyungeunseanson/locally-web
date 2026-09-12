@@ -95,7 +95,22 @@ export async function POST(request: Request) {
     }
 
     if (serviceBooking.status === 'PAID' || serviceBooking.status === 'confirmed') {
-      return NextResponse.json({ success: true, message: 'Already processed' });
+      const { data: healed, error: healError } = await supabaseAdmin
+        .rpc('confirm_service_concierge_payment_atomic', {
+          p_order_id: serviceBooking.order_id,
+          p_payment_method: serviceBooking.payment_method || 'card',
+          p_tid: serviceBooking.tid,
+        })
+        .maybeSingle<{ support_inquiry_id: string }>();
+      if (healError || !healed?.support_inquiry_id) {
+        return NextResponse.json({ success: false, error: '현지 담당자 문의 연결을 복구하지 못했습니다.' }, { status: 500 });
+      }
+      return NextResponse.json({
+        success: true,
+        message: 'Already processed',
+        supportInquiryId: healed.support_inquiry_id,
+        redirectUrl: `/guest/inbox?inquiryId=${encodeURIComponent(healed.support_inquiry_id)}`,
+      });
     }
 
     if (serviceBooking.status !== 'PENDING') {
@@ -143,11 +158,24 @@ export async function POST(request: Request) {
     }
 
     if (confirmationResult.alreadyProcessed) {
-      return NextResponse.json({ success: true, message: 'Already processed' });
+      return NextResponse.json({
+        success: true,
+        message: 'Already processed',
+        supportInquiryId: confirmationResult.supportInquiryId,
+        redirectUrl: confirmationResult.supportInquiryId
+          ? `/guest/inbox?inquiryId=${encodeURIComponent(confirmationResult.supportInquiryId)}`
+          : `/services/${serviceBooking.request_id}`,
+      });
     }
 
     console.log(`✅ [SERVICE] Payment confirmed. Order: ${orderId}`);
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      supportInquiryId: confirmationResult.supportInquiryId,
+      redirectUrl: confirmationResult.supportInquiryId
+        ? `/guest/inbox?inquiryId=${encodeURIComponent(confirmationResult.supportInquiryId)}`
+        : `/services/${serviceBooking.request_id}`,
+    });
   } catch (error: unknown) {
     const errMsg = error instanceof Error ? error.message : String(error);
     captureServerException(error, { route: '/api/services/payment/nicepay-callback', method: 'POST' });

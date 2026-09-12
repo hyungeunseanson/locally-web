@@ -15,6 +15,7 @@ type ServiceEarningsBookingRow = {
   request_id: string | null;
   host_id: string | null;
   host_payout_amount: number | null;
+  host_compensation_amount: number | null;
   payout_status: string | null;
   payout_paid_at: string | null;
   status: string;
@@ -28,7 +29,7 @@ type ServiceRequestMetaRow = {
   start_time: string | null;
 };
 
-const INCLUDED_SERVICE_EARNINGS_STATUSES = ['PAID', 'confirmed', 'completed'] as const;
+const INCLUDED_SERVICE_EARNINGS_STATUSES = ['PAID', 'confirmed', 'completed', 'cancelled'] as const;
 const MAX_SERVICE_EARNINGS_ITEMS = 5;
 
 export async function GET() {
@@ -48,7 +49,7 @@ export async function GET() {
     let { data: serviceBookingsRaw, error: serviceBookingsError } = await supabaseAdmin
       .from('service_bookings')
       .select(
-        'id, order_id, request_id, host_id, host_payout_amount, payout_status, payout_paid_at, status, created_at'
+        'id, order_id, request_id, host_id, host_payout_amount, host_compensation_amount, payout_status, payout_paid_at, status, created_at'
       )
       .eq('host_id', user.id)
       .in('status', [...INCLUDED_SERVICE_EARNINGS_STATUSES])
@@ -57,7 +58,7 @@ export async function GET() {
     if (serviceBookingsError && isMissingPayoutPaidAtColumnError(serviceBookingsError)) {
       const fallbackResult = await supabaseAdmin
         .from('service_bookings')
-        .select('id, order_id, request_id, host_id, host_payout_amount, payout_status, status, created_at')
+        .select('id, order_id, request_id, host_id, host_payout_amount, host_compensation_amount, payout_status, status, created_at')
         .eq('host_id', user.id)
         .in('status', [...INCLUDED_SERVICE_EARNINGS_STATUSES])
         .order('created_at', { ascending: false });
@@ -70,9 +71,12 @@ export async function GET() {
       throw serviceBookingsError;
     }
 
-    const serviceBookings = ((serviceBookingsRaw || []) as ServiceEarningsBookingRow[]).filter(
-      (booking) => booking.host_id === user.id && Number(booking.host_payout_amount || 0) > 0
-    );
+    const serviceBookings = ((serviceBookingsRaw || []) as ServiceEarningsBookingRow[]).filter((booking) => {
+      const effectivePayout = booking.status === 'cancelled'
+        ? Number(booking.host_compensation_amount || 0)
+        : Number(booking.host_payout_amount || 0);
+      return booking.host_id === user.id && effectivePayout > 0;
+    });
 
     const recentServiceBookings = serviceBookings.slice(0, MAX_SERVICE_EARNINGS_ITEMS);
 
@@ -107,7 +111,9 @@ export async function GET() {
         start_time: requestMeta?.start_time || null,
         status: booking.status,
         payout_status: booking.payout_status,
-        host_payout_amount: Number(booking.host_payout_amount || 0),
+        host_payout_amount: booking.status === 'cancelled'
+          ? Number(booking.host_compensation_amount || 0)
+          : Number(booking.host_payout_amount || 0),
         payout_paid_at: booking.payout_paid_at,
         created_at: booking.created_at,
         settlement_stage: getServiceSettlementStage(booking),

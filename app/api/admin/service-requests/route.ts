@@ -3,7 +3,7 @@ import { createClient as createServerClient } from '@/app/utils/supabase/server'
 import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 
-const EDITABLE_SERVICE_REQUEST_STATUSES = new Set(['pending_payment', 'open']);
+const EDITABLE_SERVICE_REQUEST_STATUSES = new Set(['pending_payment', 'assigning', 'open']);
 
 // PATCH: 어드민이 맞춤 의뢰 제목·내용 수정
 export async function PATCH(req: NextRequest) {
@@ -25,8 +25,8 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
     }
 
-    const { requestId, title, description } = await req.json();
-    if (!requestId || (!title && !description)) {
+    const { requestId, description } = await req.json();
+    if (!requestId || typeof description !== 'string' || !description.trim()) {
       return NextResponse.json({ success: false, error: '필수 항목이 누락되었습니다.' }, { status: 400 });
     }
 
@@ -53,10 +53,8 @@ export async function PATCH(req: NextRequest) {
     }
 
     const updates: Record<string, string> = {};
-    const nextTitle = title?.trim();
     const nextDescription = description?.trim();
 
-    if (nextTitle && nextTitle !== currentRequest.title) updates.title = nextTitle;
     if (typeof nextDescription === 'string' && nextDescription !== (currentRequest.description || '')) {
       updates.description = nextDescription;
     }

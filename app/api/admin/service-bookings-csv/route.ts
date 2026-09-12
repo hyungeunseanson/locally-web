@@ -10,6 +10,8 @@ type ServiceBookingCsvRow = {
     request_id: string | null;
     amount: number | null;
     host_payout_amount: number | null;
+    host_compensation_amount: number | null;
+    refund_amount: number | null;
     platform_revenue: number | null;
     status: string | null;
     payout_status: string | null;
@@ -89,9 +91,9 @@ export async function GET(request: Request) {
         let query = supabaseAdmin
             .from('service_bookings')
             .select(
-                'id, order_id, request_id, amount, host_payout_amount, platform_revenue, status, payout_status, payment_method, created_at, customer_id, host_id'
+                'id, order_id, request_id, amount, host_payout_amount, host_compensation_amount, refund_amount, platform_revenue, status, payout_status, payment_method, created_at, customer_id, host_id'
             )
-            .in('status', ['PAID', 'confirmed', 'completed'])
+            .in('status', ['PAID', 'confirmed', 'completed', 'cancelled'])
             .order('created_at', { ascending: false });
 
         if (startAt) {

@@ -18,6 +18,7 @@ import ReceiptModal from './components/ReceiptModal';
 import PastTripCard from './components/PastTripCard';
 import { getServiceRequestStatusLabel } from '@/app/constants/serviceStatus';
 import type { ServiceRequestCard } from '@/app/types/service';
+import { getServiceTypeLabel } from '@/app/utils/services/concierge';
 
 // 서비스 의뢰 N 배지: service_application_new 타입 알림 중 unread 여부
 function useServiceUnread() {
@@ -43,7 +44,7 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export default function GuestTripsPage() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const hasServiceUnread = useServiceUnread();
@@ -145,7 +146,7 @@ export default function GuestTripsPage() {
             <Link key={req.id} href={`/services/${req.id}`}>
               <div className="flex items-center justify-between border border-slate-100 rounded-xl px-4 py-3 md:py-3.5 bg-white hover:shadow-md transition-shadow [box-shadow:0_1px_4px_rgba(0,0,0,0.05)] cursor-pointer group">
                 <div className="min-w-0 flex-1">
-                  <p className="font-bold text-[12px] md:text-[13px] text-slate-900 truncate">{req.title}</p>
+                  <p className="font-bold text-[12px] md:text-[13px] text-slate-900 truncate">{req.city} · {getServiceTypeLabel(req.service_type, lang)} · {req.service_date}</p>
                   <div className="flex flex-wrap gap-x-2.5 gap-y-0.5 mt-0.5 text-[10px] md:text-[11px] text-slate-400">
                     <span className="flex items-center gap-0.5"><MapPin size={9} />{req.city}</span>
                     <span className="flex items-center gap-0.5"><Calendar size={9} />{req.service_date}</span>
@@ -155,7 +156,7 @@ export default function GuestTripsPage() {
                 </div>
                 <div className="flex items-center gap-2 shrink-0 ml-3">
                   <span className={`text-[9px] md:text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${STATUS_COLOR[req.status] ?? 'bg-slate-100 text-slate-500'}`}>
-                    {getServiceRequestStatusLabel(req.status)}
+                    {getServiceRequestStatusLabel(req.status, lang)}
                   </span>
                   <ChevronRight size={13} className="text-slate-300 group-hover:text-slate-500 transition-colors" />
                 </div>

@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Briefcase, DollarSign, RefreshCcw, CheckCircle, AlertTriangle, ChevronDown, ChevronUp,
-  X, Loader2, Download, Pencil
+  X, Loader2, Download, Pencil, Search, UserCheck
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/app/context/ToastContext';
@@ -23,7 +23,8 @@ const BOOKING_STATUS_LABELS: Record<string, { label: string; cls: string }> = {
 
 const REQUEST_STATUS_LABELS: Record<string, string> = {
   pending_payment: '결제 대기',
-  open: '호스트 모집 중',
+  assigning: '관리자 배정 중',
+  open: '관리자 배정 중(레거시)',
   matched: '매칭 완료',
   confirmed: '확정',
   completed: '완료',
@@ -31,12 +32,24 @@ const REQUEST_STATUS_LABELS: Record<string, string> = {
   expired: '만료',
 };
 
-const EDITABLE_REQUEST_STATUSES = new Set(['pending_payment', 'open']);
+const EDITABLE_REQUEST_STATUSES = new Set(['pending_payment', 'assigning', 'open']);
+
+type RefundOperation = AdminServiceBooking['refund_operations'][number];
+
+function getUnresolvedRefundOperation(booking: AdminServiceBooking) {
+  return booking.refund_operations.find((operation) => ['started', 'unknown'].includes(operation.status)) ?? null;
+}
 
 function getRowActionCopy(booking: AdminServiceBooking) {
+  if (getUnresolvedRefundOperation(booking)) {
+    return {
+      text: '환불 결과가 확정되지 않았습니다. 재환불하지 말고 결제사 내역을 대조해주세요.',
+      cls: 'text-red-700',
+    };
+  }
   if (booking.status === 'PENDING' && booking.payment_method === 'bank') {
     return {
-      text: '입금 확인 시 의뢰가 공개되고 호스트 모집이 바로 시작됩니다.',
+      text: '입금 확인 시 현지 담당자 1:1 문의와 호스트 배정 대기가 시작됩니다.',
       cls: 'text-blue-600',
     };
   }
@@ -54,7 +67,7 @@ function getRowActionCopy(booking: AdminServiceBooking) {
   }
   if ((booking.status === 'PAID' || booking.status === 'confirmed') && !booking.host_id) {
     return {
-      text: '결제가 완료되어 호스트 모집이 진행 중입니다.',
+      text: '결제가 완료되어 관리자가 호스트를 배정해야 합니다.',
       cls: 'text-indigo-600',
     };
   }
@@ -88,30 +101,27 @@ function statusBadge(status: string, map: Record<string, { label: string; cls: s
 // ── 의뢰 내용 수정 모달 ─────────────────────────────────────────────────────
 function EditRequestModal({
   requestId,
-  initialTitle,
   initialDescription,
   onClose,
   onSuccess,
 }: {
   requestId: string;
-  initialTitle: string;
   initialDescription: string;
   onClose: () => void;
   onSuccess: () => void;
 }) {
   const { showToast } = useToast();
-  const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState(initialDescription);
   const [isSaving, setIsSaving] = useState(false);
 
   const handleSave = async () => {
-    if (!title.trim()) { showToast('제목을 입력해주세요.', 'error'); return; }
+    if (!description.trim()) { showToast('요청 내용을 입력해주세요.', 'error'); return; }
     setIsSaving(true);
     try {
       const res = await fetch('/api/admin/service-requests', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId, title: title.trim(), description: description.trim() }),
+        body: JSON.stringify({ requestId, description: description.trim() }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) { showToast(data.error || '수정 실패', 'error'); return; }
@@ -130,14 +140,6 @@ function EditRequestModal({
           <button onClick={onClose} className="p-1.5 rounded-full hover:bg-slate-100 transition-colors"><X size={16} /></button>
         </div>
         <div className="space-y-3">
-          <div>
-            <label className="block text-[11px] font-bold text-slate-600 mb-1">의뢰 제목</label>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-[13px] md:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-            />
-          </div>
           <div>
             <label className="block text-[11px] font-bold text-slate-600 mb-1">요청 내용</label>
             <textarea
@@ -164,6 +166,90 @@ function EditRequestModal({
 }
 
 // ── 강제 취소 모달 ──────────────────────────────────────────────────────────
+type AssignableHost = {
+  id: string;
+  name: string;
+  email: string | null;
+  languages: string[];
+  nationality: string | null;
+  activeExperiences: Array<{ title: string; city: string | null; country: string | null }>;
+};
+
+function AssignHostModal({ booking, onClose, onSuccess }: { booking: AdminServiceBooking; onClose: () => void; onSuccess: () => void }) {
+  const { showToast } = useToast();
+  const serviceRequest = booking.service_request;
+  const [hosts, setHosts] = useState<AssignableHost[]>([]);
+  const [query, setQuery] = useState('');
+  const [selectedHostId, setSelectedHostId] = useState('');
+  const [hostHourlyRate, setHostHourlyRate] = useState(serviceRequest?.pricing_tier === 'standard' ? 20_000 : 30_000);
+  const [agreement, setAgreement] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    void fetch('/api/admin/service-hosts', { cache: 'no-store' })
+      .then(async (response) => {
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.error || '호스트 목록 조회 실패');
+        setHosts(result.data || []);
+      })
+      .catch((error) => showToast(error instanceof Error ? error.message : '호스트 목록 조회 실패', 'error'))
+      .finally(() => setLoading(false));
+  }, [showToast]);
+
+  if (!serviceRequest) return null;
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredHosts = hosts.filter((host) => !normalizedQuery || [host.name, host.email, host.nationality, ...host.languages, ...host.activeExperiences.flatMap((experience) => [experience.city, experience.title])].some((value) => String(value || '').toLowerCase().includes(normalizedQuery)));
+  const payout = hostHourlyRate * serviceRequest.duration_hours;
+
+  const submit = async () => {
+    if (!selectedHostId || !agreement) return showToast('호스트 선택과 일정·보수 동의 확인이 필요합니다.', 'error');
+    setSubmitting(true);
+    try {
+      const response = await fetch(`/api/admin/service-requests/${booking.request_id}/assign-host`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hostId: selectedHostId, hostHourlyRate, hostAgreementConfirmed: true }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || '배정 실패');
+      showToast('호스트 배정과 고객-호스트 문의 생성이 완료되었습니다.', 'success');
+      onSuccess();
+      onClose();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '배정 실패', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <div><h3 className="text-lg font-black">호스트 직접 배정</h3><p className="mt-1 text-xs text-slate-500">{serviceRequest.city} · {serviceRequest.duration_hours}시간 · {serviceRequest.guest_count}명 · {serviceRequest.pricing_tier === 'standard' ? '표준' : '프리미엄'}</p></div>
+          <button type="button" onClick={onClose} className="rounded-full p-2 hover:bg-slate-100"><X size={17} /></button>
+        </div>
+        <div className="relative mt-5"><Search className="absolute left-3 top-3 text-slate-400" size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="이름, 언어, 도시, 체험으로 검색" className="w-full rounded-xl border border-slate-200 py-3 pl-10 pr-3 text-sm" /></div>
+        <div className="mt-3 max-h-64 space-y-2 overflow-y-auto">
+          {loading ? <p className="py-10 text-center text-sm text-slate-400">불러오는 중…</p> : filteredHosts.map((host) => (
+            <button type="button" key={host.id} onClick={() => setSelectedHostId(host.id)} className={`w-full rounded-xl border p-3 text-left ${selectedHostId === host.id ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200'}`}>
+              <div className="flex items-center justify-between"><p className="text-sm font-black">{host.name}</p><span className="text-[10px] text-slate-400">{host.email}</span></div>
+              <p className="mt-1 text-xs text-slate-500">{host.languages.join(' · ') || '언어 미등록'} {host.activeExperiences.length ? `· 활성 체험 ${host.activeExperiences.length}개` : ''}</p>
+            </button>
+          ))}
+        </div>
+        <div className="mt-5 rounded-xl bg-slate-50 p-4">
+          <label className="text-xs font-bold">호스트 시간당 보수<input type="number" min={1} max={serviceRequest.hourly_rate_customer} step={1000} disabled={serviceRequest.pricing_tier === 'standard'} value={hostHourlyRate} onChange={(event) => setHostHourlyRate(Number(event.target.value))} className="mt-2 block w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm disabled:bg-slate-100" /></label>
+          <p className="mt-2 text-xs text-slate-500">예상 총 지급액: <strong className="text-emerald-700">₩{payout.toLocaleString()}</strong>{serviceRequest.pricing_tier === 'standard' && ' · 표준 보수는 시간당 20,000원으로 고정'}</p>
+        </div>
+        <label className="mt-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs font-semibold leading-5 text-amber-900"><input type="checkbox" checked={agreement} onChange={(event) => setAgreement(event.target.checked)} className="mt-1" />호스트와 모든 일정, 시간, 총 보수를 사전에 확인했습니다.</label>
+        <button type="button" disabled={submitting || !selectedHostId || !agreement} onClick={submit} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 py-4 text-sm font-black text-white disabled:opacity-40">{submitting ? <Loader2 size={16} className="animate-spin" /> : <UserCheck size={16} />}배정 확정</button>
+      </div>
+    </div>
+  );
+}
+
 function ForceCancelModal({
   booking,
   onClose,
@@ -175,27 +261,38 @@ function ForceCancelModal({
 }) {
   const { showToast } = useToast();
   const { requestConfirm, ConfirmDialogElement } = useConfirmDialog();
-  const isFullRefund = booking.status === 'PAID' && (booking.service_request?.status === 'open' || booking.service_request?.status === 'pending_payment');
+  const isFullRefund = booking.status === 'PAID' && !booking.host_id && ['assigning', 'open', 'pending_payment'].includes(booking.service_request?.status || '');
   const [refundAmt, setRefundAmt] = useState(booking.amount);
+  const [hostCompensationAmt, setHostCompensationAmt] = useState(0);
+  const [manualRefundConfirmed, setManualRefundConfirmed] = useState(false);
   const [reason, setReason] = useState('관리자 강제 취소');
   const [isProcessing, setIsProcessing] = useState(false);
+  const idempotencyKey = useRef<string | null>(null);
 
   const handleSubmit = () => {
     requestConfirm({
       title: '강제 취소',
-      description: `₩${refundAmt.toLocaleString()} 환불로 강제 취소하시겠습니까?`,
+      description: `고객 환불 ₩${refundAmt.toLocaleString()}, 호스트 보상 ₩${hostCompensationAmt.toLocaleString()}으로 취소하시겠습니까?`,
       confirmLabel: '강제 취소',
       tone: 'red',
     }, async () => {
       setIsProcessing(true);
       try {
+        idempotencyKey.current ||= `admin-ui:${crypto.randomUUID()}`;
         const res = await fetch('/api/admin/service-cancel', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ order_id: booking.order_id, refund_amount: refundAmt, cancel_reason: reason }),
+          body: JSON.stringify({ order_id: booking.order_id, refund_amount: refundAmt, host_compensation_amount: hostCompensationAmt, cancel_reason: reason, manual_refund_confirmed: manualRefundConfirmed, idempotency_key: idempotencyKey.current }),
         });
         const data = await res.json();
         if (!res.ok || !data.success) {
+          if (data.code === 'REFUND_RECONCILIATION_REQUIRED' || data.code === 'REFUND_DB_RECONCILIATION_REQUIRED') {
+            showToast(data.error || '결제사 결과 대조가 필요합니다.', 'error');
+            onSuccess();
+            onClose();
+            return;
+          }
+          if (data.code === 'REFUND_FAILED') idempotencyKey.current = null;
           showToast(data.error || '취소 실패', 'error');
           return;
         }
@@ -257,6 +354,18 @@ function ForceCancelModal({
             )}
           </div>
 
+          {booking.host_id && booking.status !== 'PENDING' && (
+            <div>
+              <label className="block text-[11px] md:text-xs font-bold text-slate-700 mb-1.5">호스트 보상액 (고객 환불과 별도)</label>
+              <input type="number" value={hostCompensationAmt} onChange={e => setHostCompensationAmt(Number(e.target.value))} min={0} max={booking.host_payout_amount || 0} className="w-full border border-slate-200 rounded-xl px-4 py-3 text-[13px] md:text-sm" />
+              <p className="mt-1 text-[10px] text-slate-500">최대 호스트 예정 지급액 ₩{(booking.host_payout_amount || 0).toLocaleString()}. 고객 환불액에서 차감하지 않습니다.</p>
+            </div>
+          )}
+
+          {booking.payment_method === 'bank' && booking.status !== 'PENDING' && refundAmt > 0 && (
+            <label className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px] font-semibold leading-5 text-amber-900"><input type="checkbox" checked={manualRefundConfirmed} onChange={e => setManualRefundConfirmed(e.target.checked)} className="mt-1" />고객 계좌로 환불 이체를 실제로 완료했습니다.</label>
+          )}
+
           <div>
             <label className="block text-[11px] md:text-xs font-bold text-slate-700 mb-1.5">취소 사유</label>
             <input
@@ -285,6 +394,94 @@ function ForceCancelModal({
   );
 }
 
+function RefundReconciliationModal({
+  booking,
+  operation,
+  onClose,
+  onSuccess,
+}: {
+  booking: AdminServiceBooking;
+  operation: RefundOperation;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const { showToast } = useToast();
+  const { requestConfirm, ConfirmDialogElement } = useConfirmDialog();
+  const [providerReference, setProviderReference] = useState(operation.provider_reference || '');
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const reconcile = (outcome: 'succeeded' | 'failed') => {
+    requestConfirm({
+      title: outcome === 'succeeded' ? '환불 성공으로 마감' : '환불 실패로 마감',
+      description: outcome === 'succeeded'
+        ? '결제사 관리자 화면에서 환불 완료를 직접 확인했습니까? 이 작업은 환불을 다시 실행하지 않고 예약을 취소 상태로 마감합니다.'
+        : '결제사 관리자 화면에서 환불 실패를 직접 확인했습니까? 예약과 의뢰를 환불 전 상태로 복구합니다.',
+      confirmLabel: outcome === 'succeeded' ? '확인했고 성공 마감' : '확인했고 실패 마감',
+      tone: outcome === 'succeeded' ? 'default' : 'red',
+    }, async () => {
+      setIsProcessing(true);
+      try {
+        const response = await fetch('/api/admin/service-refunds/reconcile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            operationId: operation.id,
+            outcome,
+            providerVerified: true,
+            providerReference: providerReference.trim() || null,
+          }),
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.error || '환불 대조 마감 실패');
+        showToast(result.message || '환불 대조 결과를 반영했습니다.', 'success');
+        onSuccess();
+        onClose();
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : '환불 대조 마감 실패', 'error');
+      } finally {
+        setIsProcessing(false);
+      }
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-[220] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-black text-slate-900">환불 결과 대조</h3>
+            <p className="mt-1 text-xs text-slate-500">주문 {booking.order_id}</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-full p-2 text-slate-400 hover:bg-slate-100"><X size={17} /></button>
+        </div>
+
+        <div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-4 text-xs leading-5 text-red-800">
+          <p className="font-black">이 화면에서는 환불을 다시 실행하지 않습니다.</p>
+          <p className="mt-1">PayPal·카드사 관리자 화면에서 실제 결과를 먼저 확인한 뒤, 그 결과만 Locally에 반영하세요.</p>
+        </div>
+
+        <dl className="mt-4 grid grid-cols-[120px_1fr] gap-y-2 rounded-xl bg-slate-50 p-4 text-xs">
+          <dt className="font-bold text-slate-500">환불액</dt><dd className="font-black">₩{operation.refund_amount.toLocaleString()}</dd>
+          <dt className="font-bold text-slate-500">호스트 보상</dt><dd>₩{operation.host_compensation_amount.toLocaleString()}</dd>
+          <dt className="font-bold text-slate-500">현재 기록</dt><dd>{operation.status === 'unknown' ? '결과 불명확' : '마감 중단'}</dd>
+          {operation.error_message && <><dt className="font-bold text-slate-500">마지막 오류</dt><dd className="break-all text-red-700">{operation.error_message}</dd></>}
+        </dl>
+
+        <label className="mt-4 block text-xs font-bold text-slate-700">
+          결제사 환불/거래 번호 (선택)
+          <input value={providerReference} onChange={(event) => setProviderReference(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm" placeholder="결제사 관리자 화면의 확인 번호" />
+        </label>
+
+        <div className="mt-5 grid grid-cols-2 gap-3">
+          <button type="button" disabled={isProcessing} onClick={() => reconcile('failed')} className="rounded-xl border border-slate-300 px-3 py-3 text-xs font-black text-slate-700 disabled:opacity-50">환불 실패 확인</button>
+          <button type="button" disabled={isProcessing} onClick={() => reconcile('succeeded')} className="rounded-xl bg-red-600 px-3 py-3 text-xs font-black text-white disabled:opacity-50">환불 완료 확인</button>
+        </div>
+      </div>
+      {ConfirmDialogElement}
+    </div>
+  );
+}
+
 // ── 서브탭 1: 전체 의뢰 목록 ────────────────────────────────────────────────
 type AllFilter = 'ALL' | 'CANCEL_REQ';
 
@@ -293,6 +490,8 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
   const { requestConfirm, ConfirmDialogElement } = useConfirmDialog();
   const [cancelTarget, setCancelTarget] = useState<AdminServiceBooking | null>(null);
   const [editTarget, setEditTarget] = useState<AdminServiceBooking | null>(null);
+  const [assignmentTarget, setAssignmentTarget] = useState<AdminServiceBooking | null>(null);
+  const [reconcileTarget, setReconcileTarget] = useState<{ booking: AdminServiceBooking; operation: RefundOperation } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [allFilter, setAllFilter] = useState<AllFilter>('ALL');
 
@@ -301,6 +500,7 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
   const settlementPendingCount = bookings.filter(
     b => ['PAID', 'confirmed', 'completed'].includes(b.status) && b.payout_status === 'pending' && b.host_id
   ).length;
+  const unresolvedRefundCount = bookings.filter((booking) => getUnresolvedRefundOperation(booking)).length;
   const displayedBookings = allFilter === 'CANCEL_REQ'
     ? bookings.filter(b => b.status === 'cancellation_requested')
     : bookings;
@@ -308,7 +508,7 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
   const handleConfirmPayment = (orderId: string) => {
     requestConfirm({
       title: '입금 확인',
-      description: '입금이 확인되었습니까? 의뢰를 공개하고 호스트 모집을 시작합니다.',
+      description: '입금이 확인되었습니까? 현지 담당자 1:1 문의를 열고 호스트 배정 대기로 전환합니다.',
       confirmLabel: '입금 확인',
       tone: 'default',
     }, async () => {
@@ -324,7 +524,7 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
           showToast(data.error || '처리 실패', 'error');
           return;
         }
-        showToast('입금 확인 완료. 의뢰가 공개되었습니다.', 'success');
+        showToast('입금 확인 완료. 현지 담당자 1:1 문의가 생성되었습니다.', 'success');
         onRefresh();
       } catch {
         showToast('서버 오류가 발생했습니다.', 'error');
@@ -346,9 +546,23 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
       {editTarget && editTarget.service_request && (
         <EditRequestModal
           requestId={editTarget.request_id}
-          initialTitle={editTarget.service_request.title}
           initialDescription={editTarget.service_request.description ?? ''}
           onClose={() => setEditTarget(null)}
+          onSuccess={onRefresh}
+        />
+      )}
+      {assignmentTarget && (
+        <AssignHostModal
+          booking={assignmentTarget}
+          onClose={() => setAssignmentTarget(null)}
+          onSuccess={onRefresh}
+        />
+      )}
+      {reconcileTarget && (
+        <RefundReconciliationModal
+          booking={reconcileTarget.booking}
+          operation={reconcileTarget.operation}
+          onClose={() => setReconcileTarget(null)}
           onSuccess={onRefresh}
         />
       )}
@@ -360,7 +574,7 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
             <div>
               <p className="text-[12px] md:text-sm font-black text-slate-900">운영 빠른 안내</p>
               <p className="text-[10px] md:text-xs text-slate-600 mt-0.5">
-                무통장 결제 대기는 입금 확인 후 의뢰가 공개됩니다. 결제 전 취소는 DB 취소만, 결제 후 취소는 환불까지 함께 처리됩니다.
+                무통장 입금 확인 후 현지 담당자 1:1 문의가 열리고 배정 대기로 전환됩니다. 결제 전 취소는 DB만, 결제 후 취소는 환불 작업 이력과 함께 처리합니다.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -372,6 +586,9 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
               </span>
               <span className="rounded-full bg-white px-2.5 py-1 text-[10px] md:text-xs font-bold text-emerald-700 border border-emerald-100">
                 정산 대기 {settlementPendingCount}건
+              </span>
+              <span className={`rounded-full bg-white px-2.5 py-1 text-[10px] md:text-xs font-bold border ${unresolvedRefundCount > 0 ? 'border-red-200 text-red-700' : 'border-slate-100 text-slate-500'}`}>
+                환불 대조 {unresolvedRefundCount}건
               </span>
             </div>
           </div>
@@ -421,6 +638,7 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
             <tbody className="divide-y divide-slate-50">
               {displayedBookings.length > 0 ? displayedBookings.map(b => {
                 const actionCopy = getRowActionCopy(b);
+                const unresolvedRefund = getUnresolvedRefundOperation(b);
 
                 return (
                   <tr key={b.id} className={`hover:bg-slate-50 transition-colors ${b.status === 'cancellation_requested' ? 'bg-orange-50/40' : ''}`}>
@@ -461,7 +679,7 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
                     <span className={`text-[9px] md:text-[10px] px-2 py-0.5 rounded font-bold whitespace-nowrap ${
                       b.payout_status === 'paid'
                         ? 'bg-emerald-50 text-emerald-700'
-                        : b.host_id && b.status === 'completed'
+                        : b.host_id && ['completed', 'cancelled'].includes(b.status)
                           ? 'bg-yellow-50 text-yellow-700'
                           : 'bg-slate-100 text-slate-500'
                     }`}>
@@ -469,7 +687,7 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
                         ? '정산완료'
                         : !b.host_id
                           ? '미선택'
-                          : b.status === 'completed'
+                          : ['completed', 'cancelled'].includes(b.status)
                             ? '정산대기'
                             : '완료 후 정산'}
                     </span>
@@ -479,6 +697,14 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
+                      {unresolvedRefund && (
+                        <button
+                          onClick={() => setReconcileTarget({ booking: b, operation: unresolvedRefund })}
+                          className="px-2 py-1 md:px-3 md:py-1.5 rounded-lg border border-red-300 bg-red-600 text-[9px] font-black text-white hover:bg-red-700 md:text-[10px]"
+                        >
+                          환불 대조
+                        </button>
+                      )}
                       <button
                         onClick={() => setEditTarget(b)}
                         disabled={!EDITABLE_REQUEST_STATUSES.has(b.service_request?.status ?? '')}
@@ -491,7 +717,7 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
                       >
                         <Pencil size={12} />
                       </button>
-                      {b.status !== 'cancelled' && b.service_request?.status !== 'completed' && (
+                      {!unresolvedRefund && b.status !== 'cancelled' && b.service_request?.status !== 'completed' && (
                         <>
                           {b.status === 'PENDING' && b.payment_method === 'bank' && (
                             <button
@@ -500,6 +726,14 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
                               className="px-2 py-1 md:px-3 md:py-1.5 bg-blue-600 text-white border border-blue-700 rounded-lg text-[9px] md:text-[10px] font-bold whitespace-nowrap hover:bg-blue-700 transition-colors disabled:opacity-60"
                             >
                               💰 입금 확인
+                            </button>
+                          )}
+                          {b.status === 'PAID' && !b.host_id && ['assigning', 'open'].includes(b.service_request?.status || '') && (
+                            <button
+                              onClick={() => setAssignmentTarget(b)}
+                              className="px-2 py-1 md:px-3 md:py-1.5 bg-emerald-600 text-white border border-emerald-700 rounded-lg text-[9px] md:text-[10px] font-bold whitespace-nowrap hover:bg-emerald-700 transition-colors"
+                            >
+                              호스트 배정
                             </button>
                           )}
                           <button
@@ -537,12 +771,17 @@ function SettlementTab({ bookings, onRefresh }: { bookings: AdminServiceBooking[
   const [expandedHost, setExpandedHost] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Filter: completed only + payout=pending + host selected
+  const getPayableAmount = (booking: AdminServiceBooking) => booking.status === 'cancelled'
+    ? (booking.host_compensation_amount ?? 0)
+    : (booking.host_payout_amount ?? 0);
+
+  // 정상 완료 보수와 취소 시 호스트 보상을 하나의 이체 대기열로 관리
   const pendingBookings = bookings.filter(
     b =>
-      b.status === 'completed' &&
+      ['completed', 'cancelled'].includes(b.status) &&
       b.payout_status === 'pending' &&
-      b.host_id !== null
+      b.host_id !== null &&
+      getPayableAmount(b) > 0
   );
 
   // Group by host_id
@@ -553,7 +792,7 @@ function SettlementTab({ bookings, onRefresh }: { bookings: AdminServiceBooking[
     const bankName = b.host_application?.bank_name || '';
     const accountNum = b.host_application?.account_number || '';
     const holder = b.host_application?.account_holder || '-';
-    const payout = b.host_payout_amount ?? 0;
+    const payout = getPayableAmount(b);
 
     if (!grouped.has(hostId)) {
       grouped.set(hostId, {
@@ -581,7 +820,7 @@ function SettlementTab({ bookings, onRefresh }: { bookings: AdminServiceBooking[
       item.service_request?.service_date || format(new Date(item.created_at), 'yyyy-MM-dd'),
       BOOKING_STATUS_LABELS[item.status]?.label || item.status,
       item.amount,
-      item.host_payout_amount ?? 0,
+      getPayableAmount(item),
     ]);
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -631,7 +870,7 @@ function SettlementTab({ bookings, onRefresh }: { bookings: AdminServiceBooking[
           <h3 className="text-[13px] md:text-base font-black text-slate-900 flex items-center gap-2">
             <DollarSign size={16} className="text-emerald-600 md:w-5 md:h-5" /> 서비스 정산 대기
           </h3>
-          <p className="text-[10px] md:text-sm text-slate-500 mt-0.5">서비스 완료 처리된 예약만 이 탭에서 이체 완료 처리할 수 있습니다.</p>
+          <p className="text-[10px] md:text-sm text-slate-500 mt-0.5">서비스 완료 보수와 취소 시 확정한 호스트 보상을 이체 완료 처리합니다.</p>
         </div>
         <div className="text-right">
           <p className="text-[10px] md:text-xs text-slate-400 font-bold uppercase mb-0.5">총 지급 대기액</p>
@@ -703,7 +942,7 @@ function SettlementTab({ bookings, onRefresh }: { bookings: AdminServiceBooking[
                           <td className="py-2">{statusBadge(item.status, BOOKING_STATUS_LABELS)}</td>
                           <td className="py-2 text-right text-slate-400">₩{item.amount.toLocaleString()}</td>
                           <td className="py-2 text-right font-bold text-slate-900 pr-1">
-                            ₩{(item.host_payout_amount ?? 0).toLocaleString()}
+                            ₩{getPayableAmount(item).toLocaleString()}
                           </td>
                         </tr>
                       ))}

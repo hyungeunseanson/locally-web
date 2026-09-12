@@ -1,467 +1,271 @@
 'use client';
 
-import React, { useState } from 'react';
-import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
-import {
-    ChevronLeft, ChevronRight, Share, Heart, MapPin, Star, Globe,
-    Check, X, Grid, ArrowLeft,
-    Clock, Users, Globe2, Sparkles, AlertCircle
-} from 'lucide-react';
+import { ArrowRight, Check, MessageSquareText } from 'lucide-react';
+
 import SiteHeader from '@/app/components/SiteHeader';
-import { useToast } from '@/app/context/ToastContext';
-import { useLanguage } from '@/app/context/LanguageContext';
-import { useHydrated } from '@/app/hooks/useHydrated';
+import { useLanguage, type Locale } from '@/app/context/LanguageContext';
 
-// ── 사진 데이터 ───────────────────────────────────────────────
-const PHOTOS = [
-    'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&q=80&w=1200',
-    'https://images.unsplash.com/photo-1542051812871-75f850b68a88?auto=format&fit=crop&q=80&w=800',
-    'https://images.unsplash.com/photo-1503899036084-c55cdd92da26?auto=format&fit=crop&q=80&w=800',
-    'https://images.unsplash.com/photo-1551482850-24982613ce43?auto=format&fit=crop&q=80&w=800',
-    'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&q=80&w=800',
-];
+type IntroCopy = {
+  eyebrow: string;
+  title: string;
+  desc: string;
+  cta: string;
+  pricingTitle: string;
+  general: string;
+  generalScope: string;
+  generalPrice: string;
+  business: string;
+  businessScope: string;
+  businessPrice: string;
+  pricingRule: string;
+  durationTitle: string;
+  durationRows: Array<[string, string]>;
+  useTitle: string;
+  personalTitle: string;
+  personalCases: string[];
+  workTitle: string;
+  workCases: string[];
+  flowTitle: string;
+  steps: Array<{ title: string; desc: string }>;
+  noteTitle: string;
+  notes: string[];
+  finalTitle: string;
+  finalDesc: string;
+};
 
-export default function ServiceIntroAirbnbStylePage() {
-    const router = useRouter();
-    const { showToast } = useToast();
-    const { t } = useLanguage();
-    const hydrated = useHydrated();
+const COPY: Record<Locale, IntroCopy> = {
+  ko: {
+    eyebrow: 'Locally · 일본 현지 맞춤 서비스',
+    title: '일본 현지 동행, 통역\n가이드 서비스',
+    desc: '여행 중 생활 통역부터 비즈니스 현장 지원까지. 신청 내용을 바탕으로 로컬리가 일정과 목적에 맞는 호스트를 직접 배정합니다.',
+    cta: '맞춤 서비스 신청하기',
+    pricingTitle: '이용 요금',
+    general: '일반 동행·생활 통역',
+    generalScope: '1~5인',
+    generalPrice: '시간당 35,000원',
+    business: '비즈니스 통역·현장 지원',
+    businessScope: '비즈니스 목적 또는 6인 이상',
+    businessPrice: '시간당 55,000원',
+    pricingRule: '비즈니스 서비스와 6인 이상 조건이 겹쳐도 추가 요금은 중복 적용되지 않습니다.',
+    durationTitle: '시간 기준',
+    durationRows: [['하루 이용 시간', '3~24시간'], ['전체 이용 시간', '최대 168시간'], ['장기 이용', '40시간 이상 신청 가능']],
+    useTitle: '이런 상황에 이용할 수 있어요',
+    personalTitle: '여행·일상 동행',
+    personalCases: ['상점에서 상품 정보나 구매 방법을 확인할 때', '병원·미용실·부동산 등에서 생활 통역이 필요할 때', '일정에 동행하며 이동과 현지 소통을 도와줄 사람이 필요할 때'],
+    workTitle: '비즈니스·행사 지원',
+    workCases: ['미팅, 시장 조사, 상권 벤치마킹 통역이 필요할 때', '팝업스토어·전시회·프로모션 현장 지원이 필요할 때', '고객 응대, 제품 설명, 현장 운영을 도울 인력이 필요할 때'],
+    flowTitle: '진행 순서',
+    steps: [
+      { title: '신청서 작성', desc: '도시, 일정, 인원, 필요한 언어와 요청 사항을 알려 주세요.' },
+      { title: '결제', desc: '예상 금액을 확인하고 결제합니다. 결제가 완료되면 신청서가 현지 담당자에게 자동으로 전달됩니다.' },
+      { title: '현지 담당자 1:1 확인', desc: '현지 담당자가 1:1 문의에서 빠진 내용과 세부 조건을 확인합니다.' },
+      { title: '호스트 배정·연결', desc: '로컬리가 일정, 언어, 경력을 확인해 호스트를 배정하고 전용 대화방을 열어 드립니다.' },
+    ],
+    noteTitle: '예약 전 확인해 주세요',
+    notes: ['입장료, 티켓, 교통비, 식비 등 현장에서 발생하는 비용은 서비스 요금에 포함되지 않습니다.', '호스트에게 추가 비용이 발생하는 일정은 현지 담당자와 사전에 협의합니다.', '호스트 배정 전 취소는 전액 환불을 원칙으로 하며, 배정 후에는 취소 시점과 진행 상태에 따라 환불 기준이 달라질 수 있습니다.'],
+    finalTitle: '호스트는 로컬리가 찾겠습니다.',
+    finalDesc: '고객은 필요한 내용만 알려 주세요. 결제 후 현지 담당자가 1:1 문의에서 확인하고 적합한 호스트를 연결합니다.',
+  },
+  en: {
+    eyebrow: 'Locally · Custom support in Japan',
+    title: 'Local companion and interpreting,\ntailored to your plans',
+    desc: 'From everyday travel help to business support, Locally reviews your request and directly assigns a host who fits your schedule and purpose.',
+    cta: 'Start a custom request',
+    pricingTitle: 'Rates',
+    general: 'Companion & everyday interpreting',
+    generalScope: '1–5 guests',
+    generalPrice: 'KRW 35,000 per hour',
+    business: 'Business interpreting & on-site support',
+    businessScope: 'Business requests or 6+ guests',
+    businessPrice: 'KRW 55,000 per hour',
+    pricingRule: 'The business and 6+ guest conditions do not stack. The hourly rate remains KRW 55,000.',
+    durationTitle: 'Time limits',
+    durationRows: [['Per date', '3–24 hours'], ['Total', 'Up to 168 hours'], ['Long bookings', '40+ hours supported']],
+    useTitle: 'When to use this service',
+    personalTitle: 'Travel & everyday help',
+    personalCases: ['Ask about products or purchases at local shops', 'Get help at hospitals, salons, or real-estate offices', 'Have someone assist with local communication throughout your itinerary'],
+    workTitle: 'Business & events',
+    workCases: ['Interpret for meetings, market research, or district benchmarking', 'Support pop-ups, exhibitions, and promotions', 'Help with customer service, product explanations, and on-site operations'],
+    flowTitle: 'How it works',
+    steps: [
+      { title: 'Submit a request', desc: 'Share the city, schedule, group size, languages, and what you need.' },
+      { title: 'Pay', desc: 'Review the total and pay. Your form is automatically delivered to a local coordinator after payment.' },
+      { title: 'Private coordinator review', desc: 'A local coordinator confirms missing details and specific conditions in private chat.' },
+      { title: 'Host assignment', desc: 'Locally checks schedule, language, and experience, then assigns a host and opens a separate chat.' },
+    ],
+    noteTitle: 'Before you book',
+    notes: ['Admission, tickets, transportation, meals, and other on-site expenses are not included.', 'Any schedule that creates extra host expenses will be discussed in advance.', 'Cancellations before host assignment are fully refundable in principle. After assignment, the refund depends on timing and progress.'],
+    finalTitle: 'Let Locally find the host.',
+    finalDesc: 'Simply tell us what you need. After payment, a local coordinator reviews the details and connects you with the right host.',
+  },
+  ja: {
+    eyebrow: 'Locally · 日本現地オーダーメイドサービス',
+    title: '日本現地の同行・通訳を、\n必要な分だけオーダーメイドで',
+    desc: '旅行中の生活通訳からビジネス現場のサポートまで。ご依頼内容をもとに、Locallyが日程と目的に合うホストを直接手配します。',
+    cta: 'オーダーメイドで依頼する',
+    pricingTitle: 'ご利用料金',
+    general: '一般同行・生活通訳',
+    generalScope: '1～5名',
+    generalPrice: '1時間35,000ウォン',
+    business: 'ビジネス通訳・現場サポート',
+    businessScope: 'ビジネス目的または6名以上',
+    businessPrice: '1時間55,000ウォン',
+    pricingRule: 'ビジネスと6名以上の条件が重なっても、追加料金は重複しません。',
+    durationTitle: '時間の基準',
+    durationRows: [['1日の利用時間', '3～24時間'], ['合計利用時間', '最大168時間'], ['長期利用', '40時間以上も申請可能']],
+    useTitle: 'このような場面で利用できます',
+    personalTitle: '旅行・日常の同行',
+    personalCases: ['店舗で商品情報や購入方法を確認したいとき', '病院、美容室、不動産などで生活通訳が必要なとき', '旅程に同行し、移動や現地での会話を手伝ってほしいとき'],
+    workTitle: 'ビジネス・イベント支援',
+    workCases: ['会議、市場調査、商圏視察の通訳が必要なとき', 'ポップアップ、展示会、プロモーションの現場支援が必要なとき', '接客、商品説明、現場運営を支援する人材が必要なとき'],
+    flowTitle: 'ご利用の流れ',
+    steps: [
+      { title: '申請フォームを入力', desc: '都市、日程、人数、必要な言語、ご依頼内容を入力します。' },
+      { title: '決済', desc: '金額を確認して決済します。完了後、申請内容が担当者へ自動で送信されます。' },
+      { title: '現地担当者が1:1で確認', desc: '現地担当者が1:1のお問い合わせで不足情報と詳細条件を確認します。' },
+      { title: 'ホスト手配・連絡', desc: '日程、言語、経験を確認してホストを手配し、専用チャットを開きます。' },
+    ],
+    noteTitle: 'ご予約前にご確認ください',
+    notes: ['入場料、チケット、交通費、食費など現地で発生する費用は含まれません。', 'ホストに追加費用が発生する日程は、事前に担当者と相談します。', 'ホスト手配前のキャンセルは原則全額返金です。手配後は時期と進行状況により基準が異なります。'],
+    finalTitle: 'ホスト探しはLocallyにお任せください。',
+    finalDesc: '必要な内容だけお知らせください。決済後、現地担当者が1:1で確認し、最適なホストを手配します。',
+  },
+  zh: {
+    eyebrow: 'Locally · 日本当地定制服务',
+    title: '日本当地陪同与口译，\n按实际需要灵活定制',
+    desc: '从旅行生活口译到商务现场支持，Locally会根据您的需求、日程和目的直接安排合适的向导。',
+    cta: '提交定制需求',
+    pricingTitle: '服务价格',
+    general: '普通陪同与生活口译',
+    generalScope: '1–5人',
+    generalPrice: '每小时35,000韩元',
+    business: '商务口译与现场支持',
+    businessScope: '商务需求或6人以上',
+    businessPrice: '每小时55,000韩元',
+    pricingRule: '商务服务与6人以上两个条件同时满足时不会重复加价。',
+    durationTitle: '时长标准',
+    durationRows: [['每天', '3–24小时'], ['总时长', '最多168小时'], ['长期服务', '支持40小时以上']],
+    useTitle: '适合这些场景',
+    personalTitle: '旅行与日常陪同',
+    personalCases: ['在商店了解商品信息或购买方式', '在医院、美容院或房产机构需要生活口译', '希望有人陪同行程并协助当地沟通'],
+    workTitle: '商务与活动支持',
+    workCases: ['会议、市场调研或商圈考察口译', '快闪店、展会或推广活动现场支持', '客户接待、产品说明与现场运营协助'],
+    flowTitle: '服务流程',
+    steps: [
+      { title: '填写申请', desc: '填写城市、日程、人数、所需语言和具体需求。' },
+      { title: '付款', desc: '确认金额并付款。付款完成后，申请表会自动发送给当地负责人。' },
+      { title: '当地负责人一对一确认', desc: '当地负责人会通过一对一咨询确认缺失信息和详细条件。' },
+      { title: '安排并联系向导', desc: 'Locally根据日程、语言和经验安排向导，并开启单独的沟通窗口。' },
+    ],
+    noteTitle: '预订前请确认',
+    notes: ['门票、交通、餐饮及其他现场费用不包含在服务费内。', '如行程会产生向导额外费用，当地负责人会提前与您确认。', '原则上，安排向导前取消可全额退款；安排后将根据取消时间和进度适用不同标准。'],
+    finalTitle: '向导由Locally为您寻找。',
+    finalDesc: '您只需告诉我们实际需求。付款后，当地负责人会一对一确认并安排最合适的向导。',
+  },
+};
 
-    const [isSaved, setIsSaved] = useState(false);
-    const [isCopySuccess, setIsCopySuccess] = useState(false);
-    const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+export default function ServiceIntroPage() {
+  const router = useRouter();
+  const { lang } = useLanguage();
+  const copy = COPY[lang];
+  const startRequest = () => router.push('/services/request');
 
-    // 예약(의뢰) 폼 상태
-    const [date, setDate] = useState('');
-    const [time, setTime] = useState('');
-    const [duration, setDuration] = useState(4);
-    const [guests, setGuests] = useState(1);
+  return (
+    <div className="min-h-screen bg-white text-zinc-950">
+      <SiteHeader />
+      <main className="mx-auto max-w-5xl px-5 pb-36 md:px-8 md:pb-20">
+        <section className="grid gap-12 border-b border-zinc-200 py-14 md:grid-cols-[minmax(0,1fr)_280px] md:items-end md:py-20">
+          <div>
+            <p className="text-xs font-medium tracking-wide text-zinc-500">{copy.eyebrow}</p>
+            <h1 className="mt-5 whitespace-pre-line text-4xl font-semibold leading-[1.15] tracking-[-0.04em] md:text-6xl">{copy.title}</h1>
+            <p className="mt-6 max-w-2xl text-base leading-8 text-zinc-600 md:text-lg">{copy.desc}</p>
+            <button type="button" onClick={startRequest} className="mt-8 hidden items-center gap-2 rounded-md bg-zinc-950 px-5 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 md:inline-flex">
+              {copy.cta}<ArrowRight size={16} />
+            </button>
+          </div>
+          <div className="border-l border-zinc-200 pl-5 text-sm text-zinc-600">
+            <p className="font-semibold text-zinc-950">{copy.durationTitle}</p>
+            <dl className="mt-4 space-y-3">
+              {copy.durationRows.map(([label, value]) => <div key={label} className="flex justify-between gap-6"><dt>{label}</dt><dd className="font-medium text-zinc-950">{value}</dd></div>)}
+            </dl>
+          </div>
+        </section>
 
-    // 달력 상태
-    const [currentDate, setCurrentDate] = useState(new Date());
+        <DocumentSection index="01" title={copy.pricingTitle}>
+          <div className="border-y border-zinc-200">
+            {[
+              [copy.general, copy.generalScope, copy.generalPrice],
+              [copy.business, copy.businessScope, copy.businessPrice],
+            ].map(([title, scope, price], index) => (
+              <div key={title} className={`grid gap-2 py-5 sm:grid-cols-[minmax(0,1fr)_220px_auto] sm:items-center ${index > 0 ? 'border-t border-zinc-200' : ''}`}>
+                <p className="font-semibold">{title}</p>
+                <p className="text-sm text-zinc-500">{scope}</p>
+                <p className="text-lg font-semibold sm:text-right">{price}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-4 text-sm leading-6 text-zinc-500">{copy.pricingRule}</p>
+        </DocumentSection>
 
-    const getDaysInMonth = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
-    const getFirstDay = (y: number, m: number) => new Date(y, m, 1).getDay();
+        <DocumentSection index="02" title={copy.useTitle}>
+          <div className="grid border-y border-zinc-200 md:grid-cols-2">
+            <UseCaseList title={copy.personalTitle} items={copy.personalCases} />
+            <UseCaseList title={copy.workTitle} items={copy.workCases} className="border-t border-zinc-200 md:border-l md:border-t-0" />
+          </div>
+        </DocumentSection>
 
-    const renderCalendar = () => {
-        const year = currentDate.getFullYear();
-        const month = currentDate.getMonth();
-        const daysCount = getDaysInMonth(year, month);
-        const startBlank = getFirstDay(year, month);
-        const days = [];
-        for (let i = 0; i < startBlank; i++) days.push(<div key={`empty-${i}`} />);
-        const todayStr = new Date().toISOString().split('T')[0];
+        <DocumentSection index="03" title={copy.flowTitle}>
+          <ol className="border-t border-zinc-200">
+            {copy.steps.map((step, index) => (
+              <li key={step.title} className="grid gap-2 border-b border-zinc-200 py-5 sm:grid-cols-[48px_190px_minmax(0,1fr)]">
+                <span className="text-sm tabular-nums text-zinc-400">{String(index + 1).padStart(2, '0')}</span>
+                <p className="font-semibold">{step.title}</p>
+                <p className="text-sm leading-6 text-zinc-600">{step.desc}</p>
+              </li>
+            ))}
+          </ol>
+        </DocumentSection>
 
-        for (let d = 1; d <= daysCount; d++) {
-            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-            const isPast = dateStr < todayStr;
-            const isSelected = date === dateStr;
-            days.push(
-                <button
-                    key={d}
-                    disabled={isPast}
-                    onClick={() => setDate(dateStr)}
-                    className={`h-9 w-9 rounded-full flex items-center justify-center text-xs font-medium transition-all ${isSelected ? 'bg-black text-white' : ''} ${!isSelected && !isPast ? 'hover:bg-slate-100 hover:border-black border border-transparent' : ''} ${isPast ? 'text-slate-300 decoration-slate-300 line-through cursor-not-allowed' : ''}`}
-                >
-                    {d}
-                </button>
-            );
-        }
-        return days;
-    };
+        <DocumentSection index="04" title={copy.noteTitle}>
+          <div className="rounded-lg bg-zinc-100 px-5 py-4">
+            {copy.notes.map((note) => <p key={note} className="flex gap-3 border-b border-zinc-200 py-3 text-sm leading-6 text-zinc-700 last:border-0"><Check className="mt-1 shrink-0" size={14} />{note}</p>)}
+          </div>
+        </DocumentSection>
 
-    // 30분 단위 시작 시간 옵션 (오전 8시 ~ 오후 8시)
-    const TIME_OPTIONS = Array.from({ length: 25 }, (_, i) => {
-        const hour = Math.floor(i / 2) + 8;
-        const min = i % 2 === 0 ? '00' : '30';
-        return `${String(hour).padStart(2, '0')}:${min}`;
-    });
+        <section className="grid gap-6 border-t border-zinc-950 py-10 md:grid-cols-[1fr_auto] md:items-center">
+          <div>
+            <div className="flex items-center gap-2 text-zinc-500"><MessageSquareText size={16} /><span className="text-xs font-medium">1:1 Concierge</span></div>
+            <h2 className="mt-3 text-2xl font-semibold tracking-[-0.025em]">{copy.finalTitle}</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-600">{copy.finalDesc}</p>
+          </div>
+          <button type="button" onClick={startRequest} className="hidden items-center justify-center gap-2 rounded-md bg-zinc-950 px-5 py-3.5 text-sm font-semibold text-white hover:bg-zinc-800 md:inline-flex">{copy.cta}<ArrowRight size={16} /></button>
+        </section>
+      </main>
 
-    const handleShare = () => {
-        navigator.clipboard.writeText(window.location.href);
-        setIsCopySuccess(true);
-        setTimeout(() => setIsCopySuccess(false), 3000);
-    };
+      <div data-testid="service-intro-mobile-cta" className="fixed left-14 right-3 z-[120] rounded-lg border border-zinc-200 bg-white p-2 shadow-[0_8px_32px_rgba(0,0,0,0.16)] md:hidden" style={{ bottom: 'max(12px, env(safe-area-inset-bottom, 0px))' }}>
+        <button type="button" onClick={startRequest} className="flex w-full items-center justify-center gap-2 rounded-md bg-zinc-950 px-5 py-3.5 text-sm font-semibold text-white">{copy.cta}<ArrowRight size={16} /></button>
+      </div>
+    </div>
+  );
+}
 
-    const handleReserve = () => {
-        if (!date) return showToast(t('si_select_date_err') as string, 'error');
-        if (!time) return showToast(t('si_select_time_err') as string, 'error');
+function DocumentSection({ index, title, children }: { index: string; title: string; children: React.ReactNode }) {
+  return (
+    <section className="grid gap-6 border-b border-zinc-200 py-10 md:grid-cols-[180px_minmax(0,1fr)] md:py-14">
+      <div><p className="text-xs tabular-nums text-zinc-400">{index}</p><h2 className="mt-2 text-xl font-semibold tracking-[-0.02em]">{title}</h2></div>
+      <div>{children}</div>
+    </section>
+  );
+}
 
-        // 의뢰 폼으로 데이터 전달
-        const params = new URLSearchParams({
-            date,
-            startTime: time,
-            duration: duration.toString(),
-            guests: guests.toString()
-        });
-        router.push(`/services/request?${params.toString()}`);
-    };
-
-    const DURATION_OPTIONS = [4, 5, 6, 7, 8, 9, 10, 12];
-    const GUEST_OPTIONS = [1, 2, 3, 4, 5, 6];
-
-    const totalPrice = 35000 * duration;
-
-    return (
-        <div className="min-h-screen bg-white text-slate-900 font-sans pb-0">
-            <SiteHeader />
-
-            {/* 링크 복사 토스트 */}
-            {isCopySuccess && (
-                <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-black text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
-                    <Check size={16} className="text-green-400" /> {t('si_copied')}
-                </div>
-            )}
-
-            {/* 📱 모바일 전용 상단 헤더 */}
-            <div
-                className="md:hidden fixed top-0 left-0 right-0 z-[120] bg-white/95 backdrop-blur-sm h-[52px] flex items-center justify-between px-4"
-                style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
-            >
-                <button onClick={() => router.back()} className="p-2 -ml-2 hover:bg-slate-100 rounded-full transition-colors">
-                    <ArrowLeft size={18} className="text-slate-900" />
-                </button>
-                <p className="absolute left-1/2 -translate-x-1/2 text-[10px] font-medium text-slate-500">{t('si_mobile_tag')}</p>
-                <div className="flex items-center gap-1">
-                    <button onClick={handleShare} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
-                        <Share size={16} className="text-slate-900" />
-                    </button>
-                    <button onClick={() => setIsSaved(!isSaved)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
-                        <Heart size={16} fill={isSaved ? '#F43F5E' : 'none'} className={isSaved ? 'text-rose-500' : 'text-slate-900'} />
-                    </button>
-                </div>
-            </div>
-
-            <main className="max-w-[1120px] mx-auto px-4 md:px-6 pt-[58px] md:pt-8 pb-[100px] md:pb-16">
-                {/* 📸 데스크탑 5분할 사진 그리드 */}
-                <section className="hidden md:block relative rounded-2xl overflow-hidden h-[480px] mb-12 bg-slate-100 group border border-slate-200 shadow-sm select-none">
-                    <div className="grid grid-cols-4 grid-rows-2 gap-2 h-full cursor-pointer" onClick={() => setIsGalleryOpen(true)}>
-                        <div className="col-span-2 row-span-2 relative overflow-hidden">
-                            <Image src={PHOTOS[0]} alt="Main" fill unoptimized className="object-cover hover:scale-105 transition-transform duration-700" />
-                        </div>
-                        {PHOTOS.slice(1, 5).map((photo, i) => (
-                            <div key={i} className="col-span-1 row-span-1 relative overflow-hidden">
-                                <Image src={photo} alt={`Sub ${i}`} fill unoptimized className="object-cover hover:scale-105 transition-transform duration-700" />
-                            </div>
-                        ))}
-                    </div>
-                    <button
-                        onClick={(e) => { e.stopPropagation(); setIsGalleryOpen(true); }}
-                        className="absolute bottom-6 right-6 bg-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg border border-black/10 flex items-center gap-2 hover:scale-105 transition-transform z-10"
-                    >
-                        <Grid size={16} /> {t('si_view_all_photos')}
-                    </button>
-                </section>
-
-                {/* 📱 모바일 사진 그리드 (2x2) */}
-                <section className="md:hidden">
-                    <div
-                        className="relative w-full aspect-square mb-6 overflow-hidden rounded-[24px] cursor-pointer border border-slate-200"
-                        onClick={() => setIsGalleryOpen(true)}
-                    >
-                        <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-[5px] bg-white">
-                            <div className="relative overflow-hidden w-full h-full rounded-tl-[24px]">
-                                <Image src={PHOTOS[0]} alt="Main" fill unoptimized className="object-cover" />
-                            </div>
-                            <div className="relative overflow-hidden w-full h-full rounded-tr-[24px]">
-                                <Image src={PHOTOS[1]} alt="Sub 1" fill unoptimized className="object-cover" />
-                            </div>
-                            <div className="relative overflow-hidden w-full h-full rounded-bl-[24px]">
-                                <Image src={PHOTOS[2]} alt="Sub 2" fill unoptimized className="object-cover" />
-                            </div>
-                            <div className="relative overflow-hidden w-full h-full rounded-br-[24px]">
-                                <Image src={PHOTOS[3]} alt="Sub 3" fill unoptimized className="object-cover" />
-                            </div>
-                        </div>
-                        <div className="absolute bottom-4 right-4 bg-white p-2.5 rounded-full shadow-[0_3px_10px_rgba(0,0,0,0.15)] border border-slate-200 z-10 text-slate-800">
-                            <Grid size={16} />
-                        </div>
-                    </div>
-                </section>
-
-                {/* ── 상단 헤더 섹션 ── */}
-                <div className="md:hidden text-center px-2 mb-6">
-                    <div className="flex justify-center mb-3">
-                        <span className="inline-flex items-center gap-1 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full shadow-sm">
-                            <Sparkles size={10} /> {t('si_badge_exclusive')}
-                        </span>
-                    </div>
-                    <h1 className="text-[24px] leading-[1.2] font-semibold tracking-[-0.01em] mb-3">
-                        {t('si_title_short')}
-                    </h1>
-                    <div className="flex items-center justify-center gap-1.5 text-[12px] font-medium mb-4">
-                        <Star size={12} className="fill-slate-900" />
-                        <span>5.0</span>
-                        <span className="text-slate-300">·</span>
-                        <span className="underline underline-offset-2">{t('si_reviews_24')}</span>
-                        <span className="text-slate-300">·</span>
-                        <span className="text-slate-500">{t('si_region_desc')}</span>
-                    </div>
-                </div>
-
-                <section className="hidden md:block mb-10">
-                    <div className="max-w-3xl">
-                        <div className="flex items-start justify-between gap-6">
-                            <div>
-                                <span className="inline-flex items-center gap-1 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[11px] font-black uppercase tracking-widest px-2.5 py-1.5 rounded-full shadow-sm mb-3">
-                                    <Sparkles size={11} /> {t('si_badge_exclusive')}
-                                </span>
-                                <h1 className="text-[40px] leading-[1.15] font-black tracking-tight text-slate-900" dangerouslySetInnerHTML={{ __html: t('si_title') as string }}>
-                                </h1>
-                            </div>
-                            <div className="flex shrink-0 gap-2 pt-1">
-                                <button onClick={handleShare} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-100 rounded-lg text-sm font-semibold underline decoration-1">
-                                    <Share size={16} /> {t('si_share')}
-                                </button>
-                                <button onClick={() => setIsSaved(!isSaved)} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-100 rounded-lg text-sm font-semibold underline decoration-1">
-                                    <Heart size={16} fill={isSaved ? '#F43F5E' : 'none'} className={isSaved ? 'text-rose-500' : 'text-slate-900'} />
-                                    {isSaved ? t('si_saved') : t('si_save')}
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="mt-5 flex items-center gap-2 text-[15px] font-medium text-slate-800">
-                            <Star size={14} className="fill-slate-900" />
-                            <span>5.0</span>
-                            <span className="text-slate-300">·</span>
-                            <span className="underline underline-offset-2 cursor-pointer">{t('si_reviews_24')}</span>
-                            <span className="text-slate-300">·</span>
-                            <span className="text-slate-500 text-sm flex items-center gap-1"><MapPin size={14} />{t('si_region_desc')}</span>
-                        </div>
-                    </div>
-                </section>
-
-                {/* ── 본문 레이아웃 ── */}
-                <div className="flex flex-col md:flex-row gap-10 md:gap-20">
-                    {/* Main Content */}
-                    <div className="flex-1 min-w-0 md:max-w-2xl">
-                        {/* 호스트 요약 바 */}
-                        <div className="border-y border-slate-200 py-6 mb-8">
-                            <div className="flex items-center gap-4">
-                                <div className="w-14 h-14 rounded-full overflow-hidden bg-slate-200 border border-slate-200 flex items-center justify-center shrink-0">
-                                    <span className="text-slate-400 text-xl font-bold">L</span>
-                                </div>
-                                <div>
-                                    <p className="text-[18px] md:text-[20px] font-semibold">{t('si_host_title')}</p>
-                                    <p className="mt-1 text-[14px] text-slate-500 flex items-center gap-2">
-                                        {t('si_host_subtitle_1')} <span className="text-slate-300">|</span> <Globe size={13} /> {t('si_host_subtitle_2')}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* 핵심 아이콘 그리드 */}
-                        <div className="mb-10 text-[15px] md:text-[16px] text-slate-800 space-y-5">
-                            <div className="flex gap-4 items-start">
-                                <Clock size={24} className="text-slate-900 shrink-0" />
-                                <div>
-                                    <p className="font-semibold">{t('si_time')}</p>
-                                    <p className="text-slate-500 text-[14px] mt-0.5">{t('si_time_desc')}</p>
-                                </div>
-                            </div>
-                            <div className="flex gap-4 items-start">
-                                <Users size={24} className="text-slate-900 shrink-0" />
-                                <div>
-                                    <p className="font-semibold">{t('si_guests')}</p>
-                                    <p className="text-slate-500 text-[14px] mt-0.5">{t('si_guests_desc')}</p>
-                                </div>
-                            </div>
-                            <div className="flex gap-4 items-start">
-                                <Globe2 size={24} className="text-slate-900 shrink-0" />
-                                <div>
-                                    <p className="font-semibold">{t('si_lang')}</p>
-                                    <p className="text-slate-500 text-[14px] mt-0.5">{t('si_lang_desc')}</p>
-                                </div>
-                            </div>
-                            <div className="flex gap-4 items-start">
-                                <MapPin size={24} className="text-slate-900 shrink-0" />
-                                <div>
-                                    <p className="font-semibold">{t('si_region')}</p>
-                                    <p className="text-slate-500 text-[14px] mt-0.5">{t('si_region_desc')}</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="border-t border-slate-200 mb-8" />
-
-                        {/* 소개 상세 내용 */}
-                        <div className="prose prose-slate prose-p:leading-[1.7] prose-p:text-[16px] text-slate-600 mb-10">
-                            <h2 className="text-[22px] font-bold text-slate-900 mb-4 pb-2">{t('si_about_title')}</h2>
-                            <p dangerouslySetInnerHTML={{ __html: t('si_about_p1') as string }} />
-                            <p dangerouslySetInnerHTML={{ __html: t('si_about_p2') as string }} />
-
-                            <h3 className="text-[18px] font-bold text-slate-900 mt-8 mb-3">{t('si_recommend_title')}</h3>
-                            <ul className="list-none pl-0 space-y-3">
-                                {[
-                                    t('si_recommend_1'),
-                                    t('si_recommend_2'),
-                                    t('si_recommend_3'),
-                                    t('si_recommend_4')
-                                ].map((item, i) => (
-                                    <li key={i} className="flex gap-3 items-start p-0 m-0">
-                                        <Check size={20} className="text-emerald-500 shrink-0 mt-0.5" />
-                                        <span>{item as string}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-
-                        <div className="border-t border-slate-200 mb-8" />
-
-                        {/* 포함/불포함 내역 */}
-                        <div className="mb-10">
-                            <h2 className="text-[22px] font-bold text-slate-900 mb-5">{t('si_info_title')}</h2>
-                            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6">
-                                <p className="font-bold text-slate-900 mb-4">{t('si_info_not_included')}</p>
-                                <ul className="space-y-3 text-[15px] text-slate-600">
-                                    <li className="flex gap-2.5 items-start"><X size={18} className="text-red-400 shrink-0 mt-0.5" />{t('si_not_incl_1')}</li>
-                                    <li className="flex gap-2.5 items-start"><X size={18} className="text-red-400 shrink-0 mt-0.5" />{t('si_not_incl_2')}</li>
-                                    <li className="flex gap-2.5 items-start"><X size={18} className="text-red-400 shrink-0 mt-0.5" />{t('si_not_incl_3')}</li>
-                                    <li className="flex gap-2.5 items-start"><AlertCircle size={18} className="text-amber-500 shrink-0 mt-0.5" />{t('si_not_incl_4')}</li>
-                                </ul>
-                            </div>
-                        </div>
-
-                    </div>
-
-                    {/* ────── 데스크탑 우측 스티키 폼 (ReservationCard 복제 완벽 동기화) ────── */}
-                    <aside className="hidden md:block w-[320px] lg:w-[380px] shrink-0">
-                        <div className="sticky top-28 border border-slate-200 shadow-[0_6px_16px_rgba(0,0,0,0.12)] rounded-2xl p-5 md:p-6 bg-white">
-                            <div className="flex justify-between items-end mb-5">
-                                <div>
-                                    <span className="text-xl md:text-2xl font-semibold">₩35,000</span>
-                                    <span className="text-slate-500 text-xs md:text-sm">{t('si_form_price_hour')}</span>
-                                </div>
-                            </div>
-
-                            <div className="border border-slate-300 rounded-xl mb-4 overflow-hidden">
-                                {/* 카스텀 달력 UI */}
-                                <div className="p-3.5 md:p-4 border-b border-slate-200 bg-white">
-                                    <div className="flex justify-between items-center mb-3">
-                                        <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() - 1)))}><ChevronLeft size={16} /></button>
-                                        <span className="font-semibold text-xs md:text-sm">{currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월</span>
-                                        <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() + 1)))}><ChevronRight size={16} /></button>
-                                    </div>
-                                    <div className="grid grid-cols-7 text-center mb-2">
-                                        {[0, 1, 2, 3, 4, 5, 6].map(i => <span key={i} className="text-[10px] md:text-[10px] text-slate-400 font-semibold">{t(`day_${i}`)}</span>)}
-                                    </div>
-                                    <div className="grid grid-cols-7 gap-y-1 justify-items-center">
-                                        {renderCalendar()}
-                                    </div>
-                                </div>
-
-                                {/* 시작 시간 및 이용 시간 */}
-                                <div className="flex border-b border-slate-300">
-                                    <div className="flex-1 p-3 border-r border-slate-300">
-                                        <label className="block text-[10px] uppercase font-bold text-slate-800 mb-1">{t('si_form_start_time')}</label>
-                                        <select
-                                            value={time}
-                                            onChange={(e) => setTime(e.target.value)}
-                                            className="w-full text-[13px] md:text-sm outline-none cursor-pointer bg-transparent font-semibold py-1"
-                                        >
-                                            <option value="">{t('si_form_select')}</option>
-                                            {TIME_OPTIONS.map(h => <option key={h} value={h}>{h}</option>)}
-                                        </select>
-                                    </div>
-                                    <div className="flex-1 p-3 bg-white">
-                                        <label className="block text-[10px] uppercase font-bold text-slate-800 mb-1">{t('si_form_duration')}</label>
-                                        <select
-                                            value={duration}
-                                            onChange={(e) => setDuration(Number(e.target.value))}
-                                            className="text-[13px] md:text-sm outline-none bg-transparent font-semibold w-full cursor-pointer py-1"
-                                        >
-                                            {DURATION_OPTIONS.map(h => <option key={h} value={h}>{h}{t('si_form_duration_hr')}</option>)}
-                                        </select>
-                                    </div>
-                                </div>
-
-                                {/* 인원 */}
-                                <div className="p-3 bg-white flex flex-col justify-center">
-                                    <label className="block text-[10px] uppercase font-bold text-slate-800 mb-1">{t('si_form_guests')}</label>
-                                    <select
-                                        value={guests}
-                                        onChange={(e) => setGuests(Number(e.target.value))}
-                                        className="text-[13px] md:text-sm outline-none bg-transparent font-semibold w-full cursor-pointer py-1"
-                                    >
-                                        {GUEST_OPTIONS.map(g => <option key={g} value={String(g)}>{g}{t('si_form_guests_unit')}</option>)}
-                                    </select>
-                                </div>
-                            </div>
-
-                            <button
-                                onClick={handleReserve}
-                                className="w-full bg-gradient-to-r from-rose-500 to-rose-600 text-white text-[14px] md:text-base font-semibold py-3.5 rounded-xl hover:shadow-lg hover:scale-[1.01] transition-all mb-4"
-                            >
-                                {t('si_btn_reserve')}
-                            </button>
-                            <p className="text-center text-slate-500 text-xs mb-3">{t('si_reserve_notice')}</p>
-
-                            <div className="space-y-2 pt-4 border-t border-slate-100 text-[12px] md:text-sm">
-                                <div className="flex justify-between text-slate-600">
-                                    <span className="underline">{(t('si_price_calc') as string).replace('{hrs}', duration.toString())}</span>
-                                    <span>₩{totalPrice.toLocaleString()}</span>
-                                </div>
-                                <div className="flex justify-between text-slate-600">
-                                    <span className="underline">{t('si_fee')}</span>
-                                    <span>₩0</span>
-                                </div>
-                            </div>
-
-                            <div className="flex justify-between font-semibold pt-4 border-t border-slate-100 mt-4 text-base md:text-lg">
-                                <span>{t('si_total')}</span>
-                                <span>₩{totalPrice.toLocaleString()}</span>
-                            </div>
-                        </div>
-                    </aside>
-
-                </div>
-            </main>
-
-            {/* ────── 모바일 하단 스티키 예약 폼 바 ────── */}
-            {hydrated && createPortal(<div
-                data-testid="service-intro-mobile-cta"
-                className="md:hidden fixed bottom-0 left-0 right-0 z-[120] bg-white/95 border-t border-slate-200 px-4 py-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur-md"
-                style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom, 0px))' }}
-            >
-                <div className="flex justify-between items-center gap-4">
-                    <div>
-                        <p className="text-[15px] font-bold text-slate-900">₩35,000 <span className="text-[12px] font-normal text-slate-500">{t('si_form_price_hour')}</span></p>
-                        <p className="text-[12px] text-slate-500 underline underline-offset-2">{t('si_mobile_date_select')}</p>
-                    </div>
-                    <button
-                        onClick={() => {
-                            const params = new URLSearchParams({ duration: '4', guests: '1' });
-                            router.push(`/services/request?${params.toString()}`);
-                        }}
-                        data-testid="service-intro-mobile-request-button"
-                        className="flex-1 max-w-[160px] py-3 bg-gradient-to-r from-rose-600 to-rose-500 text-white rounded-xl font-bold text-[15px] hover:opacity-90 transition-opacity flex justify-center items-center shadow-md"
-                    >
-                        {t('si_mobile_btn_reserve')}
-                    </button>
-                </div>
-            </div>, document.body)}
-
-            {/* 사진 모달 갤러리 */}
-            {isGalleryOpen && (
-                <div className="fixed inset-0 z-[150] bg-white animate-in fade-in duration-200 flex flex-col">
-                    <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-                        <button onClick={() => setIsGalleryOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={24} /></button>
-                        <h3 className="font-bold text-lg">{t('si_view_all_photos')}</h3>
-                        <div className="w-10"></div>
-                    </div>
-                    <div className="flex-1 overflow-y-auto p-4 md:p-10 bg-slate-50">
-                        <div className="max-w-4xl mx-auto space-y-4">
-                            {PHOTOS.map((photo, index) => (
-                                <div key={index} className="relative w-full aspect-[4/3] md:aspect-[16/10] bg-slate-200 rounded-xl overflow-hidden shadow-sm">
-                                    <Image src={photo} alt={`Gallery ${index}`} fill unoptimized className="object-contain bg-black/5" />
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
+function UseCaseList({ title, items, className = '' }: { title: string; items: string[]; className?: string }) {
+  return (
+    <div className={`p-5 md:p-6 ${className}`}>
+      <h3 className="font-semibold">{title}</h3>
+      <ul className="mt-4 space-y-3 text-sm leading-6 text-zinc-600">
+        {items.map((item) => <li key={item} className="flex gap-3"><span className="text-zinc-400">—</span><span>{item}</span></li>)}
+      </ul>
+    </div>
+  );
 }

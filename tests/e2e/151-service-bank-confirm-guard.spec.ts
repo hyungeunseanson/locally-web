@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import {
   createAuthUser,
+  cleanupTestUsers,
   createTestUser,
   formatDate,
   getTestAdminClient,
@@ -9,7 +10,6 @@ import {
 } from './helpers/testSupabase';
 
 const createdAuthUserIds: string[] = [];
-const createdWhitelistEmails: string[] = [];
 const createdServiceRequestIds: string[] = [];
 const createdServiceBookingIds: string[] = [];
 const createdAuditTargetIds: string[] = [];
@@ -122,15 +122,7 @@ test.afterAll(async () => {
     await supabase.from('service_requests').delete().in('id', createdServiceRequestIds);
   }
 
-  for (const email of createdWhitelistEmails) {
-    await supabase.from('admin_whitelist').delete().eq('email', email);
-  }
-
-  for (const userId of createdAuthUserIds) {
-    await supabase.from('profiles').delete().eq('id', userId);
-    await supabase.from('users').delete().eq('id', userId);
-    await supabase.auth.admin.deleteUser(userId);
-  }
+  await cleanupTestUsers(createdAuthUserIds);
 });
 
 test.describe.serial('Service bank confirm guard contract', () => {
@@ -176,14 +168,13 @@ test.describe.serial('Service bank confirm guard contract', () => {
     expect(requestRow?.status).toBe('pending_payment');
   });
 
-  test('rejects non-bank bookings without mutating request open state', async ({ page }) => {
+  test('rejects non-bank bookings without mutating the concierge assignment state', async ({ page }) => {
     const adminUser = createTestUser('service.bank.guard.admin');
     const customerUser = createTestUser('service.bank.guard.customer.card');
 
     const adminId = await createAuthUser(adminUser, { isAdmin: true });
     const customerId = await createAuthUser(customerUser);
     createdAuthUserIds.push(adminId, customerId);
-    createdWhitelistEmails.push(adminUser.email);
 
     const fixture = await createPendingServiceFixture({
       customerId,
@@ -226,7 +217,7 @@ test.describe.serial('Service bank confirm guard contract', () => {
     expect(requestRow?.status).toBe('pending_payment');
   });
 
-  test('handles concurrent admin confirms idempotently and opens the request once', async ({ page }) => {
+  test('handles concurrent admin confirms idempotently and starts assignment once', async ({ page }) => {
     test.setTimeout(120000);
 
     const adminUser = createTestUser('service.bank.guard.admin.concurrent');
@@ -235,7 +226,6 @@ test.describe.serial('Service bank confirm guard contract', () => {
     const adminId = await createAuthUser(adminUser, { isAdmin: true });
     const customerId = await createAuthUser(customerUser);
     createdAuthUserIds.push(adminId, customerId);
-    createdWhitelistEmails.push(adminUser.email);
 
     const fixture = await createPendingServiceFixture({
       customerId,
@@ -261,7 +251,7 @@ test.describe.serial('Service bank confirm guard contract', () => {
     expect(secondResponse.body.success).toBeTruthy();
     expect(
       [firstResponse.body.message, secondResponse.body.message].some((message) =>
-        /입금 확인 완료\. 의뢰가 공개되었습니다\.|Already processed/.test(String(message || ''))
+        /입금 확인 완료\. 현지 담당자 1:1 문의와 호스트 배정 대기가 시작되었습니다\.|Already processed/.test(String(message || ''))
       )
     ).toBeTruthy();
 
@@ -286,18 +276,18 @@ test.describe.serial('Service bank confirm guard contract', () => {
       status: 'PAID',
       payment_method: 'bank',
     });
-    expect(requestRow?.status).toBe('open');
+    expect(requestRow?.status).toBe('assigning');
 
     const { data: paymentNotifications, error: notificationError } = await supabase
       .from('notifications')
-      .select('id')
+      .select('id, link')
       .eq('user_id', customerId)
-      .eq('type', 'service_payment_confirmed')
-      .eq('link', `/services/${fixture.requestId}`);
+      .eq('type', 'service_payment_confirmed');
 
     if (notificationError) throw notificationError;
 
     expect(paymentNotifications || []).toHaveLength(1);
+    expect(paymentNotifications?.[0]?.link).toMatch(/^\/guest\/inbox\?inquiryId=/);
 
     const { data: auditLogs, error: auditError } = await supabase
       .from('admin_audit_logs')

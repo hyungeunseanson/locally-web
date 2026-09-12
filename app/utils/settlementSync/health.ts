@@ -23,7 +23,7 @@ type ExperienceDueBacklogRpcRow = {
 
 type ServiceDueRequestRow = {
   id: string;
-  service_date: string | null;
+  service_end_at: string | null;
   status: string;
   selected_host_id: string | null;
 };
@@ -45,20 +45,9 @@ function getDueLagMinutes(oldestDueAt: string | null) {
   return Math.max(0, Math.floor((Date.now() - dueDate.getTime()) / (60 * 1000)));
 }
 
-function getTodayKSTDateString() {
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Seoul',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-
-  return formatter.format(new Date());
-}
-
-function getServiceDueAt(row: Pick<ServiceDueRequestRow, 'service_date'>) {
-  if (!row.service_date) return null;
-  const dueAt = new Date(`${row.service_date}T00:00:00+09:00`);
+function getServiceDueAt(row: Pick<ServiceDueRequestRow, 'service_end_at'>) {
+  if (!row.service_end_at) return null;
+  const dueAt = new Date(row.service_end_at);
   if (Number.isNaN(dueAt.getTime())) return null;
   return dueAt.toISOString();
 }
@@ -111,12 +100,11 @@ export async function getExperienceCompletionDueBacklog(
 export async function getServiceCompletionDueBacklog(
   supabaseAdmin: SettlementSyncAdminClient
 ): Promise<SettlementSyncDueBacklog> {
-  const todayKST = getTodayKSTDateString();
-
   const { data: requestRowsRaw, error: requestError } = await supabaseAdmin
     .from('service_requests')
-    .select('id, service_date, status, selected_host_id')
-    .lt('service_date', todayKST)
+    .select('id, service_end_at, status, selected_host_id')
+    .not('service_end_at', 'is', null)
+    .lte('service_end_at', new Date().toISOString())
     .in('status', [...SERVICE_REQUEST_ACTIVE_STATUSES, ...SERVICE_REQUEST_COMPLETED_STATUSES]);
 
   if (requestError) throw requestError;

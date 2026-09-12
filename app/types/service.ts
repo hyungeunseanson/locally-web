@@ -1,22 +1,43 @@
 // =============================================================================
-// Locally: 맞춤형 동행/통역 서비스 — 역경매 매칭 시스템 타입 정의
+// Locally: 맞춤형 동행/통역 서비스 — 관리자 직접 배정 시스템 타입 정의
 // 기존 experiences / bookings 타입과 완전 독립
 // =============================================================================
 
-// service_requests 상태 플로우 (v2 에스크로)
-// pending_payment → (결제) → open → (호스트 선택) → matched → completed
+// service_requests 상태 플로우 (관리자 배정)
+// pending_payment → (결제) → assigning → (관리자 배정) → matched → completed
 // pending_payment → cancelled (결제 포기)
-// open → cancelled (결제 후 호스트 미선택 상태에서 취소 + PG 환불)
+// assigning → cancelled (배정 전 취소 + PG 환불)
 // matched → cancelled (매칭 후 취소 — 관리자 검토)
 export type ServiceRequestStatus =
   | 'pending_payment'  // v2: 결제 대기 (잡보드 미노출)
+  | 'assigning'        // 결제 확인, 관리자 직접 배정 중
   | 'open'
   | 'matched'
   | 'paid'             // 레거시 호환
   | 'confirmed'        // 레거시 호환
   | 'completed'
+  | 'cancellation_requested'
   | 'cancelled'
   | 'expired';
+
+export type ServiceType = 'general' | 'business';
+export type ServicePricingTier = 'standard' | 'premium';
+export type ServicePricingReason =
+  | 'standard'
+  | 'business'
+  | 'group_6_plus'
+  | 'business_and_group_6_plus';
+
+export type ServiceScheduleItemInput = {
+  serviceDate: string;
+  startTime: string;
+  durationHours: number;
+};
+
+export type ServiceScheduleItem = ServiceScheduleItemInput & {
+  id: string;
+  sortOrder: number;
+};
 
 // service_applications 상태
 export type ServiceApplicationStatus =
@@ -50,12 +71,17 @@ export type ServiceRequest = {
   duration_hours: number;
   languages: string[];
   guest_count: number;
+  service_type: ServiceType;
+  pricing_tier: ServicePricingTier;
+  pricing_reason: ServicePricingReason;
+  service_end_at: string | null;
+  schedule?: ServiceScheduleItem[];
 
   // 가격 (generated columns — 외부 수수료율 노출 금지)
-  hourly_rate_customer: number;  // 35,000 (고객 단가)
-  hourly_rate_host: number;      // 20,000 (호스트 단가, 절대 UI 노출 금지)
-  total_customer_price: number;  // 35,000 × hours
-  total_host_payout: number;     // 20,000 × hours (절대 UI 노출 금지)
+  hourly_rate_customer: number;  // 표준 35,000 / 프리미엄 55,000
+  hourly_rate_host: number | null; // 표준 20,000, 프리미엄은 배정 시 확정
+  total_customer_price: number;  // 고객 시간당 단가 × 총 이용시간
+  total_host_payout: number | null; // 고객 UI 노출 금지
 
   status: ServiceRequestStatus;
   selected_application_id: string | null;
@@ -96,6 +122,7 @@ export type ServiceBooking = {
   contact_phone: string | null;
   cancel_reason: string | null;
   refund_amount: number | null;
+  host_compensation_amount: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -104,7 +131,7 @@ export type ServiceBooking = {
 // JOIN 포함 확장 타입 (UI용)
 // =============================================================================
 
-// 의뢰 상세에서 호스트 지원자 카드에 필요한 정보
+// 레거시 지원 데이터 조회에만 사용하는 타입. 신규 고객/호스트 UI에서는 사용하지 않는다.
 export type ServiceApplicationWithProfile = ServiceApplication & {
   profiles?: {
     full_name: string | null;
@@ -129,7 +156,7 @@ export type ServiceApplicationWithProfile = ServiceApplication & {
   review_avg?: number;
 };
 
-// 잡보드(서비스 목록)에서 사용하는 의뢰 카드 타입
+// 고객의 내 맞춤 의뢰 목록에서 사용하는 안전 DTO 타입
 export type ServiceRequestCard = Pick<
   ServiceRequest,
   | 'id'
@@ -139,13 +166,13 @@ export type ServiceRequestCard = Pick<
   | 'service_date'
   | 'start_time'
   | 'duration_hours'
-  | 'languages'
   | 'guest_count'
+  | 'service_type'
+  | 'pricing_reason'
+  | 'service_end_at'
   | 'total_customer_price'
-  | 'total_host_payout'
   | 'status'
   | 'created_at'
-  | 'user_id'
 >;
 
 // 원자적 예약 RPC 반환 타입

@@ -28,6 +28,7 @@ type ExperienceSummaryBookingRow = {
 
 type ServiceSummaryBookingRow = {
   host_payout_amount: number | null;
+  host_compensation_amount?: number | null;
   payout_paid_at: string | null;
   payout_status: string | null;
   status: string;
@@ -112,7 +113,7 @@ export function getServiceSettlementStage(
     return 'paid';
   }
 
-  if (String(booking.status || '').toLowerCase() === 'completed') {
+  if (['completed', 'cancelled'].includes(String(booking.status || '').toLowerCase())) {
     return 'pending';
   }
 
@@ -124,7 +125,9 @@ export function buildServiceEarningsSummary(
 ): HostServiceEarningsSummary {
   return bookings.reduce<HostServiceEarningsSummary>(
     (acc, booking) => {
-      const payoutAmount = Number(booking.host_payout_amount || 0);
+      const payoutAmount = String(booking.status || '').toLowerCase() === 'cancelled'
+        ? Number(booking.host_compensation_amount || 0)
+        : Number(booking.host_payout_amount || 0);
       if (payoutAmount <= 0) {
         return acc;
       }

@@ -61,6 +61,8 @@ type AnalyticsServiceBookingRow = {
   amount: number | null;
   status: string | null;
   host_payout_amount: number | null;
+  host_compensation_amount: number | null;
+  refund_amount: number | null;
   platform_revenue: number | null;
 };
 
@@ -217,8 +219,8 @@ export async function GET(request: Request) {
 
     let serviceBookingsQuery = supabaseAdmin
       .from('service_bookings')
-      .select('id, created_at, customer_id, amount, status, host_payout_amount, platform_revenue')
-      .in('status', ['PAID', 'confirmed', 'completed']);
+      .select('id, created_at, customer_id, amount, status, host_payout_amount, host_compensation_amount, refund_amount, platform_revenue')
+      .in('status', ['PAID', 'confirmed', 'completed', 'cancelled']);
 
     if (startAt) {
       bookingsQuery = bookingsQuery.gte('created_at', startAt);
@@ -367,6 +369,18 @@ export async function GET(request: Request) {
     }
 
     for (const booking of serviceBookings) {
+      if (String(booking.status || '').toLowerCase() === 'cancelled') {
+        const netPaid = Math.max(Number(booking.amount || 0) - Number(booking.refund_amount || 0), 0);
+        cancelledCount += 1;
+        userCancel += 1;
+        gmv += netPaid;
+        netRevenue += Number(booking.platform_revenue || 0);
+        const dateKey = format(new Date(booking.created_at), 'yyyy-MM-dd');
+        const currentSeries = timeSeriesMap[dateKey] || { label: format(new Date(booking.created_at), 'MM.dd'), amount: 0 };
+        currentSeries.amount += netPaid;
+        timeSeriesMap[dateKey] = currentSeries;
+        continue;
+      }
       if (!isPaidServiceBooking(booking.status || '') && !isCompletedServiceBooking(booking.status || '')) {
         continue;
       }

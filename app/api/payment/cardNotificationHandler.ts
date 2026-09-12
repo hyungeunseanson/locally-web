@@ -303,6 +303,16 @@ async function processServiceNotification(params: {
   }
 
   if (isConfirmedBookingStatus(String(serviceBooking.status || ''))) {
+    const { data: healed, error: healError } = await supabaseAdmin
+      .rpc('confirm_service_concierge_payment_atomic', {
+        p_order_id: serviceBooking.order_id,
+        p_payment_method: serviceBooking.payment_method || 'card',
+        p_tid: serviceBooking.tid || notification.providerTransactionId,
+      })
+      .maybeSingle<{ support_inquiry_id: string }>();
+    if (healError || !healed?.support_inquiry_id) {
+      throw new Error(healError?.message || '서비스 현지 담당자 문의 복구에 실패했습니다.');
+    }
     return buildNotificationOkResponse();
   }
 

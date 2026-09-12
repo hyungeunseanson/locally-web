@@ -1,7 +1,6 @@
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { notifyMembershipMilestone } from '@/app/utils/memberMilestoneNotifications';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
-import { getEligibleServiceHostIds } from '@/app/utils/serviceHostNotifications';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 
 type AdminClient = ReturnType<typeof createAdminClient>;
@@ -15,6 +14,7 @@ type ServicePaymentOpenedParams = {
   durationHours: number;
   guestCount: number;
   customerId: string;
+  supportInquiryId?: string | number | null;
 };
 
 type ServiceCancellationParams = {
@@ -39,73 +39,20 @@ export async function notifyServicePaymentOpened(params: ServicePaymentOpenedPar
     supabaseAdmin,
     requestId,
     requestTitle,
-    requestCity,
-    requestCountry,
-    durationHours,
-    guestCount,
     customerId,
+    supportInquiryId,
   } = params;
 
   try {
-    const hostIds = await getEligibleServiceHostIds(supabaseAdmin, {
-      requestCity,
-      requestCountry,
-      customerId,
-    });
-
-    if (hostIds.length > 0) {
-      const notifications = await Promise.all(
-        hostIds.map((hostId) =>
-          buildLocalizedNotificationInsert({
-            supabaseAdmin,
-            userId: hostId,
-            type: 'service_request_new',
-            link: `/services/${requestId}`,
-            key: 'service.request_new.host',
-            copyParams: {
-              requestTitle,
-              requestCity,
-              durationHours,
-              guestCount,
-            },
-          })
-        )
-      );
-      const { error } = await supabaseAdmin.from('notifications').insert(notifications);
-      if (error) {
-        console.error('[ServiceNotificationFlows] host payment-open notification insert failed:', error);
-      }
-
-      void Promise.allSettled(
-        hostIds.map(async (hostId) => {
-          return sendImmediateGenericEmail({
-            recipientUserId: hostId,
-            subject: '',
-            title: '',
-            message: '',
-            templatedEmail: {
-              templateId: 'service.request_new_host',
-              audience: 'host',
-              payload: {
-                requestTitle,
-                requestCity,
-                durationHours,
-                guestCount,
-                ctaUrl: `/services/${requestId}`,
-              },
-            },
-          });
-        })
-      ).catch((emailError) => {
-        console.error('[ServiceNotificationFlows] host payment-open email dispatch failed:', emailError);
-      });
-    }
+    const customerLink = supportInquiryId
+      ? `/guest/inbox?inquiryId=${encodeURIComponent(String(supportInquiryId))}`
+      : `/services/${requestId}`;
 
     const customerNotificationRow = await buildLocalizedNotificationInsert({
       supabaseAdmin,
       userId: customerId,
       type: 'service_payment_confirmed',
-      link: `/services/${requestId}`,
+      link: customerLink,
       key: 'service.payment_confirmed.customer',
       copyParams: {
         requestTitle,
@@ -130,7 +77,7 @@ export async function notifyServicePaymentOpened(params: ServicePaymentOpenedPar
         audience: 'guest',
         payload: {
           requestTitle,
-          ctaUrl: `/services/${requestId}`,
+          ctaUrl: customerLink,
         },
       },
     }).catch((emailError) => {

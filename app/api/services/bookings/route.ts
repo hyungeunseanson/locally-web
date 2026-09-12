@@ -1,94 +1,92 @@
 import { NextResponse } from 'next/server';
-import { createClient as createServerClient } from '@/app/utils/supabase/server';
+
 import { createAdminClient } from '@/app/utils/supabase/admin';
+import { createClient as createServerClient } from '@/app/utils/supabase/server';
 
-// LEGACY ROUTE
-// Current service payment flow pre-creates `service_bookings` from `/api/services/requests`
-// and reuses that pending row on `/services/[requestId]/payment`.
-// Keep this route only for compatibility until any unknown legacy callers are retired.
-
-type ServiceBookingAtomicResult = {
-  new_order_id: string;
-  final_amount: number;
-  host_payout: number;
-  platform_margin: number;
-  host_id: string;
-};
-
-type CreateServiceBookingBody = {
-  request_id?: string;
-  application_id?: string;
-  contact_name?: string;
-  contact_phone?: string;
-};
-
-export async function POST(request: Request) {
-  try {
-    // 1. 인증 확인
-    const supabaseServer = await createServerClient();
-    const { data: { user }, error: authError } = await supabaseServer.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const body = (await request.json()) as CreateServiceBookingBody;
-    const { request_id, application_id, contact_name, contact_phone } = body;
-
-    if (!request_id || !application_id || !contact_name || !contact_phone) {
-      return NextResponse.json({ success: false, error: '필수 항목이 누락되었습니다.' }, { status: 400 });
-    }
-
-    // [Security] 이름/전화번호 길이 + 형식 검증 — DB 및 알림 템플릿에 비정상 데이터 삽입 방지
-    if (typeof contact_name !== 'string' || contact_name.trim().length > 100) {
-      return NextResponse.json({ success: false, error: '이름은 100자 이하여야 합니다.' }, { status: 400 });
-    }
-    if (typeof contact_phone !== 'string' || !/^[\d\s\-\+\(\)]{7,30}$/.test(contact_phone.trim())) {
-      return NextResponse.json({ success: false, error: '올바른 전화번호 형식이 아닙니다.' }, { status: 400 });
-    }
-
-    // 2. 관리자 권한 클라이언트
-    const supabaseAdmin = createAdminClient();
-
-    // 3. 원자적 예약 생성 RPC
-    const { data: bookingData, error: bookingError } = await supabaseAdmin
-      .rpc('create_service_booking_atomic', {
-        p_customer_id: user.id,
-        p_request_id: request_id,
-        p_application_id: application_id,
-        p_contact_name: contact_name.trim(),
-        p_contact_phone: contact_phone.trim(),
-      })
-      .maybeSingle<ServiceBookingAtomicResult>();
-
-    if (bookingError || !bookingData) {
-      const errMsg = bookingError?.message || '예약 처리 중 오류가 발생했습니다.';
-
-      if (errMsg.includes('SVC_NOT_FOUND')) {
-        return NextResponse.json({ success: false, error: '의뢰 또는 지원서를 찾을 수 없습니다.' }, { status: 404 });
-      }
-      if (errMsg.includes('SVC_INVALID_STATUS')) {
-        return NextResponse.json({ success: false, error: '결제 가능한 상태가 아닙니다.' }, { status: 409 });
-      }
-      if (errMsg.includes('SVC_FORBIDDEN')) {
-        return NextResponse.json({ success: false, error: '권한이 없습니다.' }, { status: 403 });
-      }
-      if (errMsg.includes('SVC_BAD_REQUEST')) {
-        return NextResponse.json({ success: false, error: '선택된 지원서 정보가 올바르지 않습니다.' }, { status: 400 });
-      }
-
-      console.error('Service Booking Atomic Error:', bookingError);
-      throw new Error(errMsg);
-    }
-
-    return NextResponse.json({
-      success: true,
-      newOrderId: bookingData.new_order_id,
-      finalAmount: bookingData.final_amount,
-    });
-
-  } catch (error: unknown) {
-    console.error('API Service Booking Error:', error);
-    return NextResponse.json({ success: false, error: '서버 오류가 발생했습니다.' }, { status: 500 });
+export async function GET(request: Request) {
+  const supabaseServer = await createServerClient();
+  const { data: { user }, error: authError } = await supabaseServer.auth.getUser();
+  if (authError || !user) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
   }
+
+  const requestId = new URL(request.url).searchParams.get('requestId');
+  if (!requestId) {
+    return NextResponse.json({ success: false, error: 'requestId is required' }, { status: 400 });
+  }
+
+  const supabaseAdmin = createAdminClient();
+  const { data: serviceRequest, error: requestError } = await supabaseAdmin
+    .from('service_requests')
+    .select('id, user_id, title, service_date, start_time, duration_hours, guest_count, service_type, pricing_reason, hourly_rate_customer, total_customer_price, contact_name, contact_phone, status')
+    .eq('id', requestId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (requestError || !serviceRequest) {
+    return NextResponse.json({ success: false, error: '결제할 의뢰를 찾을 수 없습니다.' }, { status: 404 });
+  }
+
+  const [bookingResult, scheduleResult] = await Promise.all([
+    supabaseAdmin
+      .from('service_bookings')
+      .select('id, order_id, amount, status, payment_method')
+      .eq('request_id', requestId)
+      .eq('customer_id', user.id)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+    supabaseAdmin
+      .from('service_request_schedule_items')
+      .select('id, service_date, start_time, duration_hours, sort_order')
+      .eq('request_id', requestId)
+      .order('sort_order', { ascending: true }),
+  ]);
+
+  if (bookingResult.error || scheduleResult.error) {
+    return NextResponse.json({ success: false, error: '결제 정보를 불러오지 못했습니다.' }, { status: 500 });
+  }
+  if (!bookingResult.data || bookingResult.data.status !== 'PENDING') {
+    return NextResponse.json(
+      { success: false, code: 'SERVICE_PAYMENT_NOT_PENDING', error: '이미 결제가 처리되었거나 취소된 의뢰입니다.' },
+      { status: 409 }
+    );
+  }
+
+  return NextResponse.json({
+    success: true,
+    request: {
+      id: serviceRequest.id,
+      title: serviceRequest.title,
+      service_date: serviceRequest.service_date,
+      start_time: serviceRequest.start_time,
+      duration_hours: serviceRequest.duration_hours,
+      guest_count: serviceRequest.guest_count,
+      service_type: serviceRequest.service_type,
+      pricing_reason: serviceRequest.pricing_reason,
+      hourly_rate_customer: serviceRequest.hourly_rate_customer,
+      total_customer_price: serviceRequest.total_customer_price,
+      contact_name: serviceRequest.contact_name,
+      contact_phone: serviceRequest.contact_phone,
+      schedule: (scheduleResult.data || []).map((item) => ({
+        id: item.id,
+        serviceDate: item.service_date,
+        startTime: String(item.start_time).slice(0, 5),
+        durationHours: item.duration_hours,
+        sortOrder: item.sort_order,
+      })),
+    },
+    booking: bookingResult.data,
+  });
+}
+
+export async function POST() {
+  return NextResponse.json(
+    {
+      success: false,
+      code: 'SERVICE_MARKETPLACE_DISABLED',
+      error: '기존 지원서 기반 서비스 예약은 종료되었습니다.',
+    },
+    { status: 410 }
+  );
 }

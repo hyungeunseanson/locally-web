@@ -1,331 +1,109 @@
+import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
-import { createClient as createServerClient } from '@/app/utils/supabase/server';
-import { createAdminClient } from '@/app/utils/supabase/admin';
+
 import { insertAdminAlerts, sendAdminAlertEmails } from '@/app/utils/adminAlertCenter';
-import { cancelCardPayment } from '@/app/utils/payments/card/server';
-import {
-  notifyServiceCancellationCompleted,
-  notifyServiceCancellationRequested,
-} from '@/app/utils/serviceNotificationFlows';
-import { refundPayPalCapture } from '@/app/utils/paypal/server';
 import { captureServerException } from '@/app/utils/monitoring/sentry';
+import { cancelCardPayment } from '@/app/utils/payments/card/server';
+import { refundPayPalCapture } from '@/app/utils/paypal/server';
+import { notifyServiceCancellationCompleted, notifyServiceCancellationRequested } from '@/app/utils/serviceNotificationFlows';
+import { createAdminClient } from '@/app/utils/supabase/admin';
+import { createClient as createServerClient } from '@/app/utils/supabase/server';
 
-type CancelBody = {
-  order_id?: string;
-  cancel_reason?: string;
-};
-
-type RefundResult =
-  | { ok: true; refundAmount: number }
-  | { ok: false; error: string; status: number };
-
-async function refundPaidOpenServiceBooking(
-  booking: { amount: number | null; order_id: string; payment_method: string | null; tid: string | null },
-  cancelReason: string
-): Promise<RefundResult> {
-  const refundAmount = Number(booking.amount || 0);
-
-  if (refundAmount <= 0) {
-    return { ok: true, refundAmount: 0 };
-  }
-
-  if (booking.payment_method === 'paypal') {
-    if (!booking.tid) {
-      return {
-        ok: false,
-        error: 'PayPal 환불 정보가 없어 취소를 완료할 수 없습니다. 관리자에게 문의해주세요.',
-        status: 400,
-      };
-    }
-
-    try {
-      const refund = await refundPayPalCapture(booking.tid, refundAmount, 'KRW');
-      if (!refund.status || !['COMPLETED', 'PENDING'].includes(refund.status)) {
-        return {
-          ok: false,
-          error: `PayPal 환불 거절: ${refund.status || '알 수 없는 상태'}`,
-          status: 400,
-        };
-      }
-
-      return { ok: true, refundAmount };
-    } catch (error) {
-      console.error('[SERVICE] PayPal refund exception:', error);
-      return {
-        ok: false,
-        error: 'PayPal 환불 오류로 취소를 완료하지 못했습니다. DB 상태는 변경되지 않았습니다.',
-        status: 500,
-      };
-    }
-  }
-
-  if (!booking.tid) {
-    return {
-      ok: false,
-      error: '카드 환불 정보가 없어 취소를 완료하지 못했습니다. 관리자에게 문의해주세요.',
-      status: 500,
-    };
-  }
-
-  try {
-    await cancelCardPayment({
-      providerTransactionId: booking.tid,
-      orderId: booking.order_id,
-      cancelAmount: refundAmount,
-      cancelReason,
-      totalAmount: refundAmount,
-      requireMerchantKey: true,
-      acceptedResultCodes: ['2001', '2030'],
-    });
-    return { ok: true, refundAmount };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : '';
-    if (message.startsWith('Server Config Error')) {
-      return {
-        ok: false,
-        error: '카드 환불 정보가 없어 취소를 완료하지 못했습니다. 관리자에게 문의해주세요.',
-        status: 500,
-      };
-    }
-
-    console.error('[SERVICE] NicePay cancel exception:', error);
-    return {
-      ok: false,
-      error: 'NicePay 환불 네트워크 오류로 취소를 완료하지 못했습니다. DB 상태는 변경되지 않았습니다.',
-      status: 500,
-    };
-  }
-}
+type BeginResult = { operation_id: string; booking_id: string; previous_status: string; already_started: boolean };
 
 export async function POST(request: Request) {
-  let targetOrderId: string | null = null;
-  let bookingStatusBeforeLock: string | null = null;
-  let cancellationLockAcquired = false;
-  let cancellationCommitted = false;
-
   try {
     const supabaseServer = await createServerClient();
     const { data: { user }, error: authError } = await supabaseServer.auth.getUser();
+    if (authError || !user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
 
-    if (authError || !user) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const body = (await request.json()) as CancelBody;
-    const { order_id, cancel_reason = '고객 요청 취소' } = body;
-    targetOrderId = typeof order_id === 'string' ? order_id : null;
-
-    if (!order_id) {
-      return NextResponse.json({ success: false, error: '주문 번호가 필요합니다.' }, { status: 400 });
-    }
+    const body = await request.json() as { order_id?: unknown; cancel_reason?: unknown; idempotency_key?: unknown };
+    const orderId = typeof body.order_id === 'string' ? body.order_id.trim() : '';
+    const reason = typeof body.cancel_reason === 'string' ? body.cancel_reason.trim().slice(0, 500) : '고객 요청 취소';
+    const idempotencyKey = typeof body.idempotency_key === 'string' && /^[A-Za-z0-9:_-]{16,128}$/.test(body.idempotency_key)
+      ? body.idempotency_key
+      : `customer:${randomUUID()}`;
+    if (!orderId) return NextResponse.json({ success: false, error: '주문 번호가 필요합니다.' }, { status: 400 });
 
     const supabaseAdmin = createAdminClient();
-
-    // 1. service_bookings 조회 (service_requests.status 포함)
-    const { data: booking, error: bookingError } = await supabaseAdmin
+    const { data: booking } = await supabaseAdmin
       .from('service_bookings')
-      .select('*, service_requests(title, user_id, status)')
-      .eq('order_id', order_id)
+      .select('id, order_id, request_id, customer_id, host_id, amount, tid, status, payment_method, service_requests(title, status)')
+      .eq('order_id', orderId)
       .maybeSingle();
+    if (!booking) return NextResponse.json({ success: false, error: '예약을 찾을 수 없습니다.' }, { status: 404 });
+    if (booking.customer_id !== user.id && booking.host_id !== user.id) return NextResponse.json({ success: false, error: '취소 권한이 없습니다.' }, { status: 403 });
 
-    if (bookingError || !booking) {
-      return NextResponse.json({ success: false, error: '예약 정보를 찾을 수 없습니다.' }, { status: 404 });
-    }
-
-    bookingStatusBeforeLock = typeof booking.status === 'string' ? booking.status : null;
-
-    // 2. 권한 검증 (고객 또는 호스트만)
-    const isCustomer = booking.customer_id === user.id;
-    const isHost = booking.host_id === user.id;
-
-    if (!isCustomer && !isHost) {
-      return NextResponse.json({ success: false, error: '취소 권한이 없습니다.' }, { status: 403 });
-    }
-
-    // 3. 이미 취소된 경우
-    if (booking.status === 'cancelled') {
-      return NextResponse.json({ success: false, error: '이미 취소된 예약입니다.' }, { status: 409 });
-    }
-
-    const requestInfo = booking.service_requests as { title?: string; user_id?: string; status?: string } | null;
+    const requestInfo = (Array.isArray(booking.service_requests) ? booking.service_requests[0] : booking.service_requests) as { title?: string; status?: string } | null;
     const requestTitle = requestInfo?.title || '맞춤 서비스';
-    const requestStatus = requestInfo?.status ?? '';
+    if (booking.status === 'cancelled') return NextResponse.json({ success: false, error: '이미 취소된 예약입니다.' }, { status: 409 });
 
-    // 4. PENDING 상태면 바로 취소 (결제 전 — PG 환불 불필요)
     if (booking.status === 'PENDING') {
-      await supabaseAdmin
-        .from('service_bookings')
-        .update({ status: 'cancelled', cancel_reason })
-        .eq('order_id', order_id);
-
-      await supabaseAdmin
-        .from('service_requests')
-        .update({ status: 'cancelled' })
-        .eq('id', booking.request_id);
-
-      const adminMessage = `'${requestTitle}' 서비스 의뢰가 결제 전 단계에서 취소되었습니다. 주문번호: ${order_id}`;
-      insertAdminAlerts({
-        title: '서비스 의뢰가 취소되었습니다',
-        message: adminMessage,
-        link: '/admin/dashboard?tab=SERVICE_REQUESTS',
-      }).catch((adminAlertError) => {
-        console.error('Service Cancel Admin Alert Error:', adminAlertError);
-      });
-
-      sendAdminAlertEmails({
-        subject: '[Locally Admin] 서비스 의뢰 취소',
-        title: '서비스 의뢰가 취소되었습니다',
-        message: adminMessage,
-        link: '/admin/dashboard?tab=SERVICE_REQUESTS',
-        ctaLabel: '서비스 요청 보기',
-      }).catch((adminEmailError) => {
-        console.error('Service Cancel Admin Email Error:', adminEmailError);
-      });
-
-      await notifyServiceCancellationCompleted({
-        supabaseAdmin,
-        requestId: booking.request_id,
-        requestTitle,
-        customerId: booking.customer_id || null,
-        hostId: booking.host_id || null,
-        refundAmount: 0,
-      });
-
-      return NextResponse.json({ success: true, message: '의뢰가 취소되었습니다.' });
+      const { error } = await supabaseAdmin.rpc('cancel_pending_service_concierge_atomic', { p_actor_id: user.id, p_order_id: orderId, p_cancel_reason: reason });
+      if (error) return NextResponse.json({ success: false, error: '결제 전 취소를 처리하지 못했습니다.' }, { status: 409 });
+      await notifyServiceCancellationCompleted({ supabaseAdmin, requestId: booking.request_id, requestTitle, customerId: booking.customer_id, hostId: booking.host_id, refundAmount: 0 });
+      return NextResponse.json({ success: true, status: 'cancelled', message: '결제 전 의뢰가 취소되었습니다.' });
     }
 
-    // 5. PAID + open (호스트 미선택) → NicePay 전액 환불
-    if (booking.status === 'PAID' && requestStatus === 'open') {
-      // [Race Guard] PG 환불 전 atomic lock — 이중 환불 방지
-      const { data: lockAcquired } = await supabaseAdmin
-        .from('service_bookings')
-        .update({ status: 'cancellation_requested' })
-        .eq('order_id', order_id)
-        .eq('status', 'PAID')
-        .select('order_id')
-        .maybeSingle();
+    const preAssignment = booking.status === 'PAID' && !booking.host_id && ['assigning', 'open'].includes(requestInfo?.status || '');
+    if (preAssignment && booking.payment_method !== 'bank') {
+      const refundAmount = Number(booking.amount || 0);
+      const { data: begin, error: beginError } = await supabaseAdmin.rpc('begin_service_refund_operation_atomic', {
+        p_admin_id: user.id,
+        p_order_id: orderId,
+        p_refund_amount: refundAmount,
+        p_host_compensation_amount: 0,
+        p_idempotency_key: idempotencyKey,
+      }).maybeSingle<BeginResult>();
+      if (beginError || !begin || begin.already_started) return NextResponse.json({ success: false, error: '이미 취소·환불 처리 중입니다.' }, { status: 409 });
+      await supabaseAdmin.from('service_bookings').update({ cancel_reason: reason }).eq('id', booking.id);
 
-      if (!lockAcquired) {
-        return NextResponse.json({ success: false, error: '이미 취소 처리 중이거나 취소된 예약입니다.' }, { status: 409 });
-      }
-
-      cancellationLockAcquired = true;
-
-      const refundResult = await refundPaidOpenServiceBooking(
-        {
-          amount: booking.amount,
-          order_id: booking.order_id,
-          payment_method: booking.payment_method,
-          tid: booking.tid,
-        },
-        cancel_reason
-      );
-
-      if (!refundResult.ok) {
-        await supabaseAdmin
-          .from('service_bookings')
-          .update({ status: 'PAID' })
-          .eq('order_id', order_id)
-          .eq('status', 'cancellation_requested');
-
-        cancellationLockAcquired = false;
-        return NextResponse.json({ success: false, error: refundResult.error }, { status: refundResult.status });
-      }
-
-      await supabaseAdmin
-        .from('service_bookings')
-        .update({ status: 'cancelled', cancel_reason, refund_amount: refundResult.refundAmount })
-        .eq('order_id', order_id)
-        .eq('status', 'cancellation_requested');
-
-      cancellationCommitted = true;
-
-      await supabaseAdmin
-        .from('service_requests')
-        .update({ status: 'cancelled' })
-        .eq('id', booking.request_id);
-
-      const adminMessage = `'${requestTitle}' 서비스 의뢰가 환불과 함께 취소되었습니다. 주문번호: ${order_id}`;
-      insertAdminAlerts({
-        title: '서비스 환불 취소가 처리되었습니다',
-        message: adminMessage,
-        link: '/admin/dashboard?tab=SERVICE_REQUESTS',
-      }).catch((adminAlertError) => {
-        console.error('Service Refund Cancel Admin Alert Error:', adminAlertError);
-      });
-
-      sendAdminAlertEmails({
-        subject: '[Locally Admin] 서비스 환불 취소 완료',
-        title: '서비스 환불 취소가 처리되었습니다',
-        message: adminMessage,
-        link: '/admin/dashboard?tab=SERVICE_REQUESTS',
-        ctaLabel: '서비스 요청 보기',
-      }).catch((adminEmailError) => {
-        console.error('Service Refund Cancel Admin Email Error:', adminEmailError);
-      });
-
-      await notifyServiceCancellationCompleted({
-        supabaseAdmin,
-        requestId: booking.request_id,
-        requestTitle,
-        customerId: booking.customer_id || null,
-        hostId: booking.host_id || null,
-        refundAmount: refundResult.refundAmount,
-      });
-
-      return NextResponse.json({ success: true, message: '의뢰가 취소되고 환불이 처리됩니다.' });
-    }
-
-    // 6. PAID + matched/confirmed 이후 취소 요청 (관리자 검토)
-    await supabaseAdmin
-      .from('service_bookings')
-      .update({ status: 'cancellation_requested', cancel_reason })
-      .eq('order_id', order_id);
-
-    await notifyServiceCancellationRequested({
-      supabaseAdmin,
-      requestId: booking.request_id,
-      requestTitle,
-      customerId: booking.customer_id || null,
-      hostId: booking.host_id || null,
-    });
-
-    const adminMessage = `'${requestTitle}' 서비스에 취소 요청이 접수되었습니다. 주문번호: ${order_id}`;
-    insertAdminAlerts({
-      title: '서비스 취소 요청이 접수되었습니다',
-      message: adminMessage,
-      link: '/admin/dashboard?tab=SERVICE_REQUESTS',
-    }).catch((adminAlertError) => {
-      console.error('Service Cancellation Request Admin Alert Error:', adminAlertError);
-    });
-
-    sendAdminAlertEmails({
-      subject: '[Locally Admin] 서비스 취소 요청 접수',
-      title: '서비스 취소 요청이 접수되었습니다',
-      message: adminMessage,
-      link: '/admin/dashboard?tab=SERVICE_REQUESTS',
-      ctaLabel: '서비스 요청 보기',
-    }).catch((adminEmailError) => {
-      console.error('Service Cancellation Request Admin Email Error:', adminEmailError);
-    });
-
-    return NextResponse.json({ success: true, message: '취소 요청이 접수되었습니다. 관리자 검토 후 환불이 처리됩니다.' });
-
-  } catch (error: unknown) {
-    if (cancellationLockAcquired && !cancellationCommitted && bookingStatusBeforeLock && targetOrderId) {
+      let providerReference: string | null = null;
       try {
-        await createAdminClient()
-          .from('service_bookings')
-          .update({ status: bookingStatusBeforeLock })
-          .eq('order_id', targetOrderId)
-          .eq('status', 'cancellation_requested');
-      } catch (rollbackError) {
-        console.error('[SERVICE] cancel rollback failed:', rollbackError);
+        if (refundAmount > 0 && booking.payment_method === 'paypal') {
+          if (!booking.tid) throw new Error('Definitive Config Error: PayPal capture ID missing');
+          const refund = await refundPayPalCapture(booking.tid, refundAmount, 'KRW');
+          providerReference = refund.refundId || booking.tid;
+          if (refund.status === 'PENDING') {
+            await supabaseAdmin.rpc('finish_service_refund_operation_atomic', { p_operation_id: begin.operation_id, p_outcome: 'unknown', p_provider_reference: providerReference, p_error_message: 'PayPal refund pending' });
+            void insertAdminAlerts({ title: '서비스 환불 대조 필요', message: `'${requestTitle}' PayPal 환불이 대기 중입니다.`, link: '/admin/dashboard?tab=SERVICE_REQUESTS' });
+            return NextResponse.json({ success: true, pending: true, status: 'cancellation_requested', message: '환불이 접수되어 완료 여부를 확인 중입니다.' });
+          }
+          if (refund.status !== 'COMPLETED') throw new Error(`Definitive Provider Rejection: ${refund.status || 'unknown'}`);
+        } else if (refundAmount > 0) {
+          if (!booking.tid) throw new Error('Definitive Config Error: card transaction ID missing');
+          const result = await cancelCardPayment({ providerTransactionId: booking.tid, orderId, cancelAmount: refundAmount, cancelReason: reason, totalAmount: refundAmount, requireMerchantKey: true, acceptedResultCodes: ['2001', '2030'] });
+          providerReference = result.resultCode;
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const definitive = message.startsWith('Server Config Error') || message.startsWith('Definitive Config Error') || message.startsWith('Definitive Provider Rejection') || message.startsWith('PG Cancel Failed');
+        await supabaseAdmin.rpc('finish_service_refund_operation_atomic', { p_operation_id: begin.operation_id, p_outcome: definitive ? 'failed' : 'unknown', p_provider_reference: providerReference, p_error_message: message.slice(0, 1000) });
+        if (!definitive) void insertAdminAlerts({ title: '서비스 환불 결과 대조 필요', message: `'${requestTitle}' 환불 결과가 불확실합니다. 재시도하지 마세요.`, link: '/admin/dashboard?tab=SERVICE_REQUESTS' });
+        return NextResponse.json({ success: false, status: definitive ? begin.previous_status : 'cancellation_requested', code: definitive ? 'REFUND_FAILED' : 'REFUND_RECONCILIATION_REQUIRED', error: definitive ? '환불이 거절되었습니다. 현지 담당자에게 문의해 주세요.' : '환불 결과를 결제사와 대조 중입니다. 재요청하지 마세요.' }, { status: definitive ? 400 : 503 });
       }
+
+      const { error: finishError } = await supabaseAdmin.rpc('finish_service_refund_operation_atomic', { p_operation_id: begin.operation_id, p_outcome: 'succeeded', p_provider_reference: providerReference, p_error_message: null });
+      if (finishError) {
+        void insertAdminAlerts({ title: '서비스 환불 DB 마감 필요', message: `'${requestTitle}' 환불은 성공했으나 DB 마감이 필요합니다. 재환불 금지.`, link: '/admin/dashboard?tab=SERVICE_REQUESTS' });
+        return NextResponse.json({ success: false, status: 'cancellation_requested', code: 'REFUND_DB_RECONCILIATION_REQUIRED', error: '환불은 완료되었으나 상태 확인이 필요합니다.' }, { status: 500 });
+      }
+      await notifyServiceCancellationCompleted({ supabaseAdmin, requestId: booking.request_id, requestTitle, customerId: booking.customer_id, hostId: booking.host_id, refundAmount });
+      return NextResponse.json({ success: true, status: 'cancelled', message: '호스트 배정 전 취소로 전액 환불되었습니다.' });
     }
 
+    const { data: reviewData, error: reviewError } = await supabaseAdmin.rpc('request_service_cancellation_review_atomic', { p_actor_id: user.id, p_order_id: orderId, p_cancel_reason: reason }).maybeSingle<{ already_requested: boolean }>();
+    if (reviewError) return NextResponse.json({ success: false, error: '취소 요청을 접수하지 못했습니다.' }, { status: 409 });
+    if (!reviewData?.already_requested) await notifyServiceCancellationRequested({ supabaseAdmin, requestId: booking.request_id, requestTitle, customerId: booking.customer_id, hostId: booking.host_id });
+    const adminMessage = preAssignment && booking.payment_method === 'bank'
+      ? `'${requestTitle}' 호스트 배정 전 무통장 전액 환불 요청입니다.`
+      : `'${requestTitle}' 배정 후 취소 검토 요청입니다.`;
+    void insertAdminAlerts({ title: '서비스 취소 검토 필요', message: adminMessage, link: '/admin/dashboard?tab=SERVICE_REQUESTS' });
+    void sendAdminAlertEmails({ subject: '[Locally Admin] 서비스 취소 검토', title: '서비스 취소 검토 필요', message: adminMessage, link: '/admin/dashboard?tab=SERVICE_REQUESTS', ctaLabel: '취소 검토' });
+    return NextResponse.json({ success: true, status: 'cancellation_requested', message: preAssignment ? '전액 환불 요청이 접수되었습니다. 현지 담당자가 이체 후 안내합니다.' : '취소 요청이 접수되었습니다. 환불과 호스트 보상을 분리해 검토합니다.' });
+  } catch (error) {
     captureServerException(error, { route: '/api/services/cancel', method: 'POST' });
-    console.error('API Service Cancel Error:', error);
+    console.error('[service cancel] unexpected error:', error);
     return NextResponse.json({ success: false, error: '서버 오류가 발생했습니다.' }, { status: 500 });
   }
 }

@@ -31,12 +31,13 @@ type ExperienceSummaryBookingRow = {
 
 type ServiceSummaryBookingRow = {
   host_payout_amount: number | null;
+  host_compensation_amount: number | null;
   payout_paid_at: string | null;
   payout_status: string | null;
   status: string;
 };
 
-const INCLUDED_SERVICE_EARNINGS_STATUSES = ['PAID', 'confirmed', 'completed'] as const;
+const INCLUDED_SERVICE_EARNINGS_STATUSES = ['PAID', 'confirmed', 'completed', 'cancelled'] as const;
 
 function getRequestedDelayMs(request: Request) {
   if (process.env.NODE_ENV === 'production') return 0;
@@ -125,14 +126,14 @@ export async function GET(request: Request) {
 
     let { data: serviceBookingsRaw, error: serviceBookingsError } = await supabaseAdmin
       .from('service_bookings')
-      .select('host_payout_amount, payout_status, payout_paid_at, status')
+      .select('host_payout_amount, host_compensation_amount, payout_status, payout_paid_at, status')
       .eq('host_id', user.id)
       .in('status', [...INCLUDED_SERVICE_EARNINGS_STATUSES]);
 
     if (serviceBookingsError && isMissingPayoutPaidAtColumnError(serviceBookingsError)) {
       const fallbackResult = await supabaseAdmin
         .from('service_bookings')
-        .select('host_payout_amount, payout_status, status')
+        .select('host_payout_amount, host_compensation_amount, payout_status, status')
         .eq('host_id', user.id)
         .in('status', [...INCLUDED_SERVICE_EARNINGS_STATUSES]);
 

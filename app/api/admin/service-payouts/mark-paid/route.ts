@@ -8,7 +8,7 @@ type MarkServicePayoutsBody = {
   bookingIds?: string[];
 };
 
-const ELIGIBLE_SERVICE_PAYOUT_STATUSES = ['completed'];
+const ELIGIBLE_SERVICE_PAYOUT_STATUSES = ['completed', 'cancelled'];
 
 type TargetServiceBooking = {
   id: string;
@@ -16,6 +16,8 @@ type TargetServiceBooking = {
   status: string;
   payout_status: string | null;
   host_id: string | null;
+  host_payout_amount: number | null;
+  host_compensation_amount: number | null;
 };
 
 type UpdatedServiceBookingRow = {
@@ -50,7 +52,7 @@ export async function POST(request: Request) {
 
     const { data: targetBookings, error: fetchError } = await supabaseAdmin
       .from('service_bookings')
-      .select('id, order_id, status, payout_status, host_id')
+      .select('id, order_id, status, payout_status, host_id, host_payout_amount, host_compensation_amount')
       .in('id', bookingIds);
 
     if (fetchError) {
@@ -66,6 +68,8 @@ export async function POST(request: Request) {
     const invalidBookings = normalizedTargetBookings.filter((booking) => {
       if (!booking.host_id) return true;
       if (booking.payout_status !== 'pending') return true;
+      const payableAmount = booking.status === 'cancelled' ? booking.host_compensation_amount : booking.host_payout_amount;
+      if (!payableAmount || payableAmount <= 0) return true;
       return !ELIGIBLE_SERVICE_PAYOUT_STATUSES.includes(booking.status);
     });
 
@@ -90,7 +94,7 @@ export async function POST(request: Request) {
       .update({ payout_status: 'paid', payout_paid_at: paidAt })
       .in('id', bookingIds)
       .eq('payout_status', 'pending')
-      .eq('status', 'completed')
+      .in('status', ELIGIBLE_SERVICE_PAYOUT_STATUSES)
       .select('id');
 
     if (updateError && isMissingPayoutPaidAtColumnError(updateError)) {
@@ -99,7 +103,7 @@ export async function POST(request: Request) {
         .update({ payout_status: 'paid' })
         .in('id', bookingIds)
         .eq('payout_status', 'pending')
-        .eq('status', 'completed')
+        .in('status', ELIGIBLE_SERVICE_PAYOUT_STATUSES)
         .select('id');
 
       updatedRows = fallbackResult.data;

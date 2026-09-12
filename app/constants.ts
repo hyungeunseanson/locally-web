@@ -44,5 +44,5 @@ export const SERVICE_TYPES = [
   
 export const LOCALLY_SERVICES = [
     { id: 1, title: '일본 전화 예약 · 문의 대행', price: 4500, image: '/images/services/phone-reservation-fr2.jpg', desc: '식당·숙소·교통·재고 문의까지 일본 현지 전화로 대신 확인해드립니다.', href: '/proxy-bookings/new' },
-    { id: 5, title: '현지인 동행/통역 맞춤 의뢰', price: 35000, image: 'https://images.unsplash.com/photo-1524178232363-1fb2b075b655', desc: '원하는 일정에 맞는 현지인 호스트를 직접 매칭받으세요.', href: '/services/intro' },
+    { id: 5, title: '현지인 동행/통역 맞춤 의뢰', price: 35000, image: 'https://images.unsplash.com/photo-1524178232363-1fb2b075b655', desc: '시간당 35,000원부터. 결제 후 현지 담당자가 적합한 호스트를 직접 배정합니다.', href: '/services/intro' },
   ];

@@ -44,13 +44,13 @@ export const TEST_PASSWORD = 'LocallyTest!2026';
 let adminClient: SupabaseClient | null = null;
 
 export function loadTestEnv(): EnvMap {
-  return readFileSync('.env.local', 'utf8')
-    .split(/\n/)
-    .reduce<EnvMap>((acc, line) => {
-      const match = line.match(/^([^=]+)=(.*)$/);
-      if (match) acc[match[1]] = match[2];
-      return acc;
-    }, {});
+  const fileEnv = loadOptionalEnvFile('.env.local');
+  const processEnv = Object.entries(process.env).reduce<EnvMap>((acc, [key, value]) => {
+    if (typeof value === 'string') acc[key] = value;
+    return acc;
+  }, {});
+
+  return { ...fileEnv, ...processEnv };
 }
 
 function resolveCronEnv(env?: EnvLikeMap) {
@@ -167,6 +167,91 @@ export async function createAuthUser(user: E2ETestUser, options?: { isAdmin?: bo
   }
 
   return data.user.id;
+}
+
+export async function cleanupTestUsers(userIds: string[]) {
+  const supabase = getTestAdminClient();
+  const ids = [...new Set(userIds.filter(Boolean))];
+  if (ids.length === 0) return;
+
+  const inquiryFilter = `user_id.in.(${ids.join(',')}),host_id.in.(${ids.join(',')})`;
+  const notificationFilter = `user_id.in.(${ids.join(',')}),sender_id.in.(${ids.join(',')})`;
+  const { data: inquiryRows, error: inquiryReadError } = await supabase
+    .from('inquiries')
+    .select('id')
+    .or(inquiryFilter);
+  if (inquiryReadError) throw inquiryReadError;
+
+  const inquiryIds = (inquiryRows || []).map((row) => row.id);
+  if (inquiryIds.length > 0) {
+    const { error: inquiryMessageError } = await supabase
+      .from('inquiry_messages')
+      .delete()
+      .in('inquiry_id', inquiryIds);
+    if (inquiryMessageError) throw inquiryMessageError;
+  }
+
+  const { error: senderMessageError } = await supabase
+    .from('inquiry_messages')
+    .delete()
+    .in('sender_id', ids);
+  if (senderMessageError) throw senderMessageError;
+
+  const { error: notificationError } = await supabase
+    .from('notifications')
+    .delete()
+    .or(notificationFilter);
+  if (notificationError) throw notificationError;
+
+  if (inquiryIds.length > 0) {
+    const { error: inquiryDeleteError } = await supabase
+      .from('inquiries')
+      .delete()
+      .in('id', inquiryIds);
+    if (inquiryDeleteError) throw inquiryDeleteError;
+  }
+
+  const { error: auditLogError } = await supabase
+    .from('admin_audit_logs')
+    .delete()
+    .in('admin_id', ids);
+  if (auditLogError) throw auditLogError;
+
+  const { error: experienceError } = await supabase
+    .from('experiences')
+    .delete()
+    .in('host_id', ids);
+  if (experienceError) throw experienceError;
+
+  const { error: hostApplicationError } = await supabase
+    .from('host_applications')
+    .delete()
+    .in('user_id', ids);
+  if (hostApplicationError) throw hostApplicationError;
+
+  for (const userId of ids) {
+    const { data: authUserData, error: authUserReadError } = await supabase.auth.admin.getUserById(userId);
+    if (authUserReadError) throw authUserReadError;
+    const email = authUserData.user?.email?.trim();
+    if (email) {
+      const { error: whitelistError } = await supabase
+        .from('admin_whitelist')
+        .delete()
+        .eq('email', email);
+      if (whitelistError) throw whitelistError;
+    }
+  }
+
+  const { error: publicUserError } = await supabase.from('users').delete().in('id', ids);
+  if (publicUserError) throw publicUserError;
+
+  const { error: profileError } = await supabase.from('profiles').delete().in('id', ids);
+  if (profileError) throw profileError;
+
+  for (const userId of ids) {
+    const { error: authDeleteError } = await supabase.auth.admin.deleteUser(userId);
+    if (authDeleteError) throw authDeleteError;
+  }
 }
 
 export async function login(page: Page, user: E2ETestUser) {

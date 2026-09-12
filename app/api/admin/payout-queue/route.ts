@@ -71,6 +71,7 @@ type ServiceQueueRow = {
   payout_status: string | null;
   payout_paid_at: string | null;
   host_payout_amount: number | null;
+  host_compensation_amount: number | null;
   platform_revenue: number | null;
   created_at: string;
 };
@@ -216,6 +217,7 @@ function normalizeServiceQueueRow(row: AdminRawRow): ServiceQueueRow | null {
     payout_status: readStringField(row, 'payout_status'),
     payout_paid_at: readStringField(row, 'payout_paid_at'),
     host_payout_amount: readNumberField(row, 'host_payout_amount'),
+    host_compensation_amount: readNumberField(row, 'host_compensation_amount'),
     platform_revenue: readNumberField(row, 'platform_revenue'),
     created_at: createdAt,
   };
@@ -363,15 +365,15 @@ export async function GET(request: Request) {
 
     const fetchServiceRows = async (includePaidAt: boolean) => {
       const selectColumns = includePaidAt
-        ? 'id, order_id, request_id, customer_id, host_id, amount, status, payout_status, payout_paid_at, host_payout_amount, platform_revenue, created_at'
-        : 'id, order_id, request_id, customer_id, host_id, amount, status, payout_status, host_payout_amount, platform_revenue, created_at';
+        ? 'id, order_id, request_id, customer_id, host_id, amount, status, payout_status, payout_paid_at, host_payout_amount, host_compensation_amount, platform_revenue, created_at'
+        : 'id, order_id, request_id, customer_id, host_id, amount, status, payout_status, host_payout_amount, host_compensation_amount, platform_revenue, created_at';
 
       const rows: AdminRawRow[] = [];
       for (let offset = 0; offset < PAYOUT_MAX_ROWS; offset += PAYOUT_PAGE_SIZE) {
         let query = supabaseAdmin
           .from('service_bookings')
           .select(selectColumns)
-          .in('status', view === 'pending' ? ['completed'] : ['PAID', 'confirmed', 'completed']);
+          .in('status', view === 'pending' ? ['completed', 'cancelled'] : ['PAID', 'confirmed', 'completed', 'cancelled']);
 
         if (view === 'pending') query = query.or('payout_status.eq.pending,payout_status.is.null');
         if (view === 'history') query = query.eq('payout_status', 'paid');
@@ -629,9 +631,12 @@ export async function GET(request: Request) {
     for (const booking of serviceRows) {
       if (!booking.host_id) continue;
 
-      const isPendingServicePayout = booking.status === 'completed' && booking.payout_status !== 'paid';
+      const servicePayoutAmount = booking.status === 'cancelled'
+        ? (booking.host_compensation_amount ?? 0)
+        : (booking.host_payout_amount ?? 0);
+      const isPendingServicePayout = ['completed', 'cancelled'].includes(booking.status) && booking.payout_status !== 'paid' && servicePayoutAmount > 0;
       const isPaidServiceHistory =
-        booking.payout_status === 'paid' && ['PAID', 'confirmed', 'completed'].includes(booking.status);
+        booking.payout_status === 'paid' && ['PAID', 'confirmed', 'completed', 'cancelled'].includes(booking.status) && servicePayoutAmount > 0;
 
       if (!isPendingServicePayout && !isPaidServiceHistory) {
         continue;
@@ -677,7 +682,7 @@ export async function GET(request: Request) {
         title: requestInfo?.title || '맞춤 서비스',
         guest_name: customerProfile?.full_name || requestInfo?.contact_name || 'No Name',
         amount: booking.amount,
-        payout_amount: booking.host_payout_amount ?? 0,
+        payout_amount: servicePayoutAmount,
         platform_revenue: booking.platform_revenue ?? 0,
         status: booking.status,
         payout_status: booking.payout_status,

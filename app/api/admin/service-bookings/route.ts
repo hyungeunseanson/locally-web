@@ -26,13 +26,13 @@ export async function GET() {
         // Fetch all service bookings ordered by creation date
         let { data: serviceBookings, error: sbError } = await supabaseAdmin
             .from('service_bookings')
-            .select('id, order_id, request_id, application_id, customer_id, host_id, amount, host_payout_amount, platform_revenue, status, payout_status, payout_paid_at, tid, payment_method, cancel_reason, refund_amount, created_at')
+            .select('id, order_id, request_id, application_id, customer_id, host_id, amount, host_payout_amount, host_compensation_amount, platform_revenue, status, payout_status, payout_paid_at, tid, payment_method, cancel_reason, refund_amount, created_at')
             .order('created_at', { ascending: false });
 
         if (sbError && isMissingPayoutPaidAtColumnError(sbError)) {
             const fallbackResult = await supabaseAdmin
                 .from('service_bookings')
-                .select('id, order_id, request_id, application_id, customer_id, host_id, amount, host_payout_amount, platform_revenue, status, payout_status, tid, payment_method, cancel_reason, refund_amount, created_at')
+                .select('id, order_id, request_id, application_id, customer_id, host_id, amount, host_payout_amount, host_compensation_amount, platform_revenue, status, payout_status, tid, payment_method, cancel_reason, refund_amount, created_at')
                 .order('created_at', { ascending: false });
 
             serviceBookings = attachNullPayoutPaidAt(fallbackResult.data);
@@ -48,9 +48,9 @@ export async function GET() {
         const appIds = Array.from(new Set(serviceBookings.map((b) => b.application_id).filter(Boolean)));
 
         // Fetch related data in parallel
-        const [reqsRes, usersRes, appsRes] = await Promise.all([
+        const [reqsRes, usersRes, appsRes, schedulesRes, refundOperationsRes] = await Promise.all([
             requestIds.length > 0
-                ? supabaseAdmin.from('service_requests').select('id, title, description, city, service_date, duration_hours, status').in('id', requestIds)
+                ? supabaseAdmin.from('service_requests').select('id, title, description, city, service_date, start_time, duration_hours, guest_count, languages, service_type, pricing_tier, pricing_reason, service_end_at, hourly_rate_customer, hourly_rate_host, total_customer_price, total_host_payout, status, selected_host_id').in('id', requestIds)
                 : { data: [] },
             userIds.length > 0
                 ? supabaseAdmin.from('profiles').select('id, full_name, email').in('id', userIds)
@@ -58,7 +58,19 @@ export async function GET() {
             appIds.length > 0
                 ? supabaseAdmin.from('service_applications').select('id, request_id, host_id').in('id', appIds)
                 : { data: [] },
+            requestIds.length > 0
+                ? supabaseAdmin.from('service_request_schedule_items').select('id, request_id, service_date, start_time, duration_hours, sort_order').in('request_id', requestIds).order('sort_order', { ascending: true })
+                : { data: [] },
+            serviceBookings.length > 0
+                ? supabaseAdmin
+                    .from('service_refund_operations')
+                    .select('id, booking_id, status, refund_amount, host_compensation_amount, provider_reference, error_message, created_at, updated_at, completed_at')
+                    .in('booking_id', serviceBookings.map((booking) => booking.id))
+                    .order('created_at', { ascending: false })
+                : { data: [] },
         ]);
+
+        if ('error' in refundOperationsRes && refundOperationsRes.error) throw refundOperationsRes.error;
 
         const appsMap = new Map((appsRes.data || []).map((a) => [a.id, a]));
 
@@ -101,11 +113,17 @@ export async function GET() {
 
             return {
                 ...b,
-                request: requestsMap.get(b.request_id) || null,
+                request: requestsMap.get(b.request_id)
+                    ? {
+                        ...requestsMap.get(b.request_id),
+                        schedule: (schedulesRes.data || []).filter((item) => item.request_id === b.request_id),
+                    }
+                    : null,
                 customer: usersMap.get(b.customer_id) || null,
                 host: usersMap.get(b.host_id) || null,
                 application,
                 host_application: hostUserId ? hostApplicationsMap.get(hostUserId) || null : null,
+                refund_operations: (refundOperationsRes.data || []).filter((operation) => operation.booking_id === b.id),
             };
         });
 

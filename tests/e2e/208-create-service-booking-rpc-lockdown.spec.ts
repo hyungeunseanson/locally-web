@@ -61,24 +61,23 @@ test.describe('Legacy service-booking RPC execute lockdown contract', () => {
     );
   });
 
-  test('keeps the only repository caller behind the server service-role client', () => {
+  test('retires the legacy booking RPC while keeping the compatibility reader server-only', () => {
     const legacyRoutePath = 'app/api/services/bookings/route.ts';
     const legacyRouteSource = readFileSync(legacyRoutePath, 'utf8');
     const adminClientSource = readFileSync('app/utils/supabase/admin.ts', 'utf8');
 
     expect(legacyRouteSource).toContain('createAdminClient');
-    expect(legacyRouteSource).toContain(".rpc('create_service_booking_atomic'");
+    expect(legacyRouteSource).not.toContain(".rpc('create_service_booking_atomic'");
+    expect(legacyRouteSource).toContain('export async function GET');
+    expect(legacyRouteSource).toContain('export async function POST');
+    expect(legacyRouteSource).toContain('status: 410');
     expect(adminClientSource).toContain("import 'server-only'");
     expect(adminClientSource).toContain('SUPABASE_SERVICE_ROLE_KEY');
 
     for (const sourcePath of listSourceFiles('app')) {
-      if (sourcePath === legacyRoutePath) continue;
       const source = readFileSync(sourcePath, 'utf8');
       expect(source, `${sourcePath} must not call the legacy RPC`).not.toContain(
         'create_service_booking_atomic'
-      );
-      expect(source, `${sourcePath} must not call the legacy route`).not.toContain(
-        '/api/services/bookings'
       );
     }
   });
@@ -88,8 +87,9 @@ test.describe('Legacy service-booking RPC execute lockdown contract', () => {
     const requestRouteSource = readFileSync('app/api/services/requests/route.ts', 'utf8');
 
     expect(requestPageSource).toContain("fetch('/api/services/requests'");
-    expect(requestRouteSource).toContain("const rpcName = 'create_service_request_with_booking_atomic'");
+    expect(requestRouteSource).toContain(".rpc('create_service_concierge_request_atomic'");
     expect(requestRouteSource).toContain('createAdminClient');
+    expect(requestRouteSource).not.toContain('create_service_request_with_booking_atomic');
     expect(requestRouteSource).not.toContain('create_service_booking_atomic');
   });
 });

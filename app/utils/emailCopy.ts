@@ -1147,21 +1147,21 @@ function buildServicePaymentConfirmedCustomerEmailCopy(
       return {
         subject: '[Locally] Your service payment is complete',
         title: 'Payment is complete',
-        message: `Payment for '${requestTitle}' is complete, and local host recruitment is now starting.`,
+        message: `Payment for '${requestTitle}' is complete. Your private local coordinator chat is ready and host assignment is starting.`,
         ctaLabel: 'View request',
       };
     case 'ja':
       return {
         subject: '[Locally] サービスの決済が完了しました',
         title: '決済が完了しました',
-        message: `「${requestTitle}」の決済が完了し、現地ホストの募集が始まります。`,
+        message: `「${requestTitle}」の決済が完了しました。1:1お問い合わせが開き、ホスト手配が始まります。`,
         ctaLabel: '依頼を見る',
       };
     case 'zh':
       return {
         subject: '[Locally] 服务付款已完成',
         title: '付款已完成',
-        message: `「${requestTitle}」的付款已完成，现已开始招募当地房东。`,
+        message: `「${requestTitle}」的付款已完成。当地负责人一对一咨询已打开，并开始安排向导。`,
         ctaLabel: '查看请求',
       };
     case 'ko':
@@ -1169,7 +1169,7 @@ function buildServicePaymentConfirmedCustomerEmailCopy(
       return {
         subject: '[Locally] 서비스 결제가 완료되었습니다',
         title: '결제가 완료되었습니다',
-        message: `'${requestTitle}' 결제가 완료되어 현지 호스트 모집이 시작됩니다.`,
+        message: `'${requestTitle}' 결제가 완료되었습니다. 현지 담당자 1:1 문의가 열리고 호스트 배정이 시작됩니다.`,
         ctaLabel: '의뢰 확인하기',
       };
   }
@@ -1223,32 +1223,32 @@ function buildServiceHostSelectedEmailCopy(
   switch (locale) {
     case 'en':
       return {
-        subject: '[Locally] You were selected by the guest',
-        title: 'You were selected by the guest',
-        message: `You were selected for '${requestTitle}'. Please get ready to proceed.`,
-        ctaLabel: 'View request',
+        subject: '[Locally] Your host assignment is complete',
+        title: 'Locally assigned the host',
+        message: `A host has been assigned for '${requestTitle}'. Open the private thread to confirm the details.`,
+        ctaLabel: 'Open thread',
       };
     case 'ja':
       return {
-        subject: '[Locally] ゲストに選ばれました',
-        title: 'ゲストに選ばれました',
-        message: `「${requestTitle}」の依頼で選ばれました。進行の準備をお願いします。`,
-        ctaLabel: '依頼を見る',
+        subject: '[Locally] ホスト手配が完了しました',
+        title: 'Locallyがホストを手配しました',
+        message: `「${requestTitle}」の専用お問い合わせで詳細をご確認ください。`,
+        ctaLabel: 'お問い合わせを開く',
       };
     case 'zh':
       return {
-        subject: '[Locally] 你已被游客选中',
-        title: '你已被游客选中',
-        message: `你已在「${requestTitle}」中被选中，请开始准备后续 진행。`,
-        ctaLabel: '查看请求',
+        subject: '[Locally] 向导安排已完成',
+        title: 'Locally已安排向导',
+        message: `请在「${requestTitle}」的专属咨询中确认详情。`,
+        ctaLabel: '打开咨询',
       };
     case 'ko':
     default:
       return {
-        subject: '[Locally] 고객에게 선택되었습니다',
-        title: '고객에게 선택되었습니다',
-        message: `'${requestTitle}' 의뢰에서 선택되셨습니다. 바로 진행을 준비해주세요.`,
-        ctaLabel: '의뢰 확인하기',
+        subject: '[Locally] 호스트 배정이 완료되었습니다',
+        title: '로컬리가 호스트를 배정했습니다',
+        message: `'${requestTitle}' 전용 문의에서 일정과 세부 내용을 확인해주세요.`,
+        ctaLabel: '전용 문의 열기',
       };
   }
 }
@@ -1288,7 +1288,7 @@ function buildServiceCancelEmailCopy(
         return {
           subject: '[Locally] 서비스 취소 요청이 접수되었습니다',
           title: '취소 요청이 접수되었습니다',
-          message: `'${requestTitle}' 서비스 취소 요청이 접수되었습니다. 관리자가 검토 후 처리합니다.`,
+          message: `'${requestTitle}' 서비스 취소 요청이 접수되었습니다. 현지 담당자가 검토 후 처리합니다.`,
           ctaLabel: '의뢰 확인하기',
         };
     }

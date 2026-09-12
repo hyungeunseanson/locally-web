@@ -87,13 +87,18 @@ test.describe('Server RPC execute lockdown contract', () => {
       'app/api/cron/complete-trips/route.ts',
       'app/api/cron/complete-services/route.ts',
       'app/api/services/requests/route.ts',
-      'app/api/services/select-host/route.ts',
       'app/api/admin/service-confirm-payment/route.ts',
+      'app/api/admin/service-requests/[requestId]/assign-host/route.ts',
       'app/api/admin/settlement-sync/route.ts',
       'app/api/admin/team/_shared.ts',
     ]) {
       expect(readFileSync(entryPath, 'utf8')).toContain('createAdminClient');
     }
+
+    const retiredSelectHostRoute = readFileSync('app/api/services/select-host/route.ts', 'utf8');
+    expect(retiredSelectHostRoute).toContain('status: 410');
+    expect(retiredSelectHostRoute).toContain('SERVICE_MARKETPLACE_DISABLED');
+    expect(retiredSelectHostRoute).not.toContain('createAdminClient');
 
     const translationRoute = readFileSync('app/api/cron/experience-translations/route.ts', 'utf8');
     expect(translationRoute).toContain('p_reserved_tokens: RESERVED_TOKENS[provider]');

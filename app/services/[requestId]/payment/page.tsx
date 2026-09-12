@@ -39,8 +39,21 @@ type ServicePaymentRequest = Pick<
   | 'start_time'
   | 'duration_hours'
   | 'guest_count'
+  | 'service_type'
+  | 'pricing_reason'
+  | 'hourly_rate_customer'
   | 'total_customer_price'
->;
+  | 'contact_name'
+  | 'contact_phone'
+> & {
+  schedule?: Array<{
+    id: string;
+    serviceDate: string;
+    startTime: string;
+    durationHours: number;
+    sortOrder: number;
+  }>;
+};
 
 type PaymentMethod = 'card' | 'bank' | 'paypal';
 
@@ -140,41 +153,22 @@ function ServicePaymentContent() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { router.push('/login'); return; }
 
-    // 의뢰 정보 조회
-    const { data: req, error: requestError } = await supabase
-      .from('service_requests')
-      .select('id, title, service_date, start_time, duration_hours, guest_count, total_customer_price')
-      .eq('id', requestId)
-      .maybeSingle<ServicePaymentRequest>();
-
-    if (requestError || !req) { router.push('/services/my'); return; }
-    setRequest(req);
-
-    // v2 에스크로: 사전 생성된 PENDING 예약 조회
-    const { data: booking } = await supabase
-      .from('service_bookings')
-      .select('id, order_id, amount, status, payment_method')
-      .eq('request_id', requestId)
-      .eq('customer_id', user.id)
-      .eq('status', 'PENDING')
-      .maybeSingle();
-
-    if (!booking) {
-      // 이미 결제 완료 혹은 취소된 경우
+    const paymentResponse = await fetch(`/api/services/bookings?requestId=${encodeURIComponent(requestId)}`, {
+      cache: 'no-store',
+    });
+    const paymentData = await paymentResponse.json() as {
+      success?: boolean;
+      request?: ServicePaymentRequest;
+      booking?: PendingBooking;
+    };
+    if (!paymentResponse.ok || !paymentData.success || !paymentData.request || !paymentData.booking) {
       router.push(`/services/${requestId}`);
       return;
     }
-    setPendingBooking(booking as PendingBooking);
-
-    // 연락처 자동 완성
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('full_name, phone')
-      .eq('id', user.id)
-      .maybeSingle();
-
-    if (profile?.full_name) setContactName(profile.full_name);
-    if (profile?.phone) setContactPhone(profile.phone);
+    setRequest(paymentData.request);
+    setPendingBooking(paymentData.booking);
+    setContactName(paymentData.request.contact_name || '');
+    setContactPhone(paymentData.request.contact_phone || '');
   }, [requestId, router, supabase]);
 
   useEffect(() => { void fetchData(); }, [fetchData]);
@@ -559,71 +553,69 @@ function ServicePaymentContent() {
           }}
         />
       )}
-      <div className="max-w-lg mx-auto px-4 py-6 md:py-10 pb-44 md:pb-12">
+      <div className="mx-auto max-w-2xl px-5 py-8 pb-44 md:px-8 md:py-12 md:pb-16">
         {/* 헤더 */}
-        <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => router.back()} className="w-9 h-9 flex items-center justify-center rounded-full border border-slate-200 hover:bg-slate-50">
-            <ChevronLeft size={18} />
+        <div className="mb-8 flex items-center gap-3 border-b border-zinc-200 pb-7">
+          <button onClick={() => router.back()} className="flex h-8 w-8 items-center justify-center text-zinc-500 hover:text-zinc-950">
+            <ChevronLeft size={17} />
           </button>
-          <h1 className="text-[18px] md:text-xl font-black">{t('sp_title')}</h1>
+          <h1 className="text-2xl font-semibold tracking-[-0.025em]">{t('sp_title')}</h1>
         </div>
 
         {/* 에스크로 안내 */}
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3.5 mb-5 flex items-start gap-3">
-          <Lock size={16} className="text-amber-600 shrink-0 mt-0.5" />
+        <div className="mb-7 flex items-start gap-3 rounded-md bg-zinc-100 px-4 py-3.5">
+          <Lock size={16} className="mt-0.5 shrink-0 text-zinc-700" />
           <div>
-            <p className="text-[12px] md:text-[13px] font-bold text-amber-800 mb-0.5">{t('sp_escrow_badge')}</p>
-            <p className="text-[11px] md:text-[12px] text-amber-700 leading-relaxed">
+            <p className="mb-0.5 text-xs font-semibold text-zinc-900 md:text-[13px]">{t('sp_escrow_badge')}</p>
+            <p className="text-[11px] leading-relaxed text-zinc-600 md:text-xs">
               {t('sp_escrow_desc')}
             </p>
           </div>
         </div>
 
         {/* 서비스 요약 */}
-        <div className="bg-slate-50 rounded-2xl p-4 md:p-5 mb-5">
-          <h2 className="font-bold text-[14px] md:text-[15px] mb-2 line-clamp-2">{request.title}</h2>
-          <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] md:text-[13px] text-slate-500">
+        <div className="mb-8 border-y border-zinc-200 py-5">
+          <h2 className="mb-2 line-clamp-2 text-sm font-semibold md:text-[15px]">{request.title}</h2>
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-zinc-500 md:text-[13px]">
             <span className="flex items-center gap-1"><Clock size={11} />{request.duration_hours}{t('req_duration_hours')}</span>
             <span className="flex items-center gap-1"><Users size={11} />{request.guest_count}{t('req_guest_count')}</span>
-            <span>{request.service_date} {request.start_time}</span>
+            <span>₩{request.hourly_rate_customer.toLocaleString()}/h</span>
           </div>
-          <div className="mt-3 pt-3 border-t border-slate-200 flex justify-between items-center">
-            <span className="text-[12px] md:text-sm text-slate-500">{t('sp_payment_amount')}</span>
-            <span className="font-black text-[18px] md:text-xl text-slate-900">₩{request.total_customer_price.toLocaleString()}</span>
+          <div className="mt-4 divide-y divide-zinc-200 border-y border-zinc-200">
+            {(request.schedule || []).map((item) => (
+              <div key={item.id} className="flex justify-between py-2.5 text-[11px] text-zinc-600">
+                <span>{item.serviceDate}</span><span>{item.startTime} · {item.durationHours}h</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 flex items-center justify-between border-t border-zinc-200 pt-4">
+            <span className="text-xs text-zinc-500 md:text-sm">{t('sp_payment_amount')}</span>
+            <span className="text-lg font-semibold text-zinc-950 md:text-xl">₩{request.total_customer_price.toLocaleString()}</span>
           </div>
         </div>
 
-        {/* 예약자 정보 */}
+        {/* 신청서에 이미 입력한 연락처를 결제 단계에서 재사용 */}
         <div className="mb-5">
-          <h3 className="text-[13px] md:text-sm font-bold text-slate-700 mb-3">{t('sp_booker_info')}</h3>
-          <div className="space-y-3">
-            <input
-              value={contactName}
-              onChange={(e) => setContactName(e.target.value)}
-              placeholder={t('sp_booker_name_ph') as string}
-              className="w-full border border-slate-200 rounded-xl px-4 py-3 text-[13px] md:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-            />
-            <input
-              value={contactPhone}
-              onChange={(e) => setContactPhone(e.target.value)}
-              placeholder={t('sp_booker_phone_ph') as string}
-              className="w-full border border-slate-200 rounded-xl px-4 py-3 text-[13px] md:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-            />
+          <h3 className="mb-3 text-[13px] font-semibold text-zinc-800 md:text-sm">{t('sp_booker_info')}</h3>
+          <div className="rounded-md border border-zinc-300 px-4 py-3 text-xs leading-6 text-zinc-700 md:text-[13px]">
+            <p className="font-semibold text-zinc-950">{contactName}</p>
+            <p>{contactPhone}</p>
+            <p className="mt-1 text-[10px] text-zinc-500 md:text-[11px]">{t('sp_submitted_contact')}</p>
           </div>
         </div>
 
         {/* 결제 수단 선택 */}
         <div className="mb-5">
-          <h3 className="text-[13px] md:text-sm font-bold text-slate-700 mb-3">{t('sp_method_title')}</h3>
+          <h3 className="mb-3 text-[13px] font-semibold text-zinc-800 md:text-sm">{t('sp_method_title')}</h3>
           {isCardReadyResolved && !isCardReady && (
-            <p className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700 md:text-[12px]">
+            <p className="mb-3 rounded-md bg-zinc-100 px-3 py-2 text-[11px] text-zinc-700 md:text-xs">
               {cardReadyReason === 'missing_imp_code'
                 ? t('sp_card_unavailable_config')
                 : t('sp_card_unavailable_fallback')}
             </p>
           )}
           {isBankLockedBooking && (
-            <p className="mb-3 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-[11px] text-sky-700 md:text-[12px]">
+            <p className="mb-3 rounded-md border border-zinc-300 px-3 py-2 text-[11px] text-zinc-700 md:text-xs">
               {t('sp_bank_locked_notice')}
             </p>
           )}
@@ -636,26 +628,26 @@ function ServicePaymentContent() {
                 }
               }}
               disabled={isBankLockedBooking || !isCardReadyResolved || !isCardReady}
-              className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-colors ${paymentMethod === 'card'
-                  ? 'border-slate-900 bg-slate-50'
+              className={`flex flex-col items-center gap-2 rounded-md border p-4 transition-colors ${paymentMethod === 'card'
+                  ? 'border-zinc-950 bg-zinc-950 text-white'
                   : isBankLockedBooking || !isCardReadyResolved || !isCardReady
-                    ? 'border-slate-200 bg-slate-50 text-slate-300 cursor-not-allowed'
-                    : 'border-slate-200 hover:border-slate-300'
+                    ? 'cursor-not-allowed border-zinc-200 bg-zinc-100 text-zinc-300'
+                    : 'border-zinc-300 hover:border-zinc-950'
                 }`}
             >
-              <CreditCard size={20} className={paymentMethod === 'card' ? 'text-slate-900' : 'text-slate-400'} />
-              <span className={`text-[12px] md:text-[13px] font-bold ${paymentMethod === 'card' ? 'text-slate-900' : 'text-slate-400'}`}>{t('sp_method_card')}</span>
+              <CreditCard size={20} className={paymentMethod === 'card' ? 'text-white' : 'text-zinc-400'} />
+              <span className={`text-xs font-semibold md:text-[13px] ${paymentMethod === 'card' ? 'text-white' : 'text-zinc-600'}`}>{t('sp_method_card')}</span>
             </button>
             <button
               type="button"
               onClick={() => setPaymentMethod('bank')}
-              className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-colors ${paymentMethod === 'bank'
-                  ? 'border-slate-900 bg-slate-50'
-                  : 'border-slate-200 hover:border-slate-300'
+              className={`flex flex-col items-center gap-2 rounded-md border p-4 transition-colors ${paymentMethod === 'bank'
+                  ? 'border-zinc-950 bg-zinc-950 text-white'
+                  : 'border-zinc-300 hover:border-zinc-950'
                 }`}
             >
-              <Landmark size={20} className={paymentMethod === 'bank' ? 'text-slate-900' : 'text-slate-400'} />
-              <span className={`text-[12px] md:text-[13px] font-bold ${paymentMethod === 'bank' ? 'text-slate-900' : 'text-slate-400'}`}>{t('sp_method_bank')}</span>
+              <Landmark size={20} className={paymentMethod === 'bank' ? 'text-white' : 'text-zinc-400'} />
+              <span className={`text-xs font-semibold md:text-[13px] ${paymentMethod === 'bank' ? 'text-white' : 'text-zinc-600'}`}>{t('sp_method_bank')}</span>
             </button>
             {isPayPalEnabled && (
               <button
@@ -682,17 +674,17 @@ function ServicePaymentContent() {
 
         {/* 무통장 계좌 안내 */}
         {paymentMethod === 'bank' && (
-          <div className="bg-slate-50 p-3 md:p-4 rounded-lg md:rounded-xl border border-slate-200 mb-5 animate-in fade-in zoom-in-95">
-            <p className="text-[11px] md:text-xs font-bold text-slate-500 mb-1">{t('sp_bank_account')}</p>
+          <div className="mb-5 animate-in rounded-md border border-zinc-300 p-3 fade-in zoom-in-95 md:p-4">
+            <p className="mb-1 text-[11px] font-semibold text-zinc-500 md:text-xs">{t('sp_bank_account')}</p>
             <div className="flex items-center gap-2 mb-2">
-              <span className="font-black text-[16px] md:text-lg text-slate-900">{bankInfo.account}</span>
-              <span className="text-[10px] md:text-xs font-bold bg-yellow-300 px-1 md:px-1.5 py-0.5 rounded text-black">{bankInfo.bankName}</span>
+              <span className="text-base font-semibold text-zinc-950 md:text-lg">{bankInfo.account}</span>
+              <span className="rounded border border-zinc-300 px-1.5 py-0.5 text-[10px] font-medium text-zinc-700 md:text-xs">{bankInfo.bankName}</span>
             </div>
             <p className="mb-1 text-[11px] md:text-xs text-slate-500">
               {t('pay_complete_bank_account_holder_label')}: {bankInfo.accountHolder}
             </p>
             <p className="text-[11px] md:text-xs text-slate-400">
-              {t('sp_bank_notice_1')}<span className="text-rose-500 font-bold">{t('sp_bank_notice_hl')}</span>{t('sp_bank_notice_2')}
+              {t('sp_bank_notice_1')}<span className="font-semibold text-zinc-950">{t('sp_bank_notice_hl')}</span>{t('sp_bank_notice_2')}
             </p>
           </div>
         )}
@@ -730,7 +722,7 @@ function ServicePaymentContent() {
 
         {/* 안전 결제 안내 */}
         <div className="flex items-center gap-2 text-[10px] md:text-xs text-slate-400 mb-5">
-          <ShieldCheck size={13} className="text-emerald-500 shrink-0" />
+          <ShieldCheck size={13} className="shrink-0 text-zinc-600" />
           {t('sp_safe_pay')}
         </div>
 
@@ -746,7 +738,7 @@ function ServicePaymentContent() {
           <button
             onClick={handlePayment}
             disabled={isProcessing || (paymentMethod === 'card' && (!isCardReadyResolved || !isCardReady))}
-            className="hidden w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-[14px] md:flex md:text-base hover:bg-slate-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed shadow-lg items-center justify-center gap-2"
+            className="hidden w-full items-center justify-center gap-2 rounded-md bg-zinc-950 py-4 text-sm font-semibold text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60 md:flex md:text-base"
           >
             {isProcessing ? (
               <><Loader2 size={18} className="animate-spin" /> {t('processing')}</>
@@ -757,15 +749,15 @@ function ServicePaymentContent() {
             )}
           </button>
         ) : (
-          <div className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-center text-[12px] text-slate-500">
+          <div className="w-full rounded-md border border-zinc-300 bg-white px-4 py-3 text-center text-xs text-zinc-500">
             {t('sp_paypal_hint')}
           </div>
         )}
       </div>
       <div
         data-testid="service-payment-mobile-cta"
-        className="fixed inset-x-0 bottom-0 z-[120] border-t border-slate-200 bg-white/95 px-4 py-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur-md md:hidden"
-        style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom, 0px))' }}
+        className="fixed left-14 right-3 z-[120] rounded-lg border border-zinc-200 bg-white p-2 shadow-[0_8px_32px_rgba(0,0,0,0.16)] md:hidden"
+        style={{ bottom: 'max(12px, env(safe-area-inset-bottom, 0px))' }}
       >
         <div className="mx-auto flex max-w-lg items-center gap-3">
           <div className="min-w-0 flex-1">
@@ -777,7 +769,7 @@ function ServicePaymentContent() {
               onClick={handlePayment}
               disabled={isProcessing || (paymentMethod === 'card' && (!isCardReadyResolved || !isCardReady))}
               data-testid="service-payment-mobile-submit"
-              className="min-w-[180px] rounded-2xl bg-slate-900 px-4 py-3.5 text-[13px] font-black text-white shadow-lg transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              className="min-w-[180px] rounded-md bg-zinc-950 px-4 py-3.5 text-[13px] font-semibold text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isProcessing ? (
                 <span className="inline-flex items-center justify-center gap-2">
@@ -798,7 +790,7 @@ function ServicePaymentContent() {
               type="button"
               onClick={scrollToPayPalButton}
               data-testid="service-payment-mobile-paypal-jump"
-              className="min-w-[180px] rounded-2xl bg-slate-900 px-4 py-3.5 text-[13px] font-black text-white shadow-lg transition-colors hover:bg-slate-800"
+              className="min-w-[180px] rounded-md bg-zinc-950 px-4 py-3.5 text-[13px] font-semibold text-white transition-colors hover:bg-zinc-800"
             >
               결제
             </button>

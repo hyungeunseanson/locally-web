@@ -1,40 +1,35 @@
-import { readFileSync } from 'fs';
-
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test } from '@playwright/test';
 
 import {
   cleanupAuthUsers,
   cleanupBookings,
+  cleanupSyntheticHostExperience,
   createAuthUser,
+  createSyntheticHostExperienceFixture,
   createTestUser,
   getLatestHostExperience,
   insertTestBooking,
   login,
+  type SyntheticExperienceFixture,
 } from './helpers/experienceBooking';
-
-type EnvMap = Record<string, string>;
+import { loadTestEnv } from './helpers/testSupabase';
 
 let adminClient: SupabaseClient | null = null;
 const createdAuthUserIds: string[] = [];
 const createdExperienceBookingIds: string[] = [];
 const createdServiceRequestIds: string[] = [];
 const createdServiceBookingIds: string[] = [];
+let syntheticExperienceFixture: SyntheticExperienceFixture | null = null;
 
-function loadEnv(): EnvMap {
-  return readFileSync('.env.local', 'utf8')
-    .split(/\n/)
-    .reduce<EnvMap>((acc, line) => {
-      const match = line.match(/^([^=]+)=(.*)$/);
-      if (match) acc[match[1]] = match[2];
-      return acc;
-    }, {});
-}
+test.beforeAll(async () => {
+  syntheticExperienceFixture = await createSyntheticHostExperienceFixture(createdAuthUserIds);
+});
 
 function getAdminClient() {
   if (adminClient) return adminClient;
 
-  const env = loadEnv();
+  const env = loadTestEnv();
   adminClient = createClient(
     env.NEXT_PUBLIC_SUPABASE_URL,
     env.SUPABASE_SERVICE_ROLE_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -156,6 +151,7 @@ test.afterAll(async () => {
   }
 
   await cleanupBookings(createdExperienceBookingIds);
+  await cleanupSyntheticHostExperience(syntheticExperienceFixture);
   await cleanupAuthUsers(createdAuthUserIds);
 });
 
@@ -165,7 +161,7 @@ test.describe.serial('Card callback contract', () => {
     const other = createTestUser('exp.callback.other');
     const ownerId = await createAuthUser(owner, createdAuthUserIds);
     await createAuthUser(other, createdAuthUserIds);
-    const { experienceId } = await getLatestHostExperience();
+    const { experienceId } = await getLatestHostExperience(syntheticExperienceFixture?.hostId);
 
     const bookingId = await createPaidExperienceBooking({
       experienceId,
@@ -190,7 +186,7 @@ test.describe.serial('Card callback contract', () => {
   test('treats already paid experience callbacks as idempotent', async ({ page }) => {
     const owner = createTestUser('exp.callback.idempotent');
     const ownerId = await createAuthUser(owner, createdAuthUserIds);
-    const { experienceId } = await getLatestHostExperience();
+    const { experienceId } = await getLatestHostExperience(syntheticExperienceFixture?.hostId);
 
     const bookingId = await createPaidExperienceBooking({
       experienceId,
@@ -219,7 +215,7 @@ test.describe.serial('Card callback contract', () => {
   test('keeps completed experience card notifications inert under PortOne', async ({ request }) => {
     const owner = createTestUser('exp.notification.completed');
     const ownerId = await createAuthUser(owner, createdAuthUserIds);
-    const { experienceId } = await getLatestHostExperience();
+    const { experienceId } = await getLatestHostExperience(syntheticExperienceFixture?.hostId);
 
     const bookingId = await createPaidExperienceBooking({
       experienceId,
@@ -260,7 +256,7 @@ test.describe.serial('Card callback contract', () => {
   test('keeps cancelled experience card notifications inert under PortOne', async ({ request }) => {
     const owner = createTestUser('exp.notification.cancelled');
     const ownerId = await createAuthUser(owner, createdAuthUserIds);
-    const { experienceId } = await getLatestHostExperience();
+    const { experienceId } = await getLatestHostExperience(syntheticExperienceFixture?.hostId);
 
     const bookingId = await createPaidExperienceBooking({
       experienceId,
@@ -319,7 +315,7 @@ test.describe.serial('Card callback contract', () => {
   test('keeps mismatched cancelled experience notifications inert under PortOne', async ({ request }) => {
     const owner = createTestUser('exp.notification.cancelled.mismatch');
     const ownerId = await createAuthUser(owner, createdAuthUserIds);
-    const { experienceId } = await getLatestHostExperience();
+    const { experienceId } = await getLatestHostExperience(syntheticExperienceFixture?.hostId);
 
     const bookingId = await createPaidExperienceBooking({
       experienceId,

@@ -9,15 +9,16 @@ import type { ServiceRequestStatus, ServiceApplicationStatus, ServiceBookingStat
 // service_requests 상태 집합
 // -----------------------------------------------------------------------------
 export const SERVICE_REQUEST_PENDING_PAYMENT_STATUSES = ['pending_payment'] as const; // v2: 에스크로 결제 대기
-export const SERVICE_REQUEST_OPEN_STATUSES = ['open'] as const;
+export const SERVICE_REQUEST_ASSIGNING_STATUSES = ['assigning'] as const;
+export const SERVICE_REQUEST_OPEN_STATUSES = ['open'] as const; // 레거시 전용
 export const SERVICE_REQUEST_ACTIVE_STATUSES = ['matched', 'paid', 'confirmed'] as const;
 export const SERVICE_REQUEST_COMPLETED_STATUSES = ['completed'] as const;
 export const SERVICE_REQUEST_CLOSED_STATUSES = ['cancelled', 'expired'] as const;
 
-// 호스트 잡보드에서 표시할 의뢰 상태 (open만 — pending_payment는 절대 노출 금지)
+// 레거시 호환용. 신규 호스트 화면에는 공개 의뢰 목록을 노출하지 않는다.
 export const SERVICE_REQUEST_VISIBLE_STATUSES = [...SERVICE_REQUEST_OPEN_STATUSES] as const;
 
-// v2 에스크로: 결제는 의뢰 등록 직후, 호스트 선택은 별도 단계
+// 결제는 의뢰 등록 직후, 호스트 배정은 관리자가 별도로 진행한다.
 export const SERVICE_REQUEST_PAYABLE_STATUS = 'pending_payment' as const;
 
 // -----------------------------------------------------------------------------
@@ -41,6 +42,7 @@ export const SERVICE_BOOKING_CANCELLED_STATUSES = ['cancelled', 'cancellation_re
 
 // service_requests
 export const isPendingPaymentServiceRequest = (status: string) => status === 'pending_payment'; // v2 에스크로
+export const isAssigningServiceRequest = (status: string) => status === 'assigning';
 export const isOpenServiceRequest = (status: string) => status === 'open';
 export const isMatchedServiceRequest = (status: string) => status === 'matched';
 export const isPaidServiceRequest = (status: string) => status === 'paid';
@@ -70,18 +72,17 @@ export const isCancellationRequestedServiceBooking = (status: string) =>
 // -----------------------------------------------------------------------------
 // UI 레이블 헬퍼 (ServiceRequestStatus → 표시 문자열)
 // -----------------------------------------------------------------------------
-export const getServiceRequestStatusLabel = (status: ServiceRequestStatus): string => {
-  const labels: Record<ServiceRequestStatus, string> = {
-    pending_payment: '결제 대기',  // v2 에스크로
-    open: '모집 중',
-    matched: '호스트 선택됨',
-    paid: '결제 완료',
-    confirmed: '확정',
-    completed: '완료',
-    cancelled: '취소됨',
-    expired: '기간 만료',
+export const getServiceRequestStatusLabel = (
+  status: ServiceRequestStatus,
+  locale: 'ko' | 'en' | 'ja' | 'zh' = 'ko'
+): string => {
+  const labels: Record<typeof locale, Record<ServiceRequestStatus, string>> = {
+    ko: { pending_payment: '결제 대기', assigning: '관리자 배정 중', open: '관리자 배정 중(구버전)', matched: '호스트 배정 완료', paid: '결제 완료', confirmed: '확정', completed: '완료', cancellation_requested: '취소 검토 중', cancelled: '취소됨', expired: '기간 만료' },
+    en: { pending_payment: 'Payment pending', assigning: 'Manager assigning', open: 'Manager assigning (legacy)', matched: 'Host assigned', paid: 'Paid', confirmed: 'Confirmed', completed: 'Completed', cancellation_requested: 'Cancellation review', cancelled: 'Cancelled', expired: 'Expired' },
+    ja: { pending_payment: '決済待ち', assigning: 'スタッフ手配中', open: 'スタッフ手配中（旧）', matched: 'ホスト手配済み', paid: '決済完了', confirmed: '確定', completed: '完了', cancellation_requested: 'キャンセル確認中', cancelled: 'キャンセル済み', expired: '期限切れ' },
+    zh: { pending_payment: '待付款', assigning: '管理员安排中', open: '管理员安排中（旧）', matched: '已安排向导', paid: '已付款', confirmed: '已确认', completed: '已完成', cancellation_requested: '取消审核中', cancelled: '已取消', expired: '已过期' },
   };
-  return labels[status] ?? status;
+  return labels[locale][status] ?? status;
 };
 
 export const getServiceApplicationStatusLabel = (status: ServiceApplicationStatus): string => {

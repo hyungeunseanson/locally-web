@@ -1,5 +1,3 @@
-import { readFileSync } from 'fs';
-
 import { createClient } from '@supabase/supabase-js';
 import { expect, test } from '@playwright/test';
 
@@ -7,28 +5,27 @@ import {
   cleanupAuthUsers,
   cleanupAvailability,
   cleanupBookings,
+  cleanupSyntheticHostExperience,
   createAuthUser,
+  createSyntheticHostExperienceFixture,
   createTestUser,
   login,
   prepareBookableExperience,
   type AvailabilityKey,
+  type SyntheticExperienceFixture,
 } from './helpers/experienceBooking';
+import { loadTestEnv } from './helpers/testSupabase';
 
 type EnvMap = Record<string, string>;
 
 const createdAuthUserIds: string[] = [];
 const createdBookingIds: string[] = [];
 const createdAvailabilityKeys: AvailabilityKey[] = [];
+let syntheticExperienceFixture: SyntheticExperienceFixture | null = null;
 
-function loadEnv(): EnvMap {
-  return readFileSync('.env.local', 'utf8')
-    .split(/\n/)
-    .reduce<EnvMap>((acc, line) => {
-      const match = line.match(/^([^=]+)=(.*)$/);
-      if (match) acc[match[1]] = match[2];
-      return acc;
-    }, {});
-}
+test.beforeAll(async () => {
+  syntheticExperienceFixture = await createSyntheticHostExperienceFixture(createdAuthUserIds);
+});
 
 async function getAuthenticatedUserToken(env: EnvMap, email: string, password: string) {
   const authClient = createClient(
@@ -57,15 +54,18 @@ async function getAuthenticatedUserToken(env: EnvMap, email: string, password: s
 test.afterAll(async () => {
   await cleanupBookings(createdBookingIds);
   await cleanupAvailability(createdAvailabilityKeys);
+  await cleanupSyntheticHostExperience(syntheticExperienceFixture);
   await cleanupAuthUsers(createdAuthUserIds);
 });
 
 test.describe.serial('booking RPC public guard', () => {
   test('blocks direct browser create_booking_atomic calls but keeps /api/bookings working', async ({ page }) => {
-    const env = loadEnv();
+    const env = loadTestEnv();
     const requester = createTestUser('exp.rpc.guard.requester');
     const requesterId = await createAuthUser(requester, createdAuthUserIds);
-    const experience = await prepareBookableExperience(createdAvailabilityKeys);
+    const experience = await prepareBookableExperience(createdAvailabilityKeys, {
+      hostUserId: syntheticExperienceFixture?.hostId,
+    });
 
     await login(page, requester);
 
@@ -157,6 +157,7 @@ test.describe.serial('booking RPC public guard', () => {
     await createAuthUser(holder, createdAuthUserIds);
     await createAuthUser(requester, createdAuthUserIds);
     const experience = await prepareBookableExperience(createdAvailabilityKeys, {
+      hostUserId: syntheticExperienceFixture?.hostId,
       minimumMaxGuests: 1,
     });
 
