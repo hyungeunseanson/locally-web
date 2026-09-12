@@ -171,18 +171,16 @@ test.describe('Google Analytics privacy-first contracts', () => {
     )).not.toContain('sendGoogleAnalyticsEvent');
   });
 
-  test('adds safe external links to the protected admin analytics screen', () => {
+  test('keeps the provider-neutral analytics link on the protected admin screen', () => {
     const analyticsTabSource = fs.readFileSync(
       path.join(process.cwd(), 'app/admin/dashboard/components/AnalyticsTab.tsx'),
       'utf8',
     );
 
-    expect(analyticsTabSource).toContain('admin-vercel-analytics-link');
     expect(analyticsTabSource).toContain('admin-google-analytics-link');
     expect(analyticsTabSource).toContain('target="_blank"');
     expect(analyticsTabSource).toContain('rel="noopener noreferrer"');
-    expect(analyticsTabSource).toContain(
-      'https://vercel.com/locallys-projects-b062321b/locally-web/analytics',
-    );
+    expect(analyticsTabSource).not.toContain('admin-vercel-analytics-link');
+    expect(analyticsTabSource).not.toContain('vercel.com/');
   });
 });

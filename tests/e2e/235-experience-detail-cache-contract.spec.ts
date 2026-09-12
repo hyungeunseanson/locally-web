@@ -83,7 +83,7 @@ test.describe('experience detail public cache contract', () => {
     );
   });
 
-  test('keeps R2 image components outside the Vercel optimizer path', () => {
+  test('keeps R2 image components outside the framework optimizer path', () => {
     expect(clientSource).toContain('PublicExperienceDetailImage');
     expect(clientSource).toContain('PublicHostProfileImage');
     expect(pageSource).not.toContain("from 'next/image'");

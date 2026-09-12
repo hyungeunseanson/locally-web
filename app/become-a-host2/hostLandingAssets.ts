@@ -1,6 +1,3 @@
-import fs from 'node:fs';
-import path from 'node:path';
-
 export type HostLandingLocale = 'ko' | 'en' | 'ja' | 'zh';
 
 type HostLandingDevice = 'desktop' | 'mobile';
@@ -14,8 +11,39 @@ type HostLandingSectionDefinition = {
   alt: LocalizedAlt;
 };
 
-const DEFAULT_HOST_LANDING_LOCALE: HostLandingLocale = 'ko';
-const HOST_LANDING_ASSET_EXTENSIONS = ['.webp', '.png'] as const;
+type HostLandingSectionId = HostLandingSectionDefinition['id'];
+type HostLandingExtension = '.webp' | '.png';
+
+const DESKTOP_EXTENSIONS: Record<HostLandingSectionId, HostLandingExtension> = {
+  '1': '.png',
+  '2': '.webp',
+  '3': '.png',
+  '4': '.png',
+  '5': '.webp',
+  '6': '.png',
+  '7': '.png',
+};
+
+const MOBILE_EXTENSIONS_WITH_WEBP_SECTION_FIVE: Record<HostLandingSectionId, HostLandingExtension> = {
+  ...DESKTOP_EXTENSIONS,
+};
+
+const MOBILE_EXTENSIONS_WITH_PNG_SECTION_FIVE: Record<HostLandingSectionId, HostLandingExtension> = {
+  ...DESKTOP_EXTENSIONS,
+  '5': '.png',
+};
+
+// These paths are build artifacts, not runtime filesystem discoveries. The contract
+// suite checks this manifest against public/ before either deployment path is used.
+const HOST_LANDING_ASSET_EXTENSIONS: Record<
+  HostLandingLocale,
+  Record<HostLandingDevice, Record<HostLandingSectionId, HostLandingExtension>>
+> = {
+  ko: { desktop: DESKTOP_EXTENSIONS, mobile: MOBILE_EXTENSIONS_WITH_PNG_SECTION_FIVE },
+  en: { desktop: DESKTOP_EXTENSIONS, mobile: MOBILE_EXTENSIONS_WITH_WEBP_SECTION_FIVE },
+  ja: { desktop: DESKTOP_EXTENSIONS, mobile: MOBILE_EXTENSIONS_WITH_WEBP_SECTION_FIVE },
+  zh: { desktop: DESKTOP_EXTENSIONS, mobile: MOBILE_EXTENSIONS_WITH_PNG_SECTION_FIVE },
+};
 
 const HOST_LANDING_SECTION_DEFINITIONS: HostLandingSectionDefinition[] = [
   {
@@ -100,27 +128,10 @@ const HOST_LANDING_SECTION_DEFINITIONS: HostLandingSectionDefinition[] = [
 function getHostLandingAssetPath(
   device: HostLandingDevice,
   locale: HostLandingLocale,
-  baseName: string
+  baseName: HostLandingSectionId
 ) {
-  for (const extension of HOST_LANDING_ASSET_EXTENSIONS) {
-    const localizedRelativePath = `/images/become-a-host/${device}/${locale}/${baseName}${extension}`;
-    const localizedAbsolutePath = path.join(process.cwd(), 'public', localizedRelativePath);
-
-    if (fs.existsSync(localizedAbsolutePath)) {
-      return localizedRelativePath;
-    }
-  }
-
-  for (const extension of HOST_LANDING_ASSET_EXTENSIONS) {
-    const fallbackRelativePath = `/images/become-a-host/${device}/${DEFAULT_HOST_LANDING_LOCALE}/${baseName}${extension}`;
-    const fallbackAbsolutePath = path.join(process.cwd(), 'public', fallbackRelativePath);
-
-    if (fs.existsSync(fallbackAbsolutePath)) {
-      return fallbackRelativePath;
-    }
-  }
-
-  return `/images/become-a-host/${device}/${DEFAULT_HOST_LANDING_LOCALE}/${baseName}.png`;
+  const extension = HOST_LANDING_ASSET_EXTENSIONS[locale][device][baseName];
+  return `/images/become-a-host/${device}/${locale}/${baseName}${extension}`;
 }
 
 export function getHostLandingSections(locale: HostLandingLocale) {

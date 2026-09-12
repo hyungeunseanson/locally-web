@@ -49,6 +49,15 @@ jobs:
       - name: Validate the functional canary safety contract
         run: npm run cloudflare:functional:contract
 
+      - name: Validate the migration manifest and bindings
+        run: npm run cloudflare:migration:config
+
+      - name: Validate migration runtime adaptations
+        run: npm run cloudflare:migration:contract
+
+      - name: Validate placement profile generation
+        run: npm run cloudflare:placement:contract
+
       - name: Validate the Supabase staging baseline
         run: npm run supabase:staging:baseline:check
 
@@ -58,11 +67,14 @@ jobs:
       - name: Build OpenNext worker
         run: npm run cloudflare:build
 
-      - name: Generate binding types
+      - name: Generate canary and production binding types
         run: npm run cloudflare:typegen
 
-      - name: Run Wrangler dry-run
+      - name: Run canary and production Wrangler dry-runs
         run: npm run cloudflare:dry-run
+
+      - name: Run placement profile Wrangler dry-runs
+        run: npm run cloudflare:placement:dry-run
 
       - name: Enforce Worker bundle and static asset limits
         run: npm run cloudflare:artifacts:check

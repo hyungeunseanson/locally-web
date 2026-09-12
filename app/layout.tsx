@@ -15,13 +15,11 @@ import { AuthProvider } from '@/app/context/AuthContext';
 import { ViewModeProvider, type ViewMode } from '@/app/context/ViewModeContext';
 import { getCurrentLocale } from '@/app/utils/locale';
 import { resolveDesktopFooterAdSlotConfig } from '@/app/utils/adsense';
-import { shouldRenderVercelAnalytics } from '@/app/utils/analytics/runtime';
 import { resolveGoogleAnalyticsConfig } from '@/app/utils/analytics/google';
 import { buildAbsoluteUrl, buildLocalizedAbsoluteUrl, getSiteUrl } from '@/app/utils/siteUrl';
 import { IAB_ESCAPE_BYPASS_PARAM } from '@/app/utils/iab';
 import { createClient } from '@/app/utils/supabase/server';
 import { hasSupabaseSessionCookie } from '@/app/utils/supabase/authCookies';
-import { Analytics } from "@vercel/analytics/react";
 import { SplashProvider } from '@/app/context/SplashContext';
 import GlobalSplash from '@/app/components/GlobalSplash';
 import GlobalAnnouncementModal from '@/app/components/GlobalAnnouncementModal';
@@ -132,7 +130,6 @@ export default async function RootLayout({
 }>) {
   const locale = await getCurrentLocale();
   const desktopFooterAdConfig = resolveDesktopFooterAdSlotConfig(process.env);
-  const vercelAnalyticsEnabled = shouldRenderVercelAnalytics(process.env);
   const googleAnalyticsConfig = resolveGoogleAnalyticsConfig(process.env);
   const kakaoIabEscapeEnabled = process.env.NEXT_PUBLIC_ENABLE_KAKAO_IAB_ESCAPE === 'true';
   const cookieStore = await cookies();
@@ -214,7 +211,6 @@ export default async function RootLayout({
                         <BottomTabNavigation />
                       </div>
                       <GlobalSupportReportButton />
-                      {vercelAnalyticsEnabled && <Analytics />}
                       <GoogleAnalyticsGate
                         enabled={googleAnalyticsConfig.enabled}
                         measurementId={googleAnalyticsConfig.measurementId}

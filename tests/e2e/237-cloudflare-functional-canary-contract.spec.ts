@@ -65,9 +65,9 @@ test.describe('Cloudflare functional canary contract', () => {
     expect(cacheRoute).toContain('const ISOLATE_ID = crypto.randomUUID()');
   });
 
-  test('uses Cloudflare Images only in canary and preserves current image application behavior', () => {
+  test('uses Cloudflare Images in both deployment environments and preserves image behavior', () => {
     expect(wrangler.env.canary.images).toEqual({ binding: 'IMAGES' });
-    expect(wrangler.env.production.images).toBeUndefined();
+    expect(wrangler.env.production.images).toEqual({ binding: 'IMAGES' });
     expect(nextConfig).not.toContain("loader: 'custom'");
     expect(readFileSync('app/components/PublicExperienceCardImage.tsx', 'utf8')).toContain('unoptimized');
     expect(readFileSync('app/components/PublicExperienceDetailImage.tsx', 'utf8')).toContain('supabase-fallback');

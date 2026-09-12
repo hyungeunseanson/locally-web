@@ -39,7 +39,7 @@ export async function recordAuditLog({ admin_id, admin_email, action_type, targe
     const supabaseAdmin = createAdminClient();
     
     // 비동기로 처리하여 메인 로직 속도 저하 방지
-    // await를 빼고 실행할 수도 있지만, Vercel Serverless 함수 종료 이슈 때문에 await 권장
+    // Keep the await so short-lived server runtimes do not terminate before cleanup completes.
     const { error } = await supabaseAdmin.from('admin_audit_logs').insert([{
       admin_id,
       admin_email,

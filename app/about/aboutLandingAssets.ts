@@ -1,6 +1,3 @@
-import fs from 'node:fs';
-import path from 'node:path';
-
 export type AboutLandingLocale = 'ko' | 'en' | 'ja' | 'zh';
 
 type AboutLandingDevice = 'desktop' | 'mobile';
@@ -12,8 +9,22 @@ type AboutLandingSection = {
   mobile: { src: string };
 };
 
-const DEFAULT_LOCALE: AboutLandingLocale = 'ko';
-const SUPPORTED_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp'] as const;
+type AboutLandingAssetManifest = Partial<
+  Record<AboutLandingLocale, Record<AboutLandingDevice, readonly string[]>>
+>;
+
+// Keep the runtime Worker independent from a writable/readable project filesystem.
+// A contract test verifies that every committed manifest entry exists in public/.
+const ABOUT_LANDING_ASSETS: AboutLandingAssetManifest = {
+  ko: {
+    desktop: ['1.png', '2.webp', '3.png', '4.png', '5.png', '6.webp', '7.png', '8.png'],
+    mobile: ['1.png', '2.webp', '3.png', '4.png', '5.png', '6.png', '7.png', '8.png'],
+  },
+  ja: {
+    desktop: ['1.png', '2.webp', '3.png', '4.png', '5.png', '6.webp', '7.png', '8.png'],
+    mobile: ['1.png', '2.webp', '3.png', '4.png', '5.png', '6.webp', '7.png', '8.png'],
+  },
+};
 
 const ALT_PREFIX: Record<AboutLandingLocale, string> = {
   ko: '로컬리 소개 랜딩 이미지',
@@ -22,16 +33,8 @@ const ALT_PREFIX: Record<AboutLandingLocale, string> = {
   zh: 'Locally 介绍页图片',
 };
 
-function getPublicDir(device: AboutLandingDevice, locale: AboutLandingLocale) {
-  return path.join(process.cwd(), 'public', 'images', 'about', device, locale);
-}
-
 function toPublicPath(device: AboutLandingDevice, locale: AboutLandingLocale, fileName: string) {
   return `/images/about/${device}/${locale}/${fileName}`;
-}
-
-function isSupportedImage(fileName: string) {
-  return SUPPORTED_EXTENSIONS.includes(path.extname(fileName).toLowerCase() as (typeof SUPPORTED_EXTENSIONS)[number]);
 }
 
 function getSortKey(baseName: string) {
@@ -41,20 +44,8 @@ function getSortKey(baseName: string) {
 }
 
 function readImageFileMap(device: AboutLandingDevice, locale: AboutLandingLocale) {
-  const dir = getPublicDir(device, locale);
-  const fileMap = new Map<string, string>();
-
-  if (!fs.existsSync(dir)) {
-    return fileMap;
-  }
-
-  for (const fileName of fs.readdirSync(dir)) {
-    if (!isSupportedImage(fileName)) continue;
-    const baseName = path.parse(fileName).name;
-    fileMap.set(baseName, fileName);
-  }
-
-  return fileMap;
+  const files = ABOUT_LANDING_ASSETS[locale]?.[device] ?? [];
+  return new Map(files.map((fileName) => [fileName.replace(/\.[^.]+$/, ''), fileName]));
 }
 
 function getSortedBaseNames(fileMap: Map<string, string>) {
@@ -68,8 +59,8 @@ function haveSameBaseNameSet(left: string[], right: string[]) {
 }
 
 function getRequiredBaseNames() {
-  const defaultDesktopBaseNames = getSortedBaseNames(readImageFileMap('desktop', DEFAULT_LOCALE));
-  const defaultMobileBaseNames = getSortedBaseNames(readImageFileMap('mobile', DEFAULT_LOCALE));
+  const defaultDesktopBaseNames = getSortedBaseNames(readImageFileMap('desktop', 'ko'));
+  const defaultMobileBaseNames = getSortedBaseNames(readImageFileMap('mobile', 'ko'));
 
   if (!haveSameBaseNameSet(defaultDesktopBaseNames, defaultMobileBaseNames)) {
     return [];

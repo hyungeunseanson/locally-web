@@ -77,9 +77,10 @@ export function isCrossSiteBrowserRequest(request: Request) {
 
 function getClientAddress(request: Request) {
   const headerCandidates = [
+    request.headers.get('cf-connecting-ip'),
     request.headers.get('x-forwarded-for'),
     request.headers.get('x-real-ip'),
-    request.headers.get('cf-connecting-ip'),
+    // Retained only while the Vercel rollback origin remains available.
     request.headers.get('x-vercel-forwarded-for'),
   ];
 

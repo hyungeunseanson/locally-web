@@ -54,7 +54,7 @@ test.describe('Cloudflare public experience card image manifest', () => {
     ).toBeNull();
   });
 
-  test('bypasses Vercel optimization for the canonical Supabase fallback', () => {
+  test('bypasses framework optimization for the canonical Supabase fallback', () => {
     const componentSource = readFileSync(
       'app/components/PublicExperienceCardImage.tsx',
       'utf8'
