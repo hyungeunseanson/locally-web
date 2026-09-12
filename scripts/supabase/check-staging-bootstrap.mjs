@@ -22,7 +22,9 @@ async function sqlFiles(directory = root) {
   return files;
 }
 
-const definitions = (await Promise.all((await sqlFiles()).map((path) => readFile(path, 'utf8')))).join('\n');
+const canonicalBaseline = resolve(root, 'supabase/migrations/20260909211131_production_schema_baseline.sql');
+const legacySqlFiles = (await sqlFiles()).filter((path) => path !== canonicalBaseline);
+const definitions = (await Promise.all(legacySqlFiles.map((path) => readFile(path, 'utf8')))).join('\n');
 const createdTables = new Set(
   [...definitions.matchAll(/create\s+table\s+(?:if\s+not\s+exists\s+)?(?:public\.)?["']?([a-z0-9_]+)/gi)]
     .map((match) => match[1])
@@ -46,7 +48,8 @@ for (const name of manifest.functionalCanaryMinimum.functions) {
 }
 
 console.log(JSON.stringify({
-  reproducibleFromRepoMigrations: false,
+  reproducibleFromHistoricalPatchesOnly: false,
+  reproducibleFromCanonicalBaseline: true,
   missingBaselineTableCount: manifest.repoBaselineMissing.length,
   functionalCanaryTableCount: manifest.functionalCanaryMinimum.tables.length,
   result: 'LOCALLY_STAGING_BOOTSTRAP_CONTRACT_PASS'

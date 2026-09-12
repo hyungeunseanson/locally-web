@@ -1,0 +1,313 @@
+{
+  "schemaContractVersion": 1,
+  "capturedAt": "2026-09-09",
+  "source": {
+    "kind": "read-only Production PostgreSQL catalog inventory",
+    "postgresMajor": 17,
+    "containsRows": false,
+    "containsStorageObjects": false
+  },
+  "baselineMigration": "supabase/migrations/20260909211131_production_schema_baseline.sql",
+  "objects": {
+    "publicTables": [
+      "admin_audit_logs",
+      "admin_job_runs",
+      "admin_manual_payouts",
+      "admin_support_unread_alert_batches",
+      "admin_task_comments",
+      "admin_tasks",
+      "admin_whitelist",
+      "analytics_events",
+      "bookings",
+      "community_comments",
+      "community_likes",
+      "community_posts",
+      "experience_availability",
+      "experience_popularity_snapshot",
+      "experience_translation_jobs",
+      "experience_translation_tasks",
+      "experiences",
+      "guest_reviews",
+      "host_applications",
+      "inquiries",
+      "inquiry_messages",
+      "likes",
+      "messages",
+      "notifications",
+      "profile_private_demographics",
+      "profiles",
+      "proxy_comments",
+      "proxy_requests",
+      "reviews",
+      "search_logs",
+      "service_applications",
+      "service_bookings",
+      "service_requests",
+      "translation_provider_state",
+      "users",
+      "wishlists"
+    ],
+    "publicViews": [
+      "public_host_applications",
+      "public_profiles"
+    ],
+    "columns": 472,
+    "sequences": [
+      "admin_job_runs_id_seq",
+      "experiences_id_seq",
+      "guest_reviews_id_seq",
+      "inquiries_id_seq",
+      "inquiry_messages_id_seq",
+      "likes_id_seq",
+      "messages_id_seq",
+      "notifications_id_seq",
+      "reviews_id_seq",
+      "wishlists_id_seq"
+    ],
+    "constraints": {
+      "foreignKey": 56,
+      "primaryKey": 36,
+      "check": 56,
+      "unique": 11
+    },
+    "indexes": {
+      "total": 99,
+      "constraintBacked": 47,
+      "standalone": 52
+    },
+    "functionOverloads": [
+      "public.check_rate_limit(table_name text, seconds integer)",
+      "public.claim_due_admin_support_unread_alert_batches(p_limit integer)",
+      "public.complete_admin_manual_experience_payout_atomic(p_request_key uuid, p_host_id uuid, p_settlement_type text, p_expected_current_booking_amount integer, p_legacy_amount integer, p_reason text, p_legacy_source_reference text, p_transfer_reference text, p_paid_by_admin_id uuid, p_paid_by_admin_email text)",
+      "public.complete_experience_booking_if_due_atomic(p_booking_id text)",
+      "public.complete_service_booking_if_due_atomic(p_booking_id text)",
+      "public.confirm_service_bank_payment_atomic(p_order_id text)",
+      "public.create_booking_atomic(p_user_id uuid, p_experience_id text, p_date text, p_time text, p_guests integer, p_is_private boolean, p_customer_name text, p_customer_phone text, p_payment_method text, p_is_solo_guarantee boolean)",
+      "public.create_guest_review_with_notification_atomic(p_booking_id text, p_host_id uuid, p_rating integer, p_content text, p_notification_title text, p_notification_message text)",
+      "public.create_service_booking_atomic(p_customer_id uuid, p_request_id uuid, p_application_id uuid, p_contact_name text, p_contact_phone text)",
+      "public.create_service_request_with_booking_atomic(p_user_id uuid, p_title text, p_description text, p_city text, p_country text, p_service_date date, p_start_time text, p_duration_hours integer, p_languages text[], p_guest_count integer, p_contact_name text, p_contact_phone text)",
+      "public.decrement_comment_count()",
+      "public.decrement_like_count()",
+      "public.ensure_profile_demographics_reminder(p_user_id uuid, p_title text, p_message text, p_link text)",
+      "public.get_experience_completion_due_backlog()",
+      "public.handle_new_user()",
+      "public.increment_comment_count()",
+      "public.increment_community_post_view_count(p_post_id uuid)",
+      "public.increment_like_count()",
+      "public.is_admin_reader()",
+      "public.lease_experience_translation_task(p_provider text, p_now timestamp with time zone, p_lease_seconds integer)",
+      "public.lease_experience_translation_task(p_provider text, p_now timestamp with time zone, p_lease_seconds integer, p_reserved_tokens integer)",
+      "public.list_due_experience_completion_candidates(p_booking_id text)",
+      "public.mark_room_messages_read(p_room_id uuid, p_user_id uuid)",
+      "public.prune_notifications_retention(p_cutoff timestamp with time zone, p_batch_size integer)",
+      "public.prune_team_workspace_comments(p_task_id uuid, p_keep_limit integer)",
+      "public.prune_team_workspace_tasks(p_keep_limit integer)",
+      "public.record_translation_provider_outcome(p_provider text, p_token_count integer, p_cooldown_seconds integer, p_hit_quota boolean)",
+      "public.record_translation_provider_outcome(p_provider text, p_token_count integer, p_cooldown_seconds integer, p_hit_quota boolean, p_reserved_token_count integer)",
+      "public.refresh_experience_popularity_snapshot()",
+      "public.select_service_host_atomic(p_customer_id uuid, p_request_id uuid, p_application_id uuid)",
+      "public.set_proxy_comments_updated_at()",
+      "public.set_proxy_requests_updated_at()",
+      "public.set_service_applications_updated_at()",
+      "public.set_service_bookings_updated_at()",
+      "public.set_service_requests_updated_at()",
+      "public.snapshot_booking_guest_demographics()"
+    ],
+    "triggers": [
+      "auth.users.on_auth_user_created",
+      "public.bookings.set_booking_guest_demographics_snapshot",
+      "public.community_comments.on_comment_added",
+      "public.community_comments.on_comment_removed",
+      "public.community_likes.on_like_added",
+      "public.community_likes.on_like_removed",
+      "public.proxy_comments.trg_pc_updated_at",
+      "public.proxy_requests.trg_pr_updated_at",
+      "public.service_applications.trg_sa_updated_at",
+      "public.service_bookings.trg_sb_updated_at",
+      "public.service_requests.trg_sr_updated_at"
+    ],
+    "rls": {
+      "enabled": [
+        "admin_audit_logs",
+        "admin_manual_payouts",
+        "admin_task_comments",
+        "admin_tasks",
+        "admin_whitelist",
+        "analytics_events",
+        "bookings",
+        "community_comments",
+        "community_likes",
+        "community_posts",
+        "experience_availability",
+        "experience_popularity_snapshot",
+        "experience_translation_jobs",
+        "experience_translation_tasks",
+        "experiences",
+        "guest_reviews",
+        "host_applications",
+        "inquiries",
+        "inquiry_messages",
+        "likes",
+        "messages",
+        "notifications",
+        "profile_private_demographics",
+        "profiles",
+        "proxy_comments",
+        "proxy_requests",
+        "reviews",
+        "search_logs",
+        "service_applications",
+        "service_bookings",
+        "service_requests",
+        "translation_provider_state",
+        "users",
+        "wishlists"
+      ],
+      "disabled": [
+        "admin_job_runs",
+        "admin_support_unread_alert_batches"
+      ],
+      "forced": [],
+      "publicPolicies": 111,
+      "storageObjectPolicies": 16
+    },
+    "replicaIdentity": {
+      "default": [
+        "admin_audit_logs",
+        "admin_job_runs",
+        "admin_manual_payouts",
+        "admin_support_unread_alert_batches",
+        "admin_task_comments",
+        "admin_tasks",
+        "admin_whitelist",
+        "analytics_events",
+        "bookings",
+        "community_comments",
+        "community_likes",
+        "community_posts",
+        "experience_availability",
+        "experience_popularity_snapshot",
+        "experience_translation_jobs",
+        "experience_translation_tasks",
+        "experiences",
+        "guest_reviews",
+        "host_applications",
+        "inquiries",
+        "inquiry_messages",
+        "likes",
+        "messages",
+        "notifications",
+        "profile_private_demographics",
+        "profiles",
+        "proxy_comments",
+        "proxy_requests",
+        "reviews",
+        "search_logs",
+        "service_applications",
+        "service_bookings",
+        "service_requests",
+        "translation_provider_state",
+        "users",
+        "wishlists"
+      ],
+      "nonDefault": []
+    },
+    "realtimePublication": {
+      "name": "supabase_realtime",
+      "tables": [
+        "admin_audit_logs",
+        "admin_task_comments",
+        "admin_tasks",
+        "admin_whitelist",
+        "inquiry_messages",
+        "notifications",
+        "profiles"
+      ],
+      "publish": [
+        "insert",
+        "update",
+        "delete",
+        "truncate"
+      ],
+      "publishViaPartitionRoot": false
+    },
+    "storageBuckets": [
+      {
+        "name": "admin_files",
+        "public": true,
+        "fileSizeLimit": 10485760,
+        "allowedMimeTypes": null
+      },
+      {
+        "name": "avatars",
+        "public": true,
+        "fileSizeLimit": null,
+        "allowedMimeTypes": null
+      },
+      {
+        "name": "chat-images",
+        "public": true,
+        "fileSizeLimit": null,
+        "allowedMimeTypes": null
+      },
+      {
+        "name": "experiences",
+        "public": true,
+        "fileSizeLimit": null,
+        "allowedMimeTypes": null
+      },
+      {
+        "name": "images",
+        "public": true,
+        "fileSizeLimit": null,
+        "allowedMimeTypes": null
+      },
+      {
+        "name": "verification-docs",
+        "public": false,
+        "fileSizeLimit": null,
+        "allowedMimeTypes": null
+      }
+    ],
+    "extensions": {
+      "included": [
+        "pgcrypto"
+      ],
+      "providedBySupabaseOrUnused": [
+        "pg_stat_statements",
+        "plpgsql",
+        "supabase_vault",
+        "uuid-ossp"
+      ]
+    },
+    "grants": {
+      "inventory": {
+        "tableAndView": 1273,
+        "functionExecute": 110,
+        "sequence": 114
+      },
+      "baselineNonOwner": {
+        "publicTableAndView": 791,
+        "publicFunctionExecute": 74,
+        "publicSequence": 84
+      }
+    }
+  },
+  "excluded": [
+    "auth and storage system table DDL",
+    "Supabase-managed storage triggers and storage base-table ACLs",
+    "platform-managed schemas and roles",
+    "extension version pins and platform-managed extensions",
+    "Storage bucket created_at, updated_at, type, versioning_status, and avif_autodetection values",
+    "application and customer rows",
+    "auth users",
+    "Storage objects",
+    "project refs, URLs, credentials, secrets, owner UUIDs"
+  ],
+  "historicalSql": {
+    "rootPatchFiles": 28,
+    "docsMigrationFiles": 46,
+    "foldedThrough": "docs/migrations/v3_40_41_admin_manual_payout_zero_cancellation.sql",
+    "applyAfterBaseline": []
+  }
+}

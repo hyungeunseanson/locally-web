@@ -1,6 +1,6 @@
 # Supabase staging bootstrap for the Cloudflare functional canary
 
-This repository does **not** currently contain a complete, ordered Supabase migration history. The SQL files are operational patches from different releases, and many assume that the base schema already exists. Do not run every repository SQL file alphabetically against a new project.
+This repository does **not** contain a complete historical Supabase migration history. The SQL files are operational patches from different releases, and many assume that the base schema already exists. Do not run every repository SQL file alphabetically against a new project.
 
 This change intentionally does not create a Supabase project, connect to Production, dump Production data, or apply SQL. It provides a machine-readable contract, read-only schema inspection/assertion SQL, and synthetic fixture seed/cleanup tools for the separately provisioned staging project.
 
@@ -12,7 +12,7 @@ Repository migrations alone cannot recreate the current Production schema. No tr
 
 There is also no canonical `supabase/config.toml`, no ordered `supabase/migrations` ledger, and no tracked final definition for most legacy bucket policies. Several functions have multiple historical definitions, so filename order is not a reliable way to select the Production version.
 
-Before a bootstrap migration can be created, an operator must collect **schema-only definitions** from Production using `supabase/staging/schema-only-inventory.sql` or equivalent catalog queries. This query reads catalog definitions and bucket metadata only; it does not select application/customer rows or Storage objects. The output must be reviewed for secrets and checked into a later PR as a sanitized baseline before it is applied anywhere.
+The read-only Production inventory was captured and reconciled on 2026-09-09. The resulting canonical migration is `supabase/migrations/20260909211131_production_schema_baseline.sql`; its review contract and exact counts are in `supabase/staging/production-baseline.manifest.json`. See `docs/supabase-staging-baseline.md` for the application order and exclusions.
 
 Required schema-only material:
 
@@ -24,7 +24,7 @@ Required schema-only material:
 - Storage bucket names/public flags/file limits/allowed MIME types plus final `storage.objects` policies;
 - extensions and types referenced by the above objects.
 
-The older root SQL files remain evidence and patch history, not a fresh-project bootstrap. A later baseline PR must preserve the chronological fixes through `docs/migrations/v3_40_41_admin_manual_payout_zero_cancellation.sql` and reconcile any schema-only drift before seed execution.
+The older root SQL files remain evidence and patch history, not a fresh-project bootstrap. Their final effects through `docs/migrations/v3_40_41_admin_manual_payout_zero_cancellation.sql` are folded into the baseline. No historical patch is applied after the baseline.
 
 ## Required application objects
 
@@ -62,10 +62,10 @@ References: [Supabase Google login](https://supabase.com/docs/guides/auth/social
 Platform work remains separate and requires explicit approval:
 
 1. Create a new Supabase project. Never use `uhinvcydgzqlpnvieyal` as staging.
-2. Obtain and review the missing schema-only definitions. Do not export or copy application rows or Storage objects.
-3. Add the sanitized baseline in a later PR, apply it to staging, and then apply the ordered post-baseline migrations.
-4. Configure Auth providers/redirects and create the six empty Storage buckets with their reviewed policies.
-5. Run the read-only schema gate with `psql "$SUPABASE_STAGING_DB_URL" -f supabase/staging/schema-contract.sql`.
+2. Review the canonical schema-only baseline and manifest. Do not export or copy application rows or Storage objects.
+3. Apply the canonical baseline only; there are currently no post-baseline migrations.
+4. Configure Auth providers/redirects and verify the six baseline-created empty Storage buckets and policies.
+5. Run `baseline-contract.sql` and then `schema-contract.sql` as read-only gates.
 6. Run `npm run supabase:staging:seed` with explicit staging-only environment variables.
 7. Feed the printed guest/host IDs, inquiry ID, and image URL into the PR-2 functional canary runner. The fixture password remains runner-only and is never written to the state file.
 8. After all provider sandbox journeys, run `npm run supabase:staging:cleanup -- <state-file>` and verify no `locally.staging.*@example.com`, `STAGING-*`, or `staging-canary/<run-id>/` artifacts remain.
