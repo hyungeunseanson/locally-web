@@ -111,7 +111,6 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 기본: 인증 사용자 + 본인 데이터 범위
 - 관리자: `users.role='admin'` 또는 `admin_whitelist` 매칭
 - 민감 API는 반드시 서버에서 권한 확인 후 처리
-- **[Supabase Data API 결정]** 신규 `public` schema 테이블/뷰/RPC는 `supabase-js`/PostgREST/GraphQL에서 쓰기 전에 migration 안에 명시적 `GRANT`를 함께 넣는다. RLS는 row 단위 접근을 제한하고, `GRANT`는 Data API가 객체에 닿을 수 있는지를 정하므로 둘 다 필요하다. 작성 기준은 `docs/supabase-data-api-grants.md`를 따른다.
 - **[팀 알림 아키텍처 결정]** `/api/admin/notify-team`의 수신자 수집은 `admin_whitelist` 단일 소스만 사용한다. `users.role='admin'`을 병행 소스로 쓰면 whitelist에서 삭제된 관리자에게 계속 발송되는 버그 발생. 팀원 추가/제거는 반드시 `admin_whitelist` 테이블만 통해 관리한다.
 - **[권한 Source 결정]** 관리자 권한 판정 source는 `users.role + admin_whitelist`다. `profiles`는 표시/프로필 데이터용이며, `profiles.role`을 권한 판정에 사용하지 않는다.
 - **[관리자 읽기 경계 결정]** `admin_tasks`, `admin_task_comments`, `admin_whitelist`, `admin_audit_logs`는 쓰기(write)가 아니라 읽기(select)만 admin-only client 경로를 허용한다. TEAM/감사 로그의 목록·realtime 읽기는 유지하되, mutation은 서버 경계 또는 service-role 정책으로만 처리한다.

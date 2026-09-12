@@ -105,6 +105,16 @@ test('release contract keeps marketplace disabled and the application on server 
 
   assert.match(migration, /premium' THEN 55000 ELSE 35000/);
   assert.match(migration, /pricing_tier = 'standard' THEN 20000/);
+  assert.match(migration, /CHECK \(guest_count BETWEEN 1 AND 100\)/);
+  assert.match(migration, /IF p_guest_count NOT BETWEEN 1 AND 10 THEN/);
+  assert.match(
+    migration,
+    /legacy_imported AND duration_hours BETWEEN 3 AND 168[\s\S]*?NOT legacy_imported AND duration_hours BETWEEN 3 AND 24/
+  );
+  assert.match(
+    migration,
+    /CREATE OR REPLACE FUNCTION public\.create_service_request_with_booking_atomic[\s\S]*?INSERT INTO public\.service_request_schedule_items/
+  );
   assert.match(migration, /already_assigned BOOLEAN/);
   assert.match(migration, /SVC_ALREADY_ASSIGNED/);
   assert.match(migration, /confirm_service_concierge_payment_atomic/);

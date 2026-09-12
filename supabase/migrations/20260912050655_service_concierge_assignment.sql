@@ -29,7 +29,7 @@ ALTER TABLE public.service_requests
   ADD CONSTRAINT service_requests_duration_hours_check
     CHECK (duration_hours BETWEEN 3 AND 168),
   ADD CONSTRAINT service_requests_guest_count_check
-    CHECK (guest_count BETWEEN 1 AND 10),
+    CHECK (guest_count BETWEEN 1 AND 100),
   ADD CONSTRAINT service_requests_status_check
     CHECK (status IN (
       'pending_payment', 'assigning', 'open', 'matched', 'paid', 'confirmed',
@@ -63,10 +63,14 @@ CREATE TABLE IF NOT EXISTS public.service_request_schedule_items (
   request_id UUID NOT NULL REFERENCES public.service_requests(id) ON DELETE CASCADE,
   service_date DATE NOT NULL,
   start_time TIME NOT NULL,
-  duration_hours INTEGER NOT NULL CHECK (duration_hours BETWEEN 3 AND 24),
+  duration_hours INTEGER NOT NULL,
   sort_order INTEGER NOT NULL CHECK (sort_order >= 0),
   legacy_imported BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT service_request_schedule_duration_check CHECK (
+    (legacy_imported AND duration_hours BETWEEN 3 AND 168)
+    OR (NOT legacy_imported AND duration_hours BETWEEN 3 AND 24)
+  ),
   CONSTRAINT uq_service_request_schedule_date UNIQUE (request_id, service_date),
   CONSTRAINT uq_service_request_schedule_order UNIQUE (request_id, sort_order)
 );
@@ -156,7 +160,7 @@ SELECT
     WHEN sr.start_time ~ '^(?:[01][0-9]|2[0-3]):[0-5][0-9]$' THEN sr.start_time::TIME
     ELSE TIME '09:00'
   END,
-  LEAST(24, GREATEST(3, sr.duration_hours)),
+  LEAST(168, GREATEST(3, sr.duration_hours)),
   0,
   TRUE
 FROM public.service_requests sr
@@ -177,6 +181,79 @@ WHERE si.request_id = sr.id
     WHERE si2.request_id = sr.id
   )
   AND sr.service_end_at IS NULL;
+
+-- Expand-phase compatibility: the currently deployed application still calls
+-- this RPC until the concierge application cutover. Keep its signature and
+-- response contract while atomically populating the new schedule projection.
+CREATE OR REPLACE FUNCTION public.create_service_request_with_booking_atomic(
+  p_user_id UUID,
+  p_title TEXT,
+  p_description TEXT,
+  p_city TEXT,
+  p_country TEXT,
+  p_service_date DATE,
+  p_start_time TEXT,
+  p_duration_hours INTEGER,
+  p_languages TEXT[],
+  p_guest_count INTEGER,
+  p_contact_name TEXT,
+  p_contact_phone TEXT
+)
+RETURNS TABLE (request_id UUID, booking_id TEXT, order_id TEXT, amount INTEGER)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_request public.service_requests%ROWTYPE;
+  v_booking_id TEXT;
+  v_order_id TEXT;
+  v_legacy_start_time TIME;
+BEGIN
+  v_legacy_start_time := CASE
+    WHEN p_start_time ~ '^(?:[01][0-9]|2[0-3]):[0-5][0-9]$' THEN p_start_time::TIME
+    ELSE TIME '09:00'
+  END;
+
+  INSERT INTO public.service_requests (
+    user_id, title, description, city, country, service_date, start_time,
+    duration_hours, languages, guest_count, contact_name, contact_phone,
+    service_end_at, status
+  ) VALUES (
+    p_user_id, trim(p_title), trim(p_description), p_city, p_country,
+    p_service_date, p_start_time, p_duration_hours,
+    COALESCE(p_languages, ARRAY[]::TEXT[]), p_guest_count,
+    trim(p_contact_name), trim(p_contact_phone),
+    ((p_service_date + v_legacy_start_time) AT TIME ZONE 'Asia/Tokyo')
+      + make_interval(hours => p_duration_hours),
+    'pending_payment'
+  )
+  RETURNING * INTO v_request;
+
+  INSERT INTO public.service_request_schedule_items (
+    request_id, service_date, start_time, duration_hours, sort_order, legacy_imported
+  ) VALUES (
+    v_request.id, p_service_date, v_legacy_start_time,
+    p_duration_hours, 0, TRUE
+  );
+
+  v_order_id := 'SVC-' || to_char(now(), 'YYYYMMDD') || '-' || upper(substr(gen_random_uuid()::TEXT, 1, 8));
+  v_booking_id := v_order_id;
+
+  INSERT INTO public.service_bookings (
+    id, order_id, request_id, application_id, customer_id, host_id, amount,
+    host_payout_amount, platform_revenue, status, contact_name, contact_phone,
+    payment_method, payout_status
+  ) VALUES (
+    v_booking_id, v_order_id, v_request.id, NULL, p_user_id, NULL,
+    v_request.total_customer_price, v_request.total_host_payout,
+    v_request.total_customer_price - v_request.total_host_payout,
+    'PENDING', trim(p_contact_name), trim(p_contact_phone), 'card', 'pending'
+  );
+
+  RETURN QUERY SELECT v_request.id, v_booking_id, v_order_id, v_request.total_customer_price;
+END;
+$$;
 
 CREATE OR REPLACE FUNCTION public.create_service_concierge_request_atomic(
   p_user_id UUID,
