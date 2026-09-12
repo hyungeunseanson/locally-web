@@ -2,7 +2,7 @@
 
 This repository does **not** contain a complete historical Supabase migration history. The SQL files are operational patches from different releases, and many assume that the base schema already exists. Do not run every repository SQL file alphabetically against a new project.
 
-This change intentionally does not create a Supabase project, connect to Production, dump Production data, or apply SQL. It provides a machine-readable contract, read-only schema inspection/assertion SQL, and synthetic fixture seed/cleanup tools for the separately provisioned staging project.
+This change intentionally does not create a Supabase branch/project, connect to Production, dump Production data, or apply SQL. It provides a machine-readable contract, read-only schema inspection/assertion SQL, and synthetic fixture seed/cleanup tools for an isolated staging backend.
 
 ## Reproducibility decision
 
@@ -61,11 +61,11 @@ References: [Supabase Google login](https://supabase.com/docs/guides/auth/social
 
 Platform work remains separate and requires explicit approval:
 
-1. Create a new Supabase project. Never use `uhinvcydgzqlpnvieyal` as staging.
+1. Prefer a persistent branch of the Production Supabase project with **Include data disabled**, or create a separate staging project. Record its branch/project ref and branch-specific credentials. Never use `uhinvcydgzqlpnvieyal` as staging.
 2. Review the canonical schema-only baseline and manifest. Do not export or copy application rows or Storage objects.
-3. Apply the canonical baseline only; there are currently no post-baseline migrations.
-4. Configure Auth providers/redirects and verify the six baseline-created empty Storage buckets and policies.
-5. Run `baseline-contract.sql` and then `schema-contract.sql` as read-only gates.
+3. A Supabase branch already clones its parent schema and configuration. Do not manually replay the non-idempotent baseline over that non-empty branch. Run `baseline-contract.sql` and then `schema-contract.sql`; a mismatch blocks provisioning and requires investigation. Only a genuinely empty separate project receives the canonical baseline, with no post-baseline migrations.
+4. Configure branch/project-specific Auth providers/redirects and verify the six empty Storage buckets and policies.
+5. Keep both schema contracts as read-only gates after any staging configuration change.
 6. Run `npm run supabase:staging:seed` with explicit staging-only environment variables.
 7. Feed the printed guest/host IDs, inquiry ID, and image URL into the PR-2 functional canary runner. The fixture password remains runner-only and is never written to the state file.
 8. After all provider sandbox journeys, run `npm run supabase:staging:cleanup -- <state-file>` and verify no `locally.staging.*@example.com`, `STAGING-*`, or `staging-canary/<run-id>/` artifacts remain.

@@ -1,6 +1,6 @@
 # Cloudflare functional canary gate
 
-This suite is the functional half of the canonical [Workers cutover runbook](./cloudflare-workers-cutover-runbook.md). Repository changes do not provision or deploy Cloudflare resources. The suite must run only against the named Cloudflare canary and a disposable Supabase staging project. It refuses the Locally production domain, Vercel hosts, an unverified staging target, and non-sandbox payment mode.
+This suite is the functional half of the canonical [Workers cutover runbook](./cloudflare-workers-cutover-runbook.md). Repository changes do not provision or deploy Cloudflare resources. The suite must run only against the named Cloudflare canary and an isolated Supabase staging backend. A data-less persistent branch of the Production project is preferred; a separate staging project is also supported. Both receive their own project ref, API/Auth/Storage endpoints, and credentials. The guards refuse the known Production ref `uhinvcydgzqlpnvieyal`, the Locally production domain, Vercel hosts, an unverified staging target, and non-sandbox payment mode.
 
 ## Mandatory account-edge protection before secrets
 
@@ -50,7 +50,7 @@ No existing bucket may be reused: `locally-public-experience-canary`, `locally-p
 ### Worker runtime only
 
 - `CLOUDFLARE_FUNCTIONAL_CANARY_SECRET`
-- `SUPABASE_SERVICE_ROLE_KEY` for the separate staging project. This is not merely a Realtime seed key: the current application imports `createAdminClient()` across server routes, actions, public detail rendering, notifications, booking/payment, and admin paths. It is therefore required in the Worker for full application parity, but only after Access is proven. The browser must never receive it.
+- `SUPABASE_SERVICE_ROLE_KEY` for the isolated staging branch/project. This is not merely a Realtime seed key: the current application imports `createAdminClient()` across server routes, actions, public detail rendering, notifications, booking/payment, and admin paths. It is therefore required in the Worker for full application parity, but only after Access is proven. The browser must never receive it.
 
 `NEXT_PUBLIC_SUPABASE_ANON_KEY` is intentionally a Worker var/public browser value, not a secret.
 
@@ -86,7 +86,7 @@ No existing bucket may be reused: `locally-public-experience-canary`, `locally-p
 
 ## Hard gates after provisioning
 
-0. **Staging prerequisite:** the only currently accessible Supabase project is Production. Remote Auth/Realtime/Storage/financial write gates are blocked until a separate staging Supabase project has been created and independently verified. Production Supabase is never an emergency or temporary fallback. Repository automation does not create that project.
+0. **Staging prerequisite:** remote Auth/Realtime/Storage/financial write gates are blocked until a data-less persistent Supabase staging branch (preferred) or separate staging project has been created and independently verified. Its URL-derived ref must exactly equal the declared staging ref and must differ from `uhinvcydgzqlpnvieyal`. Production Supabase is never an emergency or temporary fallback. Repository automation does not create the branch/project.
 1. Run `npm run cloudflare:functional:remote:access` before any high-sensitivity secret is added. Anonymous traffic must be stopped by Access before OpenNext executes. A valid service token must reach the app. This remains a hard gate on every canary hostname.
 2. Run `npm run cloudflare:functional:remote:cache`. It proves one R2-backed value across observed isolates, the 60-second stale-while-revalidate boundary, `revalidateTag(..., 'max')`, and optional multi-colo parity. The isolate minimum must remain at least two.
 3. Set `CLOUDFLARE_FUNCTIONAL_CANARY_ACTIVE_WRITE_GATE=realtime`, explicitly enable staging writes, and run `npm run cloudflare:functional:remote:runtime`. Readiness must report `safe: true`, the exact declared staging ref must match the configured URL, and the active gate backend must be configured. The suite proves Worker-origin login/logout/session persistence, catches every 5xx RSC response during Link prefetch/rapid/history navigation, validates local and staging-Supabase `/_next/image`, reads the existing R2 path, verifies Gmail authentication on 465 and 587 without sending, and proves Realtime message/notification delivery plus reconnect.

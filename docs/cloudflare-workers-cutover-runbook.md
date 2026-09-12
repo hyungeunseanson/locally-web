@@ -129,7 +129,7 @@ git diff --check
 
 No command in this section is run without separate platform approval.
 
-1. Create and verify the isolated staging Supabase project from the canonical baseline. Configure synthetic guest/host, minimal experience, inquiry/messages, notifications, storage images, and sandbox booking fixtures. Never use Production as fallback.
+1. Create and verify a data-less persistent Supabase branch from Production (preferred), or a separate staging project. A branch already clones the Production schema, so do not replay the non-idempotent canonical baseline over it: run both read-only schema contracts and stop on any mismatch. Configure synthetic guest/host, minimal experience, inquiry/messages, notifications, storage images, and sandbox booking fixtures. Never use Production as fallback.
 2. Build with canary `NEXT_PUBLIC_*` values and run all local gates.
 3. Create only `locally-opennext-incremental-cache-canary` in R2.
 4. Perform the initial no-route canary deployment from canonical `wrangler.jsonc`. Confirm the Worker, explicit DO migration, service binding, `ASSETS`, and `IMAGES`; confirm zero public-image bucket reuse.

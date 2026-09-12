@@ -83,8 +83,10 @@ test.describe('Cloudflare functional canary contract', () => {
     expect(readinessRoute).toContain('CLOUDFLARE_FUNCTIONAL_CANARY_STAGING_PROJECT_VERIFIED');
     expect(readinessRoute).toContain('CLOUDFLARE_FUNCTIONAL_CANARY_ALLOW_STAGING_WRITES');
     expect(readinessRoute).toContain('activeWriteGateConfigured');
-    expect(readinessRoute).not.toContain('PRODUCTION_SUPABASE_PROJECT_REF');
-    expect(globalSetup).not.toContain('PRODUCTION_SUPABASE_PROJECT_REF');
+    expect(readinessRoute).toContain('KNOWN_PRODUCTION_SUPABASE_PROJECT_REFS');
+    expect(readinessRoute).toContain("'uhinvcydgzqlpnvieyal'");
+    expect(globalSetup).toContain('KNOWN_PRODUCTION_SUPABASE_PROJECT_REFS');
+    expect(globalSetup).toContain("'uhinvcydgzqlpnvieyal'");
     expect(readinessRoute).toContain("serverProbeRoute: '/api/admin/sentry-test'");
   });
 
