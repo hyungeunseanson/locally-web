@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { CHAT_IMAGE_ATTACHMENTS_ENABLED, CHAT_IMAGE_ATTACHMENTS_UNAVAILABLE_MESSAGE, isChatImageAttachmentRequest } from '@/app/utils/chatAttachmentPolicy';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { createInquiryMessage } from '@/app/api/inquiries/thread/shared';
@@ -39,7 +40,11 @@ export async function POST(
             return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
         }
 
-        const { content } = await request.json();
+        const body = await request.json();
+        if (!CHAT_IMAGE_ATTACHMENTS_ENABLED && isChatImageAttachmentRequest(body)) {
+            return NextResponse.json({ success: false, error: CHAT_IMAGE_ATTACHMENTS_UNAVAILABLE_MESSAGE }, { status: 400 });
+        }
+        const { content } = body;
 
         if (!content || typeof content !== 'string' || content.trim().length === 0) {
             return NextResponse.json({ success: false, error: 'Invalid content' }, { status: 400 });

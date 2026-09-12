@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useChat } from '@/app/hooks/useChat';
+import { CHAT_IMAGE_ATTACHMENTS_ENABLED } from '@/app/utils/chatAttachmentPolicy';
 import UserProfileModal from '@/app/components/UserProfileModal';
 import { Send, User, Loader2, ImagePlus, ArrowLeft } from 'lucide-react';
 import Spinner from '@/app/components/ui/Spinner';
@@ -470,14 +471,18 @@ export default function InquiryChat() {
                 </div>
               )}
               <div className="flex items-end gap-2 md:gap-3">
-              <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isSending}
-                className="h-9 w-9 md:h-10 md:w-10 flex items-center justify-center bg-gray-100 text-gray-500 rounded-full hover:bg-gray-200 transition-colors shrink-0 disabled:opacity-30"
-              >
-                <ImagePlus size={16} />
-              </button>
+              {CHAT_IMAGE_ATTACHMENTS_ENABLED && (
+                <>
+                  <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isSending}
+                    className="h-9 w-9 md:h-10 md:w-10 flex items-center justify-center bg-gray-100 text-gray-500 rounded-full hover:bg-gray-200 transition-colors shrink-0 disabled:opacity-30"
+                  >
+                    <ImagePlus size={16} />
+                  </button>
+                </>
+              )}
 
               <textarea
                 ref={composerRef}
