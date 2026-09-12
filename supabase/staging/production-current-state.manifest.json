@@ -1,0 +1,279 @@
+{
+  "schemaContractVersion": 2,
+  "capturedAt": "2026-09-12",
+  "productionProjectRef": "uhinvcydgzqlpnvieyal",
+  "source": {
+    "kind": "read-only Production PostgreSQL catalog inventory",
+    "postgresMajor": 17,
+    "containsRows": false,
+    "containsStorageObjects": false
+  },
+  "migrationLedger": [
+    {
+      "version": "20260912034545",
+      "name": "remote_schema",
+      "repositoryFile": "supabase/migrations/20260912034545_production_schema_baseline.sql",
+      "repositorySha256": "dd9acf12964f5a9006baaa95323c179781a359286d8a2ea722782998ec10a1a4"
+    },
+    {
+      "version": "20260912050655",
+      "name": "service_concierge_assignment",
+      "repositoryFile": "supabase/migrations/20260912050655_service_concierge_assignment.sql",
+      "repositorySha256": "3d39ba8d5e8b5681e3c6dc46c2b1b9a5651d1815440519627e10305bc0a005ca"
+    }
+  ],
+  "operationalStateDeltas": [
+    {
+      "name": "disable_chat_image_inserts",
+      "productionEvidence": "docs/ops/chat-attachments/disable-chat-image-inserts.sql",
+      "stagingOverlay": "supabase/staging/post-baseline-current-state-overlay.sql",
+      "effect": "drop exactly the Authenticated users can upload chat images policy"
+    }
+  ],
+  "objects": {
+    "publicTables": [
+      "admin_audit_logs",
+      "admin_job_runs",
+      "admin_manual_payouts",
+      "admin_support_unread_alert_batches",
+      "admin_task_comments",
+      "admin_tasks",
+      "admin_whitelist",
+      "analytics_events",
+      "bookings",
+      "community_comments",
+      "community_likes",
+      "community_posts",
+      "experience_availability",
+      "experience_popularity_snapshot",
+      "experience_translation_jobs",
+      "experience_translation_tasks",
+      "experiences",
+      "guest_reviews",
+      "host_applications",
+      "inquiries",
+      "inquiry_messages",
+      "likes",
+      "messages",
+      "notifications",
+      "profile_private_demographics",
+      "profiles",
+      "proxy_comments",
+      "proxy_requests",
+      "reviews",
+      "search_logs",
+      "service_applications",
+      "service_assignment_history",
+      "service_bookings",
+      "service_refund_operations",
+      "service_request_schedule_items",
+      "service_requests",
+      "translation_provider_state",
+      "users",
+      "wishlists"
+    ],
+    "publicViews": [
+      "public_host_applications",
+      "public_profiles"
+    ],
+    "publicTableColumns": 510,
+    "publicViewColumns": 27,
+    "functionOverloads": [
+      "public.assign_service_concierge_host_atomic(p_admin_id uuid, p_request_id uuid, p_host_id uuid, p_host_hourly_rate integer, p_host_agreement_confirmed boolean)",
+      "public.begin_service_refund_operation_atomic(p_admin_id uuid, p_order_id text, p_refund_amount integer, p_host_compensation_amount integer, p_idempotency_key text)",
+      "public.cancel_pending_service_concierge_atomic(p_actor_id uuid, p_order_id text, p_cancel_reason text)",
+      "public.check_rate_limit(table_name text, seconds integer)",
+      "public.claim_due_admin_support_unread_alert_batches(p_limit integer)",
+      "public.complete_admin_manual_experience_payout_atomic(p_request_key uuid, p_host_id uuid, p_settlement_type text, p_expected_current_booking_amount integer, p_legacy_amount integer, p_reason text, p_legacy_source_reference text, p_transfer_reference text, p_paid_by_admin_id uuid, p_paid_by_admin_email text)",
+      "public.complete_experience_booking_if_due_atomic(p_booking_id text)",
+      "public.complete_service_booking_if_due_atomic(p_booking_id text)",
+      "public.complete_service_concierge_booking_if_due_atomic(p_booking_id text)",
+      "public.confirm_service_bank_payment_atomic(p_order_id text)",
+      "public.confirm_service_concierge_payment_atomic(p_order_id text, p_payment_method text, p_tid text)",
+      "public.create_booking_atomic(p_user_id uuid, p_experience_id text, p_date text, p_time text, p_guests integer, p_is_private boolean, p_customer_name text, p_customer_phone text, p_payment_method text, p_is_solo_guarantee boolean)",
+      "public.create_guest_review_with_notification_atomic(p_booking_id text, p_host_id uuid, p_rating integer, p_content text, p_notification_title text, p_notification_message text)",
+      "public.create_service_booking_atomic(p_customer_id uuid, p_request_id uuid, p_application_id uuid, p_contact_name text, p_contact_phone text)",
+      "public.create_service_concierge_request_atomic(p_user_id uuid, p_service_type text, p_description text, p_city text, p_schedule jsonb, p_languages text[], p_guest_count integer, p_contact_name text, p_contact_phone text, p_client_request_key text)",
+      "public.create_service_request_with_booking_atomic(p_user_id uuid, p_title text, p_description text, p_city text, p_country text, p_service_date date, p_start_time text, p_duration_hours integer, p_languages text[], p_guest_count integer, p_contact_name text, p_contact_phone text)",
+      "public.decrement_comment_count()",
+      "public.decrement_like_count()",
+      "public.ensure_profile_demographics_reminder(p_user_id uuid, p_title text, p_message text, p_link text)",
+      "public.finish_service_refund_operation_atomic(p_operation_id uuid, p_outcome text, p_provider_reference text, p_error_message text)",
+      "public.get_experience_completion_due_backlog()",
+      "public.handle_new_user()",
+      "public.increment_comment_count()",
+      "public.increment_community_post_view_count(p_post_id uuid)",
+      "public.increment_like_count()",
+      "public.is_admin_reader()",
+      "public.lease_experience_translation_task(p_provider text, p_now timestamp with time zone, p_lease_seconds integer)",
+      "public.lease_experience_translation_task(p_provider text, p_now timestamp with time zone, p_lease_seconds integer, p_reserved_tokens integer)",
+      "public.list_due_experience_completion_candidates(p_booking_id text)",
+      "public.mark_room_messages_read(p_room_id uuid, p_user_id uuid)",
+      "public.prune_notifications_retention(p_cutoff timestamp with time zone, p_batch_size integer)",
+      "public.prune_team_workspace_comments(p_task_id uuid, p_keep_limit integer)",
+      "public.prune_team_workspace_tasks(p_keep_limit integer)",
+      "public.record_translation_provider_outcome(p_provider text, p_token_count integer, p_cooldown_seconds integer, p_hit_quota boolean)",
+      "public.record_translation_provider_outcome(p_provider text, p_token_count integer, p_cooldown_seconds integer, p_hit_quota boolean, p_reserved_token_count integer)",
+      "public.refresh_experience_popularity_snapshot()",
+      "public.request_service_cancellation_review_atomic(p_actor_id uuid, p_order_id text, p_cancel_reason text)",
+      "public.select_service_host_atomic(p_customer_id uuid, p_request_id uuid, p_application_id uuid)",
+      "public.set_proxy_comments_updated_at()",
+      "public.set_proxy_requests_updated_at()",
+      "public.set_service_applications_updated_at()",
+      "public.set_service_bookings_updated_at()",
+      "public.set_service_requests_updated_at()",
+      "public.snapshot_booking_guest_demographics()"
+    ],
+    "applicationTriggers": [
+      "auth.users.on_auth_user_created",
+      "public.bookings.set_booking_guest_demographics_snapshot",
+      "public.community_comments.on_comment_added",
+      "public.community_comments.on_comment_removed",
+      "public.community_likes.on_like_added",
+      "public.community_likes.on_like_removed",
+      "public.proxy_comments.trg_pc_updated_at",
+      "public.proxy_requests.trg_pr_updated_at",
+      "public.service_applications.trg_sa_updated_at",
+      "public.service_bookings.trg_sb_updated_at",
+      "public.service_requests.trg_sr_updated_at"
+    ],
+    "indexes": 113,
+    "constraints": {
+      "total": 179,
+      "primaryKey": 39,
+      "foreignKey": 59,
+      "unique": 14,
+      "check": 67
+    },
+    "rls": {
+      "enabled": [
+        "admin_audit_logs",
+        "admin_manual_payouts",
+        "admin_task_comments",
+        "admin_tasks",
+        "admin_whitelist",
+        "analytics_events",
+        "bookings",
+        "community_comments",
+        "community_likes",
+        "community_posts",
+        "experience_availability",
+        "experience_popularity_snapshot",
+        "experience_translation_jobs",
+        "experience_translation_tasks",
+        "experiences",
+        "guest_reviews",
+        "host_applications",
+        "inquiries",
+        "inquiry_messages",
+        "likes",
+        "messages",
+        "notifications",
+        "profile_private_demographics",
+        "profiles",
+        "proxy_comments",
+        "proxy_requests",
+        "reviews",
+        "search_logs",
+        "service_applications",
+        "service_assignment_history",
+        "service_bookings",
+        "service_refund_operations",
+        "service_request_schedule_items",
+        "service_requests",
+        "translation_provider_state",
+        "users",
+        "wishlists"
+      ],
+      "disabled": [
+        "admin_job_runs",
+        "admin_support_unread_alert_batches"
+      ],
+      "forced": [],
+      "publicPolicies": 111
+    },
+    "realtimePublication": {
+      "name": "supabase_realtime",
+      "tables": [
+        "admin_audit_logs",
+        "admin_task_comments",
+        "admin_tasks",
+        "admin_whitelist",
+        "inquiry_messages",
+        "notifications",
+        "profiles"
+      ]
+    },
+    "storageBuckets": [
+      { "name": "admin_files", "public": true, "fileSizeLimit": 10485760 },
+      { "name": "avatars", "public": true, "fileSizeLimit": null },
+      { "name": "chat-images", "public": true, "fileSizeLimit": null },
+      { "name": "experiences", "public": true, "fileSizeLimit": null },
+      { "name": "images", "public": true, "fileSizeLimit": null },
+      { "name": "verification-docs", "public": false, "fileSizeLimit": null }
+    ],
+    "storageObjectPolicies": [
+      "Anyone can update their own avatar",
+      "Anyone can upload an avatar",
+      "Auth Users Upload",
+      "Authenticated Delete",
+      "Authenticated Update",
+      "Authenticated Upload",
+      "Avatar images are publicly accessible",
+      "Only admins can upload files",
+      "Owner Delete",
+      "Owner Update",
+      "Public Access",
+      "Verification docs owners can delete",
+      "Verification docs owners can read",
+      "Verification docs owners can update",
+      "Verification docs owners can upload"
+    ]
+  },
+  "activeConcierge": {
+    "tables": [
+      "service_request_schedule_items",
+      "service_assignment_history",
+      "service_refund_operations"
+    ],
+    "functionOverloads": [
+      "public.assign_service_concierge_host_atomic(p_admin_id uuid, p_request_id uuid, p_host_id uuid, p_host_hourly_rate integer, p_host_agreement_confirmed boolean)",
+      "public.begin_service_refund_operation_atomic(p_admin_id uuid, p_order_id text, p_refund_amount integer, p_host_compensation_amount integer, p_idempotency_key text)",
+      "public.cancel_pending_service_concierge_atomic(p_actor_id uuid, p_order_id text, p_cancel_reason text)",
+      "public.complete_service_concierge_booking_if_due_atomic(p_booking_id text)",
+      "public.confirm_service_concierge_payment_atomic(p_order_id text, p_payment_method text, p_tid text)",
+      "public.create_service_concierge_request_atomic(p_user_id uuid, p_service_type text, p_description text, p_city text, p_schedule jsonb, p_languages text[], p_guest_count integer, p_contact_name text, p_contact_phone text, p_client_request_key text)",
+      "public.finish_service_refund_operation_atomic(p_operation_id uuid, p_outcome text, p_provider_reference text, p_error_message text)",
+      "public.request_service_cancellation_review_atomic(p_actor_id uuid, p_order_id text, p_cancel_reason text)"
+    ],
+    "directExecuteRoles": [
+      "service_role"
+    ],
+    "securityDefiner": true,
+    "searchPath": ""
+  },
+  "legacyCompatibility": {
+    "tables": [
+      "service_applications"
+    ],
+    "functionNames": [
+      "complete_service_booking_if_due_atomic",
+      "confirm_service_bank_payment_atomic",
+      "create_service_booking_atomic",
+      "create_service_request_with_booking_atomic",
+      "select_service_host_atomic"
+    ],
+    "disabledRoutes": [
+      "app/api/services/applications/route.ts",
+      "app/api/services/select-host/route.ts"
+    ],
+    "status": 410,
+    "note": "The table remains for historical admin read and cleanup compatibility."
+  },
+  "forbiddenCurrentObjects": {
+    "tables": ["community_comment_likes"],
+    "functions": ["increment_comment_like_count", "decrement_comment_like_count"],
+    "triggers": ["on_comment_like_added", "on_comment_like_removed"],
+    "storagePolicies": ["Authenticated users can upload chat images"]
+  }
+}

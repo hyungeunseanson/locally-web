@@ -1,7 +1,12 @@
 {
-  "schemaContractVersion": 1,
+  "schemaContractVersion": 2,
   "productionProjectRefsDeniedForFixtureWrites": [
     "uhinvcydgzqlpnvieyal"
+  ],
+  "freshProjectApplyOrder": [
+    "supabase/migrations/20260912034545_production_schema_baseline.sql",
+    "supabase/migrations/20260912050655_service_concierge_assignment.sql",
+    "supabase/staging/post-baseline-current-state-overlay.sql"
   ],
   "applicationTables": [
     "admin_audit_logs",
@@ -13,7 +18,6 @@
     "admin_whitelist",
     "analytics_events",
     "bookings",
-    "community_comment_likes",
     "community_comments",
     "community_likes",
     "community_posts",
@@ -26,6 +30,8 @@
     "host_applications",
     "inquiries",
     "inquiry_messages",
+    "likes",
+    "messages",
     "notifications",
     "profile_private_demographics",
     "profiles",
@@ -34,7 +40,10 @@
     "reviews",
     "search_logs",
     "service_applications",
+    "service_assignment_history",
     "service_bookings",
+    "service_refund_operations",
+    "service_request_schedule_items",
     "service_requests",
     "translation_provider_state",
     "users",
@@ -45,23 +54,29 @@
     "public_profiles"
   ],
   "applicationFunctions": [
+    "assign_service_concierge_host_atomic",
+    "begin_service_refund_operation_atomic",
+    "cancel_pending_service_concierge_atomic",
+    "check_rate_limit",
     "claim_due_admin_support_unread_alert_batches",
     "complete_admin_manual_experience_payout_atomic",
     "complete_experience_booking_if_due_atomic",
     "complete_service_booking_if_due_atomic",
+    "complete_service_concierge_booking_if_due_atomic",
     "confirm_service_bank_payment_atomic",
+    "confirm_service_concierge_payment_atomic",
     "create_booking_atomic",
     "create_guest_review_with_notification_atomic",
     "create_service_booking_atomic",
+    "create_service_concierge_request_atomic",
     "create_service_request_with_booking_atomic",
     "decrement_comment_count",
-    "decrement_comment_like_count",
     "decrement_like_count",
     "ensure_profile_demographics_reminder",
+    "finish_service_refund_operation_atomic",
     "get_experience_completion_due_backlog",
     "handle_new_user",
     "increment_comment_count",
-    "increment_comment_like_count",
     "increment_community_post_view_count",
     "increment_like_count",
     "is_admin_reader",
@@ -73,6 +88,7 @@
     "prune_team_workspace_tasks",
     "record_translation_provider_outcome",
     "refresh_experience_popularity_snapshot",
+    "request_service_cancellation_review_atomic",
     "select_service_host_atomic",
     "set_proxy_comments_updated_at",
     "set_proxy_requests_updated_at",
@@ -84,8 +100,6 @@
   "applicationTriggers": [
     "on_auth_user_created",
     "on_comment_added",
-    "on_comment_like_added",
-    "on_comment_like_removed",
     "on_comment_removed",
     "on_like_added",
     "on_like_removed",
@@ -113,6 +127,23 @@
     { "name": "images", "public": true },
     { "name": "verification-docs", "public": false }
   ],
+  "activeConcierge": {
+    "tables": [
+      "service_request_schedule_items",
+      "service_assignment_history",
+      "service_refund_operations"
+    ],
+    "functions": [
+      "assign_service_concierge_host_atomic",
+      "begin_service_refund_operation_atomic",
+      "cancel_pending_service_concierge_atomic",
+      "complete_service_concierge_booking_if_due_atomic",
+      "confirm_service_concierge_payment_atomic",
+      "create_service_concierge_request_atomic",
+      "finish_service_refund_operation_atomic",
+      "request_service_cancellation_review_atomic"
+    ]
+  },
   "functionalCanaryMinimum": {
     "tables": [
       "bookings",
@@ -124,6 +155,11 @@
       "notifications",
       "profile_private_demographics",
       "profiles",
+      "service_assignment_history",
+      "service_bookings",
+      "service_refund_operations",
+      "service_request_schedule_items",
+      "service_requests",
       "users"
     ],
     "views": [
@@ -131,10 +167,18 @@
       "public_profiles"
     ],
     "functions": [
+      "assign_service_concierge_host_atomic",
+      "begin_service_refund_operation_atomic",
+      "cancel_pending_service_concierge_atomic",
+      "complete_service_concierge_booking_if_due_atomic",
+      "confirm_service_concierge_payment_atomic",
       "create_booking_atomic",
+      "create_service_concierge_request_atomic",
       "ensure_profile_demographics_reminder",
+      "finish_service_refund_operation_atomic",
       "handle_new_user",
-      "is_admin_reader"
+      "is_admin_reader",
+      "request_service_cancellation_review_atomic"
     ],
     "triggers": [
       "on_auth_user_created"
@@ -152,22 +196,32 @@
       "verification-docs"
     ]
   },
-  "repoBaselineMissing": [
-    "admin_audit_logs",
-    "admin_task_comments",
-    "admin_tasks",
-    "admin_whitelist",
-    "bookings",
-    "experience_availability",
-    "experiences",
-    "guest_reviews",
-    "host_applications",
-    "inquiries",
-    "inquiry_messages",
-    "notifications",
-    "profiles",
-    "reviews",
-    "users",
-    "wishlists"
-  ]
+  "legacyCompatibility": {
+    "tables": [
+      "service_applications"
+    ],
+    "functions": [
+      "complete_service_booking_if_due_atomic",
+      "confirm_service_bank_payment_atomic",
+      "create_service_booking_atomic",
+      "create_service_request_with_booking_atomic",
+      "select_service_host_atomic"
+    ],
+    "disabledRoutes": [
+      "app/api/services/applications/route.ts",
+      "app/api/services/select-host/route.ts"
+    ],
+    "status": 410,
+    "tableStillRequiredFor": [
+      "historical admin reads",
+      "historical booking joins",
+      "account cleanup"
+    ]
+  },
+  "forbiddenCurrentObjects": {
+    "tables": ["community_comment_likes"],
+    "functions": ["increment_comment_like_count", "decrement_comment_like_count"],
+    "triggers": ["on_comment_like_added", "on_comment_like_removed"],
+    "storagePolicies": ["Authenticated users can upload chat images"]
+  }
 }

@@ -1,7 +1,8 @@
 # Temporary chat attachment OFF — manual Storage step
 
-Status: **prepared, NOT applied to Production**. Merging the application PR does
-not execute this SQL. No automatic migration belongs in this change.
+Status: **applied to Production on 2026-09-12**. The SQL file is retained only as
+the immutable operator record of that separately approved action. Do not rerun it
+and do not turn it into an automatic migration.
 
 The application policy is hard-coded OFF in `app/utils/chatAttachmentPolicy.ts`.
 Guest/host controls are not rendered; `useChat.sendMessage` rejects File input
@@ -31,10 +32,12 @@ This removes client INSERT permission, not a trusted service_role's RLS bypass.
 No current application service-role path uploads chat images; keep privileged keys
 server-only. Existing-object UPDATE/DELETE is intentionally outside this OFF step.
 
-## Later operator procedure — separate approval required
+## Historical operator procedure — already completed, do not repeat
 
-1. Complete ChatGPT review and obtain explicit approval for this Production step.
-   Confirm the target project is locally-web Production, not the Supabase canary.
+The following steps document what was executed. They are not an active runbook.
+
+1. The separately approved operator confirmed the target was locally-web Production,
+   not a Supabase canary.
 2. In that project's SQL editor, run **only these read-only preflight queries**:
 
 ```sql
@@ -54,8 +57,8 @@ FROM storage.objects WHERE bucket_id = 'chat-images';
 3. Review every INSERT and ALL policy, including policies whose names do not mention
    chat. If the catalog differs, stop and review updated SQL; do not bypass the
    fingerprint check. Save the preflight output privately. Do not expose image URLs.
-4. After approval, execute `disable-chat-image-inserts.sql` as one transaction.
-   Its **only persistent change** is:
+4. The operator executed `disable-chat-image-inserts.sql` as one transaction. Its
+   **only persistent change** was:
 
 ```sql
 DROP POLICY "Authenticated users can upload chat images" ON storage.objects;
@@ -83,8 +86,9 @@ FROM (
    separately approved Storage step are complete. Before that, old clients can
    still upload directly to Storage even though the new application rejects them.
 
-An already-applied SQL rerun stops at the fingerprint check. SQL transaction failure
-rolls back the drop. Application rollback alone does not restore Storage uploads.
+Do not rely on the fingerprint guard as permission to rerun this already-applied SQL.
+The original transaction was rollback-safe. Application rollback alone does not
+restore Storage uploads.
 Do not automatically recreate the old permissive policy: any restoration needs a
 separate review/approval and is not the future R2 launch procedure.
 

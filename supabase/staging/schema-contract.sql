@@ -11,7 +11,9 @@ BEGIN
   FROM unnest(ARRAY[
     'bookings', 'experience_availability', 'experiences', 'host_applications',
     'inquiries', 'inquiry_messages', 'notifications',
-    'profile_private_demographics', 'profiles', 'users'
+    'profile_private_demographics', 'profiles', 'service_assignment_history',
+    'service_bookings', 'service_refund_operations',
+    'service_request_schedule_items', 'service_requests', 'users'
   ]) AS required(name)
   WHERE to_regclass(format('public.%I', name)) IS NULL;
 
@@ -28,8 +30,13 @@ BEGIN
   SELECT array_agg(name ORDER BY name)
   INTO missing
   FROM unnest(ARRAY[
-    'create_booking_atomic', 'ensure_profile_demographics_reminder',
-    'handle_new_user', 'is_admin_reader'
+    'assign_service_concierge_host_atomic', 'begin_service_refund_operation_atomic',
+    'cancel_pending_service_concierge_atomic',
+    'complete_service_concierge_booking_if_due_atomic',
+    'confirm_service_concierge_payment_atomic', 'create_booking_atomic',
+    'create_service_concierge_request_atomic', 'ensure_profile_demographics_reminder',
+    'finish_service_refund_operation_atomic', 'handle_new_user', 'is_admin_reader',
+    'request_service_cancellation_review_atomic'
   ]) AS required(name)
   WHERE NOT EXISTS (
     SELECT 1
@@ -60,7 +67,9 @@ BEGIN
     AND relation.relname = ANY (ARRAY[
       'bookings', 'experience_availability', 'experiences', 'host_applications',
       'inquiries', 'inquiry_messages', 'notifications',
-      'profile_private_demographics', 'profiles', 'users'
+      'profile_private_demographics', 'profiles', 'service_assignment_history',
+      'service_bookings', 'service_refund_operations',
+      'service_request_schedule_items', 'service_requests', 'users'
     ])
     AND NOT relation.relrowsecurity;
 
@@ -159,6 +168,57 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'Private demographics has a client RLS policy';
   END IF;
+
+  SELECT array_agg(required_table.name ORDER BY required_table.name)
+  INTO missing
+  FROM unnest(ARRAY[
+    'service_assignment_history',
+    'service_refund_operations',
+    'service_request_schedule_items'
+  ]) AS required_table(name)
+  WHERE EXISTS (
+    SELECT 1 FROM pg_policies AS policy_def
+    WHERE policy_def.schemaname = 'public'
+      AND policy_def.tablename = required_table.name
+  )
+  OR EXISTS (
+    SELECT 1
+    FROM unnest(ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE']) AS privilege_def(name)
+    WHERE has_table_privilege('anon', format('public.%I', required_table.name), privilege_def.name)
+       OR has_table_privilege('authenticated', format('public.%I', required_table.name), privilege_def.name)
+       OR NOT has_table_privilege('service_role', format('public.%I', required_table.name), privilege_def.name)
+  );
+
+  IF missing IS NOT NULL THEN
+    RAISE EXCEPTION 'Concierge service-role table security differs: %', missing;
+  END IF;
+
+  SELECT array_agg(procedure_def.proname ORDER BY procedure_def.proname)
+  INTO missing
+  FROM pg_proc AS procedure_def
+  JOIN pg_namespace AS namespace_def ON namespace_def.oid = procedure_def.pronamespace
+  WHERE namespace_def.nspname = 'public'
+    AND procedure_def.proname = ANY (ARRAY[
+      'assign_service_concierge_host_atomic',
+      'begin_service_refund_operation_atomic',
+      'cancel_pending_service_concierge_atomic',
+      'complete_service_concierge_booking_if_due_atomic',
+      'confirm_service_concierge_payment_atomic',
+      'create_service_concierge_request_atomic',
+      'finish_service_refund_operation_atomic',
+      'request_service_cancellation_review_atomic'
+    ])
+    AND (
+      NOT procedure_def.prosecdef
+      OR NOT (COALESCE(procedure_def.proconfig, ARRAY[]::text[]) @> ARRAY['search_path=""']::text[])
+      OR has_function_privilege('anon', procedure_def.oid, 'EXECUTE')
+      OR has_function_privilege('authenticated', procedure_def.oid, 'EXECUTE')
+      OR NOT has_function_privilege('service_role', procedure_def.oid, 'EXECUTE')
+    );
+
+  IF missing IS NOT NULL THEN
+    RAISE EXCEPTION 'Concierge RPC security differs: %', missing;
+  END IF;
 END;
 $$;
 
@@ -202,22 +262,29 @@ BEGIN
     RAISE EXCEPTION 'Missing or misconfigured storage buckets: %', mismatch;
   END IF;
 
-  SELECT array_agg(required.name ORDER BY required.name)
+  SELECT array_agg(policy_def.policyname ORDER BY policy_def.policyname)
   INTO mismatch
-  FROM (VALUES
-    ('admin_files'), ('avatars'), ('chat-images'), ('experiences'), ('images'),
-    ('verification-docs')
-  ) AS required(name)
-  WHERE NOT EXISTS (
-    SELECT 1
-    FROM pg_policies policy
-    WHERE policy.schemaname = 'storage'
-      AND policy.tablename = 'objects'
-      AND concat_ws(' ', policy.qual, policy.with_check) LIKE '%' || quote_literal(required.name) || '%'
-  );
+  FROM pg_policies AS policy_def
+  WHERE policy_def.schemaname = 'storage' AND policy_def.tablename = 'objects';
 
-  IF mismatch IS NOT NULL THEN
-    RAISE EXCEPTION 'Storage buckets without a reviewed object policy: %', mismatch;
+  IF mismatch IS DISTINCT FROM ARRAY[
+    'Anyone can update their own avatar',
+    'Anyone can upload an avatar',
+    'Auth Users Upload',
+    'Authenticated Delete',
+    'Authenticated Update',
+    'Authenticated Upload',
+    'Avatar images are publicly accessible',
+    'Only admins can upload files',
+    'Owner Delete',
+    'Owner Update',
+    'Public Access',
+    'Verification docs owners can delete',
+    'Verification docs owners can read',
+    'Verification docs owners can update',
+    'Verification docs owners can upload'
+  ]::text[] THEN
+    RAISE EXCEPTION 'Storage object policy inventory differs: %', mismatch;
   END IF;
 END;
 $$;

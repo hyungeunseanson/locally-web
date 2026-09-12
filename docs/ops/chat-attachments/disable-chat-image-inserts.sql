@@ -1,6 +1,6 @@
--- MANUAL ONLY. Not applied. Requires separate Production approval after review.
--- Target: locally-web (uhinvcydgzqlpnvieyal). Never run against a canary branch.
--- Re-audit the complete INSERT/ALL catalog using README.md before execution.
+-- HISTORICAL OPERATOR RECORD. Applied to Production on 2026-09-12; do not rerun.
+-- Target was locally-web (uhinvcydgzqlpnvieyal). Never run against any project.
+-- SQL below is preserved byte-for-byte as evidence of the approved operation.
 BEGIN;
 SET LOCAL lock_timeout = '5s';
 
