@@ -88,8 +88,24 @@
         {
           "binding": "NEXT_INC_CACHE_R2_BUCKET",
           "bucket_name": "locally-opennext-incremental-cache-production"
+        },
+        {
+          "binding": "PUBLIC_EXPERIENCE_MEDIA_R2",
+          "bucket_name": "locally-public-experience-canary"
         }
       ],
+      "queues": {
+        "consumers": [
+          {
+            "queue": "locally-public-experience-media-mirror-production",
+            "max_batch_size": 1,
+            "max_retries": 5,
+            "dead_letter_queue": "locally-public-experience-media-mirror-dlq-production",
+            "max_concurrency": 1,
+            "retry_delay": 60
+          }
+        ]
+      },
       "durable_objects": {
         "bindings": [
           {

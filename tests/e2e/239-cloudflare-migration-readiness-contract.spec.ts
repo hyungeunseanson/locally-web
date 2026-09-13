@@ -71,12 +71,10 @@ test.describe('Cloudflare migration readiness contract', () => {
       expect(environment.workers_dev).toBe(false);
       expect(environment.preview_urls).toBe(false);
       expect(environment.images).toEqual({ binding: 'IMAGES' });
-      expect(environment.r2_buckets).toEqual([
-        {
-          binding: 'NEXT_INC_CACHE_R2_BUCKET',
-          bucket_name: manifest.environments[environmentName].incrementalCacheR2,
-        },
-      ]);
+      expect(environment.r2_buckets).toContainEqual({
+        binding: 'NEXT_INC_CACHE_R2_BUCKET',
+        bucket_name: manifest.environments[environmentName].incrementalCacheR2,
+      });
       expect(environment.services).toEqual([
         {
           binding: 'WORKER_SELF_REFERENCE',
@@ -89,14 +87,26 @@ test.describe('Cloudflare migration readiness contract', () => {
       ]);
     }
 
+    expect(wrangler.env.canary.r2_buckets).toHaveLength(1);
+    expect(wrangler.env.canary.queues).toBeUndefined();
+    expect(wrangler.env.production.r2_buckets).toContainEqual({
+      binding: manifest.bindings.publicExperienceMediaR2,
+      bucket_name: manifest.environments.production.publicExperienceMediaR2,
+    });
+    expect(wrangler.env.production.queues?.producers).toBeUndefined();
+
     const wranglerEnvironments = Object.values(wrangler.env) as Array<{
-      r2_buckets: Array<{ bucket_name: string }>;
+      r2_buckets: Array<{ binding: string; bucket_name: string }>;
     }>;
-    const configuredBuckets = wranglerEnvironments
-      .flatMap((environment) => environment.r2_buckets)
-      .map((binding: { bucket_name: string }) => binding.bucket_name);
-    for (const forbiddenBucket of manifest.forbiddenR2Buckets) {
-      expect(configuredBuckets).not.toContain(forbiddenBucket);
+    const incrementalCacheBuckets = wranglerEnvironments.map(
+      (environment) =>
+        environment.r2_buckets.find(
+          (binding: { binding: string }) =>
+            binding.binding === manifest.bindings.incrementalCacheR2
+        )?.bucket_name
+    );
+    for (const forbiddenBucket of manifest.forbiddenIncrementalCacheR2Buckets) {
+      expect(incrementalCacheBuckets).not.toContain(forbiddenBucket);
     }
   });
 

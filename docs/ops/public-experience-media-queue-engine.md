@@ -1,6 +1,6 @@
 # Dormant public experience media Queue engine
 
-This repository contains a code-only mirror engine for a future public experience media Queue consumer. It is deliberately dormant: there is no Queue or DLQ resource, producer/consumer binding, public-media R2 binding, Worker handler, or Production deployment in this change.
+This repository contains a code-only mirror engine and dormant Production consumer wiring. The pre-provisioned Queue and DLQ remain empty and unbound remotely until a separately approved Worker deployment. The repository declares a Production-only consumer and public-media R2 binding, but deliberately has no Queue producer binding, producer hook, message send, or runtime deployment in this change. Canary has neither Production binding.
 
 ## Authority and processing contract
 
@@ -33,7 +33,7 @@ Outcomes are deliberately small and sanitized:
 
 - `success`, `already_exact`, and `ineligible_noop` map to acknowledgement.
 - `source_drift` and `transient_failure` map to retry.
-- `permanent_conflict` and `invalid_message` map to a future DLQ decision rather than infinite retry.
+- `permanent_conflict` and `invalid_message` are retried without acknowledgement so the configured platform retry limit preserves them in the DLQ. There is no direct DLQ producer.
 
 No outcome includes a source URL, Storage key, UUID-bearing path, raw provider error, or credential.
 
@@ -41,4 +41,6 @@ No outcome includes a source URL, Storage key, UUID-bearing path, raw provider e
 
 The scheduled reconciler keeps byte equality as its strongest fast path. New Sharp objects carry the same logical proof used by the Queue engine: source identity/SHA/size, transform width/quality/format/schema/role, the bounded `sharp-libvips` engine, and a self-consistent output SHA. If a Queue write wins the conditional-create race with different valid bytes, the scheduled path reads the object and accepts it only when the complete current-source proof and `cloudflare-images-binding` engine are exact. Unknown engines or any source/spec/integrity mismatch remain conflicts, and neither path overwrites the winner.
 
-Queue/DLQ creation, bindings, a Queue handler, producer hooks, a controlled Production canary, and deterministic runtime reader activation still require separate approval. The existing scheduled limitation that skips R2 completeness checks when manifest drift is absent also remains a separate safety-net completeness task; this compatibility change does not alter its schedule or manifest workflow.
+The Production-only consumer contract uses batch size 1, concurrency 1, five retries, a 60-second retry delay, and the pre-provisioned DLQ. Its runtime adapter reloads only `id,status,is_active,photos,itinerary,image_url` through the anon/RLS REST boundary, fetches public source bytes without credentials, and uses the existing `IMAGES` and `PUBLIC_EXPERIENCE_MEDIA_R2` bindings. The OpenNext fetch handler and cache Durable Object exports remain delegated unchanged.
+
+Remote consumer attachment, producer hooks, messages, a controlled Production canary, and deterministic runtime reader activation still require separate approval. The existing scheduled limitation that skips R2 completeness checks when manifest drift is absent also remains a separate safety-net completeness task; this compatibility change does not alter its schedule or manifest workflow.

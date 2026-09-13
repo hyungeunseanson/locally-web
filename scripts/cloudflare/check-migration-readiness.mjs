@@ -74,9 +74,10 @@ for (const environmentName of ['canary', 'production']) {
   assert.equal(environment.workers_dev, false);
   assert.equal(environment.preview_urls, false);
   assert.deepEqual(environment.images, { binding: manifest.bindings.images });
-  assert.equal(environment.r2_buckets.length, 1);
-  assert.equal(environment.r2_buckets[0].binding, manifest.bindings.incrementalCacheR2);
-  assert.equal(environment.r2_buckets[0].bucket_name, expected.incrementalCacheR2);
+  const incrementalCacheBinding = environment.r2_buckets.find(
+    (binding) => binding.binding === manifest.bindings.incrementalCacheR2
+  );
+  assert.equal(incrementalCacheBinding?.bucket_name, expected.incrementalCacheR2);
   assert.equal(environment.services.length, 1);
   assert.equal(environment.services[0].binding, manifest.bindings.selfService);
   assert.equal(environment.services[0].service, expected.worker);
@@ -98,12 +99,48 @@ for (const environmentName of ['canary', 'production']) {
   assert.equal(environment.observability.redact_query_string, true);
 }
 
+assert.equal(wrangler.env.canary.r2_buckets.length, 1);
+assert.equal(wrangler.env.canary.queues, undefined);
+assert.deepEqual(wrangler.env.production.r2_buckets, [
+  {
+    binding: manifest.bindings.incrementalCacheR2,
+    bucket_name: manifest.environments.production.incrementalCacheR2,
+  },
+  {
+    binding: manifest.bindings.publicExperienceMediaR2,
+    bucket_name: manifest.environments.production.publicExperienceMediaR2,
+  },
+]);
+assert.deepEqual(wrangler.env.production.queues, {
+  consumers: [
+    {
+      queue: manifest.environments.production.publicExperienceMediaQueue,
+      max_batch_size: manifest.publicExperienceMediaQueuePolicy.maxBatchSize,
+      max_retries: manifest.publicExperienceMediaQueuePolicy.maxRetries,
+      dead_letter_queue:
+        manifest.environments.production.publicExperienceMediaDeadLetterQueue,
+      max_concurrency: manifest.publicExperienceMediaQueuePolicy.maxConcurrency,
+      retry_delay: manifest.publicExperienceMediaQueuePolicy.retryDelaySeconds,
+    },
+  ],
+});
+assert.equal(wrangler.env.production.queues.producers, undefined);
+
+const incrementalCacheBuckets = Object.values(wrangler.env).map((environment) =>
+  environment.r2_buckets.find(
+    (binding) => binding.binding === manifest.bindings.incrementalCacheR2
+  )?.bucket_name
+);
+for (const forbiddenBucket of manifest.forbiddenIncrementalCacheR2Buckets) {
+  assert(
+    !incrementalCacheBuckets.includes(forbiddenBucket),
+    `Forbidden incremental-cache R2 bucket is bound: ${forbiddenBucket}`
+  );
+}
+
 const configuredBuckets = Object.values(wrangler.env)
   .flatMap((environment) => environment.r2_buckets ?? [])
   .map((binding) => binding.bucket_name);
-for (const forbiddenBucket of manifest.forbiddenR2Buckets) {
-  assert(!configuredBuckets.includes(forbiddenBucket), `Forbidden R2 bucket is bound: ${forbiddenBucket}`);
-}
 
 assert(openNextConfig.includes('incrementalCache: r2IncrementalCache'));
 assert(openNextConfig.includes('queue: doQueue'));

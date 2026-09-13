@@ -27,6 +27,9 @@
     "production": {
       "worker": "locally-web-opennext-production",
       "incrementalCacheR2": "locally-opennext-incremental-cache-production",
+      "publicExperienceMediaR2": "locally-public-experience-canary",
+      "publicExperienceMediaQueue": "locally-public-experience-media-mirror-production",
+      "publicExperienceMediaDeadLetterQueue": "locally-public-experience-media-mirror-dlq-production",
       "publicExperienceMediaBaseUrl": "https://media-canary.locally-travel.com",
       "workersDev": false,
       "previewUrls": false
@@ -36,6 +39,7 @@
     "staticAssets": "ASSETS",
     "images": "IMAGES",
     "incrementalCacheR2": "NEXT_INC_CACHE_R2_BUCKET",
+    "publicExperienceMediaR2": "PUBLIC_EXPERIENCE_MEDIA_R2",
     "queueDurableObject": {
       "binding": "NEXT_CACHE_DO_QUEUE",
       "className": "DOQueueHandler"
@@ -46,7 +50,13 @@
     },
     "selfService": "WORKER_SELF_REFERENCE"
   },
-  "forbiddenR2Buckets": [
+  "publicExperienceMediaQueuePolicy": {
+    "maxBatchSize": 1,
+    "maxConcurrency": 1,
+    "maxRetries": 5,
+    "retryDelaySeconds": 60
+  },
+  "forbiddenIncrementalCacheR2Buckets": [
     "locally-public-experience-canary",
     "locally-public-host-profiles",
     "locally-private-host-profile-stale",
