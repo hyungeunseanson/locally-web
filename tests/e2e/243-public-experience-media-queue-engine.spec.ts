@@ -14,6 +14,7 @@ import {
   parsePublicExperienceMediaQueueMessage,
   PUBLIC_EXPERIENCE_MEDIA_CACHE_CONTROL,
   PUBLIC_EXPERIENCE_MEDIA_MESSAGE_SCHEMA,
+  PUBLIC_EXPERIENCE_MEDIA_SCHEDULED_TRANSFORM_ENGINE,
   PUBLIC_EXPERIENCE_MEDIA_TRANSFORM_ENGINE,
   type MirrorObjectMetadata,
   type PublicExperienceMediaMirrorDependencies,
@@ -413,6 +414,38 @@ test.describe('dormant public experience media Queue mirror engine', () => {
     const conflict = await mirrorPublicExperienceMedia(message, dependencies({ store }).dependencySet);
     expect(conflict.status).toBe('permanent_conflict');
     expect(conflict.diagnosticCode).toBe('derivative_conflict');
+  });
+
+  test('accepts self-consistent scheduled Sharp provenance with different bytes and rejects unknown engines', async () => {
+    const store = new FakeStore();
+    await mirrorPublicExperienceMedia(message, dependencies({ store }).dependencySet);
+    const derivative = [...store.objects.entries()].find(([key]) => key.includes('-w384-q65.webp'))!;
+    const queueOutputSha = derivative[1].customMetadata.output_byte_sha256;
+    const sharpBytes = new TextEncoder().encode('scheduled-sharp-output');
+    const sharpSha = sha256(sharpBytes);
+    derivative[1].bytes = sharpBytes;
+    derivative[1].size = sharpBytes.byteLength;
+    derivative[1].customMetadata = {
+      ...derivative[1].customMetadata,
+      sha256: sharpSha,
+      output_byte_sha256: sharpSha,
+      transform_engine: PUBLIC_EXPERIENCE_MEDIA_SCHEDULED_TRANSFORM_ENGINE,
+      additional_provenance: 'preserved',
+    };
+    const writesBefore = store.createCalls.length;
+
+    const exact = await mirrorPublicExperienceMedia(message, dependencies({ store }).dependencySet);
+    expect(sharpSha).not.toBe(queueOutputSha);
+    expect(exact.status).toBe('already_exact');
+    expect(store.createCalls).toHaveLength(writesBefore);
+    expect(derivative[1].customMetadata.additional_provenance).toBe('preserved');
+
+    derivative[1].customMetadata.transform_engine = 'unknown-transformer';
+    const conflict = await mirrorPublicExperienceMedia(message, dependencies({ store }).dependencySet);
+    expect(conflict.status).toBe('permanent_conflict');
+    expect(conflict.disposition).toBe('dead_letter');
+    expect(conflict.diagnosticCode).toBe('derivative_conflict');
+    expect(store.createCalls).toHaveLength(writesBefore);
   });
 
   test('Cloudflare Images and hypothetical Sharp bytes may diverge without changing the key contract', async () => {

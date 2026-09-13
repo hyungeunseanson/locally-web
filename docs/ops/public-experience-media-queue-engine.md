@@ -19,7 +19,7 @@ The store abstraction exposes only `head`, `getBytes`, and `createIfAbsent`. Its
 Original keys remain `originals/v1/<source-key-sha256>/<source-byte-sha256>.<ext>`. Derivative keys remain the established deterministic card/detail keys. Existing objects are read and verified:
 
 - Wave 1.2 `legacy-observed` Sharp derivatives are accepted only when their own downloaded SHA, current source identity/SHA, and transform width/quality/format are internally consistent.
-- Queue derivatives additionally prove the transform schema, `cloudflare-images-binding` engine, derivative role, and output SHA.
+- Verified derivatives additionally prove the transform schema, a bounded engine value (`cloudflare-images-binding` or `sharp-libvips`), derivative role, source size, and output SHA.
 - Additional metadata is preserved because exact objects are never rewritten.
 - Missing objects are conditionally created. A conditional loser is re-read and accepted only if the winner supplies valid current-source provenance; otherwise processing returns a permanent conflict.
 
@@ -37,8 +37,8 @@ Outcomes are deliberately small and sanitized:
 
 No outcome includes a source URL, Storage key, UUID-bearing path, raw provider error, or credential.
 
-## Activation blockers
+## Scheduled safety-net compatibility
 
-Queue activation is forbidden until a separate provenance-aware scheduled-safety-net change is merged. The current scheduled Sharp reconciler intentionally requires byte equality with its locally generated output; it will fail closed if it races with a valid Cloudflare Images object whose bytes differ. PR #35 must teach that path to recognize valid current-source/spec provenance without weakening its conflict checks.
+The scheduled reconciler keeps byte equality as its strongest fast path. New Sharp objects carry the same logical proof used by the Queue engine: source identity/SHA/size, transform width/quality/format/schema/role, the bounded `sharp-libvips` engine, and a self-consistent output SHA. If a Queue write wins the conditional-create race with different valid bytes, the scheduled path reads the object and accepts it only when the complete current-source proof and `cloudflare-images-binding` engine are exact. Unknown engines or any source/spec/integrity mismatch remain conflicts, and neither path overwrites the winner.
 
-After that compatibility gate, resource creation, bindings, a Queue handler, producer hooks, a controlled Production canary, and deterministic runtime reader activation each require separate approval.
+Queue/DLQ creation, bindings, a Queue handler, producer hooks, a controlled Production canary, and deterministic runtime reader activation still require separate approval. The existing scheduled limitation that skips R2 completeness checks when manifest drift is absent also remains a separate safety-net completeness task; this compatibility change does not alter its schedule or manifest workflow.

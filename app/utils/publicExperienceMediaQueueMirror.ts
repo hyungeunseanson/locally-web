@@ -8,6 +8,7 @@ import {
   PUBLIC_EXPERIENCE_DETAIL_DERIVATIVES,
   sha256Hex,
 } from './publicExperienceMediaKeys';
+import provenanceContract from '../data/publicExperienceMediaProvenance.json';
 
 export const PUBLIC_EXPERIENCE_MEDIA_MESSAGE_SCHEMA =
   'locally.public-experience-media-mirror';
@@ -15,9 +16,16 @@ export const PUBLIC_EXPERIENCE_MEDIA_MESSAGE_VERSION = 1 as const;
 export const PUBLIC_EXPERIENCE_MEDIA_CACHE_CONTROL =
   'public, max-age=31536000, immutable';
 export const PUBLIC_EXPERIENCE_MEDIA_MAX_SOURCE_BYTES = 10 * 1024 * 1024;
-export const PUBLIC_EXPERIENCE_MEDIA_TRANSFORM_SCHEMA_VERSION = '1';
+export const PUBLIC_EXPERIENCE_MEDIA_TRANSFORM_SCHEMA_VERSION =
+  provenanceContract.transformSchemaVersion;
 export const PUBLIC_EXPERIENCE_MEDIA_TRANSFORM_ENGINE =
-  'cloudflare-images-binding';
+  provenanceContract.transformEngines.cloudflareImages;
+export const PUBLIC_EXPERIENCE_MEDIA_SCHEDULED_TRANSFORM_ENGINE =
+  provenanceContract.transformEngines.scheduledSharp;
+
+const ALLOWED_DERIVATIVE_TRANSFORM_ENGINES = new Set(
+  provenanceContract.allowedDerivativeEngines
+);
 
 export const PUBLIC_EXPERIENCE_MEDIA_REASONS = [
   'create',
@@ -639,11 +647,11 @@ function derivativeIsExact(
 
   if (metadata.provenance_status === 'legacy-observed') return true;
   return (
-    metadata.provenance_status === 'verified' &&
+    metadata.provenance_status === provenanceContract.provenanceStatus &&
     metadata.source_size === String(sourceSize) &&
     metadata.transform_schema_version ===
       PUBLIC_EXPERIENCE_MEDIA_TRANSFORM_SCHEMA_VERSION &&
-    metadata.transform_engine === PUBLIC_EXPERIENCE_MEDIA_TRANSFORM_ENGINE &&
+    ALLOWED_DERIVATIVE_TRANSFORM_ENGINES.has(metadata.transform_engine) &&
     metadata.derivative_role === specification.role
   );
 }

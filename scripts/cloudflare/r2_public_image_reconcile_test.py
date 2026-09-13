@@ -185,6 +185,18 @@ class ConditionalCreateTest(unittest.TestCase):
             "path": self.source.name,
             "bytes": len(self.body),
             "sha256": hashlib.sha256(self.body).hexdigest(),
+            "contentType": "image/webp",
+            "sourceKeySha256": "a" * 64,
+            "sourceByteSha256": "b" * 64,
+            "sourceSize": 321,
+            "derivativeRole": "card",
+            "width": 384,
+            "quality": 65,
+            "format": "webp",
+            "transformSchemaVersion": MODULE.TRANSFORM_SCHEMA_VERSION,
+            "transformEngine": MODULE.SCHEDULED_SHARP_TRANSFORM_ENGINE,
+            "provenanceStatus": MODULE.VERIFIED_PROVENANCE_STATUS,
+            "generatedAt": "2026-09-13T00:00:00.000Z",
         }
 
     def tearDown(self):
@@ -201,7 +213,9 @@ class ConditionalCreateTest(unittest.TestCase):
                 existed_before,
             )
         verify_public.assert_called_once_with(
-            "https://media.example", self.item["key"], self.item["bytes"]
+            "https://media.example",
+            self.item["key"],
+            len(client.objects[self.item["key"]]["body"]),
         )
         return outcome
 
@@ -211,6 +225,14 @@ class ConditionalCreateTest(unittest.TestCase):
         self.assertEqual(len(client.put_calls), 1)
         self.assertEqual(client.put_calls[0]["IfNoneMatch"], "*")
         self.assertEqual(client.objects[self.item["key"]]["body"], self.body)
+        self.assertEqual(
+            client.objects[self.item["key"]]["metadata"],
+            MODULE.desired_sharp_metadata(self.item),
+        )
+        self.assertEqual(
+            client.objects[self.item["key"]]["metadata"]["transform_engine"],
+            "sharp-libvips",
+        )
 
     def test_concurrent_exact_create_is_verified_without_overwrite(self):
         extra_metadata = {
@@ -224,7 +246,7 @@ class ConditionalCreateTest(unittest.TestCase):
             )
 
         client = FakeR2Client(before_put=concurrent_create)
-        self.assertEqual(self.run_reconcile(client), "concurrent_exact_skip")
+        self.assertEqual(self.run_reconcile(client), "concurrent_byte_exact_skip")
         self.assertEqual(len(client.put_calls), 1)
         self.assertEqual(client.objects[self.item["key"]]["metadata"], extra_metadata)
 
@@ -236,7 +258,7 @@ class ConditionalCreateTest(unittest.TestCase):
         with mock.patch.object(
             MODULE, "CONCURRENT_OBJECT_RETRY_DELAYS_SECONDS", (0, 0)
         ), mock.patch.object(MODULE.time, "sleep") as sleep:
-            self.assertEqual(self.run_reconcile(client), "concurrent_exact_skip")
+            self.assertEqual(self.run_reconcile(client), "concurrent_byte_exact_skip")
         self.assertEqual(sleep.call_count, 2)
 
     def test_recognizes_precondition_and_conditional_conflict_responses(self):
@@ -289,14 +311,125 @@ class ConditionalCreateTest(unittest.TestCase):
     def test_concurrent_sha_metadata_mismatch_or_missing_fails_closed(self):
         for metadata in ({"sha256": "wrong"}, {}):
             with self.subTest(metadata=metadata):
-                self.assert_conflict(object_value(self.body, metadata=metadata), "sha256 metadata conflict")
+                self.assert_conflict(object_value(self.body, metadata=metadata), "byte conflict")
 
     def test_object_present_in_upload_list_is_verified_with_zero_writes(self):
         client = FakeR2Client({self.item["key"]: object_value(self.body)})
-        self.assertEqual(self.run_reconcile(client, existed_before=True), "concurrent_exact_skip")
+        self.assertEqual(self.run_reconcile(client, existed_before=True), "existing_exact")
         self.assertEqual(client.put_calls, [])
         self.assertEqual(client.copy_calls, 0)
         self.assertEqual(client.delete_calls, 0)
+
+    def provenance_metadata(self, body, engine="cloudflare-images-binding", **overrides):
+        digest = hashlib.sha256(body).hexdigest()
+        metadata = {
+            "sha256": digest,
+            "output_byte_sha256": digest,
+            "source_key_sha256": self.item["sourceKeySha256"],
+            "source_byte_sha256": self.item["sourceByteSha256"],
+            "source_size": str(self.item["sourceSize"]),
+            "transform_width": str(self.item["width"]),
+            "transform_quality": str(self.item["quality"]),
+            "transform_format": self.item["format"],
+            "transform_schema_version": self.item["transformSchemaVersion"],
+            "transform_engine": engine,
+            "derivative_role": self.item["derivativeRole"],
+            "provenance_status": "verified",
+        }
+        metadata.update(overrides)
+        return metadata
+
+    def assert_provenance_conflict(self, metadata_overrides, message="provenance conflict", body=b"queue-output"):
+        metadata = self.provenance_metadata(body, **metadata_overrides)
+        self.assert_conflict(object_value(body, metadata=metadata), message)
+
+    def test_queue_wins_race_with_different_bytes_and_exact_provenance(self):
+        queue_body = b"cloudflare-images-output"
+        metadata = self.provenance_metadata(queue_body)
+        metadata["additional_provenance"] = "preserved"
+
+        def concurrent_create(client, _kwargs):
+            client.objects[self.item["key"]] = object_value(
+                queue_body, metadata=metadata
+            )
+
+        client = FakeR2Client(before_put=concurrent_create)
+        self.assertEqual(
+            self.run_reconcile(client), "concurrent_provenance_exact_skip"
+        )
+        self.assertNotEqual(hashlib.sha256(queue_body).hexdigest(), self.item["sha256"])
+        self.assertEqual(
+            client.objects[self.item["key"]]["metadata"]["additional_provenance"],
+            "preserved",
+        )
+        self.assertEqual(len(client.put_calls), 1)
+        self.assertEqual(client.copy_calls, 0)
+        self.assertEqual(client.delete_calls, 0)
+
+    def test_queue_wins_race_with_same_bytes_and_exact_provenance(self):
+        metadata = self.provenance_metadata(self.body)
+
+        def concurrent_create(client, _kwargs):
+            client.objects[self.item["key"]] = object_value(
+                self.body, metadata=metadata
+            )
+
+        client = FakeR2Client(before_put=concurrent_create)
+        self.assertEqual(
+            self.run_reconcile(client), "concurrent_provenance_exact_skip"
+        )
+
+    def test_verified_object_actual_bytes_must_match_both_stored_hashes(self):
+        metadata = self.provenance_metadata(b"queue-output")
+        self.assert_conflict(
+            object_value(b"different-bytes", metadata=metadata),
+            "provenance conflict",
+        )
+
+    def test_logical_provenance_mismatches_fail_closed(self):
+        cases = (
+            ({"source_key_sha256": "c" * 64}, "source key"),
+            ({"source_byte_sha256": "c" * 64}, "source bytes"),
+            ({"source_size": "999"}, "source size"),
+            ({"transform_width": "640"}, "width"),
+            ({"transform_quality": "75"}, "quality"),
+            ({"transform_format": "avif"}, "format"),
+            ({"derivative_role": "detail"}, "role"),
+            ({"transform_schema_version": "999"}, "schema"),
+        )
+        for overrides, label in cases:
+            with self.subTest(label=label):
+                self.assert_provenance_conflict(overrides)
+
+    def test_unknown_verified_transform_engine_fails_closed(self):
+        self.assert_provenance_conflict(
+            {"engine": "unknown-transformer"},
+            message="transform engine conflict",
+        )
+
+    def test_legacy_observed_production_metadata_remains_compatible(self):
+        legacy_body = b"historical-sharp-output"
+        digest = hashlib.sha256(legacy_body).hexdigest()
+        metadata = {
+            "sha256": digest,
+            "output_byte_sha256": digest,
+            "source_key_sha256": self.item["sourceKeySha256"],
+            "source_byte_sha256": self.item["sourceByteSha256"],
+            "transform_width": str(self.item["width"]),
+            "transform_quality": str(self.item["quality"]),
+            "transform_format": "webp",
+            "provenance_status": "legacy-observed",
+        }
+
+        def concurrent_create(client, _kwargs):
+            client.objects[self.item["key"]] = object_value(
+                legacy_body, metadata=metadata
+            )
+
+        client = FakeR2Client(before_put=concurrent_create)
+        self.assertEqual(
+            self.run_reconcile(client), "concurrent_provenance_exact_skip"
+        )
 
 
 if __name__ == "__main__":

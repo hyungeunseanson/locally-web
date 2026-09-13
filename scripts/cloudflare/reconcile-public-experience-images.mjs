@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
@@ -7,6 +8,18 @@ import { pathToFileURL } from 'node:url';
 const CARD_MANIFEST_PATH = path.resolve('app/data/publicExperienceCardImages.ts');
 const DETAIL_MANIFEST_PATH = path.resolve('app/data/publicExperienceDetailImages.generated.json');
 const PUBLIC_IMAGE_PATTERN = /^https:\/\/uhinvcydgzqlpnvieyal\.supabase\.co\/storage\/v1\/object\/public\/experiences\/experience\/[^/]+\/(?:hero|itinerary)\/[A-Za-z0-9._-]+$/;
+const PUBLIC_SOURCE_PREFIX = '/storage/v1/object/public/experiences/';
+const PUBLIC_SOURCE_KEY_PATTERN =
+  /^experience\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/(?:hero|itinerary)\/[A-Za-z0-9._-]+$/i;
+const PROVENANCE_CONTRACT = JSON.parse(
+  readFileSync(
+    new URL('../../app/data/publicExperienceMediaProvenance.json', import.meta.url),
+    'utf8',
+  ),
+);
+
+export const SCHEDULED_SHARP_TRANSFORM_ENGINE =
+  PROVENANCE_CONTRACT.transformEngines.scheduledSharp;
 
 function parseArgs() {
   const [command = 'audit', ...rest] = process.argv.slice(2);
@@ -48,6 +61,64 @@ function stableJson(value) {
 
 function urlHash(url) {
   return createHash('sha256').update(url).digest('hex').slice(0, 12);
+}
+
+export function buildSourceProvenance(originUrl, bytes) {
+  let parsed;
+  try {
+    parsed = new URL(originUrl);
+  } catch {
+    throw new Error('Refusing an invalid public experience source URL.');
+  }
+  if (
+    parsed.protocol !== 'https:'
+    || parsed.hostname !== 'uhinvcydgzqlpnvieyal.supabase.co'
+    || parsed.username
+    || parsed.password
+    || parsed.search
+    || parsed.hash
+    || !parsed.pathname.startsWith(PUBLIC_SOURCE_PREFIX)
+  ) throw new Error('Refusing source outside the Production public experiences namespace.');
+  let sourceKey;
+  try {
+    sourceKey = parsed.pathname
+      .slice(PUBLIC_SOURCE_PREFIX.length)
+      .split('/')
+      .map(decodeURIComponent)
+      .join('/');
+  } catch {
+    throw new Error('Refusing an invalid source object key encoding.');
+  }
+  if (!PUBLIC_SOURCE_KEY_PATTERN.test(sourceKey)) {
+    throw new Error('Refusing source outside the approved experience object-key contract.');
+  }
+  return {
+    sourceKeySha256: createHash('sha256').update(sourceKey).digest('hex'),
+    sourceByteSha256: createHash('sha256').update(bytes).digest('hex'),
+    sourceSize: bytes.length,
+  };
+}
+
+export function buildSharpObjectPlanItem(specification, outputPath, outputBytes, source, generatedAt) {
+  const outputByteSha256 = createHash('sha256').update(outputBytes).digest('hex');
+  return {
+    key: specification.key,
+    path: outputPath,
+    bytes: outputBytes.length,
+    sha256: outputByteSha256,
+    contentType: 'image/webp',
+    sourceKeySha256: source.sourceKeySha256,
+    sourceByteSha256: source.sourceByteSha256,
+    sourceSize: source.sourceSize,
+    derivativeRole: specification.role,
+    width: specification.width,
+    quality: specification.quality,
+    format: specification.format,
+    transformSchemaVersion: PROVENANCE_CONTRACT.transformSchemaVersion,
+    transformEngine: SCHEDULED_SHARP_TRANSFORM_ENGINE,
+    provenanceStatus: PROVENANCE_CONTRACT.provenanceStatus,
+    generatedAt,
+  };
 }
 
 export function parseCardManifest(source) {
@@ -182,12 +253,15 @@ export function buildSpecifications(inventory, expected) {
   const specifications = [];
   for (const experience of inventory) {
     const card = expected.cards[experience.id];
-    specifications.push({ originUrl: card.originUrl, key: card.smallKey, width: 384, quality: 65 }, { originUrl: card.originUrl, key: card.largeKey, width: 640, quality: 65 });
+    specifications.push(
+      { originUrl: card.originUrl, key: card.smallKey, role: 'card', width: 384, quality: 65, format: 'webp' },
+      { originUrl: card.originUrl, key: card.largeKey, role: 'card', width: 640, quality: 65, format: 'webp' },
+    );
     for (const [originUrl, entry] of Object.entries(expected.details[experience.id])) {
       specifications.push(
-        { originUrl, key: entry.smallKey, width: 480, quality: 75 },
-        { originUrl, key: entry.mediumKey, width: 960, quality: 75 },
-        { originUrl, key: entry.largeKey, width: 1440, quality: 75 },
+        { originUrl, key: entry.smallKey, role: 'detail', width: 480, quality: 75, format: 'webp' },
+        { originUrl, key: entry.mediumKey, role: 'detail', width: 960, quality: 75, format: 'webp' },
+        { originUrl, key: entry.largeKey, role: 'detail', width: 1440, quality: 75, format: 'webp' },
       );
     }
   }
@@ -235,22 +309,32 @@ async function transform(specificationsPath, missingPath, outputDirectory) {
   await mkdir(objectsDirectory, { recursive: true });
   const sourceCache = new Map();
   const objects = [];
+  const generatedAt = new Date().toISOString();
   let sourceDownloadBytes = 0;
   let sourceDownloadAttempts = 0;
   for (const specification of selected) {
     let source = sourceCache.get(specification.originUrl);
     if (!source) {
       const downloaded = await downloadSource(specification.originUrl);
-      source = downloaded.bytes;
-      sourceDownloadBytes += source.length;
+      source = {
+        bytes: downloaded.bytes,
+        ...buildSourceProvenance(specification.originUrl, downloaded.bytes),
+      };
+      sourceDownloadBytes += source.bytes.length;
       sourceDownloadAttempts += downloaded.attempts;
       sourceCache.set(specification.originUrl, source);
     }
     const destination = path.join(objectsDirectory, specification.key);
     await mkdir(path.dirname(destination), { recursive: true });
-    await sharp(source).rotate().resize({ width: specification.width, withoutEnlargement: true }).webp({ quality: specification.quality, effort: 5 }).toFile(destination);
+    await sharp(source.bytes).rotate().resize({ width: specification.width, withoutEnlargement: true }).webp({ quality: specification.quality, effort: 5 }).toFile(destination);
     const bytes = await readFile(destination);
-    objects.push({ key: specification.key, path: path.relative(outputDirectory, destination), bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex'), contentType: 'image/webp' });
+    objects.push(buildSharpObjectPlanItem(
+      specification,
+      path.relative(outputDirectory, destination),
+      bytes,
+      source,
+      generatedAt,
+    ));
   }
   const result = {
     sourceDownloadCount: sourceCache.size,
