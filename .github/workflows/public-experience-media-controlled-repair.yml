@@ -297,25 +297,26 @@ jobs:
         shell: bash
         env:
           ACTION: ${{ inputs.action }}
+          APPLY_OUTCOME: ${{ steps.apply.outcome }}
         run: |
           set -Eeuo pipefail
-          umask 077
           repair_dir="${RUNNER_TEMP}/experience-media-repair"
-          [[ -s "$repair_dir/rollback-journal.json" ]]
-          files=(rollback-journal.json)
-          if [[ -s "$repair_dir/${ACTION}-receipt.json" ]]; then
-            cp "$repair_dir/${ACTION}-receipt.json" "$repair_dir/canary-receipt.json"
-            files+=(canary-receipt.json)
+          encrypted_journal="${RUNNER_TEMP}/repair-journal.tar.gz.enc"
+          status=0
+          scripts/cloudflare/package-r2-repair-journal.sh \
+            "$repair_dir" \
+            "$ACTION" \
+            "$APPLY_OUTCOME" \
+            "$encrypted_journal" || status=$?
+          if [[ -s "$encrypted_journal" ]]; then
+            echo "artifact_ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "artifact_ready=false" >> "$GITHUB_OUTPUT"
           fi
-          tar -C "$repair_dir" -czf "${RUNNER_TEMP}/repair-journal.tar.gz" "${files[@]}"
-          openssl enc -aes-256-cbc -pbkdf2 -salt \
-            -in "${RUNNER_TEMP}/repair-journal.tar.gz" \
-            -out "${RUNNER_TEMP}/repair-journal.tar.gz.enc" \
-            -pass env:R2_REPAIR_ARTIFACT_KEY
-          rm -f "${RUNNER_TEMP}/repair-journal.tar.gz" "$repair_dir/rollback-journal.json" "$repair_dir/canary-receipt.json"
+          exit "$status"
 
       - name: Upload encrypted rollback journal
-        if: always() && steps.encrypt_journal.outcome == 'success'
+        if: always() && steps.encrypt_journal.outputs.artifact_ready == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: experience-media-repair-journal-${{ github.run_id }}

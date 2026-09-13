@@ -36,6 +36,10 @@ const r2RepairSource = readFileSync(
   'scripts/cloudflare/r2-public-image-repair.py',
   'utf8'
 );
+const repairJournalPackagingSource = readFileSync(
+  'scripts/cloudflare/package-r2-repair-journal.sh',
+  'utf8'
+);
 const controlledRepairWorkflow = readFileSync(
   '.github/workflows/public-experience-media-controlled-repair.yml',
   'utf8'
@@ -213,6 +217,34 @@ test.describe('Production reconciliation image checks stay read-only', () => {
     );
     expect(artifactPaths).not.toContain(
       '${{ runner.temp }}/experience-media-repair/rollback-journal.json'
+    );
+  });
+
+  test('packages action receipts without self-copy and preserves partial journals', () => {
+    expect(controlledRepairWorkflow).toContain(
+      'scripts/cloudflare/package-r2-repair-journal.sh'
+    );
+    expect(controlledRepairWorkflow).not.toMatch(
+      /cp\s+"\$repair_dir\/\$\{ACTION\}-receipt\.json"/
+    );
+    expect(repairJournalPackagingSource).toContain(
+      'receipt_name="${action}-receipt.json"'
+    );
+    expect(repairJournalPackagingSource).toContain(
+      'files=(rollback-journal.json)'
+    );
+    expect(repairJournalPackagingSource).toContain(
+      'files+=("$receipt_name")'
+    );
+    expect(repairJournalPackagingSource).toContain(
+      'successful apply is missing its receipt; rollback journal was preserved'
+    );
+    expect(controlledRepairWorkflow).toContain(
+      "steps.encrypt_journal.outputs.artifact_ready == 'true'"
+    );
+    expect(controlledRepairWorkflow).not.toContain('schedule:');
+    expect(r2RepairSource).not.toMatch(
+      new RegExp(`\\.${'delete' + '_object'}s?\\(`)
     );
   });
 });
