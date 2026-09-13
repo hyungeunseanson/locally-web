@@ -1,0 +1,380 @@
+name: Public Experience Media Controlled Repair
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Plan, exact two-object canary, full batch, or metadata rollback
+        required: true
+        type: choice
+        default: plan
+        options:
+          - plan
+          - canary
+          - full
+          - rollback
+      plan_run_id:
+        description: Plan workflow run ID (required for canary/full)
+        required: false
+        type: string
+      canary_run_id:
+        description: Successful canary workflow run ID (required for full)
+        required: false
+        type: string
+      journal_run_id:
+        description: Apply workflow run ID whose journal will be rolled back
+        required: false
+        type: string
+      confirm_digest:
+        description: Exact plan digest, or exact journal digest for rollback
+        required: false
+        type: string
+      current_month_class_a:
+        description: Fresh read-only R2 account Class A count (plan only)
+        required: false
+        type: number
+      current_month_class_b:
+        description: Fresh read-only R2 account Class B count (plan only)
+        required: false
+        type: number
+      account_storage_bytes:
+        description: Fresh read-only total R2 account storage bytes (plan only)
+        required: false
+        type: number
+      usage_observed_at:
+        description: UTC ISO timestamp for the quota observation (plan only; max age two hours)
+        required: false
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: public-experience-image-reconciliation
+  cancel-in-progress: false
+
+jobs:
+  controlled-repair:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    environment: production-media-sync
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      CLOUDFLARE_ACCOUNT_ID: d56f5f850c6f7dc5779a7c2054aca5a5
+      R2_ENDPOINT: ${{ vars.R2_ENDPOINT }}
+      R2_BUCKET: locally-public-experience-canary
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_REPAIR_ARTIFACT_KEY: ${{ secrets.R2_REPAIR_ARTIFACT_KEY }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+
+      - name: Validate immutable targets and required configuration
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for name in NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY R2_ENDPOINT R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_REPAIR_ARTIFACT_KEY; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "Missing production-media-sync configuration: $name" >&2
+              exit 1
+            fi
+          done
+          [[ "$NEXT_PUBLIC_SUPABASE_URL" == "https://uhinvcydgzqlpnvieyal.supabase.co" ]]
+          [[ "$CLOUDFLARE_ACCOUNT_ID" == "d56f5f850c6f7dc5779a7c2054aca5a5" ]]
+          [[ "$R2_ENDPOINT" == "https://d56f5f850c6f7dc5779a7c2054aca5a5.r2.cloudflarestorage.com" ]]
+          [[ "$R2_BUCKET" == "locally-public-experience-canary" ]]
+
+      - name: Install pinned R2 client
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -m venv "${RUNNER_TEMP}/r2-repair-venv"
+          "${RUNNER_TEMP}/r2-repair-venv/bin/python" -m pip install --disable-pip-version-check --no-input "boto3==1.42.97"
+          echo "${RUNNER_TEMP}/r2-repair-venv/bin" >> "$GITHUB_PATH"
+
+      - name: Validate dispatch contract
+        shell: bash
+        env:
+          ACTION: ${{ inputs.action }}
+          PLAN_RUN_ID: ${{ inputs.plan_run_id }}
+          CANARY_RUN_ID: ${{ inputs.canary_run_id }}
+          JOURNAL_RUN_ID: ${{ inputs.journal_run_id }}
+          CONFIRM_DIGEST: ${{ inputs.confirm_digest }}
+          CURRENT_CLASS_A: ${{ inputs.current_month_class_a }}
+          CURRENT_CLASS_B: ${{ inputs.current_month_class_b }}
+          ACCOUNT_STORAGE_BYTES: ${{ inputs.account_storage_bytes }}
+          USAGE_OBSERVED_AT: ${{ inputs.usage_observed_at }}
+        run: |
+          set -Eeuo pipefail
+          case "$ACTION" in
+            plan)
+              [[ "$CURRENT_CLASS_A" =~ ^[0-9]+$ ]]
+              [[ "$CURRENT_CLASS_B" =~ ^[0-9]+$ ]]
+              [[ "$ACCOUNT_STORAGE_BYTES" =~ ^[0-9]+$ ]]
+              [[ -n "$USAGE_OBSERVED_AT" ]]
+              ;;
+            canary)
+              [[ "$PLAN_RUN_ID" =~ ^[0-9]+$ ]]
+              [[ "$CONFIRM_DIGEST" =~ ^[0-9a-f]{64}$ ]]
+              [[ "$CURRENT_CLASS_A" =~ ^[0-9]+$ ]]
+              [[ "$CURRENT_CLASS_B" =~ ^[0-9]+$ ]]
+              [[ "$ACCOUNT_STORAGE_BYTES" =~ ^[0-9]+$ ]]
+              [[ -n "$USAGE_OBSERVED_AT" ]]
+              ;;
+            full)
+              [[ "$PLAN_RUN_ID" =~ ^[0-9]+$ ]]
+              [[ "$CANARY_RUN_ID" =~ ^[0-9]+$ ]]
+              [[ "$CONFIRM_DIGEST" =~ ^[0-9a-f]{64}$ ]]
+              [[ "$CURRENT_CLASS_A" =~ ^[0-9]+$ ]]
+              [[ "$CURRENT_CLASS_B" =~ ^[0-9]+$ ]]
+              [[ "$ACCOUNT_STORAGE_BYTES" =~ ^[0-9]+$ ]]
+              [[ -n "$USAGE_OBSERVED_AT" ]]
+              ;;
+            rollback)
+              [[ "$JOURNAL_RUN_ID" =~ ^[0-9]+$ ]]
+              [[ "$CONFIRM_DIGEST" =~ ^[0-9a-f]{64}$ ]]
+              ;;
+          esac
+
+      - name: Create read-only source and R2 repair plan
+        if: inputs.action == 'plan'
+        shell: bash
+        env:
+          CURRENT_CLASS_A: ${{ inputs.current_month_class_a }}
+          CURRENT_CLASS_B: ${{ inputs.current_month_class_b }}
+          ACCOUNT_STORAGE_BYTES: ${{ inputs.account_storage_bytes }}
+          USAGE_OBSERVED_AT: ${{ inputs.usage_observed_at }}
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          repair_dir="${RUNNER_TEMP}/experience-media-repair"
+          node scripts/cloudflare/plan-public-experience-media-repair.mjs plan --output="$repair_dir"
+          python3 scripts/cloudflare/r2-public-image-repair.py \
+            --plan \
+            --source-plan "$repair_dir/.source-plan.json" \
+            --output-dir "$repair_dir" \
+            --current-month-class-a "$CURRENT_CLASS_A" \
+            --current-month-class-b "$CURRENT_CLASS_B" \
+            --account-storage-bytes "$ACCOUNT_STORAGE_BYTES" \
+            --usage-observed-at "$USAGE_OBSERVED_AT"
+
+      - name: Encrypt private plan bundle
+        if: inputs.action == 'plan'
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          repair_dir="${RUNNER_TEMP}/experience-media-repair"
+          tar -C "$repair_dir" -czf "${RUNNER_TEMP}/repair-plan.tar.gz" .source-plan.json .repair-plan.json source-cache
+          openssl enc -aes-256-cbc -pbkdf2 -salt \
+            -in "${RUNNER_TEMP}/repair-plan.tar.gz" \
+            -out "${RUNNER_TEMP}/repair-plan.tar.gz.enc" \
+            -pass env:R2_REPAIR_ARTIFACT_KEY
+          rm -f "${RUNNER_TEMP}/repair-plan.tar.gz"
+
+      - name: Upload encrypted private plan
+        if: inputs.action == 'plan'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: experience-media-repair-plan-${{ github.run_id }}
+          path: ${{ runner.temp }}/repair-plan.tar.gz.enc
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Publish sanitized plan report
+        if: inputs.action == 'plan'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: experience-media-repair-summary-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/experience-media-repair/source-plan-summary.json
+            ${{ runner.temp }}/experience-media-repair/repair-plan-summary.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Download confirmed private plan
+        if: inputs.action == 'canary' || inputs.action == 'full'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: experience-media-repair-plan-${{ inputs.plan_run_id }}
+          path: ${{ runner.temp }}/confirmed-plan
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.plan_run_id }}
+
+      - name: Decrypt confirmed private plan
+        if: inputs.action == 'canary' || inputs.action == 'full'
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          repair_dir="${RUNNER_TEMP}/experience-media-repair"
+          mkdir -p "$repair_dir"
+          openssl enc -d -aes-256-cbc -pbkdf2 \
+            -in "${RUNNER_TEMP}/confirmed-plan/repair-plan.tar.gz.enc" \
+            -out "${RUNNER_TEMP}/repair-plan.tar.gz" \
+            -pass env:R2_REPAIR_ARTIFACT_KEY
+          tar -C "$repair_dir" -xzf "${RUNNER_TEMP}/repair-plan.tar.gz"
+          chmod 600 "$repair_dir/.source-plan.json" "$repair_dir/.repair-plan.json"
+          rm -f "${RUNNER_TEMP}/repair-plan.tar.gz"
+
+      - name: Download verified canary receipt
+        if: inputs.action == 'full'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: experience-media-repair-journal-${{ inputs.canary_run_id }}
+          path: ${{ runner.temp }}/canary-journal
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.canary_run_id }}
+
+      - name: Decrypt verified canary receipt
+        if: inputs.action == 'full'
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          mkdir -p "${RUNNER_TEMP}/canary-receipt"
+          openssl enc -d -aes-256-cbc -pbkdf2 \
+            -in "${RUNNER_TEMP}/canary-journal/repair-journal.tar.gz.enc" \
+            -out "${RUNNER_TEMP}/canary-journal.tar.gz" \
+            -pass env:R2_REPAIR_ARTIFACT_KEY
+          tar -C "${RUNNER_TEMP}/canary-receipt" -xzf "${RUNNER_TEMP}/canary-journal.tar.gz" canary-receipt.json
+          rm -f "${RUNNER_TEMP}/canary-journal.tar.gz"
+
+      - name: Verify source snapshot immediately before apply
+        if: inputs.action == 'canary' || inputs.action == 'full'
+        run: >-
+          node scripts/cloudflare/plan-public-experience-media-repair.mjs verify-source
+          --source-plan="${RUNNER_TEMP}/experience-media-repair/.source-plan.json"
+          --output="${RUNNER_TEMP}/experience-media-repair"
+
+      - name: Apply exact confirmed controlled repair
+        id: apply
+        if: inputs.action == 'canary' || inputs.action == 'full'
+        shell: bash
+        env:
+          ACTION: ${{ inputs.action }}
+          CONFIRM_DIGEST: ${{ inputs.confirm_digest }}
+          CURRENT_CLASS_A: ${{ inputs.current_month_class_a }}
+          CURRENT_CLASS_B: ${{ inputs.current_month_class_b }}
+          ACCOUNT_STORAGE_BYTES: ${{ inputs.account_storage_bytes }}
+          USAGE_OBSERVED_AT: ${{ inputs.usage_observed_at }}
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          repair_dir="${RUNNER_TEMP}/experience-media-repair"
+          args=(
+            --apply
+            --scope "$ACTION"
+            --confirm-digest "$CONFIRM_DIGEST"
+            --source-plan "$repair_dir/.source-plan.json"
+            --repair-plan "$repair_dir/.repair-plan.json"
+            --journal "$repair_dir/rollback-journal.json"
+            --output-dir "$repair_dir"
+            --current-month-class-a "$CURRENT_CLASS_A"
+            --current-month-class-b "$CURRENT_CLASS_B"
+            --account-storage-bytes "$ACCOUNT_STORAGE_BYTES"
+            --usage-observed-at "$USAGE_OBSERVED_AT"
+          )
+          if [[ "$ACTION" == "full" ]]; then
+            args+=(--canary-receipt "${RUNNER_TEMP}/canary-receipt/canary-receipt.json")
+          fi
+          python3 scripts/cloudflare/r2-public-image-repair.py "${args[@]}"
+
+      - name: Verify source snapshot after apply
+        if: (inputs.action == 'canary' || inputs.action == 'full') && steps.apply.outcome == 'success'
+        run: >-
+          node scripts/cloudflare/plan-public-experience-media-repair.mjs verify-source
+          --source-plan="${RUNNER_TEMP}/experience-media-repair/.source-plan.json"
+          --output="${RUNNER_TEMP}/experience-media-repair"
+
+      - name: Encrypt rollback journal and receipt
+        id: encrypt_journal
+        if: always() && (inputs.action == 'canary' || inputs.action == 'full')
+        shell: bash
+        env:
+          ACTION: ${{ inputs.action }}
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          repair_dir="${RUNNER_TEMP}/experience-media-repair"
+          [[ -s "$repair_dir/rollback-journal.json" ]]
+          files=(rollback-journal.json)
+          if [[ -s "$repair_dir/${ACTION}-receipt.json" ]]; then
+            cp "$repair_dir/${ACTION}-receipt.json" "$repair_dir/canary-receipt.json"
+            files+=(canary-receipt.json)
+          fi
+          tar -C "$repair_dir" -czf "${RUNNER_TEMP}/repair-journal.tar.gz" "${files[@]}"
+          openssl enc -aes-256-cbc -pbkdf2 -salt \
+            -in "${RUNNER_TEMP}/repair-journal.tar.gz" \
+            -out "${RUNNER_TEMP}/repair-journal.tar.gz.enc" \
+            -pass env:R2_REPAIR_ARTIFACT_KEY
+          rm -f "${RUNNER_TEMP}/repair-journal.tar.gz" "$repair_dir/rollback-journal.json" "$repair_dir/canary-receipt.json"
+
+      - name: Upload encrypted rollback journal
+        if: always() && steps.encrypt_journal.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: experience-media-repair-journal-${{ github.run_id }}
+          path: ${{ runner.temp }}/repair-journal.tar.gz.enc
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Download rollback journal
+        if: inputs.action == 'rollback'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: experience-media-repair-journal-${{ inputs.journal_run_id }}
+          path: ${{ runner.temp }}/rollback-journal
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.journal_run_id }}
+
+      - name: Decrypt rollback journal
+        if: inputs.action == 'rollback'
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          mkdir -p "${RUNNER_TEMP}/rollback"
+          openssl enc -d -aes-256-cbc -pbkdf2 \
+            -in "${RUNNER_TEMP}/rollback-journal/repair-journal.tar.gz.enc" \
+            -out "${RUNNER_TEMP}/rollback-journal.tar.gz" \
+            -pass env:R2_REPAIR_ARTIFACT_KEY
+          tar -C "${RUNNER_TEMP}/rollback" -xzf "${RUNNER_TEMP}/rollback-journal.tar.gz" rollback-journal.json
+          rm -f "${RUNNER_TEMP}/rollback-journal.tar.gz"
+
+      - name: Conditionally restore derivative metadata
+        if: inputs.action == 'rollback'
+        env:
+          CONFIRM_DIGEST: ${{ inputs.confirm_digest }}
+        run: >-
+          python3 scripts/cloudflare/r2-public-image-repair.py
+          --rollback
+          --journal="${RUNNER_TEMP}/rollback/rollback-journal.json"
+          --confirm-digest="$CONFIRM_DIGEST"
+          --output-dir="${RUNNER_TEMP}/rollback"
+
+      - name: Remove runner-local plaintext
+        if: always()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          rm -rf "${RUNNER_TEMP}/experience-media-repair" "${RUNNER_TEMP}/canary-receipt" "${RUNNER_TEMP}/rollback"
+
+      - name: Publish non-sensitive execution boundary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### Controlled experience media repair"
+            echo "- Requested action: ${{ inputs.action }}"
+            echo "- Supabase authority: unchanged"
+            echo "- R2 bucket: fixed existing mirror"
+            echo "- Object removal: unsupported"
+            echo "- Runtime/manifest/deploy changes: none"
+            echo "- Plaintext private artifacts uploaded: no"
+            echo "- Result: ${{ job.status }}"
+          } >> "$GITHUB_STEP_SUMMARY"

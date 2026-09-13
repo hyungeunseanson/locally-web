@@ -38,7 +38,7 @@ function stableJson(value) {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
-function hashIdentity(value) {
+export function hashIdentity(value) {
   return createHash('sha256').update(`locally-public-experience-media-v1\0${value}`).digest('hex');
 }
 
@@ -265,7 +265,7 @@ async function fetchJson(url, init, description) {
   return response.json();
 }
 
-async function fetchAllExperienceRows(baseUrl, anonKey) {
+export async function fetchAllExperienceRows(baseUrl, anonKey) {
   const pageSize = 500;
   const rows = [];
   for (let offset = 0; ; offset += pageSize) {
@@ -281,7 +281,7 @@ async function fetchAllExperienceRows(baseUrl, anonKey) {
   return rows;
 }
 
-async function listAllStorageObjects(baseUrl, anonKey) {
+export async function listAllStorageObjects(baseUrl, anonKey) {
   const pending = [''];
   const visited = new Set();
   const objects = [];

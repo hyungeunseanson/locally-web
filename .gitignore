@@ -15,6 +15,7 @@
 /playwright-report/
 /test-results/
 /.tmp/supabase-staging/
+/.tmp/public-experience-media-repair*/
 
 # next.js
 /.next/

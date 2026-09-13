@@ -67,6 +67,9 @@ jobs:
       - name: Validate read-only public experience media audit boundaries
         run: npm run cloudflare:experience-media:audit:test
 
+      - name: Validate controlled public experience media repair boundaries
+        run: npm run cloudflare:experience-media:repair:test
+
       - name: Verify the existing Next.js build path
         run: npm run build
 
