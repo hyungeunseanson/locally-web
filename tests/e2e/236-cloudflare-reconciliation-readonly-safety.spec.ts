@@ -180,6 +180,12 @@ test.describe('Production reconciliation image checks stay read-only', () => {
     );
   });
 
+  test('keeps enough timeout headroom for full repair journal packaging', () => {
+    expect(controlledRepairWorkflow).toMatch(
+      /controlled-repair:\n\s+runs-on: ubuntu-24\.04\n\s+timeout-minutes: 180\n/
+    );
+  });
+
   test('requires conditional writes and exposes no object removal API', () => {
     expect(r2RepairSource).toContain('IfNoneMatch="*"');
     expect(r2RepairSource).toContain('"CopySourceIfMatch": f');

@@ -57,7 +57,7 @@ concurrency:
 jobs:
   controlled-repair:
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 180
     environment: production-media-sync
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
