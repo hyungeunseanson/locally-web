@@ -28,6 +28,18 @@ const r2AuditSource = readFileSync(
   'scripts/cloudflare/r2-public-image-audit.py',
   'utf8'
 );
+const mediaRepairPlannerSource = readFileSync(
+  'scripts/cloudflare/plan-public-experience-media-repair.mjs',
+  'utf8'
+);
+const r2RepairSource = readFileSync(
+  'scripts/cloudflare/r2-public-image-repair.py',
+  'utf8'
+);
+const controlledRepairWorkflow = readFileSync(
+  '.github/workflows/public-experience-media-controlled-repair.yml',
+  'utf8'
+);
 
 const experienceSpecs = [
   'tests/e2e/226-cloudflare-image-canary.spec.ts',
@@ -145,5 +157,62 @@ test.describe('Production reconciliation image checks stay read-only', () => {
     expect(r2AuditSource).toContain('def get_bytes');
     expect(r2AuditSource).not.toMatch(/\.(put_object|upload_file|delete_object|delete_objects|copy_object)\(/);
     expect(r2AuditSource).not.toMatch(/method=["'](?:POST|PUT|PATCH|DELETE)["']/);
+  });
+
+  test('keeps controlled repair independent and plan-only by default', () => {
+    expect(experienceWorkflow).not.toContain(
+      'public-experience-media-controlled-repair'
+    );
+    expect(experienceWorkflow).not.toContain('r2-public-image-repair.py');
+    expect(controlledRepairWorkflow).toContain(
+      'group: public-experience-image-reconciliation'
+    );
+    expect(controlledRepairWorkflow).not.toContain('schedule:');
+    expect(controlledRepairWorkflow).toContain("default: plan");
+    expect(mediaRepairPlannerSource).toContain("const [command = 'plan'");
+    expect(r2RepairSource).toContain('args.plan = True');
+    expect(r2RepairSource).toContain(
+      'Exact plan digest confirmation is required'
+    );
+  });
+
+  test('requires conditional writes and exposes no object removal API', () => {
+    expect(r2RepairSource).toContain('IfNoneMatch="*"');
+    expect(r2RepairSource).toContain('"CopySourceIfMatch": f');
+    expect(r2RepairSource).toContain('{source_etag}');
+    expect(r2RepairSource).toContain('"MetadataDirective": "REPLACE"');
+    expect(r2RepairSource).toContain('"provenance_status"');
+    expect(r2RepairSource).not.toContain('"sharp_version"');
+    expect(r2RepairSource).not.toContain('"libvips_version"');
+    expect(r2RepairSource).not.toContain('"runtime_id"');
+    expect(r2RepairSource).not.toMatch(
+      new RegExp(`\\.${'delete' + '_object'}s?\\(`)
+    );
+    expect(r2RepairSource).not.toContain('upload_file(');
+  });
+
+  test('encrypts private artifacts and never uploads plaintext plans or journals', () => {
+    expect(controlledRepairWorkflow).toContain(
+      '-aes-256-cbc -pbkdf2 -salt'
+    );
+    expect(controlledRepairWorkflow).toContain(
+      '-pass env:R2_REPAIR_ARTIFACT_KEY'
+    );
+    expect(controlledRepairWorkflow).toContain('retention-days: 3');
+    expect(controlledRepairWorkflow).toContain(
+      'path: ${{ runner.temp }}/repair-plan.tar.gz.enc'
+    );
+    expect(controlledRepairWorkflow).toContain(
+      'path: ${{ runner.temp }}/repair-journal.tar.gz.enc'
+    );
+    const artifactPaths = [
+      ...controlledRepairWorkflow.matchAll(/^\s+path:\s+(.+)$/gm),
+    ].map((match) => match[1]);
+    expect(artifactPaths).not.toContain(
+      '${{ runner.temp }}/experience-media-repair/.source-plan.json'
+    );
+    expect(artifactPaths).not.toContain(
+      '${{ runner.temp }}/experience-media-repair/rollback-journal.json'
+    );
   });
 });
