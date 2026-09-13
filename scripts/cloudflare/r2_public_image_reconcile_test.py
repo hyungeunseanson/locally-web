@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 import importlib.util
+import hashlib
+import io
 import sys
+import tempfile
 import types
 import unittest
 import urllib.error
@@ -13,7 +16,18 @@ botocore = types.ModuleType("botocore")
 botocore_config = types.ModuleType("botocore.config")
 botocore_config.Config = object
 botocore_exceptions = types.ModuleType("botocore.exceptions")
-botocore_exceptions.ClientError = Exception
+
+
+class MockClientError(Exception):
+    def __init__(self, code, status):
+        super().__init__(code)
+        self.response = {
+            "Error": {"Code": code},
+            "ResponseMetadata": {"HTTPStatusCode": status},
+        }
+
+
+botocore_exceptions.ClientError = MockClientError
 sys.modules.setdefault("botocore", botocore)
 sys.modules.setdefault("botocore.config", botocore_config)
 sys.modules.setdefault("botocore.exceptions", botocore_exceptions)
@@ -41,6 +55,67 @@ class Response:
 
 def http_error(status):
     return urllib.error.HTTPError("https://media.example/object", status, "error", {}, None)
+
+
+class FakeR2Client:
+    def __init__(self, objects=None, before_put=None, head_failures=0):
+        self.objects = dict(objects or {})
+        self.before_put = before_put
+        self.head_failures = head_failures
+        self.put_calls = []
+        self.copy_calls = 0
+        self.delete_calls = 0
+
+    def put_object(self, **kwargs):
+        self.put_calls.append(kwargs.copy())
+        if self.before_put:
+            callback = self.before_put
+            self.before_put = None
+            callback(self, kwargs)
+        key = kwargs["Key"]
+        if kwargs.get("IfNoneMatch") != "*":
+            raise AssertionError("conditional create is required")
+        if key in self.objects:
+            raise MockClientError("PreconditionFailed", 412)
+        body = kwargs["Body"].read()
+        self.objects[key] = {
+            "body": body,
+            "content_type": kwargs["ContentType"],
+            "cache_control": kwargs["CacheControl"],
+            "metadata": dict(kwargs["Metadata"]),
+        }
+        return {"ETag": '"created"'}
+
+    def head_object(self, Bucket, Key):
+        del Bucket
+        if self.head_failures > 0:
+            self.head_failures -= 1
+            raise MockClientError("NoSuchKey", 404)
+        if Key not in self.objects:
+            raise MockClientError("NoSuchKey", 404)
+        value = self.objects[Key]
+        return {
+            "ContentLength": len(value["body"]),
+            "ContentType": value["content_type"],
+            "CacheControl": value["cache_control"],
+            "Metadata": dict(value["metadata"]),
+        }
+
+    def get_object(self, Bucket, Key):
+        del Bucket
+        if Key not in self.objects:
+            raise MockClientError("NoSuchKey", 404)
+        return {"Body": io.BytesIO(self.objects[Key]["body"])}
+
+
+def object_value(body=b"webp-bytes", content_type="image/webp", cache_control=None, metadata=None):
+    digest = hashlib.sha256(body).hexdigest()
+    return {
+        "body": body,
+        "content_type": content_type,
+        "cache_control": cache_control or MODULE.EXPECTED_CACHE_CONTROL,
+        "metadata": {"sha256": digest} if metadata is None else metadata,
+    }
 
 
 class PublicVerificationTest(unittest.TestCase):
@@ -96,6 +171,132 @@ class PublicVerificationTest(unittest.TestCase):
                 MODULE.verify_public_object("https://media.example", "image.webp", 123)
             self.assertEqual(urlopen.call_count, 3)
             self.assertEqual(sleep.call_count, 2)
+
+
+class ConditionalCreateTest(unittest.TestCase):
+    def setUp(self):
+        self.temporary_directory = tempfile.TemporaryDirectory()
+        self.root = Path(self.temporary_directory.name).resolve()
+        self.source = self.root / "object.webp"
+        self.body = b"webp-bytes"
+        self.source.write_bytes(self.body)
+        self.item = {
+            "key": "cards/experience-1-primary-hash-w384-q65.webp",
+            "path": self.source.name,
+            "bytes": len(self.body),
+            "sha256": hashlib.sha256(self.body).hexdigest(),
+        }
+
+    def tearDown(self):
+        self.temporary_directory.cleanup()
+
+    def run_reconcile(self, client, existed_before=False):
+        with mock.patch.object(MODULE, "verify_public_object") as verify_public:
+            outcome = MODULE.create_or_verify_object(
+                client,
+                "bucket",
+                "https://media.example",
+                self.root,
+                self.item,
+                existed_before,
+            )
+        verify_public.assert_called_once_with(
+            "https://media.example", self.item["key"], self.item["bytes"]
+        )
+        return outcome
+
+    def test_list_missing_conditional_put_success(self):
+        client = FakeR2Client()
+        self.assertEqual(self.run_reconcile(client), "created")
+        self.assertEqual(len(client.put_calls), 1)
+        self.assertEqual(client.put_calls[0]["IfNoneMatch"], "*")
+        self.assertEqual(client.objects[self.item["key"]]["body"], self.body)
+
+    def test_concurrent_exact_create_is_verified_without_overwrite(self):
+        extra_metadata = {
+            "sha256": self.item["sha256"],
+            "source-byte-sha256": "future-provenance",
+        }
+
+        def concurrent_create(client, _kwargs):
+            client.objects[self.item["key"]] = object_value(
+                self.body, metadata=extra_metadata
+            )
+
+        client = FakeR2Client(before_put=concurrent_create)
+        self.assertEqual(self.run_reconcile(client), "concurrent_exact_skip")
+        self.assertEqual(len(client.put_calls), 1)
+        self.assertEqual(client.objects[self.item["key"]]["metadata"], extra_metadata)
+
+    def test_conditional_conflict_rechecks_with_bounded_visibility_retries(self):
+        def concurrent_create(client, _kwargs):
+            client.objects[self.item["key"]] = object_value(self.body)
+
+        client = FakeR2Client(before_put=concurrent_create, head_failures=2)
+        with mock.patch.object(
+            MODULE, "CONCURRENT_OBJECT_RETRY_DELAYS_SECONDS", (0, 0)
+        ), mock.patch.object(MODULE.time, "sleep") as sleep:
+            self.assertEqual(self.run_reconcile(client), "concurrent_exact_skip")
+        self.assertEqual(sleep.call_count, 2)
+
+    def test_recognizes_precondition_and_conditional_conflict_responses(self):
+        self.assertTrue(
+            MODULE.is_conditional_write_conflict(
+                MockClientError("PreconditionFailed", 412)
+            )
+        )
+        self.assertTrue(
+            MODULE.is_conditional_write_conflict(
+                MockClientError("ConditionalRequestConflict", 409)
+            )
+        )
+        self.assertFalse(
+            MODULE.is_conditional_write_conflict(MockClientError("AccessDenied", 403))
+        )
+
+    def assert_conflict(self, value, message):
+        def concurrent_create(client, _kwargs):
+            client.objects[self.item["key"]] = value
+
+        client = FakeR2Client(before_put=concurrent_create)
+        with mock.patch.object(MODULE, "verify_public_object") as verify_public:
+            with self.assertRaisesRegex(RuntimeError, message):
+                MODULE.create_or_verify_object(
+                    client,
+                    "bucket",
+                    "https://media.example",
+                    self.root,
+                    self.item,
+                    False,
+                )
+        self.assertEqual(len(client.put_calls), 1)
+        verify_public.assert_not_called()
+
+    def test_concurrent_byte_sha_mismatch_fails_closed(self):
+        self.assert_conflict(
+            object_value(
+                b"WEBP-bytes", metadata={"sha256": self.item["sha256"]}
+            ),
+            "byte conflict",
+        )
+
+    def test_concurrent_content_type_mismatch_fails_closed(self):
+        self.assert_conflict(object_value(self.body, content_type="image/jpeg"), "Content-Type conflict")
+
+    def test_concurrent_cache_control_mismatch_fails_closed(self):
+        self.assert_conflict(object_value(self.body, cache_control="max-age=60"), "Cache-Control conflict")
+
+    def test_concurrent_sha_metadata_mismatch_or_missing_fails_closed(self):
+        for metadata in ({"sha256": "wrong"}, {}):
+            with self.subTest(metadata=metadata):
+                self.assert_conflict(object_value(self.body, metadata=metadata), "sha256 metadata conflict")
+
+    def test_object_present_in_upload_list_is_verified_with_zero_writes(self):
+        client = FakeR2Client({self.item["key"]: object_value(self.body)})
+        self.assertEqual(self.run_reconcile(client, existed_before=True), "concurrent_exact_skip")
+        self.assertEqual(client.put_calls, [])
+        self.assertEqual(client.copy_calls, 0)
+        self.assertEqual(client.delete_calls, 0)
 
 
 if __name__ == "__main__":
