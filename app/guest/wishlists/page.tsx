@@ -35,6 +35,8 @@ interface WishlistExperience {
   card_image_url?: string | null;
   image_url?: string | null;
   photos?: string[] | null;
+  status?: string | null;
+  is_active?: boolean | null;
 }
 
 interface WishlistItem {
@@ -90,6 +92,8 @@ const normalizeWishlistRows = (rows: unknown[]): WishlistItem[] => {
           card_image_url: exp.card_image_url ?? null,
           image_url: exp.image_url ?? null,
           photos: exp.photos ?? null,
+          status: exp.status ?? null,
+          is_active: exp.is_active ?? null,
         },
       };
     })
