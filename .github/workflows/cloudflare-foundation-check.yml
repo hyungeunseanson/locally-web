@@ -70,11 +70,17 @@ jobs:
       - name: Validate controlled public experience media repair boundaries
         run: npm run cloudflare:experience-media:repair:test
 
+      - name: Validate deterministic public experience media keys
+        run: npm run cloudflare:experience-media:key-contract
+
+      - name: Validate the Production media build wrapper
+        run: npm run cloudflare:production-build:contract
+
       - name: Verify the existing Next.js build path
         run: npm run build
 
       - name: Build OpenNext worker
-        run: npm run cloudflare:build
+        run: npm run cloudflare:build:production
 
       - name: Generate canary and production binding types
         run: npm run cloudflare:typegen

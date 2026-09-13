@@ -19,6 +19,8 @@ export interface SearchExperience {
   review_count?: number | null;
   available_dates?: string[];
   available_times?: string[];
+  status?: string | null;
+  is_active?: boolean | null;
   title_ko?: string;
   description_ko?: string;
   title_en?: string;

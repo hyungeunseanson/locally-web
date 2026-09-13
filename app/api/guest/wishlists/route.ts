@@ -20,6 +20,8 @@ const WISHLIST_EXPERIENCE_SELECT = [
   'price',
   'image_url',
   'photos',
+  'status',
+  'is_active',
 ].join(', ');
 
 async function getAuthenticatedUser() {

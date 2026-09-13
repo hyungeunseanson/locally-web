@@ -100,6 +100,23 @@ test.describe('Cloudflare migration readiness contract', () => {
     }
   });
 
+  test('owns the Production public media build-time flag without forcing local or Preview builds', () => {
+    expect(manifest.environments.production.publicExperienceMediaBaseUrl).toBe(
+      'https://media-canary.locally-travel.com'
+    );
+    expect(manifest.environmentVariables.productionBuildRequired).toEqual([
+      'NEXT_PUBLIC_CLOUDFLARE_IMAGE_CANARY_BASE_URL',
+    ]);
+    expect(packageJson.scripts['cloudflare:build:production']).toBe(
+      'node scripts/cloudflare/run-production-build.mjs'
+    );
+    expect(packageJson.scripts['precloudflare:deploy:production']).toBe(
+      'npm run cloudflare:build:production'
+    );
+    expect(packageJson.scripts.build).toBe('next build');
+    expect(packageJson.scripts['cloudflare:build']).toBe('opennextjs-cloudflare build');
+  });
+
   test('keeps current Next image URLs and allows public storage from the isolated staging project', () => {
     const nextConfig = readText('next.config.ts');
     expect(nextConfig).toContain("hostname: '*.supabase.co'");

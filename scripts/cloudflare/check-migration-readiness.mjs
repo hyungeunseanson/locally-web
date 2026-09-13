@@ -53,6 +53,15 @@ assert.equal(lockfile.packages['node_modules/@vercel/analytics'], undefined);
 assert.equal(wrangler.compatibility_date, manifest.runtimePins.compatibilityDate);
 assert.deepEqual(wrangler.compatibility_flags, ['nodejs_compat', 'global_fetch_strictly_public']);
 assert.equal(wrangler.keep_vars, true);
+assert.equal(
+  manifest.environments.production.publicExperienceMediaBaseUrl,
+  'https://media-canary.locally-travel.com'
+);
+assert.deepEqual(manifest.environmentVariables.productionBuildRequired, [
+  'NEXT_PUBLIC_CLOUDFLARE_IMAGE_CANARY_BASE_URL',
+]);
+assert.equal(packageJson.scripts['cloudflare:build:production'], 'node scripts/cloudflare/run-production-build.mjs');
+assert.equal(packageJson.scripts['precloudflare:deploy:production'], 'npm run cloudflare:build:production');
 assert.deepEqual(wrangler.assets, {
   directory: '.open-next/assets',
   binding: manifest.bindings.staticAssets,

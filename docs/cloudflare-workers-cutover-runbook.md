@@ -86,6 +86,7 @@ The manifest is exhaustive for names. Resolve every value from its current appro
 ### Build environment
 
 - Required: `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+- Production public experience delivery is repo-owned at `https://media-canary.locally-travel.com`. Use `npm run cloudflare:build:production`; it injects the public build-time value and fails unless the exact URL is present in the generated client bundle. `npm run cloudflare:deploy:production` runs that build automatically before Wrangler deploy. Generic `build` and `cloudflare:build` remain unchanged for local, Preview, and canary use.
 - Optional source-map upload: `SENTRY_AUTH_TOKEN` (secret), `SENTRY_ORG`, `SENTRY_PROJECT`, `CI=true`.
 - Build separately for canary and production because `NEXT_PUBLIC_*` values are compiled into client chunks. Never promote a staging-built artifact to production.
 

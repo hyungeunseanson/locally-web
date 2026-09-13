@@ -27,6 +27,7 @@
     "production": {
       "worker": "locally-web-opennext-production",
       "incrementalCacheR2": "locally-opennext-incremental-cache-production",
+      "publicExperienceMediaBaseUrl": "https://media-canary.locally-travel.com",
       "workersDev": false,
       "previewUrls": false
     }
@@ -65,6 +66,9 @@
       "NEXT_PUBLIC_SITE_URL",
       "NEXT_PUBLIC_SUPABASE_URL",
       "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+    ],
+    "productionBuildRequired": [
+      "NEXT_PUBLIC_CLOUDFLARE_IMAGE_CANARY_BASE_URL"
     ],
     "buildOptional": [
       "CI",
