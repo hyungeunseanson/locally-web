@@ -15,6 +15,19 @@ const hostWorkflow = readFileSync(
   '.github/workflows/public-host-profile-image-reconciliation.yml',
   'utf8'
 );
+const foundationWorkflow = readFileSync(
+  '.github/workflows/cloudflare-foundation-check.yml',
+  'utf8'
+);
+const packageSource = JSON.parse(readFileSync('package.json', 'utf8'));
+const mediaAuditSource = readFileSync(
+  'scripts/cloudflare/audit-public-experience-media.mjs',
+  'utf8'
+);
+const r2AuditSource = readFileSync(
+  'scripts/cloudflare/r2-public-image-audit.py',
+  'utf8'
+);
 
 const experienceSpecs = [
   'tests/e2e/226-cloudflare-image-canary.spec.ts',
@@ -99,5 +112,38 @@ test.describe('Production reconciliation image checks stay read-only', () => {
       expect(source).not.toMatch(/storage\.from\(|\.rpc\(|page\.request\.(post|put|patch|delete)\(/i);
       expect(source).not.toMatch(/method\s*:\s*['"](POST|PUT|PATCH|DELETE)['"]/i);
     }
+  });
+
+  test('keeps the strict parity audit independent from scheduled reconciliation writes', () => {
+    expect(experienceWorkflow).not.toContain('audit-public-experience-media.mjs');
+    expect(experienceWorkflow).not.toContain('r2-public-image-audit.py');
+    expect(packageSource.scripts['cloudflare:experience-media:audit:metadata']).toBe(
+      'node scripts/cloudflare/audit-public-experience-media.mjs metadata'
+    );
+    expect(packageSource.scripts['cloudflare:experience-media:audit:full']).toBe(
+      'node scripts/cloudflare/audit-public-experience-media.mjs full'
+    );
+    expect(foundationWorkflow).toContain(
+      'run: npm run cloudflare:experience-media:audit:test'
+    );
+    expect(foundationWorkflow).not.toContain(
+      'run: npm run cloudflare:experience-media:audit:metadata'
+    );
+    expect(foundationWorkflow).not.toContain(
+      'run: npm run cloudflare:experience-media:audit:full'
+    );
+  });
+
+  test('strict parity clients expose read operations and no remote mutation API', () => {
+    expect(mediaAuditSource).toContain("method: 'GET'");
+    expect(mediaAuditSource).toContain("operation: 'storage-list-read'");
+    expect(mediaAuditSource).toContain('supabaseMutationRequests: 0');
+    expect(mediaAuditSource).not.toMatch(/\.from\([^)]*\)\.(insert|update|upsert|delete)\(/i);
+    expect(mediaAuditSource).not.toMatch(/method\s*:\s*['\"](PUT|PATCH|DELETE)['\"]/i);
+
+    expect(r2AuditSource).toContain('def list_metadata');
+    expect(r2AuditSource).toContain('def get_bytes');
+    expect(r2AuditSource).not.toMatch(/\.(put_object|upload_file|delete_object|delete_objects|copy_object)\(/);
+    expect(r2AuditSource).not.toMatch(/method=["'](?:POST|PUT|PATCH|DELETE)["']/);
   });
 });
