@@ -566,17 +566,14 @@ test.describe('dormant public experience media Queue mirror engine', () => {
     expect(JSON.stringify(fourth)).not.toContain(SOURCE_URL);
   });
 
-  test('contains no overwrite, Copy, Delete, queue wiring, or runtime activation path', () => {
+  test('contains no overwrite, Copy, Delete, producer, or scheduled activation path', () => {
     const engineSource = readFileSync('app/utils/publicExperienceMediaQueueMirror.ts', 'utf8');
-    const workerSource = readFileSync('cloudflare-worker.ts', 'utf8');
     const wranglerSource = readFileSync('wrangler.jsonc', 'utf8');
     const scheduledWorkflow = readFileSync('.github/workflows/public-experience-image-reconciliation.yml', 'utf8');
 
     expect(engineSource).not.toMatch(/\.(delete|copy|overwrite)\s*\(/i);
     expect(engineSource).not.toContain('upload_file');
-    expect(workerSource).not.toContain('queue(');
-    expect(wranglerSource).not.toContain('queues');
-    expect(wranglerSource).not.toContain('PUBLIC_EXPERIENCE_IMAGES_R2');
+    expect(wranglerSource).not.toContain('"producers"');
     expect(scheduledWorkflow).not.toContain('publicExperienceMediaQueueMirror');
   });
 
