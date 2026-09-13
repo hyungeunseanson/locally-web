@@ -59,6 +59,36 @@ test("returns no transform work when every expected R2 key already exists", () =
   assert.deepEqual(selectMissingSpecifications(specifications, []), []);
 });
 
+test("builds manifests from only the current public-active inventory", () => {
+  const retainedCard = {
+    originUrl: originA,
+    smallKey: "cards/retained-small.webp",
+    largeKey: "cards/retained-large.webp",
+  };
+  const expected = buildExpectedManifests(
+    [
+      { id: "100", heroUrls: [originA], detailUrls: [originA, originC] },
+      { id: "200", heroUrls: [originB], detailUrls: [originB] },
+    ],
+    {
+      100: retainedCard,
+      999: {
+        originUrl: originC,
+        smallKey: "cards/stale-small.webp",
+        largeKey: "cards/stale-large.webp",
+      },
+    },
+  );
+
+  assert.deepEqual(Object.keys(expected.cards), ["100", "200"]);
+  assert.deepEqual(expected.cards["100"], retainedCard);
+  assert.match(expected.cards["200"].smallKey, /^cards\/experience-200-primary-[a-f0-9]{12}-w384-q65\.webp$/);
+  assert.deepEqual(Object.keys(expected.details), ["100", "200"]);
+  assert.deepEqual(Object.keys(expected.details["100"]), [originA, originC]);
+  assert.equal(expected.cards["999"], undefined);
+  assert.equal(expected.details["999"], undefined);
+});
+
 test("fails closed when the R2 missing plan contains an unknown or duplicate key", () => {
   const { specifications } = fixture();
   assert.throws(

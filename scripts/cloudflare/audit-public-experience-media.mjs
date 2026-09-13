@@ -42,6 +42,10 @@ export function hashIdentity(value) {
   return createHash('sha256').update(`locally-public-experience-media-v1\0${value}`).digest('hex');
 }
 
+export function hashSourceKey(value) {
+  return createHash('sha256').update(value).digest('hex');
+}
+
 function identitySetDigest(values) {
   const digest = createHash('sha256');
   for (const value of [...values].sort()) digest.update(Buffer.from(hashIdentity(value), 'hex'));
@@ -188,7 +192,7 @@ export function buildSourceScopes(rows, storageObjects, baseUrl = PRODUCTION_SUP
   };
 }
 
-export function buildManifestAudit(inventory, currentCards, currentDetails) {
+export function buildManifestAudit(inventory, currentCards, currentDetails, publicActiveKeys = null) {
   const expected = buildExpectedManifests(inventory, currentCards);
   const specifications = buildSpecifications(inventory, expected);
   const expectedEntries = specifications.map((item) => ({
@@ -204,8 +208,18 @@ export function buildManifestAudit(inventory, currentCards, currentDetails) {
   const currentKeys = new Set(currentManifestKeys);
   const currentSourcePairs = new Set(Object.entries(currentDetails).flatMap(([id, images]) => Object.keys(images).map((url) => `${id}\0${url}`)));
   const expectedSourcePairs = new Set(inventory.flatMap((item) => item.detailUrls.map((url) => `${item.id}\0${url}`)));
+  const originalSourceKeys = publicActiveKeys || new Set(
+    inventory.flatMap((item) => item.detailUrls)
+      .map((value) => normalizeSupabaseExperienceObjectKey(value))
+      .filter(Boolean),
+  );
   return {
-    r2Plan: { version: 1, expected: expectedEntries, knownManifestKeys: currentManifestKeys },
+    r2Plan: {
+      version: 1,
+      expected: expectedEntries,
+      knownManifestKeys: currentManifestKeys,
+      publicActiveOriginalSourceKeyHashes: [...originalSourceKeys].map(hashSourceKey).sort(),
+    },
     summary: {
       currentCardExperienceCount: Object.keys(currentCards).length,
       expectedCardExperienceCount: Object.keys(expected.cards).length,
@@ -363,10 +377,18 @@ function runPython(python, args, env) {
 export function classifyReadiness(source, r2) {
   if (source.publicActive.missingObjectCount > 0 || source.publicActive.invalidReferenceCount > 0) return 'NO_GO_SOURCE_PARITY';
   if ((r2.downloadedShaVerification?.mismatchCount || 0) > 0) return 'NO_GO_R2_SHA_MISMATCH';
-  if (r2.expectedMissing.total > 0 || r2.metadata.cacheControlMismatchCount > 0 || r2.metadata.contentTypeMismatchCount > 0 || r2.metadata.customShaCoverage < r2.expected.total) {
-    return 'GO_WAVE_1_2_REPAIR_REQUIRED';
+  if (
+    r2.expectedMissing.total > 0
+    || r2.metadata.cacheControlMismatchCount > 0
+    || r2.metadata.contentTypeMismatchCount > 0
+    || r2.metadata.expectedCustomShaCoverage < r2.expected.total
+    || r2.originalIdentityCoverage.missingCount > 0
+    || r2.originalIdentityCoverage.duplicateSourceKeyCount > 0
+    || r2.originalIdentityCoverage.invalidSourceKeyMetadataCount > 0
+  ) {
+    return 'NO_GO_R2_READ_CUTOVER_PARITY';
   }
-  return 'GO_WAVE_1_2';
+  return 'GO_WAVE_1_3B_READ_CUTOVER_READY';
 }
 
 export function renderSummary(report) {
@@ -382,8 +404,8 @@ export function renderSummary(report) {
     `- R2 expected/missing: ${report.r2.expected.total}/${report.r2.expectedMissing.total}`,
     `- R2 stale/unclassified/original: ${report.r2.taxonomy.staleKnownDerivative}/${report.r2.taxonomy.unclassifiedExtra}/${report.r2.taxonomy.original}`,
     `- R2 cache-control/content-type mismatch: ${report.r2.metadata.cacheControlMismatchCount}/${report.r2.metadata.contentTypeMismatchCount}`,
-    `- R2 SHA metadata coverage: ${report.r2.metadata.customShaCoverage}/${report.r2.actual.objectCount}`,
-    `- R2 originals coverage: ${report.originalsCoverage.actualObjectCount}/${report.originalsCoverage.allDbReferencedObjectCount}`,
+    `- Expected derivative SHA metadata coverage: ${report.r2.metadata.expectedCustomShaCoverage}/${report.r2.expected.total}`,
+    `- Public-active original identity coverage: ${report.r2.originalIdentityCoverage.matchingExpectedCount}/${report.r2.originalIdentityCoverage.expectedCount}`,
     `- Downloaded SHA verified/unverifiable/mismatch: ${report.r2.downloadedShaVerification.verifiedCount}/${report.r2.downloadedShaVerification.unverifiableMetadataCount}/${report.r2.downloadedShaVerification.mismatchCount}`,
     `- R2 mutation calls: ${report.safety.r2MutationRequests}`,
     `- Supabase mutation calls: ${report.safety.supabaseMutationRequests}`,
@@ -405,7 +427,7 @@ async function main() {
     readFile(DETAIL_MANIFEST_PATH, 'utf8'),
   ]);
   const source = buildSourceScopes(rows, storageObjects, baseUrl);
-  const manifest = buildManifestAudit(source.reconciliationInventory, parseCardManifest(cardSource), JSON.parse(detailSource));
+  const manifest = buildManifestAudit(source.reconciliationInventory, parseCardManifest(cardSource), JSON.parse(detailSource), source.publicActiveKeys);
   const planPath = path.join(args.output, '.r2-audit-input.json');
   const r2OutputPath = path.join(args.output, '.r2-audit-output.json');
   await writeFile(planPath, stableJson(manifest.r2Plan), { mode: 0o600 });
@@ -431,11 +453,6 @@ async function main() {
     sourceScopes: source.sourceScopes,
     manifest: manifest.summary,
     r2,
-    originalsCoverage: {
-      actualObjectCount: r2.taxonomy.original,
-      allDbReferencedObjectCount: source.sourceScopes.allDbReferenced.distinctObjectCount,
-      ratio: source.sourceScopes.allDbReferenced.distinctObjectCount === 0 ? 0 : r2.taxonomy.original / source.sourceScopes.allDbReferenced.distinctObjectCount,
-    },
     sourceDownloads,
     provenanceSchema: TRANSFORM_PROVENANCE_SCHEMA,
     readiness: classifyReadiness(source.sourceScopes, r2),

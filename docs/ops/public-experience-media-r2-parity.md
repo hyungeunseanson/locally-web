@@ -127,6 +127,6 @@ The workflow must not be dispatched in canary, full, or rollback mode until the 
 
 ## Readiness and rollback
 
-`NO_GO_SOURCE_PARITY` means a public-active source reference is invalid or missing. `NO_GO_R2_SHA_MISMATCH` means stored SHA metadata disagrees with downloaded R2 bytes. `GO_WAVE_1_2_REPAIR_REQUIRED` is expected when objects, cache metadata, SHA metadata, or originals still need a controlled mirror repair.
+`NO_GO_SOURCE_PARITY` means a public-active source reference is invalid or missing. `NO_GO_R2_SHA_MISMATCH` means stored SHA metadata disagrees with downloaded R2 bytes. `NO_GO_R2_READ_CUTOVER_PARITY` means an expected derivative, its metadata, or a public-active original identity is incomplete. `GO_WAVE_1_3B_READ_CUTOVER_READY` requires every public-active original identity and expected derivative SHA metadata entry to be present; unrelated preserved R2 objects are reported separately and are not deleted.
 
 There is no runtime rollback for Wave 1.1 because no runtime or remote state changes. Delete the generated local report directory to remove local audit artifacts.

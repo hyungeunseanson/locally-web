@@ -35,8 +35,10 @@ class FakeReadOnlyClient:
         return len(body), hashlib.sha256(body).hexdigest()
 
 
-def object_metadata(key, body, *, cache=MODULE.EXPECTED_DERIVATIVE_CACHE_CONTROL, content_type="image/webp", stored_sha=True):
+def object_metadata(key, body, *, cache=MODULE.EXPECTED_DERIVATIVE_CACHE_CONTROL, content_type="image/webp", stored_sha=True, source_key_sha=None):
     metadata = {"sha256": hashlib.sha256(body).hexdigest()} if stored_sha else {}
+    if source_key_sha:
+        metadata["source_key_sha256"] = source_key_sha
     return {
         "key": key,
         "size": len(body),
@@ -49,12 +51,14 @@ def object_metadata(key, body, *, cache=MODULE.EXPECTED_DERIVATIVE_CACHE_CONTROL
 
 class R2ReadOnlyAuditTest(unittest.TestCase):
     def setUp(self):
+        self.expected_original_hash = hashlib.sha256(b"experience/source/hero/original.jpg").hexdigest()
         self.plan = {
             "expected": [
                 {"key": "cards/expected.webp", "kind": "card"},
                 {"key": "details/missing.webp", "kind": "detail"},
             ],
             "knownManifestKeys": ["cards/expected.webp", "details/missing.webp", "details/stale.webp"],
+            "publicActiveOriginalSourceKeyHashes": [self.expected_original_hash],
         }
         self.bodies = {
             "cards/expected.webp": b"expected",
@@ -65,7 +69,7 @@ class R2ReadOnlyAuditTest(unittest.TestCase):
         self.objects = [
             object_metadata("cards/expected.webp", self.bodies["cards/expected.webp"]),
             object_metadata("details/stale.webp", self.bodies["details/stale.webp"], stored_sha=False),
-            object_metadata("originals/source-hash/original.jpg", self.bodies["originals/source-hash/original.jpg"], content_type="image/jpeg", stored_sha=False),
+            object_metadata("originals/source-hash/original.jpg", self.bodies["originals/source-hash/original.jpg"], content_type="image/jpeg", stored_sha=False, source_key_sha=self.expected_original_hash),
             object_metadata("misc/unclassified.webp", self.bodies["misc/unclassified.webp"], cache="", stored_sha=False),
         ]
 
@@ -89,6 +93,17 @@ class R2ReadOnlyAuditTest(unittest.TestCase):
         })
         self.assertEqual(report["expectedMissing"], {"total": 1, "card": 0, "detail": 1})
         self.assertEqual(report["metadata"]["customShaCoverage"], 1)
+        self.assertEqual(report["metadata"]["expectedCustomShaCoverage"], 1)
+        self.assertEqual(report["originalIdentityCoverage"], {
+            "expectedCount": 1,
+            "actualObjectCount": 1,
+            "sourceKeyMetadataCoverage": 1,
+            "matchingExpectedCount": 1,
+            "missingCount": 0,
+            "unexpectedCount": 0,
+            "duplicateSourceKeyCount": 0,
+            "invalidSourceKeyMetadataCount": 0,
+        })
         self.assertEqual(report["metadata"]["sizeCoverage"], 4)
         self.assertEqual(report["metadata"]["cacheControlMismatchCount"], 0)
         self.assertEqual(report["metadata"]["contentTypeMismatchCount"], 0)
@@ -124,6 +139,21 @@ class R2ReadOnlyAuditTest(unittest.TestCase):
         for key in self.bodies:
             self.assertNotIn(key, serialized)
         self.assertNotIn("https://", serialized)
+
+    def test_original_identity_gap_is_reported_without_exposing_source_keys(self):
+        objects = list(self.objects)
+        objects[2] = {
+            **objects[2],
+            "customMetadata": {"source_key_sha256": "f" * 64},
+        }
+        client = FakeReadOnlyClient(objects, self.bodies)
+        report = MODULE.audit(client, MODULE.EXPECTED_BUCKET, self.plan, "metadata")
+        coverage = report["originalIdentityCoverage"]
+        self.assertEqual(coverage["matchingExpectedCount"], 0)
+        self.assertEqual(coverage["missingCount"], 1)
+        self.assertEqual(coverage["unexpectedCount"], 1)
+        self.assertNotIn("experience/source/hero/original.jpg", json.dumps(report))
+        self.assert_no_mutations(client)
 
 
 if __name__ == "__main__":

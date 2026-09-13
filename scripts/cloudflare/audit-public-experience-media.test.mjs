@@ -7,6 +7,7 @@ import {
   buildSourceScopes,
   buildStorageListRequest,
   classifyReadiness,
+  hashSourceKey,
   normalizeSupabaseExperienceObjectKey,
   parseArgs,
   renderSummary,
@@ -91,6 +92,9 @@ test('builds current/expected manifest drift and future provenance contracts', (
   assert.equal(result.summary.expectedCardExperienceCount, 1);
   assert.equal(result.summary.missingManifestDerivativeKeyCount, 5);
   assert.equal(result.summary.staleManifestDerivativeKeyCount, 2);
+  assert.deepEqual(result.r2Plan.publicActiveOriginalSourceKeyHashes, [
+    hashSourceKey(`experience/${userA}/hero/a.jpg`),
+  ]);
   assert.deepEqual(Object.values(TRANSFORM_PROVENANCE_SCHEMA), [
     'source_key_sha256',
     'source_byte_sha256',
@@ -127,17 +131,28 @@ test('full downloads require an explicit full command', () => {
   assert.throws(() => parseArgs(['scheduled-full']), /metadata or full/);
 });
 
-test('readiness permits Wave 1.2 repair but blocks source or downloaded SHA failures', () => {
+test('readiness requires complete derivative metadata and public-active original identity parity', () => {
   const source = { publicActive: { missingObjectCount: 0, invalidReferenceCount: 0 } };
   const repair = {
     expected: { total: 5 },
     expectedMissing: { total: 1 },
-    metadata: { cacheControlMismatchCount: 0, contentTypeMismatchCount: 0, customShaCoverage: 2 },
+    metadata: { cacheControlMismatchCount: 0, contentTypeMismatchCount: 0, expectedCustomShaCoverage: 2 },
+    originalIdentityCoverage: { missingCount: 0, duplicateSourceKeyCount: 0, invalidSourceKeyMetadataCount: 0 },
     downloadedShaVerification: { mismatchCount: 0 },
   };
-  assert.equal(classifyReadiness(source, repair), 'GO_WAVE_1_2_REPAIR_REQUIRED');
+  assert.equal(classifyReadiness(source, repair), 'NO_GO_R2_READ_CUTOVER_PARITY');
   assert.equal(classifyReadiness({ publicActive: { missingObjectCount: 1, invalidReferenceCount: 0 } }, repair), 'NO_GO_SOURCE_PARITY');
   assert.equal(classifyReadiness(source, { ...repair, downloadedShaVerification: { mismatchCount: 1 } }), 'NO_GO_R2_SHA_MISMATCH');
+  const ready = {
+    ...repair,
+    expectedMissing: { total: 0 },
+    metadata: { cacheControlMismatchCount: 0, contentTypeMismatchCount: 0, expectedCustomShaCoverage: 5 },
+  };
+  assert.equal(classifyReadiness(source, ready), 'GO_WAVE_1_3B_READ_CUTOVER_READY');
+  assert.equal(classifyReadiness(source, {
+    ...ready,
+    originalIdentityCoverage: { missingCount: 1, duplicateSourceKeyCount: 0, invalidSourceKeyMetadataCount: 0 },
+  }), 'NO_GO_R2_READ_CUTOVER_PARITY');
 });
 
 test('machine and human reports reject URLs, UUID paths, and credential material', () => {
@@ -148,15 +163,15 @@ test('machine and human reports reject URLs, UUID paths, and credential material
   assert.deepEqual(report, { count: 1, digest: 'a'.repeat(64) });
 
   const summary = renderSummary({
-    mode: 'metadata', generatedAt: '2026-09-13T00:00:00.000Z', readiness: 'GO_WAVE_1_2_REPAIR_REQUIRED',
+    mode: 'metadata', generatedAt: '2026-09-13T00:00:00.000Z', readiness: 'NO_GO_R2_READ_CUTOVER_PARITY',
     sourceScopes: { publicActive: { experienceCount: 1, distinctObjectCount: 2 }, allDbReferenced: { distinctObjectCount: 3, missingObjectCount: 0 }, storageAll: { objectCount: 4 } },
     r2: {
       expected: { total: 5 }, expectedMissing: { total: 0 }, taxonomy: { staleKnownDerivative: 1, unclassifiedExtra: 2, original: 0 },
-      metadata: { cacheControlMismatchCount: 1, contentTypeMismatchCount: 0, customShaCoverage: 2 }, actual: { objectCount: 6 },
+      metadata: { cacheControlMismatchCount: 1, contentTypeMismatchCount: 0, expectedCustomShaCoverage: 2 }, actual: { objectCount: 6 },
+      originalIdentityCoverage: { matchingExpectedCount: 0, expectedCount: 3 },
       downloadedShaVerification: { verifiedCount: 0, unverifiableMetadataCount: 0, mismatchCount: 0 },
     },
     safety: { r2MutationRequests: 0, supabaseMutationRequests: 0 },
-    originalsCoverage: { actualObjectCount: 0, allDbReferencedObjectCount: 3 },
   });
   assert.doesNotMatch(summary, /https?:\/\/|11111111-1111|secret|credential/i);
 });
