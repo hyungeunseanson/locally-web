@@ -3,6 +3,9 @@ import { expect, test } from '@playwright/test';
 import detailImageManifest from '../../app/data/publicExperienceDetailImages.generated.json';
 import { getCloudflarePublicExperienceDetailImage } from '../../app/utils/cloudflarePublicExperienceDetailImages';
 
+const [activeExperienceId, activeImages] = Object.entries(detailImageManifest)[0]!;
+const activeOriginUrl = Object.keys(activeImages)[0]!;
+
 test.describe('Cloudflare public experience detail image boundary', () => {
   test.beforeEach(() => {
     process.env.NEXT_PUBLIC_CLOUDFLARE_IMAGE_CANARY_BASE_URL =
@@ -42,13 +45,11 @@ test.describe('Cloudflare public experience detail image boundary', () => {
   });
 
   test('fails closed for changed, unknown, and unexpected experience images', () => {
-    const [originUrl] = Object.keys(detailImageManifest['4523']);
-
-    expect(getCloudflarePublicExperienceDetailImage(4523, `${originUrl}?changed=1`)).toBeNull();
-    expect(getCloudflarePublicExperienceDetailImage(999999, originUrl)).toBeNull();
+    expect(getCloudflarePublicExperienceDetailImage(activeExperienceId, `${activeOriginUrl}?changed=1`)).toBeNull();
+    expect(getCloudflarePublicExperienceDetailImage(999999, activeOriginUrl)).toBeNull();
     expect(
       getCloudflarePublicExperienceDetailImage(
-        4523,
+        activeExperienceId,
         'https://example.com/private-or-unexpected-image.jpg'
       )
     ).toBeNull();
@@ -56,9 +57,7 @@ test.describe('Cloudflare public experience detail image boundary', () => {
 
   test('is disabled without the existing public Cloudflare base URL flag', () => {
     delete process.env.NEXT_PUBLIC_CLOUDFLARE_IMAGE_CANARY_BASE_URL;
-    const [originUrl] = Object.keys(detailImageManifest['4523']);
-
-    expect(getCloudflarePublicExperienceDetailImage(4523, originUrl)).toBeNull();
+    expect(getCloudflarePublicExperienceDetailImage(activeExperienceId, activeOriginUrl)).toBeNull();
   });
 
   test('delivers the approved detail and itinerary images from Cloudflare', async ({ page }) => {
@@ -67,7 +66,7 @@ test.describe('Cloudflare public experience detail image boundary', () => {
       'Detail canary browser contract requires the public build-time flag.'
     );
 
-    await page.goto('/experiences/4523', { waitUntil: 'domcontentloaded' });
+    await page.goto(`/experiences/${activeExperienceId}`, { waitUntil: 'domcontentloaded' });
 
     const cloudflareImages = page.locator('[data-detail-image-delivery="cloudflare-r2"]:visible');
     await expect(cloudflareImages.first()).toBeVisible({ timeout: 15_000 });
@@ -89,7 +88,7 @@ test.describe('Cloudflare public experience detail image boundary', () => {
     await page.route('https://media-canary.locally-travel.com/details/**', async (route) => {
       await route.fulfill({ status: 503, body: 'intentional detail canary failure' });
     });
-    await page.goto('/experiences/4523', { waitUntil: 'domcontentloaded' });
+    await page.goto(`/experiences/${activeExperienceId}`, { waitUntil: 'domcontentloaded' });
 
     await expect(
       page.locator('[data-detail-image-delivery="supabase-fallback"]:visible').first()

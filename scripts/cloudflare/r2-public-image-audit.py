@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
 import os
+import re
 import sys
 import threading
 import urllib.parse
@@ -196,11 +197,14 @@ def classify_key(key, expected, known_manifest_keys):
 def audit(client, bucket, plan, mode):
     expected_entries = plan.get("expected")
     known_manifest_keys = plan.get("knownManifestKeys")
-    if not isinstance(expected_entries, list) or not isinstance(known_manifest_keys, list):
+    expected_original_hashes = plan.get("publicActiveOriginalSourceKeyHashes")
+    if not isinstance(expected_entries, list) or not isinstance(known_manifest_keys, list) or not isinstance(expected_original_hashes, list):
         raise RuntimeError("Invalid audit plan")
     expected = {item["key"]: item for item in expected_entries}
     if len(expected) != len(expected_entries) or len(set(known_manifest_keys)) != len(known_manifest_keys):
         raise RuntimeError("Audit plan contains duplicate keys")
+    if len(set(expected_original_hashes)) != len(expected_original_hashes) or any(not re.fullmatch(r"[0-9a-f]{64}", value or "") for value in expected_original_hashes):
+        raise RuntimeError("Audit plan contains invalid original source identities")
     objects = client.list_metadata(bucket)
     actual = {item["key"]: item for item in objects}
     if len(actual) != len(objects):
@@ -217,6 +221,15 @@ def audit(client, bucket, plan, mode):
     etag_coverage = sum(1 for item in objects if item.get("etag"))
     size_coverage = sum(1 for item in objects if isinstance(item.get("size"), int) and item["size"] >= 0)
     sha_coverage = sum(1 for item in objects if (item.get("customMetadata") or {}).get("sha256"))
+    expected_sha_coverage = sum(1 for item in expected_objects if re.fullmatch(r"[0-9a-f]{64}", (item.get("customMetadata") or {}).get("sha256", "")))
+    original_objects = [item for item in objects if classify_key(item["key"], expected, set(known_manifest_keys)) == "original"]
+    original_hashes = [
+        (item.get("customMetadata") or {}).get("source_key_sha256", "")
+        for item in original_objects
+    ]
+    valid_original_hashes = [value for value in original_hashes if re.fullmatch(r"[0-9a-f]{64}", value)]
+    expected_original_set = set(expected_original_hashes)
+    actual_original_set = set(valid_original_hashes)
     provenance_coverage = {
         field: sum(1 for item in objects if (item.get("customMetadata") or {}).get(field))
         for field in PROVENANCE_FIELDS
@@ -261,9 +274,20 @@ def audit(client, bucket, plan, mode):
             "sizeCoverage": size_coverage,
             "etagCoverage": etag_coverage,
             "customShaCoverage": sha_coverage,
+            "expectedCustomShaCoverage": expected_sha_coverage,
             "cacheControlMismatchCount": cache_mismatch,
             "contentTypeMismatchCount": type_mismatch,
             "provenanceCoverage": provenance_coverage,
+        },
+        "originalIdentityCoverage": {
+            "expectedCount": len(expected_original_set),
+            "actualObjectCount": len(original_objects),
+            "sourceKeyMetadataCoverage": len(valid_original_hashes),
+            "matchingExpectedCount": len(expected_original_set & actual_original_set),
+            "missingCount": len(expected_original_set - actual_original_set),
+            "unexpectedCount": len(actual_original_set - expected_original_set),
+            "duplicateSourceKeyCount": len(valid_original_hashes) - len(actual_original_set),
+            "invalidSourceKeyMetadataCount": len(original_hashes) - len(valid_original_hashes),
         },
         "downloadedShaVerification": downloaded,
         "identitySetDigests": {
