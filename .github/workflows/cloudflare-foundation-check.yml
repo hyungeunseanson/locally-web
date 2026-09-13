@@ -73,6 +73,9 @@ jobs:
       - name: Validate deterministic public experience media keys
         run: npm run cloudflare:experience-media:key-contract
 
+      - name: Validate dormant public experience media Queue engine
+        run: npm run cloudflare:experience-media:queue-engine:contract
+
       - name: Validate the Production media build wrapper
         run: npm run cloudflare:production-build:contract
 
