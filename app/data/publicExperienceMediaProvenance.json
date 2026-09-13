@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "transformSchemaVersion": "1",
+  "provenanceStatus": "verified",
+  "transformEngines": {
+    "cloudflareImages": "cloudflare-images-binding",
+    "scheduledSharp": "sharp-libvips"
+  },
+  "allowedDerivativeEngines": [
+    "cloudflare-images-binding",
+    "sharp-libvips"
+  ]
+}

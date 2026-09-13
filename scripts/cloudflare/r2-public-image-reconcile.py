@@ -21,6 +21,17 @@ PUBLIC_VERIFICATION_RETRY_DELAYS_SECONDS = (2, 4, 8, 16, 30, 30, 30, 30, 30, 30,
 CONCURRENT_OBJECT_RETRY_DELAYS_SECONDS = (0.25, 0.5, 1, 2)
 EXPECTED_CONTENT_TYPE = "image/webp"
 EXPECTED_CACHE_CONTROL = "public, max-age=31536000, immutable"
+PROVENANCE_CONTRACT_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "app/data/publicExperienceMediaProvenance.json"
+)
+PROVENANCE_CONTRACT = json.loads(PROVENANCE_CONTRACT_PATH.read_text(encoding="utf-8"))
+TRANSFORM_SCHEMA_VERSION = PROVENANCE_CONTRACT["transformSchemaVersion"]
+VERIFIED_PROVENANCE_STATUS = PROVENANCE_CONTRACT["provenanceStatus"]
+SCHEDULED_SHARP_TRANSFORM_ENGINE = PROVENANCE_CONTRACT["transformEngines"]["scheduledSharp"]
+ALLOWED_DERIVATIVE_TRANSFORM_ENGINES = frozenset(
+    PROVENANCE_CONTRACT["allowedDerivativeEngines"]
+)
 
 
 def is_retryable_public_status(status):
@@ -106,26 +117,121 @@ def read_stream_sha256(body):
     return size, digest.hexdigest()
 
 
+def require_sha256(value, field, object_id):
+    if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value):
+        raise RuntimeError(f"Invalid {field} in object plan ({object_id})")
+
+
+def validate_object_plan_item(item):
+    object_id = sanitized_object_id(item.get("key", "invalid"))
+    require_sha256(item.get("sha256"), "output SHA-256", object_id)
+    require_sha256(item.get("sourceKeySha256"), "source key SHA-256", object_id)
+    require_sha256(item.get("sourceByteSha256"), "source byte SHA-256", object_id)
+    if not isinstance(item.get("bytes"), int) or item["bytes"] <= 0:
+        raise RuntimeError(f"Invalid output size in object plan ({object_id})")
+    if not isinstance(item.get("sourceSize"), int) or item["sourceSize"] <= 0:
+        raise RuntimeError(f"Invalid source size in object plan ({object_id})")
+    role = item.get("derivativeRole")
+    allowed_dimensions = {
+        "card": {(384, 65), (640, 65)},
+        "detail": {(480, 75), (960, 75), (1440, 75)},
+    }
+    if (
+        role not in allowed_dimensions
+        or (item.get("width"), item.get("quality")) not in allowed_dimensions[role]
+    ):
+        raise RuntimeError(f"Invalid derivative specification in object plan ({object_id})")
+    if item.get("format") != "webp" or item.get("contentType") != EXPECTED_CONTENT_TYPE:
+        raise RuntimeError(f"Invalid derivative format in object plan ({object_id})")
+    if item.get("transformSchemaVersion") != TRANSFORM_SCHEMA_VERSION:
+        raise RuntimeError(f"Invalid transform schema in object plan ({object_id})")
+    if item.get("transformEngine") != SCHEDULED_SHARP_TRANSFORM_ENGINE:
+        raise RuntimeError(f"Invalid scheduled transform engine in object plan ({object_id})")
+    if item.get("provenanceStatus") != VERIFIED_PROVENANCE_STATUS:
+        raise RuntimeError(f"Invalid provenance status in object plan ({object_id})")
+    if not isinstance(item.get("generatedAt"), str) or not item["generatedAt"]:
+        raise RuntimeError(f"Missing generation time in object plan ({object_id})")
+
+
+def desired_sharp_metadata(item):
+    return {
+        "sha256": item["sha256"],
+        "output_byte_sha256": item["sha256"],
+        "source_key_sha256": item["sourceKeySha256"],
+        "source_byte_sha256": item["sourceByteSha256"],
+        "source_size": str(item["sourceSize"]),
+        "transform_width": str(item["width"]),
+        "transform_quality": str(item["quality"]),
+        "transform_format": item["format"],
+        "transform_schema_version": item["transformSchemaVersion"],
+        "transform_engine": SCHEDULED_SHARP_TRANSFORM_ENGINE,
+        "derivative_role": item["derivativeRole"],
+        "provenance_status": VERIFIED_PROVENANCE_STATUS,
+        "generated_at": item["generatedAt"],
+    }
+
+
+def provenance_matches(metadata, item, actual_sha256, *, legacy=False):
+    common = (
+        metadata.get("sha256") == actual_sha256
+        and metadata.get("output_byte_sha256") == actual_sha256
+        and metadata.get("source_key_sha256") == item["sourceKeySha256"]
+        and metadata.get("source_byte_sha256") == item["sourceByteSha256"]
+        and metadata.get("transform_width") == str(item["width"])
+        and metadata.get("transform_quality") == str(item["quality"])
+        and metadata.get("transform_format") == item["format"]
+    )
+    if not common:
+        return False
+    if legacy:
+        return metadata.get("provenance_status") == "legacy-observed"
+    return (
+        metadata.get("provenance_status") == VERIFIED_PROVENANCE_STATUS
+        and metadata.get("source_size") == str(item["sourceSize"])
+        and metadata.get("transform_schema_version") == TRANSFORM_SCHEMA_VERSION
+        and metadata.get("transform_engine") in ALLOWED_DERIVATIVE_TRANSFORM_ENGINES
+        and metadata.get("derivative_role") == item["derivativeRole"]
+    )
+
+
 def verify_exact_r2_object(client, bucket, item, retry_delays=()):
     object_id = sanitized_object_id(item["key"])
     attempts = len(retry_delays) + 1
     for attempt in range(attempts):
         try:
             head = client.head_object(Bucket=bucket, Key=item["key"])
-            if head.get("ContentLength") != item["bytes"]:
-                raise RuntimeError(f"R2 object size conflict ({object_id})")
             if head.get("ContentType") != EXPECTED_CONTENT_TYPE:
                 raise RuntimeError(f"R2 object Content-Type conflict ({object_id})")
             if head.get("CacheControl") != EXPECTED_CACHE_CONTROL:
                 raise RuntimeError(f"R2 object Cache-Control conflict ({object_id})")
             metadata = head.get("Metadata") or {}
-            if metadata.get("sha256") != item["sha256"]:
-                raise RuntimeError(f"R2 object sha256 metadata conflict ({object_id})")
             response = client.get_object(Bucket=bucket, Key=item["key"])
             actual_size, actual_sha256 = read_stream_sha256(response["Body"])
-            if actual_size != item["bytes"] or actual_sha256 != item["sha256"]:
+            if actual_size != head.get("ContentLength"):
+                raise RuntimeError(f"R2 object size conflict ({object_id})")
+
+            provenance_status = metadata.get("provenance_status")
+            if provenance_status == VERIFIED_PROVENANCE_STATUS:
+                if metadata.get("transform_engine") not in ALLOWED_DERIVATIVE_TRANSFORM_ENGINES:
+                    raise RuntimeError(f"R2 object transform engine conflict ({object_id})")
+                if not provenance_matches(metadata, item, actual_sha256):
+                    raise RuntimeError(f"R2 object provenance conflict ({object_id})")
+                return {"classification": "provenance_exact", "size": actual_size}
+
+            if provenance_status == "legacy-observed":
+                if not provenance_matches(metadata, item, actual_sha256, legacy=True):
+                    raise RuntimeError(f"R2 object legacy provenance conflict ({object_id})")
+                return {"classification": "provenance_exact", "size": actual_size}
+
+            if provenance_status:
+                raise RuntimeError(f"R2 object provenance status conflict ({object_id})")
+            if (
+                actual_size != item["bytes"]
+                or actual_sha256 != item["sha256"]
+                or metadata.get("sha256") != item["sha256"]
+            ):
                 raise RuntimeError(f"R2 object byte conflict ({object_id})")
-            return
+            return {"classification": "byte_exact", "size": actual_size}
         except ClientError as error:
             if is_not_found(error) and attempt < attempts - 1:
                 time.sleep(retry_delays[attempt])
@@ -136,6 +242,7 @@ def verify_exact_r2_object(client, bucket, item, retry_delays=()):
 def create_or_verify_object(client, bucket, base_url, root, item, existed_before):
     key = item["key"]
     object_id = sanitized_object_id(key)
+    validate_object_plan_item(item)
     source = (root / item["path"]).resolve()
     if root not in source.parents or not source.is_file():
         raise RuntimeError(f"Unsafe or missing object path ({object_id})")
@@ -143,9 +250,13 @@ def create_or_verify_object(client, bucket, base_url, root, item, existed_before
         raise RuntimeError(f"Local object integrity mismatch ({object_id})")
 
     if existed_before:
-        verify_exact_r2_object(client, bucket, item)
-        verify_public_object(base_url, key, item["bytes"])
-        return "concurrent_exact_skip"
+        verification = verify_exact_r2_object(client, bucket, item)
+        verify_public_object(base_url, key, verification["size"])
+        return (
+            "existing_exact"
+            if verification["classification"] == "byte_exact"
+            else "concurrent_provenance_exact_skip"
+        )
 
     try:
         with source.open("rb") as body:
@@ -156,23 +267,29 @@ def create_or_verify_object(client, bucket, base_url, root, item, existed_before
                 ContentLength=item["bytes"],
                 ContentType=EXPECTED_CONTENT_TYPE,
                 CacheControl=EXPECTED_CACHE_CONTROL,
-                Metadata={"sha256": item["sha256"]},
+                Metadata=desired_sharp_metadata(item),
                 IfNoneMatch="*",
             )
     except ClientError as error:
         if not is_conditional_write_conflict(error):
             raise
-        verify_exact_r2_object(
+        verification = verify_exact_r2_object(
             client,
             bucket,
             item,
             retry_delays=CONCURRENT_OBJECT_RETRY_DELAYS_SECONDS,
         )
-        verify_public_object(base_url, key, item["bytes"])
-        return "concurrent_exact_skip"
+        verify_public_object(base_url, key, verification["size"])
+        return (
+            "concurrent_byte_exact_skip"
+            if verification["classification"] == "byte_exact"
+            else "concurrent_provenance_exact_skip"
+        )
 
-    verify_exact_r2_object(client, bucket, item)
+    verification = verify_exact_r2_object(client, bucket, item)
     verify_public_object(base_url, key, item["bytes"])
+    if verification["classification"] != "provenance_exact":
+        raise RuntimeError(f"Created R2 object lacks scheduled provenance ({object_id})")
     return "created"
 
 
@@ -269,14 +386,22 @@ def main():
     if newly_missing:
         raise RuntimeError(f"R2 changed during reconciliation; {len(newly_missing)} unplanned objects are now missing")
     created = []
-    concurrent_exact_skips = []
+    existing_exact = []
+    concurrent_byte_exact_skips = []
+    concurrent_provenance_exact_skips = []
     for item in plan:
         key = item["key"]
         outcome = create_or_verify_object(client, bucket, base_url, root, item, key in before)
         if outcome == "created":
             created.append(item)
+        elif outcome == "existing_exact":
+            existing_exact.append(item)
+        elif outcome == "concurrent_byte_exact_skip":
+            concurrent_byte_exact_skips.append(item)
+        elif outcome == "concurrent_provenance_exact_skip":
+            concurrent_provenance_exact_skips.append(item)
         else:
-            concurrent_exact_skips.append(item)
+            raise RuntimeError("Unexpected reconciliation outcome")
     after = list_keys(client, bucket)
     missing = sorted(expected_keys - after)
     if missing:
@@ -286,9 +411,12 @@ def main():
         "existingObjectCount": len(expected_keys & before),
         "createdObjectCount": len(created),
         "uploadedObjectCount": len(created),
-        "concurrentExactSkipCount": len(concurrent_exact_skips),
+        "existingExactCount": len(existing_exact),
+        "concurrentByteExactSkipCount": len(concurrent_byte_exact_skips),
+        "concurrentProvenanceExactSkipCount": len(concurrent_provenance_exact_skips),
+        "concurrentExactSkipCount": len(concurrent_byte_exact_skips) + len(concurrent_provenance_exact_skips),
         "conflictCount": 0,
-        "verifiedObjectCount": len(created) + len(concurrent_exact_skips),
+        "verifiedObjectCount": len(created) + len(existing_exact) + len(concurrent_byte_exact_skips) + len(concurrent_provenance_exact_skips),
         "verifiedUploadedObjectCount": len(created),
         "retainedExtraObjectCount": len(after - expected_keys),
         "deletedObjectCount": 0,
@@ -298,6 +426,8 @@ def main():
     append_github_output("uploaded_count", result["uploadedObjectCount"])
     append_github_output("created_count", result["createdObjectCount"])
     append_github_output("concurrent_exact_skip_count", result["concurrentExactSkipCount"])
+    append_github_output("concurrent_byte_exact_skip_count", result["concurrentByteExactSkipCount"])
+    append_github_output("concurrent_provenance_exact_skip_count", result["concurrentProvenanceExactSkipCount"])
     append_github_output("conflict_count", result["conflictCount"])
     append_github_output("verified_count", result["verifiedObjectCount"])
     append_github_output("verified_uploaded_count", result["verifiedUploadedObjectCount"])
