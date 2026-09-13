@@ -18,6 +18,9 @@ from botocore.exceptions import ClientError
 EXPECTED_BUCKET = "locally-public-experience-canary"
 EXPECTED_BASE_URL = "https://media-canary.locally-travel.com"
 PUBLIC_VERIFICATION_RETRY_DELAYS_SECONDS = (2, 4, 8, 16, 30, 30, 30, 30, 30, 30, 30, 30)
+CONCURRENT_OBJECT_RETRY_DELAYS_SECONDS = (0.25, 0.5, 1, 2)
+EXPECTED_CONTENT_TYPE = "image/webp"
+EXPECTED_CACHE_CONTROL = "public, max-age=31536000, immutable"
 
 
 def is_retryable_public_status(status):
@@ -68,6 +71,111 @@ def sha256_file(path):
     return digest.hexdigest()
 
 
+def sanitized_object_id(key):
+    return hashlib.sha256(key.encode()).hexdigest()[:12]
+
+
+def client_error_details(error):
+    response = getattr(error, "response", {}) or {}
+    error_payload = response.get("Error", {}) or {}
+    metadata = response.get("ResponseMetadata", {}) or {}
+    return str(error_payload.get("Code", "")), metadata.get("HTTPStatusCode")
+
+
+def is_conditional_write_conflict(error):
+    code, status = client_error_details(error)
+    return code in {"PreconditionFailed", "ConditionalRequestConflict"} or status in {409, 412}
+
+
+def is_not_found(error):
+    code, status = client_error_details(error)
+    return code in {"404", "NoSuchKey", "NotFound"} or status == 404
+
+
+def read_stream_sha256(body):
+    digest = hashlib.sha256()
+    size = 0
+    try:
+        for chunk in iter(lambda: body.read(1024 * 1024), b""):
+            digest.update(chunk)
+            size += len(chunk)
+    finally:
+        close = getattr(body, "close", None)
+        if close:
+            close()
+    return size, digest.hexdigest()
+
+
+def verify_exact_r2_object(client, bucket, item, retry_delays=()):
+    object_id = sanitized_object_id(item["key"])
+    attempts = len(retry_delays) + 1
+    for attempt in range(attempts):
+        try:
+            head = client.head_object(Bucket=bucket, Key=item["key"])
+            if head.get("ContentLength") != item["bytes"]:
+                raise RuntimeError(f"R2 object size conflict ({object_id})")
+            if head.get("ContentType") != EXPECTED_CONTENT_TYPE:
+                raise RuntimeError(f"R2 object Content-Type conflict ({object_id})")
+            if head.get("CacheControl") != EXPECTED_CACHE_CONTROL:
+                raise RuntimeError(f"R2 object Cache-Control conflict ({object_id})")
+            metadata = head.get("Metadata") or {}
+            if metadata.get("sha256") != item["sha256"]:
+                raise RuntimeError(f"R2 object sha256 metadata conflict ({object_id})")
+            response = client.get_object(Bucket=bucket, Key=item["key"])
+            actual_size, actual_sha256 = read_stream_sha256(response["Body"])
+            if actual_size != item["bytes"] or actual_sha256 != item["sha256"]:
+                raise RuntimeError(f"R2 object byte conflict ({object_id})")
+            return
+        except ClientError as error:
+            if is_not_found(error) and attempt < attempts - 1:
+                time.sleep(retry_delays[attempt])
+                continue
+            raise RuntimeError(f"R2 object unavailable for exact verification ({object_id})") from error
+
+
+def create_or_verify_object(client, bucket, base_url, root, item, existed_before):
+    key = item["key"]
+    object_id = sanitized_object_id(key)
+    source = (root / item["path"]).resolve()
+    if root not in source.parents or not source.is_file():
+        raise RuntimeError(f"Unsafe or missing object path ({object_id})")
+    if source.stat().st_size != item["bytes"] or sha256_file(source) != item["sha256"]:
+        raise RuntimeError(f"Local object integrity mismatch ({object_id})")
+
+    if existed_before:
+        verify_exact_r2_object(client, bucket, item)
+        verify_public_object(base_url, key, item["bytes"])
+        return "concurrent_exact_skip"
+
+    try:
+        with source.open("rb") as body:
+            client.put_object(
+                Bucket=bucket,
+                Key=key,
+                Body=body,
+                ContentLength=item["bytes"],
+                ContentType=EXPECTED_CONTENT_TYPE,
+                CacheControl=EXPECTED_CACHE_CONTROL,
+                Metadata={"sha256": item["sha256"]},
+                IfNoneMatch="*",
+            )
+    except ClientError as error:
+        if not is_conditional_write_conflict(error):
+            raise
+        verify_exact_r2_object(
+            client,
+            bucket,
+            item,
+            retry_delays=CONCURRENT_OBJECT_RETRY_DELAYS_SECONDS,
+        )
+        verify_public_object(base_url, key, item["bytes"])
+        return "concurrent_exact_skip"
+
+    verify_exact_r2_object(client, bucket, item)
+    verify_public_object(base_url, key, item["bytes"])
+    return "created"
+
+
 def append_github_output(name, value):
     output = os.environ.get("GITHUB_OUTPUT")
     if output:
@@ -87,7 +195,7 @@ def verify_public_object(base_url, key, expected_size):
                         continue
                     raise RuntimeError(f"HTTP {response.status}")
                 content_type = response.headers.get("Content-Type", "").split(";", 1)[0]
-                if content_type != "image/webp":
+                if content_type != EXPECTED_CONTENT_TYPE:
                     raise RuntimeError(f"unexpected content type {content_type}")
                 content_length = response.headers.get("Content-Length")
                 if content_length and int(content_length) != expected_size:
@@ -160,51 +268,38 @@ def main():
     newly_missing = (expected_keys - before) - plan_keys
     if newly_missing:
         raise RuntimeError(f"R2 changed during reconciliation; {len(newly_missing)} unplanned objects are now missing")
-    uploaded = []
+    created = []
+    concurrent_exact_skips = []
     for item in plan:
         key = item["key"]
-        source = (root / item["path"]).resolve()
-        if root not in source.parents or not source.is_file():
-            raise RuntimeError(f"Unsafe or missing object path for {key}")
-        if source.stat().st_size != item["bytes"] or sha256_file(source) != item["sha256"]:
-            raise RuntimeError(f"Local object integrity mismatch for {key}")
-        if key in before:
-            continue
-        client.upload_file(
-            str(source),
-            bucket,
-            key,
-            ExtraArgs={
-                "ContentType": "image/webp",
-                "CacheControl": "public, max-age=31536000, immutable",
-                "Metadata": {"sha256": item["sha256"]},
-            },
-        )
-        uploaded.append(item)
+        outcome = create_or_verify_object(client, bucket, base_url, root, item, key in before)
+        if outcome == "created":
+            created.append(item)
+        else:
+            concurrent_exact_skips.append(item)
     after = list_keys(client, bucket)
     missing = sorted(expected_keys - after)
     if missing:
         raise RuntimeError(f"R2 parity failed; {len(missing)} expected objects are missing")
-    verification_directory = root / "download-verification"
-    verification_directory.mkdir(exist_ok=True)
-    for item in uploaded:
-        destination = verification_directory / hashlib.sha256(item["key"].encode()).hexdigest()
-        client.download_file(bucket, item["key"], str(destination))
-        if destination.stat().st_size != item["bytes"] or sha256_file(destination) != item["sha256"]:
-            raise RuntimeError(f"Downloaded R2 object integrity mismatch for {item['key']}")
-        verify_public_object(base_url, item["key"], item["bytes"])
-        destination.unlink()
     result = {
         "expectedObjectCount": len(expected_keys),
         "existingObjectCount": len(expected_keys & before),
-        "uploadedObjectCount": len(uploaded),
-        "verifiedUploadedObjectCount": len(uploaded),
+        "createdObjectCount": len(created),
+        "uploadedObjectCount": len(created),
+        "concurrentExactSkipCount": len(concurrent_exact_skips),
+        "conflictCount": 0,
+        "verifiedObjectCount": len(created) + len(concurrent_exact_skips),
+        "verifiedUploadedObjectCount": len(created),
         "retainedExtraObjectCount": len(after - expected_keys),
         "deletedObjectCount": 0,
         "parity": True,
     }
     Path(args.output).write_text(json.dumps(result, indent=2) + "\n")
     append_github_output("uploaded_count", result["uploadedObjectCount"])
+    append_github_output("created_count", result["createdObjectCount"])
+    append_github_output("concurrent_exact_skip_count", result["concurrentExactSkipCount"])
+    append_github_output("conflict_count", result["conflictCount"])
+    append_github_output("verified_count", result["verifiedObjectCount"])
     append_github_output("verified_uploaded_count", result["verifiedUploadedObjectCount"])
     append_github_output("parity", str(result["parity"]).lower())
     print(json.dumps(result, indent=2))

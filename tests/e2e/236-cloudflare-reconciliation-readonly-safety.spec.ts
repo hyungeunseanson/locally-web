@@ -28,6 +28,10 @@ const r2AuditSource = readFileSync(
   'scripts/cloudflare/r2-public-image-audit.py',
   'utf8'
 );
+const r2ReconciliationSource = readFileSync(
+  'scripts/cloudflare/r2-public-image-reconcile.py',
+  'utf8'
+);
 const mediaRepairPlannerSource = readFileSync(
   'scripts/cloudflare/plan-public-experience-media-repair.mjs',
   'utf8'
@@ -161,6 +165,19 @@ test.describe('Production reconciliation image checks stay read-only', () => {
     expect(r2AuditSource).toContain('def get_bytes');
     expect(r2AuditSource).not.toMatch(/\.(put_object|upload_file|delete_object|delete_objects|copy_object)\(/);
     expect(r2AuditSource).not.toMatch(/method=["'](?:POST|PUT|PATCH|DELETE)["']/);
+  });
+
+  test('scheduled derivative reconciliation is conditional-create only', () => {
+    expect(r2ReconciliationSource).toContain('IfNoneMatch="*"');
+    expect(r2ReconciliationSource).toContain('client.put_object(');
+    expect(r2ReconciliationSource).not.toContain('client.upload_file(');
+    expect(r2ReconciliationSource).not.toContain('client.copy_object(');
+    expect(r2ReconciliationSource).not.toMatch(
+      new RegExp(`client\\.${'delete' + '_object'}s?\\(`)
+    );
+    expect(r2ReconciliationSource).toContain('"concurrentExactSkipCount"');
+    expect(r2ReconciliationSource).toContain('"conflictCount": 0');
+    expect(r2ReconciliationSource).toContain('"deletedObjectCount": 0');
   });
 
   test('keeps controlled repair independent and plan-only by default', () => {
