@@ -20,6 +20,8 @@ const PROVENANCE_CONTRACT = JSON.parse(
 
 export const SCHEDULED_SHARP_TRANSFORM_ENGINE =
   PROVENANCE_CONTRACT.transformEngines.scheduledSharp;
+export const TRANSFORM_SCHEMA_VERSION = PROVENANCE_CONTRACT.transformSchemaVersion;
+export const VERIFIED_PROVENANCE_STATUS = PROVENANCE_CONTRACT.provenanceStatus;
 
 function parseArgs() {
   const [command = 'audit', ...rest] = process.argv.slice(2);
@@ -114,9 +116,9 @@ export function buildSharpObjectPlanItem(specification, outputPath, outputBytes,
     width: specification.width,
     quality: specification.quality,
     format: specification.format,
-    transformSchemaVersion: PROVENANCE_CONTRACT.transformSchemaVersion,
+    transformSchemaVersion: TRANSFORM_SCHEMA_VERSION,
     transformEngine: SCHEDULED_SHARP_TRANSFORM_ENGINE,
-    provenanceStatus: PROVENANCE_CONTRACT.provenanceStatus,
+    provenanceStatus: VERIFIED_PROVENANCE_STATUS,
     generatedAt,
   };
 }

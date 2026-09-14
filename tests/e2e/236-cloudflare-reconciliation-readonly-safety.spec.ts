@@ -148,6 +148,8 @@ test.describe('Production reconciliation image checks stay read-only', () => {
     expect(experienceWorkflow).toContain("options: [audit, plan, apply, legacy-reconcile]");
     expect(experienceWorkflow).toContain("github.event_name == 'schedule' || inputs.action == 'legacy-reconcile'");
     expect(experienceWorkflow).toContain('group: public-experience-image-reconciliation');
+    expect(experienceWorkflow).toContain('needs: audit');
+    expect(experienceWorkflow).not.toContain('needs: [audit, completeness]');
     expect(experienceWorkflow).toContain("ACTION: ${{ github.event_name == 'schedule' && 'audit' || inputs.action }}");
     expect(packageSource.scripts['cloudflare:experience-media:audit:metadata']).toBe(
       'node scripts/cloudflare/audit-public-experience-media.mjs metadata'

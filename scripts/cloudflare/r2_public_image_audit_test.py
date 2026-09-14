@@ -194,6 +194,13 @@ class R2ReadOnlyAuditTest(unittest.TestCase):
         report = MODULE.audit(FakeReadOnlyClient([unverifiable], {"cards/expected.webp": b"expected"}), MODULE.EXPECTED_BUCKET, plan, "metadata")
         self.assertEqual(report["completeness"]["derivativeUnverifiableCount"], 1)
 
+    def test_whole_state_digest_covers_http_metadata(self):
+        base = object_metadata("cards/expected.webp", b"expected")
+        content_type_changed = {**base, "contentType": "application/octet-stream"}
+        cache_changed = {**base, "cacheControl": "max-age=60"}
+        self.assertNotEqual(MODULE.r2_state_digest([base]), MODULE.r2_state_digest([content_type_changed]))
+        self.assertNotEqual(MODULE.r2_state_digest([base]), MODULE.r2_state_digest([cache_changed]))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -227,7 +227,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   reconcile:
-    needs: [audit, completeness]
+    needs: audit
     if: >-
       needs.audit.outputs.drift == 'true' &&
       (github.event_name == 'schedule' || inputs.action == 'legacy-reconcile')

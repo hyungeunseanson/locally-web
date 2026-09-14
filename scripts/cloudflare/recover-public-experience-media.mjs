@@ -18,6 +18,8 @@ import {
   buildSourceProvenance,
   buildSpecifications,
   parseCardManifest,
+  TRANSFORM_SCHEMA_VERSION,
+  VERIFIED_PROVENANCE_STATUS,
 } from './reconcile-public-experience-images.mjs';
 import {
   buildOriginalKey,
@@ -174,6 +176,22 @@ function derivativeStateFor(source, derivative, r2Inspection) {
   return { classification: actual.classification, actual };
 }
 
+function originalMetadataConsistentFor(source, r2Inspection) {
+  return (r2Inspection.originalsBySourceKeySha256[source.sourceKeySha256] || []).some((item) => {
+    const metadata = metadataMap(item.customMetadata);
+    return Number.isSafeInteger(source.storage?.size) && source.storage.size > 0 &&
+      item.size === source.storage.size &&
+      metadata.source_key_sha256 === source.sourceKeySha256 &&
+      /^[0-9a-f]{64}$/.test(metadata.source_byte_sha256 || '') &&
+      metadata.source_byte_sha256 === metadata.output_byte_sha256 &&
+      metadata.source_byte_sha256 === metadata.sha256 &&
+      metadata.source_size === String(source.storage.size) &&
+      metadata.provenance_status === VERIFIED_PROVENANCE_STATUS &&
+      metadata.transform_schema_version === TRANSFORM_SCHEMA_VERSION &&
+      metadata.transform_engine === 'source-copy';
+  });
+}
+
 function exactOriginalFor(source, material, r2Inspection) {
   const candidates = r2Inspection.originalsBySourceKeySha256[source.sourceKeySha256] || [];
   const expectedKey = buildOriginalKey(source.sourceKey, material.sha256, material.contentType);
@@ -185,7 +203,11 @@ function exactOriginalFor(source, material, r2Inspection) {
       metadata.source_key_sha256 === source.sourceKeySha256 &&
       metadata.source_byte_sha256 === material.sha256 &&
       metadata.output_byte_sha256 === material.sha256 &&
-      metadata.source_size === String(material.bytes.length);
+      metadata.sha256 === material.sha256 &&
+      metadata.source_size === String(material.bytes.length) &&
+      metadata.provenance_status === VERIFIED_PROVENANCE_STATUS &&
+      metadata.transform_schema_version === TRANSFORM_SCHEMA_VERSION &&
+      metadata.transform_engine === 'source-copy';
   });
   const sameKeyConflict = candidates.some((item) => item.key === expectedKey) && !exact;
   return { exact, sameKeyConflict, expectedKey };
@@ -195,8 +217,8 @@ export async function buildBoundedRecoveryPlan({ inventory, r2Inspection, budget
   const budget = validateRecoveryBudget(inputBudget);
   const candidateHashes = inventory.sources.map((item) => item.sourceKeySha256);
   const gapCandidateHashes = inventory.sources.filter((source) => {
-    const originals = r2Inspection.originalsBySourceKeySha256[source.sourceKeySha256] || [];
-    return originals.length === 0 || source.derivatives.some((item) => derivativeStateFor(source, item, r2Inspection).classification !== 'existing_metadata_consistent');
+    return !originalMetadataConsistentFor(source, r2Inspection) ||
+      source.derivatives.some((item) => derivativeStateFor(source, item, r2Inspection).classification !== 'existing_metadata_consistent');
   }).map((item) => item.sourceKeySha256);
   const rotationPool = gapCandidateHashes.length > 0 ? gapCandidateHashes : candidateHashes;
   const rotation = selectRotatingCandidates(rotationPool, cursor, budget.maxSourceDownloads);
@@ -272,6 +294,10 @@ export async function buildBoundedRecoveryPlan({ inventory, r2Inspection, budget
       const state = derivativeStateFor(source, specification, r2Inspection);
       if (state.classification === 'conflict') {
         conflicts.push({ identity: hashIdentity(specification.key), reason: 'derivative_metadata_conflict' });
+        continue;
+      }
+      if (state.classification === 'unverifiable') {
+        conflicts.push({ identity: hashIdentity(specification.key), reason: 'derivative_metadata_unverifiable' });
         continue;
       }
       if (state.actual) {

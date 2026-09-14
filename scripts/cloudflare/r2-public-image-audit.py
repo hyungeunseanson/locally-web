@@ -54,6 +54,13 @@ def identity_set_digest(values):
     return digest.hexdigest()
 
 
+def r2_state_digest(objects):
+    return identity_set_digest(
+        f"{item['key']}\0{item.get('etag', '')}\0{item.get('size', 0)}\0{item.get('contentType', '')}\0{item.get('cacheControl', '')}\0{json.dumps(item.get('customMetadata') or {}, sort_keys=True)}"
+        for item in objects
+    )
+
+
 class S3ReadOnlyClient:
     def __init__(self, client):
         self.client = client
@@ -391,10 +398,7 @@ def audit(client, bucket, plan, mode, return_private=False):
         raise RuntimeError("R2 report leaked an object key or URL")
     private = {
         "version": 1,
-        "r2StateDigest": identity_set_digest(
-            f"{item['key']}\0{item.get('etag', '')}\0{item.get('size', 0)}\0{json.dumps(item.get('customMetadata') or {}, sort_keys=True)}"
-            for item in objects
-        ),
+        "r2StateDigest": r2_state_digest(objects),
         "derivatives": derivative_private,
         "originalsBySourceKeySha256": originals_by_source,
     }

@@ -171,7 +171,7 @@ Broad reader/producer activation remains blocked on recovery independent of mani
 
 ## Manifest-independent completeness and bounded recovery
 
-The existing `Public Experience Image Reconciliation` schedule remains at 05:48 UTC and retains its established manifest drift → derivative reconciliation → manifest PR path. A second job now evaluates actual public-active R2 completeness on every schedule, independently of whether the repository manifests drift. Manual dispatch defaults to `audit`; an audit or plan cannot enter the legacy upload/PR job. `legacy-reconcile` is the explicit manual path for the established manifest flow.
+The existing `Public Experience Image Reconciliation` schedule remains at 05:48 UTC and retains its established manifest drift → derivative reconciliation → manifest PR path. A second, non-blocking job evaluates actual public-active R2 completeness on every schedule, independently of whether the repository manifests drift; a transient completeness failure does not suppress the established reconciliation job. Manual dispatch defaults to `audit`; an audit or plan cannot enter the legacy upload/PR job. `legacy-reconcile` is the explicit manual path for the established manifest flow.
 
 The metadata audit paginates the live public-active database inventory and Supabase Storage listing, then uses R2 LIST/HEAD. It separately reports expected/missing derivatives, original source-identity coverage, metadata-consistent objects, conflicts, and objects whose current source bytes remain unverifiable. Storage size, ETag, or modification metadata is not treated as a source-byte SHA. The default scheduled audit downloads no source bytes, performs no transform, and exposes no write API.
 

@@ -67,11 +67,7 @@ def load_client():
 def normalize_metadata(client, bucket):
     wrapped = AUDIT.S3ReadOnlyClient(client)
     objects = wrapped.list_metadata(bucket)
-    digest_values = (
-        f"{item['key']}\0{item.get('etag', '')}\0{item.get('size', 0)}\0{json.dumps(item.get('customMetadata') or {}, sort_keys=True)}"
-        for item in objects
-    )
-    return objects, AUDIT.identity_set_digest(digest_values), wrapped.operations
+    return objects, AUDIT.r2_state_digest(objects), wrapped.operations
 
 
 def is_conditional_conflict(error):
