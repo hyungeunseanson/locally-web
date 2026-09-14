@@ -446,7 +446,11 @@ test.describe('default-OFF deterministic public experience media reader', () => 
         const attribute = kind === 'card' ? 'data-image-delivery' : 'data-detail-image-delivery';
         const fallback = page.locator(`img[${attribute}="supabase-fallback"]`);
         await expect(fallback).toHaveAttribute('src', FIXTURE_ORIGIN);
+        await expect(fallback).toHaveJSProperty('complete', true);
+        expect(await fallback.evaluate((node: HTMLImageElement) => node.naturalWidth)).toBeGreaterThan(0);
         await expect(page.locator('source')).toHaveCount(0);
+        expect(r2Requests).toBeGreaterThan(0);
+        expect(originRequests).toBeGreaterThan(0);
         const settledCounts = { r2Requests, originRequests };
         await page.waitForTimeout(300);
         expect({ r2Requests, originRequests }).toEqual(settledCounts);
@@ -491,11 +495,22 @@ test.describe('default-OFF deterministic public experience media reader', () => 
 
       await updateReaderHarness(page, {
         kind,
-        experienceId: SECOND_FIXTURE_ID,
-        originImageUrl: SECOND_FIXTURE_ORIGIN,
+        experienceId: FIXTURE_ID,
+        originImageUrl: FIXTURE_ORIGIN,
         r2Eligible: true,
       });
-      const thirdExpectedUrl = buildDisplayedR2Url(kind, SECOND_FIXTURE_ID, SECOND_FIXTURE_ORIGIN);
+      await expect(page.locator(`img[${attribute}="supabase-fallback"]`)).toHaveAttribute(
+        'src',
+        FIXTURE_ORIGIN
+      );
+
+      await updateReaderHarness(page, {
+        kind,
+        experienceId: SECOND_FIXTURE_ID,
+        originImageUrl: FIXTURE_ORIGIN,
+        r2Eligible: true,
+      });
+      const thirdExpectedUrl = buildDisplayedR2Url(kind, SECOND_FIXTURE_ID, FIXTURE_ORIGIN);
       await expect(page.locator(`img[${attribute}="cloudflare-r2"]`)).toHaveAttribute('src', thirdExpectedUrl);
     });
 
@@ -520,30 +535,33 @@ test.describe('default-OFF deterministic public experience media reader', () => 
       const attribute = kind === 'card' ? 'data-image-delivery' : 'data-detail-image-delivery';
       await expect(page.locator(`img[${attribute}="supabase-fallback"]`)).toHaveCount(1);
       await page.waitForTimeout(300);
+      expect(r2Requests).toBeGreaterThan(0);
+      expect(originRequests).toBeGreaterThan(0);
       const settledCounts = { r2Requests, originRequests };
       await page.waitForTimeout(500);
       expect({ r2Requests, originRequests }).toEqual(settledCounts);
     });
   }
 
-  test('OFF bundle hydrates and preserves the existing static manifest resolver', async ({ page }) => {
-    const hydrationErrors: string[] = [];
-    await page.route(`${BASE_URL}/**`, (route) => route.fulfill({
-      status: 200,
-      contentType: 'image/webp',
-      body: VALID_WEBP,
-    }));
-    await openReaderHarness(page, 'disabled', {
-      kind: 'card',
-      experienceId: manifestExperienceId,
-      originImageUrl: manifestCard.originUrl,
-      r2Eligible: true,
-    }, hydrationErrors);
+  for (const kind of ['card', 'detail'] as const) {
+    test(`OFF ${kind} bundle hydrates and preserves the existing static manifest resolver`, async ({ page }) => {
+      const hydrationErrors: string[] = [];
+      await page.route(`${BASE_URL}/**`, (route) => route.fulfill({
+        status: 200,
+        contentType: 'image/webp',
+        body: VALID_WEBP,
+      }));
+      const originImageUrl = kind === 'card' ? manifestCard.originUrl : manifestDetailOrigin;
+      await openReaderHarness(page, 'disabled', {
+        kind,
+        experienceId: manifestExperienceId,
+        originImageUrl,
+        r2Eligible: true,
+      }, hydrationErrors);
 
-    await expect(page.locator('img[data-image-delivery="cloudflare-r2"]')).toHaveAttribute(
-      'src',
-      `${BASE_URL}/${manifestCard.largeKey}`
-    );
-    expect(hydrationErrors).toEqual([]);
-  });
+      const attribute = kind === 'card' ? 'data-image-delivery' : 'data-detail-image-delivery';
+      await expect(page.locator(`img[${attribute}="cloudflare-r2"]`)).toHaveCount(1);
+      expect(hydrationErrors).toEqual([]);
+    });
+  }
 });
