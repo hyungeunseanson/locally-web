@@ -11,6 +11,7 @@ const PUBLIC_IMAGE_PATTERN = /^https:\/\/uhinvcydgzqlpnvieyal\.supabase\.co\/sto
 const PUBLIC_SOURCE_PREFIX = '/storage/v1/object/public/experiences/';
 const PUBLIC_SOURCE_KEY_PATTERN =
   /^experience\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/(?:hero|itinerary)\/[A-Za-z0-9._-]+$/i;
+const LEGACY_CARD_IDENTITIES = new Set(['4523:7922aaf9f75b']);
 const PROVENANCE_CONTRACT = JSON.parse(
   readFileSync(
     new URL('../../app/data/publicExperienceMediaProvenance.json', import.meta.url),
@@ -174,17 +175,19 @@ export function normalizeInventory(rows) {
   });
 }
 
-export function buildExpectedManifests(inventory, currentCards) {
+export function buildExpectedManifests(inventory, _currentCards = {}) {
   const cards = {};
   const details = {};
   for (const experience of inventory) {
     const primary = experience.heroUrls[0];
-    const existingCard = currentCards[experience.id];
     const hash = urlHash(primary);
-    cards[experience.id] = existingCard?.originUrl === primary ? existingCard : {
+    const prefix = LEGACY_CARD_IDENTITIES.has(`${experience.id}:${hash}`)
+      ? `experience-${experience.id}-primary`
+      : `cards/experience-${experience.id}-primary-${hash}`;
+    cards[experience.id] = {
       originUrl: primary,
-      smallKey: `cards/experience-${experience.id}-primary-${hash}-w384-q65.webp`,
-      largeKey: `cards/experience-${experience.id}-primary-${hash}-w640-q65.webp`,
+      smallKey: `${prefix}-w384-q65.webp`,
+      largeKey: `${prefix}-w640-q65.webp`,
     };
     details[experience.id] = {};
     for (const originUrl of experience.detailUrls) {

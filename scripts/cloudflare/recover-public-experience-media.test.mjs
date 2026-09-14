@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -20,6 +21,7 @@ const owner = '11111111-1111-4111-8111-111111111111';
 const sourceUrl = `${baseUrl}/storage/v1/object/public/experiences/experience/${owner}/hero/current.jpg`;
 const sourceKey = normalizeSupabaseExperienceObjectKey(sourceUrl);
 const sourceKeySha = 'ced79a186b49620f85bceb6be18d7f6bf23a0c7e828162a0b77ec5665ddb2b76';
+const cardIdentity = createHash('sha256').update(sourceUrl).digest('hex').slice(0, 12);
 
 function fixture() {
   const rows = [{ id: 77, status: 'active', is_active: true, photos: [sourceUrl], itinerary: [], image_url: null }];
@@ -28,8 +30,8 @@ function fixture() {
   const currentCards = parseCardManifest(`export const PUBLIC_EXPERIENCE_CARD_IMAGES = {
   "77": {
     originUrl: "${sourceUrl}",
-    smallKey: "cards/experience-77-primary-52a1931a4d88-w384-q65.webp",
-    largeKey: "cards/experience-77-primary-52a1931a4d88-w640-q65.webp",
+    smallKey: "cards/experience-77-primary-${cardIdentity}-w384-q65.webp",
+    largeKey: "cards/experience-77-primary-${cardIdentity}-w640-q65.webp",
   },
 } as const;`);
   const currentDetails = buildExpectedManifests(source.reconciliationInventory, currentCards).details;
@@ -80,6 +82,20 @@ test('finds derivative and original gaps even when static manifest drift is zero
   assert.equal(result.calls.transform, 5);
   assert.equal(result.plan.progress.conflictCount, 0);
   assert.equal(result.plan.progress.partial, false);
+});
+
+test('wrong same-origin static card keys cannot hide deterministic R2 gaps', () => {
+  const rows = [{ id: 77, status: 'active', is_active: true, photos: [sourceUrl], itinerary: [], image_url: null }];
+  const storage = [{ key: sourceKey, size: 12, contentType: 'image/jpeg', etag: 'source-etag', cacheControl: '3600' }];
+  const source = buildSourceScopes(rows, storage, baseUrl);
+  const wrongCards = { 77: { originUrl: sourceUrl, smallKey: 'cards/wrong-small.webp', largeKey: 'cards/wrong-large.webp' } };
+  const inventory = buildRecoveryInventory(source, storage, wrongCards, {});
+  const cardKeys = inventory.sources[0].derivatives.filter((item) => item.role === 'card').map((item) => item.key);
+  assert.deepEqual(cardKeys, [
+    `cards/experience-77-primary-${cardIdentity}-w384-q65.webp`,
+    `cards/experience-77-primary-${cardIdentity}-w640-q65.webp`,
+  ]);
+  assert.equal(inventory.manifestDrift.missingManifestDerivativeKeyCount, 5);
 });
 
 test('a DB image with no Queue event is found from current public-active inventory', async () => {
