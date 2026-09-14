@@ -143,9 +143,28 @@ test.describe('Cloudflare migration readiness contract', () => {
     expect(packageJson.scripts['cloudflare:build:production']).toBe(
       'node scripts/cloudflare/run-production-build.mjs'
     );
-    expect(packageJson.scripts['precloudflare:deploy:production']).toBe(
-      'npm run cloudflare:build:production'
+    expect(packageJson.scripts['precloudflare:deploy:production']).toBeUndefined();
+    expect(packageJson.scripts['cloudflare:deploy:production']).toBe(
+      'node scripts/cloudflare/run-production-deploy.mjs'
     );
+    expect(manifest.publicExperienceMediaReleasePolicy.defaultProductionProfile).toBe(
+      'approved-cohort'
+    );
+    expect(manifest.publicExperienceMediaReleasePolicy.profiles.off).toEqual({
+      enabled: 'false',
+      experienceIds: [],
+    });
+    expect(manifest.publicExperienceMediaReleasePolicy.profiles['single-3309']).toEqual({
+      enabled: 'true',
+      experienceIds: [3309],
+    });
+    expect(
+      manifest.publicExperienceMediaReleasePolicy.profiles['approved-cohort'].experienceIds
+    ).toEqual([
+      3071, 3081, 3188, 3253, 3307, 3308, 3309, 3331, 3343, 3402, 3403,
+      3404, 3405, 3410, 3416, 3439, 3496, 3570, 3664, 3861, 4262, 4313,
+      4397, 4413, 4414, 4424, 4523, 4597, 4659, 4660, 4811, 4837, 4838,
+    ]);
     expect(packageJson.scripts.build).toBe('next build');
     expect(packageJson.scripts['cloudflare:build']).toBe('opennextjs-cloudflare build');
   });

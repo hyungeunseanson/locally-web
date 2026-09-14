@@ -69,6 +69,57 @@
     "defaultEnabled": "false",
     "defaultExperienceIds": ""
   },
+  "publicExperienceMediaReleasePolicy": {
+    "defaultProductionProfile": "approved-cohort",
+    "profiles": {
+      "off": {
+        "enabled": "false",
+        "experienceIds": []
+      },
+      "single-3309": {
+        "enabled": "true",
+        "experienceIds": [3309]
+      },
+      "approved-cohort": {
+        "enabled": "true",
+        "experienceIds": [
+          3071,
+          3081,
+          3188,
+          3253,
+          3307,
+          3308,
+          3309,
+          3331,
+          3343,
+          3402,
+          3403,
+          3404,
+          3405,
+          3410,
+          3416,
+          3439,
+          3496,
+          3570,
+          3664,
+          3861,
+          4262,
+          4313,
+          4397,
+          4413,
+          4414,
+          4424,
+          4523,
+          4597,
+          4659,
+          4660,
+          4811,
+          4837,
+          4838
+        ]
+      }
+    }
+  },
   "forbiddenIncrementalCacheR2Buckets": [
     "locally-public-experience-canary",
     "locally-public-host-profiles",
