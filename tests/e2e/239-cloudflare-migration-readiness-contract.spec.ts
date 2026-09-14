@@ -93,7 +93,22 @@ test.describe('Cloudflare migration readiness contract', () => {
       binding: manifest.bindings.publicExperienceMediaR2,
       bucket_name: manifest.environments.production.publicExperienceMediaR2,
     });
-    expect(wrangler.env.production.queues?.producers).toBeUndefined();
+    expect(wrangler.env.production.queues?.producers).toEqual([
+      {
+        binding: manifest.bindings.publicExperienceMediaQueueProducer,
+        queue: manifest.environments.production.publicExperienceMediaQueue,
+      },
+    ]);
+    expect(wrangler.env.production.vars).toMatchObject({
+      [manifest.publicExperienceMediaProducerPolicy.enabledVariable]: 'false',
+      [manifest.publicExperienceMediaProducerPolicy.experienceIdsVariable]: '',
+    });
+    expect(wrangler.env.canary.vars).not.toHaveProperty(
+      manifest.publicExperienceMediaProducerPolicy.enabledVariable
+    );
+    expect(wrangler.env.canary.vars).not.toHaveProperty(
+      manifest.publicExperienceMediaProducerPolicy.experienceIdsVariable
+    );
 
     const wranglerEnvironments = Object.values(wrangler.env) as Array<{
       r2_buckets: Array<{ binding: string; bucket_name: string }>;

@@ -92,6 +92,19 @@ test.describe('default-OFF public experience media Queue producer', () => {
     }
   });
 
+  test('committed Production defaults keep the declared binding dormant', () => {
+    const wrangler = JSON.parse(readFileSync('wrangler.jsonc', 'utf8'));
+    const producer = wrangler.env.production.queues.producers[0];
+    const harness = producerHarness({
+      ...wrangler.env.production.vars,
+      [producer.binding]: producerHarness().queue,
+    });
+
+    expect(schedule(harness).status).toBe('disabled');
+    expect(harness.sent).toHaveLength(0);
+    expect(harness.tracked).toHaveLength(0);
+  });
+
   test('never sends for pending create, inactive/deleted rows, or unchanged public media', () => {
     const cases = [
       {
@@ -315,7 +328,7 @@ test.describe('default-OFF public experience media Queue producer', () => {
     expect(harness.sent).toHaveLength(1);
   });
 
-  test('hooks only confirmed authenticated write results and keeps producer remote wiring absent', () => {
+  test('hooks only confirmed authenticated write results and keeps the declared producer default OFF', () => {
     const shared = readFileSync('app/api/host/experiences/shared.ts', 'utf8');
     const admin = readFileSync('app/actions/admin.ts', 'utf8');
     const adminExperience = readFileSync('app/actions/updateExperienceAdminStatus.ts', 'utf8');
@@ -355,7 +368,18 @@ test.describe('default-OFF public experience media Queue producer', () => {
     expect(activationGuard).toBeLessThan(activationHook);
     expect(reorderGuard).toBeLessThan(reorderHook);
 
-    expect(wrangler.env.production.queues.producers).toBeUndefined();
+    expect(wrangler.env.production.queues.producers).toEqual([
+      {
+        binding: 'PUBLIC_EXPERIENCE_MEDIA_QUEUE',
+        queue: 'locally-public-experience-media-mirror-production',
+      },
+    ]);
+    expect(wrangler.env.production.vars).toMatchObject({
+      CLOUDFLARE_DEPLOYMENT_ENV: 'production',
+      PUBLIC_EXPERIENCE_MEDIA_PRODUCER_ENABLED: 'false',
+      PUBLIC_EXPERIENCE_MEDIA_PRODUCER_EXPERIENCE_IDS: '',
+    });
+    expect(wrangler.env.canary.queues).toBeUndefined();
     expect(worker).not.toContain('PUBLIC_EXPERIENCE_MEDIA_QUEUE.send');
     expect(worker).not.toContain('producer');
   });

@@ -263,9 +263,15 @@ test.describe('Production public experience media Queue consumer wiring', () => 
     expect(requests[0].init).not.toHaveProperty('body');
   });
 
-  test('declares only the exact Production consumer, DLQ, and public media R2 binding', () => {
+  test('declares the exact default-OFF Production producer, consumer, DLQ, and public media R2 binding', () => {
     const production = wrangler.env.production;
     expect(production.queues).toEqual({
+      producers: [
+        {
+          binding: 'PUBLIC_EXPERIENCE_MEDIA_QUEUE',
+          queue: 'locally-public-experience-media-mirror-production',
+        },
+      ],
       consumers: [
         {
           queue: 'locally-public-experience-media-mirror-production',
@@ -278,7 +284,10 @@ test.describe('Production public experience media Queue consumer wiring', () => 
         },
       ],
     });
-    expect(production.queues.producers).toBeUndefined();
+    expect(production.vars).toMatchObject({
+      PUBLIC_EXPERIENCE_MEDIA_PRODUCER_ENABLED: 'false',
+      PUBLIC_EXPERIENCE_MEDIA_PRODUCER_EXPERIENCE_IDS: '',
+    });
     expect(production.r2_buckets).toContainEqual({
       binding: 'PUBLIC_EXPERIENCE_MEDIA_R2',
       bucket_name: 'locally-public-experience-canary',

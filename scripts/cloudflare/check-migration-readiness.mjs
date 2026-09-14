@@ -112,6 +112,12 @@ assert.deepEqual(wrangler.env.production.r2_buckets, [
   },
 ]);
 assert.deepEqual(wrangler.env.production.queues, {
+  producers: [
+    {
+      binding: manifest.bindings.publicExperienceMediaQueueProducer,
+      queue: manifest.environments.production.publicExperienceMediaQueue,
+    },
+  ],
   consumers: [
     {
       queue: manifest.environments.production.publicExperienceMediaQueue,
@@ -124,7 +130,26 @@ assert.deepEqual(wrangler.env.production.queues, {
     },
   ],
 });
-assert.equal(wrangler.env.production.queues.producers, undefined);
+assert.equal(
+  wrangler.env.production.vars[manifest.publicExperienceMediaProducerPolicy.enabledVariable],
+  manifest.publicExperienceMediaProducerPolicy.defaultEnabled
+);
+assert.equal(
+  wrangler.env.production.vars[
+    manifest.publicExperienceMediaProducerPolicy.experienceIdsVariable
+  ],
+  manifest.publicExperienceMediaProducerPolicy.defaultExperienceIds
+);
+assert.equal(
+  wrangler.env.canary.vars[manifest.publicExperienceMediaProducerPolicy.enabledVariable],
+  undefined
+);
+assert.equal(
+  wrangler.env.canary.vars[
+    manifest.publicExperienceMediaProducerPolicy.experienceIdsVariable
+  ],
+  undefined
+);
 
 const incrementalCacheBuckets = Object.values(wrangler.env).map((environment) =>
   environment.r2_buckets.find(
