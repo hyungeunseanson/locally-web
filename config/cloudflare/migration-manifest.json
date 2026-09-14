@@ -40,6 +40,7 @@
     "images": "IMAGES",
     "incrementalCacheR2": "NEXT_INC_CACHE_R2_BUCKET",
     "publicExperienceMediaR2": "PUBLIC_EXPERIENCE_MEDIA_R2",
+    "publicExperienceMediaQueueProducer": "PUBLIC_EXPERIENCE_MEDIA_QUEUE",
     "queueDurableObject": {
       "binding": "NEXT_CACHE_DO_QUEUE",
       "className": "DOQueueHandler"
@@ -55,6 +56,12 @@
     "maxConcurrency": 1,
     "maxRetries": 5,
     "retryDelaySeconds": 60
+  },
+  "publicExperienceMediaProducerPolicy": {
+    "enabledVariable": "PUBLIC_EXPERIENCE_MEDIA_PRODUCER_ENABLED",
+    "experienceIdsVariable": "PUBLIC_EXPERIENCE_MEDIA_PRODUCER_EXPERIENCE_IDS",
+    "defaultEnabled": "false",
+    "defaultExperienceIds": ""
   },
   "forbiddenIncrementalCacheR2Buckets": [
     "locally-public-experience-canary",
@@ -127,7 +134,9 @@
       "TRANSLATION_GROK_RESERVED_TOKENS",
       "SETTLEMENT_SYNC_RUNNING_STALE_MINUTES",
       "SETTLEMENT_SYNC_DELAY_WARNING_MINUTES",
-      "SETTLEMENT_SYNC_LEASE_SECONDS"
+      "SETTLEMENT_SYNC_LEASE_SECONDS",
+      "PUBLIC_EXPERIENCE_MEDIA_PRODUCER_ENABLED",
+      "PUBLIC_EXPERIENCE_MEDIA_PRODUCER_EXPERIENCE_IDS"
     ],
     "canarySafetyVariables": [
       "CLOUDFLARE_FUNCTIONAL_CANARY_ENABLED",

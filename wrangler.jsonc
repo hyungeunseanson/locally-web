@@ -68,7 +68,9 @@
       "workers_dev": false,
       "preview_urls": false,
       "vars": {
-        "CLOUDFLARE_DEPLOYMENT_ENV": "production"
+        "CLOUDFLARE_DEPLOYMENT_ENV": "production",
+        "PUBLIC_EXPERIENCE_MEDIA_PRODUCER_ENABLED": "false",
+        "PUBLIC_EXPERIENCE_MEDIA_PRODUCER_EXPERIENCE_IDS": ""
       },
       "observability": {
         "enabled": true,
@@ -95,6 +97,12 @@
         }
       ],
       "queues": {
+        "producers": [
+          {
+            "binding": "PUBLIC_EXPERIENCE_MEDIA_QUEUE",
+            "queue": "locally-public-experience-media-mirror-production"
+          }
+        ],
         "consumers": [
           {
             "queue": "locally-public-experience-media-mirror-production",
