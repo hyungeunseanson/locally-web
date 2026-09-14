@@ -142,6 +142,18 @@ export type PublicExperienceMediaQueueDisposition =
   | 'retry'
   | 'dead_letter';
 
+export const PUBLIC_EXPERIENCE_MEDIA_DIAGNOSTIC_STAGES = [
+  'initial_row_load',
+  'inventory_build',
+  'source_fetch',
+  'original_check',
+  'derivative_process',
+  'final_row_load',
+] as const;
+
+export type PublicExperienceMediaDiagnosticStage =
+  (typeof PUBLIC_EXPERIENCE_MEDIA_DIAGNOSTIC_STAGES)[number];
+
 export type PublicExperienceMediaMirrorOutcome = {
   status: PublicExperienceMediaOutcomeStatus;
   disposition: PublicExperienceMediaQueueDisposition;
@@ -154,6 +166,8 @@ export type PublicExperienceMediaMirrorOutcome = {
   derivativeCreatedCount: number;
   derivativeExactSkipCount: number;
   diagnosticCode?: string;
+  diagnosticStage?: PublicExperienceMediaDiagnosticStage;
+  httpStatus?: number;
 };
 
 type R2ObjectLike = {
@@ -201,13 +215,14 @@ export interface PublicExperienceMediaImagesBindingLike {
   input(stream: ReadableStream<Uint8Array>): ImagesTransformerLike;
 }
 
-class MirrorEngineError extends Error {
+export class PublicExperienceMediaMirrorError extends Error {
   constructor(
     readonly kind: 'transient' | 'permanent',
-    readonly diagnosticCode: string
+    readonly diagnosticCode: string,
+    readonly httpStatus?: number
   ) {
     super(diagnosticCode);
-    this.name = 'MirrorEngineError';
+    this.name = 'PublicExperienceMediaMirrorError';
   }
 }
 
@@ -218,7 +233,10 @@ function normalizeContentType(value: string | null | undefined) {
 function normalizeExperienceId(value: number | string) {
   const normalized = String(value);
   if (!/^[1-9][0-9]{0,18}$/.test(normalized)) {
-    throw new MirrorEngineError('permanent', 'invalid_experience_id');
+    throw new PublicExperienceMediaMirrorError(
+      'permanent',
+      'invalid_experience_id'
+    );
   }
   return normalized;
 }
@@ -285,7 +303,10 @@ function buildDerivativeSpecifications(
   }
 
   if (new Set(specifications.map((item) => item.key)).size !== specifications.length) {
-    throw new MirrorEngineError('permanent', 'duplicate_derivative_key');
+    throw new PublicExperienceMediaMirrorError(
+      'permanent',
+      'duplicate_derivative_key'
+    );
   }
   return specifications;
 }
@@ -302,7 +323,10 @@ export function buildPublicExperienceMediaInventory(
       : [];
   const heroUrls = unique(photos.length > 0 ? photos : legacy);
   if (heroUrls.length === 0) {
-    throw new MirrorEngineError('permanent', 'missing_primary_source');
+    throw new PublicExperienceMediaMirrorError(
+      'permanent',
+      'missing_primary_source'
+    );
   }
   const detailUrls = unique([...heroUrls, ...itinerary]);
   const allSourceUrls = unique([...photos, ...itinerary, ...legacy]);
@@ -313,11 +337,17 @@ export function buildPublicExperienceMediaInventory(
     try {
       normalized = normalizePublicExperienceSourceUrl(sourceUrl);
     } catch {
-      throw new MirrorEngineError('permanent', 'invalid_source_namespace');
+      throw new PublicExperienceMediaMirrorError(
+        'permanent',
+        'invalid_source_namespace'
+      );
     }
     const existing = sourcesByKey.get(normalized.sourceKey);
     if (existing && existing.sourceUrl !== normalized.sourceUrl) {
-      throw new MirrorEngineError('permanent', 'ambiguous_source_identity');
+      throw new PublicExperienceMediaMirrorError(
+        'permanent',
+        'ambiguous_source_identity'
+      );
     }
     sourcesByKey.set(normalized.sourceKey, {
       sourceUrl: normalized.sourceUrl,
@@ -409,7 +439,7 @@ async function readBoundedStream(
     total += value.byteLength;
     if (total > maximumBytes) {
       await reader.cancel();
-      throw new MirrorEngineError('permanent', diagnosticCode);
+      throw new PublicExperienceMediaMirrorError('permanent', diagnosticCode);
     }
     chunks.push(value);
   }
@@ -448,12 +478,18 @@ export function createCloudflareImagesPublicExperienceTransformer(
           'images_output_too_large'
         );
         if (bytes.byteLength === 0 || contentType !== 'image/webp') {
-          throw new MirrorEngineError('transient', 'images_invalid_output');
+          throw new PublicExperienceMediaMirrorError(
+            'transient',
+            'images_invalid_output'
+          );
         }
         return { bytes, contentType };
       } catch (error) {
-        if (error instanceof MirrorEngineError) throw error;
-        throw new MirrorEngineError('transient', 'images_transform_failed');
+        if (error instanceof PublicExperienceMediaMirrorError) throw error;
+        throw new PublicExperienceMediaMirrorError(
+          'transient',
+          'images_transform_failed'
+        );
       }
     },
   };
@@ -514,21 +550,38 @@ function emptyOutcome(
 
 async function readSource(response: Response) {
   if (!response.ok || !response.body) {
-    throw new MirrorEngineError(
-      response.status >= 500 || response.status === 429 ? 'transient' : 'permanent',
-      'source_fetch_failed'
-    );
+    const status = response.status;
+    const kind = status >= 500 || status === 429 ? 'transient' : 'permanent';
+    const diagnosticCode =
+      status === 401 || status === 403
+        ? 'source_http_unauthorized'
+        : status === 429
+          ? 'source_http_rate_limited'
+          : status >= 500
+            ? 'source_http_server_error'
+            : status >= 400
+              ? 'source_http_client_error'
+              : status >= 300
+                ? 'source_http_redirect'
+                : 'source_response_body_missing';
+    throw new PublicExperienceMediaMirrorError(kind, diagnosticCode, status);
   }
   const contentType = normalizeContentType(response.headers.get('content-type'));
   if (!SUPPORTED_SOURCE_CONTENT_TYPES.has(contentType)) {
-    throw new MirrorEngineError('permanent', 'unsupported_source_content_type');
+    throw new PublicExperienceMediaMirrorError(
+      'permanent',
+      'unsupported_source_content_type'
+    );
   }
   const declaredSize = Number(response.headers.get('content-length'));
   if (
     Number.isFinite(declaredSize) &&
     (declaredSize <= 0 || declaredSize > PUBLIC_EXPERIENCE_MEDIA_MAX_SOURCE_BYTES)
   ) {
-    throw new MirrorEngineError('permanent', 'invalid_source_size');
+    throw new PublicExperienceMediaMirrorError(
+      'permanent',
+      'invalid_source_size'
+    );
   }
   const bytes = await readBoundedStream(
     response.body,
@@ -536,7 +589,7 @@ async function readSource(response: Response) {
     'source_too_large'
   );
   if (bytes.byteLength === 0) {
-    throw new MirrorEngineError('permanent', 'empty_source');
+    throw new PublicExperienceMediaMirrorError('permanent', 'empty_source');
   }
   return { bytes, contentType, sha256: await sha256Bytes(bytes) };
 }
@@ -593,7 +646,10 @@ async function inspectStoredObject(
   if (!head) return null;
   const bytes = await store.getBytes(key);
   if (!bytes || bytes.byteLength !== head.size) {
-    throw new MirrorEngineError('permanent', 'stored_object_unreadable');
+    throw new PublicExperienceMediaMirrorError(
+      'permanent',
+      'stored_object_unreadable'
+    );
   }
   return { head, bytes, sha256: await sha256Bytes(bytes) };
 }
@@ -675,7 +731,10 @@ async function ensureOriginal(
     if (originalIsExact(current, source, material.sha256, material.contentType, material.bytes.byteLength)) {
       return 'exact' as const;
     }
-    throw new MirrorEngineError('permanent', 'original_conflict');
+    throw new PublicExperienceMediaMirrorError(
+      'permanent',
+      'original_conflict'
+    );
   }
 
   const created = await dependencies.store.createIfAbsent({
@@ -696,7 +755,10 @@ async function ensureOriginal(
     !after ||
     !originalIsExact(after, source, material.sha256, material.contentType, material.bytes.byteLength)
   ) {
-    throw new MirrorEngineError('permanent', 'original_create_verification_failed');
+    throw new PublicExperienceMediaMirrorError(
+      'permanent',
+      'original_create_verification_failed'
+    );
   }
   return created ? ('created' as const) : ('exact' as const);
 }
@@ -712,7 +774,10 @@ async function ensureDerivative(
     if (derivativeIsExact(current, specification, material.sha256, material.bytes.byteLength)) {
       return 'exact' as const;
     }
-    throw new MirrorEngineError('permanent', 'derivative_conflict');
+    throw new PublicExperienceMediaMirrorError(
+      'permanent',
+      'derivative_conflict'
+    );
   }
 
   const output = await dependencies.transformer.transform({
@@ -726,7 +791,10 @@ async function ensureDerivative(
     output.bytes.byteLength === 0 ||
     output.bytes.byteLength > PUBLIC_EXPERIENCE_MEDIA_MAX_SOURCE_BYTES
   ) {
-    throw new MirrorEngineError('transient', 'images_invalid_output');
+    throw new PublicExperienceMediaMirrorError(
+      'transient',
+      'images_invalid_output'
+    );
   }
   const outputSha256 = await sha256Bytes(output.bytes);
   const created = await dependencies.store.createIfAbsent({
@@ -749,7 +817,10 @@ async function ensureDerivative(
     !after ||
     !derivativeIsExact(after, specification, material.sha256, material.bytes.byteLength)
   ) {
-    throw new MirrorEngineError('permanent', 'derivative_create_verification_failed');
+    throw new PublicExperienceMediaMirrorError(
+      'permanent',
+      'derivative_create_verification_failed'
+    );
   }
   return created ? ('created' as const) : ('exact' as const);
 }
@@ -766,6 +837,8 @@ export async function mirrorPublicExperienceMedia(
   }
 
   let inventory: PublicExperienceMediaInventory | undefined;
+  let diagnosticStage: PublicExperienceMediaDiagnosticStage =
+    'initial_row_load';
   const counts = {
     originalCreatedCount: 0,
     originalExactSkipCount: 0,
@@ -780,8 +853,12 @@ export async function mirrorPublicExperienceMedia(
       });
     }
     if (normalizeExperienceId(initialRow.id) !== message.experienceId) {
-      throw new MirrorEngineError('permanent', 'experience_identity_mismatch');
+      throw new PublicExperienceMediaMirrorError(
+        'permanent',
+        'experience_identity_mismatch'
+      );
     }
+    diagnosticStage = 'inventory_build';
     inventory = buildPublicExperienceMediaInventory(initialRow);
     const copiedAt = (dependencies.now || (() => new Date()))().toISOString();
     const materialBySourceIdentity = new Map<
@@ -790,14 +867,19 @@ export async function mirrorPublicExperienceMedia(
     >();
 
     for (const source of inventory.sources) {
+      diagnosticStage = 'source_fetch';
       let response: Response;
       try {
         response = await dependencies.fetchSource(source.sourceUrl);
       } catch {
-        throw new MirrorEngineError('transient', 'source_fetch_failed');
+        throw new PublicExperienceMediaMirrorError(
+          'transient',
+          'source_fetch_network_error'
+        );
       }
       const material = await readSource(response);
       materialBySourceIdentity.set(source.sourceKeySha256, material);
+      diagnosticStage = 'original_check';
       const originalResult = await ensureOriginal(
         dependencies,
         source,
@@ -809,9 +891,13 @@ export async function mirrorPublicExperienceMedia(
     }
 
     for (const specification of inventory.derivatives) {
+      diagnosticStage = 'derivative_process';
       const material = materialBySourceIdentity.get(specification.sourceKeySha256);
       if (!material) {
-        throw new MirrorEngineError('permanent', 'missing_source_material');
+        throw new PublicExperienceMediaMirrorError(
+          'permanent',
+          'missing_source_material'
+        );
       }
       const derivativeResult = await ensureDerivative(
         dependencies,
@@ -823,6 +909,7 @@ export async function mirrorPublicExperienceMedia(
       else counts.derivativeExactSkipCount += 1;
     }
 
+    diagnosticStage = 'final_row_load';
     const finalRow = await dependencies.loadLatestExperience(message.experienceId);
     let finalSnapshotDigest: string | null = null;
     if (finalRow && isPublicExperienceR2Eligible(finalRow)) {
@@ -840,6 +927,7 @@ export async function mirrorPublicExperienceMedia(
         derivativeCount: inventory.derivatives.length,
         ...counts,
         diagnosticCode: 'source_snapshot_changed',
+        diagnosticStage: 'final_row_load',
       });
     }
 
@@ -855,7 +943,9 @@ export async function mirrorPublicExperienceMedia(
       ...counts,
     });
   } catch (error) {
-    const permanent = error instanceof MirrorEngineError && error.kind === 'permanent';
+    const permanent =
+      error instanceof PublicExperienceMediaMirrorError &&
+      error.kind === 'permanent';
     return emptyOutcome(
       permanent ? 'permanent_conflict' : 'transient_failure',
       permanent ? 'dead_letter' : 'retry',
@@ -866,9 +956,14 @@ export async function mirrorPublicExperienceMedia(
         derivativeCount: inventory?.derivatives.length || 0,
         ...counts,
         diagnosticCode:
-          error instanceof MirrorEngineError
+          error instanceof PublicExperienceMediaMirrorError
             ? error.diagnosticCode
             : 'unclassified_transient_failure',
+        diagnosticStage,
+        httpStatus:
+          error instanceof PublicExperienceMediaMirrorError
+            ? error.httpStatus
+            : undefined,
       }
     );
   }

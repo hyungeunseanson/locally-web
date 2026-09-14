@@ -16,6 +16,7 @@ import {
   PUBLIC_EXPERIENCE_MEDIA_MESSAGE_SCHEMA,
   PUBLIC_EXPERIENCE_MEDIA_SCHEDULED_TRANSFORM_ENGINE,
   PUBLIC_EXPERIENCE_MEDIA_TRANSFORM_ENGINE,
+  PublicExperienceMediaMirrorError,
   type MirrorObjectMetadata,
   type PublicExperienceMediaMirrorDependencies,
   type PublicExperienceMediaMirrorStore,
@@ -246,6 +247,7 @@ test.describe('dormant public experience media Queue mirror engine', () => {
       const outcome = await mirrorPublicExperienceMedia(message, harness.dependencySet);
       expect(outcome.status).toBe('permanent_conflict');
       expect(outcome.disposition).toBe('dead_letter');
+      expect(outcome.diagnosticStage).toBe('inventory_build');
       expect(harness.store.createCalls).toHaveLength(0);
     }
   });
@@ -355,6 +357,7 @@ test.describe('dormant public experience media Queue mirror engine', () => {
     const outcome = await mirrorPublicExperienceMedia(message, conflict.dependencySet);
     expect(outcome.status).toBe('permanent_conflict');
     expect(outcome.diagnosticCode).toBe('original_conflict');
+    expect(outcome.diagnosticStage).toBe('original_check');
   });
 
   test('a conditional-create race validates the winner and never overwrites it', async () => {
@@ -414,6 +417,7 @@ test.describe('dormant public experience media Queue mirror engine', () => {
     const conflict = await mirrorPublicExperienceMedia(message, dependencies({ store }).dependencySet);
     expect(conflict.status).toBe('permanent_conflict');
     expect(conflict.diagnosticCode).toBe('derivative_conflict');
+    expect(conflict.diagnosticStage).toBe('derivative_process');
   });
 
   test('accepts self-consistent scheduled Sharp provenance with different bytes and rejects unknown engines', async () => {
@@ -532,6 +536,9 @@ test.describe('dormant public experience media Queue mirror engine', () => {
     const first = await mirrorPublicExperienceMedia(message, sourceFailure.dependencySet);
     expect(first.status).toBe('transient_failure');
     expect(first.disposition).toBe('retry');
+    expect(first.diagnosticCode).toBe('source_http_server_error');
+    expect(first.diagnosticStage).toBe('source_fetch');
+    expect(first.httpStatus).toBe(503);
     expect(JSON.stringify(first)).not.toContain('https://');
 
     const invalidType = dependencies({ response: sourceResponse(SOURCE_BYTES, 'text/html') });
@@ -563,7 +570,35 @@ test.describe('dormant public experience media Queue mirror engine', () => {
     const fourth = await mirrorPublicExperienceMedia(message, imagesFailure.dependencySet);
     expect(fourth.status).toBe('transient_failure');
     expect(fourth.disposition).toBe('retry');
+    expect(fourth.diagnosticStage).toBe('derivative_process');
     expect(JSON.stringify(fourth)).not.toContain(SOURCE_URL);
+  });
+
+  test('final latest-row failure preserves completed counts and its bounded stage', async () => {
+    const base = dependencies();
+    let loadCount = 0;
+    const outcome = await mirrorPublicExperienceMedia(message, {
+      ...base.dependencySet,
+      async loadLatestExperience() {
+        loadCount += 1;
+        if (loadCount === 1) return activeRow;
+        throw new PublicExperienceMediaMirrorError(
+          'transient',
+          'latest_row_fetch_network_error'
+        );
+      },
+    });
+
+    expect(outcome).toMatchObject({
+      status: 'transient_failure',
+      disposition: 'retry',
+      diagnosticCode: 'latest_row_fetch_network_error',
+      diagnosticStage: 'final_row_load',
+      sourceCount: 1,
+      derivativeCount: 5,
+      originalCreatedCount: 1,
+      derivativeCreatedCount: 5,
+    });
   });
 
   test('contains no overwrite, Copy, Delete, or scheduled activation path', () => {
