@@ -34,6 +34,14 @@ const EXPERIENCE_BUCKET = 'experiences';
 const CARD_MANIFEST_PATH = path.resolve('app/data/publicExperienceCardImages.ts');
 const DETAIL_MANIFEST_PATH = path.resolve('app/data/publicExperienceDetailImages.generated.json');
 const MAX_SOURCE_BYTES = 10 * 1024 * 1024;
+const SOURCE_FETCH_TIMEOUT_MS = 30_000;
+const RECOVERY_PLAN_VERSION = 2;
+const RECOVERY_SCOPE = Object.freeze({
+  source: 'supabase-public-active-experiences',
+  supabaseProjectRef: 'uhinvcydgzqlpnvieyal',
+  bucket: 'locally-public-experience-canary',
+  writeMode: 'conditional-create-only',
+});
 const DEFAULT_BUDGET = Object.freeze({
   maxSourceDownloads: 12,
   maxSourceBytes: 64 * 1024 * 1024,
@@ -83,7 +91,8 @@ export function selectRotatingCandidates(sourceHashes, cursor = 0, limit = DEFAU
 }
 
 export function assertRecoverySnapshotStable(inventory, priorPlan) {
-  if (inventory.sourceSnapshotDigest !== priorPlan.sourceSnapshotDigest) {
+  const sourceSnapshotDigest = priorPlan.execution?.sourceSnapshotDigest ?? priorPlan.sourceSnapshotDigest;
+  if (inventory.sourceSnapshotDigest !== sourceSnapshotDigest) {
     throw new Error('Public-active source snapshot changed.');
   }
 }
@@ -92,25 +101,204 @@ function sourceUrlForKey(baseUrl, sourceKey) {
   return `${baseUrl}/storage/v1/object/public/${EXPERIENCE_BUCKET}/${sourceKey.split('/').map(encodeURIComponent).join('/')}`;
 }
 
-async function fetchBoundedSource(baseUrl, anonKey, sourceKey) {
-  const response = await fetch(sourceUrlForKey(baseUrl, sourceKey), {
-    method: 'GET',
-    redirect: 'manual',
-    headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` },
+export async function fetchBoundedSource(baseUrl, anonKey, sourceKey, options = {}) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), SOURCE_FETCH_TIMEOUT_MS);
+  try {
+    const response = await fetch(sourceUrlForKey(baseUrl, sourceKey), {
+      method: 'GET',
+      redirect: 'manual',
+      signal: controller.signal,
+      headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` },
+    });
+    if (response.status >= 300 && response.status < 400) throw new Error(`Source GET redirect rejected; identity=${hashIdentity(sourceKey).slice(0, 16)}`);
+    if (!response.ok) throw new Error(`Source GET failed: HTTP ${response.status}; identity=${hashIdentity(sourceKey).slice(0, 16)}`);
+    const contentType = normalizeContentType(response.headers.get('content-type'));
+    extensionForContentType(contentType);
+    const declaredHeader = response.headers.get('content-length');
+    if (declaredHeader != null) {
+      const declared = Number(declaredHeader);
+      if (!Number.isSafeInteger(declared) || declared <= 0 || declared > MAX_SOURCE_BYTES) {
+        throw new Error(`Source size is outside the approved contract; identity=${hashIdentity(sourceKey).slice(0, 16)}`);
+      }
+    }
+    if (!response.body) throw new Error(`Source response body is missing; identity=${hashIdentity(sourceKey).slice(0, 16)}`);
+    const chunks = [];
+    let received = 0;
+    for await (const chunk of response.body) {
+      const bytes = Buffer.from(chunk);
+      received += bytes.length;
+      options.onBytes?.(bytes.length);
+      if (received > MAX_SOURCE_BYTES) {
+        controller.abort();
+        throw new Error(`Source bytes are outside the approved contract; identity=${hashIdentity(sourceKey).slice(0, 16)}`);
+      }
+      chunks.push(bytes);
+    }
+    if (received === 0) throw new Error(`Source bytes are outside the approved contract; identity=${hashIdentity(sourceKey).slice(0, 16)}`);
+    return { bytes: Buffer.concat(chunks, received), contentType, etag: String(response.headers.get('etag') || '').replace(/^"|"$/g, '') };
+  } catch (error) {
+    controller.abort();
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function emptySourcePhase() {
+  return { attempts: 0, successes: 0, failures: 0, bytes: 0 };
+}
+
+function emptyUsage() {
+  return {
+    sourceGets: { plan: emptySourcePhase(), preApply: emptySourcePhase(), apply: emptySourcePhase(), postApply: emptySourcePhase() },
+    transforms: { attempts: 0, successes: 0, failures: 0 },
+    r2Creates: { attempts: 0, successes: 0, exactSkips: 0, failures: 0 },
+  };
+}
+
+function sourceTotals(usage) {
+  return Object.values(usage.sourceGets).reduce((result, phase) => ({
+    attempts: result.attempts + phase.attempts,
+    bytes: result.bytes + phase.bytes,
+  }), { attempts: 0, bytes: 0 });
+}
+
+function consumeSourceAttempt(usage, phase, limits) {
+  const totals = sourceTotals(usage);
+  if (totals.attempts >= limits.maxSourceGetAttempts) throw new Error('Recovery lifecycle source GET attempt budget exhausted.');
+  usage.sourceGets[phase].attempts += 1;
+}
+
+function consumeSourceBytes(usage, phase, limits, count) {
+  if (!Number.isSafeInteger(count) || count < 0) throw new Error('Invalid source byte accounting.');
+  const totals = sourceTotals(usage);
+  usage.sourceGets[phase].bytes += count;
+  if (totals.bytes + count > limits.maxSourceBytes) throw new Error('Recovery lifecycle source byte budget exhausted.');
+}
+
+function lifecycleBudgetFor(budget, usage, sourceProofs, plannedCreateCount) {
+  const verificationBytes = sourceProofs.reduce((total, proof) => total + proof.sourceSize, 0);
+  const requiredSourceGetAttempts = usage.sourceGets.plan.attempts + (sourceProofs.length * 2);
+  const requiredSourceBytes = usage.sourceGets.plan.bytes + (verificationBytes * 2);
+  if (requiredSourceGetAttempts > HARD_LIMITS.maxSourceDownloads || requiredSourceBytes > HARD_LIMITS.maxSourceBytes) {
+    throw new Error('Recovery plan cannot reserve its full source verification lifecycle within the hard ceiling.');
+  }
+  return Object.freeze({
+    maxSourceGetAttempts: HARD_LIMITS.maxSourceDownloads,
+    maxSourceBytes: HARD_LIMITS.maxSourceBytes,
+    maxTransformAttempts: budget.maxTransforms,
+    maxR2CreateAttempts: plannedCreateCount,
   });
-  if (response.status >= 300 && response.status < 400) throw new Error(`Source GET redirect rejected; identity=${hashIdentity(sourceKey).slice(0, 16)}`);
-  if (!response.ok) throw new Error(`Source GET failed: HTTP ${response.status}; identity=${hashIdentity(sourceKey).slice(0, 16)}`);
-  const contentType = normalizeContentType(response.headers.get('content-type'));
-  extensionForContentType(contentType);
-  const declared = Number(response.headers.get('content-length'));
-  if (Number.isFinite(declared) && (declared <= 0 || declared > MAX_SOURCE_BYTES)) {
-    throw new Error(`Source size is outside the approved contract; identity=${hashIdentity(sourceKey).slice(0, 16)}`);
+}
+
+export function validateRecoveryPlanDocument(plan, confirmation = plan?.planDigest) {
+  if (!plan || stableJson(Object.keys(plan).sort()) !== stableJson(['execution', 'generatedAt', 'planDigest', 'progress', 'version'])) {
+    throw new Error('Invalid recovery plan document structure.');
   }
-  const bytes = Buffer.from(await response.arrayBuffer());
-  if (bytes.length === 0 || bytes.length > MAX_SOURCE_BYTES) {
-    throw new Error(`Source bytes are outside the approved contract; identity=${hashIdentity(sourceKey).slice(0, 16)}`);
+  if (plan?.version !== RECOVERY_PLAN_VERSION || plan?.execution?.version !== RECOVERY_PLAN_VERSION) {
+    throw new Error('Unsupported recovery plan schema.');
   }
-  return { bytes, contentType, etag: String(response.headers.get('etag') || '').replace(/^"|"$/g, '') };
+  const calculated = stableDigest(plan.execution);
+  if (!confirmation || confirmation !== plan.planDigest || confirmation !== calculated) {
+    throw new Error('Exact fresh recovery plan digest confirmation is required.');
+  }
+  if (stableJson(plan.execution.scope) !== stableJson(RECOVERY_SCOPE)) throw new Error('Unexpected recovery scope.');
+  return plan.execution;
+}
+
+export function createRecoveryBudgetState(plan) {
+  const execution = validateRecoveryPlanDocument(plan);
+  const usage = emptyUsage();
+  usage.sourceGets.plan = structuredClone(execution.planUsage.sourceGets);
+  usage.transforms = structuredClone(execution.planUsage.transforms);
+  return {
+    version: 1,
+    planDigest: plan.planDigest,
+    limits: execution.lifecycleBudget,
+    usage,
+  };
+}
+
+function expectedVerificationUsage(execution) {
+  return {
+    attempts: execution.sourceProofs.length,
+    successes: execution.sourceProofs.length,
+    failures: 0,
+    bytes: execution.sourceProofs.reduce((total, proof) => total + proof.sourceSize, 0),
+  };
+}
+
+function assertEmptyUsage(value, label) {
+  if (stableJson(value) !== stableJson(emptySourcePhase())) throw new Error(`Recovery ${label} phase is not empty.`);
+}
+
+function validateBudgetState(plan, state, nextPhase) {
+  const execution = validateRecoveryPlanDocument(plan);
+  if (state?.version !== 1 || state.planDigest !== plan.planDigest || stableJson(state.limits) !== stableJson(execution.lifecycleBudget)) {
+    throw new Error('Recovery lifecycle budget state does not match the approved plan.');
+  }
+  const phases = state.usage?.sourceGets;
+  if (!phases || stableJson(phases.plan) !== stableJson(execution.planUsage.sourceGets) || stableJson(state.usage.transforms) !== stableJson(execution.planUsage.transforms)) {
+    throw new Error('Recovery lifecycle usage is not bound to the approved plan.');
+  }
+  for (const phase of ['plan', 'preApply', 'apply', 'postApply']) {
+    for (const name of ['attempts', 'successes', 'failures', 'bytes']) {
+      if (!Number.isSafeInteger(phases[phase]?.[name]) || phases[phase][name] < 0) throw new Error('Invalid recovery lifecycle usage counter.');
+    }
+    if (phases[phase].successes + phases[phase].failures > phases[phase].attempts) throw new Error('Inconsistent recovery lifecycle usage counter.');
+  }
+  const totals = sourceTotals(state.usage);
+  if (totals.attempts > state.limits.maxSourceGetAttempts || totals.bytes > state.limits.maxSourceBytes) {
+    throw new Error('Recovery lifecycle source budget is already exceeded.');
+  }
+  assertEmptyUsage(phases.apply, 'apply source-read');
+  if (nextPhase === 'preApply') {
+    assertEmptyUsage(phases.preApply, 'pre-apply');
+    assertEmptyUsage(phases.postApply, 'post-apply');
+    if (stableJson(state.usage.r2Creates) !== stableJson(emptyUsage().r2Creates)) {
+      throw new Error('Recovery create attempts started before pre-apply verification.');
+    }
+  } else if (nextPhase === 'postApply') {
+    if (stableJson(phases.preApply) !== stableJson(expectedVerificationUsage(execution))) {
+      throw new Error('Recovery pre-apply source verification is incomplete.');
+    }
+    assertEmptyUsage(phases.postApply, 'post-apply');
+    const expectedCreates = execution.originals.length + execution.derivatives.length;
+    const creates = state.usage.r2Creates;
+    if (creates.attempts !== expectedCreates || creates.successes + creates.exactSkips !== expectedCreates || creates.failures !== 0) {
+      throw new Error('Recovery create phase is incomplete.');
+    }
+  }
+  return execution;
+}
+
+export async function verifyRecoverySources({ inventory, plan, phase, fetchSource, budgetState }) {
+  if (!['preApply', 'postApply'].includes(phase)) throw new Error('Invalid recovery source verification phase.');
+  const execution = validateBudgetState(plan, budgetState, phase);
+  assertRecoverySnapshotStable(inventory, plan);
+  for (const proof of execution.sourceProofs) {
+    const source = inventory.sources.find((item) => item.sourceKeySha256 === proof.sourceKeySha256);
+    if (!source) throw new Error('A planned source is no longer public-active.');
+    consumeSourceAttempt(budgetState.usage, phase, budgetState.limits);
+    let downloaded;
+    let accounted = 0;
+    try {
+      downloaded = await fetchSource(source, { onBytes: (count) => {
+        consumeSourceBytes(budgetState.usage, phase, budgetState.limits, count);
+        accounted += count;
+      } });
+      if (accounted < downloaded.bytes.length) consumeSourceBytes(budgetState.usage, phase, budgetState.limits, downloaded.bytes.length - accounted);
+      if (downloaded.bytes.length !== proof.sourceSize || sha256(downloaded.bytes) !== proof.sourceByteSha256 || downloaded.contentType !== proof.contentType) {
+        throw new Error(`Planned source bytes changed; identity=${hashIdentity(source.sourceKey).slice(0, 16)}`);
+      }
+      budgetState.usage.sourceGets[phase].successes += 1;
+    } catch (error) {
+      budgetState.usage.sourceGets[phase].failures += 1;
+      throw error;
+    }
+  }
+  return { sourceSnapshotStable: true, verifiedSourceCount: execution.sourceProofs.length, mutationRequests: 0 };
 }
 
 export function buildRecoveryInventory(source, storageObjects, currentCards, currentDetails) {
@@ -221,6 +409,8 @@ function exactOriginalFor(source, material, r2Inspection) {
 
 export async function buildBoundedRecoveryPlan({ inventory, r2Inspection, budget: inputBudget, cursor = 0, fetchSource, transform, outputDirectory }) {
   const budget = validateRecoveryBudget(inputBudget);
+  const usage = emptyUsage();
+  const planningLimits = { maxSourceGetAttempts: budget.maxSourceDownloads, maxSourceBytes: budget.maxSourceBytes };
   const candidateHashes = inventory.sources.map((item) => item.sourceKeySha256);
   const gapCandidateHashes = inventory.sources.filter((source) => {
     return !originalMetadataConsistentFor(source, r2Inspection) ||
@@ -234,9 +424,8 @@ export async function buildBoundedRecoveryPlan({ inventory, r2Inspection, budget
   const derivatives = [];
   const conflicts = [];
   const sourceProofs = [];
-  let downloadedBytes = 0;
-  let sourceDownloadAttemptCount = 0;
   let stoppedByByteBudget = false;
+  let stoppedByLifecycleBudget = false;
   let originalBudgetSkippedCount = 0;
   let derivativeBudgetSkippedCount = 0;
   await mkdir(path.join(outputDirectory, 'objects'), { recursive: true, mode: 0o700 });
@@ -247,23 +436,35 @@ export async function buildBoundedRecoveryPlan({ inventory, r2Inspection, budget
       conflicts.push({ identity: hashIdentity(source.sourceKey), reason: 'source_metadata_unverifiable' });
       continue;
     }
-    if (downloadedBytes + source.storage.size > budget.maxSourceBytes) {
+    const verifiedBytesSoFar = sourceProofs.reduce((total, proof) => total + proof.sourceSize, 0);
+    const projectedAttempts = usage.sourceGets.plan.attempts + 1 + ((sourceProofs.length + 1) * 2);
+    const projectedBytes = usage.sourceGets.plan.bytes + source.storage.size + ((verifiedBytesSoFar + source.storage.size) * 2);
+    if (usage.sourceGets.plan.bytes + source.storage.size > budget.maxSourceBytes) {
       stoppedByByteBudget = true;
+      break;
+    }
+    if (projectedAttempts > HARD_LIMITS.maxSourceDownloads || projectedBytes > HARD_LIMITS.maxSourceBytes) {
+      stoppedByLifecycleBudget = true;
       break;
     }
     let downloaded;
-    sourceDownloadAttemptCount += 1;
+    consumeSourceAttempt(usage, 'plan', planningLimits);
+    let accountedBytes = 0;
     try {
-      downloaded = await fetchSource(source);
+      downloaded = await fetchSource(source, { onBytes: (count) => {
+        consumeSourceBytes(usage, 'plan', planningLimits, count);
+        accountedBytes += count;
+      } });
+      if (accountedBytes < downloaded.bytes.length) {
+        const remaining = downloaded.bytes.length - accountedBytes;
+        consumeSourceBytes(usage, 'plan', planningLimits, remaining);
+      }
+      usage.sourceGets.plan.successes += 1;
     } catch {
+      usage.sourceGets.plan.failures += 1;
       conflicts.push({ identity: hashIdentity(source.sourceKey), reason: 'source_read_failed' });
       continue;
     }
-    if (downloadedBytes + downloaded.bytes.length > budget.maxSourceBytes) {
-      stoppedByByteBudget = true;
-      break;
-    }
-    downloadedBytes += downloaded.bytes.length;
     if (source.storage?.size != null && source.storage.size !== downloaded.bytes.length) {
       conflicts.push({ identity: hashIdentity(source.sourceKey), reason: 'source_size_changed' });
       continue;
@@ -271,6 +472,12 @@ export async function buildBoundedRecoveryPlan({ inventory, r2Inspection, budget
     if (source.storage?.contentType && normalizeContentType(source.storage.contentType) !== downloaded.contentType) {
       conflicts.push({ identity: hashIdentity(source.sourceKey), reason: 'source_content_type_changed' });
       continue;
+    }
+    const actualRequiredAttempts = usage.sourceGets.plan.attempts + ((sourceProofs.length + 1) * 2);
+    const actualRequiredBytes = usage.sourceGets.plan.bytes + ((verifiedBytesSoFar + downloaded.bytes.length) * 2);
+    if (actualRequiredAttempts > HARD_LIMITS.maxSourceDownloads || actualRequiredBytes > HARD_LIMITS.maxSourceBytes) {
+      stoppedByLifecycleBudget = true;
+      break;
     }
     const sourceByteSha256 = sha256(downloaded.bytes);
     const material = { ...downloaded, sha256: sourceByteSha256 };
@@ -313,14 +520,17 @@ export async function buildBoundedRecoveryPlan({ inventory, r2Inspection, budget
         }
         continue;
       }
-      if (derivatives.length >= budget.maxDerivativeCreates || derivatives.length >= budget.maxTransforms) {
+      if (derivatives.length >= budget.maxDerivativeCreates || usage.transforms.attempts >= budget.maxTransforms) {
         derivativeBudgetSkippedCount += 1;
         continue;
       }
       let output;
+      usage.transforms.attempts += 1;
       try {
         output = await transform({ source: downloaded.bytes, specification });
+        usage.transforms.successes += 1;
       } catch {
+        usage.transforms.failures += 1;
         conflicts.push({ identity: hashIdentity(specification.key), reason: 'transform_failed' });
         continue;
       }
@@ -331,74 +541,88 @@ export async function buildBoundedRecoveryPlan({ inventory, r2Inspection, budget
   }
 
   const processedSourceCount = sourceProofs.length;
-  const partial = rotation.partial || stoppedByByteBudget || processedSourceCount < candidateHashes.length || conflicts.length > 0 ||
+  const partial = rotation.partial || stoppedByByteBudget || stoppedByLifecycleBudget || processedSourceCount < candidateHashes.length || conflicts.length > 0 ||
     originalBudgetSkippedCount > 0 || derivativeBudgetSkippedCount > 0;
-  const withoutLocalFields = (item, fields) => {
+  const withoutGeneratedTime = (item) => {
     const result = { ...item };
-    for (const field of fields) delete result[field];
+    delete result.copiedAt;
+    delete result.generatedAt;
     return result;
   };
-  const digestPayload = {
-    version: 1,
+  const lifecycleBudget = lifecycleBudgetFor(budget, usage, sourceProofs, originals.length + derivatives.length);
+  const execution = {
+    version: RECOVERY_PLAN_VERSION,
+    scope: RECOVERY_SCOPE,
     sourceSnapshotDigest: inventory.sourceSnapshotDigest,
     r2StateDigest: r2Inspection.r2StateDigest,
     cursor,
     nextCursor: rotation.nextCursor,
     budget,
+    lifecycleBudget,
+    planUsage: {
+      sourceGets: structuredClone(usage.sourceGets.plan),
+      transforms: structuredClone(usage.transforms),
+    },
     sourceProofs,
-    originals: originals.map((item) => withoutLocalFields(item, ['path', 'copiedAt'])),
-    derivatives: derivatives.map((item) => withoutLocalFields(item, ['path', 'generatedAt'])),
+    originals: originals.map(withoutGeneratedTime),
+    derivatives: derivatives.map(withoutGeneratedTime),
     conflicts,
   };
   return {
-    ...digestPayload,
-    digestPayload,
+    version: RECOVERY_PLAN_VERSION,
+    execution,
     generatedAt,
-    planDigest: stableDigest(digestPayload),
-    originals,
-    derivatives,
+    planDigest: stableDigest(execution),
     progress: {
       candidateSourceCount: candidateHashes.length,
       gapCandidateSourceCount: gapCandidateHashes.length,
       selectedSourceCount: rotation.selected.length,
       processedSourceCount,
-      sourceDownloadCount: sourceDownloadAttemptCount,
+      sourceDownloadCount: usage.sourceGets.plan.attempts,
+      sourceDownloadSuccessCount: usage.sourceGets.plan.successes,
+      sourceDownloadFailureCount: usage.sourceGets.plan.failures,
       sourceByteVerifiedCount: processedSourceCount,
-      sourceDownloadBytes: downloadedBytes,
+      sourceDownloadBytes: usage.sourceGets.plan.bytes,
       plannedOriginalCreates: originals.length,
       plannedDerivativeCreates: derivatives.length,
-      transformCount: derivatives.length,
+      transformCount: usage.transforms.successes,
+      transformAttemptCount: usage.transforms.attempts,
+      transformFailureCount: usage.transforms.failures,
       conflictCount: conflicts.length,
       originalBudgetSkippedCount,
       derivativeBudgetSkippedCount,
       partial,
       stoppedByByteBudget,
+      stoppedByLifecycleBudget,
+      usage,
     },
   };
 }
 
 export function sanitizeRecoveryPlan(plan, inventory) {
+  const execution = validateRecoveryPlanDocument(plan);
   const conflictsByReason = Object.fromEntries(
-    [...new Set(plan.conflicts.map((item) => item.reason))].sort().map((reason) => [reason, plan.conflicts.filter((item) => item.reason === reason).length]),
+    [...new Set(execution.conflicts.map((item) => item.reason))].sort().map((reason) => [reason, execution.conflicts.filter((item) => item.reason === reason).length]),
   );
   return sanitizeReport({
     version: plan.version,
     generatedAt: plan.generatedAt,
     planDigest: plan.planDigest,
-    sourceSnapshotDigest: plan.sourceSnapshotDigest,
-    r2StateDigest: plan.r2StateDigest,
+    sourceSnapshotDigest: execution.sourceSnapshotDigest,
+    r2StateDigest: execution.r2StateDigest,
     publicActiveExperienceCount: inventory.publicActiveExperienceCount,
     expectedDerivativeCount: inventory.expectedDerivativeCount,
     manifest: inventory.manifestDrift,
     progress: plan.progress,
-    cursor: plan.cursor,
-    nextCursor: plan.nextCursor,
-    budget: plan.budget,
+    cursor: execution.cursor,
+    nextCursor: execution.nextCursor,
+    budget: execution.budget,
+    lifecycleBudget: execution.lifecycleBudget,
     cost: {
       supabaseSourceGetCount: plan.progress.sourceDownloadCount,
       supabaseSourceBytes: plan.progress.sourceDownloadBytes,
-      r2ConditionalPutCount: plan.originals.length + plan.derivatives.length,
-      imageTransformCount: plan.derivatives.length,
+      r2ConditionalPutCount: execution.originals.length + execution.derivatives.length,
+      imageTransformCount: plan.progress.transformAttemptCount,
       r2DeleteCount: 0,
       r2CopyCount: 0,
       queueSendCount: 0,
@@ -445,6 +669,9 @@ function parseArgs(argv = process.argv.slice(2)) {
     command,
     r2Inspection: values['r2-inspection'] ? path.resolve(values['r2-inspection']) : null,
     plan: values.plan ? path.resolve(values.plan) : null,
+    budgetState: values['budget-state'] ? path.resolve(values['budget-state']) : null,
+    confirmDigest: values['confirm-digest'] || null,
+    phase: values.phase || null,
     output: path.resolve(values.output || '.tmp/public-experience-media-recovery'),
     cursor: Number(values.cursor || 0),
     budget,
@@ -456,18 +683,33 @@ async function main() {
   if (!['plan', 'verify-source'].includes(args.command)) throw new Error('Command must be plan or verify-source.');
   const live = await loadLiveInventory();
   if (args.command === 'verify-source') {
-    if (!args.plan) throw new Error('--plan is required.');
-    const prior = JSON.parse(await readFile(args.plan, 'utf8'));
-    assertRecoverySnapshotStable(live.inventory, prior);
-    for (const proof of prior.sourceProofs || []) {
-      const source = live.inventory.sources.find((item) => item.sourceKeySha256 === proof.sourceKeySha256);
-      if (!source) throw new Error('A planned source is no longer public-active.');
-      const downloaded = await fetchBoundedSource(live.baseUrl, live.anonKey, source.sourceKey);
-      if (downloaded.bytes.length !== proof.sourceSize || sha256(downloaded.bytes) !== proof.sourceByteSha256 || downloaded.contentType !== proof.contentType) {
-        throw new Error(`Planned source bytes changed; identity=${hashIdentity(source.sourceKey).slice(0, 16)}`);
-      }
+    if (!args.plan || !args.budgetState || !args.confirmDigest || !args.phase) {
+      throw new Error('--plan, --budget-state, --confirm-digest, and --phase are required.');
     }
-    console.log(stableJson(sanitizeReport({ sourceSnapshotStable: true, verifiedSourceCount: (prior.sourceProofs || []).length, mutationRequests: 0 })));
+    const prior = JSON.parse(await readFile(args.plan, 'utf8'));
+    validateRecoveryPlanDocument(prior, args.confirmDigest);
+    const budgetState = JSON.parse(await readFile(args.budgetState, 'utf8'));
+    let result;
+    try {
+      result = await verifyRecoverySources({
+        inventory: live.inventory,
+        plan: prior,
+        phase: args.phase,
+        budgetState,
+        fetchSource: (source, options) => fetchBoundedSource(live.baseUrl, live.anonKey, source.sourceKey, options),
+      });
+    } finally {
+      await writeFile(args.budgetState, stableJson(budgetState), { mode: 0o600 });
+      await chmod(args.budgetState, 0o600);
+    }
+    const verificationSummary = sanitizeReport({
+      ...result,
+      phase: args.phase,
+      sourceReadUsage: budgetState.usage.sourceGets[args.phase],
+      lifecycleSourceReadUsage: sourceTotals(budgetState.usage),
+    });
+    await writeFile(path.join(args.output, `recovery-source-${args.phase}.json`), stableJson(verificationSummary));
+    console.log(stableJson(verificationSummary));
     return;
   }
   if (!args.r2Inspection) throw new Error('--r2-inspection is required.');
@@ -480,17 +722,20 @@ async function main() {
     budget: args.budget,
     cursor: args.cursor,
     outputDirectory: args.output,
-    fetchSource: (source) => fetchBoundedSource(live.baseUrl, live.anonKey, source.sourceKey),
+    fetchSource: (source, options) => fetchBoundedSource(live.baseUrl, live.anonKey, source.sourceKey, options),
     transform: async ({ source, specification }) => sharp(source).rotate().resize({ width: specification.width, withoutEnlargement: true }).webp({ quality: specification.quality, effort: 5 }).toBuffer(),
   });
   const privatePath = path.join(args.output, '.recovery-plan.json');
   await writeFile(privatePath, stableJson(plan), { mode: 0o600 });
   await chmod(privatePath, 0o600);
+  const budgetStatePath = path.join(args.output, '.recovery-budget.json');
+  await writeFile(budgetStatePath, stableJson(createRecoveryBudgetState(plan)), { mode: 0o600 });
+  await chmod(budgetStatePath, 0o600);
   const summary = sanitizeRecoveryPlan(plan, live.inventory);
   await writeFile(path.join(args.output, 'recovery-plan-summary.json'), stableJson(summary));
   console.log(stableJson(summary));
   if (process.env.GITHUB_OUTPUT) {
-    await writeFile(process.env.GITHUB_OUTPUT, `plan_digest=${plan.planDigest}\nplanned_writes=${plan.originals.length + plan.derivatives.length}\n`, { flag: 'a' });
+    await writeFile(process.env.GITHUB_OUTPUT, `plan_digest=${plan.planDigest}\nplanned_writes=${plan.execution.originals.length + plan.execution.derivatives.length}\n`, { flag: 'a' });
   }
 }
 

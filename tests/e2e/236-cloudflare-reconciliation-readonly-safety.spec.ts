@@ -201,12 +201,20 @@ test.describe('Production reconciliation image checks stay read-only', () => {
     expect(experienceWorkflow).toContain("${{ inputs.confirm_digest }}");
     expect(experienceWorkflow).toContain('Verify source immediately before create-only apply');
     expect(experienceWorkflow).toContain('Verify source after create-only apply');
+    expect(experienceWorkflow).toContain('--budget-state="$recovery_dir/.recovery-budget.json"');
+    expect(experienceWorkflow).toContain('--phase=preApply');
+    expect(experienceWorkflow).toContain('--phase=postApply');
     expect(mediaRecoverySource).toContain('selectRotatingCandidates');
     expect(mediaRecoverySource).toContain('maxSourceDownloads: 12');
     expect(mediaRecoverySource).toContain('maxSourceBytes: 64 * 1024 * 1024');
     expect(mediaRecoverySource).not.toMatch(/Queue\.send|deleteObject|copyObject/i);
+    expect(mediaRecoverySource).toContain('execution,');
+    expect(mediaRecoverySource).not.toContain('digestPayload');
+    expect(mediaRecoverySource).toContain('transformAttemptCount');
     expect(r2RecoverySource).toContain('IfNoneMatch="*"');
     expect(r2RecoverySource).toContain('Exact fresh recovery plan digest confirmation is required');
+    expect(r2RecoverySource).toContain('validate_artifacts(root, execution)');
+    expect(r2RecoverySource).toContain('consume_create_attempt(budget_state)');
     expect(r2RecoverySource).not.toMatch(/\.copy_object\(|\.delete_object\(|\.delete_objects\(/);
     const sanitizedUpload = experienceWorkflow.match(
       /- name: Upload sanitized completeness evidence[\s\S]*?- name: Publish bounded completeness summary/
