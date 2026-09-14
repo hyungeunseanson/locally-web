@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 
+import { validateReleasePolicy } from './public-experience-media-release-profile.mjs';
+
 const ROOT = process.cwd();
 const readJson = async (file) => JSON.parse(await readFile(path.join(ROOT, file), 'utf8'));
 const readText = async (file) => readFile(path.join(ROOT, file), 'utf8');
@@ -68,8 +70,13 @@ assert.deepEqual(manifest.publicExperienceMediaReaderPolicy, {
   defaultEnabled: 'false',
   defaultExperienceIds: '',
 });
+validateReleasePolicy(manifest.publicExperienceMediaReleasePolicy);
 assert.equal(packageJson.scripts['cloudflare:build:production'], 'node scripts/cloudflare/run-production-build.mjs');
-assert.equal(packageJson.scripts['precloudflare:deploy:production'], 'npm run cloudflare:build:production');
+assert.equal(packageJson.scripts['precloudflare:deploy:production'], undefined);
+assert.equal(
+  packageJson.scripts['cloudflare:deploy:production'],
+  'node scripts/cloudflare/run-production-deploy.mjs'
+);
 assert.deepEqual(wrangler.assets, {
   directory: '.open-next/assets',
   binding: manifest.bindings.staticAssets,

@@ -6,14 +6,14 @@ The machine-readable source of names and classifications is [`config/cloudflare/
 
 ## Frozen runtime and adapter architecture
 
-- Next.js `16.2.4`, React/React DOM `19.2.3`, Node `24.20.0` (`24.x` engine)
+- Next.js `16.3.5`, React/React DOM `19.2.3`, Node `24.20.0` (`24.x` engine)
 - `@opennextjs/cloudflare` `1.19.6`, Wrangler `4.129.1`, compatibility date `2026-09-08`
 - App Router with Server Components, one Server Action module, 144 Route Handlers, SSR cookies, dynamic routes, and existing rewrites/redirects
 - OpenNext R2 incremental cache, DO queue, and sharded DO tag cache with 12 base shards
 - `regionalCache: false`, `enableCacheInterception: false`, and no automatic cache purge
 - Cloudflare Images binding for the existing `/_next/image` path; public experience and host R2 variants remain direct/unoptimized
 - Supabase PostgreSQL/Auth/RLS/RPC/Realtime/Storage remain the system of record. Browser Realtime WebSockets continue directly to Supabase.
-- GitHub Actions remains the scheduler for current cron endpoints. No D1, Cloudflare Queues, or Cloudflare Cron migration is part of this cutover.
+- GitHub Actions remains the scheduler for current cron endpoints. The public-experience media Queue has one bounded Production producer/consumer pair with retry/DLQ; D1 and Cloudflare Cron are not part of this cutover.
 
 `app/middleware.ts` is not a Next.js root proxy and does not execute today. Creating `proxy.ts` would change Vercel and Cloudflare authentication behavior at the same time, so it stays deferred and is not a Cloudflare prerequisite. Current cookie refresh happens through the server Supabase client and is covered by the login/logout/session and OAuth canary gates.
 
@@ -86,7 +86,7 @@ The manifest is exhaustive for names. Resolve every value from its current appro
 ### Build environment
 
 - Required: `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
-- Production public experience delivery is repo-owned at `https://media-canary.locally-travel.com`. Use `npm run cloudflare:build:production`; it injects the public build-time value and fails unless the exact URL is present in the generated client bundle. `npm run cloudflare:deploy:production` runs that build automatically before Wrangler deploy. Generic `build` and `cloudflare:build` remain unchanged for local, Preview, and canary use.
+- Production public experience delivery is repo-owned at `https://media-canary.locally-travel.com`. `npm run cloudflare:deploy:production` resolves the reviewed `approved-cohort` profile, injects the same exact ID list into the reader build and producer runtime, runs a fresh OpenNext build, verifies the public base URL in the client bundle, and then deploys. Use `-- --media-profile=single-3309` for the reviewed one-ID rollout and `-- --media-profile=off` for the explicit safe OFF build/deploy. Raw Wrangler deploys are not an approved release path. The committed Wrangler and build fallbacks remain OFF/empty, so local, Preview, canary, and non-canonical builds do not inherit the Production Queue cohort.
 - Optional source-map upload: `SENTRY_AUTH_TOKEN` (secret), `SENTRY_ORG`, `SENTRY_PROJECT`, `CI=true`.
 - Build separately for canary and production because `NEXT_PUBLIC_*` values are compiled into client chunks. Never promote a staging-built artifact to production.
 
