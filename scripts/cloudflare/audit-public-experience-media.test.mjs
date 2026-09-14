@@ -8,6 +8,7 @@ import {
   buildStorageListRequest,
   classifyReadiness,
   hashSourceKey,
+  fetchAllExperienceRows,
   normalizeSupabaseExperienceObjectKey,
   parseArgs,
   renderSummary,
@@ -169,9 +170,31 @@ test('machine and human reports reject URLs, UUID paths, and credential material
       expected: { total: 5 }, expectedMissing: { total: 0 }, taxonomy: { staleKnownDerivative: 1, unclassifiedExtra: 2, original: 0 },
       metadata: { cacheControlMismatchCount: 1, contentTypeMismatchCount: 0, expectedCustomShaCoverage: 2 }, actual: { objectCount: 6 },
       originalIdentityCoverage: { matchingExpectedCount: 0, expectedCount: 3 },
+      completeness: { derivativeMetadataConsistentCount: 2, derivativeConflictCount: 1, derivativeUnverifiableCount: 2, originalCurrentByteVerifiedCount: 0, originalCurrentByteUnverifiableCount: 3 },
       downloadedShaVerification: { verifiedCount: 0, unverifiableMetadataCount: 0, mismatchCount: 0 },
     },
     safety: { r2MutationRequests: 0, supabaseMutationRequests: 0 },
   });
   assert.doesNotMatch(summary, /https?:\/\/|11111111-1111|secret|credential/i);
+});
+
+test('database pagination is exhaustive and malformed pages fail closed', async () => {
+  const originalFetch = globalThis.fetch;
+  const pages = [Array.from({ length: 500 }, (_, index) => ({ id: index + 1 })), [{ id: 501 }]];
+  let calls = 0;
+  globalThis.fetch = async () => new Response(JSON.stringify(pages[calls++]), { status: 200, headers: { 'content-type': 'application/json' } });
+  try {
+    const rows = await fetchAllExperienceRows(baseUrl, 'anon');
+    assert.equal(rows.length, 501);
+    assert.equal(calls, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  globalThis.fetch = async () => new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+  try {
+    await assert.rejects(fetchAllExperienceRows(baseUrl, 'anon'), /non-array/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

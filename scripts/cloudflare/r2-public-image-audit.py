@@ -16,6 +16,11 @@ EXPECTED_ACCOUNT_ID = "d56f5f850c6f7dc5779a7c2054aca5a5"
 EXPECTED_BUCKET = "locally-public-experience-canary"
 EXPECTED_ENDPOINT = f"https://{EXPECTED_ACCOUNT_ID}.r2.cloudflarestorage.com"
 EXPECTED_DERIVATIVE_CACHE_CONTROL = "public, max-age=31536000, immutable"
+PROVENANCE_CONTRACT = json.loads(
+    (Path(__file__).resolve().parents[2] / "app/data/publicExperienceMediaProvenance.json").read_text(encoding="utf-8")
+)
+TRANSFORM_SCHEMA_VERSION = PROVENANCE_CONTRACT["transformSchemaVersion"]
+VERIFIED_PROVENANCE_STATUS = PROVENANCE_CONTRACT["provenanceStatus"]
 PROVENANCE_FIELDS = (
     "source_key_sha256",
     "source_byte_sha256",
@@ -28,6 +33,7 @@ PROVENANCE_FIELDS = (
     "runtime_id",
     "generated_at",
 )
+ALLOWED_DERIVATIVE_ENGINES = frozenset(PROVENANCE_CONTRACT["allowedDerivativeEngines"])
 
 
 def require_environment(name):
@@ -194,7 +200,7 @@ def classify_key(key, expected, known_manifest_keys):
     return "unclassifiedExtra"
 
 
-def audit(client, bucket, plan, mode):
+def audit(client, bucket, plan, mode, return_private=False):
     expected_entries = plan.get("expected")
     known_manifest_keys = plan.get("knownManifestKeys")
     expected_original_hashes = plan.get("publicActiveOriginalSourceKeyHashes")
@@ -260,6 +266,74 @@ def audit(client, bucket, plan, mode):
                 else:
                     downloaded["mismatchCount"] += 1
 
+    derivative_consistent = 0
+    derivative_conflicts = 0
+    derivative_unverifiable = 0
+    derivative_private = []
+    for key, specification in expected.items():
+        item = actual.get(key)
+        if item is None:
+            derivative_private.append({"key": key, "classification": "missing"})
+            continue
+        metadata = item.get("customMetadata") or {}
+        common = (
+            item.get("contentType", "").split(";", 1)[0].lower() == "image/webp"
+            and item.get("cacheControl") == EXPECTED_DERIVATIVE_CACHE_CONTROL
+            and metadata.get("source_key_sha256") == specification.get("sourceKeySha256")
+            and metadata.get("transform_width") == str(specification.get("width"))
+            and metadata.get("transform_quality") == str(specification.get("quality"))
+            and metadata.get("transform_format") == specification.get("format")
+        )
+        sha_fields = (
+            re.fullmatch(r"[0-9a-f]{64}", metadata.get("sha256", ""))
+            and metadata.get("sha256") == metadata.get("output_byte_sha256")
+            and re.fullmatch(r"[0-9a-f]{64}", metadata.get("source_byte_sha256", ""))
+            and str(metadata.get("source_size", "")).isdigit()
+        )
+        provenance = metadata.get("provenance_status")
+        engine = metadata.get("transform_engine")
+        if common and sha_fields and provenance == VERIFIED_PROVENANCE_STATUS and engine in ALLOWED_DERIVATIVE_ENGINES and metadata.get("transform_schema_version") == TRANSFORM_SCHEMA_VERSION and metadata.get("derivative_role") == specification.get("role"):
+            derivative_consistent += 1
+            classification = "existing_metadata_consistent"
+        elif common and sha_fields and provenance == "legacy-observed":
+            derivative_consistent += 1
+            classification = "existing_metadata_consistent"
+        elif not common or provenance not in ("verified", "legacy-observed"):
+            derivative_conflicts += 1
+            classification = "conflict"
+        else:
+            derivative_unverifiable += 1
+            classification = "unverifiable"
+        derivative_private.append({"key": key, "classification": classification, "metadata": metadata, "size": item.get("size", 0)})
+
+    originals_by_source = {}
+    for item in original_objects:
+        source_hash = (item.get("customMetadata") or {}).get("source_key_sha256", "")
+        if re.fullmatch(r"[0-9a-f]{64}", source_hash):
+            originals_by_source.setdefault(source_hash, []).append(item)
+    original_metadata_consistent = 0
+    original_conflicts = 0
+    for source_hash in expected_original_set:
+        candidates = originals_by_source.get(source_hash, [])
+        if not candidates:
+            continue
+        valid = [item for item in candidates if (
+            item.get("size", 0) > 0
+            and bool(item.get("contentType"))
+            and item.get("cacheControl") == EXPECTED_DERIVATIVE_CACHE_CONTROL
+            and re.fullmatch(r"[0-9a-f]{64}", (item.get("customMetadata") or {}).get("source_byte_sha256", ""))
+            and (item.get("customMetadata") or {}).get("source_byte_sha256") == (item.get("customMetadata") or {}).get("output_byte_sha256")
+            and (item.get("customMetadata") or {}).get("sha256") == (item.get("customMetadata") or {}).get("output_byte_sha256")
+            and (item.get("customMetadata") or {}).get("source_size") == str(item.get("size"))
+            and (item.get("customMetadata") or {}).get("provenance_status") == VERIFIED_PROVENANCE_STATUS
+            and (item.get("customMetadata") or {}).get("transform_schema_version") == TRANSFORM_SCHEMA_VERSION
+            and (item.get("customMetadata") or {}).get("transform_engine") == "source-copy"
+        )]
+        if valid:
+            original_metadata_consistent += 1
+        else:
+            original_conflicts += 1
+
     report = {
         "transport": "read-only",
         "actual": {"objectCount": len(objects), "bytes": sum(item["size"] for item in objects)},
@@ -289,6 +363,21 @@ def audit(client, bucket, plan, mode):
             "duplicateSourceKeyCount": len(valid_original_hashes) - len(actual_original_set),
             "invalidSourceKeyMetadataCount": len(original_hashes) - len(valid_original_hashes),
         },
+        "completeness": {
+            "derivativeMetadataConsistentCount": derivative_consistent,
+            "derivativeConflictCount": derivative_conflicts,
+            "derivativeUnverifiableCount": derivative_unverifiable,
+            "derivativeCurrentSourceByteUnverifiableCount": derivative_consistent,
+            "originalCurrentByteVerifiedCount": 0,
+            "originalCurrentByteUnverifiableCount": len(expected_original_set & actual_original_set),
+            "originalMetadataConsistentCount": original_metadata_consistent,
+            "originalConflictCount": original_conflicts,
+            "actualR2BytesVerifiedCount": downloaded["verifiedCount"],
+            "sourceChangedOrStaleCount": None,
+            "sourceChangedOrStaleDetermination": "unverifiable_without_bounded_source_proof",
+            "budgetUninspectedCount": 0,
+            "partial": False,
+        },
         "downloadedShaVerification": downloaded,
         "identitySetDigests": {
             "actual": identity_set_digest(actual),
@@ -300,7 +389,16 @@ def audit(client, bucket, plan, mode):
     serialized = json.dumps(report)
     if "http" in serialized.lower() or any(key in serialized for key in actual):
         raise RuntimeError("R2 report leaked an object key or URL")
-    return report
+    private = {
+        "version": 1,
+        "r2StateDigest": identity_set_digest(
+            f"{item['key']}\0{item.get('etag', '')}\0{item.get('size', 0)}\0{json.dumps(item.get('customMetadata') or {}, sort_keys=True)}"
+            for item in objects
+        ),
+        "derivatives": derivative_private,
+        "originalsBySourceKeySha256": originals_by_source,
+    }
+    return (report, private) if return_private else report
 
 
 def main():
@@ -308,11 +406,16 @@ def main():
     parser.add_argument("--mode", choices=("metadata", "full"), required=True)
     parser.add_argument("--plan", required=True)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--private-output")
     args = parser.parse_args()
     plan = json.loads(Path(args.plan).read_text(encoding="utf-8"))
     client, bucket, _transport = load_client()
-    report = audit(client, bucket, plan, args.mode)
+    report, private = audit(client, bucket, plan, args.mode, return_private=True)
     Path(args.output).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    if args.private_output:
+        private_path = Path(args.private_output)
+        private_path.write_text(json.dumps(private, indent=2) + "\n", encoding="utf-8")
+        private_path.chmod(0o600)
     print(json.dumps({
         "mode": args.mode,
         "objectCount": report["actual"]["objectCount"],
