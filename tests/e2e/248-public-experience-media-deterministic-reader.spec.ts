@@ -34,6 +34,9 @@ const VALID_WEBP = Buffer.from(
 
 const [manifestExperienceId, manifestCard] = Object.entries(PUBLIC_EXPERIENCE_CARD_IMAGES)[0]!;
 const manifestDetailOrigin = Object.keys(detailImageManifest[manifestExperienceId as keyof typeof detailImageManifest])[0]!;
+const manifestDetail = detailImageManifest[
+  manifestExperienceId as keyof typeof detailImageManifest
+][manifestDetailOrigin as keyof (typeof detailImageManifest)[keyof typeof detailImageManifest]];
 
 type ReaderHarnessConfiguration = {
   kind: 'card' | 'detail';
@@ -560,7 +563,10 @@ test.describe('default-OFF deterministic public experience media reader', () => 
       }, hydrationErrors);
 
       const attribute = kind === 'card' ? 'data-image-delivery' : 'data-detail-image-delivery';
-      await expect(page.locator(`img[${attribute}="cloudflare-r2"]`)).toHaveCount(1);
+      await expect(page.locator(`img[${attribute}="cloudflare-r2"]`)).toHaveAttribute(
+        'src',
+        `${BASE_URL}/${kind === 'card' ? manifestCard.largeKey : manifestDetail.mediumKey}`
+      );
       expect(hydrationErrors).toEqual([]);
     });
   }
