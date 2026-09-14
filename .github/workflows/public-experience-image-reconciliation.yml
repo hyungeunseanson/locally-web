@@ -175,6 +175,9 @@ jobs:
           [[ "${{ inputs.confirm_digest }}" == "${{ steps.recovery_plan.outputs.plan_digest }}" ]]
           node scripts/cloudflare/recover-public-experience-media.mjs verify-source \
             --plan="$recovery_dir/.recovery-plan.json" \
+            --budget-state="$recovery_dir/.recovery-budget.json" \
+            --confirm-digest="${{ inputs.confirm_digest }}" \
+            --phase=preApply \
             --output="$recovery_dir"
 
       - name: Apply bounded create-only recovery
@@ -185,6 +188,7 @@ jobs:
           recovery_dir="${RUNNER_TEMP}/public-experience-completeness/recovery"
           python3 scripts/cloudflare/r2-public-image-recovery.py \
             --plan "$recovery_dir/.recovery-plan.json" \
+            --budget-state "$recovery_dir/.recovery-budget.json" \
             --output "$recovery_dir/recovery-result.json" \
             --confirm-digest "${{ inputs.confirm_digest }}"
 
@@ -196,6 +200,9 @@ jobs:
           recovery_dir="${RUNNER_TEMP}/public-experience-completeness/recovery"
           node scripts/cloudflare/recover-public-experience-media.mjs verify-source \
             --plan="$recovery_dir/.recovery-plan.json" \
+            --budget-state="$recovery_dir/.recovery-budget.json" \
+            --confirm-digest="${{ inputs.confirm_digest }}" \
+            --phase=postApply \
             --output="$recovery_dir"
 
       - name: Upload sanitized completeness evidence
@@ -208,6 +215,8 @@ jobs:
             ${{ runner.temp }}/public-experience-completeness/audit/summary.md
             ${{ runner.temp }}/public-experience-completeness/recovery/recovery-plan-summary.json
             ${{ runner.temp }}/public-experience-completeness/recovery/recovery-result.json
+            ${{ runner.temp }}/public-experience-completeness/recovery/recovery-source-preApply.json
+            ${{ runner.temp }}/public-experience-completeness/recovery/recovery-source-postApply.json
           if-no-files-found: warn
           retention-days: 14
 
@@ -222,6 +231,7 @@ jobs:
             echo "- Source GET budget: ${MAX_SOURCE_DOWNLOADS} objects / ${MAX_SOURCE_BYTES} bytes"
             echo "- Original/derivative create budget: ${MAX_ORIGINAL_CREATES}/${MAX_DERIVATIVE_CREATES}"
             echo "- Transform budget: ${MAX_TRANSFORMS}"
+            echo "- Lifecycle source budget: plan + pre-apply + post-apply share one persisted ledger"
             echo "- Delete/CopyObject/Queue send: unsupported"
             echo "- Result: ${{ job.status }}"
           } >> "$GITHUB_STEP_SUMMARY"

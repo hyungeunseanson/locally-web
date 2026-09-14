@@ -12,6 +12,10 @@ import {
   sanitizeRecoveryPlan,
   selectRotatingCandidates,
   validateRecoveryBudget,
+  validateRecoveryPlanDocument,
+  createRecoveryBudgetState,
+  fetchBoundedSource,
+  verifyRecoverySources,
 } from './recover-public-experience-media.mjs';
 import { buildSourceScopes, normalizeSupabaseExperienceObjectKey } from './audit-public-experience-media.mjs';
 import { buildExpectedManifests, parseCardManifest } from './reconcile-public-experience-images.mjs';
@@ -66,7 +70,7 @@ async function planWith(inspection, options = {}) {
         return Buffer.from(`webp-${specification.width}`);
       },
     });
-    return { inventory, plan, calls, files: await Promise.all([...plan.originals, ...plan.derivatives].map((item) => readFile(path.join(outputDirectory, item.path)))) };
+    return { inventory, plan, calls, files: await Promise.all([...plan.execution.originals, ...plan.execution.derivatives].map((item) => readFile(path.join(outputDirectory, item.path)))) };
   } finally {
     await rm(outputDirectory, { recursive: true, force: true });
   }
@@ -76,8 +80,8 @@ test('finds derivative and original gaps even when static manifest drift is zero
   const inventory = fixture();
   assert.equal(inventory.manifestDrift.missingManifestDerivativeKeyCount, 0);
   const result = await planWith(missingInspection(inventory));
-  assert.equal(result.plan.originals.length, 1);
-  assert.equal(result.plan.derivatives.length, 5);
+  assert.equal(result.plan.execution.originals.length, 1);
+  assert.equal(result.plan.execution.derivatives.length, 5);
   assert.equal(result.calls.fetch, 1);
   assert.equal(result.calls.transform, 5);
   assert.equal(result.plan.progress.conflictCount, 0);
@@ -116,8 +120,8 @@ test('finds an original-only gap while exact derivatives remain untouched', asyn
     originalsBySourceKeySha256: {},
   };
   const result = await planWith(inspection);
-  assert.equal(result.plan.originals.length, 1);
-  assert.equal(result.plan.derivatives.length, 0);
+  assert.equal(result.plan.execution.originals.length, 1);
+  assert.equal(result.plan.execution.derivatives.length, 0);
   assert.equal(result.calls.transform, 0);
 });
 
@@ -149,8 +153,8 @@ test('existing current provenance becomes an exact skip without transform', asyn
     },
   };
   const result = await planWith(inspection);
-  assert.equal(result.plan.originals.length, 0);
-  assert.equal(result.plan.derivatives.length, 0);
+  assert.equal(result.plan.execution.originals.length, 0);
+  assert.equal(result.plan.execution.derivatives.length, 0);
   assert.equal(result.calls.transform, 0);
   assert.equal(result.plan.progress.conflictCount, 0);
 });
@@ -182,8 +186,8 @@ test('legacy original and derivative proof remain exact after current source byt
     },
   };
   const result = await planWith(inspection);
-  assert.equal(result.plan.originals.length, 0);
-  assert.equal(result.plan.derivatives.length, 0);
+  assert.equal(result.plan.execution.originals.length, 0);
+  assert.equal(result.plan.execution.derivatives.length, 0);
   assert.equal(result.calls.transform, 0);
   assert.equal(result.plan.progress.conflictCount, 0);
 });
@@ -205,7 +209,7 @@ test('same URL with changed bytes and conflicting metadata is never treated as c
     },
   }));
   const result = await planWith(inspection);
-  assert.equal(result.plan.derivatives.length, 0);
+  assert.equal(result.plan.execution.derivatives.length, 0);
   assert.equal(result.plan.progress.conflictCount, 5);
 });
 
@@ -214,7 +218,7 @@ test('wrong metadata is a conflict and does not trigger overwrite', async () => 
   const inspection = missingInspection(inventory);
   inspection.derivatives[0] = { ...inspection.derivatives[0], classification: 'conflict', metadata: { source_key_sha256: '0'.repeat(64) } };
   const result = await planWith(inspection);
-  assert.equal(result.plan.derivatives.length, 4);
+  assert.equal(result.plan.execution.derivatives.length, 4);
   assert.equal(result.plan.progress.conflictCount, 1);
 });
 
@@ -241,16 +245,16 @@ test('unverifiable derivative and original provenance block a complete plan', as
     },
   };
   const result = await planWith(inspection);
-  assert.equal(result.plan.originals.length, 0);
-  assert.equal(result.plan.derivatives.length, 0);
+  assert.equal(result.plan.execution.originals.length, 0);
+  assert.equal(result.plan.execution.derivatives.length, 0);
   assert.equal(result.plan.progress.conflictCount, 6);
   assert.equal(result.plan.progress.partial, true);
 });
 
 test('both missing are created only within the explicitly approved object budgets', async () => {
   const result = await planWith(undefined, { budget: { maxSourceDownloads: 1, maxSourceBytes: 1024, maxOriginalCreates: 1, maxDerivativeCreates: 1, maxTransforms: 1 } });
-  assert.equal(result.plan.originals.length, 1);
-  assert.equal(result.plan.derivatives.length, 1);
+  assert.equal(result.plan.execution.originals.length, 1);
+  assert.equal(result.plan.execution.derivatives.length, 1);
   assert.equal(result.plan.progress.derivativeBudgetSkippedCount, 4);
   assert.equal(result.plan.progress.partial, true);
 });
@@ -283,7 +287,7 @@ test('zero budget is read-only and reports partial without source GET or transfo
   assert.equal(result.calls.fetch, 0);
   assert.equal(result.calls.transform, 0);
   assert.equal(result.plan.progress.partial, true);
-  assert.equal(result.plan.originals.length + result.plan.derivatives.length, 0);
+  assert.equal(result.plan.execution.originals.length + result.plan.execution.derivatives.length, 0);
 });
 
 test('bounded read and transform failures are visible partial results', async () => {
@@ -292,17 +296,198 @@ test('bounded read and transform failures are visible partial results', async ()
   try {
     const readFailure = await buildBoundedRecoveryPlan({ inventory, r2Inspection: missingInspection(inventory), outputDirectory, fetchSource: async () => { throw new Error(`secret ${sourceUrl}`); }, transform: async () => Buffer.from('never') });
     assert.equal(readFailure.progress.partial, true);
-    assert.deepEqual(readFailure.conflicts.map((item) => item.reason), ['source_read_failed']);
+    assert.deepEqual(readFailure.execution.conflicts.map((item) => item.reason), ['source_read_failed']);
     assert.equal(readFailure.progress.sourceDownloadCount, 1);
     assert.equal(readFailure.progress.sourceByteVerifiedCount, 0);
     assert.doesNotMatch(JSON.stringify(sanitizeRecoveryPlan(readFailure, inventory)), /secret|supabase\.co|11111111-1111/i);
 
     const transformFailure = await buildBoundedRecoveryPlan({ inventory, r2Inspection: missingInspection(inventory), outputDirectory, fetchSource: async () => ({ bytes: Buffer.from('source-bytes'), contentType: 'image/jpeg', etag: 'e' }), transform: async () => { throw new Error('provider credential'); } });
     assert.equal(transformFailure.progress.partial, true);
-    assert.equal(transformFailure.conflicts.filter((item) => item.reason === 'transform_failed').length, 5);
+    assert.equal(transformFailure.execution.conflicts.filter((item) => item.reason === 'transform_failed').length, 5);
   } finally {
     await rm(outputDirectory, { recursive: true, force: true });
   }
+});
+
+test('failed transform attempts consume the hard budget before provider invocation', async () => {
+  const inventory = fixture();
+  const outputDirectory = await mkdtemp(path.join(os.tmpdir(), 'media-recovery-transform-budget-'));
+  let calls = 0;
+  try {
+    const plan = await buildBoundedRecoveryPlan({
+      inventory,
+      r2Inspection: missingInspection(inventory),
+      budget: { maxSourceDownloads: 1, maxSourceBytes: 1024, maxOriginalCreates: 1, maxDerivativeCreates: 5, maxTransforms: 1 },
+      outputDirectory,
+      fetchSource: async () => ({ bytes: Buffer.from('source-bytes'), contentType: 'image/jpeg', etag: 'e' }),
+      transform: async () => { calls += 1; throw new Error('always fails'); },
+    });
+    assert.equal(calls, 1);
+    assert.equal(plan.progress.transformAttemptCount, 1);
+    assert.equal(plan.progress.transformFailureCount, 1);
+    assert.equal(plan.progress.derivativeBudgetSkippedCount, 4);
+  } finally {
+    await rm(outputDirectory, { recursive: true, force: true });
+  }
+});
+
+test('failed source streams still consume received bytes', async () => {
+  const inventory = fixture();
+  const outputDirectory = await mkdtemp(path.join(os.tmpdir(), 'media-recovery-source-budget-'));
+  try {
+    const plan = await buildBoundedRecoveryPlan({
+      inventory,
+      r2Inspection: missingInspection(inventory),
+      outputDirectory,
+      fetchSource: async (_source, { onBytes }) => { onBytes(7); throw new Error('stream interrupted'); },
+      transform: async () => Buffer.from('never'),
+    });
+    assert.equal(plan.progress.sourceDownloadBytes, 7);
+    assert.equal(plan.progress.sourceDownloadFailureCount, 1);
+    assert.equal(plan.progress.sourceDownloadSuccessCount, 0);
+  } finally {
+    await rm(outputDirectory, { recursive: true, force: true });
+  }
+});
+
+test('single execution payload binds every approved field while timestamps remain non-semantic', async () => {
+  const first = await planWith();
+  const second = await planWith();
+  assert.equal(first.plan.planDigest, second.plan.planDigest);
+  assert.notEqual(first.plan.generatedAt, undefined);
+  assert.equal('digestPayload' in first.plan, false);
+  assert.doesNotThrow(() => validateRecoveryPlanDocument(first.plan, first.plan.planDigest));
+  for (const mutate of [
+    (plan) => { plan.execution.r2StateDigest = 'f'.repeat(64); },
+    (plan) => { plan.execution.sourceSnapshotDigest = 'e'.repeat(64); },
+    (plan) => { plan.execution.budget.maxOriginalCreates += 1; },
+    (plan) => { plan.execution.originals.push(structuredClone(plan.execution.originals[0])); },
+    (plan) => { plan.execution.originals[0].key = plan.execution.originals[0].key.replace('originals/v1/', 'originals/v1/ff/'); },
+    (plan) => { plan.execution.derivatives[0].sourceByteSha256 = '0'.repeat(64); },
+    (plan) => { plan.execution.lifecycleBudget.maxSourceBytes += 1; },
+  ]) {
+    const tampered = structuredClone(first.plan);
+    mutate(tampered);
+    assert.throws(() => validateRecoveryPlanDocument(tampered, first.plan.planDigest), /digest confirmation/);
+  }
+  const duplicateAuthority = structuredClone(first.plan);
+  duplicateAuthority.originals = structuredClone(first.plan.execution.originals);
+  assert.throws(() => validateRecoveryPlanDocument(duplicateAuthority, first.plan.planDigest), /document structure/);
+});
+
+test('plan, pre-apply, and post-apply source reads share one lifecycle ledger', async () => {
+  const { inventory, plan } = await planWith();
+  const budgetState = createRecoveryBudgetState(plan);
+  const fetchSource = async (_source, { onBytes }) => {
+    const bytes = Buffer.from('source-bytes');
+    onBytes(bytes.length);
+    return { bytes, contentType: 'image/jpeg', etag: 'e' };
+  };
+  await verifyRecoverySources({ inventory, plan, phase: 'preApply', fetchSource, budgetState });
+  budgetState.usage.r2Creates = {
+    attempts: plan.execution.originals.length + plan.execution.derivatives.length,
+    successes: plan.execution.originals.length + plan.execution.derivatives.length,
+    exactSkips: 0,
+    failures: 0,
+  };
+  await verifyRecoverySources({ inventory, plan, phase: 'postApply', fetchSource, budgetState });
+  assert.deepEqual(
+    Object.fromEntries(Object.entries(budgetState.usage.sourceGets).map(([phase, value]) => [phase, value.attempts])),
+    { plan: 1, preApply: 1, apply: 0, postApply: 1 },
+  );
+  await assert.rejects(
+    verifyRecoverySources({ inventory, plan, phase: 'preApply', fetchSource, budgetState }),
+    /pre-apply phase is not empty/,
+  );
+});
+
+test('post-apply verification requires completed pre-apply and create phases', async () => {
+  const { inventory, plan } = await planWith();
+  const budgetState = createRecoveryBudgetState(plan);
+  const fetchSource = async () => ({ bytes: Buffer.from('source-bytes'), contentType: 'image/jpeg', etag: 'e' });
+  await assert.rejects(
+    verifyRecoverySources({ inventory, plan, phase: 'postApply', fetchSource, budgetState }),
+    /pre-apply source verification is incomplete/,
+  );
+  await verifyRecoverySources({ inventory, plan, phase: 'preApply', fetchSource, budgetState });
+  await assert.rejects(
+    verifyRecoverySources({ inventory, plan, phase: 'postApply', fetchSource, budgetState }),
+    /create phase is incomplete/,
+  );
+});
+
+test('bounded source streaming accepts missing Content-Length and accounts delivered bytes', async () => {
+  const originalFetch = globalThis.fetch;
+  const delivered = [];
+  globalThis.fetch = async () => new Response(
+    new ReadableStream({
+      start(controller) {
+        controller.enqueue(new Uint8Array([1, 2, 3]));
+        controller.enqueue(new Uint8Array([4, 5]));
+        controller.close();
+      },
+    }),
+    { status: 200, headers: { 'content-type': 'image/jpeg' } },
+  );
+  try {
+    const result = await fetchBoundedSource(baseUrl, 'not-a-real-secret', sourceKey, { onBytes: (count) => delivered.push(count) });
+    assert.equal(result.bytes.length, 5);
+    assert.deepEqual(delivered, [3, 2]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('a failing over-budget stream records the bytes already delivered', async () => {
+  const inventory = fixture();
+  const outputDirectory = await mkdtemp(path.join(os.tmpdir(), 'media-recovery-source-overrun-'));
+  try {
+    const plan = await buildBoundedRecoveryPlan({
+      inventory,
+      r2Inspection: missingInspection(inventory),
+      budget: { maxSourceDownloads: 1, maxSourceBytes: 20, maxOriginalCreates: 1, maxDerivativeCreates: 5, maxTransforms: 5 },
+      outputDirectory,
+      fetchSource: async (_source, { onBytes }) => { onBytes(21); throw new Error('budget stopped stream'); },
+      transform: async () => Buffer.from('never'),
+    });
+    assert.equal(plan.progress.sourceDownloadBytes, 21);
+    assert.equal(plan.progress.sourceDownloadFailureCount, 1);
+    assert.equal(plan.progress.partial, true);
+  } finally {
+    await rm(outputDirectory, { recursive: true, force: true });
+  }
+});
+
+test('pre-apply stream failure remains charged to the shared lifecycle ledger', async () => {
+  const { inventory, plan } = await planWith();
+  const budgetState = createRecoveryBudgetState(plan);
+  await assert.rejects(
+    verifyRecoverySources({
+      inventory,
+      plan,
+      phase: 'preApply',
+      budgetState,
+      fetchSource: async (_source, { onBytes }) => { onBytes(6); throw new Error('bounded transport failure'); },
+    }),
+    /bounded transport failure/,
+  );
+  assert.deepEqual(budgetState.usage.sourceGets.preApply, { attempts: 1, successes: 0, failures: 1, bytes: 6 });
+});
+
+test('source proof mismatch is a failed verification and cannot authorize apply', async () => {
+  const { inventory, plan } = await planWith();
+  const budgetState = createRecoveryBudgetState(plan);
+  await assert.rejects(
+    verifyRecoverySources({
+      inventory,
+      plan,
+      phase: 'preApply',
+      budgetState,
+      fetchSource: async () => ({ bytes: Buffer.from('changed-byte'), contentType: 'image/jpeg', etag: 'changed' }),
+    }),
+    /Planned source bytes changed/,
+  );
+  assert.deepEqual(budgetState.usage.sourceGets.preApply, { attempts: 1, successes: 0, failures: 1, bytes: 12 });
 });
 
 test('source byte budget is enforced before a download using Storage metadata', async () => {
