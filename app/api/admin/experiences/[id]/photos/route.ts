@@ -8,6 +8,7 @@ import {
   toPostgresTextArrayLiteral,
   validateExperiencePhotoReorder,
 } from '@/app/utils/experiencePhotoOrder';
+import { schedulePublicExperienceMediaProducer } from '@/app/utils/publicExperienceMediaQueueProducer.server';
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -45,7 +46,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     const { data: currentExperience, error: loadError } = await supabaseAdmin
       .from('experiences')
-      .select('id, title, photos')
+      .select('id, title, status, is_active, photos, itinerary, image_url')
       .eq('id', experienceId)
       .maybeSingle();
 
@@ -78,7 +79,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       .update({ photos: validation.nextPhotos })
       .eq('id', experienceId)
       .filter('photos', 'eq', currentPhotosLiteral)
-      .select('id, photos')
+      .select('id, status, is_active, photos, itinerary, image_url')
       .maybeSingle();
 
     if (updateError) throw updateError;
@@ -88,6 +89,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         { status: 409 }
       );
     }
+
+    schedulePublicExperienceMediaProducer({
+      before: currentExperience,
+      after: updatedExperience,
+      writeKind: 'reorder',
+    });
 
     await recordAuditLog({
       admin_id: user.id,

@@ -9,6 +9,7 @@ import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { insertAdminAlerts, sendAdminAlertEmails } from '@/app/utils/adminAlertCenter';
 import { normalizeLanguageLevels, getLanguageNames, type LanguageLevelEntry } from '@/app/utils/languageLevels';
+import { schedulePublicExperienceMediaProducer } from '@/app/utils/publicExperienceMediaQueueProducer.server';
 import {
   areExperienceLocaleArraysEqual,
   buildExperienceTranslationState,
@@ -571,12 +572,18 @@ export async function createExperienceFromBody(body: ExperienceWriteBody, actor:
       ...translationState.localizedColumns,
       ...translationState.localizedContentColumns,
     })
-    .select('id')
+    .select('id, status, is_active, photos, itinerary, image_url')
     .maybeSingle();
 
   if (error || !data) {
     throw error ?? new Error('Failed to create experience.');
   }
+
+  schedulePublicExperienceMediaProducer({
+    before: null,
+    after: data,
+    writeKind: 'create',
+  });
 
   if (translationState.queuedLocales.length > 0) {
     try {
@@ -638,7 +645,7 @@ export async function updateExperienceFromBody(params: {
 
   const { data: existing, error: existingError } = await supabaseAdmin
     .from('experiences')
-    .select('id, host_id, status, translation_version, source_locale, manual_locales, title, description, title_ko, title_en, title_ja, title_zh, description_ko, description_en, description_ja, description_zh, category, meeting_point, meeting_point_i18n, supplies, supplies_i18n, inclusions, inclusions_i18n, exclusions, exclusions_i18n, itinerary, itinerary_i18n, rules, rules_i18n, solo_guarantee_price')
+    .select('id, host_id, status, is_active, photos, image_url, translation_version, source_locale, manual_locales, title, description, title_ko, title_en, title_ja, title_zh, description_ko, description_en, description_ja, description_zh, category, meeting_point, meeting_point_i18n, supplies, supplies_i18n, inclusions, inclusions_i18n, exclusions, exclusions_i18n, itinerary, itinerary_i18n, rules, rules_i18n, solo_guarantee_price')
     .eq('id', experienceId)
     .maybeSingle();
 
@@ -746,11 +753,19 @@ export async function updateExperienceFromBody(params: {
     updateQuery = updateQuery.eq('host_id', actor.id);
   }
 
-  const { data, error } = await updateQuery.select('id').maybeSingle();
+  const { data, error } = await updateQuery
+    .select('id, status, is_active, photos, itinerary, image_url')
+    .maybeSingle();
 
   if (error || !data) {
     throw error ?? new ApiError(500, '체험 저장에 실패했습니다.');
   }
+
+  schedulePublicExperienceMediaProducer({
+    before: existing,
+    after: data,
+    writeKind: 'edit',
+  });
 
   if (translationDirty && translationState.queuedLocales.length > 0) {
     try {

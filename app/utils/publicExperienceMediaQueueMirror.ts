@@ -43,13 +43,14 @@ const SUPPORTED_SOURCE_CONTENT_TYPES = new Set([
   'image/webp',
 ]);
 
-type QueueReason = (typeof PUBLIC_EXPERIENCE_MEDIA_REASONS)[number];
+export type PublicExperienceMediaQueueReason =
+  (typeof PUBLIC_EXPERIENCE_MEDIA_REASONS)[number];
 
 export type PublicExperienceMediaQueueMessage = {
   schema: typeof PUBLIC_EXPERIENCE_MEDIA_MESSAGE_SCHEMA;
   version: typeof PUBLIC_EXPERIENCE_MEDIA_MESSAGE_VERSION;
   experienceId: string;
-  reason: QueueReason;
+  reason: PublicExperienceMediaQueueReason;
   eventId: string;
 };
 
@@ -368,7 +369,9 @@ export function parsePublicExperienceMediaQueueMessage(
     typeof record.experienceId !== 'string' ||
     !/^[1-9][0-9]{0,18}$/.test(record.experienceId) ||
     typeof record.reason !== 'string' ||
-    !PUBLIC_EXPERIENCE_MEDIA_REASONS.includes(record.reason as QueueReason) ||
+    !PUBLIC_EXPERIENCE_MEDIA_REASONS.includes(
+      record.reason as PublicExperienceMediaQueueReason
+    ) ||
     typeof record.eventId !== 'string' ||
     !/^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/.test(record.eventId)
   ) {
@@ -378,7 +381,7 @@ export function parsePublicExperienceMediaQueueMessage(
     schema: record.schema,
     version: record.version,
     experienceId: record.experienceId,
-    reason: record.reason as QueueReason,
+    reason: record.reason as PublicExperienceMediaQueueReason,
     eventId: record.eventId,
   };
 }

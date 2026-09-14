@@ -8,6 +8,8 @@ import { settleExperienceBookingPayouts } from '@/app/utils/adminPayouts';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 import { isLatestPublicHostApplication, pickLatestPublicHostApplication } from '@/app/utils/hostVisibility';
+import { schedulePublicExperienceMediaProducer } from '@/app/utils/publicExperienceMediaQueueProducer.server';
+import type { PublicExperienceMediaRow } from '@/app/utils/publicExperienceMediaQueueMirror';
 
 // 🔒 관리자 권한 확인
 async function getAdminClient() {
@@ -155,10 +157,18 @@ export async function updateAdminStatus(
 
   // 🟢 [추가] 기록 전 대상 이름(제목/호스트명) 가져오기
   let targetTitle = targetId;
+  let mediaBefore: PublicExperienceMediaRow | null = null;
   try {
     if (table === 'experiences') {
-      const { data } = await supabaseAdmin.from('experiences').select('title').eq('id', id).maybeSingle();
-      if (data) targetTitle = data.title;
+      const { data } = await supabaseAdmin
+        .from('experiences')
+        .select('id, title, status, is_active, photos, itinerary, image_url')
+        .eq('id', id)
+        .maybeSingle();
+      if (data) {
+        targetTitle = data.title;
+        mediaBefore = data;
+      }
     } else if (table === 'host_applications') {
       const { data } = await supabaseAdmin.from('host_applications').select('name').eq('id', id).maybeSingle();
       if (data) targetTitle = data.name;
@@ -174,8 +184,28 @@ export async function updateAdminStatus(
     await assertLatestHostApplicationForStatusChange(supabaseAdmin, id);
   }
 
-  const { error } = await supabaseAdmin.from(table).update(updateData).eq('id', id);
-  if (error) throw new Error(error.message);
+  if (table === 'experiences') {
+    const { data: updatedExperience, error } = await supabaseAdmin
+      .from('experiences')
+      .update(updateData)
+      .eq('id', id)
+      .select('id, status, is_active, photos, itinerary, image_url')
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!updatedExperience) throw new Error('Experience not found');
+
+    schedulePublicExperienceMediaProducer({
+      before: mediaBefore,
+      after: updatedExperience,
+      writeKind: 'activation',
+    });
+  } else {
+    const { error } = await supabaseAdmin
+      .from('host_applications')
+      .update(updateData)
+      .eq('id', id);
+    if (error) throw new Error(error.message);
+  }
 
   if (table === 'host_applications' && ['approved', 'revision', 'rejected'].includes(status)) {
     const { data: app } = await supabaseAdmin
