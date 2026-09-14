@@ -36,7 +36,11 @@ const [manifestExperienceId, manifestCard] = Object.entries(PUBLIC_EXPERIENCE_CA
 const manifestDetailOrigin = Object.keys(detailImageManifest[manifestExperienceId as keyof typeof detailImageManifest])[0]!;
 const manifestDetail = detailImageManifest[
   manifestExperienceId as keyof typeof detailImageManifest
-][manifestDetailOrigin as keyof (typeof detailImageManifest)[keyof typeof detailImageManifest]];
+][manifestDetailOrigin as keyof (typeof detailImageManifest)[keyof typeof detailImageManifest]] as {
+  smallKey: string;
+  mediumKey: string;
+  largeKey: string;
+};
 
 type ReaderHarnessConfiguration = {
   kind: 'card' | 'detail';
