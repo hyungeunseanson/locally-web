@@ -1,6 +1,10 @@
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+import { build } from 'esbuild';
 
 import { PUBLIC_EXPERIENCE_CARD_IMAGES } from '../../app/data/publicExperienceCardImages';
 import detailImageManifest from '../../app/data/publicExperienceDetailImages.generated.json';
@@ -18,6 +22,7 @@ import {
 
 const BASE_URL = 'https://media-canary.locally-travel.com';
 const FIXTURE_ID = 999991;
+const SECOND_FIXTURE_ID = 999992;
 const FIXTURE_ORIGIN =
   'https://uhinvcydgzqlpnvieyal.supabase.co/storage/v1/object/public/experiences/experience/11111111-1111-4111-8111-111111111111/hero/deterministic-reader.jpg';
 const SECOND_FIXTURE_ORIGIN =
@@ -29,6 +34,120 @@ const VALID_WEBP = Buffer.from(
 
 const [manifestExperienceId, manifestCard] = Object.entries(PUBLIC_EXPERIENCE_CARD_IMAGES)[0]!;
 const manifestDetailOrigin = Object.keys(detailImageManifest[manifestExperienceId as keyof typeof detailImageManifest])[0]!;
+
+type ReaderHarnessConfiguration = {
+  kind: 'card' | 'detail';
+  experienceId: number | string;
+  originImageUrl: string;
+  r2Eligible: boolean;
+};
+
+type ReaderHarnessArtifacts = {
+  clientBundlePath: string;
+  render(configuration: ReaderHarnessConfiguration): string;
+};
+
+const fixtureDirectory = path.resolve('tests/fixtures/public-experience-media-reader');
+const fixtureArtifactsDirectory = mkdtempSync(path.join(os.tmpdir(), 'locally-reader-components-'));
+const harnesses = new Map<'enabled' | 'disabled', ReaderHarnessArtifacts>();
+
+async function buildReaderHarness(mode: 'enabled' | 'disabled') {
+  const enabled = mode === 'enabled';
+  const define = {
+    'process.env.NODE_ENV': JSON.stringify('production'),
+    'process.env.NEXT_PUBLIC_CLOUDFLARE_IMAGE_CANARY_BASE_URL': JSON.stringify(BASE_URL),
+    'process.env.NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_ENABLED': JSON.stringify(
+      enabled ? 'true' : 'false'
+    ),
+    'process.env.NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_EXPERIENCE_IDS': JSON.stringify(
+      enabled ? `${FIXTURE_ID},${SECOND_FIXTURE_ID}` : ''
+    ),
+  };
+  const alias = {
+    'next/image': path.join(fixtureDirectory, 'NextImageStub.tsx'),
+  };
+  const serverBundlePath = path.join(fixtureArtifactsDirectory, `${mode}-server.cjs`);
+  const clientBundlePath = path.join(fixtureArtifactsDirectory, `${mode}-client.js`);
+
+  await Promise.all([
+    build({
+      entryPoints: [path.join(fixtureDirectory, 'ReaderHarness.server.tsx')],
+      outfile: serverBundlePath,
+      bundle: true,
+      platform: 'node',
+      format: 'cjs',
+      target: 'node22',
+      alias,
+      define,
+      logLevel: 'silent',
+    }),
+    build({
+      entryPoints: [path.join(fixtureDirectory, 'ReaderHarness.client.tsx')],
+      outfile: clientBundlePath,
+      bundle: true,
+      platform: 'browser',
+      format: 'iife',
+      target: 'chrome120',
+      alias,
+      define,
+      logLevel: 'silent',
+    }),
+  ]);
+
+  const server = await import(`${pathToFileURL(serverBundlePath).href}?mode=${mode}`) as {
+    renderReaderHarness(configuration: ReaderHarnessConfiguration): string;
+  };
+  harnesses.set(mode, {
+    clientBundlePath,
+    render: server.renderReaderHarness,
+  });
+}
+
+async function openReaderHarness(
+  page: Page,
+  mode: 'enabled' | 'disabled',
+  configuration: ReaderHarnessConfiguration,
+  hydrationErrors?: string[]
+) {
+  const harness = harnesses.get(mode)!;
+  if (hydrationErrors) {
+    page.on('console', (message) => {
+      if (message.type() === 'error' && /hydration/i.test(message.text())) {
+        hydrationErrors.push(message.text());
+      }
+    });
+    page.on('pageerror', (error) => {
+      if (/hydration/i.test(error.message)) hydrationErrors.push(error.message);
+    });
+  }
+  await page.setContent(`<main id="root">${harness.render(configuration)}</main>`);
+  await page.addScriptTag({ path: harness.clientBundlePath });
+  await page.evaluate((nextConfiguration) => {
+    window.publicExperienceMediaReaderHarness.hydrate(nextConfiguration);
+  }, configuration);
+}
+
+async function mountReaderHarness(
+  page: Page,
+  mode: 'enabled' | 'disabled',
+  configuration: ReaderHarnessConfiguration
+) {
+  const harness = harnesses.get(mode)!;
+  await page.setContent('<main id="root"></main>');
+  await page.addScriptTag({ path: harness.clientBundlePath });
+  await page.evaluate((nextConfiguration) => {
+    window.publicExperienceMediaReaderHarness.mount(nextConfiguration);
+  }, configuration);
+}
+
+async function updateReaderHarness(
+  page: Page,
+  configuration: ReaderHarnessConfiguration
+) {
+  await page.evaluate((nextConfiguration) => {
+    window.publicExperienceMediaReaderHarness.update(nextConfiguration);
+  }, configuration);
+}
 
 function enableFixtureReader(experienceIds = String(FIXTURE_ID)) {
   process.env.NEXT_PUBLIC_CLOUDFLARE_IMAGE_CANARY_BASE_URL = BASE_URL;
@@ -59,13 +178,32 @@ function buildFixtureExperience(originImageUrl = FIXTURE_ORIGIN) {
   };
 }
 
+function buildDisplayedR2Url(
+  kind: 'card' | 'detail',
+  experienceId: number | string,
+  originImageUrl: string
+) {
+  const key = kind === 'card'
+    ? buildPublicExperienceCardKeys(experienceId, originImageUrl).largeKey
+    : buildPublicExperienceDetailKeys(experienceId, originImageUrl).mediumKey;
+  return `${BASE_URL}/${key}`;
+}
+
 test.describe('default-OFF deterministic public experience media reader', () => {
+  test.beforeAll(async () => {
+    await Promise.all([buildReaderHarness('enabled'), buildReaderHarness('disabled')]);
+  });
+
   test.beforeEach(() => enableFixtureReader());
 
   test.afterEach(() => {
     delete process.env.NEXT_PUBLIC_CLOUDFLARE_IMAGE_CANARY_BASE_URL;
     delete process.env.NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_ENABLED;
     delete process.env.NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_EXPERIENCE_IDS;
+  });
+
+  test.afterAll(() => {
+    rmSync(fixtureArtifactsDirectory, { recursive: true, force: true });
   });
 
   test('requires an exact enabled flag and entirely valid numeric allowlist', () => {
@@ -257,5 +395,155 @@ test.describe('default-OFF deterministic public experience media reader', () => 
     const settledRequestCount = r2Requests;
     await page.waitForTimeout(500);
     expect(r2Requests).toBe(settledRequestCount);
+  });
+
+  for (const kind of ['card', 'detail'] as const) {
+    test(`${kind} component hydrates with the same compiled reader configuration and loads deterministic R2`, async ({ page }) => {
+      const hydrationErrors: string[] = [];
+      await page.route(`${BASE_URL}/**`, (route) => route.fulfill({
+        status: 200,
+        contentType: 'image/webp',
+        body: VALID_WEBP,
+      }));
+
+      await openReaderHarness(page, 'enabled', {
+        kind,
+        experienceId: FIXTURE_ID,
+        originImageUrl: FIXTURE_ORIGIN,
+        r2Eligible: true,
+      }, hydrationErrors);
+
+      const attribute = kind === 'card' ? 'data-image-delivery' : 'data-detail-image-delivery';
+      const image = page.locator(`img[${attribute}="cloudflare-r2"]`);
+      await expect(image).toHaveCount(1);
+      await expect(image).toHaveJSProperty('complete', true);
+      expect(await image.evaluate((node: HTMLImageElement) => node.naturalWidth)).toBeGreaterThan(0);
+      expect(hydrationErrors).toEqual([]);
+    });
+
+    for (const failure of ['404', 'network'] as const) {
+      test(`${kind} component falls back after an R2 ${failure} without retrying the failed target`, async ({ page }) => {
+        let r2Requests = 0;
+        let originRequests = 0;
+        await page.route(`${BASE_URL}/**`, (route) => {
+          r2Requests += 1;
+          return failure === '404'
+            ? route.fulfill({ status: 404, body: 'not found' })
+            : route.abort('failed');
+        });
+        await page.route(FIXTURE_ORIGIN, (route) => {
+          originRequests += 1;
+          return route.fulfill({ status: 200, contentType: 'image/webp', body: VALID_WEBP });
+        });
+
+        await mountReaderHarness(page, 'enabled', {
+          kind,
+          experienceId: FIXTURE_ID,
+          originImageUrl: FIXTURE_ORIGIN,
+          r2Eligible: true,
+        });
+
+        const attribute = kind === 'card' ? 'data-image-delivery' : 'data-detail-image-delivery';
+        const fallback = page.locator(`img[${attribute}="supabase-fallback"]`);
+        await expect(fallback).toHaveAttribute('src', FIXTURE_ORIGIN);
+        await expect(page.locator('source')).toHaveCount(0);
+        const settledCounts = { r2Requests, originRequests };
+        await page.waitForTimeout(300);
+        expect({ r2Requests, originRequests }).toEqual(settledCounts);
+      });
+    }
+
+    test(`${kind} component does not leak a failed target across origin and experience changes`, async ({ page }) => {
+      const firstKeys = kind === 'card'
+        ? buildPublicExperienceCardKeys(FIXTURE_ID, FIXTURE_ORIGIN)
+        : buildPublicExperienceDetailKeys(FIXTURE_ID, FIXTURE_ORIGIN);
+      const firstTargetKeys = new Set(Object.values(firstKeys));
+
+      await page.route(`${BASE_URL}/**`, (route) => {
+        const requestKey = new URL(route.request().url()).pathname.slice(1);
+        return firstTargetKeys.has(requestKey)
+          ? route.fulfill({ status: 404, body: 'first target missing' })
+          : route.fulfill({ status: 200, contentType: 'image/webp', body: VALID_WEBP });
+      });
+      await page.route(FIXTURE_ORIGIN, (route) => route.fulfill({
+        status: 200,
+        contentType: 'image/webp',
+        body: VALID_WEBP,
+      }));
+
+      await mountReaderHarness(page, 'enabled', {
+        kind,
+        experienceId: FIXTURE_ID,
+        originImageUrl: FIXTURE_ORIGIN,
+        r2Eligible: true,
+      });
+      const attribute = kind === 'card' ? 'data-image-delivery' : 'data-detail-image-delivery';
+      await expect(page.locator(`img[${attribute}="supabase-fallback"]`)).toHaveCount(1);
+
+      await updateReaderHarness(page, {
+        kind,
+        experienceId: FIXTURE_ID,
+        originImageUrl: SECOND_FIXTURE_ORIGIN,
+        r2Eligible: true,
+      });
+      const secondExpectedUrl = buildDisplayedR2Url(kind, FIXTURE_ID, SECOND_FIXTURE_ORIGIN);
+      await expect(page.locator(`img[${attribute}="cloudflare-r2"]`)).toHaveAttribute('src', secondExpectedUrl);
+
+      await updateReaderHarness(page, {
+        kind,
+        experienceId: SECOND_FIXTURE_ID,
+        originImageUrl: SECOND_FIXTURE_ORIGIN,
+        r2Eligible: true,
+      });
+      const thirdExpectedUrl = buildDisplayedR2Url(kind, SECOND_FIXTURE_ID, SECOND_FIXTURE_ORIGIN);
+      await expect(page.locator(`img[${attribute}="cloudflare-r2"]`)).toHaveAttribute('src', thirdExpectedUrl);
+    });
+
+    test(`${kind} component stops after the Supabase fallback also fails`, async ({ page }) => {
+      let r2Requests = 0;
+      let originRequests = 0;
+      await page.route(`${BASE_URL}/**`, (route) => {
+        r2Requests += 1;
+        return route.abort('failed');
+      });
+      await page.route(FIXTURE_ORIGIN, (route) => {
+        originRequests += 1;
+        return route.abort('failed');
+      });
+
+      await mountReaderHarness(page, 'enabled', {
+        kind,
+        experienceId: FIXTURE_ID,
+        originImageUrl: FIXTURE_ORIGIN,
+        r2Eligible: true,
+      });
+      const attribute = kind === 'card' ? 'data-image-delivery' : 'data-detail-image-delivery';
+      await expect(page.locator(`img[${attribute}="supabase-fallback"]`)).toHaveCount(1);
+      await page.waitForTimeout(300);
+      const settledCounts = { r2Requests, originRequests };
+      await page.waitForTimeout(500);
+      expect({ r2Requests, originRequests }).toEqual(settledCounts);
+    });
+  }
+
+  test('OFF bundle hydrates and preserves the existing static manifest resolver', async ({ page }) => {
+    const hydrationErrors: string[] = [];
+    await page.route(`${BASE_URL}/**`, (route) => route.fulfill({
+      status: 200,
+      contentType: 'image/webp',
+      body: VALID_WEBP,
+    }));
+    await openReaderHarness(page, 'disabled', {
+      kind: 'card',
+      experienceId: manifestExperienceId,
+      originImageUrl: manifestCard.originUrl,
+      r2Eligible: true,
+    }, hydrationErrors);
+
+    await expect(page.locator('img[data-image-delivery="cloudflare-r2"]')).toHaveAttribute(
+      'src',
+      `${BASE_URL}/${manifestCard.largeKey}`
+    );
+    expect(hydrationErrors).toEqual([]);
   });
 });
