@@ -64,7 +64,7 @@ test("returns no transform work when every expected R2 key already exists", () =
   assert.deepEqual(selectMissingSpecifications(specifications, []), []);
 });
 
-test("builds manifests from only the current public-active inventory", () => {
+test("builds deterministic manifests from only the current public-active inventory", () => {
   const retainedCard = {
     originUrl: originA,
     smallKey: "cards/retained-small.webp",
@@ -86,12 +86,29 @@ test("builds manifests from only the current public-active inventory", () => {
   );
 
   assert.deepEqual(Object.keys(expected.cards), ["100", "200"]);
-  assert.deepEqual(expected.cards["100"], retainedCard);
+  assert.notDeepEqual(expected.cards["100"], retainedCard);
+  assert.deepEqual(expected.cards["100"], {
+    originUrl: originA,
+    smallKey: `cards/experience-100-primary-${createHash('sha256').update(originA).digest('hex').slice(0, 12)}-w384-q65.webp`,
+    largeKey: `cards/experience-100-primary-${createHash('sha256').update(originA).digest('hex').slice(0, 12)}-w640-q65.webp`,
+  });
   assert.match(expected.cards["200"].smallKey, /^cards\/experience-200-primary-[a-f0-9]{12}-w384-q65\.webp$/);
   assert.deepEqual(Object.keys(expected.details), ["100", "200"]);
   assert.deepEqual(Object.keys(expected.details["100"]), [originA, originC]);
   assert.equal(expected.cards["999"], undefined);
   assert.equal(expected.details["999"], undefined);
+});
+
+test("preserves the explicit legacy card identity without trusting manifest keys", () => {
+  const legacyOrigin = 'https://uhinvcydgzqlpnvieyal.supabase.co/storage/v1/object/public/experiences/experience/0288da66-8322-447c-bf80-bff314ee7299/hero/1786530514581_1786530514581-xj0z0lli.png';
+  const expected = buildExpectedManifests([{ id: '4523', heroUrls: [legacyOrigin], detailUrls: [legacyOrigin] }], {
+    4523: { originUrl: legacyOrigin, smallKey: 'wrong-small.webp', largeKey: 'wrong-large.webp' },
+  });
+  assert.deepEqual(expected.cards['4523'], {
+    originUrl: legacyOrigin,
+    smallKey: 'experience-4523-primary-w384-q65.webp',
+    largeKey: 'experience-4523-primary-w640-q65.webp',
+  });
 });
 
 test("fails closed when the R2 missing plan contains an unknown or duplicate key", () => {

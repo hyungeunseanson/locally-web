@@ -63,6 +63,7 @@ export function parseArgs(argv = process.argv.slice(2)) {
     mode,
     output: path.resolve(values.output || DEFAULT_OUTPUT),
     python: values.python || process.env.PYTHON || 'python3',
+    privateOutput: values['private-output'] ? path.resolve(values['private-output']) : null,
   };
 }
 
@@ -198,6 +199,11 @@ export function buildManifestAudit(inventory, currentCards, currentDetails, publ
   const expectedEntries = specifications.map((item) => ({
     key: item.key,
     kind: item.key.startsWith('cards/') || !item.key.includes('/') ? 'card' : 'detail',
+    role: item.role,
+    width: item.width,
+    quality: item.quality,
+    format: item.format,
+    sourceKeySha256: hashSourceKey(normalizeSupabaseExperienceObjectKey(item.originUrl)),
     expectedContentType: 'image/webp',
     expectedCacheControl: 'public, max-age=31536000, immutable',
   }));
@@ -406,6 +412,8 @@ export function renderSummary(report) {
     `- R2 cache-control/content-type mismatch: ${report.r2.metadata.cacheControlMismatchCount}/${report.r2.metadata.contentTypeMismatchCount}`,
     `- Expected derivative SHA metadata coverage: ${report.r2.metadata.expectedCustomShaCoverage}/${report.r2.expected.total}`,
     `- Public-active original identity coverage: ${report.r2.originalIdentityCoverage.matchingExpectedCount}/${report.r2.originalIdentityCoverage.expectedCount}`,
+    `- Derivative metadata-consistent/conflict/unverifiable: ${report.r2.completeness.derivativeMetadataConsistentCount}/${report.r2.completeness.derivativeConflictCount}/${report.r2.completeness.derivativeUnverifiableCount}`,
+    `- Original current-byte verified/unverifiable: ${report.r2.completeness.originalCurrentByteVerifiedCount}/${report.r2.completeness.originalCurrentByteUnverifiableCount}`,
     `- Downloaded SHA verified/unverifiable/mismatch: ${report.r2.downloadedShaVerification.verifiedCount}/${report.r2.downloadedShaVerification.unverifiableMetadataCount}/${report.r2.downloadedShaVerification.mismatchCount}`,
     `- R2 mutation calls: ${report.safety.r2MutationRequests}`,
     `- Supabase mutation calls: ${report.safety.supabaseMutationRequests}`,
@@ -432,11 +440,13 @@ async function main() {
   const r2OutputPath = path.join(args.output, '.r2-audit-output.json');
   await writeFile(planPath, stableJson(manifest.r2Plan), { mode: 0o600 });
   try {
-    await runPython(args.python, [
+    const pythonArgs = [
       '--mode', args.mode,
       '--plan', planPath,
       '--output', r2OutputPath,
-    ], process.env);
+    ];
+    if (args.privateOutput) pythonArgs.push('--private-output', args.privateOutput);
+    await runPython(args.python, pythonArgs, process.env);
   } finally {
     await rm(planPath, { force: true });
   }

@@ -32,6 +32,14 @@ const r2ReconciliationSource = readFileSync(
   'scripts/cloudflare/r2-public-image-reconcile.py',
   'utf8'
 );
+const mediaRecoverySource = readFileSync(
+  'scripts/cloudflare/recover-public-experience-media.mjs',
+  'utf8'
+);
+const r2RecoverySource = readFileSync(
+  'scripts/cloudflare/r2-public-image-recovery.py',
+  'utf8'
+);
 const mediaRepairPlannerSource = readFileSync(
   'scripts/cloudflare/plan-public-experience-media-repair.mjs',
   'utf8'
@@ -134,9 +142,15 @@ test.describe('Production reconciliation image checks stay read-only', () => {
     }
   });
 
-  test('keeps the strict parity audit independent from scheduled reconciliation writes', () => {
-    expect(experienceWorkflow).not.toContain('audit-public-experience-media.mjs');
-    expect(experienceWorkflow).not.toContain('r2-public-image-audit.py');
+  test('runs manifest-independent completeness without coupling manual audit to legacy writes', () => {
+    expect(experienceWorkflow).toContain('Run manifest-independent metadata completeness audit');
+    expect(experienceWorkflow).toContain('audit-public-experience-media.mjs metadata');
+    expect(experienceWorkflow).toContain("options: [audit, plan, apply, legacy-reconcile]");
+    expect(experienceWorkflow).toContain("github.event_name == 'schedule' || inputs.action == 'legacy-reconcile'");
+    expect(experienceWorkflow).toContain('group: public-experience-image-reconciliation');
+    expect(experienceWorkflow).toContain('needs: audit');
+    expect(experienceWorkflow).not.toContain('needs: [audit, completeness]');
+    expect(experienceWorkflow).toContain("ACTION: ${{ github.event_name == 'schedule' && 'audit' || inputs.action }}");
     expect(packageSource.scripts['cloudflare:experience-media:audit:metadata']).toBe(
       'node scripts/cloudflare/audit-public-experience-media.mjs metadata'
     );
@@ -178,6 +192,29 @@ test.describe('Production reconciliation image checks stay read-only', () => {
     expect(r2ReconciliationSource).toContain('"concurrentExactSkipCount"');
     expect(r2ReconciliationSource).toContain('"conflictCount": 0');
     expect(r2ReconciliationSource).toContain('"deletedObjectCount": 0');
+  });
+
+  test('bounded missed-enqueue recovery is explicit, conditional-create only, and default read-only', () => {
+    expect(experienceWorkflow).toContain('default: audit');
+    expect(experienceWorkflow).toContain("if: env.ACTION == 'apply'");
+    expect(experienceWorkflow).toContain("${{ inputs.approve_apply }}");
+    expect(experienceWorkflow).toContain("${{ inputs.confirm_digest }}");
+    expect(experienceWorkflow).toContain('Verify source immediately before create-only apply');
+    expect(experienceWorkflow).toContain('Verify source after create-only apply');
+    expect(mediaRecoverySource).toContain('selectRotatingCandidates');
+    expect(mediaRecoverySource).toContain('maxSourceDownloads: 12');
+    expect(mediaRecoverySource).toContain('maxSourceBytes: 64 * 1024 * 1024');
+    expect(mediaRecoverySource).not.toMatch(/Queue\.send|deleteObject|copyObject/i);
+    expect(r2RecoverySource).toContain('IfNoneMatch="*"');
+    expect(r2RecoverySource).toContain('Exact fresh recovery plan digest confirmation is required');
+    expect(r2RecoverySource).not.toMatch(/\.copy_object\(|\.delete_object\(|\.delete_objects\(/);
+    const sanitizedUpload = experienceWorkflow.match(
+      /- name: Upload sanitized completeness evidence[\s\S]*?- name: Publish bounded completeness summary/
+    )?.[0] ?? '';
+    expect(sanitizedUpload).not.toContain('.r2-inspection.json');
+    expect(sanitizedUpload).not.toContain('.recovery-plan.json');
+    expect(sanitizedUpload).not.toContain('source-cache');
+    expect(sanitizedUpload).not.toContain('/objects/');
   });
 
   test('keeps controlled repair independent and plan-only by default', () => {

@@ -155,6 +155,52 @@ class R2ReadOnlyAuditTest(unittest.TestCase):
         self.assertNotIn("experience/source/hero/original.jpg", json.dumps(report))
         self.assert_no_mutations(client)
 
+    def test_completeness_distinguishes_consistent_conflicting_and_unverifiable_metadata(self):
+        source_key_sha = "a" * 64
+        output_sha = hashlib.sha256(b"expected").hexdigest()
+        base_metadata = {
+            "sha256": output_sha,
+            "output_byte_sha256": output_sha,
+            "source_byte_sha256": "b" * 64,
+            "source_key_sha256": source_key_sha,
+            "source_size": "321",
+            "transform_width": "384",
+            "transform_quality": "65",
+            "transform_format": "webp",
+            "derivative_role": "card",
+            "transform_schema_version": MODULE.TRANSFORM_SCHEMA_VERSION,
+            "transform_engine": next(iter(MODULE.ALLOWED_DERIVATIVE_ENGINES)),
+            "provenance_status": MODULE.VERIFIED_PROVENANCE_STATUS,
+        }
+        plan = {
+            "expected": [{
+                "key": "cards/expected.webp", "kind": "card", "role": "card",
+                "width": 384, "quality": 65, "format": "webp", "sourceKeySha256": source_key_sha,
+            }],
+            "knownManifestKeys": ["cards/expected.webp"],
+            "publicActiveOriginalSourceKeyHashes": [],
+        }
+        consistent = object_metadata("cards/expected.webp", b"expected")
+        consistent["customMetadata"] = base_metadata
+        report = MODULE.audit(FakeReadOnlyClient([consistent], {"cards/expected.webp": b"expected"}), MODULE.EXPECTED_BUCKET, plan, "metadata")
+        self.assertEqual(report["completeness"]["derivativeMetadataConsistentCount"], 1)
+        self.assertEqual(report["completeness"]["derivativeConflictCount"], 0)
+
+        conflicting = {**consistent, "customMetadata": {**base_metadata, "transform_quality": "75"}}
+        report = MODULE.audit(FakeReadOnlyClient([conflicting], {"cards/expected.webp": b"expected"}), MODULE.EXPECTED_BUCKET, plan, "metadata")
+        self.assertEqual(report["completeness"]["derivativeConflictCount"], 1)
+
+        unverifiable = {**consistent, "customMetadata": {**base_metadata, "transform_engine": "unknown-engine"}}
+        report = MODULE.audit(FakeReadOnlyClient([unverifiable], {"cards/expected.webp": b"expected"}), MODULE.EXPECTED_BUCKET, plan, "metadata")
+        self.assertEqual(report["completeness"]["derivativeUnverifiableCount"], 1)
+
+    def test_whole_state_digest_covers_http_metadata(self):
+        base = object_metadata("cards/expected.webp", b"expected")
+        content_type_changed = {**base, "contentType": "application/octet-stream"}
+        cache_changed = {**base, "cacheControl": "max-age=60"}
+        self.assertNotEqual(MODULE.r2_state_digest([base]), MODULE.r2_state_digest([content_type_changed]))
+        self.assertNotEqual(MODULE.r2_state_digest([base]), MODULE.r2_state_digest([cache_changed]))
+
 
 if __name__ == "__main__":
     unittest.main()

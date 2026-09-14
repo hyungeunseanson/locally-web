@@ -2,6 +2,44 @@ name: Public Experience Image Reconciliation
 
 on:
   workflow_dispatch:
+    inputs:
+      action:
+        description: Read-only completeness audit/plan, explicit create-only recovery apply, or legacy manifest reconciliation
+        type: choice
+        options: [audit, plan, apply, legacy-reconcile]
+        default: audit
+      approve_apply:
+        description: Must be checked together with an exact fresh plan digest for apply
+        type: boolean
+        default: false
+      confirm_digest:
+        description: Exact fresh bounded recovery plan digest (apply only)
+        type: string
+        required: false
+      cursor:
+        description: Rotating source verification cursor
+        type: string
+        default: '0'
+      max_source_downloads:
+        description: Maximum bounded Supabase source GETs
+        type: string
+        default: '12'
+      max_source_bytes:
+        description: Maximum downloaded source bytes
+        type: string
+        default: '67108864'
+      max_original_creates:
+        description: Maximum immutable original creates
+        type: string
+        default: '12'
+      max_derivative_creates:
+        description: Maximum derivative creates
+        type: string
+        default: '40'
+      max_transforms:
+        description: Maximum Sharp transforms
+        type: string
+        default: '40'
   schedule:
     - cron: '48 5 * * *'
 
@@ -50,9 +88,149 @@ jobs:
             echo "- Pull request: skipped"
           } >> "$GITHUB_STEP_SUMMARY"
 
+  completeness:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: production-media-sync
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ENDPOINT: ${{ vars.R2_ENDPOINT }}
+      R2_BUCKET: locally-public-experience-canary
+      R2_PUBLIC_BASE_URL: https://media-canary.locally-travel.com
+      BOTO3_VERSION: 1.43.70
+      ACTION: ${{ github.event_name == 'schedule' && 'audit' || inputs.action }}
+      CURSOR: ${{ inputs.cursor || '0' }}
+      MAX_SOURCE_DOWNLOADS: ${{ inputs.max_source_downloads || '12' }}
+      MAX_SOURCE_BYTES: ${{ inputs.max_source_bytes || '67108864' }}
+      MAX_ORIGINAL_CREATES: ${{ inputs.max_original_creates || '12' }}
+      MAX_DERIVATIVE_CREATES: ${{ inputs.max_derivative_creates || '40' }}
+      MAX_TRANSFORMS: ${{ inputs.max_transforms || '40' }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+
+      - name: Validate fixed completeness boundary
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$NEXT_PUBLIC_SUPABASE_URL" == "https://uhinvcydgzqlpnvieyal.supabase.co" ]]
+          [[ "$R2_ENDPOINT" == "https://d56f5f850c6f7dc5779a7c2054aca5a5.r2.cloudflarestorage.com" ]]
+          [[ "$R2_BUCKET" == "locally-public-experience-canary" ]]
+          [[ "$R2_PUBLIC_BASE_URL" == "https://media-canary.locally-travel.com" ]]
+          if [[ "$ACTION" == "apply" ]]; then
+            [[ "${{ inputs.approve_apply }}" == "true" ]]
+            [[ "${{ inputs.confirm_digest }}" =~ ^[0-9a-f]{64}$ ]]
+          fi
+
+      - name: Install pinned read-only R2 client
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -m venv "${RUNNER_TEMP}/r2-venv"
+          "${RUNNER_TEMP}/r2-venv/bin/python" -m pip install --disable-pip-version-check --no-input "boto3==${BOTO3_VERSION}"
+          echo "${RUNNER_TEMP}/r2-venv/bin" >> "$GITHUB_PATH"
+
+      - name: Run manifest-independent metadata completeness audit
+        id: completeness_audit
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          audit_dir="${RUNNER_TEMP}/public-experience-completeness"
+          mkdir -p "$audit_dir"
+          node scripts/cloudflare/audit-public-experience-media.mjs metadata \
+            --output="$audit_dir/audit" \
+            --private-output="$audit_dir/.r2-inspection.json"
+
+      - name: Install project dependencies for bounded plan or apply
+        if: env.ACTION == 'plan' || env.ACTION == 'apply'
+        run: npm ci
+
+      - name: Build bounded source-proven recovery plan
+        if: env.ACTION == 'plan' || env.ACTION == 'apply'
+        id: recovery_plan
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          recovery_dir="${RUNNER_TEMP}/public-experience-completeness/recovery"
+          node scripts/cloudflare/recover-public-experience-media.mjs plan \
+            --r2-inspection="${RUNNER_TEMP}/public-experience-completeness/.r2-inspection.json" \
+            --output="$recovery_dir" \
+            --cursor="$CURSOR" \
+            --maxSourceDownloads="$MAX_SOURCE_DOWNLOADS" \
+            --maxSourceBytes="$MAX_SOURCE_BYTES" \
+            --maxOriginalCreates="$MAX_ORIGINAL_CREATES" \
+            --maxDerivativeCreates="$MAX_DERIVATIVE_CREATES" \
+            --maxTransforms="$MAX_TRANSFORMS"
+
+      - name: Verify source immediately before create-only apply
+        if: env.ACTION == 'apply'
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          recovery_dir="${RUNNER_TEMP}/public-experience-completeness/recovery"
+          [[ "${{ inputs.confirm_digest }}" == "${{ steps.recovery_plan.outputs.plan_digest }}" ]]
+          node scripts/cloudflare/recover-public-experience-media.mjs verify-source \
+            --plan="$recovery_dir/.recovery-plan.json" \
+            --output="$recovery_dir"
+
+      - name: Apply bounded create-only recovery
+        if: env.ACTION == 'apply'
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          recovery_dir="${RUNNER_TEMP}/public-experience-completeness/recovery"
+          python3 scripts/cloudflare/r2-public-image-recovery.py \
+            --plan "$recovery_dir/.recovery-plan.json" \
+            --output "$recovery_dir/recovery-result.json" \
+            --confirm-digest "${{ inputs.confirm_digest }}"
+
+      - name: Verify source after create-only apply
+        if: env.ACTION == 'apply'
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          recovery_dir="${RUNNER_TEMP}/public-experience-completeness/recovery"
+          node scripts/cloudflare/recover-public-experience-media.mjs verify-source \
+            --plan="$recovery_dir/.recovery-plan.json" \
+            --output="$recovery_dir"
+
+      - name: Upload sanitized completeness evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-experience-media-completeness-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/public-experience-completeness/audit/report.json
+            ${{ runner.temp }}/public-experience-completeness/audit/summary.md
+            ${{ runner.temp }}/public-experience-completeness/recovery/recovery-plan-summary.json
+            ${{ runner.temp }}/public-experience-completeness/recovery/recovery-result.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Publish bounded completeness summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### Manifest-independent public media completeness"
+            echo "- Action: ${ACTION}"
+            echo "- Static manifest decision and R2 completeness decision: independent"
+            echo "- Source GET budget: ${MAX_SOURCE_DOWNLOADS} objects / ${MAX_SOURCE_BYTES} bytes"
+            echo "- Original/derivative create budget: ${MAX_ORIGINAL_CREATES}/${MAX_DERIVATIVE_CREATES}"
+            echo "- Transform budget: ${MAX_TRANSFORMS}"
+            echo "- Delete/CopyObject/Queue send: unsupported"
+            echo "- Result: ${{ job.status }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   reconcile:
     needs: audit
-    if: needs.audit.outputs.drift == 'true'
+    if: >-
+      needs.audit.outputs.drift == 'true' &&
+      (github.event_name == 'schedule' || inputs.action == 'legacy-reconcile')
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     environment: production-media-sync
