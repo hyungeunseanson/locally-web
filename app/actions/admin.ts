@@ -9,7 +9,7 @@ import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 import { isLatestPublicHostApplication, pickLatestPublicHostApplication } from '@/app/utils/hostVisibility';
 import { schedulePublicExperienceMediaProducer } from '@/app/utils/publicExperienceMediaQueueProducer.server';
-import type { PublicExperienceMediaRow } from '@/app/utils/publicExperienceMediaQueueMirror';
+import { executeUpdateExperienceAdminStatus } from './updateExperienceAdminStatus';
 
 // 🔒 관리자 권한 확인
 async function getAdminClient() {
@@ -80,28 +80,6 @@ function buildHostApplicationStatusNotification(status: string, comment?: string
   return null;
 }
 
-function buildExperienceStatusNotification(status: string, id: string | number) {
-  const normalizedStatus = status.trim().toLowerCase();
-
-  if (normalizedStatus === 'active' || normalizedStatus === 'approved') {
-    return {
-      type: 'experience_approved',
-      link: `/host/experiences/${id}`,
-      key: 'experience.approved' as const,
-    };
-  }
-
-  if (normalizedStatus === 'revision') {
-    return {
-      type: 'experience_revision_requested',
-      link: `/host/experiences/${id}/edit`,
-      key: 'experience.revision' as const,
-    };
-  }
-
-  return null;
-}
-
 function asNonEmptyString(value: unknown) {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 }
@@ -149,6 +127,17 @@ export async function updateAdminStatus(
   status: string,
   comment?: string
 ) {
+  if (table === 'experiences') {
+    return executeUpdateExperienceAdminStatus(id, status, comment, {
+      getAdminClient,
+      createAdminClient,
+      scheduleMediaProducer: schedulePublicExperienceMediaProducer,
+      buildLocalizedNotificationInsert,
+      sendImmediateGenericEmail,
+      recordAuditLog,
+    });
+  }
+
   const supabase = await getAdminClient();
   const { data: { user: adminUser } } = await supabase.auth.getUser();
   const supabaseAdmin = createAdminClient();
@@ -157,55 +146,23 @@ export async function updateAdminStatus(
 
   // 🟢 [추가] 기록 전 대상 이름(제목/호스트명) 가져오기
   let targetTitle = targetId;
-  let mediaBefore: PublicExperienceMediaRow | null = null;
   try {
-    if (table === 'experiences') {
-      const { data } = await supabaseAdmin
-        .from('experiences')
-        .select('id, title, status, is_active, photos, itinerary, image_url')
-        .eq('id', id)
-        .maybeSingle();
-      if (data) {
-        targetTitle = data.title;
-        mediaBefore = data;
-      }
-    } else if (table === 'host_applications') {
-      const { data } = await supabaseAdmin.from('host_applications').select('name').eq('id', id).maybeSingle();
-      if (data) targetTitle = data.name;
-    }
+    const { data } = await supabaseAdmin.from('host_applications').select('name').eq('id', id).maybeSingle();
+    if (data) targetTitle = data.name;
   } catch { }
 
   const updateData: { status: string; admin_comment?: string } = { status };
-  if ((table === 'host_applications' || table === 'experiences') && trimmedComment) {
+  if (trimmedComment) {
     updateData.admin_comment = trimmedComment;
   }
 
-  if (table === 'host_applications') {
-    await assertLatestHostApplicationForStatusChange(supabaseAdmin, id);
-  }
+  await assertLatestHostApplicationForStatusChange(supabaseAdmin, id);
 
-  if (table === 'experiences') {
-    const { data: updatedExperience, error } = await supabaseAdmin
-      .from('experiences')
-      .update(updateData)
-      .eq('id', id)
-      .select('id, status, is_active, photos, itinerary, image_url')
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    if (!updatedExperience) throw new Error('Experience not found');
-
-    schedulePublicExperienceMediaProducer({
-      before: mediaBefore,
-      after: updatedExperience,
-      writeKind: 'activation',
-    });
-  } else {
-    const { error } = await supabaseAdmin
-      .from('host_applications')
-      .update(updateData)
-      .eq('id', id);
-    if (error) throw new Error(error.message);
-  }
+  const { error } = await supabaseAdmin
+    .from('host_applications')
+    .update(updateData)
+    .eq('id', id);
+  if (error) throw new Error(error.message);
 
   if (table === 'host_applications' && ['approved', 'revision', 'rejected'].includes(status)) {
     const { data: app } = await supabaseAdmin
@@ -303,66 +260,6 @@ export async function updateAdminStatus(
           });
         } catch (emailError) {
           console.error('Host application status email failed:', emailError);
-        }
-      }
-    }
-  }
-
-  if (table === 'experiences') {
-    const notification = buildExperienceStatusNotification(status, id);
-
-    if (notification) {
-      const { data: experience } = await supabaseAdmin
-        .from('experiences')
-        .select('host_id, title')
-        .eq('id', id)
-        .maybeSingle();
-
-      if (experience?.host_id) {
-        const copyParams = notification.key === 'experience.revision'
-          ? {
-            experienceTitle: experience.title,
-            comment: trimmedComment,
-          }
-          : {
-            experienceTitle: experience.title,
-          };
-
-        const notificationRow = await buildLocalizedNotificationInsert({
-          supabaseAdmin,
-          userId: experience.host_id,
-          type: notification.type,
-          link: notification.link,
-          key: notification.key,
-          copyParams,
-        });
-
-        const { error: notificationError } = await supabaseAdmin
-          .from('notifications')
-          .insert(notificationRow);
-
-        if (notificationError) {
-          console.error('Experience status notification insert failed:', notificationError);
-        }
-
-        try {
-          await sendImmediateGenericEmail({
-            recipientUserId: experience.host_id,
-            subject: '',
-            title: '',
-            message: '',
-            templatedEmail: {
-              templateId: 'notice.copy',
-              audience: 'host',
-              payload: {
-                copyKey: notification.key,
-                copyParams,
-                ctaUrl: notification.link,
-              },
-            },
-          });
-        } catch (emailError) {
-          console.error('Experience status email failed:', emailError);
         }
       }
     }

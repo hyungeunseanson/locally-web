@@ -64,7 +64,10 @@ test.describe('Admin experience photo order contracts', () => {
   });
 
   test('keeps the API permission-only and the UI save explicit', () => {
-    const routeSource = fs.readFileSync('app/api/admin/experiences/[id]/photos/route.ts', 'utf8');
+    const routeSource = [
+      fs.readFileSync('app/api/admin/experiences/[id]/photos/route.ts', 'utf8'),
+      fs.readFileSync('app/api/admin/experiences/[id]/photos/routeHandler.ts', 'utf8'),
+    ].join('\n');
     const detailsSource = fs.readFileSync('app/admin/dashboard/components/DetailsPanel.tsx', 'utf8');
     const editSource = fs.readFileSync('app/host/experiences/[id]/edit/page.tsx', 'utf8');
     const homeSource = fs.readFileSync('app/api/home/experiences/route.ts', 'utf8');

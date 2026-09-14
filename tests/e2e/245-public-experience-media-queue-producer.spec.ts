@@ -9,6 +9,7 @@ import {
 import {
   planPublicExperienceMediaAfterWrite,
   schedulePublicExperienceMediaAfterWrite,
+  type PublicExperienceMediaAfterWrite,
   type PublicExperienceMediaProducerLog,
 } from '../../app/utils/publicExperienceMediaQueueProducer';
 
@@ -58,7 +59,7 @@ function producerHarness(overrides: Record<string, unknown> = {}) {
 
 function schedule(
   harness: ReturnType<typeof producerHarness>,
-  input = {
+  input: PublicExperienceMediaAfterWrite = {
     before: row({ photos: [`${SOURCE_ROOT}/experience/${SOURCE_OWNER}/hero/old.jpg`] }),
     after: row(),
     writeKind: 'edit' as const,
@@ -317,23 +318,42 @@ test.describe('default-OFF public experience media Queue producer', () => {
   test('hooks only confirmed authenticated write results and keeps producer remote wiring absent', () => {
     const shared = readFileSync('app/api/host/experiences/shared.ts', 'utf8');
     const admin = readFileSync('app/actions/admin.ts', 'utf8');
-    const photoRoute = readFileSync('app/api/admin/experiences/[id]/photos/route.ts', 'utf8');
+    const adminExperience = readFileSync('app/actions/updateExperienceAdminStatus.ts', 'utf8');
+    const createRoute = readFileSync('app/api/host/experiences/route.ts', 'utf8');
+    const updateRoute = readFileSync('app/api/host/experiences/[id]/route.ts', 'utf8');
+    const photoRouteEntry = readFileSync('app/api/admin/experiences/[id]/photos/route.ts', 'utf8');
+    const photoRoute = readFileSync('app/api/admin/experiences/[id]/photos/routeHandler.ts', 'utf8');
     const wrangler = JSON.parse(readFileSync('wrangler.jsonc', 'utf8'));
     const worker = readFileSync('cloudflare-worker.ts', 'utf8');
 
-    expect(shared.match(/schedulePublicExperienceMediaProducer\(/g)).toHaveLength(2);
+    expect(shared.match(/dependencies\.scheduleMediaProducer\(/g)).toHaveLength(2);
     expect(shared).toContain(".select('id, status, is_active, photos, itinerary, image_url')");
-    expect(shared.indexOf("throw error ?? new Error('Failed to create experience.')"))
-      .toBeLessThan(shared.indexOf('writeKind: \'create\''));
-    expect(shared.indexOf("throw error ?? new ApiError(500, '체험 저장에 실패했습니다.')"))
-      .toBeLessThan(shared.indexOf("writeKind: 'edit'"));
+    const createGuard = shared.indexOf("throw error ?? new Error('Failed to create experience.')");
+    const createHook = shared.indexOf("writeKind: 'create'");
+    const editGuard = shared.indexOf("throw error ?? new ApiError(500, '체험 저장에 실패했습니다.')");
+    const editHook = shared.indexOf("writeKind: 'edit'");
+    expect(createGuard).toBeGreaterThanOrEqual(0);
+    expect(createHook).toBeGreaterThanOrEqual(0);
+    expect(editGuard).toBeGreaterThanOrEqual(0);
+    expect(editHook).toBeGreaterThanOrEqual(0);
+    expect(createGuard).toBeLessThan(createHook);
+    expect(editGuard).toBeLessThan(editHook);
 
-    expect(admin).toContain(".select('id, status, is_active, photos, itinerary, image_url')");
-    expect(admin).toContain("if (!updatedExperience) throw new Error('Experience not found')");
-    expect(admin.indexOf("if (!updatedExperience) throw new Error('Experience not found')"))
-      .toBeLessThan(admin.indexOf("writeKind: 'activation'"));
-    expect(photoRoute.indexOf('if (!updatedExperience)'))
-      .toBeLessThan(photoRoute.indexOf("writeKind: 'reorder'"));
+    expect(admin).toContain('executeUpdateExperienceAdminStatus');
+    expect(createRoute).toContain('return handleHostExperienceCreate(request)');
+    expect(updateRoute).toContain('return handleHostExperienceUpdate(request, context)');
+    expect(photoRouteEntry).toContain('return handleAdminExperiencePhotoReorder(request, context)');
+    expect(adminExperience).toContain(".select('id, status, is_active, photos, itinerary, image_url')");
+    const activationGuard = adminExperience.indexOf("if (!updatedExperience) throw new Error('Experience not found')");
+    const activationHook = adminExperience.indexOf("writeKind: 'activation'");
+    const reorderGuard = photoRoute.indexOf('if (!updatedExperience)');
+    const reorderHook = photoRoute.indexOf("writeKind: 'reorder'");
+    expect(activationGuard).toBeGreaterThanOrEqual(0);
+    expect(activationHook).toBeGreaterThanOrEqual(0);
+    expect(reorderGuard).toBeGreaterThanOrEqual(0);
+    expect(reorderHook).toBeGreaterThanOrEqual(0);
+    expect(activationGuard).toBeLessThan(activationHook);
+    expect(reorderGuard).toBeLessThan(reorderHook);
 
     expect(wrangler.env.production.queues.producers).toBeUndefined();
     expect(worker).not.toContain('PUBLIC_EXPERIENCE_MEDIA_QUEUE.send');
