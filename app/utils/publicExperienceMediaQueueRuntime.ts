@@ -1,6 +1,7 @@
 import {
   createCloudflareImagesPublicExperienceTransformer,
   createR2PublicExperienceMediaMirrorStore,
+  PublicExperienceMediaMirrorError,
   type PublicExperienceMediaImagesBindingLike,
   type PublicExperienceMediaMirrorDependencies,
   type PublicExperienceMediaR2BindingLike,
@@ -27,6 +28,65 @@ function requiredEnvironmentValue(value: unknown, name: string) {
     throw new Error(`public_experience_media_missing_${name.toLowerCase()}`);
   }
   return value.trim();
+}
+
+function latestRowHttpError(status: number) {
+  if (status === 401 || status === 403) {
+    return new PublicExperienceMediaMirrorError(
+      'permanent',
+      'latest_row_http_unauthorized',
+      status
+    );
+  }
+  if (status === 429) {
+    return new PublicExperienceMediaMirrorError(
+      'transient',
+      'latest_row_http_rate_limited',
+      status
+    );
+  }
+  if (status >= 500) {
+    return new PublicExperienceMediaMirrorError(
+      'transient',
+      'latest_row_http_server_error',
+      status
+    );
+  }
+  if (status >= 400) {
+    return new PublicExperienceMediaMirrorError(
+      'permanent',
+      'latest_row_http_client_error',
+      status
+    );
+  }
+  if (status >= 300) {
+    return new PublicExperienceMediaMirrorError(
+      'permanent',
+      'latest_row_http_redirect',
+      status
+    );
+  }
+  return new PublicExperienceMediaMirrorError(
+    'transient',
+    'latest_row_http_unexpected_status',
+    status
+  );
+}
+
+function isLatestRow(value: unknown): value is PublicExperienceMediaRow {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const row = value as Record<string, unknown>;
+  const idValid =
+    (typeof row.id === 'number' && Number.isSafeInteger(row.id) && row.id > 0) ||
+    (typeof row.id === 'string' && /^[1-9][0-9]{0,18}$/.test(row.id));
+  return Boolean(
+    idValid &&
+      (typeof row.status === 'string' || row.status === null) &&
+      (typeof row.is_active === 'boolean' || row.is_active === null) &&
+      (Array.isArray(row.photos) || row.photos === null) &&
+      (Array.isArray(row.itinerary) || row.itinerary === null) &&
+      (typeof row.image_url === 'string' || row.image_url === null)
+  );
 }
 
 export function createPublicExperienceLatestRowLoader(
@@ -63,28 +123,62 @@ export function createPublicExperienceLatestRowLoader(
     requestUrl.searchParams.set('id', `eq.${experienceId}`);
     requestUrl.searchParams.set('limit', '1');
 
-    const response = await fetchImplementation(requestUrl, {
-      method: 'GET',
-      headers: {
-        apikey: anonKey,
-        authorization: `Bearer ${anonKey}`,
-        accept: 'application/json',
-        'cache-control': 'no-store',
-      },
-      redirect: 'error',
-    });
-    if (!response.ok) {
-      throw new Error('public_experience_media_latest_row_read_failed');
+    let response: Response;
+    try {
+      response = await fetchImplementation(requestUrl, {
+        method: 'GET',
+        headers: {
+          apikey: anonKey,
+          authorization: `Bearer ${anonKey}`,
+          accept: 'application/json',
+          'cache-control': 'no-store',
+        },
+        // Workers does not implement redirect="error". Manual mode keeps the
+        // request fail-closed because every 3xx is rejected below.
+        redirect: 'manual',
+      });
+    } catch {
+      throw new PublicExperienceMediaMirrorError(
+        'transient',
+        'latest_row_fetch_network_error'
+      );
     }
-    const payload: unknown = await response.json();
+    if (!response.ok) {
+      throw latestRowHttpError(response.status);
+    }
+    const contentType = String(response.headers.get('content-type') || '')
+      .split(';', 1)[0]
+      .trim()
+      .toLowerCase();
+    if (contentType !== 'application/json') {
+      throw new PublicExperienceMediaMirrorError(
+        'permanent',
+        'latest_row_unexpected_content_type'
+      );
+    }
+    let payload: unknown;
+    try {
+      payload = await response.json();
+    } catch {
+      throw new PublicExperienceMediaMirrorError(
+        'permanent',
+        'latest_row_json_parse_failed'
+      );
+    }
     if (!Array.isArray(payload) || payload.length > 1) {
-      throw new Error('public_experience_media_latest_row_invalid_response');
+      throw new PublicExperienceMediaMirrorError(
+        'permanent',
+        'latest_row_invalid_shape'
+      );
     }
     if (payload.length === 0) return null;
-    if (!payload[0] || typeof payload[0] !== 'object' || Array.isArray(payload[0])) {
-      throw new Error('public_experience_media_latest_row_invalid_response');
+    if (!isLatestRow(payload[0])) {
+      throw new PublicExperienceMediaMirrorError(
+        'permanent',
+        'latest_row_invalid_shape'
+      );
     }
-    return payload[0] as PublicExperienceMediaRow;
+    return payload[0];
   };
 }
 
@@ -104,7 +198,7 @@ export function createPublicExperienceMediaQueueDependencies(
       fetchImplementation
     ),
     fetchSource: (sourceUrl) =>
-      fetchImplementation(sourceUrl, { method: 'GET', redirect: 'error' }),
+      fetchImplementation(sourceUrl, { method: 'GET', redirect: 'manual' }),
     store: createR2PublicExperienceMediaMirrorStore(
       environment.PUBLIC_EXPERIENCE_MEDIA_R2
     ),

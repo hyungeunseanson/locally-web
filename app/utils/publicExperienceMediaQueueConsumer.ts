@@ -2,6 +2,7 @@ import {
   mirrorPublicExperienceMedia,
   parsePublicExperienceMediaQueueMessage,
   type PublicExperienceMediaMirrorDependencies,
+  PUBLIC_EXPERIENCE_MEDIA_DIAGNOSTIC_STAGES,
   type PublicExperienceMediaMirrorOutcome,
 } from './publicExperienceMediaQueueMirror';
 import {
@@ -61,6 +62,24 @@ function safeCount(value: unknown) {
     : 0;
 }
 
+function safeDiagnosticStage(value: unknown) {
+  return typeof value === 'string' &&
+    PUBLIC_EXPERIENCE_MEDIA_DIAGNOSTIC_STAGES.includes(
+      value as (typeof PUBLIC_EXPERIENCE_MEDIA_DIAGNOSTIC_STAGES)[number]
+    )
+    ? value
+    : undefined;
+}
+
+function safeHttpStatus(value: unknown) {
+  return typeof value === 'number' &&
+    Number.isInteger(value) &&
+    value >= 100 &&
+    value <= 599
+    ? value
+    : undefined;
+}
+
 function queueLogRecord(
   message: PublicExperienceMediaQueueMessageLike,
   outcome: PublicExperienceMediaMirrorOutcome
@@ -73,6 +92,8 @@ function queueLogRecord(
     reason: parsed?.reason,
     outcome: outcome.status,
     diagnosticCode: safeDiagnosticCode(outcome.diagnosticCode),
+    diagnosticStage: safeDiagnosticStage(outcome.diagnosticStage),
+    httpStatus: safeHttpStatus(outcome.httpStatus),
     sourceCount: safeCount(outcome.sourceCount),
     derivativeCount: safeCount(outcome.derivativeCount),
     originalCreatedCount: safeCount(outcome.originalCreatedCount),
