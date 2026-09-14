@@ -1,15 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createExperienceFromBody, getRouteActor, toApiErrorResponse } from './shared';
+import { NextRequest } from 'next/server';
+import { handleHostExperienceCreate } from './routeHandler';
 
 export async function POST(request: NextRequest) {
-  try {
-    const { actor } = await getRouteActor();
-    const body = await request.json();
-    const result = await createExperienceFromBody(body, actor);
-
-    return NextResponse.json({ success: true, ...result });
-  } catch (error) {
-    return toApiErrorResponse(error);
-  }
+  return handleHostExperienceCreate(request);
 }
-

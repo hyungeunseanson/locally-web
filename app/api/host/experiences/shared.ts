@@ -9,6 +9,7 @@ import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { insertAdminAlerts, sendAdminAlertEmails } from '@/app/utils/adminAlertCenter';
 import { normalizeLanguageLevels, getLanguageNames, type LanguageLevelEntry } from '@/app/utils/languageLevels';
+import { schedulePublicExperienceMediaProducer } from '@/app/utils/publicExperienceMediaQueueProducer.server';
 import {
   areExperienceLocaleArraysEqual,
   buildExperienceTranslationState,
@@ -31,10 +32,23 @@ import {
   type TranslationMetaEntry,
 } from '@/app/utils/experienceTranslation';
 
-type RouteActor = {
+export type RouteActor = {
   id: string;
   email: string | null;
   isAdmin: boolean;
+};
+
+export type RouteActorDependencies = {
+  createServerClient: () => Promise<{
+    auth: {
+      getUser: () => Promise<{
+        data: { user: { id: string; email?: string | null } | null };
+        error: unknown;
+      }>;
+    };
+  }>;
+  createAdminClient: typeof createAdminClient;
+  resolveAdminAccess: typeof resolveAdminAccess;
 };
 
 type ExperienceWriteBody = {
@@ -427,17 +441,26 @@ export function toApiErrorResponse(error: unknown) {
   return NextResponse.json({ success: false, error: '서버 오류가 발생했습니다.' }, { status: 500 });
 }
 
-export async function getRouteActor() {
-  const { createClient: createServerClient } = await import('@/app/utils/supabase/server');
-  const supabaseServer = await createServerClient();
+export async function getRouteActor(
+  dependencies?: RouteActorDependencies
+) {
+  const resolvedDependencies = dependencies ?? {
+    createServerClient: async () => {
+      const { createClient } = await import('@/app/utils/supabase/server');
+      return createClient();
+    },
+    createAdminClient,
+    resolveAdminAccess,
+  };
+  const supabaseServer = await resolvedDependencies.createServerClient();
   const { data: { user }, error: authError } = await supabaseServer.auth.getUser();
 
   if (authError || !user) {
     throw new ApiError(401, 'Unauthorized');
   }
 
-  const supabaseAdmin = createAdminClient();
-  const adminAccess = await resolveAdminAccess(supabaseAdmin, {
+  const supabaseAdmin = resolvedDependencies.createAdminClient();
+  const adminAccess = await resolvedDependencies.resolveAdminAccess(supabaseAdmin, {
     userId: user.id,
     email: user.email,
   });
@@ -518,7 +541,29 @@ async function markTranslationQueueFailure(params: {
     .eq('id', experienceId);
 }
 
-export async function createExperienceFromBody(body: ExperienceWriteBody, actor: RouteActor) {
+export type ExperienceWriteDependencies = {
+  createAdminClient: typeof createAdminClient;
+  scheduleMediaProducer: typeof schedulePublicExperienceMediaProducer;
+  enqueueTranslationJob: typeof enqueueTranslationJob;
+  markTranslationQueueFailure: typeof markTranslationQueueFailure;
+  insertAdminAlerts: typeof insertAdminAlerts;
+  sendAdminAlertEmails: typeof sendAdminAlertEmails;
+};
+
+const DEFAULT_EXPERIENCE_WRITE_DEPENDENCIES: ExperienceWriteDependencies = {
+  createAdminClient,
+  scheduleMediaProducer: schedulePublicExperienceMediaProducer,
+  enqueueTranslationJob,
+  markTranslationQueueFailure,
+  insertAdminAlerts,
+  sendAdminAlertEmails,
+};
+
+export async function createExperienceFromBody(
+  body: ExperienceWriteBody,
+  actor: RouteActor,
+  dependencies: ExperienceWriteDependencies = DEFAULT_EXPERIENCE_WRITE_DEPENDENCIES
+) {
   const input = normalizeExperienceWriteBody(body);
   const translationVersion = 1;
   const queuedLocales = getQueuedTranslationLocales({
@@ -534,7 +579,7 @@ export async function createExperienceFromBody(body: ExperienceWriteBody, actor:
     translationVersion,
     queuedLocales,
   });
-  const supabaseAdmin = createAdminClient();
+  const supabaseAdmin = dependencies.createAdminClient();
   const languageNames = getLanguageNames(input.languageLevels);
 
   const { data, error } = await supabaseAdmin
@@ -571,16 +616,22 @@ export async function createExperienceFromBody(body: ExperienceWriteBody, actor:
       ...translationState.localizedColumns,
       ...translationState.localizedContentColumns,
     })
-    .select('id')
+    .select('id, status, is_active, photos, itinerary, image_url')
     .maybeSingle();
 
   if (error || !data) {
     throw error ?? new Error('Failed to create experience.');
   }
 
+  dependencies.scheduleMediaProducer({
+    before: null,
+    after: data,
+    writeKind: 'create',
+  });
+
   if (translationState.queuedLocales.length > 0) {
     try {
-      await enqueueTranslationJob({
+      await dependencies.enqueueTranslationJob({
         supabaseAdmin,
         experienceId: data.id,
         sourceLocale: input.sourceLocale,
@@ -589,7 +640,7 @@ export async function createExperienceFromBody(body: ExperienceWriteBody, actor:
       });
     } catch (queueError) {
       console.error('[Experience API] Failed to enqueue translation job:', queueError);
-      await markTranslationQueueFailure({
+      await dependencies.markTranslationQueueFailure({
         supabaseAdmin,
         experienceId: data.id,
         version: translationVersion,
@@ -601,7 +652,7 @@ export async function createExperienceFromBody(body: ExperienceWriteBody, actor:
   }
 
   if (!actor.isAdmin) {
-    insertAdminAlerts({
+    dependencies.insertAdminAlerts({
       title: '새 체험 신청이 접수되었습니다',
       message: `'${translationState.canonicalTitle}' 체험이 신규 제출되었습니다.`,
       link: '/admin/dashboard?tab=APPROVALS',
@@ -610,7 +661,7 @@ export async function createExperienceFromBody(body: ExperienceWriteBody, actor:
     });
 
     try {
-      await sendAdminAlertEmails({
+      await dependencies.sendAdminAlertEmails({
         subject: '[Locally Admin][신청] 새 체험 신청이 접수되었습니다',
         title: '새 체험 신청이 접수되었습니다',
         message: `'${translationState.canonicalTitle}' 체험이 신규 제출되었습니다.\n체험 ID: ${data.id}`,
@@ -632,13 +683,13 @@ export async function updateExperienceFromBody(params: {
   experienceId: number;
   body: ExperienceWriteBody;
   actor: RouteActor;
-}) {
+}, dependencies: ExperienceWriteDependencies = DEFAULT_EXPERIENCE_WRITE_DEPENDENCIES) {
   const { experienceId, body, actor } = params;
-  const supabaseAdmin = createAdminClient();
+  const supabaseAdmin = dependencies.createAdminClient();
 
   const { data: existing, error: existingError } = await supabaseAdmin
     .from('experiences')
-    .select('id, host_id, status, translation_version, source_locale, manual_locales, title, description, title_ko, title_en, title_ja, title_zh, description_ko, description_en, description_ja, description_zh, category, meeting_point, meeting_point_i18n, supplies, supplies_i18n, inclusions, inclusions_i18n, exclusions, exclusions_i18n, itinerary, itinerary_i18n, rules, rules_i18n, solo_guarantee_price')
+    .select('id, host_id, status, is_active, photos, image_url, translation_version, source_locale, manual_locales, title, description, title_ko, title_en, title_ja, title_zh, description_ko, description_en, description_ja, description_zh, category, meeting_point, meeting_point_i18n, supplies, supplies_i18n, inclusions, inclusions_i18n, exclusions, exclusions_i18n, itinerary, itinerary_i18n, rules, rules_i18n, solo_guarantee_price')
     .eq('id', experienceId)
     .maybeSingle();
 
@@ -746,15 +797,23 @@ export async function updateExperienceFromBody(params: {
     updateQuery = updateQuery.eq('host_id', actor.id);
   }
 
-  const { data, error } = await updateQuery.select('id').maybeSingle();
+  const { data, error } = await updateQuery
+    .select('id, status, is_active, photos, itinerary, image_url')
+    .maybeSingle();
 
   if (error || !data) {
     throw error ?? new ApiError(500, '체험 저장에 실패했습니다.');
   }
 
+  dependencies.scheduleMediaProducer({
+    before: existing,
+    after: data,
+    writeKind: 'edit',
+  });
+
   if (translationDirty && translationState.queuedLocales.length > 0) {
     try {
-      await enqueueTranslationJob({
+      await dependencies.enqueueTranslationJob({
         supabaseAdmin,
         experienceId,
         sourceLocale: input.sourceLocale,
@@ -763,7 +822,7 @@ export async function updateExperienceFromBody(params: {
       });
     } catch (queueError) {
       console.error('[Experience API] Failed to enqueue translation job:', queueError);
-      await markTranslationQueueFailure({
+      await dependencies.markTranslationQueueFailure({
         supabaseAdmin,
         experienceId,
         version: translationVersion,
@@ -775,7 +834,7 @@ export async function updateExperienceFromBody(params: {
   }
 
   if (shouldResubmitForReview) {
-    insertAdminAlerts({
+    dependencies.insertAdminAlerts({
       title: '보완 요청 체험이 재제출되었습니다',
       message: `'${translationState.canonicalTitle}' 체험이 다시 제출되었습니다.`,
       link: '/admin/dashboard?tab=APPROVALS',
@@ -784,7 +843,7 @@ export async function updateExperienceFromBody(params: {
     });
 
     try {
-      await sendAdminAlertEmails({
+      await dependencies.sendAdminAlertEmails({
         subject: '[Locally Admin][신청] 보완 요청 체험이 재제출되었습니다',
         title: '보완 요청 체험이 재제출되었습니다',
         message: `'${translationState.canonicalTitle}' 체험이 다시 제출되었습니다.\n체험 ID: ${experienceId}`,
