@@ -291,18 +291,18 @@ def audit(client, bucket, plan, mode, return_private=False):
             and metadata.get("transform_quality") == str(specification.get("quality"))
             and metadata.get("transform_format") == specification.get("format")
         )
-        sha_fields = (
+        core_sha_fields = (
             re.fullmatch(r"[0-9a-f]{64}", metadata.get("sha256", ""))
             and metadata.get("sha256") == metadata.get("output_byte_sha256")
             and re.fullmatch(r"[0-9a-f]{64}", metadata.get("source_byte_sha256", ""))
-            and str(metadata.get("source_size", "")).isdigit()
         )
+        verified_sha_fields = core_sha_fields and str(metadata.get("source_size", "")).isdigit()
         provenance = metadata.get("provenance_status")
         engine = metadata.get("transform_engine")
-        if common and sha_fields and provenance == VERIFIED_PROVENANCE_STATUS and engine in ALLOWED_DERIVATIVE_ENGINES and metadata.get("transform_schema_version") == TRANSFORM_SCHEMA_VERSION and metadata.get("derivative_role") == specification.get("role"):
+        if common and verified_sha_fields and provenance == VERIFIED_PROVENANCE_STATUS and engine in ALLOWED_DERIVATIVE_ENGINES and metadata.get("transform_schema_version") == TRANSFORM_SCHEMA_VERSION and metadata.get("derivative_role") == specification.get("role"):
             derivative_consistent += 1
             classification = "existing_metadata_consistent"
-        elif common and sha_fields and provenance == "legacy-observed":
+        elif common and core_sha_fields and provenance == "legacy-observed":
             derivative_consistent += 1
             classification = "existing_metadata_consistent"
         elif not common or provenance not in ("verified", "legacy-observed"):
@@ -324,18 +324,27 @@ def audit(client, bucket, plan, mode, return_private=False):
         candidates = originals_by_source.get(source_hash, [])
         if not candidates:
             continue
-        valid = [item for item in candidates if (
-            item.get("size", 0) > 0
-            and bool(item.get("contentType"))
-            and item.get("cacheControl") == EXPECTED_DERIVATIVE_CACHE_CONTROL
-            and re.fullmatch(r"[0-9a-f]{64}", (item.get("customMetadata") or {}).get("source_byte_sha256", ""))
-            and (item.get("customMetadata") or {}).get("source_byte_sha256") == (item.get("customMetadata") or {}).get("output_byte_sha256")
-            and (item.get("customMetadata") or {}).get("sha256") == (item.get("customMetadata") or {}).get("output_byte_sha256")
-            and (item.get("customMetadata") or {}).get("source_size") == str(item.get("size"))
-            and (item.get("customMetadata") or {}).get("provenance_status") == VERIFIED_PROVENANCE_STATUS
-            and (item.get("customMetadata") or {}).get("transform_schema_version") == TRANSFORM_SCHEMA_VERSION
-            and (item.get("customMetadata") or {}).get("transform_engine") == "source-copy"
-        )]
+        valid = []
+        for item in candidates:
+            metadata = item.get("customMetadata") or {}
+            core = (
+                item.get("size", 0) > 0
+                and bool(item.get("contentType"))
+                and item.get("cacheControl") == EXPECTED_DERIVATIVE_CACHE_CONTROL
+                and re.fullmatch(r"[0-9a-f]{64}", metadata.get("source_byte_sha256", ""))
+                and metadata.get("source_byte_sha256") == metadata.get("output_byte_sha256")
+                and metadata.get("sha256", metadata.get("output_byte_sha256")) == metadata.get("output_byte_sha256")
+                and metadata.get("source_size") == str(item.get("size"))
+            )
+            provenance_values = (
+                metadata.get("provenance_status"),
+                metadata.get("transform_schema_version"),
+                metadata.get("transform_engine"),
+            )
+            legacy = all(value in (None, "") for value in provenance_values)
+            verified = provenance_values == (VERIFIED_PROVENANCE_STATUS, TRANSFORM_SCHEMA_VERSION, "source-copy")
+            if core and (legacy or verified):
+                valid.append(item)
         if valid:
             original_metadata_consistent += 1
         else:

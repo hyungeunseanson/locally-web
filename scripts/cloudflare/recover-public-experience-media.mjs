@@ -179,16 +179,19 @@ function derivativeStateFor(source, derivative, r2Inspection) {
 function originalMetadataConsistentFor(source, r2Inspection) {
   return (r2Inspection.originalsBySourceKeySha256[source.sourceKeySha256] || []).some((item) => {
     const metadata = metadataMap(item.customMetadata);
+    const provenance = [metadata.provenance_status, metadata.transform_schema_version, metadata.transform_engine];
+    const legacy = provenance.every((value) => value == null || value === '');
+    const verified = metadata.provenance_status === VERIFIED_PROVENANCE_STATUS &&
+      metadata.transform_schema_version === TRANSFORM_SCHEMA_VERSION &&
+      metadata.transform_engine === 'source-copy';
     return Number.isSafeInteger(source.storage?.size) && source.storage.size > 0 &&
       item.size === source.storage.size &&
       metadata.source_key_sha256 === source.sourceKeySha256 &&
       /^[0-9a-f]{64}$/.test(metadata.source_byte_sha256 || '') &&
       metadata.source_byte_sha256 === metadata.output_byte_sha256 &&
-      metadata.source_byte_sha256 === metadata.sha256 &&
+      (!metadata.sha256 || metadata.source_byte_sha256 === metadata.sha256) &&
       metadata.source_size === String(source.storage.size) &&
-      metadata.provenance_status === VERIFIED_PROVENANCE_STATUS &&
-      metadata.transform_schema_version === TRANSFORM_SCHEMA_VERSION &&
-      metadata.transform_engine === 'source-copy';
+      (legacy || verified);
   });
 }
 
@@ -197,17 +200,20 @@ function exactOriginalFor(source, material, r2Inspection) {
   const expectedKey = buildOriginalKey(source.sourceKey, material.sha256, material.contentType);
   const exact = candidates.find((item) => {
     const metadata = metadataMap(item.customMetadata);
+    const provenance = [metadata.provenance_status, metadata.transform_schema_version, metadata.transform_engine];
+    const legacy = provenance.every((value) => value == null || value === '');
+    const verified = metadata.provenance_status === VERIFIED_PROVENANCE_STATUS &&
+      metadata.transform_schema_version === TRANSFORM_SCHEMA_VERSION &&
+      metadata.transform_engine === 'source-copy';
     return item.key === expectedKey && item.size === material.bytes.length &&
       normalizeContentType(item.contentType) === material.contentType &&
       item.cacheControl === 'public, max-age=31536000, immutable' &&
       metadata.source_key_sha256 === source.sourceKeySha256 &&
       metadata.source_byte_sha256 === material.sha256 &&
       metadata.output_byte_sha256 === material.sha256 &&
-      metadata.sha256 === material.sha256 &&
+      (!metadata.sha256 || metadata.sha256 === material.sha256) &&
       metadata.source_size === String(material.bytes.length) &&
-      metadata.provenance_status === VERIFIED_PROVENANCE_STATUS &&
-      metadata.transform_schema_version === TRANSFORM_SCHEMA_VERSION &&
-      metadata.transform_engine === 'source-copy';
+      (legacy || verified);
   });
   const sameKeyConflict = candidates.some((item) => item.key === expectedKey) && !exact;
   return { exact, sameKeyConflict, expectedKey };

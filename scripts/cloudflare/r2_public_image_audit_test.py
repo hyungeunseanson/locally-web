@@ -194,6 +194,59 @@ class R2ReadOnlyAuditTest(unittest.TestCase):
         report = MODULE.audit(FakeReadOnlyClient([unverifiable], {"cards/expected.webp": b"expected"}), MODULE.EXPECTED_BUCKET, plan, "metadata")
         self.assertEqual(report["completeness"]["derivativeUnverifiableCount"], 1)
 
+    def test_legacy_observed_derivative_without_source_size_is_metadata_consistent(self):
+        source_key_sha = "a" * 64
+        output_sha = hashlib.sha256(b"expected").hexdigest()
+        legacy = object_metadata("cards/expected.webp", b"expected")
+        legacy["customMetadata"] = {
+            "sha256": output_sha,
+            "output_byte_sha256": output_sha,
+            "source_byte_sha256": "b" * 64,
+            "source_key_sha256": source_key_sha,
+            "transform_width": "384",
+            "transform_quality": "65",
+            "transform_format": "webp",
+            "provenance_status": "legacy-observed",
+        }
+        plan = {
+            "expected": [{
+                "key": "cards/expected.webp", "kind": "card", "role": "card",
+                "width": 384, "quality": 65, "format": "webp", "sourceKeySha256": source_key_sha,
+            }],
+            "knownManifestKeys": ["cards/expected.webp"],
+            "publicActiveOriginalSourceKeyHashes": [],
+        }
+        report = MODULE.audit(FakeReadOnlyClient([legacy], {"cards/expected.webp": b"expected"}), MODULE.EXPECTED_BUCKET, plan, "metadata")
+        self.assertEqual(report["completeness"]["derivativeMetadataConsistentCount"], 1)
+        self.assertEqual(report["completeness"]["derivativeConflictCount"], 0)
+        self.assertEqual(report["completeness"]["derivativeUnverifiableCount"], 0)
+
+    def test_legacy_original_core_metadata_is_consistent_but_partial_provenance_conflicts(self):
+        source_hash = "a" * 64
+        body = b"original"
+        digest = hashlib.sha256(body).hexdigest()
+        original = object_metadata(
+            "originals/source-hash/original.jpg",
+            body,
+            content_type="image/jpeg",
+            stored_sha=False,
+            source_key_sha=source_hash,
+        )
+        original["customMetadata"].update({
+            "source_byte_sha256": digest,
+            "output_byte_sha256": digest,
+            "source_size": str(len(body)),
+        })
+        plan = {"expected": [], "knownManifestKeys": [], "publicActiveOriginalSourceKeyHashes": [source_hash]}
+        report = MODULE.audit(FakeReadOnlyClient([original], {original["key"]: body}), MODULE.EXPECTED_BUCKET, plan, "metadata")
+        self.assertEqual(report["completeness"]["originalMetadataConsistentCount"], 1)
+        self.assertEqual(report["completeness"]["originalConflictCount"], 0)
+
+        partial = {**original, "customMetadata": {**original["customMetadata"], "provenance_status": "verified"}}
+        report = MODULE.audit(FakeReadOnlyClient([partial], {partial["key"]: body}), MODULE.EXPECTED_BUCKET, plan, "metadata")
+        self.assertEqual(report["completeness"]["originalMetadataConsistentCount"], 0)
+        self.assertEqual(report["completeness"]["originalConflictCount"], 1)
+
     def test_whole_state_digest_covers_http_metadata(self):
         base = object_metadata("cards/expected.webp", b"expected")
         content_type_changed = {**base, "contentType": "application/octet-stream"}

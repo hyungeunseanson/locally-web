@@ -155,6 +155,39 @@ test('existing current provenance becomes an exact skip without transform', asyn
   assert.equal(result.plan.progress.conflictCount, 0);
 });
 
+test('legacy original and derivative proof remain exact after current source bytes are verified', async () => {
+  const inventory = fixture();
+  const sourceSha = '7f28ba79acf8e757e8245300024fe24ba8f5459bb096cfa7b4af6acb8ff43163';
+  const originalKey = `originals/v1/${sourceKeySha.slice(0, 2)}/${sourceKeySha}/${sourceSha}.jpg`;
+  const inspection = {
+    r2StateDigest: 'e'.repeat(64),
+    derivatives: inventory.sources[0].derivatives.map((item) => ({
+      key: item.key,
+      classification: 'existing_metadata_consistent',
+      metadata: {
+        sha256: '1'.repeat(64), output_byte_sha256: '1'.repeat(64),
+        source_key_sha256: sourceKeySha, source_byte_sha256: sourceSha,
+        transform_width: String(item.width), transform_quality: String(item.quality),
+        transform_format: item.format, provenance_status: 'legacy-observed',
+      },
+    })),
+    originalsBySourceKeySha256: {
+      [sourceKeySha]: [{
+        key: originalKey, size: 12, contentType: 'image/jpeg', cacheControl: 'public, max-age=31536000, immutable',
+        customMetadata: {
+          source_key_sha256: sourceKeySha, source_byte_sha256: sourceSha,
+          output_byte_sha256: sourceSha, source_size: '12',
+        },
+      }],
+    },
+  };
+  const result = await planWith(inspection);
+  assert.equal(result.plan.originals.length, 0);
+  assert.equal(result.plan.derivatives.length, 0);
+  assert.equal(result.calls.transform, 0);
+  assert.equal(result.plan.progress.conflictCount, 0);
+});
+
 test('same URL with changed bytes and conflicting metadata is never treated as complete', async () => {
   const inventory = fixture();
   const inspection = missingInspection(inventory);
@@ -196,14 +229,14 @@ test('unverifiable derivative and original provenance block a complete plan', as
       metadata: {
         source_key_sha256: sourceKeySha, source_byte_sha256: sourceSha, source_size: '12',
         transform_width: String(item.width), transform_quality: String(item.quality),
-        transform_format: item.format, derivative_role: item.role,
+        transform_format: item.format, derivative_role: item.role, provenance_status: 'unknown',
       },
     })),
     originalsBySourceKeySha256: {
       [sourceKeySha]: [{
         key: `originals/v1/${sourceKeySha.slice(0, 2)}/${sourceKeySha}/${sourceSha}.jpg`,
         size: 12, contentType: 'image/jpeg', cacheControl: 'public, max-age=31536000, immutable',
-        customMetadata: { source_key_sha256: sourceKeySha, source_byte_sha256: sourceSha, output_byte_sha256: sourceSha, source_size: '12' },
+        customMetadata: { source_key_sha256: sourceKeySha, source_byte_sha256: sourceSha, output_byte_sha256: sourceSha, source_size: '12', provenance_status: 'verified' },
       }],
     },
   };
