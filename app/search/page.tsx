@@ -466,6 +466,7 @@ function SearchResults() {
           <PublicExperienceCardImage
             experienceId={item.id}
             originImageUrl={imageUrl}
+            r2Eligible={item.public_image_r2_eligible === true}
             alt={title}
             sizes="168px"
             className="object-cover"

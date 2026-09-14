@@ -14,6 +14,7 @@ import { formatLocalizedExperienceLocation } from '@/app/utils/locationLocalizat
 import { getExperienceLanguageBadges, getExperiencePriceParts } from '@/app/utils/experienceCardDisplay';
 import { useAuth } from '@/app/context/AuthContext';
 import { getExperienceCardImageUrl } from '@/app/utils/experienceImages';
+import { isPublicExperienceR2Eligible } from '@/app/utils/publicExperienceMediaKeys';
 
 interface WishlistExperience {
   id: number;
@@ -295,6 +296,7 @@ export default function WishlistsPage() {
                       <PublicExperienceCardImage
                         experienceId={exp.id}
                         originImageUrl={imageUrl}
+                        r2Eligible={isPublicExperienceR2Eligible(exp)}
                         alt={title}
                         className="object-cover transition-transform duration-500 ease-out md:group-hover:scale-[1.04]"
                         sizes="(max-width: 768px) 42vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 18vw"

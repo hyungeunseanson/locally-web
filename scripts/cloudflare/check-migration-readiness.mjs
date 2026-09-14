@@ -59,7 +59,15 @@ assert.equal(
 );
 assert.deepEqual(manifest.environmentVariables.productionBuildRequired, [
   'NEXT_PUBLIC_CLOUDFLARE_IMAGE_CANARY_BASE_URL',
+  'NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_ENABLED',
+  'NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_EXPERIENCE_IDS',
 ]);
+assert.deepEqual(manifest.publicExperienceMediaReaderPolicy, {
+  enabledVariable: 'NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_ENABLED',
+  experienceIdsVariable: 'NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_EXPERIENCE_IDS',
+  defaultEnabled: 'false',
+  defaultExperienceIds: '',
+});
 assert.equal(packageJson.scripts['cloudflare:build:production'], 'node scripts/cloudflare/run-production-build.mjs');
 assert.equal(packageJson.scripts['precloudflare:deploy:production'], 'npm run cloudflare:build:production');
 assert.deepEqual(wrangler.assets, {

@@ -1,4 +1,8 @@
 import detailImageManifest from '@/app/data/publicExperienceDetailImages.generated.json';
+import {
+  getDeterministicPublicExperienceDetailKeys,
+  isPublicExperienceDeterministicReaderTarget,
+} from '@/app/utils/publicExperienceMediaReader';
 
 type DetailImageManifestEntry = {
   smallKey: string;
@@ -20,12 +24,30 @@ function getBaseUrl() {
 
 export function getCloudflarePublicExperienceDetailImage(
   experienceId: number | string,
-  originImageUrl: string
+  originImageUrl: string,
+  r2Eligible = false
 ): CloudflarePublicExperienceDetailImage | null {
   const baseUrl = getBaseUrl();
+  if (!baseUrl) return null;
+
+  if (isPublicExperienceDeterministicReaderTarget(experienceId)) {
+    const keys = getDeterministicPublicExperienceDetailKeys(
+      experienceId,
+      originImageUrl,
+      r2Eligible
+    );
+    return keys
+      ? {
+          smallUrl: `${baseUrl}/${keys.smallKey}`,
+          mediumUrl: `${baseUrl}/${keys.mediumKey}`,
+          largeUrl: `${baseUrl}/${keys.largeKey}`,
+        }
+      : null;
+  }
+
   const image = manifest[String(experienceId)]?.[originImageUrl];
 
-  if (!baseUrl || !image) return null;
+  if (!image) return null;
 
   return {
     smallUrl: `${baseUrl}/${image.smallKey}`,

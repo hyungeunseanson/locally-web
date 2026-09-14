@@ -63,6 +63,12 @@
     "defaultEnabled": "false",
     "defaultExperienceIds": ""
   },
+  "publicExperienceMediaReaderPolicy": {
+    "enabledVariable": "NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_ENABLED",
+    "experienceIdsVariable": "NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_EXPERIENCE_IDS",
+    "defaultEnabled": "false",
+    "defaultExperienceIds": ""
+  },
   "forbiddenIncrementalCacheR2Buckets": [
     "locally-public-experience-canary",
     "locally-public-host-profiles",
@@ -85,7 +91,9 @@
       "NEXT_PUBLIC_SUPABASE_ANON_KEY"
     ],
     "productionBuildRequired": [
-      "NEXT_PUBLIC_CLOUDFLARE_IMAGE_CANARY_BASE_URL"
+      "NEXT_PUBLIC_CLOUDFLARE_IMAGE_CANARY_BASE_URL",
+      "NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_ENABLED",
+      "NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_EXPERIENCE_IDS"
     ],
     "buildOptional": [
       "CI",

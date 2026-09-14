@@ -12,6 +12,7 @@ type PublicExperienceDetailImageProps = {
   sizes: string;
   className: string;
   eager?: boolean;
+  r2Eligible?: boolean;
 };
 
 export default function PublicExperienceDetailImage({
@@ -21,10 +22,21 @@ export default function PublicExperienceDetailImage({
   sizes,
   className,
   eager = false,
+  r2Eligible = false,
 }: PublicExperienceDetailImageProps) {
-  const cloudflareImage = getCloudflarePublicExperienceDetailImage(experienceId, originImageUrl);
-  const [failedCloudflareUrl, setFailedCloudflareUrl] = useState<string | null>(null);
-  const cloudflareFailed = cloudflareImage?.largeUrl === failedCloudflareUrl;
+  const cloudflareImage = getCloudflarePublicExperienceDetailImage(
+    experienceId,
+    originImageUrl,
+    r2Eligible
+  );
+  const targetIdentity = `${String(experienceId)}\u0000${originImageUrl}`;
+  const [failedCloudflareTarget, setFailedCloudflareTarget] = useState<{
+    identity: string;
+    url: string;
+  } | null>(null);
+  const cloudflareFailed =
+    failedCloudflareTarget?.identity === targetIdentity &&
+    cloudflareImage?.largeUrl === failedCloudflareTarget.url;
 
   if (cloudflareImage && !cloudflareFailed) {
     return (
@@ -39,7 +51,10 @@ export default function PublicExperienceDetailImage({
           alt={alt}
           loading={eager ? 'eager' : 'lazy'}
           decoding="async"
-          onError={() => setFailedCloudflareUrl(cloudflareImage.largeUrl)}
+          onError={() => setFailedCloudflareTarget({
+            identity: targetIdentity,
+            url: cloudflareImage.largeUrl,
+          })}
           className={`absolute inset-0 h-full w-full ${className}`}
           data-detail-image-delivery="cloudflare-r2"
         />

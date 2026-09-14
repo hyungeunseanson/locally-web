@@ -25,6 +25,7 @@ import { formatExperiencePrice, getExperienceLanguageBadges, getExperiencePriceP
 import ExperienceCardMeta from '@/app/components/ExperienceCardMeta';
 import PublicExperienceCardImage from '@/app/components/PublicExperienceCardImage';
 import { getExperienceCardImageUrl } from '@/app/utils/experienceImages';
+import { isPublicExperienceR2Eligible } from '@/app/utils/publicExperienceMediaKeys';
 
 type ExperienceCardData = {
   id: number | string;
@@ -48,6 +49,9 @@ type ExperienceCardData = {
   review_count?: number | null;
   price?: number | string | null;
   duration?: number | string | null;
+  status?: string | null;
+  is_active?: boolean | null;
+  public_image_r2_eligible?: boolean;
 };
 
 function renderCategoryIcon(categoryLabel: string) {
@@ -108,6 +112,7 @@ export default function ExperienceCard({
 
   // 이미지 주소 처리
   const imageUrl = getExperienceCardImageUrl(data);
+  const r2Eligible = data.public_image_r2_eligible === true || isPublicExperienceR2Eligible(data);
 
   // 지역 정보 (없으면 기본값)
   const location = formatLocalizedExperienceLocation(data, lang) || t('exp_card_location_fallback');
@@ -124,6 +129,7 @@ export default function ExperienceCard({
         <PublicExperienceCardImage
           experienceId={data.id}
           originImageUrl={imageUrl}
+          r2Eligible={r2Eligible}
           alt={title}
           eager={eager}
           className="object-cover transition-transform duration-700 ease-out group-hover:scale-110"

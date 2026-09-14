@@ -92,12 +92,12 @@ test.describe('public experience deterministic media key contract', () => {
     }
   });
 
-  test('keeps static manifests as the only runtime delivery authority', () => {
+  test('keeps static manifests as the default runtime delivery authority', () => {
     const cardReader = readFileSync('app/utils/cloudflareImageCanary.ts', 'utf8');
     const detailReader = readFileSync('app/utils/cloudflarePublicExperienceDetailImages.ts', 'utf8');
     expect(cardReader).toContain('PUBLIC_EXPERIENCE_CARD_IMAGES');
     expect(detailReader).toContain('publicExperienceDetailImages.generated.json');
-    expect(cardReader).not.toContain('publicExperienceMediaKeys');
-    expect(detailReader).not.toContain('publicExperienceMediaKeys');
+    expect(cardReader).toContain('isPublicExperienceDeterministicReaderTarget');
+    expect(detailReader).toContain('isPublicExperienceDeterministicReaderTarget');
   });
 });
