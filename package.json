@@ -46,6 +46,7 @@
     "cloudflare:experience-media:repair:test": "node --test scripts/cloudflare/plan-public-experience-media-repair.test.mjs && python3 -m unittest scripts/cloudflare/r2_public_image_repair_test.py",
     "cloudflare:experience-media:key-contract": "NEXT_PUBLIC_SITE_URL=http://127.0.0.1:3000 NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54329 NEXT_PUBLIC_SUPABASE_ANON_KEY=local-media-key-contract-anon-key SUPABASE_SERVICE_ROLE_KEY=local-media-key-contract-service-role-key playwright test -c playwright.contracts.config.ts tests/e2e/242-public-experience-media-key-contract.spec.ts --project=chromium --workers=1",
     "cloudflare:experience-media:queue-engine:contract": "NODE_OPTIONS=--conditions=react-server NEXT_PUBLIC_SITE_URL=http://127.0.0.1:3000 NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54329 NEXT_PUBLIC_SUPABASE_ANON_KEY=local-media-queue-contract-anon-key playwright test -c playwright.contracts.config.ts tests/e2e/243-public-experience-media-queue-engine.spec.ts tests/e2e/244-public-experience-media-queue-consumer.spec.ts tests/e2e/245-public-experience-media-queue-producer.spec.ts tests/e2e/246-public-experience-media-producer-integration.spec.ts --project=chromium --workers=1",
+    "test:e2e:next-security-contract": "NEXT_PUBLIC_SITE_URL=http://127.0.0.1:3000 NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54329 NEXT_PUBLIC_SUPABASE_ANON_KEY=local-next-security-contract-anon-key playwright test -c playwright.contracts.config.ts tests/e2e/247-next-security-runtime-contract.spec.ts --project=chromium --workers=1",
     "supabase:staging:baseline:check": "node scripts/supabase/check-production-baseline.mjs",
     "supabase:staging:current:check": "node scripts/supabase/check-production-current-state.mjs",
     "supabase:staging:contract": "npm run supabase:staging:baseline:check && npm run supabase:staging:current:check && node scripts/supabase/check-staging-bootstrap.mjs && NEXT_PUBLIC_SITE_URL=http://127.0.0.1:3000 NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54329 NEXT_PUBLIC_SUPABASE_ANON_KEY=local-staging-contract-anon-key SUPABASE_SERVICE_ROLE_KEY=local-staging-contract-service-role-key playwright test -c playwright.contracts.config.ts tests/e2e/238-supabase-staging-bootstrap-contract.spec.ts --project=chromium --workers=1",
@@ -103,7 +104,7 @@
     "html-to-image": "^1.11.13",
     "isomorphic-dompurify": "^3.0.0-rc.2",
     "lucide-react": "^0.563.0",
-    "next": "16.2.4",
+    "next": "16.3.5",
     "nodemailer": "^8.0.1",
     "react": "19.2.3",
     "react-confetti": "^6.4.0",
@@ -127,7 +128,7 @@
     "@types/react-date-range": "^1.4.10",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.4",
+    "eslint-config-next": "16.3.5",
     "hasown": "2.0.2",
     "side-channel": "1.1.0",
     "side-channel-list": "1.0.0",
@@ -139,7 +140,7 @@
   },
   "overrides": {
     "next": {
-      "postcss": "8.5.12"
+      "postcss": "8.5.23"
     }
   }
 }

@@ -35,7 +35,7 @@ jobs:
         run: npm ci
 
       - name: Verify pinned runtime dependencies
-        run: npm ls @opennextjs/cloudflare@1.19.6 wrangler@4.129.1 next@16.2.4 react@19.2.3 react-dom@19.2.3 --depth=0
+        run: npm ls @opennextjs/cloudflare@1.19.6 wrangler@4.129.1 next@16.3.5 eslint-config-next@16.3.5 react@19.2.3 react-dom@19.2.3 --depth=0
 
       - name: Lint
         run: npm run lint
@@ -45,6 +45,9 @@ jobs:
 
       - name: Run Auth regression gate
         run: npm run test:e2e:auth-regression
+
+      - name: Validate the patched Next.js runtime contract
+        run: npm run test:e2e:next-security-contract
 
       - name: Validate the functional canary safety contract
         run: npm run cloudflare:functional:contract
