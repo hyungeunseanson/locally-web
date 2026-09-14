@@ -17,6 +17,7 @@ import {
   type SearchTypeId,
 } from '@/app/search/searchContract';
 import { buildSearchHaystack, buildSearchTypeHaystack, tokenizeSearchInput } from '@/app/search/searchText';
+import { isPublicExperienceR2Eligible } from '@/app/utils/publicExperienceMediaKeys';
 
 const SEARCH_CACHE_HEADERS = {
   'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=600',
@@ -153,6 +154,7 @@ function hasPublicExperienceVisibility(item: SearchExperience) {
 }
 
 function stripInternalExperienceFields(item: SearchExperience) {
+  const publicImageR2Eligible = isPublicExperienceR2Eligible(item);
   const publicItem = {
     ...(item as SearchExperience & {
       host_id?: unknown;
@@ -171,6 +173,7 @@ function stripInternalExperienceFields(item: SearchExperience) {
   delete publicItem.is_active;
   delete publicItem.status;
   delete publicItem.tags;
+  publicItem.public_image_r2_eligible = publicImageR2Eligible;
   return publicItem;
 }
 

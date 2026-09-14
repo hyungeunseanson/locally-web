@@ -20,14 +20,55 @@ export async function readProductionMediaBaseUrl() {
   return value;
 }
 
-export function buildProductionEnvironment(currentEnvironment, mediaBaseUrl) {
+export async function readProductionMediaReaderPolicy() {
+  const manifest = JSON.parse(await readFile(MANIFEST_PATH, 'utf8'));
+  const policy = manifest.publicExperienceMediaReaderPolicy;
+  assert.deepEqual(policy, {
+    enabledVariable: 'NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_ENABLED',
+    experienceIdsVariable: 'NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_EXPERIENCE_IDS',
+    defaultEnabled: 'false',
+    defaultExperienceIds: '',
+  }, 'Production deterministic reader defaults are missing or unexpected.');
+  return policy;
+}
+
+function resolveProductionReaderConfiguration(currentEnvironment, policy) {
+  const enabled = currentEnvironment[policy.enabledVariable] ?? policy.defaultEnabled;
+  const experienceIds = currentEnvironment[policy.experienceIdsVariable]
+    ?? policy.defaultExperienceIds;
+
+  assert(
+    enabled === 'true' || enabled === 'false',
+    'Production deterministic reader enabled value must be exactly true or false.'
+  );
+  assert(
+    experienceIds === '' || /^\d+(,\d+)*$/.test(experienceIds),
+    'Production deterministic reader allowlist must be empty or comma-separated numeric IDs.'
+  );
+  assert(
+    (enabled === 'true' && experienceIds !== '') || (enabled === 'false' && experienceIds === ''),
+    'Production deterministic reader must be either enabled with an allowlist or fully OFF.'
+  );
+
+  return { enabled, experienceIds };
+}
+
+export function buildProductionEnvironment(currentEnvironment, mediaBaseUrl, readerPolicy = {
+  enabledVariable: 'NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_ENABLED',
+  experienceIdsVariable: 'NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_EXPERIENCE_IDS',
+  defaultEnabled: 'false',
+  defaultExperienceIds: '',
+}) {
   const configuredValue = currentEnvironment.NEXT_PUBLIC_CLOUDFLARE_IMAGE_CANARY_BASE_URL?.trim();
   if (configuredValue && configuredValue.replace(/\/$/, '') !== mediaBaseUrl) {
     throw new Error('Refusing a conflicting Production public experience media base URL.');
   }
+  const reader = resolveProductionReaderConfiguration(currentEnvironment, readerPolicy);
   return {
     ...currentEnvironment,
     NEXT_PUBLIC_CLOUDFLARE_IMAGE_CANARY_BASE_URL: mediaBaseUrl,
+    [readerPolicy.enabledVariable]: reader.enabled,
+    [readerPolicy.experienceIdsVariable]: reader.experienceIds,
   };
 }
 
@@ -62,12 +103,18 @@ export function runOpenNextBuild(environment) {
 
 export async function main() {
   const mediaBaseUrl = await readProductionMediaBaseUrl();
-  const environment = buildProductionEnvironment(process.env, mediaBaseUrl);
+  const readerPolicy = await readProductionMediaReaderPolicy();
+  const environment = buildProductionEnvironment(process.env, mediaBaseUrl, readerPolicy);
   runOpenNextBuild(environment);
   await verifyProductionClientBundle(mediaBaseUrl);
   console.log(JSON.stringify({
     status: 'LOCALLY_CLOUDFLARE_PRODUCTION_BUILD_CONTRACT_PASS',
     publicExperienceMediaBaseUrl: mediaBaseUrl,
+    deterministicReaderEnabled: environment[readerPolicy.enabledVariable],
+    deterministicReaderExperienceCount:
+      environment[readerPolicy.experienceIdsVariable] === ''
+        ? 0
+        : environment[readerPolicy.experienceIdsVariable].split(',').length,
   }));
 }
 

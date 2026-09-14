@@ -50,6 +50,7 @@ type HostExperienceCardData = {
   review_count?: number | null;
   price?: number | string | null;
   duration?: number | string | null;
+  status?: string | null;
   is_active?: boolean | null;
 };
 
@@ -126,6 +127,7 @@ function normalizeHostExperienceRows(rows: unknown): HostExperienceCardData[] {
       review_count: readNullableNumber(row.review_count),
       price: readNullableNumberOrString(row.price),
       duration: readNullableNumberOrString(row.duration),
+      status: readNullableString(row.status),
       is_active: readNullableBoolean(row.is_active),
     });
 
@@ -135,6 +137,7 @@ function normalizeHostExperienceRows(rows: unknown): HostExperienceCardData[] {
 
 const PUBLIC_HOST_PROFILE_EXPERIENCE_SELECT = [
   ...PUBLIC_EXPERIENCE_CARD_SELECT_FIELDS,
+  'status',
   'is_active',
 ].join(', ');
 

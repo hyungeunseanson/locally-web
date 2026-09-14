@@ -7,6 +7,7 @@ import test from 'node:test';
 import {
   buildProductionEnvironment,
   readProductionMediaBaseUrl,
+  readProductionMediaReaderPolicy,
   verifyProductionClientBundle,
 } from './run-production-build.mjs';
 
@@ -24,6 +25,37 @@ test('owns the exact Production media URL and injects it only through the Produc
     }, EXPECTED_URL),
     /conflicting Production/
   );
+});
+
+test('defaults the deterministic reader OFF and validates an explicit build-time rollout', async () => {
+  const policy = await readProductionMediaReaderPolicy();
+  const disabled = buildProductionEnvironment({}, EXPECTED_URL, policy);
+  assert.equal(disabled.NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_ENABLED, 'false');
+  assert.equal(disabled.NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_EXPERIENCE_IDS, '');
+
+  const enabled = buildProductionEnvironment({
+    NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_ENABLED: 'true',
+    NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_EXPERIENCE_IDS: '3309',
+  }, EXPECTED_URL, policy);
+  assert.equal(enabled.NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_ENABLED, 'true');
+  assert.equal(enabled.NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_EXPERIENCE_IDS, '3309');
+
+  for (const invalid of [
+    { NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_ENABLED: 'true' },
+    {
+      NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_ENABLED: 'false',
+      NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_EXPERIENCE_IDS: '3309',
+    },
+    {
+      NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_ENABLED: 'true',
+      NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_EXPERIENCE_IDS: '*',
+    },
+  ]) {
+    assert.throws(
+      () => buildProductionEnvironment(invalid, EXPECTED_URL, policy),
+      /deterministic reader/
+    );
+  }
 });
 
 test('fails closed unless the exact URL is present in a generated client bundle', async () => {

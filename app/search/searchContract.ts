@@ -21,6 +21,7 @@ export interface SearchExperience {
   available_times?: string[];
   status?: string | null;
   is_active?: boolean | null;
+  public_image_r2_eligible?: boolean;
   title_ko?: string;
   description_ko?: string;
   title_en?: string;

@@ -131,7 +131,15 @@ test.describe('Cloudflare migration readiness contract', () => {
     );
     expect(manifest.environmentVariables.productionBuildRequired).toEqual([
       'NEXT_PUBLIC_CLOUDFLARE_IMAGE_CANARY_BASE_URL',
+      'NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_ENABLED',
+      'NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_EXPERIENCE_IDS',
     ]);
+    expect(manifest.publicExperienceMediaReaderPolicy).toEqual({
+      enabledVariable: 'NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_ENABLED',
+      experienceIdsVariable: 'NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_EXPERIENCE_IDS',
+      defaultEnabled: 'false',
+      defaultExperienceIds: '',
+    });
     expect(packageJson.scripts['cloudflare:build:production']).toBe(
       'node scripts/cloudflare/run-production-build.mjs'
     );

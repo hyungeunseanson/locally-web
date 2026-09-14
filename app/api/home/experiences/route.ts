@@ -7,6 +7,7 @@ import {
   pickLatestPublicHostApplicationsByUser,
 } from '@/app/utils/hostVisibility';
 import { PUBLIC_EXPERIENCE_CARD_SELECT_FIELDS } from '@/app/search/searchContract';
+import { isPublicExperienceR2Eligible } from '@/app/utils/publicExperienceMediaKeys';
 
 type PublicHostApplicationRow = {
   id?: string | number | null;
@@ -174,6 +175,7 @@ export async function GET() {
 
       return {
         ...publicExperience,
+        public_image_r2_eligible: isPublicExperienceR2Eligible(experience),
         is_superhost: superhostIds.has(String(experience.host_id || '')),
         card_image_url: experience.photos?.[0] ?? experience.image_url ?? null,
         available_dates: availableDatesByExperienceId.get(String(experience.id)) ?? [],

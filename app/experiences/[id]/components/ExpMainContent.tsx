@@ -19,6 +19,7 @@ import {
   getLocalizedRefundPolicyLabel,
 } from '@/app/utils/experienceTranslation';
 import { getExperienceDurationHours } from '@/app/utils/experienceCardDisplay';
+import { isPublicExperienceR2Eligible } from '@/app/utils/publicExperienceMediaKeys';
 
 type MainContentProps = {
   experience: ExperienceDetail;
@@ -80,6 +81,7 @@ export default function ExpMainContent({
   const activityLevel = getLocalizedActivityLevelLabel(rules.activity_level || '보통', lang);
   const durationHours = getExperienceDurationHours(experience.duration);
   const durationText = durationHours ? t('exp_card_duration_hours', { hours: durationHours }) : '';
+  const publicImageR2Eligible = isPublicExperienceR2Eligible(experience);
 
   const handleCopyAddress = () => {
     navigator.clipboard.writeText(copyTarget);
@@ -110,6 +112,7 @@ export default function ExpMainContent({
                     <PublicExperienceDetailImage
                       experienceId={experience.id}
                       originImageUrl={imageSrc}
+                      r2Eligible={publicImageR2Eligible}
                       sizes="(max-width: 768px) 72px, 100px"
                       className="object-cover"
                       alt={item?.title || `itinerary-${idx + 1}`}

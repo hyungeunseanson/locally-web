@@ -46,6 +46,7 @@ export interface HomeExperienceCardData {
   card_image_url?: string | null;
   photos?: string[] | null;
   image_url?: string | null;
+  public_image_r2_eligible?: boolean;
 }
 
 function renderCategoryIcon(categoryLabel: string) {
@@ -104,6 +105,7 @@ export default function HomeExperienceCard({ data }: { data: HomeExperienceCardD
         <PublicExperienceCardImage
           experienceId={data.id}
           originImageUrl={imageUrl}
+          r2Eligible={data.public_image_r2_eligible === true}
           alt={title}
           className="object-cover transition-transform duration-500 ease-out md:group-hover:scale-[1.04]"
           sizes="(max-width: 768px) 42vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 18vw"
