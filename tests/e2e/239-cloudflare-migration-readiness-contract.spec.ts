@@ -108,6 +108,7 @@ test.describe('Cloudflare migration readiness contract', () => {
       [manifest.publicExperienceMediaProducerPolicy.experienceIdsVariable]: '',
       [manifest.experienceTranslationReleasePolicy.queueEnabledVariable]: 'false',
       [manifest.experienceTranslationReleasePolicy.scheduledRecoveryEnabledVariable]: 'false',
+      [manifest.homePopularityReleasePolicy.scheduledEnabledVariable]: 'false',
     });
     expect(wrangler.env.production.queues?.consumers).toContainEqual({
       queue: manifest.environments.production.experienceTranslationQueue,
@@ -120,6 +121,9 @@ test.describe('Cloudflare migration readiness contract', () => {
     expect(wrangler.env.production.triggers).toEqual({
       crons: [manifest.experienceTranslationQueuePolicy.recoveryCron],
     });
+    expect(manifest.homePopularityReleasePolicy.cron).toBe(
+      manifest.experienceTranslationQueuePolicy.recoveryCron
+    );
     expect(wrangler.env.canary.vars).not.toHaveProperty(
       manifest.publicExperienceMediaProducerPolicy.enabledVariable
     );
@@ -131,6 +135,9 @@ test.describe('Cloudflare migration readiness contract', () => {
     );
     expect(wrangler.env.canary.vars).not.toHaveProperty(
       manifest.experienceTranslationReleasePolicy.scheduledRecoveryEnabledVariable
+    );
+    expect(wrangler.env.canary.vars).not.toHaveProperty(
+      manifest.homePopularityReleasePolicy.scheduledEnabledVariable
     );
     expect(wrangler.env.canary.triggers).toBeUndefined();
 

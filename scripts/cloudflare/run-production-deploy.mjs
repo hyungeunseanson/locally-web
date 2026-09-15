@@ -9,12 +9,14 @@ import {
   resolveReleaseProfile,
 } from './public-experience-media-release-profile.mjs';
 import { readTranslationReleasePolicy, resolveTranslationReleaseProfile } from './experience-translation-release-profile.mjs';
+import { readHomePopularityReleasePolicy, resolveHomePopularityReleaseProfile } from './home-popularity-release-profile.mjs';
 
 const ROOT = process.cwd();
 
 export function parseDeploymentArguments(argumentsList) {
   let requestedProfile;
   let requestedTranslationProfile;
+  let requestedHomePopularityProfile;
   let dryRun = false;
   for (const argument of argumentsList) {
     if (argument.startsWith('--media-profile=')) {
@@ -25,16 +27,20 @@ export function parseDeploymentArguments(argumentsList) {
       assert(!requestedTranslationProfile, 'Specify the translation release profile only once.');
       requestedTranslationProfile = argument.slice('--translation-profile='.length);
       assert(requestedTranslationProfile, 'The translation release profile cannot be empty.');
+    } else if (argument.startsWith('--home-popularity-profile=')) {
+      assert(!requestedHomePopularityProfile, 'Specify the Home popularity release profile only once.');
+      requestedHomePopularityProfile = argument.slice('--home-popularity-profile='.length);
+      assert(requestedHomePopularityProfile, 'The Home popularity release profile cannot be empty.');
     } else if (argument === '--dry-run') {
       dryRun = true;
     } else {
       throw new Error(`Unsupported Production deployment argument: ${argument}`);
     }
   }
-  return { requestedProfile, requestedTranslationProfile, dryRun };
+  return { requestedProfile, requestedTranslationProfile, requestedHomePopularityProfile, dryRun };
 }
 
-export function buildDeploymentContract(profile, translationProfile, { dryRun = false } = {}) {
+export function buildDeploymentContract(profile, translationProfile, homePopularityProfile, { dryRun = false } = {}) {
   const readerEnvironment = {
     NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_ENABLED: profile.enabled,
     NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_EXPERIENCE_IDS: profile.experienceIds,
@@ -54,6 +60,8 @@ export function buildDeploymentContract(profile, translationProfile, { dryRun = 
     `EXPERIENCE_TRANSLATION_QUEUE_ENABLED:${translationProfile.queueEnabled}`,
     '--var',
     `EXPERIENCE_TRANSLATION_SCHEDULED_RECOVERY_ENABLED:${translationProfile.scheduledRecoveryEnabled}`,
+    '--var',
+    `HOME_POPULARITY_SNAPSHOT_SCHEDULED_ENABLED:${homePopularityProfile.scheduledEnabled}`,
   ];
   if (dryRun) wranglerArguments.push('--dry-run');
   return { readerEnvironment, wranglerArguments };
@@ -77,7 +85,9 @@ export async function main(argumentsList = process.argv.slice(2)) {
   const profile = resolveReleaseProfile(policy, options.requestedProfile);
   const translationPolicy = await readTranslationReleasePolicy();
   const translationProfile = resolveTranslationReleaseProfile(translationPolicy, options.requestedTranslationProfile);
-  const contract = buildDeploymentContract(profile, translationProfile, options);
+  const homePopularityPolicy = await readHomePopularityReleasePolicy();
+  const homePopularityProfile = resolveHomePopularityReleaseProfile(homePopularityPolicy, options.requestedHomePopularityProfile);
+  const contract = buildDeploymentContract(profile, translationProfile, homePopularityProfile, options);
   const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
   const wranglerCommand = path.join(
     ROOT,
@@ -100,6 +110,8 @@ export async function main(argumentsList = process.argv.slice(2)) {
     experienceTranslationProfile: translationProfile.name,
     experienceTranslationQueueEnabled: translationProfile.queueEnabled,
     experienceTranslationScheduledRecoveryEnabled: translationProfile.scheduledRecoveryEnabled,
+    homePopularityProfile: homePopularityProfile.name,
+    homePopularityScheduledEnabled: homePopularityProfile.scheduledEnabled,
   }));
 }
 
