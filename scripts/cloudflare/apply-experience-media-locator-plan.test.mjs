@@ -31,9 +31,13 @@ test('prevalidates every selected row before the first optimistic write', async 
 test('binds the write to all approved old media fields', () => {
   const url = new URL(buildOptimisticPatchUrl('https://example.test', plan.changes[0]));
   assert.equal(url.searchParams.get('id'), 'eq.42');
-  assert.equal(url.searchParams.get('photos'), `eq.${JSON.stringify(row.photos)}`);
+  assert.equal(url.searchParams.get('photos'), `eq.{"${sourceUrl}"}`);
   assert.equal(url.searchParams.get('image_url'), 'is.null');
   assert.equal(url.searchParams.get('itinerary'), `eq.${JSON.stringify(row.itinerary)}`);
+  const withLegacyImage = structuredClone(plan.changes[0]);
+  withLegacyImage.before.image_url = sourceUrl;
+  const legacyUrl = new URL(buildOptimisticPatchUrl('https://example.test', withLegacyImage));
+  assert.equal(legacyUrl.searchParams.get('image_url'), `eq.${sourceUrl}`);
 });
 
 test('rejects a tampered digest and optimistic conflict', async () => {

@@ -17,13 +17,27 @@ function rowState(row) {
   return Object.fromEntries(FIELDS.map((field) => [field, row[field] ?? null]));
 }
 
-function filterValue(value) {
-  return value === null ? 'is.null' : `eq.${JSON.stringify(value)}`;
+function postgresTextArray(value) {
+  assert(Array.isArray(value), 'Photos must remain a text array.');
+  return `{${value.map((item) => {
+    assert.equal(typeof item, 'string', 'Photos must contain only strings.');
+    return `"${item.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
+  }).join(',')}}`;
+}
+
+function filterValue(field, value) {
+  if (value === null) return 'is.null';
+  if (field === 'photos') return `eq.${postgresTextArray(value)}`;
+  if (field === 'image_url') {
+    assert.equal(typeof value, 'string', 'Legacy image URL must remain text.');
+    return `eq.${value}`;
+  }
+  return `eq.${JSON.stringify(value)}`;
 }
 
 export function buildOptimisticPatchUrl(baseUrl, change) {
   const query = new URLSearchParams({ id: `eq.${change.experienceId}` });
-  for (const field of FIELDS) query.set(field, filterValue(change.before[field] ?? null));
+  for (const field of FIELDS) query.set(field, filterValue(field, change.before[field] ?? null));
   return `${baseUrl}/rest/v1/experiences?${query}`;
 }
 
