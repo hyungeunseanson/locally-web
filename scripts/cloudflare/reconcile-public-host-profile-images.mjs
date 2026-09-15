@@ -6,7 +6,9 @@ import { pathToFileURL } from 'node:url';
 
 const MANIFEST_PATH = path.resolve('app/data/publicHostProfileImages.generated.json');
 const EXCLUSIONS_PATH = path.resolve('config/public-host-profile-r2-exclusions.json');
-const PUBLIC_PROFILE_PATTERN = /^https:\/\/uhinvcydgzqlpnvieyal\.supabase\.co\/storage\/v1\/object\/public\/images\/profile\/[A-Za-z0-9._-]+$/;
+const PUBLIC_STORAGE_ORIGIN = 'https://uhinvcydgzqlpnvieyal.supabase.co';
+const PROFILE_PATH_PATTERN = /^\/storage\/v1\/object\/public\/images\/profile\/[A-Za-z0-9._-]+$/;
+const AVATAR_PATH_PATTERN = /^\/storage\/v1\/object\/public\/avatars\/[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/;
 const HOST_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const VISIBLE_STATUSES = new Set(['approved', 'active']);
 
@@ -21,7 +23,10 @@ function parseArgs() {
     output: path.resolve(values.output || '.tmp/cloudflare-public-host-profile-reconciliation'),
     plan: values.plan ? path.resolve(values.plan) : null,
     missing: values.missing ? path.resolve(values.missing) : null,
+    objects: values.objects ? path.resolve(values.objects) : null,
+    priorSourceBytes: Number(values['prior-source-bytes'] || 0),
     hostId: values['host-id'] || null,
+    allowNoDrift: values['allow-no-drift'] === 'true',
   };
 }
 
@@ -87,32 +92,75 @@ export function pickLatestRowsByUser(rows) {
   return [...latest.values()].sort((a, b) => a.user_id.localeCompare(b.user_id));
 }
 
-export function normalizeInventory(rows, exclusions = []) {
+export function normalizePublicHostProfileSourceUrl(value, allowedKinds = ['application-profile', 'public-profile-avatar']) {
+  if (typeof value !== 'string' || value !== value.trim()) return null;
+  try {
+    const parsed = new URL(value);
+    if (parsed.origin !== PUBLIC_STORAGE_ORIGIN || parsed.search || parsed.hash || parsed.username || parsed.password) return null;
+    if (parsed.href !== value) return null;
+    if (allowedKinds.includes('application-profile') && PROFILE_PATH_PATTERN.test(parsed.pathname)) {
+      return { originUrl: value, sourceKind: 'application-profile' };
+    }
+    if (allowedKinds.includes('public-profile-avatar') && AVATAR_PATH_PATTERN.test(parsed.pathname)) {
+      return { originUrl: value, sourceKind: 'public-profile-avatar' };
+    }
+  } catch {}
+  return null;
+}
+
+export function normalizeInventory(rows, exclusions = [], profiles = []) {
   if (!Array.isArray(rows) || rows.length === 0) throw new Error('No public host application rows were returned.');
   if (!Array.isArray(exclusions)) throw new Error('Profile R2 exclusions must be an array.');
   const excludedHostIds = new Set(exclusions.map(validateHostId));
+  const profilesById = new Map();
+  for (const profile of profiles) {
+    const id = typeof profile?.id === 'string' ? profile.id.trim().toLowerCase() : '';
+    if (!id) continue;
+    validateHostId(id);
+    if (profilesById.has(id)) throw new Error('Duplicate public profile id in profile inventory.');
+    profilesById.set(id, profile);
+  }
   const latestRows = pickLatestRowsByUser(rows);
   const visibleRows = latestRows.filter((row) => VISIBLE_STATUSES.has(row.status));
   const inventory = [];
   let missingPhotoCount = 0;
   let unexpectedPhotoCount = 0;
   let excludedHostCount = 0;
+  let externalAvatarExcludedCount = 0;
+  let applicationProfileCount = 0;
+  let publicProfileAvatarCount = 0;
 
   for (const row of visibleRows) {
     const photo = typeof row.profile_photo === 'string' ? row.profile_photo.trim() : '';
-    if (!photo) {
-      missingPhotoCount += 1;
+    const applicationSource = photo
+      ? normalizePublicHostProfileSourceUrl(photo, ['application-profile'])
+      : null;
+    if (photo && !applicationSource) {
+      unexpectedPhotoCount += 1;
       continue;
     }
-    if (!PUBLIC_PROFILE_PATTERN.test(photo)) {
-      unexpectedPhotoCount += 1;
+    const publicAvatar = typeof profilesById.get(row.user_id)?.avatar_url === 'string'
+      ? profilesById.get(row.user_id).avatar_url.trim()
+      : '';
+    const avatarSource = !photo && publicAvatar
+      ? normalizePublicHostProfileSourceUrl(publicAvatar, ['public-profile-avatar', 'application-profile'])
+      : null;
+    if (!photo && publicAvatar && !avatarSource) {
+      externalAvatarExcludedCount += 1;
+      continue;
+    }
+    const source = applicationSource || avatarSource;
+    if (!source) {
+      missingPhotoCount += 1;
       continue;
     }
     if (excludedHostIds.has(row.user_id)) {
       excludedHostCount += 1;
       continue;
     }
-    inventory.push({ hostId: row.user_id, originUrl: photo });
+    if (source.sourceKind === 'application-profile') applicationProfileCount += 1;
+    else publicProfileAvatarCount += 1;
+    inventory.push({ hostId: row.user_id, ...source });
   }
 
   const uniqueHostIds = new Set(inventory.map((item) => item.hostId));
@@ -130,13 +178,22 @@ export function normalizeInventory(rows, exclusions = []) {
       missingPhotoCount,
       unexpectedPhotoCount,
       excludedHostCount,
-      snapshotHash: snapshotHash(latestRows.map((row) => ({
-        id: row.id,
-        user_id: row.user_id,
-        status: row.status,
-        profile_photo: row.profile_photo,
-        created_at: row.created_at,
-      }))),
+      externalAvatarExcludedCount,
+      applicationProfileCount,
+      publicProfileAvatarCount,
+      snapshotHash: snapshotHash({
+        applications: latestRows.map((row) => ({
+          id: row.id,
+          user_id: row.user_id,
+          status: row.status,
+          profile_photo: row.profile_photo,
+          created_at: row.created_at,
+        })),
+        profiles: visibleRows.map((row) => ({
+          id: row.user_id,
+          avatar_url: profilesById.get(row.user_id)?.avatar_url ?? null,
+        })),
+      }),
     },
   };
 }
@@ -157,10 +214,11 @@ export function buildSpecifications(manifest) {
   const specifications = [];
   for (const [hostId, entry] of Object.entries(manifest)) {
     validateHostId(hostId);
-    if (!PUBLIC_PROFILE_PATTERN.test(entry.originUrl)) throw new Error(`Refusing unexpected profile origin for host ${hostId}.`);
+    const source = normalizePublicHostProfileSourceUrl(entry.originUrl);
+    if (!source) throw new Error(`Refusing unexpected profile origin for host ${hostId}.`);
     specifications.push(
-      { hostId, originUrl: entry.originUrl, key: entry.smallKey, width: 128, quality: 80 },
-      { hostId, originUrl: entry.originUrl, key: entry.largeKey, width: 256, quality: 80 },
+      { hostId, originUrl: entry.originUrl, sourceKind: source.sourceKind, key: entry.smallKey, width: 128, quality: 80 },
+      { hostId, originUrl: entry.originUrl, sourceKind: source.sourceKind, key: entry.largeKey, width: 256, quality: 80 },
     );
   }
   const keys = specifications.map((item) => item.key);
@@ -194,6 +252,26 @@ async function fetchPublicHostApplications() {
   return rows;
 }
 
+async function fetchPublicProfiles(hostIds) {
+  if (hostIds.length === 0) return [];
+  await loadLocalPublicEnvironment();
+  const baseUrl = requireEnvironment('NEXT_PUBLIC_SUPABASE_URL').replace(/\/$/, '');
+  const anonKey = requireEnvironment('NEXT_PUBLIC_SUPABASE_ANON_KEY');
+  const query = new URLSearchParams({
+    select: 'id,avatar_url',
+    id: `in.(${hostIds.join(',')})`,
+  });
+  const response = await fetch(`${baseUrl}/rest/v1/public_profiles?${query}`, {
+    headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` },
+    redirect: 'manual',
+  });
+  if (response.status >= 300 && response.status < 400) throw new Error('Public profile inventory refused a redirect.');
+  if (!response.ok) throw new Error(`Public profile inventory failed: HTTP ${response.status}`);
+  const rows = await response.json();
+  if (!Array.isArray(rows)) throw new Error('Public profile inventory response is not an array.');
+  return rows;
+}
+
 async function loadExclusions() {
   const exclusions = JSON.parse(await readFile(EXCLUSIONS_PATH, 'utf8'));
   if (!Array.isArray(exclusions)) throw new Error('Profile R2 exclusions must be an array.');
@@ -207,7 +285,9 @@ async function loadState() {
     loadExclusions(),
     readFile(MANIFEST_PATH, 'utf8'),
   ]);
-  const normalized = normalizeInventory(rows, exclusions);
+  const latestRows = pickLatestRowsByUser(rows);
+  const profiles = await fetchPublicProfiles(latestRows.map((row) => row.user_id));
+  const normalized = normalizeInventory(rows, exclusions, profiles);
   const currentManifest = JSON.parse(manifestSource);
   const expectedManifest = buildExpectedManifest(normalized.inventory);
   const drift = stableJson(currentManifest) !== stableJson(expectedManifest);
@@ -229,7 +309,7 @@ async function appendGithubOutput(name, value) {
   if (process.env.GITHUB_OUTPUT) await writeFile(process.env.GITHUB_OUTPUT, `${name}=${value}\n`, { flag: 'a' });
 }
 
-async function downloadSource(url) {
+async function downloadSource(url, budget) {
   let lastError;
   for (let attempt = 1; attempt <= 4; attempt += 1) {
     try {
@@ -238,7 +318,26 @@ async function downloadSource(url) {
       if (response.url !== url) throw new Error('unexpected source redirect');
       const contentType = (response.headers.get('content-type') || '').split(';', 1)[0];
       if (!['image/jpeg', 'image/png', 'image/webp'].includes(contentType)) throw new Error(`unexpected content type ${contentType}`);
-      const bytes = Buffer.from(await response.arrayBuffer());
+      const declaredLength = Number(response.headers.get('content-length') || 0);
+      if (declaredLength > 10 * 1024 * 1024 || budget.bytes + declaredLength > budget.maxBytes) {
+        throw new Error('source image exceeds the bounded download budget');
+      }
+      if (!response.body) throw new Error('source response body is unavailable');
+      const reader = response.body.getReader();
+      const chunks = [];
+      let received = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        received += value.byteLength;
+        budget.bytes += value.byteLength;
+        if (received > 10 * 1024 * 1024 || budget.bytes > budget.maxBytes) {
+          await reader.cancel();
+          throw new Error('source image exceeds the bounded download budget');
+        }
+        chunks.push(Buffer.from(value));
+      }
+      const bytes = Buffer.concat(chunks);
       if (bytes.length === 0) throw new Error('empty response body');
       if (bytes.length > 10 * 1024 * 1024) throw new Error('source image exceeds 10 MiB');
       return { bytes, attempts: attempt };
@@ -263,18 +362,23 @@ async function transform(specificationsPath, missingPath, outputDirectory) {
   const objects = [];
   let sourceDownloadBytes = 0;
   let sourceDownloadAttempts = 0;
+  const budget = { bytes: 0, maxBytes: 256 * 1024 * 1024, transforms: 0, maxTransforms: 512 };
+  if (selected.length > budget.maxTransforms) throw new Error('Transform plan exceeds the 512-attempt ceiling.');
+  if (new Set(selected.map((item) => item.originUrl)).size > 256) throw new Error('Source plan exceeds the 256-object ceiling.');
 
   for (const specification of selected) {
     let source = sourceCache.get(specification.originUrl);
     if (!source) {
-      const downloaded = await downloadSource(specification.originUrl);
+      const downloaded = await downloadSource(specification.originUrl, budget);
       source = downloaded.bytes;
       sourceCache.set(specification.originUrl, source);
-      sourceDownloadBytes += source.length;
+      sourceDownloadBytes = budget.bytes;
       sourceDownloadAttempts += downloaded.attempts;
     }
     const destination = path.join(objectsDirectory, specification.key);
     await mkdir(path.dirname(destination), { recursive: true });
+    budget.transforms += 1;
+    if (budget.transforms > budget.maxTransforms) throw new Error('Transform attempt budget exhausted.');
     await sharp(source).rotate().resize({ width: specification.width, height: specification.width, fit: 'cover' }).webp({ quality: specification.quality, effort: 5 }).toFile(destination);
     const bytes = await readFile(destination);
     objects.push({
@@ -284,6 +388,12 @@ async function transform(specificationsPath, missingPath, outputDirectory) {
       bytes: bytes.length,
       sha256: createHash('sha256').update(bytes).digest('hex'),
       contentType: 'image/webp',
+      sourceIdentityHash: createHash('sha256').update(specification.originUrl).digest('hex'),
+      sourceSha256: createHash('sha256').update(source).digest('hex'),
+      sourceBytes: source.length,
+      sourceKind: specification.sourceKind,
+      width: specification.width,
+      quality: specification.quality,
     });
   }
 
@@ -292,6 +402,7 @@ async function transform(specificationsPath, missingPath, outputDirectory) {
     sourceDownloadBytes,
     sourceDownloadAttempts,
     transformedObjectCount: objects.length,
+    transformAttemptCount: budget.transforms,
     transformedObjectBytes: objects.reduce((total, item) => total + item.bytes, 0),
   };
   await Promise.all([
@@ -306,6 +417,40 @@ async function transform(specificationsPath, missingPath, outputDirectory) {
     transformed_object_bytes: result.transformedObjectBytes,
   })) await appendGithubOutput(name, value);
   return result;
+}
+
+export async function verifySourceBytes(specificationsPath, objectsPath, priorSourceBytes) {
+  if (!Number.isSafeInteger(priorSourceBytes) || priorSourceBytes < 0 || priorSourceBytes > 256 * 1024 * 1024) {
+    throw new Error('Prior source byte usage is invalid.');
+  }
+  const [specifications, objects] = await Promise.all([
+    readFile(specificationsPath, 'utf8').then(JSON.parse),
+    readFile(objectsPath, 'utf8').then(JSON.parse),
+  ]);
+  const expectedByKey = new Map(specifications.map((item) => [item.key, item]));
+  const expectedByOrigin = new Map();
+  for (const object of objects) {
+    const specification = expectedByKey.get(object.key);
+    if (!specification || specification.sourceKind !== object.sourceKind) throw new Error('Source verification plan mismatch.');
+    const previous = expectedByOrigin.get(specification.originUrl);
+    const proof = { sha256: object.sourceSha256, bytes: object.sourceBytes };
+    if (previous && (previous.sha256 !== proof.sha256 || previous.bytes !== proof.bytes)) throw new Error('Inconsistent source proof across variants.');
+    expectedByOrigin.set(specification.originUrl, proof);
+  }
+  const budget = { bytes: priorSourceBytes, maxBytes: 256 * 1024 * 1024 };
+  let attempts = 0;
+  for (const [originUrl, proof] of expectedByOrigin) {
+    const downloaded = await downloadSource(originUrl, budget);
+    attempts += downloaded.attempts;
+    const digest = createHash('sha256').update(downloaded.bytes).digest('hex');
+    if (downloaded.bytes.length !== proof.bytes || digest !== proof.sha256) throw new Error('Public profile source bytes changed during reconciliation.');
+  }
+  return {
+    verifiedSourceCount: expectedByOrigin.size,
+    verificationSourceBytes: budget.bytes - priorSourceBytes,
+    totalSourceBytes: budget.bytes,
+    verificationSourceAttempts: attempts,
+  };
 }
 
 async function writePlan(state, outputDirectory) {
@@ -334,6 +479,9 @@ async function publishSummaryOutputs(summary) {
     missing_photo_count: summary.missingPhotoCount,
     unexpected_photo_count: summary.unexpectedPhotoCount,
     excluded_host_count: summary.excludedHostCount,
+    external_avatar_excluded_count: summary.externalAvatarExcludedCount,
+    application_profile_count: summary.applicationProfileCount,
+    public_profile_avatar_count: summary.publicProfileAvatarCount,
   })) await appendGithubOutput(name, value);
 }
 
@@ -343,6 +491,19 @@ async function main() {
     if (!args.plan || !args.missing) throw new Error('--plan and --missing are required for transform.');
     await mkdir(args.output, { recursive: true });
     console.log(stableJson(await transform(args.plan, args.missing, args.output)));
+    return;
+  }
+
+  if (args.command === 'verify-source-bytes') {
+    if (!args.plan || !args.objects) throw new Error('--plan and --objects are required for verify-source-bytes.');
+    const result = await verifySourceBytes(args.plan, args.objects, args.priorSourceBytes);
+    for (const [name, value] of Object.entries({
+      verified_source_count: result.verifiedSourceCount,
+      verification_source_bytes: result.verificationSourceBytes,
+      total_source_bytes: result.totalSourceBytes,
+      verification_source_attempts: result.verificationSourceAttempts,
+    })) await appendGithubOutput(name, value);
+    console.log(stableJson(result));
     return;
   }
 
@@ -376,7 +537,7 @@ async function main() {
     return;
   }
   if (args.command !== 'plan') throw new Error(`Unknown command: ${args.command}`);
-  if (!state.summary.drift) {
+  if (!state.summary.drift && !args.allowNoDrift) {
     console.log(stableJson({ ...state.summary, skipped: 'no-drift' }));
     return;
   }

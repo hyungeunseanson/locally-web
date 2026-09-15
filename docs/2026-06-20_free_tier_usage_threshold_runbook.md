@@ -13,6 +13,8 @@ The first assumption for any odd-looking implementation is:
 
 Do not change storage objects, payment paths, search UX, presence tracking, Cloudflare/R2, or image rendering strategy from this runbook alone.
 
+Public host profile media now has its own bounded R2 delivery runbook in `docs/ops/public-host-profile-r2-delivery.md`. That work does not change the Free-tier decision boundary here: Supabase remains the source/write authority, and Auth, Realtime, bookings, payments, and PostgreSQL are intentionally retained rather than treated as incomplete migrations. A later database proof of concept evaluates Neon before D1; translation and other non-financial background work remain separate.
+
 ## Current Console Baseline
 
 Last direct console baseline: 2026-06-18, before public custom-domain cutover.

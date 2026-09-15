@@ -32,6 +32,10 @@ const r2ReconciliationSource = readFileSync(
   'scripts/cloudflare/r2-public-image-reconcile.py',
   'utf8'
 );
+const hostR2ReconciliationSource = readFileSync(
+  'scripts/cloudflare/r2-public-host-profile-reconcile.py',
+  'utf8'
+);
 const mediaRecoverySource = readFileSync(
   'scripts/cloudflare/recover-public-experience-media.mjs',
   'utf8'
@@ -192,6 +196,17 @@ test.describe('Production reconciliation image checks stay read-only', () => {
     expect(r2ReconciliationSource).toContain('"concurrentExactSkipCount"');
     expect(r2ReconciliationSource).toContain('"conflictCount": 0');
     expect(r2ReconciliationSource).toContain('"deletedObjectCount": 0');
+  });
+
+  test('host profile manual recovery is digest-bound and conditional-create only', () => {
+    expect(hostWorkflow).toContain('options: [audit, plan, apply-create-only, legacy-reconcile]');
+    expect(hostWorkflow).toContain('confirmed_plan_digest');
+    expect(hostWorkflow).toContain("inputs.action == 'apply-create-only'");
+    expect(hostWorkflow).toContain('--create-only-plan');
+    expect(hostR2ReconciliationSource).toContain('IfNoneMatch="*"');
+    expect(hostR2ReconciliationSource).toContain('Confirmed profile plan digest does not match');
+    expect(hostR2ReconciliationSource).toContain('concurrentExactSkipCount');
+    expect(hostR2ReconciliationSource).toContain('deletedObjectCount');
   });
 
   test('bounded missed-enqueue recovery is explicit, conditional-create only, and default read-only', () => {

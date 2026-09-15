@@ -27,6 +27,10 @@ ACTIVE_KEY_PATTERN = re.compile(
 )
 PUBLIC_RETRY_DELAYS = (2, 4, 8, 16, 30, 30, 30, 30, 30, 30, 30, 30, 30)
 PUBLIC_VERIFY_USER_AGENT = "Locally-R2-Reconciliation/1.0"
+IMMUTABLE_CACHE_CONTROL = "public, max-age=86400, immutable"
+TRANSFORM_SCHEMA = "public-host-profile-v1"
+MAX_EXPECTED_OBJECTS = 512
+MAX_NEW_BODY_BYTES = 256 * 1024 * 1024
 
 
 def require_environment(name):
@@ -133,7 +137,7 @@ def verify_public_object(key, expected_size):
 
 
 def validate_expected_plan(plan):
-    if not isinstance(plan, list) or not plan:
+    if not isinstance(plan, list) or not plan or len(plan) > MAX_EXPECTED_OBJECTS:
         raise RuntimeError("Expected profile object plan must be a non-empty array")
     keys = set()
     for item in plan:
@@ -142,13 +146,17 @@ def validate_expected_plan(plan):
         match = ACTIVE_KEY_PATTERN.fullmatch(key or "")
         if not match or match.group("host_id") != host_id:
             raise RuntimeError("Expected profile object plan contains an unsafe key")
+        if item.get("width") not in (128, 256) or item.get("quality") != 80:
+            raise RuntimeError("Expected profile object plan contains an unsupported transform")
+        if item.get("sourceKind") not in ("application-profile", "public-profile-avatar"):
+            raise RuntimeError("Expected profile object plan contains an unsupported source kind")
         if key in keys:
             raise RuntimeError("Expected profile object plan contains duplicate keys")
         keys.add(key)
     return keys
 
 
-def head_object_integrity(client, bucket, key):
+def head_object_integrity(client, bucket, key, require_cache=False):
     response = client.head_object(Bucket=bucket, Key=key)
     content_type = response.get("ContentType", "").split(";", 1)[0]
     if content_type != "image/webp":
@@ -156,7 +164,81 @@ def head_object_integrity(client, bucket, key):
     size = int(response.get("ContentLength", 0))
     if size <= 0:
         raise RuntimeError(f"Empty R2 object for {key}")
+    cache_control = response.get("CacheControl", "")
+    if require_cache and cache_control != IMMUTABLE_CACHE_CONTROL:
+        raise RuntimeError(f"Unexpected R2 cache control for {key}")
     return size, response.get("Metadata", {}).get("sha256", "")
+
+
+def get_object_bytes(client, bucket, key):
+    response = client.get_object(Bucket=bucket, Key=key)
+    body = response["Body"]
+    return body.read() if hasattr(body, "read") else bytes(body)
+
+
+def derivative_metadata(item):
+    return {
+        "sha256": item["sha256"],
+        "host-id": item["hostId"],
+        "source-identity": item["sourceIdentityHash"],
+        "source-sha256": item["sourceSha256"],
+        "source-bytes": str(item["sourceBytes"]),
+        "source-kind": item["sourceKind"],
+        "transform-schema": TRANSFORM_SCHEMA,
+        "transform-engine": "sharp",
+        "output-format": "webp",
+        "width": str(item["width"]),
+        "quality": str(item["quality"]),
+    }
+
+
+def validate_existing_derivative(client, item):
+    key = item["key"]
+    response = client.head_object(Bucket=ACTIVE_BUCKET, Key=key)
+    if response.get("ContentType", "").split(";", 1)[0] != "image/webp":
+        raise RuntimeError(f"Concurrent profile object content type conflict for {key}")
+    if response.get("CacheControl", "") != IMMUTABLE_CACHE_CONTROL:
+        raise RuntimeError(f"Concurrent profile object cache control conflict for {key}")
+    body = get_object_bytes(client, ACTIVE_BUCKET, key)
+    digest = hashlib.sha256(body).hexdigest()
+    metadata = response.get("Metadata", {})
+    if len(body) != item["bytes"] or digest != item["sha256"] or metadata.get("sha256") != digest:
+        raise RuntimeError(f"Concurrent profile object byte conflict for {key}")
+    expected = derivative_metadata(item)
+    provenance_keys = set(expected) - {"sha256", "host-id"}
+    present = provenance_keys & set(metadata)
+    if present and any(metadata.get(name) != expected[name] for name in provenance_keys):
+        raise RuntimeError(f"Concurrent profile object provenance conflict for {key}")
+    if metadata.get("host-id") not in (None, "", item["hostId"]):
+        raise RuntimeError(f"Concurrent profile object host conflict for {key}")
+    return len(body)
+
+
+def is_precondition_failure(error):
+    response = getattr(error, "response", {}) or {}
+    code = str(response.get("Error", {}).get("Code", ""))
+    status = response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+    return code in {"PreconditionFailed", "412", "ConditionalRequestConflict"} or status == 412
+
+
+def conditional_create_derivative(client, source, item):
+    with source.open("rb") as body:
+        try:
+            client.put_object(
+                Bucket=ACTIVE_BUCKET,
+                Key=item["key"],
+                Body=body,
+                IfNoneMatch="*",
+                ContentType="image/webp",
+                CacheControl=IMMUTABLE_CACHE_CONTROL,
+                Metadata=derivative_metadata(item),
+            )
+            return "created"
+        except ClientError as error:
+            if not is_precondition_failure(error):
+                raise
+    validate_existing_derivative(client, item)
+    return "concurrent-exact-skip"
 
 
 def transfer_between_buckets(source_client, source_bucket, destination_client, destination_bucket, key):
@@ -167,17 +249,25 @@ def transfer_between_buckets(source_client, source_bucket, destination_client, d
         downloaded_sha = sha256_file(local)
         if local.stat().st_size != source_size or (source_sha and downloaded_sha != source_sha):
             raise RuntimeError(f"Source R2 integrity mismatch for {key}")
-        destination_client.upload_file(
-            str(local),
-            destination_bucket,
-            key,
-            ExtraArgs={
-                "ContentType": "image/webp",
-                "Metadata": {"sha256": downloaded_sha},
-            },
-        )
+        with local.open("rb") as body:
+            try:
+                arguments = {
+                    "Bucket": destination_bucket,
+                    "Key": key,
+                    "Body": body,
+                    "IfNoneMatch": "*",
+                    "ContentType": "image/webp",
+                    "Metadata": {"sha256": downloaded_sha},
+                }
+                if destination_bucket == ACTIVE_BUCKET:
+                    arguments["CacheControl"] = IMMUTABLE_CACHE_CONTROL
+                destination_client.put_object(**arguments)
+            except ClientError as error:
+                if not is_precondition_failure(error):
+                    raise
         destination_size, destination_sha = head_object_integrity(destination_client, destination_bucket, key)
-        if destination_size != source_size or destination_sha != downloaded_sha:
+        destination_bytes = get_object_bytes(destination_client, destination_bucket, key)
+        if destination_size != source_size or destination_sha != downloaded_sha or hashlib.sha256(destination_bytes).hexdigest() != downloaded_sha:
             raise RuntimeError(f"Destination R2 integrity mismatch for {key}")
         return source_size
 
@@ -219,9 +309,46 @@ def plan_mode(args, active_client, stale_client, plan):
     if unexpected_active:
         raise RuntimeError(f"Active profile bucket contains {len(unexpected_active)} unexpected keys")
     missing_active = expected_keys - active_keys
-    restore_keys = sorted(missing_active & stale_keys)
-    transform_keys = sorted(missing_active - set(restore_keys))
+    restore_keys = [] if args.create_only_plan else sorted(missing_active & stale_keys)
+    transform_keys = sorted(missing_active if args.create_only_plan else missing_active - set(restore_keys))
     stale_candidates = sorted((active_keys - expected_keys))
+    metadata_conflicts = []
+    metadata_consistent = 0
+    for item in plan:
+        if item["key"] not in active_keys:
+            continue
+        try:
+            response = active_client.head_object(Bucket=ACTIVE_BUCKET, Key=item["key"])
+            metadata = response.get("Metadata", {})
+            if response.get("ContentType", "").split(";", 1)[0] != "image/webp":
+                raise RuntimeError("content-type")
+            if response.get("CacheControl", "") != IMMUTABLE_CACHE_CONTROL:
+                raise RuntimeError("cache-control")
+            if not re.fullmatch(r"[a-f0-9]{64}", metadata.get("sha256", "")):
+                raise RuntimeError("sha256")
+            if metadata.get("host-id") not in (None, "", item["hostId"]):
+                raise RuntimeError("host-id")
+            metadata_consistent += 1
+        except (RuntimeError, ClientError, KeyError):
+            metadata_conflicts.append(item["key"])
+    execution_payload = {
+        "version": 2,
+        "expected": plan,
+        "missingKeys": transform_keys,
+        "existingKeys": sorted(expected_keys & active_keys),
+        "metadataConflictKeys": metadata_conflicts,
+        "staleCandidateKeys": stale_candidates,
+        "snapshotHash": args.snapshot_hash,
+        "budgets": {
+            "maxSourceObjects": 256,
+            "maxSourceBytes": 256 * 1024 * 1024,
+            "maxTransforms": 512,
+            "maxNewObjects": 512,
+            "maxNewBodyBytes": MAX_NEW_BODY_BYTES,
+        },
+        "r2StateDigest": hashlib.sha256("\n".join(sorted(active_keys)).encode()).hexdigest(),
+    }
+    plan_digest = hashlib.sha256(json.dumps(execution_payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     result = {
         "expectedObjectCount": len(expected_keys),
         "existingActiveObjectCount": len(expected_keys & active_keys),
@@ -231,6 +358,11 @@ def plan_mode(args, active_client, stale_client, plan):
         "restoreKeys": restore_keys,
         "staleCandidateCount": len(stale_candidates),
         "staleCandidateKeys": stale_candidates,
+        "metadataConsistentObjectCount": metadata_consistent,
+        "metadataConflictCount": len(metadata_conflicts),
+        "metadataConflictKeys": metadata_conflicts,
+        "executionPayload": execution_payload,
+        "planDigest": plan_digest,
     }
     write_json(args.output, result)
     for name, value in {
@@ -239,12 +371,23 @@ def plan_mode(args, active_client, stale_client, plan):
         "restore_count": result["restoreObjectCount"],
         "missing_count": result["missingObjectCount"],
         "stale_candidate_count": result["staleCandidateCount"],
+        "metadata_conflict_count": result["metadataConflictCount"],
+        "plan_digest": result["planDigest"],
     }.items():
         append_github_output(name, value)
-    print(json.dumps(result, indent=2))
+    print(json.dumps({
+        "expectedObjectCount": result["expectedObjectCount"],
+        "existingActiveObjectCount": result["existingActiveObjectCount"],
+        "metadataConsistentObjectCount": result["metadataConsistentObjectCount"],
+        "metadataConflictCount": result["metadataConflictCount"],
+        "missingObjectCount": result["missingObjectCount"],
+        "restoreObjectCount": result["restoreObjectCount"],
+        "staleCandidateCount": result["staleCandidateCount"],
+        "planDigest": result["planDigest"],
+    }, indent=2))
 
 
-def apply_mode(args, active_client, stale_client, transformed_plan, expected_plan, object_plan):
+def apply_mode(args, active_client, stale_client, transformed_plan, expected_plan, object_plan, create_only=False):
     expected_keys = validate_expected_plan(expected_plan)
     missing_keys = object_plan.get("missingKeys")
     restore_keys = object_plan.get("restoreKeys")
@@ -258,6 +401,48 @@ def apply_mode(args, active_client, stale_client, transformed_plan, expected_pla
         raise RuntimeError("Restore or missing plan contains unexpected keys")
     if any(not ACTIVE_KEY_PATTERN.fullmatch(key) for key in stale_candidates):
         raise RuntimeError("Stale plan contains an unsafe active key")
+    expected_by_key = {item["key"]: item for item in expected_plan}
+    for item in transformed_plan:
+        specification = expected_by_key.get(item.get("key"))
+        if not specification:
+            raise RuntimeError("Transformed profile object is outside the expected plan")
+        expected_identity = hashlib.sha256(specification["originUrl"].encode()).hexdigest()
+        if (
+            item.get("hostId") != specification["hostId"]
+            or item.get("sourceKind") != specification["sourceKind"]
+            or item.get("width") != specification["width"]
+            or item.get("quality") != specification["quality"]
+            or item.get("sourceIdentityHash") != expected_identity
+            or not re.fullmatch(r"[a-f0-9]{64}", item.get("sourceSha256", ""))
+            or not isinstance(item.get("sourceBytes"), int)
+            or item["sourceBytes"] <= 0
+        ):
+            raise RuntimeError("Transformed profile provenance does not match the approved source/spec")
+    if object_plan.get("planDigest") != args.confirm_digest:
+        raise RuntimeError("Confirmed profile plan digest does not match")
+    payload = object_plan.get("executionPayload")
+    if not isinstance(payload, dict):
+        raise RuntimeError("Profile execution payload is missing")
+    calculated_digest = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    if (
+        calculated_digest != object_plan.get("planDigest")
+        or payload.get("expected") != expected_plan
+        or payload.get("missingKeys") != missing_keys
+        or payload.get("metadataConflictKeys") != object_plan.get("metadataConflictKeys")
+        or payload.get("staleCandidateKeys") != stale_candidates
+    ):
+        raise RuntimeError("Profile execution payload was modified after approval")
+    if object_plan.get("metadataConflictCount") != 0:
+        raise RuntimeError("Existing profile metadata conflicts prevent apply")
+    if len(missing_keys) > 512 or sum(int(item.get("bytes", 0)) for item in transformed_plan) > MAX_NEW_BODY_BYTES:
+        raise RuntimeError("Profile apply exceeds the approved write budget")
+    active_now = list_keys(active_client, ACTIVE_BUCKET)
+    current_state_digest = hashlib.sha256("\n".join(sorted(active_now)).encode()).hexdigest()
+    if current_state_digest != payload.get("r2StateDigest"):
+        raise RuntimeError("Active profile R2 inventory changed after approval")
+
+    if create_only and restore_keys:
+        raise RuntimeError("Create-only profile apply refuses private restore candidates")
 
     restored = []
     for key in restore_keys:
@@ -269,6 +454,7 @@ def apply_mode(args, active_client, stale_client, transformed_plan, expected_pla
 
     root = Path(args.plan).resolve().parent
     uploaded = []
+    concurrent_exact_skips = []
     for item in transformed_plan:
         key = item["key"]
         source = (root / item["path"]).resolve()
@@ -276,21 +462,16 @@ def apply_mode(args, active_client, stale_client, transformed_plan, expected_pla
             raise RuntimeError(f"Unsafe or missing transformed object path for {key}")
         if source.stat().st_size != item["bytes"] or sha256_file(source) != item["sha256"]:
             raise RuntimeError(f"Local transformed profile integrity mismatch for {key}")
-        active_client.upload_file(
-            str(source),
-            ACTIVE_BUCKET,
-            key,
-            ExtraArgs={
-                "ContentType": "image/webp",
-                "CacheControl": "public, max-age=86400, immutable",
-                "Metadata": {"sha256": item["sha256"], "host-id": item["hostId"]},
-            },
-        )
-        size, digest = head_object_integrity(active_client, ACTIVE_BUCKET, key)
+        outcome = conditional_create_derivative(active_client, source, item)
+        size, digest = head_object_integrity(active_client, ACTIVE_BUCKET, key, require_cache=True)
         if size != item["bytes"] or digest != item["sha256"]:
             raise RuntimeError(f"Uploaded active profile integrity mismatch for {key}")
+        validate_existing_derivative(active_client, item)
         verify_public_object(key, item["bytes"])
-        uploaded.append(key)
+        if outcome == "created":
+            uploaded.append(key)
+        else:
+            concurrent_exact_skips.append(key)
 
     active_after_upload = list_keys(active_client, ACTIVE_BUCKET)
     missing_after_upload = expected_keys - active_after_upload
@@ -299,7 +480,7 @@ def apply_mode(args, active_client, stale_client, transformed_plan, expected_pla
 
     quarantined = []
     quarantined_bytes = 0
-    for key in stale_candidates:
+    for key in ([] if create_only else stale_candidates):
         if key in expected_keys:
             raise RuntimeError("Refusing to quarantine a current expected profile object")
         if key not in active_after_upload:
@@ -317,14 +498,17 @@ def apply_mode(args, active_client, stale_client, transformed_plan, expected_pla
         "expectedObjectCount": len(expected_keys),
         "restoredObjectCount": len(restored),
         "uploadedObjectCount": len(uploaded),
+        "concurrentExactSkipCount": len(concurrent_exact_skips),
         "quarantinedObjectCount": len(quarantined),
         "quarantinedBytes": quarantined_bytes,
         "activeParity": True,
+        "deletedObjectCount": 0 if create_only else len(quarantined),
     }
     write_json(args.output, result)
     for name, value in {
         "restored_count": result["restoredObjectCount"],
         "uploaded_count": result["uploadedObjectCount"],
+        "concurrent_exact_skip_count": result["concurrentExactSkipCount"],
         "quarantined_count": result["quarantinedObjectCount"],
         "quarantined_bytes": result["quarantinedBytes"],
         "parity": "true",
@@ -415,7 +599,7 @@ def purge_mode(args, active_client, stale_client):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", choices=("plan", "apply", "purge"), required=True)
+    parser.add_argument("--mode", choices=("plan", "apply", "create-only", "purge"), required=True)
     parser.add_argument("--plan", required=False)
     parser.add_argument("--expected")
     parser.add_argument("--objects")
@@ -423,6 +607,9 @@ def main():
     parser.add_argument("--output", required=True)
     parser.add_argument("--host-id")
     parser.add_argument("--confirm")
+    parser.add_argument("--confirm-digest")
+    parser.add_argument("--snapshot-hash", default="")
+    parser.add_argument("--create-only-plan", action="store_true")
     args = parser.parse_args()
     active_client, stale_client = load_clients()
     if args.mode == "purge":
@@ -439,7 +626,7 @@ def main():
     expected = json.loads(Path(args.expected).resolve().read_text(encoding="utf-8"))
     objects = json.loads(Path(args.objects).resolve().read_text(encoding="utf-8"))
     r2_plan = json.loads(Path(args.r2_plan).resolve().read_text(encoding="utf-8"))
-    apply_mode(args, active_client, stale_client, objects, expected, r2_plan)
+    apply_mode(args, active_client, stale_client, objects, expected, r2_plan, create_only=args.mode == "create-only")
 
 
 if __name__ == "__main__":
