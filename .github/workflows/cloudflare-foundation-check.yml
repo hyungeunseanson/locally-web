@@ -89,6 +89,9 @@ jobs:
       - name: Validate controlled public experience media repair boundaries
         run: npm run cloudflare:experience-media:repair:test
 
+      - name: Validate experience media source authority migration boundaries
+        run: npm run cloudflare:experience-media:source-migration-contract
+
       - name: Validate public host profile media boundaries
         run: npm run cloudflare:host-profile-media:test
 

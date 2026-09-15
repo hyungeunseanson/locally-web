@@ -106,9 +106,18 @@ function extractItineraryUrls(itinerary) {
   return itinerary.map((item) => item?.image_url).filter((value) => typeof value === 'string' && value.trim() !== '');
 }
 
+function extractNestedImageUrls(value) {
+  if (Array.isArray(value)) return value.flatMap(extractNestedImageUrls);
+  if (!value || typeof value !== 'object') return [];
+  return Object.entries(value).flatMap(([key, item]) => [
+    ...(key === 'image_url' && typeof item === 'string' && item.trim() ? [item] : []),
+    ...(Array.isArray(item) || (item && typeof item === 'object') ? extractNestedImageUrls(item) : []),
+  ]);
+}
+
 function extractRowReferences(row) {
   const photos = Array.isArray(row.photos) ? row.photos.filter((value) => typeof value === 'string' && value.trim() !== '') : [];
-  const itinerary = extractItineraryUrls(row.itinerary);
+  const itinerary = [...extractItineraryUrls(row.itinerary), ...extractNestedImageUrls(row.itinerary_i18n)];
   const legacy = typeof row.image_url === 'string' && row.image_url.trim() !== '' ? [row.image_url] : [];
   return { photos, itinerary, legacy };
 }
@@ -263,6 +272,8 @@ function storageItem(prefix, item) {
     contentType: String(metadata.mimetype || metadata.contentType || '').split(';', 1)[0].toLowerCase(),
     etag: String(metadata.eTag || metadata.etag || '').replace(/^"|"$/g, ''),
     cacheControl: String(metadata.cacheControl || metadata.cache_control || ''),
+    version: typeof item.id === 'string' ? item.id : null,
+    updatedAt: typeof item.updated_at === 'string' ? item.updated_at : null,
   };
 }
 
@@ -289,7 +300,7 @@ export async function fetchAllExperienceRows(baseUrl, anonKey) {
   const pageSize = 500;
   const rows = [];
   for (let offset = 0; ; offset += pageSize) {
-    const query = new URLSearchParams({ select: 'id,photos,image_url,itinerary,status,is_active', order: 'id.asc' });
+    const query = new URLSearchParams({ select: 'id,photos,image_url,itinerary,itinerary_i18n,status,is_active', order: 'id.asc' });
     const page = await fetchJson(`${baseUrl}/rest/v1/experiences?${query}`, {
       method: 'GET',
       headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}`, Range: `${offset}-${offset + pageSize - 1}` },
