@@ -8,11 +8,12 @@ fi
 
 backup_dir="$1"
 assertions_sql="$2"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 restore_container="locally-backup-restore-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-1}-${BASHPID}"
 postgres_image="${BACKUP_RESTORE_POSTGRES_IMAGE:-public.ecr.aws/supabase/postgres:17.6.1.158@sha256:99b1729aeb0bac314445024fc149fbd39306170b61dd50800ccf180327ab3459}"
 container_started=false
 
-if [[ ! -d "$backup_dir" || "$backup_dir" == postgresql://* || "$backup_dir" == postgres://* ]]; then
+if [[ ! -d "$backup_dir" || -L "$backup_dir" || "$backup_dir" == postgresql://* || "$backup_dir" == postgres://* ]]; then
   echo "backup restore input must be a local backup directory" >&2
   exit 64
 fi
@@ -32,7 +33,7 @@ fi
 cleanup() {
   status=$?
   if [[ "$status" -ne 0 && "$container_started" == true ]]; then
-    scripts/backup/postgres-container-lifecycle.sh diagnose "$restore_container" || true
+    "$script_dir/postgres-container-lifecycle.sh" diagnose "$restore_container" || true
   fi
   if [[ "$container_started" == true ]]; then
     docker rm -f "$restore_container" >/dev/null 2>&1 || true
@@ -47,7 +48,7 @@ docker run --detach --name "$restore_container" \
   "$postgres_image" >/dev/null
 container_started=true
 
-scripts/backup/postgres-container-lifecycle.sh wait "$restore_container" 180
+"$script_dir/postgres-container-lifecycle.sh" wait "$restore_container" 180
 
 docker cp "$backup_dir/database.dump" "$restore_container:/tmp/database.dump"
 docker cp "$backup_dir/roles.sql" "$restore_container:/tmp/roles.sql"

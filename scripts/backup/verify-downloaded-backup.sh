@@ -10,6 +10,7 @@ ciphertext="$1"
 ciphertext_checksum="$2"
 identity="$3"
 assertions_sql="${4:-}"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
 sha256_file() {
   if command -v sha256sum >/dev/null 2>&1; then
@@ -105,6 +106,6 @@ echo "R2_DOWNLOAD_DECRYPT_AND_INTERNAL_CHECKSUM_PASS"
 
 if [[ -n "$assertions_sql" ]]; then
   rm "$plaintext_archive"
-  scripts/backup/restore-test.sh "$verification_dir/extracted" "$assertions_sql"
+  "$script_dir/restore-test.sh" "$verification_dir/extracted" "$assertions_sql"
   echo "R2_DOWNLOAD_DECRYPT_RESTORE_PASS"
 fi

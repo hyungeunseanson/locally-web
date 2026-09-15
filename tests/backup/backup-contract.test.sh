@@ -16,8 +16,8 @@ if grep -Eq -- '-p |--publish|restore_url=' "$restore_script"; then
   exit 1
 fi
 grep -Fq -- '--single-transaction --exit-on-error' "$restore_script"
-grep -Fq 'postgres-container-lifecycle.sh wait' "$restore_script"
-grep -Fq 'scripts/backup/restore-test.sh "$verification_dir/extracted"' "$verify_script"
+grep -Fq 'postgres-container-lifecycle.sh" wait' "$restore_script"
+grep -Fq 'restore-test.sh" "$verification_dir/extracted"' "$verify_script"
 
 fixture_root="$(mktemp -d)"
 trap 'rm -rf "$fixture_root"' EXIT
