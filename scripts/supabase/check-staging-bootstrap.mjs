@@ -34,7 +34,7 @@ function exact(label, actual, expected) {
 const expectedApplyOrder = [
   'supabase/migrations/20260912034545_production_schema_baseline.sql',
   'supabase/migrations/20260912050655_service_concierge_assignment.sql',
-  'supabase/staging/post-baseline-current-state-overlay.sql',
+  'supabase/migrations/20260915141606_p0_storage_rpc_security_hardening.sql',
 ];
 exact('fresh-project apply order', required.freshProjectApplyOrder, expectedApplyOrder);
 
@@ -42,11 +42,11 @@ const migrationFiles = (await readdir(resolve(root, 'supabase/migrations')))
   .filter((name) => name.endsWith('.sql'))
   .sort()
   .map((name) => `supabase/migrations/${name}`);
-exact('ordered repository migrations', migrationFiles, expectedApplyOrder.slice(0, 2));
+exact('ordered repository migrations', migrationFiles, expectedApplyOrder);
 exact(
   'manifest repository migrations',
   current.migrationLedger.map((entry) => entry.repositoryFile),
-  expectedApplyOrder.slice(0, 2)
+  expectedApplyOrder
 );
 
 for (const table of required.functionalCanaryMinimum.tables) {
@@ -95,10 +95,10 @@ for (const requiredFragment of [
 }
 
 for (const [name, fingerprint] of Object.entries({
-  storageBuckets: 'c3ff5767c8e4934ae05b3d96550441c8',
-  storagePolicies: '38c973a52a0bebe8fa78b3f53089e427',
+  storageBuckets: '384007869cd8ffb76874b05397c554da',
+  storagePolicies: '27b4679aafb896ae579c14510bd9a9d7',
   publicRlsPolicies: '8e2720ce969cfa4252ec20069000fc4c',
-  publicRelationGrants: '21aa717aae9fd797e1e51053688ddac3',
+  publicRelationGrants: '2c6aec1f48323525171d8f17f135107e',
 })) {
   if (current.securityFingerprints[name] !== fingerprint || !currentContract.includes(fingerprint)) {
     fail(`current-state security fingerprint differs: ${name}`);

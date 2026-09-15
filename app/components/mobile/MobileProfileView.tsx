@@ -146,7 +146,7 @@ export default function MobileProfileView({
 
         setUploading(true);
         const fileExt = file.name.split('.').pop();
-        const filePath = `${userId}-${Math.random()}.${fileExt}`;
+        const filePath = `${userId}/${Date.now()}-${Math.random()}.${fileExt}`;
         try {
             const compressedFile = await compressImage(file);
             const { error } = await supabase.storage.from('avatars').upload(filePath, compressedFile);

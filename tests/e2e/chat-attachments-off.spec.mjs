@@ -13,6 +13,10 @@ const oldImage = {
   image_url: 'https://legacy.invalid/storage/v1/object/public/chat-images/1/old.jpg',
   created_at: '2026-09-01T00:00:00Z', sender: { id: 'host', name: 'Host', avatar_url: null },
 };
+const deliveredOldImage = {
+  ...oldImage,
+  image_url: '/api/inquiries/messages/10/image',
+};
 const inquiry = {
   id: 1, user_id: 'guest', host_id: 'host', type: 'general', content: '기존 대화',
   guest: { id: 'guest', name: 'Guest', avatar_url: null },
@@ -37,7 +41,7 @@ function loadModule(entry, mocks = {}, fetch = noNetwork) {
     const localRequire = (id) => {
       if (id in mocks) return mocks[id];
       if (['react', 'react/jsx-runtime', 'lucide-react'].includes(id)) return require(id);
-      if (['@/app/utils/chatAttachmentPolicy', '@/app/utils/inquiry', '@/app/utils/chatPolicySignals', '@/app/utils/officialSender'].includes(id)) {
+      if (['@/app/utils/chatAttachmentPolicy', '@/app/utils/inquiry', '@/app/utils/chatPolicySignals', '@/app/utils/officialSender', '@/app/utils/privateStorageDelivery'].includes(id)) {
         return load(id.replace('@/', '') + '.ts');
       }
       throw new Error(`Unmocked module: ${id}`);
@@ -201,7 +205,7 @@ test('hook still sends text and parses existing image_url rows', async () => {
   await hook.sendMessage(1, '안녕하세요', undefined, 'guest');
   expect(requests[0]).toMatchObject({ url: '/api/inquiries/message', body: { content: '안녕하세요', type: 'text', imageUrl: null } });
   await hook.loadMessages(1);
-  expect(state[2][0]).toMatchObject({ image_url: oldImage.image_url, type: 'image', content: '📷 사진을 보냈습니다.' });
+  expect(state[2][0]).toMatchObject({ image_url: deliveredOldImage.image_url, type: 'image', content: '📷 사진을 보냈습니다.' });
 });
 
 for (const surface of ['guest', 'host', 'support']) {
@@ -210,7 +214,7 @@ for (const surface of ['guest', 'host', 'support']) {
     const chat = {
       inquiries: [selectedInquiry], selectedInquiry, isLoading: false,
       currentUser: { id: surface === 'host' ? 'host' : 'guest' },
-      messages: [oldImage, { ...oldImage, id: 12, type: 'text', content: '기존 텍스트', image_url: null }],
+      messages: [deliveredOldImage, { ...oldImage, id: 12, type: 'text', content: '기존 텍스트', image_url: null }],
     };
     const blank = () => null;
     const mocks = {
@@ -234,8 +238,8 @@ for (const surface of ['guest', 'host', 'support']) {
     await page.setContent(renderToStaticMarkup(React.createElement(Component)));
     await expect(page.locator('input[type="file"], svg.lucide-image-plus')).toHaveCount(0);
     await expect(page.getByText('기존 텍스트', { exact: true })).toBeVisible();
-    await expect(page.locator('img[alt="chat-img"]')).toHaveAttribute('src', oldImage.image_url);
-    await expect(page.locator(`a[href="${oldImage.image_url}"]`)).toHaveCount(1);
+    await expect(page.locator('img[alt="chat-img"]')).toHaveAttribute('src', deliveredOldImage.image_url);
+    await expect(page.locator(`a[href="${deliveredOldImage.image_url}"]`)).toHaveCount(1);
     await expect(page.locator('textarea')).toBeEnabled();
   });
 }

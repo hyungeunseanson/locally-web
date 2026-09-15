@@ -18,7 +18,8 @@ BEGIN
     FROM supabase_migrations.schema_migrations;
   expected := ARRAY[
     '20260912034545:remote_schema',
-    '20260912050655:service_concierge_assignment'
+    '20260912050655:service_concierge_assignment',
+    '20260915141606:p0_storage_rpc_security_hardening'
   ]::text[];
   IF actual IS DISTINCT FROM expected THEN
     RAISE EXCEPTION 'migration ledger mismatch: %', actual;
@@ -268,7 +269,7 @@ BEGIN
     )) AS acl_entry
    WHERE namespace_def.nspname = 'public'
      AND class_def.relkind IN ('r', 'p', 'v', 'm', 'f');
-  IF actual_fingerprint IS DISTINCT FROM '21aa717aae9fd797e1e51053688ddac3' THEN
+  IF actual_fingerprint IS DISTINCT FROM '2c6aec1f48323525171d8f17f135107e' THEN
     RAISE EXCEPTION 'public relation grant fingerprint mismatch: %', actual_fingerprint;
   END IF;
 
@@ -292,7 +293,7 @@ BEGIN
     INTO actual
     FROM storage.buckets AS bucket_def;
   IF actual IS DISTINCT FROM ARRAY[
-    'admin_files|true|10485760', 'avatars|true|', 'chat-images|true|',
+    'admin_files|false|10485760', 'avatars|true|', 'chat-images|false|',
     'experiences|true|', 'images|true|', 'verification-docs|false|'
   ]::text[] THEN
     RAISE EXCEPTION 'Storage bucket contract mismatch: %', actual;
@@ -306,7 +307,7 @@ BEGIN
          ))
     INTO actual_fingerprint
     FROM storage.buckets AS bucket_def;
-  IF actual_fingerprint IS DISTINCT FROM 'c3ff5767c8e4934ae05b3d96550441c8' THEN
+  IF actual_fingerprint IS DISTINCT FROM '384007869cd8ffb76874b05397c554da' THEN
     RAISE EXCEPTION 'Storage bucket fingerprint mismatch: %', actual_fingerprint;
   END IF;
 
@@ -315,16 +316,21 @@ BEGIN
     FROM pg_policies AS policy_def
    WHERE policy_def.schemaname = 'storage' AND policy_def.tablename = 'objects';
   expected := ARRAY[
-    'Anyone can update their own avatar',
-    'Anyone can upload an avatar',
+    'Admins can delete files',
+    'Admins can read files',
+    'Admins can update files',
     'Auth Users Upload',
-    'Authenticated Delete',
-    'Authenticated Update',
-    'Authenticated Upload',
     'Avatar images are publicly accessible',
+    'Avatar owners can delete',
+    'Avatar owners can update',
+    'Avatar owners can upload',
+    'Experience object owners can delete',
+    'Experience object owners can update',
+    'Image owners can delete',
+    'Image owners can read',
+    'Image owners can update',
+    'Image owners can upload',
     'Only admins can upload files',
-    'Owner Delete',
-    'Owner Update',
     'Public Access',
     'Verification docs owners can delete',
     'Verification docs owners can read',
@@ -345,8 +351,46 @@ BEGIN
     INTO actual_fingerprint
     FROM pg_policies AS policy_def
    WHERE policy_def.schemaname = 'storage' AND policy_def.tablename = 'objects';
-  IF actual_fingerprint IS DISTINCT FROM '38c973a52a0bebe8fa78b3f53089e427' THEN
+  IF actual_fingerprint IS DISTINCT FROM '27b4679aafb896ae579c14510bd9a9d7' THEN
     RAISE EXCEPTION 'Storage policy fingerprint mismatch: %', actual_fingerprint;
+  END IF;
+
+  IF has_function_privilege('anon', 'public.check_rate_limit(text,integer)', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'public.check_rate_limit(text,integer)', 'EXECUTE')
+     OR NOT has_function_privilege('service_role', 'public.check_rate_limit(text,integer)', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.handle_new_user()', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'public.handle_new_user()', 'EXECUTE')
+     OR NOT has_function_privilege('service_role', 'public.handle_new_user()', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.mark_room_messages_read(uuid,uuid)', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'public.mark_room_messages_read(uuid,uuid)', 'EXECUTE')
+     OR NOT has_function_privilege('service_role', 'public.mark_room_messages_read(uuid,uuid)', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.is_admin_reader()', 'EXECUTE')
+     OR NOT has_function_privilege('authenticated', 'public.is_admin_reader()', 'EXECUTE')
+     OR NOT has_function_privilege('service_role', 'public.is_admin_reader()', 'EXECUTE') THEN
+    RAISE EXCEPTION 'P0 SECURITY DEFINER execute contract mismatch';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+      FROM pg_proc AS procedure_def
+      JOIN pg_namespace AS namespace_def ON namespace_def.oid = procedure_def.pronamespace
+     WHERE namespace_def.nspname = 'public'
+       AND procedure_def.proname = 'mark_room_messages_read'
+       AND NOT (coalesce(procedure_def.proconfig, ARRAY[]::text[])
+         @> ARRAY['search_path=public, pg_catalog']::text[])
+  ) THEN
+    RAISE EXCEPTION 'mark_room_messages_read search_path contract mismatch';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+      FROM information_schema.role_table_grants
+     WHERE table_schema = 'public'
+       AND table_name IN ('public_profiles', 'public_host_applications')
+       AND grantee IN ('anon', 'authenticated', 'service_role')
+       AND privilege_type <> 'SELECT'
+  ) THEN
+    RAISE EXCEPTION 'public projection grants are not SELECT-only';
   END IF;
 
   IF to_regclass('public.community_comment_likes') IS NOT NULL

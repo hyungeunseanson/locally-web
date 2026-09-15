@@ -14,6 +14,7 @@ import {
   SOFT_DELETED_INQUIRY_MESSAGE_TYPE,
 } from '@/app/utils/inquiry';
 import { getHostPublicProfile } from '@/app/utils/profile';
+import { getPrivateChatImageDeliveryUrl } from '@/app/utils/privateStorageDelivery';
 
 type ProfileRow = {
   id: string;
@@ -337,6 +338,9 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
           return {
             ...msg,
+            image_url: msg.type === 'image' && msg.image_url
+              ? getPrivateChatImageDeliveryUrl(msg.id)
+              : null,
             content: getInquiryMessageDisplayContent({
               type: msg.type,
               content: msg.content,

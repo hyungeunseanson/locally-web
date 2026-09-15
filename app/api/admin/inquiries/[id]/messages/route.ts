@@ -19,6 +19,7 @@ import {
   OFFICIAL_SUPPORT_AVATAR_SRC,
   OFFICIAL_SUPPORT_SENDER_NAME,
 } from '@/app/utils/officialSender';
+import { getPrivateChatImageDeliveryUrl } from '@/app/utils/privateStorageDelivery';
 
 type ProfileRow = {
   id: string;
@@ -231,6 +232,9 @@ export async function GET(
 
       return {
         ...msg,
+        image_url: msg.type === 'image' && msg.image_url
+          ? getPrivateChatImageDeliveryUrl(msg.id)
+          : null,
         content: getInquiryMessageDisplayContent({
           type: msg.type,
           content: msg.content,

@@ -80,6 +80,9 @@ jobs:
       - name: Validate the Supabase Production current-state contract
         run: npm run supabase:staging:current:check
 
+      - name: Validate Supabase P0 Storage and RPC hardening
+        run: npm run supabase:p0-security:contract
+
       - name: Validate read-only public experience media audit boundaries
         run: npm run cloudflare:experience-media:audit:test
 

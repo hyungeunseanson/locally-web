@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { TEAM_CHAT_ROOM_ID } from '@/app/api/admin/team/_shared';
 import { recordAuditLog } from '@/app/utils/supabase/admin';
+import { extractStorageObjectPath } from '@/app/utils/privateStorageDelivery';
 
 export const TEAM_WORKSPACE_TASK_RETENTION_LIMIT = 100;
 export const TEAM_WORKSPACE_COMMENT_RETENTION_LIMIT = 100;
@@ -112,31 +113,18 @@ export function extractAdminFilePathFromUrl(value?: string | null) {
     return trimmedValue;
   }
 
-  try {
-    const parsed = new URL(trimmedValue);
-    const decodedHref = decodeURIComponent(parsed.href);
-    const markers = [
-      '/storage/v1/object/public/admin_files/',
-      '/storage/v1/object/sign/admin_files/',
-      '/storage/v1/object/authenticated/admin_files/',
-      '/storage/v1/object/admin_files/',
-    ];
-
-    for (const marker of markers) {
-      const markerIndex = decodedHref.indexOf(marker);
-      if (markerIndex < 0) continue;
-
-      const nextPath = decodedHref
-        .slice(markerIndex + marker.length)
-        .split('?')[0]
-        .replace(/^\/+/, '');
-
-      if (isSupportedTeamWorkspaceStoragePath(nextPath)) {
-        return nextPath;
-      }
+  if (trimmedValue.startsWith('/api/admin/files/')) {
+    try {
+      const path = decodeURIComponent(trimmedValue.slice('/api/admin/files/'.length));
+      return isSupportedTeamWorkspaceStoragePath(path) ? path : null;
+    } catch {
+      return null;
     }
-  } catch {
-    return null;
+  }
+
+  const storagePath = extractStorageObjectPath(trimmedValue, 'admin_files');
+  if (storagePath && isSupportedTeamWorkspaceStoragePath(storagePath)) {
+    return storagePath;
   }
 
   return null;

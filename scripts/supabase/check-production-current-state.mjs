@@ -9,11 +9,13 @@ const contractPath = resolve(root, 'supabase/staging/current-state-contract.sql'
 const overlayPath = resolve(root, 'supabase/staging/post-baseline-current-state-overlay.sql');
 
 const expectedFingerprints = {
-  storageBuckets: 'c3ff5767c8e4934ae05b3d96550441c8',
-  storagePolicies: '38c973a52a0bebe8fa78b3f53089e427',
+  storageBuckets: '384007869cd8ffb76874b05397c554da',
+  storagePolicies: '27b4679aafb896ae579c14510bd9a9d7',
   publicRlsPolicies: '8e2720ce969cfa4252ec20069000fc4c',
-  publicRelationGrants: '21aa717aae9fd797e1e51053688ddac3',
+  publicRelationGrants: '2c6aec1f48323525171d8f17f135107e',
   stagingOverlayBaselineStoragePolicies: 'd6b381fd629405acfdd615593031de5c',
+  stagingOverlayTargetStorageBuckets: 'c3ff5767c8e4934ae05b3d96550441c8',
+  stagingOverlayTargetStoragePolicies: '38c973a52a0bebe8fa78b3f53089e427',
 };
 
 const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
@@ -81,6 +83,11 @@ const expectedLedger = [
     name: 'service_concierge_assignment',
     repositoryFile: 'supabase/migrations/20260912050655_service_concierge_assignment.sql',
   },
+  {
+    version: '20260915141606',
+    name: 'p0_storage_rpc_security_hardening',
+    repositoryFile: 'supabase/migrations/20260915141606_p0_storage_rpc_security_hardening.sql',
+  },
 ];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));
 for (const [index, expected] of expectedLedger.entries()) {
@@ -100,8 +107,10 @@ exact('repository migration files', migrationFiles, expectedLedger.map(({ reposi
 
 const objects = manifest.objects;
 for (const [name, fingerprint] of Object.entries(expectedFingerprints)) {
-  assert(manifest.securityFingerprints[name] === fingerprint,
-    `security fingerprint differs: ${name}`);
+  if (!name.startsWith('stagingOverlayTarget')) {
+    assert(manifest.securityFingerprints[name] === fingerprint,
+      `security fingerprint differs: ${name}`);
+  }
 }
 assert(objects.publicTables.length === 39, 'expected 39 public tables');
 assert(objects.publicViews.length === 2, 'expected 2 public views');
@@ -121,7 +130,7 @@ assert(objects.rls.forced.length === 0, 'expected zero FORCE RLS tables');
 assert(objects.rls.publicPolicies === 111, 'expected 111 public policies');
 assert(objects.realtimePublication.tables.length === 7, 'expected seven Realtime tables');
 assert(objects.storageBuckets.length === 6, 'expected six Storage buckets');
-assert(objects.storageObjectPolicies.length === 15, 'expected 15 Storage policies');
+assert(objects.storageObjectPolicies.length === 20, 'expected 20 Storage policies');
 
 exact('required tables', required.applicationTables, objects.publicTables);
 exact('required views', required.applicationViews, objects.publicViews);
@@ -180,7 +189,7 @@ assert(contract.trimEnd().endsWith('ROLLBACK;'), 'current-state contract must en
 assert(contract.includes('LOCALLY_PRODUCTION_CURRENT_STATE_CONTRACT_PASS'),
   'current-state contract pass marker is missing');
 for (const [name, fingerprint] of Object.entries(expectedFingerprints)) {
-  if (name !== 'stagingOverlayBaselineStoragePolicies') {
+  if (!name.startsWith('stagingOverlay')) {
     assert(contract.includes(fingerprint), `current-state contract omits ${name} fingerprint`);
   }
 }
@@ -206,9 +215,9 @@ assert(!overlayWithoutComments.includes('DROP POLICY IF EXISTS'), 'overlay must 
 assert(overlayWithoutComments.includes('DROP POLICY "Authenticated users can upload chat images" ON storage.objects;'),
   'overlay targets the wrong policy');
 for (const fingerprint of [
-  expectedFingerprints.storageBuckets,
+  expectedFingerprints.stagingOverlayTargetStorageBuckets,
   expectedFingerprints.stagingOverlayBaselineStoragePolicies,
-  expectedFingerprints.storagePolicies,
+  expectedFingerprints.stagingOverlayTargetStoragePolicies,
 ]) {
   assert(overlay.includes(fingerprint), `overlay omits required fingerprint: ${fingerprint}`);
 }
