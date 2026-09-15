@@ -28,13 +28,14 @@ test('migrates only locator strings while preserving photo order and itinerary c
     photos: ['unchanged', sourceUrl],
     image_url: sourceUrl,
     itinerary: [{ title: 'Keep me', image_url: sourceUrl, nested: { value: 1 } }],
-    itinerary_i18n: { en: [{ title: 'Also keep', image_url: sourceUrl }] },
+    itinerary_i18n: { en: [{ title: 'Also keep', image_url: sourceUrl, captions: [sourceUrl] }] },
   };
   const plan = buildExperienceLocatorMigrationPlan({ rows: [row], proofs: [proof], createdAt: 'excluded' });
   validateExperienceLocatorMigrationPlan(plan);
   assert.deepEqual(plan.changes[0].after.photos.map((value) => value === 'unchanged'), [true, false]);
   assert.equal(plan.changes[0].after.itinerary[0].title, 'Keep me');
   assert.equal(plan.changes[0].after.itinerary_i18n.en[0].title, 'Also keep');
+  assert.equal(plan.changes[0].after.itinerary_i18n.en[0].captions[0], sourceUrl);
   assert.equal(plan.planDigest, buildExperienceLocatorMigrationPlan({ rows: [row], proofs: [proof], createdAt: 'different' }).planDigest);
   const tampered = structuredClone(plan);
   tampered.changes[0].after.photos.reverse();

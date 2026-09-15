@@ -43,15 +43,15 @@ export function buildMigratedR2Locator({ sourceUrl, r2Key, sourceByteSha256 }) {
   return `${R2_BASE}/${r2Key}?legacy=${legacy.legacyIdentity}`;
 }
 
-function rewriteValue(value, replacements, path = '$') {
+function rewriteValue(value, replacements, path = '$', replaceStrings = false) {
   if (typeof value === 'string') {
-    const replacement = replacements.get(value);
+    const replacement = replaceStrings ? replacements.get(value) : null;
     return replacement ? { value: replacement, changedPaths: [path] } : { value, changedPaths: [] };
   }
   if (Array.isArray(value)) {
     const changedPaths = [];
     const next = value.map((item, index) => {
-      const result = rewriteValue(item, replacements, `${path}[${index}]`);
+      const result = rewriteValue(item, replacements, `${path}[${index}]`, replaceStrings);
       changedPaths.push(...result.changedPaths);
       return result.value;
     });
@@ -62,11 +62,11 @@ function rewriteValue(value, replacements, path = '$') {
     const next = {};
     for (const [key, item] of Object.entries(value)) {
       if (key === 'image_url') {
-        const result = rewriteValue(item, replacements, `${path}.${key}`);
+        const result = rewriteValue(item, replacements, `${path}.${key}`, true);
         changedPaths.push(...result.changedPaths);
         next[key] = result.value;
       } else if (Array.isArray(item) || (item && typeof item === 'object')) {
-        const result = rewriteValue(item, replacements, `${path}.${key}`);
+        const result = rewriteValue(item, replacements, `${path}.${key}`, false);
         changedPaths.push(...result.changedPaths);
         next[key] = result.value;
       } else {
@@ -85,12 +85,20 @@ export function buildExperienceLocatorMigrationPlan({ rows, proofs, createdAt })
     assert.equal(proof.sourceByteSha256, proof.r2ByteSha256, 'Source/R2 SHA mismatch.');
     replacements.set(proof.sourceUrl, buildMigratedR2Locator(proof));
   }
+  const approvedProofs = proofs.map((proof) => ({
+    sourceUrl: proof.sourceUrl,
+    r2Key: proof.r2Key,
+    sourceByteSha256: proof.sourceByteSha256,
+    r2ByteSha256: proof.r2ByteSha256,
+    sourceSize: proof.sourceSize,
+    r2Size: proof.r2Size,
+  })).sort((left, right) => left.sourceUrl.localeCompare(right.sourceUrl));
   const changes = [];
   for (const row of rows) {
     const next = { photos: row.photos, image_url: row.image_url, itinerary: row.itinerary, itinerary_i18n: row.itinerary_i18n };
     const changedPaths = [];
     for (const field of Object.keys(next)) {
-      const result = rewriteValue(next[field], replacements, field);
+      const result = rewriteValue(next[field], replacements, field, field === 'photos' || field === 'image_url');
       next[field] = result.value;
       changedPaths.push(...result.changedPaths);
     }
@@ -111,7 +119,7 @@ export function buildExperienceLocatorMigrationPlan({ rows, proofs, createdAt })
     schema: EXPERIENCE_MEDIA_MIGRATION_SCHEMA,
     sourceAuthority: 'supabase-storage-experiences',
     targetAuthority: 'cloudflare-r2-locally-public-experience-canary',
-    proofCount: proofs.length,
+    proofs: approvedProofs,
     changes,
   };
   return { ...payload, createdAt, planDigest: digestPayload(payload) };
@@ -125,7 +133,7 @@ export function validateExperienceLocatorMigrationPlan(plan) {
     schema: plan.schema,
     sourceAuthority: plan.sourceAuthority,
     targetAuthority: plan.targetAuthority,
-    proofCount: plan.proofCount,
+    proofs: plan.proofs,
     changes: plan.changes,
   };
   assert.equal(digestPayload(payload), plan.planDigest, 'Experience locator plan digest mismatch.');
