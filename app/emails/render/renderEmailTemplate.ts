@@ -1,6 +1,6 @@
 import { render } from '@react-email/render';
 import * as React from 'react';
-import { createAdminClient } from '@/app/utils/supabase/admin';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   normalizeNotificationLocale,
   resolveRecipientLocale,
@@ -15,7 +15,7 @@ import type {
 import { DEFAULT_EMAIL_LOCALE } from '@/app/emails/registry/emailTypes';
 import { renderEmailText } from './renderEmailText';
 
-type AdminClient = ReturnType<typeof createAdminClient>;
+type AdminClient = SupabaseClient;
 
 export function isSupportedEmailTemplateId(
   templateId: string
@@ -32,7 +32,8 @@ export async function resolveRequestedEmailLocale(params: {
   if (explicitLocale) return explicitLocale;
 
   if (params.recipientUserId) {
-    const supabaseAdmin = params.supabaseAdmin || createAdminClient();
+    const supabaseAdmin = params.supabaseAdmin ||
+      (await import('@/app/utils/supabase/admin')).createAdminClient();
     return resolveRecipientLocale(supabaseAdmin, params.recipientUserId);
   }
 

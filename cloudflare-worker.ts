@@ -16,8 +16,13 @@ import {
   type HomePopularitySnapshotRuntimeEnv,
 } from './app/utils/homePopularitySnapshot';
 import { PUBLIC_EXPERIENCE_MEDIA_PRODUCTION_QUEUE } from './app/utils/publicExperienceMediaQueueConsumer';
+import {
+  ADMIN_SUPPORT_UNREAD_ALERTS_CRON,
+  handleAdminSupportUnreadAlertsScheduled,
+  type AdminSupportUnreadAlertsRuntimeEnv,
+} from './app/utils/adminSupportUnreadAlertsScheduled';
 
-type WorkerEnvironment = PublicExperienceMediaQueueRuntimeEnv & ExperienceTranslationQueueRuntimeEnv & HomePopularitySnapshotRuntimeEnv;
+type WorkerEnvironment = PublicExperienceMediaQueueRuntimeEnv & ExperienceTranslationQueueRuntimeEnv & HomePopularitySnapshotRuntimeEnv & AdminSupportUnreadAlertsRuntimeEnv;
 
 const worker = {
   fetch(request: Request, env: WorkerEnvironment, ctx: unknown) {
@@ -36,9 +41,11 @@ const worker = {
   scheduled(controller: { cron: string }, env: WorkerEnvironment, ctx: unknown) {
     const scheduled = (openNextWorker as unknown as { scheduled?: (controller: { cron: string }, env: WorkerEnvironment, ctx: unknown) => unknown }).scheduled;
     return handleLocallyScheduledEvent(controller, env, {
-      cron: EXPERIENCE_TRANSLATION_RECOVERY_CRON,
+      dailyCron: EXPERIENCE_TRANSLATION_RECOVERY_CRON,
+      adminSupportCron: ADMIN_SUPPORT_UNREAD_ALERTS_CRON,
       runTranslationRecovery: handleExperienceTranslationScheduledRecovery,
       runHomePopularitySnapshot: handleHomePopularitySnapshotScheduled,
+      runAdminSupportUnreadAlerts: handleAdminSupportUnreadAlertsScheduled,
       delegate: typeof scheduled === 'function'
         ? (nextController, nextEnv) => scheduled.call(openNextWorker, nextController, nextEnv, ctx)
         : undefined,

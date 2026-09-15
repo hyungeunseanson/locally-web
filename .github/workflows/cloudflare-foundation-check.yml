@@ -101,6 +101,9 @@ jobs:
       - name: Validate Home popularity Cloudflare Cron transport
         run: npm run cloudflare:home-popularity:contract
 
+      - name: Validate Admin Support unread Cloudflare Cron transport
+        run: npm run cloudflare:admin-support:contract
+
       - name: Validate the Production media build wrapper
         run: npm run cloudflare:production-build:contract
 

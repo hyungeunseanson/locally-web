@@ -127,7 +127,8 @@ test.describe('Home popularity Cloudflare Cron', () => {
       { cron: HOME_POPULARITY_SNAPSHOT_CRON },
       {},
       {
-        cron: HOME_POPULARITY_SNAPSHOT_CRON,
+        dailyCron: HOME_POPULARITY_SNAPSHOT_CRON,
+        adminSupportCron: '*/10 * * * *',
         runTranslationRecovery: async () => {
           calls.push('translation');
           throw new Error('private translation response');
@@ -135,6 +136,7 @@ test.describe('Home popularity Cloudflare Cron', () => {
         runHomePopularitySnapshot: async () => {
           calls.push('home');
         },
+        runAdminSupportUnreadAlerts: async () => calls.push('admin-support'),
         log: () => undefined,
       }
     )).rejects.toThrow('locally_scheduled_task_failed');
@@ -145,12 +147,14 @@ test.describe('Home popularity Cloudflare Cron', () => {
       { cron: HOME_POPULARITY_SNAPSHOT_CRON },
       {},
       {
-        cron: HOME_POPULARITY_SNAPSHOT_CRON,
+        dailyCron: HOME_POPULARITY_SNAPSHOT_CRON,
+        adminSupportCron: '*/10 * * * *',
         runTranslationRecovery: async () => calls.push('translation'),
         runHomePopularitySnapshot: async () => {
           calls.push('home');
           throw new Error('private database response');
         },
+        runAdminSupportUnreadAlerts: async () => calls.push('admin-support'),
         log: () => undefined,
       }
     )).rejects.toThrow('locally_scheduled_task_failed');
@@ -163,9 +167,11 @@ test.describe('Home popularity Cloudflare Cron', () => {
       { cron: '0 0 * * *' },
       {},
       {
-        cron: HOME_POPULARITY_SNAPSHOT_CRON,
+        dailyCron: HOME_POPULARITY_SNAPSHOT_CRON,
+        adminSupportCron: '*/10 * * * *',
         runTranslationRecovery: () => calls.push('translation'),
         runHomePopularitySnapshot: () => calls.push('home'),
+        runAdminSupportUnreadAlerts: () => calls.push('admin-support'),
         delegate: () => {
           calls.push('delegate');
           return 'delegated';

@@ -1,5 +1,6 @@
-import { createAdminClient } from '@/app/utils/supabase/admin';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { sendImmediateAdminEmail } from '@/app/utils/adminEmailProvider';
+import type { EmailEnv } from '@/app/emails/delivery/sendTemplatedEmail';
 import {
   buildAdminPaymentConfirmedEmail,
   normalizeAdminAlertEmails,
@@ -18,11 +19,18 @@ type RecipientRow = {
   email: string | null;
 };
 
+type AdminClient = SupabaseClient;
+
+async function resolveAdminClient(client?: AdminClient) {
+  if (client) return client;
+  return (await import('@/app/utils/supabase/admin')).createAdminClient();
+}
+
 export async function resolveAdminAlertRecipientsForEmails(params: {
   emails: Array<string | null | undefined>;
-  supabaseAdmin?: ReturnType<typeof createAdminClient>;
+  supabaseAdmin?: AdminClient;
 }): Promise<AdminAlertRecipient[]> {
-  const supabaseAdmin = params.supabaseAdmin ?? createAdminClient();
+  const supabaseAdmin = await resolveAdminClient(params.supabaseAdmin);
   const emails = normalizeAdminAlertEmails(params.emails);
 
   if (emails.length === 0) {
@@ -37,7 +45,11 @@ export async function resolveAdminAlertRecipientsForEmails(params: {
     .in('email', emails);
 
   if (profileError) {
-    console.warn('[AdminAlertCenter] profiles email lookup failed, falling back to users:', profileError.message);
+    console.warn(JSON.stringify({
+      event: 'admin_alert_recipient_resolution',
+      status: 'fallback',
+      diagnosticCode: 'profile_lookup_failed',
+    }));
   } else {
     const safeProfileRows = (profileRows || []) as RecipientRow[];
     safeProfileRows.forEach((row) => {
@@ -55,7 +67,11 @@ export async function resolveAdminAlertRecipientsForEmails(params: {
       .in('email', unresolvedEmails);
 
     if (userError) {
-      console.warn('[AdminAlertCenter] users email fallback failed:', userError.message);
+      console.warn(JSON.stringify({
+        event: 'admin_alert_recipient_resolution',
+        status: 'failed',
+        diagnosticCode: 'user_lookup_failed',
+      }));
     } else {
       const safeUserRows = (userRows || []) as RecipientRow[];
       safeUserRows.forEach((row) => {
@@ -76,15 +92,22 @@ export async function resolveAdminAlertRecipientsForEmails(params: {
 
   if (missingInAppRecipients.length > 0) {
     console.warn(
-      `[AdminAlertCenter] Unable to resolve in-app admin recipients for whitelist emails: ${missingInAppRecipients.join(', ')}`
+      JSON.stringify({
+        event: 'admin_alert_recipient_resolution',
+        status: 'partial',
+        unresolvedCount: missingInAppRecipients.length,
+        diagnosticCode: 'in_app_recipient_missing',
+      })
     );
   }
 
   return recipients;
 }
 
-async function getAdminAlertRecipients(): Promise<AdminAlertRecipient[]> {
-  const supabaseAdmin = createAdminClient();
+async function getAdminAlertRecipients(
+  providedClient?: AdminClient
+): Promise<AdminAlertRecipient[]> {
+  const supabaseAdmin = await resolveAdminClient(providedClient);
 
   const { data: whitelistRows, error: whitelistError } = await supabaseAdmin
     .from('admin_whitelist')
@@ -104,15 +127,15 @@ export async function insertAdminAlerts(params: {
   title: string;
   message: string;
   link?: string | null;
-}) {
-  const recipients = await getAdminAlertRecipients();
+}, options?: { supabaseAdmin?: AdminClient }) {
+  const supabaseAdmin = await resolveAdminClient(options?.supabaseAdmin);
+  const recipients = await getAdminAlertRecipients(supabaseAdmin);
   const inAppRecipients = recipients.filter((recipient): recipient is AdminAlertRecipient & { userId: string } => Boolean(recipient.userId));
 
   if (inAppRecipients.length === 0) {
     return { success: true, count: 0, targetCount: 0 };
   }
 
-  const supabaseAdmin = createAdminClient();
   const { error } = await supabaseAdmin
     .from('notifications')
     .insert(inAppRecipients.map((recipient) => ({
@@ -137,8 +160,13 @@ export async function sendAdminAlertEmails(params: {
   message: string;
   link?: string | null;
   ctaLabel?: string;
+}, options?: {
+  supabaseAdmin?: AdminClient;
+  env?: EmailEnv;
+  sendEmail?: typeof sendImmediateAdminEmail;
 }) {
-  const recipients = await getAdminAlertRecipients();
+  const supabaseAdmin = await resolveAdminClient(options?.supabaseAdmin);
+  const recipients = await getAdminAlertRecipients(supabaseAdmin);
 
   if (recipients.length === 0) {
     return { success: true, count: 0, targetCount: 0 };
@@ -148,7 +176,7 @@ export async function sendAdminAlertEmails(params: {
 
   await Promise.all(recipients.map(async (recipient) => {
     try {
-      const result = await sendImmediateAdminEmail({
+      const result = await (options?.sendEmail ?? sendImmediateAdminEmail)({
         to: recipient.email,
         subject: '',
         title: '',
@@ -165,13 +193,17 @@ export async function sendAdminAlertEmails(params: {
             footerVariant: 'opsAdmin',
           },
         },
-      });
+      }, { supabaseAdmin, env: options?.env });
 
       if (result.sent) {
         sentCount += 1;
       }
-    } catch (error) {
-      console.error(`[AdminAlertCenter] admin email failed (${recipient.email}):`, error);
+    } catch {
+      console.error(JSON.stringify({
+        event: 'admin_alert_email_delivery',
+        status: 'failed',
+        diagnosticCode: 'email_delivery_failed',
+      }));
     }
   }));
 

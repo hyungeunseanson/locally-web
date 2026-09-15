@@ -162,15 +162,27 @@ assert.deepEqual(wrangler.env.production.queues, {
     },
   ],
 });
-assert.deepEqual(wrangler.env.production.triggers, { crons: [manifest.experienceTranslationQueuePolicy.recoveryCron] });
+assert.deepEqual(wrangler.env.production.triggers, {
+  crons: [
+    manifest.experienceTranslationQueuePolicy.recoveryCron,
+    manifest.adminSupportUnreadReleasePolicy.cron,
+  ],
+});
 assert.equal(wrangler.env.production.vars.EXPERIENCE_TRANSLATION_QUEUE_ENABLED, 'false');
 assert.equal(wrangler.env.production.vars.EXPERIENCE_TRANSLATION_SCHEDULED_RECOVERY_ENABLED, 'false');
 assert.equal(wrangler.env.production.vars.HOME_POPULARITY_SNAPSHOT_SCHEDULED_ENABLED, 'false');
+assert.equal(wrangler.env.production.vars.ADMIN_SUPPORT_UNREAD_ALERTS_SCHEDULED_ENABLED, 'false');
 assert.deepEqual(manifest.homePopularityReleasePolicy, {
   defaultProductionProfile: 'on',
   scheduledEnabledVariable: 'HOME_POPULARITY_SNAPSHOT_SCHEDULED_ENABLED',
   rawDefault: 'false',
   cron: '17 19 * * *',
+});
+assert.deepEqual(manifest.adminSupportUnreadReleasePolicy, {
+  defaultProductionProfile: 'on',
+  scheduledEnabledVariable: 'ADMIN_SUPPORT_UNREAD_ALERTS_SCHEDULED_ENABLED',
+  rawDefault: 'false',
+  cron: '*/10 * * * *',
 });
 assert.equal(
   wrangler.env.production.vars[manifest.publicExperienceMediaProducerPolicy.enabledVariable],
