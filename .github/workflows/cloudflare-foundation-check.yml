@@ -111,7 +111,8 @@ jobs:
         run: npm run cloudflare:production-build:contract
 
       - name: Remove contract dev-server output
-        run: node -e "require('node:fs').rmSync('.next/dev', { recursive: true, force: true })"
+        run: >-
+          node -e "require('node:fs').rmSync('.next/dev', { recursive: true, force: true })"
 
       - name: Verify the existing Next.js build path
         run: npm run build
