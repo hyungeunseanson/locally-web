@@ -41,6 +41,11 @@ try {
       response.end('[]');
       return;
     }
+    if (request.url?.startsWith('/rest/v1/rpc/refresh_experience_popularity_snapshot')) {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end('20');
+      return;
+    }
     response.writeHead(500, { 'content-type': 'application/json' });
     response.end('{"error":"unexpected_fixture_request"}');
   });
@@ -58,6 +63,7 @@ try {
       CLOUDFLARE_DEPLOYMENT_ENV: 'production',
       EXPERIENCE_TRANSLATION_QUEUE_ENABLED: 'true',
       EXPERIENCE_TRANSLATION_SCHEDULED_RECOVERY_ENABLED: 'true',
+      HOME_POPULARITY_SNAPSHOT_SCHEDULED_ENABLED: 'true',
       NEXT_PUBLIC_SUPABASE_URL: `http://127.0.0.1:${backendAddress.port}`,
       SUPABASE_SERVICE_ROLE_KEY: 'fixture-service-role',
       GEMINI_API_KEY: 'fixture-gemini-key',
@@ -92,6 +98,7 @@ try {
   assert.equal(firstScheduled.status, 200);
   await waitFor(() => (output.match(/experience_translation_queue_outcome/g) ?? []).length >= 1, 15_000, 'cold Queue outcome');
   assert.equal(backendRequests.filter((request) => request.startsWith('/rest/v1/rpc/lease_experience_translation_task')).length, 2);
+  assert.equal(backendRequests.filter((request) => request.startsWith('/rest/v1/rpc/refresh_experience_popularity_snapshot')).length, 1);
 
   const unauthorized = await fetch(`http://127.0.0.1:${workerPort}/api/cron/experience-translations`);
   assert.equal(unauthorized.status, 401);
@@ -99,10 +106,11 @@ try {
   assert.equal(secondScheduled.status, 200);
   await waitFor(() => (output.match(/experience_translation_queue_outcome/g) ?? []).length >= 2, 15_000, 'warm Queue outcome');
   assert.equal(backendRequests.filter((request) => request.startsWith('/rest/v1/rpc/lease_experience_translation_task')).length, 4);
+  assert.equal(backendRequests.filter((request) => request.startsWith('/rest/v1/rpc/refresh_experience_popularity_snapshot')).length, 2);
   const applicationLogs = output.split('\n').filter((line) => line.includes('experience_translation_')).join('\n');
   assert(!applicationLogs.includes('fixture-service-role'));
   assert(!applicationLogs.includes('fixture-gemini-key'));
-  console.log(JSON.stringify({ coldQueue: 'PASS', afterHttpQueue: 'PASS', leaseRequests: 4, providerCalls: 0 }));
+  console.log(JSON.stringify({ coldQueue: 'PASS', coldScheduledHome: 'PASS', afterHttpQueue: 'PASS', leaseRequests: 4, homeRefreshRequests: 2, providerCalls: 0 }));
 } catch (error) {
   const diagnostic = output
     .replaceAll('fixture-service-role', '[REDACTED]')

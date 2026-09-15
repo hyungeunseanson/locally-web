@@ -10,9 +10,14 @@ import type { PublicExperienceMediaQueueRuntimeEnv } from './app/utils/publicExp
 import { handleExperienceTranslationQueueBatch, type ExperienceTranslationQueueBatchLike, type ExperienceTranslationQueueRuntimeEnv } from './app/utils/experienceTranslation/queueConsumer';
 import { EXPERIENCE_TRANSLATION_QUEUE_NAME } from './app/utils/experienceTranslation/queueMessage';
 import { EXPERIENCE_TRANSLATION_RECOVERY_CRON, handleExperienceTranslationScheduledRecovery } from './app/utils/experienceTranslation/scheduledRecovery';
+import { handleLocallyScheduledEvent } from './app/utils/cloudflareScheduled';
+import {
+  handleHomePopularitySnapshotScheduled,
+  type HomePopularitySnapshotRuntimeEnv,
+} from './app/utils/homePopularitySnapshot';
 import { PUBLIC_EXPERIENCE_MEDIA_PRODUCTION_QUEUE } from './app/utils/publicExperienceMediaQueueConsumer';
 
-type WorkerEnvironment = PublicExperienceMediaQueueRuntimeEnv & ExperienceTranslationQueueRuntimeEnv;
+type WorkerEnvironment = PublicExperienceMediaQueueRuntimeEnv & ExperienceTranslationQueueRuntimeEnv & HomePopularitySnapshotRuntimeEnv;
 
 const worker = {
   fetch(request: Request, env: WorkerEnvironment, ctx: unknown) {
@@ -29,10 +34,15 @@ const worker = {
     throw new Error('locally_unexpected_queue');
   },
   scheduled(controller: { cron: string }, env: WorkerEnvironment, ctx: unknown) {
-    if (controller.cron === EXPERIENCE_TRANSLATION_RECOVERY_CRON) return handleExperienceTranslationScheduledRecovery(controller, env);
     const scheduled = (openNextWorker as unknown as { scheduled?: (controller: { cron: string }, env: WorkerEnvironment, ctx: unknown) => unknown }).scheduled;
-    if (typeof scheduled === 'function') return scheduled.call(openNextWorker, controller, env, ctx);
-    throw new Error('locally_unexpected_scheduled_trigger');
+    return handleLocallyScheduledEvent(controller, env, {
+      cron: EXPERIENCE_TRANSLATION_RECOVERY_CRON,
+      runTranslationRecovery: handleExperienceTranslationScheduledRecovery,
+      runHomePopularitySnapshot: handleHomePopularitySnapshotScheduled,
+      delegate: typeof scheduled === 'function'
+        ? (nextController, nextEnv) => scheduled.call(openNextWorker, nextController, nextEnv, ctx)
+        : undefined,
+    });
   },
 };
 

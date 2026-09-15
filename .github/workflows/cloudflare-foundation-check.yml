@@ -98,6 +98,9 @@ jobs:
       - name: Validate PostgreSQL-backed experience translation Queue transport
         run: npm run cloudflare:translation-queue:contract
 
+      - name: Validate Home popularity Cloudflare Cron transport
+        run: npm run cloudflare:home-popularity:contract
+
       - name: Validate the Production media build wrapper
         run: npm run cloudflare:production-build:contract
 
@@ -113,7 +116,7 @@ jobs:
       - name: Run canary and production Wrangler dry-runs
         run: npm run cloudflare:dry-run
 
-      - name: Validate generated Worker cold translation Queue runtime
+      - name: Validate generated Worker cold scheduled and translation Queue runtime
         run: npm run cloudflare:translation-queue:runtime
 
       - name: Run placement profile Wrangler dry-runs

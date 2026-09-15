@@ -2,26 +2,27 @@ import { NextResponse } from 'next/server';
 
 import { hasValidCronAuthorization } from '@/app/utils/cronAuth';
 import { createAdminClient } from '@/app/utils/supabase/admin';
+import {
+  createSupabaseHomePopularitySnapshotRepository,
+  refreshHomePopularitySnapshot,
+  type HomePopularitySnapshotRepository,
+} from '@/app/utils/homePopularitySnapshot';
 
-export async function GET(request: Request) {
+export async function executeHomePopularitySnapshotCron(
+  request: Request,
+  repository?: HomePopularitySnapshotRepository
+) {
   const authHeader = request.headers.get('authorization');
   if (!hasValidCronAuthorization(authHeader)) {
     return new NextResponse('Unauthorized', { status: 401 });
   }
 
   try {
-    const supabase = createAdminClient();
-    const { data, error } = await supabase.rpc('refresh_experience_popularity_snapshot');
-
-    if (error) {
-      throw error;
-    }
-
-    return NextResponse.json({
-      success: true,
-      refreshedCount: Number(data || 0),
-      refreshedAt: new Date().toISOString(),
-    });
+    const result = await refreshHomePopularitySnapshot(
+      repository ??
+        createSupabaseHomePopularitySnapshotRepository(createAdminClient())
+    );
+    return NextResponse.json(result);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown cron error';
     console.error('[CRON Home Popularity Snapshot] Error:', err);
@@ -35,4 +36,8 @@ export async function GET(request: Request) {
       { status: 500 }
     );
   }
+}
+
+export async function GET(request: Request) {
+  return executeHomePopularitySnapshotCron(request);
 }
