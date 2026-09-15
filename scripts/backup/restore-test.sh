@@ -9,7 +9,8 @@ fi
 backup_dir="$1"
 assertions_sql="$2"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-restore_container="locally-backup-restore-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-1}-${BASHPID}"
+shell_pid="${BASHPID:-$$}"
+restore_container="locally-backup-restore-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-1}-${shell_pid}"
 postgres_image="${BACKUP_RESTORE_POSTGRES_IMAGE:-public.ecr.aws/supabase/postgres:17.6.1.158@sha256:99b1729aeb0bac314445024fc149fbd39306170b61dd50800ccf180327ab3459}"
 container_started=false
 

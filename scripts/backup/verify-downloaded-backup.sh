@@ -41,7 +41,7 @@ actual_ciphertext_sha="$(sha256_file "$ciphertext")"
 [[ "$expected_ciphertext_sha" == "$actual_ciphertext_sha" ]]
 echo "R2_CIPHERTEXT_CHECKSUM_PASS"
 
-verification_dir="$(mktemp -d)"
+verification_dir="$(mktemp -d "${TMPDIR:-/tmp}/locally-backup-verify.XXXXXX")"
 trap 'rm -rf "$verification_dir"' EXIT
 chmod 700 "$verification_dir"
 plaintext_archive="$verification_dir/backup.tar.gz"
