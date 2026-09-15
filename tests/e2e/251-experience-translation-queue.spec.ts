@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { readFileSync } from 'node:fs';
 import { NextRequest } from 'next/server';
 import { executeExperienceTranslationCron } from '../../app/api/cron/experience-translations/route';
 import { scheduleExperienceTranslationWake } from '../../app/utils/experienceTranslation/queueProducer';
@@ -181,5 +182,15 @@ test.describe('experience translation Queue wake transport', () => {
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({ success: true, completed: 0, failed: 0, retried: 0, cancelled: 0, processed: 0 });
     } finally { if (prior === undefined) delete process.env.CRON_SECRET; else process.env.CRON_SECRET = prior; }
+  });
+
+  test('GitHub keeps only the manual authenticated HTTP fallback after Cloudflare activation', () => {
+    const workflow = readFileSync('.github/workflows/experience-translation-queue.yml', 'utf8');
+    expect(workflow).toMatch(/\n\s*workflow_dispatch:\s*(?:\n|$)/);
+    expect(workflow).not.toMatch(/\n\s*schedule:\s*(?:\n|$)/);
+    expect(workflow).toContain('/api/cron/experience-translations');
+    expect(workflow).toContain('-H "Authorization: Bearer ${CRON_SECRET}"');
+    expect(workflow).toContain('group: experience-translation-queue');
+    expect(workflow).toContain('cancel-in-progress: false');
   });
 });

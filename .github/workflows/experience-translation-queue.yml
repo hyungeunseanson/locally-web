@@ -1,10 +1,6 @@
 name: Experience Translation Queue
 
 on:
-  schedule:
-    # 매일 한국 시간 새벽 4시 17분 (UTC 19:17)에 queued / retryable 번역 task 복구
-    - cron: '17 19 * * *'
-
   workflow_dispatch:
     inputs:
       repeat_count:
