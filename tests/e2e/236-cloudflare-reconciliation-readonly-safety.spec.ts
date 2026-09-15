@@ -200,6 +200,8 @@ test.describe('Production reconciliation image checks stay read-only', () => {
 
   test('host profile manual recovery is digest-bound and conditional-create only', () => {
     expect(hostWorkflow).toContain('options: [audit, plan, apply-create-only, legacy-reconcile]');
+    expect(hostWorkflow.match(/Set up Node\.js 24\.20\.0/g)).toHaveLength(2);
+    expect(hostWorkflow.match(/node-version: 24\.20\.0/g)).toHaveLength(2);
     expect(hostWorkflow).toContain('confirmed_plan_digest');
     expect(hostWorkflow).toContain("inputs.action == 'apply-create-only'");
     expect(hostWorkflow).toContain('--create-only-plan');
