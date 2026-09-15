@@ -106,7 +106,9 @@ export default function PostEditor({ initialBoard, initialLocale }: PostEditorPr
     for (const file of imageFiles) {
       const compressed = asProcessedImageFile(await compressImage(file));
       const fileName = sanitizeFileName(compressed.name);
-      const filePath = `community/${Date.now()}-${fileName}`;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('로그인이 필요합니다.');
+      const filePath = `community/${user.id}/${Date.now()}-${fileName}`;
       const { error } = await supabase.storage
         .from('images')
         .upload(filePath, compressed, { cacheControl: '3600', upsert: false });

@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm';
 import { Bold, Italic, Code, Quote, Image as ImageIcon, CheckCircle2, X } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { compressImage } from '@/app/utils/image';
+import { getAdminFileDeliveryUrl, resolveAdminFileDeliveryUrl } from '@/app/utils/privateStorageDelivery';
 
 interface MarkdownMemoEditorProps {
     initialValue?: string;
@@ -78,12 +79,11 @@ export default function MarkdownMemoEditor({ initialValue = '', onSave, onCancel
 
             if (error) throw error;
 
-            const { data: publicUrlData } = supabase.storage
-                .from('admin_files')
-                .getPublicUrl(filePath);
+            const deliveryUrl = getAdminFileDeliveryUrl(filePath);
+            if (!deliveryUrl) throw new Error('Invalid admin file path');
 
             // Replace placeholder with actual image markdown
-            setContent(prev => prev.replace(placeholder, `![${file.name}](${publicUrlData.publicUrl})`));
+            setContent(prev => prev.replace(placeholder, `![${file.name}](${deliveryUrl})`));
         } catch (error) {
             console.error('Image upload failed:', error);
             setContent(prev => prev.replace(placeholder, `*Failed to upload image: ${file.name}*`));
@@ -142,8 +142,10 @@ export default function MarkdownMemoEditor({ initialValue = '', onSave, onCancel
                                         // eslint-disable-next-line @next/next/no-img-element
                                         <img
                                             {...props}
+                                            src={resolveAdminFileDeliveryUrl(props.src)}
                                             onClick={() => {
-                                                if (props.src) setZoomImage(props.src as string);
+                                                const src = resolveAdminFileDeliveryUrl(props.src);
+                                                if (typeof src === 'string') setZoomImage(src);
                                             }}
                                             alt={props.alt || "markdown image"}
                                         />

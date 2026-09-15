@@ -1,12 +1,12 @@
 {
-  "schemaContractVersion": 2,
+  "schemaContractVersion": 3,
   "productionProjectRefsDeniedForFixtureWrites": [
     "uhinvcydgzqlpnvieyal"
   ],
   "freshProjectApplyOrder": [
     "supabase/migrations/20260912034545_production_schema_baseline.sql",
     "supabase/migrations/20260912050655_service_concierge_assignment.sql",
-    "supabase/staging/post-baseline-current-state-overlay.sql"
+    "supabase/migrations/20260915141606_p0_storage_rpc_security_hardening.sql"
   ],
   "applicationTables": [
     "admin_audit_logs",
@@ -120,9 +120,9 @@
     "profiles"
   ],
   "storageBuckets": [
-    { "name": "admin_files", "public": true },
+    { "name": "admin_files", "public": false },
     { "name": "avatars", "public": true },
-    { "name": "chat-images", "public": true },
+    { "name": "chat-images", "public": false },
     { "name": "experiences", "public": true },
     { "name": "images", "public": true },
     { "name": "verification-docs", "public": false }
@@ -222,6 +222,15 @@
     "tables": ["community_comment_likes"],
     "functions": ["increment_comment_like_count", "decrement_comment_like_count"],
     "triggers": ["on_comment_like_added", "on_comment_like_removed"],
-    "storagePolicies": ["Authenticated users can upload chat images"]
+    "storagePolicies": [
+      "Anyone can update their own avatar",
+      "Anyone can upload an avatar",
+      "Authenticated Delete",
+      "Authenticated Update",
+      "Authenticated Upload",
+      "Authenticated users can upload chat images",
+      "Owner Delete",
+      "Owner Update"
+    ]
   }
 }

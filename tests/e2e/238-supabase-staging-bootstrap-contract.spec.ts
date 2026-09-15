@@ -37,11 +37,12 @@ test.describe('Supabase staging bootstrap contract', () => {
     expect(currentManifest.migrationLedger.map(({ version }: { version: string }) => version)).toEqual([
       '20260912034545',
       '20260912050655',
+      '20260915141606',
     ]);
     expect(manifest.freshProjectApplyOrder).toEqual([
       'supabase/migrations/20260912034545_production_schema_baseline.sql',
       'supabase/migrations/20260912050655_service_concierge_assignment.sql',
-      'supabase/staging/post-baseline-current-state-overlay.sql',
+      'supabase/migrations/20260915141606_p0_storage_rpc_security_hardening.sql',
     ]);
     expect(packageJson.scripts['supabase:staging:baseline:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:current:check']).toBeTruthy();
@@ -161,12 +162,12 @@ test.describe('Supabase staging bootstrap contract', () => {
     ]);
     expect(currentManifest.objects.rls.forced).toEqual([]);
     expect(currentManifest.objects.rls.publicPolicies).toBe(111);
-    expect(currentManifest.objects.storageObjectPolicies).toHaveLength(15);
+    expect(currentManifest.objects.storageObjectPolicies).toHaveLength(20);
     expect(currentManifest.securityFingerprints).toMatchObject({
-      storageBuckets: 'c3ff5767c8e4934ae05b3d96550441c8',
-      storagePolicies: '38c973a52a0bebe8fa78b3f53089e427',
+      storageBuckets: '384007869cd8ffb76874b05397c554da',
+      storagePolicies: '27b4679aafb896ae579c14510bd9a9d7',
       publicRlsPolicies: '8e2720ce969cfa4252ec20069000fc4c',
-      publicRelationGrants: '21aa717aae9fd797e1e51053688ddac3',
+      publicRelationGrants: '2c6aec1f48323525171d8f17f135107e',
       stagingOverlayBaselineStoragePolicies: 'd6b381fd629405acfdd615593031de5c',
     });
     for (const fingerprint of [
@@ -191,7 +192,7 @@ test.describe('Supabase staging bootstrap contract', () => {
     expect(currentManifest.legacyCompatibility.status).toBe(410);
   });
 
-  test('keeps the staging-only current-state overlay outside migrations and fail-closed', () => {
+  test('keeps the superseded staging-only overlay as fail-closed historical evidence', () => {
     expect(currentStateOverlay).toContain("target_ref = 'uhinvcydgzqlpnvieyal'");
     expect(currentStateOverlay).toContain("current_setting('locally.staging_target_ref', true)");
     expect(currentStateOverlay.indexOf('$target_guard$')).toBeLessThan(
@@ -224,7 +225,14 @@ test.describe('Supabase staging bootstrap contract', () => {
       expect(manifest.applicationTriggers).not.toContain(staleName);
     }
     expect(manifest.forbiddenCurrentObjects.storagePolicies).toEqual([
+      'Anyone can update their own avatar',
+      'Anyone can upload an avatar',
+      'Authenticated Delete',
+      'Authenticated Update',
+      'Authenticated Upload',
       'Authenticated users can upload chat images',
+      'Owner Delete',
+      'Owner Update',
     ]);
   });
 

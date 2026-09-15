@@ -224,9 +224,9 @@ $$;
 
 WITH required(name, expected_public) AS (
   VALUES
-    ('admin_files', true),
+    ('admin_files', false),
     ('avatars', true),
-    ('chat-images', true),
+    ('chat-images', false),
     ('experiences', true),
     ('images', true),
     ('verification-docs', false)
@@ -248,9 +248,9 @@ BEGIN
   INTO mismatch
   FROM (
     VALUES
-      ('admin_files', true),
+      ('admin_files', false),
       ('avatars', true),
-      ('chat-images', true),
+      ('chat-images', false),
       ('experiences', true),
       ('images', true),
       ('verification-docs', false)
@@ -268,16 +268,21 @@ BEGIN
   WHERE policy_def.schemaname = 'storage' AND policy_def.tablename = 'objects';
 
   IF mismatch IS DISTINCT FROM ARRAY[
-    'Anyone can update their own avatar',
-    'Anyone can upload an avatar',
+    'Admins can delete files',
+    'Admins can read files',
+    'Admins can update files',
     'Auth Users Upload',
-    'Authenticated Delete',
-    'Authenticated Update',
-    'Authenticated Upload',
     'Avatar images are publicly accessible',
+    'Avatar owners can delete',
+    'Avatar owners can update',
+    'Avatar owners can upload',
+    'Experience object owners can delete',
+    'Experience object owners can update',
+    'Image owners can delete',
+    'Image owners can read',
+    'Image owners can update',
+    'Image owners can upload',
     'Only admins can upload files',
-    'Owner Delete',
-    'Owner Update',
     'Public Access',
     'Verification docs owners can delete',
     'Verification docs owners can read',

@@ -17,6 +17,7 @@ import { AdminTask, AdminComment } from '@/app/types/admin';
 import { useToast } from '@/app/context/ToastContext';
 import { useConfirmDialog } from '@/app/hooks/useConfirmDialog';
 import { ensureAdminTeamLastViewed, markAdminTeamViewed } from '@/app/utils/adminBadgeState';
+import { resolveAdminFileDeliveryUrl } from '@/app/utils/privateStorageDelivery';
 
 type TeamTabProps = {
   initialInnerTab?: 'todo' | 'memo' | 'proxy';
@@ -1092,8 +1093,10 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
                                       {/* eslint-disable-next-line @next/next/no-img-element */}
                                       <img
                                         {...props}
+                                        src={resolveAdminFileDeliveryUrl(props.src)}
                                         onClick={() => {
-                                          if (props.src) setZoomImage(props.src as string);
+                                          const src = resolveAdminFileDeliveryUrl(props.src);
+                                          if (typeof src === 'string') setZoomImage(src);
                                         }}
                                         alt={props.alt || "markdown image"}
                                       />
