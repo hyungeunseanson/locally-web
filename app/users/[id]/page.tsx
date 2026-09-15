@@ -152,12 +152,17 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
   useEffect(() => {
     const fetchProfile = async () => {
       // 공개 호스트 프로필은 safe projection view만 사용한다.
-      const [{ data: hostApp }, publicDemographics] = await Promise.all([
+      const [{ data: hostApp }, { data: publicAccountProfile }, publicDemographics] = await Promise.all([
         supabase
           .from('public_host_applications')
           .select('id, status, name, profile_photo, self_intro, languages, is_superhost, created_at')
           .eq('user_id', resolvedParams.id)
           .order('created_at', { ascending: false }),
+        supabase
+          .from('public_profiles')
+          .select('avatar_url')
+          .eq('id', resolvedParams.id)
+          .maybeSingle(),
         fetchPublicDemographics(resolvedParams.id),
       ]);
 
@@ -167,7 +172,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
 
       setProfile(isPublicHost && latestHostApp ? {
         full_name: latestHostApp.name,
-        avatar_url: latestHostApp.profile_photo,
+        avatar_url: latestHostApp.profile_photo || publicAccountProfile?.avatar_url || null,
         bio: latestHostApp.self_intro,
         introduction: latestHostApp.self_intro,
         languages: Array.isArray(latestHostApp.languages)

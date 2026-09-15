@@ -59,8 +59,13 @@ assert.equal(
   manifest.environments.production.publicExperienceMediaBaseUrl,
   'https://media-canary.locally-travel.com'
 );
+assert.equal(
+  manifest.environments.production.publicHostProfileMediaBaseUrl,
+  'https://profiles-media.locally-travel.com'
+);
 assert.deepEqual(manifest.environmentVariables.productionBuildRequired, [
   'NEXT_PUBLIC_CLOUDFLARE_IMAGE_CANARY_BASE_URL',
+  'NEXT_PUBLIC_CLOUDFLARE_HOST_PROFILE_BASE_URL',
   'NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_ENABLED',
   'NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_EXPERIENCE_IDS',
 ]);

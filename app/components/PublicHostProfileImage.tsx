@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { getCloudflarePublicHostProfileImage } from "@/app/utils/cloudflarePublicHostProfileImages";
 
@@ -28,9 +28,21 @@ export default function PublicHostProfileImage({
   const [failedCloudflareUrl, setFailedCloudflareUrl] = useState<string | null>(
     null,
   );
+  const imageRef = useRef<HTMLImageElement | null>(null);
   const useCloudflare = Boolean(
     cloudflareImage && cloudflareImage.largeUrl !== failedCloudflareUrl,
   );
+
+  useEffect(() => {
+    if (!useCloudflare || !cloudflareImage) return;
+    const frame = window.requestAnimationFrame(() => {
+      const image = imageRef.current;
+      if (image?.complete && image.naturalWidth === 0) {
+        setFailedCloudflareUrl(cloudflareImage.largeUrl);
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [cloudflareImage, useCloudflare]);
 
   if (!useCloudflare || !cloudflareImage) {
     return (
@@ -51,6 +63,7 @@ export default function PublicHostProfileImage({
     // Immutable public R2 variants bypass framework image transformation.
     // eslint-disable-next-line @next/next/no-img-element
     <img
+      ref={imageRef}
       src={cloudflareImage.largeUrl}
       srcSet={`${cloudflareImage.smallUrl} 128w, ${cloudflareImage.largeUrl} 256w`}
       sizes={sizes}

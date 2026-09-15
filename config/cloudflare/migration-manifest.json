@@ -31,6 +31,7 @@
       "publicExperienceMediaQueue": "locally-public-experience-media-mirror-production",
       "publicExperienceMediaDeadLetterQueue": "locally-public-experience-media-mirror-dlq-production",
       "publicExperienceMediaBaseUrl": "https://media-canary.locally-travel.com",
+      "publicHostProfileMediaBaseUrl": "https://profiles-media.locally-travel.com",
       "workersDev": false,
       "previewUrls": false
     }
@@ -143,6 +144,7 @@
     ],
     "productionBuildRequired": [
       "NEXT_PUBLIC_CLOUDFLARE_IMAGE_CANARY_BASE_URL",
+      "NEXT_PUBLIC_CLOUDFLARE_HOST_PROFILE_BASE_URL",
       "NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_ENABLED",
       "NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_EXPERIENCE_IDS"
     ],

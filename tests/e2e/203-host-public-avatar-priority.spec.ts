@@ -1,8 +1,17 @@
 import { expect, test } from '@playwright/test';
+import { readFileSync } from 'node:fs';
 
 import { getHostPublicProfile } from '@/app/utils/profile';
 
 test.describe('Host public avatar priority', () => {
+  test('public host page loads only the safe public profile avatar projection as fallback', () => {
+    const source = readFileSync('app/users/[id]/page.tsx', 'utf8');
+    expect(source).toContain(".from('public_profiles')");
+    expect(source).toContain(".select('avatar_url')");
+    expect(source).toContain('latestHostApp.profile_photo || publicAccountProfile?.avatar_url || null');
+    expect(source).not.toMatch(/publicAccountProfile\?\.(email|phone|birth_date|bank|identity)/);
+  });
+
   test('uses the host application photo before the account profile avatar', () => {
     const hostPublicProfile = getHostPublicProfile(
       {

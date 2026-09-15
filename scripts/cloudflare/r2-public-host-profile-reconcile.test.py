@@ -1,4 +1,5 @@
 import importlib.util
+import io
 import sys
 import tempfile
 import types
@@ -14,7 +15,13 @@ botocore = types.ModuleType("botocore")
 botocore_config = types.ModuleType("botocore.config")
 botocore_config.Config = object
 botocore_exceptions = types.ModuleType("botocore.exceptions")
-botocore_exceptions.ClientError = RuntimeError
+class FakeClientError(RuntimeError):
+    def __init__(self, code="PreconditionFailed", status=412):
+        super().__init__(code)
+        self.response = {"Error": {"Code": code}, "ResponseMetadata": {"HTTPStatusCode": status}}
+
+
+botocore_exceptions.ClientError = FakeClientError
 sys.modules.setdefault("botocore", botocore)
 sys.modules.setdefault("botocore.config", botocore_config)
 sys.modules.setdefault("botocore.exceptions", botocore_exceptions)
@@ -132,6 +139,9 @@ class FakePaginator:
 class FakeClient:
     def __init__(self, buckets):
         self.buckets = buckets
+        self.put_calls = []
+        self.delete_calls = 0
+        self.on_put = None
 
     def get_paginator(self, name):
         if name != "list_objects_v2":
@@ -144,7 +154,11 @@ class FakeClient:
             "ContentLength": len(item["body"]),
             "ContentType": item.get("content_type", "application/octet-stream"),
             "Metadata": item.get("metadata", {}),
+            "CacheControl": item.get("cache_control", ""),
         }
+
+    def get_object(self, Bucket, Key):
+        return {"Body": io.BytesIO(self.buckets[Bucket][Key]["body"])}
 
     def download_file(self, Bucket, Key, Filename):
         Path(Filename).write_bytes(self.buckets[Bucket][Key]["body"])
@@ -156,9 +170,221 @@ class FakeClient:
             "metadata": ExtraArgs.get("Metadata", {}),
         }
 
+    def put_object(self, **kwargs):
+        self.put_calls.append(kwargs)
+        if self.on_put:
+            self.on_put(kwargs)
+        bucket = kwargs["Bucket"]
+        key = kwargs["Key"]
+        if kwargs.get("IfNoneMatch") != "*":
+            raise AssertionError("conditional create required")
+        if key in self.buckets.setdefault(bucket, {}):
+            raise FakeClientError()
+        body = kwargs["Body"].read()
+        self.buckets[bucket][key] = {
+            "body": body,
+            "content_type": kwargs.get("ContentType"),
+            "cache_control": kwargs.get("CacheControl", ""),
+            "metadata": kwargs.get("Metadata", {}),
+        }
+
     def delete_objects(self, Bucket, Delete):
+        self.delete_calls += len(Delete["Objects"])
         for item in Delete["Objects"]:
             self.buckets.get(Bucket, {}).pop(item["Key"], None)
+
+
+class CreateOnlyApplyTests(unittest.TestCase):
+    HOST = "11111111-1111-4111-8111-111111111111"
+    KEY = f"hosts/{HOST}/0123456789ab/avatar-w128-q80.webp"
+
+    def setUp(self):
+        self.directory = Path(tempfile.mkdtemp())
+        self.body = b"RIFF-fake-webp"
+        self.source = self.directory / "objects" / "avatar.webp"
+        self.source.parent.mkdir()
+        self.source.write_bytes(self.body)
+        self.origin = "https://uhinvcydgzqlpnvieyal.supabase.co/storage/v1/object/public/avatars/user/avatar.jpg"
+        self.item = {
+            "hostId": self.HOST,
+            "key": self.KEY,
+            "path": "objects/avatar.webp",
+            "bytes": len(self.body),
+            "sha256": profile_r2.hashlib.sha256(self.body).hexdigest(),
+            "sourceIdentityHash": profile_r2.hashlib.sha256(self.origin.encode()).hexdigest(),
+            "sourceSha256": "2" * 64,
+            "sourceBytes": 321,
+            "sourceKind": "public-profile-avatar",
+            "width": 128,
+            "quality": 80,
+        }
+        self.expected = [{
+            "hostId": self.HOST,
+            "originUrl": self.origin,
+            "sourceKind": "public-profile-avatar",
+            "key": self.KEY,
+            "width": 128,
+            "quality": 80,
+        }]
+        self.buckets = {profile_r2.ACTIVE_BUCKET: {}, profile_r2.STALE_BUCKET: {}}
+        self.active = FakeClient(self.buckets)
+        self.stale = FakeClient(self.buckets)
+
+    def make_plan(self):
+        output = self.directory / "r2-plan.json"
+        profile_r2.plan_mode(SimpleNamespace(output=str(output), snapshot_hash="a" * 64, create_only_plan=True), self.active, self.stale, self.expected)
+        return profile_r2.json.loads(output.read_text())
+
+    def apply(self, plan):
+        args = SimpleNamespace(plan=str(self.directory / "objects.json"), confirm_digest=plan["planDigest"])
+        output = self.directory / "result.json"
+        args.output = str(output)
+        with mock.patch.object(profile_r2, "verify_public_object"):
+            profile_r2.apply_mode(args, self.active, self.stale, [self.item], self.expected, plan, create_only=True)
+        return profile_r2.json.loads(output.read_text())
+
+    def test_conditional_create_success_and_second_run_is_exact_without_overwrite(self):
+        result = self.apply(self.make_plan())
+        self.assertEqual(result["uploadedObjectCount"], 1)
+        self.assertEqual(result["deletedObjectCount"], 0)
+        self.assertEqual(self.active.put_calls[0]["IfNoneMatch"], "*")
+        self.assertEqual(self.active.delete_calls, 0)
+
+        # A fresh plan sees the object as existing and schedules no transformed write.
+        second = self.make_plan()
+        self.assertEqual(second["missingObjectCount"], 0)
+        self.assertEqual(second["actualBytesVerifiedObjectCount"], 1)
+
+    def test_plan_get_verifies_legacy_bytes_and_rejects_corruption_or_provenance_conflict(self):
+        digest = profile_r2.hashlib.sha256(self.body).hexdigest()
+        self.buckets[profile_r2.ACTIVE_BUCKET][self.KEY] = {
+            "body": self.body,
+            "content_type": "image/webp",
+            "cache_control": profile_r2.IMMUTABLE_CACHE_CONTROL,
+            "metadata": {"sha256": digest, "host-id": self.HOST},
+        }
+        legacy = self.make_plan()
+        self.assertEqual(legacy["metadataConflictCount"], 0)
+        self.assertEqual(legacy["actualBytesVerifiedObjectCount"], 1)
+        self.assertEqual(legacy["actualBytesVerified"], len(self.body))
+        self.assertEqual(
+            legacy["executionPayload"]["existingProofs"][0]["sourceIdentity"],
+            "legacy-unavailable",
+        )
+
+        self.buckets[profile_r2.ACTIVE_BUCKET][self.KEY]["body"] = b"corrupt"
+        corrupt = self.make_plan()
+        self.assertEqual(corrupt["metadataConflictCount"], 1)
+        self.assertEqual(corrupt["actualBytesVerifiedObjectCount"], 0)
+
+        self.buckets[profile_r2.ACTIVE_BUCKET][self.KEY] = {
+            "body": self.body,
+            "content_type": "image/webp",
+            "cache_control": profile_r2.IMMUTABLE_CACHE_CONTROL,
+            "metadata": {
+                "sha256": digest,
+                "host-id": self.HOST,
+                "source-identity": "f" * 64,
+            },
+        }
+        provenance_conflict = self.make_plan()
+        self.assertEqual(provenance_conflict["metadataConflictCount"], 1)
+
+    def test_existing_object_proof_drift_refuses_before_write(self):
+        digest = profile_r2.hashlib.sha256(self.body).hexdigest()
+        self.buckets[profile_r2.ACTIVE_BUCKET][self.KEY] = {
+            "body": self.body,
+            "content_type": "image/webp",
+            "cache_control": profile_r2.IMMUTABLE_CACHE_CONTROL,
+            "metadata": {"sha256": digest},
+        }
+        plan = self.make_plan()
+        self.buckets[profile_r2.ACTIVE_BUCKET][self.KEY]["body"] = b"changed-after-plan"
+        args = SimpleNamespace(plan=str(self.directory / "objects.json"), confirm_digest=plan["planDigest"], output=str(self.directory / "result.json"))
+        with self.assertRaisesRegex(RuntimeError, "body-sha256"):
+            profile_r2.apply_mode(args, self.active, self.stale, [], self.expected, plan, create_only=True)
+        self.assertEqual(len(self.active.put_calls), 0)
+        self.assertEqual(self.active.delete_calls, 0)
+
+    def test_concurrent_exact_writer_is_verified_and_preserved(self):
+        plan = self.make_plan()
+        expected_metadata = profile_r2.derivative_metadata(self.item)
+        def race(_kwargs):
+            self.active.on_put = None
+            self.buckets[profile_r2.ACTIVE_BUCKET][self.KEY] = {
+                "body": self.body,
+                "content_type": "image/webp",
+                "cache_control": profile_r2.IMMUTABLE_CACHE_CONTROL,
+                "metadata": {**expected_metadata, "producer": "queue"},
+            }
+        self.active.on_put = race
+        result = self.apply(plan)
+        self.assertEqual(result["uploadedObjectCount"], 0)
+        self.assertEqual(result["concurrentExactSkipCount"], 1)
+        self.assertEqual(self.buckets[profile_r2.ACTIVE_BUCKET][self.KEY]["metadata"]["producer"], "queue")
+
+    def test_concurrent_conflict_fails_closed_without_delete_or_retry_put(self):
+        plan = self.make_plan()
+        def race(_kwargs):
+            self.active.on_put = None
+            self.buckets[profile_r2.ACTIVE_BUCKET][self.KEY] = {
+                "body": b"different",
+                "content_type": "image/webp",
+                "cache_control": profile_r2.IMMUTABLE_CACHE_CONTROL,
+                "metadata": {"sha256": "0" * 64},
+            }
+        self.active.on_put = race
+        with mock.patch.object(profile_r2, "verify_public_object"):
+            with self.assertRaisesRegex(RuntimeError, "byte conflict"):
+                self.apply(plan)
+        self.assertEqual(len(self.active.put_calls), 1)
+        self.assertEqual(self.active.delete_calls, 0)
+
+    def test_concurrent_header_or_provenance_conflict_is_not_legacy_skipped(self):
+        for mutation in ("content_type", "cache_control", "source-sha256"):
+            with self.subTest(mutation=mutation):
+                self.setUp()
+                plan = self.make_plan()
+                metadata = profile_r2.derivative_metadata(self.item)
+                if mutation == "source-sha256":
+                    metadata[mutation] = "f" * 64
+                def race(_kwargs, metadata=metadata, mutation=mutation):
+                    self.active.on_put = None
+                    self.buckets[profile_r2.ACTIVE_BUCKET][self.KEY] = {
+                        "body": self.body,
+                        "content_type": "text/html" if mutation == "content_type" else "image/webp",
+                        "cache_control": "max-age=0" if mutation == "cache_control" else profile_r2.IMMUTABLE_CACHE_CONTROL,
+                        "metadata": metadata,
+                    }
+                self.active.on_put = race
+                with mock.patch.object(profile_r2, "verify_public_object"):
+                    with self.assertRaisesRegex(RuntimeError, "conflict"):
+                        self.apply(plan)
+                self.assertEqual(len(self.active.put_calls), 1)
+                self.assertEqual(self.active.delete_calls, 0)
+
+    def test_r2_state_or_source_provenance_drift_refuses_before_write(self):
+        plan = self.make_plan()
+        self.buckets[profile_r2.ACTIVE_BUCKET][
+            f"hosts/{self.HOST}/ffffffffffff/avatar-w256-q80.webp"
+        ] = {"body": b"other", "content_type": "image/webp"}
+        with self.assertRaisesRegex(RuntimeError, "inventory changed"):
+            self.apply(plan)
+        self.assertEqual(len(self.active.put_calls), 0)
+
+        self.buckets[profile_r2.ACTIVE_BUCKET].clear()
+        plan = self.make_plan()
+        self.item["sourceSha256"] = "invalid"
+        with self.assertRaisesRegex(RuntimeError, "provenance"):
+            self.apply(plan)
+        self.assertEqual(len(self.active.put_calls), 0)
+
+    def test_tampered_digest_or_metadata_conflict_refuses_before_write(self):
+        plan = self.make_plan()
+        plan["executionPayload"]["missingKeys"] = []
+        with self.assertRaisesRegex(RuntimeError, "modified"):
+            self.apply(plan)
+        self.assertEqual(len(self.active.put_calls), 0)
 
 
 class PurgeTests(unittest.TestCase):

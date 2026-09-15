@@ -3,6 +3,15 @@ name: Public Host Profile Image Reconciliation
 on:
   workflow_dispatch:
     inputs:
+      action:
+        description: Read-only audit/plan or explicitly approved create-only apply
+        required: true
+        type: choice
+        default: audit
+        options: [audit, plan, apply-create-only, legacy-reconcile]
+      confirmed_plan_digest:
+        description: Exact digest from a fresh plan run (apply-create-only only)
+        required: false
       expected_visible_hosts:
         description: Initial Production visible host guard
         required: true
@@ -56,11 +65,12 @@ jobs:
           missing="${{ steps.audit.outputs.missing_photo_count }}"
           unexpected="${{ steps.audit.outputs.unexpected_photo_count }}"
           excluded="${{ steps.audit.outputs.excluded_host_count }}"
-          for count in "$latest" "$visible" "$eligible" "$missing" "$unexpected" "$excluded"; do
+          external="${{ steps.audit.outputs.external_avatar_excluded_count }}"
+          for count in "$latest" "$visible" "$eligible" "$missing" "$unexpected" "$excluded" "$external"; do
             [[ "$count" =~ ^[0-9]+$ ]]
           done
           (( latest >= visible ))
-          (( visible == eligible + missing + unexpected + excluded ))
+          (( visible == eligible + missing + unexpected + excluded + external ))
           (( eligible > 0 ))
           (( unexpected == 0 ))
           (( excluded == 0 ))
@@ -81,13 +91,13 @@ jobs:
           [[ "${{ steps.audit.outputs.eligible_host_count }}" == "$EXPECTED_ELIGIBLE_HOSTS" ]]
           [[ "${{ steps.audit.outputs.missing_photo_count }}" == "$EXPECTED_MISSING_PHOTOS" ]]
 
-      - name: Finish without R2 credentials when no drift exists
-        if: steps.audit.outputs.drift != 'true'
+      - name: Finish read-only audit without R2 credentials
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'audit'
         shell: bash
         run: |
           {
             echo "### Public host profile image reconciliation"
-            echo "- Drift: none"
+            echo "- Drift: ${{ steps.audit.outputs.drift }}"
             echo "- R2 credentials: not loaded"
             echo "- Downloads, transforms, uploads, stale moves: skipped"
             echo "- Pull request: skipped"
@@ -95,7 +105,9 @@ jobs:
 
   reconcile:
     needs: audit
-    if: needs.audit.outputs.drift == 'true'
+    if: >-
+      (github.event_name == 'schedule' && needs.audit.outputs.drift == 'true') ||
+      (github.event_name == 'workflow_dispatch' && inputs.action != 'audit')
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     environment: production-profile-media-sync
@@ -166,21 +178,46 @@ jobs:
           PY
 
       - name: Plan candidate manifest without downloading images
-        run: node scripts/cloudflare/reconcile-public-host-profile-images.mjs plan --output="${RUNNER_TEMP}/public-host-profile-sync"
+        run: >-
+          node scripts/cloudflare/reconcile-public-host-profile-images.mjs plan
+          --allow-no-drift=true
+          --output="${RUNNER_TEMP}/public-host-profile-sync"
 
       - name: Identify missing, restorable, and stale active objects
         id: r2_plan
+        env:
+          CREATE_ONLY_PLAN: ${{ github.event_name == 'workflow_dispatch' && (inputs.action == 'plan' || inputs.action == 'apply-create-only') && '--create-only-plan' || '' }}
         shell: bash
         run: |
           python3 scripts/cloudflare/r2-public-host-profile-reconcile.py \
             --mode plan \
             --plan "${RUNNER_TEMP}/public-host-profile-sync/specifications.json" \
+            --snapshot-hash "${{ needs.audit.outputs.snapshot_hash }}" \
+            $CREATE_ONLY_PLAN \
             --output "${RUNNER_TEMP}/public-host-profile-sync/r2-plan.json"
 
+      - name: Publish read-only plan and stop before source downloads
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'plan'
+        shell: bash
+        run: |
+          {
+            echo "### Public host profile create-only plan"
+            echo "- Plan digest: ${{ steps.r2_plan.outputs.plan_digest }}"
+            echo "- Expected objects: ${{ steps.r2_plan.outputs.expected_count }}"
+            echo "- Existing objects: ${{ steps.r2_plan.outputs.existing_count }}"
+            echo "- Existing bodies verified: ${{ steps.r2_plan.outputs.actual_bytes_verified_count }}"
+            echo "- Existing body bytes read: ${{ steps.r2_plan.outputs.actual_bytes_verified }}"
+            echo "- Missing objects: ${{ steps.r2_plan.outputs.missing_count }}"
+            echo "- Metadata conflicts: ${{ steps.r2_plan.outputs.metadata_conflict_count }}"
+            echo "- Source downloads/transforms/writes: 0"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Install pinned project dependencies
+        if: github.event_name == 'schedule' || inputs.action == 'apply-create-only' || inputs.action == 'legacy-reconcile'
         run: npm ci --ignore-scripts=false
 
       - name: Download and transform only missing variants
+        if: github.event_name == 'schedule' || inputs.action == 'apply-create-only' || inputs.action == 'legacy-reconcile'
         id: transform
         shell: bash
         run: |
@@ -190,33 +227,63 @@ jobs:
             --output="${RUNNER_TEMP}/public-host-profile-sync"
 
       - name: Reject Production changes before R2 mutation
+        if: github.event_name == 'schedule' || inputs.action == 'apply-create-only' || inputs.action == 'legacy-reconcile'
         run: node scripts/cloudflare/reconcile-public-host-profile-images.mjs verify-snapshot --plan="${RUNNER_TEMP}/public-host-profile-sync/plan.json"
 
-      - name: Restore, upload, verify, and privately quarantine stale objects
+      - name: Verify source bytes immediately before R2 mutation
+        if: github.event_name == 'schedule' || inputs.action == 'apply-create-only' || inputs.action == 'legacy-reconcile'
+        id: source_preverify
+        run: >-
+          node scripts/cloudflare/reconcile-public-host-profile-images.mjs verify-source-bytes
+          --plan="${RUNNER_TEMP}/public-host-profile-sync/specifications.json"
+          --objects="${RUNNER_TEMP}/public-host-profile-sync/objects.json"
+          --prior-source-bytes="${{ steps.transform.outputs.source_download_bytes }}"
+
+      - name: Conditionally create and verify approved profile objects
+        if: github.event_name == 'schedule' || inputs.action == 'apply-create-only' || inputs.action == 'legacy-reconcile'
         id: r2_apply
+        env:
+          APPLY_MODE: ${{ inputs.action == 'apply-create-only' && 'create-only' || 'apply' }}
+          CONFIRMED_PLAN_DIGEST: ${{ inputs.action == 'apply-create-only' && inputs.confirmed_plan_digest || steps.r2_plan.outputs.plan_digest }}
         shell: bash
         run: |
+          set -Eeuo pipefail
+          [[ "$CONFIRMED_PLAN_DIGEST" =~ ^[a-f0-9]{64}$ ]]
           python3 scripts/cloudflare/r2-public-host-profile-reconcile.py \
-            --mode apply \
+            --mode "$APPLY_MODE" \
             --plan "${RUNNER_TEMP}/public-host-profile-sync/specifications.json" \
             --expected "${RUNNER_TEMP}/public-host-profile-sync/specifications.json" \
             --objects "${RUNNER_TEMP}/public-host-profile-sync/objects.json" \
             --r2-plan "${RUNNER_TEMP}/public-host-profile-sync/r2-plan.json" \
+            --confirm-digest "$CONFIRMED_PLAN_DIGEST" \
             --output "${RUNNER_TEMP}/public-host-profile-sync/r2-result.json"
 
       - name: Reject Production changes after R2 mutation
+        if: github.event_name == 'schedule' || inputs.action == 'apply-create-only' || inputs.action == 'legacy-reconcile'
         run: node scripts/cloudflare/reconcile-public-host-profile-images.mjs verify-snapshot --plan="${RUNNER_TEMP}/public-host-profile-sync/plan.json"
 
+      - name: Verify source bytes stayed exact within the shared read budget
+        if: github.event_name == 'schedule' || inputs.action == 'apply-create-only' || inputs.action == 'legacy-reconcile'
+        id: source_verify
+        run: >-
+          node scripts/cloudflare/reconcile-public-host-profile-images.mjs verify-source-bytes
+          --plan="${RUNNER_TEMP}/public-host-profile-sync/specifications.json"
+          --objects="${RUNNER_TEMP}/public-host-profile-sync/objects.json"
+          --prior-source-bytes="${{ steps.source_preverify.outputs.total_source_bytes }}"
+
       - name: Apply verified candidate manifest
+        if: github.event_name == 'schedule' || inputs.action == 'legacy-reconcile'
         shell: bash
         run: |
           cp "${RUNNER_TEMP}/public-host-profile-sync/publicHostProfileImages.generated.json" app/data/publicHostProfileImages.generated.json
           git diff --check
 
       - name: Install pinned Chromium
+        if: github.event_name == 'schedule' || inputs.action == 'legacy-reconcile'
         run: npx playwright install --with-deps chromium
 
       - name: Run profile and existing Cloudflare image boundary tests
+        if: github.event_name == 'schedule' || inputs.action == 'legacy-reconcile'
         env:
           NEXT_PUBLIC_SUPABASE_URL: ''
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ''
@@ -236,6 +303,7 @@ jobs:
           --project=chromium --workers=1
 
       - name: Create or update one manifest pull request
+        if: github.event_name == 'schedule' || inputs.action == 'legacy-reconcile'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -267,9 +335,14 @@ jobs:
             echo "### Public host profile reconciliation"
             echo "- Eligible hosts: ${{ needs.audit.outputs.eligible_host_count }}"
             echo "- Expected active objects: ${{ steps.r2_plan.outputs.expected_count || '0' }}"
+            echo "- Existing bodies verified: ${{ steps.r2_plan.outputs.actual_bytes_verified_count || '0' }}"
+            echo "- Existing body bytes read: ${{ steps.r2_plan.outputs.actual_bytes_verified || '0' }}"
             echo "- Source images downloaded: ${{ steps.transform.outputs.source_download_count || '0' }}"
             echo "- Variants generated: ${{ steps.transform.outputs.transformed_object_count || '0' }}"
+            echo "- Sources reverified: ${{ steps.source_verify.outputs.verified_source_count || '0' }}"
+            echo "- Total source bytes: ${{ steps.source_verify.outputs.total_source_bytes || steps.transform.outputs.source_download_bytes || '0' }}"
             echo "- Active objects uploaded: ${{ steps.r2_apply.outputs.uploaded_count || '0' }}"
+            echo "- Concurrent exact skips: ${{ steps.r2_apply.outputs.concurrent_exact_skip_count || '0' }}"
             echo "- Objects restored from private stale: ${{ steps.r2_apply.outputs.restored_count || '0' }}"
             echo "- Objects moved to private stale: ${{ steps.r2_apply.outputs.quarantined_count || '0' }}"
             echo "- Active parity: ${{ steps.r2_apply.outputs.parity || 'not-run' }}"

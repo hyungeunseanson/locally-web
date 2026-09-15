@@ -20,6 +20,17 @@ export async function readProductionMediaBaseUrl() {
   return value;
 }
 
+export async function readProductionHostProfileMediaBaseUrl() {
+  const manifest = JSON.parse(await readFile(MANIFEST_PATH, 'utf8'));
+  const value = manifest.environments?.production?.publicHostProfileMediaBaseUrl;
+  assert.equal(
+    value,
+    'https://profiles-media.locally-travel.com',
+    'Production public host profile media base URL contract is missing or unexpected.'
+  );
+  return value;
+}
+
 export async function readProductionMediaReaderPolicy() {
   const manifest = JSON.parse(await readFile(MANIFEST_PATH, 'utf8'));
   const policy = manifest.publicExperienceMediaReaderPolicy;
@@ -58,15 +69,20 @@ export function buildProductionEnvironment(currentEnvironment, mediaBaseUrl, rea
   experienceIdsVariable: 'NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_EXPERIENCE_IDS',
   defaultEnabled: 'false',
   defaultExperienceIds: '',
-}) {
+}, hostProfileBaseUrl = 'https://profiles-media.locally-travel.com') {
   const configuredValue = currentEnvironment.NEXT_PUBLIC_CLOUDFLARE_IMAGE_CANARY_BASE_URL?.trim();
   if (configuredValue && configuredValue.replace(/\/$/, '') !== mediaBaseUrl) {
     throw new Error('Refusing a conflicting Production public experience media base URL.');
+  }
+  const configuredProfileValue = currentEnvironment.NEXT_PUBLIC_CLOUDFLARE_HOST_PROFILE_BASE_URL?.trim();
+  if (configuredProfileValue && configuredProfileValue.replace(/\/$/, '') !== hostProfileBaseUrl) {
+    throw new Error('Refusing a conflicting Production public host profile media base URL.');
   }
   const reader = resolveProductionReaderConfiguration(currentEnvironment, readerPolicy);
   return {
     ...currentEnvironment,
     NEXT_PUBLIC_CLOUDFLARE_IMAGE_CANARY_BASE_URL: mediaBaseUrl,
+    NEXT_PUBLIC_CLOUDFLARE_HOST_PROFILE_BASE_URL: hostProfileBaseUrl,
     [readerPolicy.enabledVariable]: reader.enabled,
     [readerPolicy.experienceIdsVariable]: reader.experienceIds,
   };
@@ -81,13 +97,17 @@ async function listFiles(directory) {
   return nested.flat();
 }
 
-export async function verifyProductionClientBundle(mediaBaseUrl, assetRoot = CLIENT_ASSET_ROOT) {
+export async function verifyProductionClientBundle(mediaBaseUrls, assetRoot = CLIENT_ASSET_ROOT) {
+  const expectedUrls = Array.isArray(mediaBaseUrls) ? mediaBaseUrls : [mediaBaseUrls];
   const files = (await listFiles(assetRoot)).filter((file) => file.endsWith('.js'));
   assert(files.length > 0, 'Production OpenNext client bundle contains no JavaScript assets.');
-  for (const file of files) {
-    if ((await readFile(file, 'utf8')).includes(mediaBaseUrl)) return;
+  const sources = await Promise.all(files.map((file) => readFile(file, 'utf8')));
+  for (const expectedUrl of expectedUrls) {
+    assert(
+      sources.some((source) => source.includes(expectedUrl)),
+      `Production public media base URL was not compiled into the client bundle: ${expectedUrl}`
+    );
   }
-  throw new Error('Production public experience media base URL was not compiled into the client bundle.');
 }
 
 export function runOpenNextBuild(environment) {
@@ -103,13 +123,15 @@ export function runOpenNextBuild(environment) {
 
 export async function main() {
   const mediaBaseUrl = await readProductionMediaBaseUrl();
+  const hostProfileMediaBaseUrl = await readProductionHostProfileMediaBaseUrl();
   const readerPolicy = await readProductionMediaReaderPolicy();
-  const environment = buildProductionEnvironment(process.env, mediaBaseUrl, readerPolicy);
+  const environment = buildProductionEnvironment(process.env, mediaBaseUrl, readerPolicy, hostProfileMediaBaseUrl);
   runOpenNextBuild(environment);
-  await verifyProductionClientBundle(mediaBaseUrl);
+  await verifyProductionClientBundle([mediaBaseUrl, hostProfileMediaBaseUrl]);
   console.log(JSON.stringify({
     status: 'LOCALLY_CLOUDFLARE_PRODUCTION_BUILD_CONTRACT_PASS',
     publicExperienceMediaBaseUrl: mediaBaseUrl,
+    publicHostProfileMediaBaseUrl: hostProfileMediaBaseUrl,
     deterministicReaderEnabled: environment[readerPolicy.enabledVariable],
     deterministicReaderExperienceCount:
       environment[readerPolicy.experienceIdsVariable] === ''
