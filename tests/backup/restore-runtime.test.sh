@@ -4,7 +4,8 @@ set -Eeuo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 postgres_image='public.ecr.aws/supabase/postgres:17.6.1.158@sha256:99b1729aeb0bac314445024fc149fbd39306170b61dd50800ccf180327ab3459'
 fixture_root="$(mktemp -d)"
-source_container="locally-backup-source-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-1}-${BASHPID}"
+shell_pid="${BASHPID:-$$}"
+source_container="locally-backup-source-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-1}-${shell_pid}"
 source_started=false
 
 cleanup() {
