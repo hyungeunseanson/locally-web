@@ -104,6 +104,11 @@
     "defaultEnabled": "false",
     "defaultExperienceIds": ""
   },
+  "experienceMediaSourceReleasePolicy": {
+    "defaultProductionProfile": "off",
+    "enabledVariable": "EXPERIENCE_MEDIA_R2_SOURCE_ENABLED",
+    "rawDefault": "false"
+  },
   "publicExperienceMediaReaderPolicy": {
     "enabledVariable": "NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_ENABLED",
     "experienceIdsVariable": "NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_EXPERIENCE_IDS",
@@ -238,6 +243,7 @@
       "SETTLEMENT_SYNC_LEASE_SECONDS",
       "PUBLIC_EXPERIENCE_MEDIA_PRODUCER_ENABLED",
       "PUBLIC_EXPERIENCE_MEDIA_PRODUCER_EXPERIENCE_IDS",
+      "EXPERIENCE_MEDIA_R2_SOURCE_ENABLED",
       "EXPERIENCE_TRANSLATION_QUEUE_ENABLED",
       "EXPERIENCE_TRANSLATION_SCHEDULED_RECOVERY_ENABLED",
       "HOME_POPULARITY_SNAPSHOT_SCHEDULED_ENABLED",

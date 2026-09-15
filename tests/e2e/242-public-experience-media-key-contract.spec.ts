@@ -66,6 +66,10 @@ test.describe('public experience deterministic media key contract', () => {
     expect(normalizePublicExperienceSourceUrl(GOLDEN_SOURCE_URL)).toEqual({
       sourceUrl: GOLDEN_SOURCE_URL,
       sourceKey: GOLDEN_SOURCE_KEY,
+      sourceKeySha256: sha256Hex(GOLDEN_SOURCE_KEY),
+      derivativeIdentity: '39696081a432',
+      sourceKind: 'supabase',
+      r2Key: null,
     });
     for (const invalidUrl of [
       'https://example.com/storage/v1/object/public/experiences/experience/id/hero/a.jpg',
@@ -74,6 +78,27 @@ test.describe('public experience deterministic media key contract', () => {
     ]) {
       expect(() => buildPublicExperienceCardKeys(42, invalidUrl)).toThrow();
     }
+  });
+
+  test('keeps migrated R2 originals on their reviewed legacy derivative identity', () => {
+    const sourceKeySha = sha256Hex(GOLDEN_SOURCE_KEY);
+    const r2Url = `https://media-canary.locally-travel.com/originals/v1/${sourceKeySha.slice(0, 2)}/${sourceKeySha}/${GOLDEN_SOURCE_BYTE_SHA}.jpg?legacy=39696081a432`;
+    expect(normalizePublicExperienceSourceUrl(r2Url)).toEqual({
+      sourceUrl: r2Url,
+      sourceKey: `originals/v1/${sourceKeySha.slice(0, 2)}/${sourceKeySha}/${GOLDEN_SOURCE_BYTE_SHA}.jpg`,
+      sourceKeySha256: sourceKeySha,
+      derivativeIdentity: '39696081a432',
+      sourceKind: 'r2',
+      r2Key: `originals/v1/${sourceKeySha.slice(0, 2)}/${sourceKeySha}/${GOLDEN_SOURCE_BYTE_SHA}.jpg`,
+    });
+    expect(buildPublicExperienceCardKeys(42, r2Url)).toEqual(
+      buildPublicExperienceCardKeys(42, GOLDEN_SOURCE_URL)
+    );
+    expect(buildPublicExperienceDetailKeys(42, r2Url)).toEqual(
+      buildPublicExperienceDetailKeys(42, GOLDEN_SOURCE_URL)
+    );
+    expect(() => normalizePublicExperienceSourceUrl(`${r2Url}&extra=1`)).toThrow();
+    expect(() => normalizePublicExperienceSourceUrl(`${r2Url}&legacy=39696081a432`)).toThrow();
   });
 
   test('requires explicit approved and active eligibility without changing current readers', () => {

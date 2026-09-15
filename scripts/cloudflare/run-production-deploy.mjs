@@ -13,6 +13,7 @@ import { readHomePopularityReleasePolicy, resolveHomePopularityReleaseProfile } 
 import { readAdminSupportUnreadReleasePolicy, resolveAdminSupportUnreadReleaseProfile } from './admin-support-unread-release-profile.mjs';
 import { readNotificationRetentionReleasePolicy, resolveNotificationRetentionReleaseProfile } from './notification-retention-release-profile.mjs';
 import { readExperienceCompletionReleasePolicy, resolveExperienceCompletionReleaseProfile } from './experience-completion-release-profile.mjs';
+import { readExperienceMediaSourceReleasePolicy, resolveExperienceMediaSourceReleaseProfile } from './experience-media-source-release-profile.mjs';
 
 const ROOT = process.cwd();
 
@@ -23,6 +24,7 @@ export function parseDeploymentArguments(argumentsList) {
   let requestedAdminSupportUnreadProfile;
   let requestedNotificationRetentionProfile;
   let requestedExperienceCompletionProfile;
+  let requestedExperienceMediaSourceProfile;
   let dryRun = false;
   for (const argument of argumentsList) {
     if (argument.startsWith('--media-profile=')) {
@@ -49,16 +51,31 @@ export function parseDeploymentArguments(argumentsList) {
       assert(!requestedExperienceCompletionProfile, 'Specify the Experience completion release profile only once.');
       requestedExperienceCompletionProfile = argument.slice('--experience-completion-profile='.length);
       assert(requestedExperienceCompletionProfile, 'The Experience completion release profile cannot be empty.');
+    } else if (argument.startsWith('--experience-media-source-profile=')) {
+      assert(!requestedExperienceMediaSourceProfile, 'Specify the Experience media source release profile only once.');
+      requestedExperienceMediaSourceProfile = argument.slice('--experience-media-source-profile='.length);
+      assert(requestedExperienceMediaSourceProfile, 'The Experience media source release profile cannot be empty.');
     } else if (argument === '--dry-run') {
       dryRun = true;
     } else {
       throw new Error(`Unsupported Production deployment argument: ${argument}`);
     }
   }
-  return { requestedProfile, requestedTranslationProfile, requestedHomePopularityProfile, requestedAdminSupportUnreadProfile, requestedNotificationRetentionProfile, requestedExperienceCompletionProfile, dryRun };
+  return {
+    requestedProfile,
+    requestedTranslationProfile,
+    requestedHomePopularityProfile,
+    requestedAdminSupportUnreadProfile,
+    requestedNotificationRetentionProfile,
+    requestedExperienceCompletionProfile,
+    ...(requestedExperienceMediaSourceProfile
+      ? { requestedExperienceMediaSourceProfile }
+      : {}),
+    dryRun,
+  };
 }
 
-export function buildDeploymentContract(profile, translationProfile, homePopularityProfile, adminSupportUnreadProfile, notificationRetentionProfile, { dryRun = false } = {}, experienceCompletionProfile = { scheduledEnabled: 'false' }) {
+export function buildDeploymentContract(profile, translationProfile, homePopularityProfile, adminSupportUnreadProfile, notificationRetentionProfile, { dryRun = false } = {}, experienceCompletionProfile = { scheduledEnabled: 'false' }, experienceMediaSourceProfile = { enabled: 'false' }) {
   const readerEnvironment = {
     NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_ENABLED: profile.enabled,
     NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_EXPERIENCE_IDS: profile.experienceIds,
@@ -75,6 +92,8 @@ export function buildDeploymentContract(profile, translationProfile, homePopular
     '--var',
     `PUBLIC_EXPERIENCE_MEDIA_PRODUCER_EXPERIENCE_IDS:${profile.experienceIds}`,
     '--var',
+    `EXPERIENCE_MEDIA_R2_SOURCE_ENABLED:${experienceMediaSourceProfile.enabled}`,
+    '--var',
     `EXPERIENCE_TRANSLATION_QUEUE_ENABLED:${translationProfile.queueEnabled}`,
     '--var',
     `EXPERIENCE_TRANSLATION_SCHEDULED_RECOVERY_ENABLED:${translationProfile.scheduledRecoveryEnabled}`,
@@ -84,6 +103,7 @@ export function buildDeploymentContract(profile, translationProfile, homePopular
     `ADMIN_SUPPORT_UNREAD_ALERTS_SCHEDULED_ENABLED:${adminSupportUnreadProfile.scheduledEnabled}`,
     '--var',
     `NOTIFICATION_RETENTION_CLEANUP_SCHEDULED_ENABLED:${notificationRetentionProfile.scheduledEnabled}`,
+    '--var',
     `EXPERIENCE_COMPLETION_SCHEDULED_ENABLED:${experienceCompletionProfile.scheduledEnabled}`,
   ];
   if (dryRun) wranglerArguments.push('--dry-run');
@@ -116,7 +136,9 @@ export async function main(argumentsList = process.argv.slice(2)) {
   const notificationRetentionProfile = resolveNotificationRetentionReleaseProfile(notificationRetentionPolicy, options.requestedNotificationRetentionProfile);
   const experienceCompletionPolicy = await readExperienceCompletionReleasePolicy();
   const experienceCompletionProfile = resolveExperienceCompletionReleaseProfile(experienceCompletionPolicy, options.requestedExperienceCompletionProfile);
-  const contract = buildDeploymentContract(profile, translationProfile, homePopularityProfile, adminSupportUnreadProfile, notificationRetentionProfile, options, experienceCompletionProfile);
+  const experienceMediaSourcePolicy = await readExperienceMediaSourceReleasePolicy();
+  const experienceMediaSourceProfile = resolveExperienceMediaSourceReleaseProfile(experienceMediaSourcePolicy, options.requestedExperienceMediaSourceProfile);
+  const contract = buildDeploymentContract(profile, translationProfile, homePopularityProfile, adminSupportUnreadProfile, notificationRetentionProfile, options, experienceCompletionProfile, experienceMediaSourceProfile);
   const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
   const wranglerCommand = path.join(
     ROOT,
@@ -147,6 +169,8 @@ export async function main(argumentsList = process.argv.slice(2)) {
     notificationRetentionScheduledEnabled: notificationRetentionProfile.scheduledEnabled,
     experienceCompletionProfile: experienceCompletionProfile.name,
     experienceCompletionScheduledEnabled: experienceCompletionProfile.scheduledEnabled,
+    experienceMediaSourceProfile: experienceMediaSourceProfile.name,
+    experienceMediaR2SourceEnabled: experienceMediaSourceProfile.enabled,
   }));
 }
 

@@ -156,6 +156,9 @@ test.describe('Cloudflare migration readiness contract', () => {
     expect(wrangler.env.canary.vars).not.toHaveProperty(
       manifest.experienceCompletionReleasePolicy.scheduledEnabledVariable
     );
+    expect(wrangler.env.canary.vars).not.toHaveProperty(
+      manifest.experienceMediaSourceReleasePolicy.enabledVariable
+    );
     expect(wrangler.env.canary.triggers).toBeUndefined();
 
     const wranglerEnvironments = Object.values(wrangler.env) as Array<{
@@ -210,6 +213,12 @@ test.describe('Cloudflare migration readiness contract', () => {
       enabled: 'true',
       experienceIds: [3309],
     });
+    expect(manifest.experienceMediaSourceReleasePolicy).toEqual({
+      defaultProductionProfile: 'off',
+      enabledVariable: 'EXPERIENCE_MEDIA_R2_SOURCE_ENABLED',
+      rawDefault: 'false',
+    });
+    expect(wrangler.env.production.vars.EXPERIENCE_MEDIA_R2_SOURCE_ENABLED).toBe('false');
     expect(
       manifest.publicExperienceMediaReleasePolicy.profiles['approved-cohort'].experienceIds
     ).toEqual([

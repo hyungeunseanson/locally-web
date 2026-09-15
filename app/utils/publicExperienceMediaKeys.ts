@@ -2,6 +2,11 @@ const PRODUCTION_SUPABASE_HOST = 'uhinvcydgzqlpnvieyal.supabase.co';
 const PUBLIC_EXPERIENCE_OBJECT_PREFIX = '/storage/v1/object/public/experiences/';
 const PUBLIC_EXPERIENCE_OBJECT_KEY_PATTERN =
   /^experience\/[^/]+\/(?:hero|itinerary)\/[A-Za-z0-9._-]+$/;
+const PUBLIC_EXPERIENCE_R2_HOST = 'media-canary.locally-travel.com';
+const PUBLIC_EXPERIENCE_R2_SOURCE_KEY_PATTERN =
+  /^sources\/v1\/experience\/[0-9a-f]{64}\/[0-9a-f-]{36}\/(?:hero|itinerary)\.(?:avif|gif|jpe?g|png|webp)$/;
+const PUBLIC_EXPERIENCE_R2_ORIGINAL_KEY_PATTERN =
+  /^originals\/v1\/[0-9a-f]{2}\/([0-9a-f]{64})\/([0-9a-f]{64})\.(?:avif|gif|jpe?g|png|webp)$/;
 const LEGACY_CARD_IDENTITIES = new Set(['4523:7922aaf9f75b']);
 
 export const PUBLIC_EXPERIENCE_CARD_DERIVATIVES = [
@@ -116,11 +121,54 @@ export function normalizePublicExperienceSourceUrl(sourceUrl: string) {
     throw new Error('Public experience media source URL is invalid.');
   }
 
+  if (parsed.protocol !== 'https:' || parsed.hash) {
+    throw new Error('Public experience media source URL is outside the approved origin.');
+  }
+
+  if (parsed.hostname === PUBLIC_EXPERIENCE_R2_HOST) {
+    const encodedKey = parsed.pathname.replace(/^\//, '');
+    let r2Key: string;
+    try {
+      r2Key = encodedKey.split('/').map(decodeURIComponent).join('/');
+    } catch {
+      throw new Error('Public experience media source key encoding is invalid.');
+    }
+    const originalMatch = r2Key.match(PUBLIC_EXPERIENCE_R2_ORIGINAL_KEY_PATTERN);
+    if (originalMatch) {
+      const legacyIdentity = parsed.searchParams.get('legacy');
+      if (
+        !legacyIdentity ||
+        !/^[0-9a-f]{12}$/.test(legacyIdentity) ||
+        [...parsed.searchParams.entries()].length !== 1 ||
+        [...parsed.searchParams.keys()].some((key) => key !== 'legacy')
+      ) {
+        throw new Error('Migrated original requires one bounded legacy identity.');
+      }
+      return {
+        sourceUrl,
+        sourceKey: r2Key,
+        sourceKeySha256: originalMatch[1],
+        derivativeIdentity: legacyIdentity,
+        sourceKind: 'r2' as const,
+        r2Key,
+      };
+    }
+    if (parsed.search || !PUBLIC_EXPERIENCE_R2_SOURCE_KEY_PATTERN.test(r2Key)) {
+      throw new Error('Public experience media R2 source key is outside the approved namespace.');
+    }
+    return {
+      sourceUrl,
+      sourceKey: r2Key,
+      sourceKeySha256: sha256Hex(r2Key),
+      derivativeIdentity: sha256Hex(sourceUrl).slice(0, 12),
+      sourceKind: 'r2' as const,
+      r2Key,
+    };
+  }
+
   if (
-    parsed.protocol !== 'https:' ||
     parsed.hostname !== PRODUCTION_SUPABASE_HOST ||
     parsed.search ||
-    parsed.hash ||
     !parsed.pathname.startsWith(PUBLIC_EXPERIENCE_OBJECT_PREFIX)
   ) {
     throw new Error('Public experience media source URL is outside the approved origin.');
@@ -137,7 +185,14 @@ export function normalizePublicExperienceSourceUrl(sourceUrl: string) {
     throw new Error('Public experience media source key is outside the approved namespace.');
   }
 
-  return { sourceUrl, sourceKey };
+  return {
+    sourceUrl,
+    sourceKey,
+    sourceKeySha256: sha256Hex(sourceKey),
+    derivativeIdentity: sha256Hex(sourceUrl).slice(0, 12),
+    sourceKind: 'supabase' as const,
+    r2Key: null,
+  };
 }
 
 export function buildPublicExperienceCardKeys(
@@ -145,8 +200,7 @@ export function buildPublicExperienceCardKeys(
   sourceUrl: string
 ) {
   const id = normalizeExperienceId(experienceId);
-  normalizePublicExperienceSourceUrl(sourceUrl);
-  const identity = sha256Hex(sourceUrl).slice(0, 12);
+  const identity = normalizePublicExperienceSourceUrl(sourceUrl).derivativeIdentity;
   const prefix = LEGACY_CARD_IDENTITIES.has(`${id}:${identity}`)
     ? `experience-${id}-primary`
     : `cards/experience-${id}-primary-${identity}`;
@@ -162,8 +216,7 @@ export function buildPublicExperienceDetailKeys(
   sourceUrl: string
 ) {
   const id = normalizeExperienceId(experienceId);
-  normalizePublicExperienceSourceUrl(sourceUrl);
-  const identity = sha256Hex(sourceUrl).slice(0, 12);
+  const identity = normalizePublicExperienceSourceUrl(sourceUrl).derivativeIdentity;
   const [small, medium, large] = PUBLIC_EXPERIENCE_DETAIL_DERIVATIVES;
   return {
     smallKey: `details/experience-${id}-${identity}-w${small.width}-q${small.quality}.webp`,

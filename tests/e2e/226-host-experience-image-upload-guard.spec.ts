@@ -141,13 +141,11 @@ test('uploads materialized bytes and cleans only pre-create partial uploads', ()
     'utf8'
   );
 
-  expect(pageSource).toContain('materializeExperienceImage(file)');
-  expect(pageSource).toContain("upload(fileName, bytes, {");
-  expect(pageSource).toContain("contentType,");
+  expect(pageSource).toContain('uploadExperienceImage({ file, folder })');
+  expect(pageSource).not.toContain("storage.from('experiences').upload");
   expect(pageSource).toContain("creationRequestStarted = true");
   expect(pageSource).toContain("if (!creationRequestStarted && uploadedPaths.length > 0)");
   expect(pageSource).toContain('await Promise.allSettled(');
-  expect(pageSource).not.toContain('throw uploadError');
 
   expect(cleanupSource).toContain(".eq('host_id', actor.id)");
   expect(cleanupSource).toContain('!referencedContent.includes(path)');
@@ -160,12 +158,13 @@ test('WebKit-style partial upload rejects the empty file and requests cleanup fo
   const cleanupBodies: Array<{ paths?: string[] }> = [];
   const createRequests: string[] = [];
 
-  await page.route(`${supabaseUrl}/storage/v1/object/experiences/**`, async (route) => {
+  await page.route('**/api/host/experience-images/upload', async (route) => {
     storageUploads.push(route.request().url());
+    const path = `experience/${USER_ID}/hero/mock.jpg`;
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ Id: 'mock-object-id', Key: 'mock-object-key' }),
+      body: JSON.stringify({ success: true, publicUrl: `${supabaseUrl}/storage/v1/object/public/experiences/${path}`, cleanupPath: path, authority: 'supabase' }),
     });
   });
   await page.route('**/api/host/experience-images/cleanup', async (route) => {

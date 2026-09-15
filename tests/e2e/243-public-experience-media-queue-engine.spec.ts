@@ -204,6 +204,66 @@ test.describe('dormant public experience media Queue mirror engine', () => {
     expect(second.getTransformCalls()).toHaveLength(0);
   });
 
+  test('reads an authoritative R2 source directly and does not mirror an original-of-original', async () => {
+    const legacy = normalizePublicExperienceSourceUrl(SOURCE_URL);
+    const sourceSha = sha256(SOURCE_BYTES);
+    const r2Key = buildPublicExperienceOriginalKey(legacy.sourceKey, sourceSha, 'image/jpeg');
+    const r2Url = `https://media-canary.locally-travel.com/${r2Key}?legacy=${legacy.derivativeIdentity}`;
+    const store = new FakeStore();
+    store.objects.set(r2Key, {
+      bytes: SOURCE_BYTES,
+      size: SOURCE_BYTES.byteLength,
+      httpMetadata: { contentType: 'image/jpeg', cacheControl: PUBLIC_EXPERIENCE_MEDIA_CACHE_CONTROL },
+      customMetadata: {
+        sha256: sourceSha,
+        source_key_sha256: legacy.sourceKeySha256,
+        source_byte_sha256: sourceSha,
+        output_byte_sha256: sourceSha,
+        source_size: String(SOURCE_BYTES.byteLength),
+      },
+    });
+    let fetchCount = 0;
+    const row = { ...activeRow, photos: [r2Url] };
+    const harness = dependencies({ rows: [row, row], store });
+    harness.dependencySet.fetchSource = async () => {
+      fetchCount += 1;
+      throw new Error('R2 source must not use HTTP');
+    };
+    const outcome = await mirrorPublicExperienceMedia(message, harness.dependencySet);
+    expect(outcome.status).toBe('success');
+    expect(outcome.originalCreatedCount).toBe(0);
+    expect(outcome.originalExactSkipCount).toBe(1);
+    expect(fetchCount).toBe(0);
+    expect(store.createCalls.every((call) => !call.key.startsWith('originals/v1/'))).toBe(true);
+    expect(store.createCalls).toHaveLength(5);
+  });
+
+  test('fails closed before transform when authoritative R2 source proof conflicts', async () => {
+    const legacy = normalizePublicExperienceSourceUrl(SOURCE_URL);
+    const sourceSha = sha256(SOURCE_BYTES);
+    const r2Key = buildPublicExperienceOriginalKey(legacy.sourceKey, sourceSha, 'image/jpeg');
+    const r2Url = `https://media-canary.locally-travel.com/${r2Key}?legacy=${legacy.derivativeIdentity}`;
+    const store = new FakeStore();
+    store.objects.set(r2Key, {
+      bytes: SOURCE_BYTES,
+      size: SOURCE_BYTES.byteLength,
+      httpMetadata: { contentType: 'image/jpeg', cacheControl: PUBLIC_EXPERIENCE_MEDIA_CACHE_CONTROL },
+      customMetadata: {
+        source_key_sha256: legacy.sourceKeySha256,
+        source_byte_sha256: '0'.repeat(64),
+        output_byte_sha256: sourceSha,
+        source_size: String(SOURCE_BYTES.byteLength),
+      },
+    });
+    const row = { ...activeRow, photos: [r2Url] };
+    const harness = dependencies({ rows: [row, row], store });
+    const outcome = await mirrorPublicExperienceMedia(message, harness.dependencySet);
+    expect(outcome.status).toBe('permanent_conflict');
+    expect(outcome.diagnosticCode).toBe('r2_source_conflict');
+    expect(harness.getTransformCalls()).toHaveLength(0);
+    expect(store.createCalls).toHaveLength(0);
+  });
+
   test('inactive or deleted latest row is an acknowledged zero-write no-op', async () => {
     for (const row of [{ ...activeRow, is_active: false }, null]) {
       const harness = dependencies({ rows: [row] });
