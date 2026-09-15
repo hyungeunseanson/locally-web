@@ -111,7 +111,7 @@ socket. On failure it records only bounded container state (`OOMKilled`, exit
 code, restart count, lifecycle timestamps) and allowlisted PostgreSQL lifecycle
 messages before removing that exact disposable container.
 
-## Storage byte recovery policy (not yet executed)
+## Storage byte backup and recovery
 
 The database backup covers `storage.buckets` and `storage.objects` metadata, not
 the object payloads. A future separately approved Storage backup should use the
@@ -142,6 +142,133 @@ DB and Storage manifests share the same snapshot boundary, verify outer and
 per-object checksums, restore into a non-production destination first, and
 re-check private bucket authorization before any traffic is enabled.
 
-No Storage byte copy is performed by the database backup workflow. Adding that
-phase, changing retention, or restoring files remains a separately approved
-operation.
+The database workflow still performs no Storage byte copy. Storage bytes use
+the separately invoked `scripts/backup/storage-byte-backup.py` tool. It covers
+all objects in the six allowlisted buckets, including inactive, orphaned,
+legacy, zero-byte, Unicode-named, and private objects. It never changes the
+source buckets.
+
+### Retention and privacy boundary
+
+Storage snapshots use unique keys below `daily/storage-v1/<snapshot-id>/` in
+the existing private `locally-production-db-backups` bucket. This placement is
+required: the current bucket policy locks `daily/` objects for 30 days and
+expires them after 35 days; a sibling top-level prefix would not inherit those
+rules. Do not change the prefix or treat the private ciphertext as public just
+because five source buckets are public. A deleted user file can remain in an
+immutable encrypted snapshot until the 35-day lifecycle expiry.
+
+Every source file is encrypted separately with the existing public age
+recipient before upload. R2 keys contain only a SHA-256 source identity, never
+the bucket path or user identifier. The encrypted manifest retains the exact
+bucket, original key, MIME/Storage metadata, source version evidence, plaintext
+SHA-256, ciphertext key/SHA/size, and capture boundary required for restore.
+The adjacent public-safe summary contains counts, byte totals, plan digest and
+hashed R2 locations only.
+
+### Plan, prepare, and apply
+
+The default `plan` mode lists Storage metadata and writes only a mode-`0600`
+local plan. It performs no source payload GET, transform, Queue operation, or R2
+write. The `prepare` step rechecks the complete inventory, downloads only the
+objects that lack reusable unexpired proof, enforces the 1,200-object and 512
+MiB received-byte ceilings, hashes the actual bytes, and produces the prepared
+plan. That plan's canonical digest binds the source bucket/key, identity, size,
+actual SHA, metadata evidence, ciphertext destination, database-backup
+relation, retention, scope, and all hard ceilings.
+
+`apply` accepts only a prepared plan plus the exact confirmation digest. Before
+the first R2 write it validates the schema, namespace, limits, every cached
+file's actual size/SHA, and a fresh complete source inventory. Uploads use S3
+`If-None-Match: *`; a concurrent or resumed object is accepted only when its
+plan/source proof is exact. The tool never calls overwrite helpers,
+CopyObject, or DeleteObject. A final inventory drift prevents a complete
+manifest. Partial ciphertext remains immutable and the same approved plan can
+resume without recreating already accepted objects.
+
+Hard ceilings for one baseline are 1,200 source objects, 512 MiB of source
+payload received (failed attempts included), 2,500 new R2 objects, and 640 MiB
+of newly stored ciphertext/checksum/manifest bytes. Provider retries are
+disabled for R2 writes so an SDK retry cannot bypass the attempt accounting.
+The source client also performs no automatic payload retry. Operators must
+record platform billing meters separately from these byte/application counts.
+
+Plans and decrypted manifests contain private paths. Keep them only in a
+mode-`0700` operator directory, never in GitHub artifacts or logs. A typical
+approved run is:
+
+```bash
+umask 077
+export SUPABASE_SERVICE_ROLE_KEY='(load from an existing approved local source)'
+export R2_ENDPOINT='(existing private R2 S3 endpoint)'
+export R2_BUCKET='locally-production-db-backups'
+export AWS_ACCESS_KEY_ID='(existing scoped credential)'
+export AWS_SECRET_ACCESS_KEY='(existing scoped credential)'
+
+scripts/backup/storage-byte-backup.py plan \
+  --output "$RUN_DIR/plan.json" \
+  --snapshot-id "$SNAPSHOT_ID" \
+  --db-backup-id 34916900214 \
+  --db-backup-time 2026-09-15T01:21:29Z
+
+scripts/backup/storage-byte-backup.py prepare \
+  --plan "$RUN_DIR/plan.json" \
+  --output "$RUN_DIR/prepared.json" \
+  --cache-dir "$RUN_DIR/source-cache"
+
+# Review the sanitized counts and exact prepared plan digest first.
+scripts/backup/storage-byte-backup.py apply \
+  --plan "$RUN_DIR/prepared.json" \
+  --confirm-digest "$APPROVED_DIGEST" \
+  --cache-dir "$RUN_DIR/source-cache" \
+  --work-dir "$RUN_DIR/encrypted-work" \
+  --age-recipient "$AGE_RECIPIENT" \
+  --summary "$RUN_DIR/public-summary.json"
+```
+
+The DB backup identifier and timestamps express association, not an atomic
+cross-service snapshot. Compare start/end Storage inventory digests and the
+recorded time delta before accepting a pair.
+
+### Incremental snapshots
+
+An operator may provide a previously decrypted, still-recoverable manifest to
+`prepare --previous-manifest`. Metadata-identical entries reuse their recorded
+plaintext SHA and ciphertext references without a source GET or R2 PUT. Their
+proof is explicitly `reused-prior-byte-sha256`, not newly byte-verified. The
+new snapshot's `recoverableUntil` is the earliest expiry among all referenced
+ciphertexts, so an older reference cannot silently expire before the manifest.
+Changed or new objects are downloaded and encrypted normally. This mode is not
+scheduled automatically.
+
+### Download-based file restore
+
+Restore downloads the encrypted manifest and every referenced ciphertext from
+private R2, verifies the outer checksums, decrypts with the existing mode-0600
+offline identity, rejects traversal/symlink destinations, and compares every
+restored byte SHA/size with the encrypted manifest:
+
+```bash
+scripts/backup/storage-byte-backup.py restore \
+  --manifest-key "$MANIFEST_KEY" \
+  --manifest-checksum-key "$MANIFEST_KEY.sha256" \
+  --identity ~/.locally-backup/keys/production-r2-backup.agekey \
+  --destination "$DISPOSABLE_LOCAL_DIRECTORY"
+```
+
+The destination contains the original bucket/key tree plus private manifest
+and verification metadata. It is a disposable local byte restore, not a
+Production Storage API restore and not proof that RLS or signed/public URL
+behavior was recreated. Delete only the task-created plaintext directory after
+verification; preserve the offline identity and remote encrypted snapshot.
+
+### Project settings outside DB and Storage bytes
+
+Auth provider enablement, OAuth client IDs/secrets and redirect allowlists,
+SMTP credentials, project URLs/API keys, Edge Function secrets, webhook
+destinations, DNS, and Cloudflare/Vercel configuration remain outside both
+backup payloads. The recovery operator must take their names and required
+values from the private platform consoles/approved secret manager, recreate or
+rotate credentials through each provider, and then test in an isolated project.
+The repository documents required setting names and ordering only; secret
+values and Supabase platform root keys must never be exported into Git.
