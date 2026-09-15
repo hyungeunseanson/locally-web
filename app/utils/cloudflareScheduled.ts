@@ -1,7 +1,8 @@
 export type LocallyScheduledTaskName =
   | 'experience_translation_recovery'
   | 'home_popularity_snapshot'
-  | 'admin_support_unread_alerts';
+  | 'admin_support_unread_alerts'
+  | 'notification_retention_cleanup';
 
 type ScheduledControllerLike = { cron: string };
 type ScheduledHandler<Environment> = (
@@ -12,9 +13,11 @@ type ScheduledHandler<Environment> = (
 type ScheduledOptions<Environment> = {
   dailyCron: string;
   adminSupportCron: string;
+  notificationRetentionCron: string;
   runTranslationRecovery: ScheduledHandler<Environment>;
   runHomePopularitySnapshot: ScheduledHandler<Environment>;
   runAdminSupportUnreadAlerts: ScheduledHandler<Environment>;
+  runNotificationRetentionCleanup: ScheduledHandler<Environment>;
   delegate?: ScheduledHandler<Environment>;
   log?: (entry: Record<string, unknown>) => void;
 };
@@ -37,7 +40,8 @@ export async function handleLocallyScheduledEvent<Environment>(
 ) {
   if (
     controller.cron !== options.dailyCron &&
-    controller.cron !== options.adminSupportCron
+    controller.cron !== options.adminSupportCron &&
+    controller.cron !== options.notificationRetentionCron
   ) {
     if (options.delegate) return options.delegate(controller, environment);
     throw new Error('locally_unexpected_scheduled_trigger');
@@ -55,10 +59,15 @@ export async function handleLocallyScheduledEvent<Environment>(
       name: 'home_popularity_snapshot',
       run: options.runHomePopularitySnapshot,
     },
-  ] : [
+  ] : controller.cron === options.adminSupportCron ? [
     {
       name: 'admin_support_unread_alerts',
       run: options.runAdminSupportUnreadAlerts,
+    },
+  ] : [
+    {
+      name: 'notification_retention_cleanup',
+      run: options.runNotificationRetentionCleanup,
     },
   ];
   const results = await Promise.allSettled(

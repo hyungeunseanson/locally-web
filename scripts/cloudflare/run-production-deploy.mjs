@@ -11,6 +11,7 @@ import {
 import { readTranslationReleasePolicy, resolveTranslationReleaseProfile } from './experience-translation-release-profile.mjs';
 import { readHomePopularityReleasePolicy, resolveHomePopularityReleaseProfile } from './home-popularity-release-profile.mjs';
 import { readAdminSupportUnreadReleasePolicy, resolveAdminSupportUnreadReleaseProfile } from './admin-support-unread-release-profile.mjs';
+import { readNotificationRetentionReleasePolicy, resolveNotificationRetentionReleaseProfile } from './notification-retention-release-profile.mjs';
 
 const ROOT = process.cwd();
 
@@ -19,6 +20,7 @@ export function parseDeploymentArguments(argumentsList) {
   let requestedTranslationProfile;
   let requestedHomePopularityProfile;
   let requestedAdminSupportUnreadProfile;
+  let requestedNotificationRetentionProfile;
   let dryRun = false;
   for (const argument of argumentsList) {
     if (argument.startsWith('--media-profile=')) {
@@ -37,16 +39,20 @@ export function parseDeploymentArguments(argumentsList) {
       assert(!requestedAdminSupportUnreadProfile, 'Specify the Admin Support unread release profile only once.');
       requestedAdminSupportUnreadProfile = argument.slice('--admin-support-unread-profile='.length);
       assert(requestedAdminSupportUnreadProfile, 'The Admin Support unread release profile cannot be empty.');
+    } else if (argument.startsWith('--notification-retention-profile=')) {
+      assert(!requestedNotificationRetentionProfile, 'Specify the notification retention release profile only once.');
+      requestedNotificationRetentionProfile = argument.slice('--notification-retention-profile='.length);
+      assert(requestedNotificationRetentionProfile, 'The notification retention release profile cannot be empty.');
     } else if (argument === '--dry-run') {
       dryRun = true;
     } else {
       throw new Error(`Unsupported Production deployment argument: ${argument}`);
     }
   }
-  return { requestedProfile, requestedTranslationProfile, requestedHomePopularityProfile, requestedAdminSupportUnreadProfile, dryRun };
+  return { requestedProfile, requestedTranslationProfile, requestedHomePopularityProfile, requestedAdminSupportUnreadProfile, requestedNotificationRetentionProfile, dryRun };
 }
 
-export function buildDeploymentContract(profile, translationProfile, homePopularityProfile, adminSupportUnreadProfile, { dryRun = false } = {}) {
+export function buildDeploymentContract(profile, translationProfile, homePopularityProfile, adminSupportUnreadProfile, notificationRetentionProfile, { dryRun = false } = {}) {
   const readerEnvironment = {
     NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_ENABLED: profile.enabled,
     NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_EXPERIENCE_IDS: profile.experienceIds,
@@ -70,6 +76,8 @@ export function buildDeploymentContract(profile, translationProfile, homePopular
     `HOME_POPULARITY_SNAPSHOT_SCHEDULED_ENABLED:${homePopularityProfile.scheduledEnabled}`,
     '--var',
     `ADMIN_SUPPORT_UNREAD_ALERTS_SCHEDULED_ENABLED:${adminSupportUnreadProfile.scheduledEnabled}`,
+    '--var',
+    `NOTIFICATION_RETENTION_CLEANUP_SCHEDULED_ENABLED:${notificationRetentionProfile.scheduledEnabled}`,
   ];
   if (dryRun) wranglerArguments.push('--dry-run');
   return { readerEnvironment, wranglerArguments };
@@ -97,7 +105,9 @@ export async function main(argumentsList = process.argv.slice(2)) {
   const homePopularityProfile = resolveHomePopularityReleaseProfile(homePopularityPolicy, options.requestedHomePopularityProfile);
   const adminSupportUnreadPolicy = await readAdminSupportUnreadReleasePolicy();
   const adminSupportUnreadProfile = resolveAdminSupportUnreadReleaseProfile(adminSupportUnreadPolicy, options.requestedAdminSupportUnreadProfile);
-  const contract = buildDeploymentContract(profile, translationProfile, homePopularityProfile, adminSupportUnreadProfile, options);
+  const notificationRetentionPolicy = await readNotificationRetentionReleasePolicy();
+  const notificationRetentionProfile = resolveNotificationRetentionReleaseProfile(notificationRetentionPolicy, options.requestedNotificationRetentionProfile);
+  const contract = buildDeploymentContract(profile, translationProfile, homePopularityProfile, adminSupportUnreadProfile, notificationRetentionProfile, options);
   const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
   const wranglerCommand = path.join(
     ROOT,
@@ -124,6 +134,8 @@ export async function main(argumentsList = process.argv.slice(2)) {
     homePopularityScheduledEnabled: homePopularityProfile.scheduledEnabled,
     adminSupportUnreadProfile: adminSupportUnreadProfile.name,
     adminSupportUnreadScheduledEnabled: adminSupportUnreadProfile.scheduledEnabled,
+    notificationRetentionProfile: notificationRetentionProfile.name,
+    notificationRetentionScheduledEnabled: notificationRetentionProfile.scheduledEnabled,
   }));
 }
 

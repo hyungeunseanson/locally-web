@@ -313,9 +313,11 @@ test.describe('Admin Support unread Cloudflare Cron', () => {
     const options = {
       dailyCron: HOME_POPULARITY_SNAPSHOT_CRON,
       adminSupportCron: ADMIN_SUPPORT_UNREAD_ALERTS_CRON,
+      notificationRetentionCron: '31 19 * * *',
       runTranslationRecovery: () => calls.push('translation'),
       runHomePopularitySnapshot: () => calls.push('home'),
       runAdminSupportUnreadAlerts: () => calls.push('admin-support'),
+      runNotificationRetentionCleanup: () => calls.push('retention'),
       log: () => undefined,
     };
     await handleLocallyScheduledEvent({ cron: ADMIN_SUPPORT_UNREAD_ALERTS_CRON }, {}, options);

@@ -13,6 +13,7 @@ import {
 import { readTranslationReleasePolicy, resolveTranslationReleaseProfile } from './experience-translation-release-profile.mjs';
 import { readHomePopularityReleasePolicy, resolveHomePopularityReleaseProfile } from './home-popularity-release-profile.mjs';
 import { readAdminSupportUnreadReleasePolicy, resolveAdminSupportUnreadReleaseProfile } from './admin-support-unread-release-profile.mjs';
+import { readNotificationRetentionReleasePolicy, resolveNotificationRetentionReleaseProfile } from './notification-retention-release-profile.mjs';
 
 async function homeProfile(name = 'off') {
   return resolveHomePopularityReleaseProfile(
@@ -24,6 +25,13 @@ async function homeProfile(name = 'off') {
 async function adminSupportProfile(name = 'off') {
   return resolveAdminSupportUnreadReleaseProfile(
     await readAdminSupportUnreadReleasePolicy(),
+    name
+  );
+}
+
+async function retentionProfile(name = 'off') {
+  return resolveNotificationRetentionReleaseProfile(
+    await readNotificationRetentionReleasePolicy(),
     name
   );
 }
@@ -56,7 +64,7 @@ test('couples reader build values and producer runtime values for every profile'
   const translationProfile = resolveTranslationReleaseProfile(await readTranslationReleasePolicy(), 'off');
   for (const name of Object.keys(policy.profiles)) {
     const profile = resolveReleaseProfile(policy, name);
-    const contract = buildDeploymentContract(profile, translationProfile, await homeProfile(), await adminSupportProfile());
+    const contract = buildDeploymentContract(profile, translationProfile, await homeProfile(), await adminSupportProfile(), await retentionProfile());
     assert.equal(
       contract.readerEnvironment.NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_ENABLED,
       profile.enabled
@@ -82,6 +90,7 @@ test('defaults canonical Production deploy to the approved cohort and rejects ad
     requestedTranslationProfile: undefined,
     requestedHomePopularityProfile: undefined,
     requestedAdminSupportUnreadProfile: undefined,
+    requestedNotificationRetentionProfile: undefined,
     dryRun: false,
   });
   assert.deepEqual(parseDeploymentArguments(['--media-profile=off', '--dry-run']), {
@@ -89,6 +98,7 @@ test('defaults canonical Production deploy to the approved cohort and rejects ad
     requestedTranslationProfile: undefined,
     requestedHomePopularityProfile: undefined,
     requestedAdminSupportUnreadProfile: undefined,
+    requestedNotificationRetentionProfile: undefined,
     dryRun: true,
   });
   assert.throws(() => parseDeploymentArguments(['--var', 'X:Y']), /Unsupported/);
@@ -122,7 +132,7 @@ test('dry-run preserves the exact deployment contract without changing the profi
   const policy = await readReleasePolicy();
   const profile = resolveReleaseProfile(policy, 'single-3309');
   const translationProfile = resolveTranslationReleaseProfile(await readTranslationReleasePolicy(), 'off');
-  const contract = buildDeploymentContract(profile, translationProfile, await homeProfile(), await adminSupportProfile(), { dryRun: true });
+  const contract = buildDeploymentContract(profile, translationProfile, await homeProfile(), await adminSupportProfile(), await retentionProfile(), { dryRun: true });
   assert.equal(contract.wranglerArguments.at(-1), '--dry-run');
   assert(contract.wranglerArguments.includes('CLOUDFLARE_DEPLOYMENT_ENV:production'));
   assert(!contract.wranglerArguments.some((argument) => argument.includes('*')));
@@ -134,7 +144,7 @@ test('translation ON/OFF profiles are independent from the approved media cohort
   assert.equal(resolveTranslationReleaseProfile(policy).name, 'on');
   for (const name of ['off', 'on']) {
     const translation = resolveTranslationReleaseProfile(policy, name);
-    const contract = buildDeploymentContract(media, translation, await homeProfile(), await adminSupportProfile());
+    const contract = buildDeploymentContract(media, translation, await homeProfile(), await adminSupportProfile(), await retentionProfile());
     assert(contract.wranglerArguments.includes(`EXPERIENCE_TRANSLATION_QUEUE_ENABLED:${translation.queueEnabled}`));
     assert(contract.wranglerArguments.includes(`EXPERIENCE_TRANSLATION_SCHEDULED_RECOVERY_ENABLED:${translation.scheduledRecoveryEnabled}`));
     assert(contract.wranglerArguments.includes(`PUBLIC_EXPERIENCE_MEDIA_PRODUCER_EXPERIENCE_IDS:${media.experienceIds}`));
@@ -144,6 +154,7 @@ test('translation ON/OFF profiles are independent from the approved media cohort
     requestedTranslationProfile: 'off',
     requestedHomePopularityProfile: undefined,
     requestedAdminSupportUnreadProfile: undefined,
+    requestedNotificationRetentionProfile: undefined,
     dryRun: false,
   });
 });
@@ -157,7 +168,7 @@ test('Home popularity ON/OFF profiles are independent from Translation and media
   assert.equal(resolveHomePopularityReleaseProfile(policy).name, 'on');
   for (const name of ['off', 'on']) {
     const home = resolveHomePopularityReleaseProfile(policy, name);
-    const contract = buildDeploymentContract(media, translation, home, await adminSupportProfile());
+    const contract = buildDeploymentContract(media, translation, home, await adminSupportProfile(), await retentionProfile());
     assert(contract.wranglerArguments.includes(
       `HOME_POPULARITY_SNAPSHOT_SCHEDULED_ENABLED:${home.scheduledEnabled}`
     ));
@@ -171,6 +182,7 @@ test('Home popularity ON/OFF profiles are independent from Translation and media
     requestedTranslationProfile: undefined,
     requestedHomePopularityProfile: 'off',
     requestedAdminSupportUnreadProfile: undefined,
+    requestedNotificationRetentionProfile: undefined,
     dryRun: false,
   });
 });
@@ -183,7 +195,7 @@ test('Admin Support unread ON/OFF profiles are independent from Home, Translatio
   assert.equal(resolveAdminSupportUnreadReleaseProfile(policy).name, 'on');
   for (const name of ['off', 'on']) {
     const adminSupport = resolveAdminSupportUnreadReleaseProfile(policy, name);
-    const contract = buildDeploymentContract(media, translation, home, adminSupport);
+    const contract = buildDeploymentContract(media, translation, home, adminSupport, await retentionProfile());
     assert(contract.wranglerArguments.includes(
       `ADMIN_SUPPORT_UNREAD_ALERTS_SCHEDULED_ENABLED:${adminSupport.scheduledEnabled}`
     ));
@@ -198,6 +210,37 @@ test('Admin Support unread ON/OFF profiles are independent from Home, Translatio
     requestedTranslationProfile: undefined,
     requestedHomePopularityProfile: undefined,
     requestedAdminSupportUnreadProfile: 'off',
+    requestedNotificationRetentionProfile: undefined,
+    dryRun: false,
+  });
+});
+
+test('notification retention ON/OFF profiles are independent from all existing Production profiles', async () => {
+  const media = resolveReleaseProfile(await readReleasePolicy());
+  const translation = resolveTranslationReleaseProfile(await readTranslationReleasePolicy());
+  const home = await homeProfile('on');
+  const adminSupport = await adminSupportProfile('on');
+  const policy = await readNotificationRetentionReleasePolicy();
+  assert.equal(resolveNotificationRetentionReleaseProfile(policy).name, 'on');
+  for (const name of ['off', 'on']) {
+    const retention = resolveNotificationRetentionReleaseProfile(policy, name);
+    const contract = buildDeploymentContract(media, translation, home, adminSupport, retention);
+    assert(contract.wranglerArguments.includes(
+      `NOTIFICATION_RETENTION_CLEANUP_SCHEDULED_ENABLED:${retention.scheduledEnabled}`
+    ));
+    assert(contract.wranglerArguments.includes('EXPERIENCE_TRANSLATION_QUEUE_ENABLED:true'));
+    assert(contract.wranglerArguments.includes('HOME_POPULARITY_SNAPSHOT_SCHEDULED_ENABLED:true'));
+    assert(contract.wranglerArguments.includes('ADMIN_SUPPORT_UNREAD_ALERTS_SCHEDULED_ENABLED:true'));
+    assert(contract.wranglerArguments.includes(
+      `PUBLIC_EXPERIENCE_MEDIA_PRODUCER_EXPERIENCE_IDS:${media.experienceIds}`
+    ));
+  }
+  assert.deepEqual(parseDeploymentArguments(['--notification-retention-profile=off']), {
+    requestedProfile: undefined,
+    requestedTranslationProfile: undefined,
+    requestedHomePopularityProfile: undefined,
+    requestedAdminSupportUnreadProfile: undefined,
+    requestedNotificationRetentionProfile: 'off',
     dryRun: false,
   });
 });

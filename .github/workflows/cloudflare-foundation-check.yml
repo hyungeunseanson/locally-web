@@ -104,6 +104,9 @@ jobs:
       - name: Validate Admin Support unread Cloudflare Cron transport
         run: npm run cloudflare:admin-support:contract
 
+      - name: Validate notification retention Cloudflare Cron transport
+        run: npm run cloudflare:notification-retention:contract
+
       - name: Validate the Production media build wrapper
         run: npm run cloudflare:production-build:contract
 
