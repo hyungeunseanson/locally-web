@@ -98,10 +98,27 @@ test.describe('Cloudflare migration readiness contract', () => {
         binding: manifest.bindings.publicExperienceMediaQueueProducer,
         queue: manifest.environments.production.publicExperienceMediaQueue,
       },
+      {
+        binding: manifest.bindings.experienceTranslationQueueProducer,
+        queue: manifest.environments.production.experienceTranslationQueue,
+      },
     ]);
     expect(wrangler.env.production.vars).toMatchObject({
       [manifest.publicExperienceMediaProducerPolicy.enabledVariable]: 'false',
       [manifest.publicExperienceMediaProducerPolicy.experienceIdsVariable]: '',
+      [manifest.experienceTranslationReleasePolicy.queueEnabledVariable]: 'false',
+      [manifest.experienceTranslationReleasePolicy.scheduledRecoveryEnabledVariable]: 'false',
+    });
+    expect(wrangler.env.production.queues?.consumers).toContainEqual({
+      queue: manifest.environments.production.experienceTranslationQueue,
+      max_batch_size: manifest.experienceTranslationQueuePolicy.maxBatchSize,
+      max_retries: manifest.experienceTranslationQueuePolicy.maxRetries,
+      dead_letter_queue: manifest.environments.production.experienceTranslationDeadLetterQueue,
+      max_concurrency: manifest.experienceTranslationQueuePolicy.maxConcurrency,
+      retry_delay: manifest.experienceTranslationQueuePolicy.retryDelaySeconds,
+    });
+    expect(wrangler.env.production.triggers).toEqual({
+      crons: [manifest.experienceTranslationQueuePolicy.recoveryCron],
     });
     expect(wrangler.env.canary.vars).not.toHaveProperty(
       manifest.publicExperienceMediaProducerPolicy.enabledVariable
@@ -109,6 +126,13 @@ test.describe('Cloudflare migration readiness contract', () => {
     expect(wrangler.env.canary.vars).not.toHaveProperty(
       manifest.publicExperienceMediaProducerPolicy.experienceIdsVariable
     );
+    expect(wrangler.env.canary.vars).not.toHaveProperty(
+      manifest.experienceTranslationReleasePolicy.queueEnabledVariable
+    );
+    expect(wrangler.env.canary.vars).not.toHaveProperty(
+      manifest.experienceTranslationReleasePolicy.scheduledRecoveryEnabledVariable
+    );
+    expect(wrangler.env.canary.triggers).toBeUndefined();
 
     const wranglerEnvironments = Object.values(wrangler.env) as Array<{
       r2_buckets: Array<{ binding: string; bucket_name: string }>;

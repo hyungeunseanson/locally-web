@@ -60,7 +60,10 @@ export class TranslationProviderError extends Error {
   }
 }
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+export type TranslationProviderRuntime = {
+  apiKey?: string;
+  fetch?: typeof fetch;
+};
 
 const localeLabelMap: Record<ExperienceLocale, string> = {
   ko: 'Korean',
@@ -502,8 +505,10 @@ function normalizeGeminiProviderError(error: unknown) {
 
 async function generateGeminiTranslation(
   request: TranslationRequest,
-  model: string
+  model: string,
+  apiKey: string
 ): Promise<TranslationResult> {
+  const genAI = new GoogleGenerativeAI(apiKey);
   const geminiModel = genAI.getGenerativeModel({ model });
   const result = await geminiModel.generateContent(buildTranslationPrompt(request));
   const response = result.response;
@@ -517,8 +522,12 @@ async function generateGeminiTranslation(
   };
 }
 
-export async function translateWithGemini(request: TranslationRequest): Promise<TranslationResult> {
-  if (!process.env.GEMINI_API_KEY) {
+export async function translateWithGemini(
+  request: TranslationRequest,
+  runtime: TranslationProviderRuntime = {}
+): Promise<TranslationResult> {
+  const apiKey = runtime.apiKey ?? process.env.GEMINI_API_KEY;
+  if (!apiKey) {
     throw new TranslationProviderError({
       provider: 'gemini',
       message: 'GEMINI_API_KEY is not set',
@@ -527,7 +536,7 @@ export async function translateWithGemini(request: TranslationRequest): Promise<
   }
 
   try {
-    return await generateGeminiTranslation(request, request.model);
+    return await generateGeminiTranslation(request, request.model, apiKey);
   } catch (error) {
     const providerError = normalizeGeminiProviderError(error);
     const fallbackModel = shouldUseGeminiFallbackModel(request.model, providerError);
@@ -539,7 +548,8 @@ export async function translateWithGemini(request: TranslationRequest): Promise<
             ...request,
             model: fallbackModel,
           },
-          fallbackModel
+          fallbackModel,
+          apiKey
         );
       } catch (fallbackError) {
         throw normalizeGeminiProviderError(fallbackError);
@@ -550,8 +560,12 @@ export async function translateWithGemini(request: TranslationRequest): Promise<
   }
 }
 
-export async function translateWithGrok(request: TranslationRequest): Promise<TranslationResult> {
-  if (!process.env.XAI_API_KEY) {
+export async function translateWithGrok(
+  request: TranslationRequest,
+  runtime: TranslationProviderRuntime = {}
+): Promise<TranslationResult> {
+  const apiKey = runtime.apiKey ?? process.env.XAI_API_KEY;
+  if (!apiKey) {
     throw new TranslationProviderError({
       provider: 'grok',
       message: 'XAI_API_KEY is not set',
@@ -559,11 +573,12 @@ export async function translateWithGrok(request: TranslationRequest): Promise<Tr
     });
   }
 
-  const response = await fetch('https://api.x.ai/v1/chat/completions', {
+  const fetchImplementation = runtime.fetch ?? fetch;
+  const response = await fetchImplementation('https://api.x.ai/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.XAI_API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
       model: request.model,

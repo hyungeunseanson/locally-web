@@ -10,6 +10,7 @@ import {
   buildDeploymentContract,
   parseDeploymentArguments,
 } from './run-production-deploy.mjs';
+import { readTranslationReleasePolicy, resolveTranslationReleaseProfile } from './experience-translation-release-profile.mjs';
 
 const APPROVED_IDS = [
   3071, 3081, 3188, 3253, 3307, 3308, 3309, 3331, 3343, 3402, 3403,
@@ -36,9 +37,10 @@ test('owns an exact approved cohort while retaining explicit single-ID and OFF p
 
 test('couples reader build values and producer runtime values for every profile', async () => {
   const policy = await readReleasePolicy();
+  const translationProfile = resolveTranslationReleaseProfile(await readTranslationReleasePolicy(), 'off');
   for (const name of Object.keys(policy.profiles)) {
     const profile = resolveReleaseProfile(policy, name);
-    const contract = buildDeploymentContract(profile);
+    const contract = buildDeploymentContract(profile, translationProfile);
     assert.equal(
       contract.readerEnvironment.NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_ENABLED,
       profile.enabled
@@ -61,10 +63,12 @@ test('defaults canonical Production deploy to the approved cohort and rejects ad
   assert.equal(resolveReleaseProfile(policy).name, 'approved-cohort');
   assert.deepEqual(parseDeploymentArguments([]), {
     requestedProfile: undefined,
+    requestedTranslationProfile: undefined,
     dryRun: false,
   });
   assert.deepEqual(parseDeploymentArguments(['--media-profile=off', '--dry-run']), {
     requestedProfile: 'off',
+    requestedTranslationProfile: undefined,
     dryRun: true,
   });
   assert.throws(() => parseDeploymentArguments(['--var', 'X:Y']), /Unsupported/);
@@ -97,8 +101,27 @@ test('fails closed for malformed, duplicate, unsorted, wildcard, or uncoupled pr
 test('dry-run preserves the exact deployment contract without changing the profile', async () => {
   const policy = await readReleasePolicy();
   const profile = resolveReleaseProfile(policy, 'single-3309');
-  const contract = buildDeploymentContract(profile, { dryRun: true });
+  const translationProfile = resolveTranslationReleaseProfile(await readTranslationReleasePolicy(), 'off');
+  const contract = buildDeploymentContract(profile, translationProfile, { dryRun: true });
   assert.equal(contract.wranglerArguments.at(-1), '--dry-run');
   assert(contract.wranglerArguments.includes('CLOUDFLARE_DEPLOYMENT_ENV:production'));
   assert(!contract.wranglerArguments.some((argument) => argument.includes('*')));
+});
+
+test('translation ON/OFF profiles are independent from the approved media cohort', async () => {
+  const media = resolveReleaseProfile(await readReleasePolicy());
+  const policy = await readTranslationReleasePolicy();
+  assert.equal(resolveTranslationReleaseProfile(policy).name, 'on');
+  for (const name of ['off', 'on']) {
+    const translation = resolveTranslationReleaseProfile(policy, name);
+    const contract = buildDeploymentContract(media, translation);
+    assert(contract.wranglerArguments.includes(`EXPERIENCE_TRANSLATION_QUEUE_ENABLED:${translation.queueEnabled}`));
+    assert(contract.wranglerArguments.includes(`EXPERIENCE_TRANSLATION_SCHEDULED_RECOVERY_ENABLED:${translation.scheduledRecoveryEnabled}`));
+    assert(contract.wranglerArguments.includes(`PUBLIC_EXPERIENCE_MEDIA_PRODUCER_EXPERIENCE_IDS:${media.experienceIds}`));
+  }
+  assert.deepEqual(parseDeploymentArguments(['--translation-profile=off']), {
+    requestedProfile: undefined,
+    requestedTranslationProfile: 'off',
+    dryRun: false,
+  });
 });

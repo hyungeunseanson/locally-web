@@ -30,6 +30,8 @@
       "publicExperienceMediaR2": "locally-public-experience-canary",
       "publicExperienceMediaQueue": "locally-public-experience-media-mirror-production",
       "publicExperienceMediaDeadLetterQueue": "locally-public-experience-media-mirror-dlq-production",
+      "experienceTranslationQueue": "locally-experience-translation-production",
+      "experienceTranslationDeadLetterQueue": "locally-experience-translation-dlq-production",
       "publicExperienceMediaBaseUrl": "https://media-canary.locally-travel.com",
       "publicHostProfileMediaBaseUrl": "https://profiles-media.locally-travel.com",
       "workersDev": false,
@@ -42,6 +44,7 @@
     "incrementalCacheR2": "NEXT_INC_CACHE_R2_BUCKET",
     "publicExperienceMediaR2": "PUBLIC_EXPERIENCE_MEDIA_R2",
     "publicExperienceMediaQueueProducer": "PUBLIC_EXPERIENCE_MEDIA_QUEUE",
+    "experienceTranslationQueueProducer": "EXPERIENCE_TRANSLATION_QUEUE",
     "queueDurableObject": {
       "binding": "NEXT_CACHE_DO_QUEUE",
       "className": "DOQueueHandler"
@@ -57,6 +60,19 @@
     "maxConcurrency": 1,
     "maxRetries": 5,
     "retryDelaySeconds": 60
+  },
+  "experienceTranslationQueuePolicy": {
+    "maxBatchSize": 1,
+    "maxConcurrency": 1,
+    "maxRetries": 5,
+    "retryDelaySeconds": 60,
+    "recoveryCron": "17 19 * * *"
+  },
+  "experienceTranslationReleasePolicy": {
+    "defaultProductionProfile": "on",
+    "queueEnabledVariable": "EXPERIENCE_TRANSLATION_QUEUE_ENABLED",
+    "scheduledRecoveryEnabledVariable": "EXPERIENCE_TRANSLATION_SCHEDULED_RECOVERY_ENABLED",
+    "rawDefault": "false"
   },
   "publicExperienceMediaProducerPolicy": {
     "enabledVariable": "PUBLIC_EXPERIENCE_MEDIA_PRODUCER_ENABLED",
@@ -197,7 +213,9 @@
       "SETTLEMENT_SYNC_DELAY_WARNING_MINUTES",
       "SETTLEMENT_SYNC_LEASE_SECONDS",
       "PUBLIC_EXPERIENCE_MEDIA_PRODUCER_ENABLED",
-      "PUBLIC_EXPERIENCE_MEDIA_PRODUCER_EXPERIENCE_IDS"
+      "PUBLIC_EXPERIENCE_MEDIA_PRODUCER_EXPERIENCE_IDS",
+      "EXPERIENCE_TRANSLATION_QUEUE_ENABLED",
+      "EXPERIENCE_TRANSLATION_SCHEDULED_RECOVERY_ENABLED"
     ],
     "canarySafetyVariables": [
       "CLOUDFLARE_FUNCTIONAL_CANARY_ENABLED",

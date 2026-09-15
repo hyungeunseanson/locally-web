@@ -373,6 +373,10 @@ test.describe('default-OFF public experience media Queue producer', () => {
         binding: 'PUBLIC_EXPERIENCE_MEDIA_QUEUE',
         queue: 'locally-public-experience-media-mirror-production',
       },
+      {
+        binding: 'EXPERIENCE_TRANSLATION_QUEUE',
+        queue: 'locally-experience-translation-production',
+      },
     ]);
     expect(wrangler.env.production.vars).toMatchObject({
       CLOUDFLARE_DEPLOYMENT_ENV: 'production',

@@ -540,6 +540,10 @@ test.describe('Production public experience media Queue consumer wiring', () => 
           binding: 'PUBLIC_EXPERIENCE_MEDIA_QUEUE',
           queue: 'locally-public-experience-media-mirror-production',
         },
+        {
+          binding: 'EXPERIENCE_TRANSLATION_QUEUE',
+          queue: 'locally-experience-translation-production',
+        },
       ],
       consumers: [
         {
@@ -548,6 +552,14 @@ test.describe('Production public experience media Queue consumer wiring', () => 
           max_retries: 5,
           dead_letter_queue:
             'locally-public-experience-media-mirror-dlq-production',
+          max_concurrency: 1,
+          retry_delay: 60,
+        },
+        {
+          queue: 'locally-experience-translation-production',
+          max_batch_size: 1,
+          max_retries: 5,
+          dead_letter_queue: 'locally-experience-translation-dlq-production',
           max_concurrency: 1,
           retry_delay: 60,
         },

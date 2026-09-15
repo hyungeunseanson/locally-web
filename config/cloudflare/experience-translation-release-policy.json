@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "defaultProductionProfile": "on",
+  "profiles": {
+    "off": {
+      "queueEnabled": "false",
+      "scheduledRecoveryEnabled": "false"
+    },
+    "on": {
+      "queueEnabled": "true",
+      "scheduledRecoveryEnabled": "true"
+    }
+  }
+}
