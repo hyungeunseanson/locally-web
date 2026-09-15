@@ -21,14 +21,6 @@ const WORKFLOWS: ScheduledCronWorkflowContract[] = [
     endpoint: '/api/cron/cancel-pending',
   },
   {
-    path: '.github/workflows/admin-support-unread-alerts.yml',
-    name: 'Admin Support Unread Alerts',
-    schedule: "'*/10 * * * *'",
-    concurrencyGroup: 'admin-support-unread-alerts',
-    timeoutMinutes: 10,
-    endpoint: '/api/cron/admin-support-unread-alerts',
-  },
-  {
     path: '.github/workflows/complete-trips.yml',
     name: 'Experience Completion Sync',
     schedule: "'23 */2 * * *'",

@@ -324,4 +324,13 @@ test.describe('Admin Support unread Cloudflare Cron', () => {
     await handleLocallyScheduledEvent({ cron: HOME_POPULARITY_SNAPSHOT_CRON }, {}, options);
     expect(calls).toEqual(['translation', 'home']);
   });
+
+  test('retires only the GitHub automatic schedule and keeps the authenticated manual fallback', () => {
+    const workflow = readFileSync('.github/workflows/admin-support-unread-alerts.yml', 'utf8');
+    expect(workflow).not.toMatch(/\n\s*schedule:\s*(?:\n|$)/);
+    expect(workflow).toMatch(/\n\s*workflow_dispatch:\s*(?:\n|$)/);
+    expect(workflow).toContain('group: admin-support-unread-alerts');
+    expect(workflow).toContain('${PROD_URL%/}/api/cron/admin-support-unread-alerts');
+    expect(workflow).toContain('-H "Authorization: Bearer ${CRON_SECRET}"');
+  });
 });
