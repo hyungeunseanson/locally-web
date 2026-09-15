@@ -107,6 +107,9 @@ jobs:
       - name: Validate notification retention Cloudflare Cron transport
         run: npm run cloudflare:notification-retention:contract
 
+      - name: Validate Experience completion Cloudflare Cron transport
+        run: npm run cloudflare:experience-completion:contract
+
       - name: Validate the Production media build wrapper
         run: npm run cloudflare:production-build:contract
 

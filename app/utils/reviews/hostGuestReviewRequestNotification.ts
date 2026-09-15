@@ -113,10 +113,11 @@ export async function deliverHostGuestReviewRequestsForCompletedBookings(params:
         .eq('booking_id', bookingId);
 
       if (updateError) {
-        console.warn(
-          `[guest review request] notification localization failed for booking ${bookingId}:`,
-          updateError
-        );
+        console.warn(JSON.stringify({
+          event: 'guest_review_request_delivery',
+          status: 'partial',
+          diagnosticCode: 'notification_localization_failed',
+        }));
       }
 
       await sendEmail({
@@ -139,17 +140,18 @@ export async function deliverHostGuestReviewRequestsForCompletedBookings(params:
   let processedCount = 0;
   let failedCount = 0;
 
-  settledResults.forEach((result, index) => {
+  settledResults.forEach((result) => {
     if (result.status === 'fulfilled') {
       if (result.value) processedCount += 1;
       return;
     }
 
     failedCount += 1;
-    console.warn(
-      `[guest review request] post-completion delivery failed for booking ${bookingIds[index]}:`,
-      result.reason
-    );
+    console.warn(JSON.stringify({
+      event: 'guest_review_request_delivery',
+      status: 'failed',
+      diagnosticCode: 'post_completion_delivery_failed',
+    }));
   });
 
   return { processedCount, failedCount };

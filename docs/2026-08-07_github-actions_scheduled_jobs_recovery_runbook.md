@@ -56,6 +56,10 @@ GitHub 호스티드 러너 장애로 예약 workflow가 실행 단계에 들어�
 - 완료 시각이 지났지만 여전히 active 상태인 체험 예약이 남았는지 확인한다.
 - `admin_job_runs`에서 `experience_completion_sync`의 최근 `last_success_at`, 상태, 처리 건수를 확인한다.
 - 완료 예약별 review-request 등 keyed side effect가 중복되지 않았는지 확인한다.
+- Cloudflare 전환 후에는 `23 */2 * * *` Cron과
+  `EXPERIENCE_COMPLETION_SCHEDULED_ENABLED`가 primary scheduler 계약이다.
+  GitHub `workflow_dispatch`와 `/api/cron/complete-trips`는 수동 emergency fallback으로 유지한다.
+  운영·rollback 절차는 `docs/ops/experience-completion-cloudflare-cron.md`를 따른다.
 
 ## 수동 복구 결정
 

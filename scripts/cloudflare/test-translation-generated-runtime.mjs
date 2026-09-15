@@ -10,6 +10,7 @@ const BUNDLE = path.join(ROOT, '.wrangler/deploy/production/cloudflare-worker.js
 const CRON = '17 19 * * *';
 const ADMIN_SUPPORT_CRON = '*/10 * * * *';
 const NOTIFICATION_RETENTION_CRON = '31 19 * * *';
+const EXPERIENCE_COMPLETION_CRON = '23 */2 * * *';
 
 async function reservePort() {
   const server = http.createServer();
@@ -58,6 +59,25 @@ try {
       response.end('0');
       return;
     }
+    if (request.url?.startsWith('/rest/v1/admin_job_runs')) {
+      if (request.method === 'POST') {
+        response.writeHead(200, { 'content-type': 'application/json' });
+        response.end(JSON.stringify({
+          id: 1,
+          started_at: '2026-09-15T00:00:00.000Z',
+          lease_expires_at: '2026-09-15T00:02:00.000Z',
+        }));
+        return;
+      }
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(request.url.includes('select=id') ? '{"id":1}' : '[]');
+      return;
+    }
+    if (request.url?.startsWith('/rest/v1/rpc/list_due_experience_completion_candidates')) {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end('[]');
+      return;
+    }
     response.writeHead(500, { 'content-type': 'application/json' });
     response.end('{"error":"unexpected_fixture_request"}');
   });
@@ -78,6 +98,7 @@ try {
       HOME_POPULARITY_SNAPSHOT_SCHEDULED_ENABLED: 'true',
       ADMIN_SUPPORT_UNREAD_ALERTS_SCHEDULED_ENABLED: 'true',
       NOTIFICATION_RETENTION_CLEANUP_SCHEDULED_ENABLED: 'true',
+      EXPERIENCE_COMPLETION_SCHEDULED_ENABLED: 'true',
       NEXT_PUBLIC_SUPABASE_URL: `http://127.0.0.1:${backendAddress.port}`,
       SUPABASE_SERVICE_ROLE_KEY: 'fixture-service-role',
       GEMINI_API_KEY: 'fixture-gemini-key',
@@ -86,7 +107,7 @@ try {
       producers: [{ binding: 'EXPERIENCE_TRANSLATION_QUEUE', queue: 'locally-experience-translation-production' }],
       consumers: [{ queue: 'locally-experience-translation-production', max_batch_size: 1 }],
     },
-    triggers: { crons: [CRON, ADMIN_SUPPORT_CRON, NOTIFICATION_RETENTION_CRON] },
+    triggers: { crons: [CRON, ADMIN_SUPPORT_CRON, NOTIFICATION_RETENTION_CRON, EXPERIENCE_COMPLETION_CRON] },
     rules: [
       { type: 'CompiledWasm', globs: [`${path.dirname(BUNDLE)}/*.wasm`], fallthrough: true },
       { type: 'Data', globs: [`${path.dirname(BUNDLE)}/*.bin`], fallthrough: true },
@@ -122,8 +143,16 @@ try {
   assert.equal(adminScheduled.status, 200);
   await waitFor(() => output.includes('admin_support_unread_scheduled'), 15_000, 'cold Admin Support scheduled outcome');
   assert.equal(backendRequests.filter((request) => request.startsWith('/rest/v1/rpc/claim_due_admin_support_unread_alert_batches')).length, 1);
+
+  const completionScheduledUrl = new URL('/cdn-cgi/local/scheduled', `http://127.0.0.1:${workerPort}`);
+  completionScheduledUrl.searchParams.set('cron', EXPERIENCE_COMPLETION_CRON);
+  const completionScheduled = await fetch(completionScheduledUrl);
+  assert.equal(completionScheduled.status, 200);
+  await waitFor(() => output.includes('experience_completion_scheduled'), 15_000, 'cold Experience completion scheduled outcome');
+  assert.equal(backendRequests.filter((request) => request.startsWith('/rest/v1/rpc/list_due_experience_completion_candidates')).length, 1);
   assert.equal(backendRequests.filter((request) => request.startsWith('/rest/v1/rpc/lease_experience_translation_task')).length, 2);
   assert.equal(backendRequests.filter((request) => request.startsWith('/rest/v1/rpc/refresh_experience_popularity_snapshot')).length, 1);
+  assert.equal(backendRequests.filter((request) => request.startsWith('/rest/v1/rpc/claim_due_admin_support_unread_alert_batches')).length, 1);
   assert.equal(backendRequests.filter((request) => request.startsWith('/rest/v1/rpc/prune_notifications_retention')).length, 0);
 
   const retentionScheduledUrl = new URL('/cdn-cgi/local/scheduled', `http://127.0.0.1:${workerPort}`);
@@ -146,7 +175,10 @@ try {
   const applicationLogs = output.split('\n').filter((line) => line.includes('experience_translation_')).join('\n');
   assert(!applicationLogs.includes('fixture-service-role'));
   assert(!applicationLogs.includes('fixture-gemini-key'));
-  console.log(JSON.stringify({ coldQueue: 'PASS', coldScheduledHome: 'PASS', coldScheduledAdminSupport: 'PASS', coldScheduledNotificationRetention: 'PASS', exactCronIsolation: 'PASS', afterHttpQueue: 'PASS', leaseRequests: 4, homeRefreshRequests: 2, adminSupportClaimRequests: 1, notificationRetentionRequests: 1, providerCalls: 0 }));
+  const completionLogs = output.split('\n').filter((line) => line.includes('experience_completion_')).join('\n');
+  assert(!completionLogs.includes('fixture-service-role'));
+  assert(!completionLogs.includes('fixture-gemini-key'));
+  console.log(JSON.stringify({ coldQueue: 'PASS', coldScheduledHome: 'PASS', coldScheduledAdminSupport: 'PASS', coldScheduledNotificationRetention: 'PASS', coldScheduledExperienceCompletion: 'PASS', exactCronIsolation: 'PASS', afterHttpQueue: 'PASS', leaseRequests: 4, homeRefreshRequests: 2, adminSupportClaimRequests: 1, notificationRetentionRequests: 1, experienceCompletionDueRequests: 1, providerCalls: 0, financialProviderCalls: 0 }));
 } catch (error) {
   const diagnostic = output
     .replaceAll('fixture-service-role', '[REDACTED]')

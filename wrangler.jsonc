@@ -75,7 +75,8 @@
         "EXPERIENCE_TRANSLATION_SCHEDULED_RECOVERY_ENABLED": "false",
         "HOME_POPULARITY_SNAPSHOT_SCHEDULED_ENABLED": "false",
         "ADMIN_SUPPORT_UNREAD_ALERTS_SCHEDULED_ENABLED": "false",
-        "NOTIFICATION_RETENTION_CLEANUP_SCHEDULED_ENABLED": "false"
+        "NOTIFICATION_RETENTION_CLEANUP_SCHEDULED_ENABLED": "false",
+        "EXPERIENCE_COMPLETION_SCHEDULED_ENABLED": "false"
       },
       "observability": {
         "enabled": true,
@@ -132,7 +133,7 @@
         ]
       },
       "triggers": {
-        "crons": ["17 19 * * *", "*/10 * * * *", "31 19 * * *"]
+        "crons": ["17 19 * * *", "*/10 * * * *", "31 19 * * *", "23 */2 * * *"]
       },
       "durable_objects": {
         "bindings": [
