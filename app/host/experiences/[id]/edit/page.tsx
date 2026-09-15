@@ -19,7 +19,8 @@ import {
 import { useToast } from '@/app/context/ToastContext'; // 🟢 Toast로 UX 개선
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 1. Import
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
-import { compressImage, sanitizeFileName, validateImage, isHeicValidationResult } from '@/app/utils/image';
+import { compressImage, validateImage, isHeicValidationResult } from '@/app/utils/image';
+import { uploadExperienceImage } from '@/app/host/create/experienceImageUpload';
 import { getLanguageNames, normalizeLanguageLevels } from '@/app/utils/languageLevels';
 import { buildExperienceWritePayload, getManualFieldValue, setManualFieldValue, syncManualContentWithLocales } from '@/app/host/create/experienceFormState';
 import HostPhotoActionSheet from '@/app/host/components/HostPhotoActionSheet';
@@ -216,15 +217,12 @@ export default function EditExperiencePage() {
     }
 
     const compressedFile = asProcessedImageFile(await compressImage(file));
-    const fileName = `experience/${formData.host_id}/${folder}/${Date.now()}_${sanitizeFileName(compressedFile.name)}`;
-    const { error } = await supabase.storage.from('experiences').upload(fileName, compressedFile);
-
-    if (error) {
-      throw error;
-    }
-
-    const { data } = supabase.storage.from('experiences').getPublicUrl(fileName);
-    return data.publicUrl;
+    const result = await uploadExperienceImage({
+      file: compressedFile,
+      folder,
+      experienceId,
+    });
+    return result.publicUrl;
   };
 
   // 저장하기

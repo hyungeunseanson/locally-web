@@ -15,6 +15,7 @@ import { readHomePopularityReleasePolicy, resolveHomePopularityReleaseProfile } 
 import { readAdminSupportUnreadReleasePolicy, resolveAdminSupportUnreadReleaseProfile } from './admin-support-unread-release-profile.mjs';
 import { readNotificationRetentionReleasePolicy, resolveNotificationRetentionReleaseProfile } from './notification-retention-release-profile.mjs';
 import { readExperienceCompletionReleasePolicy, resolveExperienceCompletionReleaseProfile } from './experience-completion-release-profile.mjs';
+import { readExperienceMediaSourceReleasePolicy, resolveExperienceMediaSourceReleaseProfile } from './experience-media-source-release-profile.mjs';
 
 async function homeProfile(name = 'off') {
   return resolveHomePopularityReleaseProfile(
@@ -113,6 +114,39 @@ test('defaults canonical Production deploy to the approved cohort and rejects ad
   });
   assert.throws(() => parseDeploymentArguments(['--var', 'X:Y']), /Unsupported/);
   assert.throws(() => resolveReleaseProfile(policy, 'wildcard'), /Unknown/);
+});
+
+test('Experience media source authority is independent, reproducible, and OFF by default', async () => {
+  const policy = await readExperienceMediaSourceReleasePolicy();
+  assert.equal(resolveExperienceMediaSourceReleaseProfile(policy).name, 'off');
+  const media = resolveReleaseProfile(await readReleasePolicy());
+  const translation = resolveTranslationReleaseProfile(await readTranslationReleasePolicy());
+  for (const name of ['off', 'on']) {
+    const source = resolveExperienceMediaSourceReleaseProfile(policy, name);
+    const contract = buildDeploymentContract(
+      media,
+      translation,
+      await homeProfile('on'),
+      await adminSupportProfile('on'),
+      await retentionProfile('on'),
+      {},
+      await experienceCompletionProfile('on'),
+      source
+    );
+    assert(contract.wranglerArguments.includes(`EXPERIENCE_MEDIA_R2_SOURCE_ENABLED:${source.enabled}`));
+    assert(contract.wranglerArguments.includes(`PUBLIC_EXPERIENCE_MEDIA_PRODUCER_EXPERIENCE_IDS:${media.experienceIds}`));
+    assert(contract.wranglerArguments.includes('EXPERIENCE_TRANSLATION_QUEUE_ENABLED:true'));
+  }
+  assert.deepEqual(parseDeploymentArguments(['--experience-media-source-profile=on']), {
+    requestedProfile: undefined,
+    requestedTranslationProfile: undefined,
+    requestedHomePopularityProfile: undefined,
+    requestedAdminSupportUnreadProfile: undefined,
+    requestedNotificationRetentionProfile: undefined,
+    requestedExperienceCompletionProfile: undefined,
+    requestedExperienceMediaSourceProfile: 'on',
+    dryRun: false,
+  });
 });
 
 test('fails closed for malformed, duplicate, unsorted, wildcard, or uncoupled profiles', () => {

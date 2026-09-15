@@ -9,6 +9,36 @@ export class ExperienceImageUploadError extends Error {
     this.code = code;
   }
 }
+
+export type ExperienceImageUploadFolder = 'hero' | 'itinerary';
+
+export async function uploadExperienceImage(input: {
+  file: File;
+  folder: ExperienceImageUploadFolder;
+  experienceId?: string | number;
+}) {
+  const { bytes, contentType } = await materializeExperienceImage(input.file);
+  const body = new FormData();
+  body.set('file', new File([bytes], input.file.name, { type: contentType }));
+  body.set('folder', input.folder);
+  if (input.experienceId !== undefined) {
+    body.set('experienceId', String(input.experienceId));
+  }
+
+  const response = await fetch('/api/host/experience-images/upload', {
+    method: 'POST',
+    body,
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok || payload?.success !== true || typeof payload?.publicUrl !== 'string') {
+    throw new ExperienceImageUploadError('upload_failed');
+  }
+  return {
+    publicUrl: payload.publicUrl as string,
+    cleanupPath: typeof payload.cleanupPath === 'string' ? payload.cleanupPath : null,
+    authority: payload.authority === 'r2' ? 'r2' as const : 'supabase' as const,
+  };
+}
 export async function materializeExperienceImage(file: File) {
   let bytes: ArrayBuffer;
 

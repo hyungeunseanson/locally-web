@@ -74,10 +74,12 @@ export type PublicExperienceMediaDerivativeSpecification = {
   format: 'webp';
 };
 
-type SourceInventoryItem = {
+export type SourceInventoryItem = {
   sourceUrl: string;
   sourceKey: string;
   sourceKeySha256: string;
+  sourceKind: 'supabase' | 'r2';
+  r2Key: string | null;
 };
 
 export type PublicExperienceMediaInventory = {
@@ -274,9 +276,7 @@ function buildDerivativeSpecifications(
   for (const [index, derivative] of PUBLIC_EXPERIENCE_CARD_DERIVATIVES.entries()) {
     specifications.push({
       role: 'card',
-      sourceKeySha256: sha256Hex(
-        normalizePublicExperienceSourceUrl(primarySourceUrl).sourceKey
-      ),
+      sourceKeySha256: normalizePublicExperienceSourceUrl(primarySourceUrl).sourceKeySha256,
       key: index === 0 ? cardKeys.smallKey : cardKeys.largeKey,
       width: derivative.width,
       quality: derivative.quality,
@@ -287,9 +287,7 @@ function buildDerivativeSpecifications(
   for (const sourceUrl of detailSourceUrls) {
     const detailKeys = buildPublicExperienceDetailKeys(experienceId, sourceUrl);
     const keys = [detailKeys.smallKey, detailKeys.mediumKey, detailKeys.largeKey];
-    const sourceKeySha256 = sha256Hex(
-      normalizePublicExperienceSourceUrl(sourceUrl).sourceKey
-    );
+    const sourceKeySha256 = normalizePublicExperienceSourceUrl(sourceUrl).sourceKeySha256;
     for (const [index, derivative] of PUBLIC_EXPERIENCE_DETAIL_DERIVATIVES.entries()) {
       specifications.push({
         role: 'detail',
@@ -342,17 +340,19 @@ export function buildPublicExperienceMediaInventory(
         'invalid_source_namespace'
       );
     }
-    const existing = sourcesByKey.get(normalized.sourceKey);
+    const existing = sourcesByKey.get(normalized.sourceKeySha256);
     if (existing && existing.sourceUrl !== normalized.sourceUrl) {
       throw new PublicExperienceMediaMirrorError(
         'permanent',
         'ambiguous_source_identity'
       );
     }
-    sourcesByKey.set(normalized.sourceKey, {
+    sourcesByKey.set(normalized.sourceKeySha256, {
       sourceUrl: normalized.sourceUrl,
       sourceKey: normalized.sourceKey,
-      sourceKeySha256: sha256Hex(normalized.sourceKey),
+      sourceKeySha256: normalized.sourceKeySha256,
+      sourceKind: normalized.sourceKind,
+      r2Key: normalized.r2Key,
     });
   }
 
@@ -372,6 +372,7 @@ export function buildPublicExperienceMediaInventory(
       sources: sources.map((item) => ({
         sourceKeySha256: item.sourceKeySha256,
         sourceUrlSha256: sha256Hex(item.sourceUrl),
+        sourceKind: item.sourceKind,
       })),
       derivatives: derivatives.map(({ key, role, width, quality, sourceKeySha256 }) => ({
         key,
@@ -763,6 +764,35 @@ async function ensureOriginal(
   return created ? ('created' as const) : ('exact' as const);
 }
 
+async function readR2AuthoritativeSource(
+  store: PublicExperienceMediaMirrorStore,
+  source: SourceInventoryItem
+) {
+  if (!source.r2Key) {
+    throw new PublicExperienceMediaMirrorError('permanent', 'r2_source_key_missing');
+  }
+  const current = await inspectStoredObject(store, source.r2Key);
+  if (!current) {
+    throw new PublicExperienceMediaMirrorError('permanent', 'r2_source_missing');
+  }
+  const contentType = normalizeContentType(current.head.httpMetadata.contentType);
+  const metadata = current.head.customMetadata;
+  if (
+    !SUPPORTED_SOURCE_CONTENT_TYPES.has(contentType) ||
+    current.head.size <= 0 ||
+    current.head.size > PUBLIC_EXPERIENCE_MEDIA_MAX_SOURCE_BYTES ||
+    current.head.httpMetadata.cacheControl !== PUBLIC_EXPERIENCE_MEDIA_CACHE_CONTROL ||
+    metadata.source_key_sha256 !== source.sourceKeySha256 ||
+    metadata.source_byte_sha256 !== current.sha256 ||
+    metadata.output_byte_sha256 !== current.sha256 ||
+    metadata.source_size !== String(current.head.size) ||
+    (metadata.sha256 && metadata.sha256 !== current.sha256)
+  ) {
+    throw new PublicExperienceMediaMirrorError('permanent', 'r2_source_conflict');
+  }
+  return { bytes: new Uint8Array(current.bytes), contentType, sha256: current.sha256 };
+}
+
 async function ensureDerivative(
   dependencies: PublicExperienceMediaMirrorDependencies,
   specification: PublicExperienceMediaDerivativeSpecification,
@@ -868,24 +898,26 @@ export async function mirrorPublicExperienceMedia(
 
     for (const source of inventory.sources) {
       diagnosticStage = 'source_fetch';
-      let response: Response;
-      try {
-        response = await dependencies.fetchSource(source.sourceUrl);
-      } catch {
-        throw new PublicExperienceMediaMirrorError(
-          'transient',
-          'source_fetch_network_error'
-        );
+      let material: Awaited<ReturnType<typeof readSource>>;
+      if (source.sourceKind === 'r2') {
+        material = await readR2AuthoritativeSource(dependencies.store, source);
+      } else {
+        let response: Response;
+        try {
+          response = await dependencies.fetchSource(source.sourceUrl);
+        } catch {
+          throw new PublicExperienceMediaMirrorError(
+            'transient',
+            'source_fetch_network_error'
+          );
+        }
+        material = await readSource(response);
       }
-      const material = await readSource(response);
       materialBySourceIdentity.set(source.sourceKeySha256, material);
       diagnosticStage = 'original_check';
-      const originalResult = await ensureOriginal(
-        dependencies,
-        source,
-        material,
-        copiedAt
-      );
+      const originalResult = source.sourceKind === 'r2'
+        ? 'exact' as const
+        : await ensureOriginal(dependencies, source, material, copiedAt);
       if (originalResult === 'created') counts.originalCreatedCount += 1;
       else counts.originalExactSkipCount += 1;
     }

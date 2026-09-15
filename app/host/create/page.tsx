@@ -14,7 +14,7 @@ import {
   getExperienceFormCopy,
 } from './config';
 import ExperienceFormSteps from './components/ExperienceFormSteps';
-import { validateImage, sanitizeFileName, compressImage, isHeicValidationResult } from '@/app/utils/image';
+import { validateImage, compressImage, isHeicValidationResult } from '@/app/utils/image';
 import { getLanguageNames } from '@/app/utils/languageLevels';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { buildExperienceWritePayload, syncManualContentWithLocales, type ExperienceFormState, type ItineraryItem } from './experienceFormState';
@@ -33,7 +33,7 @@ import { useExperienceDraft } from './useExperienceDraft';
 import type { LoadedExperienceDraft } from './experienceDraftStorage';
 import {
   ExperienceImageUploadError,
-  materializeExperienceImage,
+  uploadExperienceImage,
 } from './experienceImageUpload';
 
 type ProcessedImageFile = File & {
@@ -488,22 +488,9 @@ export default function CreateExperiencePage() {
     });
   };
 
-  const uploadImageToStorage = async (userId: string, file: ProcessedImageFile, folder: 'hero' | 'itinerary') => {
-    const safeName = sanitizeFileName(file.name);
-    const fileName = `experience/${userId}/${folder}/${Date.now()}_${safeName}`;
-    const { bytes, contentType } = await materializeExperienceImage(file);
-
-    const { error: uploadError } = await supabase.storage.from('experiences').upload(fileName, bytes, {
-      contentType,
-      cacheControl: '3600',
-    });
-
-    if (uploadError) {
-      throw new ExperienceImageUploadError('upload_failed');
-    }
-
-    const { data } = supabase.storage.from('experiences').getPublicUrl(fileName);
-    return { path: fileName, publicUrl: data.publicUrl };
+  const uploadImageToStorage = async (_userId: string, file: ProcessedImageFile, folder: 'hero' | 'itinerary') => {
+    const upload = await uploadExperienceImage({ file, folder });
+    return { path: upload.cleanupPath, publicUrl: upload.publicUrl };
   };
 
   const cleanupUploadedImages = async (paths: string[]) => {
@@ -538,7 +525,7 @@ export default function CreateExperiencePage() {
       const photoUrls: string[] = [];
       for (const file of imageFiles) {
         const { path, publicUrl } = await uploadImageToStorage(user.id, file, 'hero');
-        uploadedPaths.push(path);
+        if (path) uploadedPaths.push(path);
         photoUrls.push(publicUrl);
       }
 
@@ -549,7 +536,7 @@ export default function CreateExperiencePage() {
 
           if (itineraryFile) {
             const upload = await uploadImageToStorage(user.id, itineraryFile, 'itinerary');
-            uploadedPaths.push(upload.path);
+            if (upload.path) uploadedPaths.push(upload.path);
             imageUrl = upload.publicUrl;
           } else if (item.image_url && !item.image_url.startsWith('blob:')) {
             imageUrl = item.image_url;

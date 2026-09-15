@@ -87,6 +87,7 @@ The manifest is exhaustive for names. Resolve every value from its current appro
 
 - Required: `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 - Production public experience delivery is repo-owned at `https://media-canary.locally-travel.com`. `npm run cloudflare:deploy:production` resolves the reviewed `approved-cohort` profile, injects the same exact ID list into the reader build and producer runtime, runs a fresh OpenNext build, verifies the public base URL in the client bundle, and then deploys. Use `-- --media-profile=single-3309` for the reviewed one-ID rollout and `-- --media-profile=off` for the explicit safe OFF build/deploy. Raw Wrangler deploys are not an approved release path. The committed Wrangler and build fallbacks remain OFF/empty, so local, Preview, canary, and non-canonical builds do not inherit the Production Queue cohort.
+- Experience source/write authority is a separate profile. `-- --experience-media-source-profile=off` stops new R2 source writes without changing the 33-ID reader/producer cohort or any background scheduler. Its immutable key, Vercel limitation, migration digest, backup gate, and deletion point-of-no-return are documented in `docs/ops/experience-media-r2-source-authority.md`.
 - Optional source-map upload: `SENTRY_AUTH_TOKEN` (secret), `SENTRY_ORG`, `SENTRY_PROJECT`, `CI=true`.
 - Build separately for canary and production because `NEXT_PUBLIC_*` values are compiled into client chunks. Never promote a staging-built artifact to production.
 
