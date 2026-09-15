@@ -33,6 +33,7 @@ test('normalizes only exact Production experiences object URLs without logging i
 test('separates public-active, all-db-referenced, and storage-all scopes', () => {
   const activeHero = url(userA, 'hero', 'a.jpg');
   const activeItinerary = url(userA, 'itinerary', 'b.jpg');
+  const translatedItinerary = url(userA, 'itinerary', 'translated.jpg');
   const inactiveHero = url(userB, 'hero', 'c.jpg');
   const legacy = url(userB, 'hero', 'legacy.jpg');
   const rows = [
@@ -42,6 +43,7 @@ test('separates public-active, all-db-referenced, and storage-all scopes', () =>
       is_active: true,
       photos: [activeHero, activeHero],
       itinerary: [{ image_url: activeItinerary }],
+      itinerary_i18n: { en: [{ title: 'Keep', image_url: translatedItinerary }] },
       image_url: activeHero,
     },
     {
@@ -53,7 +55,7 @@ test('separates public-active, all-db-referenced, and storage-all scopes', () =>
       image_url: legacy,
     },
   ];
-  const storage = [activeHero, activeItinerary, inactiveHero, legacy, url(userB, 'itinerary', 'orphan.jpg')].map((item, index) => ({
+  const storage = [activeHero, activeItinerary, translatedItinerary, inactiveHero, legacy, url(userB, 'itinerary', 'orphan.jpg')].map((item, index) => ({
     key: normalizeSupabaseExperienceObjectKey(item),
     size: 100 + index,
     contentType: 'image/jpeg',
@@ -63,17 +65,17 @@ test('separates public-active, all-db-referenced, and storage-all scopes', () =>
   const result = buildSourceScopes(rows, storage);
 
   assert.equal(result.sourceScopes.publicActive.experienceCount, 1);
-  assert.equal(result.sourceScopes.publicActive.distinctObjectCount, 2);
-  assert.deepEqual(result.sourceScopes.publicActive.references, { photos: 2, itinerary: 1, legacyImageUrl: 1 });
+  assert.equal(result.sourceScopes.publicActive.distinctObjectCount, 3);
+  assert.deepEqual(result.sourceScopes.publicActive.references, { photos: 2, itinerary: 2, legacyImageUrl: 1 });
   assert.equal(result.sourceScopes.allDbReferenced.experienceCount, 2);
-  assert.equal(result.sourceScopes.allDbReferenced.distinctObjectCount, 4);
-  assert.equal(result.sourceScopes.storageAll.objectCount, 5);
+  assert.equal(result.sourceScopes.allDbReferenced.distinctObjectCount, 5);
+  assert.equal(result.sourceScopes.storageAll.objectCount, 6);
   assert.equal(result.sourceScopes.storageAll.unreferencedObjectCount, 1);
   assert.equal(result.sourceScopes.allDbReferenced.missingObjectCount, 0);
   assert.match(result.sourceScopes.publicActive.identitySetDigest, /^[0-9a-f]{64}$/);
   assert.match(result.sourceScopes.allDbReferenced.identitySetDigest, /^[0-9a-f]{64}$/);
   assert.match(result.sourceScopes.storageAll.identitySetDigest, /^[0-9a-f]{64}$/);
-  assert.deepEqual(result.reconciliationInventory, [{ id: '1', heroUrls: [activeHero], detailUrls: [activeHero, activeItinerary] }]);
+  assert.deepEqual(result.reconciliationInventory, [{ id: '1', heroUrls: [activeHero], detailUrls: [activeHero, activeItinerary, translatedItinerary] }]);
 });
 
 test('reports missing source references without exposing their value', () => {

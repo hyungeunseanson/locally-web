@@ -6,7 +6,7 @@ on:
       action:
         description: Read-only completeness audit/plan, explicit create-only recovery apply, or legacy manifest reconciliation
         type: choice
-        options: [audit, plan, apply, legacy-reconcile]
+        options: [audit, plan, apply, source-copy-plan, source-copy-apply, legacy-reconcile]
         default: audit
       approve_apply:
         description: Must be checked together with an exact fresh plan digest for apply
@@ -233,6 +233,101 @@ jobs:
             echo "- Transform budget: ${MAX_TRANSFORMS}"
             echo "- Lifecycle source budget: plan + pre-apply + post-apply share one persisted ledger"
             echo "- Delete/CopyObject/Queue send: unsupported"
+            echo "- Result: ${{ job.status }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  source-authority-copy:
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (inputs.action == 'source-copy-plan' || inputs.action == 'source-copy-apply')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: production-media-sync
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ENDPOINT: ${{ vars.R2_ENDPOINT }}
+      R2_BUCKET: locally-public-experience-canary
+      BOTO3_VERSION: 1.43.70
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+
+      - name: Validate exact source-copy boundary
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$NEXT_PUBLIC_SUPABASE_URL" == "https://uhinvcydgzqlpnvieyal.supabase.co" ]]
+          [[ "$R2_ENDPOINT" == "https://d56f5f850c6f7dc5779a7c2054aca5a5.r2.cloudflarestorage.com" ]]
+          [[ "$R2_BUCKET" == "locally-public-experience-canary" ]]
+          if [[ "${{ inputs.action }}" == "source-copy-apply" ]]; then
+            [[ "${{ inputs.approve_apply }}" == "true" ]]
+            [[ "${{ inputs.confirm_digest }}" =~ ^[0-9a-f]{64}$ ]]
+          fi
+
+      - name: Install pinned dependencies
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          npm ci
+          python3 -m venv "${RUNNER_TEMP}/r2-source-copy-venv"
+          "${RUNNER_TEMP}/r2-source-copy-venv/bin/python" -m pip install --disable-pip-version-check --no-input "boto3==${BOTO3_VERSION}"
+          echo "${RUNNER_TEMP}/r2-source-copy-venv/bin" >> "$GITHUB_PATH"
+
+      - name: Inspect R2 originals without mutation
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p "${RUNNER_TEMP}/experience-source-copy"
+          chmod 700 "${RUNNER_TEMP}/experience-source-copy"
+          python3 scripts/cloudflare/r2-experience-media-source-copy.py inspect \
+            --output "${RUNNER_TEMP}/experience-source-copy/.r2-inspection.json"
+
+      - name: Build fresh all-current-reference source-copy plan
+        id: source_copy_plan
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          node scripts/cloudflare/plan-experience-media-source-copy.mjs \
+            --r2-inspection="${RUNNER_TEMP}/experience-source-copy/.r2-inspection.json" \
+            --output="${RUNNER_TEMP}/experience-source-copy"
+
+      - name: Apply exact create-only source-copy plan
+        if: inputs.action == 'source-copy-apply'
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "${{ inputs.confirm_digest }}" == "${{ steps.source_copy_plan.outputs.plan_digest }}" ]]
+          python3 scripts/cloudflare/r2-experience-media-source-copy.py apply \
+            --plan "${RUNNER_TEMP}/experience-source-copy/.source-copy-plan.json" \
+            --confirm-digest "${{ inputs.confirm_digest }}" \
+            --output "${RUNNER_TEMP}/experience-source-copy/source-copy-result.json"
+
+      - name: Upload sanitized source-copy evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: experience-media-source-copy-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/experience-source-copy/source-copy-summary.json
+            ${{ runner.temp }}/experience-source-copy/source-copy-result.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Publish source-copy summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### Experience media authoritative source copy"
+            echo "- Action: ${{ inputs.action }}"
+            echo "- Plan digest: ${{ steps.source_copy_plan.outputs.plan_digest }}"
+            echo "- Planned writes: ${{ steps.source_copy_plan.outputs.planned_writes }}"
+            echo "- Scope: every currently DB-referenced experiences source"
+            echo "- Write mode: conditional create-only"
+            echo "- Copy/Delete/Queue operations: unsupported"
             echo "- Result: ${{ job.status }}"
           } >> "$GITHUB_STEP_SUMMARY"
 
