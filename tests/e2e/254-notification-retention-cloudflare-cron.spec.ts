@@ -34,10 +34,12 @@ function multiplexerOptions(calls: string[]) {
     dailyCron: HOME_POPULARITY_SNAPSHOT_CRON,
     adminSupportCron: ADMIN_SUPPORT_UNREAD_ALERTS_CRON,
     notificationRetentionCron: NOTIFICATION_RETENTION_CLEANUP_CRON,
+    experienceCompletionCron: '23 */2 * * *',
     runTranslationRecovery: () => calls.push('translation'),
     runHomePopularitySnapshot: () => calls.push('home'),
     runAdminSupportUnreadAlerts: () => calls.push('admin-support'),
     runNotificationRetentionCleanup: () => calls.push('retention'),
+    runExperienceCompletionSync: () => calls.push('completion'),
     log: () => undefined,
   };
 }

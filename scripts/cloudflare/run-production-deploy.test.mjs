@@ -14,6 +14,7 @@ import { readTranslationReleasePolicy, resolveTranslationReleaseProfile } from '
 import { readHomePopularityReleasePolicy, resolveHomePopularityReleaseProfile } from './home-popularity-release-profile.mjs';
 import { readAdminSupportUnreadReleasePolicy, resolveAdminSupportUnreadReleaseProfile } from './admin-support-unread-release-profile.mjs';
 import { readNotificationRetentionReleasePolicy, resolveNotificationRetentionReleaseProfile } from './notification-retention-release-profile.mjs';
+import { readExperienceCompletionReleasePolicy, resolveExperienceCompletionReleaseProfile } from './experience-completion-release-profile.mjs';
 
 async function homeProfile(name = 'off') {
   return resolveHomePopularityReleaseProfile(
@@ -32,6 +33,13 @@ async function adminSupportProfile(name = 'off') {
 async function retentionProfile(name = 'off') {
   return resolveNotificationRetentionReleaseProfile(
     await readNotificationRetentionReleasePolicy(),
+    name
+  );
+}
+
+async function experienceCompletionProfile(name = 'off') {
+  return resolveExperienceCompletionReleaseProfile(
+    await readExperienceCompletionReleasePolicy(),
     name
   );
 }
@@ -91,6 +99,7 @@ test('defaults canonical Production deploy to the approved cohort and rejects ad
     requestedHomePopularityProfile: undefined,
     requestedAdminSupportUnreadProfile: undefined,
     requestedNotificationRetentionProfile: undefined,
+    requestedExperienceCompletionProfile: undefined,
     dryRun: false,
   });
   assert.deepEqual(parseDeploymentArguments(['--media-profile=off', '--dry-run']), {
@@ -99,6 +108,7 @@ test('defaults canonical Production deploy to the approved cohort and rejects ad
     requestedHomePopularityProfile: undefined,
     requestedAdminSupportUnreadProfile: undefined,
     requestedNotificationRetentionProfile: undefined,
+    requestedExperienceCompletionProfile: undefined,
     dryRun: true,
   });
   assert.throws(() => parseDeploymentArguments(['--var', 'X:Y']), /Unsupported/);
@@ -155,6 +165,7 @@ test('translation ON/OFF profiles are independent from the approved media cohort
     requestedHomePopularityProfile: undefined,
     requestedAdminSupportUnreadProfile: undefined,
     requestedNotificationRetentionProfile: undefined,
+    requestedExperienceCompletionProfile: undefined,
     dryRun: false,
   });
 });
@@ -183,6 +194,7 @@ test('Home popularity ON/OFF profiles are independent from Translation and media
     requestedHomePopularityProfile: 'off',
     requestedAdminSupportUnreadProfile: undefined,
     requestedNotificationRetentionProfile: undefined,
+    requestedExperienceCompletionProfile: undefined,
     dryRun: false,
   });
 });
@@ -211,6 +223,7 @@ test('Admin Support unread ON/OFF profiles are independent from Home, Translatio
     requestedHomePopularityProfile: undefined,
     requestedAdminSupportUnreadProfile: 'off',
     requestedNotificationRetentionProfile: undefined,
+    requestedExperienceCompletionProfile: undefined,
     dryRun: false,
   });
 });
@@ -241,6 +254,48 @@ test('notification retention ON/OFF profiles are independent from all existing P
     requestedHomePopularityProfile: undefined,
     requestedAdminSupportUnreadProfile: undefined,
     requestedNotificationRetentionProfile: 'off',
+    requestedExperienceCompletionProfile: undefined,
+    dryRun: false,
+  });
+});
+
+test('Experience completion ON/OFF profiles are independent from every existing Production profile', async () => {
+  const media = resolveReleaseProfile(await readReleasePolicy());
+  const translation = resolveTranslationReleaseProfile(await readTranslationReleasePolicy());
+  const home = await homeProfile('on');
+  const adminSupport = await adminSupportProfile('on');
+  const retention = await retentionProfile('on');
+  const policy = await readExperienceCompletionReleasePolicy();
+  assert.equal(resolveExperienceCompletionReleaseProfile(policy).name, 'on');
+  for (const name of ['off', 'on']) {
+    const completion = await experienceCompletionProfile(name);
+    const contract = buildDeploymentContract(
+      media,
+      translation,
+      home,
+      adminSupport,
+      retention,
+      {},
+      completion
+    );
+    assert(contract.wranglerArguments.includes(
+      `EXPERIENCE_COMPLETION_SCHEDULED_ENABLED:${completion.scheduledEnabled}`
+    ));
+    assert(contract.wranglerArguments.includes('EXPERIENCE_TRANSLATION_QUEUE_ENABLED:true'));
+    assert(contract.wranglerArguments.includes('HOME_POPULARITY_SNAPSHOT_SCHEDULED_ENABLED:true'));
+    assert(contract.wranglerArguments.includes('ADMIN_SUPPORT_UNREAD_ALERTS_SCHEDULED_ENABLED:true'));
+    assert(contract.wranglerArguments.includes('NOTIFICATION_RETENTION_CLEANUP_SCHEDULED_ENABLED:true'));
+    assert(contract.wranglerArguments.includes(
+      `PUBLIC_EXPERIENCE_MEDIA_PRODUCER_EXPERIENCE_IDS:${media.experienceIds}`
+    ));
+  }
+  assert.deepEqual(parseDeploymentArguments(['--experience-completion-profile=off']), {
+    requestedProfile: undefined,
+    requestedTranslationProfile: undefined,
+    requestedHomePopularityProfile: undefined,
+    requestedAdminSupportUnreadProfile: undefined,
+    requestedNotificationRetentionProfile: undefined,
+    requestedExperienceCompletionProfile: 'off',
     dryRun: false,
   });
 });

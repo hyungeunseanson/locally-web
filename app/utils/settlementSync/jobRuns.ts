@@ -96,7 +96,12 @@ function asAdminJobRunsInfrastructureError(
   error: { code?: string | null; message?: string | null; details?: string | null; hint?: string | null },
   fallbackMessage?: string
 ) {
-  console.error('[settlement sync] admin_job_runs access failed:', error);
+  void error;
+  console.error(JSON.stringify({
+    event: 'settlement_sync_job_run',
+    status: 'failed',
+    diagnosticCode: 'admin_job_runs_access_failed',
+  }));
   return new SettlementSyncInfrastructureError(fallbackMessage);
 }
 

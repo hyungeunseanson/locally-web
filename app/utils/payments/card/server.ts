@@ -725,10 +725,15 @@ export async function verifyCardPaymentNotification(params: {
 }
 
 export async function cancelCardPayment(
-  params: CancelCardPaymentParams
+  params: CancelCardPaymentParams,
+  options: {
+    environment?: Record<string, string | undefined>;
+    fetch?: typeof fetch;
+  } = {}
 ): Promise<CancelCardPaymentResult> {
-  const mid = process.env.NICEPAY_MID;
-  const merchantKey = process.env.NICEPAY_MERCHANT_KEY;
+  const environment = options.environment ?? process.env;
+  const mid = environment.NICEPAY_MID;
+  const merchantKey = environment.NICEPAY_MERCHANT_KEY;
 
   if (!mid) {
     throw new Error('Server Config Error: NICEPAY_MID missing');
@@ -758,7 +763,7 @@ export async function cancelCardPayment(
   formBody.set('CharSet', 'utf-8');
   formBody.set('EdiType', 'JSON');
 
-  const response = await fetch(NICEPAY_CANCEL_URL, {
+  const response = await (options.fetch ?? fetch)(NICEPAY_CANCEL_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: formBody.toString(),

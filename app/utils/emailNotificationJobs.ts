@@ -1,4 +1,6 @@
 import { sendTemplatedEmail } from '@/app/emails/delivery/sendTemplatedEmail';
+import type { EmailEnv } from '@/app/emails/delivery/sendTemplatedEmail';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
   EmailAudience,
   EmailLocale,
@@ -24,7 +26,7 @@ export async function sendImmediateGenericEmail(params: {
   link?: string | null;
   ctaLabel?: string;
   templatedEmail: GenericTemplatedEmailInput;
-}) {
+}, options?: { env?: EmailEnv; supabaseAdmin?: SupabaseClient }) {
   return sendTemplatedEmail({
     templateId: params.templatedEmail.templateId,
     audience: params.templatedEmail.audience,
@@ -35,5 +37,5 @@ export async function sendImmediateGenericEmail(params: {
     },
     payload: params.templatedEmail.payload as never,
     transportPolicy: params.templatedEmail.transportPolicy,
-  });
+  }, options);
 }

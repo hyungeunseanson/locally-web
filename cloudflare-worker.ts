@@ -26,8 +26,13 @@ import {
   NOTIFICATION_RETENTION_CLEANUP_CRON,
   type NotificationRetentionRuntimeEnv,
 } from './app/utils/notificationRetentionCleanup';
+import {
+  EXPERIENCE_COMPLETION_SYNC_CRON,
+  handleExperienceCompletionScheduled,
+  type ExperienceCompletionScheduledRuntimeEnv,
+} from './app/utils/experienceCompletionScheduled';
 
-type WorkerEnvironment = PublicExperienceMediaQueueRuntimeEnv & ExperienceTranslationQueueRuntimeEnv & HomePopularitySnapshotRuntimeEnv & AdminSupportUnreadAlertsRuntimeEnv & NotificationRetentionRuntimeEnv;
+type WorkerEnvironment = PublicExperienceMediaQueueRuntimeEnv & ExperienceTranslationQueueRuntimeEnv & HomePopularitySnapshotRuntimeEnv & AdminSupportUnreadAlertsRuntimeEnv & NotificationRetentionRuntimeEnv & ExperienceCompletionScheduledRuntimeEnv;
 
 const worker = {
   fetch(request: Request, env: WorkerEnvironment, ctx: unknown) {
@@ -49,10 +54,12 @@ const worker = {
       dailyCron: EXPERIENCE_TRANSLATION_RECOVERY_CRON,
       adminSupportCron: ADMIN_SUPPORT_UNREAD_ALERTS_CRON,
       notificationRetentionCron: NOTIFICATION_RETENTION_CLEANUP_CRON,
+      experienceCompletionCron: EXPERIENCE_COMPLETION_SYNC_CRON,
       runTranslationRecovery: handleExperienceTranslationScheduledRecovery,
       runHomePopularitySnapshot: handleHomePopularitySnapshotScheduled,
       runAdminSupportUnreadAlerts: handleAdminSupportUnreadAlertsScheduled,
       runNotificationRetentionCleanup: handleNotificationRetentionCleanupScheduled,
+      runExperienceCompletionSync: handleExperienceCompletionScheduled,
       delegate: typeof scheduled === 'function'
         ? (nextController, nextEnv) => scheduled.call(openNextWorker, nextController, nextEnv, ctx)
         : undefined,

@@ -66,11 +66,16 @@ async function notifyGuestSoloRefundStatus(params: {
   });
 
   if (error) {
-    console.error('[solo guarantee refund] guest notification failed:', error);
+    console.error(JSON.stringify({
+      event: 'solo_guarantee_refund',
+      status: 'failed',
+      diagnosticCode: 'guest_notification_failed',
+    }));
   }
 }
 
 async function alertAdminSoloRefundRequired(params: {
+  supabaseAdmin: SupabaseClient;
   title: string;
   booking: SoloGuaranteeRefundSlotBooking;
   message: string;
@@ -83,9 +88,13 @@ async function alertAdminSoloRefundRequired(params: {
         experience?.title || '체험 예약'
       } - ${params.message}`,
       link: '/admin/dashboard?tab=LEDGER',
-    });
-  } catch (error) {
-    console.error('[solo guarantee refund] admin alert failed:', error);
+    }, { supabaseAdmin: params.supabaseAdmin });
+  } catch {
+    console.error(JSON.stringify({
+      event: 'solo_guarantee_refund',
+      status: 'failed',
+      diagnosticCode: 'admin_alert_failed',
+    }));
   }
 }
 
@@ -107,6 +116,7 @@ async function markSoloRefundFailed(params: {
     .eq('id', params.booking.id);
 
   await alertAdminSoloRefundRequired({
+    supabaseAdmin: params.supabaseAdmin,
     title: '1인 진행 추가금 환불 확인 필요',
     booking: params.booking,
     message: params.errorMessage,
@@ -155,6 +165,7 @@ async function processManualSoloRefund(params: {
     refundAmount: params.refundAmount,
   });
   await alertAdminSoloRefundRequired({
+    supabaseAdmin: params.supabaseAdmin,
     title: '1인 진행 추가금 수동 환불 필요',
     booking: params.booking,
     message: `카드 외 결제수단 예약입니다. ${formatWon(params.refundAmount)} 수동 환불 후 장부에서 완료 처리해 주세요.`,

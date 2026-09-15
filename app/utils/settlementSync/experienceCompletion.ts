@@ -60,6 +60,12 @@ const EXPERIENCE_SYNC_JOB_NAME = 'experience_completion_sync';
 const EXPERIENCE_FORCE_ONE_JOB_NAME = 'experience_completion_sync_force_one';
 const EXPERIENCE_ACTIVE_STATUS_SET = new Set<string>(BOOKING_ACTIVE_STATUS_FOR_CAPACITY);
 
+export type ExperienceCompletionSyncDependencies = {
+  completeBookings?: typeof completeExperienceBookingsIfDueAtomic;
+  processSoloGuaranteeRefunds?: typeof processSoloGuaranteeRefundsForCompletedBookings;
+  deliverReviewRequests?: typeof deliverHostGuestReviewRequestsForCompletedBookings;
+};
+
 function delay(ms?: number) {
   if (!ms || ms <= 0) return Promise.resolve();
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -214,33 +220,43 @@ async function listDueExperienceCompletionCandidates(
 
 async function processSoloGuaranteeRefundSideEffects(
   supabaseAdmin: SettlementSyncAdminClient,
-  bookingIds: string[]
+  bookingIds: string[],
+  processRefunds: typeof processSoloGuaranteeRefundsForCompletedBookings
 ) {
   if (bookingIds.length === 0) return;
 
   try {
-    await processSoloGuaranteeRefundsForCompletedBookings({
+    await processRefunds({
       supabaseAdmin,
       completedBookingIds: bookingIds,
     });
-  } catch (error) {
-    console.error('[settlement sync] solo guarantee refund processing failed:', error);
+  } catch {
+    console.error(JSON.stringify({
+      event: 'experience_completion_side_effect',
+      status: 'failed',
+      diagnosticCode: 'solo_guarantee_refund_failed',
+    }));
   }
 }
 
 async function processHostGuestReviewRequestSideEffects(
   supabaseAdmin: SettlementSyncAdminClient,
-  bookingIds: string[]
+  bookingIds: string[],
+  deliverReviewRequests: typeof deliverHostGuestReviewRequestsForCompletedBookings
 ) {
   if (bookingIds.length === 0) return;
 
   try {
-    await deliverHostGuestReviewRequestsForCompletedBookings({
+    await deliverReviewRequests({
       supabaseAdmin,
       completedBookingIds: bookingIds,
     });
-  } catch (error) {
-    console.error('[settlement sync] host guest review request delivery failed:', error);
+  } catch {
+    console.error(JSON.stringify({
+      event: 'experience_completion_side_effect',
+      status: 'failed',
+      diagnosticCode: 'review_request_delivery_failed',
+    }));
   }
 }
 
@@ -270,8 +286,18 @@ export async function resolveExperienceCompletionTarget(
 }
 
 export async function runExperienceCompletionSync(
-  params: SettlementSyncRunDueParams
+  params: SettlementSyncRunDueParams & {
+    dependencies?: ExperienceCompletionSyncDependencies;
+  }
 ): Promise<SettlementSyncRunResult> {
+  const completeBookings =
+    params.dependencies?.completeBookings ?? completeExperienceBookingsIfDueAtomic;
+  const processRefunds =
+    params.dependencies?.processSoloGuaranteeRefunds ??
+    processSoloGuaranteeRefundsForCompletedBookings;
+  const deliverReviewRequests =
+    params.dependencies?.deliverReviewRequests ??
+    deliverHostGuestReviewRequestsForCompletedBookings;
   const started = await startSettlementSyncRun({
     supabaseAdmin: params.supabaseAdmin,
     jobName: EXPERIENCE_SYNC_JOB_NAME,
@@ -332,7 +358,7 @@ export async function runExperienceCompletionSync(
     await delayWithHeartbeat(params.testDelayMs, renewLease);
     maybeThrowInjectedFailure(params.failPhase);
 
-    const completionBatch = await completeExperienceBookingsIfDueAtomic(
+    const completionBatch = await completeBookings(
       params.supabaseAdmin,
       dueCandidates.map((row) => row.id)
     );
@@ -341,8 +367,16 @@ export async function runExperienceCompletionSync(
       .map((result) => result.bookingId);
     failedBookingIds = completionBatch.failures.map((failure) => failure.bookingId);
 
-    await processSoloGuaranteeRefundSideEffects(params.supabaseAdmin, completedBookingIds);
-    await processHostGuestReviewRequestSideEffects(params.supabaseAdmin, completedBookingIds);
+    await processSoloGuaranteeRefundSideEffects(
+      params.supabaseAdmin,
+      completedBookingIds,
+      processRefunds
+    );
+    await processHostGuestReviewRequestSideEffects(
+      params.supabaseAdmin,
+      completedBookingIds,
+      deliverReviewRequests
+    );
     await renewLease();
 
     if (completionBatch.failures.length > 0) {
@@ -412,8 +446,16 @@ export async function runExperienceCompletionSync(
 }
 
 export async function forceExperienceCompletionSync(
-  params: SettlementSyncForceOneParams
+  params: SettlementSyncForceOneParams & {
+    dependencies?: ExperienceCompletionSyncDependencies;
+  }
 ): Promise<SettlementSyncRunResult> {
+  const processRefunds =
+    params.dependencies?.processSoloGuaranteeRefunds ??
+    processSoloGuaranteeRefundsForCompletedBookings;
+  const deliverReviewRequests =
+    params.dependencies?.deliverReviewRequests ??
+    deliverHostGuestReviewRequestsForCompletedBookings;
   const target = await resolveExperienceCompletionTarget(params.supabaseAdmin, params.identifier);
   if (!target) {
     return { success: false, status: 404, error: '체험 예약을 찾을 수 없습니다.' };
@@ -539,8 +581,16 @@ export async function forceExperienceCompletionSync(
     );
 
     if (completionResult.completed) {
-      await processSoloGuaranteeRefundSideEffects(params.supabaseAdmin, [target.booking_id]);
-      await processHostGuestReviewRequestSideEffects(params.supabaseAdmin, [target.booking_id]);
+      await processSoloGuaranteeRefundSideEffects(
+        params.supabaseAdmin,
+        [target.booking_id],
+        processRefunds
+      );
+      await processHostGuestReviewRequestSideEffects(
+        params.supabaseAdmin,
+        [target.booking_id],
+        deliverReviewRequests
+      );
       await renewLease();
       await finishSettlementSyncRunSuccess({
         supabaseAdmin: params.supabaseAdmin,

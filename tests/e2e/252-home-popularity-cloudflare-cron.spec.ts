@@ -130,6 +130,7 @@ test.describe('Home popularity Cloudflare Cron', () => {
         dailyCron: HOME_POPULARITY_SNAPSHOT_CRON,
         adminSupportCron: '*/10 * * * *',
         notificationRetentionCron: '31 19 * * *',
+        experienceCompletionCron: '23 */2 * * *',
         runTranslationRecovery: async () => {
           calls.push('translation');
           throw new Error('private translation response');
@@ -139,6 +140,7 @@ test.describe('Home popularity Cloudflare Cron', () => {
         },
         runAdminSupportUnreadAlerts: async () => calls.push('admin-support'),
         runNotificationRetentionCleanup: async () => calls.push('retention'),
+        runExperienceCompletionSync: async () => calls.push('completion'),
         log: () => undefined,
       }
     )).rejects.toThrow('locally_scheduled_task_failed');
@@ -152,6 +154,7 @@ test.describe('Home popularity Cloudflare Cron', () => {
         dailyCron: HOME_POPULARITY_SNAPSHOT_CRON,
         adminSupportCron: '*/10 * * * *',
         notificationRetentionCron: '31 19 * * *',
+        experienceCompletionCron: '23 */2 * * *',
         runTranslationRecovery: async () => calls.push('translation'),
         runHomePopularitySnapshot: async () => {
           calls.push('home');
@@ -159,6 +162,7 @@ test.describe('Home popularity Cloudflare Cron', () => {
         },
         runAdminSupportUnreadAlerts: async () => calls.push('admin-support'),
         runNotificationRetentionCleanup: async () => calls.push('retention'),
+        runExperienceCompletionSync: async () => calls.push('completion'),
         log: () => undefined,
       }
     )).rejects.toThrow('locally_scheduled_task_failed');
@@ -174,10 +178,12 @@ test.describe('Home popularity Cloudflare Cron', () => {
         dailyCron: HOME_POPULARITY_SNAPSHOT_CRON,
         adminSupportCron: '*/10 * * * *',
         notificationRetentionCron: '31 19 * * *',
+        experienceCompletionCron: '23 */2 * * *',
         runTranslationRecovery: () => calls.push('translation'),
         runHomePopularitySnapshot: () => calls.push('home'),
         runAdminSupportUnreadAlerts: () => calls.push('admin-support'),
         runNotificationRetentionCleanup: () => calls.push('retention'),
+        runExperienceCompletionSync: () => calls.push('completion'),
         delegate: () => {
           calls.push('delegate');
           return 'delegated';
