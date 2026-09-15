@@ -1,4 +1,6 @@
 import { sendTemplatedEmail } from '@/app/emails/delivery/sendTemplatedEmail';
+import type { EmailEnv } from '@/app/emails/delivery/sendTemplatedEmail';
+import type { createAdminClient } from '@/app/utils/supabase/admin';
 import type {
   EmailAudience,
   EmailLocale,
@@ -33,7 +35,11 @@ type SendAdminEmailResult = {
 };
 
 export async function sendImmediateAdminEmail(
-  params: SendAdminEmailParams
+  params: SendAdminEmailParams,
+  options?: {
+    supabaseAdmin?: ReturnType<typeof createAdminClient> | null;
+    env?: EmailEnv;
+  }
 ): Promise<SendAdminEmailResult> {
   const result = await sendTemplatedEmail({
     templateId: params.templatedEmail.templateId,
@@ -44,7 +50,7 @@ export async function sendImmediateAdminEmail(
     },
     payload: params.templatedEmail.payload as never,
     transportPolicy: params.templatedEmail.transportPolicy || 'opsAdmin',
-  });
+  }, options);
 
   return {
     success: result.success,

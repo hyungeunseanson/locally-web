@@ -1,6 +1,7 @@
 export type LocallyScheduledTaskName =
   | 'experience_translation_recovery'
-  | 'home_popularity_snapshot';
+  | 'home_popularity_snapshot'
+  | 'admin_support_unread_alerts';
 
 type ScheduledControllerLike = { cron: string };
 type ScheduledHandler<Environment> = (
@@ -9,9 +10,11 @@ type ScheduledHandler<Environment> = (
 ) => Promise<unknown> | unknown;
 
 type ScheduledOptions<Environment> = {
-  cron: string;
+  dailyCron: string;
+  adminSupportCron: string;
   runTranslationRecovery: ScheduledHandler<Environment>;
   runHomePopularitySnapshot: ScheduledHandler<Environment>;
+  runAdminSupportUnreadAlerts: ScheduledHandler<Environment>;
   delegate?: ScheduledHandler<Environment>;
   log?: (entry: Record<string, unknown>) => void;
 };
@@ -32,7 +35,10 @@ export async function handleLocallyScheduledEvent<Environment>(
   environment: Environment,
   options: ScheduledOptions<Environment>
 ) {
-  if (controller.cron !== options.cron) {
+  if (
+    controller.cron !== options.dailyCron &&
+    controller.cron !== options.adminSupportCron
+  ) {
     if (options.delegate) return options.delegate(controller, environment);
     throw new Error('locally_unexpected_scheduled_trigger');
   }
@@ -40,7 +46,7 @@ export async function handleLocallyScheduledEvent<Environment>(
   const tasks: Array<{
     name: LocallyScheduledTaskName;
     run: ScheduledHandler<Environment>;
-  }> = [
+  }> = controller.cron === options.dailyCron ? [
     {
       name: 'experience_translation_recovery',
       run: options.runTranslationRecovery,
@@ -48,6 +54,11 @@ export async function handleLocallyScheduledEvent<Environment>(
     {
       name: 'home_popularity_snapshot',
       run: options.runHomePopularitySnapshot,
+    },
+  ] : [
+    {
+      name: 'admin_support_unread_alerts',
+      run: options.runAdminSupportUnreadAlerts,
     },
   ];
   const results = await Promise.allSettled(

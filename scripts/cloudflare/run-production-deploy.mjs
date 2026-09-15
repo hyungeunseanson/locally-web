@@ -10,6 +10,7 @@ import {
 } from './public-experience-media-release-profile.mjs';
 import { readTranslationReleasePolicy, resolveTranslationReleaseProfile } from './experience-translation-release-profile.mjs';
 import { readHomePopularityReleasePolicy, resolveHomePopularityReleaseProfile } from './home-popularity-release-profile.mjs';
+import { readAdminSupportUnreadReleasePolicy, resolveAdminSupportUnreadReleaseProfile } from './admin-support-unread-release-profile.mjs';
 
 const ROOT = process.cwd();
 
@@ -17,6 +18,7 @@ export function parseDeploymentArguments(argumentsList) {
   let requestedProfile;
   let requestedTranslationProfile;
   let requestedHomePopularityProfile;
+  let requestedAdminSupportUnreadProfile;
   let dryRun = false;
   for (const argument of argumentsList) {
     if (argument.startsWith('--media-profile=')) {
@@ -31,16 +33,20 @@ export function parseDeploymentArguments(argumentsList) {
       assert(!requestedHomePopularityProfile, 'Specify the Home popularity release profile only once.');
       requestedHomePopularityProfile = argument.slice('--home-popularity-profile='.length);
       assert(requestedHomePopularityProfile, 'The Home popularity release profile cannot be empty.');
+    } else if (argument.startsWith('--admin-support-unread-profile=')) {
+      assert(!requestedAdminSupportUnreadProfile, 'Specify the Admin Support unread release profile only once.');
+      requestedAdminSupportUnreadProfile = argument.slice('--admin-support-unread-profile='.length);
+      assert(requestedAdminSupportUnreadProfile, 'The Admin Support unread release profile cannot be empty.');
     } else if (argument === '--dry-run') {
       dryRun = true;
     } else {
       throw new Error(`Unsupported Production deployment argument: ${argument}`);
     }
   }
-  return { requestedProfile, requestedTranslationProfile, requestedHomePopularityProfile, dryRun };
+  return { requestedProfile, requestedTranslationProfile, requestedHomePopularityProfile, requestedAdminSupportUnreadProfile, dryRun };
 }
 
-export function buildDeploymentContract(profile, translationProfile, homePopularityProfile, { dryRun = false } = {}) {
+export function buildDeploymentContract(profile, translationProfile, homePopularityProfile, adminSupportUnreadProfile, { dryRun = false } = {}) {
   const readerEnvironment = {
     NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_ENABLED: profile.enabled,
     NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_EXPERIENCE_IDS: profile.experienceIds,
@@ -62,6 +68,8 @@ export function buildDeploymentContract(profile, translationProfile, homePopular
     `EXPERIENCE_TRANSLATION_SCHEDULED_RECOVERY_ENABLED:${translationProfile.scheduledRecoveryEnabled}`,
     '--var',
     `HOME_POPULARITY_SNAPSHOT_SCHEDULED_ENABLED:${homePopularityProfile.scheduledEnabled}`,
+    '--var',
+    `ADMIN_SUPPORT_UNREAD_ALERTS_SCHEDULED_ENABLED:${adminSupportUnreadProfile.scheduledEnabled}`,
   ];
   if (dryRun) wranglerArguments.push('--dry-run');
   return { readerEnvironment, wranglerArguments };
@@ -87,7 +95,9 @@ export async function main(argumentsList = process.argv.slice(2)) {
   const translationProfile = resolveTranslationReleaseProfile(translationPolicy, options.requestedTranslationProfile);
   const homePopularityPolicy = await readHomePopularityReleasePolicy();
   const homePopularityProfile = resolveHomePopularityReleaseProfile(homePopularityPolicy, options.requestedHomePopularityProfile);
-  const contract = buildDeploymentContract(profile, translationProfile, homePopularityProfile, options);
+  const adminSupportUnreadPolicy = await readAdminSupportUnreadReleasePolicy();
+  const adminSupportUnreadProfile = resolveAdminSupportUnreadReleaseProfile(adminSupportUnreadPolicy, options.requestedAdminSupportUnreadProfile);
+  const contract = buildDeploymentContract(profile, translationProfile, homePopularityProfile, adminSupportUnreadProfile, options);
   const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
   const wranglerCommand = path.join(
     ROOT,
@@ -112,6 +122,8 @@ export async function main(argumentsList = process.argv.slice(2)) {
     experienceTranslationScheduledRecoveryEnabled: translationProfile.scheduledRecoveryEnabled,
     homePopularityProfile: homePopularityProfile.name,
     homePopularityScheduledEnabled: homePopularityProfile.scheduledEnabled,
+    adminSupportUnreadProfile: adminSupportUnreadProfile.name,
+    adminSupportUnreadScheduledEnabled: adminSupportUnreadProfile.scheduledEnabled,
   }));
 }
 

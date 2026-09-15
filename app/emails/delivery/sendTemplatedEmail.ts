@@ -1,6 +1,6 @@
 import { appendFile } from 'fs/promises';
 import nodemailer from 'nodemailer';
-import { createAdminClient } from '@/app/utils/supabase/admin';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
   EmailAudience,
   EmailSendRequest,
@@ -9,7 +9,7 @@ import type {
 } from '@/app/emails/registry/emailTypes';
 import { renderEmailTemplate } from '@/app/emails/render/renderEmailTemplate';
 
-type AdminClient = ReturnType<typeof createAdminClient>;
+type AdminClient = SupabaseClient;
 
 type SendTemplatedEmailResult = {
   success: boolean;
@@ -24,7 +24,7 @@ type SendTemplatedEmailResult = {
 
 const LOCAL_DEV_FALLBACK_MAIL_CAPTURE_PATH = '/tmp/locally-mock-nodemailer.jsonl';
 
-type EmailEnv = Partial<Record<
+export type EmailEnv = Partial<Record<
   | 'RESEND_API_KEY'
   | 'RESEND_FROM_EMAIL'
   | 'GMAIL_USER'
@@ -36,8 +36,8 @@ type EmailEnv = Partial<Record<
   string
 >>;
 
-function hasResendConfig() {
-  return Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL);
+function hasResendConfig(env: EmailEnv = process.env) {
+  return Boolean(env.RESEND_API_KEY && env.RESEND_FROM_EMAIL);
 }
 
 function hasGmailConfig(env: EmailEnv = process.env) {
@@ -77,13 +77,13 @@ export function resolveGmailSenderProfile(
   return null;
 }
 
-function getMockCapturePath() {
-  const value = process.env.MOCK_ADMIN_ALERT_EMAILS_FILE;
+function getMockCapturePath(env: EmailEnv = process.env) {
+  const value = env.MOCK_ADMIN_ALERT_EMAILS_FILE;
   if (typeof value === 'string' && value.trim()) {
     return value.trim();
   }
 
-  if (process.env.NODE_ENV !== 'production') {
+  if (env.NODE_ENV !== 'production') {
     return LOCAL_DEV_FALLBACK_MAIL_CAPTURE_PATH;
   }
 
@@ -165,15 +165,15 @@ async function sendWithResend(params: {
   subject: string;
   html: string;
   text: string;
-}) {
+}, env: EmailEnv = process.env) {
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      Authorization: `Bearer ${env.RESEND_API_KEY}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: process.env.RESEND_FROM_EMAIL,
+      from: env.RESEND_FROM_EMAIL,
       to: [params.to],
       subject: params.subject,
       html: params.html,
@@ -192,8 +192,8 @@ async function sendWithMockFile(params: {
   subject: string;
   html: string;
   from?: string;
-}) {
-  const capturePath = getMockCapturePath();
+}, env: EmailEnv = process.env) {
+  const capturePath = getMockCapturePath(env);
   if (!capturePath) return false;
 
   await appendFile(
@@ -218,6 +218,7 @@ export async function sendTemplatedEmail<T extends EmailTemplateId>(
   request: EmailSendRequest<T>,
   options?: {
     supabaseAdmin?: AdminClient | null;
+    env?: EmailEnv;
   }
 ): Promise<SendTemplatedEmailResult> {
   if (!request.recipient.email && !request.recipient.userId) {
@@ -239,7 +240,9 @@ export async function sendTemplatedEmail<T extends EmailTemplateId>(
       (request.recipient.userId && !request.locale)
   );
   const supabaseAdmin =
-    options?.supabaseAdmin || (needsAdminClient ? createAdminClient() : null);
+    options?.supabaseAdmin || (needsAdminClient
+      ? (await import('@/app/utils/supabase/admin')).createAdminClient()
+      : null);
   const recipientEmail =
     request.recipient.userId && supabaseAdmin
       ? await resolveRecipientEmail({
@@ -265,16 +268,17 @@ export async function sendTemplatedEmail<T extends EmailTemplateId>(
   }
 
   const transportPolicy = resolveTransportPolicy(request.transportPolicy);
-  const gmailSender = resolveGmailSenderProfile(transportPolicy);
+  const emailEnvironment = options?.env ?? process.env;
+  const gmailSender = resolveGmailSenderProfile(transportPolicy, emailEnvironment);
   const prefersDedicatedAdminGmail =
-    transportPolicy === 'opsAdmin' && hasAdminGmailConfig();
+    transportPolicy === 'opsAdmin' && hasAdminGmailConfig(emailEnvironment);
 
   if (transportPolicy === 'opsAdmin' && (await sendWithMockFile({
     to: recipientEmail,
     subject: rendered.subject,
     html: rendered.html,
     from: gmailSender?.from,
-  }))) {
+  }, emailEnvironment))) {
     return {
       success: true,
       sent: true,
@@ -300,13 +304,13 @@ export async function sendTemplatedEmail<T extends EmailTemplateId>(
     };
   }
 
-  if (transportPolicy === 'opsAdmin' && hasResendConfig()) {
+  if (transportPolicy === 'opsAdmin' && hasResendConfig(emailEnvironment)) {
     await sendWithResend({
       to: recipientEmail,
       subject: rendered.subject,
       html: rendered.html,
       text: rendered.text,
-    });
+    }, emailEnvironment);
 
     return {
       success: true,

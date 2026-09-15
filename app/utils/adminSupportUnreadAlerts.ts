@@ -1,8 +1,20 @@
 import { getInquiryMessageDisplayContent, isAdminSupportInquiry } from '@/app/utils/inquiry';
 import { insertAdminAlerts, sendAdminAlertEmails } from '@/app/utils/adminAlertCenter';
-import { createAdminClient } from '@/app/utils/supabase/admin';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
-type SupabaseAdminClient = ReturnType<typeof createAdminClient>;
+type SupabaseAdminClient = SupabaseClient;
+
+export type AdminSupportUnreadAlertDeliveryResult = {
+  success: boolean;
+  count: number;
+  targetCount: number;
+};
+
+type AdminSupportUnreadAlertDependencies = {
+  insertAdminAlerts: typeof insertAdminAlerts;
+  sendAdminAlertEmails: typeof sendAdminAlertEmails;
+  log?: (entry: Record<string, unknown>) => void;
+};
 
 type Identifier = number | string;
 
@@ -82,6 +94,17 @@ const UNREAD_ALERT_AUDIT_ACTIONS = [
   UNREAD_ALERT_IN_APP_AUDIT_ACTION,
   UNREAD_ALERT_EMAIL_AUDIT_ACTION,
 ] as const;
+
+function safeAdminSupportLog(
+  log: AdminSupportUnreadAlertDependencies['log'],
+  entry: Record<string, unknown>
+) {
+  try {
+    (log ?? ((record) => console.log(JSON.stringify(record))))(entry);
+  } catch {
+    // Observability must never change delivery or release semantics.
+  }
+}
 
 function addMinutes(timestamp: string, minutes: number) {
   const base = new Date(timestamp);
@@ -267,8 +290,9 @@ async function insertUnreadAlertAuditMarker(params: {
 async function processDueAdminSupportUnreadAlertsFallback(params: {
   supabaseAdmin: SupabaseAdminClient;
   claimLimit: number;
+  dependencies: AdminSupportUnreadAlertDependencies;
 }) {
-  const { supabaseAdmin, claimLimit } = params;
+  const { supabaseAdmin, claimLimit, dependencies } = params;
   const now = Date.now();
 
   const { data: inquiryRows, error: inquiriesError } = await supabaseAdmin
@@ -452,7 +476,7 @@ async function processDueAdminSupportUnreadAlertsFallback(params: {
 
     try {
       if (!inAppAlreadySent) {
-        const alertResult = await insertAdminAlerts({
+        const alertResult = await dependencies.insertAdminAlerts({
           title: copy.title,
           message: copy.message,
           link: copy.link,
@@ -471,7 +495,7 @@ async function processDueAdminSupportUnreadAlertsFallback(params: {
       }
 
       if (!emailAlreadySent) {
-        const emailResult = await sendAdminAlertEmails({
+        const emailResult = await dependencies.sendAdminAlertEmails({
           subject: copy.subject,
           title: copy.title,
           message: copy.message,
@@ -490,9 +514,15 @@ async function processDueAdminSupportUnreadAlertsFallback(params: {
           });
         }
       }
-    } catch (error) {
+    } catch {
       rowFailed = true;
-      console.error('[AdminSupportUnreadAlerts] fallback delivery failed:', error);
+      safeAdminSupportLog(dependencies.log, {
+        event: 'admin_support_unread_delivery',
+        status: 'failed',
+        storage: 'audit-log-fallback',
+        diagnosticStage: 'delivery',
+        diagnosticCode: 'delivery_failed',
+      });
     }
 
     if (rowFailed) {
@@ -604,7 +634,8 @@ export async function startOrAdvanceAdminSupportUnreadBatch(params: {
   messageId: Identifier;
   messageCreatedAt?: string | null;
 }) {
-  const supabaseAdmin = params.supabaseAdmin ?? createAdminClient();
+  const supabaseAdmin = params.supabaseAdmin ??
+    (await import('@/app/utils/supabase/admin')).createAdminClient();
   const messageCreatedAt =
     normalizeIsoTimestamp(params.messageCreatedAt) || new Date().toISOString();
 
@@ -668,7 +699,8 @@ export async function clearAdminSupportUnreadBatch(params: {
   inquiryId: Identifier;
   expectedWave?: InquiryUnreadWaveIdentity | null;
 }) {
-  const supabaseAdmin = params.supabaseAdmin ?? createAdminClient();
+  const supabaseAdmin = params.supabaseAdmin ??
+    (await import('@/app/utils/supabase/admin')).createAdminClient();
 
   const { data: inquiry, error: inquiryError } = await supabaseAdmin
     .from('inquiries')
@@ -740,9 +772,18 @@ export async function clearAdminSupportUnreadBatch(params: {
 export async function processDueAdminSupportUnreadAlerts(params?: {
   supabaseAdmin?: SupabaseAdminClient;
   claimLimit?: number;
+  insertAdminAlerts?: typeof insertAdminAlerts;
+  sendAdminAlertEmails?: typeof sendAdminAlertEmails;
+  log?: (entry: Record<string, unknown>) => void;
 }) {
-  const supabaseAdmin = params?.supabaseAdmin ?? createAdminClient();
+  const supabaseAdmin = params?.supabaseAdmin ??
+    (await import('@/app/utils/supabase/admin')).createAdminClient();
   const claimLimit = params?.claimLimit ?? 50;
+  const dependencies: AdminSupportUnreadAlertDependencies = {
+    insertAdminAlerts: params?.insertAdminAlerts ?? insertAdminAlerts,
+    sendAdminAlertEmails: params?.sendAdminAlertEmails ?? sendAdminAlertEmails,
+    log: params?.log,
+  };
 
   const { data: claimedRows, error: claimError } = await supabaseAdmin.rpc(
     'claim_due_admin_support_unread_alert_batches',
@@ -757,6 +798,7 @@ export async function processDueAdminSupportUnreadAlerts(params?: {
         return processDueAdminSupportUnreadAlertsFallback({
           supabaseAdmin,
           claimLimit,
+          dependencies,
         });
       }
 
@@ -892,7 +934,7 @@ export async function processDueAdminSupportUnreadAlerts(params?: {
 
     try {
       if (!nextInAppSentAt) {
-        const alertResult = await insertAdminAlerts({
+        const alertResult = await dependencies.insertAdminAlerts({
           title: copy.title,
           message: copy.message,
           link: copy.link,
@@ -905,7 +947,7 @@ export async function processDueAdminSupportUnreadAlerts(params?: {
       }
 
       if (!nextEmailSentAt) {
-        const emailResult = await sendAdminAlertEmails({
+        const emailResult = await dependencies.sendAdminAlertEmails({
           subject: copy.subject,
           title: copy.title,
           message: copy.message,
@@ -918,9 +960,15 @@ export async function processDueAdminSupportUnreadAlerts(params?: {
           emailedCount += emailResult.count;
         }
       }
-    } catch (error) {
+    } catch {
       rowFailed = true;
-      console.error('[AdminSupportUnreadAlerts] failed to send unread alerts:', error);
+      safeAdminSupportLog(dependencies.log, {
+        event: 'admin_support_unread_delivery',
+        status: 'failed',
+        storage: 'batch-table',
+        diagnosticStage: 'delivery',
+        diagnosticCode: 'delivery_failed',
+      });
     } finally {
       const releaseResult = await updateUnreadBatchForWave({
         supabaseAdmin,
@@ -934,10 +982,13 @@ export async function processDueAdminSupportUnreadAlerts(params?: {
       });
 
       if (!releaseResult.updated && claimedWave) {
-        console.warn(
-          '[AdminSupportUnreadAlerts] skipped release for superseded unread wave:',
-          claimedWave
-        );
+        safeAdminSupportLog(dependencies.log, {
+          event: 'admin_support_unread_release',
+          status: 'skipped',
+          storage: 'batch-table',
+          diagnosticStage: 'release',
+          diagnosticCode: 'wave_superseded',
+        });
       }
     }
 
