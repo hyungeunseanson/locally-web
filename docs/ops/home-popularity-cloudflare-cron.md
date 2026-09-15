@@ -29,7 +29,7 @@ change requires a new concurrency review.
   refresh independently, then waits for both outcomes. One failure is logged
   separately and does not prevent the other task from starting; any failure
   still makes the owned scheduled invocation fail for observability.
-- Emergency fallback: GitHub `workflow_dispatch` calls the authenticated
+- Emergency fallback: the schedule-retired GitHub `workflow_dispatch` calls the authenticated
   `/api/cron/home-popularity-snapshot` route.
 - Both Home paths call the same shared processor and the same PostgreSQL RPC.
 
@@ -93,7 +93,7 @@ Call the authenticated HTTP fallback at most once for the canary, then verify:
 - the audited function touches only the rebuildable snapshot table.
 
 Do not create test wishlists or experiences, rewrite the SQL, purge application
-caches, or repeat a failed Production refresh. Keep the GitHub automatic
-schedule until the dormant deployment, local cold scheduled test, HTTP canary,
-and ON deployment all pass. After activation, remove only the automatic GitHub
-schedule and retain `workflow_dispatch` plus the authenticated HTTP route.
+caches, or repeat a failed Production refresh. The GitHub automatic schedule
+was retired only after the dormant deployment, local cold scheduled test, HTTP
+canary, and ON deployment passed. Retain `workflow_dispatch` plus the
+authenticated HTTP route as the emergency fallback.

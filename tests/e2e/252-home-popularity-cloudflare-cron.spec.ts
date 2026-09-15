@@ -195,12 +195,13 @@ test.describe('Home popularity Cloudflare Cron', () => {
     expect(serialized).not.toContain('fixture-service-role');
   });
 
-  test('keeps GitHub automatic schedule until Production activation', () => {
+  test('retires only the GitHub automatic schedule after Production activation', () => {
     const workflow = readFileSync(
       '.github/workflows/home-popularity-snapshot.yml',
       'utf8'
     );
-    expect(workflow).toContain("- cron: '17 19 * * *'");
+    expect(workflow).not.toMatch(/\n\s*schedule:\s*(?:\n|$)/);
+    expect(workflow).not.toContain("- cron: '17 19 * * *'");
     expect(workflow).toMatch(/\n\s*workflow_dispatch:\s*(?:\n|$)/);
     expect(workflow).toContain('/api/cron/home-popularity-snapshot');
   });

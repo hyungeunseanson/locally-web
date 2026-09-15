@@ -1,10 +1,6 @@
 name: Home Popularity Snapshot
 
 on:
-  schedule:
-    # 매일 한국 시간 새벽 4시 17분 (UTC 19:17)에 홈 인기 체험 snapshot 갱신
-    - cron: '17 19 * * *'
-
   workflow_dispatch:
 
 jobs:
