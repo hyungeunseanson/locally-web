@@ -8,7 +8,7 @@ GitHub 호스티드 러너 장애로 예약 workflow가 실행 단계에 들어�
 
 - `Cancel Pending Bookings`
 - `Admin Support Unread Alerts`
-- `Experience Completion Sync`
+- `Experience Completion Sync` (Cloudflare 전환 후에는 수동 fallback만 유지)
 
 이 작업들은 한 회차의 이벤트만 처리하지 않는다. 실행 시점에 이미 기한이 지난 전체 대상을 다시 조회하므로, GitHub Actions가 복구된 뒤 다음 정상 실행이 누락 회차를 따라잡는다.
 
@@ -58,7 +58,8 @@ GitHub 호스티드 러너 장애로 예약 workflow가 실행 단계에 들어�
 - 완료 예약별 review-request 등 keyed side effect가 중복되지 않았는지 확인한다.
 - Cloudflare 전환 후에는 `23 */2 * * *` Cron과
   `EXPERIENCE_COMPLETION_SCHEDULED_ENABLED`가 primary scheduler 계약이다.
-  GitHub `workflow_dispatch`와 `/api/cron/complete-trips`는 수동 emergency fallback으로 유지한다.
+  GitHub automatic schedule은 retired 상태이며, `workflow_dispatch`와
+  `/api/cron/complete-trips`는 수동 emergency fallback으로 유지한다.
   운영·rollback 절차는 `docs/ops/experience-completion-cloudflare-cron.md`를 따른다.
 
 ## 수동 복구 결정
