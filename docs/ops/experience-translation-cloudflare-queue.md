@@ -33,4 +33,4 @@ The OFF profile stops new application and scheduled wakes. It does not cancel me
 
 The Cloudflare Cron is the primary missed-enqueue recovery. GitHub `workflow_dispatch` and the authorized HTTP route remain the manual emergency fallback. Logs are limited to event ID, reason, hop, attempt, bounded outcome/diagnostic codes, task counts, and provider-call counts; translation text and raw provider errors are prohibited.
 
-Until Production activation succeeds, the legacy GitHub automatic schedule remains enabled. After activation and a successful Queue canary, remove only the `schedule` trigger while retaining `workflow_dispatch`.
+Production activation completed with a successful empty-drain Queue canary. The legacy GitHub automatic schedule is retired; `workflow_dispatch` and the authenticated HTTP route remain available for explicit emergency recovery. Cloudflare Cron is now the primary missed-enqueue wake path.
