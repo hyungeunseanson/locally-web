@@ -14,7 +14,7 @@ Production uses the repository-owned deploy wrapper. During the dormant phase us
 npm run cloudflare:deploy:production -- --experience-media-source-profile=off
 ```
 
-After the source-authority rollout is approved and complete, `experienceMediaSourceReleasePolicy.defaultProductionProfile` is changed to `on`. The explicit emergency profile is:
+The approved Production source-authority profile is repository-owned and defaults to `on`. The explicit emergency profile is:
 
 ```sh
 npm run cloudflare:deploy:production -- --experience-media-source-profile=off
