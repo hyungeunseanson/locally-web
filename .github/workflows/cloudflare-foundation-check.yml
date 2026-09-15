@@ -12,6 +12,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  backup-restore-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+
+      - name: Validate backup restore lifecycle and isolation contracts
+        run: npm run backup:restore:contract
+
+      - name: Reproduce temporary readiness and validate a pinned-image cold restore
+        run: npm run backup:restore:runtime
+
   validate:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
