@@ -315,6 +315,42 @@ class StorageByteBackupTests(unittest.TestCase):
         with self.assertRaises(backup.ValidationError):
             backup.make_plan([dict(self.items[0], key="../escape", identity=backup.source_identity("experiences", "../escape"))], "unsafe", "db", "2026-09-15T00:00:00Z", "2026-09-15T00:00:00Z")
 
+    def test_apply_rejects_expired_plan_and_reused_ciphertext_before_write(self):
+        prepared = self.prepared()
+        client = FakeS3()
+        store = backup.R2Store(client, backup.PRIVATE_R2_BUCKET)
+        after_expiry = dt.datetime(2026, 10, 30, tzinfo=dt.timezone.utc)
+        with self.assertRaisesRegex(backup.ValidationError, "plan retention has expired"):
+            backup.apply_plan(
+                prepared, prepared["planDigest"], self.source, store, FakeAge(),
+                self.cache, self.work, now=after_expiry,
+            )
+        self.assertEqual(client.put_calls, 0)
+
+        prior_client = FakeS3()
+        prior_store = backup.R2Store(prior_client, backup.PRIVATE_R2_BUCKET)
+        summary, _ = backup.apply_plan(
+            prepared, prepared["planDigest"], self.source, prior_store, FakeAge(),
+            self.cache, self.work, now=dt.datetime(2026, 9, 16, tzinfo=dt.timezone.utc),
+        )
+        manifest = json.loads(prior_client.objects[summary["manifestKey"]]["body"][3:])
+        fresh = backup.make_plan(
+            self.items, "reuse-expiry", "34916900214", "2026-09-15T01:21:29Z",
+            "2026-10-19T00:00:00Z",
+        )
+        incremental, _ = backup.prepare_plan(
+            fresh, FakeSource(self.items, self.source.bodies), self.root / "reuse-expiry-cache",
+            manifest, dt.datetime(2026, 10, 19, tzinfo=dt.timezone.utc),
+        )
+        before = prior_client.put_calls
+        with self.assertRaisesRegex(backup.ValidationError, "reused ciphertext retention has expired"):
+            backup.apply_plan(
+                incremental, incremental["planDigest"], FakeSource(self.items, self.source.bodies),
+                prior_store, FakeAge(), self.root / "reuse-expiry-cache", self.root / "reuse-expiry-work",
+                now=dt.datetime(2026, 10, 21, tzinfo=dt.timezone.utc),
+            )
+        self.assertEqual(prior_client.put_calls, before)
+
     def test_failures_do_not_expose_provider_details(self):
         prepared = self.prepared()
         client = FakeS3()

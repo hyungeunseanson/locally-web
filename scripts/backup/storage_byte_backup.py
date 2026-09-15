@@ -671,8 +671,20 @@ def verify_reused(store: R2Store, entry: Mapping[str, Any]) -> None:
             raise ConflictError("reused ciphertext reference is unavailable or inconsistent")
 
 
-def apply_plan(plan: Mapping[str, Any], confirm_digest: str, source: Any, store: R2Store, encryptor: Any, cache_dir: pathlib.Path, work_dir: pathlib.Path) -> Tuple[Dict[str, Any], TransferBudget]:
+def apply_plan(
+    plan: Mapping[str, Any],
+    confirm_digest: str,
+    source: Any,
+    store: R2Store,
+    encryptor: Any,
+    cache_dir: pathlib.Path,
+    work_dir: pathlib.Path,
+    now: Optional[dt.datetime] = None,
+) -> Tuple[Dict[str, Any], TransferBudget]:
     validate_plan(plan, confirm_digest=confirm_digest, require_prepared=True)
+    apply_time = now or dt.datetime.now(dt.timezone.utc)
+    if parse_utc(plan["expiresAt"]) <= apply_time:
+        raise ValidationError("prepared plan retention has expired")
     current = source.inventory()
     if inventory_digest(current) != plan["inventoryDigest"]:
         raise SourceDriftError("source inventory changed before apply")
@@ -680,7 +692,8 @@ def apply_plan(plan: Mapping[str, Any], confirm_digest: str, source: Any, store:
     local_files: Dict[str, pathlib.Path] = {}
     for entry in plan["objects"]:
         if entry.get("reuse"):
-            parse_utc(entry["reuse"]["expiresAt"])
+            if parse_utc(entry["reuse"]["expiresAt"]) <= apply_time:
+                raise ValidationError("reused ciphertext retention has expired")
         else:
             local_files[entry["identity"]] = ensure_cache_file(cache_dir, entry)
 
