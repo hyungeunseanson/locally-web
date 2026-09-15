@@ -92,16 +92,39 @@ export function pickLatestRowsByUser(rows) {
   return [...latest.values()].sort((a, b) => a.user_id.localeCompare(b.user_id));
 }
 
-export function normalizePublicHostProfileSourceUrl(value, allowedKinds = ['application-profile', 'public-profile-avatar']) {
+function sourcePathBelongsToHost(pathname, sourceKind, hostId) {
+  if (!hostId) return true;
+  validateHostId(hostId);
+  if (sourceKind === 'application-profile') {
+    return pathname.startsWith(`/storage/v1/object/public/images/profile/${hostId}_`);
+  }
+  const avatarPrefix = '/storage/v1/object/public/avatars/';
+  const relativePath = pathname.slice(avatarPrefix.length);
+  return relativePath.startsWith(`${hostId}/`) || relativePath.startsWith(`${hostId}-`);
+}
+
+export function normalizePublicHostProfileSourceUrl(
+  value,
+  allowedKinds = ['application-profile', 'public-profile-avatar'],
+  expectedHostId = null,
+) {
   if (typeof value !== 'string' || value !== value.trim()) return null;
   try {
     const parsed = new URL(value);
     if (parsed.origin !== PUBLIC_STORAGE_ORIGIN || parsed.search || parsed.hash || parsed.username || parsed.password) return null;
     if (parsed.href !== value) return null;
-    if (allowedKinds.includes('application-profile') && PROFILE_PATH_PATTERN.test(parsed.pathname)) {
+    if (
+      allowedKinds.includes('application-profile')
+      && PROFILE_PATH_PATTERN.test(parsed.pathname)
+      && sourcePathBelongsToHost(parsed.pathname, 'application-profile', expectedHostId)
+    ) {
       return { originUrl: value, sourceKind: 'application-profile' };
     }
-    if (allowedKinds.includes('public-profile-avatar') && AVATAR_PATH_PATTERN.test(parsed.pathname)) {
+    if (
+      allowedKinds.includes('public-profile-avatar')
+      && AVATAR_PATH_PATTERN.test(parsed.pathname)
+      && sourcePathBelongsToHost(parsed.pathname, 'public-profile-avatar', expectedHostId)
+    ) {
       return { originUrl: value, sourceKind: 'public-profile-avatar' };
     }
   } catch {}
@@ -133,7 +156,7 @@ export function normalizeInventory(rows, exclusions = [], profiles = []) {
   for (const row of visibleRows) {
     const photo = typeof row.profile_photo === 'string' ? row.profile_photo.trim() : '';
     const applicationSource = photo
-      ? normalizePublicHostProfileSourceUrl(photo, ['application-profile'])
+      ? normalizePublicHostProfileSourceUrl(photo, ['application-profile'], row.user_id)
       : null;
     if (photo && !applicationSource) {
       unexpectedPhotoCount += 1;
@@ -143,7 +166,11 @@ export function normalizeInventory(rows, exclusions = [], profiles = []) {
       ? profilesById.get(row.user_id).avatar_url.trim()
       : '';
     const avatarSource = !photo && publicAvatar
-      ? normalizePublicHostProfileSourceUrl(publicAvatar, ['public-profile-avatar', 'application-profile'])
+      ? normalizePublicHostProfileSourceUrl(
+        publicAvatar,
+        ['public-profile-avatar', 'application-profile'],
+        row.user_id,
+      )
       : null;
     if (!photo && publicAvatar && !avatarSource) {
       externalAvatarExcludedCount += 1;
@@ -214,7 +241,11 @@ export function buildSpecifications(manifest) {
   const specifications = [];
   for (const [hostId, entry] of Object.entries(manifest)) {
     validateHostId(hostId);
-    const source = normalizePublicHostProfileSourceUrl(entry.originUrl);
+    const source = normalizePublicHostProfileSourceUrl(
+      entry.originUrl,
+      ['application-profile', 'public-profile-avatar'],
+      hostId,
+    );
     if (!source) throw new Error(`Refusing unexpected profile origin for host ${hostId}.`);
     specifications.push(
       { hostId, originUrl: entry.originUrl, sourceKind: source.sourceKind, key: entry.smallKey, width: 128, quality: 80 },

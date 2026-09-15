@@ -214,6 +214,64 @@ def validate_existing_derivative(client, item):
     return len(body)
 
 
+def validate_planned_existing_derivative(client, item):
+    key = item["key"]
+    response = client.head_object(Bucket=ACTIVE_BUCKET, Key=key)
+    if response.get("ContentType", "").split(";", 1)[0] != "image/webp":
+        raise RuntimeError("content-type")
+    if response.get("CacheControl", "") != IMMUTABLE_CACHE_CONTROL:
+        raise RuntimeError("cache-control")
+    size = int(response.get("ContentLength", 0))
+    if size <= 0 or size > MAX_NEW_BODY_BYTES:
+        raise RuntimeError("content-length")
+    metadata = response.get("Metadata", {})
+    stored_digest = metadata.get("sha256", "")
+    if not re.fullmatch(r"[a-f0-9]{64}", stored_digest):
+        raise RuntimeError("sha256")
+    body = get_object_bytes(client, ACTIVE_BUCKET, key)
+    if len(body) != size or hashlib.sha256(body).hexdigest() != stored_digest:
+        raise RuntimeError("body-sha256")
+
+    expected_provenance = {
+        "host-id": item["hostId"],
+        "source-identity": hashlib.sha256(item["originUrl"].encode()).hexdigest(),
+        "source-kind": item["sourceKind"],
+        "transform-schema": TRANSFORM_SCHEMA,
+        "transform-engine": "sharp",
+        "output-format": "webp",
+        "width": str(item["width"]),
+        "quality": str(item["quality"]),
+    }
+    if metadata.get("host-id") not in (None, "", item["hostId"]):
+        raise RuntimeError("host-id")
+    optional_provenance = set(expected_provenance) - {"host-id"}
+    if any(
+        name in metadata and metadata.get(name) != expected_provenance[name]
+        for name in optional_provenance
+    ):
+        raise RuntimeError("provenance")
+    source_sha = metadata.get("source-sha256")
+    source_bytes = metadata.get("source-bytes")
+    if source_sha is not None and not re.fullmatch(r"[a-f0-9]{64}", source_sha):
+        raise RuntimeError("source-sha256")
+    if source_bytes is not None and (not str(source_bytes).isdigit() or int(source_bytes) <= 0):
+        raise RuntimeError("source-bytes")
+    return {
+        "key": key,
+        "bytes": size,
+        "outputSha256": stored_digest,
+        "sourceIdentity": metadata.get("source-identity", "legacy-unavailable"),
+        "sourceSha256": metadata.get("source-sha256", "legacy-unavailable"),
+        "sourceBytes": metadata.get("source-bytes", "legacy-unavailable"),
+        "sourceKind": metadata.get("source-kind", "legacy-unavailable"),
+        "transformSchema": metadata.get("transform-schema", "legacy-unavailable"),
+        "transformEngine": metadata.get("transform-engine", "legacy-unavailable"),
+        "outputFormat": metadata.get("output-format", "legacy-unavailable"),
+        "width": metadata.get("width", "legacy-unavailable"),
+        "quality": metadata.get("quality", "legacy-unavailable"),
+    }
+
+
 def is_precondition_failure(error):
     response = getattr(error, "response", {}) or {}
     code = str(response.get("Error", {}).get("Code", ""))
@@ -314,21 +372,20 @@ def plan_mode(args, active_client, stale_client, plan):
     stale_candidates = sorted((active_keys - expected_keys))
     metadata_conflicts = []
     metadata_consistent = 0
+    bytes_verified = 0
+    verified_body_bytes = 0
+    existing_proofs = []
     for item in plan:
         if item["key"] not in active_keys:
             continue
         try:
-            response = active_client.head_object(Bucket=ACTIVE_BUCKET, Key=item["key"])
-            metadata = response.get("Metadata", {})
-            if response.get("ContentType", "").split(";", 1)[0] != "image/webp":
-                raise RuntimeError("content-type")
-            if response.get("CacheControl", "") != IMMUTABLE_CACHE_CONTROL:
-                raise RuntimeError("cache-control")
-            if not re.fullmatch(r"[a-f0-9]{64}", metadata.get("sha256", "")):
-                raise RuntimeError("sha256")
-            if metadata.get("host-id") not in (None, "", item["hostId"]):
-                raise RuntimeError("host-id")
+            proof = validate_planned_existing_derivative(active_client, item)
+            verified_body_bytes += proof["bytes"]
+            if verified_body_bytes > MAX_NEW_BODY_BYTES:
+                raise RuntimeError("existing-byte-budget")
             metadata_consistent += 1
+            bytes_verified += 1
+            existing_proofs.append(proof)
         except (RuntimeError, ClientError, KeyError):
             metadata_conflicts.append(item["key"])
     execution_payload = {
@@ -336,6 +393,7 @@ def plan_mode(args, active_client, stale_client, plan):
         "expected": plan,
         "missingKeys": transform_keys,
         "existingKeys": sorted(expected_keys & active_keys),
+        "existingProofs": sorted(existing_proofs, key=lambda item: item["key"]),
         "metadataConflictKeys": metadata_conflicts,
         "staleCandidateKeys": stale_candidates,
         "snapshotHash": args.snapshot_hash,
@@ -359,6 +417,8 @@ def plan_mode(args, active_client, stale_client, plan):
         "staleCandidateCount": len(stale_candidates),
         "staleCandidateKeys": stale_candidates,
         "metadataConsistentObjectCount": metadata_consistent,
+        "actualBytesVerifiedObjectCount": bytes_verified,
+        "actualBytesVerified": verified_body_bytes,
         "metadataConflictCount": len(metadata_conflicts),
         "metadataConflictKeys": metadata_conflicts,
         "executionPayload": execution_payload,
@@ -372,6 +432,8 @@ def plan_mode(args, active_client, stale_client, plan):
         "missing_count": result["missingObjectCount"],
         "stale_candidate_count": result["staleCandidateCount"],
         "metadata_conflict_count": result["metadataConflictCount"],
+        "actual_bytes_verified_count": result["actualBytesVerifiedObjectCount"],
+        "actual_bytes_verified": result["actualBytesVerified"],
         "plan_digest": result["planDigest"],
     }.items():
         append_github_output(name, value)
@@ -379,6 +441,8 @@ def plan_mode(args, active_client, stale_client, plan):
         "expectedObjectCount": result["expectedObjectCount"],
         "existingActiveObjectCount": result["existingActiveObjectCount"],
         "metadataConsistentObjectCount": result["metadataConsistentObjectCount"],
+        "actualBytesVerifiedObjectCount": result["actualBytesVerifiedObjectCount"],
+        "actualBytesVerified": result["actualBytesVerified"],
         "metadataConflictCount": result["metadataConflictCount"],
         "missingObjectCount": result["missingObjectCount"],
         "restoreObjectCount": result["restoreObjectCount"],
@@ -440,6 +504,19 @@ def apply_mode(args, active_client, stale_client, transformed_plan, expected_pla
     current_state_digest = hashlib.sha256("\n".join(sorted(active_now)).encode()).hexdigest()
     if current_state_digest != payload.get("r2StateDigest"):
         raise RuntimeError("Active profile R2 inventory changed after approval")
+    existing_keys = payload.get("existingKeys")
+    if not isinstance(existing_keys, list) or set(existing_keys) != expected_keys & set(active_now):
+        raise RuntimeError("Existing profile R2 scope changed after approval")
+    current_proofs = []
+    current_verified_bytes = 0
+    for key in existing_keys:
+        proof = validate_planned_existing_derivative(active_client, expected_by_key[key])
+        current_verified_bytes += proof["bytes"]
+        if current_verified_bytes > MAX_NEW_BODY_BYTES:
+            raise RuntimeError("Existing profile verification exceeds the read budget")
+        current_proofs.append(proof)
+    if sorted(current_proofs, key=lambda item: item["key"]) != payload.get("existingProofs"):
+        raise RuntimeError("Existing profile R2 proof changed after approval")
 
     if create_only and restore_keys:
         raise RuntimeError("Create-only profile apply refuses private restore candidates")

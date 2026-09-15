@@ -205,6 +205,8 @@ jobs:
             echo "- Plan digest: ${{ steps.r2_plan.outputs.plan_digest }}"
             echo "- Expected objects: ${{ steps.r2_plan.outputs.expected_count }}"
             echo "- Existing objects: ${{ steps.r2_plan.outputs.existing_count }}"
+            echo "- Existing bodies verified: ${{ steps.r2_plan.outputs.actual_bytes_verified_count }}"
+            echo "- Existing body bytes read: ${{ steps.r2_plan.outputs.actual_bytes_verified }}"
             echo "- Missing objects: ${{ steps.r2_plan.outputs.missing_count }}"
             echo "- Metadata conflicts: ${{ steps.r2_plan.outputs.metadata_conflict_count }}"
             echo "- Source downloads/transforms/writes: 0"
@@ -227,6 +229,15 @@ jobs:
       - name: Reject Production changes before R2 mutation
         if: github.event_name == 'schedule' || inputs.action == 'apply-create-only' || inputs.action == 'legacy-reconcile'
         run: node scripts/cloudflare/reconcile-public-host-profile-images.mjs verify-snapshot --plan="${RUNNER_TEMP}/public-host-profile-sync/plan.json"
+
+      - name: Verify source bytes immediately before R2 mutation
+        if: github.event_name == 'schedule' || inputs.action == 'apply-create-only' || inputs.action == 'legacy-reconcile'
+        id: source_preverify
+        run: >-
+          node scripts/cloudflare/reconcile-public-host-profile-images.mjs verify-source-bytes
+          --plan="${RUNNER_TEMP}/public-host-profile-sync/specifications.json"
+          --objects="${RUNNER_TEMP}/public-host-profile-sync/objects.json"
+          --prior-source-bytes="${{ steps.transform.outputs.source_download_bytes }}"
 
       - name: Conditionally create and verify approved profile objects
         if: github.event_name == 'schedule' || inputs.action == 'apply-create-only' || inputs.action == 'legacy-reconcile'
@@ -258,7 +269,7 @@ jobs:
           node scripts/cloudflare/reconcile-public-host-profile-images.mjs verify-source-bytes
           --plan="${RUNNER_TEMP}/public-host-profile-sync/specifications.json"
           --objects="${RUNNER_TEMP}/public-host-profile-sync/objects.json"
-          --prior-source-bytes="${{ steps.transform.outputs.source_download_bytes }}"
+          --prior-source-bytes="${{ steps.source_preverify.outputs.total_source_bytes }}"
 
       - name: Apply verified candidate manifest
         if: github.event_name == 'schedule' || inputs.action == 'legacy-reconcile'
@@ -324,6 +335,8 @@ jobs:
             echo "### Public host profile reconciliation"
             echo "- Eligible hosts: ${{ needs.audit.outputs.eligible_host_count }}"
             echo "- Expected active objects: ${{ steps.r2_plan.outputs.expected_count || '0' }}"
+            echo "- Existing bodies verified: ${{ steps.r2_plan.outputs.actual_bytes_verified_count || '0' }}"
+            echo "- Existing body bytes read: ${{ steps.r2_plan.outputs.actual_bytes_verified || '0' }}"
             echo "- Source images downloaded: ${{ steps.transform.outputs.source_download_count || '0' }}"
             echo "- Variants generated: ${{ steps.transform.outputs.transformed_object_count || '0' }}"
             echo "- Sources reverified: ${{ steps.source_verify.outputs.verified_source_count || '0' }}"

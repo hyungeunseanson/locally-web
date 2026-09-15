@@ -253,6 +253,58 @@ class CreateOnlyApplyTests(unittest.TestCase):
         # A fresh plan sees the object as existing and schedules no transformed write.
         second = self.make_plan()
         self.assertEqual(second["missingObjectCount"], 0)
+        self.assertEqual(second["actualBytesVerifiedObjectCount"], 1)
+
+    def test_plan_get_verifies_legacy_bytes_and_rejects_corruption_or_provenance_conflict(self):
+        digest = profile_r2.hashlib.sha256(self.body).hexdigest()
+        self.buckets[profile_r2.ACTIVE_BUCKET][self.KEY] = {
+            "body": self.body,
+            "content_type": "image/webp",
+            "cache_control": profile_r2.IMMUTABLE_CACHE_CONTROL,
+            "metadata": {"sha256": digest, "host-id": self.HOST},
+        }
+        legacy = self.make_plan()
+        self.assertEqual(legacy["metadataConflictCount"], 0)
+        self.assertEqual(legacy["actualBytesVerifiedObjectCount"], 1)
+        self.assertEqual(legacy["actualBytesVerified"], len(self.body))
+        self.assertEqual(
+            legacy["executionPayload"]["existingProofs"][0]["sourceIdentity"],
+            "legacy-unavailable",
+        )
+
+        self.buckets[profile_r2.ACTIVE_BUCKET][self.KEY]["body"] = b"corrupt"
+        corrupt = self.make_plan()
+        self.assertEqual(corrupt["metadataConflictCount"], 1)
+        self.assertEqual(corrupt["actualBytesVerifiedObjectCount"], 0)
+
+        self.buckets[profile_r2.ACTIVE_BUCKET][self.KEY] = {
+            "body": self.body,
+            "content_type": "image/webp",
+            "cache_control": profile_r2.IMMUTABLE_CACHE_CONTROL,
+            "metadata": {
+                "sha256": digest,
+                "host-id": self.HOST,
+                "source-identity": "f" * 64,
+            },
+        }
+        provenance_conflict = self.make_plan()
+        self.assertEqual(provenance_conflict["metadataConflictCount"], 1)
+
+    def test_existing_object_proof_drift_refuses_before_write(self):
+        digest = profile_r2.hashlib.sha256(self.body).hexdigest()
+        self.buckets[profile_r2.ACTIVE_BUCKET][self.KEY] = {
+            "body": self.body,
+            "content_type": "image/webp",
+            "cache_control": profile_r2.IMMUTABLE_CACHE_CONTROL,
+            "metadata": {"sha256": digest},
+        }
+        plan = self.make_plan()
+        self.buckets[profile_r2.ACTIVE_BUCKET][self.KEY]["body"] = b"changed-after-plan"
+        args = SimpleNamespace(plan=str(self.directory / "objects.json"), confirm_digest=plan["planDigest"], output=str(self.directory / "result.json"))
+        with self.assertRaisesRegex(RuntimeError, "body-sha256"):
+            profile_r2.apply_mode(args, self.active, self.stale, [], self.expected, plan, create_only=True)
+        self.assertEqual(len(self.active.put_calls), 0)
+        self.assertEqual(self.active.delete_calls, 0)
 
     def test_concurrent_exact_writer_is_verified_and_preserved(self):
         plan = self.make_plan()

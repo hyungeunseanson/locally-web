@@ -84,6 +84,33 @@ test('excludes OAuth fallback and rejects URL ambiguity or a different Storage b
   ]) assert.equal(normalizePublicHostProfileSourceUrl(unsafe), null);
 });
 
+test('binds every mirrored source path to the public host namespace', () => {
+  const crossHostApplication = normalizeInventory([
+    { id: 1, user_id: hostA, status: 'approved', profile_photo: profileUrl(hostB), created_at: '2026-01-01T00:00:00Z' },
+  ]);
+  assert.equal(crossHostApplication.inventory.length, 0);
+  assert.equal(crossHostApplication.summary.unexpectedPhotoCount, 1);
+
+  const crossHostAvatar = normalizeInventory([
+    { id: 1, user_id: hostA, status: 'active', profile_photo: null, created_at: '2026-01-01T00:00:00Z' },
+  ], [], [{ id: hostA, avatar_url: avatarUrl(hostB) }]);
+  assert.equal(crossHostAvatar.inventory.length, 0);
+  assert.equal(crossHostAvatar.summary.externalAvatarExcludedCount, 1);
+
+  assert.equal(
+    normalizePublicHostProfileSourceUrl(avatarUrl(hostB), ['public-profile-avatar'], hostA),
+    null,
+  );
+  assert.equal(
+    normalizePublicHostProfileSourceUrl(
+      `https://uhinvcydgzqlpnvieyal.supabase.co/storage/v1/object/public/avatars/${hostA}-legacy.jpg`,
+      ['public-profile-avatar'],
+      hostA,
+    )?.sourceKind,
+    'public-profile-avatar',
+  );
+});
+
 test('exclusions prevent a still-public host from being reconciled', () => {
   const rows = [{ id: 1, user_id: hostA, status: 'approved', profile_photo: profileUrl(hostA), created_at: '2026-01-01T00:00:00Z' }];
   const state = normalizeInventory(rows, [hostA]);

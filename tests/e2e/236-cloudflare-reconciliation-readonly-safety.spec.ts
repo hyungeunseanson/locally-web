@@ -203,8 +203,13 @@ test.describe('Production reconciliation image checks stay read-only', () => {
     expect(hostWorkflow).toContain('confirmed_plan_digest');
     expect(hostWorkflow).toContain("inputs.action == 'apply-create-only'");
     expect(hostWorkflow).toContain('--create-only-plan');
+    expect(hostWorkflow).toContain('Verify source bytes immediately before R2 mutation');
+    expect(hostWorkflow).toContain('Verify source bytes stayed exact within the shared read budget');
+    expect(hostWorkflow).toContain('steps.source_preverify.outputs.total_source_bytes');
     expect(hostR2ReconciliationSource).toContain('IfNoneMatch="*"');
     expect(hostR2ReconciliationSource).toContain('Confirmed profile plan digest does not match');
+    expect(hostR2ReconciliationSource).toContain('validate_planned_existing_derivative');
+    expect(hostR2ReconciliationSource).toContain('existingProofs');
     expect(hostR2ReconciliationSource).toContain('concurrentExactSkipCount');
     expect(hostR2ReconciliationSource).toContain('deletedObjectCount');
   });
