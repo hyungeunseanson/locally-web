@@ -114,17 +114,17 @@ messages before removing that exact disposable container.
 ## Storage byte backup and recovery
 
 The database backup covers `storage.buckets` and `storage.objects` metadata, not
-the object payloads. A future separately approved Storage backup should use the
+the object payloads. The separately approved Storage-byte backup uses the
 existing private backup bucket, client-side encryption, and a snapshot manifest.
-It must not copy private files into the public media bucket.
+It must not copy sensitive files into the public media bucket.
 
 | Source bucket | Sensitivity and recovery source | Planned private backup treatment |
 | --- | --- | --- |
 | `experiences` | Public and inactive experience source media; the public R2 mirror covers only a subset | Encrypt every authoritative Supabase object; use public R2 only as secondary evidence |
 | `images` | Mixed application media | Encrypt by source object identity and preserve access metadata in the snapshot manifest |
 | `avatars` | Public-facing profile media with account linkage | Encrypt; restore only after the matching DB/Auth snapshot is selected |
-| `chat-images` | Private conversation data | Encrypt with restricted recovery access; never place in public R2 |
-| `admin_files` | Operational/private documents | Encrypt with restricted recovery access; never place in public R2 |
+| `chat-images` | The source bucket is public, but conversation media remains sensitive recovery data | Encrypt with restricted recovery access; never place in public R2 |
+| `admin_files` | The source bucket is public, but operational documents remain sensitive recovery data | Encrypt with restricted recovery access; never place in public R2 |
 | `verification-docs` | Highest-sensitivity identity documents | Encrypt separately within the private backup namespace; never place in public R2 |
 
 The snapshot manifest should bind each object key hash, byte size, content type,
