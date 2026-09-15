@@ -137,6 +137,10 @@ assert.deepEqual(wrangler.env.production.queues, {
       binding: manifest.bindings.publicExperienceMediaQueueProducer,
       queue: manifest.environments.production.publicExperienceMediaQueue,
     },
+    {
+      binding: manifest.bindings.experienceTranslationQueueProducer,
+      queue: manifest.environments.production.experienceTranslationQueue,
+    },
   ],
   consumers: [
     {
@@ -148,8 +152,19 @@ assert.deepEqual(wrangler.env.production.queues, {
       max_concurrency: manifest.publicExperienceMediaQueuePolicy.maxConcurrency,
       retry_delay: manifest.publicExperienceMediaQueuePolicy.retryDelaySeconds,
     },
+    {
+      queue: manifest.environments.production.experienceTranslationQueue,
+      max_batch_size: manifest.experienceTranslationQueuePolicy.maxBatchSize,
+      max_retries: manifest.experienceTranslationQueuePolicy.maxRetries,
+      dead_letter_queue: manifest.environments.production.experienceTranslationDeadLetterQueue,
+      max_concurrency: manifest.experienceTranslationQueuePolicy.maxConcurrency,
+      retry_delay: manifest.experienceTranslationQueuePolicy.retryDelaySeconds,
+    },
   ],
 });
+assert.deepEqual(wrangler.env.production.triggers, { crons: [manifest.experienceTranslationQueuePolicy.recoveryCron] });
+assert.equal(wrangler.env.production.vars.EXPERIENCE_TRANSLATION_QUEUE_ENABLED, 'false');
+assert.equal(wrangler.env.production.vars.EXPERIENCE_TRANSLATION_SCHEDULED_RECOVERY_ENABLED, 'false');
 assert.equal(
   wrangler.env.production.vars[manifest.publicExperienceMediaProducerPolicy.enabledVariable],
   manifest.publicExperienceMediaProducerPolicy.defaultEnabled

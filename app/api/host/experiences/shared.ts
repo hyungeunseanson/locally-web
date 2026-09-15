@@ -10,6 +10,7 @@ import { createAdminClient } from '@/app/utils/supabase/admin';
 import { insertAdminAlerts, sendAdminAlertEmails } from '@/app/utils/adminAlertCenter';
 import { normalizeLanguageLevels, getLanguageNames, type LanguageLevelEntry } from '@/app/utils/languageLevels';
 import { schedulePublicExperienceMediaProducer } from '@/app/utils/publicExperienceMediaQueueProducer.server';
+import { scheduleExperienceTranslationProducer } from '@/app/utils/experienceTranslation/queueProducer.server';
 import {
   areExperienceLocaleArraysEqual,
   buildExperienceTranslationState,
@@ -475,7 +476,7 @@ export async function getRouteActor(
   };
 }
 
-async function enqueueTranslationJob(params: {
+export async function enqueueTranslationJob(params: {
   supabaseAdmin: ReturnType<typeof createAdminClient>;
   experienceId: number;
   sourceLocale: ExperienceLocale;
@@ -544,6 +545,7 @@ async function markTranslationQueueFailure(params: {
 export type ExperienceWriteDependencies = {
   createAdminClient: typeof createAdminClient;
   scheduleMediaProducer: typeof schedulePublicExperienceMediaProducer;
+  scheduleTranslationProducer: typeof scheduleExperienceTranslationProducer;
   enqueueTranslationJob: typeof enqueueTranslationJob;
   markTranslationQueueFailure: typeof markTranslationQueueFailure;
   insertAdminAlerts: typeof insertAdminAlerts;
@@ -553,6 +555,7 @@ export type ExperienceWriteDependencies = {
 const DEFAULT_EXPERIENCE_WRITE_DEPENDENCIES: ExperienceWriteDependencies = {
   createAdminClient,
   scheduleMediaProducer: schedulePublicExperienceMediaProducer,
+  scheduleTranslationProducer: scheduleExperienceTranslationProducer,
   enqueueTranslationJob,
   markTranslationQueueFailure,
   insertAdminAlerts,
@@ -638,6 +641,7 @@ export async function createExperienceFromBody(
         translationVersion,
         targetLocales: translationState.queuedLocales,
       });
+      dependencies.scheduleTranslationProducer();
     } catch (queueError) {
       console.error('[Experience API] Failed to enqueue translation job:', queueError);
       await dependencies.markTranslationQueueFailure({
@@ -820,6 +824,7 @@ export async function updateExperienceFromBody(params: {
         translationVersion,
         targetLocales: translationState.queuedLocales,
       });
+      dependencies.scheduleTranslationProducer();
     } catch (queueError) {
       console.error('[Experience API] Failed to enqueue translation job:', queueError);
       await dependencies.markTranslationQueueFailure({

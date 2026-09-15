@@ -7,6 +7,7 @@ import { handleHostExperienceUpdate } from '@/app/api/host/experiences/[id]/rout
 import { handleHostExperienceCreate } from '@/app/api/host/experiences/routeHandler';
 import {
   createExperienceFromBody,
+  enqueueTranslationJob,
   getRouteActor,
   updateExperienceFromBody,
   type ExperienceWriteDependencies,
@@ -364,6 +365,7 @@ function writeDependencies(
   return {
     createAdminClient: () => asAdminClient(database),
     scheduleMediaProducer: producer.schedule,
+    scheduleTranslationProducer: () => ({ status: 'disabled' }),
     enqueueTranslationJob: async () => undefined,
     markTranslationQueueFailure: async () => undefined,
     insertAdminAlerts: async () => ({ success: true, count: 0, targetCount: 0 }),
@@ -414,6 +416,63 @@ async function responseBody(response: Response) {
 }
 
 test.describe('public experience media producer application integration', () => {
+  test('translation wake runs once only after translation job and task creation succeeds', async () => {
+    const producer = producerHarness();
+    const database = new FakeDatabase([
+      { table: 'experiences', operation: 'insert', result: success(mediaRow({ status: 'pending', is_active: false })) },
+      { table: 'experience_translation_jobs', operation: 'insert', result: success({ id: 'job_0001' }) },
+      { table: 'experience_translation_tasks', operation: 'insert', result: success(null) },
+    ]);
+    const writes = writeDependencies(database, producer);
+    const order: string[] = [];
+    writes.enqueueTranslationJob = async (input) => { await enqueueTranslationJob(input); order.push('job-and-tasks-committed'); };
+    writes.scheduleTranslationProducer = () => { order.push('wake-scheduled'); return { status: 'disabled' }; };
+    await createExperienceFromBody(validBody(), { id: 'host-1', email: 'host@example.test', isAdmin: true }, writes);
+    expect(order).toEqual(['job-and-tasks-committed', 'wake-scheduled']);
+    database.assertExhausted();
+
+    const failedDatabase = new FakeDatabase([
+      { table: 'experiences', operation: 'insert', result: success(mediaRow({ status: 'pending', is_active: false })) },
+      { table: 'experience_translation_jobs', operation: 'insert', result: success({ id: 'job_0002' }) },
+      { table: 'experience_translation_tasks', operation: 'insert', result: failure('task insert failed') },
+      { table: 'experience_translation_jobs', operation: 'delete', result: success(null) },
+    ]);
+    const failedWrites = writeDependencies(failedDatabase, producer);
+    let wakes = 0;
+    failedWrites.enqueueTranslationJob = enqueueTranslationJob;
+    failedWrites.scheduleTranslationProducer = () => { wakes += 1; return { status: 'disabled' }; };
+    failedWrites.markTranslationQueueFailure = async () => undefined;
+    await createExperienceFromBody(validBody(), { id: 'host-1', email: 'host@example.test', isAdmin: true }, failedWrites);
+    expect(wakes).toBe(0);
+    failedDatabase.assertExhausted();
+  });
+
+  test('host edit source changes create database tasks before one translation wake', async () => {
+    const producer = producerHarness();
+    const database = new FakeDatabase([
+      { table: 'experiences', operation: 'select', result: success(mediaRow()) },
+      { table: 'experiences', operation: 'update', result: success(mediaRow({ title: '변경된 서울 골목 체험', translation_version: 2 })) },
+      { table: 'experience_translation_jobs', operation: 'insert', result: success({ id: 'job_edit_0001' }) },
+      { table: 'experience_translation_tasks', operation: 'insert', result: success(null) },
+    ]);
+    const writes = writeDependencies(database, producer);
+    const order: string[] = [];
+    writes.enqueueTranslationJob = async (input) => { await enqueueTranslationJob(input); order.push('job-and-tasks-committed'); };
+    writes.scheduleTranslationProducer = () => { order.push('wake-scheduled'); return { status: 'disabled' }; };
+    const response = await handleHostExperienceUpdate(
+      request('PATCH', validBody({ manual_content: { ko: { title: '변경된 서울 골목 체험', description: mediaRow().description } } })),
+      { params: Promise.resolve({ id: '42' }) },
+      updateRouteDependencies(
+        actorDependencies({ isAdmin: true, adminDatabase: database }),
+        writes
+      )
+    );
+    expect(response.status).toBe(200);
+    expect(await responseBody(response)).toMatchObject({ success: true, id: 42 });
+    expect(order).toEqual(['job-and-tasks-committed', 'wake-scheduled']);
+    database.assertExhausted();
+  });
+
   test('host create executes route auth and preserves validation/insert/pending behavior', async () => {
     const unauthProducer = producerHarness();
     const unauthDatabase = new FakeDatabase([]);
