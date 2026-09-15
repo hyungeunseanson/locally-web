@@ -105,7 +105,7 @@
     "defaultExperienceIds": ""
   },
   "experienceMediaSourceReleasePolicy": {
-    "defaultProductionProfile": "off",
+    "defaultProductionProfile": "on",
     "enabledVariable": "EXPERIENCE_MEDIA_R2_SOURCE_ENABLED",
     "rawDefault": "false"
   },

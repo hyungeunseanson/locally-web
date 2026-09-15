@@ -214,7 +214,7 @@ test.describe('Cloudflare migration readiness contract', () => {
       experienceIds: [3309],
     });
     expect(manifest.experienceMediaSourceReleasePolicy).toEqual({
-      defaultProductionProfile: 'off',
+      defaultProductionProfile: 'on',
       enabledVariable: 'EXPERIENCE_MEDIA_R2_SOURCE_ENABLED',
       rawDefault: 'false',
     });

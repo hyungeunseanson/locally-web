@@ -116,9 +116,9 @@ test('defaults canonical Production deploy to the approved cohort and rejects ad
   assert.throws(() => resolveReleaseProfile(policy, 'wildcard'), /Unknown/);
 });
 
-test('Experience media source authority is independent, reproducible, and OFF by default', async () => {
+test('Experience media source authority is independently ON by default with an explicit OFF rollback', async () => {
   const policy = await readExperienceMediaSourceReleasePolicy();
-  assert.equal(resolveExperienceMediaSourceReleaseProfile(policy).name, 'off');
+  assert.equal(resolveExperienceMediaSourceReleaseProfile(policy).name, 'on');
   const media = resolveReleaseProfile(await readReleasePolicy());
   const translation = resolveTranslationReleaseProfile(await readTranslationReleasePolicy());
   for (const name of ['off', 'on']) {
