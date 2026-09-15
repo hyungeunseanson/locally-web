@@ -6,6 +6,7 @@ import os
 import pathlib
 import shutil
 import tempfile
+import time
 import unittest
 
 import storage_byte_backup as backup
@@ -125,6 +126,17 @@ class FailingAge(FakeAge):
     def encrypt(self, source, destination):
         raise backup.BackupError("age encryption failed")
 
+
+class BlockingResponse:
+    headers = {}
+
+    def read(self, _amount):
+        time.sleep(1)
+        return b""
+
+    def close(self):
+        pass
+
 class StorageByteBackupTests(unittest.TestCase):
     def setUp(self):
         self.root = pathlib.Path(tempfile.mkdtemp())
@@ -173,6 +185,35 @@ class StorageByteBackupTests(unittest.TestCase):
         self.assertEqual((restored / "experiences/folder/한글.jpg").read_bytes(), b"alpha")
         self.assertEqual((restored / "verification-docs/same-name").read_bytes(), b"secret")
         self.assertEqual((restored / "images/empty").read_bytes(), b"")
+
+    def test_prepare_resumes_only_cache_bound_to_the_exact_plan(self):
+        self.cache.mkdir(mode=0o700)
+        backup.bind_resume_cache(self.cache, self.plan)
+        first = self.plan["objects"][0]
+        cached = self.cache / (first["identity"] + ".source")
+        cached.write_bytes(b"alpha")
+        os.chmod(cached, 0o600)
+
+        prepared, budget = backup.prepare_plan(self.plan, self.source, self.cache)
+        self.assertEqual(self.source.downloads, 2)
+        self.assertEqual(budget.source_attempts, 3)
+        self.assertEqual(budget.source_bytes, 11)
+        self.assertEqual(prepared["objects"][0]["sourceSha256"], hashlib.sha256(b"alpha").hexdigest())
+
+        other = backup.make_plan(self.items, "other-plan", "34916900214", "2026-09-15T01:21:29Z", "2026-09-15T02:00:00Z")
+        with self.assertRaisesRegex(backup.ValidationError, "not bound"):
+            backup.prepare_plan(other, self.source, self.cache)
+
+    def test_payload_read_deadline_interrupts_stalled_body_and_removes_partial_file(self):
+        source = backup.SupabaseStorageSource("https://uhinvcydgzqlpnvieyal.supabase.co", "fixture", timeout=0.05)
+        source._request = lambda *_args, **_kwargs: BlockingResponse()
+        target = self.root / "stalled.source"
+        budget = backup.TransferBudget()
+        with self.assertRaises(backup.SourceTimeoutError):
+            source.download(self.items[0], target, budget)
+        self.assertFalse(target.exists())
+        self.assertEqual(budget.source_attempts, 1)
+        self.assertEqual(budget.source_bytes, 0)
 
     def test_second_apply_is_exact_skip_without_overwrite(self):
         prepared = self.prepared()
