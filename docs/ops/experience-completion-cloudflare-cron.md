@@ -5,6 +5,7 @@
 - Production schedule: `23 */2 * * *` (UTC), owned by the existing `locally-web-opennext-production` Worker.
 - Primary executor after rollout: Cloudflare Cron → `handleExperienceCompletionScheduled()` → `runExperienceCompletionSync()`.
 - Manual fallback: GitHub `workflow_dispatch` → authenticated `GET /api/cron/complete-trips` → the same shared processor.
+- The GitHub automatic `23 */2 * * *` schedule is retired after the Production rollout; only `workflow_dispatch` remains there.
 - PostgreSQL remains authoritative for due selection, run leases, booking completion, notifications, payout/refund state, and all financial truth. No Cloudflare Queue, KV, D1, R2, or Durable Object stores completion state.
 
 The raw Wrangler baseline is fail-closed: `EXPERIENCE_COMPLETION_SCHEDULED_ENABLED="false"`. The repository-owned Production profile defaults to `on` after rollout. Use:
