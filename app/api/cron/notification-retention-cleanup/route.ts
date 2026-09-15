@@ -2,67 +2,56 @@ import { NextResponse } from 'next/server';
 
 import { hasValidCronAuthorization } from '@/app/utils/cronAuth';
 import { createAdminClient } from '@/app/utils/supabase/admin';
+import {
+  buildNotificationRetentionCutoff,
+  createSupabaseNotificationRetentionRepository,
+  NotificationRetentionCleanupError,
+  runNotificationRetentionCleanup,
+  type NotificationRetentionRepository,
+} from '@/app/utils/notificationRetentionCleanup';
 
-const NOTIFICATION_RETENTION_DAYS = 30;
-const NOTIFICATION_RETENTION_BATCH_SIZE = 1000;
-const NOTIFICATION_RETENTION_MAX_BATCHES = 5;
-
-export async function GET(request: Request) {
+export async function executeNotificationRetentionCleanupCron(
+  request: Request,
+  repository?: NotificationRetentionRepository,
+  now: () => Date = () => new Date()
+) {
   const authHeader = request.headers.get('authorization');
   if (!hasValidCronAuthorization(authHeader)) {
     return new NextResponse('Unauthorized', { status: 401 });
   }
 
-  const cutoff = new Date(
-    Date.now() - NOTIFICATION_RETENTION_DAYS * 24 * 60 * 60 * 1000
-  ).toISOString();
+  const invocationNow = now();
+  const cutoff = buildNotificationRetentionCutoff(invocationNow);
 
   try {
-    const supabase = createAdminClient();
-    let deletedCount = 0;
-    let batches = 0;
-
-    for (let attempt = 0; attempt < NOTIFICATION_RETENTION_MAX_BATCHES; attempt += 1) {
-      const { data, error } = await supabase.rpc('prune_notifications_retention', {
-        p_cutoff: cutoff,
-        p_batch_size: NOTIFICATION_RETENTION_BATCH_SIZE,
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      const batchDeletedCount = Number(data || 0);
-      if (!Number.isFinite(batchDeletedCount) || batchDeletedCount <= 0) {
-        break;
-      }
-
-      deletedCount += batchDeletedCount;
-      batches += 1;
-
-      if (batchDeletedCount < NOTIFICATION_RETENTION_BATCH_SIZE) {
-        break;
-      }
-    }
-
-    return NextResponse.json({
-      success: true,
-      cutoff,
-      deletedCount,
-      batches,
-    });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown cron error';
-    console.error('[CRON Notification Retention Cleanup] Error:', error);
+    const result = await runNotificationRetentionCleanup(
+      repository ??
+        createSupabaseNotificationRetentionRepository(createAdminClient()),
+      { now: () => invocationNow }
+    );
+    return NextResponse.json(result);
+  } catch (error) {
+    const diagnosticCode = error instanceof NotificationRetentionCleanupError
+      ? error.diagnosticCode
+      : 'cleanup_failed';
+    console.error(JSON.stringify({
+      event: 'notification_retention_cleanup_http_fallback',
+      status: 'failed',
+      diagnosticCode,
+    }));
     return NextResponse.json(
       {
         success: false,
         cutoff,
         deletedCount: 0,
         batches: 0,
-        error: message,
+        error: diagnosticCode,
       },
       { status: 500 }
     );
   }
+}
+
+export async function GET(request: Request) {
+  return executeNotificationRetentionCleanupCron(request);
 }

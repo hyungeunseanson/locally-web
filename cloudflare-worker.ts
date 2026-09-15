@@ -21,8 +21,13 @@ import {
   handleAdminSupportUnreadAlertsScheduled,
   type AdminSupportUnreadAlertsRuntimeEnv,
 } from './app/utils/adminSupportUnreadAlertsScheduled';
+import {
+  handleNotificationRetentionCleanupScheduled,
+  NOTIFICATION_RETENTION_CLEANUP_CRON,
+  type NotificationRetentionRuntimeEnv,
+} from './app/utils/notificationRetentionCleanup';
 
-type WorkerEnvironment = PublicExperienceMediaQueueRuntimeEnv & ExperienceTranslationQueueRuntimeEnv & HomePopularitySnapshotRuntimeEnv & AdminSupportUnreadAlertsRuntimeEnv;
+type WorkerEnvironment = PublicExperienceMediaQueueRuntimeEnv & ExperienceTranslationQueueRuntimeEnv & HomePopularitySnapshotRuntimeEnv & AdminSupportUnreadAlertsRuntimeEnv & NotificationRetentionRuntimeEnv;
 
 const worker = {
   fetch(request: Request, env: WorkerEnvironment, ctx: unknown) {
@@ -43,9 +48,11 @@ const worker = {
     return handleLocallyScheduledEvent(controller, env, {
       dailyCron: EXPERIENCE_TRANSLATION_RECOVERY_CRON,
       adminSupportCron: ADMIN_SUPPORT_UNREAD_ALERTS_CRON,
+      notificationRetentionCron: NOTIFICATION_RETENTION_CLEANUP_CRON,
       runTranslationRecovery: handleExperienceTranslationScheduledRecovery,
       runHomePopularitySnapshot: handleHomePopularitySnapshotScheduled,
       runAdminSupportUnreadAlerts: handleAdminSupportUnreadAlertsScheduled,
+      runNotificationRetentionCleanup: handleNotificationRetentionCleanupScheduled,
       delegate: typeof scheduled === 'function'
         ? (nextController, nextEnv) => scheduled.call(openNextWorker, nextController, nextEnv, ctx)
         : undefined,

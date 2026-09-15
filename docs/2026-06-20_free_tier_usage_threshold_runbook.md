@@ -134,7 +134,7 @@ This section is for candidate discovery only. Actual deletion is prohibited with
 
 ### Still needs read-only console confirmation
 
-- Vercel Cron Jobs registration for notification retention.
+- Notification retention is scheduled by the Production Cloudflare Worker at `31 19 * * *`; GitHub `workflow_dispatch` and the authenticated HTTP route remain the emergency manual fallback.
 - Vercel Cron Jobs registration for completion and support alert jobs.
 - Supabase logs for retention RPC failures.
 - Whether `admin_audit_logs` has a separate retention/prune policy beyond the UI/API list cap.
