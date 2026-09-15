@@ -281,9 +281,10 @@ test.describe('notification retention Cloudflare Cron', () => {
     expect(failureCalls).toEqual(['translation', 'home']);
   });
 
-  test('keeps GitHub automatic schedule until the Cloudflare activation gate', () => {
+  test('retires only the GitHub automatic schedule after Cloudflare activation', () => {
     const workflow = readFileSync('.github/workflows/notification-retention-cleanup.yml', 'utf8');
-    expect(workflow).toContain("- cron: '31 19 * * *'");
+    expect(workflow).not.toMatch(/\n\s*schedule:\s*(?:\n|$)/);
+    expect(workflow).not.toContain("- cron: '31 19 * * *'");
     expect(workflow).toMatch(/\n\s*workflow_dispatch:\s*(?:\n|$)/);
     expect(workflow).toContain('/api/cron/notification-retention-cleanup');
   });
