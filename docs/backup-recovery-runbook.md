@@ -173,7 +173,12 @@ local plan. It performs no source payload GET, transform, Queue operation, or R2
 write. The `prepare` step rechecks the complete inventory, downloads only the
 objects that lack reusable unexpired proof, enforces the 1,200-object and 512
 MiB received-byte ceilings, hashes the actual bytes, and produces the prepared
-plan. That plan's canonical digest binds the source bucket/key, identity, size,
+plan. Response-body reads are bounded by the CLI `--timeout`, not only the
+initial HTTP connection. An interrupted prepare can reuse completed cache files
+only when the private cache is bound to the exact metadata plan digest; the
+already received objects and bytes continue to count against the same ceilings.
+An unbound, mismatched, incomplete, or symlinked cache fails closed. That plan's
+canonical digest binds the source bucket/key, identity, size,
 actual SHA, metadata evidence, ciphertext destination, database-backup
 relation, retention, scope, and all hard ceilings.
 

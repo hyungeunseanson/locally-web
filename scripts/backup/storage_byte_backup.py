@@ -9,6 +9,7 @@ without remote services.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import dataclasses
 import datetime as dt
 import hashlib
@@ -16,6 +17,7 @@ import json
 import os
 import pathlib
 import shutil
+import signal
 import stat
 import subprocess
 import tempfile
@@ -60,6 +62,10 @@ class BudgetError(BackupError):
 
 class SourceDriftError(BackupError):
     code = "source_drift"
+
+
+class SourceTimeoutError(BackupError):
+    code = "source_timeout"
 
 
 class ConflictError(BackupError):
@@ -276,6 +282,55 @@ def inventory_digest(entries: Sequence[Mapping[str, Any]]) -> str:
     return sha256_bytes(canonical_json([metadata_fingerprint(entry) for entry in sorted(entries, key=lambda item: (item["bucket"], item["key"]))]))
 
 
+@contextlib.contextmanager
+def payload_read_deadline(seconds: float):
+    """Bound a blocking response-body read in the main CLI process."""
+    if seconds <= 0 or not hasattr(signal, "setitimer"):
+        raise ValidationError("payload deadline is unavailable")
+
+    previous_handler = signal.getsignal(signal.SIGALRM)
+
+    def handle_timeout(_signum, _frame):
+        raise SourceTimeoutError("Supabase Storage payload read timed out")
+
+    signal.signal(signal.SIGALRM, handle_timeout)
+    previous_timer = signal.setitimer(signal.ITIMER_REAL, seconds)
+    try:
+        yield
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous_handler)
+        if previous_timer[0] > 0:
+            signal.setitimer(signal.ITIMER_REAL, *previous_timer)
+
+
+def bind_resume_cache(cache_dir: pathlib.Path, plan: Mapping[str, Any]) -> None:
+    marker = cache_dir / ".plan-digest"
+    if marker.exists():
+        if marker.is_symlink() or not marker.is_file() or marker.read_text(encoding="ascii").strip() != plan["planDigest"]:
+            raise ValidationError("resume cache is not bound to this plan")
+        return
+    if any(cache_dir.iterdir()):
+        raise ValidationError("non-empty resume cache is missing its plan binding")
+    marker.write_text(plan["planDigest"] + "\n", encoding="ascii")
+    os.chmod(marker, 0o600)
+
+
+def resume_or_download_source(
+    source: Any, entry: Mapping[str, Any], cache_path: pathlib.Path, budget: "TransferBudget",
+) -> Mapping[str, Optional[str]]:
+    if cache_path.exists():
+        if cache_path.is_symlink() or not cache_path.is_file():
+            raise ValidationError("unsafe resume cache file")
+        digest, size = sha256_file(cache_path)
+        if size != entry["size"]:
+            raise ValidationError("resume cache file size differs from plan")
+        budget.begin_source()
+        budget.receive_source(size)
+        return {"sha256": digest, "etag": entry.get("sourceEtag"), "contentType": entry.get("contentType")}
+    return source.download(entry, cache_path, budget)
+
+
 @dataclasses.dataclass
 class TransferBudget:
     max_source_objects: int = MAX_OBJECTS
@@ -419,7 +474,7 @@ class SupabaseStorageSource:
         digest = hashlib.sha256()
         size = 0
         try:
-            with os.fdopen(fd, "wb") as output:
+            with os.fdopen(fd, "wb") as output, payload_read_deadline(self.timeout):
                 while True:
                     chunk = response.read(CHUNK_SIZE)
                     if not chunk:
@@ -431,6 +486,8 @@ class SupabaseStorageSource:
         except BaseException:
             destination.unlink(missing_ok=True)
             raise
+        finally:
+            response.close()
         if size != entry["size"]:
             destination.unlink(missing_ok=True)
             raise SourceDriftError("downloaded source size differs from plan")
@@ -490,6 +547,7 @@ def prepare_plan(
     validate_plan(plan)
     cache_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(cache_dir, 0o700)
+    bind_resume_cache(cache_dir, plan)
     current = source.inventory()
     if inventory_digest(current) != plan["inventoryDigest"]:
         raise SourceDriftError("source inventory changed before prepare")
@@ -524,7 +582,7 @@ def prepare_plan(
         else:
             cache_name = identity + ".source"
             cache_path = cache_dir / cache_name
-            result = source.download(entry, cache_path, budget)
+            result = resume_or_download_source(source, entry, cache_path, budget)
             entry.update({
                 "sourceSha256": result["sha256"],
                 "cacheFile": cache_name,
