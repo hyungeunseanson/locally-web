@@ -8,29 +8,52 @@ fi
 
 backup_dir="$1"
 assertions_sql="$2"
-restore_container="locally-backup-restore-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-1}"
-restore_port="55432"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+restore_container="locally-backup-restore-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-1}-${BASHPID}"
+postgres_image="${BACKUP_RESTORE_POSTGRES_IMAGE:-public.ecr.aws/supabase/postgres:17.6.1.158@sha256:99b1729aeb0bac314445024fc149fbd39306170b61dd50800ccf180327ab3459}"
+container_started=false
+
+if [[ ! -d "$backup_dir" || -L "$backup_dir" || "$backup_dir" == postgresql://* || "$backup_dir" == postgres://* ]]; then
+  echo "backup restore input must be a local backup directory" >&2
+  exit 64
+fi
+
+for required_file in database.dump roles.sql catalog.sql source-catalog.json dump-counts.json; do
+  if [[ ! -f "$backup_dir/$required_file" || -L "$backup_dir/$required_file" ]]; then
+    echo "missing or unsafe backup input: $required_file" >&2
+    exit 65
+  fi
+done
+
+if [[ ! -f "$assertions_sql" || -L "$assertions_sql" ]]; then
+  echo "security assertions must be a regular local file" >&2
+  exit 65
+fi
 
 cleanup() {
-  docker rm -f "$restore_container" >/dev/null 2>&1 || true
+  status=$?
+  if [[ "$status" -ne 0 && "$container_started" == true ]]; then
+    "$script_dir/postgres-container-lifecycle.sh" diagnose "$restore_container" || true
+  fi
+  if [[ "$container_started" == true ]]; then
+    docker rm -f "$restore_container" >/dev/null 2>&1 || true
+  fi
+  exit "$status"
 }
 trap cleanup EXIT
 
 docker run --detach --name "$restore_container" \
+  --network none \
   -e POSTGRES_PASSWORD=postgres \
-  -p "127.0.0.1:${restore_port}:5432" \
-  public.ecr.aws/supabase/postgres:17.6.1.158 >/dev/null
+  "$postgres_image" >/dev/null
+container_started=true
 
-for _ in {1..90}; do
-  if docker exec "$restore_container" pg_isready -U postgres -d postgres >/dev/null 2>&1; then
-    break
-  fi
-  sleep 2
-done
-docker exec "$restore_container" pg_isready -U postgres -d postgres >/dev/null
+"$script_dir/postgres-container-lifecycle.sh" wait "$restore_container" 180
 
 docker cp "$backup_dir/database.dump" "$restore_container:/tmp/database.dump"
 docker cp "$backup_dir/roles.sql" "$restore_container:/tmp/roles.sql"
+docker cp "$assertions_sql" "$restore_container:/tmp/security-assertions.sql"
+docker cp "$backup_dir/catalog.sql" "$restore_container:/tmp/catalog.sql"
 
 docker exec --interactive "$restore_container" \
   psql --username supabase_admin --dbname postgres --variable ON_ERROR_STOP=1 <<'SQL'
@@ -55,10 +78,12 @@ docker exec "$restore_container" \
   --single-transaction --exit-on-error \
   --use-list /tmp/restore.list /tmp/database.dump
 
-restore_url="postgresql://supabase_admin:postgres@127.0.0.1:${restore_port}/locally_restore"
-
-psql "$restore_url" --variable ON_ERROR_STOP=1 --file "$assertions_sql"
-psql "$restore_url" --quiet --variable ON_ERROR_STOP=1 --file "$backup_dir/catalog.sql" \
+docker exec "$restore_container" \
+  psql --username supabase_admin --dbname locally_restore \
+  --variable ON_ERROR_STOP=1 --file /tmp/security-assertions.sql
+docker exec "$restore_container" \
+  psql --username supabase_admin --dbname locally_restore \
+  --quiet --variable ON_ERROR_STOP=1 --file /tmp/catalog.sql \
   > "$backup_dir/restored-catalog.json"
 
 python3 - "$backup_dir/source-catalog.json" "$backup_dir/restored-catalog.json" <<'PY'

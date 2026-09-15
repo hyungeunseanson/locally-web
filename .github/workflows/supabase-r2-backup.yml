@@ -28,6 +28,7 @@ jobs:
       SUPABASE_CLI_VERSION: 2.114.0
       AGE_VERSION: 1.3.1
       BOTO3_VERSION: 1.43.70
+      SUPABASE_POSTGRES_IMAGE: public.ecr.aws/supabase/postgres:17.6.1.158@sha256:99b1729aeb0bac314445024fc149fbd39306170b61dd50800ccf180327ab3459
 
     steps:
       - name: Check out repository
@@ -115,25 +116,25 @@ jobs:
           fi
 
           docker run --rm \
-            public.ecr.aws/supabase/postgres:17.6.1.158 \
+            "$SUPABASE_POSTGRES_IMAGE" \
             pg_dump "$SUPABASE_DB_URL" --schema-only --no-owner \
             --schema=auth --schema=storage \
             --section=pre-data \
             > "$backup_dir/managed-auth-storage-pre.sql"
           docker run --rm \
-            public.ecr.aws/supabase/postgres:17.6.1.158 \
+            "$SUPABASE_POSTGRES_IMAGE" \
             pg_dump "$SUPABASE_DB_URL" --schema-only --no-owner \
             --schema=auth --schema=storage \
             --section=post-data \
             > "$backup_dir/managed-auth-storage.sql"
           docker run --rm \
-            public.ecr.aws/supabase/postgres:17.6.1.158 \
+            "$SUPABASE_POSTGRES_IMAGE" \
             pg_dump "$SUPABASE_DB_URL" --format=custom \
             --exclude-table-data=storage.buckets_vectors \
             --exclude-table-data=storage.vector_indexes \
             > "$backup_dir/database.dump"
           docker run --rm --interactive \
-            public.ecr.aws/supabase/postgres:17.6.1.158 \
+            "$SUPABASE_POSTGRES_IMAGE" \
             pg_restore --data-only --file - \
             < "$backup_dir/database.dump" \
             > "$backup_dir/database-data-for-counts.sql"
@@ -168,6 +169,8 @@ jobs:
 
       - name: Restore into isolated Postgres and validate security boundaries
         shell: bash
+        env:
+          BACKUP_RESTORE_POSTGRES_IMAGE: ${{ env.SUPABASE_POSTGRES_IMAGE }}
         run: |
           set -Eeuo pipefail
           scripts/backup/restore-test.sh \

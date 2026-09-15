@@ -51,6 +51,8 @@
     "supabase:staging:baseline:check": "node scripts/supabase/check-production-baseline.mjs",
     "supabase:staging:current:check": "node scripts/supabase/check-production-current-state.mjs",
     "supabase:staging:contract": "npm run supabase:staging:baseline:check && npm run supabase:staging:current:check && node scripts/supabase/check-staging-bootstrap.mjs && NEXT_PUBLIC_SITE_URL=http://127.0.0.1:3000 NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54329 NEXT_PUBLIC_SUPABASE_ANON_KEY=local-staging-contract-anon-key SUPABASE_SERVICE_ROLE_KEY=local-staging-contract-service-role-key playwright test -c playwright.contracts.config.ts tests/e2e/238-supabase-staging-bootstrap-contract.spec.ts --project=chromium --workers=1",
+    "backup:restore:contract": "bash tests/backup/backup-contract.test.sh && bash tests/backup/postgres-container-lifecycle.test.sh",
+    "backup:restore:runtime": "bash tests/backup/restore-runtime.test.sh",
     "supabase:staging:seed": "node scripts/supabase/staging-fixtures.mjs seed",
     "supabase:staging:cleanup": "node scripts/supabase/staging-fixtures.mjs cleanup",
     "cloudflare:build-public-experience-details": "node scripts/cloudflare/build-public-experience-detail-canary.mjs --all-public --output=.tmp/cloudflare-public-experience-details",
