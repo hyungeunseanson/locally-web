@@ -21,7 +21,7 @@ function legacyRefCount(rows, objectName) {
   return (JSON.stringify(rows).match(new RegExp(locator.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
 }
 
-export async function applyDeletePlan({ plan, confirmation, loadLiveObjects, loadRows, fetchObject, removeBatch, objectExists, recordProgress = async () => {} }) {
+export async function applyDeletePlan({ plan, confirmation, loadLiveObjects, loadRows, fetchObject, removeBatch, recordProgress = async () => {} }) {
   assert.equal(plan.planDigest, confirmation, 'Exact delete plan confirmation is required.');
   const [metadata, rows] = await Promise.all([loadLiveObjects(), loadRows()]);
   const metadataByName = new Map(metadata.map((item) => [item.key || item.name, item]));
@@ -48,8 +48,9 @@ export async function applyDeletePlan({ plan, confirmation, loadLiveObjects, loa
       throw new Error('Supabase Storage returned a partial deletion batch.');
     }
     result.deleted += names.length;
+    const remaining = new Set((await loadLiveObjects()).map((item) => item.key || item.name));
     for (const name of names) {
-      if (await objectExists(name)) {
+      if (remaining.has(name)) {
         await recordProgress(result);
         throw new Error('Deleted object is still present.');
       }
@@ -96,13 +97,6 @@ async function main() {
       const { data, error } = await client.storage.from('experiences').remove(names);
       if (error) throw new Error(`Storage deletion failed: ${error.statusCode || 'provider-error'}.`);
       return data;
-    },
-    objectExists: async (name) => {
-      const encoded = name.split('/').map(encodeURIComponent).join('/');
-      const response = await fetch(`${baseUrl}/storage/v1/object/authenticated/experiences/${encoded}`, { headers, redirect: 'manual' });
-      if (response.status === 404) return false;
-      if (response.ok) return true;
-      throw new Error(`Storage post-delete verification failed: HTTP ${response.status}.`);
     },
     recordProgress,
   });
