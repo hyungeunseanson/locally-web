@@ -468,4 +468,151 @@ test.describe.serial('Admin master ledger regressions', () => {
       await expect(page.getByText(reviewMarker, { exact: true })).toHaveCount(0);
     }
   });
+
+  test('sorts the loaded ledger by payment or tour date and exports the visible order', async ({ page }) => {
+    test.setTimeout(120000);
+
+    const adminUser = createUser('sort');
+    await createAuthUser(adminUser, true);
+    await login(page, adminUser);
+
+    const ledgerEntry = ({
+      id,
+      type,
+      createdAt,
+      date,
+      time,
+      title,
+    }: {
+      id: string;
+      type: 'experience' | 'service';
+      createdAt: string;
+      date: string;
+      time: string | null;
+      title: string;
+    }) => ({
+      _type: type,
+      id,
+      order_id: id,
+      created_at: createdAt,
+      date,
+      time,
+      amount: 10000,
+      total_price: 10000,
+      total_experience_price: 10000,
+      price_at_booking: 10000,
+      status: 'confirmed',
+      payment_method: 'card',
+      contact_name: `Guest ${id}`,
+      contact_phone: '01000000000',
+      guests: 1,
+      host_payout_amount: 8000,
+      platform_revenue: 2000,
+      refund_amount: null,
+      cancel_reason: null,
+      payout_status: 'pending',
+      experiences: {
+        title,
+        host_id: null,
+        profiles: { name: '정렬 테스트 호스트' },
+      },
+      profiles: {
+        email: `${id}@example.com`,
+        name: `Guest ${id}`,
+      },
+    });
+
+    const responseEntries = [
+      ledgerEntry({
+        id: 'sort-service-early',
+        type: 'service',
+        createdAt: '2030-01-01T00:00:00.000Z',
+        date: '2030-02-10',
+        time: '09:00',
+        title: '투어 빠른 서비스',
+      }),
+      ledgerEntry({
+        id: 'sort-invalid-date',
+        type: 'experience',
+        createdAt: '2030-01-02T00:00:00.000Z',
+        date: 'invalid-date',
+        time: '12:00',
+        title: '날짜 오류 일반예약',
+      }),
+      ledgerEntry({
+        id: 'sort-experience-same-day',
+        type: 'experience',
+        createdAt: '2030-01-03T00:00:00.000Z',
+        date: '2030-02-10',
+        time: '15:00',
+        title: '같은 날 늦은 일반예약',
+      }),
+      ledgerEntry({
+        id: 'sort-experience-late',
+        type: 'experience',
+        createdAt: '2030-01-04T00:00:00.000Z',
+        date: '2030-02-20',
+        time: '10:00',
+        title: '투어 늦은 일반예약',
+      }),
+    ];
+
+    await page.route('**/api/admin/master-ledger*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, data: responseEntries }),
+      });
+    });
+
+    await page.goto('/admin/dashboard?tab=LEDGER', { waitUntil: 'networkidle' });
+    const sortSelect = page.getByRole('combobox', { name: '장부 정렬' });
+    const visibleTitles = () => page.locator('tbody tr td:nth-child(5) div').allTextContents();
+
+    await expect(sortSelect).toHaveValue('payment_desc');
+    await expect.poll(visibleTitles).toEqual([
+      '투어 늦은 일반예약',
+      '같은 날 늦은 일반예약',
+      '날짜 오류 일반예약',
+      '투어 빠른 서비스',
+    ]);
+
+    await sortSelect.selectOption('tour_asc');
+    await expect.poll(visibleTitles).toEqual([
+      '투어 빠른 서비스',
+      '같은 날 늦은 일반예약',
+      '투어 늦은 일반예약',
+      '날짜 오류 일반예약',
+    ]);
+
+    await sortSelect.selectOption('tour_desc');
+    await expect.poll(visibleTitles).toEqual([
+      '투어 늦은 일반예약',
+      '같은 날 늦은 일반예약',
+      '투어 빠른 서비스',
+      '날짜 오류 일반예약',
+    ]);
+
+    const searchInput = page.getByPlaceholder('검색 (이름, 예약번호)');
+    await searchInput.fill('서비스');
+    await expect.poll(visibleTitles).toEqual(['투어 빠른 서비스']);
+    await searchInput.clear();
+    await expect.poll(visibleTitles).toEqual([
+      '투어 늦은 일반예약',
+      '같은 날 늦은 일반예약',
+      '투어 빠른 서비스',
+      '날짜 오류 일반예약',
+    ]);
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'CSV 다운로드' }).click();
+    const download = await downloadPromise;
+    const downloadPath = await download.path();
+    expect(downloadPath).not.toBeNull();
+    const csv = readFileSync(downloadPath as string, 'utf8');
+
+    expect(csv.indexOf('투어 늦은 일반예약')).toBeLessThan(csv.indexOf('같은 날 늦은 일반예약'));
+    expect(csv.indexOf('같은 날 늦은 일반예약')).toBeLessThan(csv.indexOf('투어 빠른 서비스'));
+    expect(csv.indexOf('투어 빠른 서비스')).toBeLessThan(csv.indexOf('날짜 오류 일반예약'));
+  });
 });

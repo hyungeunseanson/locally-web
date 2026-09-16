@@ -52,6 +52,10 @@ import {
   isBookingReviewPending,
   type BookingReviewRequestType,
 } from '@/app/utils/hostUnavailableReview';
+import {
+  sortMasterLedgerEntries,
+  type MasterLedgerSortMode,
+} from './masterLedgerSort';
 
 // SSR 비활성화로 react-date-range import (window is not defined 에러 방지)
 const DateRange = dynamic(() => import('react-date-range').then(mod => mod.DateRange), { ssr: false });
@@ -207,6 +211,7 @@ export default function MasterLedgerTab({
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PAID' | 'PENDING' | 'CANCELLED'>('ALL');
   const [reviewOnly, setReviewOnly] = useState(false);
+  const [sortMode, setSortMode] = useState<MasterLedgerSortMode>('payment_desc');
   const [selectedBooking, setSelectedBooking] = useState<AdminMasterLedgerEntry | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [allBookings, setAllBookings] = useState<AdminMasterLedgerEntry[]>([]);
@@ -313,7 +318,7 @@ export default function MasterLedgerTab({
   };
 
   // 1. 장부 데이터 필터링
-  const ledgerData = allBookings.filter((b) => {
+  const ledgerData = sortMasterLedgerEntries(allBookings.filter((b) => {
     // 날짜 범위 필터
     const sd = dateRange[0].startDate;
     const ed = dateRange[0].endDate;
@@ -368,7 +373,7 @@ export default function MasterLedgerTab({
     }
 
     return startMatch && endMatch && searchMatch && statusMatch;
-  });
+  }), sortMode);
 
   const pendingHostUnavailableReviewCount = allBookings.filter(
     (booking) => isBookingReviewPending(booking.cancel_reason)
@@ -768,7 +773,19 @@ export default function MasterLedgerTab({
                 className="w-full pl-8 md:pl-9 pr-3 py-1.5 md:py-2 bg-slate-50 border border-slate-100 rounded-lg md:rounded-xl text-[10px] md:text-xs focus:outline-none"
               />
             </div>
+            <select
+              aria-label="장부 정렬"
+              data-testid="admin-master-ledger-sort"
+              value={sortMode}
+              onChange={(event) => setSortMode(event.target.value as MasterLedgerSortMode)}
+              className="w-[112px] shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-[10px] font-bold text-slate-700 focus:border-slate-400 focus:outline-none md:w-auto md:rounded-xl md:px-3 md:py-2 md:text-xs"
+            >
+              <option value="payment_desc">결제 최신순</option>
+              <option value="tour_asc">투어일 빠른순</option>
+              <option value="tour_desc">투어일 늦은순</option>
+            </select>
             <button
+              aria-label="CSV 다운로드"
               onClick={downloadLedgerCSV}
               className="flex items-center justify-center gap-1.5 md:gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-[11px] md:text-sm font-bold transition-all shrink-0"
             >
