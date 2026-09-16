@@ -7,7 +7,8 @@
     "supabase/migrations/20260912034545_production_schema_baseline.sql",
     "supabase/migrations/20260912050655_service_concierge_assignment.sql",
     "supabase/migrations/20260915141606_p0_storage_rpc_security_hardening.sql",
-    "supabase/migrations/20260916024355_experience_media_locator_cas.sql"
+    "supabase/migrations/20260916024355_experience_media_locator_cas.sql",
+    "supabase/migrations/20260916031212_experience_storage_lockdown.sql"
   ],
   "applicationTables": [
     "admin_audit_logs",
@@ -125,7 +126,7 @@
     { "name": "admin_files", "public": false },
     { "name": "avatars", "public": true },
     { "name": "chat-images", "public": false },
-    { "name": "experiences", "public": true },
+    { "name": "experiences", "public": false },
     { "name": "images", "public": true },
     { "name": "verification-docs", "public": false }
   ],
@@ -231,8 +232,12 @@
       "Authenticated Update",
       "Authenticated Upload",
       "Authenticated users can upload chat images",
+      "Auth Users Upload",
+      "Experience object owners can delete",
+      "Experience object owners can update",
       "Owner Delete",
-      "Owner Update"
+      "Owner Update",
+      "Public Access"
     ]
   }
 }

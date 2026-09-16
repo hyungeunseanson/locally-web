@@ -39,12 +39,14 @@ test.describe('Supabase staging bootstrap contract', () => {
       '20260912050655',
       '20260915141606',
       '20260916024355',
+      '20260916031212',
     ]);
     expect(manifest.freshProjectApplyOrder).toEqual([
       'supabase/migrations/20260912034545_production_schema_baseline.sql',
       'supabase/migrations/20260912050655_service_concierge_assignment.sql',
       'supabase/migrations/20260915141606_p0_storage_rpc_security_hardening.sql',
       'supabase/migrations/20260916024355_experience_media_locator_cas.sql',
+      'supabase/migrations/20260916031212_experience_storage_lockdown.sql',
     ]);
     expect(packageJson.scripts['supabase:staging:baseline:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:current:check']).toBeTruthy();
@@ -164,10 +166,10 @@ test.describe('Supabase staging bootstrap contract', () => {
     ]);
     expect(currentManifest.objects.rls.forced).toEqual([]);
     expect(currentManifest.objects.rls.publicPolicies).toBe(111);
-    expect(currentManifest.objects.storageObjectPolicies).toHaveLength(20);
+    expect(currentManifest.objects.storageObjectPolicies).toHaveLength(16);
     expect(currentManifest.securityFingerprints).toMatchObject({
-      storageBuckets: '384007869cd8ffb76874b05397c554da',
-      storagePolicies: '27b4679aafb896ae579c14510bd9a9d7',
+      storageBuckets: '7419cabe695cd50a522314a749216c05',
+      storagePolicies: '1519cc7c3877bf1389c0e02c63bc223a',
       publicRlsPolicies: '8e2720ce969cfa4252ec20069000fc4c',
       publicRelationGrants: '2c6aec1f48323525171d8f17f135107e',
       stagingOverlayBaselineStoragePolicies: 'd6b381fd629405acfdd615593031de5c',
@@ -233,8 +235,12 @@ test.describe('Supabase staging bootstrap contract', () => {
       'Authenticated Update',
       'Authenticated Upload',
       'Authenticated users can upload chat images',
+      'Auth Users Upload',
+      'Experience object owners can delete',
+      'Experience object owners can update',
       'Owner Delete',
       'Owner Update',
+      'Public Access',
     ]);
   });
 
