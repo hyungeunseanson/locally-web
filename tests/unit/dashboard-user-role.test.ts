@@ -7,6 +7,8 @@ import { resolveDashboardUserRole } from '../../app/utils/dashboardUserRole.ts';
 test('prioritizes admin over approved host state', () => {
   assert.equal(resolveDashboardUserRole('admin', 'approved'), 'admin');
   assert.equal(resolveDashboardUserRole(' ADMIN ', 'active'), 'admin');
+  assert.equal(resolveDashboardUserRole('guest', 'approved', true), 'admin');
+  assert.equal(resolveDashboardUserRole(null, null, true), 'admin');
 });
 
 test('recognizes role-based and latest approved or active hosts', () => {

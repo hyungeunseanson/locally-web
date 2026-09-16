@@ -29,6 +29,7 @@ const createdWhitelistEmails: string[] = [];
 const createdInquiryIds: Array<number | string> = [];
 const createdServiceRequestIds: string[] = [];
 const createdProxyRequestIds: string[] = [];
+const createdAuditTargetIds: string[] = [];
 
 function loadEnv(): EnvMap {
   return readFileSync('.env.local', 'utf8')
@@ -280,6 +281,13 @@ async function createProxyRequestWithoutLinkedInquiry(
 test.afterAll(async () => {
   const supabase = getAdminClient();
 
+  if (createdAuditTargetIds.length > 0) {
+    await supabase
+      .from('admin_audit_logs')
+      .delete()
+      .in('target_id', Array.from(new Set(createdAuditTargetIds)));
+  }
+
   if (createdProxyRequestIds.length > 0) {
     await supabase.from('proxy_comments').delete().in('request_id', createdProxyRequestIds);
     await supabase.from('proxy_requests').delete().in('id', createdProxyRequestIds);
@@ -493,6 +501,87 @@ test.describe.serial('Messaging boundary contracts', () => {
     expect(notifications?.some((notification) => notification.message?.includes(firstMessage))).toBe(true);
     expect(notifications?.some((notification) => notification.message?.includes(secondMessage))).toBe(true);
     expect(notifications?.some((notification) => notification.type === 'admin_alert')).toBe(false);
+  });
+
+  test('whitelist-only admins keep admin role, routing, and official historical-thread sender behavior', async ({ page }) => {
+    const callerAdmin = createUser('whitelist-summary-caller');
+    const whitelistAdmin = createUser('whitelist-only-admin');
+    const guestUser = createUser('whitelist-routing-guest');
+    const hostUser = createUser('whitelist-routing-host');
+    await createAuthUser(callerAdmin, { whitelistAdmin: true });
+    const whitelistAdminId = await createAuthUser(whitelistAdmin, { whitelistAdmin: true });
+    const guestId = await createAuthUser(guestUser);
+    const hostId = await createAuthUser(hostUser);
+    await setUserRole(hostId, hostUser.email, 'host');
+
+    await login(page, callerAdmin);
+    const summaryResponse = await page.request.get('/api/admin/users-summary');
+    expect(summaryResponse.status()).toBe(200);
+    const summary = await summaryResponse.json();
+    expect(summary.data).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: whitelistAdminId, role: 'admin' }),
+    ]));
+
+    const adminRecipientInquiryId = await createAdminSupportInquiry({
+      guestId,
+      hostId: whitelistAdminId,
+      content: `whitelist admin recipient ${Date.now()}`,
+    });
+    await login(page, guestUser);
+    const guestMessage = `route to whitelist admin ${Date.now()}`;
+    const guestResponse = await page.request.post('/api/inquiries/message', {
+      data: { inquiryId: adminRecipientInquiryId, content: guestMessage, type: 'text' },
+    });
+    expect(guestResponse.status()).toBe(200);
+
+    const { data: adminRecipientNotification, error: adminRecipientNotificationError } = await getAdminClient()
+      .from('notifications')
+      .select('type, link')
+      .eq('user_id', whitelistAdminId)
+      .eq('type', 'new_message')
+      .eq('link', `/admin/dashboard?tab=CHATS&inquiryId=${adminRecipientInquiryId}`)
+      .maybeSingle();
+    if (adminRecipientNotificationError) throw adminRecipientNotificationError;
+    expect(adminRecipientNotification).toMatchObject({ type: 'new_message' });
+
+    const historicalInquiryId = await createAdminSupportInquiry({
+      guestId: whitelistAdminId,
+      hostId,
+      type: 'admin',
+      content: `historical whitelist admin ${Date.now()}`,
+    });
+    createdAuditTargetIds.push(String(historicalInquiryId));
+    await login(page, whitelistAdmin);
+    const historicalMessage = `official historical reply ${Date.now()}`;
+    const historicalResponse = await page.request.post('/api/inquiries/message', {
+      data: { inquiryId: historicalInquiryId, content: historicalMessage, type: 'text' },
+    });
+    expect(historicalResponse.status()).toBe(200);
+
+    const { data: hostNotification, error: hostNotificationError } = await getAdminClient()
+      .from('notifications')
+      .select('type, title, message, link')
+      .eq('user_id', hostId)
+      .eq('type', 'new_message')
+      .eq('link', `/host/dashboard?tab=inquiries&inquiryId=${historicalInquiryId}`)
+      .maybeSingle();
+    if (hostNotificationError) throw hostNotificationError;
+    expect(hostNotification).toMatchObject({ type: 'new_message' });
+    expect(hostNotification?.title).toContain('Locally Support');
+    expect(hostNotification?.message).toContain(historicalMessage);
+
+    const { data: auditLog, error: auditLogError } = await getAdminClient()
+      .from('admin_audit_logs')
+      .select('action_type, admin_id, target_id')
+      .eq('target_id', String(historicalInquiryId))
+      .eq('action_type', 'ADMIN_CS_MESSAGE_SEND')
+      .maybeSingle();
+    if (auditLogError) throw auditLogError;
+    expect(auditLog).toMatchObject({
+      action_type: 'ADMIN_CS_MESSAGE_SEND',
+      admin_id: whitelistAdminId,
+      target_id: String(historicalInquiryId),
+    });
   });
 
   test('host support uses the host inbox for admin messages and ChatMonitor for the host reply', async ({ page }) => {

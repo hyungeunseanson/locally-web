@@ -46,6 +46,10 @@ type HostApplicationStatusRow = {
   status: string | null;
 };
 
+type AdminWhitelistRow = {
+  email: string;
+};
+
 const USER_ROLE_BATCH_SIZE = 100;
 const HOST_APPLICATION_BATCH_SIZE = 100;
 function chunkIds(ids: string[], size: number) {
@@ -101,6 +105,11 @@ function normalizeHostApplicationStatusRow(row: AdminRawRow): HostApplicationSta
   };
 }
 
+function normalizeAdminWhitelistRow(row: AdminRawRow): AdminWhitelistRow | null {
+  const email = readStringField(row, 'email');
+  return email ? { email } : null;
+}
+
 export async function GET() {
   try {
     const supabaseServer = await createServerClient();
@@ -135,9 +144,10 @@ export async function GET() {
 
     const roleMap = new Map<string, string | null>();
     const hostStatusMap = new Map<string, string | null>();
+    const adminWhitelistEmails = new Set<string>();
 
     if (profileIds.length > 0) {
-      const [userRoleChunks, hostApplicationChunks] = await Promise.all([
+      const [userRoleChunks, hostApplicationChunks, adminWhitelistResult] = await Promise.all([
         Promise.all(
           chunkIds(profileIds, USER_ROLE_BATCH_SIZE).map(async (batchIds) => {
             const { data: userRows, error: usersError } = await supabaseAdmin
@@ -160,7 +170,10 @@ export async function GET() {
             return toAdminRawRows(hostApplicationRows).map(normalizeHostApplicationStatusRow).filter(isPresent);
           })
         ),
+        supabaseAdmin.from('admin_whitelist').select('email'),
       ]);
+
+      if (adminWhitelistResult.error) throw adminWhitelistResult.error;
 
       userRoleChunks.flat().forEach((userRow) => {
         roleMap.set(userRow.id, userRow.role);
@@ -169,12 +182,23 @@ export async function GET() {
       hostApplicationChunks.flat().forEach((hostApplicationRow) => {
         hostStatusMap.set(hostApplicationRow.user_id, hostApplicationRow.status);
       });
+
+      toAdminRawRows(adminWhitelistResult.data)
+        .map(normalizeAdminWhitelistRow)
+        .filter(isPresent)
+        .forEach((whitelistRow) => {
+          adminWhitelistEmails.add(whitelistRow.email);
+        });
     }
 
     const mergedProfiles = profileRows.map((profile) => ({
       ...profile,
       name: profile.name ?? profile.full_name ?? null,
-      role: resolveDashboardUserRole(roleMap.get(profile.id) ?? null, hostStatusMap.get(profile.id) ?? null),
+      role: resolveDashboardUserRole(
+        roleMap.get(profile.id) ?? null,
+        hostStatusMap.get(profile.id) ?? null,
+        Boolean(profile.email && adminWhitelistEmails.has(profile.email))
+      ),
     }));
 
     return NextResponse.json({ success: true, data: mergedProfiles });
