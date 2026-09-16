@@ -9,12 +9,16 @@ import {
   ExperienceCompletionScheduledError,
   handleExperienceCompletionScheduled,
 } from '../../app/utils/experienceCompletionScheduled';
-import { runExperienceCompletionSync } from '../../app/utils/settlementSync/experienceCompletion';
+import {
+  forceExperienceCompletionSync,
+  runExperienceCompletionSync,
+} from '../../app/utils/settlementSync/experienceCompletion';
 
 type FixtureState = {
   running: boolean;
   nextRunId: number;
   dueRows: Array<Record<string, unknown>>;
+  bookingRows: Array<Record<string, unknown>>;
   calls: string[];
 };
 
@@ -23,6 +27,7 @@ function createSettlementClient(state: FixtureState) {
     private insertValue: Record<string, unknown> | null = null;
     private updateValue: Record<string, unknown> | null = null;
     private hasSelection = false;
+    private filters = new Map<string, unknown>();
 
     constructor(private readonly table: string) {}
     insert(value: Record<string, unknown>) {
@@ -37,12 +42,21 @@ function createSettlementClient(state: FixtureState) {
       this.hasSelection = true;
       return this;
     }
-    eq() { return this; }
+    eq(column: string, value: unknown) {
+      this.filters.set(column, value);
+      return this;
+    }
     lt() { return this; }
     single() { return Promise.resolve(this.resolve(true)); }
     maybeSingle() { return Promise.resolve(this.resolve(true)); }
 
     private resolve(single = false) {
+      if (this.table === 'bookings') {
+        const row = state.bookingRows.find((candidate) =>
+          Array.from(this.filters.entries()).every(([column, value]) => candidate[column] === value)
+        );
+        return { data: row || null, error: null };
+      }
       expect(this.table).toBe('admin_job_runs');
       if (this.insertValue) {
         state.calls.push('job-run:start');
@@ -98,8 +112,11 @@ function createSettlementClient(state: FixtureState) {
   };
 }
 
-function createState(dueRows: Array<Record<string, unknown>> = []): FixtureState {
-  return { running: false, nextRunId: 1, dueRows, calls: [] };
+function createState(
+  dueRows: Array<Record<string, unknown>> = [],
+  bookingRows: Array<Record<string, unknown>> = []
+): FixtureState {
+  return { running: false, nextRunId: 1, dueRows, bookingRows, calls: [] };
 }
 
 const productionEnvironment = {
@@ -119,7 +136,7 @@ test.describe('Experience Completion Cloudflare Cron', () => {
     expect(response.status).toBe(401);
   });
 
-  test('runs the actual shared engine with no candidates and no completion side effects', async () => {
+  test('runs refund reconciliation without completion or review side effects when no completion is due', async () => {
     const state = createState();
     let completionCalls = 0;
     let refundCalls = 0;
@@ -150,7 +167,7 @@ test.describe('Experience Completion Cloudflare Cron', () => {
     });
     expect({ completionCalls, refundCalls, reviewCalls }).toEqual({
       completionCalls: 0,
-      refundCalls: 0,
+      refundCalls: 1,
       reviewCalls: 0,
     });
     expect(state.calls).toEqual([
@@ -158,8 +175,54 @@ test.describe('Experience Completion Cloudflare Cron', () => {
       'job-run:start',
       'rpc:list_due_experience_completion_candidates',
       'job-run:renew',
+      'job-run:renew',
       'job-run:success',
     ]);
+  });
+
+  test('reconciles an already-completed force-one target without completing or reviewing it again', async () => {
+    const state = createState([], [{
+      id: 'completed-booking',
+      order_id: 'completed-order',
+      user_id: 'private-user-id',
+      date: '2026-01-01',
+      time: '14:00',
+      status: 'completed',
+      experiences: { title: 'private title' },
+    }]);
+    const refundInputs: Array<{
+      completedBookingIds: Array<string | number | null | undefined>;
+      reconcileCompleted?: boolean;
+    }> = [];
+    let reviewCalls = 0;
+
+    const result = await forceExperienceCompletionSync({
+      supabaseAdmin: createSettlementClient(state) as never,
+      triggerSource: 'manual_force_one',
+      identifier: 'completed-booking',
+      dependencies: {
+        processSoloGuaranteeRefunds: async (params) => {
+          refundInputs.push(params);
+          return { processed: 0, refunded: 0, pendingManual: 0, failed: 0, skipped: 1 };
+        },
+        deliverReviewRequests: async () => {
+          reviewCalls += 1;
+          return { processedCount: 0, failedCount: 0 };
+        },
+      },
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      outcome: 'already_processed',
+      processedCount: 0,
+      skippedCount: 1,
+    });
+    expect(refundInputs).toHaveLength(1);
+    expect(refundInputs[0].completedBookingIds).toEqual(['completed-booking']);
+    expect(refundInputs[0].reconcileCompleted).toBeFalsy();
+    expect(reviewCalls).toBe(0);
+    expect(state.calls).not.toContain('rpc:complete_experience_booking_if_due_atomic');
   });
 
   test('preserves completion, refund, review, and job-run ordering in the actual engine', async () => {

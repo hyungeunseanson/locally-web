@@ -3,9 +3,12 @@ import {
   type SoloGuaranteeRefundStatus,
 } from '@/app/utils/soloGuaranteeRefundStatus';
 import { getBookingExperienceAmount } from '@/app/utils/bookingFinance';
+import { getBookingStartTimestamp } from '@/app/utils/bookingStartTime';
 import { DEFAULT_SOLO_GUARANTEE_PRICE } from '@/app/constants/soloGuarantee';
+import { getExperienceDurationHours } from '@/app/utils/experienceCardDisplay';
 
 export const SOLO_GUARANTEE_REFUND_AMOUNT = DEFAULT_SOLO_GUARANTEE_PRICE;
+const EXPERIENCE_DURATION_FALLBACK_HOURS = 2;
 
 export type SoloGuaranteeRefundSlotBooking = {
   id: string;
@@ -29,7 +32,7 @@ export type SoloGuaranteeRefundSlotBooking = {
   payout_status?: string | null;
   payment_method?: string | null;
   tid?: string | null;
-  experiences?: { title?: string | null; host_id?: string | null } | Array<{ title?: string | null; host_id?: string | null }> | null;
+  experiences?: { title?: string | null; host_id?: string | null; duration?: number | string | null } | Array<{ title?: string | null; host_id?: string | null; duration?: number | string | null }> | null;
 };
 
 export type SoloGuaranteeRefundCandidate = {
@@ -105,6 +108,37 @@ function normalizeStatus(value?: string | null) {
   return String(value || '').trim().toLowerCase();
 }
 
+function normalizeExperienceMeta(value: SoloGuaranteeRefundSlotBooking['experiences']) {
+  return Array.isArray(value) ? value[0] || null : value || null;
+}
+
+export function getSoloGuaranteeTourEndTimestamp(
+  booking: Pick<SoloGuaranteeRefundSlotBooking, 'date' | 'time' | 'experiences'>
+) {
+  if (!booking.date) return null;
+
+  const time = typeof booking.time === 'string' ? booking.time.trim() : '';
+  if (!/^(?:[01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(time)) return null;
+
+  const startTimestamp = getBookingStartTimestamp(booking.date, time);
+  if (startTimestamp == null) return null;
+
+  const duration = getExperienceDurationHours(normalizeExperienceMeta(booking.experiences)?.duration);
+  const durationHours = duration == null
+    ? EXPERIENCE_DURATION_FALLBACK_HOURS
+    : Number(duration);
+
+  return startTimestamp + durationHours * 60 * 60 * 1000;
+}
+
+export function hasSoloGuaranteeTourEnded(
+  booking: Pick<SoloGuaranteeRefundSlotBooking, 'date' | 'time' | 'experiences'>,
+  now = new Date()
+) {
+  const endTimestamp = getSoloGuaranteeTourEndTimestamp(booking);
+  return endTimestamp != null && endTimestamp <= now.getTime();
+}
+
 function isConfirmedParticipant(row: Pick<SoloGuaranteeRefundSlotBooking, 'status' | 'guests'>) {
   return (
     CONFIRMED_PARTICIPANT_STATUS_SET.has(normalizeStatus(row.status)) &&
@@ -112,7 +146,7 @@ function isConfirmedParticipant(row: Pick<SoloGuaranteeRefundSlotBooking, 'statu
   );
 }
 
-function isRefundableSoloCandidate(row: SoloGuaranteeRefundSlotBooking) {
+function isRefundableSoloCandidate(row: SoloGuaranteeRefundSlotBooking, now: Date) {
   const targetRefundAmount = getSoloGuaranteeRefundTargetAmount(row);
   const currentRefundAmount = toSoloGuaranteeRefundNumber(row.solo_guarantee_refund_amount);
   const refundStatus = normalizeSoloGuaranteeRefundStatus(row.solo_guarantee_refund_status);
@@ -121,15 +155,18 @@ function isRefundableSoloCandidate(row: SoloGuaranteeRefundSlotBooking) {
     normalizeStatus(row.status) === 'completed' &&
     targetRefundAmount > 0 &&
     currentRefundAmount < targetRefundAmount &&
-    SOLO_REFUND_AUTO_PROCESSABLE_STATUS_SET.has(refundStatus)
+    SOLO_REFUND_AUTO_PROCESSABLE_STATUS_SET.has(refundStatus) &&
+    hasSoloGuaranteeTourEnded(row, now)
   );
 }
 
 export function findSoloGuaranteeRefundCandidatesInSlot(
-  rows: SoloGuaranteeRefundSlotBooking[]
+  rows: SoloGuaranteeRefundSlotBooking[],
+  options: { now?: Date } = {}
 ): SoloGuaranteeRefundCandidate[] {
+  const now = options.now ?? new Date();
   return rows.reduce<SoloGuaranteeRefundCandidate[]>((acc, row) => {
-    if (!isRefundableSoloCandidate(row)) {
+    if (!isRefundableSoloCandidate(row, now)) {
       return acc;
     }
 

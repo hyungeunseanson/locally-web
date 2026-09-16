@@ -4,7 +4,9 @@ import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import {
   buildSoloRefundSettlementSnapshot,
   findSoloGuaranteeRefundCandidatesInSlot,
+  getSoloGuaranteeRefundTargetAmount,
   getSoloManualRefundCompletionGuard,
+  hasSoloGuaranteeTourEnded,
   type SoloGuaranteeRefundSlotBooking,
   toSoloGuaranteeRefundNumber as toNumber,
 } from '@/app/utils/bookings/soloGuaranteeRefundPolicy';
@@ -27,6 +29,9 @@ type ProcessSoloGuaranteeRefundResult = {
 };
 
 type CancelCardPaymentFn = typeof cancelCardPayment;
+
+const SOLO_REFUND_RECONCILIATION_LIMIT = 50;
+const SOLO_REFUND_RECONCILIATION_ROTATION_MS = 2 * 60 * 60 * 1000;
 
 function normalizeExperienceMeta(value: SoloGuaranteeRefundSlotBooking['experiences']) {
   return Array.isArray(value) ? value[0] || null : value || null;
@@ -151,7 +156,8 @@ async function processManualSoloRefund(params: {
       ...snapshot,
     })
     .eq('id', params.booking.id)
-    .in('solo_guarantee_refund_status', ['not_applicable', 'failed'])
+    .eq('status', 'completed')
+    .eq('solo_guarantee_refund_status', 'not_applicable')
     .select('id')
     .maybeSingle();
 
@@ -180,6 +186,7 @@ async function processCardSoloRefund(params: {
   triggerBookingId: string;
   refundAmount: number;
   cancelCardPaymentFn: CancelCardPaymentFn;
+  now: Date;
 }) {
   if (params.booking.payout_status === 'paid') {
     await markSoloRefundFailed({
@@ -211,30 +218,63 @@ async function processCardSoloRefund(params: {
       solo_guarantee_refund_trigger_booking_id: params.triggerBookingId,
     })
     .eq('id', params.booking.id)
-    .in('solo_guarantee_refund_status', ['not_applicable', 'failed'])
+    .eq('status', 'completed')
+    .eq('solo_guarantee_refund_status', 'not_applicable')
     .select(
-      'id, order_id, user_id, amount, total_price, total_experience_price, price_at_booking, solo_guarantee_price, solo_guarantee_refund_amount, refund_amount, tid, payout_status'
+      'id, order_id, user_id, experience_id, date, time, status, amount, total_price, total_experience_price, price_at_booking, solo_guarantee_price, solo_guarantee_refund_status, solo_guarantee_refund_amount, refund_amount, payment_method, tid, payout_status, experiences(title, host_id, duration)'
     )
     .maybeSingle();
 
   if (lockError) throw lockError;
   if (!lockedRow) return 'skipped' as const;
 
+  const lockedBooking = { ...params.booking, ...(lockedRow as SoloGuaranteeRefundSlotBooking) };
+  if (lockedBooking.payout_status === 'paid') {
+    await markSoloRefundFailed({
+      supabaseAdmin: params.supabaseAdmin,
+      booking: lockedBooking,
+      triggerBookingId: params.triggerBookingId,
+      refundAmount: params.refundAmount,
+      errorMessage: '이미 정산 완료된 예약입니다. 수동 확인이 필요합니다.',
+    });
+    return 'failed' as const;
+  }
+
+  const stillEligible =
+    String(lockedBooking.status || '').toLowerCase() === 'completed' &&
+    normalizeSoloGuaranteeRefundStatus(lockedBooking.solo_guarantee_refund_status) === 'processing' &&
+    String(lockedBooking.payment_method || '').toLowerCase() === 'card' &&
+    getSoloGuaranteeRefundTargetAmount(lockedBooking) === params.refundAmount &&
+    toNumber(lockedBooking.solo_guarantee_refund_amount) < params.refundAmount &&
+    hasSoloGuaranteeTourEnded(lockedBooking, params.now);
+
+  if (!stillEligible || !lockedBooking.tid) {
+    await params.supabaseAdmin
+      .from('bookings')
+      .update({
+        solo_guarantee_refund_status: 'not_applicable',
+        solo_guarantee_refund_error: null,
+        solo_guarantee_refund_trigger_booking_id: null,
+      })
+      .eq('id', params.booking.id)
+      .eq('solo_guarantee_refund_status', 'processing');
+    return 'skipped' as const;
+  }
+
   try {
     await params.cancelCardPaymentFn({
-      providerTransactionId: String(params.booking.tid),
-      orderId: params.booking.order_id || params.booking.id,
+      providerTransactionId: String(lockedBooking.tid),
+      orderId: lockedBooking.order_id || lockedBooking.id,
       cancelAmount: params.refundAmount,
       cancelReason: '1인 진행 추가금 환불',
-      totalAmount: toNumber(params.booking.amount),
+      totalAmount: toNumber(lockedBooking.amount),
       requireMerchantKey: true,
       acceptedResultCodes: ['2001', '2211'],
     });
 
-    const lockedBooking = { ...params.booking, ...(lockedRow as SoloGuaranteeRefundSlotBooking) };
     const snapshot = buildSoloRefundSettlementSnapshot(lockedBooking, params.refundAmount);
     const nextRefundAmount = Math.min(
-      toNumber(params.booking.amount),
+      toNumber(lockedBooking.amount),
       toNumber(lockedBooking.refund_amount) + params.refundAmount
     );
     const refundedAt = new Date().toISOString();
@@ -323,7 +363,7 @@ async function fetchSlotBookings(
       payout_status,
       payment_method,
       tid,
-      experiences(title, host_id)
+      experiences(title, host_id, duration)
     `)
     .eq('experience_id', slot.experience_id)
     .eq('date', slot.date);
@@ -336,14 +376,57 @@ async function fetchSlotBookings(
   return (data || []) as SoloGuaranteeRefundSlotBooking[];
 }
 
+async function fetchSoloRefundReconciliationBookingIds(
+  supabaseAdmin: SupabaseClient,
+  now: Date
+) {
+  const { count, error: countError } = await supabaseAdmin
+    .from('bookings')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'completed')
+    .gt('solo_guarantee_price', 0)
+    .eq('solo_guarantee_refund_status', 'not_applicable');
+
+  if (countError) throw countError;
+  if (!count) return [];
+
+  const pageCount = Math.ceil(count / SOLO_REFUND_RECONCILIATION_LIMIT);
+  // The existing completion cron runs every two hours; rotate one bounded page per slot.
+  const rotation = Math.floor(now.getTime() / SOLO_REFUND_RECONCILIATION_ROTATION_MS);
+  const pageIndex = ((rotation % pageCount) + pageCount) % pageCount;
+  const pageStart = pageIndex * SOLO_REFUND_RECONCILIATION_LIMIT;
+  const { data, error } = await supabaseAdmin
+    .from('bookings')
+    .select('id, date, time, experiences(duration)')
+    .eq('status', 'completed')
+    .gt('solo_guarantee_price', 0)
+    .eq('solo_guarantee_refund_status', 'not_applicable')
+    .order('date', { ascending: true, nullsFirst: false })
+    .order('id', { ascending: true })
+    .range(pageStart, pageStart + SOLO_REFUND_RECONCILIATION_LIMIT - 1);
+
+  if (error) throw error;
+
+  return ((data || []) as SoloGuaranteeRefundSlotBooking[])
+    .filter((booking) => hasSoloGuaranteeTourEnded(booking, now))
+    .map((booking) => booking.id);
+}
+
 export async function processSoloGuaranteeRefundsForCompletedBookings(params: {
   supabaseAdmin: SupabaseClient;
   completedBookingIds: Array<string | number | null | undefined>;
   cancelCardPaymentFn?: CancelCardPaymentFn;
+  reconcileCompleted?: boolean;
+  now?: Date;
 }): Promise<ProcessSoloGuaranteeRefundResult> {
-  const uniqueBookingIds = Array.from(
-    new Set(params.completedBookingIds.map((id) => String(id || '').trim()).filter(Boolean))
-  );
+  const now = params.now ?? new Date();
+  const bookingIds = params.completedBookingIds
+    .map((id) => String(id || '').trim())
+    .filter(Boolean);
+  if (params.reconcileCompleted) {
+    bookingIds.push(...await fetchSoloRefundReconciliationBookingIds(params.supabaseAdmin, now));
+  }
+  const uniqueBookingIds = Array.from(new Set(bookingIds));
   const result: ProcessSoloGuaranteeRefundResult = {
     processed: 0,
     refunded: 0,
@@ -360,7 +443,7 @@ export async function processSoloGuaranteeRefundsForCompletedBookings(params: {
   for (const slot of uniqueSlots) {
     const rows = await fetchSlotBookings(params.supabaseAdmin, slot);
     const rowMap = new Map(rows.map((row) => [row.id, row]));
-    const candidates = findSoloGuaranteeRefundCandidatesInSlot(rows);
+    const candidates = findSoloGuaranteeRefundCandidatesInSlot(rows, { now });
 
     for (const candidate of candidates) {
       const booking = rowMap.get(candidate.bookingId);
@@ -378,6 +461,7 @@ export async function processSoloGuaranteeRefundsForCompletedBookings(params: {
             triggerBookingId: candidate.triggerBookingId,
             refundAmount: candidate.refundAmount,
             cancelCardPaymentFn: params.cancelCardPaymentFn || cancelCardPayment,
+            now,
           })
         : await processManualSoloRefund({
             supabaseAdmin: params.supabaseAdmin,
