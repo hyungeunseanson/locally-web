@@ -17,13 +17,27 @@ function rowState(row) {
   return Object.fromEntries(FIELDS.map((field) => [field, row[field] ?? null]));
 }
 
-function filterValue(value) {
-  return value === null ? 'is.null' : `eq.${JSON.stringify(value)}`;
+function postgresTextArray(value) {
+  assert(Array.isArray(value), 'Photos must remain a text array.');
+  return `{${value.map((item) => {
+    assert.equal(typeof item, 'string', 'Photos must contain only strings.');
+    return `"${item.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
+  }).join(',')}}`;
+}
+
+function filterValue(field, value) {
+  if (value === null) return 'is.null';
+  if (field === 'photos') return `eq.${postgresTextArray(value)}`;
+  if (field === 'image_url') {
+    assert.equal(typeof value, 'string', 'Legacy image URL must remain text.');
+    return `eq.${value}`;
+  }
+  return `eq.${JSON.stringify(value)}`;
 }
 
 export function buildOptimisticPatchUrl(baseUrl, change) {
   const query = new URLSearchParams({ id: `eq.${change.experienceId}` });
-  for (const field of FIELDS) query.set(field, filterValue(change.before[field] ?? null));
+  for (const field of FIELDS) query.set(field, filterValue(field, change.before[field] ?? null));
   return `${baseUrl}/rest/v1/experiences?${query}`;
 }
 
@@ -40,14 +54,29 @@ export async function applyLocatorPlan({ plan, confirmation, experienceId, loadR
   const current = await loadRows(selected.map((item) => item.experienceId));
   assert.equal(current.length, selected.length, 'Current locator row set differs from the approved plan.');
   const byId = new Map(current.map((row) => [String(row.id), row]));
+  const pending = [];
+  let alreadyExact = 0;
   for (const change of selected) {
     const row = byId.get(change.experienceId);
     assert(row, 'Approved experience row is missing.');
-    assert.equal(digestPayload(rowState(row)), change.expectedDigest, 'Locator plan is stale before first write.');
+    const currentDigest = digestPayload(rowState(row));
+    if (currentDigest === change.nextDigest) {
+      alreadyExact += 1;
+      continue;
+    }
+    assert.equal(currentDigest, change.expectedDigest, 'Locator plan is stale before first write.');
+    pending.push(change);
   }
 
-  const result = { selected: selected.length, updated: 0, conflicts: 0, verified: 0 };
-  for (const change of selected) {
+  const result = {
+    selected: selected.length,
+    plannedUpdates: pending.length,
+    alreadyExact,
+    updated: 0,
+    conflicts: 0,
+    verified: alreadyExact,
+  };
+  for (const change of pending) {
     const updated = await patchRow(change);
     if (!updated) {
       result.conflicts += 1;
