@@ -22,7 +22,8 @@ BEGIN
     '20260915141606:p0_storage_rpc_security_hardening',
     '20260916024355:experience_media_locator_cas',
     '20260916032730:experience_storage_lockdown',
-    '20260916111416:review_tour_end_db_foundation'
+    '20260916111416:review_tour_end_db_foundation',
+    '20260916134243:review_direct_write_lockdown'
   ]::text[];
   IF actual IS DISTINCT FROM expected THEN
     RAISE EXCEPTION 'migration ledger mismatch: %', actual;
@@ -235,8 +236,8 @@ BEGIN
   END IF;
 
   SELECT count(*) INTO actual_count FROM pg_policies WHERE schemaname = 'public';
-  IF actual_count <> 111 THEN
-    RAISE EXCEPTION 'public RLS policy count %, expected 111', actual_count;
+  IF actual_count <> 108 THEN
+    RAISE EXCEPTION 'public RLS policy count %, expected 108', actual_count;
   END IF;
 
   SELECT md5(string_agg(
@@ -249,7 +250,7 @@ BEGIN
     INTO actual_fingerprint
     FROM pg_policies AS policy_def
    WHERE policy_def.schemaname = 'public';
-  IF actual_fingerprint IS DISTINCT FROM '8e2720ce969cfa4252ec20069000fc4c' THEN
+  IF actual_fingerprint IS DISTINCT FROM 'e40c9b6b6a5b834ce627e6e421b11ff8' THEN
     RAISE EXCEPTION 'public RLS policy fingerprint mismatch: %', actual_fingerprint;
   END IF;
 
@@ -275,7 +276,7 @@ BEGIN
     )) AS acl_entry
    WHERE namespace_def.nspname = 'public'
      AND class_def.relkind IN ('r', 'p', 'v', 'm', 'f');
-  IF actual_fingerprint IS DISTINCT FROM '2c6aec1f48323525171d8f17f135107e' THEN
+  IF actual_fingerprint IS DISTINCT FROM '814931d0ab076cc787b8ce26adc5ec0a' THEN
     RAISE EXCEPTION 'public relation grant fingerprint mismatch: %', actual_fingerprint;
   END IF;
 
