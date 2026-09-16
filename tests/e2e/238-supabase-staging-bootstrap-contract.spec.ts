@@ -40,6 +40,7 @@ test.describe('Supabase staging bootstrap contract', () => {
       '20260915141606',
       '20260916024355',
       '20260916032730',
+      '20260916111416',
     ]);
     expect(manifest.freshProjectApplyOrder).toEqual([
       'supabase/migrations/20260912034545_production_schema_baseline.sql',
@@ -47,6 +48,7 @@ test.describe('Supabase staging bootstrap contract', () => {
       'supabase/migrations/20260915141606_p0_storage_rpc_security_hardening.sql',
       'supabase/migrations/20260916024355_experience_media_locator_cas.sql',
       'supabase/migrations/20260916032730_experience_storage_lockdown.sql',
+      'supabase/migrations/20260916111416_review_tour_end_db_foundation.sql',
     ]);
     expect(packageJson.scripts['supabase:staging:baseline:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:current:check']).toBeTruthy();
@@ -149,7 +151,7 @@ test.describe('Supabase staging bootstrap contract', () => {
     expect(currentManifest.objects.publicViews).toHaveLength(2);
     expect(currentManifest.objects.publicTableColumns).toBe(510);
     expect(currentManifest.objects.publicViewColumns).toBe(27);
-    expect(currentManifest.objects.functionOverloads).toHaveLength(45);
+    expect(currentManifest.objects.functionOverloads).toHaveLength(47);
     expect(currentManifest.objects.applicationTriggers).toHaveLength(11);
     expect(currentManifest.objects.indexes).toBe(113);
     expect(currentManifest.objects.constraints).toEqual({

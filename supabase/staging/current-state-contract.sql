@@ -21,7 +21,8 @@ BEGIN
     '20260912050655:service_concierge_assignment',
     '20260915141606:p0_storage_rpc_security_hardening',
     '20260916024355:experience_media_locator_cas',
-    '20260916032730:experience_storage_lockdown'
+    '20260916032730:experience_storage_lockdown',
+    '20260916111416:review_tour_end_db_foundation'
   ]::text[];
   IF actual IS DISTINCT FROM expected THEN
     RAISE EXCEPTION 'migration ledger mismatch: %', actual;
@@ -100,6 +101,7 @@ BEGIN
     'public.confirm_service_bank_payment_atomic(p_order_id text)',
     'public.confirm_service_concierge_payment_atomic(p_order_id text, p_payment_method text, p_tid text)',
     'public.create_booking_atomic(p_user_id uuid, p_experience_id text, p_date text, p_time text, p_guests integer, p_is_private boolean, p_customer_name text, p_customer_phone text, p_payment_method text, p_is_solo_guarantee boolean)',
+    'public.create_experience_review_atomic(p_booking_id text, p_user_id uuid, p_experience_id bigint, p_rating integer, p_content text)',
     'public.create_guest_review_with_notification_atomic(p_booking_id text, p_host_id uuid, p_rating integer, p_content text, p_notification_title text, p_notification_message text)',
     'public.create_service_booking_atomic(p_customer_id uuid, p_request_id uuid, p_application_id uuid, p_contact_name text, p_contact_phone text)',
     'public.create_service_concierge_request_atomic(p_user_id uuid, p_service_type text, p_description text, p_city text, p_schedule jsonb, p_languages text[], p_guest_count integer, p_contact_name text, p_contact_phone text, p_client_request_key text)',
@@ -117,6 +119,7 @@ BEGIN
     'public.lease_experience_translation_task(p_provider text, p_now timestamp with time zone, p_lease_seconds integer)',
     'public.lease_experience_translation_task(p_provider text, p_now timestamp with time zone, p_lease_seconds integer, p_reserved_tokens integer)',
     'public.list_due_experience_completion_candidates(p_booking_id text)',
+    'public.list_due_experience_review_request_candidates(p_limit integer)',
     'public.mark_room_messages_read(p_room_id uuid, p_user_id uuid)',
     'public.prune_notifications_retention(p_cutoff timestamp with time zone, p_batch_size integer)',
     'public.prune_team_workspace_comments(p_task_id uuid, p_keep_limit integer)',
