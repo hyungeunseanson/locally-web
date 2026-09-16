@@ -11,6 +11,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { detectChatPolicySignals } from '@/app/utils/chatPolicySignals';
 import {
+  isAdminSupportInquiry,
   isDeletedInquiryMessage,
   isOfficialInquirySupportMessage,
   shouldApplyChatPolicySignals,
@@ -211,6 +212,8 @@ export default function InquiryChat() {
     if (file) handleSend(file);
   };
 
+  const selectedIsAdminSupport = isAdminSupportInquiry(selectedInquiry?.type);
+
   return (
     <div className="flex gap-0 md:gap-6 h-full w-full relative min-h-0 md:h-[min(780px,calc(100vh-220px))]">
       <UserProfileModal
@@ -260,6 +263,7 @@ export default function InquiryChat() {
             <div className="p-10 text-center text-slate-400 text-sm md:text-base">문의가 없습니다.</div>
           )}
           {inquiries.map((inq) => {
+            const isAdminSupport = isAdminSupportInquiry(inq.type);
             const lastTime = inq.updated_at
               ? new Date(inq.updated_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
               : '';
@@ -272,7 +276,9 @@ export default function InquiryChat() {
               >
                 {/* 아바타 */}
                 <div className="w-11 h-11 md:w-12 md:h-12 rounded-full shrink-0 overflow-hidden relative bg-slate-100 border border-slate-200">
-                  {inq.guest?.avatar_url
+                  {isAdminSupport
+                    ? <Image src={OFFICIAL_SUPPORT_AVATAR_SRC} alt="Locally support" fill sizes="(max-width: 768px) 44px, 48px" unoptimized className="object-cover" />
+                    : inq.guest?.avatar_url
                     ? <Image src={secureUrl(inq.guest.avatar_url)!} alt="guest" fill sizes="(max-width: 768px) 44px, 48px" unoptimized className="object-cover" />
                     : <div className="w-full h-full flex items-center justify-center"><User size={18} className="text-slate-400" /></div>
                   }
@@ -283,7 +289,7 @@ export default function InquiryChat() {
                   <div className="flex justify-between items-baseline mb-0.5">
                     <div className="flex min-w-0 items-center gap-1.5 pr-2">
                       <span className={`text-[14px] md:text-[15px] truncate ${inq.unread_count > 0 ? 'font-bold text-gray-900' : 'font-semibold text-gray-800'}`}>
-                        {inq.guest?.name || '게스트'}
+                        {isAdminSupport ? t('admin_name') : (inq.guest?.name || '게스트')}
                       </span>
                       {inq.unread_count > 0 && (
                         <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-800">
@@ -343,18 +349,20 @@ export default function InquiryChat() {
               </button>
               {/* 게스트 정보 */}
               <div
-                className="flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer"
-                onClick={() => setModalUserId(selectedInquiry.user_id)}
+                className={`flex items-center gap-2.5 flex-1 min-w-0 ${selectedIsAdminSupport ? '' : 'cursor-pointer'}`}
+                onClick={selectedIsAdminSupport ? undefined : () => setModalUserId(selectedInquiry.user_id)}
               >
                 <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gray-100 overflow-hidden border border-gray-200 relative shrink-0">
-                  {selectedInquiry.guest?.avatar_url
+                  {selectedIsAdminSupport
+                    ? <Image src={OFFICIAL_SUPPORT_AVATAR_SRC} alt="Locally support" fill sizes="(max-width: 768px) 32px, 40px" unoptimized className="object-cover" />
+                    : selectedInquiry.guest?.avatar_url
                     ? <Image src={secureUrl(selectedInquiry.guest.avatar_url)!} alt="guest" fill sizes="(max-width: 768px) 32px, 40px" unoptimized className="object-cover" />
                     : <div className="w-full h-full flex items-center justify-center"><User size={14} className="text-slate-400" /></div>
                   }
                 </div>
                 <div className="min-w-0">
                   <div className="font-bold text-[14px] md:text-[15px] leading-tight truncate">
-                    {selectedInquiry.guest?.name || '게스트'}
+                    {selectedIsAdminSupport ? t('admin_chat_title') : (selectedInquiry.guest?.name || '게스트')}
                   </div>
                   <div className="text-[11px] md:text-[12px] text-gray-500 truncate">{selectedInquiry.experiences?.title}</div>
                 </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 // 🟢 [수정] 아이콘 추가 및 유틸리티 import
 import {
@@ -104,6 +105,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: {
   onlineUsers: OnlineUser[]; 
   deleteItem: (table: string, id: string) => void;
 }) {
+  const router = useRouter();
   const { showToast } = useToast(); // 🟢 추가
   const { requestConfirm, ConfirmDialogElement } = useConfirmDialog();
   const [searchTerm, setSearchTerm] = useState('');
@@ -332,14 +334,49 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: {
     setSelectedUserIds(prev => prev.includes(id) ? prev.filter(uid => uid !== id) : [...prev, id]);
   };
 
-  // 🟢 [추가] 알림 발송 로직
-  const handleSendNotification = async () => {
-    if (!notiTitle.trim() || !notiMessage.trim()) {
-      showToast('제목과 내용을 입력해주세요.', 'error');
+  const selectedMessageRecipient = selectedUserIds.length === 1
+    ? displayUsers.find((user) => user.id === selectedUserIds[0]) || null
+    : null;
+  const isDirectSupportMessage = Boolean(
+    selectedMessageRecipient && selectedMessageRecipient.role !== 'admin'
+  );
+
+  // 🟢 [추가] 개별 1:1 문의 / 기존 알림 발송 로직
+  const handleSendMessage = async () => {
+    if (isSending) return;
+
+    if (!notiMessage.trim() || (!isDirectSupportMessage && !notiTitle.trim())) {
+      showToast(isDirectSupportMessage ? '내용을 입력해주세요.' : '제목과 내용을 입력해주세요.', 'error');
       return;
     }
+
     setIsSending(true);
     try {
+      if (isDirectSupportMessage && selectedMessageRecipient) {
+        const response = await fetch('/api/inquiries/thread', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contextType: 'admin_initiated_support',
+            guestId: selectedMessageRecipient.id,
+            message: notiMessage.trim(),
+            openOnly: true,
+          }),
+        });
+        const result = await response.json();
+
+        if (!response.ok || !result?.success || !result?.inquiryId) {
+          throw new Error(result?.error || '1:1 문의 전송에 실패했습니다.');
+        }
+
+        setIsNotiModalOpen(false);
+        setNotiTitle('');
+        setNotiMessage('');
+        setSelectedUserIds([]);
+        router.push(result.redirectUrl || `/admin/dashboard?tab=CHATS&inquiryId=${result.inquiryId}`);
+        return;
+      }
+
       const result = await sendNotification({
         recipient_ids: selectedUserIds,
         type: 'admin_alert',
@@ -362,7 +399,9 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: {
         showToast(`${notificationCount}명에게 인앱+이메일 전송 완료!`, 'success');
       }
       setIsNotiModalOpen(false);
-      setNotiTitle(''); setNotiMessage(''); setSelectedUserIds([]);
+      setNotiTitle('');
+      setNotiMessage('');
+      setSelectedUserIds([]);
     } catch (e) {
       console.error(e);
       showToast(e instanceof Error ? e.message : '전송 실패', 'error');
@@ -453,7 +492,9 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: {
                   onClick={() => setIsNotiModalOpen(true)}
                   className="flex shrink-0 items-center gap-2 px-3 md:px-4 py-2 bg-slate-900 text-white text-xs md:text-sm font-bold rounded-lg hover:bg-slate-800 transition-colors animate-in fade-in"
                 >
-                  <Bell size={16} /> {selectedUserIds.length}명에게 알림 발송
+                  {selectedUserIds.length === 1 && selectedMessageRecipient?.role !== 'admin'
+                    ? <><MessageCircle size={16} /> 1:1 문의 보내기</>
+                    : <><Bell size={16} /> {selectedUserIds.length}명에게 알림 발송</>}
                 </button>
               )}
 
@@ -880,7 +921,9 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: {
               onClick={() => { setSelectedUserIds([selectedUser.id]); setIsNotiModalOpen(true); }}
               className="w-full bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold py-2.5 md:py-3 rounded-xl transition-colors flex items-center justify-center gap-1.5 md:gap-2 mb-2 text-xs md:text-sm"
             >
-              <Bell className="w-3.5 h-3.5 md:w-4 md:h-4" /> 이 회원에게 알림 보내기
+              {selectedUser.role === 'admin'
+                ? <><Bell className="w-3.5 h-3.5 md:w-4 md:h-4" /> 이 회원에게 알림 보내기</>
+                : <><MessageCircle className="w-3.5 h-3.5 md:w-4 md:h-4" /> 이 회원에게 1:1 문의 보내기</>}
             </button>
 
             <p className="text-[10px] md:text-xs text-slate-400 text-center mb-2">
@@ -896,7 +939,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: {
         </div>
       )}
 
-      {/* 🟢 [추가] 알림 발송 모달 */}
+      {/* 🟢 [추가] 개별 1:1 문의 / 알림 발송 모달 */}
       {isNotiModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl relative animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
@@ -904,15 +947,21 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: {
 
             <div className="mb-6 text-center">
               <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3 mx-auto"><Send size={24} /></div>
-              <h3 className="text-xl font-black">알림 보내기</h3>
-              <p className="text-sm text-slate-500">선택된 <span className="font-bold text-slate-900">{selectedUserIds.length}명</span>에게 메시지를 보냅니다.</p>
+              <h3 className="text-xl font-black">{isDirectSupportMessage ? '1:1 문의 보내기' : '알림 보내기'}</h3>
+              <p className="text-sm text-slate-500">
+                {isDirectSupportMessage
+                  ? `${selectedMessageRecipient?.full_name || selectedMessageRecipient?.email || '선택한 회원'}님에게 메시지를 보냅니다.`
+                  : <>선택된 <span className="font-bold text-slate-900">{selectedUserIds.length}명</span>에게 메시지를 보냅니다.</>}
+              </p>
             </div>
 
             <div className="space-y-4">
-              <input type="text" value={notiTitle} onChange={(e) => setNotiTitle(e.target.value)} className="w-full p-3 bg-slate-50 border rounded-xl font-bold text-sm" placeholder="제목" autoFocus />
-              <textarea value={notiMessage} onChange={(e) => setNotiMessage(e.target.value)} className="w-full p-3 bg-slate-50 border rounded-xl text-sm h-32 resize-none" placeholder="내용" />
-              <button onClick={handleSendNotification} disabled={isSending} className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-black">
-                {isSending ? '발송 중...' : <><CheckCircle size={18} /> 발송하기</>}
+              {!isDirectSupportMessage && (
+                <input type="text" value={notiTitle} onChange={(e) => setNotiTitle(e.target.value)} className="w-full p-3 bg-slate-50 border rounded-xl font-bold text-sm" placeholder="제목" autoFocus />
+              )}
+              <textarea value={notiMessage} onChange={(e) => setNotiMessage(e.target.value)} className="w-full p-3 bg-slate-50 border rounded-xl text-sm h-32 resize-none" placeholder="내용" autoFocus={isDirectSupportMessage} />
+              <button onClick={handleSendMessage} disabled={isSending} className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-black disabled:cursor-not-allowed disabled:opacity-60">
+                {isSending ? '발송 중...' : <><CheckCircle size={18} /> {isDirectSupportMessage ? '문의 보내기' : '발송하기'}</>}
               </button>
             </div>
           </div>
