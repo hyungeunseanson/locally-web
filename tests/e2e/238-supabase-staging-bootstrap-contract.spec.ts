@@ -38,13 +38,13 @@ test.describe('Supabase staging bootstrap contract', () => {
       '20260912034545',
       '20260912050655',
       '20260915141606',
-      '20260916020911',
+      '20260916024355',
     ]);
     expect(manifest.freshProjectApplyOrder).toEqual([
       'supabase/migrations/20260912034545_production_schema_baseline.sql',
       'supabase/migrations/20260912050655_service_concierge_assignment.sql',
       'supabase/migrations/20260915141606_p0_storage_rpc_security_hardening.sql',
-      'supabase/migrations/20260916020911_experience_media_locator_cas.sql',
+      'supabase/migrations/20260916024355_experience_media_locator_cas.sql',
     ]);
     expect(packageJson.scripts['supabase:staging:baseline:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:current:check']).toBeTruthy();
