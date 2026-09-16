@@ -6,7 +6,8 @@
   "freshProjectApplyOrder": [
     "supabase/migrations/20260912034545_production_schema_baseline.sql",
     "supabase/migrations/20260912050655_service_concierge_assignment.sql",
-    "supabase/migrations/20260915141606_p0_storage_rpc_security_hardening.sql"
+    "supabase/migrations/20260915141606_p0_storage_rpc_security_hardening.sql",
+    "supabase/migrations/20260916020911_experience_media_locator_cas.sql"
   ],
   "applicationTables": [
     "admin_audit_logs",
@@ -54,6 +55,7 @@
     "public_profiles"
   ],
   "applicationFunctions": [
+    "apply_experience_media_locator_cas",
     "assign_service_concierge_host_atomic",
     "begin_service_refund_operation_atomic",
     "cancel_pending_service_concierge_atomic",

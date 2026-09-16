@@ -1,6 +1,6 @@
 {
   "schemaContractVersion": 3,
-  "capturedAt": "2026-09-15",
+  "capturedAt": "2026-09-16",
   "productionProjectRef": "uhinvcydgzqlpnvieyal",
   "source": {
     "kind": "read-only Production PostgreSQL catalog inventory",
@@ -34,6 +34,12 @@
       "name": "p0_storage_rpc_security_hardening",
       "repositoryFile": "supabase/migrations/20260915141606_p0_storage_rpc_security_hardening.sql",
       "repositorySha256": "1ea5c5ac17ec03fd2cc90cd92f471919aa06703ced3c688c0a83b79b34e6a1a0"
+    },
+    {
+      "version": "20260916020911",
+      "name": "experience_media_locator_cas",
+      "repositoryFile": "supabase/migrations/20260916020911_experience_media_locator_cas.sql",
+      "repositorySha256": "9f8f0b3b015044a269e21222fd552abb9f81be29a28fbdb6fe8845e2556d67e4"
     }
   ],
   "operationalStateDeltas": [
@@ -93,6 +99,7 @@
     "publicTableColumns": 510,
     "publicViewColumns": 27,
     "functionOverloads": [
+      "public.apply_experience_media_locator_cas(p_experience_id bigint, p_before_photos text[], p_before_image_url text, p_before_itinerary jsonb, p_before_itinerary_i18n jsonb, p_after_photos text[], p_after_image_url text, p_after_itinerary jsonb, p_after_itinerary_i18n jsonb)",
       "public.assign_service_concierge_host_atomic(p_admin_id uuid, p_request_id uuid, p_host_id uuid, p_host_hourly_rate integer, p_host_agreement_confirmed boolean)",
       "public.begin_service_refund_operation_atomic(p_admin_id uuid, p_order_id text, p_refund_amount integer, p_host_compensation_amount integer, p_idempotency_key text)",
       "public.cancel_pending_service_concierge_atomic(p_actor_id uuid, p_order_id text, p_cancel_reason text)",
