@@ -54,14 +54,29 @@ export async function applyLocatorPlan({ plan, confirmation, experienceId, loadR
   const current = await loadRows(selected.map((item) => item.experienceId));
   assert.equal(current.length, selected.length, 'Current locator row set differs from the approved plan.');
   const byId = new Map(current.map((row) => [String(row.id), row]));
+  const pending = [];
+  let alreadyExact = 0;
   for (const change of selected) {
     const row = byId.get(change.experienceId);
     assert(row, 'Approved experience row is missing.');
-    assert.equal(digestPayload(rowState(row)), change.expectedDigest, 'Locator plan is stale before first write.');
+    const currentDigest = digestPayload(rowState(row));
+    if (currentDigest === change.nextDigest) {
+      alreadyExact += 1;
+      continue;
+    }
+    assert.equal(currentDigest, change.expectedDigest, 'Locator plan is stale before first write.');
+    pending.push(change);
   }
 
-  const result = { selected: selected.length, updated: 0, conflicts: 0, verified: 0 };
-  for (const change of selected) {
+  const result = {
+    selected: selected.length,
+    plannedUpdates: pending.length,
+    alreadyExact,
+    updated: 0,
+    conflicts: 0,
+    verified: alreadyExact,
+  };
+  for (const change of pending) {
     const updated = await patchRow(change);
     if (!updated) {
       result.conflicts += 1;

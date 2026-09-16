@@ -18,13 +18,63 @@ test('prevalidates every selected row before the first optimistic write', async 
     loadRows: async () => [row],
     patchRow: async (change) => { writes += 1; return { id: 42, ...change.after }; },
   });
-  assert.deepEqual(result, { selected: 1, updated: 1, conflicts: 0, verified: 1 });
+  assert.deepEqual(result, {
+    selected: 1,
+    plannedUpdates: 1,
+    alreadyExact: 0,
+    updated: 1,
+    conflicts: 0,
+    verified: 1,
+  });
   assert.equal(writes, 1);
   await assert.rejects(() => applyLocatorPlan({
     plan, confirmation: plan.planDigest,
     loadRows: async () => [{ ...row, photos: [] }],
     patchRow: async () => { writes += 1; },
   }), /stale/);
+  assert.equal(writes, 1);
+});
+
+test('treats rows already at the approved next digest as verified without another write', async () => {
+  let writes = 0;
+  const result = await applyLocatorPlan({
+    plan,
+    confirmation: plan.planDigest,
+    loadRows: async () => [{ id: row.id, ...plan.changes[0].after }],
+    patchRow: async () => { writes += 1; },
+  });
+  assert.deepEqual(result, {
+    selected: 1,
+    plannedUpdates: 0,
+    alreadyExact: 1,
+    updated: 0,
+    conflicts: 0,
+    verified: 1,
+  });
+  assert.equal(writes, 0);
+});
+
+test('prevalidates a mixed already-exact and pending batch before writing', async () => {
+  const secondRow = { ...row, id: 43 };
+  const mixedPlan = buildExperienceLocatorMigrationPlan({ rows: [row, secondRow], proofs: [proof], createdAt: 'ignored' });
+  let writes = 0;
+  const result = await applyLocatorPlan({
+    plan: mixedPlan,
+    confirmation: mixedPlan.planDigest,
+    loadRows: async () => [
+      { id: row.id, ...mixedPlan.changes[0].after },
+      secondRow,
+    ],
+    patchRow: async (change) => { writes += 1; return { id: 43, ...change.after }; },
+  });
+  assert.deepEqual(result, {
+    selected: 2,
+    plannedUpdates: 1,
+    alreadyExact: 1,
+    updated: 1,
+    conflicts: 0,
+    verified: 2,
+  });
   assert.equal(writes, 1);
 });
 
