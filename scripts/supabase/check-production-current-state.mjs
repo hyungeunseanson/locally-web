@@ -94,9 +94,9 @@ const expectedLedger = [
     repositoryFile: 'supabase/migrations/20260916024355_experience_media_locator_cas.sql',
   },
   {
-    version: '20260916031212',
+    version: '20260916032730',
     name: 'experience_storage_lockdown',
-    repositoryFile: 'supabase/migrations/20260916031212_experience_storage_lockdown.sql',
+    repositoryFile: 'supabase/migrations/20260916032730_experience_storage_lockdown.sql',
   },
 ];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));
