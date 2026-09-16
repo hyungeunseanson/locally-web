@@ -11,8 +11,8 @@ const overlayPath = resolve(root, 'supabase/staging/post-baseline-current-state-
 const expectedFingerprints = {
   storageBuckets: '7419cabe695cd50a522314a749216c05',
   storagePolicies: '1519cc7c3877bf1389c0e02c63bc223a',
-  publicRlsPolicies: '8e2720ce969cfa4252ec20069000fc4c',
-  publicRelationGrants: '2c6aec1f48323525171d8f17f135107e',
+  publicRlsPolicies: 'e40c9b6b6a5b834ce627e6e421b11ff8',
+  publicRelationGrants: '814931d0ab076cc787b8ce26adc5ec0a',
   stagingOverlayBaselineStoragePolicies: 'd6b381fd629405acfdd615593031de5c',
   stagingOverlayTargetStorageBuckets: 'c3ff5767c8e4934ae05b3d96550441c8',
   stagingOverlayTargetStoragePolicies: '38c973a52a0bebe8fa78b3f53089e427',
@@ -103,6 +103,11 @@ const expectedLedger = [
     name: 'review_tour_end_db_foundation',
     repositoryFile: 'supabase/migrations/20260916111416_review_tour_end_db_foundation.sql',
   },
+  {
+    version: '20260916134243',
+    name: 'review_direct_write_lockdown',
+    repositoryFile: 'supabase/migrations/20260916134243_review_direct_write_lockdown.sql',
+  },
 ];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));
 for (const [index, expected] of expectedLedger.entries()) {
@@ -142,7 +147,7 @@ assert(objects.constraints.check === 67, 'expected 67 check constraints');
 assert(objects.rls.enabled.length === 37, 'expected 37 RLS-enabled tables');
 assert(objects.rls.disabled.length === 2, 'expected 2 RLS-disabled tables');
 assert(objects.rls.forced.length === 0, 'expected zero FORCE RLS tables');
-assert(objects.rls.publicPolicies === 111, 'expected 111 public policies');
+assert(objects.rls.publicPolicies === 108, 'expected 108 public policies');
 assert(objects.realtimePublication.tables.length === 7, 'expected seven Realtime tables');
 assert(objects.storageBuckets.length === 6, 'expected six Storage buckets');
 assert(objects.storageObjectPolicies.length === 16, 'expected 16 Storage policies');

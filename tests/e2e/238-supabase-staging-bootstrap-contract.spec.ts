@@ -41,6 +41,7 @@ test.describe('Supabase staging bootstrap contract', () => {
       '20260916024355',
       '20260916032730',
       '20260916111416',
+      '20260916134243',
     ]);
     expect(manifest.freshProjectApplyOrder).toEqual([
       'supabase/migrations/20260912034545_production_schema_baseline.sql',
@@ -49,6 +50,7 @@ test.describe('Supabase staging bootstrap contract', () => {
       'supabase/migrations/20260916024355_experience_media_locator_cas.sql',
       'supabase/migrations/20260916032730_experience_storage_lockdown.sql',
       'supabase/migrations/20260916111416_review_tour_end_db_foundation.sql',
+      'supabase/migrations/20260916134243_review_direct_write_lockdown.sql',
     ]);
     expect(packageJson.scripts['supabase:staging:baseline:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:current:check']).toBeTruthy();
@@ -167,13 +169,13 @@ test.describe('Supabase staging bootstrap contract', () => {
       'admin_support_unread_alert_batches',
     ]);
     expect(currentManifest.objects.rls.forced).toEqual([]);
-    expect(currentManifest.objects.rls.publicPolicies).toBe(111);
+    expect(currentManifest.objects.rls.publicPolicies).toBe(108);
     expect(currentManifest.objects.storageObjectPolicies).toHaveLength(16);
     expect(currentManifest.securityFingerprints).toMatchObject({
       storageBuckets: '7419cabe695cd50a522314a749216c05',
       storagePolicies: '1519cc7c3877bf1389c0e02c63bc223a',
-      publicRlsPolicies: '8e2720ce969cfa4252ec20069000fc4c',
-      publicRelationGrants: '2c6aec1f48323525171d8f17f135107e',
+      publicRlsPolicies: 'e40c9b6b6a5b834ce627e6e421b11ff8',
+      publicRelationGrants: '814931d0ab076cc787b8ce26adc5ec0a',
       stagingOverlayBaselineStoragePolicies: 'd6b381fd629405acfdd615593031de5c',
     });
     for (const fingerprint of [

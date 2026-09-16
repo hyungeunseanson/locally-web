@@ -12,8 +12,8 @@
     "canonicalization": "MD5 of pipe-delimited fields, newline-delimited rows in the contract's explicit deterministic order; NULL is an empty string and policy roles are comma-delimited",
     "storageBuckets": "7419cabe695cd50a522314a749216c05",
     "storagePolicies": "1519cc7c3877bf1389c0e02c63bc223a",
-    "publicRlsPolicies": "8e2720ce969cfa4252ec20069000fc4c",
-    "publicRelationGrants": "2c6aec1f48323525171d8f17f135107e",
+    "publicRlsPolicies": "e40c9b6b6a5b834ce627e6e421b11ff8",
+    "publicRelationGrants": "814931d0ab076cc787b8ce26adc5ec0a",
     "stagingOverlayBaselineStoragePolicies": "d6b381fd629405acfdd615593031de5c"
   },
   "migrationLedger": [
@@ -52,6 +52,12 @@
       "name": "review_tour_end_db_foundation",
       "repositoryFile": "supabase/migrations/20260916111416_review_tour_end_db_foundation.sql",
       "repositorySha256": "f1fe84ba7b7e3726524788820bfb848c2f786b1b9f0eb4ab54a98fb6bc0de9fc"
+    },
+    {
+      "version": "20260916134243",
+      "name": "review_direct_write_lockdown",
+      "repositoryFile": "supabase/migrations/20260916134243_review_direct_write_lockdown.sql",
+      "repositorySha256": "46101fbfea8c0bf01e322001db8ba9511ad01772baf9fcfed726ac0d80e79c8b"
     }
   ],
   "operationalStateDeltas": [
@@ -225,7 +231,7 @@
         "admin_support_unread_alert_batches"
       ],
       "forced": [],
-      "publicPolicies": 111
+      "publicPolicies": 108
     },
     "realtimePublication": {
       "name": "supabase_realtime",
