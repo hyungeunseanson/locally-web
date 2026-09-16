@@ -52,7 +52,9 @@ interface ReservationCardProps {
     } | null;
     experiences?: {
       title?: string | null;
+      duration?: number | string | null;
     } | null;
+    reviewEligible?: boolean;
     membershipStatus?: LocallyMembershipStatus;
   };
   isNew: boolean;
@@ -117,8 +119,9 @@ export default function ReservationCard({
   const dDay = getDDay(res.date);
   const isConfirmed = isConfirmedBookingStatus(res.status);
   const hasStarted = hasBookingStarted(res.date, res.time);
-  const canReview = hasStarted && isCompletedBookingStatus(res.status) && !isCancelledBookingStatus(res.status);
-  const showDesktopReviewButton = canReview;
+  const reviewWindowOpen = res.reviewEligible === true && isCompletedBookingStatus(res.status) && !isCancelledBookingStatus(res.status);
+  const canReview = reviewWindowOpen && !hasReview;
+  const showReviewButton = hasReview || reviewWindowOpen;
   const orderDisplay = String(res.order_id || res.id);
   const guestCount = res.guests ?? 0;
   const expectedIncomeDisplay = `₩${getBookingHostPayout(res).toLocaleString()}`;
@@ -284,11 +287,11 @@ export default function ReservationCard({
             onClick={onCalendar}
           />
 
-          {canReview && (
+          {showReviewButton && (
             <MobileActionButton
               icon={<CheckCircle2 size={15} className={hasReview ? 'text-slate-400' : 'text-blue-500'} />}
               label={hasReview ? t('res_review_done') : t('res_review_write')}
-              onClick={() => { if (!hasReview) onReview(); }}
+              onClick={() => { if (canReview) onReview(); }}
               fullWidth
               disabled={hasReview}
             />
@@ -404,9 +407,9 @@ export default function ReservationCard({
             <MessageSquare size={16} /> {messageButtonLabel}
           </button>
 
-          {showDesktopReviewButton && (
+          {showReviewButton && (
             <button
-              onClick={(e) => { e.stopPropagation(); if (!hasReview) onReview(); }}
+              onClick={(e) => { e.stopPropagation(); if (canReview) onReview(); }}
               disabled={hasReview}
               className={`w-full px-4 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-colors ${hasReview
                 ? 'bg-slate-100 text-slate-400 cursor-default'

@@ -22,6 +22,7 @@ import {
   isOverdueActiveBooking,
 } from '@/app/utils/bookingStartTime';
 import { isUnapprovedCardPaymentAttempt } from '@/app/utils/bookings/pendingBookingHolds';
+import { isBookingReviewEligible } from '@/app/utils/reviews/reviewEligibility';
 
 // 컴포넌트
 import ReservationCard from './ReservationCard';
@@ -45,6 +46,7 @@ type ReservationGuest = {
 
 type ReservationExperience = {
   title?: string | null;
+  duration?: number | string | null;
 };
 
 type ReservationExperienceRelation = ReservationExperience | ReservationExperience[] | null;
@@ -74,6 +76,7 @@ type ReservationRecord = {
   guest_age_band?: string | null;
   guest_gender?: string | null;
   raw_status?: string | null;
+  reviewEligible?: boolean;
   guest?: ReservationGuest | null;
   experiences?: ReservationExperience | null;
 };
@@ -138,7 +141,8 @@ const RESERVATION_SELECT = `
   guest_age_band,
   guest_gender,
   experiences!inner (
-    title
+    title,
+    duration
   )
 `;
 
@@ -333,6 +337,7 @@ export default function ReservationManager() {
       );
       const nextReservations = reservationRows.map((reservation) => {
         const rawStatus = reservation.status;
+        const experience = getSingleExperience(reservation.experiences);
         const effectiveStatus = getEffectiveCompletedStatus(
           rawStatus,
           reservation.date,
@@ -344,12 +349,17 @@ export default function ReservationManager() {
           ...reservation,
           status: effectiveStatus,
           raw_status: rawStatus,
+          reviewEligible: isBookingReviewEligible({
+            date: reservation.date,
+            time: reservation.time,
+            duration: experience?.duration,
+          }, now),
           guest: {
             ...(guestById.get(String(reservation.user_id)) || {}),
             id: reservation.user_id,
             phone: reservation.contact_phone || null,
           },
-          experiences: getSingleExperience(reservation.experiences),
+          experiences: experience,
         };
       });
       setReservations(nextReservations);
@@ -671,6 +681,11 @@ export default function ReservationManager() {
                 hasReview={reviewedBookingIds.includes(String(res.id))}
                 onReview={() => {
                   const syncAndOpenReview = async () => {
+                    if (!res.reviewEligible) {
+                      showToast(t('res_review_before_tour'), 'error');
+                      return;
+                    }
+
                     const shouldSyncBeforeReview = isOverdueActiveBooking(
                       res.raw_status || '',
                       res.date,

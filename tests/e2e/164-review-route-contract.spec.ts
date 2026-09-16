@@ -75,6 +75,8 @@ async function createCompletedBooking(params: {
   guestPhone: string;
   experienceId: number;
   suffix: string;
+  date?: string;
+  time?: string | null;
 }) {
   const bookingId = `REVIEW-CONTRACT-${params.suffix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
   const bookingDate = new Date();
@@ -90,8 +92,8 @@ async function createCompletedBooking(params: {
     total_experience_price: 30000,
     status: 'completed',
     guests: 1,
-    date: formatDate(bookingDate),
-    time: '10:00',
+    date: params.date ?? formatDate(bookingDate),
+    time: params.time === undefined ? '10:00' : params.time,
     type: 'group',
     contact_name: params.guestName,
     contact_phone: params.guestPhone,
@@ -254,6 +256,48 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Review route contract', () => {
+  test('rejects a completed booking before its scheduled tour end and preserves ownership', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const { userId: hostId } = await createRegularUser('host.not-eligible');
+    const { user: guest, userId: guestId } = await createRegularUser('guest.not-eligible');
+    const { user: otherGuest } = await createRegularUser('guest.not-owner');
+    const experience = await createExperienceFixture(hostId, 'not-eligible');
+    const bookingId = await createCompletedBooking({
+      guestId,
+      guestName: guest.fullName,
+      guestPhone: guest.phone,
+      experienceId: experience.id,
+      suffix: 'not-eligible',
+      date: '2099-09-20',
+      time: '14:00',
+    });
+
+    await login(page, guest);
+    const beforeEndResponse = await postReviewFromBrowser(page, {
+      experienceId: experience.id,
+      bookingId,
+      rating: 5,
+      content: '체험 종료 전에는 작성할 수 없습니다.',
+    });
+    expect(beforeEndResponse).toMatchObject({
+      status: 400,
+      body: { error: '체험 예정 종료 후에 후기를 작성할 수 있습니다.' },
+    });
+
+    await login(page, otherGuest);
+    const foreignResponse = await postReviewFromBrowser(page, {
+      experienceId: experience.id,
+      bookingId,
+      rating: 5,
+      content: '다른 고객의 예약에는 작성할 수 없습니다.',
+    });
+    expect(foreignResponse).toMatchObject({
+      status: 403,
+      body: { error: '본인의 예약에만 후기를 작성할 수 있습니다.' },
+    });
+  });
+
   test('creates review with booking truth, notification, admin alert, and synced aggregates', async ({ page }) => {
     test.setTimeout(90000);
 

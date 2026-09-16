@@ -30,6 +30,8 @@ export interface GuestTrip {
   title_zh?: string | null;
   date: string;
   time: string;
+  duration?: number | string | null;
+  reviewEligible?: boolean;
   location?: string;
   meetingPoint?: string;
   meetingPointI18n?: Record<string, string> | null;

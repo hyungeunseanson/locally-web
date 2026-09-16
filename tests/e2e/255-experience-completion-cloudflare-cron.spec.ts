@@ -107,6 +107,9 @@ function createSettlementClient(state: FixtureState) {
       if (name === 'list_due_experience_completion_candidates') {
         return { data: state.dueRows, error: null };
       }
+      if (name === 'list_due_experience_review_request_candidates') {
+        return { data: [], error: null };
+      }
       throw new Error(`unexpected fixture rpc: ${name}`);
     },
   };
@@ -136,11 +139,12 @@ test.describe('Experience Completion Cloudflare Cron', () => {
     expect(response.status).toBe(401);
   });
 
-  test('runs refund reconciliation without completion or review side effects when no completion is due', async () => {
+  test('runs refund and bounded review-request reconciliation when no completion is due', async () => {
     const state = createState();
     let completionCalls = 0;
     let refundCalls = 0;
     let reviewCalls = 0;
+    let reviewReconciliationCalls = 0;
     const result = await runExperienceCompletionSync({
       supabaseAdmin: createSettlementClient(state) as never,
       triggerSource: 'cron',
@@ -157,6 +161,16 @@ test.describe('Experience Completion Cloudflare Cron', () => {
           reviewCalls += 1;
           return { processedCount: 0, failedCount: 0 };
         },
+        reconcileReviewRequests: async () => {
+          reviewReconciliationCalls += 1;
+          return {
+            candidateCount: 0,
+            customerCreatedCount: 0,
+            hostCreatedCount: 0,
+            failedCount: 0,
+            hostNotificationBookingIds: [],
+          };
+        },
       },
     });
     expect(result).toMatchObject({
@@ -165,10 +179,11 @@ test.describe('Experience Completion Cloudflare Cron', () => {
       processedCount: 0,
       skippedCount: 0,
     });
-    expect({ completionCalls, refundCalls, reviewCalls }).toEqual({
+    expect({ completionCalls, refundCalls, reviewCalls, reviewReconciliationCalls }).toEqual({
       completionCalls: 0,
       refundCalls: 1,
       reviewCalls: 0,
+      reviewReconciliationCalls: 1,
     });
     expect(state.calls).toEqual([
       'job-run:abandon-expired',

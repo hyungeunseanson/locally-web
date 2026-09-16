@@ -5,6 +5,7 @@ import {
 } from '@/app/utils/bookings/completeExperienceBooking';
 import { processSoloGuaranteeRefundsForCompletedBookings } from '@/app/utils/bookings/soloGuaranteeRefund';
 import { deliverHostGuestReviewRequestsForCompletedBookings } from '@/app/utils/reviews/hostGuestReviewRequestNotification';
+import { reconcileDueExperienceReviewRequests } from '@/app/utils/reviews/reviewRequestReconciliation';
 
 import {
   finishSettlementSyncRunFailure,
@@ -64,6 +65,7 @@ export type ExperienceCompletionSyncDependencies = {
   completeBookings?: typeof completeExperienceBookingsIfDueAtomic;
   processSoloGuaranteeRefunds?: typeof processSoloGuaranteeRefundsForCompletedBookings;
   deliverReviewRequests?: typeof deliverHostGuestReviewRequestsForCompletedBookings;
+  reconcileReviewRequests?: typeof reconcileDueExperienceReviewRequests;
 };
 
 function delay(ms?: number) {
@@ -274,6 +276,29 @@ async function processHostGuestReviewRequestSideEffects(
   }
 }
 
+async function processReviewRequestReconciliationSideEffects(
+  supabaseAdmin: SettlementSyncAdminClient,
+  reconcileReviewRequests: typeof reconcileDueExperienceReviewRequests,
+  deliverReviewRequests: typeof deliverHostGuestReviewRequestsForCompletedBookings
+) {
+  try {
+    const result = await reconcileReviewRequests({ supabaseAdmin });
+    await processHostGuestReviewRequestSideEffects(
+      supabaseAdmin,
+      result.hostNotificationBookingIds,
+      deliverReviewRequests
+    );
+    return result;
+  } catch {
+    console.error(JSON.stringify({
+      event: 'experience_completion_side_effect',
+      status: 'failed',
+      diagnosticCode: 'review_request_reconciliation_failed',
+    }));
+    return null;
+  }
+}
+
 export async function resolveExperienceCompletionTarget(
   supabaseAdmin: SettlementSyncAdminClient,
   identifier: string
@@ -312,6 +337,9 @@ export async function runExperienceCompletionSync(
   const deliverReviewRequests =
     params.dependencies?.deliverReviewRequests ??
     deliverHostGuestReviewRequestsForCompletedBookings;
+  const reconcileReviewRequests =
+    params.dependencies?.reconcileReviewRequests ??
+    reconcileDueExperienceReviewRequests;
   const started = await startSettlementSyncRun({
     supabaseAdmin: params.supabaseAdmin,
     jobName: EXPERIENCE_SYNC_JOB_NAME,
@@ -349,6 +377,11 @@ export async function runExperienceCompletionSync(
       await reconcileCompletedSoloGuaranteeRefundSideEffects(
         params.supabaseAdmin,
         processRefunds
+      );
+      await processReviewRequestReconciliationSideEffects(
+        params.supabaseAdmin,
+        reconcileReviewRequests,
+        deliverReviewRequests
       );
       await renewLease();
       await finishSettlementSyncRunSuccess({
@@ -395,6 +428,11 @@ export async function runExperienceCompletionSync(
     await processHostGuestReviewRequestSideEffects(
       params.supabaseAdmin,
       completedBookingIds,
+      deliverReviewRequests
+    );
+    await processReviewRequestReconciliationSideEffects(
+      params.supabaseAdmin,
+      reconcileReviewRequests,
       deliverReviewRequests
     );
     await renewLease();
