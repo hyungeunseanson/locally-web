@@ -36,6 +36,7 @@ const expectedApplyOrder = [
   'supabase/migrations/20260912050655_service_concierge_assignment.sql',
   'supabase/migrations/20260915141606_p0_storage_rpc_security_hardening.sql',
   'supabase/migrations/20260916024355_experience_media_locator_cas.sql',
+  'supabase/migrations/20260916031212_experience_storage_lockdown.sql',
 ];
 exact('fresh-project apply order', required.freshProjectApplyOrder, expectedApplyOrder);
 
@@ -96,8 +97,8 @@ for (const requiredFragment of [
 }
 
 for (const [name, fingerprint] of Object.entries({
-  storageBuckets: '384007869cd8ffb76874b05397c554da',
-  storagePolicies: '27b4679aafb896ae579c14510bd9a9d7',
+  storageBuckets: '7419cabe695cd50a522314a749216c05',
+  storagePolicies: '1519cc7c3877bf1389c0e02c63bc223a',
   publicRlsPolicies: '8e2720ce969cfa4252ec20069000fc4c',
   publicRelationGrants: '2c6aec1f48323525171d8f17f135107e',
 })) {

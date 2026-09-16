@@ -20,7 +20,8 @@ BEGIN
     '20260912034545:remote_schema',
     '20260912050655:service_concierge_assignment',
     '20260915141606:p0_storage_rpc_security_hardening',
-    '20260916024355:experience_media_locator_cas'
+    '20260916024355:experience_media_locator_cas',
+    '20260916031212:experience_storage_lockdown'
   ]::text[];
   IF actual IS DISTINCT FROM expected THEN
     RAISE EXCEPTION 'migration ledger mismatch: %', actual;
@@ -296,7 +297,7 @@ BEGIN
     FROM storage.buckets AS bucket_def;
   IF actual IS DISTINCT FROM ARRAY[
     'admin_files|false|10485760', 'avatars|true|', 'chat-images|false|',
-    'experiences|true|', 'images|true|', 'verification-docs|false|'
+    'experiences|false|', 'images|true|', 'verification-docs|false|'
   ]::text[] THEN
     RAISE EXCEPTION 'Storage bucket contract mismatch: %', actual;
   END IF;
@@ -309,7 +310,7 @@ BEGIN
          ))
     INTO actual_fingerprint
     FROM storage.buckets AS bucket_def;
-  IF actual_fingerprint IS DISTINCT FROM '384007869cd8ffb76874b05397c554da' THEN
+  IF actual_fingerprint IS DISTINCT FROM '7419cabe695cd50a522314a749216c05' THEN
     RAISE EXCEPTION 'Storage bucket fingerprint mismatch: %', actual_fingerprint;
   END IF;
 
@@ -321,19 +322,15 @@ BEGIN
     'Admins can delete files',
     'Admins can read files',
     'Admins can update files',
-    'Auth Users Upload',
     'Avatar images are publicly accessible',
     'Avatar owners can delete',
     'Avatar owners can update',
     'Avatar owners can upload',
-    'Experience object owners can delete',
-    'Experience object owners can update',
     'Image owners can delete',
     'Image owners can read',
     'Image owners can update',
     'Image owners can upload',
     'Only admins can upload files',
-    'Public Access',
     'Verification docs owners can delete',
     'Verification docs owners can read',
     'Verification docs owners can update',
@@ -353,7 +350,7 @@ BEGIN
     INTO actual_fingerprint
     FROM pg_policies AS policy_def
    WHERE policy_def.schemaname = 'storage' AND policy_def.tablename = 'objects';
-  IF actual_fingerprint IS DISTINCT FROM '27b4679aafb896ae579c14510bd9a9d7' THEN
+  IF actual_fingerprint IS DISTINCT FROM '1519cc7c3877bf1389c0e02c63bc223a' THEN
     RAISE EXCEPTION 'Storage policy fingerprint mismatch: %', actual_fingerprint;
   END IF;
 

@@ -10,8 +10,8 @@
   },
   "securityFingerprints": {
     "canonicalization": "MD5 of pipe-delimited fields, newline-delimited rows in the contract's explicit deterministic order; NULL is an empty string and policy roles are comma-delimited",
-    "storageBuckets": "384007869cd8ffb76874b05397c554da",
-    "storagePolicies": "27b4679aafb896ae579c14510bd9a9d7",
+    "storageBuckets": "7419cabe695cd50a522314a749216c05",
+    "storagePolicies": "1519cc7c3877bf1389c0e02c63bc223a",
     "publicRlsPolicies": "8e2720ce969cfa4252ec20069000fc4c",
     "publicRelationGrants": "2c6aec1f48323525171d8f17f135107e",
     "stagingOverlayBaselineStoragePolicies": "d6b381fd629405acfdd615593031de5c"
@@ -40,6 +40,12 @@
       "name": "experience_media_locator_cas",
       "repositoryFile": "supabase/migrations/20260916024355_experience_media_locator_cas.sql",
       "repositorySha256": "9f8f0b3b015044a269e21222fd552abb9f81be29a28fbdb6fe8845e2556d67e4"
+    },
+    {
+      "version": "20260916031212",
+      "name": "experience_storage_lockdown",
+      "repositoryFile": "supabase/migrations/20260916031212_experience_storage_lockdown.sql",
+      "repositorySha256": "17f5c74534d1aa0704048395668881572c3e5104249a2074866c9bd804f040e4"
     }
   ],
   "operationalStateDeltas": [
@@ -229,7 +235,7 @@
       { "name": "admin_files", "public": false, "fileSizeLimit": 10485760 },
       { "name": "avatars", "public": true, "fileSizeLimit": null },
       { "name": "chat-images", "public": false, "fileSizeLimit": null },
-      { "name": "experiences", "public": true, "fileSizeLimit": null },
+      { "name": "experiences", "public": false, "fileSizeLimit": null },
       { "name": "images", "public": true, "fileSizeLimit": null },
       { "name": "verification-docs", "public": false, "fileSizeLimit": null }
     ],
@@ -237,19 +243,15 @@
       "Admins can delete files",
       "Admins can read files",
       "Admins can update files",
-      "Auth Users Upload",
       "Avatar images are publicly accessible",
       "Avatar owners can delete",
       "Avatar owners can update",
       "Avatar owners can upload",
-      "Experience object owners can delete",
-      "Experience object owners can update",
       "Image owners can delete",
       "Image owners can read",
       "Image owners can update",
       "Image owners can upload",
       "Only admins can upload files",
-      "Public Access",
       "Verification docs owners can delete",
       "Verification docs owners can read",
       "Verification docs owners can update",
@@ -307,8 +309,12 @@
       "Authenticated Update",
       "Authenticated Upload",
       "Authenticated users can upload chat images",
+      "Auth Users Upload",
+      "Experience object owners can delete",
+      "Experience object owners can update",
       "Owner Delete",
-      "Owner Update"
+      "Owner Update",
+      "Public Access"
     ]
   }
 }

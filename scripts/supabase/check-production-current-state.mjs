@@ -9,8 +9,8 @@ const contractPath = resolve(root, 'supabase/staging/current-state-contract.sql'
 const overlayPath = resolve(root, 'supabase/staging/post-baseline-current-state-overlay.sql');
 
 const expectedFingerprints = {
-  storageBuckets: '384007869cd8ffb76874b05397c554da',
-  storagePolicies: '27b4679aafb896ae579c14510bd9a9d7',
+  storageBuckets: '7419cabe695cd50a522314a749216c05',
+  storagePolicies: '1519cc7c3877bf1389c0e02c63bc223a',
   publicRlsPolicies: '8e2720ce969cfa4252ec20069000fc4c',
   publicRelationGrants: '2c6aec1f48323525171d8f17f135107e',
   stagingOverlayBaselineStoragePolicies: 'd6b381fd629405acfdd615593031de5c',
@@ -93,6 +93,11 @@ const expectedLedger = [
     name: 'experience_media_locator_cas',
     repositoryFile: 'supabase/migrations/20260916024355_experience_media_locator_cas.sql',
   },
+  {
+    version: '20260916031212',
+    name: 'experience_storage_lockdown',
+    repositoryFile: 'supabase/migrations/20260916031212_experience_storage_lockdown.sql',
+  },
 ];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));
 for (const [index, expected] of expectedLedger.entries()) {
@@ -135,7 +140,7 @@ assert(objects.rls.forced.length === 0, 'expected zero FORCE RLS tables');
 assert(objects.rls.publicPolicies === 111, 'expected 111 public policies');
 assert(objects.realtimePublication.tables.length === 7, 'expected seven Realtime tables');
 assert(objects.storageBuckets.length === 6, 'expected six Storage buckets');
-assert(objects.storageObjectPolicies.length === 20, 'expected 20 Storage policies');
+assert(objects.storageObjectPolicies.length === 16, 'expected 16 Storage policies');
 
 exact('required tables', required.applicationTables, objects.publicTables);
 exact('required views', required.applicationViews, objects.publicViews);
