@@ -221,14 +221,16 @@ async function listDueExperienceCompletionCandidates(
 async function processSoloGuaranteeRefundSideEffects(
   supabaseAdmin: SettlementSyncAdminClient,
   bookingIds: string[],
-  processRefunds: typeof processSoloGuaranteeRefundsForCompletedBookings
+  processRefunds: typeof processSoloGuaranteeRefundsForCompletedBookings,
+  options: { reconcileCompleted?: boolean } = {}
 ) {
-  if (bookingIds.length === 0) return;
+  if (bookingIds.length === 0 && !options.reconcileCompleted) return;
 
   try {
     await processRefunds({
       supabaseAdmin,
       completedBookingIds: bookingIds,
+      reconcileCompleted: options.reconcileCompleted,
     });
   } catch {
     console.error(JSON.stringify({
@@ -237,6 +239,18 @@ async function processSoloGuaranteeRefundSideEffects(
       diagnosticCode: 'solo_guarantee_refund_failed',
     }));
   }
+}
+
+async function reconcileCompletedSoloGuaranteeRefundSideEffects(
+  supabaseAdmin: SettlementSyncAdminClient,
+  processRefunds: typeof processSoloGuaranteeRefundsForCompletedBookings
+) {
+  await processSoloGuaranteeRefundSideEffects(
+    supabaseAdmin,
+    [],
+    processRefunds,
+    { reconcileCompleted: true }
+  );
 }
 
 async function processHostGuestReviewRequestSideEffects(
@@ -332,6 +346,11 @@ export async function runExperienceCompletionSync(
     await renewLease();
 
     if (dueCandidates.length === 0) {
+      await reconcileCompletedSoloGuaranteeRefundSideEffects(
+        params.supabaseAdmin,
+        processRefunds
+      );
+      await renewLease();
       await finishSettlementSyncRunSuccess({
         supabaseAdmin: params.supabaseAdmin,
         runId: started.runId,
@@ -370,7 +389,8 @@ export async function runExperienceCompletionSync(
     await processSoloGuaranteeRefundSideEffects(
       params.supabaseAdmin,
       completedBookingIds,
-      processRefunds
+      processRefunds,
+      { reconcileCompleted: true }
     );
     await processHostGuestReviewRequestSideEffects(
       params.supabaseAdmin,
@@ -495,6 +515,12 @@ export async function forceExperienceCompletionSync(
     };
 
     if (String(target.status || '').toLowerCase() === 'completed') {
+      await processSoloGuaranteeRefundSideEffects(
+        params.supabaseAdmin,
+        [target.booking_id],
+        processRefunds
+      );
+      await renewLease();
       await finishSettlementSyncRunSuccess({
         supabaseAdmin: params.supabaseAdmin,
         runId: started.runId,
@@ -617,6 +643,14 @@ export async function forceExperienceCompletionSync(
 
     await renewLease();
     const outcome = completionResult.alreadyProcessed ? 'already_processed' : 'not_due';
+
+    if (completionResult.alreadyProcessed) {
+      await processSoloGuaranteeRefundSideEffects(
+        params.supabaseAdmin,
+        [target.booking_id],
+        processRefunds
+      );
+    }
 
     await finishSettlementSyncRunSuccess({
       supabaseAdmin: params.supabaseAdmin,
