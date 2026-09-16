@@ -32,13 +32,17 @@ test('historical references are retained and canary scope is exact', () => {
 test('preverifies every byte and refcount before the first official Storage delete', async () => {
   const plan = buildDeleteCandidatePlan({ sourceProof: proof, liveRows: [migratedRow], storageObjects: storage, createdAt: 'ignored' });
   let deletes = 0;
+  let liveStorage = [...storage];
   const result = await applyDeletePlan({
     plan, confirmation: plan.planDigest,
-    loadLiveObjects: async () => storage,
+    loadLiveObjects: async () => liveStorage,
     loadRows: async () => [migratedRow],
     fetchObject: async () => bytes,
-    removeBatch: async (names) => { deletes += names.length; return names.map((name) => ({ name })); },
-    objectExists: async () => false,
+    removeBatch: async (names) => {
+      deletes += names.length;
+      liveStorage = liveStorage.filter((item) => !names.includes(item.key));
+      return names.map((name) => ({ name }));
+    },
   });
   assert.deepEqual(result, { planned: 1, preverified: 1, deleted: 1, absentVerified: 1, failed: 0 });
   assert.equal(deletes, 1);
@@ -50,9 +54,22 @@ test('preverifies every byte and refcount before the first official Storage dele
     loadRows: async () => [migratedRow],
     fetchObject: async () => Buffer.from('drift'),
     removeBatch: async () => { deletes += 1; },
-    objectExists: async () => false,
   }), /SHA drift/);
   assert.equal(deletes, 0);
+});
+
+test('verifies deletion against fresh Storage metadata instead of a potentially cached object GET', async () => {
+  const plan = buildDeleteCandidatePlan({ sourceProof: proof, liveRows: [migratedRow], storageObjects: storage, createdAt: 'ignored' });
+  let inventoryReads = 0;
+  await assert.rejects(() => applyDeletePlan({
+    plan,
+    confirmation: plan.planDigest,
+    loadLiveObjects: async () => { inventoryReads += 1; return storage; },
+    loadRows: async () => [migratedRow],
+    fetchObject: async () => bytes,
+    removeBatch: async (names) => names.map((name) => ({ name })),
+  }), /still present/);
+  assert.equal(inventoryReads, 2);
 });
 
 test('rejects plan tampering and live re-reference before deletion', async () => {
@@ -60,11 +77,11 @@ test('rejects plan tampering and live re-reference before deletion', async () =>
   let deletes = 0;
   await assert.rejects(() => applyDeletePlan({
     plan, confirmation: '0'.repeat(64), loadLiveObjects: async () => storage, loadRows: async () => [migratedRow], fetchObject: async () => bytes,
-    removeBatch: async () => { deletes += 1; }, objectExists: async () => false,
+    removeBatch: async () => { deletes += 1; },
   }), /confirmation/);
   await assert.rejects(() => applyDeletePlan({
     plan, confirmation: plan.planDigest, loadLiveObjects: async () => storage, loadRows: async () => proof.rows, fetchObject: async () => bytes,
-    removeBatch: async () => { deletes += 1; }, objectExists: async () => false,
+    removeBatch: async () => { deletes += 1; },
   }), /became referenced/);
   assert.equal(deletes, 0);
 });
