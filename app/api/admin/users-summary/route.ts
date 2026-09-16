@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
+import { resolveDashboardUserRole } from '@/app/utils/dashboardUserRole';
 import {
   type AdminRawRow,
   isPresent,
@@ -47,8 +48,6 @@ type HostApplicationStatusRow = {
 
 const USER_ROLE_BATCH_SIZE = 100;
 const HOST_APPLICATION_BATCH_SIZE = 100;
-const HOST_APPROVED_STATUSES = new Set(['approved', 'active']);
-
 function chunkIds(ids: string[], size: number) {
   const chunks: string[][] = [];
 
@@ -100,23 +99,6 @@ function normalizeHostApplicationStatusRow(row: AdminRawRow): HostApplicationSta
     user_id: userId,
     status: readStringField(row, 'status'),
   };
-}
-
-function resolveDashboardRole(userRole: string | null, hostStatus: string | null) {
-  if (userRole === 'admin') {
-    return 'admin';
-  }
-
-  const normalizedHostStatus = hostStatus?.trim().toLowerCase() || null;
-  if (normalizedHostStatus && HOST_APPROVED_STATUSES.has(normalizedHostStatus)) {
-    return 'host';
-  }
-
-  if (userRole === 'host') {
-    return 'host';
-  }
-
-  return userRole;
 }
 
 export async function GET() {
@@ -192,7 +174,7 @@ export async function GET() {
     const mergedProfiles = profileRows.map((profile) => ({
       ...profile,
       name: profile.name ?? profile.full_name ?? null,
-      role: resolveDashboardRole(roleMap.get(profile.id) ?? null, hostStatusMap.get(profile.id) ?? null),
+      role: resolveDashboardUserRole(roleMap.get(profile.id) ?? null, hostStatusMap.get(profile.id) ?? null),
     }));
 
     return NextResponse.json({ success: true, data: mergedProfiles });

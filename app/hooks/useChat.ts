@@ -11,10 +11,16 @@ import { compressImage, sanitizeFileName, validateImage, isHeicValidationResult 
 import {
   getInquiryMessageDisplayContent,
   InquiryType,
+  isAdminSupportInquiry,
+  isOfficialInquirySupportMessage,
   SOFT_DELETED_INQUIRY_MESSAGE_TYPE,
 } from '@/app/utils/inquiry';
 import { getHostPublicProfile } from '@/app/utils/profile';
 import { getPrivateChatImageDeliveryUrl } from '@/app/utils/privateStorageDelivery';
+import {
+  OFFICIAL_SUPPORT_AVATAR_SRC,
+  OFFICIAL_SUPPORT_SENDER_NAME,
+} from '@/app/utils/officialSender';
 
 type ProfileRow = {
   id: string;
@@ -109,6 +115,10 @@ type RealtimeInquiryPayload = {
 const REALTIME_INQUIRY_REFRESH_DEBOUNCE_MS = 300;
 const REALTIME_MESSAGE_REFRESH_DEBOUNCE_MS = 250;
 
+function getHostInboxInquiryFilter(userId: string) {
+  return `and(host_id.eq.${userId},type.eq.general),and(user_id.eq.${userId},type.in.(admin_support,admin))`;
+}
+
 export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   const [inquiries, setInquiries] = useState<InquiryListItem[]>([]);
   const [selectedInquiry, setSelectedInquiry] = useState<InquiryListItem | null>(null);
@@ -163,7 +173,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         .limit(100); // 🟢 OOM 방지 및 빠른 렌더링을 위한 최근 100개 제한
 
       if (role === 'guest') query = query.eq('user_id', user.id);
-      else if (role === 'host') query = query.eq('host_id', user.id).eq('type', 'general');
+      else if (role === 'host') query = query.or(getHostInboxInquiryFilter(user.id));
 
       const { data: inquiriesData, error } = await query;
       if (error) throw error;
@@ -179,13 +189,18 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
           .eq('id', deepLinkedInquiryId);
         exactQuery = role === 'guest'
           ? exactQuery.eq('user_id', user.id)
-          : exactQuery.eq('host_id', user.id).eq('type', 'general');
+          : exactQuery.or(getHostInboxInquiryFilter(user.id));
         const { data: exactInquiry } = await exactQuery.maybeSingle();
         if (exactInquiry) inquiryRows.unshift(exactInquiry as InquiryRow);
       }
       if (inquiryRows.length > 0) {
         const inquiryIds = inquiryRows.map((i) => i.id);
-        const hostIds = Array.from(new Set(inquiryRows.map((item) => item.host_id).filter(Boolean))) as string[];
+        const hostIds = Array.from(new Set(
+          inquiryRows
+            .filter((item) => !isAdminSupportInquiry(item.type))
+            .map((item) => item.host_id)
+            .filter(Boolean)
+        )) as string[];
         const guestIds = Array.from(new Set(inquiryRows.map((item) => item.user_id).filter(Boolean))) as string[];
 
         const [profilesRes, appsRes, guestProfilesRes, unreadRes] = await Promise.all([
@@ -216,6 +231,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         });
 
         const safeData: InquiryListItem[] = inquiryRows.map((item) => {
+          const isAdminSupport = isAdminSupportInquiry(item.type);
           const experience = normalizeInquiryExperience(item.experiences);
           const hostApp = appsMap.get(item.host_id || '');
           const hostProfile = profilesMap.get(item.host_id || '');
@@ -235,9 +251,11 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
               avatar_url: secureUrl(guestAvatar ?? null),
             },
             host: {
-              id: item.host_id,
-              name: hostPublicProfile.name,
-              avatar_url: secureUrl(hostPublicProfile.avatarUrl ?? null)
+              id: isAdminSupport ? null : item.host_id,
+              name: isAdminSupport ? OFFICIAL_SUPPORT_SENDER_NAME : hostPublicProfile.name,
+              avatar_url: isAdminSupport
+                ? OFFICIAL_SUPPORT_AVATAR_SRC
+                : secureUrl(hostPublicProfile.avatarUrl ?? null)
             },
             experiences: experience
               ? {
@@ -318,7 +336,20 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
       if (data) {
         const rawMessages = data as InquiryMessageRow[];
-        const senderIds = Array.from(new Set(rawMessages.map((m) => m.sender_id)));
+        const selectedThread = inquiriesRef.current.find(
+          (inquiry) => String(inquiry.id) === String(inquiryId)
+        );
+        const isOfficialSupportSender = (senderId: string) => isOfficialInquirySupportMessage({
+          inquiryType: selectedThread?.type,
+          senderId,
+          guestId: selectedThread?.user_id,
+          hostId: selectedThread?.host_id,
+        });
+        const senderIds = Array.from(new Set(
+          rawMessages
+            .map((message) => message.sender_id)
+            .filter((senderId) => !isOfficialSupportSender(senderId))
+        ));
         const [proRes, appRes] = await Promise.all([
           supabase.from('public_profiles').select('id, full_name, avatar_url').in('id', senderIds),
           supabase.from('host_applications').select('user_id, name, profile_photo').in('user_id', senderIds)
@@ -329,12 +360,13 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         const profileMap = new Map(profileRows.map((p) => [p.id, p]));
         const appMap = new Map(appRows.map((a) => [a.user_id, a]));
 
-          const safeMessages: InquiryMessageView[] = rawMessages.map((msg) => {
+        const safeMessages: InquiryMessageView[] = rawMessages.map((msg) => {
+          const isOfficialSupport = isOfficialSupportSender(msg.sender_id);
           const profile = profileMap.get(msg.sender_id);
           const app = appMap.get(msg.sender_id);
           const hostPublicProfile = getHostPublicProfile(profile, app, '알 수 없음');
-          const name = hostPublicProfile.name;
-          const avatar = hostPublicProfile.avatarUrl;
+          const name = isOfficialSupport ? OFFICIAL_SUPPORT_SENDER_NAME : hostPublicProfile.name;
+          const avatar = isOfficialSupport ? OFFICIAL_SUPPORT_AVATAR_SRC : hostPublicProfile.avatarUrl;
 
           return {
             ...msg,
@@ -713,12 +745,37 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   useEffect(() => {
     if (!currentUser) return;
 
-    const inquiryRealtimeConfig =
+    const inquiryRealtimeConfigs =
       role === 'guest'
-        ? { event: 'UPDATE' as const, schema: 'public', table: 'inquiries', filter: `user_id=eq.${currentUser.id}` }
+        ? [{ event: 'UPDATE' as const, schema: 'public', table: 'inquiries', filter: `user_id=eq.${currentUser.id}` }]
         : role === 'host'
-          ? { event: 'UPDATE' as const, schema: 'public', table: 'inquiries', filter: `host_id=eq.${currentUser.id}` }
-          : { event: 'UPDATE' as const, schema: 'public', table: 'inquiries' };
+          ? [
+              {
+                event: 'UPDATE' as const,
+                schema: 'public',
+                table: 'inquiries',
+                filter: `host_id=eq.${currentUser.id}`,
+              },
+              {
+                event: 'UPDATE' as const,
+                schema: 'public',
+                table: 'inquiries',
+                filter: `user_id=eq.${currentUser.id}`,
+              },
+            ]
+          : [{ event: 'UPDATE' as const, schema: 'public', table: 'inquiries' }];
+
+    const handleInquiryUpdate = (payload: { new: unknown }) => {
+      const newPayload = payload.new as RealtimeInquiryPayload | null;
+      const selected = selectedInquiryRef.current;
+
+      scheduleRealtimeInquiryRefresh();
+
+      if (!selected || String(newPayload?.id) !== String(selected.id)) return;
+      if (newPayload?.updated_at && newPayload.updated_at === selected.updated_at) return;
+
+      scheduleRealtimeMessageRefresh(selected.id);
+    };
 
     const channel = supabase
       .channel(`chat-realtime-updates-${currentUser.id}`)
@@ -765,23 +822,13 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
             scheduleRealtimeMessageRefresh(selectedInquiryRef.current.id);
           }
         }
-      )
-      .on(
-        'postgres_changes',
-        inquiryRealtimeConfig,
-        (payload) => {
-          const newPayload = payload.new as RealtimeInquiryPayload | null;
-          const selected = selectedInquiryRef.current;
+      );
 
-          scheduleRealtimeInquiryRefresh();
+    inquiryRealtimeConfigs.forEach((config) => {
+      channel.on('postgres_changes', config, handleInquiryUpdate);
+    });
 
-          if (!selected || String(newPayload?.id) !== String(selected.id)) return;
-          if (newPayload?.updated_at && newPayload.updated_at === selected.updated_at) return;
-
-          scheduleRealtimeMessageRefresh(selected.id);
-        }
-      )
-      .subscribe((status) => {
+    channel.subscribe((status) => {
         if (status !== 'SUBSCRIBED') return;
 
         // Catch up once when the realtime channel becomes active so messages

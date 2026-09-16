@@ -18,6 +18,7 @@ import { startOrAdvanceAdminSupportUnreadBatch } from '@/app/utils/adminSupportU
 import { insertAdminAlerts, sendAdminAlertEmails } from '@/app/utils/adminAlertCenter';
 import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
+import { resolveDashboardUserRole } from '@/app/utils/dashboardUserRole';
 import { sendTemplatedEmail } from '@/app/emails/delivery/sendTemplatedEmail';
 import type { EmailAudience } from '@/app/emails/registry/emailTypes';
 import { OFFICIAL_SUPPORT_SENDER_NAME } from '@/app/utils/officialSender';
@@ -122,6 +123,14 @@ type InquiryUpdatedAtRow = {
   updated_at: string | null;
 };
 
+type UserRoleLookupRow = {
+  role?: string | null;
+};
+
+type HostStatusLookupRow = {
+  status?: string | null;
+};
+
 type ResolvedInquiryThread = {
   existing: InquiryInsertRow | null;
   guestId: string;
@@ -146,6 +155,59 @@ class InquiryThreadError extends Error {
 const buildGuestInboxLink = (inquiryId: number | string) => `/guest/inbox?inquiryId=${encodeURIComponent(String(inquiryId))}`;
 const buildHostInquiryLink = (inquiryId: number | string) => `/host/dashboard?tab=inquiries&inquiryId=${encodeURIComponent(String(inquiryId))}`;
 const buildAdminChatLink = (inquiryId: number | string) => `/admin/dashboard?tab=CHATS&inquiryId=${encodeURIComponent(String(inquiryId))}`;
+
+async function resolveAdminSupportRecipientDelivery(params: {
+  recipientId: string;
+  inquiryId: number | string;
+  recipientIsAdmin: boolean;
+}): Promise<{ link: string; audience: EmailAudience }> {
+  const { recipientId, inquiryId, recipientIsAdmin } = params;
+
+  if (recipientIsAdmin) {
+    return {
+      link: buildAdminChatLink(inquiryId),
+      audience: 'admin',
+    };
+  }
+
+  const supabaseAdmin = createAdminClient();
+  const [userRoleResult, hostStatusResult] = await Promise.all([
+    supabaseAdmin
+      .from('users')
+      .select('role')
+      .eq('id', recipientId)
+      .maybeSingle<UserRoleLookupRow>(),
+    supabaseAdmin
+      .from('public_host_applications')
+      .select('status')
+      .eq('user_id', recipientId)
+      .maybeSingle<HostStatusLookupRow>(),
+  ]);
+
+  if (userRoleResult.error || hostStatusResult.error) {
+    console.error('[inquiries/thread] support recipient role lookup failed:', {
+      recipientId,
+      userRoleError: userRoleResult.error,
+      hostStatusError: hostStatusResult.error,
+    });
+    throw new InquiryThreadError(500, '수신자 역할을 확인할 수 없습니다.');
+  }
+
+  const recipientRole = resolveDashboardUserRole(
+    userRoleResult.data?.role,
+    hostStatusResult.data?.status
+  );
+
+  return recipientRole === 'host'
+    ? {
+        link: buildHostInquiryLink(inquiryId),
+        audience: 'host',
+      }
+    : {
+        link: buildGuestInboxLink(inquiryId),
+        audience: 'guest',
+      };
+}
 async function hasServiceRequestInquiryKeyColumn() {
   const supabaseAdmin = createAdminClient();
   const { error } = await supabaseAdmin
@@ -657,9 +719,10 @@ async function resolveInquiryMessageAccess(params: {
   const isParticipant =
     String(inquiry.user_id) === String(actor.id) ||
     (inquiry.host_id != null && String(inquiry.host_id) === String(actor.id));
+  const isAdminSupport = isAdminSupportType(inquiry.type);
 
   let actorIsAdmin = false;
-  if (!isParticipant) {
+  if (!isParticipant || (isAdminSupport && String(inquiry.user_id) !== String(actor.id))) {
     await assertAdminActor(actor);
     actorIsAdmin = true;
   }
@@ -667,7 +730,7 @@ async function resolveInquiryMessageAccess(params: {
   return {
     inquiry,
     actorIsAdmin,
-    isAdminSupport: isAdminSupportType(inquiry.type),
+    isAdminSupport,
   };
 }
 
@@ -698,6 +761,35 @@ export async function createInquiryMessage(params: {
     actor,
     inquiryId,
   });
+
+  const recipientId = (() => {
+    if (isAdminSupport) {
+      return actorIsAdmin ? inquiry.user_id : inquiry.host_id;
+    }
+
+    if (String(actor.id) === String(inquiry.host_id)) return inquiry.user_id;
+    if (String(actor.id) === String(inquiry.user_id)) return inquiry.host_id;
+    if (actorIsAdmin) return inquiry.host_id;
+    return inquiry.host_id;
+  })();
+  const recipientDelivery = recipientId && String(recipientId) !== String(actor.id)
+    ? isAdminSupport
+      ? await resolveAdminSupportRecipientDelivery({
+          recipientId: String(recipientId),
+          inquiryId: inquiry.id,
+          recipientIsAdmin: !actorIsAdmin,
+        })
+      : {
+          link: String(actor.id) === String(inquiry.host_id)
+            ? buildGuestInboxLink(inquiry.id)
+            : buildHostInquiryLink(inquiry.id),
+          audience: resolveInquiryEmailAudience({
+            isAdminSupport: false,
+            recipientId: String(recipientId),
+            hostId: inquiry.host_id,
+          }),
+        }
+    : null;
 
   const displayContent = cleanContent || (normalizedType === 'image' ? '📷 사진을 보냈습니다.' : '');
   const updatedAt = new Date().toISOString();
@@ -806,43 +898,15 @@ export async function createInquiryMessage(params: {
     });
   }
 
-  const recipientId = (() => {
-    if (isAdminSupport) {
-      if (String(actor.id) === String(inquiry.user_id)) return inquiry.host_id;
-      return inquiry.user_id;
-    }
-
-    if (String(actor.id) === String(inquiry.host_id)) return inquiry.user_id;
-    if (String(actor.id) === String(inquiry.user_id)) return inquiry.host_id;
-    if (actorIsAdmin) return inquiry.host_id;
-    return inquiry.host_id;
-  })();
-
-  const notificationLink = (() => {
-    if (isAdminSupport) {
-      return actorIsAdmin || String(actor.id) === String(inquiry.host_id)
-        ? buildGuestInboxLink(inquiry.id)
-        : buildAdminChatLink(inquiry.id);
-    }
-
-    return String(actor.id) === String(inquiry.host_id)
-      ? buildGuestInboxLink(inquiry.id)
-      : buildHostInquiryLink(inquiry.id);
-  })();
-
-  if (recipientId && String(recipientId) !== String(actor.id)) {
+  if (recipientId && recipientDelivery) {
     await notifyRecipient({
       recipientId,
       emailTitle: `💬 ${actorDisplayName}님의 새 메시지`,
       emailMessage: displayContent,
       actorDisplayName,
       displayContent,
-      link: notificationLink,
-      audience: resolveInquiryEmailAudience({
-        isAdminSupport,
-        recipientId,
-        hostId: inquiry.host_id,
-      }),
+      link: recipientDelivery.link,
+      audience: recipientDelivery.audience,
     });
   }
 
@@ -1041,6 +1105,30 @@ export async function upsertInquiryThread(params: {
     throw new InquiryThreadError(500, '문의방을 확인할 수 없습니다.');
   }
 
+  const recipientId = contextType === 'admin_initiated_support'
+    ? resolved.guestId
+    : actor.id === resolved.hostId
+      ? resolved.guestId
+      : resolved.hostId;
+  const recipientDelivery = cleanMessage && recipientId && recipientId !== actor.id
+    ? resolved.inquiryType === 'admin_support'
+      ? await resolveAdminSupportRecipientDelivery({
+          recipientId: String(recipientId),
+          inquiryId: inquiry.id,
+          recipientIsAdmin: contextType !== 'admin_initiated_support',
+        })
+      : {
+          link: actor.id === resolved.hostId
+            ? buildGuestInboxLink(inquiry.id)
+            : buildHostInquiryLink(inquiry.id),
+          audience: resolveInquiryEmailAudience({
+            isAdminSupport: false,
+            recipientId: String(recipientId),
+            hostId: resolved.hostId,
+          }),
+        }
+    : null;
+
   if (cleanMessage) {
     const updatedAt = new Date().toISOString();
     const { data: insertedMessage, error: messageError } = await supabaseAdmin
@@ -1098,26 +1186,15 @@ export async function upsertInquiryThread(params: {
       actorId: actor.id,
       useOfficialSenderName: contextType === 'admin_initiated_support',
     });
-    const recipientId = actor.id === resolved.hostId ? resolved.guestId : resolved.hostId;
-    const notificationLink = actor.id === resolved.hostId
-      ? buildGuestInboxLink(inquiry.id)
-      : resolved.inquiryType === 'admin_support'
-        ? buildAdminChatLink(inquiry.id)
-        : buildHostInquiryLink(inquiry.id);
-
-    if (recipientId && recipientId !== actor.id) {
+    if (recipientId && recipientDelivery) {
       await notifyRecipient({
         recipientId,
         emailTitle: `💬 ${actorDisplayName}님의 새 메시지`,
         emailMessage: cleanMessage,
         actorDisplayName,
         displayContent: cleanMessage,
-        link: notificationLink,
-        audience: resolveInquiryEmailAudience({
-          isAdminSupport: resolved.inquiryType === 'admin_support',
-          recipientId,
-          hostId: resolved.hostId,
-        }),
+        link: recipientDelivery.link,
+        audience: recipientDelivery.audience,
       });
     }
 
