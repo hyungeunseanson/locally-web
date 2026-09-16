@@ -117,7 +117,10 @@ export function getSoloGuaranteeTourEndTimestamp(
 ) {
   if (!booking.date) return null;
 
-  const startTimestamp = getBookingStartTimestamp(booking.date, booking.time);
+  const time = typeof booking.time === 'string' ? booking.time.trim() : '';
+  if (!/^(?:[01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(time)) return null;
+
+  const startTimestamp = getBookingStartTimestamp(booking.date, time);
   if (startTimestamp == null) return null;
 
   const duration = getExperienceDurationHours(normalizeExperienceMeta(booking.experiences)?.duration);

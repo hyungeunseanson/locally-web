@@ -260,6 +260,54 @@ test.describe('Solo guarantee refund contract', () => {
     );
   });
 
+  test('fails closed and never calls the card PG when booking time is null', async () => {
+    const { solo, participant } = refundSlot({ time: null }, { time: null });
+    const state = { bookings: [solo, participant], notifications: [] };
+    let pgCalls = 0;
+
+    expect(hasSoloGuaranteeTourEnded(solo, new Date('2030-01-01T00:00:00+09:00'))).toBe(false);
+    const result = await processSoloGuaranteeRefundsForCompletedBookings({
+      supabaseAdmin: createRefundClient(state),
+      completedBookingIds: [solo.id],
+      now: new Date('2030-01-01T00:00:00+09:00'),
+      cancelCardPaymentFn: async () => {
+        pgCalls += 1;
+        return { resultCode: '2001', resultMessage: 'ok', raw: '{}' };
+      },
+    });
+
+    expect(result.refunded).toBe(0);
+    expect(pgCalls).toBe(0);
+    expect(solo.solo_guarantee_refund_status).toBe('not_applicable');
+  });
+
+  test('fails closed and never calls the card PG when booking time is empty', async () => {
+    const { solo, participant } = refundSlot({ time: '' }, { time: '' });
+    const state = { bookings: [solo, participant], notifications: [] };
+    let pgCalls = 0;
+
+    expect(hasSoloGuaranteeTourEnded(solo, new Date('2030-01-01T00:00:00+09:00'))).toBe(false);
+    const result = await processSoloGuaranteeRefundsForCompletedBookings({
+      supabaseAdmin: createRefundClient(state),
+      completedBookingIds: [solo.id],
+      now: new Date('2030-01-01T00:00:00+09:00'),
+      cancelCardPaymentFn: async () => {
+        pgCalls += 1;
+        return { resultCode: '2001', resultMessage: 'ok', raw: '{}' };
+      },
+    });
+
+    expect(result.refunded).toBe(0);
+    expect(pgCalls).toBe(0);
+    expect(solo.solo_guarantee_refund_status).toBe('not_applicable');
+  });
+
+  test('fails closed for malformed booking times without changing the shared time helper', () => {
+    for (const time of ['25:00', '14:99', 'not-a-time']) {
+      expect(getSoloGuaranteeTourEndTimestamp(booking({ time })), time).toBeNull();
+    }
+  });
+
   test('does not call the card PG before the scheduled tour end', async () => {
     const { solo, participant } = refundSlot();
     const state = { bookings: [solo, participant], notifications: [] };
