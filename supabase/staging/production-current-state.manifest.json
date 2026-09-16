@@ -42,9 +42,9 @@
       "repositorySha256": "9f8f0b3b015044a269e21222fd552abb9f81be29a28fbdb6fe8845e2556d67e4"
     },
     {
-      "version": "20260916031212",
+      "version": "20260916032730",
       "name": "experience_storage_lockdown",
-      "repositoryFile": "supabase/migrations/20260916031212_experience_storage_lockdown.sql",
+      "repositoryFile": "supabase/migrations/20260916032730_experience_storage_lockdown.sql",
       "repositorySha256": "17f5c74534d1aa0704048395668881572c3e5104249a2074866c9bd804f040e4"
     }
   ],

@@ -8,7 +8,7 @@
     "supabase/migrations/20260912050655_service_concierge_assignment.sql",
     "supabase/migrations/20260915141606_p0_storage_rpc_security_hardening.sql",
     "supabase/migrations/20260916024355_experience_media_locator_cas.sql",
-    "supabase/migrations/20260916031212_experience_storage_lockdown.sql"
+    "supabase/migrations/20260916032730_experience_storage_lockdown.sql"
   ],
   "applicationTables": [
     "admin_audit_logs",

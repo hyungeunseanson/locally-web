@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-const migrationPath = 'supabase/migrations/20260916031212_experience_storage_lockdown.sql';
+const migrationPath = 'supabase/migrations/20260916032730_experience_storage_lockdown.sql';
 const sql = await readFile(migrationPath, 'utf8');
 const withoutComments = sql.replace(/^\s*--.*$/gm, '');
 

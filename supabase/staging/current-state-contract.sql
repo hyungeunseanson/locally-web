@@ -21,7 +21,7 @@ BEGIN
     '20260912050655:service_concierge_assignment',
     '20260915141606:p0_storage_rpc_security_hardening',
     '20260916024355:experience_media_locator_cas',
-    '20260916031212:experience_storage_lockdown'
+    '20260916032730:experience_storage_lockdown'
   ]::text[];
   IF actual IS DISTINCT FROM expected THEN
     RAISE EXCEPTION 'migration ledger mismatch: %', actual;
