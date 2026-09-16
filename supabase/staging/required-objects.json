@@ -8,7 +8,8 @@
     "supabase/migrations/20260912050655_service_concierge_assignment.sql",
     "supabase/migrations/20260915141606_p0_storage_rpc_security_hardening.sql",
     "supabase/migrations/20260916024355_experience_media_locator_cas.sql",
-    "supabase/migrations/20260916032730_experience_storage_lockdown.sql"
+    "supabase/migrations/20260916032730_experience_storage_lockdown.sql",
+    "supabase/migrations/20260916111416_review_tour_end_db_foundation.sql"
   ],
   "applicationTables": [
     "admin_audit_logs",
@@ -69,6 +70,7 @@
     "confirm_service_bank_payment_atomic",
     "confirm_service_concierge_payment_atomic",
     "create_booking_atomic",
+    "create_experience_review_atomic",
     "create_guest_review_with_notification_atomic",
     "create_service_booking_atomic",
     "create_service_concierge_request_atomic",
@@ -85,6 +87,7 @@
     "is_admin_reader",
     "lease_experience_translation_task",
     "list_due_experience_completion_candidates",
+    "list_due_experience_review_request_candidates",
     "mark_room_messages_read",
     "prune_notifications_retention",
     "prune_team_workspace_comments",

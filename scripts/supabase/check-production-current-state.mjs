@@ -98,6 +98,11 @@ const expectedLedger = [
     name: 'experience_storage_lockdown',
     repositoryFile: 'supabase/migrations/20260916032730_experience_storage_lockdown.sql',
   },
+  {
+    version: '20260916111416',
+    name: 'review_tour_end_db_foundation',
+    repositoryFile: 'supabase/migrations/20260916111416_review_tour_end_db_foundation.sql',
+  },
 ];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));
 for (const [index, expected] of expectedLedger.entries()) {
@@ -126,7 +131,7 @@ assert(objects.publicTables.length === 39, 'expected 39 public tables');
 assert(objects.publicViews.length === 2, 'expected 2 public views');
 assert(objects.publicTableColumns === 510, 'expected 510 public table columns');
 assert(objects.publicViewColumns === 27, 'expected 27 public view columns');
-assert(objects.functionOverloads.length === 45, 'expected 45 public function overloads');
+assert(objects.functionOverloads.length === 47, 'expected 47 public function overloads');
 assert(objects.applicationTriggers.length === 11, 'expected 11 application triggers');
 assert(objects.indexes === 113, 'expected 113 public indexes');
 assert(objects.constraints.total === 179, 'expected 179 constraints');
