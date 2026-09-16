@@ -98,7 +98,7 @@ export default function PastTripCard({ trip, onOpenReview }: PastTripCardProps) 
                 </button>
               )}
             </div>
-          ) : (
+          ) : trip.reviewEligible ? (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -108,7 +108,7 @@ export default function PastTripCard({ trip, onOpenReview }: PastTripCardProps) 
             >
               {t('trip_review')} {/* 🟢 교체 (후기 작성하기) */}
             </button>
-          )
+          ) : null
         ) : (
           <span className="text-[10px] text-slate-400 mt-1 inline-block bg-slate-100 px-1.5 py-0.5 rounded">{t('trip_status_cancelled')}</span>
         )}

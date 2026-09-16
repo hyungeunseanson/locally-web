@@ -4,6 +4,7 @@ import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
+import { isBookingReviewEligible } from '@/app/utils/reviews/reviewEligibility';
 
 type GuestReviewBody = {
   bookingId?: unknown;
@@ -15,9 +16,11 @@ type BookingOwnershipRow = {
   id: string | number;
   user_id: string | null;
   status: string;
+  date: string | null;
+  time: string | null;
   experiences:
-    | { host_id: string | null; title: string | null }
-    | { host_id: string | null; title: string | null }[]
+    | { host_id: string | null; title: string | null; duration: number | string | null }
+    | { host_id: string | null; title: string | null; duration: number | string | null }[]
     | null;
 };
 
@@ -68,7 +71,7 @@ export async function POST(request: NextRequest) {
     const supabaseAdmin = createAdminClient();
     const { data: bookingData, error: bookingError } = await supabaseAdmin
       .from('bookings')
-      .select('id, user_id, status, experiences!inner(host_id, title)')
+      .select('id, user_id, status, date, time, experiences!inner(host_id, title, duration)')
       .eq('id', bookingId)
       .maybeSingle();
 
@@ -88,6 +91,16 @@ export async function POST(request: NextRequest) {
     // [Guard] 완료된 예약에 대해서만 후기 작성 허용
     if (booking.status !== 'completed') {
       return NextResponse.json({ success: false, error: '완료된 예약에 대해서만 후기를 작성할 수 있습니다.' }, { status: 400 });
+    }
+    if (!isBookingReviewEligible({
+      date: booking.date,
+      time: booking.time,
+      duration: experience?.duration,
+    })) {
+      return NextResponse.json(
+        { success: false, error: '체험 예정 종료 후에 고객 평가를 작성할 수 있습니다.' },
+        { status: 400 }
+      );
     }
     if (!booking.user_id) {
       return NextResponse.json({ success: false, error: 'Invalid payload' }, { status: 400 });

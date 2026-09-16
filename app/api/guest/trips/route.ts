@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { isOverdueActiveBooking } from '@/app/utils/bookingStartTime';
 import { getHostPublicProfile } from '@/app/utils/profile';
 import { isUnapprovedCardPaymentAttempt } from '@/app/utils/bookings/pendingBookingHolds';
+import { isBookingReviewEligible } from '@/app/utils/reviews/reviewEligibility';
 
 const GUEST_TRIPS_BOOKING_SELECT = `
   id,
@@ -29,6 +30,7 @@ const GUEST_TRIPS_BOOKING_SELECT = `
     title_zh,
     image_url,
     photos,
+    duration,
     location,
     meeting_point,
     meeting_point_i18n
@@ -58,6 +60,7 @@ type BookingExperienceRow = {
   title_zh?: string | null;
   image_url?: string | null;
   photos?: string[] | null;
+  duration?: number | string | null;
   location?: string | null;
   meeting_point?: string | null;
   meeting_point_i18n?: Record<string, string> | null;
@@ -154,6 +157,7 @@ export async function GET() {
         title_zh: experience?.title_zh || null,
         image: experience?.image_url,
         photos: experience?.photos, // 🟢 누락되었던 체험 사진 배열 추가 매핑
+        duration: experience?.duration ?? null,
         location: experience?.location,
         meetingPoint: experience?.meeting_point,
         meetingPointI18n: experience?.meeting_point_i18n || null,
@@ -170,6 +174,11 @@ export async function GET() {
         hostId: experience?.host_id, // 메시지 보내기용
         hostName: hostPublicProfile?.name || 'Host',
         hostAvatarUrl: hostPublicProfile?.avatarUrl || null,
+        reviewEligible: isBookingReviewEligible({
+          date: booking.date,
+          time: booking.time,
+          duration: experience?.duration,
+        }, now),
         hasReview: booking.reviews && booking.reviews.length > 0, // 🟢 후기 작성 여부 (배열 길이로 체크)
         review: firstReview ? {  // [R5] 수정용 후기 데이터
           id: firstReview.id,

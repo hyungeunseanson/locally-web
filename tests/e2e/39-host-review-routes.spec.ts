@@ -186,6 +186,8 @@ async function createBooking(params: {
   guest: TestUser;
   experienceId: number;
   status?: 'completed' | 'PAID' | 'PENDING';
+  date?: string;
+  time?: string | null;
 }) {
   const supabase = getAdminClient();
   const bookingId = `HOST-REV-BOOKING-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
@@ -202,8 +204,8 @@ async function createBooking(params: {
     total_experience_price: 30000,
     status: params.status || 'completed',
     guests: 1,
-    date: bookingDate.toISOString().slice(0, 10),
-    time: '10:00',
+    date: params.date ?? bookingDate.toISOString().slice(0, 10),
+    time: params.time === undefined ? '10:00' : params.time,
     type: 'group',
     contact_name: params.guest.fullName,
     contact_phone: params.guest.phone,
@@ -421,6 +423,37 @@ test.describe.serial('Host review routes', () => {
     await expect(guestReviewResponse.json()).resolves.toMatchObject({
       success: false,
       error: '완료된 예약에 대해서만 후기를 작성할 수 있습니다.',
+    });
+  });
+
+  test('rejects host guest reviews before the scheduled tour end', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const host = createUser('host-not-eligible');
+    const guest = createUser('guest-not-eligible');
+    const hostId = await createAuthUser(host);
+    const guestId = await createAuthUser(guest);
+    await createApprovedHostApplication(hostId, host);
+
+    const experienceId = await createExperienceFixture(hostId);
+    const bookingId = await createBooking({
+      hostId,
+      guestId,
+      guest,
+      experienceId,
+      date: '2099-09-20',
+      time: '14:00',
+    });
+
+    await login(page, host);
+    const response = await page.request.post('/api/host/guest-reviews', {
+      data: { bookingId, rating: 5, content: '체험 종료 전에는 고객 평가가 거부되어야 합니다.' },
+    });
+
+    expect(response.status()).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      success: false,
+      error: '체험 예정 종료 후에 고객 평가를 작성할 수 있습니다.',
     });
   });
 
