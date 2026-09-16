@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
 
 const FUNCTION_SIGNATURE = 'public.apply_experience_media_locator_cas(bigint,text[],text,jsonb,jsonb,text[],text,jsonb,jsonb)';
-const migrationPath = 'supabase/migrations/20260916020911_experience_media_locator_cas.sql';
+const migrationPath = 'supabase/migrations/20260916024355_experience_media_locator_cas.sql';
 const db = new PGlite();
 
 const state = ({

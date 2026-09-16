@@ -35,7 +35,7 @@ const expectedApplyOrder = [
   'supabase/migrations/20260912034545_production_schema_baseline.sql',
   'supabase/migrations/20260912050655_service_concierge_assignment.sql',
   'supabase/migrations/20260915141606_p0_storage_rpc_security_hardening.sql',
-  'supabase/migrations/20260916020911_experience_media_locator_cas.sql',
+  'supabase/migrations/20260916024355_experience_media_locator_cas.sql',
 ];
 exact('fresh-project apply order', required.freshProjectApplyOrder, expectedApplyOrder);
 

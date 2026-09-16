@@ -36,9 +36,9 @@
       "repositorySha256": "1ea5c5ac17ec03fd2cc90cd92f471919aa06703ced3c688c0a83b79b34e6a1a0"
     },
     {
-      "version": "20260916020911",
+      "version": "20260916024355",
       "name": "experience_media_locator_cas",
-      "repositoryFile": "supabase/migrations/20260916020911_experience_media_locator_cas.sql",
+      "repositoryFile": "supabase/migrations/20260916024355_experience_media_locator_cas.sql",
       "repositorySha256": "9f8f0b3b015044a269e21222fd552abb9f81be29a28fbdb6fe8845e2556d67e4"
     }
   ],
