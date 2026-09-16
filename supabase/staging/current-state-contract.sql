@@ -19,7 +19,8 @@ BEGIN
   expected := ARRAY[
     '20260912034545:remote_schema',
     '20260912050655:service_concierge_assignment',
-    '20260915141606:p0_storage_rpc_security_hardening'
+    '20260915141606:p0_storage_rpc_security_hardening',
+    '20260916020911:experience_media_locator_cas'
   ]::text[];
   IF actual IS DISTINCT FROM expected THEN
     RAISE EXCEPTION 'migration ledger mismatch: %', actual;
@@ -85,6 +86,7 @@ BEGIN
     JOIN pg_namespace AS namespace_def ON namespace_def.oid = procedure_def.pronamespace
    WHERE namespace_def.nspname = 'public';
   expected := ARRAY[
+    'public.apply_experience_media_locator_cas(p_experience_id bigint, p_before_photos text[], p_before_image_url text, p_before_itinerary jsonb, p_before_itinerary_i18n jsonb, p_after_photos text[], p_after_image_url text, p_after_itinerary jsonb, p_after_itinerary_i18n jsonb)',
     'public.assign_service_concierge_host_atomic(p_admin_id uuid, p_request_id uuid, p_host_id uuid, p_host_hourly_rate integer, p_host_agreement_confirmed boolean)',
     'public.begin_service_refund_operation_atomic(p_admin_id uuid, p_order_id text, p_refund_amount integer, p_host_compensation_amount integer, p_idempotency_key text)',
     'public.cancel_pending_service_concierge_atomic(p_actor_id uuid, p_order_id text, p_cancel_reason text)',
@@ -366,8 +368,11 @@ BEGIN
      OR NOT has_function_privilege('service_role', 'public.mark_room_messages_read(uuid,uuid)', 'EXECUTE')
      OR has_function_privilege('anon', 'public.is_admin_reader()', 'EXECUTE')
      OR NOT has_function_privilege('authenticated', 'public.is_admin_reader()', 'EXECUTE')
-     OR NOT has_function_privilege('service_role', 'public.is_admin_reader()', 'EXECUTE') THEN
-    RAISE EXCEPTION 'P0 SECURITY DEFINER execute contract mismatch';
+     OR NOT has_function_privilege('service_role', 'public.is_admin_reader()', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.apply_experience_media_locator_cas(bigint,text[],text,jsonb,jsonb,text[],text,jsonb,jsonb)', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'public.apply_experience_media_locator_cas(bigint,text[],text,jsonb,jsonb,text[],text,jsonb,jsonb)', 'EXECUTE')
+     OR NOT has_function_privilege('service_role', 'public.apply_experience_media_locator_cas(bigint,text[],text,jsonb,jsonb,text[],text,jsonb,jsonb)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'privileged function execute contract mismatch';
   END IF;
 
   IF EXISTS (
@@ -380,6 +385,22 @@ BEGIN
          @> ARRAY['search_path=public, pg_catalog']::text[])
   ) THEN
     RAISE EXCEPTION 'mark_room_messages_read search_path contract mismatch';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+      FROM pg_proc AS procedure_def
+      JOIN pg_namespace AS namespace_def ON namespace_def.oid = procedure_def.pronamespace
+     WHERE namespace_def.nspname = 'public'
+       AND procedure_def.proname = 'apply_experience_media_locator_cas'
+       AND (
+         procedure_def.prosecdef
+         OR pg_get_userbyid(procedure_def.proowner) <> 'postgres'
+         OR NOT (coalesce(procedure_def.proconfig, ARRAY[]::text[])
+           @> ARRAY['search_path=""']::text[])
+       )
+  ) THEN
+    RAISE EXCEPTION 'experience media locator CAS security contract mismatch';
   END IF;
 
   IF EXISTS (

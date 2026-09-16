@@ -13,7 +13,7 @@
     "cloudflare:build": "opennextjs-cloudflare build",
     "cloudflare:build:production": "node scripts/cloudflare/run-production-build.mjs",
     "cloudflare:production-build:contract": "node --test scripts/cloudflare/run-production-build.test.mjs scripts/cloudflare/run-production-deploy.test.mjs",
-    "cloudflare:experience-media:source-migration-contract": "node --test scripts/cloudflare/experience-media-source-migration.test.mjs scripts/cloudflare/plan-experience-media-source-copy.test.mjs scripts/cloudflare/verify-experience-media-source-cutover.test.mjs scripts/cloudflare/apply-experience-media-locator-plan.test.mjs scripts/cloudflare/experience-media-source-cutover-operations.test.mjs && python3 -m unittest scripts/cloudflare/r2_experience_media_source_copy_test.py",
+    "cloudflare:experience-media:source-migration-contract": "node scripts/supabase/test-experience-media-locator-cas.mjs && node --test scripts/cloudflare/experience-media-source-migration.test.mjs scripts/cloudflare/plan-experience-media-source-copy.test.mjs scripts/cloudflare/verify-experience-media-source-cutover.test.mjs scripts/cloudflare/apply-experience-media-locator-plan.test.mjs scripts/cloudflare/experience-media-source-cutover-operations.test.mjs && python3 -m unittest scripts/cloudflare/r2_experience_media_source_copy_test.py",
     "cloudflare:deploy:production": "node scripts/cloudflare/run-production-deploy.mjs",
     "precloudflare:typegen": "node -e \"require('node:fs').mkdirSync('.wrangler', { recursive: true })\"",
     "cloudflare:typegen:canary": "WRANGLER_LOG_PATH=.wrangler/logs wrangler types --env canary --env-interface CloudflareEnv --include-runtime false .wrangler/cloudflare-env.d.ts",

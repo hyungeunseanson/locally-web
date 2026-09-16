@@ -10,6 +10,7 @@ import {
 } from './experience-media-source-migration.mjs';
 
 const PROJECT_URL = 'https://uhinvcydgzqlpnvieyal.supabase.co';
+const LOCATOR_CAS_RPC = 'apply_experience_media_locator_cas';
 const MAX_ROWS = 100;
 const FIELDS = ['photos', 'image_url', 'itinerary', 'itinerary_i18n'];
 
@@ -17,28 +18,18 @@ function rowState(row) {
   return Object.fromEntries(FIELDS.map((field) => [field, row[field] ?? null]));
 }
 
-function postgresTextArray(value) {
-  assert(Array.isArray(value), 'Photos must remain a text array.');
-  return `{${value.map((item) => {
-    assert.equal(typeof item, 'string', 'Photos must contain only strings.');
-    return `"${item.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
-  }).join(',')}}`;
-}
-
-function filterValue(field, value) {
-  if (value === null) return 'is.null';
-  if (field === 'photos') return `eq.${postgresTextArray(value)}`;
-  if (field === 'image_url') {
-    assert.equal(typeof value, 'string', 'Legacy image URL must remain text.');
-    return `eq.${value}`;
-  }
-  return `eq.${JSON.stringify(value)}`;
-}
-
-export function buildOptimisticPatchUrl(baseUrl, change) {
-  const query = new URLSearchParams({ id: `eq.${change.experienceId}` });
-  for (const field of FIELDS) query.set(field, filterValue(field, change.before[field] ?? null));
-  return `${baseUrl}/rest/v1/experiences?${query}`;
+export function buildLocatorCasRpcBody(change) {
+  return {
+    p_experience_id: change.experienceId,
+    p_before_photos: change.before.photos ?? null,
+    p_before_image_url: change.before.image_url ?? null,
+    p_before_itinerary: change.before.itinerary ?? null,
+    p_before_itinerary_i18n: change.before.itinerary_i18n ?? null,
+    p_after_photos: change.after.photos ?? null,
+    p_after_image_url: change.after.image_url ?? null,
+    p_after_itinerary: change.after.itinerary ?? null,
+    p_after_itinerary_i18n: change.after.itinerary_i18n ?? null,
+  };
 }
 
 export async function applyLocatorPlan({ plan, confirmation, experienceId, loadRows, patchRow, recordProgress = async () => {} }) {
@@ -74,17 +65,29 @@ export async function applyLocatorPlan({ plan, confirmation, experienceId, loadR
     alreadyExact,
     updated: 0,
     conflicts: 0,
+    notFound: 0,
     verified: alreadyExact,
   };
   for (const change of pending) {
-    const updated = await patchRow(change);
-    if (!updated) {
+    const operation = await patchRow(change);
+    if (operation.outcome === 'conflict') {
       result.conflicts += 1;
       await recordProgress(result);
       throw new Error('Optimistic locator update conflict.');
     }
-    result.updated += 1;
-    if (digestPayload(rowState(updated)) !== change.nextDigest) {
+    if (operation.outcome === 'not_found') {
+      result.notFound += 1;
+      await recordProgress(result);
+      throw new Error('Approved experience row was not found during locator update.');
+    }
+    assert(
+      operation.outcome === 'updated' || operation.outcome === 'already_exact',
+      'Unknown locator CAS outcome.'
+    );
+    assert(operation.row, 'Locator CAS success requires a verified row.');
+    if (operation.outcome === 'updated') result.updated += 1;
+    else result.alreadyExact += 1;
+    if (digestPayload(rowState(operation.row)) !== change.nextDigest) {
       await recordProgress(result);
       throw new Error('Locator update verification failed.');
     }
@@ -127,14 +130,19 @@ async function main() {
     return response.json();
   };
   const patchRow = async (change) => {
-    const response = await fetch(buildOptimisticPatchUrl(baseUrl, change), {
-      method: 'PATCH', headers: { ...headers, Prefer: 'return=representation' }, redirect: 'manual',
-      body: JSON.stringify(change.after),
+    const response = await fetch(`${baseUrl}/rest/v1/rpc/${LOCATOR_CAS_RPC}`, {
+      method: 'POST', headers, redirect: 'manual',
+      body: JSON.stringify(buildLocatorCasRpcBody(change)),
     });
     if (!response.ok) throw new Error(`Locator update failed: HTTP ${response.status}.`);
-    const rows = await response.json();
-    if (!Array.isArray(rows) || rows.length !== 1) return null;
-    return rows[0];
+    const outcome = await response.json();
+    if (!['updated', 'already_exact'].includes(outcome)) return { outcome };
+    const query = new URLSearchParams({ select: `id,${FIELDS.join(',')}`, id: `eq.${change.experienceId}` });
+    const verification = await fetch(`${baseUrl}/rest/v1/experiences?${query}`, { headers, redirect: 'manual' });
+    if (!verification.ok) throw new Error(`Locator verification failed: HTTP ${verification.status}.`);
+    const rows = await verification.json();
+    if (!Array.isArray(rows) || rows.length !== 1) throw new Error('Locator verification row is missing.');
+    return { outcome, row: rows[0] };
   };
   const recordProgress = (result) => writeFile(input.output, `${JSON.stringify({ ...result, planDigest: plan.planDigest }, null, 2)}\n`, { mode: 0o600 });
   const result = await applyLocatorPlan({ plan, confirmation: input.confirmation, experienceId: input.experienceId, loadRows, patchRow, recordProgress });
