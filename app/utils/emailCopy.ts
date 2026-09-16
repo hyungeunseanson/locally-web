@@ -15,6 +15,10 @@ type ReviewGuestRequestHostParams = {
   experienceTitle: string;
 };
 
+type ReviewRequestGuestParams = {
+  experienceTitle: string;
+};
+
 type ReviewGuestReceivedGuestParams = {
   experienceTitle: string;
 };
@@ -124,6 +128,7 @@ export type EmailCopy = {
 export type EmailCopyKey =
   | 'review.new.host'
   | 'review.reply.guest'
+  | 'review.request.guest'
   | 'review.guest_request.host'
   | 'review.guest_received.guest'
   | 'membership.member_welcome'
@@ -157,6 +162,7 @@ export type EmailCopyKey =
 type EmailCopyParams = {
   'review.new.host': ReviewNewHostParams;
   'review.reply.guest': ReviewReplyGuestParams;
+  'review.request.guest': ReviewRequestGuestParams;
   'review.guest_request.host': ReviewGuestRequestHostParams;
   'review.guest_received.guest': ReviewGuestReceivedGuestParams;
   'membership.member_welcome': MembershipParams;
@@ -308,6 +314,45 @@ function buildReviewGuestRequestHostEmailCopy(
         title: '게스트 평가를 남겨주세요',
         message: `'${experienceTitle}' 체험의 게스트 평가를 남겨주세요.`,
         ctaLabel: '게스트 평가하기',
+      };
+  }
+}
+
+function buildReviewRequestGuestEmailCopy(
+  locale: NotificationLocale,
+  params: ReviewRequestGuestParams
+): EmailCopy {
+  const { experienceTitle } = params;
+
+  switch (locale) {
+    case 'en':
+      return {
+        subject: '[Locally] How was your trip? Share your review',
+        title: 'Keep your travel memories alive',
+        message: `How was your '${experienceTitle}' experience? Your review means a lot to your host and helps future travelers.`,
+        ctaLabel: 'Write a review',
+      };
+    case 'ja':
+      return {
+        subject: '[Locally] 旅はいかがでしたか？レビューをお寄せください',
+        title: '旅の思い出を残しましょう',
+        message: `「${experienceTitle}」の体験はいかがでしたか？大切なレビューは、ホストと次の旅行者の大きな助けになります。`,
+        ctaLabel: 'レビューを書く',
+      };
+    case 'zh':
+      return {
+        subject: '[Locally] 这次旅行怎么样？欢迎留下评价',
+        title: '记录您的旅行回忆',
+        message: `“${experienceTitle}”体验怎么样？您的宝贵评价将为体验达人和之后的旅行者提供很大帮助。`,
+        ctaLabel: '撰写评价',
+      };
+    case 'ko':
+    default:
+      return {
+        subject: '[Locally] 여행은 어떠셨나요? 후기를 남겨주세요',
+        title: '여행의 기억을 남겨주세요',
+        message: `'${experienceTitle}' 체험은 어떠셨나요? 소중한 후기는 호스트와 다음 여행자에게 큰 도움이 됩니다.`,
+        ctaLabel: '후기 작성하기',
       };
   }
 }
@@ -1555,6 +1600,11 @@ export function buildEmailCopy<K extends EmailCopyKey>(
       return buildReviewReplyGuestEmailCopy(
         locale,
         copyParams as EmailCopyParams['review.reply.guest']
+      );
+    case 'review.request.guest':
+      return buildReviewRequestGuestEmailCopy(
+        locale,
+        copyParams as EmailCopyParams['review.request.guest']
       );
     case 'review.guest_request.host':
       return buildReviewGuestRequestHostEmailCopy(

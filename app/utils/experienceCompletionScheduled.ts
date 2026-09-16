@@ -4,6 +4,7 @@ import type { EmailEnv } from '@/app/emails/delivery/sendTemplatedEmail';
 import { processSoloGuaranteeRefundsForCompletedBookings } from '@/app/utils/bookings/soloGuaranteeRefund';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { cancelCardPayment } from '@/app/utils/payments/card/server';
+import { deliverGuestReviewRequestEmailsForCompletedBookings } from '@/app/utils/reviews/guestReviewRequestEmail';
 import { deliverHostGuestReviewRequestsForCompletedBookings } from '@/app/utils/reviews/hostGuestReviewRequestNotification';
 import {
   runExperienceCompletionSync,
@@ -122,6 +123,15 @@ export function createExperienceCompletionScheduledDependencies(
       }),
     deliverReviewRequests: (params) =>
       deliverHostGuestReviewRequestsForCompletedBookings({
+        ...params,
+        sendEmail: (request) =>
+          sendImmediateGenericEmail(request, {
+            env: environment,
+            supabaseAdmin: params.supabaseAdmin,
+          }),
+      }),
+    deliverGuestReviewRequestEmails: (params) =>
+      deliverGuestReviewRequestEmailsForCompletedBookings({
         ...params,
         sendEmail: (request) =>
           sendImmediateGenericEmail(request, {
