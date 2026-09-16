@@ -101,6 +101,7 @@ export async function reconcileDueExperienceReviewRequests(params: {
   }
 
   const settled = await Promise.allSettled(operations);
+  const customerNotificationBookingIds: string[] = [];
   const hostNotificationBookingIds: string[] = [];
   let customerCreatedCount = 0;
   let hostCreatedCount = 0;
@@ -120,6 +121,7 @@ export async function reconcileDueExperienceReviewRequests(params: {
     if (!result.value.created) continue;
     if (result.value.kind === 'customer') {
       customerCreatedCount += 1;
+      customerNotificationBookingIds.push(result.value.bookingId);
     } else {
       hostCreatedCount += 1;
       hostNotificationBookingIds.push(result.value.bookingId);
@@ -131,6 +133,7 @@ export async function reconcileDueExperienceReviewRequests(params: {
     customerCreatedCount,
     hostCreatedCount,
     failedCount,
+    customerNotificationBookingIds,
     hostNotificationBookingIds,
   };
 }

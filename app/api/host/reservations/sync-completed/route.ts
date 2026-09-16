@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 import { completeExperienceBookingsIfDueAtomic } from '@/app/utils/bookings/completeExperienceBooking';
 import { processSoloGuaranteeRefundsForCompletedBookings } from '@/app/utils/bookings/soloGuaranteeRefund';
+import { deliverGuestReviewRequestEmailsForCompletedBookings } from '@/app/utils/reviews/guestReviewRequestEmail';
 import { deliverHostGuestReviewRequestsForCompletedBookings } from '@/app/utils/reviews/hostGuestReviewRequestNotification';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
@@ -61,6 +62,9 @@ export async function POST(request: NextRequest) {
     const completedBookingIds = completionBatch.results
       .filter((result) => result.completed)
       .map((result) => result.bookingId);
+    const customerNotificationBookingIds = completionBatch.results
+      .filter((result) => result.completed && result.notificationCreated)
+      .map((result) => result.bookingId);
 
     try {
       await processSoloGuaranteeRefundsForCompletedBookings({
@@ -80,6 +84,18 @@ export async function POST(request: NextRequest) {
       console.error(
         '[host/reservations/sync-completed] host guest review request delivery failed:',
         notificationError
+      );
+    }
+
+    try {
+      await deliverGuestReviewRequestEmailsForCompletedBookings({
+        supabaseAdmin,
+        notificationBookingIds: customerNotificationBookingIds,
+      });
+    } catch (emailError) {
+      console.error(
+        '[host/reservations/sync-completed] guest review request email delivery failed:',
+        emailError
       );
     }
 

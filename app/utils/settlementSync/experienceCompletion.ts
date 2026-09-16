@@ -4,6 +4,7 @@ import {
   completeExperienceBookingsIfDueAtomic,
 } from '@/app/utils/bookings/completeExperienceBooking';
 import { processSoloGuaranteeRefundsForCompletedBookings } from '@/app/utils/bookings/soloGuaranteeRefund';
+import { deliverGuestReviewRequestEmailsForCompletedBookings } from '@/app/utils/reviews/guestReviewRequestEmail';
 import { deliverHostGuestReviewRequestsForCompletedBookings } from '@/app/utils/reviews/hostGuestReviewRequestNotification';
 import { reconcileDueExperienceReviewRequests } from '@/app/utils/reviews/reviewRequestReconciliation';
 
@@ -65,6 +66,7 @@ export type ExperienceCompletionSyncDependencies = {
   completeBookings?: typeof completeExperienceBookingsIfDueAtomic;
   processSoloGuaranteeRefunds?: typeof processSoloGuaranteeRefundsForCompletedBookings;
   deliverReviewRequests?: typeof deliverHostGuestReviewRequestsForCompletedBookings;
+  deliverGuestReviewRequestEmails?: typeof deliverGuestReviewRequestEmailsForCompletedBookings;
   reconcileReviewRequests?: typeof reconcileDueExperienceReviewRequests;
 };
 
@@ -276,13 +278,40 @@ async function processHostGuestReviewRequestSideEffects(
   }
 }
 
+async function processGuestReviewRequestEmailSideEffects(
+  supabaseAdmin: SettlementSyncAdminClient,
+  bookingIds: string[],
+  deliverEmails: typeof deliverGuestReviewRequestEmailsForCompletedBookings
+) {
+  if (bookingIds.length === 0) return;
+
+  try {
+    await deliverEmails({
+      supabaseAdmin,
+      notificationBookingIds: bookingIds,
+    });
+  } catch {
+    console.error(JSON.stringify({
+      event: 'experience_completion_side_effect',
+      status: 'failed',
+      diagnosticCode: 'guest_review_request_email_failed',
+    }));
+  }
+}
+
 async function processReviewRequestReconciliationSideEffects(
   supabaseAdmin: SettlementSyncAdminClient,
   reconcileReviewRequests: typeof reconcileDueExperienceReviewRequests,
-  deliverReviewRequests: typeof deliverHostGuestReviewRequestsForCompletedBookings
+  deliverReviewRequests: typeof deliverHostGuestReviewRequestsForCompletedBookings,
+  deliverGuestReviewRequestEmails: typeof deliverGuestReviewRequestEmailsForCompletedBookings
 ) {
   try {
     const result = await reconcileReviewRequests({ supabaseAdmin });
+    await processGuestReviewRequestEmailSideEffects(
+      supabaseAdmin,
+      result.customerNotificationBookingIds,
+      deliverGuestReviewRequestEmails
+    );
     await processHostGuestReviewRequestSideEffects(
       supabaseAdmin,
       result.hostNotificationBookingIds,
@@ -337,6 +366,9 @@ export async function runExperienceCompletionSync(
   const deliverReviewRequests =
     params.dependencies?.deliverReviewRequests ??
     deliverHostGuestReviewRequestsForCompletedBookings;
+  const deliverGuestReviewRequestEmails =
+    params.dependencies?.deliverGuestReviewRequestEmails ??
+    deliverGuestReviewRequestEmailsForCompletedBookings;
   const reconcileReviewRequests =
     params.dependencies?.reconcileReviewRequests ??
     reconcileDueExperienceReviewRequests;
@@ -381,7 +413,8 @@ export async function runExperienceCompletionSync(
       await processReviewRequestReconciliationSideEffects(
         params.supabaseAdmin,
         reconcileReviewRequests,
-        deliverReviewRequests
+        deliverReviewRequests,
+        deliverGuestReviewRequestEmails
       );
       await renewLease();
       await finishSettlementSyncRunSuccess({
@@ -417,6 +450,9 @@ export async function runExperienceCompletionSync(
     completedBookingIds = completionBatch.results
       .filter((result) => result.completed)
       .map((result) => result.bookingId);
+    const customerNotificationBookingIds = completionBatch.results
+      .filter((result) => result.completed && result.notificationCreated)
+      .map((result) => result.bookingId);
     failedBookingIds = completionBatch.failures.map((failure) => failure.bookingId);
 
     await processSoloGuaranteeRefundSideEffects(
@@ -430,10 +466,16 @@ export async function runExperienceCompletionSync(
       completedBookingIds,
       deliverReviewRequests
     );
+    await processGuestReviewRequestEmailSideEffects(
+      params.supabaseAdmin,
+      customerNotificationBookingIds,
+      deliverGuestReviewRequestEmails
+    );
     await processReviewRequestReconciliationSideEffects(
       params.supabaseAdmin,
       reconcileReviewRequests,
-      deliverReviewRequests
+      deliverReviewRequests,
+      deliverGuestReviewRequestEmails
     );
     await renewLease();
 
@@ -514,6 +556,9 @@ export async function forceExperienceCompletionSync(
   const deliverReviewRequests =
     params.dependencies?.deliverReviewRequests ??
     deliverHostGuestReviewRequestsForCompletedBookings;
+  const deliverGuestReviewRequestEmails =
+    params.dependencies?.deliverGuestReviewRequestEmails ??
+    deliverGuestReviewRequestEmailsForCompletedBookings;
   const target = await resolveExperienceCompletionTarget(params.supabaseAdmin, params.identifier);
   if (!target) {
     return { success: false, status: 404, error: '체험 예약을 찾을 수 없습니다.' };
@@ -655,6 +700,13 @@ export async function forceExperienceCompletionSync(
         [target.booking_id],
         deliverReviewRequests
       );
+      if (completionResult.notificationCreated) {
+        await processGuestReviewRequestEmailSideEffects(
+          params.supabaseAdmin,
+          [target.booking_id],
+          deliverGuestReviewRequestEmails
+        );
+      }
       await renewLease();
       await finishSettlementSyncRunSuccess({
         supabaseAdmin: params.supabaseAdmin,

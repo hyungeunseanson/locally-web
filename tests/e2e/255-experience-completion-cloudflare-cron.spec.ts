@@ -145,6 +145,7 @@ test.describe('Experience Completion Cloudflare Cron', () => {
     let refundCalls = 0;
     let reviewCalls = 0;
     let reviewReconciliationCalls = 0;
+    const guestEmailInputs: string[][] = [];
     const result = await runExperienceCompletionSync({
       supabaseAdmin: createSettlementClient(state) as never,
       triggerSource: 'cron',
@@ -161,13 +162,18 @@ test.describe('Experience Completion Cloudflare Cron', () => {
           reviewCalls += 1;
           return { processedCount: 0, failedCount: 0 };
         },
+        deliverGuestReviewRequestEmails: async ({ notificationBookingIds }) => {
+          guestEmailInputs.push(notificationBookingIds);
+          return { processedCount: notificationBookingIds.length, failedCount: 0 };
+        },
         reconcileReviewRequests: async () => {
           reviewReconciliationCalls += 1;
           return {
             candidateCount: 0,
-            customerCreatedCount: 0,
+            customerCreatedCount: 1,
             hostCreatedCount: 0,
             failedCount: 0,
+            customerNotificationBookingIds: ['reconciled-booking'],
             hostNotificationBookingIds: [],
           };
         },
@@ -185,6 +191,7 @@ test.describe('Experience Completion Cloudflare Cron', () => {
       reviewCalls: 0,
       reviewReconciliationCalls: 1,
     });
+    expect(guestEmailInputs).toEqual([['reconciled-booking']]);
     expect(state.calls).toEqual([
       'job-run:abandon-expired',
       'job-run:start',
@@ -274,12 +281,50 @@ test.describe('Experience Completion Cloudflare Cron', () => {
           sideEffects.push(`review:${completedBookingIds.length}`);
           return { processedCount: 1, failedCount: 0 };
         },
+        deliverGuestReviewRequestEmails: async ({ notificationBookingIds }) => {
+          sideEffects.push(`guest-email:${notificationBookingIds.length}`);
+          return { processedCount: 1, failedCount: 0 };
+        },
       },
     });
     expect(result).toMatchObject({ success: true, outcome: 'completed', processedCount: 1 });
-    expect(sideEffects).toEqual(['complete:1', 'refund:1', 'review:1']);
+    expect(sideEffects).toEqual(['complete:1', 'refund:1', 'review:1', 'guest-email:1']);
     expect(state.calls.at(-2)).toBe('job-run:renew');
     expect(state.calls.at(-1)).toBe('job-run:success');
+  });
+
+  test('does not email when completion did not create a new customer review request', async () => {
+    const state = createState([{
+      booking_id: 'already-notified-booking',
+      date: '2026-01-01',
+      time: '09:00',
+      status: 'PAID',
+    }]);
+    let guestEmailCalls = 0;
+    const result = await runExperienceCompletionSync({
+      supabaseAdmin: createSettlementClient(state) as never,
+      triggerSource: 'cron',
+      dependencies: {
+        completeBookings: async () => ({
+          results: [{
+            bookingId: 'already-notified-booking', orderId: null, userId: 'guest-1',
+            alreadyProcessed: false, notDue: false, completed: true,
+            notificationCreated: false,
+          }],
+          failures: [],
+        }),
+        processSoloGuaranteeRefunds: async () => ({
+          processed: 0, refunded: 0, pendingManual: 0, failed: 0, skipped: 1,
+        }),
+        deliverReviewRequests: async () => ({ processedCount: 0, failedCount: 0 }),
+        deliverGuestReviewRequestEmails: async () => {
+          guestEmailCalls += 1;
+          return { processedCount: 0, failedCount: 0 };
+        },
+      },
+    });
+    expect(result).toMatchObject({ success: true, outcome: 'completed' });
+    expect(guestEmailCalls).toBe(0);
   });
 
   test('uses the database lease to make duplicate scheduled invocations no-op', async () => {
@@ -303,6 +348,7 @@ test.describe('Experience Completion Cloudflare Cron', () => {
       completeBookings: completeBookings as never,
       processSoloGuaranteeRefunds: async () => ({ processed: 0, refunded: 0, pendingManual: 0, failed: 0, skipped: 1 }),
       deliverReviewRequests: async () => ({ processedCount: 0, failedCount: 0 }),
+      deliverGuestReviewRequestEmails: async () => ({ processedCount: 0, failedCount: 0 }),
     };
     const first = runExperienceCompletionSync({
       supabaseAdmin: createSettlementClient(state) as never,

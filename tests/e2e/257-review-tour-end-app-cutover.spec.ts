@@ -163,6 +163,7 @@ test.describe('Review tour-end app cutover contract', () => {
       customerCreatedCount: 1,
       hostCreatedCount: 2,
       failedCount: 0,
+      customerNotificationBookingIds: ['both-needed'],
       hostNotificationBookingIds: ['both-needed', 'host-only'],
     });
   });
@@ -193,6 +194,7 @@ test.describe('Review tour-end app cutover contract', () => {
       customerCreatedCount: 0,
       hostCreatedCount: 0,
       failedCount: 0,
+      customerNotificationBookingIds: [],
       hostNotificationBookingIds: [],
     });
   });
