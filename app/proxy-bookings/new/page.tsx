@@ -23,6 +23,7 @@ import type {
   CardPaymentPublicRuntime,
   CardPaymentReadiness,
 } from '@/app/utils/payments/card/types';
+import SiteHeader from '@/app/components/SiteHeader';
 import {
   getProxyCategoryLabel,
   getProxyRequestFeeKrw,
@@ -1645,7 +1646,10 @@ export default function NewProxyBooking() {
     Boolean(cardRuntime?.scriptSrc) && cardRuntime?.provider !== 'nicepay';
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-5 sm:px-5 sm:py-8">
+    <>
+      <SiteHeader />
+
+      <div className="mx-auto max-w-5xl px-4 py-5 sm:px-5 sm:py-8">
       {shouldLoadCardRuntimeScript && cardRuntime?.scriptSrc && (
         <Script
           id={`proxy-card-sdk-${cardRuntime.provider}`}
@@ -1974,6 +1978,7 @@ export default function NewProxyBooking() {
         </div>
       </form>
 
-    </div>
+      </div>
+    </>
   );
 }

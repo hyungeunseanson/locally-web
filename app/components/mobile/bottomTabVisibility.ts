@@ -16,7 +16,6 @@ export function shouldHideMobileBottomTab(pathname: string | null | undefined, i
     pathname.startsWith('/admin') ||
     pathname.startsWith('/login') ||
     pathname.startsWith('/signup') ||
-    pathname === '/proxy-bookings/new' ||
     isServicePaymentFlow ||
     isHostEditingFlow
   );
