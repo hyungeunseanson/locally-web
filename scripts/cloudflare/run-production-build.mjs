@@ -9,6 +9,20 @@ const ROOT = process.cwd();
 const MANIFEST_PATH = path.join(ROOT, 'config/cloudflare/migration-manifest.json');
 const CLIENT_ASSET_ROOT = path.join(ROOT, '.open-next/assets/_next/static');
 
+const PRODUCTION_SUPABASE_BUILD_ENV_ERROR =
+  'Refusing Production build: required Supabase public build environment is missing.';
+
+export function assertProductionSupabasePublicBuildEnvironment(currentEnvironment) {
+  const requiredVariables = [
+    'NEXT_PUBLIC_SUPABASE_URL',
+    'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+  ];
+
+  if (requiredVariables.some((variable) => !currentEnvironment[variable]?.trim())) {
+    throw new Error(PRODUCTION_SUPABASE_BUILD_ENV_ERROR);
+  }
+}
+
 export async function readProductionMediaBaseUrl() {
   const manifest = JSON.parse(await readFile(MANIFEST_PATH, 'utf8'));
   const value = manifest.environments?.production?.publicExperienceMediaBaseUrl;
@@ -97,15 +111,19 @@ async function listFiles(directory) {
   return nested.flat();
 }
 
-export async function verifyProductionClientBundle(mediaBaseUrls, assetRoot = CLIENT_ASSET_ROOT) {
-  const expectedUrls = Array.isArray(mediaBaseUrls) ? mediaBaseUrls : [mediaBaseUrls];
+export async function verifyProductionClientBundle(
+  expectedValues,
+  assetRoot = CLIENT_ASSET_ROOT,
+  valueDescription = 'Production public media base URL'
+) {
+  const values = Array.isArray(expectedValues) ? expectedValues : [expectedValues];
   const files = (await listFiles(assetRoot)).filter((file) => file.endsWith('.js'));
   assert(files.length > 0, 'Production OpenNext client bundle contains no JavaScript assets.');
   const sources = await Promise.all(files.map((file) => readFile(file, 'utf8')));
-  for (const expectedUrl of expectedUrls) {
+  for (const expectedValue of values) {
     assert(
-      sources.some((source) => source.includes(expectedUrl)),
-      `Production public media base URL was not compiled into the client bundle: ${expectedUrl}`
+      sources.some((source) => source.includes(expectedValue)),
+      `${valueDescription} was not compiled into the client bundle.`
     );
   }
 }
@@ -122,12 +140,18 @@ export function runOpenNextBuild(environment) {
 }
 
 export async function main() {
+  assertProductionSupabasePublicBuildEnvironment(process.env);
   const mediaBaseUrl = await readProductionMediaBaseUrl();
   const hostProfileMediaBaseUrl = await readProductionHostProfileMediaBaseUrl();
   const readerPolicy = await readProductionMediaReaderPolicy();
   const environment = buildProductionEnvironment(process.env, mediaBaseUrl, readerPolicy, hostProfileMediaBaseUrl);
   runOpenNextBuild(environment);
   await verifyProductionClientBundle([mediaBaseUrl, hostProfileMediaBaseUrl]);
+  await verifyProductionClientBundle(
+    environment.NEXT_PUBLIC_SUPABASE_URL.trim(),
+    CLIENT_ASSET_ROOT,
+    'Production Supabase public URL'
+  );
   console.log(JSON.stringify({
     status: 'LOCALLY_CLOUDFLARE_PRODUCTION_BUILD_CONTRACT_PASS',
     publicExperienceMediaBaseUrl: mediaBaseUrl,

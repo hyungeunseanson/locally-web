@@ -12,6 +12,7 @@
     "lint": "eslint",
     "cloudflare:build": "opennextjs-cloudflare build",
     "cloudflare:build:production": "node scripts/cloudflare/run-production-build.mjs",
+    "cloudflare:production-browser-smoke": "node scripts/cloudflare/run-production-browser-smoke.mjs",
     "cloudflare:production-build:contract": "node --test scripts/cloudflare/run-production-build.test.mjs scripts/cloudflare/run-production-deploy.test.mjs",
     "cloudflare:experience-media:source-migration-contract": "node scripts/supabase/test-experience-media-locator-cas.mjs && node scripts/supabase/test-experience-storage-lockdown.mjs && node --test scripts/cloudflare/experience-media-source-migration.test.mjs scripts/cloudflare/plan-experience-media-source-copy.test.mjs scripts/cloudflare/verify-experience-media-source-cutover.test.mjs scripts/cloudflare/apply-experience-media-locator-plan.test.mjs scripts/cloudflare/experience-media-source-cutover-operations.test.mjs && python3 -m unittest scripts/cloudflare/r2_experience_media_source_copy_test.py",
     "cloudflare:deploy:production": "node scripts/cloudflare/run-production-deploy.mjs",
