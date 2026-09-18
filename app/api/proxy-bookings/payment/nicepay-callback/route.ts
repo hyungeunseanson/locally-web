@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 
 import { finalizeProxyCardPayment } from '@/app/api/proxy-bookings/payment/proxyCardConfirmation';
 import { getCurrentCardPaymentProvider, verifyApprovedCardPayment } from '@/app/utils/payments/card/server';
-import { getProxyRequestFeeKrw } from '@/app/utils/proxyBooking';
+import { getProxyRequestFeeKrw, isProxyCardPaymentAnchor } from '@/app/utils/proxyBooking';
 import type { ProxyCategory } from '@/app/types/proxy';
+import type { VerifiedCardPayment } from '@/app/utils/payments/card/types';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 
@@ -85,18 +86,61 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: '로컬리 결제 요청만 처리할 수 있습니다.' }, { status: 409 });
     }
 
+    const expectedAmount = getProxyRequestFeeKrw(
+      String(originalRequest.category || 'RESTAURANT') as ProxyCategory,
+      (originalRequest.form_data as Record<string, unknown> | null | undefined) ?? undefined
+    );
+
     if (String(originalRequest.payment_status || '').toUpperCase() === 'COMPLETED') {
-      return NextResponse.json({ success: true, message: 'Already processed' });
+      if (!isProxyCardPaymentAnchor(originalRequest)) {
+        return NextResponse.json({ success: true, message: 'Already processed' });
+      }
+
+      const storedTid = String(originalRequest.tid || '').trim();
+      if (!storedTid) {
+        return NextResponse.json(
+          { success: false, error: '완료된 카드 결제의 거래번호가 없습니다.' },
+          { status: 409 }
+        );
+      }
+
+      if (getCurrentCardPaymentProvider() === 'nicepay' && approvalId !== storedTid) {
+        return NextResponse.json(
+          { success: false, error: '카드 결제 거래번호가 요청과 일치하지 않습니다.' },
+          { status: 409 }
+        );
+      }
+
+      const recoveryResult: VerifiedCardPayment = {
+        provider: getCurrentCardPaymentProvider(),
+        approvedAmount: expectedAmount,
+        providerTransactionId: storedTid,
+        raw: { replay: true, approvalId },
+      };
+      const confirmationResult = await finalizeProxyCardPayment({
+        supabaseAdmin,
+        proxyRequest: originalRequest,
+        verificationResult: recoveryResult,
+      });
+
+      if (!confirmationResult.success) {
+        return NextResponse.json(
+          { success: false, error: confirmationResult.error },
+          { status: confirmationResult.status }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: confirmationResult.alreadyProcessed ? 'Already processed' : undefined,
+        inquiryId: confirmationResult.inquiryId,
+        redirectUrl: confirmationResult.redirectUrl,
+      });
     }
 
     let verificationResult;
 
     try {
-      const expectedAmount = getProxyRequestFeeKrw(
-        String(originalRequest.category || 'RESTAURANT') as ProxyCategory,
-        (originalRequest.form_data as Record<string, unknown> | null | undefined) ?? undefined
-      );
-
       verificationResult = await verifyApprovedCardPayment({
         provider: getCurrentCardPaymentProvider(),
         approvalId,
@@ -126,10 +170,19 @@ export async function POST(request: Request) {
     }
 
     if (confirmationResult.alreadyProcessed) {
-      return NextResponse.json({ success: true, message: 'Already processed' });
+      return NextResponse.json({
+        success: true,
+        message: 'Already processed',
+        inquiryId: confirmationResult.inquiryId,
+        redirectUrl: confirmationResult.redirectUrl,
+      });
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      inquiryId: confirmationResult.inquiryId,
+      redirectUrl: confirmationResult.redirectUrl,
+    });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : '결제 처리 중 서버 오류가 발생했습니다.';

@@ -108,6 +108,11 @@ const expectedLedger = [
     name: 'review_direct_write_lockdown',
     repositoryFile: 'supabase/migrations/20260916134243_review_direct_write_lockdown.sql',
   },
+  {
+    version: '20260918000000',
+    name: 'proxy_card_intake_atomic',
+    repositoryFile: 'supabase/migrations/20260918000000_proxy_card_intake_atomic.sql',
+  },
 ];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));
 for (const [index, expected] of expectedLedger.entries()) {
@@ -136,7 +141,7 @@ assert(objects.publicTables.length === 39, 'expected 39 public tables');
 assert(objects.publicViews.length === 2, 'expected 2 public views');
 assert(objects.publicTableColumns === 510, 'expected 510 public table columns');
 assert(objects.publicViewColumns === 27, 'expected 27 public view columns');
-assert(objects.functionOverloads.length === 47, 'expected 47 public function overloads');
+assert(objects.functionOverloads.length === 48, 'expected 48 public function overloads');
 assert(objects.applicationTriggers.length === 11, 'expected 11 application triggers');
 assert(objects.indexes === 113, 'expected 113 public indexes');
 assert(objects.constraints.total === 179, 'expected 179 constraints');

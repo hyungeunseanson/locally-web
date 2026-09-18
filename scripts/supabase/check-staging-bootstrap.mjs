@@ -39,6 +39,7 @@ const expectedApplyOrder = [
   'supabase/migrations/20260916032730_experience_storage_lockdown.sql',
   'supabase/migrations/20260916111416_review_tour_end_db_foundation.sql',
   'supabase/migrations/20260916134243_review_direct_write_lockdown.sql',
+  'supabase/migrations/20260918000000_proxy_card_intake_atomic.sql',
 ];
 exact('fresh-project apply order', required.freshProjectApplyOrder, expectedApplyOrder);
 

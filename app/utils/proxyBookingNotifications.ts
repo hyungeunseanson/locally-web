@@ -1,10 +1,68 @@
 import { createAdminClient } from '@/app/utils/supabase/admin';
+import { insertAdminAlerts, sendAdminAlertEmails } from '@/app/utils/adminAlertCenter';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
-import { getProxyLinkedInquiryId, getProxyRequestTitle } from '@/app/utils/proxyBooking';
+import { getProxyLinkedInquiryId, getProxyRequestTitle, getProxyCategoryLabel } from '@/app/utils/proxyBooking';
 import type { ProxyFormData, ProxyRequest } from '@/app/types/proxy';
 
 type ProxyPaymentEvent = 'confirmed' | 'cancelled' | 'refunded';
+
+function getProxyRequesterName(params: {
+  fallbackEmail?: string | null;
+  formData: Record<string, unknown> | null | undefined;
+  contactName?: string | null;
+}) {
+  const directContactName = typeof params.contactName === 'string' ? params.contactName.trim() : '';
+  if (directContactName) return directContactName;
+
+  const reservationName = typeof params.formData?.reservation_name === 'string'
+    ? params.formData.reservation_name.trim()
+    : '';
+  if (reservationName) return reservationName;
+
+  const fallbackEmail = typeof params.fallbackEmail === 'string' ? params.fallbackEmail.trim() : '';
+  if (fallbackEmail) return fallbackEmail.split('@')[0];
+
+  return '고객';
+}
+
+export async function notifyProxyRequestAdminIntake(params: {
+  request: Pick<ProxyRequest, 'id' | 'category' | 'form_data'>;
+  fallbackEmail?: string | null;
+  paymentLabel: string;
+  finalAmount: number;
+}) {
+  const requesterName = getProxyRequesterName({
+    fallbackEmail: params.fallbackEmail,
+    formData: params.request.form_data,
+    contactName: typeof params.request.form_data?.contact_name === 'string'
+      ? params.request.form_data.contact_name
+      : null,
+  });
+  const categoryLabel = getProxyCategoryLabel(params.request.category);
+  const alertLink = `/admin/dashboard?tab=TEAM&teamTab=proxy&proxyRequestId=${params.request.id}`;
+  const alertMessage = `${categoryLabel} · ${requesterName} · ${params.paymentLabel} · ₩${params.finalAmount.toLocaleString()}`;
+
+  try {
+    await insertAdminAlerts({
+      title: '새 전화 예약 요청이 접수되었습니다',
+      message: alertMessage,
+      link: alertLink,
+    });
+
+    void sendAdminAlertEmails({
+      subject: '[Locally Admin] 새 전화 예약 요청이 접수되었습니다',
+      title: '새 전화 예약 요청이 접수되었습니다',
+      message: `${alertMessage}\n\nTEAM > 전화 예약 탭에서 요청을 확인해주세요.`,
+      link: alertLink,
+      ctaLabel: '전화 예약 열기',
+    }).catch((emailError) => {
+      console.error('[ProxyBookingNotifications] admin intake email side effect failed:', emailError);
+    });
+  } catch (error) {
+    console.error('[ProxyBookingNotifications] admin intake side effect failed:', error);
+  }
+}
 
 function buildProxyCustomerLink(params: {
   requestId: string;

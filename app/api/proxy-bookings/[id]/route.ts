@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
-import { getProxyLinkedInquiryId, PROXY_LINKED_INQUIRY_REQUIRED_ERROR } from '@/app/utils/proxyBooking';
+import {
+    getProxyLinkedInquiryId,
+    isProxyCardPaymentAnchor,
+    PROXY_LINKED_INQUIRY_REQUIRED_ERROR,
+} from '@/app/utils/proxyBooking';
 
 type ProxyRequestRow = {
     id: string;
@@ -76,6 +80,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         }
 
         const requestRow = data as ProxyRequestRow;
+        if (isProxyCardPaymentAnchor(requestRow)) {
+            return NextResponse.json({ success: false, error: 'Request not found' }, { status: 404 });
+        }
+
         let profile: ProfileRow | null = null;
 
         if (requestRow.user_id) {
@@ -213,11 +221,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
         const { data: existingRequest, error: existingError } = await supabase
             .from('proxy_requests')
-            .select('id, user_id, status, payment_status')
+            .select('id, user_id, status, payment_status, form_data, payment_channel')
             .eq('id', id)
             .maybeSingle();
 
         if (existingError || !existingRequest) {
+            return NextResponse.json({ success: false, error: 'Request not found' }, { status: 404 });
+        }
+
+        if (isProxyCardPaymentAnchor(existingRequest)) {
             return NextResponse.json({ success: false, error: 'Request not found' }, { status: 404 });
         }
 

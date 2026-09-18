@@ -249,6 +249,54 @@ async function createProxyRequestFixture(params: {
   };
 }
 
+async function createProxyCardAnchorFixture(params: {
+  userId: string;
+  user: TestUser;
+  suffix: string;
+}) {
+  const requestId = crypto.randomUUID();
+  const orderId = `LOCALLY-PROXY-${requestId}`;
+  const restaurantName = `원자적 카드 앵커 ${params.suffix}`;
+  const { data, error } = await getAdminClient()
+    .from('proxy_requests')
+    .insert({
+      id: requestId,
+      user_id: params.userId,
+      category: 'RESTAURANT',
+      status: 'PENDING',
+      payment_channel: 'LOCALLY',
+      payment_status: 'WAITING',
+      locally_order_id: orderId,
+      agreed_to_terms: true,
+      form_data: {
+        restaurant_name: restaurantName,
+        preferred_slot_primary: '2026-01-15T19:00',
+        reservation_name: params.user.fullName,
+        guest_number: 2,
+        korean_contact: params.user.phone,
+        payment_method: 'card',
+        contact_name: params.user.fullName,
+        contact_phone: params.user.phone,
+        service_fee_krw: 4500,
+        __proxy_card_anchor: 'v1',
+      },
+    })
+    .select('id, locally_order_id')
+    .single();
+
+  if (error || !data?.id) {
+    throw error || new Error('Failed to create proxy card anchor fixture.');
+  }
+
+  createdProxyRequestIds.push(String(data.id));
+  return {
+    requestId: String(data.id),
+    orderId: String(data.locally_order_id || orderId),
+    restaurantName,
+    tid: `TX-TID-ANCHOR-${params.suffix}`,
+  };
+}
+
 async function createServicePaymentFixture(params: {
   customerId: string;
   customer: TestUser;
@@ -1620,5 +1668,127 @@ test.describe('Card payment provider cutover contracts', () => {
       (proxyBookingNotifications as { notifyProxyPaymentEvent: typeof proxyBookingNotifications.notifyProxyPaymentEvent }).notifyProxyPaymentEvent =
         originalNotifyProxyPaymentEvent;
     }
+  });
+
+  test('finalizes a completed proxy card anchor atomically under callback/notification replay', async () => {
+    const user = createUser('atomic-anchor');
+    const userId = await createAuthUser(user);
+    const fixture = await createProxyCardAnchorFixture({
+      userId,
+      user,
+      suffix: String(Date.now()),
+    });
+    const initialMessage = `atomic proxy card intake ${fixture.requestId}`;
+
+    const { error: paymentUpdateError } = await getAdminClient()
+      .from('proxy_requests')
+      .update({
+        payment_status: 'COMPLETED',
+        tid: fixture.tid,
+        paid_at: new Date().toISOString(),
+      })
+      .eq('id', fixture.requestId)
+      .eq('payment_status', 'WAITING');
+
+    if (paymentUpdateError) throw paymentUpdateError;
+
+    const finalize = () => getAdminClient()
+      .rpc('finalize_proxy_card_intake_atomic', {
+        p_proxy_request_id: fixture.requestId,
+        p_verified_amount: 4500,
+        p_verified_tid: fixture.tid,
+        p_initial_message: initialMessage,
+      })
+      .maybeSingle();
+
+    const [first, second] = await Promise.all([finalize(), finalize()]);
+    if (first.error) throw first.error;
+    if (second.error) throw second.error;
+
+    const results = [first.data, second.data].filter(Boolean) as Array<{
+      inquiry_id: number | string;
+      message_id: number | string | null;
+      activated_now: boolean;
+    }>;
+    expect(results).toHaveLength(2);
+    expect(results.filter((result) => result.activated_now)).toHaveLength(1);
+    expect(results[0]?.inquiry_id).toBe(results[1]?.inquiry_id);
+
+    const inquiryId = String(results[0]?.inquiry_id);
+    const { data: requestAfterFinalize, error: requestAfterFinalizeError } = await getAdminClient()
+      .from('proxy_requests')
+      .select('payment_status, tid, form_data')
+      .eq('id', fixture.requestId)
+      .single();
+    if (requestAfterFinalizeError) throw requestAfterFinalizeError;
+    expect(requestAfterFinalize).toMatchObject({ payment_status: 'COMPLETED', tid: fixture.tid });
+    expect((requestAfterFinalize.form_data as Record<string, unknown>).__proxy_card_anchor).toBeUndefined();
+    expect(String((requestAfterFinalize.form_data as Record<string, unknown>).linked_inquiry_id)).toBe(inquiryId);
+
+    const { count: inquiryCount, error: inquiryCountError } = await getAdminClient()
+      .from('inquiries')
+      .select('id', { count: 'exact', head: true })
+      .eq('id', inquiryId);
+    if (inquiryCountError) throw inquiryCountError;
+    expect(inquiryCount).toBe(1);
+
+    const { count: messageCount, error: messageCountError } = await getAdminClient()
+      .from('inquiry_messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('inquiry_id', inquiryId)
+      .eq('content', initialMessage);
+    if (messageCountError) throw messageCountError;
+    expect(messageCount).toBe(1);
+
+    const replay = await finalize();
+    if (replay.error) throw replay.error;
+    expect((replay.data as { activated_now?: boolean } | null)?.activated_now).toBe(false);
+
+    const { count: replayMessageCount, error: replayMessageCountError } = await getAdminClient()
+      .from('inquiry_messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('inquiry_id', inquiryId)
+      .eq('content', initialMessage);
+    if (replayMessageCountError) throw replayMessageCountError;
+    expect(replayMessageCount).toBe(1);
+  });
+
+  test('rolls back an invalid atomic activation without losing the completed payment anchor', async () => {
+    const user = createUser('atomic-rollback');
+    const userId = await createAuthUser(user);
+    const fixture = await createProxyCardAnchorFixture({
+      userId,
+      user,
+      suffix: `rollback-${Date.now()}`,
+    });
+
+    const { error: paymentUpdateError } = await getAdminClient()
+      .from('proxy_requests')
+      .update({
+        payment_status: 'COMPLETED',
+        tid: fixture.tid,
+        paid_at: new Date().toISOString(),
+      })
+      .eq('id', fixture.requestId)
+      .eq('payment_status', 'WAITING');
+    if (paymentUpdateError) throw paymentUpdateError;
+
+    const failed = await getAdminClient().rpc('finalize_proxy_card_intake_atomic', {
+      p_proxy_request_id: fixture.requestId,
+      p_verified_amount: 4500,
+      p_verified_tid: fixture.tid,
+      p_initial_message: '',
+    });
+    expect(failed.error).toBeTruthy();
+
+    const { data: requestAfterFailure, error: requestAfterFailureError } = await getAdminClient()
+      .from('proxy_requests')
+      .select('payment_status, tid, form_data')
+      .eq('id', fixture.requestId)
+      .single();
+    if (requestAfterFailureError) throw requestAfterFailureError;
+    expect(requestAfterFailure).toMatchObject({ payment_status: 'COMPLETED', tid: fixture.tid });
+    expect((requestAfterFailure.form_data as Record<string, unknown>).__proxy_card_anchor).toBe('v1');
+    expect((requestAfterFailure.form_data as Record<string, unknown>).linked_inquiry_id).toBeUndefined();
   });
 });

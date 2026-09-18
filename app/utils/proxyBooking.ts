@@ -26,6 +26,8 @@ export const PROXY_RESTAURANT_SERVICE_OPTION_PRICES: Record<RestaurantServiceOpt
 };
 
 export const PROXY_LINKED_INQUIRY_REQUIRED_ERROR = '연결된 1:1 문의를 찾을 수 없습니다.';
+export const PROXY_CARD_ANCHOR_MARKER = '__proxy_card_anchor';
+export const PROXY_CARD_ANCHOR_VERSION = 'v1';
 
 export const PROXY_OPERATIONAL_STATUS_ORDER: readonly ProxyStatus[] = [
   'PENDING',
@@ -41,7 +43,14 @@ const PROXY_OPERATIONAL_STATUS_PRIORITY: Record<ProxyStatus, number> = {
   CANCELLED: 3,
 };
 
-const INTERNAL_PROXY_FORM_FIELDS = new Set(['payment_method', 'contact_name', 'contact_phone', 'service_fee_krw', 'linked_inquiry_id']);
+const INTERNAL_PROXY_FORM_FIELDS = new Set([
+  'payment_method',
+  'contact_name',
+  'contact_phone',
+  'service_fee_krw',
+  'linked_inquiry_id',
+  PROXY_CARD_ANCHOR_MARKER,
+]);
 
 const PROXY_FORM_LABELS: Record<string, string> = {
   restaurant_name: '식당 이름',
@@ -217,6 +226,22 @@ export function getProxyPaymentMethod(
   }
 
   return null;
+}
+
+export function isProxyCardPaymentAnchor(
+  request:
+    | {
+        payment_channel?: string | null;
+        form_data?: Record<string, unknown> | null;
+      }
+    | null
+    | undefined
+) {
+  return (
+    String(request?.payment_channel || '').toUpperCase() === 'LOCALLY' &&
+    getProxyPaymentMethod(request?.form_data) === 'card' &&
+    request?.form_data?.[PROXY_CARD_ANCHOR_MARKER] === PROXY_CARD_ANCHOR_VERSION
+  );
 }
 
 export function getProxyPaymentStatusLabel(

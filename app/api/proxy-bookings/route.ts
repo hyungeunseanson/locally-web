@@ -4,11 +4,12 @@ import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { upsertInquiryThread } from '@/app/api/inquiries/thread/shared';
 import { ProxyRequestValidationSchema } from '@/app/schemas/proxyRequestSchema';
-import { insertAdminAlerts, sendAdminAlertEmails } from '@/app/utils/adminAlertCenter';
+import { notifyProxyRequestAdminIntake } from '@/app/utils/proxyBookingNotifications';
 import {
     buildProxyInquiryInitialMessage,
-    getProxyCategoryLabel,
     getProxyRequestFeeKrw,
+    PROXY_CARD_ANCHOR_MARKER,
+    PROXY_CARD_ANCHOR_VERSION,
     PROXY_OPERATIONAL_STATUS_ORDER,
 } from '@/app/utils/proxyBooking';
 
@@ -47,25 +48,6 @@ function clampPositiveInteger(value: string | null, fallback: number) {
     return Math.max(0, Math.floor(parsed));
 }
 
-function getAdminAlertRequesterName(params: {
-    fallbackEmail?: string | null;
-    intakeFormData: Record<string, unknown>;
-    contactName?: string | null;
-}) {
-    const directContactName = typeof params.contactName === 'string' ? params.contactName.trim() : '';
-    if (directContactName) return directContactName;
-
-    const reservationName = typeof params.intakeFormData.reservation_name === 'string'
-        ? params.intakeFormData.reservation_name.trim()
-        : '';
-    if (reservationName) return reservationName;
-
-    const fallbackEmail = typeof params.fallbackEmail === 'string' ? params.fallbackEmail.trim() : '';
-    if (fallbackEmail) return fallbackEmail.split('@')[0];
-
-    return '고객';
-}
-
 export async function POST(request: Request) {
     try {
         const supabase = await createServerClient();
@@ -88,6 +70,7 @@ export async function POST(request: Request) {
 
         const data = validationResult.data;
         const isNaver = data.payment_channel === 'NAVER';
+        const isCardAnchor = data.payment_channel === 'LOCALLY' && data.payment_method === 'card';
         const baseFormData = data.category_data.form_data;
         const finalAmount = getProxyRequestFeeKrw(data.category_data.category, baseFormData);
         const intakeFormData = isNaver
@@ -102,6 +85,48 @@ export async function POST(request: Request) {
               contact_name: data.contact_name,
               contact_phone: data.contact_phone,
             };
+
+        if (isCardAnchor) {
+            const proxyRequestId = crypto.randomUUID();
+            const formData = {
+                ...intakeFormData,
+                [PROXY_CARD_ANCHOR_MARKER]: PROXY_CARD_ANCHOR_VERSION,
+            };
+            const locallyOrderId = `LOCALLY-PROXY-${proxyRequestId}`;
+            const { data: newRequest, error: insertError } = await supabase
+                .from('proxy_requests')
+                .insert({
+                    id: proxyRequestId,
+                    user_id: user.id,
+                    category: data.category_data.category,
+                    form_data: formData,
+                    payment_channel: 'LOCALLY',
+                    payment_status: 'WAITING',
+                    naver_buyer_name: null,
+                    locally_order_id: locallyOrderId,
+                    agreed_to_terms: data.agreed_to_terms,
+                    status: 'PENDING',
+                })
+                .select('id, locally_order_id')
+                .maybeSingle();
+
+            if (insertError || !newRequest) {
+                console.error('Proxy Card Anchor Create Error:', insertError);
+                if (insertError?.code === '23505') {
+                    return NextResponse.json({ success: false, error: 'Duplicate request' }, { status: 409 });
+                }
+                return NextResponse.json({ success: false, error: 'Failed to create request' }, { status: 500 });
+            }
+
+            return NextResponse.json({
+                success: true,
+                requestId: newRequest.id,
+                inquiryId: null,
+                redirectUrl: null,
+                locallyOrderId: newRequest.locally_order_id,
+                finalAmount,
+            });
+        }
 
         const inquiryMessage = buildProxyInquiryInitialMessage({
             category: data.category_data.category,
@@ -158,35 +183,18 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: false, error: 'Failed to create request' }, { status: 500 });
         }
 
-        try {
-            const requesterName = getAdminAlertRequesterName({
-                fallbackEmail: user.email,
-                intakeFormData,
-                contactName: 'contact_name' in data ? data.contact_name : null,
-            });
-            const categoryLabel = getProxyCategoryLabel(data.category_data.category);
-            const paymentLabel = isNaver
+        await notifyProxyRequestAdminIntake({
+            request: {
+                id: newRequest.id,
+                category: data.category_data.category,
+                form_data: formData,
+            },
+            fallbackEmail: user.email,
+            paymentLabel: isNaver
                 ? 'NAVER'
-                : `LOCALLY · ${data.payment_method === 'card' ? '카드 · 결제 미완료' : '무통장 · 입금 대기'}`;
-            const alertLink = `/admin/dashboard?tab=TEAM&teamTab=proxy&proxyRequestId=${newRequest.id}`;
-            const alertMessage = `${categoryLabel} · ${requesterName} · ${paymentLabel} · ₩${finalAmount.toLocaleString()}`;
-
-            await insertAdminAlerts({
-                title: '새 전화 예약 요청이 접수되었습니다',
-                message: alertMessage,
-                link: alertLink,
-            });
-
-            void sendAdminAlertEmails({
-                subject: '[Locally Admin] 새 전화 예약 요청이 접수되었습니다',
-                title: '새 전화 예약 요청이 접수되었습니다',
-                message: `${alertMessage}\n\nTEAM > 전화 예약 탭에서 요청을 확인해주세요.`,
-                link: alertLink,
-                ctaLabel: '전화 예약 열기',
-            });
-        } catch (adminAlertError) {
-            console.error('[proxy-bookings] admin alert side effect failed:', adminAlertError);
-        }
+                : 'LOCALLY · 무통장 · 입금 대기',
+            finalAmount,
+        });
 
         return NextResponse.json({
             success: true,
@@ -232,7 +240,10 @@ export async function GET(request: Request) {
                     const { count, error } = await supabase
                         .from('proxy_requests')
                         .select('id', { count: 'exact', head: true })
-                        .eq('status', status);
+                        .eq('status', status)
+                        .or(
+                            `form_data->>${PROXY_CARD_ANCHOR_MARKER}.is.null,form_data->>${PROXY_CARD_ANCHOR_MARKER}.neq.${PROXY_CARD_ANCHOR_VERSION}`
+                        );
 
                     if (error) {
                         throw error;
@@ -264,6 +275,9 @@ export async function GET(request: Request) {
                     .from('proxy_requests')
                     .select('id, user_id, category, status, form_data, payment_channel, payment_status, naver_buyer_name, locally_order_id, agreed_to_terms, created_at, updated_at')
                     .eq('status', status)
+                    .or(
+                        `form_data->>${PROXY_CARD_ANCHOR_MARKER}.is.null,form_data->>${PROXY_CARD_ANCHOR_MARKER}.neq.${PROXY_CARD_ANCHOR_VERSION}`
+                    )
                     .order('created_at', { ascending: false })
                     .order('id', { ascending: false })
                     .range(remainingOffset, remainingOffset + rowsToFetch - 1);
@@ -285,6 +299,9 @@ export async function GET(request: Request) {
             let query = supabase
                 .from('proxy_requests')
                 .select('id, user_id, category, status, form_data, payment_channel, payment_status, naver_buyer_name, locally_order_id, agreed_to_terms, created_at, updated_at')
+                .or(
+                    `form_data->>${PROXY_CARD_ANCHOR_MARKER}.is.null,form_data->>${PROXY_CARD_ANCHOR_MARKER}.neq.${PROXY_CARD_ANCHOR_VERSION}`
+                )
                 .order('created_at', { ascending: false });
 
             if (!isAdmin) {

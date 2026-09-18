@@ -1,7 +1,7 @@
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
-import { getProxyPaymentMethod } from '@/app/utils/proxyBooking';
+import { getProxyPaymentMethod, isProxyCardPaymentAnchor } from '@/app/utils/proxyBooking';
 
 import type { ProxyCategory, ProxyFormData, ProxyPaymentMethod, ProxyStatus } from '@/app/types/proxy';
 
@@ -58,6 +58,10 @@ export async function requireAdminProxyBooking(requestId: string) {
 
   if (requestError || !proxyRequest) {
     return { error: '전화 예약 요청을 찾을 수 없습니다.', status: 404 as const };
+  }
+
+  if (isProxyCardPaymentAnchor(proxyRequest)) {
+    return { error: '결제 전 카드 요청은 운영 대상이 아닙니다.', status: 404 as const };
   }
 
   return {
