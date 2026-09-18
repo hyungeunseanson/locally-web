@@ -153,7 +153,7 @@ export async function POST(request: Request) {
             }
         }
 
-        // GitHub cron이 지연돼도 기존 2시간 정책을 넘긴 카드 홀드가 슬롯을 계속 막지 않게 한다.
+        // GitHub cron이 지연돼도 30분 정책을 넘긴 카드 홀드가 슬롯을 계속 막지 않게 한다.
         const { error: staleCardHoldCleanupError } = await supabaseAdmin
             .from('bookings')
             .delete()

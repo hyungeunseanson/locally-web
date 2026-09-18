@@ -1,14 +1,20 @@
-export const CARD_PAYMENT_HOLD_EXPIRY_MS = 2 * 60 * 60 * 1000;
+export const CARD_PAYMENT_HOLD_EXPIRY_MS = 30 * 60 * 1000;
+export const PAYPAL_PAYMENT_HOLD_EXPIRY_MS = 30 * 60 * 1000;
+export const OTHER_PAYMENT_HOLD_EXPIRY_MS = 2 * 60 * 60 * 1000;
 export const BANK_TRANSFER_EXPIRY_MS = 12 * 60 * 60 * 1000;
 
 export const EXPLICIT_CARD_CHECKOUT_CANCEL_REASON =
   '카드 결제창에서 결제를 취소함 (승인 전)';
 export const STALE_CARD_CHECKOUT_CANCEL_REASON =
-  '카드 결제 미완료 (2시간 경과 자동 취소)';
+  '카드 결제 미완료 (30분 경과 자동 취소)';
 export const STALE_PAYPAL_CHECKOUT_CANCEL_REASON =
-  'PayPal 결제 미완료 (2시간 경과 자동 취소)';
+  'PayPal 결제 미완료 (30분 경과 자동 취소)';
 export const STALE_PAYMENT_CHECKOUT_CANCEL_REASON =
   '결제 미완료 (2시간 경과 자동 취소)';
+export const LEGACY_STALE_CARD_CHECKOUT_CANCEL_REASON =
+  '카드 결제 미완료 (2시간 경과 자동 취소)';
+export const LEGACY_STALE_PAYPAL_CHECKOUT_CANCEL_REASON =
+  'PayPal 결제 미완료 (2시간 경과 자동 취소)';
 export const BANK_TRANSFER_EXPIRED_CANCEL_REASON =
   '입금 기한 만료 (12시간 경과 자동 취소)';
 export const CARD_APPROVAL_RELEASE_RACE_LOCK_REASON =
@@ -26,6 +32,7 @@ type BookingPaymentAttemptRow = {
 const PRE_APPROVAL_CARD_CANCEL_REASONS = new Set([
   EXPLICIT_CARD_CHECKOUT_CANCEL_REASON,
   STALE_CARD_CHECKOUT_CANCEL_REASON,
+  LEGACY_STALE_CARD_CHECKOUT_CANCEL_REASON,
 ]);
 
 export function isUnapprovedCardPaymentAttempt(booking: BookingPaymentAttemptRow) {
@@ -48,7 +55,11 @@ export function getPendingBookingExpiryCutoff(
   const normalizedMethod = String(paymentMethod || '').toLowerCase();
   const expiryMs = normalizedMethod === 'bank'
     ? BANK_TRANSFER_EXPIRY_MS
-    : CARD_PAYMENT_HOLD_EXPIRY_MS;
+    : normalizedMethod === 'card'
+      ? CARD_PAYMENT_HOLD_EXPIRY_MS
+      : normalizedMethod === 'paypal'
+        ? PAYPAL_PAYMENT_HOLD_EXPIRY_MS
+        : OTHER_PAYMENT_HOLD_EXPIRY_MS;
 
   return new Date(now - expiryMs).toISOString();
 }

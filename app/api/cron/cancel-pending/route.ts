@@ -22,8 +22,8 @@ export async function GET(request: Request) {
 
     const cardExpiryCutoff = getPendingBookingExpiryCutoff('card');
 
-    // Fetch the existing two-hour candidate set, then apply the longer bank
-    // transfer policy without delaying card, PayPal, or other payment cleanup.
+    // Fetch the existing card/PayPal 30-minute candidate set, then apply the
+    // longer bank and other-payment policies without delaying their cleanup.
     const { data: pendingBookingCandidates, error } = await supabase
       .from('bookings')
       .select('id, created_at, payment_method')
@@ -37,6 +37,7 @@ export async function GET(request: Request) {
       return isPendingBookingExpired(booking.payment_method, booking.created_at);
     });
 
+    // Keep rows carrying the legacy two-hour card reason untouched.
     const { data: releasedCardBookings, error: releasedCardBookingsError } = await supabase
       .from('bookings')
       .select('id')
