@@ -58,6 +58,12 @@
       "name": "review_direct_write_lockdown",
       "repositoryFile": "supabase/migrations/20260916134243_review_direct_write_lockdown.sql",
       "repositorySha256": "46101fbfea8c0bf01e322001db8ba9511ad01772baf9fcfed726ac0d80e79c8b"
+    },
+    {
+      "version": "20260918000000",
+      "name": "proxy_card_intake_atomic",
+      "repositoryFile": "supabase/migrations/20260918000000_proxy_card_intake_atomic.sql",
+      "repositorySha256": "3752b8cc2fa385bc28f684e9aea5aab622933b5c3ec291c25eb0b850b6baa138"
     }
   ],
   "operationalStateDeltas": [
@@ -138,6 +144,7 @@
       "public.decrement_comment_count()",
       "public.decrement_like_count()",
       "public.ensure_profile_demographics_reminder(p_user_id uuid, p_title text, p_message text, p_link text)",
+      "public.finalize_proxy_card_intake_atomic(p_proxy_request_id uuid, p_verified_amount integer, p_verified_tid text, p_initial_message text)",
       "public.finish_service_refund_operation_atomic(p_operation_id uuid, p_outcome text, p_provider_reference text, p_error_message text)",
       "public.get_experience_completion_due_backlog()",
       "public.handle_new_user()",

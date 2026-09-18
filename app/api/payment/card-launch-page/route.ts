@@ -5,6 +5,14 @@ import {
   getCardPaymentReadiness,
   getCurrentCardPaymentProvider,
 } from '@/app/utils/payments/card/server';
+import { createAdminClient } from '@/app/utils/supabase/admin';
+import { createClient as createServerClient } from '@/app/utils/supabase/server';
+import {
+  getProxyCategoryLabel,
+  getProxyPaymentMethod,
+  getProxyRequestFeeKrw,
+} from '@/app/utils/proxyBooking';
+import type { ProxyCategory } from '@/app/types/proxy';
 
 const NICEPAY_RESULT_MESSAGE_TYPE = 'locally:nicepay-result';
 const NICEPAY_SCRIPT_SRC = 'https://pg-web.nicepay.co.kr/v3/common/js/nicepay-pgweb.js';
@@ -124,12 +132,41 @@ function renderNicePayLaunchPage(params: {
 </html>`;
 }
 
+function renderNicePayOutcomePage(params: {
+  origin: string;
+  message: string;
+}) {
+  return `<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Locally NICEPAY</title>
+    <script>
+      const LOCALLY_RESULT_MESSAGE_TYPE = ${escapeJsonForInlineScript(NICEPAY_RESULT_MESSAGE_TYPE)};
+      const LOCALLY_OPENER_ORIGIN = ${escapeJsonForInlineScript(params.origin)};
+      const LOCALLY_MESSAGE = ${escapeJsonForInlineScript(params.message)};
+      if (window.opener && typeof window.opener.postMessage === 'function') {
+        window.opener.postMessage({
+          type: LOCALLY_RESULT_MESSAGE_TYPE,
+          success: false,
+          message: LOCALLY_MESSAGE
+        }, LOCALLY_OPENER_ORIGIN);
+      }
+      window.setTimeout(function () { window.close(); }, 120);
+    </script>
+  </head>
+  <body></body>
+</html>`;
+}
+
 export async function POST(request: Request) {
   const formData = await request.formData();
   const body = Object.fromEntries(
     Array.from(formData.entries()).map(([key, value]) => [key, String(value)])
   ) as CardLaunchPageBody;
   const provider = getCurrentCardPaymentProvider();
+  const origin = new URL(request.url).origin;
 
   if (provider !== 'nicepay') {
     return NextResponse.json(
@@ -152,6 +189,78 @@ export async function POST(request: Request) {
     );
   }
 
+  let launchOrderId = String(body.orderId || '').trim();
+  let launchProductName = String(body.productName || '');
+  let launchAmount = Number(body.amount || 0);
+  let launchBuyerName = String(body.buyerName || '');
+  let launchBuyerTel = String(body.buyerTel || '');
+  let launchBuyerEmail = String(body.buyerEmail || '');
+
+  if (launchOrderId.startsWith('LOCALLY-PROXY-')) {
+    const supabaseServer = await createServerClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabaseServer.auth.getUser();
+
+    const outcome = (message: string) => new NextResponse(
+      renderNicePayOutcomePage({ origin, message }),
+      {
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-store',
+        },
+      }
+    );
+
+    if (authError || !user) {
+      return outcome('로그인 세션을 확인할 수 없습니다. 다시 시도해주세요.');
+    }
+
+    const { data: proxyRequest, error: proxyRequestError } = await createAdminClient()
+      .from('proxy_requests')
+      .select('id, user_id, category, form_data, payment_channel, payment_status, tid, locally_order_id')
+      .eq('locally_order_id', launchOrderId)
+      .maybeSingle();
+
+    if (proxyRequestError || !proxyRequest || proxyRequest.user_id !== user.id) {
+      return outcome('결제 요청을 확인할 수 없습니다. 다시 시도해주세요.');
+    }
+
+    if (
+      proxyRequest.payment_channel !== 'LOCALLY' ||
+      getProxyPaymentMethod(proxyRequest.form_data as Record<string, unknown> | null | undefined) !== 'card'
+    ) {
+      return outcome('카드 결제 요청만 결제창을 열 수 있습니다.');
+    }
+
+    if (String(proxyRequest.payment_status || '').toUpperCase() === 'COMPLETED' && proxyRequest.tid) {
+      return outcome('이미 완료된 카드 결제입니다. 새 결제창을 열지 않습니다.');
+    }
+
+    if (
+      String(proxyRequest.payment_status || '').toUpperCase() !== 'WAITING' ||
+      proxyRequest.tid
+    ) {
+      return outcome('현재 상태에서는 카드 결제창을 열 수 없습니다.');
+    }
+
+    const storedFormData = (proxyRequest.form_data || {}) as Record<string, unknown>;
+    launchOrderId = String(proxyRequest.locally_order_id || launchOrderId);
+    launchAmount = getProxyRequestFeeKrw(
+      String(proxyRequest.category || 'RESTAURANT') as ProxyCategory,
+      storedFormData
+    );
+    launchProductName = `Locally ${getProxyCategoryLabel(String(proxyRequest.category || 'RESTAURANT') as ProxyCategory)}`;
+    launchBuyerName = typeof storedFormData.contact_name === 'string'
+      ? storedFormData.contact_name
+      : launchBuyerName;
+    launchBuyerTel = typeof storedFormData.contact_phone === 'string'
+      ? storedFormData.contact_phone
+      : launchBuyerTel;
+    launchBuyerEmail = user.email || launchBuyerEmail;
+  }
+
   const readiness = getCardPaymentReadiness();
   if (!readiness.ready || !readiness.runtime) {
     return NextResponse.json(
@@ -166,14 +275,13 @@ export async function POST(request: Request) {
   }
 
   try {
-    const origin = new URL(request.url).origin;
     const fields = buildNicePayLaunchFields({
-      orderId: String(body.orderId || ''),
-      productName: String(body.productName || ''),
-      amount: Number(body.amount || 0),
-      buyerName: String(body.buyerName || ''),
-      buyerTel: String(body.buyerTel || ''),
-      buyerEmail: String(body.buyerEmail || ''),
+      orderId: launchOrderId,
+      productName: launchProductName,
+      amount: launchAmount,
+      buyerName: launchBuyerName,
+      buyerTel: launchBuyerTel,
+      buyerEmail: launchBuyerEmail,
       returnUrl: `${origin}/api/payment/nicepay/relay`,
     });
 

@@ -848,16 +848,9 @@ export default function NewProxyBooking() {
     } catch (paymentError) {
       console.error('[proxy-bookings/new] card payment launch failed:', paymentError);
 
-      if (pending.runtime.provider === 'nicepay') {
-        setPendingCardPayment(pending);
-        setCardRetryAvailable(true);
-        setError('요청은 저장됐지만 카드 결제는 완료되지 않았습니다. 새 요청을 만들지 말고 같은 요청으로 다시 결제해주세요.');
-        return;
-      }
-
-      setPendingCardPayment(null);
-      setCardRetryAvailable(false);
-      router.push(`/proxy-bookings/${encodeURIComponent(pending.requestId)}?payment=review`);
+      setPendingCardPayment(pending);
+      setCardRetryAvailable(true);
+      setError('요청은 저장됐지만 카드 결제는 완료되지 않았습니다. 새 요청을 만들지 말고 같은 요청으로 다시 결제해주세요.');
       return;
     }
 
@@ -876,13 +869,14 @@ export default function NewProxyBooking() {
 
     const callbackResult = await callbackRes.json().catch(() => null);
     if (!callbackRes.ok || !callbackResult?.success) {
-      setPendingCardPayment(null);
-      router.push(`/proxy-bookings/${encodeURIComponent(pending.requestId)}?payment=review`);
+      setPendingCardPayment(pending);
+      setCardRetryAvailable(true);
+      setError(callbackResult?.error || '카드 결제가 확인되지 않았습니다. 같은 요청으로 다시 시도해주세요.');
       return;
     }
 
     setPendingCardPayment(null);
-    router.push(pending.inquiryRedirectUrl || '/guest/inbox');
+    router.push(callbackResult.redirectUrl || pending.inquiryRedirectUrl || '/guest/inbox');
   };
 
   const handleCardPaymentRetry = async () => {

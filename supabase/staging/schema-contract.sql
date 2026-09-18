@@ -35,7 +35,8 @@ BEGIN
     'complete_service_concierge_booking_if_due_atomic',
     'confirm_service_concierge_payment_atomic', 'create_booking_atomic',
     'create_service_concierge_request_atomic', 'ensure_profile_demographics_reminder',
-    'finish_service_refund_operation_atomic', 'handle_new_user', 'is_admin_reader',
+    'finalize_proxy_card_intake_atomic', 'finish_service_refund_operation_atomic',
+    'handle_new_user', 'is_admin_reader',
     'request_service_cancellation_review_atomic'
   ]) AS required(name)
   WHERE NOT EXISTS (
@@ -218,6 +219,35 @@ BEGIN
 
   IF missing IS NOT NULL THEN
     RAISE EXCEPTION 'Concierge RPC security differs: %', missing;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_proc AS procedure_def
+    JOIN pg_namespace AS namespace_def ON namespace_def.oid = procedure_def.pronamespace
+    WHERE namespace_def.nspname = 'public'
+      AND procedure_def.proname = 'finalize_proxy_card_intake_atomic'
+      AND pg_get_function_identity_arguments(procedure_def.oid) =
+        'p_proxy_request_id uuid, p_verified_amount integer, p_verified_tid text, p_initial_message text'
+  ) THEN
+    RAISE EXCEPTION 'Proxy card intake RPC is missing';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM pg_proc AS procedure_def
+    JOIN pg_namespace AS namespace_def ON namespace_def.oid = procedure_def.pronamespace
+    WHERE namespace_def.nspname = 'public'
+      AND procedure_def.proname = 'finalize_proxy_card_intake_atomic'
+      AND (
+        procedure_def.prosecdef
+        OR NOT (COALESCE(procedure_def.proconfig, ARRAY[]::text[]) @> ARRAY['search_path=""']::text[])
+        OR has_function_privilege('anon', procedure_def.oid, 'EXECUTE')
+        OR has_function_privilege('authenticated', procedure_def.oid, 'EXECUTE')
+        OR NOT has_function_privilege('service_role', procedure_def.oid, 'EXECUTE')
+      )
+  ) THEN
+    RAISE EXCEPTION 'Proxy card intake RPC security differs';
   END IF;
 END;
 $$;

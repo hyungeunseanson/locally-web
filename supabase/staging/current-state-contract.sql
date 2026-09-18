@@ -23,7 +23,8 @@ BEGIN
     '20260916024355:experience_media_locator_cas',
     '20260916032730:experience_storage_lockdown',
     '20260916111416:review_tour_end_db_foundation',
-    '20260916134243:review_direct_write_lockdown'
+    '20260916134243:review_direct_write_lockdown',
+    '20260918000000:proxy_card_intake_atomic'
   ]::text[];
   IF actual IS DISTINCT FROM expected THEN
     RAISE EXCEPTION 'migration ledger mismatch: %', actual;
@@ -110,6 +111,7 @@ BEGIN
     'public.decrement_comment_count()',
     'public.decrement_like_count()',
     'public.ensure_profile_demographics_reminder(p_user_id uuid, p_title text, p_message text, p_link text)',
+    'public.finalize_proxy_card_intake_atomic(p_proxy_request_id uuid, p_verified_amount integer, p_verified_tid text, p_initial_message text)',
     'public.finish_service_refund_operation_atomic(p_operation_id uuid, p_outcome text, p_provider_reference text, p_error_message text)',
     'public.get_experience_completion_due_backlog()',
     'public.handle_new_user()',
@@ -514,6 +516,48 @@ BEGIN
   END IF;
 END
 $concierge_security_contract$;
+
+DO $proxy_card_rpc_security_contract$
+DECLARE
+  function_oid oid;
+BEGIN
+  SELECT procedure_def.oid
+    INTO function_oid
+    FROM pg_proc AS procedure_def
+    JOIN pg_namespace AS namespace_def ON namespace_def.oid = procedure_def.pronamespace
+   WHERE namespace_def.nspname = 'public'
+     AND procedure_def.proname = 'finalize_proxy_card_intake_atomic'
+     AND pg_get_function_identity_arguments(procedure_def.oid) =
+       'p_proxy_request_id uuid, p_verified_amount integer, p_verified_tid text, p_initial_message text';
+
+  IF function_oid IS NULL THEN
+    RAISE EXCEPTION 'proxy card intake RPC is missing';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+      FROM pg_proc AS procedure_def
+     WHERE procedure_def.oid = function_oid
+       AND (
+         procedure_def.prosecdef
+         OR NOT (coalesce(procedure_def.proconfig, ARRAY[]::text[]) @> ARRAY['search_path=""']::text[])
+         OR has_function_privilege('anon', procedure_def.oid, 'EXECUTE')
+         OR has_function_privilege('authenticated', procedure_def.oid, 'EXECUTE')
+         OR NOT has_function_privilege('service_role', procedure_def.oid, 'EXECUTE')
+         OR EXISTS (
+           SELECT 1
+             FROM aclexplode(coalesce(
+               procedure_def.proacl,
+               acldefault('f', procedure_def.proowner)
+             )) AS acl_entry
+            WHERE acl_entry.grantee = 0 AND acl_entry.privilege_type = 'EXECUTE'
+         )
+       )
+  ) THEN
+    RAISE EXCEPTION 'proxy card intake RPC security contract mismatch';
+  END IF;
+END
+$proxy_card_rpc_security_contract$;
 
 SELECT 'LOCALLY_PRODUCTION_CURRENT_STATE_CONTRACT_PASS' AS result;
 

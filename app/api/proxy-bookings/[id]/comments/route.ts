@@ -3,7 +3,11 @@ import { CHAT_IMAGE_ATTACHMENTS_ENABLED, CHAT_IMAGE_ATTACHMENTS_UNAVAILABLE_MESS
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { createInquiryMessage } from '@/app/api/inquiries/thread/shared';
-import { getProxyLinkedInquiryId, PROXY_LINKED_INQUIRY_REQUIRED_ERROR } from '@/app/utils/proxyBooking';
+import {
+    getProxyLinkedInquiryId,
+    isProxyCardPaymentAnchor,
+    PROXY_LINKED_INQUIRY_REQUIRED_ERROR,
+} from '@/app/utils/proxyBooking';
 
 type CommentAuthorProfile = { full_name?: string | null; avatar_url?: string | null } | null;
 
@@ -24,11 +28,15 @@ export async function POST(
         // Validate request existence and access
         const { data: proxyReq, error: reqError } = await supabase
             .from('proxy_requests')
-            .select('id, user_id, form_data')
+            .select('id, user_id, form_data, payment_channel')
             .eq('id', requestId)
             .maybeSingle();
 
         if (reqError || !proxyReq) {
+            return NextResponse.json({ success: false, error: 'Request not found' }, { status: 404 });
+        }
+
+        if (isProxyCardPaymentAnchor(proxyReq)) {
             return NextResponse.json({ success: false, error: 'Request not found' }, { status: 404 });
         }
 

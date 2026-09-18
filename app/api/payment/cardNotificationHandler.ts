@@ -7,7 +7,7 @@ import { isCancelledBookingStatus, isConfirmedBookingStatus } from '@/app/consta
 import { isCancelledServiceBooking } from '@/app/constants/serviceStatus';
 import type { ProxyCategory } from '@/app/types/proxy';
 import { EXPLICIT_CARD_CHECKOUT_CANCEL_REASON } from '@/app/utils/bookings/pendingBookingHolds';
-import { getProxyRequestFeeKrw } from '@/app/utils/proxyBooking';
+import { getProxyRequestFeeKrw, isProxyCardPaymentAnchor } from '@/app/utils/proxyBooking';
 import {
   getCurrentCardPaymentProvider,
   readCardPaymentNotificationRequest,
@@ -422,6 +422,45 @@ async function processProxyNotification(params: {
   }
 
   if (normalizedProxyPaymentStatus === 'COMPLETED') {
+    if (isProxyCardPaymentAnchor(proxyRequest)) {
+      const orderId = proxyRequest.locally_order_id || proxyRequest.id;
+      const expectedAmount = getProxyRequestFeeKrw(
+        String(proxyRequest.category || 'RESTAURANT') as ProxyCategory,
+        (proxyRequest.form_data as Record<string, unknown> | null | undefined) ?? undefined
+      );
+
+      if (
+        (notification.orderId && notification.orderId !== orderId) ||
+        !hasMatchingStoredTransaction(proxyRequest, notification) ||
+        (notification.amount != null && notification.amount !== expectedAmount)
+      ) {
+        return NextResponse.json(
+          { success: false, error: '완료된 카드 결제 통보가 저장된 결제 정보와 일치하지 않습니다.' },
+          { status: 409 }
+        );
+      }
+
+      const verificationResult = await verifyCardPaymentNotification({
+        notification,
+        orderId,
+        expectedAmount,
+      });
+      const confirmationResult = await finalizeProxyCardPayment({
+        supabaseAdmin,
+        proxyRequest,
+        verificationResult,
+      });
+
+      if (!confirmationResult.success) {
+        return NextResponse.json(
+          { success: false, error: confirmationResult.error },
+          { status: confirmationResult.status }
+        );
+      }
+
+      return buildNotificationOkResponse();
+    }
+
     return buildNotificationOkResponse();
   }
 

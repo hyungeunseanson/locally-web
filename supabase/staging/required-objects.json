@@ -10,7 +10,8 @@
     "supabase/migrations/20260916024355_experience_media_locator_cas.sql",
     "supabase/migrations/20260916032730_experience_storage_lockdown.sql",
     "supabase/migrations/20260916111416_review_tour_end_db_foundation.sql",
-    "supabase/migrations/20260916134243_review_direct_write_lockdown.sql"
+    "supabase/migrations/20260916134243_review_direct_write_lockdown.sql",
+    "supabase/migrations/20260918000000_proxy_card_intake_atomic.sql"
   ],
   "applicationTables": [
     "admin_audit_logs",
@@ -79,6 +80,7 @@
     "decrement_comment_count",
     "decrement_like_count",
     "ensure_profile_demographics_reminder",
+    "finalize_proxy_card_intake_atomic",
     "finish_service_refund_operation_atomic",
     "get_experience_completion_due_backlog",
     "handle_new_user",
