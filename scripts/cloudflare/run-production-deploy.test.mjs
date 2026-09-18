@@ -8,6 +8,7 @@ import {
 } from './public-experience-media-release-profile.mjs';
 import {
   buildDeploymentContract,
+  main,
   parseDeploymentArguments,
 } from './run-production-deploy.mjs';
 import { readTranslationReleasePolicy, resolveTranslationReleaseProfile } from './experience-translation-release-profile.mjs';
@@ -332,4 +333,90 @@ test('Experience completion ON/OFF profiles are independent from every existing 
     requestedExperienceCompletionProfile: 'off',
     dryRun: false,
   });
+});
+
+test('runs read-only Production browser smoke only after a successful real deploy', async () => {
+  const events = [];
+  const commands = [];
+  await main([], {
+    runCommand: (command, argumentsList) => {
+      commands.push({ command, argumentsList });
+      events.push(argumentsList.includes('deploy') ? 'wrangler' : 'build');
+    },
+    runBrowserSmoke: async () => {
+      events.push('browser-smoke');
+    },
+    log: () => {},
+  });
+
+  assert.deepEqual(events, ['build', 'wrangler', 'browser-smoke']);
+  assert.equal(commands.length, 2);
+  assert(!commands[0].argumentsList.includes('--dry-run'));
+  assert(!commands[1].argumentsList.includes('--dry-run'));
+});
+
+test('does not run browser smoke when Wrangler deploy fails', async () => {
+  let smokeRuns = 0;
+  await assert.rejects(
+    () => main([], {
+      runCommand: (_command, argumentsList) => {
+        if (argumentsList.includes('deploy')) throw new Error('stub Wrangler failure');
+      },
+      runBrowserSmoke: async () => {
+        smokeRuns += 1;
+      },
+      log: () => {},
+    }),
+    /stub Wrangler failure/
+  );
+  assert.equal(smokeRuns, 0);
+});
+
+test('skips browser smoke for Production dry-run', async () => {
+  let smokeRuns = 0;
+  let wranglerArguments;
+  await main(['--dry-run'], {
+    runCommand: (_command, argumentsList) => {
+      if (argumentsList.includes('deploy')) wranglerArguments = argumentsList;
+    },
+    runBrowserSmoke: async () => {
+      smokeRuns += 1;
+    },
+    log: () => {},
+  });
+
+  assert.equal(smokeRuns, 0);
+  assert(wranglerArguments.includes('--dry-run'));
+});
+
+test('propagates browser smoke failure after the Worker deploy without rollback', async () => {
+  const events = [];
+  await assert.rejects(
+    () => main([], {
+      runCommand: (_command, argumentsList) => {
+        events.push(argumentsList.includes('deploy') ? 'wrangler' : 'build');
+      },
+      runBrowserSmoke: async () => {
+        events.push('browser-smoke');
+        throw new Error('homepage smoke stage failed');
+      },
+      log: () => {},
+    }),
+    /Production Worker deploy completed, but browser smoke failed: homepage smoke stage failed.*Automatic rollback was not attempted/
+  );
+  assert.deepEqual(events, ['build', 'wrangler', 'browser-smoke']);
+});
+
+test('completes successfully when browser smoke passes', async () => {
+  const events = [];
+  await main([], {
+    runCommand: (_command, argumentsList) => {
+      events.push(argumentsList.includes('deploy') ? 'wrangler' : 'build');
+    },
+    runBrowserSmoke: async () => {
+      events.push('browser-smoke');
+    },
+    log: () => {},
+  });
+  assert.deepEqual(events, ['build', 'wrangler', 'browser-smoke']);
 });

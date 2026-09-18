@@ -14,6 +14,7 @@ import { readAdminSupportUnreadReleasePolicy, resolveAdminSupportUnreadReleasePr
 import { readNotificationRetentionReleasePolicy, resolveNotificationRetentionReleaseProfile } from './notification-retention-release-profile.mjs';
 import { readExperienceCompletionReleasePolicy, resolveExperienceCompletionReleaseProfile } from './experience-completion-release-profile.mjs';
 import { readExperienceMediaSourceReleasePolicy, resolveExperienceMediaSourceReleaseProfile } from './experience-media-source-release-profile.mjs';
+import { runProductionBrowserSmoke } from './run-production-browser-smoke.mjs';
 
 const ROOT = process.cwd();
 
@@ -122,7 +123,10 @@ function run(command, argumentsList, options = {}) {
   }
 }
 
-export async function main(argumentsList = process.argv.slice(2)) {
+export async function main(argumentsList = process.argv.slice(2), dependencies = {}) {
+  const runCommand = dependencies.runCommand ?? run;
+  const runBrowserSmoke = dependencies.runBrowserSmoke ?? runProductionBrowserSmoke;
+  const log = dependencies.log ?? console.log;
   const options = parseDeploymentArguments(argumentsList);
   const policy = await readReleasePolicy();
   const profile = resolveReleaseProfile(policy, options.requestedProfile);
@@ -147,14 +151,25 @@ export async function main(argumentsList = process.argv.slice(2)) {
     process.platform === 'win32' ? 'wrangler.cmd' : 'wrangler'
   );
 
-  run(npmCommand, ['run', 'cloudflare:build:production'], {
+  runCommand(npmCommand, ['run', 'cloudflare:build:production'], {
     env: { ...process.env, ...contract.readerEnvironment },
   });
-  run(wranglerCommand, contract.wranglerArguments);
-  console.log(JSON.stringify({
+  runCommand(wranglerCommand, contract.wranglerArguments);
+  if (!options.dryRun) {
+    try {
+      await runBrowserSmoke();
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `Production Worker deploy completed, but browser smoke failed: ${reason} Automatic rollback was not attempted.`
+      );
+    }
+  }
+  log(JSON.stringify({
     status: options.dryRun
       ? 'LOCALLY_CLOUDFLARE_PRODUCTION_DEPLOY_DRY_RUN_PASS'
       : 'LOCALLY_CLOUDFLARE_PRODUCTION_DEPLOY_PASS',
+    productionBrowserSmoke: options.dryRun ? 'skipped' : 'pass',
     publicExperienceMediaProfile: profile.name,
     publicExperienceMediaEnabled: profile.enabled,
     publicExperienceMediaExperienceCount: profile.experienceCount,
