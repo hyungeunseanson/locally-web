@@ -5,6 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 
 import {
+  assertProductionSupabasePublicBuildEnvironment,
   buildProductionEnvironment,
   readProductionMediaBaseUrl,
   readProductionHostProfileMediaBaseUrl,
@@ -14,6 +15,38 @@ import {
 
 const EXPECTED_URL = 'https://media-canary.locally-travel.com';
 const EXPECTED_PROFILE_URL = 'https://profiles-media.locally-travel.com';
+
+test('fails closed when either required public Supabase build variable is missing', () => {
+  const productionUrl = 'https://project.supabase.co';
+  const productionAnonKey = 'production-anon-key-that-must-never-be-logged';
+
+  assert.throws(
+    () => assertProductionSupabasePublicBuildEnvironment({ NEXT_PUBLIC_SUPABASE_ANON_KEY: productionAnonKey }),
+    (error) => error instanceof Error
+      && error.message === 'Refusing Production build: required Supabase public build environment is missing.'
+      && !error.message.includes(productionAnonKey)
+  );
+  assert.throws(
+    () => assertProductionSupabasePublicBuildEnvironment({ NEXT_PUBLIC_SUPABASE_URL: productionUrl }),
+    /Refusing Production build: required Supabase public build environment is missing\./
+  );
+  assert.throws(
+    () => assertProductionSupabasePublicBuildEnvironment({
+      NEXT_PUBLIC_SUPABASE_URL: '  ',
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: productionAnonKey,
+    }),
+    /Refusing Production build: required Supabase public build environment is missing\./
+  );
+});
+
+test('accepts both required public Supabase build variables without exposing their values', () => {
+  const environment = {
+    NEXT_PUBLIC_SUPABASE_URL: 'https://project.supabase.co',
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: 'production-anon-key-that-must-never-be-logged',
+  };
+
+  assert.doesNotThrow(() => assertProductionSupabasePublicBuildEnvironment(environment));
+});
 
 test('owns the exact Production media URL and injects it only through the Production wrapper', async () => {
   assert.equal(await readProductionMediaBaseUrl(), EXPECTED_URL);
@@ -78,7 +111,7 @@ test('fails closed unless the exact URL is present in a generated client bundle'
     await writeFile(path.join(directory, 'chunks', 'missing.js'), 'globalThis.__media="missing";');
     await assert.rejects(() => verifyProductionClientBundle([EXPECTED_URL, EXPECTED_PROFILE_URL], directory), /not compiled/);
     await writeFile(path.join(directory, 'chunks', 'present.js'), `globalThis.__media=${JSON.stringify(EXPECTED_URL)};`);
-    await assert.rejects(() => verifyProductionClientBundle([EXPECTED_URL, EXPECTED_PROFILE_URL], directory), /profiles-media/);
+    await assert.rejects(() => verifyProductionClientBundle([EXPECTED_URL, EXPECTED_PROFILE_URL], directory), /not compiled/);
     await writeFile(path.join(directory, 'chunks', 'profile.js'), `globalThis.__profile=${JSON.stringify(EXPECTED_PROFILE_URL)};`);
     await verifyProductionClientBundle([EXPECTED_URL, EXPECTED_PROFILE_URL], directory);
   } finally {
