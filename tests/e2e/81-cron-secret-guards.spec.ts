@@ -9,6 +9,10 @@ import {
   getPendingBookingExpiryCutoff,
   isUnapprovedCardPaymentAttempt,
   isPendingBookingExpired,
+  LEGACY_STALE_CARD_CHECKOUT_CANCEL_REASON,
+  LEGACY_STALE_PAYPAL_CHECKOUT_CANCEL_REASON,
+  OTHER_PAYMENT_HOLD_EXPIRY_MS,
+  PAYPAL_PAYMENT_HOLD_EXPIRY_MS,
   STALE_CARD_CHECKOUT_CANCEL_REASON,
   STALE_PAYPAL_CHECKOUT_CANCEL_REASON,
   STALE_PAYMENT_CHECKOUT_CANCEL_REASON,
@@ -31,10 +35,10 @@ test.describe('Cron secret guards', () => {
       now - CARD_PAYMENT_HOLD_EXPIRY_MS
     );
     expect(Date.parse(getPendingBookingExpiryCutoff('paypal', now))).toBe(
-      now - CARD_PAYMENT_HOLD_EXPIRY_MS
+      now - PAYPAL_PAYMENT_HOLD_EXPIRY_MS
     );
     expect(Date.parse(getPendingBookingExpiryCutoff('other', now))).toBe(
-      now - CARD_PAYMENT_HOLD_EXPIRY_MS
+      now - OTHER_PAYMENT_HOLD_EXPIRY_MS
     );
     expect(Date.parse(getPendingBookingExpiryCutoff('bank', now))).toBe(
       now - BANK_TRANSFER_EXPIRY_MS
@@ -43,9 +47,15 @@ test.describe('Cron secret guards', () => {
       '입금 기한 만료 (12시간 경과 자동 취소)'
     );
     expect(STALE_CARD_CHECKOUT_CANCEL_REASON).toBe(
-      '카드 결제 미완료 (2시간 경과 자동 취소)'
+      '카드 결제 미완료 (30분 경과 자동 취소)'
     );
     expect(STALE_PAYPAL_CHECKOUT_CANCEL_REASON).toBe(
+      'PayPal 결제 미완료 (30분 경과 자동 취소)'
+    );
+    expect(LEGACY_STALE_CARD_CHECKOUT_CANCEL_REASON).toBe(
+      '카드 결제 미완료 (2시간 경과 자동 취소)'
+    );
+    expect(LEGACY_STALE_PAYPAL_CHECKOUT_CANCEL_REASON).toBe(
       'PayPal 결제 미완료 (2시간 경과 자동 취소)'
     );
     expect(getExpiredPendingBookingCancelReason('bank')).toBe(
@@ -73,6 +83,11 @@ test.describe('Cron secret guards', () => {
     )).toBe(false);
     expect(isPendingBookingExpired(
       'bank',
+      createdAt(OTHER_PAYMENT_HOLD_EXPIRY_MS + 60_000),
+      now
+    )).toBe(false);
+    expect(isPendingBookingExpired(
+      'bank',
       createdAt(BANK_TRANSFER_EXPIRY_MS),
       now
     )).toBe(false);
@@ -83,17 +98,32 @@ test.describe('Cron secret guards', () => {
     )).toBe(true);
     expect(isPendingBookingExpired(
       'card',
+      createdAt(CARD_PAYMENT_HOLD_EXPIRY_MS - 60_000),
+      now
+    )).toBe(false);
+    expect(isPendingBookingExpired(
+      'card',
       createdAt(CARD_PAYMENT_HOLD_EXPIRY_MS + 60_000),
       now
     )).toBe(true);
     expect(isPendingBookingExpired(
       'paypal',
-      createdAt(CARD_PAYMENT_HOLD_EXPIRY_MS + 60_000),
+      createdAt(PAYPAL_PAYMENT_HOLD_EXPIRY_MS - 60_000),
+      now
+    )).toBe(false);
+    expect(isPendingBookingExpired(
+      'paypal',
+      createdAt(PAYPAL_PAYMENT_HOLD_EXPIRY_MS + 60_000),
       now
     )).toBe(true);
     expect(isPendingBookingExpired(
       'other',
-      createdAt(CARD_PAYMENT_HOLD_EXPIRY_MS + 60_000),
+      createdAt(OTHER_PAYMENT_HOLD_EXPIRY_MS - 60_000),
+      now
+    )).toBe(false);
+    expect(isPendingBookingExpired(
+      'other',
+      createdAt(OTHER_PAYMENT_HOLD_EXPIRY_MS + 60_000),
       now
     )).toBe(true);
   });
@@ -110,6 +140,18 @@ test.describe('Cron secret guards', () => {
       payment_method: 'card',
       tid: null,
       cancel_reason: EXPLICIT_CARD_CHECKOUT_CANCEL_REASON,
+    })).toBe(true);
+    expect(isUnapprovedCardPaymentAttempt({
+      status: 'cancelled',
+      payment_method: 'card',
+      tid: null,
+      cancel_reason: LEGACY_STALE_CARD_CHECKOUT_CANCEL_REASON,
+    })).toBe(true);
+    expect(isUnapprovedCardPaymentAttempt({
+      status: 'cancelled',
+      payment_method: 'card',
+      tid: null,
+      cancel_reason: STALE_CARD_CHECKOUT_CANCEL_REASON,
     })).toBe(true);
 
     expect(isUnapprovedCardPaymentAttempt({
@@ -160,11 +202,14 @@ test.describe('Cron secret guards', () => {
       const bookingDate = new Date();
       bookingDate.setDate(bookingDate.getDate() + 60);
       const date = bookingDate.toISOString().slice(0, 10);
-      const twoHourExpiredAt = new Date(
+      const cardExpiredAt = new Date(
+        Date.now() - CARD_PAYMENT_HOLD_EXPIRY_MS - 60_000
+      ).toISOString();
+      const bankOverThirtyMinutesAt = new Date(
         Date.now() - CARD_PAYMENT_HOLD_EXPIRY_MS - 60_000
       ).toISOString();
       const bankOverTwoHoursAt = new Date(
-        Date.now() - CARD_PAYMENT_HOLD_EXPIRY_MS - 60_000
+        Date.now() - OTHER_PAYMENT_HOLD_EXPIRY_MS - 60_000
       ).toISOString();
       const bankNearExpiryAt = new Date(
         Date.now() - BANK_TRANSFER_EXPIRY_MS + 60_000
@@ -193,11 +238,31 @@ test.describe('Cron secret guards', () => {
         paymentMethod: 'card',
       });
 
+      const legacyCancelledCardId = await insertTestBooking({
+        userId,
+        experienceId: Number(experience.id),
+        date,
+        time: '08:30',
+        guests: 1,
+        status: 'cancelled',
+        paymentMethod: 'card',
+      });
+
       const pendingBankOverTwoHoursId = await insertTestBooking({
         userId,
         experienceId: Number(experience.id),
         date,
         time: '09:00',
+        guests: 1,
+        status: 'PENDING',
+        paymentMethod: 'bank',
+      });
+
+      const pendingBankOverThirtyMinutesId = await insertTestBooking({
+        userId,
+        experienceId: Number(experience.id),
+        date,
+        time: '09:30',
         guests: 1,
         status: 'PENDING',
         paymentMethod: 'bank',
@@ -266,7 +331,9 @@ test.describe('Cron secret guards', () => {
       createdBookingIds.push(
         pendingCardId,
         releasedCardId,
+        legacyCancelledCardId,
         pendingBankOverTwoHoursId,
+        pendingBankOverThirtyMinutesId,
         pendingBankNearExpiryId,
         expiredBankId,
         pendingPaypalId,
@@ -277,15 +344,30 @@ test.describe('Cron secret guards', () => {
 
       const { error: fixtureUpdateError } = await supabase
         .from('bookings')
-        .update({ created_at: twoHourExpiredAt })
+        .update({ created_at: cardExpiredAt })
         .in('id', [pendingCardId, releasedCardId, pendingPaypalId]);
       if (fixtureUpdateError) throw fixtureUpdateError;
+
+      const { error: legacyCardUpdateError } = await supabase
+        .from('bookings')
+        .update({
+          created_at: cardExpiredAt,
+          cancel_reason: LEGACY_STALE_CARD_CHECKOUT_CANCEL_REASON,
+        })
+        .eq('id', legacyCancelledCardId);
+      if (legacyCardUpdateError) throw legacyCardUpdateError;
 
       const { error: bankOverTwoHoursError } = await supabase
         .from('bookings')
         .update({ created_at: bankOverTwoHoursAt })
         .eq('id', pendingBankOverTwoHoursId);
       if (bankOverTwoHoursError) throw bankOverTwoHoursError;
+
+      const { error: bankOverThirtyMinutesError } = await supabase
+        .from('bookings')
+        .update({ created_at: bankOverThirtyMinutesAt })
+        .eq('id', pendingBankOverThirtyMinutesId);
+      if (bankOverThirtyMinutesError) throw bankOverThirtyMinutesError;
 
       const { error: bankNearExpiryError } = await supabase
         .from('bookings')
@@ -341,10 +423,24 @@ test.describe('Cron secret guards', () => {
         cancelledBookingCount: 2,
       });
 
-      expect(remainingRows).toHaveLength(7);
+      expect(remainingRows).toHaveLength(9);
       expect(remainingRows).toEqual(expect.arrayContaining([
         expect.objectContaining({
+          id: legacyCancelledCardId,
+          status: 'cancelled',
+          payment_method: 'card',
+          cancel_reason: LEGACY_STALE_CARD_CHECKOUT_CANCEL_REASON,
+          tid: null,
+        }),
+        expect.objectContaining({
           id: pendingBankOverTwoHoursId,
+          status: 'PENDING',
+          payment_method: 'bank',
+          cancel_reason: null,
+          tid: null,
+        }),
+        expect.objectContaining({
+          id: pendingBankOverThirtyMinutesId,
           status: 'PENDING',
           payment_method: 'bank',
           cancel_reason: null,
