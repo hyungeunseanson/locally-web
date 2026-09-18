@@ -1,4 +1,5 @@
-export const PENDING_BOOKING_EXPIRY_MS = 2 * 60 * 60 * 1000;
+export const CARD_PAYMENT_HOLD_EXPIRY_MS = 2 * 60 * 60 * 1000;
+export const BANK_TRANSFER_EXPIRY_MS = 12 * 60 * 60 * 1000;
 
 export const EXPLICIT_CARD_CHECKOUT_CANCEL_REASON =
   '카드 결제창에서 결제를 취소함 (승인 전)';
@@ -9,7 +10,7 @@ export const STALE_PAYPAL_CHECKOUT_CANCEL_REASON =
 export const STALE_PAYMENT_CHECKOUT_CANCEL_REASON =
   '결제 미완료 (2시간 경과 자동 취소)';
 export const BANK_TRANSFER_EXPIRED_CANCEL_REASON =
-  '입금 기한 만료 (2시간 경과 자동 취소)';
+  '입금 기한 만료 (12시간 경과 자동 취소)';
 export const CARD_APPROVAL_RELEASE_RACE_LOCK_REASON =
   '카드 결제창 취소와 승인 응답 경합 처리 중';
 export const CARD_APPROVAL_RELEASE_RACE_REFUNDED_REASON =
@@ -40,8 +41,27 @@ export function isUnapprovedCardPaymentAttempt(booking: BookingPaymentAttemptRow
   );
 }
 
-export function getPendingBookingExpiryCutoff(now = Date.now()) {
-  return new Date(now - PENDING_BOOKING_EXPIRY_MS).toISOString();
+export function getPendingBookingExpiryCutoff(
+  paymentMethod?: string | null,
+  now = Date.now()
+) {
+  const normalizedMethod = String(paymentMethod || '').toLowerCase();
+  const expiryMs = normalizedMethod === 'bank'
+    ? BANK_TRANSFER_EXPIRY_MS
+    : CARD_PAYMENT_HOLD_EXPIRY_MS;
+
+  return new Date(now - expiryMs).toISOString();
+}
+
+export function isPendingBookingExpired(
+  paymentMethod: string | null | undefined,
+  createdAt: string | null | undefined,
+  now = Date.now()
+) {
+  const createdAtTimestamp = Date.parse(String(createdAt || ''));
+  if (!Number.isFinite(createdAtTimestamp)) return false;
+
+  return createdAtTimestamp < Date.parse(getPendingBookingExpiryCutoff(paymentMethod, now));
 }
 
 export function getExpiredPendingBookingCancelReason(paymentMethod?: string | null) {

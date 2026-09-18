@@ -5,6 +5,7 @@ import {
   EXPLICIT_CARD_CHECKOUT_CANCEL_REASON,
   getExpiredPendingBookingCancelReason,
   getPendingBookingExpiryCutoff,
+  isPendingBookingExpired,
   STALE_CARD_CHECKOUT_CANCEL_REASON,
 } from '@/app/utils/bookings/pendingBookingHolds';
 
@@ -19,18 +20,22 @@ export async function GET(request: Request) {
   try {
     const supabase = createAdminClient();
 
-    const expiryCutoff = getPendingBookingExpiryCutoff();
+    const cardExpiryCutoff = getPendingBookingExpiryCutoff('card');
 
-    // Find pending bookings older than 2 hours. Card rows are temporary payment
-    // holds, while bank transfers remain real pending bookings with an audit trail.
-    const { data: expiredBookings, error } = await supabase
+    // Fetch the existing two-hour candidate set, then apply the longer bank
+    // transfer policy without delaying card, PayPal, or other payment cleanup.
+    const { data: pendingBookingCandidates, error } = await supabase
       .from('bookings')
       .select('id, created_at, payment_method')
       .eq('status', 'PENDING')
       .is('tid', null)
-      .lt('created_at', expiryCutoff);
+      .lt('created_at', cardExpiryCutoff);
 
     if (error) throw error;
+
+    const expiredBookings = (pendingBookingCandidates || []).filter((booking) => {
+      return isPendingBookingExpired(booking.payment_method, booking.created_at);
+    });
 
     const { data: releasedCardBookings, error: releasedCardBookingsError } = await supabase
       .from('bookings')
@@ -42,7 +47,7 @@ export async function GET(request: Request) {
         EXPLICIT_CARD_CHECKOUT_CANCEL_REASON,
         STALE_CARD_CHECKOUT_CANCEL_REASON,
       ])
-      .lt('created_at', expiryCutoff);
+      .lt('created_at', cardExpiryCutoff);
 
     if (releasedCardBookingsError) throw releasedCardBookingsError;
 

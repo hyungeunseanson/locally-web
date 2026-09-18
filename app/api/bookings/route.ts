@@ -163,7 +163,7 @@ export async function POST(request: Request) {
             .eq('status', 'PENDING')
             .eq('payment_method', 'card')
             .is('tid', null)
-            .lt('created_at', getPendingBookingExpiryCutoff());
+            .lt('created_at', getPendingBookingExpiryCutoff('card'));
 
         if (staleCardHoldCleanupError) {
             console.warn('[api/bookings] stale card hold cleanup skipped:', staleCardHoldCleanupError.message);
