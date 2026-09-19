@@ -8,13 +8,14 @@ import type {
   EmailTransportPolicy,
 } from '@/app/emails/registry/emailTypes';
 import { renderEmailTemplate } from '@/app/emails/render/renderEmailTemplate';
+import { OFFICIAL_SUPPORT_EMAIL } from '@/app/utils/officialSender';
 
 type AdminClient = SupabaseClient;
 
 type SendTemplatedEmailResult = {
   success: boolean;
   sent: boolean;
-  provider: 'resend' | 'gmail' | 'mock' | 'none';
+  provider: 'resend' | 'gmail' | 'cloudflare' | 'mock' | 'none';
   skipped?: 'provider_not_configured' | 'recipient_missing';
   subject: string;
   preheader: string;
@@ -23,6 +24,8 @@ type SendTemplatedEmailResult = {
 };
 
 const LOCAL_DEV_FALLBACK_MAIL_CAPTURE_PATH = '/tmp/locally-mock-nodemailer.jsonl';
+const CLOUDFLARE_EMAIL_API_BASE_URL = 'https://api.cloudflare.com/client/v4';
+const CLOUDFLARE_EMAIL_FROM_NAME = 'Locally';
 
 export type EmailEnv = Partial<Record<
   | 'RESEND_API_KEY'
@@ -31,10 +34,23 @@ export type EmailEnv = Partial<Record<
   | 'GMAIL_APP_PASSWORD'
   | 'ADMIN_GMAIL_USER'
   | 'ADMIN_GMAIL_APP_PASSWORD'
+  | 'EMAIL_TRANSPORT_PROVIDER'
+  | 'CLOUDFLARE_ACCOUNT_ID'
+  | 'CLOUDFLARE_EMAIL_API_TOKEN'
   | 'MOCK_ADMIN_ALERT_EMAILS_FILE'
   | 'NODE_ENV',
   string
 >>;
+
+export type EmailTransportProvider = 'gmail' | 'cloudflare';
+
+export function resolveEmailTransportProvider(
+  env: EmailEnv = process.env
+): EmailTransportProvider {
+  return env.EMAIL_TRANSPORT_PROVIDER?.trim().toLowerCase() === 'cloudflare'
+    ? 'cloudflare'
+    : 'gmail';
+}
 
 function hasResendConfig(env: EmailEnv = process.env) {
   return Boolean(env.RESEND_API_KEY && env.RESEND_FROM_EMAIL);
@@ -42,6 +58,10 @@ function hasResendConfig(env: EmailEnv = process.env) {
 
 function hasGmailConfig(env: EmailEnv = process.env) {
   return Boolean(env.GMAIL_USER && env.GMAIL_APP_PASSWORD);
+}
+
+function hasCloudflareEmailConfig(env: EmailEnv = process.env) {
+  return Boolean(env.CLOUDFLARE_ACCOUNT_ID?.trim() && env.CLOUDFLARE_EMAIL_API_TOKEN?.trim());
 }
 
 export function hasAdminGmailConfig(env: EmailEnv = process.env) {
@@ -187,6 +207,97 @@ async function sendWithResend(params: {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isCloudflareSendResult(value: unknown): value is Record<string, unknown> {
+  return (
+    isRecord(value) &&
+    ['delivered', 'permanent_bounces', 'queued'].every((key) =>
+      Array.isArray(value[key])
+    )
+  );
+}
+
+function formatCloudflareErrorCodes(value: unknown) {
+  if (!Array.isArray(value)) return '';
+
+  const codes = value
+    .map((error) => {
+      if (!isRecord(error)) return null;
+      const code = error.code;
+      return typeof code === 'string' || typeof code === 'number' ? String(code) : null;
+    })
+    .filter((code): code is string => Boolean(code))
+    .slice(0, 3);
+
+  return codes.length > 0 ? ` (error codes: ${codes.join(', ')})` : '';
+}
+
+export async function sendWithCloudflareEmail(params: {
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+}, env: EmailEnv = process.env) {
+  const accountId = env.CLOUDFLARE_ACCOUNT_ID?.trim();
+  const apiToken = env.CLOUDFLARE_EMAIL_API_TOKEN?.trim();
+
+  if (!accountId || !apiToken) {
+    throw new Error('Cloudflare Email Sending is not configured');
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(
+      `${CLOUDFLARE_EMAIL_API_BASE_URL}/accounts/${encodeURIComponent(accountId)}/email/sending/send`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: params.to,
+          from: {
+            address: OFFICIAL_SUPPORT_EMAIL,
+            name: CLOUDFLARE_EMAIL_FROM_NAME,
+          },
+          reply_to: OFFICIAL_SUPPORT_EMAIL,
+          subject: params.subject,
+          html: params.html,
+          text: params.text,
+        }),
+      }
+    );
+  } catch {
+    throw new Error('Cloudflare Email Sending request failed');
+  }
+
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    throw new Error(`Cloudflare Email Sending returned invalid JSON (${response.status})`);
+  }
+
+  if (
+    !response.ok ||
+    !isRecord(payload) ||
+    payload.success !== true ||
+    !Array.isArray(payload.errors) ||
+    payload.errors.length > 0 ||
+    !Array.isArray(payload.messages) ||
+    !isCloudflareSendResult(payload.result)
+  ) {
+    const errorCodes = isRecord(payload)
+      ? formatCloudflareErrorCodes(payload.errors)
+      : '';
+    throw new Error(`Cloudflare Email Sending failed (${response.status})${errorCodes}`);
+  }
+}
+
 async function sendWithMockFile(params: {
   to: string;
   subject: string;
@@ -283,6 +394,32 @@ export async function sendTemplatedEmail<T extends EmailTemplateId>(
       success: true,
       sent: true,
       provider: 'mock',
+      ...rendered,
+    };
+  }
+
+  if (resolveEmailTransportProvider(emailEnvironment) === 'cloudflare') {
+    if (!hasCloudflareEmailConfig(emailEnvironment)) {
+      return {
+        success: true,
+        sent: false,
+        provider: 'none',
+        skipped: 'provider_not_configured',
+        ...rendered,
+      };
+    }
+
+    await sendWithCloudflareEmail({
+      to: recipientEmail,
+      subject: rendered.subject,
+      html: rendered.html,
+      text: rendered.text,
+    }, emailEnvironment);
+
+    return {
+      success: true,
+      sent: true,
+      provider: 'cloudflare',
       ...rendered,
     };
   }

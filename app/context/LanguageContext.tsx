@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import { useAuth } from '@/app/context/AuthContext';
 import { experienceUiDictionary } from './experienceUiDictionary';
+import { OFFICIAL_SUPPORT_EMAIL } from '@/app/utils/officialSender';
 
 export type Locale = 'ko' | 'en' | 'ja' | 'zh';
 const SUPPORTED_LOCALES: Locale[] = ['ko', 'en', 'ja', 'zh'];
@@ -1499,7 +1500,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     hp_intro_ph: "게스트에게 나를 소개해 주세요.",
     hp_private_warn_title: "알림 이메일은 직접 수정할 수 있습니다.",
     hp_private_warn_desc1: "예약, 문의, 취소 등 중요한 메일 알림은 아래 알림 이메일로 발송됩니다.",
-    hp_private_warn_desc2: "전화번호, 생년월일, 국적 및 정산 정보 변경은 보안 및 정산 오류 방지를 위해 고객센터(locally.partners@gmail.com)로 문의해 주세요.",
+    hp_private_warn_desc2: `전화번호, 생년월일, 국적 및 정산 정보 변경은 보안 및 정산 오류 방지를 위해 고객센터(${OFFICIAL_SUPPORT_EMAIL})로 문의해 주세요.`,
     hp_private_info: "개인 신상 정보",
     hp_notification_email_label: "알림 이메일",
     hp_notification_email_desc: "로그인 이메일은 변경되지 않으며, 호스트 알림 수신 주소만 변경됩니다.",
@@ -3033,7 +3034,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     hp_intro_ph: "Introduce yourself to guests.",
     hp_private_warn_title: "You can update your notification email directly.",
     hp_private_warn_desc1: "Important booking, inquiry, and cancellation emails are sent to the notification email below.",
-    hp_private_warn_desc2: "For phone, birth date, nationality, or settlement changes, please contact support (locally.partners@gmail.com) to prevent security and settlement errors.",
+    hp_private_warn_desc2: `For phone, birth date, nationality, or settlement changes, please contact support (${OFFICIAL_SUPPORT_EMAIL}) to prevent security and settlement errors.`,
     hp_private_info: "Personal Information",
     hp_notification_email_label: "Notification Email",
     hp_notification_email_desc: "Your login email will not change. Only the host notification address is updated.",
@@ -4568,7 +4569,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     hp_intro_ph: "ゲストにあなたを紹介してください。",
     hp_private_warn_title: "通知用メールアドレスは直接変更できます。",
     hp_private_warn_desc1: "予約、問い合わせ、キャンセルなどの重要なメール通知は、下記の通知用メールアドレスに送信されます。",
-    hp_private_warn_desc2: "電話番号、生年月日、国籍、精算情報の変更は、セキュリティおよび精算エラー防止のためカスタマーサポート（locally.partners@gmail.com）にお問い合わせください。",
+    hp_private_warn_desc2: `電話番号、生年月日、国籍、精算情報の変更は、セキュリティおよび精算エラー防止のためカスタマーサポート（${OFFICIAL_SUPPORT_EMAIL}）にお問い合わせください。`,
     hp_private_info: "個人情報",
     hp_notification_email_label: "通知用メールアドレス",
     hp_notification_email_desc: "ログイン用メールアドレスは変更されず、ホスト通知の受信先のみ変更されます。",
@@ -6102,7 +6103,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     hp_intro_ph: "向房客介绍一下自己吧。",
     hp_private_warn_title: "通知邮箱可以直接修改。",
     hp_private_warn_desc1: "预订、咨询、取消等重要邮件通知会发送到下方通知邮箱。",
-    hp_private_warn_desc2: "如需修改电话、出生日期、国籍或结算信息，为防止安全和结算错误，请联系客服（locally.partners@gmail.com）。",
+    hp_private_warn_desc2: `如需修改电话、出生日期、国籍或结算信息，为防止安全和结算错误，请联系客服（${OFFICIAL_SUPPORT_EMAIL}）。`,
     hp_private_info: "个人基本信息",
     hp_notification_email_label: "通知邮箱",
     hp_notification_email_desc: "登录邮箱不会更改，只会更新房东通知接收地址。",

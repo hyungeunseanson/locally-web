@@ -305,7 +305,7 @@ export async function runExperienceBankConfirmSideEffects(
         templatedEmail: {
           templateId: 'notice.copy',
           audience: 'guest',
-          transportPolicy: 'opsAdmin',
+          transportPolicy: 'transactional',
           payload: {
             copyKey: 'booking.bank_confirmed.guest',
             copyParams: {

@@ -130,7 +130,7 @@ export async function notifyExperiencePaymentConfirmed(
       templatedEmail: {
         templateId: 'booking.confirmed',
         audience: 'guest',
-        transportPolicy: 'opsAdmin',
+        transportPolicy: 'transactional',
         payload: {
           experienceTitle,
           bookingDate,

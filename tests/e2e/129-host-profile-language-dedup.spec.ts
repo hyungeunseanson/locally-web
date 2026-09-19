@@ -234,7 +234,7 @@ test.describe.serial('Host profile language dedup', () => {
     await login(page, user);
     await page.goto('/host/dashboard?tab=profile', { waitUntil: 'networkidle' });
 
-    await expect(page.getByText('locally.partners@gmail.com')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('support@locally-travel.com')).toBeVisible({ timeout: 15000 });
 
     const englishChip = page.getByRole('button', { name: 'English' }).first();
     await expect(englishChip).toBeVisible({ timeout: 15000 });

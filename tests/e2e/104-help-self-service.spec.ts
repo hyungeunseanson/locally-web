@@ -23,9 +23,9 @@ test.describe('Help Center self-service copy', () => {
 
     await expect(page.getByTestId('help-public-support-email')).toHaveAttribute(
       'href',
-      /mailto:locally\.partners@gmail\.com\?subject=Locally%20Support/
+      /mailto:support@locally-travel\.com\?subject=Locally%20Support/
     );
-    await expect(page.getByTestId('help-public-support-email-note')).toContainText('locally.partners@gmail.com');
+    await expect(page.getByTestId('help-public-support-email-note')).toContainText('support@locally-travel.com');
   });
 
   test('shows expanded host help categories', async ({ page }) => {

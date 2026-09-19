@@ -8,6 +8,7 @@ import {
   EMAIL_FONT_STACK,
   emailTypography,
 } from '@/app/emails/theme/tokens';
+import { OFFICIAL_SUPPORT_EMAIL } from '@/app/utils/officialSender';
 
 interface EmailFooterProps {
   variant?: EmailFooterVariant;
@@ -36,7 +37,7 @@ export default function EmailFooter({
       <Text style={legalText}>{copy.description}</Text>
       <Text style={legalText}>
         {copy.supportLabel}{' '}
-        <Link href="mailto:locally.partners@gmail.com" style={link}>locally.partners@gmail.com</Link>
+        <Link href={`mailto:${OFFICIAL_SUPPORT_EMAIL}`} style={link}>{OFFICIAL_SUPPORT_EMAIL}</Link>
       </Text>
       <Text style={legalText}>
         <Link href={buildAbsoluteUrl('/privacy')} style={link}>Privacy</Link>

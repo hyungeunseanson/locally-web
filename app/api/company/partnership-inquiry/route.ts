@@ -108,7 +108,6 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       provider: result.provider,
-      recipient: getPartnershipInquiryRecipientEmail(),
     });
   } catch (error) {
     const message =
