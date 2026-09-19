@@ -272,7 +272,7 @@ export async function POST(request: Request) {
                             templatedEmail: {
                                 templateId: 'notice.copy',
                                 audience: 'guest',
-                                transportPolicy: 'opsAdmin',
+                                transportPolicy: 'transactional',
                                 payload: {
                                     copyKey: 'booking.bank_pending.guest',
                                     copyParams: {

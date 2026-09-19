@@ -1,5 +1,7 @@
 // app/constants/legalText_zh.ts
 
+import { OFFICIAL_PUBLIC_EMAIL } from '@/app/utils/officialSender';
+
 export const TERMS_OF_USE_ZH = `
 第1条 目的
 
@@ -240,13 +242,13 @@ IP地址、Cookie、MAC地址、服务使用记录、访问记录、不良使用
 ▶ 个人信息保护责任人
 姓名：Nishimura Mayu
 职位：个人信息保护责任人
-联系方式：locally.partners@gmail.com / 帮助中心 1:1 咨询
+联系方式：${OFFICIAL_PUBLIC_EMAIL} / 帮助中心 1:1 咨询
 ※ 将连接到个人信息保护负责部门。
 
 ▶ 个人信息保护负责部门
 部门名：Locally 运营团队
 负责人：客服负责人
-联系方式：locally.partners@gmail.com / 帮助中心 1:1 咨询
+联系方式：${OFFICIAL_PUBLIC_EMAIL} / 帮助中心 1:1 咨询
 
 ② 信息主体可就使用公司服务（或业务）过程中产生的所有个人信息保护相关咨询、投诉处理、损害救济等事项向个人信息保护责任人及负责部门咨询。公司将对信息主体的咨询不延迟地回复和处理。
 
@@ -256,7 +258,7 @@ IP地址、Cookie、MAC地址、服务使用记录、访问记录、不良使用
 ▶ 个人信息查阅申请受理・处理部门
 部门名：Locally 运营团队
 负责人：客服负责人
-联系方式：locally.partners@gmail.com / 帮助中心 1:1 咨询
+联系方式：${OFFICIAL_PUBLIC_EMAIL} / 帮助中心 1:1 咨询
 
 第12条（权益侵害救济方法）
 信息主体可向以下机关咨询个人信息侵害相关损害救济、咨询等事项。

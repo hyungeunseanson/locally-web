@@ -1,5 +1,7 @@
 // app/constants/legalText.ts
 
+import { OFFICIAL_PUBLIC_EMAIL } from '@/app/utils/officialSender';
+
 export const TERMS_OF_USE = `
 제1조 목적
 
@@ -247,13 +249,13 @@ IP주소, 쿠키, MAC주소, 서비스 이용기록, 방문기록, 불량 이용
 ▶ 개인정보 보호책임자
 성명 : Nishimura Mayu
 직책 : 개인정보보호책임자
-연락처 : locally.partners@gmail.com / 도움말 센터 1:1 문의
+연락처 : ${OFFICIAL_PUBLIC_EMAIL} / 도움말 센터 1:1 문의
 ※ 개인정보 보호 담당부서로 연결됩니다.
 
 ▶ 개인정보 보호 담당부서
 부서명 : Locally 운영팀
 담당자 : 고객지원 담당자
-연락처 : locally.partners@gmail.com / 도움말 센터 1:1 문의
+연락처 : ${OFFICIAL_PUBLIC_EMAIL} / 도움말 센터 1:1 문의
 
 ② 정보주체께서는 회사의 서비스(또는 사업)을 이용하시면서 발생한 모든 개인정보 보호 관련 문의, 불만 처리, 피해구제 등에 관한 사항을 개인정보 보호책임자 및 담당부서로 문의하실 수 있습니다. 회사는 정보주체의 문의에 대해 지체없이 답변 및 처리해드릴 것입니다.
 
@@ -264,7 +266,7 @@ IP주소, 쿠키, MAC주소, 서비스 이용기록, 방문기록, 불량 이용
 ▶ 개인정보 열람청구 접수․처리 부서
 부서명 : Locally 운영팀
 담당자 : 고객지원 담당자
-연락처 : locally.partners@gmail.com / 도움말 센터 1:1 문의
+연락처 : ${OFFICIAL_PUBLIC_EMAIL} / 도움말 센터 1:1 문의
 
 제12조(권익침해 구제 방법)
 정보주체는 아래의 기관에 대해 개인정보 침해에 대한 피해구제, 상담 등을 문의하실 수 있습니다.

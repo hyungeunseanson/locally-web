@@ -1,5 +1,7 @@
 // app/constants/legalText_ja.ts
 
+import { OFFICIAL_PUBLIC_EMAIL } from '@/app/utils/officialSender';
+
 export const TERMS_OF_USE_JA = `
 第1条 目的
 
@@ -240,13 +242,13 @@ IPアドレス、クッキー、MACアドレス、サービス利用記録、訪
 ▶ 個人情報保護責任者
 氏名：Nishimura Mayu
 役職：個人情報保護責任者
-連絡先：locally.partners@gmail.com / ヘルプセンター1:1お問い合わせ
+連絡先：${OFFICIAL_PUBLIC_EMAIL} / ヘルプセンター1:1お問い合わせ
 ※ 個人情報保護担当部署へおつなぎします。
 
 ▶ 個人情報保護担当部署
 部署名：Locally運営チーム
 担当者：カスタマーサポート担当者
-連絡先：locally.partners@gmail.com / ヘルプセンター1:1お問い合わせ
+連絡先：${OFFICIAL_PUBLIC_EMAIL} / ヘルプセンター1:1お問い合わせ
 
 ② 情報主体は、会社のサービス（または事業）を利用する中で発生したすべての個人情報保護に関するお問い合わせ、苦情処理、被害救済等に関する事項を個人情報保護責任者および担当部署へお問い合わせいただけます。会社は情報主体のお問い合わせに対して遅滞なく回答および対応いたします。
 
@@ -256,7 +258,7 @@ IPアドレス、クッキー、MACアドレス、サービス利用記録、訪
 ▶ 個人情報閲覧請求受付・処理部署
 部署名：Locally運営チーム
 担当者：カスタマーサポート担当者
-連絡先：locally.partners@gmail.com / ヘルプセンター1:1お問い合わせ
+連絡先：${OFFICIAL_PUBLIC_EMAIL} / ヘルプセンター1:1お問い合わせ
 
 第12条（権益侵害の救済方法）
 情報主体は以下の機関に対して、個人情報侵害に関する被害救済、相談等をお問い合わせいただけます。

@@ -22,19 +22,19 @@ test.describe('Guest booking email policy', () => {
     expect(bookingCreateSource).toContain("type: 'booking_pending'");
     expect(bookingCreateSource).toContain("key: 'booking.bank_pending.guest'");
     expect(bookingCreateSource).toContain('after(async () => {');
-    expect(bookingCreateSource).toContain("transportPolicy: 'opsAdmin'");
+    expect(bookingCreateSource).toContain("transportPolicy: 'transactional'");
 
     const guestConfirmedCall = paymentConfirmedSource.slice(
       paymentConfirmedSource.indexOf('if (guestId) {')
     );
     expect(guestConfirmedCall).toContain("audience: 'guest'");
-    expect(guestConfirmedCall).toContain("transportPolicy: 'opsAdmin'");
+    expect(guestConfirmedCall).toContain("transportPolicy: 'transactional'");
 
     const guestBankConfirmedCall = bankConfirmedSource.slice(
       bankConfirmedSource.indexOf('if (booking.user_id) {')
     );
     expect(guestBankConfirmedCall).toContain("audience: 'guest'");
-    expect(guestBankConfirmedCall).toContain("transportPolicy: 'opsAdmin'");
+    expect(guestBankConfirmedCall).toContain("transportPolicy: 'transactional'");
   });
 
   test('builds all three guest booking emails with the existing templates and trips CTA', () => {

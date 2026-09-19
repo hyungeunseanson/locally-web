@@ -210,6 +210,8 @@
       "PAYPAL_ENV",
       "PAYPAL_CLIENT_ID",
       "RESEND_FROM_EMAIL",
+      "EMAIL_TRANSPORT_PROVIDER",
+      "CLOUDFLARE_ACCOUNT_ID",
       "NEXT_PUBLIC_PORTONE_IMP_CODE",
       "NEXT_PUBLIC_PAYPAL_CLIENT_ID",
       "NEXT_PUBLIC_KAKAO_MAP_API_KEY",
@@ -278,6 +280,7 @@
         "ADMIN_GMAIL_USER",
         "ADMIN_GMAIL_APP_PASSWORD"
       ],
+      "cloudflareEmailSending": ["CLOUDFLARE_EMAIL_API_TOKEN"],
       "resendFallback": ["RESEND_API_KEY"],
       "portone": ["PORTONE_API_KEY", "PORTONE_API_SECRET"],
       "nicepay": ["NICEPAY_MERCHANT_KEY"],

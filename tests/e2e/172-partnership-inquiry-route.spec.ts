@@ -111,11 +111,12 @@ test.describe('Partnership inquiry route', () => {
     );
 
     expect(response.ok()).toBeTruthy();
-    await expect(response.json()).resolves.toMatchObject({
+    const responseBody = await response.json();
+    expect(responseBody).toMatchObject({
       success: true,
       provider: 'mock',
-      recipient: 'locally.partners@gmail.com',
     });
+    expect(responseBody).not.toHaveProperty('recipient');
 
     const mails = readMockMails();
     expect(mails).toHaveLength(1);

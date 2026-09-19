@@ -30,7 +30,7 @@ type SendAdminEmailParams = {
 type SendAdminEmailResult = {
   success: boolean;
   sent: boolean;
-  provider: 'resend' | 'gmail' | 'mock' | 'none';
+  provider: 'resend' | 'gmail' | 'cloudflare' | 'mock' | 'none';
   skipped?: 'provider_not_configured' | 'recipient_missing';
 };
 

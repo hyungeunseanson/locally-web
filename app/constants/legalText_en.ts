@@ -1,5 +1,7 @@
 // app/constants/legalText_en.ts
 
+import { OFFICIAL_PUBLIC_EMAIL } from '@/app/utils/officialSender';
+
 export const TERMS_OF_USE_EN = `
 Article 1. Purpose
 
@@ -240,13 +242,13 @@ Article 10. (Personal Information Protection Officer)
 ▶ Personal Information Protection Officer
 Name: Nishimura Mayu
 Position: Personal Information Protection Officer
-Contact: locally.partners@gmail.com / Help Center 1:1 inquiry
+Contact: ${OFFICIAL_PUBLIC_EMAIL} / Help Center 1:1 inquiry
 ※ You will be connected to the Personal Information Protection department.
 
 ▶ Personal Information Protection Department
 Department name: Locally Operations
 Person in charge: Customer Support Manager
-Contact: locally.partners@gmail.com / Help Center 1:1 inquiry
+Contact: ${OFFICIAL_PUBLIC_EMAIL} / Help Center 1:1 inquiry
 
 ② Data subjects may contact the Personal Information Protection Officer and the responsible department regarding all personal information protection-related inquiries, complaints processing, damage relief, etc. that arise while using the Company's services (or business). The Company will respond to and process data subjects' inquiries without delay.
 
@@ -256,7 +258,7 @@ Data subjects may request access to personal information pursuant to Article 35 
 ▶ Department for receiving and processing personal information access requests
 Department name: Locally Operations
 Person in charge: Customer Support Manager
-Contact: locally.partners@gmail.com / Help Center 1:1 inquiry
+Contact: ${OFFICIAL_PUBLIC_EMAIL} / Help Center 1:1 inquiry
 
 Article 12. (Methods of Remedying Rights Infringements)
 Data subjects may contact the following institutions regarding damage relief and consultation for personal information infringement.
