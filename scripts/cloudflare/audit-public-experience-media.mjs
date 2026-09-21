@@ -6,6 +6,9 @@ import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
 import {
+  normalizePublicExperienceSourceUrl as normalizeSourceContract,
+} from '../../app/utils/publicExperienceMediaSourceContract.mjs';
+import {
   buildExpectedManifests,
   buildSpecifications,
   parseCardManifest,
@@ -43,6 +46,7 @@ export function hashIdentity(value) {
 }
 
 export function hashSourceKey(value) {
+  if (typeof value !== 'string' || value.length === 0) throw new Error('Canonical source key is required.');
   return createHash('sha256').update(value).digest('hex');
 }
 
@@ -50,6 +54,13 @@ function identitySetDigest(values) {
   const digest = createHash('sha256');
   for (const value of [...values].sort()) digest.update(Buffer.from(hashIdentity(value), 'hex'));
   return digest.digest('hex');
+}
+
+function sourceIdentitySetDigest(supabaseKeys, r2SourceKeyHashes) {
+  return identitySetDigest([
+    ...[...supabaseKeys].map((key) => `supabase:${key}`),
+    ...[...r2SourceKeyHashes].map((sourceKeySha256) => `r2:${sourceKeySha256}`),
+  ]);
 }
 
 export function parseArgs(argv = process.argv.slice(2)) {
@@ -74,31 +85,23 @@ function requireEnvironment(name) {
 }
 
 export function normalizeSupabaseExperienceObjectKey(value, baseUrl = PRODUCTION_SUPABASE_URL) {
+  if (baseUrl.replace(/\/$/, '') !== PRODUCTION_SUPABASE_URL) return null;
   if (typeof value !== 'string' || value.trim() === '') return null;
-  let parsed;
   try {
-    parsed = new URL(value.trim());
+    const normalized = normalizeSourceContract(value.trim());
+    return normalized.sourceKind === 'supabase' ? normalized.sourceKey : null;
   } catch {
     return null;
   }
-  if (parsed.origin !== baseUrl || parsed.username || parsed.password) return null;
-  const prefix = `/storage/v1/object/public/${EXPERIENCE_BUCKET}/`;
-  if (!parsed.pathname.startsWith(prefix) || parsed.search || parsed.hash) return null;
-  let objectKey;
+}
+
+export function normalizePublicExperienceSource(value) {
+  if (typeof value !== 'string' || value.trim() === '') return null;
   try {
-    objectKey = parsed.pathname.slice(prefix.length).split('/').map(decodeURIComponent).join('/');
+    return normalizeSourceContract(value.trim());
   } catch {
     return null;
   }
-  const parts = objectKey.split('/');
-  if (
-    parts.length !== 4
-    || parts[0] !== 'experience'
-    || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(parts[1])
-    || !['hero', 'itinerary'].includes(parts[2])
-    || parts.slice(3).some((part) => part === '' || part === '.' || part === '..')
-  ) return null;
-  return objectKey;
 }
 
 function extractItineraryUrls(itinerary) {
@@ -126,10 +129,16 @@ export function buildSourceScopes(rows, storageObjects, baseUrl = PRODUCTION_SUP
   const storageByKey = new Map(storageObjects.map((item) => [item.key, item]));
   const allKeys = new Set();
   const activeKeys = new Set();
+  const allR2SourceKeyHashes = new Set();
+  const activeR2SourceKeyHashes = new Set();
   const invalidByScope = { allDbReferenced: 0, publicActive: 0 };
   const references = {
     allDbReferenced: { photos: 0, itinerary: 0, legacyImageUrl: 0 },
     publicActive: { photos: 0, itinerary: 0, legacyImageUrl: 0 },
+  };
+  const sourceKindCounts = {
+    allDbReferenced: { supabase: 0, r2: 0 },
+    publicActive: { supabase: 0, r2: 0 },
   };
   const reconciliationInventory = [];
 
@@ -142,15 +151,22 @@ export function buildSourceScopes(rows, storageObjects, baseUrl = PRODUCTION_SUP
       references.allDbReferenced[outputName] += values.length;
       if (active) references.publicActive[outputName] += values.length;
       for (const value of values) {
-        const key = normalizeSupabaseExperienceObjectKey(value, baseUrl);
-        if (!key) {
+        const source = normalizePublicExperienceSource(value);
+        if (!source || baseUrl.replace(/\/$/, '') !== PRODUCTION_SUPABASE_URL) {
           invalidByScope.allDbReferenced += 1;
           if (active) invalidByScope.publicActive += 1;
           continue;
         }
-        normalized[group].push({ key, url: value.trim() });
-        allKeys.add(key);
-        if (active) activeKeys.add(key);
+        normalized[group].push({ ...source, url: value.trim() });
+        sourceKindCounts.allDbReferenced[source.sourceKind] += 1;
+        if (active) sourceKindCounts.publicActive[source.sourceKind] += 1;
+        if (source.sourceKind === 'supabase') {
+          allKeys.add(source.sourceKey);
+          if (active) activeKeys.add(source.sourceKey);
+        } else {
+          allR2SourceKeyHashes.add(source.sourceKeySha256);
+          if (active) activeR2SourceKeyHashes.add(source.sourceKeySha256);
+        }
       }
     }
     if (active) {
@@ -160,18 +176,21 @@ export function buildSourceScopes(rows, storageObjects, baseUrl = PRODUCTION_SUP
     }
   }
 
-  const summarize = (keys, invalidCount, referenceCounts, experienceCount) => {
+  const summarize = (keys, r2SourceKeyHashes, invalidCount, referenceCounts, experienceCount, kindCounts) => {
     const existing = [...keys].filter((key) => storageByKey.has(key));
     const missing = [...keys].filter((key) => !storageByKey.has(key));
     return {
       experienceCount,
       referenceCount: Object.values(referenceCounts).reduce((total, count) => total + count, 0),
       distinctObjectCount: keys.size,
+      distinctSourceCount: keys.size + r2SourceKeyHashes.size,
       existingObjectCount: existing.length,
       missingObjectCount: missing.length,
       invalidReferenceCount: invalidCount,
       referencedBytes: existing.reduce((total, key) => total + (storageByKey.get(key)?.size || 0), 0),
       identitySetDigest: identitySetDigest(keys),
+      sourceIdentitySetDigest: sourceIdentitySetDigest(keys, r2SourceKeyHashes),
+      sourceKindCounts: kindCounts,
       references: referenceCounts,
     };
   };
@@ -193,16 +212,24 @@ export function buildSourceScopes(rows, storageObjects, baseUrl = PRODUCTION_SUP
   return {
     allDbReferencedKeys: allKeys,
     publicActiveKeys: activeKeys,
+    allDbReferencedR2SourceKeyHashes: allR2SourceKeyHashes,
+    publicActiveR2SourceKeyHashes: activeR2SourceKeyHashes,
     reconciliationInventory,
     sourceScopes: {
-      publicActive: summarize(activeKeys, invalidByScope.publicActive, references.publicActive, reconciliationInventory.length),
-      allDbReferenced: summarize(allKeys, invalidByScope.allDbReferenced, references.allDbReferenced, rows.length),
+      publicActive: summarize(activeKeys, activeR2SourceKeyHashes, invalidByScope.publicActive, references.publicActive, reconciliationInventory.length, sourceKindCounts.publicActive),
+      allDbReferenced: summarize(allKeys, allR2SourceKeyHashes, invalidByScope.allDbReferenced, references.allDbReferenced, rows.length, sourceKindCounts.allDbReferenced),
       storageAll: storageMetadata,
     },
   };
 }
 
-export function buildManifestAudit(inventory, currentCards, currentDetails, publicActiveKeys = null) {
+export function buildManifestAudit(
+  inventory,
+  currentCards,
+  currentDetails,
+  publicActiveKeys = null,
+  publicActiveR2SourceKeyHashes = null,
+) {
   const expected = buildExpectedManifests(inventory, currentCards);
   const specifications = buildSpecifications(inventory, expected);
   const expectedEntries = specifications.map((item) => ({
@@ -212,7 +239,7 @@ export function buildManifestAudit(inventory, currentCards, currentDetails, publ
     width: item.width,
     quality: item.quality,
     format: item.format,
-    sourceKeySha256: hashSourceKey(normalizeSupabaseExperienceObjectKey(item.originUrl)),
+    sourceKeySha256: normalizeSourceContract(item.originUrl).sourceKeySha256,
     expectedContentType: 'image/webp',
     expectedCacheControl: 'public, max-age=31536000, immutable',
   }));
@@ -223,17 +250,17 @@ export function buildManifestAudit(inventory, currentCards, currentDetails, publ
   const currentKeys = new Set(currentManifestKeys);
   const currentSourcePairs = new Set(Object.entries(currentDetails).flatMap(([id, images]) => Object.keys(images).map((url) => `${id}\0${url}`)));
   const expectedSourcePairs = new Set(inventory.flatMap((item) => item.detailUrls.map((url) => `${item.id}\0${url}`)));
-  const originalSourceKeys = publicActiveKeys || new Set(
-    inventory.flatMap((item) => item.detailUrls)
-      .map((value) => normalizeSupabaseExperienceObjectKey(value))
-      .filter(Boolean),
-  );
+  const originalSourceKeyHashes = new Set(publicActiveKeys ? [...publicActiveKeys].map(hashSourceKey) : []);
+  for (const value of inventory.flatMap((item) => item.detailUrls)) {
+    originalSourceKeyHashes.add(normalizeSourceContract(value).sourceKeySha256);
+  }
+  for (const sourceKeySha256 of publicActiveR2SourceKeyHashes || []) originalSourceKeyHashes.add(sourceKeySha256);
   return {
     r2Plan: {
       version: 1,
       expected: expectedEntries,
       knownManifestKeys: currentManifestKeys,
-      publicActiveOriginalSourceKeyHashes: [...originalSourceKeys].map(hashSourceKey).sort(),
+      publicActiveOriginalSourceKeyHashes: [...originalSourceKeyHashes].sort(),
     },
     summary: {
       currentCardExperienceCount: Object.keys(currentCards).length,
@@ -446,7 +473,13 @@ async function main() {
     readFile(DETAIL_MANIFEST_PATH, 'utf8'),
   ]);
   const source = buildSourceScopes(rows, storageObjects, baseUrl);
-  const manifest = buildManifestAudit(source.reconciliationInventory, parseCardManifest(cardSource), JSON.parse(detailSource), source.publicActiveKeys);
+  const manifest = buildManifestAudit(
+    source.reconciliationInventory,
+    parseCardManifest(cardSource),
+    JSON.parse(detailSource),
+    source.publicActiveKeys,
+    source.publicActiveR2SourceKeyHashes,
+  );
   const planPath = path.join(args.output, '.r2-audit-input.json');
   const r2OutputPath = path.join(args.output, '.r2-audit-output.json');
   await writeFile(planPath, stableJson(manifest.r2Plan), { mode: 0o600 });
@@ -470,7 +503,7 @@ async function main() {
     version: 1,
     mode: args.mode,
     generatedAt: new Date().toISOString(),
-    authority: { source: 'supabase-storage', mirror: 'r2-derivatives' },
+    authority: { source: 'supabase-storage-and-r2-immutable-originals', mirror: 'r2-derivatives' },
     sourceScopes: source.sourceScopes,
     manifest: manifest.summary,
     r2,

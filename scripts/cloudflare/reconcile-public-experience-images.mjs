@@ -5,12 +5,10 @@ import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 
+import { normalizePublicExperienceSourceUrl } from '../../app/utils/publicExperienceMediaSourceContract.mjs';
+
 const CARD_MANIFEST_PATH = path.resolve('app/data/publicExperienceCardImages.ts');
 const DETAIL_MANIFEST_PATH = path.resolve('app/data/publicExperienceDetailImages.generated.json');
-const PUBLIC_IMAGE_PATTERN = /^https:\/\/uhinvcydgzqlpnvieyal\.supabase\.co\/storage\/v1\/object\/public\/experiences\/experience\/[^/]+\/(?:hero|itinerary)\/[A-Za-z0-9._-]+$/;
-const PUBLIC_SOURCE_PREFIX = '/storage/v1/object/public/experiences/';
-const PUBLIC_SOURCE_KEY_PATTERN =
-  /^experience\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/(?:hero|itinerary)\/[A-Za-z0-9._-]+$/i;
 const LEGACY_CARD_IDENTITIES = new Set(['4523:7922aaf9f75b']);
 const PROVENANCE_CONTRACT = JSON.parse(
   readFileSync(
@@ -62,42 +60,24 @@ function stableJson(value) {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
-function urlHash(url) {
-  return createHash('sha256').update(url).digest('hex').slice(0, 12);
+function parseSourceLocator(originUrl) {
+  try {
+    return normalizePublicExperienceSourceUrl(originUrl);
+  } catch (error) {
+    const reason = error instanceof Error ? `: ${error.message}` : '';
+    throw new Error(`Refusing non-public or unexpected image URL: ${originUrl}${reason}`);
+  }
 }
 
 export function buildSourceProvenance(originUrl, bytes) {
-  let parsed;
-  try {
-    parsed = new URL(originUrl);
-  } catch {
-    throw new Error('Refusing an invalid public experience source URL.');
-  }
-  if (
-    parsed.protocol !== 'https:'
-    || parsed.hostname !== 'uhinvcydgzqlpnvieyal.supabase.co'
-    || parsed.username
-    || parsed.password
-    || parsed.search
-    || parsed.hash
-    || !parsed.pathname.startsWith(PUBLIC_SOURCE_PREFIX)
-  ) throw new Error('Refusing source outside the Production public experiences namespace.');
-  let sourceKey;
-  try {
-    sourceKey = parsed.pathname
-      .slice(PUBLIC_SOURCE_PREFIX.length)
-      .split('/')
-      .map(decodeURIComponent)
-      .join('/');
-  } catch {
-    throw new Error('Refusing an invalid source object key encoding.');
-  }
-  if (!PUBLIC_SOURCE_KEY_PATTERN.test(sourceKey)) {
-    throw new Error('Refusing source outside the approved experience object-key contract.');
+  const source = parseSourceLocator(originUrl);
+  const sourceByteSha256 = createHash('sha256').update(bytes).digest('hex');
+  if (source.sourceByteSha256 && source.sourceByteSha256 !== sourceByteSha256) {
+    throw new Error('Refusing R2 immutable original with mismatched source bytes.');
   }
   return {
-    sourceKeySha256: createHash('sha256').update(sourceKey).digest('hex'),
-    sourceByteSha256: createHash('sha256').update(bytes).digest('hex'),
+    sourceKeySha256: source.sourceKeySha256,
+    sourceByteSha256,
     sourceSize: bytes.length,
   };
 }
@@ -169,18 +149,20 @@ export function normalizeInventory(rows) {
     const itinerary = Array.isArray(experience.itinerary) ? experience.itinerary.map((item) => item?.image_url).filter(Boolean) : [];
     const heroUrls = [...new Set(hero.map((url) => String(url || '').trim()).filter(Boolean))];
     const detailUrls = [...new Set([...heroUrls, ...itinerary.map((url) => String(url || '').trim())].filter(Boolean))];
-    if (heroUrls.length === 0) throw new Error(`Public experience ${experience.id} has no public hero image.`);
-    for (const url of detailUrls) if (!PUBLIC_IMAGE_PATTERN.test(url)) throw new Error(`Refusing non-public or unexpected image URL: ${url}`);
+    if (heroUrls.length === 0) throw new Error(`Public experience ${experience.id} has no canonical public hero image.`);
+    for (const url of detailUrls) parseSourceLocator(url);
     return { id: String(experience.id), heroUrls, detailUrls };
   });
 }
 
 export function buildExpectedManifests(inventory, _currentCards = {}) {
+  void _currentCards;
   const cards = {};
   const details = {};
   for (const experience of inventory) {
     const primary = experience.heroUrls[0];
-    const hash = urlHash(primary);
+    if (!primary) throw new Error(`Public experience ${experience.id} has no canonical public hero image.`);
+    const hash = parseSourceLocator(primary).derivativeIdentity;
     const prefix = LEGACY_CARD_IDENTITIES.has(`${experience.id}:${hash}`)
       ? `experience-${experience.id}-primary`
       : `cards/experience-${experience.id}-primary-${hash}`;
@@ -191,7 +173,7 @@ export function buildExpectedManifests(inventory, _currentCards = {}) {
     };
     details[experience.id] = {};
     for (const originUrl of experience.detailUrls) {
-      const detailHash = urlHash(originUrl);
+      const detailHash = parseSourceLocator(originUrl).derivativeIdentity;
       details[experience.id][originUrl] = {
         smallKey: `details/experience-${experience.id}-${detailHash}-w480-q75.webp`,
         mediumKey: `details/experience-${experience.id}-${detailHash}-w960-q75.webp`,

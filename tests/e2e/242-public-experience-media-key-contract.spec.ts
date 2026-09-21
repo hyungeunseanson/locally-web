@@ -19,6 +19,9 @@ const GOLDEN_SOURCE_URL =
 const GOLDEN_SOURCE_KEY =
   'experience/11111111-1111-4111-8111-111111111111/hero/sample.jpg';
 const GOLDEN_SOURCE_BYTE_SHA = 'a'.repeat(64);
+const R2_SOURCE_ASSET_ID = '22222222-2222-4222-8222-222222222222';
+const R2_SOURCE_KEY = `sources/v1/experience/${'b'.repeat(64)}/${R2_SOURCE_ASSET_ID}/hero.jpg`;
+const R2_SOURCE_URL = `https://media-canary.locally-travel.com/${R2_SOURCE_KEY}`;
 
 test.describe('public experience deterministic media key contract', () => {
   test('matches Node SHA-256 and the fixed card/detail/original golden vectors', () => {
@@ -67,12 +70,17 @@ test.describe('public experience deterministic media key contract', () => {
       sourceUrl: GOLDEN_SOURCE_URL,
       sourceKey: GOLDEN_SOURCE_KEY,
       sourceKeySha256: sha256Hex(GOLDEN_SOURCE_KEY),
+      sourceByteSha256: null,
       derivativeIdentity: '39696081a432',
       sourceKind: 'supabase',
       r2Key: null,
     });
     for (const invalidUrl of [
       'https://example.com/storage/v1/object/public/experiences/experience/id/hero/a.jpg',
+      GOLDEN_SOURCE_URL.replace('11111111-1111-4111-8111-111111111111', 'not-a-uuid'),
+      `https://user:password@${new URL(GOLDEN_SOURCE_URL).host}${new URL(GOLDEN_SOURCE_URL).pathname}`,
+      GOLDEN_SOURCE_URL.replace('https://uhinvcydgzqlpnvieyal.supabase.co', 'https://uhinvcydgzqlpnvieyal.supabase.co:444'),
+      GOLDEN_SOURCE_URL.replace('https://uhinvcydgzqlpnvieyal.supabase.co', 'https://uhinvcydgzqlpnvieyal.supabase.co:443'),
       `${GOLDEN_SOURCE_URL}?changed=1`,
       'https://uhinvcydgzqlpnvieyal.supabase.co/storage/v1/object/public/avatars/avatar.jpg',
     ]) {
@@ -87,6 +95,7 @@ test.describe('public experience deterministic media key contract', () => {
       sourceUrl: r2Url,
       sourceKey: `originals/v1/${sourceKeySha.slice(0, 2)}/${sourceKeySha}/${GOLDEN_SOURCE_BYTE_SHA}.jpg`,
       sourceKeySha256: sourceKeySha,
+      sourceByteSha256: GOLDEN_SOURCE_BYTE_SHA,
       derivativeIdentity: '39696081a432',
       sourceKind: 'r2',
       r2Key: `originals/v1/${sourceKeySha.slice(0, 2)}/${sourceKeySha}/${GOLDEN_SOURCE_BYTE_SHA}.jpg`,
@@ -99,6 +108,27 @@ test.describe('public experience deterministic media key contract', () => {
     );
     expect(() => normalizePublicExperienceSourceUrl(`${r2Url}&extra=1`)).toThrow();
     expect(() => normalizePublicExperienceSourceUrl(`${r2Url}&legacy=39696081a432`)).toThrow();
+    expect(() => normalizePublicExperienceSourceUrl(r2Url.replace('/originals/v1/', '/other/v1/'))).toThrow();
+    expect(() => normalizePublicExperienceSourceUrl(
+      r2Url.replace(`/originals/v1/${sourceKeySha.slice(0, 2)}/`, '/originals/v1/ff/')
+    )).toThrow();
+  });
+
+  test('accepts producer R2 source locators and rejects non-UUID assets or explicit ports', () => {
+    expect(normalizePublicExperienceSourceUrl(R2_SOURCE_URL)).toMatchObject({
+      sourceKind: 'r2',
+      sourceKey: R2_SOURCE_KEY,
+      sourceKeySha256: sha256Hex(R2_SOURCE_KEY),
+      sourceByteSha256: null,
+      r2Key: R2_SOURCE_KEY,
+    });
+    for (const invalidUrl of [
+      R2_SOURCE_URL.replace(R2_SOURCE_ASSET_ID, 'not-a-uuid'),
+      R2_SOURCE_URL.replace('https://media-canary.locally-travel.com', 'https://media-canary.locally-travel.com:444'),
+      R2_SOURCE_URL.replace('https://media-canary.locally-travel.com', 'https://media-canary.locally-travel.com:443'),
+    ]) {
+      expect(() => normalizePublicExperienceSourceUrl(invalidUrl)).toThrow();
+    }
   });
 
   test('requires explicit approved and active eligibility without changing current readers', () => {

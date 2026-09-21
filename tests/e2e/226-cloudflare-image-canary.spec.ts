@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 import { expect, test } from '@playwright/test';
 
 import { PUBLIC_EXPERIENCE_CARD_IMAGES } from '../../app/data/publicExperienceCardImages';
@@ -17,6 +19,7 @@ const canaryExperience = {
   languages: ['Korean'],
   photos: [originImageUrl],
   image_url: originImageUrl,
+  public_image_r2_eligible: true,
   price: 10000,
   duration: 2,
   rating: 5,
@@ -69,6 +72,9 @@ test.describe('Cloudflare public image canary boundary', () => {
     });
     await page.route('https://media-canary.locally-travel.com/**', async (route) => {
       await route.fulfill({ status: 503, body: 'intentional canary failure' });
+    });
+    await page.route(originImageUrl, async (route) => {
+      await route.fulfill({ path: path.resolve('tests/e2e/test-image.png') });
     });
 
     await page.goto('/', { waitUntil: 'domcontentloaded' });
