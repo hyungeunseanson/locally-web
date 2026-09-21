@@ -67,12 +67,14 @@ test.describe('public experience deterministic media key contract', () => {
       sourceUrl: GOLDEN_SOURCE_URL,
       sourceKey: GOLDEN_SOURCE_KEY,
       sourceKeySha256: sha256Hex(GOLDEN_SOURCE_KEY),
+      sourceByteSha256: null,
       derivativeIdentity: '39696081a432',
       sourceKind: 'supabase',
       r2Key: null,
     });
     for (const invalidUrl of [
       'https://example.com/storage/v1/object/public/experiences/experience/id/hero/a.jpg',
+      `https://user:password@${new URL(GOLDEN_SOURCE_URL).host}${new URL(GOLDEN_SOURCE_URL).pathname}`,
       `${GOLDEN_SOURCE_URL}?changed=1`,
       'https://uhinvcydgzqlpnvieyal.supabase.co/storage/v1/object/public/avatars/avatar.jpg',
     ]) {
@@ -87,6 +89,7 @@ test.describe('public experience deterministic media key contract', () => {
       sourceUrl: r2Url,
       sourceKey: `originals/v1/${sourceKeySha.slice(0, 2)}/${sourceKeySha}/${GOLDEN_SOURCE_BYTE_SHA}.jpg`,
       sourceKeySha256: sourceKeySha,
+      sourceByteSha256: GOLDEN_SOURCE_BYTE_SHA,
       derivativeIdentity: '39696081a432',
       sourceKind: 'r2',
       r2Key: `originals/v1/${sourceKeySha.slice(0, 2)}/${sourceKeySha}/${GOLDEN_SOURCE_BYTE_SHA}.jpg`,
@@ -99,6 +102,10 @@ test.describe('public experience deterministic media key contract', () => {
     );
     expect(() => normalizePublicExperienceSourceUrl(`${r2Url}&extra=1`)).toThrow();
     expect(() => normalizePublicExperienceSourceUrl(`${r2Url}&legacy=39696081a432`)).toThrow();
+    expect(() => normalizePublicExperienceSourceUrl(r2Url.replace('/originals/v1/', '/other/v1/'))).toThrow();
+    expect(() => normalizePublicExperienceSourceUrl(
+      r2Url.replace(`/originals/v1/${sourceKeySha.slice(0, 2)}/`, '/originals/v1/ff/')
+    )).toThrow();
   });
 
   test('requires explicit approved and active eligibility without changing current readers', () => {

@@ -7,6 +7,7 @@ import {
   buildSharpObjectPlanItem,
   buildSourceProvenance,
   buildSpecifications,
+  normalizeInventory,
   SCHEDULED_SHARP_TRANSFORM_ENGINE,
   selectMissingSpecifications,
 } from "./reconcile-public-experience-images.mjs";
@@ -111,6 +112,56 @@ test("preserves the explicit legacy card identity without trusting manifest keys
   });
 });
 
+test("accepts migrated R2 originals and preserves the legacy derivative identity", () => {
+  const sourceKey = `experience/${publicId}/hero/a.jpg`;
+  const sourceKeySha256 = createHash("sha256").update(sourceKey).digest("hex");
+  const sourceBytes = Buffer.from("migrated-r2-source");
+  const sourceByteSha256 = createHash("sha256").update(sourceBytes).digest("hex");
+  const legacyIdentity = createHash("sha256").update(originA).digest("hex").slice(0, 12);
+  const migratedOrigin = `https://media-canary.locally-travel.com/originals/v1/${sourceKeySha256.slice(0, 2)}/${sourceKeySha256}/${sourceByteSha256}.jpg?legacy=${legacyIdentity}`;
+
+  assert.deepEqual(buildSourceProvenance(migratedOrigin, sourceBytes), {
+    sourceKeySha256,
+    sourceByteSha256,
+    sourceSize: sourceBytes.length,
+  });
+  assert.throws(
+    () => buildSourceProvenance(migratedOrigin, Buffer.from("changed-source")),
+    /mismatched source bytes/,
+  );
+
+  const legacyExpected = buildExpectedManifests(
+    [{ id: "100", heroUrls: [originA], detailUrls: [originA, originC] }],
+    {},
+  );
+  const migratedExpected = buildExpectedManifests(
+    [{ id: "100", heroUrls: [migratedOrigin], detailUrls: [migratedOrigin, originC] }],
+    {},
+  );
+  assert.deepEqual(
+    { ...migratedExpected.cards["100"], originUrl: originA },
+    legacyExpected.cards["100"],
+  );
+  assert.deepEqual(
+    migratedExpected.details["100"][migratedOrigin],
+    legacyExpected.details["100"][originA],
+  );
+
+  const inventory = normalizeInventory([{
+    id: 3071,
+    status: "active",
+    is_active: true,
+    photos: [migratedOrigin],
+    itinerary: [{ image_url: migratedOrigin }],
+    image_url: null,
+  }]);
+  assert.deepEqual(inventory[0], {
+    id: "3071",
+    heroUrls: [migratedOrigin],
+    detailUrls: [migratedOrigin],
+  });
+});
+
 test("fails closed when the R2 missing plan contains an unknown or duplicate key", () => {
   const { specifications } = fixture();
   assert.throws(
@@ -174,7 +225,7 @@ test("fails closed when provenance source normalization differs from the runtime
     `${originA}?changed=1`,
     originA.replace("/experiences/", "/avatars/"),
     originA.replace("uhinvcydgzqlpnvieyal.supabase.co", "example.com"),
-    originA.replace(publicId, "not-a-uuid"),
+    originA.replace("/hero/a.jpg", "/hero/a%2Fbad.jpg"),
   ]) {
     assert.throws(
       () => buildSourceProvenance(sourceUrl, Buffer.from("source")),

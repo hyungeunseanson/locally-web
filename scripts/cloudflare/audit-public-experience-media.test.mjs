@@ -10,6 +10,7 @@ import {
   hashSourceKey,
   fetchAllExperienceRows,
   normalizeSupabaseExperienceObjectKey,
+  normalizePublicExperienceSource,
   parseArgs,
   renderSummary,
   sanitizeReport,
@@ -19,15 +20,34 @@ const baseUrl = 'https://uhinvcydgzqlpnvieyal.supabase.co';
 const userA = '11111111-1111-4111-8111-111111111111';
 const userB = '22222222-2222-4222-8222-222222222222';
 const url = (user, kind, name) => `${baseUrl}/storage/v1/object/public/experiences/experience/${user}/${kind}/${encodeURIComponent(name)}`;
+const migratedSourceKey = `experience/${userA}/hero/r2.jpg`;
+const migratedSourceKeySha256 = hashSourceKey(migratedSourceKey);
+const migratedSourceBytes = Buffer.from('migrated-source');
+const migratedSourceByteSha256 = hashSourceKey(migratedSourceBytes.toString());
+const migratedSourceUrl = `https://media-canary.locally-travel.com/originals/v1/${migratedSourceKeySha256.slice(0, 2)}/${migratedSourceKeySha256}/${migratedSourceByteSha256}.jpg?legacy=123456789abc`;
 
 test('normalizes only exact Production experiences object URLs without logging identities', () => {
   assert.equal(
-    normalizeSupabaseExperienceObjectKey(url(userA, 'hero', '한 장.jpg')),
-    `experience/${userA}/hero/한 장.jpg`,
+    normalizeSupabaseExperienceObjectKey(url(userA, 'hero', 'a.jpg')),
+    `experience/${userA}/hero/a.jpg`,
   );
   assert.equal(normalizeSupabaseExperienceObjectKey('https://example.com/image.jpg'), null);
   assert.equal(normalizeSupabaseExperienceObjectKey(`${baseUrl}/storage/v1/object/public/avatars/${userA}/a.jpg`), null);
   assert.equal(normalizeSupabaseExperienceObjectKey(`${baseUrl}/storage/v1/object/public/experiences/../secret`), null);
+});
+
+test('normalizes migrated R2 sources without treating them as Supabase objects', () => {
+  assert.deepEqual(normalizePublicExperienceSource(migratedSourceUrl), {
+    sourceUrl: migratedSourceUrl,
+    sourceKey: `originals/v1/${migratedSourceKeySha256.slice(0, 2)}/${migratedSourceKeySha256}/${migratedSourceByteSha256}.jpg`,
+    sourceKeySha256: migratedSourceKeySha256,
+    sourceByteSha256: migratedSourceByteSha256,
+    derivativeIdentity: '123456789abc',
+    sourceKind: 'r2',
+    r2Key: `originals/v1/${migratedSourceKeySha256.slice(0, 2)}/${migratedSourceKeySha256}/${migratedSourceByteSha256}.jpg`,
+  });
+  assert.equal(normalizeSupabaseExperienceObjectKey(migratedSourceUrl), null);
+  assert.equal(normalizePublicExperienceSource(`${migratedSourceUrl}&extra=1`), null);
 });
 
 test('separates public-active, all-db-referenced, and storage-all scopes', () => {
@@ -83,6 +103,55 @@ test('reports missing source references without exposing their value', () => {
   const result = buildSourceScopes([{ id: 1, status: 'active', is_active: true, photos: [missing], itinerary: [], image_url: null }], []);
   assert.equal(result.sourceScopes.publicActive.missingObjectCount, 1);
   assert.doesNotMatch(JSON.stringify(result.sourceScopes), /missing\.jpg|11111111-1111/);
+});
+
+test('keeps mixed Supabase and migrated R2 sources in the active inventory', () => {
+  const supabaseHero = url(userA, 'hero', 'a.jpg');
+  const result = buildSourceScopes([{
+    id: 3071,
+    status: 'active',
+    is_active: true,
+    photos: [supabaseHero, migratedSourceUrl],
+    itinerary: [{ image_url: migratedSourceUrl }],
+    image_url: null,
+  }], [{
+    key: `experience/${userA}/hero/a.jpg`,
+    size: 10,
+    contentType: 'image/jpeg',
+    etag: 'etag',
+    cacheControl: 'max-age=3600',
+  }]);
+
+  assert.equal(result.sourceScopes.publicActive.invalidReferenceCount, 0);
+  assert.equal(result.sourceScopes.publicActive.missingObjectCount, 0);
+  assert.deepEqual(result.sourceScopes.publicActive.sourceKindCounts, { supabase: 1, r2: 2 });
+  assert.equal(result.sourceScopes.publicActive.distinctObjectCount, 1);
+  assert.equal(result.sourceScopes.publicActive.distinctSourceCount, 2);
+  assert.deepEqual([...result.publicActiveR2SourceKeyHashes], [migratedSourceKeySha256]);
+  assert.deepEqual(result.reconciliationInventory, [{
+    id: '3071',
+    heroUrls: [supabaseHero, migratedSourceUrl],
+    detailUrls: [supabaseHero, migratedSourceUrl],
+  }]);
+});
+
+test('builds R2 manifest provenance from the canonical source identity', () => {
+  const result = buildManifestAudit(
+    [{ id: '3071', heroUrls: [migratedSourceUrl], detailUrls: [migratedSourceUrl] }],
+    {},
+    {},
+    new Set(),
+    new Set([migratedSourceKeySha256]),
+  );
+  assert.equal(result.r2Plan.expected[0].sourceKeySha256, migratedSourceKeySha256);
+  assert.deepEqual(result.r2Plan.publicActiveOriginalSourceKeyHashes, [migratedSourceKeySha256]);
+});
+
+test('fails with a domain error when an active experience has no canonical hero', () => {
+  assert.throws(
+    () => buildManifestAudit([{ id: '3071', heroUrls: [], detailUrls: [] }], {}, {}),
+    /Public experience 3071 has no canonical public hero image/,
+  );
 });
 
 test('builds current/expected manifest drift and future provenance contracts', () => {
