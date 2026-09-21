@@ -225,6 +225,9 @@ test("fails closed when provenance source normalization differs from the runtime
     `${originA}?changed=1`,
     originA.replace("/experiences/", "/avatars/"),
     originA.replace("uhinvcydgzqlpnvieyal.supabase.co", "example.com"),
+    originA.replace(publicId, "not-a-uuid"),
+    originA.replace("https://uhinvcydgzqlpnvieyal.supabase.co", "https://uhinvcydgzqlpnvieyal.supabase.co:444"),
+    originA.replace("https://uhinvcydgzqlpnvieyal.supabase.co", "https://uhinvcydgzqlpnvieyal.supabase.co:443"),
     originA.replace("/hero/a.jpg", "/hero/a%2Fbad.jpg"),
   ]) {
     assert.throws(

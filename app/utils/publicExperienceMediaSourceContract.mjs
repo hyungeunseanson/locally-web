@@ -1,10 +1,12 @@
 const PRODUCTION_SUPABASE_HOST = 'uhinvcydgzqlpnvieyal.supabase.co';
 const PUBLIC_EXPERIENCE_OBJECT_PREFIX = '/storage/v1/object/public/experiences/';
 const PUBLIC_EXPERIENCE_OBJECT_KEY_PATTERN =
-  /^experience\/[^/]+\/(?:hero|itinerary)\/[A-Za-z0-9._-]+$/;
+  /^experience\/([^/]+)\/(?:hero|itinerary)\/[A-Za-z0-9._-]+$/;
+const PUBLIC_EXPERIENCE_UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const PUBLIC_EXPERIENCE_R2_HOST = 'media-canary.locally-travel.com';
 const PUBLIC_EXPERIENCE_R2_SOURCE_KEY_PATTERN =
-  /^sources\/v1\/experience\/[0-9a-f]{64}\/[0-9a-f-]{36}\/(?:hero|itinerary)\.(?:avif|gif|jpe?g|png|webp)$/;
+  /^sources\/v1\/experience\/[0-9a-f]{64}\/([^/]+)\/(?:hero|itinerary)\.(?:avif|gif|jpe?g|png|webp)$/;
 const PUBLIC_EXPERIENCE_R2_ORIGINAL_KEY_PATTERN =
   /^originals\/v1\/([0-9a-f]{2})\/([0-9a-f]{64})\/([0-9a-f]{64})\.(?:avif|gif|jpe?g|png|webp)$/;
 
@@ -112,12 +114,18 @@ export function sha256Hex(value) {
 export function normalizePublicExperienceSourceUrl(sourceUrl) {
   let parsed;
   try {
+    if (typeof sourceUrl !== 'string') throw new TypeError('source URL must be a string');
     parsed = new URL(sourceUrl);
   } catch {
     throw new Error('Public experience media source URL is invalid.');
   }
 
-  if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.hash) {
+  // WHATWG URL normalizes an explicit default :443 to an empty `port`; inspect
+  // the raw authority as well so canonical origins cannot carry an explicit port.
+  const authority = sourceUrl.match(/^[A-Za-z][A-Za-z0-9+.-]*:\/\/([^/?#]*)/)?.[1] || '';
+  const hostPort = authority.slice(authority.lastIndexOf('@') + 1);
+  const hasExplicitPort = Boolean(parsed.port || /:\d+$/.test(hostPort));
+  if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.hash || hasExplicitPort) {
     throw new Error('Public experience media source URL is outside the approved origin.');
   }
 
@@ -153,7 +161,8 @@ export function normalizePublicExperienceSourceUrl(sourceUrl) {
         r2Key,
       };
     }
-    if (parsed.search || !PUBLIC_EXPERIENCE_R2_SOURCE_KEY_PATTERN.test(r2Key)) {
+    const sourceMatch = r2Key.match(PUBLIC_EXPERIENCE_R2_SOURCE_KEY_PATTERN);
+    if (parsed.search || !sourceMatch || !PUBLIC_EXPERIENCE_UUID_PATTERN.test(sourceMatch[1])) {
       throw new Error('Public experience media R2 source key is outside the approved namespace.');
     }
     return {
@@ -182,7 +191,8 @@ export function normalizePublicExperienceSourceUrl(sourceUrl) {
   } catch {
     throw new Error('Public experience media source key encoding is invalid.');
   }
-  if (!PUBLIC_EXPERIENCE_OBJECT_KEY_PATTERN.test(sourceKey)) {
+  const objectMatch = sourceKey.match(PUBLIC_EXPERIENCE_OBJECT_KEY_PATTERN);
+  if (!objectMatch || !PUBLIC_EXPERIENCE_UUID_PATTERN.test(objectMatch[1])) {
     throw new Error('Public experience media source key is outside the approved namespace.');
   }
 
