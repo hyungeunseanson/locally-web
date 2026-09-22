@@ -11,7 +11,7 @@ export const PROXY_SELECT = 'id,user_id,category,status,form_data,payment_channe
 const BATCH = 100;
 export type SupportInquiry = {
   id: string | number; user_id: string; type?: string | null;
-  inquiry_messages?: { sender_id: string; content: string; type?: string | null }[];
+  inquiry_messages?: { sender_id: string; content: string; created_at: string; type?: string | null }[];
 };
 
 export async function linkedRequests(db: SupabaseClient, inquiryIds: string[]) {
@@ -51,13 +51,20 @@ export async function enrichPhoneRequests(db: SupabaseClient, rows: ProxyRequest
     const inquiry = (inquiries.data as SupportInquiry[]).find(item => String(item.id) === getProxyLinkedInquiryId(row.form_data));
     const linked = inquiry && validLinkedRequest(inquiry, links)?.id === row.id;
     const latest = linked ? inquiry.inquiry_messages?.[0] : undefined;
+    const latestFromCustomer = latest?.sender_id === row.user_id;
+    const completedNeedsReply = row.status === 'COMPLETED' && latestFromCustomer;
+    // updated_at is refreshed by the existing trigger when the request is cancelled.
+    const latestTime = Date.parse(latest?.created_at ?? '');
+    const cancelledTime = Date.parse(row.updated_at ?? '');
+    const cancelledNeedsReply = row.status === 'CANCELLED' && latestFromCustomer
+      && Number.isFinite(latestTime) && Number.isFinite(cancelledTime) && latestTime > cancelledTime;
     const active = row.status === 'PENDING' || row.status === 'IN_PROGRESS';
     return {
       ...row,
       profiles: profiles.data?.find(profile => profile.id === row.user_id),
       linked_inquiry_id: linked ? String(inquiry.id) : null,
       needs_attention: !linked || (active && ['REFUNDED', 'FAILED'].includes(row.payment_status)),
-      needs_reply: (row.status === 'COMPLETED' || row.status === 'CANCELLED') && latest?.sender_id === row.user_id,
+      needs_reply: completedNeedsReply || cancelledNeedsReply,
       latest_sender_id: latest?.sender_id ?? null,
       latest_content: latest?.content ?? null,
     };
