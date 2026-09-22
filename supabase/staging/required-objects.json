@@ -17,12 +17,6 @@
   ],
   "pendingProductionMigrations": [
     {
-      "version": "20260922081710",
-      "name": "experience_payment_claim_and_pending_cleanup",
-      "repositoryFile": "supabase/migrations/20260922081710_experience_payment_claim_and_pending_cleanup.sql",
-      "productionApplied": false
-    },
-    {
       "version": "20260922125140",
       "name": "close_refunded_phone_proxy_requests",
       "repositoryFile": "supabase/migrations/20260922125140_close_refunded_phone_proxy_requests.sql",
@@ -77,14 +71,20 @@
   "applicationFunctions": [
     "apply_experience_media_locator_cas",
     "assign_service_concierge_host_atomic",
+    "attach_experience_payment_provider_reference_atomic",
+    "begin_experience_payment_capture_atomic",
     "begin_service_refund_operation_atomic",
+    "cancel_expired_pending_bookings_atomic",
     "cancel_pending_service_concierge_atomic",
     "check_rate_limit",
     "claim_due_admin_support_unread_alert_batches",
+    "claim_experience_payment_atomic",
     "complete_admin_manual_experience_payout_atomic",
     "complete_experience_booking_if_due_atomic",
     "complete_service_booking_if_due_atomic",
     "complete_service_concierge_booking_if_due_atomic",
+    "confirm_experience_bank_payment_atomic",
+    "confirm_experience_payment_atomic",
     "confirm_service_bank_payment_atomic",
     "confirm_service_concierge_payment_atomic",
     "create_booking_atomic",
@@ -99,6 +99,7 @@
     "finalize_proxy_card_intake_atomic",
     "finish_service_refund_operation_atomic",
     "get_experience_completion_due_backlog",
+    "guard_experience_payment_claim_columns",
     "handle_new_user",
     "increment_comment_count",
     "increment_community_post_view_count",
@@ -123,6 +124,7 @@
     "snapshot_booking_guest_demographics"
   ],
   "applicationTriggers": [
+    "bookings_payment_claim_columns_server_only",
     "on_auth_user_created",
     "on_comment_added",
     "on_comment_removed",

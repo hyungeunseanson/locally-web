@@ -43,6 +43,7 @@ test.describe('Supabase staging bootstrap contract', () => {
       '20260916111416',
       '20260916134243',
       '20260918000000',
+      '20260922081710',
     ]);
     expect(manifest.freshProjectApplyOrder).toEqual([
       'supabase/migrations/20260912034545_production_schema_baseline.sql',
@@ -57,12 +58,6 @@ test.describe('Supabase staging bootstrap contract', () => {
       'supabase/migrations/20260922125140_close_refunded_phone_proxy_requests.sql',
     ]);
     expect(manifest.pendingProductionMigrations).toEqual([
-      {
-        version: '20260922081710',
-        name: 'experience_payment_claim_and_pending_cleanup',
-        repositoryFile: 'supabase/migrations/20260922081710_experience_payment_claim_and_pending_cleanup.sql',
-        productionApplied: false,
-      },
       {
         version: '20260922125140',
         name: 'close_refunded_phone_proxy_requests',
@@ -134,6 +129,36 @@ test.describe('Supabase staging bootstrap contract', () => {
     }
   });
 
+  test('captures applied payment claim objects and service-only security without widening the canary', () => {
+    const claim = currentManifest.paymentClaim;
+    expect(claim.columns.map(({ name }: { name: string }) => name)).toEqual([
+      'payment_claim_state', 'payment_claim_expires_at', 'payment_provider',
+      'payment_provider_reference', 'payment_claim_token',
+    ]);
+    expect(claim.indexes.map(({ name }: { name: string }) => name)).toEqual([
+      'bookings_payment_claim_reconciliation_idx', 'bookings_payment_provider_reference_key',
+      'bookings_pending_cleanup_candidate_idx',
+    ]);
+    expect(claim.constraint.name).toBe('bookings_payment_claim_state_check');
+    expect(claim.trigger.name).toBe('bookings_payment_claim_columns_server_only');
+    expect(claim.securityDefinerFunctions).toHaveLength(7);
+    expect(claim.securityInvokerFunctions).toEqual(['public.guard_experience_payment_claim_columns()']);
+    expect(claim.directExecuteRoles).toEqual(['service_role']);
+    expect(claim.searchPath).toBe('');
+    for (const identity of [...claim.securityDefinerFunctions, ...claim.securityInvokerFunctions]) {
+      expect(currentManifest.objects.functionOverloads).toContain(identity);
+      expect(manifest.applicationFunctions).toContain(identity.split('.')[1].split('(')[0]);
+    }
+    for (const object of [...claim.indexes, claim.constraint, claim.trigger]) {
+      expect(currentContract).toContain(object.definition.replaceAll("'", "''"));
+    }
+    expect(currentContract).toContain("procedure_def.prosecdef <> (procedure_def.proname <> 'guard_experience_payment_claim_columns')");
+    expect(currentContract).toContain("coalesce(procedure_def.proconfig, ARRAY[]::text[]) <> ARRAY['search_path=\"\"']::text[]");
+    expect(manifest.applicationTriggers).toContain(claim.trigger.name);
+    expect(manifest.functionalCanaryMinimum.functions).not.toContain('claim_experience_payment_atomic');
+    expect(manifest.functionalCanaryMinimum.functions).not.toContain('cancel_expired_pending_bookings_atomic');
+  });
+
   test('reproduces the exact seven-table Production Realtime publication', () => {
     expect(manifest.realtimePublicationTables).toEqual([
       'admin_audit_logs',
@@ -169,17 +194,17 @@ test.describe('Supabase staging bootstrap contract', () => {
   test('models the exact Production current-state inventory and concierge boundary', () => {
     expect(currentManifest.objects.publicTables).toHaveLength(39);
     expect(currentManifest.objects.publicViews).toHaveLength(2);
-    expect(currentManifest.objects.publicTableColumns).toBe(510);
+    expect(currentManifest.objects.publicTableColumns).toBe(515);
     expect(currentManifest.objects.publicViewColumns).toBe(27);
-    expect(currentManifest.objects.functionOverloads).toHaveLength(48);
-    expect(currentManifest.objects.applicationTriggers).toHaveLength(11);
-    expect(currentManifest.objects.indexes).toBe(113);
+    expect(currentManifest.objects.functionOverloads).toHaveLength(55);
+    expect(currentManifest.objects.applicationTriggers).toHaveLength(12);
+    expect(currentManifest.objects.indexes).toBe(116);
     expect(currentManifest.objects.constraints).toEqual({
-      total: 179,
+      total: 180,
       primaryKey: 39,
       foreignKey: 59,
       unique: 14,
-      check: 67,
+      check: 68,
     });
     expect(currentManifest.objects.rls.enabled).toHaveLength(37);
     expect(currentManifest.objects.rls.disabled).toEqual([
