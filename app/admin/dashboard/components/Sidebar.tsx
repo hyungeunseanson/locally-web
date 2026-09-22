@@ -73,7 +73,7 @@ export default function Sidebar() {
   }, [supabase]);
 
   const handleTabChange = (tab: string) => {
-    router.push(`/admin/dashboard?tab=${tab}`);
+    router.push(`/admin/dashboard?tab=${tab}${tab === 'CHATS' ? '&view=support' : ''}`);
     setIsMobileOpen(false); // 🟢 모바일에서 탭 전환 시 사이드바 닫기
   };
 
@@ -119,7 +119,7 @@ export default function Sidebar() {
           <h2 className="text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2.5 md:mb-3 px-2">Operation</h2>
           <div className="space-y-0.5 md:space-y-1">
             <NavButton active={activeTab === 'ALERTS'} onClick={() => handleTabChange('ALERTS')} icon={<Bell size={16} className="md:w-[18px] md:h-[18px]" />} label="Admin Alerts" />
-            <NavButton active={activeTab === 'CHATS'} onClick={() => handleTabChange('CHATS')} icon={<MessageSquare size={16} className="md:w-[18px] md:h-[18px]" />} label="Message Monitoring" />
+            <NavButton active={activeTab === 'CHATS'} onClick={() => handleTabChange('CHATS')} icon={<MessageSquare size={16} className="md:w-[18px] md:h-[18px]" />} label="Customer Support" />
             <NavButton
               active={activeTab === 'TEAM'}
               onClick={() => handleTabChange('TEAM')}

@@ -4,6 +4,7 @@ import {
   detectChatPolicySignals,
 } from '@/app/utils/chatPolicySignals';
 import {
+  isAdminSupportInquiry,
   isOfficialInquirySupportMessage,
   shouldApplyChatPolicySignals,
   SOFT_DELETED_INQUIRY_MESSAGE_TYPE,
@@ -12,6 +13,7 @@ import { createClient as createServerClient } from '@/app/utils/supabase/server'
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { getHostPublicProfile } from '@/app/utils/profile';
+import { filteredPage, linkedRequests, validLinkedRequest } from '../customer-support/queries';
 
 // `useChat`에서 사용하던 Profile/HostApp 인터페이스
 type ProfileRow = {
@@ -60,7 +62,7 @@ function normalizeInquiryExperience(experience: InquiryExperienceRelation): Inqu
   return experience ?? null;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const supabaseServer = await createServerClient();
     const { data: { user }, error: authError } = await supabaseServer.auth.getUser();
@@ -80,21 +82,42 @@ export async function GET() {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
     }
 
-    // 1. 최근 문의 100건 조회
-    const { data: inquiriesData, error: inquiriesError } = await supabaseAdmin
-      .from('inquiries')
-      .select('id, user_id, host_id, experience_id, type, status, content, updated_at, experiences (id, title, photos, image_url, host_id), inquiry_messages (sender_id, created_at)')
-      .order('updated_at', { ascending: false })
-      .order('created_at', { referencedTable: 'inquiry_messages', ascending: false })
-      .limit(1, { referencedTable: 'inquiry_messages' })
-      .limit(100);
-
-    if (inquiriesError) throw inquiriesError;
-
-    const inquiryRows = (inquiriesData || []) as InquiryListRow[];
-    
+    const params = new URL(request.url).searchParams;
+    const view = params.get('view') === 'monitor' ? 'monitor' : 'support';
+    const selectedId = params.get('inquiryId');
+    const offset = Math.max(0, Number.parseInt(params.get('offset') || '0', 10) || 0);
+    const limit = Math.min(50, Math.max(1, Number.parseInt(params.get('limit') || '50', 10) || 50));
+    const columns = 'id, user_id, host_id, experience_id, type, status, content, updated_at, experiences (id, title, photos, image_url, host_id), inquiry_messages (sender_id, created_at)';
+    let selected: InquiryListRow | null = null;
+    let selection: { view: string; proxyRequestId?: string } | null = null;
+    if (selectedId) {
+      const { data, error } = await supabaseAdmin.from('inquiries').select(columns).eq('id', selectedId)
+        .order('created_at', { referencedTable: 'inquiry_messages', ascending: false })
+        .limit(1, { referencedTable: 'inquiry_messages' }).maybeSingle();
+      if (error) throw error;
+      if (!data) return NextResponse.json({ success: false, error: 'Inquiry not found' }, { status: 404 });
+      selected = data as InquiryListRow;
+      const linked = validLinkedRequest(selected, await linkedRequests(supabaseAdmin, [String(selected.id)]));
+      selection = linked ? { view: 'phone', proxyRequestId: linked.id }
+        : { view: isAdminSupportInquiry(selected.type) ? 'support' : 'monitor' };
+    }
+    const page = params.get('resolveOnly') === 'true' ? { data: [], pagination: { offset, limit, hasMore: false } }
+      : await filteredPage(async scan => {
+        let query = supabaseAdmin.from('inquiries').select(columns);
+        query = view === 'support' ? query.in('type', ['admin', 'admin_support'])
+          : query.or('type.is.null,type.not.in.(admin,admin_support)');
+        const { data, error } = await query.order('updated_at', { ascending: false }).order('id', { ascending: false })
+          .order('created_at', { referencedTable: 'inquiry_messages', ascending: false })
+          .limit(1, { referencedTable: 'inquiry_messages' }).range(scan, scan + 99);
+        if (error) throw error;
+        const rows = data as InquiryListRow[];
+        const links = view === 'support' ? await linkedRequests(supabaseAdmin, rows.map(row => String(row.id))) : [];
+        return rows.map(row => ({ ...row, phoneLinked: Boolean(validLinkedRequest(row, links)) }));
+      }, row => !row.phoneLinked, offset, limit);
+    const inquiryRows: InquiryListRow[] = [...page.data];
+    if (selected && selection?.view === view && !inquiryRows.some(row => String(row.id) === String(selected.id))) inquiryRows.unshift(selected);
     if (inquiryRows.length === 0) {
-      return NextResponse.json({ success: true, data: [] });
+      return NextResponse.json({ success: true, data: [], selection, pagination: page.pagination });
     }
 
     // 2. 연관된 사용자 ID 수집 (호스트 & 게스트)
@@ -186,7 +209,7 @@ export async function GET() {
       };
     });
 
-    return NextResponse.json({ success: true, data: safeData });
+    return NextResponse.json({ success: true, data: safeData, selection, pagination: page.pagination });
   } catch (error: unknown) {
     console.error('[inquiries/list] error:', error);
     const message = error instanceof Error ? error.message : 'Server error';

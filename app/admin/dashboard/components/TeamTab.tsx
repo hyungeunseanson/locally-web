@@ -4,12 +4,11 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom';
 import { createClient } from '@/app/utils/supabase/client';
 import MarkdownMemoEditor from './MarkdownMemoEditor';
-import PhoneReservationTab from './PhoneReservationTab';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
   ClipboardList, CheckSquare, FileText, Plus, Trash2,
-  Clock, CheckCircle2, Circle, X, NotebookPen, MessageCircle, Send, Settings, Edit2, Phone, RefreshCw
+  Clock, CheckCircle2, Circle, X, NotebookPen, MessageCircle, Send, Settings, Edit2, RefreshCw
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -20,8 +19,7 @@ import { ensureAdminTeamLastViewed, markAdminTeamViewed } from '@/app/utils/admi
 import { resolveAdminFileDeliveryUrl } from '@/app/utils/privateStorageDelivery';
 
 type TeamTabProps = {
-  initialInnerTab?: 'todo' | 'memo' | 'proxy';
-  initialProxyRequestId?: string | null;
+  initialInnerTab?: 'todo' | 'memo';
 };
 
 type TeamWorkspaceCurrentUser = {
@@ -48,7 +46,7 @@ type TeamWorkspaceBootstrapResponse = {
 const getErrorMessage = (error: unknown, fallback: string) =>
   error instanceof Error ? error.message : fallback;
 
-export default function TeamTab({ initialInnerTab, initialProxyRequestId }: TeamTabProps) {
+export default function TeamTab({ initialInnerTab }: TeamTabProps) {
   const { showToast } = useToast();
   const { requestConfirm, ConfirmDialogElement } = useConfirmDialog();
   const [tasks, setTasks] = useState<AdminTask[]>([]);
@@ -59,7 +57,7 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
   const tasksRef = useRef<AdminTask[]>([]); // ⭐ 추가: stale closure 방지를 위한 ref
   const [newLog, setNewLog] = useState({ task: '', note: '' });
   const [newTodo, setNewTodo] = useState('');
-  const [innerTab, setInnerTab] = useState<'todo' | 'memo' | 'proxy'>(initialInnerTab || 'todo'); // 🟢 새로운 서브 탭
+  const [innerTab, setInnerTab] = useState<'todo' | 'memo'>(initialInnerTab || 'todo'); // 🟢 새로운 서브 탭
   const [isComposingMemo, setIsComposingMemo] = useState(false);
   const [editingMemo, setEditingMemo] = useState<AdminTask | null>(null); // ⭐ 수정 모드용 상태
   const [memoCommentInputs, setMemoCommentInputs] = useState<Record<string, string>>({}); // ⭐ 메모별 댓글 입력 상태
@@ -439,12 +437,6 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
   ]);
 
   useEffect(() => {
-    if (initialInnerTab === 'proxy') {
-      setInnerTab('proxy');
-    }
-  }, [initialInnerTab]);
-
-  useEffect(() => {
     autoResizeTextarea(newTodoTextareaRef.current, 112);
   }, [newTodo, autoResizeTextarea]);
 
@@ -796,28 +788,20 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
                 <span className="w-4 h-4 bg-rose-500 text-[8px] font-bold text-white rounded-full flex items-center justify-center shrink-0">N</span>
               )}
             </button>
-            <button
-              onClick={() => setInnerTab('proxy')}
-              className={`flex-1 md:flex-initial px-2.5 md:px-6 py-1 rounded-md text-[9px] md:text-sm font-bold transition-all flex items-center justify-center gap-1 flex-nowrap whitespace-nowrap ${innerTab === 'proxy' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              <Phone size={11} /> 전화 예약
-            </button>
           </div>
 
-          {innerTab !== 'proxy' ? (
-            <button
-              type="button"
-              data-testid="admin-team-refresh-button"
-              onClick={() => {
-                void handleManualWorkspaceRefresh();
-              }}
-              disabled={isRefreshingWorkspace}
-              className="inline-flex items-center justify-center gap-2 self-end rounded-full border border-slate-200 bg-white px-3 py-2 text-[10px] font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60 md:self-auto md:text-xs"
-            >
-              <RefreshCw size={14} className={isRefreshingWorkspace ? 'animate-spin' : ''} />
-              새로고침
-            </button>
-          ) : null}
+          <button
+            type="button"
+            data-testid="admin-team-refresh-button"
+            onClick={() => {
+              void handleManualWorkspaceRefresh();
+            }}
+            disabled={isRefreshingWorkspace}
+            className="inline-flex items-center justify-center gap-2 self-end rounded-full border border-slate-200 bg-white px-3 py-2 text-[10px] font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60 md:self-auto md:text-xs"
+          >
+            <RefreshCw size={14} className={isRefreshingWorkspace ? 'animate-spin' : ''} />
+            새로고침
+          </button>
         </div>
       </div>
 
@@ -1000,7 +984,7 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
             </div>
 
           </>
-        ) : innerTab === 'memo' ? (
+        ) : (
           /* 팀 메모장 탭 */
           <div className="flex-1 flex flex-col overflow-hidden animate-in fade-in duration-300">
             {isComposingMemo ? (
@@ -1156,8 +1140,6 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
               </div>
             )}
           </div>
-        ) : (
-          <PhoneReservationTab initialSelectedRequestId={initialProxyRequestId} />
         )}
       </div>
 

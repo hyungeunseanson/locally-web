@@ -423,22 +423,20 @@ test.describe.serial('Proxy booking team workspace flow', () => {
         title: '새 전화 예약 요청이 접수되었습니다',
         linkIncludes: `proxyRequestId=${createdRequest!.id}`,
       });
-      expect(adminAlert.link).toContain('teamTab=proxy');
+      expect(adminAlert.link).toContain('tab=CHATS&view=phone');
       expect(adminAlert.message).toContain('식당 예약 문의');
 
       const adminSession = await createIsolatedPage(browser, adminUser);
       const adminPage = adminSession.page;
 
       await adminPage.goto(`/admin/dashboard?tab=TEAM&teamTab=proxy&proxyRequestId=${createdRequest!.id}`, { waitUntil: 'networkidle' });
-      await expect(adminPage.getByRole('heading', { name: '전화 예약', exact: true })).toBeVisible({ timeout: 15000 });
-      await expect(adminPage.getByRole('heading', { name: restaurantName })).toBeVisible({ timeout: 15000 });
-      await expect(adminPage.getByRole('button', { name: '진행 중', exact: true })).toBeDisabled();
-      await expect(adminPage.getByRole('button', { name: '완료', exact: true })).toBeDisabled();
-      await expect(adminPage.getByRole('link', { name: '1:1 문의함에서 열기' })).toBeVisible({ timeout: 15000 });
-
+      await expect(adminPage.getByRole('heading', { name: '전화예약', exact: true })).toBeVisible({ timeout: 15000 });
+      await expect(adminPage.getByRole('heading', { name: new RegExp(restaurantName) })).toBeVisible({ timeout: 15000 });
+      await expect(adminPage).toHaveURL(/tab=CHATS&.*view=phone/);
+      await expect(adminPage.getByRole('button', { name: '안내 보내고 완료', exact: true })).toBeDisabled();
+      await expect(adminPage.getByTestId('admin-chat-message-list').filter({ visible: true })).toBeVisible();
       await adminPage.getByRole('button', { name: '입금 확인', exact: true }).click();
       await expect(adminPage.getByText('결제 완료').first()).toBeVisible({ timeout: 15000 });
-      await expect(adminPage.getByRole('button', { name: '진행 중', exact: true })).toBeEnabled();
 
       await waitForNotification({
         userId: customerUserId,
@@ -447,17 +445,18 @@ test.describe.serial('Proxy booking team workspace flow', () => {
         linkIncludes: `inquiryId=${inquiryId}`,
       });
 
-      await adminPage.getByRole('button', { name: '진행 중', exact: true }).click();
-      await expect(adminPage.locator('div').filter({ hasText: /현재 상태:\s*진행 중/ }).first()).toBeVisible({ timeout: 15000 });
-      const inquiryLink = adminPage.getByRole('link', { name: '1:1 문의함에서 열기' });
-      await expect(inquiryLink).toHaveAttribute('href', new RegExp(`tab=CHATS&inquiryId=${inquiryId}`));
+      await adminPage.getByTestId('admin-chat-composer').filter({ visible: true }).fill('업체 확인 결과를 안내드립니다.');
+      await adminPage.getByRole('button', { name: '안내 보내고 완료', exact: true }).click();
+      await expect.poll(async () => {
+        const response = await adminPage.request.get(`/api/proxy-bookings/${createdRequest!.id}`);
+        return (await response.json()).data.status;
+      }).toBe('COMPLETED');
 
       const pagingBaseTime = Date.now() + 60 * 60 * 1000;
       const pagingBaseRequest = await seedProxyRequest({
         userId: customerUserId,
         user: customerUser,
         restaurantName,
-        linkedInquiryId: inquiryId,
         createdAt: new Date(pagingBaseTime).toISOString(),
       });
 
@@ -471,25 +470,22 @@ test.describe.serial('Proxy booking team workspace flow', () => {
       }
 
       await adminPage.goto(`/admin/dashboard?tab=TEAM&teamTab=proxy&proxyRequestId=${pagingBaseRequest.requestId}`, { waitUntil: 'networkidle' });
-      await expect(adminPage.getByRole('heading', { name: restaurantName })).toBeVisible({ timeout: 15000 });
+      await expect(adminPage.getByRole('heading', { name: new RegExp(restaurantName) })).toBeVisible({ timeout: 15000 });
       await expect(adminPage.getByTestId('admin-phone-reservation-refresh-button')).toBeVisible();
       const pagedProxyRows = adminPage.getByTestId('admin-phone-reservation-list-item').filter({ hasText: pagingPrefix });
-      await expect(pagedProxyRows).toHaveCount(11, { timeout: 15000 });
+      await adminPage.getByRole('button', { name: '전체', exact: true }).click();
+      await adminPage.getByRole('textbox', { name: '전화예약 검색' }).fill(pagingPrefix);
+      await expect(pagedProxyRows).toHaveCount(10, { timeout: 15000 });
       await expect(adminPage.getByTestId('admin-phone-reservation-load-more-button')).toBeVisible();
-
-      const formEntries = adminPage.getByTestId('admin-phone-reservation-form-entry');
-      await expect(formEntries).toHaveCount(6);
-      await adminPage.getByTestId('admin-phone-reservation-form-toggle').click();
-      await expect(formEntries).toHaveCount(7, { timeout: 15000 });
-      await adminPage.getByTestId('admin-phone-reservation-form-toggle').click();
-      await expect(formEntries).toHaveCount(6, { timeout: 15000 });
+      await expect(adminPage.getByTestId('admin-phone-reservation-form-section')).toContainText('예약 희망 일시 1지망');
+      await expect(adminPage.getByTestId('admin-phone-reservation-form-section')).toContainText('예약 희망 일시 3지망');
 
       await adminPage.getByTestId('admin-phone-reservation-load-more-button').click();
       await expect(pagedProxyRows).toHaveCount(13, { timeout: 15000 });
       await expect(adminPage.getByTestId('admin-phone-reservation-load-more-button')).toHaveCount(0);
 
       await adminPage.getByTestId('admin-phone-reservation-refresh-button').click();
-      await expect(adminPage.getByRole('heading', { name: restaurantName })).toBeVisible({ timeout: 15000 });
+      await expect(adminPage.getByRole('heading', { name: new RegExp(restaurantName) })).toBeVisible({ timeout: 15000 });
 
       const statusSortPrefix = `전화예약 상태정렬 ${Date.now()}`;
       const statusSortBaseTime = Date.now() + (2 * 60 * 60 * 1000);

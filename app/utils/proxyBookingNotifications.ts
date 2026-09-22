@@ -40,7 +40,7 @@ export async function notifyProxyRequestAdminIntake(params: {
       : null,
   });
   const categoryLabel = getProxyCategoryLabel(params.request.category);
-  const alertLink = `/admin/dashboard?tab=TEAM&teamTab=proxy&proxyRequestId=${params.request.id}`;
+  const alertLink = `/admin/dashboard?tab=CHATS&view=phone&proxyRequestId=${params.request.id}`;
   const alertMessage = `${categoryLabel} · ${requesterName} · ${params.paymentLabel} · ₩${params.finalAmount.toLocaleString()}`;
 
   try {
@@ -53,7 +53,7 @@ export async function notifyProxyRequestAdminIntake(params: {
     void sendAdminAlertEmails({
       subject: '[Locally Admin] 새 전화 예약 요청이 접수되었습니다',
       title: '새 전화 예약 요청이 접수되었습니다',
-      message: `${alertMessage}\n\nTEAM > 전화 예약 탭에서 요청을 확인해주세요.`,
+      message: `${alertMessage}\n\nCustomer Support > 전화예약 탭에서 요청을 확인해주세요.`,
       link: alertLink,
       ctaLabel: '전화 예약 열기',
     }).catch((emailError) => {

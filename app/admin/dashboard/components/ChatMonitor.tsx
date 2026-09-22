@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import Image from 'next/image';
-import { MessageCircle, User, Send, RefreshCw, Loader2, AlertTriangle, Eye, Shield, Trash2 } from 'lucide-react';
+import { MessageCircle, User, Send, RefreshCw, Loader2, AlertTriangle, Shield, Trash2 } from 'lucide-react';
 import { useAdminChatQuery } from '../hooks/useAdminChatQuery';
 import {
   isAdminSupportInquiry,
@@ -65,9 +65,23 @@ function formatInquiryListTimestamp(value?: string | null) {
   });
 }
 
-export default function ChatMonitor() {
+type ChatMonitorProps = {
+  view?: 'support' | 'monitor';
+  enabled?: boolean;
+  phone?: {
+    inquiryId: string | null;
+    header: React.ReactNode;
+    canComplete: boolean;
+    onComplete: () => Promise<void>;
+    onSent: () => void;
+  };
+};
+
+export default function ChatMonitor({ view = 'support', enabled = true, phone }: ChatMonitorProps) {
   const searchParams = useSearchParams();
-  const targetInquiryId = searchParams.get('inquiryId');
+  const targetInquiryId = phone ? phone.inquiryId : searchParams.get('inquiryId');
+  const phoneMode = Boolean(phone);
+  const activeTab = view === 'monitor' ? 'monitor' : 'admin';
   const router = useRouter();
   const pathname = usePathname();
 
@@ -85,11 +99,13 @@ export default function ChatMonitor() {
     error,
     isMessagesLoading,
     messageError,
-  } = useAdminChatQuery();
+    hasMore,
+    loadMore,
+  } = useAdminChatQuery({ view, conversationOnly: phoneMode, enabled });
 
   const { showToast } = useToast();
   const { requestConfirm, ConfirmDialogElement } = useConfirmDialog();
-  const [activeTab, setActiveTab] = useState<'monitor' | 'admin'>('admin');
+  const [pendingCompletion, setPendingCompletion] = useState<Record<string, boolean>>({});
   const [csStatusFilter, setCsStatusFilter] = useState<CSStatusFilter>('ALL');
   const [draftsByInquiryId, setDraftsByInquiryId] = useState<Record<string, string>>({});
   const [isSending, setIsSending] = useState(false);
@@ -132,14 +148,20 @@ export default function ChatMonitor() {
 
   // URL ?inquiryId=X 파라미터로 특정 1:1 문의 자동 선택 (DetailsPanel에서 CS 개시 후 이동)
   useEffect(() => {
+    if (!enabled) return;
     if (!targetInquiryId) {
       appliedDeepLinkIdRef.current = null;
       pendingUrlSelectionIdRef.current = null;
+      if (phoneMode) clearSelected();
       return;
     }
 
     const targetId = String(targetInquiryId);
     if (pendingUrlSelectionIdRef.current && pendingUrlSelectionIdRef.current !== targetId) {
+      return;
+    }
+    if (phoneMode) {
+      if (String(selectedInquiry?.id ?? '') !== targetId) void selectInquiry(targetId);
       return;
     }
     if (!inquiries?.length) return;
@@ -153,11 +175,10 @@ export default function ChatMonitor() {
     if (appliedDeepLinkIdRef.current === targetId) return;
 
     appliedDeepLinkIdRef.current = targetId;
-    setActiveTab(isAdminSupportInquiry(target.type) ? 'admin' : 'monitor');
     if (String(selectedInquiry?.id ?? '') !== targetId) {
       void selectInquiry(target.id);
     }
-  }, [targetInquiryId, inquiries, selectInquiry, selectedInquiry?.id]);
+  }, [enabled, phoneMode, clearSelected, targetInquiryId, inquiries, selectInquiry, selectedInquiry?.id]);
 
   const replaceInquiryInUrl = useCallback((inquiryId?: number | string) => {
     const nextParams = new URLSearchParams(searchParams.toString());
@@ -183,12 +204,6 @@ export default function ChatMonitor() {
     appliedDeepLinkIdRef.current = targetId;
     void selectInquiry(inquiryId);
     replaceInquiryInUrl(inquiryId);
-  };
-
-  const handleActiveTabChange = (nextTab: 'monitor' | 'admin') => {
-    if (nextTab === activeTab) return;
-    setActiveTab(nextTab);
-    handleClearSelected();
   };
 
   const handleCSStatusFilterChange = (nextFilter: CSStatusFilter) => {
@@ -235,13 +250,15 @@ export default function ChatMonitor() {
     }
   };
 
-  const handleSend = async () => {
+  const handleSend = async (complete = false) => {
     if (sendingRef.current || isMessagesLoading || messageError || !selectedInquiry || !replyText.trim()) return;
 
     const inquiryId = selectedInquiry.id;
     const inquiryType = selectedInquiry.type;
     const inquiryStatus = selectedInquiry.status;
     const submittedText = replyText;
+    if (phone && pendingCompletion[String(inquiryId)]) return;
+    if (complete && !phone?.canComplete) return;
 
     sendingRef.current = true;
     setIsSending(true);
@@ -259,7 +276,15 @@ export default function ChatMonitor() {
       }
 
       // 🟢 첫 번째 답변 시: '대기(open)' 상태를 '처리중(in_progress)'으로 자동 전환
-      if (isAdminSupportInquiry(inquiryType)) {
+      if (phone) {
+        if (complete) {
+          setPendingCompletion(current => ({ ...current, [String(inquiryId)]: true }));
+          await phone.onComplete();
+          setPendingCompletion(current => ({ ...current, [String(inquiryId)]: false }));
+        }
+        phone.onSent();
+      }
+      if (!phone && isAdminSupportInquiry(inquiryType)) {
         if (!inquiryStatus || inquiryStatus === 'open') {
           await handleUpdateCSStatus(inquiryId, 'in_progress', {
             updatedAt: messageResult.updatedAt,
@@ -270,6 +295,23 @@ export default function ChatMonitor() {
       console.error('[ChatMonitor] sendMessage failed:', error);
       const message = error instanceof Error ? error.message : '메시지 전송 실패';
       showToast(message, 'error');
+    } finally {
+      sendingRef.current = false;
+      setIsSending(false);
+    }
+  };
+
+  const retryCompletion = async () => {
+    if (!phone || !selectedInquiryId || sendingRef.current) return;
+    const id = selectedInquiryId;
+    sendingRef.current = true;
+    setIsSending(true);
+    try {
+      await phone.onComplete();
+      setPendingCompletion(current => ({ ...current, [id]: false }));
+      phone.onSent();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '완료 처리에 실패했습니다.', 'error');
     } finally {
       sendingRef.current = false;
       setIsSending(false);
@@ -382,7 +424,7 @@ export default function ChatMonitor() {
   });
 
   useEffect(() => {
-    if (!selectedInquiry) return;
+    if (!selectedInquiry || phoneMode || !enabled) return;
 
     const selectedIsAdmin = isAdminSupportInquiry(selectedInquiry.type);
     const belongsToActiveTab = activeTab === 'admin' ? selectedIsAdmin : !selectedIsAdmin;
@@ -395,7 +437,7 @@ export default function ChatMonitor() {
     if (!belongsToActiveTab || !belongsToStatusFilter) {
       handleClearSelected();
     }
-  }, [activeTab, csStatusFilter, handleClearSelected, selectedInquiry]);
+  }, [activeTab, csStatusFilter, handleClearSelected, selectedInquiry, phoneMode, enabled]);
 
   const selectedIsAdminSupport = isAdminSupportInquiry(selectedInquiry?.type);
   const hasWarning = selectedInquiry
@@ -408,8 +450,9 @@ export default function ChatMonitor() {
   const hostProfile = selectedIsAdminSupport ? null : buildHostProfile(selectedInquiry);
 
   return (
-    <div className="flex h-[calc(100dvh-190px)] md:h-[calc(100dvh-185px)] lg:h-[calc(100dvh-195px)] gap-4 md:gap-6 w-full relative">
+    <div className={phoneMode ? "flex min-h-0 h-full w-full" : "flex h-[calc(100dvh-235px)] gap-4 md:gap-6 w-full relative"}>
       {/* 왼쪽 목록 패널 */}
+      {!phoneMode && <>
       <div className={`w-full md:w-[420px] md:min-w-[400px] xl:w-[460px] bg-white rounded-xl md:rounded-2xl border border-slate-200 flex flex-col shadow-sm transition-all duration-300 ${selectedInquiry ? 'hidden md:flex' : 'flex'} h-full`}>
         <div className="p-3 md:px-3.5 md:py-3 border-b border-slate-100 bg-slate-50/50">
           <div className="flex justify-between items-center mb-2.5 md:mb-3">
@@ -418,21 +461,6 @@ export default function ChatMonitor() {
             </h3>
             <button onClick={() => refresh(true)} className="p-1.5 md:p-2 hover:bg-slate-200 rounded-full text-slate-500" title="새로고침">
               <RefreshCw size={14} className={`md:w-4 md:h-4 ${isLoading ? "animate-spin" : ""}`} />
-            </button>
-          </div>
-
-          <div className="flex bg-slate-200/50 p-1 rounded-lg md:rounded-xl">
-            <button
-              onClick={() => handleActiveTabChange('admin')}
-              className={`flex-1 flex items-center justify-center gap-1.5 md:gap-2 py-1.5 md:py-1.5 text-[10px] md:text-[11px] font-bold rounded-md md:rounded-lg transition-all ${activeTab === 'admin' ? 'bg-white text-green-600 shadow-sm' : 'text-slate-500 hover:bg-slate-200/50'}`}
-            >
-              <Shield size={12} className="md:w-3.5 md:h-3.5" /> 1:1 문의
-            </button>
-            <button
-              onClick={() => handleActiveTabChange('monitor')}
-              className={`flex-1 flex items-center justify-center gap-1.5 md:gap-2 py-1.5 md:py-1.5 text-[10px] md:text-[11px] font-bold rounded-md md:rounded-lg transition-all ${activeTab === 'monitor' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:bg-slate-200/50'}`}
-            >
-              <Eye size={12} className="md:w-3.5 md:h-3.5" /> 실시간 모니터링
             </button>
           </div>
 
@@ -517,14 +545,18 @@ export default function ChatMonitor() {
               </div>
             ))
           )}
+          {hasMore && <button className="w-full p-3 text-sm font-semibold" onClick={() => void loadMore()}>더 보기</button>}
         </div>
       </div>
 
+      </>}
       {/* 오른쪽 채팅창 (모바일에서는 오버레이처럼 보이거나 교체됨) */}
       {/* 🟢 이슈5: 데스크탑에서 채팅창이 fullscreen으로 뜨는 문제 수정 — fixed/inset-0/w-[100vw]/h-[100vh]를 모바일 전용으로 제한 */}
-      <div className={`flex-1 bg-white md:rounded-2xl border-l-[0px] md:border-l border-slate-200 md:border-slate-200 flex flex-col shadow-sm transition-all duration-300 ${selectedInquiry ? 'flex fixed inset-x-0 top-14 bottom-0 z-[50] w-full h-auto -ml-0 md:ml-0 md:static md:inset-auto md:top-auto md:bottom-auto md:w-auto md:h-auto md:z-0 md:flex-1 md:rounded-2xl' : 'hidden md:flex'}`}>
-        {selectedInquiry ? (
+      <div className={phoneMode ? "flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white" : `flex-1 bg-white md:rounded-2xl border-l-[0px] md:border-l border-slate-200 md:border-slate-200 flex flex-col shadow-sm transition-all duration-300 ${selectedInquiry ? 'flex fixed inset-x-0 top-14 bottom-0 z-[50] w-full h-auto -ml-0 md:ml-0 md:static md:inset-auto md:top-auto md:bottom-auto md:w-auto md:h-auto md:z-0 md:flex-1 md:rounded-2xl' : 'hidden md:flex'}`}>
+        {phone && <div className="max-h-[42%] shrink-0 overflow-y-auto border-b p-3">{phone.header}</div>}
+        {selectedInquiry && (!phone || selectedInquiryId === targetInquiryId) ? (
           <>
+            {!phoneMode && <>
             <div className="p-3 md:p-4 border-b border-slate-100 bg-slate-50/30 flex justify-between items-center relative gap-2 shrink-0 pt-3 md:pt-4">
               {/* CS 상태 변경 버튼 (1:1 문의 탭에서만) */}
               {activeTab === 'admin' && selectedIsAdminSupport && (
@@ -659,8 +691,9 @@ export default function ChatMonitor() {
               </div>
             </div>
 
+            </>}
             <div
-              className="flex-1 p-3 md:p-6 overflow-y-auto bg-slate-50 space-y-3 md:space-y-4 relative custom-scrollbar"
+              className="flex-1 min-h-24 p-3 md:p-6 overflow-y-auto bg-slate-50 space-y-3 md:space-y-4 relative custom-scrollbar"
               ref={scrollRef}
               data-testid="admin-chat-message-list"
               onScroll={(event) => {
@@ -765,15 +798,30 @@ export default function ChatMonitor() {
               })}
             </div>
 
-            <div className="p-2 md:p-4 bg-white border-t border-slate-100 flex items-end gap-1.5 md:gap-2 shrink-0 pb-2 md:pb-4">
+            {phone && <div className="shrink-0 space-y-2 border-t px-3 py-2 text-xs">
+              {pendingCompletion[selectedInquiryId!] ? <div role="alert" className="rounded-lg bg-amber-50 p-2 text-amber-900">
+                고객 안내는 전송됐지만 완료 처리에 실패했습니다.
+                <button disabled={isSending} className="ml-2 underline" onClick={() => void retryCompletion()}>완료 처리 다시 시도</button>
+              </div> : <div className="flex flex-wrap gap-2">
+                {[
+                  ['예약 확정', '예약이 완료되었습니다. 아래 내용을 확인해주세요.\n\n[예약 결과를 입력해주세요]'],
+                  ['예약 불가', '확인 결과 요청하신 예약 진행이 어렵습니다.\n\n[상세 내용을 입력해주세요]'],
+                  ['확인 결과', '업체에 확인한 결과를 안내드립니다.\n\n[확인 내용을 입력해주세요]'],
+                ].map(([label, draft]) => <button key={label} disabled={isSending}
+                  className="rounded-full border px-2 py-1" onClick={() => setDraftsByInquiryId(current => ({ ...current, [selectedInquiryId!]: draft }))}>{label}</button>)}
+              </div>}
+              {phone.canComplete && !isMessagesLoading && !messageError && !pendingCompletion[selectedInquiryId!] && messages.filter(message => !isDeletedInquiryMessage(message.type)).at(-1)?.sender_id !== selectedInquiry.user_id && messages.length > 0 &&
+                <button disabled={isSending} onClick={() => void retryCompletion()} className="text-slate-500 underline">이미 안내한 요청 완료 처리</button>}
+            </div>}
+            <div className="p-2 md:p-4 bg-white border-t border-slate-100 flex flex-wrap items-end gap-1.5 md:gap-2 shrink-0 pb-2 md:pb-4">
               <textarea
                 ref={composerRef}
                 rows={1}
                 data-testid="admin-chat-composer"
-                className="flex-1 min-h-9 md:min-h-11 max-h-28 resize-none overflow-y-hidden border border-slate-200 bg-slate-50 rounded-lg md:rounded-xl px-2.5 md:px-4 py-2 md:py-3 focus:outline-none focus:border-black focus:bg-white transition-all text-[11px] md:text-sm leading-5"
+                className={`${phone ? 'basis-full md:basis-auto text-sm' : 'text-[11px]'} flex-1 min-h-9 md:min-h-11 max-h-28 resize-none overflow-y-hidden border border-slate-200 bg-slate-50 rounded-lg md:rounded-xl px-2.5 md:px-4 py-2 md:py-3 focus:outline-none focus:border-black focus:bg-white transition-all md:text-sm leading-5`}
                 placeholder={activeTab === 'monitor' ? "관리자 권한 메시지 전송..." : "답변을 입력하세요..."}
                 value={replyText}
-                disabled={isSending || isMessagesLoading || Boolean(messageError)}
+                disabled={isSending || isMessagesLoading || Boolean(messageError) || Boolean(pendingCompletion[selectedInquiryId!])}
                 onChange={(e) => {
                   if (!selectedInquiryId) return;
                   const nextValue = e.target.value;
@@ -788,15 +836,18 @@ export default function ChatMonitor() {
                 }}
               />
               <button
-                onClick={handleSend}
-                disabled={isSending || isMessagesLoading || Boolean(messageError) || !replyText.trim()}
-                aria-label="메시지 전송"
+                onClick={() => void handleSend()}
+                disabled={isSending || isMessagesLoading || Boolean(messageError) || !replyText.trim() || Boolean(pendingCompletion[selectedInquiryId!])}
+                aria-label={phone ? '답변 보내기' : '메시지 전송'}
                 className="bg-black text-white px-3 md:px-5 py-2 rounded-lg md:rounded-xl hover:bg-slate-800 transition-colors shrink-0 flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {isSending
+                {phone ? '답변 보내기' : isSending
                   ? <Loader2 className="w-3.5 h-3.5 md:w-[18px] md:h-[18px] animate-spin" />
                   : <Send className="w-3.5 h-3.5 md:w-[18px] md:h-[18px]" />}
               </button>
+              {phone && <button onClick={() => void handleSend(true)}
+                disabled={!phone.canComplete || isSending || isMessagesLoading || Boolean(messageError) || !replyText.trim() || Boolean(pendingCompletion[selectedInquiryId!])}
+                className="shrink-0 rounded-lg bg-emerald-700 px-3 py-2 text-xs text-white disabled:opacity-50">안내 보내고 완료</button>}
             </div>
           </>
         ) : (
