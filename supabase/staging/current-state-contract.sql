@@ -24,7 +24,8 @@ BEGIN
     '20260916032730:experience_storage_lockdown',
     '20260916111416:review_tour_end_db_foundation',
     '20260916134243:review_direct_write_lockdown',
-    '20260918000000:proxy_card_intake_atomic'
+    '20260918000000:proxy_card_intake_atomic',
+    '20260922081710:experience_payment_claim_and_pending_cleanup'
   ]::text[];
   IF actual IS DISTINCT FROM expected THEN
     RAISE EXCEPTION 'migration ledger mismatch: %', actual;
@@ -57,8 +58,8 @@ BEGIN
     INTO actual_count
     FROM information_schema.columns
    WHERE table_schema = 'public' AND table_name = ANY (expected);
-  IF actual_count <> 510 THEN
-    RAISE EXCEPTION 'public table column count %, expected 510', actual_count;
+  IF actual_count <> 515 THEN
+    RAISE EXCEPTION 'public table column count %, expected 515', actual_count;
   END IF;
 
   SELECT array_agg(class_def.relname ORDER BY class_def.relname)
@@ -92,14 +93,20 @@ BEGIN
   expected := ARRAY[
     'public.apply_experience_media_locator_cas(p_experience_id bigint, p_before_photos text[], p_before_image_url text, p_before_itinerary jsonb, p_before_itinerary_i18n jsonb, p_after_photos text[], p_after_image_url text, p_after_itinerary jsonb, p_after_itinerary_i18n jsonb)',
     'public.assign_service_concierge_host_atomic(p_admin_id uuid, p_request_id uuid, p_host_id uuid, p_host_hourly_rate integer, p_host_agreement_confirmed boolean)',
+    'public.attach_experience_payment_provider_reference_atomic(p_booking_id text, p_user_id uuid, p_provider_reference text, p_claim_token uuid)',
+    'public.begin_experience_payment_capture_atomic(p_booking_id text, p_user_id uuid, p_provider_reference text)',
     'public.begin_service_refund_operation_atomic(p_admin_id uuid, p_order_id text, p_refund_amount integer, p_host_compensation_amount integer, p_idempotency_key text)',
+    'public.cancel_expired_pending_bookings_atomic(p_batch_size integer)',
     'public.cancel_pending_service_concierge_atomic(p_actor_id uuid, p_order_id text, p_cancel_reason text)',
     'public.check_rate_limit(table_name text, seconds integer)',
     'public.claim_due_admin_support_unread_alert_batches(p_limit integer)',
+    'public.claim_experience_payment_atomic(p_booking_id text, p_user_id uuid, p_provider text, p_provider_reference text)',
     'public.complete_admin_manual_experience_payout_atomic(p_request_key uuid, p_host_id uuid, p_settlement_type text, p_expected_current_booking_amount integer, p_legacy_amount integer, p_reason text, p_legacy_source_reference text, p_transfer_reference text, p_paid_by_admin_id uuid, p_paid_by_admin_email text)',
     'public.complete_experience_booking_if_due_atomic(p_booking_id text)',
     'public.complete_service_booking_if_due_atomic(p_booking_id text)',
     'public.complete_service_concierge_booking_if_due_atomic(p_booking_id text)',
+    'public.confirm_experience_bank_payment_atomic(p_booking_id text)',
+    'public.confirm_experience_payment_atomic(p_booking_id text, p_provider text, p_provider_reference text, p_provider_transaction_id text, p_verified_amount integer)',
     'public.confirm_service_bank_payment_atomic(p_order_id text)',
     'public.confirm_service_concierge_payment_atomic(p_order_id text, p_payment_method text, p_tid text)',
     'public.create_booking_atomic(p_user_id uuid, p_experience_id text, p_date text, p_time text, p_guests integer, p_is_private boolean, p_customer_name text, p_customer_phone text, p_payment_method text, p_is_solo_guarantee boolean)',
@@ -114,6 +121,7 @@ BEGIN
     'public.finalize_proxy_card_intake_atomic(p_proxy_request_id uuid, p_verified_amount integer, p_verified_tid text, p_initial_message text)',
     'public.finish_service_refund_operation_atomic(p_operation_id uuid, p_outcome text, p_provider_reference text, p_error_message text)',
     'public.get_experience_completion_due_backlog()',
+    'public.guard_experience_payment_claim_columns()',
     'public.handle_new_user()',
     'public.increment_comment_count()',
     'public.increment_community_post_view_count(p_post_id uuid)',
@@ -154,6 +162,7 @@ BEGIN
    WHERE NOT trigger_def.tgisinternal AND namespace_def.nspname IN ('public', 'auth');
   expected := ARRAY[
     'auth.users.on_auth_user_created',
+    'public.bookings.bookings_payment_claim_columns_server_only',
     'public.bookings.set_booking_guest_demographics_snapshot',
     'public.community_comments.on_comment_added',
     'public.community_comments.on_comment_removed',
@@ -170,8 +179,8 @@ BEGIN
   END IF;
 
   SELECT count(*) INTO actual_count FROM pg_indexes WHERE schemaname = 'public';
-  IF actual_count <> 113 THEN
-    RAISE EXCEPTION 'public index count %, expected 113', actual_count;
+  IF actual_count <> 116 THEN
+    RAISE EXCEPTION 'public index count %, expected 116', actual_count;
   END IF;
 
   SELECT count(*),
@@ -184,8 +193,8 @@ BEGIN
     JOIN pg_class AS class_def ON class_def.oid = constraint_def.conrelid
     JOIN pg_namespace AS namespace_def ON namespace_def.oid = class_def.relnamespace
    WHERE namespace_def.nspname = 'public';
-  IF actual_count <> 179 OR primary_key_count <> 39 OR foreign_key_count <> 59
-     OR unique_count <> 14 OR check_count <> 67 THEN
+  IF actual_count <> 180 OR primary_key_count <> 39 OR foreign_key_count <> 59
+     OR unique_count <> 14 OR check_count <> 68 THEN
     RAISE EXCEPTION 'constraint counts differ: total %, PK %, FK %, UNIQUE %, CHECK %',
       actual_count, primary_key_count, foreign_key_count, unique_count, check_count;
   END IF;
@@ -558,6 +567,103 @@ BEGIN
   END IF;
 END
 $proxy_card_rpc_security_contract$;
+
+-- Captured via schema-only-inventory.sql on 2026-09-22; no schema/data writes.
+DO $payment_claim_contract$
+DECLARE
+  actual text[];
+  actual_definition text;
+BEGIN
+  SELECT array_agg(column_name || '|' || data_type || '|' || is_nullable || '|' || coalesce(column_default, '') ORDER BY column_name)
+    INTO actual
+    FROM information_schema.columns
+   WHERE table_schema = 'public' AND table_name = 'bookings'
+     AND column_name = ANY (ARRAY[
+    'payment_claim_state',
+    'payment_claim_expires_at',
+    'payment_provider',
+    'payment_provider_reference',
+    'payment_claim_token'
+  ]::text[]);
+  IF actual IS DISTINCT FROM ARRAY[
+    'payment_claim_expires_at|timestamp with time zone|YES|',
+    'payment_claim_state|text|YES|',
+    'payment_claim_token|uuid|YES|',
+    'payment_provider|text|YES|',
+    'payment_provider_reference|text|YES|'
+  ]::text[] THEN
+    RAISE EXCEPTION 'payment claim column contract mismatch: %', actual;
+  END IF;
+
+  SELECT array_agg(indexdef ORDER BY indexname)
+    INTO actual
+    FROM pg_indexes
+   WHERE schemaname = 'public' AND tablename = 'bookings'
+     AND indexname = ANY (ARRAY[
+    'bookings_payment_claim_reconciliation_idx',
+    'bookings_payment_provider_reference_key',
+    'bookings_pending_cleanup_candidate_idx'
+  ]::text[]);
+  IF actual IS DISTINCT FROM ARRAY[
+    'CREATE INDEX bookings_payment_claim_reconciliation_idx ON public.bookings USING btree (payment_claim_state, payment_claim_expires_at) WHERE (payment_claim_state = ANY (ARRAY[''processing''::text, ''reconciliation_required''::text]))',
+    'CREATE UNIQUE INDEX bookings_payment_provider_reference_key ON public.bookings USING btree (payment_provider, payment_provider_reference) WHERE (payment_provider_reference IS NOT NULL)',
+    'CREATE INDEX bookings_pending_cleanup_candidate_idx ON public.bookings USING btree (payment_method, created_at, id) WHERE ((lower(status) = ''pending''::text) AND (tid IS NULL))'
+  ]::text[] THEN
+    RAISE EXCEPTION 'payment claim index contract mismatch: %', actual;
+  END IF;
+
+  SELECT pg_get_constraintdef(oid, true)
+    INTO actual_definition
+    FROM pg_constraint
+   WHERE conrelid = 'public.bookings'::regclass
+     AND conname = 'bookings_payment_claim_state_check';
+  IF actual_definition IS DISTINCT FROM 'CHECK (payment_claim_state IS NULL OR (payment_claim_state = ANY (ARRAY[''claimed''::text, ''processing''::text, ''reconciliation_required''::text, ''completed''::text, ''released''::text])))' THEN
+    RAISE EXCEPTION 'payment claim CHECK contract mismatch: %', actual_definition;
+  END IF;
+
+  SELECT pg_get_triggerdef(oid, true)
+    INTO actual_definition
+    FROM pg_trigger
+   WHERE tgrelid = 'public.bookings'::regclass AND NOT tgisinternal
+     AND tgenabled = 'O'
+     AND tgname = 'bookings_payment_claim_columns_server_only';
+  IF actual_definition IS DISTINCT FROM 'CREATE TRIGGER bookings_payment_claim_columns_server_only BEFORE INSERT OR UPDATE ON bookings FOR EACH ROW EXECUTE FUNCTION guard_experience_payment_claim_columns()' THEN
+    RAISE EXCEPTION 'payment claim trigger contract mismatch: %', actual_definition;
+  END IF;
+
+  SELECT array_agg(procedure_def.proname ORDER BY procedure_def.proname)
+    INTO actual
+    FROM pg_proc AS procedure_def
+    JOIN pg_namespace AS namespace_def ON namespace_def.oid = procedure_def.pronamespace
+   WHERE namespace_def.nspname = 'public'
+     AND procedure_def.proname = ANY (ARRAY[
+    'attach_experience_payment_provider_reference_atomic',
+    'begin_experience_payment_capture_atomic',
+    'cancel_expired_pending_bookings_atomic',
+    'claim_experience_payment_atomic',
+    'confirm_experience_bank_payment_atomic',
+    'confirm_experience_payment_atomic',
+    'create_booking_atomic',
+    'guard_experience_payment_claim_columns'
+  ]::text[])
+     AND (
+       procedure_def.prosecdef <> (procedure_def.proname <> 'guard_experience_payment_claim_columns')
+       OR pg_get_userbyid(procedure_def.proowner) <> 'postgres'
+       OR coalesce(procedure_def.proconfig, ARRAY[]::text[]) <> ARRAY['search_path=""']::text[]
+       OR has_function_privilege('anon', procedure_def.oid, 'EXECUTE')
+       OR has_function_privilege('authenticated', procedure_def.oid, 'EXECUTE')
+       OR NOT has_function_privilege('service_role', procedure_def.oid, 'EXECUTE')
+       OR EXISTS (
+         SELECT 1
+           FROM aclexplode(coalesce(procedure_def.proacl, acldefault('f', procedure_def.proowner))) AS acl_entry
+          WHERE acl_entry.grantee = 0 AND acl_entry.privilege_type = 'EXECUTE'
+       )
+     );
+  IF actual IS NOT NULL THEN
+    RAISE EXCEPTION 'payment claim function security contract mismatch: %', actual;
+  END IF;
+END
+$payment_claim_contract$;
 
 SELECT 'LOCALLY_PRODUCTION_CURRENT_STATE_CONTRACT_PASS' AS result;
 

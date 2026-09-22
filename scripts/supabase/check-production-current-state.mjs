@@ -113,14 +113,13 @@ const expectedLedger = [
     name: 'proxy_card_intake_atomic',
     repositoryFile: 'supabase/migrations/20260918000000_proxy_card_intake_atomic.sql',
   },
-];
-const expectedPendingMigrations = [
   {
     version: '20260922081710',
     name: 'experience_payment_claim_and_pending_cleanup',
     repositoryFile: 'supabase/migrations/20260922081710_experience_payment_claim_and_pending_cleanup.sql',
-    productionApplied: false,
   },
+];
+const expectedPendingMigrations = [
   {
     version: '20260922125140',
     name: 'close_refunded_phone_proxy_requests',
@@ -162,16 +161,16 @@ for (const [name, fingerprint] of Object.entries(expectedFingerprints)) {
 }
 assert(objects.publicTables.length === 39, 'expected 39 public tables');
 assert(objects.publicViews.length === 2, 'expected 2 public views');
-assert(objects.publicTableColumns === 510, 'expected 510 public table columns');
+assert(objects.publicTableColumns === 515, 'expected 515 public table columns');
 assert(objects.publicViewColumns === 27, 'expected 27 public view columns');
-assert(objects.functionOverloads.length === 48, 'expected 48 public function overloads');
-assert(objects.applicationTriggers.length === 11, 'expected 11 application triggers');
-assert(objects.indexes === 113, 'expected 113 public indexes');
-assert(objects.constraints.total === 179, 'expected 179 constraints');
+assert(objects.functionOverloads.length === 55, 'expected 55 public function overloads');
+assert(objects.applicationTriggers.length === 12, 'expected 12 application triggers');
+assert(objects.indexes === 116, 'expected 116 public indexes');
+assert(objects.constraints.total === 180, 'expected 180 constraints');
 assert(objects.constraints.primaryKey === 39, 'expected 39 primary keys');
 assert(objects.constraints.foreignKey === 59, 'expected 59 foreign keys');
 assert(objects.constraints.unique === 14, 'expected 14 unique constraints');
-assert(objects.constraints.check === 67, 'expected 67 check constraints');
+assert(objects.constraints.check === 68, 'expected 68 check constraints');
 assert(objects.rls.enabled.length === 37, 'expected 37 RLS-enabled tables');
 assert(objects.rls.disabled.length === 2, 'expected 2 RLS-disabled tables');
 assert(objects.rls.forced.length === 0, 'expected zero FORCE RLS tables');
@@ -277,6 +276,38 @@ assert(!/^\s*(?:INSERT\s+INTO|UPDATE\s+|DELETE\s+FROM|ALTER\s+|CREATE\s+|TRUNCAT
 
 const appFiles = await sourceFiles(resolve(root, 'app'));
 const appSources = await Promise.all(appFiles.map(async (path) => ({ path, source: await readFile(path, 'utf8') })));
+const paymentClaim = manifest.paymentClaim;
+const paymentClaimMigration = await readFile(resolve(root,
+  'supabase/migrations/20260922081710_experience_payment_claim_and_pending_cleanup.sql'), 'utf8');
+assert(paymentClaim.columns.length === 5, 'expected five payment claim columns');
+assert(paymentClaim.indexes.length === 3, 'expected three payment claim indexes');
+assert(paymentClaim.securityDefinerFunctions.length === 7, 'expected seven payment claim DEFINER functions');
+exact('payment claim INVOKER function', paymentClaim.securityInvokerFunctions,
+  ['public.guard_experience_payment_claim_columns()']);
+exact('payment claim direct execute roles', paymentClaim.directExecuteRoles, ['service_role']);
+assert(paymentClaim.searchPath === '', 'payment claim search_path must remain empty');
+for (const column of paymentClaim.columns) {
+  assert(column.nullable && column.default === null, `payment claim column defaults differ: ${column.name}`);
+  assert(paymentClaimMigration.includes(`ADD COLUMN ${column.name} ${column.type}`),
+    `payment claim column differs from migration: ${column.name}`);
+  assert(contract.includes(`${column.name}|${column.type}|YES|`),
+    `payment claim column contract missing: ${column.name}`);
+}
+for (const object of [...paymentClaim.indexes, paymentClaim.constraint, paymentClaim.trigger]) {
+  assert(paymentClaimMigration.includes(object.name), `payment claim object missing from migration: ${object.name}`);
+  assert(contract.includes(object.definition.replaceAll("'", "''")),
+    `payment claim catalog definition missing from contract: ${object.name}`);
+}
+for (const identity of [...paymentClaim.securityDefinerFunctions, ...paymentClaim.securityInvokerFunctions]) {
+  assert(objects.functionOverloads.includes(identity), `payment claim overload missing: ${identity}`);
+}
+for (const identity of paymentClaim.securityDefinerFunctions) {
+  const functionName = identity.match(/^public\.([^()]+)\(/)[1];
+  assert(appSources.some(({ source }) => source.includes(functionName)),
+    `payment claim function has no application callsite: ${functionName}`);
+}
+assert(contract.includes('$payment_claim_contract$'), 'payment claim security contract is missing');
+
 for (const functionName of required.activeConcierge.functions) {
   assert(appSources.some(({ source }) => source.includes(functionName)),
     `active concierge function has no application callsite: ${functionName}`);
