@@ -170,3 +170,23 @@ for (const scenario of [
   }
   expect(row).toEqual(before);
 });
+
+for (const status of ['CANCELLED', 'COMPLETED'] as const) test(`${status} customer reply reopens todo; admin reply returns to closed`, async () => {
+  for (const sender of ['guest-1', 'admin']) {
+    install(database([request(1, { status, payment_status: 'REFUNDED' })], [{ id: 1, user_id: 'guest-1', type: 'admin_support', inquiry_messages: [{ sender_id: sender, type: 'text' }] }]));
+    const result = await (await phoneGet(new Request('http://local/api?requestId=request-1'))).json();
+    const row = result.data;
+    expect(row).toMatchObject({ status, payment_status: 'REFUNDED', needs_attention: false, needs_reply: sender === 'guest-1' });
+    expect(matchesPhoneFilter(row, 'todo')).toBe(sender === 'guest-1');
+    expect(matchesPhoneFilter(row, 'closed')).toBe(sender === 'admin');
+  }
+});
+
+test('payment metadata is selected only for authorized detail requests', async () => {
+  const db = database([request(1)], [{ id: 1, user_id: 'guest-1', type: 'admin_support' }]); install(db);
+  await phoneGet(new Request('http://local/api?filter=all'));
+  expect(db.calls.filter(url => url.pathname.endsWith('proxy_requests')).every(url => !url.searchParams.get('select')?.includes('refunded_at'))).toBe(true);
+  db.calls.length = 0;
+  await phoneGet(new Request('http://local/api?requestId=request-1'));
+  expect(db.calls.some(url => url.searchParams.get('select')?.endsWith(',tid,paid_at,refunded_at'))).toBe(true);
+});

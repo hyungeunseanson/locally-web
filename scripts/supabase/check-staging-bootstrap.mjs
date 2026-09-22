@@ -43,6 +43,7 @@ const expectedAppliedOrder = [
 ];
 const expectedPendingOrder = [
   'supabase/migrations/20260922081710_experience_payment_claim_and_pending_cleanup.sql',
+  'supabase/migrations/20260922125140_close_refunded_phone_proxy_requests.sql',
 ];
 const expectedApplyOrder = [...expectedAppliedOrder, ...expectedPendingOrder];
 exact('fresh-project apply order', required.freshProjectApplyOrder, expectedApplyOrder);

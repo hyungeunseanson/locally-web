@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     const params = new URL(request.url).searchParams;
     const requestId = params.get('requestId');
     if (requestId) {
-      const { data, error } = await db.from('proxy_requests').select(PROXY_SELECT)
+      const { data, error } = await db.from('proxy_requests').select(`${PROXY_SELECT},tid,paid_at,refunded_at`)
         .or(FORMAL_PROXY_FILTER).eq('id', requestId).maybeSingle();
       if (error) throw error;
       if (!data) return NextResponse.json({ success: false, error: 'Request not found' }, { status: 404 });

@@ -57,7 +57,7 @@ export async function enrichPhoneRequests(db: SupabaseClient, rows: ProxyRequest
       profiles: profiles.data?.find(profile => profile.id === row.user_id),
       linked_inquiry_id: linked ? String(inquiry.id) : null,
       needs_attention: !linked || (active && ['REFUNDED', 'FAILED'].includes(row.payment_status)),
-      needs_reply: row.status === 'COMPLETED' && latest?.sender_id === row.user_id,
+      needs_reply: (row.status === 'COMPLETED' || row.status === 'CANCELLED') && latest?.sender_id === row.user_id,
       latest_sender_id: latest?.sender_id ?? null,
       latest_content: latest?.content ?? null,
     };

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 import ChatMonitor from './ChatMonitor';
+import PhonePaymentDetails from './PhonePaymentDetails';
 import { useConfirmDialog } from '@/app/hooks/useConfirmDialog';
 import { ChevronLeft, MoreHorizontal } from 'lucide-react';
 import { getProxyCategoryLabel, getProxyPaymentMethod, getProxyPaymentStatusLabel, getProxyRequestTitle, getProxyRequesterDisplayName } from '@/app/utils/proxyBooking';
@@ -126,6 +127,8 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
     if (id) next.set('proxyRequestId', id); else next.delete('proxyRequestId');
     router.push(`/admin/dashboard?${next}`, { scroll: false });
   };
+  const [paymentDetailsId, setPaymentDetailsId] = useState<string | null>(null);
+  const paymentMenuRef = useRef<HTMLElement>(null);
   // Never show the previous customer's conversation while the next detail loads.
   const selected = detail?.id === initialSelectedRequestId ? detail : null;
   const attentionLabel = selected ? getPhoneAttentionLabel(selected) : null;
@@ -175,19 +178,20 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
         <span className="text-slate-500">{getProxyPaymentStatusLabel(selected)}</span>
         {attentionLabel && <span className="whitespace-nowrap text-amber-700">{attentionLabel}</span>}
       </div>
-      {(canComplete || manualPayment || selected.payment_status === 'COMPLETED') && <details key={selected.id} className="relative shrink-0" onKeyDown={event => {
+      <details key={selected.id} className="relative shrink-0" onKeyDown={event => {
         if (event.key === 'Escape') { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); }
       }}>
-        <summary aria-label="전화예약 업무 메뉴" className="flex cursor-pointer list-none rounded-full p-1.5 text-slate-500 focus-visible:outline-2 focus-visible:outline-slate-400 [&::-webkit-details-marker]:hidden"><MoreHorizontal size={18} /></summary>
+        <summary ref={paymentMenuRef} aria-label="전화예약 업무 메뉴" className="flex cursor-pointer list-none rounded-full p-1.5 text-slate-500 focus-visible:outline-2 focus-visible:outline-slate-400 [&::-webkit-details-marker]:hidden"><MoreHorizontal size={18} /></summary>
         <div className="absolute right-0 top-full z-20 mt-2 w-36 rounded-lg border border-slate-200 bg-white p-1 shadow-lg" onClick={event => {
           if ((event.target as HTMLElement).closest('button')) event.currentTarget.closest('details')?.removeAttribute('open');
         }}>
+          <button className="w-full rounded p-2 text-left text-xs hover:bg-slate-50" onClick={() => setPaymentDetailsId(selected.id)}>결제 상세</button>
           {canComplete && <button disabled={updating} className="w-full rounded p-2 text-left text-xs hover:bg-slate-50 disabled:opacity-50" onClick={() => requestConfirm({ title: '처리 완료', description: '이 전화예약 업무를 완료 처리할까요?', confirmLabel: '완료 처리' }, complete)}>처리 완료</button>}
           {manualPayment && <button disabled={updating} className="w-full rounded p-2 text-left text-xs hover:bg-slate-50 disabled:opacity-50" onClick={() => void paymentAction('confirm-payment')}>입금 확인</button>}
           {manualPayment && <button disabled={updating} className="w-full rounded p-2 text-left text-xs text-rose-700 hover:bg-slate-50 disabled:opacity-50" onClick={() => confirmPaymentAction('cancel-payment')}>결제 취소</button>}
           {selected.payment_status === 'COMPLETED' && <button disabled={updating} className="w-full rounded p-2 text-left text-xs text-rose-700 hover:bg-slate-50 disabled:opacity-50" onClick={() => confirmPaymentAction('refund-payment')}>환불 처리</button>}
         </div>
-      </details>}
+      </details>
     </>}
   </div>;
 
@@ -217,6 +221,7 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
         inquiryId: selected?.linked_inquiry_id || null, toolbar, onSent: refresh,
       }} />
     </section>
+    {active && selected && paymentDetailsId === selected.id && <PhonePaymentDetails request={selected} onClose={() => { setPaymentDetailsId(null); paymentMenuRef.current?.focus(); }} />}
     {ConfirmDialogElement}
   </div>;
 }
