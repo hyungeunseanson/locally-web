@@ -31,7 +31,7 @@ function booking(overrides: Record<string, unknown> = {}) {
     contact_name: 'DB Guest',
     contact_phone: '01012345678',
     payment_claim_state: 'processing',
-    payment_claim_expires_at: '2026-09-22T12:10:00.000Z',
+    payment_claim_expires_at: '2099-09-22T12:10:00.000Z',
     payment_provider: 'nicepay',
     payment_provider_reference: ORDER_ID,
     experiences: { title: 'DB Experience Title' },
