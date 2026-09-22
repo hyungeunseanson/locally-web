@@ -13,6 +13,7 @@ import {
   normalizeGoogleAnalyticsPropertyId,
   normalizeGoogleAnalyticsSearchTerm,
   normalizeGoogleCmpScriptUrl,
+  prepareGoogleAnalyticsQueue,
   resolveGoogleAnalyticsConfig,
 } from '@/app/utils/analytics/google';
 import { getLegalDocument } from '@/app/constants/legalDocuments';
@@ -88,6 +89,20 @@ test.describe('Google Analytics privacy-first contracts', () => {
     expect(isGoogleAnalyticsConsentGranted(null, statusEnum)).toBeFalsy();
   });
 
+  test('creates the command queue before the external Google tag loads', () => {
+    const runtime: {
+      dataLayer?: unknown[];
+      gtag?: (...args: unknown[]) => void;
+    } = {};
+
+    expect(prepareGoogleAnalyticsQueue(runtime)).toBeTruthy();
+    runtime.gtag?.('config', 'G-ABC123');
+
+    expect(runtime.dataLayer).toEqual([
+      ['config', 'G-ABC123'],
+    ]);
+  });
+
   test('removes query data and excludes administrative or callback paths', () => {
     expect(buildSanitizedGoogleAnalyticsLocation(
       'https://www.locally-travel.com',
@@ -149,10 +164,15 @@ test.describe('Google Analytics privacy-first contracts', () => {
     expect(gateSource).toContain('isGoogleAnalyticsConsentGranted');
     expect(gateSource).toContain('buildSanitizedGoogleAnalyticsLocation');
 
-    const consentDefaultIndex = analyticsSource.indexOf("window.gtag('consent', 'default'");
-    const tagInitializationIndex = analyticsSource.indexOf("window.gtag('js', new Date())");
-    const consentUpdateIndex = analyticsSource.indexOf("window.gtag('consent', 'update'");
-    const analyticsConfigIndex = analyticsSource.indexOf("window.gtag('config'");
+    const prepareQueueIndex = gateSource.indexOf('if (granted) prepareGoogleAnalyticsQueue()');
+    const revealTagIndex = gateSource.indexOf('setConsentGranted(granted)');
+    expect(prepareQueueIndex).toBeGreaterThan(-1);
+    expect(prepareQueueIndex).toBeLessThan(revealTagIndex);
+
+    const consentDefaultIndex = analyticsSource.indexOf("gtag('consent', 'default'");
+    const tagInitializationIndex = analyticsSource.indexOf("gtag('js', new Date())");
+    const consentUpdateIndex = analyticsSource.indexOf("gtag('consent', 'update'");
+    const analyticsConfigIndex = analyticsSource.indexOf("gtag('config'");
     expect(consentDefaultIndex).toBeGreaterThan(-1);
     expect(consentDefaultIndex).toBeLessThan(tagInitializationIndex);
     expect(tagInitializationIndex).toBeLessThan(consentUpdateIndex);

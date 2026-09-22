@@ -19,6 +19,11 @@ export type GoogleConsentModeStatusEnum = {
 
 export type GoogleAnalyticsEventParams = Record<string, unknown>;
 
+export type GoogleAnalyticsRuntime = {
+  dataLayer?: unknown[];
+  gtag?: (...args: unknown[]) => void;
+};
+
 type QueuedGoogleAnalyticsEvent = {
   name: string;
   params: GoogleAnalyticsEventParams;
@@ -202,29 +207,39 @@ export function normalizeGoogleAnalyticsSearchTerm(value?: string | null) {
   return SAFE_SEARCH_TERMS.get(normalized) || 'other';
 }
 
+export function prepareGoogleAnalyticsQueue(runtime?: GoogleAnalyticsRuntime | null) {
+  const target = runtime ?? (typeof window === 'undefined' ? null : window);
+  if (!target) return false;
+
+  target.dataLayer = target.dataLayer || [];
+  target.gtag = target.gtag || ((...args: unknown[]) => {
+    target.dataLayer?.push(args);
+  });
+  return true;
+}
+
 export function initializeGoogleAnalytics(measurementId: string) {
   if (typeof window === 'undefined') return false;
   const normalizedMeasurementId = normalizeGoogleAnalyticsMeasurementId(measurementId);
   if (!normalizedMeasurementId || !window.__locallyGoogleAnalyticsConsentGranted) return false;
 
-  window.dataLayer = window.dataLayer || [];
-  window.gtag = window.gtag || ((...args: unknown[]) => {
-    window.dataLayer?.push(args);
-  });
-  window.gtag('consent', 'default', {
+  if (!prepareGoogleAnalyticsQueue(window) || !window.gtag) return false;
+  const gtag = window.gtag;
+
+  gtag('consent', 'default', {
     analytics_storage: 'denied',
     ad_storage: 'denied',
     ad_user_data: 'denied',
     ad_personalization: 'denied',
   });
-  window.gtag('js', new Date());
-  window.gtag('consent', 'update', {
+  gtag('js', new Date());
+  gtag('consent', 'update', {
     analytics_storage: 'granted',
     ad_storage: 'denied',
     ad_user_data: 'denied',
     ad_personalization: 'denied',
   });
-  window.gtag('config', normalizedMeasurementId, {
+  gtag('config', normalizedMeasurementId, {
     send_page_view: false,
     allow_google_signals: false,
     allow_ad_personalization_signals: false,
@@ -238,7 +253,7 @@ export function initializeGoogleAnalytics(measurementId: string) {
   const queuedEvents = window.__locallyGoogleAnalyticsQueue || [];
   window.__locallyGoogleAnalyticsQueue = [];
   for (const event of queuedEvents) {
-    window.gtag('event', event.name, event.params);
+    gtag('event', event.name, event.params);
     if (event.dedupeStorageKey) {
       getLocalStorage()?.setItem(event.dedupeStorageKey, '1');
     }
