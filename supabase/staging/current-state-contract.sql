@@ -25,7 +25,8 @@ BEGIN
     '20260916111416:review_tour_end_db_foundation',
     '20260916134243:review_direct_write_lockdown',
     '20260918000000:proxy_card_intake_atomic',
-    '20260922081710:experience_payment_claim_and_pending_cleanup'
+    '20260922081710:experience_payment_claim_and_pending_cleanup',
+    '20260922125140:close_refunded_phone_proxy_requests'
   ]::text[];
   IF actual IS DISTINCT FROM expected THEN
     RAISE EXCEPTION 'migration ledger mismatch: %', actual;

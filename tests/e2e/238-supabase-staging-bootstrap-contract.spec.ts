@@ -44,6 +44,7 @@ test.describe('Supabase staging bootstrap contract', () => {
       '20260916134243',
       '20260918000000',
       '20260922081710',
+      '20260922125140',
     ]);
     expect(manifest.freshProjectApplyOrder).toEqual([
       'supabase/migrations/20260912034545_production_schema_baseline.sql',
@@ -57,14 +58,7 @@ test.describe('Supabase staging bootstrap contract', () => {
       'supabase/migrations/20260922081710_experience_payment_claim_and_pending_cleanup.sql',
       'supabase/migrations/20260922125140_close_refunded_phone_proxy_requests.sql',
     ]);
-    expect(manifest.pendingProductionMigrations).toEqual([
-      {
-        version: '20260922125140',
-        name: 'close_refunded_phone_proxy_requests',
-        repositoryFile: 'supabase/migrations/20260922125140_close_refunded_phone_proxy_requests.sql',
-        productionApplied: false,
-      },
-    ]);
+    expect(manifest.pendingProductionMigrations).toEqual([]);
     expect(packageJson.scripts['supabase:staging:baseline:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:current:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:contract']).toBeTruthy();
