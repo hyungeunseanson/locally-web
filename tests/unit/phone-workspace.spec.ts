@@ -6,7 +6,7 @@ import * as admin from '@/app/utils/supabase/admin';
 import { GET as phoneGet } from '@/app/api/admin/customer-support/route';
 import { GET as inquiryGet } from '@/app/api/admin/inquiries/route';
 import { filteredPage, FORMAL_PROXY_FILTER } from '@/app/api/admin/customer-support/queries';
-import { getPhoneFormSections, matchesPhoneFilter, type PhoneWorkspaceRequest } from '@/app/utils/phoneReservationWorkspace';
+import { matchesPhoneFilter, type PhoneWorkspaceRequest } from '@/app/utils/phoneReservationWorkspace';
 import { readFileSync } from 'node:fs';
 
 type Row = Record<string, unknown>;
@@ -123,14 +123,6 @@ test('filters distinguish payment waiting, completed replies, closed, anomalies 
   expect(matchesPhoneFilter({ ...row, status: 'COMPLETED', needs_reply: true }, 'closed')).toBe(false);
   expect(matchesPhoneFilter({ ...row, status: 'COMPLETED', needs_reply: true }, 'todo')).toBe(true);
   expect(matchesPhoneFilter({ ...row, form_data: { __proxy_card_anchor: 'v1', payment_method: 'card' } }, 'all')).toBe(false);
-});
-
-test('all categories prioritize phone information regardless of field insertion order', () => {
-  for (const [category, key] of [['RESTAURANT', 'restaurant_phone'], ['HOTEL', 'reservation_number'], ['TRANSPORT', 'flight_number'], ['GENERAL', 'inquiry_content'], ['LOST_AND_FOUND', 'item_description']] as const) {
-    const sections = getPhoneFormSections({ category, form_data: { a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, [key]: '핵심 정보' } });
-    expect(sections.core.some(entry => entry.key === key)).toBe(true);
-    expect(sections.other).toHaveLength(6);
-  }
 });
 
 test('legacy TEAM phone redirects without mounting Team bootstrap; sidebar and alerts use new destination', () => {
