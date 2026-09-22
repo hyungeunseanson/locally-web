@@ -104,6 +104,12 @@
     "rawDefault": "false",
     "cron": "23 */2 * * *"
   },
+  "cancelPendingBookingsReleasePolicy": {
+    "defaultProductionProfile": "off",
+    "scheduledEnabledVariable": "CANCEL_PENDING_BOOKINGS_SCHEDULED_ENABLED",
+    "rawDefault": "false",
+    "cron": "7,37 * * * *"
+  },
   "publicExperienceMediaProducerPolicy": {
     "enabledVariable": "PUBLIC_EXPERIENCE_MEDIA_PRODUCER_ENABLED",
     "experienceIdsVariable": "PUBLIC_EXPERIENCE_MEDIA_PRODUCER_EXPERIENCE_IDS",
@@ -258,7 +264,8 @@
       "ADMIN_SUPPORT_UNREAD_ALERTS_SCHEDULED_ENABLED",
       "NOTIFICATION_RETENTION_CLEANUP_SCHEDULED_ENABLED",
       "EXPERIENCE_COMPLETION_SCHEDULED_ENABLED",
-      "SERVICE_COMPLETION_SCHEDULED_ENABLED"
+    "SERVICE_COMPLETION_SCHEDULED_ENABLED",
+    "CANCEL_PENDING_BOOKINGS_SCHEDULED_ENABLED"
     ],
     "canarySafetyVariables": [
       "CLOUDFLARE_FUNCTIONAL_CANARY_ENABLED",

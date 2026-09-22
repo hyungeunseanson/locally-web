@@ -168,6 +168,7 @@ assert.deepEqual(wrangler.env.production.triggers, {
     manifest.adminSupportUnreadReleasePolicy.cron,
     manifest.notificationRetentionReleasePolicy.cron,
     manifest.experienceCompletionReleasePolicy.cron,
+    manifest.cancelPendingBookingsReleasePolicy.cron,
   ],
 });
 assert.equal(wrangler.env.production.vars.EXPERIENCE_TRANSLATION_QUEUE_ENABLED, 'false');
@@ -177,6 +178,7 @@ assert.equal(wrangler.env.production.vars.ADMIN_SUPPORT_UNREAD_ALERTS_SCHEDULED_
 assert.equal(wrangler.env.production.vars.NOTIFICATION_RETENTION_CLEANUP_SCHEDULED_ENABLED, 'false');
 assert.equal(wrangler.env.production.vars.EXPERIENCE_COMPLETION_SCHEDULED_ENABLED, 'false');
 assert.equal(wrangler.env.production.vars.SERVICE_COMPLETION_SCHEDULED_ENABLED, 'false');
+assert.equal(wrangler.env.production.vars.CANCEL_PENDING_BOOKINGS_SCHEDULED_ENABLED, 'false');
 assert.deepEqual(manifest.homePopularityReleasePolicy, {
   defaultProductionProfile: 'on',
   scheduledEnabledVariable: 'HOME_POPULARITY_SNAPSHOT_SCHEDULED_ENABLED',
@@ -206,6 +208,12 @@ assert.deepEqual(manifest.serviceCompletionReleasePolicy, {
   scheduledEnabledVariable: 'SERVICE_COMPLETION_SCHEDULED_ENABLED',
   rawDefault: 'false',
   cron: '23 */2 * * *',
+});
+assert.deepEqual(manifest.cancelPendingBookingsReleasePolicy, {
+  defaultProductionProfile: 'off',
+  scheduledEnabledVariable: 'CANCEL_PENDING_BOOKINGS_SCHEDULED_ENABLED',
+  rawDefault: 'false',
+  cron: '7,37 * * * *',
 });
 assert.equal(
   manifest.serviceCompletionReleasePolicy.cron,

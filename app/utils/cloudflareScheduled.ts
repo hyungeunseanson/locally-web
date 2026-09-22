@@ -4,7 +4,8 @@ export type LocallyScheduledTaskName =
   | 'admin_support_unread_alerts'
   | 'notification_retention_cleanup'
   | 'experience_completion_sync'
-  | 'service_completion_sync';
+  | 'service_completion_sync'
+  | 'cancel_pending_bookings';
 
 type ScheduledControllerLike = { cron: string };
 type ScheduledHandler<Environment> = (
@@ -17,12 +18,14 @@ type ScheduledOptions<Environment> = {
   adminSupportCron: string;
   notificationRetentionCron: string;
   experienceCompletionCron: string;
+  cancelPendingCron?: string;
   runTranslationRecovery: ScheduledHandler<Environment>;
   runHomePopularitySnapshot: ScheduledHandler<Environment>;
   runAdminSupportUnreadAlerts: ScheduledHandler<Environment>;
   runNotificationRetentionCleanup: ScheduledHandler<Environment>;
   runExperienceCompletionSync: ScheduledHandler<Environment>;
   runServiceCompletionSync: ScheduledHandler<Environment>;
+  runCancelPendingBookings?: ScheduledHandler<Environment>;
   delegate?: ScheduledHandler<Environment>;
   log?: (entry: Record<string, unknown>) => void;
 };
@@ -47,7 +50,8 @@ export async function handleLocallyScheduledEvent<Environment>(
     controller.cron !== options.dailyCron &&
     controller.cron !== options.adminSupportCron &&
     controller.cron !== options.notificationRetentionCron &&
-    controller.cron !== options.experienceCompletionCron
+    controller.cron !== options.experienceCompletionCron &&
+    controller.cron !== options.cancelPendingCron
   ) {
     if (options.delegate) return options.delegate(controller, environment);
     throw new Error('locally_unexpected_scheduled_trigger');
@@ -74,6 +78,11 @@ export async function handleLocallyScheduledEvent<Environment>(
     {
       name: 'notification_retention_cleanup',
       run: options.runNotificationRetentionCleanup,
+    },
+  ] : controller.cron === options.cancelPendingCron ? [
+    {
+      name: 'cancel_pending_bookings',
+      run: options.runCancelPendingBookings!,
     },
   ] : [
     {

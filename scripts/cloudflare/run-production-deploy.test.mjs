@@ -11,6 +11,7 @@ import {
   main,
   parseDeploymentArguments,
   resolveAllowedPlannedChanges,
+  resolveAllowedPlannedCronAdditions,
 } from './run-production-deploy.mjs';
 import { readTranslationReleasePolicy, resolveTranslationReleaseProfile } from './experience-translation-release-profile.mjs';
 import { readHomePopularityReleasePolicy, resolveHomePopularityReleaseProfile } from './home-popularity-release-profile.mjs';
@@ -18,6 +19,7 @@ import { readAdminSupportUnreadReleasePolicy, resolveAdminSupportUnreadReleasePr
 import { readNotificationRetentionReleasePolicy, resolveNotificationRetentionReleaseProfile } from './notification-retention-release-profile.mjs';
 import { readExperienceCompletionReleasePolicy, resolveExperienceCompletionReleaseProfile } from './experience-completion-release-profile.mjs';
 import { readServiceCompletionReleasePolicy, resolveServiceCompletionReleaseProfile } from './service-completion-release-profile.mjs';
+import { readCancelPendingBookingsReleasePolicy, resolveCancelPendingBookingsReleaseProfile } from './cancel-pending-bookings-release-profile.mjs';
 import { readExperienceMediaSourceReleasePolicy, resolveExperienceMediaSourceReleaseProfile } from './experience-media-source-release-profile.mjs';
 
 async function homeProfile(name = 'off') {
@@ -51,6 +53,13 @@ async function experienceCompletionProfile(name = 'off') {
 async function serviceCompletionProfile(name = 'off') {
   return resolveServiceCompletionReleaseProfile(
     await readServiceCompletionReleasePolicy(),
+    name
+  );
+}
+
+async function cancelPendingBookingsProfile(name = 'off') {
+  return resolveCancelPendingBookingsReleaseProfile(
+    await readCancelPendingBookingsReleasePolicy(),
     name
   );
 }
@@ -399,6 +408,77 @@ test('Service completion defaults OFF and passes an independent ON/OFF deploymen
     requestedServiceCompletionProfile: 'on',
     dryRun: true,
   });
+});
+
+test('Cancel Pending Bookings defaults OFF and requires an explicit one-time Cron addition allowance', async () => {
+  const media = resolveReleaseProfile(await readReleasePolicy());
+  const translation = resolveTranslationReleaseProfile(await readTranslationReleasePolicy());
+  const home = await homeProfile('on');
+  const adminSupport = await adminSupportProfile('on');
+  const retention = await retentionProfile('on');
+  const experience = await experienceCompletionProfile('on');
+  const service = await serviceCompletionProfile('on');
+  const source = resolveExperienceMediaSourceReleaseProfile(
+    await readExperienceMediaSourceReleasePolicy(),
+    'on'
+  );
+  const policy = await readCancelPendingBookingsReleasePolicy();
+  assert.equal(resolveCancelPendingBookingsReleaseProfile(policy).name, 'off');
+
+  for (const name of ['off', 'on']) {
+    const cancelPending = await cancelPendingBookingsProfile(name);
+    const contract = buildDeploymentContract(
+      media,
+      translation,
+      home,
+      adminSupport,
+      retention,
+      {},
+      experience,
+      source,
+      service,
+      cancelPending
+    );
+    assert(contract.wranglerArguments.includes(
+      `CANCEL_PENDING_BOOKINGS_SCHEDULED_ENABLED:${cancelPending.scheduledEnabled}`
+    ));
+  }
+
+  const options = parseDeploymentArguments([
+    '--cancel-pending-profile=off',
+    '--allow-cancel-pending-cron-addition',
+  ]);
+  assert.equal(options.requestedCancelPendingBookingsProfile, 'off');
+  assert.deepEqual(resolveAllowedPlannedChanges(options), [
+    'CANCEL_PENDING_BOOKINGS_SCHEDULED_ENABLED',
+  ]);
+  assert.deepEqual(resolveAllowedPlannedCronAdditions(options), ['7,37 * * * *']);
+  assert.deepEqual(resolveAllowedPlannedCronAdditions(parseDeploymentArguments([])), []);
+});
+
+test('passes the Cancel Pending profile and planned Cron addition to semantic preflight', async () => {
+  let preflightOptions;
+  await main([
+    '--service-completion-profile=on',
+    '--cancel-pending-profile=off',
+    '--allow-cancel-pending-cron-addition',
+  ], {
+    runCommand: () => {},
+    runSemanticPreflight: async (options) => {
+      preflightOptions = options;
+    },
+    runBrowserSmoke: async () => {},
+    log: () => {},
+  });
+
+  assert.equal(
+    preflightOptions.expectedVariables.CANCEL_PENDING_BOOKINGS_SCHEDULED_ENABLED,
+    'false'
+  );
+  assert.deepEqual(preflightOptions.allowedPlannedCronAdditions, ['7,37 * * * *']);
+  assert(preflightOptions.allowedPlannedChanges.includes(
+    'CANCEL_PENDING_BOOKINGS_SCHEDULED_ENABLED'
+  ));
 });
 
 test('runs read-only Production browser smoke only after a successful real deploy', async () => {
