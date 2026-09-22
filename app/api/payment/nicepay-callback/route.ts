@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 
 import { finalizeExperienceCardPayment } from '@/app/api/payment/experienceCardConfirmation';
-import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 import { EXPLICIT_CARD_CHECKOUT_CANCEL_REASON } from '@/app/utils/bookings/pendingBookingHolds';
 import { getCurrentCardPaymentProvider, verifyApprovedCardPayment } from '@/app/utils/payments/card/server';
 import { captureServerException } from '@/app/utils/monitoring/sentry';
@@ -88,17 +87,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
     }
 
-    if (BOOKING_ACTIVE_STATUS_FOR_CAPACITY.includes(originalBooking.status)) {
-      return NextResponse.json({ success: true, message: 'Already processed' });
-    }
-
     const isExplicitReleasedCardHold =
       String(originalBooking.status || '').toLowerCase() === 'cancelled' &&
       !originalBooking.tid &&
       originalBooking.cancel_reason === EXPLICIT_CARD_CHECKOUT_CANCEL_REASON;
+    const isPaidLike = ['paid', 'confirmed', 'completed'].includes(
+      String(originalBooking.status || '').toLowerCase()
+    );
 
     if (
       String(originalBooking.status || '').toUpperCase() !== 'PENDING' &&
+      !isPaidLike &&
       !isExplicitReleasedCardHold
     ) {
       return NextResponse.json(
@@ -120,8 +119,12 @@ export async function POST(request: Request) {
 
     let verificationResult;
     try {
+      const storedProvider = String(originalBooking.payment_provider || '').toLowerCase();
+      const provider = storedProvider === 'nicepay' || storedProvider === 'portone'
+        ? storedProvider
+        : getCurrentCardPaymentProvider();
       verificationResult = await verifyApprovedCardPayment({
-        provider: getCurrentCardPaymentProvider(),
+        provider,
         approvalId: impUid,
         orderId: expectedOrderId,
         expectedAmount,

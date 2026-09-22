@@ -5,6 +5,7 @@ import {
   getCardPaymentReadiness,
   getCurrentCardPaymentProvider,
 } from '@/app/utils/payments/card/server';
+import { resolveExperienceCardLaunch } from '@/app/utils/payments/card/experienceLaunch';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import {
@@ -196,22 +197,22 @@ export async function POST(request: Request) {
   let launchBuyerTel = String(body.buyerTel || '');
   let launchBuyerEmail = String(body.buyerEmail || '');
 
+  const outcome = (message: string) => new NextResponse(
+    renderNicePayOutcomePage({ origin, message }),
+    {
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store',
+      },
+    }
+  );
+
   if (launchOrderId.startsWith('LOCALLY-PROXY-')) {
     const supabaseServer = await createServerClient();
     const {
       data: { user },
       error: authError,
     } = await supabaseServer.auth.getUser();
-
-    const outcome = (message: string) => new NextResponse(
-      renderNicePayOutcomePage({ origin, message }),
-      {
-        headers: {
-          'Content-Type': 'text/html; charset=utf-8',
-          'Cache-Control': 'no-store',
-        },
-      }
-    );
 
     if (authError || !user) {
       return outcome('로그인 세션을 확인할 수 없습니다. 다시 시도해주세요.');
@@ -259,6 +260,27 @@ export async function POST(request: Request) {
       ? storedFormData.contact_phone
       : launchBuyerTel;
     launchBuyerEmail = user.email || launchBuyerEmail;
+  } else if (!launchOrderId.startsWith('SVC-')) {
+    const launch = await resolveExperienceCardLaunch({
+      supabaseServer: await createServerClient(),
+      supabaseAdmin: createAdminClient(),
+      requestedOrderId: launchOrderId,
+      provider,
+    });
+
+    if (!launch.ok) {
+      const message = launch.code === 'authentication_required'
+        ? '로그인 세션을 확인할 수 없습니다. 다시 시도해주세요.'
+        : '안전한 카드 결제 요청을 확인할 수 없습니다. 다시 시도해주세요.';
+      return outcome(message);
+    }
+
+    launchOrderId = launch.orderId;
+    launchProductName = launch.productName;
+    launchAmount = launch.amount;
+    launchBuyerName = launch.buyerName;
+    launchBuyerTel = launch.buyerTel;
+    launchBuyerEmail = launch.buyerEmail;
   }
 
   const readiness = getCardPaymentReadiness();

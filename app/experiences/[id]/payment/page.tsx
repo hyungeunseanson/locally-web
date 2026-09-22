@@ -83,6 +83,12 @@ type BookingErrorCode =
 type ExperienceCardReadyReason = CardPaymentReadiness['reason'];
 type ExperienceCardReadyResponse = CardPaymentReadiness;
 
+type ExperienceCardClaimResponse = {
+  success?: boolean;
+  provider?: CardPaymentProvider;
+  error?: string;
+};
+
 type PayPalCreateOrderResponse = {
   success?: boolean;
   paypalOrderId?: string;
@@ -504,6 +510,7 @@ function PaymentContent() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Refresh resolves asynchronously and updates the slot snapshot.
     void refreshSlotSummary();
   }, [refreshSlotSummary]);
 
@@ -546,6 +553,7 @@ function PaymentContent() {
 
   useEffect(() => {
     if (!isPayPalEnabled && paymentMethod === 'paypal') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Provider availability invalidates the selected method.
       setPaymentMethod(isCardReadyResolved && !isCardReady ? 'bank' : 'card');
       return;
     }
@@ -563,6 +571,7 @@ function PaymentContent() {
   useEffect(() => {
     if (paymentMethod !== 'paypal') {
       paypalSessionRef.current = null;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Reset stale provider errors when checkout inputs change.
       setPaymentError('');
     }
   }, [date, effectiveIsSoloGuarantee, experienceId, guests, isPrivate, paymentMethod, time]);
@@ -840,6 +849,7 @@ function PaymentContent() {
 
   useEffect(() => {
     if (!isPayPalSdkReady) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- SDK teardown must clear rendered-button readiness.
       setIsPayPalButtonsReady(false);
       return;
     }
@@ -1061,6 +1071,25 @@ function PaymentContent() {
       }
 
       try {
+        const claimResponse = await fetch('/api/payment/card-claim', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId: newOrderId }),
+        });
+        const claimResult = (await claimResponse.json()) as ExperienceCardClaimResponse;
+
+        if (
+          !claimResponse.ok ||
+          !claimResult.success ||
+          claimResult.provider !== cardProvider
+        ) {
+          const message = claimResult.error || (t('exp_payment_card_process_error') as string);
+          setPaymentError(message);
+          showToast(message, 'error');
+          setIsProcessing(false);
+          return;
+        }
+
         const paymentSession = await launchCardPayment({
           provider: cardProvider,
           merchantCode: cardRuntime.merchantCode,

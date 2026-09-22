@@ -114,6 +114,14 @@ const expectedLedger = [
     repositoryFile: 'supabase/migrations/20260918000000_proxy_card_intake_atomic.sql',
   },
 ];
+const expectedPendingMigrations = [
+  {
+    version: '20260922081710',
+    name: 'experience_payment_claim_and_pending_cleanup',
+    repositoryFile: 'supabase/migrations/20260922081710_experience_payment_claim_and_pending_cleanup.sql',
+    productionApplied: false,
+  },
+];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));
 for (const [index, expected] of expectedLedger.entries()) {
   const actual = manifest.migrationLedger[index];
@@ -128,7 +136,16 @@ for (const [index, expected] of expectedLedger.entries()) {
 const migrationFiles = (await readdir(resolve(root, 'supabase/migrations')))
   .filter((name) => name.endsWith('.sql'))
   .sort();
-exact('repository migration files', migrationFiles, expectedLedger.map(({ repositoryFile }) => repositoryFile.split('/').at(-1)));
+exact(
+  'repository migration files',
+  migrationFiles,
+  [...expectedLedger, ...expectedPendingMigrations]
+    .map(({ repositoryFile }) => repositoryFile.split('/').at(-1))
+);
+assert(
+  JSON.stringify(required.pendingProductionMigrations) === JSON.stringify(expectedPendingMigrations),
+  'pending Production migration contract differs'
+);
 
 const objects = manifest.objects;
 for (const [name, fingerprint] of Object.entries(expectedFingerprints)) {

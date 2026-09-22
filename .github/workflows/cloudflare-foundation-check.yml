@@ -86,6 +86,9 @@ jobs:
       - name: Validate Supabase P0 Storage and RPC hardening
         run: npm run supabase:p0-security:contract
 
+      - name: Validate experience payment claim and pending cleanup safety
+        run: npm run supabase:experience-payment-claim:contract
+
       - name: Validate read-only public experience media audit boundaries
         run: npm run cloudflare:experience-media:audit:test
 

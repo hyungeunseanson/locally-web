@@ -7,7 +7,10 @@ import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { getHostBookingMessageHref } from '@/app/utils/hostBookingMessageLink';
 import { notifyMembershipMilestone } from '@/app/utils/memberMilestoneNotifications';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
-import { isPendingBookingStatus } from '@/app/constants/bookingStatus';
+import {
+  confirmExperienceBankPaymentAtomic,
+  ExperiencePaymentContractError,
+} from '@/app/utils/bookings/experiencePaymentClaims';
 
 type BookingExperienceMetaRow = {
   title: string | null;
@@ -25,6 +28,7 @@ type ConfirmExperienceBankPaymentBookingRow = {
   price_at_booking: number | null;
   host_payout_amount?: number | null;
   platform_revenue?: number | null;
+  payout_status?: string | null;
   refund_amount?: number | null;
   solo_guarantee_price: number | null;
   solo_guarantee_refund_amount?: number | null;
@@ -49,7 +53,7 @@ type ConfirmExperienceBankPaymentSnapshot = ReturnType<typeof getBookingSettleme
 
 type ConfirmExperienceBankPaymentFailure = {
   success: false;
-  status: 400 | 404 | 409;
+  status: 400 | 403 | 404 | 409;
   error: string;
 };
 
@@ -114,6 +118,29 @@ export async function confirmExperienceBankPayment(
   }
 
   const normalizedBookingId = bookingId.trim();
+  let outcome: 'confirmed_now' | 'already_processed';
+
+  try {
+    outcome = await confirmExperienceBankPaymentAtomic({
+      supabaseAdmin,
+      bookingId: normalizedBookingId,
+    });
+  } catch (error) {
+    if (error instanceof ExperiencePaymentContractError && error.status !== 500) {
+      const message = error.diagnosticCode === 'BANK_CONFIRM_METHOD_CONFLICT'
+        ? '무통장 예약만 입금 확인할 수 있습니다.'
+        : error.diagnosticCode === 'BANK_CONFIRM_NOT_FOUND'
+          ? '예약 정보를 찾을 수 없습니다.'
+          : '현재 상태에서는 입금 확인할 수 없습니다.';
+      return {
+        success: false,
+        status: error.status,
+        error: message,
+      };
+    }
+    throw error;
+  }
+
   const { data: bookingRaw, error: bookingError } = await supabaseAdmin
     .from('bookings')
     .select(`
@@ -125,6 +152,9 @@ export async function confirmExperienceBankPayment(
       total_price,
       total_experience_price,
       price_at_booking,
+      host_payout_amount,
+      platform_revenue,
+      payout_status,
       refund_amount,
       solo_guarantee_price,
       solo_guarantee_refund_amount,
@@ -145,7 +175,7 @@ export async function confirmExperienceBankPayment(
     return { success: false, status: 404, error: '예약 정보를 찾을 수 없습니다.' };
   }
 
-  if (!isPendingBookingStatus(booking.status)) {
+  if (String(booking.status || '').toLowerCase() !== 'confirmed') {
     return {
       success: false,
       status: 409,
@@ -168,25 +198,6 @@ export async function confirmExperienceBankPayment(
   });
   const guestDisplayName = await resolveGuestDisplayName(supabaseAdmin, booking);
 
-  const { data: updatedRow, error: updateError } = await supabaseAdmin
-    .from('bookings')
-    .update({
-      status: 'confirmed',
-      price_at_booking: snapshot.basePrice,
-      total_experience_price: snapshot.totalExperiencePrice,
-      host_payout_amount: snapshot.hostPayout,
-      platform_revenue: snapshot.platformRevenue,
-      payout_status: 'pending',
-    })
-    .eq('id', normalizedBookingId)
-    .eq('status', booking.status)
-    .select('id')
-    .maybeSingle();
-
-  if (updateError) {
-    throw new Error(updateError.message);
-  }
-
   const confirmedBooking: ConfirmedExperienceBankPaymentBooking = {
     ...booking,
     status: 'confirmed',
@@ -200,7 +211,7 @@ export async function confirmExperienceBankPayment(
 
   return {
     success: true,
-    alreadyProcessed: !updatedRow,
+    alreadyProcessed: outcome === 'already_processed',
     booking: confirmedBooking,
     experience,
     guestDisplayName,

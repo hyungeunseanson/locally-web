@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     const supabaseAdmin = createAdminClient();
     const { data: booking, error: bookingError } = await supabaseAdmin
       .from('bookings')
-      .select('id, user_id, status, payment_method, tid, cancel_reason')
+      .select('id, order_id, user_id, status, payment_method, tid, cancel_reason, payment_claim_state, payment_provider, payment_provider_reference')
       .eq('order_id', orderId)
       .maybeSingle();
 
@@ -39,6 +39,7 @@ export async function POST(request: Request) {
 
     if (
       String(booking.status || '').toLowerCase() === 'cancelled' &&
+      booking.payment_claim_state === 'released' &&
       booking.cancel_reason === EXPLICIT_CARD_CHECKOUT_CANCEL_REASON
     ) {
       return NextResponse.json({ success: true, alreadyReleased: true });
@@ -58,17 +59,34 @@ export async function POST(request: Request) {
       );
     }
 
+    if (
+      booking.payment_claim_state !== 'processing' ||
+      !['nicepay', 'portone'].includes(String(booking.payment_provider || '')) ||
+      booking.payment_provider_reference !== (booking.order_id || booking.id)
+    ) {
+      return NextResponse.json(
+        { success: false, error: '활성 카드 결제 시도만 해제할 수 있습니다.' },
+        { status: 409 }
+      );
+    }
+
     const { data: releasedBooking, error: releaseError } = await supabaseAdmin
       .from('bookings')
       .update({
         status: 'cancelled',
         cancel_reason: EXPLICIT_CARD_CHECKOUT_CANCEL_REASON,
         refund_amount: 0,
+        payment_claim_state: 'released',
+        payment_claim_expires_at: null,
+        payment_claim_token: null,
       })
       .eq('id', booking.id)
       .eq('user_id', user.id)
       .eq('status', 'PENDING')
       .eq('payment_method', 'card')
+      .eq('payment_claim_state', 'processing')
+      .eq('payment_provider', booking.payment_provider)
+      .eq('payment_provider_reference', booking.order_id || booking.id)
       .is('tid', null)
       .select('id')
       .maybeSingle();
@@ -80,7 +98,7 @@ export async function POST(request: Request) {
 
     const { data: latestBooking, error: latestError } = await supabaseAdmin
       .from('bookings')
-      .select('status, tid, cancel_reason')
+      .select('status, tid, cancel_reason, payment_claim_state')
       .eq('id', booking.id)
       .maybeSingle();
 
@@ -88,6 +106,7 @@ export async function POST(request: Request) {
     if (
       String(latestBooking?.status || '').toLowerCase() === 'cancelled' &&
       !latestBooking?.tid &&
+      latestBooking?.payment_claim_state === 'released' &&
       latestBooking?.cancel_reason === EXPLICIT_CARD_CHECKOUT_CANCEL_REASON
     ) {
       return NextResponse.json({ success: true, alreadyReleased: true });

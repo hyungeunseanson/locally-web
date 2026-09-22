@@ -1,14 +1,17 @@
 import { NextResponse } from 'next/server';
-import { revalidatePath } from 'next/cache';
 
-import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
-import { createClient as createServerClient } from '@/app/utils/supabase/server';
-import { createAdminClient } from '@/app/utils/supabase/admin';
-import { insertAdminAlerts, sendAdminPaymentConfirmedEmail } from '@/app/utils/adminAlertCenter';
-import { getBookingSettlementSnapshotForConfirmation } from '@/app/utils/bookingFinance';
-import { notifyExperiencePaymentConfirmed } from '@/app/utils/experienceNotificationFlows';
-import { capturePayPalOrder, getPayPalOrder } from '@/app/utils/paypal/server';
+import {
+  confirmExperiencePayment,
+  runExperiencePaymentConfirmationSideEffects,
+} from '@/app/utils/bookings/confirmExperiencePayment';
+import {
+  beginExperiencePaymentCaptureAtomic,
+  ExperiencePaymentContractError,
+} from '@/app/utils/bookings/experiencePaymentClaims';
 import { captureServerException } from '@/app/utils/monitoring/sentry';
+import { capturePayPalOrder, getPayPalOrder } from '@/app/utils/paypal/server';
+import { createAdminClient } from '@/app/utils/supabase/admin';
+import { createClient as createServerClient } from '@/app/utils/supabase/server';
 
 type CaptureOrderBody = {
   bookingId?: string;
@@ -33,9 +36,8 @@ export async function POST(request: Request) {
     }
 
     const body = (await request.json()) as CaptureOrderBody;
-    const bookingId = (body.bookingId || '').trim();
-    const paypalOrderId = (body.paypalOrderId || '').trim();
-
+    const bookingId = String(body.bookingId || '').trim();
+    const paypalOrderId = String(body.paypalOrderId || '').trim();
     if (!bookingId || !paypalOrderId) {
       return NextResponse.json(
         { success: false, error: 'Missing bookingId or paypalOrderId' },
@@ -44,191 +46,124 @@ export async function POST(request: Request) {
     }
 
     const supabaseAdmin = createAdminClient();
-    const { data: originalBooking, error: bookingError } = await supabaseAdmin
+    const { data: booking, error: bookingError } = await supabaseAdmin
       .from('bookings')
-      .select('*, experiences (price, private_price, max_guests, host_id, title)')
+      .select('id, order_id, user_id, amount, status, payment_method')
       .eq('id', bookingId)
       .maybeSingle();
-
-    if (bookingError || !originalBooking) {
-      return NextResponse.json({ success: false, error: '예약 정보를 찾을 수 없습니다.' }, { status: 404 });
+    if (bookingError || !booking) {
+      throw new ExperiencePaymentContractError(404, 'PAYMENT_CAPTURE_BOOKING_LOOKUP_FAILED');
     }
-
-    if (originalBooking.user_id !== user.id) {
+    if (booking.user_id !== user.id) {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
     }
-
-    if (BOOKING_ACTIVE_STATUS_FOR_CAPACITY.includes(originalBooking.status)) {
-      return NextResponse.json({ success: true, message: 'Already processed' });
-    }
-
-    if (String(originalBooking.status || '').toUpperCase() !== 'PENDING') {
+    const bookingStatus = String(booking.status || '').toLowerCase();
+    if (!['pending', 'paid', 'confirmed', 'completed'].includes(bookingStatus)) {
       return NextResponse.json(
-        { success: false, error: `현재 상태(${originalBooking.status})에서는 PayPal 결제를 확정할 수 없습니다.` },
+        { success: false, error: `현재 상태(${booking.status})에서는 PayPal 결제를 확정할 수 없습니다.` },
+        { status: 409 }
+      );
+    }
+    const paymentMethod = String(booking.payment_method || '').toLowerCase();
+    if (paymentMethod === 'bank') {
+      return NextResponse.json(
+        { success: false, error: '무통장 입금 대기 예약에는 PayPal 결제를 확정할 수 없습니다.' },
+        { status: 409 }
+      );
+    }
+    if (paymentMethod && paymentMethod !== 'paypal') {
+      return NextResponse.json(
+        { success: false, error: 'PayPal 결제 대기 예약만 PayPal 결제를 확정할 수 있습니다.' },
         { status: 409 }
       );
     }
 
-    const normalizedPaymentMethod = String(originalBooking.payment_method || '').toLowerCase();
-    if (normalizedPaymentMethod && normalizedPaymentMethod !== 'paypal') {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            normalizedPaymentMethod === 'bank'
-              ? '무통장 입금 대기 예약에는 PayPal 결제를 확정할 수 없습니다.'
-              : 'PayPal 결제 대기 예약만 PayPal 결제를 확정할 수 있습니다.',
-        },
-        { status: 409 }
-      );
-    }
+    const captureClaim = await beginExperiencePaymentCaptureAtomic({
+      supabaseAdmin,
+      bookingId,
+      userId: user.id,
+      providerReference: paypalOrderId,
+    });
 
-    const expectedOrderId = originalBooking.order_id || originalBooking.id;
-    const expectedAmount = Number(originalBooking.amount || 0);
-    const experienceMeta = Array.isArray(originalBooking.experiences)
-      ? originalBooking.experiences[0]
-      : originalBooking.experiences;
-
+    const expectedOrderId = booking.order_id || booking.id;
+    const expectedAmount = Number(booking.amount || 0);
     const paypalOrder = await getPayPalOrder(paypalOrderId);
     const purchaseUnit = paypalOrder.purchase_units?.[0];
     const unitOrderId = purchaseUnit?.custom_id || purchaseUnit?.reference_id || '';
     const orderAmount = parsePayPalAmount(purchaseUnit?.amount?.value);
 
-    if (unitOrderId !== expectedOrderId) {
-      return NextResponse.json({ success: false, error: 'PayPal 주문 참조가 일치하지 않습니다.' }, { status: 400 });
-    }
-
-    if (orderAmount !== expectedAmount) {
-      return NextResponse.json({ success: false, error: 'PayPal 주문 금액이 일치하지 않습니다.' }, { status: 400 });
-    }
-
-    const captured =
-      paypalOrder.status === 'COMPLETED'
-        ? {
-            orderId: paypalOrder.id,
-            status: paypalOrder.status,
-            captureId: purchaseUnit?.payments?.captures?.[0]?.id || null,
-            amount: purchaseUnit?.payments?.captures?.[0]?.amount || null,
-            raw: paypalOrder,
-          }
-        : await capturePayPalOrder(paypalOrderId);
-
-    const capturedAmount = parsePayPalAmount(captured.amount?.value);
-    if (captured.status !== 'COMPLETED' || capturedAmount !== expectedAmount) {
-      return NextResponse.json({ success: false, error: 'PayPal 결제 승인 검증에 실패했습니다.' }, { status: 400 });
-    }
-
-    const { data: existingBookings } = await supabaseAdmin
-      .from('bookings')
-      .select('id, guests, type')
-      .eq('experience_id', originalBooking.experience_id)
-      .eq('date', originalBooking.date)
-      .eq('time', originalBooking.time)
-      .neq('id', bookingId)
-      .in('status', [...BOOKING_ACTIVE_STATUS_FOR_CAPACITY]);
-
-    const currentBookedCount =
-      existingBookings?.reduce((sum, booking) => sum + Number(booking.guests || 0), 0) || 0;
-    const hasPrivateBooking = existingBookings?.some((booking) => booking.type === 'private');
-    const maxGuests = experienceMeta?.max_guests || 10;
-
-    if (
-      hasPrivateBooking ||
-      (originalBooking.type === 'private' && currentBookedCount > 0) ||
-      (originalBooking.type !== 'private' &&
-        currentBookedCount + Number(originalBooking.guests || 0) > maxGuests)
-    ) {
+    if (unitOrderId !== expectedOrderId || orderAmount !== expectedAmount) {
       return NextResponse.json(
-        { success: false, error: '잔여 좌석이 부족하여 예약을 확정할 수 없습니다.' },
+        { success: false, error: 'PayPal 주문 정보가 예약과 일치하지 않습니다.' },
+        { status: 400 }
+      );
+    }
+
+    if (captureClaim.outcome === 'already_processing' && paypalOrder.status !== 'COMPLETED') {
+      return NextResponse.json(
+        { success: false, error: 'PayPal 결제 승인이 이미 처리 중입니다.' },
         { status: 409 }
       );
     }
 
-    const snapshot = getBookingSettlementSnapshotForConfirmation({
-      ...originalBooking,
-      amount: expectedAmount,
-    });
+    const captured = paypalOrder.status === 'COMPLETED'
+      ? {
+          orderId: paypalOrder.id,
+          status: paypalOrder.status,
+          captureId: purchaseUnit?.payments?.captures?.[0]?.id || null,
+          amount: purchaseUnit?.payments?.captures?.[0]?.amount || null,
+        }
+      : await capturePayPalOrder(paypalOrderId);
 
-    const { data: bookingData, error: updateError } = await supabaseAdmin
-      .from('bookings')
-      .update({
-        status: 'PAID',
-        payment_method: 'paypal',
-        tid: captured.captureId,
-        price_at_booking: snapshot.basePrice,
-        total_experience_price: snapshot.totalExperiencePrice,
-        host_payout_amount: snapshot.hostPayout,
-        platform_revenue: snapshot.platformRevenue,
-        payout_status: 'pending',
-      })
-      .eq('id', bookingId)
-      .eq('status', 'PENDING') // [Race Guard] PENDING 상태일 때만 업데이트 — 중복 처리 방지
-      .select('*, experiences (host_id, title)')
-      .maybeSingle();
-
-    if (updateError) {
-      throw new Error(updateError.message || '결제 확정 업데이트에 실패했습니다.');
-    }
-    if (!bookingData) {
-      // 다른 요청이 이미 처리 완료 — 멱등성 응답
-      return NextResponse.json({ success: true, message: 'Already processed' });
+    const capturedAmount = parsePayPalAmount(captured.amount?.value);
+    const captureId = String(captured.captureId || '').trim();
+    if (captured.status !== 'COMPLETED' || capturedAmount !== expectedAmount || !captureId) {
+      return NextResponse.json(
+        { success: false, error: 'PayPal 결제 승인 검증에 실패했습니다.' },
+        { status: 400 }
+      );
     }
 
-    const bookingExperienceMeta = Array.isArray(bookingData.experiences)
-      ? bookingData.experiences[0]
-      : bookingData.experiences;
-    const expTitle = bookingExperienceMeta?.title || 'Locally 체험';
-    const resolvedHostId = bookingExperienceMeta?.host_id;
-    const guestName = bookingData.contact_name || '게스트';
-
-    await notifyExperiencePaymentConfirmed({
+    const confirmation = await confirmExperiencePayment({
       supabaseAdmin,
-      guestId: bookingData.user_id || null,
-      hostId: resolvedHostId || null,
-      experienceId: bookingData.experience_id || originalBooking.experience_id || null,
-      experienceTitle: expTitle,
-      guestName,
-      guestsCount: Number(bookingData.guests || 1),
-      bookingDate: bookingData.date,
-      bookingTime: bookingData.time || null,
-      guestPaidAmount: Number(bookingData.amount || expectedAmount || 0),
-      hostBookingAmount: snapshot.totalExperiencePrice,
+      bookingId,
+      provider: 'paypal',
+      providerReference: paypalOrderId,
+      providerTransactionId: captureId,
+      verifiedAmount: capturedAmount,
     });
 
-    insertAdminAlerts({
-      title: '체험 예약 PayPal 결제가 완료되었습니다',
-      message: `'${expTitle}' 예약 결제가 완료되었습니다. 게스트: ${guestName}`,
-      link: '/admin/dashboard?tab=LEDGER',
-    }).catch((adminAlertError) => {
-      console.error('[PAYPAL] booking admin alert failed:', adminAlertError);
-    });
-
-    try {
-      await sendAdminPaymentConfirmedEmail({
-        domain: 'experience',
-        title: expTitle,
-        orderId: bookingData.order_id || bookingData.id,
-        amount: Number(bookingData.amount || expectedAmount || 0),
+    if (confirmation.outcome === 'confirmed_now') {
+      await runExperiencePaymentConfirmationSideEffects({
+        supabaseAdmin,
+        booking: confirmation.booking,
         paymentMethod: 'paypal',
-        link: '/admin/dashboard?tab=LEDGER',
-        customerName: guestName,
       });
-    } catch (adminEmailError) {
-      console.error('[PAYPAL] booking admin email failed:', adminEmailError);
     }
-
-    revalidatePath(`/experiences/${originalBooking.experience_id}`);
 
     return NextResponse.json({
       success: true,
-      captureId: captured.captureId,
-      bookingId,
+      captureId,
       paypalOrderId: captured.orderId,
+      alreadyProcessed: confirmation.outcome === 'already_processed',
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Internal Server Error';
+    if (error instanceof ExperiencePaymentContractError) {
+      return NextResponse.json(
+        { success: false, error: error.message, code: error.diagnosticCode },
+        { status: error.status }
+      );
+    }
+
     captureServerException(error, { route: '/api/payment/paypal/capture-order', method: 'POST' });
-    console.error('[PAYPAL] capture-order error:', error);
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    console.error(JSON.stringify({
+      event: 'experience_paypal_capture',
+      status: 'failed',
+      diagnosticCode: 'provider_or_internal_error',
+    }));
+    return NextResponse.json(
+      { success: false, error: 'PayPal 결제 처리 중 서버 오류가 발생했습니다.' },
+      { status: 500 }
+    );
   }
 }

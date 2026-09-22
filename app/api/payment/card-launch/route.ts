@@ -1,19 +1,11 @@
 import { NextResponse } from 'next/server';
 
 import {
-  buildNicePayLaunchFields,
-  getCardPaymentReadiness,
   getCurrentCardPaymentProvider,
 } from '@/app/utils/payments/card/server';
 
 type CardLaunchBody = {
   provider?: string;
-  orderId?: string;
-  productName?: string;
-  amount?: number;
-  buyerName?: string;
-  buyerTel?: string;
-  buyerEmail?: string;
 };
 
 export async function POST(request: Request) {
@@ -41,46 +33,11 @@ export async function POST(request: Request) {
     );
   }
 
-  const readiness = getCardPaymentReadiness();
-  if (!readiness.ready || !readiness.runtime) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Card payment is not ready.',
-        provider: readiness.provider,
-        missingConfig: readiness.missingConfig || [],
-      },
-      { status: 503 }
-    );
-  }
-
-  try {
-    const fields = buildNicePayLaunchFields({
-      orderId: String(body.orderId || ''),
-      productName: String(body.productName || ''),
-      amount: Number(body.amount || 0),
-      buyerName: String(body.buyerName || ''),
-      buyerTel: String(body.buyerTel || ''),
-      buyerEmail: String(body.buyerEmail || ''),
-      returnUrl: `${new URL(request.url).origin}/api/payment/nicepay/relay`,
-    });
-
-    return NextResponse.json({
-      success: true,
-      provider,
-      formAction: '/api/payment/nicepay/relay',
-      fields,
-    });
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'NICEPAY 결제 시작 정보 생성에 실패했습니다.';
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: message,
-      },
-      { status: 400 }
-    );
-  }
+  return NextResponse.json(
+    {
+      success: false,
+      error: 'Card launch signing is unavailable. Use the authenticated launch page.',
+    },
+    { status: 410 }
+  );
 }
