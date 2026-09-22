@@ -9,6 +9,7 @@ import {
   initializeGoogleAnalytics,
   isGoogleAnalyticsConsentGranted,
   isGoogleAnalyticsPathAllowed,
+  prepareGoogleAnalyticsQueue,
   sendGoogleAnalyticsEvent,
 } from '@/app/utils/analytics/google';
 
@@ -56,6 +57,7 @@ export default function GoogleAnalyticsGate({
       }
 
       window.__locallyGoogleAnalyticsConsentGranted = granted;
+      if (granted) prepareGoogleAnalyticsQueue();
       setConsentGranted(granted);
     };
 
