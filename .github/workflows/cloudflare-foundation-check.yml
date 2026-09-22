@@ -56,6 +56,9 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
+      - name: Verify Customer Support phone workspace without external services
+        run: npx playwright test -c playwright.phone-workspace.config.ts
+
       - name: Run Auth regression gate
         run: npm run test:e2e:auth-regression
 

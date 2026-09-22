@@ -8,7 +8,7 @@ import UsersTab from './components/UsersTab';
 import SalesTab from './components/SalesTab';
 import AnalyticsTab from './components/AnalyticsTab';
 import ManagementTab from './components/ManagementTab';
-import ChatMonitor from './components/ChatMonitor';
+import CustomerSupportTabs from './components/CustomerSupportTabs';
 import MasterLedgerTab from './components/MasterLedgerTab';
 import TeamTab from './components/TeamTab';
 import ServiceAdminTab from './components/ServiceAdminTab';
@@ -152,12 +152,19 @@ function AdminDashboardContent() {
     getServerStoredAdminTab
   );
   const savedTab = normalizeAdminDashboardTab(storedTab);
-  const activeTab = urlTab || savedTab || 'APPROVALS';
-  const teamTab = searchParams.get('teamTab');
-  const proxyRequestId = searchParams.get('proxyRequestId');
+  const legacyPhone = urlTab === 'TEAM' && searchParams.get('teamTab') === 'proxy';
+  const activeTab = legacyPhone ? 'CHATS' : urlTab || savedTab || 'APPROVALS';
   const experienceId = searchParams.get('experienceId');
 
   useEffect(() => {
+    if (legacyPhone) {
+      const next = new URLSearchParams(searchParams.toString());
+      next.set('tab', 'CHATS');
+      next.set('view', 'phone');
+      next.delete('teamTab');
+      router.replace(`/admin/dashboard?${next}`, { scroll: false });
+      return;
+    }
     if (urlTab && rawUrlTab?.toUpperCase() !== urlTab) {
       const nextParams = new URLSearchParams(searchParams.toString());
       nextParams.set('tab', urlTab);
@@ -171,17 +178,17 @@ function AdminDashboardContent() {
     } else if (savedTab) {
       router.replace(`/admin/dashboard?tab=${savedTab}`);
     }
-  }, [rawUrlTab, router, savedTab, searchParams, urlTab]);
+  }, [legacyPhone, rawUrlTab, router, savedTab, searchParams, urlTab]);
 
   return (
     <div className="bg-white p-2 md:p-6 rounded-lg md:rounded-2xl shadow-sm border border-slate-100 min-h-[80vh] flex flex-col h-full lg:h-auto overflow-hidden lg:overflow-visible">
       <div key={activeTab} className="animate-in fade-in duration-200 flex flex-col flex-1">
       {activeTab === 'TEAM' ? (
-        <TeamTab initialInnerTab={teamTab === 'proxy' ? 'proxy' : undefined} initialProxyRequestId={proxyRequestId} />
+        <TeamTab />
       ) : activeTab === 'ALERTS' ? (
         <AdminAlertsTab />
       ) : activeTab === 'CHATS' ? (
-        <ChatMonitor />
+        <CustomerSupportTabs />
       ) : activeTab === 'SERVICE_REQUESTS' ? (
         <ServiceAdminTab />
       ) : activeTab === 'SALES' ? (

@@ -1,676 +1,213 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
-import { CheckCircle, Clock, ExternalLink, Phone, RefreshCw, XCircle } from 'lucide-react';
-
-import type { PaymentStatus, ProxyRequest, ProxyStatus } from '@/app/types/proxy';
-import {
-  getProxyCategoryLabel,
-  getProxyFormDisplayEntries,
-  getProxyLinkedInquiryIdFromRequest,
-  getProxyPaymentMethod,
-  getProxyPaymentStatusLabel,
-  getProxyRequestFeeKrw,
-  getProxyRequestTitle,
-  getProxyRequesterDisplayName,
-  compareProxyRequestsForOperations,
-} from '@/app/utils/proxyBooking';
-
-type ProxyRequestDetail = ProxyRequest & {
-  linked_inquiry_id?: string | null;
-};
-
-type ProxyListResponse = {
-  success?: boolean;
-  data?: ProxyRequest[];
-  pagination?: {
-    limit?: number;
-    offset?: number;
-    hasMore?: boolean;
-  };
-};
-
-type ProxyDetailResponse = {
-  success?: boolean;
-  data?: ProxyRequestDetail;
-};
-
-type PhoneReservationTabProps = {
-  initialSelectedRequestId?: string | null;
-};
+import ChatMonitor from './ChatMonitor';
+import { getProxyCategoryLabel, getProxyPaymentMethod, getProxyPaymentStatusLabel, getProxyRequestFeeKrw, getProxyRequestTitle, getProxyRequesterDisplayName } from '@/app/utils/proxyBooking';
+import { getPhoneFormSections, PHONE_FILTER_LABELS, type PhoneFilter, type PhoneWorkspaceRequest } from '@/app/utils/phoneReservationWorkspace';
 
 const PAGE_SIZE = 10;
-const FORM_PREVIEW_COUNT = 6;
+const STATUS_LABELS = { PENDING: '대기', IN_PROGRESS: '진행 중', COMPLETED: '완료', CANCELLED: '취소' };
 
-function getStatusBadge(status: string) {
-  switch (status) {
-    case 'PENDING':
-      return <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-semibold flex items-center gap-1"><Clock size={12} /> 대기 중</span>;
-    case 'IN_PROGRESS':
-      return <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold flex items-center gap-1"><Phone size={12} /> 진행 중</span>;
-    case 'COMPLETED':
-      return <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-semibold flex items-center gap-1"><CheckCircle size={12} /> 완료</span>;
-    case 'CANCELLED':
-      return <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-semibold flex items-center gap-1"><XCircle size={12} /> 취소됨</span>;
-    default:
-      return <span className="px-2 py-1 bg-slate-100 text-slate-700 rounded-full text-xs font-semibold">{status}</span>;
-  }
-}
-
-function buildProxyRequestsUrl(limit: number, offset: number) {
-  const searchParams = new URLSearchParams({
-    limit: String(limit),
-    offset: String(offset),
-    sort: 'operational',
-  });
-
-  return `/api/proxy-bookings?${searchParams.toString()}`;
-}
-
-export default function PhoneReservationTab({ initialSelectedRequestId = null }: PhoneReservationTabProps) {
+export default function PhoneReservationTab({ initialSelectedRequestId = null, active = true }: {
+  initialSelectedRequestId?: string | null; active?: boolean;
+}) {
+  const router = useRouter();
+  const params = useSearchParams();
   const { showToast } = useToast();
-  const selectedIdRef = useRef<string | null>(null);
-  const loadedCountRef = useRef<number>(PAGE_SIZE);
-
-  const [requests, setRequests] = useState<ProxyRequest[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selectedRequest, setSelectedRequest] = useState<ProxyRequestDetail | null>(null);
-  const [loadingList, setLoadingList] = useState(true);
-  const [loadingDetail, setLoadingDetail] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [updating, setUpdating] = useState(false);
+  const [filter, setFilter] = useState<PhoneFilter>('todo');
+  const [search, setSearch] = useState('');
+  const [query, setQuery] = useState('');
+  const [requests, setRequests] = useState<PhoneWorkspaceRequest[]>([]);
+  const [detail, setDetail] = useState<PhoneWorkspaceRequest | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [detailError, setDetailError] = useState('');
   const [hasMore, setHasMore] = useState(false);
-  const [nextOffset, setNextOffset] = useState(0);
-  const [showAllFormEntries, setShowAllFormEntries] = useState(false);
-
-  const setActiveRequestId = useCallback((requestId: string | null) => {
-    selectedIdRef.current = requestId;
-    setSelectedId(requestId);
-    setShowAllFormEntries(false);
-  }, []);
-
-  const fetchRequestsPage = useCallback(async (limit: number, offset: number) => {
-    const response = await fetch(buildProxyRequestsUrl(limit, offset), { cache: 'no-store' });
-    const result = (await response.json()) as ProxyListResponse;
-
-    if (!response.ok || result.success === false) {
-      throw new Error('전화 예약 목록을 불러오지 못했습니다.');
-    }
-
-    return {
-      data: Array.isArray(result.data) ? result.data : [],
-      hasMore: Boolean(result.pagination?.hasMore),
-    };
-  }, []);
-
-  const loadDetail = useCallback(async (requestId: string) => {
-    setLoadingDetail(true);
-    try {
-      const response = await fetch(`/api/proxy-bookings/${requestId}?includeComments=false`, { cache: 'no-store' });
-      const result = (await response.json()) as ProxyDetailResponse;
-
-      if (!response.ok || result.success === false || !result.data) {
-        throw new Error('전화 예약 상세를 불러오지 못했습니다.');
-      }
-
-      setSelectedRequest(result.data);
-      return result.data;
-    } finally {
-      setLoadingDetail(false);
-    }
-  }, []);
-
-  const selectRequest = useCallback(async (requestId: string) => {
-    setActiveRequestId(requestId);
-
-    try {
-      await loadDetail(requestId);
-    } catch (error) {
-      console.error('[PhoneReservationTab] load detail failed:', error);
-      showToast('전화 예약 상세를 불러오지 못했습니다.', 'error');
-    }
-  }, [loadDetail, setActiveRequestId, showToast]);
-
-  const refreshSelectedRequest = useCallback(async (
-    requestId?: string | null,
-    options?: { loadedCount?: number }
-  ) => {
-    const requestedLimit = Math.max(options?.loadedCount ?? loadedCountRef.current, PAGE_SIZE);
-    const { data: nextRequests, hasMore: nextHasMore } = await fetchRequestsPage(requestedLimit, 0);
-
-    setRequests(nextRequests);
-    setHasMore(nextHasMore);
-    setNextOffset(nextRequests.length);
-    loadedCountRef.current = Math.max(nextRequests.length, PAGE_SIZE);
-
-    const preferredId = requestId ?? selectedIdRef.current;
-
-    if (preferredId) {
-      try {
-        setActiveRequestId(preferredId);
-        await loadDetail(preferredId);
-        return nextRequests;
-      } catch (error) {
-        console.error('[PhoneReservationTab] preferred detail load failed:', error);
-      }
-    }
-
-    if (nextRequests[0]?.id) {
-      setActiveRequestId(nextRequests[0].id);
-      await loadDetail(nextRequests[0].id);
-    } else {
-      setActiveRequestId(null);
-      setSelectedRequest(null);
-    }
-
-    return nextRequests;
-  }, [fetchRequestsPage, loadDetail, setActiveRequestId]);
+  const [updating, setUpdating] = useState(false);
+  const pages = useRef(1);
+  const listVersion = useRef(0);
+  const detailVersion = useRef(0);
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
-    let isMounted = true;
+    const timer = setTimeout(() => setQuery(search.trim()), 250);
+    return () => clearTimeout(timer);
+  }, [search]);
 
-    const init = async () => {
-      try {
-        await refreshSelectedRequest(initialSelectedRequestId, { loadedCount: PAGE_SIZE });
-      } catch (error) {
-        console.error('[PhoneReservationTab] init failed:', error);
-        if (isMounted) {
-          showToast('전화 예약 목록을 불러오지 못했습니다.', 'error');
-        }
-      } finally {
-        if (isMounted) {
-          setLoadingList(false);
-        }
+  const read = useCallback(async (url: string) => {
+    const response = await fetch(url, { cache: 'no-store' });
+    const result = await response.json();
+    if (!response.ok || !result.success) throw new Error(result.error || '전화예약을 불러오지 못했습니다.');
+    return result;
+  }, []);
+
+  const loadList = useCallback(async (more = false) => {
+    if (!active) return;
+    const version = ++listVersion.current;
+    setLoading(true);
+    setError('');
+    try {
+      const count = pages.current + (more ? 1 : 0);
+      const rows: PhoneWorkspaceRequest[] = [];
+      let nextHasMore = false;
+      for (let page = 0; page < count; page++) {
+        const searchParams = new URLSearchParams({ filter, q: query, offset: String(page * PAGE_SIZE), limit: String(PAGE_SIZE) });
+        const result = await read(`/api/admin/customer-support?${searchParams}`);
+        rows.push(...result.data);
+        nextHasMore = result.pagination.hasMore;
+        if (!nextHasMore) break;
       }
-    };
-
-    void init();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [initialSelectedRequestId, refreshSelectedRequest, showToast]);
-
-  useEffect(() => {
-    loadedCountRef.current = Math.max(requests.length, PAGE_SIZE);
-  }, [requests.length]);
-
-  const handleManualRefresh = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      await refreshSelectedRequest(undefined, { loadedCount: loadedCountRef.current });
-    } catch (error) {
-      console.error('[PhoneReservationTab] manual refresh failed:', error);
-      showToast('전화 예약 목록을 불러오지 못했습니다.', 'error');
-    } finally {
-      setRefreshing(false);
-    }
-  }, [refreshSelectedRequest, showToast]);
-
-  const handleLoadMore = useCallback(async () => {
-    if (!hasMore || loadingMore) return;
-
-    setLoadingMore(true);
-    try {
-      const { data: nextRequests, hasMore: nextHasMore } = await fetchRequestsPage(PAGE_SIZE, nextOffset);
-
-      setRequests((prev) => {
-        const seen = new Set(prev.map((item) => item.id));
-        const merged = [...prev];
-
-        for (const item of nextRequests) {
-          if (!seen.has(item.id)) {
-            seen.add(item.id);
-            merged.push(item);
-          }
-        }
-
-        loadedCountRef.current = Math.max(merged.length, PAGE_SIZE);
-        return merged;
-      });
+      if (version !== listVersion.current) return;
+      pages.current = count;
+      setRequests([...new Map(rows.map(row => [row.id, row])).values()]);
       setHasMore(nextHasMore);
-      setNextOffset((prev) => prev + nextRequests.length);
-    } catch (error) {
-      console.error('[PhoneReservationTab] load more failed:', error);
-      showToast('전화 예약 목록을 더 불러오지 못했습니다.', 'error');
+    } catch (err) {
+      if (version === listVersion.current) setError(err instanceof Error ? err.message : '목록 조회 실패');
     } finally {
-      setLoadingMore(false);
+      if (version === listVersion.current) setLoading(false);
     }
-  }, [fetchRequestsPage, hasMore, loadingMore, nextOffset, showToast]);
+  }, [active, filter, query, read]);
 
-  const handleUpdateStatus = useCallback(async (nextStatus: ProxyStatus) => {
-    if (!selectedIdRef.current) return;
+  const loadDetail = useCallback(async () => {
+    const version = ++detailVersion.current;
+    if (!active || !initialSelectedRequestId) return;
+    setDetailLoading(true);
+    setDetailError('');
+    try {
+      const result = await read(`/api/admin/customer-support?requestId=${encodeURIComponent(initialSelectedRequestId)}`);
+      if (version === detailVersion.current) setDetail(result.data);
+    } catch (err) {
+      if (version === detailVersion.current) {
+        setDetail(null);
+        setDetailError(err instanceof Error ? err.message : '상세 조회 실패');
+      }
+    } finally {
+      if (version === detailVersion.current) setDetailLoading(false);
+    }
+  }, [active, initialSelectedRequestId, read]);
 
+  useEffect(() => {
+    pages.current = 1;
+    void loadList();
+    const version = listVersion;
+    return () => { version.current++; };
+  }, [loadList]);
+  useEffect(() => {
+    void loadDetail();
+    const version = detailVersion;
+    return () => { version.current++; };
+  }, [loadDetail]);
+
+  const refresh = useCallback(() => { void loadList(); void loadDetail(); }, [loadList, loadDetail]);
+  useEffect(() => {
+    if (!active) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const schedule = () => { clearTimeout(timer); timer = setTimeout(refresh, 350); };
+    const channel = supabase.channel('admin-phone-workspace')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'proxy_requests' }, schedule)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'inquiry_messages' }, schedule)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'inquiry_messages' }, payload => {
+        if (payload.new.type === 'deleted') schedule();
+      }).subscribe();
+    return () => { clearTimeout(timer); void supabase.removeChannel(channel); };
+  }, [active, refresh, supabase]);
+
+  const select = (id: string | null) => {
+    const next = new URLSearchParams(params.toString());
+    next.set('view', 'phone');
+    next.delete('inquiryId');
+    if (id) next.set('proxyRequestId', id); else next.delete('proxyRequestId');
+    router.push(`/admin/dashboard?${next}`, { scroll: false });
+  };
+  // Never show the previous customer's conversation while the next detail loads.
+  const selected = detail?.id === initialSelectedRequestId ? detail : null;
+  const canComplete = Boolean(selected && !updating && selected.payment_status === 'COMPLETED' && ['PENDING', 'IN_PROGRESS'].includes(selected.status) && selected.linked_inquiry_id);
+  const complete = async () => {
+    if (!selected) throw new Error('요청을 먼저 선택해주세요.');
+    const response = await fetch(`/api/proxy-bookings/${selected.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'COMPLETED' }),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) throw new Error(result.error || '완료 처리에 실패했습니다.');
+    refresh();
+  };
+  const paymentAction = async (action: 'confirm-payment' | 'cancel-payment' | 'refund-payment') => {
+    if (!selected || updating) return;
     setUpdating(true);
     try {
-      const response = await fetch(`/api/proxy-bookings/${selectedIdRef.current}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: nextStatus }),
+      const response = await fetch(`/api/admin/proxy-bookings/${action}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ requestId: selected.id }),
       });
-
-      const result = await response.json().catch(() => null);
-      if (!response.ok || result?.success === false) {
-        throw new Error(result?.error || '상태 변경에 실패했습니다.');
-      }
-
-      await refreshSelectedRequest(selectedIdRef.current, { loadedCount: loadedCountRef.current });
-      showToast('전화 예약 상태를 업데이트했습니다.', 'success');
-    } catch (error) {
-      console.error('[PhoneReservationTab] update status failed:', error);
-      showToast(error instanceof Error ? error.message : '상태 변경에 실패했습니다.', 'error');
-    } finally {
-      setUpdating(false);
-    }
-  }, [refreshSelectedRequest, showToast]);
-
-  const applyLocalPaymentState = useCallback((
-    requestId: string,
-    nextPaymentStatus: PaymentStatus,
-    nextRequestStatus?: ProxyStatus
-  ) => {
-    setRequests((prev) => prev.map((item) => (
-      item.id === requestId
-        ? {
-            ...item,
-            payment_status: nextPaymentStatus,
-            ...(nextRequestStatus ? { status: nextRequestStatus } : {}),
-          }
-        : item
-    )));
-
-    setSelectedRequest((prev) => (
-      prev && prev.id === requestId
-        ? {
-            ...prev,
-            payment_status: nextPaymentStatus,
-            ...(nextRequestStatus ? { status: nextRequestStatus } : {}),
-          }
-        : prev
-    ));
-  }, []);
-
-  const handlePaymentAction = useCallback(async (
-    endpoint: '/api/admin/proxy-bookings/confirm-payment' | '/api/admin/proxy-bookings/cancel-payment' | '/api/admin/proxy-bookings/refund-payment',
-    successMessage: string
-  ) => {
-    if (!selectedIdRef.current) return;
-
-    setUpdating(true);
-    try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId: selectedIdRef.current }),
-      });
-
-      const result = await response.json().catch(() => null);
-      if (!response.ok || result?.success === false) {
-        throw new Error(result?.error || '결제 상태 변경에 실패했습니다.');
-      }
-
-      if (endpoint === '/api/admin/proxy-bookings/confirm-payment') {
-        applyLocalPaymentState(selectedIdRef.current, 'COMPLETED');
-      } else if (endpoint === '/api/admin/proxy-bookings/cancel-payment') {
-        applyLocalPaymentState(selectedIdRef.current, 'FAILED', 'CANCELLED');
-      } else {
-        applyLocalPaymentState(selectedIdRef.current, 'REFUNDED');
-      }
-
-      // Keep the operator flow responsive once the write succeeds; the follow-up
-      // detail refresh should not block the next valid status action.
-      setUpdating(false);
-      await refreshSelectedRequest(selectedIdRef.current, { loadedCount: loadedCountRef.current });
-      showToast(successMessage, 'success');
-    } catch (error) {
-      console.error('[PhoneReservationTab] update payment failed:', error);
-      showToast(error instanceof Error ? error.message : '결제 상태 변경에 실패했습니다.', 'error');
-    } finally {
-      setUpdating(false);
-    }
-  }, [applyLocalPaymentState, refreshSelectedRequest, showToast]);
-
-  const selectedServiceFee = selectedRequest
-    ? getProxyRequestFeeKrw(selectedRequest.category, selectedRequest.form_data)
-    : null;
-  const linkedInquiryId = selectedRequest
-    ? getProxyLinkedInquiryIdFromRequest(selectedRequest)
-    : null;
-  const selectedFormEntries = selectedRequest
-    ? getProxyFormDisplayEntries(selectedRequest.form_data)
-    : [];
-  const selectedPaymentMethod = selectedRequest
-    ? getProxyPaymentMethod(selectedRequest.form_data)
-    : null;
-  const canStartProcessing = selectedRequest?.payment_status === 'COMPLETED';
-  const showManualPaymentActions = Boolean(
-    selectedRequest &&
-    selectedRequest.payment_status === 'WAITING' &&
-    (selectedRequest.payment_channel === 'NAVER' || selectedPaymentMethod === 'bank')
-  );
-  const showCardWaitingHint = Boolean(
-    selectedRequest &&
-    selectedRequest.payment_status === 'WAITING' &&
-    selectedPaymentMethod === 'card'
-  );
-  const showRefundAction = Boolean(selectedRequest && selectedRequest.payment_status === 'COMPLETED');
-  const visibleFormEntries = showAllFormEntries
-    ? selectedFormEntries
-    : selectedFormEntries.slice(0, FORM_PREVIEW_COUNT);
-  const hasExpandableFormEntries = selectedFormEntries.length > FORM_PREVIEW_COUNT;
-  const visibleRequests = useMemo(() => {
-    const seen = new Set<string>();
-    const nextVisibleRequests: ProxyRequest[] = [];
-
-    if (selectedRequest && !requests.some((item) => item.id === selectedRequest.id)) {
-      nextVisibleRequests.push(selectedRequest);
-      seen.add(selectedRequest.id);
-    }
-
-    for (const item of requests) {
-      if (!seen.has(item.id)) {
-        seen.add(item.id);
-        nextVisibleRequests.push(item);
-      }
-    }
-
-    return nextVisibleRequests.sort(compareProxyRequestsForOperations);
-  }, [requests, selectedRequest]);
-
-  if (loadingList) {
-    return (
-      <div className="grid grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)] gap-4 md:gap-6 h-full">
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
-          <div className="h-10 bg-slate-100 rounded-xl animate-pulse" />
-          <div className="h-24 bg-slate-100 rounded-xl animate-pulse" />
-          <div className="h-24 bg-slate-100 rounded-xl animate-pulse" />
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
-          <div className="h-8 bg-slate-100 rounded-xl animate-pulse" />
-          <div className="h-48 bg-slate-100 rounded-xl animate-pulse" />
-        </div>
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || '결제 처리에 실패했습니다.');
+      refresh();
+    } catch (err) { showToast(err instanceof Error ? err.message : '결제 처리 실패', 'error'); }
+    finally { setUpdating(false); }
+  };
+  const sections = selected ? getPhoneFormSections(selected) : null;
+  const method = selected ? getProxyPaymentMethod(selected.form_data) : null;
+  const manualPayment = selected?.payment_status === 'WAITING' && (selected.payment_channel === 'NAVER' || method === 'bank');
+  const showEntries = (entries: NonNullable<typeof sections>['core']) => entries.map(entry => <div key={entry.key} className="min-w-0" data-testid="admin-phone-reservation-form-entry">
+    <dt className="text-xs text-slate-500">{entry.label}</dt>
+    <dd className="break-words whitespace-pre-wrap text-sm text-slate-900">{entry.value}
+      {/phone$/.test(entry.key) && <button className="ml-2 text-xs underline" onClick={() => void navigator.clipboard.writeText(entry.value).then(() => showToast('전화번호를 복사했습니다.', 'success')).catch(() => showToast('복사하지 못했습니다.', 'error'))}>복사</button>}
+      {/^(https?:\/\/)/i.test(entry.value) && <a className="ml-2 text-xs underline" href={entry.value} target="_blank" rel="noopener noreferrer">열기</a>}
+    </dd>
+  </div>);
+  const header = <div className="space-y-3">
+    <button onClick={() => select(null)} className="text-sm text-slate-600 md:hidden">← 목록으로</button>
+    {detailError ? <p role="alert">{detailError}</p> : !selected ? <p>{detailLoading ? '상세를 불러오는 중...' : '전화예약을 선택해주세요.'}</p> : <>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-bold">{getProxyRequestTitle(selected)} · {getProxyRequesterDisplayName(selected.profiles)}</h2>
+        <span className="text-xs">{STATUS_LABELS[selected.status]}{selected.needs_reply ? ' · 추가 답장' : ''}{selected.needs_attention ? ' · 확인 필요' : ''}</span>
       </div>
-    );
-  }
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)] gap-4 md:gap-6 flex-1 min-h-0">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-h-[320px]">
-        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/70">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900">전화 예약</h3>
-              <p className="text-xs text-slate-500">새 요청과 진행 상태를 한 곳에서 확인합니다.</p>
-            </div>
-            <button
-              type="button"
-              data-testid="admin-phone-reservation-refresh-button"
-              disabled={refreshing || loadingList}
-              onClick={() => {
-                void handleManualRefresh();
-              }}
-              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
-            >
-              <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
-              새로고침
-            </button>
-          </div>
-          <p className="mt-2 text-[11px] font-semibold text-slate-400">{visibleRequests.length}건 표시</p>
+      <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2" data-testid="admin-phone-reservation-form-section">{sections && showEntries(sections.core)}</dl>
+      {sections && sections.other.length > 0 && <details><summary className="cursor-pointer text-xs font-semibold">신청서 전체 보기</summary><dl className="mt-2 grid gap-2 sm:grid-cols-2">{showEntries(sections.other)}</dl></details>}
+      <div className="flex flex-wrap items-center gap-3 border-t pt-2 text-sm">
+        <span>{getProxyPaymentStatusLabel(selected)} · ₩{getProxyRequestFeeKrw(selected.category, selected.form_data).toLocaleString()} · {selected.payment_channel === 'NAVER' ? 'NAVER' : method === 'card' ? '카드' : '무통장'}</span>
+        {manualPayment && <button disabled={updating} onClick={() => void paymentAction('confirm-payment')} className="rounded-lg bg-slate-900 px-3 py-1 text-white disabled:opacity-50">입금 확인</button>}
+      </div>
+      {selected.payment_status === 'WAITING' && method === 'card' && <p className="text-xs text-amber-800">카드 결제 확인 전에는 완료할 수 없습니다.</p>}
+      <details className="text-xs"><summary className="cursor-pointer text-slate-500">결제 상세</summary>
+        <div className="mt-2 space-y-2"><p>주문번호: {selected.locally_order_id || '—'}</p><p>네이버 구매자명: {selected.naver_buyer_name || '—'}</p>
+          {manualPayment && <button disabled={updating} className="text-rose-700 underline" onClick={() => void paymentAction('cancel-payment')}>결제 취소</button>}
+          {selected.payment_status === 'COMPLETED' && <button disabled={updating} className="text-rose-700 underline" onClick={() => void paymentAction('refund-payment')}>환불 처리</button>}
         </div>
+      </details>
+      {!selected.linked_inquiry_id && <p role="alert" className="rounded-lg bg-amber-50 p-2 text-sm text-amber-900">확인 필요: 고객 문의 연결을 확인해주세요. 이 상태에서는 답변하거나 완료할 수 없습니다.</p>}
+    </>}
+  </div>;
 
-        {visibleRequests.length === 0 ? (
-          <div className="px-4 py-10 text-sm text-slate-500 text-center">아직 접수된 전화 예약이 없습니다.</div>
-        ) : (
-          <div className="max-h-[72vh] overflow-y-auto" data-testid="admin-phone-reservation-list">
-            <div className="divide-y divide-slate-100">
-              {visibleRequests.map((item) => {
-                const paymentMethod = getProxyPaymentMethod(item.form_data);
-                const isSelected = selectedId === item.id;
-
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    data-testid="admin-phone-reservation-list-item"
-                    onClick={() => {
-                      if (item.id !== selectedId) {
-                        void selectRequest(item.id);
-                      }
-                    }}
-                    className={`w-full text-left px-4 py-4 transition-colors ${isSelected ? 'bg-blue-50' : 'bg-white hover:bg-slate-50'}`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{getProxyCategoryLabel(item.category)}</p>
-                        <p className="text-sm font-bold text-slate-900 truncate">{getProxyRequestTitle(item)}</p>
-                        <p className="text-xs text-slate-500 mt-1">{getProxyRequesterDisplayName(item.profiles)}</p>
-                      </div>
-                      <div className="shrink-0">{getStatusBadge(item.status)}</div>
-                    </div>
-                    <div className="flex items-center justify-between mt-3 text-[11px] text-slate-500">
-                      <span>{new Date(item.created_at).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                      <span>
-                        {paymentMethod === 'card' && item.payment_status === 'WAITING'
-                          ? '카드 · 결제 미완료'
-                          : `${item.payment_channel}${paymentMethod ? ` · ${paymentMethod === 'card' ? '카드' : '무통장'}` : ''}`}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-
-            {hasMore && (
-              <div className="border-t border-slate-100 p-4">
-                <button
-                  type="button"
-                  data-testid="admin-phone-reservation-load-more-button"
-                  disabled={loadingMore}
-                  onClick={() => {
-                    void handleLoadMore();
-                  }}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
-                >
-                  {loadingMore ? '불러오는 중...' : '더 보기'}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+  return <div className="grid h-[calc(100dvh-235px)] min-h-[460px] grid-cols-1 gap-3 md:grid-cols-[minmax(230px,30%)_minmax(0,1fr)]">
+    <section className={`${initialSelectedRequestId ? 'hidden md:flex' : 'flex'} min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200`}>
+      <div className="space-y-2 border-b p-3">
+        <div className="flex items-center justify-between"><h2 className="font-bold">전화예약</h2><button data-testid="admin-phone-reservation-refresh-button" disabled={loading} className="text-xs" onClick={refresh}>새로고침</button></div>
+        <input aria-label="전화예약 검색" value={search} onChange={event => setSearch(event.target.value)} placeholder="고객·업체·요청번호 검색" className="w-full rounded-lg border p-2 text-sm" />
+        <div className="flex flex-wrap gap-1">{Object.entries(PHONE_FILTER_LABELS).map(([key, label]) => <button key={key} aria-pressed={filter === key} onClick={() => setFilter(key as PhoneFilter)} className={`rounded-full border px-2 py-1 text-xs ${filter === key ? 'bg-slate-900 text-white' : ''}`}>{label}</button>)}</div>
       </div>
-
-      <div className="relative bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-h-[420px] flex flex-col">
-        {!selectedRequest ? (
-          <div className="flex-1 flex items-center justify-center text-sm text-slate-500">
-            확인할 전화 예약을 선택해주세요.
-          </div>
-        ) : (
-          <>
-            <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/70">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{getProxyCategoryLabel(selectedRequest.category)}</p>
-                  <h3 className="text-lg font-bold text-slate-900">{getProxyRequestTitle(selectedRequest)}</h3>
-                  <p className="text-sm text-slate-500 mt-1">
-                    고객: {getProxyRequesterDisplayName(selectedRequest.profiles)}
-                    {selectedRequest.profiles?.email ? ` · ${selectedRequest.profiles.email}` : ''}
-                  </p>
-                  {selectedRequest.profiles?.phone && (
-                    <p className="text-sm text-slate-500">{selectedRequest.profiles.phone}</p>
-                  )}
-                </div>
-                <div className="shrink-0">{getStatusBadge(selectedRequest.status)}</div>
-              </div>
-            </div>
-
-            <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-5">
-              <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 space-y-3 text-sm">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <h4 className="font-bold text-slate-900">결제 정보</h4>
-                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 border border-slate-200">
-                    {getProxyPaymentStatusLabel(selectedRequest)}
-                  </span>
-                </div>
-                <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                  <div className="flex justify-between gap-3"><span className="text-slate-500">결제 채널</span><span className="font-semibold">{selectedRequest.payment_channel}</span></div>
-                  <div className="flex justify-between gap-3"><span className="text-slate-500">결제 수단</span><span className="font-semibold">{selectedPaymentMethod === 'card' ? '카드' : selectedPaymentMethod === 'bank' ? '무통장' : '미지정'}</span></div>
-                  <div className="flex justify-between gap-3"><span className="text-slate-500">서비스 수수료</span><span className="font-semibold">₩{selectedServiceFee?.toLocaleString()}</span></div>
-                  <div className="flex justify-between gap-3"><span className="text-slate-500">결제 상태</span><span className="font-semibold">{getProxyPaymentStatusLabel(selectedRequest)}</span></div>
-                  {selectedRequest.locally_order_id && (
-                    <div className="flex justify-between gap-3 md:col-span-2"><span className="text-slate-500">주문번호</span><span className="font-mono text-xs">{selectedRequest.locally_order_id}</span></div>
-                  )}
-                  {selectedRequest.naver_buyer_name && (
-                    <div className="flex justify-between gap-3 md:col-span-2"><span className="text-slate-500">네이버 구매자명</span><span className="font-semibold">{selectedRequest.naver_buyer_name}</span></div>
-                  )}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-100 bg-white p-4">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <h4 className="font-bold text-slate-900">결제 액션</h4>
-                    <p className="text-xs text-slate-500 mt-1">현재 상태에서 가능한 작업만 표시됩니다.</p>
-                  </div>
-                </div>
-
-                {showManualPaymentActions && (
-                  <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    <button
-                      type="button"
-                      disabled={updating}
-                      onClick={() => {
-                        void handlePaymentAction('/api/admin/proxy-bookings/confirm-payment', '결제 확인을 완료했습니다.');
-                      }}
-                      className="w-full rounded-xl border border-emerald-200 px-3 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-60"
-                    >
-                      입금 확인
-                    </button>
-                    <button
-                      type="button"
-                      disabled={updating}
-                      onClick={() => {
-                        void handlePaymentAction('/api/admin/proxy-bookings/cancel-payment', '결제 취소 처리를 완료했습니다.');
-                      }}
-                      className="w-full rounded-xl border border-rose-200 px-3 py-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-60"
-                    >
-                      결제 취소
-                    </button>
-                  </div>
-                )}
-
-                {showManualPaymentActions && (
-                  <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                    입금 확인 후에만 진행 상태를 바꿀 수 있습니다.
-                  </div>
-                )}
-
-                {showCardWaitingHint && (
-                  <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-                    카드 결제 미완료로 운영 시작 금지 상태입니다. 결제 완료 전에는 진행 상태를 바꿀 수 없습니다.
-                  </div>
-                )}
-
-                {showRefundAction && (
-                  <div className="mt-4">
-                    <button
-                      type="button"
-                      disabled={updating}
-                      onClick={() => {
-                        void handlePaymentAction('/api/admin/proxy-bookings/refund-payment', '환불 처리를 완료했습니다.');
-                      }}
-                      className="w-full rounded-xl border border-amber-200 px-3 py-3 text-sm font-semibold text-amber-700 transition hover:bg-amber-50 disabled:opacity-60"
-                    >
-                      환불 처리
-                    </button>
-                  </div>
-                )}
-
-                {!showManualPaymentActions && !showCardWaitingHint && !showRefundAction && (
-                  <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
-                    현재 결제 상태에서는 추가 결제 액션이 없습니다.
-                  </div>
-                )}
-              </div>
-
-              <div className="rounded-2xl border border-slate-100 bg-white p-4">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <h4 className="font-bold text-slate-900">운영 액션</h4>
-                    <p className="text-xs text-slate-500 mt-1">결제 완료 후에만 실제 전화 진행을 시작하거나 완료로 변경할 수 있습니다.</p>
-                  </div>
-                  <div className="text-xs font-semibold text-slate-500">
-                    현재 상태: <span className="text-slate-900">{selectedRequest.status === 'PENDING' ? '대기 중' : selectedRequest.status === 'IN_PROGRESS' ? '진행 중' : selectedRequest.status === 'COMPLETED' ? '완료' : '취소'}</span>
-                  </div>
-                </div>
-                {!canStartProcessing && (
-                  <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                    결제 완료 후에만 전화 예약 진행을 시작할 수 있습니다.
-                  </div>
-                )}
-                <div className="mt-4 grid grid-cols-2 gap-2 xl:grid-cols-4">
-                  <button type="button" disabled={updating} onClick={() => { void handleUpdateStatus('PENDING'); }} className="w-full rounded-xl bg-slate-900 px-3 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60">대기 중</button>
-                  <button type="button" disabled={updating || !canStartProcessing} onClick={() => { void handleUpdateStatus('IN_PROGRESS'); }} className="w-full rounded-xl bg-blue-600 px-3 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-60">진행 중</button>
-                  <button type="button" disabled={updating || !canStartProcessing} onClick={() => { void handleUpdateStatus('COMPLETED'); }} className="w-full rounded-xl bg-emerald-600 px-3 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-60">완료</button>
-                  <button type="button" disabled={updating} onClick={() => { void handleUpdateStatus('CANCELLED'); }} className="w-full rounded-xl bg-rose-600 px-3 py-3 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:opacity-60">취소</button>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-100 p-4" data-testid="admin-phone-reservation-form-section">
-                <div className="flex items-center justify-between gap-3">
-                  <h4 className="font-bold text-slate-900">폼 작성 내용</h4>
-                  {hasExpandableFormEntries && (
-                    <button
-                      type="button"
-                      data-testid="admin-phone-reservation-form-toggle"
-                      onClick={() => setShowAllFormEntries((prev) => !prev)}
-                      className="text-xs font-semibold text-slate-600 transition hover:text-slate-900"
-                    >
-                      {showAllFormEntries ? '간단히 보기' : '전체 항목 보기'}
-                    </button>
-                  )}
-                </div>
-                <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                  {visibleFormEntries.map((entry) => (
-                    <div key={entry.key} data-testid="admin-phone-reservation-form-entry" className="rounded-xl bg-slate-50 px-3 py-2">
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{entry.label}</p>
-                      <p className="text-slate-800 mt-1 break-words whitespace-pre-wrap">{entry.value}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-100 p-4">
-                <div>
-                  <h4 className="font-bold text-slate-900">고객 문의함</h4>
-                  <p className="text-xs text-slate-500 mt-1">대화와 진행 안내는 1:1 문의함에서 이어서 확인합니다.</p>
-                </div>
-
-                {linkedInquiryId ? (
-                  <a
-                    href={`/admin/dashboard?tab=CHATS&inquiryId=${encodeURIComponent(linkedInquiryId)}`}
-                    className="mt-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-                  >
-                    <ExternalLink size={14} />
-                    1:1 문의함에서 열기
-                  </a>
-                ) : (
-                  <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
-                    연결된 문의 스레드가 없습니다.
-                  </div>
-                )}
-              </div>
-            </div>
-          </>
-        )}
-
-        {loadingDetail && (
-          <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] flex items-center justify-center rounded-2xl text-sm text-slate-600">
-            전화 예약 상세를 불러오는 중입니다.
-          </div>
-        )}
+      <div className="min-h-0 flex-1 overflow-auto" data-testid="admin-phone-reservation-list">
+        {error && <p role="alert" className="p-3">{error}</p>}
+        {!loading && !error && !requests.length && <p className="p-4 text-sm text-slate-500">해당하는 전화예약이 없습니다.</p>}
+        {requests.map(row => <button key={row.id} data-testid="admin-phone-reservation-list-item" onClick={() => select(row.id)} className={`w-full border-b p-3 text-left ${row.id === initialSelectedRequestId ? 'bg-blue-50' : ''}`}>
+          <p className="text-xs text-slate-500">{getProxyCategoryLabel(row.category)} · {STATUS_LABELS[row.status]}</p>
+          <p className="truncate text-sm font-bold">{getProxyRequestTitle(row)} · {getProxyRequesterDisplayName(row.profiles)}</p>
+          <p className="text-xs text-slate-500">{getProxyPaymentStatusLabel(row)}</p>
+          <p className="line-clamp-1 text-xs text-slate-500">{row.latest_content}</p>
+          {row.needs_reply && <span className="text-xs font-bold text-blue-700">추가 답장 </span>}
+          {row.needs_attention && <span className="text-xs font-bold text-amber-700">확인 필요</span>}
+        </button>)}
+        {loading && <p className="p-3 text-sm">불러오는 중...</p>}
+        {hasMore && <button disabled={loading} data-testid="admin-phone-reservation-load-more-button" onClick={() => void loadList(true)} className="w-full p-3 text-sm">더 보기</button>}
       </div>
-    </div>
-  );
+    </section>
+    <section className={`${initialSelectedRequestId ? 'flex' : 'hidden md:flex'} min-h-0 min-w-0 flex-col`}>
+      <ChatMonitor enabled={active && Boolean(selected?.linked_inquiry_id)} phone={{
+        inquiryId: selected?.linked_inquiry_id || null, header, canComplete, onComplete: complete, onSent: refresh,
+      }} />
+    </section>
+  </div>;
 }

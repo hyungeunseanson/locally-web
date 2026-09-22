@@ -124,12 +124,16 @@ function isAdminSendMessageResult(value: unknown): value is AdminSendMessageResu
   );
 }
 
-export function useAdminChatQuery() {
+export function useAdminChatQuery({ view = 'support', conversationOnly = false, enabled = true }: {
+  view?: 'support' | 'monitor'; conversationOnly?: boolean; enabled?: boolean;
+} = {}) {
   const [inquiries, setInquiries] = useState<MonitorInquiry[]>([]);
   const [selectedInquiry, setSelectedInquiry] = useState<MonitorInquiry | null>(null);
   const [messages, setMessages] = useState<MonitorMessage[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
+  const pagesRef = useRef(1);
   const [error, setError] = useState<string | undefined>();
   const [isMessagesLoading, setIsMessagesLoading] = useState(false);
   const [messageError, setMessageError] = useState<string | undefined>();
@@ -196,7 +200,8 @@ export function useAdminChatQuery() {
     patchInquiry(inquiryId, patch);
   }, [patchInquiry]);
 
-  const fetchInquiries = useCallback(async (showLoading = true) => {
+  const fetchInquiries = useCallback(async (showLoading = true, more = false) => {
+    if (!enabled) return;
     const requestVersion = ++inquiryRequestVersionRef.current;
     if (showLoading && inquiriesRef.current.length === 0) setIsLoading(true);
     setError(undefined);
@@ -210,16 +215,29 @@ export function useAdminChatQuery() {
         return;
       }
 
-      const response = await fetch('/api/admin/inquiries');
-      const result = await response.json();
+      if (conversationOnly) return;
+      const requestedPages = pagesRef.current + (more ? 1 : 0);
+      const nextInquiries: MonitorInquiry[] = [];
+      let nextHasMore = false;
+      for (let page = 0; page < requestedPages; page += 1) {
+        const params = new URLSearchParams({ view, offset: String(page * 50), limit: '50' });
+        const deepLink = new URLSearchParams(window.location.search).get('inquiryId');
+        if (deepLink && page === 0) params.set('inquiryId', deepLink);
+        const response = await fetch('/api/admin/inquiries' + `?${params.toString()}`);
+        const result = await response.json();
 
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || '목록을 불러오지 못했습니다.');
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || '목록을 불러오지 못했습니다.');
+        }
+
+        nextInquiries.push(...(Array.isArray(result.data) ? result.data as MonitorInquiry[] : []));
+        nextHasMore = Boolean(result.pagination?.hasMore);
+        if (!nextHasMore) break;
       }
-
-      const nextInquiries = Array.isArray(result.data) ? result.data as MonitorInquiry[] : [];
       if (requestVersion !== inquiryRequestVersionRef.current) return;
-      commitInquiries(nextInquiries);
+      pagesRef.current = requestedPages;
+      setHasMore(nextHasMore);
+      commitInquiries([...new Map(nextInquiries.map(row => [String(row.id), row])).values()]);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '로딩 오류';
       console.error('[AdminChatQuery] fetchInquiries error:', err);
@@ -231,7 +249,7 @@ export function useAdminChatQuery() {
         setIsLoading(false);
       }
     }
-  }, [commitInquiries, getAuthenticatedUser]);
+  }, [commitInquiries, getAuthenticatedUser, view, conversationOnly, enabled]);
 
   const loadMessages = useCallback(async (
     inquiryId: number | string,
@@ -245,7 +263,8 @@ export function useAdminChatQuery() {
     }
 
     if (shouldSelect) {
-      const selectedFromList = inquiriesRef.current.find((inquiry) => String(inquiry.id) === targetId);
+      const selectedFromList = inquiriesRef.current.find((inquiry) => String(inquiry.id) === targetId)
+        ?? (conversationOnly ? { id: inquiryId, user_id: '' } : null);
       if (!selectedFromList) return false;
 
       selectedInquiryRef.current = selectedFromList;
@@ -332,7 +351,7 @@ export function useAdminChatQuery() {
         setIsMessagesLoading(false);
       }
     }
-  }, [patchInquiry, showToast]);
+  }, [patchInquiry, showToast, conversationOnly]);
 
   const selectInquiry = useCallback((inquiryId: number | string) => {
     return loadMessages(inquiryId, { select: true });
@@ -418,14 +437,17 @@ export function useAdminChatQuery() {
 
   // 실시간 구독 로직
   useEffect(() => {
-    fetchInquiries();
+    pagesRef.current = 1;
+    void fetchInquiries();
+    const version = inquiryRequestVersionRef;
+    return () => { version.current++; };
   }, [fetchInquiries]);
 
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser || !enabled) return;
 
     const channel = supabase
-      .channel(`admin-chat-realtime-${currentUser.id}`)
+      .channel(`admin-chat-realtime-${currentUser.id}-${conversationOnly ? 'detail' : view}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'inquiry_messages' },
@@ -504,7 +526,7 @@ export function useAdminChatQuery() {
       }
       supabase.removeChannel(channel);
     };
-  }, [supabase, currentUser, loadMessages, scheduleFetchInquiries]);
+  }, [supabase, currentUser, loadMessages, scheduleFetchInquiries, enabled, conversationOnly, view]);
 
   return {
     inquiries,
@@ -520,5 +542,7 @@ export function useAdminChatQuery() {
     sendMessage,
     clearSelected,
     refresh: fetchInquiries,
+    hasMore,
+    loadMore: () => fetchInquiries(false, true),
   };
 }
