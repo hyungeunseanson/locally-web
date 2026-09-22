@@ -21,6 +21,7 @@ const expectedVariables = {
   NOTIFICATION_RETENTION_CLEANUP_SCHEDULED_ENABLED: 'true',
   EXPERIENCE_COMPLETION_SCHEDULED_ENABLED: 'true',
   SERVICE_COMPLETION_SCHEDULED_ENABLED: 'true',
+  CANCEL_PENDING_BOOKINGS_SCHEDULED_ENABLED: 'false',
 };
 const expected = buildExpectedProductionContract(config, expectedVariables);
 
@@ -49,7 +50,10 @@ function currentProductionSnapshot() {
       { name: 'NEXT_CACHE_DO_QUEUE', type: 'durable_object_namespace', class_name: 'DOQueueHandler' },
       { name: 'NEXT_TAG_CACHE_DO_SHARDED', type: 'durable_object_namespace', class_name: 'DOShardedTagCache' },
       ...Object.entries(expectedVariables)
-        .filter(([name]) => name !== 'SERVICE_COMPLETION_SCHEDULED_ENABLED')
+        .filter(([name]) => ![
+          'SERVICE_COMPLETION_SCHEDULED_ENABLED',
+          'CANCEL_PENDING_BOOKINGS_SCHEDULED_ENABLED',
+        ].includes(name))
         .map(([name, text]) => plainVariable(name, text)),
       { name: 'SUPABASE_SERVICE_ROLE_KEY', type: 'secret_text', text: 'must-never-appear' },
     ],
@@ -71,8 +75,17 @@ function currentProductionSnapshot() {
   };
 }
 
-function verify(remote = currentProductionSnapshot(), allowedPlannedChanges = ['SERVICE_COMPLETION_SCHEDULED_ENABLED']) {
-  return verifyProductionDeployContract({ expected, remote, allowedPlannedChanges });
+function verify(
+  remote = currentProductionSnapshot(),
+  allowedPlannedChanges = ['SERVICE_COMPLETION_SCHEDULED_ENABLED'],
+  allowedPlannedCronAdditions = ['7,37 * * * *']
+) {
+  return verifyProductionDeployContract({
+    expected,
+    remote,
+    allowedPlannedChanges,
+    allowedPlannedCronAdditions,
+  });
 }
 
 function expectFailure(remote, code, allowedPlannedChanges) {
@@ -83,7 +96,7 @@ function expectFailure(remote, code, allowedPlannedChanges) {
   );
 }
 
-test('accepts the exact current Production snapshot and reports only the planned Service change', () => {
+test('accepts the current Production snapshot with only the explicit pending-cleanup Cron addition', () => {
   assert.deepEqual(verify(), {
     status: 'PRODUCTION_DEPLOY_SEMANTIC_PREFLIGHT_PASS',
     route: 'pass',
@@ -94,7 +107,10 @@ test('accepts the exact current Production snapshot and reports only the planned
     r2: 'pass',
     durableObjects: 'pass',
     vars: 'pass',
-    allowedPlannedChanges: ['SERVICE_COMPLETION_SCHEDULED_ENABLED'],
+    allowedPlannedChanges: [
+      'SERVICE_COMPLETION_SCHEDULED_ENABLED',
+      'cron:7,37 * * * *',
+    ],
   });
 });
 
@@ -185,6 +201,38 @@ test('compares Cron expressions as an exact unordered set', () => {
   expectFailure(removed, 'cron_mismatch');
 });
 
+test('allows only the explicitly planned pending-cleanup Cron addition', () => {
+  const beforeAddition = currentProductionSnapshot();
+  beforeAddition.bindings.push(plainVariable('SERVICE_COMPLETION_SCHEDULED_ENABLED', 'true'));
+  assert.deepEqual(
+    verify(beforeAddition, [], ['7,37 * * * *']).allowedPlannedChanges,
+    ['cron:7,37 * * * *']
+  );
+
+  const afterAddition = currentProductionSnapshot();
+  afterAddition.bindings.push(plainVariable('SERVICE_COMPLETION_SCHEDULED_ENABLED', 'true'));
+  afterAddition.crons.push('7,37 * * * *');
+  assert.deepEqual(verify(afterAddition, [], []).allowedPlannedChanges, []);
+
+  assert.throws(
+    () => verify(beforeAddition, [], []),
+    /cron_mismatch/
+  );
+
+  const missingExistingCron = currentProductionSnapshot();
+  missingExistingCron.bindings.push(plainVariable('SERVICE_COMPLETION_SCHEDULED_ENABLED', 'true'));
+  missingExistingCron.crons = missingExistingCron.crons.filter((cron) => cron !== '31 19 * * *');
+  assert.throws(
+    () => verify(missingExistingCron, [], ['7,37 * * * *']),
+    /cron_mismatch/
+  );
+
+  assert.throws(
+    () => verify(beforeAddition, [], ['0 0 * * *']),
+    /allowed_cron_addition_not_expected/
+  );
+});
+
 test('rejects R2 and Durable Object target drift', () => {
   const r2 = currentProductionSnapshot();
   r2.bindings.find((binding) => binding.name === 'PUBLIC_EXPERIENCE_MEDIA_R2').bucket_name = 'wrong-bucket';
@@ -196,10 +244,16 @@ test('rejects R2 and Durable Object target drift', () => {
 });
 
 test('accepts unchanged intended variables and an absent or false planned Service flag', () => {
-  assert.deepEqual(verify().allowedPlannedChanges, ['SERVICE_COMPLETION_SCHEDULED_ENABLED']);
+  assert.deepEqual(verify().allowedPlannedChanges, [
+    'SERVICE_COMPLETION_SCHEDULED_ENABLED',
+    'cron:7,37 * * * *',
+  ]);
   const remote = currentProductionSnapshot();
   remote.bindings.push(plainVariable('SERVICE_COMPLETION_SCHEDULED_ENABLED', 'false'));
-  assert.deepEqual(verify(remote).allowedPlannedChanges, ['SERVICE_COMPLETION_SCHEDULED_ENABLED']);
+  assert.deepEqual(verify(remote).allowedPlannedChanges, [
+    'SERVICE_COMPLETION_SCHEDULED_ENABLED',
+    'cron:7,37 * * * *',
+  ]);
 });
 
 test('rejects unrelated feature flag drift', () => {

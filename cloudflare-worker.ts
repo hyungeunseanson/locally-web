@@ -35,8 +35,13 @@ import {
   handleServiceCompletionScheduled,
   type ServiceCompletionScheduledRuntimeEnv,
 } from './app/utils/serviceCompletionScheduled';
+import {
+  CANCEL_PENDING_BOOKINGS_CRON,
+  handleCancelPendingBookingsScheduled,
+  type CancelPendingBookingsScheduledRuntimeEnv,
+} from './app/utils/cancelPendingBookingsScheduled';
 
-type WorkerEnvironment = PublicExperienceMediaQueueRuntimeEnv & ExperienceTranslationQueueRuntimeEnv & HomePopularitySnapshotRuntimeEnv & AdminSupportUnreadAlertsRuntimeEnv & NotificationRetentionRuntimeEnv & ExperienceCompletionScheduledRuntimeEnv & ServiceCompletionScheduledRuntimeEnv;
+type WorkerEnvironment = PublicExperienceMediaQueueRuntimeEnv & ExperienceTranslationQueueRuntimeEnv & HomePopularitySnapshotRuntimeEnv & AdminSupportUnreadAlertsRuntimeEnv & NotificationRetentionRuntimeEnv & ExperienceCompletionScheduledRuntimeEnv & ServiceCompletionScheduledRuntimeEnv & CancelPendingBookingsScheduledRuntimeEnv;
 
 const worker = {
   fetch(request: Request, env: WorkerEnvironment, ctx: unknown) {
@@ -59,12 +64,14 @@ const worker = {
       adminSupportCron: ADMIN_SUPPORT_UNREAD_ALERTS_CRON,
       notificationRetentionCron: NOTIFICATION_RETENTION_CLEANUP_CRON,
       experienceCompletionCron: EXPERIENCE_COMPLETION_SYNC_CRON,
+      cancelPendingCron: CANCEL_PENDING_BOOKINGS_CRON,
       runTranslationRecovery: handleExperienceTranslationScheduledRecovery,
       runHomePopularitySnapshot: handleHomePopularitySnapshotScheduled,
       runAdminSupportUnreadAlerts: handleAdminSupportUnreadAlertsScheduled,
       runNotificationRetentionCleanup: handleNotificationRetentionCleanupScheduled,
       runExperienceCompletionSync: handleExperienceCompletionScheduled,
       runServiceCompletionSync: handleServiceCompletionScheduled,
+      runCancelPendingBookings: handleCancelPendingBookingsScheduled,
       delegate: typeof scheduled === 'function'
         ? (nextController, nextEnv) => scheduled.call(openNextWorker, nextController, nextEnv, ctx)
         : undefined,

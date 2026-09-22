@@ -78,7 +78,8 @@
         "ADMIN_SUPPORT_UNREAD_ALERTS_SCHEDULED_ENABLED": "false",
         "NOTIFICATION_RETENTION_CLEANUP_SCHEDULED_ENABLED": "false",
         "EXPERIENCE_COMPLETION_SCHEDULED_ENABLED": "false",
-        "SERVICE_COMPLETION_SCHEDULED_ENABLED": "false"
+        "SERVICE_COMPLETION_SCHEDULED_ENABLED": "false",
+        "CANCEL_PENDING_BOOKINGS_SCHEDULED_ENABLED": "false"
       },
       "observability": {
         "enabled": true,
@@ -135,7 +136,7 @@
         ]
       },
       "triggers": {
-        "crons": ["17 19 * * *", "*/10 * * * *", "31 19 * * *", "23 */2 * * *"]
+        "crons": ["17 19 * * *", "*/10 * * * *", "31 19 * * *", "23 */2 * * *", "7,37 * * * *"]
       },
       "durable_objects": {
         "bindings": [

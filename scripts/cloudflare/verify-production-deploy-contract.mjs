@@ -101,6 +101,7 @@ export function verifyProductionDeployContract({
   expected,
   remote,
   allowedPlannedChanges = [],
+  allowedPlannedCronAdditions = [],
 }) {
   const diagnostics = new Set();
   const allowed = new Set(allowedPlannedChanges);
@@ -162,7 +163,22 @@ export function verifyProductionDeployContract({
     fail('queue_consumer_mismatch', diagnostics);
   }
 
-  if (!sameSet(remote.crons, expected.crons)) fail('cron_mismatch', diagnostics);
+  const expectedCrons = new Set(expected.crons);
+  const remoteCrons = new Set(remote.crons);
+  const allowedCronAdditions = new Set(allowedPlannedCronAdditions);
+  if ([...allowedCronAdditions].some((cron) => !expectedCrons.has(cron))) {
+    fail('allowed_cron_addition_not_expected', diagnostics);
+  }
+  const unexpectedRemoteCrons = [...remoteCrons].filter((cron) => !expectedCrons.has(cron));
+  const missingExpectedCrons = [...expectedCrons].filter((cron) => !remoteCrons.has(cron));
+  if (unexpectedRemoteCrons.length > 0) fail('cron_mismatch', diagnostics);
+  for (const cron of missingExpectedCrons) {
+    if (allowedCronAdditions.has(cron)) {
+      plannedChanges.push(`cron:${cron}`);
+    } else {
+      fail('cron_mismatch', diagnostics);
+    }
+  }
 
   const expectedR2 = expected.r2.map((binding) => `${binding.binding}:${binding.bucket_name}`);
   const actualR2 = remote.bindings
@@ -325,6 +341,7 @@ export function resolveCloudflareReadCredentials({
 export async function runProductionDeploySemanticPreflight({
   expectedVariables,
   allowedPlannedChanges = [],
+  allowedPlannedCronAdditions = [],
   configPath = DEFAULT_CONFIG_PATH,
   credentials,
   environment = process.env,
@@ -343,7 +360,12 @@ export async function runProductionDeploySemanticPreflight({
     workerName: expected.workerName,
     fetchImplementation,
   });
-  const result = verifyProductionDeployContract({ expected, remote, allowedPlannedChanges });
+  const result = verifyProductionDeployContract({
+    expected,
+    remote,
+    allowedPlannedChanges,
+    allowedPlannedCronAdditions,
+  });
   log(JSON.stringify(result));
   return result;
 }
