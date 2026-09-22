@@ -70,6 +70,12 @@
       "name": "experience_payment_claim_and_pending_cleanup",
       "repositoryFile": "supabase/migrations/20260922081710_experience_payment_claim_and_pending_cleanup.sql",
       "repositorySha256": "c1decd62998af9e0f05f2b803ecafad446d09b9dcad22cc2d2ad2c34f3fbba6e"
+    },
+    {
+      "version": "20260922125140",
+      "name": "close_refunded_phone_proxy_requests",
+      "repositoryFile": "supabase/migrations/20260922125140_close_refunded_phone_proxy_requests.sql",
+      "repositorySha256": "a951fd089dd62da1bb140b9f4c64044709e5b3752923c788faa7fe26b68ef900"
     }
   ],
   "operationalStateDeltas": [
