@@ -212,9 +212,11 @@ export function prepareGoogleAnalyticsQueue(runtime?: GoogleAnalyticsRuntime | n
   if (!target) return false;
 
   target.dataLayer = target.dataLayer || [];
-  target.gtag = target.gtag || ((...args: unknown[]) => {
-    target.dataLayer?.push(args);
-  });
+  target.gtag = target.gtag || function gtag() {
+    // Google tag consumes the function's arguments object as its command tuple.
+    // eslint-disable-next-line prefer-rest-params
+    target.dataLayer?.push(arguments);
+  };
   return true;
 }
 
@@ -222,6 +224,7 @@ export function initializeGoogleAnalytics(measurementId: string) {
   if (typeof window === 'undefined') return false;
   const normalizedMeasurementId = normalizeGoogleAnalyticsMeasurementId(measurementId);
   if (!normalizedMeasurementId || !window.__locallyGoogleAnalyticsConsentGranted) return false;
+  if (window.__locallyGoogleAnalyticsReady) return true;
 
   if (!prepareGoogleAnalyticsQueue(window) || !window.gtag) return false;
   const gtag = window.gtag;

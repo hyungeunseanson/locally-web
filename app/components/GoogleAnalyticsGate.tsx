@@ -57,7 +57,12 @@ export default function GoogleAnalyticsGate({
       }
 
       window.__locallyGoogleAnalyticsConsentGranted = granted;
-      if (granted) prepareGoogleAnalyticsQueue();
+      if (granted) {
+        prepareGoogleAnalyticsQueue();
+        if (initializeGoogleAnalytics(measurementId)) {
+          setAnalyticsReady(true);
+        }
+      }
       setConsentGranted(granted);
     };
 

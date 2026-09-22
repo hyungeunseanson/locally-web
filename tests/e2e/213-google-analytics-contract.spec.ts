@@ -98,8 +98,11 @@ test.describe('Google Analytics privacy-first contracts', () => {
     expect(prepareGoogleAnalyticsQueue(runtime)).toBeTruthy();
     runtime.gtag?.('config', 'G-ABC123');
 
-    expect(runtime.dataLayer).toEqual([
-      ['config', 'G-ABC123'],
+    expect(runtime.dataLayer).toHaveLength(1);
+    expect(Array.isArray(runtime.dataLayer?.[0])).toBeFalsy();
+    expect(Array.from(runtime.dataLayer?.[0] as ArrayLike<unknown>)).toEqual([
+      'config',
+      'G-ABC123',
     ]);
   });
 
@@ -164,10 +167,14 @@ test.describe('Google Analytics privacy-first contracts', () => {
     expect(gateSource).toContain('isGoogleAnalyticsConsentGranted');
     expect(gateSource).toContain('buildSanitizedGoogleAnalyticsLocation');
 
-    const prepareQueueIndex = gateSource.indexOf('if (granted) prepareGoogleAnalyticsQueue()');
+    const prepareQueueIndex = gateSource.indexOf('prepareGoogleAnalyticsQueue()');
+    const initializeAnalyticsIndex = gateSource.indexOf('initializeGoogleAnalytics(measurementId)');
     const revealTagIndex = gateSource.indexOf('setConsentGranted(granted)');
     expect(prepareQueueIndex).toBeGreaterThan(-1);
     expect(prepareQueueIndex).toBeLessThan(revealTagIndex);
+    expect(initializeAnalyticsIndex).toBeGreaterThan(prepareQueueIndex);
+    expect(initializeAnalyticsIndex).toBeLessThan(revealTagIndex);
+    expect(analyticsSource).toContain('target.dataLayer?.push(arguments)');
 
     const consentDefaultIndex = analyticsSource.indexOf("gtag('consent', 'default'");
     const tagInitializationIndex = analyticsSource.indexOf("gtag('js', new Date())");
