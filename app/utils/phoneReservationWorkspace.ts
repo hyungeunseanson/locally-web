@@ -22,3 +22,15 @@ export function matchesPhoneFilter(request: PhoneWorkspaceRequest, filter: Phone
   if (filter === 'closed') return !active && !request.needs_reply && !request.needs_attention;
   return true;
 }
+
+/** Display only: keep the server's attention/filter decision authoritative. */
+export function getPhoneAttentionLabel(request: Pick<PhoneWorkspaceRequest, 'needs_attention' | 'linked_inquiry_id' | 'status' | 'payment_status'>): string | null {
+  if (!request.needs_attention) return null;
+  // The server normalizes missing, broken and wrong-customer links to null.
+  if (!request.linked_inquiry_id) return '문의 연결 확인 필요';
+  if (request.status === 'PENDING' || request.status === 'IN_PROGRESS') {
+    if (request.payment_status === 'REFUNDED') return '환불 후 예약 상태 확인';
+    if (request.payment_status === 'FAILED') return '결제 취소 후 예약 상태 확인';
+  }
+  return null;
+}

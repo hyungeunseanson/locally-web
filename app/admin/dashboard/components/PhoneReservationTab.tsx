@@ -8,7 +8,7 @@ import ChatMonitor from './ChatMonitor';
 import { useConfirmDialog } from '@/app/hooks/useConfirmDialog';
 import { ChevronLeft, MoreHorizontal } from 'lucide-react';
 import { getProxyCategoryLabel, getProxyPaymentMethod, getProxyPaymentStatusLabel, getProxyRequestTitle, getProxyRequesterDisplayName } from '@/app/utils/proxyBooking';
-import { PHONE_FILTER_LABELS, type PhoneFilter, type PhoneWorkspaceRequest } from '@/app/utils/phoneReservationWorkspace';
+import { getPhoneAttentionLabel, PHONE_FILTER_LABELS, type PhoneFilter, type PhoneWorkspaceRequest } from '@/app/utils/phoneReservationWorkspace';
 
 const PAGE_SIZE = 10;
 const STATUS_LABELS = { PENDING: '대기', IN_PROGRESS: '진행 중', COMPLETED: '완료', CANCELLED: '취소' };
@@ -128,6 +128,7 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
   };
   // Never show the previous customer's conversation while the next detail loads.
   const selected = detail?.id === initialSelectedRequestId ? detail : null;
+  const attentionLabel = selected ? getPhoneAttentionLabel(selected) : null;
   const canComplete = Boolean(selected && !updating && selected.payment_status === 'COMPLETED' && ['PENDING', 'IN_PROGRESS'].includes(selected.status) && selected.linked_inquiry_id);
   const complete = async () => {
     if (!selected || !canComplete) return;
@@ -172,7 +173,7 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
       <div className="flex shrink-0 flex-col items-end gap-0.5 text-[8px] md:text-[10px]">
         <span className="rounded-full border border-slate-200 bg-white px-1.5 py-0.5">{STATUS_LABELS[selected.status]}</span>
         <span className="text-slate-500">{getProxyPaymentStatusLabel(selected)}</span>
-        {selected.needs_attention && <span className="text-amber-700">확인 필요</span>}
+        {attentionLabel && <span className="whitespace-nowrap text-amber-700">{attentionLabel}</span>}
       </div>
       {(canComplete || manualPayment || selected.payment_status === 'COMPLETED') && <details key={selected.id} className="relative shrink-0" onKeyDown={event => {
         if (event.key === 'Escape') { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); }
@@ -205,7 +206,7 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
           <p className="flex gap-1 text-sm font-bold"><span className="min-w-0 truncate" title={getProxyRequestTitle(row)}>{getProxyRequestTitle(row)}</span><span className="max-w-[40%] shrink-0 truncate">· {getProxyRequesterDisplayName(row.profiles)}</span></p>
           <p className="flex items-baseline gap-1 text-xs text-slate-500"><span className="shrink-0">{getProxyPaymentStatusLabel(row)}</span><span aria-hidden="true">·</span><span className="min-w-0 truncate">{row.latest_content}</span></p>
           {row.needs_reply && <span className="text-xs font-bold text-blue-700">추가 답장 </span>}
-          {row.needs_attention && <span className="text-xs font-bold text-amber-700">확인 필요</span>}
+          {row.needs_attention && <span className="text-xs font-bold text-amber-700">{getPhoneAttentionLabel(row)}</span>}
         </button>)}
         {loading && <p className="p-3 text-sm">불러오는 중...</p>}
         {hasMore && <button disabled={loading} data-testid="admin-phone-reservation-load-more-button" onClick={() => void loadList(true)} className="w-full p-3 text-sm">더 보기</button>}
