@@ -40,6 +40,7 @@ function multiplexerOptions(calls: string[]) {
     runAdminSupportUnreadAlerts: () => calls.push('admin-support'),
     runNotificationRetentionCleanup: () => calls.push('retention'),
     runExperienceCompletionSync: () => calls.push('completion'),
+    runServiceCompletionSync: () => calls.push('service'),
     log: () => undefined,
   };
 }

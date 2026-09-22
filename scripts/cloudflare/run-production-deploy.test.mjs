@@ -16,6 +16,7 @@ import { readHomePopularityReleasePolicy, resolveHomePopularityReleaseProfile } 
 import { readAdminSupportUnreadReleasePolicy, resolveAdminSupportUnreadReleaseProfile } from './admin-support-unread-release-profile.mjs';
 import { readNotificationRetentionReleasePolicy, resolveNotificationRetentionReleaseProfile } from './notification-retention-release-profile.mjs';
 import { readExperienceCompletionReleasePolicy, resolveExperienceCompletionReleaseProfile } from './experience-completion-release-profile.mjs';
+import { readServiceCompletionReleasePolicy, resolveServiceCompletionReleaseProfile } from './service-completion-release-profile.mjs';
 import { readExperienceMediaSourceReleasePolicy, resolveExperienceMediaSourceReleaseProfile } from './experience-media-source-release-profile.mjs';
 
 async function homeProfile(name = 'off') {
@@ -42,6 +43,13 @@ async function retentionProfile(name = 'off') {
 async function experienceCompletionProfile(name = 'off') {
   return resolveExperienceCompletionReleaseProfile(
     await readExperienceCompletionReleasePolicy(),
+    name
+  );
+}
+
+async function serviceCompletionProfile(name = 'off') {
+  return resolveServiceCompletionReleaseProfile(
+    await readServiceCompletionReleasePolicy(),
     name
   );
 }
@@ -332,6 +340,54 @@ test('Experience completion ON/OFF profiles are independent from every existing 
     requestedNotificationRetentionProfile: undefined,
     requestedExperienceCompletionProfile: 'off',
     dryRun: false,
+  });
+});
+
+test('Service completion defaults OFF and passes an independent ON/OFF deployment variable', async () => {
+  const media = resolveReleaseProfile(await readReleasePolicy());
+  const translation = resolveTranslationReleaseProfile(await readTranslationReleasePolicy());
+  const home = await homeProfile('on');
+  const adminSupport = await adminSupportProfile('on');
+  const retention = await retentionProfile('on');
+  const experience = await experienceCompletionProfile('on');
+  const source = resolveExperienceMediaSourceReleaseProfile(
+    await readExperienceMediaSourceReleasePolicy(),
+    'off'
+  );
+  const policy = await readServiceCompletionReleasePolicy();
+  assert.equal(resolveServiceCompletionReleaseProfile(policy).name, 'off');
+
+  for (const name of ['off', 'on']) {
+    const service = await serviceCompletionProfile(name);
+    const contract = buildDeploymentContract(
+      media,
+      translation,
+      home,
+      adminSupport,
+      retention,
+      { dryRun: true },
+      experience,
+      source,
+      service
+    );
+    assert(contract.wranglerArguments.includes(
+      `SERVICE_COMPLETION_SCHEDULED_ENABLED:${service.scheduledEnabled}`
+    ));
+    assert(contract.wranglerArguments.includes(
+      `EXPERIENCE_COMPLETION_SCHEDULED_ENABLED:${experience.scheduledEnabled}`
+    ));
+    assert(contract.wranglerArguments.includes('--dry-run'));
+  }
+
+  assert.deepEqual(parseDeploymentArguments(['--service-completion-profile=on', '--dry-run']), {
+    requestedProfile: undefined,
+    requestedTranslationProfile: undefined,
+    requestedHomePopularityProfile: undefined,
+    requestedAdminSupportUnreadProfile: undefined,
+    requestedNotificationRetentionProfile: undefined,
+    requestedExperienceCompletionProfile: undefined,
+    requestedServiceCompletionProfile: 'on',
+    dryRun: true,
   });
 });
 

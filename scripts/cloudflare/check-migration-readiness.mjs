@@ -176,6 +176,7 @@ assert.equal(wrangler.env.production.vars.HOME_POPULARITY_SNAPSHOT_SCHEDULED_ENA
 assert.equal(wrangler.env.production.vars.ADMIN_SUPPORT_UNREAD_ALERTS_SCHEDULED_ENABLED, 'false');
 assert.equal(wrangler.env.production.vars.NOTIFICATION_RETENTION_CLEANUP_SCHEDULED_ENABLED, 'false');
 assert.equal(wrangler.env.production.vars.EXPERIENCE_COMPLETION_SCHEDULED_ENABLED, 'false');
+assert.equal(wrangler.env.production.vars.SERVICE_COMPLETION_SCHEDULED_ENABLED, 'false');
 assert.deepEqual(manifest.homePopularityReleasePolicy, {
   defaultProductionProfile: 'on',
   scheduledEnabledVariable: 'HOME_POPULARITY_SNAPSHOT_SCHEDULED_ENABLED',
@@ -200,6 +201,16 @@ assert.deepEqual(manifest.experienceCompletionReleasePolicy, {
   rawDefault: 'false',
   cron: '23 */2 * * *',
 });
+assert.deepEqual(manifest.serviceCompletionReleasePolicy, {
+  defaultProductionProfile: 'off',
+  scheduledEnabledVariable: 'SERVICE_COMPLETION_SCHEDULED_ENABLED',
+  rawDefault: 'false',
+  cron: '23 */2 * * *',
+});
+assert.equal(
+  manifest.serviceCompletionReleasePolicy.cron,
+  manifest.experienceCompletionReleasePolicy.cron
+);
 assert.equal(
   wrangler.env.production.vars[manifest.publicExperienceMediaProducerPolicy.enabledVariable],
   manifest.publicExperienceMediaProducerPolicy.defaultEnabled

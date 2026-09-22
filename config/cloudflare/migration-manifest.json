@@ -98,6 +98,12 @@
     "rawDefault": "false",
     "cron": "23 */2 * * *"
   },
+  "serviceCompletionReleasePolicy": {
+    "defaultProductionProfile": "off",
+    "scheduledEnabledVariable": "SERVICE_COMPLETION_SCHEDULED_ENABLED",
+    "rawDefault": "false",
+    "cron": "23 */2 * * *"
+  },
   "publicExperienceMediaProducerPolicy": {
     "enabledVariable": "PUBLIC_EXPERIENCE_MEDIA_PRODUCER_ENABLED",
     "experienceIdsVariable": "PUBLIC_EXPERIENCE_MEDIA_PRODUCER_EXPERIENCE_IDS",
@@ -251,7 +257,8 @@
       "HOME_POPULARITY_SNAPSHOT_SCHEDULED_ENABLED",
       "ADMIN_SUPPORT_UNREAD_ALERTS_SCHEDULED_ENABLED",
       "NOTIFICATION_RETENTION_CLEANUP_SCHEDULED_ENABLED",
-      "EXPERIENCE_COMPLETION_SCHEDULED_ENABLED"
+      "EXPERIENCE_COMPLETION_SCHEDULED_ENABLED",
+      "SERVICE_COMPLETION_SCHEDULED_ENABLED"
     ],
     "canarySafetyVariables": [
       "CLOUDFLARE_FUNCTIONAL_CANARY_ENABLED",

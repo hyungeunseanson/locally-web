@@ -3,7 +3,8 @@ export type LocallyScheduledTaskName =
   | 'home_popularity_snapshot'
   | 'admin_support_unread_alerts'
   | 'notification_retention_cleanup'
-  | 'experience_completion_sync';
+  | 'experience_completion_sync'
+  | 'service_completion_sync';
 
 type ScheduledControllerLike = { cron: string };
 type ScheduledHandler<Environment> = (
@@ -21,6 +22,7 @@ type ScheduledOptions<Environment> = {
   runAdminSupportUnreadAlerts: ScheduledHandler<Environment>;
   runNotificationRetentionCleanup: ScheduledHandler<Environment>;
   runExperienceCompletionSync: ScheduledHandler<Environment>;
+  runServiceCompletionSync: ScheduledHandler<Environment>;
   delegate?: ScheduledHandler<Environment>;
   log?: (entry: Record<string, unknown>) => void;
 };
@@ -77,6 +79,10 @@ export async function handleLocallyScheduledEvent<Environment>(
     {
       name: 'experience_completion_sync',
       run: options.runExperienceCompletionSync,
+    },
+    {
+      name: 'service_completion_sync',
+      run: options.runServiceCompletionSync,
     },
   ];
   const results = await Promise.allSettled(
