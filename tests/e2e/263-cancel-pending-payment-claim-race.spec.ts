@@ -194,7 +194,7 @@ test.describe('Cancel pending payment-claim race safety', () => {
     expect(bankConfirmation).not.toContain(".update({\n      status: 'confirmed'");
   });
 
-  test('removes operational booking deletes and keeps the GitHub schedule unchanged', () => {
+  test('removes operational booking deletes and keeps the GitHub manual fallback', () => {
     const bookingRoute = source('app/api/bookings/route.ts');
     const cleanupRoute = source('app/api/cron/cancel-pending/route.ts');
     const workflow = source('.github/workflows/cancel-pending-bookings.yml');
@@ -203,7 +203,7 @@ test.describe('Cancel pending payment-claim race safety', () => {
     expect(cleanupRoute).not.toContain('.delete()');
     expect(cleanupRoute).not.toContain('ids:');
     expect(cleanupRoute).toContain('runCancelPendingBookings');
-    expect(workflow).toContain("cron: '7,37 * * * *'");
+    expect(workflow).not.toMatch(/\n\s*schedule:\s*(?:\n|$)/);
     expect(workflow).toContain('workflow_dispatch:');
   });
 

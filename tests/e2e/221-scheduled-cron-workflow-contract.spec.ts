@@ -5,7 +5,6 @@ import { expect, test } from '@playwright/test';
 type ScheduledCronWorkflowContract = {
   path: string;
   name: string;
-  schedule: string;
   concurrencyGroup: string;
   timeoutMinutes: number;
   endpoint: string;
@@ -15,7 +14,6 @@ const WORKFLOWS: ScheduledCronWorkflowContract[] = [
   {
     path: '.github/workflows/cancel-pending-bookings.yml',
     name: 'Cancel Pending Bookings',
-    schedule: "'7,37 * * * *'",
     concurrencyGroup: 'cancel-pending-bookings',
     timeoutMinutes: 10,
     endpoint: '/api/cron/cancel-pending',
@@ -24,11 +22,11 @@ const WORKFLOWS: ScheduledCronWorkflowContract[] = [
 
 test.describe('Scheduled cron workflow recovery contract', () => {
   for (const workflow of WORKFLOWS) {
-    test(`${workflow.name} keeps its safe scheduler and authenticated request contract`, () => {
+    test(`${workflow.name} keeps its manual authenticated fallback contract`, () => {
       const source = readFileSync(workflow.path, 'utf8');
 
       expect(source).toContain(`name: ${workflow.name}`);
-      expect(source).toContain(`- cron: ${workflow.schedule}`);
+      expect(source).not.toMatch(/\n\s*schedule:\s*(?:\n|$)/);
       expect(source).toMatch(/\n\s*workflow_dispatch:\s*(?:\n|$)/);
       expect(source).toContain(`group: ${workflow.concurrencyGroup}`);
       expect(source).toMatch(/cancel-in-progress:\s*false/);

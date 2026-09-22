@@ -60,7 +60,8 @@ test.describe('proxy card intake contracts', () => {
     expect(notificationHandler).toContain('verifyCardPaymentNotification');
   });
 
-  test('does not change the existing cancel-pending Cron cadence', () => {
-    expect(cronWorkflow).toContain("cron: '7,37 * * * *'");
+  test('keeps Cancel Pending Bookings as a manual GitHub fallback', () => {
+    expect(cronWorkflow).not.toMatch(/\n\s*schedule:\s*(?:\n|$)/);
+    expect(cronWorkflow).toContain('workflow_dispatch:');
   });
 });

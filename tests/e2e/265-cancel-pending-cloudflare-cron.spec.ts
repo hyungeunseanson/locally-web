@@ -232,7 +232,7 @@ test.describe('Cancel Pending Bookings Cloudflare Cron', () => {
       '31 19 * * *',
     ]));
     expect(worker).toContain('handleCancelPendingBookingsScheduled');
-    expect(workflow).toContain("cron: '7,37 * * * *'");
+    expect(workflow).not.toMatch(/\n\s*schedule:\s*(?:\n|$)/);
     expect(workflow).toContain('workflow_dispatch:');
   });
 });
