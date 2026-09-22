@@ -553,7 +553,7 @@ export default function ChatMonitor({ view = 'support', enabled = true, phone }:
       {/* 오른쪽 채팅창 (모바일에서는 오버레이처럼 보이거나 교체됨) */}
       {/* 🟢 이슈5: 데스크탑에서 채팅창이 fullscreen으로 뜨는 문제 수정 — fixed/inset-0/w-[100vw]/h-[100vh]를 모바일 전용으로 제한 */}
       <div className={phoneMode ? "flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white" : `flex-1 bg-white md:rounded-2xl border-l-[0px] md:border-l border-slate-200 md:border-slate-200 flex flex-col shadow-sm transition-all duration-300 ${selectedInquiry ? 'flex fixed inset-x-0 top-14 bottom-0 z-[50] w-full h-auto -ml-0 md:ml-0 md:static md:inset-auto md:top-auto md:bottom-auto md:w-auto md:h-auto md:z-0 md:flex-1 md:rounded-2xl' : 'hidden md:flex'}`}>
-        {phone && <div className="max-h-[42%] shrink-0 overflow-y-auto border-b p-3">{phone.header}</div>}
+        {phone && <div data-testid="admin-phone-intake-header" className="max-h-[38%] shrink-0 overflow-y-auto border-b border-slate-200 p-2 md:max-h-[min(32%,290px)] md:px-3">{phone.header}</div>}
         {selectedInquiry && (!phone || selectedInquiryId === targetInquiryId) ? (
           <>
             {!phoneMode && <>
@@ -798,7 +798,7 @@ export default function ChatMonitor({ view = 'support', enabled = true, phone }:
               })}
             </div>
 
-            {phone && <div className="shrink-0 space-y-2 border-t px-3 py-2 text-xs">
+            {phone && <div data-testid="admin-phone-quick-replies" className="shrink-0 space-y-1 border-t border-slate-200 px-3 py-1.5 text-xs">
               {pendingCompletion[selectedInquiryId!] ? <div role="alert" className="rounded-lg bg-amber-50 p-2 text-amber-900">
                 고객 안내는 전송됐지만 완료 처리에 실패했습니다.
                 <button disabled={isSending} className="ml-2 underline" onClick={() => void retryCompletion()}>완료 처리 다시 시도</button>
@@ -808,17 +808,17 @@ export default function ChatMonitor({ view = 'support', enabled = true, phone }:
                   ['예약 불가', '확인 결과 요청하신 예약 진행이 어렵습니다.\n\n[상세 내용을 입력해주세요]'],
                   ['확인 결과', '업체에 확인한 결과를 안내드립니다.\n\n[확인 내용을 입력해주세요]'],
                 ].map(([label, draft]) => <button key={label} disabled={isSending}
-                  className="rounded-full border px-2 py-1" onClick={() => setDraftsByInquiryId(current => ({ ...current, [selectedInquiryId!]: draft }))}>{label}</button>)}
+                  className="rounded-full border border-slate-200 px-2 py-0.5" onClick={() => setDraftsByInquiryId(current => ({ ...current, [selectedInquiryId!]: draft }))}>{label}</button>)}
               </div>}
               {phone.canComplete && !isMessagesLoading && !messageError && !pendingCompletion[selectedInquiryId!] && messages.filter(message => !isDeletedInquiryMessage(message.type)).at(-1)?.sender_id !== selectedInquiry.user_id && messages.length > 0 &&
                 <button disabled={isSending} onClick={() => void retryCompletion()} className="text-slate-500 underline">이미 안내한 요청 완료 처리</button>}
             </div>}
-            <div className="p-2 md:p-4 bg-white border-t border-slate-100 flex flex-wrap items-end gap-1.5 md:gap-2 shrink-0 pb-2 md:pb-4">
+            <div className={`${phone ? 'border-slate-200 p-2 md:px-3 md:py-3' : 'border-slate-100 p-2 md:p-4 pb-2 md:pb-4'} bg-white border-t flex flex-wrap items-end gap-1.5 md:gap-2 shrink-0`}>
               <textarea
                 ref={composerRef}
                 rows={1}
                 data-testid="admin-chat-composer"
-                className={`${phone ? 'basis-full md:basis-auto text-sm' : 'text-[11px]'} flex-1 min-h-9 md:min-h-11 max-h-28 resize-none overflow-y-hidden border border-slate-200 bg-slate-50 rounded-lg md:rounded-xl px-2.5 md:px-4 py-2 md:py-3 focus:outline-none focus:border-black focus:bg-white transition-all md:text-sm leading-5`}
+                className={`${phone ? 'basis-full md:basis-auto text-sm md:min-h-[52px]' : 'text-[11px]'} flex-1 min-h-9 md:min-h-11 max-h-28 resize-none overflow-y-hidden border border-slate-200 bg-slate-50 rounded-lg md:rounded-xl px-2.5 md:px-4 py-2 md:py-3 focus:outline-none focus:border-black focus:bg-white transition-all md:text-sm leading-5`}
                 placeholder={activeTab === 'monitor' ? "관리자 권한 메시지 전송..." : "답변을 입력하세요..."}
                 value={replyText}
                 disabled={isSending || isMessagesLoading || Boolean(messageError) || Boolean(pendingCompletion[selectedInquiryId!])}
@@ -839,7 +839,7 @@ export default function ChatMonitor({ view = 'support', enabled = true, phone }:
                 onClick={() => void handleSend()}
                 disabled={isSending || isMessagesLoading || Boolean(messageError) || !replyText.trim() || Boolean(pendingCompletion[selectedInquiryId!])}
                 aria-label={phone ? '답변 보내기' : '메시지 전송'}
-                className="bg-black text-white px-3 md:px-5 py-2 rounded-lg md:rounded-xl hover:bg-slate-800 transition-colors shrink-0 flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-50"
+                className={`${phone ? 'md:min-h-[52px] text-sm' : ''} bg-black text-white px-3 md:px-5 py-2 rounded-lg md:rounded-xl hover:bg-slate-800 transition-colors shrink-0 flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-50`}
               >
                 {phone ? '답변 보내기' : isSending
                   ? <Loader2 className="w-3.5 h-3.5 md:w-[18px] md:h-[18px] animate-spin" />
@@ -847,7 +847,7 @@ export default function ChatMonitor({ view = 'support', enabled = true, phone }:
               </button>
               {phone && <button onClick={() => void handleSend(true)}
                 disabled={!phone.canComplete || isSending || isMessagesLoading || Boolean(messageError) || !replyText.trim() || Boolean(pendingCompletion[selectedInquiryId!])}
-                className="shrink-0 rounded-lg bg-emerald-700 px-3 py-2 text-xs text-white disabled:opacity-50">안내 보내고 완료</button>}
+                className="shrink-0 rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50 md:min-h-[52px] md:text-sm">안내 보내고 완료</button>}
             </div>
           </>
         ) : (

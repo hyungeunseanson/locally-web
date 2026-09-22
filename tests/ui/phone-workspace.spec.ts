@@ -3,6 +3,8 @@ import { build } from 'esbuild';
 import postcss from 'postcss';
 import tailwind from '@tailwindcss/postcss';
 import { resolve } from 'node:path';
+import { writeFileSync, mkdirSync } from 'node:fs';
+import { buildProxyInquiryInitialMessage } from '@/app/utils/proxyBooking';
 
 let script: string;
 let css: string;
@@ -33,15 +35,24 @@ test.beforeAll(async () => {
   css = (await postcss([tailwind()]).process('@import "tailwindcss";', { from: resolve('app/phone-fixture.css') })).css;
 });
 
-async function fixture(page: Page, options: { failSend?: boolean; failComplete?: boolean; unpaid?: boolean; status?: string; inquiryId?: string } = {}) {
+async function fixture(page: Page, options: { failSend?: boolean; failComplete?: boolean; unpaid?: boolean; status?: string; inquiryId?: string; visual?: boolean } = {}) {
   const request = {
     id: 'request-1', user_id: 'guest', category: 'RESTAURANT', status: options.status || 'PENDING',
     payment_status: options.unpaid ? 'WAITING' : 'COMPLETED', payment_channel: 'LOCALLY',
-    form_data: { payment_method: options.unpaid ? 'bank' : 'card', restaurant_name: '스시 테스트', restaurant_phone: '0312345678', google_map_url: 'https://example.com/map', preferred_slot_primary: '2026-09-25T19:00', guest_number: 2, reservation_name: '홍길동', linked_inquiry_id: '123', request_notes: '창가 자리' },
+    form_data: { payment_method: options.unpaid ? 'bank' as const : 'card' as const, restaurant_name: '스시 테스트', restaurant_phone: '0312345678', google_map_url: 'https://example.com/map', preferred_slot_primary: '2026-09-25T19:00', guest_number: 2, reservation_name: '홍길동', linked_inquiry_id: '123', request_notes: '창가 자리' },
     profiles: { full_name: '홍길동' }, linked_inquiry_id: '123', needs_attention: false, needs_reply: false,
     latest_sender_id: 'guest', latest_content: '예약해주세요', created_at: '2026-09-22T00:00:00Z',
   };
+  if (options.visual) Object.assign(request, {
+    category: 'HOTEL', profiles: { full_name: '테스트 고객' },
+    form_data: { payment_method: 'card', property_name: '호텔 라이브맥스 버짓 닛포리 (Hotel Livemax BUDGET Nippori)', property_phone: '03-3823-1313', property_link: 'https://maps.app.goo.gl/fCPWn7ZoYQdZ4ode7?g_st=ac', reservation_number: 'TEST-12345678', checkin_date: '2026-09-25', checkout_date: '2026-09-28', hotel_inquiry_type: 'RESERVATION_CHECK', request_content: '늦은 체크인이 가능한지 확인해주세요.', contact_name: '테스트 고객', contact_phone: '010-0000-0000', additional_notes: '현장 확인 후 안내 부탁드립니다.', linked_inquiry_id: '123' },
+  });
   const messages = [{ id: 1, sender_id: 'guest', content: '예약해주세요', type: 'text', sender: { name: '홍길동' } }];
+  if (options.visual) messages[0].content = buildProxyInquiryInitialMessage({category: 'HOTEL', formData: request.form_data, paymentChannel: 'LOCALLY', finalAmount: 6000});
+  if (options.visual) messages.push(
+    { id: 2, sender_id: 'admin', content: '숙소에 늦은 체크인 가능 여부를 확인하고 안내드리겠습니다.', type: 'text', sender: { name: '운영팀' } },
+    { id: 3, sender_id: 'guest', content: '감사합니다. 밤 10시쯤 도착할 예정입니다.', type: 'text', sender: { name: '테스트 고객' } },
+  );
   const calls: { path: string; body: Record<string, unknown> }[] = [];
   let failComplete = options.failComplete;
   await page.route('**/*', async route => {
@@ -57,7 +68,7 @@ async function fixture(page: Page, options: { failSend?: boolean; failComplete?:
       const matching = filter === 'all' || filter === 'closed' && request.status === 'COMPLETED' && !request.needs_reply
         || filter === 'todo' && (request.needs_reply || request.status !== 'COMPLETED' && request.payment_status === 'COMPLETED')
         || filter === 'payment' && request.payment_status === 'WAITING';
-      return json({ success: true, data: url.searchParams.has('requestId') ? request : matching ? [request] : [], pagination: { hasMore: false } });
+      return json({ success: true, data: url.searchParams.has('requestId') ? request : matching ? (options.visual ? Array.from({length:10},(_,i)=>({...request,id:i ? `request-${i+1}` : request.id, latest_content:'업체 확인 후 안내드리겠습니다.'})) : [request]) : [], pagination: { hasMore: false } });
     }
     if (path === '/api/admin/inquiries') {
       const id = url.searchParams.get('inquiryId');
@@ -78,7 +89,7 @@ async function fixture(page: Page, options: { failSend?: boolean; failComplete?:
       request.status = 'COMPLETED'; return json({ success: true });
     }
     if (path.startsWith('/api/')) return json({ success: true });
-    return route.fulfill({ contentType: 'text/html', body: `<html><head><style>${css}</style></head><body><main style="padding:16px"><div id="root"></div></main><script>${script.replaceAll('</script', '<\\/script')}</script></body></html>` });
+    return route.fulfill({ contentType: 'text/html', body: `<html><head><style>${css}${options.visual ? '@media(min-width:768px){html{font-size:20px}body>main{max-width:1785px;margin:40px auto}}' : ''}</style></head><body><main style="padding:16px"><div id="root"></div></main><script>${script.replaceAll('</script', '<\\/script')}</script></body></html>` });
   });
   await page.goto(`http://phone.test/admin/dashboard?tab=CHATS&${options.inquiryId ? `inquiryId=${options.inquiryId}` : 'view=phone&proxyRequestId=request-1'}`);
   return { calls, request, messages };
@@ -175,4 +186,57 @@ for (const view of ['', 'support', 'phone', 'monitor']) test(`explicit view ${vi
   const label = view === 'phone' ? '전화예약' : view === 'monitor' ? '실시간 모니터링' : '1:1 문의';
   await expect(page.getByRole('navigation', { name: 'Customer Support' }).getByRole('button', { name: label, exact: true })).toHaveAttribute('aria-current', 'page');
   if (view !== 'phone') await expect(page.getByTestId('admin-chat-inquiry-row-' + (view === 'monitor' ? '456' : '789'))).toBeVisible();
+});
+
+test('desktop polish reference at 2048x1231', async ({ page }) => {
+  await page.setViewportSize({width:2048,height:1231});
+  await fixture(page, {visual:true});
+  await expect(page.getByText('늦은 체크인이 가능한지 확인해주세요.',{exact:true})).toBeVisible();
+  await expect(page.getByTestId('admin-chat-messages-loading')).toHaveCount(0);
+  const metrics = await page.evaluate(() => {
+    const messages = document.querySelector('[data-testid="admin-chat-message-list"]')!;
+    const detail = messages.parentElement!;
+    const header = detail.firstElementChild!;
+    const quick = messages.nextElementSibling!;
+    const composer = quick.nextElementSibling!;
+    const list = document.querySelector('[data-testid="admin-phone-reservation-list"]')!;
+    const box = (el:Element) => Math.round(el.getBoundingClientRect().height);
+    return {header:box(header),conversation:box(messages),quick:box(quick),composer:box(composer),row:box(list.querySelector('button')!),listHeader:box(list.previousElementSibling!),leftWidth:Math.round(list.getBoundingClientRect().width),rightWidth:Math.round(detail.getBoundingClientRect().width)};
+  });
+  mkdirSync('.tmp/phone-polish',{recursive:true});
+  expect(metrics.header).toBeLessThanOrEqual(290);
+  expect(metrics.conversation).toBeGreaterThanOrEqual(480);
+  expect(metrics.quick).toBeLessThanOrEqual(46);
+  expect(metrics.composer).toBeLessThanOrEqual(88);
+  expect(metrics.row).toBeLessThanOrEqual(110);
+  expect(metrics.listHeader).toBeLessThanOrEqual(155);
+  expect(metrics.leftWidth / (metrics.leftWidth + metrics.rightWidth)).toBeCloseTo(0.3, 1);
+  const link = page.getByRole('link', {name: '숙소 링크 열기'});
+  await expect(link).toHaveAttribute('href', 'https://maps.app.goo.gl/fCPWn7ZoYQdZ4ode7?g_st=ac');
+  await expect(link).toHaveAttribute('target', '_blank');
+  await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  const label = 'after';
+  writeFileSync(`.tmp/phone-polish/${label}-metrics.json`,JSON.stringify(metrics,null,2));
+  await page.screenshot({path:`.tmp/phone-polish/${label}-desktop.png`,fullPage:true});
+});
+
+
+test('mobile hotel intake and composer remain accessible without horizontal overflow', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await fixture(page, { visual: true });
+  await expect(page.getByTestId('admin-chat-messages-loading')).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+  for (const name of ['답변 보내기', '안내 보내고 완료']) {
+    const box = await page.getByRole('button', { name, exact: true }).boundingBox();
+    expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(844);
+  }
+  const disclosure = page.getByText('신청서 전체 보기', { exact: false });
+  await expect(disclosure).toHaveCount(1);
+  {
+    await disclosure.focus();
+    await page.keyboard.press('Enter');
+    await expect(disclosure.locator('..')).toHaveAttribute('open', '');
+  }
+  await page.screenshot({ path: '.tmp/phone-polish/after-mobile.png', fullPage: true });
 });
