@@ -201,6 +201,10 @@ export async function createPayPalOrder(
   return paypalFetch<PayPalOrder>('/v2/checkout/orders', {
     method: 'POST',
     body: JSON.stringify(payload),
+    // A booking owns one provider order. If the provider succeeds but the
+    // following DB attach fails, a retry returns that order instead of
+    // creating an untracked replacement.
+    headers: { 'PayPal-Request-Id': `create-${params.orderId}` },
   });
 }
 

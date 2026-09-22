@@ -183,7 +183,7 @@ test.describe.serial('Card callback contract', () => {
     expect(response.status()).toBe(403);
   });
 
-  test('treats already paid experience callbacks as idempotent', async ({ page }) => {
+  test('rejects an already-paid experience callback without an exact stored attempt', async ({ page }) => {
     const owner = createTestUser('exp.callback.idempotent');
     const ownerId = await createAuthUser(owner, createdAuthUserIds);
     const { experienceId } = await getLatestHostExperience(syntheticExperienceFixture?.hostId);
@@ -205,11 +205,8 @@ test.describe.serial('Card callback contract', () => {
       },
     });
 
-    expect(response.status()).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      success: true,
-      message: 'Already processed',
-    });
+    expect([400, 409]).toContain(response.status());
+    await expect(response.json()).resolves.toMatchObject({ success: false });
   });
 
   test('keeps completed experience card notifications inert under PortOne', async ({ request }) => {

@@ -5,9 +5,6 @@ import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
 import { captureServerException } from '@/app/utils/monitoring/sentry';
-import {
-    getPendingBookingExpiryCutoff,
-} from '@/app/utils/bookings/pendingBookingHolds';
 import { readPrivateDemographics } from '@/app/utils/demographicsServer';
 
 type BookingRequestBody = {
@@ -153,23 +150,7 @@ export async function POST(request: Request) {
             }
         }
 
-        // GitHub cron이 지연돼도 30분 정책을 넘긴 카드 홀드가 슬롯을 계속 막지 않게 한다.
-        const { error: staleCardHoldCleanupError } = await supabaseAdmin
-            .from('bookings')
-            .delete()
-            .eq('experience_id', normalizedExperienceId)
-            .eq('date', date)
-            .eq('time', normalizedTime)
-            .eq('status', 'PENDING')
-            .eq('payment_method', 'card')
-            .is('tid', null)
-            .lt('created_at', getPendingBookingExpiryCutoff('card'));
-
-        if (staleCardHoldCleanupError) {
-            console.warn('[api/bookings] stale card hold cleanup skipped:', staleCardHoldCleanupError.message);
-        }
-
-        // 3. 예약 원자화 RPC 호출 (슬롯 잠금 + 검증 + 삽입)
+        // 3. 예약 원자화 RPC 호출 (슬롯 잠금 + 안전한 stale card tombstone + 검증 + 삽입)
         // [Note] solo-guarantee 사전 DB 조회(TOCTOU 취약)는 제거. RPC가 atomic하게 동일 조건 검증함.
         const { data: bookingData, error: bookingError } = await supabaseAdmin
             .rpc('create_booking_atomic', {

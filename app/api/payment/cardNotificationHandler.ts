@@ -196,10 +196,6 @@ async function processExperienceNotification(params: {
       : buildRejectedPostCancellationResponse();
   }
 
-  if (isConfirmedBookingStatus(String(booking.status || ''))) {
-    return buildNotificationOkResponse();
-  }
-
   if (
     isCancelledBookingStatus(String(booking.status || '')) &&
     hasMatchingStoredTransaction(booking, notification)
@@ -211,9 +207,11 @@ async function processExperienceNotification(params: {
     isCancelledBookingStatus(String(booking.status || '')) &&
     !booking.tid &&
     booking.cancel_reason === EXPLICIT_CARD_CHECKOUT_CANCEL_REASON;
+  const isPaidLike = isConfirmedBookingStatus(String(booking.status || ''));
 
   if (
     String(booking.status || '').toUpperCase() !== 'PENDING' &&
+    !isPaidLike &&
     !isExplicitReleasedCardHold
   ) {
     return NextResponse.json(

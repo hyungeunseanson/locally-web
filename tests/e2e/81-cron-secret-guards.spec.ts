@@ -418,13 +418,27 @@ test.describe('Cron secret guards', () => {
 
       expect(await response.json()).toMatchObject({
         success: true,
-        count: 4,
-        deletedCardAttemptCount: 2,
-        cancelledBookingCount: 2,
+        outcome: 'completed',
+        cancelledCount: 3,
+        reconciliationRequiredCount: 0,
       });
 
-      expect(remainingRows).toHaveLength(9);
+      expect(remainingRows).toHaveLength(11);
       expect(remainingRows).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          id: pendingCardId,
+          status: 'cancelled',
+          payment_method: 'card',
+          cancel_reason: STALE_CARD_CHECKOUT_CANCEL_REASON,
+          tid: null,
+        }),
+        expect.objectContaining({
+          id: releasedCardId,
+          status: 'cancelled',
+          payment_method: 'card',
+          cancel_reason: EXPLICIT_CARD_CHECKOUT_CANCEL_REASON,
+          tid: null,
+        }),
         expect.objectContaining({
           id: legacyCancelledCardId,
           status: 'cancelled',
@@ -493,7 +507,9 @@ test.describe('Cron secret guards', () => {
       });
       expect(repeatResponse.status()).toBe(200);
       expect(await repeatResponse.json()).toMatchObject({
-        message: 'No expired bookings found',
+        success: true,
+        outcome: 'no_candidates',
+        cancelledCount: 0,
       });
 
       const { data: rowsAfterRepeat, error: rowsAfterRepeatError } = await supabase

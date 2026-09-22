@@ -31,7 +31,7 @@ function exact(label, actual, expected) {
   }
 }
 
-const expectedApplyOrder = [
+const expectedAppliedOrder = [
   'supabase/migrations/20260912034545_production_schema_baseline.sql',
   'supabase/migrations/20260912050655_service_concierge_assignment.sql',
   'supabase/migrations/20260915141606_p0_storage_rpc_security_hardening.sql',
@@ -41,7 +41,16 @@ const expectedApplyOrder = [
   'supabase/migrations/20260916134243_review_direct_write_lockdown.sql',
   'supabase/migrations/20260918000000_proxy_card_intake_atomic.sql',
 ];
+const expectedPendingOrder = [
+  'supabase/migrations/20260922081710_experience_payment_claim_and_pending_cleanup.sql',
+];
+const expectedApplyOrder = [...expectedAppliedOrder, ...expectedPendingOrder];
 exact('fresh-project apply order', required.freshProjectApplyOrder, expectedApplyOrder);
+exact(
+  'pending Production migrations',
+  required.pendingProductionMigrations.map((entry) => entry.repositoryFile),
+  expectedPendingOrder
+);
 
 const migrationFiles = (await readdir(resolve(root, 'supabase/migrations')))
   .filter((name) => name.endsWith('.sql'))
@@ -51,7 +60,7 @@ exact('ordered repository migrations', migrationFiles, expectedApplyOrder);
 exact(
   'manifest repository migrations',
   current.migrationLedger.map((entry) => entry.repositoryFile),
-  expectedApplyOrder
+  expectedAppliedOrder
 );
 
 for (const table of required.functionalCanaryMinimum.tables) {
@@ -126,6 +135,7 @@ console.log(JSON.stringify({
   reproducibleFromHistoricalPatchesOnly: false,
   reproducibleFromImmutableBaselineOnly: false,
   freshProjectApplyOrder: expectedApplyOrder,
+  pendingProductionMigrations: expectedPendingOrder,
   clonedProductionBranchAction: 'run current-state-contract.sql only',
   functionalCanaryTableCount: required.functionalCanaryMinimum.tables.length,
   activeConciergeTableCount: required.activeConcierge.tables.length,
