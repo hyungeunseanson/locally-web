@@ -35,18 +35,19 @@ test.beforeAll(async () => {
   css = (await postcss([tailwind()]).process('@import "tailwindcss";', { from: resolve('app/phone-fixture.css') })).css;
 });
 
-async function fixture(page: Page, options: { failSend?: boolean; failComplete?: boolean; unpaid?: boolean; status?: string; inquiryId?: string; visual?: boolean; channel?: string; method?: string } = {}) {
+async function fixture(page: Page, options: { paymentStatus?: string; missingLink?: boolean; failSend?: boolean; failComplete?: boolean; unpaid?: boolean; status?: string; inquiryId?: string; visual?: boolean; channel?: string; method?: string } = {}) {
   const request = {
     id: 'request-1', user_id: 'guest', category: 'RESTAURANT', status: options.status || 'PENDING',
-    payment_status: options.unpaid ? 'WAITING' : 'COMPLETED', payment_channel: options.channel || 'LOCALLY',
+    payment_status: options.paymentStatus || (options.unpaid ? 'WAITING' : 'COMPLETED'), payment_channel: options.channel || 'LOCALLY',
     form_data: { payment_method: (options.method || (options.unpaid ? 'bank' : 'card')) as 'bank' | 'card', restaurant_name: '스시 테스트', restaurant_phone: '0312345678', google_map_url: 'https://example.com/map', preferred_slot_primary: '2026-09-25T19:00', guest_number: 2, reservation_name: '홍길동', linked_inquiry_id: '123', request_notes: '창가 자리' },
-    profiles: { full_name: '홍길동' }, linked_inquiry_id: '123', needs_attention: false, needs_reply: false,
+    profiles: { full_name: '홍길동' }, linked_inquiry_id: options.missingLink ? null : '123', needs_attention: false, needs_reply: false,
     latest_sender_id: 'guest', latest_content: '예약해주세요', created_at: '2026-09-22T00:00:00Z',
   };
   if (options.visual) Object.assign(request, {
     category: 'HOTEL', profiles: { full_name: '테스트 고객' },
     form_data: { payment_method: 'card', property_name: '호텔 라이브맥스 버짓 닛포리 (Hotel Livemax BUDGET Nippori)', property_phone: '03-3823-1313', property_link: 'https://maps.app.goo.gl/fCPWn7ZoYQdZ4ode7?g_st=ac', reservation_number: 'TEST-12345678', checkin_date: '2026-09-25', checkout_date: '2026-09-28', hotel_inquiry_type: 'RESERVATION_CHECK', request_content: '늦은 체크인이 가능한지 확인해주세요.', contact_name: '테스트 고객', contact_phone: '010-0000-0000', additional_notes: '현장 확인 후 안내 부탁드립니다.', linked_inquiry_id: '123' },
   });
+  request.needs_attention = !request.linked_inquiry_id || (['PENDING', 'IN_PROGRESS'].includes(request.status) && ['REFUNDED', 'FAILED'].includes(request.payment_status));
   const messages = [{ id: 1, sender_id: 'guest', content: '예약해주세요', type: 'text', sender: { name: '홍길동' } }];
   if (options.visual) messages[0].content = buildProxyInquiryInitialMessage({category: 'HOTEL', formData: request.form_data, paymentChannel: 'LOCALLY', finalAmount: 6000});
   if (options.visual) messages.push(
@@ -66,7 +67,7 @@ async function fixture(page: Page, options: { failSend?: boolean; failComplete?:
       request.needs_reply = request.status === 'COMPLETED' && latest.sender_id === 'guest';
       const filter = url.searchParams.get('filter');
       const matching = filter === 'all' || filter === 'closed' && request.status === 'COMPLETED' && !request.needs_reply
-        || filter === 'todo' && (request.needs_reply || request.status !== 'COMPLETED' && request.payment_status === 'COMPLETED')
+        || filter === 'todo' && (request.needs_attention || request.needs_reply || request.status !== 'COMPLETED' && request.payment_status === 'COMPLETED')
         || filter === 'payment' && request.payment_status === 'WAITING';
       return json({ success: true, data: url.searchParams.has('requestId') ? request : matching ? (options.visual ? Array.from({length:10},(_,i)=>({...request,id:i ? `request-${i+1}` : request.id, latest_content:'업체 확인 후 안내드리겠습니다.'})) : [request]) : [], pagination: { hasMore: false } });
     }
@@ -260,4 +261,31 @@ for (const view of ['support', 'monitor']) test(`${view} retains its existing se
   expect(state.calls.map(call=>call.path)).toEqual(view==='support'?['/api/inquiries/message','/api/admin/inquiries/789/status']:['/api/inquiries/message']);
   if(view==='support') expect(state.calls[1].body.status).toBe('in_progress');
   expect(state.request.status).toBe('PENDING');
+});
+
+for (const scenario of [
+  { paymentStatus: 'REFUNDED', label: '환불 후 예약 상태 확인' },
+  { paymentStatus: 'FAILED', label: '결제 취소 후 예약 상태 확인' },
+  { paymentStatus: 'COMPLETED', missingLink: true, label: '문의 연결 확인 필요' },
+  { paymentStatus: 'REFUNDED', missingLink: true, label: '문의 연결 확인 필요' },
+]) test(`390px attention stays compact in detail and todo list: ${scenario.paymentStatus}/${Boolean(scenario.missingLink)}`, async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const state = await fixture(page, { ...scenario, visual: true });
+  const header = page.getByTestId('admin-phone-chat-header');
+  await expect(header.getByText(scenario.label, { exact: true })).toBeVisible();
+  await expect(page.getByText('확인 필요', { exact: true })).toHaveCount(0);
+  const metrics = await header.evaluate(el => ({ height: el.getBoundingClientRect().height, overflow: document.documentElement.scrollWidth > innerWidth }));
+  expect(metrics.height).toBeLessThan(85);
+  expect(metrics.overflow).toBe(false);
+  mkdirSync('.tmp/phone-attention', { recursive: true });
+  const name = `${scenario.paymentStatus}-${Boolean(scenario.missingLink)}`;
+  writeFileSync(`.tmp/phone-attention/${name}.json`, JSON.stringify(metrics));
+  await page.screenshot({ path: `.tmp/phone-attention/${name}.png`, fullPage: true });
+  await page.getByRole('button', { name: '목록으로', exact: true }).click();
+  await expect(page.getByRole('button', { name: '처리할 일', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('admin-phone-reservation-list-item').first().getByText(scenario.label, { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+  expect(state.calls).toHaveLength(0);
+  expect(state.request.status).toBe('PENDING');
+  expect(state.request.payment_status).toBe(scenario.paymentStatus);
 });

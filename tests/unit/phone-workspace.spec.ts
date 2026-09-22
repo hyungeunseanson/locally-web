@@ -6,7 +6,7 @@ import * as admin from '@/app/utils/supabase/admin';
 import { GET as phoneGet } from '@/app/api/admin/customer-support/route';
 import { GET as inquiryGet } from '@/app/api/admin/inquiries/route';
 import { filteredPage, FORMAL_PROXY_FILTER } from '@/app/api/admin/customer-support/queries';
-import { matchesPhoneFilter, type PhoneWorkspaceRequest } from '@/app/utils/phoneReservationWorkspace';
+import { getPhoneAttentionLabel, matchesPhoneFilter, type PhoneWorkspaceRequest } from '@/app/utils/phoneReservationWorkspace';
 import { readFileSync } from 'node:fs';
 
 type Row = Record<string, unknown>;
@@ -92,18 +92,22 @@ test('valid phone inquiries are excluded from support, broken customer links sta
 });
 
 test('latest actual sender survives read and deleted messages; invalid links are flagged', async () => {
-  const rows = [request(1, { status: 'COMPLETED' }), request(2), request(3, { form_data: {} }), request(4, { payment_status: 'REFUNDED' })];
+  const rows = [request(1, { status: 'COMPLETED' }), request(2), request(3, { form_data: {} }), request(4, { payment_status: 'REFUNDED' }), request(5)];
   const db = database(rows, [
     { id: 1, user_id: 'guest-1', type: 'admin_support', inquiry_messages: [{ sender_id: 'guest-1', type: 'text', is_read: true }, { sender_id: 'admin', type: 'deleted' }] },
     { id: 2, user_id: 'other-guest', type: 'admin_support' },
     { id: 4, user_id: 'guest-4', type: 'admin_support' },
   ]); install(db);
   const result = await (await phoneGet(new Request('http://local/api?filter=todo'))).json();
-  expect(result.data).toHaveLength(4);
+  expect(result.data).toHaveLength(5);
   expect(result.data[0]).toMatchObject({ needs_reply: true, status: 'COMPLETED' });
   expect(result.data[1]).toMatchObject({ needs_attention: true, linked_inquiry_id: null });
   expect(result.data[2]).toMatchObject({ needs_attention: true, linked_inquiry_id: null });
   expect(result.data[3]).toMatchObject({ needs_attention: true });
+  expect(result.data[4]).toMatchObject({ needs_attention: true, linked_inquiry_id: null });
+  expect(result.data.map(getPhoneAttentionLabel)).toEqual([
+    null, '문의 연결 확인 필요', '문의 연결 확인 필요', '환불 후 예약 상태 확인', '문의 연결 확인 필요',
+  ]);
 });
 
 test('anchor detail is 404 and non-admin reads are denied', async () => {
@@ -145,4 +149,24 @@ test('support pagination excludes linked requests before slicing and direct link
   expect(last.data.map((row: Row) => row.id)).toEqual([121, 122, 123, 124, 125]);
   const deepLink = await (await inquiryGet(new Request('http://local/api?view=support&limit=10&inquiryId=125'))).json();
   expect(deepLink.data.some((row: Row) => row.id === 125)).toBe(true);
+});
+
+for (const scenario of [
+  { name: 'normal paid active', status: 'PENDING', payment_status: 'COMPLETED', linked_inquiry_id: '1', needs_attention: false, label: null },
+  { name: 'missing inquiry', status: 'PENDING', payment_status: 'COMPLETED', linked_inquiry_id: null, needs_attention: true, label: '문의 연결 확인 필요' },
+  { name: 'pending refunded', status: 'PENDING', payment_status: 'REFUNDED', linked_inquiry_id: '1', needs_attention: true, label: '환불 후 예약 상태 확인' },
+  { name: 'in progress refunded', status: 'IN_PROGRESS', payment_status: 'REFUNDED', linked_inquiry_id: '1', needs_attention: true, label: '환불 후 예약 상태 확인' },
+  { name: 'pending failed', status: 'PENDING', payment_status: 'FAILED', linked_inquiry_id: '1', needs_attention: true, label: '결제 취소 후 예약 상태 확인' },
+  { name: 'completed refunded', status: 'COMPLETED', payment_status: 'REFUNDED', linked_inquiry_id: '1', needs_attention: false, label: null },
+  { name: 'missing inquiry takes priority over refund', status: 'PENDING', payment_status: 'REFUNDED', linked_inquiry_id: null, needs_attention: true, label: '문의 연결 확인 필요' },
+  { name: 'missing inquiry takes priority over failed payment', status: 'PENDING', payment_status: 'FAILED', linked_inquiry_id: null, needs_attention: true, label: '문의 연결 확인 필요' },
+] as const) test(`attention label: ${scenario.name}`, () => {
+  const row = { ...request(1), needs_reply: false, ...scenario } as unknown as PhoneWorkspaceRequest;
+  const before = structuredClone(row);
+  expect(getPhoneAttentionLabel(row)).toBe(scenario.label);
+  if (scenario.needs_attention) {
+    expect(matchesPhoneFilter(row, 'todo')).toBe(true);
+    expect(matchesPhoneFilter(row, 'closed')).toBe(false);
+  }
+  expect(row).toEqual(before);
 });
