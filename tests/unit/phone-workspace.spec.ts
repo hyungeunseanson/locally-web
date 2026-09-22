@@ -239,3 +239,17 @@ test('legacy refund migration closes old customer messages using the update trig
     expect(matchesPhoneFilter(row, 'closed')).toBe(true);
   } finally { await db.close(); }
 });
+
+test('phone timestamps reuse latest actual message and fall back only for display', async () => {
+  const created = '2026-09-20T00:00:00Z';
+  const updated = '2026-09-21T00:00:00Z';
+  const latest = '2026-09-22T15:21:00Z';
+  const rows = [request(1, { created_at: created, updated_at: updated }), request(2, { created_at: created, updated_at: updated }), request(3, { created_at: created }), request(4, { created_at: null }), request(5, { updated_at: updated, form_data: {} })];
+  const inquiries = rows.slice(0, 4).map((row, i) => ({ id: i + 1, user_id: row.user_id, type: 'admin_support', inquiry_messages: i === 0 ? [{ sender_id: 'guest-1', type: 'text', created_at: latest }] : [] }));
+  const db = database(rows, inquiries); install(db);
+  const read = async () => (await (await phoneGet(new Request('http://local/api?filter=all'))).json()).data;
+  expect((await read()).map((row: PhoneWorkspaceRequest) => row.latest_created_at)).toEqual([latest, updated, created, null, updated]);
+  inquiries[0].inquiry_messages.push({ sender_id: 'guest-1', type: 'text', created_at: '2026-09-22T15:25:00Z' });
+  expect((await read())[0].latest_created_at).toBe('2026-09-22T15:25:00Z');
+  expect(db.calls.filter(url => url.pathname.endsWith('inquiries')).every(url => url.searchParams.get('inquiry_messages.limit') === '1')).toBe(true);
+});
