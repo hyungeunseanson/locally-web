@@ -35,25 +35,27 @@ test.beforeAll(async () => {
   css = (await postcss([tailwind()]).process('@import "tailwindcss";', { from: resolve('app/phone-fixture.css') })).css;
 });
 
-async function fixture(page: Page, options: { paymentStatus?: string; missingLink?: boolean; failSend?: boolean; failComplete?: boolean; unpaid?: boolean; status?: string; inquiryId?: string; visual?: boolean; channel?: string; method?: string } = {}) {
+async function fixture(page: Page, options: { paymentMetadata?: boolean; lastAdmin?: boolean; paymentStatus?: string; missingLink?: boolean; failSend?: boolean; failComplete?: boolean; unpaid?: boolean; status?: string; inquiryId?: string; visual?: boolean; channel?: string; method?: string } = {}) {
   const request = {
     id: 'request-1', user_id: 'guest', category: 'RESTAURANT', status: options.status || 'PENDING',
     payment_status: options.paymentStatus || (options.unpaid ? 'WAITING' : 'COMPLETED'), payment_channel: options.channel || 'LOCALLY',
     form_data: { payment_method: (options.method || (options.unpaid ? 'bank' : 'card')) as 'bank' | 'card', restaurant_name: '스시 테스트', restaurant_phone: '0312345678', google_map_url: 'https://example.com/map', preferred_slot_primary: '2026-09-25T19:00', guest_number: 2, reservation_name: '홍길동', linked_inquiry_id: '123', request_notes: '창가 자리' },
     profiles: { full_name: '홍길동' }, linked_inquiry_id: options.missingLink ? null : '123', needs_attention: false, needs_reply: false,
-    latest_sender_id: 'guest', latest_content: '예약해주세요', created_at: '2026-09-22T00:00:00Z',
+    latest_sender_id: 'guest', latest_content: '예약해주세요', created_at: '2026-09-22T00:00:00Z', updated_at: '2026-09-22T10:00:00Z',
   };
   if (options.visual) Object.assign(request, {
     category: 'HOTEL', profiles: { full_name: '테스트 고객' },
     form_data: { payment_method: 'card', property_name: '호텔 라이브맥스 버짓 닛포리 (Hotel Livemax BUDGET Nippori)', property_phone: '03-3823-1313', property_link: 'https://maps.app.goo.gl/fCPWn7ZoYQdZ4ode7?g_st=ac', reservation_number: 'TEST-12345678', checkin_date: '2026-09-25', checkout_date: '2026-09-28', hotel_inquiry_type: 'RESERVATION_CHECK', request_content: '늦은 체크인이 가능한지 확인해주세요.', contact_name: '테스트 고객', contact_phone: '010-0000-0000', additional_notes: '현장 확인 후 안내 부탁드립니다.', linked_inquiry_id: '123' },
   });
   request.needs_attention = !request.linked_inquiry_id || (['PENDING', 'IN_PROGRESS'].includes(request.status) && ['REFUNDED', 'FAILED'].includes(request.payment_status));
-  const messages = [{ id: 1, sender_id: 'guest', content: '예약해주세요', type: 'text', sender: { name: '홍길동' } }];
+  const messages = [{ id: 1, sender_id: 'guest', content: '예약해주세요', type: 'text', created_at: '2026-09-22T10:05:00Z', sender: { name: '홍길동' } }];
   if (options.visual) messages[0].content = buildProxyInquiryInitialMessage({category: 'HOTEL', formData: request.form_data, paymentChannel: 'LOCALLY', finalAmount: 6000});
   if (options.visual) messages.push(
-    { id: 2, sender_id: 'admin', content: '숙소에 늦은 체크인 가능 여부를 확인하고 안내드리겠습니다.', type: 'text', sender: { name: '운영팀' } },
-    { id: 3, sender_id: 'guest', content: '감사합니다. 밤 10시쯤 도착할 예정입니다.', type: 'text', sender: { name: '테스트 고객' } },
+    { id: 2, sender_id: 'admin', content: '숙소에 늦은 체크인 가능 여부를 확인하고 안내드리겠습니다.', type: 'text', created_at: '2026-09-22T10:05:00Z', sender: { name: '운영팀' } },
+    { id: 3, sender_id: 'guest', content: '감사합니다. 밤 10시쯤 도착할 예정입니다.', type: 'text', created_at: '2026-09-22T10:05:00Z', sender: { name: '테스트 고객' } },
   );
+  if (options.lastAdmin) messages.push({ id: 4, sender_id: 'admin', content: '환불 안내', type: 'text', created_at: '2026-09-22T10:05:00Z', sender: { name: '운영팀' } });
+  if (options.paymentMetadata) Object.assign(request, { locally_order_id: 'ORDER-123', naver_buyer_name: '네이버 구매자', tid: 'CARD-TRANSACTION-123', paid_at: '2026-09-22T01:00:00Z', refunded_at: '2026-09-22T02:00:00Z' });
   const calls: { path: string; body: Record<string, unknown> }[] = [];
   let failComplete = options.failComplete;
   await page.route('**/*', async route => {
@@ -64,10 +66,10 @@ async function fixture(page: Page, options: { paymentStatus?: string; missingLin
     if (path === '/api/admin/customer-support') {
       const latest = messages.at(-1)!;
       request.latest_sender_id = latest.sender_id;
-      request.needs_reply = request.status === 'COMPLETED' && latest.sender_id === 'guest';
+      request.needs_reply = latest.sender_id === 'guest' && (request.status === 'COMPLETED' || request.status === 'CANCELLED' && Date.parse(latest.created_at) > Date.parse(request.updated_at));
       const filter = url.searchParams.get('filter');
-      const matching = filter === 'all' || filter === 'closed' && request.status === 'COMPLETED' && !request.needs_reply
-        || filter === 'todo' && (request.needs_attention || request.needs_reply || request.status !== 'COMPLETED' && request.payment_status === 'COMPLETED')
+      const matching = filter === 'all' || filter === 'closed' && ['COMPLETED', 'CANCELLED'].includes(request.status) && !request.needs_reply && !request.needs_attention
+        || filter === 'todo' && (request.needs_attention || request.needs_reply || ['PENDING', 'IN_PROGRESS'].includes(request.status) && request.payment_status === 'COMPLETED')
         || filter === 'payment' && request.payment_status === 'WAITING';
       return json({ success: true, data: url.searchParams.has('requestId') ? request : matching ? (options.visual ? Array.from({length:10},(_,i)=>({...request,id:i ? `request-${i+1}` : request.id, latest_content:'업체 확인 후 안내드리겠습니다.'})) : [request]) : [], pagination: { hasMore: false } });
     }
@@ -81,13 +83,19 @@ async function fixture(page: Page, options: { paymentStatus?: string; missingLin
     if (path === '/api/inquiries/message') {
       const body = route.request().postDataJSON(); calls.push({ path, body });
       if (options.failSend) return json({ success: false, error: '전송 실패' }, 500);
-      messages.push({ id: messages.length + 1, sender_id: 'admin', content: body.content, type: 'text', sender: { name: '관리자' } });
+      messages.push({ id: messages.length + 1, sender_id: 'admin', content: body.content, type: 'text', created_at: '2026-09-22T10:05:00Z', sender: { name: '관리자' } });
       return json({ success: true, inquiryId: body.inquiryId, messageId: messages.length, displayContent: body.content, updatedAt: new Date().toISOString() });
     }
     if (path === '/api/proxy-bookings/request-1') {
       calls.push({ path, body: route.request().postDataJSON() });
       if (failComplete || request.payment_status !== 'COMPLETED') { failComplete = false; return json({ success: false, error: '완료 처리 실패' }, 409); }
       request.status = 'COMPLETED'; return json({ success: true });
+    }
+    if (path === '/api/admin/proxy-bookings/refund-payment') {
+      calls.push({ path, body: route.request().postDataJSON() });
+      request.payment_status = 'REFUNDED';
+      if (['PENDING', 'IN_PROGRESS'].includes(request.status)) { request.status = 'CANCELLED'; request.updated_at = '2026-09-22T10:10:00Z'; }
+      return json({ success: true });
     }
     if (path.startsWith('/api/')) {
       if (route.request().method() !== 'GET') calls.push({path, body:route.request().postDataJSON()});
@@ -164,7 +172,10 @@ for (const channel of ['LOCALLY','NAVER']) test(`unpaid ${channel}: manual actio
 test('legacy waiting card has no manual payment or completion actions', async ({page}) => {
   await fixture(page,{unpaid:true,method:'card'});
   await expect(composer(page)).toBeVisible();
-  await expect(menu(page)).toHaveCount(0);
+  await menu(page).click();
+  await expect(page.getByRole('button', { name: '결제 상세', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '입금 확인', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '처리 완료', exact: true })).toHaveCount(0);
 });
 
 for (const action of ['cancel-payment','refund-payment']) test(`${action} stays behind confirmation and uses existing endpoint`, async ({page}) => {
@@ -177,13 +188,13 @@ for (const action of ['cancel-payment','refund-payment']) test(`${action} stays 
   expect(state.calls[0]).toEqual({path:`/api/admin/proxy-bookings/${action}`,body:{requestId:'request-1'}});
 });
 
-test('completed follow-up reply clears needs_reply without changing proxy or inquiry status', async ({ page }) => {
-  const state = await fixture(page, { status:'COMPLETED' });
+for (const status of ['COMPLETED', 'CANCELLED']) test(`${status} follow-up reply clears needs_reply without changing proxy or inquiry status`, async ({ page }) => {
+  const state = await fixture(page, { status });
   await expect(page.getByTestId('admin-phone-reservation-list-item')).toContainText('추가 답장');
   await composer(page).fill('추가 답변');
   await send(page).click();
   await expect(page.getByTestId('admin-phone-reservation-list-item')).toHaveCount(0);
-  expect(state.request.status).toBe('COMPLETED');
+  expect(state.request.status).toBe(status);
   expect(state.calls.map(call=>call.path)).toEqual(['/api/inquiries/message']);
 });
 
@@ -288,4 +299,59 @@ for (const scenario of [
   expect(state.calls).toHaveLength(0);
   expect(state.request.status).toBe('PENDING');
   expect(state.request.payment_status).toBe(scenario.paymentStatus);
+});
+
+for (const paymentStatus of ['WAITING', 'COMPLETED', 'FAILED', 'REFUNDED']) test(`read-only payment details at 390px: ${paymentStatus}`, async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const state = await fixture(page, { paymentStatus, status: paymentStatus === 'REFUNDED' || paymentStatus === 'FAILED' ? 'CANCELLED' : 'PENDING', paymentMetadata: true, channel: paymentStatus === 'WAITING' ? 'NAVER' : 'LOCALLY' });
+  await menu(page).click();
+  await page.getByRole('button', { name: '결제 상세', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: '결제 상세' });
+  await expect(dialog).toBeVisible();
+  for (const text of ['ORDER-123', 'CARD-TRANSACTION-123', '네이버 구매자', '2026. 9. 22. 10:00', '2026. 9. 22. 11:00', '한국 시간', '₩']) await expect(dialog).toContainText(text);
+  await expect(dialog).toContainText(paymentStatus === 'WAITING' ? '네이버 주문' : '카드');
+  await expect(dialog.getByRole('button')).toHaveCount(1);
+  if (paymentStatus === 'REFUNDED') {
+    mkdirSync('.tmp/phone-payment', { recursive: true });
+    await page.screenshot({ path: '.tmp/phone-payment/mobile.png', fullPage: true });
+  }
+  expect(await dialog.evaluate(el => el.scrollWidth > el.clientWidth || document.documentElement.scrollWidth > innerWidth)).toBe(false);
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(menu(page)).toBeFocused();
+  await menu(page).click();
+  await page.getByRole('button', { name: '결제 상세', exact: true }).click();
+  await page.getByRole('button', { name: '결제 상세 닫기' }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(state.calls).toHaveLength(0);
+});
+
+test('missing payment metadata uses placeholders; refunded request stays closed without a customer reply', async ({ page }) => {
+  const state = await fixture(page, { paymentStatus: 'REFUNDED', status: 'CANCELLED', lastAdmin: true });
+  await menu(page).click();
+  await page.getByRole('button', { name: '결제 상세', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.locator('dd').filter({ hasText: /^—$/ })).toHaveCount(5);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: '종료', exact: true }).click();
+  await expect(page.getByTestId('admin-phone-reservation-list-item')).toBeVisible();
+  await expect(page.getByText('환불 후 예약 상태 확인', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '처리할 일', exact: true }).click();
+  await expect(page.getByTestId('admin-phone-reservation-list-item')).toHaveCount(0);
+  expect(state.calls).toHaveLength(0);
+});
+
+for (const status of ['PENDING', 'IN_PROGRESS']) test(`refund refresh closes ${status} without sending a message`, async ({ page }) => {
+  const state = await fixture(page, { status, lastAdmin: true });
+  await menu(page).click();
+  await page.getByRole('button', { name: '환불 처리', exact: true }).click();
+  await page.getByRole('button', { name: '확인', exact: true }).click();
+  const header = page.getByTestId('admin-phone-chat-header');
+  await expect(header).toContainText('취소');
+  await expect(header).toContainText('환불 완료');
+  await expect(header).not.toContainText('환불 후 예약 상태 확인');
+  await expect(page.getByTestId('admin-phone-reservation-list-item')).toHaveCount(0);
+  await page.getByRole('button', { name: '종료', exact: true }).click();
+  await expect(page.getByTestId('admin-phone-reservation-list-item')).toBeVisible();
+  expect(state.calls.map(call => call.path)).toEqual(['/api/admin/proxy-bookings/refund-payment']);
 });

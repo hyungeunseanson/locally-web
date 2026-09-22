@@ -7,6 +7,7 @@ import { GET as phoneGet } from '@/app/api/admin/customer-support/route';
 import { GET as inquiryGet } from '@/app/api/admin/inquiries/route';
 import { filteredPage, FORMAL_PROXY_FILTER } from '@/app/api/admin/customer-support/queries';
 import { getPhoneAttentionLabel, matchesPhoneFilter, type PhoneWorkspaceRequest } from '@/app/utils/phoneReservationWorkspace';
+import { PGlite } from '@electric-sql/pglite';
 import { readFileSync } from 'node:fs';
 
 type Row = Record<string, unknown>;
@@ -169,4 +170,72 @@ for (const scenario of [
     expect(matchesPhoneFilter(row, 'closed')).toBe(false);
   }
   expect(row).toEqual(before);
+});
+
+for (const status of ['CANCELLED', 'COMPLETED'] as const) test(`${status} customer reply reopens todo; admin reply returns to closed`, async () => {
+  for (const sender of ['guest-1', 'admin']) {
+    install(database([request(1, { status, payment_status: 'REFUNDED', updated_at: '2026-09-22T10:00:00Z' })], [{ id: 1, user_id: 'guest-1', type: 'admin_support', inquiry_messages: [{ sender_id: sender, type: 'text', created_at: '2026-09-22T10:05:00Z' }] }]));
+    const result = await (await phoneGet(new Request('http://local/api?requestId=request-1'))).json();
+    const row = result.data;
+    expect(row).toMatchObject({ status, payment_status: 'REFUNDED', needs_attention: false, needs_reply: sender === 'guest-1' });
+    expect(matchesPhoneFilter(row, 'todo')).toBe(sender === 'guest-1');
+    expect(matchesPhoneFilter(row, 'closed')).toBe(sender === 'admin');
+  }
+});
+
+test('payment metadata is selected only for authorized detail requests', async () => {
+  const db = database([request(1)], [{ id: 1, user_id: 'guest-1', type: 'admin_support' }]); install(db);
+  await phoneGet(new Request('http://local/api?filter=all'));
+  expect(db.calls.filter(url => url.pathname.endsWith('proxy_requests')).every(url => !url.searchParams.get('select')?.includes('refunded_at'))).toBe(true);
+  db.calls.length = 0;
+  await phoneGet(new Request('http://local/api?requestId=request-1'));
+  expect(db.calls.some(url => url.searchParams.get('select')?.endsWith(',tid,paid_at,refunded_at'))).toBe(true);
+});
+
+for (const scenario of [
+  { name: 'pre-cancel customer', message: '2026-09-22T09:55:00Z', boundary: '2026-09-22T10:00:00Z', reply: false },
+  { name: 'equal timestamp', message: '2026-09-22T10:00:00Z', boundary: '2026-09-22T10:00:00Z', reply: false },
+  { name: 'post-cancel customer', message: '2026-09-22T10:05:00Z', boundary: '2026-09-22T10:00:00Z', reply: true },
+  { name: 'invalid message', message: 'invalid', boundary: '2026-09-22T10:00:00Z', reply: false },
+  { name: 'missing message time', message: null, boundary: '2026-09-22T10:00:00Z', reply: false },
+  { name: 'invalid boundary', message: '2026-09-22T10:05:00Z', boundary: 'invalid', reply: false },
+  { name: 'missing boundary', message: '2026-09-22T10:05:00Z', boundary: null, reply: false },
+  { name: 'admin after follow-up', message: '2026-09-22T10:10:00Z', boundary: '2026-09-22T10:00:00Z', reply: false, admin: true },
+]) test(`CANCELLED boundary: ${scenario.name}`, async () => {
+  install(database([request(1, { status: 'CANCELLED', payment_status: 'REFUNDED', updated_at: scenario.boundary })], [{
+    id: 1, user_id: 'guest-1', type: 'admin_support', inquiry_messages: [
+      ...(scenario.admin ? [{ sender_id: 'guest-1', type: 'text', created_at: '2026-09-22T10:05:00Z' }] : []),
+      { sender_id: scenario.admin ? 'admin' : 'guest-1', type: 'text', created_at: scenario.message },
+    ],
+  }]));
+  const row = (await (await phoneGet(new Request('http://local/api?requestId=request-1'))).json()).data;
+  expect(row.needs_reply).toBe(scenario.reply);
+  expect(matchesPhoneFilter(row, 'todo')).toBe(scenario.reply);
+  expect(matchesPhoneFilter(row, 'closed')).toBe(!scenario.reply);
+});
+
+for (const created_at of [undefined, '2026-09-22T09:55:00Z']) test(`COMPLETED preserves customer follow-up without a cancellation boundary: ${created_at}`, async () => {
+  install(database([request(1, { status: 'COMPLETED', updated_at: '2026-09-22T10:00:00Z' })], [{ id: 1, user_id: 'guest-1', type: 'admin_support', inquiry_messages: [{ sender_id: 'guest-1', type: 'text', created_at }] }]));
+  const row = (await (await phoneGet(new Request('http://local/api?requestId=request-1'))).json()).data;
+  expect(row.needs_reply).toBe(true);
+  expect(matchesPhoneFilter(row, 'todo')).toBe(true);
+});
+
+test('legacy refund migration closes old customer messages using the update trigger boundary', async () => {
+  const db = new PGlite();
+  try {
+    await db.exec(`CREATE TABLE proxy_requests (status text, payment_status text, updated_at timestamptz);
+      CREATE FUNCTION set_proxy_requests_updated_at() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN NEW.updated_at = now(); RETURN NEW; END $$;
+      CREATE TRIGGER update_timestamp BEFORE UPDATE ON proxy_requests FOR EACH ROW EXECUTE FUNCTION set_proxy_requests_updated_at();
+      INSERT INTO proxy_requests VALUES ('PENDING', 'REFUNDED', '2020-01-01T00:00:00Z');`);
+    await db.exec(readFileSync('supabase/migrations/20260922125140_close_refunded_phone_proxy_requests.sql', 'utf8'));
+    const { rows: [migrated] } = await db.query<{ status: string; payment_status: string; updated_at: Date }>('SELECT * FROM proxy_requests');
+    expect(migrated.status).toBe('CANCELLED');
+    expect(migrated.updated_at.getTime()).toBeGreaterThan(Date.parse('2020-01-01T09:55:00Z'));
+    install(database([request(1, { ...migrated, updated_at: migrated.updated_at.toISOString() })], [{ id: 1, user_id: 'guest-1', type: 'admin_support', inquiry_messages: [{ sender_id: 'guest-1', type: 'text', created_at: '2020-01-01T09:55:00Z' }] }]));
+    const row = (await (await phoneGet(new Request('http://local/api?requestId=request-1'))).json()).data;
+    expect(row).toMatchObject({ status: 'CANCELLED', payment_status: 'REFUNDED', needs_reply: false });
+    expect(matchesPhoneFilter(row, 'todo')).toBe(false);
+    expect(matchesPhoneFilter(row, 'closed')).toBe(true);
+  } finally { await db.close(); }
 });

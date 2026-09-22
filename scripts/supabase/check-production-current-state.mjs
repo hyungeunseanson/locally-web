@@ -121,6 +121,12 @@ const expectedPendingMigrations = [
     repositoryFile: 'supabase/migrations/20260922081710_experience_payment_claim_and_pending_cleanup.sql',
     productionApplied: false,
   },
+  {
+    version: '20260922125140',
+    name: 'close_refunded_phone_proxy_requests',
+    repositoryFile: 'supabase/migrations/20260922125140_close_refunded_phone_proxy_requests.sql',
+    productionApplied: false,
+  },
 ];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));
 for (const [index, expected] of expectedLedger.entries()) {

@@ -54,6 +54,7 @@ export async function POST(request: Request) {
       requestId: proxyRequest.id,
       currentPaymentStatus: 'COMPLETED',
       paymentStatus: 'REFUNDED',
+      requestStatus: ['PENDING', 'IN_PROGRESS'].includes(proxyRequest.status) ? 'CANCELLED' : undefined,
       refundedAt: new Date().toISOString(),
     });
 
