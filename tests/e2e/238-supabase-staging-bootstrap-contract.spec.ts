@@ -57,8 +57,16 @@ test.describe('Supabase staging bootstrap contract', () => {
       'supabase/migrations/20260918000000_proxy_card_intake_atomic.sql',
       'supabase/migrations/20260922081710_experience_payment_claim_and_pending_cleanup.sql',
       'supabase/migrations/20260922125140_close_refunded_phone_proxy_requests.sql',
+      'supabase/migrations/20260922150728_ops_anomaly_monitor_snapshot.sql',
     ]);
-    expect(manifest.pendingProductionMigrations).toEqual([]);
+    expect(manifest.pendingProductionMigrations).toEqual([
+      {
+        version: '20260922150728',
+        name: 'ops_anomaly_monitor_snapshot',
+        repositoryFile: 'supabase/migrations/20260922150728_ops_anomaly_monitor_snapshot.sql',
+        productionApplied: false,
+      },
+    ]);
     expect(packageJson.scripts['supabase:staging:baseline:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:current:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:contract']).toBeTruthy();

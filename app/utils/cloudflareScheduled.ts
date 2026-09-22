@@ -5,7 +5,8 @@ export type LocallyScheduledTaskName =
   | 'notification_retention_cleanup'
   | 'experience_completion_sync'
   | 'service_completion_sync'
-  | 'cancel_pending_bookings';
+  | 'cancel_pending_bookings'
+  | 'ops_anomaly_monitor';
 
 type ScheduledControllerLike = { cron: string };
 type ScheduledHandler<Environment> = (
@@ -26,6 +27,7 @@ type ScheduledOptions<Environment> = {
   runExperienceCompletionSync: ScheduledHandler<Environment>;
   runServiceCompletionSync: ScheduledHandler<Environment>;
   runCancelPendingBookings?: ScheduledHandler<Environment>;
+  runOpsAnomalyMonitor?: ScheduledHandler<Environment>;
   delegate?: ScheduledHandler<Environment>;
   log?: (entry: Record<string, unknown>) => void;
 };
@@ -74,6 +76,10 @@ export async function handleLocallyScheduledEvent<Environment>(
       name: 'admin_support_unread_alerts',
       run: options.runAdminSupportUnreadAlerts,
     },
+    ...(options.runOpsAnomalyMonitor ? [{
+      name: 'ops_anomaly_monitor' as const,
+      run: options.runOpsAnomalyMonitor,
+    }] : []),
   ] : controller.cron === options.notificationRetentionCron ? [
     {
       name: 'notification_retention_cleanup',

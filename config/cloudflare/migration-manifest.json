@@ -110,6 +110,13 @@
     "rawDefault": "false",
     "cron": "7,37 * * * *"
   },
+  "opsAnomalyMonitorReleasePolicy": {
+    "defaultProductionProfile": "off",
+    "scheduledEnabledVariable": "OPS_ANOMALY_MONITOR_SCHEDULED_ENABLED",
+    "queueReadTokenSecret": "OPS_ANOMALY_MONITOR_CLOUDFLARE_API_TOKEN",
+    "rawDefault": "false",
+    "cron": "*/10 * * * *"
+  },
   "publicExperienceMediaProducerPolicy": {
     "enabledVariable": "PUBLIC_EXPERIENCE_MEDIA_PRODUCER_ENABLED",
     "experienceIdsVariable": "PUBLIC_EXPERIENCE_MEDIA_PRODUCER_EXPERIENCE_IDS",
@@ -264,8 +271,9 @@
       "ADMIN_SUPPORT_UNREAD_ALERTS_SCHEDULED_ENABLED",
       "NOTIFICATION_RETENTION_CLEANUP_SCHEDULED_ENABLED",
       "EXPERIENCE_COMPLETION_SCHEDULED_ENABLED",
-    "SERVICE_COMPLETION_SCHEDULED_ENABLED",
-    "CANCEL_PENDING_BOOKINGS_SCHEDULED_ENABLED"
+      "SERVICE_COMPLETION_SCHEDULED_ENABLED",
+      "CANCEL_PENDING_BOOKINGS_SCHEDULED_ENABLED",
+      "OPS_ANOMALY_MONITOR_SCHEDULED_ENABLED"
     ],
     "canarySafetyVariables": [
       "CLOUDFLARE_FUNCTIONAL_CANARY_ENABLED",
@@ -300,7 +308,8 @@
       "nicepay": ["NICEPAY_MERCHANT_KEY"],
       "paypal": ["PAYPAL_CLIENT_SECRET"],
       "sentryRuntime": ["SENTRY_DSN"],
-      "translation": ["GEMINI_API_KEY", "XAI_API_KEY"]
+      "translation": ["GEMINI_API_KEY", "XAI_API_KEY"],
+      "opsAnomalyMonitorQueueRead": ["OPS_ANOMALY_MONITOR_CLOUDFLARE_API_TOKEN"]
     },
     "buildOnly": [
       "SENTRY_AUTH_TOKEN"

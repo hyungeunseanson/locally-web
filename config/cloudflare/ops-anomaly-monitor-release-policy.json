@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "defaultProductionProfile": "off",
+  "profiles": {
+    "off": {
+      "scheduledEnabled": "false"
+    },
+    "on": {
+      "scheduledEnabled": "true"
+    }
+  }
+}
