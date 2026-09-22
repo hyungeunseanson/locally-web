@@ -16,6 +16,7 @@ import { readExperienceCompletionReleasePolicy, resolveExperienceCompletionRelea
 import { readServiceCompletionReleasePolicy, resolveServiceCompletionReleaseProfile } from './service-completion-release-profile.mjs';
 import { readExperienceMediaSourceReleasePolicy, resolveExperienceMediaSourceReleaseProfile } from './experience-media-source-release-profile.mjs';
 import { runProductionBrowserSmoke } from './run-production-browser-smoke.mjs';
+import { runProductionDeploySemanticPreflight } from './verify-production-deploy-contract.mjs';
 
 const ROOT = process.cwd();
 
@@ -90,36 +91,53 @@ export function buildDeploymentContract(profile, translationProfile, homePopular
     NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_ENABLED: profile.enabled,
     NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_EXPERIENCE_IDS: profile.experienceIds,
   };
+  const runtimeVariables = {
+    CLOUDFLARE_DEPLOYMENT_ENV: 'production',
+    PUBLIC_EXPERIENCE_MEDIA_PRODUCER_ENABLED: profile.enabled,
+    PUBLIC_EXPERIENCE_MEDIA_PRODUCER_EXPERIENCE_IDS: profile.experienceIds,
+    EXPERIENCE_MEDIA_R2_SOURCE_ENABLED: experienceMediaSourceProfile.enabled,
+    EXPERIENCE_TRANSLATION_QUEUE_ENABLED: translationProfile.queueEnabled,
+    EXPERIENCE_TRANSLATION_SCHEDULED_RECOVERY_ENABLED: translationProfile.scheduledRecoveryEnabled,
+    HOME_POPULARITY_SNAPSHOT_SCHEDULED_ENABLED: homePopularityProfile.scheduledEnabled,
+    ADMIN_SUPPORT_UNREAD_ALERTS_SCHEDULED_ENABLED: adminSupportUnreadProfile.scheduledEnabled,
+    NOTIFICATION_RETENTION_CLEANUP_SCHEDULED_ENABLED: notificationRetentionProfile.scheduledEnabled,
+    EXPERIENCE_COMPLETION_SCHEDULED_ENABLED: experienceCompletionProfile.scheduledEnabled,
+    SERVICE_COMPLETION_SCHEDULED_ENABLED: serviceCompletionProfile.scheduledEnabled,
+  };
   const wranglerArguments = [
     'deploy',
+    '--config',
+    './wrangler.jsonc',
     '--env',
     'production',
     '--autoconfig=false',
-    '--var',
-    'CLOUDFLARE_DEPLOYMENT_ENV:production',
-    '--var',
-    `PUBLIC_EXPERIENCE_MEDIA_PRODUCER_ENABLED:${profile.enabled}`,
-    '--var',
-    `PUBLIC_EXPERIENCE_MEDIA_PRODUCER_EXPERIENCE_IDS:${profile.experienceIds}`,
-    '--var',
-    `EXPERIENCE_MEDIA_R2_SOURCE_ENABLED:${experienceMediaSourceProfile.enabled}`,
-    '--var',
-    `EXPERIENCE_TRANSLATION_QUEUE_ENABLED:${translationProfile.queueEnabled}`,
-    '--var',
-    `EXPERIENCE_TRANSLATION_SCHEDULED_RECOVERY_ENABLED:${translationProfile.scheduledRecoveryEnabled}`,
-    '--var',
-    `HOME_POPULARITY_SNAPSHOT_SCHEDULED_ENABLED:${homePopularityProfile.scheduledEnabled}`,
-    '--var',
-    `ADMIN_SUPPORT_UNREAD_ALERTS_SCHEDULED_ENABLED:${adminSupportUnreadProfile.scheduledEnabled}`,
-    '--var',
-    `NOTIFICATION_RETENTION_CLEANUP_SCHEDULED_ENABLED:${notificationRetentionProfile.scheduledEnabled}`,
-    '--var',
-    `EXPERIENCE_COMPLETION_SCHEDULED_ENABLED:${experienceCompletionProfile.scheduledEnabled}`,
-    '--var',
-    `SERVICE_COMPLETION_SCHEDULED_ENABLED:${serviceCompletionProfile.scheduledEnabled}`,
+    ...Object.entries(runtimeVariables).flatMap(([name, value]) => ['--var', `${name}:${value}`]),
   ];
   if (dryRun) wranglerArguments.push('--dry-run');
-  return { readerEnvironment, wranglerArguments };
+  return { readerEnvironment, runtimeVariables, wranglerArguments };
+}
+
+export function resolveAllowedPlannedChanges(options) {
+  const changes = [];
+  if (options.requestedProfile) {
+    changes.push(
+      'PUBLIC_EXPERIENCE_MEDIA_PRODUCER_ENABLED',
+      'PUBLIC_EXPERIENCE_MEDIA_PRODUCER_EXPERIENCE_IDS'
+    );
+  }
+  if (options.requestedTranslationProfile) {
+    changes.push(
+      'EXPERIENCE_TRANSLATION_QUEUE_ENABLED',
+      'EXPERIENCE_TRANSLATION_SCHEDULED_RECOVERY_ENABLED'
+    );
+  }
+  if (options.requestedHomePopularityProfile) changes.push('HOME_POPULARITY_SNAPSHOT_SCHEDULED_ENABLED');
+  if (options.requestedAdminSupportUnreadProfile) changes.push('ADMIN_SUPPORT_UNREAD_ALERTS_SCHEDULED_ENABLED');
+  if (options.requestedNotificationRetentionProfile) changes.push('NOTIFICATION_RETENTION_CLEANUP_SCHEDULED_ENABLED');
+  if (options.requestedExperienceCompletionProfile) changes.push('EXPERIENCE_COMPLETION_SCHEDULED_ENABLED');
+  if (options.requestedExperienceMediaSourceProfile) changes.push('EXPERIENCE_MEDIA_R2_SOURCE_ENABLED');
+  if (options.requestedServiceCompletionProfile) changes.push('SERVICE_COMPLETION_SCHEDULED_ENABLED');
+  return changes;
 }
 
 function run(command, argumentsList, options = {}) {
@@ -137,6 +155,7 @@ function run(command, argumentsList, options = {}) {
 export async function main(argumentsList = process.argv.slice(2), dependencies = {}) {
   const runCommand = dependencies.runCommand ?? run;
   const runBrowserSmoke = dependencies.runBrowserSmoke ?? runProductionBrowserSmoke;
+  const runSemanticPreflight = dependencies.runSemanticPreflight ?? runProductionDeploySemanticPreflight;
   const log = dependencies.log ?? console.log;
   const options = parseDeploymentArguments(argumentsList);
   const policy = await readReleasePolicy();
@@ -167,6 +186,14 @@ export async function main(argumentsList = process.argv.slice(2), dependencies =
   runCommand(npmCommand, ['run', 'cloudflare:build:production'], {
     env: { ...process.env, ...contract.readerEnvironment },
   });
+  if (!options.dryRun) {
+    await runSemanticPreflight({
+      expectedVariables: contract.runtimeVariables,
+      allowedPlannedChanges: resolveAllowedPlannedChanges(options),
+      wranglerCommand,
+      log,
+    });
+  }
   runCommand(wranglerCommand, contract.wranglerArguments);
   if (!options.dryRun) {
     try {
