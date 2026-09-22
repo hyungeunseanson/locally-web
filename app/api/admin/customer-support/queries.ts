@@ -67,6 +67,7 @@ export async function enrichPhoneRequests(db: SupabaseClient, rows: ProxyRequest
       needs_reply: completedNeedsReply || cancelledNeedsReply,
       latest_sender_id: latest?.sender_id ?? null,
       latest_content: latest?.content ?? null,
+      latest_created_at: latest?.created_at ?? row.updated_at ?? row.created_at ?? null,
     };
   });
 }

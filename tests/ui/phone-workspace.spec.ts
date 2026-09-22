@@ -41,7 +41,7 @@ async function fixture(page: Page, options: { paymentMetadata?: boolean; lastAdm
     payment_status: options.paymentStatus || (options.unpaid ? 'WAITING' : 'COMPLETED'), payment_channel: options.channel || 'LOCALLY',
     form_data: { payment_method: (options.method || (options.unpaid ? 'bank' : 'card')) as 'bank' | 'card', restaurant_name: '스시 테스트', restaurant_phone: '0312345678', google_map_url: 'https://example.com/map', preferred_slot_primary: '2026-09-25T19:00', guest_number: 2, reservation_name: '홍길동', linked_inquiry_id: '123', request_notes: '창가 자리' },
     profiles: { full_name: '홍길동' }, linked_inquiry_id: options.missingLink ? null : '123', needs_attention: false, needs_reply: false,
-    latest_sender_id: 'guest', latest_content: '예약해주세요', created_at: '2026-09-22T00:00:00Z', updated_at: '2026-09-22T10:00:00Z',
+    latest_created_at: null as string | null, latest_sender_id: 'guest', latest_content: '예약해주세요', created_at: '2026-09-22T00:00:00Z', updated_at: '2026-09-22T10:00:00Z',
   };
   if (options.visual) Object.assign(request, {
     category: 'HOTEL', profiles: { full_name: '테스트 고객' },
@@ -66,6 +66,7 @@ async function fixture(page: Page, options: { paymentMetadata?: boolean; lastAdm
     if (path === '/api/admin/customer-support') {
       const latest = messages.at(-1)!;
       request.latest_sender_id = latest.sender_id;
+      request.latest_created_at = latest.created_at;
       request.needs_reply = latest.sender_id === 'guest' && (request.status === 'COMPLETED' || request.status === 'CANCELLED' && Date.parse(latest.created_at) > Date.parse(request.updated_at));
       const filter = url.searchParams.get('filter');
       const matching = filter === 'all' || filter === 'closed' && ['COMPLETED', 'CANCELLED'].includes(request.status) && !request.needs_reply && !request.needs_attention
@@ -354,4 +355,29 @@ for (const status of ['PENDING', 'IN_PROGRESS']) test(`refund refresh closes ${s
   await page.getByRole('button', { name: '종료', exact: true }).click();
   await expect(page.getByTestId('admin-phone-reservation-list-item')).toBeVisible();
   expect(state.calls.map(call => call.path)).toEqual(['/api/admin/proxy-bookings/refund-payment']);
+});
+
+for (const width of [390, 2048]) test(`phone list timestamp matches support formatting and refreshes at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: width === 390 ? 844 : 1231 });
+  const state = await fixture(page, { visual: true });
+  if (width === 390) await page.getByRole('button', { name: '목록으로', exact: true }).click();
+  const row = page.getByTestId('admin-phone-reservation-list-item').first();
+  const timestamp = row.getByTestId('admin-phone-list-timestamp');
+  const format = (value: string) => page.evaluate(value => new Date(value).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }), value);
+  await expect(timestamp).toHaveText(await format(state.messages.at(-1)!.created_at));
+  await expect(row.getByText('대기', { exact: true })).toBeVisible();
+  const before = await row.boundingBox();
+  state.messages.push({ id: 99, sender_id: 'guest', content: '추가 문의', type: 'text', created_at: '2026-09-22T15:21:00Z', sender: { name: '테스트 고객' } });
+  await page.getByRole('button', { name: '새로고침', exact: true }).click();
+  await expect(timestamp).toHaveText(await format('2026-09-22T15:21:00Z'));
+  expect((await row.boundingBox())!.height).toBe(before!.height);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  mkdirSync('.tmp/phone-timestamp', { recursive: true });
+  await page.screenshot({ path: `.tmp/phone-timestamp/${width}.png`, fullPage: true });
+  for (const value of ['invalid', null]) {
+    state.messages.at(-1)!.created_at = value as unknown as string;
+    await page.getByRole('button', { name: '새로고침', exact: true }).click();
+    await expect(timestamp).toBeEmpty();
+    await expect(row.getByText('대기', { exact: true })).toBeVisible();
+  }
 });

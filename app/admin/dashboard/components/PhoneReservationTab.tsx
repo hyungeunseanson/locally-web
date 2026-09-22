@@ -14,6 +14,21 @@ import { getPhoneAttentionLabel, PHONE_FILTER_LABELS, type PhoneFilter, type Pho
 const PAGE_SIZE = 10;
 const STATUS_LABELS = { PENDING: '대기', IN_PROGRESS: '진행 중', COMPLETED: '완료', CANCELLED: '취소' };
 
+function formatPhoneListTimestamp(value?: string | null) {
+  if (!value) return '';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+
+  return date.toLocaleString('ko-KR', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
+
 export default function PhoneReservationTab({ initialSelectedRequestId = null, active = true }: {
   initialSelectedRequestId?: string | null; active?: boolean;
 }) {
@@ -206,7 +221,7 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
         {error && <p role="alert" className="p-3">{error}</p>}
         {!loading && !error && !requests.length && <p className="p-4 text-sm text-slate-500">해당하는 전화예약이 없습니다.</p>}
         {requests.map(row => <button key={row.id} data-testid="admin-phone-reservation-list-item" onClick={() => select(row.id)} className={`w-full space-y-1 border-b border-slate-200 px-3 py-3 text-left ${row.id === initialSelectedRequestId ? 'bg-blue-50' : ''}`}>
-          <p className="flex items-center justify-between gap-2 text-xs text-slate-500"><span className="min-w-0 truncate">{getProxyCategoryLabel(row.category)}</span><span className="shrink-0">{STATUS_LABELS[row.status]}</span></p>
+          <p className="flex items-center justify-between gap-2 text-xs text-slate-500"><span className="min-w-0 truncate">{getProxyCategoryLabel(row.category)}</span><span className="flex shrink-0 items-center gap-1.5"><span>{STATUS_LABELS[row.status]}</span><span className="text-[9px] md:text-[10px] text-slate-400 shrink-0 font-medium whitespace-nowrap leading-4" data-testid="admin-phone-list-timestamp">{formatPhoneListTimestamp(row.latest_created_at)}</span></span></p>
           <p className="flex gap-1 text-sm font-bold"><span className="min-w-0 truncate" title={getProxyRequestTitle(row)}>{getProxyRequestTitle(row)}</span><span className="max-w-[40%] shrink-0 truncate">· {getProxyRequesterDisplayName(row.profiles)}</span></p>
           <p className="flex items-baseline gap-1 text-xs text-slate-500"><span className="shrink-0">{getProxyPaymentStatusLabel(row)}</span><span aria-hidden="true">·</span><span className="min-w-0 truncate">{row.latest_content}</span></p>
           {row.needs_reply && <span className="text-xs font-bold text-blue-700">추가 답장 </span>}
