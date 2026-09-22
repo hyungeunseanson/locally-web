@@ -320,6 +320,7 @@ test.describe('Admin Support unread Cloudflare Cron', () => {
       runAdminSupportUnreadAlerts: () => calls.push('admin-support'),
       runNotificationRetentionCleanup: () => calls.push('retention'),
       runExperienceCompletionSync: () => calls.push('completion'),
+      runServiceCompletionSync: () => calls.push('service'),
       log: () => undefined,
     };
     await handleLocallyScheduledEvent({ cron: ADMIN_SUPPORT_UNREAD_ALERTS_CRON }, {}, options);

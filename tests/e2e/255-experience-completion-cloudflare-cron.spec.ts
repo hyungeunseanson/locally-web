@@ -442,10 +442,11 @@ test.describe('Experience Completion Cloudflare Cron', () => {
       runAdminSupportUnreadAlerts: () => calls.push('admin'),
       runNotificationRetentionCleanup: () => calls.push('retention'),
       runExperienceCompletionSync: () => calls.push('completion'),
+      runServiceCompletionSync: () => calls.push('service'),
       log: () => undefined,
     };
     await handleLocallyScheduledEvent({ cron: EXPERIENCE_COMPLETION_SYNC_CRON }, {}, options);
-    expect(calls).toEqual(['completion']);
+    expect(calls).toEqual(['completion', 'service']);
     calls.length = 0;
     await handleLocallyScheduledEvent({ cron: '17 19 * * *' }, {}, options);
     expect(calls).toEqual(['translation', 'home']);

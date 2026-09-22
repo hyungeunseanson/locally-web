@@ -141,6 +141,7 @@ test.describe('Home popularity Cloudflare Cron', () => {
         runAdminSupportUnreadAlerts: async () => calls.push('admin-support'),
         runNotificationRetentionCleanup: async () => calls.push('retention'),
         runExperienceCompletionSync: async () => calls.push('completion'),
+        runServiceCompletionSync: () => calls.push('service'),
         log: () => undefined,
       }
     )).rejects.toThrow('locally_scheduled_task_failed');
@@ -163,6 +164,7 @@ test.describe('Home popularity Cloudflare Cron', () => {
         runAdminSupportUnreadAlerts: async () => calls.push('admin-support'),
         runNotificationRetentionCleanup: async () => calls.push('retention'),
         runExperienceCompletionSync: async () => calls.push('completion'),
+        runServiceCompletionSync: () => calls.push('service'),
         log: () => undefined,
       }
     )).rejects.toThrow('locally_scheduled_task_failed');
@@ -184,6 +186,7 @@ test.describe('Home popularity Cloudflare Cron', () => {
         runAdminSupportUnreadAlerts: () => calls.push('admin-support'),
         runNotificationRetentionCleanup: () => calls.push('retention'),
         runExperienceCompletionSync: () => calls.push('completion'),
+        runServiceCompletionSync: () => calls.push('service'),
         delegate: () => {
           calls.push('delegate');
           return 'delegated';

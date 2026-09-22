@@ -31,8 +31,12 @@ import {
   handleExperienceCompletionScheduled,
   type ExperienceCompletionScheduledRuntimeEnv,
 } from './app/utils/experienceCompletionScheduled';
+import {
+  handleServiceCompletionScheduled,
+  type ServiceCompletionScheduledRuntimeEnv,
+} from './app/utils/serviceCompletionScheduled';
 
-type WorkerEnvironment = PublicExperienceMediaQueueRuntimeEnv & ExperienceTranslationQueueRuntimeEnv & HomePopularitySnapshotRuntimeEnv & AdminSupportUnreadAlertsRuntimeEnv & NotificationRetentionRuntimeEnv & ExperienceCompletionScheduledRuntimeEnv;
+type WorkerEnvironment = PublicExperienceMediaQueueRuntimeEnv & ExperienceTranslationQueueRuntimeEnv & HomePopularitySnapshotRuntimeEnv & AdminSupportUnreadAlertsRuntimeEnv & NotificationRetentionRuntimeEnv & ExperienceCompletionScheduledRuntimeEnv & ServiceCompletionScheduledRuntimeEnv;
 
 const worker = {
   fetch(request: Request, env: WorkerEnvironment, ctx: unknown) {
@@ -60,6 +64,7 @@ const worker = {
       runAdminSupportUnreadAlerts: handleAdminSupportUnreadAlertsScheduled,
       runNotificationRetentionCleanup: handleNotificationRetentionCleanupScheduled,
       runExperienceCompletionSync: handleExperienceCompletionScheduled,
+      runServiceCompletionSync: handleServiceCompletionScheduled,
       delegate: typeof scheduled === 'function'
         ? (nextController, nextEnv) => scheduled.call(openNextWorker, nextController, nextEnv, ctx)
         : undefined,
