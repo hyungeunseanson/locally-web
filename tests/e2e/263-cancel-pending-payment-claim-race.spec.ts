@@ -153,6 +153,8 @@ test.describe('Cancel pending payment-claim race safety', () => {
   test('gates card launch and preserves one immutable PayPal provider order', () => {
     const paymentPage = source('app/experiences/[id]/payment/page.tsx');
     const claimRoute = source('app/api/payment/card-claim/route.ts');
+    const launchPage = source('app/api/payment/card-launch-page/route.ts');
+    const legacyLaunch = source('app/api/payment/card-launch/route.ts');
     const paypalCreate = source('app/api/payment/paypal/create-order/route.ts');
     const paypalCapture = source('app/api/payment/paypal/capture-order/route.ts');
     const paypalServer = source('app/utils/paypal/server.ts');
@@ -160,6 +162,11 @@ test.describe('Cancel pending payment-claim race safety', () => {
     expect(paymentPage.indexOf("fetch('/api/payment/card-claim'"))
       .toBeLessThan(paymentPage.indexOf('launchCardPayment({'));
     expect(claimRoute).toContain('claimExperiencePaymentAtomic');
+    expect(launchPage).toContain('resolveExperienceCardLaunch');
+    expect(launchPage).toContain('launchAmount = launch.amount;');
+    expect(launchPage.indexOf('resolveExperienceCardLaunch({'))
+      .toBeLessThan(launchPage.indexOf('buildNicePayLaunchFields({'));
+    expect(legacyLaunch).not.toContain('buildNicePayLaunchFields');
     expect(paypalCreate).toContain('claim.providerReference');
     expect(paypalCreate).toContain('claim.claimToken');
     expect(paypalCreate).toContain('attachExperiencePaymentProviderReferenceAtomic');
