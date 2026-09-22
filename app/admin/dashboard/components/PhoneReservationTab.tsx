@@ -151,28 +151,30 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
   const sections = selected ? getPhoneFormSections(selected) : null;
   const method = selected ? getProxyPaymentMethod(selected.form_data) : null;
   const manualPayment = selected?.payment_status === 'WAITING' && (selected.payment_channel === 'NAVER' || method === 'bank');
+  const disclosureClass = 'inline-flex w-auto cursor-pointer list-none items-center gap-1 rounded-sm text-xs text-slate-500 outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 [&::-webkit-details-marker]:hidden';
   const showEntries = (entries: NonNullable<typeof sections>['core']) => entries.map(entry => <div key={entry.key} className="min-w-0" data-testid="admin-phone-reservation-form-entry">
     <dt className="text-xs text-slate-500">{entry.label}</dt>
-    <dd className="break-words whitespace-pre-wrap text-sm text-slate-900">{entry.value}
+    <dd className="break-words whitespace-pre-wrap text-sm leading-snug text-slate-900">{/^(https?:\/\/)/i.test(entry.value)
+      ? <a className="inline-flex items-center gap-1 text-slate-700 underline decoration-slate-300 underline-offset-2" href={entry.value} target="_blank" rel="noopener noreferrer">{entry.key === 'google_map_url' ? 'Google Maps' : entry.key === 'property_link' ? '숙소 링크' : entry.key === 'business_link' ? '업체 링크' : entry.label} 열기 <span aria-hidden="true">↗</span></a>
+      : entry.value}
       {/phone$/.test(entry.key) && <button className="ml-2 text-xs underline" onClick={() => void navigator.clipboard.writeText(entry.value).then(() => showToast('전화번호를 복사했습니다.', 'success')).catch(() => showToast('복사하지 못했습니다.', 'error'))}>복사</button>}
-      {/^(https?:\/\/)/i.test(entry.value) && <a className="ml-2 text-xs underline" href={entry.value} target="_blank" rel="noopener noreferrer">열기</a>}
     </dd>
   </div>);
-  const header = <div className="space-y-3">
+  const header = <div className="space-y-1.5">
     <button onClick={() => select(null)} className="text-sm text-slate-600 md:hidden">← 목록으로</button>
     {detailError ? <p role="alert">{detailError}</p> : !selected ? <p>{detailLoading ? '상세를 불러오는 중...' : '전화예약을 선택해주세요.'}</p> : <>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="font-bold">{getProxyRequestTitle(selected)} · {getProxyRequesterDisplayName(selected.profiles)}</h2>
-        <span className="text-xs">{STATUS_LABELS[selected.status]}{selected.needs_reply ? ' · 추가 답장' : ''}{selected.needs_attention ? ' · 확인 필요' : ''}</span>
+      <div className="flex items-start justify-between gap-2">
+        <h2 className="min-w-0 font-bold md:truncate" title={`${getProxyRequestTitle(selected)} · ${getProxyRequesterDisplayName(selected.profiles)}`}>{getProxyRequestTitle(selected)} · {getProxyRequesterDisplayName(selected.profiles)}</h2>
+        <span className="shrink-0 pt-0.5 text-xs text-slate-500">{STATUS_LABELS[selected.status]}{selected.needs_reply ? ' · 추가 답장' : ''}{selected.needs_attention ? ' · 확인 필요' : ''}</span>
       </div>
-      <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2" data-testid="admin-phone-reservation-form-section">{sections && showEntries(sections.core)}</dl>
-      {sections && sections.other.length > 0 && <details><summary className="cursor-pointer text-xs font-semibold">신청서 전체 보기</summary><dl className="mt-2 grid gap-2 sm:grid-cols-2">{showEntries(sections.other)}</dl></details>}
-      <div className="flex flex-wrap items-center gap-3 border-t pt-2 text-sm">
+      <dl className="grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2" data-testid="admin-phone-reservation-form-section">{sections && showEntries(sections.core)}</dl>
+      {sections && sections.other.length > 0 && <details><summary className={disclosureClass}>신청서 전체 보기 <span aria-hidden="true">▾</span></summary><dl className="mt-2 grid gap-2 sm:grid-cols-2">{showEntries(sections.other)}</dl></details>}
+      <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 pt-1.5 text-xs text-slate-500">
         <span>{getProxyPaymentStatusLabel(selected)} · ₩{getProxyRequestFeeKrw(selected.category, selected.form_data).toLocaleString()} · {selected.payment_channel === 'NAVER' ? 'NAVER' : method === 'card' ? '카드' : '무통장'}</span>
         {manualPayment && <button disabled={updating} onClick={() => void paymentAction('confirm-payment')} className="rounded-lg bg-slate-900 px-3 py-1 text-white disabled:opacity-50">입금 확인</button>}
       </div>
       {selected.payment_status === 'WAITING' && method === 'card' && <p className="text-xs text-amber-800">카드 결제 확인 전에는 완료할 수 없습니다.</p>}
-      <details className="text-xs"><summary className="cursor-pointer text-slate-500">결제 상세</summary>
+      <details className="text-xs"><summary className={disclosureClass}>결제 상세 <span aria-hidden="true">▾</span></summary>
         <div className="mt-2 space-y-2"><p>주문번호: {selected.locally_order_id || '—'}</p><p>네이버 구매자명: {selected.naver_buyer_name || '—'}</p>
           {manualPayment && <button disabled={updating} className="text-rose-700 underline" onClick={() => void paymentAction('cancel-payment')}>결제 취소</button>}
           {selected.payment_status === 'COMPLETED' && <button disabled={updating} className="text-rose-700 underline" onClick={() => void paymentAction('refund-payment')}>환불 처리</button>}
@@ -184,19 +186,18 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
 
   return <div className="grid h-[calc(100dvh-235px)] min-h-[460px] grid-cols-1 gap-3 md:grid-cols-[minmax(230px,30%)_minmax(0,1fr)]">
     <section className={`${initialSelectedRequestId ? 'hidden md:flex' : 'flex'} min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200`}>
-      <div className="space-y-2 border-b p-3">
+      <div className="space-y-2 border-b border-slate-200 px-3 py-2">
         <div className="flex items-center justify-between"><h2 className="font-bold">전화예약</h2><button data-testid="admin-phone-reservation-refresh-button" disabled={loading} className="text-xs" onClick={refresh}>새로고침</button></div>
-        <input aria-label="전화예약 검색" value={search} onChange={event => setSearch(event.target.value)} placeholder="고객·업체·요청번호 검색" className="w-full rounded-lg border p-2 text-sm" />
-        <div className="flex flex-wrap gap-1">{Object.entries(PHONE_FILTER_LABELS).map(([key, label]) => <button key={key} aria-pressed={filter === key} onClick={() => setFilter(key as PhoneFilter)} className={`rounded-full border px-2 py-1 text-xs ${filter === key ? 'bg-slate-900 text-white' : ''}`}>{label}</button>)}</div>
+        <input aria-label="전화예약 검색" value={search} onChange={event => setSearch(event.target.value)} placeholder="고객·업체·요청번호 검색" className="h-[44px] w-full rounded-lg border border-slate-200 px-3 text-sm" />
+        <div className="flex flex-wrap gap-1">{Object.entries(PHONE_FILTER_LABELS).map(([key, label]) => <button key={key} aria-pressed={filter === key} onClick={() => setFilter(key as PhoneFilter)} className={`rounded-full border border-slate-200 px-2 py-1 text-xs ${filter === key ? 'bg-slate-900 text-white' : ''}`}>{label}</button>)}</div>
       </div>
       <div className="min-h-0 flex-1 overflow-auto" data-testid="admin-phone-reservation-list">
         {error && <p role="alert" className="p-3">{error}</p>}
         {!loading && !error && !requests.length && <p className="p-4 text-sm text-slate-500">해당하는 전화예약이 없습니다.</p>}
-        {requests.map(row => <button key={row.id} data-testid="admin-phone-reservation-list-item" onClick={() => select(row.id)} className={`w-full border-b p-3 text-left ${row.id === initialSelectedRequestId ? 'bg-blue-50' : ''}`}>
-          <p className="text-xs text-slate-500">{getProxyCategoryLabel(row.category)} · {STATUS_LABELS[row.status]}</p>
-          <p className="truncate text-sm font-bold">{getProxyRequestTitle(row)} · {getProxyRequesterDisplayName(row.profiles)}</p>
-          <p className="text-xs text-slate-500">{getProxyPaymentStatusLabel(row)}</p>
-          <p className="line-clamp-1 text-xs text-slate-500">{row.latest_content}</p>
+        {requests.map(row => <button key={row.id} data-testid="admin-phone-reservation-list-item" onClick={() => select(row.id)} className={`w-full space-y-1 border-b border-slate-200 px-3 py-3 text-left ${row.id === initialSelectedRequestId ? 'bg-blue-50' : ''}`}>
+          <p className="flex items-center justify-between gap-2 text-xs text-slate-500"><span className="min-w-0 truncate">{getProxyCategoryLabel(row.category)}</span><span className="shrink-0">{STATUS_LABELS[row.status]}</span></p>
+          <p className="flex gap-1 text-sm font-bold"><span className="min-w-0 truncate" title={getProxyRequestTitle(row)}>{getProxyRequestTitle(row)}</span><span className="max-w-[40%] shrink-0 truncate">· {getProxyRequesterDisplayName(row.profiles)}</span></p>
+          <p className="flex items-baseline gap-1 text-xs text-slate-500"><span className="shrink-0">{getProxyPaymentStatusLabel(row)}</span><span aria-hidden="true">·</span><span className="min-w-0 truncate">{row.latest_content}</span></p>
           {row.needs_reply && <span className="text-xs font-bold text-blue-700">추가 답장 </span>}
           {row.needs_attention && <span className="text-xs font-bold text-amber-700">확인 필요</span>}
         </button>)}
