@@ -35,11 +35,11 @@ test.beforeAll(async () => {
   css = (await postcss([tailwind()]).process('@import "tailwindcss";', { from: resolve('app/phone-fixture.css') })).css;
 });
 
-async function fixture(page: Page, options: { failSend?: boolean; failComplete?: boolean; unpaid?: boolean; status?: string; inquiryId?: string; visual?: boolean } = {}) {
+async function fixture(page: Page, options: { failSend?: boolean; failComplete?: boolean; unpaid?: boolean; status?: string; inquiryId?: string; visual?: boolean; channel?: string; method?: string } = {}) {
   const request = {
     id: 'request-1', user_id: 'guest', category: 'RESTAURANT', status: options.status || 'PENDING',
-    payment_status: options.unpaid ? 'WAITING' : 'COMPLETED', payment_channel: 'LOCALLY',
-    form_data: { payment_method: options.unpaid ? 'bank' as const : 'card' as const, restaurant_name: '스시 테스트', restaurant_phone: '0312345678', google_map_url: 'https://example.com/map', preferred_slot_primary: '2026-09-25T19:00', guest_number: 2, reservation_name: '홍길동', linked_inquiry_id: '123', request_notes: '창가 자리' },
+    payment_status: options.unpaid ? 'WAITING' : 'COMPLETED', payment_channel: options.channel || 'LOCALLY',
+    form_data: { payment_method: (options.method || (options.unpaid ? 'bank' : 'card')) as 'bank' | 'card', restaurant_name: '스시 테스트', restaurant_phone: '0312345678', google_map_url: 'https://example.com/map', preferred_slot_primary: '2026-09-25T19:00', guest_number: 2, reservation_name: '홍길동', linked_inquiry_id: '123', request_notes: '창가 자리' },
     profiles: { full_name: '홍길동' }, linked_inquiry_id: '123', needs_attention: false, needs_reply: false,
     latest_sender_id: 'guest', latest_content: '예약해주세요', created_at: '2026-09-22T00:00:00Z',
   };
@@ -88,99 +88,111 @@ async function fixture(page: Page, options: { failSend?: boolean; failComplete?:
       if (failComplete || request.payment_status !== 'COMPLETED') { failComplete = false; return json({ success: false, error: '완료 처리 실패' }, 409); }
       request.status = 'COMPLETED'; return json({ success: true });
     }
-    if (path.startsWith('/api/')) return json({ success: true });
+    if (path.startsWith('/api/')) {
+      if (route.request().method() !== 'GET') calls.push({path, body:route.request().postDataJSON()});
+      return json({ success: true });
+    }
     return route.fulfill({ contentType: 'text/html', body: `<html><head><style>${css}${options.visual ? '@media(min-width:768px){html{font-size:20px}body>main{max-width:1785px;margin:40px auto}}' : ''}</style></head><body><main style="padding:16px"><div id="root"></div></main><script>${script.replaceAll('</script', '<\\/script')}</script></body></html>` });
   });
   await page.goto(`http://phone.test/admin/dashboard?tab=CHATS&${options.inquiryId ? `inquiryId=${options.inquiryId}` : 'view=phone&proxyRequestId=request-1'}`);
   return { calls, request, messages };
 }
 
-for (const status of ['PENDING', 'IN_PROGRESS']) test(`paid ${status}: sends once then completes without navigation`, async ({ page }) => {
+const composer = (page: Page) => page.getByTestId('admin-chat-composer').filter({ visible: true });
+const send = (page: Page) => page.getByRole('button', { name: '메시지 전송', exact: true }).filter({ visible: true });
+const menu = (page: Page) => page.getByLabel('전화예약 업무 메뉴');
+async function complete(page: Page) {
+  await menu(page).click();
+  await page.getByRole('button', { name: '처리 완료', exact: true }).click();
+  await page.getByRole('button', { name: '완료 처리', exact: true }).click();
+}
+
+for (const status of ['PENDING', 'IN_PROGRESS']) test(`paid ${status}: reply and completion are independent`, async ({ page }) => {
   const state = await fixture(page, { status });
-  await page.getByTestId('admin-chat-composer').filter({ visible: true }).fill('예약 결과입니다.');
-  await page.getByRole('button', { name: '안내 보내고 완료', exact: true }).click();
+  await composer(page).fill('고객에게 안내');
+  await send(page).click();
+  await expect(composer(page)).toHaveValue('');
+  expect(state.request.status).toBe(status);
+  expect(state.calls.map(call => call.path)).toEqual(['/api/inquiries/message']);
+  await complete(page);
   await expect.poll(() => state.request.status).toBe('COMPLETED');
   expect(state.calls.map(call => call.path)).toEqual(['/api/inquiries/message', '/api/proxy-bookings/request-1']);
-  await expect(page.getByTestId('admin-chat-message-list').filter({ visible: true }).getByText('예약 결과입니다.')).toBeVisible();
+  expect(state.calls[1].body).toEqual({status:'COMPLETED'});
+  await menu(page).click();
+  await expect(page.getByRole('button', { name: '처리 완료', exact:true })).toHaveCount(0);
 });
 
-test('partial completion failure retries status only and keeps the pending state across tabs', async ({ page }) => {
+test('completion without sending preserves draft; failure can be retried independently', async ({ page }) => {
   const state = await fixture(page, { failComplete: true });
-  await page.getByTestId('admin-chat-composer').filter({ visible: true }).fill('안내 전송');
-  await page.getByRole('button', { name: '안내 보내고 완료', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('고객 안내는 전송됐지만 완료 처리에 실패했습니다.');
-  await page.getByRole('navigation').getByRole('button', { name: '1:1 문의', exact: true }).click();
-  await page.getByRole('navigation').getByRole('button', { name: '전화예약', exact: true }).click();
-  await page.getByTestId('admin-phone-reservation-list-item').click();
-  await page.getByRole('button', { name: '완료 처리 다시 시도' }).click();
-  await expect.poll(() => state.request.status).toBe('COMPLETED');
-  expect(state.calls.filter(call => call.path === '/api/inquiries/message')).toHaveLength(1);
-  expect(state.calls.filter(call => call.path === '/api/proxy-bookings/request-1')).toHaveLength(2);
-});
-
-test('send failure does not complete; draft remains', async ({ page }) => {
-  const state = await fixture(page, { failSend: true });
-  const input = page.getByTestId('admin-chat-composer').filter({ visible: true });
-  await input.fill('남아야 하는 답변');
-  await page.getByRole('button', { name: '안내 보내고 완료', exact: true }).click();
-  await expect(input).toBeEnabled();
-  await expect(input).toHaveValue('남아야 하는 답변');
-  expect(state.calls.filter(call => call.path.includes('/proxy-bookings/'))).toHaveLength(0);
-});
-
-test('unpaid completion disabled; ordinary reply changes no request status', async ({ page }) => {
-  const state = await fixture(page, { unpaid: true });
-  await page.getByTestId('admin-chat-composer').filter({ visible: true }).fill('입금을 확인하겠습니다.');
-  await expect(page.getByRole('button', { name: '안내 보내고 완료', exact: true })).toBeDisabled();
-  await expect(page.getByRole('button', { name: '입금 확인', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '답변 보내기', exact: true }).click();
+  await composer(page).fill('아직 보내지 않은 초안');
+  await complete(page);
   await expect.poll(() => state.calls.length).toBe(1);
   expect(state.request.status).toBe('PENDING');
+  await expect(page.getByRole('button',{name:'완료 처리',exact:true})).toHaveCount(0);
+  await complete(page);
+  await expect.poll(() => state.request.status).toBe('COMPLETED');
+  expect(state.calls.map(call=>call.path)).toEqual(['/api/proxy-bookings/request-1','/api/proxy-bookings/request-1']);
+  expect(state.messages).toHaveLength(1);
+  await expect(composer(page)).toHaveValue('아직 보내지 않은 초안');
 });
 
-test('completed customer follow-up returns to todo until admin replies, without reopening request', async ({ page }) => {
-  const state = await fixture(page, { status: 'COMPLETED' });
+test('send failure leaves draft and request unchanged', async ({ page }) => {
+  const state = await fixture(page, { failSend:true });
+  await composer(page).fill('남아야 하는 답변');
+  await send(page).click();
+  await expect(composer(page)).toBeEnabled();
+  await expect(composer(page)).toHaveValue('남아야 하는 답변');
+  expect(state.request.status).toBe('PENDING');
+  expect(state.calls.map(call=>call.path)).toEqual(['/api/inquiries/message']);
+});
+
+for (const channel of ['LOCALLY','NAVER']) test(`unpaid ${channel}: manual actions available, completion absent`, async ({ page }) => {
+  const state = await fixture(page, { unpaid:true, channel });
+  await menu(page).click();
+  await expect(page.getByRole('button',{name:'처리 완료',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'결제 취소',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'입금 확인',exact:true}).click();
+  expect(state.calls.map(call=>call.path)).toEqual(['/api/admin/proxy-bookings/confirm-payment']);
+  await composer(page).fill('입금 확인 중입니다.');
+  await send(page).click();
+  await expect(composer(page)).toHaveValue('');
+  expect(state.request.status).toBe('PENDING');
+  expect(state.calls.map(call=>call.path)).toEqual(['/api/admin/proxy-bookings/confirm-payment','/api/inquiries/message']);
+});
+
+test('legacy waiting card has no manual payment or completion actions', async ({page}) => {
+  await fixture(page,{unpaid:true,method:'card'});
+  await expect(composer(page)).toBeVisible();
+  await expect(menu(page)).toHaveCount(0);
+});
+
+for (const action of ['cancel-payment','refund-payment']) test(`${action} stays behind confirmation and uses existing endpoint`, async ({page}) => {
+  const state = await fixture(page,{unpaid:action==='cancel-payment',status:action==='refund-payment'?'COMPLETED':'PENDING'});
+  await menu(page).click();
+  await page.getByRole('button',{name:action==='refund-payment'?'환불 처리':'결제 취소',exact:true}).click();
+  expect(state.calls).toHaveLength(0);
+  await page.getByRole('button',{name:'확인',exact:true}).click();
+  await expect.poll(()=>state.calls.length).toBe(1);
+  expect(state.calls[0]).toEqual({path:`/api/admin/proxy-bookings/${action}`,body:{requestId:'request-1'}});
+});
+
+test('completed follow-up reply clears needs_reply without changing proxy or inquiry status', async ({ page }) => {
+  const state = await fixture(page, { status:'COMPLETED' });
   await expect(page.getByTestId('admin-phone-reservation-list-item')).toContainText('추가 답장');
-  await page.getByTestId('admin-chat-composer').filter({ visible: true }).fill('추가 답변');
-  await page.getByRole('button', { name: '답변 보내기', exact: true }).click();
+  await composer(page).fill('추가 답변');
+  await send(page).click();
   await expect(page.getByTestId('admin-phone-reservation-list-item')).toHaveCount(0);
   expect(state.request.status).toBe('COMPLETED');
-  expect(state.calls).toHaveLength(1);
+  expect(state.calls.map(call=>call.path)).toEqual(['/api/inquiries/message']);
 });
 
-for (const [id, view] of [['123', 'phone'], ['456', 'monitor'], ['789', 'support']]) test(`legacy inquiry ${id} resolves to ${view}`, async ({ page }) => {
-  await fixture(page, { inquiryId: id });
+for (const [id, view] of [['123','phone'],['456','monitor'],['789','support']]) test(`legacy inquiry ${id} resolves to ${view}`, async ({page}) => {
+  await fixture(page,{inquiryId:id});
   await expect(page).toHaveURL(new RegExp(`view=${view}`));
-  if (view === 'phone') await expect(page).toHaveURL(/proxyRequestId=request-1/);
+  if(view==='phone') await expect(page).toHaveURL(/proxyRequestId=request-1/);
 });
 
-test('mobile back keeps filter/search and draft; templates never send automatically', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  const state = await fixture(page);
-  await page.getByRole('button', { name: '예약 확정', exact: true }).click();
-  await expect(page.getByTestId('admin-chat-composer').filter({ visible: true })).toHaveValue(/예약 결과를 입력해주세요/);
-  expect(state.calls).toHaveLength(0);
-  await page.getByRole('button', { name: '← 목록으로', exact: true }).click();
-  await page.getByRole('button', { name: '전체', exact: true }).click();
-  await page.getByRole('textbox', { name: '전화예약 검색' }).fill('홍길동');
-  await page.getByTestId('admin-phone-reservation-list-item').click();
-  await expect(page.getByTestId('admin-chat-composer').filter({ visible: true })).toHaveValue(/예약 결과를 입력해주세요/);
-  const box = await page.getByRole('button', { name: '안내 보내고 완료', exact: true }).boundingBox();
-  expect(box!.x + box!.width).toBeLessThanOrEqual(390);
-  await page.screenshot({ path: '.tmp/phone-validation/mobile.png', fullPage: true });
-});
-
-test('desktop has list and one detail column with intake before payment and conversation', async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 900 });
-  await fixture(page);
-  await expect(page.getByText('창가 자리', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: '복사', exact: true })).toBeVisible();
-  await expect(page.getByText('결제 완료 · ₩4,500 · 카드')).toBeVisible();
-  await expect(page.getByRole('button', { name: '환불 처리', exact: true })).toBeHidden();
-  await page.screenshot({ path: '.tmp/phone-validation/desktop.png', fullPage: true });
-});
-
-for (const view of ['', 'support', 'phone', 'monitor']) test(`explicit view ${view || 'default'} opens its own workspace`, async ({ page }) => {
+for (const view of ['', 'support', 'phone', 'monitor']) test(`explicit view ${view || 'default'} opens its workspace`, async ({ page }) => {
   await fixture(page);
   await page.goto(`http://phone.test/admin/dashboard?tab=CHATS${view ? `&view=${view}` : ''}`);
   const label = view === 'phone' ? '전화예약' : view === 'monitor' ? '실시간 모니터링' : '1:1 문의';
@@ -188,55 +200,64 @@ for (const view of ['', 'support', 'phone', 'monitor']) test(`explicit view ${vi
   if (view !== 'phone') await expect(page.getByTestId('admin-chat-inquiry-row-' + (view === 'monitor' ? '456' : '789'))).toBeVisible();
 });
 
-test('desktop polish reference at 2048x1231', async ({ page }) => {
-  await page.setViewportSize({width:2048,height:1231});
-  await fixture(page, {visual:true});
-  await expect(page.getByText('늦은 체크인이 가능한지 확인해주세요.',{exact:true})).toBeVisible();
-  await expect(page.getByTestId('admin-chat-messages-loading')).toHaveCount(0);
-  const metrics = await page.evaluate(() => {
-    const messages = document.querySelector('[data-testid="admin-chat-message-list"]')!;
-    const detail = messages.parentElement!;
-    const header = detail.firstElementChild!;
-    const quick = messages.nextElementSibling!;
-    const composer = quick.nextElementSibling!;
-    const list = document.querySelector('[data-testid="admin-phone-reservation-list"]')!;
-    const box = (el:Element) => Math.round(el.getBoundingClientRect().height);
-    return {header:box(header),conversation:box(messages),quick:box(quick),composer:box(composer),row:box(list.querySelector('button')!),listHeader:box(list.previousElementSibling!),leftWidth:Math.round(list.getBoundingClientRect().width),rightWidth:Math.round(detail.getBoundingClientRect().width)};
-  });
-  mkdirSync('.tmp/phone-polish',{recursive:true});
-  expect(metrics.header).toBeLessThanOrEqual(290);
-  expect(metrics.conversation).toBeGreaterThanOrEqual(480);
-  expect(metrics.quick).toBeLessThanOrEqual(46);
-  expect(metrics.composer).toBeLessThanOrEqual(88);
-  expect(metrics.row).toBeLessThanOrEqual(110);
-  expect(metrics.listHeader).toBeLessThanOrEqual(155);
-  expect(metrics.leftWidth / (metrics.leftWidth + metrics.rightWidth)).toBeCloseTo(0.3, 1);
-  const link = page.getByRole('link', {name: '숙소 링크 열기'});
-  await expect(link).toHaveAttribute('href', 'https://maps.app.goo.gl/fCPWn7ZoYQdZ4ode7?g_st=ac');
-  await expect(link).toHaveAttribute('target', '_blank');
-  await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
-  const label = 'after';
-  writeFileSync(`.tmp/phone-polish/${label}-metrics.json`,JSON.stringify(metrics,null,2));
-  await page.screenshot({path:`.tmp/phone-polish/${label}-desktop.png`,fullPage:true});
+test('mobile back preserves draft, filter and search', async ({page}) => {
+  await page.setViewportSize({width:390,height:844});
+  const state = await fixture(page);
+  await composer(page).fill('작성 중인 답변');
+  await page.getByRole('button',{name:'목록으로',exact:true}).click();
+  await page.getByRole('button',{name:'전체',exact:true}).click();
+  await page.getByRole('textbox',{name:'전화예약 검색'}).fill('홍길동');
+  await page.getByTestId('admin-phone-reservation-list-item').click();
+  await expect(composer(page)).toHaveValue('작성 중인 답변');
+  await page.getByRole('button',{name:'목록으로',exact:true}).click();
+  await expect(page.getByRole('textbox',{name:'전화예약 검색'})).toHaveValue('홍길동');
+  await expect(page.getByRole('button',{name:'전체',exact:true})).toHaveAttribute('aria-pressed','true');
+  expect(state.calls).toHaveLength(0);
 });
 
+for (const width of [390,2048]) test(`normal chat layout and composer parity at ${width}px`, async ({page}) => {
+  await page.setViewportSize({width,height:width===390?844:1231});
+  const state = await fixture(page,{visual:true});
+  await expect(composer(page)).toBeVisible();
+  const messages = page.getByTestId('admin-chat-message-list').filter({visible:true});
+  await expect(messages).toContainText(state.messages[0].content);
+  for(const label of ['예약 확정','예약 불가','확인 결과','안내 보내고 완료','답변 보내기','신청서 전체 보기']) {
+    await expect(page.getByRole('button',{name:label,exact:true})).toHaveCount(0);
+  }
+  await expect(page.getByTestId('admin-phone-intake-header')).toHaveCount(0);
+  await expect(page.getByTestId('admin-phone-quick-replies')).toHaveCount(0);
+  const metrics = await messages.evaluate(el=>({conversation:el.getBoundingClientRect().height,detail:el.parentElement!.getBoundingClientRect().height,header:el.previousElementSibling!.getBoundingClientRect().height,overflow:document.documentElement.scrollWidth>innerWidth}));
+  expect(metrics.overflow).toBe(false);
+  expect(metrics.conversation / metrics.detail).toBeGreaterThan(0.65);
+  expect(metrics.header).toBeLessThan(width===390?85:110);
+  const style = await composer(page).evaluate(el=>({height:el.getBoundingClientRect().height,font:getComputedStyle(el).fontSize,padding:getComputedStyle(el).padding}));
+  const box = await send(page).boundingBox();
+  expect(box!.x+box!.width).toBeLessThanOrEqual(width);
+  expect(box!.y+box!.height).toBeLessThanOrEqual(width===390?844:1231);
+  if(width===2048) {
+    const list = await page.getByTestId('admin-phone-reservation-list').boundingBox();
+    const detail = await messages.boundingBox();
+    expect(list!.x+list!.width).toBeLessThan(detail!.x);
+    expect(list!.width/(list!.width+detail!.width)).toBeCloseTo(0.3,1);
+  }
+  mkdirSync('.tmp/phone-unification',{recursive:true});
+  writeFileSync(`.tmp/phone-unification/${width}-metrics.json`,JSON.stringify({metrics,composer:style},null,2));
+  await page.screenshot({path:`.tmp/phone-unification/${width}.png`,fullPage:true});
+  await page.goto('http://phone.test/admin/dashboard?tab=CHATS&view=support&inquiryId=789');
+  await expect(composer(page)).toBeVisible();
+  const normal = await composer(page).evaluate(el=>({height:el.getBoundingClientRect().height,font:getComputedStyle(el).fontSize,padding:getComputedStyle(el).padding}));
+  expect(style).toEqual(normal);
+});
 
-test('mobile hotel intake and composer remain accessible without horizontal overflow', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await fixture(page, { visual: true });
-  await expect(page.getByTestId('admin-chat-messages-loading')).toHaveCount(0);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
-  for (const name of ['답변 보내기', '안내 보내고 완료']) {
-    const box = await page.getByRole('button', { name, exact: true }).boundingBox();
-    expect(box!.x + box!.width).toBeLessThanOrEqual(390);
-    expect(box!.y + box!.height).toBeLessThanOrEqual(844);
-  }
-  const disclosure = page.getByText('신청서 전체 보기', { exact: false });
-  await expect(disclosure).toHaveCount(1);
-  {
-    await disclosure.focus();
-    await page.keyboard.press('Enter');
-    await expect(disclosure.locator('..')).toHaveAttribute('open', '');
-  }
-  await page.screenshot({ path: '.tmp/phone-polish/after-mobile.png', fullPage: true });
+for (const view of ['support', 'monitor']) test(`${view} retains its existing send and inquiry-status behavior`, async ({page}) => {
+  const state = await fixture(page);
+  const id = view === 'support' ? '789' : '456';
+  await page.goto(`http://phone.test/admin/dashboard?tab=CHATS&view=${view}&inquiryId=${id}`);
+  await composer(page).fill('기존 채팅 답변');
+  await send(page).click();
+  await expect(composer(page)).toHaveValue('');
+  await expect.poll(()=>state.calls.length).toBe(view==='support'?2:1);
+  expect(state.calls.map(call=>call.path)).toEqual(view==='support'?['/api/inquiries/message','/api/admin/inquiries/789/status']:['/api/inquiries/message']);
+  if(view==='support') expect(state.calls[1].body.status).toBe('in_progress');
+  expect(state.request.status).toBe('PENDING');
 });

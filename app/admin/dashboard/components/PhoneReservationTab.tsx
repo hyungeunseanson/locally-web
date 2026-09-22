@@ -5,8 +5,10 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 import ChatMonitor from './ChatMonitor';
-import { getProxyCategoryLabel, getProxyPaymentMethod, getProxyPaymentStatusLabel, getProxyRequestFeeKrw, getProxyRequestTitle, getProxyRequesterDisplayName } from '@/app/utils/proxyBooking';
-import { getPhoneFormSections, PHONE_FILTER_LABELS, type PhoneFilter, type PhoneWorkspaceRequest } from '@/app/utils/phoneReservationWorkspace';
+import { useConfirmDialog } from '@/app/hooks/useConfirmDialog';
+import { ChevronLeft, MoreHorizontal } from 'lucide-react';
+import { getProxyCategoryLabel, getProxyPaymentMethod, getProxyPaymentStatusLabel, getProxyRequestTitle, getProxyRequesterDisplayName } from '@/app/utils/proxyBooking';
+import { PHONE_FILTER_LABELS, type PhoneFilter, type PhoneWorkspaceRequest } from '@/app/utils/phoneReservationWorkspace';
 
 const PAGE_SIZE = 10;
 const STATUS_LABELS = { PENDING: '대기', IN_PROGRESS: '진행 중', COMPLETED: '완료', CANCELLED: '취소' };
@@ -17,6 +19,7 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
   const router = useRouter();
   const params = useSearchParams();
   const { showToast } = useToast();
+  const { requestConfirm, ConfirmDialogElement } = useConfirmDialog();
   const [filter, setFilter] = useState<PhoneFilter>('todo');
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
@@ -127,13 +130,17 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
   const selected = detail?.id === initialSelectedRequestId ? detail : null;
   const canComplete = Boolean(selected && !updating && selected.payment_status === 'COMPLETED' && ['PENDING', 'IN_PROGRESS'].includes(selected.status) && selected.linked_inquiry_id);
   const complete = async () => {
-    if (!selected) throw new Error('요청을 먼저 선택해주세요.');
-    const response = await fetch(`/api/proxy-bookings/${selected.id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'COMPLETED' }),
-    });
-    const result = await response.json();
-    if (!response.ok || !result.success) throw new Error(result.error || '완료 처리에 실패했습니다.');
-    refresh();
+    if (!selected || !canComplete) return;
+    setUpdating(true);
+    try {
+      const response = await fetch(`/api/proxy-bookings/${selected.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'COMPLETED' }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || '완료 처리에 실패했습니다.');
+      refresh();
+    } catch (err) { showToast(err instanceof Error ? err.message : '완료 처리 실패', 'error'); }
+    finally { setUpdating(false); }
   };
   const paymentAction = async (action: 'confirm-payment' | 'cancel-payment' | 'refund-payment') => {
     if (!selected || updating) return;
@@ -148,39 +155,38 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
     } catch (err) { showToast(err instanceof Error ? err.message : '결제 처리 실패', 'error'); }
     finally { setUpdating(false); }
   };
-  const sections = selected ? getPhoneFormSections(selected) : null;
   const method = selected ? getProxyPaymentMethod(selected.form_data) : null;
   const manualPayment = selected?.payment_status === 'WAITING' && (selected.payment_channel === 'NAVER' || method === 'bank');
-  const disclosureClass = 'inline-flex w-auto cursor-pointer list-none items-center gap-1 rounded-sm text-xs text-slate-500 outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 [&::-webkit-details-marker]:hidden';
-  const showEntries = (entries: NonNullable<typeof sections>['core']) => entries.map(entry => <div key={entry.key} className="min-w-0" data-testid="admin-phone-reservation-form-entry">
-    <dt className="text-xs text-slate-500">{entry.label}</dt>
-    <dd className="break-words whitespace-pre-wrap text-sm leading-snug text-slate-900">{/^(https?:\/\/)/i.test(entry.value)
-      ? <a className="inline-flex items-center gap-1 text-slate-700 underline decoration-slate-300 underline-offset-2" href={entry.value} target="_blank" rel="noopener noreferrer">{entry.key === 'google_map_url' ? 'Google Maps' : entry.key === 'property_link' ? '숙소 링크' : entry.key === 'business_link' ? '업체 링크' : entry.label} 열기 <span aria-hidden="true">↗</span></a>
-      : entry.value}
-      {/phone$/.test(entry.key) && <button className="ml-2 text-xs underline" onClick={() => void navigator.clipboard.writeText(entry.value).then(() => showToast('전화번호를 복사했습니다.', 'success')).catch(() => showToast('복사하지 못했습니다.', 'error'))}>복사</button>}
-    </dd>
-  </div>);
-  const header = <div className="space-y-1.5">
-    <button onClick={() => select(null)} className="text-sm text-slate-600 md:hidden">← 목록으로</button>
-    {detailError ? <p role="alert">{detailError}</p> : !selected ? <p>{detailLoading ? '상세를 불러오는 중...' : '전화예약을 선택해주세요.'}</p> : <>
-      <div className="flex items-start justify-between gap-2">
-        <h2 className="min-w-0 font-bold md:truncate" title={`${getProxyRequestTitle(selected)} · ${getProxyRequesterDisplayName(selected.profiles)}`}>{getProxyRequestTitle(selected)} · {getProxyRequesterDisplayName(selected.profiles)}</h2>
-        <span className="shrink-0 pt-0.5 text-xs text-slate-500">{STATUS_LABELS[selected.status]}{selected.needs_reply ? ' · 추가 답장' : ''}{selected.needs_attention ? ' · 확인 필요' : ''}</span>
+  const confirmPaymentAction = (action: 'cancel-payment' | 'refund-payment') => requestConfirm({
+    title: action === 'refund-payment' ? '환불 처리' : '결제 취소',
+    description: action === 'refund-payment' ? '이 전화예약 결제를 환불 처리할까요?' : '이 전화예약 결제를 취소할까요?',
+    confirmLabel: '확인', tone: 'red',
+  }, () => paymentAction(action));
+  const toolbar = <div data-testid="admin-phone-chat-header" className="relative flex shrink-0 items-center gap-2 border-b border-slate-100 bg-slate-50/30 p-3 md:p-4">
+    <button aria-label="목록으로" onClick={() => select(null)} className="shrink-0 rounded-full bg-slate-100 p-1.5 text-slate-500 md:hidden"><ChevronLeft size={18} /></button>
+    {detailError ? <p role="alert" className="text-xs">{detailError}</p> : !selected ? <p className="text-xs">{detailLoading ? '상세를 불러오는 중...' : '전화예약을 선택해주세요.'}</p> : <>
+      <div className="min-w-0 flex-1">
+        <h2 className="truncate text-xs font-bold text-slate-900 md:text-lg">{getProxyRequesterDisplayName(selected.profiles)}</h2>
+        <p className="truncate text-[8px] font-medium text-slate-500 md:text-[11px]" title={getProxyRequestTitle(selected)}>{getProxyRequestTitle(selected)}</p>
       </div>
-      <dl className="grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2" data-testid="admin-phone-reservation-form-section">{sections && showEntries(sections.core)}</dl>
-      {sections && sections.other.length > 0 && <details><summary className={disclosureClass}>신청서 전체 보기 <span aria-hidden="true">▾</span></summary><dl className="mt-2 grid gap-2 sm:grid-cols-2">{showEntries(sections.other)}</dl></details>}
-      <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 pt-1.5 text-xs text-slate-500">
-        <span>{getProxyPaymentStatusLabel(selected)} · ₩{getProxyRequestFeeKrw(selected.category, selected.form_data).toLocaleString()} · {selected.payment_channel === 'NAVER' ? 'NAVER' : method === 'card' ? '카드' : '무통장'}</span>
-        {manualPayment && <button disabled={updating} onClick={() => void paymentAction('confirm-payment')} className="rounded-lg bg-slate-900 px-3 py-1 text-white disabled:opacity-50">입금 확인</button>}
+      <div className="flex shrink-0 flex-col items-end gap-0.5 text-[8px] md:text-[10px]">
+        <span className="rounded-full border border-slate-200 bg-white px-1.5 py-0.5">{STATUS_LABELS[selected.status]}</span>
+        <span className="text-slate-500">{getProxyPaymentStatusLabel(selected)}</span>
+        {selected.needs_attention && <span className="text-amber-700">확인 필요</span>}
       </div>
-      {selected.payment_status === 'WAITING' && method === 'card' && <p className="text-xs text-amber-800">카드 결제 확인 전에는 완료할 수 없습니다.</p>}
-      <details className="text-xs"><summary className={disclosureClass}>결제 상세 <span aria-hidden="true">▾</span></summary>
-        <div className="mt-2 space-y-2"><p>주문번호: {selected.locally_order_id || '—'}</p><p>네이버 구매자명: {selected.naver_buyer_name || '—'}</p>
-          {manualPayment && <button disabled={updating} className="text-rose-700 underline" onClick={() => void paymentAction('cancel-payment')}>결제 취소</button>}
-          {selected.payment_status === 'COMPLETED' && <button disabled={updating} className="text-rose-700 underline" onClick={() => void paymentAction('refund-payment')}>환불 처리</button>}
+      {(canComplete || manualPayment || selected.payment_status === 'COMPLETED') && <details key={selected.id} className="relative shrink-0" onKeyDown={event => {
+        if (event.key === 'Escape') { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); }
+      }}>
+        <summary aria-label="전화예약 업무 메뉴" className="flex cursor-pointer list-none rounded-full p-1.5 text-slate-500 focus-visible:outline-2 focus-visible:outline-slate-400 [&::-webkit-details-marker]:hidden"><MoreHorizontal size={18} /></summary>
+        <div className="absolute right-0 top-full z-20 mt-2 w-36 rounded-lg border border-slate-200 bg-white p-1 shadow-lg" onClick={event => {
+          if ((event.target as HTMLElement).closest('button')) event.currentTarget.closest('details')?.removeAttribute('open');
+        }}>
+          {canComplete && <button disabled={updating} className="w-full rounded p-2 text-left text-xs hover:bg-slate-50 disabled:opacity-50" onClick={() => requestConfirm({ title: '처리 완료', description: '이 전화예약 업무를 완료 처리할까요?', confirmLabel: '완료 처리' }, complete)}>처리 완료</button>}
+          {manualPayment && <button disabled={updating} className="w-full rounded p-2 text-left text-xs hover:bg-slate-50 disabled:opacity-50" onClick={() => void paymentAction('confirm-payment')}>입금 확인</button>}
+          {manualPayment && <button disabled={updating} className="w-full rounded p-2 text-left text-xs text-rose-700 hover:bg-slate-50 disabled:opacity-50" onClick={() => confirmPaymentAction('cancel-payment')}>결제 취소</button>}
+          {selected.payment_status === 'COMPLETED' && <button disabled={updating} className="w-full rounded p-2 text-left text-xs text-rose-700 hover:bg-slate-50 disabled:opacity-50" onClick={() => confirmPaymentAction('refund-payment')}>환불 처리</button>}
         </div>
-      </details>
-      {!selected.linked_inquiry_id && <p role="alert" className="rounded-lg bg-amber-50 p-2 text-sm text-amber-900">확인 필요: 고객 문의 연결을 확인해주세요. 이 상태에서는 답변하거나 완료할 수 없습니다.</p>}
+      </details>}
     </>}
   </div>;
 
@@ -206,9 +212,10 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
       </div>
     </section>
     <section className={`${initialSelectedRequestId ? 'flex' : 'hidden md:flex'} min-h-0 min-w-0 flex-col`}>
-      <ChatMonitor enabled={active && Boolean(selected?.linked_inquiry_id)} phone={{
-        inquiryId: selected?.linked_inquiry_id || null, header, canComplete, onComplete: complete, onSent: refresh,
+      <ChatMonitor enabled={active && Boolean(selected?.linked_inquiry_id)} phoneContext={{
+        inquiryId: selected?.linked_inquiry_id || null, toolbar, onSent: refresh,
       }} />
     </section>
+    {ConfirmDialogElement}
   </div>;
 }
