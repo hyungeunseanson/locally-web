@@ -26,7 +26,8 @@ BEGIN
     '20260916134243:review_direct_write_lockdown',
     '20260918000000:proxy_card_intake_atomic',
     '20260922081710:experience_payment_claim_and_pending_cleanup',
-    '20260922125140:close_refunded_phone_proxy_requests'
+    '20260922125140:close_refunded_phone_proxy_requests',
+    '20260923013312:ops_anomaly_monitor_snapshot'
   ]::text[];
   IF actual IS DISTINCT FROM expected THEN
     RAISE EXCEPTION 'migration ledger mismatch: %', actual;
@@ -122,6 +123,7 @@ BEGIN
     'public.finalize_proxy_card_intake_atomic(p_proxy_request_id uuid, p_verified_amount integer, p_verified_tid text, p_initial_message text)',
     'public.finish_service_refund_operation_atomic(p_operation_id uuid, p_outcome text, p_provider_reference text, p_error_message text)',
     'public.get_experience_completion_due_backlog()',
+    'public.get_ops_anomaly_snapshot(p_observed_at timestamp with time zone, p_claim_overdue_minutes integer, p_refund_stale_minutes integer, p_payout_long_hold_days integer, p_experience_job_missing_minutes integer, p_service_job_missing_minutes integer, p_cancel_pending_job_missing_minutes integer)',
     'public.guard_experience_payment_claim_columns()',
     'public.handle_new_user()',
     'public.increment_comment_count()',

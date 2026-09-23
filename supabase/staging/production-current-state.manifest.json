@@ -1,6 +1,6 @@
 {
   "schemaContractVersion": 3,
-  "capturedAt": "2026-09-22",
+  "capturedAt": "2026-09-23",
   "productionProjectRef": "uhinvcydgzqlpnvieyal",
   "source": {
     "kind": "read-only Production PostgreSQL catalog inventory",
@@ -76,6 +76,12 @@
       "name": "close_refunded_phone_proxy_requests",
       "repositoryFile": "supabase/migrations/20260922125140_close_refunded_phone_proxy_requests.sql",
       "repositorySha256": "a951fd089dd62da1bb140b9f4c64044709e5b3752923c788faa7fe26b68ef900"
+    },
+    {
+      "version": "20260923013312",
+      "name": "ops_anomaly_monitor_snapshot",
+      "repositoryFile": "supabase/migrations/20260923013312_ops_anomaly_monitor_snapshot.sql",
+      "repositorySha256": "e9ff8ab1277cab03c3df3d26dc3c9edafef4b40753ff17c725a93c7aa69553bd"
     }
   ],
   "operationalStateDeltas": [
@@ -165,6 +171,7 @@
       "public.finalize_proxy_card_intake_atomic(p_proxy_request_id uuid, p_verified_amount integer, p_verified_tid text, p_initial_message text)",
       "public.finish_service_refund_operation_atomic(p_operation_id uuid, p_outcome text, p_provider_reference text, p_error_message text)",
       "public.get_experience_completion_due_backlog()",
+      "public.get_ops_anomaly_snapshot(p_observed_at timestamp with time zone, p_claim_overdue_minutes integer, p_refund_stale_minutes integer, p_payout_long_hold_days integer, p_experience_job_missing_minutes integer, p_service_job_missing_minutes integer, p_cancel_pending_job_missing_minutes integer)",
       "public.guard_experience_payment_claim_columns()",
       "public.handle_new_user()",
       "public.increment_comment_count()",

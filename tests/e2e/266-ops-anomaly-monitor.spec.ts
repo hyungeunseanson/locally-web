@@ -23,7 +23,7 @@ import {
 import { handleLocallyScheduledEvent } from '@/app/utils/cloudflareScheduled';
 
 const observedAt = new Date('2026-09-22T16:00:00.000Z');
-const migrationPath = 'supabase/migrations/20260922150728_ops_anomaly_monitor_snapshot.sql';
+const migrationPath = 'supabase/migrations/20260923013312_ops_anomaly_monitor_snapshot.sql';
 
 const productionEnvironment = {
   CLOUDFLARE_DEPLOYMENT_ENV: 'production',

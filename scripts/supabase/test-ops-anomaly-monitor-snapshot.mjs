@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 
 import { PGlite } from '@electric-sql/pglite';
 
-const migrationPath = 'supabase/migrations/20260922150728_ops_anomaly_monitor_snapshot.sql';
+const migrationPath = 'supabase/migrations/20260923013312_ops_anomaly_monitor_snapshot.sql';
 const signature = 'public.get_ops_anomaly_snapshot(timestamp with time zone,integer,integer,integer,integer,integer,integer)';
 const observedAt = '2026-09-22T16:00:00.000Z';
 const db = new PGlite();
