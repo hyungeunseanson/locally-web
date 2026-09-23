@@ -29,6 +29,8 @@ export type NotificationType =
   | 'review_reply'             // 게스트에게: 호스트가 후기에 답글
   | 'review_request'           // 게스트에게: 체험 완료 후 후기 작성 요청
   | 'guest_review_request'     // 호스트에게: 체험 완료 후 게스트 평가 요청
+  | 'review_request_reminder'
+  | 'guest_review_request_reminder'
   | 'guest_review_received';   // 게스트에게: 호스트가 게스트 평가 작성
 
 type NotificationCopyKey =

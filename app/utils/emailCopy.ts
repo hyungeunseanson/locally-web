@@ -130,6 +130,8 @@ export type EmailCopyKey =
   | 'review.reply.guest'
   | 'review.request.guest'
   | 'review.guest_request.host'
+  | 'review.request_reminder.guest'
+  | 'review.guest_request_reminder.host'
   | 'review.guest_received.guest'
   | 'membership.member_welcome'
   | 'membership.circle_welcome'
@@ -164,6 +166,8 @@ type EmailCopyParams = {
   'review.reply.guest': ReviewReplyGuestParams;
   'review.request.guest': ReviewRequestGuestParams;
   'review.guest_request.host': ReviewGuestRequestHostParams;
+  'review.request_reminder.guest': ReviewRequestGuestParams;
+  'review.guest_request_reminder.host': ReviewGuestRequestHostParams;
   'review.guest_received.guest': ReviewGuestReceivedGuestParams;
   'membership.member_welcome': MembershipParams;
   'membership.circle_welcome': MembershipParams;
@@ -354,6 +358,28 @@ function buildReviewRequestGuestEmailCopy(
         message: `'${experienceTitle}' 체험은 어떠셨나요? 소중한 후기는 호스트와 다음 여행자에게 큰 도움이 됩니다.`,
         ctaLabel: '후기 작성하기',
       };
+  }
+}
+
+function buildReviewReminderEmailCopy(
+  locale: NotificationLocale,
+  role: 'guest' | 'host',
+  params: ReviewRequestGuestParams
+): EmailCopy {
+  const experienceTitle = params.experienceTitle;
+  if (role === 'guest') {
+    switch (locale) {
+      case 'en': return { subject: '[Locally] A reminder to review your experience', title: 'Share your experience', message: `Your review of '${experienceTitle}' is still waiting.`, ctaLabel: 'Write a review' };
+      case 'ja': return { subject: '[Locally] 体験レビューのリマインダー', title: 'レビューをお待ちしています', message: `「${experienceTitle}」のレビューをお寄せください。`, ctaLabel: 'レビューを書く' };
+      case 'zh': return { subject: '[Locally] 体验评价提醒', title: '期待您的评价', message: `请为“${experienceTitle}”留下评价。`, ctaLabel: '撰写评价' };
+      default: return { subject: '[Locally] 체험 후기 작성 알림', title: '후기를 기다리고 있어요', message: `'${experienceTitle}' 체험 후기를 아직 작성하지 않으셨어요.`, ctaLabel: '후기 작성하기' };
+    }
+  }
+  switch (locale) {
+    case 'en': return { subject: '[Locally] A reminder to review your guest', title: 'Review your guest', message: `Your guest review for '${experienceTitle}' is still waiting.`, ctaLabel: 'Write guest review' };
+    case 'ja': return { subject: '[Locally] ゲスト評価のリマインダー', title: 'ゲスト評価をお待ちしています', message: `「${experienceTitle}」のゲスト評価をお寄せください。`, ctaLabel: 'ゲストを評価' };
+    case 'zh': return { subject: '[Locally] 客人评价提醒', title: '期待您的客人评价', message: `请为“${experienceTitle}”的客人留下评价。`, ctaLabel: '评价客人' };
+    default: return { subject: '[Locally] 게스트 평가 작성 알림', title: '게스트 평가를 기다리고 있어요', message: `'${experienceTitle}' 체험의 게스트 평가를 아직 작성하지 않으셨어요.`, ctaLabel: '게스트 평가하기' };
   }
 }
 
@@ -1611,6 +1637,10 @@ export function buildEmailCopy<K extends EmailCopyKey>(
         locale,
         copyParams as EmailCopyParams['review.guest_request.host']
       );
+    case 'review.request_reminder.guest':
+      return buildReviewReminderEmailCopy(locale, 'guest', copyParams as EmailCopyParams['review.request_reminder.guest']);
+    case 'review.guest_request_reminder.host':
+      return buildReviewReminderEmailCopy(locale, 'host', copyParams as EmailCopyParams['review.guest_request_reminder.host']);
     case 'review.guest_received.guest':
       return buildReviewGuestReceivedGuestEmailCopy(
         locale,

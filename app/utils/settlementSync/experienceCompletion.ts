@@ -7,6 +7,7 @@ import { processSoloGuaranteeRefundsForCompletedBookings } from '@/app/utils/boo
 import { deliverGuestReviewRequestEmailsForCompletedBookings } from '@/app/utils/reviews/guestReviewRequestEmail';
 import { deliverHostGuestReviewRequestsForCompletedBookings } from '@/app/utils/reviews/hostGuestReviewRequestNotification';
 import { reconcileDueExperienceReviewRequests } from '@/app/utils/reviews/reviewRequestReconciliation';
+import { reconcileDueReviewRequestReminders } from '@/app/utils/reviews/reviewReminderReconciliation';
 
 import {
   finishSettlementSyncRunFailure,
@@ -68,6 +69,7 @@ export type ExperienceCompletionSyncDependencies = {
   deliverReviewRequests?: typeof deliverHostGuestReviewRequestsForCompletedBookings;
   deliverGuestReviewRequestEmails?: typeof deliverGuestReviewRequestEmailsForCompletedBookings;
   reconcileReviewRequests?: typeof reconcileDueExperienceReviewRequests;
+  reconcileReviewReminders?: typeof reconcileDueReviewRequestReminders;
 };
 
 function delay(ms?: number) {
@@ -328,6 +330,21 @@ async function processReviewRequestReconciliationSideEffects(
   }
 }
 
+async function processReviewReminderSideEffects(
+  supabaseAdmin: SettlementSyncAdminClient,
+  reconcileReminders: typeof reconcileDueReviewRequestReminders
+) {
+  try {
+    await reconcileReminders({ supabaseAdmin });
+  } catch {
+    console.error(JSON.stringify({
+      event: 'experience_completion_side_effect',
+      status: 'failed',
+      diagnosticCode: 'review_reminder_reconciliation_failed',
+    }));
+  }
+}
+
 export async function resolveExperienceCompletionTarget(
   supabaseAdmin: SettlementSyncAdminClient,
   identifier: string
@@ -372,6 +389,9 @@ export async function runExperienceCompletionSync(
   const reconcileReviewRequests =
     params.dependencies?.reconcileReviewRequests ??
     reconcileDueExperienceReviewRequests;
+  const reconcileReviewReminders =
+    params.dependencies?.reconcileReviewReminders ??
+    reconcileDueReviewRequestReminders;
   const started = await startSettlementSyncRun({
     supabaseAdmin: params.supabaseAdmin,
     jobName: EXPERIENCE_SYNC_JOB_NAME,
@@ -416,6 +436,7 @@ export async function runExperienceCompletionSync(
         deliverReviewRequests,
         deliverGuestReviewRequestEmails
       );
+      await processReviewReminderSideEffects(params.supabaseAdmin, reconcileReviewReminders);
       await renewLease();
       await finishSettlementSyncRunSuccess({
         supabaseAdmin: params.supabaseAdmin,
@@ -477,6 +498,7 @@ export async function runExperienceCompletionSync(
       deliverReviewRequests,
       deliverGuestReviewRequestEmails
     );
+    await processReviewReminderSideEffects(params.supabaseAdmin, reconcileReviewReminders);
     await renewLease();
 
     if (completionBatch.failures.length > 0) {

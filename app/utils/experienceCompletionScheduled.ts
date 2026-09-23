@@ -6,6 +6,7 @@ import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { cancelCardPayment } from '@/app/utils/payments/card/server';
 import { deliverGuestReviewRequestEmailsForCompletedBookings } from '@/app/utils/reviews/guestReviewRequestEmail';
 import { deliverHostGuestReviewRequestsForCompletedBookings } from '@/app/utils/reviews/hostGuestReviewRequestNotification';
+import { reconcileDueReviewRequestReminders } from '@/app/utils/reviews/reviewReminderReconciliation';
 import {
   runExperienceCompletionSync,
   type ExperienceCompletionSyncDependencies,
@@ -132,6 +133,15 @@ export function createExperienceCompletionScheduledDependencies(
       }),
     deliverGuestReviewRequestEmails: (params) =>
       deliverGuestReviewRequestEmailsForCompletedBookings({
+        ...params,
+        sendEmail: (request) =>
+          sendImmediateGenericEmail(request, {
+            env: environment,
+            supabaseAdmin: params.supabaseAdmin,
+          }),
+      }),
+    reconcileReviewReminders: (params) =>
+      reconcileDueReviewRequestReminders({
         ...params,
         sendEmail: (request) =>
           sendImmediateGenericEmail(request, {
