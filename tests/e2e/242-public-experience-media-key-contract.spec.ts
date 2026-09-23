@@ -52,8 +52,11 @@ test.describe('public experience deterministic media key contract', () => {
       Object.entries(images).map(([sourceUrl, keys]) => ({ experienceId, sourceUrl, keys }))
     );
 
-    expect(cardEntries).toHaveLength(33);
-    expect(detailEntries).toHaveLength(263);
+    expect(cardEntries.length).toBeGreaterThan(0);
+    expect(detailEntries.length).toBeGreaterThan(0);
+    expect(new Set(Object.keys(detailImageManifest))).toEqual(
+      new Set(cardEntries.map(([experienceId]) => experienceId))
+    );
     for (const [experienceId, entry] of cardEntries) {
       expect(buildPublicExperienceCardKeys(experienceId, entry.originUrl)).toEqual({
         smallKey: entry.smallKey,
@@ -106,6 +109,7 @@ test.describe('public experience deterministic media key contract', () => {
     expect(buildPublicExperienceDetailKeys(42, r2Url)).toEqual(
       buildPublicExperienceDetailKeys(42, GOLDEN_SOURCE_URL)
     );
+    expect(() => normalizePublicExperienceSourceUrl(r2Url.split('?')[0]!)).toThrow();
     expect(() => normalizePublicExperienceSourceUrl(`${r2Url}&extra=1`)).toThrow();
     expect(() => normalizePublicExperienceSourceUrl(`${r2Url}&legacy=39696081a432`)).toThrow();
     expect(() => normalizePublicExperienceSourceUrl(r2Url.replace('/originals/v1/', '/other/v1/'))).toThrow();

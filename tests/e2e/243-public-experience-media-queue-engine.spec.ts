@@ -327,6 +327,8 @@ test.describe('dormant public experience media Queue mirror engine', () => {
   test('matches all current card/detail manifests through the canonical inventory contract', () => {
     let sourceCount = 0;
     let derivativeCount = 0;
+    let expectedSourceCount = 0;
+    let expectedDerivativeCount = 0;
     for (const [experienceId, card] of Object.entries(PUBLIC_EXPERIENCE_CARD_IMAGES)) {
       const detailEntries = Object.entries(
         detailImageManifest[experienceId as keyof typeof detailImageManifest]
@@ -334,6 +336,7 @@ test.describe('dormant public experience media Queue mirror engine', () => {
       const remaining = detailEntries
         .map(([sourceUrl]) => sourceUrl)
         .filter((sourceUrl) => sourceUrl !== card.originUrl);
+      expect(detailEntries.some(([sourceUrl]) => sourceUrl === card.originUrl)).toBe(true);
       const inventory = buildPublicExperienceMediaInventory({
         id: experienceId,
         status: 'active',
@@ -348,11 +351,14 @@ test.describe('dormant public experience media Queue mirror engine', () => {
         ...detailEntries.flatMap(([, entry]) => [entry.smallKey, entry.mediumKey, entry.largeKey]),
       ]);
       expect(actualKeys).toEqual(expectedKeys);
+      expect(inventory.derivatives).toHaveLength(expectedKeys.size);
       sourceCount += inventory.sources.length;
       derivativeCount += inventory.derivatives.length;
+      expectedSourceCount += new Set(detailEntries.map(([sourceUrl]) => sourceUrl)).size;
+      expectedDerivativeCount += 2 + detailEntries.length * 3;
     }
-    expect(sourceCount).toBe(263);
-    expect(derivativeCount).toBe(855);
+    expect(sourceCount).toBe(expectedSourceCount);
+    expect(derivativeCount).toBe(expectedDerivativeCount);
   });
 
   test('uses exact card/detail dimensions and Cloudflare Images q65/q75 WebP calls', async () => {
