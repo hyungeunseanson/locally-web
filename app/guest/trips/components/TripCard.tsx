@@ -32,6 +32,8 @@ export interface GuestTrip {
   time: string;
   duration?: number | string | null;
   reviewEligible?: boolean;
+  hasReview?: boolean;
+  review?: { id?: number | string | null; rating?: number | null; content?: string | null; created_at?: string | null } | null;
   location?: string;
   meetingPoint?: string;
   meetingPointI18n?: Record<string, string> | null;

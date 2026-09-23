@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
+import { getGuestReviewRequestHref, getHostGuestReviewRequestHref } from '@/app/utils/reviews/reviewRequestDeepLinks';
 
 const REVIEW_REQUEST_RECONCILIATION_LIMIT = 50;
 
@@ -70,7 +71,7 @@ export async function reconcileDueExperienceReviewRequests(params: {
           type: 'review_request',
           title: '후기를 남겨주세요!',
           message: `'${experienceTitle}' 어떠셨나요? 소중한 후기를 남겨주세요.`,
-          link: '/guest/trips',
+          link: getGuestReviewRequestHref(bookingId),
           is_read: false,
           booking_id: bookingId,
         }),
@@ -83,7 +84,7 @@ export async function reconcileDueExperienceReviewRequests(params: {
           supabaseAdmin: params.supabaseAdmin,
           userId: hostId,
           type: 'guest_review_request',
-          link: '/host/dashboard?tab=reservations',
+          link: getHostGuestReviewRequestHref(bookingId),
           key: 'review.guest_request.host',
           copyParams: { experienceTitle },
         });

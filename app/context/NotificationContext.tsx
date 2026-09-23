@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { X, Bell, MessageSquare } from 'lucide-react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from '@/app/context/AuthContext';
+import { getReviewRequestNotificationHref } from '@/app/utils/reviews/reviewRequestDeepLinks';
 
 interface NotificationDB {
   id: number;
@@ -15,6 +16,7 @@ interface NotificationDB {
   title: string;
   message: string;
   link: string;
+  booking_id?: string | number | null;
   is_read: boolean;
   created_at: string;
 }
@@ -37,13 +39,17 @@ interface NotificationContextType {
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
-const NOTIFICATION_SELECT_COLUMNS = 'id, user_id, type, title, message, link, is_read, created_at';
+const NOTIFICATION_SELECT_COLUMNS = 'id, user_id, type, title, message, link, booking_id, is_read, created_at';
 const TOAST_DURATION_MS = 5000;
 const VISIBILITY_SYNC_MIN_INTERVAL_MS = 2500;
 const HOST_STATUS_REFRESH_NOTIFICATION_TYPES = new Set([
   'host_application_approved',
   'application_status_changed',
 ]);
+
+function withReviewRequestDeepLink(notification: NotificationDB): NotificationDB {
+  return { ...notification, link: getReviewRequestNotificationHref(notification) };
+}
 
 async function markNotificationsRead(params: { notificationId?: number; markAll?: boolean }) {
   const response = await fetch('/api/notifications/read', {
@@ -122,7 +128,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       if (!data) return;
 
       lastSyncAtRef.current = Date.now();
-      setNotifications(data);
+      setNotifications(data.map(withReviewRequestDeepLink));
 
       const cursor = sessionStorage.getItem('lastSeenNotiCreatedAt');
 
@@ -143,7 +149,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       if (!candidate) return;
 
       sessionStorage.setItem('lastSeenNotiCreatedAt', data[0].created_at);
-      showToast(candidate);
+      showToast(withReviewRequestDeepLink(candidate));
       if (newlySeenNotifications.some((notification) => HOST_STATUS_REFRESH_NOTIFICATION_TYPES.has(notification.type))) {
         void refreshHostStatus();
       }
@@ -190,7 +196,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           'postgres_changes',
           { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${currentUserId}` },
           (payload) => {
-            const newNoti = payload.new as NotificationDB | undefined;
+            const newNoti = payload.new
+              ? withReviewRequestDeepLink(payload.new as NotificationDB)
+              : undefined;
             const oldNoti = payload.old as RealtimeNotificationRow | undefined;
 
             if (payload.eventType === 'INSERT' && newNoti) {

@@ -154,6 +154,11 @@ test.describe('Review tour-end app cutover contract', () => {
       ['both-needed', 'guest_review_request'],
       ['host-only', 'guest_review_request'],
     ]);
+    expect(insertedRows.map((row) => row.link)).toEqual([
+      '/guest/trips?reviewBookingId=both-needed',
+      '/host/dashboard?tab=reservations&reservationTab=completed&reviewBookingId=both-needed',
+      '/host/dashboard?tab=reservations&reservationTab=completed&reviewBookingId=host-only',
+    ]);
     expect(rpcCalls).toEqual([{
       name: 'list_due_experience_review_request_candidates',
       params: { p_limit: 50 },
