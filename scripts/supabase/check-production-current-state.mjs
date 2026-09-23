@@ -124,7 +124,14 @@ const expectedLedger = [
     repositoryFile: 'supabase/migrations/20260922125140_close_refunded_phone_proxy_requests.sql',
   },
 ];
-const expectedPendingMigrations = [];
+const expectedPendingMigrations = [
+  {
+    version: '20260922150728',
+    name: 'ops_anomaly_monitor_snapshot',
+    repositoryFile: 'supabase/migrations/20260922150728_ops_anomaly_monitor_snapshot.sql',
+    productionApplied: false,
+  },
+];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));
 for (const [index, expected] of expectedLedger.entries()) {
   const actual = manifest.migrationLedger[index];

@@ -116,6 +116,9 @@ jobs:
       - name: Validate Admin Support unread Cloudflare Cron transport
         run: npm run cloudflare:admin-support:contract
 
+      - name: Validate read-only Ops Anomaly Monitor
+        run: npm run cloudflare:ops-anomaly:contract
+
       - name: Validate notification retention Cloudflare Cron transport
         run: npm run cloudflare:notification-retention:contract
 

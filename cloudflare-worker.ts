@@ -40,8 +40,12 @@ import {
   handleCancelPendingBookingsScheduled,
   type CancelPendingBookingsScheduledRuntimeEnv,
 } from './app/utils/cancelPendingBookingsScheduled';
+import {
+  handleOpsAnomalyMonitorScheduled,
+  type OpsAnomalyMonitorScheduledRuntimeEnv,
+} from './app/utils/opsAnomalyMonitorScheduled';
 
-type WorkerEnvironment = PublicExperienceMediaQueueRuntimeEnv & ExperienceTranslationQueueRuntimeEnv & HomePopularitySnapshotRuntimeEnv & AdminSupportUnreadAlertsRuntimeEnv & NotificationRetentionRuntimeEnv & ExperienceCompletionScheduledRuntimeEnv & ServiceCompletionScheduledRuntimeEnv & CancelPendingBookingsScheduledRuntimeEnv;
+type WorkerEnvironment = PublicExperienceMediaQueueRuntimeEnv & ExperienceTranslationQueueRuntimeEnv & HomePopularitySnapshotRuntimeEnv & AdminSupportUnreadAlertsRuntimeEnv & NotificationRetentionRuntimeEnv & ExperienceCompletionScheduledRuntimeEnv & ServiceCompletionScheduledRuntimeEnv & CancelPendingBookingsScheduledRuntimeEnv & OpsAnomalyMonitorScheduledRuntimeEnv;
 
 const worker = {
   fetch(request: Request, env: WorkerEnvironment, ctx: unknown) {
@@ -72,6 +76,7 @@ const worker = {
       runExperienceCompletionSync: handleExperienceCompletionScheduled,
       runServiceCompletionSync: handleServiceCompletionScheduled,
       runCancelPendingBookings: handleCancelPendingBookingsScheduled,
+      runOpsAnomalyMonitor: handleOpsAnomalyMonitorScheduled,
       delegate: typeof scheduled === 'function'
         ? (nextController, nextEnv) => scheduled.call(openNextWorker, nextController, nextEnv, ctx)
         : undefined,

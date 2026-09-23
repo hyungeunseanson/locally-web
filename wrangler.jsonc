@@ -79,7 +79,8 @@
         "NOTIFICATION_RETENTION_CLEANUP_SCHEDULED_ENABLED": "false",
         "EXPERIENCE_COMPLETION_SCHEDULED_ENABLED": "false",
         "SERVICE_COMPLETION_SCHEDULED_ENABLED": "false",
-        "CANCEL_PENDING_BOOKINGS_SCHEDULED_ENABLED": "false"
+        "CANCEL_PENDING_BOOKINGS_SCHEDULED_ENABLED": "false",
+        "OPS_ANOMALY_MONITOR_SCHEDULED_ENABLED": "false"
       },
       "observability": {
         "enabled": true,

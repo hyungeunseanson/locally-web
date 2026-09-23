@@ -15,6 +15,7 @@ import { readNotificationRetentionReleasePolicy, resolveNotificationRetentionRel
 import { readExperienceCompletionReleasePolicy, resolveExperienceCompletionReleaseProfile } from './experience-completion-release-profile.mjs';
 import { readServiceCompletionReleasePolicy, resolveServiceCompletionReleaseProfile } from './service-completion-release-profile.mjs';
 import { readCancelPendingBookingsReleasePolicy, resolveCancelPendingBookingsReleaseProfile } from './cancel-pending-bookings-release-profile.mjs';
+import { readOpsAnomalyMonitorReleasePolicy, resolveOpsAnomalyMonitorReleaseProfile } from './ops-anomaly-monitor-release-profile.mjs';
 import { readExperienceMediaSourceReleasePolicy, resolveExperienceMediaSourceReleaseProfile } from './experience-media-source-release-profile.mjs';
 import { runProductionBrowserSmoke } from './run-production-browser-smoke.mjs';
 import { runProductionDeploySemanticPreflight } from './verify-production-deploy-contract.mjs';
@@ -31,6 +32,7 @@ export function parseDeploymentArguments(argumentsList) {
   let requestedServiceCompletionProfile;
   let requestedExperienceMediaSourceProfile;
   let requestedCancelPendingBookingsProfile;
+  let requestedOpsAnomalyMonitorProfile;
   let allowCancelPendingCronAddition = false;
   let dryRun = false;
   for (const argument of argumentsList) {
@@ -70,6 +72,10 @@ export function parseDeploymentArguments(argumentsList) {
       assert(!requestedCancelPendingBookingsProfile, 'Specify the Cancel Pending Bookings release profile only once.');
       requestedCancelPendingBookingsProfile = argument.slice('--cancel-pending-profile='.length);
       assert(requestedCancelPendingBookingsProfile, 'The Cancel Pending Bookings release profile cannot be empty.');
+    } else if (argument.startsWith('--ops-anomaly-monitor-profile=')) {
+      assert(!requestedOpsAnomalyMonitorProfile, 'Specify the Ops Anomaly Monitor release profile only once.');
+      requestedOpsAnomalyMonitorProfile = argument.slice('--ops-anomaly-monitor-profile='.length);
+      assert(requestedOpsAnomalyMonitorProfile, 'The Ops Anomaly Monitor release profile cannot be empty.');
     } else if (argument === '--allow-cancel-pending-cron-addition') {
       assert(!allowCancelPendingCronAddition, 'Allow the Cancel Pending Bookings Cron addition only once.');
       allowCancelPendingCronAddition = true;
@@ -95,6 +101,9 @@ export function parseDeploymentArguments(argumentsList) {
     ...(requestedCancelPendingBookingsProfile
       ? { requestedCancelPendingBookingsProfile }
       : {}),
+    ...(requestedOpsAnomalyMonitorProfile
+      ? { requestedOpsAnomalyMonitorProfile }
+      : {}),
     ...(allowCancelPendingCronAddition
       ? { allowCancelPendingCronAddition: true }
       : {}),
@@ -102,7 +111,7 @@ export function parseDeploymentArguments(argumentsList) {
   };
 }
 
-export function buildDeploymentContract(profile, translationProfile, homePopularityProfile, adminSupportUnreadProfile, notificationRetentionProfile, { dryRun = false } = {}, experienceCompletionProfile = { scheduledEnabled: 'false' }, experienceMediaSourceProfile = { enabled: 'false' }, serviceCompletionProfile = { scheduledEnabled: 'false' }, cancelPendingBookingsProfile = { scheduledEnabled: 'false' }) {
+export function buildDeploymentContract(profile, translationProfile, homePopularityProfile, adminSupportUnreadProfile, notificationRetentionProfile, { dryRun = false } = {}, experienceCompletionProfile = { scheduledEnabled: 'false' }, experienceMediaSourceProfile = { enabled: 'false' }, serviceCompletionProfile = { scheduledEnabled: 'false' }, cancelPendingBookingsProfile = { scheduledEnabled: 'false' }, opsAnomalyMonitorProfile = { scheduledEnabled: 'false' }) {
   const readerEnvironment = {
     NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_ENABLED: profile.enabled,
     NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_EXPERIENCE_IDS: profile.experienceIds,
@@ -120,6 +129,7 @@ export function buildDeploymentContract(profile, translationProfile, homePopular
     EXPERIENCE_COMPLETION_SCHEDULED_ENABLED: experienceCompletionProfile.scheduledEnabled,
     SERVICE_COMPLETION_SCHEDULED_ENABLED: serviceCompletionProfile.scheduledEnabled,
     CANCEL_PENDING_BOOKINGS_SCHEDULED_ENABLED: cancelPendingBookingsProfile.scheduledEnabled,
+    OPS_ANOMALY_MONITOR_SCHEDULED_ENABLED: opsAnomalyMonitorProfile.scheduledEnabled,
   };
   const wranglerArguments = [
     'deploy',
@@ -155,6 +165,7 @@ export function resolveAllowedPlannedChanges(options) {
   if (options.requestedExperienceMediaSourceProfile) changes.push('EXPERIENCE_MEDIA_R2_SOURCE_ENABLED');
   if (options.requestedServiceCompletionProfile) changes.push('SERVICE_COMPLETION_SCHEDULED_ENABLED');
   if (options.requestedCancelPendingBookingsProfile) changes.push('CANCEL_PENDING_BOOKINGS_SCHEDULED_ENABLED');
+  if (options.requestedOpsAnomalyMonitorProfile) changes.push('OPS_ANOMALY_MONITOR_SCHEDULED_ENABLED');
   return changes;
 }
 
@@ -196,9 +207,11 @@ export async function main(argumentsList = process.argv.slice(2), dependencies =
   const serviceCompletionProfile = resolveServiceCompletionReleaseProfile(serviceCompletionPolicy, options.requestedServiceCompletionProfile);
   const cancelPendingBookingsPolicy = await readCancelPendingBookingsReleasePolicy();
   const cancelPendingBookingsProfile = resolveCancelPendingBookingsReleaseProfile(cancelPendingBookingsPolicy, options.requestedCancelPendingBookingsProfile);
+  const opsAnomalyMonitorPolicy = await readOpsAnomalyMonitorReleasePolicy();
+  const opsAnomalyMonitorProfile = resolveOpsAnomalyMonitorReleaseProfile(opsAnomalyMonitorPolicy, options.requestedOpsAnomalyMonitorProfile);
   const experienceMediaSourcePolicy = await readExperienceMediaSourceReleasePolicy();
   const experienceMediaSourceProfile = resolveExperienceMediaSourceReleaseProfile(experienceMediaSourcePolicy, options.requestedExperienceMediaSourceProfile);
-  const contract = buildDeploymentContract(profile, translationProfile, homePopularityProfile, adminSupportUnreadProfile, notificationRetentionProfile, options, experienceCompletionProfile, experienceMediaSourceProfile, serviceCompletionProfile, cancelPendingBookingsProfile);
+  const contract = buildDeploymentContract(profile, translationProfile, homePopularityProfile, adminSupportUnreadProfile, notificationRetentionProfile, options, experienceCompletionProfile, experienceMediaSourceProfile, serviceCompletionProfile, cancelPendingBookingsProfile, opsAnomalyMonitorProfile);
   const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
   const wranglerCommand = path.join(
     ROOT,
@@ -253,6 +266,8 @@ export async function main(argumentsList = process.argv.slice(2), dependencies =
     serviceCompletionScheduledEnabled: serviceCompletionProfile.scheduledEnabled,
     cancelPendingBookingsProfile: cancelPendingBookingsProfile.name,
     cancelPendingBookingsScheduledEnabled: cancelPendingBookingsProfile.scheduledEnabled,
+    opsAnomalyMonitorProfile: opsAnomalyMonitorProfile.name,
+    opsAnomalyMonitorScheduledEnabled: opsAnomalyMonitorProfile.scheduledEnabled,
     experienceMediaSourceProfile: experienceMediaSourceProfile.name,
     experienceMediaR2SourceEnabled: experienceMediaSourceProfile.enabled,
   }));

@@ -20,6 +20,7 @@ import { readNotificationRetentionReleasePolicy, resolveNotificationRetentionRel
 import { readExperienceCompletionReleasePolicy, resolveExperienceCompletionReleaseProfile } from './experience-completion-release-profile.mjs';
 import { readServiceCompletionReleasePolicy, resolveServiceCompletionReleaseProfile } from './service-completion-release-profile.mjs';
 import { readCancelPendingBookingsReleasePolicy, resolveCancelPendingBookingsReleaseProfile } from './cancel-pending-bookings-release-profile.mjs';
+import { readOpsAnomalyMonitorReleasePolicy, resolveOpsAnomalyMonitorReleaseProfile } from './ops-anomaly-monitor-release-profile.mjs';
 import { readExperienceMediaSourceReleasePolicy, resolveExperienceMediaSourceReleaseProfile } from './experience-media-source-release-profile.mjs';
 
 async function homeProfile(name = 'off') {
@@ -60,6 +61,13 @@ async function serviceCompletionProfile(name = 'off') {
 async function cancelPendingBookingsProfile(name = 'off') {
   return resolveCancelPendingBookingsReleaseProfile(
     await readCancelPendingBookingsReleasePolicy(),
+    name
+  );
+}
+
+async function opsAnomalyMonitorProfile(name = 'off') {
+  return resolveOpsAnomalyMonitorReleaseProfile(
+    await readOpsAnomalyMonitorReleasePolicy(),
     name
   );
 }
@@ -539,6 +547,75 @@ test('passes the final Service ON deployment contract to semantic preflight', as
 
   assert.equal(preflightOptions.expectedVariables.SERVICE_COMPLETION_SCHEDULED_ENABLED, 'true');
   assert.deepEqual(preflightOptions.allowedPlannedChanges, ['SERVICE_COMPLETION_SCHEDULED_ENABLED']);
+});
+
+test('keeps Ops Anomaly Monitor OFF by default and resolves its ON profile independently', async () => {
+  const policy = await readOpsAnomalyMonitorReleasePolicy();
+  assert.equal(resolveOpsAnomalyMonitorReleaseProfile(policy).name, 'off');
+  assert.deepEqual(resolveOpsAnomalyMonitorReleaseProfile(policy, 'on'), {
+    name: 'on',
+    scheduledEnabled: 'true',
+  });
+  assert.deepEqual(parseDeploymentArguments(['--ops-anomaly-monitor-profile=on']), {
+    requestedProfile: undefined,
+    requestedTranslationProfile: undefined,
+    requestedHomePopularityProfile: undefined,
+    requestedAdminSupportUnreadProfile: undefined,
+    requestedNotificationRetentionProfile: undefined,
+    requestedExperienceCompletionProfile: undefined,
+    requestedOpsAnomalyMonitorProfile: 'on',
+    dryRun: false,
+  });
+  assert.deepEqual(
+    resolveAllowedPlannedChanges(parseDeploymentArguments(['--ops-anomaly-monitor-profile=on'])),
+    ['OPS_ANOMALY_MONITOR_SCHEDULED_ENABLED']
+  );
+});
+
+test('passes only the final Ops Anomaly Monitor ON change to semantic preflight', async () => {
+  let preflightOptions;
+  await main(['--ops-anomaly-monitor-profile=on'], {
+    runCommand: () => {},
+    runSemanticPreflight: async (options) => {
+      preflightOptions = options;
+    },
+    runBrowserSmoke: async () => {},
+    log: () => {},
+  });
+
+  assert.equal(preflightOptions.expectedVariables.OPS_ANOMALY_MONITOR_SCHEDULED_ENABLED, 'true');
+  assert.deepEqual(preflightOptions.allowedPlannedChanges, [
+    'OPS_ANOMALY_MONITOR_SCHEDULED_ENABLED',
+  ]);
+});
+
+test('includes the Ops Anomaly Monitor flag in the explicit root-config deployment contract', async () => {
+  const media = resolveReleaseProfile(await readReleasePolicy());
+  const translation = resolveTranslationReleaseProfile(await readTranslationReleasePolicy());
+  const mediaSource = resolveExperienceMediaSourceReleaseProfile(
+    await readExperienceMediaSourceReleasePolicy()
+  );
+  const contract = buildDeploymentContract(
+    media,
+    translation,
+    await homeProfile(),
+    await adminSupportProfile(),
+    await retentionProfile(),
+    { dryRun: true },
+    await experienceCompletionProfile(),
+    mediaSource,
+    await serviceCompletionProfile(),
+    await cancelPendingBookingsProfile(),
+    await opsAnomalyMonitorProfile('on')
+  );
+
+  assert.deepEqual(contract.wranglerArguments.slice(0, 3), [
+    'deploy',
+    '--config',
+    './wrangler.jsonc',
+  ]);
+  assert(contract.wranglerArguments.includes('OPS_ANOMALY_MONITOR_SCHEDULED_ENABLED:true'));
+  assert.equal(contract.wranglerArguments.at(-1), '--dry-run');
 });
 
 test('does not run browser smoke when Wrangler deploy fails', async () => {
