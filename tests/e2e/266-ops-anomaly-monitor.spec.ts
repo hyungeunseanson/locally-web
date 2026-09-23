@@ -262,6 +262,37 @@ test.describe('Ops Anomaly Monitor', () => {
     expect(JSON.stringify(calls)).not.toMatch(/receive|ack|retry|purge|delete|replay/i);
   });
 
+  test('invokes the Worker fetch implementation without an object receiver', async () => {
+    const queues = [
+      ['media-main', 'locally-public-experience-media-mirror-production'],
+      ['media-dlq', 'locally-public-experience-media-mirror-dlq-production'],
+      ['translation-main', 'locally-experience-translation-production'],
+      ['translation-dlq', 'locally-experience-translation-dlq-production'],
+    ];
+    const receiverSensitiveFetch = async function (
+      this: unknown,
+      input: RequestInfo | URL
+    ) {
+      if (this !== undefined) throw new TypeError('Illegal invocation');
+      if (String(input).endsWith('/queues?per_page=100')) {
+        return Response.json({
+          success: true,
+          result: queues.map(([queue_id, queue_name]) => ({ queue_id, queue_name })),
+        });
+      }
+      return Response.json({
+        success: true,
+        result: { backlog_count: 0, backlog_bytes: 0, oldest_message_timestamp_ms: 0 },
+      });
+    };
+
+    await expect(loadQueueOpsAnomaly({
+      runtime: productionEnvironment,
+      observedAt,
+      fetchImplementation: receiverSensitiveFetch as typeof fetch,
+    })).resolves.toBeNull();
+  });
+
   test('classifies missing Queue runtime bindings without exposing their values', async () => {
     await expect(loadQueueOpsAnomaly({
       runtime: { ...productionEnvironment, CLOUDFLARE_ACCOUNT_ID: '' },
