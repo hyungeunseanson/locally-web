@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Star, X, Loader2 } from 'lucide-react';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext';
+import { trackReviewFunnelEvent, type ReviewFunnelSource } from '@/app/utils/reviews/reviewFunnelAnalytics';
 
 type GuestBookingReviewTarget = {
   id: string | number;
@@ -16,11 +17,18 @@ interface Props {
   booking: GuestBookingReviewTarget;
   onClose: () => void;
   onSuccess: () => void;
+  source?: ReviewFunnelSource;
 }
 
-export default function GuestReviewModal({ booking, onClose, onSuccess }: Props) {
+export default function GuestReviewModal({ booking, onClose, onSuccess, source = 'host_dashboard' }: Props) {
   const { showToast } = useToast();
   const { t } = useLanguage();
+  const trackedOpenRef = useRef(false);
+  useEffect(() => {
+    if (trackedOpenRef.current) return;
+    trackedOpenRef.current = true;
+    trackReviewFunnelEvent('review_modal_open', 'host', source);
+  }, [source]);
   
   const [rating, setRating] = useState(5);
   const [content, setContent] = useState('');
@@ -32,6 +40,7 @@ export default function GuestReviewModal({ booking, onClose, onSuccess }: Props)
       return;
     }
     setSubmitting(true);
+    let submissionSucceeded = false;
 
     try {
       const response = await fetch('/api/host/guest-reviews', {
@@ -49,10 +58,13 @@ export default function GuestReviewModal({ booking, onClose, onSuccess }: Props)
         throw new Error(result?.error || '후기 등록 실패');
       }
 
+      submissionSucceeded = true;
+      trackReviewFunnelEvent('review_submit_success', 'host', source);
       showToast(t('guest_review_alert_success'), 'success');
       onSuccess();
       onClose();
     } catch (e: unknown) {
+      if (!submissionSucceeded) trackReviewFunnelEvent('review_submit_error', 'host', source);
       const message = e instanceof Error ? e.message : 'Unknown Error';
       console.error(e);
       showToast(`${t('guest_review_alert_fail')}: ${message}`, 'error');

@@ -6,6 +6,7 @@ import { createClient } from '@/app/utils/supabase/client'; // 🟢 Supabase 클
 import { useToast } from '@/app/context/ToastContext'; // 🟢 토스트 알림 추가
 import { useLanguage } from '@/app/context/LanguageContext';
 import type { GuestTrip } from '@/app/guest/trips/components/TripCard';
+import { trackReviewFunnelEvent, type ReviewFunnelSource } from '@/app/utils/reviews/reviewFunnelAnalytics';
 
 type EditableReview = {
   id?: number | string | null;
@@ -22,6 +23,7 @@ interface ReviewModalProps {
   trip: ReviewTrip;
   onClose: () => void;
   onReviewSubmitted?: () => void; // 🟢 후기 작성/수정 완료 후 목록 새로고침용 콜백
+  source?: ReviewFunnelSource;
 }
 
 function secureUrl(url: string | null | undefined) {
@@ -30,10 +32,16 @@ function secureUrl(url: string | null | undefined) {
   return url;
 }
 
-export default function ReviewModal({ trip, onClose, onReviewSubmitted }: ReviewModalProps) {
+export default function ReviewModal({ trip, onClose, onReviewSubmitted, source = 'trips' }: ReviewModalProps) {
   const supabase = useMemo(() => createClient(), []);
   const { showToast } = useToast();
   const { t } = useLanguage();
+  const trackedOpenRef = useRef(false);
+  useEffect(() => {
+    if (trackedOpenRef.current) return;
+    trackedOpenRef.current = true;
+    trackReviewFunnelEvent('review_modal_open', 'guest', source);
+  }, [source]);
 
   // 닫힘 애니메이션
   const [closing, setClosing] = useState(false);
@@ -68,6 +76,7 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
     if (reviewText.length < 10) return showToast(t('rv_min_length') as string, 'error');
 
     setIsSubmitting(true);
+    let submissionSucceeded = false;
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -108,11 +117,15 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
         showToast(t('rv_save_success') as string, 'success');
       }
 
+      submissionSucceeded = true;
+      trackReviewFunnelEvent('review_submit_success', 'guest', source);
+
       // 🟢 목록 새로고침 요청 후 모달 닫기
       if (onReviewSubmitted) onReviewSubmitted();
       onClose();
 
     } catch (error: unknown) {
+      if (!submissionSucceeded) trackReviewFunnelEvent('review_submit_error', 'guest', source);
       console.error(error);
       const message = error instanceof Error ? error.message : String(error);
       showToast((isEditMode ? `${t('rv_edit_fail')} ` : `${t('rv_save_fail')} `) + message, 'error');

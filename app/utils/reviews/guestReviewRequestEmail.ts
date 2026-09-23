@@ -104,7 +104,7 @@ export async function deliverGuestReviewRequestEmailsForCompletedBookings(params
           payload: {
             copyKey: 'review.request.guest',
             copyParams: { experienceTitle: experience?.title || 'Locally Experience' },
-            ctaUrl: getGuestReviewRequestHref(bookingId),
+            ctaUrl: getGuestReviewRequestHref(bookingId, 'email'),
           },
         },
       });

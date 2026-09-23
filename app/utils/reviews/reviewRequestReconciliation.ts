@@ -71,7 +71,7 @@ export async function reconcileDueExperienceReviewRequests(params: {
           type: 'review_request',
           title: '후기를 남겨주세요!',
           message: `'${experienceTitle}' 어떠셨나요? 소중한 후기를 남겨주세요.`,
-          link: getGuestReviewRequestHref(bookingId),
+          link: getGuestReviewRequestHref(bookingId, 'notification'),
           is_read: false,
           booking_id: bookingId,
         }),
@@ -84,7 +84,7 @@ export async function reconcileDueExperienceReviewRequests(params: {
           supabaseAdmin: params.supabaseAdmin,
           userId: hostId,
           type: 'guest_review_request',
-          link: getHostGuestReviewRequestHref(bookingId),
+          link: getHostGuestReviewRequestHref(bookingId, 'notification'),
           key: 'review.guest_request.host',
           copyParams: { experienceTitle },
         });

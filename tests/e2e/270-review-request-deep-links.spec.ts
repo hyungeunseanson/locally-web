@@ -7,6 +7,7 @@ import {
   getGuestReviewRequestHref,
   getHostGuestReviewRequestHref,
   getReviewRequestNotificationHref,
+  parseReviewRequestSource,
 } from '@/app/utils/reviews/reviewRequestDeepLinks';
 import { deliverHostGuestReviewRequestsForCompletedBookings } from '@/app/utils/reviews/hostGuestReviewRequestNotification';
 
@@ -20,13 +21,26 @@ const hostReservation = {
 
 test('request email and notifications use the same booking-specific links, including legacy RPC rows', async () => {
   expect(getGuestReviewRequestHref('booking 1')).toBe('/guest/trips?reviewBookingId=booking%201');
+  expect(getGuestReviewRequestHref('booking 1', 'email')).toBe('/guest/trips?reviewBookingId=booking%201&reviewSource=email');
+  expect(getGuestReviewRequestHref('booking 1', 'notification')).toBe('/guest/trips?reviewBookingId=booking%201&reviewSource=notification');
+  expect(getGuestReviewRequestHref('booking 1', 'invalid')).toBe('/guest/trips?reviewBookingId=booking%201');
   expect(getHostGuestReviewRequestHref('booking 1')).toBe(
     '/host/dashboard?tab=reservations&reservationTab=completed&reviewBookingId=booking%201'
   );
+  expect(getHostGuestReviewRequestHref('booking 1', 'email')).toBe(
+    '/host/dashboard?tab=reservations&reservationTab=completed&reviewBookingId=booking%201&reviewSource=email'
+  );
+  expect(getHostGuestReviewRequestHref('booking 1', 'notification')).toBe(
+    '/host/dashboard?tab=reservations&reservationTab=completed&reviewBookingId=booking%201&reviewSource=notification'
+  );
+  expect(getHostGuestReviewRequestHref('booking 1', 'invalid')).toBe(getHostGuestReviewRequestHref('booking 1'));
+  expect(parseReviewRequestSource('email')).toBe('email');
+  expect(parseReviewRequestSource('notification')).toBe('notification');
+  expect(parseReviewRequestSource('invalid')).toBeNull();
   expect(getReviewRequestNotificationHref({ type: 'review_request', booking_id: 'owned-booking', link: '/guest/trips' }))
-    .toBe(getGuestReviewRequestHref('owned-booking'));
+    .toBe(getGuestReviewRequestHref('owned-booking', 'notification'));
   expect(getReviewRequestNotificationHref({ type: 'guest_review_request', booking_id: 'owned-booking', link: '/host/dashboard?tab=reservations' }))
-    .toBe(getHostGuestReviewRequestHref('owned-booking'));
+    .toBe(getHostGuestReviewRequestHref('owned-booking', 'notification'));
   expect(getReviewRequestNotificationHref({ type: 'review_request', link: '/guest/trips' })).toBe('/guest/trips');
 
   const updatedLinks: string[] = [];
@@ -58,8 +72,30 @@ test('request email and notifications use the same booking-specific links, inclu
     },
   });
   expect(result).toEqual({ processedCount: 1, failedCount: 0 });
-  expect(updatedLinks).toEqual([getHostGuestReviewRequestHref('owned-booking')]);
-  expect(emailedLinks).toEqual(updatedLinks);
+  expect(updatedLinks).toEqual([getHostGuestReviewRequestHref('owned-booking', 'notification')]);
+  expect(emailedLinks).toEqual([getHostGuestReviewRequestHref('owned-booking', 'email')]);
+
+  const originalWarn = console.warn;
+  const warnings: string[] = [];
+  console.warn = (message: string) => { warnings.push(message); };
+  try {
+    for (const skipped of ['provider_not_configured', 'recipient_missing', 'unexpected-provider-text']) {
+      const failed = await deliverHostGuestReviewRequestsForCompletedBookings({
+        supabaseAdmin: client as never,
+        completedBookingIds: ['owned-booking'],
+        sendEmail: async () => ({ sent: false, skipped }) as never,
+      });
+      expect(failed).toEqual({ processedCount: 0, failedCount: 1 });
+    }
+  } finally {
+    console.warn = originalWarn;
+  }
+  expect(updatedLinks).toHaveLength(4); // Notification localization still ran when email failed.
+  expect(warnings.map((warning) => JSON.parse(warning).diagnosticCode)).toEqual([
+    'provider_not_configured', 'recipient_missing', 'email_not_sent',
+  ]);
+  expect(warnings.join(' ')).not.toContain('owned-booking');
+  expect(warnings.join(' ')).not.toContain('host-1');
 });
 
 test('selectors fail closed for another user or host, reviewed, ineligible, and invalid bookings', () => {
@@ -114,9 +150,9 @@ async function bundleComponent(component: 'guest' | 'host') {
         if (path.endsWith('ToastContext')) return { contents: `const showToast = () => {}; export const useToast = () => ({ showToast });`, loader: 'js' };
         if (path.endsWith('supabase/client')) return { contents: `export const createClient = () => window.deepLinkFixture.supabase;`, loader: 'js' };
         if (path.endsWith('useGuestTrips')) return { contents: `export const useGuestTrips = () => window.deepLinkFixture.tripsHook;`, loader: 'js' };
-        if (path.endsWith('GuestReviewModal')) return { contents: `import React from 'react'; export default function Modal({ booking }) { return React.createElement('div', { 'data-testid': 'guest-review-modal' }, String(booking.id)); }`, loader: 'js', resolveDir: process.cwd() };
-        if (path.endsWith('ReviewModal')) return { contents: `import React from 'react'; export default function Modal({ trip }) { return React.createElement('div', { 'data-testid': 'review-modal' }, String(trip.id)); }`, loader: 'js', resolveDir: process.cwd() };
-        if (path.endsWith('ReservationCard')) return { contents: `import React from 'react'; export default function Card({ res }) { return React.createElement('div', { 'data-testid': 'reservation-card' }, String(res.id)); }`, loader: 'js', resolveDir: process.cwd() };
+        if (path.endsWith('GuestReviewModal')) return { contents: `import React from 'react'; export default function Modal({ booking, source }) { return React.createElement('div', { 'data-testid': 'guest-review-modal', 'data-source': source }, String(booking.id)); }`, loader: 'js', resolveDir: process.cwd() };
+        if (path.endsWith('ReviewModal')) return { contents: `import React from 'react'; export default function Modal({ trip, source }) { return React.createElement('div', { 'data-testid': 'review-modal', 'data-source': source }, String(trip.id)); }`, loader: 'js', resolveDir: process.cwd() };
+        if (path.endsWith('ReservationCard')) return { contents: `import React from 'react'; export default function Card({ res, onReview }) { return React.createElement('div', { 'data-testid': 'reservation-card' }, String(res.id), React.createElement('button', { 'aria-label': 'write guest review', style: { width: 44, height: 44 }, onClick: onReview })); }`, loader: 'js', resolveDir: process.cwd() };
         if (path.endsWith('Skeleton')) return { contents: `export default function Skeleton() { return null; }`, loader: 'js' };
         if (path.endsWith('EmptyState')) return { contents: `export default function EmptyState() { return 'empty state'; }`, loader: 'js' };
         if (path.endsWith('concierge')) return { contents: `export const getServiceTypeLabel = () => 'service';`, loader: 'js' };
@@ -145,6 +181,66 @@ async function openFixture(page: Page, query: string) {
 async function mountFixture(page: Page, bundle: string) {
   await page.addScriptTag({ content: bundle });
   await page.evaluate(() => (window as typeof window & { mountDeepLinkPage: () => void }).mountDeepLinkPage());
+}
+
+async function installAnalyticsSpy(page: Page) {
+  await page.evaluate(() => {
+    const browser = window as typeof window & { reviewGaEvents: Array<{ name: string; params: Record<string, unknown> }> };
+    browser.reviewGaEvents = [];
+    browser.__locallyGoogleAnalyticsConsentGranted = true;
+    browser.__locallyGoogleAnalyticsReady = true;
+    browser.gtag = (command, name, params) => {
+      if (command === 'event') browser.reviewGaEvents.push({ name: String(name), params: params as Record<string, unknown> });
+    };
+  });
+}
+
+async function readAnalyticsEvents(page: Page) {
+  return page.evaluate(() =>
+    (window as typeof window & { reviewGaEvents: Array<{ name: string; params: Record<string, unknown> }> }).reviewGaEvents
+  );
+}
+
+async function bundleActualReviewModal(role: 'guest' | 'host') {
+  const entry = role === 'guest' ? './app/components/ReviewModal' : './app/host/dashboard/components/GuestReviewModal';
+  const mocks = new Set([
+    '@/app/context/LanguageContext', '@/app/context/ToastContext', '@/app/utils/supabase/client',
+  ]);
+  const bundle = await build({
+    stdin: {
+      contents: `import React from 'react'; import { createRoot } from 'react-dom/client'; import Modal from '${entry}'; window.mountActualReviewModal = () => createRoot(document.getElementById('fixture')).render(React.createElement(Modal, window.reviewModalFixture.props));`,
+      resolveDir: process.cwd(), loader: 'js',
+    },
+    bundle: true, format: 'iife', platform: 'browser', write: false,
+    plugins: [{ name: 'review-modal-fixtures', setup(api) {
+      api.onResolve({ filter: /.*/ }, (args) => mocks.has(args.path) ? { path: args.path, namespace: 'review-modal-fixture' } : null);
+      api.onLoad({ filter: /.*/, namespace: 'review-modal-fixture' }, (args) => {
+        if (args.path.endsWith('LanguageContext')) return { contents: `export const useLanguage = () => ({ t: (key) => key });`, loader: 'js' };
+        if (args.path.endsWith('ToastContext')) return { contents: `export const useToast = () => ({ showToast: () => {} });`, loader: 'js' };
+        return { contents: `export const createClient = () => window.reviewModalFixture.supabase;`, loader: 'js' };
+      });
+    }}],
+  });
+  return bundle.outputFiles[0].text;
+}
+
+async function mountActualReviewModal(page: Page, bundle: string, role: 'guest' | 'host', succeeds: boolean, source?: string) {
+  await page.evaluate(({ role, succeeds, source }) => {
+    const state = {
+      requests: [] as Array<{ path: string; method: string }>,
+      supabase: { auth: { getUser: async () => ({ data: { user: { id: 'private-user-id' } } }) } },
+      props: role === 'guest'
+        ? { trip: { id: 'private-booking-id', expId: 'private-experience-id', title: 'Private Experience Title' }, source: source || 'email', onClose: () => {}, onReviewSubmitted: () => {} }
+        : { booking: { id: 'private-booking-id', guest: { full_name: 'Private Guest Name' } }, source: source || 'notification', onClose: () => {}, onSuccess: () => {} },
+    };
+    (window as typeof window & { reviewModalFixture: unknown }).reviewModalFixture = state;
+    window.fetch = async (input, init) => {
+      state.requests.push({ path: String(input), method: init?.method || 'GET' });
+      return Response.json(succeeds ? { success: true } : { success: false, error: 'private@example.com' }, { status: succeeds ? 200 : 500 });
+    };
+  }, { role, succeeds, source });
+  await page.addScriptTag({ content: bundle });
+  await page.evaluate(() => (window as typeof window & { mountActualReviewModal: () => void }).mountActualReviewModal());
 }
 
 async function installGuestFixture(page: Page, trips: Array<Record<string, unknown>>) {
@@ -212,9 +308,29 @@ test('guest deep link opens the requested modal and plain trips entry stays ordi
   await expect(page.getByTestId('review-modal')).toHaveCount(0);
 });
 
+test('guest review request landing keeps email and notification sources and strips query and PII from GA', async ({ page }) => {
+  const bundle = await bundleComponent('guest');
+  for (const source of ['email', 'notification', 'invalid']) {
+    await openFixture(page, `?reviewBookingId=owned-booking&reviewSource=${source}`);
+    await installAnalyticsSpy(page);
+    await installGuestFixture(page, [guestTrip]);
+    await mountFixture(page, bundle);
+    await expect(page.getByTestId('review-modal')).toHaveAttribute('data-source', source === 'invalid' ? 'trips' : source);
+    const events = await readAnalyticsEvents(page);
+    const landing = events.filter((event) => event.name === 'review_request_landing');
+    expect(landing).toHaveLength(source === 'invalid' ? 0 : 1);
+    if (landing[0]) {
+      expect(landing[0].params).toMatchObject({ review_role: 'guest', source });
+      expect(Object.keys(landing[0].params).sort()).toEqual(['page_location', 'page_path', 'review_role', 'source']);
+      expect(JSON.stringify(landing[0])).not.toMatch(/owned-booking|guest-1|체험|@|reviewBookingId|reviewSource/);
+    }
+  }
+});
+
 test('eligible unfinished past trip shows a touch-sized CTA and count; CTA opens review without navigating', async ({ page }) => {
   const bundle = await bundleComponent('guest');
   await openFixture(page, '');
+  await installAnalyticsSpy(page);
   await installGuestFixture(page, [guestTrip]);
   await mountFixture(page, bundle);
 
@@ -226,6 +342,8 @@ test('eligible unfinished past trip shows a touch-sized CTA and count; CTA opens
 
   await cta.click();
   await expect(page.getByTestId('review-modal')).toHaveText('owned-booking');
+  await expect(page.getByTestId('review-modal')).toHaveAttribute('data-source', 'trips');
+  expect((await readAnalyticsEvents(page)).filter((event) => event.name === 'review_request_landing')).toHaveLength(0);
   expect(await page.evaluate(() => (window as typeof window & { deepLinkFixture: { routePushes: string[] } }).deepLinkFixture.routePushes)).toEqual([]);
 
   await page.setViewportSize({ width: 1280, height: 800 });
@@ -283,6 +401,32 @@ test('host deep link selects completed and opens only its own unreviewed reserva
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
 
+test('host review request landing and direct action retain their respective safe sources', async ({ page }) => {
+  const bundle = await bundleComponent('host');
+  for (const source of ['email', 'notification', 'invalid']) {
+    await openFixture(page, `?tab=reservations&reservationTab=completed&reviewBookingId=owned-booking&reviewSource=${source}`);
+    await installAnalyticsSpy(page);
+    await installHostFixture(page);
+    await mountFixture(page, bundle);
+    await expect(page.getByTestId('guest-review-modal')).toHaveAttribute('data-source', source === 'invalid' ? 'host_dashboard' : source);
+    const landing = (await readAnalyticsEvents(page)).filter((event) => event.name === 'review_request_landing');
+    expect(landing).toHaveLength(source === 'invalid' ? 0 : 1);
+    if (landing[0]) {
+      expect(landing[0].params).toMatchObject({ review_role: 'host', source });
+      expect(Object.keys(landing[0].params).sort()).toEqual(['page_location', 'page_path', 'review_role', 'source']);
+      expect(JSON.stringify(landing[0])).not.toMatch(/owned-booking|host-1|guest-1|체험|@|reviewBookingId|reviewSource/);
+    }
+  }
+
+  await openFixture(page, '?tab=reservations&reservationTab=completed');
+  await installAnalyticsSpy(page);
+  await installHostFixture(page);
+  await mountFixture(page, bundle);
+  await page.getByRole('button', { name: 'write guest review' }).click();
+  await expect(page.getByTestId('guest-review-modal')).toHaveAttribute('data-source', 'host_dashboard');
+  expect((await readAnalyticsEvents(page)).filter((event) => event.name === 'review_request_landing')).toHaveLength(0);
+});
+
 test('host UI fails closed for another host, an already reviewed booking, and plain reservations', async ({ page }) => {
   const bundle = await bundleComponent('host');
   for (const scenario of [
@@ -304,5 +448,46 @@ test('host UI fails closed for another host, an already reviewed booking, and pl
     if (scenario.query === '?tab=reservations') {
       await expect(page.getByRole('button', { name: 'tab_upcoming' })).toHaveClass(/bg-white/);
     }
+  }
+});
+
+test('actual guest and host modals emit one open and one submit result with only safe GA fields', async ({ page }) => {
+  for (const role of ['guest', 'host'] as const) {
+    const bundle = await bundleActualReviewModal(role);
+    for (const succeeds of [true, false]) {
+      await openFixture(page, '?reviewBookingId=private-booking-id&reviewSource=email');
+      await installAnalyticsSpy(page);
+      await mountActualReviewModal(page, bundle, role, succeeds);
+      await expect.poll(async () => (await readAnalyticsEvents(page)).length).toBe(1);
+
+      if (role === 'guest') {
+        await page.locator('button').filter({ has: page.locator('svg.lucide-star') }).last().click();
+        await page.locator('textarea').fill('A wonderful experience worth reviewing');
+        await page.getByRole('button', { name: 'rv_btn_submit' }).click();
+      } else {
+        await page.locator('textarea').fill('A thoughtful guest review');
+        await page.getByRole('button', { name: 'guest_review_submit' }).click();
+      }
+
+      await expect.poll(async () => (await readAnalyticsEvents(page)).length).toBe(2);
+      const events = await readAnalyticsEvents(page);
+      expect(events.map((event) => event.name)).toEqual([
+        'review_modal_open', succeeds ? 'review_submit_success' : 'review_submit_error',
+      ]);
+      for (const event of events) {
+        expect(event.params).toMatchObject({ review_role: role, source: role === 'guest' ? 'email' : 'notification' });
+        expect(Object.keys(event.params).sort()).toEqual(['page_location', 'page_path', 'review_role', 'source']);
+        expect(JSON.stringify(event)).not.toMatch(/private-booking-id|private-user-id|private-experience-id|Private Experience Title|Private Guest Name|private@example.com|A wonderful experience worth reviewing|A thoughtful guest review|reviewBookingId|reviewSource/);
+      }
+    }
+
+    await openFixture(page, '');
+    await installAnalyticsSpy(page);
+    await mountActualReviewModal(page, bundle, role, true, role === 'guest' ? 'trips' : 'host_dashboard');
+    await expect.poll(async () => (await readAnalyticsEvents(page)).length).toBe(1);
+    expect(await readAnalyticsEvents(page)).toMatchObject([{
+      name: 'review_modal_open',
+      params: { review_role: role, source: role === 'guest' ? 'trips' : 'host_dashboard' },
+    }]);
   }
 });
