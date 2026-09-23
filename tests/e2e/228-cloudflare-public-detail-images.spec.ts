@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 
 import detailImageManifest from '../../app/data/publicExperienceDetailImages.generated.json';
 import { getCloudflarePublicExperienceDetailImage } from '../../app/utils/cloudflarePublicExperienceDetailImages';
+import { normalizePublicExperienceSourceUrl } from '../../app/utils/publicExperienceMediaKeys';
 
 const [activeExperienceId, activeImages] = Object.entries(detailImageManifest)[0]!;
 const activeOriginUrl = Object.keys(activeImages)[0]!;
@@ -29,9 +30,7 @@ test.describe('Cloudflare public experience detail image boundary', () => {
     expect(new Set(keys).size).toBe(keys.length);
 
     for (const { experienceId, originUrl, image } of entries) {
-      expect(originUrl).toMatch(
-        /^https:\/\/uhinvcydgzqlpnvieyal\.supabase\.co\/storage\/v1\/object\/public\/experiences\/experience\/[^/]+\/(?:hero|itinerary)\/[A-Za-z0-9._-]+$/
-      );
+      expect(normalizePublicExperienceSourceUrl(originUrl).sourceUrl).toBe(originUrl);
       expect(image.smallKey).toMatch(new RegExp(`^details/experience-${experienceId}-[a-f0-9]{12}-w480-q75\\.webp$`));
       expect(image.mediumKey).toMatch(new RegExp(`^details/experience-${experienceId}-[a-f0-9]{12}-w960-q75\\.webp$`));
       expect(image.largeKey).toMatch(new RegExp(`^details/experience-${experienceId}-[a-f0-9]{12}-w1440-q75\\.webp$`));
@@ -45,7 +44,9 @@ test.describe('Cloudflare public experience detail image boundary', () => {
   });
 
   test('fails closed for changed, unknown, and unexpected experience images', () => {
-    expect(getCloudflarePublicExperienceDetailImage(activeExperienceId, `${activeOriginUrl}?changed=1`)).toBeNull();
+    const changedOrigin = new URL(activeOriginUrl);
+    changedOrigin.searchParams.set('changed', '1');
+    expect(getCloudflarePublicExperienceDetailImage(activeExperienceId, changedOrigin.toString())).toBeNull();
     expect(getCloudflarePublicExperienceDetailImage(999999, activeOriginUrl)).toBeNull();
     expect(
       getCloudflarePublicExperienceDetailImage(
@@ -77,7 +78,7 @@ test.describe('Cloudflare public experience detail image boundary', () => {
     );
   });
 
-  test('falls back to the unchanged Supabase path when Cloudflare detail delivery fails', async ({
+  test('falls back to the current original when Cloudflare detail delivery fails', async ({
     page,
   }) => {
     test.skip(
@@ -90,9 +91,11 @@ test.describe('Cloudflare public experience detail image boundary', () => {
     });
     await page.goto(`/experiences/${activeExperienceId}`, { waitUntil: 'domcontentloaded' });
 
-    await expect(
-      page.locator('[data-detail-image-delivery="supabase-fallback"]:visible').first()
-    ).toBeVisible({ timeout: 15_000 });
+    const fallback = page.locator('[data-detail-image-delivery="supabase-fallback"]:visible').first();
+    await expect(fallback).toBeVisible({ timeout: 15_000 });
+    const fallbackSource = await fallback.getAttribute('src');
+    expect(fallbackSource).not.toBeNull();
+    expect(normalizePublicExperienceSourceUrl(fallbackSource!).sourceUrl).toBe(fallbackSource);
     await expect(
       page.locator('[data-detail-image-delivery="cloudflare-r2"]:visible')
     ).toHaveCount(0);

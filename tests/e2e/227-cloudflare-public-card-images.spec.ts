@@ -4,6 +4,7 @@ import { expect, test } from '@playwright/test';
 
 import { PUBLIC_EXPERIENCE_CARD_IMAGES } from '../../app/data/publicExperienceCardImages';
 import { getCloudflareExperienceCardImage } from '../../app/utils/cloudflareImageCanary';
+import { normalizePublicExperienceSourceUrl } from '../../app/utils/publicExperienceMediaKeys';
 
 test.describe('Cloudflare public experience card image manifest', () => {
   test.beforeEach(() => {
@@ -24,11 +25,9 @@ test.describe('Cloudflare public experience card image manifest', () => {
 
     for (const [experienceId, image] of entries) {
       expect(experienceId).toMatch(/^\d+$/);
-      expect(image.originUrl).toMatch(
-        /^https:\/\/uhinvcydgzqlpnvieyal\.supabase\.co\/storage\/v1\/object\/public\/experiences\//
-      );
-      expect(image.smallKey).toMatch(/(?:^|\/)experience-\d+-primary-(?:[a-f0-9]{12}-)?w384-q65\.webp$/);
-      expect(image.largeKey).toMatch(/(?:^|\/)experience-\d+-primary-(?:[a-f0-9]{12}-)?w640-q65\.webp$/);
+      expect(normalizePublicExperienceSourceUrl(image.originUrl).sourceUrl).toBe(image.originUrl);
+      expect(image.smallKey).toMatch(new RegExp(`(?:^|/)experience-${experienceId}-primary-(?:[a-f0-9]{12}-)?w384-q65\\.webp$`));
+      expect(image.largeKey).toMatch(new RegExp(`(?:^|/)experience-${experienceId}-primary-(?:[a-f0-9]{12}-)?w640-q65\\.webp$`));
     }
   });
 
@@ -39,22 +38,19 @@ test.describe('Cloudflare public experience card image manifest', () => {
         largeUrl: `https://media-canary.locally-travel.com/${image.largeKey}`,
       });
 
-      expect(
-        getCloudflareExperienceCardImage(experienceId, `${image.originUrl}?changed=1`)
-      ).toBeNull();
+      const changedOrigin = new URL(image.originUrl);
+      changedOrigin.searchParams.set('changed', '1');
+      expect(getCloudflareExperienceCardImage(experienceId, changedOrigin.toString())).toBeNull();
     }
   });
 
-  test('keeps unknown and newly changed experiences on the Supabase path', () => {
+  test('does not select derivatives for an unknown experience', () => {
     expect(
-      getCloudflareExperienceCardImage(
-        999999,
-        'https://uhinvcydgzqlpnvieyal.supabase.co/storage/v1/object/public/experiences/unknown.jpg'
-      )
+      getCloudflareExperienceCardImage(999999, Object.values(PUBLIC_EXPERIENCE_CARD_IMAGES)[0]!.originUrl)
     ).toBeNull();
   });
 
-  test('bypasses framework optimization for the canonical Supabase fallback', () => {
+  test('bypasses framework optimization for the current original fallback', () => {
     const componentSource = readFileSync(
       'app/components/PublicExperienceCardImage.tsx',
       'utf8'
