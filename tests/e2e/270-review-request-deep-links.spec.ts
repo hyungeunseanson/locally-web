@@ -93,7 +93,7 @@ async function bundleComponent(component: 'guest' | 'host') {
     '@/app/utils/supabase/client', '@/app/components/SiteHeader', '@/app/components/ReviewModal',
     '@/app/components/ui/Spinner', '@/app/components/ui/Skeleton', '@/app/components/EmptyState',
     '@/app/components/ui/ConfirmModal', '@/app/utils/services/concierge', '@/app/constants/serviceStatus',
-    './hooks/useGuestTrips', './components/TripCard', './components/PastTripCard', './components/ReceiptModal',
+    './hooks/useGuestTrips', './components/TripCard', './components/ReceiptModal',
     './ReservationCard', './GuestProfileModal', './GuestReviewModal',
   ]);
   const bundle = await build({
@@ -106,10 +106,10 @@ async function bundleComponent(component: 'guest' | 'host') {
       api.onResolve({ filter: /.*/ }, (args) => mocked.has(args.path) ? { path: args.path, namespace: 'deep-link-fixture' } : null);
       api.onLoad({ filter: /.*/, namespace: 'deep-link-fixture' }, (args) => {
         const path = args.path;
-        if (path === 'next/navigation') return { contents: `export const useRouter = () => ({ push: () => {}, back: () => {} }); export const useSearchParams = () => new URLSearchParams(window.location.search);`, loader: 'js' };
+        if (path === 'next/navigation') return { contents: `export const useRouter = () => ({ push: (href) => window.deepLinkFixture.routePushes.push(href), back: () => {} }); export const useSearchParams = () => new URLSearchParams(window.location.search);`, loader: 'js' };
         if (path === 'next/link') return { contents: `import React from 'react'; export default function Link({ children, href, ...props }) { return React.createElement('a', { href, ...props }, children); }`, loader: 'js', resolveDir: process.cwd() };
         if (path === 'next/image') return { contents: `export default function Image() { return null; }`, loader: 'js' };
-        if (path.endsWith('LanguageContext')) return { contents: `const t = (key) => key; export const useLanguage = () => ({ t, lang: 'ko' });`, loader: 'js' };
+        if (path.endsWith('LanguageContext')) return { contents: `const t = (key, vars) => vars?.count === undefined ? key : key + ' ' + vars.count; export const useLanguage = () => ({ t, lang: 'ko' });`, loader: 'js' };
         if (path.endsWith('NotificationContext')) return { contents: `export const useNotification = () => ({ notifications: [] });`, loader: 'js' };
         if (path.endsWith('ToastContext')) return { contents: `const showToast = () => {}; export const useToast = () => ({ showToast });`, loader: 'js' };
         if (path.endsWith('supabase/client')) return { contents: `export const createClient = () => window.deepLinkFixture.supabase;`, loader: 'js' };
@@ -147,10 +147,11 @@ async function mountFixture(page: Page, bundle: string) {
   await page.evaluate(() => (window as typeof window & { mountDeepLinkPage: () => void }).mountDeepLinkPage());
 }
 
-async function installGuestFixture(page: Page, trips: typeof guestTrip[]) {
+async function installGuestFixture(page: Page, trips: Array<Record<string, unknown>>) {
   await page.evaluate((ownedTrips) => {
     const state = {
       refreshCount: 0,
+      routePushes: [] as string[],
       supabase: { auth: { getUser: async () => ({ data: { user: { id: 'guest-1' } }, error: null }) } },
       tripsHook: {
         upcomingTrips: [], pastTrips: ownedTrips, isLoading: false, errorMsg: '', requestCancel: async () => false,
@@ -209,6 +210,56 @@ test('guest deep link opens the requested modal and plain trips entry stays ordi
   await mountFixture(page, bundle);
   await expect(page.getByRole('heading', { name: 'my_trips' })).toBeVisible();
   await expect(page.getByTestId('review-modal')).toHaveCount(0);
+});
+
+test('eligible unfinished past trip shows a touch-sized CTA and count; CTA opens review without navigating', async ({ page }) => {
+  const bundle = await bundleComponent('guest');
+  await openFixture(page, '');
+  await installGuestFixture(page, [guestTrip]);
+  await mountFixture(page, bundle);
+
+  const cta = page.locator('button:visible', { hasText: 'trip_review' });
+  await expect(cta).toBeVisible();
+  expect((await cta.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+  await expect(page.locator('p:visible', { hasText: 'trip_reviews_to_write 1' })).toHaveCount(1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+
+  await cta.click();
+  await expect(page.getByTestId('review-modal')).toHaveText('owned-booking');
+  expect(await page.evaluate(() => (window as typeof window & { deepLinkFixture: { routePushes: string[] } }).deepLinkFixture.routePushes)).toEqual([]);
+
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await expect(page.locator('button:visible', { hasText: 'trip_review' })).toBeVisible();
+  await expect(page.locator('p:visible', { hasText: 'trip_reviews_to_write 1' })).toHaveCount(1);
+});
+
+test('reviewed, ineligible, and cancelled past trips have no new CTA or pending count', async ({ page }) => {
+  const bundle = await bundleComponent('guest');
+  for (const trip of [
+    { ...guestTrip, hasReview: true, review: { id: 7 } },
+    { ...guestTrip, reviewEligible: false },
+    { ...guestTrip, status: 'cancelled' },
+  ]) {
+    await openFixture(page, '');
+    await installGuestFixture(page, [trip]);
+    await mountFixture(page, bundle);
+    await expect(page.locator('button:visible', { hasText: 'trip_review' })).toHaveCount(0);
+    await expect(page.locator('p:visible', { hasText: 'trip_reviews_to_write' })).toHaveCount(0);
+    if (trip.hasReview) {
+      await expect(page.getByText('status_review_done').filter({ visible: true })).toBeVisible();
+      await expect(page.locator('button:visible', { hasText: 'action_edit' })).toBeVisible();
+    }
+  }
+});
+
+test('the past trip card still opens its experience detail when its body is clicked', async ({ page }) => {
+  const bundle = await bundleComponent('guest');
+  await openFixture(page, '');
+  await installGuestFixture(page, [guestTrip]);
+  await mountFixture(page, bundle);
+  await page.getByText('체험', { exact: true }).filter({ visible: true }).first().click();
+  expect(await page.evaluate(() => (window as typeof window & { deepLinkFixture: { routePushes: string[] } }).deepLinkFixture.routePushes))
+    .toEqual(['/experiences/experience-1']);
 });
 
 test('guest UI keeps ordinary trips for a foreign, reviewed, or invalid booking link', async ({ page }) => {
