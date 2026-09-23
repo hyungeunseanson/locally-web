@@ -27,7 +27,8 @@ BEGIN
     '20260918000000:proxy_card_intake_atomic',
     '20260922081710:experience_payment_claim_and_pending_cleanup',
     '20260922125140:close_refunded_phone_proxy_requests',
-    '20260923013312:ops_anomaly_monitor_snapshot'
+    '20260923013312:ops_anomaly_monitor_snapshot',
+    '20260923084232:one_time_review_request_reminders'
   ]::text[];
   IF actual IS DISTINCT FROM expected THEN
     RAISE EXCEPTION 'migration ledger mismatch: %', actual;
@@ -102,6 +103,7 @@ BEGIN
     'public.cancel_pending_service_concierge_atomic(p_actor_id uuid, p_order_id text, p_cancel_reason text)',
     'public.check_rate_limit(table_name text, seconds integer)',
     'public.claim_due_admin_support_unread_alert_batches(p_limit integer)',
+    'public.claim_due_review_request_reminders(p_limit integer)',
     'public.claim_experience_payment_atomic(p_booking_id text, p_user_id uuid, p_provider text, p_provider_reference text)',
     'public.complete_admin_manual_experience_payout_atomic(p_request_key uuid, p_host_id uuid, p_settlement_type text, p_expected_current_booking_amount integer, p_legacy_amount integer, p_reason text, p_legacy_source_reference text, p_transfer_reference text, p_paid_by_admin_id uuid, p_paid_by_admin_email text)',
     'public.complete_experience_booking_if_due_atomic(p_booking_id text)',
@@ -182,8 +184,18 @@ BEGIN
   END IF;
 
   SELECT count(*) INTO actual_count FROM pg_indexes WHERE schemaname = 'public';
-  IF actual_count <> 116 THEN
-    RAISE EXCEPTION 'public index count %, expected 116', actual_count;
+  IF actual_count <> 118 THEN
+    RAISE EXCEPTION 'public index count %, expected 118', actual_count;
+  END IF;
+  IF to_regclass('public.uq_notifications_review_request_reminder_booking_id') IS NULL
+    OR to_regclass('public.uq_notifications_guest_review_request_reminder_booking_id') IS NULL
+    OR NOT has_function_privilege('service_role', 'public.claim_due_review_request_reminders(integer)', 'EXECUTE')
+    OR has_function_privilege('anon', 'public.claim_due_review_request_reminders(integer)', 'EXECUTE')
+    OR has_function_privilege('authenticated', 'public.claim_due_review_request_reminders(integer)', 'EXECUTE')
+    OR (SELECT p.prosecdef FROM pg_proc AS p
+        WHERE p.oid = to_regprocedure('public.claim_due_review_request_reminders(integer)'))
+  THEN
+    RAISE EXCEPTION 'review reminder index or RPC security mismatch';
   END IF;
 
   SELECT count(*),

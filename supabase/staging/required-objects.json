@@ -17,14 +17,7 @@
     "supabase/migrations/20260923013312_ops_anomaly_monitor_snapshot.sql",
     "supabase/migrations/20260923084232_one_time_review_request_reminders.sql"
   ],
-  "pendingProductionMigrations": [
-    {
-      "version": "20260923084232",
-      "name": "one_time_review_request_reminders",
-      "repositoryFile": "supabase/migrations/20260923084232_one_time_review_request_reminders.sql",
-      "productionApplied": false
-    }
-  ],
+  "pendingProductionMigrations": [],
   "applicationTables": [
     "admin_audit_logs",
     "admin_job_runs",
@@ -80,6 +73,7 @@
     "cancel_pending_service_concierge_atomic",
     "check_rate_limit",
     "claim_due_admin_support_unread_alert_batches",
+    "claim_due_review_request_reminders",
     "claim_experience_payment_atomic",
     "complete_admin_manual_experience_payout_atomic",
     "complete_experience_booking_if_due_atomic",

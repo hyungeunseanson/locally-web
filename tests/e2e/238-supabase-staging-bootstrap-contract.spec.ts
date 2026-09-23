@@ -46,6 +46,7 @@ test.describe('Supabase staging bootstrap contract', () => {
       '20260922081710',
       '20260922125140',
       '20260923013312',
+      '20260923084232',
     ]);
     expect(manifest.freshProjectApplyOrder).toEqual([
       'supabase/migrations/20260912034545_production_schema_baseline.sql',
@@ -61,12 +62,7 @@ test.describe('Supabase staging bootstrap contract', () => {
       'supabase/migrations/20260923013312_ops_anomaly_monitor_snapshot.sql',
       'supabase/migrations/20260923084232_one_time_review_request_reminders.sql',
     ]);
-    expect(manifest.pendingProductionMigrations).toEqual([{
-      version: '20260923084232',
-      name: 'one_time_review_request_reminders',
-      repositoryFile: 'supabase/migrations/20260923084232_one_time_review_request_reminders.sql',
-      productionApplied: false,
-    }]);
+    expect(manifest.pendingProductionMigrations).toEqual([]);
     expect(packageJson.scripts['supabase:staging:baseline:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:current:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:contract']).toBeTruthy();
@@ -198,9 +194,9 @@ test.describe('Supabase staging bootstrap contract', () => {
     expect(currentManifest.objects.publicViews).toHaveLength(2);
     expect(currentManifest.objects.publicTableColumns).toBe(515);
     expect(currentManifest.objects.publicViewColumns).toBe(27);
-    expect(currentManifest.objects.functionOverloads).toHaveLength(56);
+    expect(currentManifest.objects.functionOverloads).toHaveLength(57);
     expect(currentManifest.objects.applicationTriggers).toHaveLength(12);
-    expect(currentManifest.objects.indexes).toBe(116);
+    expect(currentManifest.objects.indexes).toBe(118);
     expect(currentManifest.objects.constraints).toEqual({
       total: 180,
       primaryKey: 39,

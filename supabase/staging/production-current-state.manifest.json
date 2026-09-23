@@ -82,6 +82,12 @@
       "name": "ops_anomaly_monitor_snapshot",
       "repositoryFile": "supabase/migrations/20260923013312_ops_anomaly_monitor_snapshot.sql",
       "repositorySha256": "e9ff8ab1277cab03c3df3d26dc3c9edafef4b40753ff17c725a93c7aa69553bd"
+    },
+    {
+      "version": "20260923084232",
+      "name": "one_time_review_request_reminders",
+      "repositoryFile": "supabase/migrations/20260923084232_one_time_review_request_reminders.sql",
+      "repositorySha256": "587e2ed1ab66b83adb0d47fae135475c3484af2a4337a3f3b3d71f5ebec94e00"
     }
   ],
   "operationalStateDeltas": [
@@ -150,6 +156,7 @@
       "public.cancel_pending_service_concierge_atomic(p_actor_id uuid, p_order_id text, p_cancel_reason text)",
       "public.check_rate_limit(table_name text, seconds integer)",
       "public.claim_due_admin_support_unread_alert_batches(p_limit integer)",
+      "public.claim_due_review_request_reminders(p_limit integer)",
       "public.claim_experience_payment_atomic(p_booking_id text, p_user_id uuid, p_provider text, p_provider_reference text)",
       "public.complete_admin_manual_experience_payout_atomic(p_request_key uuid, p_host_id uuid, p_settlement_type text, p_expected_current_booking_amount integer, p_legacy_amount integer, p_reason text, p_legacy_source_reference text, p_transfer_reference text, p_paid_by_admin_id uuid, p_paid_by_admin_email text)",
       "public.complete_experience_booking_if_due_atomic(p_booking_id text)",
@@ -212,7 +219,7 @@
       "public.service_bookings.trg_sb_updated_at",
       "public.service_requests.trg_sr_updated_at"
     ],
-    "indexes": 116,
+    "indexes": 118,
     "constraints": {
       "total": 180,
       "primaryKey": 39,
