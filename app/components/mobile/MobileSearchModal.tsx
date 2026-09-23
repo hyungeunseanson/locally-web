@@ -4,7 +4,6 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Search, X, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/app/context/LanguageContext';
-import DatePicker from '@/app/components/DatePicker';
 import { sendSearchLog } from '@/app/utils/analytics/client';
 import {
     getLocalizedSearchLocationLabel,
@@ -203,12 +202,12 @@ interface MobileSearchModalProps {
 export default function MobileSearchModal({
     isOpen, onClose,
     locationInput, setLocationInput,
-    dateRange, setDateRange,
+    setDateRange,
     selectedLanguage, setSelectedLanguage,
 }: MobileSearchModalProps) {
     const { t, lang } = useLanguage();
     const router = useRouter();
-    const [activePanel, setActivePanel] = useState<'location' | 'date' | 'language' | null>('location');
+    const [activePanel, setActivePanel] = useState<'location' | 'language' | null>('location');
     const [isVisible, setIsVisible] = useState(false);
     const [isSearchExpanded, setIsSearchExpanded] = useState(false);
     const [recentSearches, setRecentSearches] = useState<RecentSearch[]>(() => readRecentSearches());
@@ -226,8 +225,6 @@ export default function MobileSearchModal({
         htmlOverflow: '',
         htmlOverscrollBehavior: '',
     });
-    const localeMap: Record<string, string> = { ko: 'ko-KR', en: 'en-US', ja: 'ja-JP', zh: 'zh-CN' };
-    const displayLocale = localeMap[lang] || 'en-US';
     const englishLanguageNames =
         typeof Intl !== 'undefined' && typeof Intl.DisplayNames !== 'undefined'
             ? new Intl.DisplayNames(['en'], { type: 'language' })
@@ -254,6 +251,7 @@ export default function MobileSearchModal({
         if (isOpen) {
             requestAnimationFrame(() => {
                 setActivePanel('location');
+                setDateRange({ start: null, end: null });
                 setIsSearchExpanded(false);
                 if (!selectedLanguage) {
                     setSelectedLanguage('한국어');
@@ -263,7 +261,7 @@ export default function MobileSearchModal({
         } else {
             requestAnimationFrame(() => setIsVisible(false));
         }
-    }, [isOpen, selectedLanguage, setSelectedLanguage]);
+    }, [isOpen, selectedLanguage, setDateRange, setSelectedLanguage]);
 
     useEffect(() => {
         if (typeof window === 'undefined') return;
@@ -344,8 +342,8 @@ export default function MobileSearchModal({
 
     const saveRecentSearch = (name: string) => {
         if (!name) return;
-        const desc = formatDateRange() || undefined;
-        const next = [{ name, desc }, ...recentSearches.filter(item => item.name !== name)].slice(0, 6);
+        const existing = recentSearches.find(item => item.name === name);
+        const next = [{ name, ...(existing?.desc ? { desc: existing.desc } : {}) }, ...recentSearches.filter(item => item.name !== name)].slice(0, 6);
         setRecentSearches(next);
         try {
             window.localStorage.setItem('locally_recent_searches', JSON.stringify(next));
@@ -358,7 +356,7 @@ export default function MobileSearchModal({
         setLocationInput(name);
         saveRecentSearch(name);
         if (closeExpanded) setIsSearchExpanded(false);
-        setActivePanel('date');
+        setActivePanel('language');
     };
 
     const submitTypedLocation = (closeExpanded?: boolean) => {
@@ -373,6 +371,7 @@ export default function MobileSearchModal({
     };
 
     const handleSearch = () => {
+        setDateRange({ start: null, end: null });
         const typed = locationInput.trim();
         if (typed) {
             saveRecentSearch(typed);
@@ -387,12 +386,6 @@ export default function MobileSearchModal({
         if (typed) {
             params.set('location', typed);
         }
-        if (dateRange.start) {
-            params.set('startDate', dateRange.start.toISOString().split('T')[0]);
-        }
-        if (dateRange.end) {
-            params.set('endDate', dateRange.end.toISOString().split('T')[0]);
-        }
         router.push(`/search?${params.toString()}`);
     };
 
@@ -400,21 +393,6 @@ export default function MobileSearchModal({
         setLocationInput('');
         setDateRange({ start: null, end: null });
         setSelectedLanguage('all');
-    };
-
-    const formatDateLabel = (date: Date) => {
-        return new Intl.DateTimeFormat(displayLocale, {
-            month: 'short',
-            day: 'numeric',
-        }).format(date);
-    };
-
-    const formatDateRange = () => {
-        if (dateRange.start && dateRange.end) {
-            return `${formatDateLabel(dateRange.start)} - ${formatDateLabel(dateRange.end)}`;
-        }
-        if (dateRange.start) return formatDateLabel(dateRange.start);
-        return '';
     };
 
     const getLanguageLabel = () => {
@@ -505,7 +483,6 @@ export default function MobileSearchModal({
                                             <PlaceBadge type={inferPlaceType(item.name)} />
                                             <div>
                                                 <span className="text-[12px] font-semibold text-[#222222] block">{getLocalizedPlaceName(item.name)}</span>
-                                                {item.desc && <span className="text-[10px] text-[#8B8B8B] font-normal">{item.desc}</span>}
                                             </div>
                                         </button>
                                     ))}
@@ -552,39 +529,10 @@ export default function MobileSearchModal({
                         </div>
                     )}
 
-                    {/* 날짜 패널 */}
-                    {activePanel === 'date' ? (
-                        <div
-                            className="bg-white mb-2 overflow-hidden transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
-                            style={{ borderRadius: '22px', boxShadow: '0 2px 6px rgba(0,0,0,0.05), 0 8px 18px rgba(0,0,0,0.06)', border: '0.5px solid #E6E6E6' }}
-                        >
-                            <div className="p-5">
-                                <h3 className="text-[16px] font-extrabold text-[#222222] mb-3 tracking-[-0.02em]">{t('label_date')}</h3>
-                                <DatePicker
-                                    selectedRange={dateRange}
-                                    onChange={(range) => {
-                                        setDateRange(range);
-                                        if (range.start && range.end) setActivePanel('language');
-                                    }}
-                                    variant="mobile"
-                                />
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="mb-2">
-                            <CollapsedPanel
-                                label={t('label_date')}
-                                value={formatDateRange()}
-                                placeholder={t('add_dates')}
-                                onOpen={() => setActivePanel('date')}
-                                testId="home-mobile-collapsed-date"
-                            />
-                        </div>
-                    )}
-
                     {/* 언어 패널 */}
                     {activePanel === 'language' ? (
                         <div
+                            data-testid="home-mobile-language-panel"
                             className="bg-white mb-2 overflow-hidden transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
                             style={{ borderRadius: '22px', boxShadow: '0 2px 6px rgba(0,0,0,0.05), 0 8px 18px rgba(0,0,0,0.06)', border: '0.5px solid #E6E6E6' }}
                         >
@@ -594,6 +542,7 @@ export default function MobileSearchModal({
                                     {languages.map((lang) => (
                                         <button
                                             key={lang.value}
+                                            data-testid={`home-mobile-language-option-${lang.code || 'all'}`}
                                             onClick={() => setSelectedLanguage(lang.value)}
                                             className={`flex items-center justify-between w-full px-2.5 py-[10px] rounded-[12px] text-left transition-colors ${selectedLanguage === lang.value ? 'bg-[#F5F5F5]' : 'hover:bg-[#F7F7F7]'
                                                 }`}

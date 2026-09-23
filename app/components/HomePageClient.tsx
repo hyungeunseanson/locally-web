@@ -72,6 +72,11 @@ export default function HomePageClient() {
     applyFilters
   } = useExperienceFilter();
 
+  const handleHomeSearch = (locationOverride?: string) => {
+    setDateRange({ start: null, end: null });
+    applyFilters(locationOverride);
+  };
+
   useEffect(() => {
     const handleScroll = () => {
       setScrollY(window.scrollY);
@@ -85,12 +90,10 @@ export default function HomePageClient() {
     const params = new URLSearchParams();
     if (locationInput.trim()) params.set('location', locationInput.trim());
     if (selectedLanguage && selectedLanguage !== 'all') params.set('language', selectedLanguage);
-    if (dateRange.start) params.set('startDate', dateRange.start.toISOString().slice(0, 10));
-    if (dateRange.end) params.set('endDate', dateRange.end.toISOString().slice(0, 10));
 
     const query = params.toString();
     return query ? `/search?${query}` : '/search';
-  }, [dateRange.end, dateRange.start, locationInput, selectedLanguage]);
+  }, [locationInput, selectedLanguage]);
 
   const { popularExperiences, allExperiencesLatest } = React.useMemo(
     () => buildHomeExperienceSections(filteredExperiences as HomeExperience[]),
@@ -170,7 +173,7 @@ export default function HomePageClient() {
         selectedLanguage={selectedLanguage}
         setSelectedLanguage={setSelectedLanguage}
         searchRef={searchRef}
-        onSearch={applyFilters}
+        onSearch={handleHomeSearch}
       />
 
       <main className="max-w-[1760px] mx-auto px-0 md:px-12 py-0 md:py-8 min-h-screen relative z-[1]">

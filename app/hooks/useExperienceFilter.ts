@@ -18,6 +18,8 @@ const cityMap: Record<string, string> = {
 };
 
 const EMPTY_EXPERIENCES: Experience[] = [];
+// Keep the date state and filtering path for a future return of the home date UI.
+const HOME_SEARCH_DATE_ENABLED = false;
 
 export function useExperienceFilter() {
   const {
@@ -64,7 +66,7 @@ export function useExperienceFilter() {
       result = result.filter(item => item.languages?.includes(selectedLanguage));
     }
 
-    if (dateRange.start) {
+    if (HOME_SEARCH_DATE_ENABLED && dateRange.start) {
       const start = new Date(dateRange.start); start.setHours(0, 0, 0, 0);
       const end = dateRange.end ? new Date(dateRange.end) : new Date(dateRange.start); end.setHours(23, 59, 59, 999);
 
