@@ -123,15 +123,13 @@ const expectedLedger = [
     name: 'close_refunded_phone_proxy_requests',
     repositoryFile: 'supabase/migrations/20260922125140_close_refunded_phone_proxy_requests.sql',
   },
-];
-const expectedPendingMigrations = [
   {
-    version: '20260922150728',
+    version: '20260923013312',
     name: 'ops_anomaly_monitor_snapshot',
-    repositoryFile: 'supabase/migrations/20260922150728_ops_anomaly_monitor_snapshot.sql',
-    productionApplied: false,
+    repositoryFile: 'supabase/migrations/20260923013312_ops_anomaly_monitor_snapshot.sql',
   },
 ];
+const expectedPendingMigrations = [];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));
 for (const [index, expected] of expectedLedger.entries()) {
   const actual = manifest.migrationLedger[index];
@@ -168,7 +166,7 @@ assert(objects.publicTables.length === 39, 'expected 39 public tables');
 assert(objects.publicViews.length === 2, 'expected 2 public views');
 assert(objects.publicTableColumns === 515, 'expected 515 public table columns');
 assert(objects.publicViewColumns === 27, 'expected 27 public view columns');
-assert(objects.functionOverloads.length === 55, 'expected 55 public function overloads');
+assert(objects.functionOverloads.length === 56, 'expected 56 public function overloads');
 assert(objects.applicationTriggers.length === 12, 'expected 12 application triggers');
 assert(objects.indexes === 116, 'expected 116 public indexes');
 assert(objects.constraints.total === 180, 'expected 180 constraints');
