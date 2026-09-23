@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import React from 'react';
-import { ChevronRight, CheckCircle, Mountain, Receipt } from 'lucide-react'; // 🟢 아이콘 추가
+import { ChevronRight, CheckCircle, Mountain, PenLine, Receipt } from 'lucide-react'; // 🟢 아이콘 추가
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 import { useRouter } from 'next/navigation';
 import type { GuestTrip } from './TripCard';
@@ -20,6 +20,13 @@ type PastGuestTrip = GuestTrip & {
 interface PastTripCardProps {
   trip: PastGuestTrip;
   onOpenReview: (trip: PastGuestTrip) => void;
+}
+
+export function isPendingGuestTripReview(trip: GuestTrip) {
+  return trip.status?.toLowerCase() === 'completed' &&
+    trip.reviewEligible === true &&
+    trip.hasReview === false &&
+    !trip.review?.id;
 }
 
 export default function PastTripCard({ trip, onOpenReview }: PastTripCardProps) {
@@ -98,15 +105,18 @@ export default function PastTripCard({ trip, onOpenReview }: PastTripCardProps) 
                 </button>
               )}
             </div>
-          ) : trip.reviewEligible ? (
+          ) : isPendingGuestTripReview(trip) ? (
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onOpenReview(trip);
               }}
-              className="text-[11px] md:text-xs font-semibold text-blue-600 hover:underline mt-1"
+              onKeyDown={(e) => e.stopPropagation()}
+              className="mt-2 inline-flex min-h-11 max-w-full items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-semibold text-blue-700 transition-colors hover:border-blue-300 hover:bg-blue-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
             >
-              {t('trip_review')} {/* 🟢 교체 (후기 작성하기) */}
+              <PenLine className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              {t('trip_review')}
             </button>
           ) : null
         ) : (

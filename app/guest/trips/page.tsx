@@ -15,7 +15,7 @@ import { useNotification } from '@/app/context/NotificationContext';
 import { useGuestTrips } from './hooks/useGuestTrips';
 import TripCard, { type GuestTrip } from './components/TripCard';
 import ReceiptModal from './components/ReceiptModal';
-import PastTripCard from './components/PastTripCard';
+import PastTripCard, { isPendingGuestTripReview } from './components/PastTripCard';
 import { getServiceRequestStatusLabel } from '@/app/constants/serviceStatus';
 import type { ServiceRequestCard } from '@/app/types/service';
 import { getServiceTypeLabel } from '@/app/utils/services/concierge';
@@ -118,6 +118,7 @@ function GuestTripsContent() {
 
   const openReceipt = (trip: GuestTrip) => { setSelectedTrip(trip); setIsReceiptModalOpen(true); };
   const openReview = (trip: GuestTrip) => { setSelectedTrip(trip); setIsReviewModalOpen(true); };
+  const pendingReviewCount = pastTrips.filter(isPendingGuestTripReview).length;
   const handleMobileBack = () => {
     if (typeof window !== 'undefined' && window.history.length > 1) {
       router.back();
@@ -251,6 +252,11 @@ function GuestTripsContent() {
                 <span className="text-[10px] md:text-[11px] font-semibold text-slate-400 uppercase tracking-wider">{t('trip_past')}</span>
                 <div className="h-px flex-1 bg-slate-100" />
               </div>
+              {pendingReviewCount > 0 && (
+                <p className="mb-1 text-[11px] font-medium text-blue-700">
+                  {t('trip_reviews_to_write', { count: pendingReviewCount })}
+                </p>
+              )}
               <div className="space-y-2.5 md:space-y-3">
                 {pastTrips.map((trip: GuestTrip) => (
                   <PastTripCard key={trip.id} trip={trip} onOpenReview={openReview} />
@@ -303,6 +309,11 @@ function GuestTripsContent() {
               <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-slate-400">
                 <History size={20} /> {t('trip_past')}
               </h2>
+              {pendingReviewCount > 0 && (
+                <p className="-mt-4 mb-3 text-xs font-medium text-blue-700">
+                  {t('trip_reviews_to_write', { count: pendingReviewCount })}
+                </p>
+              )}
 
               {pastTrips.length > 0 ? (
                 <div className="space-y-4">
