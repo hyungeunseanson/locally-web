@@ -164,7 +164,8 @@ async function cloudflareGet<T>(params: {
 }) {
   let response: Response;
   try {
-    response = await params.fetchImplementation(
+    const fetchImplementation = params.fetchImplementation;
+    response = await fetchImplementation(
       `https://api.cloudflare.com/client/v4${params.pathname}`,
       { method: 'GET', headers: { Authorization: `Bearer ${params.token}` } }
     );
