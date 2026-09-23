@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Star, Trash2, Search, RefreshCw } from 'lucide-react';
 import { useToast } from '@/app/context/ToastContext';
 import { useConfirmDialog } from '@/app/hooks/useConfirmDialog';
+import GuestReviewCards, { type AdminGuestReview } from './GuestReviewCards';
 
 interface AdminReview {
   id: number;
@@ -24,6 +25,10 @@ export default function ReviewsTab() {
   const { requestConfirm, ConfirmDialogElement } = useConfirmDialog();
 
   const [reviews, setReviews] = useState<AdminReview[]>([]);
+  const [guestReviews, setGuestReviews] = useState<AdminGuestReview[]>([]);
+  const [activeReviewTab, setActiveReviewTab] = useState<'experience' | 'guest'>('experience');
+  const [guestReviewsLoaded, setGuestReviewsLoaded] = useState(false);
+  const [guestLoading, setGuestLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [ratingFilter, setRatingFilter] = useState<number | null>(null);
@@ -51,6 +56,30 @@ export default function ReviewsTab() {
   useEffect(() => {
     void fetchReviews();
   }, [fetchReviews]);
+
+  const fetchGuestReviews = useCallback(async () => {
+    setGuestLoading(true);
+    try {
+      const response = await fetch('/api/admin/guest-reviews', { cache: 'no-store' });
+      const result = await response.json();
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || 'Failed to fetch guest reviews');
+      }
+      setGuestReviews((result.data as AdminGuestReview[]) || []);
+      setGuestReviewsLoaded(true);
+    } catch (err) {
+      console.error(err);
+      showToast('게스트 평가 목록 로드 실패', 'error');
+    } finally {
+      setGuestLoading(false);
+    }
+  }, [showToast]);
+
+  useEffect(() => {
+    if (activeReviewTab === 'guest' && !guestReviewsLoaded) {
+      void fetchGuestReviews();
+    }
+  }, [activeReviewTab, guestReviewsLoaded, fetchGuestReviews]);
 
   const handleDelete = (reviewId: number) => {
     requestConfirm({
@@ -92,9 +121,22 @@ export default function ReviewsTab() {
     return matchRating && matchSearch;
   });
 
+  const filteredGuestReviews = guestReviews.filter((review) => {
+    const matchRating = ratingFilter === null || Math.floor(review.rating ?? 0) === ratingFilter;
+    const query = searchQuery.trim().toLowerCase();
+    const matchSearch = !query || [review.host_name, review.guest_name, review.experience_title, review.content]
+      .some((value) => value?.toLowerCase().includes(query));
+    return matchRating && matchSearch;
+  });
+
   const avgRating = reviews.length > 0
     ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
     : '0.0';
+  const guestAvgRating = guestReviews.length > 0
+    ? (guestReviews.reduce((sum, review) => sum + (review.rating ?? 0), 0) / guestReviews.length).toFixed(1)
+    : '0.0';
+  const visibleCount = activeReviewTab === 'experience' ? reviews.length : guestReviews.length;
+  const visibleAvgRating = activeReviewTab === 'experience' ? avgRating : guestAvgRating;
 
   return (
     <div className="p-4 md:p-6">
@@ -106,35 +148,57 @@ export default function ReviewsTab() {
             리뷰 품질 관리
           </h2>
           <p className="text-xs md:text-sm text-slate-500 mt-0.5">
-            플랫폼 전체 후기 품질과 이상 징후를 운영 관점에서 확인합니다. 전체 {reviews.length}개 · 평균 {avgRating}점
+            플랫폼 전체 후기 품질과 이상 징후를 운영 관점에서 확인합니다. 전체 {visibleCount}개 · 평균 {visibleAvgRating}점
           </p>
         </div>
         <button
-          onClick={fetchReviews}
+          onClick={() => void (activeReviewTab === 'experience' ? fetchReviews() : fetchGuestReviews())}
           className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-500"
           title="새로고침"
         >
-          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+          <RefreshCw size={16} className={loading || guestLoading ? 'animate-spin' : ''} />
         </button>
       </div>
 
+      <div role="tablist" aria-label="리뷰 유형" className="mb-5 flex w-full min-w-0 gap-1 rounded-xl bg-slate-100 p-1 sm:w-fit">
+        {([
+          ['experience', '체험 후기'],
+          ['guest', '게스트 평가'],
+        ] as const).map(([tab, label]) => (
+          <button
+            key={tab}
+            type="button"
+            role="tab"
+            aria-selected={activeReviewTab === tab}
+            onClick={() => {
+              setActiveReviewTab(tab);
+              setSearchQuery('');
+              setRatingFilter(null);
+            }}
+            className={`min-w-0 flex-1 rounded-lg px-3 py-2 text-sm font-semibold sm:flex-none ${activeReviewTab === tab ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       {/* 검색 + 필터 */}
-      <div className="flex flex-col md:flex-row gap-2 mb-5">
-        <div className="relative flex-1">
+      <div className="mb-5 flex min-w-0 flex-col gap-2 md:flex-row">
+        <div className="relative min-w-0 flex-1">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-slate-400"
-            placeholder="게스트명, 체험명, 내용 검색..."
+            placeholder={activeReviewTab === 'experience' ? '게스트명, 체험명, 내용 검색...' : '호스트명, 게스트명, 체험명, 내용 검색...'}
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
           />
         </div>
-        <div className="flex gap-1.5">
+        <div className="flex max-w-full gap-1.5 overflow-x-auto pb-1">
           {[null, 5, 4, 3, 2, 1].map(r => (
             <button
               key={String(r)}
               onClick={() => setRatingFilter(r)}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${ratingFilter === r ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+              className={`shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${ratingFilter === r ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
             >
               {r === null ? '전체' : `${r}★`}
             </button>
@@ -143,14 +207,16 @@ export default function ReviewsTab() {
       </div>
 
       {/* 목록 */}
-      {loading ? (
+      {(activeReviewTab === 'experience' ? loading : guestLoading) ? (
         <div className="space-y-3">
           {[1, 2, 3].map(i => (
             <div key={i} className="animate-pulse h-24 bg-slate-100 rounded-xl" />
           ))}
         </div>
-      ) : filtered.length === 0 ? (
+      ) : (activeReviewTab === 'experience' ? filtered.length : filteredGuestReviews.length) === 0 ? (
         <div className="text-center py-16 text-slate-400 text-sm">검색 결과가 없습니다.</div>
+      ) : activeReviewTab === 'guest' ? (
+        <GuestReviewCards reviews={filteredGuestReviews} />
       ) : (
         <div className="space-y-3">
           {filtered.map(review => (
