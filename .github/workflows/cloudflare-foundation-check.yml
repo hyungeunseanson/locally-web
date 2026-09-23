@@ -59,6 +59,9 @@ jobs:
       - name: Verify admin guest review access and 390px review quality UI
         run: npx playwright test -c playwright.contracts.config.ts tests/e2e/269-admin-guest-review-quality.spec.ts --project=chromium --workers=1 --reporter=line
 
+      - name: Verify review request deep links and existing review boundaries
+        run: npx playwright test -c playwright.contracts.config.ts tests/e2e/257-review-tour-end-app-cutover.spec.ts tests/e2e/258-guest-review-request-email.spec.ts tests/e2e/270-review-request-deep-links.spec.ts --project=chromium --workers=1 --reporter=line
+
       - name: Verify Customer Support phone workspace without external services
         run: npx playwright test -c playwright.phone-workspace.config.ts
 

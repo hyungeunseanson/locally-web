@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Ghost, AlertCircle, History, ArrowLeft, Briefcase, ChevronRight, Clock, MapPin, Users, Calendar, Plus } from 'lucide-react';
 import Link from 'next/link';
 import SiteHeader from '@/app/components/SiteHeader';
 import ReviewModal from '@/app/components/ReviewModal';
 import Spinner from '@/app/components/ui/Spinner';
 import { useLanguage } from '@/app/context/LanguageContext';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import { useNotification } from '@/app/context/NotificationContext';
 
@@ -19,6 +19,7 @@ import PastTripCard from './components/PastTripCard';
 import { getServiceRequestStatusLabel } from '@/app/constants/serviceStatus';
 import type { ServiceRequestCard } from '@/app/types/service';
 import { getServiceTypeLabel } from '@/app/utils/services/concierge';
+import { findGuestReviewDeepLinkTrip } from '@/app/utils/reviews/reviewRequestDeepLinks';
 
 // 서비스 의뢰 N 배지: service_application_new 타입 알림 중 unread 여부
 function useServiceUnread() {
@@ -43,10 +44,12 @@ const STATUS_COLOR: Record<string, string> = {
   expired: 'bg-slate-100 text-slate-400',
 };
 
-export default function GuestTripsPage() {
+function GuestTripsContent() {
   const { t, lang } = useLanguage();
   const router = useRouter();
+  const reviewBookingId = useSearchParams().get('reviewBookingId');
   const supabase = useMemo(() => createClient(), []);
+  const attemptedReviewBookingIdRef = useRef<string | null>(null);
   const hasServiceUnread = useServiceUnread();
 
   const {
@@ -67,6 +70,34 @@ export default function GuestTripsPage() {
   // 맞춤 의뢰 목록
   const [serviceRequests, setServiceRequests] = useState<ServiceRequestCard[]>([]);
   const [serviceLoading, setServiceLoading] = useState(true);
+
+  useEffect(() => {
+    if (!reviewBookingId || isLoading || attemptedReviewBookingIdRef.current === reviewBookingId) return;
+
+    let cancelled = false;
+    const openRequestedReview = async () => {
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error || !user || cancelled) return;
+
+        // Refetch the user-scoped trips instead of trusting a cached list or the URL.
+        const result = await refreshTrips();
+        if (cancelled || result.isError) return;
+        const trip = findGuestReviewDeepLinkTrip(result.data?.trips ?? [], reviewBookingId);
+        if (trip) {
+          setSelectedTrip(trip);
+          setIsReviewModalOpen(true);
+        }
+      } catch (error) {
+        console.error('[GuestTripsPage] review deep link lookup failed:', error);
+      } finally {
+        if (!cancelled) attemptedReviewBookingIdRef.current = reviewBookingId;
+      }
+    };
+
+    void openRequestedReview();
+    return () => { cancelled = true; };
+  }, [isLoading, refreshTrips, reviewBookingId, supabase]);
 
   useEffect(() => {
     const loadServices = async () => {
@@ -299,4 +330,8 @@ export default function GuestTripsPage() {
       )}
     </div>
   );
+}
+
+export default function GuestTripsPage() {
+  return <Suspense fallback={<div className="min-h-screen bg-white" />}><GuestTripsContent /></Suspense>;
 }

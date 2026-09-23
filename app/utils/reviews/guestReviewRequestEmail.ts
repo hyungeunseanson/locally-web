@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
+import { getGuestReviewRequestHref } from '@/app/utils/reviews/reviewRequestDeepLinks';
 
 type ExperienceRelation = {
   title: string | null;
@@ -103,7 +104,7 @@ export async function deliverGuestReviewRequestEmailsForCompletedBookings(params
           payload: {
             copyKey: 'review.request.guest',
             copyParams: { experienceTitle: experience?.title || 'Locally Experience' },
-            ctaUrl: '/guest/trips',
+            ctaUrl: getGuestReviewRequestHref(bookingId),
           },
         },
       });

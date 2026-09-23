@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { RefreshCw, AlertCircle } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Skeleton from '@/app/components/ui/Skeleton';
 import EmptyState from '@/app/components/EmptyState';
 import ConfirmModal from '@/app/components/ui/ConfirmModal';
@@ -23,6 +23,7 @@ import {
 } from '@/app/utils/bookingStartTime';
 import { isUnapprovedCardPaymentAttempt } from '@/app/utils/bookings/pendingBookingHolds';
 import { isBookingReviewEligible } from '@/app/utils/reviews/reviewEligibility';
+import { findHostGuestReviewDeepLinkBooking } from '@/app/utils/reviews/reviewRequestDeepLinks';
 
 // 컴포넌트
 import ReservationCard from './ReservationCard';
@@ -104,6 +105,13 @@ type GuestReviewBookingIdRow = {
   booking_id: string | number;
 };
 
+type ReviewDeepLinkSnapshot = {
+  hostUserId: string;
+  reservations: ReservationRecord[];
+  hostExperienceIds: Set<string>;
+  reviewedBookingIds: Set<string>;
+};
+
 type GuestMembershipResponse = {
   success?: boolean;
   memberships?: Record<string, LocallyMembershipStatus>;
@@ -156,6 +164,9 @@ function getSingleExperience(experience?: ReservationExperienceRelation) {
 export default function ReservationManager() {
   const { t } = useLanguage(); // 🟢 2. t 함수 추가
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const reviewBookingId = searchParams.get('reviewBookingId');
+  const reservationTab = searchParams.get('reservationTab');
   const supabase = createClient();
   const { showToast } = useToast();
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
@@ -166,6 +177,8 @@ export default function ReservationManager() {
   const realtimeRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const membershipRequestSeqRef = useRef(0);
   const backgroundCompletedSyncInFlightRef = useRef(false);
+  const attemptedReviewBookingIdRef = useRef<string | null>(null);
+  const [reviewDeepLinkSnapshot, setReviewDeepLinkSnapshot] = useState<ReviewDeepLinkSnapshot | null>(null);
 
   const [activeTab, setActiveTab] = useState<'upcoming' | 'completed' | 'cancelled'>('upcoming');
   const [reservations, setReservations] = useState<ReservationRecord[]>([]);
@@ -182,6 +195,10 @@ export default function ReservationManager() {
 
   // ✅ [복구] 에러 메시지 상태
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (reservationTab === 'completed' || reviewBookingId) setActiveTab('completed');
+  }, [reservationTab, reviewBookingId]);
 
   // ✅ [복구] 초기화 로직 (localStorage 로드)
   useEffect(() => {
@@ -303,6 +320,7 @@ export default function ReservationManager() {
     try {
       if (!isBackground) setLoading(true);
       setErrorMsg(null);
+      setReviewDeepLinkSnapshot(null);
 
       const hostUserId = await getHostUserId();
       if (!hostUserId) return;
@@ -372,6 +390,12 @@ export default function ReservationManager() {
 
       if (bookingIds.length === 0) {
         setReviewedBookingIds([]);
+        setReviewDeepLinkSnapshot({
+          hostUserId,
+          reservations: nextReservations,
+          hostExperienceIds: new Set(hostExperienceIdsRef.current),
+          reviewedBookingIds: new Set(),
+        });
       } else {
         const { data: reviews, error: reviewsError } = await supabase
           .from('guest_reviews')
@@ -383,9 +407,15 @@ export default function ReservationManager() {
           console.error('[ReservationManager] guest_reviews lookup error:', reviewsError);
           setReviewedBookingIds([]);
         } else {
-          setReviewedBookingIds(
-            ((reviews as GuestReviewBookingIdRow[] | null) || []).map((review) => String(review.booking_id))
-          );
+          const reviewedIds = ((reviews as GuestReviewBookingIdRow[] | null) || [])
+            .map((review) => String(review.booking_id));
+          setReviewedBookingIds(reviewedIds);
+          setReviewDeepLinkSnapshot({
+            hostUserId,
+            reservations: nextReservations,
+            hostExperienceIds: new Set(hostExperienceIdsRef.current),
+            reviewedBookingIds: new Set(reviewedIds),
+          });
         }
       }
 
@@ -422,6 +452,60 @@ export default function ReservationManager() {
       if (!isBackground) setLoading(false);
     }
   }, [fetchGuestMembershipStatuses, getHostUserId, showToast, supabase, syncCompletedReservations, t]);
+
+  const openGuestReview = useCallback(async (res: ReservationRecord) => {
+    if (!res.reviewEligible) {
+      showToast(t('res_review_before_tour'), 'error');
+      return;
+    }
+
+    const shouldSyncBeforeReview = isOverdueActiveBooking(
+      res.raw_status || '',
+      res.date,
+      res.time
+    );
+
+    if (!isCompletedBookingStatus(res.status) && !shouldSyncBeforeReview) {
+      showToast(t('res_review_before_tour'), 'error');
+      return;
+    }
+
+    if (shouldSyncBeforeReview) {
+      const syncResult = await syncCompletedReservations([res.id]);
+      if (!syncResult) return;
+      void fetchReservations(true);
+    }
+
+    setSelectedBookingForReview({ ...res, raw_status: 'completed', status: 'completed' });
+    setReviewModalOpen(true);
+  }, [fetchReservations, showToast, syncCompletedReservations, t]);
+
+  useEffect(() => {
+    if (!reviewBookingId || !reviewDeepLinkSnapshot || attemptedReviewBookingIdRef.current === reviewBookingId) return;
+
+    let cancelled = false;
+    const openRequestedReview = async () => {
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (cancelled) return;
+        attemptedReviewBookingIdRef.current = reviewBookingId;
+        if (error || !user || user.id !== reviewDeepLinkSnapshot.hostUserId) return;
+
+        const booking = findHostGuestReviewDeepLinkBooking(
+          reviewDeepLinkSnapshot.reservations,
+          reviewBookingId,
+          reviewDeepLinkSnapshot.hostExperienceIds,
+          reviewDeepLinkSnapshot.reviewedBookingIds
+        );
+        if (booking) await openGuestReview(booking);
+      } catch (error) {
+        console.error('[ReservationManager] guest review deep link lookup failed:', error);
+      }
+    };
+
+    void openRequestedReview();
+    return () => { cancelled = true; };
+  }, [openGuestReview, reviewBookingId, reviewDeepLinkSnapshot, supabase]);
 
   const scheduleRealtimeRefresh = useCallback(() => {
     clearRealtimeRefresh();
@@ -679,43 +763,7 @@ export default function ReservationManager() {
                 onCalendar={() => addToGoogleCalendar(res)}
                 // 🟢 [추가] 후기 관련 Props
                 hasReview={reviewedBookingIds.includes(String(res.id))}
-                onReview={() => {
-                  const syncAndOpenReview = async () => {
-                    if (!res.reviewEligible) {
-                      showToast(t('res_review_before_tour'), 'error');
-                      return;
-                    }
-
-                    const shouldSyncBeforeReview = isOverdueActiveBooking(
-                      res.raw_status || '',
-                      res.date,
-                      res.time
-                    );
-
-                    if (!isCompletedBookingStatus(res.status) && !shouldSyncBeforeReview) {
-                      showToast(t('res_review_before_tour'), 'error');
-                      return;
-                    }
-
-                    if (shouldSyncBeforeReview) {
-                      const syncResult = await syncCompletedReservations([res.id]);
-                      if (!syncResult) {
-                        return;
-                      }
-
-                      void fetchReservations(true);
-                    }
-
-                    setSelectedBookingForReview({
-                      ...res,
-                      raw_status: 'completed',
-                      status: 'completed',
-                    });
-                    setReviewModalOpen(true);
-                  };
-
-                  void syncAndOpenReview();
-                }}
+                onReview={() => { void openGuestReview(res); }}
 
               />
             ))}

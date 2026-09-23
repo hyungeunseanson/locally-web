@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
+import { getHostGuestReviewRequestHref } from '@/app/utils/reviews/reviewRequestDeepLinks';
 
 type ExperienceRelation = {
   host_id: string | null;
@@ -95,7 +96,7 @@ export async function deliverHostGuestReviewRequestsForCompletedBookings(params:
         supabaseAdmin: params.supabaseAdmin,
         userId: experience.host_id,
         type: 'guest_review_request',
-        link: '/host/dashboard?tab=reservations',
+        link: getHostGuestReviewRequestHref(bookingId),
         key: 'review.guest_request.host',
         copyParams: { experienceTitle },
       });
@@ -128,7 +129,7 @@ export async function deliverHostGuestReviewRequestsForCompletedBookings(params:
           payload: {
             copyKey: 'review.guest_request.host',
             copyParams: { experienceTitle },
-            ctaUrl: '/host/dashboard?tab=reservations',
+            ctaUrl: getHostGuestReviewRequestHref(bookingId),
           },
         },
       });
