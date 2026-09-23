@@ -255,7 +255,20 @@ export default function MainSearchBar({
             border: '0.5px solid #E6E6E6',
           }}
         >
-          <h4 className="text-[15px] font-extrabold text-[#222222] mb-4">{t('label_destination')}</h4>
+          <div className="flex h-10 items-center gap-2 rounded-xl border border-[#E6E6E6] px-3 focus-within:border-[#B8B8B8]">
+            <Search size={16} strokeWidth={1.8} className="shrink-0 text-[#8B8B8B]" aria-hidden="true" />
+            <input
+              autoFocus
+              type="text"
+              aria-label="도시·지역·명소 검색"
+              placeholder="여행지 검색"
+              value={displayLocationInput}
+              onChange={(e) => setLocationInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="min-w-0 w-full bg-transparent text-[13px] font-medium text-[#222222] outline-none placeholder:text-[#8B8B8B]"
+            />
+          </div>
+          <h4 className="mt-3 mb-1 px-2 text-[11px] font-semibold text-[#8B8B8B]">추천 여행지</h4>
           <div className="space-y-0.5">
             {recommendedPlaces.map((place) => (
               <button
