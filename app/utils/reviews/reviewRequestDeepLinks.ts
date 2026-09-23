@@ -1,4 +1,9 @@
 type BookingId = string | number | null | undefined;
+export type ReviewRequestSource = 'email' | 'notification';
+
+export function parseReviewRequestSource(value: string | null): ReviewRequestSource | null {
+  return value === 'email' || value === 'notification' ? value : null;
+}
 
 function normalizeBookingId(bookingId: BookingId) {
   if (bookingId === null || bookingId === undefined) return null;
@@ -6,12 +11,16 @@ function normalizeBookingId(bookingId: BookingId) {
   return value && value.length <= 128 ? value : null;
 }
 
-export function getGuestReviewRequestHref(bookingId: string | number) {
-  return `/guest/trips?reviewBookingId=${encodeURIComponent(String(bookingId))}`;
+export function getGuestReviewRequestHref(bookingId: string | number, source?: string) {
+  const href = `/guest/trips?reviewBookingId=${encodeURIComponent(String(bookingId))}`;
+  const reviewSource = parseReviewRequestSource(source ?? null);
+  return reviewSource ? `${href}&reviewSource=${reviewSource}` : href;
 }
 
-export function getHostGuestReviewRequestHref(bookingId: string | number) {
-  return `/host/dashboard?tab=reservations&reservationTab=completed&reviewBookingId=${encodeURIComponent(String(bookingId))}`;
+export function getHostGuestReviewRequestHref(bookingId: string | number, source?: string) {
+  const href = `/host/dashboard?tab=reservations&reservationTab=completed&reviewBookingId=${encodeURIComponent(String(bookingId))}`;
+  const reviewSource = parseReviewRequestSource(source ?? null);
+  return reviewSource ? `${href}&reviewSource=${reviewSource}` : href;
 }
 
 export function getReviewRequestNotificationHref(notification: {
@@ -21,8 +30,8 @@ export function getReviewRequestNotificationHref(notification: {
 }) {
   const bookingId = normalizeBookingId(notification.booking_id);
   if (!bookingId) return notification.link;
-  if (notification.type === 'review_request') return getGuestReviewRequestHref(bookingId);
-  if (notification.type === 'guest_review_request') return getHostGuestReviewRequestHref(bookingId);
+  if (notification.type === 'review_request') return getGuestReviewRequestHref(bookingId, 'notification');
+  if (notification.type === 'guest_review_request') return getHostGuestReviewRequestHref(bookingId, 'notification');
   return notification.link;
 }
 

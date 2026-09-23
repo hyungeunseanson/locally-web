@@ -19,7 +19,8 @@ import PastTripCard, { isPendingGuestTripReview } from './components/PastTripCar
 import { getServiceRequestStatusLabel } from '@/app/constants/serviceStatus';
 import type { ServiceRequestCard } from '@/app/types/service';
 import { getServiceTypeLabel } from '@/app/utils/services/concierge';
-import { findGuestReviewDeepLinkTrip } from '@/app/utils/reviews/reviewRequestDeepLinks';
+import { findGuestReviewDeepLinkTrip, parseReviewRequestSource } from '@/app/utils/reviews/reviewRequestDeepLinks';
+import { trackReviewFunnelEvent, type ReviewFunnelSource } from '@/app/utils/reviews/reviewFunnelAnalytics';
 
 // 서비스 의뢰 N 배지: service_application_new 타입 알림 중 unread 여부
 function useServiceUnread() {
@@ -47,9 +48,12 @@ const STATUS_COLOR: Record<string, string> = {
 function GuestTripsContent() {
   const { t, lang } = useLanguage();
   const router = useRouter();
-  const reviewBookingId = useSearchParams().get('reviewBookingId');
+  const searchParams = useSearchParams();
+  const reviewBookingId = searchParams.get('reviewBookingId');
+  const reviewRequestSource = parseReviewRequestSource(searchParams.get('reviewSource'));
   const supabase = useMemo(() => createClient(), []);
   const attemptedReviewBookingIdRef = useRef<string | null>(null);
+  const trackedReviewLandingRef = useRef<string | null>(null);
   const hasServiceUnread = useServiceUnread();
 
   const {
@@ -66,10 +70,19 @@ function GuestTripsContent() {
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState<GuestTrip | null>(null);
+  const [selectedReviewSource, setSelectedReviewSource] = useState<ReviewFunnelSource>('trips');
 
   // 맞춤 의뢰 목록
   const [serviceRequests, setServiceRequests] = useState<ServiceRequestCard[]>([]);
   const [serviceLoading, setServiceLoading] = useState(true);
+
+  useEffect(() => {
+    if (!reviewBookingId || !reviewRequestSource) return;
+    const landingKey = `${reviewBookingId}:${reviewRequestSource}`;
+    if (trackedReviewLandingRef.current === landingKey) return;
+    trackedReviewLandingRef.current = landingKey;
+    trackReviewFunnelEvent('review_request_landing', 'guest', reviewRequestSource);
+  }, [reviewBookingId, reviewRequestSource]);
 
   useEffect(() => {
     if (!reviewBookingId || isLoading || attemptedReviewBookingIdRef.current === reviewBookingId) return;
@@ -86,6 +99,7 @@ function GuestTripsContent() {
         const trip = findGuestReviewDeepLinkTrip(result.data?.trips ?? [], reviewBookingId);
         if (trip) {
           setSelectedTrip(trip);
+          setSelectedReviewSource(reviewRequestSource ?? 'trips');
           setIsReviewModalOpen(true);
         }
       } catch (error) {
@@ -97,7 +111,7 @@ function GuestTripsContent() {
 
     void openRequestedReview();
     return () => { cancelled = true; };
-  }, [isLoading, refreshTrips, reviewBookingId, supabase]);
+  }, [isLoading, refreshTrips, reviewBookingId, reviewRequestSource, supabase]);
 
   useEffect(() => {
     const loadServices = async () => {
@@ -117,7 +131,7 @@ function GuestTripsContent() {
   }, [supabase]);
 
   const openReceipt = (trip: GuestTrip) => { setSelectedTrip(trip); setIsReceiptModalOpen(true); };
-  const openReview = (trip: GuestTrip) => { setSelectedTrip(trip); setIsReviewModalOpen(true); };
+  const openReview = (trip: GuestTrip) => { setSelectedTrip(trip); setSelectedReviewSource('trips'); setIsReviewModalOpen(true); };
   const pendingReviewCount = pastTrips.filter(isPendingGuestTripReview).length;
   const handleMobileBack = () => {
     if (typeof window !== 'undefined' && window.history.length > 1) {
@@ -335,6 +349,7 @@ function GuestTripsContent() {
       {isReviewModalOpen && selectedTrip && (
         <ReviewModal
           trip={selectedTrip}
+          source={selectedReviewSource}
           onClose={() => setIsReviewModalOpen(false)}
           onReviewSubmitted={refreshTrips}
         />

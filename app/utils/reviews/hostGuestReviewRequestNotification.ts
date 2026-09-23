@@ -96,7 +96,7 @@ export async function deliverHostGuestReviewRequestsForCompletedBookings(params:
         supabaseAdmin: params.supabaseAdmin,
         userId: experience.host_id,
         type: 'guest_review_request',
-        link: getHostGuestReviewRequestHref(bookingId),
+        link: getHostGuestReviewRequestHref(bookingId, 'notification'),
         key: 'review.guest_request.host',
         copyParams: { experienceTitle },
       });
@@ -121,7 +121,7 @@ export async function deliverHostGuestReviewRequestsForCompletedBookings(params:
         }));
       }
 
-      await sendEmail({
+      const emailResult = await sendEmail({
         recipientUserId: experience.host_id,
         templatedEmail: {
           templateId: 'notice.copy',
@@ -129,10 +129,16 @@ export async function deliverHostGuestReviewRequestsForCompletedBookings(params:
           payload: {
             copyKey: 'review.guest_request.host',
             copyParams: { experienceTitle },
-            ctaUrl: getHostGuestReviewRequestHref(bookingId),
+            ctaUrl: getHostGuestReviewRequestHref(bookingId, 'email'),
           },
         },
       });
+
+      if (!emailResult.sent) {
+        return emailResult.skipped === 'provider_not_configured' || emailResult.skipped === 'recipient_missing'
+          ? emailResult.skipped
+          : 'email_not_sent';
+      }
 
       return true;
     })
@@ -143,7 +149,15 @@ export async function deliverHostGuestReviewRequestsForCompletedBookings(params:
 
   settledResults.forEach((result) => {
     if (result.status === 'fulfilled') {
-      if (result.value) processedCount += 1;
+      if (result.value === true) processedCount += 1;
+      if (typeof result.value === 'string') {
+        failedCount += 1;
+        console.warn(JSON.stringify({
+          event: 'guest_review_request_delivery',
+          status: 'failed',
+          diagnosticCode: result.value,
+        }));
+      }
       return;
     }
 

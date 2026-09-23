@@ -74,7 +74,7 @@ test.describe('Guest review request email', () => {
         payload: {
           copyKey: 'review.request.guest',
           copyParams: { experienceTitle: 'Seoul Night Walk' },
-          ctaUrl: '/guest/trips?reviewBookingId=booking-1',
+          ctaUrl: '/guest/trips?reviewBookingId=booking-1&reviewSource=email',
         },
       },
     }]);

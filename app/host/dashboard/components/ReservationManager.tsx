@@ -10,6 +10,7 @@ import ConfirmModal from '@/app/components/ui/ConfirmModal';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 1. import 추가
 import GuestReviewModal from './GuestReviewModal'; // 모달 추가
+import { trackReviewFunnelEvent, type ReviewFunnelSource } from '@/app/utils/reviews/reviewFunnelAnalytics';
 import {
   isCompletedBookingStatus,
   isCancellationRequestedBookingStatus,
@@ -23,7 +24,7 @@ import {
 } from '@/app/utils/bookingStartTime';
 import { isUnapprovedCardPaymentAttempt } from '@/app/utils/bookings/pendingBookingHolds';
 import { isBookingReviewEligible } from '@/app/utils/reviews/reviewEligibility';
-import { findHostGuestReviewDeepLinkBooking } from '@/app/utils/reviews/reviewRequestDeepLinks';
+import { findHostGuestReviewDeepLinkBooking, parseReviewRequestSource } from '@/app/utils/reviews/reviewRequestDeepLinks';
 
 // 컴포넌트
 import ReservationCard from './ReservationCard';
@@ -166,11 +167,13 @@ export default function ReservationManager() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const reviewBookingId = searchParams.get('reviewBookingId');
+  const reviewRequestSource = parseReviewRequestSource(searchParams.get('reviewSource'));
   const reservationTab = searchParams.get('reservationTab');
   const supabase = createClient();
   const { showToast } = useToast();
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [selectedBookingForReview, setSelectedBookingForReview] = useState<ReservationRecord | null>(null);
+  const [selectedReviewSource, setSelectedReviewSource] = useState<ReviewFunnelSource>('host_dashboard');
   const [reviewedBookingIds, setReviewedBookingIds] = useState<string[]>([]); // 작성 완료된 예약 ID 목록
   const hostExperienceIdsRef = useRef<Set<string>>(new Set());
   const hostUserIdRef = useRef<string | null>(null);
@@ -178,6 +181,7 @@ export default function ReservationManager() {
   const membershipRequestSeqRef = useRef(0);
   const backgroundCompletedSyncInFlightRef = useRef(false);
   const attemptedReviewBookingIdRef = useRef<string | null>(null);
+  const trackedReviewLandingRef = useRef<string | null>(null);
   const [reviewDeepLinkSnapshot, setReviewDeepLinkSnapshot] = useState<ReviewDeepLinkSnapshot | null>(null);
 
   const [activeTab, setActiveTab] = useState<'upcoming' | 'completed' | 'cancelled'>('upcoming');
@@ -195,6 +199,14 @@ export default function ReservationManager() {
 
   // ✅ [복구] 에러 메시지 상태
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!reviewBookingId || !reviewRequestSource) return;
+    const landingKey = `${reviewBookingId}:${reviewRequestSource}`;
+    if (trackedReviewLandingRef.current === landingKey) return;
+    trackedReviewLandingRef.current = landingKey;
+    trackReviewFunnelEvent('review_request_landing', 'host', reviewRequestSource);
+  }, [reviewBookingId, reviewRequestSource]);
 
   useEffect(() => {
     if (reservationTab === 'completed' || reviewBookingId) setActiveTab('completed');
@@ -453,7 +465,7 @@ export default function ReservationManager() {
     }
   }, [fetchGuestMembershipStatuses, getHostUserId, showToast, supabase, syncCompletedReservations, t]);
 
-  const openGuestReview = useCallback(async (res: ReservationRecord) => {
+  const openGuestReview = useCallback(async (res: ReservationRecord, source: ReviewFunnelSource = 'host_dashboard') => {
     if (!res.reviewEligible) {
       showToast(t('res_review_before_tour'), 'error');
       return;
@@ -477,6 +489,7 @@ export default function ReservationManager() {
     }
 
     setSelectedBookingForReview({ ...res, raw_status: 'completed', status: 'completed' });
+    setSelectedReviewSource(source);
     setReviewModalOpen(true);
   }, [fetchReservations, showToast, syncCompletedReservations, t]);
 
@@ -497,7 +510,7 @@ export default function ReservationManager() {
           reviewDeepLinkSnapshot.hostExperienceIds,
           reviewDeepLinkSnapshot.reviewedBookingIds
         );
-        if (booking) await openGuestReview(booking);
+        if (booking) await openGuestReview(booking, reviewRequestSource ?? 'host_dashboard');
       } catch (error) {
         console.error('[ReservationManager] guest review deep link lookup failed:', error);
       }
@@ -505,7 +518,7 @@ export default function ReservationManager() {
 
     void openRequestedReview();
     return () => { cancelled = true; };
-  }, [openGuestReview, reviewBookingId, reviewDeepLinkSnapshot, supabase]);
+  }, [openGuestReview, reviewBookingId, reviewDeepLinkSnapshot, reviewRequestSource, supabase]);
 
   const scheduleRealtimeRefresh = useCallback(() => {
     clearRealtimeRefresh();
@@ -781,6 +794,7 @@ export default function ReservationManager() {
       {reviewModalOpen && selectedBookingForReview && (
         <GuestReviewModal
           booking={selectedBookingForReview}
+          source={selectedReviewSource}
           onClose={() => setReviewModalOpen(false)}
           onSuccess={() => fetchReservations(true)} // 목록 갱신
         />
