@@ -40,4 +40,6 @@ export type OpsAnomalyMonitorResult =
       outcome: 'already_running' | 'failed';
       error: string;
       runId?: number;
+      diagnosticCode?: string;
+      httpStatus?: number;
     };

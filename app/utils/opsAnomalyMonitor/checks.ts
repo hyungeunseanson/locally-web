@@ -31,6 +31,7 @@ type QueueMetrics = {
 type CloudflareEnvelope<T> = {
   success?: boolean;
   result?: T;
+  errors?: Array<{ code?: unknown }>;
 };
 
 export type OpsAnomalyQueueRuntime = {
@@ -45,6 +46,34 @@ const DATABASE_DIAGNOSTIC_CODES = new Set<OpsAnomalyDiagnosticCode>([
   'payout_attention_required',
   'job_stale_or_failed',
 ]);
+
+type QueueReadStage = 'inventory' | 'metrics';
+
+export class OpsAnomalyCollectionError extends Error {
+  readonly diagnosticCode: string;
+  readonly httpStatus?: number;
+
+  constructor(diagnosticCode: string, httpStatus?: number) {
+    super(diagnosticCode);
+    this.name = 'OpsAnomalyCollectionError';
+    this.diagnosticCode = diagnosticCode;
+    this.httpStatus = httpStatus;
+  }
+}
+
+const OPS_ANOMALY_COLLECTION_DIAGNOSTIC_PATTERN = /^ops_queue_(?:account_id_missing|token_missing|inventory_(?:invalid|incomplete|http_(?:401|403|404|429|other)|api_error_[1-9]\d{0,9})|metrics_(?:invalid|http_(?:401|403|404|429|other)|api_error_[1-9]\d{0,9}))$/;
+
+export function boundedOpsAnomalyCollectionDiagnosticCode(value: unknown) {
+  return typeof value === 'string' && OPS_ANOMALY_COLLECTION_DIAGNOSTIC_PATTERN.test(value)
+    ? value
+    : 'ops_anomaly_monitor_failed';
+}
+
+export function boundedOpsAnomalyCollectionHttpStatus(value: unknown) {
+  return Number.isInteger(value) && Number(value) >= 100 && Number(value) <= 599
+    ? Number(value)
+    : undefined;
+}
 
 function boundedCount(value: unknown) {
   const parsed = Number(value);
@@ -99,29 +128,64 @@ export async function loadDatabaseOpsAnomalies(params: {
 function requiredAccountId(value: unknown) {
   const normalized = typeof value === 'string' ? value.trim() : '';
   if (!/^[a-f0-9]{32}$/.test(normalized)) {
-    throw new Error('ops_anomaly_cloudflare_account_unavailable');
+    throw new OpsAnomalyCollectionError('ops_queue_account_id_missing');
   }
   return normalized;
 }
 
 function requiredToken(value: unknown) {
   const normalized = typeof value === 'string' ? value.trim() : '';
-  if (!normalized) throw new Error('ops_anomaly_cloudflare_token_unavailable');
+  if (!normalized) throw new OpsAnomalyCollectionError('ops_queue_token_missing');
   return normalized;
 }
 
+function boundedProviderCode(payload: CloudflareEnvelope<unknown>) {
+  const rawCode = payload.errors?.[0]?.code;
+  const code = typeof rawCode === 'number'
+    ? rawCode
+    : typeof rawCode === 'string' && /^\d{1,10}$/.test(rawCode)
+      ? Number(rawCode)
+      : Number.NaN;
+  return Number.isSafeInteger(code) && code > 0 && code <= 9_999_999_999
+    ? code
+    : null;
+}
+
+function httpDiagnostic(stage: QueueReadStage, status: number) {
+  const suffix = [401, 403, 404, 429].includes(status) ? String(status) : 'other';
+  return `ops_queue_${stage}_http_${suffix}`;
+}
+
 async function cloudflareGet<T>(params: {
+  stage: QueueReadStage;
   pathname: string;
   token: string;
   fetchImplementation: typeof fetch;
 }) {
-  const response = await params.fetchImplementation(
-    `https://api.cloudflare.com/client/v4${params.pathname}`,
-    { method: 'GET', headers: { Authorization: `Bearer ${params.token}` } }
-  );
-  const payload = await response.json().catch(() => ({})) as CloudflareEnvelope<T>;
+  let response: Response;
+  try {
+    response = await params.fetchImplementation(
+      `https://api.cloudflare.com/client/v4${params.pathname}`,
+      { method: 'GET', headers: { Authorization: `Bearer ${params.token}` } }
+    );
+  } catch {
+    throw new OpsAnomalyCollectionError(`ops_queue_${params.stage}_http_other`);
+  }
+  const payload = await response.json().catch(() => null) as CloudflareEnvelope<T> | null;
+  if (!payload || typeof payload !== 'object') {
+    throw new OpsAnomalyCollectionError(
+      `ops_queue_${params.stage}_invalid`,
+      response.status
+    );
+  }
   if (!response.ok || payload.success !== true) {
-    throw new Error('ops_anomaly_cloudflare_read_failed');
+    const providerCode = boundedProviderCode(payload);
+    throw new OpsAnomalyCollectionError(
+      providerCode == null
+        ? httpDiagnostic(params.stage, response.status)
+        : `ops_queue_${params.stage}_api_error_${providerCode}`,
+      response.status
+    );
   }
   return payload.result;
 }
@@ -153,11 +217,14 @@ export async function loadQueueOpsAnomaly(params: {
   const token = requiredToken(params.runtime.OPS_ANOMALY_MONITOR_CLOUDFLARE_API_TOKEN);
   const fetchImplementation = params.fetchImplementation ?? fetch;
   const inventory = await cloudflareGet<QueueInventoryRow[]>({
+    stage: 'inventory',
     pathname: `/accounts/${accountId}/queues?per_page=100`,
     token,
     fetchImplementation,
   });
-  if (!Array.isArray(inventory)) throw new Error('ops_anomaly_queue_inventory_invalid');
+  if (!Array.isArray(inventory)) {
+    throw new OpsAnomalyCollectionError('ops_queue_inventory_invalid');
+  }
 
   const queueIds = new Map(
     inventory.flatMap((row) => {
@@ -167,17 +234,25 @@ export async function loadQueueOpsAnomaly(params: {
     })
   );
   if (OPS_ANOMALY_QUEUE_CONTRACT.some((queue) => !queueIds.has(queue.name))) {
-    throw new Error('ops_anomaly_queue_inventory_incomplete');
+    throw new OpsAnomalyCollectionError('ops_queue_inventory_incomplete');
   }
 
   const snapshots = await Promise.all(OPS_ANOMALY_QUEUE_CONTRACT.map(async (queue) => {
     const queueId = queueIds.get(queue.name)!;
     const metrics = await cloudflareGet<QueueMetrics>({
+      stage: 'metrics',
       pathname: `/accounts/${accountId}/queues/${encodeURIComponent(queueId)}/metrics`,
       token,
       fetchImplementation,
     });
-    const backlogCount = boundedCount(metrics?.backlog_count);
+    if (!metrics || typeof metrics !== 'object') {
+      throw new OpsAnomalyCollectionError('ops_queue_metrics_invalid');
+    }
+    const rawBacklogCount = Number(metrics.backlog_count);
+    if (!Number.isFinite(rawBacklogCount) || rawBacklogCount < 0) {
+      throw new OpsAnomalyCollectionError('ops_queue_metrics_invalid');
+    }
+    const backlogCount = boundedCount(rawBacklogCount);
     const oldestTimestamp = Number(metrics?.oldest_message_timestamp_ms);
     const oldestAt = Number.isFinite(oldestTimestamp) && oldestTimestamp > 0
       ? new Date(oldestTimestamp)

@@ -9,7 +9,13 @@ import {
   startSettlementSyncRun,
 } from '@/app/utils/settlementSync/jobRuns';
 
-import { collectOpsAnomalies, type OpsAnomalyQueueRuntime } from './checks';
+import {
+  boundedOpsAnomalyCollectionDiagnosticCode,
+  boundedOpsAnomalyCollectionHttpStatus,
+  collectOpsAnomalies,
+  OpsAnomalyCollectionError,
+  type OpsAnomalyQueueRuntime,
+} from './checks';
 import {
   OPS_ANOMALY_DEFINITIONS,
   OPS_ANOMALY_MONITOR_JOB_NAME,
@@ -277,7 +283,13 @@ export async function runOpsAnomalyMonitor(params: {
       suppressedCount: plan.suppressedCount,
       severityCounts: counts,
     };
-  } catch {
+  } catch (error) {
+    const diagnosticCode = error instanceof OpsAnomalyCollectionError
+      ? boundedOpsAnomalyCollectionDiagnosticCode(error.diagnosticCode)
+      : 'ops_anomaly_monitor_failed';
+    const httpStatus = error instanceof OpsAnomalyCollectionError
+      ? boundedOpsAnomalyCollectionHttpStatus(error.httpStatus)
+      : undefined;
     await finishSettlementSyncRunFailure({
       supabaseAdmin: params.supabaseAdmin,
       runId: started.runId,
@@ -287,7 +299,11 @@ export async function runOpsAnomalyMonitor(params: {
       processedCount: anomalyCount,
       skippedCount: 0,
       errorMessage: 'Ops anomaly monitor failed.',
-      details: { diagnostic_count: diagnosticCount },
+      details: {
+        diagnostic_count: diagnosticCount,
+        failure_diagnostic_code: diagnosticCode,
+        ...(httpStatus == null ? {} : { failure_http_status: httpStatus }),
+      },
       testLeaseMs: params.testLeaseMs,
       simulateMissingAdminJobRuns: params.simulateMissingAdminJobRuns,
     });
@@ -297,6 +313,8 @@ export async function runOpsAnomalyMonitor(params: {
       outcome: 'failed',
       error: 'Ops anomaly monitor failed.',
       runId: started.runId,
+      diagnosticCode,
+      ...(httpStatus == null ? {} : { httpStatus }),
     };
   }
 }

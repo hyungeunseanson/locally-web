@@ -1,6 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 
 import type { EmailEnv } from '@/app/emails/delivery/sendTemplatedEmail';
+import {
+  boundedOpsAnomalyCollectionDiagnosticCode,
+  boundedOpsAnomalyCollectionHttpStatus,
+} from '@/app/utils/opsAnomalyMonitor/checks';
 import { OPS_ANOMALY_MONITOR_CRON } from '@/app/utils/opsAnomalyMonitor/config';
 import { runOpsAnomalyMonitor } from '@/app/utils/opsAnomalyMonitor/runOpsAnomalyMonitor';
 
@@ -29,11 +33,17 @@ type ScheduledOptions = {
 export class OpsAnomalyMonitorScheduledError extends Error {
   readonly diagnosticStage: 'runtime' | 'processor';
   readonly diagnosticCode: string;
+  readonly httpStatus?: number;
 
-  constructor(diagnosticStage: 'runtime' | 'processor', diagnosticCode: string) {
+  constructor(
+    diagnosticStage: 'runtime' | 'processor',
+    diagnosticCode: string,
+    httpStatus?: number
+  ) {
     super(diagnosticCode);
     this.diagnosticStage = diagnosticStage;
     this.diagnosticCode = diagnosticCode;
+    this.httpStatus = httpStatus;
   }
 }
 
@@ -110,7 +120,11 @@ export async function handleOpsAnomalyMonitorScheduled(
       dependencies: { fetch: options.fetch },
     });
     if (!result.success && result.outcome !== 'already_running') {
-      throw new OpsAnomalyMonitorScheduledError('processor', 'ops_anomaly_monitor_failed');
+      throw new OpsAnomalyMonitorScheduledError(
+        'processor',
+        boundedOpsAnomalyCollectionDiagnosticCode(result.diagnosticCode),
+        boundedOpsAnomalyCollectionHttpStatus(result.httpStatus)
+      );
     }
     const aggregate = result.success ? {
       anomalyCount: result.anomalyCount,
@@ -146,13 +160,17 @@ export async function handleOpsAnomalyMonitorScheduled(
     const diagnosticCode = error instanceof OpsAnomalyMonitorScheduledError
       ? error.diagnosticCode
       : 'ops_anomaly_monitor_failed';
+    const httpStatus = error instanceof OpsAnomalyMonitorScheduledError
+      ? error.httpStatus
+      : undefined;
     safeLog(options.log, {
       event: 'ops_anomaly_monitor_scheduled',
       status: 'failed',
       diagnosticStage,
       diagnosticCode,
+      ...(httpStatus == null ? {} : { httpStatus }),
       durationMs: Math.max(0, (options.now?.() ?? Date.now()) - startedAt),
     });
-    throw new OpsAnomalyMonitorScheduledError(diagnosticStage, diagnosticCode);
+    throw new OpsAnomalyMonitorScheduledError(diagnosticStage, diagnosticCode, httpStatus);
   }
 }
