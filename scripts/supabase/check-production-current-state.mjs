@@ -128,15 +128,13 @@ const expectedLedger = [
     name: 'ops_anomaly_monitor_snapshot',
     repositoryFile: 'supabase/migrations/20260923013312_ops_anomaly_monitor_snapshot.sql',
   },
-];
-const expectedPendingMigrations = [
   {
     version: '20260923084232',
     name: 'one_time_review_request_reminders',
     repositoryFile: 'supabase/migrations/20260923084232_one_time_review_request_reminders.sql',
-    productionApplied: false,
   },
 ];
+const expectedPendingMigrations = [];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));
 for (const [index, expected] of expectedLedger.entries()) {
   const actual = manifest.migrationLedger[index];
@@ -173,9 +171,9 @@ assert(objects.publicTables.length === 39, 'expected 39 public tables');
 assert(objects.publicViews.length === 2, 'expected 2 public views');
 assert(objects.publicTableColumns === 515, 'expected 515 public table columns');
 assert(objects.publicViewColumns === 27, 'expected 27 public view columns');
-assert(objects.functionOverloads.length === 56, 'expected 56 public function overloads');
+assert(objects.functionOverloads.length === 57, 'expected 57 public function overloads');
 assert(objects.applicationTriggers.length === 12, 'expected 12 application triggers');
-assert(objects.indexes === 116, 'expected 116 public indexes');
+assert(objects.indexes === 118, 'expected 118 public indexes');
 assert(objects.constraints.total === 180, 'expected 180 constraints');
 assert(objects.constraints.primaryKey === 39, 'expected 39 primary keys');
 assert(objects.constraints.foreignKey === 59, 'expected 59 foreign keys');
