@@ -2,7 +2,11 @@ import { readFileSync } from 'node:fs';
 
 import { expect, test } from '@playwright/test';
 
-import { loadDatabaseOpsAnomalies, loadQueueOpsAnomaly } from '@/app/utils/opsAnomalyMonitor/checks';
+import {
+  loadDatabaseOpsAnomalies,
+  loadQueueOpsAnomaly,
+  OpsAnomalyCollectionError,
+} from '@/app/utils/opsAnomalyMonitor/checks';
 import {
   OPS_ANOMALY_MONITOR_CRON,
   OPS_ANOMALY_THRESHOLDS,
@@ -96,6 +100,7 @@ function createProcessorClient(options: {
   previousDetails?: Record<string, unknown> | null;
   alreadyRunning?: boolean;
   calls: string[];
+  updates?: Record<string, unknown>[];
 }) {
   class Query implements PromiseLike<unknown> {
     private inserted = false;
@@ -103,7 +108,11 @@ function createProcessorClient(options: {
     private selected = '';
 
     insert() { this.inserted = true; return this; }
-    update(value: Record<string, unknown>) { this.updated = value; return this; }
+    update(value: Record<string, unknown>) {
+      this.updated = value;
+      options.updates?.push(value);
+      return this;
+    }
     select(value = '') { this.selected = value; return this; }
     eq() { return this; }
     lt() { return this; }
@@ -253,6 +262,134 @@ test.describe('Ops Anomaly Monitor', () => {
     expect(JSON.stringify(calls)).not.toMatch(/receive|ack|retry|purge|delete|replay/i);
   });
 
+  test('classifies missing Queue runtime bindings without exposing their values', async () => {
+    await expect(loadQueueOpsAnomaly({
+      runtime: { ...productionEnvironment, CLOUDFLARE_ACCOUNT_ID: '' },
+      observedAt,
+    })).rejects.toEqual(expect.objectContaining({
+      diagnosticCode: 'ops_queue_account_id_missing',
+    } satisfies Partial<OpsAnomalyCollectionError>));
+
+    await expect(loadQueueOpsAnomaly({
+      runtime: { ...productionEnvironment, OPS_ANOMALY_MONITOR_CLOUDFLARE_API_TOKEN: '' },
+      observedAt,
+    })).rejects.toEqual(expect.objectContaining({
+      diagnosticCode: 'ops_queue_token_missing',
+    } satisfies Partial<OpsAnomalyCollectionError>));
+  });
+
+  test('bounds inventory HTTP and Cloudflare API diagnostics', async () => {
+    for (const status of [401, 403, 404, 429, 500]) {
+      const fetchImplementation = async () => Response.json(
+        { success: false, result: null, errors: [] },
+        { status }
+      );
+      await expect(loadQueueOpsAnomaly({
+        runtime: productionEnvironment,
+        observedAt,
+        fetchImplementation: fetchImplementation as typeof fetch,
+      })).rejects.toEqual(expect.objectContaining({
+        diagnosticCode: `ops_queue_inventory_http_${status === 500 ? 'other' : status}`,
+        httpStatus: status,
+      } satisfies Partial<OpsAnomalyCollectionError>));
+    }
+
+    const privateBody = 'private-token raw provider message';
+    const apiErrorFetch = async () => Response.json(
+      { success: false, errors: [{ code: 9109, message: privateBody }] },
+      { status: 403 }
+    );
+    let error: unknown;
+    try {
+      await loadQueueOpsAnomaly({
+        runtime: productionEnvironment,
+        observedAt,
+        fetchImplementation: apiErrorFetch as typeof fetch,
+      });
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toEqual(expect.objectContaining({
+      diagnosticCode: 'ops_queue_inventory_api_error_9109',
+      httpStatus: 403,
+    } satisfies Partial<OpsAnomalyCollectionError>));
+    expect(JSON.stringify(error)).not.toContain(privateBody);
+
+    const invalidProviderCodeFetch = async () => Response.json(
+      { success: false, errors: [{ code: null, message: privateBody }] },
+      { status: 403 }
+    );
+    await expect(loadQueueOpsAnomaly({
+      runtime: productionEnvironment,
+      observedAt,
+      fetchImplementation: invalidProviderCodeFetch as typeof fetch,
+    })).rejects.toEqual(expect.objectContaining({
+      diagnosticCode: 'ops_queue_inventory_http_403',
+      httpStatus: 403,
+    } satisfies Partial<OpsAnomalyCollectionError>));
+  });
+
+  test('bounds metrics HTTP and invalid response diagnostics', async () => {
+    const queueRows = [
+      ['media-main', 'locally-public-experience-media-mirror-production'],
+      ['media-dlq', 'locally-public-experience-media-mirror-dlq-production'],
+      ['translation-main', 'locally-experience-translation-production'],
+      ['translation-dlq', 'locally-experience-translation-dlq-production'],
+    ].map(([queue_id, queue_name]) => ({ queue_id, queue_name }));
+
+    for (const status of [401, 403, 404, 429, 500]) {
+      const fetchImplementation = async (input: RequestInfo | URL) => {
+        if (String(input).endsWith('/queues?per_page=100')) {
+          return Response.json({ success: true, result: queueRows });
+        }
+        return Response.json({ success: false, result: null, errors: [] }, { status });
+      };
+      await expect(loadQueueOpsAnomaly({
+        runtime: productionEnvironment,
+        observedAt,
+        fetchImplementation: fetchImplementation as typeof fetch,
+      })).rejects.toEqual(expect.objectContaining({
+        diagnosticCode: `ops_queue_metrics_http_${status === 500 ? 'other' : status}`,
+        httpStatus: status,
+      } satisfies Partial<OpsAnomalyCollectionError>));
+    }
+
+    const invalidMetricsFetch = async (input: RequestInfo | URL) => {
+      if (String(input).endsWith('/queues?per_page=100')) {
+        return Response.json({ success: true, result: queueRows });
+      }
+      return Response.json({ success: true, result: { backlog_count: 'not-a-number' } });
+    };
+    await expect(loadQueueOpsAnomaly({
+      runtime: productionEnvironment,
+      observedAt,
+      fetchImplementation: invalidMetricsFetch as typeof fetch,
+    })).rejects.toEqual(expect.objectContaining({
+      diagnosticCode: 'ops_queue_metrics_invalid',
+    } satisfies Partial<OpsAnomalyCollectionError>));
+  });
+
+  test('rejects invalid or incomplete Queue inventory envelopes', async () => {
+    await expect(loadQueueOpsAnomaly({
+      runtime: productionEnvironment,
+      observedAt,
+      fetchImplementation: (async () => Response.json({ success: true, result: {} })) as typeof fetch,
+    })).rejects.toEqual(expect.objectContaining({
+      diagnosticCode: 'ops_queue_inventory_invalid',
+    } satisfies Partial<OpsAnomalyCollectionError>));
+
+    await expect(loadQueueOpsAnomaly({
+      runtime: productionEnvironment,
+      observedAt,
+      fetchImplementation: (async () => Response.json({
+        success: true,
+        result: [{ queue_id: 'media-main', queue_name: 'locally-public-experience-media-mirror-production' }],
+      })) as typeof fetch,
+    })).rejects.toEqual(expect.objectContaining({
+      diagnosticCode: 'ops_queue_inventory_incomplete',
+    } satisfies Partial<OpsAnomalyCollectionError>));
+  });
+
   test('does not spam persistent alerts, re-alerts critical after cooldown, and resets after resolution', () => {
     const current = [anomaly('payment_reconciliation_required')];
     const first = planOpsAnomalyNotifications({
@@ -347,6 +484,54 @@ test.describe('Ops Anomaly Monitor', () => {
     expect(failedCalls.at(-1)).toBe('lease:failed');
   });
 
+  test('preserves only bounded Queue failure diagnostics through the processor', async () => {
+    const calls: string[] = [];
+    const updates: Record<string, unknown>[] = [];
+    const result = await runOpsAnomalyMonitor({
+      supabaseAdmin: createProcessorClient({ calls, updates }) as never,
+      queueRuntime: productionEnvironment,
+      emailEnv: productionEnvironment,
+      triggerSource: 'cron',
+      dependencies: {
+        collectAnomalies: async () => {
+          throw new OpsAnomalyCollectionError('ops_queue_metrics_api_error_9109', 403);
+        },
+      },
+    });
+    expect(result).toMatchObject({
+      success: false,
+      diagnosticCode: 'ops_queue_metrics_api_error_9109',
+      httpStatus: 403,
+    });
+    expect(JSON.stringify(result)).not.toMatch(/token|authorization|provider body/i);
+    expect(calls.at(-1)).toBe('lease:failed');
+    expect(updates.at(-1)?.details).toEqual({
+      diagnostic_count: 0,
+      failure_diagnostic_code: 'ops_queue_metrics_api_error_9109',
+      failure_http_status: 403,
+    });
+    expect(JSON.stringify(updates.at(-1))).not.toMatch(/token|authorization|provider body/i);
+
+    const unsafeUpdates: Record<string, unknown>[] = [];
+    const unsafeResult = await runOpsAnomalyMonitor({
+      supabaseAdmin: createProcessorClient({ calls: [], updates: unsafeUpdates }) as never,
+      queueRuntime: productionEnvironment,
+      emailEnv: productionEnvironment,
+      triggerSource: 'cron',
+      dependencies: {
+        collectAnomalies: async () => {
+          throw new OpsAnomalyCollectionError('private-provider-body', 999);
+        },
+      },
+    });
+    expect(unsafeResult).toMatchObject({
+      success: false,
+      diagnosticCode: 'ops_anomaly_monitor_failed',
+    });
+    expect(unsafeResult).not.toHaveProperty('httpStatus');
+    expect(JSON.stringify(unsafeUpdates.at(-1))).not.toMatch(/private-provider-body|999/);
+  });
+
   test('runs only on the exact Production trigger with the independent flag enabled', async () => {
     const calls: unknown[] = [];
     const options = {
@@ -383,6 +568,52 @@ test.describe('Ops Anomaly Monitor', () => {
       diagnosticCode: 'ops_anomaly_monitor_failed',
     } satisfies Partial<OpsAnomalyMonitorScheduledError>));
     expect(JSON.stringify(logs)).not.toMatch(/private-order-id|private-tid|private-email|private-phone/);
+  });
+
+  test('logs bounded Queue diagnostics without raw response or secrets', async () => {
+    const logs: Record<string, unknown>[] = [];
+    await expect(handleOpsAnomalyMonitorScheduled(
+      { cron: OPS_ANOMALY_MONITOR_CRON }, productionEnvironment, {
+        createClient: () => ({}) as never,
+        runMonitor: async () => ({
+          success: false,
+          status: 500,
+          outcome: 'failed',
+          error: 'Ops anomaly monitor failed.',
+          diagnosticCode: 'ops_queue_inventory_api_error_9109',
+          httpStatus: 403,
+        }),
+        log: (entry) => logs.push(entry),
+      }
+    )).rejects.toEqual(expect.objectContaining({
+      diagnosticCode: 'ops_queue_inventory_api_error_9109',
+      httpStatus: 403,
+    } satisfies Partial<OpsAnomalyMonitorScheduledError>));
+    expect(logs).toEqual([expect.objectContaining({
+      status: 'failed',
+      diagnosticCode: 'ops_queue_inventory_api_error_9109',
+      httpStatus: 403,
+    })]);
+    expect(JSON.stringify(logs)).not.toMatch(/private-queue-read-token|authorization|response body/i);
+
+    logs.length = 0;
+    await expect(handleOpsAnomalyMonitorScheduled(
+      { cron: OPS_ANOMALY_MONITOR_CRON }, productionEnvironment, {
+        createClient: () => ({}) as never,
+        runMonitor: async () => ({
+          success: false,
+          status: 500,
+          outcome: 'failed',
+          error: 'Ops anomaly monitor failed.',
+          diagnosticCode: 'private-provider-response',
+          httpStatus: 999,
+        }),
+        log: (entry) => logs.push(entry),
+      }
+    )).rejects.toEqual(expect.objectContaining({
+      diagnosticCode: 'ops_anomaly_monitor_failed',
+    } satisfies Partial<OpsAnomalyMonitorScheduledError>));
+    expect(JSON.stringify(logs)).not.toMatch(/private-provider-response|999/);
   });
 
   test('shares the admin trigger with allSettled independence and preserves the Cron set', async () => {
