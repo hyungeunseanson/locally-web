@@ -8,7 +8,6 @@ import {
   matchSearchPreset,
   RECOMMENDED_SEARCH_PRESETS,
 } from '@/app/utils/searchLocationCatalog';
-import DatePicker from './DatePicker';
 
 const PlaceIcon = ({ type }: { type: string }) => {
   const colors: Record<string, string> = {
@@ -119,19 +118,12 @@ interface MainSearchBarProps {
 export default function MainSearchBar({
   activeSearchField, setActiveSearchField,
   locationInput, setLocationInput,
-  dateRange, setDateRange,
-  selectedLanguage, setSelectedLanguage,
+  setDateRange, selectedLanguage, setSelectedLanguage,
   isVisible,
   onSearch
 }: MainSearchBarProps) {
   const { t, lang } = useLanguage();
   const rootRef = useRef<HTMLDivElement>(null);
-
-  const searchLocale =
-    lang === 'en' ? 'en-US' :
-      lang === 'ja' ? 'ja-JP' :
-        lang === 'zh' ? 'zh-CN' :
-          'ko-KR';
 
   useEffect(() => {
     if (!activeSearchField) return;
@@ -157,24 +149,16 @@ export default function MainSearchBar({
     };
   }, [activeSearchField, setActiveSearchField]);
 
-  const formatDateLabel = (date: Date) => new Intl.DateTimeFormat(searchLocale, {
-    month: 'short',
-    day: 'numeric',
-  }).format(date);
-
-  const formatDateRange = () => {
-    if (dateRange.start && dateRange.end) {
-      return `${formatDateLabel(dateRange.start)} - ${formatDateLabel(dateRange.end)}`;
-    }
-    if (dateRange.start) return formatDateLabel(dateRange.start);
-    return '';
-  };
-
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       onSearch();
       setActiveSearchField(null);
     }
+  };
+
+  const openSearchField = (field: 'location' | 'language') => {
+    setDateRange({ start: null, end: null });
+    setActiveSearchField(field);
   };
 
   const languages = [
@@ -197,16 +181,16 @@ export default function MainSearchBar({
   return (
     <div
       ref={rootRef}
-      className={`relative w-full max-w-[850px] h-[66px] transition-all duration-300 ease-in-out ${isVisible ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto' : 'opacity-0 -translate-y-4 scale-95 pointer-events-none'}`}
+      className={`relative w-full max-w-[760px] h-[66px] transition-all duration-300 ease-in-out ${isVisible ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto' : 'opacity-0 -translate-y-4 scale-95 pointer-events-none'}`}
     >
       <div className={`absolute inset-0 flex items-center bg-white border ${activeSearchField ? 'border-transparent bg-slate-100/50' : 'border-slate-200'} rounded-full shadow-[var(--shadow-card)] transition-all duration-500`}>
 
         {/* 1. 여행지 입력 */}
         <div
           data-testid="home-desktop-search-location-field"
-          className={`flex-1 relative h-full flex flex-col justify-center px-8 rounded-full cursor-pointer transition-all duration-300 z-10 group
+          className={`flex-[1.3] min-w-0 relative h-full flex flex-col justify-center px-8 rounded-full cursor-pointer transition-all duration-300 z-10 group
             ${activeSearchField === 'location' ? 'bg-white shadow-[var(--shadow-floating)]' : 'hover:bg-slate-100/80'}`}
-          onClick={() => setActiveSearchField('location')}
+          onClick={() => openSearchField('location')}
         >
           <label className="text-[11px] font-bold text-slate-800">{t('label_destination')}</label>
           <input
@@ -218,33 +202,15 @@ export default function MainSearchBar({
             className="w-full text-sm outline-none bg-transparent placeholder:text-slate-500 text-black font-semibold truncate cursor-pointer"
           />
           <div className={`absolute right-0 top-1/2 -translate-y-1/2 w-[1px] h-8 bg-slate-200 transition-opacity 
-            ${activeSearchField === 'location' || activeSearchField === 'date' ? 'opacity-0' : 'group-hover:opacity-0'}`}></div>
+            ${activeSearchField === 'location' || activeSearchField === 'language' ? 'opacity-0' : 'group-hover:opacity-0'}`}></div>
         </div>
 
-        {/* 2. 날짜 입력 */}
+        {/* 2. 언어 선택 */}
         <div
-          data-testid="home-desktop-search-date-field"
-          className={`flex-1 relative h-full flex flex-col justify-center px-6 rounded-full cursor-pointer transition-all duration-300 z-10 group
-            ${activeSearchField === 'date' ? 'bg-white shadow-[var(--shadow-floating)]' : 'hover:bg-slate-100/80'}`}
-          onClick={() => setActiveSearchField('date')}
-        >
-          <label className="text-[11px] font-bold text-slate-800">{t('label_date')}</label> {/* 🟢 교체 */}
-          <input
-            type="text"
-            placeholder={t('add_dates')} // 🟢 교체
-            value={formatDateRange()}
-            readOnly
-            className="w-full text-sm outline-none bg-transparent placeholder:text-slate-500 text-black font-semibold truncate cursor-pointer"
-          />
-          <div className={`absolute right-0 top-1/2 -translate-y-1/2 w-[1px] h-8 bg-slate-200 transition-opacity 
-            ${activeSearchField === 'date' || activeSearchField === 'language' ? 'opacity-0' : 'group-hover:opacity-0'}`}></div>
-        </div>
-
-        {/* 3. 언어 선택 */}
-        <div
-          className={`flex-1 relative h-full flex flex-col justify-center px-6 rounded-full cursor-pointer transition-all duration-300 z-10 group
+          data-testid="home-desktop-search-language-field"
+          className={`flex-[0.9] min-w-0 relative h-full flex flex-col justify-center px-6 rounded-full cursor-pointer transition-all duration-300 z-10 group
             ${activeSearchField === 'language' ? 'bg-white shadow-[var(--shadow-floating)]' : 'hover:bg-slate-100/80'}`}
-          onClick={() => setActiveSearchField('language')}
+          onClick={() => openSearchField('language')}
         >
           <label className="text-[11px] font-bold text-slate-800">{t('label_progress_language')}</label>
           <div className="flex justify-between items-center w-full">
@@ -262,7 +228,7 @@ export default function MainSearchBar({
           </div>
         </div>
 
-        {/* 4. 검색 버튼 */}
+        {/* 3. 검색 버튼 */}
         <div className="pl-2 pr-2 h-full flex items-center justify-end rounded-full z-10">
           <button
             data-testid="home-desktop-search-submit"
@@ -311,13 +277,6 @@ export default function MainSearchBar({
               </button>
             ))}
           </div>
-        </div>
-      )}
-
-      {/* 날짜 팝업 */}
-      {activeSearchField === 'date' && (
-        <div className="absolute top-[80px] left-1/2 -translate-x-1/2 w-[360px] bg-white rounded-[32px] shadow-[0_8px_28px_rgba(0,0,0,0.12)] p-6 z-50 animate-in fade-in duration-200 ease-out">
-          <DatePicker selectedRange={dateRange} onChange={(range) => { setDateRange(range); }} />
         </div>
       )}
 

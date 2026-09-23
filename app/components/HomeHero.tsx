@@ -67,10 +67,9 @@ export default function HomeHero({
             'transition-all duration-300 ease-in-out',
             isScrolled ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-75 pointer-events-none',
           ].join(' ')}
-          onClick={() => { window.scrollTo({ top: 0, behavior: 'smooth' }); setActiveSearchField('location'); }}
+          onClick={() => { setDateRange({ start: null, end: null }); window.scrollTo({ top: 0, behavior: 'smooth' }); setActiveSearchField('location'); }}
         >
           <div className="px-4 text-sm font-bold text-slate-900 border-r border-slate-300">{t('anywhere')}</div>
-          <div className="px-4 text-sm font-bold text-slate-900 border-r border-slate-300">{t('anytime')}</div>
           <div className="px-4 text-sm font-bold text-slate-500">{t('search')}</div>
           <button className="w-8 h-8 bg-slate-900 rounded-full flex items-center justify-center text-white ml-2">
             <Search size={14} strokeWidth={3} />
@@ -88,7 +87,7 @@ export default function HomeHero({
         <div className="px-5 mb-2 transition-all duration-300 flex items-center gap-2.5">
           <button
             data-testid="home-mobile-search-trigger"
-            onClick={() => setIsMobileSearchOpen(true)}
+            onClick={() => { setDateRange({ start: null, end: null }); setIsMobileSearchOpen(true); }}
             className="flex-1 h-[56px] flex items-center justify-center gap-2.5 bg-white rounded-[28px] px-6 active:scale-[0.98] transition-transform"
             style={{
               boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
