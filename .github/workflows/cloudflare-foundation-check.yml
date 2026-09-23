@@ -56,6 +56,9 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
+      - name: Verify admin guest review access and 390px review quality UI
+        run: npx playwright test -c playwright.contracts.config.ts tests/e2e/269-admin-guest-review-quality.spec.ts --project=chromium --workers=1 --reporter=line
+
       - name: Verify Customer Support phone workspace without external services
         run: npx playwright test -c playwright.phone-workspace.config.ts
 
