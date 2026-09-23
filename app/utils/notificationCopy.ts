@@ -135,6 +135,8 @@ export type NotificationCopyKey =
   | 'inquiry.new_message'
   | 'review.new.host'
   | 'review.guest_request.host'
+  | 'review.request_reminder.guest'
+  | 'review.guest_request_reminder.host'
   | 'review.guest_received.guest'
   | 'service.request_new.host'
   | 'service.payment_confirmed.customer'
@@ -170,6 +172,8 @@ type NotificationCopyParams = {
   'inquiry.new_message': InquiryNewMessageParams;
   'review.new.host': ReviewNewHostParams;
   'review.guest_request.host': ReviewGuestRequestHostParams;
+  'review.request_reminder.guest': ReviewGuestRequestHostParams;
+  'review.guest_request_reminder.host': ReviewGuestRequestHostParams;
   'review.guest_received.guest': ReviewGuestReceivedGuestParams;
   'service.request_new.host': ServiceRequestNewHostParams;
   'service.payment_confirmed.customer': ServicePaymentConfirmedCustomerParams;
@@ -984,6 +988,28 @@ function buildReviewGuestRequestHostCopy(
   }
 }
 
+function buildReviewReminderCopy(
+  locale: NotificationLocale,
+  role: 'guest' | 'host',
+  params: ReviewGuestRequestHostParams
+): NotificationCopy {
+  const title = params.experienceTitle;
+  if (role === 'guest') {
+    switch (locale) {
+      case 'en': return { title: 'A reminder to review your experience', message: `How was '${title}'? Your review is still waiting.` };
+      case 'ja': return { title: '体験レビューのリマインダー', message: `「${title}」のレビューをお待ちしています。` };
+      case 'zh': return { title: '体验评价提醒', message: `期待您为“${title}”留下评价。` };
+      default: return { title: '체험 후기 작성 알림', message: `'${title}' 체험 후기를 아직 작성하지 않으셨어요.` };
+    }
+  }
+  switch (locale) {
+    case 'en': return { title: 'A reminder to review your guest', message: `Your guest review for '${title}' is still waiting.` };
+    case 'ja': return { title: 'ゲスト評価のリマインダー', message: `「${title}」のゲスト評価をお待ちしています。` };
+    case 'zh': return { title: '客人评价提醒', message: `期待您为“${title}”的客人留下评价。` };
+    default: return { title: '게스트 평가 작성 알림', message: `'${title}' 체험의 게스트 평가를 아직 작성하지 않으셨어요.` };
+  }
+}
+
 function buildReviewGuestReceivedGuestCopy(
   locale: NotificationLocale,
   params: ReviewGuestReceivedGuestParams
@@ -1608,6 +1634,10 @@ export function buildNotificationCopy<K extends NotificationCopyKey>(
         locale,
         copyParams as NotificationCopyParams['review.guest_request.host']
       );
+    case 'review.request_reminder.guest':
+      return buildReviewReminderCopy(locale, 'guest', copyParams as NotificationCopyParams['review.request_reminder.guest']);
+    case 'review.guest_request_reminder.host':
+      return buildReviewReminderCopy(locale, 'host', copyParams as NotificationCopyParams['review.guest_request_reminder.host']);
     case 'review.guest_received.guest':
       return buildReviewGuestReceivedGuestCopy(
         locale,

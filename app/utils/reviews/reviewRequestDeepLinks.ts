@@ -30,8 +30,8 @@ export function getReviewRequestNotificationHref(notification: {
 }) {
   const bookingId = normalizeBookingId(notification.booking_id);
   if (!bookingId) return notification.link;
-  if (notification.type === 'review_request') return getGuestReviewRequestHref(bookingId, 'notification');
-  if (notification.type === 'guest_review_request') return getHostGuestReviewRequestHref(bookingId, 'notification');
+  if (notification.type === 'review_request' || notification.type === 'review_request_reminder') return getGuestReviewRequestHref(bookingId, 'notification');
+  if (notification.type === 'guest_review_request' || notification.type === 'guest_review_request_reminder') return getHostGuestReviewRequestHref(bookingId, 'notification');
   return notification.link;
 }
 

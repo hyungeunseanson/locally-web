@@ -110,6 +110,9 @@ function createSettlementClient(state: FixtureState) {
       if (name === 'list_due_experience_review_request_candidates') {
         return { data: [], error: null };
       }
+      if (name === 'claim_due_review_request_reminders') {
+        return { data: [], error: null };
+      }
       throw new Error(`unexpected fixture rpc: ${name}`);
     },
   };
@@ -197,6 +200,7 @@ test.describe('Experience Completion Cloudflare Cron', () => {
       'job-run:start',
       'rpc:list_due_experience_completion_candidates',
       'job-run:renew',
+      'rpc:claim_due_review_request_reminders',
       'job-run:renew',
       'job-run:success',
     ]);

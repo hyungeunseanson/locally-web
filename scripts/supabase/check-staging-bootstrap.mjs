@@ -44,7 +44,9 @@ const expectedAppliedOrder = [
   'supabase/migrations/20260922125140_close_refunded_phone_proxy_requests.sql',
   'supabase/migrations/20260923013312_ops_anomaly_monitor_snapshot.sql',
 ];
-const expectedPendingOrder = [];
+const expectedPendingOrder = [
+  'supabase/migrations/20260923084232_one_time_review_request_reminders.sql',
+];
 const expectedApplyOrder = [...expectedAppliedOrder, ...expectedPendingOrder];
 exact('fresh-project apply order', required.freshProjectApplyOrder, expectedApplyOrder);
 exact(

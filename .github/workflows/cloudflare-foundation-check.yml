@@ -60,7 +60,10 @@ jobs:
         run: npx playwright test -c playwright.contracts.config.ts tests/e2e/269-admin-guest-review-quality.spec.ts --project=chromium --workers=1 --reporter=line
 
       - name: Verify review request deep links and existing review boundaries
-        run: npx playwright test -c playwright.contracts.config.ts tests/e2e/257-review-tour-end-app-cutover.spec.ts tests/e2e/258-guest-review-request-email.spec.ts tests/e2e/270-review-request-deep-links.spec.ts --project=chromium --workers=1 --reporter=line
+        run: npx playwright test -c playwright.contracts.config.ts tests/e2e/257-review-tour-end-app-cutover.spec.ts tests/e2e/258-guest-review-request-email.spec.ts tests/e2e/270-review-request-deep-links.spec.ts tests/e2e/271-review-request-reminders.spec.ts --project=chromium --workers=1 --reporter=line
+
+      - name: Verify review reminder migration timing, idempotency and role isolation
+        run: node scripts/supabase/test-review-reminder-migration.mjs
 
       - name: Verify Customer Support phone workspace without external services
         run: npx playwright test -c playwright.phone-workspace.config.ts
