@@ -181,7 +181,7 @@ function AdminDashboardContent() {
   }, [legacyPhone, rawUrlTab, router, savedTab, searchParams, urlTab]);
 
   return (
-    <div className="bg-white p-2 md:p-6 rounded-lg md:rounded-2xl shadow-sm border border-slate-100 min-h-[80vh] flex flex-col h-full lg:h-auto overflow-hidden lg:overflow-visible">
+    <div className={`bg-white p-2 md:p-6 rounded-lg md:rounded-2xl shadow-sm border border-slate-100 min-h-[80vh] flex flex-col h-full lg:h-auto overflow-hidden lg:overflow-visible ${activeTab === 'LEDGER' ? 'md:overflow-visible' : ''}`}>
       <div key={activeTab} className="animate-in fade-in duration-200 flex flex-col flex-1">
       {activeTab === 'TEAM' ? (
         <TeamTab />
