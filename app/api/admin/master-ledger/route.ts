@@ -4,6 +4,14 @@ import { createAdminClient } from '@/app/utils/supabase/admin';
 import { captureServerException } from '@/app/utils/monitoring/sentry';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { isUnapprovedCardPaymentAttempt } from '@/app/utils/bookings/pendingBookingHolds';
+import { isPublicExperienceVisible } from '@/app/utils/hostVisibility';
+import {
+  buildMasterLedgerSlotSummaries,
+  getMasterLedgerSlotKey,
+  getMasterLedgerSlotPairs,
+  type LedgerAvailabilityRow,
+  type LedgerSlotBookingRow,
+} from '@/app/utils/masterLedgerSlotSummary';
 
 type ServiceRequestLedgerRow = {
   id: string;
@@ -38,6 +46,63 @@ function toKSTDateStr(utcString: string): string {
   const d = new Date(utcString);
   d.setHours(d.getHours() + 9);
   return d.toISOString().slice(0, 10);
+}
+
+// Query every booking in the listed slots, including bookings outside the ledger's row limit.
+// Pair batches keep the PostgREST URL bounded; range pages avoid the default 1,000-row cap.
+async function fetchSlotRows(
+  supabaseAdmin: ReturnType<typeof createAdminClient>,
+  pairs: ReturnType<typeof getMasterLedgerSlotPairs>
+) {
+  const bookingRows: LedgerSlotBookingRow[] = [];
+  const availabilityRows: LedgerAvailabilityRow[] = [];
+  const batchSize = 40;
+  const pageSize = 1000;
+
+  for (let index = 0; index < pairs.length; index += batchSize) {
+    const batch = pairs.slice(index, index + batchSize);
+    const filter = batch.map(({ experienceId, date }) =>
+      `and(experience_id.eq.${experienceId},date.eq.${date})`
+    ).join(',');
+
+    let bookingOffset = 0;
+    let availabilityOffset = 0;
+    let bookingDone = false;
+    let availabilityDone = false;
+    while (!bookingDone || !availabilityDone) {
+      const [bookingsResult, availabilityResult] = await Promise.all([
+        (async (): Promise<{ data: LedgerSlotBookingRow[]; error: unknown } | null> => {
+          if (bookingDone) return null;
+          const result = await supabaseAdmin.from('bookings')
+            .select('id, experience_id, date, time, guests, status, type, is_solo_guarantee, solo_guarantee_refund_status, payment_method, tid, payment_claim_state, created_at')
+            .or(filter)
+            .order('id')
+            .range(bookingOffset, bookingOffset + pageSize - 1);
+          return { data: result.data || [], error: result.error };
+        })(),
+        (async (): Promise<{ data: LedgerAvailabilityRow[]; error: unknown } | null> => {
+          if (availabilityDone) return null;
+          const result = await supabaseAdmin.from('experience_availability')
+            .select('id, experience_id, date, start_time, is_booked')
+            .or(filter)
+            .order('id')
+            .range(availabilityOffset, availabilityOffset + pageSize - 1);
+          return { data: result.data || [], error: result.error };
+        })(),
+      ]);
+      if (bookingsResult?.error) throw bookingsResult.error;
+      if (availabilityResult?.error) throw availabilityResult.error;
+      const bookingPage = bookingsResult?.data || [];
+      const availabilityPage = availabilityResult?.data || [];
+      bookingRows.push(...bookingPage);
+      availabilityRows.push(...availabilityPage);
+      bookingDone = bookingDone || bookingPage.length < pageSize;
+      availabilityDone = availabilityDone || availabilityPage.length < pageSize;
+      bookingOffset += pageSize;
+      availabilityOffset += pageSize;
+    }
+  }
+  return { bookingRows, availabilityRows };
 }
 
 export async function GET(request: Request) {
@@ -162,7 +227,7 @@ export async function GET(request: Request) {
 
     const [{ data: experiences, error: experiencesError }, { data: bookingProfiles, error: bookingProfilesError }] = await Promise.all([
       experienceIds.length > 0
-        ? supabaseAdmin.from('experiences').select('id, title, host_id').in('id', experienceIds)
+        ? supabaseAdmin.from('experiences').select('id, title, host_id, max_guests, status, is_active').in('id', experienceIds)
         : Promise.resolve({ data: [], error: null }),
       guestIds.length > 0
         ? supabaseAdmin.from('profiles').select('id, full_name, email').in('id', guestIds)
@@ -190,6 +255,21 @@ export async function GET(request: Request) {
     if (hostApplicationsError) throw hostApplicationsError;
 
     const experienceMap = new Map((experiences || []).map((experience) => [experience.id, experience]));
+    const slotPairs = getMasterLedgerSlotPairs(bookingRows);
+    const slotRows = slotPairs.length > 0
+      ? await fetchSlotRows(supabaseAdmin, slotPairs)
+      : { bookingRows: [], availabilityRows: [] };
+    const slotSummaries = buildMasterLedgerSlotSummaries({
+      listedRows: bookingRows,
+      bookingRows: slotRows.bookingRows,
+      availabilityRows: slotRows.availabilityRows,
+      maxGuestsByExperience: new Map((experiences || []).map((experience) =>
+        [String(experience.id), experience.max_guests]
+      )),
+      experienceVisibilityById: new Map((experiences || []).map((experience) =>
+        [String(experience.id), isPublicExperienceVisible(experience)]
+      )),
+    });
     const bookingProfileMap = new Map((bookingProfiles || []).map((profile) => [profile.id, profile]));
     const hostProfileMap = new Map((hostProfiles || []).map((profile) => [profile.id, profile]));
     const hostAppNameMap = new Map<string, string>();
@@ -209,6 +289,7 @@ export async function GET(request: Request) {
       return {
         ...booking,
         _type: 'experience' as const,
+        slot_summary: slotSummaries.get(getMasterLedgerSlotKey(booking) || '') || null,
         order_id: booking.order_id ?? booking.id,
         experiences: {
           title: experience?.title || 'Unknown Experience',

@@ -534,6 +534,7 @@ export interface SettlementSyncTriggerResponse {
 export interface AdminMasterLedgerEntry {
   _type: 'experience' | 'service';
   id: string;
+  experience_id?: number | null;
   order_id: string | null;
   created_at: string;
   date: string;
@@ -558,6 +559,7 @@ export interface AdminMasterLedgerEntry {
   solo_guarantee_refunded_at?: string | null;
   solo_guarantee_refund_error?: string | null;
   solo_guarantee_refund_trigger_booking_id?: string | null;
+  slot_summary?: import('@/app/utils/masterLedgerSlotSummary').MasterLedgerSlotSummary | null;
   experiences: {
     title: string;
     host_id?: string | null;
