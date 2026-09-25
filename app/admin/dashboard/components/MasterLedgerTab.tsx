@@ -707,8 +707,8 @@ export default function MasterLedgerTab({
     : null;
 
   return (
-    <div className="flex h-full gap-4 md:gap-6 relative overflow-hidden flex-col md:flex-row">
-      <div className={`flex-1 flex flex-col gap-4 md:gap-6 transition-all duration-300 ${selectedBooking ? 'hidden md:flex md:w-2/3' : 'flex w-full'}`}>
+    <div className="flex h-full gap-4 md:gap-6 relative overflow-hidden md:overflow-x-clip md:overflow-y-visible flex-col md:flex-row">
+      <div className={`flex-1 flex flex-col gap-4 md:gap-6 transition-all duration-300 md:min-w-0 ${selectedBooking ? 'hidden md:flex md:w-2/3' : 'flex w-full'}`}>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 md:gap-4 shrink-0">
           <div className="bg-slate-900 p-2.5 md:p-5 rounded-xl md:rounded-2xl text-white shadow-lg shadow-slate-200">
@@ -970,9 +970,9 @@ export default function MasterLedgerTab({
           onClick={() => setSelectedBooking(null)}
           className="fixed inset-0 z-[90] bg-slate-900/35 md:hidden"
         />
-        <div className="fixed inset-x-2 bottom-2 top-16 z-[100] flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl animate-in slide-in-from-bottom-6 duration-300 md:relative md:inset-auto md:z-30 md:h-full md:w-[400px] md:rounded-2xl md:border md:border-slate-200 md:shadow-2xl">
+        <div className="fixed inset-x-2 bottom-2 top-16 z-[100] flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl animate-in slide-in-from-bottom-6 duration-300 md:sticky md:left-auto md:right-auto md:bottom-auto md:top-6 md:z-30 md:h-[calc(100dvh-7rem)] md:max-h-[calc(100dvh-7rem)] md:w-[400px] md:shrink-0 md:self-start md:rounded-2xl md:border md:border-slate-200 md:shadow-2xl">
           {/* Header */}
-          <div className="p-2.5 md:p-5 border-b border-slate-100 flex justify-between items-start bg-slate-50">
+          <div className="p-2.5 md:p-5 border-b border-slate-100 flex justify-between items-start bg-slate-50 md:shrink-0">
             <div className="flex-1 pr-2">
               <div className="flex items-center gap-1.5 md:gap-2 mb-1 md:mb-1.5">
                 <div className={`px-1.5 md:px-2 py-0.5 rounded text-[9px] md:text-[10px] font-black uppercase tracking-wider ${selectedBooking.status.toLowerCase() === 'pending' ? 'bg-amber-100 text-amber-700 animate-pulse' :
@@ -998,7 +998,7 @@ export default function MasterLedgerTab({
             <button onClick={() => setSelectedBooking(null)} className="text-slate-400 hover:text-slate-900 p-1 md:bg-white rounded-full bg-slate-200/50 md:border md:border-slate-100 md:shadow-sm"><X size={14} className="md:w-4 md:h-4" /></button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-3 md:p-5 space-y-3 md:space-y-6 scrollbar-hide bg-white pb-6 md:pb-10">
+          <div className="flex-1 min-h-0 overflow-y-auto p-3 md:p-5 space-y-3 md:space-y-6 scrollbar-hide bg-white pb-6 md:pb-10">
             {selectedBooking._type === 'experience' && selectedBooking.slot_summary && (
               <section aria-label="해당 회차" data-testid="master-ledger-slot-detail">
                 <h4 className="mb-1.5 flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-slate-400 md:mb-2 md:text-[10px]"><Calendar size={10} /> 해당 회차</h4>
