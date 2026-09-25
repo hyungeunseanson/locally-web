@@ -545,9 +545,11 @@ export interface AdminMasterLedgerEntry {
   contact_phone: string | null;
   guests: number | string | null;
   price_at_booking: number | null;
+  total_price?: number | null;
   total_experience_price: number | null;
   host_payout_amount: number | null;
   platform_revenue: number | null;
+  payout_status?: string | null;
   refund_amount: number | null;
   cancel_reason: string | null;
   solo_guarantee_price?: number | null;

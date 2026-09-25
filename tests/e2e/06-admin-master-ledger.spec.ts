@@ -294,7 +294,7 @@ async function createBankTransferBooking(page: Page, guest: TestUser, experience
 async function openMasterLedger(page: Page, adminUser: TestUser) {
   await login(page, adminUser);
   await page.goto('/admin/dashboard?tab=LEDGER', { waitUntil: 'networkidle' });
-  await expect(page.getByText('Total Sales')).toBeVisible({ timeout: 20000 });
+  await expect(page.getByText('원 결제액 합계')).toBeVisible({ timeout: 20000 });
   await expect(page.getByTestId('ledger-date-basis-note')).toBeVisible();
   await expect(page.getByPlaceholder('검색 (이름, 예약번호)')).toBeVisible();
 }

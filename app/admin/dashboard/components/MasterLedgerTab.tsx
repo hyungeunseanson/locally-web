@@ -56,6 +56,7 @@ import {
   sortMasterLedgerEntries,
   type MasterLedgerSortMode,
 } from './masterLedgerSort';
+import { getMasterLedgerPaymentBreakdown } from './masterLedgerPaymentBreakdown';
 
 // SSR 비활성화로 react-date-range import (window is not defined 에러 방지)
 const DateRange = dynamic(() => import('react-date-range').then(mod => mod.DateRange), { ssr: false });
@@ -78,6 +79,12 @@ function getLedgerBasePrice(booking: AdminMasterLedgerEntry) {
   }
 
   return getBookingBasePrice(booking);
+}
+
+function getDisplayLedgerBasePrice(booking: AdminMasterLedgerEntry) {
+  const basePrice = getLedgerBasePrice(booking);
+  if (basePrice === 0 && Number(booking.amount) > 0) return null;
+  return basePrice;
 }
 
 function getLedgerPayout(booking: AdminMasterLedgerEntry) {
@@ -159,22 +166,42 @@ function getSoloRefundAdminLabel(booking: AdminMasterLedgerEntry) {
   const amount = Number(booking.solo_guarantee_refund_amount || 0);
 
   if (status === 'refunded') {
-    return `환불 완료 ${amount > 0 ? `₩${amount.toLocaleString()}` : ''}`.trim();
+    return `1인 출발 추가금 환급 완료 ${amount > 0 ? `₩${amount.toLocaleString()}` : ''}`.trim();
   }
 
   if (status === 'pending_manual') {
-    return `수동 환불 필요 ${amount > 0 ? `₩${amount.toLocaleString()}` : ''}`.trim();
+    return `1인 출발 추가금 수동 환급 필요 ${amount > 0 ? `₩${amount.toLocaleString()}` : ''}`.trim();
   }
 
   if (status === 'processing') {
-    return '자동 환불 처리 중';
+    return '1인 출발 추가금 환급 처리 중';
   }
 
   if (status === 'failed') {
-    return '환불 확인 필요';
+    return '1인 출발 추가금 환급 확인 필요';
   }
 
   return null;
+}
+
+function getLedgerStatusLabel(status: string) {
+  const normalized = String(status || '').toLowerCase();
+  if (normalized === 'completed') return '이용 완료';
+  if (normalized === 'paid' || normalized === 'confirmed') return '확정';
+  if (normalized === 'cancelled' || normalized === 'declined') return '취소됨';
+  if (normalized === 'cancellation_requested') return '취소 요청';
+  if (normalized === 'pending') return '결제 대기';
+  return status;
+}
+
+function getPayoutStatusLabel(status?: string | null) {
+  if (status === 'paid') return '지급 완료';
+  if (status === 'pending') return '정산 대기';
+  return status || '미기록';
+}
+
+function formatWon(amount: number | null) {
+  return amount == null ? '-' : `₩${amount.toLocaleString()}`;
 }
 
 function canCompleteSoloManualRefund(booking: AdminMasterLedgerEntry) {
@@ -395,7 +422,7 @@ export default function MasterLedgerTab({
 
   // 3. 엑셀 CSV 다운로드
   const downloadLedgerCSV = () => {
-    const headers = ['Type', 'Date', 'Booking ID', 'Host', 'Tour', 'Customer', 'Status', 'Base Price', 'Total Price', 'Payout', 'Sales(Paid)', 'Revenue'];
+    const headers = ['Type', 'Date', 'Booking ID', 'Host', 'Tour', 'Customer', 'Status', '체험금액', '체험 정산 기준액', '호스트 정산액', '원 결제액', '플랫폼 수익'];
     const rows = ledgerData.map(b => [
       b._type === 'service' ? '서비스의뢰' : '일반예약',
       b.date,
@@ -404,7 +431,7 @@ export default function MasterLedgerTab({
       `"${b.experiences?.title}"`,
       `"${b.contact_name}(${b.guests}인)"`,
       b.status,
-      getLedgerBasePrice(b) ?? '',
+      getDisplayLedgerBasePrice(b) ?? '',
       getLedgerExperiencePrice(b),
       getLedgerPayout(b) ?? '',
       getLedgerPaidAmountForDisplay(b),
@@ -633,6 +660,7 @@ export default function MasterLedgerTab({
   const renderStatusBadge = (booking: AdminMasterLedgerEntry) => {
     const status = booking.status;
     const s = status?.toLowerCase();
+    if (s === 'completed') return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700">이용 완료</span>;
     if (isConfirmedBookingStatus(status)) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700">확정</span>;
     if (s === 'pending') {
       const isBankTransfer = String(booking.payment_method || '').toLowerCase() === 'bank';
@@ -642,30 +670,34 @@ export default function MasterLedgerTab({
     return <span className="text-xs text-slate-500">{status}</span>;
   };
 
+  const selectedPayment = selectedBooking
+    ? getMasterLedgerPaymentBreakdown(selectedBooking)
+    : null;
+
   return (
     <div className="flex h-full gap-4 md:gap-6 relative overflow-hidden flex-col md:flex-row">
       <div className={`flex-1 flex flex-col gap-4 md:gap-6 transition-all duration-300 ${selectedBooking ? 'hidden md:flex md:w-2/3' : 'flex w-full'}`}>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 md:gap-4 shrink-0">
           <div className="bg-slate-900 p-2.5 md:p-5 rounded-xl md:rounded-2xl text-white shadow-lg shadow-slate-200">
-            <div className="text-[8px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5 md:mb-1">Total Sales</div>
+            <div className="text-[8px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5 md:mb-1">원 결제액 합계</div>
             <div className="text-[13px] md:text-2xl font-black">₩{totals.totalSales.toLocaleString()}</div>
-            <div className="text-[7px] md:text-[10px] text-slate-500 mt-0.5 md:mt-1">실결제 매출</div>
+            <div className="text-[7px] md:text-[10px] text-slate-500 mt-0.5 md:mt-1">확정·이용 완료 행의 환불 전 금액</div>
           </div>
           <div className="bg-white p-2.5 md:p-5 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm">
-            <div className="text-[8px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5 md:mb-1">Payout (80%)</div>
+            <div className="text-[8px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5 md:mb-1">호스트 정산액</div>
             <div className="text-[13px] md:text-2xl font-black text-rose-600">₩{totals.totalPayout.toLocaleString()}</div>
-            <div className="text-[7px] md:text-[10px] text-slate-400 mt-0.5 md:mt-1">지급 예정액</div>
+            <div className="text-[7px] md:text-[10px] text-slate-400 mt-0.5 md:mt-1">확정·이용 완료 행 · 지급 여부 무관</div>
           </div>
           <div className="bg-white p-2.5 md:p-5 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm">
-            <div className="text-[8px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5 md:mb-1">Net Revenue</div>
+            <div className="text-[8px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5 md:mb-1">플랫폼 수익</div>
             <div className="text-[13px] md:text-2xl font-black text-blue-600">₩{totals.totalProfit.toLocaleString()}</div>
-            <div className="text-[7px] md:text-[10px] text-slate-400 mt-0.5 md:mt-1">순수익</div>
+            <div className="text-[7px] md:text-[10px] text-slate-400 mt-0.5 md:mt-1">확정·이용 완료 행의 현재 정산값</div>
           </div>
           <div className="bg-white p-2.5 md:p-5 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm">
-            <div className="text-[8px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5 md:mb-1">Bookings</div>
+            <div className="text-[8px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5 md:mb-1">조회 건수</div>
             <div className="text-[13px] md:text-2xl font-black text-slate-900">{ledgerData.length}건</div>
-            <div className="text-[7px] md:text-[10px] text-slate-400 mt-0.5 md:mt-1 truncate">
+            <div className="text-[7px] md:text-[10px] text-slate-400 mt-0.5 md:mt-1 truncate">필터된 예약·서비스 행 · {' '}
               {dateRange[0].startDate && dateRange[0].endDate ?
                 `${format(dateRange[0].startDate, 'yy.MM.dd')} ~ ${format(dateRange[0].endDate, 'yy.MM.dd')}`
                 : '전체 기간'
@@ -681,7 +713,7 @@ export default function MasterLedgerTab({
             <div className="relative w-full md:w-auto">
               <button
                 onClick={() => setIsCalendarOpen(!isCalendarOpen)}
-                className="flex items-center justify-center md:justify-start w-full md:w-auto gap-1.5 md:gap-2 px-2 md:px-3 py-1.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-xl text-[10px] md:text-sm font-bold text-slate-700 hover:bg-slate-100 transition-colors"
+                className="flex items-center justify-center md:justify-start w-full md:w-auto gap-1.5 md:gap-2 px-2 md:px-3 py-1.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-xl text-[10px] md:text-sm font-bold text-slate-700 hover:bg-slate-100 transition-colors whitespace-nowrap"
               >
                 <Calendar size={14} className="text-blue-600 md:w-4 md:h-4" />
                 {dateRange[0].startDate && dateRange[0].endDate
@@ -719,12 +751,12 @@ export default function MasterLedgerTab({
               )}
             </div>
 
-            <div className="flex flex-wrap bg-slate-100 p-1 rounded-lg w-full md:w-auto justify-center">
+            <div className="flex flex-nowrap bg-slate-100 p-1 rounded-lg w-full md:w-auto md:shrink-0 justify-center">
               {STATUS_TABS.map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => setStatusFilter(tab.id)}
-                  className={`flex-1 md:flex-none px-1.5 py-1 md:px-3 text-[9px] md:text-xs font-bold rounded-md md:rounded-lg transition-all ${statusFilter === tab.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  className={`flex-1 md:flex-none px-1.5 py-1 md:px-2 text-[9px] md:text-xs font-bold rounded-md md:rounded-lg transition-all whitespace-nowrap ${statusFilter === tab.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                 >
                   {tab.id === 'PENDING' ? (
                     <>
@@ -733,8 +765,7 @@ export default function MasterLedgerTab({
                     </>
                   ) : tab.id === 'PAID' ? (
                     <>
-                      <span className="md:hidden">확정</span>
-                      <span className="hidden md:inline">확정됨</span>
+                      <span>확정/완료</span>
                     </>
                   ) : tab.id === 'CANCELLED' ? (
                     <>
@@ -747,7 +778,7 @@ export default function MasterLedgerTab({
             </div>
             <button
               onClick={() => setReviewOnly((current) => !current)}
-              className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-[10px] font-bold transition-all md:text-xs ${
+              className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-[10px] font-bold transition-all whitespace-nowrap md:text-xs ${
                 reviewOnly
                   ? 'border-orange-200 bg-orange-50 text-orange-700'
                   : 'border-slate-200 bg-white text-slate-500 hover:text-slate-700'
@@ -806,16 +837,16 @@ export default function MasterLedgerTab({
             <table className="w-full text-[9px] md:text-[13px] text-left border-collapse min-w-[620px] md:min-w-[800px]">
               <thead className="bg-slate-50 text-[8px] md:text-[10px] font-black text-slate-400 uppercase sticky top-0 z-10 border-b border-slate-100">
                 <tr>
-                  <th className="px-1.5 md:px-4 py-2 md:py-4 w-16 md:w-24"><span className="md:hidden">상태</span><span className="hidden md:inline">Status</span></th>
+                  <th className="w-[110px] min-w-[110px] px-1.5 py-2 md:w-[135px] md:min-w-[135px] md:px-4 md:py-4"><span className="md:hidden">상태</span><span className="hidden md:inline">Status</span></th>
                   <th className="hidden md:table-cell px-2 md:px-4 py-2 md:py-4">Type</th>
                   <th className="px-1.5 md:px-4 py-2 md:py-4"><span className="md:hidden">일자</span><span className="hidden md:inline">Date</span></th>
                   <th className="px-1.5 md:px-4 py-2 md:py-4"><span className="md:hidden">호스트</span><span className="hidden md:inline">Host</span></th>
                   <th className="px-1.5 md:px-4 py-2 md:py-4"><span className="md:hidden">상품</span><span className="hidden md:inline">Tour Item</span></th>
                   <th className="px-1.5 md:px-4 py-2 md:py-4 text-center"><span className="md:hidden">게스트</span><span className="hidden md:inline">Customer</span></th>
-                  <th className="px-1.5 md:px-4 py-2 md:py-4 text-right"><span className="md:hidden">가격</span><span className="hidden md:inline">Price</span></th>
-                  <th className="px-1.5 md:px-4 py-2 md:py-4 text-right"><span className="md:hidden">정산</span><span className="hidden md:inline">Payout</span></th>
-                  <th className="px-2 md:px-4 py-2 md:py-4 text-right text-slate-900 bg-slate-100/50">매출(Paid)</th>
-                  <th className="px-2 md:px-4 py-2 md:py-4 text-right text-blue-600">수익</th>
+                  <th className="px-1.5 md:px-4 py-2 md:py-4 text-right">체험금액</th>
+                  <th className="px-1.5 md:px-4 py-2 md:py-4 text-right">호스트 정산액</th>
+                  <th className="px-2 md:px-4 py-2 md:py-4 text-right text-slate-900 bg-slate-100/50">원 결제액</th>
+                  <th className="px-2 md:px-4 py-2 md:py-4 text-right text-blue-600">플랫폼 수익</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -841,7 +872,7 @@ export default function MasterLedgerTab({
                             </span>
                           )}
                           {b._type !== 'service' && getSoloRefundAdminLabel(b) && (
-                            <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-bold md:px-2 md:text-[10px] ${
+                            <span className={`inline-flex max-w-[110px] items-center break-keep rounded px-1.5 py-0.5 text-[9px] font-bold leading-tight md:max-w-[125px] md:px-2 md:text-[10px] ${
                               isSoloGuaranteeRefundUnresolvedStatus(b.solo_guarantee_refund_status)
                                 ? 'bg-orange-100 text-orange-700'
                                 : 'bg-emerald-100 text-emerald-700'
@@ -864,11 +895,12 @@ export default function MasterLedgerTab({
                           {b.experiences?.title}
                         </div>
                       </td>
-                      <td className="px-1.5 md:px-4 py-2 md:py-4 text-center text-[9px] md:text-sm text-slate-600 truncate max-w-[76px] md:max-w-[80px]">
-                        {b.contact_name}({b.guests})
+                      <td className="px-1.5 md:px-4 py-2 md:py-4 text-center text-[9px] md:text-sm text-slate-600 max-w-[76px] md:max-w-[80px]">
+                        <span className="block truncate">{b.contact_name}</span>
+                        <span className="block text-[8px] font-bold text-slate-500 md:text-[10px]">{Number(b.guests) > 0 ? `${b.guests}명` : '-'}</span>
                       </td>
                       <td className="px-1.5 md:px-4 py-2 md:py-4 text-right font-mono text-[8px] md:text-sm text-slate-400">
-                        {getLedgerBasePrice(b) != null ? getLedgerBasePrice(b)?.toLocaleString() : '-'}
+                        {getDisplayLedgerBasePrice(b) != null ? getDisplayLedgerBasePrice(b)?.toLocaleString() : '-'}
                       </td>
                       <td className="px-1.5 md:px-4 py-2 md:py-4 text-right font-mono text-[9px] md:text-sm font-black text-rose-600 bg-rose-50/30">
                         {getLedgerPayout(b) != null ? getLedgerPayout(b)?.toLocaleString() : '-'}
@@ -904,7 +936,7 @@ export default function MasterLedgerTab({
                 <div className={`px-1.5 md:px-2 py-0.5 rounded text-[9px] md:text-[10px] font-black uppercase tracking-wider ${selectedBooking.status.toLowerCase() === 'pending' ? 'bg-amber-100 text-amber-700 animate-pulse' :
                   isConfirmedBookingStatus(selectedBooking.status) ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
                   }`}>
-                  {selectedBooking.status}
+                  {getLedgerStatusLabel(selectedBooking.status)}
                 </div>
                 {isBookingReviewPending(selectedBooking.cancel_reason) && (
                   <div className="inline-flex items-center gap-1 rounded bg-orange-100 px-1.5 py-0.5 text-[9px] font-black tracking-wider text-orange-700 md:px-2 md:text-[10px]">
@@ -976,53 +1008,93 @@ export default function MasterLedgerTab({
               </div>
             </div>
 
-            {/* 결제 및 정산 (Compact List) */}
-            <div>
-              <h4 className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 md:mb-2 flex items-center gap-1"><CreditCard size={10} /> Payment Breakdown</h4>
-              <div className="bg-slate-50 rounded-xl p-2.5 md:p-3 space-y-1 md:space-y-2 border border-slate-100">
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] md:text-xs text-slate-500">결제 수단</span>
-                  <span className="text-[10px] md:text-xs font-bold text-slate-700 flex items-center gap-1">
-                    {/* 결제수단 로직 개선: payment_method 필드 자체를 확인 */}
-                    {selectedBooking.payment_method === 'bank' || (selectedBooking.payment_method && selectedBooking.payment_method.includes('bank')) ? '🏛️ 무통장 입금' : '💳 카드 결제'}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] md:text-xs text-slate-500">결제 금액</span>
-                  <span className="text-[11px] md:text-sm font-black text-slate-900">₩{Number(selectedBooking.amount).toLocaleString()}</span>
-                </div>
-                <div className="h-px bg-slate-200 my-0.5 md:my-1"></div>
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] md:text-xs text-slate-500">호스트 정산 (80%)</span>
-                  <span className="text-[10px] md:text-xs font-bold text-rose-500">
-                    {getLedgerPayout(selectedBooking) != null ? `₩${getLedgerPayout(selectedBooking)?.toLocaleString()}` : '-'}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] md:text-xs text-slate-500">플랫폼 수익 (Net)</span>
-                  <span className="text-[10px] md:text-xs font-bold text-blue-600">
-                    {getLedgerRevenue(selectedBooking) != null ? `₩${getLedgerRevenue(selectedBooking)?.toLocaleString()}` : '-'}
-                  </span>
-                </div>
-                {selectedBooking._type !== 'service' && getSoloRefundAdminLabel(selectedBooking) && (
-                  <div className="flex justify-between items-center rounded-lg bg-white px-2 py-1.5">
-                    <span className="text-[10px] md:text-xs text-slate-500">1인 추가금 환불</span>
-                    <span className={`text-[10px] md:text-xs font-bold ${
-                      isSoloGuaranteeRefundUnresolvedStatus(selectedBooking.solo_guarantee_refund_status)
-                        ? 'text-orange-600'
-                        : 'text-emerald-600'
-                    }`}>
-                      {getSoloRefundAdminLabel(selectedBooking)}
-                    </span>
+            {/* 고객 결제와 호스트 정산은 서로 다른 의미의 금액이다. */}
+            <div className="space-y-3">
+              <section aria-label="고객 결제">
+                <h4 className="mb-1.5 flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-slate-400 md:mb-2 md:text-[10px]"><CreditCard size={10} /> 고객 결제</h4>
+                <div className="space-y-2 rounded-xl border border-slate-100 bg-slate-50 p-2.5 md:p-3">
+                  <div className="flex justify-between gap-2 text-[10px] md:text-xs">
+                    <span className="text-slate-500">결제 수단</span>
+                    <span className="font-bold text-slate-700">{selectedBooking.payment_method === 'bank' ? '무통장 입금' : selectedBooking.payment_method === 'card' ? '카드 결제' : selectedBooking.payment_method === 'paypal' ? 'PayPal' : '미기록'}</span>
                   </div>
-                )}
-                {selectedBooking._type !== 'service' && selectedBooking.solo_guarantee_refund_error && (
-                  <p className="rounded-lg bg-orange-50 px-2 py-1.5 text-[10px] leading-4 text-orange-700">
-                    {selectedBooking.solo_guarantee_refund_error}
-                  </p>
-                )}
-              </div>
-              <p className="hidden md:flex text-[8px] md:text-[9px] text-slate-400 mt-1.5 md:mt-2 text-right justify-end gap-1 items-center"><Info size={10} /> Order ID: {selectedBooking.order_id || selectedBooking.id}</p>
+                  {selectedBooking._type === 'experience' && (
+                    <>
+                      <div className="flex justify-between gap-2 text-[10px] md:text-xs">
+                        <span className="shrink-0 text-slate-500">예약 인원</span>
+                        <span className="font-bold text-slate-700">{selectedPayment?.guestCount != null ? `${selectedPayment.guestCount}명` : '-'}</span>
+                      </div>
+                      <div className="flex justify-between gap-2 text-[10px] md:text-xs">
+                        <span className="shrink-0 text-slate-500">체험금액</span>
+                        <span className="text-right font-bold text-slate-800">
+                          {selectedPayment?.subtotal != null && selectedPayment.guestCount != null
+                            ? `${formatWon(selectedPayment.subtotal)} · ${selectedPayment.guestCount}명`
+                            : formatWon(selectedPayment?.subtotal ?? null)}
+                        </span>
+                      </div>
+                      {(selectedPayment?.soloGuaranteePrice ?? 0) > 0 && (
+                        <div className="flex justify-between gap-2 text-[10px] md:text-xs">
+                          <span className="text-slate-500">1인 출발 추가금</span>
+                          <span className="font-bold text-slate-800">{formatWon(selectedPayment?.soloGuaranteePrice ?? null)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between gap-2 text-[10px] md:text-xs">
+                        <span className="text-slate-500">고객 수수료</span>
+                        <span className="font-bold text-slate-800">{formatWon(selectedPayment?.customerFee ?? null)}</span>
+                      </div>
+                      {selectedPayment?.subtotal == null || selectedPayment.customerFee == null ? (
+                        <p className="text-[9px] leading-4 text-amber-700 md:text-[10px]">예약 당시 금액 구성을 확인할 수 없어 일부 항목은 표시하지 않습니다.</p>
+                      ) : null}
+                    </>
+                  )}
+                  {selectedBooking._type === 'service' && (
+                    <p className="text-[9px] leading-4 text-slate-500 md:text-[10px]">서비스 상세 요금 구성은 서비스 의뢰 탭에서 확인하세요.</p>
+                  )}
+                  <div className="flex justify-between gap-2 border-t border-slate-200 pt-2 text-[11px] md:text-sm">
+                    <span className="font-bold text-slate-700">원 결제액</span>
+                    <span className="font-black text-slate-900">{formatWon(selectedPayment?.originalAmount ?? null)}</span>
+                  </div>
+                  {isPendingBookingStatus(selectedBooking.status) && (
+                    <p className="text-[9px] leading-4 text-amber-700 md:text-[10px]">결제 대기 중인 예약의 청구 예정액입니다.</p>
+                  )}
+                  {(selectedPayment?.refundAmount ?? 0) > 0 && (
+                    <div className="space-y-1.5 border-t border-slate-200 pt-2">
+                      {(selectedPayment?.soloRefundAmount ?? 0) > 0 && (
+                        <div className="flex justify-between gap-2 text-[10px] text-emerald-700 md:text-xs">
+                          <span>1인 출발 추가금 환급 완료</span>
+                          <span className="font-bold">-{formatWon(selectedPayment?.soloRefundAmount ?? null)}</span>
+                        </div>
+                      )}
+                      {(selectedPayment?.otherRefundAmount ?? 0) > 0 && (
+                        <div className="flex justify-between gap-2 text-[10px] text-slate-600 md:text-xs">
+                          <span>{selectedPayment?.soloRefundAmount ? '기타 환불' : '환불 금액'}</span>
+                          <span className="font-bold">-{formatWon(selectedPayment?.otherRefundAmount ?? null)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between gap-2 text-[11px] md:text-sm">
+                        <span className="font-bold text-slate-700">환불 차감 후 금액</span>
+                        <span className="font-black text-slate-900">{formatWon(selectedPayment?.netAmount ?? null)}</span>
+                      </div>
+                    </div>
+                  )}
+                  {selectedBooking._type === 'experience' &&
+                    isSoloGuaranteeRefundUnresolvedStatus(selectedBooking.solo_guarantee_refund_status) && (
+                      <p className="rounded-lg bg-orange-50 px-2 py-1.5 text-[10px] font-bold leading-4 text-orange-700">{getSoloRefundAdminLabel(selectedBooking)} · 환급 완료 전</p>
+                    )}
+                  {selectedBooking._type === 'experience' && selectedBooking.solo_guarantee_refund_error && (
+                    <p className="rounded-lg bg-orange-50 px-2 py-1.5 text-[10px] leading-4 text-orange-700">{selectedBooking.solo_guarantee_refund_error}</p>
+                  )}
+                </div>
+              </section>
+
+              <section aria-label="정산">
+                <h4 className="mb-1.5 text-[9px] font-black uppercase tracking-widest text-slate-400 md:mb-2 md:text-[10px]">정산</h4>
+                <div className="space-y-2 rounded-xl border border-blue-100 bg-blue-50/40 p-2.5 md:p-3">
+                  <div className="flex justify-between gap-2 text-[10px] md:text-xs"><span className="text-slate-600">호스트 정산액</span><span className="font-bold text-rose-600">{formatWon(getLedgerPayout(selectedBooking))}</span></div>
+                  <div className="flex justify-between gap-2 text-[10px] md:text-xs"><span className="text-slate-600">플랫폼 수익</span><span className="font-bold text-blue-600">{formatWon(getLedgerRevenue(selectedBooking))}</span></div>
+                  <div className="flex justify-between gap-2 border-t border-blue-100 pt-2 text-[10px] md:text-xs"><span className="text-slate-600">지급 상태</span><span className="font-bold text-slate-800">{getPayoutStatusLabel(selectedBooking.payout_status)}</span></div>
+                </div>
+              </section>
+              <p className="hidden items-center justify-end gap-1 text-right text-[8px] text-slate-400 md:flex md:text-[9px]"><Info size={10} /> Order ID: {selectedBooking.order_id || selectedBooking.id}</p>
             </div>
 
             {selectedBooking._type !== 'service' &&
