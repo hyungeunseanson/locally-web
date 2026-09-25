@@ -302,7 +302,7 @@ test.describe.serial('Admin sidebar smoke', () => {
     const getAbortedRequestCount = await installAuthUserAbortPatch(page);
 
     await page.goto('/admin/dashboard?tab=LEDGER', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByText('Total Sales')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('원 결제액 합계')).toBeVisible({ timeout: 15000 });
     await expect(page.getByPlaceholder('검색 (이름, 예약번호)')).toBeVisible({ timeout: 15000 });
     await expect.poll(getAbortedRequestCount, { timeout: 15000 }).toBeGreaterThan(0);
     await page.waitForTimeout(500);
