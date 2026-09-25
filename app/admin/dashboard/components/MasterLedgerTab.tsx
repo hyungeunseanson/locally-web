@@ -57,6 +57,7 @@ import {
   type MasterLedgerSortMode,
 } from './masterLedgerSort';
 import { getMasterLedgerPaymentBreakdown } from './masterLedgerPaymentBreakdown';
+import type { MasterLedgerSlotSummary } from '@/app/utils/masterLedgerSlotSummary';
 
 // SSR 비활성화로 react-date-range import (window is not defined 에러 방지)
 const DateRange = dynamic(() => import('react-date-range').then(mod => mod.DateRange), { ssr: false });
@@ -202,6 +203,37 @@ function getPayoutStatusLabel(status?: string | null) {
 
 function formatWon(amount: number | null) {
   return amount == null ? '-' : `₩${amount.toLocaleString()}`;
+}
+
+function getSlotRowLabel(slot: MasterLedgerSlotSummary) {
+  const people = slot.completedGuestCount > 0 && slot.confirmedGuestCount === 0
+    ? `이용 완료 ${slot.completedGuestCount}명`
+    : `확정 ${slot.confirmedGuestCount}명`;
+  const capacity = slot.currentMaxGuests == null ? '' : ` / 정원 ${slot.currentMaxGuests}명`;
+  const pending = slot.pendingGuestCount > 0 ? ` · 대기 ${slot.pendingGuestCount}명` : '';
+  return `${slot.bookingCount}건 · ${people}${capacity}${pending}`;
+}
+
+function getSlotRowStateLabel(slot: MasterLedgerSlotSummary) {
+  if (slot.availabilityState === 'private_booked') return ' · 단독 예약 마감';
+  if (slot.availabilityState === 'private_pending') return ' · 단독 임시 보유';
+  if (slot.availabilityState === 'full') return ' · 정원 마감';
+  if (slot.availabilityState === 'not_listed') return ' · 현재 시간대 비공개';
+  if (slot.availabilityState === 'experience_unavailable') return ' · 현재 상품 비공개';
+  return '';
+}
+
+function getSlotAvailabilityLabel(slot: MasterLedgerSlotSummary) {
+  switch (slot.availabilityState) {
+    case 'available': return '현재 설정 기준 예약 가능';
+    case 'full': return '현재 정원 도달';
+    case 'private_booked': return '단독 예약으로 추가 예약 불가';
+    case 'private_pending': return '단독 예약 임시 보유 중';
+    case 'not_listed': return '현재 공개된 예약 가능 시간대 아님';
+    case 'experience_unavailable': return '현재 상품 비공개';
+    case 'past': return '지난 회차';
+    default: return '예약 가능 여부 확인 필요';
+  }
 }
 
 function canCompleteSoloManualRefund(booking: AdminMasterLedgerEntry) {
@@ -888,12 +920,22 @@ export default function MasterLedgerTab({
                           : <span className="inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-500">일반예약</span>
                         }
                       </td>
-                      <td className="px-1.5 md:px-4 py-2 md:py-4 font-mono text-[8px] md:text-xs text-slate-500">{b.date?.slice(5)}</td>
+                      <td className="px-1.5 md:px-4 py-2 md:py-4 font-mono text-[8px] md:text-xs text-slate-500">
+                        <span className="block">{b.date?.slice(5)}</span>
+                        {b._type === 'experience' && b.slot_summary && <span className="block text-[8px] text-slate-400 md:text-[10px]">{b.time?.slice(0, 5)}</span>}
+                      </td>
                       <td className="px-1.5 md:px-4 py-2 md:py-4 font-bold text-slate-900 truncate max-w-[76px] md:max-w-[80px]">{b.experiences?.profiles?.name || '-'}</td>
                       <td className="px-1.5 md:px-4 py-2 md:py-4">
-                        <div className="max-w-[112px] md:max-w-[150px] truncate font-medium text-slate-700" title={b.experiences?.title}>
+                        <div className="max-w-[112px] md:max-w-[190px] truncate font-medium text-slate-700" title={b.experiences?.title}>
                           {b.experiences?.title}
                         </div>
+                        {b._type === 'experience' && b.slot_summary && (
+                          <span data-testid="master-ledger-slot-summary" className="mt-0.5 block max-w-[112px] truncate text-[8px] font-bold text-slate-500 md:max-w-[260px] md:text-[10px]" title={`${getSlotRowLabel(b.slot_summary)}${getSlotRowStateLabel(b.slot_summary)}`}>
+                            {getSlotRowLabel(b.slot_summary)}
+                            {b.slot_summary.soloGuaranteeActive && <span className="ml-1 text-blue-600">· 1인 출발 확정</span>}
+                            {getSlotRowStateLabel(b.slot_summary) && <span className="text-amber-700">{getSlotRowStateLabel(b.slot_summary)}</span>}
+                          </span>
+                        )}
                       </td>
                       <td className="px-1.5 md:px-4 py-2 md:py-4 text-center text-[9px] md:text-sm text-slate-600 max-w-[76px] md:max-w-[80px]">
                         <span className="block truncate">{b.contact_name}</span>
@@ -957,6 +999,21 @@ export default function MasterLedgerTab({
           </div>
 
           <div className="flex-1 overflow-y-auto p-3 md:p-5 space-y-3 md:space-y-6 scrollbar-hide bg-white pb-6 md:pb-10">
+            {selectedBooking._type === 'experience' && selectedBooking.slot_summary && (
+              <section aria-label="해당 회차" data-testid="master-ledger-slot-detail">
+                <h4 className="mb-1.5 flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-slate-400 md:mb-2 md:text-[10px]"><Calendar size={10} /> 해당 회차</h4>
+                <div className="space-y-1.5 rounded-xl border border-slate-100 bg-slate-50 p-2.5 text-[10px] md:p-3 md:text-xs">
+                  <div className="flex justify-between"><span className="text-slate-500">확정 예약</span><span className="font-bold text-slate-800">{selectedBooking.slot_summary.confirmedBookingCount}건 · {selectedBooking.slot_summary.confirmedGuestCount}명</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">임시 보유</span><span className="font-bold text-amber-700">{selectedBooking.slot_summary.pendingBookingCount}건 · {selectedBooking.slot_summary.pendingGuestCount}명</span></div>
+                  {selectedBooking.slot_summary.completedBookingCount > 0 && <div className="flex justify-between"><span className="text-slate-500">이용 완료 기록</span><span className="font-bold text-slate-800">{selectedBooking.slot_summary.completedBookingCount}건 · {selectedBooking.slot_summary.completedGuestCount}명</span></div>}
+                  {selectedBooking.slot_summary.cancelledBookingCount > 0 && <div className="flex justify-between"><span className="text-slate-500">취소 완료</span><span className="font-bold text-slate-600">{selectedBooking.slot_summary.cancelledBookingCount}건 · {selectedBooking.slot_summary.cancelledGuestCount}명</span></div>}
+                  {selectedBooking.slot_summary.cancellationRequestedCount > 0 && <div className="flex justify-between"><span className="text-slate-500">취소 요청</span><span className="font-bold text-slate-600">{selectedBooking.slot_summary.cancellationRequestedCount}건 · {selectedBooking.slot_summary.cancellationRequestedGuestCount}명</span></div>}
+                  <div className="flex justify-between border-t border-slate-200 pt-1.5"><span className="text-slate-500">현재 정원</span><span className="font-bold text-slate-800">{selectedBooking.slot_summary.currentMaxGuests != null ? `${selectedBooking.slot_summary.currentMaxGuests}명` : '미확인'}</span></div>
+                  <div className="flex justify-between gap-2"><span className="shrink-0 text-slate-500">회차 상태</span><span className="text-right font-bold text-blue-700">{getSlotAvailabilityLabel(selectedBooking.slot_summary)}</span></div>
+                  {selectedBooking.slot_summary.soloGuaranteeActive && <p className="text-right font-bold text-blue-700">1인 출발 확정 · 추가 예약 가능 여부는 회차 상태 기준</p>}
+                </div>
+              </section>
+            )}
             {isBookingReviewPending(selectedBooking.cancel_reason) && (
               <div className="rounded-xl border border-orange-100 bg-orange-50 p-3 md:p-4">
                 <div className="flex items-start gap-2">
@@ -1033,8 +1090,8 @@ export default function MasterLedgerTab({
                       </div>
                       {(selectedPayment?.soloGuaranteePrice ?? 0) > 0 && (
                         <div className="flex justify-between gap-2 text-[10px] md:text-xs">
-                          <span className="text-slate-500">1인 출발 추가금</span>
-                          <span className="font-bold text-slate-800">{formatWon(selectedPayment?.soloGuaranteePrice ?? null)}</span>
+                          <span className="text-amber-800">1인 출발 추가금</span>
+                          <span className="font-bold text-amber-900">{formatWon(selectedPayment?.soloGuaranteePrice ?? null)}</span>
                         </div>
                       )}
                       <div className="flex justify-between gap-2 text-[10px] md:text-xs">
