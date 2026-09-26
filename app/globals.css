@@ -81,3 +81,12 @@ body {
     animation: none;
   }
 }
+
+@keyframes locally-brand-splash-fade {
+  0%, 76.923% { opacity: 1; visibility: visible; }
+  100% { opacity: 0; visibility: hidden; }
+}
+
+.locally-brand-splash {
+  animation: locally-brand-splash-fade 1300ms linear forwards;
+}

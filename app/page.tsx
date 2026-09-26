@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { Metadata } from 'next';
 import HomePageClient from '@/app/components/HomePageClient';
 import LegacyExperiencePopup from '@/app/components/LegacyExperiencePopup';
@@ -6,6 +6,22 @@ import JsonLd from '@/app/components/seo/JsonLd';
 import { getCurrentLocale } from '@/app/utils/locale';
 import { buildLocalizedAbsoluteUrl } from '@/app/utils/siteUrl';
 import { buildOrganizationJsonLd, buildWebsiteJsonLd } from '@/app/utils/structuredData';
+import { getPublicHomeExperiences } from '@/app/home/homeExperienceData.server';
+import HomeSplashTrigger from '@/app/home/HomeSplashTrigger';
+import HomeStreamingFallback from '@/app/home/HomeStreamingFallback';
+
+type HomeData = Awaited<ReturnType<typeof getPublicHomeExperiences>> | null;
+
+async function HomeContent({ homeDataPromise }: { homeDataPromise: Promise<HomeData> }) {
+  const homeData = await homeDataPromise;
+
+  return (
+    <HomePageClient
+      initialExperiences={homeData?.data}
+      initialExperiencesUpdatedAt={homeData?.updatedAt}
+    />
+  );
+}
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getCurrentLocale();
@@ -45,12 +61,19 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function Page() {
+  const homeDataPromise = getPublicHomeExperiences().catch((error: unknown) => {
+    console.error('[home] initial experiences unavailable:', error);
+    return null;
+  });
   const locale = await getCurrentLocale();
 
   return (
     <>
       <JsonLd data={[buildOrganizationJsonLd(locale), buildWebsiteJsonLd(locale)]} />
-      <HomePageClient />
+      <HomeSplashTrigger />
+      <Suspense fallback={<HomeStreamingFallback />}>
+        <HomeContent homeDataPromise={homeDataPromise} />
+      </Suspense>
       <LegacyExperiencePopup />
     </>
   );

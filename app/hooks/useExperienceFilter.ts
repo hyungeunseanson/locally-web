@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useEffect, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchActiveExperiences } from '../utils/api/experiences';
-import { Experience } from '../types';
+import type { PublicHomeExperience } from '@/app/home/homeExperienceTypes';
 import { sendSearchLog } from '@/app/utils/analytics/client';
 import { buildSearchHaystack, tokenizeSearchInput } from '@/app/search/searchText';
 
-// 🟢 통역기: 영어 ID가 들어오면 한글 DB 이름으로 바꿔주는 역할 (유지)
+// Keep the Home city shortcuts aligned with the Korean city values in the public data.
 const cityMap: Record<string, string> = {
   tokyo: '도쿄',
   osaka: '오사카',
@@ -17,91 +17,121 @@ const cityMap: Record<string, string> = {
   jeju: '제주'
 };
 
-const EMPTY_EXPERIENCES: Experience[] = [];
+const EMPTY_EXPERIENCES: PublicHomeExperience[] = [];
+const HOME_EXPERIENCES_QUERY_KEY = ['home-experiences', 'active'] as const;
 // Keep the date state and filtering path for a future return of the home date UI.
 const HOME_SEARCH_DATE_ENABLED = false;
+type DateRange = { start: Date | null; end: Date | null };
 
-export function useExperienceFilter() {
+type InitialHomeExperiences = {
+  initialExperiences?: PublicHomeExperience[];
+  initialExperiencesUpdatedAt?: number;
+};
+
+function filterExperiences(
+  experiences: PublicHomeExperience[],
+  searchTerm: string,
+  selectedCategory: string,
+  selectedLanguage: string,
+  dateRange: DateRange
+) {
+  let result = experiences;
+
+  if (searchTerm.trim()) {
+    const searchTerms = tokenizeSearchInput(searchTerm);
+    result = result.filter((item) => {
+      const haystack = buildSearchHaystack(item);
+      return searchTerms.every((term) => haystack.includes(term));
+    });
+  }
+
+  if (selectedLanguage !== 'all' && selectedLanguage !== '전체') {
+    result = result.filter((item) => item.languages?.includes(selectedLanguage));
+  }
+
+  if (HOME_SEARCH_DATE_ENABLED && dateRange.start) {
+    const start = new Date(dateRange.start); start.setHours(0, 0, 0, 0);
+    const end = dateRange.end ? new Date(dateRange.end) : new Date(dateRange.start); end.setHours(23, 59, 59, 999);
+
+    result = result.filter((item) =>
+      item.available_dates?.some((date) => {
+        const time = new Date(date).getTime();
+        return time >= start.getTime() && time <= end.getTime();
+      })
+    );
+  }
+
+  if (selectedCategory !== 'all') {
+    const targetCity = cityMap[selectedCategory] || selectedCategory;
+    result = result.filter((item) => item.city === targetCity);
+  }
+
+  return result;
+}
+
+export function useExperienceFilter({ initialExperiences, initialExperiencesUpdatedAt }: InitialHomeExperiences = {}) {
+  const queryClient = useQueryClient();
   const {
     data: allExperiences = EMPTY_EXPERIENCES,
+    dataUpdatedAt,
     isLoading: loading,
-    isSuccess,
     isError,
     refetch,
   } = useQuery({
-    queryKey: ['home-experiences', 'active'],
+    queryKey: HOME_EXPERIENCES_QUERY_KEY,
     queryFn: fetchActiveExperiences,
+    initialData: initialExperiences,
+    initialDataUpdatedAt: initialExperiencesUpdatedAt,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
     retry: false,
   });
 
-  const [filteredExperiences, setFilteredExperiences] = useState<Experience[]>([]);
-  const [locationInput, setLocationInput] = useState('');
+  const [locationInput, setLocationInputState] = useState('');
+  const [committedLocation, setCommittedLocation] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedLanguage, setSelectedLanguage] = useState('all');
-  const [dateRange, setDateRange] = useState<{ start: Date | null; end: Date | null }>({ start: null, end: null });
+  const [dateRange, setDateRange] = useState<DateRange>({ start: null, end: null });
 
-  useEffect(() => {
-    if (isSuccess) {
-      setFilteredExperiences(allExperiences);
-    }
-  }, [allExperiences, isSuccess]);
-
-  const applyFilters = (locationOverride?: string) => {
-    let result = allExperiences;
-    const searchTerm = locationOverride !== undefined ? locationOverride : locationInput;
-
-    if (searchTerm.trim()) {
-      sendSearchLog(searchTerm.trim(), 'main');
-
-      const searchTerms = tokenizeSearchInput(searchTerm);
-      result = result.filter(item => {
-        const haystack = buildSearchHaystack(item);
-        return searchTerms.every(term => haystack.includes(term));
-      });
-    }
-
-    if (selectedLanguage !== 'all' && selectedLanguage !== '전체') {
-      result = result.filter(item => item.languages?.includes(selectedLanguage));
-    }
-
-    if (HOME_SEARCH_DATE_ENABLED && dateRange.start) {
-      const start = new Date(dateRange.start); start.setHours(0, 0, 0, 0);
-      const end = dateRange.end ? new Date(dateRange.end) : new Date(dateRange.start); end.setHours(23, 59, 59, 999);
-
-      result = result.filter(item =>
-        item.available_dates?.some(d => {
-          const t = new Date(d).getTime();
-          return t >= start.getTime() && t <= end.getTime();
-        })
-      );
-    }
-
-    if (selectedCategory !== 'all') {
-      const targetCity = cityMap[selectedCategory] || selectedCategory;
-      result = result.filter(item => item.city === targetCity);
-    }
-
-    setFilteredExperiences(result);
+  const setLocationInput = (value: string) => {
+    setLocationInputState(value);
+    if (!value) setCommittedLocation('');
   };
 
+  // Render the server snapshot from the first frame. initialData does not replace
+  // an existing Query entry on a client-side return, so merge a newer snapshot.
+  const hasNewServerSnapshot = Boolean(
+    initialExperiences && initialExperiencesUpdatedAt && dataUpdatedAt < initialExperiencesUpdatedAt
+  );
+  const currentExperiences = hasNewServerSnapshot && initialExperiences ? initialExperiences : allExperiences;
+  const filteredExperiences = useMemo(() => filterExperiences(
+    currentExperiences, committedLocation, selectedCategory, selectedLanguage, dateRange
+  ), [currentExperiences, committedLocation, selectedCategory, selectedLanguage, dateRange]);
+
   useEffect(() => {
-    if (!locationInput) applyFilters();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCategory, selectedLanguage, dateRange, allExperiences]);
+    if (hasNewServerSnapshot && initialExperiences && initialExperiencesUpdatedAt) {
+      queryClient.setQueryData(HOME_EXPERIENCES_QUERY_KEY, initialExperiences, {
+        updatedAt: initialExperiencesUpdatedAt,
+      });
+    }
+  }, [hasNewServerSnapshot, initialExperiences, initialExperiencesUpdatedAt, queryClient]);
+
+  const applyFilters = (locationOverride?: string) => {
+    const searchTerm = locationOverride !== undefined ? locationOverride : locationInput;
+    if (searchTerm.trim()) sendSearchLog(searchTerm.trim(), 'main');
+    setCommittedLocation(searchTerm);
+  };
 
   return {
-    loading,
-    loadError: isError,
+    loading: loading && !hasNewServerSnapshot,
+    loadError: isError && !hasNewServerSnapshot,
     refetchExperiences: refetch,
     filteredExperiences,
-    allExperiences,
+    allExperiences: currentExperiences,
     locationInput, setLocationInput,
     selectedCategory, setSelectedCategory,
     selectedLanguage, setSelectedLanguage,
     dateRange, setDateRange,
-    setFilteredExperiences,
     applyFilters
   };
 }
