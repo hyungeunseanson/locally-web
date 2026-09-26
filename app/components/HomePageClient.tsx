@@ -11,8 +11,8 @@ import { HOME_MOBILE_CITY_SHORTCUTS, LOCALLY_SERVICES, type HomeMobileCityShortc
 import { useExperienceFilter } from '@/app/hooks/useExperienceFilter';
 import { HomeExperienceCardSkeleton } from '@/app/components/skeletons/HomeExperienceCardSkeleton';
 import { useLanguage } from '@/app/context/LanguageContext';
-import { useSplash } from '@/app/context/SplashContext';
 import { buildHomeExperienceSections } from '@/app/utils/homeExperienceSections';
+import type { PublicHomeExperience } from '@/app/home/homeExperienceTypes';
 
 type HomeExperience = HomeExperienceCardData & {
   created_at?: string | null;
@@ -48,14 +48,14 @@ function PopularExperienceHint({ text }: { text: string }) {
   );
 }
 
-export default function HomePageClient() {
+export default function HomePageClient({
+  initialExperiences,
+  initialExperiencesUpdatedAt,
+}: {
+  initialExperiences?: PublicHomeExperience[];
+  initialExperiencesUpdatedAt?: number;
+}) {
   const { t } = useLanguage();
-  const { showSplash } = useSplash();
-
-  useEffect(() => {
-    showSplash();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
   const [activeTab, setActiveTab] = useState<'experience' | 'service'>('experience');
   const [activeSearchField, setActiveSearchField] = useState<'location' | 'date' | 'language' | null>(null);
   const [scrollY, setScrollY] = useState(0);
@@ -68,9 +68,8 @@ export default function HomePageClient() {
     selectedCategory, setSelectedCategory,
     selectedLanguage, setSelectedLanguage,
     dateRange, setDateRange,
-    setFilteredExperiences,
     applyFilters
-  } = useExperienceFilter();
+  } = useExperienceFilter({ initialExperiences, initialExperiencesUpdatedAt });
 
   const handleHomeSearch = (locationOverride?: string) => {
     setDateRange({ start: null, end: null });
@@ -105,6 +104,8 @@ export default function HomePageClient() {
   );
 
   useEffect(() => {
+    // Pagination belongs to the current result set, so start again when it changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRevealedAllExperiencesCount(0);
   }, [allExperiencesResultKey]);
 
@@ -160,7 +161,6 @@ export default function HomePageClient() {
           setSelectedCategory(id);
           if (id === 'all') {
             setLocationInput('');
-            setFilteredExperiences(allExperiences);
           }
         }}
         isScrolled={scrollY > 50}
@@ -353,7 +353,6 @@ export default function HomePageClient() {
                     setSelectedLanguage('all');
                     setDateRange({ start: null, end: null });
                     setSelectedCategory('all');
-                    setFilteredExperiences(allExperiences);
                   }}
                   className="px-6 py-3 bg-slate-100 text-slate-900 rounded-xl font-bold hover:bg-slate-200 transition-colors"
                 >

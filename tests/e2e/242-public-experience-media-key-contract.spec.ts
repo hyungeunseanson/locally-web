@@ -141,11 +141,11 @@ test.describe('public experience deterministic media key contract', () => {
     expect(isPublicExperienceR2Eligible({ status: 'active', is_active: null })).toBe(false);
     expect(isPublicExperienceR2Eligible({ status: 'draft', is_active: true })).toBe(false);
 
-    const homeRoute = readFileSync('app/api/home/experiences/route.ts', 'utf8');
+    const homeData = readFileSync('app/home/homeExperienceData.server.ts', 'utf8');
     const searchRoute = readFileSync('app/api/search/experiences/route.ts', 'utf8');
     const detailData = readFileSync('app/experiences/[id]/publicDetailData.server.ts', 'utf8');
     const wishlistRoute = readFileSync('app/api/guest/wishlists/route.ts', 'utf8');
-    for (const source of [homeRoute, searchRoute, detailData, wishlistRoute]) {
+    for (const source of [homeData, searchRoute, detailData, wishlistRoute]) {
       expect(source).toMatch(/\bstatus\b/);
       expect(source).toMatch(/\bis_active\b/);
     }
