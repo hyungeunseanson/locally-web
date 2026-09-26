@@ -208,9 +208,11 @@ test.describe('Home public data behind brand splash', () => {
     const splash = page.locator('div[style*="z-index: 9999"] > img[alt="Locally"]');
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await expect(splash).toBeHidden();
+    await expect(page.getByTestId('home-desktop-all-experiences-section').getByText('서울 사전 로드 체험')).toBeVisible();
     await page.locator('button:has(svg.lucide-globe)').first().click();
+    const splashVisible = splash.waitFor({ state: 'visible', timeout: 2500 });
     await page.getByRole('button', { name: 'English' }).click();
-    await expect(splash).toBeVisible();
+    await splashVisible;
     await expect(splash).toBeHidden({ timeout: 2500 });
     await expect(page.getByTestId('home-desktop-all-experiences-section').getByText('Seoul Preloaded Experience')).toBeVisible();
   });

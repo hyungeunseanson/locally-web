@@ -321,9 +321,11 @@ test.describe('default-OFF deterministic public experience media reader', () => 
     for (const source of sources) expect(source).toContain('r2Eligible=');
 
     const homeRoute = readFileSync('app/api/home/experiences/route.ts', 'utf8');
+    const homeData = readFileSync('app/home/homeExperienceData.server.ts', 'utf8');
     const searchRoute = readFileSync('app/api/search/experiences/route.ts', 'utf8');
     const hostProfile = readFileSync('app/users/[id]/page.tsx', 'utf8');
-    expect(homeRoute).toContain('public_image_r2_eligible: isPublicExperienceR2Eligible(experience)');
+    expect(homeRoute).toContain('getPublicHomeExperiences()');
+    expect(homeData).toContain('public_image_r2_eligible: isPublicExperienceR2Eligible(experience)');
     expect(searchRoute).toContain('publicItem.public_image_r2_eligible = publicImageR2Eligible');
     expect(hostProfile).toContain("'status'");
     expect(hostProfile).toContain("'is_active'");
