@@ -489,9 +489,11 @@ test('passes the Cancel Pending profile and planned Cron addition to semantic pr
   ));
 });
 
-test('runs read-only Production browser smoke only after a successful real deploy', async () => {
+test('orders build, semantic preflight, pre-deploy smoke, deploy, and post-deploy smoke', async () => {
   const events = [];
   const commands = [];
+  const logs = [];
+  let smokeRuns = 0;
   await main([], {
     runCommand: (command, argumentsList) => {
       commands.push({ command, argumentsList });
@@ -501,16 +503,47 @@ test('runs read-only Production browser smoke only after a successful real deplo
       events.push('semantic-preflight');
     },
     runBrowserSmoke: async () => {
-      events.push('browser-smoke');
+      events.push(++smokeRuns === 1 ? 'pre-smoke' : 'post-smoke');
     },
-    log: () => {},
+    log: (message) => { logs.push(message); },
   });
 
-  assert.deepEqual(events, ['build', 'semantic-preflight', 'wrangler', 'browser-smoke']);
+  assert.deepEqual(events, ['build', 'semantic-preflight', 'pre-smoke', 'wrangler', 'post-smoke']);
+  assert.equal(smokeRuns, 2);
   assert.equal(commands.length, 2);
   assert(!commands[0].argumentsList.includes('--dry-run'));
   assert(!commands[1].argumentsList.includes('--dry-run'));
   assert.deepEqual(commands[1].argumentsList.slice(0, 3), ['deploy', '--config', './wrangler.jsonc']);
+  assert(logs.includes('PRE_DEPLOY_PRODUCTION_SMOKE_PASS'));
+  assert(logs.includes('POST_DEPLOY_PRODUCTION_SMOKE_PASS'));
+  assert.equal(JSON.parse(logs.at(-1)).preDeployProductionBrowserSmoke, 'pass');
+  assert.equal(JSON.parse(logs.at(-1)).productionBrowserSmoke, 'pass');
+});
+
+test('pre-deploy smoke failure preserves diagnostics and prevents Wrangler deploy', async () => {
+  const events = [];
+  const logs = [];
+  const diagnostic = new Error('/login input readiness timed out: {"elapsedMs":45000}');
+  await assert.rejects(
+    () => main([], {
+      runCommand: (_command, argumentsList) => {
+        events.push(argumentsList.includes('deploy') ? 'wrangler' : 'build');
+      },
+      runSemanticPreflight: async () => { events.push('semantic-preflight'); },
+      runBrowserSmoke: async () => {
+        events.push('pre-smoke');
+        throw diagnostic;
+      },
+      log: (message) => { logs.push(message); },
+    }),
+    (error) => {
+      assert.match(error.message, /PRE_DEPLOY_PRODUCTION_SMOKE_FAILED: \/login input readiness timed out/);
+      assert.equal(error.cause, diagnostic);
+      return true;
+    }
+  );
+  assert.deepEqual(events, ['build', 'semantic-preflight', 'pre-smoke']);
+  assert(logs.includes('PRE_DEPLOY_PRODUCTION_SMOKE_FAILED'));
 });
 
 test('preflight failure prevents Wrangler deploy invocation', async () => {
@@ -618,7 +651,7 @@ test('includes the Ops Anomaly Monitor flag in the explicit root-config deployme
   assert.equal(contract.wranglerArguments.at(-1), '--dry-run');
 });
 
-test('does not run browser smoke when Wrangler deploy fails', async () => {
+test('does not run post-deploy browser smoke when Wrangler deploy fails', async () => {
   let smokeRuns = 0;
   await assert.rejects(
     () => main([], {
@@ -633,13 +666,14 @@ test('does not run browser smoke when Wrangler deploy fails', async () => {
     }),
     /stub Wrangler failure/
   );
-  assert.equal(smokeRuns, 0);
+  assert.equal(smokeRuns, 1);
 });
 
 test('skips browser smoke for Production dry-run', async () => {
   let smokeRuns = 0;
   let preflightRuns = 0;
   let wranglerArguments;
+  const logs = [];
   await main(['--dry-run'], {
     runCommand: (_command, argumentsList) => {
       if (argumentsList.includes('deploy')) wranglerArguments = argumentsList;
@@ -650,16 +684,20 @@ test('skips browser smoke for Production dry-run', async () => {
     runSemanticPreflight: async () => {
       preflightRuns += 1;
     },
-    log: () => {},
+    log: (message) => { logs.push(message); },
   });
 
   assert.equal(smokeRuns, 0);
   assert.equal(preflightRuns, 0);
   assert(wranglerArguments.includes('--dry-run'));
+  assert.equal(JSON.parse(logs.at(-1)).preDeployProductionBrowserSmoke, 'skipped');
+  assert.equal(JSON.parse(logs.at(-1)).productionBrowserSmoke, 'skipped');
 });
 
 test('propagates browser smoke failure after the Worker deploy without rollback', async () => {
   const events = [];
+  const logs = [];
+  let smokeRuns = 0;
   await assert.rejects(
     () => main([], {
       runCommand: (_command, argumentsList) => {
@@ -669,18 +707,21 @@ test('propagates browser smoke failure after the Worker deploy without rollback'
         events.push('semantic-preflight');
       },
       runBrowserSmoke: async () => {
-        events.push('browser-smoke');
-        throw new Error('homepage smoke stage failed');
+        events.push(++smokeRuns === 1 ? 'pre-smoke' : 'post-smoke');
+        if (smokeRuns === 2) throw new Error('homepage smoke stage failed');
       },
-      log: () => {},
+      log: (message) => { logs.push(message); },
     }),
-    /Production Worker deploy completed, but browser smoke failed: homepage smoke stage failed.*Automatic rollback was not attempted/
+    /POST_DEPLOY_PRODUCTION_SMOKE_FAILED: Production Worker deploy completed, but browser smoke failed: homepage smoke stage failed.*Automatic rollback was not attempted/
   );
-  assert.deepEqual(events, ['build', 'semantic-preflight', 'wrangler', 'browser-smoke']);
+  assert.deepEqual(events, ['build', 'semantic-preflight', 'pre-smoke', 'wrangler', 'post-smoke']);
+  assert.equal(smokeRuns, 2);
+  assert(logs.includes('POST_DEPLOY_PRODUCTION_SMOKE_FAILED'));
 });
 
 test('completes successfully when browser smoke passes', async () => {
   const events = [];
+  let smokeRuns = 0;
   await main([], {
     runCommand: (_command, argumentsList) => {
       events.push(argumentsList.includes('deploy') ? 'wrangler' : 'build');
@@ -689,9 +730,9 @@ test('completes successfully when browser smoke passes', async () => {
       events.push('semantic-preflight');
     },
     runBrowserSmoke: async () => {
-      events.push('browser-smoke');
+      events.push(++smokeRuns === 1 ? 'pre-smoke' : 'post-smoke');
     },
     log: () => {},
   });
-  assert.deepEqual(events, ['build', 'semantic-preflight', 'wrangler', 'browser-smoke']);
+  assert.deepEqual(events, ['build', 'semantic-preflight', 'pre-smoke', 'wrangler', 'post-smoke']);
 });

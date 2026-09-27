@@ -5,9 +5,28 @@ import test from 'node:test';
 
 import { runProductionBrowserSmoke } from './run-production-browser-smoke.mjs';
 
-async function withFixtureServer({ unexpectedMethod, unexpectedPath, analyticsBody = '{"event_type":"view","target_id":"42"}', rumPosts = 0 } = {}, check) {
+async function withFixtureServer({
+  unexpectedMethod,
+  unexpectedPath,
+  analyticsBody = '{"event_type":"view","target_id":"42"}',
+  rumPosts = 0,
+  externalMethod,
+  externalPath = '/telemetry',
+  loginInputDelayMs = 0,
+  loginSpinnerForever = false,
+  loginGenericError = false,
+  loginUnrelatedInput = false,
+} = {}, check) {
   const receivedRequests = [];
+  const externalReceivedRequests = [];
   let backgroundStarted = false;
+  const externalServer = createServer((request, response) => {
+    const url = new URL(request.url, 'http://127.0.0.1');
+    externalReceivedRequests.push({ method: request.method, pathname: url.pathname });
+    response.writeHead(200, { 'access-control-allow-origin': '*' }).end('OK');
+  });
+  await new Promise((resolve) => externalServer.listen(0, '127.0.0.1', resolve));
+  const externalOrigin = `http://127.0.0.1:${externalServer.address().port}`;
   const server = createServer((request, response) => {
     const url = new URL(request.url, 'http://127.0.0.1');
     receivedRequests.push({ method: request.method, pathname: url.pathname, search: url.search });
@@ -25,6 +44,9 @@ async function withFixtureServer({ unexpectedMethod, unexpectedPath, analyticsBo
 
     const unexpectedWrite = unexpectedMethod
       ? `fetch(${JSON.stringify(unexpectedPath)}, { method: ${JSON.stringify(unexpectedMethod)} }).catch(() => {});`
+      : '';
+    const externalRequest = externalMethod
+      ? `fetch(${JSON.stringify(`${externalOrigin}${externalPath}`)}, { method: ${JSON.stringify(externalMethod)} }).catch(() => {});`
       : '';
     const rumWrites = Array.from({ length: rumPosts }, () => `
       fetch('/cdn-cgi/rum', { method: 'POST' })
@@ -44,8 +66,15 @@ async function withFixtureServer({ unexpectedMethod, unexpectedPath, analyticsBo
           .catch(() => {});
         ${rumWrites}
         ${unexpectedWrite}
+        ${externalRequest}
       </script></body>`,
-      '/login': '<title>Login</title><body><input aria-label="Email"></body>',
+      '/login': loginGenericError
+        ? '<title>Login</title><body>Something went wrong</body>'
+        : loginSpinnerForever
+          ? `<title>Login</title><body>${loginUnrelatedInput ? '<input aria-label="Site search">' : ''}<div class="animate-spin"></div></body>`
+          : loginInputDelayMs > 0
+            ? `<title>Login</title><body><div class="animate-spin"></div><script>setTimeout(() => { document.body.insertAdjacentHTML('beforeend', '<div data-testid="login-modal"><input aria-label="Email"></div>'); }, ${loginInputDelayMs});</script></body>`
+            : '<title>Login</title><body><div data-testid="login-modal"><input aria-label="Email"></div></body>',
     };
     response.writeHead(200, { 'content-type': 'text/html' });
     response.end(pages[url.pathname] ?? '<body>OK</body>');
@@ -54,10 +83,12 @@ async function withFixtureServer({ unexpectedMethod, unexpectedPath, analyticsBo
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const origin = `http://127.0.0.1:${server.address().port}`;
   try {
-    await check({ origin, receivedRequests, backgroundStarted: () => backgroundStarted });
+    await check({ origin, externalOrigin, receivedRequests, externalReceivedRequests, backgroundStarted: () => backgroundStarted });
   } finally {
     server.closeAllConnections();
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    externalServer.closeAllConnections();
+    await new Promise((resolve, reject) => externalServer.close((error) => error ? reject(error) : resolve()));
   }
 }
 
@@ -172,3 +203,94 @@ for (const [method, pathname] of [
     });
   });
 }
+
+test('external GET passes through the mutation gate', async () => {
+  await withFixtureServer({ externalMethod: 'GET' }, async ({ origin, externalReceivedRequests }) => {
+    const result = await runProductionBrowserSmoke(origin);
+    assert.equal(result.status, 'LOCALLY_PRODUCTION_BROWSER_SMOKE_PASS');
+    assert.deepEqual(externalReceivedRequests, [{ method: 'GET', pathname: '/telemetry' }]);
+    assert.deepEqual(result.blockedExpectedExternalWrites, []);
+    assert.deepEqual(result.blockedUnexpectedExternalWrites, []);
+  });
+});
+
+test('exact reviewed external telemetry POST is fulfilled locally without reaching the external server', async () => {
+  await withFixtureServer({ externalMethod: 'POST' }, async ({ origin, externalOrigin, externalReceivedRequests }) => {
+    const result = await runProductionBrowserSmoke(origin, {
+      reviewedExternalTelemetry: [{
+        origin: externalOrigin,
+        pathname: '/telemetry',
+        method: 'POST',
+        kind: 'test_telemetry',
+      }],
+    });
+    assert.equal(result.status, 'LOCALLY_PRODUCTION_BROWSER_SMOKE_PASS');
+    assert.deepEqual(result.blockedExpectedExternalWrites, [{
+      method: 'POST',
+      pathname: '/telemetry',
+      hostname: '127.0.0.1',
+      resourceType: 'fetch',
+      kind: 'test_telemetry',
+    }]);
+    assert.deepEqual(result.blockedUnexpectedExternalWrites, []);
+    assert.deepEqual(externalReceivedRequests, []);
+  });
+});
+
+for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+  test(`unknown external ${method} is blocked locally and fails smoke`, async () => {
+    await withFixtureServer({ externalMethod: method }, async ({ origin, externalReceivedRequests }) => {
+      await assert.rejects(runProductionBrowserSmoke(origin), (error) =>
+        error.message.includes('unexpected writes')
+        && error.message.includes(`"method":"${method}"`)
+        && error.message.includes('"pathname":"/telemetry"'));
+      assert.deepEqual(externalReceivedRequests, []);
+    });
+  });
+}
+
+for (const [label, loginInputDelayMs] of [
+  ['14-second-equivalent', 140],
+  ['20-second-equivalent', 200],
+]) {
+  test(`delayed Login input ${label} passes within the Login-specific timeout`, async () => {
+    await withFixtureServer({ loginInputDelayMs }, async ({ origin }) => {
+      const result = await runProductionBrowserSmoke(origin, { loginReadinessTimeoutMs: 450 });
+      assert.equal(result.login, 'rendered');
+    });
+  });
+}
+
+test('Login input beyond its timeout boundary fails with bounded diagnostics', async () => {
+  await withFixtureServer({ loginInputDelayMs: 1000 }, async ({ origin }) => {
+    await assert.rejects(
+      runProductionBrowserSmoke(origin, { loginReadinessTimeoutMs: 100 }),
+      (error) => error.message.includes('/login input readiness timed out')
+        && error.message.includes('"bodyReady":true')
+        && error.message.includes('"spinnerPresent":true')
+        && error.message.includes('"loginModalPresent":false')
+        && error.message.includes('"documentReadyState":"complete"')
+        && error.message.includes('"pendingFirstPartyRequestCount":0')
+    );
+  });
+});
+
+test('Login spinner forever fails rather than passing on HTTP 200', async () => {
+  await withFixtureServer({ loginSpinnerForever: true, loginUnrelatedInput: true }, async ({ origin }) => {
+    await assert.rejects(
+      runProductionBrowserSmoke(origin, { loginReadinessTimeoutMs: 100 }),
+      (error) => error.message.includes('/login input readiness timed out')
+        && error.message.includes('"spinnerPresent":true')
+    );
+  });
+});
+
+test('Login generic error before input fails rather than passing on HTTP 200', async () => {
+  await withFixtureServer({ loginGenericError: true }, async ({ origin }) => {
+    await assert.rejects(
+      runProductionBrowserSmoke(origin, { loginReadinessTimeoutMs: 100 }),
+      (error) => error.message.includes('/login rendered a generic error before input readiness')
+        && error.message.includes('"genericErrorPresent":true')
+    );
+  });
+});

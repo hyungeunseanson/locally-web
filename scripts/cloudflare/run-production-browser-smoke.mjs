@@ -9,26 +9,53 @@ const GENERIC_ERROR_TEXT = /페이지를 불러오지 못했습니다|Something 
 const MISSING_SUPABASE_ENV_TEXT = /\[Supabase\].*NEXT_PUBLIC_SUPABASE_URL.*NEXT_PUBLIC_SUPABASE_ANON_KEY/;
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const READINESS_TIMEOUT_MS = 15000;
+const LOGIN_READINESS_TIMEOUT_MS = 45000;
 const EXPECTED_ANALYTICS_PATH = '/api/analytics/events';
 const EXPECTED_CLOUDFLARE_RUM_PATH = '/cdn-cgi/rum';
 const KNOWN_ANALYTICS_EVENT_TYPES = new Set(['view', 'click', 'payment_init', 'booking_confirmed']);
+// The bounded Production diagnostic observed no external writes. Keep this empty
+// until a specific host and path have been observed and reviewed.
+const REVIEWED_EXTERNAL_TELEMETRY = Object.freeze([]);
 
-export async function installProductionMutationGate(context, origin) {
+export async function installProductionMutationGate(context, origin, { reviewedExternalTelemetry = REVIEWED_EXTERNAL_TELEMETRY } = {}) {
   const productionOrigin = new URL(origin).origin;
   const blockedExpectedWrites = [];
   const blockedUnexpectedWrites = [];
+  const blockedExpectedExternalWrites = [];
+  const blockedUnexpectedExternalWrites = [];
 
   await context.route('**/*', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
     const method = request.method().toUpperCase();
 
-    if (url.origin !== productionOrigin || READ_METHODS.has(method)) {
+    if (READ_METHODS.has(method)) {
       await route.continue();
       return;
     }
 
     const blockedWrite = { method, pathname: url.pathname };
+    if (url.origin !== productionOrigin) {
+      const externalWrite = {
+        ...blockedWrite,
+        hostname: url.hostname,
+        resourceType: request.resourceType(),
+      };
+      const reviewed = reviewedExternalTelemetry.find((contract) =>
+        contract.origin === url.origin
+        && contract.pathname === url.pathname
+        && contract.method === method
+      );
+      if (reviewed) {
+        blockedExpectedExternalWrites.push({ ...externalWrite, kind: reviewed.kind });
+        await route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*' }, body: '' });
+      } else {
+        blockedUnexpectedExternalWrites.push(externalWrite);
+        await route.abort('blockedbyclient');
+      }
+      return;
+    }
+
     if (method === 'POST' && url.pathname === EXPECTED_CLOUDFLARE_RUM_PATH) {
       blockedExpectedWrites.push({ ...blockedWrite, kind: 'cloudflare_rum' });
       await route.fulfill({ status: 204, body: '' });
@@ -65,7 +92,12 @@ export async function installProductionMutationGate(context, origin) {
     await route.abort('blockedbyclient');
   });
 
-  return { blockedExpectedWrites, blockedUnexpectedWrites };
+  return {
+    blockedExpectedWrites,
+    blockedUnexpectedWrites,
+    blockedExpectedExternalWrites,
+    blockedUnexpectedExternalWrites,
+  };
 }
 
 function resolveProductionOrigin() {
@@ -89,6 +121,12 @@ async function visitReadOnlyPage(context, origin, pathname, check) {
   const page = await context.newPage();
   const pageErrors = [];
   const firstPartyConsoleErrors = [];
+  const pendingFirstPartyRequests = new Set();
+  page.on('request', (request) => {
+    if (new URL(request.url()).origin === origin) pendingFirstPartyRequests.add(request);
+  });
+  page.on('requestfinished', (request) => pendingFirstPartyRequests.delete(request));
+  page.on('requestfailed', (request) => pendingFirstPartyRequests.delete(request));
   page.on('pageerror', (error) => pageErrors.push(error.message));
   page.on('console', (message) => {
     if (message.type() !== 'error') return;
@@ -106,7 +144,7 @@ async function visitReadOnlyPage(context, origin, pathname, check) {
     });
     assert.equal(response?.status(), 200, `${pathname} must return HTTP 200.`);
     await page.locator('body').waitFor({ state: 'visible', timeout: READINESS_TIMEOUT_MS });
-    const result = await check(page);
+    const result = await check(page, () => pendingFirstPartyRequests.size);
     await page.waitForTimeout(750);
 
     const bodyText = await page.locator('body').innerText();
@@ -123,10 +161,46 @@ async function visitReadOnlyPage(context, origin, pathname, check) {
   }
 }
 
-export async function runProductionBrowserSmoke(origin = resolveProductionOrigin()) {
+async function waitForLoginInput(page, timeoutMs, pendingFirstPartyRequestCount) {
+  const startedAt = Date.now();
+  try {
+    await page.locator('[data-testid="login-modal"] input:visible').first().waitFor({
+      state: 'visible', timeout: timeoutMs,
+    });
+  } catch (error) {
+    if (error?.name !== 'TimeoutError') throw error;
+    const state = await page.evaluate(() => ({
+      documentReadyState: document.readyState,
+      bodyReady: Boolean(document.body),
+      spinnerPresent: Boolean(document.querySelector('.animate-spin')),
+      loginModalPresent: Boolean(document.querySelector('[data-testid="login-modal"]')),
+      genericErrorPresent: /페이지를 불러오지 못했습니다|Something went wrong|An error occurred/i.test(document.body?.innerText ?? ''),
+    }));
+    const diagnostic = {
+      elapsedMs: Date.now() - startedAt,
+      ...state,
+      pendingFirstPartyRequestCount: pendingFirstPartyRequestCount(),
+    };
+    if (state.genericErrorPresent) {
+      throw new Error(`/login rendered a generic error before input readiness: ${JSON.stringify(diagnostic)}`, { cause: error });
+    }
+    throw new Error(`/login input readiness timed out: ${JSON.stringify(diagnostic)}`, { cause: error });
+  }
+}
+
+export async function runProductionBrowserSmoke(
+  origin = resolveProductionOrigin(),
+  { loginReadinessTimeoutMs = LOGIN_READINESS_TIMEOUT_MS, reviewedExternalTelemetry = REVIEWED_EXTERNAL_TELEMETRY } = {}
+) {
+  assert(Number.isFinite(loginReadinessTimeoutMs) && loginReadinessTimeoutMs > 0);
   const browser = await chromium.launch({ headless: true, ...createBrowserLaunchOptions() });
   const context = await browser.newContext({ serviceWorkers: 'block' });
-  const { blockedExpectedWrites, blockedUnexpectedWrites } = await installProductionMutationGate(context, origin);
+  const {
+    blockedExpectedWrites,
+    blockedUnexpectedWrites,
+    blockedExpectedExternalWrites,
+    blockedUnexpectedExternalWrites,
+  } = await installProductionMutationGate(context, origin, { reviewedExternalTelemetry });
   let result;
   let smokeError;
 
@@ -152,10 +226,8 @@ export async function runProductionBrowserSmoke(origin = resolveProductionOrigin
       return null;
     });
 
-    await visitReadOnlyPage(context, origin, '/login', async (page) => {
-      await page.locator('input:visible').first().waitFor({
-        state: 'visible', timeout: READINESS_TIMEOUT_MS,
-      });
+    await visitReadOnlyPage(context, origin, '/login', async (page, pendingFirstPartyRequestCount) => {
+      await waitForLoginInput(page, loginReadinessTimeoutMs, pendingFirstPartyRequestCount);
       return null;
     });
 
@@ -181,6 +253,8 @@ export async function runProductionBrowserSmoke(origin = resolveProductionOrigin
       unauthenticatedProxyBookings: unauthenticatedStatus,
       blockedExpectedWrites,
       blockedUnexpectedWrites,
+      blockedExpectedExternalWrites,
+      blockedUnexpectedExternalWrites,
     };
   } catch (error) {
     smokeError = error;
@@ -189,8 +263,11 @@ export async function runProductionBrowserSmoke(origin = resolveProductionOrigin
     await browser.close();
   }
 
-  if (blockedUnexpectedWrites.length > 0) {
-    throw new Error(`Production smoke blocked unexpected first-party writes: ${JSON.stringify(blockedUnexpectedWrites)}`, {
+  if (blockedUnexpectedWrites.length > 0 || blockedUnexpectedExternalWrites.length > 0) {
+    throw new Error(`Production smoke blocked unexpected writes: ${JSON.stringify({
+      firstParty: blockedUnexpectedWrites,
+      external: blockedUnexpectedExternalWrites,
+    })}`, {
       cause: smokeError,
     });
   }
