@@ -67,6 +67,9 @@ export default function LanguageSelector() {
     }
 
     router.push(newPath);
+    // Root/page metadata can be reused across a client-side locale rewrite.
+    // Refresh the destination so canonical and alternate links use its locale.
+    router.refresh();
   };
 
   return (

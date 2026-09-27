@@ -74,6 +74,11 @@ test.describe('Auth session regression gate', () => {
     await page.reload();
     await expect(page).toHaveURL(/\/account$/);
 
+    await page.goto('/en/account');
+    await expect(page).toHaveURL(/\/en\/account$/);
+    await expect(page.getByRole('button', { name: 'Sign Out', exact: true })).toBeVisible();
+    expect((await context.cookies(APP_ORIGIN)).some(({ name }) => isSupabaseSessionCookie(name))).toBe(true);
+
     const persistedState = await context.storageState();
     const restoredContext = await browser.newContext({
       baseURL: APP_ORIGIN,
@@ -102,6 +107,18 @@ test.describe('Auth session regression gate', () => {
 
     await page.goto('/account');
     await expect(page).toHaveURL(/\/login\?returnUrl=%2Faccount$/);
+  });
+
+  test('locale-prefixed login keeps the return path and session', async ({ page, context }) => {
+    const response = await page.goto('/en/login?returnUrl=%2Fen%2Faccount');
+    expect(response?.status()).toBe(200);
+    await dismissGlobalAnnouncement(page);
+    await page.locator('input[type="email"]').fill(MOCK_AUTH_EMAIL);
+    await page.locator('input[type="password"]').fill(MOCK_AUTH_PASSWORD);
+    await page.getByRole('button', { name: 'Log in', exact: true }).click();
+    await expect(page).toHaveURL(/\/en\/account$/);
+    await expect(page.getByRole('heading', { name: 'Profile & Account' })).toBeVisible();
+    expect((await context.cookies(APP_ORIGIN)).some(({ name }) => isSupabaseSessionCookie(name))).toBe(true);
   });
 
   for (const provider of ['google', 'kakao'] as const) {

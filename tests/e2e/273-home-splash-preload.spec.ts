@@ -59,6 +59,10 @@ test.describe('Home public data behind brand splash', () => {
         return;
       }
       if (path.endsWith('/experiences')) {
+        if (new URL(request.url ?? '/', `http://127.0.0.1:${fixturePort}`).searchParams.get('id') === 'eq.99001') {
+          respond(response, 200, visibleExperience);
+          return;
+        }
         respond(response, 200, [
           visibleExperience,
           { ...visibleExperience, id: 99002, title: 'Inactive Experience', is_active: false },
@@ -229,4 +233,60 @@ test.describe('Home public data behind brand splash', () => {
       await expect(page.getByTestId('home-desktop-all-experiences-section').getByText(title)).toBeVisible();
     });
   }
+
+  for (const [locale, title] of [
+    ['en', 'Seoul Preloaded Experience'],
+    ['ja', 'ソウル事前読み込み体験'],
+    ['zh', '首尔预加载体验'],
+  ] as const) {
+    test(`serves /${locale} with localized initial Home data`, async ({ page, context }) => {
+      await context.clearCookies();
+      const initialApiRequests: string[] = [];
+      page.on('request', (request) => {
+        if (request.url().includes('/api/home/experiences')) initialApiRequests.push(request.url());
+      });
+      const response = await page.goto(`/${locale}`, { waitUntil: 'domcontentloaded' });
+      expect(response?.status()).toBe(200);
+      expect(await response?.text()).toContain(title);
+      await expect(page.locator('html')).toHaveAttribute('lang', locale);
+      await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', new RegExp(`/${locale}$`));
+      await expect(page.getByTestId('home-desktop-all-experiences-section').getByText(title)).toBeVisible();
+      await expect(page.locator('div[style*="z-index: 9999"] > img[alt="Locally"]')).toBeHidden({ timeout: 2500 });
+      expect((await context.cookies()).find((cookie) => cookie.name === 'app_lang')?.value).toBe(locale);
+      expect(initialApiRequests).toHaveLength(0);
+    });
+  }
+
+  test('replaces locale prefixes without losing the path, query, or language splash', async ({ page }) => {
+    await page.goto('/search?location=Tokyo', { waitUntil: 'domcontentloaded' });
+    for (const [label, path, locale] of [
+      ['English', '/en/search?location=Tokyo', 'en'],
+      ['日本語', '/ja/search?location=Tokyo', 'ja'],
+      ['中文', '/zh/search?location=Tokyo', 'zh'],
+      ['한국어', '/search?location=Tokyo', 'ko'],
+    ] as const) {
+      await page.locator('button:has(svg.lucide-globe)').first().click();
+      await page.getByRole('button', { name: label, exact: true }).click();
+      await expect(page).toHaveURL(new RegExp(`${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`));
+      await expect(page.locator('div[style*="z-index: 9999"] > img[alt="Locally"]')).toBeHidden({ timeout: 2500 });
+      await expect(page.locator('html')).toHaveAttribute('lang', locale);
+      await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+        'href', new RegExp(`${locale === 'ko' ? '' : `/${locale}`}/search$`)
+      );
+      expect((await page.context().cookies()).find((cookie) => cookie.name === 'app_lang')?.value).toBe(locale);
+    }
+  });
+
+  test('keeps a public experience detail reachable through locale prefixes', async ({ request }) => {
+    for (const locale of ['ko', 'en', 'ja', 'zh'] as const) {
+      const path = locale === 'ko' ? '/experiences/99001' : `/${locale}/experiences/99001`;
+      const response = await request.get(path);
+      expect(response.status(), path).toBe(200);
+      const html = await response.text();
+      expect(html).toContain(`<html lang="${locale}"`);
+      expect(html).toContain(locale === 'en' ? 'Seoul Preloaded Experience' :
+        locale === 'ja' ? 'ソウル事前読み込み体験' :
+        locale === 'zh' ? '首尔预加载体验' : '서울 사전 로드 체험');
+    }
+  });
 });
