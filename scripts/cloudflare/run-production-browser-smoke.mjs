@@ -10,6 +10,7 @@ const MISSING_SUPABASE_ENV_TEXT = /\[Supabase\].*NEXT_PUBLIC_SUPABASE_URL.*NEXT_
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const READINESS_TIMEOUT_MS = 15000;
 const EXPECTED_ANALYTICS_PATH = '/api/analytics/events';
+const EXPECTED_CLOUDFLARE_RUM_PATH = '/cdn-cgi/rum';
 const KNOWN_ANALYTICS_EVENT_TYPES = new Set(['view', 'click', 'payment_init', 'booking_confirmed']);
 
 export async function installProductionMutationGate(context, origin) {
@@ -28,6 +29,11 @@ export async function installProductionMutationGate(context, origin) {
     }
 
     const blockedWrite = { method, pathname: url.pathname };
+    if (method === 'POST' && url.pathname === EXPECTED_CLOUDFLARE_RUM_PATH) {
+      blockedExpectedWrites.push({ ...blockedWrite, kind: 'cloudflare_rum' });
+      await route.fulfill({ status: 204, body: '' });
+      return;
+    }
     if (method === 'POST' && url.pathname === EXPECTED_ANALYTICS_PATH) {
       let payload;
       try {

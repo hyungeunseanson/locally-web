@@ -5,7 +5,7 @@ import test from 'node:test';
 
 import { runProductionBrowserSmoke } from './run-production-browser-smoke.mjs';
 
-async function withFixtureServer({ unexpectedMethod, unexpectedPath, analyticsBody = '{"event_type":"view","target_id":"42"}' } = {}, check) {
+async function withFixtureServer({ unexpectedMethod, unexpectedPath, analyticsBody = '{"event_type":"view","target_id":"42"}', rumPosts = 0 } = {}, check) {
   const receivedRequests = [];
   let backgroundStarted = false;
   const server = createServer((request, response) => {
@@ -26,6 +26,14 @@ async function withFixtureServer({ unexpectedMethod, unexpectedPath, analyticsBo
     const unexpectedWrite = unexpectedMethod
       ? `fetch(${JSON.stringify(unexpectedPath)}, { method: ${JSON.stringify(unexpectedMethod)} }).catch(() => {});`
       : '';
+    const rumWrites = Array.from({ length: rumPosts }, () => `
+      fetch('/cdn-cgi/rum', { method: 'POST' })
+        .then((result) => {
+          if (result.status !== 204) throw new Error('RUM synthetic response was not HTTP 204');
+          return fetch('/rum-synthetic-observed?status=' + result.status);
+        })
+        .catch((error) => console.error(error));
+    `).join('');
     const pages = {
       '/': '<title>Home</title><body><a href="/experiences/42">Public experience</a><script>fetch("/get-probe");fetch("/head-probe",{method:"HEAD"});fetch("/options-probe",{method:"OPTIONS"});</script></body>',
       '/experiences/42': `<title>Experience</title><body><h1>Public experience</h1><script>
@@ -34,6 +42,7 @@ async function withFixtureServer({ unexpectedMethod, unexpectedPath, analyticsBo
           .then((result) => result.json())
           .then((body) => fetch('/synthetic-observed?success=' + body.success + '&skipped=' + body.skipped))
           .catch(() => {});
+        ${rumWrites}
         ${unexpectedWrite}
       </script></body>`,
       '/login': '<title>Login</title><body><input aria-label="Email"></body>',
@@ -76,6 +85,50 @@ test('GET pages and protected API stay live while analytics POST is fulfilled lo
     assert.deepEqual(receivedRequests.filter((request) => !['GET', 'HEAD', 'OPTIONS'].includes(request.method)), []);
   });
 });
+
+for (const rumPosts of [1, 2]) {
+  test(`${rumPosts} exact Cloudflare RUM POST beacon(s) are fulfilled locally without console errors`, async () => {
+    await withFixtureServer({ rumPosts }, async ({ origin, receivedRequests }) => {
+      const result = await runProductionBrowserSmoke(origin);
+      assert.equal(result.unauthenticatedProxyBookings, 401);
+      assert.equal(result.blockedExpectedWrites.filter((write) =>
+        write.method === 'POST' && write.pathname === '/cdn-cgi/rum'
+        && write.kind === 'cloudflare_rum').length, rumPosts);
+      assert.equal(receivedRequests.filter((request) =>
+        request.method === 'GET' && request.pathname === '/rum-synthetic-observed'
+        && request.search === '?status=204').length, rumPosts);
+      assert.deepEqual(result.blockedUnexpectedWrites, []);
+      assert.deepEqual(receivedRequests.filter((request) => !['GET', 'HEAD', 'OPTIONS'].includes(request.method)), []);
+    });
+  });
+}
+
+for (const pathname of [
+  '/cdn-cgi/rum-evil',
+  '/cdn-cgi/rum/test',
+  '/api/cdn-cgi/rum',
+  '/cdn-cgi/other',
+  '/cdn-cgi/rum/',
+]) {
+  test(`POST ${pathname} is not expected Cloudflare RUM telemetry`, async () => {
+    await withFixtureServer({ unexpectedMethod: 'POST', unexpectedPath: pathname }, async ({ origin, receivedRequests }) => {
+      await assert.rejects(runProductionBrowserSmoke(origin), (error) =>
+        error.message.includes(`"pathname":"${pathname}"`));
+      assert.deepEqual(receivedRequests.filter((request) => !['GET', 'HEAD', 'OPTIONS'].includes(request.method)), []);
+    });
+  });
+}
+
+for (const method of ['PUT', 'PATCH', 'DELETE']) {
+  test(`${method} /cdn-cgi/rum is blocked and fails smoke`, async () => {
+    await withFixtureServer({ unexpectedMethod: method, unexpectedPath: '/cdn-cgi/rum' }, async ({ origin, receivedRequests }) => {
+      await assert.rejects(runProductionBrowserSmoke(origin), (error) =>
+        error.message.includes(`"method":"${method}"`)
+        && error.message.includes('"pathname":"/cdn-cgi/rum"'));
+      assert.deepEqual(receivedRequests.filter((request) => !['GET', 'HEAD', 'OPTIONS'].includes(request.method)), []);
+    });
+  });
+}
 
 for (const [label, analyticsBody, eventType] of [
   ['click', '{"event_type":"click","target_id":"42"}', 'click'],
