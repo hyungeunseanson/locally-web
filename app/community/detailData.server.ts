@@ -123,6 +123,7 @@ const COMMUNITY_DETAIL_POST_SELECT_LEGACY = [
 ].join(', ');
 
 const COMMUNITY_DETAIL_REVALIDATE_SECONDS = 300;
+const COMMUNITY_POST_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function getCommunityDetailPostUncached(id: string) {
   const supabase = createPublicServerClient();
@@ -226,6 +227,15 @@ async function getCommunityDetailPostUncached(id: string) {
 }
 
 export async function getCommunityDetailPost(id: string) {
+  if (!COMMUNITY_POST_ID_RE.test(id)) {
+    return {
+      post: null,
+      profile: null,
+      linkedExperience: null,
+      usedPreBoardFallback: false,
+    };
+  }
+
   if (process.env.NODE_ENV !== 'production') {
     return getCommunityDetailPostUncached(id);
   }
