@@ -231,15 +231,26 @@ export async function main(argumentsList = process.argv.slice(2), dependencies =
       wranglerCommand,
       log,
     });
+    try {
+      await runBrowserSmoke();
+      log('PRE_DEPLOY_PRODUCTION_SMOKE_PASS');
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      log('PRE_DEPLOY_PRODUCTION_SMOKE_FAILED');
+      throw new Error(`PRE_DEPLOY_PRODUCTION_SMOKE_FAILED: ${reason}`, { cause: error });
+    }
   }
   runCommand(wranglerCommand, contract.wranglerArguments);
   if (!options.dryRun) {
     try {
       await runBrowserSmoke();
+      log('POST_DEPLOY_PRODUCTION_SMOKE_PASS');
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
+      log('POST_DEPLOY_PRODUCTION_SMOKE_FAILED');
       throw new Error(
-        `Production Worker deploy completed, but browser smoke failed: ${reason} Automatic rollback was not attempted.`
+        `POST_DEPLOY_PRODUCTION_SMOKE_FAILED: Production Worker deploy completed, but browser smoke failed: ${reason} Automatic rollback was not attempted.`,
+        { cause: error }
       );
     }
   }
@@ -247,6 +258,7 @@ export async function main(argumentsList = process.argv.slice(2), dependencies =
     status: options.dryRun
       ? 'LOCALLY_CLOUDFLARE_PRODUCTION_DEPLOY_DRY_RUN_PASS'
       : 'LOCALLY_CLOUDFLARE_PRODUCTION_DEPLOY_PASS',
+    preDeployProductionBrowserSmoke: options.dryRun ? 'skipped' : 'pass',
     productionBrowserSmoke: options.dryRun ? 'skipped' : 'pass',
     publicExperienceMediaProfile: profile.name,
     publicExperienceMediaEnabled: profile.enabled,
