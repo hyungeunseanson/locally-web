@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import test from 'node:test';
 
 import { runProductionBrowserSmoke } from './run-production-browser-smoke.mjs';
 
-async function withFixtureServer({ unexpectedMethod, unexpectedPath } = {}, check) {
+async function withFixtureServer({ unexpectedMethod, unexpectedPath, analyticsBody = '{"event_type":"view","target_id":"42"}' } = {}, check) {
   const receivedRequests = [];
   let backgroundStarted = false;
   const server = createServer((request, response) => {
@@ -29,9 +30,10 @@ async function withFixtureServer({ unexpectedMethod, unexpectedPath } = {}, chec
       '/': '<title>Home</title><body><a href="/experiences/42">Public experience</a><script>fetch("/get-probe");fetch("/head-probe",{method:"HEAD"});fetch("/options-probe",{method:"OPTIONS"});</script></body>',
       '/experiences/42': `<title>Experience</title><body><h1>Public experience</h1><script>
         fetch('/background');
-        fetch('/api/analytics/events', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+        fetch('/api/analytics/events', { method: 'POST', headers: { 'content-type': 'application/json' }, body: ${JSON.stringify(analyticsBody)} })
           .then((result) => result.json())
-          .then((body) => fetch('/synthetic-observed?success=' + body.success + '&skipped=' + body.skipped));
+          .then((body) => fetch('/synthetic-observed?success=' + body.success + '&skipped=' + body.skipped))
+          .catch(() => {});
         ${unexpectedWrite}
       </script></body>`,
       '/login': '<title>Login</title><body><input aria-label="Email"></body>',
@@ -68,10 +70,36 @@ test('GET pages and protected API stay live while analytics POST is fulfilled lo
       && request.search.includes('success=true')
       && request.search.includes('skipped=production_smoke')));
     assert(result.blockedExpectedWrites.some((write) =>
-      write.method === 'POST' && write.pathname === '/api/analytics/events'));
+      write.method === 'POST' && write.pathname === '/api/analytics/events'
+      && write.eventType === 'view' && write.targetId === '42'));
     assert.deepEqual(result.blockedUnexpectedWrites, []);
     assert.deepEqual(receivedRequests.filter((request) => !['GET', 'HEAD', 'OPTIONS'].includes(request.method)), []);
   });
+});
+
+for (const [label, analyticsBody, eventType] of [
+  ['click', '{"event_type":"click","target_id":"42"}', 'click'],
+  ['payment_init', '{"event_type":"payment_init","target_id":"42"}', 'payment_init'],
+  ['booking_confirmed', '{"event_type":"booking_confirmed","target_id":"42"}', 'booking_confirmed'],
+  ['missing event_type', '{"target_id":"42"}', null],
+  ['malformed JSON', '{', null],
+  ['missing target_id', '{"event_type":"view"}', 'view'],
+]) {
+  test(`analytics ${label} is blocked before the server and fails smoke`, async () => {
+    await withFixtureServer({ analyticsBody }, async ({ origin, receivedRequests }) => {
+      await assert.rejects(
+        runProductionBrowserSmoke(origin),
+        (error) => error.message.includes('"pathname":"/api/analytics/events"')
+          && error.message.includes(`"eventType":${JSON.stringify(eventType)}`)
+      );
+      assert.deepEqual(receivedRequests.filter((request) => !['GET', 'HEAD', 'OPTIONS'].includes(request.method)), []);
+    });
+  });
+}
+
+test('protected API smoke cannot bypass BrowserContext routes through APIRequestContext', () => {
+  const source = readFileSync(new URL('./run-production-browser-smoke.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /\b(?:context|page|apiPage)\.request\b|\bAPIRequestContext\b/);
 });
 
 for (const [method, pathname] of [

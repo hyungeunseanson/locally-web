@@ -10,6 +10,7 @@ const MISSING_SUPABASE_ENV_TEXT = /\[Supabase\].*NEXT_PUBLIC_SUPABASE_URL.*NEXT_
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const READINESS_TIMEOUT_MS = 15000;
 const EXPECTED_ANALYTICS_PATH = '/api/analytics/events';
+const KNOWN_ANALYTICS_EVENT_TYPES = new Set(['view', 'click', 'payment_init', 'booking_confirmed']);
 
 export async function installProductionMutationGate(context, origin) {
   const productionOrigin = new URL(origin).origin;
@@ -28,13 +29,30 @@ export async function installProductionMutationGate(context, origin) {
 
     const blockedWrite = { method, pathname: url.pathname };
     if (method === 'POST' && url.pathname === EXPECTED_ANALYTICS_PATH) {
-      blockedExpectedWrites.push(blockedWrite);
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ success: true, skipped: 'production_smoke' }),
-      });
-      return;
+      let payload;
+      try {
+        payload = JSON.parse(request.postData() ?? '');
+      } catch {
+        // Malformed analytics is still a blocked write, never a request to Production.
+      }
+      if (payload?.event_type === 'view'
+        && typeof payload.target_id === 'string'
+        && payload.target_id.trim().length > 0) {
+        blockedExpectedWrites.push({
+          ...blockedWrite,
+          eventType: 'view',
+          targetId: payload.target_id,
+        });
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true, skipped: 'production_smoke' }),
+        });
+        return;
+      }
+      blockedWrite.eventType = KNOWN_ANALYTICS_EVENT_TYPES.has(payload?.event_type)
+        ? payload.event_type
+        : null;
     }
 
     blockedUnexpectedWrites.push(blockedWrite);
@@ -135,8 +153,18 @@ export async function runProductionBrowserSmoke(origin = resolveProductionOrigin
       return null;
     });
 
-    const unauthenticated = await context.request.get(new URL('/api/proxy-bookings', origin).href);
-    assert.equal(unauthenticated.status(), 401, 'Unauthenticated proxy booking API must return HTTP 401.');
+    const apiPage = await context.newPage();
+    let unauthenticatedStatus;
+    try {
+      const response = await apiPage.goto(new URL('/api/proxy-bookings', origin).href, {
+        waitUntil: 'domcontentloaded',
+        timeout: 30000,
+      });
+      unauthenticatedStatus = response?.status();
+      assert.equal(unauthenticatedStatus, 401, 'Unauthenticated proxy booking API must return HTTP 401.');
+    } finally {
+      await apiPage.close();
+    }
 
     result = {
       status: 'LOCALLY_PRODUCTION_BROWSER_SMOKE_PASS',
@@ -144,7 +172,7 @@ export async function runProductionBrowserSmoke(origin = resolveProductionOrigin
       homepage: 'rendered',
       publicExperience: home.experiencePath,
       login: 'rendered',
-      unauthenticatedProxyBookings: unauthenticated.status(),
+      unauthenticatedProxyBookings: unauthenticatedStatus,
       blockedExpectedWrites,
       blockedUnexpectedWrites,
     };
