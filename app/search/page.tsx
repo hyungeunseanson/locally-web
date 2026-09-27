@@ -153,7 +153,6 @@ function SearchResults() {
   const [selectedExperienceId, setSelectedExperienceId] = useState<string | null>(null);
   const [desktopPopover, setDesktopPopover] = useState<'city' | 'type' | 'time' | null>(null);
   const requestSeqRef = useRef(0);
-  const latestErrorToastRef = useRef({ message: t('search_results_load_error'), showToast });
   const desktopPopoverRef = useRef<HTMLDivElement | null>(null);
 
   const [activeSheet, setActiveSheet] = useState<'city' | 'type' | 'time' | 'filter' | null>(null);
@@ -182,17 +181,6 @@ function SearchResults() {
   const selectedTimesKey = useMemo(() => [...selectedTimes].sort().join(','), [selectedTimes]);
   const selectedTypesKey = useMemo(() => [...selectedTypes].sort().join(','), [selectedTypes]);
   const searchSignature = `${location}|${language}|${startDate || ''}|${endDate || ''}|${selectedCity}|${selectedTimesKey}|${selectedTypesKey}`;
-  const searchRequestUrl = useMemo(() => {
-    const params = new URLSearchParams();
-    if (location) params.set('location', location);
-    if (language) params.set('language', language);
-    if (startDate) params.set('startDate', startDate);
-    if (endDate) params.set('endDate', endDate);
-    if (selectedCity) params.set('city', selectedCity);
-    if (selectedTimesKey) params.set('times', selectedTimesKey);
-    if (selectedTypesKey) params.set('types', selectedTypesKey);
-    return `/api/search/experiences?${params.toString()}`;
-  }, [location, language, startDate, endDate, selectedCity, selectedTimesKey, selectedTypesKey]);
 
   const replaceSearchParams = (mutator: (params: URLSearchParams) => void) => {
     const nextParams = new URLSearchParams(searchParams.toString());
@@ -224,21 +212,26 @@ function SearchResults() {
     setSelectedExperienceId(null);
   }, [searchSignature]);
 
-  useLayoutEffect(() => {
-    latestErrorToastRef.current = { message: t('search_results_load_error'), showToast };
-  }, [showToast, t]);
-
   useEffect(() => {
     const requestId = ++requestSeqRef.current;
 
     const fetchSearchResults = async () => {
       setLoading(true);
       try {
-        const response = await fetch(searchRequestUrl);
+        const params = new URLSearchParams();
+        if (location) params.set('location', location);
+        if (language) params.set('language', language);
+        if (startDate) params.set('startDate', startDate);
+        if (endDate) params.set('endDate', endDate);
+        if (selectedCity) params.set('city', selectedCity);
+        if (selectedTimesKey) params.set('times', selectedTimesKey);
+        if (selectedTypesKey) params.set('types', selectedTypesKey);
+
+        const response = await fetch(`/api/search/experiences?${params.toString()}`);
         const payload = await response.json();
 
         if (!response.ok) {
-          throw new Error(payload.error || latestErrorToastRef.current.message);
+          throw new Error(payload.error || t('search_results_load_error'));
         }
 
         const nextData = ((payload as SearchExperiencesResponse).data ?? []) as SearchExperience[];
@@ -248,8 +241,7 @@ function SearchResults() {
       } catch (error) {
         console.error('Search error:', error);
         if (requestId === requestSeqRef.current) {
-          const { message, showToast: showLatestToast } = latestErrorToastRef.current;
-          showLatestToast(message, 'error');
+          showToast(t('search_results_load_error'), 'error');
         }
       } finally {
         if (requestId === requestSeqRef.current) {
@@ -259,7 +251,7 @@ function SearchResults() {
     };
 
     fetchSearchResults();
-  }, [searchRequestUrl]);
+  }, [location, language, startDate, endDate, selectedCity, selectedTimesKey, selectedTypesKey, showToast, t, searchSignature]);
 
   useEffect(() => {
     if (!selectedExperienceId) return;
