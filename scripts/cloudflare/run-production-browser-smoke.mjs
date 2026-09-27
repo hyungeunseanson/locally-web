@@ -10,6 +10,7 @@ const MISSING_SUPABASE_ENV_TEXT = /\[Supabase\].*NEXT_PUBLIC_SUPABASE_URL.*NEXT_
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const READINESS_TIMEOUT_MS = 15000;
 const LOGIN_READINESS_TIMEOUT_MS = 45000;
+const MAX_PENDING_REQUEST_DIAGNOSTICS = 10;
 const EXPECTED_ANALYTICS_PATH = '/api/analytics/events';
 const EXPECTED_CLOUDFLARE_RUM_PATH = '/cdn-cgi/rum';
 const KNOWN_ANALYTICS_EVENT_TYPES = new Set(['view', 'click', 'payment_init', 'booking_confirmed']);
@@ -117,13 +118,31 @@ function createBrowserLaunchOptions() {
     : {};
 }
 
+export function summarizePendingFirstPartyRequests(pendingRequests, now = Date.now()) {
+  return [...pendingRequests.values()]
+    .map(({ startedAt, ...request }) => ({
+      ...request,
+      elapsedMs: Math.max(0, now - startedAt),
+    }))
+    .sort((left, right) => right.elapsedMs - left.elapsedMs)
+    .slice(0, MAX_PENDING_REQUEST_DIAGNOSTICS);
+}
+
 async function visitReadOnlyPage(context, origin, pathname, check) {
   const page = await context.newPage();
   const pageErrors = [];
   const firstPartyConsoleErrors = [];
-  const pendingFirstPartyRequests = new Set();
+  const pendingFirstPartyRequests = new Map();
   page.on('request', (request) => {
-    if (new URL(request.url()).origin === origin) pendingFirstPartyRequests.add(request);
+    const url = new URL(request.url());
+    if (url.origin !== origin) return;
+    pendingFirstPartyRequests.set(request, {
+      method: request.method(),
+      pathname: url.pathname,
+      resourceType: request.resourceType(),
+      isNavigationRequest: request.isNavigationRequest(),
+      startedAt: Date.now(),
+    });
   });
   page.on('requestfinished', (request) => pendingFirstPartyRequests.delete(request));
   page.on('requestfailed', (request) => pendingFirstPartyRequests.delete(request));
@@ -144,7 +163,10 @@ async function visitReadOnlyPage(context, origin, pathname, check) {
     });
     assert.equal(response?.status(), 200, `${pathname} must return HTTP 200.`);
     await page.locator('body').waitFor({ state: 'visible', timeout: READINESS_TIMEOUT_MS });
-    const result = await check(page, () => pendingFirstPartyRequests.size);
+    const result = await check(page, () => ({
+      count: pendingFirstPartyRequests.size,
+      requests: summarizePendingFirstPartyRequests(pendingFirstPartyRequests),
+    }));
     await page.waitForTimeout(750);
 
     const bodyText = await page.locator('body').innerText();
@@ -161,7 +183,7 @@ async function visitReadOnlyPage(context, origin, pathname, check) {
   }
 }
 
-async function waitForLoginInput(page, timeoutMs, pendingFirstPartyRequestCount) {
+async function waitForLoginInput(page, timeoutMs, pendingFirstPartyRequestSummary) {
   const startedAt = Date.now();
   try {
     await page.locator('[data-testid="login-modal"] input:visible').first().waitFor({
@@ -176,10 +198,12 @@ async function waitForLoginInput(page, timeoutMs, pendingFirstPartyRequestCount)
       loginModalPresent: Boolean(document.querySelector('[data-testid="login-modal"]')),
       genericErrorPresent: /페이지를 불러오지 못했습니다|Something went wrong|An error occurred/i.test(document.body?.innerText ?? ''),
     }));
+    const pendingRequests = pendingFirstPartyRequestSummary();
     const diagnostic = {
       elapsedMs: Date.now() - startedAt,
       ...state,
-      pendingFirstPartyRequestCount: pendingFirstPartyRequestCount(),
+      pendingFirstPartyRequestCount: pendingRequests.count,
+      pendingFirstPartyRequests: pendingRequests.requests,
     };
     if (state.genericErrorPresent) {
       throw new Error(`/login rendered a generic error before input readiness: ${JSON.stringify(diagnostic)}`, { cause: error });
@@ -226,8 +250,8 @@ export async function runProductionBrowserSmoke(
       return null;
     });
 
-    await visitReadOnlyPage(context, origin, '/login', async (page, pendingFirstPartyRequestCount) => {
-      await waitForLoginInput(page, loginReadinessTimeoutMs, pendingFirstPartyRequestCount);
+    await visitReadOnlyPage(context, origin, '/login', async (page, pendingFirstPartyRequestSummary) => {
+      await waitForLoginInput(page, loginReadinessTimeoutMs, pendingFirstPartyRequestSummary);
       return null;
     });
 
