@@ -78,5 +78,10 @@ test.describe('patched Next.js runtime contract', () => {
         }),
       ])
     );
+    const localeSources = (Array.isArray(rewrites) ? rewrites : rewrites?.afterFiles ?? [])
+      .map((rewrite) => rewrite.source);
+    expect(localeSources.indexOf('/:locale(ko|en|ja|zh)')).toBeLessThan(
+      localeSources.indexOf('/:locale(ko|en|ja|zh)/:path*')
+    );
   });
 });

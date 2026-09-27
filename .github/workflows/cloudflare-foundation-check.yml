@@ -147,6 +147,9 @@ jobs:
       - name: Build OpenNext worker
         run: npm run cloudflare:build:production
 
+      - name: Verify locale-prefixed routes in the local OpenNext Worker
+        run: node scripts/cloudflare/test-locale-routing-runtime.mjs
+
       - name: Generate canary and production binding types
         run: npm run cloudflare:typegen
 

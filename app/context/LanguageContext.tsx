@@ -6259,6 +6259,7 @@ export function LanguageProvider({
 
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLang(resolved);
+    document.documentElement.lang = resolved;
     persistLocale(resolved);
   }, [initialLocale, pathname]);
 

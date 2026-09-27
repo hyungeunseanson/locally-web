@@ -73,9 +73,9 @@ test.describe('Public metadata smoke', () => {
     });
   }
 
-  test('keeps locale-prefixed public pages canonicalized to primary no-prefix routes', async ({ page }) => {
+  test('keeps each public page canonicalized to its current metadata policy', async ({ page }) => {
     const cases = [
-      { path: '/en/about', canonicalPath: '/about' },
+      { path: '/en/about', canonicalPath: '/en/about' },
       { path: '/ja/community', canonicalPath: '/community' },
       { path: '/zh/services/intro', canonicalPath: '/services/intro' },
     ] as const;
