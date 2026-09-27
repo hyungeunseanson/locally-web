@@ -3,7 +3,10 @@ import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import test from 'node:test';
 
-import { runProductionBrowserSmoke } from './run-production-browser-smoke.mjs';
+import {
+  runProductionBrowserSmoke,
+  summarizePendingFirstPartyRequests,
+} from './run-production-browser-smoke.mjs';
 
 async function withFixtureServer({
   unexpectedMethod,
@@ -16,6 +19,7 @@ async function withFixtureServer({
   loginSpinnerForever = false,
   loginGenericError = false,
   loginUnrelatedInput = false,
+  loginResources = [],
 } = {}, check) {
   const receivedRequests = [];
   const externalReceivedRequests = [];
@@ -27,9 +31,26 @@ async function withFixtureServer({
   });
   await new Promise((resolve) => externalServer.listen(0, '127.0.0.1', resolve));
   const externalOrigin = `http://127.0.0.1:${externalServer.address().port}`;
+  const loginResourcesByPath = new Map(loginResources.map((resource) => [
+    new URL(resource.url, 'http://127.0.0.1').pathname,
+    resource,
+  ]));
   const server = createServer((request, response) => {
     const url = new URL(request.url, 'http://127.0.0.1');
     receivedRequests.push({ method: request.method, pathname: url.pathname, search: url.search });
+
+    const loginResource = loginResourcesByPath.get(url.pathname);
+    if (loginResource) {
+      if (loginResource.behavior === 'hang') {
+        response.writeHead(200, { 'content-type': 'text/javascript' });
+        response.write('void 0;');
+      } else if (loginResource.behavior === 'fail') {
+        setTimeout(() => response.destroy(), loginResource.responseDelayMs ?? 30);
+      } else {
+        setTimeout(() => response.writeHead(200, { 'content-type': 'text/javascript' }).end('void 0;'), loginResource.responseDelayMs ?? 30);
+      }
+      return;
+    }
 
     if (url.pathname === '/background') {
       backgroundStarted = true;
@@ -56,6 +77,14 @@ async function withFixtureServer({
         })
         .catch((error) => console.error(error));
     `).join('');
+    const loginResourceScripts = loginResources.map(({ url: resourceUrl, startDelayMs = 0 }) => `
+      setTimeout(() => {
+        const script = document.createElement('script');
+        script.src = ${JSON.stringify(resourceUrl)};
+        document.head.append(script);
+      }, ${startDelayMs});
+    `).join('');
+    const loginResourceBootstrap = loginResourceScripts ? `<script>${loginResourceScripts}</script>` : '';
     const pages = {
       '/': '<title>Home</title><body><a href="/experiences/42">Public experience</a><script>fetch("/get-probe");fetch("/head-probe",{method:"HEAD"});fetch("/options-probe",{method:"OPTIONS"});</script></body>',
       '/experiences/42': `<title>Experience</title><body><h1>Public experience</h1><script>
@@ -71,7 +100,7 @@ async function withFixtureServer({
       '/login': loginGenericError
         ? '<title>Login</title><body>Something went wrong</body>'
         : loginSpinnerForever
-          ? `<title>Login</title><body>${loginUnrelatedInput ? '<input aria-label="Site search">' : ''}<div class="animate-spin"></div></body>`
+          ? `<title>Login</title><body>${loginUnrelatedInput ? '<input aria-label="Site search">' : ''}<div class="animate-spin"></div>${loginResourceBootstrap}</body>`
           : loginInputDelayMs > 0
             ? `<title>Login</title><body><div class="animate-spin"></div><script>setTimeout(() => { document.body.insertAdjacentHTML('beforeend', '<div data-testid="login-modal"><input aria-label="Email"></div>'); }, ${loginInputDelayMs});</script></body>`
             : '<title>Login</title><body><div data-testid="login-modal"><input aria-label="Email"></div></body>',
@@ -273,6 +302,107 @@ test('Login input beyond its timeout boundary fails with bounded diagnostics', a
         && error.message.includes('"pendingFirstPartyRequestCount":0')
     );
   });
+});
+
+function loginTimeoutDiagnostic(error) {
+  const prefix = '/login input readiness timed out: ';
+  assert(error.message.startsWith(prefix), error.message);
+  return JSON.parse(error.message.slice(prefix.length));
+}
+
+test('Login timeout reports a hanging first-party script without query, body, or header data', async () => {
+  await withFixtureServer({
+    loginSpinnerForever: true,
+    loginResources: [{
+      url: '/hanging-login.js?secret=DO_NOT_LOG',
+      behavior: 'hang',
+    }],
+  }, async ({ origin, receivedRequests }) => {
+    await assert.rejects(
+      runProductionBrowserSmoke(origin, { loginReadinessTimeoutMs: 300 }),
+      (error) => {
+        const diagnostic = loginTimeoutDiagnostic(error);
+        assert(diagnostic.pendingFirstPartyRequestCount >= 1);
+        assert(diagnostic.pendingFirstPartyRequests.some((request) =>
+          request.method === 'GET'
+          && request.pathname === '/hanging-login.js'
+          && request.resourceType === 'script'
+          && request.isNavigationRequest === false
+          && request.elapsedMs >= 0));
+        assert.doesNotMatch(error.message, /DO_NOT_LOG|\?secret=|Authorization|Cookie|requestBody|headers/i);
+        return true;
+      }
+    );
+    assert(receivedRequests.some((request) =>
+      request.pathname === '/hanging-login.js' && request.search === '?secret=DO_NOT_LOG'));
+  });
+});
+
+test('finished and failed first-party scripts are removed from Login timeout pending requests', async () => {
+  await withFixtureServer({
+    loginSpinnerForever: true,
+    loginResources: [
+      { url: '/finished-login.js', behavior: 'finish' },
+      { url: '/failed-login.js', behavior: 'fail' },
+      { url: '/still-hanging-login.js', behavior: 'hang' },
+    ],
+  }, async ({ origin, receivedRequests }) => {
+    await assert.rejects(
+      runProductionBrowserSmoke(origin, { loginReadinessTimeoutMs: 300 }),
+      (error) => {
+        const diagnostic = loginTimeoutDiagnostic(error);
+        assert.equal(diagnostic.pendingFirstPartyRequestCount, 1);
+        assert.deepEqual(diagnostic.pendingFirstPartyRequests.map((request) => request.pathname), [
+          '/still-hanging-login.js',
+        ]);
+        return true;
+      }
+    );
+    for (const pathname of ['/finished-login.js', '/failed-login.js', '/still-hanging-login.js']) {
+      assert(receivedRequests.some((request) => request.pathname === pathname));
+    }
+  });
+});
+
+test('Login timeout reports the longest pending first-party request first', async () => {
+  await withFixtureServer({
+    loginSpinnerForever: true,
+    loginResources: [
+      { url: '/older-login.js', behavior: 'hang' },
+      { url: '/newer-login.js', behavior: 'hang', startDelayMs: 80 },
+    ],
+  }, async ({ origin }) => {
+    await assert.rejects(
+      runProductionBrowserSmoke(origin, { loginReadinessTimeoutMs: 350 }),
+      (error) => {
+        const requests = loginTimeoutDiagnostic(error).pendingFirstPartyRequests;
+        assert.deepEqual(requests.map((request) => request.pathname), [
+          '/older-login.js', '/newer-login.js',
+        ]);
+        assert(requests[0].elapsedMs > requests[1].elapsedMs);
+        return true;
+      }
+    );
+  });
+});
+
+test('pending request summary keeps the total count while listing at most ten longest requests', () => {
+  const pending = new Map(Array.from({ length: 12 }, (_, index) => [
+    index,
+    {
+      method: 'GET',
+      pathname: `/chunk-${index}.js`,
+      resourceType: 'script',
+      isNavigationRequest: false,
+      startedAt: 1000 + index,
+    },
+  ]));
+  const summary = summarizePendingFirstPartyRequests(pending, 2000);
+  assert.equal(pending.size, 12);
+  assert.equal(summary.length, 10);
+  assert.equal(summary[0].pathname, '/chunk-0.js');
+  assert.equal(summary[9].pathname, '/chunk-9.js');
+  assert(summary.every((request) => !Object.hasOwn(request, 'startedAt')));
 });
 
 test('Login spinner forever fails rather than passing on HTTP 200', async () => {
