@@ -144,6 +144,18 @@ jobs:
       - name: Verify the existing Next.js build path
         run: npm run build
 
+      - name: Verify Search single initial request regression
+        env:
+          PLAYWRIGHT_SERVER_MODE: start
+        run: >-
+          npx playwright test
+          -c playwright.contracts.config.ts
+          tests/e2e/274-search-single-initial-request.spec.ts
+          --project=chromium
+          --workers=1
+          --retries=0
+          --reporter=line
+
       - name: Build OpenNext worker
         run: npm run cloudflare:build:production
 
