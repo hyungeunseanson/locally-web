@@ -55,7 +55,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    environment: production-media-sync
+    environment: production-media-sync-v2
     outputs:
       drift: ${{ steps.audit.outputs.drift }}
       snapshot_hash: ${{ steps.audit.outputs.snapshot_hash }}
@@ -92,7 +92,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    environment: production-media-sync
+    environment: production-media-sync-v2
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
@@ -242,7 +242,7 @@ jobs:
       (inputs.action == 'source-copy-plan' || inputs.action == 'source-copy-apply')
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    environment: production-media-sync
+    environment: production-media-sync-v2
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
@@ -344,7 +344,7 @@ jobs:
       (github.event_name == 'schedule' || inputs.action == 'legacy-reconcile')
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    environment: production-media-sync
+    environment: production-media-sync-v2
     permissions:
       contents: write
       pull-requests: write
