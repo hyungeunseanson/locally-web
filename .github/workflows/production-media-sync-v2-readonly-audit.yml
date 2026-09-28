@@ -1,0 +1,94 @@
+name: Production Media Sync v2 Read-only Audit
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: production-media-sync-v2
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+
+      - name: Test incremental reconciliation boundaries
+        run: node --test scripts/cloudflare/reconcile-public-experience-images.test.mjs
+
+      - name: Audit Production image drift
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          node scripts/cloudflare/reconcile-public-experience-images.mjs audit --output="${RUNNER_TEMP}/public-image-sync"
+
+  completeness:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: production-media-sync-v2
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ENDPOINT: ${{ vars.R2_ENDPOINT }}
+      R2_BUCKET: locally-public-experience-canary
+      R2_PUBLIC_BASE_URL: https://media-canary.locally-travel.com
+      BOTO3_VERSION: 1.43.70
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+
+      - name: Validate fixed completeness boundary
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$NEXT_PUBLIC_SUPABASE_URL" == "https://uhinvcydgzqlpnvieyal.supabase.co" ]]
+          [[ "$R2_ENDPOINT" == "https://d56f5f850c6f7dc5779a7c2054aca5a5.r2.cloudflarestorage.com" ]]
+          [[ "$R2_BUCKET" == "locally-public-experience-canary" ]]
+          [[ "$R2_PUBLIC_BASE_URL" == "https://media-canary.locally-travel.com" ]]
+          [[ -n "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ]]
+          [[ -n "$R2_ACCESS_KEY_ID" ]]
+          [[ -n "$R2_SECRET_ACCESS_KEY" ]]
+
+      - name: Install pinned read-only R2 client
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -m venv "${RUNNER_TEMP}/r2-venv"
+          "${RUNNER_TEMP}/r2-venv/bin/python" -m pip install --disable-pip-version-check --no-input "boto3==${BOTO3_VERSION}"
+          echo "${RUNNER_TEMP}/r2-venv/bin" >> "$GITHUB_PATH"
+
+      - name: Run manifest-independent metadata completeness audit
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          audit_dir="${RUNNER_TEMP}/public-experience-completeness"
+          mkdir -p "$audit_dir"
+          node scripts/cloudflare/audit-public-experience-media.mjs metadata \
+            --output="$audit_dir/audit" \
+            --private-output="$audit_dir/.r2-inspection.json"
+
+      - name: Verify read-only audit counters
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report = json.loads((Path(os.environ['RUNNER_TEMP']) / 'public-experience-completeness/audit/report.json').read_text())
+          assert report['mode'] == 'metadata'
+          assert report['r2']['readOperations']['listRequests'] > 0
+          assert report['safety']['r2MutationRequests'] == 0
+          assert report['safety']['supabaseMutationRequests'] == 0
+          print('R2_READ_AUTHENTICATED_AND_MUTATION_COUNTERS_ZERO')
+          PY
