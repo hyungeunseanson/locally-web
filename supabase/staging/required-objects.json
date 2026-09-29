@@ -18,13 +18,7 @@
     "supabase/migrations/20260923084232_one_time_review_request_reminders.sql",
     "supabase/migrations/20260929144521_harden_public_host_applications_security_barrier.sql"
   ],
-  "pendingProductionMigrations": [
-    {
-      "version": "20260929144521",
-      "name": "harden_public_host_applications_security_barrier",
-      "repositoryFile": "supabase/migrations/20260929144521_harden_public_host_applications_security_barrier.sql"
-    }
-  ],
+  "pendingProductionMigrations": [],
   "applicationTables": [
     "admin_audit_logs",
     "admin_job_runs",

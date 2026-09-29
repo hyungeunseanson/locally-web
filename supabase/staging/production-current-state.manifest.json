@@ -1,6 +1,6 @@
 {
   "schemaContractVersion": 3,
-  "capturedAt": "2026-09-23",
+  "capturedAt": "2026-09-30",
   "productionProjectRef": "uhinvcydgzqlpnvieyal",
   "source": {
     "kind": "read-only Production PostgreSQL catalog inventory",
@@ -88,6 +88,12 @@
       "name": "one_time_review_request_reminders",
       "repositoryFile": "supabase/migrations/20260923084232_one_time_review_request_reminders.sql",
       "repositorySha256": "587e2ed1ab66b83adb0d47fae135475c3484af2a4337a3f3b3d71f5ebec94e00"
+    },
+    {
+      "version": "20260929144521",
+      "name": "harden_public_host_applications_security_barrier",
+      "repositoryFile": "supabase/migrations/20260929144521_harden_public_host_applications_security_barrier.sql",
+      "repositorySha256": "94224b4845633bbd3844822018a99ba1775540f26aa4624e2835a405fa96d2ca"
     }
   ],
   "operationalStateDeltas": [

@@ -28,7 +28,8 @@ BEGIN
     '20260922081710:experience_payment_claim_and_pending_cleanup',
     '20260922125140:close_refunded_phone_proxy_requests',
     '20260923013312:ops_anomaly_monitor_snapshot',
-    '20260923084232:one_time_review_request_reminders'
+    '20260923084232:one_time_review_request_reminders',
+    '20260929144521:harden_public_host_applications_security_barrier'
   ]::text[];
   IF actual IS DISTINCT FROM expected THEN
     RAISE EXCEPTION 'migration ledger mismatch: %', actual;
