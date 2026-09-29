@@ -134,7 +134,11 @@ const expectedLedger = [
     repositoryFile: 'supabase/migrations/20260923084232_one_time_review_request_reminders.sql',
   },
 ];
-const expectedPendingMigrations = [];
+const expectedPendingMigrations = [{
+  version: '20260929144521',
+  name: 'harden_public_host_applications_security_barrier',
+  repositoryFile: 'supabase/migrations/20260929144521_harden_public_host_applications_security_barrier.sql',
+}];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));
 for (const [index, expected] of expectedLedger.entries()) {
   const actual = manifest.migrationLedger[index];
