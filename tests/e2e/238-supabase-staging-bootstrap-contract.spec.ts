@@ -61,8 +61,13 @@ test.describe('Supabase staging bootstrap contract', () => {
       'supabase/migrations/20260922125140_close_refunded_phone_proxy_requests.sql',
       'supabase/migrations/20260923013312_ops_anomaly_monitor_snapshot.sql',
       'supabase/migrations/20260923084232_one_time_review_request_reminders.sql',
+      'supabase/migrations/20260929144521_harden_public_host_applications_security_barrier.sql',
     ]);
-    expect(manifest.pendingProductionMigrations).toEqual([]);
+    expect(manifest.pendingProductionMigrations).toEqual([{
+      version: '20260929144521',
+      name: 'harden_public_host_applications_security_barrier',
+      repositoryFile: 'supabase/migrations/20260929144521_harden_public_host_applications_security_barrier.sql',
+    }]);
     expect(packageJson.scripts['supabase:staging:baseline:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:current:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:contract']).toBeTruthy();
