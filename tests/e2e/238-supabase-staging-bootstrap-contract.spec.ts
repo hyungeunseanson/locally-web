@@ -49,6 +49,7 @@ test.describe('Supabase staging bootstrap contract', () => {
       '20260923013312',
       '20260923084232',
       '20260929144521',
+      '20260930022348',
     ]);
     expect(manifest.freshProjectApplyOrder).toEqual([
       'supabase/migrations/20260912034545_production_schema_baseline.sql',
@@ -66,11 +67,7 @@ test.describe('Supabase staging bootstrap contract', () => {
       'supabase/migrations/20260929144521_harden_public_host_applications_security_barrier.sql',
       'supabase/migrations/20260930022348_move_is_admin_reader_to_private_schema.sql',
     ]);
-    expect(manifest.pendingProductionMigrations).toEqual([{
-      version: '20260930022348',
-      name: 'move_is_admin_reader_to_private_schema',
-      repositoryFile: 'supabase/migrations/20260930022348_move_is_admin_reader_to_private_schema.sql',
-    }]);
+    expect(manifest.pendingProductionMigrations).toEqual([]);
     expect(packageJson.scripts['supabase:staging:baseline:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:current:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:contract']).toBeTruthy();
@@ -80,6 +77,16 @@ test.describe('Supabase staging bootstrap contract', () => {
     expect(schemaContract).toContain('BEGIN READ ONLY;');
     expect(schemaContract).toContain('ROLLBACK;');
     expect(schemaContract).toContain('LOCALLY_STAGING_SCHEMA_CONTRACT_PASS');
+    expect(schemaContract.match(/\('experiences', false\)/g)).toHaveLength(2);
+    expect(schemaContract).not.toContain("('experiences', true)");
+    for (const retiredPolicy of [
+      'Auth Users Upload',
+      'Experience object owners can delete',
+      'Experience object owners can update',
+      'Public Access',
+    ]) {
+      expect(schemaContract).not.toContain(retiredPolicy);
+    }
     expect(baselineContract).toContain('BEGIN READ ONLY;');
     expect(baselineContract).toContain('ROLLBACK;');
     expect(baselineContract).toContain('LOCALLY_PRODUCTION_BASELINE_CATALOG_PASS');
@@ -90,6 +97,8 @@ test.describe('Supabase staging bootstrap contract', () => {
     expect(adminReaderTargetContract).toContain('ROLLBACK;');
     expect(adminReaderTargetContract).toContain("to_regprocedure('public.is_admin_reader()')");
     expect(adminReaderTargetContract).toContain('private.is_admin_reader()');
+    expect(schemaContract).toContain("WHEN required.name = 'is_admin_reader' THEN 'private'");
+    expect(schemaContract).toContain("to_regprocedure('public.is_admin_reader()')");
     expect(inventory).toContain('BEGIN READ ONLY;');
     expect(inventory).toContain('pg_get_functiondef');
     expect(inventory).not.toMatch(/\b(insert|update|delete|alter|create|drop|truncate)\s+/i);
@@ -206,7 +215,8 @@ test.describe('Supabase staging bootstrap contract', () => {
     expect(currentManifest.objects.publicViews).toHaveLength(2);
     expect(currentManifest.objects.publicTableColumns).toBe(515);
     expect(currentManifest.objects.publicViewColumns).toBe(27);
-    expect(currentManifest.objects.functionOverloads).toHaveLength(57);
+    expect(currentManifest.objects.functionOverloads).toHaveLength(56);
+    expect(currentManifest.objects.privateFunctionOverloads).toEqual(['private.is_admin_reader()']);
     expect(currentManifest.objects.applicationTriggers).toHaveLength(12);
     expect(currentManifest.objects.indexes).toBe(118);
     expect(currentManifest.objects.constraints).toEqual({
@@ -226,8 +236,8 @@ test.describe('Supabase staging bootstrap contract', () => {
     expect(currentManifest.objects.storageObjectPolicies).toHaveLength(16);
     expect(currentManifest.securityFingerprints).toMatchObject({
       storageBuckets: '7419cabe695cd50a522314a749216c05',
-      storagePolicies: '1519cc7c3877bf1389c0e02c63bc223a',
-      publicRlsPolicies: 'e40c9b6b6a5b834ce627e6e421b11ff8',
+      storagePolicies: '898e8b7f917fd0f4530ef30c9b61961e',
+      publicRlsPolicies: '4741211273ef7aeae0ced24ccd2345da',
       publicRelationGrants: '814931d0ab076cc787b8ce26adc5ec0a',
       stagingOverlayBaselineStoragePolicies: 'd6b381fd629405acfdd615593031de5c',
     });

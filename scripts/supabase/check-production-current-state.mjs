@@ -10,8 +10,8 @@ const overlayPath = resolve(root, 'supabase/staging/post-baseline-current-state-
 
 const expectedFingerprints = {
   storageBuckets: '7419cabe695cd50a522314a749216c05',
-  storagePolicies: '1519cc7c3877bf1389c0e02c63bc223a',
-  publicRlsPolicies: 'e40c9b6b6a5b834ce627e6e421b11ff8',
+  storagePolicies: '898e8b7f917fd0f4530ef30c9b61961e',
+  publicRlsPolicies: '4741211273ef7aeae0ced24ccd2345da',
   publicRelationGrants: '814931d0ab076cc787b8ce26adc5ec0a',
   stagingOverlayBaselineStoragePolicies: 'd6b381fd629405acfdd615593031de5c',
   stagingOverlayTargetStorageBuckets: 'c3ff5767c8e4934ae05b3d96550441c8',
@@ -138,14 +138,13 @@ const expectedLedger = [
     name: 'harden_public_host_applications_security_barrier',
     repositoryFile: 'supabase/migrations/20260929144521_harden_public_host_applications_security_barrier.sql',
   },
-];
-const expectedPendingMigrations = [
   {
     version: '20260930022348',
     name: 'move_is_admin_reader_to_private_schema',
     repositoryFile: 'supabase/migrations/20260930022348_move_is_admin_reader_to_private_schema.sql',
   },
 ];
+const expectedPendingMigrations = [];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));
 for (const [index, expected] of expectedLedger.entries()) {
   const actual = manifest.migrationLedger[index];
@@ -182,7 +181,8 @@ assert(objects.publicTables.length === 39, 'expected 39 public tables');
 assert(objects.publicViews.length === 2, 'expected 2 public views');
 assert(objects.publicTableColumns === 515, 'expected 515 public table columns');
 assert(objects.publicViewColumns === 27, 'expected 27 public view columns');
-assert(objects.functionOverloads.length === 57, 'expected 57 public function overloads');
+assert(objects.functionOverloads.length === 56, 'expected 56 public function overloads');
+exact('private function overloads', objects.privateFunctionOverloads, ['private.is_admin_reader()']);
 assert(objects.applicationTriggers.length === 12, 'expected 12 application triggers');
 assert(objects.indexes === 118, 'expected 118 public indexes');
 assert(objects.constraints.total === 180, 'expected 180 constraints');
@@ -203,7 +203,8 @@ exact('required views', required.applicationViews, objects.publicViews);
 exact(
   'required function names',
   required.applicationFunctions,
-  new Set(objects.functionOverloads.map((identity) => identity.match(/^public\.([^()]+)\(/)?.[1]).filter(Boolean))
+  new Set([...objects.functionOverloads, ...objects.privateFunctionOverloads]
+    .map((identity) => identity.match(/^(?:public|private)\.([^()]+)\(/)?.[1]).filter(Boolean))
 );
 exact(
   'required triggers',

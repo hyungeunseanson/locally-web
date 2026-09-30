@@ -44,12 +44,18 @@ BEGIN
     FROM pg_proc procedure
     JOIN pg_namespace namespace ON namespace.oid = procedure.pronamespace
     WHERE procedure.proname = required.name
-      AND (namespace.nspname = 'public'
-           OR (required.name = 'is_admin_reader' AND namespace.nspname = 'private'))
+      AND namespace.nspname = CASE
+        WHEN required.name = 'is_admin_reader' THEN 'private'
+        ELSE 'public'
+      END
   );
 
   IF missing IS NOT NULL THEN
     RAISE EXCEPTION 'Missing functional-canary functions: %', missing;
+  END IF;
+
+  IF to_regprocedure('public.is_admin_reader()') IS NOT NULL THEN
+    RAISE EXCEPTION 'Exposed public admin reader helper must be absent';
   END IF;
 
   IF NOT EXISTS (
@@ -259,7 +265,7 @@ WITH required(name, expected_public) AS (
     ('admin_files', false),
     ('avatars', true),
     ('chat-images', false),
-    ('experiences', true),
+    ('experiences', false),
     ('images', true),
     ('verification-docs', false)
 ), actual AS (
@@ -283,7 +289,7 @@ BEGIN
       ('admin_files', false),
       ('avatars', true),
       ('chat-images', false),
-      ('experiences', true),
+      ('experiences', false),
       ('images', true),
       ('verification-docs', false)
   ) AS required(name, expected_public)
@@ -303,19 +309,15 @@ BEGIN
     'Admins can delete files',
     'Admins can read files',
     'Admins can update files',
-    'Auth Users Upload',
     'Avatar images are publicly accessible',
     'Avatar owners can delete',
     'Avatar owners can update',
     'Avatar owners can upload',
-    'Experience object owners can delete',
-    'Experience object owners can update',
     'Image owners can delete',
     'Image owners can read',
     'Image owners can update',
     'Image owners can upload',
     'Only admins can upload files',
-    'Public Access',
     'Verification docs owners can delete',
     'Verification docs owners can read',
     'Verification docs owners can update',

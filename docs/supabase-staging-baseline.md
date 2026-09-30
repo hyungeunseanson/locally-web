@@ -36,8 +36,8 @@ Bucket `created_at`, `updated_at`, `type`, `versioning_status`, and `avif_autode
 3. For a **new empty project**, apply the immutable baseline and immediately run `baseline-contract.sql`. This contract is a checkpoint gate and is expected to fail after later migrations.
 4. Apply `20260912050655_service_concierge_assignment.sql`.
 5. In the same staging-only database session, set `locally.staging_target_ref` to the exact staging ref and apply `supabase/staging/post-baseline-current-state-overlay.sql`. It changes only the old chat-image INSERT policy and rejects the Production ref before its write.
-6. Run `current-state-contract.sql` and `schema-contract.sql`, both read-only.
-7. For a **branch cloned from current Production**, do not replay the baseline, concierge migration, or Storage overlay. Run only the current-state and staging schema contracts.
+6. Apply the remaining migrations in `freshProjectApplyOrder`, through `20260930022348_move_is_admin_reader_to_private_schema.sql`. Run `current-state-contract.sql`, `admin-reader-private-contract.sql`, and `schema-contract.sql`, all read-only.
+7. For a **branch cloned from current Production**, do not replay the baseline, concierge migration, or Storage overlay. Run the current-state, admin-reader-private, and staging schema contracts without applying migrations.
 8. Configure staging-only Auth/OAuth, then seed synthetic fixtures only after the applicable contracts pass.
 
 The migration fails closed when the expected Supabase-managed schemas/publication are absent or when `supabase_realtime` already has an unexpected member. A non-empty or customized project must be discarded or reconciled explicitly; the baseline does not delete unknown objects.
@@ -46,8 +46,8 @@ The migration fails closed when the expected Supabase-managed schemas/publicatio
 
 The repository static gate checks object identity/count parity, exact Realtime membership, bucket presence, and absence of project refs, URLs, emails, credential assignments, customer inserts, managed table DDL, Storage system triggers, and extension version pins.
 
-`baseline-contract.sql` is authoritative only at the immutable baseline checkpoint. `current-state-contract.sql` is the authoritative read-only test for a current Production clone or an empty project bootstrapped through the migrations already applied in Production. This repository change does not create a branch/project, connect staging secrets, or remotely apply SQL.
+`baseline-contract.sql` is authoritative only at the immutable baseline checkpoint. `current-state-contract.sql` is the authoritative read-only test for a current Production clone or an empty project bootstrapped through the migrations already applied in Production. This contract-only follow-up does not create a branch/project, connect staging secrets, or remotely apply SQL.
 
-## Pending admin reader hardening (1-B2)
+## Applied admin reader hardening (1-B2)
 
-`20260930022348_move_is_admin_reader_to_private_schema.sql` is pending Production application. The Production current-state manifest and `current-state-contract.sql` continue to describe the **pre-migration** state. Run that contract before the pending migration on a clone. After applying the migration in an isolated project, run `admin-reader-private-contract.sql` and `schema-contract.sql` read-only; these verify the new helper and the ten RLS policies. Before any later Production application, independently confirm that `private` is absent from the Data API exposed schemas. This Draft PR does not apply the migration.
+`20260930022348_move_is_admin_reader_to_private_schema.sql` is applied in Production. The Production current-state manifest and `current-state-contract.sql` now describe the private helper and the ten rewired RLS policies. `pendingProductionMigrations` is empty. The `private` schema remains outside the Data API exposed schemas (`public`, `graphql_public`). Run `admin-reader-private-contract.sql` and `schema-contract.sql` read-only on a current Production clone or a freshly bootstrapped staging project.
