@@ -7,6 +7,7 @@ restore_script="$repo_root/scripts/backup/restore-test.sh"
 verify_script="$repo_root/scripts/backup/verify-downloaded-backup.sh"
 storage_script="$repo_root/scripts/backup/storage-byte-backup.py"
 storage_module="$repo_root/scripts/backup/storage_byte_backup.py"
+recovery_runbook="$repo_root/docs/backup-recovery-runbook.md"
 
 grep -Fq 'group: supabase-production-r2-backup' "$workflow"
 grep -Fq 'cancel-in-progress: false' "$workflow"
@@ -29,6 +30,19 @@ grep -Fq 'MAX_OBJECTS = 1200' "$storage_module"
 grep -Fq 'MAX_SOURCE_BYTES = 512 * 1024 * 1024' "$storage_module"
 grep -Fq 'MAX_R2_OBJECTS = 2500' "$storage_module"
 grep -Fq 'MAX_R2_BYTES = 640 * 1024 * 1024' "$storage_module"
+python3 - "$recovery_runbook" <<'PY'
+import pathlib
+import sys
+
+rows = {}
+for line in pathlib.Path(sys.argv[1]).read_text(encoding="utf-8").splitlines():
+    cells = [cell.strip() for cell in line.split("|")]
+    if len(cells) >= 4 and cells[1].startswith("`"):
+        rows[cells[1].strip("`")] = cells[2].lower()
+for bucket in ("experiences", "chat-images", "admin_files", "verification-docs"):
+    if "private" not in rows.get(bucket, ""):
+        raise SystemExit(f"private source bucket misclassified in recovery runbook: {bucket}")
+PY
 if grep -Eq 'delete_object|copy_object|upload_file' "$storage_module"; then
   echo 'Storage backup unexpectedly permits overwrite/copy/delete APIs' >&2
   exit 1
