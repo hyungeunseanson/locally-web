@@ -1,5 +1,6 @@
 import 'server-only';
 import { createClient } from '@supabase/supabase-js';
+import { unstable_cache } from 'next/cache';
 
 import {
   getVisiblePublicHostIdSet,
@@ -29,6 +30,15 @@ type PopularitySnapshotRow = {
 };
 
 const HOME_EXPERIENCE_SELECT = ['host_id', 'status', 'is_active', ...PUBLIC_EXPERIENCE_CARD_SELECT_FIELDS, 'created_at'].join(', ');
+const HOME_PUBLIC_QUERY_LIMIT = 1000;
+const HOME_PUBLIC_CACHE_KEY = 'public-home-experiences-v1';
+const HOME_PUBLIC_REVALIDATE_SECONDS = 300;
+
+class PopularitySnapshotUnavailable extends Error {
+  constructor(readonly fallbackData: PublicHomeExperience[], message: string) {
+    super(message);
+  }
+}
 
 function asComparableId(value: number | string | null | undefined) {
   return typeof value === 'number' || typeof value === 'string' ? String(value) : '';
@@ -42,18 +52,48 @@ function getTodayIsoDate() {
   return toIsoDateString(new Date());
 }
 
-export async function getPublicHomeExperiences(): Promise<{ data: PublicHomeExperience[]; updatedAt: number }> {
+async function loadPublicHomeExperiences(): Promise<PublicHomeExperience[]> {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  const { data: publicHostApplications, error: applicationsError } = await supabase
-    .from('public_host_applications')
-    .select('id, user_id, status, created_at, is_superhost');
+  const [
+    { data: publicHostApplications, error: applicationsError },
+    { data: experiences, error: experiencesError },
+    { data: availabilityRows, error: availabilityError },
+    { data: popularityRows, error: popularityError },
+  ] = await Promise.all([
+    supabase.from('public_host_applications')
+      .select('id, user_id, status, created_at, is_superhost')
+      .limit(HOME_PUBLIC_QUERY_LIMIT),
+    supabase.from('experiences')
+      .select(HOME_EXPERIENCE_SELECT)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(HOME_PUBLIC_QUERY_LIMIT),
+    supabase.from('experience_availability')
+      .select('experience_id, date')
+      .gte('date', getTodayIsoDate())
+      .limit(HOME_PUBLIC_QUERY_LIMIT),
+    supabase.from('experience_popularity_snapshot')
+      .select('experience_id, wishlist_count')
+      .limit(HOME_PUBLIC_QUERY_LIMIT),
+  ]);
 
   if (applicationsError) {
     throw applicationsError;
+  }
+  if (experiencesError) {
+    throw experiencesError;
+  }
+  if (availabilityError) {
+    throw availabilityError;
+  }
+  if ([publicHostApplications, experiences, availabilityRows, popularityRows].some(
+    (rows) => (rows?.length ?? 0) === HOME_PUBLIC_QUERY_LIMIT
+  )) {
+    throw new Error('[home/experiences] public dataset exceeded the safe query limit');
   }
 
   const publicHostApplicationRows = (publicHostApplications ?? []) as PublicHostApplicationRow[];
@@ -65,49 +105,11 @@ export async function getPublicHomeExperiences(): Promise<{ data: PublicHomeExpe
       .map(([hostId]) => hostId)
   );
 
-  if (visibleHostIds.size === 0) {
-    return { data: [], updatedAt: Date.now() };
-  }
-
-  const visibleHostIdList = Array.from(visibleHostIds);
-
-  const { data: experiences, error: experiencesError } = await supabase
-    .from('experiences')
-    .select(HOME_EXPERIENCE_SELECT)
-    .in('host_id', visibleHostIdList)
-    .eq('status', 'active')
-    .order('created_at', { ascending: false });
-
-  if (experiencesError) {
-    throw experiencesError;
-  }
-
   const visibleExperiences = ((experiences ?? []) as unknown as HomeExperienceRow[]).filter((experience) =>
     visibleHostIds.has(String(experience.host_id || '')) && isPublicExperienceVisible(experience)
   );
 
-  if (visibleExperiences.length === 0) {
-    return { data: [], updatedAt: Date.now() };
-  }
-
-  const experienceIds = visibleExperiences.map((experience) => experience.id);
-
-  const [{ data: availabilityRows, error: availabilityError }, { data: popularityRows, error: popularityError }] =
-    await Promise.all([
-      supabase
-        .from('experience_availability')
-        .select('experience_id, date')
-        .in('experience_id', experienceIds)
-        .gte('date', getTodayIsoDate()),
-      supabase
-        .from('experience_popularity_snapshot')
-        .select('experience_id, wishlist_count')
-        .in('experience_id', experienceIds),
-    ]);
-
-  if (availabilityError) {
-    throw availabilityError;
-  }
+  const visibleExperienceIds = new Set(visibleExperiences.map((experience) => String(experience.id)));
 
   if (popularityError) {
     console.warn('[home/experiences] popularity snapshot unavailable:', popularityError.message);
@@ -116,7 +118,7 @@ export async function getPublicHomeExperiences(): Promise<{ data: PublicHomeExpe
   const availableDatesByExperienceId = new Map<string, string[]>();
   for (const row of (availabilityRows ?? []) as AvailabilityRow[]) {
     const experienceId = asComparableId(row.experience_id);
-    if (!experienceId || typeof row.date !== 'string' || row.date.length === 0) {
+    if (!visibleExperienceIds.has(experienceId) || typeof row.date !== 'string' || row.date.length === 0) {
       continue;
     }
 
@@ -128,7 +130,7 @@ export async function getPublicHomeExperiences(): Promise<{ data: PublicHomeExpe
   const popularityByExperienceId = new Map<string, number>();
   for (const row of (popularityRows ?? []) as PopularitySnapshotRow[]) {
     const experienceId = asComparableId(row.experience_id);
-    if (!experienceId) {
+    if (!visibleExperienceIds.has(experienceId)) {
       continue;
     }
 
@@ -152,6 +154,31 @@ export async function getPublicHomeExperiences(): Promise<{ data: PublicHomeExpe
       wishlist_count: popularityByExperienceId.get(String(experience.id)) ?? 0,
     };
   });
+
+  if (popularityError) {
+    // Keep the existing non-fatal fallback, without caching a degraded snapshot.
+    throw new PopularitySnapshotUnavailable(data, popularityError.message);
+  }
+
+  return data;
+}
+
+const getCachedPublicHomeExperiences = unstable_cache(
+  loadPublicHomeExperiences,
+  [HOME_PUBLIC_CACHE_KEY],
+  { revalidate: HOME_PUBLIC_REVALIDATE_SECONDS }
+);
+
+export async function getPublicHomeExperiences(): Promise<{ data: PublicHomeExperience[]; updatedAt: number }> {
+  let data: PublicHomeExperience[];
+  try {
+    data = process.env.NODE_ENV === 'production'
+      ? await getCachedPublicHomeExperiences()
+      : await loadPublicHomeExperiences();
+  } catch (error) {
+    if (!(error instanceof PopularitySnapshotUnavailable)) throw error;
+    data = error.fallbackData;
+  }
 
   return { data, updatedAt: Date.now() };
 }

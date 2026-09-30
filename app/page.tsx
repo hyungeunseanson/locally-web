@@ -7,7 +7,6 @@ import { getCurrentLocale } from '@/app/utils/locale';
 import { buildLocalizedAbsoluteUrl } from '@/app/utils/siteUrl';
 import { buildOrganizationJsonLd, buildWebsiteJsonLd } from '@/app/utils/structuredData';
 import { getPublicHomeExperiences } from '@/app/home/homeExperienceData.server';
-import HomeSplashTrigger from '@/app/home/HomeSplashTrigger';
 import HomeStreamingFallback from '@/app/home/HomeStreamingFallback';
 
 type HomeData = Awaited<ReturnType<typeof getPublicHomeExperiences>> | null;
@@ -70,7 +69,6 @@ export default async function Page() {
   return (
     <>
       <JsonLd data={[buildOrganizationJsonLd(locale), buildWebsiteJsonLd(locale)]} />
-      <HomeSplashTrigger />
       <Suspense fallback={<HomeStreamingFallback />}>
         <HomeContent homeDataPromise={homeDataPromise} />
       </Suspense>
