@@ -29,7 +29,8 @@ BEGIN
     '20260922125140:close_refunded_phone_proxy_requests',
     '20260923013312:ops_anomaly_monitor_snapshot',
     '20260923084232:one_time_review_request_reminders',
-    '20260929144521:harden_public_host_applications_security_barrier'
+    '20260929144521:harden_public_host_applications_security_barrier',
+    '20260930022348:move_is_admin_reader_to_private_schema'
   ]::text[];
   IF actual IS DISTINCT FROM expected THEN
     RAISE EXCEPTION 'migration ledger mismatch: %', actual;
@@ -132,7 +133,6 @@ BEGIN
     'public.increment_comment_count()',
     'public.increment_community_post_view_count(p_post_id uuid)',
     'public.increment_like_count()',
-    'public.is_admin_reader()',
     'public.lease_experience_translation_task(p_provider text, p_now timestamp with time zone, p_lease_seconds integer)',
     'public.lease_experience_translation_task(p_provider text, p_now timestamp with time zone, p_lease_seconds integer, p_reserved_tokens integer)',
     'public.list_due_experience_completion_candidates(p_booking_id text)',
@@ -155,6 +155,55 @@ BEGIN
   ]::text[];
   IF actual IS DISTINCT FROM expected THEN
     RAISE EXCEPTION 'public function overload inventory mismatch: %', actual;
+  END IF;
+
+  SELECT array_agg(
+           format('private.%I(%s)', procedure_def.proname,
+                  pg_get_function_identity_arguments(procedure_def.oid))
+           ORDER BY procedure_def.proname,
+                    pg_get_function_identity_arguments(procedure_def.oid)
+         )
+    INTO actual
+    FROM pg_proc AS procedure_def
+    JOIN pg_namespace AS namespace_def ON namespace_def.oid = procedure_def.pronamespace
+   WHERE namespace_def.nspname = 'private';
+  IF actual IS DISTINCT FROM ARRAY['private.is_admin_reader()']::text[] THEN
+    RAISE EXCEPTION 'private function overload inventory mismatch: %', actual;
+  END IF;
+
+  IF to_regprocedure('public.is_admin_reader()') IS NOT NULL
+    OR NOT EXISTS (
+      SELECT 1 FROM pg_namespace AS namespace_def
+      WHERE namespace_def.nspname = 'private'
+        AND pg_get_userbyid(namespace_def.nspowner) = 'postgres'
+        AND namespace_def.nspacl::text =
+          '{postgres=UC/postgres,authenticated=U/postgres,service_role=U/postgres}'
+    )
+    OR NOT EXISTS (
+      SELECT 1 FROM pg_proc AS procedure_def
+      WHERE procedure_def.oid = to_regprocedure('private.is_admin_reader()')
+        AND pg_get_userbyid(procedure_def.proowner) = 'postgres'
+        AND procedure_def.prosecdef
+        AND procedure_def.provolatile = 's'
+        AND procedure_def.pronargs = 0
+        AND procedure_def.prorettype = 'boolean'::regtype
+        AND procedure_def.proconfig = ARRAY['search_path=""']::text[]
+        AND procedure_def.prosrc LIKE '%resolved_user_role%'
+        AND procedure_def.prosrc NOT LIKE '%current_role%'
+        AND procedure_def.proacl::text =
+          '{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}'
+    )
+    OR has_schema_privilege('anon', 'private', 'USAGE')
+    OR has_schema_privilege('anon', 'private', 'CREATE')
+    OR has_schema_privilege('authenticated', 'private', 'CREATE')
+    OR NOT has_schema_privilege('authenticated', 'private', 'USAGE')
+    OR has_schema_privilege('service_role', 'private', 'CREATE')
+    OR NOT has_schema_privilege('service_role', 'private', 'USAGE')
+    OR has_function_privilege('anon', 'private.is_admin_reader()', 'EXECUTE')
+    OR NOT has_function_privilege('authenticated', 'private.is_admin_reader()', 'EXECUTE')
+    OR NOT has_function_privilege('service_role', 'private.is_admin_reader()', 'EXECUTE')
+  THEN
+    RAISE EXCEPTION 'private admin reader function contract mismatch';
   END IF;
 
   SELECT array_agg(
@@ -277,7 +326,7 @@ BEGIN
     INTO actual_fingerprint
     FROM pg_policies AS policy_def
    WHERE policy_def.schemaname = 'public';
-  IF actual_fingerprint IS DISTINCT FROM 'e40c9b6b6a5b834ce627e6e421b11ff8' THEN
+  IF actual_fingerprint IS DISTINCT FROM '4741211273ef7aeae0ced24ccd2345da' THEN
     RAISE EXCEPTION 'public RLS policy fingerprint mismatch: %', actual_fingerprint;
   END IF;
 
@@ -381,7 +430,7 @@ BEGIN
     INTO actual_fingerprint
     FROM pg_policies AS policy_def
    WHERE policy_def.schemaname = 'storage' AND policy_def.tablename = 'objects';
-  IF actual_fingerprint IS DISTINCT FROM '1519cc7c3877bf1389c0e02c63bc223a' THEN
+  IF actual_fingerprint IS DISTINCT FROM '898e8b7f917fd0f4530ef30c9b61961e' THEN
     RAISE EXCEPTION 'Storage policy fingerprint mismatch: %', actual_fingerprint;
   END IF;
 
@@ -394,9 +443,6 @@ BEGIN
      OR has_function_privilege('anon', 'public.mark_room_messages_read(uuid,uuid)', 'EXECUTE')
      OR has_function_privilege('authenticated', 'public.mark_room_messages_read(uuid,uuid)', 'EXECUTE')
      OR NOT has_function_privilege('service_role', 'public.mark_room_messages_read(uuid,uuid)', 'EXECUTE')
-     OR has_function_privilege('anon', 'public.is_admin_reader()', 'EXECUTE')
-     OR NOT has_function_privilege('authenticated', 'public.is_admin_reader()', 'EXECUTE')
-     OR NOT has_function_privilege('service_role', 'public.is_admin_reader()', 'EXECUTE')
      OR has_function_privilege('anon', 'public.apply_experience_media_locator_cas(bigint,text[],text,jsonb,jsonb,text[],text,jsonb,jsonb)', 'EXECUTE')
      OR has_function_privilege('authenticated', 'public.apply_experience_media_locator_cas(bigint,text[],text,jsonb,jsonb,text[],text,jsonb,jsonb)', 'EXECUTE')
      OR NOT has_function_privilege('service_role', 'public.apply_experience_media_locator_cas(bigint,text[],text,jsonb,jsonb,text[],text,jsonb,jsonb)', 'EXECUTE') THEN

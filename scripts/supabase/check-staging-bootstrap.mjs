@@ -49,10 +49,9 @@ const expectedAppliedOrder = [
   'supabase/migrations/20260923013312_ops_anomaly_monitor_snapshot.sql',
   'supabase/migrations/20260923084232_one_time_review_request_reminders.sql',
   'supabase/migrations/20260929144521_harden_public_host_applications_security_barrier.sql',
-];
-const expectedPendingOrder = [
   'supabase/migrations/20260930022348_move_is_admin_reader_to_private_schema.sql',
 ];
+const expectedPendingOrder = [];
 const expectedApplyOrder = [...expectedAppliedOrder, ...expectedPendingOrder];
 exact('fresh-project apply order', required.freshProjectApplyOrder, expectedApplyOrder);
 exact(
@@ -125,8 +124,8 @@ for (const requiredFragment of [
 
 for (const [name, fingerprint] of Object.entries({
   storageBuckets: '7419cabe695cd50a522314a749216c05',
-  storagePolicies: '1519cc7c3877bf1389c0e02c63bc223a',
-  publicRlsPolicies: 'e40c9b6b6a5b834ce627e6e421b11ff8',
+  storagePolicies: '898e8b7f917fd0f4530ef30c9b61961e',
+  publicRlsPolicies: '4741211273ef7aeae0ced24ccd2345da',
   publicRelationGrants: '814931d0ab076cc787b8ce26adc5ec0a',
 })) {
   if (current.securityFingerprints[name] !== fingerprint || !currentContract.includes(fingerprint)) {
