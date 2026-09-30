@@ -6,8 +6,8 @@ import { ReactNode } from 'react';
 
 export default function PageTransition({ children }: { children: ReactNode }) {
     const pathname = usePathname();
-    const shouldAnimate =
-        pathname === '/' ||
+    const isHomeRoot = /^\/(?:ko|en|ja|zh)?\/?$/.test(pathname ?? '');
+    const shouldAnimate = !isHomeRoot && (
         pathname?.startsWith('/about') ||
         pathname?.startsWith('/become-a-host') ||
         pathname?.startsWith('/company') ||
@@ -16,7 +16,8 @@ export default function PageTransition({ children }: { children: ReactNode }) {
         pathname?.startsWith('/experiences') ||
         pathname?.startsWith('/search') ||
         pathname?.startsWith('/guest') ||
-        pathname?.startsWith('/services');
+        pathname?.startsWith('/services')
+    );
 
     if (!shouldAnimate) {
         return <>{children}</>;

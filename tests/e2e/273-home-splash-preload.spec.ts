@@ -27,10 +27,20 @@ const visibleExperience = {
 };
 
 let server: Server;
-let mode: 'records' | 'empty' | 'fail-once' = 'records';
+let mode: 'records' | 'empty' | 'fail-once' | 'popularity-fail' = 'records';
 let failNextHostRequest = false;
 let responseDelayMs = 0;
 const queries: string[] = [];
+const homeSourceNames = ['public_host_applications', 'experiences', 'experience_availability', 'experience_popularity_snapshot'];
+let parallelBarrier: {
+  seen: Set<string>;
+  pending: Array<{ response: import('node:http').ServerResponse; status: number; data: unknown }>;
+  firstResponseSourceCount: number | null;
+  firstStartedAt: number | null;
+  allStartedAt: number | null;
+  releasedAt: number | null;
+  released: boolean;
+} | null = null;
 
 function respond(response: import('node:http').ServerResponse, status: number, data: unknown) {
   setTimeout(() => {
@@ -39,7 +49,33 @@ function respond(response: import('node:http').ServerResponse, status: number, d
   }, responseDelayMs);
 }
 
-test.describe('Home public data behind brand splash', () => {
+function respondHomeSource(path: string, response: import('node:http').ServerResponse, status: number, data: unknown) {
+  const barrier = parallelBarrier;
+  if (!barrier || barrier.released || !homeSourceNames.some((name) => path.endsWith(`/${name}`))) {
+    respond(response, status, data);
+    return;
+  }
+  if (barrier.firstStartedAt === null) barrier.firstStartedAt = Date.now();
+  barrier.seen.add(path);
+  barrier.pending.push({ response, status, data });
+  const release = () => {
+    if (barrier.released) return;
+    barrier.released = true;
+    barrier.releasedAt = Date.now();
+    barrier.firstResponseSourceCount = barrier.seen.size;
+    for (const pending of barrier.pending) respond(pending.response, pending.status, pending.data);
+    barrier.pending.length = 0;
+  };
+  if (barrier.seen.size === homeSourceNames.length) {
+    barrier.allStartedAt = Date.now();
+    release();
+  } else if (barrier.seen.size === 1) {
+    // A sequential implementation cannot pass: its first response is released with fewer than four sources started.
+    setTimeout(release, 2000);
+  }
+}
+
+test.describe('Home public data without an automatic splash', () => {
   test.describe.configure({ mode: 'serial' });
 
   test.beforeAll(async () => {
@@ -49,10 +85,10 @@ test.describe('Home public data behind brand splash', () => {
       if (path.endsWith('/public_host_applications')) {
         if (mode === 'fail-once' && failNextHostRequest) {
           failNextHostRequest = false;
-          respond(response, 500, { message: 'temporary fixture failure' });
+          respondHomeSource(path, response, 500, { message: 'temporary fixture failure' });
           return;
         }
-        respond(response, 200, mode === 'empty' ? [] : [
+        respondHomeSource(path, response, 200, mode === 'empty' ? [] : [
           { id: 1, user_id: 'host-visible', status: 'approved', created_at: '2026-09-01T00:00:00.000Z', is_superhost: false },
           { id: 2, user_id: 'host-private', status: 'rejected', created_at: '2026-09-01T00:00:00.000Z', is_superhost: false },
         ]);
@@ -60,10 +96,10 @@ test.describe('Home public data behind brand splash', () => {
       }
       if (path.endsWith('/experiences')) {
         if (new URL(request.url ?? '/', `http://127.0.0.1:${fixturePort}`).searchParams.get('id') === 'eq.99001') {
-          respond(response, 200, visibleExperience);
+          respondHomeSource(path, response, 200, visibleExperience);
           return;
         }
-        respond(response, 200, [
+        respondHomeSource(path, response, 200, [
           visibleExperience,
           { ...visibleExperience, id: 99002, title: 'Inactive Experience', is_active: false },
           { ...visibleExperience, id: 99003, title: 'Private Host Experience', host_id: 'host-private' },
@@ -71,11 +107,15 @@ test.describe('Home public data behind brand splash', () => {
         return;
       }
       if (path.endsWith('/experience_availability')) {
-        respond(response, 200, [{ experience_id: 99001, date: '2099-10-01' }]);
+        respondHomeSource(path, response, 200, [{ experience_id: 99001, date: '2099-10-01' }]);
         return;
       }
       if (path.endsWith('/experience_popularity_snapshot')) {
-        respond(response, 200, [{ experience_id: 99001, wishlist_count: 3 }]);
+        if (mode === 'popularity-fail') {
+          respondHomeSource(path, response, 500, { message: 'temporary popularity failure' });
+          return;
+        }
+        respondHomeSource(path, response, 200, [{ experience_id: 99001, wishlist_count: 3 }]);
         return;
       }
       respond(response, 404, { message: 'fixture route not found' });
@@ -91,6 +131,7 @@ test.describe('Home public data behind brand splash', () => {
     mode = 'records';
     failNextHostRequest = false;
     responseDelayMs = 0;
+    parallelBarrier = null;
     queries.length = 0;
     await context.addCookies([{ name: 'app_lang', value: 'ko', url: 'http://127.0.0.1:3000' }]);
   });
@@ -136,8 +177,48 @@ test.describe('Home public data behind brand splash', () => {
     expect(payload.data.map((item: { id: number }) => item.id)).toEqual([99001]);
     expect(payload.data[0].available_dates).toEqual(['2099-10-01']);
     expect(payload.data[0].wishlist_count).toBe(3);
+    expect(payload.data[0]).not.toHaveProperty('status');
+    expect(payload.data[0]).not.toHaveProperty('is_active');
+    expect(payload.data[0]).toMatchObject({
+      public_image_r2_eligible: true,
+      is_superhost: false,
+      card_image_url: null,
+    });
     await page.goto('/');
     await expect(page.getByText('Inactive Experience')).toHaveCount(0);
+  });
+
+  test('starts all four public sources before any source response', async ({ request }) => {
+    responseDelayMs = 250;
+    parallelBarrier = {
+      seen: new Set(), pending: [], firstResponseSourceCount: null,
+      firstStartedAt: null, allStartedAt: null, releasedAt: null, released: false,
+    };
+    const response = await request.get('/');
+    expect(response.status()).toBe(200);
+    expect(await response.text()).toContain('서울 사전 로드 체험');
+    expect(parallelBarrier.firstResponseSourceCount).toBe(4);
+    expect(parallelBarrier.seen.size).toBe(4);
+    expect(parallelBarrier.allStartedAt).not.toBeNull();
+    expect(parallelBarrier.allStartedAt! - parallelBarrier.firstStartedAt!).toBeLessThan(500);
+    console.log('Home fixture benchmark:', JSON.stringify({
+      sourceStartSpreadMs: parallelBarrier.allStartedAt! - parallelBarrier.firstStartedAt!,
+      artificialDelayPerStageMs: responseDelayMs,
+      sequentialThreeStageLowerBoundMs: responseDelayMs * 3,
+      parallelSourceLowerBoundMs: responseDelayMs + parallelBarrier.releasedAt! - parallelBarrier.firstStartedAt!,
+    }));
+  });
+
+  test('keeps visible cards when only popularity fails', async ({ request }) => {
+    mode = 'popularity-fail';
+    const response = await request.get('/');
+    expect(response.status()).toBe(200);
+    expect(await response.text()).toContain('서울 사전 로드 체험');
+    const apiResponse = await request.get('/api/home/experiences');
+    expect(apiResponse.status()).toBe(200);
+    const payload = await apiResponse.json();
+    expect(payload.data.map((item: { id: number }) => item.id)).toEqual([99001]);
+    expect(payload.data[0].wishlist_count).toBe(0);
   });
 
   test('treats a successful empty result as an empty state without fetching the API again', async ({ page }) => {
@@ -166,45 +247,38 @@ test.describe('Home public data behind brand splash', () => {
     expect(homeApiRequests).toHaveLength(1);
   });
 
-  test('keeps the Home splash bounded on first load, refresh, and browser back', async ({ page }) => {
+  test('does not cover the first Home load, refresh, or browser back with a splash', async ({ page }) => {
     const splash = page.locator('div[style*="z-index: 9999"] > img[alt="Locally"]');
-    const verifySplash = async () => {
-      await expect(splash).toBeVisible();
-      await expect(splash.locator('..')).toHaveCSS('animation-duration', '1.3s');
-      const visibleAt = Date.now();
-      await expect(splash).toBeHidden({ timeout: 2500 });
-      const visibleMs = Date.now() - visibleAt;
-      expect(visibleMs).toBeGreaterThanOrEqual(750);
+    const verifyHome = async () => {
+      await expect(splash).toHaveCount(0);
       await expect(page.getByTestId('home-desktop-all-experiences-section').getByText('서울 사전 로드 체험')).toBeVisible();
+      await page.waitForTimeout(1400);
+      await expect(splash).toHaveCount(0);
     };
 
     await page.goto('/', { waitUntil: 'domcontentloaded' });
-    await verifySplash();
+    await verifyHome();
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await verifySplash();
+    await verifyHome();
     await page.goto('/about', { waitUntil: 'domcontentloaded' });
     await page.goBack({ waitUntil: 'domcontentloaded' });
-    await expect(splash).toBeHidden({ timeout: 2500 });
-    await expect(page.getByTestId('home-desktop-all-experiences-section').getByText('서울 사전 로드 체험')).toBeVisible();
+    await verifyHome();
   });
 
-  test('shows the brand splash when navigating from another route to Home', async ({ page }) => {
+  test('does not show the brand splash when navigating from another route to Home', async ({ page }) => {
     await page.goto('/about', { waitUntil: 'domcontentloaded' });
     await page.locator('a[href="/"]').first().click();
     const splash = page.locator('div[style*="z-index: 9999"] > img[alt="Locally"]');
-    await expect(splash).toBeVisible();
-    await expect(splash).toBeHidden({ timeout: 2500 });
+    await expect(splash).toHaveCount(0);
     await expect(page.getByTestId('home-desktop-all-experiences-section').getByText('서울 사전 로드 체험')).toBeVisible();
   });
 
-  test('streams the splash and a skeleton before slow public data finishes', async ({ page }) => {
+  test('streams an unobscured skeleton before slow public data finishes', async ({ page }) => {
     responseDelayMs = 1000;
     const splash = page.locator('div[style*="z-index: 9999"] > img[alt="Locally"]');
     await page.goto('/', { waitUntil: 'commit' });
-    await expect(splash).toBeVisible();
-    await expect(page.getByTestId('home-streaming-skeleton')).toBeAttached();
-    await expect(splash).toBeHidden({ timeout: 2500 });
     await expect(page.getByTestId('home-streaming-skeleton')).toBeVisible();
+    await expect(splash).toHaveCount(0);
     await expect(page.getByTestId('home-desktop-all-experiences-section').getByText('서울 사전 로드 체험')).toBeVisible();
   });
 
