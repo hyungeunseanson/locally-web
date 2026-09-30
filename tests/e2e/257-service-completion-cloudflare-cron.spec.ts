@@ -121,6 +121,17 @@ function createProcessorClient(calls: string[], alreadyRunning = false) {
 }
 
 test.describe('Service Completion Cloudflare Cron', () => {
+  test('defaults the Production release ON while retaining OFF rollback and raw fail-safe', () => {
+    const policy = JSON.parse(readFileSync(
+      'config/cloudflare/service-completion-release-policy.json', 'utf8'
+    ));
+    const wrangler = JSON.parse(readFileSync('wrangler.jsonc', 'utf8'));
+    expect(policy.defaultProductionProfile).toBe('on');
+    expect(policy.profiles.off.scheduledEnabled).toBe('false');
+    expect(policy.profiles.on.scheduledEnabled).toBe('true');
+    expect(wrangler.env.production.vars.SERVICE_COMPLETION_SCHEDULED_ENABLED).toBe('false');
+  });
+
   test('preserves the manual HTTP fallback guard', async () => {
     const response = await executeServiceCompletionCron(
       new Request('https://example.test/api/cron/complete-services')

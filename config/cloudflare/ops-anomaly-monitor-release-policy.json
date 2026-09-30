@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "defaultProductionProfile": "off",
+  "defaultProductionProfile": "on",
   "profiles": {
     "off": {
       "scheduledEnabled": "false"

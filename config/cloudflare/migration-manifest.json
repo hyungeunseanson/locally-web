@@ -99,19 +99,19 @@
     "cron": "23 */2 * * *"
   },
   "serviceCompletionReleasePolicy": {
-    "defaultProductionProfile": "off",
+    "defaultProductionProfile": "on",
     "scheduledEnabledVariable": "SERVICE_COMPLETION_SCHEDULED_ENABLED",
     "rawDefault": "false",
     "cron": "23 */2 * * *"
   },
   "cancelPendingBookingsReleasePolicy": {
-    "defaultProductionProfile": "off",
+    "defaultProductionProfile": "on",
     "scheduledEnabledVariable": "CANCEL_PENDING_BOOKINGS_SCHEDULED_ENABLED",
     "rawDefault": "false",
     "cron": "7,37 * * * *"
   },
   "opsAnomalyMonitorReleasePolicy": {
-    "defaultProductionProfile": "off",
+    "defaultProductionProfile": "on",
     "scheduledEnabledVariable": "OPS_ANOMALY_MONITOR_SCHEDULED_ENABLED",
     "queueReadTokenSecret": "OPS_ANOMALY_MONITOR_CLOUDFLARE_API_TOKEN",
     "rawDefault": "false",

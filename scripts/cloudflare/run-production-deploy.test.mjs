@@ -370,7 +370,7 @@ test('Experience completion ON/OFF profiles are independent from every existing 
   });
 });
 
-test('Service completion defaults OFF and passes an independent ON/OFF deployment variable', async () => {
+test('Service completion defaults ON and passes an independent ON/OFF deployment variable', async () => {
   const media = resolveReleaseProfile(await readReleasePolicy());
   const translation = resolveTranslationReleaseProfile(await readTranslationReleasePolicy());
   const home = await homeProfile('on');
@@ -382,7 +382,7 @@ test('Service completion defaults OFF and passes an independent ON/OFF deploymen
     'off'
   );
   const policy = await readServiceCompletionReleasePolicy();
-  assert.equal(resolveServiceCompletionReleaseProfile(policy).name, 'off');
+  assert.equal(resolveServiceCompletionReleaseProfile(policy).name, 'on');
 
   for (const name of ['off', 'on']) {
     const service = await serviceCompletionProfile(name);
@@ -418,7 +418,7 @@ test('Service completion defaults OFF and passes an independent ON/OFF deploymen
   });
 });
 
-test('Cancel Pending Bookings defaults OFF and requires an explicit one-time Cron addition allowance', async () => {
+test('Cancel Pending Bookings defaults ON and retains an explicit Cron addition allowance', async () => {
   const media = resolveReleaseProfile(await readReleasePolicy());
   const translation = resolveTranslationReleaseProfile(await readTranslationReleasePolicy());
   const home = await homeProfile('on');
@@ -431,7 +431,7 @@ test('Cancel Pending Bookings defaults OFF and requires an explicit one-time Cro
     'on'
   );
   const policy = await readCancelPendingBookingsReleasePolicy();
-  assert.equal(resolveCancelPendingBookingsReleaseProfile(policy).name, 'off');
+  assert.equal(resolveCancelPendingBookingsReleaseProfile(policy).name, 'on');
 
   for (const name of ['off', 'on']) {
     const cancelPending = await cancelPendingBookingsProfile(name);
@@ -487,6 +487,55 @@ test('passes the Cancel Pending profile and planned Cron addition to semantic pr
   assert(preflightOptions.allowedPlannedChanges.includes(
     'CANCEL_PENDING_BOOKINGS_SCHEDULED_ENABLED'
   ));
+});
+
+test('default Production deploy resolves all three scheduled flags ON without planned changes', async () => {
+  let preflightOptions;
+  const commands = [];
+  await main([], {
+    runCommand: (_command, argumentsList) => { commands.push(argumentsList); },
+    runSemanticPreflight: async (options) => { preflightOptions = options; },
+    runBrowserSmoke: async () => {},
+    log: () => {},
+  });
+
+  for (const name of [
+    'SERVICE_COMPLETION_SCHEDULED_ENABLED',
+    'CANCEL_PENDING_BOOKINGS_SCHEDULED_ENABLED',
+    'OPS_ANOMALY_MONITOR_SCHEDULED_ENABLED',
+  ]) {
+    assert.equal(preflightOptions.expectedVariables[name], 'true');
+    assert(commands[1].includes(`${name}:true`));
+  }
+  assert.deepEqual(preflightOptions.allowedPlannedChanges, []);
+  assert.deepEqual(preflightOptions.allowedPlannedCronAdditions, []);
+});
+
+test('explicit OFF profiles retain independent rollback for all three scheduled flags', async () => {
+  for (const [argument, name] of [
+    ['--service-completion-profile=off', 'SERVICE_COMPLETION_SCHEDULED_ENABLED'],
+    ['--cancel-pending-profile=off', 'CANCEL_PENDING_BOOKINGS_SCHEDULED_ENABLED'],
+    ['--ops-anomaly-monitor-profile=off', 'OPS_ANOMALY_MONITOR_SCHEDULED_ENABLED'],
+  ]) {
+    let preflightOptions;
+    const commands = [];
+    await main([argument], {
+      runCommand: (_command, argumentsList) => { commands.push(argumentsList); },
+      runSemanticPreflight: async (options) => { preflightOptions = options; },
+      runBrowserSmoke: async () => {},
+      log: () => {},
+    });
+    assert.equal(preflightOptions.expectedVariables[name], 'false');
+    assert(commands[1].includes(`${name}:false`));
+    assert.deepEqual(preflightOptions.allowedPlannedChanges, [name]);
+    for (const other of [
+      'SERVICE_COMPLETION_SCHEDULED_ENABLED',
+      'CANCEL_PENDING_BOOKINGS_SCHEDULED_ENABLED',
+      'OPS_ANOMALY_MONITOR_SCHEDULED_ENABLED',
+    ].filter((variable) => variable !== name)) {
+      assert.equal(preflightOptions.expectedVariables[other], 'true');
+    }
+  }
 });
 
 test('orders build, semantic preflight, pre-deploy smoke, deploy, and post-deploy smoke', async () => {
@@ -582,12 +631,12 @@ test('passes the final Service ON deployment contract to semantic preflight', as
   assert.deepEqual(preflightOptions.allowedPlannedChanges, ['SERVICE_COMPLETION_SCHEDULED_ENABLED']);
 });
 
-test('keeps Ops Anomaly Monitor OFF by default and resolves its ON profile independently', async () => {
+test('keeps Ops Anomaly Monitor ON by default and resolves its OFF profile independently', async () => {
   const policy = await readOpsAnomalyMonitorReleasePolicy();
-  assert.equal(resolveOpsAnomalyMonitorReleaseProfile(policy).name, 'off');
-  assert.deepEqual(resolveOpsAnomalyMonitorReleaseProfile(policy, 'on'), {
-    name: 'on',
-    scheduledEnabled: 'true',
+  assert.equal(resolveOpsAnomalyMonitorReleaseProfile(policy).name, 'on');
+  assert.deepEqual(resolveOpsAnomalyMonitorReleaseProfile(policy, 'off'), {
+    name: 'off',
+    scheduledEnabled: 'false',
   });
   assert.deepEqual(parseDeploymentArguments(['--ops-anomaly-monitor-profile=on']), {
     requestedProfile: undefined,
