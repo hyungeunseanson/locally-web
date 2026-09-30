@@ -13,6 +13,7 @@ const currentManifest = JSON.parse(
 );
 const baselineContract = readFileSync('supabase/staging/baseline-contract.sql', 'utf8');
 const currentContract = readFileSync('supabase/staging/current-state-contract.sql', 'utf8');
+const adminReaderTargetContract = readFileSync('supabase/staging/admin-reader-private-contract.sql', 'utf8');
 const schemaContract = readFileSync('supabase/staging/schema-contract.sql', 'utf8');
 const inventory = readFileSync('supabase/staging/schema-only-inventory.sql', 'utf8');
 const currentStateOverlay = readFileSync(
@@ -63,8 +64,13 @@ test.describe('Supabase staging bootstrap contract', () => {
       'supabase/migrations/20260923013312_ops_anomaly_monitor_snapshot.sql',
       'supabase/migrations/20260923084232_one_time_review_request_reminders.sql',
       'supabase/migrations/20260929144521_harden_public_host_applications_security_barrier.sql',
+      'supabase/migrations/20260930022348_move_is_admin_reader_to_private_schema.sql',
     ]);
-    expect(manifest.pendingProductionMigrations).toEqual([]);
+    expect(manifest.pendingProductionMigrations).toEqual([{
+      version: '20260930022348',
+      name: 'move_is_admin_reader_to_private_schema',
+      repositoryFile: 'supabase/migrations/20260930022348_move_is_admin_reader_to_private_schema.sql',
+    }]);
     expect(packageJson.scripts['supabase:staging:baseline:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:current:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:contract']).toBeTruthy();
@@ -80,6 +86,10 @@ test.describe('Supabase staging bootstrap contract', () => {
     expect(currentContract).toContain('BEGIN READ ONLY;');
     expect(currentContract).toContain('ROLLBACK;');
     expect(currentContract).toContain('LOCALLY_PRODUCTION_CURRENT_STATE_CONTRACT_PASS');
+    expect(adminReaderTargetContract).toContain('BEGIN READ ONLY;');
+    expect(adminReaderTargetContract).toContain('ROLLBACK;');
+    expect(adminReaderTargetContract).toContain("to_regprocedure('public.is_admin_reader()')");
+    expect(adminReaderTargetContract).toContain('private.is_admin_reader()');
     expect(inventory).toContain('BEGIN READ ONLY;');
     expect(inventory).toContain('pg_get_functiondef');
     expect(inventory).not.toMatch(/\b(insert|update|delete|alter|create|drop|truncate)\s+/i);
