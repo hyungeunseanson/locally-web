@@ -137,6 +137,59 @@ class BlockingResponse:
     def close(self):
         pass
 
+
+class ProgressingResponse:
+    headers = {}
+
+    def __init__(self):
+        self.chunks = iter((b"a", b"b", b"c", b""))
+
+    def read(self, _amount):
+        chunk = next(self.chunks)
+        if chunk:
+            time.sleep(0.12)
+        return chunk
+
+    def close(self):
+        pass
+
+
+class ScriptedResponse:
+    headers = {}
+
+    def __init__(self, *reads):
+        self.reads = iter(reads)
+        self.closed = False
+
+    def read(self, _amount):
+        value = next(self.reads)
+        if value == "stall":
+            time.sleep(1)
+        if isinstance(value, Exception):
+            raise value
+        return value
+
+    def close(self):
+        self.closed = True
+
+
+class SequencedSource(backup.SupabaseStorageSource):
+    def __init__(self, items, responses, timeout=0.03):
+        super().__init__("https://uhinvcydgzqlpnvieyal.supabase.co", "fixture", timeout=timeout)
+        self.items = items
+        self.responses = iter(responses)
+        self.requests = 0
+
+    def inventory(self):
+        return [dict(item) for item in self.items]
+
+    def _request(self, method, path, body=None):
+        self.requests += 1
+        response = next(self.responses)
+        if isinstance(response, Exception):
+            raise response
+        return response
+
 class StorageByteBackupTests(unittest.TestCase):
     def setUp(self):
         self.root = pathlib.Path(tempfile.mkdtemp())
@@ -196,13 +249,38 @@ class StorageByteBackupTests(unittest.TestCase):
 
         prepared, budget = backup.prepare_plan(self.plan, self.source, self.cache)
         self.assertEqual(self.source.downloads, 2)
-        self.assertEqual(budget.source_attempts, 3)
-        self.assertEqual(budget.source_bytes, 11)
+        self.assertEqual(budget.source_attempts, 2)
+        self.assertEqual(budget.source_bytes, 6)
+        self.assertEqual(budget.cached_source_objects, 1)
+        self.assertEqual(budget.cached_source_bytes, 5)
+        self.assertEqual(prepared["summary"]["downloadedObjects"], 3)
+        self.assertEqual(prepared["summary"]["downloadedBytes"], 11)
+        self.assertEqual(prepared["summary"]["remoteSourceAttempts"], 2)
+        self.assertEqual(prepared["summary"]["samePlanCachedObjects"], 1)
         self.assertEqual(prepared["objects"][0]["sourceSha256"], hashlib.sha256(b"alpha").hexdigest())
 
         other = backup.make_plan(self.items, "other-plan", "34916900214", "2026-09-15T01:21:29Z", "2026-09-15T02:00:00Z")
         with self.assertRaisesRegex(backup.ValidationError, "not bound"):
             backup.prepare_plan(other, self.source, self.cache)
+
+    def test_resume_rejects_unsafe_cache_file_and_binding(self):
+        self.cache.mkdir(mode=0o700)
+        backup.bind_resume_cache(self.cache, self.plan)
+        first = self.plan["objects"][0]
+        cached = self.cache / (first["identity"] + ".source")
+        cached.write_bytes(b"alpha")
+        os.chmod(cached, 0o644)
+        with self.assertRaises(backup.ValidationError):
+            backup.prepare_plan(self.plan, self.source, self.cache)
+        cached.unlink()
+        cached.symlink_to(self.root / "missing-source")
+        with self.assertRaises(backup.ValidationError):
+            backup.prepare_plan(self.plan, self.source, self.cache)
+        cached.unlink()
+        os.chmod(self.cache / ".plan-digest", 0o644)
+        with self.assertRaises(backup.ValidationError):
+            backup.prepare_plan(self.plan, self.source, self.cache)
+        self.assertEqual(self.source.downloads, 0)
 
     def test_payload_read_deadline_interrupts_stalled_body_and_removes_partial_file(self):
         source = backup.SupabaseStorageSource("https://uhinvcydgzqlpnvieyal.supabase.co", "fixture", timeout=0.05)
@@ -214,6 +292,101 @@ class StorageByteBackupTests(unittest.TestCase):
         self.assertFalse(target.exists())
         self.assertEqual(budget.source_attempts, 1)
         self.assertEqual(budget.source_bytes, 0)
+
+    def test_progressing_reads_can_exceed_total_timeout(self):
+        source = backup.SupabaseStorageSource("https://uhinvcydgzqlpnvieyal.supabase.co", "fixture", timeout=0.3)
+        source._request = lambda *_args, **_kwargs: ProgressingResponse()
+        target = self.root / "progressing.source"
+        budget = backup.TransferBudget()
+        result = source.download(entry("images", "slow", b"abc"), target, budget)
+        self.assertEqual(target.read_bytes(), b"abc")
+        self.assertEqual(result["sha256"], hashlib.sha256(b"abc").hexdigest())
+        self.assertEqual(budget.source_bytes, 3)
+
+    def test_timeout_once_retries_cleanly_and_charges_failed_bytes(self):
+        item = entry("images", "private/retry", b"abcd")
+        first = ScriptedResponse(b"ab", "stall")
+        second = ScriptedResponse(b"abcd", b"")
+        source = SequencedSource([item], [first, second])
+        target = self.root / "retry.source"
+        budget = backup.TransferBudget()
+        result = backup.resume_or_download_source(source, item, target, budget)
+        self.assertEqual(target.read_bytes(), b"abcd")
+        self.assertEqual(result["sha256"], hashlib.sha256(b"abcd").hexdigest())
+        self.assertEqual((source.requests, budget.source_attempts, budget.source_retries), (2, 2, 1))
+        self.assertEqual((budget.source_completed_downloads, budget.source_bytes), (1, 6))
+        self.assertTrue(first.closed and second.closed)
+
+    def test_two_timeouts_propagate_without_third_attempt(self):
+        item = entry("images", "private/exhausted", b"abcd")
+        source = SequencedSource([item], [ScriptedResponse(b"a", "stall"), ScriptedResponse(b"b", "stall")])
+        target = self.root / "exhausted.source"
+        budget = backup.TransferBudget()
+        with self.assertRaises(backup.SourceTimeoutError) as raised:
+            backup.resume_or_download_source(source, item, target, budget)
+        self.assertNotIn(item["key"], str(raised.exception))
+        self.assertFalse(target.exists())
+        self.assertEqual((source.requests, budget.source_attempts, budget.source_retries, budget.source_bytes), (2, 2, 1, 2))
+
+    def test_socket_read_timeout_is_classified_without_private_path(self):
+        item = entry("images", "private/secret-name", b"abcd")
+        source = SequencedSource([item], [ScriptedResponse(TimeoutError("socket stalled"))])
+        target = self.root / "socket-timeout.source"
+        budget = backup.TransferBudget()
+        with self.assertRaises(backup.SourceTimeoutError) as raised:
+            source.download(item, target, budget)
+        self.assertNotIn(item["key"], str(raised.exception))
+        self.assertNotIn(str(target), str(raised.exception))
+        self.assertFalse(target.exists())
+
+    def test_source_drift_and_validation_do_not_retry(self):
+        item = entry("images", "private/drift", b"abcd")
+        for response, error in ((ScriptedResponse(b"ab", b""), backup.SourceDriftError), (backup.ValidationError("invalid fixture"), backup.ValidationError), (backup.BackupError("HTTP 401"), backup.BackupError)):
+            with self.subTest(error=error):
+                source = SequencedSource([item], [response])
+                target = self.root / "no-retry.source"
+                budget = backup.TransferBudget()
+                with self.assertRaises(error):
+                    backup.resume_or_download_source(source, item, target, budget)
+                self.assertEqual((source.requests, budget.source_attempts, budget.source_retries), (1, 1, 0))
+                self.assertFalse(target.exists())
+
+    def test_retry_attempt_and_received_byte_ceilings_fail_closed(self):
+        item = entry("images", "private/budget", b"abcd")
+        attempt_source = SequencedSource([item], [ScriptedResponse(b"a", "stall")])
+        attempt_budget = backup.TransferBudget(max_source_objects=1)
+        target = self.root / "attempt-budget.source"
+        with self.assertRaises(backup.BudgetError):
+            backup.resume_or_download_source(attempt_source, item, target, attempt_budget)
+        self.assertEqual((attempt_source.requests, attempt_budget.source_attempts, attempt_budget.source_bytes), (1, 1, 1))
+        self.assertFalse(target.exists())
+
+        byte_source = SequencedSource([item], [ScriptedResponse(b"ab", "stall"), ScriptedResponse(b"ab", b"cd", b"")])
+        byte_budget = backup.TransferBudget(max_source_bytes=3)
+        target = self.root / "byte-budget.source"
+        with self.assertRaises(backup.BudgetError):
+            backup.resume_or_download_source(byte_source, item, target, byte_budget)
+        self.assertEqual((byte_source.requests, byte_budget.source_attempts, byte_budget.source_bytes), (2, 2, 4))
+        self.assertFalse(target.exists())
+
+    def test_prepared_metrics_keep_logical_objects_separate_from_attempts(self):
+        item = entry("images", "private/metrics", b"abcd")
+        source = SequencedSource([item], [ScriptedResponse(b"ab", "stall"), ScriptedResponse(b"abcd", b"")])
+        plan = backup.make_plan([item], "retry-metrics", "db-fixture", "2026-09-15T01:21:29Z", "2026-09-15T02:00:00Z")
+        prepared, budget = backup.prepare_plan(plan, source, self.cache)
+        summary = prepared["summary"]
+        self.assertEqual(summary["objectCount"], 1)
+        self.assertEqual(summary["downloadedObjects"], 1)
+        self.assertEqual(summary["downloadedBytes"], 4)
+        self.assertEqual((summary["logicalSourceObjects"], summary["logicalSourceBytes"]), (1, 4))
+        self.assertEqual(summary["remoteSourceAttempts"], 2)
+        self.assertEqual(summary["remoteCompletedDownloads"], 1)
+        self.assertEqual(summary["sourceRetryCount"], 1)
+        self.assertEqual(summary["cumulativeNetworkBytes"], 6)
+        self.assertEqual(summary["samePlanCachedObjects"], 0)
+        self.assertEqual(summary["reusedObjects"], 0)
+        self.assertEqual(budget.source_bytes, 6)
+        backup.validate_plan(prepared, require_prepared=True)
 
     def test_second_apply_is_exact_skip_without_overwrite(self):
         prepared = self.prepared()

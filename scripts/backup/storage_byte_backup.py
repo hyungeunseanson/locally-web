@@ -46,6 +46,7 @@ MAX_R2_BYTES = 640 * 1024 * 1024
 LOCK_DAYS = 30
 EXPIRY_DAYS = 35
 CHUNK_SIZE = 1024 * 1024
+MAX_SOURCE_RETRIES_PER_OBJECT = 1
 
 
 class BackupError(RuntimeError):
@@ -307,7 +308,7 @@ def payload_read_deadline(seconds: float):
 def bind_resume_cache(cache_dir: pathlib.Path, plan: Mapping[str, Any]) -> None:
     marker = cache_dir / ".plan-digest"
     if marker.exists():
-        if marker.is_symlink() or not marker.is_file() or marker.read_text(encoding="ascii").strip() != plan["planDigest"]:
+        if marker.is_symlink() or not marker.is_file() or stat.S_IMODE(marker.stat().st_mode) != 0o600 or marker.read_text(encoding="ascii").strip() != plan["planDigest"]:
             raise ValidationError("resume cache is not bound to this plan")
         return
     if any(cache_dir.iterdir()):
@@ -319,16 +320,31 @@ def bind_resume_cache(cache_dir: pathlib.Path, plan: Mapping[str, Any]) -> None:
 def resume_or_download_source(
     source: Any, entry: Mapping[str, Any], cache_path: pathlib.Path, budget: "TransferBudget",
 ) -> Mapping[str, Optional[str]]:
+    if cache_path.is_symlink():
+        raise ValidationError("unsafe resume cache file")
     if cache_path.exists():
-        if cache_path.is_symlink() or not cache_path.is_file():
+        if cache_path.is_symlink() or not cache_path.is_file() or stat.S_IMODE(cache_path.stat().st_mode) != 0o600:
             raise ValidationError("unsafe resume cache file")
         digest, size = sha256_file(cache_path)
         if size != entry["size"]:
             raise ValidationError("resume cache file size differs from plan")
-        budget.begin_source()
-        budget.receive_source(size)
+        budget.cached_source_objects += 1
+        budget.cached_source_bytes += size
         return {"sha256": digest, "etag": entry.get("sourceEtag"), "contentType": entry.get("contentType")}
-    return source.download(entry, cache_path, budget)
+    for retry in range(MAX_SOURCE_RETRIES_PER_OBJECT + 1):
+        if cache_path.exists() or cache_path.is_symlink():
+            raise ValidationError("partial source cache file remains before retry")
+        if retry:
+            budget.source_retries += 1
+        try:
+            result = source.download(entry, cache_path, budget)
+        except SourceTimeoutError:
+            if retry == MAX_SOURCE_RETRIES_PER_OBJECT:
+                raise
+            continue
+        budget.source_completed_downloads += 1
+        return result
+    raise AssertionError("unreachable source retry state")
 
 
 @dataclasses.dataclass
@@ -337,8 +353,12 @@ class TransferBudget:
     max_source_bytes: int = MAX_SOURCE_BYTES
     max_new_r2_objects: int = MAX_R2_OBJECTS
     max_new_r2_bytes: int = MAX_R2_BYTES
-    source_attempts: int = 0
-    source_bytes: int = 0
+    source_attempts: int = 0  # Remote GET attempts, including timed-out attempts.
+    source_bytes: int = 0  # All received network bytes, including failed attempts.
+    source_retries: int = 0
+    source_completed_downloads: int = 0
+    cached_source_objects: int = 0
+    cached_source_bytes: int = 0
     r2_attempts: int = 0
     new_r2_objects: int = 0
     new_r2_bytes: int = 0
@@ -474,9 +494,13 @@ class SupabaseStorageSource:
         digest = hashlib.sha256()
         size = 0
         try:
-            with os.fdopen(fd, "wb") as output, payload_read_deadline(self.timeout):
+            with os.fdopen(fd, "wb") as output:
                 while True:
-                    chunk = response.read(CHUNK_SIZE)
+                    try:
+                        with payload_read_deadline(self.timeout):
+                            chunk = response.read(CHUNK_SIZE)
+                    except TimeoutError as exc:
+                        raise SourceTimeoutError("Supabase Storage payload read timed out") from exc
                     if not chunk:
                         break
                     budget.receive_source(len(chunk))
@@ -545,6 +569,8 @@ def prepare_plan(
     previous: Optional[Mapping[str, Any]] = None, now: Optional[dt.datetime] = None,
 ) -> Tuple[Dict[str, Any], TransferBudget]:
     validate_plan(plan)
+    if cache_dir.is_symlink():
+        raise ValidationError("unsafe resume cache directory")
     cache_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(cache_dir, 0o700)
     bind_resume_cache(cache_dir, plan)
@@ -597,7 +623,20 @@ def prepare_plan(
     prepared["objects"] = prepared_objects
     prepared["preparedAt"] = utc_now()
     prepared["manifestCreatedAt"] = prepared["preparedAt"]
-    prepared["summary"] = dict(plan["summary"], downloadedObjects=budget.source_attempts, downloadedBytes=budget.source_bytes, reusedObjects=len(prepared_objects) - budget.source_attempts)
+    downloaded = [entry for entry in prepared_objects if entry["proof"] == "downloaded-byte-sha256"]
+    logical_source_bytes = sum(entry["size"] for entry in downloaded)
+    prepared["summary"] = dict(
+        plan["summary"],
+        downloadedObjects=len(downloaded), downloadedBytes=logical_source_bytes,
+        logicalSourceObjects=len(downloaded), logicalSourceBytes=logical_source_bytes,
+        reusedObjects=len(prepared_objects) - len(downloaded),
+        remoteSourceAttempts=budget.source_attempts,
+        remoteCompletedDownloads=budget.source_completed_downloads,
+        sourceRetryCount=budget.source_retries,
+        cumulativeNetworkBytes=budget.source_bytes,
+        samePlanCachedObjects=budget.cached_source_objects,
+        samePlanCachedBytes=budget.cached_source_bytes,
+    )
     prepared["planDigest"] = plan_digest(prepared)
     validate_plan(prepared, require_prepared=True)
     return prepared, budget
@@ -980,7 +1019,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         previous = read_private_json(args.previous_manifest) if args.previous_manifest else None
         prepared, budget = prepare_plan(plan, source_from_env(args), args.cache_dir, previous)
         safe_write_json(args.output, prepared)
-        print(json.dumps({"status": "prepared", "objectCount": len(prepared["objects"]), "planDigest": prepared["planDigest"], "sourceAttempts": budget.source_attempts, "sourceBytes": budget.source_bytes}, sort_keys=True))
+        print(json.dumps({
+            "status": "prepared", "objectCount": len(prepared["objects"]), "planDigest": prepared["planDigest"],
+            "sourceAttempts": budget.source_attempts, "sourceBytes": budget.source_bytes,
+            "remoteSourceAttempts": budget.source_attempts, "remoteCompletedDownloads": budget.source_completed_downloads,
+            "sourceRetryCount": budget.source_retries, "cumulativeNetworkBytes": budget.source_bytes,
+            "samePlanCachedObjects": budget.cached_source_objects,
+        }, sort_keys=True))
     elif args.command == "apply":
         plan = read_private_json(args.plan)
         summary, _ = apply_plan(plan, args.confirm_digest, source_from_env(args), boto3_store(), AgeEncryptor(args.age_recipient), args.cache_dir, args.work_dir)
