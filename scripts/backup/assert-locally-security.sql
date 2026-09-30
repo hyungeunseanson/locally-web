@@ -139,12 +139,23 @@ BEGIN
     RAISE EXCEPTION 'Anonymous access to private profile/user tables exists';
   END IF;
 
-  IF to_regprocedure('public.is_admin_reader()') IS NULL OR NOT EXISTS (
-    SELECT 1 FROM pg_proc
-    WHERE oid = to_regprocedure('public.is_admin_reader()')::oid
-      AND prosecdef AND provolatile = 's'
-      AND pg_get_userbyid(proowner) = 'postgres'
-  ) THEN
+  IF (to_regprocedure('public.is_admin_reader()') IS NULL) =
+     (to_regprocedure('private.is_admin_reader()') IS NULL)
+    OR NOT EXISTS (
+      SELECT 1 FROM pg_proc
+      WHERE oid = COALESCE(
+        to_regprocedure('private.is_admin_reader()'),
+        to_regprocedure('public.is_admin_reader()')
+      )::oid
+        AND prosecdef AND provolatile = 's'
+        AND pg_get_userbyid(proowner) = 'postgres'
+    )
+    OR (to_regprocedure('private.is_admin_reader()') IS NOT NULL AND (
+      has_schema_privilege('anon', 'private', 'USAGE')
+      OR has_function_privilege('anon', 'private.is_admin_reader()', 'EXECUTE')
+      OR NOT has_function_privilege('authenticated', 'private.is_admin_reader()', 'EXECUTE')
+    ))
+  THEN
     RAISE EXCEPTION 'is_admin_reader() security contract drifted';
   END IF;
 

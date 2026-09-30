@@ -43,7 +43,9 @@ BEGIN
     SELECT 1
     FROM pg_proc procedure
     JOIN pg_namespace namespace ON namespace.oid = procedure.pronamespace
-    WHERE namespace.nspname = 'public' AND procedure.proname = required.name
+    WHERE procedure.proname = required.name
+      AND (namespace.nspname = 'public'
+           OR (required.name = 'is_admin_reader' AND namespace.nspname = 'private'))
   );
 
   IF missing IS NOT NULL THEN

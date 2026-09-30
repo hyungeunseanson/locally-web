@@ -16,6 +16,10 @@ const currentContract = await readFile(
   resolve(root, 'supabase/staging/current-state-contract.sql'),
   'utf8'
 );
+const adminReaderTargetContract = await readFile(
+  resolve(root, 'supabase/staging/admin-reader-private-contract.sql'),
+  'utf8'
+);
 const overlay = await readFile(
   resolve(root, 'supabase/staging/post-baseline-current-state-overlay.sql'),
   'utf8'
@@ -46,7 +50,9 @@ const expectedAppliedOrder = [
   'supabase/migrations/20260923084232_one_time_review_request_reminders.sql',
   'supabase/migrations/20260929144521_harden_public_host_applications_security_barrier.sql',
 ];
-const expectedPendingOrder = [];
+const expectedPendingOrder = [
+  'supabase/migrations/20260930022348_move_is_admin_reader_to_private_schema.sql',
+];
 const expectedApplyOrder = [...expectedAppliedOrder, ...expectedPendingOrder];
 exact('fresh-project apply order', required.freshProjectApplyOrder, expectedApplyOrder);
 exact(
@@ -82,6 +88,12 @@ if (!currentContract.includes('BEGIN READ ONLY;') || !currentContract.trimEnd().
 }
 if (!currentContract.includes('LOCALLY_PRODUCTION_CURRENT_STATE_CONTRACT_PASS')) {
   fail('current-state-contract.sql pass marker is missing');
+}
+if (!adminReaderTargetContract.includes('BEGIN READ ONLY;')
+    || !adminReaderTargetContract.trimEnd().endsWith('ROLLBACK;')
+    || !adminReaderTargetContract.includes("to_regprocedure('public.is_admin_reader()')")
+    || !adminReaderTargetContract.includes('private.is_admin_reader()')) {
+  fail('admin-reader-private-contract.sql must verify the target in a read-only transaction');
 }
 
 const guardIndex = overlay.indexOf('$target_guard$');

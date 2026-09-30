@@ -16,9 +16,16 @@
     "supabase/migrations/20260922125140_close_refunded_phone_proxy_requests.sql",
     "supabase/migrations/20260923013312_ops_anomaly_monitor_snapshot.sql",
     "supabase/migrations/20260923084232_one_time_review_request_reminders.sql",
-    "supabase/migrations/20260929144521_harden_public_host_applications_security_barrier.sql"
+    "supabase/migrations/20260929144521_harden_public_host_applications_security_barrier.sql",
+    "supabase/migrations/20260930022348_move_is_admin_reader_to_private_schema.sql"
   ],
-  "pendingProductionMigrations": [],
+  "pendingProductionMigrations": [
+    {
+      "version": "20260930022348",
+      "name": "move_is_admin_reader_to_private_schema",
+      "repositoryFile": "supabase/migrations/20260930022348_move_is_admin_reader_to_private_schema.sql"
+    }
+  ],
   "applicationTables": [
     "admin_audit_logs",
     "admin_job_runs",

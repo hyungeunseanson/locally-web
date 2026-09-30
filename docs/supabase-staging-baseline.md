@@ -46,4 +46,8 @@ The migration fails closed when the expected Supabase-managed schemas/publicatio
 
 The repository static gate checks object identity/count parity, exact Realtime membership, bucket presence, and absence of project refs, URLs, emails, credential assignments, customer inserts, managed table DDL, Storage system triggers, and extension version pins.
 
-`baseline-contract.sql` is authoritative only at the immutable baseline checkpoint. `current-state-contract.sql` is the authoritative read-only test for a current Production clone or a fully bootstrapped empty project. This repository change does not create a branch/project, connect staging secrets, or remotely apply SQL.
+`baseline-contract.sql` is authoritative only at the immutable baseline checkpoint. `current-state-contract.sql` is the authoritative read-only test for a current Production clone or an empty project bootstrapped through the migrations already applied in Production. This repository change does not create a branch/project, connect staging secrets, or remotely apply SQL.
+
+## Pending admin reader hardening (1-B2)
+
+`20260930022348_move_is_admin_reader_to_private_schema.sql` is pending Production application. The Production current-state manifest and `current-state-contract.sql` continue to describe the **pre-migration** state. Run that contract before the pending migration on a clone. After applying the migration in an isolated project, run `admin-reader-private-contract.sql` and `schema-contract.sql` read-only; these verify the new helper and the ten RLS policies. Before any later Production application, independently confirm that `private` is absent from the Data API exposed schemas. This Draft PR does not apply the migration.
