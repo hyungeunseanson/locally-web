@@ -120,12 +120,12 @@ It must not copy sensitive files into the public media bucket.
 
 | Source bucket | Sensitivity and recovery source | Planned private backup treatment |
 | --- | --- | --- |
-| `experiences` | Public and inactive experience source media; the public R2 mirror covers only a subset | Encrypt every authoritative Supabase object; use public R2 only as secondary evidence |
+| `experiences` | Private and inactive experience source media; the public R2 mirror covers only a subset | Encrypt every authoritative Supabase object; use public R2 only as secondary evidence |
 | `images` | Mixed application media | Encrypt by source object identity and preserve access metadata in the snapshot manifest |
 | `avatars` | Public-facing profile media with account linkage | Encrypt; restore only after the matching DB/Auth snapshot is selected |
-| `chat-images` | The source bucket is public, but conversation media remains sensitive recovery data | Encrypt with restricted recovery access; never place in public R2 |
-| `admin_files` | The source bucket is public, but operational documents remain sensitive recovery data | Encrypt with restricted recovery access; never place in public R2 |
-| `verification-docs` | Highest-sensitivity identity documents | Encrypt separately within the private backup namespace; never place in public R2 |
+| `chat-images` | The source bucket is private and conversation media is sensitive recovery data | Encrypt with restricted recovery access; never place in public R2 |
+| `admin_files` | The source bucket is private and operational documents are sensitive recovery data | Encrypt with restricted recovery access; never place in public R2 |
+| `verification-docs` | Private bucket with highest-sensitivity identity documents | Encrypt separately within the private backup namespace; never place in public R2 |
 
 The snapshot manifest should bind each object key hash, byte size, content type,
 source modification evidence, and ciphertext SHA-256 to the database backup ID
@@ -155,7 +155,7 @@ the existing private `locally-production-db-backups` bucket. This placement is
 required: the current bucket policy locks `daily/` objects for 30 days and
 expires them after 35 days; a sibling top-level prefix would not inherit those
 rules. Do not change the prefix or treat the private ciphertext as public just
-because five source buckets are public. A deleted user file can remain in an
+because some source buckets are public. A deleted user file can remain in an
 immutable encrypted snapshot until the 35-day lifecycle expiry.
 
 Every source file is encrypted separately with the existing public age
