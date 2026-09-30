@@ -682,7 +682,9 @@ test.describe('Ops Anomaly Monitor', () => {
     const policy = JSON.parse(readFileSync(
       'config/cloudflare/ops-anomaly-monitor-release-policy.json', 'utf8'
     ));
-    expect(policy.defaultProductionProfile).toBe('off');
+    expect(policy.defaultProductionProfile).toBe('on');
+    expect(policy.profiles.off.scheduledEnabled).toBe('false');
+    expect(policy.profiles.on.scheduledEnabled).toBe('true');
     expect(wrangler.env.production.vars.OPS_ANOMALY_MONITOR_SCHEDULED_ENABLED).toBe('false');
     expect(new Set(wrangler.env.production.triggers.crons)).toEqual(new Set([
       '*/10 * * * *',

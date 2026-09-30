@@ -29,7 +29,7 @@ function plainVariable(name, text) {
   return { name, text, type: 'plain_text' };
 }
 
-function currentProductionSnapshot() {
+function preRolloutProductionSnapshot() {
   return {
     routes: [{ pattern: 'www.locally-travel.com/*' }],
     customDomains: [],
@@ -76,7 +76,7 @@ function currentProductionSnapshot() {
 }
 
 function verify(
-  remote = currentProductionSnapshot(),
+  remote = preRolloutProductionSnapshot(),
   allowedPlannedChanges = ['SERVICE_COMPLETION_SCHEDULED_ENABLED'],
   allowedPlannedCronAdditions = ['7,37 * * * *']
 ) {
@@ -96,7 +96,7 @@ function expectFailure(remote, code, allowedPlannedChanges) {
   );
 }
 
-test('accepts the current Production snapshot with only the explicit pending-cleanup Cron addition', () => {
+test('accepts a pre-rollout snapshot with only the explicit pending-cleanup Cron addition', () => {
   assert.deepEqual(verify(), {
     status: 'PRODUCTION_DEPLOY_SEMANTIC_PREFLIGHT_PASS',
     route: 'pass',
@@ -114,12 +114,35 @@ test('accepts the current Production snapshot with only the explicit pending-cle
   });
 });
 
+test('accepts aligned scheduled flags with no planned variable or Cron changes', () => {
+  const alignedVariables = {
+    ...expectedVariables,
+    CANCEL_PENDING_BOOKINGS_SCHEDULED_ENABLED: 'true',
+    OPS_ANOMALY_MONITOR_SCHEDULED_ENABLED: 'true',
+  };
+  const remote = preRolloutProductionSnapshot();
+  remote.bindings.push(
+    plainVariable('SERVICE_COMPLETION_SCHEDULED_ENABLED', 'true'),
+    plainVariable('CANCEL_PENDING_BOOKINGS_SCHEDULED_ENABLED', 'true'),
+    plainVariable('OPS_ANOMALY_MONITOR_SCHEDULED_ENABLED', 'true')
+  );
+  remote.crons.push('7,37 * * * *');
+  const result = verifyProductionDeployContract({
+    expected: buildExpectedProductionContract(config, alignedVariables),
+    remote,
+    allowedPlannedChanges: [],
+    allowedPlannedCronAdditions: [],
+  });
+  assert.equal(result.status, 'PRODUCTION_DEPLOY_SEMANTIC_PREFLIGHT_PASS');
+  assert.deepEqual(result.allowedPlannedChanges, []);
+});
+
 test('accepts only the exact dashboard-managed route', () => {
   assert.equal(verify().route, 'pass');
-  const missing = currentProductionSnapshot();
+  const missing = preRolloutProductionSnapshot();
   missing.routes = [];
   expectFailure(missing, 'route_mismatch');
-  const unexpected = currentProductionSnapshot();
+  const unexpected = preRolloutProductionSnapshot();
   unexpected.routes = [{ pattern: 'api.locally-travel.com/*' }];
   expectFailure(unexpected, 'route_mismatch');
 });
@@ -130,40 +153,40 @@ test('rejects workers.dev, Preview URLs, and custom domains', () => {
     (remote) => { remote.subdomain.previews_enabled = true; },
     (remote) => { remote.customDomains = [{ hostname: 'www.locally-travel.com' }]; },
   ]) {
-    const remote = currentProductionSnapshot();
+    const remote = preRolloutProductionSnapshot();
     mutate(remote);
     assert.throws(() => verify(remote), /PRODUCTION_DEPLOY_SEMANTIC_PREFLIGHT_FAILED/);
   }
 });
 
 test('normalizes top-level and nested observability sampling at 0.1', () => {
-  const nested = currentProductionSnapshot();
+  const nested = preRolloutProductionSnapshot();
   assert.equal(verify(nested).observability, 'pass');
-  const topLevelOnly = currentProductionSnapshot();
+  const topLevelOnly = preRolloutProductionSnapshot();
   delete topLevelOnly.observability.logs.head_sampling_rate;
   delete topLevelOnly.observability.traces.head_sampling_rate;
   assert.equal(verify(topLevelOnly).observability, 'pass');
 });
 
 test('rejects effective observability sampling of 1', () => {
-  const remote = currentProductionSnapshot();
+  const remote = preRolloutProductionSnapshot();
   remote.observability.logs.head_sampling_rate = 1;
   expectFailure(remote, 'observability_sampling_mismatch');
 });
 
 test('rejects disabled Production logs', () => {
-  const remote = currentProductionSnapshot();
+  const remote = preRolloutProductionSnapshot();
   remote.observability.logs.enabled = false;
   expectFailure(remote, 'observability_logs_enabled_mismatch');
 });
 
 test('ignores redundant Production service environment metadata but rejects the wrong service', () => {
   assert.equal(verify().serviceBinding, 'pass');
-  const remote = currentProductionSnapshot();
+  const remote = preRolloutProductionSnapshot();
   remote.bindings.find((binding) => binding.name === 'WORKER_SELF_REFERENCE').service = 'wrong-worker';
   expectFailure(remote, 'service_binding_mismatch');
 
-  const entrypoint = currentProductionSnapshot();
+  const entrypoint = preRolloutProductionSnapshot();
   entrypoint.bindings.find((binding) => binding.name === 'WORKER_SELF_REFERENCE').entrypoint = 'WrongEntrypoint';
   expectFailure(entrypoint, 'service_binding_mismatch');
 });
@@ -173,7 +196,7 @@ test('normalizes the omitted local Queue timeout to the remote 5000ms default', 
 });
 
 test('ignores Queue order but rejects retry, concurrency, and DLQ drift', () => {
-  const reordered = currentProductionSnapshot();
+  const reordered = preRolloutProductionSnapshot();
   reordered.queueConsumers.reverse();
   assert.equal(verify(reordered).queues, 'pass');
 
@@ -182,34 +205,34 @@ test('ignores Queue order but rejects retry, concurrency, and DLQ drift', () => 
     (consumer) => { consumer.settings.max_concurrency = 2; },
     (consumer) => { consumer.dead_letter_queue = 'wrong-dlq'; },
   ]) {
-    const remote = currentProductionSnapshot();
+    const remote = preRolloutProductionSnapshot();
     mutate(remote.queueConsumers[0]);
     expectFailure(remote, 'queue_consumer_mismatch');
   }
 });
 
 test('compares Cron expressions as an exact unordered set', () => {
-  const reordered = currentProductionSnapshot();
+  const reordered = preRolloutProductionSnapshot();
   reordered.crons.reverse();
   assert.equal(verify(reordered).crons, 'pass');
 
-  const added = currentProductionSnapshot();
+  const added = preRolloutProductionSnapshot();
   added.crons.push('0 0 * * *');
   expectFailure(added, 'cron_mismatch');
-  const removed = currentProductionSnapshot();
+  const removed = preRolloutProductionSnapshot();
   removed.crons.pop();
   expectFailure(removed, 'cron_mismatch');
 });
 
 test('allows only the explicitly planned pending-cleanup Cron addition', () => {
-  const beforeAddition = currentProductionSnapshot();
+  const beforeAddition = preRolloutProductionSnapshot();
   beforeAddition.bindings.push(plainVariable('SERVICE_COMPLETION_SCHEDULED_ENABLED', 'true'));
   assert.deepEqual(
     verify(beforeAddition, [], ['7,37 * * * *']).allowedPlannedChanges,
     ['cron:7,37 * * * *']
   );
 
-  const afterAddition = currentProductionSnapshot();
+  const afterAddition = preRolloutProductionSnapshot();
   afterAddition.bindings.push(plainVariable('SERVICE_COMPLETION_SCHEDULED_ENABLED', 'true'));
   afterAddition.crons.push('7,37 * * * *');
   assert.deepEqual(verify(afterAddition, [], []).allowedPlannedChanges, []);
@@ -219,7 +242,7 @@ test('allows only the explicitly planned pending-cleanup Cron addition', () => {
     /cron_mismatch/
   );
 
-  const missingExistingCron = currentProductionSnapshot();
+  const missingExistingCron = preRolloutProductionSnapshot();
   missingExistingCron.bindings.push(plainVariable('SERVICE_COMPLETION_SCHEDULED_ENABLED', 'true'));
   missingExistingCron.crons = missingExistingCron.crons.filter((cron) => cron !== '31 19 * * *');
   assert.throws(
@@ -234,11 +257,11 @@ test('allows only the explicitly planned pending-cleanup Cron addition', () => {
 });
 
 test('rejects R2 and Durable Object target drift', () => {
-  const r2 = currentProductionSnapshot();
+  const r2 = preRolloutProductionSnapshot();
   r2.bindings.find((binding) => binding.name === 'PUBLIC_EXPERIENCE_MEDIA_R2').bucket_name = 'wrong-bucket';
   expectFailure(r2, 'r2_binding_mismatch');
 
-  const durableObject = currentProductionSnapshot();
+  const durableObject = preRolloutProductionSnapshot();
   durableObject.bindings.find((binding) => binding.name === 'NEXT_CACHE_DO_QUEUE').class_name = 'WrongClass';
   expectFailure(durableObject, 'durable_object_binding_mismatch');
 });
@@ -248,7 +271,7 @@ test('accepts unchanged intended variables and an absent or false planned Servic
     'SERVICE_COMPLETION_SCHEDULED_ENABLED',
     'cron:7,37 * * * *',
   ]);
-  const remote = currentProductionSnapshot();
+  const remote = preRolloutProductionSnapshot();
   remote.bindings.push(plainVariable('SERVICE_COMPLETION_SCHEDULED_ENABLED', 'false'));
   assert.deepEqual(verify(remote).allowedPlannedChanges, [
     'SERVICE_COMPLETION_SCHEDULED_ENABLED',
@@ -257,13 +280,13 @@ test('accepts unchanged intended variables and an absent or false planned Servic
 });
 
 test('rejects unrelated feature flag drift', () => {
-  const remote = currentProductionSnapshot();
+  const remote = preRolloutProductionSnapshot();
   remote.bindings.find((binding) => binding.name === 'HOME_POPULARITY_SNAPSHOT_SCHEDULED_ENABLED').text = 'false';
   expectFailure(remote, 'variable_mismatch:HOME_POPULARITY_SNAPSHOT_SCHEDULED_ENABLED');
 });
 
 test('never includes secret values in results or errors', () => {
-  const remote = currentProductionSnapshot();
+  const remote = preRolloutProductionSnapshot();
   remote.routes = [];
   let message = '';
   try {
@@ -280,13 +303,13 @@ test('Production snapshot reader performs GET-only requests', async () => {
   const response = (result) => ({ ok: true, json: async () => ({ success: true, result }) });
   const fetchImplementation = async (url, options) => {
     methods.push(options.method);
-    if (url.includes('/settings')) return response({ observability: currentProductionSnapshot().observability, bindings: currentProductionSnapshot().bindings });
-    if (url.includes('/schedules')) return response({ schedules: currentProductionSnapshot().crons.map((cron) => ({ cron })) });
-    if (url.includes('/routes?')) return response(currentProductionSnapshot().routes);
-    if (url.includes('/subdomain')) return response(currentProductionSnapshot().subdomain);
+    if (url.includes('/settings')) return response({ observability: preRolloutProductionSnapshot().observability, bindings: preRolloutProductionSnapshot().bindings });
+    if (url.includes('/schedules')) return response({ schedules: preRolloutProductionSnapshot().crons.map((cron) => ({ cron })) });
+    if (url.includes('/routes?')) return response(preRolloutProductionSnapshot().routes);
+    if (url.includes('/subdomain')) return response(preRolloutProductionSnapshot().subdomain);
     if (url.includes('/domains/records')) return response([]);
     if (url.endsWith('/queues?per_page=100')) return response([{ queue_id: 'queue-1' }]);
-    if (url.endsWith('/queues/queue-1/consumers')) return response(currentProductionSnapshot().queueConsumers);
+    if (url.endsWith('/queues/queue-1/consumers')) return response(preRolloutProductionSnapshot().queueConsumers);
     throw new Error(`unexpected URL: ${url}`);
   };
 

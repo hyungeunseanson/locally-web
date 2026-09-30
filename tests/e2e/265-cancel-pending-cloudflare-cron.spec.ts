@@ -211,7 +211,7 @@ test.describe('Cancel Pending Bookings Cloudflare Cron', () => {
     )).rejects.toThrow('locally_unexpected_scheduled_trigger');
   });
 
-  test('pins the OFF-by-default release and scheduler configuration', () => {
+  test('pins the ON Production release default and fail-safe raw scheduler configuration', () => {
     const policy = JSON.parse(readFileSync(
       'config/cloudflare/cancel-pending-bookings-release-policy.json',
       'utf8'
@@ -220,7 +220,7 @@ test.describe('Cancel Pending Bookings Cloudflare Cron', () => {
     const workflow = readFileSync('.github/workflows/cancel-pending-bookings.yml', 'utf8');
     const worker = readFileSync('cloudflare-worker.ts', 'utf8');
 
-    expect(policy.defaultProductionProfile).toBe('off');
+    expect(policy.defaultProductionProfile).toBe('on');
     expect(policy.profiles.off.scheduledEnabled).toBe('false');
     expect(policy.profiles.on.scheduledEnabled).toBe('true');
     expect(wrangler.env.production.vars.CANCEL_PENDING_BOOKINGS_SCHEDULED_ENABLED).toBe('false');

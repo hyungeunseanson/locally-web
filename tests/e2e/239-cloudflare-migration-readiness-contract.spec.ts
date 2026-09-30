@@ -114,6 +114,7 @@ test.describe('Cloudflare migration readiness contract', () => {
       [manifest.experienceCompletionReleasePolicy.scheduledEnabledVariable]: 'false',
       [manifest.serviceCompletionReleasePolicy.scheduledEnabledVariable]: 'false',
       [manifest.cancelPendingBookingsReleasePolicy.scheduledEnabledVariable]: 'false',
+      [manifest.opsAnomalyMonitorReleasePolicy.scheduledEnabledVariable]: 'false',
     });
     expect(wrangler.env.production.queues?.consumers).toContainEqual({
       queue: manifest.environments.production.experienceTranslationQueue,
@@ -231,6 +232,14 @@ test.describe('Cloudflare migration readiness contract', () => {
       enabledVariable: 'EXPERIENCE_MEDIA_R2_SOURCE_ENABLED',
       rawDefault: 'false',
     });
+    for (const policy of [
+      manifest.serviceCompletionReleasePolicy,
+      manifest.cancelPendingBookingsReleasePolicy,
+      manifest.opsAnomalyMonitorReleasePolicy,
+    ]) {
+      expect(policy.defaultProductionProfile).toBe('on');
+      expect(policy.rawDefault).toBe('false');
+    }
     expect(wrangler.env.production.vars.EXPERIENCE_MEDIA_R2_SOURCE_ENABLED).toBe('false');
     expect(
       manifest.publicExperienceMediaReleasePolicy.profiles['approved-cohort'].experienceIds
