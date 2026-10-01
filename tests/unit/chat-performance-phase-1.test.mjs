@@ -111,6 +111,120 @@ test('Realtime canonical row arriving before send ACK is deduplicated and read/d
   assert.doesNotMatch(f.get().messages[0].content, /removed secret/);
 });
 
+for (const role of ['guest', 'host']) {
+  for (const type of ['text', 'deleted']) {
+  for (const staleSnapshot of ['missing', 'old-row']) {
+    test(`${role}: GET before ACK shows exactly one bubble and preserves canonical ${type}/read state against ${staleSnapshot}`, async (t) => {
+      const f = await mounted(t, { role }), oldQuery = f.query;
+      const actorId = role === 'host' ? 'host' : 'guest';
+      f.query = (q) => q.table === 'inquiry_messages' && q.columns !== 'inquiry_id' ? { data: [] } : oldQuery(q);
+      await f.flush(() => f.get().loadMessages(1));
+      const ack = deferred(), request = f.request;
+      let acknowledged = false, send;
+      f.request = (url, options) => url === '/api/inquiries/message' ? ack.promise : request(url, options);
+      await f.flush(() => { send = f.get().sendMessage(1, 'draft').then(() => { acknowledged = true; }); });
+      assert.equal(f.get().messages.length, 1);
+      assert.match(ids(f)[0], /^temp-/);
+      const canonical = { ...message(99, 1, actorId, type === 'deleted' ? 'removed secret' : 'draft'), type, is_read: true, read_at: timestamp };
+      f.query = (q) => q.table === 'inquiry_messages' && q.columns !== 'inquiry_id' ? { data: [canonical] } : oldQuery(q);
+      await f.flush(() => f.get().loadMessages(1));
+      assert.equal(acknowledged, false, 'ACK remains blocked');
+      assert.equal(f.get().messages.length, 1);
+      assert.equal(f.dom.window.document.querySelectorAll('p[data-id]').length, 1);
+      // A second, stale GET started while the ACK is still pending must not
+      // remove the buffered canonical row or the one visible pending bubble.
+      const stale = deferred();
+      f.query = (q) => q.table === 'inquiry_messages' && q.columns !== 'inquiry_id' ? stale.promise : oldQuery(q);
+      let loading;
+      await f.flush(() => { loading = f.get().loadMessages(1); });
+      await f.flush(async () => { ack.resolve(response({ success: true, messageId: 99, updatedAt: timestamp })); await send; });
+      const assertCanonical = () => {
+        assert.deepEqual(ids(f), ['99']);
+        assert.equal(f.dom.window.document.querySelectorAll('p[data-id]').length, 1);
+        assert.equal(f.get().messages[0].is_read, true);
+        assert.equal(f.get().messages[0].read_at, timestamp);
+        assert.equal(f.get().messages[0].type, type);
+        if (type === 'deleted') assert.doesNotMatch(f.get().messages[0].content, /removed secret|draft/);
+      };
+      assertCanonical();
+      await f.flush(async () => { stale.resolve({ data: staleSnapshot === 'missing' ? [] : [message(99, 1, actorId, 'draft')] }); await loading; });
+      assertCanonical();
+      // Repeating that old snapshot still cannot erase the acknowledged row.
+      f.query = (q) => q.table === 'inquiry_messages' && q.columns !== 'inquiry_id' ? { data: [] } : oldQuery(q);
+      await f.flush(() => f.get().loadMessages(1));
+      assertCanonical();
+    });
+  }
+}
+}
+
+for (const role of ['guest', 'host']) {
+  test(`${role}: reconcile by ACK ID, retaining distinct same-content rows and incoming messages`, async (t) => {
+    const f = await mounted(t, { role }), oldQuery = f.query;
+    const actorId = role === 'host' ? 'host' : 'guest';
+    const otherId = role === 'host' ? 'guest' : 'host';
+    const existing = message(20, 1, actorId, 'same content');
+    f.query = (q) => q.table === 'inquiry_messages' && q.columns !== 'inquiry_id' ? { data: [existing] } : oldQuery(q);
+    await f.flush(() => f.get().loadMessages(1));
+    const ack = deferred(), request = f.request;
+    f.request = (url, options) => url === '/api/inquiries/message' ? ack.promise : request(url, options);
+    let send;
+    await f.flush(() => { send = f.get().sendMessage(1, 'same content'); });
+    const fetched = [
+      { ...existing, is_read: true, read_at: timestamp },
+      message(22, 1, otherId, 'same content'),
+      { ...message(99, 1, actorId, 'same content'), is_read: true, read_at: timestamp },
+      message(100, 1, actorId, 'same content'), // Another client: a distinct row.
+    ];
+    f.query = (q) => q.table === 'inquiry_messages' && q.columns !== 'inquiry_id' ? { data: fetched } : oldQuery(q);
+    await f.flush(() => f.get().loadMessages(1));
+    assert.equal(f.get().messages.length, 3);
+    assert.ok(ids(f).includes('20'), 'previous same-content own message stays visible');
+    assert.ok(ids(f).includes('22'), 'incoming message stays visible');
+    assert.equal(f.get().messages.find((msg) => msg.id === 20).is_read, true);
+    await f.flush(async () => { ack.resolve(response({ success: true, messageId: 99, updatedAt: timestamp })); await send; });
+    assert.deepEqual(ids(f).sort(), ['100', '20', '22', '99']);
+    assert.equal(f.get().messages.find((msg) => msg.id === 99).is_read, true);
+    assert.equal(f.get().messages.find((msg) => msg.id === 100).is_read, false);
+    assert.equal(f.get().messages.filter((msg) => msg.content === 'same content').length, 4);
+  });
+}
+
+test('single pending-send invariant cannot be overwritten by an accidental second hook call', async (t) => {
+  const f = await mounted(t), ack = deferred(), request = f.request;
+  await f.flush(() => f.get().loadMessages(1));
+  f.request = (url, options) => url === '/api/inquiries/message' ? ack.promise : request(url, options);
+  let send;
+  await f.flush(() => { send = f.get().sendMessage(1, 'first'); });
+  await f.flush(() => assert.rejects(f.get().sendMessage(1, 'second'), /전송이 진행 중/));
+  assert.equal(sends(f).length, 1);
+  assert.equal(f.get().messages.filter((msg) => String(msg.id).startsWith('temp-')).length, 1);
+  await f.flush(async () => { ack.resolve(response({ success: true, messageId: 99, updatedAt: timestamp })); await send; });
+});
+
+test('failed ACK removes temp and releases observed server rows without losing them', async (t) => {
+  const f = await mounted(t), oldQuery = f.query, ack = deferred(), request = f.request;
+  f.query = (q) => q.table === 'inquiry_messages' && q.columns !== 'inquiry_id' ? { data: [] } : oldQuery(q);
+  await f.flush(() => f.get().loadMessages(1));
+  f.request = (url, options) => url === '/api/inquiries/message' ? ack.promise : request(url, options);
+  let failed;
+  await f.flush(() => { failed = f.get().sendMessage(1, 'draft').catch((error) => error); });
+  f.query = (q) => q.table === 'inquiry_messages' && q.columns !== 'inquiry_id'
+    ? { data: [{ ...message(77, 1, 'guest', 'different client'), is_read: true, read_at: timestamp }] } : oldQuery(q);
+  await f.flush(() => f.get().loadMessages(1));
+  assert.equal(f.get().messages.length, 1);
+  await f.flush(async () => { ack.resolve(response({ success: false, error: 'forced failure' }, 500)); assert.match((await failed).message, /forced failure/); });
+  assert.deepEqual(ids(f), ['77']);
+  assert.equal(f.get().messages[0].is_read, true);
+  // A failed API may have rolled its insert back after the GET observed it.
+  f.query = (q) => q.table === 'inquiry_messages' && q.columns !== 'inquiry_id' ? { data: [] } : oldQuery(q);
+  await f.flush(() => f.get().loadMessages(1));
+  assert.deepEqual(ids(f), []);
+  f.request = request;
+  await f.flush(() => f.get().sendMessage(1, 'retry'));
+  assert.deepEqual(ids(f), ['99']);
+});
+
 test('body renders while sender profile and application are still pending, then metadata enriches', async (t) => {
   const f = await mounted(t);
   const profile = deferred(), app = deferred(), oldQuery = f.query;

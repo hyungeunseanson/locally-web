@@ -92,6 +92,13 @@ type InquiryMessageView = InquiryMessageRow & {
   };
 };
 
+type PendingInquirySend = {
+  inquiryId: string;
+  senderId: string;
+  knownMessageIds: Set<string>;
+  observedOwnRows: Map<string, InquiryMessageView>;
+};
+
 function sortInquiriesByUpdatedAt(items: InquiryListItem[]) {
   return [...items].sort((a, b) => new Date(b.updated_at || '').getTime() - new Date(a.updated_at || '').getTime());
 }
@@ -146,12 +153,46 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   // Keep local sends until a message GET observes their canonical ID. A GET
   // started before the insert must not erase a pending or acknowledged send.
   const localMessagesRef = useRef(new Map<string, Map<string, InquiryMessageView>>());
+  const localMessageAckRef = useRef(new Map<string, { requestVersion: number; hasServerSnapshot: boolean }>());
+  const pendingSendRef = useRef<PendingInquirySend | null>(null);
 
-  const mergeLocalMessages = useCallback((inquiryId: string, fetched: InquiryMessageView[]) => {
+  const mergeLocalMessages = useCallback((inquiryId: string, fetched: InquiryMessageView[], requestVersion = 0) => {
+    const pending = pendingSendRef.current;
+    // A locked composer allows one pending send. Until the ACK supplies its
+    // exact ID, buffer new own rows instead of guessing identity from content.
+    // Existing own rows and incoming messages remain visible and up to date.
+    const fetchedVisible = fetched.filter((message) => {
+      const id = String(message.id);
+      if (pending?.inquiryId === inquiryId
+        && String(message.inquiry_id) === inquiryId
+        && message.sender_id === pending.senderId
+        && !pending.knownMessageIds.has(id)) {
+        pending.observedOwnRows.set(id, message);
+        return false;
+      }
+      return true;
+    });
     const local = localMessagesRef.current.get(inquiryId);
-    if (!local) return fetched;
-    for (const message of fetched) local.delete(String(message.id));
-    const merged = [...fetched, ...local.values()];
+    if (!local) return fetchedVisible;
+    const visible = fetchedVisible.map((message) => {
+      const id = String(message.id);
+      const key = `${inquiryId}:${id}`;
+      const acknowledged = localMessageAckRef.current.get(key);
+      if (acknowledged && requestVersion <= acknowledged.requestVersion) {
+        // Pre-ACK snapshots cannot retire the protection or overwrite a
+        // server row already observed before ACK (including read/deletion).
+        const protectedMessage = local.get(id);
+        if (protectedMessage && acknowledged.hasServerSnapshot) return protectedMessage;
+        local.set(id, message);
+        acknowledged.hasServerSnapshot = true;
+      } else {
+        local.delete(id);
+        localMessageAckRef.current.delete(key);
+      }
+      return message;
+    });
+    const visibleIds = new Set(visible.map((message) => String(message.id)));
+    const merged = [...visible, ...[...local.values()].filter((message) => !visibleIds.has(String(message.id)))];
     if (local.size === 0) localMessagesRef.current.delete(inquiryId);
     return merged.sort((a, b) => a.created_at.localeCompare(b.created_at));
   }, []);
@@ -391,7 +432,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
       // Publish bodies before awaiting sender metadata. Only enrich sender fields
       // afterwards, so this response cannot replace a newer send or read update.
-      setMessages(mergeLocalMessages(targetId, safeMessages));
+      setMessages(mergeLocalMessages(targetId, safeMessages, requestVersion));
       if (selectedThread) void markAsRead(inquiryId);
 
       const senderIds = Array.from(new Set(
@@ -491,6 +532,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     const optimisticCreatedAt = new Date().toISOString();
     const targetId = String(inquiryId);
     let optimisticMessage: InquiryMessageView | null = null;
+    let pendingSend: PendingInquirySend | null = null;
 
     if (file) {
       const validation = validateImage(file);
@@ -522,6 +564,13 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     }
 
     if (shouldOptimisticallyAppend && optimisticMessageId) {
+      if (pendingSendRef.current) throw new Error('메시지 전송이 진행 중입니다.');
+      const knownMessageIds = new Set([
+        ...messages.filter((message) => String(message.inquiry_id) === targetId).map((message) => String(message.id)),
+        ...(localMessagesRef.current.get(targetId)?.keys() || []),
+      ]);
+      pendingSend = { inquiryId: targetId, senderId: actorId, knownMessageIds, observedOwnRows: new Map() };
+      pendingSendRef.current = pendingSend;
       optimisticMessage = {
         id: optimisticMessageId,
         inquiry_id: inquiryId,
@@ -613,7 +662,8 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         selectedInquiryRef.current?.host?.avatar_url ||
         null;
 
-      const persistedMessage: InquiryMessageView = optimisticMessage
+      const observedRows = pendingSend?.observedOwnRows;
+      const persistedMessage: InquiryMessageView = observedRows?.get(String(result.messageId)) || (optimisticMessage
         ? { ...optimisticMessage, id: result.messageId }
         : {
           id: result.messageId,
@@ -626,18 +676,28 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
           read_at: null,
           created_at: String(result.updatedAt || optimisticCreatedAt),
           sender: { id: actorId, name: senderName, avatar_url: secureUrl(senderAvatar) },
-        };
+        });
       const local = localMessagesRef.current.get(targetId) || new Map<string, InquiryMessageView>();
       if (optimisticMessageId) local.delete(optimisticMessageId);
-      local.set(String(result.messageId), persistedMessage);
+      const releasedRows = new Map(observedRows);
+      releasedRows.set(String(result.messageId), persistedMessage);
+      for (const [id, message] of releasedRows) {
+        local.set(id, message);
+        localMessageAckRef.current.set(`${targetId}:${id}`, {
+          requestVersion: messageRequestVersionRef.current,
+          hasServerSnapshot: observedRows?.has(id) || false,
+        });
+      }
       localMessagesRef.current.set(targetId, local);
+      if (pendingSendRef.current === pendingSend) pendingSendRef.current = null;
       if (activeInquiryIdRef.current === targetId) {
         setMessages((prev) => {
-          const withoutTemp = prev.filter((message) => String(message.id) !== optimisticMessageId);
-          // Realtime may have observed the canonical row before the API reply.
-          return withoutTemp.some((message) => String(message.id) === String(result.messageId))
-            ? withoutTemp
-            : [...withoutTemp, persistedMessage];
+          const merged = new Map(prev.filter((message) => String(message.id) !== optimisticMessageId)
+            .map((message) => [String(message.id), message]));
+          // Publish every buffered server row; the ACK identifies which one
+          // replaces the temp. Preserve its read/deleted state verbatim.
+          for (const [id, message] of releasedRows) merged.set(id, message);
+          return [...merged.values()].sort((a, b) => a.created_at.localeCompare(b.created_at));
         });
       }
     } catch (err: unknown) {
@@ -649,9 +709,20 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       }
 
       if (shouldOptimisticallyAppend && optimisticMessageId) {
-        localMessagesRef.current.get(targetId)?.delete(optimisticMessageId);
+        const local = localMessagesRef.current.get(targetId);
+        local?.delete(optimisticMessageId);
+        const observedRows = pendingSend?.observedOwnRows || new Map<string, InquiryMessageView>();
+        // No ACK means no proof that an observed row is this send. Release
+        // server rows, but let the next GET reflect any server-side rollback.
+        if (local?.size === 0) localMessagesRef.current.delete(targetId);
+        if (pendingSendRef.current === pendingSend) pendingSendRef.current = null;
         if (activeInquiryIdRef.current === targetId) {
-          setMessages((prev) => prev.filter((msg) => String(msg.id) !== optimisticMessageId));
+          setMessages((prev) => {
+            const merged = new Map(prev.filter((message) => String(message.id) !== optimisticMessageId)
+              .map((message) => [String(message.id), message]));
+            for (const [id, message] of observedRows) merged.set(id, message);
+            return [...merged.values()].sort((a, b) => a.created_at.localeCompare(b.created_at));
+          });
         }
       }
 
