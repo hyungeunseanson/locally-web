@@ -154,7 +154,7 @@ test.describe('Home public data without an automatic splash', () => {
       });
       const response = await page.goto('/', { waitUntil: 'domcontentloaded' });
       expect(await response?.text()).toContain('서울 사전 로드 체험');
-      const section = width > 768 ? 'home-desktop-all-experiences-section' : 'home-mobile-all-experiences-section';
+      const section = 'home-all-experiences-section';
       await expect(page.getByTestId(section).getByText('서울 사전 로드 체험')).toBeVisible();
       await page.waitForTimeout(1500);
       expect(homeApiRequests).toHaveLength(0);
@@ -229,7 +229,7 @@ test.describe('Home public data without an automatic splash', () => {
     });
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('home-load-error-state')).toHaveCount(0);
-    await expect(page.getByTestId('home-desktop-all-experiences-section')).toHaveCount(0);
+    await expect(page.getByTestId('home-all-experiences-section')).toHaveCount(0);
     await page.waitForTimeout(1500);
     expect(homeApiRequests).toHaveLength(0);
   });
@@ -243,7 +243,7 @@ test.describe('Home public data without an automatic splash', () => {
     });
     const response = await page.goto('/', { waitUntil: 'domcontentloaded' });
     expect(response?.status()).toBe(200);
-    await expect(page.getByTestId('home-desktop-all-experiences-section').getByText('서울 사전 로드 체험')).toBeVisible();
+    await expect(page.getByTestId('home-all-experiences-section').getByText('서울 사전 로드 체험')).toBeVisible();
     expect(homeApiRequests).toHaveLength(1);
   });
 
@@ -251,7 +251,7 @@ test.describe('Home public data without an automatic splash', () => {
     const splash = page.locator('div[style*="z-index: 9999"] > img[alt="Locally"]');
     const verifyHome = async () => {
       await expect(splash).toHaveCount(0);
-      await expect(page.getByTestId('home-desktop-all-experiences-section').getByText('서울 사전 로드 체험')).toBeVisible();
+      await expect(page.getByTestId('home-all-experiences-section').getByText('서울 사전 로드 체험')).toBeVisible();
       await page.waitForTimeout(1400);
       await expect(splash).toHaveCount(0);
     };
@@ -270,7 +270,7 @@ test.describe('Home public data without an automatic splash', () => {
     await page.locator('a[href="/"]').first().click();
     const splash = page.locator('div[style*="z-index: 9999"] > img[alt="Locally"]');
     await expect(splash).toHaveCount(0);
-    await expect(page.getByTestId('home-desktop-all-experiences-section').getByText('서울 사전 로드 체험')).toBeVisible();
+    await expect(page.getByTestId('home-all-experiences-section').getByText('서울 사전 로드 체험')).toBeVisible();
   });
 
   test('streams an unobscured skeleton before slow public data finishes', async ({ page }) => {
@@ -279,20 +279,20 @@ test.describe('Home public data without an automatic splash', () => {
     await page.goto('/', { waitUntil: 'commit' });
     await expect(page.getByTestId('home-streaming-skeleton')).toBeVisible();
     await expect(splash).toHaveCount(0);
-    await expect(page.getByTestId('home-desktop-all-experiences-section').getByText('서울 사전 로드 체험')).toBeVisible();
+    await expect(page.getByTestId('home-all-experiences-section').getByText('서울 사전 로드 체험')).toBeVisible();
   });
 
   test('preserves the language-change splash and localized cards', async ({ page }) => {
     const splash = page.locator('div[style*="z-index: 9999"] > img[alt="Locally"]');
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await expect(splash).toBeHidden();
-    await expect(page.getByTestId('home-desktop-all-experiences-section').getByText('서울 사전 로드 체험')).toBeVisible();
+    await expect(page.getByTestId('home-all-experiences-section').getByText('서울 사전 로드 체험')).toBeVisible();
     await page.locator('button:has(svg.lucide-globe)').first().click();
     const splashVisible = splash.waitFor({ state: 'visible', timeout: 2500 });
     await page.getByRole('button', { name: 'English' }).click();
     await splashVisible;
     await expect(splash).toBeHidden({ timeout: 2500 });
-    await expect(page.getByTestId('home-desktop-all-experiences-section').getByText('Seoul Preloaded Experience')).toBeVisible();
+    await expect(page.getByTestId('home-all-experiences-section').getByText('Seoul Preloaded Experience')).toBeVisible();
   });
 
   for (const [locale, title] of [
@@ -304,7 +304,7 @@ test.describe('Home public data without an automatic splash', () => {
     test(`renders initial data in ${locale}`, async ({ page, context }) => {
       await context.addCookies([{ name: 'app_lang', value: locale, url: 'http://127.0.0.1:3000' }]);
       await page.goto('/', { waitUntil: 'domcontentloaded' });
-      await expect(page.getByTestId('home-desktop-all-experiences-section').getByText(title)).toBeVisible();
+      await expect(page.getByTestId('home-all-experiences-section').getByText(title)).toBeVisible();
     });
   }
 
@@ -324,7 +324,7 @@ test.describe('Home public data without an automatic splash', () => {
       expect(await response?.text()).toContain(title);
       await expect(page.locator('html')).toHaveAttribute('lang', locale);
       await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', new RegExp(`/${locale}$`));
-      await expect(page.getByTestId('home-desktop-all-experiences-section').getByText(title)).toBeVisible();
+      await expect(page.getByTestId('home-all-experiences-section').getByText(title)).toBeVisible();
       await expect(page.locator('div[style*="z-index: 9999"] > img[alt="Locally"]')).toBeHidden({ timeout: 2500 });
       expect((await context.cookies()).find((cookie) => cookie.name === 'app_lang')?.value).toBe(locale);
       expect(initialApiRequests).toHaveLength(0);

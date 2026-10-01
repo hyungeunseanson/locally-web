@@ -27,9 +27,10 @@ function isHomeCategoryIconId(id: HomeMobileCityShortcutId): id is 'seoul' | 'bu
 }
 
 function getDesktopPopularVisibilityClass(index: number) {
-  if (index >= 5) return 'hidden 2xl:block';
-  if (index >= 4) return 'hidden xl:block 2xl:block';
-  if (index >= 3) return 'hidden lg:block xl:block 2xl:block';
+  if (index >= 6) return 'md:hidden';
+  if (index >= 5) return 'md:hidden 2xl:block';
+  if (index >= 4) return 'md:hidden xl:block';
+  if (index >= 3) return 'md:hidden lg:block';
   return 'block';
 }
 
@@ -109,12 +110,13 @@ export default function HomePageClient({
     setRevealedAllExperiencesCount(0);
   }, [allExperiencesResultKey]);
 
-  const mobilePopularExperiences = popularExperiences.slice(0, 10);
-  const desktopPopularExperiences = popularExperiences.slice(0, 6);
-  const mobileLatestExperiences = allExperiencesLatest.slice(0, Math.max(revealedAllExperiencesCount, MOBILE_ALL_EXPERIENCES_PAGE_SIZE));
-  const desktopLatestExperiences = allExperiencesLatest.slice(0, Math.max(revealedAllExperiencesCount, DESKTOP_ALL_EXPERIENCES_PAGE_SIZE));
-  const hasMoreMobileLatestExperiences = mobileLatestExperiences.length < allExperiencesLatest.length;
-  const hasMoreDesktopLatestExperiences = desktopLatestExperiences.length < allExperiencesLatest.length;
+  const visiblePopularExperiences = popularExperiences.slice(0, 10);
+  const mobileLatestVisibleCount = Math.max(revealedAllExperiencesCount, MOBILE_ALL_EXPERIENCES_PAGE_SIZE);
+  const desktopLatestVisibleCount = Math.max(revealedAllExperiencesCount, DESKTOP_ALL_EXPERIENCES_PAGE_SIZE);
+  // Share one card tree across breakpoints. CSS hides the desktop-only cards on mobile.
+  const latestExperiences = allExperiencesLatest.slice(0, desktopLatestVisibleCount);
+  const hasMoreMobileLatestExperiences = mobileLatestVisibleCount < allExperiencesLatest.length;
+  const hasMoreDesktopLatestExperiences = desktopLatestVisibleCount < allExperiencesLatest.length;
 
   const revealMoreAllExperiences = (pageSize: number) => {
     setRevealedAllExperiencesCount((visibleCount) => Math.max(visibleCount, pageSize) + pageSize);
@@ -368,23 +370,23 @@ export default function HomePageClient({
             </div>
           ) : (
             <>
-              {/* 📱 모바일: 인기 + 전체 체험 */}
-              <div className="md:hidden pb-4">
-                <section data-testid="home-mobile-popular-experiences-section">
-                  <div className="px-5 pt-3 pb-2">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <h2 className="text-[17px] font-semibold leading-tight tracking-[-0.02em] text-[#222222]">
+              <div className="pb-4 md:pb-0">
+                <section data-testid="home-popular-experiences-section">
+                  <div className="px-5 pt-3 pb-2 md:mb-5 md:p-0">
+                    <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
+                      <h2 className="text-[17px] font-semibold leading-tight tracking-[-0.02em] text-[#222222] md:text-[28px] md:leading-normal md:tracking-[-0.025em] md:text-slate-900">
                         {t('home_section_popular_experiences')}
                       </h2>
                       <PopularExperienceHint text={t('home_section_popular_experiences_hint')} />
                     </div>
                   </div>
-                  <div className="flex gap-[10px] overflow-x-auto no-scrollbar px-5 pb-5">
-                    {mobilePopularExperiences.map((item) => (
+                  <div className="flex gap-[10px] overflow-x-auto no-scrollbar px-5 pb-5 md:grid md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 md:gap-x-6 md:gap-y-10 md:overflow-visible md:p-0">
+                    {visiblePopularExperiences.map((item, index) => (
                       <div
                         key={item.id}
                         data-testid={`home-popular-experience-card-${item.id}`}
-                        className="min-w-[42vw] max-w-[42vw] shrink-0"
+                        className={`min-w-[42vw] max-w-[42vw] shrink-0 md:min-w-0 md:max-w-none md:animate-in md:fade-in md:duration-500 ${getDesktopPopularVisibilityClass(index)}`}
+                        style={{ animationDelay: `${Math.min(index * 60, 360)}ms`, animationFillMode: 'both' }}
                       >
                         <HomeExperienceCard data={item} />
                       </div>
@@ -392,25 +394,26 @@ export default function HomePageClient({
                   </div>
                 </section>
 
-                <section data-testid="home-mobile-all-experiences-section">
-                  <div className="px-5 pt-1 pb-3">
-                    <h2 className="text-[17px] font-semibold leading-tight tracking-[-0.02em] text-[#222222]">
+                <section data-testid="home-all-experiences-section" className="md:mt-14">
+                  <div className="px-5 pt-1 pb-3 md:mb-5 md:p-0">
+                    <h2 className="text-[17px] font-semibold leading-tight tracking-[-0.02em] text-[#222222] md:text-[28px] md:leading-normal md:tracking-[-0.025em] md:text-slate-900">
                       {t('home_section_all_experiences')}
                     </h2>
                   </div>
-                  <div className="grid grid-cols-2 gap-x-2.5 gap-y-5 px-5 pb-5">
-                    {mobileLatestExperiences.map((item) => (
+                  <div className="grid grid-cols-2 gap-x-2.5 gap-y-5 px-5 pb-5 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 md:gap-x-6 md:gap-y-10 md:p-0">
+                    {latestExperiences.map((item, index) => (
                       <div
                         key={item.id}
                         data-testid={`home-all-experience-card-${item.id}`}
-                        className="min-w-0"
+                        className={`min-w-0 md:animate-in md:fade-in md:duration-500 ${index >= mobileLatestVisibleCount ? 'hidden md:block' : 'block'}`}
+                        style={{ animationDelay: `${Math.min(index * 60, 600)}ms`, animationFillMode: 'both' }}
                       >
                         <HomeExperienceCard data={item} />
                       </div>
                     ))}
                   </div>
                   {hasMoreMobileLatestExperiences && (
-                    <div className="px-5 pb-3">
+                    <div className="px-5 pb-3 md:hidden">
                       <button
                         type="button"
                         data-testid="home-mobile-all-experiences-load-more"
@@ -421,54 +424,8 @@ export default function HomePageClient({
                       </button>
                     </div>
                   )}
-                </section>
-              </div>
-
-              {/* 🖥️ 데스크탑: 인기 체험 1행 + 전체 체험 */}
-              <div className="hidden md:block">
-                <section data-testid="home-desktop-popular-experiences-section">
-                  <div className="mb-5">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-[28px] font-semibold tracking-[-0.025em] text-slate-900">
-                        {t('home_section_popular_experiences')}
-                      </h2>
-                      <PopularExperienceHint text={t('home_section_popular_experiences_hint')} />
-                    </div>
-                  </div>
-                  <div className="grid md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-6 gap-y-10">
-                    {desktopPopularExperiences.map((item, index) => (
-                      <div
-                        key={item.id}
-                        data-testid={`home-popular-experience-card-${item.id}`}
-                        className={`${getDesktopPopularVisibilityClass(index)} animate-in fade-in duration-500`}
-                        style={{ animationDelay: `${Math.min(index * 60, 360)}ms`, animationFillMode: 'both' }}
-                      >
-                        <HomeExperienceCard data={item} />
-                      </div>
-                    ))}
-                  </div>
-                </section>
-
-                <section data-testid="home-desktop-all-experiences-section" className="mt-14">
-                  <div className="mb-5">
-                    <h2 className="text-[28px] font-semibold tracking-[-0.025em] text-slate-900">
-                      {t('home_section_all_experiences')}
-                    </h2>
-                  </div>
-                  <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-6 gap-y-10">
-                    {desktopLatestExperiences.map((item, index) => (
-                      <div
-                        key={item.id}
-                        data-testid={`home-all-experience-card-${item.id}`}
-                        className="animate-in fade-in duration-500"
-                        style={{ animationDelay: `${Math.min(index * 60, 600)}ms`, animationFillMode: 'both' }}
-                      >
-                        <HomeExperienceCard data={item} />
-                      </div>
-                    ))}
-                  </div>
                   {hasMoreDesktopLatestExperiences && (
-                    <div className="mt-8 flex justify-center">
+                    <div className="hidden md:mt-8 md:flex md:justify-center">
                       <button
                         type="button"
                         data-testid="home-desktop-all-experiences-load-more"

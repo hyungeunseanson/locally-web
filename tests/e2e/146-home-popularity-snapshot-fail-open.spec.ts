@@ -99,8 +99,8 @@ test.describe('Home popularity snapshot fail-open', () => {
     await expect(page.getByTestId('home-load-error-state')).toHaveCount(0);
     await expect(page.getByText('No matching experiences are showing on the home feed yet')).toHaveCount(0);
 
-    const popularSection = page.getByTestId('home-desktop-popular-experiences-section');
-    const allSection = page.getByTestId('home-desktop-all-experiences-section');
+    const popularSection = page.getByTestId('home-popular-experiences-section');
+    const allSection = page.getByTestId('home-all-experiences-section');
     await expect(popularSection).toBeVisible();
     await expect(allSection).toBeVisible();
 

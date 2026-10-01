@@ -197,8 +197,8 @@ test.describe('Home experience sections', () => {
     await page.setViewportSize({ width: 1440, height: 1400 });
     await prepareLocale(page, 'en', '/en');
 
-    const popularSection = page.getByTestId('home-desktop-popular-experiences-section');
-    const allSection = page.getByTestId('home-desktop-all-experiences-section');
+    const popularSection = page.getByTestId('home-popular-experiences-section');
+    const allSection = page.getByTestId('home-all-experiences-section');
 
     await expect(popularSection).toBeVisible({ timeout: 10000 });
     await expect(popularSection).toContainText('Popular Experiences');
@@ -215,7 +215,7 @@ test.describe('Home experience sections', () => {
     await expect(popularCards.nth(4)).toContainText('Osaka Eta');
     await expect(popularSection.getByTestId('home-popular-experience-card-9001')).toBeHidden();
 
-    const allCards = allSection.locator('[data-testid^="home-all-experience-card-"]');
+    const allCards = allSection.locator('[data-testid^="home-all-experience-card-"]:visible');
     await expect(allCards.nth(0)).toContainText('Seoul Gamma');
     await expect(allCards.nth(1)).toContainText('Busan Delta');
     await expect(allCards.nth(2)).toContainText('Tokyo Alpha');
@@ -227,8 +227,8 @@ test.describe('Home experience sections', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await prepareLocale(page, 'en', '/en');
 
-    const popularSection = page.getByTestId('home-mobile-popular-experiences-section');
-    const allSection = page.getByTestId('home-mobile-all-experiences-section');
+    const popularSection = page.getByTestId('home-popular-experiences-section');
+    const allSection = page.getByTestId('home-all-experiences-section');
 
     await expect(popularSection).toBeVisible({ timeout: 10000 });
     await expect(popularSection).toContainText('Most saved');
@@ -245,7 +245,7 @@ test.describe('Home experience sections', () => {
     await expect(popularCards.nth(1)).toContainText('Tokyo Beta');
     await expect(popularCards.nth(2)).toContainText('Seoul Gamma');
 
-    const allCards = allSection.locator('[data-testid^="home-all-experience-card-"]');
+    const allCards = allSection.locator('[data-testid^="home-all-experience-card-"]:visible');
     await expect(allCards.nth(0)).toContainText('Seoul Gamma');
     await expect(allCards.nth(1)).toContainText('Busan Delta');
     await expect(allCards.nth(2)).toContainText('Tokyo Alpha');
@@ -259,10 +259,10 @@ test.describe('Home experience sections', () => {
 
     await page.getByTestId('home-desktop-category-tokyo').click();
 
-    const popularSection = page.getByTestId('home-desktop-popular-experiences-section');
-    const allSection = page.getByTestId('home-desktop-all-experiences-section');
+    const popularSection = page.getByTestId('home-popular-experiences-section');
+    const allSection = page.getByTestId('home-all-experiences-section');
     const popularCards = popularSection.locator('[data-testid^="home-popular-experience-card-"]');
-    const allCards = allSection.locator('[data-testid^="home-all-experience-card-"]');
+    const allCards = allSection.locator('[data-testid^="home-all-experience-card-"]:visible');
 
     await expect(popularCards).toHaveCount(4);
     await expect(popularCards.nth(0)).toContainText('Tokyo Epsilon');
@@ -285,8 +285,8 @@ test.describe('Home experience sections', () => {
     await page.setViewportSize({ width: 1440, height: 1400 });
     await prepareLocale(page, 'en', '/en');
 
-    const allSection = page.getByTestId('home-desktop-all-experiences-section');
-    const allCards = allSection.locator('[data-testid^="home-all-experience-card-"]');
+    const allSection = page.getByTestId('home-all-experiences-section');
+    const allCards = allSection.locator('[data-testid^="home-all-experience-card-"]:visible');
     const loadMore = page.getByTestId('home-desktop-all-experiences-load-more');
 
     await expect(allCards).toHaveCount(24);
@@ -302,8 +302,8 @@ test.describe('Home experience sections', () => {
     expect(new Set(cardIds).size).toBe(35);
 
     await page.setViewportSize({ width: 390, height: 844 });
-    const mobileAllSection = page.getByTestId('home-mobile-all-experiences-section');
-    const mobileAllCards = mobileAllSection.locator('[data-testid^="home-all-experience-card-"]');
+    const mobileAllSection = page.getByTestId('home-all-experiences-section');
+    const mobileAllCards = mobileAllSection.locator('[data-testid^="home-all-experience-card-"]:visible');
     await expect(mobileAllCards).toHaveCount(35);
     await expect(page.getByTestId('home-mobile-all-experiences-load-more')).toHaveCount(0);
 
@@ -326,8 +326,8 @@ test.describe('Home experience sections', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await prepareLocale(page, 'en', '/en');
 
-    const allSection = page.getByTestId('home-mobile-all-experiences-section');
-    const allCards = allSection.locator('[data-testid^="home-all-experience-card-"]');
+    const allSection = page.getByTestId('home-all-experiences-section');
+    const allCards = allSection.locator('[data-testid^="home-all-experience-card-"]:visible');
     const loadMore = page.getByTestId('home-mobile-all-experiences-load-more');
 
     await expect(allCards).toHaveCount(12);
@@ -345,4 +345,50 @@ test.describe('Home experience sections', () => {
     const cardIds = await allCards.evaluateAll((cards) => cards.map((card) => card.getAttribute('data-testid')));
     expect(new Set(cardIds).size).toBe(35);
   });
+
+  test('shares one card tree across breakpoints and preserves reveal state when resizing', async ({ page }) => {
+    await stubHomeExperiences(page, HOME_PAGINATION_FIXTURES);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await prepareLocale(page, 'en', '/en');
+
+    const popular = page.getByTestId('home-popular-experiences-section');
+    const latest = page.getByTestId('home-all-experiences-section');
+    const popularCards = popular.locator('[data-testid^="home-popular-experience-card-"]');
+    const latestCards = latest.locator('[data-testid^="home-all-experience-card-"]');
+    await expect(popularCards).toHaveCount(10);
+    await expect(latestCards).toHaveCount(24);
+    await expect(latestCards.locator('visible=true')).toHaveCount(12);
+
+    for (const cards of [popularCards, latestCards]) {
+      const ids = await cards.evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-testid')));
+      expect(new Set(ids).size).toBe(ids.length);
+    }
+    const firstMobileCard = await popularCards.first().boundingBox();
+    expect(firstMobileCard!.width).toBeCloseTo(390 * 0.42, 0);
+    const scroller = popularCards.first().locator('..');
+    expect(await scroller.evaluate((node) => node.scrollWidth > node.clientWidth)).toBe(true);
+    await scroller.evaluate((node) => { node.scrollLeft = node.scrollWidth; });
+    await expect(popularCards.last()).toBeInViewport();
+
+    for (const [width, visiblePopular] of [[768, 3], [1024, 4], [1280, 5], [1536, 6]]) {
+      await page.setViewportSize({ width, height: 1400 });
+      await expect(popularCards.locator('visible=true')).toHaveCount(visiblePopular);
+      await expect(latestCards.locator('visible=true')).toHaveCount(24);
+      await expect(popularCards).toHaveCount(10);
+      await expect(latestCards).toHaveCount(24);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    }
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByTestId('home-mobile-all-experiences-load-more').click();
+    await expect(latestCards.locator('visible=true')).toHaveCount(24);
+    await page.setViewportSize({ width: 1440, height: 1400 });
+    await expect(latestCards.locator('visible=true')).toHaveCount(24);
+    await page.getByTestId('home-desktop-all-experiences-load-more').click();
+    await expect(latestCards).toHaveCount(35);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(latestCards.locator('visible=true')).toHaveCount(35);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  });
+
 });
