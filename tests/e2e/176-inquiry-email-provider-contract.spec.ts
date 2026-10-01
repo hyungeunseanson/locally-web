@@ -12,7 +12,9 @@ test.describe('Inquiry email provider contract', () => {
     expect(source).toContain('audience: resolveInquiryEmailAudience({');
     expect(source).toContain("transportPolicy: audience === 'admin' ? 'opsAdmin' : 'transactional'");
     expect(source).toContain("import { after } from 'next/server';");
-    expect(source).toContain('after(async () => {');
+    expect(source).toContain('after(postSave)');
+    expect(source).toContain('else after(deliverEmail)');
+    expect(source).toContain('await deliverEmail()');
     expect(source).toContain('const result = await sendTemplatedEmail({');
     expect(source).toContain("console.warn('[inquiries/thread] message notification email failed:', error);");
     expect(source).not.toContain('void sendTemplatedEmail({');

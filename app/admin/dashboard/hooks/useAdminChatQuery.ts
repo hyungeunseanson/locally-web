@@ -5,7 +5,9 @@ import { User } from '@supabase/supabase-js';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 import { sanitizeText } from '@/app/utils/sanitize';
-import { SOFT_DELETED_INQUIRY_MESSAGE_TYPE } from '@/app/utils/inquiry';
+import { getPrivateChatImageDeliveryUrl } from '@/app/utils/privateStorageDelivery';
+import { OFFICIAL_SUPPORT_SENDER_NAME } from '@/app/utils/officialSender';
+import { getInquiryMessageDisplayContent, SOFT_DELETED_INQUIRY_MESSAGE_TYPE } from '@/app/utils/inquiry';
 
 type MonitorInquiry = {
   id: number | string;
@@ -28,6 +30,10 @@ type MonitorMessage = {
   content: string;
   image_url?: string | null;
   type?: string | null;
+  inquiry_id?: number | string;
+  created_at?: string;
+  is_read?: boolean;
+  read_at?: string | null;
   sender?: { name?: string | null };
   has_policy_signal?: boolean;
   policy_signal_categories?: string[];
@@ -54,12 +60,21 @@ type AdminSendMessageResult = {
   messageId: number | string;
   displayContent: string;
   updatedAt: string;
+  message?: MonitorMessage;
 };
 
 type InquiryPreviewPatch = Partial<Pick<
   MonitorInquiry,
   'content' | 'updated_at' | 'has_policy_signal' | 'policy_signal_categories'
 >>;
+
+function normalizeServerMessage(message: MonitorMessage): MonitorMessage {
+  return {
+    ...message,
+    content: getInquiryMessageDisplayContent(message),
+    image_url: message.type === 'image' && message.image_url ? getPrivateChatImageDeliveryUrl(message.id) : null,
+  };
+}
 
 function isAdminSupportType(type?: string | null) {
   return type === 'admin' || type === 'admin_support';
@@ -148,6 +163,8 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
   const fetchInquiriesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inquiryRequestVersionRef = useRef(0);
   const messageRequestVersionRef = useRef(0);
+  const localMessagesRef = useRef(new Map<string, Map<string, { message: MonitorMessage; version: number }>>());
+  const observedOwnRowsRef = useRef(new Map<string, MonitorMessage>());
 
   const getAuthenticatedUser = useCallback(async (): Promise<User | null> => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -292,7 +309,16 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
         return false;
       }
 
-      const nextMessages = Array.isArray(result.data) ? result.data as MonitorMessage[] : [];
+      const fetched = Array.isArray(result.data) ? result.data as MonitorMessage[] : [];
+      const local = localMessagesRef.current.get(targetId);
+      const merged = new Map(fetched.map((message) => {
+        const id = String(message.id), protectedRow = local?.get(id);
+        if (protectedRow && requestVersion <= protectedRow.version) return [id, protectedRow.message] as const;
+        local?.delete(id);
+        return [id, message] as const;
+      }));
+      for (const [id, row] of local || []) if (!merged.has(id)) merged.set(id, row.message);
+      const nextMessages = [...merged.values()].sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')));
       messagesRef.current = nextMessages;
       setMessages(nextMessages);
 
@@ -399,13 +425,37 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
         throw new Error(errorMessage);
       }
 
-      patchInquiryPreview(inquiryId, {
+      const currentInquiry = inquiriesRef.current.find((inquiry) => String(inquiry.id) === String(inquiryId));
+      if (!currentInquiry || result.updatedAt >= String(currentInquiry.updated_at || '')) patchInquiryPreview(inquiryId, {
         content: result.displayContent,
         updated_at: result.updatedAt,
         has_policy_signal: false,
         policy_signal_categories: [],
       });
-      await loadMessages(inquiryId);
+      const targetId = String(inquiryId);
+      if (result.message && String(result.message.id) === String(result.messageId)
+        && String(result.message.inquiry_id) === targetId && typeof result.message.content === 'string'
+        && typeof result.message.sender_id === 'string' && typeof result.message.created_at === 'string') {
+        const observed = (String(selectedInquiryRef.current?.id) === targetId ? messagesRef.current.find((message) => String(message.id) === String(result.messageId)) : undefined)
+          || observedOwnRowsRef.current.get(String(result.messageId));
+        const canonicalRow = { ...result.message, ...observed };
+        const canonical = normalizeServerMessage({
+          ...canonicalRow,
+          sender: observed?.sender || { name: OFFICIAL_SUPPORT_SENDER_NAME },
+        });
+        const local = localMessagesRef.current.get(targetId) || new Map();
+        local.set(String(result.messageId), { message: canonical, version: messageRequestVersionRef.current });
+        localMessagesRef.current.set(targetId, local);
+        if (String(selectedInquiryRef.current?.id) === targetId) {
+          const merged = new Map(messagesRef.current.map((message) => [String(message.id), message]));
+          merged.set(String(result.messageId), canonical);
+          messagesRef.current = [...merged.values()].sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')));
+          setMessages(messagesRef.current);
+        }
+      } else {
+        // Compatibility with an older API response during a rolling release.
+        await loadMessages(inquiryId);
+      }
       return result;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.';
@@ -478,7 +528,35 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
           const newPayload = payload.new as InquiryMessageRealtimeRow | null;
           const oldPayload = payload.old as InquiryMessageRealtimeRow | null;
           const inquiryId = newPayload?.inquiry_id || oldPayload?.inquiry_id;
-          if (!inquiryId || !selectedInquiryRef.current) return;
+          if (!inquiryId) return;
+          const raw = newPayload as Partial<MonitorMessage> | null;
+          if (raw?.id != null && raw.sender_id === currentUser.id) {
+            const observed = { ...observedOwnRowsRef.current.get(String(raw.id)), ...raw } as MonitorMessage;
+            observedOwnRowsRef.current.set(String(raw.id), {
+              ...(typeof observed.content === 'string' ? normalizeServerMessage(observed) : observed),
+              sender: { name: OFFICIAL_SUPPORT_SENDER_NAME },
+            });
+            if (typeof observed.content === 'string' && typeof observed.created_at === 'string') {
+              const local = localMessagesRef.current.get(String(inquiryId)) || new Map();
+              local.set(String(raw.id), { message: observedOwnRowsRef.current.get(String(raw.id))!, version: messageRequestVersionRef.current });
+              localMessagesRef.current.set(String(inquiryId), local);
+            }
+            if (observedOwnRowsRef.current.size > 100) observedOwnRowsRef.current.delete(observedOwnRowsRef.current.keys().next().value!);
+          }
+          if (!selectedInquiryRef.current) return;
+          if (raw?.id != null) {
+            const index = messagesRef.current.findIndex((message) => String(message.id) === String(raw.id));
+            if (index >= 0) {
+              const updated = { ...messagesRef.current[index], ...raw };
+              const normalized = normalizeServerMessage(updated);
+              messagesRef.current = messagesRef.current.map((message, i) => i === index ? normalized : message);
+              setMessages(messagesRef.current);
+              const local = localMessagesRef.current.get(String(inquiryId)) || new Map();
+              local.set(String(raw.id), { message: normalized, version: messageRequestVersionRef.current });
+              localMessagesRef.current.set(String(inquiryId), local);
+              return;
+            }
+          }
 
           if (
             String(inquiryId) === String(selectedInquiryRef.current.id)

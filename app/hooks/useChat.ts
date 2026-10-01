@@ -97,6 +97,7 @@ type PendingInquirySend = {
   senderId: string;
   knownMessageIds: Set<string>;
   observedOwnRows: Map<string, InquiryMessageView>;
+  observedRowVersions: Map<string, number>;
 };
 
 function sortInquiriesByUpdatedAt(items: InquiryListItem[]) {
@@ -108,15 +109,13 @@ function normalizeInquiryExperience(experience: InquiryExperienceRelation): Inqu
   return experience ?? null;
 }
 
-type RealtimeMessagePayload = {
-  id?: number;
-  sender_id?: string;
-  inquiry_id?: number | string;
-};
+type RealtimeMessagePayload = Partial<InquiryMessageRow>;
 
 type RealtimeInquiryPayload = {
   id?: number | string;
   updated_at?: string | null;
+  content?: string;
+  status?: string | null;
 };
 
 const REALTIME_INQUIRY_REFRESH_DEBOUNCE_MS = 300;
@@ -138,16 +137,30 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   const { notifications } = useNotification();
 
   // 실시간 이벤트 중복 수신 방지 (메시지 id 단위)
-  const processedEventRef = useRef<Set<string>>(new Set());
+  const observedMessageIdsRef = useRef(new Set<string>());
+  const notificationLookupsRef = useRef(new Set<string>());
+  const unreadRequestVersionsRef = useRef(new Map<string, number>());
+  const unreadRefreshTimeoutsRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const inquiryPatchVersionsRef = useRef(new Map<string, number>());
+  const inboxRequestVersionRef = useRef(0);
   // 실시간 핸들러가 최신 상태를 참조하기 위한 refs (의존성 배열 안정화)
   const inquiriesRef = useRef<InquiryListItem[]>([]);
   const selectedInquiryRef = useRef<InquiryListItem | null>(null);
   const realtimeRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const realtimeMessageRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const realtimeMessageFollowUpTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasPrimedNotificationsRef = useRef(false);
   const latestNotificationIdRef = useRef<number | null>(null);
-  const lastRealtimeSignalAtRef = useRef(0);
+  const messagesRef = useRef<InquiryMessageView[]>([]);
+  const commitMessages = useCallback((update: InquiryMessageView[] | ((previous: InquiryMessageView[]) => InquiryMessageView[])) => {
+    const next = typeof update === 'function' ? update(messagesRef.current) : update;
+    messagesRef.current = next;
+    setMessages(next);
+  }, []);
+  const rememberMessage = useCallback((id: number | string) => {
+    const seen = observedMessageIdsRef.current;
+    seen.add(String(id));
+    if (seen.size > 500) seen.delete(seen.values().next().value!);
+  }, []);
   const activeInquiryIdRef = useRef<string | null>(null);
   const messageRequestVersionRef = useRef(0);
   // Keep local sends until a message GET observes their canonical ID. A GET
@@ -167,7 +180,11 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         && String(message.inquiry_id) === inquiryId
         && message.sender_id === pending.senderId
         && !pending.knownMessageIds.has(id)) {
-        pending.observedOwnRows.set(id, message);
+        const realtimeVersion = pending.observedRowVersions.get(id);
+        if (realtimeVersion === undefined || requestVersion > realtimeVersion) {
+          pending.observedOwnRows.set(id, message);
+          pending.observedRowVersions.delete(id);
+        }
         return false;
       }
       return true;
@@ -210,6 +227,8 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   }, [supabase]);
 
   const fetchInquiries = useCallback(async (showLoading = true) => {
+    const requestVersion = ++inboxRequestVersionRef.current;
+    const patchVersions = new Map(inquiryPatchVersionsRef.current);
     if (showLoading && inquiriesRef.current.length === 0) setIsLoading(true);
 
     try {
@@ -319,9 +338,25 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
           };
         });
 
-        setInquiries(safeData);
-        inquiriesRef.current = safeData;
+        if (requestVersion !== inboxRequestVersionRef.current) return;
+        const reconciled = safeData.map((item) => {
+          const id = String(item.id);
+          if (patchVersions.get(id) === inquiryPatchVersionsRef.current.get(id)) return item;
+          const current = inquiriesRef.current.find((row) => String(row.id) === id);
+          if (!current) return item;
+          return { ...item, ...(String(current.updated_at || '') >= String(item.updated_at || '')
+            ? { content: current.content, updated_at: current.updated_at, status: current.status } : {}), unread_count: current.unread_count };
+        });
+        setInquiries(sortInquiriesByUpdatedAt(reconciled));
+        inquiriesRef.current = sortInquiriesByUpdatedAt(reconciled);
+        const selected = selectedInquiryRef.current;
+        const refreshedSelected = selected && reconciled.find((item) => String(item.id) === String(selected.id));
+        if (refreshedSelected) {
+          selectedInquiryRef.current = refreshedSelected;
+          setSelectedInquiry(refreshedSelected);
+        }
       } else {
+        if (requestVersion !== inboxRequestVersionRef.current) return;
         setInquiries([]);
         inquiriesRef.current = [];
       }
@@ -335,6 +370,12 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   const markAsRead = useCallback(async (inquiryId: number | string) => {
     if (!currentUser) return;
     const targetId = String(inquiryId);
+    inquiryPatchVersionsRef.current.set(targetId, (inquiryPatchVersionsRef.current.get(targetId) || 0) + 1);
+    const readVersion = (unreadRequestVersionsRef.current.get(targetId) || 0) + 1;
+    unreadRequestVersionsRef.current.set(targetId, readVersion);
+    const unreadTimer = unreadRefreshTimeoutsRef.current.get(targetId);
+    if (unreadTimer) clearTimeout(unreadTimer);
+    unreadRefreshTimeoutsRef.current.delete(targetId);
     const previousInquiries = inquiriesRef.current;
     const previousSelected = selectedInquiryRef.current;
     const nextInquiries = previousInquiries.map((inq) =>
@@ -363,6 +404,8 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       }
     } catch (error) {
       console.error('[useChat] markAsRead failed:', error);
+      if (unreadRequestVersionsRef.current.get(targetId) !== readVersion) return;
+      inquiryPatchVersionsRef.current.set(targetId, (inquiryPatchVersionsRef.current.get(targetId) || 0) + 1);
       const restoredInquiries = inquiriesRef.current.map((inquiry) => {
         const previous = previousInquiries.find((item) => String(item.id) === targetId);
         return String(inquiry.id) === targetId && previous
@@ -389,7 +432,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     const selectedThread = inquiriesRef.current.find((inquiry) => String(inquiry.id) === targetId);
     if (activeInquiryIdRef.current !== targetId) {
       activeInquiryIdRef.current = targetId;
-      setMessages(mergeLocalMessages(targetId, []));
+      commitMessages(mergeLocalMessages(targetId, []));
     }
     if (selectedThread) {
       selectedInquiryRef.current = selectedThread;
@@ -432,7 +475,8 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
       // Publish bodies before awaiting sender metadata. Only enrich sender fields
       // afterwards, so this response cannot replace a newer send or read update.
-      setMessages(mergeLocalMessages(targetId, safeMessages, requestVersion));
+      safeMessages.forEach((message) => rememberMessage(message.id));
+      commitMessages(mergeLocalMessages(targetId, safeMessages, requestVersion));
       if (selectedThread) void markAsRead(inquiryId);
 
       const senderIds = Array.from(new Set(
@@ -450,7 +494,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       const profileMap = new Map(((proRes.data || []) as ProfileRow[]).map((profile) => [profile.id, profile]));
       const appMap = new Map(((appRes.data || []) as HostApplicationRow[]).map((app) => [app.user_id, app]));
       const fetchedIds = new Set(rawMessages.map((message) => String(message.id)));
-      setMessages((previous) => previous.map((message) => {
+      commitMessages((previous) => previous.map((message) => {
         if (String(message.inquiry_id) !== targetId || !fetchedIds.has(String(message.id)) || isOfficialSupportSender(message.sender_id)) return message;
         const profile = profileMap.get(message.sender_id);
         const app = appMap.get(message.sender_id);
@@ -461,7 +505,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     } catch (err: unknown) {
       if (isCurrentRequest()) console.error(err);
     }
-  }, [supabase, markAsRead, mergeLocalMessages]);
+  }, [supabase, markAsRead, mergeLocalMessages, commitMessages, rememberMessage]);
 
   const scheduleRealtimeInquiryRefresh = useCallback(() => {
     if (realtimeRefreshTimeoutRef.current) {
@@ -479,35 +523,121 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     void loadMessages(inquiryId);
   }, [loadMessages]);
 
-  const scheduleRealtimeMessageRefresh = useCallback((
-    inquiryId: number | string,
-    options?: {
-      primaryDelayMs?: number;
-      followUpDelayMs?: number;
-    }
-  ) => {
-    const primaryDelayMs = options?.primaryDelayMs ?? REALTIME_MESSAGE_REFRESH_DEBOUNCE_MS;
-    const followUpDelayMs = options?.followUpDelayMs ?? 0;
-
-    if (realtimeMessageRefreshTimeoutRef.current) {
-      clearTimeout(realtimeMessageRefreshTimeoutRef.current);
-    }
-    if (realtimeMessageFollowUpTimeoutRef.current) {
-      clearTimeout(realtimeMessageFollowUpTimeoutRef.current);
-    }
-
+  const scheduleRealtimeMessageRefresh = useCallback((inquiryId: number | string, delay = REALTIME_MESSAGE_REFRESH_DEBOUNCE_MS) => {
+    if (String(selectedInquiryRef.current?.id) !== String(inquiryId)) return;
+    if (realtimeMessageRefreshTimeoutRef.current) clearTimeout(realtimeMessageRefreshTimeoutRef.current);
     realtimeMessageRefreshTimeoutRef.current = setTimeout(() => {
       realtimeMessageRefreshTimeoutRef.current = null;
       refreshSelectedInquiryMessages(inquiryId);
-    }, primaryDelayMs);
-
-    if (followUpDelayMs > 0) {
-      realtimeMessageFollowUpTimeoutRef.current = setTimeout(() => {
-        realtimeMessageFollowUpTimeoutRef.current = null;
-        refreshSelectedInquiryMessages(inquiryId);
-      }, primaryDelayMs + followUpDelayMs);
-    }
+    }, delay);
   }, [refreshSelectedInquiryMessages]);
+
+  const patchInquiry = useCallback((inquiryId: number | string, patch: Partial<InquiryListItem>) => {
+    const id = String(inquiryId);
+    inquiryPatchVersionsRef.current.set(id, (inquiryPatchVersionsRef.current.get(id) || 0) + 1);
+    const next = sortInquiriesByUpdatedAt(inquiriesRef.current.map((item) => String(item.id) === id ? { ...item, ...patch } : item));
+    inquiriesRef.current = next;
+    setInquiries(next);
+    if (String(selectedInquiryRef.current?.id) === id) {
+      const selected = { ...selectedInquiryRef.current!, ...patch };
+      selectedInquiryRef.current = selected;
+      setSelectedInquiry(selected);
+    }
+  }, []);
+
+  const refreshUnread = useCallback(async (inquiryId: number | string) => {
+    if (!currentUser) return;
+    const id = String(inquiryId);
+    const version = (unreadRequestVersionsRef.current.get(id) || 0) + 1;
+    unreadRequestVersionsRef.current.set(id, version);
+    try {
+      const { data, error } = await supabase.from('inquiry_messages').select('inquiry_id')
+        .eq('inquiry_id', inquiryId).eq('is_read', false)
+        .neq('type', SOFT_DELETED_INQUIRY_MESSAGE_TYPE).neq('sender_id', currentUser.id);
+      if (error) throw error;
+      if (unreadRequestVersionsRef.current.get(id) === version) patchInquiry(inquiryId, { unread_count: data?.length || 0 });
+    } catch (error) { console.warn('[useChat] unread refresh failed:', error); }
+  }, [supabase, currentUser, patchInquiry]);
+
+  const scheduleUnreadRefresh = useCallback((inquiryId: number | string) => {
+    const id = String(inquiryId), timers = unreadRefreshTimeoutsRef.current;
+    const existing = timers.get(id);
+    if (existing) clearTimeout(existing);
+    // Bulk read UPDATEs need only one scoped unread query for this room.
+    timers.set(id, setTimeout(() => {
+      timers.delete(id);
+      void refreshUnread(inquiryId);
+    }, REALTIME_INQUIRY_REFRESH_DEBOUNCE_MS));
+  }, [refreshUnread]);
+
+  const applyMessageRow = useCallback((row: RealtimeMessagePayload, insert = false) => {
+    if (row.id == null || row.inquiry_id == null) return false;
+    const targetId = String(row.inquiry_id), id = String(row.id);
+    const thread = inquiriesRef.current.find((item) => String(item.id) === targetId);
+    if (!thread) return false;
+    // A notification lookup / catch-up may already contain a newer read or
+    // deleted snapshot than the INSERT payload. Never replay that old insert.
+    if (insert && observedMessageIdsRef.current.has(id)) return true;
+    const previous = pendingSendRef.current?.observedOwnRows.get(id)
+      || localMessagesRef.current.get(targetId)?.get(id)
+      || messagesRef.current.find((message) => String(message.id) === id && String(message.inquiry_id) === targetId);
+    const raw = { ...previous, ...row };
+    if (!raw.sender_id || typeof raw.content !== 'string' || !raw.created_at) return false;
+    const official = isOfficialInquirySupportMessage({ inquiryType: thread.type, senderId: raw.sender_id, guestId: thread.user_id, hostId: thread.host_id });
+    const participant = raw.sender_id === thread.user_id ? thread.guest : thread.host;
+    const next: InquiryMessageView = {
+      ...raw as InquiryMessageRow,
+      content: getInquiryMessageDisplayContent({ type: raw.type, content: raw.content }),
+      image_url: raw.type === 'image' && raw.image_url ? getPrivateChatImageDeliveryUrl(row.id) : null,
+      sender: official ? { id: raw.sender_id, name: OFFICIAL_SUPPORT_SENDER_NAME, avatar_url: OFFICIAL_SUPPORT_AVATAR_SRC }
+        : previous?.sender || { id: raw.sender_id, name: participant?.name || '알 수 없음', avatar_url: participant?.avatar_url || null },
+    };
+    rememberMessage(row.id);
+    const selected = activeInquiryIdRef.current === targetId;
+    if (selected || pendingSendRef.current?.inquiryId === targetId) {
+      const pending = pendingSendRef.current;
+      if (pending?.inquiryId === targetId && pending.senderId === next.sender_id && !pending.knownMessageIds.has(id)) {
+        pending.observedOwnRows.set(id, next);
+        pending.observedRowVersions.set(id, messageRequestVersionRef.current);
+      } else {
+        const local = localMessagesRef.current.get(targetId) || new Map<string, InquiryMessageView>();
+        local.set(id, next);
+        localMessagesRef.current.set(targetId, local);
+        localMessageAckRef.current.set(`${targetId}:${id}`, { requestVersion: messageRequestVersionRef.current, hasServerSnapshot: true });
+        if (selected) commitMessages((previousMessages) => [...new Map([...previousMessages, next].map((message) => [String(message.id), message])).values()]
+          .sort((a, b) => a.created_at.localeCompare(b.created_at)));
+      }
+    }
+    if (insert && next.created_at >= String(thread.updated_at || '')) {
+      patchInquiry(thread.id, { content: next.content, updated_at: next.created_at });
+    }
+    if (next.sender_id !== currentUser?.id) {
+      if (selected) {
+        if (insert && !next.is_read && !next.read_at && next.type !== SOFT_DELETED_INQUIRY_MESSAGE_TYPE) void markAsRead(thread.id);
+      } else scheduleUnreadRefresh(thread.id);
+    }
+    return true;
+  }, [commitMessages, currentUser, markAsRead, patchInquiry, scheduleUnreadRefresh, rememberMessage]);
+
+  const refreshNotifiedMessage = useCallback(async (inquiryId: string, messageId: string) => {
+    if (observedMessageIdsRef.current.has(messageId) || notificationLookupsRef.current.has(messageId)) return;
+    notificationLookupsRef.current.add(messageId);
+    try {
+      const { data, error } = await supabase.from('inquiry_messages')
+        .select('id, inquiry_id, sender_id, content, image_url, type, is_read, read_at, created_at')
+        .eq('inquiry_id', inquiryId).eq('id', messageId).maybeSingle<InquiryMessageRow>();
+      if (error) throw error;
+      if (observedMessageIdsRef.current.has(messageId)) return;
+      if (!data || !applyMessageRow(data, true)) {
+        scheduleRealtimeInquiryRefresh();
+        scheduleRealtimeMessageRefresh(inquiryId);
+      }
+    } catch (error) {
+      console.warn('[useChat] notification catch-up failed:', error);
+      scheduleRealtimeInquiryRefresh();
+      scheduleRealtimeMessageRefresh(inquiryId);
+    } finally { notificationLookupsRef.current.delete(messageId); }
+  }, [supabase, applyMessageRow, scheduleRealtimeInquiryRefresh, scheduleRealtimeMessageRefresh]);
 
   const sendMessage = async (inquiryId: number | string, content: string, file?: File, senderId?: string) => {
     if (!CHAT_IMAGE_ATTACHMENTS_ENABLED && file) {
@@ -566,10 +696,10 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     if (shouldOptimisticallyAppend && optimisticMessageId) {
       if (pendingSendRef.current) throw new Error('메시지 전송이 진행 중입니다.');
       const knownMessageIds = new Set([
-        ...messages.filter((message) => String(message.inquiry_id) === targetId).map((message) => String(message.id)),
+        ...messagesRef.current.filter((message) => String(message.inquiry_id) === targetId).map((message) => String(message.id)),
         ...(localMessagesRef.current.get(targetId)?.keys() || []),
       ]);
-      pendingSend = { inquiryId: targetId, senderId: actorId, knownMessageIds, observedOwnRows: new Map() };
+      pendingSend = { inquiryId: targetId, senderId: actorId, knownMessageIds, observedOwnRows: new Map(), observedRowVersions: new Map() };
       pendingSendRef.current = pendingSend;
       optimisticMessage = {
         id: optimisticMessageId,
@@ -593,7 +723,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       localMessagesRef.current.set(targetId, local);
       if (activeInquiryIdRef.current === targetId) {
         const pendingMessage = optimisticMessage;
-        setMessages((prev) => [...prev, pendingMessage]);
+        commitMessages((prev) => [...prev, pendingMessage]);
       }
     }
 
@@ -618,6 +748,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       const nextInquiries = inquiriesRef.current
         .map((inq) =>
           String(inq.id) === String(inquiryId)
+            && String(result.updatedAt || '') >= String(inq.updated_at || '')
             ? {
               ...inq,
               content: String(result.displayContent || cleanContent || ''),
@@ -662,9 +793,11 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         selectedInquiryRef.current?.host?.avatar_url ||
         null;
 
+      rememberMessage(result.messageId);
+      inquiryPatchVersionsRef.current.set(targetId, (inquiryPatchVersionsRef.current.get(targetId) || 0) + 1);
       const observedRows = pendingSend?.observedOwnRows;
       const persistedMessage: InquiryMessageView = observedRows?.get(String(result.messageId)) || (optimisticMessage
-        ? { ...optimisticMessage, id: result.messageId }
+        ? { ...optimisticMessage, ...(result.message || {}), id: result.messageId }
         : {
           id: result.messageId,
           inquiry_id: inquiryId,
@@ -691,7 +824,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       localMessagesRef.current.set(targetId, local);
       if (pendingSendRef.current === pendingSend) pendingSendRef.current = null;
       if (activeInquiryIdRef.current === targetId) {
-        setMessages((prev) => {
+        commitMessages((prev) => {
           const merged = new Map(prev.filter((message) => String(message.id) !== optimisticMessageId)
             .map((message) => [String(message.id), message]));
           // Publish every buffered server row; the ACK identifies which one
@@ -717,7 +850,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         if (local?.size === 0) localMessagesRef.current.delete(targetId);
         if (pendingSendRef.current === pendingSend) pendingSendRef.current = null;
         if (activeInquiryIdRef.current === targetId) {
-          setMessages((prev) => {
+          commitMessages((prev) => {
             const merged = new Map(prev.filter((message) => String(message.id) !== optimisticMessageId)
               .map((message) => [String(message.id), message]));
             for (const [id, message] of observedRows) merged.set(id, message);
@@ -785,7 +918,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     setSelectedInquiry(nextInquiry);
 
     const firstMessageId = result.messageId ?? `temp-thread-${Date.now()}`;
-    setMessages([
+    commitMessages([
       {
         id: firstMessageId,
         inquiry_id: result.inquiryId,
@@ -819,7 +952,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   const startNewChat = (hostData: { id: string; name: string; avatarUrl?: string }, expData: { id: string; title: string }) => {
     ++messageRequestVersionRef.current;
     activeInquiryIdRef.current = 'new';
-    setMessages([]);
+    commitMessages([]);
     const nextInquiry: InquiryListItem = {
       id: 'new',
       type: 'general',
@@ -844,6 +977,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   useEffect(() => {
     if (!currentUser) return;
 
+    const unreadTimers = unreadRefreshTimeoutsRef.current;
     const inquiryRealtimeConfigs =
       role === 'guest'
         ? [{ event: 'UPDATE' as const, schema: 'public', table: 'inquiries', filter: `user_id=eq.${currentUser.id}` }]
@@ -865,67 +999,36 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
           : [{ event: 'UPDATE' as const, schema: 'public', table: 'inquiries' }];
 
     const handleInquiryUpdate = (payload: { new: unknown }) => {
-      const newPayload = payload.new as RealtimeInquiryPayload | null;
-      const selected = selectedInquiryRef.current;
-
-      scheduleRealtimeInquiryRefresh();
-
-      if (!selected || String(newPayload?.id) !== String(selected.id)) return;
-      if (newPayload?.updated_at && newPayload.updated_at === selected.updated_at) return;
-
-      scheduleRealtimeMessageRefresh(selected.id);
+      const row = payload.new as RealtimeInquiryPayload | null;
+      if (row?.id == null) return;
+      const existing = inquiriesRef.current.find((item) => String(item.id) === String(row.id));
+      if (!existing) { scheduleRealtimeInquiryRefresh(); return; }
+      if (row.updated_at && String(row.updated_at) < String(existing.updated_at || '')) return;
+      patchInquiry(row.id, {
+        ...(row.content !== undefined ? { content: row.content } : {}),
+        ...(row.updated_at !== undefined ? { updated_at: row.updated_at } : {}),
+        ...(row.status !== undefined ? { status: row.status } : {}),
+      });
     };
 
-    const channel = supabase
-      .channel(`chat-realtime-updates-${currentUser.id}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'inquiry_messages' },
-        (payload) => {
-          const newPayload = payload.new as RealtimeMessagePayload | null;
-          const rawId = newPayload?.id || 'unknown';
-          const eventKey = `INSERT:${rawId}`;
-          if (processedEventRef.current.has(eventKey)) return;
-          processedEventRef.current.add(eventKey);
-          setTimeout(() => processedEventRef.current.delete(eventKey), 1500);
-          lastRealtimeSignalAtRef.current = Date.now();
-          if (newPayload && newPayload.sender_id !== currentUser.id) {
-            scheduleRealtimeInquiryRefresh();
-            if (selectedInquiryRef.current && String(newPayload.inquiry_id) === String(selectedInquiryRef.current.id)) {
-              scheduleRealtimeMessageRefresh(selectedInquiryRef.current.id, {
-                primaryDelayMs: 0,
-                followUpDelayMs: 700,
-              });
-            }
-          }
+    const channel = supabase.channel(`chat-realtime-updates-${currentUser.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'inquiry_messages' }, (payload) => {
+        const row = payload.new as RealtimeMessagePayload | null;
+        if (row && applyMessageRow(row, true)) return;
+        scheduleRealtimeInquiryRefresh();
+        if (row?.inquiry_id != null) scheduleRealtimeMessageRefresh(row.inquiry_id);
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'inquiry_messages' }, (payload) => {
+        const row = payload.new as RealtimeMessagePayload | null;
+        if (row && applyMessageRow(row)) return;
+        // Partial payloads cannot be used to invent a row: recover once.
+        const inquiryId = row?.inquiry_id || (payload.old as RealtimeMessagePayload)?.inquiry_id;
+        if (inquiryId != null) {
+          scheduleUnreadRefresh(inquiryId);
+          scheduleRealtimeMessageRefresh(inquiryId);
         }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'inquiry_messages' },
-        (payload) => {
-          const newPayload = payload.new as RealtimeMessagePayload | null;
-          const oldPayload = payload.old as RealtimeMessagePayload | null;
-          const rawId = newPayload?.id || oldPayload?.id || 'unknown';
-          const eventKey = `UPDATE:${rawId}`;
-          if (processedEventRef.current.has(eventKey)) return;
-          processedEventRef.current.add(eventKey);
-          setTimeout(() => processedEventRef.current.delete(eventKey), 1500);
-          lastRealtimeSignalAtRef.current = Date.now();
-          const inquiryId = newPayload?.inquiry_id || oldPayload?.inquiry_id;
-          if (!inquiryId) return;
-
-          scheduleRealtimeInquiryRefresh();
-
-          if (selectedInquiryRef.current && String(inquiryId) === String(selectedInquiryRef.current.id)) {
-            scheduleRealtimeMessageRefresh(selectedInquiryRef.current.id);
-          }
-        }
-      );
-
-    inquiryRealtimeConfigs.forEach((config) => {
-      channel.on('postgres_changes', config, handleInquiryUpdate);
-    });
+      });
+    inquiryRealtimeConfigs.forEach((config) => channel.on('postgres_changes', config, handleInquiryUpdate));
 
     channel.subscribe((status) => {
         if (status !== 'SUBSCRIBED') return;
@@ -934,10 +1037,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         // inserted just before subscribe/reconnect are not missed.
         scheduleRealtimeInquiryRefresh();
         if (selectedInquiryRef.current) {
-          scheduleRealtimeMessageRefresh(selectedInquiryRef.current.id, {
-            primaryDelayMs: 0,
-            followUpDelayMs: 700,
-          });
+          scheduleRealtimeMessageRefresh(selectedInquiryRef.current.id, 0);
         }
       });
 
@@ -950,13 +1050,11 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         clearTimeout(realtimeMessageRefreshTimeoutRef.current);
         realtimeMessageRefreshTimeoutRef.current = null;
       }
-      if (realtimeMessageFollowUpTimeoutRef.current) {
-        clearTimeout(realtimeMessageFollowUpTimeoutRef.current);
-        realtimeMessageFollowUpTimeoutRef.current = null;
-      }
+      for (const timer of unreadTimers.values()) clearTimeout(timer);
+      unreadTimers.clear();
       supabase.removeChannel(channel);
     };
-  }, [supabase, currentUser, role, scheduleRealtimeInquiryRefresh, scheduleRealtimeMessageRefresh]);
+  }, [supabase, currentUser, role, scheduleRealtimeInquiryRefresh, scheduleRealtimeMessageRefresh, applyMessageRow, scheduleUnreadRefresh, patchInquiry]);
 
   useEffect(() => {
     hasPrimedNotificationsRef.current = false;
@@ -972,31 +1070,27 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       return;
     }
 
-    if (!latestMessageNotification) return;
-    if (latestNotificationIdRef.current === latestMessageNotification.id) return;
+    if (!latestMessageNotification || latestNotificationIdRef.current === latestMessageNotification.id) return;
+    const messageNotifications = notifications.filter((notification) => notification.type === 'new_message');
+    const previousIndex = messageNotifications.findIndex((notification) => notification.id === latestNotificationIdRef.current);
+    const fresh = previousIndex >= 0 ? messageNotifications.slice(0, previousIndex) : messageNotifications;
     latestNotificationIdRef.current = latestMessageNotification.id;
-    const selected = selectedInquiryRef.current;
-    const linkedInquiryId = getInquiryIdFromNotificationLink(latestMessageNotification.link);
-    if (Date.now() - lastRealtimeSignalAtRef.current < 1500) {
-      if (selected && linkedInquiryId && String(linkedInquiryId) === String(selected.id)) {
-        scheduleRealtimeMessageRefresh(selected.id, {
-          primaryDelayMs: 700,
-          followUpDelayMs: 0,
-        });
+    for (const notification of fresh) {
+      const linkedInquiryId = getInquiryIdFromNotificationLink(notification.link);
+      const messageId = getMessageIdFromNotificationLink(notification.link);
+      if (linkedInquiryId && messageId) {
+        void refreshNotifiedMessage(String(linkedInquiryId), messageId);
+        continue;
       }
-      return;
+      // Older notifications carry no message identity. Keep one debounced
+      // recovery query; a recent unrelated event cannot suppress catch-up.
+      scheduleRealtimeInquiryRefresh();
+      const selected = selectedInquiryRef.current;
+      if (selected && linkedInquiryId && String(linkedInquiryId) === String(selected.id)) {
+        scheduleRealtimeMessageRefresh(selected.id);
+      }
     }
-
-    scheduleRealtimeInquiryRefresh();
-
-    if (!selected || !linkedInquiryId) return;
-    if (String(linkedInquiryId) !== String(selected.id)) return;
-
-    scheduleRealtimeMessageRefresh(selected.id, {
-      primaryDelayMs: 0,
-      followUpDelayMs: 700,
-    });
-  }, [notifications, scheduleRealtimeInquiryRefresh, scheduleRealtimeMessageRefresh]);
+  }, [notifications, scheduleRealtimeInquiryRefresh, scheduleRealtimeMessageRefresh, refreshNotifiedMessage]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -1006,10 +1100,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
       scheduleRealtimeInquiryRefresh();
       if (selectedInquiryRef.current) {
-        scheduleRealtimeMessageRefresh(selectedInquiryRef.current.id, {
-          primaryDelayMs: 0,
-          followUpDelayMs: 700,
-        });
+        scheduleRealtimeMessageRefresh(selectedInquiryRef.current.id, 0);
       }
     };
 
@@ -1024,7 +1115,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     activeInquiryIdRef.current = null;
     selectedInquiryRef.current = null;
     setSelectedInquiry(null);
-    setMessages([]);
+    commitMessages([]);
   };
 
   return {
@@ -1050,5 +1141,10 @@ function getInquiryIdFromNotificationLink(link: string | null | undefined) {
   if (!link) return null;
 
   const match = link.match(/[?&]inquiryId=([^&]+)/);
+  return match?.[1] ? decodeURIComponent(match[1]) : null;
+}
+
+function getMessageIdFromNotificationLink(link: string | null | undefined) {
+  const match = link?.match(/[?&]messageId=([^&]+)/);
   return match?.[1] ? decodeURIComponent(match[1]) : null;
 }

@@ -9,14 +9,14 @@ import { JSDOM } from 'jsdom';
 const require = createRequire(import.meta.url);
 // Load actual source, with an explicit boundary around I/O and Next-only UI.
 // Unknown imports fail closed; these tests never create a real Supabase client.
-export function sourceLoader(stubs = {}) {
+export function sourceLoader(stubs = {}, sources = {}) {
   const modules = new Map();
   function load(path) {
     const filename = resolve(path);
     if (modules.has(filename)) return modules.get(filename).exports;
     const loadedModule = { exports: {} };
     modules.set(filename, loadedModule);
-    const code = ts.transpileModule(readFileSync(filename, 'utf8'), {
+    const code = ts.transpileModule(sources[filename] ?? readFileSync(filename, 'utf8'), {
       compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2020, esModuleInterop: true },
       fileName: filename,
     }).outputText;
@@ -67,11 +67,11 @@ export function message(id, inquiryId, sender = 'host', content = `body-${id}`) 
 }
 export function response(body, status = 200) { return { ok: status < 400, status, json: async () => body }; }
 
-export function clientFixture({ role = 'guest', rows = [inquiry(1), inquiry(2), inquiry(3, 'admin_support')] } = {}) {
+export function clientFixture({ additionalStubs = {}, sources = {}, role = 'guest', rows = [inquiry(1), inquiry(2), inquiry(3, 'admin_support')] } = {}) {
   const calls = { auth: 0, queries: [], requests: [], channels: [], removed: [] };
   const pendingTimers = new Map();
   const fixture = {
-    calls, rows, role,
+    calls, rows, role, notifications: [],
     auth: async () => ({ data: { user: role === 'host' ? { ...user, id: 'host' } : user } }),
     query: async (state) => {
       if (state.table === 'inquiries') return { data: fixture.rows };
@@ -109,7 +109,7 @@ export function clientFixture({ role = 'guest', rows = [inquiry(1), inquiry(2), 
   const stubs = {
     '@/app/utils/supabase/client': { createClient: () => client },
     '@/app/context/ToastContext': { useToast: () => toast },
-    '@/app/context/NotificationContext': { useNotification: () => ({ notifications: [] }) },
+    '@/app/context/NotificationContext': { useNotification: () => ({ notifications: fixture.notifications }) },
     '@/app/utils/image': {},
     '@/app/utils/privateStorageDelivery': { getPrivateChatImageDeliveryUrl: (id) => `/api/inquiries/messages/${id}/image` },
     '@/app/context/LanguageContext': { useLanguage: () => ({ t: (key) => key, lang: 'ko' }) },
@@ -123,8 +123,9 @@ export function clientFixture({ role = 'guest', rows = [inquiry(1), inquiry(2), 
     '@/app/components/proxy/ProxyBankTransferNotice': { ProxyBankTransferNotice: empty },
     '@/app/components/chat/ChatSafetyNotice': { default: empty },
   };
+  Object.assign(stubs, additionalStubs);
   for (const stub of Object.values(stubs)) { if (Object.hasOwn(stub, 'default')) stub.__esModule = true; }
-  const load = sourceLoader(stubs);
+  const load = sourceLoader(stubs, sources);
   const hook = load('app/hooks/useChat.ts').useChat;
   let latest;
   const dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost/', pretendToBeVisual: true });
