@@ -92,6 +92,13 @@ type InquiryMessageView = InquiryMessageRow & {
   };
 };
 
+type PendingInquirySend = {
+  inquiryId: string;
+  senderId: string;
+  knownMessageIds: Set<string>;
+  observedOwnRows: Map<string, InquiryMessageView>;
+};
+
 function sortInquiriesByUpdatedAt(items: InquiryListItem[]) {
   return [...items].sort((a, b) => new Date(b.updated_at || '').getTime() - new Date(a.updated_at || '').getTime());
 }
@@ -141,6 +148,54 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   const hasPrimedNotificationsRef = useRef(false);
   const latestNotificationIdRef = useRef<number | null>(null);
   const lastRealtimeSignalAtRef = useRef(0);
+  const activeInquiryIdRef = useRef<string | null>(null);
+  const messageRequestVersionRef = useRef(0);
+  // Keep local sends until a message GET observes their canonical ID. A GET
+  // started before the insert must not erase a pending or acknowledged send.
+  const localMessagesRef = useRef(new Map<string, Map<string, InquiryMessageView>>());
+  const localMessageAckRef = useRef(new Map<string, { requestVersion: number; hasServerSnapshot: boolean }>());
+  const pendingSendRef = useRef<PendingInquirySend | null>(null);
+
+  const mergeLocalMessages = useCallback((inquiryId: string, fetched: InquiryMessageView[], requestVersion = 0) => {
+    const pending = pendingSendRef.current;
+    // A locked composer allows one pending send. Until the ACK supplies its
+    // exact ID, buffer new own rows instead of guessing identity from content.
+    // Existing own rows and incoming messages remain visible and up to date.
+    const fetchedVisible = fetched.filter((message) => {
+      const id = String(message.id);
+      if (pending?.inquiryId === inquiryId
+        && String(message.inquiry_id) === inquiryId
+        && message.sender_id === pending.senderId
+        && !pending.knownMessageIds.has(id)) {
+        pending.observedOwnRows.set(id, message);
+        return false;
+      }
+      return true;
+    });
+    const local = localMessagesRef.current.get(inquiryId);
+    if (!local) return fetchedVisible;
+    const visible = fetchedVisible.map((message) => {
+      const id = String(message.id);
+      const key = `${inquiryId}:${id}`;
+      const acknowledged = localMessageAckRef.current.get(key);
+      if (acknowledged && requestVersion <= acknowledged.requestVersion) {
+        // Pre-ACK snapshots cannot retire the protection or overwrite a
+        // server row already observed before ACK (including read/deletion).
+        const protectedMessage = local.get(id);
+        if (protectedMessage && acknowledged.hasServerSnapshot) return protectedMessage;
+        local.set(id, message);
+        acknowledged.hasServerSnapshot = true;
+      } else {
+        local.delete(id);
+        localMessageAckRef.current.delete(key);
+      }
+      return message;
+    });
+    const visibleIds = new Set(visible.map((message) => String(message.id)));
+    const merged = [...visible, ...[...local.values()].filter((message) => !visibleIds.has(String(message.id)))];
+    if (local.size === 0) localMessagesRef.current.delete(inquiryId);
+    return merged.sort((a, b) => a.created_at.localeCompare(b.created_at));
+  }, []);
 
   const secureUrl = (url: string | null | undefined) => {
     if (!url || url === '') return null;
@@ -150,11 +205,9 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
   const getAuthenticatedUser = useCallback(async (): Promise<User | null> => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (user && (!currentUser || currentUser.id !== user.id)) {
-      setCurrentUser(user);
-    }
+    setCurrentUser((previousUser) => previousUser?.id === user?.id ? previousUser : user);
     return user;
-  }, [supabase, currentUser]);
+  }, [supabase]);
 
   const fetchInquiries = useCallback(async (showLoading = true) => {
     if (showLoading && inquiriesRef.current.length === 0) setIsLoading(true);
@@ -310,21 +363,39 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       }
     } catch (error) {
       console.error('[useChat] markAsRead failed:', error);
-      inquiriesRef.current = previousInquiries;
-      setInquiries(previousInquiries);
+      const restoredInquiries = inquiriesRef.current.map((inquiry) => {
+        const previous = previousInquiries.find((item) => String(item.id) === targetId);
+        return String(inquiry.id) === targetId && previous
+          ? { ...inquiry, unread_count: previous.unread_count }
+          : inquiry;
+      });
+      inquiriesRef.current = restoredInquiries;
+      setInquiries(restoredInquiries);
 
-      if (previousSelected && String(previousSelected.id) === targetId) {
-        selectedInquiryRef.current = previousSelected;
-        setSelectedInquiry(previousSelected);
+      const selected = selectedInquiryRef.current;
+      if (selected && String(selected.id) === targetId && previousSelected && String(previousSelected.id) === targetId) {
+        const restoredSelected = { ...selected, unread_count: previousSelected.unread_count };
+        selectedInquiryRef.current = restoredSelected;
+        setSelectedInquiry(restoredSelected);
       }
     }
   }, [currentUser]);
 
-  useEffect(() => {
-    selectedInquiryRef.current = selectedInquiry;
-  }, [selectedInquiry]);
-
   const loadMessages = useCallback(async (inquiryId: number | string) => {
+    const targetId = String(inquiryId);
+    const requestVersion = ++messageRequestVersionRef.current;
+    const isCurrentRequest = () => messageRequestVersionRef.current === requestVersion
+      && activeInquiryIdRef.current === targetId;
+    const selectedThread = inquiriesRef.current.find((inquiry) => String(inquiry.id) === targetId);
+    if (activeInquiryIdRef.current !== targetId) {
+      activeInquiryIdRef.current = targetId;
+      setMessages(mergeLocalMessages(targetId, []));
+    }
+    if (selectedThread) {
+      selectedInquiryRef.current = selectedThread;
+      setSelectedInquiry(selectedThread);
+    }
+
     try {
       const { data, error } = await supabase
         .from('inquiry_messages')
@@ -332,73 +403,65 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         .eq('inquiry_id', inquiryId)
         .order('created_at', { ascending: true });
 
+      if (!isCurrentRequest()) return;
       if (error) throw error;
+      if (!data) return;
 
-      if (data) {
-        const rawMessages = data as InquiryMessageRow[];
-        const selectedThread = inquiriesRef.current.find(
-          (inquiry) => String(inquiry.id) === String(inquiryId)
-        );
-        const isOfficialSupportSender = (senderId: string) => isOfficialInquirySupportMessage({
-          inquiryType: selectedThread?.type,
-          senderId,
-          guestId: selectedThread?.user_id,
-          hostId: selectedThread?.host_id,
-        });
-        const senderIds = Array.from(new Set(
-          rawMessages
-            .map((message) => message.sender_id)
-            .filter((senderId) => !isOfficialSupportSender(senderId))
-        ));
-        const [proRes, appRes] = await Promise.all([
-          supabase.from('public_profiles').select('id, full_name, avatar_url').in('id', senderIds),
-          supabase.from('host_applications').select('user_id, name, profile_photo').in('user_id', senderIds)
-        ]);
+      const rawMessages = data as InquiryMessageRow[];
+      const isOfficialSupportSender = (senderId: string) => isOfficialInquirySupportMessage({
+        inquiryType: selectedThread?.type,
+        senderId,
+        guestId: selectedThread?.user_id,
+        hostId: selectedThread?.host_id,
+      });
+      const initialSender = (senderId: string): InquiryMessageView['sender'] => {
+        if (isOfficialSupportSender(senderId)) {
+          return { id: senderId, name: OFFICIAL_SUPPORT_SENDER_NAME, avatar_url: OFFICIAL_SUPPORT_AVATAR_SRC };
+        }
+        const participant = senderId === selectedThread?.user_id ? selectedThread.guest
+          : senderId === selectedThread?.host_id ? selectedThread.host : undefined;
+        return { id: senderId, name: participant?.name || '알 수 없음', avatar_url: participant?.avatar_url || null };
+      };
+      const safeMessages: InquiryMessageView[] = rawMessages.map((msg) => ({
+        ...msg,
+        image_url: msg.type === 'image' && msg.image_url ? getPrivateChatImageDeliveryUrl(msg.id) : null,
+        content: getInquiryMessageDisplayContent({ type: msg.type, content: msg.content }),
+        created_at: msg.created_at || new Date().toISOString(),
+        sender: initialSender(msg.sender_id),
+      }));
 
-        const profileRows = (proRes.data || []) as ProfileRow[];
-        const appRows = (appRes.data || []) as HostApplicationRow[];
-        const profileMap = new Map(profileRows.map((p) => [p.id, p]));
-        const appMap = new Map(appRows.map((a) => [a.user_id, a]));
+      // Publish bodies before awaiting sender metadata. Only enrich sender fields
+      // afterwards, so this response cannot replace a newer send or read update.
+      setMessages(mergeLocalMessages(targetId, safeMessages, requestVersion));
+      if (selectedThread) void markAsRead(inquiryId);
 
-        const safeMessages: InquiryMessageView[] = rawMessages.map((msg) => {
-          const isOfficialSupport = isOfficialSupportSender(msg.sender_id);
-          const profile = profileMap.get(msg.sender_id);
-          const app = appMap.get(msg.sender_id);
-          const hostPublicProfile = getHostPublicProfile(profile, app, '알 수 없음');
-          const name = isOfficialSupport ? OFFICIAL_SUPPORT_SENDER_NAME : hostPublicProfile.name;
-          const avatar = isOfficialSupport ? OFFICIAL_SUPPORT_AVATAR_SRC : hostPublicProfile.avatarUrl;
+      const senderIds = Array.from(new Set(
+        rawMessages
+          .map((message) => message.sender_id)
+          .filter((senderId) => !isOfficialSupportSender(senderId))
+      ));
+      if (senderIds.length === 0) return;
+      const [proRes, appRes] = await Promise.all([
+        supabase.from('public_profiles').select('id, full_name, avatar_url').in('id', senderIds),
+        supabase.from('host_applications').select('user_id, name, profile_photo').in('user_id', senderIds),
+      ]);
+      if (!isCurrentRequest()) return;
 
-          return {
-            ...msg,
-            image_url: msg.type === 'image' && msg.image_url
-              ? getPrivateChatImageDeliveryUrl(msg.id)
-              : null,
-            content: getInquiryMessageDisplayContent({
-              type: msg.type,
-              content: msg.content,
-            }),
-            created_at: msg.created_at || new Date().toISOString(),
-            sender: {
-              id: msg.sender_id,
-              name,
-              avatar_url: secureUrl(avatar ?? null)
-            }
-          };
-        });
-
-        setMessages(safeMessages);
-      }
-
-      const selected = inquiriesRef.current.find((i) => String(i.id) === String(inquiryId));
-      if (selected) {
-        selectedInquiryRef.current = selected;
-        setSelectedInquiry(selected);
-        markAsRead(inquiryId);
-      }
+      const profileMap = new Map(((proRes.data || []) as ProfileRow[]).map((profile) => [profile.id, profile]));
+      const appMap = new Map(((appRes.data || []) as HostApplicationRow[]).map((app) => [app.user_id, app]));
+      const fetchedIds = new Set(rawMessages.map((message) => String(message.id)));
+      setMessages((previous) => previous.map((message) => {
+        if (String(message.inquiry_id) !== targetId || !fetchedIds.has(String(message.id)) || isOfficialSupportSender(message.sender_id)) return message;
+        const profile = profileMap.get(message.sender_id);
+        const app = appMap.get(message.sender_id);
+        if (!profile && !app) return message;
+        const publicProfile = getHostPublicProfile(profile, app, message.sender.name);
+        return { ...message, sender: { id: message.sender_id, name: publicProfile.name, avatar_url: secureUrl(publicProfile.avatarUrl ?? message.sender.avatar_url) } };
+      }));
     } catch (err: unknown) {
-      console.error(err);
+      if (isCurrentRequest()) console.error(err);
     }
-  }, [supabase, markAsRead]);
+  }, [supabase, markAsRead, mergeLocalMessages]);
 
   const scheduleRealtimeInquiryRefresh = useCallback(() => {
     if (realtimeRefreshTimeoutRef.current) {
@@ -455,11 +518,11 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     const cleanContent = sanitizeText(content);
     if (!cleanContent.trim() && !file) return;
 
-    const fallbackUser = senderId ? null : await getAuthenticatedUser();
-    const actorId = senderId || currentUser?.id || fallbackUser?.id;
+    const authUser = currentUser || (senderId ? null : await getAuthenticatedUser());
+    const actorId = senderId || authUser?.id;
     if (!actorId) {
       showToast('로그인이 필요합니다.', 'error');
-      return;
+      throw new Error('로그인이 필요합니다.');
     }
 
     let imageUrl: string | null = null;
@@ -467,7 +530,9 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     const shouldOptimisticallyAppend = !file && normalizedHasText(cleanContent);
     const optimisticMessageId = shouldOptimisticallyAppend ? `temp-${Date.now()}` : null;
     const optimisticCreatedAt = new Date().toISOString();
-    const previousInquiries = inquiriesRef.current;
+    const targetId = String(inquiryId);
+    let optimisticMessage: InquiryMessageView | null = null;
+    let pendingSend: PendingInquirySend | null = null;
 
     if (file) {
       const validation = validateImage(file);
@@ -499,7 +564,14 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     }
 
     if (shouldOptimisticallyAppend && optimisticMessageId) {
-      const optimisticMessage: InquiryMessageView = {
+      if (pendingSendRef.current) throw new Error('메시지 전송이 진행 중입니다.');
+      const knownMessageIds = new Set([
+        ...messages.filter((message) => String(message.inquiry_id) === targetId).map((message) => String(message.id)),
+        ...(localMessagesRef.current.get(targetId)?.keys() || []),
+      ]);
+      pendingSend = { inquiryId: targetId, senderId: actorId, knownMessageIds, observedOwnRows: new Map() };
+      pendingSendRef.current = pendingSend;
+      optimisticMessage = {
         id: optimisticMessageId,
         inquiry_id: inquiryId,
         sender_id: actorId,
@@ -511,12 +583,18 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         created_at: optimisticCreatedAt,
         sender: {
           id: actorId,
-          name: currentUser?.user_metadata?.full_name || currentUser?.email || '나',
-          avatar_url: currentUser?.user_metadata?.avatar_url || null,
+          name: authUser?.user_metadata?.full_name || authUser?.email || '나',
+          avatar_url: authUser?.user_metadata?.avatar_url || null,
         },
       };
 
-      setMessages((prev) => [...prev, optimisticMessage]);
+      const local = localMessagesRef.current.get(targetId) || new Map<string, InquiryMessageView>();
+      local.set(optimisticMessageId, optimisticMessage);
+      localMessagesRef.current.set(targetId, local);
+      if (activeInquiryIdRef.current === targetId) {
+        const pendingMessage = optimisticMessage;
+        setMessages((prev) => [...prev, pendingMessage]);
+      }
     }
 
     try {
@@ -552,7 +630,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       inquiriesRef.current = nextInquiries;
       setInquiries(nextInquiries);
       const updatedSelectedInquiry = nextInquiries.find((inq) => String(inq.id) === String(inquiryId)) || null;
-      if (updatedSelectedInquiry) {
+      if (updatedSelectedInquiry && activeInquiryIdRef.current === targetId) {
         // DB 재조립 시 host.avatar_url이 placeholder/null로 내려오면 기존 정상 avatar를 보존
         const isPlaceholder = (url: string | null | undefined) =>
           !url || url === '/images/logo.png';
@@ -570,37 +648,24 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         const mergedInquiry = { ...updatedSelectedInquiry, host: mergedHost };
         selectedInquiryRef.current = mergedInquiry;
         setSelectedInquiry(mergedInquiry);
-      } else {
-        selectedInquiryRef.current = null;
       }
 
       const senderName =
-        currentUser?.user_metadata?.full_name ||
-        currentUser?.email ||
+        authUser?.user_metadata?.full_name ||
+        authUser?.email ||
         selectedInquiryRef.current?.guest?.name ||
         selectedInquiryRef.current?.host?.name ||
         '나';
       const senderAvatar =
-        currentUser?.user_metadata?.avatar_url ||
+        authUser?.user_metadata?.avatar_url ||
         selectedInquiryRef.current?.guest?.avatar_url ||
         selectedInquiryRef.current?.host?.avatar_url ||
         null;
 
-      if (shouldOptimisticallyAppend && optimisticMessageId) {
-        setMessages((prev) =>
-          prev.map((msg) =>
-            String(msg.id) === optimisticMessageId
-              ? {
-                ...msg,
-                id: result.messageId,
-                content: cleanContent,
-                created_at: optimisticCreatedAt,
-              }
-              : msg
-          )
-        );
-      } else {
-        const persistedMessage: InquiryMessageView = {
+      const observedRows = pendingSend?.observedOwnRows;
+      const persistedMessage: InquiryMessageView = observedRows?.get(String(result.messageId)) || (optimisticMessage
+        ? { ...optimisticMessage, id: result.messageId }
+        : {
           id: result.messageId,
           inquiry_id: inquiryId,
           sender_id: actorId,
@@ -610,14 +675,30 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
           is_read: false,
           read_at: null,
           created_at: String(result.updatedAt || optimisticCreatedAt),
-          sender: {
-            id: actorId,
-            name: senderName,
-            avatar_url: secureUrl(senderAvatar),
-          },
-        };
-
-        setMessages((prev) => [...prev, persistedMessage]);
+          sender: { id: actorId, name: senderName, avatar_url: secureUrl(senderAvatar) },
+        });
+      const local = localMessagesRef.current.get(targetId) || new Map<string, InquiryMessageView>();
+      if (optimisticMessageId) local.delete(optimisticMessageId);
+      const releasedRows = new Map(observedRows);
+      releasedRows.set(String(result.messageId), persistedMessage);
+      for (const [id, message] of releasedRows) {
+        local.set(id, message);
+        localMessageAckRef.current.set(`${targetId}:${id}`, {
+          requestVersion: messageRequestVersionRef.current,
+          hasServerSnapshot: observedRows?.has(id) || false,
+        });
+      }
+      localMessagesRef.current.set(targetId, local);
+      if (pendingSendRef.current === pendingSend) pendingSendRef.current = null;
+      if (activeInquiryIdRef.current === targetId) {
+        setMessages((prev) => {
+          const merged = new Map(prev.filter((message) => String(message.id) !== optimisticMessageId)
+            .map((message) => [String(message.id), message]));
+          // Publish every buffered server row; the ACK identifies which one
+          // replaces the temp. Preserve its read/deleted state verbatim.
+          for (const [id, message] of releasedRows) merged.set(id, message);
+          return [...merged.values()].sort((a, b) => a.created_at.localeCompare(b.created_at));
+        });
       }
     } catch (err: unknown) {
       const dbError = err as { code?: string, message?: string };
@@ -628,9 +709,21 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       }
 
       if (shouldOptimisticallyAppend && optimisticMessageId) {
-        setMessages((prev) => prev.filter((msg) => String(msg.id) !== optimisticMessageId));
-        inquiriesRef.current = previousInquiries;
-        setInquiries(previousInquiries);
+        const local = localMessagesRef.current.get(targetId);
+        local?.delete(optimisticMessageId);
+        const observedRows = pendingSend?.observedOwnRows || new Map<string, InquiryMessageView>();
+        // No ACK means no proof that an observed row is this send. Release
+        // server rows, but let the next GET reflect any server-side rollback.
+        if (local?.size === 0) localMessagesRef.current.delete(targetId);
+        if (pendingSendRef.current === pendingSend) pendingSendRef.current = null;
+        if (activeInquiryIdRef.current === targetId) {
+          setMessages((prev) => {
+            const merged = new Map(prev.filter((message) => String(message.id) !== optimisticMessageId)
+              .map((message) => [String(message.id), message]));
+            for (const [id, message] of observedRows) merged.set(id, message);
+            return [...merged.values()].sort((a, b) => a.created_at.localeCompare(b.created_at));
+          });
+        }
       }
 
       showToast('메시지 전송 실패: ' + message, 'error');
@@ -686,6 +779,8 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     ]);
     inquiriesRef.current = nextInquiries;
     setInquiries(nextInquiries);
+    ++messageRequestVersionRef.current;
+    activeInquiryIdRef.current = String(nextInquiry.id);
     selectedInquiryRef.current = nextInquiry;
     setSelectedInquiry(nextInquiry);
 
@@ -722,8 +817,10 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   };
 
   const startNewChat = (hostData: { id: string; name: string; avatarUrl?: string }, expData: { id: string; title: string }) => {
+    ++messageRequestVersionRef.current;
+    activeInquiryIdRef.current = 'new';
     setMessages([]);
-    setSelectedInquiry({
+    const nextInquiry: InquiryListItem = {
       id: 'new',
       type: 'general',
       host_id: hostData.id,
@@ -737,7 +834,9 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       },
       experiences: { id: expData.id, title: expData.title },
       content: ''
-    });
+    };
+    selectedInquiryRef.current = nextInquiry;
+    setSelectedInquiry(nextInquiry);
   };
 
   useEffect(() => { fetchInquiries(); }, [fetchInquiries]);
@@ -918,7 +1017,11 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [currentUser, scheduleRealtimeInquiryRefresh, scheduleRealtimeMessageRefresh]);
 
+  useEffect(() => () => { ++messageRequestVersionRef.current; }, []);
+
   const clearSelected = () => {
+    ++messageRequestVersionRef.current;
+    activeInquiryIdRef.current = null;
     selectedInquiryRef.current = null;
     setSelectedInquiry(null);
     setMessages([]);

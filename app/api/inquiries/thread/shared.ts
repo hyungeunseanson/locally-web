@@ -11,9 +11,9 @@ import {
   CHAT_POLICY_SIGNAL_LABELS,
   detectChatPolicySignals,
 } from '@/app/utils/chatPolicySignals';
-import { buildLocalizedEmailCopy } from '@/app/utils/emailCopy';
+import { buildEmailCopy } from '@/app/utils/emailCopy';
 import { buildNotificationCopy } from '@/app/utils/notificationCopy';
-import { resolveRecipientLocale } from '@/app/utils/notificationLocale';
+import { resolveRecipientLocale, type NotificationLocale } from '@/app/utils/notificationLocale';
 import { startOrAdvanceAdminSupportUnreadBatch } from '@/app/utils/adminSupportUnreadAlerts';
 import { insertAdminAlerts, sendAdminAlertEmails } from '@/app/utils/adminAlertCenter';
 import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
@@ -270,6 +270,7 @@ export async function resolveInquiryNotificationEmailCopy(params: {
   actorDisplayName: string;
   displayContent: string;
   localizeEmailForRecipient?: boolean;
+  recipientLocale?: NotificationLocale;
 }) {
   const {
     supabaseAdmin,
@@ -279,6 +280,7 @@ export async function resolveInquiryNotificationEmailCopy(params: {
     actorDisplayName,
     displayContent,
     localizeEmailForRecipient = false,
+    recipientLocale,
   } = params;
 
   if (!localizeEmailForRecipient) {
@@ -290,15 +292,8 @@ export async function resolveInquiryNotificationEmailCopy(params: {
     };
   }
 
-  return buildLocalizedEmailCopy({
-    supabaseAdmin,
-    userId: recipientId,
-    key: 'inquiry.new_message',
-    copyParams: {
-      actorDisplayName,
-      displayContent,
-    },
-  });
+  const locale = recipientLocale ?? await resolveRecipientLocale(supabaseAdmin, recipientId);
+  return buildEmailCopy('inquiry.new_message', locale, { actorDisplayName, displayContent });
 }
 
 export function resolveInquiryEmailAudience(params: {
@@ -361,6 +356,7 @@ async function notifyRecipient(params: {
       actorDisplayName,
       displayContent,
       localizeEmailForRecipient,
+      recipientLocale: locale,
     });
 
     after(async () => {

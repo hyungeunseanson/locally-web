@@ -2,8 +2,7 @@ import { readFileSync } from 'fs';
 
 import { expect, test } from '@playwright/test';
 
-const sharedInquiryPath =
-  '/Users/hyungeunseanson/Documents/서비스/locally-web/app/api/inquiries/thread/shared.ts';
+const sharedInquiryPath = 'app/api/inquiries/thread/shared.ts';
 
 test.describe('Inquiry email provider contract', () => {
   test('delegates admin inquiry mail to ops admin while routing host and guest mail transactionally', () => {
