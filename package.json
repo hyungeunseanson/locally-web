@@ -10,6 +10,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:chat:platform": "NODE_OPTIONS=--conditions=react-server NEXT_PUBLIC_SITE_URL=http://127.0.0.1:3000 NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54329 NEXT_PUBLIC_SUPABASE_ANON_KEY=local-chat-platform-anon SUPABASE_SERVICE_ROLE_KEY=local-chat-platform-service CRON_SECRET=local-admin-support-cron-secret playwright test -c playwright.chat-platform-regression.config.ts",
+    "test:chat:phase2": "node --test tests/unit/chat-performance-phase-1.test.mjs tests/unit/chat-performance-phase-2.test.mjs tests/unit/admin-support-direct-messaging.test.ts && playwright test -c playwright.chat-regression.config.ts",
     "test:chat:phase1": "node --test tests/unit/chat-performance-phase-1.test.mjs tests/unit/admin-support-direct-messaging.test.ts && playwright test -c playwright.chat-regression.config.ts",
     "cloudflare:build": "opennextjs-cloudflare build",
     "cloudflare:build:production": "node scripts/cloudflare/run-production-build.mjs",

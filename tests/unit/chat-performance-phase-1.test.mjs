@@ -31,11 +31,11 @@ for (const role of ['guest', 'host']) {
     await f.timers(300);
     assert.equal(inboxRequests(f).length, 2);
     await f.timers(700);
-    assert.equal(messageRequests(f).length, before + 2);
+    assert.equal(messageRequests(f).length, before + 1);
     await f.flush(() => f.calls.channels[0].status('SUBSCRIBED'));
     await f.timers(700);
     assert.equal(inboxRequests(f).length, 3);
-    assert.equal(messageRequests(f).length, before + 4);
+    assert.equal(messageRequests(f).length, before + 2);
   });
 
   test(`${role}: cached user sends immediately; stale refetch preserves temp and acknowledged row`, async (t) => {
@@ -422,11 +422,12 @@ for (const locale of ['ko', 'en', 'ja', 'zh']) {
     const f = serverFixture({ locale });
     const shared = f.load('app/api/inquiries/thread/shared.ts');
     await shared.createInquiryMessage({ actor: { id: 'guest' }, body: { inquiryId: 1, content: 'Hello' } });
-    assert.equal(f.lookups(), 1);
-    assert.equal(f.notifications.length, 1);
+    assert.equal(f.lookups(), 0, 'locale lookup is after response');
+    assert.equal(f.notifications.length, 0);
     assert.equal(f.emails.length, 0, 'email remains in after()');
     assert.equal(f.background.length, 1);
     await f.background[0]();
+    assert.equal(f.notifications.length, 1);
     assert.equal(f.lookups(), 1);
     assert.equal(f.emails[0].locale, locale);
     assert.equal(f.emails[0].transportPolicy, 'transactional');
@@ -439,8 +440,9 @@ for (const locale of ['ko', 'en', 'ja', 'zh']) {
 test('official admin support send reuses locale, preserves official sender and host routing', async () => {
   const f = serverFixture({ type: 'admin_support', locale: 'en' });
   await f.load('app/api/inquiries/thread/shared.ts').createInquiryMessage({ actor: { id: 'admin' }, body: { inquiryId: 1, content: 'Support reply' } });
-  assert.equal(f.lookups(), 1);
+  assert.equal(f.lookups(), 0);
   await f.background[0]();
+  assert.equal(f.lookups(), 1);
   assert.equal(f.emails[0].payload.actorName, 'Locally Support');
   assert.equal(f.emails[0].audience, 'host');
   assert.equal(f.emails[0].locale, 'en');
@@ -454,8 +456,9 @@ test('admin recipient keeps Korean ops mail and a single locale lookup for in-ap
   f.client.from = (table) => table === 'inquiries' ? queryBuilder(table, (q) => ({ data: q.operation === 'update' ? { updated_at: timestamp } : { ...inquiry(1, 'admin_support'), host_id: 'admin' } })) : from(table);
   // Role resolver uses recipientId from the stored support room.
   await f.load('app/api/inquiries/thread/shared.ts').createInquiryMessage({ actor: { id: 'guest' }, body: { inquiryId: 1, content: 'Support question' } });
-  assert.equal(f.lookups(), 1);
+  assert.equal(f.lookups(), 0);
   await f.background[0]();
+  assert.equal(f.lookups(), 1);
   assert.equal(f.emails[0].locale, 'ko');
   assert.equal(f.emails[0].audience, 'admin');
   assert.equal(f.emails[0].transportPolicy, 'opsAdmin');

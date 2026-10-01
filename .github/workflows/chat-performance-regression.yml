@@ -11,11 +11,13 @@ on:
       - 'app/utils/notificationLocale.ts'
       - 'app/utils/emailCopy.ts'
       - 'tests/unit/chat-performance-phase-1.test.mjs'
+      - 'tests/unit/chat-performance-phase-2.test.mjs'
       - 'tests/unit/helpers/chatRuntime.mjs'
       - 'tests/unit/admin-support-direct-messaging.test.ts'
       - 'tests/e2e/*chat*'
       - 'tests/e2e/*inquiry*'
       - 'playwright.chat-regression.config.ts'
+      - 'playwright.chat-platform-regression.config.ts'
       - 'package*.json'
       - '.github/workflows/chat-performance-regression.yml'
 
@@ -32,6 +34,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 24.20.0
@@ -40,4 +44,6 @@ jobs:
       - run: npm ci --legacy-peer-deps --no-audit --no-fund
       - run: npx playwright install --with-deps chromium
       # All I/O is mocked. This job has no application server or service secrets.
-      - run: npm run test:chat:phase1
+      - run: npm run test:chat:phase2
+      - run: npm run test:chat:platform
+      - run: npm run cloudflare:production-build:contract

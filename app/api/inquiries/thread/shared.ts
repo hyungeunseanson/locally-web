@@ -79,6 +79,17 @@ export type InquiryMessageResponse = {
   messageId: number | string;
   displayContent: string;
   updatedAt: string;
+  message: {
+    id: number | string;
+    inquiry_id: number | string;
+    sender_id: string;
+    content: string;
+    image_url: string | null;
+    type: 'text' | 'image';
+    is_read: boolean;
+    read_at: string | null;
+    created_at: string;
+  };
 };
 
 export type InquiryReadResponse = {
@@ -320,6 +331,7 @@ async function notifyRecipient(params: {
   displayContent: string;
   link: string;
   audience: EmailAudience;
+  deferEmail?: boolean;
 }) {
   try {
     const supabaseAdmin = createAdminClient();
@@ -339,14 +351,19 @@ async function notifyRecipient(params: {
       displayContent,
     });
 
-    await supabaseAdmin.from('notifications').insert({
-      user_id: recipientId,
-      type: 'new_message',
-      title: inAppCopy.title,
-      message: inAppCopy.message,
-      link,
-      is_read: false,
-    });
+    try {
+      const { error } = await supabaseAdmin.from('notifications').insert({
+        user_id: recipientId,
+        type: 'new_message',
+        title: inAppCopy.title,
+        message: inAppCopy.message,
+        link,
+        is_read: false,
+      });
+      if (error) throw error;
+    } catch (error) {
+      console.warn('[inquiries/thread] in-app notification failed:', error);
+    }
 
     const emailCopy = await resolveInquiryNotificationEmailCopy({
       supabaseAdmin,
@@ -359,7 +376,7 @@ async function notifyRecipient(params: {
       recipientLocale: locale,
     });
 
-    after(async () => {
+    const deliverEmail = async () => {
       try {
         const result = await sendTemplatedEmail({
           templateId: 'inquiry.new_message',
@@ -386,7 +403,9 @@ async function notifyRecipient(params: {
       } catch (error) {
         console.warn('[inquiries/thread] message notification email failed:', error);
       }
-    });
+    };
+    if (params.deferEmail === false) await deliverEmail();
+    else after(deliverEmail);
   } catch (error) {
     console.warn('[inquiries/thread] message notification email failed:', error);
   }
@@ -644,7 +663,7 @@ async function emitChatPolicySignal(params: {
     console.warn('[inquiries/thread] policy admin alert failed:', error);
   }
 
-  void sendAdminAlertEmails({
+  await sendAdminAlertEmails({
     subject: '[Locally Admin] 채팅 정책위반 의심 메시지 감지',
     title: '채팅 정책위반 의심 메시지 감지',
     message: [
@@ -772,53 +791,6 @@ export async function createInquiryMessage(params: {
     inquiryId,
   });
 
-  let recipientId = (() => {
-    if (isAdminSupport) {
-      if (String(actor.id) === String(inquiry.user_id)) return inquiry.host_id;
-      if (String(actor.id) === String(inquiry.host_id)) return inquiry.user_id;
-      return actorIsAdmin ? inquiry.user_id : null;
-    }
-
-    if (String(actor.id) === String(inquiry.host_id)) return inquiry.user_id;
-    if (String(actor.id) === String(inquiry.user_id)) return inquiry.host_id;
-    if (actorIsAdmin) return inquiry.host_id;
-    return inquiry.host_id;
-  })();
-  let recipientDelivery = recipientId && String(recipientId) !== String(actor.id)
-    ? isAdminSupport
-      ? await resolveAdminSupportRecipientDelivery({
-          recipientId: String(recipientId),
-          inquiryId: inquiry.id,
-        })
-      : {
-          link: String(actor.id) === String(inquiry.host_id)
-            ? buildGuestInboxLink(inquiry.id)
-            : buildHostInquiryLink(inquiry.id),
-          audience: resolveInquiryEmailAudience({
-            isAdminSupport: false,
-            recipientId: String(recipientId),
-            hostId: inquiry.host_id,
-          }),
-        }
-    : null;
-
-  const actorIsStoredParticipant =
-    String(actor.id) === String(inquiry.user_id) ||
-    String(actor.id) === String(inquiry.host_id);
-  if (
-    isAdminSupport &&
-    actorIsAdmin &&
-    !actorIsStoredParticipant &&
-    recipientDelivery?.audience === 'admin' &&
-    inquiry.host_id
-  ) {
-    recipientId = inquiry.host_id;
-    recipientDelivery = await resolveAdminSupportRecipientDelivery({
-      recipientId: String(recipientId),
-      inquiryId: inquiry.id,
-    });
-  }
-
   const displayContent = cleanContent || (normalizedType === 'image' ? '📷 사진을 보냈습니다.' : '');
   const updatedAt = new Date().toISOString();
 
@@ -912,76 +884,128 @@ export async function createInquiryMessage(params: {
 
   const canonicalMessageCreatedAt = insertedMessage.created_at || canonicalUpdatedAt;
 
-  const actorDisplayName = await resolveInquirySenderDisplayName({
-    actorId: actor.id,
-    useOfficialSenderName: actorIsAdmin,
-  });
-
+  // Keep the unread-wave write ordered before an administrator can read and
+  // clear it. Its failure must not report an already committed message as failed.
   if (isAdminSupport && !actorIsAdmin) {
-    await startOrAdvanceAdminSupportUnreadBatch({
-      supabaseAdmin,
-      inquiryId: inquiry.id,
-      messageId: insertedMessage.id,
-      messageCreatedAt: canonicalMessageCreatedAt,
-    });
-  }
-
-  if (recipientId && recipientDelivery) {
-    await notifyRecipient({
-      recipientId,
-      emailTitle: `💬 ${actorDisplayName}님의 새 메시지`,
-      emailMessage: displayContent,
-      actorDisplayName,
-      displayContent,
-      link: recipientDelivery.link,
-      audience: recipientDelivery.audience,
-    });
-  }
-
-  await emitChatPolicySignal({
-    inquiryId: inquiry.id,
-    messageId: insertedMessage.id,
-    inquiryType: inquiry.type,
-    actor,
-    actorIsAdmin,
-    content: displayContent,
-    hasImage: Boolean(imageUrl),
-  });
-
-  // 🟢 관리자가 CS 문의에 답변할 경우 운영 감사로그 추가
-  if (actorIsAdmin && isAdminSupport) {
     try {
-      await recordAuditLog({
-        admin_id: actor.id,
-        admin_email: actor.email || '',
-        action_type: 'ADMIN_CS_MESSAGE_SEND',
-        target_type: 'inquiries',
-        target_id: String(inquiry.id),
-        details: {
-          inquiry_type: inquiry.type,
-          guest_id: inquiry.user_id,
-          message_id: insertedMessage.id,
-          content_preview: cleanContent ? cleanContent.substring(0, 50) : (normalizedType === 'image' ? '[이미지 첨부]' : ''),
-        },
+      await startOrAdvanceAdminSupportUnreadBatch({
+        supabaseAdmin,
+        inquiryId: inquiry.id,
+        messageId: insertedMessage.id,
+        messageCreatedAt: canonicalMessageCreatedAt,
       });
-    } catch (e) {
-      console.warn('[inquiries/thread] audit log failed:', e);
+    } catch (error) {
+      console.warn('[inquiries/thread] unread batch failed:', error);
     }
   }
 
-  if (actorIsAdmin && !isAdminSupport) {
-    await recordAuditLog({
-      admin_id: actor.id,
-      admin_email: actor.email || '',
-      action_type: 'ADMIN_MONITORED_CHAT_MESSAGE_SEND',
-      target_type: 'inquiries',
-      target_id: String(inquiry.id),
-      details: {
-        inquiry_type: inquiry.type,
-        message_id: insertedMessage.id,
-        content_length: cleanContent.length,
-      },
-    });
+  const runPostSaveTask = async (name: string, task: () => Promise<unknown>) => {
+    try { await task(); }
+    catch (error) { console.warn(`[inquiries/thread] ${name} failed:`, error); }
+  };
+  const postSave = async () => {
+    // All promises stay attached to after()/waitUntil. Failure in one delivery
+    // cannot prevent independent policy/audit work or change the send result.
+    await Promise.all([
+      runPostSaveTask('recipient notification', async () => {
+        let recipientId = (() => {
+          if (isAdminSupport) {
+            if (String(actor.id) === String(inquiry.user_id)) return inquiry.host_id;
+            if (String(actor.id) === String(inquiry.host_id)) return inquiry.user_id;
+            return actorIsAdmin ? inquiry.user_id : null;
+          }
+          if (String(actor.id) === String(inquiry.host_id)) return inquiry.user_id;
+          if (String(actor.id) === String(inquiry.user_id)) return inquiry.host_id;
+          return inquiry.host_id;
+        })();
+        if (!recipientId || String(recipientId) === String(actor.id)) return;
+        let recipientDelivery = isAdminSupport
+          ? await resolveAdminSupportRecipientDelivery({ recipientId: String(recipientId), inquiryId: inquiry.id })
+          : {
+              link: String(actor.id) === String(inquiry.host_id)
+                ? buildGuestInboxLink(inquiry.id) : buildHostInquiryLink(inquiry.id),
+              audience: resolveInquiryEmailAudience({ isAdminSupport: false, recipientId: String(recipientId), hostId: inquiry.host_id }),
+            };
+        const actorIsStoredParticipant = String(actor.id) === String(inquiry.user_id)
+          || String(actor.id) === String(inquiry.host_id);
+        if (
+          isAdminSupport &&
+          actorIsAdmin &&
+          !actorIsStoredParticipant &&
+          recipientDelivery?.audience === 'admin' &&
+          inquiry.host_id
+        ) {
+          recipientId = inquiry.host_id;
+          recipientDelivery = await resolveAdminSupportRecipientDelivery({ recipientId: String(recipientId), inquiryId: inquiry.id });
+        }
+        const actorDisplayName = await resolveInquirySenderDisplayName({ actorId: actor.id, useOfficialSenderName: actorIsAdmin });
+        await notifyRecipient({
+          recipientId,
+          emailTitle: `💬 ${actorDisplayName}님의 새 메시지`,
+          emailMessage: displayContent,
+          actorDisplayName,
+          displayContent,
+          link: `${recipientDelivery.link}&messageId=${encodeURIComponent(String(insertedMessage.id))}`,
+          deferEmail: false,
+          audience: recipientDelivery.audience,
+        });
+      }),
+      runPostSaveTask('policy signal', async () => {
+        await emitChatPolicySignal({
+          inquiryId: inquiry.id,
+          messageId: insertedMessage.id,
+          inquiryType: inquiry.type,
+          actor,
+          actorIsAdmin,
+          content: displayContent,
+          hasImage: Boolean(imageUrl),
+        });
+
+      }),
+      runPostSaveTask('send audit', async () => {
+        // 🟢 관리자가 CS 문의에 답변할 경우 운영 감사로그 추가
+        if (actorIsAdmin && isAdminSupport) {
+          try {
+            await recordAuditLog({
+              admin_id: actor.id,
+              admin_email: actor.email || '',
+              action_type: 'ADMIN_CS_MESSAGE_SEND',
+              target_type: 'inquiries',
+              target_id: String(inquiry.id),
+              details: {
+                inquiry_type: inquiry.type,
+                guest_id: inquiry.user_id,
+                message_id: insertedMessage.id,
+                content_preview: cleanContent ? cleanContent.substring(0, 50) : (normalizedType === 'image' ? '[이미지 첨부]' : ''),
+              },
+            });
+          } catch (e) {
+            console.warn('[inquiries/thread] audit log failed:', e);
+          }
+        }
+
+        if (actorIsAdmin && !isAdminSupport) {
+          await recordAuditLog({
+            admin_id: actor.id,
+            admin_email: actor.email || '',
+            action_type: 'ADMIN_MONITORED_CHAT_MESSAGE_SEND',
+            target_type: 'inquiries',
+            target_id: String(inquiry.id),
+            details: {
+              inquiry_type: inquiry.type,
+              message_id: insertedMessage.id,
+              content_length: cleanContent.length,
+            },
+          });
+        }
+      }),
+    ]);
+  };
+  try { after(postSave); }
+  catch (error) {
+    // Non-adapter runtimes must await delivery rather than detach the promise.
+    console.warn('[inquiries/thread] after unavailable; awaiting delivery:', error);
+    await postSave();
   }
 
   return {
@@ -990,6 +1014,17 @@ export async function createInquiryMessage(params: {
     messageId: insertedMessage.id,
     displayContent,
     updatedAt: canonicalUpdatedAt,
+    message: {
+      id: insertedMessage.id,
+      inquiry_id: inquiry.id,
+      sender_id: actor.id,
+      content: cleanContent,
+      image_url: imageUrl,
+      type: normalizedType,
+      is_read: false,
+      read_at: null,
+      created_at: canonicalMessageCreatedAt,
+    },
   } satisfies InquiryMessageResponse;
 }
 
