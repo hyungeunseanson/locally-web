@@ -10,6 +10,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:chat:phase1": "node --test tests/unit/chat-performance-phase-1.test.mjs tests/unit/admin-support-direct-messaging.test.ts && playwright test -c playwright.chat-regression.config.ts",
     "cloudflare:build": "opennextjs-cloudflare build",
     "cloudflare:build:production": "node scripts/cloudflare/run-production-build.mjs",
     "cloudflare:production-browser-smoke": "node scripts/cloudflare/run-production-browser-smoke.mjs",

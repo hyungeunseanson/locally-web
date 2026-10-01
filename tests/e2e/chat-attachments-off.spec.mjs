@@ -41,7 +41,7 @@ function loadModule(entry, mocks = {}, fetch = noNetwork) {
     const localRequire = (id) => {
       if (id in mocks) return mocks[id];
       if (['react', 'react/jsx-runtime', 'lucide-react'].includes(id)) return require(id);
-      if (['@/app/utils/chatAttachmentPolicy', '@/app/utils/inquiry', '@/app/utils/chatPolicySignals', '@/app/utils/officialSender', '@/app/utils/privateStorageDelivery'].includes(id)) {
+      if (['@/app/utils/dashboardUserRole', '@/app/utils/chatAttachmentPolicy', '@/app/utils/inquiry', '@/app/utils/chatPolicySignals', '@/app/utils/officialSender', '@/app/utils/privateStorageDelivery'].includes(id)) {
         return load(id.replace('@/', '') + '.ts');
       }
       throw new Error(`Unmocked module: ${id}`);
@@ -87,14 +87,14 @@ function serverModules(thread = inquiry) {
     '@/app/utils/supabase/admin': { createAdminClient: () => { adminCalls++; return db.client; }, recordAuditLog: async () => {} },
     '@/app/utils/supabase/server': { createClient: async () => db.client },
     '@/app/utils/sanitize': { sanitizeText: (text) => text, sanitizeUrl: (url) => url },
-    '@/app/utils/emailCopy': { buildLocalizedEmailCopy: async () => ({ message: 'text' }) },
+    '@/app/utils/emailCopy': { buildEmailCopy: () => ({ message: 'text' }) },
     '@/app/utils/notificationCopy': { buildNotificationCopy: () => ({ title: 'text', message: 'text' }) },
     '@/app/utils/notificationLocale': { resolveRecipientLocale: async () => 'ko' },
     '@/app/utils/adminSupportUnreadAlerts': { startOrAdvanceAdminSupportUnreadBatch: async () => {} },
     '@/app/utils/adminAlertCenter': { insertAdminAlerts: async () => {}, sendAdminAlertEmails: async () => {} },
     '@/app/utils/adminAccess': { resolveAdminAccess: async () => ({ isAdmin: false }) },
     '@/app/emails/delivery/sendTemplatedEmail': { sendTemplatedEmail: noNetwork },
-    '@/app/utils/proxyBooking': { getProxyLinkedInquiryId: () => 1 },
+    '@/app/utils/proxyBooking': { ...loadModule('app/utils/proxyBooking.ts'), getProxyLinkedInquiryId: () => 1 },
   };
   const shared = loadModule('app/api/inquiries/thread/shared.ts', mocks);
   mocks['../thread/shared'] = shared;

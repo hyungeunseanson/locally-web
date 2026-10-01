@@ -158,7 +158,11 @@ test.describe('Chat policy signal utility', () => {
 
     expect(retryHandler).toContain('runProxyCardPayment(pendingCardPayment)');
     expect(retryHandler).not.toContain("fetch('/api/proxy-bookings'");
-    expect(source).toContain("pending.runtime.provider === 'nicepay'");
+    // Provider routing moved into the shared card adapter. Keep checking the
+    // stored request and callback path rather than an obsolete inline branch.
+    expect(source).toContain('provider: pending.runtime.provider');
+    expect(source).toContain('buildCardPaymentCallbackRequestBody({');
+    expect(source).toContain('orderId: pending.locallyOrderId');
     expect(source).toContain('?payment=review');
     expect(source).toContain('setPendingCardPayment(pendingPayment)');
   });
