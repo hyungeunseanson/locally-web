@@ -5,6 +5,8 @@ import { usePathname } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import { useAuth } from '@/app/context/AuthContext';
 import { experienceUiDictionary } from './experienceUiDictionary';
+import { isPasswordResetPath } from '@/app/utils/passwordReset';
+import { getPasswordResetCopy } from '@/app/components/passwordResetLocalization';
 import { OFFICIAL_SUPPORT_EMAIL } from '@/app/utils/officialSender';
 
 export type Locale = 'ko' | 'en' | 'ja' | 'zh';
@@ -485,7 +487,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     q_g_account_1: "호스트는 믿을 수 있는 사람인가요?",
     a_g_account_1: "로컬리의 모든 호스트는 엄격한 신원 인증(본인 확인, 전화번호 인증, 계좌 점유 인증)을 거칩니다. 또한, 실제 투어 참여 게스트들의 솔직한 후기로 평판이 투명하게 관리되고 있어 안심하셔도 됩니다.",
     q_g_account_2: "비밀번호를 잊어버렸어요.",
-    a_g_account_2: "현재 비밀번호 재설정 기능은 지원하지 않습니다. 가입 시 사용한 로그인 정보 또는 소셜 로그인 수단을 다시 확인해 주세요.",
+    a_g_account_2: getPasswordResetCopy('ko').guidance,
     q_g_account_3: "회원 탈퇴는 어떻게 하나요?",
     a_g_account_3: "회원 탈퇴는 운영팀이 도와드리고 있어요. 문의로 접수해 주세요.",
 
@@ -2021,7 +2023,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     q_g_account_1: "Is the host reliable?",
     a_g_account_1: "All Locally hosts undergo strict identity verification. Plus, their reputation is transparently managed via reviews from real guests.",
     q_g_account_2: "I forgot my password.",
-    a_g_account_2: "Password reset is not supported right now. Please check the login method or social sign-in option you originally used.",
+    a_g_account_2: getPasswordResetCopy('en').guidance,
     q_g_account_3: "How do I delete my account?",
     a_g_account_3: "Our support team can help you delete your account. Please contact us to get started.",
 
@@ -3556,7 +3558,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     q_g_account_1: "ホストは信頼できる人ですか？",
     a_g_account_1: "Locallyのすべてのホストは厳格な本人確認（身分証、電話番号認証、口座認証）を経て登録されています。また、実際にツアーに参加したゲストの正直なレビューにより評判が透明に管理されているため、安心してご利用いただけます。",
     q_g_account_2: "パスワードを忘れました。",
-    a_g_account_2: "現在、パスワード再設定機能は提供していません。登録時に利用したログイン方法またはソーシャルログイン手段をご確認ください。",
+    a_g_account_2: getPasswordResetCopy('ja').guidance,
     q_g_account_3: "退会するにはどうすればよいですか？",
     a_g_account_3: "退会をご希望の場合は、運営チームがご案内します。お問い合わせください。",
 
@@ -5091,7 +5093,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     q_g_account_1: "房东值得信任吗？",
     a_g_account_1: "Locally 的所有房东都经过严格的身份认证（本人确认、手机号认证、账户认证）。此外，通过实际参与行程的游客的真实评价，透明地管理声誉，请放心预订。",
     q_g_account_2: "忘记了密码。",
-    a_g_account_2: "目前暂不支持密码重置功能。请确认您注册时使用的登录方式或社交登录方式。",
+    a_g_account_2: getPasswordResetCopy('zh').guidance,
     q_g_account_3: "如何注销会员？",
     a_g_account_3: "如需注销账号，请联系我们，运营团队会协助处理。",
 
@@ -6269,6 +6271,8 @@ export function LanguageProvider({
   };
 
   useEffect(() => {
+    // Recovery must not cause unrelated user metadata writes.
+    if (isPasswordResetPath(pathname)) return;
     if (!user?.id) {
       localeSyncRef.current = null;
       return;
@@ -6314,7 +6318,7 @@ export function LanguageProvider({
     return () => {
       cancelled = true;
     };
-  }, [lang, supabase, user]);
+  }, [lang, pathname, supabase, user]);
 
   const t = (key: string, vars?: Record<string, string | number>) => {
     const template = dictionary[lang]?.[key] ?? experienceUiDictionary[lang]?.[key] ?? key;

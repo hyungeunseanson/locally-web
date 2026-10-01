@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import React, { useMemo, useState } from 'react';
 import { X, ChevronDown, Loader2 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
@@ -14,6 +15,8 @@ import {
 import { useModalClose } from '@/app/hooks/useModalClose';
 import { normalizeInternalReturnPath } from '@/app/utils/authRedirect';
 import { sendGoogleAnalyticsEvent } from '@/app/utils/analytics/google';
+import { SIGNUP_PASSWORD_MIN_LENGTH } from '@/app/utils/passwordReset';
+import { getPasswordResetCopy } from '@/app/components/passwordResetLocalization';
 import { compactBirthDateToIso } from '@/app/utils/demographics';
 
 type Gender = 'Male' | 'Female' | '';
@@ -29,6 +32,7 @@ interface InputItemProps {
   setFocus: React.Dispatch<React.SetStateAction<string | null>>;
   autoComplete: string;
   dataTestId?: string;
+  minLength?: number;
 }
 
 function getErrorMessage(error: unknown, fallbackMessage: string) {
@@ -309,6 +313,11 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
                 )}
               </div>
 
+              {mode === 'LOGIN' && (
+                <Link href="/auth/forgot-password" onClick={onClose} className="mb-4 block text-right text-sm font-semibold underline">
+                  {getPasswordResetCopy(lang).forgotLink}
+                </Link>
+              )}
               <form onSubmit={handleAuth}>
                 <div className="border border-gray-300 rounded-xl overflow-hidden mb-5 md:mb-6">
 
@@ -323,6 +332,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
                     isFirst={false} focusKey="PASSWORD" currentFocus={isFocused} setFocus={setIsFocused}
                     autoComplete={mode === 'LOGIN' ? "current-password" : "new-password"}
                     dataTestId={mode === 'SIGNUP' ? 'signup-password-input' : undefined}
+                    minLength={mode === 'SIGNUP' ? SIGNUP_PASSWORD_MIN_LENGTH : undefined}
                   />
 
                   {mode === 'SIGNUP' && (
@@ -337,6 +347,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
                       setFocus={setIsFocused}
                       autoComplete="new-password"
                       dataTestId="signup-password-confirm-input"
+                      minLength={SIGNUP_PASSWORD_MIN_LENGTH}
                     />
                   )}
 
@@ -543,7 +554,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
   );
 }
 
-function InputItem({ type, label, value, setValue, isFirst, focusKey, currentFocus, setFocus, autoComplete, dataTestId }: InputItemProps) {
+function InputItem({ type, label, value, setValue, isFirst, focusKey, currentFocus, setFocus, autoComplete, dataTestId, minLength }: InputItemProps) {
   const isFocused = currentFocus === focusKey;
 
   return (
@@ -558,6 +569,7 @@ function InputItem({ type, label, value, setValue, isFirst, focusKey, currentFoc
         onBlur={() => setFocus(null)}
         autoComplete={autoComplete}
         data-testid={dataTestId}
+        minLength={minLength}
       />
       <label className="absolute text-[13px] md:text-[14px] text-gray-500 duration-150 transform -translate-y-3 scale-75 top-3.5 md:top-4 z-10 origin-[0] left-3.5 md:left-4 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-3 font-medium pointer-events-none">
         {label}

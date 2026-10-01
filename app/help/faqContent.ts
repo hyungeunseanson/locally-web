@@ -1,3 +1,4 @@
+import { getPasswordResetCopy } from '@/app/components/passwordResetLocalization';
 import type { Locale } from '@/app/context/LanguageContext';
 
 export type HelpTab = 'guest' | 'host';
@@ -392,7 +393,7 @@ const ko: HelpFaqLocaleContent = {
         {
           id: 'forgot-password',
           q: '비밀번호를 잊어버렸어요.',
-          a: '현재는 비밀번호 재설정 기능이 별도로 열려 있지 않습니다. 처음 가입할 때 사용한 로그인 방식이나 소셜 로그인 수단을 다시 확인해주세요.',
+          a: getPasswordResetCopy('ko').guidance,
           searchTerms: ['비밀번호', '로그인 실패', '비밀번호 재설정', 'password'],
         },
         {
@@ -987,7 +988,7 @@ const en: HelpFaqLocaleContent = {
         {
           id: 'forgot-password',
           q: 'I forgot my password.',
-          a: 'Password reset is not currently available as a separate self-service step. Please check the original login method or social sign-in option you used.',
+          a: getPasswordResetCopy('en').guidance,
           searchTerms: ['forgot password', 'password reset', 'login'],
         },
         {
@@ -1582,7 +1583,7 @@ const ja: HelpFaqLocaleContent = {
         {
           id: 'forgot-password',
           q: 'パスワードを忘れました。',
-          a: '現時点ではパスワード再設定が独立したセルフサービスとしては開いていません。最初に使ったログイン方法やソーシャルログインを確認してください。',
+          a: getPasswordResetCopy('ja').guidance,
           searchTerms: ['パスワード', '再設定', 'ログイン'],
         },
         {
@@ -2177,7 +2178,7 @@ const zh: HelpFaqLocaleContent = {
         {
           id: 'forgot-password',
           q: '我忘记密码了。',
-          a: '目前尚未开放独立的密码重置自助功能。请先确认你最初使用的登录方式或社交登录方式。',
+          a: getPasswordResetCopy('zh').guidance,
           searchTerms: ['密码', '重置密码', '登录失败'],
         },
         {

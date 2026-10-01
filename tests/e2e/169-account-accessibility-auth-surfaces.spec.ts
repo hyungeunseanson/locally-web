@@ -1,3 +1,4 @@
+import { getPasswordResetCopy } from '@/app/components/passwordResetLocalization';
 import { expect, test, type Page } from '@playwright/test';
 
 import {
@@ -184,7 +185,7 @@ test.describe('Account accessibility auth surfaces', () => {
 
     await page.getByRole('button', { name: '비밀번호를 잊어버렸어요.' }).click();
     await expect(
-      page.getByText('현재는 비밀번호 재설정 기능이 별도로 열려 있지 않습니다. 처음 가입할 때 사용한 로그인 방식이나 소셜 로그인 수단을 다시 확인해주세요.')
+      page.getByText(getPasswordResetCopy('ko').guidance)
     ).toBeVisible({ timeout: 10000 });
 
     await page.getByRole('button', { name: '회원 탈퇴는 어떻게 하나요?' }).click();
