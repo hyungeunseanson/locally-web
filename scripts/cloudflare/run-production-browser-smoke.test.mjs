@@ -4,6 +4,8 @@ import { createServer } from 'node:http';
 import test from 'node:test';
 
 import {
+  installProductionMutationGate,
+  REVIEWED_EXTERNAL_SCRIPT_STUBS,
   runProductionBrowserSmoke,
   summarizePendingFirstPartyRequests,
 } from './run-production-browser-smoke.mjs';
@@ -15,6 +17,7 @@ async function withFixtureServer({
   rumPosts = 0,
   externalMethod,
   externalPath = '/telemetry',
+  externalScriptPaths = [],
   loginInputDelayMs = 0,
   loginSpinnerForever = false,
   loginGenericError = false,
@@ -27,7 +30,10 @@ async function withFixtureServer({
   const externalServer = createServer((request, response) => {
     const url = new URL(request.url, 'http://127.0.0.1');
     externalReceivedRequests.push({ method: request.method, pathname: url.pathname });
-    response.writeHead(200, { 'access-control-allow-origin': '*' }).end('OK');
+    response.writeHead(200, {
+      'access-control-allow-origin': '*',
+      'content-type': 'application/javascript',
+    }).end('fetch("/unexpected-script-side-effect", { method: "POST" });');
   });
   await new Promise((resolve) => externalServer.listen(0, '127.0.0.1', resolve));
   const externalOrigin = `http://127.0.0.1:${externalServer.address().port}`;
@@ -69,6 +75,8 @@ async function withFixtureServer({
     const externalRequest = externalMethod
       ? `fetch(${JSON.stringify(`${externalOrigin}${externalPath}`)}, { method: ${JSON.stringify(externalMethod)} }).catch(() => {});`
       : '';
+    const externalScripts = externalScriptPaths.map((pathname) =>
+      `<script src="${externalOrigin}${pathname}"></script>`).join('');
     const rumWrites = Array.from({ length: rumPosts }, () => `
       fetch('/cdn-cgi/rum', { method: 'POST' })
         .then((result) => {
@@ -86,7 +94,7 @@ async function withFixtureServer({
     `).join('');
     const loginResourceBootstrap = loginResourceScripts ? `<script>${loginResourceScripts}</script>` : '';
     const pages = {
-      '/': '<title>Home</title><body><a href="/experiences/42">Public experience</a><script>fetch("/get-probe");fetch("/head-probe",{method:"HEAD"});fetch("/options-probe",{method:"OPTIONS"});</script></body>',
+      '/': `<title>Home</title><body><a href="/experiences/42">Public experience</a>${externalScripts}<script>fetch("/get-probe");fetch("/head-probe",{method:"HEAD"});fetch("/options-probe",{method:"OPTIONS"});</script></body>`,
       '/experiences/42': `<title>Experience</title><body><h1>Public experience</h1><script>
         fetch('/background');
         fetch('/api/analytics/events', { method: 'POST', headers: { 'content-type': 'application/json' }, body: ${JSON.stringify(analyticsBody)} })
@@ -232,6 +240,116 @@ for (const [method, pathname] of [
     });
   });
 }
+
+async function exerciseScriptGate(url, { method = 'GET', resourceType = 'script' } = {}) {
+  let handler;
+  const actions = [];
+  const diagnostics = await installProductionMutationGate({
+    route: async (_pattern, callback) => { handler = callback; },
+  }, 'https://www.locally-travel.com');
+  await handler({
+    request: () => ({ url: () => url, method: () => method, resourceType: () => resourceType }),
+    continue: async () => actions.push({ type: 'continue' }),
+    abort: async (reason) => actions.push({ type: 'abort', reason }),
+    fulfill: async (response) => actions.push({ type: 'fulfill', ...response }),
+  });
+  return { actions, diagnostics };
+}
+
+const defaultScriptCases = [
+  ['Funding Choices', 'https://fundingchoicesmessages.google.com/i/pub-123456?fixture=private', 'google_cmp_loader', '/i/pub-[REDACTED]'],
+  ['gtag', 'https://www.googletagmanager.com/gtag/js?id=fixture-private', 'google_analytics_loader', '/gtag/js'],
+  ['AdSense', 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=fixture-private', 'google_adsense_loader', '/pagead/js/adsbygoogle.js'],
+];
+
+for (const [label, url, kind, diagnosticPathname] of defaultScriptCases) {
+  test(`${label} script GET is synthetic 200 no-op JS with identifier-free diagnostics`, async () => {
+    const { actions, diagnostics } = await exerciseScriptGate(url);
+    assert.deepEqual(actions, [{ type: 'fulfill', status: 200, contentType: 'application/javascript', body: ';' }]);
+    assert.deepEqual(diagnostics.stubbedExternalScripts, [{
+      hostname: new URL(url).hostname, pathname: diagnosticPathname,
+      method: 'GET', resourceType: 'script', kind,
+    }]);
+    const diagnosticJson = JSON.stringify(diagnostics);
+    assert(!diagnosticJson.includes('123456'));
+    assert(!diagnosticJson.includes('fixture-private'));
+    assert(!diagnosticJson.includes('?'));
+    assert.deepEqual(diagnostics.blockedUnexpectedExternalWrites, []);
+  });
+
+  test(`${label} loader URL with a non-script resource type still continues as an ordinary read`, async () => {
+    const { actions, diagnostics } = await exerciseScriptGate(url, { resourceType: 'xhr' });
+    assert.deepEqual(actions, [{ type: 'continue' }]);
+    assert.deepEqual(diagnostics.stubbedExternalScripts, []);
+  });
+
+  for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+    test(`${label} loader URL ${method} is never stubbed and remains an unexpected blocked write`, async () => {
+      const { actions, diagnostics } = await exerciseScriptGate(url, { method });
+      assert.deepEqual(actions, [{ type: 'abort', reason: 'blockedbyclient' }]);
+      assert.deepEqual(diagnostics.stubbedExternalScripts, []);
+      assert.deepEqual(diagnostics.blockedExpectedExternalWrites, []);
+      assert.equal(diagnostics.blockedUnexpectedExternalWrites.length, 1);
+    });
+  }
+}
+
+for (const [url, resourceType] of [
+  ['https://fundingchoicesmessages.google.com/el/something', 'xhr'],
+  ['https://fundingchoicesmessages.google.com/el/something', 'script'],
+  ['https://fundingchoicesmessages.google.com/unrelated.js', 'script'],
+  ['https://fundingchoicesmessages.google.com/i/pub-invalid', 'script'],
+  ['https://fundingchoicesmessages.google.com/i/pub-123456/other.js', 'script'],
+  ['https://www.googletagmanager.com/other.js', 'script'],
+  ['https://www.googletagmanager.com/gtag/js/other', 'script'],
+  ['https://pagead2.googlesyndication.com/pagead/js/other.js', 'script'],
+  ['https://pagead2.googlesyndication.com/pagead/ping', 'xhr'],
+  ['http://www.googletagmanager.com/gtag/js', 'script'],
+  ['https://www.googletagmanager.com.example/gtag/js', 'script'],
+]) {
+  test(`unreviewed read ${new URL(url).hostname}${new URL(url).pathname} (${resourceType}) is not stubbed`, async () => {
+    const { actions, diagnostics } = await exerciseScriptGate(url, { resourceType });
+    assert.deepEqual(actions, [{ type: 'continue' }]);
+    assert.deepEqual(diagnostics.stubbedExternalScripts, []);
+  });
+}
+
+for (const contract of REVIEWED_EXTERNAL_SCRIPT_STUBS) {
+  const pathname = contract.pathname ?? '/i/pub-123456';
+  test(`${contract.kind} no-op loader cannot reach a real external fixture server or execute its side effect`, async () => {
+    await withFixtureServer({ externalScriptPaths: [pathname + '?fixture=private'] }, async ({ origin, externalOrigin, externalReceivedRequests, receivedRequests }) => {
+      const result = await runProductionBrowserSmoke(origin, {
+        reviewedExternalScriptStubs: [{ ...contract, origin: externalOrigin }],
+      });
+      assert.equal(result.status, 'LOCALLY_PRODUCTION_BROWSER_SMOKE_PASS');
+      assert.equal(result.stubbedExternalScripts.length, 1);
+      assert.equal(result.stubbedExternalScripts[0].kind, contract.kind);
+      assert.deepEqual(externalReceivedRequests, []);
+      assert(!receivedRequests.some((request) => request.pathname === '/unexpected-script-side-effect'));
+      assert.deepEqual(result.blockedUnexpectedWrites, []);
+      assert.deepEqual(result.blockedUnexpectedExternalWrites, []);
+    });
+  });
+
+  test(`${contract.kind} loader POST still fails smoke and never reaches the external fixture`, async () => {
+    await withFixtureServer({ externalMethod: 'POST', externalPath: pathname }, async ({ origin, externalOrigin, externalReceivedRequests }) => {
+      await assert.rejects(runProductionBrowserSmoke(origin, {
+        reviewedExternalScriptStubs: [{ ...contract, origin: externalOrigin }],
+      }), /unexpected writes/);
+      assert.deepEqual(externalReceivedRequests, []);
+    });
+  });
+}
+
+test('AdSense runtime ping POST stays blocked and fails smoke with loader isolation enabled', async () => {
+  await withFixtureServer({ externalMethod: 'POST', externalPath: '/pagead/ping' }, async ({ origin, externalOrigin, externalReceivedRequests }) => {
+    const contract = REVIEWED_EXTERNAL_SCRIPT_STUBS.find((entry) => entry.kind === 'google_adsense_loader');
+    await assert.rejects(runProductionBrowserSmoke(origin, {
+      reviewedExternalScriptStubs: [{ ...contract, origin: externalOrigin }],
+    }), /unexpected writes/);
+    assert.deepEqual(externalReceivedRequests, []);
+  });
+});
 
 test('external GET passes through the mutation gate', async () => {
   await withFixtureServer({ externalMethod: 'GET' }, async ({ origin, externalReceivedRequests }) => {

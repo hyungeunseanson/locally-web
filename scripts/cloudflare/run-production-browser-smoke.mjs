@@ -18,17 +18,70 @@ const KNOWN_ANALYTICS_EVENT_TYPES = new Set(['view', 'click', 'payment_init', 'b
 // until a specific host and path have been observed and reviewed.
 const REVIEWED_EXTERNAL_TELEMETRY = Object.freeze([]);
 
-export async function installProductionMutationGate(context, origin, { reviewedExternalTelemetry = REVIEWED_EXTERNAL_TELEMETRY } = {}) {
+// Smoke-only isolation: never execute loaders that generate provider telemetry.
+// Query strings are ignored for matching and never included in diagnostics.
+export const REVIEWED_EXTERNAL_SCRIPT_STUBS = Object.freeze([
+  Object.freeze({
+    origin: 'https://fundingchoicesmessages.google.com',
+    pathnamePattern: /^\/i\/pub-\d+$/,
+    diagnosticPathname: '/i/pub-[REDACTED]',
+    method: 'GET',
+    resourceType: 'script',
+    kind: 'google_cmp_loader',
+  }),
+  Object.freeze({
+    origin: 'https://www.googletagmanager.com',
+    pathname: '/gtag/js',
+    method: 'GET',
+    resourceType: 'script',
+    kind: 'google_analytics_loader',
+  }),
+  Object.freeze({
+    origin: 'https://pagead2.googlesyndication.com',
+    pathname: '/pagead/js/adsbygoogle.js',
+    method: 'GET',
+    resourceType: 'script',
+    kind: 'google_adsense_loader',
+  }),
+]);
+
+export async function installProductionMutationGate(context, origin, {
+  reviewedExternalTelemetry = REVIEWED_EXTERNAL_TELEMETRY,
+  reviewedExternalScriptStubs = REVIEWED_EXTERNAL_SCRIPT_STUBS,
+} = {}) {
   const productionOrigin = new URL(origin).origin;
   const blockedExpectedWrites = [];
   const blockedUnexpectedWrites = [];
   const blockedExpectedExternalWrites = [];
   const blockedUnexpectedExternalWrites = [];
+  const stubbedExternalScripts = [];
 
   await context.route('**/*', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
     const method = request.method().toUpperCase();
+
+    if (url.origin !== productionOrigin && method === 'GET' && request.resourceType() === 'script') {
+      const stub = reviewedExternalScriptStubs.find((contract) =>
+        contract.origin === url.origin
+        && contract.method === method
+        && contract.resourceType === request.resourceType()
+        && (contract.pathname !== undefined
+          ? contract.pathname === url.pathname
+          : contract.pathnamePattern?.test(url.pathname))
+      );
+      if (stub) {
+        stubbedExternalScripts.push({
+          hostname: url.hostname,
+          pathname: stub.diagnosticPathname ?? url.pathname,
+          method,
+          resourceType: request.resourceType(),
+          kind: stub.kind,
+        });
+        await route.fulfill({ status: 200, contentType: 'application/javascript', body: ';' });
+        return;
+      }
+    }
 
     if (READ_METHODS.has(method)) {
       await route.continue();
@@ -98,6 +151,7 @@ export async function installProductionMutationGate(context, origin, { reviewedE
     blockedUnexpectedWrites,
     blockedExpectedExternalWrites,
     blockedUnexpectedExternalWrites,
+    stubbedExternalScripts,
   };
 }
 
@@ -214,7 +268,11 @@ async function waitForLoginInput(page, timeoutMs, pendingFirstPartyRequestSummar
 
 export async function runProductionBrowserSmoke(
   origin = resolveProductionOrigin(),
-  { loginReadinessTimeoutMs = LOGIN_READINESS_TIMEOUT_MS, reviewedExternalTelemetry = REVIEWED_EXTERNAL_TELEMETRY } = {}
+  {
+    loginReadinessTimeoutMs = LOGIN_READINESS_TIMEOUT_MS,
+    reviewedExternalTelemetry = REVIEWED_EXTERNAL_TELEMETRY,
+    reviewedExternalScriptStubs = REVIEWED_EXTERNAL_SCRIPT_STUBS,
+  } = {}
 ) {
   assert(Number.isFinite(loginReadinessTimeoutMs) && loginReadinessTimeoutMs > 0);
   const browser = await chromium.launch({ headless: true, ...createBrowserLaunchOptions() });
@@ -224,7 +282,8 @@ export async function runProductionBrowserSmoke(
     blockedUnexpectedWrites,
     blockedExpectedExternalWrites,
     blockedUnexpectedExternalWrites,
-  } = await installProductionMutationGate(context, origin, { reviewedExternalTelemetry });
+    stubbedExternalScripts,
+  } = await installProductionMutationGate(context, origin, { reviewedExternalTelemetry, reviewedExternalScriptStubs });
   let result;
   let smokeError;
 
@@ -279,6 +338,7 @@ export async function runProductionBrowserSmoke(
       blockedUnexpectedWrites,
       blockedExpectedExternalWrites,
       blockedUnexpectedExternalWrites,
+      stubbedExternalScripts,
     };
   } catch (error) {
     smokeError = error;
