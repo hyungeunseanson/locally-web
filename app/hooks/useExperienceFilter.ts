@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchActiveExperiences } from '../utils/api/experiences';
 import type { PublicHomeExperience } from '@/app/home/homeExperienceTypes';
+import { HOME_SEARCH_DATE_ENABLED } from '@/app/home/homeSearchConfig';
 import { sendSearchLog } from '@/app/utils/analytics/client';
 import { buildSearchHaystack, tokenizeSearchInput } from '@/app/search/searchText';
 
@@ -20,7 +21,6 @@ const cityMap: Record<string, string> = {
 const EMPTY_EXPERIENCES: PublicHomeExperience[] = [];
 const HOME_EXPERIENCES_QUERY_KEY = ['home-experiences', 'active'] as const;
 // Keep the date state and filtering path for a future return of the home date UI.
-const HOME_SEARCH_DATE_ENABLED = false;
 type DateRange = { start: Date | null; end: Date | null };
 
 type InitialHomeExperiences = {

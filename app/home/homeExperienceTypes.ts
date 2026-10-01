@@ -26,10 +26,12 @@ export type HomeExperienceRow = {
   created_at?: string | null;
 };
 
-export type PublicHomeExperience = Omit<HomeExperienceRow, 'status' | 'is_active'> & {
+export type PublicHomeExperience = Omit<
+  HomeExperienceRow,
+  'status' | 'is_active' | 'host_id' | 'photos' | 'image_url'
+> & {
   public_image_r2_eligible: boolean;
-  is_superhost: boolean;
   card_image_url: string | null;
-  available_dates: string[];
+  available_dates?: string[];
   wishlist_count: number;
 };

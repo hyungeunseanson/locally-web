@@ -44,6 +44,8 @@ export interface HomeExperienceCardData {
   review_count?: number | null;
   wishlist_count?: number | null;
   card_image_url?: string | null;
+  // Legacy snapshots may have these; the current Home payload only sends the
+  // normalized card_image_url, which the same resolver consumes without them.
   photos?: string[] | null;
   image_url?: string | null;
   public_image_r2_eligible?: boolean;

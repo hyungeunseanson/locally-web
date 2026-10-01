@@ -264,14 +264,13 @@ test.describe.serial('Public search server filters', () => {
         expect.objectContaining({
           id: visibleExperience.id,
           title: visibleExperience.title,
-          available_dates: expect.arrayContaining([visibleExperience.date]),
         }),
       ])
     );
     const visibleHomeExperience = homePayload.data.find(
       (experience: { id: number }) => experience.id === visibleExperience.id
     );
-    expect(visibleHomeExperience?.available_dates).not.toContain(visibleExperience.expiredDate);
+    expect(visibleHomeExperience).not.toHaveProperty('available_dates');
     expect(homePayload.data).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({

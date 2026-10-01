@@ -5,7 +5,6 @@ const fixturePort = 54329;
 const sourceNames = [
   'public_host_applications',
   'experiences',
-  'experience_availability',
   'experience_popularity_snapshot',
 ];
 
@@ -25,7 +24,8 @@ test.describe('production Home public dataset cache', () => {
     server = createServer((request, response) => {
       const path = new URL(request.url ?? '/', `http://127.0.0.1:${fixturePort}`).pathname;
       const source = sourceNames.find((name) => path.endsWith(`/${name}`));
-      if (source) sourceRequests.push(source);
+      if (path.endsWith('/experience_availability')) sourceRequests.push('experience_availability');
+      else if (source) sourceRequests.push(source);
 
       const data = source === 'public_host_applications'
         ? [{ id: 1, user_id: 'cache-test-host', status: 'approved', created_at: '2026-09-01T00:00:00.000Z', is_superhost: true }]
@@ -58,10 +58,11 @@ test.describe('production Home public dataset cache', () => {
     expect(first.status()).toBe(200);
     const firstHtml = await first.text();
     expect(firstHtml).toContain('Cached Home Experience');
+    expect(sourceRequests).not.toContain('experience_availability');
     const firstSourceCount = sourceRequests.length;
-    // A fresh local build makes four reads; a repeated test may reuse the persisted local Data Cache.
-    expect([0, 4]).toContain(firstSourceCount);
-    if (firstSourceCount === 4) expect([...sourceRequests].sort()).toEqual([...sourceNames].sort());
+    // A fresh local build makes three reads; a repeated test may reuse the persisted local Data Cache.
+    expect([0, 3]).toContain(firstSourceCount);
+    if (firstSourceCount === 3) expect([...sourceRequests].sort()).toEqual([...sourceNames].sort());
     const firstUpdatedAt = deliveredAt(firstHtml);
 
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -115,5 +116,10 @@ test.describe('production Home public dataset cache', () => {
       };
     });
     console.log('Local production Home browser timing:', JSON.stringify({ ...localTiming, requestCount: browserRequests.length }));
+    const payload = await (await request.get('/api/home/experiences')).json();
+    for (const field of ['host_id', 'is_superhost', 'photos', 'image_url', 'available_dates']) {
+      expect(payload.data[0]).not.toHaveProperty(field);
+    }
+    expect(sourceRequests).not.toContain('experience_availability');
   });
 });

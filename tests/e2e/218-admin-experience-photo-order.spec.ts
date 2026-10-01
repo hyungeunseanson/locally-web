@@ -85,6 +85,8 @@ test.describe('Admin experience photo order contracts', () => {
 
     expect(editSource).toContain("isAdminEditor ? '관리자 화면으로 돌아가기'");
     expect(editSource).toContain('{!isAdminEditor && <SiteHeader />}');
-    expect(homeSource).toContain('experience.photos?.[0] ?? experience.image_url ?? null');
+    expect(homeSource).toContain('getPublicHomeExperiences');
+    const homeLoader = fs.readFileSync('app/home/homeExperienceData.server.ts', 'utf8');
+    expect(homeLoader).toContain('card_image_url: getExperienceCardImageUrl(experience)');
   });
 });

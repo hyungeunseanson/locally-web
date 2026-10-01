@@ -31,7 +31,7 @@ let mode: 'records' | 'empty' | 'fail-once' | 'popularity-fail' = 'records';
 let failNextHostRequest = false;
 let responseDelayMs = 0;
 const queries: string[] = [];
-const homeSourceNames = ['public_host_applications', 'experiences', 'experience_availability', 'experience_popularity_snapshot'];
+const homeSourceNames = ['public_host_applications', 'experiences', 'experience_popularity_snapshot'];
 let parallelBarrier: {
   seen: Set<string>;
   pending: Array<{ response: import('node:http').ServerResponse; status: number; data: unknown }>;
@@ -70,7 +70,7 @@ function respondHomeSource(path: string, response: import('node:http').ServerRes
     barrier.allStartedAt = Date.now();
     release();
   } else if (barrier.seen.size === 1) {
-    // A sequential implementation cannot pass: its first response is released with fewer than four sources started.
+    // A sequential implementation cannot pass: its first response is released with fewer than three sources started.
     setTimeout(release, 2000);
   }
 }
@@ -127,12 +127,17 @@ test.describe('Home public data without an automatic splash', () => {
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   });
 
-  test.beforeEach(async ({ context }) => {
+  test.beforeEach(async ({ context, page }) => {
     mode = 'records';
     failNextHostRequest = false;
     responseDelayMs = 0;
     parallelBarrier = null;
     queries.length = 0;
+    await page.route('**/*', (route) => {
+      const incoming = route.request();
+      if (incoming.method() !== 'GET' || !['localhost', '127.0.0.1'].includes(new URL(incoming.url()).hostname)) return route.abort();
+      return route.continue();
+    });
     await context.addCookies([{ name: 'app_lang', value: 'ko', url: 'http://127.0.0.1:3000' }]);
   });
 
@@ -175,20 +180,22 @@ test.describe('Home public data without an automatic splash', () => {
     expect(response.ok()).toBe(true);
     const payload = await response.json();
     expect(payload.data.map((item: { id: number }) => item.id)).toEqual([99001]);
-    expect(payload.data[0].available_dates).toEqual(['2099-10-01']);
+    for (const field of ['host_id', 'is_superhost', 'photos', 'image_url', 'available_dates']) {
+      expect(payload.data[0]).not.toHaveProperty(field);
+    }
+    expect(queries.some((path) => path.endsWith('/experience_availability'))).toBe(false);
     expect(payload.data[0].wishlist_count).toBe(3);
     expect(payload.data[0]).not.toHaveProperty('status');
     expect(payload.data[0]).not.toHaveProperty('is_active');
     expect(payload.data[0]).toMatchObject({
       public_image_r2_eligible: true,
-      is_superhost: false,
-      card_image_url: null,
+      card_image_url: 'https://images.unsplash.com/photo-1542051841857-5f90071e7989',
     });
     await page.goto('/');
     await expect(page.getByText('Inactive Experience')).toHaveCount(0);
   });
 
-  test('starts all four public sources before any source response', async ({ request }) => {
+  test('starts all three enabled public sources before any source response', async ({ request }) => {
     responseDelayMs = 250;
     parallelBarrier = {
       seen: new Set(), pending: [], firstResponseSourceCount: null,
@@ -197,8 +204,8 @@ test.describe('Home public data without an automatic splash', () => {
     const response = await request.get('/');
     expect(response.status()).toBe(200);
     expect(await response.text()).toContain('서울 사전 로드 체험');
-    expect(parallelBarrier.firstResponseSourceCount).toBe(4);
-    expect(parallelBarrier.seen.size).toBe(4);
+    expect(parallelBarrier.firstResponseSourceCount).toBe(3);
+    expect(parallelBarrier.seen.size).toBe(3);
     expect(parallelBarrier.allStartedAt).not.toBeNull();
     expect(parallelBarrier.allStartedAt! - parallelBarrier.firstStartedAt!).toBeLessThan(500);
     console.log('Home fixture benchmark:', JSON.stringify({
@@ -287,6 +294,7 @@ test.describe('Home public data without an automatic splash', () => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await expect(splash).toBeHidden();
     await expect(page.getByTestId('home-all-experiences-section').getByText('서울 사전 로드 체험')).toBeVisible();
+    await page.waitForLoadState('networkidle');
     await page.locator('button:has(svg.lucide-globe)').first().click();
     const splashVisible = splash.waitFor({ state: 'visible', timeout: 2500 });
     await page.getByRole('button', { name: 'English' }).click();
@@ -333,6 +341,8 @@ test.describe('Home public data without an automatic splash', () => {
 
   test('replaces locale prefixes without losing the path, query, or language splash', async ({ page }) => {
     await page.goto('/search?location=Tokyo', { waitUntil: 'domcontentloaded' });
+    // Wait for the interactive header, rather than clicking its pre-hydration HTML.
+    await page.waitForLoadState('networkidle');
     for (const [label, path, locale] of [
       ['English', '/en/search?location=Tokyo', 'en'],
       ['日本語', '/ja/search?location=Tokyo', 'ja'],
