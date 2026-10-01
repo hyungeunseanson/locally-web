@@ -49,19 +49,47 @@ const DATABASE_DIAGNOSTIC_CODES = new Set<OpsAnomalyDiagnosticCode>([
 
 type QueueReadStage = 'inventory' | 'metrics';
 
+// Inventory is followed by four parallel metrics reads: at most 49.4s of
+// request/backoff waiting, comfortably below the existing 120s job lease.
+export const OPS_QUEUE_READ_TIMEOUT_MS = 8_000;
+export const OPS_QUEUE_READ_RETRY_BACKOFF_MS = [200, 500] as const;
+
 export class OpsAnomalyCollectionError extends Error {
   readonly diagnosticCode: string;
   readonly httpStatus?: number;
+  readonly queueReadStage?: QueueReadStage;
+  readonly retryCount?: number;
+  readonly timedOut?: boolean;
 
-  constructor(diagnosticCode: string, httpStatus?: number) {
+  constructor(diagnosticCode: string, httpStatus?: number, queueRead?: {
+    stage: QueueReadStage;
+    retryCount: number;
+    timedOut: boolean;
+  }) {
     super(diagnosticCode);
     this.name = 'OpsAnomalyCollectionError';
     this.diagnosticCode = diagnosticCode;
     this.httpStatus = httpStatus;
+    this.queueReadStage = queueRead?.stage;
+    this.retryCount = queueRead?.retryCount;
+    this.timedOut = queueRead?.timedOut;
   }
 }
 
-const OPS_ANOMALY_COLLECTION_DIAGNOSTIC_PATTERN = /^ops_queue_(?:account_id_missing|token_missing|inventory_(?:invalid|incomplete|http_(?:401|403|404|429|other)|api_error_[1-9]\d{0,9})|metrics_(?:invalid|http_(?:401|403|404|429|other)|api_error_[1-9]\d{0,9}))$/;
+const OPS_ANOMALY_COLLECTION_DIAGNOSTIC_PATTERN = /^ops_queue_(?:account_id_missing|token_missing|inventory_(?:invalid|incomplete|timeout|http_(?:401|403|404|429|other)|api_error_[1-9]\d{0,9})|metrics_(?:invalid|timeout|http_(?:401|403|404|429|other)|api_error_[1-9]\d{0,9}))$/;
+
+export function boundedOpsAnomalyQueueReadDetails(error: unknown) {
+  if (!(error instanceof OpsAnomalyCollectionError)
+    || !['inventory', 'metrics'].includes(error.queueReadStage ?? '')
+    || !Number.isInteger(error.retryCount)
+    || error.retryCount! < 0 || error.retryCount! > OPS_QUEUE_READ_RETRY_BACKOFF_MS.length
+    || typeof error.timedOut !== 'boolean') return {};
+  return {
+    failure_queue_stage: error.queueReadStage,
+    failure_retry_count: error.retryCount,
+    failure_timed_out: error.timedOut,
+  };
+}
 
 export function boundedOpsAnomalyCollectionDiagnosticCode(value: unknown) {
   return typeof value === 'string' && OPS_ANOMALY_COLLECTION_DIAGNOSTIC_PATTERN.test(value)
@@ -156,39 +184,83 @@ function httpDiagnostic(stage: QueueReadStage, status: number) {
   return `ops_queue_${stage}_http_${suffix}`;
 }
 
-async function cloudflareGet<T>(params: {
+async function cloudflareGetAttempt<T>(params: {
   stage: QueueReadStage;
   pathname: string;
   token: string;
   fetchImplementation: typeof fetch;
 }) {
-  let response: Response;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), OPS_QUEUE_READ_TIMEOUT_MS);
+  let response: Response | undefined;
   try {
     const fetchImplementation = params.fetchImplementation;
     response = await fetchImplementation(
       `https://api.cloudflare.com/client/v4${params.pathname}`,
-      { method: 'GET', headers: { Authorization: `Bearer ${params.token}` } }
+      {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${params.token}` },
+        signal: controller.signal,
+      }
     );
-  } catch {
-    throw new OpsAnomalyCollectionError(`ops_queue_${params.stage}_http_other`);
-  }
-  const payload = await response.json().catch(() => null) as CloudflareEnvelope<T> | null;
-  if (!payload || typeof payload !== 'object') {
+    // Keep the same deadline through body consumption, not just response headers.
+    const payload = await response.json().catch(() => null) as CloudflareEnvelope<T> | null;
+    controller.signal.throwIfAborted();
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)
+      || typeof payload.success !== 'boolean'
+      || (payload.errors != null && !Array.isArray(payload.errors))) {
+      throw new OpsAnomalyCollectionError(`ops_queue_${params.stage}_invalid`, response.status);
+    }
+    if (!response.ok || payload.success !== true) {
+      const providerCode = boundedProviderCode(payload);
+      throw new OpsAnomalyCollectionError(
+        providerCode == null
+          ? httpDiagnostic(params.stage, response.status)
+          : `ops_queue_${params.stage}_api_error_${providerCode}`,
+        response.status
+      );
+    }
+    return payload.result;
+  } catch (error) {
+    if (error instanceof OpsAnomalyCollectionError) throw error;
     throw new OpsAnomalyCollectionError(
-      `ops_queue_${params.stage}_invalid`,
-      response.status
+      `ops_queue_${params.stage}_${controller.signal.aborted ? 'timeout' : 'http_other'}`,
+      response?.status
     );
+  } finally {
+    clearTimeout(timer);
   }
-  if (!response.ok || payload.success !== true) {
-    const providerCode = boundedProviderCode(payload);
-    throw new OpsAnomalyCollectionError(
-      providerCode == null
-        ? httpDiagnostic(params.stage, response.status)
-        : `ops_queue_${params.stage}_api_error_${providerCode}`,
-      response.status
-    );
+}
+
+function isTransientQueueRead(error: OpsAnomalyCollectionError) {
+  // Invalid responses, auth/configuration failures and unrelated transport errors
+  // are never retried, even when a malformed provider response claims code 15000.
+  if (error.diagnosticCode.endsWith('_invalid')) return false;
+  const status = error.httpStatus;
+  if (status != null && status >= 400 && status < 500 && status !== 429) return false;
+  if (error.diagnosticCode.endsWith('_timeout')) return true;
+  if (status === 429 || (status != null && status >= 500 && status <= 599)) return true;
+  return status != null && status >= 200 && status < 300
+    && error.diagnosticCode.endsWith('_api_error_15000');
+}
+
+async function cloudflareGet<T>(params: Parameters<typeof cloudflareGetAttempt<T>>[0]) {
+  for (let retryCount = 0; ; retryCount += 1) {
+    try {
+      return await cloudflareGetAttempt<T>(params);
+    } catch (error) {
+      if (!(error instanceof OpsAnomalyCollectionError)) throw error;
+      const backoff = OPS_QUEUE_READ_RETRY_BACKOFF_MS[retryCount];
+      if (backoff == null || !isTransientQueueRead(error)) {
+        throw new OpsAnomalyCollectionError(error.diagnosticCode, error.httpStatus, {
+          stage: params.stage,
+          retryCount,
+          timedOut: error.diagnosticCode.endsWith('_timeout'),
+        });
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, backoff));
+    }
   }
-  return payload.result;
 }
 
 function queueSeverity(params: {
