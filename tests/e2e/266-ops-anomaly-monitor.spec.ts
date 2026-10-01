@@ -6,6 +6,9 @@ import {
   loadDatabaseOpsAnomalies,
   loadQueueOpsAnomaly,
   OpsAnomalyCollectionError,
+  OPS_QUEUE_READ_TIMEOUT_MS,
+  OPS_QUEUE_READ_RETRY_BACKOFF_MS,
+  boundedOpsAnomalyQueueReadDetails,
 } from '@/app/utils/opsAnomalyMonitor/checks';
 import {
   OPS_ANOMALY_MONITOR_CRON,
@@ -101,11 +104,13 @@ function createProcessorClient(options: {
   alreadyRunning?: boolean;
   calls: string[];
   updates?: Record<string, unknown>[];
+  leaseRows?: Array<{ job_name: string; status: string; lease_expires_at: string }>;
 }) {
   class Query implements PromiseLike<unknown> {
     private inserted = false;
     private updated: Record<string, unknown> | null = null;
     private selected = '';
+    private filters = new Map<string, unknown>();
 
     insert() { this.inserted = true; return this; }
     update(value: Record<string, unknown>) {
@@ -114,8 +119,8 @@ function createProcessorClient(options: {
       return this;
     }
     select(value = '') { this.selected = value; return this; }
-    eq() { return this; }
-    lt() { return this; }
+    eq(column: string, value: unknown) { this.filters.set(column, value); return this; }
+    lt(column: string, value: unknown) { this.filters.set(`lt:${column}`, value); return this; }
     order() { return this; }
     limit() { return this; }
     single() { return Promise.resolve(this.resolve()); }
@@ -137,6 +142,13 @@ function createProcessorClient(options: {
         };
       }
       if (this.updated?.status === 'abandoned') {
+        for (const row of options.leaseRows ?? []) {
+          if (row.job_name === this.filters.get('job_name')
+            && row.status === this.filters.get('status')
+            && row.lease_expires_at < String(this.filters.get('lt:lease_expires_at'))) {
+            row.status = 'abandoned';
+          }
+        }
         options.calls.push('lease:abandon');
         return { data: null, error: null };
       }
@@ -169,6 +181,217 @@ function createProcessorClient(options: {
 
   return { from: () => new Query() };
 }
+
+function transientQueueFetch(stage: 'inventory' | 'metrics', failures: Array<Response | 'timeout' | 'body-timeout'>) {
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+  const healthyFetch = queueFetch({ calls: [] });
+  let attempts = 0;
+  const fetchImplementation = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    calls.push({ url, init });
+    const target = stage === 'inventory'
+      ? url.endsWith('/queues?per_page=100')
+      : url.endsWith('/media-main/metrics');
+    if (!target) return healthyFetch(input, init);
+    const failure = failures[attempts++];
+    if (failure === 'timeout') {
+      return new Promise<Response>((_resolve, reject) => {
+        init!.signal!.addEventListener('abort', () => reject(new Error('private provider body')), { once: true });
+      });
+    }
+    if (failure === 'body-timeout') {
+      return new Response(new ReadableStream({
+        start(controller) {
+          init!.signal!.addEventListener('abort', () => controller.error(new Error('private body')), { once: true });
+        },
+      }), { headers: { 'Content-Type': 'application/json' } });
+    }
+    return failure ?? healthyFetch(input, init);
+  };
+  return { fetchImplementation: fetchImplementation as typeof fetch, calls, attempts: () => attempts };
+}
+
+function providerFailure(status = 500, code = 15000) {
+  return Response.json({
+    success: false,
+    errors: [{ code, message: 'private provider body private-queue-read-token' }],
+  }, { status });
+}
+
+async function runQueueScenario(scenario: ReturnType<typeof transientQueueFetch>) {
+  const calls: string[] = [];
+  const updates: Record<string, unknown>[] = [];
+  const result = await runOpsAnomalyMonitor({
+    supabaseAdmin: {
+      ...createProcessorClient({ calls, updates }),
+      rpc: async () => ({ data: [], error: null }),
+    } as never,
+    queueRuntime: productionEnvironment,
+    emailEnv: productionEnvironment,
+    triggerSource: 'cron',
+    dependencies: { fetch: scenario.fetchImplementation, now: () => observedAt },
+  });
+  expect(scenario.calls.every(({ url, init }) =>
+    init?.method === 'GET' && init.body == null && init.signal instanceof AbortSignal
+      && (url.endsWith('/metrics') || url.endsWith('/queues?per_page=100')))).toBe(true);
+  expect(JSON.stringify({ result, updates })).not.toMatch(/private provider body|private-queue-read-token|authorization/i);
+  return { result, calls, updates };
+}
+
+test.describe('Bounded Queue GET resilience', () => {
+  for (const stage of ['inventory', 'metrics'] as const) {
+    for (const failureCount of [1, 2]) {
+      test(`${stage} recovers after ${failureCount} transient 500/15000 failures and completes the monitor`, async () => {
+        const scenario = transientQueueFetch(stage, Array.from({ length: failureCount }, () => providerFailure()));
+        const { result, calls } = await runQueueScenario(scenario);
+        expect(result).toMatchObject({ success: true, outcome: 'no_anomalies' });
+        expect(scenario.attempts()).toBe(failureCount + 1);
+        expect(calls.at(-1)).toBe('lease:success');
+      });
+    }
+
+    test(`${stage} exhausts three 15000 attempts and records a failed run`, async () => {
+      const scenario = transientQueueFetch(stage, Array.from({ length: 3 }, () => providerFailure()));
+      const { result, calls, updates } = await runQueueScenario(scenario);
+      expect(result).toMatchObject({ success: false, diagnosticCode: `ops_queue_${stage}_api_error_15000`, httpStatus: 500 });
+      expect(scenario.attempts()).toBe(3);
+      expect(calls.at(-1)).toBe('lease:failed');
+      expect(updates.at(-1)?.details).toMatchObject({
+        failure_queue_stage: stage, failure_retry_count: 2, failure_timed_out: false,
+      });
+    });
+
+    for (const status of [429, 500, 503]) {
+      test(`${stage} retries HTTP ${status} without a provider code`, async () => {
+        const scenario = transientQueueFetch(stage, [Response.json({ success: false }, { status })]);
+        expect((await runQueueScenario(scenario)).result.success).toBe(true);
+        expect(scenario.attempts()).toBe(2);
+      });
+    }
+
+    test(`${stage} retries provider 15000 even with HTTP 200`, async () => {
+      const scenario = transientQueueFetch(stage, [providerFailure(200)]);
+      expect((await runQueueScenario(scenario)).result.success).toBe(true);
+      expect(scenario.attempts()).toBe(2);
+    });
+
+    for (const status of [400, 401, 403, 404]) {
+      test(`${stage} fails immediately on HTTP ${status}, even if the body claims 15000`, async () => {
+        const scenario = transientQueueFetch(stage, [providerFailure(status)]);
+        const { result, updates } = await runQueueScenario(scenario);
+        expect(result).toMatchObject({ success: false, httpStatus: status });
+        expect(scenario.attempts()).toBe(1);
+        expect(updates.at(-1)?.details).toMatchObject({ failure_retry_count: 0 });
+      });
+    }
+
+    test(`${stage} does not retry malformed JSON, envelope/schema, or unknown provider errors`, async () => {
+      for (const failure of [
+        new Response('private provider body', { status: 500 }),
+        Response.json({ errors: [{ code: 15000 }] }, { status: 500 }),
+        Response.json({ success: true, result: {} }),
+        providerFailure(200, 9109),
+      ]) {
+        const scenario = transientQueueFetch(stage, [failure]);
+        expect((await runQueueScenario(scenario)).result.success).toBe(false);
+        expect(scenario.attempts()).toBe(1);
+      }
+    });
+
+    test(`${stage} times out a stalled fetch, retries once, and completes successfully`, async () => {
+      const scenario = transientQueueFetch(stage, ['timeout']);
+      expect((await runQueueScenario(scenario)).result.success).toBe(true);
+      expect(scenario.attempts()).toBe(2);
+      expect(scenario.calls.filter(({ init }) => init?.signal?.aborted)).toHaveLength(1);
+    });
+
+    test(`${stage} keeps repeated timeouts bounded and fails closed`, async () => {
+      test.setTimeout(35_000);
+      const startedAt = Date.now();
+      const scenario = transientQueueFetch(stage, ['timeout', 'timeout', 'timeout']);
+      const { result, calls, updates } = await runQueueScenario(scenario);
+      expect(result).toMatchObject({ success: false, diagnosticCode: `ops_queue_${stage}_timeout` });
+      expect(scenario.attempts()).toBe(3);
+      expect(calls.at(-1)).toBe('lease:failed');
+      expect(updates.at(-1)?.details).toMatchObject({
+        failure_queue_stage: stage, failure_retry_count: 2, failure_timed_out: true,
+      });
+      expect(Date.now() - startedAt).toBeLessThan(30_000);
+    });
+  }
+
+  test('deadline also aborts stalled response body consumption and allows recovery', async () => {
+    const scenario = transientQueueFetch('metrics', ['body-timeout']);
+    expect((await runQueueScenario(scenario)).result.success).toBe(true);
+    expect(scenario.attempts()).toBe(2);
+    expect(scenario.calls.filter(({ init }) => init?.signal?.aborted)).toHaveLength(1);
+  });
+
+  test('does not retry missing runtime credentials or an unrelated transport/configuration error', async () => {
+    for (const runtime of [
+      { ...productionEnvironment, CLOUDFLARE_ACCOUNT_ID: '' },
+      { ...productionEnvironment, OPS_ANOMALY_MONITOR_CLOUDFLARE_API_TOKEN: '' },
+    ]) {
+      const scenario = transientQueueFetch('inventory', []);
+      await expect(loadQueueOpsAnomaly({ runtime, observedAt, fetchImplementation: scenario.fetchImplementation })).rejects.toBeInstanceOf(OpsAnomalyCollectionError);
+      expect(scenario.calls).toHaveLength(0);
+    }
+    let calls = 0;
+    await expect(loadQueueOpsAnomaly({
+      runtime: productionEnvironment, observedAt,
+      fetchImplementation: (async () => { calls += 1; throw new TypeError('private provider body'); }) as typeof fetch,
+    })).rejects.toMatchObject({ diagnosticCode: 'ops_queue_inventory_http_other', retryCount: 0 });
+    expect(calls).toBe(1);
+  });
+
+  test('inventory plus parallel metrics request/backoff budget stays well inside the 120s lease', () => {
+    const perRead = OPS_QUEUE_READ_TIMEOUT_MS * (OPS_QUEUE_READ_RETRY_BACKOFF_MS.length + 1)
+      + OPS_QUEUE_READ_RETRY_BACKOFF_MS.reduce((sum, delay) => sum + delay, 0);
+    expect(OPS_QUEUE_READ_TIMEOUT_MS).toBeLessThanOrEqual(8_000);
+    expect(OPS_QUEUE_READ_RETRY_BACKOFF_MS).toEqual([200, 500]);
+    expect(perRead * 2).toBe(49_400);
+    expect(perRead * 2).toBeLessThan(120_000 / 2);
+  });
+
+  test('does not persist unbounded retry metadata', () => {
+    expect(boundedOpsAnomalyQueueReadDetails(new OpsAnomalyCollectionError('ops_queue_metrics_timeout', undefined, {
+      stage: 'metrics', retryCount: 999, timedOut: true,
+    }))).toEqual({});
+    expect(boundedOpsAnomalyQueueReadDetails(new OpsAnomalyCollectionError('ops_queue_metrics_timeout', undefined, {
+      stage: 'private provider body' as never, retryCount: 1, timedOut: true,
+    }))).toEqual({});
+  });
+
+  test('recovers an expired monitor lease before starting a successful run and preserves other jobs', async () => {
+    const leaseRows = [
+      { job_name: 'ops_anomaly_monitor', status: 'running', lease_expires_at: '2026-01-01T00:00:00Z' },
+      { job_name: 'service_completion_sync', status: 'running', lease_expires_at: '2026-01-01T00:00:00Z' },
+    ];
+    const calls: string[] = [];
+    const result = await runOpsAnomalyMonitor({
+      supabaseAdmin: createProcessorClient({ calls, leaseRows }) as never,
+      queueRuntime: productionEnvironment, emailEnv: productionEnvironment, triggerSource: 'cron',
+      dependencies: { collectAnomalies: async () => [] },
+    });
+    expect(result.success).toBe(true);
+    expect(leaseRows.map((row) => row.status)).toEqual(['abandoned', 'running']);
+    expect(calls.slice(0, 2)).toEqual(['lease:abandon', 'lease:start']);
+    expect(calls.at(-1)).toBe('lease:success');
+  });
+
+  test('keeps an unexpired monitor lease running and refuses a duplicate run', async () => {
+    const leaseRows = [{
+      job_name: 'ops_anomaly_monitor', status: 'running',
+      lease_expires_at: new Date(Date.now() + 120_000).toISOString(),
+    }];
+    const result = await runOpsAnomalyMonitor({
+      supabaseAdmin: createProcessorClient({ calls: [], leaseRows, alreadyRunning: true }) as never,
+      queueRuntime: productionEnvironment, emailEnv: productionEnvironment, triggerSource: 'cron',
+    });
+    expect(result).toMatchObject({ success: false, outcome: 'already_running' });
+    expect(leaseRows[0].status).toBe('running');
+  });
+});
 
 test.describe('Ops Anomaly Monitor', () => {
   test('uses a service-role-only aggregate snapshot with no business mutation', () => {

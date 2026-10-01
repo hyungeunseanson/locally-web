@@ -12,6 +12,7 @@ import {
 import {
   boundedOpsAnomalyCollectionDiagnosticCode,
   boundedOpsAnomalyCollectionHttpStatus,
+  boundedOpsAnomalyQueueReadDetails,
   collectOpsAnomalies,
   OpsAnomalyCollectionError,
   type OpsAnomalyQueueRuntime,
@@ -303,6 +304,7 @@ export async function runOpsAnomalyMonitor(params: {
         diagnostic_count: diagnosticCount,
         failure_diagnostic_code: diagnosticCode,
         ...(httpStatus == null ? {} : { failure_http_status: httpStatus }),
+        ...boundedOpsAnomalyQueueReadDetails(error),
       },
       testLeaseMs: params.testLeaseMs,
       simulateMissingAdminJobRuns: params.simulateMissingAdminJobRuns,
