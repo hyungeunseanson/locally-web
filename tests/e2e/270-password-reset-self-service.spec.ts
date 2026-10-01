@@ -5,17 +5,22 @@ import { buildPasswordRecoveryRedirect } from '@/app/utils/passwordReset';
 import { isGoogleAnalyticsPathAllowed } from '@/app/utils/analytics/google';
 import { startMockSupabaseAuthServer, type MockSupabaseAuthServer } from './helpers/mockSupabaseAuthServer';
 
-const ORIGIN = 'http://127.0.0.1:3000';
+// Next dev normalizes Request.url to localhost; Production uses forwarded host.
+const ORIGIN = process.env.PLAYWRIGHT_SERVER_MODE === 'start'
+  ? 'http://127.0.0.1:3000' : 'http://localhost:3000';
 let mock: MockSupabaseAuthServer;
+async function navigate(page: Page, path: string) {
+  return page.goto(new URL(path, ORIGIN).toString());
+}
 async function requestReset(page: Page, email = 'reset@example.com') {
-  await page.goto('/auth/forgot-password');
+  await navigate(page, '/auth/forgot-password');
   await page.getByLabel('Email', { exact: true }).fill(email);
   await page.getByRole('button', { name: 'Request reset email', exact: true }).click();
   await expect(page.getByRole('status')).toHaveText(getPasswordResetCopy('en').sent);
 }
 async function recover(page: Page) {
   await requestReset(page);
-  await page.goto('/auth/callback?flow=recovery&next=%2Fauth%2Fupdate-password&code=mock-recovery-code');
+  await navigate(page, '/auth/callback?flow=recovery&next=%2Fauth%2Fupdate-password&code=mock-recovery-code');
   await expect(page).toHaveURL(`${ORIGIN}/auth/update-password`);
   await expect(page.getByLabel('New password', { exact: true })).toBeVisible();
 }
@@ -37,17 +42,17 @@ test.describe('Password reset self-service (local Auth mock only)', () => {
   });
 
   test('login link appears only in LOGIN mode', async ({ page }) => {
-    await page.goto('/login?returnUrl=%2Faccount');
+    await navigate(page, '/login?returnUrl=%2Faccount');
     await expect(page.getByRole('link', { name: 'Forgot your password?' })).toHaveAttribute('href', '/auth/forgot-password');
     await page.getByRole('link', { name: 'Forgot your password?' }).click();
     await expect(page).toHaveURL(`${ORIGIN}/auth/forgot-password`);
-    await page.goto('/login?returnUrl=%2Faccount');
+    await navigate(page, '/login?returnUrl=%2Faccount');
     await page.getByRole('button', { name: /Don't have an account/ }).click();
     await expect(page.getByRole('link', { name: 'Forgot your password?' })).toHaveCount(0);
   });
 
   test('signup retains required fields, agreements, and internal return URL', async ({ page }) => {
-    await page.goto('/login?returnUrl=%2Faccount');
+    await navigate(page, '/login?returnUrl=%2Faccount');
     await page.getByRole('button', { name: /Don't have an account/ }).click();
     await page.locator('input[autocomplete="username"]').fill('signup@example.com');
     await page.getByTestId('signup-password-input').fill('new-password');
@@ -81,7 +86,7 @@ test.describe('Password reset self-service (local Auth mock only)', () => {
 
   test('429 shows safe retry copy', async ({ page }) => {
     mock.setRecoveryStatus(429);
-    await page.goto('/auth/forgot-password');
+    await navigate(page, '/auth/forgot-password');
     await page.getByLabel('Email', { exact: true }).fill('reset@example.com');
     await page.getByRole('button', { name: 'Request reset email', exact: true }).click();
     await expect(page.getByRole('status')).toHaveText(getPasswordResetCopy('en').retryLater);
@@ -90,7 +95,7 @@ test.describe('Password reset self-service (local Auth mock only)', () => {
 
   test('PKCE recovery skips demographics side effects, blocks external next, and strips code', async ({ page }) => {
     await requestReset(page);
-    const response = await page.goto('/auth/callback?flow=recovery&next=https%3A%2F%2Fevil.example&code=mock-recovery-code');
+    const response = await navigate(page, '/auth/callback?flow=recovery&next=https%3A%2F%2Fevil.example&code=mock-recovery-code');
     expect(response?.status()).toBe(200);
     await expect(page).toHaveURL(`${ORIGIN}/auth/update-password`);
     expect(count('POST', '/auth/v1/token')).toBe(1);
@@ -103,9 +108,9 @@ test.describe('Password reset self-service (local Auth mock only)', () => {
     test(`${scenario} code produces a safe retry screen`, async ({ page }) => {
       if (scenario !== 'missing') await requestReset(page);
       if (scenario === 'expired') mock.setPkceStatus(400);
-      if (scenario === 'reused') await page.goto('/auth/callback?flow=recovery&code=mock-recovery-code');
+      if (scenario === 'reused') await navigate(page, '/auth/callback?flow=recovery&code=mock-recovery-code');
       const code = scenario === 'missing' ? '' : '&code=mock-recovery-code';
-      await page.goto(`/auth/callback?flow=recovery${code}`);
+      await navigate(page, `/auth/callback?flow=recovery${code}`);
       await expect(page).toHaveURL(/\/auth\/forgot-password\?invalid=1$/);
       await expect(page.locator('main').getByRole('alert')).toHaveText(getPasswordResetCopy('en').invalid);
       await expect(page.getByRole('link', { name: 'Request another reset email' })).toHaveAttribute('href', '/auth/forgot-password');
@@ -160,7 +165,7 @@ test.describe('Password reset self-service (local Auth mock only)', () => {
   });
 
   test('missing session blocks update UI', async ({ page }) => {
-    await page.goto('/auth/update-password?flow=recovery');
+    await navigate(page, '/auth/update-password?flow=recovery');
     await expect(page.locator('main').getByRole('alert')).toHaveText(getPasswordResetCopy('en').invalid);
     await expect(page.locator('input[type=password]')).toHaveCount(0);
     expect(count('PUT', '/auth/v1/user')).toBe(0);
@@ -178,20 +183,20 @@ test.describe('Password reset self-service (local Auth mock only)', () => {
 
   test('OAuth callback keeps internal return path and rejects external next', async ({ page }) => {
     await requestReset(page); // Establish a local PKCE verifier for callback regression.
-    await page.goto('/auth/callback?code=mock-oauth-code&next=%2Faccount');
+    await navigate(page, '/auth/callback?code=mock-oauth-code&next=%2Faccount');
     await expect(page).toHaveURL(`${ORIGIN}/account`);
     await page.context().clearCookies();
     await requestReset(page);
-    await page.goto('/auth/callback?code=mock-oauth-code&next=https%3A%2F%2Fevil.example');
+    await navigate(page, '/auth/callback?code=mock-oauth-code&next=https%3A%2F%2Fevil.example');
     await expect(page).toHaveURL(`${ORIGIN}/`);
   });
 
   for (const locale of ['ko', 'en', 'ja', 'zh']) {
     test(`${locale} reset and help copy`, async ({ page, context }) => {
       await context.addCookies([{ name: 'app_lang', value: locale, url: ORIGIN }]);
-      await page.goto('/auth/forgot-password');
+      await navigate(page, '/auth/forgot-password');
       await expect(page.getByRole('heading', { name: getPasswordResetCopy(locale).title, exact: true })).toBeVisible();
-      await page.goto('/help');
+      await navigate(page, '/help');
       const questions = { ko: '비밀번호를 잊어버렸어요.', en: 'I forgot my password.', ja: 'パスワードを忘れました。', zh: '我忘记密码了。' };
       await page.getByRole('button', { name: questions[locale as keyof typeof questions], exact: true }).click();
       await expect(page.getByText(getPasswordResetCopy(locale).guidance, { exact: true })).toBeVisible();

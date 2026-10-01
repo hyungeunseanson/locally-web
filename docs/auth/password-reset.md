@@ -20,6 +20,6 @@ Management API GET only: email provider enabled, custom SMTP configured, minimum
 
 ## Local verification
 
-Use the existing `playwright.contracts.config.ts` with local-only Supabase env (`http://127.0.0.1:54329`, dummy anon/service keys), a Production Next build and `PLAYWRIGHT_SERVER_MODE=start`. The mock server implements recovery, PKCE, user validation/update and local logout. Production-target guards and browser external-network blocking keep these tests local. Do not run user-creating account tests against Production.
+Use the existing `playwright.contracts.config.ts` with local-only Supabase env (`http://127.0.0.1:54329`, dummy anon/service keys), a Production Next build and `PLAYWRIGHT_SERVER_MODE=start`. The existing `test:e2e:auth-regression` CI gate includes recovery tests and also supports the dev server (localhost callback origin). The mock server implements recovery, PKCE, user validation/update and local logout. Production-target guards and browser external-network blocking keep these tests local. Do not run user-creating account tests against Production.
 
 Tests: `270-password-reset-self-service`, `183-auth-runtime-contract`, `226-auth-session-regression`; the no-write signup/help subset of `169-account-accessibility-auth-surfaces`. TypeScript, relevant lint, Next/OpenNext builds, Production Wrangler dry-run and Production deploy contracts are required. Dry-run is not deployment.
