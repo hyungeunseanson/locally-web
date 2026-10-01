@@ -5,18 +5,18 @@ import { unstable_cache } from 'next/cache';
 import {
   getVisiblePublicHostIdSet,
   isPublicExperienceVisible,
-  pickLatestPublicHostApplicationsByUser,
 } from '@/app/utils/hostVisibility';
 import { PUBLIC_EXPERIENCE_CARD_SELECT_FIELDS } from '@/app/search/searchContract';
 import { isPublicExperienceR2Eligible } from '@/app/utils/publicExperienceMediaKeys';
+import { getExperienceCardImageUrl } from '@/app/utils/experienceImages';
 import type { HomeExperienceRow, PublicHomeExperience } from './homeExperienceTypes';
+import { HOME_SEARCH_DATE_ENABLED } from './homeSearchConfig';
 
 type PublicHostApplicationRow = {
   id?: string | number | null;
   user_id?: string | null;
   status?: string | null;
   created_at?: string | null;
-  is_superhost?: boolean | null;
 };
 
 type AvailabilityRow = {
@@ -65,17 +65,19 @@ async function loadPublicHomeExperiences(): Promise<PublicHomeExperience[]> {
     { data: popularityRows, error: popularityError },
   ] = await Promise.all([
     supabase.from('public_host_applications')
-      .select('id, user_id, status, created_at, is_superhost')
+      .select('id, user_id, status, created_at')
       .limit(HOME_PUBLIC_QUERY_LIMIT),
     supabase.from('experiences')
       .select(HOME_EXPERIENCE_SELECT)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(HOME_PUBLIC_QUERY_LIMIT),
-    supabase.from('experience_availability')
-      .select('experience_id, date')
-      .gte('date', getTodayIsoDate())
-      .limit(HOME_PUBLIC_QUERY_LIMIT),
+    HOME_SEARCH_DATE_ENABLED
+      ? supabase.from('experience_availability')
+          .select('experience_id, date')
+          .gte('date', getTodayIsoDate())
+          .limit(HOME_PUBLIC_QUERY_LIMIT)
+      : Promise.resolve({ data: [], error: null }),
     supabase.from('experience_popularity_snapshot')
       .select('experience_id, wishlist_count')
       .limit(HOME_PUBLIC_QUERY_LIMIT),
@@ -98,12 +100,6 @@ async function loadPublicHomeExperiences(): Promise<PublicHomeExperience[]> {
 
   const publicHostApplicationRows = (publicHostApplications ?? []) as PublicHostApplicationRow[];
   const visibleHostIds = getVisiblePublicHostIdSet(publicHostApplicationRows);
-  const latestHostApplications = pickLatestPublicHostApplicationsByUser(publicHostApplicationRows);
-  const superhostIds = new Set(
-    Array.from(latestHostApplications.entries())
-      .filter(([hostId, application]) => visibleHostIds.has(hostId) && application.is_superhost === true)
-      .map(([hostId]) => hostId)
-  );
 
   const visibleExperiences = ((experiences ?? []) as unknown as HomeExperienceRow[]).filter((experience) =>
     visibleHostIds.has(String(experience.host_id || '')) && isPublicExperienceVisible(experience)
@@ -115,16 +111,18 @@ async function loadPublicHomeExperiences(): Promise<PublicHomeExperience[]> {
     console.warn('[home/experiences] popularity snapshot unavailable:', popularityError.message);
   }
 
-  const availableDatesByExperienceId = new Map<string, string[]>();
-  for (const row of (availabilityRows ?? []) as AvailabilityRow[]) {
-    const experienceId = asComparableId(row.experience_id);
-    if (!visibleExperienceIds.has(experienceId) || typeof row.date !== 'string' || row.date.length === 0) {
-      continue;
-    }
+  const availableDatesByExperienceId = HOME_SEARCH_DATE_ENABLED ? new Map<string, string[]>() : undefined;
+  if (availableDatesByExperienceId) {
+    for (const row of (availabilityRows ?? []) as AvailabilityRow[]) {
+      const experienceId = asComparableId(row.experience_id);
+      if (!visibleExperienceIds.has(experienceId) || typeof row.date !== 'string' || row.date.length === 0) {
+        continue;
+      }
 
-    const existing = availableDatesByExperienceId.get(experienceId) ?? [];
-    existing.push(row.date);
-    availableDatesByExperienceId.set(experienceId, existing);
+      const existing = availableDatesByExperienceId.get(experienceId) ?? [];
+      existing.push(row.date);
+      availableDatesByExperienceId.set(experienceId, existing);
+    }
   }
 
   const popularityByExperienceId = new Map<string, number>();
@@ -141,16 +139,33 @@ async function loadPublicHomeExperiences(): Promise<PublicHomeExperience[]> {
   }
 
   const data = visibleExperiences.map((experience) => {
-    const publicExperience = { ...experience };
-    delete publicExperience.status;
-    delete publicExperience.is_active;
-
+    // Explicit Home projection keeps server visibility/source fields private.
     return {
-      ...publicExperience,
+      id: experience.id,
+      title: experience.title,
+      title_ko: experience.title_ko,
+      title_en: experience.title_en,
+      title_ja: experience.title_ja,
+      title_zh: experience.title_zh,
+      category: experience.category,
+      category_en: experience.category_en,
+      category_ja: experience.category_ja,
+      category_zh: experience.category_zh,
+      city: experience.city,
+      country: experience.country,
+      location: experience.location,
+      languages: experience.languages,
+      rating: experience.rating,
+      review_count: experience.review_count,
+      price: experience.price,
+      duration: experience.duration,
+      created_at: experience.created_at,
       public_image_r2_eligible: isPublicExperienceR2Eligible(experience),
-      is_superhost: superhostIds.has(String(experience.host_id || '')),
-      card_image_url: experience.photos?.[0] ?? experience.image_url ?? null,
-      available_dates: availableDatesByExperienceId.get(String(experience.id)) ?? [],
+      // Use the existing card resolver, including blank/trimmed URL fallbacks.
+      card_image_url: getExperienceCardImageUrl(experience),
+      ...(availableDatesByExperienceId ? {
+        available_dates: availableDatesByExperienceId.get(String(experience.id)) ?? [],
+      } : {}),
       wishlist_count: popularityByExperienceId.get(String(experience.id)) ?? 0,
     };
   });
@@ -165,7 +180,7 @@ async function loadPublicHomeExperiences(): Promise<PublicHomeExperience[]> {
 
 const getCachedPublicHomeExperiences = unstable_cache(
   loadPublicHomeExperiences,
-  [HOME_PUBLIC_CACHE_KEY],
+  [HOME_PUBLIC_CACHE_KEY, HOME_SEARCH_DATE_ENABLED ? 'date-on' : 'date-off'],
   { revalidate: HOME_PUBLIC_REVALIDATE_SECONDS }
 );
 
