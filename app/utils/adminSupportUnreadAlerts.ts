@@ -232,6 +232,7 @@ async function updateUnreadBatchForWave(params: {
   supabaseAdmin: SupabaseAdminClient;
   inquiryId: Identifier;
   expectedWave?: InquiryUnreadWaveIdentity | null;
+  expectedLastMessageId?: Identifier | null;
   patch: Record<string, unknown>;
 }) {
   const nextUpdatedAt = new Date().toISOString();
@@ -252,6 +253,12 @@ async function updateUnreadBatchForWave(params: {
     } else {
       query = query.is('first_unread_message_at', null);
     }
+  }
+
+  if (params.expectedLastMessageId !== undefined) {
+    query = params.expectedLastMessageId === null
+      ? query.is('last_unread_message_id', null)
+      : query.eq('last_unread_message_id', params.expectedLastMessageId);
   }
 
   const { data, error } = await query.select('inquiry_id');
@@ -322,9 +329,9 @@ async function processDueAdminSupportUnreadAlertsFallback(params: {
 
   const { data: unreadMessageRows, error: unreadMessagesError } = await supabaseAdmin
     .from('inquiry_messages')
-    .select('id, inquiry_id, sender_id, content, type, created_at, read_at')
+    .select('id, inquiry_id, sender_id, content, type, created_at, admin_read_at')
     .in('inquiry_id', inquiryIds)
-    .is('read_at', null)
+    .is('admin_read_at', null)
     .order('created_at', { ascending: true });
 
   if (unreadMessagesError) {
@@ -716,12 +723,24 @@ export async function clearAdminSupportUnreadBatch(params: {
     return { success: true, cleared: false, remainingUnreadCount: 0 };
   }
 
+  // Capture the wave before counting. A new arrival between count and clear
+  // changes its identity or last message and makes the clear CAS lose.
+  const { data: batch, error: batchError } = await supabaseAdmin
+    .from(UNREAD_BATCH_TABLE)
+    .select('inquiry_id, first_unread_message_id, first_unread_message_at, last_unread_message_id')
+    .eq('inquiry_id', inquiry.id).maybeSingle<InquiryUnreadBatchRow>();
+  if (batchError) {
+    if (isMissingUnreadBatchInfraMessage(batchError.message)) return { success: true, cleared: false, remainingUnreadCount: 0, storage: 'audit-log-fallback' } as const;
+    throw new Error(batchError.message);
+  }
+  if (!batch) return { success: true, cleared: false, remainingUnreadCount: 0 };
+
   const { count, error: unreadError } = await supabaseAdmin
     .from('inquiry_messages')
     .select('id', { count: 'exact', head: true })
     .eq('inquiry_id', inquiry.id)
     .eq('sender_id', inquiry.user_id)
-    .is('read_at', null);
+    .is('admin_read_at', null);
 
   if (unreadError) {
     throw new Error(unreadError.message);
@@ -734,7 +753,11 @@ export async function clearAdminSupportUnreadBatch(params: {
   const clearResult = await updateUnreadBatchForWave({
     supabaseAdmin,
     inquiryId: inquiry.id,
-    expectedWave: params.expectedWave || null,
+    expectedWave: params.expectedWave || getUnreadWaveIdentity({
+      inquiryId: inquiry.id, firstUnreadMessageId: batch.first_unread_message_id,
+      firstUnreadMessageAt: batch.first_unread_message_at,
+    }),
+    expectedLastMessageId: batch.last_unread_message_id ?? null,
     patch: {
       is_active: false,
       first_unread_message_id: null,
@@ -901,7 +924,7 @@ export async function processDueAdminSupportUnreadAlerts(params?: {
       .select('id', { count: 'exact', head: true })
       .eq('inquiry_id', inquiry.id)
       .eq('sender_id', inquiry.user_id)
-      .is('read_at', null);
+      .is('admin_read_at', null);
 
     if (unreadError) {
       throw new Error(unreadError.message);

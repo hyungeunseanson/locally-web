@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import type { AdminInquiryActivity } from '@/app/utils/adminInquiryActivity';
 import { User } from '@supabase/supabase-js';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
@@ -9,7 +10,7 @@ import { getPrivateChatImageDeliveryUrl } from '@/app/utils/privateStorageDelive
 import { OFFICIAL_SUPPORT_SENDER_NAME } from '@/app/utils/officialSender';
 import { getInquiryMessageDisplayContent, SOFT_DELETED_INQUIRY_MESSAGE_TYPE } from '@/app/utils/inquiry';
 
-type MonitorInquiry = {
+type MonitorInquiry = Partial<AdminInquiryActivity> & {
   id: number | string;
   type?: string | null;
   guest?: { full_name?: string | null; name?: string | null; email?: string | null; avatar_url?: string | null; phone?: string | null; };
@@ -31,7 +32,7 @@ type MonitorMessage = {
   image_url?: string | null;
   type?: string | null;
   inquiry_id?: number | string;
-  created_at?: string;
+  created_at?: string | null;
   is_read?: boolean;
   read_at?: string | null;
   sender?: { name?: string | null };
@@ -65,7 +66,7 @@ type AdminSendMessageResult = {
 
 type InquiryPreviewPatch = Partial<Pick<
   MonitorInquiry,
-  'content' | 'updated_at' | 'has_policy_signal' | 'policy_signal_categories'
+  'content' | 'updated_at' | 'has_policy_signal' | 'policy_signal_categories' | 'last_message_at' | 'last_sender_role' | 'needs_reply' | 'reply_waiting_since'
 >>;
 
 function normalizeServerMessage(message: MonitorMessage): MonitorMessage {
@@ -85,11 +86,12 @@ function sortMonitorInquiries(items: MonitorInquiry[]) {
     const aIsResolvedSupport = isAdminSupportType(a.type) && a.status === 'resolved';
     const bIsResolvedSupport = isAdminSupportType(b.type) && b.status === 'resolved';
 
+    if (Boolean(a.needs_reply) !== Boolean(b.needs_reply)) return a.needs_reply ? -1 : 1;
     if (aIsResolvedSupport !== bIsResolvedSupport) {
       return aIsResolvedSupport ? 1 : -1;
     }
 
-    return new Date(b.updated_at || '').getTime() - new Date(a.updated_at || '').getTime();
+    return (Date.parse(b.last_message_at || b.updated_at || '') || 0) - (Date.parse(a.last_message_at || a.updated_at || '') || 0);
   });
 }
 
@@ -101,6 +103,7 @@ function mergeMonitorInquiry(
     return null;
   }
 
+  if (base?.updated_at && patch?.updated_at && Date.parse(base.updated_at) > Date.parse(patch.updated_at)) return base;
   const nextBase = base ?? null;
   const nextPatch = patch ?? {};
 
@@ -240,7 +243,7 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
         const params = new URLSearchParams({ view, offset: String(page * 50), limit: '50' });
         const deepLink = new URLSearchParams(window.location.search).get('inquiryId');
         if (deepLink && page === 0) params.set('inquiryId', deepLink);
-        const response = await fetch('/api/admin/inquiries' + `?${params.toString()}`);
+        const response = await fetch('/api/admin/inquiries' + `?${params.toString()}`, { cache: 'no-store', signal: AbortSignal.timeout(15_000) });
         const result = await response.json();
 
         if (!response.ok || !result.success) {
@@ -254,7 +257,9 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
       if (requestVersion !== inquiryRequestVersionRef.current) return;
       pagesRef.current = requestedPages;
       setHasMore(nextHasMore);
-      commitInquiries([...new Map(nextInquiries.map(row => [String(row.id), row])).values()]);
+      const existing = new Map(inquiriesRef.current.map(row => [String(row.id), row]));
+      commitInquiries([...new Map(nextInquiries.map(row => [String(row.id), row])).values()]
+        .map(row => mergeMonitorInquiry(existing.get(String(row.id)), row) ?? row));
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '로딩 오류';
       console.error('[AdminChatQuery] fetchInquiries error:', err);
@@ -295,7 +300,7 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
     const requestVersion = ++messageRequestVersionRef.current;
 
     try {
-      const response = await fetch(`/api/admin/inquiries/${inquiryId}/messages`);
+      const response = await fetch(`/api/admin/inquiries/${inquiryId}/messages`, { cache: 'no-store', signal: AbortSignal.timeout(15_000) });
       const result = await response.json();
 
       if (!response.ok || !result.success) {
@@ -332,26 +337,20 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
           : selectedFromList,
         inquiryDetail
       );
-      const shouldClearUnread =
-        isAdminSupportType(
-          inquiryDetail?.type ??
-          selectedFromList?.type ??
-          selectedInquiryRef.current?.type
-        );
-      const mergedSelected = nextSelected && shouldClearUnread
-        ? { ...nextSelected, unread_count: 0 }
-        : nextSelected;
-
-      if (mergedSelected) {
-        selectedInquiryRef.current = mergedSelected;
-        setSelectedInquiry(mergedSelected);
+      if (nextSelected) {
+        selectedInquiryRef.current = nextSelected;
+        setSelectedInquiry(nextSelected);
       }
+      if (inquiryDetail) patchInquiry(inquiryId, inquiryDetail);
 
-      if (inquiryDetail || shouldClearUnread) {
-        patchInquiry(inquiryId, {
-          ...(inquiryDetail ?? {}),
-          ...(shouldClearUnread ? { unread_count: 0 } : {}),
-        });
+      // Acknowledge only the snapshot that was successfully rendered, separately
+      // from customer read receipts. Failure is retried by a later catch-up.
+      if (nextSelected && isAdminSupportType(nextSelected.type) && fetched.length) {
+        const throughMessageId = fetched.reduce((last, row) => BigInt(row.id) > BigInt(last) ? row.id : last, fetched[0].id);
+        void fetch(`/api/admin/inquiries/${inquiryId}/ack`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ throughMessageId: String(throughMessageId) }),
+        }).catch(() => {});
       }
 
       return true;
@@ -429,6 +428,10 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
       if (!currentInquiry || result.updatedAt >= String(currentInquiry.updated_at || '')) patchInquiryPreview(inquiryId, {
         content: result.displayContent,
         updated_at: result.updatedAt,
+        last_message_at: result.message?.created_at ?? null,
+        last_sender_role: 'admin',
+        needs_reply: false,
+        reply_waiting_since: null,
         has_policy_signal: false,
         policy_signal_categories: [],
       });
@@ -485,6 +488,48 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
     }, delay);
   }, [fetchInquiries]);
 
+  const catchUpRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    if (!enabled || !currentUser) return;
+    let stopped = false;
+    let running = false;
+    let requested = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const catchUp = async () => {
+      if (stopped || document.visibilityState === 'hidden') return;
+      if (running) { requested = true; return; }
+      running = true;
+      try {
+        do {
+          requested = false;
+          const selectedId = selectedInquiryRef.current?.id;
+          await Promise.allSettled([
+            fetchInquiries(false),
+            selectedId != null ? loadMessages(selectedId) : Promise.resolve(),
+          ]);
+        } while (requested && !stopped && !document.hidden);
+      } finally { running = false; }
+    };
+    catchUpRef.current = () => { void catchUp(); };
+    const tick = () => {
+      void catchUp();
+      timer = setTimeout(tick, 30_000);
+    };
+    const visible = () => { if (document.visibilityState === 'visible') void catchUp(); };
+    window.addEventListener('online', catchUpRef.current);
+    document.addEventListener('visibilitychange', visible);
+    timer = setTimeout(tick, 30_000);
+    const online = catchUpRef.current;
+    return () => {
+      stopped = true;
+      catchUpRef.current = () => {};
+      if (timer) clearTimeout(timer);
+      window.removeEventListener('online', online);
+      document.removeEventListener('visibilitychange', visible);
+      messageRequestVersionRef.current++;
+    };
+  }, [enabled, currentUser, fetchInquiries, loadMessages]);
+
   // 실시간 구독 로직
   useEffect(() => {
     pagesRef.current = 1;
@@ -512,11 +557,10 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
           setTimeout(() => processedEventRef.current.delete(eventKey), 1500);
 
           if (newPayload && newPayload.sender_id !== currentUser.id) {
+            scheduleFetchInquiries();
             // 현재 열려있는 탭의 메시지인 경우 즉시 메시지 갱신
             if (selectedInquiryRef.current && String(newPayload.inquiry_id) === String(selectedInquiryRef.current.id)) {
               loadMessages(selectedInquiryRef.current.id);
-            } else {
-              scheduleFetchInquiries();
             }
           }
         }
@@ -596,7 +640,9 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
           }
         }
       )
-      .subscribe();
+      .subscribe(status => {
+        if (status === 'SUBSCRIBED') catchUpRef.current();
+      });
 
     return () => {
       if (fetchInquiriesTimerRef.current) {

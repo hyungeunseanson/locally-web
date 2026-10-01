@@ -8,6 +8,15 @@ on:
       - 'app/guest/inbox/**'
       - 'app/host/dashboard/InquiryChat.tsx'
       - 'app/admin/dashboard/hooks/useAdminChatQuery.ts'
+      - 'app/admin/dashboard/components/ChatMonitor.tsx'
+      - 'app/api/admin/inquiries/**'
+      - 'app/utils/adminChatTime.ts'
+      - 'app/utils/adminInquiryActivity.ts'
+      - 'app/utils/adminSupportUnreadAlerts.ts'
+      - 'supabase/migrations/*admin_message_monitoring*'
+      - 'tests/unit/admin-message-monitoring*.test.mjs'
+      - 'tests/ui/admin-message-monitoring.spec.ts'
+      - 'playwright.admin-chat-phase1.config.ts'
       - 'app/utils/notificationLocale.ts'
       - 'app/utils/emailCopy.ts'
       - 'tests/unit/chat-performance-phase-1.test.mjs'
@@ -42,8 +51,7 @@ jobs:
           cache: npm
       # Use peer resolution compatible with the existing lockfile.
       - run: npm ci --legacy-peer-deps --no-audit --no-fund
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium webkit
       # All I/O is mocked. This job has no application server or service secrets.
-      - run: npm run test:chat:phase2
-      - run: npm run test:chat:platform
+      - run: npm run test:admin-chat:phase1
       - run: npm run cloudflare:production-build:contract

@@ -3,17 +3,15 @@ import {
   ACTIVE_CHAT_POLICY_SIGNAL_CATEGORIES,
   detectChatPolicySignals,
 } from '@/app/utils/chatPolicySignals';
-import { clearAdminSupportUnreadBatch } from '@/app/utils/adminSupportUnreadAlerts';
+import { getAdminInquiryActivity } from '@/app/utils/adminInquiryActivity';
 import {
   getInquiryMessageDisplayContent,
-  isAdminSupportInquiry,
   isOfficialInquirySupportMessage,
   shouldApplyChatPolicySignals,
 } from '@/app/utils/inquiry';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
-import { markInquiryMessagesRead } from '@/app/api/inquiries/thread/shared';
 import { getHostPublicProfile } from '@/app/utils/profile';
 import {
   OFFICIAL_SUPPORT_AVATAR_SRC,
@@ -105,20 +103,8 @@ export async function GET(
 
     if (inquiryError) throw inquiryError;
 
-    if (inquiryRow && isAdminSupportInquiry(inquiryRow.type)) {
-      await markInquiryMessagesRead({
-        actor: {
-          id: user.id,
-          email: user.email,
-        },
-        body: { inquiryId },
-      });
-
-      await clearAdminSupportUnreadBatch({
-        supabaseAdmin,
-        inquiryId,
-      });
-    }
+    if (!inquiryRow) return NextResponse.json({ success: false, error: 'Inquiry not found' }, { status: 404 });
+    const activity = (await getAdminInquiryActivity(supabaseAdmin, [inquiryId])).get(String(inquiryId));
 
     const secureUrl = (url: string | null | undefined) => {
       if (!url || url === '') return null;
@@ -160,6 +146,7 @@ export async function GET(
     const inquiryDetail = inquiryRow
       ? {
           ...inquiryRow,
+          ...activity,
           guest: {
             id: inquiryRow.user_id ?? null,
             name: inquiryGuestName,
@@ -188,7 +175,7 @@ export async function GET(
       .from('inquiry_messages')
       .select('id, inquiry_id, sender_id, content, image_url, type, is_read, read_at, created_at')
       .eq('inquiry_id', inquiryId)
-      .order('created_at', { ascending: true });
+      .order('created_at', { ascending: true }).order('id', { ascending: true });
 
     if (messagesError) throw messagesError;
 
@@ -239,7 +226,7 @@ export async function GET(
           type: msg.type,
           content: msg.content,
         }),
-        created_at: msg.created_at || new Date().toISOString(),
+        created_at: msg.created_at ?? null,
         has_policy_signal: signal.matched,
         policy_signal_categories: signal.categories,
         sender: {
@@ -250,7 +237,7 @@ export async function GET(
       };
     });
 
-    return NextResponse.json({ success: true, data: safeMessages, inquiry: inquiryDetail });
+    return NextResponse.json({ success: true, data: safeMessages, inquiry: inquiryDetail }, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error: unknown) {
     console.error(`[inquiries/messages] error:`, error);
     const message = error instanceof Error ? error.message : 'Server error';
