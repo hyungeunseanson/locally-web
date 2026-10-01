@@ -88,7 +88,7 @@ test.describe('production Home public dataset cache', () => {
       } catch { /* LCP may not be available in every browser. */ }
       const check = () => {
         const now = performance.now();
-        if (state.shell === null && document.querySelector('[data-testid="home-streaming-skeleton"], [data-testid="home-desktop-all-experiences-section"]')) state.shell = now;
+        if (state.shell === null && document.querySelector('[data-testid="home-streaming-skeleton"], [data-testid="home-all-experiences-section"]')) state.shell = now;
         if (state.card === null && document.querySelector('[data-testid^="home-all-experience-card-"]')) state.card = now;
         if (document.querySelector('.locally-brand-splash')) state.splash = true;
         window.setTimeout(check, 25);
@@ -96,7 +96,7 @@ test.describe('production Home public dataset cache', () => {
       check();
     });
     await page.goto('/', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByTestId('home-desktop-all-experiences-section').getByText('Cached Home Experience')).toBeVisible();
+    await expect(page.getByTestId('home-all-experiences-section').getByText('Cached Home Experience')).toBeVisible();
     await page.waitForTimeout(1500);
     expect(homeApiRequests).toEqual([]);
     const localTiming = await page.evaluate(() => {

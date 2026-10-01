@@ -34,7 +34,7 @@ async function getPublicExperienceFixture(page: import('@playwright/test').Page)
   await dismissAnnouncementIfVisible(page);
 
   for (let attempt = 0; attempt < 8; attempt += 1) {
-    const homeAllSection = page.getByTestId('home-desktop-all-experiences-section');
+    const homeAllSection = page.getByTestId('home-all-experiences-section');
     await expect(homeAllSection).toBeVisible({ timeout: 15000 });
 
     const experienceLink = homeAllSection.locator('a[href^="/experiences/"]:visible').nth(attempt);
@@ -101,8 +101,8 @@ test.describe.serial('Guest search/detail ingress smoke', () => {
     await expect
       .poll(() => new URL(page.url()).pathname, { timeout: 15000 })
       .toMatch(/^\/(en|ja|zh)?$/);
-    await expect(page.getByTestId('home-desktop-popular-experiences-section')).toBeVisible();
-    await expect(page.getByTestId('home-desktop-all-experiences-section')).toBeVisible();
+    await expect(page.getByTestId('home-popular-experiences-section')).toBeVisible();
+    await expect(page.getByTestId('home-all-experiences-section')).toBeVisible();
 
     const experienceLink = page.locator(`a[href="/experiences/${experience.id}"]:visible`).first();
     await expect(experienceLink).toBeVisible({ timeout: 15000 });
@@ -130,8 +130,8 @@ test.describe.serial('Guest search/detail ingress smoke', () => {
     await expect
       .poll(() => new URL(page.url()).pathname, { timeout: 15000 })
       .toMatch(/^\/(en|ja|zh)?$/);
-    await expect(page.getByTestId('home-desktop-popular-experiences-section')).toBeVisible();
-    await expect(page.getByTestId('home-desktop-all-experiences-section')).toBeVisible();
+    await expect(page.getByTestId('home-popular-experiences-section')).toBeVisible();
+    await expect(page.getByTestId('home-all-experiences-section')).toBeVisible();
 
     const experienceLink = page.locator(`a[href="/experiences/${experience.id}"]:visible`).first();
     await expect(experienceLink).toBeVisible({ timeout: 15000 });
