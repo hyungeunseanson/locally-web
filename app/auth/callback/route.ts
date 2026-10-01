@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/app/utils/supabase/server';
 import { normalizeInternalReturnPath, resolveAuthCallbackOrigin } from '@/app/utils/authRedirect';
+import { validatedRecoveryIdentity, issueRecoveryGrant, recoveryCookieOptions, clearRecoveryCookie } from '@/app/utils/passwordRecovery.server';
+import { RECOVERY_COOKIE_NAME } from '@/app/utils/passwordReset';
 import { ensureDemographicsReminder } from '@/app/utils/demographicsReminder';
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -13,6 +15,7 @@ export async function GET(request: Request) {
     const response = NextResponse.redirect(`${redirectOrigin}${path}`);
     response.headers.set('Cache-Control', 'private, no-store');
     response.headers.set('Referrer-Policy', 'no-referrer');
+    clearRecoveryCookie(response);
     return response;
   };
   const redirectOrigin = resolveAuthCallbackOrigin(request.url, request.headers);
@@ -22,6 +25,14 @@ export async function GET(request: Request) {
       const supabase = await createClient();
       const { data, error } = await supabase.auth.exchangeCodeForSession(code);
       if (!error && (!recovery || data.session)) {
+        if (recovery && data.session) {
+          const identity = await validatedRecoveryIdentity(supabase, data.session);
+          if (!identity) return redirect('/auth/forgot-password?invalid=1');
+          const grant = issueRecoveryGrant(identity);
+          const response = redirect(next);
+          response.cookies.set(RECOVERY_COOKIE_NAME, grant.value, { ...recoveryCookieOptions, maxAge: grant.maxAge });
+          return response;
+        }
         const userId = data.session?.user?.id;
         if (userId && !recovery) {
           try {

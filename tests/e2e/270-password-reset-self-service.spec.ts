@@ -1,7 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
+import { createHmac } from 'node:crypto';
 import { getPasswordResetCopy } from '@/app/components/passwordResetLocalization';
-import { buildPasswordRecoveryRedirect } from '@/app/utils/passwordReset';
+import { buildPasswordRecoveryRedirect, RECOVERY_COOKIE_NAME, RECOVERY_COOKIE_PATH } from '@/app/utils/passwordReset';
 import { isGoogleAnalyticsPathAllowed } from '@/app/utils/analytics/google';
 import { startMockSupabaseAuthServer, type MockSupabaseAuthServer } from './helpers/mockSupabaseAuthServer';
 
@@ -115,6 +116,7 @@ test.describe('Password reset self-service (local Auth mock only)', () => {
       await expect(page.locator('main').getByRole('alert')).toHaveText(getPasswordResetCopy('en').invalid);
       await expect(page.getByRole('link', { name: 'Request another reset email' })).toHaveAttribute('href', '/auth/forgot-password');
       expect(count('PUT', '/auth/v1/user')).toBe(0);
+      expect((await page.context().cookies()).some((c) => c.name === RECOVERY_COOKIE_NAME)).toBe(false);
       await expect(page.getByText('Sensitive provider diagnostic')).toHaveCount(0);
     });
   }
@@ -136,18 +138,25 @@ test.describe('Password reset self-service (local Auth mock only)', () => {
     test(`valid recovery updates once and clears local session (logout ${logoutStatus})`, async ({ page, context }) => {
       await recover(page);
       mock.setLogoutStatus(logoutStatus);
-      const changed = page.waitForRequest((r) => r.method() === 'PUT' && new URL(r.url()).pathname === '/auth/v1/user');
+      const changed = page.waitForRequest((r) => r.method() === 'POST' && new URL(r.url()).pathname === '/auth/update-password/submit');
       await page.getByLabel('New password', { exact: true }).fill('new-password');
       await page.getByLabel('Confirm password', { exact: true }).fill('new-password');
       await page.getByRole('button', { name: 'Change password', exact: true }).click();
-      expect((await changed).postDataJSON()).toMatchObject({ password: 'new-password' });
+      expect((await changed).postDataJSON()).toEqual({ password: 'new-password', confirmation: 'new-password' });
       await expect(page.getByRole('status')).toHaveText(getPasswordResetCopy('en').success);
       expect(count('PUT', '/auth/v1/user')).toBe(1);
+      expect(mock.requests.find((r) => r.method === 'PUT')?.bodyFields).toEqual(['password', 'code_challenge', 'code_challenge_method']);
+      expect((await context.cookies()).some((c) => c.name === RECOVERY_COOKIE_NAME)).toBe(false);
       const logout = mock.requests.find((r) => new URL(r.url).pathname === '/auth/v1/logout');
       expect(new URL(logout!.url).searchParams.get('scope')).toBe('local');
       expect((await context.cookies()).filter((c) => /-auth-token(?:\.\d+)?$/.test(c.name))).toHaveLength(0);
       await page.getByRole('link', { name: 'Continue to login' }).click();
       await expect(page).toHaveURL(`${ORIGIN}/login`);
+      await page.goBack();
+      await expect(page.locator('input[type=password]')).toHaveCount(0);
+      await navigate(page, '/auth/update-password');
+      await expect(page.locator('input[type=password]')).toHaveCount(0);
+      expect(count('PUT', '/auth/v1/user')).toBe(1);
     });
   }
 
@@ -162,6 +171,133 @@ test.describe('Password reset self-service (local Auth mock only)', () => {
     await page.getByRole('button', { name: 'Continue to login' }).click();
     await expect(page.getByRole('link', { name: 'Continue to login' })).toBeVisible();
     expect(count('PUT', '/auth/v1/user')).toBe(1);
+  });
+
+  test('successful change consumes recovery state even when local cleanup fails', async ({ page, context }) => {
+    await recover(page);
+    const grant = (await context.cookies()).find((c) => c.name === RECOVERY_COOKIE_NAME)!;
+    expect(grant.httpOnly).toBe(true);
+    expect(grant.secure).toBe(process.env.PLAYWRIGHT_SERVER_MODE === 'start');
+    expect(grant.sameSite).toBe('Lax');
+    expect(grant.path).toBe(RECOVERY_COOKIE_PATH);
+    expect(grant.expires).toBeLessThanOrEqual(Date.now() / 1000 + 600);
+    mock.setLogoutStatus(500);
+    await page.getByLabel('New password', { exact: true }).fill('new-password');
+    await page.getByLabel('Confirm password', { exact: true }).fill('new-password');
+    await page.getByRole('button', { name: 'Change password', exact: true }).click();
+    await expect(page.getByRole('status')).toHaveText(getPasswordResetCopy('en').cleanupFailed);
+    expect(count('PUT', '/auth/v1/user')).toBe(1);
+    expect((await context.cookies()).some((c) => c.name === RECOVERY_COOKIE_NAME)).toBe(false);
+    // Restore the old signed grant while the session is still present. Auth's
+    // consumed recovery state must reject it, rather than trusting cookie deletion.
+    await context.addCookies([grant]);
+    await page.reload();
+    await expect(page.locator('main').getByRole('alert')).toHaveText(getPasswordResetCopy('en').invalid);
+    await expect(page.locator('input[type=password]')).toHaveCount(0);
+    const response = await page.request.post(`${ORIGIN}/auth/update-password/submit`, {
+      headers: { Origin: ORIGIN }, data: { password: 'another-password', confirmation: 'another-password' },
+    });
+    expect(response.status()).toBe(403);
+    expect(count('PUT', '/auth/v1/user')).toBe(1);
+  });
+
+  test('authenticated recovery session without server marker cannot update', async ({ page, context }) => {
+    await recover(page);
+    await context.clearCookies({ name: RECOVERY_COOKIE_NAME });
+    await page.reload();
+    await expect(page.locator('main').getByRole('alert')).toHaveText(getPasswordResetCopy('en').invalid);
+    const response = await page.request.post(`${ORIGIN}/auth/update-password/submit`, {
+      headers: { Origin: ORIGIN }, data: { password: 'new-password', confirmation: 'new-password' },
+    });
+    expect(response.status()).toBe(403);
+    expect(count('PUT', '/auth/v1/user')).toBe(0);
+  });
+
+  test('expired signed recovery grant blocks both UI and server mutation', async ({ page, context }) => {
+    await recover(page);
+    const grant = (await context.cookies()).find((c) => c.name === RECOVERY_COOKIE_NAME)!;
+    const original = JSON.parse(Buffer.from(grant.value.split('.')[0], 'base64url').toString());
+    // Sign an expired grant with the local mock-only signing key. Retain a live
+    // browser cookie to test server expiry, rather than browser deletion alone.
+    const now = Math.floor(Date.now() / 1000);
+    const payload = Buffer.from(JSON.stringify({ ...original, issuedAt: now - 601, expiresAt: now - 1 })).toString('base64url');
+    const key = createHmac('sha256', process.env.CRON_SECRET!).update('locally/password-recovery/v1/key').digest();
+    const signed = createHmac('sha256', key).update(`locally/password-recovery/v1:${payload}`).digest('hex');
+    await context.addCookies([{ ...grant, value: `${payload}.${signed}` }]);
+    await page.reload();
+    await expect(page.locator('input[type=password]')).toHaveCount(0);
+    await expect(page.locator('main').getByRole('alert')).toHaveText(getPasswordResetCopy('en').invalid);
+    const denied = await page.request.post(`${ORIGIN}/auth/update-password/submit`, {
+      headers: { Origin: ORIGIN }, data: { password: 'new-password', confirmation: 'new-password' },
+    });
+    expect(denied.status()).toBe(403);
+    expect(count('PUT', '/auth/v1/user')).toBe(0);
+  });
+
+  test('old recovery grant cannot authorize a different session', async ({ page, context }) => {
+    await recover(page);
+    const grant = (await context.cookies()).find((c) => c.name === RECOVERY_COOKIE_NAME)!;
+    await context.clearCookies();
+    await recover(page);
+    await context.addCookies([grant]);
+    await page.reload();
+    await expect(page.locator('input[type=password]')).toHaveCount(0);
+    const denied = await page.request.post(`${ORIGIN}/auth/update-password/submit`, {
+      headers: { Origin: ORIGIN }, data: { password: 'new-password', confirmation: 'new-password' },
+    });
+    expect(denied.status()).toBe(403);
+    expect(count('PUT', '/auth/v1/user')).toBe(0);
+  });
+
+  test('recovery exchange without explicit recovery flow never issues a grant', async ({ page, context }) => {
+    await requestReset(page);
+    await navigate(page, '/auth/callback?code=mock-recovery-code&next=%2Fauth%2Fupdate-password');
+    await expect(page.locator('input[type=password]')).toHaveCount(0);
+    expect((await context.cookies()).some((c) => c.name === RECOVERY_COOKIE_NAME)).toBe(false);
+    expect(count('PUT', '/auth/v1/user')).toBe(0);
+  });
+
+  test('OAuth code with flow=recovery cannot mint a recovery marker', async ({ page, context }) => {
+    await requestReset(page);
+    await navigate(page, '/auth/callback?flow=recovery&code=mock-oauth-code');
+    await expect(page).toHaveURL(/forgot-password\?invalid=1$/);
+    expect((await context.cookies()).some((c) => c.name === RECOVERY_COOKIE_NAME)).toBe(false);
+    expect(count('PUT', '/auth/v1/user')).toBe(0);
+  });
+
+  test('tampered marker and cross-origin POST cannot update', async ({ page, context }) => {
+    await recover(page);
+    const grant = (await context.cookies()).find((c) => c.name === RECOVERY_COOKIE_NAME)!;
+    const crossOrigin = await page.request.post(`${ORIGIN}/auth/update-password/submit`, {
+      headers: { Origin: 'https://evil.example' }, data: { password: 'new-password', confirmation: 'new-password' },
+    });
+    expect(crossOrigin.status()).toBe(403);
+    await context.addCookies([{ ...grant, value: grant.value.slice(0, -1) + (grant.value.endsWith('a') ? 'b' : 'a') }]);
+    await page.reload();
+    await expect(page.locator('main').getByRole('alert')).toHaveText(getPasswordResetCopy('en').invalid);
+    const denied = await page.request.post(`${ORIGIN}/auth/update-password/submit`, {
+      headers: { Origin: ORIGIN }, data: { password: 'new-password', confirmation: 'new-password' },
+    });
+    expect(denied.status()).toBe(403);
+    expect(count('PUT', '/auth/v1/user')).toBe(0);
+  });
+
+  test('normal email login cannot enter recovery directly or write a password', async ({ page }) => {
+    await navigate(page, '/login?returnUrl=%2Faccount');
+    await page.locator('input[type="email"]').fill('auth.regression@example.com');
+    await page.locator('input[type="password"]').fill('auth-regression-password');
+    await page.getByRole('button', { name: 'Log in', exact: true }).click();
+    await expect(page).toHaveURL(`${ORIGIN}/account`);
+    await navigate(page, '/auth/update-password');
+    await expect(page.locator('main').getByRole('alert')).toHaveText(getPasswordResetCopy('en').invalid);
+    await expect(page.locator('input[type=password]')).toHaveCount(0);
+    expect(count('PUT', '/auth/v1/user')).toBe(0);
+    expect((await page.context().cookies()).some((c) => c.name === RECOVERY_COOKIE_NAME)).toBe(false);
+    const denied = await page.request.post(`${ORIGIN}/auth/update-password/submit`, {
+      headers: { Origin: ORIGIN }, data: { password: 'new-password', confirmation: 'new-password' },
+    });
+    expect(denied.status()).toBe(403);
+    expect(count('PUT', '/auth/v1/user')).toBe(0);
   });
 
   test('missing session blocks update UI', async ({ page }) => {
@@ -185,6 +321,7 @@ test.describe('Password reset self-service (local Auth mock only)', () => {
     await requestReset(page); // Establish a local PKCE verifier for callback regression.
     await navigate(page, '/auth/callback?code=mock-oauth-code&next=%2Faccount');
     await expect(page).toHaveURL(`${ORIGIN}/account`);
+    expect((await page.context().cookies()).some((c) => c.name === RECOVERY_COOKIE_NAME)).toBe(false);
     await page.context().clearCookies();
     await requestReset(page);
     await navigate(page, '/auth/callback?code=mock-oauth-code&next=https%3A%2F%2Fevil.example');
@@ -211,10 +348,10 @@ test.describe('Password reset self-service (local Auth mock only)', () => {
     for (const path of ['/auth/forgot-password', '/auth/update-password', '/auth/callback']) {
       expect(isGoogleAnalyticsPathAllowed(path)).toBe(false);
     }
-    for (const file of ['app/auth/PasswordResetForm.tsx', 'app/auth/callback/route.ts']) {
+    for (const file of ['app/auth/PasswordResetForm.tsx', 'app/auth/callback/route.ts', 'app/auth/update-password/submit/route.ts', 'app/utils/passwordRecovery.server.ts']) {
       const source = readFileSync(file, 'utf8');
       expect(source).not.toMatch(/sendGoogleAnalyticsEvent|captureException|captureRequestError|console\.(log|error)|localStorage/);
-      expect(source).not.toMatch(/SERVICE_ROLE|updateUserById/);
+      expect(source).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY|updateUserById/);
     }
     for (const file of ['app/help/faqContent.ts', 'app/context/LanguageContext.tsx']) {
       expect(readFileSync(file, 'utf8')).not.toMatch(/비밀번호 재설정 기능.*지원하지|Password reset is not|再設定機能は提供していません|暂不支持密码重置|尚未开放独立/);

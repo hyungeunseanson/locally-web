@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 
 const DEFAULT_PORT = 54329;
@@ -8,6 +9,7 @@ export const MOCK_AUTH_PASSWORD = 'auth-regression-password';
 type RecordedRequest = {
   method: string;
   url: string;
+  bodyFields?: string[];
 };
 
 export type MockSupabaseAuthServer = {
@@ -50,7 +52,7 @@ function encodeBase64Url(value: object) {
   return Buffer.from(JSON.stringify(value)).toString('base64url');
 }
 
-function createAccessToken() {
+function createAccessToken(method: string) {
   const now = Math.floor(Date.now() / 1000);
   return [
     encodeBase64Url({ alg: 'HS256', typ: 'JWT' }),
@@ -59,7 +61,8 @@ function createAccessToken() {
       exp: now + 3600,
       iat: now,
       role: 'authenticated',
-      session_id: '8b8c2d18-b330-4f20-83f3-a84a7dcb7a14',
+      session_id: randomUUID(),
+      amr: [{ method, timestamp: now }],
       sub: mockUser.id,
       email: MOCK_AUTH_EMAIL,
     }),
@@ -84,14 +87,14 @@ function sendJson(response: ServerResponse, status: number, body: unknown) {
   response.end(JSON.stringify(body));
 }
 
-function sendSession(response: ServerResponse) {
+function sendSession(response: ServerResponse, method = 'password', recoverySentAt: string | undefined = undefined) {
   sendJson(response, 200, {
-    access_token: createAccessToken(),
+    access_token: createAccessToken(method),
     token_type: 'bearer',
     expires_in: 3600,
     expires_at: Math.floor(Date.now() / 1000) + 3600,
     refresh_token: 'local-refresh-token',
-    user: mockUser,
+    user: { ...mockUser, recovery_sent_at: recoverySentAt },
   });
 }
 
@@ -103,6 +106,7 @@ export async function startMockSupabaseAuthServer(
   let pkceStatus = 200;
   let userStatus = 200;
   let logoutStatus = 204;
+  let recoverySentAt: string | undefined;
 
   const server = createServer((request, response) => {
     applyCors(request, response);
@@ -127,17 +131,32 @@ export async function startMockSupabaseAuthServer(
         sendJson(response, pkceStatus, { code: 'otp_expired', message: 'Sensitive provider diagnostic must never reach the UI' });
         return;
       }
-      sendSession(response);
+      if (requestUrl.searchParams.get('grant_type') === 'pkce') {
+        let raw = '';
+        request.on('data', (chunk) => { raw += String(chunk); });
+        request.on('end', () => {
+          const input = JSON.parse(raw) as { auth_code?: string };
+          sendSession(response, input.auth_code === 'mock-recovery-code' ? 'recovery' : 'oauth', recoverySentAt);
+        });
+      } else sendSession(response, 'password', recoverySentAt);
       return;
     }
 
     if (requestUrl.pathname === '/auth/v1/user' && method === 'GET') {
-      sendJson(response, userStatus, userStatus === 200 ? mockUser : { message: 'Session expired' });
+      sendJson(response, userStatus, userStatus === 200 ? { ...mockUser, recovery_sent_at: recoverySentAt } : { message: 'Session expired' });
       return;
     }
 
     if (requestUrl.pathname === '/auth/v1/user' && method === 'PUT') {
-      sendJson(response, 200, mockUser);
+      let raw = '';
+      request.on('data', (chunk) => { raw += String(chunk); });
+      request.on('end', () => {
+        const input = JSON.parse(raw) as Record<string, unknown>;
+        const recorded = requests.findLast((entry) => entry.method === 'PUT');
+        if (recorded) recorded.bodyFields = Object.keys(input);
+        if (typeof input.password === 'string') recoverySentAt = undefined;
+        sendJson(response, 200, { ...mockUser, recovery_sent_at: recoverySentAt });
+      });
       return;
     }
 
@@ -150,6 +169,7 @@ export async function startMockSupabaseAuthServer(
     }
 
     if (requestUrl.pathname === '/auth/v1/recover' && method === 'POST') {
+      if (recoveryStatus === 200) recoverySentAt = new Date().toISOString();
       sendJson(response, recoveryStatus, recoveryStatus === 200 ? {} : {
         code: recoveryStatus === 429 ? 'over_email_send_rate_limit' : 'user_not_found',
         message: 'Sensitive account detail must never reach the UI',
@@ -161,6 +181,11 @@ export async function startMockSupabaseAuthServer(
       response.statusCode = 200;
       response.setHeader('Content-Type', 'text/html; charset=utf-8');
       response.end('<!doctype html><title>Mock OAuth authorization</title>');
+      return;
+    }
+
+    if (requestUrl.pathname.startsWith('/auth/v1/admin/users/') && method === 'GET') {
+      sendJson(response, 200, { ...mockUser, recovery_sent_at: recoverySentAt });
       return;
     }
 
@@ -192,6 +217,7 @@ export async function startMockSupabaseAuthServer(
       requests.length = 0;
       recoveryStatus = pkceStatus = userStatus = 200;
       logoutStatus = 204;
+      recoverySentAt = undefined;
     },
     setRecoveryStatus(status) { recoveryStatus = status; },
     setPkceStatus(status) { pkceStatus = status; },

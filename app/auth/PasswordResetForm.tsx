@@ -60,21 +60,22 @@ export default function PasswordResetForm({ mode }: { mode: 'request' | 'update'
         setMessage(error?.status === 429 ? copy.retryLater : copy.sent);
         setEmail('');
       } else {
-        // Revalidate with Auth immediately before updating; neither a query
-        // parameter nor a locally cached session authorizes a password change.
-        const { data, error: sessionError } = await supabase.auth.getUser();
-        if (sessionError || !data.user) {
+        const response = await fetch('/auth/update-password/submit', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password, confirmation }),
+        });
+        const result = await response.json() as { result?: string };
+        if (result.result === 'invalid') {
           setInvalid(true);
           return;
         }
-        const { error } = await supabase.auth.updateUser({ password });
-        if (error) {
-          if ([401, 403].includes(error.status ?? 0)) setInvalid(true);
-          else setMessage(copy.updateFailed);
+        if (result.result !== 'success' && result.result !== 'cleanup-required') {
+          setMessage(copy.updateFailed);
           return;
         }
         setChanged(true);
-        await cleanupSession();
+        setCleanedUp(result.result === 'success');
+        setMessage(result.result === 'success' ? copy.success : copy.cleanupFailed);
       }
     } catch {
       setMessage(mode === 'request' ? copy.retryLater : copy.updateFailed);

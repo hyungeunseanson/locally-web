@@ -12,3 +12,6 @@ export function isPasswordResetPath(pathname: string | null): boolean {
   const path = (pathname ?? '').replace(/^\/(ko|en|ja|zh)(?=\/)/, '');
   return path === '/auth/forgot-password' || path === '/auth/update-password';
 }
+
+export const RECOVERY_COOKIE_NAME = 'locally_password_recovery';
+export const RECOVERY_COOKIE_PATH = '/auth/update-password';
