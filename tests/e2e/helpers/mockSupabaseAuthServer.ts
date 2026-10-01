@@ -15,6 +15,10 @@ export type MockSupabaseAuthServer = {
   requests: RecordedRequest[];
   resetRequests: () => void;
   close: () => Promise<void>;
+  setRecoveryStatus: (status: number) => void;
+  setPkceStatus: (status: number) => void;
+  setUserStatus: (status: number) => void;
+  setLogoutStatus: (status: number) => void;
 };
 
 const mockUser = {
@@ -95,6 +99,10 @@ export async function startMockSupabaseAuthServer(
   port = DEFAULT_PORT
 ): Promise<MockSupabaseAuthServer> {
   const requests: RecordedRequest[] = [];
+  let recoveryStatus = 200;
+  let pkceStatus = 200;
+  let userStatus = 200;
+  let logoutStatus = 204;
 
   const server = createServer((request, response) => {
     applyCors(request, response);
@@ -109,13 +117,22 @@ export async function startMockSupabaseAuthServer(
       return;
     }
 
+    if (requestUrl.pathname === '/auth/v1/signup' && method === 'POST') {
+      sendSession(response);
+      return;
+    }
+
     if (requestUrl.pathname === '/auth/v1/token' && method === 'POST') {
+      if (requestUrl.searchParams.get('grant_type') === 'pkce' && pkceStatus !== 200) {
+        sendJson(response, pkceStatus, { code: 'otp_expired', message: 'Sensitive provider diagnostic must never reach the UI' });
+        return;
+      }
       sendSession(response);
       return;
     }
 
     if (requestUrl.pathname === '/auth/v1/user' && method === 'GET') {
-      sendJson(response, 200, mockUser);
+      sendJson(response, userStatus, userStatus === 200 ? mockUser : { message: 'Session expired' });
       return;
     }
 
@@ -125,8 +142,18 @@ export async function startMockSupabaseAuthServer(
     }
 
     if (requestUrl.pathname === '/auth/v1/logout' && method === 'POST') {
-      response.statusCode = 204;
-      response.end();
+      if (logoutStatus === 204) {
+        response.statusCode = 204;
+        response.end();
+      } else sendJson(response, logoutStatus, { message: 'Session ended' });
+      return;
+    }
+
+    if (requestUrl.pathname === '/auth/v1/recover' && method === 'POST') {
+      sendJson(response, recoveryStatus, recoveryStatus === 200 ? {} : {
+        code: recoveryStatus === 429 ? 'over_email_send_rate_limit' : 'user_not_found',
+        message: 'Sensitive account detail must never reach the UI',
+      });
       return;
     }
 
@@ -163,7 +190,13 @@ export async function startMockSupabaseAuthServer(
     requests,
     resetRequests() {
       requests.length = 0;
+      recoveryStatus = pkceStatus = userStatus = 200;
+      logoutStatus = 204;
     },
+    setRecoveryStatus(status) { recoveryStatus = status; },
+    setPkceStatus(status) { pkceStatus = status; },
+    setUserStatus(status) { userStatus = status; },
+    setLogoutStatus(status) { logoutStatus = status; },
     close() {
       return new Promise<void>((resolve, reject) => {
         server.close((error) => (error ? reject(error) : resolve()));
