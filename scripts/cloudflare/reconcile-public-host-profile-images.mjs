@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
+import { createSupabaseApiKeyHeaders } from '../../app/utils/supabase/apiKeys.mjs';
 
 const MANIFEST_PATH = path.resolve('app/data/publicHostProfileImages.generated.json');
 const EXCLUSIONS_PATH = path.resolve('config/public-host-profile-r2-exclusions.json');
@@ -275,7 +276,7 @@ async function fetchPublicHostApplications() {
     order: 'user_id.asc,created_at.desc',
   });
   const response = await fetch(`${baseUrl}/rest/v1/public_host_applications?${query}`, {
-    headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` },
+    headers: createSupabaseApiKeyHeaders(anonKey),
   });
   if (!response.ok) throw new Error(`Public host profile inventory failed: HTTP ${response.status}`);
   const rows = await response.json();
@@ -293,7 +294,7 @@ async function fetchPublicProfiles(hostIds) {
     id: `in.(${hostIds.join(',')})`,
   });
   const response = await fetch(`${baseUrl}/rest/v1/public_profiles?${query}`, {
-    headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` },
+    headers: createSupabaseApiKeyHeaders(anonKey),
     redirect: 'manual',
   });
   if (response.status >= 300 && response.status < 400) throw new Error('Public profile inventory refused a redirect.');

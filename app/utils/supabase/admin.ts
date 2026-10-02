@@ -4,6 +4,8 @@ import { createClient } from '@supabase/supabase-js';
 // 🔒 서버 전용 클라이언트 생성 (클라이언트 컴포넌트 사용 금지)
 export const createAdminClient = () => {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  // Compatibility alias: accepts legacy service_role JWTs and modern secret API keys.
+  // Authorization remains with Supabase and the callers' existing permission guards.
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !serviceRoleKey) {

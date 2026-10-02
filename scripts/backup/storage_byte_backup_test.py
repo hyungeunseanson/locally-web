@@ -8,8 +8,34 @@ import shutil
 import tempfile
 import time
 import unittest
+from unittest import mock
 
 import storage_byte_backup as backup
+
+
+class SupabaseApiKeyCompatibilityTests(unittest.TestCase):
+    def test_storage_http_uses_modern_apikey_only_and_preserves_legacy_bearer(self):
+        for key in ("legacy.service-role.fixture", "sb_secret_phase1_fixture", "sb_publishable_phase1_fixture"):
+            with self.subTest(format="modern" if key.startswith("sb_") else "legacy"):
+                source = backup.SupabaseStorageSource("https://uhinvcydgzqlpnvieyal.supabase.co", key)
+                with mock.patch.object(backup.urllib.request, "urlopen", return_value=io.BytesIO(b"fixture")) as open_request:
+                    source._request("GET", "/storage/v1/object/authenticated/fixture/object")
+                request = open_request.call_args.args[0]
+                self.assertEqual(request.get_header("Apikey"), key)
+                self.assertEqual(request.get_header("Authorization"), None if key.startswith("sb_") else "Bearer " + key)
+                self.assertEqual(request.get_method(), "GET")
+
+    def test_credential_errors_and_transport_causes_are_sanitized(self):
+        key = "sb_secret_phase1_fixture"
+        with self.assertRaises(backup.ValidationError) as invalid:
+            backup.supabase_api_key_headers(key + "\ninvalid")
+        self.assertNotIn(key, str(invalid.exception))
+        source = backup.SupabaseStorageSource("https://uhinvcydgzqlpnvieyal.supabase.co", key)
+        with mock.patch.object(backup.urllib.request, "urlopen", side_effect=backup.urllib.error.URLError(key)):
+            with self.assertRaises(backup.BackupError) as failure:
+                source._request("GET", "/storage/v1/object/authenticated/fixture/object")
+        self.assertNotIn(key, str(failure.exception))
+        self.assertTrue(failure.exception.__suppress_context__)
 
 
 def entry(bucket, key, body, content_type="application/octet-stream", version="v1"):

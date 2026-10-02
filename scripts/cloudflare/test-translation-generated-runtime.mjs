@@ -4,6 +4,11 @@ import http from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import { LEGACY_SERVICE_KEY, MODERN_SECRET_KEY } from '../../tests/fixtures/supabaseApiKeys.mjs';
+
+const keyFormat = process.argv[2] === '--key-format=modern' ? 'modern' : 'legacy';
+assert(process.argv.length <= 2 || (process.argv.length === 3 && process.argv[2] === '--key-format=modern'), 'unsupported_fixture_key_format');
+const fixtureServiceKey = keyFormat === 'modern' ? MODERN_SECRET_KEY : LEGACY_SERVICE_KEY;
 
 const ROOT = process.cwd();
 const BUNDLE = path.join(ROOT, '.wrangler/deploy/production/cloudflare-worker.js');
@@ -37,8 +42,16 @@ let output = '';
 try {
   await readFile(BUNDLE, 'utf8');
   const backendRequests = [];
+  const credentialChecks = [];
   backend = http.createServer((request, response) => {
     backendRequests.push(request.url ?? '');
+    const directHttp = ['/rest/v1/rpc/refresh_experience_popularity_snapshot', '/rest/v1/rpc/prune_notifications_retention']
+      .some((route) => request.url?.startsWith(route));
+    credentialChecks.push({
+      apikeyMatches: request.headers.apikey === fixtureServiceKey,
+      authorizationMatches: !directHttp || request.headers.authorization ===
+        (keyFormat === 'modern' ? undefined : 'Bearer ' + fixtureServiceKey),
+    });
     if (request.url?.startsWith('/rest/v1/rpc/lease_experience_translation_task')) {
       response.writeHead(200, { 'content-type': 'application/json' });
       response.end('[]');
@@ -100,7 +113,7 @@ try {
       NOTIFICATION_RETENTION_CLEANUP_SCHEDULED_ENABLED: 'true',
       EXPERIENCE_COMPLETION_SCHEDULED_ENABLED: 'true',
       NEXT_PUBLIC_SUPABASE_URL: `http://127.0.0.1:${backendAddress.port}`,
-      SUPABASE_SERVICE_ROLE_KEY: 'fixture-service-role',
+      SUPABASE_SERVICE_ROLE_KEY: fixtureServiceKey,
       GEMINI_API_KEY: 'fixture-gemini-key',
     },
     queues: {
@@ -173,15 +186,16 @@ try {
   assert.equal(backendRequests.filter((request) => request.startsWith('/rest/v1/rpc/lease_experience_translation_task')).length, 4);
   assert.equal(backendRequests.filter((request) => request.startsWith('/rest/v1/rpc/refresh_experience_popularity_snapshot')).length, 2);
   const applicationLogs = output.split('\n').filter((line) => line.includes('experience_translation_')).join('\n');
-  assert(!applicationLogs.includes('fixture-service-role'));
+  assert(!applicationLogs.includes(fixtureServiceKey));
   assert(!applicationLogs.includes('fixture-gemini-key'));
   const completionLogs = output.split('\n').filter((line) => line.includes('experience_completion_')).join('\n');
-  assert(!completionLogs.includes('fixture-service-role'));
+  assert(!completionLogs.includes(fixtureServiceKey));
   assert(!completionLogs.includes('fixture-gemini-key'));
-  console.log(JSON.stringify({ coldQueue: 'PASS', coldScheduledHome: 'PASS', coldScheduledAdminSupport: 'PASS', coldScheduledNotificationRetention: 'PASS', coldScheduledExperienceCompletion: 'PASS', exactCronIsolation: 'PASS', afterHttpQueue: 'PASS', leaseRequests: 4, homeRefreshRequests: 2, adminSupportClaimRequests: 1, notificationRetentionRequests: 1, experienceCompletionDueRequests: 1, providerCalls: 0, financialProviderCalls: 0 }));
+  assert(credentialChecks.length > 0 && credentialChecks.every((entry) => entry.apikeyMatches && entry.authorizationMatches));
+  console.log(JSON.stringify({ credentialFormat: keyFormat, coldQueue: 'PASS', coldScheduledHome: 'PASS', coldScheduledAdminSupport: 'PASS', coldScheduledNotificationRetention: 'PASS', coldScheduledExperienceCompletion: 'PASS', exactCronIsolation: 'PASS', afterHttpQueue: 'PASS', leaseRequests: 4, homeRefreshRequests: 2, adminSupportClaimRequests: 1, notificationRetentionRequests: 1, experienceCompletionDueRequests: 1, providerCalls: 0, financialProviderCalls: 0 }));
 } catch (error) {
   const diagnostic = output
-    .replaceAll('fixture-service-role', '[REDACTED]')
+    .replaceAll(fixtureServiceKey, '[REDACTED]')
     .replaceAll('fixture-gemini-key', '[REDACTED]')
     .replaceAll(temporaryDirectory, '[TEMP]')
     .slice(-6000);

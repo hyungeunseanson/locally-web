@@ -1,5 +1,34 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { LEGACY_SERVICE_KEY, MODERN_SECRET_KEY, MODERN_PUBLISHABLE_KEY, LEGACY_ANON_KEY } from '../../tests/fixtures/supabaseApiKeys.mjs';
+
+test('privileged configuration rejects public keys before any build, preflight or deploy command', async () => {
+  for (const key of ['', MODERN_PUBLISHABLE_KEY, LEGACY_ANON_KEY]) {
+    let commands = 0;
+    await assert.rejects(() => main([], {
+      environment: { SUPABASE_SERVICE_ROLE_KEY: key },
+      runCommand: () => { commands += 1; },
+      runSemanticPreflight: async () => { commands += 1; },
+    }), /supabase_privileged_api_key_invalid/);
+    assert.equal(commands, 0);
+  }
+});
+
+test('deployment configuration keeps the credential alias compatible with both supported formats', async () => {
+  for (const key of [LEGACY_SERVICE_KEY, MODERN_SECRET_KEY]) {
+    const logs = [];
+    let buildEnvironment;
+    await main(['--dry-run'], {
+      environment: { SUPABASE_SERVICE_ROLE_KEY: key },
+      runCommand: (_command, args, options) => {
+        if (args.includes('cloudflare:build:production')) buildEnvironment = options.env;
+      },
+      log: (entry) => logs.push(entry),
+    });
+    assert.equal(buildEnvironment.SUPABASE_SERVICE_ROLE_KEY, key);
+    assert.equal(JSON.stringify(logs).includes(key), false);
+  }
+});
 
 import {
   readReleasePolicy,
@@ -471,6 +500,7 @@ test('passes the Cancel Pending profile and planned Cron addition to semantic pr
     '--cancel-pending-profile=off',
     '--allow-cancel-pending-cron-addition',
   ], {
+    environment: {},
     runCommand: () => {},
     runSemanticPreflight: async (options) => {
       preflightOptions = options;
@@ -493,6 +523,7 @@ test('default Production deploy resolves all three scheduled flags ON without pl
   let preflightOptions;
   const commands = [];
   await main([], {
+    environment: {},
     runCommand: (_command, argumentsList) => { commands.push(argumentsList); },
     runSemanticPreflight: async (options) => { preflightOptions = options; },
     runBrowserSmoke: async () => {},
@@ -520,6 +551,7 @@ test('explicit OFF profiles retain independent rollback for all three scheduled 
     let preflightOptions;
     const commands = [];
     await main([argument], {
+      environment: {},
       runCommand: (_command, argumentsList) => { commands.push(argumentsList); },
       runSemanticPreflight: async (options) => { preflightOptions = options; },
       runBrowserSmoke: async () => {},
@@ -544,6 +576,7 @@ test('orders build, semantic preflight, pre-deploy smoke, deploy, and post-deplo
   const logs = [];
   let smokeRuns = 0;
   await main([], {
+    environment: {},
     runCommand: (command, argumentsList) => {
       commands.push({ command, argumentsList });
       events.push(argumentsList.includes('deploy') ? 'wrangler' : 'build');
@@ -575,6 +608,7 @@ test('pre-deploy smoke failure preserves diagnostics and prevents Wrangler deplo
   const diagnostic = new Error('/login input readiness timed out: {"elapsedMs":45000}');
   await assert.rejects(
     () => main([], {
+      environment: {},
       runCommand: (_command, argumentsList) => {
         events.push(argumentsList.includes('deploy') ? 'wrangler' : 'build');
       },
@@ -599,6 +633,7 @@ test('preflight failure prevents Wrangler deploy invocation', async () => {
   const events = [];
   await assert.rejects(
     () => main([], {
+      environment: {},
       runCommand: (_command, argumentsList) => {
         events.push(argumentsList.includes('deploy') ? 'wrangler' : 'build');
       },
@@ -619,6 +654,7 @@ test('preflight failure prevents Wrangler deploy invocation', async () => {
 test('passes the final Service ON deployment contract to semantic preflight', async () => {
   let preflightOptions;
   await main(['--service-completion-profile=on'], {
+    environment: {},
     runCommand: () => {},
     runSemanticPreflight: async (options) => {
       preflightOptions = options;
@@ -657,6 +693,7 @@ test('keeps Ops Anomaly Monitor ON by default and resolves its OFF profile indep
 test('passes only the final Ops Anomaly Monitor ON change to semantic preflight', async () => {
   let preflightOptions;
   await main(['--ops-anomaly-monitor-profile=on'], {
+    environment: {},
     runCommand: () => {},
     runSemanticPreflight: async (options) => {
       preflightOptions = options;
@@ -704,6 +741,7 @@ test('does not run post-deploy browser smoke when Wrangler deploy fails', async 
   let smokeRuns = 0;
   await assert.rejects(
     () => main([], {
+      environment: {},
       runCommand: (_command, argumentsList) => {
         if (argumentsList.includes('deploy')) throw new Error('stub Wrangler failure');
       },
@@ -724,6 +762,7 @@ test('skips browser smoke for Production dry-run', async () => {
   let wranglerArguments;
   const logs = [];
   await main(['--dry-run'], {
+    environment: {},
     runCommand: (_command, argumentsList) => {
       if (argumentsList.includes('deploy')) wranglerArguments = argumentsList;
     },
@@ -749,6 +788,7 @@ test('propagates browser smoke failure after the Worker deploy without rollback'
   let smokeRuns = 0;
   await assert.rejects(
     () => main([], {
+      environment: {},
       runCommand: (_command, argumentsList) => {
         events.push(argumentsList.includes('deploy') ? 'wrangler' : 'build');
       },
@@ -772,6 +812,7 @@ test('completes successfully when browser smoke passes', async () => {
   const events = [];
   let smokeRuns = 0;
   await main([], {
+    environment: {},
     runCommand: (_command, argumentsList) => {
       events.push(argumentsList.includes('deploy') ? 'wrangler' : 'build');
     },

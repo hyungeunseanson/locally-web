@@ -1,3 +1,5 @@
+import { createSupabaseApiKeyHeaders } from './supabase/apiKeys.mjs';
+
 export const HOME_POPULARITY_SNAPSHOT_CRON = '17 19 * * *';
 
 export type HomePopularitySnapshotResult = {
@@ -111,12 +113,12 @@ export function createCloudflareHomePopularitySnapshotRepository(
         response = await fetchImplementation(endpoint, {
           method: 'POST',
           redirect: 'manual',
-          headers: {
-            apikey: serviceRoleKey,
-            authorization: `Bearer ${serviceRoleKey}`,
-            accept: 'application/json',
-            'content-type': 'application/json',
-          },
+          headers: createSupabaseApiKeyHeaders(serviceRoleKey, {
+            headers: {
+              accept: 'application/json',
+              'content-type': 'application/json',
+            },
+          }),
           body: '{}',
         });
       } catch {

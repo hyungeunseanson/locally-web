@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 
 import { expect, test } from '@playwright/test';
+import { LEGACY_ANON_KEY, MODERN_PUBLISHABLE_KEY } from '../fixtures/supabaseApiKeys.mjs';
 
 import {
   handlePublicExperienceMediaQueueBatch,
@@ -370,6 +371,25 @@ test.describe('Production public experience media Queue consumer wiring', () => 
     expect(requests[0].init?.method).toBe('GET');
     expect(requests[0].init?.redirect).toBe('manual');
     expect(JSON.stringify(requests[0].init)).not.toContain('service_role');
+  });
+
+  test('latest-row Queue loader supports legacy anon and modern publishable keys without JWT assumptions', async () => {
+    for (const key of [LEGACY_ANON_KEY, MODERN_PUBLISHABLE_KEY]) {
+      const loader = createPublicExperienceLatestRowLoader({
+        ...environment(), NEXT_PUBLIC_SUPABASE_ANON_KEY: key,
+      }, async (_input, init) => {
+        const headers = new Headers(init?.headers);
+        expect(headers.get('apikey')).toBe(key);
+        expect(headers.get('authorization')).toBe(
+          key === MODERN_PUBLISHABLE_KEY ? null : 'Bearer ' + key
+        );
+        return Response.json([{
+          id: 42, status: 'active', is_active: true, photos: [],
+          itinerary: [], image_url: null,
+        }]);
+      });
+      await expect(loader('42')).resolves.toMatchObject({ id: 42 });
+    }
   });
 
   test('actual loader, engine, and consumer reach fake storage and transforms for a public row', async () => {

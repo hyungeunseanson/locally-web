@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
+import { createSupabaseApiKeyHeaders, fetchSupabase } from '../../app/utils/supabase/apiKeys.mjs';
 
 import {
   buildNotificationRetentionCutoff,
@@ -77,18 +78,15 @@ export async function reportNotificationRetentionPreflight({
   assert.equal(origin.protocol, 'https:', 'Production preflight requires HTTPS Supabase origin.');
   assert(/^[a-z0-9]{20}\.supabase\.co$/.test(origin.hostname), 'Unexpected Supabase origin.');
   const serviceRole = requiredEnvironment('SUPABASE_SERVICE_ROLE_KEY');
-  const headers = {
-    apikey: serviceRole,
-    authorization: `Bearer ${serviceRole}`,
-    accept: 'application/json',
-    prefer: 'count=exact',
-  };
+  const headers = createSupabaseApiKeyHeaders(serviceRole, {
+    headers: { accept: 'application/json', prefer: 'count=exact' },
+  });
   const cutoff = buildNotificationRetentionCutoff(now);
 
   const totalUrl = new URL('/rest/v1/notifications', origin);
   totalUrl.searchParams.set('select', 'id');
   totalUrl.searchParams.set('limit', '1');
-  const totalResponse = await fetchImplementation(totalUrl, { headers, redirect: 'manual' });
+  const totalResponse = await fetchSupabase(totalUrl, { headers, redirect: 'manual' }, fetchImplementation);
   if (!totalResponse.ok) throw new Error(`total_count_failed_${totalResponse.status}`);
   const totalCount = parseExactCount(totalResponse);
 
@@ -98,13 +96,13 @@ export async function reportNotificationRetentionPreflight({
     pageUrl.searchParams.set('select', 'id,type,is_read,created_at');
     pageUrl.searchParams.set('created_at', `lt.${cutoff}`);
     pageUrl.searchParams.set('order', 'created_at.asc,id.asc');
-    const response = await fetchImplementation(pageUrl, {
+    const response = await fetchSupabase(pageUrl, {
       headers: {
         ...headers,
         range: `${page * PAGE_SIZE}-${(page + 1) * PAGE_SIZE - 1}`,
       },
       redirect: 'manual',
-    });
+    }, fetchImplementation);
     const pageRows = await fetchJson(response, 'old_rows_failed');
     assert(Array.isArray(pageRows), 'Supabase returned an invalid notification list.');
     rows.push(...pageRows);

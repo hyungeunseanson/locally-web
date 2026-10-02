@@ -3,6 +3,7 @@ import { chmod, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
+import { createSupabaseApiKeyHeaders, fetchSupabase, readSupabaseJson } from '../../app/utils/supabase/apiKeys.mjs';
 
 import {
   digestPayload,
@@ -122,25 +123,25 @@ async function main() {
   const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, '');
   const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
   if (baseUrl !== PROJECT_URL || !serviceRole) throw new Error('Exact Production service-role configuration is required.');
-  const headers = { apikey: serviceRole, Authorization: `Bearer ${serviceRole}`, 'Content-Type': 'application/json' };
+  const headers = createSupabaseApiKeyHeaders(serviceRole, { headers: { 'Content-Type': 'application/json' } });
   const loadRows = async (ids) => {
     const query = new URLSearchParams({ select: `id,${FIELDS.join(',')}`, id: `in.(${ids.join(',')})` });
-    const response = await fetch(`${baseUrl}/rest/v1/experiences?${query}`, { headers, redirect: 'manual' });
+    const response = await fetchSupabase(`${baseUrl}/rest/v1/experiences?${query}`, { headers, redirect: 'manual' });
     if (!response.ok) throw new Error(`Locator preflight failed: HTTP ${response.status}.`);
-    return response.json();
+    return readSupabaseJson(response);
   };
   const patchRow = async (change) => {
-    const response = await fetch(`${baseUrl}/rest/v1/rpc/${LOCATOR_CAS_RPC}`, {
+    const response = await fetchSupabase(`${baseUrl}/rest/v1/rpc/${LOCATOR_CAS_RPC}`, {
       method: 'POST', headers, redirect: 'manual',
       body: JSON.stringify(buildLocatorCasRpcBody(change)),
     });
     if (!response.ok) throw new Error(`Locator update failed: HTTP ${response.status}.`);
-    const outcome = await response.json();
+    const outcome = await readSupabaseJson(response);
     if (!['updated', 'already_exact'].includes(outcome)) return { outcome };
     const query = new URLSearchParams({ select: `id,${FIELDS.join(',')}`, id: `eq.${change.experienceId}` });
-    const verification = await fetch(`${baseUrl}/rest/v1/experiences?${query}`, { headers, redirect: 'manual' });
+    const verification = await fetchSupabase(`${baseUrl}/rest/v1/experiences?${query}`, { headers, redirect: 'manual' });
     if (!verification.ok) throw new Error(`Locator verification failed: HTTP ${verification.status}.`);
-    const rows = await verification.json();
+    const rows = await readSupabaseJson(verification);
     if (!Array.isArray(rows) || rows.length !== 1) throw new Error('Locator verification row is missing.');
     return { outcome, row: rows[0] };
   };

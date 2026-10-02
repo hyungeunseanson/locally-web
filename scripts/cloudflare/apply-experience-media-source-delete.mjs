@@ -4,6 +4,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import { createClient } from '@supabase/supabase-js';
+import { createSupabaseApiKeyHeaders, fetchSupabase } from '../../app/utils/supabase/apiKeys.mjs';
 
 import { fetchAllExperienceRows, listAllStorageObjects } from './audit-public-experience-media.mjs';
 import {
@@ -79,11 +80,11 @@ async function main() {
   const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, '');
   const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
   if (baseUrl !== PROJECT_URL || !serviceRole) throw new Error('Exact Production service-role configuration is required.');
-  const headers = { apikey: serviceRole, Authorization: `Bearer ${serviceRole}` };
+  const headers = createSupabaseApiKeyHeaders(serviceRole);
   const client = createClient(baseUrl, serviceRole, { auth: { persistSession: false, autoRefreshToken: false } });
   const fetchObject = async (name) => {
     const encoded = name.split('/').map(encodeURIComponent).join('/');
-    const response = await fetch(`${baseUrl}/storage/v1/object/authenticated/experiences/${encoded}`, { headers, redirect: 'manual' });
+    const response = await fetchSupabase(`${baseUrl}/storage/v1/object/authenticated/experiences/${encoded}`, { headers, redirect: 'manual' });
     if (!response.ok) throw new Error(`Storage proof GET failed: HTTP ${response.status}.`);
     return Buffer.from(await response.arrayBuffer());
   };
