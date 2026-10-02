@@ -1,8 +1,25 @@
 # Verdict
 
-ADMIN_CHAT_FULL_AUDIT_BLOCKED
+ADMIN_CHAT_FULL_AUDIT_AND_IMPROVEMENT_COMPLETE
 
-Final CI confirmation pending. This audit distinguishes executable evidence, source-derived behavior, and remaining product/capacity work. Production was never used for interactive chat tests: opening an unseen thread would ACK it.
+This audit distinguishes executable evidence, source-derived behavior, and remaining product/capacity work. Production was never used for interactive chat tests: opening an unseen thread would ACK it.
+
+The audit identified and fixed 13 concrete issues (A01–A13). Completion means the audit, safe application changes and stated verification are delivered; it does not mean every capacity/product/configuration follow-up has been implemented.
+
+| Operational question | Conclusion |
+|---|---|
+| A. Can messages be missed? | Same-admin second-tab INSERT and attachment visibility were broken and are fixed. Very long threads still require cursor loading before the server row cap is reached. |
+| B. Can N be wrong? | Exact-ID ACK and late-transaction semantics pass; hidden-tab ACK is now prevented and failed ACK is recoverable. Missed events can temporarily leave counts stale until catch-up. |
+| C. Are reply need and admin confirmation separate? | Yes in the current RPC/store contract; phone additional-reply rules remain distinct. Moderation no longer changes participant receipts. |
+| D. Does disconnect recovery work? | Simulated reconnect/online/visibility tests pass. Production lacks proxy_requests publication, so request-only changes depend on catch-up until separately corrected. |
+| E. Are requests excessive? | Same-main fixture shows no request/concurrency/commit regression. Repeated full earlier pages and server phone scan remain growth concerns. |
+| F. Can navigation retain stale conversations? | URL removal/back/forward/surface changes are fixed. Deleted or newly unauthorized selections still need explicit terminal-state UX. |
+| G. Is mobile operation usable? | Four viewport fixtures in Chromium/WebKit pass after overflow/header/retry/focus fixes. Physical keyboard/safe-area behavior on a real device is not proven. |
+| H. Will thousands of conversations scale? | Not yet guaranteed: global ordering/search and thread cursor loading need bounded SQL contracts. Current counts do not justify virtualization first. |
+| I. What would improve daily work? | Global search, separate N/reply filters, waiting-time sort and copyable permalinks have clear operational value; ownership/notes need product/schema decisions. |
+| J. Is legacy behavior present? | Redundant INSERT timer state and moderation receipt writes were removed. Existing catch-up and compatibility paths are intentional; unrelated badge helper users remain. |
+
+Evidence was cross-checked in six directions: Git history, current dependency/call graph, authorized API/SQL contracts, Production aggregate/schema/RPC/publication reads, simulated Realtime lifecycle/races, and actual React browser fixtures. Only the aggregate/database metadata inspection used Production. Browser events and SQL concurrency tests were isolated fixtures/local databases.
 
 # Starting main
 
@@ -79,7 +96,7 @@ Statuses describe the starting main. “Fixed” identifies this PR's action, no
 | P2 A07 | Offline/hung inquiry resolver or 500; phone detail 500 at 390px | No resolver deadline/retry; hidden phone list leaves no retry | CustomerSupportTabs/PhoneReservationTab | Fixed |
 | P2 A08 | Desired support status exists only beyond the loaded first page | Browser filter ran after API pagination | inquiries GET/hook/ChatMonitor | Fixed: DB predicate; invalid input 400 |
 | P2 A09 | Initial phone metadata GET captures pending; status changes before response; online/Realtime invalidation shares that GET | No trailing metadata request; old status remains until next event | PhoneReservationTab | Fixed; delayed-response browser test asserts exactly 2 serial GETs |
-| P2 A10 | ACK returns 500; unrelated list metadata rerenders | Silent failure and opportunistic duplicate attempts; no direct recovery | hook/ChatMonitor | Fixed: retry control, one attempt per snapshot-load/explicit retry; N retained |
+| P2 A10 | ACK returns 500; unrelated list metadata rerenders | Silent failure and opportunistic duplicate attempts; no direct recovery | hook/ChatMonitor | Fixed: retry control, one attempt per snapshot-load/explicit retry; late A failure cannot erase B retry; N retained |
 | P2 A11 | Selected hidden browser tab receives unseen message | Successful render in hidden document qualified for ACK | useAdminChatQuery | Fixed: visible-document guard; resume loads and ACKs |
 | P2 A13 | Leave Alerts while initial GET is pending, then resolve it | Init resumed after unmount and created an orphan channel | AdminAlertsTab | Fixed; delayed GET/unmount browser test |
 | P3 A12 | Tab through list, inspect state buttons; 768px long URL | Div rows; no filter pressed state; fixed list min width | ChatMonitor | Fixed; button/current/pressed/label/status semantics and wrapping |
@@ -270,12 +287,12 @@ Local Node 24.20.0; dependencies installed with repository CI's `--legacy-peer-d
 
 - Starting-main focused bug reproduction: 4 failures expected; fixed tests pass.
 - `npm run test:admin-chat:phase1`: 44 Phase 1/#155 + 94 chat unit tests, 26 chat contracts, 29 platform contracts and 14 Chromium/WebKit layout tests passed.
-- `npm run test:admin-attention:phase2`: 20 unit/contract/performance tests and 36 Chromium/WebKit real-component tests passed, including simultaneous browser tabs and unmount during initial Alerts loading.
+- `npm run test:admin-attention:phase2`: 21 unit/contract/performance tests and 36 Chromium/WebKit real-component tests passed, including simultaneous browser tabs and unmount during initial Alerts loading.
 - Phone workspace: final 87 tests passed, including after trailing-metadata changes.
 - Native local PostgreSQL: historical repair, row-lock status races, late-ID and dual-admin ACK, concurrent deletion, receipt invariance pass.
 - Local Cloudflare production-build/smoke/deploy **contracts**: 157 passed; these use fixtures, not Production deployment.
 - Full ESLint: 0 errors, 7 existing unrelated warnings. `tsc --noEmit`: pass; final validation also recorded in PR.
-- Full Cloudflare Foundation and chat CI results are recorded on the Draft PR. No live write-enabled E2E, account creation, production browser chat opening, or payment tests run.
+- Implementation head `bdcf5da9d477169b32b985db2e48002322fa1399`: [Chat regression CI passed](https://github.com/hyungeunseanson/locally-web/actions/runs/37001368364) and [Cloudflare Foundation CI passed](https://github.com/hyungeunseanson/locally-web/actions/runs/37001368385), including Auth, phone workspace, Next/OpenNext builds and local Worker dry-runs. A final selected-conversation guard for late ACK failure was subsequently reproduced failing, fixed, and covered by the 21-test local suite. Final-head CI results are recorded in the Draft PR and final delivery. No live write-enabled E2E, account creation, production browser chat opening, or payment tests run.
 
 # Production impact
 
@@ -291,6 +308,8 @@ Only allowlisted Supabase metadata/function definitions, aggregate counts/link a
 
 # Draft PR
 
-[Draft PR #162](https://github.com/hyungeunseanson/locally-web/pull/162), branch `codex/admin-chat-full-audit`. Initial implementation commit `048606ea7d6a2413d2800bbf72e586bca7e67fc0`; subsequent commits preserve history and are listed in the PR. Exact final head is recorded at final delivery. Sixteen changed files are enumerated in the PR Files changed view. No merge authorized or attempted.
+[Draft PR #162](https://github.com/hyungeunseanson/locally-web/pull/162), branch `codex/admin-chat-full-audit`. Initial implementation commit `048606ea7d6a2413d2800bbf72e586bca7e67fc0`; subsequent commits preserve history and are listed in the PR. Full CI also passed on implementation head `bdcf5da9d477169b32b985db2e48002322fa1399` before the final late-ACK guard and report commit. Exact final head is recorded at final delivery. Sixteen changed files are enumerated in the PR Files changed view. No merge authorized or attempted.
 
 The first Foundation run found a lint issue in the new test probe (assignment during render). The probe now records the hook result in an effect; application code was not affected. The first Chat run also exposed a fixture timing issue: an Alerts event was injected before the subscription existed. The test now waits for channel readiness; a separate regression covers unmount during initial load. Final CI results supersede those runs.
+
+ADMIN_CHAT_FULL_AUDIT_AND_IMPROVEMENT_COMPLETE

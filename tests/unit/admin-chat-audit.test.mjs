@@ -7,8 +7,8 @@ import { clientFixture, inquiry, message, response, deferred, sourceLoader, quer
 
 const hook = 'app/admin/dashboard/hooks/useAdminChatQuery.ts';
 const sources = process.env.ADMIN_AUDIT_BASELINE ? { [resolve(hook)]: execFileSync('git', ['show', `da69a033:${hook}`], { encoding: 'utf8' }) } : {};
-async function fixture() {
-  const f = clientFixture({ sources, rows: [inquiry(1, 'admin_support')] });
+async function fixture(rows = [inquiry(1, 'admin_support')]) {
+  const f = clientFixture({ sources, rows });
   f.auth = async () => ({ data: { user: { id: 'admin' } } });
   const useChat = f.load(hook).useAdminChatQuery;
   let chat;
@@ -113,4 +113,24 @@ test('a hidden admin tab never acknowledges a newly loaded unseen snapshot', asy
     await f.flush(()=>f.chat().loadMessages(1));
     assert.equal(f.calls.requests.filter(row=>row.url.endsWith('/ack')).length,1);
   }finally{await f.dispose();}
+});
+
+
+test('late ACK failure for A cannot erase B acknowledgement retry after A→B', async () => {
+  const f = await fixture([inquiry(1, 'admin_support'), inquiry(2, 'admin_support')]);
+  try {
+    const a = deferred(), b = deferred();
+    f.request = async url => {
+      const id = Number(url.match(/inquiries\/(\d+)/)?.[1]);
+      if (url.endsWith('/ack')) return (id === 1 ? a : b).promise;
+      return response({ success: true, inquiry: { ...f.rows.find(row => row.id === id), admin_unread_count: 1 }, data: [message(id * 10 + 1, id, 'guest')] });
+    };
+    await f.flush(() => f.chat().loadMessages(1));
+    await f.flush(() => f.chat().selectInquiry(2));
+    await f.flush(() => b.resolve(response({ success: false }, 500)));
+    assert.equal(f.chat().acknowledgementFailed, true);
+    await f.flush(() => a.resolve(response({ success: false }, 500)));
+    assert.equal(f.chat().selectedInquiry.id, 2);
+    assert.equal(f.chat().acknowledgementFailed, true, 'old conversation failure cannot replace the selected failure');
+  } finally { await f.dispose(); }
 });

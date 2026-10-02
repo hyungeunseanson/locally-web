@@ -423,7 +423,9 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
         if (attention) attention.applyAcknowledgement(captured.inquiryId, result.admin_unread_count, captured.version);
         else patchInquiry(captured.inquiryId, { admin_unread_count: result.admin_unread_count });
       }
-    }).catch(() => setAckFailure(captured.inquiryId)).finally(() => pendingAcknowledgementsRef.current.delete(snapshot));
+    }).catch(() => {
+      if (String(selectedInquiryRef.current?.id) === captured.inquiryId) setAckFailure(captured.inquiryId);
+    }).finally(() => pendingAcknowledgementsRef.current.delete(snapshot));
   }, [messages, selectedInquiry, enabled, isMessagesLoading, messageError, attention, patchInquiry, ackAttempt]);
 
   useEffect(() => {
