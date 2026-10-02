@@ -17,6 +17,21 @@ BEGIN
   IF has_any_column_privilege('authenticated','public.inquiry_messages','UPDATE')
     OR has_any_column_privilege('authenticated','public.inquiries','UPDATE') THEN RAISE EXCEPTION 'Participant direct UPDATE restored'; END IF;
   IF to_regclass('public.inquiry_messages_admin_unseen_idx') IS NULL THEN RAISE EXCEPTION 'Missing unseen index'; END IF;
+  IF to_regclass('private.admin_monitor_cutover') IS NULL THEN RAISE EXCEPTION 'Missing one-time monitor cutover'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_class WHERE oid = 'private.admin_monitor_cutover'::regclass AND relrowsecurity)
+    OR (SELECT count(*) FROM private.admin_monitor_cutover) <> 1
+    OR NOT EXISTS (SELECT 1 FROM private.admin_monitor_cutover WHERE singleton AND applied_at <= clock_timestamp()
+      AND messages >= conversations AND conversations >= 0) THEN RAISE EXCEPTION 'Invalid monitor cutover record'; END IF;
+  FOREACH role_name IN ARRAY ARRAY['anon','authenticated'] LOOP
+    IF has_table_privilege(role_name,'private.admin_monitor_cutover','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+      OR has_any_column_privilege(role_name,'private.admin_monitor_cutover','SELECT,INSERT,UPDATE,REFERENCES') THEN
+      RAISE EXCEPTION 'Public monitor cutover access %', role_name;
+    END IF;
+  END LOOP;
+  IF NOT has_table_privilege('service_role','private.admin_monitor_cutover','SELECT')
+    OR has_table_privilege('service_role','private.admin_monitor_cutover','INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') THEN
+    RAISE EXCEPTION 'Unsafe server cutover grant';
+  END IF;
   IF to_regprocedure('private.prepare_support_message()') IS NULL
     OR to_regprocedure('private.advance_support_version()') IS NULL THEN RAISE EXCEPTION 'Missing Phase 1 safety functions'; END IF;
 END $$;

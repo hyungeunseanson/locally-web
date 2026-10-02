@@ -72,11 +72,13 @@ test.describe('Supabase staging bootstrap contract', () => {
       'supabase/migrations/20261002015110_admin_message_monitoring_historical_reinquiry.sql',
       'supabase/migrations/20261002041848_admin_attention_badges_phase_2.sql',
     ]);
+    expect(manifest.pendingPrivateTables).toEqual(['private.admin_monitor_cutover']);
+    expect(manifest.pendingApplicationFunctions).toEqual(['ack_admin_inquiry_snapshot','get_admin_attention']);
     expect(manifest.pendingProductionMigrations).toEqual([{
       version: '20261002041848',
       name: 'admin_attention_badges_phase_2',
       repositoryFile: 'supabase/migrations/20261002041848_admin_attention_badges_phase_2.sql',
-      repositorySha256: '2957a758c9b4fdbd1caf9b73ba8cccc8cf74733730a3bbe7e26033150aa821fe',
+      repositorySha256: 'd20d5774318f8fe52dc41d13a533728b13c98a20fab812cd693737dba0de51a2',
       status: 'prepared-not-applied',
     }]);
     expect(packageJson.scripts['supabase:staging:baseline:check']).toBeTruthy();

@@ -40,11 +40,25 @@
 | Billing & Revenue / 정산 | 매출 집계·수동 정산/환불 등 서로 다른 상태, 통합 미처리 기준 없음 | **FOLLOW-UP CANDIDATE**. 새 정산 상태 시스템은 범위 밖. |
 | User Management / Data Analytics | 승인/CS와 별개인 조회 화면; 확실한 unseen/work queue 기준 없음 | 이번에는 badge 없음. |
 
-Action 숫자는 initial/catch-up/5분 안전망에서 확인한 DB 상태다. 관련 테이블의 publication 변경이나 결제·승인 workflow 변경은 하지 않았다.
+Action 숫자는 initial/catch-up/5분 안전망에서 확인한 DB 상태다. 같은 화면에서 승인·삭제·입금·취소 처리에 성공하면 shared store를 즉시 갱신한다. 관련 테이블의 publication 변경이나 결제·승인 서버 workflow 변경은 하지 않았다.
+
+## PR #157 rollout 검수 수정
+
+Phase 1은 support 이력에만 admin seen을 초기화했다. 따라서 일반 monitor의 과거 NULL을 그대로 N으로 세면 오래된 대화를 새 문의처럼 표시한다. pending Phase 2 SQL에 **한 번만 적용되는 일반 대화 시작 기준**을 추가했다.
+
+- `private.admin_monitor_cutover`에는 적용 시각과 실제 baseline 메시지/대화 수를 한 행으로 기록한다. 공개 Data API 밖이며 RLS 활성화, anon/authenticated 접근 없음, service_role SELECT만 허용한다.
+- 첫 적용에서 messages/inquiries 쓰기 잠금을 얻은 뒤 존재하는 일반 메시지 중 admin seen이 NULL인 유효 non-admin 행만 baseline 처리한다. `type IS DISTINCT FROM 'admin' AND ... 'admin_support'`를 사용해 NULL inquiry type도 포함한다. 삭제/관리자/이미 확인된 메시지와 모든 support/phone 이력은 보존한다. 고객 `is_read/read_at`은 쓰지 않는다.
+- 잠금 이후의 행 존재가 경계다. `created_at`이나 ID 상한으로 추측하지 않는다. 적용 후 새 메시지는 과거 시각/작은 ID로 INSERT돼도 NULL로 남는다. 기록이 있으면 재실행은 baseline을 생략한다. UPDATE와 기록은 같은 transaction으로 commit/rollback한다.
+- Production 읽기 전용 preflight 재조회: **2026-10-02 15:24 KST** 일반 monitor **40대화·410메시지**가 현재 예상 baseline 대상이다. 그중 331메시지는 7일 초과, 135메시지는 30일 초과, 가장 오래된 값은 `2026-05-07T14:48:21.670866Z`였다. support 후보는 0, 보존 대상 phone은 **10대화·12메시지**였다. 실제 적용 시점의 트래픽에 따라 수는 변하며 테스트 expected로 쓰지 않는다. Phase 2는 미적용이고 participant UPDATE grant는 두 테이블 모두 false다.
+- 로컬 PostgreSQL에서 **적용 전** 일반/NULL-type guest·host 이력을 seed한다. 적용 직후 monitor N 0, 모든 participant receipts 완전 동일, support/phone unread 동일을 검증했다. **적용 후** 과거 created_at의 guest/host 메시지 두 건을 INSERT하면 해당 대화만 N 1이며 exact rendered IDs ACK 후 N 0이다. 즉시 재실행 및 새 메시지 이후 재실행도 처음 기록/새 N을 보존한다.
+
+처리 대기 배지의 기존 성공 경로도 확인했다. Approvals의 `updateAdminStatus`/삭제 뒤에는 approvals 목록만 갱신했고, Master Ledger의 `refreshAfterMutation`은 장부와 선택적 부모 callback만 실행했다(현재 dashboard는 callback 미전달). Service Requests의 입금/취소 성공 callback 역시 service 목록만 갱신했다. Provider는 이 테이블들을 구독하지 않으므로 기존 배지는 다른 catch-up이 없다면 최대 5분 지연된다.
+
+이 세 경로의 **서버 성공 확인 뒤** 공통 `attention.refresh()`를 호출한다. 실패한 mutation은 숫자를 줄이지 않는다. 이 count 요청은 thread GET을 호출하지 않고 loading/ACK와 독립이다. 이미 실행 중인 full count GET이 실패해도 성공한 mutation이 요청한 직렬 trailing refresh는 소실되지 않는다. 실제 hook/MasterLedger/ServiceAdmin 컴포넌트를 DOM에 mount한 테스트에서 rejection → 숫자 보존, success → timer 없이 공통 GET 1회 및 배지 갱신, thread GET 0을 확인했다. 승인/입금 Realtime publication이나 Cron은 추가하지 않았다.
 
 ## 의미와 race 보호
 
-- **NEW / UNSEEN**: 유효한 non-admin 메시지 중 `admin_read_at IS NULL`인 메시지가 존재하는 대화. 메시지 1개/10개 모두 행 N 하나, 탭 숫자 한 건.
+- **NEW / UNSEEN**: 유효한 non-admin 메시지 중 `admin_read_at IS NULL`인 메시지가 존재하는 대화. 일반 monitor는 최초 cutover 이전 이력을 baseline 처리한 뒤 이 기준을 적용한다. 메시지 1개/10개 모두 행 N 하나, 탭 숫자 한 건.
 - **ACTION REQUIRED**: 답변 필요, 전화예약 추가 답장/주의, 승인·입금 대기. 열람만으로 없애지 않는다.
 - admin seen은 기존 Phase 1의 공통 관리자 확인 상태다. 고객/호스트 `is_read/read_at`이나 브라우저의 localStorage 시각과 섞지 않는다.
 - 전화예약은 formal proxy 한 건, 같은 고객, support inquiry type이 모두 맞아야 한다. 중복·잘못된 고객·card anchor는 fail closed로 support에 남긴다.
@@ -56,7 +70,7 @@ Action 숫자는 initial/catch-up/5분 안전망에서 확인한 DB 상태다. �
 ## 다섯 경로의 교차 검증
 
 1. Git: 위 commit과 제거 diff, hotfix 4개 파일을 비교했다.
-2. Production DB: `BEGIN READ ONLY ... ROLLBACK` 집계만 실행했다. 재조회 당시 support 0 / phone **11대화·13메시지** / monitor **40대화·407메시지**였다. 개인정보/메시지 내용은 가져오지 않았다. 숫자는 실제 고객 활동으로 달라질 수 있는 관찰값이며 고정 expected fixture가 아니다.
+2. Production DB: `BEGIN READ ONLY ... ROLLBACK` 집계만 실행했다. 최초 조사 당시 support 0 / phone **11대화·13메시지** / monitor **40대화·407메시지**였다. monitor 값은 과거 NULL 후보이며 새 메시지라는 증거가 아니었다. 위 rollout 수정의 재집계와 baseline 기준으로 보완했다. 개인정보/메시지 내용은 가져오지 않았다. 숫자는 실제 고객 활동으로 달라질 수 있는 관찰값이며 고정 expected fixture가 아니다.
 3. API: 동일 로컬 PostgreSQL fixture에서 support 1 / phone 1 / monitor 1, 합계 3을 검증했다. 실제 list API의 전화예약 제외, phone API의 10메시지→1대화, Sidebar 3을 대조했다. phone activity 조회는 batch 한 번이며 Guest/Host는 Sidebar API 403, 비로그인은 401이다.
 4. Realtime: INSERT burst, ACK UPDATE, stale GET/ACK, 재접속·online·visibility, Alerts INSERT/PK-only DELETE를 검증했다. 읽음 UPDATE 10회에도 thread GET은 증가하지 않았다.
 5. UI: 실제 컴포넌트를 Chromium/WebKit에 bundle해 390px/1280px에서 확인했다. 세 탭 숫자와 Sidebar 합계, N 하나, 전화예약 추가 답장 독립, Alerts 143(목록 범위 밖 포함), ACK 실패/성공/놓친 새 메시지 복구를 검증했다. 외부 네트워크는 차단한 합성 fixture다. Production 브라우저에는 쓰기를 수행하지 않았다.
@@ -80,15 +94,15 @@ idle의 추가 2회는 새 Sidebar/탭 공통 count의 5분 안전망이다. 새
 ## 준비한 DB 변경과 적용 경계
 
 - 제안 파일: `supabase/migrations/20261002041848_admin_attention_badges_phase_2.sql`.
-- 기존 activity/legacy ACK를 일반 대화까지 확장하고, exact snapshot ACK 및 shared attention RPC를 추가한다. unseen partial index를 추가한다. service-role 전용/빈 search_path를 검증한다.
+- 기존 activity/legacy ACK를 일반 대화까지 확장하고, one-time monitor baseline, exact snapshot ACK 및 shared attention RPC를 추가한다. unseen partial index를 추가한다. service-role 전용/빈 search_path를 검증한다.
 - 로컬 PostgreSQL(PGlite)에서 실제 SQL 실행·재실행, roles/admin whitelist/deleted 제외, snapshot 경계/remaining unread, 고객 read 보존, direct UPDATE 차단, phone 분류를 검증했다.
-- `pendingProductionMigrations`와 별도 `pendingApplicationFunctions`에만 proposal을 기록한다. 적용된 migration SQL, 실제 ledger mapping, Production manifest/current-state SQL은 변경하지 않았다.
+- `pendingProductionMigrations`, `pendingApplicationFunctions`, `pendingPrivateTables`에만 proposal을 기록한다. pending migration SHA256: `d20d5774318f8fe52dc41d13a533728b13c98a20fab812cd693737dba0de51a2`. required objects/current-state checker/staging target/contract fixture를 함께 동기화했다. 적용된 migration SQL, 실제 ledger mapping, Production manifest/current-state SQL은 변경하지 않았다.
 - Production parity contract는 pending SQL **이전** checkpoint에서 실행한다. 로컬/staging의 승인된 target 단계에서만 pending SQL 뒤 `admin-attention-target-contract.sql`을 실행한다.
 - 이 코드의 shared count/새 ACK RPC에는 proposal이 필요하므로, 이번 Draft PR은 Production 배포 완료를 뜻하지 않는다. 이번 작업에서는 적용·배포하지 않는다.
 
 ## 검증 명령과 결과
 
-- `npm run test:admin-attention:phase2`: 9 unit + 14 Chromium/WebKit browser tests PASS.
+- `npm run test:admin-attention:phase2`: 14 unit + 14 Chromium/WebKit browser tests PASS. cutover/재실행 및 action freshness 회귀 포함.
 - `npm run test:admin-chat:phase1`: hotfix `admin-message-monitoring-loading`, Phase 1 read/security/reopen/history/idle, PR #151/#152 성능·optimistic·Realtime·race, chat/platform 및 KST browser regression PASS.
 - `npx playwright test -c playwright.phone-workspace.config.ts`: 87 PASS, hotfix phone initial + SUBSCRIBED/visibility/online browser races 포함.
 - `npm run supabase:staging:contract`: immutable baseline/current-state/bootstrap + 13 contract tests PASS.

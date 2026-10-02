@@ -37,10 +37,12 @@ function exact(label, actual, expected) {
 }
 
 exact('pending attention RPCs', required.pendingApplicationFunctions, ['ack_admin_inquiry_snapshot', 'get_admin_attention']);
+exact('pending private cutover tables', required.pendingPrivateTables, ['private.admin_monitor_cutover']);
 if (!attentionTargetContract.includes('BEGIN READ ONLY;') || !attentionTargetContract.trimEnd().endsWith('ROLLBACK;')
   || !attentionTargetContract.includes('ADMIN_ATTENTION_TARGET_CONTRACT_PASS')
-  || required.pendingApplicationFunctions.some(fn => !attentionTargetContract.includes(`public.${fn}(`))) {
-  fail('pending attention target contract must verify both server-only RPCs read-only');
+  || required.pendingApplicationFunctions.some(fn => !attentionTargetContract.includes(`public.${fn}(`))
+  || required.pendingPrivateTables.some(table => !attentionTargetContract.includes(table))) {
+  fail('pending attention target contract must verify server-only RPCs and private cutover read-only');
 }
 
 const expectedAppliedOrder = [

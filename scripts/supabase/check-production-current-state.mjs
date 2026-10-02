@@ -162,7 +162,7 @@ const expectedPendingMigrations = [{
   version: '20261002041848',
   name: 'admin_attention_badges_phase_2',
   repositoryFile: 'supabase/migrations/20261002041848_admin_attention_badges_phase_2.sql',
-  repositorySha256: '2957a758c9b4fdbd1caf9b73ba8cccc8cf74733730a3bbe7e26033150aa821fe',
+  repositorySha256: 'd20d5774318f8fe52dc41d13a533728b13c98a20fab812cd693737dba0de51a2',
   status: 'prepared-not-applied',
 }];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));
@@ -204,6 +204,7 @@ assert(
 );
 
 // Prepared Phase 2 is not in the Production ledger or catalog assertions.
+exact('prepared private cutover tables', required.pendingPrivateTables, ['private.admin_monitor_cutover']);
 for (const pending of expectedPendingMigrations) {
   assert(await sha256(pending.repositoryFile) === pending.repositorySha256, 'prepared attention migration bytes differ');
 }

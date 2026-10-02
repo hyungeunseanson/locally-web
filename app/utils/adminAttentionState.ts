@@ -61,13 +61,19 @@ export class AdminAttentionStore {
     try {
       do {
         this.fullAgain = false;
-        const revision = this.revision, alertsRevision = this.alertsRevision;
-        const data = await this.read('/api/admin/sidebar-counts');
-        if (this.stopped) return;
-        if (revision !== this.revision || alertsRevision !== this.alertsRevision) { this.fullAgain = true; continue; }
-        this.commit({ ...data, conversations: Object.fromEntries((data.conversations as AttentionConversation[]).map(row => [String(row.inquiry_id), row])), ready: true, error: null });
+        try {
+          const revision = this.revision, alertsRevision = this.alertsRevision;
+          const data = await this.read('/api/admin/sidebar-counts');
+          if (this.stopped) return;
+          if (revision !== this.revision || alertsRevision !== this.alertsRevision) { this.fullAgain = true; continue; }
+          this.commit({ ...data, conversations: Object.fromEntries((data.conversations as AttentionConversation[]).map(row => [String(row.inquiry_id), row])), ready: true, error: null });
+        } catch (error) {
+          this.commit({ error: error instanceof Error ? error.message : '표시 갱신 실패' });
+          // A successful action may have queued a refresh while this older GET
+          // was pending. Honor that explicit request even when the older GET fails.
+        }
       } while (this.fullAgain && !this.stopped);
-    } catch (error) { this.commit({ error: error instanceof Error ? error.message : '표시 갱신 실패' }); }
+    }
     finally { this.fullRunning = false; }
   };
   changed = (id: number | string) => {

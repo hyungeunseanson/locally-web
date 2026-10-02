@@ -1,6 +1,42 @@
 -- PREPARED ONLY. Do not apply to Production as part of this PR.
 -- Preserve Phase 1 write lockdown, participant receipts and support reopen triggers.
 BEGIN;
+-- One-time rollout boundary, not a claim that an admin opened historical chats.
+-- Keep the marker outside the Data API. Never re-baseline post-cutover messages,
+-- including messages inserted later with an old created_at or a lower ID.
+CREATE TABLE IF NOT EXISTS private.admin_monitor_cutover (
+  singleton boolean PRIMARY KEY DEFAULT true CHECK (singleton),
+  applied_at timestamptz NOT NULL,
+  messages bigint NOT NULL CHECK (messages >= 0),
+  conversations bigint NOT NULL CHECK (conversations >= 0 AND conversations <= messages)
+);
+ALTER TABLE private.admin_monitor_cutover ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE private.admin_monitor_cutover FROM PUBLIC, anon, authenticated, service_role;
+GRANT SELECT ON TABLE private.admin_monitor_cutover TO service_role;
+DO $$
+DECLARE cutover_at timestamptz; affected_messages bigint; affected_conversations bigint;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM private.admin_monitor_cutover) THEN
+    -- Drain existing writers and block INSERT/UPDATE until this transaction commits.
+    -- The boundary is row existence after the locks, never a created_at/ID guess.
+    LOCK TABLE public.inquiry_messages, public.inquiries IN SHARE ROW EXCLUSIVE MODE;
+    IF NOT EXISTS (SELECT 1 FROM private.admin_monitor_cutover) THEN
+      cutover_at := clock_timestamp();
+      WITH baselined AS (
+        UPDATE public.inquiry_messages m SET admin_read_at = cutover_at
+        FROM public.inquiries i
+        WHERE i.id = m.inquiry_id
+          AND i.type IS DISTINCT FROM 'admin' AND i.type IS DISTINCT FROM 'admin_support'
+          AND m.admin_read_at IS NULL AND m.type IS DISTINCT FROM 'deleted'
+          AND NOT private.is_inquiry_admin_sender(m.sender_id)
+        RETURNING m.inquiry_id
+      ) SELECT count(*), count(DISTINCT inquiry_id) INTO affected_messages, affected_conversations FROM baselined;
+      INSERT INTO private.admin_monitor_cutover(singleton, applied_at, messages, conversations)
+        VALUES (true, cutover_at, affected_messages, affected_conversations);
+    END IF;
+  END IF;
+END $$;
+
 CREATE OR REPLACE FUNCTION public.get_admin_inquiry_activity(p_inquiry_ids bigint[])
 RETURNS TABLE(inquiry_id bigint, status text, updated_at timestamptz, last_message_at timestamptz, last_sender_role text,
   last_message_content text, needs_reply boolean, reply_waiting_since timestamptz,
