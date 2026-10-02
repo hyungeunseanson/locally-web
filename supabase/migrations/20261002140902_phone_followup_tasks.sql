@@ -129,6 +129,17 @@ REVOKE ALL ON FUNCTION private.delete_pending_phone_followup() FROM PUBLIC, anon
 CREATE TRIGGER phone_followup_delete AFTER DELETE OR UPDATE OF type ON public.inquiry_messages
 FOR EACH ROW EXECUTE FUNCTION private.delete_pending_phone_followup();
 
+-- Link adoption can observe a message whose concurrent deletion has already run
+-- its cleanup trigger. Validate live message existence as well as indexed pending
+-- state; a private tombstone must never reopen operational work.
+CREATE FUNCTION private.has_phone_followup(p_request uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
+  SELECT EXISTS (SELECT 1 FROM private.phone_followup_tasks t
+    JOIN public.inquiry_messages m ON m.id = t.message_id AND m.inquiry_id = t.inquiry_id
+    WHERE t.proxy_request_id = p_request AND t.handled_at IS NULL AND coalesce(m.type,'text') IN ('text','image'));
+$$;
+REVOKE ALL ON FUNCTION private.has_phone_followup(uuid) FROM PUBLIC, anon, authenticated, service_role;
+
 CREATE FUNCTION private.handle_phone_followup(p_request uuid,p_inquiry bigint,p_ids bigint[],p_admin uuid,p_complete boolean)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 DECLARE i public.inquiries%ROWTYPE; r public.proxy_requests%ROWTYPE; handled jsonb; pending boolean;
@@ -138,6 +149,14 @@ BEGIN
     OR (SELECT count(DISTINCT id) FROM unnest(p_ids) id) <> cardinality(p_ids) THEN
     RAISE EXCEPTION 'Invalid rendered snapshot' USING ERRCODE = '22023';
   END IF;
+  -- Inactive/new-link adoption is the only request -> inquiry lock path.
+  -- Reject an invisible/anchor/wrong-link candidate before taking the inquiry
+  -- lock, then revalidate below after locking the immutable formal link.
+  IF NOT EXISTS (SELECT 1 FROM public.proxy_requests p WHERE p.id = p_request
+    AND p.form_data->>'__proxy_card_anchor' IS DISTINCT FROM 'v1'
+    AND btrim(p.form_data->>'linked_inquiry_id') = p_inquiry::text) THEN
+    RAISE EXCEPTION 'Invalid formal phone candidate' USING ERRCODE = '22023';
+  END IF;
   SELECT * INTO i FROM public.inquiries WHERE id = p_inquiry FOR UPDATE;
   SELECT * INTO r FROM public.proxy_requests WHERE id = p_request FOR UPDATE;
   IF i.id IS NULL OR r.id IS NULL OR coalesce(i.type,'') NOT IN ('admin','admin_support') OR i.user_id IS DISTINCT FROM r.user_id
@@ -146,8 +165,10 @@ BEGIN
       AND p.form_data->>'__proxy_card_anchor' IS DISTINCT FROM 'v1') <> 1 THEN
     RAISE EXCEPTION 'Invalid or duplicate phone link' USING ERRCODE = '22023';
   END IF;
-  -- Message -> task order matches deletion. Parent lock prevents concurrent INSERT.
-  PERFORM 1 FROM public.inquiry_messages m WHERE m.inquiry_id = i.id AND m.id = ANY(p_ids) ORDER BY m.id FOR UPDATE;
+  -- Protect message identity/hard deletion without blocking ACK/receipt UPDATEs.
+  -- Task row locks serialize handling with soft-delete cleanup. Exclusive message
+  -- locks would invert against an ACK that visits multiple messages in heap order.
+  PERFORM 1 FROM public.inquiry_messages m WHERE m.inquiry_id = i.id AND m.id = ANY(p_ids) ORDER BY m.id FOR KEY SHARE;
   IF EXISTS (SELECT 1 FROM unnest(p_ids) AS snapshot(id) WHERE NOT EXISTS (
       SELECT 1 FROM public.inquiry_messages m WHERE m.id = snapshot.id AND m.inquiry_id = i.id AND m.sender_id = r.user_id
         AND NOT private.is_inquiry_admin_sender(m.sender_id) AND coalesce(m.type,'text') IN ('text','image','deleted')
@@ -165,9 +186,11 @@ BEGIN
   END IF;
   WITH changed AS (
     UPDATE private.phone_followup_tasks SET handled_at = clock_timestamp(), handled_by = p_admin
-    WHERE proxy_request_id = r.id AND inquiry_id = i.id AND message_id = ANY(p_ids) AND handled_at IS NULL RETURNING message_id
+    WHERE proxy_request_id = r.id AND inquiry_id = i.id AND message_id = ANY(p_ids) AND handled_at IS NULL
+      AND EXISTS (SELECT 1 FROM public.inquiry_messages m WHERE m.id = message_id AND m.inquiry_id = i.id AND coalesce(m.type,'text') IN ('text','image'))
+    RETURNING message_id
   ) SELECT coalesce(jsonb_agg(message_id::text ORDER BY message_id),'[]'::jsonb) INTO handled FROM changed;
-  SELECT EXISTS(SELECT 1 FROM private.phone_followup_tasks WHERE proxy_request_id = r.id AND handled_at IS NULL) INTO pending;
+  SELECT private.has_phone_followup(r.id) INTO pending;
   RETURN jsonb_build_object('status',r.status,'handledMessageIds',handled,'needsReply',r.status = 'COMPLETED' AND pending,'hasMoreUnhandled',pending);
 END $$;
 REVOKE ALL ON FUNCTION private.handle_phone_followup(uuid,bigint,bigint[],uuid,boolean) FROM PUBLIC, anon, authenticated, service_role;
@@ -201,11 +224,10 @@ RETURNS TABLE(inquiry_id bigint,status text,updated_at timestamptz,last_message_
   admin_unread_count bigint,phone_needs_reply boolean)
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
   SELECT a.*, coalesce(pending.found,false) FROM public.get_admin_inquiry_activity(p_inquiry_ids) a
-  LEFT JOIN LATERAL (SELECT true AS found FROM private.phone_followup_tasks t
-    JOIN public.proxy_requests p ON p.id = t.proxy_request_id
+  LEFT JOIN LATERAL (SELECT true AS found FROM public.proxy_requests p
     WHERE btrim(p.form_data->>'linked_inquiry_id') = a.inquiry_id::text
       AND p.form_data->>'__proxy_card_anchor' IS DISTINCT FROM 'v1'
-      AND t.handled_at IS NULL LIMIT 1) pending ON true;
+      AND private.has_phone_followup(p.id) LIMIT 1) pending ON true;
 $$;
 REVOKE ALL ON FUNCTION public.get_admin_phone_activity(bigint[]) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.get_admin_phone_activity(bigint[]) TO service_role;

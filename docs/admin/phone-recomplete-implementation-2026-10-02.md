@@ -4,7 +4,7 @@ Prepared for Draft PR review from main `e870f8c71029298b9deede3aba53fd65a435d979
 
 ## Contract and architecture
 
-The existing **••• → 처리 완료** action uses `POST /api/admin/proxy-bookings/[id]/complete` with `{ inquiryId: "42", seenCustomerMessageIds: ["100", "101"] }`. A verified admin session supplies the actor. One service-only RPC locks inquiry → request → selected messages → tasks. Initial completion requires paid PENDING/IN_PROGRESS; re-completion does not update the request, payment, or request timestamp. The response supplies `status`, `handledMessageIds`, `needsReply`, and `hasMoreUnhandled`. A successful response can still need a reply.
+The existing **••• → 처리 완료** action uses `POST /api/admin/proxy-bookings/[id]/complete` with `{ inquiryId: "42", seenCustomerMessageIds: ["100", "101"] }`. A verified admin session supplies the actor. One service-only RPC first rejects inactive/wrong-link candidates without locking, then locks inquiry → request → selected message keys → tasks. Message key-share locks permit ACK/receipt updates while protecting hard deletion; task row locks serialize soft-delete cleanup. Initial completion requires paid PENDING/IN_PROGRESS; re-completion does not update the request, payment, or request timestamp. The response supplies `status`, `handledMessageIds`, `needsReply`, and `hasMoreUnhandled`. A successful response can still need a reply.
 
 The phone conversation commits a rendered customer-message snapshot to its parent. Loading, failure, invalid selection/link, and empty snapshots disable completion. The confirmation freezes its request, inquiry, and exact IDs; later messages are not added. The bounded request timeout does not automatically retry. All outcomes use the existing serialized workspace refresh; the response never blindly overwrites needs_reply or the currently selected row.
 
@@ -23,7 +23,7 @@ The application and payment-provider intake order is unchanged. Two narrow trigg
 1. Link adoption locks the inquiry and captures existing eligible customer messages when a formal linked request first appears. It rejects duplicate/wrong-user links and subsequent formal relinking/owner changes. Unrelated form-data edits do not acquire the inquiry lock.
 2. Later customer INSERTs already hold the inquiry lock from Phase 1. An AFTER INSERT trigger adds exactly one private task in the same transaction, regardless of request status. General support, monitor, admin and non-message event types do not create tasks.
 
-A new request or inactive card anchor may hold its request row before acquiring the inquiry lock. This is safe only because that row is invisible or excluded from capture until activation commits. A message that wins first commits without referencing that request; adoption then sees and captures it. If adoption wins, the waiting INSERT sees the committed formal link. Existing formal requests do not use this reverse order. Independent PostgreSQL 17 connections test both orders, actual unchanged card RPC branches, and concurrent duplicate adoption.
+A new request or inactive card anchor may hold its request row before acquiring the inquiry lock. This is safe only because that row is invisible or excluded from capture until activation commits. A message that wins first commits without referencing that request; adoption then sees and captures it. If adoption wins, the waiting INSERT sees the committed formal link. Existing formal requests do not use this reverse order. Completion/reply reject anchor candidates before locking the inquiry, so an invalid request cannot enter an inversion against activation. Independent PostgreSQL 17 connections test both orders, actual unchanged card RPC branches, and concurrent duplicate adoption.
 
 ## Migration and baseline
 
@@ -43,7 +43,7 @@ A rollback of the application must not drop the task table or restore timestamp/
 - COMPLETED needs_reply comes from pending private tasks, independent of latest sender and administrative acknowledgement.
 - COMPLETED means the original reservation operation completed. Handling follow-ups does not rewrite it.
 - PENDING/IN_PROGRESS and CANCELLED list semantics remain unchanged.
-- Soft/hard deletion removes pending tasks. Handled history remains. A snapshot containing a hard-deleted unhandled ID fails safely and requires refresh; soft-deleted IDs are no-ops.
+- Soft/hard deletion cleans up pending tasks. A live-message EXISTS check also excludes a tombstone captured by first-link adoption after a concurrent delete already ran its cleanup. Such a private unhandled tombstone may remain, but cannot cause needs_reply or acquire a false handled_by. Handled history remains. A snapshot containing a hard-deleted unhandled ID fails safely and requires refresh; soft-deleted IDs are no-ops.
 
 ## Security and propagation
 
@@ -60,11 +60,12 @@ Native PostgreSQL 17, three independent connections, bounded 5-second lock obser
 | Initial completion vs INSERT, customer first/admin first | New exact IDs stay pending in either order |
 | Late lower/higher IDs | Omitted IDs remain pending |
 | Re-complete and concurrent arrival | Snapshot only; request timestamp/status/payment unchanged |
+| ACK UPDATE overlap and invalid anchor completion | No message/activation lock inversion |
 | Two admins, double click, same-snapshot retry | Idempotent; first handler retained |
 | Reply success/INSERT failure | Atomic handling, rollback on insert constraint failure |
 | Wrong inquiry/customer, duplicate link, two requests for same customer | Fail closed / isolated |
 | Concurrent duplicate first link | Second adoption rejected after lock |
-| Soft/hard deletion, both lock directions | Pending removed; handled history retained |
+| Soft/hard deletion, both lock directions, plus first-link adoption overlap | Deleted messages never actionable; handled history retained |
 | Refund wins lock | Initial completion rejects without handling |
 | Migration vs INSERT/old completion | Busy migration aborts wholly; blocked INSERT captured after successful cutover |
 | Legacy client without snapshot | No implicit handling |
@@ -89,11 +90,11 @@ Added database work, beyond existing auth/reopen/send work:
 
 - Customer capture: one inquiry SELECT, one indexed linked-request aggregate, one owner EXISTS, one admin-sender predicate (users/auth/whitelist EXISTS), and one task INSERT. No added public UPDATE.
 - Link adoption: one locked inquiry read, one duplicate-link count, and one batched INSERT SELECT over existing eligible customer messages. Once per initial formal link.
-- Completion: one RPC; admin predicate, locked inquiry/request reads, duplicate-link count, bounded selected-message locks/relationship validation, one task UPDATE and pending EXISTS. Initial completion also changes one request status; re-completion changes zero public rows. Admin predicates/EXISTS may probe multiple relations; these are SQL operations, not claimed physical disk-read counts.
+- Completion: one RPC; admin predicate, one unlocked formal-candidate probe, locked inquiry/request reads, duplicate-link count, bounded selected-message locks/relationship validation, one task UPDATE and pending EXISTS. Initial completion also changes one request status; re-completion changes zero public rows. Admin predicates/EXISTS may probe multiple relations; these are SQL operations, not claimed physical disk-read counts.
 - Reply: replaces the existing direct INSERT network request with one RPC containing the same INSERT and exact task handling. Post-save work is unchanged.
 - Delete: one indexed DELETE of matching pending task, at most one row.
 
-PostgreSQL 17 EXPLAIN ANALYZE with ~10k requests justified the linked-inquiry expression index: 144 shared-hit blocks/full scan versus 3/index lookup in the recorded run. At 500k handled task rows, pending existence and absence use the partial index (2 and 1 shared-hit blocks). No query-plan timing is a Production latency guarantee.
+PostgreSQL 17 EXPLAIN ANALYZE with ~10k requests justified the linked-inquiry expression index: 144 shared-hit blocks/full scan versus 3/index lookup in the recorded run. At 500k handled task rows, pending existence and absence use the partial index; the live-message join excludes concurrent deletion tombstones. In the small message fixture, the planner chose a message scan for the presence case and an indexed message lookup for absence (not executed because no pending row existed). No query-plan timing is a Production latency guarantee.
 
 ## Validation and delivery
 

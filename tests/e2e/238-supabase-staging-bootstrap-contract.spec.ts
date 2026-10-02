@@ -86,7 +86,7 @@ test.describe('Supabase staging bootstrap contract', () => {
     "version": "20261002140902",
     "name": "phone_followup_tasks",
     "repositoryFile": "supabase/migrations/20261002140902_phone_followup_tasks.sql",
-    "repositorySha256": "ef1e1fffa1dd1a746bc5518a0ad3c2e98a34d114e1dfbde68fdeaf76de20bab1",
+    "repositorySha256": "d81de5b09ccfc25bd22b9646ef22b703a95c467b3fca7b974b86c0ef4be30fb9",
     "status": "prepared_not_applied"
   }
 ]);

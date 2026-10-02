@@ -92,6 +92,18 @@ try {
     assert.equal(card.activated_now,!reuse);assert.equal((await pending(n)).length,1);
   }
   pass('unchanged card RPC: new inquiry and existing inquiry reuse both capture exactly once');
+  await inquiry(16);await link(db,16,16,{__proxy_card_anchor:'v1',payment_method:'card',service_fee_krw:4500});await msg(db,16,1600);
+  await a.query('BEGIN');await a.query('SELECT 1 FROM proxy_requests WHERE id=$1 FOR UPDATE',[request(16)]);
+  // Must fail without waiting for activation's request lock / acquiring its inquiry.
+  await assert.rejects(complete(b,16,['1600']),{code:'22023'});
+  await a.query("SELECT * FROM finalize_proxy_card_intake_atomic($1,4500,'fixture-tid','card fixture')",[request(16)]);await a.query('COMMIT');
+  assert.deepEqual(await pending(16),['1600']);pass('invalid anchor completion cannot invert locks against card activation');
+  await inquiry(50);await link(db,50);await msg(db,50,50100);await msg(db,50,50099);
+  await a.query('BEGIN');await a.query('SELECT * FROM ack_admin_inquiry_snapshot(50,ARRAY[50100]::bigint[])');
+  await complete(b,50,['50099','50100']);
+  await a.query('SELECT * FROM ack_admin_inquiry_snapshot(50,ARRAY[50099]::bigint[])');await a.query('ROLLBACK');
+  assert.deepEqual(await pending(50),[]);pass('ACK row updates overlap completion without message lock inversion');
+
 
   // Initial completion, customer first; new ID omitted from rendered snapshot stays pending.
   await a.query('BEGIN');await msg(a,10,999);
@@ -147,6 +159,20 @@ try {
     assert.ok(!(await pending(10)).includes(String(other)));
   }
   pass('soft/hard delete races in both directions; handled history retained');
+  // Deletion cleanup can precede first-link adoption. The live-message guard
+  // prevents an adopted tombstone from ever becoming actionable pending work.
+  for(const hard of [false,true]) for(const adoptionFirst of [false,true]) {
+    const n=60+Number(hard)*2+Number(adoptionFirst),id=n*100;await inquiry(n);await msg(db,n,id);
+    if(adoptionFirst){await b.query('BEGIN');await link(b,n);}
+    await a.query('BEGIN');await a.query(hard?'DELETE FROM inquiry_messages WHERE id=$1':"UPDATE inquiry_messages SET type='deleted' WHERE id=$1",[id]);
+    if(!adoptionFirst)await link(b,n);
+    await a.query('COMMIT');if(adoptionFirst)await b.query('COMMIT');
+    assert.equal((await db.query('SELECT private.has_phone_followup($1) AS pending',[request(n)])).rows[0].pending,false);
+    assert.equal((await db.query('SELECT phone_needs_reply FROM get_admin_phone_activity(ARRAY[$1]::bigint[])',[n])).rows[0].phone_needs_reply,false);
+    if(!hard)assert.deepEqual((await complete(db,n,[String(id)])).handledMessageIds,[]);
+  }
+  pass('first-link adoption vs soft/hard delete in both orders: private tombstone never actionable');
+
   await a.query('BEGIN');await a.query("UPDATE proxy_requests SET payment_status='REFUNDED',status='CANCELLED' WHERE id=$1",[request(12)]);
   const refund=complete(b,12,['1200']).then(value=>({value}),error=>({error}));await waiting(b);await a.query('COMMIT');assert.equal((await refund).error?.code,'P0001');
   assert.deepEqual(await pending(12),['1200']);pass('refund wins request lock: initial completion rejected without task writes');
@@ -181,7 +207,7 @@ try {
   await db.query("INSERT INTO private.phone_followup_tasks(proxy_request_id,inquiry_id,message_id,handled_at,handled_by) SELECT $1,10,n,now(),$2 FROM generate_series(1000000,1499999) n",[request(10),admin]);
   await db.query('ANALYZE private.phone_followup_tasks');
   for(const n of [10,11]) {
-    const plan=JSON.stringify((await db.query('EXPLAIN (ANALYZE,BUFFERS,FORMAT JSON) SELECT 1 FROM private.phone_followup_tasks WHERE proxy_request_id=$1 AND handled_at IS NULL LIMIT 1',[request(n)])).rows);
+    const plan=JSON.stringify((await db.query(`EXPLAIN (ANALYZE,BUFFERS,FORMAT JSON) SELECT 1 FROM private.phone_followup_tasks t JOIN inquiry_messages m ON m.id=t.message_id AND m.inquiry_id=t.inquiry_id WHERE t.proxy_request_id=$1 AND t.handled_at IS NULL AND coalesce(m.type,'text') IN ('text','image') LIMIT 1`,[request(n)])).rows);
     assert.match(plan,/phone_followup_pending_idx/);console.log('PENDING_PLAN',plan);
   }
   assert.equal((await db.query('SELECT count(*) FROM inquiry_messages WHERE is_read OR read_at IS NOT NULL OR admin_read_at IS NOT NULL')).rows[0].count,'0');
