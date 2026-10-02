@@ -140,6 +140,9 @@ jobs:
       - name: Validate Experience completion Cloudflare Cron transport
         run: npm run cloudflare:experience-completion:contract
 
+      - name: Validate candidate release safety without provider mutations
+        run: npm run cloudflare:candidate-release:contract
+
       - name: Validate the Production media build wrapper
         run: npm run cloudflare:production-build:contract
 
