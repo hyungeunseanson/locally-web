@@ -30,6 +30,7 @@ export default function ChatParticipantProfileModal({
   onClose,
 }: ChatParticipantProfileModalProps) {
   // 닫힘 애니메이션
+  const panelRef = useRef<HTMLDivElement>(null);
   const [closing, setClosing] = useState(false);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (closeTimerRef.current) clearTimeout(closeTimerRef.current); }, []);
@@ -42,10 +43,20 @@ export default function ChatParticipantProfileModal({
   useEffect(() => {
     if (!participant) return;
 
+    const previousFocus = document.activeElement as HTMLElement | null;
+    panelRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
     const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Tab') {
+        const controls = panelRef.current?.querySelectorAll<HTMLElement>('button, a[href], [tabindex="0"]');
+        if (controls?.length) {
+          const first = controls[0], last = controls[controls.length - 1];
+          if (event.shiftKey && (document.activeElement === first || !panelRef.current?.contains(document.activeElement))) { event.preventDefault(); last.focus(); }
+          else if (!event.shiftKey && (document.activeElement === last || !panelRef.current?.contains(document.activeElement))) { event.preventDefault(); first.focus(); }
+        }
+      }
       if (event.key === 'Escape') {
         requestClose();
       }
@@ -55,6 +66,7 @@ export default function ChatParticipantProfileModal({
 
     return () => {
       document.body.style.overflow = originalOverflow;
+      if (previousFocus?.isConnected) previousFocus.focus();
       window.removeEventListener('keydown', handleEscape);
     };
   }, [participant, requestClose]);
@@ -79,10 +91,11 @@ export default function ChatParticipantProfileModal({
         onClick={requestClose}
       />
 
-      <div className={`relative z-10 w-full max-w-md overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl transition-all duration-150 ${closing ? 'opacity-0 scale-95' : 'animate-in zoom-in-95 duration-200'}`}>
+      <div ref={panelRef} className={`relative z-10 w-full max-w-md overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl transition-all duration-150 ${closing ? 'opacity-0 scale-95' : 'animate-in zoom-in-95 duration-200'}`}>
         <button
           type="button"
           onClick={requestClose}
+          aria-label="프로필 닫기"
           className="absolute right-3 top-3 rounded-full border border-slate-200 bg-white p-2 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900"
         >
           <X size={16} />
