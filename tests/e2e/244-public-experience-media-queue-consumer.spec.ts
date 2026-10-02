@@ -605,7 +605,7 @@ test.describe('Production public experience media Queue consumer wiring', () => 
 
   test('wraps only fetch and queue while preserving the OpenNext DO exports', () => {
     const workerSource = readFileSync('cloudflare-worker.ts', 'utf8');
-    expect(workerSource).toContain('openNextWorker.fetch(request, env, ctx)');
+    expect(workerSource).toContain('openNextWorker.fetch(rewriteRevalidation(request), env, ctx)');
     expect(workerSource).toContain('handlePublicExperienceMediaQueueBatch(batch, env)');
     expect(workerSource).toContain('export { DOQueueHandler, DOShardedTagCache }');
     expect(workerSource).not.toContain('...openNextWorker');

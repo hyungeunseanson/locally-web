@@ -168,6 +168,9 @@ export async function main() {
   const hostProfileMediaBaseUrl = await readProductionHostProfileMediaBaseUrl();
   const readerPolicy = await readProductionMediaReaderPolicy();
   const environment = buildProductionEnvironment(process.env, mediaBaseUrl, readerPolicy, hostProfileMediaBaseUrl);
+  if (environment.LOCALLY_ISR_BRIDGE_SOURCE && environment.LOCALLY_ISR_BRIDGE_SOURCE !== 'fixture'
+    && environment.LOCALLY_ISR_BRIDGE_SOURCE !== 'provider') throw new Error('OPENNEXT_REVALIDATION_BRIDGE_PRODUCTION_SOURCE_INVALID');
+  environment.LOCALLY_ISR_BRIDGE_SOURCE ??= 'provider';
   runOpenNextBuild(environment);
   await verifyProductionClientBundle([mediaBaseUrl, hostProfileMediaBaseUrl]);
   await verifyProductionClientBundle(
