@@ -1,3 +1,4 @@
+import { inspectExperienceLocale } from './integrity';
 import { createClient } from '@supabase/supabase-js';
 import type { createAdminClient } from '@/app/utils/supabase/admin';
 import {
@@ -232,6 +233,17 @@ async function processTask(
     return 'failed' as const;
   }
 
+  const manual = isManualTargetLocale(experience, task.target_locale);
+  if (manual) {
+    const title = String(experience[`title_${task.target_locale}`] ?? '').trim();
+    const description = String(experience[`description_${task.target_locale}`] ?? '').trim();
+    if (!title || !description || inspectExperienceLocale(task.target_locale, { title, description }).outcome === 'CLEAR_LANGUAGE_MISMATCH') {
+      // Provider retries cannot repair protected manual text. Keep it untouched
+      // and require an explicit reviewed content edit, not an AI override.
+      await repository.markTaskFailed(task, experience, 'Manual target content requires locale review');
+      return 'failed' as const;
+    }
+  }
   await repository.markTaskProcessing(task);
   const dbModel = await repository.getProviderModel(task.provider);
   const model = config.models[task.provider]
@@ -257,7 +269,11 @@ async function processTask(
     const translation = task.provider === 'gemini'
       ? await dependencies.translateGemini(request)
       : await dependencies.translateGrok(request);
-    const manual = isManualTargetLocale(experience, task.target_locale);
+    const integrity = inspectExperienceLocale(task.target_locale, translation);
+    if (integrity.outcome === 'CLEAR_LANGUAGE_MISMATCH') {
+      throw new TranslationProviderError({ provider: task.provider, retryable: true,
+        message: `Wrong-language translation: ${integrity.issues.filter(i => i.outcome === 'CLEAR_LANGUAGE_MISMATCH').map(i => i.field).join(', ')}` });
+    }
     const payload: Record<string, unknown> = {
       meeting_point_i18n: mergeLocalizedTextValue(experience.meeting_point_i18n, task.target_locale, translation.meetingPoint),
       supplies_i18n: mergeLocalizedTextValue(experience.supplies_i18n, task.target_locale, translation.supplies),

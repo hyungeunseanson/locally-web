@@ -233,3 +233,22 @@ test.describe('Experience translation provider completeness', () => {
     });
   });
 });
+
+for (const targetLocale of ['ko', 'en', 'zh'] as const) {
+  test(`rejects structurally complete Japanese prose for ${targetLocale} before returning a result`, async () => {
+    const payload = completeProviderResponse();
+    payload.description = '東京の街を一緒に歩きましょう。楽しい場所をご案内します。';
+    await expect(translateGrokResponse(payload, { ...translationRequest, targetLocale }))
+      .rejects.toMatchObject({ provider: 'grok', retryable: true, message: expect.stringContaining('wrong-language translation: description') });
+  });
+}
+
+test('fixed policy ID survives translation and cannot acquire a provider-authored policy literal', async () => {
+  const payload = completeProviderResponse();
+  payload.rules.refund_policy = 'Any cancellation is free';
+  const result = await translateGrokResponse(payload, {
+    ...translationRequest,
+    rules: { ...translationRequest.rules, refund_policy: '', refund_policy_id: 'locally_standard_v1' },
+  });
+  expect(result.rules).toMatchObject({ refund_policy_id: 'locally_standard_v1', refund_policy: '' });
+});
