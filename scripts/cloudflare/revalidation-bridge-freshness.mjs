@@ -64,6 +64,7 @@ export async function assertProductionBridgeProofFresh({
       && current.versions[0].percentage === 100 && current.versions[0].version_id === proof.versionId);
     const version = await get(`/versions/${proof.versionId}`);
     requireFresh(version.id === proof.versionId && version.resources?.script?.etag === proof.etag);
+    return proof;
   } catch (error) {
     // Fail closed even on malformed files, transport errors or credential lookup
     // failures. Never attach a cause: it could contain private response content.

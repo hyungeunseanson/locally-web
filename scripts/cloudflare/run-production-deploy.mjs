@@ -187,16 +187,7 @@ function run(command, argumentsList, options = {}) {
   }
 }
 
-export async function main(argumentsList = process.argv.slice(2), dependencies = {}) {
-  const environment = dependencies.environment ?? process.env;
-  assertProductionSupabasePrivilegedEnvironment(environment);
-  const runCommand = dependencies.runCommand ?? run;
-  const runBrowserSmoke = dependencies.runBrowserSmoke ?? runProductionBrowserSmoke;
-  const runSemanticPreflight = dependencies.runSemanticPreflight ?? runProductionDeploySemanticPreflight;
-  const runBridgeProofFreshness = dependencies.runBridgeProofFreshness ?? assertProductionBridgeProofFresh;
-  const log = dependencies.log ?? console.log;
-  const options = parseDeploymentArguments(argumentsList);
-  if (!options.dryRun && (environment.LOCALLY_ISR_BRIDGE_SOURCE ?? 'provider') !== 'provider') throw new Error('OPENNEXT_REVALIDATION_BRIDGE_FIXTURE_DEPLOY_FORBIDDEN');
+export async function resolveProductionDeploymentContract(options = parseDeploymentArguments([])) {
   const policy = await readReleasePolicy();
   const profile = resolveReleaseProfile(policy, options.requestedProfile);
   const translationPolicy = await readTranslationReleasePolicy();
@@ -218,6 +209,25 @@ export async function main(argumentsList = process.argv.slice(2), dependencies =
   const experienceMediaSourcePolicy = await readExperienceMediaSourceReleasePolicy();
   const experienceMediaSourceProfile = resolveExperienceMediaSourceReleaseProfile(experienceMediaSourcePolicy, options.requestedExperienceMediaSourceProfile);
   const contract = buildDeploymentContract(profile, translationProfile, homePopularityProfile, adminSupportUnreadProfile, notificationRetentionProfile, options, experienceCompletionProfile, experienceMediaSourceProfile, serviceCompletionProfile, cancelPendingBookingsProfile, opsAnomalyMonitorProfile);
+  return { ...contract, profiles: { profile, translationProfile, homePopularityProfile, adminSupportUnreadProfile,
+    notificationRetentionProfile, experienceCompletionProfile, experienceMediaSourceProfile, serviceCompletionProfile,
+    cancelPendingBookingsProfile, opsAnomalyMonitorProfile } };
+}
+
+export async function main(argumentsList = process.argv.slice(2), dependencies = {}) {
+  const environment = dependencies.environment ?? process.env;
+  assertProductionSupabasePrivilegedEnvironment(environment);
+  const runCommand = dependencies.runCommand ?? run;
+  const runBrowserSmoke = dependencies.runBrowserSmoke ?? runProductionBrowserSmoke;
+  const runSemanticPreflight = dependencies.runSemanticPreflight ?? runProductionDeploySemanticPreflight;
+  const runBridgeProofFreshness = dependencies.runBridgeProofFreshness ?? assertProductionBridgeProofFresh;
+  const log = dependencies.log ?? console.log;
+  const options = parseDeploymentArguments(argumentsList);
+  if (!options.dryRun && (environment.LOCALLY_ISR_BRIDGE_SOURCE ?? 'provider') !== 'provider') throw new Error('OPENNEXT_REVALIDATION_BRIDGE_FIXTURE_DEPLOY_FORBIDDEN');
+  const contract = await resolveProductionDeploymentContract(options);
+  const { profile, translationProfile, homePopularityProfile, adminSupportUnreadProfile, notificationRetentionProfile,
+    experienceCompletionProfile, experienceMediaSourceProfile, serviceCompletionProfile, cancelPendingBookingsProfile,
+    opsAnomalyMonitorProfile } = contract.profiles;
   const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
   const wranglerCommand = path.join(
     ROOT,

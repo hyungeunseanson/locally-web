@@ -141,6 +141,9 @@ jobs:
       - name: Validate Experience completion Cloudflare Cron transport
         run: npm run cloudflare:experience-completion:contract
 
+      - name: Validate candidate release safety without provider mutations
+        run: npm run cloudflare:candidate-release:contract
+
       - name: Validate ISR bridge without provider access
         run: npm run cloudflare:isr-bridge:contract
 
