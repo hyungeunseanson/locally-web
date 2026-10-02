@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { waitForLoginHydration } from './helpers/loginHydration';
 import { readFileSync } from 'node:fs';
 import { createHmac } from 'node:crypto';
 import { getPasswordResetCopy } from '@/app/components/passwordResetLocalization';
@@ -11,7 +12,9 @@ const ORIGIN = process.env.PLAYWRIGHT_SERVER_MODE === 'start'
   ? 'http://127.0.0.1:3000' : 'http://localhost:3000';
 let mock: MockSupabaseAuthServer;
 async function navigate(page: Page, path: string) {
-  return page.goto(new URL(path, ORIGIN).toString());
+  const response = await page.goto(new URL(path, ORIGIN).toString());
+  if (new URL(path, ORIGIN).pathname === '/login') await waitForLoginHydration(page);
+  return response;
 }
 async function requestReset(page: Page, email = 'reset@example.com') {
   await navigate(page, '/auth/forgot-password');
