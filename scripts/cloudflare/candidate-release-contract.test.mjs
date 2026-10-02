@@ -314,3 +314,12 @@ test('identity is exclusive to the exact unauthenticated endpoint; no metadata o
     const response=new Response('ordinary');assert.equal(withReleaseProbeIdentity(new Request(PRODUCTION_ORIGIN+path,{headers:{'X-Locally-Release-Probe':'1',...headers}}),response,{id:candidateId}),response);
   }
 });
+test('fresh DO artifact ETag must equal the final bridge provider proof',async()=>{
+  const {actions,calls}=fixtureActions(),read=actions.bridgeProofFreshness;
+  actions.bridgeProofFreshness=async()=>({...await read(),etag:'c'.repeat(64)});
+  await assert.rejects(executeCandidateReleaseContract(makePlan(),actions),blocked('bridge_provenance_or_freshness_failed'));assert(!calls.includes('upload'));
+});
+test('compatible plan cannot lose its explicit mode acknowledgement before mutation arguments',()=>{
+  const plan=makePlan({durableObjectProof:compatibleProof()});delete plan.doCodeUpdateMode;
+  assert.throws(()=>stageZeroArguments(plan,candidateId));assert.throws(()=>promotionArguments(plan,candidateId,{}));
+});

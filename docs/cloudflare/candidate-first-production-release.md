@@ -55,6 +55,8 @@ Re-read official documentation on 2026-10-03 KST:
   including 0%. Custom-domain smoke uses this header; no persistent matcher or
   separate override-creation API is needed. An ignored override falls back to
   ordinary traffic allocation, so deterministic identity must pass before smoke.
+  The public override header is routing control, not an authorization boundary;
+  candidate application authentication must remain identical.
 - [Version metadata](https://developers.cloudflare.com/workers/runtime-apis/bindings/version-metadata/)
   supplies the UUID for the dedicated probe; sampled logs are not an identity gate.
 - [DO gradual deployment](https://developers.cloudflare.com/workers/versions-and-deployments/gradual-deployments/with-durable-objects/):

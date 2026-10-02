@@ -177,6 +177,8 @@ export function buildCandidateReleasePlan({ config, baseline, runtimeVariables, 
 
 export function stageZeroArguments(plan, candidateId) {
   requireCondition(plan.blockers.length === 0, 'candidate_plan_blocked');
+  requireCondition(plan.doImplementation !== 'BRIDGE_COMPATIBLE_BUILD_STATE_ONLY'
+    || plan.doCodeUpdateMode === 'provider-default-no-drain-guarantee', 'explicit_supported_do_update_mode_required');
   requireCondition(UUID.test(candidateId) && candidateId !== plan.stableVersionId, 'candidate_equals_stable_or_invalid');
   // Explicit zero is mandatory. Never substitute epsilon traffic.
   return ['versions', 'deploy', `${plan.stableVersionId}@100%`, `${candidateId}@0%`, '--config', './wrangler.jsonc', '--env', 'production', '--yes'];
@@ -238,6 +240,8 @@ export function assertOverrideIdentity({ versionId, smoke, expectedOrigin = PROD
 
 export function promotionArguments(plan, candidateId, evidence) {
   requireCondition(plan.blockers.length === 0, 'candidate_plan_blocked');
+  requireCondition(plan.doImplementation !== 'BRIDGE_COMPATIBLE_BUILD_STATE_ONLY'
+    || plan.doCodeUpdateMode === 'provider-default-no-drain-guarantee', 'explicit_supported_do_update_mode_required');
   requireCondition(UUID.test(candidateId) && candidateId !== plan.stableVersionId, 'candidate_equals_stable_or_invalid');
   requireCondition(evidence.semanticPreflight === 'PASS' && evidence.uploadDeploymentUnchanged === true
     && evidence.exactZeroStagingVerified === true && evidence.overrideIdentityVerified === true
@@ -274,7 +278,9 @@ export async function executeCandidateReleaseContract(plan, actions) {
   const bridgeProof = await actions.bridgeProofFreshness();
   requireCondition(bridgeProof?.kind === 'provider' && bridgeProof.etagMatch === true
     && bridgeProof.deploymentId === before.deployment.id && bridgeProof.versionId === plan.stableVersionId
-    && /^[a-f0-9]{64}$/.test(bridgeProof.etag ?? '') && bridgeProof.compatSha256 === plan.bridgeLineage, 'bridge_provenance_or_freshness_failed');
+    && /^[a-f0-9]{64}$/.test(bridgeProof.etag ?? '') && bridgeProof.etag === proof.scriptEtag
+    && (!proof.bridgeCompatibility || proof.bridgeCompatibility.compatSha256 === plan.bridgeLineage)
+    && bridgeProof.compatSha256 === plan.bridgeLineage, 'bridge_provenance_or_freshness_failed');
   const candidate = parseVersionUploadOutput(await actions.upload(plan.uploadArguments), plan.workerName);
   requireCondition(candidate.versionId !== plan.stableVersionId, 'candidate_equals_stable_or_invalid');
   const metadata = await actions.versionMetadata(candidate.versionId);
