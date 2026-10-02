@@ -8,6 +8,7 @@ test('privileged configuration rejects public keys before any build, preflight o
     await assert.rejects(() => main([], {
       environment: { SUPABASE_SERVICE_ROLE_KEY: key },
       runCommand: () => { commands += 1; },
+      runBridgeProofFreshness: async () => {},
       runSemanticPreflight: async () => { commands += 1; },
     }), /supabase_privileged_api_key_invalid/);
     assert.equal(commands, 0);
@@ -502,6 +503,7 @@ test('passes the Cancel Pending profile and planned Cron addition to semantic pr
   ], {
     environment: {},
     runCommand: () => {},
+    runBridgeProofFreshness: async () => {},
     runSemanticPreflight: async (options) => {
       preflightOptions = options;
     },
@@ -525,6 +527,7 @@ test('default Production deploy resolves all three scheduled flags ON without pl
   await main([], {
     environment: {},
     runCommand: (_command, argumentsList) => { commands.push(argumentsList); },
+    runBridgeProofFreshness: async () => {},
     runSemanticPreflight: async (options) => { preflightOptions = options; },
     runBrowserSmoke: async () => {},
     log: () => {},
@@ -553,6 +556,7 @@ test('explicit OFF profiles retain independent rollback for all three scheduled 
     await main([argument], {
       environment: {},
       runCommand: (_command, argumentsList) => { commands.push(argumentsList); },
+      runBridgeProofFreshness: async () => {},
       runSemanticPreflight: async (options) => { preflightOptions = options; },
       runBrowserSmoke: async () => {},
       log: () => {},
@@ -581,6 +585,7 @@ test('orders build, semantic preflight, pre-deploy smoke, deploy, and post-deplo
       commands.push({ command, argumentsList });
       events.push(argumentsList.includes('deploy') ? 'wrangler' : 'build');
     },
+    runBridgeProofFreshness: async () => {},
     runSemanticPreflight: async () => {
       events.push('semantic-preflight');
     },
@@ -612,6 +617,7 @@ test('pre-deploy smoke failure preserves diagnostics and prevents Wrangler deplo
       runCommand: (_command, argumentsList) => {
         events.push(argumentsList.includes('deploy') ? 'wrangler' : 'build');
       },
+      runBridgeProofFreshness: async () => {},
       runSemanticPreflight: async () => { events.push('semantic-preflight'); },
       runBrowserSmoke: async () => {
         events.push('pre-smoke');
@@ -637,6 +643,7 @@ test('preflight failure prevents Wrangler deploy invocation', async () => {
       runCommand: (_command, argumentsList) => {
         events.push(argumentsList.includes('deploy') ? 'wrangler' : 'build');
       },
+      runBridgeProofFreshness: async () => {},
       runSemanticPreflight: async () => {
         events.push('semantic-preflight');
         throw new Error('semantic drift');
@@ -656,6 +663,7 @@ test('passes the final Service ON deployment contract to semantic preflight', as
   await main(['--service-completion-profile=on'], {
     environment: {},
     runCommand: () => {},
+    runBridgeProofFreshness: async () => {},
     runSemanticPreflight: async (options) => {
       preflightOptions = options;
     },
@@ -695,6 +703,7 @@ test('passes only the final Ops Anomaly Monitor ON change to semantic preflight'
   await main(['--ops-anomaly-monitor-profile=on'], {
     environment: {},
     runCommand: () => {},
+    runBridgeProofFreshness: async () => {},
     runSemanticPreflight: async (options) => {
       preflightOptions = options;
     },
@@ -745,6 +754,7 @@ test('does not run post-deploy browser smoke when Wrangler deploy fails', async 
       runCommand: (_command, argumentsList) => {
         if (argumentsList.includes('deploy')) throw new Error('stub Wrangler failure');
       },
+      runBridgeProofFreshness: async () => {},
       runSemanticPreflight: async () => {},
       runBrowserSmoke: async () => {
         smokeRuns += 1;
@@ -769,6 +779,7 @@ test('skips browser smoke for Production dry-run', async () => {
     runBrowserSmoke: async () => {
       smokeRuns += 1;
     },
+    runBridgeProofFreshness: async () => {},
     runSemanticPreflight: async () => {
       preflightRuns += 1;
     },
@@ -792,6 +803,7 @@ test('propagates browser smoke failure after the Worker deploy without rollback'
       runCommand: (_command, argumentsList) => {
         events.push(argumentsList.includes('deploy') ? 'wrangler' : 'build');
       },
+      runBridgeProofFreshness: async () => {},
       runSemanticPreflight: async () => {
         events.push('semantic-preflight');
       },
@@ -816,6 +828,7 @@ test('completes successfully when browser smoke passes', async () => {
     runCommand: (_command, argumentsList) => {
       events.push(argumentsList.includes('deploy') ? 'wrangler' : 'build');
     },
+    runBridgeProofFreshness: async () => {},
     runSemanticPreflight: async () => {
       events.push('semantic-preflight');
     },

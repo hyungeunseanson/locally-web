@@ -22,6 +22,16 @@ Both credentials are scanned across `.open-next/assets` and `.next/static`, incl
 
 Build IDs and `deploymentId` are not pinned or rewritten. Only the callback credential is inherited. No node_modules or runtime vendor fork is used.
 
+## Final Production baseline freshness gate
+
+The official non-dry Production command runs build → semantic preflight → pre-deploy browser smoke → bridge proof freshness → Wrangler deploy. The freshness await is immediately adjacent to the deploy invocation, with no other asynchronous work between them. Non-dry builds explicitly use provider mode; local/fixture modes cannot deploy. Dry-runs may use fixtures and skip this provider gate.
+
+The gate reads `.open-next/locally-revalidation-bridge-proof.json`, requires provider kind, true ETag match, valid deployment/version UUIDs and ETag/compat SHA-256 digests, and rejects unknown fields or malformed optional evidence fields. It requires the compatibility digest to match `config/cloudflare/revalidation-bridge.json`; mismatch throws `OPENNEXT_REVALIDATION_BRIDGE_LINEAGE_MISMATCH`.
+
+GET-only rechecks require the current deployment to have exactly one version at numeric 100%, with the exact proof deployment/version IDs. The exact version metadata must retain the proof script ETag. Drift, missing/malformed proof or provider errors stop before any deploy call with `OPENNEXT_REVALIDATION_BRIDGE_BASELINE_CHANGED_BEFORE_DEPLOY`. Responses, credentials and exception causes are never logged. Tests simulate drift during pre-smoke and assert zero deploy invocations for every rejection.
+
+This removes the build/smoke-duration freshness gap. The final read and provider deployment are not an atomic compare-and-swap; an independent deployment after the final GET remains a narrow external race, so release operators must still serialize Production releases.
+
 ## Compatibility evidence
 
 `npm run cloudflare:isr-bridge:contract` exercises:
