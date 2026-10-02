@@ -1,5 +1,7 @@
 'use client';
 
+import type { PhoneReplySnapshot } from '@/app/utils/phoneFollowup';
+
 import { useAdminAttention } from '../components/AdminAttentionProvider';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { AdminInquiryActivity } from '@/app/utils/adminInquiryActivity';
@@ -498,7 +500,7 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
     return loadMessages(selectedInquiryRef.current.id, { select: true });
   }, [loadMessages]);
 
-  const sendMessage = async (inquiryId: number | string, content: string): Promise<AdminSendMessageResult> => {
+  const sendMessage = async (inquiryId: number | string, content: string, phoneFollowup?: PhoneReplySnapshot): Promise<AdminSendMessageResult> => {
     const cleanContent = sanitizeText(content);
     if (!cleanContent.trim()) {
       throw new Error('메시지 전송에 실패했습니다.');
@@ -512,6 +514,7 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
           inquiryId,
           content: cleanContent,
           type: 'text',
+          ...(phoneFollowup ? { phoneFollowup } : {}),
         }),
       });
 

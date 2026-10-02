@@ -1,3 +1,4 @@
+import { validPhoneRequestId, validPhoneSnapshot, type PhoneReplySnapshot } from '@/app/utils/phoneFollowup';
 import { after } from 'next/server';
 
 import {
@@ -63,6 +64,7 @@ export type InquiryThreadResponse = {
 };
 
 export type InquiryMessageRequestBody = {
+  phoneFollowup?: PhoneReplySnapshot;
   inquiryId?: number | string;
   content?: string;
   imageUrl?: string | null;
@@ -794,18 +796,37 @@ export async function createInquiryMessage(params: {
   const displayContent = cleanContent || (normalizedType === 'image' ? '📷 사진을 보냈습니다.' : '');
   const updatedAt = new Date().toISOString();
 
-  const { data: insertedMessage, error: messageError } = await supabaseAdmin
-    .from('inquiry_messages')
-    .insert({
-      inquiry_id: inquiry.id,
-      sender_id: actor.id,
-      content: cleanContent,
-      image_url: imageUrl,
-      type: normalizedType,
-      is_read: false,
-    })
-    .select('id, created_at')
-    .maybeSingle<InquiryMessageInsertRow>();
+  let insertedMessage: InquiryMessageInsertRow | null = null;
+  let messageError: { code?: string; message?: string } | null = null;
+  if (body.phoneFollowup !== undefined) {
+    if (!actorIsAdmin || !isAdminSupport) throw new InquiryThreadError(403, 'Forbidden');
+    if (!validPhoneRequestId(body.phoneFollowup?.proxyRequestId) || !validPhoneSnapshot(body.phoneFollowup?.seenCustomerMessageIds)) {
+      throw new InquiryThreadError(400, '대화를 다시 확인한 후 답장해주세요.');
+    }
+    const result = await supabaseAdmin.rpc('reply_phone_request', {
+      p_request_id: body.phoneFollowup.proxyRequestId, p_inquiry_id: inquiry.id,
+      p_message_ids: body.phoneFollowup.seenCustomerMessageIds, p_admin_id: actor.id,
+      p_content: cleanContent, p_type: normalizedType, p_image_url: imageUrl,
+    });
+    insertedMessage = result.data;
+    messageError = result.error;
+  } else {
+    // Legacy clients can send, but never implicitly handle an unseen phone task.
+    const result = await supabaseAdmin
+      .from('inquiry_messages')
+      .insert({
+        inquiry_id: inquiry.id,
+        sender_id: actor.id,
+        content: cleanContent,
+        image_url: imageUrl,
+        type: normalizedType,
+        is_read: false,
+      })
+      .select('id, created_at')
+      .maybeSingle<InquiryMessageInsertRow>();
+    insertedMessage = result.data;
+    messageError = result.error;
+  }
 
   if (messageError || !insertedMessage) {
     if (messageError?.code === '23503' && messageError.message?.includes('profiles')) {

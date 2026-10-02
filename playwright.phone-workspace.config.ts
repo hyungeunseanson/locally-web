@@ -6,5 +6,5 @@ export default defineConfig({
   testMatch: ['ui/phone-workspace.spec.ts', 'unit/phone-workspace.spec.ts', 'unit/phone-refund.spec.ts'],
   workers: 1,
   reporter: 'list',
-  projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
+  projects: [{ name: 'chromium', use: { browserName: 'chromium' } }, ...(process.env.PHONE_WEBKIT === '1' ? [{ name: 'webkit', use: { browserName: 'webkit' as const } }] : [])],
 });

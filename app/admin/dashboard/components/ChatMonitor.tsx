@@ -1,6 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
+import { PHONE_SNAPSHOT_LIMIT, validPhoneId, type PhoneRenderedSnapshot } from '@/app/utils/phoneFollowup';
+
+import React, { useState, useEffect, useMemo, useLayoutEffect, useRef, useCallback } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import Image from 'next/image';
 import { MessageCircle, User, Send, RefreshCw, Loader2, AlertTriangle, Shield, Trash2 } from 'lucide-react';
@@ -60,6 +62,8 @@ type ChatMonitorProps = {
   enabled?: boolean;
   phoneContext?: {
     inquiryId: string | null;
+    requestId: string | null;
+    onSnapshot: (snapshot: PhoneRenderedSnapshot) => void;
     toolbar: React.ReactNode;
     onSent: () => void;
   };
@@ -118,6 +122,17 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
   const selectedInquiryId = selectedInquiry ? String(selectedInquiry.id) : null;
   const replyText = selectedInquiryId ? draftsByInquiryId[selectedInquiryId] || '' : '';
   const composerRef = useAutoResizeTextarea(replyText);
+
+  const phoneSnapshot = useMemo<PhoneRenderedSnapshot>(() => {
+    const ready = Boolean(enabled && phone?.requestId && phone.inquiryId === selectedInquiryId
+      && !isMessagesLoading && !messageError && selectedInquiry);
+    const messageIds = ready ? messages.filter(message => message.sender_id === selectedInquiry?.user_id
+      && (!message.type || ['text', 'image'].includes(message.type)) && validPhoneId(String(message.id)))
+      .map(message => String(message.id)).slice(-PHONE_SNAPSHOT_LIMIT) : [];
+    return { inquiryId: phone?.inquiryId ?? null, messageIds, ready: ready && messageIds.length > 0 };
+  }, [enabled, phone?.requestId, phone?.inquiryId, selectedInquiryId, selectedInquiry, isMessagesLoading, messageError, messages]);
+  const onPhoneSnapshot = phone?.onSnapshot;
+  useEffect(() => { onPhoneSnapshot?.(phoneSnapshot); }, [onPhoneSnapshot, phoneSnapshot]);
 
   const previousViewRef = useRef(view);
   useEffect(() => {
@@ -263,6 +278,7 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
   const handleSend = async () => {
     if (sendingRef.current || isMessagesLoading || messageError || !selectedInquiry || !replyText.trim()) return;
 
+    if (phone && !phoneSnapshot.ready) return;
     const inquiryId = selectedInquiry.id;
     const inquiryType = selectedInquiry.type;
     const inquiryStatus = selectedInquiry.status;
@@ -272,7 +288,7 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
     setIsSending(true);
 
     try {
-      const messageResult = await sendMessage(inquiryId, submittedText);
+      const messageResult = await sendMessage(inquiryId, submittedText, phone?.requestId ? { proxyRequestId: phone.requestId, seenCustomerMessageIds: [...phoneSnapshot.messageIds] } : undefined);
       setDraftsByInquiryId((current) => {
         if (current[String(inquiryId)] !== submittedText) return current;
         const remainingDrafts = { ...current };
@@ -815,7 +831,7 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
                 className={`text-[11px] flex-1 min-h-9 md:min-h-11 max-h-28 resize-none overflow-y-hidden border border-slate-200 bg-slate-50 rounded-lg md:rounded-xl px-2.5 md:px-4 py-2 md:py-3 focus:outline-none focus:border-black focus:bg-white transition-all md:text-sm leading-5`}
                 placeholder={activeTab === 'monitor' ? "관리자 권한 메시지 전송..." : "답변을 입력하세요..."}
                 value={replyText}
-                disabled={isSending || isMessagesLoading || Boolean(messageError)}
+                disabled={Boolean(phone && !phoneSnapshot.ready) || isSending || isMessagesLoading || Boolean(messageError)}
                 onChange={(e) => {
                   if (!selectedInquiryId) return;
                   const nextValue = e.target.value;
@@ -831,7 +847,7 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
               />
               <button
                 onClick={() => void handleSend()}
-                disabled={isSending || isMessagesLoading || Boolean(messageError) || !replyText.trim()}
+                disabled={Boolean(phone && !phoneSnapshot.ready) || isSending || isMessagesLoading || Boolean(messageError) || !replyText.trim()}
                 aria-label="메시지 전송"
                 className={`bg-black text-white px-3 md:px-5 py-2 rounded-lg md:rounded-xl hover:bg-slate-800 transition-colors shrink-0 flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-50`}
               >
