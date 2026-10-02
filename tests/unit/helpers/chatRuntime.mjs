@@ -45,7 +45,7 @@ export function deferred() {
 export function queryBuilder(table, execute) {
   const state = { table, filters: [], operation: 'select' };
   const builder = {};
-  for (const method of ['select', 'order', 'limit', 'eq', 'neq', 'in', 'or', 'is', 'insert', 'update', 'delete', 'maybeSingle', 'single']) {
+  for (const method of ['select', 'order', 'limit', 'range', 'eq', 'neq', 'in', 'or', 'is', 'insert', 'update', 'delete', 'maybeSingle', 'single']) {
     builder[method] = (...args) => {
       if (method === 'select') state.columns = args[0];
       else if (['insert', 'update', 'delete'].includes(method)) { state.operation = method; state.body = args[0]; }
@@ -70,6 +70,7 @@ export function response(body, status = 200) { return { ok: status < 400, status
 export function clientFixture({ additionalStubs = {}, sources = {}, role = 'guest', rows = [inquiry(1), inquiry(2), inquiry(3, 'admin_support')] } = {}) {
   const calls = { auth: 0, queries: [], requests: [], channels: [], removed: [] };
   const pendingTimers = new Map();
+  let virtualNow = 0;
   const fixture = {
     calls, rows, role, notifications: [],
     auth: async () => ({ data: { user: role === 'host' ? { ...user, id: 'host' } : user } }),
@@ -135,7 +136,7 @@ export function clientFixture({ additionalStubs = {}, sources = {}, role = 'gues
     HTMLTextAreaElement: dom.window.HTMLTextAreaElement, IS_REACT_ACT_ENVIRONMENT: true,
     fetch: (url, options) => { calls.requests.push({ url, options }); return fixture.request(url, options); },
     // Deterministic Realtime timers; no sleeps and no live sockets.
-    setTimeout: (callback, delay) => { const id = Symbol(); pendingTimers.set(id, { callback, delay }); return id; },
+    setTimeout: (callback, delay) => { const id = Symbol(); pendingTimers.set(id, { callback, delay, deadline: virtualNow + delay }); return id; },
     clearTimeout: (id) => pendingTimers.delete(id),
   };
   for (const [key, value] of Object.entries(replacements)) {
@@ -159,6 +160,17 @@ export function clientFixture({ additionalStubs = {}, sources = {}, role = 'gues
   fixture.timers = async (maxDelay = Infinity) => {
     const ready = [...pendingTimers].filter(([, item]) => item.delay <= maxDelay);
     await fixture.flush(() => { for (const [id, item] of ready) { if (pendingTimers.delete(id)) item.callback(); } });
+  };
+  fixture.advanceTimers = async (duration) => {
+    const target = virtualNow + duration;
+    while (true) {
+      const next = Math.min(...[...pendingTimers.values()].map(item => item.deadline));
+      if (next > target) break;
+      virtualNow = next;
+      const ready = [...pendingTimers].filter(([, item]) => item.deadline <= virtualNow);
+      await fixture.flush(() => { for (const [id, item] of ready) if (pendingTimers.delete(id)) item.callback(); });
+    }
+    virtualNow = target;
   };
   fixture.dispose = async () => {
     await React.act(async () => root.unmount());

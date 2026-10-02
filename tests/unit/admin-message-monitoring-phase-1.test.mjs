@@ -105,7 +105,11 @@ async function adminFixture(t, options = {}) {
   f.auth = async () => ({ data: { user: { id: 'admin' } } });
   const useAdmin = f.load('app/admin/dashboard/hooks/useAdminChatQuery.ts').useAdminChatQuery;
   let state;
-  function Probe() { state = useAdmin(); return null; }
+  function Probe() {
+    const chat = useAdmin();
+    React.useEffect(() => { state = chat; });
+    return null;
+  }
   await f.mount(Probe); f.admin = () => state;
   return f;
 }
@@ -136,7 +140,7 @@ test('admin acknowledgement clears only its captured alert wave; a concurrent ar
   }
 });
 
-test('admin reconnect, visibility, online and 30s fallback recover missing publication/events; bursts are serialized', async t => {
+test('admin reconnect, visibility, online and slow healthy / disconnected fallback recover missing publication/events; bursts are serialized', async t => {
   const f = await adminFixture(t);
   await f.flush(() => f.admin().selectInquiry(1));
   let version = 10;
@@ -152,7 +156,12 @@ test('admin reconnect, visibility, online and 30s fallback recover missing publi
   await f.flush(() => f.dom.window.dispatchEvent(new f.dom.window.Event('online')));
   assert.equal(f.admin().messages[0].id, 12);
   version = 13;
+  await f.timers(30_000); assert.equal(f.admin().messages[0].id, 12);
+  await f.timers(300_000); assert.equal(f.admin().messages[0].id, 13);
+  version = 15;
+  await f.flush(() => f.calls.channels[0].status('TIMED_OUT'));
   await f.timers(30_000); assert.equal(f.admin().messages[0].id, 13);
+  await f.timers(60_000); assert.equal(f.admin().messages[0].id, 15);
   const blocked = deferred(); let active = 0, maxActive = 0;
   f.request = async (url, opts) => {
     if (/\/messages$/.test(url)) { maxActive = Math.max(maxActive, ++active); await blocked.promise; active--; return response({ success: true, data: [message(14, 1)], inquiry: f.rows[0] }); }
@@ -170,11 +179,11 @@ test('hidden admin fallback does no work; stale list cannot revert a newer statu
   const f = await adminFixture(t);
   await f.flush(() => f.admin().selectInquiry(1));
   Object.defineProperty(f.dom.window.document, 'visibilityState', { configurable: true, value: 'hidden' });
-  const n = lists(f); await f.timers(30_000); assert.equal(lists(f), n);
+  const n = lists(f); await f.timers(300_000); assert.equal(lists(f), n);
   Object.defineProperty(f.dom.window.document, 'visibilityState', { configurable: true, value: 'visible' });
   const original = f.request;
   const slow = deferred();
-  f.request = (url, opts) => url.startsWith('/api/admin/inquiries?') ? slow.promise : response({ success: true, inquiry: { ...f.rows[0], updated_at: '2026-10-02T01:00Z', status: 'open', needs_reply: true }, data: [message(22, 1)] });
+  f.request = url => url.startsWith('/api/admin/inquiries?') ? slow.promise : response({ success: true, inquiry: { ...f.rows[0], updated_at: '2026-10-02T01:00Z', status: 'open', needs_reply: true }, data: [message(22, 1)] });
   let old;
   await f.flush(() => { old = f.admin().refresh(false); });
   await f.flush(() => f.admin().loadMessages(1));

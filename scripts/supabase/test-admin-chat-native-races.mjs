@@ -7,6 +7,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'node:net';
+import { historyActors, repairedHistoryIds, historicalReinquirySeedSql, captureHistory } from '../../tests/unit/helpers/adminHistoricalReinquiryFixture.mjs';
 
 const modules = process.env.ADMIN_CHAT_NATIVE_MODULES;
 if (!modules) throw new Error('Set ADMIN_CHAT_NATIVE_MODULES to an external embedded-postgres node_modules directory');
@@ -38,8 +39,29 @@ try {
     INSERT INTO public.users VALUES ('${guest}','guest'),('${admin}','admin');
     INSERT INTO inquiries VALUES(1,'${guest}',null,'admin_support','open','question',clock_timestamp());
   `);
+  await setup.query(`
+    INSERT INTO users VALUES('${historyActors.whitelist}','guest'),('${historyActors.outsider}','guest');
+    INSERT INTO auth.users VALUES('${historyActors.whitelist}','staff@example.invalid');
+    INSERT INTO admin_whitelist VALUES(1,'staff@example.invalid');
+  `);
+  await setup.query(historicalReinquirySeedSql());
   const migration = await readFile('supabase/migrations/20261001170718_admin_message_monitoring_phase_1.sql', 'utf8');
   await setup.query(migration); await setup.query(migration);
+  const historicalRepair = await readFile('supabase/migrations/20261002015110_admin_message_monitoring_historical_reinquiry.sql', 'utf8');
+  const historicalBefore = await captureHistory(setup);
+  await setup.query(historicalRepair);
+  const historicalAfter = await captureHistory(setup);
+  assert.deepEqual(historicalAfter.inquiries.filter(row => row.status !== historicalBefore.inquiries.find(old => old.id === row.id).status).map(row => Number(row.id)), repairedHistoryIds);
+  assert.equal(historicalAfter.inquiries[0].support_reopened_at.toISOString(), '2026-09-01T00:11:00.000Z');
+  assert.deepEqual(historicalAfter.messages, historicalBefore.messages);
+  for (const row of historicalAfter.inquiries.filter(row => !repairedHistoryIds.includes(Number(row.id)))) {
+    assert.deepEqual(row, historicalBefore.inquiries.find(old => old.id === row.id));
+  }
+  const repairAudit = historicalAfter.audit.filter(row => row.action_type === 'ADMIN_INQUIRY_HISTORICAL_REOPEN');
+  assert.equal(repairAudit.length, 3);
+  assert.ok(repairAudit.every(row => row.admin_id === null && row.details.resolved_audit_id));
+  await setup.query(historicalRepair); assert.deepEqual(await captureHistory(setup), historicalAfter);
+  console.log('ADMIN_CHAT_NATIVE_HISTORY_PASS: 3 eligible / 23 excluded, exact receipts and idempotent evidence audit');
   const publication = (await setup.query("SELECT tablename FROM pg_publication_tables WHERE pubname='supabase_realtime' ORDER BY tablename")).rows;
   assert.deepEqual(publication.map(r => r.tablename), ['inquiries', 'inquiry_messages']);
 
