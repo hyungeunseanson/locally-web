@@ -1,3 +1,5 @@
+> Phase 2 checkpoint: Production parity remains the 16 applied migrations, through the historical reinquiry migration. Run `current-state-contract.sql` before any pending migration. The prepared `20261002041848_admin_attention_badges_phase_2.sql` is **not applied to Production**. Only local/staging target verification applies it after that checkpoint, then runs `admin-attention-target-contract.sql`. Current Production fingerprints/ledger are intentionally unchanged.
+
 # Supabase staging schema baseline
 
 ## Decision
@@ -50,4 +52,4 @@ The repository static gate checks object identity/count parity, exact Realtime m
 
 ## Applied admin reader hardening (1-B2)
 
-`20260930022348_move_is_admin_reader_to_private_schema.sql` is applied in Production. The Production current-state manifest and `current-state-contract.sql` now describe the private helper and the ten rewired RLS policies. `pendingProductionMigrations` is empty. The `private` schema remains outside the Data API exposed schemas (`public`, `graphql_public`). Run `admin-reader-private-contract.sql` and `schema-contract.sql` read-only on a current Production clone or a freshly bootstrapped staging project.
+`20260930022348_move_is_admin_reader_to_private_schema.sql` is applied in Production. The Production current-state manifest and `current-state-contract.sql` now describe the private helper and the ten rewired RLS policies. `pendingProductionMigrations` contains only the prepared Phase 2 attention migration; it is not part of current Production parity. The `private` schema remains outside the Data API exposed schemas (`public`, `graphql_public`). Run `admin-reader-private-contract.sql` and `schema-contract.sql` read-only on a current Production clone or a freshly bootstrapped staging project.

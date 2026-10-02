@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation';
 import { Bell, Briefcase, Check, ClipboardList, CreditCard, MessageSquare, Trash2 } from 'lucide-react';
 
+import { useAdminAttention, useAdminAttentionSnapshot } from './AdminAttentionProvider';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 import { getAdminNotificationCategory, isAdminAlertNotification } from '@/app/utils/adminNotifications';
@@ -31,29 +32,59 @@ function getNotificationIcon(notification: AdminNotificationItem) {
 }
 
 export default function AdminAlertsTab() {
+  const attentionStore = useAdminAttention();
+  const attention = useAdminAttentionSnapshot();
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const { showToast } = useToast();
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const mountedRef = useRef(false);
+  const revisionRef = useRef(0);
+  const flightRef = useRef<Promise<void> | null>(null);
+  const refreshAgainRef = useRef(false);
 
   const [notifications, setNotifications] = useState<AdminNotificationItem[]>([]);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [expandedIds, setExpandedIds] = useState<number[]>([]);
 
-  const fetchNotifications = useCallback(async () => {
-    const response = await fetch('/api/admin/alerts', { cache: 'no-store' });
-    const result = await response.json();
-
-    if (!response.ok || result?.success === false) {
-      throw new Error(result?.error || '관리자 알림을 불러오지 못했습니다.');
+  const fetchNotifications = useCallback((): Promise<void> => {
+    if (flightRef.current) {
+      refreshAgainRef.current = true;
+      return flightRef.current;
     }
-
-    setNotifications(Array.isArray(result?.data) ? result.data : []);
+    const flight = (async () => {
+      do {
+        refreshAgainRef.current = false;
+        const revision = revisionRef.current;
+        const response = await fetch('/api/admin/alerts', { cache: 'no-store', signal: AbortSignal.timeout(15_000) });
+        const result = await response.json();
+        if (!response.ok || result?.success === false) {
+          throw new Error(result?.error || '관리자 알림을 불러오지 못했습니다.');
+        }
+        if (!mountedRef.current) return;
+        if (revision !== revisionRef.current) { refreshAgainRef.current = true; continue; }
+        setNotifications(Array.isArray(result?.data) ? result.data : []);
+      } while (refreshAgainRef.current && mountedRef.current);
+    })();
+    flightRef.current = flight;
+    void flight.finally(() => { if (flightRef.current === flight) flightRef.current = null; }).catch(() => {});
+    return flight;
   }, []);
 
   useEffect(() => {
     let isMounted = true;
+    mountedRef.current = true;
+    const catchUp = () => {
+      if (!isMounted || document.hidden) return;
+      void fetchNotifications().catch(error => {
+        if (!isAbortError(error) && isMounted) showToast('관리자 알림을 갱신하지 못했습니다.', 'error');
+      });
+    };
+    const onVisible = () => { if (!document.hidden) catchUp(); };
+    window.addEventListener('online', catchUp);
+    document.addEventListener('visibilitychange', onVisible);
+    const fallback = setInterval(catchUp, 300_000);
 
     const init = async () => {
       try {
@@ -78,11 +109,14 @@ export default function AdminAlertsTab() {
           .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, (payload) => {
             const nextRow = payload.new as AdminNotificationItem | undefined;
             const prevRow = payload.old as AdminNotificationItem | undefined;
-            const targetRow = nextRow || prevRow;
-
-            if (!targetRow || targetRow.user_id !== user.id || !isAdminAlertNotification(targetRow)) {
+            // DELETE may contain only the primary key; the channel is user-scoped.
+            if (payload.eventType === 'DELETE' && prevRow?.id != null) {
+              revisionRef.current++;
+              setNotifications((prev) => prev.filter((item) => item.id !== prevRow.id));
               return;
             }
+            if (!nextRow?.id || nextRow.user_id !== user.id || !isAdminAlertNotification(nextRow)) return;
+            revisionRef.current++;
 
             if (payload.eventType === 'INSERT' && nextRow) {
               setNotifications((prev) => [nextRow, ...prev.filter((item) => item.id !== nextRow.id)].slice(0, 100));
@@ -94,11 +128,8 @@ export default function AdminAlertsTab() {
               return;
             }
 
-            if (payload.eventType === 'DELETE' && prevRow) {
-              setNotifications((prev) => prev.filter((item) => item.id !== prevRow.id));
-            }
           })
-          .subscribe();
+          .subscribe(status => { if (status === 'SUBSCRIBED') catchUp(); });
       } catch (error) {
         if (isAbortError(error)) {
           return;
@@ -106,7 +137,6 @@ export default function AdminAlertsTab() {
 
         console.error('[AdminAlertsTab] fetch notifications failed:', error);
         if (isMounted) {
-          setNotifications([]);
           showToast('관리자 알림을 불러오지 못했습니다.', 'error');
         }
       } finally {
@@ -120,6 +150,10 @@ export default function AdminAlertsTab() {
 
     return () => {
       isMounted = false;
+      mountedRef.current = false;
+      clearInterval(fallback);
+      window.removeEventListener('online', catchUp);
+      document.removeEventListener('visibilitychange', onVisible);
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
@@ -127,7 +161,7 @@ export default function AdminAlertsTab() {
     };
   }, [fetchNotifications, showToast, supabase]);
 
-  const unreadCount = notifications.filter((notification) => !notification.is_read).length;
+  const unreadCount = attention.adminAlertsUnread ?? notifications.filter((notification) => !notification.is_read).length;
   const filteredNotifications = notifications.filter((notification) => {
     if (filter === 'unread') return !notification.is_read;
     return true;
@@ -135,11 +169,6 @@ export default function AdminAlertsTab() {
 
   const handleClick = async (notification: AdminNotificationItem) => {
     if (!notification.is_read) {
-      const previousNotifications = notifications;
-      setNotifications((prev) => prev.map((item) => (
-        item.id === notification.id ? { ...item, is_read: true } : item
-      )));
-
       try {
         const response = await fetch(`/api/admin/alerts/${notification.id}`, {
           method: 'PATCH',
@@ -149,9 +178,11 @@ export default function AdminAlertsTab() {
         if (!response.ok || result?.success === false) {
           throw new Error(result?.error || '알림 읽음 처리 실패');
         }
+        revisionRef.current++;
+        setNotifications(prev => prev.map(item => item.id === notification.id ? { ...item, is_read: true } : item));
+        attentionStore?.alertsChanged();
       } catch (error) {
         console.error('[AdminAlertsTab] mark read failed:', error);
-        setNotifications(previousNotifications);
         showToast('알림 읽음 처리에 실패했습니다.', 'error');
       }
     }
@@ -169,14 +200,9 @@ export default function AdminAlertsTab() {
   };
 
   const handleMarkAllRead = async () => {
-    const unreadIds = notifications
-      .filter((notification) => !notification.is_read)
-      .map((notification) => notification.id);
+    if (unreadCount === 0) return;
 
-    if (unreadIds.length === 0) return;
-
-    const previousNotifications = notifications;
-    setNotifications((prev) => prev.map((notification) => ({ ...notification, is_read: true })));
+    const renderedIds = new Set(notifications.map(notification => notification.id));
 
     try {
       const response = await fetch('/api/admin/alerts/read-all', {
@@ -187,17 +213,17 @@ export default function AdminAlertsTab() {
       if (!response.ok || result?.success === false) {
         throw new Error(result?.error || '전체 읽음 처리 실패');
       }
+      revisionRef.current++;
+      setNotifications(prev => prev.map(item => renderedIds.has(item.id) ? { ...item, is_read: true } : item));
+      attentionStore?.alertsChanged();
+      await fetchNotifications();
     } catch (error) {
       console.error('[AdminAlertsTab] mark all read failed:', error);
-      setNotifications(previousNotifications);
       showToast('전체 읽음 처리에 실패했습니다.', 'error');
     }
   };
 
   const handleDelete = async (notificationId: number) => {
-    const previousNotifications = notifications;
-    setNotifications((prev) => prev.filter((notification) => notification.id !== notificationId));
-
     try {
       const response = await fetch(`/api/admin/alerts/${notificationId}`, {
         method: 'DELETE',
@@ -207,9 +233,11 @@ export default function AdminAlertsTab() {
       if (!response.ok || result?.success === false) {
         throw new Error(result?.error || '알림 삭제 실패');
       }
+      revisionRef.current++;
+      setNotifications(prev => prev.filter(item => item.id !== notificationId));
+      attentionStore?.alertsChanged();
     } catch (error) {
       console.error('[AdminAlertsTab] delete notification failed:', error);
-      setNotifications(previousNotifications);
       showToast('알림 삭제에 실패했습니다.', 'error');
     }
   };

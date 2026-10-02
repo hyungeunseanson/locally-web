@@ -20,6 +20,7 @@ const adminReaderTargetContract = await readFile(
   resolve(root, 'supabase/staging/admin-reader-private-contract.sql'),
   'utf8'
 );
+const attentionTargetContract = await readFile(resolve(root, 'supabase/staging/admin-attention-target-contract.sql'), 'utf8');
 const overlay = await readFile(
   resolve(root, 'supabase/staging/post-baseline-current-state-overlay.sql'),
   'utf8'
@@ -33,6 +34,15 @@ function exact(label, actual, expected) {
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
     fail(`${label} differs\nactual=${JSON.stringify(actual)}\nexpected=${JSON.stringify(expected)}`);
   }
+}
+
+exact('pending attention RPCs', required.pendingApplicationFunctions, ['ack_admin_inquiry_snapshot', 'get_admin_attention']);
+exact('pending private cutover tables', required.pendingPrivateTables, ['private.admin_monitor_cutover']);
+if (!attentionTargetContract.includes('BEGIN READ ONLY;') || !attentionTargetContract.trimEnd().endsWith('ROLLBACK;')
+  || !attentionTargetContract.includes('ADMIN_ATTENTION_TARGET_CONTRACT_PASS')
+  || required.pendingApplicationFunctions.some(fn => !attentionTargetContract.includes(`public.${fn}(`))
+  || required.pendingPrivateTables.some(table => !attentionTargetContract.includes(table))) {
+  fail('pending attention target contract must verify server-only RPCs and private cutover read-only');
 }
 
 const expectedAppliedOrder = [
@@ -53,7 +63,7 @@ const expectedAppliedOrder = [
   'supabase/migrations/20261001170718_admin_message_monitoring_phase_1.sql',
   'supabase/migrations/20261002015110_admin_message_monitoring_historical_reinquiry.sql',
 ];
-const expectedPendingOrder = [];
+const expectedPendingOrder = ['supabase/migrations/20261002041848_admin_attention_badges_phase_2.sql'];
 const expectedApplyOrder = [...expectedAppliedOrder, ...expectedPendingOrder];
 exact('fresh-project apply order', required.freshProjectApplyOrder, expectedApplyOrder);
 exact(

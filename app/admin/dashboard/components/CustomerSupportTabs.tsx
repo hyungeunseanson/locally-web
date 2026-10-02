@@ -2,10 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useAdminAttentionSnapshot } from './AdminAttentionProvider';
+import { attentionTotals } from '@/app/utils/adminAttentionState';
+import { AttentionCountBadge } from './AttentionBadge';
 import ChatMonitor from './ChatMonitor';
 import PhoneReservationTab from './PhoneReservationTab';
 
 export default function CustomerSupportTabs() {
+  const attention = useAdminAttentionSnapshot();
+  const counts = attentionTotals(attention);
   const router = useRouter();
   const params = useSearchParams();
   const rawView = params.get('view');
@@ -48,7 +53,7 @@ export default function CustomerSupportTabs() {
     <nav aria-label="Customer Support" className="flex gap-1 rounded-xl bg-slate-100 p-1">
       {([['support', '1:1 문의'], ['phone', '전화예약'], ['monitor', '실시간 모니터링']] as const).map(([key, label]) =>
         <button key={key} aria-current={view === key ? 'page' : undefined} onClick={() => changeView(key)}
-          className={`flex-1 rounded-lg px-3 py-2 text-sm font-bold ${view === key ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>{label}</button>)}
+          className={`flex-1 rounded-lg px-3 py-2 text-sm font-bold ${view === key ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>{label}<AttentionCountBadge count={counts[key]} /></button>)}
     </nav>
     {routingError ? <p role="alert">{routingError}</p> : resolving ? <p>문의 위치를 확인하는 중...</p> : null}
     <div hidden={view === 'phone' || resolving || Boolean(routingError)}>

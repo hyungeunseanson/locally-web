@@ -1,5 +1,9 @@
 'use client';
 
+import { useAdminAttentionSnapshot } from './AdminAttentionProvider';
+import { attentionTotals } from '@/app/utils/adminAttentionState';
+import { AttentionCountBadge } from './AttentionBadge';
+
 import Image from 'next/image';
 import Link from 'next/link';
 import React, { type ReactNode, useEffect, useMemo, useState } from 'react';
@@ -17,6 +21,8 @@ type NavButtonProps = {
   onClick: () => void;
   icon: ReactNode;
   label: string;
+  count?: number;
+  kind?: 'unseen' | 'action';
 };
 
 type SidebarUser = {
@@ -24,8 +30,9 @@ type SidebarUser = {
   email?: string | null;
 } | null;
 
-const NavButton = ({ active, onClick, icon, label }: NavButtonProps) => (
+const NavButton = ({ active, onClick, icon, label, count = 0, kind }: NavButtonProps) => (
   <button
+    aria-current={active ? 'page' : undefined}
     onClick={onClick}
     className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 group ${active
       ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/30'
@@ -36,10 +43,13 @@ const NavButton = ({ active, onClick, icon, label }: NavButtonProps) => (
       <div className="shrink-0">{icon}</div>
       <span className="text-[11px] md:text-sm font-medium truncate">{label}</span>
     </div>
+    <AttentionCountBadge count={count} kind={kind} />
   </button>
 );
 
 export default function Sidebar() {
+  const attention = useAdminAttentionSnapshot();
+  const unseen = attentionTotals(attention);
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
@@ -102,6 +112,7 @@ export default function Sidebar() {
       </Link>
 
       <div className="space-y-8 flex-1 overflow-y-auto scrollbar-hide">
+        {attention.error && <p role="status" className="px-2 text-xs text-amber-300">{attention.error} 이전 표시를 유지합니다.</p>}
         <div>
           <h2 className="text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2.5 md:mb-3 px-2">Management</h2>
           <div className="space-y-0.5 md:space-y-1">
@@ -109,7 +120,7 @@ export default function Sidebar() {
               active={activeTab === 'APPROVALS' || activeTab === 'APPS' || activeTab === 'EXPS'}
               onClick={() => handleTabChange('APPROVALS')}
               icon={<CheckCircle2 size={16} className="md:w-[18px] md:h-[18px]" />}
-              label="Approvals"
+              label="Approvals" count={attention.appsCount + attention.expsCount} kind="action"
             />
             <NavButton active={activeTab === 'USERS'} onClick={() => handleTabChange('USERS')} icon={<Users size={16} className="md:w-[18px] md:h-[18px]" />} label="User Management" />
           </div>
@@ -118,8 +129,8 @@ export default function Sidebar() {
         <div>
           <h2 className="text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2.5 md:mb-3 px-2">Operation</h2>
           <div className="space-y-0.5 md:space-y-1">
-            <NavButton active={activeTab === 'ALERTS'} onClick={() => handleTabChange('ALERTS')} icon={<Bell size={16} className="md:w-[18px] md:h-[18px]" />} label="Admin Alerts" />
-            <NavButton active={activeTab === 'CHATS'} onClick={() => handleTabChange('CHATS')} icon={<MessageSquare size={16} className="md:w-[18px] md:h-[18px]" />} label="Customer Support" />
+            <NavButton active={activeTab === 'ALERTS'} onClick={() => handleTabChange('ALERTS')} icon={<Bell size={16} className="md:w-[18px] md:h-[18px]" />} label="Admin Alerts" count={attention.adminAlertsUnread ?? 0} />
+            <NavButton active={activeTab === 'CHATS'} onClick={() => handleTabChange('CHATS')} icon={<MessageSquare size={16} className="md:w-[18px] md:h-[18px]" />} label="Customer Support" count={unseen.total} />
             <NavButton
               active={activeTab === 'TEAM'}
               onClick={() => handleTabChange('TEAM')}
@@ -132,8 +143,8 @@ export default function Sidebar() {
         <div>
           <h2 className="text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2.5 md:mb-3 px-2">Finance</h2>
           <div className="space-y-0.5 md:space-y-1">
-            <NavButton active={activeTab === 'LEDGER'} onClick={() => handleTabChange('LEDGER')} icon={<LayoutDashboard size={16} className="md:w-[18px] md:h-[18px]" />} label="Master Ledger" />
-            <NavButton active={activeTab === 'SERVICE_REQUESTS'} onClick={() => handleTabChange('SERVICE_REQUESTS')} icon={<ClipboardList size={16} className="md:w-[18px] md:h-[18px]" />} label="Service Requests" />
+            <NavButton active={activeTab === 'LEDGER'} onClick={() => handleTabChange('LEDGER')} icon={<LayoutDashboard size={16} className="md:w-[18px] md:h-[18px]" />} label="Master Ledger" count={attention.pendingBookingCount} kind="action" />
+            <NavButton active={activeTab === 'SERVICE_REQUESTS'} onClick={() => handleTabChange('SERVICE_REQUESTS')} icon={<ClipboardList size={16} className="md:w-[18px] md:h-[18px]" />} label="Service Requests" count={attention.svcBankPendingCount} kind="action" />
             <NavButton active={activeTab === 'SALES'} onClick={() => handleTabChange('SALES')} icon={<CreditCard size={16} className="md:w-[18px] md:h-[18px]" />} label="Billing & Revenue" />
             <NavButton active={activeTab === 'ANALYTICS'} onClick={() => handleTabChange('ANALYTICS')} icon={<BarChart2 size={16} className="md:w-[18px] md:h-[18px]" />} label="Data Analytics" />
           </div>
@@ -181,7 +192,7 @@ export default function Sidebar() {
           <span className="text-[15px] font-bold tracking-tight">Locally</span>
           <span className="text-[9px] text-slate-400 font-medium tracking-wider uppercase ml-1">Admin</span>
         </div>
-        <button onClick={() => setIsMobileOpen(!isMobileOpen)} className="p-2 hover:bg-slate-800 rounded-lg transition-colors">
+        <button aria-label={isMobileOpen ? '관리자 메뉴 닫기' : '관리자 메뉴 열기'} onClick={() => setIsMobileOpen(!isMobileOpen)} className="p-2 hover:bg-slate-800 rounded-lg transition-colors">
           {isMobileOpen ? <X size={22} /> : <Menu size={22} />}
         </button>
       </div>

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useToast } from '@/app/context/ToastContext';
 import { updateAdminStatus } from '@/app/actions/admin';
+import { useAdminAttention } from '../components/AdminAttentionProvider';
 
 import { AdminApprovalTable, AdminItemId, HostApplication, ExperienceApprovalItem } from '@/app/types/admin';
 
@@ -33,6 +34,7 @@ async function fetchAdminPayload<T>(url: string): Promise<AdminApiPayload<T>> {
 
 export function useAdminApprovalsData() {
   const { showToast } = useToast();
+  const attention = useAdminAttention();
 
   const [apps, setApps] = useState<HostApplication[]>([]);
   const [exps, setExps] = useState<ExperienceApprovalItem[]>([]);
@@ -92,6 +94,7 @@ export function useAdminApprovalsData() {
 
     try {
       await updateAdminStatus(table, id, nextStatus, comment);
+      void attention?.refresh();
       showToast(`성공적으로 업데이트되었습니다. (${nextStatus})`, 'success');
       await fetchApprovals();
       return true;
@@ -100,7 +103,7 @@ export function useAdminApprovalsData() {
       showToast(`업데이트 실패: ${message}`, 'error');
       return false;
     }
-  }, [fetchApprovals, showToast]);
+  }, [attention, fetchApprovals, showToast]);
 
   const deleteItem = useCallback(async (table: string, id: AdminItemId) => {
 
@@ -117,6 +120,7 @@ export function useAdminApprovalsData() {
       }
 
       showToast('삭제되었습니다.', 'success');
+      void attention?.refresh();
       await fetchApprovals();
       return true;
     } catch (error) {
@@ -124,7 +128,7 @@ export function useAdminApprovalsData() {
       showToast(`삭제 실패: ${message}`, 'error');
       return false;
     }
-  }, [fetchApprovals, showToast]);
+  }, [attention, fetchApprovals, showToast]);
 
   const updateExperiencePhotos = useCallback((id: AdminItemId, photos: string[]) => {
     setExps((current) => current.map((experience) => (

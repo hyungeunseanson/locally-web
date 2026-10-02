@@ -19,9 +19,18 @@
     "supabase/migrations/20260929144521_harden_public_host_applications_security_barrier.sql",
     "supabase/migrations/20260930022348_move_is_admin_reader_to_private_schema.sql",
     "supabase/migrations/20261001170718_admin_message_monitoring_phase_1.sql",
-    "supabase/migrations/20261002015110_admin_message_monitoring_historical_reinquiry.sql"
+    "supabase/migrations/20261002015110_admin_message_monitoring_historical_reinquiry.sql",
+    "supabase/migrations/20261002041848_admin_attention_badges_phase_2.sql"
   ],
-  "pendingProductionMigrations": [],
+  "pendingProductionMigrations": [
+    {
+      "version": "20261002041848",
+      "name": "admin_attention_badges_phase_2",
+      "repositoryFile": "supabase/migrations/20261002041848_admin_attention_badges_phase_2.sql",
+      "repositorySha256": "d20d5774318f8fe52dc41d13a533728b13c98a20fab812cd693737dba0de51a2",
+      "status": "prepared-not-applied"
+    }
+  ],
   "applicationTables": [
     "admin_audit_logs",
     "admin_job_runs",
@@ -156,12 +165,30 @@
     "profiles"
   ],
   "storageBuckets": [
-    { "name": "admin_files", "public": false },
-    { "name": "avatars", "public": true },
-    { "name": "chat-images", "public": false },
-    { "name": "experiences", "public": false },
-    { "name": "images", "public": true },
-    { "name": "verification-docs", "public": false }
+    {
+      "name": "admin_files",
+      "public": false
+    },
+    {
+      "name": "avatars",
+      "public": true
+    },
+    {
+      "name": "chat-images",
+      "public": false
+    },
+    {
+      "name": "experiences",
+      "public": false
+    },
+    {
+      "name": "images",
+      "public": true
+    },
+    {
+      "name": "verification-docs",
+      "public": false
+    }
   ],
   "activeConcierge": {
     "tables": [
@@ -255,9 +282,17 @@
     ]
   },
   "forbiddenCurrentObjects": {
-    "tables": ["community_comment_likes"],
-    "functions": ["increment_comment_like_count", "decrement_comment_like_count"],
-    "triggers": ["on_comment_like_added", "on_comment_like_removed"],
+    "tables": [
+      "community_comment_likes"
+    ],
+    "functions": [
+      "increment_comment_like_count",
+      "decrement_comment_like_count"
+    ],
+    "triggers": [
+      "on_comment_like_added",
+      "on_comment_like_removed"
+    ],
     "storagePolicies": [
       "Anyone can update their own avatar",
       "Anyone can upload an avatar",
@@ -272,5 +307,12 @@
       "Owner Update",
       "Public Access"
     ]
-  }
+  },
+  "pendingPrivateTables": [
+    "private.admin_monitor_cutover"
+  ],
+  "pendingApplicationFunctions": [
+    "ack_admin_inquiry_snapshot",
+    "get_admin_attention"
+  ]
 }

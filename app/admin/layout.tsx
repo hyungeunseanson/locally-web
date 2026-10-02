@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ReactNode, Suspense } from "react";
+import AdminAttentionProvider from "@/app/admin/dashboard/components/AdminAttentionProvider";
 import Sidebar from "@/app/admin/dashboard/components/Sidebar";
 import { createAdminClient } from "@/app/utils/supabase/admin";
 import { resolveAdminAccess } from "@/app/utils/adminAccess";
@@ -59,7 +60,7 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <AdminAttentionProvider userId={user.id}><div className="flex min-h-screen bg-slate-50">
       {/* 왼쪽: 고정된 관리자 사이드바 (모바일에서 숨김 — Sidebar 내부에서 모바일 메뉴 처리) */}
       <div className="hidden md:block w-64 flex-shrink-0 bg-slate-900 min-h-screen sticky top-0">
         <Suspense fallback={<div className="h-full w-full bg-slate-800 animate-pulse" />}>
@@ -80,6 +81,6 @@ export default async function AdminLayout({
           {children}
         </div>
       </main>
-    </div>
+    </div></AdminAttentionProvider>
   );
 }

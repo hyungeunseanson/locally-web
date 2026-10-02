@@ -21,6 +21,19 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     if (!/^[1-9]\d*$/.test(id) || !/^[1-9]\d*$/.test(throughMessageId)) {
       return NextResponse.json({ success: false }, { status: 400 });
     }
+    if (body.messageIds !== undefined) {
+      const ids = body.messageIds;
+      if (!Array.isArray(ids) || !ids.length || ids.length > 10000 || ids.some(id => !/^[1-9]\d*$/.test(String(id)))
+        || !ids.some(id => String(id) === throughMessageId)) {
+        return NextResponse.json({ success: false }, { status: 400 });
+      }
+      const { data, error: snapshotError } = await admin.rpc('ack_admin_inquiry_snapshot', {
+        p_inquiry_id: id, p_message_ids: ids.map(String),
+      });
+      if (snapshotError || !Array.isArray(data) || !data[0]) return NextResponse.json({ success: false }, { status: 400 });
+      await clearAdminSupportUnreadBatch({ supabaseAdmin: admin, inquiryId: id });
+      return NextResponse.json({ success: true, admin_unread_count: Number(data[0].admin_unread_count), throughMessageId });
+    }
     const { error: ackError } = await admin.rpc('ack_admin_inquiry_messages', {
       p_inquiry_id: id, p_through_message_id: throughMessageId,
     });
