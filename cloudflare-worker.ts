@@ -2,6 +2,9 @@
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore Generated module is intentionally absent before the Cloudflare build but present on repeat builds.
 import openNextWorker from './.open-next/worker.js';
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore Private generated server module is created after the OpenNext build.
+import rewriteRevalidation from './.open-next/locally-revalidation-bridge.js';
 import {
   handlePublicExperienceMediaQueueBatch,
   type PublicExperienceMediaQueueBatchLike,
@@ -49,7 +52,7 @@ type WorkerEnvironment = PublicExperienceMediaQueueRuntimeEnv & ExperienceTransl
 
 const worker = {
   fetch(request: Request, env: WorkerEnvironment, ctx: unknown) {
-    return openNextWorker.fetch(request, env, ctx);
+    return openNextWorker.fetch(rewriteRevalidation(request), env, ctx);
   },
   queue(
     batch: PublicExperienceMediaQueueBatchLike | ExperienceTranslationQueueBatchLike,

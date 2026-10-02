@@ -194,6 +194,8 @@ export async function main(argumentsList = process.argv.slice(2), dependencies =
   const runSemanticPreflight = dependencies.runSemanticPreflight ?? runProductionDeploySemanticPreflight;
   const log = dependencies.log ?? console.log;
   const options = parseDeploymentArguments(argumentsList);
+  if (!options.dryRun && environment.LOCALLY_ISR_BRIDGE_SOURCE
+    && environment.LOCALLY_ISR_BRIDGE_SOURCE !== 'provider') throw new Error('OPENNEXT_REVALIDATION_BRIDGE_FIXTURE_DEPLOY_FORBIDDEN');
   const policy = await readReleasePolicy();
   const profile = resolveReleaseProfile(policy, options.requestedProfile);
   const translationPolicy = await readTranslationReleasePolicy();

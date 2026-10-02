@@ -30,6 +30,7 @@ jobs:
     timeout-minutes: 45
     env:
       CI: 'true'
+      LOCALLY_ISR_BRIDGE_SOURCE: fixture
       NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
       NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54329
       NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_cloudflare_foundation_fixture
@@ -139,6 +140,9 @@ jobs:
 
       - name: Validate Experience completion Cloudflare Cron transport
         run: npm run cloudflare:experience-completion:contract
+
+      - name: Validate ISR bridge without provider access
+        run: npm run cloudflare:isr-bridge:contract
 
       - name: Validate the Production media build wrapper
         run: npm run cloudflare:production-build:contract

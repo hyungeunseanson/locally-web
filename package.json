@@ -14,7 +14,7 @@
     "test:chat:platform": "NODE_OPTIONS=--conditions=react-server NEXT_PUBLIC_SITE_URL=http://127.0.0.1:3000 NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54329 NEXT_PUBLIC_SUPABASE_ANON_KEY=local-chat-platform-anon SUPABASE_SERVICE_ROLE_KEY=local-chat-platform-service CRON_SECRET=local-admin-support-cron-secret playwright test -c playwright.chat-platform-regression.config.ts",
     "test:chat:phase2": "node --test tests/unit/chat-performance-phase-1.test.mjs tests/unit/chat-performance-phase-2.test.mjs tests/unit/admin-support-direct-messaging.test.ts && playwright test -c playwright.chat-regression.config.ts",
     "test:chat:phase1": "node --test tests/unit/chat-performance-phase-1.test.mjs tests/unit/admin-support-direct-messaging.test.ts && playwright test -c playwright.chat-regression.config.ts",
-    "cloudflare:build": "opennextjs-cloudflare build",
+    "cloudflare:build": "node scripts/cloudflare/run-opennext-build.mjs",
     "cloudflare:build:production": "node scripts/cloudflare/run-production-build.mjs",
     "cloudflare:production-browser-smoke": "node scripts/cloudflare/run-production-browser-smoke.mjs",
     "cloudflare:production-build:contract": "node --test scripts/cloudflare/run-production-build.test.mjs scripts/cloudflare/run-production-browser-smoke.test.mjs scripts/cloudflare/run-production-deploy.test.mjs scripts/cloudflare/verify-production-deploy-contract.test.mjs",
@@ -111,7 +111,8 @@
     "test:e2e:qa:live-gate-cross:plan": "node scripts/run-domain-qa.mjs --bundle live-gate",
     "test:e2e:qa:live-gate-cross": "node scripts/run-domain-qa.mjs --bundle live-gate --run",
     "test:supabase-api-keys": "node --conditions=react-server --test tests/unit/supabase-api-key-compatibility.test.mjs tests/unit/supabase-operator-api-key-compatibility.test.mjs && python3 scripts/backup/storage_byte_backup_test.py",
-    "test:admin-attention:phase2": "node --test tests/unit/admin-attention-badges.test.mjs tests/unit/admin-attention-loading.test.mjs tests/unit/admin-attention-performance.test.mjs && playwright test -c playwright.admin-attention.config.ts"
+    "test:admin-attention:phase2": "node --test tests/unit/admin-attention-badges.test.mjs tests/unit/admin-attention-loading.test.mjs tests/unit/admin-attention-performance.test.mjs && playwright test -c playwright.admin-attention.config.ts",
+    "cloudflare:isr-bridge:contract": "node --test scripts/cloudflare/revalidation-bridge.test.mjs scripts/cloudflare/revalidation-bridge-runtime.test.mjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -154,6 +155,8 @@
     "@types/react": "^19",
     "@types/react-date-range": "^1.4.10",
     "@types/react-dom": "^19",
+    "acorn": "8.16.0",
+    "esbuild": "0.25.4",
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
     "hasown": "2.0.2",
