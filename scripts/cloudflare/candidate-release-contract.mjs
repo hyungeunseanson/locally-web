@@ -155,7 +155,7 @@ export function buildCandidateReleasePlan({ config, baseline, runtimeVariables, 
   for (const name of ['SUPABASE_SERVICE_ROLE_KEY', 'NEXT_PUBLIC_SUPABASE_ANON_KEY']) {
     requireCondition(snapshot.bindings.some(b => b.name === name && b.type === 'secret_text'), 'required_encrypted_binding_missing');
   }
-  const doImplementation = compareDurableObjectProof(durableObjectProof, stableVersionId);
+  const doImplementation = compareDurableObjectProof(durableObjectProof?.deploymentId === baseline.deployment.id ? durableObjectProof : null, stableVersionId);
   const blockers = COMPATIBLE_DO.has(doImplementation) ? [] : [doImplementation];
   requireCondition(/^[a-f0-9]{64}$/.test(bridgeLineage ?? ''), 'bridge_lineage_missing');
   if (doImplementation === 'BRIDGE_COMPATIBLE_BUILD_STATE_ONLY') {
@@ -276,7 +276,8 @@ export async function executeCandidateReleaseContract(plan, actions) {
   assertDistribution(before.deployment, [{ id: plan.stableVersionId, percentage: 100 }]);
   requireCondition(before.deployment.id === plan.stableDeployment.id, 'concurrent_deployment_changed');
   const bridgeProof = await actions.bridgeProofFreshness();
-  requireCondition(bridgeProof?.kind === 'provider' && bridgeProof.etagMatch === true
+  requireCondition(bridgeProof?.kind === 'provider' && bridgeProof.sourceKind === 'workers-version-modules'
+    && bridgeProof.artifactSha256 === proof.artifactSha256 && proof.deploymentId === before.deployment.id
     && bridgeProof.deploymentId === before.deployment.id && bridgeProof.versionId === plan.stableVersionId
     && /^[a-f0-9]{64}$/.test(bridgeProof.etag ?? '') && bridgeProof.etag === proof.scriptEtag
     && (!proof.bridgeCompatibility || proof.bridgeCompatibility.compatSha256 === plan.bridgeLineage)

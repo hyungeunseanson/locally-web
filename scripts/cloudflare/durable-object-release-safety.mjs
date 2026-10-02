@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { readActiveVersionArtifact, VERSION_SOURCE } from './active-version-artifact.mjs';
 
 export const DO_MODULES = {
   DOQueueHandler: '.open-next/.build/durable-objects/queue.js',
@@ -39,7 +40,8 @@ export function fingerprintDurableObjectArtifact(source) {
 export function compareDurableObjectProof(proof, stableVersionId) {
   const unknown = 'DO_IMPLEMENTATION_UNKNOWN';
   if (!proof || proof.stableVersionId !== stableVersionId
-    || !SHA256.test(proof.scriptEtag ?? '') || proof.contentEtag !== proof.scriptEtag
+    || !SHA256.test(proof.scriptEtag ?? '') || proof.sourceKind !== VERSION_SOURCE
+    || !SHA256.test(proof.artifactSha256 ?? '') || !proof.deploymentId
     || !Array.isArray(proof.namedHandlers)
     || proof.namedHandlers.length !== 2
     || !Object.keys(DO_MODULES).every(name => proof.namedHandlers.some(h => h.name === name && h.handlers?.includes('class')))) return unknown;
@@ -70,26 +72,17 @@ export function compareDurableObjectProof(proof, stableVersionId) {
   return 'BRIDGE_COMPATIBLE_BUILD_STATE_ONLY';
 }
 
-// GET only. The current script content is tied to the exact deployed stable
-// version by the provider's content ETag and that version's script ETag.
-export async function readStableDurableObjectArtifact({ credentials, workerName, stableVersionId, fetchImplementation = fetch }) {
-  const base = `https://api.cloudflare.com/client/v4/accounts/${credentials.accountId}/workers/scripts/${workerName}`;
-  const options = { method: 'GET', redirect: 'error', signal: AbortSignal.timeout(30000), headers: { Authorization: `Bearer ${credentials.apiToken}` } };
-  const metadataResponse = await fetchImplementation(`${base}/versions/${stableVersionId}`, options);
-  const metadata = await metadataResponse.json();
-  if (!metadataResponse.ok || !metadata.success || metadata.result?.id !== stableVersionId) return null;
-  const response = await fetchImplementation(`${base}/content/v2`, options);
-  const scriptEtag = metadata.result.resources?.script?.etag;
-  const contentEtag = response.headers.get('etag')?.replace(/^"|"$/g, '');
-  if (!response.ok || !SHA256.test(scriptEtag ?? '') || contentEtag !== scriptEtag) return null;
-  const form = await response.formData();
-  const entries = [...form.values()].filter(v => typeof v !== 'string' && v.name.endsWith('.js'));
-  if (entries.length !== 1) return null;
-  const source = await entries[0].text();
-  const stable = fingerprintDurableObjectArtifact(source);
-  const proof = { stableVersionId, scriptEtag, contentEtag,
-    namedHandlers: metadata.result.resources.script.named_handlers,
-    sourceRevision: 'UNKNOWN_NOT_ATTESTED_BY_PROVIDER', stable };
-  Object.defineProperty(proof, 'source', { value: source });
-  return proof;
+// Both bridge extraction and DO comparison use the same version-scoped source.
+export async function readStableDurableObjectArtifact(options) {
+  try {
+    const artifact = await readActiveVersionArtifact(options);
+    const stable = fingerprintDurableObjectArtifact(artifact.source);
+    if (!stable) return null;
+    const proof = { stableVersionId: artifact.versionId, deploymentId: artifact.deploymentId,
+      sourceKind: artifact.sourceKind, scriptEtag: artifact.etag, artifactSha256: artifact.artifactSha256,
+      namedHandlers: artifact.namedHandlers,
+      sourceRevision: 'UNKNOWN_NOT_ATTESTED_BY_PROVIDER', stable };
+    Object.defineProperty(proof, 'source', { value: artifact.source });
+    return proof;
+  } catch { return null; }
 }
