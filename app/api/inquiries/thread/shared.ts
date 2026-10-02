@@ -1040,10 +1040,18 @@ export async function markInquiryMessagesRead(params: {
     throw new InquiryThreadError(400, 'inquiryId is required');
   }
 
-  const { inquiry } = await resolveInquiryMessageAccess({
+  const { inquiry, actorIsAdmin, isAdminSupport } = await resolveInquiryMessageAccess({
     actor,
     inquiryId,
   });
+
+  const isReadActorAdmin = actorIsAdmin || (!isAdminSupport && (await resolveAdminAccess(supabaseAdmin, {
+    userId: actor.id, email: actor.email,
+  })).isAdmin);
+  // Administrators acknowledge support separately; only participants own read receipts.
+  if (isReadActorAdmin || (String(inquiry.user_id) !== actor.id && String(inquiry.host_id) !== actor.id)) {
+    throw new InquiryThreadError(403, '관리자 열람은 고객 읽음 처리 대상이 아닙니다.');
+  }
 
   const readAt = new Date().toISOString();
   const { data: updatedRows, error: updateError } = await supabaseAdmin

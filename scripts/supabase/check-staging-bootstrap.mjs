@@ -51,7 +51,10 @@ const expectedAppliedOrder = [
   'supabase/migrations/20260929144521_harden_public_host_applications_security_barrier.sql',
   'supabase/migrations/20260930022348_move_is_admin_reader_to_private_schema.sql',
 ];
-const expectedPendingOrder = [];
+const expectedPendingOrder = [
+  'supabase/migrations/20261001170718_admin_message_monitoring_phase_1.sql',
+  'supabase/migrations/20261002015110_admin_message_monitoring_historical_reinquiry.sql',
+];
 const expectedApplyOrder = [...expectedAppliedOrder, ...expectedPendingOrder];
 exact('fresh-project apply order', required.freshProjectApplyOrder, expectedApplyOrder);
 exact(

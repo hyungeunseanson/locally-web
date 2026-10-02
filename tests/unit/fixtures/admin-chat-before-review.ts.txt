@@ -168,10 +168,6 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
   const messageRequestVersionRef = useRef(0);
   const localMessagesRef = useRef(new Map<string, Map<string, { message: MonitorMessage; version: number }>>());
   const observedOwnRowsRef = useRef(new Map<string, MonitorMessage>());
-  const acknowledgedSnapshotsRef = useRef(new Set<string>());
-  const pendingAcknowledgementsRef = useRef(new Set<string>());
-  const realtimeHealthyRef = useRef(false);
-  const scheduleFallbackRef = useRef<() => void>(() => {});
 
   const getAuthenticatedUser = useCallback(async (): Promise<User | null> => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -347,28 +343,14 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
       }
       if (inquiryDetail) patchInquiry(inquiryId, inquiryDetail);
 
-      // No acknowledgement for an already-read thread. Cache successful snapshots,
-      // including every ID: a lower-ID transaction can commit after the highest ID.
-      if (nextSelected && isAdminSupportType(nextSelected.type) && fetched.length
-        && Number(inquiryDetail?.admin_unread_count ?? 0) > 0) {
-        const snapshot = `${targetId}:${fetched.map(row => String(row.id)).sort().join(',')}`;
-        if (!acknowledgedSnapshotsRef.current.has(snapshot) && !pendingAcknowledgementsRef.current.has(snapshot)) {
-          const throughMessageId = fetched.reduce((last, row) => BigInt(row.id) > BigInt(last) ? row.id : last, fetched[0].id);
-          pendingAcknowledgementsRef.current.add(snapshot);
-          void fetch(`/api/admin/inquiries/${inquiryId}/ack`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ throughMessageId: String(throughMessageId) }),
-            signal: AbortSignal.timeout(15_000),
-          }).then(async response => {
-            const result = await response.json();
-            if (response.ok && result.success) {
-              acknowledgedSnapshotsRef.current.add(snapshot);
-              if (acknowledgedSnapshotsRef.current.size > 100) {
-                acknowledgedSnapshotsRef.current.delete(acknowledgedSnapshotsRef.current.values().next().value!);
-              }
-            }
-          }).catch(() => {}).finally(() => pendingAcknowledgementsRef.current.delete(snapshot));
-        }
+      // Acknowledge only the snapshot that was successfully rendered, separately
+      // from customer read receipts. Failure is retried by a later catch-up.
+      if (nextSelected && isAdminSupportType(nextSelected.type) && fetched.length) {
+        const throughMessageId = fetched.reduce((last, row) => BigInt(row.id) > BigInt(last) ? row.id : last, fetched[0].id);
+        void fetch(`/api/admin/inquiries/${inquiryId}/ack`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ throughMessageId: String(throughMessageId) }),
+        }).catch(() => {});
       }
 
       return true;
@@ -531,24 +513,16 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
     catchUpRef.current = () => { void catchUp(); };
     const tick = () => {
       void catchUp();
-      scheduleFallback();
+      timer = setTimeout(tick, 30_000);
     };
-    // A quiet connected channel still needs a slow safety net when a table is
-    // missing from the publication. Disconnected channels retry more promptly.
-    const scheduleFallback = () => {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(tick, realtimeHealthyRef.current ? 300_000 : 60_000);
-    };
-    scheduleFallbackRef.current = scheduleFallback;
     const visible = () => { if (document.visibilityState === 'visible') void catchUp(); };
     window.addEventListener('online', catchUpRef.current);
     document.addEventListener('visibilitychange', visible);
-    scheduleFallback();
+    timer = setTimeout(tick, 30_000);
     const online = catchUpRef.current;
     return () => {
       stopped = true;
       catchUpRef.current = () => {};
-      scheduleFallbackRef.current = () => {};
       if (timer) clearTimeout(timer);
       window.removeEventListener('online', online);
       document.removeEventListener('visibilitychange', visible);
@@ -567,9 +541,6 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
   useEffect(() => {
     if (!currentUser || !enabled) return;
 
-    let disposed = false;
-    realtimeHealthyRef.current = false;
-    scheduleFallbackRef.current();
     const channel = supabase
       .channel(`admin-chat-realtime-${currentUser.id}-${conversationOnly ? 'detail' : view}`)
       .on(
@@ -670,9 +641,6 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
         }
       )
       .subscribe(status => {
-        if (disposed) return;
-        realtimeHealthyRef.current = status === 'SUBSCRIBED';
-        scheduleFallbackRef.current();
         if (status === 'SUBSCRIBED') catchUpRef.current();
       });
 
@@ -680,8 +648,6 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
       if (fetchInquiriesTimerRef.current) {
         clearTimeout(fetchInquiriesTimerRef.current);
       }
-      disposed = true;
-      realtimeHealthyRef.current = false;
       supabase.removeChannel(channel);
     };
   }, [supabase, currentUser, loadMessages, scheduleFetchInquiries, enabled, conversationOnly, view]);

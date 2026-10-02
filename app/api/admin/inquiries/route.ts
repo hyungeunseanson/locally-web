@@ -12,6 +12,7 @@ import {
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
+import { getAdminInquiryActivity } from '@/app/utils/adminInquiryActivity';
 import { getHostPublicProfile } from '@/app/utils/profile';
 import { filteredPage, linkedRequests, validLinkedRequest } from '../customer-support/queries';
 
@@ -126,7 +127,7 @@ export async function GET(request: Request) {
     const guestIds = Array.from(new Set(inquiryRows.map((item) => item.user_id).filter(Boolean))) as string[];
 
     // 3. 프로필, 애플리케이션, 그리고 안 읽은 메시지 수 조회
-    const [profilesRes, appsRes, guestProfilesRes, unreadRes] = await Promise.all([
+    const [profilesRes, appsRes, guestProfilesRes, unreadRes, activityMap] = await Promise.all([
       supabaseAdmin.from('profiles').select('id, full_name, email, avatar_url').in('id', hostIds),
       supabaseAdmin.from('host_applications').select('user_id, name, profile_photo, status').in('user_id', hostIds),
       supabaseAdmin.from('profiles').select('id, full_name, email, avatar_url').in('id', guestIds),
@@ -135,7 +136,8 @@ export async function GET(request: Request) {
         .in('inquiry_id', inquiryIds)
         .eq('is_read', false)
         .neq('type', SOFT_DELETED_INQUIRY_MESSAGE_TYPE)
-        .neq('sender_id', user.id)
+        .neq('sender_id', user.id),
+      getAdminInquiryActivity(supabaseAdmin, inquiryIds)
     ]);
 
     const hostProfiles = (profilesRes.data || []) as ProfileRow[];
@@ -170,6 +172,7 @@ export async function GET(request: Request) {
       const guestProfile = guestMap.get(item.user_id);
       const guestName = guestProfile?.full_name || guestProfile?.email?.split('@')[0] || '게스트';
       const guestAvatar = guestProfile?.avatar_url;
+      const activity = activityMap.get(String(item.id));
       const latestSenderId = latestMessages?.[0]?.sender_id ?? null;
       const latestIsOfficialSupport = isOfficialInquirySupportMessage({
         inquiryType: item.type,
@@ -185,8 +188,10 @@ export async function GET(request: Request) {
 
       return {
         ...publicItem,
+        ...activity,
+        content: activity?.last_message_content ?? item.content,
         experience_id: item.experience_id ?? '',
-        unread_count: unreadCounts[String(item.id)] || 0,
+        unread_count: isAdminSupportInquiry(item.type) ? Number(activity?.admin_unread_count ?? 0) : unreadCounts[String(item.id)] || 0,
         has_policy_signal: signal.matched,
         policy_signal_categories: signal.categories,
         guest: {
@@ -209,7 +214,7 @@ export async function GET(request: Request) {
       };
     });
 
-    return NextResponse.json({ success: true, data: safeData, selection, pagination: page.pagination });
+    return NextResponse.json({ success: true, data: safeData, selection, pagination: page.pagination }, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error: unknown) {
     console.error('[inquiries/list] error:', error);
     const message = error instanceof Error ? error.message : 'Server error';

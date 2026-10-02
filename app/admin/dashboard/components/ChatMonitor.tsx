@@ -14,6 +14,8 @@ import { useToast } from '@/app/context/ToastContext';
 import { useConfirmDialog } from '@/app/hooks/useConfirmDialog';
 import ChatParticipantProfileModal, { type ChatParticipantProfile } from './ChatParticipantProfileModal';
 import { useAutoResizeTextarea } from '@/app/hooks/useAutoResizeTextarea';
+import type { AdminInquiryActivity } from '@/app/utils/adminInquiryActivity';
+import { formatAdminMessageTime, formatAdminMessageDay, formatAdminListTime, formatReplyWait, kstDateKey } from '@/app/utils/adminChatTime';
 import { OFFICIAL_SUPPORT_SENDER_NAME } from '@/app/utils/officialSender';
 
 type CSStatus = 'open' | 'in_progress' | 'resolved';
@@ -37,7 +39,7 @@ type MonitorGuest = {
   phone?: string | null;
 };
 
-type MonitorInquiry = {
+type MonitorInquiry = Partial<AdminInquiryActivity> & {
   id: number | string;
   type?: string | null;
   guest?: MonitorGuest;
@@ -49,21 +51,6 @@ type MonitorInquiry = {
   has_policy_signal?: boolean;
   policy_signal_categories?: string[];
 };
-
-function formatInquiryListTimestamp(value?: string | null) {
-  if (!value) return '';
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-
-  return date.toLocaleString('ko-KR', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-}
 
 type ChatMonitorProps = {
   view?: 'support' | 'monitor';
@@ -103,6 +90,13 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
 
   const { showToast } = useToast();
   const { requestConfirm, ConfirmDialogElement } = useConfirmDialog();
+  const [clockNow, setClockNow] = useState(() => Date.now());
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = () => { setClockNow(Date.now()); timer = setTimeout(tick, 60_000); };
+    timer = setTimeout(tick, 60_000);
+    return () => clearTimeout(timer);
+  }, []);
   const [csStatusFilter, setCsStatusFilter] = useState<CSStatusFilter>('ALL');
   const [draftsByInquiryId, setDraftsByInquiryId] = useState<Record<string, string>>({});
   const [isSending, setIsSending] = useState(false);
@@ -496,7 +490,12 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
                     )}
                     <span className="truncate">{getGuestName(inq.guest)}</span>
                   </span>
-                  <span className="text-[9px] md:text-[10px] text-slate-400 shrink-0 font-medium leading-4">{formatInquiryListTimestamp(inq.updated_at)}</span>
+                  <span className="text-[9px] md:text-[10px] text-slate-400 shrink-0 font-medium leading-4">{formatAdminListTime(inq.last_message_at, clockNow)}</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5 text-[10px] md:text-[11px] mb-1" data-testid="admin-chat-activity">
+                  <span className="text-slate-500">마지막 발신: {inq.last_sender_role ? { customer: '고객', host: '호스트', admin: '관리자' }[inq.last_sender_role] : '정보 없음'}</span>
+                  {inq.needs_reply && <span className="font-bold text-amber-700">답변 필요 · {formatReplyWait(inq.reply_waiting_since, clockNow)}</span>}
+                  {inq.support_reopened_at && <span className="font-bold text-rose-700">완료 후 재문의</span>}
                 </div>
                 <div className="text-[10px] md:text-[11px] text-slate-500 mb-1 line-clamp-1 leading-4">
                   {inq.experiences?.title ? `🏠 ${inq.experiences.title}` : '📄 문의 내용'}
@@ -696,7 +695,7 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
                     다시 시도
                   </button>
                 </div>
-              ) : messages.map((msg) => {
+              ) : messages.map((msg, index) => {
                 const isGuest = String(msg.sender_id) === String(selectedInquiry.user_id);
                 const alignRight = !isGuest;
                 const isDeletedMessage = isDeletedInquiryMessage(msg.type);
@@ -715,56 +714,66 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
                     ? `로컬리 (${msg.sender?.name || '알 수 없음'})`
                     : (msg.sender?.name || '알 수 없음');
 
+                const showDate = index === 0 || kstDateKey(msg.created_at) !== kstDateKey(messages[index - 1].created_at);
                 return (
-                  <div
-                    key={msg.id}
-                    data-message-id={String(msg.id)}
-                    data-official-support={isOfficialSupport ? 'true' : 'false'}
-                    className={`flex flex-col ${alignRight ? 'items-end' : 'items-start'}`}
-                  >
-                    <div className="mb-0.5 md:mb-1 flex items-center gap-2 px-1">
-                      <span className="text-[9px] md:text-[10px] text-slate-400">
-                        {displayName}
-                      </span>
-                      {hasPolicySignal && !isDeletedMessage && (
-                        <div
-                          data-testid="admin-chat-message-policy-badge"
-                          className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[8px] md:text-[10px] font-bold text-rose-700 border border-rose-200"
-                        >
-                          <AlertTriangle size={10} />
-                          정책위반 의심
-                        </div>
-                      )}
-                      {isDeletedMessage && (
-                        <div className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[8px] md:text-[10px] font-bold text-slate-600 border border-slate-200">
-                          <Shield size={10} />
-                          운영 삭제
-                        </div>
-                      )}
-                      {activeTab === 'monitor' && !isDeletedMessage && (
-                        <button
-                          type="button"
-                          onClick={() => handleSoftDeleteMessage(msg.id, msg.content)}
-                          data-delete-message-id={String(msg.id)}
-                          className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[8px] md:text-[10px] font-bold text-rose-600 border border-rose-200 hover:bg-rose-50"
-                          title="이 메시지만 운영 삭제"
-                        >
-                          <Trash2 size={10} />
-                          삭제
-                        </button>
-                      )}
+                  <React.Fragment key={msg.id}>
+                    {showDate && (
+                      <div className="flex items-center gap-3 py-2 text-[11px] text-slate-500" data-testid="admin-chat-date-separator">
+                        <span className="h-px flex-1 bg-slate-200" />
+                        <span>{formatAdminMessageDay(msg.created_at, clockNow)}</span>
+                        <span className="h-px flex-1 bg-slate-200" />
+                      </div>
+                    )}
+                    <div
+                      data-message-id={String(msg.id)}
+                      data-official-support={isOfficialSupport ? 'true' : 'false'}
+                      className={`flex flex-col ${alignRight ? 'items-end' : 'items-start'}`}
+                    >
+                      <div className="mb-0.5 md:mb-1 flex items-center gap-2 px-1">
+                        <span className="text-[9px] md:text-[10px] text-slate-400">
+                          {displayName}
+                        </span>
+                        {hasPolicySignal && !isDeletedMessage && (
+                          <div
+                            data-testid="admin-chat-message-policy-badge"
+                            className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[8px] md:text-[10px] font-bold text-rose-700 border border-rose-200"
+                          >
+                            <AlertTriangle size={10} />
+                            정책위반 의심
+                          </div>
+                        )}
+                        {isDeletedMessage && (
+                          <div className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[8px] md:text-[10px] font-bold text-slate-600 border border-slate-200">
+                            <Shield size={10} />
+                            운영 삭제
+                          </div>
+                        )}
+                        {activeTab === 'monitor' && !isDeletedMessage && (
+                          <button
+                            type="button"
+                            onClick={() => handleSoftDeleteMessage(msg.id, msg.content)}
+                            data-delete-message-id={String(msg.id)}
+                            className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[8px] md:text-[10px] font-bold text-rose-600 border border-rose-200 hover:bg-rose-50"
+                            title="이 메시지만 운영 삭제"
+                          >
+                            <Trash2 size={10} />
+                            삭제
+                          </button>
+                        )}
+                      </div>
+                      <div className={`p-2.5 md:p-3 rounded-lg md:rounded-xl max-w-[85%] md:max-w-[70%] text-xs md:text-sm shadow-sm leading-relaxed whitespace-pre-wrap break-words ${isDeletedMessage
+                        ? 'border border-slate-200 border-dashed bg-slate-100 text-slate-500 italic'
+                        : hasPolicySignal
+                          ? 'border border-rose-200 bg-rose-50 text-rose-900'
+                          : alignRight
+                            ? 'bg-black text-white rounded-tr-none'
+                            : 'bg-white border border-slate-200 rounded-tl-none text-slate-800'
+                        }`}>
+                        {msg.content}
+                      </div>
+                      <time dateTime={msg.created_at || undefined} className="mt-1 px-1 text-[10px] text-slate-500">{formatAdminMessageTime(msg.created_at)}</time>
                     </div>
-                    <div className={`p-2.5 md:p-3 rounded-lg md:rounded-xl max-w-[85%] md:max-w-[70%] text-xs md:text-sm shadow-sm leading-relaxed whitespace-pre-wrap break-words ${isDeletedMessage
-                      ? 'border border-slate-200 border-dashed bg-slate-100 text-slate-500 italic'
-                      : hasPolicySignal
-                        ? 'border border-rose-200 bg-rose-50 text-rose-900'
-                        : alignRight
-                          ? 'bg-black text-white rounded-tr-none'
-                          : 'bg-white border border-slate-200 rounded-tl-none text-slate-800'
-                      }`}>
-                      {msg.content}
-                    </div>
-                  </div>
+                  </React.Fragment>
                 );
               })}
             </div>
