@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFile, writeFile, readdir, rm, mkdir } from 'node:fs/promises';
 import path from 'node:path';
+import { gunzipSync, brotliDecompressSync } from 'node:zlib';
 import { parse } from 'acorn';
 import { resolveCloudflareReadCredentials } from './verify-production-deploy-contract.mjs';
 
@@ -118,7 +119,11 @@ export async function assertNoClientTokenLeakage(roots, tokens) {
       else {
         // Refuse symlinks so an unexpected output layout cannot evade the scan.
         requireContract(entry.isFile());
-        const bytes = await readFile(file); files++;
+        let bytes = await readFile(file); files++;
+        try {
+          if (file.endsWith('.gz')) bytes = gunzipSync(bytes);
+          if (file.endsWith('.br')) bytes = brotliDecompressSync(bytes);
+        } catch { throw new Error(PATCH_ERROR); }
         if (tokens.some(token => bytes.includes(Buffer.from(token)))) throw new Error('OPENNEXT_REVALIDATION_BRIDGE_CLIENT_TOKEN_LEAK');
       }
     }

@@ -3,6 +3,7 @@ import test from 'node:test';
 import { mkdtemp, mkdir, writeFile, rm, readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { gzipSync, brotliCompressSync } from 'node:zlib';
 import { createRevalidationBridge } from '../../app/utils/isrRevalidationBridge.mjs';
 import { patchQueueArtifact, inspectQueueToken, readProviderCompatToken, sha256, assertNoClientTokenLeakage, applyRevalidationBridge } from './revalidation-bridge-build.mjs';
 import { main as deploy } from './run-production-deploy.mjs';
@@ -68,6 +69,13 @@ test('scan covers JS, maps, fonts and HTML; neither credential may leak',async()
 });
 test('official live deploy rejects fixture before build or any provider action',async()=>{
   const calls=[];await assert.rejects(deploy([],{environment:{LOCALLY_ISR_BRIDGE_SOURCE:'fixture'},runCommand:()=>calls.push('mutation')}),{message:'OPENNEXT_REVALIDATION_BRIDGE_FIXTURE_DEPLOY_FORBIDDEN'});assert.deepEqual(calls,[]);
+});
+test('precompressed client assets cannot hide either credential',async()=>{
+  const root=await mkdtemp(path.join(os.tmpdir(),'isr-compressed-'));
+  try {for(const [extension,compress] of [['gz',gzipSync],['br',brotliCompressSync]]){
+    const file=path.join(root,`app.js.${extension}`);await writeFile(file,compress(Buffer.from(current)));
+    await assert.rejects(assertNoClientTokenLeakage([root],[compat,current]),{message:'OPENNEXT_REVALIDATION_BRIDGE_CLIENT_TOKEN_LEAK'});await rm(file);
+  }}finally{await rm(root,{recursive:true,force:true});}
 });
 test('private output stays ignored and wrapper delegates through exact translation',async()=>{
   assert((await readFile('.gitignore','utf8')).includes('/.open-next/'));
