@@ -207,6 +207,9 @@ test('promotion requires preflight, both identity proofs and both full smoke pas
 test('planned migrations/routes/bindings and live trigger drift block', async () => {
   const changed = structuredClone(config); changed.env.production.migrations.push({ tag: 'new-migration' });
   assert.throws(() => makePlan({ config: changed }), blocked('planned_trigger_or_config_change'));
+  const ordered = structuredClone(config); ordered.env.production.migrations = [{ tag: 'first' }, { tag: 'second' }];
+  const reordered = structuredClone(ordered); reordered.env.production.migrations.reverse();
+  assert.throws(() => makePlan({ config: reordered, baselineConfig: ordered }), blocked('planned_trigger_or_config_change'));
   for (const mutate of [s => s.routes.push({ pattern: 'other.example.com/*' }), s => s.crons.push('* * * * *'),
     s => { s.queueConsumers[0].settings.max_retries = 9; }, s => { s.bindings[2].name = 'OTHER_SECRET'; }]) {
     const { actions, calls } = fixtureActions();

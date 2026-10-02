@@ -88,7 +88,8 @@ export function buildCandidateReleasePlan({ config, baseline, runtimeVariables, 
   requireCondition(wranglerVersion === PINNED_WRANGLER_VERSION, 'wrangler_contract_version_changed');
   requireCondition(config.keep_vars === true, 'keep_vars_required');
   requireCondition(config.env.production.name === PRODUCTION_WORKER, 'unexpected_worker');
-  requireCondition(baselineConfig && stableJson(config) === stableJson(baselineConfig), 'planned_trigger_or_config_change');
+  // Preserve local array order: reordering DO migrations is a planned change.
+  requireCondition(baselineConfig && JSON.stringify(config) === JSON.stringify(baselineConfig), 'planned_trigger_or_config_change');
   const snapshot = safeConfigSnapshot(baseline.snapshot);
   const stableVersionId = captureStableVersion(baseline.deployment);
   for (const [name, value] of Object.entries(runtimeVariables)) {
