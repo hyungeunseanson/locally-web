@@ -165,3 +165,32 @@ reset DOs, so this remains an observation, not an invented root cause.
 Local structural/runtime tests do not claim a live natural ISR success or that
 candidate0 smoke executes candidate DO code. No live candidate, override,
 traffic change, upload, deploy, rollback, or data mutation was performed here.
+
+
+## Post-upload version scope correction
+
+Observed on 2026-10-03: uploading a candidate left the deployment and exact
+stable version unchanged, while `/settings` gained `CF_VERSION_METADATA` and
+`/content/v2` returned the uploaded candidate's ETag. This is an observed
+projection, not a guarantee about every deployment shape. Neither endpoint is
+sufficient to identify the active version after upload.
+
+The reader separates `activeDeployment`, `activeStableVersion`,
+`uploadedCandidateVersion`, `scriptGlobalSettings`, and
+`triggersAndBindingsOutsideVersionScope`. Exact `/versions/{uuid}` resources
+anchor version invariance; `/script-settings` anchors global settings. Dedicated
+routes, domains, schedules and Queue consumer reads remain mandatory. Legacy
+settings are diagnostic only. Candidate bindings may add only version metadata;
+all previous bindings, runtime, lifecycle and global settings must remain equal.
+
+Artifact readers retain the matching `/content/v2` ETag path when available.
+If it points elsewhere, GET `/workers/workers/{name}/versions/{uuid}?include=modules`
+reads the exact immutable version. UUID, main module and a second exact metadata
+read must agree. Proof records `artifactIdentity: EXACT_VERSION_MODULES` plus
+`sourceSha256`; `etagMatch` then means the exact version metadata ETag remained
+unchanged, **not** that the legacy content response ETag matched. No raw module
+or compatibility credential is persisted by the reader.
+
+Sources: [version state](https://developers.cloudflare.com/workers/versions-and-deployments/),
+[script-global settings](https://developers.cloudflare.com/api/resources/workers/subresources/scripts/subresources/settings/methods/get/),
+[exact-version modules](https://developers.cloudflare.com/api/resources/workers/subresources/beta/subresources/workers/subresources/versions/methods/get/).
