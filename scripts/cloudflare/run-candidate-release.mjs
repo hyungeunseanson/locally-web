@@ -1,3 +1,7 @@
+import { compareBridgeArtifacts } from './bridge-candidate-compatibility.mjs';
+import { verifyBridgeRuntimeMatrix } from './bridge-candidate-runtime.mjs';
+import { assertProductionBridgeProofFresh } from './revalidation-bridge-freshness.mjs';
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
@@ -21,6 +25,23 @@ export async function readCandidateBaseline({ credentials = resolveCloudflareRea
   const body = await r.json();
   if (!r.ok || !body.success) throw new CandidateReleaseBlocked('deployment_snapshot_unavailable');
   const latest = [...(body.result.deployments ?? body.result)].sort((a, b) => Date.parse(b.created_on) - Date.parse(a.created_on))[0];
+  const get = async suffix => {
+    const response = await fetchImplementation(`https://api.cloudflare.com/client/v4/accounts/${credentials.accountId}${suffix}`, {
+      method: 'GET', redirect: 'error', signal: AbortSignal.timeout(30000), headers: { Authorization: `Bearer ${credentials.apiToken}` },
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) throw new CandidateReleaseBlocked('runtime_snapshot_unavailable');
+    return data.result;
+  };
+  const settings = await get(`/workers/scripts/${PRODUCTION_WORKER}/settings`);
+  const scripts = await get('/workers/scripts');
+  const script = scripts.find(s => s.id === PRODUCTION_WORKER);
+  if (!script?.migration_tag) throw new CandidateReleaseBlocked('migration_tag_missing');
+  snapshot.runtime = { compatibilityDate: settings.compatibility_date, compatibilityFlags: settings.compatibility_flags, migrationTag: script.migration_tag };
+  for (const binding of snapshot.bindings) {
+    const raw = settings.bindings.find(b => b.name === binding.name);
+    if (raw?.type === 'plain_text') binding.valueSha256 = createHash('sha256').update(raw.text).digest('hex');
+  }
   return { snapshot, deployment: { id: latest?.id, versions: latest?.versions.map(v => ({ id: v.version_id, percentage: v.percentage })) } };
 }
 
@@ -45,23 +66,33 @@ export async function main(args = process.argv.slice(2), dependencies = {}) {
   const baseline = await (dependencies.readBaseline ?? readCandidateBaseline)();
   const wranglerVersion = dependencies.wranglerVersion ?? JSON.parse(await readFile('node_modules/wrangler/package.json', 'utf8')).version;
   const input = { config, baseline, baselineConfig, workerSource, baselineWorkerSource,
-    runtimeVariables: contract.runtimeVariables, wranglerVersion };
+    runtimeVariables: contract.runtimeVariables, wranglerVersion,
+    bridgeLineage: (dependencies.bridgePolicy ?? JSON.parse(await readFile('config/cloudflare/revalidation-bridge.json', 'utf8'))).compatTokenSha256,
+    doCodeUpdateMode: 'provider-default-no-drain-guarantee' };
   let plan = buildCandidateReleasePlan({ ...input, durableObjectProof: dependencies.durableObjectProof });
   const semantic = await (dependencies.semanticPreflight ?? runProductionDeploySemanticPreflight)({
     expectedVariables: contract.runtimeVariables, allowedPlannedChanges: [], allowedPlannedCronAdditions: [], log: () => {},
   });
   if (semantic?.status !== 'PRODUCTION_DEPLOY_SEMANTIC_PREFLIGHT_PASS') throw new CandidateReleaseBlocked('semantic_preflight_failed');
   if (options.dryRun) {
-    const env = { ...process.env, ...contract.readerEnvironment, WRANGLER_SEND_METRICS: 'false' };
+    const env = { ...process.env, ...contract.readerEnvironment, WRANGLER_SEND_METRICS: 'false', LOCALLY_ISR_BRIDGE_SOURCE: 'provider' };
     const run = dependencies.runLocal ?? runLocal;
     run(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'cloudflare:build:production'], env);
     run(path.join(process.cwd(), 'node_modules', '.bin', process.platform === 'win32' ? 'wrangler.cmd' : 'wrangler'),
       [...plan.uploadArguments, '--outdir', '.wrangler/candidate-dry-run', '--dry-run'], env);
+    const rebuiltSemantic = await (dependencies.semanticPreflight ?? runProductionDeploySemanticPreflight)({ expectedVariables: contract.runtimeVariables, allowedPlannedChanges: [], allowedPlannedCronAdditions: [], log: () => {} });
+    if (rebuiltSemantic?.status !== 'PRODUCTION_DEPLOY_SEMANTIC_PREFLIGHT_PASS') throw new CandidateReleaseBlocked('semantic_preflight_failed');
     const stableArtifact = await (dependencies.readStableArtifact ?? (() => readStableDurableObjectArtifact({
       credentials: resolveCloudflareReadCredentials(), workerName: PRODUCTION_WORKER, stableVersionId: plan.stableVersionId,
     })))();
     const source = await (dependencies.readCandidateArtifact ?? (() => readFile('.wrangler/candidate-dry-run/cloudflare-worker.js', 'utf8')))();
-    const durableObjectProof = { ...stableArtifact, candidate: fingerprintDurableObjectArtifact(source) };
+    const policy = JSON.parse(await readFile('config/cloudflare/revalidation-bridge.json', 'utf8'));
+    const bridgeCompatibility = compareBridgeArtifacts(stableArtifact?.source, source, policy.compatTokenSha256);
+    if (['DO_IMPLEMENTATION_UNCHANGED', 'BRIDGE_COMPATIBLE_BUILD_STATE_ONLY'].includes(bridgeCompatibility.classification)) {
+      bridgeCompatibility.runtime = await verifyBridgeRuntimeMatrix(stableArtifact.source, source);
+    }
+    await (dependencies.bridgeFreshness ?? assertProductionBridgeProofFresh)();
+    const durableObjectProof = { ...stableArtifact, candidate: fingerprintDurableObjectArtifact(source), bridgeCompatibility };
     const after = await (dependencies.readBaseline ?? readCandidateBaseline)();
     assertConfigUnchanged(baseline.snapshot, after.snapshot);
     if (JSON.stringify(baseline.deployment) !== JSON.stringify(after.deployment)) throw new CandidateReleaseBlocked('concurrent_deployment_changed');

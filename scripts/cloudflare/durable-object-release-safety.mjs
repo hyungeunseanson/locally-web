@@ -53,14 +53,28 @@ export function compareDurableObjectProof(proof, stableVersionId) {
   const unchanged = stable.preludeSha256 === candidate.preludeSha256
     && keys.every(k => stable.dependencies[k] === candidate.dependencies[k])
     && Object.keys(DO_MODULES).every(k => stable.modules[k].sha256 === candidate.modules[k].sha256 && stable.modules[k].bytes === candidate.modules[k].bytes);
-  return unchanged ? 'DO_IMPLEMENTATION_UNCHANGED' : 'DO_IMPLEMENTATION_CHANGED';
+  if (unchanged) return 'DO_IMPLEMENTATION_UNCHANGED';
+  const c = proof.bridgeCompatibility;
+  if (!c || c.classification === 'UNKNOWN') return 'UNKNOWN';
+  if (c.classification !== 'BRIDGE_COMPATIBLE_BUILD_STATE_ONLY'
+    || stable.preludeSha256 !== candidate.preludeSha256
+    || !keys.every(k => stable.dependencies[k] === candidate.dependencies[k])
+    || !SHA256.test(c.compatSha256 ?? '')
+    || c.nextAuthenticationUnchanged !== true || c.workerClientsUnchanged !== true
+    || !Object.keys(DO_MODULES).every(k => c.modules?.[k]?.stableSha256 === stable.modules[k].sha256
+      && c.modules?.[k]?.candidateSha256 === candidate.modules[k].sha256 && c.modules[k].structuralContractIdentical === true)
+    || c.modules.DOShardedTagCache.classification !== 'DO_IMPLEMENTATION_UNCHANGED'
+    || c.differences?.length !== 4 || c.differences.some(d => d.class !== 'DOQueueHandler' || d.classification !== 'BUILD_ID_ONLY')
+    || !['fourWay', 'generation01', 'generation12', 'rollback'].every(k => c.runtime?.[k] === 'PASS')
+    || c.runtime.buildState !== 'BUILD_STATE_RESET_EXPECTED') return 'DO_RUNTIME_CHANGED';
+  return 'BRIDGE_COMPATIBLE_BUILD_STATE_ONLY';
 }
 
 // GET only. The current script content is tied to the exact deployed stable
 // version by the provider's content ETag and that version's script ETag.
 export async function readStableDurableObjectArtifact({ credentials, workerName, stableVersionId, fetchImplementation = fetch }) {
   const base = `https://api.cloudflare.com/client/v4/accounts/${credentials.accountId}/workers/scripts/${workerName}`;
-  const options = { method: 'GET', headers: { Authorization: `Bearer ${credentials.apiToken}` } };
+  const options = { method: 'GET', redirect: 'error', signal: AbortSignal.timeout(30000), headers: { Authorization: `Bearer ${credentials.apiToken}` } };
   const metadataResponse = await fetchImplementation(`${base}/versions/${stableVersionId}`, options);
   const metadata = await metadataResponse.json();
   if (!metadataResponse.ok || !metadata.success || metadata.result?.id !== stableVersionId) return null;
@@ -71,8 +85,11 @@ export async function readStableDurableObjectArtifact({ credentials, workerName,
   const form = await response.formData();
   const entries = [...form.values()].filter(v => typeof v !== 'string' && v.name.endsWith('.js'));
   if (entries.length !== 1) return null;
-  const stable = fingerprintDurableObjectArtifact(await entries[0].text());
-  return { stableVersionId, scriptEtag, contentEtag,
+  const source = await entries[0].text();
+  const stable = fingerprintDurableObjectArtifact(source);
+  const proof = { stableVersionId, scriptEtag, contentEtag,
     namedHandlers: metadata.result.resources.script.named_handlers,
     sourceRevision: 'UNKNOWN_NOT_ATTESTED_BY_PROVIDER', stable };
+  Object.defineProperty(proof, 'source', { value: source });
+  return proof;
 }

@@ -249,7 +249,7 @@ test.describe('Cloudflare migration readiness contract', () => {
       4397, 4413, 4414, 4424, 4523, 4597, 4659, 4660, 4811, 4837, 4838,
     ]);
     expect(packageJson.scripts.build).toBe('next build');
-    expect(packageJson.scripts['cloudflare:build']).toBe('opennextjs-cloudflare build');
+    expect(packageJson.scripts['cloudflare:build']).toBe('node scripts/cloudflare/run-opennext-build.mjs');
   });
 
   test('keeps current Next image URLs and allows public storage from the isolated staging project', () => {

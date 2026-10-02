@@ -94,8 +94,12 @@ export async function installProductionMutationGate(context, origin, {
 
     if (READ_METHODS.has(method)) {
       if (override && url.origin === productionOrigin) {
+        if (request.headers().cookie || request.headers().authorization) {
+          blockedUnexpectedWrites.push({ method, pathname: url.pathname, kind: 'candidate_authenticated_read_forbidden' });
+          await route.abort('blockedbyclient'); return;
+        }
         await route.continue({ headers: { ...request.headers(), 'Cloudflare-Workers-Version-Overrides': override,
-          ...(['GET', 'HEAD'].includes(method) ? { 'X-Locally-Release-Probe': '1' } : {}) } });
+          ...(url.pathname === '/.well-known/locally-release' && ['GET', 'HEAD'].includes(method) ? { 'X-Locally-Release-Probe': '1' } : {}) } });
         versionOverride.onApplied?.({ pathname: url.pathname, resourceType: request.resourceType(), method });
       } else {
         if (override && url.origin !== productionOrigin) {

@@ -20,6 +20,7 @@ import { readExperienceMediaSourceReleasePolicy, resolveExperienceMediaSourceRel
 import { runProductionBrowserSmoke } from './run-production-browser-smoke.mjs';
 import { runProductionDeploySemanticPreflight } from './verify-production-deploy-contract.mjs';
 import { assertProductionSupabasePrivilegedEnvironment } from './run-production-build.mjs';
+import { assertProductionBridgeProofFresh } from './revalidation-bridge-freshness.mjs';
 
 const ROOT = process.cwd();
 
@@ -219,8 +220,10 @@ export async function main(argumentsList = process.argv.slice(2), dependencies =
   const runCommand = dependencies.runCommand ?? run;
   const runBrowserSmoke = dependencies.runBrowserSmoke ?? runProductionBrowserSmoke;
   const runSemanticPreflight = dependencies.runSemanticPreflight ?? runProductionDeploySemanticPreflight;
+  const runBridgeProofFreshness = dependencies.runBridgeProofFreshness ?? assertProductionBridgeProofFresh;
   const log = dependencies.log ?? console.log;
   const options = parseDeploymentArguments(argumentsList);
+  if (!options.dryRun && (environment.LOCALLY_ISR_BRIDGE_SOURCE ?? 'provider') !== 'provider') throw new Error('OPENNEXT_REVALIDATION_BRIDGE_FIXTURE_DEPLOY_FORBIDDEN');
   const contract = await resolveProductionDeploymentContract(options);
   const { profile, translationProfile, homePopularityProfile, adminSupportUnreadProfile, notificationRetentionProfile,
     experienceCompletionProfile, experienceMediaSourceProfile, serviceCompletionProfile, cancelPendingBookingsProfile,
@@ -234,7 +237,7 @@ export async function main(argumentsList = process.argv.slice(2), dependencies =
   );
 
   runCommand(npmCommand, ['run', 'cloudflare:build:production'], {
-    env: { ...environment, ...contract.readerEnvironment },
+    env: { ...environment, ...contract.readerEnvironment, LOCALLY_ISR_BRIDGE_SOURCE: environment.LOCALLY_ISR_BRIDGE_SOURCE ?? 'provider' },
   });
   if (!options.dryRun) {
     await runSemanticPreflight({
@@ -253,6 +256,9 @@ export async function main(argumentsList = process.argv.slice(2), dependencies =
       throw new Error(`PRE_DEPLOY_PRODUCTION_SMOKE_FAILED: ${reason}`, { cause: error });
     }
   }
+  // Keep this final GET-only gate adjacent to deploy: no other asynchronous work
+  // may be inserted after it and before the command invocation.
+  if (!options.dryRun) await runBridgeProofFreshness({ root: ROOT, environment });
   runCommand(wranglerCommand, contract.wranglerArguments);
   if (!options.dryRun) {
     try {

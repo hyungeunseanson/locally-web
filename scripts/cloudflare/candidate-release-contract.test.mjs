@@ -12,17 +12,19 @@ import { withReleaseProbeIdentity } from '../../app/utils/cloudflareReleaseProbe
 import { main, parseCandidateArguments } from './run-candidate-release.mjs';
 import { runCandidateBrowserSmoke } from './run-candidate-browser-smoke.mjs';
 
+const lineage = 'a'.repeat(64);
 const stableId = '11111111-1111-4111-8111-111111111111';
 const candidateId = '22222222-2222-4222-8222-222222222222';
 const workerSource = "export { DOQueueHandler, DOShardedTagCache } from './.open-next/worker.js';";
 const flags = { CLOUDFLARE_DEPLOYMENT_ENV: 'production', OPS_ANOMALY_MONITOR_SCHEDULED_ENABLED: 'true' };
-const baselineConfig = { keep_vars: true, env: { production: { name: PRODUCTION_WORKER, preview_urls: false,
+const baselineConfig = { keep_vars: true, compatibility_date: '2026-01-01', compatibility_flags: ['nodejs_compat'], env: { production: { name: PRODUCTION_WORKER, preview_urls: false,
   durable_objects: { bindings: Object.keys(DO_MODULES).map(class_name => ({ name: class_name, class_name })) },
   migrations: [{ tag: 'cache-v1', new_sqlite_classes: Object.keys(DO_MODULES) }] } } };
 const config = structuredClone(baselineConfig);
 config.env.production.version_metadata = { binding: 'CF_VERSION_METADATA' };
 const metadataBinding = { name: 'CF_VERSION_METADATA', type: 'version_metadata' };
 const snapshot = {
+  runtime: {compatibilityDate:'2026-01-01',compatibilityFlags:['nodejs_compat'],migrationTag:'cache-v1'},
   routes: [{ pattern: 'www.locally-travel.com/*' }], customDomains: [],
   subdomain: { enabled: false, previews_enabled: false }, observability: { enabled: true, head_sampling_rate: 0.1 },
   bindings: [...Object.entries(flags).map(([name, text]) => ({ name, type: 'plain_text', text })),
@@ -44,7 +46,7 @@ function makeProof(candidateSource = artifact()) {
     stable: fingerprintDurableObjectArtifact(artifact()), candidate: fingerprintDurableObjectArtifact(candidateSource) };
 }
 const makePlan = (overrides = {}) => buildCandidateReleasePlan({ config, baselineConfig, baseline, workerSource,
-  baselineWorkerSource: workerSource, durableObjectProof: makeProof(), runtimeVariables: flags, wranglerVersion: '4.129.1', ...overrides });
+  baselineWorkerSource: workerSource, durableObjectProof: makeProof(), runtimeVariables: flags, wranglerVersion: '4.129.1', bridgeLineage: lineage, doCodeUpdateMode: 'provider-default-no-drain-guarantee', ...overrides });
 const safeAttempt = pathname => ({ pathname, pass: true, timeout: false, pendingStaticAssets: 0,
   httpHardErrors: 0, fiveXX: 0, asset404: 0, genericError: false, pageErrors: 0, consoleErrors: 0, unexpectedWrites: 0, versionMismatch: false });
 function makeSmoke() {
@@ -52,17 +54,20 @@ function makeSmoke() {
     ...safeAttempt('/'), assetSetMatches: true, assetRefs: ['/_next/static/app.js', '/_next/static/font.woff2'],
     assetResponses: ['/_next/static/app.js', '/_next/static/font.woff2'].map(pathname => ({ pathname, status: 200, overrideApplied: true, redirected: false })),
     attempts: ['/', '/experiences/42', '/login'].map(safeAttempt),
-    overrideCoverage: { document: true, script: true, font: true, api: true }, allFirstPartyReadsOverridden: true,
+    probeReceipt: { pathname: '/.well-known/locally-release', status: 204, versionId: candidateId, overrideApplied: true, probeApplied: true },
+    overrideCoverage: { document: true, script: true, stylesheet: true, image: true, data: true, font: true, api: true }, allFirstPartyReadsOverridden: true,
     workerReceipts: ['/', '/experiences/42', '/login', '/api/proxy-bookings'].map(pathname => ({ pathname, versionId: candidateId, overrideApplied: true, probeApplied: true })) };
 }
 function fixtureActions() {
   const calls = []; let deployment = structuredClone(baseline.deployment); let bindings = structuredClone(snapshot.bindings);
   const actions = {
+    recheckIdentity: async versionId => ({versionId,status:204}), authorizedCandidateUpload: true, authorizePromotion: async () => true,
+    bridgeProofFreshness: async () => ({kind:'provider',etagMatch:true,deploymentId:baseline.deployment.id,versionId:stableId,etag:'a'.repeat(64),compatSha256:lineage}),
     build: async () => calls.push('build'), semanticPreflight: async () => { calls.push('preflight'); return 'PASS'; },
     durableObjectProof: async () => { calls.push('do-proof'); return makeProof(); },
     snapshot: async () => { calls.push('snapshot'); return { snapshot: { ...structuredClone(snapshot), bindings: structuredClone(bindings) }, deployment: structuredClone(deployment) }; },
     upload: async args => { calls.push('upload'); assert.deepEqual(args.slice(0, 2), ['versions', 'upload']); return `Worker Version ID: ${candidateId}\n`; },
-    versionMetadata: async id => { calls.push('metadata'); return { id, bindings: [...structuredClone(snapshot.bindings), metadataBinding] }; },
+    versionMetadata: async id => { calls.push('metadata'); return { id, runtime: snapshot.runtime, bindings: [...structuredClone(snapshot.bindings), metadataBinding] }; },
     stageZero: async args => { calls.push('stage-zero'); assert(args.includes(`${stableId}@100%`) && args.includes(`${candidateId}@0%`));
       deployment = { id: 'zero-deployment', versions: [{ id: stableId, percentage: 100 }, { id: candidateId, percentage: 0 }] }; },
     smoke: async input => { calls.push('override-smoke'); assert.equal(input.mode, 'override'); assert.equal(input.origin, PRODUCTION_ORIGIN); return makeSmoke(); },
@@ -98,8 +103,8 @@ test('DO bindings and exported lifecycle cannot be changed', () => {
 });
 test('generated build/auth constants are compared without normalization', () => {
   assert.equal(compareDurableObjectProof(makeProof(), stableId), 'DO_IMPLEMENTATION_UNCHANGED');
-  assert.equal(compareDurableObjectProof(makeProof(artifact('different-revalidation-token')), stableId), 'DO_IMPLEMENTATION_CHANGED');
-  assert(makePlan({ durableObjectProof: makeProof(artifact('changed')) }).blockers.includes('DO_IMPLEMENTATION_CHANGED'));
+  assert.equal(compareDurableObjectProof(makeProof(artifact('different-revalidation-token')), stableId), 'UNKNOWN');
+  assert(makePlan({ durableObjectProof: makeProof(artifact('changed')) }).blockers.includes('UNKNOWN'));
 });
 test('unknown artifact, dependency or provider provenance blocks', () => {
   for (const proof of [undefined, { ...makeProof(), contentEtag: 'b'.repeat(64) }, { ...makeProof(), candidate: null },
@@ -152,12 +157,12 @@ test('epsilon, unknown percentage, missing candidate and third version all rejec
   }
 });
 test('ignored override or absent metadata fails identity without sampled logs', () => {
-  for (const versionId of [stableId, null]) { const smoke = makeSmoke(); smoke.workerReceipts[0].versionId = versionId;
+  for (const versionId of [stableId, null]) { const smoke = makeSmoke(); smoke.probeReceipt.versionId = versionId;
     assert.throws(() => assertOverrideIdentity({ versionId: candidateId, smoke }), blocked('candidate_identity_unverified')); }
   assertOverrideIdentity({ versionId: candidateId, smoke: makeSmoke() });
 });
 test('every Worker path and first-party read requires exact identity/override/probe', () => {
-  for (const key of ['overrideApplied', 'probeApplied']) { const smoke = makeSmoke(); smoke.workerReceipts[0][key] = false; assert.throws(() => assertOverrideIdentity({ versionId: candidateId, smoke })); }
+  for (const key of ['overrideApplied', 'probeApplied']) { const smoke = makeSmoke(); smoke.probeReceipt[key] = false; assert.throws(() => assertOverrideIdentity({ versionId: candidateId, smoke })); }
   const missing = makeSmoke(); missing.workerReceipts.pop(); assert.throws(() => assertOverrideIdentity({ versionId: candidateId, smoke: missing }));
   const incomplete = makeSmoke(); incomplete.allFirstPartyReadsOverridden = false; assert.throws(() => assertOverrideIdentity({ versionId: candidateId, smoke: incomplete }));
 });
@@ -166,12 +171,12 @@ test('ordinary responses have no new header and retain the same response object'
   assert.equal(withReleaseProbeIdentity(new Request(PRODUCTION_ORIGIN), response, { id: candidateId }), response);
   assert.equal(response.headers.has('X-Locally-Worker-Version'), false);
 });
-test('exact GET/HEAD probe adds identity while preserving status/body/existing headers', async () => {
+test('exact GET/HEAD dedicated probe returns bodyless uncached identity', async () => {
   for (const method of ['GET', 'HEAD']) {
     const response = new Response('fixture-body', { status: 401, headers: { 'content-type': 'text/plain', 'x-existing': 'same' } });
-    const probe = withReleaseProbeIdentity(new Request(PRODUCTION_ORIGIN, { method, headers: { 'X-Locally-Release-Probe': '1' } }), response, { id: candidateId });
-    assert.equal(probe.headers.get('X-Locally-Worker-Version'), candidateId); assert.equal(probe.status, 401);
-    assert.equal(probe.headers.get('x-existing'), 'same'); assert.equal(probe.headers.has('set-cookie'), false); assert.equal(await probe.text(), 'fixture-body');
+    const probe = withReleaseProbeIdentity(new Request(PRODUCTION_ORIGIN + '/.well-known/locally-release', { method, headers: { 'X-Locally-Release-Probe': '1' } }), response, { id: candidateId });
+    assert.equal(probe.headers.get('X-Locally-Worker-Version'), candidateId); assert.equal(probe.status, 204);
+    assert.equal(probe.headers.get('cache-control'), 'private, no-store'); assert.equal(probe.headers.has('set-cookie'), false); assert.equal(await probe.text(), '');
   }
 });
 test('writes, nonexact probe and missing metadata cannot add a version header', () => {
@@ -186,7 +191,7 @@ test('static assets need override/200/no redirect and matching candidate HTML se
 });
 test('promotion arguments cannot be formed before every gate passes', () => {
   const evidence = { semanticPreflight: 'PASS', uploadDeploymentUnchanged: true, exactZeroStagingVerified: true,
-    overrideIdentityVerified: true, doImplementation: 'DO_IMPLEMENTATION_UNCHANGED', overrideSmoke: makeSmoke() };
+    promotionAuthorized: true, bridgeLineage: lineage, overrideIdentityVerified: true, doImplementation: 'DO_IMPLEMENTATION_UNCHANGED', overrideSmoke: makeSmoke() };
   assert(promotionArguments(makePlan(), candidateId, evidence).includes(`${candidateId}@100%`));
   for (const key of ['semanticPreflight', 'uploadDeploymentUnchanged', 'exactZeroStagingVerified', 'overrideIdentityVerified', 'doImplementation']) assert.throws(() => promotionArguments(makePlan(), candidateId, { ...evidence, [key]: null }));
   const smoke = makeSmoke(); smoke.workerReceipts = []; assert.throws(() => promotionArguments(makePlan(), candidateId, { ...evidence, overrideSmoke: smoke }));
@@ -217,7 +222,7 @@ test('lost encrypted binding on uploaded candidate prevents staging', async () =
 test('CLI installs no live adapters and only executes local dry-run commands', async () => {
   for (const args of [['--execute'], ['--force'], ['--plan', '--dry-run']]) assert.throws(() => parseCandidateArguments(args));
   const calls = []; const logs = []; const proof = makeProof();
-  const deps = { config, baselineConfig, workerSource, baselineWorkerSource: workerSource, durableObjectProof: proof,
+  const deps = { bridgeFreshness: async () => {}, config, baselineConfig, workerSource, baselineWorkerSource: workerSource, durableObjectProof: proof,
     readBaseline: async () => baseline, resolveContract: async () => ({ runtimeVariables: flags, readerEnvironment: {} }), wranglerVersion: '4.129.1',
     semanticPreflight: async () => ({ status: 'PRODUCTION_DEPLOY_SEMANTIC_PREFLIGHT_PASS' }), readStableArtifact: async () => proof,
     readCandidateArtifact: async () => artifact(), runLocal: (_cmd, args) => calls.push(args), log: s => logs.push(s) };
@@ -237,7 +242,7 @@ test('Chromium propagates override/probe on documents, data, JS, CSS, font, imag
   const server = createServer((request, response) => {
     const pathname = new URL(request.url, 'http://127.0.0.1').pathname;
     received.push({ pathname, method: request.method, override: request.headers['cloudflare-workers-version-overrides'], probe: request.headers['x-locally-release-probe'] });
-    if (!pathname.startsWith('/_next/static/')) response.setHeader('X-Locally-Worker-Version', candidateId);
+    if (pathname === '/.well-known/locally-release') { response.writeHead(204, { 'X-Locally-Worker-Version': candidateId }).end(); return; }
     if (pathname === '/api/proxy-bookings') { response.writeHead(401).end(); return; }
     if (pathname === '/data') { response.writeHead(200, { 'content-type': 'application/json' }).end('{}'); return; }
     if (pathname === '/_next/static/app.js') { response.writeHead(200, { 'content-type': 'text/javascript' }).end("fetch('/data');fetch('/cdn-cgi/rum',{method:'POST'}).catch(()=>{});"); return; }
@@ -256,8 +261,56 @@ test('Chromium propagates override/probe on documents, data, JS, CSS, font, imag
     assertFullCandidateSmoke(smoke); assertOverrideIdentity({ versionId: candidateId, smoke, expectedOrigin: origin });
     assert(Object.values(smoke.overrideCoverage).every(Boolean));
     for (const path of ['/', '/login', '/experiences/42', '/_next/static/app.js', '/_next/static/font.woff2', '/_next/static/style.css', '/image.svg', '/data', '/api/proxy-bookings']) {
-      assert(received.some(r => r.pathname === path), path); assert(received.filter(r => r.pathname === path).every(r => r.override === versionOverrideHeader(PRODUCTION_WORKER, candidateId) && r.probe === '1'), path);
+      assert(received.some(r => r.pathname === path), path); assert(received.filter(r => r.pathname === path).every(r => r.override === versionOverrideHeader(PRODUCTION_WORKER, candidateId) && r.probe === undefined), path);
     }
     assert(received.every(r => r.method === 'GET'), 'mutation gate must not forward telemetry POST');
   } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
+});
+
+function compatibleProof() {
+  const p = makeProof(); p.candidate.modules.DOQueueHandler = {sha256:'b'.repeat(64),bytes:100};
+  p.bridgeCompatibility = { classification:'BRIDGE_COMPATIBLE_BUILD_STATE_ONLY',compatSha256:lineage,nextAuthenticationUnchanged:true,workerClientsUnchanged:true,
+    modules:Object.fromEntries(Object.keys(DO_MODULES).map(k=>[k,{stableSha256:p.stable.modules[k].sha256,candidateSha256:p.candidate.modules[k].sha256,structuralContractIdentical:true,classification:k==='DOQueueHandler'?'BRIDGE_COMPATIBLE_BUILD_STATE_ONLY':'DO_IMPLEMENTATION_UNCHANGED'}])),
+    differences:Array.from({length:4},()=>({class:'DOQueueHandler',classification:'BUILD_ID_ONLY'})),
+    runtime:{fourWay:'PASS',generation01:'PASS',generation12:'PASS',rollback:'PASS',buildState:'BUILD_STATE_RESET_EXPECTED'}};
+  return p;
+}
+test('proven bridge-compatible build state permits a plan, explicit installed mode required',()=>{
+  const p=compatibleProof();assert.equal(makePlan({durableObjectProof:p}).doImplementation,'BRIDGE_COMPATIBLE_BUILD_STATE_ONLY');
+  for(const mode of [undefined,'deferred 30s','immediate'])assert.throws(()=>makePlan({durableObjectProof:p,doCodeUpdateMode:mode}));
+  for(const mutate of [p=>p.bridgeCompatibility.runtime.fourWay='FAIL',p=>p.bridgeCompatibility.compatSha256='b'.repeat(64),p=>p.bridgeCompatibility.modules.DOQueueHandler.candidateSha256='c'.repeat(64)]){
+    const changed=compatibleProof();mutate(changed);assert.throws(()=>stageZeroArguments(makePlan({durableObjectProof:changed}),candidateId));
+  }
+});
+test('unknown/runtime changes cannot generate staging or promotion args',()=>{
+  for(const proof of [null,makeProof(artifact('unexplained'))]){
+    const plan=makePlan({durableObjectProof:proof});assert.throws(()=>stageZeroArguments(plan,candidateId));assert.throws(()=>promotionArguments(plan,candidateId,{}));assert.throws(()=>rollbackArguments(plan));
+  }
+});
+test('fresh bridge provider lineage must match immediately before upload; fixture/changed baseline blocks',async()=>{
+  for(const patch of [{kind:'fixture'},{etagMatch:false},{deploymentId:'changed'},{versionId:candidateId},{etag:''},{compatSha256:'b'.repeat(64)}]){
+    const {actions,calls}=fixtureActions();const read=actions.bridgeProofFreshness;actions.bridgeProofFreshness=async()=>({...await read(),...patch});
+    await assert.rejects(executeCandidateReleaseContract(makePlan(),actions),blocked('bridge_provenance_or_freshness_failed'));assert(!calls.includes('upload'));
+  }
+  const {actions,calls}=fixtureActions();const read=actions.bridgeProofFreshness;actions.bridgeProofFreshness=async()=>{calls.push('freshness');return read();};
+  await executeCandidateReleaseContract(makePlan(),actions);assert.equal(calls[calls.indexOf('upload')-1],'freshness');
+});
+test('explicit upload/promotion approvals and final identity are mandatory',async()=>{
+  for(const setup of [a=>a.authorizedCandidateUpload=false,a=>a.authorizePromotion=async()=>false,a=>a.recheckIdentity=async()=>({versionId:stableId,status:204})]){
+    const {actions,calls}=fixtureActions();setup(actions);await assert.rejects(executeCandidateReleaseContract(makePlan(),actions));assert(!calls.includes('promote'));
+  }
+});
+test('final config/deployment race and candidate runtime drift cannot promote',async()=>{
+  for(const kind of ['runtime','deployment','binding']){
+    const {actions,calls}=fixtureActions(),read=actions.snapshot;
+    actions.snapshot=async()=>{const r=await read();if(calls.includes('override-smoke')){if(kind==='runtime')r.snapshot.runtime.compatibilityDate='different';if(kind==='deployment')r.deployment.id='different';if(kind==='binding')r.snapshot.bindings.pop();}return r;};
+    await assert.rejects(executeCandidateReleaseContract(makePlan(),actions));assert(!calls.includes('promote'));
+  }
+  const {actions,calls}=fixtureActions();actions.versionMetadata=async id=>({id,bindings:[...snapshot.bindings,metadataBinding],runtime:{}});
+  await assert.rejects(executeCandidateReleaseContract(makePlan(),actions),blocked('candidate_runtime_drift'));assert(!calls.includes('stage-zero'));
+});
+test('identity is exclusive to the exact unauthenticated endpoint; no metadata on user pages',()=>{
+  for(const [path,headers] of [['/',{}],['/.well-known/locally-release?x=1',{}],['/.well-known/locally-release',{cookie:'fixture'}],['/.well-known/locally-release',{authorization:'fixture'}]]){
+    const response=new Response('ordinary');assert.equal(withReleaseProbeIdentity(new Request(PRODUCTION_ORIGIN+path,{headers:{'X-Locally-Release-Probe':'1',...headers}}),response,{id:candidateId}),response);
+  }
 });

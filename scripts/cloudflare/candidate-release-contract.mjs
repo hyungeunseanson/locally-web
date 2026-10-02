@@ -3,6 +3,7 @@ import { compareDurableObjectProof } from './durable-object-release-safety.mjs';
 export const PRODUCTION_WORKER = 'locally-web-opennext-production';
 export const PRODUCTION_ORIGIN = 'https://www.locally-travel.com';
 export const PINNED_WRANGLER_VERSION = '4.129.1';
+const COMPATIBLE_DO = new Set(['DO_IMPLEMENTATION_UNCHANGED', 'BRIDGE_COMPATIBLE_BUILD_STATE_ONLY']);
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const MANAGED_VAR = /^(CLOUDFLARE_DEPLOYMENT_ENV|PUBLIC_EXPERIENCE_MEDIA_PRODUCER_EXPERIENCE_IDS|.+_ENABLED)$/;
 const TARGET_KEYS = ['service', 'environment', 'entrypoint', 'queue_name', 'bucket_name', 'class_name', 'namespace_id', 'script_name', 'id'];
@@ -30,6 +31,10 @@ function stableJson(value) {
 export function safeBinding(binding) {
   const result = { name: binding.name, type: binding.type };
   for (const key of TARGET_KEYS) if (binding[key] !== undefined) result[key] = binding[key];
+  if (binding.valueSha256 !== undefined) {
+    requireCondition(/^[a-f0-9]{64}$/.test(binding.valueSha256), 'invalid_variable_fingerprint');
+    result.valueSha256 = binding.valueSha256;
+  }
   if (binding.type === 'plain_text' && MANAGED_VAR.test(binding.name)) result.text = binding.text;
   return result;
 }
@@ -41,6 +46,7 @@ export function safeConfigSnapshot(snapshot) {
     customDomains: snapshot.customDomains.map(d => ({ hostname: d.hostname })),
     subdomain: { enabled: snapshot.subdomain.enabled, previews_enabled: snapshot.subdomain.previews_enabled },
     observability: snapshot.observability,
+    runtime: snapshot.runtime,
     bindings: snapshot.bindings.map(safeBinding),
     crons: snapshot.crons,
     queueConsumers: snapshot.queueConsumers.map(c => ({
@@ -122,7 +128,7 @@ export function parseVersionUploadOutput(output, workerName = PRODUCTION_WORKER)
 }
 
 export function buildCandidateReleasePlan({ config, baseline, runtimeVariables, baselineConfig, wranglerVersion,
-  workerSource, baselineWorkerSource, durableObjectProof }) {
+  workerSource, baselineWorkerSource, durableObjectProof, bridgeLineage, doCodeUpdateMode }) {
   requireCondition(wranglerVersion === PINNED_WRANGLER_VERSION, 'wrangler_contract_version_changed');
   requireCondition(config.keep_vars === true, 'keep_vars_required');
   requireCondition(config.env.production.name === PRODUCTION_WORKER, 'unexpected_worker');
@@ -138,6 +144,9 @@ export function buildCandidateReleasePlan({ config, baseline, runtimeVariables, 
   requireCondition(config.env.production.version_metadata?.binding === 'CF_VERSION_METADATA', 'candidate_version_metadata_binding_missing');
   requireCondition(JSON.stringify(stripMetadata(config)) === JSON.stringify(stripMetadata(baselineConfig)), 'planned_trigger_or_config_change');
   const snapshot = safeConfigSnapshot(baseline.snapshot);
+  requireCondition(snapshot.runtime && snapshot.runtime.compatibilityDate === (config.env.production.compatibility_date ?? config.compatibility_date)
+    && stableJson(snapshot.runtime.compatibilityFlags) === stableJson(config.env.production.compatibility_flags ?? config.compatibility_flags)
+    && snapshot.runtime.migrationTag === (config.env.production.migrations ?? config.migrations)?.at(-1)?.tag, 'live_runtime_or_migration_drift');
   const stableVersionId = captureStableVersion(baseline.deployment);
   for (const [name, value] of Object.entries(runtimeVariables)) {
     requireCondition(MANAGED_VAR.test(name), 'credential_or_unmanaged_var_override');
@@ -147,13 +156,18 @@ export function buildCandidateReleasePlan({ config, baseline, runtimeVariables, 
     requireCondition(snapshot.bindings.some(b => b.name === name && b.type === 'secret_text'), 'required_encrypted_binding_missing');
   }
   const doImplementation = compareDurableObjectProof(durableObjectProof, stableVersionId);
-  const blockers = doImplementation === 'DO_IMPLEMENTATION_UNCHANGED' ? [] : [doImplementation];
+  const blockers = COMPATIBLE_DO.has(doImplementation) ? [] : [doImplementation];
+  requireCondition(/^[a-f0-9]{64}$/.test(bridgeLineage ?? ''), 'bridge_lineage_missing');
+  if (doImplementation === 'BRIDGE_COMPATIBLE_BUILD_STATE_ONLY') {
+    requireCondition(durableObjectProof.bridgeCompatibility.compatSha256 === bridgeLineage, 'bridge_lineage_mismatch');
+    requireCondition(doCodeUpdateMode === 'provider-default-no-drain-guarantee', 'explicit_supported_do_update_mode_required');
+  }
   const ownObjects = config.env.production.durable_objects?.bindings?.filter(b => !b.script_name || b.script_name === PRODUCTION_WORKER) ?? [];
   return {
     status: blockers.length ? 'CANDIDATE_OVERRIDE_ONLY_RELEASE_FLOW_BLOCKED' : 'CANDIDATE_OVERRIDE_ONLY_RELEASE_FLOW_READY',
     blockers, workerName: PRODUCTION_WORKER, productionOrigin: PRODUCTION_ORIGIN,
     stableVersionId, stableDeployment: baseline.deployment, baselineSnapshot: snapshot,
-    plannedTriggerChanges: [], intentionalBindingAddition: 'CF_VERSION_METADATA', doImplementation,
+    bridgeLineage, doCodeUpdateMode, plannedTriggerChanges: [], intentionalBindingAddition: 'CF_VERSION_METADATA', doImplementation,
     versionUrlCapability: ownObjects.length ? 'UNAVAILABLE_EXPECTED_FOR_DO_WORKER' : snapshot.subdomain.previews_enabled ? 'OPTIONAL' : 'UNAVAILABLE_PREVIEWS_DISABLED',
     encryptedSecrets: 'inherit_without_reading_values',
     uploadArguments: ['versions', 'upload', '--config', './wrangler.jsonc', '--env', 'production', '--keep-vars', '--strict',
@@ -162,6 +176,7 @@ export function buildCandidateReleasePlan({ config, baseline, runtimeVariables, 
 }
 
 export function stageZeroArguments(plan, candidateId) {
+  requireCondition(plan.blockers.length === 0, 'candidate_plan_blocked');
   requireCondition(UUID.test(candidateId) && candidateId !== plan.stableVersionId, 'candidate_equals_stable_or_invalid');
   // Explicit zero is mandatory. Never substitute epsilon traffic.
   return ['versions', 'deploy', `${plan.stableVersionId}@100%`, `${candidateId}@0%`, '--config', './wrangler.jsonc', '--env', 'production', '--yes'];
@@ -207,29 +222,34 @@ export function assertOverrideIdentity({ versionId, smoke, expectedOrigin = PROD
   requireCondition(UUID.test(versionId), 'invalid_candidate_identity');
   requireCondition(smoke.origin === expectedOrigin && smoke.redirected === false, 'override_origin_changed');
   requireCondition(smoke.allFirstPartyReadsOverridden === true
-    && ['document', 'script', 'font', 'api'].every(k => smoke.overrideCoverage?.[k] === true), 'override_subrequest_coverage_missing');
+    && ['document', 'script', 'stylesheet', 'font', 'image', 'data', 'api'].every(k => smoke.overrideCoverage?.[k] === true), 'override_subrequest_coverage_missing');
+  requireCondition(smoke.probeReceipt?.pathname === '/.well-known/locally-release'
+    && smoke.probeReceipt.versionId === versionId && smoke.probeReceipt.status === 204
+    && smoke.probeReceipt.overrideApplied === true && smoke.probeReceipt.probeApplied === true, 'candidate_identity_unverified');
   const receipts = smoke.workerReceipts;
   requireCondition(Array.isArray(receipts) && receipts.length >= 4, 'candidate_request_receipts_missing');
   const paths = new Set(receipts.map(r => r.pathname));
   requireCondition(paths.has('/') && paths.has('/login') && paths.has('/api/proxy-bookings')
     && [...paths].some(p => /^\/experiences\/\d+$/.test(p)), 'candidate_request_receipts_missing');
   for (const receipt of receipts) {
-    requireCondition(!receipt.pathname.includes('?') && receipt.versionId === versionId
-      && receipt.overrideApplied === true && receipt.probeApplied === true, 'candidate_identity_unverified');
+    requireCondition(!receipt.pathname.includes('?') && receipt.overrideApplied === true, 'candidate_identity_unverified');
   }
 }
 
 export function promotionArguments(plan, candidateId, evidence) {
+  requireCondition(plan.blockers.length === 0, 'candidate_plan_blocked');
   requireCondition(UUID.test(candidateId) && candidateId !== plan.stableVersionId, 'candidate_equals_stable_or_invalid');
   requireCondition(evidence.semanticPreflight === 'PASS' && evidence.uploadDeploymentUnchanged === true
     && evidence.exactZeroStagingVerified === true && evidence.overrideIdentityVerified === true
-    && evidence.doImplementation === 'DO_IMPLEMENTATION_UNCHANGED', 'promotion_identity_or_preflight_missing');
+    && evidence.doImplementation === plan.doImplementation && COMPATIBLE_DO.has(evidence.doImplementation)
+    && evidence.promotionAuthorized === true && evidence.bridgeLineage === plan.bridgeLineage, 'promotion_identity_or_preflight_missing');
   assertFullCandidateSmoke(evidence.overrideSmoke);
   assertOverrideIdentity({ versionId: candidateId, smoke: evidence.overrideSmoke });
   return ['versions', 'deploy', `${candidateId}@100%`, '--config', './wrangler.jsonc', '--env', 'production', '--yes'];
 }
 
 export function rollbackArguments(plan) {
+  requireCondition(plan.blockers.length === 0 && COMPATIBLE_DO.has(plan.doImplementation) && /^[a-f0-9]{64}$/.test(plan.bridgeLineage), 'rollback_compatibility_missing');
   return ['versions', 'deploy', `${plan.stableVersionId}@100%`, '--config', './wrangler.jsonc', '--env', 'production', '--yes'];
 }
 
@@ -241,20 +261,26 @@ export function assertDistribution(deployment, expected) {
 // CLI below deliberately installs no live mutation adapters.
 export async function executeCandidateReleaseContract(plan, actions) {
   requireCondition(plan.blockers.length === 0 && plan.plannedTriggerChanges.length === 0, 'candidate_plan_blocked');
-  await actions.build();
+  requireCondition(actions.authorizedCandidateUpload === true, 'candidate_upload_not_authorized');
+  await actions.build({ bridgeSource: 'provider' });
   requireCondition(await actions.semanticPreflight() === 'PASS', 'semantic_preflight_failed');
   const proof = await actions.durableObjectProof(plan.stableVersionId);
   const doImplementation = compareDurableObjectProof(proof, plan.stableVersionId);
-  requireCondition(doImplementation === 'DO_IMPLEMENTATION_UNCHANGED', doImplementation);
+  requireCondition(COMPATIBLE_DO.has(doImplementation) && doImplementation === plan.doImplementation, doImplementation);
   const before = await actions.snapshot();
   assertConfigUnchanged(plan.baselineSnapshot, before.snapshot);
   assertDistribution(before.deployment, [{ id: plan.stableVersionId, percentage: 100 }]);
   requireCondition(before.deployment.id === plan.stableDeployment.id, 'concurrent_deployment_changed');
+  const bridgeProof = await actions.bridgeProofFreshness();
+  requireCondition(bridgeProof?.kind === 'provider' && bridgeProof.etagMatch === true
+    && bridgeProof.deploymentId === before.deployment.id && bridgeProof.versionId === plan.stableVersionId
+    && /^[a-f0-9]{64}$/.test(bridgeProof.etag ?? '') && bridgeProof.compatSha256 === plan.bridgeLineage, 'bridge_provenance_or_freshness_failed');
   const candidate = parseVersionUploadOutput(await actions.upload(plan.uploadArguments), plan.workerName);
   requireCondition(candidate.versionId !== plan.stableVersionId, 'candidate_equals_stable_or_invalid');
   const metadata = await actions.versionMetadata(candidate.versionId);
   requireCondition(metadata.id === candidate.versionId, 'uploaded_version_metadata_mismatch');
   assertBindingsUnchanged(plan.baselineSnapshot.bindings, metadata.bindings, 'required');
+  requireCondition(stableJson(metadata.runtime) === stableJson(plan.baselineSnapshot.runtime), 'candidate_runtime_drift');
   const afterUpload = await actions.snapshot();
   assertConfigUnchanged(plan.baselineSnapshot, afterUpload.snapshot);
   assertDistribution(afterUpload.deployment, [{ id: plan.stableVersionId, percentage: 100 }]);
@@ -267,13 +293,16 @@ export async function executeCandidateReleaseContract(plan, actions) {
     overrideHeader: versionOverrideHeader(plan.workerName, candidate.versionId) });
   assertFullCandidateSmoke(overrideSmoke);
   assertOverrideIdentity({ versionId: candidate.versionId, smoke: overrideSmoke });
+  requireCondition(await actions.authorizePromotion({ stableVersionId: plan.stableVersionId, candidateVersionId: candidate.versionId, bridgeLineage: plan.bridgeLineage }) === true, 'promotion_not_authorized');
+  const identity = await actions.recheckIdentity(candidate.versionId);
+  requireCondition(identity?.versionId === candidate.versionId && identity.status === 204, 'candidate_identity_expired');
   // Recheck for concurrent deployments/config changes immediately before promotion.
   const finalPrecheck = await actions.snapshot();
   assertConfigUnchanged(plan.baselineSnapshot, finalPrecheck.snapshot, { metadata: 'optional' });
   assertDistribution(finalPrecheck.deployment, zero.deployment.versions);
   requireCondition(finalPrecheck.deployment.id === zero.deployment.id, 'concurrent_deployment_changed');
   const args = promotionArguments(plan, candidate.versionId, { semanticPreflight: 'PASS', uploadDeploymentUnchanged: true,
-    exactZeroStagingVerified: true, doImplementation, overrideIdentityVerified: true, overrideSmoke });
+    exactZeroStagingVerified: true, doImplementation, overrideIdentityVerified: true, overrideSmoke, promotionAuthorized: true, bridgeLineage: plan.bridgeLineage });
   await actions.promote(args);
   const final = await actions.snapshot();
   assertConfigUnchanged(plan.baselineSnapshot, final.snapshot, { metadata: 'required' });
