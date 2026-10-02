@@ -139,9 +139,62 @@ The isolated duplicate parent query uses inquiries_pkey, three shared-hit blocks
 This is an operational contract for a separately approved release, not an operation performed by this PR:
 
 1. Finish review/build/preflight readiness first. Nominate one release operator, record a **15-minute transition deadline**, and coordinate a pause of admin phone replies/completions across existing tabs. Customer messages remain captured normally.
-2. Apply the prepared migration once, then immediately run the official application deployment serially. Do not interleave another release, bypass gates, extend deployment timeouts, or add automatic retries.
+2. Apply the prepared migration once, perform DB post-checks, merge only PR #165, then immediately run the official deployment of its exact resulting main SHA serially. Do not interleave another release, bypass gates, extend deployment timeouts, or add automatic retries.
 3. Confirm the intended deployed version and have every participating administrator reload existing tabs before resuming phone work. A successful deployment alone does not upgrade already-open tabs.
 4. If deployment fails or the transition deadline expires, keep admin phone work paused and require an explicit rollout recovery decision. Do not drop task history, guess handled messages, or silently revert task semantics.
 5. Any old-client reply during the window deliberately leaves its exact customer tasks pending. After reload these residual tasks stay visible; an administrator reviews the conversation and uses the existing 처리 완료 action. Messages outside that newly rendered snapshot remain pending.
 
 The time bound is operator coordination, not a claim that an unmodified old client is technically disabled. A missed/stale tab is still fail-safe: it can create false-positive pending work, never silently consume unseen messages. No timestamp, max-ID, latest-admin-reply inference or destructive reconciliation is used. Native coverage executes an old-style reply and preview UPDATE after migration, verifies pending activity remains true, then verifies new completion clears only the explicit reviewed ID while a late lower ID remains pending until separately handled.
+
+## Final pre-production audit (2026-10-03 KST)
+
+Audited application/migration head: `935c715640c9c99db369a79d2a47a879eda82415`; fetched main: `4d7ab274d181e1b3245724185473e7842823b757`. This audit adds verification and this document only; the migration and application code are unchanged. The prepared migration SHA-256 is `88769a249dca3d7b2f0cbd2dc6a8cf2197960213a357bac71353978a5ae0e396`, matching all pending contracts. Applied Production baseline/current-state manifests are byte-identical to main. The PR remains Draft and must not be merged/applied/deployed by this audit.
+
+### Migration transaction, locks and rollback
+
+The entire SQL file is one BEGIN/COMMIT transaction. ACCESS EXCLUSIVE NOWAIT acquires proxy_requests → inquiry_messages → inquiries. This conflicts with readers as well as writers: a quiet **database** window is required, not merely no admin clicks. A failed later lock does not leave earlier locks or objects behind once the failed transaction is rolled back/closed. The native test checks readers on each table, message/request writers, failures after baseline DDL and after all functions/triggers exist, and a real old/new baseline mismatch. It compares relation/function/trigger catalogs and public rows before/after rollback. No partial objects survive. The successful in-transaction baseline also compares every inquiry, message, request and monitor-cutover row before a waiting customer INSERT is allowed to proceed.
+
+The runtime lock analysis remains inquiry → formal request → message key-share/task. New-link/card-anchor adoption is the documented reverse-order exception because capture cannot reference that formal request before activation commits; invalid anchor completion fails before taking an inquiry lock. Actual unchanged card RPC branches, both INSERT/completion lock orders, ACK overlap, soft/hard deletion, duplicate adoption and refund contention all pass. This covers application paths inspected in this PR, not arbitrary future ad-hoc SQL that acquires locks in a different order.
+
+Rollback before commit is transactional. After a successful Production commit there is **no automatic down migration**: keep capture and private history, pause admin phone work, and make an explicit recovery decision. Dropping the table would destroy operational history and is not an approved rollback.
+
+### Live read-only baseline and security
+
+Fresh Production READ ONLY queries observe PostgreSQL 17.6, no phone task table, and no `20261002140902` ledger entry. Exact old/new needs_reply sets remain 16/16, missing/unexpected 0/0, across 87 valid formal requests and 38 COMPLETED requests; baseline customer task counts are 26 COMPLETED / 73 all statuses. All 87 formal requests have valid links: missing/nonexistent/wrong-customer/wrong-type/duplicate-link counts are all zero. Values remain observations, never migration constants. Migration-time equality is re-evaluated under the cutover locks.
+
+Actual role execution and ACL checks in local PG17 verify: PUBLIC/anon/authenticated RPC execution denied; service_role wrappers allowed; all three roles denied direct task SELECT; no PUBLIC table grant; RLS; SECURITY DEFINER wrappers with fixed empty search_path. The service role is intentionally trusted server code: it can submit a validated admin actor, while browser-supplied actor fields are never used. Non-admin actor spoofing is rejected by the RPC. Default RPC EXECUTE is revoked explicitly. No credential was created or changed.
+
+Production Data API GET with `Accept-Profile: private` returns **406/PGRST106, Invalid schema: private**. Only an existing public anon key was used process-locally; it was not printed or saved. No service key was fetched. The private schema is absent from Realtime publication as well.
+
+Read-only Supabase security advisor reports two existing SECURITY DEFINER view findings (`public.public_host_applications`, `public.public_profiles`) and six RLS-without-policy INFO findings (including existing private monitor cutover). This migration is not installed, so these findings are not caused by its new objects. They are separate existing-security review items, not evidence that all Production security checks are clean. References: [view advisor](https://supabase.com/docs/guides/database/database-linter?lint=0010_security_definer_view), [RLS policy advisor](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy). No advisor remediation was applied.
+
+### Batch query/index evidence
+
+The live index catalog contains no equivalent normalized linked-inquiry expression index. The proposed index avoids the previously measured full request scan (144 vs 3 shared-hit blocks at ~10k requests). The pending partial index remains useful despite matching the PK columns: it excludes 500k handled rows, and both presence/absence plans use it. The UNIQUE(inquiry_id,message_id) separately enforces one request per exact linked message and supports deletion cleanup. No proposed index was found redundant for these access paths.
+
+Actual RPC EXPLAIN ANALYZE, plus the exact expanded SQL body because SECURITY DEFINER hides nested plans, was measured with 500k handled tasks and correct 50% pending results. One warmup, five measured calls; local warm-cache medians, milliseconds:
+
+| Requests | Phone rows | Actual RPC | Expanded body |
+| ---: | ---: | ---: | ---: |
+| 1,000 | 10 | 0.749 | 0.568 |
+| 1,000 | 100 | 4.174 | 3.843 |
+| 10,000 | 10 | 0.882 | 0.696 |
+| 10,000 | 100 | 4.487 | 4.079 |
+
+All expanded batch plans use proxy_requests_phone_link_idx. Their per-row indexed SQL probes stay inside one RPC, not network N+1. Existing get_admin_inquiry_activity work is included in the actual RPC timing. These are fixture measurements, not Production latency guarantees. The native suite now has **30 groups**, including the unchanged atomic parent-failure injection and all prior races.
+
+### Exact future rollout order — not executed
+
+1. Coordinate and confirm admin phone-reservation work is paused, including old tabs. Record the release operator and 15-minute migration-to-app transition deadline; expiry preserves the pause and requires explicit recovery, never gate bypass.
+2. Exact Production preflight: fetch main/PR refs; prove reviewed head, mergeability and green gates; verify the SQL hash above, prerequisites, absent target table/ledger entry, live baseline/link integrity and exposure/grants. Confirm normal deployment credentials/build inputs are available without changing them. Do not treat this earlier audit as a live preflight.
+3. Apply **only** this approved migration using the existing migration mechanism. It must execute as one transaction. On NOWAIT/baseline failure, rollback/close the transaction and stop; do not partially continue or auto-retry.
+4. DB post-check: verify ledger/hash, five-column table/indexes/triggers/RPC signatures and definitions, ACL/RLS/private exposure/publication, equality evidence from cutover, no false historical actor, and preserved receipt/request/payment/monitor state. Customer arrivals after commit can legitimately change pending counts, so do not compare stale literal counts. Record the before/after evidence from the protected cutover.
+5. Merge **only PR #165** after successful DB post-check and fresh mergeability/CI verification. Capture the actual resulting main commit; a squash/merge commit is not the PR head. Main drift or changed release content requires review before proceeding.
+6. Build/deploy that exact merged SHA through `npm run cloudflare:deploy:production`, retaining build → semantic preflight → pre-smoke → deploy → post-smoke, existing timeouts/retries and mutation guards. No direct Wrangler bypass or silent newer-main substitution.
+7. Verify login readiness, Customer Support/phone/monitor, settled loading, safe already-read conversations, N semantics and 390px layout without intentional unread ACK/business writes. Record the active Production version and its SHA identity.
+8. Confirm all administrators reload their existing tabs to the verified application version.
+9. Resume admin phone work. Review any residual pending left by transition-window old-client replies and handle only a newly rendered exact snapshot.
+
+If merge/build/deploy/smoke fails after migration, the safe state is: keep migration/capture/task history, keep admin phone work paused, retain the prior running app until an explicitly approved recovery, and leave any old-client residual task visible for the new UI. Do not infer handling from an old reply, timestamp or max ID. Customer capture continues under the installed triggers. A post-deploy failure is not an authorization to automatically revert app/schema; assess the active version and recover explicitly.
+
+Applied Production metadata is reconciled only after actual migration success through a separately reviewed update. This audit intentionally leaves the repository applied ledger unchanged and the migration marked pending.

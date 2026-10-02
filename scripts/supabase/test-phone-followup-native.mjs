@@ -47,7 +47,7 @@ try {
   const complete=async(c,n,ids,inq=n,actor=admin)=>(await c.query('SELECT complete_phone_request($1,$2,$3,$4) AS result',[request(n),inq,ids,actor])).rows[0].result;
   const reply=async(c,n,ids,content='reply')=>(await c.query("SELECT reply_phone_request($1,$2,$3,$4,$5,'text',null) AS result",[request(n),n,ids,admin,content])).rows[0].result;
   const waiting=async c=>{const until=Date.now()+5000;while(Date.now()<until){if((await db.query('SELECT wait_event_type FROM pg_stat_activity WHERE pid=$1',[c.processID])).rows[0]?.wait_event_type==='Lock')return;await new Promise(r=>setTimeout(r,10));}throw Error('Expected contention');};
-  const publicState=async()=> (await db.query("SELECT jsonb_build_object('messages',(SELECT jsonb_agg(to_jsonb(m) ORDER BY id) FROM inquiry_messages m),'requests',(SELECT jsonb_agg(to_jsonb(p) ORDER BY id) FROM proxy_requests p),'cutover',(SELECT jsonb_agg(to_jsonb(c)) FROM private.admin_monitor_cutover c)) AS state")).rows[0].state;
+  const publicState=async(c=db)=> (await c.query("SELECT jsonb_build_object('inquiries',(SELECT jsonb_agg(to_jsonb(i) ORDER BY id) FROM inquiries i),'messages',(SELECT jsonb_agg(to_jsonb(m) ORDER BY id) FROM inquiry_messages m),'requests',(SELECT jsonb_agg(to_jsonb(p) ORDER BY id) FROM proxy_requests p),'cutover',(SELECT jsonb_agg(to_jsonb(c)) FROM private.admin_monitor_cutover c)) AS state")).rows[0].state;
   for(let n=1;n<=5;n++){await inquiry(n);await link(db,n);await msg(db,n,n*100);await msg(db,n,n*100+1,admin);if(n%2===0){await msg(db,n,n*100+2);await msg(db,n,n*100+3);}await db.query("UPDATE proxy_requests SET status='COMPLETED' WHERE id=$1",[request(n)]);}
   // Cutover cannot race either old message or old completion writers. NOWAIT aborts atomically.
   for(const mode of ['message','completion']){
@@ -57,11 +57,37 @@ try {
     assert.equal((await db.query("SELECT to_regclass('private.phone_followup_tasks') AS t")).rows[0].t,null);
     await a.query('COMMIT');pass(`migration concurrent ${mode}: fail-fast, no partial cutover`);
   }
+  for(const table of ['proxy_requests','inquiry_messages','inquiries']) {
+    await a.query('BEGIN READ ONLY');await a.query('SELECT 1 FROM '+table+' LIMIT 0');
+    await assert.rejects(b.query(migration),{code:'55P03'});await b.query('ROLLBACK');await a.query('ROLLBACK');
+    assert.equal((await db.query("SELECT to_regclass('private.phone_followup_tasks') AS t")).rows[0].t,null);
+  }
+  pass('NOWAIT covers readers of all three tables, including failure after earlier locks were acquired');
+  // Fail after real DDL/baseline and after all RPCs/triggers were created.
+  const catalog=async()=> (await db.query(`SELECT jsonb_build_object(
+    'relations',(SELECT jsonb_agg(c.relname ORDER BY c.relname) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname IN ('public','private')),
+    'functions',(SELECT jsonb_agg(p.oid::regprocedure::text ORDER BY p.oid::regprocedure::text) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname IN ('public','private')),
+    'triggers',(SELECT jsonb_agg(tgname ORDER BY tgname) FROM pg_trigger WHERE NOT tgisinternal)) AS state`)).rows[0].state;
+  const beforeCatalog=await catalog(),beforeFailedMigration=await publicState();
+  for(const location of ['DROP FUNCTION private.seed_phone_followup','COMMIT;']) {
+    const injected=migration.replace(location,'SELECT 1/0;\n'+location);
+    await assert.rejects(a.query(injected),{code:'22012'});await a.query('ROLLBACK');
+    assert.deepEqual(await catalog(),beforeCatalog);assert.deepEqual(await publicState(),beforeFailedMigration);
+  }
+  // Real baseline mismatch (historical customer is now an admin) must abort DDL.
+  await a.query('BEGIN');await a.query("UPDATE users SET role='admin' WHERE id=$1",[customer]);
+  await assert.rejects(a.query(migration.replace(/^BEGIN;$/m,'')),/Phone followup baseline mismatch/);await a.query('ROLLBACK');
+  assert.deepEqual(await catalog(),beforeCatalog);assert.deepEqual(await publicState(),beforeFailedMigration);
+  pass('mid/late migration failure and real baseline mismatch leave no partial table/index/function/trigger or public changes');
   const oldState=await publicState();
   await a.query('BEGIN');await a.query(migration.replace(/^BEGIN;$/m,'').replace(/^COMMIT;$/m,''));
+  assert.deepEqual(await publicState(a),oldState); // Includes all parent versions before the waiting INSERT.
   const cutoverInsert=msg(b,5,550);await waiting(b);await a.query('COMMIT');await cutoverInsert;
   const afterCutover=await publicState();afterCutover.messages=afterCutover.messages.filter(m=>m.id!==550);
-  assert.deepEqual(afterCutover,oldState);assert.deepEqual(await pending(5),['550']);
+  const beforeOtherRows=structuredClone(oldState);
+  // The waiting INSERT legitimately advances only inquiry 5 after cutover.
+  afterCutover.inquiries=afterCutover.inquiries.filter(i=>i.id!==5);beforeOtherRows.inquiries=beforeOtherRows.inquiries.filter(i=>i.id!==5);
+  assert.deepEqual(afterCutover,beforeOtherRows);assert.deepEqual(await pending(5),['550']);
   pass('migration wins lock: blocked customer INSERT captured after cutover');
   assert.deepEqual(await pending(1),['150']);assert.deepEqual(await pending(2),['202','203']);assert.deepEqual(await pending(3),[]);
   assert.equal((await db.query('SELECT count(*) FROM private.phone_followup_tasks WHERE handled_by IS NOT NULL')).rows[0].count,'0');
@@ -228,6 +254,21 @@ try {
   assert.equal((await db.query("SELECT has_function_privilege('service_role','public.complete_phone_request(uuid,bigint,bigint[],uuid)','EXECUTE') AS ok")).rows[0].ok,true);
   assert.equal((await db.query("SELECT relrowsecurity FROM pg_class WHERE oid='private.phone_followup_tasks'::regclass")).rows[0].relrowsecurity,true);
   assert.equal((await db.query("SELECT count(*) FROM pg_publication_tables WHERE schemaname='private'")).rows[0].count,'0');
+  for(const signature of ['complete_phone_request(uuid,bigint,bigint[],uuid)','reply_phone_request(uuid,bigint,bigint[],uuid,text,text,text)','get_admin_phone_activity(bigint[])']) {
+    const fn=(await db.query("SELECT proconfig,prosecdef,NOT EXISTS(SELECT 1 FROM aclexplode(proacl) WHERE grantee=0 AND privilege_type='EXECUTE') AS no_public FROM pg_proc WHERE oid=$1::regprocedure",['public.'+signature])).rows[0];
+    assert.equal(fn.prosecdef,true);assert.deepEqual(fn.proconfig,['search_path=""']);assert.equal(fn.no_public,true);
+    for(const role of ['anon','authenticated','service_role']) assert.equal((await db.query("SELECT has_function_privilege($1,$2,'EXECUTE') AS allowed",[role,'public.'+signature])).rows[0].allowed,role==='service_role');
+  }
+  assert.equal((await db.query("SELECT count(*) FROM pg_class c CROSS JOIN LATERAL aclexplode(c.relacl) a WHERE c.oid='private.phone_followup_tasks'::regclass AND a.grantee=0")).rows[0].count,'0');
+  for(const role of ['anon','authenticated','service_role']) {
+    await b.query('SET ROLE '+role);
+    await assert.rejects(b.query('SELECT * FROM private.phone_followup_tasks LIMIT 0'),{code:'42501'});
+    if(role==='service_role') {
+      await complete(b,71,['7099']);await assert.rejects(complete(b,71,['7099'],71,customer),{code:'42501'});
+    } else await assert.rejects(complete(b,71,['7099']),{code:'42501'});
+    await b.query('RESET ROLE');
+  }
+  pass('actual anon/authenticated/service role execution: no direct task access, wrappers service-only, fixed search_path, non-admin spoof denied');
   const phoneActivity=(await db.query('SELECT * FROM get_admin_phone_activity(ARRAY[10,11]::bigint[])')).rows;
   assert.equal(phoneActivity.find(r=>r.inquiry_id==='10').phone_needs_reply,true);assert.equal(phoneActivity.find(r=>r.inquiry_id==='11').phone_needs_reply,false);
   pass('RLS/grants/service RPC/batched pending activity/publication boundaries');
@@ -277,6 +318,30 @@ try {
   }
   assert.equal((await db.query('SELECT count(*) FROM inquiry_messages WHERE is_read OR read_at IS NOT NULL OR admin_read_at IS NOT NULL')).rows[0].count,'0');
   pass('500k handled history: pending existence/absence partial index; all participant/admin receipts unchanged');
+  // End-to-end RPC plus its exact SQL body (SECURITY DEFINER hides inner plans).
+  const activityBody=migration.match(/CREATE FUNCTION public.get_admin_phone_activity[\s\S]*?AS \$\$([\s\S]*?)\$\$/)[1].trim().replace(/;$/,'');
+  for(const requestCount of [1000,10000]) {
+    await db.query('BEGIN');await db.query("DELETE FROM proxy_requests WHERE form_data='{}'::jsonb");
+    await db.query("INSERT INTO inquiries(id,user_id,type,status) SELECT n,$1,'admin_support','open' FROM generate_series(300000,300099) n",[customer]);
+    await db.query("INSERT INTO proxy_requests(id,user_id,status,form_data) SELECT md5('activity-'||n)::uuid,$1,'COMPLETED',jsonb_build_object('linked_inquiry_id',n::text) FROM generate_series(300000,300099) n",[customer]);
+    await db.query("INSERT INTO inquiry_messages(id,inquiry_id,sender_id,content) SELECT n*10,n,$1,'activity fixture' FROM generate_series(300000,300099) n",[customer]);
+    await db.query("UPDATE private.phone_followup_tasks SET handled_at=now(),handled_by=$1 WHERE inquiry_id BETWEEN 300000 AND 300099 AND inquiry_id%2=0",[admin]);
+    const existing=Number((await db.query('SELECT count(*) FROM proxy_requests')).rows[0].count);
+    await db.query("INSERT INTO proxy_requests(id,user_id,form_data) SELECT md5('unlinked-cost-'||n)::uuid,$1,'{}'::jsonb FROM generate_series(1,$2::int) n",[customer,requestCount-existing]);
+    await db.query('ANALYZE proxy_requests; ANALYZE inquiries; ANALYZE inquiry_messages; ANALYZE private.phone_followup_tasks');
+    for(const rows of [10,100]) {
+      const ids=Array.from({length:rows},(_,n)=>300000+n),literal='ARRAY['+ids.join(',')+']::bigint[]';
+      const actual=(await db.query('SELECT * FROM get_admin_phone_activity($1)',[ids])).rows;
+      assert.equal(actual.length,rows);assert.equal(actual.filter(r=>r.phone_needs_reply).length,rows/2);
+      for(const [kind,sql] of [['rpc','SELECT * FROM get_admin_phone_activity('+literal+')'],['body',activityBody.replaceAll('p_inquiry_ids',literal)]]) {
+        const plans=[];for(let n=0;n<6;n++)plans.push((await db.query('EXPLAIN (ANALYZE,BUFFERS,FORMAT JSON) '+sql)).rows[0]['QUERY PLAN'][0]);
+        const representative=plans[1];if(kind==='body')assert.match(JSON.stringify(representative),/proxy_requests_phone_link_idx/);
+        console.log('PHONE_ACTIVITY_PLAN',JSON.stringify({requestCount,rows,handledHistory:500000,kind,medianMs:median(plans.slice(1).map(p=>p['Execution Time'])),plan:representative}));
+      }
+    }
+    await db.query('ROLLBACK');
+  }
+  pass('phone activity plans: 10/100-row batches at 1k/10k requests with 500k handled tasks, correct pending sets');
   console.log(`PHONE_NATIVE_PASS: ${passed.length} groups; PostgreSQL 17; independent connections; no remote database`);
 } finally {
   for(const c of clients)await c.end();
