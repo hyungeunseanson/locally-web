@@ -28,7 +28,7 @@
       "version": "20261002140902",
       "name": "phone_followup_tasks",
       "repositoryFile": "supabase/migrations/20261002140902_phone_followup_tasks.sql",
-      "repositorySha256": "d81de5b09ccfc25bd22b9646ef22b703a95c467b3fca7b974b86c0ef4be30fb9",
+      "repositorySha256": "88769a249dca3d7b2f0cbd2dc6a8cf2197960213a357bac71353978a5ae0e396",
       "status": "prepared_not_applied"
     }
   ],

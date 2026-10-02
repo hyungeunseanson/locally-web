@@ -796,6 +796,7 @@ export async function createInquiryMessage(params: {
   const displayContent = cleanContent || (normalizedType === 'image' ? '📷 사진을 보냈습니다.' : '');
   const updatedAt = new Date().toISOString();
 
+  let phoneInquiryUpdatedAt: string | null = null;
   let insertedMessage: InquiryMessageInsertRow | null = null;
   let messageError: { code?: string; message?: string } | null = null;
   if (body.phoneFollowup !== undefined) {
@@ -809,6 +810,7 @@ export async function createInquiryMessage(params: {
       p_content: cleanContent, p_type: normalizedType, p_image_url: imageUrl,
     });
     insertedMessage = result.data;
+    phoneInquiryUpdatedAt = result.data?.inquiryUpdatedAt ?? null;
     messageError = result.error;
   } else {
     // Legacy clients can send, but never implicitly handle an unseen phone task.
@@ -835,71 +837,79 @@ export async function createInquiryMessage(params: {
     throw new InquiryThreadError(500, '메시지 저장에 실패했습니다.');
   }
 
-  let updatedInquiry: InquiryUpdatedAtRow | null = null;
-  let updateError: unknown = null;
-  try {
-    const updateResult = await supabaseAdmin
-      .from('inquiries')
-      .update({
-        content: displayContent,
-        updated_at: updatedAt,
-      })
-      .eq('id', inquiry.id)
-      .select('updated_at')
-      .maybeSingle<InquiryUpdatedAtRow>();
-    updatedInquiry = updateResult.data;
-    updateError = updateResult.error;
-  } catch (error) {
-    updateError = error;
-  }
-
-  let canonicalUpdatedAt = updatedInquiry?.updated_at || updatedAt;
-  if (updateError || !updatedInquiry) {
-    let reconciledInquiry: { content?: string | null; updated_at?: string | null } | null = null;
+  let canonicalUpdatedAt = updatedAt;
+  if (body.phoneFollowup !== undefined) {
+    // The RPC already committed reply + exact tasks + canonical parent version.
+    // Never run generic external UPDATE/delete compensation on this path.
+    if (!phoneInquiryUpdatedAt) throw new InquiryThreadError(500, '문의방 갱신 결과를 확인할 수 없습니다.');
+    canonicalUpdatedAt = phoneInquiryUpdatedAt;
+  } else {
+    let updatedInquiry: InquiryUpdatedAtRow | null = null;
+    let updateError: unknown = null;
     try {
-      const reconcileResult = await supabaseAdmin
+      const updateResult = await supabaseAdmin
         .from('inquiries')
-        .select('content, updated_at')
+        .update({
+          content: displayContent,
+          updated_at: updatedAt,
+        })
         .eq('id', inquiry.id)
-        .maybeSingle<{ content?: string | null; updated_at?: string | null }>();
-      reconciledInquiry = reconcileResult.data;
+        .select('updated_at')
+        .maybeSingle<InquiryUpdatedAtRow>();
+      updatedInquiry = updateResult.data;
+      updateError = updateResult.error;
     } catch (error) {
-      console.error('[inquiries/thread] inquiry update reconciliation failed:', error);
+      updateError = error;
     }
 
-    const reconciledAt = reconciledInquiry?.updated_at
-      ? new Date(reconciledInquiry.updated_at).getTime()
-      : Number.NaN;
-    if (
-      reconciledInquiry?.content === displayContent &&
-      reconciledInquiry.updated_at &&
-      reconciledAt === new Date(updatedAt).getTime()
-    ) {
-      canonicalUpdatedAt = reconciledInquiry.updated_at;
-    } else {
-      let rollbackError: unknown = null;
+    canonicalUpdatedAt = updatedInquiry?.updated_at || updatedAt;
+    if (updateError || !updatedInquiry) {
+      let reconciledInquiry: { content?: string | null; updated_at?: string | null } | null = null;
       try {
-        const rollbackResult = await supabaseAdmin
-          .from('inquiry_messages')
-          .delete()
-          .eq('id', insertedMessage.id)
-          .eq('inquiry_id', inquiry.id);
-        rollbackError = rollbackResult.error;
+        const reconcileResult = await supabaseAdmin
+          .from('inquiries')
+          .select('content, updated_at')
+          .eq('id', inquiry.id)
+          .maybeSingle<{ content?: string | null; updated_at?: string | null }>();
+        reconciledInquiry = reconcileResult.data;
       } catch (error) {
-        rollbackError = error;
+        console.error('[inquiries/thread] inquiry update reconciliation failed:', error);
       }
 
-      if (!rollbackError) {
-        throw new InquiryThreadError(500, '문의방 갱신에 실패했습니다.');
-      }
+      const reconciledAt = reconciledInquiry?.updated_at
+        ? new Date(reconciledInquiry.updated_at).getTime()
+        : Number.NaN;
+      if (
+        reconciledInquiry?.content === displayContent &&
+        reconciledInquiry.updated_at &&
+        reconciledAt === new Date(updatedAt).getTime()
+      ) {
+        canonicalUpdatedAt = reconciledInquiry.updated_at;
+      } else {
+        let rollbackError: unknown = null;
+        try {
+          const rollbackResult = await supabaseAdmin
+            .from('inquiry_messages')
+            .delete()
+            .eq('id', insertedMessage.id)
+            .eq('inquiry_id', inquiry.id);
+          rollbackError = rollbackResult.error;
+        } catch (error) {
+          rollbackError = error;
+        }
 
-      console.error('[inquiries/thread] inquiry update and message rollback failed:', {
-        inquiryId: inquiry.id,
-        messageId: insertedMessage.id,
-        updateError,
-        rollbackError,
-      });
-      canonicalUpdatedAt = inquiry.updated_at || insertedMessage.created_at || updatedAt;
+        if (!rollbackError) {
+          throw new InquiryThreadError(500, '문의방 갱신에 실패했습니다.');
+        }
+
+        console.error('[inquiries/thread] inquiry update and message rollback failed:', {
+          inquiryId: inquiry.id,
+          messageId: insertedMessage.id,
+          updateError,
+          rollbackError,
+        });
+        canonicalUpdatedAt = inquiry.updated_at || insertedMessage.created_at || updatedAt;
+      }
     }
   }
 

@@ -204,7 +204,7 @@ GRANT EXECUTE ON FUNCTION public.complete_phone_request(uuid,bigint,bigint[],uui
 
 CREATE FUNCTION public.reply_phone_request(p_request_id uuid,p_inquiry_id bigint,p_message_ids bigint[],p_admin_id uuid,p_content text,p_type text,p_image_url text)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
-DECLARE result jsonb; inserted public.inquiry_messages%ROWTYPE;
+DECLARE result jsonb; inserted public.inquiry_messages%ROWTYPE; canonical_updated_at timestamptz;
 BEGIN
   IF p_type NOT IN ('text','image') OR (nullif(btrim(p_content),'') IS NULL AND p_image_url IS NULL) THEN
     RAISE EXCEPTION 'Invalid reply' USING ERRCODE = '22023';
@@ -212,7 +212,14 @@ BEGIN
   result := private.handle_phone_followup(p_request_id,p_inquiry_id,p_message_ids,p_admin_id,false);
   INSERT INTO public.inquiry_messages(inquiry_id,sender_id,content,type,image_url,is_read)
     VALUES(p_inquiry_id,p_admin_id,p_content,p_type,p_image_url,false) RETURNING * INTO inserted;
-  RETURN result || jsonb_build_object('id',inserted.id::text,'created_at',inserted.created_at);
+  -- The preview/version belongs to the same transaction as the reply and tasks.
+  -- Return the stored version after inquiry_support_version has adjusted it.
+  UPDATE public.inquiries SET content = CASE WHEN coalesce(p_content,'') <> '' THEN p_content
+      WHEN p_type = 'image' THEN '📷 사진을 보냈습니다.' ELSE '' END,
+    updated_at = clock_timestamp()
+  WHERE id = p_inquiry_id RETURNING updated_at INTO STRICT canonical_updated_at;
+  RETURN result || jsonb_build_object('id',inserted.id::text,'created_at',inserted.created_at,
+    'inquiryUpdatedAt',canonical_updated_at);
 END $$;
 REVOKE ALL ON FUNCTION public.reply_phone_request(uuid,bigint,bigint[],uuid,text,text,text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.reply_phone_request(uuid,bigint,bigint[],uuid,text,text,text) TO service_role;

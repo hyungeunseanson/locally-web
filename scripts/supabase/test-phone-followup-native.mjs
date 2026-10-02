@@ -130,6 +130,36 @@ try {
   await db.query("ALTER TABLE inquiry_messages ADD CONSTRAINT forced_failure CHECK (content <> 'force-fail')");
   await assert.rejects(reply(db,10,['1003'],'force-fail'),{code:'23514'});assert.deepEqual(await pending(10),['1003']);
   pass('reply+exact handling atomic; failed INSERT rolls handling back');
+  // Real failure AFTER INSERT and task handling, during canonical parent update.
+  await inquiry(70);await link(db,70);await msg(db,70,7000);
+  const atomicState=async c=>(await c.query(`SELECT jsonb_build_object(
+    'inquiry',(SELECT to_jsonb(i) FROM inquiries i WHERE id=70),
+    'messages',(SELECT jsonb_agg(to_jsonb(m) ORDER BY id) FROM inquiry_messages m WHERE inquiry_id=70),
+    'tasks',(SELECT jsonb_agg(to_jsonb(t) ORDER BY message_id) FROM private.phone_followup_tasks t WHERE inquiry_id=70),
+    'request',(SELECT to_jsonb(p) FROM proxy_requests p WHERE id=$1)) AS state`,[request(70)])).rows[0].state;
+  const atomicBefore=await atomicState(db);
+  await db.query(`CREATE FUNCTION fail_phone_parent() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN
+    IF NEW.content='parent-force-fail' THEN
+      IF NOT EXISTS(SELECT 1 FROM public.inquiry_messages WHERE inquiry_id=70 AND content=NEW.content AND sender_id='${admin}')
+        OR NOT EXISTS(SELECT 1 FROM private.phone_followup_tasks WHERE message_id=7000 AND handled_by='${admin}' AND handled_at IS NOT NULL)
+        THEN RAISE EXCEPTION 'Failure did not reach post-insert/handling boundary' USING ERRCODE='XX000'; END IF;
+      RAISE EXCEPTION 'Injected canonical parent failure after INSERT' USING ERRCODE='23514';
+    END IF;RETURN NEW;END$$;
+    CREATE TRIGGER force_phone_parent BEFORE UPDATE OF content ON inquiries FOR EACH ROW EXECUTE FUNCTION fail_phone_parent();`);
+  await assert.rejects(reply(a,70,['7000'],'parent-force-fail'),{code:'23514'});
+  assert.deepEqual(await atomicState(b),atomicBefore);
+  assert.deepEqual((await db.query('SELECT handled_at,handled_by FROM private.phone_followup_tasks WHERE message_id=7000')).rows,[{handled_at:null,handled_by:null}]);
+  pass('parent update failure after successful reply INSERT rolls back message/task/parent; receipts/request/payment unchanged');
+  await a.query('BEGIN');const atomicReply=await reply(a,70,['7000'],'atomic success');
+  assert.deepEqual(await atomicState(b),atomicBefore);await a.query('COMMIT');
+  const atomicAfter=await atomicState(b);
+  assert.equal(atomicAfter.inquiry.content,'atomic success');assert.equal(atomicAfter.inquiry.updated_at,atomicReply.inquiryUpdatedAt);
+  assert.equal(atomicAfter.messages.length,atomicBefore.messages.length+1);assert.equal(atomicAfter.messages.at(-1)?.is_read,false);
+  assert.equal(atomicAfter.tasks[0].handled_by,admin);assert.ok(atomicAfter.tasks[0].handled_at);
+  assert.deepEqual(atomicAfter.request,atomicBefore.request);
+  assert.ok(atomicAfter.messages.every(m=>!m.is_read&&m.read_at===null&&m.admin_read_at===null));
+  pass('reply/task/canonical parent commit together and returned version equals stored trigger-adjusted version');
+  await db.query('DROP TRIGGER force_phone_parent ON inquiries; DROP FUNCTION fail_phone_parent()');
   await assert.rejects(complete(db,10,['1003'],11),{code:'22023'});
   await assert.rejects(complete(db,10,['1101']),{code:'22023'});
   await assert.rejects(complete(db,10,['1003'],10,customer),{code:'42501'});
@@ -180,6 +210,16 @@ try {
   // Legacy replies never consume private tasks.
   await msg(db,10,1006,admin);assert.deepEqual(await pending(10),['1003']);
   pass('legacy without snapshot safe; admin/system/general/monitor do not create tasks');
+  // Migration-first window: old-client reply updates the preview, never guesses a snapshot.
+  await inquiry(71);await link(db,71);await msg(db,71,7100);await complete(db,71,['7100']);
+  await msg(db,71,7101);await msg(db,71,7102,admin);
+  await db.query("UPDATE inquiries SET content='legacy transition reply',updated_at=clock_timestamp() WHERE id=71");
+  assert.deepEqual(await pending(71),['7101']);
+  assert.equal((await db.query('SELECT phone_needs_reply FROM get_admin_phone_activity(ARRAY[71]::bigint[])')).rows[0].phone_needs_reply,true);
+  // New client reopens and explicitly handles rendered work. A late lower ID stays visible.
+  await msg(db,71,7099);assert.equal((await complete(db,71,['7101'])).needsReply,true);
+  assert.deepEqual(await pending(71),['7099']);assert.equal((await complete(db,71,['7099'])).needsReply,false);
+  pass('migration-first old-client reply leaves visible residual; new exact completion handles only reviewed IDs');
   await inquiry(30,'general');await msg(db,30,3000);await inquiry(31);await msg(db,31,3100);
   assert.equal((await db.query('SELECT count(*) FROM private.phone_followup_tasks WHERE inquiry_id IN (30,31)')).rows[0].count,'0');
   // Service-only wrapper and no table access, RLS, no publication changes.
@@ -204,6 +244,31 @@ try {
   await db.query('BEGIN; DROP INDEX proxy_requests_phone_link_idx');const withoutIndex=await plan();assert.match(withoutIndex,/Seq Scan/);await db.query('ROLLBACK');
   console.log('LINK_PLAN',JSON.stringify({before:JSON.parse(withoutIndex),after:JSON.parse(withIndex)}));
   pass('PG17 index evidence: full scan -> selective link index');
+  // Measure the separate capture trigger, without changing the shared BEFORE trigger.
+  // All comparison writes roll back; disabled-trigger samples are local diagnostics only.
+  await db.query("INSERT INTO inquiries(id,user_id,type,status) SELECT n,$1,'general','open' FROM generate_series(200000,210000) n",[customer]);
+  for(const [n,type,phone] of [[80,'admin_support',false],[81,'admin_support',true],[82,'general',false],[83,'admin_support',true]]) {
+    await inquiry(n,type);if(phone)await link(db,n);
+  }
+  await db.query('ANALYZE inquiries');
+  const lookup=(await db.query('EXPLAIN (ANALYZE,BUFFERS,FORMAT JSON) SELECT * FROM inquiries WHERE id=81')).rows[0]['QUERY PLAN'][0];
+  assert.match(JSON.stringify(lookup),/inquiries_pkey/);
+  console.log('CAPTURE_PARENT_LOOKUP',JSON.stringify(lookup));
+  const median=values=>[...values].sort((x,y)=>x-y)[Math.floor(values.length/2)];
+  for(const [name,n,sender] of [['support',80,customer],['phone',81,customer],['monitor',82,customer],['admin',83,admin]]) for(const count of [1,10]) {
+    const samples={off:[],on:[],trigger:[]};
+    for(let trial=0;trial<32;trial++) for(const enabled of (trial%2?[true,false]:[false,true])) {
+      await db.query('BEGIN');
+      if(!enabled)await db.query('ALTER TABLE inquiry_messages DISABLE TRIGGER phone_followup_capture');
+      const result=(await db.query(`EXPLAIN (ANALYZE,BUFFERS,FORMAT JSON) INSERT INTO inquiry_messages(id,inquiry_id,sender_id,content)
+        SELECT 8000000+v,$1,$2,'cost fixture' FROM generate_series(1,$3::int) v`,[n,sender,count])).rows[0]['QUERY PLAN'][0];
+      await db.query('ROLLBACK');
+      if(trial>=2){samples[enabled?'on':'off'].push(result['Execution Time']);
+        if(enabled){const trigger=result.Triggers.find(t=>t['Trigger Name']==='phone_followup_capture');assert.equal(trigger.Calls,count);samples.trigger.push(trigger.Time);}}
+    }
+    console.log('CAPTURE_COST',JSON.stringify({name,count,samples:30,withoutCaptureMs:median(samples.off),withCaptureMs:median(samples.on),captureTriggerMs:median(samples.trigger),parentLookupsAdded:count}));
+  }
+  pass('capture hot path measured: support/phone/monitor/admin one and ten-message inserts, 10k parent rows');
   await db.query("INSERT INTO private.phone_followup_tasks(proxy_request_id,inquiry_id,message_id,handled_at,handled_by) SELECT $1,10,n,now(),$2 FROM generate_series(1000000,1499999) n",[request(10),admin]);
   await db.query('ANALYZE private.phone_followup_tasks');
   for(const n of [10,11]) {

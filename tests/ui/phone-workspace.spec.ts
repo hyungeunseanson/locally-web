@@ -489,7 +489,10 @@ test('phone workload benchmark: idle ten minutes, one INSERT, ten INSERT burst, 
     await complete(page);await expect.poll(()=>state.reads.length).toBe(2);recomplete=metrics();
     expect(recomplete.mutations).toBe(1);expect(recomplete.thread).toBe(0);
   }
-  console.log('PHONE_WORKLOAD',JSON.stringify({source:process.env.PHONE_RECOMPLETE_BASELINE?'starting-main':'current',initial,idle,one,burst,recomplete}));
+  state.reads.length=0;state.messageRequests.length=0;state.calls.length=0;
+  await composer(page).fill('benchmark reply');await send(page).click();await expect(composer(page)).toHaveValue('');
+  await page.clock.runFor(1000);const reply=metrics();expect(reply.mutations).toBe(1);
+  console.log('PHONE_WORKLOAD',JSON.stringify({reply,source:process.env.PHONE_RECOMPLETE_BASELINE?'starting-main':'current',initial,idle,one,burst,recomplete}));
   expect(one.thread).toBeGreaterThanOrEqual(1);expect(burst.thread).toBeGreaterThanOrEqual(1);expect(idle.list).toBe(2);expect(idle.detail).toBe(2);
 });
 
