@@ -98,6 +98,7 @@ test('Alerts Realtime insert, primary-key-only delete, read success and reconnec
 for(const event of ['reconnect','visibility','online'])test(`real shared provider + phone workspace initial ${event}: one pending GET, serialized trailing catch-up, spinner settles`,async({page})=>{
   await page.setViewportSize({width:390,height:900});const f=await setup(page,true);
   await expect.poll(()=>f.calls.filter(url=>url.endsWith('/messages')).length).toBe(1);
+  await expect.poll(()=>page.evaluate(()=>(window as unknown as {hasChannel:(name:string)=>boolean}).hasChannel('admin-chat-realtime-admin-detail'))).toBe(true);
   await page.evaluate(event=>{if(event==='reconnect')(window as unknown as {reconnect:()=>void}).reconnect();else if(event==='visibility')document.dispatchEvent(new Event('visibilitychange'));else dispatchEvent(new Event('online'));},event);
   await expect(page.getByTestId('admin-chat-messages-loading')).toBeVisible();expect(f.calls.filter(url=>url.endsWith('/messages')).length).toBe(1);
   f.releaseMessages();await expect(page.getByTestId('admin-chat-messages-loading')).toHaveCount(0);

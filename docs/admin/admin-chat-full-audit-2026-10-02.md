@@ -145,7 +145,7 @@ READ ONLY Production verification: exact RPC definitions match the Phase 2 contr
 | Owner/channel | Inputs | Reconciliation | Lifecycle / limitations |
 |---|---|---|---|
 | AdminAttentionProvider `admin-attention-{userId}` | all inquiry_messages/inquiries; user-filtered notifications | 250ms scoped batch (100 IDs max); PK-only unknown delete triggers catch-up | cleanup removes channel/listeners/timer; SUBSCRIBED/online/visible + existing 5-minute fallback |
-| useAdminChatQuery `admin-chat-monitor-{view}-{conversation/list}` | message INSERT/UPDATE/DELETE; inquiry UPDATE | current-admin INSERT and existing-row UPDATE deltas; selected other-sender INSERT coalesces one thread GET; deletion tombstone | enabled/currentUser controls subscription; cleanup removes timers/channel; current health status drives existing 60s disconnected/300s healthy catch-up |
+| useAdminChatQuery `admin-chat-realtime-{userId}-{detail|view}` | message INSERT/UPDATE/DELETE; inquiry UPDATE | current-admin INSERT and existing-row UPDATE deltas; selected other-sender INSERT coalesces one thread GET; deletion tombstone | enabled/currentUser controls subscription; cleanup removes timers/channel; current health status drives existing 60s disconnected/300s healthy catch-up |
 | Phone `admin-phone-workspace` | proxy_requests all; relevant message INSERT / deleted UPDATE | 350ms schedule; shared GET + new serialized trailing metadata catch-up | inactive removes channel/listeners; stable refresh callback avoids resubscribe on every query; existing 5-minute safety catch-up |
 | AdminAlertsTab | own admin notifications | insert/update/delete list deltas; shared attention alerts refresh | initial auth/load + subscription; 5-minute/online/visible catch-up; channel cleanup |
 | Participant useChat / notification context | participant channels | independent participant delivery/receipt behavior | inspected and covered by existing chat regression; not rewritten |
@@ -288,7 +288,7 @@ Local Node 24.20.0; dependencies installed with repository CI's `--legacy-peer-d
 - Starting-main focused bug reproduction: 4 failures expected; fixed tests pass.
 - `npm run test:admin-chat:phase1`: 44 Phase 1/#155 + 94 chat unit tests, 26 chat contracts, 29 platform contracts and 14 Chromium/WebKit layout tests passed.
 - `npm run test:admin-attention:phase2`: 21 unit/contract/performance tests and 36 Chromium/WebKit real-component tests passed, including simultaneous browser tabs and unmount during initial Alerts loading.
-- Phone workspace: final 87 tests passed, including after trailing-metadata changes.
+- Phone workspace: final 87 tests passed, including after trailing-metadata changes. Initial reconnect/visibility/online races also passed 60 repeated Chromium/WebKit runs after making subscription readiness explicit.
 - Native local PostgreSQL: historical repair, row-lock status races, late-ID and dual-admin ACK, concurrent deletion, receipt invariance pass.
 - Local Cloudflare production-build/smoke/deploy **contracts**: 157 passed; these use fixtures, not Production deployment.
 - Full ESLint: 0 errors, 7 existing unrelated warnings. `tsc --noEmit`: pass; final validation also recorded in PR.
@@ -310,6 +310,6 @@ Only allowlisted Supabase metadata/function definitions, aggregate counts/link a
 
 [Draft PR #162](https://github.com/hyungeunseanson/locally-web/pull/162), branch `codex/admin-chat-full-audit`. Initial implementation commit `048606ea7d6a2413d2800bbf72e586bca7e67fc0`; subsequent commits preserve history and are listed in the PR. Full CI also passed on implementation head `bdcf5da9d477169b32b985db2e48002322fa1399` before the final late-ACK guard and report commit. Exact final head is recorded at final delivery. Sixteen changed files are enumerated in the PR Files changed view. No merge authorized or attempted.
 
-The first Foundation run found a lint issue in the new test probe (assignment during render). The probe now records the hook result in an effect; application code was not affected. The first Chat run also exposed a fixture timing issue: an Alerts event was injected before the subscription existed. The test now waits for channel readiness; a separate regression covers unmount during initial load. Final CI results supersede those runs.
+The first Foundation run found a lint issue in the new test probe (assignment during render). The probe now records the hook result in an effect; application code was not affected. The first Chat run also exposed a fixture timing issue: an Alerts event was injected before the subscription existed. The test now waits for channel readiness; a separate regression covers unmount during initial load. A later WebKit run exposed the same readiness assumption in the existing initial phone catch-up tests; these now also wait for the selected-thread subscription before injecting reconnect/online/visibility. No arbitrary sleep or application catch-up change was used. Final CI results supersede those runs.
 
 ADMIN_CHAT_FULL_AUDIT_AND_IMPROVEMENT_COMPLETE
