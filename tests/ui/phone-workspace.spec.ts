@@ -25,8 +25,8 @@ test.beforeAll(async () => {
           export function useSearchParams(){const search=useSyncExternalStore(subscribe,()=>location.search);return useMemo(()=>new URLSearchParams(search),[search])}`;
         else if (args.path === 'next/image') contents = `import React from 'react';export default function Image({unoptimized,...props}){return React.createElement('img',props)}`;
         else if (args.path.includes('ToastContext')) contents = `const showToast=(message)=>{window.lastToast=message};export const useToast=()=>({showToast})`;
-        else contents = `const listeners=new Set(); window.emitDatabaseChange=(table,event,row)=>{for(const l of listeners)if(l.table===table&&(l.event===event||l.event==='*'))l.cb({new:row,eventType:event})};
-          const client={auth:{getUser:async()=>({data:{user:{id:'admin'}}})},channel:()=>{const owned=[];const c={on:(_,opts,cb)=>{const l={...opts,cb};listeners.add(l);owned.push(l);return c},subscribe:()=>c,owned};return c},removeChannel:c=>c.owned.forEach(l=>listeners.delete(l))};export const createClient=()=>client;`;
+        else contents = `const listeners=new Set(); const statuses=new Set(); window.emitSubscriptionStatus=status=>{for(const cb of statuses)cb(status)}; window.emitDatabaseChange=(table,event,row)=>{for(const l of listeners)if(l.table===table&&(l.event===event||l.event==='*'))l.cb({new:row,eventType:event})};
+          const client={auth:{getUser:async()=>({data:{user:{id:'admin'}}})},channel:()=>{const owned=[];const c={on:(_,opts,cb)=>{const l={...opts,cb};listeners.add(l);owned.push(l);return c},subscribe:cb=>{if(cb){statuses.add(cb);c.status=cb}return c},owned};return c},removeChannel:c=>{c.owned.forEach(l=>listeners.delete(l));statuses.delete(c.status)}};export const createClient=()=>client;`;
         return { contents, loader: 'js', resolveDir: process.cwd() };
       });
     } }],
@@ -35,7 +35,7 @@ test.beforeAll(async () => {
   css = (await postcss([tailwind()]).process('@import "tailwindcss";', { from: resolve('app/phone-fixture.css') })).css;
 });
 
-async function fixture(page: Page, options: { paymentMetadata?: boolean; lastAdmin?: boolean; paymentStatus?: string; missingLink?: boolean; failSend?: boolean; failComplete?: boolean; unpaid?: boolean; status?: string; inquiryId?: string; visual?: boolean; channel?: string; method?: string } = {}) {
+async function fixture(page: Page, options: { messageGate?: Promise<void>; paymentMetadata?: boolean; lastAdmin?: boolean; paymentStatus?: string; missingLink?: boolean; failSend?: boolean; failComplete?: boolean; unpaid?: boolean; status?: string; inquiryId?: string; visual?: boolean; channel?: string; method?: string } = {}) {
   const request = {
     id: 'request-1', user_id: 'guest', category: 'RESTAURANT', status: options.status || 'PENDING',
     payment_status: options.paymentStatus || (options.unpaid ? 'WAITING' : 'COMPLETED'), payment_channel: options.channel || 'LOCALLY',
@@ -57,6 +57,7 @@ async function fixture(page: Page, options: { paymentMetadata?: boolean; lastAdm
   if (options.lastAdmin) messages.push({ id: 4, sender_id: 'admin', content: '환불 안내', type: 'text', created_at: '2026-09-22T10:05:00Z', sender: { name: '운영팀' } });
   if (options.paymentMetadata) Object.assign(request, { locally_order_id: 'ORDER-123', naver_buyer_name: '네이버 구매자', tid: 'CARD-TRANSACTION-123', paid_at: '2026-09-22T01:00:00Z', refunded_at: '2026-09-22T02:00:00Z' });
   const calls: { path: string; body: Record<string, unknown> }[] = [];
+  const messageRequests: string[] = [];
   let failComplete = options.failComplete;
   await page.route('**/*', async route => {
     const url = new URL(route.request().url());
@@ -80,7 +81,11 @@ async function fixture(page: Page, options: { paymentMetadata?: boolean; lastAdm
       return json({ success: true, selection: id === '123' ? { view: 'phone', proxyRequestId: 'request-1' } : { view: monitor ? 'monitor' : 'support' },
         data: [{ id: monitor ? '456' : '789', user_id: 'guest', type: monitor ? 'general' : 'admin_support', guest: { name: '일반 고객' }, content: '일반 문의' }], pagination: { hasMore: false } });
     }
-    if (/\/api\/admin\/inquiries\/\w+\/messages/.test(path)) return json({ success: true, data: messages, inquiry: { id: url.pathname.split('/')[4], user_id: 'guest', type: path.includes('456') ? 'general' : 'admin_support', guest: { name: '홍길동' } } });
+    if (/\/api\/admin\/inquiries\/\w+\/messages/.test(path)) {
+      messageRequests.push(path);
+      if (options.messageGate) await options.messageGate;
+      return json({ success: true, data: messages, inquiry: { id: url.pathname.split('/')[4], user_id: 'guest', type: path.includes('456') ? 'general' : 'admin_support', guest: { name: '홍길동' } } });
+    }
     if (path === '/api/inquiries/message') {
       const body = route.request().postDataJSON(); calls.push({ path, body });
       if (options.failSend) return json({ success: false, error: '전송 실패' }, 500);
@@ -105,7 +110,7 @@ async function fixture(page: Page, options: { paymentMetadata?: boolean; lastAdm
     return route.fulfill({ contentType: 'text/html', body: `<html><head><style>${css}${options.visual ? '@media(min-width:768px){html{font-size:20px}body>main{max-width:1785px;margin:40px auto}}' : ''}</style></head><body><main style="padding:16px"><div id="root"></div></main><script>${script.replaceAll('</script', '<\\/script')}</script></body></html>` });
   });
   await page.goto(`http://phone.test/admin/dashboard?tab=CHATS&${options.inquiryId ? `inquiryId=${options.inquiryId}` : 'view=phone&proxyRequestId=request-1'}`);
-  return { calls, request, messages };
+  return { calls, request, messages, messageRequests };
 }
 
 const composer = (page: Page) => page.getByTestId('admin-chat-composer').filter({ visible: true });
@@ -381,3 +386,25 @@ for (const width of [390, 2048]) test(`phone list timestamp matches support form
     await expect(row.getByText('대기', { exact: true })).toBeVisible();
   }
 });
+
+for (const event of ['SUBSCRIBED', 'visibilitychange', 'online']) {
+  test(`pending phone selection plus ${event} finishes loading and renders the actual conversation`, async ({ page }) => {
+    let release!: () => void;
+    const messageGate = new Promise<void>(resolve => { release = resolve; });
+    const state = await fixture(page, { messageGate });
+    const loading = page.getByTestId('admin-chat-messages-loading');
+    await expect(loading).toBeVisible();
+    await expect.poll(() => state.messageRequests.length).toBe(1);
+    await page.evaluate(event => {
+      if (event === 'SUBSCRIBED') (window as unknown as { emitSubscriptionStatus: (status: string) => void }).emitSubscriptionStatus(event);
+      else if (event === 'visibilitychange') document.dispatchEvent(new Event(event));
+      else window.dispatchEvent(new Event(event));
+    }, event);
+    expect(state.messageRequests).toHaveLength(1);
+    release();
+    await expect(loading).toHaveCount(0);
+    await expect(page.getByTestId('admin-chat-message-list')).toContainText('예약해주세요');
+    await expect(composer(page)).toBeVisible();
+    await expect.poll(() => state.messageRequests.length).toBe(2);
+  });
+}
