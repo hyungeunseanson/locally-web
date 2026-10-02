@@ -1,14 +1,14 @@
-> Phase 2 checkpoint: Production parity remains the 16 applied migrations, through the historical reinquiry migration. Run `current-state-contract.sql` before any pending migration. The prepared `20261002041848_admin_attention_badges_phase_2.sql` is **not applied to Production**. Only local/staging target verification applies it after that checkpoint, then runs `admin-attention-target-contract.sql`. Current Production fingerprints/ledger are intentionally unchanged.
+> Phase 2 is applied in Production: ledger `20261002075149` maps to repository migration `20261002041848_admin_attention_badges_phase_2.sql`. Both SQL digests are `d20d5774318f8fe52dc41d13a533728b13c98a20fab812cd693737dba0de51a2`. Current parity has 17 applied ledger entries and no pending migrations. This state sync uses read-only catalog/ledger checks; it never replays SQL or edits migration history.
 
 # Supabase staging bootstrap for the Cloudflare functional canary
 
 This repository does **not** contain a complete historical Supabase migration history. The SQL files are operational patches from different releases, and many assume that the base schema already exists. Do not run every repository SQL file alphabetically against a new project.
 
-This change intentionally does not create a Supabase branch/project, connect to Production, dump Production data, or apply SQL. It provides a machine-readable contract, read-only schema inspection/assertion SQL, and synthetic fixture seed/cleanup tools for an isolated staging backend.
+This state sync reads Production catalog metadata, migration statement digests, and the immutable cutover control marker only. It does not create a Supabase branch/project, export application data, or apply SQL. It provides a machine-readable contract, read-only schema inspection/assertion SQL, and synthetic fixture seed/cleanup tools for an isolated staging backend.
 
 ## Reproducibility decision
 
-The repository now has an explicit two-layer contract. The immutable `20260912034545_production_schema_baseline.sql` and `production-baseline.manifest.json` reconstruct the 2026-09-09 checkpoint. The current Production contract includes the 16 applied ledger entries recorded in `production-current-state.manifest.json`, including both Phase 1 chat migrations. Repository file versions and actual ledger versions are mapped explicitly in `required-objects.json`. The immutable checkpoint artifacts remain unchanged.
+The repository now has an explicit two-layer contract. The immutable `20260912034545_production_schema_baseline.sql` and `production-baseline.manifest.json` reconstruct the 2026-09-09 checkpoint. The current Production contract includes the 17 applied ledger entries recorded in `production-current-state.manifest.json`, including both Phase 1 chat migrations and the applied Phase 2 attention migration. Repository file versions and actual ledger versions are mapped explicitly in `production-current-state.manifest.json`. The immutable checkpoint artifacts remain unchanged.
 
 The root `supabase_*.sql` files and `docs/migrations/*.sql` remain historical evidence, not an ordered bootstrap. A new empty project uses only the explicit order below. A branch cloned from current Production receives its parent schema and must not replay any migration SQL.
 
@@ -22,7 +22,7 @@ Required schema-only material:
 - Storage bucket names/public flags/file limits/allowed MIME types plus final `storage.objects` policies;
 - extensions and types referenced by the above objects.
 
-The baseline folds in historical effects through `docs/migrations/v3_40_41_admin_manual_payout_zero_cancellation.sql`. After that checkpoint, use only the explicit `freshProjectApplyOrder` in `required-objects.json`; it includes later applied migrations and the pending Phase 2 proposal. Do not alphabetically replay historical patches.
+The baseline folds in historical effects through `docs/migrations/v3_40_41_admin_manual_payout_zero_cancellation.sql`. After that checkpoint, use only the explicit `freshProjectApplyOrder` in `required-objects.json`; it includes all later applied migrations through Phase 2. Do not alphabetically replay historical patches.
 
 ## Required application objects
 
@@ -63,7 +63,7 @@ Platform work remains separate and requires explicit approval:
 2. Run the immutable baseline and current-state static checkers. Do not export or copy application rows or Storage objects.
 3. **New empty project:** apply the immutable baseline, run `baseline-contract.sql`, then apply the remaining **already-applied** migrations in `freshProjectApplyOrder`. Preserve the separately documented Storage overlay checkpoint and target guard; do not replay historical patches.
 4. **Branch cloned from current Production:** do not replay the baseline, post-baseline migration, or overlay. Run only the read-only current-state contracts.
-5. At the Production-parity checkpoint, run `current-state-contract.sql` and `schema-contract.sql`. These verify the 16-entry actual ledger, current catalog, security boundaries, eight-table Realtime publication, buckets, and 16-policy Storage state. Applying the prepared Phase 2 migration is a separate local/staging target step followed by `admin-attention-target-contract.sql`; it must not be mistaken for current Production parity.
+5. Run `schema-contract.sql`, `admin-reader-private-contract.sql`, and `admin-attention-target-contract.sql` read-only on either staging target. On a current Production clone, also run `current-state-contract.sql`: it checks the actual 17-entry Production ledger and the immutable cutover marker (40 conversations / 410 messages). A new empty staging project uses repository filename versions and its own cutover counts, so those Production-specific ledger/marker assertions do not apply. Never rewrite either ledger to make it match. Both targets retain the same catalog security, eight-table publication, buckets, and 16-policy Storage contract.
 6. Configure branch/project-specific Auth providers/redirects and verify the six empty Storage buckets and policies.
 7. Run `npm run supabase:staging:seed` with explicit staging-only environment variables.
 8. Feed the printed guest/host IDs, inquiry ID, and image URL into the functional canary runner. The fixture password remains runner-only and is never written to the state file.

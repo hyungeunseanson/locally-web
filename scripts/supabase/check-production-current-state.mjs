@@ -13,6 +13,7 @@ const expectedFingerprints = {
   storagePolicies: '898e8b7f917fd0f4530ef30c9b61961e',
   publicRlsPolicies: 'e5a16a4215c569060fbf895453a5cd00',
   publicRelationGrants: 'a9c644ba2ab5c795f29aff57092aa002',
+  privateRelationGrants: 'c0c83ee9ce880c47d3d24f3f918b4364',
   stagingOverlayBaselineStoragePolicies: 'd6b381fd629405acfdd615593031de5c',
   stagingOverlayTargetStorageBuckets: 'c3ff5767c8e4934ae05b3d96550441c8',
   stagingOverlayTargetStoragePolicies: '38c973a52a0bebe8fa78b3f53089e427',
@@ -157,14 +158,15 @@ const expectedLedger = [
     repositoryFile: 'supabase/migrations/20261002015110_admin_message_monitoring_historical_reinquiry.sql',
     repositorySha256: '80f34eea7ad6e2405aa38962a886c97e8713bfa1fefe72f0d9647686489747a1',
   },
+  {
+    version: '20261002075149',
+    repositoryVersion: '20261002041848',
+    name: 'admin_attention_badges_phase_2',
+    repositoryFile: 'supabase/migrations/20261002041848_admin_attention_badges_phase_2.sql',
+    repositorySha256: 'd20d5774318f8fe52dc41d13a533728b13c98a20fab812cd693737dba0de51a2',
+  },
 ];
-const expectedPendingMigrations = [{
-  version: '20261002041848',
-  name: 'admin_attention_badges_phase_2',
-  repositoryFile: 'supabase/migrations/20261002041848_admin_attention_badges_phase_2.sql',
-  repositorySha256: 'd20d5774318f8fe52dc41d13a533728b13c98a20fab812cd693737dba0de51a2',
-  status: 'prepared-not-applied',
-}];
+const expectedPendingMigrations = [];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));
 for (const [index, expected] of expectedLedger.entries()) {
   const actual = manifest.migrationLedger[index];
@@ -184,7 +186,7 @@ for (const [index, expected] of expectedLedger.entries()) {
     `applied ledger SQL bytes differ for ${expected.version}`);
     const sql = await readFile(resolve(root, actual.repositoryFile));
     const digest = createHash('md5').update(sql).digest('hex');
-    assert(contract.includes(`${actual.version}:${actual.name}:1:${digest}`),
+    assert(contract.includes(`${actual.version}:${actual.name}:1:${digest}:${actual.repositorySha256}`),
       `read-only ledger SQL assertion differs for ${expected.version}`);
   }
 }
@@ -203,8 +205,8 @@ assert(
   'pending Production migration contract differs'
 );
 
-// Prepared Phase 2 is not in the Production ledger or catalog assertions.
-exact('prepared private cutover tables', required.pendingPrivateTables, ['private.admin_monitor_cutover']);
+assert(!('pendingPrivateTables' in required) && !('pendingApplicationFunctions' in required),
+  'applied attention objects must not remain pending');
 for (const pending of expectedPendingMigrations) {
   assert(await sha256(pending.repositoryFile) === pending.repositorySha256, 'prepared attention migration bytes differ');
 }
@@ -220,7 +222,7 @@ assert(objects.publicTables.length === 39, 'expected 39 public tables');
 assert(objects.publicViews.length === 2, 'expected 2 public views');
 assert(objects.publicTableColumns === 517, 'expected 517 public table columns');
 assert(objects.publicViewColumns === 27, 'expected 27 public view columns');
-assert(objects.functionOverloads.length === 58, 'expected 58 public function overloads');
+assert(objects.functionOverloads.length === 60, 'expected 60 public function overloads');
 exact('private function overloads', objects.privateFunctionOverloads, [
   'private.advance_support_version()',
   'private.is_admin_reader()',
@@ -228,7 +230,7 @@ exact('private function overloads', objects.privateFunctionOverloads, [
   'private.prepare_support_message()'
 ]);
 assert(objects.applicationTriggers.length === 14, 'expected 14 application triggers');
-assert(objects.indexes === 119, 'expected 119 public indexes');
+assert(objects.indexes === 120, 'expected 120 public indexes');
 assert(objects.constraints.total === 180, 'expected 180 constraints');
 assert(objects.constraints.primaryKey === 39, 'expected 39 primary keys');
 assert(objects.constraints.foreignKey === 59, 'expected 59 foreign keys');
@@ -241,6 +243,13 @@ assert(objects.rls.publicPolicies === 106, 'expected 106 public policies');
 assert(objects.realtimePublication.tables.length === 8, 'expected eight Realtime tables');
 assert(objects.storageBuckets.length === 6, 'expected six Storage buckets');
 assert(objects.storageObjectPolicies.length === 16, 'expected 16 Storage policies');
+
+exact('private tables', objects.privateTables, ['admin_monitor_cutover']);
+exact('required private tables', required.applicationPrivateTables, objects.privateTables.map(name => `private.${name}`));
+assert(objects.privateTableColumns === 4 && objects.privateIndexes === 1 && objects.privateConstraints === 4,
+  'private cutover catalog counts differ');
+exact('private RLS tables', objects.privateRls.enabled, ['admin_monitor_cutover']);
+assert(objects.privateRls.forced.length === 0 && objects.privateRls.policies === 0, 'private RLS policy surface differs');
 
 exact('required tables', required.applicationTables, objects.publicTables);
 exact('required views', required.applicationViews, objects.publicViews);
@@ -373,10 +382,10 @@ for (const identity of paymentClaim.securityDefinerFunctions) {
 assert(contract.includes('$payment_claim_contract$'), 'payment claim security contract is missing');
 
 const monitoring = manifest.adminMessageMonitoring;
-assert(manifest.schemaContractVersion === 4 && required.schemaContractVersion === 4,
-  'expected current-state contract version 4');
-assert(monitoring.columns.length === 2 && monitoring.indexes.length === 1
-  && monitoring.triggers.length === 2 && monitoring.functions.length === 5,
+assert(manifest.schemaContractVersion === 5 && required.schemaContractVersion === 5,
+  'expected current-state contract version 5');
+assert(monitoring.columns.length === 2 && monitoring.indexes.length === 2
+  && monitoring.triggers.length === 2 && monitoring.functions.length === 7,
   'admin monitoring object counts differ');
 exact('chat direct write roles', monitoring.directWriteRoles, ['service_role']);
 exact('chat public RPC execute roles', monitoring.publicRpcExecuteRoles, ['service_role']);
@@ -410,6 +419,32 @@ for (const fragment of ['$admin_message_monitoring_contract$', '$admin_monitorin
   'has_any_column_privilege', 'index_def.indisvalid', "trigger_def.tgenabled = 'O'", 'rowfilter IS NOT NULL']) {
   assert(contract.includes(fragment), `chat safety assertion missing: ${fragment}`);
 }
+
+const cutover = manifest.adminAttention.cutover;
+assert(cutover.schema === 'private' && cutover.table === 'admin_monitor_cutover' && cutover.owner === 'postgres'
+  && cutover.rlsEnabled && !cutover.rlsForced && cutover.policies === 0
+  && cutover.acl === '{postgres=arwdDxtm/postgres,service_role=r/postgres}', 'cutover table security differs');
+exact('cutover client roles', cutover.clientAccessRoles, []);
+exact('cutover server SELECT roles', cutover.serverSelectRoles, ['service_role']);
+assert(cutover.columns.length === 4 && cutover.constraints.length === 4, 'cutover shape differs');
+for (const column of cutover.columns) {
+  assert(!column.nullable && contract.includes(`${column.name}|${column.type}|NO|${column.default ?? ''}`),
+    `cutover column assertion missing: ${column.name}`);
+}
+for (const constraint of cutover.constraints) {
+  assert(contract.includes(`${constraint.name}|${constraint.type}|${constraint.definition}`), 'cutover constraint assertion missing');
+}
+assert(contract.includes(cutover.index.definition), 'cutover index assertion missing');
+assert(cutover.productionMarker.singleton && cutover.productionMarker.messages === 410
+  && cutover.productionMarker.conversations === 40
+  && cutover.productionMarker.applied_at === '2026-10-02T07:51:49.802096+00:00', 'Production cutover evidence differs');
+for (const fragment of ['$admin_attention_contract$', '$admin_attention_production_marker$', 'conversations = 40 AND messages = 410',
+  "'2026-10-02T07:51:49.802096Z'", "sha256(convert_to(statements[1], 'UTF8'))"]) {
+  assert(contract.includes(fragment), `applied attention assertion missing: ${fragment}`);
+}
+exact('attention function identities', manifest.adminAttention.functions, monitoring.functions.filter(fn => fn.identity.startsWith('public.')).map(fn => fn.identity));
+exact('attention execute roles', manifest.adminAttention.directExecuteRoles, ['service_role']);
+assert(manifest.adminAttention.searchPath === '', 'attention search_path differs');
 
 for (const functionName of required.activeConcierge.functions) {
   assert(appSources.some(({ source }) => source.includes(functionName)),

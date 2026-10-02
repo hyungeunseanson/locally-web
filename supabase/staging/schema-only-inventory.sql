@@ -24,7 +24,7 @@ SELECT jsonb_build_object(
     ) ORDER BY nsp.nspname, cls.relname)
     FROM pg_class AS cls
     JOIN pg_namespace AS nsp ON nsp.oid = cls.relnamespace
-    WHERE nsp.nspname = 'public'
+    WHERE nsp.nspname IN ('public', 'private')
       AND cls.relkind IN ('r', 'p', 'v', 'm')
   ), '[]'::jsonb),
   'views', COALESCE((
@@ -48,29 +48,30 @@ SELECT jsonb_build_object(
     JOIN pg_class AS view_cls
       ON view_cls.relnamespace = view_nsp.oid
       AND view_cls.relname = view_meta.table_name
-    WHERE view_meta.table_schema = 'public'
+    WHERE view_meta.table_schema IN ('public', 'private')
   ), '[]'::jsonb),
   'columns', COALESCE((
-    SELECT jsonb_agg(to_jsonb(column_meta) ORDER BY table_name, ordinal_position)
+    SELECT jsonb_agg(to_jsonb(column_meta) ORDER BY table_schema, table_name, ordinal_position)
     FROM information_schema.columns AS column_meta
-    WHERE table_schema = 'public'
+    WHERE table_schema IN ('public', 'private')
   ), '[]'::jsonb),
   'constraints', COALESCE((
     SELECT jsonb_agg(jsonb_build_object(
+      'schema', constrained_nsp.nspname,
       'table', constrained_cls.relname,
       'name', con_def.conname,
       'type', con_def.contype,
       'definition', pg_get_constraintdef(con_def.oid, true)
-    ) ORDER BY constrained_cls.relname, con_def.conname)
+    ) ORDER BY constrained_nsp.nspname, constrained_cls.relname, con_def.conname)
     FROM pg_constraint AS con_def
     JOIN pg_class AS constrained_cls ON constrained_cls.oid = con_def.conrelid
     JOIN pg_namespace AS constrained_nsp ON constrained_nsp.oid = constrained_cls.relnamespace
-    WHERE constrained_nsp.nspname = 'public'
+    WHERE constrained_nsp.nspname IN ('public', 'private')
   ), '[]'::jsonb),
   'indexes', COALESCE((
-    SELECT jsonb_agg(to_jsonb(index_meta) ORDER BY tablename, indexname)
+    SELECT jsonb_agg(to_jsonb(index_meta) ORDER BY schemaname, tablename, indexname)
     FROM pg_indexes AS index_meta
-    WHERE schemaname = 'public'
+    WHERE schemaname IN ('public', 'private')
   ), '[]'::jsonb),
   'sequences', COALESCE((
     SELECT jsonb_agg(jsonb_build_object(
@@ -103,7 +104,7 @@ SELECT jsonb_build_object(
     LEFT JOIN pg_attribute AS owned_attr
       ON owned_attr.attrelid = seq_dependency.refobjid
       AND owned_attr.attnum = seq_dependency.refobjsubid
-    WHERE seq_nsp.nspname = 'public'
+    WHERE seq_nsp.nspname IN ('public', 'private')
       AND seq_cls.relkind = 'S'
   ), '[]'::jsonb),
   'functions', COALESCE((
@@ -122,6 +123,8 @@ SELECT jsonb_build_object(
       'strict', proc_def.proisstrict,
       'returns_set', proc_def.proretset,
       'configuration', proc_def.proconfig,
+      'body_md5', md5(proc_def.prosrc),
+      'acl', proc_def.proacl::text,
       'definition', CASE
         WHEN proc_def.prokind = 'a' THEN NULL
         ELSE pg_get_functiondef(proc_def.oid)
@@ -148,7 +151,7 @@ SELECT jsonb_build_object(
   'policies', COALESCE((
     SELECT jsonb_agg(to_jsonb(policy_meta) ORDER BY schemaname, tablename, policyname)
     FROM pg_policies AS policy_meta
-    WHERE schemaname IN ('public', 'storage')
+    WHERE schemaname IN ('public', 'private', 'storage')
   ), '[]'::jsonb),
   'table_and_view_grants', COALESCE((
     SELECT jsonb_agg(jsonb_build_object(
@@ -163,7 +166,7 @@ SELECT jsonb_build_object(
     FROM pg_class AS grant_cls
     JOIN pg_namespace AS grant_nsp ON grant_nsp.oid = grant_cls.relnamespace
     CROSS JOIN LATERAL aclexplode(COALESCE(grant_cls.relacl, acldefault('r', grant_cls.relowner))) AS acl_entry
-    WHERE grant_nsp.nspname IN ('public', 'storage')
+    WHERE grant_nsp.nspname IN ('public', 'private', 'storage')
       AND grant_cls.relkind IN ('r', 'p', 'v', 'm', 'f')
   ), '[]'::jsonb),
   'column_grants', COALESCE((
@@ -177,7 +180,7 @@ SELECT jsonb_build_object(
     JOIN pg_class AS grant_cls ON grant_cls.oid = grant_attr.attrelid
     JOIN pg_namespace AS grant_nsp ON grant_nsp.oid = grant_cls.relnamespace
     CROSS JOIN LATERAL aclexplode(grant_attr.attacl) AS acl_entry
-    WHERE grant_nsp.nspname IN ('public', 'storage')
+    WHERE grant_nsp.nspname IN ('public', 'private', 'storage')
       AND grant_attr.attnum > 0 AND NOT grant_attr.attisdropped
   ), '[]'::jsonb),
   'function_execute_grants', COALESCE((
@@ -206,7 +209,7 @@ SELECT jsonb_build_object(
     FROM pg_class AS grant_seq
     JOIN pg_namespace AS grant_seq_nsp ON grant_seq_nsp.oid = grant_seq.relnamespace
     CROSS JOIN LATERAL aclexplode(COALESCE(grant_seq.relacl, acldefault('s', grant_seq.relowner))) AS acl_entry
-    WHERE grant_seq_nsp.nspname = 'public'
+    WHERE grant_seq_nsp.nspname IN ('public', 'private')
       AND grant_seq.relkind = 'S'
   ), '[]'::jsonb),
   'realtime_tables', COALESCE((
@@ -253,7 +256,7 @@ SELECT jsonb_build_object(
     LEFT JOIN pg_index AS replica_index
       ON replica_index.indrelid = replica_cls.oid
       AND replica_index.indisreplident
-    WHERE replica_nsp.nspname = 'public'
+    WHERE replica_nsp.nspname IN ('public', 'private')
       AND replica_cls.relkind IN ('r', 'p')
   ), '[]'::jsonb),
   'storage_buckets', COALESCE((
@@ -295,7 +298,7 @@ SELECT jsonb_build_object(
     JOIN pg_namespace AS type_nsp ON type_nsp.oid = type_def.typnamespace
     LEFT JOIN pg_class AS composite_cls ON composite_cls.oid = type_def.typrelid
     LEFT JOIN pg_range AS range_meta ON range_meta.rngtypid = type_def.oid OR range_meta.rngmultitypid = type_def.oid
-    WHERE type_nsp.nspname = 'public'
+    WHERE type_nsp.nspname IN ('public', 'private')
       AND (
         type_def.typtype IN ('d', 'e', 'r', 'm')
         OR (type_def.typtype = 'c' AND composite_cls.relkind = 'c')

@@ -1,4 +1,4 @@
-> Phase 2 checkpoint: Production parity remains the 16 applied migrations, through the historical reinquiry migration. Run `current-state-contract.sql` before any pending migration. The prepared `20261002041848_admin_attention_badges_phase_2.sql` is **not applied to Production**. Only local/staging target verification applies it after that checkpoint, then runs `admin-attention-target-contract.sql`. Current Production fingerprints/ledger are intentionally unchanged.
+> Phase 2 is applied in Production: ledger `20261002075149` maps to repository migration `20261002041848_admin_attention_badges_phase_2.sql`. Both SQL digests are `d20d5774318f8fe52dc41d13a533728b13c98a20fab812cd693737dba0de51a2`. Current parity has 17 applied ledger entries and no pending migrations. This state sync uses read-only catalog/ledger checks; it never replays SQL or edits migration history.
 
 # Supabase staging schema baseline
 
@@ -21,7 +21,7 @@ The root `supabase_*.sql` files and `docs/migrations/*.sql` remain historical ev
 - six empty bucket configurations, with public/private flags and the `admin_files` size limit;
 - `pgcrypto`, the only non-platform extension used by captured defaults/function bodies.
 
-`supabase/staging/production-baseline.manifest.json` is the immutable checkpoint review contract. `supabase/staging/production-current-state.manifest.json` separately describes the current 39-table/44-function Production state. Production contains legacy `likes` and `messages`, and the `check_rate_limit(text, integer)` function. Conversely, the catalog does not contain `community_comment_likes` or its two counter functions/triggers.
+`supabase/staging/production-baseline.manifest.json` is the immutable checkpoint review contract. `supabase/staging/production-current-state.manifest.json` separately describes the current 39-public-table/60-public-function-overload Production state, plus one private cutover table and four private function overloads. Production contains legacy `likes` and `messages`, and the `check_rate_limit(text, integer)` function. Conversely, the catalog does not contain `community_comment_likes` or its two counter functions/triggers.
 
 ## Deliberate exclusions
 
@@ -38,8 +38,8 @@ Bucket `created_at`, `updated_at`, `type`, `versioning_status`, and `avif_autode
 3. For a **new empty project**, apply the immutable baseline and immediately run `baseline-contract.sql`. This contract is a checkpoint gate and is expected to fail after later migrations.
 4. Apply `20260912050655_service_concierge_assignment.sql`.
 5. In the same staging-only database session, set `locally.staging_target_ref` to the exact staging ref and apply `supabase/staging/post-baseline-current-state-overlay.sql`. It changes only the old chat-image INSERT policy and rejects the Production ref before its write.
-6. Apply the remaining migrations in `freshProjectApplyOrder`, through `20260930022348_move_is_admin_reader_to_private_schema.sql`. Run `current-state-contract.sql`, `admin-reader-private-contract.sql`, and `schema-contract.sql`, all read-only.
-7. For a **branch cloned from current Production**, do not replay the baseline, concierge migration, or Storage overlay. Run the current-state, admin-reader-private, and staging schema contracts without applying migrations.
+6. Apply the remaining migrations in `freshProjectApplyOrder` through `20261002041848_admin_attention_badges_phase_2.sql` to this new staging project only. Run `admin-reader-private-contract.sql`, `schema-contract.sql`, and `admin-attention-target-contract.sql`, all read-only. Fresh staging uses repository filename ledger versions and environment-specific cutover counts; do not replace them with Production history or counters.
+7. For a **branch cloned from current Production**, do not replay the baseline, concierge migration, or Storage overlay. Run the current-state, admin-reader-private, staging schema, and attention target contracts without applying migrations.
 8. Configure staging-only Auth/OAuth, then seed synthetic fixtures only after the applicable contracts pass.
 
 The migration fails closed when the expected Supabase-managed schemas/publication are absent or when `supabase_realtime` already has an unexpected member. A non-empty or customized project must be discarded or reconciled explicitly; the baseline does not delete unknown objects.
@@ -48,8 +48,8 @@ The migration fails closed when the expected Supabase-managed schemas/publicatio
 
 The repository static gate checks object identity/count parity, exact Realtime membership, bucket presence, and absence of project refs, URLs, emails, credential assignments, customer inserts, managed table DDL, Storage system triggers, and extension version pins.
 
-`baseline-contract.sql` is authoritative only at the immutable baseline checkpoint. `current-state-contract.sql` is the authoritative read-only test for a current Production clone or an empty project bootstrapped through the migrations already applied in Production. This contract-only follow-up does not create a branch/project, connect staging secrets, or remotely apply SQL.
+`baseline-contract.sql` is authoritative only at the immutable baseline checkpoint. `current-state-contract.sql` is the authoritative read-only test for current Production or its clone, including the actual ledger versions, SQL digests, and immutable cutover marker. A new empty staging project uses `schema-contract.sql` and `admin-attention-target-contract.sql` for structural/security parity; its own ledger versions and cutover counts are retained. This contract-only follow-up does not create a branch/project, connect staging secrets, or remotely apply SQL.
 
 ## Applied admin reader hardening (1-B2)
 
-`20260930022348_move_is_admin_reader_to_private_schema.sql` is applied in Production. The Production current-state manifest and `current-state-contract.sql` now describe the private helper and the ten rewired RLS policies. `pendingProductionMigrations` contains only the prepared Phase 2 attention migration; it is not part of current Production parity. The `private` schema remains outside the Data API exposed schemas (`public`, `graphql_public`). Run `admin-reader-private-contract.sql` and `schema-contract.sql` read-only on a current Production clone or a freshly bootstrapped staging project.
+`20260930022348_move_is_admin_reader_to_private_schema.sql` is applied in Production. The Production current-state manifest and `current-state-contract.sql` now describe the private helper and the ten rewired RLS policies. `pendingProductionMigrations` is empty. The applied Phase 2 functions, unseen index, and private cutover table are now part of current Production parity. The marker records 40 conversations / 410 messages at `2026-10-02T07:51:49.802096Z`; it is operational control metadata, not an expectation for synthetic staging traffic. The `private` schema remains outside the Data API exposed schemas (`public`, `graphql_public`). Run `admin-reader-private-contract.sql` and `schema-contract.sql` read-only on a current Production clone or a freshly bootstrapped staging project.
