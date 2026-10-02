@@ -1,3 +1,4 @@
+import { readExactVersionArtifact } from './exact-version-artifact.mjs';
 import { createHash } from 'node:crypto';
 import { readFile, writeFile, readdir, rm, mkdir } from 'node:fs/promises';
 import path from 'node:path';
@@ -94,19 +95,14 @@ export async function readProviderCompatToken({ policy, credentials, fetchImplem
       return { deploymentId: d.id, versionId: d.versions[0].version_id };
     };
     const before = await current();
-    const v = await json(`/versions/${before.versionId}`);
-    requireContract(v.id === before.versionId && v.resources.script.named_handlers.some(h => h.name === 'DOQueueHandler' && h.handlers.includes('class')));
-    const response = await get('/content/v2');
-    const etag = response.headers.get('etag')?.replace(/^"|"$/g, '');
-    requireContract(response.ok && HEX.test(etag) && etag === v.resources.script.etag);
-    const form = await response.formData();
-    const scripts = [...form.values()].filter(v => typeof v !== 'string' && v.name.endsWith('.js'));
-    requireContract(scripts.length === 1);
-    const token = inspectQueueToken(queueModuleFromProvider(await scripts[0].text())).value;
+    const artifact = await readExactVersionArtifact({ credentials, workerName: policy.workerName, versionId: before.versionId, fetchImplementation });
+    requireContract(artifact.metadata.resources.script.named_handlers.some(h => h.name === 'DOQueueHandler' && h.handlers.includes('class')));
+    const etag = artifact.scriptEtag;
+    const token = inspectQueueToken(queueModuleFromProvider(artifact.source)).value;
     requireContract(sha256(token) === policy.compatTokenSha256);
     const after = await current();
     requireContract(JSON.stringify(before) === JSON.stringify(after));
-    return { token, provenance: { kind: 'provider', ...before, etag, etagMatch: true, compatSha256: sha256(token), length: token.length } };
+    return { token, provenance: { kind: 'provider', ...before, etag, etagMatch: true, ...(artifact.sourceEvidence === 'EXACT_VERSION_MODULES' ? { artifactIdentity: artifact.sourceEvidence, sourceSha256: artifact.sourceSha256 } : {}), compatSha256: sha256(token), length: token.length } };
   } catch { throw new Error('OPENNEXT_REVALIDATION_BRIDGE_PROVENANCE_FAILED'); }
 }
 

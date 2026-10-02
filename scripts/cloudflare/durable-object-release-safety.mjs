@@ -1,3 +1,4 @@
+import { readExactVersionArtifact } from './exact-version-artifact.mjs';
 import { createHash } from 'node:crypto';
 
 export const DO_MODULES = {
@@ -39,7 +40,7 @@ export function fingerprintDurableObjectArtifact(source) {
 export function compareDurableObjectProof(proof, stableVersionId) {
   const unknown = 'DO_IMPLEMENTATION_UNKNOWN';
   if (!proof || proof.stableVersionId !== stableVersionId
-    || !SHA256.test(proof.scriptEtag ?? '') || proof.contentEtag !== proof.scriptEtag
+    || !SHA256.test(proof.scriptEtag ?? '') || (proof.contentEtag !== proof.scriptEtag && !(proof.sourceEvidence === 'EXACT_VERSION_MODULES' && SHA256.test(proof.sourceSha256 ?? '')))
     || !Array.isArray(proof.namedHandlers)
     || proof.namedHandlers.length !== 2
     || !Object.keys(DO_MODULES).every(name => proof.namedHandlers.some(h => h.name === name && h.handlers?.includes('class')))) return unknown;
@@ -73,22 +74,13 @@ export function compareDurableObjectProof(proof, stableVersionId) {
 // GET only. The current script content is tied to the exact deployed stable
 // version by the provider's content ETag and that version's script ETag.
 export async function readStableDurableObjectArtifact({ credentials, workerName, stableVersionId, fetchImplementation = fetch }) {
-  const base = `https://api.cloudflare.com/client/v4/accounts/${credentials.accountId}/workers/scripts/${workerName}`;
-  const options = { method: 'GET', redirect: 'error', signal: AbortSignal.timeout(30000), headers: { Authorization: `Bearer ${credentials.apiToken}` } };
-  const metadataResponse = await fetchImplementation(`${base}/versions/${stableVersionId}`, options);
-  const metadata = await metadataResponse.json();
-  if (!metadataResponse.ok || !metadata.success || metadata.result?.id !== stableVersionId) return null;
-  const response = await fetchImplementation(`${base}/content/v2`, options);
-  const scriptEtag = metadata.result.resources?.script?.etag;
-  const contentEtag = response.headers.get('etag')?.replace(/^"|"$/g, '');
-  if (!response.ok || !SHA256.test(scriptEtag ?? '') || contentEtag !== scriptEtag) return null;
-  const form = await response.formData();
-  const entries = [...form.values()].filter(v => typeof v !== 'string' && v.name.endsWith('.js'));
-  if (entries.length !== 1) return null;
-  const source = await entries[0].text();
+  let artifact;
+  try { artifact = await readExactVersionArtifact({credentials,workerName,versionId:stableVersionId,fetchImplementation}); }
+  catch { return null; }
+  const { metadata, source, scriptEtag, contentEtag, sourceEvidence, sourceSha256 } = artifact;
   const stable = fingerprintDurableObjectArtifact(source);
-  const proof = { stableVersionId, scriptEtag, contentEtag,
-    namedHandlers: metadata.result.resources.script.named_handlers,
+  const proof = { stableVersionId, scriptEtag, contentEtag, sourceEvidence, sourceSha256,
+    namedHandlers: metadata.resources.script.named_handlers,
     sourceRevision: 'UNKNOWN_NOT_ATTESTED_BY_PROVIDER', stable };
   Object.defineProperty(proof, 'source', { value: source });
   return proof;

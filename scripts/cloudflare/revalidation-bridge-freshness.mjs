@@ -12,6 +12,8 @@ const requireFresh = condition => { if (!condition) throw new Error(BASELINE_CHA
 // being accepted as proof. No file contents, provider bodies or causes are logged.
 const fields = {
   kind: value => value === 'provider',
+  artifactIdentity: value => value === 'EXACT_VERSION_MODULES',
+  sourceSha256: digest,
   etagMatch: value => value === true,
   deploymentId: uuid,
   versionId: uuid,
@@ -38,6 +40,7 @@ export async function assertProductionBridgeProofFresh({
     for (const [key, value] of Object.entries(proof)) {
       requireFresh(Object.hasOwn(fields, key) && fields[key](value));
     }
+    requireFresh((proof.artifactIdentity === undefined) === (proof.sourceSha256 === undefined));
     const policy = JSON.parse(await readFile(path.join(root, 'config/cloudflare/revalidation-bridge.json'), 'utf8'));
     if (!digest(policy?.compatTokenSha256) || policy.compatTokenSha256 !== proof.compatSha256) {
       throw new Error(LINEAGE_MISMATCH);
