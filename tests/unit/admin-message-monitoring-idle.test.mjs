@@ -68,6 +68,7 @@ async function mountAdmin(f) {
   return () => state;
 }
 
+// Phase 2 removes the participant-unread query from each list GET in both fixtures.
 test('idle visible subscribed ten-minute API/DB counts: reviewed 30s baseline vs slow safety net', async () => {
   const metrics = [];
   for (const sources of [{ [resolve(hookPath)]: beforeSource }, {}]) {
@@ -90,8 +91,8 @@ test('idle visible subscribed ten-minute API/DB counts: reviewed 30s baseline vs
     } finally { await f.dispose(); }
   }
   assert.deepEqual(metrics, [
-    { list: 20, thread: 20, ack: 20, api: 60, db: 500 },
-    { list: 2, thread: 2, ack: 0, api: 4, db: 36 },
+    { list: 20, thread: 20, ack: 20, api: 60, db: 480 },
+    { list: 2, thread: 2, ack: 0, api: 4, db: 34 },
   ]);
   console.log(`ADMIN_CHAT_IDLE_10_MIN ${JSON.stringify({ before: metrics[0], after: metrics[1] })}`);
 });

@@ -10,6 +10,7 @@ import { useToast } from '@/app/context/ToastContext';
 import { useConfirmDialog } from '@/app/hooks/useConfirmDialog';
 import { useServiceAdminData } from '../hooks/useServiceAdminData';
 import { AdminServiceBooking } from '@/app/types/admin';
+import { useAdminAttention } from './AdminAttentionProvider';
 
 // ── 상태 라벨 헬퍼 ──────────────────────────────────────────────────────────
 const BOOKING_STATUS_LABELS: Record<string, { label: string; cls: string }> = {
@@ -487,6 +488,11 @@ type AllFilter = 'ALL' | 'CANCEL_REQ';
 
 function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking[]; onRefresh: () => void }) {
   const { showToast } = useToast();
+  const attention = useAdminAttention();
+  const refreshAfterMutation = () => {
+    void attention?.refresh();
+    onRefresh();
+  };
   const { requestConfirm, ConfirmDialogElement } = useConfirmDialog();
   const [cancelTarget, setCancelTarget] = useState<AdminServiceBooking | null>(null);
   const [editTarget, setEditTarget] = useState<AdminServiceBooking | null>(null);
@@ -525,7 +531,7 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
           return;
         }
         showToast('입금 확인 완료. 현지 담당자 1:1 문의가 생성되었습니다.', 'success');
-        onRefresh();
+        refreshAfterMutation();
       } catch {
         showToast('서버 오류가 발생했습니다.', 'error');
       } finally {
@@ -540,7 +546,7 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
         <ForceCancelModal
           booking={cancelTarget}
           onClose={() => setCancelTarget(null)}
-          onSuccess={onRefresh}
+          onSuccess={refreshAfterMutation}
         />
       )}
       {editTarget && editTarget.service_request && (
@@ -548,14 +554,14 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
           requestId={editTarget.request_id}
           initialDescription={editTarget.service_request.description ?? ''}
           onClose={() => setEditTarget(null)}
-          onSuccess={onRefresh}
+          onSuccess={refreshAfterMutation}
         />
       )}
       {assignmentTarget && (
         <AssignHostModal
           booking={assignmentTarget}
           onClose={() => setAssignmentTarget(null)}
-          onSuccess={onRefresh}
+          onSuccess={refreshAfterMutation}
         />
       )}
       {reconcileTarget && (
@@ -563,7 +569,7 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
           booking={reconcileTarget.booking}
           operation={reconcileTarget.operation}
           onClose={() => setReconcileTarget(null)}
-          onSuccess={onRefresh}
+          onSuccess={refreshAfterMutation}
         />
       )}
 

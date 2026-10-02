@@ -16,6 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { useToast } from '@/app/context/ToastContext';
+import { useAdminAttention } from './AdminAttentionProvider';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import dynamic from 'next/dynamic';
@@ -260,6 +261,7 @@ export default function MasterLedgerTab({
   refreshSignal?: string;
 }) {
   const { showToast } = useToast();
+  const attention = useAdminAttention();
   const supabase = useRef(createClient()).current;
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRange, setDateRange] = useState<Range[]>([{
@@ -515,6 +517,7 @@ export default function MasterLedgerTab({
   };
 
   const refreshAfterMutation = async () => {
+    void attention?.refresh();
     await Promise.allSettled([
       fetchLedger(),
       Promise.resolve(onRefresh?.()),

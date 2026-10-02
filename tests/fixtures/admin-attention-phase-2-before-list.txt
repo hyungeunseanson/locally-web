@@ -7,6 +7,7 @@ import {
   isAdminSupportInquiry,
   isOfficialInquirySupportMessage,
   shouldApplyChatPolicySignals,
+  SOFT_DELETED_INQUIRY_MESSAGE_TYPE,
 } from '@/app/utils/inquiry';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
@@ -126,19 +127,33 @@ export async function GET(request: Request) {
     const guestIds = Array.from(new Set(inquiryRows.map((item) => item.user_id).filter(Boolean))) as string[];
 
     // 3. 프로필, 애플리케이션, 그리고 안 읽은 메시지 수 조회
-    const [profilesRes, appsRes, guestProfilesRes, activityMap] = await Promise.all([
+    const [profilesRes, appsRes, guestProfilesRes, unreadRes, activityMap] = await Promise.all([
       supabaseAdmin.from('profiles').select('id, full_name, email, avatar_url').in('id', hostIds),
       supabaseAdmin.from('host_applications').select('user_id, name, profile_photo, status').in('user_id', hostIds),
       supabaseAdmin.from('profiles').select('id, full_name, email, avatar_url').in('id', guestIds),
+      supabaseAdmin.from('inquiry_messages')
+        .select('inquiry_id')
+        .in('inquiry_id', inquiryIds)
+        .eq('is_read', false)
+        .neq('type', SOFT_DELETED_INQUIRY_MESSAGE_TYPE)
+        .neq('sender_id', user.id),
       getAdminInquiryActivity(supabaseAdmin, inquiryIds)
     ]);
 
     const hostProfiles = (profilesRes.data || []) as ProfileRow[];
     const hostApps = (appsRes.data || []) as HostApplicationRow[];
     const guestProfiles = (guestProfilesRes.data || []) as ProfileRow[];
+    const unreadRows = (unreadRes.data || []) as Array<{ inquiry_id: number | string }>;
+
     const profilesMap = new Map(hostProfiles.map((p) => [p.id, p]));
     const appsMap = new Map(hostApps.map((a) => [a.user_id, a]));
     const guestMap = new Map(guestProfiles.map((g) => [g.id, g]));
+
+    const unreadCounts: Record<string, number> = {};
+    unreadRows.forEach((msg) => {
+      const key = String(msg.inquiry_id);
+      unreadCounts[key] = (unreadCounts[key] || 0) + 1;
+    });
 
     const secureUrl = (url: string | null | undefined) => {
       if (!url || url === '') return null;
@@ -176,7 +191,7 @@ export async function GET(request: Request) {
         ...activity,
         content: activity?.last_message_content ?? item.content,
         experience_id: item.experience_id ?? '',
-        unread_count: Number(activity?.admin_unread_count ?? 0),
+        unread_count: isAdminSupportInquiry(item.type) ? Number(activity?.admin_unread_count ?? 0) : unreadCounts[String(item.id)] || 0,
         has_policy_signal: signal.matched,
         policy_signal_categories: signal.categories,
         guest: {

@@ -158,7 +158,13 @@ const expectedLedger = [
     repositorySha256: '80f34eea7ad6e2405aa38962a886c97e8713bfa1fefe72f0d9647686489747a1',
   },
 ];
-const expectedPendingMigrations = [];
+const expectedPendingMigrations = [{
+  version: '20261002041848',
+  name: 'admin_attention_badges_phase_2',
+  repositoryFile: 'supabase/migrations/20261002041848_admin_attention_badges_phase_2.sql',
+  repositorySha256: 'd20d5774318f8fe52dc41d13a533728b13c98a20fab812cd693737dba0de51a2',
+  status: 'prepared-not-applied',
+}];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));
 for (const [index, expected] of expectedLedger.entries()) {
   const actual = manifest.migrationLedger[index];
@@ -197,7 +203,11 @@ assert(
   'pending Production migration contract differs'
 );
 
-// No pending migrations remain; applied SQL is verified without replaying it.
+// Prepared Phase 2 is not in the Production ledger or catalog assertions.
+exact('prepared private cutover tables', required.pendingPrivateTables, ['private.admin_monitor_cutover']);
+for (const pending of expectedPendingMigrations) {
+  assert(await sha256(pending.repositoryFile) === pending.repositorySha256, 'prepared attention migration bytes differ');
+}
 
 const objects = manifest.objects;
 for (const [name, fingerprint] of Object.entries(expectedFingerprints)) {

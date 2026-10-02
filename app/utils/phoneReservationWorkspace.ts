@@ -4,6 +4,7 @@ import { isProxyCardPaymentAnchor } from './proxyBooking';
 export type PhoneFilter = 'todo' | 'payment' | 'closed' | 'all';
 export type PhoneWorkspaceRequest = ProxyRequest & {
   linked_inquiry_id: string | null;
+  admin_unread_count?: number;
   needs_attention: boolean;
   needs_reply: boolean;
   latest_sender_id: string | null;

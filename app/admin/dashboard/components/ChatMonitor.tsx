@@ -4,6 +4,8 @@ import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import Image from 'next/image';
 import { MessageCircle, User, Send, RefreshCw, Loader2, AlertTriangle, Shield, Trash2 } from 'lucide-react';
+import { useAdminAttentionSnapshot } from './AdminAttentionProvider';
+import { NewConversationBadge } from './AttentionBadge';
 import { useAdminChatQuery } from '../hooks/useAdminChatQuery';
 import {
   isAdminSupportInquiry,
@@ -63,6 +65,7 @@ type ChatMonitorProps = {
 };
 
 export default function ChatMonitor({ view = 'support', enabled = true, phoneContext: phone }: ChatMonitorProps) {
+  const attention = useAdminAttentionSnapshot();
   const searchParams = useSearchParams();
   const targetInquiryId = phone ? phone.inquiryId : searchParams.get('inquiryId');
   const phoneMode = Boolean(phone);
@@ -489,6 +492,7 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
                       </span>
                     )}
                     <span className="truncate">{getGuestName(inq.guest)}</span>
+                    <NewConversationBadge unseen={Number(attention.ready ? attention.conversations[String(inq.id)]?.admin_unread_count ?? 0 : inq.admin_unread_count ?? 0) > 0} />
                   </span>
                   <span className="text-[9px] md:text-[10px] text-slate-400 shrink-0 font-medium leading-4">{formatAdminListTime(inq.last_message_at, clockNow)}</span>
                 </div>
@@ -551,6 +555,7 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
               )}
               <div className="flex items-center gap-1.5 md:gap-4 min-w-0">
                 <button
+                  aria-label="대화 목록으로 돌아가기"
                   onClick={handleClearSelected} // 목록으로 돌아가기
                   className="md:hidden p-1.5 -ml-1 text-slate-500 shrink-0 bg-slate-100 rounded-full"
                 >

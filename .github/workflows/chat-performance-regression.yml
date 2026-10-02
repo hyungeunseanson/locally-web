@@ -8,7 +8,18 @@ on:
       - 'app/guest/inbox/**'
       - 'app/host/dashboard/InquiryChat.tsx'
       - 'app/admin/dashboard/hooks/useAdminChatQuery.ts'
-      - 'app/admin/dashboard/components/ChatMonitor.tsx'
+      - 'app/admin/dashboard/components/**'
+      - 'app/admin/layout.tsx'
+      - 'app/utils/adminAttentionState.ts'
+      - 'app/api/admin/sidebar-counts/**'
+      - 'app/api/admin/customer-support/**'
+      - 'tests/unit/admin-attention*.test.mjs'
+      - 'tests/unit/helpers/adminAttentionDatabase.mjs'
+      - 'tests/fixtures/admin-attention*'
+      - 'tests/ui/admin-attention-badges.spec.ts'
+      - 'tests/ui/phone-workspace.spec.ts'
+      - 'playwright.admin-attention.config.ts'
+      - 'supabase/migrations/*admin_attention_badges*'
       - 'app/api/admin/inquiries/**'
       - 'app/utils/adminChatTime.ts'
       - 'app/utils/adminInquiryActivity.ts'
@@ -57,4 +68,5 @@ jobs:
       - run: npx playwright install --with-deps chromium webkit
       # All I/O is mocked. This job has no application server or service secrets.
       - run: npm run test:admin-chat:phase1
+      - run: npm run test:admin-attention:phase2
       - run: npm run cloudflare:production-build:contract
