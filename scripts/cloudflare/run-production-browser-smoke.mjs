@@ -3,6 +3,7 @@ import { pathToFileURL } from 'node:url';
 import process from 'node:process';
 
 import { chromium, errors } from '@playwright/test';
+import { versionOverrideHeader } from './candidate-release-contract.mjs';
 
 const DEFAULT_PRODUCTION_ORIGIN = 'https://www.locally-travel.com';
 const GENERIC_ERROR_TEXT = /페이지를 불러오지 못했습니다|Something went wrong|An error occurred/i;
@@ -54,8 +55,10 @@ export const REVIEWED_EXTERNAL_SCRIPT_STUBS = Object.freeze([
 export async function installProductionMutationGate(context, origin, {
   reviewedExternalTelemetry = REVIEWED_EXTERNAL_TELEMETRY,
   reviewedExternalScriptStubs = REVIEWED_EXTERNAL_SCRIPT_STUBS,
+  versionOverride,
 } = {}) {
   const productionOrigin = new URL(origin).origin;
+  const override = versionOverride === undefined ? null : versionOverrideHeader(versionOverride.workerName, versionOverride.versionId);
   const blockedExpectedWrites = [];
   const blockedUnexpectedWrites = [];
   const blockedExpectedExternalWrites = [];
@@ -90,7 +93,22 @@ export async function installProductionMutationGate(context, origin, {
     }
 
     if (READ_METHODS.has(method)) {
-      await route.continue();
+      if (override && url.origin === productionOrigin) {
+        if (request.headers().cookie || request.headers().authorization) {
+          blockedUnexpectedWrites.push({ method, pathname: url.pathname, kind: 'candidate_authenticated_read_forbidden' });
+          await route.abort('blockedbyclient'); return;
+        }
+        await route.continue({ headers: { ...request.headers(), 'Cloudflare-Workers-Version-Overrides': override,
+          ...(url.pathname === '/.well-known/locally-release' && ['GET', 'HEAD'].includes(method) ? { 'X-Locally-Release-Probe': '1' } : {}) } });
+        versionOverride.onApplied?.({ pathname: url.pathname, resourceType: request.resourceType(), method });
+      } else {
+        if (override && url.origin !== productionOrigin) {
+          const headers = { ...request.headers() };
+          delete headers['cloudflare-workers-version-overrides'];
+          delete headers['x-locally-release-probe'];
+          await route.continue({ headers });
+        } else await route.continue();
+      }
       return;
     }
 
@@ -234,6 +252,8 @@ export async function visitReadOnlyPage(context, origin, pathname, check, {
   attemptDiagnostics = [],
   log = console.log,
   navigationTimeoutMs = NAVIGATION_TIMEOUT_MS,
+  assertAdditionalSafety = () => {},
+  collectReadOnlyPageEvidence = async () => {},
 } = {}) {
   assert(mutationGate, 'Read-only pages require the context mutation gate.');
   assert(Number.isFinite(navigationTimeoutMs) && navigationTimeoutMs > 0 && navigationTimeoutMs <= NAVIGATION_TIMEOUT_MS);
@@ -312,6 +332,7 @@ export async function visitReadOnlyPage(context, origin, pathname, check, {
     }
     const timeout = readOnlyTimeouts.get(failure);
     const assertSafety = () => {
+      assertAdditionalSafety();
       assertNoUnexpectedWrites(mutationGate);
       if (navigationStatus !== undefined) assert.equal(navigationStatus, 200, `${diagnosticPathname} must return HTTP 200.`);
       if (state?.genericErrorPresent) {
@@ -332,6 +353,7 @@ export async function visitReadOnlyPage(context, origin, pathname, check, {
     try {
       state = await readPageState(page);
       assertSafety();
+      if (!failure) await collectReadOnlyPageEvidence(page);
     } catch (error) {
       safetyFailure = error;
     } finally {
@@ -401,12 +423,24 @@ export async function runProductionBrowserSmoke(
     reviewedExternalTelemetry = REVIEWED_EXTERNAL_TELEMETRY,
     reviewedExternalScriptStubs = REVIEWED_EXTERNAL_SCRIPT_STUBS,
     log = console.log,
+    versionOverride,
+    observeContext = async () => {},
+    assertAdditionalSafety = () => {},
+    collectReadOnlyPageEvidence = async () => {},
   } = {}
 ) {
   assert(Number.isFinite(loginReadinessTimeoutMs) && loginReadinessTimeoutMs > 0);
+  if (versionOverride) versionOverrideHeader(versionOverride.workerName, versionOverride.versionId);
   const browser = await chromium.launch({ headless: true, ...createBrowserLaunchOptions() });
   const context = await browser.newContext({ serviceWorkers: 'block' });
-  const mutationGate = await installProductionMutationGate(context, origin, { reviewedExternalTelemetry, reviewedExternalScriptStubs });
+  let mutationGate;
+  try {
+    mutationGate = await installProductionMutationGate(context, origin, { reviewedExternalTelemetry, reviewedExternalScriptStubs, versionOverride });
+    await observeContext(context);
+  } catch (error) {
+    await browser.close();
+    throw error;
+  }
   const {
     blockedExpectedWrites,
     blockedUnexpectedWrites,
@@ -415,7 +449,7 @@ export async function runProductionBrowserSmoke(
     stubbedExternalScripts,
   } = mutationGate;
   const pageAttempts = [];
-  const visitOptions = { mutationGate, attemptDiagnostics: pageAttempts, log };
+  const visitOptions = { mutationGate, attemptDiagnostics: pageAttempts, log, assertAdditionalSafety, collectReadOnlyPageEvidence };
   let result;
   let smokeError;
 
@@ -489,6 +523,7 @@ export async function runProductionBrowserSmoke(
     });
   }
   if (smokeError) throw smokeError;
+  assertAdditionalSafety();
   return result;
 }
 

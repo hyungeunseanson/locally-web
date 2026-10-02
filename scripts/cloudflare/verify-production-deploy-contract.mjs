@@ -285,7 +285,7 @@ export async function readProductionSnapshot({
     observability: settings?.observability,
     bindings: (settings?.bindings ?? []).map((binding) => {
       const result = { name: binding.name, type: binding.type };
-      for (const key of ['service', 'environment', 'entrypoint', 'queue_name', 'bucket_name', 'class_name']) {
+      for (const key of ['service', 'environment', 'entrypoint', 'queue_name', 'bucket_name', 'class_name', 'namespace_id', 'script_name', 'id']) {
         if (binding[key] !== undefined) result[key] = binding[key];
       }
       if (binding.type === 'plain_text' && MANAGED_FEATURE_VARIABLE.test(binding.name)) {
