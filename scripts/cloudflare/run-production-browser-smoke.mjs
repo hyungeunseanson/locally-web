@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
 import process from 'node:process';
 
-import { chromium } from '@playwright/test';
+import { chromium, errors } from '@playwright/test';
 
 const DEFAULT_PRODUCTION_ORIGIN = 'https://www.locally-travel.com';
 const GENERIC_ERROR_TEXT = /페이지를 불러오지 못했습니다|Something went wrong|An error occurred/i;
@@ -10,6 +10,12 @@ const MISSING_SUPABASE_ENV_TEXT = /\[Supabase\].*NEXT_PUBLIC_SUPABASE_URL.*NEXT_
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const READINESS_TIMEOUT_MS = 15000;
 const LOGIN_READINESS_TIMEOUT_MS = 45000;
+const NAVIGATION_TIMEOUT_MS = 30000;
+const READ_ONLY_MAX_ATTEMPTS = 2;
+const READ_ONLY_RETRY_DELAY_MS = 1000;
+const DIAGNOSTIC_TIMEOUT_MS = 1000;
+// Only timeouts raised by the navigation/readiness operations below may retry.
+const readOnlyTimeouts = new WeakMap();
 const MAX_PENDING_REQUEST_DIAGNOSTICS = 10;
 const EXPECTED_ANALYTICS_PATH = '/api/analytics/events';
 const EXPECTED_CLOUDFLARE_RUM_PATH = '/cdn-cgi/rum';
@@ -182,88 +188,210 @@ export function summarizePendingFirstPartyRequests(pendingRequests, now = Date.n
     .slice(0, MAX_PENDING_REQUEST_DIAGNOSTICS);
 }
 
-async function visitReadOnlyPage(context, origin, pathname, check) {
-  const page = await context.newPage();
-  const pageErrors = [];
-  const firstPartyConsoleErrors = [];
-  const pendingFirstPartyRequests = new Map();
-  page.on('request', (request) => {
-    const url = new URL(request.url());
-    if (url.origin !== origin) return;
-    pendingFirstPartyRequests.set(request, {
-      method: request.method(),
-      pathname: url.pathname,
-      resourceType: request.resourceType(),
-      isNavigationRequest: request.isNavigationRequest(),
-      startedAt: Date.now(),
-    });
-  });
-  page.on('requestfinished', (request) => pendingFirstPartyRequests.delete(request));
-  page.on('requestfailed', (request) => pendingFirstPartyRequests.delete(request));
-  page.on('pageerror', (error) => pageErrors.push(error.message));
-  page.on('console', (message) => {
-    if (message.type() !== 'error') return;
-    const location = message.location().url;
-    const isFirstParty = !location || new URL(location).origin === origin;
-    if (isFirstParty || MISSING_SUPABASE_ENV_TEXT.test(message.text())) {
-      firstPartyConsoleErrors.push(message.text());
-    }
-  });
-
+async function waitForReadOnlyReadiness(locator, options, stage = 'readiness') {
+  const startedAt = Date.now();
   try {
-    const response = await page.goto(new URL(pathname, origin).href, {
-      waitUntil: 'domcontentloaded',
-      timeout: 30000,
-    });
-    assert.equal(response?.status(), 200, `${pathname} must return HTTP 200.`);
-    await page.locator('body').waitFor({ state: 'visible', timeout: READINESS_TIMEOUT_MS });
-    const result = await check(page, () => ({
-      count: pendingFirstPartyRequests.size,
-      requests: summarizePendingFirstPartyRequests(pendingFirstPartyRequests),
-    }));
-    await page.waitForTimeout(750);
-
-    const bodyText = await page.locator('body').innerText();
-    assert(!GENERIC_ERROR_TEXT.test(bodyText), `${pathname} rendered the generic error page.`);
-    assert.deepEqual(pageErrors, [], `${pathname} raised an uncaught browser error: ${pageErrors.join(' | ')}`);
-    assert.deepEqual(
-      firstPartyConsoleErrors,
-      [],
-      `${pathname} emitted a first-party browser console error: ${firstPartyConsoleErrors.join(' | ')}`
-    );
-    return result;
-  } finally {
-    await page.close();
+    await locator.waitFor(options);
+  } catch (error) {
+    if (error instanceof errors.TimeoutError) {
+      readOnlyTimeouts.set(error, { stage, elapsedMs: Date.now() - startedAt });
+    }
+    throw error;
   }
 }
 
-async function waitForLoginInput(page, timeoutMs, pendingFirstPartyRequestSummary) {
-  const startedAt = Date.now();
+async function readPageState(page) {
+  let timer;
   try {
-    await page.locator('[data-testid="login-modal"] input:visible').first().waitFor({
-      state: 'visible', timeout: timeoutMs,
-    });
-  } catch (error) {
-    if (error?.name !== 'TimeoutError') throw error;
-    const state = await page.evaluate(() => ({
-      documentReadyState: document.readyState,
-      bodyReady: Boolean(document.body),
-      spinnerPresent: Boolean(document.querySelector('.animate-spin')),
-      loginModalPresent: Boolean(document.querySelector('[data-testid="login-modal"]')),
-      genericErrorPresent: /페이지를 불러오지 못했습니다|Something went wrong|An error occurred/i.test(document.body?.innerText ?? ''),
-    }));
-    const pendingRequests = pendingFirstPartyRequestSummary();
-    const diagnostic = {
-      elapsedMs: Date.now() - startedAt,
-      ...state,
-      pendingFirstPartyRequestCount: pendingRequests.count,
-      pendingFirstPartyRequests: pendingRequests.requests,
-    };
-    if (state.genericErrorPresent) {
-      throw new Error(`/login rendered a generic error before input readiness: ${JSON.stringify(diagnostic)}`, { cause: error });
-    }
-    throw new Error(`/login input readiness timed out: ${JSON.stringify(diagnostic)}`, { cause: error });
+    return await Promise.race([
+      page.evaluate((genericErrorPattern) => ({
+        documentReadyState: document.readyState,
+        bodyReady: Boolean(document.body),
+        spinnerPresent: Boolean(document.querySelector('.animate-spin')),
+        loginModalPresent: Boolean(document.querySelector('[data-testid="login-modal"]')),
+        genericErrorPresent: new RegExp(genericErrorPattern, 'i').test(document.body?.innerText ?? ''),
+      }), GENERIC_ERROR_TEXT.source),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Page diagnostics timed out.')), DIAGNOSTIC_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
   }
+}
+
+function assertNoUnexpectedWrites(mutationGate) {
+  if (mutationGate.blockedUnexpectedWrites.length || mutationGate.blockedUnexpectedExternalWrites.length) {
+    throw new Error(`Production smoke blocked unexpected writes: ${JSON.stringify({
+      firstParty: mutationGate.blockedUnexpectedWrites,
+      external: mutationGate.blockedUnexpectedExternalWrites,
+    })}`);
+  }
+}
+
+export async function visitReadOnlyPage(context, origin, pathname, check, {
+  mutationGate,
+  attemptDiagnostics = [],
+  log = console.log,
+  navigationTimeoutMs = NAVIGATION_TIMEOUT_MS,
+} = {}) {
+  assert(mutationGate, 'Read-only pages require the context mutation gate.');
+  assert(Number.isFinite(navigationTimeoutMs) && navigationTimeoutMs > 0 && navigationTimeoutMs <= NAVIGATION_TIMEOUT_MS);
+  const diagnosticPathname = new URL(pathname, origin).pathname;
+  for (let attempt = 1; attempt <= READ_ONLY_MAX_ATTEMPTS; attempt += 1) {
+    assertNoUnexpectedWrites(mutationGate);
+    const page = await context.newPage();
+    const pageErrors = [];
+    const firstPartyConsoleErrors = [];
+    const pendingFirstPartyRequests = new Map();
+    let navigationStatus;
+    page.on('response', (response) => {
+      const request = response.request();
+      if (request.isNavigationRequest() && request.frame() === page.mainFrame()) {
+        const status = response.status();
+        if (status < 300 || status >= 400) navigationStatus = status;
+      }
+    });
+    page.on('request', (request) => {
+      const url = new URL(request.url());
+      if (url.origin !== origin) return;
+      pendingFirstPartyRequests.set(request, {
+        method: request.method(),
+        pathname: url.pathname,
+        resourceType: request.resourceType(),
+        isNavigationRequest: request.isNavigationRequest(),
+        startedAt: Date.now(),
+      });
+    });
+    page.on('requestfinished', (request) => pendingFirstPartyRequests.delete(request));
+    page.on('requestfailed', (request) => pendingFirstPartyRequests.delete(request));
+    page.on('pageerror', (error) => pageErrors.push(error.message));
+    page.on('console', (message) => {
+      if (message.type() !== 'error') return;
+      const location = message.location().url;
+      const isFirstParty = !location || new URL(location).origin === origin;
+      if (isFirstParty || MISSING_SUPABASE_ENV_TEXT.test(message.text())) {
+        firstPartyConsoleErrors.push(message.text());
+      }
+    });
+
+    const navigationStartedAt = Date.now();
+    let navigationElapsedMs = 0;
+    let readinessStartedAt;
+    let readinessElapsedMs = 0;
+    let result;
+    let failure;
+    let state;
+    try {
+      let response;
+      try {
+        response = await page.goto(new URL(pathname, origin).href, {
+          waitUntil: 'domcontentloaded',
+          timeout: navigationTimeoutMs,
+        });
+      } catch (error) {
+        if (error instanceof errors.TimeoutError) {
+          readOnlyTimeouts.set(error, { stage: 'navigation', elapsedMs: Date.now() - navigationStartedAt });
+        }
+        throw error;
+      } finally {
+        navigationElapsedMs = Date.now() - navigationStartedAt;
+      }
+      assert.equal(response?.status(), 200, `${diagnosticPathname} must return HTTP 200.`);
+      readinessStartedAt = Date.now();
+      await waitForReadOnlyReadiness(page.locator('body'), { state: 'visible', timeout: READINESS_TIMEOUT_MS });
+      result = await check(page, () => ({
+        count: pendingFirstPartyRequests.size,
+        requests: summarizePendingFirstPartyRequests(pendingFirstPartyRequests),
+      }), waitForReadOnlyReadiness);
+      readinessElapsedMs = Date.now() - readinessStartedAt;
+      await page.waitForTimeout(750);
+    } catch (error) {
+      failure = error;
+      if (readinessStartedAt !== undefined && !readinessElapsedMs) readinessElapsedMs = Date.now() - readinessStartedAt;
+    }
+    const timeout = readOnlyTimeouts.get(failure);
+    const assertSafety = () => {
+      assertNoUnexpectedWrites(mutationGate);
+      if (navigationStatus !== undefined) assert.equal(navigationStatus, 200, `${diagnosticPathname} must return HTTP 200.`);
+      if (state?.genericErrorPresent) {
+        const prefix = timeout?.stage === 'login_input_readiness'
+          ? '/login rendered a generic error before input readiness'
+          : `${diagnosticPathname} rendered the generic error page.`;
+        throw new Error(`${prefix}: ${JSON.stringify(state)}`);
+      }
+      assert.deepEqual(pageErrors, [], `${diagnosticPathname} raised an uncaught browser error: ${pageErrors.join(' | ')}`);
+      assert.deepEqual(
+        firstPartyConsoleErrors,
+        [],
+        `${diagnosticPathname} emitted a first-party browser console error: ${firstPartyConsoleErrors.join(' | ')}`
+      );
+    };
+    let safetyFailure;
+    let pendingSummary;
+    try {
+      state = await readPageState(page);
+      assertSafety();
+    } catch (error) {
+      safetyFailure = error;
+    } finally {
+      pendingSummary = {
+        count: pendingFirstPartyRequests.size,
+        requests: summarizePendingFirstPartyRequests(pendingFirstPartyRequests),
+      };
+      try {
+        await page.close();
+      } catch (error) {
+        safetyFailure ??= error;
+      }
+    }
+    // Closing a timed-out page must not erase errors or writes from that attempt.
+    try {
+      assertSafety();
+    } catch (error) {
+      safetyFailure ??= error;
+    }
+    const retry = Boolean(timeout && !safetyFailure && attempt < READ_ONLY_MAX_ATTEMPTS);
+    const diagnostic = {
+      pathname: diagnosticPathname,
+      attempt,
+      navigationElapsedMs,
+      readinessElapsedMs,
+      timeoutStage: timeout?.stage ?? null,
+      elapsedMs: timeout?.elapsedMs ?? navigationElapsedMs + readinessElapsedMs,
+      documentReadyState: state?.documentReadyState ?? null,
+      bodyReady: state?.bodyReady ?? null,
+      spinnerPresent: state?.spinnerPresent ?? null,
+      loginModalPresent: state?.loginModalPresent ?? null,
+      genericErrorPresent: state?.genericErrorPresent ?? null,
+      pendingFirstPartyRequestCount: pendingSummary.count,
+      pendingFirstPartyRequests: pendingSummary.requests,
+      outcome: retry ? 'retry' : failure || safetyFailure ? 'fail' : 'pass',
+    };
+    attemptDiagnostics.push(diagnostic);
+    log(JSON.stringify({ status: 'PRODUCTION_BROWSER_SMOKE_PAGE_ATTEMPT', ...diagnostic }));
+    if (safetyFailure) throw safetyFailure;
+    if (!failure) return result;
+    if (retry) {
+      await new Promise((resolve) => setTimeout(resolve, READ_ONLY_RETRY_DELAY_MS));
+      assertNoUnexpectedWrites(mutationGate);
+      continue;
+    }
+    if (timeout) {
+      const prefix = timeout.stage === 'login_input_readiness'
+        ? '/login input readiness timed out: '
+        : `${diagnosticPathname} ${timeout.stage} timed out: `;
+      // Do not retain Playwright's raw URL/query-bearing timeout message.
+      throw new errors.TimeoutError(prefix + JSON.stringify(diagnostic));
+    }
+    throw failure;
+  }
+}
+
+async function waitForLoginInput(page, timeoutMs) {
+  await waitForReadOnlyReadiness(page.locator('[data-testid="login-modal"] input:visible').first(), {
+    state: 'visible', timeout: timeoutMs,
+  }, 'login_input_readiness');
 }
 
 export async function runProductionBrowserSmoke(
@@ -272,27 +400,31 @@ export async function runProductionBrowserSmoke(
     loginReadinessTimeoutMs = LOGIN_READINESS_TIMEOUT_MS,
     reviewedExternalTelemetry = REVIEWED_EXTERNAL_TELEMETRY,
     reviewedExternalScriptStubs = REVIEWED_EXTERNAL_SCRIPT_STUBS,
+    log = console.log,
   } = {}
 ) {
   assert(Number.isFinite(loginReadinessTimeoutMs) && loginReadinessTimeoutMs > 0);
   const browser = await chromium.launch({ headless: true, ...createBrowserLaunchOptions() });
   const context = await browser.newContext({ serviceWorkers: 'block' });
+  const mutationGate = await installProductionMutationGate(context, origin, { reviewedExternalTelemetry, reviewedExternalScriptStubs });
   const {
     blockedExpectedWrites,
     blockedUnexpectedWrites,
     blockedExpectedExternalWrites,
     blockedUnexpectedExternalWrites,
     stubbedExternalScripts,
-  } = await installProductionMutationGate(context, origin, { reviewedExternalTelemetry, reviewedExternalScriptStubs });
+  } = mutationGate;
+  const pageAttempts = [];
+  const visitOptions = { mutationGate, attemptDiagnostics: pageAttempts, log };
   let result;
   let smokeError;
 
   try {
-    const home = await visitReadOnlyPage(context, origin, '/', async (page) => {
+    const home = await visitReadOnlyPage(context, origin, '/', async (page, _pending, waitForReadiness) => {
       const bodyText = await page.locator('body').innerText();
       assert(bodyText.trim().length > 0, 'Production homepage rendered an empty body.');
       assert((await page.title()).trim().length > 0, 'Production homepage has no document title.');
-      await page.locator('a[href^="/experiences/"]').first().waitFor({
+      await waitForReadiness(page.locator('a[href^="/experiences/"]').first(), {
         state: 'attached', timeout: READINESS_TIMEOUT_MS,
       });
       const hrefs = await page.locator('a[href^="/experiences/"]').evaluateAll((links) =>
@@ -300,19 +432,19 @@ export async function runProductionBrowserSmoke(
       );
       assert(hrefs.length > 0, 'Production homepage exposed no public experience link.');
       return { experiencePath: hrefs[0] };
-    });
+    }, visitOptions);
 
-    await visitReadOnlyPage(context, origin, home.experiencePath, async (page) => {
-      await page.locator('h1:visible').first().waitFor({
+    await visitReadOnlyPage(context, origin, home.experiencePath, async (page, _pending, waitForReadiness) => {
+      await waitForReadiness(page.locator('h1:visible').first(), {
         state: 'visible', timeout: READINESS_TIMEOUT_MS,
       });
       return null;
-    });
+    }, visitOptions);
 
-    await visitReadOnlyPage(context, origin, '/login', async (page, pendingFirstPartyRequestSummary) => {
-      await waitForLoginInput(page, loginReadinessTimeoutMs, pendingFirstPartyRequestSummary);
+    await visitReadOnlyPage(context, origin, '/login', async (page) => {
+      await waitForLoginInput(page, loginReadinessTimeoutMs);
       return null;
-    });
+    }, visitOptions);
 
     const apiPage = await context.newPage();
     let unauthenticatedStatus;
@@ -334,6 +466,7 @@ export async function runProductionBrowserSmoke(
       publicExperience: home.experiencePath,
       login: 'rendered',
       unauthenticatedProxyBookings: unauthenticatedStatus,
+      pageAttempts,
       blockedExpectedWrites,
       blockedUnexpectedWrites,
       blockedExpectedExternalWrites,
