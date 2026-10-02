@@ -144,7 +144,20 @@ const expectedLedger = [
     repositoryFile: 'supabase/migrations/20260930022348_move_is_admin_reader_to_private_schema.sql',
   },
 ];
-const expectedPendingMigrations = [];
+const expectedPendingMigrations = [
+  {
+    version: '20261001170718',
+    name: 'admin_message_monitoring_phase_1',
+    repositoryFile: 'supabase/migrations/20261001170718_admin_message_monitoring_phase_1.sql',
+    repositorySha256: 'aee6d14e1a897579e5dc6454221cb52d4bab822952096425e0b110eeb907ae95',
+  },
+  {
+    version: '20261002015110',
+    name: 'admin_message_monitoring_historical_reinquiry',
+    repositoryFile: 'supabase/migrations/20261002015110_admin_message_monitoring_historical_reinquiry.sql',
+    repositorySha256: '80f34eea7ad6e2405aa38962a886c97e8713bfa1fefe72f0d9647686489747a1',
+  },
+];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));
 for (const [index, expected] of expectedLedger.entries()) {
   const actual = manifest.migrationLedger[index];
@@ -169,6 +182,13 @@ assert(
   JSON.stringify(required.pendingProductionMigrations) === JSON.stringify(expectedPendingMigrations),
   'pending Production migration contract differs'
 );
+
+// Pending files must be reviewed byte-for-byte, without asserting they are
+// applied to Production or changing its immutable/current-state fingerprints.
+for (const entry of expectedPendingMigrations) {
+  assert(await sha256(entry.repositoryFile) === entry.repositorySha256,
+    `pending migration hash differs for ${entry.version}`);
+}
 
 const objects = manifest.objects;
 for (const [name, fingerprint] of Object.entries(expectedFingerprints)) {

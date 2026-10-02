@@ -17,9 +17,24 @@
     "supabase/migrations/20260923013312_ops_anomaly_monitor_snapshot.sql",
     "supabase/migrations/20260923084232_one_time_review_request_reminders.sql",
     "supabase/migrations/20260929144521_harden_public_host_applications_security_barrier.sql",
-    "supabase/migrations/20260930022348_move_is_admin_reader_to_private_schema.sql"
+    "supabase/migrations/20260930022348_move_is_admin_reader_to_private_schema.sql",
+    "supabase/migrations/20261001170718_admin_message_monitoring_phase_1.sql",
+    "supabase/migrations/20261002015110_admin_message_monitoring_historical_reinquiry.sql"
   ],
-  "pendingProductionMigrations": [],
+  "pendingProductionMigrations": [
+    {
+      "version": "20261001170718",
+      "name": "admin_message_monitoring_phase_1",
+      "repositoryFile": "supabase/migrations/20261001170718_admin_message_monitoring_phase_1.sql",
+      "repositorySha256": "aee6d14e1a897579e5dc6454221cb52d4bab822952096425e0b110eeb907ae95"
+    },
+    {
+      "version": "20261002015110",
+      "name": "admin_message_monitoring_historical_reinquiry",
+      "repositoryFile": "supabase/migrations/20261002015110_admin_message_monitoring_historical_reinquiry.sql",
+      "repositorySha256": "80f34eea7ad6e2405aa38962a886c97e8713bfa1fefe72f0d9647686489747a1"
+    }
+  ],
   "applicationTables": [
     "admin_audit_logs",
     "admin_job_runs",
