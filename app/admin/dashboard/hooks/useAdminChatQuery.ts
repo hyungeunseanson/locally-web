@@ -166,6 +166,11 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
   const fetchInquiriesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inquiryRequestVersionRef = useRef(0);
   const messageRequestVersionRef = useRef(0);
+  const messageFlightRef = useRef<{
+    targetId: string;
+    refreshRequested: boolean;
+    promise: Promise<boolean>;
+  } | null>(null);
   const localMessagesRef = useRef(new Map<string, Map<string, { message: MonitorMessage; version: number }>>());
   const observedOwnRowsRef = useRef(new Map<string, MonitorMessage>());
   const acknowledgedSnapshotsRef = useRef(new Set<string>());
@@ -277,7 +282,7 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
     }
   }, [commitInquiries, getAuthenticatedUser, view, conversationOnly, enabled]);
 
-  const loadMessages = useCallback(async (
+  const fetchMessages = useCallback(async (
     inquiryId: number | string,
     options: { select?: boolean } = {}
   ) => {
@@ -330,6 +335,7 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
       const nextMessages = [...merged.values()].sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')));
       messagesRef.current = nextMessages;
       setMessages(nextMessages);
+      setMessageError(undefined);
 
       const inquiryDetail = typeof result.inquiry === 'object' && result.inquiry !== null
           ? result.inquiry as Partial<MonitorInquiry>
@@ -387,7 +393,6 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
       return false;
     } finally {
       if (
-        shouldSelect &&
         requestVersion === messageRequestVersionRef.current &&
         String(selectedInquiryRef.current?.id ?? '') === targetId
       ) {
@@ -395,6 +400,48 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
       }
     }
   }, [patchInquiry, showToast, conversationOnly]);
+
+  const loadMessages = useCallback((
+    inquiryId: number | string,
+    options: { select?: boolean } = {}
+  ): Promise<boolean> => {
+    const targetId = String(inquiryId);
+    const pending = messageFlightRef.current;
+    if (pending?.targetId === targetId && String(selectedInquiryRef.current?.id ?? '') === targetId) {
+      // Share the initial load. A background invalidation may have happened after
+      // its snapshot, so coalesce the burst into one serialized trailing refresh.
+      pending.refreshRequested ||= !options.select;
+      return pending.promise;
+    }
+    if (!options.select && String(selectedInquiryRef.current?.id ?? '') !== targetId) {
+      return Promise.resolve(false);
+    }
+
+    const flight = { targetId, refreshRequested: false, promise: Promise.resolve(false) };
+    messageFlightRef.current = flight;
+    flight.promise = (async () => {
+      try {
+        let loaded = await fetchMessages(inquiryId, options);
+        // Each completed GET settles its own UI lifecycle before revalidation.
+        // Changing A -> B -> A creates a new owner, even when the ID matches.
+        while (flight.refreshRequested && messageFlightRef.current === flight) {
+          flight.refreshRequested = false;
+          loaded = await fetchMessages(inquiryId);
+        }
+        return loaded;
+      } finally {
+        if (messageFlightRef.current === flight) messageFlightRef.current = null;
+      }
+    })();
+    return flight.promise;
+  }, [fetchMessages]);
+
+  // Subscription/auth effect restarts do not own the selected thread's GET.
+  // Only unmount, deselection or a newer request invalidates its response.
+  useEffect(() => () => {
+    messageRequestVersionRef.current++;
+    messageFlightRef.current = null;
+  }, []);
 
   const selectInquiry = useCallback((inquiryId: number | string) => {
     return loadMessages(inquiryId, { select: true });
@@ -487,6 +534,7 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
 
   const clearSelected = useCallback(() => {
     messageRequestVersionRef.current += 1;
+    messageFlightRef.current = null;
     selectedInquiryRef.current = null;
     messagesRef.current = [];
     setSelectedInquiry(null);
@@ -515,15 +563,18 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
     let timer: ReturnType<typeof setTimeout> | null = null;
     const catchUp = async () => {
       if (stopped || document.visibilityState === 'hidden') return;
+      const selectedId = selectedInquiryRef.current?.id;
+      // Queue detail invalidations immediately; loadMessages serializes them.
+      // The list loop below must not enqueue the same detail refresh again.
+      const messages = selectedId != null ? loadMessages(selectedId) : Promise.resolve();
       if (running) { requested = true; return; }
       running = true;
       try {
         do {
           requested = false;
-          const selectedId = selectedInquiryRef.current?.id;
           await Promise.allSettled([
             fetchInquiries(false),
-            selectedId != null ? loadMessages(selectedId) : Promise.resolve(),
+            messages,
           ]);
         } while (requested && !stopped && !document.hidden);
       } finally { running = false; }
@@ -552,7 +603,6 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
       if (timer) clearTimeout(timer);
       window.removeEventListener('online', online);
       document.removeEventListener('visibilitychange', visible);
-      messageRequestVersionRef.current++;
     };
   }, [enabled, currentUser, fetchInquiries, loadMessages]);
 
