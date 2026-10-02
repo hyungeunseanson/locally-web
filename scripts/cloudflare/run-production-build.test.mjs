@@ -6,12 +6,29 @@ import test from 'node:test';
 
 import {
   assertProductionSupabasePublicBuildEnvironment,
+  assertProductionSupabasePrivilegedEnvironment,
   buildProductionEnvironment,
   readProductionMediaBaseUrl,
   readProductionHostProfileMediaBaseUrl,
   readProductionMediaReaderPolicy,
   verifyProductionClientBundle,
+  verifyProductionClientBundleDoesNotExposePrivilegedKey,
 } from './run-production-build.mjs';
+import { LEGACY_SERVICE_KEY, LEGACY_ANON_KEY, MODERN_SECRET_KEY, MODERN_PUBLISHABLE_KEY, USER_ACCESS_TOKEN } from '../../tests/fixtures/supabaseApiKeys.mjs';
+
+test('runtime privileged binding supports legacy and modern secret without exposing rejected values', () => {
+  assert.doesNotThrow(() => assertProductionSupabasePrivilegedEnvironment({}));
+  for (const key of [LEGACY_SERVICE_KEY, MODERN_SECRET_KEY]) {
+    const environment = { SUPABASE_SERVICE_ROLE_KEY: key };
+    assert.doesNotThrow(() => assertProductionSupabasePrivilegedEnvironment(environment));
+    assert.equal(buildProductionEnvironment(environment, 'https://media-canary.locally-travel.com').SUPABASE_SERVICE_ROLE_KEY, key);
+  }
+  for (const key of ['', ' ', undefined, LEGACY_ANON_KEY, MODERN_PUBLISHABLE_KEY, USER_ACCESS_TOKEN]) {
+    assert.throws(() => buildProductionEnvironment({ SUPABASE_SERVICE_ROLE_KEY: key }, 'https://media-canary.locally-travel.com'),
+      (error) => error.message === 'supabase_privileged_api_key_invalid'
+        && (!key || !error.message.includes(key)));
+  }
+});
 
 const EXPECTED_URL = 'https://media-canary.locally-travel.com';
 const EXPECTED_PROFILE_URL = 'https://profiles-media.locally-travel.com';
@@ -114,6 +131,23 @@ test('fails closed unless the exact URL is present in a generated client bundle'
     await assert.rejects(() => verifyProductionClientBundle([EXPECTED_URL, EXPECTED_PROFILE_URL], directory), /not compiled/);
     await writeFile(path.join(directory, 'chunks', 'profile.js'), `globalThis.__profile=${JSON.stringify(EXPECTED_PROFILE_URL)};`);
     await verifyProductionClientBundle([EXPECTED_URL, EXPECTED_PROFILE_URL], directory);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('client bundle rejects either privileged credential without printing it', async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'locally-private-key-bundle-'));
+  try {
+    for (const key of [LEGACY_SERVICE_KEY, MODERN_SECRET_KEY]) {
+      await writeFile(path.join(directory, 'client.js'), 'globalThis.fixture=' + JSON.stringify(key));
+      await assert.rejects(() => verifyProductionClientBundleDoesNotExposePrivilegedKey(key, directory),
+        (error) => !error.message.includes(key) && error.message.includes('privileged Supabase credential'));
+      await assert.rejects(() => verifyProductionClientBundleDoesNotExposePrivilegedKey('  ' + key + '  ', directory),
+        (error) => !error.message.includes(key) && error.message.includes('privileged Supabase credential'));
+    }
+    await writeFile(path.join(directory, 'client.js'), 'globalThis.fixture=' + JSON.stringify(MODERN_PUBLISHABLE_KEY));
+    await verifyProductionClientBundleDoesNotExposePrivilegedKey(MODERN_SECRET_KEY, directory);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

@@ -4,6 +4,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
+import { createSupabaseApiKeyHeaders } from '../../app/utils/supabase/apiKeys.mjs';
 
 import { normalizePublicExperienceSourceUrl } from '../../app/utils/publicExperienceMediaSourceContract.mjs';
 
@@ -134,7 +135,7 @@ async function fetchPublicExperiences() {
     select: 'id,photos,image_url,itinerary,status,is_active', status: 'eq.active', is_active: 'eq.true', order: 'id.asc',
   });
   const response = await fetch(`${baseUrl}/rest/v1/experiences?${query}`, {
-    headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` },
+    headers: createSupabaseApiKeyHeaders(anonKey),
   });
   if (!response.ok) throw new Error(`Public experience inventory failed: HTTP ${response.status}`);
   const rows = await response.json();

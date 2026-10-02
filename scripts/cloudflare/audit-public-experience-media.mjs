@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { createSupabaseApiKeyHeaders, fetchSupabase, readSupabaseJson } from '../../app/utils/supabase/apiKeys.mjs';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
@@ -309,7 +310,7 @@ export function buildStorageListRequest(baseUrl, anonKey, prefix, offset) {
     url: `${baseUrl}/storage/v1/object/list/${EXPERIENCE_BUCKET}`,
     init: {
       method: 'POST',
-      headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}`, 'content-type': 'application/json' },
+      headers: createSupabaseApiKeyHeaders(anonKey, { headers: { 'content-type': 'application/json' } }),
       body: JSON.stringify({ prefix, limit: STORAGE_PAGE_SIZE, offset, sortBy: { column: 'name', order: 'asc' } }),
     },
     operation: 'storage-list-read',
@@ -318,9 +319,9 @@ export function buildStorageListRequest(baseUrl, anonKey, prefix, offset) {
 }
 
 async function fetchJson(url, init, description) {
-  const response = await fetch(url, init);
+  const response = await fetchSupabase(url, init);
   if (!response.ok) throw new Error(`${description} failed: HTTP ${response.status}`);
-  return response.json();
+  return readSupabaseJson(response);
 }
 
 export async function fetchAllExperienceRows(baseUrl, anonKey) {
@@ -330,7 +331,7 @@ export async function fetchAllExperienceRows(baseUrl, anonKey) {
     const query = new URLSearchParams({ select: 'id,photos,image_url,itinerary,itinerary_i18n,status,is_active', order: 'id.asc' });
     const page = await fetchJson(`${baseUrl}/rest/v1/experiences?${query}`, {
       method: 'GET',
-      headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}`, Range: `${offset}-${offset + pageSize - 1}` },
+      headers: createSupabaseApiKeyHeaders(anonKey, { headers: { Range: `${offset}-${offset + pageSize - 1}` } }),
     }, 'Experience SELECT');
     if (!Array.isArray(page)) throw new Error('Experience SELECT returned a non-array response.');
     rows.push(...page);
@@ -369,9 +370,9 @@ async function auditSourceDownloads(baseUrl, anonKey, sourceKeys, storageObjects
   const metadata = new Map(storageObjects.map((item) => [item.key, item]));
   const download = async (key) => {
     const encodedKey = key.split('/').map(encodeURIComponent).join('/');
-    const response = await fetch(`${baseUrl}/storage/v1/object/public/${EXPERIENCE_BUCKET}/${encodedKey}`, {
+    const response = await fetchSupabase(`${baseUrl}/storage/v1/object/public/${EXPERIENCE_BUCKET}/${encodedKey}`, {
       method: 'GET',
-      headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` },
+      headers: createSupabaseApiKeyHeaders(anonKey),
     });
     if (!response.ok) throw new Error(`Source object GET failed: HTTP ${response.status}; identity=${hashIdentity(key).slice(0, 16)}`);
     const bytes = Buffer.from(await response.arrayBuffer());

@@ -3,6 +3,7 @@ import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
+import { createSupabaseApiKeyHeaders } from '../../app/utils/supabase/apiKeys.mjs';
 
 import {
   buildManifestAudit,
@@ -92,7 +93,7 @@ function sourceUrlForKey(baseUrl, sourceKey) {
 async function downloadSource(baseUrl, anonKey, sourceKey) {
   const response = await fetch(sourceUrlForKey(baseUrl, sourceKey), {
     method: 'GET',
-    headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` },
+    headers: createSupabaseApiKeyHeaders(anonKey),
   });
   if (!response.ok) throw new Error(`Source GET failed: HTTP ${response.status}; identity=${hashIdentity(sourceKey).slice(0, 16)}`);
   const bytes = Buffer.from(await response.arrayBuffer());

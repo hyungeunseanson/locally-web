@@ -3,6 +3,7 @@ import { chmod, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
+import { createSupabaseApiKeyHeaders, fetchSupabase, readSupabaseJson } from '../../app/utils/supabase/apiKeys.mjs';
 
 import { listAllStorageObjects } from './audit-public-experience-media.mjs';
 import {
@@ -77,14 +78,14 @@ async function main() {
   const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, '');
   const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
   if (baseUrl !== PROJECT_URL || !serviceRole) throw new Error('Exact Production service-role configuration is required.');
-  const headers = { apikey: serviceRole, Authorization: `Bearer ${serviceRole}` };
-  const response = await fetch(`${baseUrl}/rest/v1/experiences?select=id,photos,image_url,itinerary,itinerary_i18n`, { headers, redirect: 'manual' });
+  const headers = createSupabaseApiKeyHeaders(serviceRole);
+  const response = await fetchSupabase(`${baseUrl}/rest/v1/experiences?select=id,photos,image_url,itinerary,itinerary_i18n`, { headers, redirect: 'manual' });
   if (!response.ok) throw new Error(`Live locator inventory failed: HTTP ${response.status}.`);
   const [sourceProof, historicalKeys, storageObjects, liveRows] = await Promise.all([
     readFile(input.proof, 'utf8').then(JSON.parse),
     readFile(input.historical, 'utf8').then(JSON.parse),
     listAllStorageObjects(baseUrl, serviceRole),
-    response.json(),
+    readSupabaseJson(response),
   ]);
   const plan = buildDeleteCandidatePlan({ sourceProof, historicalKeys, storageObjects, liveRows, experienceId: input.experienceId, createdAt: new Date().toISOString() });
   await writeFile(input.output, stableJson(plan), { mode: 0o600 }); await chmod(input.output, 0o600);

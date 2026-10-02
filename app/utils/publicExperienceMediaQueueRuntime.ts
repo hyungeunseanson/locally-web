@@ -1,3 +1,5 @@
+import { createSupabaseApiKeyHeaders } from './supabase/apiKeys.mjs';
+
 import {
   createCloudflareImagesPublicExperienceTransformer,
   createR2PublicExperienceMediaMirrorStore,
@@ -127,12 +129,12 @@ export function createPublicExperienceLatestRowLoader(
     try {
       response = await fetchImplementation(requestUrl, {
         method: 'GET',
-        headers: {
-          apikey: anonKey,
-          authorization: `Bearer ${anonKey}`,
-          accept: 'application/json',
-          'cache-control': 'no-store',
-        },
+        headers: createSupabaseApiKeyHeaders(anonKey, {
+          headers: {
+            accept: 'application/json',
+            'cache-control': 'no-store',
+          },
+        }),
         // Workers does not implement redirect="error". Manual mode keeps the
         // request fail-closed because every 3xx is rejected below.
         redirect: 'manual',

@@ -390,15 +390,24 @@ class TransferBudget:
         return dataclasses.asdict(self)
 
 
+def supabase_api_key_headers(api_key: str) -> Dict[str, str]:
+    """Mirror the JS transport contract; API-key format is not authorization."""
+    if not isinstance(api_key, str) or not api_key.strip() or any(char.isspace() for char in api_key.strip()):
+        raise ValidationError("invalid Supabase API credential")
+    key = api_key.strip()
+    headers = {"apikey": key, "content-type": "application/json"}
+    if not key.startswith(("sb_secret_", "sb_publishable_")):
+        headers["authorization"] = "Bearer " + key
+    return headers
+
+
 class SupabaseStorageSource:
     def __init__(self, project_url: str, service_role_key: str, timeout: float = 30.0):
         parsed = urllib.parse.urlparse(project_url)
         if parsed.scheme != "https" or parsed.hostname != "uhinvcydgzqlpnvieyal.supabase.co" or parsed.path not in {"", "/"}:
             raise ValidationError("unexpected Supabase origin")
-        if not service_role_key:
-            raise ValidationError("missing Supabase service credential")
         self.base = project_url.rstrip("/")
-        self.key = service_role_key
+        self.key = supabase_api_key_headers(service_role_key)["apikey"]
         self.timeout = timeout
 
     def _request(self, method: str, path: str, body: Optional[bytes] = None) -> urllib.response.addinfourl:
@@ -406,18 +415,14 @@ class SupabaseStorageSource:
             self.base + path,
             data=body,
             method=method,
-            headers={
-                "apikey": self.key,
-                "authorization": "Bearer " + self.key,
-                "content-type": "application/json",
-            },
+            headers=supabase_api_key_headers(self.key),
         )
         try:
             return urllib.request.urlopen(request, timeout=self.timeout)
         except urllib.error.HTTPError as exc:
             raise BackupError(f"Supabase Storage request failed with HTTP {exc.code}") from None
-        except (urllib.error.URLError, TimeoutError) as exc:
-            raise BackupError("Supabase Storage request transport failure") from exc
+        except (urllib.error.URLError, TimeoutError):
+            raise BackupError("Supabase Storage request transport failure") from None
 
     def _list_directory(self, bucket: str, prefix: str) -> Iterable[Dict[str, Any]]:
         offset = 0

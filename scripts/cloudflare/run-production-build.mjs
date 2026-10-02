@@ -4,6 +4,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
+import { validateSupabasePrivilegedKey } from '../../app/utils/supabase/apiKeys.mjs';
 
 const ROOT = process.cwd();
 const MANIFEST_PATH = path.join(ROOT, 'config/cloudflare/migration-manifest.json');
@@ -20,6 +21,14 @@ export function assertProductionSupabasePublicBuildEnvironment(currentEnvironmen
 
   if (requiredVariables.some((variable) => !currentEnvironment[variable]?.trim())) {
     throw new Error(PRODUCTION_SUPABASE_BUILD_ENV_ERROR);
+  }
+}
+
+// A build can omit the runtime-only binding. If supplied locally, reject public
+// credentials while supporting either legacy service_role or modern secret.
+export function assertProductionSupabasePrivilegedEnvironment(currentEnvironment) {
+  if (Object.hasOwn(currentEnvironment, 'SUPABASE_SERVICE_ROLE_KEY')) {
+    validateSupabasePrivilegedKey(currentEnvironment.SUPABASE_SERVICE_ROLE_KEY);
   }
 }
 
@@ -84,6 +93,7 @@ export function buildProductionEnvironment(currentEnvironment, mediaBaseUrl, rea
   defaultEnabled: 'false',
   defaultExperienceIds: '',
 }, hostProfileBaseUrl = 'https://profiles-media.locally-travel.com') {
+  assertProductionSupabasePrivilegedEnvironment(currentEnvironment);
   const configuredValue = currentEnvironment.NEXT_PUBLIC_CLOUDFLARE_IMAGE_CANARY_BASE_URL?.trim();
   if (configuredValue && configuredValue.replace(/\/$/, '') !== mediaBaseUrl) {
     throw new Error('Refusing a conflicting Production public experience media base URL.');
@@ -139,6 +149,19 @@ export function runOpenNextBuild(environment) {
   if (result.status !== 0) throw new Error(`Production OpenNext build failed with exit code ${result.status}.`);
 }
 
+export async function verifyProductionClientBundleDoesNotExposePrivilegedKey(
+  privilegedKey,
+  assetRoot = CLIENT_ASSET_ROOT
+) {
+  if (!privilegedKey) return; // Runtime-only encrypted bindings are not read here.
+  const normalizedKey = privilegedKey.trim();
+  const files = (await listFiles(assetRoot)).filter((file) => file.endsWith('.js'));
+  const sources = await Promise.all(files.map((file) => readFile(file, 'utf8')));
+  if (sources.some((source) => source.includes(normalizedKey))) {
+    throw new Error('Refusing Production build: privileged Supabase credential is present in client assets.');
+  }
+}
+
 export async function main() {
   assertProductionSupabasePublicBuildEnvironment(process.env);
   const mediaBaseUrl = await readProductionMediaBaseUrl();
@@ -151,6 +174,9 @@ export async function main() {
     environment.NEXT_PUBLIC_SUPABASE_URL.trim(),
     CLIENT_ASSET_ROOT,
     'Production Supabase public URL'
+  );
+  await verifyProductionClientBundleDoesNotExposePrivilegedKey(
+    environment.SUPABASE_SERVICE_ROLE_KEY
   );
   console.log(JSON.stringify({
     status: 'LOCALLY_CLOUDFLARE_PRODUCTION_BUILD_CONTRACT_PASS',

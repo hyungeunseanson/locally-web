@@ -19,6 +19,7 @@ import { readOpsAnomalyMonitorReleasePolicy, resolveOpsAnomalyMonitorReleaseProf
 import { readExperienceMediaSourceReleasePolicy, resolveExperienceMediaSourceReleaseProfile } from './experience-media-source-release-profile.mjs';
 import { runProductionBrowserSmoke } from './run-production-browser-smoke.mjs';
 import { runProductionDeploySemanticPreflight } from './verify-production-deploy-contract.mjs';
+import { assertProductionSupabasePrivilegedEnvironment } from './run-production-build.mjs';
 
 const ROOT = process.cwd();
 
@@ -186,6 +187,8 @@ function run(command, argumentsList, options = {}) {
 }
 
 export async function main(argumentsList = process.argv.slice(2), dependencies = {}) {
+  const environment = dependencies.environment ?? process.env;
+  assertProductionSupabasePrivilegedEnvironment(environment);
   const runCommand = dependencies.runCommand ?? run;
   const runBrowserSmoke = dependencies.runBrowserSmoke ?? runProductionBrowserSmoke;
   const runSemanticPreflight = dependencies.runSemanticPreflight ?? runProductionDeploySemanticPreflight;
@@ -221,7 +224,7 @@ export async function main(argumentsList = process.argv.slice(2), dependencies =
   );
 
   runCommand(npmCommand, ['run', 'cloudflare:build:production'], {
-    env: { ...process.env, ...contract.readerEnvironment },
+    env: { ...environment, ...contract.readerEnvironment },
   });
   if (!options.dryRun) {
     await runSemanticPreflight({

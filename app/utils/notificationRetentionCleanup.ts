@@ -1,3 +1,5 @@
+import { createSupabaseApiKeyHeaders } from './supabase/apiKeys.mjs';
+
 export const NOTIFICATION_RETENTION_CLEANUP_CRON = '31 19 * * *';
 export const NOTIFICATION_RETENTION_DAYS = 30;
 export const NOTIFICATION_RETENTION_BATCH_SIZE = 1000;
@@ -161,12 +163,12 @@ export function createCloudflareNotificationRetentionRepository(
         response = await fetchImplementation(endpoint, {
           method: 'POST',
           redirect: 'manual',
-          headers: {
-            apikey: serviceRoleKey,
-            authorization: `Bearer ${serviceRoleKey}`,
-            accept: 'application/json',
-            'content-type': 'application/json',
-          },
+          headers: createSupabaseApiKeyHeaders(serviceRoleKey, {
+            headers: {
+              accept: 'application/json',
+              'content-type': 'application/json',
+            },
+          }),
           body: JSON.stringify({ p_cutoff: cutoff, p_batch_size: batchSize }),
         });
       } catch {
