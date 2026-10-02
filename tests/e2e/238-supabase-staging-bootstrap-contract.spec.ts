@@ -14,6 +14,7 @@ const currentManifest = JSON.parse(
 const baselineContract = readFileSync('supabase/staging/baseline-contract.sql', 'utf8');
 const currentContract = readFileSync('supabase/staging/current-state-contract.sql', 'utf8');
 const adminReaderTargetContract = readFileSync('supabase/staging/admin-reader-private-contract.sql', 'utf8');
+const attentionTargetContract = readFileSync('supabase/staging/admin-attention-target-contract.sql', 'utf8');
 const schemaContract = readFileSync('supabase/staging/schema-contract.sql', 'utf8');
 const inventory = readFileSync('supabase/staging/schema-only-inventory.sql', 'utf8');
 const currentStateOverlay = readFileSync(
@@ -52,6 +53,7 @@ test.describe('Supabase staging bootstrap contract', () => {
       '20260930022348',
       '20261002024534',
       '20261002024638',
+      '20261002075149',
     ]);
     expect(manifest.freshProjectApplyOrder).toEqual([
       'supabase/migrations/20260912034545_production_schema_baseline.sql',
@@ -72,15 +74,13 @@ test.describe('Supabase staging bootstrap contract', () => {
       'supabase/migrations/20261002015110_admin_message_monitoring_historical_reinquiry.sql',
       'supabase/migrations/20261002041848_admin_attention_badges_phase_2.sql',
     ]);
-    expect(manifest.pendingPrivateTables).toEqual(['private.admin_monitor_cutover']);
-    expect(manifest.pendingApplicationFunctions).toEqual(['ack_admin_inquiry_snapshot','get_admin_attention']);
-    expect(manifest.pendingProductionMigrations).toEqual([{
-      version: '20261002041848',
-      name: 'admin_attention_badges_phase_2',
-      repositoryFile: 'supabase/migrations/20261002041848_admin_attention_badges_phase_2.sql',
-      repositorySha256: 'd20d5774318f8fe52dc41d13a533728b13c98a20fab812cd693737dba0de51a2',
-      status: 'prepared-not-applied',
-    }]);
+    expect(manifest.pendingPrivateTables).toBeUndefined();
+    expect(manifest.pendingApplicationFunctions).toBeUndefined();
+    expect(manifest.applicationPrivateTables).toEqual(['private.admin_monitor_cutover']);
+    expect(manifest.applicationFunctions).toEqual(expect.arrayContaining([
+      'ack_admin_inquiry_snapshot', 'get_admin_attention',
+    ]));
+    expect(manifest.pendingProductionMigrations).toEqual([]);
     expect(packageJson.scripts['supabase:staging:baseline:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:current:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:contract']).toBeTruthy();
@@ -137,7 +137,9 @@ test.describe('Supabase staging bootstrap contract', () => {
       "'realtime_tables'",
       "'replica_identity'",
       "'storage_buckets'",
-      "schemaname IN ('public', 'storage')",
+      "schemaname IN ('public', 'private', 'storage')",
+      "'body_md5', md5(proc_def.prosrc)",
+      "'acl', proc_def.proacl::text",
       "'extensions'",
       "'custom_types'",
     ]) {
@@ -165,7 +167,7 @@ test.describe('Supabase staging bootstrap contract', () => {
   });
 
   test('preserves actual applied ledger versions and unchanged repository SQL bytes', () => {
-    expect(currentManifest.migrationLedger.slice(-2)).toEqual([
+    expect(currentManifest.migrationLedger.slice(-3)).toEqual([
       {
         version: '20261002024534', name: 'admin_message_monitoring_phase_1',
         repositoryVersion: '20261001170718',
@@ -180,9 +182,16 @@ test.describe('Supabase staging bootstrap contract', () => {
         repositorySha256: '80f34eea7ad6e2405aa38962a886c97e8713bfa1fefe72f0d9647686489747a1',
         ledgerStatementsSha256: '80f34eea7ad6e2405aa38962a886c97e8713bfa1fefe72f0d9647686489747a1',
       },
+      {
+        version: '20261002075149', name: 'admin_attention_badges_phase_2',
+        repositoryVersion: '20261002041848',
+        repositoryFile: 'supabase/migrations/20261002041848_admin_attention_badges_phase_2.sql',
+        repositorySha256: 'd20d5774318f8fe52dc41d13a533728b13c98a20fab812cd693737dba0de51a2',
+        ledgerStatementsSha256: 'd20d5774318f8fe52dc41d13a533728b13c98a20fab812cd693737dba0de51a2',
+      },
     ]);
-    expect(currentManifest.schemaContractVersion).toBe(4);
-    expect(manifest.schemaContractVersion).toBe(4);
+    expect(currentManifest.schemaContractVersion).toBe(5);
+    expect(manifest.schemaContractVersion).toBe(5);
   });
 
   test('rejects chat schema, grants, function and applied-ledger drift in local PostgreSQL', () => {
@@ -191,8 +200,48 @@ test.describe('Supabase staging bootstrap contract', () => {
     });
     expect(result.status, `${result.stdout}${result.stderr}`).toBe(0);
     expect(result.stdout).toContain('CURRENT_STATE_CATALOG_DRIFT_TEST_PASS');
-    expect(result.stdout).toContain('"driftChecks":17');
+    expect(result.stdout).toContain('"driftChecks":30');
     expect(result.stdout).toContain('"productionMutation":0');
+  });
+
+  test('checks applied attention security while separating Production and fresh staging cutover markers', () => {
+    const attention = currentManifest.adminAttention;
+    expect(attention.directExecuteRoles).toEqual(['service_role']);
+    expect(attention.searchPath).toBe('');
+    expect(attention.functions).toHaveLength(4);
+    expect(attention.cutover.rlsEnabled).toBe(true);
+    expect(attention.cutover.rlsForced).toBe(false);
+    expect(attention.cutover.policies).toBe(0);
+    expect(attention.cutover.clientAccessRoles).toEqual([]);
+    expect(attention.cutover.serverSelectRoles).toEqual(['service_role']);
+    expect(attention.cutover.productionMarker).toEqual({
+      singleton: true, conversations: 40, messages: 410,
+      applied_at: '2026-10-02T07:51:49.802096+00:00',
+    });
+    const assertions = attentionTargetContract.match(
+      /DO \$admin_attention_contract\$[\s\S]*?\$admin_attention_contract\$;/
+    )?.[0];
+    expect(assertions).toBeTruthy();
+    for (const contract of [currentContract, schemaContract, attentionTargetContract]) {
+      expect(contract).toContain('BEGIN READ ONLY;');
+      expect(contract).toContain('ROLLBACK;');
+      expect(contract).toContain(assertions!);
+    }
+    expect(currentContract).toContain('$admin_attention_production_marker$');
+    expect(schemaContract).not.toContain('$admin_attention_production_marker$');
+    expect(attentionTargetContract).not.toContain('$admin_attention_production_marker$');
+    expect(currentManifest.adminMessageMonitoring.indexes.map(({ name }: { name: string }) => name))
+      .toContain('inquiry_messages_admin_unseen_idx');
+    for (const identity of attention.functions) {
+      const definition = currentManifest.adminMessageMonitoring.functions.find(
+        (entry: { identity: string }) => entry.identity === identity
+      );
+      expect(definition.securityDefiner).toBe(true);
+      expect(definition.acl).toBe('{postgres=X/postgres,service_role=X/postgres}');
+      expect(definition.configuration).toEqual(['search_path=""']);
+      expect(currentContract).toContain(definition.bodyMd5);
+      expect(schemaContract).toContain(definition.bodyMd5);
+    }
   });
 
   test('captures applied payment claim objects and service-only security without widening the canary', () => {
@@ -263,7 +312,7 @@ test.describe('Supabase staging bootstrap contract', () => {
     expect(currentManifest.objects.publicViews).toHaveLength(2);
     expect(currentManifest.objects.publicTableColumns).toBe(517);
     expect(currentManifest.objects.publicViewColumns).toBe(27);
-    expect(currentManifest.objects.functionOverloads).toHaveLength(58);
+    expect(currentManifest.objects.functionOverloads).toHaveLength(60);
     expect(currentManifest.objects.privateFunctionOverloads).toEqual([
       'private.advance_support_version()',
       'private.is_admin_reader()',
@@ -271,7 +320,11 @@ test.describe('Supabase staging bootstrap contract', () => {
       'private.prepare_support_message()'
     ]);
     expect(currentManifest.objects.applicationTriggers).toHaveLength(14);
-    expect(currentManifest.objects.indexes).toBe(119);
+    expect(currentManifest.objects.indexes).toBe(120);
+    expect(currentManifest.objects.privateTables).toEqual(['admin_monitor_cutover']);
+    expect(currentManifest.objects.privateTableColumns).toBe(4);
+    expect(currentManifest.objects.privateIndexes).toBe(1);
+    expect(currentManifest.objects.privateConstraints).toBe(4);
     expect(currentManifest.objects.constraints).toEqual({
       total: 180,
       primaryKey: 39,
@@ -292,6 +345,7 @@ test.describe('Supabase staging bootstrap contract', () => {
       storagePolicies: '898e8b7f917fd0f4530ef30c9b61961e',
       publicRlsPolicies: 'e5a16a4215c569060fbf895453a5cd00',
       publicRelationGrants: 'a9c644ba2ab5c795f29aff57092aa002',
+      privateRelationGrants: 'c0c83ee9ce880c47d3d24f3f918b4364',
       stagingOverlayBaselineStoragePolicies: 'd6b381fd629405acfdd615593031de5c',
     });
     for (const fingerprint of [
@@ -299,6 +353,7 @@ test.describe('Supabase staging bootstrap contract', () => {
       currentManifest.securityFingerprints.storagePolicies,
       currentManifest.securityFingerprints.publicRlsPolicies,
       currentManifest.securityFingerprints.publicRelationGrants,
+      currentManifest.securityFingerprints.privateRelationGrants,
     ]) {
       expect(currentContract).toContain(fingerprint);
     }

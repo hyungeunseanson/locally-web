@@ -1,12 +1,15 @@
 {
-  "schemaContractVersion": 4,
+  "schemaContractVersion": 5,
   "capturedAt": "2026-10-02",
   "productionProjectRef": "uhinvcydgzqlpnvieyal",
   "source": {
     "kind": "read-only Production PostgreSQL catalog inventory",
     "postgresMajor": 17,
     "containsRows": false,
-    "containsStorageObjects": false
+    "containsStorageObjects": false,
+    "operationalControlMetadata": [
+      "private.admin_monitor_cutover singleton marker"
+    ]
   },
   "securityFingerprints": {
     "canonicalization": "MD5 of pipe-delimited fields, newline-delimited rows in the contract's explicit deterministic order; NULL is an empty string and policy roles are comma-delimited",
@@ -14,7 +17,8 @@
     "storagePolicies": "898e8b7f917fd0f4530ef30c9b61961e",
     "publicRlsPolicies": "e5a16a4215c569060fbf895453a5cd00",
     "publicRelationGrants": "a9c644ba2ab5c795f29aff57092aa002",
-    "stagingOverlayBaselineStoragePolicies": "d6b381fd629405acfdd615593031de5c"
+    "stagingOverlayBaselineStoragePolicies": "d6b381fd629405acfdd615593031de5c",
+    "privateRelationGrants": "c0c83ee9ce880c47d3d24f3f918b4364"
   },
   "migrationLedger": [
     {
@@ -116,6 +120,14 @@
       "repositoryFile": "supabase/migrations/20261002015110_admin_message_monitoring_historical_reinquiry.sql",
       "repositorySha256": "80f34eea7ad6e2405aa38962a886c97e8713bfa1fefe72f0d9647686489747a1",
       "ledgerStatementsSha256": "80f34eea7ad6e2405aa38962a886c97e8713bfa1fefe72f0d9647686489747a1"
+    },
+    {
+      "version": "20261002075149",
+      "name": "admin_attention_badges_phase_2",
+      "repositoryVersion": "20261002041848",
+      "repositoryFile": "supabase/migrations/20261002041848_admin_attention_badges_phase_2.sql",
+      "repositorySha256": "d20d5774318f8fe52dc41d13a533728b13c98a20fab812cd693737dba0de51a2",
+      "ledgerStatementsSha256": "d20d5774318f8fe52dc41d13a533728b13c98a20fab812cd693737dba0de51a2"
     }
   ],
   "operationalStateDeltas": [
@@ -176,6 +188,7 @@
     "publicViewColumns": 27,
     "functionOverloads": [
       "public.ack_admin_inquiry_messages(p_inquiry_id bigint, p_through_message_id bigint)",
+      "public.ack_admin_inquiry_snapshot(p_inquiry_id bigint, p_message_ids bigint[])",
       "public.apply_experience_media_locator_cas(p_experience_id bigint, p_before_photos text[], p_before_image_url text, p_before_itinerary jsonb, p_before_itinerary_i18n jsonb, p_after_photos text[], p_after_image_url text, p_after_itinerary jsonb, p_after_itinerary_i18n jsonb)",
       "public.assign_service_concierge_host_atomic(p_admin_id uuid, p_request_id uuid, p_host_id uuid, p_host_hourly_rate integer, p_host_agreement_confirmed boolean)",
       "public.attach_experience_payment_provider_reference_atomic(p_booking_id text, p_user_id uuid, p_provider_reference text, p_claim_token uuid)",
@@ -206,6 +219,7 @@
       "public.ensure_profile_demographics_reminder(p_user_id uuid, p_title text, p_message text, p_link text)",
       "public.finalize_proxy_card_intake_atomic(p_proxy_request_id uuid, p_verified_amount integer, p_verified_tid text, p_initial_message text)",
       "public.finish_service_refund_operation_atomic(p_operation_id uuid, p_outcome text, p_provider_reference text, p_error_message text)",
+      "public.get_admin_attention(p_inquiry_ids bigint[])",
       "public.get_admin_inquiry_activity(p_inquiry_ids bigint[])",
       "public.get_experience_completion_due_backlog()",
       "public.get_ops_anomaly_snapshot(p_observed_at timestamp with time zone, p_claim_overdue_minutes integer, p_refund_stale_minutes integer, p_payout_long_hold_days integer, p_experience_job_missing_minutes integer, p_service_job_missing_minutes integer, p_cancel_pending_job_missing_minutes integer)",
@@ -256,7 +270,7 @@
       "public.service_bookings.trg_sb_updated_at",
       "public.service_requests.trg_sr_updated_at"
     ],
-    "indexes": 119,
+    "indexes": 120,
     "constraints": {
       "total": 180,
       "primaryKey": 39,
@@ -325,12 +339,12 @@
       ]
     },
     "storageBuckets": [
-      { "name": "admin_files", "public": false, "fileSizeLimit": 10485760 },
-      { "name": "avatars", "public": true, "fileSizeLimit": null },
-      { "name": "chat-images", "public": false, "fileSizeLimit": null },
-      { "name": "experiences", "public": false, "fileSizeLimit": null },
-      { "name": "images", "public": true, "fileSizeLimit": null },
-      { "name": "verification-docs", "public": false, "fileSizeLimit": null }
+      {"name": "admin_files", "public": false, "fileSizeLimit": 10485760},
+      {"name": "avatars", "public": true, "fileSizeLimit": null},
+      {"name": "chat-images", "public": false, "fileSizeLimit": null},
+      {"name": "experiences", "public": false, "fileSizeLimit": null},
+      {"name": "images", "public": true, "fileSizeLimit": null},
+      {"name": "verification-docs", "public": false, "fileSizeLimit": null}
     ],
     "storageObjectPolicies": [
       "Admins can delete files",
@@ -349,7 +363,20 @@
       "Verification docs owners can read",
       "Verification docs owners can update",
       "Verification docs owners can upload"
-    ]
+    ],
+    "privateTables": [
+      "admin_monitor_cutover"
+    ],
+    "privateTableColumns": 4,
+    "privateIndexes": 1,
+    "privateConstraints": 4,
+    "privateRls": {
+      "enabled": [
+        "admin_monitor_cutover"
+      ],
+      "forced": [],
+      "policies": 0
+    }
   },
   "activeConcierge": {
     "tables": [
@@ -392,9 +419,17 @@
     "note": "The table remains for historical admin read and cleanup compatibility."
   },
   "forbiddenCurrentObjects": {
-    "tables": ["community_comment_likes"],
-    "functions": ["increment_comment_like_count", "decrement_comment_like_count"],
-    "triggers": ["on_comment_like_added", "on_comment_like_removed"],
+    "tables": [
+      "community_comment_likes"
+    ],
+    "functions": [
+      "increment_comment_like_count",
+      "decrement_comment_like_count"
+    ],
+    "triggers": [
+      "on_comment_like_added",
+      "on_comment_like_removed"
+    ],
     "storagePolicies": [
       "Anyone can update their own avatar",
       "Anyone can upload an avatar",
@@ -503,6 +538,10 @@
       {
         "name": "inquiry_messages_admin_activity_idx",
         "definition": "CREATE INDEX inquiry_messages_admin_activity_idx ON public.inquiry_messages USING btree (inquiry_id, id DESC)"
+      },
+      {
+        "name": "inquiry_messages_admin_unseen_idx",
+        "definition": "CREATE INDEX inquiry_messages_admin_unseen_idx ON public.inquiry_messages USING btree (inquiry_id, id) WHERE ((admin_read_at IS NULL) AND (type IS DISTINCT FROM 'deleted'::text))"
       }
     ],
     "triggers": [
@@ -564,7 +603,31 @@
           "search_path=\"\""
         ],
         "acl": "{postgres=X/postgres,service_role=X/postgres}",
-        "bodyMd5": "475a832f9d6408b31673d5b26a955254"
+        "bodyMd5": "bff56ffe887a01755e9d667d7ed5b3e6"
+      },
+      {
+        "identity": "public.ack_admin_inquiry_snapshot(p_inquiry_id bigint, p_message_ids bigint[])",
+        "owner": "postgres",
+        "result": "TABLE(changed bigint, admin_unread_count bigint)",
+        "securityDefiner": true,
+        "volatility": "v",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "acl": "{postgres=X/postgres,service_role=X/postgres}",
+        "bodyMd5": "b1869462839cb831be4eb47e4478d47b"
+      },
+      {
+        "identity": "public.get_admin_attention(p_inquiry_ids bigint[])",
+        "owner": "postgres",
+        "result": "jsonb",
+        "securityDefiner": true,
+        "volatility": "s",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "acl": "{postgres=X/postgres,service_role=X/postgres}",
+        "bodyMd5": "064a8bf9c5db77fe2c2279736d2381cf"
       },
       {
         "identity": "public.get_admin_inquiry_activity(p_inquiry_ids bigint[])",
@@ -576,7 +639,7 @@
           "search_path=\"\""
         ],
         "acl": "{postgres=X/postgres,service_role=X/postgres}",
-        "bodyMd5": "632f807ffa404e2854db8f272b4db437"
+        "bodyMd5": "9dc6fbc65a6ae8e3208fb0842efe985e"
       }
     ],
     "directWriteRoles": [
@@ -592,5 +655,88 @@
       "Users can update own inquiries",
       "Users can update messages in their inquiries"
     ]
+  },
+  "adminAttention": {
+    "cutover": {
+      "schema": "private",
+      "table": "admin_monitor_cutover",
+      "owner": "postgres",
+      "rlsEnabled": true,
+      "rlsForced": false,
+      "policies": 0,
+      "acl": "{postgres=arwdDxtm/postgres,service_role=r/postgres}",
+      "columns": [
+        {
+          "name": "singleton",
+          "type": "boolean",
+          "default": "true",
+          "nullable": false
+        },
+        {
+          "name": "applied_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "messages",
+          "type": "bigint",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "conversations",
+          "type": "bigint",
+          "default": null,
+          "nullable": false
+        }
+      ],
+      "constraints": [
+        {
+          "name": "admin_monitor_cutover_check",
+          "type": "c",
+          "definition": "CHECK (conversations >= 0 AND conversations <= messages)"
+        },
+        {
+          "name": "admin_monitor_cutover_messages_check",
+          "type": "c",
+          "definition": "CHECK (messages >= 0)"
+        },
+        {
+          "name": "admin_monitor_cutover_pkey",
+          "type": "p",
+          "definition": "PRIMARY KEY (singleton)"
+        },
+        {
+          "name": "admin_monitor_cutover_singleton_check",
+          "type": "c",
+          "definition": "CHECK (singleton)"
+        }
+      ],
+      "index": {
+        "name": "admin_monitor_cutover_pkey",
+        "definition": "CREATE UNIQUE INDEX admin_monitor_cutover_pkey ON private.admin_monitor_cutover USING btree (singleton)"
+      },
+      "productionMarker": {
+        "messages": 410,
+        "singleton": true,
+        "applied_at": "2026-10-02T07:51:49.802096+00:00",
+        "conversations": 40
+      },
+      "clientAccessRoles": [],
+      "serverSelectRoles": [
+        "service_role"
+      ]
+    },
+    "functions": [
+      "public.ack_admin_inquiry_messages(p_inquiry_id bigint, p_through_message_id bigint)",
+      "public.ack_admin_inquiry_snapshot(p_inquiry_id bigint, p_message_ids bigint[])",
+      "public.get_admin_attention(p_inquiry_ids bigint[])",
+      "public.get_admin_inquiry_activity(p_inquiry_ids bigint[])"
+    ],
+    "directExecuteRoles": [
+      "service_role"
+    ],
+    "searchPath": ""
   }
 }

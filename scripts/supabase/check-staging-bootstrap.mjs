@@ -36,13 +36,17 @@ function exact(label, actual, expected) {
   }
 }
 
-exact('pending attention RPCs', required.pendingApplicationFunctions, ['ack_admin_inquiry_snapshot', 'get_admin_attention']);
-exact('pending private cutover tables', required.pendingPrivateTables, ['private.admin_monitor_cutover']);
+exact('applied private attention tables', required.applicationPrivateTables, ['private.admin_monitor_cutover']);
+if ('pendingPrivateTables' in required || 'pendingApplicationFunctions' in required) fail('applied attention objects remain pending');
 if (!attentionTargetContract.includes('BEGIN READ ONLY;') || !attentionTargetContract.trimEnd().endsWith('ROLLBACK;')
   || !attentionTargetContract.includes('ADMIN_ATTENTION_TARGET_CONTRACT_PASS')
-  || required.pendingApplicationFunctions.some(fn => !attentionTargetContract.includes(`public.${fn}(`))
-  || required.pendingPrivateTables.some(table => !attentionTargetContract.includes(table))) {
-  fail('pending attention target contract must verify server-only RPCs and private cutover read-only');
+  || current.adminAttention.functions.some(identity => !current.objects.functionOverloads.includes(identity))) {
+  fail('applied attention contract must verify current server-only RPCs read-only');
+}
+const attentionAssertions = attentionTargetContract.match(/DO \$admin_attention_contract\$[\s\S]*?\$admin_attention_contract\$;/)?.[0];
+if (!attentionAssertions || !currentContract.includes(attentionAssertions) || !schemaContract.includes(attentionAssertions)
+  || schemaContract.includes('$admin_attention_production_marker$')) {
+  fail('current/staging must share cutover security assertions; exact Production counters are not staging seed expectations');
 }
 
 const expectedAppliedOrder = [
@@ -62,8 +66,9 @@ const expectedAppliedOrder = [
   'supabase/migrations/20260930022348_move_is_admin_reader_to_private_schema.sql',
   'supabase/migrations/20261001170718_admin_message_monitoring_phase_1.sql',
   'supabase/migrations/20261002015110_admin_message_monitoring_historical_reinquiry.sql',
+  'supabase/migrations/20261002041848_admin_attention_badges_phase_2.sql',
 ];
-const expectedPendingOrder = ['supabase/migrations/20261002041848_admin_attention_badges_phase_2.sql'];
+const expectedPendingOrder = [];
 const expectedApplyOrder = [...expectedAppliedOrder, ...expectedPendingOrder];
 exact('fresh-project apply order', required.freshProjectApplyOrder, expectedApplyOrder);
 exact(
@@ -143,6 +148,7 @@ for (const [name, fingerprint] of Object.entries({
   storagePolicies: '898e8b7f917fd0f4530ef30c9b61961e',
   publicRlsPolicies: 'e5a16a4215c569060fbf895453a5cd00',
   publicRelationGrants: 'a9c644ba2ab5c795f29aff57092aa002',
+  privateRelationGrants: 'c0c83ee9ce880c47d3d24f3f918b4364',
 })) {
   if (current.securityFingerprints[name] !== fingerprint || !currentContract.includes(fingerprint)) {
     fail(`current-state security fingerprint differs: ${name}`);

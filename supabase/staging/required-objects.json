@@ -1,5 +1,5 @@
 {
-  "schemaContractVersion": 4,
+  "schemaContractVersion": 5,
   "productionProjectRefsDeniedForFixtureWrites": [
     "uhinvcydgzqlpnvieyal"
   ],
@@ -22,15 +22,7 @@
     "supabase/migrations/20261002015110_admin_message_monitoring_historical_reinquiry.sql",
     "supabase/migrations/20261002041848_admin_attention_badges_phase_2.sql"
   ],
-  "pendingProductionMigrations": [
-    {
-      "version": "20261002041848",
-      "name": "admin_attention_badges_phase_2",
-      "repositoryFile": "supabase/migrations/20261002041848_admin_attention_badges_phase_2.sql",
-      "repositorySha256": "d20d5774318f8fe52dc41d13a533728b13c98a20fab812cd693737dba0de51a2",
-      "status": "prepared-not-applied"
-    }
-  ],
+  "pendingProductionMigrations": [],
   "applicationTables": [
     "admin_audit_logs",
     "admin_job_runs",
@@ -78,6 +70,7 @@
   ],
   "applicationFunctions": [
     "ack_admin_inquiry_messages",
+    "ack_admin_inquiry_snapshot",
     "advance_support_version",
     "apply_experience_media_locator_cas",
     "assign_service_concierge_host_atomic",
@@ -109,6 +102,7 @@
     "ensure_profile_demographics_reminder",
     "finalize_proxy_card_intake_atomic",
     "finish_service_refund_operation_atomic",
+    "get_admin_attention",
     "get_admin_inquiry_activity",
     "get_experience_completion_due_backlog",
     "get_ops_anomaly_snapshot",
@@ -308,11 +302,7 @@
       "Public Access"
     ]
   },
-  "pendingPrivateTables": [
+  "applicationPrivateTables": [
     "private.admin_monitor_cutover"
-  ],
-  "pendingApplicationFunctions": [
-    "ack_admin_inquiry_snapshot",
-    "get_admin_attention"
   ]
 }
