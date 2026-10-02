@@ -27,7 +27,7 @@ A new request or inactive card anchor may hold its request row before acquiring 
 
 ## Migration and baseline
 
-`20261002140902_phone_followup_tasks.sql` is **prepared only**. It requires the existing Phase 1/Phase 2 migrations. Its path and SHA-256 are registered only in the pending migration contract; the applied Production ledger, object manifest and staging apply order are unchanged. It is a one-time forward migration; it deliberately does not re-baseline an existing task table.
+`20261002140902_phone_followup_tasks.sql` is **prepared only**. It requires the existing Phase 1/Phase 2 migrations. Its path and SHA-256 are registered only in the pending migration contract; the applied Production ledger and object manifest are unchanged. The future fresh-staging apply plan lists it after the applied migrations, following the existing pending-migration convention; that plan was not executed. It is a one-time forward migration; it deliberately does not re-baseline an existing task table.
 
 The transaction first acquires NOWAIT exclusive locks on requests, messages, and inquiries. If a writer is active, the whole migration fails immediately with no partial cutover. Operators must schedule a quiet application window; there is no automatic migration retry. Locks cover trigger installation, baseline computation, and the old/new COMPLETED set assertion. A writer waiting behind cutover is captured after commit.
 

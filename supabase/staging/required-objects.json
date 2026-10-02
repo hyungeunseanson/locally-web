@@ -20,7 +20,8 @@
     "supabase/migrations/20260930022348_move_is_admin_reader_to_private_schema.sql",
     "supabase/migrations/20261001170718_admin_message_monitoring_phase_1.sql",
     "supabase/migrations/20261002015110_admin_message_monitoring_historical_reinquiry.sql",
-    "supabase/migrations/20261002041848_admin_attention_badges_phase_2.sql"
+    "supabase/migrations/20261002041848_admin_attention_badges_phase_2.sql",
+    "supabase/migrations/20261002140902_phone_followup_tasks.sql"
   ],
   "pendingProductionMigrations": [
     {
