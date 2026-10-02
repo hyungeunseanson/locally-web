@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import test from 'node:test';
 import React from 'react';
 import { sourceLoader, queryBuilder, clientFixture, inquiry, message, response, deferred } from './helpers/chatRuntime.mjs';
 
-// Run the reviewed pre-fix commit, rather than copying its polling algorithm.
-const beforeSource = execFileSync('git', ['show', 'c2c9f85d454bc2c3ef91fe76583647a973611fd6:app/admin/dashboard/hooks/useAdminChatQuery.ts'], { encoding: 'utf8' });
+// Frozen source from reviewed commit c2c9f85d454bc2c3ef91fe76583647a973611fd6.
+// Keep the baseline portable after a squash merge or shallow checkout.
+const beforeSource = readFileSync('tests/unit/fixtures/admin-chat-before-review.ts.txt', 'utf8');
+assert.equal(createHash('sha256').update(beforeSource).digest('hex'), '50a7b1c2b6c5a1c54d9cb91c397df1198acc065e7b29e7575fdbb34013f0d0cb', 'reviewed baseline must remain byte-for-byte unchanged');
 const hookPath = 'app/admin/dashboard/hooks/useAdminChatQuery.ts';
 
 function countedServer() {
