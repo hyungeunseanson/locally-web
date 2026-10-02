@@ -165,6 +165,11 @@ try {
   const phoneActivity=(await db.query('SELECT * FROM get_admin_phone_activity(ARRAY[10,11]::bigint[])')).rows;
   assert.equal(phoneActivity.find(r=>r.inquiry_id==='10').phone_needs_reply,true);assert.equal(phoneActivity.find(r=>r.inquiry_id==='11').phone_needs_reply,false);
   pass('RLS/grants/service RPC/batched pending activity/publication boundaries');
+  await inquiry(40);await link(db,40);
+  await db.query("INSERT INTO inquiry_messages(id,inquiry_id,sender_id,content) SELECT n,40,$1,'long thread fixture' FROM generate_series(40000,40200) n",[customer]);
+  assert.equal((await pending(40)).length,201);
+  assert.equal((await complete(db,40,Array.from({length:201},(_,n)=>String(40000+n)))).needsReply,false);
+  assert.deepEqual(await pending(40),[]);pass('201 exact rendered IDs complete without stranding old pending tasks');
   // Representative plan: 10,000 unrelated requests. Populate before link only; no trigger disable needed.
   await db.query("INSERT INTO proxy_requests(id,user_id,form_data) SELECT md5(n::text)::uuid,$1,'{}'::jsonb FROM generate_series(100,10100) n",[customer]);
   await db.query('ANALYZE proxy_requests');

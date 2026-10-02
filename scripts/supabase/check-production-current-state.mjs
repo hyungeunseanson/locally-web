@@ -166,7 +166,15 @@ const expectedLedger = [
     repositorySha256: 'd20d5774318f8fe52dc41d13a533728b13c98a20fab812cd693737dba0de51a2',
   },
 ];
-const expectedPendingMigrations = [];
+const expectedPendingMigrations = [
+  {
+    "version": "20261002140902",
+    "name": "phone_followup_tasks",
+    "repositoryFile": "supabase/migrations/20261002140902_phone_followup_tasks.sql",
+    "repositorySha256": "ef1e1fffa1dd1a746bc5518a0ad3c2e98a34d114e1dfbde68fdeaf76de20bab1",
+    "status": "prepared_not_applied"
+  }
+];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));
 for (const [index, expected] of expectedLedger.entries()) {
   const actual = manifest.migrationLedger[index];
@@ -208,7 +216,7 @@ assert(
 assert(!('pendingPrivateTables' in required) && !('pendingApplicationFunctions' in required),
   'applied attention objects must not remain pending');
 for (const pending of expectedPendingMigrations) {
-  assert(await sha256(pending.repositoryFile) === pending.repositorySha256, 'prepared attention migration bytes differ');
+  assert(await sha256(pending.repositoryFile) === pending.repositorySha256, 'prepared migration bytes differ');
 }
 
 const objects = manifest.objects;

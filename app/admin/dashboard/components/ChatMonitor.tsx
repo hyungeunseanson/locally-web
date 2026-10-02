@@ -128,8 +128,8 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
       && !isMessagesLoading && !messageError && selectedInquiry);
     const messageIds = ready ? messages.filter(message => message.sender_id === selectedInquiry?.user_id
       && (!message.type || ['text', 'image'].includes(message.type)))
-      .map(message => renderedPhoneMessageId(message.id)).filter((id): id is string => id !== null).slice(-PHONE_SNAPSHOT_LIMIT) : [];
-    return { inquiryId: phone?.inquiryId ?? null, messageIds, ready: ready && messageIds.length > 0 };
+      .map(message => renderedPhoneMessageId(message.id)).filter((id): id is string => id !== null) : [];
+    return { inquiryId: phone?.inquiryId ?? null, messageIds, ready: ready && messageIds.length > 0 && messageIds.length <= PHONE_SNAPSHOT_LIMIT };
   }, [enabled, phone?.requestId, phone?.inquiryId, selectedInquiryId, selectedInquiry, isMessagesLoading, messageError, messages]);
   const onPhoneSnapshot = phone?.onSnapshot;
   useEffect(() => { onPhoneSnapshot?.(phoneSnapshot); }, [onPhoneSnapshot, phoneSnapshot]);

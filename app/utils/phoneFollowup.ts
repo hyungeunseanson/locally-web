@@ -1,5 +1,5 @@
 // Decimal strings preserve bigint identity across JSON and the rendered snapshot.
-export const PHONE_SNAPSHOT_LIMIT = 200;
+export const PHONE_SNAPSHOT_LIMIT = 10_000;
 export type PhoneRenderedSnapshot = { inquiryId: string | null; messageIds: string[]; ready: boolean };
 export type PhoneReplySnapshot = { proxyRequestId: string; seenCustomerMessageIds: string[] };
 export function validPhoneId(value: unknown): value is string {

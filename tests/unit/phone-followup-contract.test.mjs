@@ -32,7 +32,7 @@ test('canonical completion uses verified actor and one RPC; concurrent pending t
 });
 test('auth, malformed/bigint/empty/duplicate snapshots and RPC conflicts fail without alternate writes',async()=>{
   for(const [options,status] of [[{user:null},401],[{allowed:false},403]]){const f=fixture(options);assert.equal((await f.complete({inquiryId:'1',seenCustomerMessageIds:['100']})).status,status);assert.equal(f.calls.length,0);}
-  for(const ids of [undefined,[],['100','100'],['0'],['-1'],['9223372036854775808'],[100],Array(201).fill('100')]){
+  for(const ids of [undefined,[],['100','100'],['0'],['-1'],['9223372036854775808'],[100],Array.from({length:10001},(_,n)=>String(n+1))]){
     const f=fixture();assert.equal((await f.complete({inquiryId:'1',seenCustomerMessageIds:ids})).status,400);assert.equal(f.calls.length,0);
   }
   for(const [code,status] of [['22023',409],['P0001',409],['42501',403],['XX000',500]]){
@@ -62,4 +62,5 @@ test('rendered snapshot preserves decimal bigint strings and rejects rounded JSO
   assert.equal(renderedPhoneMessageId(42),'42');assert.equal(renderedPhoneMessageId('9223372036854775807'),'9223372036854775807');
   assert.equal(renderedPhoneMessageId(Number.MAX_SAFE_INTEGER+1),null);assert.equal(renderedPhoneMessageId('9223372036854775808'),null);
   assert.equal(validPhoneSnapshot(['9223372036854775807']),true);
+  assert.equal(validPhoneSnapshot(Array.from({length:201},(_,n)=>String(n+1))),true);
 });

@@ -22,7 +22,15 @@
     "supabase/migrations/20261002015110_admin_message_monitoring_historical_reinquiry.sql",
     "supabase/migrations/20261002041848_admin_attention_badges_phase_2.sql"
   ],
-  "pendingProductionMigrations": [],
+  "pendingProductionMigrations": [
+    {
+      "version": "20261002140902",
+      "name": "phone_followup_tasks",
+      "repositoryFile": "supabase/migrations/20261002140902_phone_followup_tasks.sql",
+      "repositorySha256": "ef1e1fffa1dd1a746bc5518a0ad3c2e98a34d114e1dfbde68fdeaf76de20bab1",
+      "status": "prepared_not_applied"
+    }
+  ],
   "applicationTables": [
     "admin_audit_logs",
     "admin_job_runs",

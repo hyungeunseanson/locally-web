@@ -37,7 +37,7 @@ test.beforeAll(async () => {
   css = (await postcss([tailwind()]).process('@import "tailwindcss";', { from: resolve('app/phone-fixture.css') })).css;
 });
 
-async function fixture(page: Page, options: { firstMessageId?: number; messageGate?: Promise<void>; paymentMetadata?: boolean; lastAdmin?: boolean; paymentStatus?: string; missingLink?: boolean; failSend?: boolean; failComplete?: boolean; unpaid?: boolean; status?: string; inquiryId?: string; visual?: boolean; channel?: string; method?: string } = {}) {
+async function fixture(page: Page, options: { customerMessages?: number; firstMessageId?: number; messageGate?: Promise<void>; paymentMetadata?: boolean; lastAdmin?: boolean; paymentStatus?: string; missingLink?: boolean; failSend?: boolean; failComplete?: boolean; unpaid?: boolean; status?: string; inquiryId?: string; visual?: boolean; channel?: string; method?: string } = {}) {
   const request = {
     id: 'request-1', user_id: 'guest', category: 'RESTAURANT', status: options.status || 'PENDING',
     payment_status: options.paymentStatus || (options.unpaid ? 'WAITING' : 'COMPLETED'), payment_channel: options.channel || 'LOCALLY',
@@ -51,6 +51,7 @@ async function fixture(page: Page, options: { firstMessageId?: number; messageGa
   });
   request.needs_attention = !request.linked_inquiry_id || (['PENDING', 'IN_PROGRESS'].includes(request.status) && ['REFUNDED', 'FAILED'].includes(request.payment_status));
   const messages = [{ id: options.firstMessageId || 1, sender_id: 'guest', content: '예약해주세요', type: 'text', created_at: '2026-09-22T10:05:00Z', sender: { name: '홍길동' } }];
+  if(options.customerMessages) for(let id=2;id<=options.customerMessages;id++) messages.push({...messages[0],id,content:`고객 질문 ${id}`});
   if (options.visual) messages[0].content = buildProxyInquiryInitialMessage({category: 'HOTEL', formData: request.form_data, paymentChannel: 'LOCALLY', finalAmount: 6000});
   if (options.visual) messages.push(
     { id: 2, sender_id: 'admin', content: '숙소에 늦은 체크인 가능 여부를 확인하고 안내드리겠습니다.', type: 'text', created_at: '2026-09-22T10:05:00Z', sender: { name: '운영팀' } },
@@ -519,4 +520,12 @@ test('failed message load cannot produce a handled snapshot and retry restores a
   await page.unroute('**/api/admin/inquiries/123/messages');
   await page.getByRole('button',{name:'다시 시도',exact:true}).click();
   await expect(page.getByRole('button',{name:'처리 완료',exact:true})).toBeEnabled();
+});
+
+test('201 rendered customer messages are not silently truncated or stranded by repeated completion',async({page})=>{
+  const state=await fixture(page,{status:'COMPLETED',customerMessages:201});
+  await expect(composer(page)).toBeEnabled();await complete(page);
+  await expect(page.getByTestId('admin-phone-reservation-list-item')).toHaveCount(0);
+  expect(state.calls[0].body.seenCustomerMessageIds).toEqual(Array.from({length:201},(_,n)=>String(n+1)));
+  expect(state.handled.size).toBe(201);
 });

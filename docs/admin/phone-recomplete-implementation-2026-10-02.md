@@ -12,7 +12,7 @@ For COMPLETED requests the confirmation reads: “현재 확인한 메시지까�
 
 Phone replies pass the same rendered snapshot in `phoneFollowup`. `reply_phone_request` handles exactly those tasks and inserts the admin message in one transaction. An INSERT failure rolls handling back. Existing canonical send reconciliation and post-save notification delivery remain in place. Generic support/monitor sends retain their path. Older clients can send but cannot implicitly handle private tasks; the old COMPLETED PATCH returns 409 rather than bypassing the snapshot contract.
 
-Snapshots are bounded at 200 distinct decimal-string bigint IDs. Unsafe JSON numeric IDs are excluded to prevent rounding from handling a different message. The UI selects the last 200 eligible rendered customer messages. If older pending tasks remain, the server keeps needs_reply true. There is no max-ID/time watermark and no “handle all in DB” fallback.
+Snapshots are bounded at 10,000 distinct decimal-string bigint IDs, matching the existing ACK bound. Unsafe JSON numeric IDs are excluded to prevent rounding from handling a different message. The UI never truncates the rendered snapshot to a recent-ID tail: that would strand older pending tasks. More than 10,000 eligible rendered IDs disables the action instead of partially handling them; larger threads require a separately designed bounded message window. Native and browser tests cover 201 customer messages. There is no max-ID/time watermark and no “handle all in DB” fallback.
 
 ## Intake and locking proof
 
@@ -27,7 +27,7 @@ A new request or inactive card anchor may hold its request row before acquiring 
 
 ## Migration and baseline
 
-`20261002140902_phone_followup_tasks.sql` is **prepared only**. It requires the existing Phase 1/Phase 2 migrations. It is a one-time forward migration; it deliberately does not re-baseline an existing task table.
+`20261002140902_phone_followup_tasks.sql` is **prepared only**. It requires the existing Phase 1/Phase 2 migrations. Its path and SHA-256 are registered only in the pending migration contract; the applied Production ledger, object manifest and staging apply order are unchanged. It is a one-time forward migration; it deliberately does not re-baseline an existing task table.
 
 The transaction first acquires NOWAIT exclusive locks on requests, messages, and inquiries. If a writer is active, the whole migration fails immediately with no partial cutover. Operators must schedule a quiet application window; there is no automatic migration retry. Locks cover trigger installation, baseline computation, and the old/new COMPLETED set assertion. A writer waiting behind cutover is captured after commit.
 

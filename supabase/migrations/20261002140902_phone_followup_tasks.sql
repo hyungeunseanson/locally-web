@@ -134,7 +134,7 @@ RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 DECLARE i public.inquiries%ROWTYPE; r public.proxy_requests%ROWTYPE; handled jsonb; pending boolean;
 BEGIN
   IF NOT private.is_inquiry_admin_sender(p_admin) THEN RAISE EXCEPTION 'Forbidden' USING ERRCODE = '42501'; END IF;
-  IF coalesce(cardinality(p_ids),0) NOT BETWEEN 1 AND 200 OR EXISTS (SELECT 1 FROM unnest(p_ids) id WHERE id IS NULL OR id <= 0)
+  IF coalesce(cardinality(p_ids),0) NOT BETWEEN 1 AND 10000 OR EXISTS (SELECT 1 FROM unnest(p_ids) id WHERE id IS NULL OR id <= 0)
     OR (SELECT count(DISTINCT id) FROM unnest(p_ids) id) <> cardinality(p_ids) THEN
     RAISE EXCEPTION 'Invalid rendered snapshot' USING ERRCODE = '22023';
   END IF;
