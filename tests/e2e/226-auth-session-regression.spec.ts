@@ -1,4 +1,5 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
+import { waitForLoginHydration } from './helpers/loginHydration';
 
 import {
   MOCK_AUTH_EMAIL,
@@ -26,6 +27,7 @@ async function setEnglishLocale(context: BrowserContext) {
 }
 
 async function dismissGlobalAnnouncement(page: Page) {
+  await waitForLoginHydration(page);
   const dismissButton = page.getByTestId('global-site-announcement-dismiss');
   if (await dismissButton.isVisible().catch(() => false)) {
     await dismissButton.click();
@@ -45,6 +47,82 @@ test.describe('Auth session regression gate', () => {
     mockSupabase.resetRequests();
     await setEnglishLocale(context);
   });
+
+  for (const path of ['/login']) {
+    test(`resolved no-session SSR exposes the form without JavaScript: ${path}`, async ({ browser }) => {
+      const context = await browser.newContext({ javaScriptEnabled: false, baseURL: APP_ORIGIN });
+      try {
+        await setEnglishLocale(context);
+        const page = await context.newPage();
+        const response = await page.goto(path);
+        expect(response?.status()).toBe(200);
+        await expect(page.locator('input[type="email"]')).toBeVisible();
+        await expect(page.locator('input[type="password"]')).toBeVisible();
+        await expect(page.locator('.animate-spin')).toHaveCount(0);
+      } finally { await context.close(); }
+    });
+  }
+
+  for (const path of ['/login?returnUrl=%2Faccount', '/en/login?returnUrl=%2Faccount']) {
+    test(`login form precedes delayed static JavaScript hydration in cold Chromium: ${path}`, async ({ page }) => {
+      let release!: () => void;
+      const held = new Promise<void>(resolve => { release = resolve; });
+      let pendingScripts = 0;
+      await page.route('**/_next/static/**/*.js*', async route => {
+        pendingScripts++;
+        await held;
+        await route.continue();
+      });
+      try {
+        // DOMContentLoaded waits for deferred scripts; inspect SSR after commit instead.
+        await page.goto(path, { waitUntil: 'commit' });
+        await expect.poll(() => pendingScripts).toBeGreaterThan(0);
+        await expect(page.locator('input[type="email"]')).toBeVisible();
+        await expect(page.locator('input[type="password"]')).toBeVisible();
+        await expect(page.locator('.animate-spin')).toHaveCount(0);
+      } finally { release(); }
+      await page.waitForLoadState('domcontentloaded');
+      await dismissGlobalAnnouncement(page);
+      await page.locator('input[type="email"]').fill(MOCK_AUTH_EMAIL);
+      await page.locator('input[type="password"]').fill(MOCK_AUTH_PASSWORD);
+      await page.getByRole('button', { name: 'Log in', exact: true }).click();
+      await expect(page).toHaveURL(/\/account$/);
+    });
+
+  }
+
+  for (const stale of [false, true]) {
+    test(`server resolves ${stale ? 'stale' : 'valid'} session before login SSR`, async ({ page, context, browser }) => {
+      await page.goto('/login?returnUrl=%2Faccount');
+      await dismissGlobalAnnouncement(page);
+      await page.locator('input[type="email"]').fill(MOCK_AUTH_EMAIL);
+      await page.locator('input[type="password"]').fill(MOCK_AUTH_PASSWORD);
+      await page.getByRole('button', { name: 'Log in', exact: true }).click();
+      await expect(page).toHaveURL(/\/account$/);
+      const state = await context.storageState();
+      mockSupabase.resetRequests();
+      if (stale) mockSupabase.setUserStatus(401);
+      const noJs = await browser.newContext({ javaScriptEnabled: false, storageState: state, baseURL: APP_ORIGIN });
+      try {
+        const ssrPage = await noJs.newPage();
+        await ssrPage.goto('/login');
+        expect(mockSupabase.requests.some(({ method, url }) => method === 'GET' && new URL(url).pathname === '/auth/v1/user')).toBe(true);
+        if (stale) {
+          await expect(ssrPage.locator('input[type="email"]')).toBeVisible();
+          await expect(ssrPage.locator('input[type="password"]')).toBeVisible();
+          await expect(ssrPage.locator('.animate-spin')).toHaveCount(0);
+        } else {
+          await expect(ssrPage.locator('input[type="email"]')).toHaveCount(0);
+          // Hydrated valid-session behavior remains the existing returnUrl redirect.
+          await page.goto('/login?returnUrl=%2Faccount');
+          await expect(page).toHaveURL(/\/account$/);
+        }
+      } finally {
+        mockSupabase.setUserStatus(200);
+        await noJs.close();
+      }
+    });
+  }
 
   test('email login persists across reload and a new browser context, then logout clears the session', async ({
     browser,

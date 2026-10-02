@@ -61,6 +61,10 @@ try {
     assert.equal(response.status, 200, `${pathname} should resolve in the local OpenNext Worker`);
     const html = await response.text();
     assert.equal(readAttribute(html, /<html[^>]*\blang="([^"]+)"/), locale, `${pathname} HTML locale`);
+    if (pathname.endsWith('/login')) {
+      assert.match(html, /<input[^>]*type="email"/, `${pathname} anonymous SSR email input`);
+      assert.match(html, /<input[^>]*type="password"/, `${pathname} anonymous SSR password input`);
+    }
     if (pathname.startsWith(`/${locale}`)) {
       assert.match(response.headers.get('set-cookie') ?? '', new RegExp(`app_lang=${locale}`), `${pathname} locale cookie`);
     }

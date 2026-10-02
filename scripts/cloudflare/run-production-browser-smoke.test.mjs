@@ -4,6 +4,7 @@ import { createServer } from 'node:http';
 import { EventEmitter } from 'node:events';
 import test from 'node:test';
 import { chromium, errors } from '@playwright/test';
+import { safeNetworkRecord } from './diagnose-login-readiness.mjs';
 
 import {
   installProductionMutationGate,
@@ -14,6 +15,50 @@ import {
 } from './run-production-browser-smoke.mjs';
 
 const runProductionBrowserSmoke = (origin, options) => productionBrowserSmoke(origin, { log: () => {}, ...options });
+
+test('readiness diagnostics discard query, headers, body, credentials and external URLs', () => {
+  const event = { type: 'Script', request: { url: 'https://user:password@example.invalid/chunk.js?secret=hidden', method: 'GET', headers: { authorization: 'hidden' }, postData: 'hidden' } };
+  assert.deepEqual(safeNetworkRecord(event, 'https://example.invalid'), { pathname: '/chunk.js', type: 'Script', method: 'GET' });
+  assert.equal(safeNetworkRecord(event, 'https://different.invalid'), null);
+});
+
+test('local A/B: unchanged global mutation routing disables warm HTTP asset cache', async () => {
+  let assetGets = 0;
+  const server = createServer((request, response) => {
+    if (request.url === '/asset.js') {
+      assetGets++;
+      response.writeHead(200, { 'content-type': 'application/javascript', 'cache-control': 'public, max-age=3600' }).end('window.fixtureReady = true;');
+    } else {
+      response.writeHead(200, { 'content-type': 'text/html', 'cache-control': 'no-store' })
+        .end('<!doctype html><script src="/asset.js"></script><input type="email">');
+    }
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch();
+  const measurements = [];
+  try {
+    for (const routed of [false, true]) {
+      assetGets = 0;
+      const context = await browser.newContext({ serviceWorkers: 'block' });
+      try {
+        if (routed) await installProductionMutationGate(context, origin);
+        const page = await context.newPage();
+        await page.goto(`${origin}/first`);
+        await page.goto(`${origin}/second`);
+        const transferBytes = await page.evaluate(() => performance.getEntriesByType('resource').find(r => r.name.endsWith('/asset.js')).transferSize);
+        measurements.push({ routed, assetGets, transferBytes });
+      } finally { await context.close(); }
+    }
+    assert.equal(measurements[0].assetGets, 1);
+    assert.equal(measurements[0].transferBytes, 0);
+    assert.equal(measurements[1].assetGets, 2);
+    assert.ok(measurements[1].transferBytes > 0);
+  } finally {
+    await browser.close();
+    await new Promise(resolve => server.close(resolve));
+  }
+});
 
 async function withFixtureServer({
   unexpectedMethod,

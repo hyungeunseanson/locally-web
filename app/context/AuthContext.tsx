@@ -50,7 +50,8 @@ export function AuthProvider({
   const [user, setUser] = useState<User | null>(initialUser);
   const [isHost, setIsHost] = useState(false);
   const [applicationStatus, setApplicationStatus] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(!initialUser);
+  // A server-resolved null user is anonymous, not pending client auth.
+  const [isLoading, setIsLoading] = useState(!initialSessionResolved && !initialUser);
   const [hostStatusResolved, setHostStatusResolved] = useState(Boolean(initialSessionResolved && !initialUser));
   const supabase = useMemo(() => createClient(), []);
 
