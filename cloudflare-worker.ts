@@ -2,6 +2,7 @@
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore Generated module is intentionally absent before the Cloudflare build but present on repeat builds.
 import openNextWorker from './.open-next/worker.js';
+import { withReleaseProbeIdentity } from './app/utils/cloudflareReleaseProbe.mjs';
 import {
   handlePublicExperienceMediaQueueBatch,
   type PublicExperienceMediaQueueBatchLike,
@@ -45,11 +46,12 @@ import {
   type OpsAnomalyMonitorScheduledRuntimeEnv,
 } from './app/utils/opsAnomalyMonitorScheduled';
 
-type WorkerEnvironment = PublicExperienceMediaQueueRuntimeEnv & ExperienceTranslationQueueRuntimeEnv & HomePopularitySnapshotRuntimeEnv & AdminSupportUnreadAlertsRuntimeEnv & NotificationRetentionRuntimeEnv & ExperienceCompletionScheduledRuntimeEnv & ServiceCompletionScheduledRuntimeEnv & CancelPendingBookingsScheduledRuntimeEnv & OpsAnomalyMonitorScheduledRuntimeEnv;
+type WorkerEnvironment = PublicExperienceMediaQueueRuntimeEnv & ExperienceTranslationQueueRuntimeEnv & HomePopularitySnapshotRuntimeEnv & AdminSupportUnreadAlertsRuntimeEnv & NotificationRetentionRuntimeEnv & ExperienceCompletionScheduledRuntimeEnv & ServiceCompletionScheduledRuntimeEnv & CancelPendingBookingsScheduledRuntimeEnv & OpsAnomalyMonitorScheduledRuntimeEnv & { CF_VERSION_METADATA?: { id: string } };
 
 const worker = {
-  fetch(request: Request, env: WorkerEnvironment, ctx: unknown) {
-    return openNextWorker.fetch(request, env, ctx);
+  async fetch(request: Request, env: WorkerEnvironment, ctx: unknown) {
+    const response = await openNextWorker.fetch(request, env, ctx);
+    return withReleaseProbeIdentity(request, response, env.CF_VERSION_METADATA);
   },
   queue(
     batch: PublicExperienceMediaQueueBatchLike | ExperienceTranslationQueueBatchLike,

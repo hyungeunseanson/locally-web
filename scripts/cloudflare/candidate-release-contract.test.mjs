@@ -3,313 +3,261 @@ import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import test from 'node:test';
 import {
-  assertConfigUnchanged, assertFullCandidateSmoke, assertOverrideIdentity,
-  buildCandidateReleasePlan, classifyCandidateAttempt, executeCandidateReleaseContract,
-  parseVersionUploadOutput, promotionArguments, PRODUCTION_ORIGIN, PRODUCTION_WORKER,
-  rollbackArguments, safeConfigSnapshot, stageZeroArguments, versionOverrideHeader,
+  assertConfigUnchanged, assertFullCandidateSmoke, assertOverrideIdentity, buildCandidateReleasePlan,
+  classifyCandidateAttempt, executeCandidateReleaseContract, parseVersionUploadOutput, promotionArguments,
+  PRODUCTION_ORIGIN, PRODUCTION_WORKER, rollbackArguments, safeConfigSnapshot, stageZeroArguments, versionOverrideHeader,
 } from './candidate-release-contract.mjs';
+import { compareDurableObjectProof, DO_MODULES, fingerprintDurableObjectArtifact, readStableDurableObjectArtifact } from './durable-object-release-safety.mjs';
+import { withReleaseProbeIdentity } from '../../app/utils/cloudflareReleaseProbe.mjs';
 import { main, parseCandidateArguments } from './run-candidate-release.mjs';
 import { runCandidateBrowserSmoke } from './run-candidate-browser-smoke.mjs';
 
 const stableId = '11111111-1111-4111-8111-111111111111';
 const candidateId = '22222222-2222-4222-8222-222222222222';
-const versionUrl = `https://22222222-${PRODUCTION_WORKER}.fixture.workers.dev`;
+const workerSource = "export { DOQueueHandler, DOShardedTagCache } from './.open-next/worker.js';";
 const flags = { CLOUDFLARE_DEPLOYMENT_ENV: 'production', OPS_ANOMALY_MONITOR_SCHEDULED_ENABLED: 'true' };
-const config = {
-  keep_vars: true,
-  env: { production: { name: PRODUCTION_WORKER, preview_urls: true, migrations: [] } },
-};
+const baselineConfig = { keep_vars: true, env: { production: { name: PRODUCTION_WORKER, preview_urls: false,
+  durable_objects: { bindings: Object.keys(DO_MODULES).map(class_name => ({ name: class_name, class_name })) },
+  migrations: [{ tag: 'cache-v1', new_sqlite_classes: Object.keys(DO_MODULES) }] } } };
+const config = structuredClone(baselineConfig);
+config.env.production.version_metadata = { binding: 'CF_VERSION_METADATA' };
+const metadataBinding = { name: 'CF_VERSION_METADATA', type: 'version_metadata' };
 const snapshot = {
   routes: [{ pattern: 'www.locally-travel.com/*' }], customDomains: [],
-  subdomain: { enabled: false, previews_enabled: true },
-  observability: { enabled: true, head_sampling_rate: 0.1 },
-  bindings: [
-    ...Object.entries(flags).map(([name, text]) => ({ name, type: 'plain_text', text })),
-    { name: 'SUPABASE_SERVICE_ROLE_KEY', type: 'secret_text' },
-    { name: 'NEXT_PUBLIC_SUPABASE_ANON_KEY', type: 'secret_text' },
+  subdomain: { enabled: false, previews_enabled: false }, observability: { enabled: true, head_sampling_rate: 0.1 },
+  bindings: [...Object.entries(flags).map(([name, text]) => ({ name, type: 'plain_text', text })),
+    { name: 'SUPABASE_SERVICE_ROLE_KEY', type: 'secret_text' }, { name: 'NEXT_PUBLIC_SUPABASE_ANON_KEY', type: 'secret_text' },
     { name: 'EXAMPLE_QUEUE', type: 'queue', queue_name: 'fixture-queue' },
-  ],
-  crons: ['*/10 * * * *'],
-  queueConsumers: [{ queue_name: 'fixture-queue', script: PRODUCTION_WORKER, dead_letter_queue: 'fixture-dlq', settings: { max_retries: 5 } }],
+    ...Object.keys(DO_MODULES).map(name => ({ name, class_name: name, type: 'durable_object_namespace', namespace_id: `${name}-namespace` }))],
+  crons: ['*/10 * * * *'], queueConsumers: [{ queue_name: 'fixture-queue', script: PRODUCTION_WORKER, dead_letter_queue: 'fixture-dlq', settings: { max_retries: 5 } }],
 };
-const baseline = { snapshot, deployment: { id: 'fixture-deployment', versions: [{ id: stableId, percentage: 100 }] } };
-const makePlan = (overrides = {}) => buildCandidateReleasePlan({ config, baselineConfig: config, baseline,
-  runtimeVariables: flags, wranglerVersion: '4.129.1', ...overrides });
+const baseline = { snapshot, deployment: { id: 'stable-deployment', versions: [{ id: stableId, percentage: 100 }] } };
+const blocked = code => error => error.code === code;
+function artifact(constant = 'fixture-original') {
+  return 'var helper = 1;\n' + Object.entries(DO_MODULES).map(([name, p]) => `// ${p}\nvar ${name} = class extends DurableObject { value = "${constant}"; };\n`).join('')
+    + '// app/manifest.js\nglobalThis.nextVersion = "16.3.5"; globalThis.openNextVersion = "3.10.4";\n'
+    + 'var manifest = { runtimePins: { node: "24.20.0", next: "16.3.5", openNextCloudflare: "1.19.6", wrangler: "4.129.1" } };\n';
+}
+function makeProof(candidateSource = artifact()) {
+  return { stableVersionId: stableId, scriptEtag: 'a'.repeat(64), contentEtag: 'a'.repeat(64),
+    namedHandlers: Object.keys(DO_MODULES).map(name => ({ name, handlers: ['class'] })),
+    stable: fingerprintDurableObjectArtifact(artifact()), candidate: fingerprintDurableObjectArtifact(candidateSource) };
+}
+const makePlan = (overrides = {}) => buildCandidateReleasePlan({ config, baselineConfig, baseline, workerSource,
+  baselineWorkerSource: workerSource, durableObjectProof: makeProof(), runtimeVariables: flags, wranglerVersion: '4.129.1', ...overrides });
 const safeAttempt = pathname => ({ pathname, pass: true, timeout: false, pendingStaticAssets: 0,
-  httpHardErrors: 0, fiveXX: 0, asset404: 0, genericError: false, pageErrors: 0,
-  consoleErrors: 0, unexpectedWrites: 0, versionMismatch: false });
-const receipts = ['/', '/experiences/42', '/login', '/api/proxy-bookings'].map((pathname, i) => ({
-  pathname, rayId: (i + 1).toString(16).padStart(16, '0'), startedAt: 100, finishedAt: 200,
-}));
-const makeEvents = () => receipts.map(r => ({ timestamp: 150, $workers: {
-  scriptName: PRODUCTION_WORKER, scriptVersion: { id: candidateId }, requestId: r.rayId, eventType: 'fetch', outcome: 'ok',
-} }));
-function makeSmoke(origin = PRODUCTION_ORIGIN) {
-  return { origin, redirected: false, fullPass: true,
-    checks: { home: true, login: true, experience: true, api401: true },
-    httpHardErrors: 0, fiveXX: 0, asset404: 0, genericError: false, pageErrors: 0,
-    consoleErrors: 0, unexpectedWrites: 0, versionMismatch: false,
-    assetRefs: ['/_next/static/app.js', '/_next/static/font.woff2'],
-    assetResponses: [{ pathname: '/_next/static/app.js', status: 200 }, { pathname: '/_next/static/font.woff2', status: 200 }],
+  httpHardErrors: 0, fiveXX: 0, asset404: 0, genericError: false, pageErrors: 0, consoleErrors: 0, unexpectedWrites: 0, versionMismatch: false });
+function makeSmoke() {
+  return { origin: PRODUCTION_ORIGIN, redirected: false, fullPass: true, checks: { home: true, login: true, experience: true, api401: true },
+    ...safeAttempt('/'), assetSetMatches: true, assetRefs: ['/_next/static/app.js', '/_next/static/font.woff2'],
+    assetResponses: ['/_next/static/app.js', '/_next/static/font.woff2'].map(pathname => ({ pathname, status: 200, overrideApplied: true, redirected: false })),
     attempts: ['/', '/experiences/42', '/login'].map(safeAttempt),
-    overrideCoverage: { document: true, script: true, font: true, api: true },
-    workerReceipts: structuredClone(receipts),
-  };
+    overrideCoverage: { document: true, script: true, font: true, api: true }, allFirstPartyReadsOverridden: true,
+    workerReceipts: ['/', '/experiences/42', '/login', '/api/proxy-bookings'].map(pathname => ({ pathname, versionId: candidateId, overrideApplied: true, probeApplied: true })) };
 }
 function fixtureActions() {
-  const calls = [];
-  let deployment = structuredClone(baseline.deployment);
+  const calls = []; let deployment = structuredClone(baseline.deployment); let bindings = structuredClone(snapshot.bindings);
   const actions = {
-    build: async () => calls.push('build'),
-    semanticPreflight: async () => { calls.push('preflight'); return 'PASS'; },
-    snapshot: async () => { calls.push('snapshot'); return { snapshot: structuredClone(snapshot), deployment: structuredClone(deployment) }; },
-    upload: async args => {
-      calls.push('upload');
-      assert.deepEqual(args.slice(0, 2), ['versions', 'upload']);
-      assert.equal(deployment.versions.length, 1, 'upload must leave stable traffic untouched');
-      return `Worker Version ID: ${candidateId}\nVersion Preview URL: ${versionUrl}\n`;
-    },
-    versionMetadata: async id => { calls.push('metadata'); return { id, bindings: structuredClone(snapshot.bindings) }; },
-    smoke: async ({ mode, origin }) => { calls.push(`${mode}-smoke`); return makeSmoke(origin); },
-    stageZero: async args => {
-      calls.push('stage-zero');
-      assert(args.includes(`${stableId}@100%`) && args.includes(`${candidateId}@0%`));
-      deployment.versions.push({ id: candidateId, percentage: 0 });
-    },
-    identityEvents: async () => { calls.push('identity'); return makeEvents(); },
-    promote: async args => {
-      calls.push('promote');
-      assert(args.includes(`${candidateId}@100%`));
-      assert(calls.includes('identity') && calls.includes('override-smoke') && calls.includes('isolated-smoke'));
-      deployment.versions = [{ id: candidateId, percentage: 100 }];
-    },
-    postDeployVerification: async () => { calls.push('post-verification'); return {
-      browserSmoke: 'PASS', naturalCronHealth: 'PASS', queueHealth: 'PASS', scheduledFlags: 'UNCHANGED',
-    }; },
+    build: async () => calls.push('build'), semanticPreflight: async () => { calls.push('preflight'); return 'PASS'; },
+    durableObjectProof: async () => { calls.push('do-proof'); return makeProof(); },
+    snapshot: async () => { calls.push('snapshot'); return { snapshot: { ...structuredClone(snapshot), bindings: structuredClone(bindings) }, deployment: structuredClone(deployment) }; },
+    upload: async args => { calls.push('upload'); assert.deepEqual(args.slice(0, 2), ['versions', 'upload']); return `Worker Version ID: ${candidateId}\n`; },
+    versionMetadata: async id => { calls.push('metadata'); return { id, bindings: [...structuredClone(snapshot.bindings), metadataBinding] }; },
+    stageZero: async args => { calls.push('stage-zero'); assert(args.includes(`${stableId}@100%`) && args.includes(`${candidateId}@0%`));
+      deployment = { id: 'zero-deployment', versions: [{ id: stableId, percentage: 100 }, { id: candidateId, percentage: 0 }] }; },
+    smoke: async input => { calls.push('override-smoke'); assert.equal(input.mode, 'override'); assert.equal(input.origin, PRODUCTION_ORIGIN); return makeSmoke(); },
+    promote: async args => { calls.push('promote'); assert(args.includes(`${candidateId}@100%`)); assert(calls.includes('override-smoke'));
+      deployment = { id: 'promoted-deployment', versions: [{ id: candidateId, percentage: 100 }] }; bindings.push(metadataBinding); },
+    postDeployVerification: async () => { calls.push('post-verification'); return { browserSmoke: 'PASS', naturalCronHealth: 'PASS', queueHealth: 'PASS', scheduledFlags: 'UNCHANGED' }; },
   };
-  return { calls, actions };
+  return { actions, calls };
 }
-const blocked = code => error => error.code === code;
 
-test('upload alone preserves stable 100%; promotion follows all candidate gates', async () => {
-  const { actions, calls } = fixtureActions();
-  const result = await executeCandidateReleaseContract(makePlan(), actions);
-  assert.equal(result.status, 'CANDIDATE_FIRST_RELEASE_CONTRACT_PASS');
-  assert.equal(calls.filter(c => c === 'upload').length, 1);
-  assert.deepEqual(calls.filter(c => c !== 'snapshot'), ['build', 'preflight', 'upload', 'metadata',
-    'isolated-smoke', 'stage-zero', 'override-smoke', 'identity', 'promote', 'post-verification']);
-  assert.deepEqual(result.rollbackArguments, rollbackArguments(makePlan()));
+test('DO Worker without Version URL and with previews disabled can be READY', () => {
+  const plan = makePlan(); assert.equal(plan.status, 'CANDIDATE_OVERRIDE_ONLY_RELEASE_FLOW_READY');
+  assert.equal(plan.versionUrlCapability, 'UNAVAILABLE_EXPECTED_FOR_DO_WORKER'); assert.deepEqual(plan.blockers, []);
 });
-
-test('provider output yields exact candidate UUID and immutable Version URL; ambiguity rejects', () => {
-  assert.deepEqual(parseVersionUploadOutput(`Worker Version ID: ${candidateId}\nVersion Preview URL: ${versionUrl}`),
-    { versionId: candidateId, versionUrl });
-  for (const output of ['Version uploaded', `Worker Version ID: ${candidateId}\nWorker Version ID: ${stableId}`,
-    `Worker Version ID: ${candidateId}\nVersion Preview URL: https://stable.example.com`]) {
-    assert.throws(() => parseVersionUploadOutput(output));
-  }
-});
-
-test('exact zero staging is mandatory; epsilon/provider drift prevents promotion', async () => {
-  assert(stageZeroArguments(makePlan(), candidateId).includes(`${candidateId}@0%`));
-  const { actions, calls } = fixtureActions();
-  const read = actions.snapshot;
-  actions.snapshot = async () => {
-    const value = await read();
-    if (calls.includes('stage-zero')) value.deployment.versions[1].percentage = 0.01;
-    return value;
-  };
-  await assert.rejects(executeCandidateReleaseContract(makePlan(), actions), blocked('unexpected_deployment_distribution'));
-  assert(!calls.includes('promote'));
-});
-
-test('DO implementation or disabled previews blocks before build/upload', async () => {
-  for (const plan of [makePlan({ config: { ...config, env: { production: { ...config.env.production,
-    durable_objects: { bindings: [{ name: 'CACHE', class_name: 'Cache' }] } } } },
-  baselineConfig: { ...config, env: { production: { ...config.env.production,
-    durable_objects: { bindings: [{ name: 'CACHE', class_name: 'Cache' }] } } } } }),
-  makePlan({ baseline: { ...baseline, snapshot: { ...snapshot, subdomain: { enabled: false, previews_enabled: false } } } })]) {
-    const { actions, calls } = fixtureActions();
-    await assert.rejects(executeCandidateReleaseContract(plan, actions), blocked('candidate_plan_blocked'));
-    assert.deepEqual(calls, []);
-  }
-});
-
-test('missing isolated endpoint or candidate metadata mismatch cannot reach staging', async () => {
-  for (const change of [a => { a.upload = async () => `Worker Version ID: ${candidateId}`; },
-    a => { a.versionMetadata = async () => ({ id: stableId, bindings: snapshot.bindings }); }]) {
-    const { actions, calls } = fixtureActions(); change(actions);
-    await assert.rejects(executeCandidateReleaseContract(makePlan(), actions));
-    assert(!calls.includes('stage-zero') && !calls.includes('promote'));
-  }
-});
-
-test('version metadata existence cannot substitute for runtime identity', async () => {
-  for (const events of [[], makeEvents().map(e => ({ ...e, $workers: { ...e.$workers, scriptVersion: { id: stableId } } })),
-    makeEvents().map(e => ({ ...e, timestamp: 999 })), makeEvents().slice(0, 3)]) {
-    const { actions, calls } = fixtureActions();
-    actions.identityEvents = async () => events;
-    await assert.rejects(executeCandidateReleaseContract(makePlan(), actions), blocked('candidate_identity_unverified'));
-    assert(!calls.includes('promote'));
-  }
-});
-
-test('identity requires correlated receipts for every Worker path and override coverage', () => {
-  const smoke = makeSmoke();
-  assertOverrideIdentity({ versionId: candidateId, workerName: PRODUCTION_WORKER, smoke, events: makeEvents() });
-  smoke.workerReceipts = Array(4).fill(receipts[0]);
-  assert.throws(() => assertOverrideIdentity({ versionId: candidateId, workerName: PRODUCTION_WORKER, smoke, events: makeEvents() }));
-  smoke.workerReceipts = receipts; smoke.overrideCoverage.font = false;
-  assert.throws(() => assertOverrideIdentity({ versionId: candidateId, workerName: PRODUCTION_WORKER, smoke, events: makeEvents() }), blocked('override_subrequest_coverage_missing'));
-});
-
-test('HTTP 5xx, generic error, page/console error, writes, asset 404 and mismatch block promotion', async () => {
-  for (const [field, value] of Object.entries({ httpHardErrors: 1, fiveXX: 1, asset404: 1, genericError: true,
-    pageErrors: 1, consoleErrors: 1, unexpectedWrites: 1, versionMismatch: true })) {
-    const { actions, calls } = fixtureActions();
-    actions.smoke = async ({ origin }) => ({ ...makeSmoke(origin), [field]: value });
-    await assert.rejects(executeCandidateReleaseContract(makePlan(), actions), blocked('candidate_hard_failure'));
-    assert(!calls.includes('promote'), field);
-  }
-});
-
-test('transport-only timeout needs positive pending static evidence and a subsequent full PASS', () => {
-  const timeout = { ...safeAttempt('/login'), timeout: true, pass: false, pendingStaticAssets: 1 };
-  assert.equal(classifyCandidateAttempt(timeout), 'TRANSPORT_ONLY_TIMEOUT');
-  const smoke = makeSmoke(); smoke.attempts.splice(2, 0, timeout);
-  assertFullCandidateSmoke(smoke);
-  smoke.attempts.pop();
-  assert.throws(() => assertFullCandidateSmoke(smoke), blocked('full_pass_after_timeout_missing'));
-  for (const patch of [{ pendingStaticAssets: 0 }, { fiveXX: 1 }, { genericError: true }, { unexpectedWrites: 1 }, { versionMismatch: true }]) {
-    assert.equal(classifyCandidateAttempt({ ...timeout, ...patch }), 'APPLICATION_FAILURE');
-  }
-});
-
-test('third attempt, incomplete checks and missing asset response evidence cannot pass', () => {
-  const third = makeSmoke(); third.attempts.push(safeAttempt('/login'), safeAttempt('/login'));
-  assert.throws(() => assertFullCandidateSmoke(third), blocked('more_than_two_smoke_attempts'));
-  const incomplete = makeSmoke(); incomplete.checks.login = false;
-  assert.throws(() => assertFullCandidateSmoke(incomplete), blocked('candidate_checks_incomplete'));
-  const missing = makeSmoke(); missing.assetResponses.pop();
-  assert.throws(() => assertFullCandidateSmoke(missing), blocked('candidate_asset_missing'));
-});
-
-test('promotion requires preflight, both identity proofs and both full smoke passes', () => {
-  const evidence = { semanticPreflight: 'PASS', isolatedIdentityVerified: true, overrideIdentityVerified: true,
-    isolatedSmoke: makeSmoke(versionUrl), overrideSmoke: makeSmoke() };
-  for (const patch of [{ semanticPreflight: 'FAIL' }, { isolatedIdentityVerified: false },
-    { overrideIdentityVerified: false }, { overrideSmoke: { fullPass: false } }]) {
-    assert.throws(() => promotionArguments(makePlan(), candidateId, { ...evidence, ...patch }));
-  }
-  assert.throws(() => promotionArguments(makePlan(), stableId, evidence));
-});
-
-test('planned migrations/routes/bindings and live trigger drift block', async () => {
-  const changed = structuredClone(config); changed.env.production.migrations.push({ tag: 'new-migration' });
+test('only CF_VERSION_METADATA is an intentional local config change', () => {
+  const changed = structuredClone(config); changed.env.production.preview_urls = true;
   assert.throws(() => makePlan({ config: changed }), blocked('planned_trigger_or_config_change'));
-  const ordered = structuredClone(config); ordered.env.production.migrations = [{ tag: 'first' }, { tag: 'second' }];
-  const reordered = structuredClone(ordered); reordered.env.production.migrations.reverse();
-  assert.throws(() => makePlan({ config: reordered, baselineConfig: ordered }), blocked('planned_trigger_or_config_change'));
-  for (const mutate of [s => s.routes.push({ pattern: 'other.example.com/*' }), s => s.crons.push('* * * * *'),
-    s => { s.queueConsumers[0].settings.max_retries = 9; }, s => { s.bindings[2].name = 'OTHER_SECRET'; }]) {
-    const { actions, calls } = fixtureActions();
-    const read = actions.snapshot;
-    actions.snapshot = async () => { const value = await read(); mutate(value.snapshot); return value; };
-    await assert.rejects(executeCandidateReleaseContract(makePlan(), actions), blocked('trigger_or_config_drift'));
-    assert(!calls.includes('upload'));
+  const renamed = structuredClone(config); renamed.env.production.version_metadata.binding = 'WRONG';
+  assert.throws(() => makePlan({ config: renamed }));
+});
+test('DO migration additions, deletions, renames, transfers, tags and order block', () => {
+  for (const field of ['new_classes', 'deleted_classes', 'renamed_classes', 'transferred_classes', 'tag']) {
+    const changed = structuredClone(config); changed.env.production.migrations[0][field] = field === 'tag' ? 'new-tag' : ['Changed'];
+    assert.throws(() => makePlan({ config: changed }), blocked('DURABLE_OBJECT_LIFECYCLE_CHANGE_REQUIRES_ATOMIC_DEPLOY'));
+  }
+  const changed = structuredClone(config); changed.env.production.migrations[0].new_sqlite_classes.reverse();
+  assert.throws(() => makePlan({ config: changed }), blocked('DURABLE_OBJECT_LIFECYCLE_CHANGE_REQUIRES_ATOMIC_DEPLOY'));
+});
+test('DO bindings and exported lifecycle cannot be changed', () => {
+  const changed = structuredClone(config); changed.env.production.durable_objects.bindings[0].class_name = 'NewCache';
+  assert.throws(() => makePlan({ config: changed }), blocked('DURABLE_OBJECT_LIFECYCLE_CHANGE_REQUIRES_ATOMIC_DEPLOY'));
+  assert.throws(() => makePlan({ workerSource: workerSource.replace('DOQueueHandler', 'Other') }), blocked('DURABLE_OBJECT_LIFECYCLE_CHANGE_REQUIRES_ATOMIC_DEPLOY'));
+});
+test('generated build/auth constants are compared without normalization', () => {
+  assert.equal(compareDurableObjectProof(makeProof(), stableId), 'DO_IMPLEMENTATION_UNCHANGED');
+  assert.equal(compareDurableObjectProof(makeProof(artifact('different-revalidation-token')), stableId), 'DO_IMPLEMENTATION_CHANGED');
+  assert(makePlan({ durableObjectProof: makeProof(artifact('changed')) }).blockers.includes('DO_IMPLEMENTATION_CHANGED'));
+});
+test('unknown artifact, dependency or provider provenance blocks', () => {
+  for (const proof of [undefined, { ...makeProof(), contentEtag: 'b'.repeat(64) }, { ...makeProof(), candidate: null },
+    { ...makeProof(), stableVersionId: candidateId }, { ...makeProof(), namedHandlers: [] }]) {
+    assert(makePlan({ durableObjectProof: proof }).blockers.includes('DO_IMPLEMENTATION_UNKNOWN'));
+  }
+  assert.equal(fingerprintDurableObjectArtifact('no generated DO modules'), null);
+});
+test('stable artifact GET is tied to the exact provider version ETag', async () => {
+  const calls = []; const form = new FormData(); form.append('worker.js', new Blob([artifact()], { type: 'application/javascript' }), 'worker.js');
+  const fetchImplementation = async (url, options) => {
+    calls.push({ url, method: options.method });
+    if (url.endsWith(`/versions/${stableId}`)) return Response.json({ success: true, result: { id: stableId, resources: { script: { etag: 'a'.repeat(64), named_handlers: makeProof().namedHandlers } } } });
+    const r = new Response(form); r.headers.set('etag', '"' + 'a'.repeat(64) + '"'); return r;
+  };
+  const result = await readStableDurableObjectArtifact({ credentials: { accountId: 'fixture', apiToken: 'fixture-not-secret' }, workerName: PRODUCTION_WORKER, stableVersionId: stableId, fetchImplementation });
+  assert.equal(result.stable.modules.DOQueueHandler.sha256, makeProof().stable.modules.DOQueueHandler.sha256);
+  assert(calls.every(c => c.method === 'GET')); assert(calls[1].url.endsWith('/content/v2'));
+});
+test('upload without Version URL is accepted; ambiguous UUID is rejected', () => {
+  assert.deepEqual(parseVersionUploadOutput(`Worker Version ID: ${candidateId}`), { versionId: candidateId, versionUrl: null });
+  for (const value of ['', `Worker Version ID: ${candidateId}\nWorker Version ID: ${stableId}`]) assert.throws(() => parseVersionUploadOutput(value));
+});
+test('exact stable100/candidate0 staging contract', () => {
+  assert.deepEqual(stageZeroArguments(makePlan(), candidateId), ['versions', 'deploy', `${stableId}@100%`, `${candidateId}@0%`, '--config', './wrangler.jsonc', '--env', 'production', '--yes']);
+});
+test('promotion follows all gates and upload does not change the active deployment', async () => {
+  const { actions, calls } = fixtureActions(); const result = await executeCandidateReleaseContract(makePlan(), actions);
+  assert.equal(result.status, 'CANDIDATE_OVERRIDE_ONLY_RELEASE_CONTRACT_PASS');
+  assert.deepEqual(calls.filter(c => c !== 'snapshot'), ['build', 'preflight', 'do-proof', 'upload', 'metadata', 'stage-zero', 'override-smoke', 'promote', 'post-verification']);
+  assert.equal(calls.filter(c => c === 'upload').length, 1); assert.deepEqual(result.rollbackArguments, rollbackArguments(makePlan()));
+});
+test('fresh DO proof is required before upload even after a READY plan', async () => {
+  for (const proof of [makeProof(artifact('changed')), null]) {
+    const { actions, calls } = fixtureActions(); actions.durableObjectProof = async () => proof;
+    await assert.rejects(executeCandidateReleaseContract(makePlan(), actions)); assert(!calls.includes('upload'));
   }
 });
-
-test('concurrent config/traffic change at the final promotion gate aborts', async () => {
+test('changed deployment ID after upload blocks before staging', async () => {
   const { actions, calls } = fixtureActions(); const read = actions.snapshot;
-  actions.snapshot = async () => {
-    const result = await read();
-    if (calls.includes('identity')) result.deployment.versions[0].id = '33333333-3333-4333-8333-333333333333';
-    return result;
-  };
-  await assert.rejects(executeCandidateReleaseContract(makePlan(), actions), blocked('unexpected_deployment_distribution'));
-  assert(!calls.includes('promote'));
+  actions.snapshot = async () => { const r = await read(); if (calls.includes('upload')) r.deployment.id = 'concurrent'; return r; };
+  await assert.rejects(executeCandidateReleaseContract(makePlan(), actions), blocked('upload_changed_active_deployment')); assert(!calls.includes('stage-zero'));
 });
-
-test('bindings retain target IDs; secret values never appear in safe snapshots/plans/errors', () => {
-  const raw = structuredClone(snapshot);
-  raw.bindings[2].text = 'fixture-sensitive-value';
-  raw.bindings.push({ name: 'CACHE', type: 'durable_object_namespace', namespace_id: 'namespace-a', class_name: 'Cache' });
-  const safe = safeConfigSnapshot(raw);
-  assert(!JSON.stringify(safe).includes('fixture-sensitive-value'));
-  const changed = structuredClone(raw); changed.bindings.at(-1).namespace_id = 'namespace-b';
-  assert.throws(() => assertConfigUnchanged(raw, changed), blocked('trigger_or_config_drift'));
-  const plan = makePlan({ baseline: { ...baseline, snapshot: raw } });
-  assert(!JSON.stringify(plan).includes('fixture-sensitive-value'));
-  assert.throws(() => makePlan({ runtimeVariables: { SUPABASE_SERVICE_ROLE_KEY: 'fixture-sensitive-value' } }), error => {
-    assert(!error.message.includes('fixture-sensitive-value')); return error.code === 'credential_or_unmanaged_var_override';
-  });
-  assert.throws(() => parseVersionUploadOutput(`Worker Version ID: ${candidateId}\nVersion Preview URL: https://[fixture-sensitive-value`), error => {
-    assert(!error.message.includes('fixture-sensitive-value')); return error.code === 'invalid_provider_version_url';
-  });
+test('epsilon, unknown percentage, missing candidate and third version all reject', async () => {
+  for (const mutate of [d => { d.versions[0].percentage = 99.99; d.versions[1].percentage = 0.01; },
+    d => { delete d.versions[1].percentage; }, d => { d.versions.pop(); }, d => { d.versions.push({ id: '33333333-3333-4333-8333-333333333333', percentage: 0 }); }]) {
+    const { actions, calls } = fixtureActions(); const read = actions.snapshot;
+    actions.snapshot = async () => { const r = await read(); if (calls.includes('stage-zero')) mutate(r.deployment); return r; };
+    await assert.rejects(executeCandidateReleaseContract(makePlan(), actions), blocked('unexpected_deployment_distribution')); assert(!calls.includes('promote'));
+  }
 });
-
+test('ignored override or absent metadata fails identity without sampled logs', () => {
+  for (const versionId of [stableId, null]) { const smoke = makeSmoke(); smoke.workerReceipts[0].versionId = versionId;
+    assert.throws(() => assertOverrideIdentity({ versionId: candidateId, smoke }), blocked('candidate_identity_unverified')); }
+  assertOverrideIdentity({ versionId: candidateId, smoke: makeSmoke() });
+});
+test('every Worker path and first-party read requires exact identity/override/probe', () => {
+  for (const key of ['overrideApplied', 'probeApplied']) { const smoke = makeSmoke(); smoke.workerReceipts[0][key] = false; assert.throws(() => assertOverrideIdentity({ versionId: candidateId, smoke })); }
+  const missing = makeSmoke(); missing.workerReceipts.pop(); assert.throws(() => assertOverrideIdentity({ versionId: candidateId, smoke: missing }));
+  const incomplete = makeSmoke(); incomplete.allFirstPartyReadsOverridden = false; assert.throws(() => assertOverrideIdentity({ versionId: candidateId, smoke: incomplete }));
+});
+test('ordinary responses have no new header and retain the same response object', () => {
+  const response = new Response('unchanged', { headers: { 'content-type': 'text/plain' } });
+  assert.equal(withReleaseProbeIdentity(new Request(PRODUCTION_ORIGIN), response, { id: candidateId }), response);
+  assert.equal(response.headers.has('X-Locally-Worker-Version'), false);
+});
+test('exact GET/HEAD probe adds identity while preserving status/body/existing headers', async () => {
+  for (const method of ['GET', 'HEAD']) {
+    const response = new Response('fixture-body', { status: 401, headers: { 'content-type': 'text/plain', 'x-existing': 'same' } });
+    const probe = withReleaseProbeIdentity(new Request(PRODUCTION_ORIGIN, { method, headers: { 'X-Locally-Release-Probe': '1' } }), response, { id: candidateId });
+    assert.equal(probe.headers.get('X-Locally-Worker-Version'), candidateId); assert.equal(probe.status, 401);
+    assert.equal(probe.headers.get('x-existing'), 'same'); assert.equal(probe.headers.has('set-cookie'), false); assert.equal(await probe.text(), 'fixture-body');
+  }
+});
+test('writes, nonexact probe and missing metadata cannot add a version header', () => {
+  for (const [method, value, metadata] of [['POST', '1', { id: candidateId }], ['GET', 'true', { id: candidateId }], ['GET', '1', undefined]]) {
+    const response = new Response(); assert.equal(withReleaseProbeIdentity(new Request(PRODUCTION_ORIGIN, { method, headers: { 'X-Locally-Release-Probe': value } }), response, metadata), response);
+  }
+});
+test('static assets need override/200/no redirect and matching candidate HTML set, not metadata headers', () => {
+  assertFullCandidateSmoke(makeSmoke());
+  for (const mutate of [s => { s.assetResponses[0].status = 404; }, s => { s.assetResponses[0].redirected = true; },
+    s => { s.assetResponses[0].overrideApplied = false; }, s => { s.assetSetMatches = false; }]) { const s = makeSmoke(); mutate(s); assert.throws(() => assertFullCandidateSmoke(s)); }
+});
+test('promotion arguments cannot be formed before every gate passes', () => {
+  const evidence = { semanticPreflight: 'PASS', uploadDeploymentUnchanged: true, exactZeroStagingVerified: true,
+    overrideIdentityVerified: true, doImplementation: 'DO_IMPLEMENTATION_UNCHANGED', overrideSmoke: makeSmoke() };
+  assert(promotionArguments(makePlan(), candidateId, evidence).includes(`${candidateId}@100%`));
+  for (const key of ['semanticPreflight', 'uploadDeploymentUnchanged', 'exactZeroStagingVerified', 'overrideIdentityVerified', 'doImplementation']) assert.throws(() => promotionArguments(makePlan(), candidateId, { ...evidence, [key]: null }));
+  const smoke = makeSmoke(); smoke.workerReceipts = []; assert.throws(() => promotionArguments(makePlan(), candidateId, { ...evidence, overrideSmoke: smoke }));
+});
+test('at most two attempts; only static transport timeouts can precede a full pass', () => {
+  const retry = { ...safeAttempt('/login'), pass: false, timeout: true, pendingStaticAssets: 1 };
+  assert.equal(classifyCandidateAttempt(retry), 'TRANSPORT_ONLY_TIMEOUT');
+  const smoke = makeSmoke(); smoke.attempts.splice(2, 0, retry); assertFullCandidateSmoke(smoke);
+  smoke.attempts.splice(2, 0, retry); assert.throws(() => assertFullCandidateSmoke(smoke), blocked('more_than_two_smoke_attempts'));
+  for (const change of [{ pageErrors: 1 }, { fiveXX: 1 }, { unexpectedWrites: 1 }, { pendingStaticAssets: 0 }]) assert.equal(classifyCandidateAttempt({ ...retry, ...change }), 'APPLICATION_FAILURE');
+});
+test('only version metadata may differ in provider readback; secrets and all triggers remain fixed', () => {
+  assertConfigUnchanged(snapshot, { ...snapshot, bindings: [...snapshot.bindings, metadataBinding] }, { metadata: 'required' });
+  for (const change of [{ crons: [] }, { queueConsumers: [] }, { routes: [] }]) assert.throws(() => assertConfigUnchanged(snapshot, { ...snapshot, ...change }));
+  const changed = structuredClone(snapshot); changed.bindings[0].text = 'changed'; assert.throws(() => assertConfigUnchanged(snapshot, changed, { metadata: 'optional' }));
+  const lost = { ...snapshot, bindings: [...snapshot.bindings.slice(1), metadataBinding] }; assert.throws(() => assertConfigUnchanged(snapshot, lost, { metadata: 'required' }));
+});
+test('secret values and unmanaged var values cannot enter logs or plans', () => {
+  const raw = structuredClone(snapshot); raw.bindings.find(b => b.name === 'SUPABASE_SERVICE_ROLE_KEY').text = 'fixture-sensitive-value';
+  assert(!JSON.stringify(safeConfigSnapshot(raw)).includes('fixture-sensitive-value'));
+  assert(!JSON.stringify(makePlan({ baseline: { ...baseline, snapshot: raw } })).includes('fixture-sensitive-value'));
+  assert.throws(() => makePlan({ runtimeVariables: { SUPABASE_SERVICE_ROLE_KEY: 'fixture-sensitive-value' } }), blocked('credential_or_unmanaged_var_override'));
+});
 test('lost encrypted binding on uploaded candidate prevents staging', async () => {
-  const { actions, calls } = fixtureActions();
-  actions.versionMetadata = async id => ({ id, bindings: snapshot.bindings.filter(b => b.name !== 'SUPABASE_SERVICE_ROLE_KEY') });
-  await assert.rejects(executeCandidateReleaseContract(makePlan(), actions), blocked('candidate_binding_or_secret_drift'));
-  assert(!calls.includes('stage-zero'));
+  const { actions, calls } = fixtureActions(); actions.versionMetadata = async id => ({ id, bindings: [...snapshot.bindings.filter(b => b.name !== 'SUPABASE_SERVICE_ROLE_KEY'), metadataBinding] });
+  await assert.rejects(executeCandidateReleaseContract(makePlan(), actions), blocked('candidate_binding_or_secret_drift')); assert(!calls.includes('stage-zero'));
 });
-
-test('CLI is plan/dry-run only and cannot run upload/stage/promote or force options', async () => {
+test('CLI installs no live adapters and only executes local dry-run commands', async () => {
   for (const args of [['--execute'], ['--force'], ['--plan', '--dry-run']]) assert.throws(() => parseCandidateArguments(args));
-  const calls = []; const logs = [];
-  const deps = { config, baselineConfig: config, readBaseline: async () => baseline,
-    resolveContract: async () => ({ runtimeVariables: flags, readerEnvironment: {} }), wranglerVersion: '4.129.1',
-    semanticPreflight: async () => ({ status: 'PRODUCTION_DEPLOY_SEMANTIC_PREFLIGHT_PASS' }),
-    runLocal: (_cmd, args) => calls.push(args), log: s => logs.push(s) };
+  const calls = []; const logs = []; const proof = makeProof();
+  const deps = { config, baselineConfig, workerSource, baselineWorkerSource: workerSource, durableObjectProof: proof,
+    readBaseline: async () => baseline, resolveContract: async () => ({ runtimeVariables: flags, readerEnvironment: {} }), wranglerVersion: '4.129.1',
+    semanticPreflight: async () => ({ status: 'PRODUCTION_DEPLOY_SEMANTIC_PREFLIGHT_PASS' }), readStableArtifact: async () => proof,
+    readCandidateArtifact: async () => artifact(), runLocal: (_cmd, args) => calls.push(args), log: s => logs.push(s) };
   const plan = await main(['--plan'], deps); assert.equal(plan.candidateUpload, 0); assert.deepEqual(calls, []);
-  await main(['--dry-run'], deps);
-  assert.equal(calls.length, 2);
-  assert.deepEqual(calls[0], ['run', 'cloudflare:build:production']);
-  assert.deepEqual(calls[1].slice(0, 2), ['versions', 'upload']); assert.equal(calls[1].at(-1), '--dry-run');
+  const dry = await main(['--dry-run'], deps); assert.equal(dry.localDryRun, 'PASS'); assert.equal(calls.length, 2);
+  assert.deepEqual(calls[0], ['run', 'cloudflare:build:production']); assert.equal(calls[1].at(-1), '--dry-run'); assert(calls[1].includes('--outdir'));
+  await assert.rejects(main(['--plan'], { ...deps, durableObjectProof: undefined }), blocked('DO_IMPLEMENTATION_UNKNOWN'));
   assert(logs.every(s => !s.includes('fixture-sensitive-value')));
-  await assert.rejects(main(['--plan'], { ...deps, semanticPreflight: async () => ({ status: 'FAIL' }) }), blocked('semantic_preflight_failed'));
+});
+test('failed post-promotion regression does not automatically repeat promotion or rollback', async () => {
+  const { actions, calls } = fixtureActions(); actions.postDeployVerification = async () => ({ browserSmoke: 'FAIL' });
+  await assert.rejects(executeCandidateReleaseContract(makePlan(), actions), blocked('post_deploy_verification_failed')); assert.equal(calls.filter(c => c === 'promote').length, 1);
 });
 
-test('post-promotion regression fails without an automatic rollback or second promotion', async () => {
-  const { actions, calls } = fixtureActions();
-  actions.postDeployVerification = async () => ({ browserSmoke: 'FAIL' });
-  await assert.rejects(executeCandidateReleaseContract(makePlan(), actions), blocked('post_deploy_verification_failed'));
-  assert.equal(calls.filter(c => c === 'promote').length, 1);
-});
-
-test('real Chromium sends the candidate override on HTML, JS, font and API; writes remain blocked', { timeout: 20000 }, async () => {
-  const received = [];
-  const font = await readFile(new URL('../../app/fonts/Inter/Inter_18pt-Regular.woff2', import.meta.url));
-  let ray = 1;
+test('Chromium propagates override/probe on documents, data, JS, CSS, font, image and API; writes remain blocked', { timeout: 25000 }, async () => {
+  const received = []; const font = await readFile(new URL('../../app/fonts/Inter/Inter_18pt-Regular.woff2', import.meta.url));
   const server = createServer((request, response) => {
     const pathname = new URL(request.url, 'http://127.0.0.1').pathname;
-    received.push({ pathname, method: request.method, override: request.headers['cloudflare-workers-version-overrides'] });
-    response.setHeader('cf-ray', `${(ray++).toString(16).padStart(16, '0')}-TEST`);
+    received.push({ pathname, method: request.method, override: request.headers['cloudflare-workers-version-overrides'], probe: request.headers['x-locally-release-probe'] });
+    if (!pathname.startsWith('/_next/static/')) response.setHeader('X-Locally-Worker-Version', candidateId);
     if (pathname === '/api/proxy-bookings') { response.writeHead(401).end(); return; }
-    if (pathname === '/_next/static/app.js') { response.writeHead(200, { 'content-type': 'text/javascript' }).end('void 0;'); return; }
+    if (pathname === '/data') { response.writeHead(200, { 'content-type': 'application/json' }).end('{}'); return; }
+    if (pathname === '/_next/static/app.js') { response.writeHead(200, { 'content-type': 'text/javascript' }).end("fetch('/data');fetch('/cdn-cgi/rum',{method:'POST'}).catch(()=>{});"); return; }
     if (pathname === '/_next/static/font.woff2') { response.writeHead(200, { 'content-type': 'font/woff2' }).end(font); return; }
+    if (pathname === '/_next/static/style.css') { response.writeHead(200, { 'content-type': 'text/css' }).end('body{color:black}'); return; }
+    if (pathname === '/image.svg') { response.writeHead(200, { 'content-type': 'image/svg+xml' }).end('<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>'); return; }
     response.writeHead(200, { 'content-type': 'text/html' }).end(`<!doctype html><title>Fixture</title>
-      <link rel="preload" href="/_next/static/font.woff2" as="font" type="font/woff2" crossorigin>
+      <link rel="preload" href="/_next/static/font.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/_next/static/style.css">
       <style>@font-face{font-family:fixture;src:url('/_next/static/font.woff2')}body{font-family:fixture}</style>
-      <script src="/_next/static/app.js"></script><body><h1>Fixture</h1><a href="/experiences/42">Experience</a>
-      ${pathname === '/login' ? '<div data-testid="login-modal"><input type="email"><input type="password"></div>' : ''}
-      <script>fetch('/cdn-cgi/rum',{method:'POST'}).catch(()=>{});</script></body>`);
+      <script src="/_next/static/app.js"></script><body><h1>Fixture</h1><img src="/image.svg"><a href="/experiences/42">Experience</a>
+      ${pathname === '/login' ? '<div data-testid="login-modal"><input type="email"><input type="password"></div>' : ''}</body>`);
   });
-  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  const origin = `http://127.0.0.1:${server.address().port}`;
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve)); const origin = `http://127.0.0.1:${server.address().port}`;
   try {
     const smoke = await runCandidateBrowserSmoke({ origin, mode: 'override', workerName: PRODUCTION_WORKER, versionId: candidateId });
-    assertFullCandidateSmoke(smoke);
-    assert.deepEqual(smoke.overrideCoverage, { document: true, script: true, font: true, api: true });
-    assert.equal(smoke.workerReceipts.length, 4);
-    for (const path of ['/', '/login', '/experiences/42', '/_next/static/app.js', '/_next/static/font.woff2', '/api/proxy-bookings']) {
-      assert(received.some(r => r.pathname === path), path);
-      assert(received.filter(r => r.pathname === path).every(r => r.override === versionOverrideHeader(PRODUCTION_WORKER, candidateId)), path);
+    assertFullCandidateSmoke(smoke); assertOverrideIdentity({ versionId: candidateId, smoke, expectedOrigin: origin });
+    assert(Object.values(smoke.overrideCoverage).every(Boolean));
+    for (const path of ['/', '/login', '/experiences/42', '/_next/static/app.js', '/_next/static/font.woff2', '/_next/static/style.css', '/image.svg', '/data', '/api/proxy-bookings']) {
+      assert(received.some(r => r.pathname === path), path); assert(received.filter(r => r.pathname === path).every(r => r.override === versionOverrideHeader(PRODUCTION_WORKER, candidateId) && r.probe === '1'), path);
     }
     assert(received.every(r => r.method === 'GET'), 'mutation gate must not forward telemetry POST');
-  } finally {
-    server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
-  }
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
 });

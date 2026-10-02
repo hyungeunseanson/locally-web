@@ -3,7 +3,8 @@ import path from 'node:path';
 import process from 'node:process';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { buildCandidateReleasePlan, CandidateReleaseBlocked, PRODUCTION_WORKER } from './candidate-release-contract.mjs';
+import { assertConfigUnchanged, buildCandidateReleasePlan, CandidateReleaseBlocked, PRODUCTION_WORKER } from './candidate-release-contract.mjs';
+import { fingerprintDurableObjectArtifact, readStableDurableObjectArtifact } from './durable-object-release-safety.mjs';
 import { resolveProductionDeploymentContract } from './run-production-deploy.mjs';
 import { readProductionSnapshot, resolveCloudflareReadCredentials, runProductionDeploySemanticPreflight } from './verify-production-deploy-contract.mjs';
 
@@ -37,10 +38,15 @@ export async function main(args = process.argv.slice(2), dependencies = {}) {
   // A changed local config must not declare itself the unchanged baseline.
   const baselineConfig = dependencies.baselineConfig ?? JSON.parse(execFileSync('git',
     ['show', 'origin/main:wrangler.jsonc'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }));
+  const workerSource = dependencies.workerSource ?? await readFile('cloudflare-worker.ts', 'utf8');
+  const baselineWorkerSource = dependencies.baselineWorkerSource ?? execFileSync('git',
+    ['show', 'origin/main:cloudflare-worker.ts'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   const contract = await (dependencies.resolveContract ?? resolveProductionDeploymentContract)();
   const baseline = await (dependencies.readBaseline ?? readCandidateBaseline)();
   const wranglerVersion = dependencies.wranglerVersion ?? JSON.parse(await readFile('node_modules/wrangler/package.json', 'utf8')).version;
-  const plan = buildCandidateReleasePlan({ config, baseline, baselineConfig, runtimeVariables: contract.runtimeVariables, wranglerVersion });
+  const input = { config, baseline, baselineConfig, workerSource, baselineWorkerSource,
+    runtimeVariables: contract.runtimeVariables, wranglerVersion };
+  let plan = buildCandidateReleasePlan({ ...input, durableObjectProof: dependencies.durableObjectProof });
   const semantic = await (dependencies.semanticPreflight ?? runProductionDeploySemanticPreflight)({
     expectedVariables: contract.runtimeVariables, allowedPlannedChanges: [], allowedPlannedCronAdditions: [], log: () => {},
   });
@@ -50,27 +56,40 @@ export async function main(args = process.argv.slice(2), dependencies = {}) {
     const run = dependencies.runLocal ?? runLocal;
     run(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'cloudflare:build:production'], env);
     run(path.join(process.cwd(), 'node_modules', '.bin', process.platform === 'win32' ? 'wrangler.cmd' : 'wrangler'),
-      [...plan.uploadArguments, '--dry-run'], env);
+      [...plan.uploadArguments, '--outdir', '.wrangler/candidate-dry-run', '--dry-run'], env);
+    const stableArtifact = await (dependencies.readStableArtifact ?? (() => readStableDurableObjectArtifact({
+      credentials: resolveCloudflareReadCredentials(), workerName: PRODUCTION_WORKER, stableVersionId: plan.stableVersionId,
+    })))();
+    const source = await (dependencies.readCandidateArtifact ?? (() => readFile('.wrangler/candidate-dry-run/cloudflare-worker.js', 'utf8')))();
+    const durableObjectProof = { ...stableArtifact, candidate: fingerprintDurableObjectArtifact(source) };
+    const after = await (dependencies.readBaseline ?? readCandidateBaseline)();
+    assertConfigUnchanged(baseline.snapshot, after.snapshot);
+    if (JSON.stringify(baseline.deployment) !== JSON.stringify(after.deployment)) throw new CandidateReleaseBlocked('concurrent_deployment_changed');
+    plan = buildCandidateReleasePlan({ ...input, durableObjectProof });
+    // Contains only digests, public class/version IDs and dependency versions.
+    log(JSON.stringify({ durableObjectProof, doImplementation: plan.doImplementation }));
   }
   const result = {
     status: plan.status, stableVersionId: plan.stableVersionId, blockers: plan.blockers,
     plannedTriggerChanges: [], encryptedSecrets: plan.encryptedSecrets,
     semanticPreflight: 'PASS',
+    doImplementation: plan.doImplementation, versionUrlCapability: plan.versionUrlCapability,
+    intentionalBindingAddition: plan.intentionalBindingAddition,
     candidateUpload: 0, deploymentMutation: 0, trafficChange: 0,
     localDryRun: options.dryRun ? 'PASS' : 'NOT_RUN',
-    liveExecutionAdapters: 'NOT_INSTALLED_PENDING_SUPPORTED_ISOLATION_PATH',
+    liveExecutionAdapters: 'NOT_INSTALLED_CODE_CONTRACT_ONLY',
   };
   log(JSON.stringify(result));
   // Plan/read-only and local dry-run only. No upload/stage/promote command can
-  // be executed by this CLI while Production isolation is unsupported.
-  if (plan.blockers.length) throw new CandidateReleaseBlocked('isolated_candidate_endpoint_unavailable');
+  // be executed by this CLI; exact-zero staging needs separate authorization.
+  if (plan.blockers.length) throw new CandidateReleaseBlocked(plan.blockers[0]);
   return result;
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
   try { await main(); }
   catch (error) {
-    console.error(JSON.stringify({ status: 'CANDIDATE_FIRST_RELEASE_FLOW_BLOCKED',
+    console.error(JSON.stringify({ status: 'CANDIDATE_OVERRIDE_ONLY_RELEASE_FLOW_BLOCKED',
       reason: error instanceof CandidateReleaseBlocked ? error.code : 'candidate_release_verification_failed' }));
     process.exitCode = 1;
   }

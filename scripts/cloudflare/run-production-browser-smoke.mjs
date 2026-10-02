@@ -94,10 +94,16 @@ export async function installProductionMutationGate(context, origin, {
 
     if (READ_METHODS.has(method)) {
       if (override && url.origin === productionOrigin) {
-        await route.continue({ headers: { ...request.headers(), 'Cloudflare-Workers-Version-Overrides': override } });
-        versionOverride.onApplied?.({ pathname: url.pathname, resourceType: request.resourceType() });
+        await route.continue({ headers: { ...request.headers(), 'Cloudflare-Workers-Version-Overrides': override,
+          ...(['GET', 'HEAD'].includes(method) ? { 'X-Locally-Release-Probe': '1' } : {}) } });
+        versionOverride.onApplied?.({ pathname: url.pathname, resourceType: request.resourceType(), method });
       } else {
-        await route.continue();
+        if (override && url.origin !== productionOrigin) {
+          const headers = { ...request.headers() };
+          delete headers['cloudflare-workers-version-overrides'];
+          delete headers['x-locally-release-probe'];
+          await route.continue({ headers });
+        } else await route.continue();
       }
       return;
     }
@@ -243,6 +249,7 @@ export async function visitReadOnlyPage(context, origin, pathname, check, {
   log = console.log,
   navigationTimeoutMs = NAVIGATION_TIMEOUT_MS,
   assertAdditionalSafety = () => {},
+  collectReadOnlyPageEvidence = async () => {},
 } = {}) {
   assert(mutationGate, 'Read-only pages require the context mutation gate.');
   assert(Number.isFinite(navigationTimeoutMs) && navigationTimeoutMs > 0 && navigationTimeoutMs <= NAVIGATION_TIMEOUT_MS);
@@ -342,6 +349,7 @@ export async function visitReadOnlyPage(context, origin, pathname, check, {
     try {
       state = await readPageState(page);
       assertSafety();
+      if (!failure) await collectReadOnlyPageEvidence(page);
     } catch (error) {
       safetyFailure = error;
     } finally {
@@ -414,6 +422,7 @@ export async function runProductionBrowserSmoke(
     versionOverride,
     observeContext = async () => {},
     assertAdditionalSafety = () => {},
+    collectReadOnlyPageEvidence = async () => {},
   } = {}
 ) {
   assert(Number.isFinite(loginReadinessTimeoutMs) && loginReadinessTimeoutMs > 0);
@@ -436,7 +445,7 @@ export async function runProductionBrowserSmoke(
     stubbedExternalScripts,
   } = mutationGate;
   const pageAttempts = [];
-  const visitOptions = { mutationGate, attemptDiagnostics: pageAttempts, log, assertAdditionalSafety };
+  const visitOptions = { mutationGate, attemptDiagnostics: pageAttempts, log, assertAdditionalSafety, collectReadOnlyPageEvidence };
   let result;
   let smokeError;
 

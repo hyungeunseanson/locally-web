@@ -1,28 +1,15 @@
-# Candidate-first Production release contract
+# Candidate override-only Production release contract
 
-## Current decision: BLOCKED
+This Draft replaces the Version URL prerequisite with exact-zero deployment and
+Version Override smoke. Workers implementing Durable Objects have no Version
+URL; `preview_urls=false` and DO presence do not block this architecture.
+A candidate in the current deployment at exactly 0% can be selected on the
+Production custom domain with a Version Override.
 
-This Draft adds a separately tested release contract, a candidate browser adapter,
-and a read-only/local dry-run command. It does **not** install live upload,
-deployment, telemetry-query or post-deployment health adapters. The existing
-`cloudflare:deploy:production` command retains its current gates and behavior.
+Sources: [Version URLs](https://developers.cloudflare.com/workers/versions-and-deployments/version-urls/),
+[Version Overrides](https://developers.cloudflare.com/workers/versions-and-deployments/version-overrides/).
 
-Production implements `DOQueueHandler` and `DOShardedTagCache`, and both its
-config and the provider snapshot disable Version URLs. Cloudflare does not
-generate Version URLs for Workers implementing Durable Objects. Enabling
-`preview_urls` alone would not resolve that limitation. Creating a separate
-Preview would provision separate DO resources/settings and would require a
-separately reviewed design; it cannot silently replace testing the uploaded
-Production version with the existing bindings.
-
-Consequently this path blocks before an actual upload. No preview flag, DO
-binding, migration, route, consumer or secret is changed to make it pass. Missing
-isolation must be resolved before enabling live execution.
-
-See [Version URLs](https://developers.cloudflare.com/workers/versions-and-deployments/version-urls/)
-and [workflow comparison](https://developers.cloudflare.com/workers/previews/compare-workflows/).
-
-## Commands available in this Draft
+## Commands and authorization boundary
 
 ```sh
 npm run cloudflare:release:production -- --plan
@@ -30,98 +17,163 @@ npm run cloudflare:release:production -- --dry-run
 npm run cloudflare:candidate-release:contract
 ```
 
-The default is `--plan`. It reads Production metadata, checks the local Wrangler
-config against fetched `origin/main`, and runs the existing semantic preflight
-with no allowed config/Cron changes. On current Production it reports BLOCKED
-and exits nonzero. Fetch/recheck `origin/main` before running it.
+Fetch/recheck `origin/main` first. The CLI supports only read-only planning and
+local build/package dry-run. It installs no live mutation adapters and accepts
+no execute, force or bypass option. The existing `cloudflare:deploy:production`
+command retains its gates and behavior. PR #160 remains Draft; merge is forbidden
+until the Admin Attention Production rollout has completed and merge is authorized.
 
-`--dry-run` additionally runs the existing Production build and
-`wrangler versions upload --dry-run`. Wrangler 4.129.1 skips provider assets and
-version uploads in that mode. Public build variables are supplied exactly as
-for the existing build; Production secret values are never fetched. Fixture
-public variables are acceptable for local build validation only, and cannot
-produce a Production-ready release artifact. Child output is captured instead
-of logged because it can contain variable values. There is no `--execute`,
-force or bypass option.
+`--plan` requires fresh DO artifact evidence to report release readiness; without
+it the verdict is `DO_IMPLEMENTATION_UNKNOWN`. `--dry-run` builds Production
+locally, packages with `wrangler versions upload --dry-run`, compares DO artifacts
+and checks the provider baseline again. Child output stays captured because it
+can contain variable values. Public fixture credentials validate local packaging
+only and do not produce a deployable Production artifact. No Production secret
+values are fetched or printed.
 
-## Future sequence, exercised with injected fixture adapters
+An actual `versions upload` creates a version without assigning active traffic.
+`stable@100% + candidate@0%` **changes Production deployment metadata**, although
+ordinary candidate traffic remains 0%. That staging requires separate user
+approval. This code/contract task performs neither operation.
 
-1. Capture the current single stable version at 100% and sanitize the provider
-   configuration snapshot. Build, then semantic preflight must pass.
-2. Recheck stable traffic/config immediately before `versions upload`. Keep
-   encrypted secrets and managed flag values; capture exactly one uploaded UUID
-   and its provider Version URL. Check candidate metadata/binding targets and
-   verify upload left the deployment unchanged.
-3. Run isolated candidate smoke on its immutable Version URL. Require that same
-   origin, no redirects, HTML asset references returning 200, Home, public detail,
-   login input readiness and unauthenticated API 401.
-4. Add the candidate to the active deployment at **exactly 0%**, stable at 100%.
-   This is a deployment mutation even though ordinary traffic remains stable.
-   Read the provider distribution back; epsilon traffic is rejected.
-5. Smoke `https://www.locally-travel.com` with
-   `Cloudflare-Workers-Version-Overrides: locally-web-opennext-production="<UUID>"`
-   on first-party read requests, including HTML, JS, font and API. Reuse the
-   existing context mutation gate and maximum two attempts per page.
-6. Require request-level execution identity, both full candidate smoke passes,
-   no hard failure and a fresh unchanged-config/distribution precheck. Then
-   `versions deploy <candidate>@100%` removes stable from the distribution.
-7. Require the resulting single candidate at 100%, unchanged scheduled flags,
-   natural Cron health, Queue health and post-deploy browser smoke. The Draft's
-   fixture adapter checks these obligations; live health readers remain absent.
+## Release sequence, tested with fixture adapters
 
-Upload never substitutes for deployment. Trigger changes are an independent
-provider operation and are absent from the plan. Pinned Wrangler may synchronize
-non-versioned settings during `versions deploy`; snapshots before/after staging
-and promotion must therefore remain identical.
+1. Capture the exact single stable version at 100%, deployment ID and sanitized
+   config. Build and semantic preflight must pass. Validate fresh DO proof.
+2. Recheck config and deployment immediately before upload. Upload once with
+   pinned Wrangler and `--keep-vars --strict`; capture exactly one candidate UUID.
+   Verify its encrypted binding names/types and targets, allowing only the new
+   `CF_VERSION_METADATA` binding. Version URL is optional capability data.
+3. Verify upload left the exact active deployment ID and stable100 distribution
+   unchanged. No isolated Version URL smoke is attempted.
+4. Stage exactly:
 
-See [versions and deployments](https://developers.cloudflare.com/workers/versions-and-deployments/),
-[deployment management](https://developers.cloudflare.com/workers/versions-and-deployments/deployment-management/)
-and [version overrides](https://developers.cloudflare.com/workers/versions-and-deployments/version-overrides/).
+   ```sh
+   wrangler versions deploy <stable>@100% <candidate>@0% \
+     --config ./wrangler.jsonc --env production --yes
+   ```
 
-## Identity and transport evidence
+   Read back exactly those two versions with numeric 100 and 0. Reject epsilon
+   traffic, an unknown percentage, a missing candidate or any third version.
+5. Smoke `https://www.locally-travel.com` with both headers on first-party reads:
 
-Version existence or a configured override header does not prove execution.
-For override smoke, correlate response Ray IDs and bounded request timestamps
-with existing Workers Observability invocation fields: script name, exact
-`scriptVersion.id`, `requestId`, fetch event and successful outcome. Require
-receipts for Home, login, public detail and API. Keep only pathname, timestamp,
-status and Ray receipts; do not collect bodies, cookies, auth, query strings,
-HAR or raw provider events. Static responses need the same override and 200
-asset evidence; they need not generate Worker invocation logs.
+   ```text
+   Cloudflare-Workers-Version-Overrides: locally-web-opennext-production="<candidate UUID>"
+   X-Locally-Release-Probe: 1
+   ```
 
-The provider API describes `requestId` as the triggering request's Cloudflare
-Ray ID. Missing or sampled-out identity evidence blocks promotion. Current 10%
-Observability sampling is preserved and may cause that block; no debug header
-or sampling/config change is introduced. Version URLs cannot be inspected with
-Workers Logs, tail or Logpush; their isolated identity contract relies on the
-provider-issued immutable URL, matching UUID/metadata and absence of redirects.
+   This includes documents, RSC/data GET, JS, CSS, fonts, images and API GET.
+   Preserve the existing context write gate and PR #158's maximum two attempts,
+   readiness timeouts, HTTP status assertions and browser error checks.
+6. Require exact deterministic candidate identity, Home/login/detail/API401 PASS,
+   assets matched to the candidate HTML, no redirect/404/5xx/generic error,
+   pageerror, first-party console error or unexpected write. Recheck the exact
+   zero deployment ID, distribution and config before promotion.
+7. Only after all gates pass, deploy candidate100, read back single100 and verify
+   browser, natural Cron and Queue health plus unchanged scheduled flags.
+   Live upload/stage/promote and health adapters are intentionally absent here.
 
-Only a recorded timeout with pending JS/font assets and explicit absence of
-HTTP hard errors, 5xx, generic error, page/console errors, writes, asset 404 or
-version mismatch is `TRANSPORT_ONLY_TIMEOUT`. A subsequent full PASS within
-two attempts is required. An unclassified timeout, missing evidence or third
-attempt blocks. The classifier does not widen timeouts, change QUIC settings
-or bypass the existing browser safety checks.
+No automatic mutation retry or rollback is installed. A rollback argument helper
+retains the captured stable UUID; executing it is a separately approved action.
 
-See [Workers API telemetry fields](https://developers.cloudflare.com/api/resources/workers/)
-and [Workers Logs](https://developers.cloudflare.com/workers/observability/logs/workers-logs/).
+## Durable Object gates
 
-## Preservation and recovery
+Preserve Production `DOQueueHandler` and `DOShardedTagCache` bindings, namespace
+IDs, exported handlers and migration declarations **including array order**.
+Creation, deletion, rename, transfer, tag, binding or export lifecycle changes
+block with `DURABLE_OBJECT_LIFECYCLE_CHANGE_REQUIRES_ATOMIC_DEPLOY`.
 
-Snapshot comparisons cover routes, custom domains, preview settings,
-Observability, Cron expressions, Queue consumers/settings, managed flags and
-binding names/types/targets including DO namespace IDs. Local config comparison
-includes DO migrations. `plannedTriggerChanges` is always empty. Secret values
-and public API-key values are excluded; only encrypted binding names/types are
-retained. `SUPABASE_SERVICE_ROLE_KEY` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` must
-remain encrypted bindings. `keep_vars: true`, `--keep-vars` and Wrangler's
-existing secret inheritance preserve provider state. Managed runtime overrides
-must already equal the snapshot, including all scheduled flags.
+Implementation proof compares the complete generated named DO module bytes,
+bundler prelude and dependency versions. Stable Worker content comes from a
+read-only provider GET and is linked to the exact stable version by matching
+content ETag to that version's script ETag. Missing provenance/modules/dependencies
+is `DO_IMPLEMENTATION_UNKNOWN`. A different module or dependency is
+`DO_IMPLEMENTATION_CHANGED`. Only `DO_IMPLEMENTATION_UNCHANGED` permits the
+fixture execution/promotion contract.
 
-Before release, retain the captured stable UUID. The rollback contract generates
-`wrangler versions deploy <stable>@100% --config ./wrangler.jsonc --env production --yes`.
-Check config and read back single-version 100% after an approved recovery; do
-not assume rollback reverses DB, R2, Queue or DO data changes. There is no
-automatic rollback or mutation retry in this Draft.
+The comparison includes build IDs and private revalidation constants. It never
+normalizes those values away or prints them. Source changes alone cannot prove
+that generated DO code stayed the same. Dependency evidence separates embedded
+Next/OpenNext runtime versions from bundled declared Node/OpenNext Cloudflare/
+Wrangler release pins; those declarations do not attest the original builder.
+If the provider has no source revision annotation, report the revision unknown.
+Only digests, byte counts, public class/version IDs and version numbers enter the
+report. Keep downloaded source outside Git.
 
-See [rollback support and limitations](https://developers.cloudflare.com/workers/versions-and-deployments/rollbacks/).
+Cloudflare assigns DO instances to versions separately from fetch routing.
+Override smoke verifies candidate fetch/runtime paths; it does not prove execution
+of a new DO implementation. Releases that change DO code need a separate DO
+release process. Lifecycle changes require atomic deployment.
+
+Sources: [deployment management](https://developers.cloudflare.com/workers/versions-and-deployments/deployment-management/),
+[gradual deployments with Durable Objects](https://developers.cloudflare.com/workers/versions-and-deployments/gradual-deployments/with-durable-objects/).
+
+## Deterministic identity and asset evidence
+
+The sole intentional Wrangler config addition is:
+
+```json
+"version_metadata": { "binding": "CF_VERSION_METADATA" }
+```
+
+The Worker adds `X-Locally-Worker-Version: env.CF_VERSION_METADATA.id` only for
+GET/HEAD with the exact probe value `1`. Ordinary requests retain their response;
+the probe does not change status, body, existing headers, cookies, auth or business
+behavior. Probe responses missing the exact candidate UUID block, including an
+override ignored by the provider and served by stable.
+
+Sampled Observability remains 10% and is optional secondary evidence. Sampling
+cannot randomly block candidate identity. Static assets need no runtime version
+header. Candidate HTML references and the received static asset set must match;
+all referenced assets must return 200 with override propagation and no redirect.
+Evidence collection stores no bodies, cookie/auth headers, query strings or PII.
+Release headers are stripped from external reads, including redirect destinations.
+
+Source: [Version Metadata binding](https://developers.cloudflare.com/workers/runtime-apis/bindings/version-metadata/).
+
+## Preserved Production configuration
+
+Check routes, custom domains, preview settings, Observability, all five Crons,
+two Queue consumers/settings, R2 bindings, DO namespace targets, managed flags
+and encrypted secret names/types. Only `CF_VERSION_METADATA` may be added.
+Local config comparison includes all settings and ordered migrations. Runtime
+managed overrides must equal provider values; `plannedTriggerChanges` stays
+empty. `SUPABASE_SERVICE_ROLE_KEY` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` remain
+encrypted and inherit existing values. No provider config/secret change occurs
+in this task. PR #161's resolved-anonymous login SSR behavior, auth tests and
+package auth command remain intact.
+
+## Before a live candidate
+
+Require a fresh `DO_IMPLEMENTATION_UNCHANGED` proof for the exact current stable
+and actual candidate artifact, Production build variables, approved mutation
+adapters, complete post-deploy health readers and explicit staging/promotion
+approval. Do not treat a fixture contract PASS as permission to stage or deploy.
+
+## Read-only artifact audit — 2026-10-02
+
+The refreshed Production baseline was stable version
+`f3a6fba6-ab9e-4777-a9ea-3e0fd6586136` at 100%, deployment
+`e6cf3dc1-8ad6-4ae2-85e3-d35011897358`. Its content ETag matched version script
+ETag `0efcf951bcfe625bb12e98b146b415c618964da817ad6ef01944ddb648f99863`.
+The provider exposed the two expected named class handlers, but no attested Git
+source revision. Local comparison used the new Production build and versions
+upload **dry-run**, with fixture public build variables.
+
+| Artifact | Stable SHA-256 | Candidate dry-run SHA-256 | Result |
+| --- | --- | --- | --- |
+| DOQueueHandler (12,383 bytes) | `ee400ce13b7587de8dd1b9b309d121be554a223e184cf3627a0895f2bcf944a7` | `233a6428ef66ce750e0dd9971c7ac9dcb4a4aa6ee76e99590ee62ca93c49c92d` | changed |
+| DOShardedTagCache (4,149 bytes) | `42f2d9d625bf35b9d32b057355b83ba087edd834c3a35e9030c079ac5f368947` | `42f2d9d625bf35b9d32b057355b83ba087edd834c3a35e9030c079ac5f368947` | identical |
+
+Bundler prelude matched. Both artifacts reported Next 16.3.5 and OpenNext AWS
+3.10.4, with declared release pins Node 24.20.0, OpenNext Cloudflare 1.19.6 and
+Wrangler 4.129.1. Production bindings/migrations and named export lifecycle were
+preserved. The semantic preflight passed and the provider baseline remained
+unchanged during this comparison.
+
+Verdict: **DO_IMPLEMENTATION_CHANGED**. The corrected architecture is tested,
+but this actual artifact cannot use override-only promotion. Generated build and
+revalidation constants remain part of the safety comparison. A new Production
+baseline or actual build requires a new proof; this audit is not durable release
+authorization. No candidate upload, staging, promotion or other provider mutation
+was performed by this task.
