@@ -1,6 +1,6 @@
 {
-  "schemaContractVersion": 3,
-  "capturedAt": "2026-09-30",
+  "schemaContractVersion": 4,
+  "capturedAt": "2026-10-02",
   "productionProjectRef": "uhinvcydgzqlpnvieyal",
   "source": {
     "kind": "read-only Production PostgreSQL catalog inventory",
@@ -12,8 +12,8 @@
     "canonicalization": "MD5 of pipe-delimited fields, newline-delimited rows in the contract's explicit deterministic order; NULL is an empty string and policy roles are comma-delimited",
     "storageBuckets": "7419cabe695cd50a522314a749216c05",
     "storagePolicies": "898e8b7f917fd0f4530ef30c9b61961e",
-    "publicRlsPolicies": "4741211273ef7aeae0ced24ccd2345da",
-    "publicRelationGrants": "814931d0ab076cc787b8ce26adc5ec0a",
+    "publicRlsPolicies": "e5a16a4215c569060fbf895453a5cd00",
+    "publicRelationGrants": "a9c644ba2ab5c795f29aff57092aa002",
     "stagingOverlayBaselineStoragePolicies": "d6b381fd629405acfdd615593031de5c"
   },
   "migrationLedger": [
@@ -100,6 +100,22 @@
       "name": "move_is_admin_reader_to_private_schema",
       "repositoryFile": "supabase/migrations/20260930022348_move_is_admin_reader_to_private_schema.sql",
       "repositorySha256": "c31dd60f34ad0e3bfc1444dc0b19570262d9376a52615e9312313ef7f254d1f3"
+    },
+    {
+      "version": "20261002024534",
+      "name": "admin_message_monitoring_phase_1",
+      "repositoryVersion": "20261001170718",
+      "repositoryFile": "supabase/migrations/20261001170718_admin_message_monitoring_phase_1.sql",
+      "repositorySha256": "aee6d14e1a897579e5dc6454221cb52d4bab822952096425e0b110eeb907ae95",
+      "ledgerStatementsSha256": "aee6d14e1a897579e5dc6454221cb52d4bab822952096425e0b110eeb907ae95"
+    },
+    {
+      "version": "20261002024638",
+      "name": "admin_message_monitoring_historical_reinquiry",
+      "repositoryVersion": "20261002015110",
+      "repositoryFile": "supabase/migrations/20261002015110_admin_message_monitoring_historical_reinquiry.sql",
+      "repositorySha256": "80f34eea7ad6e2405aa38962a886c97e8713bfa1fefe72f0d9647686489747a1",
+      "ledgerStatementsSha256": "80f34eea7ad6e2405aa38962a886c97e8713bfa1fefe72f0d9647686489747a1"
     }
   ],
   "operationalStateDeltas": [
@@ -156,9 +172,10 @@
       "public_host_applications",
       "public_profiles"
     ],
-    "publicTableColumns": 515,
+    "publicTableColumns": 517,
     "publicViewColumns": 27,
     "functionOverloads": [
+      "public.ack_admin_inquiry_messages(p_inquiry_id bigint, p_through_message_id bigint)",
       "public.apply_experience_media_locator_cas(p_experience_id bigint, p_before_photos text[], p_before_image_url text, p_before_itinerary jsonb, p_before_itinerary_i18n jsonb, p_after_photos text[], p_after_image_url text, p_after_itinerary jsonb, p_after_itinerary_i18n jsonb)",
       "public.assign_service_concierge_host_atomic(p_admin_id uuid, p_request_id uuid, p_host_id uuid, p_host_hourly_rate integer, p_host_agreement_confirmed boolean)",
       "public.attach_experience_payment_provider_reference_atomic(p_booking_id text, p_user_id uuid, p_provider_reference text, p_claim_token uuid)",
@@ -189,6 +206,7 @@
       "public.ensure_profile_demographics_reminder(p_user_id uuid, p_title text, p_message text, p_link text)",
       "public.finalize_proxy_card_intake_atomic(p_proxy_request_id uuid, p_verified_amount integer, p_verified_tid text, p_initial_message text)",
       "public.finish_service_refund_operation_atomic(p_operation_id uuid, p_outcome text, p_provider_reference text, p_error_message text)",
+      "public.get_admin_inquiry_activity(p_inquiry_ids bigint[])",
       "public.get_experience_completion_due_backlog()",
       "public.get_ops_anomaly_snapshot(p_observed_at timestamp with time zone, p_claim_overdue_minutes integer, p_refund_stale_minutes integer, p_payout_long_hold_days integer, p_experience_job_missing_minutes integer, p_service_job_missing_minutes integer, p_cancel_pending_job_missing_minutes integer)",
       "public.guard_experience_payment_claim_columns()",
@@ -217,7 +235,10 @@
       "public.snapshot_booking_guest_demographics()"
     ],
     "privateFunctionOverloads": [
-      "private.is_admin_reader()"
+      "private.advance_support_version()",
+      "private.is_admin_reader()",
+      "private.is_inquiry_admin_sender(p_sender uuid)",
+      "private.prepare_support_message()"
     ],
     "applicationTriggers": [
       "auth.users.on_auth_user_created",
@@ -227,13 +248,15 @@
       "public.community_comments.on_comment_removed",
       "public.community_likes.on_like_added",
       "public.community_likes.on_like_removed",
+      "public.inquiries.inquiry_support_version",
+      "public.inquiry_messages.inquiry_support_message",
       "public.proxy_comments.trg_pc_updated_at",
       "public.proxy_requests.trg_pr_updated_at",
       "public.service_applications.trg_sa_updated_at",
       "public.service_bookings.trg_sb_updated_at",
       "public.service_requests.trg_sr_updated_at"
     ],
-    "indexes": 118,
+    "indexes": 119,
     "constraints": {
       "total": 180,
       "primaryKey": 39,
@@ -286,7 +309,7 @@
         "admin_support_unread_alert_batches"
       ],
       "forced": [],
-      "publicPolicies": 108
+      "publicPolicies": 106
     },
     "realtimePublication": {
       "name": "supabase_realtime",
@@ -295,6 +318,7 @@
         "admin_task_comments",
         "admin_tasks",
         "admin_whitelist",
+        "inquiries",
         "inquiry_messages",
         "notifications",
         "profiles"
@@ -457,5 +481,116 @@
       "service_role"
     ],
     "searchPath": ""
+  },
+  "adminMessageMonitoring": {
+    "columns": [
+      {
+        "table": "inquiries",
+        "name": "support_reopened_at",
+        "type": "timestamp with time zone",
+        "nullable": true,
+        "default": null
+      },
+      {
+        "table": "inquiry_messages",
+        "name": "admin_read_at",
+        "type": "timestamp with time zone",
+        "nullable": true,
+        "default": null
+      }
+    ],
+    "indexes": [
+      {
+        "name": "inquiry_messages_admin_activity_idx",
+        "definition": "CREATE INDEX inquiry_messages_admin_activity_idx ON public.inquiry_messages USING btree (inquiry_id, id DESC)"
+      }
+    ],
+    "triggers": [
+      {
+        "table": "inquiries",
+        "name": "inquiry_support_version",
+        "definition": "CREATE TRIGGER inquiry_support_version BEFORE UPDATE ON inquiries FOR EACH ROW EXECUTE FUNCTION private.advance_support_version()"
+      },
+      {
+        "table": "inquiry_messages",
+        "name": "inquiry_support_message",
+        "definition": "CREATE TRIGGER inquiry_support_message BEFORE INSERT ON inquiry_messages FOR EACH ROW EXECUTE FUNCTION private.prepare_support_message()"
+      }
+    ],
+    "functions": [
+      {
+        "identity": "private.advance_support_version()",
+        "owner": "postgres",
+        "result": "trigger",
+        "securityDefiner": true,
+        "volatility": "v",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "acl": "{postgres=X/postgres}",
+        "bodyMd5": "bc70811ad62c5a9c5d0102b25edcc973"
+      },
+      {
+        "identity": "private.is_inquiry_admin_sender(p_sender uuid)",
+        "owner": "postgres",
+        "result": "boolean",
+        "securityDefiner": true,
+        "volatility": "s",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "acl": "{postgres=X/postgres}",
+        "bodyMd5": "62c7da6bb51d6fc0e972cccfbb65b163"
+      },
+      {
+        "identity": "private.prepare_support_message()",
+        "owner": "postgres",
+        "result": "trigger",
+        "securityDefiner": true,
+        "volatility": "v",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "acl": "{postgres=X/postgres}",
+        "bodyMd5": "e14b53805c9a60cce33e6d91d80ee903"
+      },
+      {
+        "identity": "public.ack_admin_inquiry_messages(p_inquiry_id bigint, p_through_message_id bigint)",
+        "owner": "postgres",
+        "result": "bigint",
+        "securityDefiner": true,
+        "volatility": "v",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "acl": "{postgres=X/postgres,service_role=X/postgres}",
+        "bodyMd5": "475a832f9d6408b31673d5b26a955254"
+      },
+      {
+        "identity": "public.get_admin_inquiry_activity(p_inquiry_ids bigint[])",
+        "owner": "postgres",
+        "result": "TABLE(inquiry_id bigint, status text, updated_at timestamp with time zone, last_message_at timestamp with time zone, last_sender_role text, last_message_content text, needs_reply boolean, reply_waiting_since timestamp with time zone, support_reopened_at timestamp with time zone, admin_unread_count bigint)",
+        "securityDefiner": true,
+        "volatility": "s",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "acl": "{postgres=X/postgres,service_role=X/postgres}",
+        "bodyMd5": "632f807ffa404e2854db8f272b4db437"
+      }
+    ],
+    "directWriteRoles": [
+      "service_role"
+    ],
+    "publicRpcExecuteRoles": [
+      "service_role"
+    ],
+    "privateHelperExecuteRoles": [
+      "postgres"
+    ],
+    "removedUpdatePolicies": [
+      "Users can update own inquiries",
+      "Users can update messages in their inquiries"
+    ]
   }
 }

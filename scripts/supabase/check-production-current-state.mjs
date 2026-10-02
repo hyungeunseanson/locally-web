@@ -11,8 +11,8 @@ const overlayPath = resolve(root, 'supabase/staging/post-baseline-current-state-
 const expectedFingerprints = {
   storageBuckets: '7419cabe695cd50a522314a749216c05',
   storagePolicies: '898e8b7f917fd0f4530ef30c9b61961e',
-  publicRlsPolicies: '4741211273ef7aeae0ced24ccd2345da',
-  publicRelationGrants: '814931d0ab076cc787b8ce26adc5ec0a',
+  publicRlsPolicies: 'e5a16a4215c569060fbf895453a5cd00',
+  publicRelationGrants: 'a9c644ba2ab5c795f29aff57092aa002',
   stagingOverlayBaselineStoragePolicies: 'd6b381fd629405acfdd615593031de5c',
   stagingOverlayTargetStorageBuckets: 'c3ff5767c8e4934ae05b3d96550441c8',
   stagingOverlayTargetStoragePolicies: '38c973a52a0bebe8fa78b3f53089e427',
@@ -143,21 +143,22 @@ const expectedLedger = [
     name: 'move_is_admin_reader_to_private_schema',
     repositoryFile: 'supabase/migrations/20260930022348_move_is_admin_reader_to_private_schema.sql',
   },
-];
-const expectedPendingMigrations = [
   {
-    version: '20261001170718',
+    version: '20261002024534',
+    repositoryVersion: '20261001170718',
     name: 'admin_message_monitoring_phase_1',
     repositoryFile: 'supabase/migrations/20261001170718_admin_message_monitoring_phase_1.sql',
     repositorySha256: 'aee6d14e1a897579e5dc6454221cb52d4bab822952096425e0b110eeb907ae95',
   },
   {
-    version: '20261002015110',
+    version: '20261002024638',
+    repositoryVersion: '20261002015110',
     name: 'admin_message_monitoring_historical_reinquiry',
     repositoryFile: 'supabase/migrations/20261002015110_admin_message_monitoring_historical_reinquiry.sql',
     repositorySha256: '80f34eea7ad6e2405aa38962a886c97e8713bfa1fefe72f0d9647686489747a1',
   },
 ];
+const expectedPendingMigrations = [];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));
 for (const [index, expected] of expectedLedger.entries()) {
   const actual = manifest.migrationLedger[index];
@@ -167,6 +168,19 @@ for (const [index, expected] of expectedLedger.entries()) {
     `repository migration path differs for ${expected.version}`);
   assert(await sha256(actual.repositoryFile) === actual.repositorySha256,
     `repository migration hash differs for ${expected.version}`);
+  if (expected.repositoryVersion) {
+    assert(actual.repositoryVersion === expected.repositoryVersion,
+      `repository filename version differs for ${expected.version}`);
+    assert(actual.repositoryFile.split('/').at(-1).startsWith(`${actual.repositoryVersion}_`),
+      `repository filename mapping differs for ${expected.version}`);
+    assert(actual.repositorySha256 === expected.repositorySha256
+      && actual.ledgerStatementsSha256 === expected.repositorySha256,
+    `applied ledger SQL bytes differ for ${expected.version}`);
+    const sql = await readFile(resolve(root, actual.repositoryFile));
+    const digest = createHash('md5').update(sql).digest('hex');
+    assert(contract.includes(`${actual.version}:${actual.name}:1:${digest}`),
+      `read-only ledger SQL assertion differs for ${expected.version}`);
+  }
 }
 
 const migrationFiles = (await readdir(resolve(root, 'supabase/migrations')))
@@ -183,12 +197,7 @@ assert(
   'pending Production migration contract differs'
 );
 
-// Pending files must be reviewed byte-for-byte, without asserting they are
-// applied to Production or changing its immutable/current-state fingerprints.
-for (const entry of expectedPendingMigrations) {
-  assert(await sha256(entry.repositoryFile) === entry.repositorySha256,
-    `pending migration hash differs for ${entry.version}`);
-}
+// No pending migrations remain; applied SQL is verified without replaying it.
 
 const objects = manifest.objects;
 for (const [name, fingerprint] of Object.entries(expectedFingerprints)) {
@@ -199,12 +208,17 @@ for (const [name, fingerprint] of Object.entries(expectedFingerprints)) {
 }
 assert(objects.publicTables.length === 39, 'expected 39 public tables');
 assert(objects.publicViews.length === 2, 'expected 2 public views');
-assert(objects.publicTableColumns === 515, 'expected 515 public table columns');
+assert(objects.publicTableColumns === 517, 'expected 517 public table columns');
 assert(objects.publicViewColumns === 27, 'expected 27 public view columns');
-assert(objects.functionOverloads.length === 56, 'expected 56 public function overloads');
-exact('private function overloads', objects.privateFunctionOverloads, ['private.is_admin_reader()']);
-assert(objects.applicationTriggers.length === 12, 'expected 12 application triggers');
-assert(objects.indexes === 118, 'expected 118 public indexes');
+assert(objects.functionOverloads.length === 58, 'expected 58 public function overloads');
+exact('private function overloads', objects.privateFunctionOverloads, [
+  'private.advance_support_version()',
+  'private.is_admin_reader()',
+  'private.is_inquiry_admin_sender(p_sender uuid)',
+  'private.prepare_support_message()'
+]);
+assert(objects.applicationTriggers.length === 14, 'expected 14 application triggers');
+assert(objects.indexes === 119, 'expected 119 public indexes');
 assert(objects.constraints.total === 180, 'expected 180 constraints');
 assert(objects.constraints.primaryKey === 39, 'expected 39 primary keys');
 assert(objects.constraints.foreignKey === 59, 'expected 59 foreign keys');
@@ -213,8 +227,8 @@ assert(objects.constraints.check === 68, 'expected 68 check constraints');
 assert(objects.rls.enabled.length === 37, 'expected 37 RLS-enabled tables');
 assert(objects.rls.disabled.length === 2, 'expected 2 RLS-disabled tables');
 assert(objects.rls.forced.length === 0, 'expected zero FORCE RLS tables');
-assert(objects.rls.publicPolicies === 108, 'expected 108 public policies');
-assert(objects.realtimePublication.tables.length === 7, 'expected seven Realtime tables');
+assert(objects.rls.publicPolicies === 106, 'expected 106 public policies');
+assert(objects.realtimePublication.tables.length === 8, 'expected eight Realtime tables');
 assert(objects.storageBuckets.length === 6, 'expected six Storage buckets');
 assert(objects.storageObjectPolicies.length === 16, 'expected 16 Storage policies');
 
@@ -347,6 +361,45 @@ for (const identity of paymentClaim.securityDefinerFunctions) {
     `payment claim function has no application callsite: ${functionName}`);
 }
 assert(contract.includes('$payment_claim_contract$'), 'payment claim security contract is missing');
+
+const monitoring = manifest.adminMessageMonitoring;
+assert(manifest.schemaContractVersion === 4 && required.schemaContractVersion === 4,
+  'expected current-state contract version 4');
+assert(monitoring.columns.length === 2 && monitoring.indexes.length === 1
+  && monitoring.triggers.length === 2 && monitoring.functions.length === 5,
+  'admin monitoring object counts differ');
+exact('chat direct write roles', monitoring.directWriteRoles, ['service_role']);
+exact('chat public RPC execute roles', monitoring.publicRpcExecuteRoles, ['service_role']);
+exact('chat private helper execute roles', monitoring.privateHelperExecuteRoles, ['postgres']);
+exact('removed chat UPDATE policies', monitoring.removedUpdatePolicies, [
+  'Users can update own inquiries', 'Users can update messages in their inquiries',
+]);
+for (const column of monitoring.columns) {
+  assert(column.nullable && column.default === null, `chat column defaults differ: ${column.name}`);
+  assert(contract.includes(`${column.table}|${column.name}|${column.type}|YES|`),
+    `chat column contract missing: ${column.name}`);
+}
+for (const object of [...monitoring.indexes, ...monitoring.triggers]) {
+  assert(contract.includes(object.definition.replaceAll("'", "''")),
+    `chat catalog definition missing: ${object.name}`);
+}
+for (const fn of monitoring.functions) {
+  const isPublic = fn.identity.startsWith('public.');
+  assert((isPublic ? objects.functionOverloads : objects.privateFunctionOverloads).includes(fn.identity),
+    `chat function inventory missing: ${fn.identity}`);
+  assert(fn.owner === 'postgres' && fn.securityDefiner
+    && JSON.stringify(fn.configuration) === JSON.stringify(['search_path=""'])
+    && fn.acl === (isPublic ? '{postgres=X/postgres,service_role=X/postgres}' : '{postgres=X/postgres}'),
+  `chat function security differs: ${fn.identity}`);
+  const tuple = [fn.identity, fn.owner, fn.securityDefiner, fn.volatility, fn.result,
+    fn.configuration.join(','), fn.acl, fn.bodyMd5].join('|');
+  assert(contract.includes(tuple.replaceAll("'", "''")),
+    `chat function body/ACL assertion missing: ${fn.identity}`);
+}
+for (const fragment of ['$admin_message_monitoring_contract$', '$admin_monitoring_ledger_contract$',
+  'has_any_column_privilege', 'index_def.indisvalid', "trigger_def.tgenabled = 'O'", 'rowfilter IS NOT NULL']) {
+  assert(contract.includes(fragment), `chat safety assertion missing: ${fragment}`);
+}
 
 for (const functionName of required.activeConcierge.functions) {
   assert(appSources.some(({ source }) => source.includes(functionName)),

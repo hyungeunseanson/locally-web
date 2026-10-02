@@ -30,7 +30,9 @@ BEGIN
     '20260923013312:ops_anomaly_monitor_snapshot',
     '20260923084232:one_time_review_request_reminders',
     '20260929144521:harden_public_host_applications_security_barrier',
-    '20260930022348:move_is_admin_reader_to_private_schema'
+    '20260930022348:move_is_admin_reader_to_private_schema',
+    '20261002024534:admin_message_monitoring_phase_1',
+    '20261002024638:admin_message_monitoring_historical_reinquiry'
   ]::text[];
   IF actual IS DISTINCT FROM expected THEN
     RAISE EXCEPTION 'migration ledger mismatch: %', actual;
@@ -63,8 +65,8 @@ BEGIN
     INTO actual_count
     FROM information_schema.columns
    WHERE table_schema = 'public' AND table_name = ANY (expected);
-  IF actual_count <> 515 THEN
-    RAISE EXCEPTION 'public table column count %, expected 515', actual_count;
+  IF actual_count <> 517 THEN
+    RAISE EXCEPTION 'public table column count %, expected 517', actual_count;
   END IF;
 
   SELECT array_agg(class_def.relname ORDER BY class_def.relname)
@@ -96,6 +98,7 @@ BEGIN
     JOIN pg_namespace AS namespace_def ON namespace_def.oid = procedure_def.pronamespace
    WHERE namespace_def.nspname = 'public';
   expected := ARRAY[
+    'public.ack_admin_inquiry_messages(p_inquiry_id bigint, p_through_message_id bigint)',
     'public.apply_experience_media_locator_cas(p_experience_id bigint, p_before_photos text[], p_before_image_url text, p_before_itinerary jsonb, p_before_itinerary_i18n jsonb, p_after_photos text[], p_after_image_url text, p_after_itinerary jsonb, p_after_itinerary_i18n jsonb)',
     'public.assign_service_concierge_host_atomic(p_admin_id uuid, p_request_id uuid, p_host_id uuid, p_host_hourly_rate integer, p_host_agreement_confirmed boolean)',
     'public.attach_experience_payment_provider_reference_atomic(p_booking_id text, p_user_id uuid, p_provider_reference text, p_claim_token uuid)',
@@ -126,6 +129,7 @@ BEGIN
     'public.ensure_profile_demographics_reminder(p_user_id uuid, p_title text, p_message text, p_link text)',
     'public.finalize_proxy_card_intake_atomic(p_proxy_request_id uuid, p_verified_amount integer, p_verified_tid text, p_initial_message text)',
     'public.finish_service_refund_operation_atomic(p_operation_id uuid, p_outcome text, p_provider_reference text, p_error_message text)',
+    'public.get_admin_inquiry_activity(p_inquiry_ids bigint[])',
     'public.get_experience_completion_due_backlog()',
     'public.get_ops_anomaly_snapshot(p_observed_at timestamp with time zone, p_claim_overdue_minutes integer, p_refund_stale_minutes integer, p_payout_long_hold_days integer, p_experience_job_missing_minutes integer, p_service_job_missing_minutes integer, p_cancel_pending_job_missing_minutes integer)',
     'public.guard_experience_payment_claim_columns()',
@@ -167,7 +171,12 @@ BEGIN
     FROM pg_proc AS procedure_def
     JOIN pg_namespace AS namespace_def ON namespace_def.oid = procedure_def.pronamespace
    WHERE namespace_def.nspname = 'private';
-  IF actual IS DISTINCT FROM ARRAY['private.is_admin_reader()']::text[] THEN
+  IF actual IS DISTINCT FROM ARRAY[
+    'private.advance_support_version()',
+    'private.is_admin_reader()',
+    'private.is_inquiry_admin_sender(p_sender uuid)',
+    'private.prepare_support_message()'
+  ]::text[] THEN
     RAISE EXCEPTION 'private function overload inventory mismatch: %', actual;
   END IF;
 
@@ -223,6 +232,8 @@ BEGIN
     'public.community_comments.on_comment_removed',
     'public.community_likes.on_like_added',
     'public.community_likes.on_like_removed',
+    'public.inquiries.inquiry_support_version',
+    'public.inquiry_messages.inquiry_support_message',
     'public.proxy_comments.trg_pc_updated_at',
     'public.proxy_requests.trg_pr_updated_at',
     'public.service_applications.trg_sa_updated_at',
@@ -234,8 +245,8 @@ BEGIN
   END IF;
 
   SELECT count(*) INTO actual_count FROM pg_indexes WHERE schemaname = 'public';
-  IF actual_count <> 118 THEN
-    RAISE EXCEPTION 'public index count %, expected 118', actual_count;
+  IF actual_count <> 119 THEN
+    RAISE EXCEPTION 'public index count %, expected 119', actual_count;
   END IF;
   IF to_regclass('public.uq_notifications_review_request_reminder_booking_id') IS NULL
     OR to_regclass('public.uq_notifications_guest_review_request_reminder_booking_id') IS NULL
@@ -312,8 +323,8 @@ BEGIN
   END IF;
 
   SELECT count(*) INTO actual_count FROM pg_policies WHERE schemaname = 'public';
-  IF actual_count <> 108 THEN
-    RAISE EXCEPTION 'public RLS policy count %, expected 108', actual_count;
+  IF actual_count <> 106 THEN
+    RAISE EXCEPTION 'public RLS policy count %, expected 106', actual_count;
   END IF;
 
   SELECT md5(string_agg(
@@ -326,7 +337,7 @@ BEGIN
     INTO actual_fingerprint
     FROM pg_policies AS policy_def
    WHERE policy_def.schemaname = 'public';
-  IF actual_fingerprint IS DISTINCT FROM '4741211273ef7aeae0ced24ccd2345da' THEN
+  IF actual_fingerprint IS DISTINCT FROM 'e5a16a4215c569060fbf895453a5cd00' THEN
     RAISE EXCEPTION 'public RLS policy fingerprint mismatch: %', actual_fingerprint;
   END IF;
 
@@ -352,7 +363,7 @@ BEGIN
     )) AS acl_entry
    WHERE namespace_def.nspname = 'public'
      AND class_def.relkind IN ('r', 'p', 'v', 'm', 'f');
-  IF actual_fingerprint IS DISTINCT FROM '814931d0ab076cc787b8ce26adc5ec0a' THEN
+  IF actual_fingerprint IS DISTINCT FROM 'a9c644ba2ab5c795f29aff57092aa002' THEN
     RAISE EXCEPTION 'public relation grant fingerprint mismatch: %', actual_fingerprint;
   END IF;
 
@@ -363,7 +374,7 @@ BEGIN
      AND publication_def.schemaname = 'public';
   IF actual IS DISTINCT FROM ARRAY[
     'admin_audit_logs', 'admin_task_comments', 'admin_tasks', 'admin_whitelist',
-    'inquiry_messages', 'notifications', 'profiles'
+    'inquiries', 'inquiry_messages', 'notifications', 'profiles'
   ]::text[] THEN
     RAISE EXCEPTION 'supabase_realtime membership mismatch: %', actual;
   END IF;
@@ -726,6 +737,133 @@ BEGIN
   END IF;
 END
 $payment_claim_contract$;
+
+-- Captured from Production catalogs on 2026-10-02. These assertions only read
+-- metadata; they never invoke chat RPCs, triggers, or replay applied migrations.
+DO $admin_message_monitoring_contract$
+DECLARE
+  actual text[];
+BEGIN
+  SELECT array_agg(table_name || '|' || column_name || '|' || data_type || '|' || is_nullable || '|' || coalesce(column_default, '') ORDER BY table_name, column_name)
+    INTO actual FROM information_schema.columns
+   WHERE table_schema = 'public'
+     AND (table_name, column_name) IN (('inquiries', 'support_reopened_at'), ('inquiry_messages', 'admin_read_at'));
+  IF actual IS DISTINCT FROM ARRAY[
+    'inquiries|support_reopened_at|timestamp with time zone|YES|',
+    'inquiry_messages|admin_read_at|timestamp with time zone|YES|'
+  ]::text[] THEN
+    RAISE EXCEPTION 'admin monitoring column contract mismatch: %', actual;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM unnest(ARRAY['inquiries', 'inquiry_messages']) AS table_def(name)
+    CROSS JOIN unnest(ARRAY['anon', 'authenticated']) AS role_def(name)
+    CROSS JOIN unnest(ARRAY['INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER']) AS privilege_def(name)
+    WHERE has_table_privilege(role_def.name, 'public.' || table_def.name, privilege_def.name)
+  ) OR EXISTS (
+    SELECT 1 FROM unnest(ARRAY['inquiries', 'inquiry_messages']) AS table_def(name)
+    CROSS JOIN unnest(ARRAY['anon', 'authenticated']) AS role_def(name)
+    CROSS JOIN unnest(ARRAY['INSERT', 'UPDATE', 'REFERENCES']) AS privilege_def(name)
+    WHERE has_any_column_privilege(role_def.name, 'public.' || table_def.name, privilege_def.name)
+  ) THEN
+    RAISE EXCEPTION 'chat client table or column write grant exists';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM unnest(ARRAY['inquiries', 'inquiry_messages']) AS table_def(name)
+    CROSS JOIN unnest(ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER']) AS privilege_def(name)
+    WHERE NOT has_table_privilege('service_role', 'public.' || table_def.name, privilege_def.name)
+  ) OR EXISTS (
+    SELECT 1 FROM unnest(ARRAY['inquiries', 'inquiry_messages']) AS table_def(name)
+    CROSS JOIN unnest(ARRAY['anon', 'authenticated']) AS role_def(name)
+    WHERE NOT has_table_privilege(role_def.name, 'public.' || table_def.name, 'SELECT')
+  ) THEN
+    RAISE EXCEPTION 'chat server writes or client SELECT grants differ';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public'
+      AND tablename IN ('inquiries', 'inquiry_messages') AND cmd IN ('UPDATE', 'ALL')
+  ) THEN
+    RAISE EXCEPTION 'retired chat UPDATE policy exists';
+  END IF;
+
+  SELECT array_agg(index_meta.indexdef ORDER BY index_meta.indexname) INTO actual
+    FROM pg_indexes AS index_meta JOIN pg_namespace AS namespace_def ON namespace_def.nspname = index_meta.schemaname
+    JOIN pg_class AS class_def ON class_def.relnamespace = namespace_def.oid AND class_def.relname = index_meta.indexname
+    JOIN pg_index AS index_def ON index_def.indexrelid = class_def.oid
+   WHERE index_meta.schemaname = 'public' AND index_meta.indexname = 'inquiry_messages_admin_activity_idx'
+     AND index_def.indisvalid AND index_def.indisready;
+  IF actual IS DISTINCT FROM ARRAY[
+    'CREATE INDEX inquiry_messages_admin_activity_idx ON public.inquiry_messages USING btree (inquiry_id, id DESC)'
+  ]::text[] THEN
+    RAISE EXCEPTION 'admin monitoring index contract mismatch: %', actual;
+  END IF;
+
+  SELECT array_agg(pg_get_triggerdef(trigger_def.oid, true) ORDER BY class_def.relname, trigger_def.tgname) INTO actual
+    FROM pg_trigger AS trigger_def JOIN pg_class AS class_def ON class_def.oid = trigger_def.tgrelid
+    JOIN pg_namespace AS namespace_def ON namespace_def.oid = class_def.relnamespace
+   WHERE namespace_def.nspname = 'public' AND NOT trigger_def.tgisinternal AND trigger_def.tgenabled = 'O'
+     AND (class_def.relname, trigger_def.tgname) IN (('inquiries', 'inquiry_support_version'), ('inquiry_messages', 'inquiry_support_message'));
+  IF actual IS DISTINCT FROM ARRAY[
+    'CREATE TRIGGER inquiry_support_version BEFORE UPDATE ON inquiries FOR EACH ROW EXECUTE FUNCTION private.advance_support_version()',
+    'CREATE TRIGGER inquiry_support_message BEFORE INSERT ON inquiry_messages FOR EACH ROW EXECUTE FUNCTION private.prepare_support_message()'
+  ]::text[] THEN
+    RAISE EXCEPTION 'admin monitoring trigger contract mismatch: %', actual;
+  END IF;
+
+  SELECT array_agg(format('%I.%I(%s)', namespace_def.nspname, procedure_def.proname, pg_get_function_identity_arguments(procedure_def.oid)) || '|' ||
+      pg_get_userbyid(procedure_def.proowner) || '|' || procedure_def.prosecdef::text || '|' || procedure_def.provolatile::text || '|' ||
+      pg_get_function_result(procedure_def.oid) || '|' || array_to_string(procedure_def.proconfig, ',') || '|' || procedure_def.proacl::text || '|' || md5(procedure_def.prosrc)
+      ORDER BY namespace_def.nspname, procedure_def.proname, pg_get_function_identity_arguments(procedure_def.oid)) INTO actual
+    FROM pg_proc AS procedure_def JOIN pg_namespace AS namespace_def ON namespace_def.oid = procedure_def.pronamespace
+   WHERE (namespace_def.nspname = 'private' AND procedure_def.proname IN ('advance_support_version', 'is_inquiry_admin_sender', 'prepare_support_message'))
+      OR (namespace_def.nspname = 'public' AND procedure_def.proname IN ('ack_admin_inquiry_messages', 'get_admin_inquiry_activity'));
+  IF actual IS DISTINCT FROM ARRAY[
+    'private.advance_support_version()|postgres|true|v|trigger|search_path=""|{postgres=X/postgres}|bc70811ad62c5a9c5d0102b25edcc973',
+    'private.is_inquiry_admin_sender(p_sender uuid)|postgres|true|s|boolean|search_path=""|{postgres=X/postgres}|62c7da6bb51d6fc0e972cccfbb65b163',
+    'private.prepare_support_message()|postgres|true|v|trigger|search_path=""|{postgres=X/postgres}|e14b53805c9a60cce33e6d91d80ee903',
+    'public.ack_admin_inquiry_messages(p_inquiry_id bigint, p_through_message_id bigint)|postgres|true|v|bigint|search_path=""|{postgres=X/postgres,service_role=X/postgres}|475a832f9d6408b31673d5b26a955254',
+    'public.get_admin_inquiry_activity(p_inquiry_ids bigint[])|postgres|true|s|TABLE(inquiry_id bigint, status text, updated_at timestamp with time zone, last_message_at timestamp with time zone, last_sender_role text, last_message_content text, needs_reply boolean, reply_waiting_since timestamp with time zone, support_reopened_at timestamp with time zone, admin_unread_count bigint)|search_path=""|{postgres=X/postgres,service_role=X/postgres}|632f807ffa404e2854db8f272b4db437'
+  ]::text[] THEN
+    RAISE EXCEPTION 'admin monitoring function definition or execute ACL mismatch: %', actual;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime'
+      AND (schemaname <> 'public' OR rowfilter IS NOT NULL OR attnames IS DISTINCT FROM (
+        SELECT array_agg(attribute_def.attname ORDER BY attribute_def.attnum)
+          FROM pg_attribute AS attribute_def
+         WHERE attribute_def.attrelid = format('%I.%I', schemaname, tablename)::regclass
+           AND attribute_def.attnum > 0 AND NOT attribute_def.attisdropped
+      ))
+  ) OR NOT EXISTS (
+    SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime'
+      AND pg_get_userbyid(pubowner) = 'postgres' AND NOT puballtables
+      AND pubinsert AND pubupdate AND pubdelete AND pubtruncate AND NOT pubviaroot
+  ) THEN
+    RAISE EXCEPTION 'Realtime publication configuration or column/filter contract mismatch';
+  END IF;
+END
+$admin_message_monitoring_contract$;
+
+-- Production ledger versions differ from repository filename versions. The
+-- single stored statement was verified byte-for-byte against each unchanged SQL.
+DO $admin_monitoring_ledger_contract$
+DECLARE
+  actual text[];
+BEGIN
+  SELECT array_agg(version || ':' || name || ':' || cardinality(statements) || ':' || md5(statements[1]) ORDER BY version)
+    INTO actual FROM supabase_migrations.schema_migrations
+   WHERE version IN ('20261002024534', '20261002024638');
+  IF actual IS DISTINCT FROM ARRAY[
+    '20261002024534:admin_message_monitoring_phase_1:1:502c4fc1f7413543896685476ab0e17e',
+    '20261002024638:admin_message_monitoring_historical_reinquiry:1:1670660673237da481adb1419b5a3042'
+  ]::text[] THEN
+    RAISE EXCEPTION 'admin monitoring applied ledger SQL mapping mismatch: %', actual;
+  END IF;
+END
+$admin_monitoring_ledger_contract$;
 
 SELECT 'LOCALLY_PRODUCTION_CURRENT_STATE_CONTRACT_PASS' AS result;
 

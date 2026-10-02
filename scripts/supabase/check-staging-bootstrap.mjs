@@ -50,11 +50,10 @@ const expectedAppliedOrder = [
   'supabase/migrations/20260923084232_one_time_review_request_reminders.sql',
   'supabase/migrations/20260929144521_harden_public_host_applications_security_barrier.sql',
   'supabase/migrations/20260930022348_move_is_admin_reader_to_private_schema.sql',
-];
-const expectedPendingOrder = [
   'supabase/migrations/20261001170718_admin_message_monitoring_phase_1.sql',
   'supabase/migrations/20261002015110_admin_message_monitoring_historical_reinquiry.sql',
 ];
+const expectedPendingOrder = [];
 const expectedApplyOrder = [...expectedAppliedOrder, ...expectedPendingOrder];
 exact('fresh-project apply order', required.freshProjectApplyOrder, expectedApplyOrder);
 exact(
@@ -90,6 +89,10 @@ if (!currentContract.includes('BEGIN READ ONLY;') || !currentContract.trimEnd().
 }
 if (!currentContract.includes('LOCALLY_PRODUCTION_CURRENT_STATE_CONTRACT_PASS')) {
   fail('current-state-contract.sql pass marker is missing');
+}
+const chatAssertions = currentContract.match(/DO \$admin_message_monitoring_contract\$[\s\S]*?\$admin_message_monitoring_contract\$;/)?.[0];
+if (!chatAssertions || !schemaContract.includes(chatAssertions)) {
+  fail('staging schema must enforce the same applied chat security contract');
 }
 if (!adminReaderTargetContract.includes('BEGIN READ ONLY;')
     || !adminReaderTargetContract.trimEnd().endsWith('ROLLBACK;')
@@ -128,8 +131,8 @@ for (const requiredFragment of [
 for (const [name, fingerprint] of Object.entries({
   storageBuckets: '7419cabe695cd50a522314a749216c05',
   storagePolicies: '898e8b7f917fd0f4530ef30c9b61961e',
-  publicRlsPolicies: '4741211273ef7aeae0ced24ccd2345da',
-  publicRelationGrants: '814931d0ab076cc787b8ce26adc5ec0a',
+  publicRlsPolicies: 'e5a16a4215c569060fbf895453a5cd00',
+  publicRelationGrants: 'a9c644ba2ab5c795f29aff57092aa002',
 })) {
   if (current.securityFingerprints[name] !== fingerprint || !currentContract.includes(fingerprint)) {
     fail(`current-state security fingerprint differs: ${name}`);
