@@ -107,3 +107,15 @@ test('post-build patch writes only generated files, hash-only proof; failed patc
     await assert.rejects(readFile(path.join(root,'.open-next/locally-revalidation-bridge-proof.json')),{code:'ENOENT'});
   }finally{await rm(root,{recursive:true,force:true});}
 });
+
+for(const fault of [null,'wrong_uuid','changed_etag','missing_modules'])test(`exact stable artifact after newer upload: ${fault??'success'}`,async()=>{
+ const p=provider();let reads=0;
+ const fetchImplementation=async(url,options)=>{
+  if(url.includes('?include=modules'))return Response.json({success:true,result:{id:fault==='wrong_uuid'?'22222222-2222-4222-8222-222222222222':versionId,main_module:'worker.js',modules:fault==='missing_modules'?[]:[{name:'worker.js',content_type:'application/javascript+module',content_base64:Buffer.from('// .open-next/.build/durable-objects/queue.js\n'+queue(compat)).toString('base64')}]}});
+  if(url.endsWith(`/versions/${versionId}`)&&++reads===2&&fault==='changed_etag')return Response.json({success:true,result:{id:versionId,resources:{script:{etag:'c'.repeat(64)}}}});
+  return p.fetch(url,options);
+ };
+ const invoke=()=>readProviderCompatToken({policy,credentials:{accountId:'fixture',apiToken:'fixture'},fetchImplementation});
+ if(fault)await assert.rejects(invoke,{message:'OPENNEXT_REVALIDATION_BRIDGE_PROVENANCE_FAILED'});
+ else {const r=await invoke();assert.equal(r.token,compat);assert.equal(r.provenance.sourceKind,'workers-version-modules');assert.equal(r.provenance.artifactSha256.length,64);}
+});

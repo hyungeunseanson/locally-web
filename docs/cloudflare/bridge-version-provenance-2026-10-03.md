@@ -1,6 +1,10 @@
 # Active Worker version source provenance
 
 Starting main: `c4b04d7917f2e8d199e7df588dc61726f1e642d6`.
+During this task, #167 advanced main to `0729af24f4ce0f6eef275461bc98ba88ff24e854`.
+A normal merge preserves its exact-version candidate configuration invariants.
+Its ETag-matching script-content fast path is removed by this change.
+
 This change does not modify PR #165, its migration, runtime Worker configuration,
 or application code. No Production uploads, deployments, traffic/config/secret,
 Supabase/DB/business, or Vercel mutations were performed.

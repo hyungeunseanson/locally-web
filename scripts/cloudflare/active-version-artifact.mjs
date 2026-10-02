@@ -1,8 +1,7 @@
-import { createHash } from 'node:crypto';
+import { readExactVersionArtifact } from './exact-version-artifact.mjs';
 
 export const VERSION_SOURCE = 'workers-version-modules';
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
-const HEX = /^[a-f0-9]{64}$/;
 const ERROR = 'ACTIVE_VERSION_ARTIFACT_PROVENANCE_FAILED';
 const check = condition => { if (!condition) throw new Error(ERROR); };
 
@@ -35,29 +34,11 @@ export async function readActiveVersionArtifact({ credentials, workerName, stabl
     };
     const before = await deployment();
     check(stableVersionId === undefined || stableVersionId === before.versionId);
-    const metadata = async () => {
-      const v = await get(`${script}/versions/${before.versionId}`);
-      check(v.id === before.versionId && HEX.test(v.resources?.script?.etag));
-      check(Array.isArray(v.resources.script.named_handlers));
-      return { etag: v.resources.script.etag, namedHandlers: v.resources.script.named_handlers };
-    };
-    const version = await metadata();
-    const scoped = await get(`/workers/${workerName}/versions/${before.versionId}?include=modules`);
-    check(scoped.id === before.versionId && typeof scoped.main_module === 'string' && Array.isArray(scoped.modules));
-    check(scoped.modules.every(m => typeof m.name === 'string') && new Set(scoped.modules.map(m => m.name)).size === scoped.modules.length);
-    const scripts = scoped.modules.filter(m => m.content_type === 'application/javascript+module');
-    check(scripts.length === 1 && scripts[0].name === scoped.main_module);
-    const encoded = scripts[0].content_base64;
-    check(typeof encoded === 'string' && encoded.length > 0);
-    const bytes = Buffer.from(encoded, 'base64');
-    check(bytes.toString('base64') === encoded);
-    const source = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-    const afterVersion = await metadata();
-    check(JSON.stringify(version) === JSON.stringify(afterVersion));
+    const artifact = await readExactVersionArtifact({ credentials, workerName, versionId: before.versionId, fetchImplementation });
     check(JSON.stringify(before) === JSON.stringify(await deployment()));
-    const result = { sourceKind: VERSION_SOURCE, ...before, ...version,
-      artifactSha256: createHash('sha256').update(bytes).digest('hex') };
-    Object.defineProperty(result, 'source', { value: source });
+    const result = { sourceKind: VERSION_SOURCE, ...before, etag: artifact.scriptEtag,
+      namedHandlers: artifact.metadata.resources.script.named_handlers, artifactSha256: artifact.sourceSha256 };
+    Object.defineProperty(result, 'source', { value: artifact.source });
     return result;
   } catch {
     // Provider bodies, parser errors and credentials must not escape diagnostics.

@@ -4,13 +4,13 @@ import { createServer } from 'node:http';
 import test from 'node:test';
 import { versionProvider, artifactDigest, deploymentId } from './active-version-artifact.fixture.mjs';
 import {
-  assertConfigUnchanged, assertFullCandidateSmoke, assertOverrideIdentity, buildCandidateReleasePlan,
+  assertPostUploadInvariance, safeVersionSnapshot, assertConfigUnchanged, assertFullCandidateSmoke, assertOverrideIdentity, buildCandidateReleasePlan,
   classifyCandidateAttempt, executeCandidateReleaseContract, parseVersionUploadOutput, promotionArguments,
   PRODUCTION_ORIGIN, PRODUCTION_WORKER, rollbackArguments, safeConfigSnapshot, stageZeroArguments, versionOverrideHeader,
 } from './candidate-release-contract.mjs';
 import { compareDurableObjectProof, DO_MODULES, fingerprintDurableObjectArtifact, readStableDurableObjectArtifact } from './durable-object-release-safety.mjs';
 import { withReleaseProbeIdentity } from '../../app/utils/cloudflareReleaseProbe.mjs';
-import { main, parseCandidateArguments } from './run-candidate-release.mjs';
+import { main, parseCandidateArguments, readCandidateBaseline } from './run-candidate-release.mjs';
 import { runCandidateBrowserSmoke } from './run-candidate-browser-smoke.mjs';
 
 const lineage = 'a'.repeat(64);
@@ -31,10 +31,22 @@ const snapshot = {
   bindings: [...Object.entries(flags).map(([name, text]) => ({ name, type: 'plain_text', text })),
     { name: 'SUPABASE_SERVICE_ROLE_KEY', type: 'secret_text' }, { name: 'NEXT_PUBLIC_SUPABASE_ANON_KEY', type: 'secret_text' },
     { name: 'EXAMPLE_QUEUE', type: 'queue', queue_name: 'fixture-queue' },
+    { name: 'CACHE_R2', type: 'r2_bucket', bucket_name: 'fixture-cache' },
+    { name: 'SELF', type: 'service', service: PRODUCTION_WORKER, environment: 'production' },
     ...Object.keys(DO_MODULES).map(name => ({ name, class_name: name, type: 'durable_object_namespace', namespace_id: `${name}-namespace` }))],
   crons: ['*/10 * * * *'], queueConsumers: [{ queue_name: 'fixture-queue', script: PRODUCTION_WORKER, dead_letter_queue: 'fixture-dlq', settings: { max_retries: 5 } }],
 };
 const baseline = { snapshot, deployment: { id: deploymentId, versions: [{ id: stableId, percentage: 100 }] } };
+const exactStable = { id: stableId, resources: { bindings: structuredClone(snapshot.bindings), script: { etag: 'a'.repeat(64), handlers:['fetch'], named_handlers: [] }, script_runtime: { compatibility_date:'2026-01-01', compatibility_flags:['nodejs_compat'], migration_tag:'cache-v1' } } };
+const exactCandidate = { ...structuredClone(exactStable), id:candidateId };
+exactCandidate.resources.bindings.push(metadataBinding);
+exactCandidate.resources.script.etag='b'.repeat(64);
+function scoped(value, candidate = null) { return { ...value, activeDeployment:structuredClone(value.deployment),
+  activeStableVersion:structuredClone(exactStable), uploadedCandidateVersion:candidate,
+  scriptGlobalSettings:{observability:{enabled:true}},
+  triggersAndBindingsOutsideVersionScope:{crons:structuredClone(value.snapshot.crons),queueConsumers:structuredClone(value.snapshot.queueConsumers),routes:structuredClone(value.snapshot.routes),domains:[],migrationTag:'cache-v1'},
+}; }
+
 const blocked = code => error => error.code === code;
 function artifact(constant = 'fixture-original') {
   return 'var helper = 1;\n' + Object.entries(DO_MODULES).map(([name, p]) => `// ${p}\nvar ${name} = class extends DurableObject { value = "${constant}"; };\n`).join('')
@@ -66,7 +78,7 @@ function fixtureActions() {
     bridgeProofFreshness: async () => ({kind:'provider',sourceKind:'workers-version-modules',artifactSha256:artifactDigest(artifact()),deploymentId:baseline.deployment.id,versionId:stableId,etag:'a'.repeat(64),compatSha256:lineage}),
     build: async () => calls.push('build'), semanticPreflight: async () => { calls.push('preflight'); return 'PASS'; },
     durableObjectProof: async () => { calls.push('do-proof'); return makeProof(); },
-    snapshot: async () => { calls.push('snapshot'); return { snapshot: { ...structuredClone(snapshot), bindings: structuredClone(bindings) }, deployment: structuredClone(deployment) }; },
+    snapshot: async (options = {}) => { calls.push('snapshot'); return scoped({ snapshot: { ...structuredClone(snapshot), bindings: structuredClone(bindings) }, deployment: structuredClone(deployment) }, options.candidateVersionId ? structuredClone(exactCandidate) : null); },
     upload: async args => { calls.push('upload'); assert.deepEqual(args.slice(0, 2), ['versions', 'upload']); return `Worker Version ID: ${candidateId}\n`; },
     versionMetadata: async id => { calls.push('metadata'); return { id, runtime: snapshot.runtime, bindings: [...structuredClone(snapshot.bindings), metadataBinding] }; },
     stageZero: async args => { calls.push('stage-zero'); assert(args.includes(`${stableId}@100%`) && args.includes(`${candidateId}@0%`));
@@ -143,14 +155,14 @@ test('fresh DO proof is required before upload even after a READY plan', async (
 });
 test('changed deployment ID after upload blocks before staging', async () => {
   const { actions, calls } = fixtureActions(); const read = actions.snapshot;
-  actions.snapshot = async () => { const r = await read(); if (calls.includes('upload')) r.deployment.id = 'concurrent'; return r; };
+  actions.snapshot = async options => { const r = await read(options); if (calls.includes('upload')) r.deployment.id = r.activeDeployment.id = 'concurrent'; return r; };
   await assert.rejects(executeCandidateReleaseContract(makePlan(), actions), blocked('upload_changed_active_deployment')); assert(!calls.includes('stage-zero'));
 });
 test('epsilon, unknown percentage, missing candidate and third version all reject', async () => {
   for (const mutate of [d => { d.versions[0].percentage = 99.99; d.versions[1].percentage = 0.01; },
     d => { delete d.versions[1].percentage; }, d => { d.versions.pop(); }, d => { d.versions.push({ id: '33333333-3333-4333-8333-333333333333', percentage: 0 }); }]) {
     const { actions, calls } = fixtureActions(); const read = actions.snapshot;
-    actions.snapshot = async () => { const r = await read(); if (calls.includes('stage-zero')) mutate(r.deployment); return r; };
+    actions.snapshot = async options => { const r = await read(options); if (calls.includes('stage-zero')) mutate(r.deployment); return r; };
     await assert.rejects(executeCandidateReleaseContract(makePlan(), actions), blocked('unexpected_deployment_distribution')); assert(!calls.includes('promote'));
   }
 });
@@ -333,4 +345,67 @@ test('final bridge and DO proofs must attest identical version source bytes', as
   actions.bridgeProofFreshness=async()=>({...await original(),artifactSha256:'b'.repeat(64)});
   await assert.rejects(executeCandidateReleaseContract(makePlan(),actions),blocked('bridge_provenance_or_freshness_failed'));
   assert(!calls.includes('upload'));
+});
+
+test('real incident: latest /settings gains metadata, exact stable and globals stay unchanged', () => {
+  const before=scoped(baseline);const after=scoped(baseline,structuredClone(exactCandidate));
+  before.diagnosticLegacyBindings=structuredClone(snapshot.bindings);
+  after.diagnosticLegacyBindings=[...structuredClone(snapshot.bindings),metadataBinding];
+  assert.equal(assertPostUploadInvariance(before,after),'POST_UPLOAD_INVARIANCE_PASS');
+});
+for (const [label,change] of Object.entries({
+  deployment: s=>s.activeDeployment.id='changed',
+  percentage: s=>s.activeDeployment.versions[0].percentage=99,
+  stableUUID: s=>s.activeDeployment.versions[0].id=candidateId,
+  stableResources: s=>s.activeStableVersion.resources.script.etag='c'.repeat(64),
+  stableBinding: s=>s.activeStableVersion.resources.bindings.pop(),
+  lostSecret: s=>s.uploadedCandidateVersion.resources.bindings.splice(2,1),
+  extraBinding: s=>s.uploadedCandidateVersion.resources.bindings.push({name:'unexpected',type:'secret_text'}),
+  runtime: s=>s.uploadedCandidateVersion.resources.script_runtime.usage_model='changed',
+  date: s=>s.uploadedCandidateVersion.resources.script_runtime.compatibility_date='2030-01-01',
+  flags: s=>s.uploadedCandidateVersion.resources.script_runtime.compatibility_flags.push('changed'),
+  doTarget: s=>s.uploadedCandidateVersion.resources.bindings.find(b=>b.type==='durable_object_namespace').namespace_id='changed',
+  r2Target: s=>s.uploadedCandidateVersion.resources.bindings.find(b=>b.type==='r2_bucket').bucket_name='changed',
+  serviceTarget: s=>s.uploadedCandidateVersion.resources.bindings.find(b=>b.type==='service').service='changed',
+  queueProducer: s=>s.uploadedCandidateVersion.resources.bindings.find(b=>b.type==='queue').queue_name='changed',
+  queue: s=>s.triggersAndBindingsOutsideVersionScope.queueConsumers=[],
+  cron: s=>s.triggersAndBindingsOutsideVersionScope.crons=[],
+  route: s=>s.triggersAndBindingsOutsideVersionScope.routes=[],
+  domain: s=>s.triggersAndBindingsOutsideVersionScope.domains=['changed'],
+  global: s=>s.scriptGlobalSettings.logpush=true,
+  migration: s=>s.triggersAndBindingsOutsideVersionScope.migrationTag='changed',
+})) test(`post-upload scoped invariant rejects ${label}`,()=>{
+  const after=scoped(baseline,structuredClone(exactCandidate));change(after);
+  assert.throws(()=>assertPostUploadInvariance(scoped(baseline),after));
+});
+test('exact version serialization hashes unmanaged plain values and never serializes secret values',()=>{
+  const v=structuredClone(exactStable);v.resources.bindings=[{name:'PRIVATE',type:'plain_text',text:'fixture-private-value'},{name:'SECRET',type:'secret_text',text:'fixture-secret-value'}];
+  const safe=safeVersionSnapshot(v);assert(!JSON.stringify(safe).includes('fixture-'));assert.equal(safe.resources.bindings[0].valueSha256.length,64);
+});
+
+test('GET reader anchors before/after upload to exact stable resources, not legacy settings',async()=>{
+  let uploaded=false;const calls=[];
+  const fetchImplementation=async(url,options)=>{
+    calls.push(url);assert.equal(options.method,'GET');let result;
+    const runtime=exactStable.resources.script_runtime;
+    if(url.endsWith('/deployments')) result={deployments:[{id:'deployment',created_on:'2026-01-01',versions:[{version_id:stableId,percentage:100}]}]};
+    else if(url.endsWith(`/versions/${stableId}`))result=exactStable;
+    else if(url.endsWith(`/versions/${candidateId}`))result=exactCandidate;
+    else if(url.endsWith('/script-settings'))result={observability:{enabled:true},logpush:false};
+    else if(url.endsWith('/settings'))result={bindings:uploaded?exactCandidate.resources.bindings:exactStable.resources.bindings,...runtime,observability:{enabled:false}};
+    else if(url.endsWith('/workers/scripts'))result=[{id:PRODUCTION_WORKER,migration_tag:'cache-v1'}];
+    else if(url.endsWith('/schedules'))result={schedules:[{cron:'*/10 * * * *'}]};
+    else if(url.includes('/routes?'))result=snapshot.routes;
+    else if(url.endsWith('/subdomain'))result=snapshot.subdomain;
+    else result=[];
+    return Response.json({success:true,result});
+  };
+  const options={credentials:{accountId:'fixture',apiToken:'fixture'},fetchImplementation};
+  const before=await readCandidateBaseline(options);uploaded=true;
+  const after=await readCandidateBaseline({...options,candidateVersionId:candidateId});
+  assert.equal(after.diagnosticLegacyBindings.some(b=>b.name==='CF_VERSION_METADATA'),true);
+  assert.equal(after.activeStableVersion.resources.bindings.some(b=>b.name==='CF_VERSION_METADATA'),false);
+  assert.equal(assertPostUploadInvariance(before,after),'POST_UPLOAD_INVARIANCE_PASS');
+  assert(calls.some(url=>url.endsWith('/script-settings')));
+
 });
