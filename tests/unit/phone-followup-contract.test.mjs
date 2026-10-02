@@ -56,3 +56,10 @@ test('legacy reply retains normal send path without handling; legacy completion 
   const patch=fixture();const result=await patch.load('app/api/proxy-bookings/[id]/route.ts').PATCH({json:async()=>({status:'COMPLETED'})},{params:Promise.resolve({id:requestId})});
   assert.equal(result.status,409);assert.ok(!patch.queries.some(q=>q.operation==='update'));
 });
+
+test('rendered snapshot preserves decimal bigint strings and rejects rounded JSON numbers',()=>{
+  const {renderedPhoneMessageId,validPhoneSnapshot}=sourceLoader()('app/utils/phoneFollowup.ts');
+  assert.equal(renderedPhoneMessageId(42),'42');assert.equal(renderedPhoneMessageId('9223372036854775807'),'9223372036854775807');
+  assert.equal(renderedPhoneMessageId(Number.MAX_SAFE_INTEGER+1),null);assert.equal(renderedPhoneMessageId('9223372036854775808'),null);
+  assert.equal(validPhoneSnapshot(['9223372036854775807']),true);
+});

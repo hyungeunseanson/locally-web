@@ -12,7 +12,7 @@ For COMPLETED requests the confirmation reads: “현재 확인한 메시지까�
 
 Phone replies pass the same rendered snapshot in `phoneFollowup`. `reply_phone_request` handles exactly those tasks and inserts the admin message in one transaction. An INSERT failure rolls handling back. Existing canonical send reconciliation and post-save notification delivery remain in place. Generic support/monitor sends retain their path. Older clients can send but cannot implicitly handle private tasks; the old COMPLETED PATCH returns 409 rather than bypassing the snapshot contract.
 
-Snapshots are bounded at 200 distinct decimal-string bigint IDs. The UI selects the last 200 eligible rendered customer messages. If older pending tasks remain, the server keeps needs_reply true. There is no max-ID/time watermark and no “handle all in DB” fallback.
+Snapshots are bounded at 200 distinct decimal-string bigint IDs. Unsafe JSON numeric IDs are excluded to prevent rounding from handling a different message. The UI selects the last 200 eligible rendered customer messages. If older pending tasks remain, the server keeps needs_reply true. There is no max-ID/time watermark and no “handle all in DB” fallback.
 
 ## Intake and locking proof
 

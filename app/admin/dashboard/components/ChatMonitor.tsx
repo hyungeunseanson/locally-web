@@ -1,6 +1,6 @@
 'use client';
 
-import { PHONE_SNAPSHOT_LIMIT, validPhoneId, type PhoneRenderedSnapshot } from '@/app/utils/phoneFollowup';
+import { PHONE_SNAPSHOT_LIMIT, renderedPhoneMessageId, type PhoneRenderedSnapshot } from '@/app/utils/phoneFollowup';
 
 import React, { useState, useEffect, useMemo, useLayoutEffect, useRef, useCallback } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
@@ -127,8 +127,8 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
     const ready = Boolean(enabled && phone?.requestId && phone.inquiryId === selectedInquiryId
       && !isMessagesLoading && !messageError && selectedInquiry);
     const messageIds = ready ? messages.filter(message => message.sender_id === selectedInquiry?.user_id
-      && (!message.type || ['text', 'image'].includes(message.type)) && validPhoneId(String(message.id)))
-      .map(message => String(message.id)).slice(-PHONE_SNAPSHOT_LIMIT) : [];
+      && (!message.type || ['text', 'image'].includes(message.type)))
+      .map(message => renderedPhoneMessageId(message.id)).filter((id): id is string => id !== null).slice(-PHONE_SNAPSHOT_LIMIT) : [];
     return { inquiryId: phone?.inquiryId ?? null, messageIds, ready: ready && messageIds.length > 0 };
   }, [enabled, phone?.requestId, phone?.inquiryId, selectedInquiryId, selectedInquiry, isMessagesLoading, messageError, messages]);
   const onPhoneSnapshot = phone?.onSnapshot;

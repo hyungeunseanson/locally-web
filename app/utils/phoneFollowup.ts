@@ -12,3 +12,10 @@ export function validPhoneSnapshot(value: unknown): value is string[] {
   return Array.isArray(value) && value.length > 0 && value.length <= PHONE_SNAPSHOT_LIMIT
     && value.every(validPhoneId) && new Set(value).size === value.length;
 }
+
+export function renderedPhoneMessageId(value: unknown): string | null {
+  // PostgREST may return bigint IDs as JSON numbers. Never acknowledge a rounded ID.
+  if (typeof value === 'number' && !Number.isSafeInteger(value)) return null;
+  const id = typeof value === 'number' ? String(value) : value;
+  return validPhoneId(id) ? id : null;
+}
