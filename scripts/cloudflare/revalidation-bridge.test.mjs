@@ -8,6 +8,16 @@ import { createRevalidationBridge } from '../../app/utils/isrRevalidationBridge.
 import { patchQueueArtifact, inspectQueueToken, readProviderCompatToken, sha256, assertNoClientTokenLeakage, applyRevalidationBridge } from './revalidation-bridge-build.mjs';
 import { main as deploy } from './run-production-deploy.mjs';
 
+test('initial bridge policy and current stable fixture attest the same single lineage', async () => {
+  const policy = JSON.parse(await readFile('config/cloudflare/revalidation-bridge.json', 'utf8'));
+  const fixture = JSON.parse(await readFile('tests/fixtures/cloudflare-isr/stable-extracted.json', 'utf8'));
+  assert.equal(policy.baselineVersionId, '5e010718-4e12-438a-9db9-725289be579e');
+  assert.equal(policy.baselineVersionId, fixture.provenance.versionId);
+  assert.equal(policy.compatTokenSha256, fixture.provenance.compatTokenSha256);
+  assert.equal(policy.compatTokenSha256, '2fee1dcac25e7158d0225f9d086b33ff14b504002efe10cd77e2699d3e646d6f');
+  assert.equal(fixture.provenance.etag, 'ea58122e893067411499f420d9d3f5f8deaba7a3f2d880513c1c3868eab0c6bf');
+});
+
 const compat = '0'.repeat(32), current = '1'.repeat(32);
 const rewrite = createRevalidationBridge(compat, current);
 const request = (method = 'HEAD', changes = {}) => new Request('https://fixture.invalid/cache?fixture=1', { method,
