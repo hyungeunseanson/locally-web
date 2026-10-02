@@ -126,11 +126,11 @@ SELECT jsonb_build_object(
         WHEN proc_def.prokind = 'a' THEN NULL
         ELSE pg_get_functiondef(proc_def.oid)
       END
-    ) ORDER BY proc_def.proname, pg_get_function_identity_arguments(proc_def.oid))
+    ) ORDER BY proc_nsp.nspname, proc_def.proname, pg_get_function_identity_arguments(proc_def.oid))
     FROM pg_proc AS proc_def
     JOIN pg_namespace AS proc_nsp ON proc_nsp.oid = proc_def.pronamespace
     JOIN pg_language AS proc_language ON proc_language.oid = proc_def.prolang
-    WHERE proc_nsp.nspname = 'public'
+    WHERE proc_nsp.nspname IN ('public', 'private')
   ), '[]'::jsonb),
   'triggers', COALESCE((
     SELECT jsonb_agg(jsonb_build_object(
@@ -166,6 +166,20 @@ SELECT jsonb_build_object(
     WHERE grant_nsp.nspname IN ('public', 'storage')
       AND grant_cls.relkind IN ('r', 'p', 'v', 'm', 'f')
   ), '[]'::jsonb),
+  'column_grants', COALESCE((
+    SELECT jsonb_agg(jsonb_build_object(
+      'schema', grant_nsp.nspname, 'table', grant_cls.relname,
+      'column', grant_attr.attname,
+      'grantee', CASE WHEN acl_entry.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(acl_entry.grantee) END,
+      'privilege', acl_entry.privilege_type, 'grantable', acl_entry.is_grantable
+    ) ORDER BY grant_nsp.nspname, grant_cls.relname, grant_attr.attnum, acl_entry.grantee, acl_entry.privilege_type)
+    FROM pg_attribute AS grant_attr
+    JOIN pg_class AS grant_cls ON grant_cls.oid = grant_attr.attrelid
+    JOIN pg_namespace AS grant_nsp ON grant_nsp.oid = grant_cls.relnamespace
+    CROSS JOIN LATERAL aclexplode(grant_attr.attacl) AS acl_entry
+    WHERE grant_nsp.nspname IN ('public', 'storage')
+      AND grant_attr.attnum > 0 AND NOT grant_attr.attisdropped
+  ), '[]'::jsonb),
   'function_execute_grants', COALESCE((
     SELECT jsonb_agg(jsonb_build_object(
       'identity', format('%I.%I(%s)', grant_proc_nsp.nspname, grant_proc.proname,
@@ -174,11 +188,11 @@ SELECT jsonb_build_object(
       'grantee', CASE WHEN acl_entry.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(acl_entry.grantee) END,
       'privilege', acl_entry.privilege_type,
       'grantable', acl_entry.is_grantable
-    ) ORDER BY grant_proc.proname, pg_get_function_identity_arguments(grant_proc.oid), acl_entry.grantee)
+    ) ORDER BY grant_proc_nsp.nspname, grant_proc.proname, pg_get_function_identity_arguments(grant_proc.oid), acl_entry.grantee)
     FROM pg_proc AS grant_proc
     JOIN pg_namespace AS grant_proc_nsp ON grant_proc_nsp.oid = grant_proc.pronamespace
     CROSS JOIN LATERAL aclexplode(COALESCE(grant_proc.proacl, acldefault('f', grant_proc.proowner))) AS acl_entry
-    WHERE grant_proc_nsp.nspname = 'public'
+    WHERE grant_proc_nsp.nspname IN ('public', 'private')
   ), '[]'::jsonb),
   'sequence_grants', COALESCE((
     SELECT jsonb_agg(jsonb_build_object(

@@ -1,5 +1,5 @@
 {
-  "schemaContractVersion": 3,
+  "schemaContractVersion": 4,
   "productionProjectRefsDeniedForFixtureWrites": [
     "uhinvcydgzqlpnvieyal"
   ],
@@ -21,20 +21,7 @@
     "supabase/migrations/20261001170718_admin_message_monitoring_phase_1.sql",
     "supabase/migrations/20261002015110_admin_message_monitoring_historical_reinquiry.sql"
   ],
-  "pendingProductionMigrations": [
-    {
-      "version": "20261001170718",
-      "name": "admin_message_monitoring_phase_1",
-      "repositoryFile": "supabase/migrations/20261001170718_admin_message_monitoring_phase_1.sql",
-      "repositorySha256": "aee6d14e1a897579e5dc6454221cb52d4bab822952096425e0b110eeb907ae95"
-    },
-    {
-      "version": "20261002015110",
-      "name": "admin_message_monitoring_historical_reinquiry",
-      "repositoryFile": "supabase/migrations/20261002015110_admin_message_monitoring_historical_reinquiry.sql",
-      "repositorySha256": "80f34eea7ad6e2405aa38962a886c97e8713bfa1fefe72f0d9647686489747a1"
-    }
-  ],
+  "pendingProductionMigrations": [],
   "applicationTables": [
     "admin_audit_logs",
     "admin_job_runs",
@@ -81,6 +68,8 @@
     "public_profiles"
   ],
   "applicationFunctions": [
+    "ack_admin_inquiry_messages",
+    "advance_support_version",
     "apply_experience_media_locator_cas",
     "assign_service_concierge_host_atomic",
     "attach_experience_payment_provider_reference_atomic",
@@ -111,6 +100,7 @@
     "ensure_profile_demographics_reminder",
     "finalize_proxy_card_intake_atomic",
     "finish_service_refund_operation_atomic",
+    "get_admin_inquiry_activity",
     "get_experience_completion_due_backlog",
     "get_ops_anomaly_snapshot",
     "guard_experience_payment_claim_columns",
@@ -119,10 +109,12 @@
     "increment_community_post_view_count",
     "increment_like_count",
     "is_admin_reader",
+    "is_inquiry_admin_sender",
     "lease_experience_translation_task",
     "list_due_experience_completion_candidates",
     "list_due_experience_review_request_candidates",
     "mark_room_messages_read",
+    "prepare_support_message",
     "prune_notifications_retention",
     "prune_team_workspace_comments",
     "prune_team_workspace_tasks",
@@ -138,13 +130,15 @@
     "snapshot_booking_guest_demographics"
   ],
   "applicationTriggers": [
-    "bookings_payment_claim_columns_server_only",
     "on_auth_user_created",
+    "bookings_payment_claim_columns_server_only",
+    "set_booking_guest_demographics_snapshot",
     "on_comment_added",
     "on_comment_removed",
     "on_like_added",
     "on_like_removed",
-    "set_booking_guest_demographics_snapshot",
+    "inquiry_support_version",
+    "inquiry_support_message",
     "trg_pc_updated_at",
     "trg_pr_updated_at",
     "trg_sa_updated_at",
@@ -156,6 +150,7 @@
     "admin_task_comments",
     "admin_tasks",
     "admin_whitelist",
+    "inquiries",
     "inquiry_messages",
     "notifications",
     "profiles"
