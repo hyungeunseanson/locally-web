@@ -73,7 +73,9 @@ export function parseVersionUploadOutput(output, workerName = PRODUCTION_WORKER)
   const match = output.match(/Version Preview URL:\s*(https:\/\/[^\s]+)/);
   const result = { versionId: ids[0], versionUrl: null };
   if (match) {
-    const url = new URL(match[1]);
+    let url;
+    try { url = new URL(match[1]); }
+    catch { throw new CandidateReleaseBlocked('invalid_provider_version_url'); }
     requireCondition(url.protocol === 'https:' && !url.username && !url.password && !url.search && !url.hash
       && url.pathname === '/' && url.hostname.startsWith(`${ids[0].slice(0, 8)}-${workerName}.`)
       && url.hostname.endsWith('.workers.dev'), 'invalid_provider_version_url');

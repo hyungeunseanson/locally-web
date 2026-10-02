@@ -241,6 +241,9 @@ test('bindings retain target IDs; secret values never appear in safe snapshots/p
   assert.throws(() => makePlan({ runtimeVariables: { SUPABASE_SERVICE_ROLE_KEY: 'fixture-sensitive-value' } }), error => {
     assert(!error.message.includes('fixture-sensitive-value')); return error.code === 'credential_or_unmanaged_var_override';
   });
+  assert.throws(() => parseVersionUploadOutput(`Worker Version ID: ${candidateId}\nVersion Preview URL: https://[fixture-sensitive-value`), error => {
+    assert(!error.message.includes('fixture-sensitive-value')); return error.code === 'invalid_provider_version_url';
+  });
 });
 
 test('lost encrypted binding on uploaded candidate prevents staging', async () => {
