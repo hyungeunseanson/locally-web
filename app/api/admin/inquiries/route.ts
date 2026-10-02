@@ -85,6 +85,10 @@ export async function GET(request: Request) {
     const params = new URL(request.url).searchParams;
     const view = params.get('view') === 'monitor' ? 'monitor' : 'support';
     const selectedId = params.get('inquiryId');
+    const status = params.get('status');
+    if ((selectedId && !/^[1-9]\d*$/.test(selectedId)) || (status && !['open', 'in_progress', 'resolved'].includes(status))) {
+      return NextResponse.json({ success: false, error: 'Invalid inquiry query' }, { status: 400 });
+    }
     const offset = Math.max(0, Number.parseInt(params.get('offset') || '0', 10) || 0);
     const limit = Math.min(50, Math.max(1, Number.parseInt(params.get('limit') || '50', 10) || 50));
     const columns = 'id, user_id, host_id, experience_id, type, status, content, updated_at, experiences (id, title, photos, image_url, host_id), inquiry_messages (sender_id, created_at)';
@@ -106,6 +110,9 @@ export async function GET(request: Request) {
         let query = supabaseAdmin.from('inquiries').select(columns);
         query = view === 'support' ? query.in('type', ['admin', 'admin_support'])
           : query.or('type.is.null,type.not.in.(admin,admin_support)');
+        if (view === 'support' && status) {
+          query = status === 'open' ? query.or('status.is.null,status.eq.open') : query.eq('status', status);
+        }
         const { data, error } = await query.order('updated_at', { ascending: false }).order('id', { ascending: false })
           .order('created_at', { referencedTable: 'inquiry_messages', ascending: false })
           .limit(1, { referencedTable: 'inquiry_messages' }).range(scan, scan + 99);

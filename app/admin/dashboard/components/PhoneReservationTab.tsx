@@ -138,7 +138,28 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
     return () => { version.current++; };
   }, [loadDetail]);
 
-  const refresh = useCallback(() => { void loadList(); void loadDetail(); }, [loadList, loadDetail]);
+  const refreshRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    let stopped = false, running = false, again = false;
+    refreshRef.current = () => {
+      if (running) { again = true; return; }
+      running = true;
+      void (async () => {
+        try {
+          // A shared GET may predate the invalidation. Let it settle, then
+          // revalidate once; sharing that old snapshot alone loses the event.
+          await Promise.allSettled([...requestFlights.current.values()]);
+          do {
+            if (stopped) return;
+            again = false;
+            await Promise.allSettled([loadList(), loadDetail()]);
+          } while (again && !stopped);
+        } finally { running = false; }
+      })();
+    };
+    return () => { stopped = true; refreshRef.current = () => {}; };
+  }, [loadList, loadDetail]);
+  const refresh = useCallback(() => refreshRef.current(), []);
   useEffect(() => {
     if (!active) return;
     let timer: ReturnType<typeof setTimeout>;
@@ -212,7 +233,7 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
   }, () => paymentAction(action));
   const toolbar = <div data-testid="admin-phone-chat-header" className="relative flex shrink-0 items-center gap-2 border-b border-slate-100 bg-slate-50/30 p-3 md:p-4">
     <button aria-label="목록으로" onClick={() => select(null)} className="shrink-0 rounded-full bg-slate-100 p-1.5 text-slate-500 md:hidden"><ChevronLeft size={18} /></button>
-    {detailError ? <p role="alert" className="text-xs">{detailError}</p> : !selected ? <p className="text-xs">{detailLoading ? '상세를 불러오는 중...' : '전화예약을 선택해주세요.'}</p> : <>
+    {detailError ? <p role="alert" className="text-xs">{detailError} <button className="underline" onClick={() => void loadDetail()}>다시 시도</button></p> : !selected ? <p className="text-xs">{detailLoading ? '상세를 불러오는 중...' : '전화예약을 선택해주세요.'}</p> : <>
       <div className="min-w-0 flex-1">
         <h2 className="truncate text-xs font-bold text-slate-900 md:text-lg">{getProxyRequesterDisplayName(selected.profiles)}</h2>
         <p className="truncate text-[8px] font-medium text-slate-500 md:text-[11px]" title={getProxyRequestTitle(selected)}>{getProxyRequestTitle(selected)}</p>
