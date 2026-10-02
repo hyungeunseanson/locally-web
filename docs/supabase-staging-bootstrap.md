@@ -1,3 +1,5 @@
+> Phase 2 checkpoint: Production parity remains the 16 applied migrations, through the historical reinquiry migration. Run `current-state-contract.sql` before any pending migration. The prepared `20261002041848_admin_attention_badges_phase_2.sql` is **not applied to Production**. Only local/staging target verification applies it after that checkpoint, then runs `admin-attention-target-contract.sql`. Current Production fingerprints/ledger are intentionally unchanged.
+
 # Supabase staging bootstrap for the Cloudflare functional canary
 
 This repository does **not** contain a complete historical Supabase migration history. The SQL files are operational patches from different releases, and many assume that the base schema already exists. Do not run every repository SQL file alphabetically against a new project.
@@ -6,7 +8,7 @@ This change intentionally does not create a Supabase branch/project, connect to 
 
 ## Reproducibility decision
 
-The repository now has an explicit two-layer contract. The immutable `20260912034545_production_schema_baseline.sql` and `production-baseline.manifest.json` reconstruct the 2026-09-09 checkpoint. The current Production contract is that baseline plus `20260912050655_service_concierge_assignment.sql` and the separately approved chat-image INSERT policy removal. `production-current-state.manifest.json` records the current 39-table/44-function catalog without changing the checkpoint artifacts.
+The repository now has an explicit two-layer contract. The immutable `20260912034545_production_schema_baseline.sql` and `production-baseline.manifest.json` reconstruct the 2026-09-09 checkpoint. The current Production contract includes the 16 applied ledger entries recorded in `production-current-state.manifest.json`, including both Phase 1 chat migrations. Repository file versions and actual ledger versions are mapped explicitly in `required-objects.json`. The immutable checkpoint artifacts remain unchanged.
 
 The root `supabase_*.sql` files and `docs/migrations/*.sql` remain historical evidence, not an ordered bootstrap. A new empty project uses only the explicit order below. A branch cloned from current Production receives its parent schema and must not replay any migration SQL.
 
@@ -20,7 +22,7 @@ Required schema-only material:
 - Storage bucket names/public flags/file limits/allowed MIME types plus final `storage.objects` policies;
 - extensions and types referenced by the above objects.
 
-The baseline folds in historical effects through `docs/migrations/v3_40_41_admin_manual_payout_zero_cancellation.sql`. After that checkpoint, apply only the ordered concierge migration and staging-only current Storage overlay described below. Do not alphabetically replay historical patches.
+The baseline folds in historical effects through `docs/migrations/v3_40_41_admin_manual_payout_zero_cancellation.sql`. After that checkpoint, use only the explicit `freshProjectApplyOrder` in `required-objects.json`; it includes later applied migrations and the pending Phase 2 proposal. Do not alphabetically replay historical patches.
 
 ## Required application objects
 
@@ -32,12 +34,12 @@ The canary minimum is:
 - views: `public_profiles`, `public_host_applications`;
 - functions: the existing Auth/booking functions plus all eight active concierge RPCs;
 - trigger: `on_auth_user_created` on `auth.users`;
-- Realtime publication: reproduce the exact Production membership: `admin_audit_logs`, `admin_task_comments`, `admin_tasks`, `admin_whitelist`, `inquiry_messages`, `notifications`, and `profiles`. The functional canary exercises `inquiry_messages`, `notifications`, and `profiles`; it does not add `bookings` or `inquiries` to the publication;
+- Realtime publication: reproduce the exact Production membership: `admin_audit_logs`, `admin_task_comments`, `admin_tasks`, `admin_whitelist`, `inquiries`, `inquiry_messages`, `notifications`, and `profiles`. The functional canary exercises `inquiry_messages`, `notifications`, and `profiles`; it does not add `bookings` or any other table to the publication;
 - Storage: public `admin_files`, `avatars`, `chat-images`, `experiences`, `images`; private `verification-docs`.
 
 The public flags above are the current runtime contract, not approval of broad object-listing policies. Preserve final Production RLS semantics. In particular, `profiles`/`users` must not be anon-readable, inquiry reads must be participant/admin scoped, direct client inserts to `inquiry_messages` must remain disabled, and `verification-docs` must remain owner/admin private. Production Storage files are never copied.
 
-The current clients register `postgres_changes` handlers for `inquiries` and `bookings`, but those tables are not members of the Production `supabase_realtime` publication. Chat correctness already treats an `inquiry_messages` event as a signal to refetch inquiry/message state and performs a catch-up refetch after subscribe/reconnect. The canary must validate that Production behavior: create or update a message through the server path, observe the published `inquiry_messages` event, and verify the subsequent inquiry/message refetch. Booking correctness remains request/response based in this canary. Do not change publication membership merely to make the unused handlers fire.
+Current Production publishes `inquiries` and `inquiry_messages`; `bookings` remains outside the publication. Chat correctness already treats an `inquiry_messages` event as a signal to refetch inquiry/message state and performs a catch-up refetch after subscribe/reconnect. The canary must validate that Production behavior: create or update a message through the server path, observe the published `inquiry_messages` event, and verify the subsequent inquiry/message refetch. Booking correctness remains request/response based in this canary. Do not change publication membership merely to make the unused handlers fire.
 
 ## Auth and OAuth configuration
 
@@ -59,9 +61,9 @@ Platform work remains separate and requires explicit approval:
 
 1. Obtain separate approval for an empty staging project or a data-less branch. Record its exact ref and branch-specific credentials. Never use `uhinvcydgzqlpnvieyal` as staging.
 2. Run the immutable baseline and current-state static checkers. Do not export or copy application rows or Storage objects.
-3. **New empty project:** apply the immutable baseline, run `baseline-contract.sql`, apply `20260912050655_service_concierge_assignment.sql`, set `locally.staging_target_ref` to the exact staging ref, then apply `post-baseline-current-state-overlay.sql`.
+3. **New empty project:** apply the immutable baseline, run `baseline-contract.sql`, then apply the remaining **already-applied** migrations in `freshProjectApplyOrder`. Preserve the separately documented Storage overlay checkpoint and target guard; do not replay historical patches.
 4. **Branch cloned from current Production:** do not replay the baseline, post-baseline migration, or overlay. Run only the read-only current-state contracts.
-5. Run `current-state-contract.sql` and `schema-contract.sql`. The former verifies the exact two-entry migration ledger, 39-table/44-function catalog, security boundaries, Realtime membership, buckets, and 15-policy Storage state.
+5. At the Production-parity checkpoint, run `current-state-contract.sql` and `schema-contract.sql`. These verify the 16-entry actual ledger, current catalog, security boundaries, eight-table Realtime publication, buckets, and 16-policy Storage state. Applying the prepared Phase 2 migration is a separate local/staging target step followed by `admin-attention-target-contract.sql`; it must not be mistaken for current Production parity.
 6. Configure branch/project-specific Auth providers/redirects and verify the six empty Storage buckets and policies.
 7. Run `npm run supabase:staging:seed` with explicit staging-only environment variables.
 8. Feed the printed guest/host IDs, inquiry ID, and image URL into the functional canary runner. The fixture password remains runner-only and is never written to the state file.

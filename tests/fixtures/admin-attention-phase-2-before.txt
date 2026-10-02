@@ -1,6 +1,5 @@
 'use client';
 
-import { useAdminAttention } from '../components/AdminAttentionProvider';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { AdminInquiryActivity } from '@/app/utils/adminInquiryActivity';
 import { User } from '@supabase/supabase-js';
@@ -36,7 +35,6 @@ type MonitorMessage = {
   created_at?: string | null;
   is_read?: boolean;
   read_at?: string | null;
-  admin_read_at?: string | null;
   sender?: { name?: string | null };
   has_policy_signal?: boolean;
   policy_signal_categories?: string[];
@@ -147,7 +145,6 @@ function isAdminSendMessageResult(value: unknown): value is AdminSendMessageResu
 export function useAdminChatQuery({ view = 'support', conversationOnly = false, enabled = true }: {
   view?: 'support' | 'monitor'; conversationOnly?: boolean; enabled?: boolean;
 } = {}) {
-  const attention = useAdminAttention();
   const [inquiries, setInquiries] = useState<MonitorInquiry[]>([]);
   const [selectedInquiry, setSelectedInquiry] = useState<MonitorInquiry | null>(null);
   const [messages, setMessages] = useState<MonitorMessage[]>([]);
@@ -169,17 +166,10 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
   const fetchInquiriesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inquiryRequestVersionRef = useRef(0);
   const messageRequestVersionRef = useRef(0);
-  const messageFlightRef = useRef<{
-    targetId: string;
-    refreshRequested: boolean;
-    promise: Promise<boolean>;
-  } | null>(null);
   const localMessagesRef = useRef(new Map<string, Map<string, { message: MonitorMessage; version: number }>>());
   const observedOwnRowsRef = useRef(new Map<string, MonitorMessage>());
   const acknowledgedSnapshotsRef = useRef(new Set<string>());
   const pendingAcknowledgementsRef = useRef(new Set<string>());
-  const renderedSnapshotRef = useRef<{ inquiryId: string; messages: MonitorMessage[]; unread: number; version: number } | null>(null);
-  const threadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const realtimeHealthyRef = useRef(false);
   const scheduleFallbackRef = useRef<() => void>(() => {});
 
@@ -287,7 +277,7 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
     }
   }, [commitInquiries, getAuthenticatedUser, view, conversationOnly, enabled]);
 
-  const fetchMessages = useCallback(async (
+  const loadMessages = useCallback(async (
     inquiryId: number | string,
     options: { select?: boolean } = {}
   ) => {
@@ -312,7 +302,6 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
     }
 
     const requestVersion = ++messageRequestVersionRef.current;
-    const attentionVersion = attention?.version(targetId) ?? 0;
 
     try {
       const response = await fetch(`/api/admin/inquiries/${inquiryId}/messages`, { cache: 'no-store', signal: AbortSignal.timeout(15_000) });
@@ -341,7 +330,6 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
       const nextMessages = [...merged.values()].sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')));
       messagesRef.current = nextMessages;
       setMessages(nextMessages);
-      setMessageError(undefined);
 
       const inquiryDetail = typeof result.inquiry === 'object' && result.inquiry !== null
           ? result.inquiry as Partial<MonitorInquiry>
@@ -359,11 +347,29 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
       }
       if (inquiryDetail) patchInquiry(inquiryId, inquiryDetail);
 
-      // This snapshot is eligible only after React commits the successful thread.
-      renderedSnapshotRef.current = {
-        inquiryId: targetId, messages: fetched, unread: Number(inquiryDetail?.admin_unread_count ?? 0),
-        version: attentionVersion,
-      };
+      // No acknowledgement for an already-read thread. Cache successful snapshots,
+      // including every ID: a lower-ID transaction can commit after the highest ID.
+      if (nextSelected && isAdminSupportType(nextSelected.type) && fetched.length
+        && Number(inquiryDetail?.admin_unread_count ?? 0) > 0) {
+        const snapshot = `${targetId}:${fetched.map(row => String(row.id)).sort().join(',')}`;
+        if (!acknowledgedSnapshotsRef.current.has(snapshot) && !pendingAcknowledgementsRef.current.has(snapshot)) {
+          const throughMessageId = fetched.reduce((last, row) => BigInt(row.id) > BigInt(last) ? row.id : last, fetched[0].id);
+          pendingAcknowledgementsRef.current.add(snapshot);
+          void fetch(`/api/admin/inquiries/${inquiryId}/ack`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ throughMessageId: String(throughMessageId) }),
+            signal: AbortSignal.timeout(15_000),
+          }).then(async response => {
+            const result = await response.json();
+            if (response.ok && result.success) {
+              acknowledgedSnapshotsRef.current.add(snapshot);
+              if (acknowledgedSnapshotsRef.current.size > 100) {
+                acknowledgedSnapshotsRef.current.delete(acknowledgedSnapshotsRef.current.values().next().value!);
+              }
+            }
+          }).catch(() => {}).finally(() => pendingAcknowledgementsRef.current.delete(snapshot));
+        }
+      }
 
       return true;
     } catch (err: unknown) {
@@ -381,100 +387,14 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
       return false;
     } finally {
       if (
+        shouldSelect &&
         requestVersion === messageRequestVersionRef.current &&
         String(selectedInquiryRef.current?.id ?? '') === targetId
       ) {
         setIsMessagesLoading(false);
       }
     }
-  }, [patchInquiry, showToast, conversationOnly, attention]);
-
-  useEffect(() => {
-    const captured = renderedSnapshotRef.current;
-    if (!enabled || isMessagesLoading || messageError || !captured || !captured.messages.length || captured.unread <= 0
-      || captured.inquiryId !== String(selectedInquiry?.id)) return;
-    const renderedIds = new Set(messages.map(row => String(row.id)));
-    if (!captured.messages.every(row => renderedIds.has(String(row.id)))) return;
-    const ids = captured.messages.map(row => String(row.id)).sort();
-    const snapshot = `${captured.inquiryId}:${ids.join(',')}`;
-    if (acknowledgedSnapshotsRef.current.has(snapshot) || pendingAcknowledgementsRef.current.has(snapshot)) return;
-    const throughMessageId = ids.reduce((last, id) => BigInt(id) > BigInt(last) ? id : last);
-    pendingAcknowledgementsRef.current.add(snapshot);
-    void fetch(`/api/admin/inquiries/${captured.inquiryId}/ack`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ throughMessageId, messageIds: ids }), signal: AbortSignal.timeout(15_000),
-    }).then(async response => {
-      const result = await response.json();
-      if (!response.ok || !result.success) return;
-      acknowledgedSnapshotsRef.current.add(snapshot);
-      if (acknowledgedSnapshotsRef.current.size > 100) acknowledgedSnapshotsRef.current.delete(acknowledgedSnapshotsRef.current.values().next().value!);
-      if (typeof result.admin_unread_count === 'number') {
-        if (attention) attention.applyAcknowledgement(captured.inquiryId, result.admin_unread_count, captured.version);
-        else patchInquiry(captured.inquiryId, { admin_unread_count: result.admin_unread_count });
-      }
-    }).catch(() => {}).finally(() => pendingAcknowledgementsRef.current.delete(snapshot));
-  }, [messages, selectedInquiry, enabled, isMessagesLoading, messageError, attention, patchInquiry]);
-
-  useEffect(() => {
-    if (!attention || !enabled) return;
-    const observedVersions = new Map<string, number>();
-    return attention.subscribe(() => {
-      const rows = Object.values(attention.getSnapshot().conversations);
-      for (const activity of rows) {
-        if (inquiriesRef.current.some(row => String(row.id) === String(activity.inquiry_id))) {
-          patchInquiry(activity.inquiry_id, { ...activity, content: activity.last_message_content });
-        } else if (!conversationOnly && activity.surface === view && Number(activity.admin_unread_count) > 0
-          && attention.version(String(activity.inquiry_id)) > (observedVersions.get(String(activity.inquiry_id)) ?? 0)) {
-          observedVersions.set(String(activity.inquiry_id), attention.version(String(activity.inquiry_id)));
-          // A genuinely new conversation needs its participant metadata once.
-          if (fetchInquiriesTimerRef.current) clearTimeout(fetchInquiriesTimerRef.current);
-          fetchInquiriesTimerRef.current = setTimeout(() => { fetchInquiriesTimerRef.current = null; void fetchInquiries(false); }, 250);
-        }
-      }
-    });
-  }, [attention, enabled, patchInquiry, conversationOnly, view, fetchInquiries]);
-
-  const loadMessages = useCallback((
-    inquiryId: number | string,
-    options: { select?: boolean } = {}
-  ): Promise<boolean> => {
-    const targetId = String(inquiryId);
-    const pending = messageFlightRef.current;
-    if (pending?.targetId === targetId && String(selectedInquiryRef.current?.id ?? '') === targetId) {
-      // Share the initial load. A background invalidation may have happened after
-      // its snapshot, so coalesce the burst into one serialized trailing refresh.
-      pending.refreshRequested ||= !options.select;
-      return pending.promise;
-    }
-    if (!options.select && String(selectedInquiryRef.current?.id ?? '') !== targetId) {
-      return Promise.resolve(false);
-    }
-
-    const flight = { targetId, refreshRequested: false, promise: Promise.resolve(false) };
-    messageFlightRef.current = flight;
-    flight.promise = (async () => {
-      try {
-        let loaded = await fetchMessages(inquiryId, options);
-        // Each completed GET settles its own UI lifecycle before revalidation.
-        // Changing A -> B -> A creates a new owner, even when the ID matches.
-        while (flight.refreshRequested && messageFlightRef.current === flight) {
-          flight.refreshRequested = false;
-          loaded = await fetchMessages(inquiryId);
-        }
-        return loaded;
-      } finally {
-        if (messageFlightRef.current === flight) messageFlightRef.current = null;
-      }
-    })();
-    return flight.promise;
-  }, [fetchMessages]);
-
-  // Subscription/auth effect restarts do not own the selected thread's GET.
-  // Only unmount, deselection or a newer request invalidates its response.
-  useEffect(() => () => {
-    messageRequestVersionRef.current++;
-    messageFlightRef.current = null;
-  }, []);
+  }, [patchInquiry, showToast, conversationOnly]);
 
   const selectInquiry = useCallback((inquiryId: number | string) => {
     return loadMessages(inquiryId, { select: true });
@@ -567,7 +487,6 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
 
   const clearSelected = useCallback(() => {
     messageRequestVersionRef.current += 1;
-    messageFlightRef.current = null;
     selectedInquiryRef.current = null;
     messagesRef.current = [];
     setSelectedInquiry(null);
@@ -596,18 +515,15 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
     let timer: ReturnType<typeof setTimeout> | null = null;
     const catchUp = async () => {
       if (stopped || document.visibilityState === 'hidden') return;
-      const selectedId = selectedInquiryRef.current?.id;
-      // Queue detail invalidations immediately; loadMessages serializes them.
-      // The list loop below must not enqueue the same detail refresh again.
-      const messages = selectedId != null ? loadMessages(selectedId) : Promise.resolve();
       if (running) { requested = true; return; }
       running = true;
       try {
         do {
           requested = false;
+          const selectedId = selectedInquiryRef.current?.id;
           await Promise.allSettled([
             fetchInquiries(false),
-            messages,
+            selectedId != null ? loadMessages(selectedId) : Promise.resolve(),
           ]);
         } while (requested && !stopped && !document.hidden);
       } finally { running = false; }
@@ -636,6 +552,7 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
       if (timer) clearTimeout(timer);
       window.removeEventListener('online', online);
       document.removeEventListener('visibilitychange', visible);
+      messageRequestVersionRef.current++;
     };
   }, [enabled, currentUser, fetchInquiries, loadMessages]);
 
@@ -669,14 +586,10 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
           setTimeout(() => processedEventRef.current.delete(eventKey), 1500);
 
           if (newPayload && newPayload.sender_id !== currentUser.id) {
-            if (!attention) scheduleFetchInquiries();
+            scheduleFetchInquiries();
             // 현재 열려있는 탭의 메시지인 경우 즉시 메시지 갱신
             if (selectedInquiryRef.current && String(newPayload.inquiry_id) === String(selectedInquiryRef.current.id)) {
-              if (!attention) void loadMessages(selectedInquiryRef.current.id);
-              else {
-                if (threadTimerRef.current) clearTimeout(threadTimerRef.current);
-                threadTimerRef.current = setTimeout(() => { threadTimerRef.current = null; const id = selectedInquiryRef.current?.id; if (id != null) void loadMessages(id); }, 250);
-              }
+              loadMessages(selectedInquiryRef.current.id);
             }
           }
         }
@@ -745,7 +658,7 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
           const newPayload = payload.new as InquiryRealtimeRow | null;
           if (!newPayload?.id) return;
           // 문의 상태 변경, 내용 업데이트 시
-          if (!attention) scheduleFetchInquiries();
+          scheduleFetchInquiries();
           // 열려있는 문의가 업데이트 된 경우 객체 갱신
           if (selectedInquiryRef.current && String(newPayload.id) === String(selectedInquiryRef.current.id)) {
              const nextSelected = mergeMonitorInquiry(selectedInquiryRef.current, newPayload);
@@ -767,12 +680,11 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
       if (fetchInquiriesTimerRef.current) {
         clearTimeout(fetchInquiriesTimerRef.current);
       }
-      if (threadTimerRef.current) clearTimeout(threadTimerRef.current);
       disposed = true;
       realtimeHealthyRef.current = false;
       supabase.removeChannel(channel);
     };
-  }, [supabase, currentUser, loadMessages, scheduleFetchInquiries, enabled, conversationOnly, view, attention]);
+  }, [supabase, currentUser, loadMessages, scheduleFetchInquiries, enabled, conversationOnly, view]);
 
   return {
     inquiries,

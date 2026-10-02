@@ -70,8 +70,15 @@ test.describe('Supabase staging bootstrap contract', () => {
       'supabase/migrations/20260930022348_move_is_admin_reader_to_private_schema.sql',
       'supabase/migrations/20261001170718_admin_message_monitoring_phase_1.sql',
       'supabase/migrations/20261002015110_admin_message_monitoring_historical_reinquiry.sql',
+      'supabase/migrations/20261002041848_admin_attention_badges_phase_2.sql',
     ]);
-    expect(manifest.pendingProductionMigrations).toEqual([]);
+    expect(manifest.pendingProductionMigrations).toEqual([{
+      version: '20261002041848',
+      name: 'admin_attention_badges_phase_2',
+      repositoryFile: 'supabase/migrations/20261002041848_admin_attention_badges_phase_2.sql',
+      repositorySha256: '2957a758c9b4fdbd1caf9b73ba8cccc8cf74733730a3bbe7e26033150aa821fe',
+      status: 'prepared-not-applied',
+    }]);
     expect(packageJson.scripts['supabase:staging:baseline:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:current:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:contract']).toBeTruthy();

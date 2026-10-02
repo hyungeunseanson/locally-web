@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
+import { useAdminAttention, useAdminAttentionSnapshot } from './AdminAttentionProvider';
+import { NewConversationBadge } from './AttentionBadge';
 import ChatMonitor from './ChatMonitor';
 import PhonePaymentDetails from './PhonePaymentDetails';
 import { useConfirmDialog } from '@/app/hooks/useConfirmDialog';
@@ -32,6 +34,8 @@ function formatPhoneListTimestamp(value?: string | null) {
 export default function PhoneReservationTab({ initialSelectedRequestId = null, active = true }: {
   initialSelectedRequestId?: string | null; active?: boolean;
 }) {
+  const attentionStore = useAdminAttention();
+  const attention = useAdminAttentionSnapshot();
   const router = useRouter();
   const params = useSearchParams();
   const { showToast } = useToast();
@@ -50,7 +54,14 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
   const pages = useRef(1);
   const listVersion = useRef(0);
   const detailVersion = useRef(0);
+  const requestFlights = useRef(new Map<string, Promise<{ success: boolean; data: PhoneWorkspaceRequest[] | PhoneWorkspaceRequest; pagination: { hasMore: boolean } }>>());
+  const linkedInquiryIds = useRef(new Set<string>());
   const supabase = useMemo(() => createClient(), []);
+
+  useEffect(() => {
+    linkedInquiryIds.current = new Set([...requests, ...(detail ? [detail] : [])]
+      .flatMap(row => row.linked_inquiry_id ? [String(row.linked_inquiry_id)] : []));
+  }, [requests, detail]);
 
   useEffect(() => {
     const timer = setTimeout(() => setQuery(search.trim()), 250);
@@ -58,10 +69,16 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
   }, [search]);
 
   const read = useCallback(async (url: string) => {
-    const response = await fetch(url, { cache: 'no-store' });
-    const result = await response.json();
-    if (!response.ok || !result.success) throw new Error(result.error || '전화예약을 불러오지 못했습니다.');
-    return result;
+    const existing = requestFlights.current.get(url);
+    if (existing) return existing;
+    const flight = (async () => {
+      const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(15_000) });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || '전화예약을 불러오지 못했습니다.');
+      return result;
+    })();
+    requestFlights.current.set(url, flight);
+    try { return await flight; } finally { if (requestFlights.current.get(url) === flight) requestFlights.current.delete(url); }
   }, []);
 
   const loadList = useCallback(async (more = false) => {
@@ -76,7 +93,7 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
       for (let page = 0; page < count; page++) {
         const searchParams = new URLSearchParams({ filter, q: query, offset: String(page * PAGE_SIZE), limit: String(PAGE_SIZE) });
         const result = await read(`/api/admin/customer-support?${searchParams}`);
-        rows.push(...result.data);
+        rows.push(...result.data as PhoneWorkspaceRequest[]);
         nextHasMore = result.pagination.hasMore;
         if (!nextHasMore) break;
       }
@@ -98,7 +115,7 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
     setDetailError('');
     try {
       const result = await read(`/api/admin/customer-support?requestId=${encodeURIComponent(initialSelectedRequestId)}`);
-      if (version === detailVersion.current) setDetail(result.data);
+      if (version === detailVersion.current) setDetail(result.data as PhoneWorkspaceRequest);
     } catch (err) {
       if (version === detailVersion.current) {
         setDetail(null);
@@ -126,14 +143,26 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
     if (!active) return;
     let timer: ReturnType<typeof setTimeout>;
     const schedule = () => { clearTimeout(timer); timer = setTimeout(refresh, 350); };
+    const catchUp = () => { if (!document.hidden) refresh(); };
+    const isPhone = (id: string | number) => !attentionStore || linkedInquiryIds.current.has(String(id))
+      || attentionStore.getSnapshot().conversations[String(id)]?.surface === 'phone';
     const channel = supabase.channel('admin-phone-workspace')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'proxy_requests' }, schedule)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'inquiry_messages' }, schedule)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'inquiry_messages' }, payload => {
+        // The shared store owns unread deltas. Only phone workspace activity needs a refresh.
+        if (isPhone(payload.new.inquiry_id)) schedule();
+      })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'inquiry_messages' }, payload => {
-        if (payload.new.type === 'deleted') schedule();
-      }).subscribe();
-    return () => { clearTimeout(timer); void supabase.removeChannel(channel); };
-  }, [active, refresh, supabase]);
+        if (payload.new.type === 'deleted' && isPhone(payload.new.inquiry_id)) schedule();
+      }).subscribe(status => { if (status === 'SUBSCRIBED') catchUp(); });
+    const fallback = setInterval(catchUp, 300_000);
+    window.addEventListener('online', catchUp);
+    document.addEventListener('visibilitychange', catchUp);
+    return () => {
+      clearTimeout(timer); clearInterval(fallback); void supabase.removeChannel(channel);
+      window.removeEventListener('online', catchUp); document.removeEventListener('visibilitychange', catchUp);
+    };
+  }, [active, refresh, supabase, attentionStore]);
 
   const select = (id: string | null) => {
     const next = new URLSearchParams(params.toString());
@@ -221,7 +250,7 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
         {error && <p role="alert" className="p-3">{error}</p>}
         {!loading && !error && !requests.length && <p className="p-4 text-sm text-slate-500">해당하는 전화예약이 없습니다.</p>}
         {requests.map(row => <button key={row.id} data-testid="admin-phone-reservation-list-item" onClick={() => select(row.id)} className={`w-full space-y-1 border-b border-slate-200 px-3 py-3 text-left ${row.id === initialSelectedRequestId ? 'bg-blue-50' : ''}`}>
-          <p className="flex items-center justify-between gap-2 text-xs text-slate-500"><span className="min-w-0 truncate">{getProxyCategoryLabel(row.category)}</span><span className="flex shrink-0 items-center gap-1.5"><span>{STATUS_LABELS[row.status]}</span><span className="text-[9px] md:text-[10px] text-slate-400 shrink-0 font-medium whitespace-nowrap leading-4" data-testid="admin-phone-list-timestamp">{formatPhoneListTimestamp(row.latest_created_at)}</span></span></p>
+          <p className="flex items-center justify-between gap-2 text-xs text-slate-500"><span className="min-w-0 truncate">{getProxyCategoryLabel(row.category)}</span><span className="flex shrink-0 items-center gap-1.5"><NewConversationBadge unseen={Number(attention.ready ? attention.conversations[row.linked_inquiry_id ?? '']?.admin_unread_count ?? 0 : row.admin_unread_count ?? 0) > 0} /><span>{STATUS_LABELS[row.status]}</span><span className="text-[9px] md:text-[10px] text-slate-400 shrink-0 font-medium whitespace-nowrap leading-4" data-testid="admin-phone-list-timestamp">{formatPhoneListTimestamp(row.latest_created_at)}</span></span></p>
           <p className="flex gap-1 text-sm font-bold"><span className="min-w-0 truncate" title={getProxyRequestTitle(row)}>{getProxyRequestTitle(row)}</span><span className="max-w-[40%] shrink-0 truncate">· {getProxyRequesterDisplayName(row.profiles)}</span></p>
           <p className="flex items-baseline gap-1 text-xs text-slate-500"><span className="shrink-0">{getProxyPaymentStatusLabel(row)}</span><span aria-hidden="true">·</span><span className="min-w-0 truncate">{row.latest_content}</span></p>
           {row.needs_reply && <span className="text-xs font-bold text-blue-700">추가 답장 </span>}

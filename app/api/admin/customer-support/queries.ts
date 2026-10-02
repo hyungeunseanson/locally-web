@@ -1,4 +1,5 @@
 import 'server-only';
+import { getAdminInquiryActivity } from '@/app/utils/adminInquiryActivity';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ProxyRequest } from '@/app/types/proxy';
 import { getProxyLinkedInquiryId, PROXY_CARD_ANCHOR_MARKER, PROXY_CARD_ANCHOR_VERSION } from '@/app/utils/proxyBooking';
@@ -36,7 +37,7 @@ export function validLinkedRequest(inquiry: Pick<SupportInquiry, 'id' | 'user_id
 export async function enrichPhoneRequests(db: SupabaseClient, rows: ProxyRequest[]): Promise<PhoneWorkspaceRequest[]> {
   if (!rows.length) return [];
   const ids = [...new Set(rows.map(row => getProxyLinkedInquiryId(row.form_data)).filter((id): id is string => Boolean(id) && /^\d+$/.test(id!)))];
-  const [profiles, inquiries, links] = await Promise.all([
+  const [profiles, inquiries, links, activities] = await Promise.all([
     db.from('profiles').select('id,full_name,email,avatar_url,phone').in('id', [...new Set(rows.map(row => row.user_id))]),
     ids.length ? db.from('inquiries').select('id,user_id,type,inquiry_messages(sender_id,content,type,created_at,id)')
       .in('id', ids).or('type.is.null,type.in.(text,image)', { referencedTable: 'inquiry_messages' })
@@ -44,6 +45,7 @@ export async function enrichPhoneRequests(db: SupabaseClient, rows: ProxyRequest
       .order('id', { referencedTable: 'inquiry_messages', ascending: false })
       .limit(1, { referencedTable: 'inquiry_messages' }) : Promise.resolve({ data: [], error: null }),
     linkedRequests(db, ids),
+    getAdminInquiryActivity(db, ids),
   ]);
   if (profiles.error) throw profiles.error;
   if (inquiries.error) throw inquiries.error;
@@ -63,6 +65,7 @@ export async function enrichPhoneRequests(db: SupabaseClient, rows: ProxyRequest
       ...row,
       profiles: profiles.data?.find(profile => profile.id === row.user_id),
       linked_inquiry_id: linked ? String(inquiry.id) : null,
+      admin_unread_count: linked ? Number(activities.get(String(inquiry.id))?.admin_unread_count ?? 0) : 0,
       needs_attention: !linked || (active && ['REFUNDED', 'FAILED'].includes(row.payment_status)),
       needs_reply: completedNeedsReply || cancelledNeedsReply,
       latest_sender_id: latest?.sender_id ?? null,
