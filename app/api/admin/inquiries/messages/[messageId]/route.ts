@@ -174,15 +174,12 @@ export async function PATCH(
       });
     }
 
-    const readAt = message.read_at || new Date().toISOString();
     const { error: updateError } = await supabaseAdmin
       .from('inquiry_messages')
       .update({
         type: SOFT_DELETED_INQUIRY_MESSAGE_TYPE,
         content: SOFT_DELETED_INQUIRY_MESSAGE_PLACEHOLDER,
         image_url: null,
-        is_read: true,
-        read_at: readAt,
       })
       .eq('id', message.id);
 

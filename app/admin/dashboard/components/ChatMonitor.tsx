@@ -18,6 +18,7 @@ import ChatParticipantProfileModal, { type ChatParticipantProfile } from './Chat
 import { useAutoResizeTextarea } from '@/app/hooks/useAutoResizeTextarea';
 import type { AdminInquiryActivity } from '@/app/utils/adminInquiryActivity';
 import { formatAdminMessageTime, formatAdminMessageDay, formatAdminListTime, formatReplyWait, kstDateKey } from '@/app/utils/adminChatTime';
+import AdminChatImage from './AdminChatImage';
 import { OFFICIAL_SUPPORT_SENDER_NAME } from '@/app/utils/officialSender';
 
 type CSStatus = 'open' | 'in_progress' | 'resolved';
@@ -73,6 +74,7 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
   const router = useRouter();
   const pathname = usePathname();
 
+  const [csStatusFilter, setCsStatusFilter] = useState<CSStatusFilter>('ALL');
   const {
     inquiries,
     selectedInquiry,
@@ -87,9 +89,11 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
     error,
     isMessagesLoading,
     messageError,
+    acknowledgementFailed,
+    retryAcknowledgement,
     hasMore,
     loadMore,
-  } = useAdminChatQuery({ view, conversationOnly: phoneMode, enabled });
+  } = useAdminChatQuery({ view, conversationOnly: phoneMode, enabled, statusFilter: csStatusFilter });
 
   const { showToast } = useToast();
   const { requestConfirm, ConfirmDialogElement } = useConfirmDialog();
@@ -100,12 +104,12 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
     timer = setTimeout(tick, 60_000);
     return () => clearTimeout(timer);
   }, []);
-  const [csStatusFilter, setCsStatusFilter] = useState<CSStatusFilter>('ALL');
   const [draftsByInquiryId, setDraftsByInquiryId] = useState<Record<string, string>>({});
   const [isSending, setIsSending] = useState(false);
   const [profileModal, setProfileModal] = useState<ChatParticipantProfile | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const sendingRef = useRef(false);
+  const previousUrlInquiryIdRef = useRef(targetInquiryId);
   const appliedDeepLinkIdRef = useRef<string | null>(null);
   const pendingUrlSelectionIdRef = useRef<string | null>(null);
   const lastSelectedInquiryIdRef = useRef<string | null>(null);
@@ -114,6 +118,16 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
   const selectedInquiryId = selectedInquiry ? String(selectedInquiry.id) : null;
   const replyText = selectedInquiryId ? draftsByInquiryId[selectedInquiryId] || '' : '';
   const composerRef = useAutoResizeTextarea(replyText);
+
+  const previousViewRef = useRef(view);
+  useEffect(() => {
+    if (previousViewRef.current !== view) {
+      previousViewRef.current = view;
+      appliedDeepLinkIdRef.current = null;
+      pendingUrlSelectionIdRef.current = null;
+      clearSelected();
+    }
+  }, [view, clearSelected]);
 
   useLayoutEffect(() => {
     if (selectedInquiryId !== lastSelectedInquiryIdRef.current) {
@@ -143,10 +157,12 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
   // URL ?inquiryId=X 파라미터로 특정 1:1 문의 자동 선택 (DetailsPanel에서 CS 개시 후 이동)
   useEffect(() => {
     if (!enabled) return;
+    const previousId = previousUrlInquiryIdRef.current;
+    previousUrlInquiryIdRef.current = targetInquiryId;
     if (!targetInquiryId) {
       appliedDeepLinkIdRef.current = null;
       pendingUrlSelectionIdRef.current = null;
-      if (phoneMode) clearSelected();
+      if (phoneMode || previousId) clearSelected();
       return;
     }
 
@@ -174,7 +190,7 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
     }
   }, [enabled, phoneMode, clearSelected, targetInquiryId, inquiries, selectInquiry, selectedInquiry?.id]);
 
-  const replaceInquiryInUrl = useCallback((inquiryId?: number | string) => {
+  const navigateInquiryInUrl = useCallback((inquiryId?: number | string) => {
     const nextParams = new URLSearchParams(searchParams.toString());
     if (inquiryId == null) {
       nextParams.delete('inquiryId');
@@ -182,22 +198,22 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
       nextParams.set('inquiryId', String(inquiryId));
     }
     const query = nextParams.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }, [pathname, router, searchParams]);
 
   const handleClearSelected = useCallback(() => {
     clearSelected();
     appliedDeepLinkIdRef.current = targetInquiryId ? String(targetInquiryId) : null;
     pendingUrlSelectionIdRef.current = null;
-    replaceInquiryInUrl();
-  }, [clearSelected, replaceInquiryInUrl, targetInquiryId]);
+    navigateInquiryInUrl();
+  }, [clearSelected, navigateInquiryInUrl, targetInquiryId]);
 
   const handleSelectInquiry = (inquiryId: number | string) => {
     const targetId = String(inquiryId);
     pendingUrlSelectionIdRef.current = targetId;
     appliedDeepLinkIdRef.current = targetId;
     void selectInquiry(inquiryId);
-    replaceInquiryInUrl(inquiryId);
+    navigateInquiryInUrl(inquiryId);
   };
 
   const handleCSStatusFilterChange = (nextFilter: CSStatusFilter) => {
@@ -421,7 +437,7 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
     <div className={phoneMode ? "flex min-h-0 h-full w-full" : "flex h-[calc(100dvh-235px)] gap-4 md:gap-6 w-full relative"}>
       {/* 왼쪽 목록 패널 */}
       {!phoneMode && <>
-      <div className={`w-full md:w-[420px] md:min-w-[400px] xl:w-[460px] bg-white rounded-xl md:rounded-2xl border border-slate-200 flex flex-col shadow-sm transition-all duration-300 ${selectedInquiry ? 'hidden md:flex' : 'flex'} h-full`}>
+      <div className={`w-full md:w-[38%] md:min-w-0 md:shrink-0 xl:w-[420px] bg-white rounded-xl md:rounded-2xl border border-slate-200 flex flex-col shadow-sm transition-all duration-300 ${selectedInquiry ? 'hidden md:flex' : 'flex'} h-full`}>
         <div className="p-3 md:px-3.5 md:py-3 border-b border-slate-100 bg-slate-50/50">
           <div className="flex justify-between items-center mb-2.5 md:mb-3">
             <h3 className="font-bold text-sm md:text-[15px] text-slate-800 flex items-center gap-1.5 md:gap-2">
@@ -438,6 +454,7 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
               {(['ALL', 'open', 'in_progress', 'resolved'] as CSStatusFilter[]).map((s) => (
                 <button
                   key={s}
+                  aria-pressed={csStatusFilter === s}
                   onClick={() => handleCSStatusFilterChange(s)}
                   className={`px-2 md:px-2 py-0.5 md:py-0.5 rounded-full text-[9px] md:text-[10px] font-bold border transition-colors ${csStatusFilter === s
                     ? 'bg-slate-800 text-white border-slate-800'
@@ -452,7 +469,7 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
         </div>
 
         {error && (
-          <div className="p-4 bg-red-50 border-b border-red-100 text-red-600 text-xs break-all">
+          <div role="alert" className="p-4 bg-red-50 border-b border-red-100 text-red-600 text-xs break-all">
             <div className="flex items-center gap-2 font-bold mb-1"><AlertTriangle size={14} /> 오류 발생</div>
             {error}
           </div>
@@ -473,14 +490,16 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
             </div>
           ) : (
             filteredInquiries.map((inq) => (
-              <div
+              <button
+                type="button"
+                aria-current={String(selectedInquiry?.id) === String(inq.id) ? 'true' : undefined}
                 key={inq.id}
                 data-testid={`admin-chat-inquiry-row-${inq.id}`}
                 data-has-policy-signal={
                   inq.has_policy_signal && !isAdminSupportInquiry(inq.type) ? 'true' : 'false'
                 }
                 onClick={() => handleSelectInquiry(inq.id)}
-                className={`p-3 md:px-3 md:py-2.5 border-b border-slate-100 cursor-pointer transition-colors hover:bg-slate-50 md:min-h-[76px] ${selectedInquiry?.id === inq.id ? 'bg-blue-50 border-l-[3px] md:border-l-4 border-l-blue-500' : 'border-l-[3px] md:border-l-4 border-l-transparent'}`}
+                className={`w-full text-left focus-visible:outline-2 focus-visible:outline-blue-500 p-3 md:px-3 md:py-2.5 border-b border-slate-100 cursor-pointer transition-colors hover:bg-slate-50 md:min-h-[76px] ${selectedInquiry?.id === inq.id ? 'bg-blue-50 border-l-[3px] md:border-l-4 border-l-blue-500' : 'border-l-[3px] md:border-l-4 border-l-transparent'}`}
               >
                 <div className="flex items-start justify-between gap-2 mb-1.5">
                   <span className="font-bold text-xs md:text-[12px] text-slate-800 flex items-center gap-1.5 min-w-0 leading-4">
@@ -516,7 +535,7 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
                     </span>
                   )}
                 </div>
-              </div>
+              </button>
             ))
           )}
           {hasMore && <button className="w-full p-3 text-sm font-semibold" onClick={() => void loadMore()}>더 보기</button>}
@@ -526,15 +545,15 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
       </>}
       {/* 오른쪽 채팅창 (모바일에서는 오버레이처럼 보이거나 교체됨) */}
       {/* 🟢 이슈5: 데스크탑에서 채팅창이 fullscreen으로 뜨는 문제 수정 — fixed/inset-0/w-[100vw]/h-[100vh]를 모바일 전용으로 제한 */}
-      <div className={phoneMode ? "flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white" : `flex-1 bg-white md:rounded-2xl border-l-[0px] md:border-l border-slate-200 md:border-slate-200 flex flex-col shadow-sm transition-all duration-300 ${selectedInquiry ? 'flex fixed inset-x-0 top-14 bottom-0 z-[50] w-full h-auto -ml-0 md:ml-0 md:static md:inset-auto md:top-auto md:bottom-auto md:w-auto md:h-auto md:z-0 md:flex-1 md:rounded-2xl' : 'hidden md:flex'}`}>
+      <div className={phoneMode ? "flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white" : `min-w-0 flex-1 bg-white md:rounded-2xl border-l-[0px] md:border-l border-slate-200 md:border-slate-200 flex flex-col shadow-sm transition-all duration-300 ${selectedInquiry ? 'flex fixed inset-x-0 top-14 bottom-0 z-[50] w-full h-auto -ml-0 md:ml-0 md:static md:inset-auto md:top-auto md:bottom-auto md:w-auto md:h-auto md:z-0 md:flex-1 md:rounded-2xl' : 'hidden md:flex'}`}>
         {phone?.toolbar}
         {selectedInquiry && (!phone || selectedInquiryId === targetInquiryId) ? (
           <>
             {!phoneMode && <>
-            <div className="p-3 md:p-4 border-b border-slate-100 bg-slate-50/30 flex justify-between items-center relative gap-2 shrink-0 pt-3 md:pt-4">
+            <div className={`p-3 md:p-4 border-b border-slate-100 bg-slate-50/30 flex justify-between items-center relative gap-2 shrink-0 ${selectedIsAdminSupport ? 'pt-8 md:pt-10' : 'pt-3 md:pt-4'}`}>
               {/* CS 상태 변경 버튼 (1:1 문의 탭에서만) */}
               {activeTab === 'admin' && selectedIsAdminSupport && (
-                <div className="absolute top-2 right-2 md:top-3 md:right-3 flex gap-1 z-10">
+                <div data-testid="admin-chat-status-controls" className="absolute top-2 right-2 md:top-3 md:right-3 flex gap-1 z-10">
                   {(['open', 'in_progress', 'resolved'] as CSStatus[]).map((s) => {
                     const currentStatus = selectedInquiry.status;
                     const isActive = currentStatus === s || (!currentStatus && s === 'open');
@@ -553,7 +572,7 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
                   })}
                 </div>
               )}
-              <div className="flex items-center gap-1.5 md:gap-4 min-w-0">
+              <div data-testid="admin-chat-identity" className="flex items-center gap-1.5 md:gap-4 min-w-0">
                 <button
                   aria-label="대화 목록으로 돌아가기"
                   onClick={handleClearSelected} // 목록으로 돌아가기
@@ -598,7 +617,7 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
                   type="button"
                   data-participant-card="guest"
                   aria-label="게스트 프로필 열기"
-                  onClick={openGuestProfile}
+                  onClick={event => { event.currentTarget.focus(); openGuestProfile(); }}
                   disabled={isMessagesLoading || Boolean(messageError)}
                   className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-left transition-colors hover:border-blue-200 hover:bg-blue-50/70 disabled:cursor-not-allowed disabled:opacity-60"
                 >
@@ -630,7 +649,7 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
                     type="button"
                     data-participant-card="host"
                     aria-label="호스트 프로필 열기"
-                    onClick={openHostProfile}
+                    onClick={event => { event.currentTarget.focus(); openHostProfile(); }}
                     disabled={isMessagesLoading || Boolean(messageError) || !hostProfile}
                     className={`rounded-xl border p-3 text-left transition-colors ${
                       hostProfile
@@ -686,11 +705,11 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
               )}
 
               {isMessagesLoading ? (
-                <div className="flex h-full items-center justify-center text-xs text-slate-400" data-testid="admin-chat-messages-loading">
+                <div className="flex h-full items-center justify-center text-xs text-slate-400" role="status" data-testid="admin-chat-messages-loading">
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 메시지를 불러오는 중...
                 </div>
               ) : messageError ? (
-                <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-xs text-slate-500" data-testid="admin-chat-messages-error">
+                <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-xs text-slate-500" role="alert" data-testid="admin-chat-messages-error">
                   <span>{messageError}</span>
                   <button
                     type="button"
@@ -766,7 +785,7 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
                           </button>
                         )}
                       </div>
-                      <div className={`p-2.5 md:p-3 rounded-lg md:rounded-xl max-w-[85%] md:max-w-[70%] text-xs md:text-sm shadow-sm leading-relaxed whitespace-pre-wrap break-words ${isDeletedMessage
+                      <div className={`p-2.5 md:p-3 rounded-lg md:rounded-xl max-w-[85%] md:max-w-[70%] text-xs md:text-sm shadow-sm leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere] ${isDeletedMessage
                         ? 'border border-slate-200 border-dashed bg-slate-100 text-slate-500 italic'
                         : hasPolicySignal
                           ? 'border border-rose-200 bg-rose-50 text-rose-900'
@@ -774,7 +793,7 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
                             ? 'bg-black text-white rounded-tr-none'
                             : 'bg-white border border-slate-200 rounded-tl-none text-slate-800'
                         }`}>
-                        {msg.content}
+                        {msg.type === 'image' && msg.image_url ? <AdminChatImage src={msg.image_url} /> : msg.content}
                       </div>
                       <time dateTime={msg.created_at || undefined} className="mt-1 px-1 text-[10px] text-slate-500">{formatAdminMessageTime(msg.created_at)}</time>
                     </div>
@@ -783,10 +802,15 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
               })}
             </div>
 
-            <div className="p-2 md:p-4 bg-white border-t border-slate-100 flex flex-wrap items-end gap-1.5 md:gap-2 shrink-0 pb-2 md:pb-4">
+            {acknowledgementFailed && <p role="status" className="px-3 py-2 text-xs text-amber-800">
+              관리자 확인을 저장하지 못했습니다. N 표시를 유지합니다.{' '}
+              <button className="underline" onClick={retryAcknowledgement}>확인 다시 시도</button>
+            </p>}
+            <div className="p-2 md:p-4 bg-white border-t border-slate-100 flex flex-wrap items-end gap-1.5 md:gap-2 shrink-0 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:pb-4">
               <textarea
                 ref={composerRef}
                 rows={1}
+                aria-label="답변 입력"
                 data-testid="admin-chat-composer"
                 className={`text-[11px] flex-1 min-h-9 md:min-h-11 max-h-28 resize-none overflow-y-hidden border border-slate-200 bg-slate-50 rounded-lg md:rounded-xl px-2.5 md:px-4 py-2 md:py-3 focus:outline-none focus:border-black focus:bg-white transition-all md:text-sm leading-5`}
                 placeholder={activeTab === 'monitor' ? "관리자 권한 메시지 전송..." : "답변을 입력하세요..."}
@@ -826,7 +850,7 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
         )}
       </div>
 
-      <ChatParticipantProfileModal participant={profileModal} onClose={() => setProfileModal(null)} />
+      {profileModal && <ChatParticipantProfileModal participant={profileModal} onClose={() => setProfileModal(null)} />}
       {ConfirmDialogElement}
     </div>
   );

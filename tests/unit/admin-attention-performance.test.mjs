@@ -4,18 +4,21 @@ import React from 'react';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { sourceLoader, queryBuilder, clientFixture, inquiry, message, response } from './helpers/chatRuntime.mjs';
 
 const hook='app/admin/dashboard/hooks/useAdminChatQuery.ts', listPath='app/api/admin/inquiries/route.ts';
 const beforeHook=readFileSync('tests/fixtures/admin-attention-phase-2-before.txt','utf8');
 const beforeList=readFileSync('tests/fixtures/admin-attention-phase-2-before-list.txt','utf8');
+const auditedMainHook=execFileSync('git',['show',`da69a033:${hook}`],{encoding:'utf8'});
+const auditedMainList=execFileSync('git',['show',`da69a033:${listPath}`],{encoding:'utf8'});
 const hotfixHook=readFileSync('tests/fixtures/admin-attention-after-hotfix-before.txt','utf8');
 // Preserve the first audit baseline and compare Phase 2 against hotfix main c7d37dab.
 const baselineHashes = [createHash('sha256').update(beforeHook).digest('hex'),createHash('sha256').update(beforeList).digest('hex')];
 assert.deepEqual(baselineHashes, ['570ef04c44522daab7502e80879cf6a14ba950df79e08db7bc5c9b66fa107203','27dd540b013f614f81f22f562afc5662e77bbb493fae5111ac357ddb73dfda1d']);
 assert.equal(createHash('sha256').update(hotfixHook).digest('hex'),'1ebb1dc3618216214b3a30189d346cdc38ef5a9ecd062c2cbd04d7bf99cddef2');
 
-function countedServer(before) {
+function countedServer(before, auditedMain = false) {
   const calls=[]; const row={...inquiry(1,'admin_support'),guest:{name:'Customer'}};
   const server={ unread:0, messages:[message(10,1,'guest')], statuses:[] };
   const meta=()=>({inquiry_id:1,status:'open',updated_at:row.updated_at,last_sender_role:'customer',last_message_at:row.updated_at,
@@ -44,7 +47,7 @@ function countedServer(before) {
     '@/app/utils/supabase/admin':{createAdminClient:()=>client},
     '@/app/utils/adminAlertCenter':{insertAdminAlerts:async()=>{},sendAdminAlertEmails:async()=>{}},
     '@/app/utils/privateStorageDelivery':{getPrivateChatImageDeliveryUrl:id=>`/image/${id}`}
-  },before?{[resolve(listPath)]:beforeList}:{});
+  },before?{[resolve(listPath)]:beforeList}:auditedMain?{[resolve(listPath)]:auditedMainList}:{});
   server.calls=calls;
   server.request=async(url,options)=>{
     const route=url.startsWith('/api/admin/sidebar-counts')?await load('app/api/admin/sidebar-counts/route.ts').GET(new Request(`http://local${url}`))
@@ -56,19 +59,20 @@ function countedServer(before) {
   return server;
 }
 async function measure(label, scenario) {
-  const before=label!=='after';
-  const server=countedServer(before); const f=clientFixture({sources:before?{[resolve(hook)]:label==='legacy'?beforeHook:hotfixHook}:{}});
-  f.auth=async()=>({data:{user:{id:'admin'}}}); f.request=server.request;
+  const before=label==='legacy'||label==='hotfix';
+  const server=countedServer(before,label==='auditedMain'); const f=clientFixture({sources:before?{[resolve(hook)]:label==='legacy'?beforeHook:hotfixHook}:label==='auditedMain'?{[resolve(hook)]:auditedMainHook}:{}});
+  let active=0,maxActive=0,commits=0;
+  f.auth=async()=>({data:{user:{id:'admin'}}}); f.request=async(...args)=>{maxActive=Math.max(maxActive,++active);try{return await server.request(...args);}finally{active--;}};
   const useQuery=f.load(hook).useAdminChatQuery;
   const Provider=f.load('app/admin/dashboard/components/AdminAttentionProvider.tsx').default;
   const state={current:null};
   function Probe(){const value=useQuery();React.useEffect(()=>{state.current=value;});return React.createElement('div',null,value.messages.map(row=>React.createElement('p',{key:row.id},row.content)));}
-  function Root(){return before?React.createElement(Probe):React.createElement(Provider,{userId:'admin'},React.createElement(Probe));}
+  function Root(){return React.createElement(React.Profiler,{id:'audit',onRender:()=>commits++},before?React.createElement(Probe):React.createElement(Provider,{userId:'admin'},React.createElement(Probe)));}
   try {
     await f.mount(Root); await f.flush(()=>state.current.selectInquiry(1));
     await f.flush(()=>{for(const channel of f.calls.channels) channel.status?.('SUBSCRIBED');});
     await f.timers(250);
-    f.calls.requests.length=0;server.calls.length=0;
+    f.calls.requests.length=0;server.calls.length=0;maxActive=0;commits=0;
     if(scenario==='idle')await f.advanceTimers(600_000);
     else {
       const count=scenario==='single'?1:10;
@@ -90,6 +94,7 @@ async function measure(label, scenario) {
     }
     const requests=f.calls.requests;
     assert.ok(server.statuses.every(status=>status===200),'every measured route, including the actual ACK, succeeds');
+    console.log(`ADMIN_AUDIT_RUNTIME ${JSON.stringify({label,scenario,maxConcurrentApi:maxActive,commits})}`);
     return { list:requests.filter(r=>r.url.startsWith('/api/admin/inquiries?')).length,
       thread:requests.filter(r=>r.url.endsWith('/messages')).length,
       aggregate:requests.filter(r=>r.url.startsWith('/api/admin/sidebar-counts')).length,
@@ -98,8 +103,9 @@ async function measure(label, scenario) {
 }
 test('same actual-route fixture: idle ten minutes, one message, ten-message burst before/after; deltas coalesce and preserve existing safety fallback', async()=>{
   const results={baselineHashes};
-  for(const scenario of ['idle','single','burst'])results[scenario]={legacy:await measure('legacy',scenario),before:await measure('hotfix',scenario),after:await measure('after',scenario)};
+  for(const scenario of ['idle','single','burst'])results[scenario]={legacy:await measure('legacy',scenario),before:await measure('hotfix',scenario),auditedMain:await measure('auditedMain',scenario),after:await measure('after',scenario)};
   console.log(`ADMIN_ATTENTION_PERFORMANCE ${JSON.stringify(results)}`);
+  for(const scenario of ['idle','single','burst'])assert.deepEqual(results[scenario].auditedMain,results[scenario].after,'no request regression against starting main');
   assert.equal(results.idle.before.list,2); assert.equal(results.idle.after.list,2);
   assert.equal(results.idle.after.ack,0); assert.equal(results.single.after.list,0);
   assert.equal(results.single.after.thread,1); assert.equal(results.burst.after.list,0); assert.equal(results.burst.after.thread,1);

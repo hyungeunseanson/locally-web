@@ -74,6 +74,7 @@ type InquiryPreviewPatch = Partial<Pick<
 function normalizeServerMessage(message: MonitorMessage): MonitorMessage {
   return {
     ...message,
+    ...(message.type === SOFT_DELETED_INQUIRY_MESSAGE_TYPE ? { has_policy_signal: false, policy_signal_categories: [] } : {}),
     content: getInquiryMessageDisplayContent(message),
     image_url: message.type === 'image' && message.image_url ? getPrivateChatImageDeliveryUrl(message.id) : null,
   };
@@ -144,8 +145,8 @@ function isAdminSendMessageResult(value: unknown): value is AdminSendMessageResu
   );
 }
 
-export function useAdminChatQuery({ view = 'support', conversationOnly = false, enabled = true }: {
-  view?: 'support' | 'monitor'; conversationOnly?: boolean; enabled?: boolean;
+export function useAdminChatQuery({ view = 'support', conversationOnly = false, enabled = true, statusFilter = 'ALL' }: {
+  view?: 'support' | 'monitor'; conversationOnly?: boolean; enabled?: boolean; statusFilter?: 'ALL' | 'open' | 'in_progress' | 'resolved';
 } = {}) {
   const attention = useAdminAttention();
   const [inquiries, setInquiries] = useState<MonitorInquiry[]>([]);
@@ -157,6 +158,8 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
   const pagesRef = useRef(1);
   const [error, setError] = useState<string | undefined>();
   const [isMessagesLoading, setIsMessagesLoading] = useState(false);
+  const [ackFailure, setAckFailure] = useState<string | null>(null);
+  const [ackAttempt, setAckAttempt] = useState(0);
   const [messageError, setMessageError] = useState<string | undefined>();
 
   const supabase = useMemo(() => createClient(), []);
@@ -165,7 +168,7 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
   const inquiriesRef = useRef<MonitorInquiry[]>([]);
   const selectedInquiryRef = useRef<MonitorInquiry | null>(null);
   const messagesRef = useRef<MonitorMessage[]>([]);
-  const processedEventRef = useRef<Set<string>>(new Set());
+  const deletedMessageIdsRef = useRef(new Set<string>());
   const fetchInquiriesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inquiryRequestVersionRef = useRef(0);
   const messageRequestVersionRef = useRef(0);
@@ -177,8 +180,9 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
   const localMessagesRef = useRef(new Map<string, Map<string, { message: MonitorMessage; version: number }>>());
   const observedOwnRowsRef = useRef(new Map<string, MonitorMessage>());
   const acknowledgedSnapshotsRef = useRef(new Set<string>());
+  const attemptedAcknowledgementsRef = useRef(new Set<string>());
   const pendingAcknowledgementsRef = useRef(new Set<string>());
-  const renderedSnapshotRef = useRef<{ inquiryId: string; messages: MonitorMessage[]; unread: number; version: number } | null>(null);
+  const renderedSnapshotRef = useRef<{ inquiryId: string; messages: MonitorMessage[]; unread: number; version: number; requestVersion: number } | null>(null);
   const threadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const realtimeHealthyRef = useRef(false);
   const scheduleFallbackRef = useRef<() => void>(() => {});
@@ -255,6 +259,7 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
       let nextHasMore = false;
       for (let page = 0; page < requestedPages; page += 1) {
         const params = new URLSearchParams({ view, offset: String(page * 50), limit: '50' });
+        if (view === 'support' && statusFilter !== 'ALL') params.set('status', statusFilter);
         const deepLink = new URLSearchParams(window.location.search).get('inquiryId');
         if (deepLink && page === 0) params.set('inquiryId', deepLink);
         const response = await fetch('/api/admin/inquiries' + `?${params.toString()}`, { cache: 'no-store', signal: AbortSignal.timeout(15_000) });
@@ -285,7 +290,7 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
         setIsLoading(false);
       }
     }
-  }, [commitInquiries, getAuthenticatedUser, view, conversationOnly, enabled]);
+  }, [commitInquiries, getAuthenticatedUser, view, conversationOnly, enabled, statusFilter]);
 
   const fetchMessages = useCallback(async (
     inquiryId: number | string,
@@ -329,7 +334,8 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
         return false;
       }
 
-      const fetched = Array.isArray(result.data) ? result.data as MonitorMessage[] : [];
+      const fetched = (Array.isArray(result.data) ? result.data as MonitorMessage[] : [])
+        .filter(row => !deletedMessageIdsRef.current.has(String(row.id)));
       const local = localMessagesRef.current.get(targetId);
       const merged = new Map(fetched.map((message) => {
         const id = String(message.id), protectedRow = local?.get(id);
@@ -362,7 +368,7 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
       // This snapshot is eligible only after React commits the successful thread.
       renderedSnapshotRef.current = {
         inquiryId: targetId, messages: fetched, unread: Number(inquiryDetail?.admin_unread_count ?? 0),
-        version: attentionVersion,
+        version: attentionVersion, requestVersion,
       };
 
       return true;
@@ -372,7 +378,7 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
         requestVersion === messageRequestVersionRef.current &&
         String(selectedInquiryRef.current?.id ?? '') === targetId
       ) {
-        if (shouldSelect) {
+        if (shouldSelect || messagesRef.current.length === 0) {
           setMessageError('메시지를 불러오지 못했습니다. 다시 시도해주세요.');
         } else {
           showToast('메시지를 불러오지 못했습니다.', 'error');
@@ -391,13 +397,17 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
 
   useEffect(() => {
     const captured = renderedSnapshotRef.current;
-    if (!enabled || isMessagesLoading || messageError || !captured || !captured.messages.length || captured.unread <= 0
+    if (!enabled || document.visibilityState === 'hidden' || isMessagesLoading || messageError || !captured || !captured.messages.length || captured.unread <= 0
       || captured.inquiryId !== String(selectedInquiry?.id)) return;
     const renderedIds = new Set(messages.map(row => String(row.id)));
     if (!captured.messages.every(row => renderedIds.has(String(row.id)))) return;
     const ids = captured.messages.map(row => String(row.id)).sort();
     const snapshot = `${captured.inquiryId}:${ids.join(',')}`;
     if (acknowledgedSnapshotsRef.current.has(snapshot) || pendingAcknowledgementsRef.current.has(snapshot)) return;
+    const attempt = `${snapshot}:${captured.requestVersion}:${ackAttempt}`;
+    if (attemptedAcknowledgementsRef.current.has(attempt)) return;
+    attemptedAcknowledgementsRef.current.add(attempt);
+    if (attemptedAcknowledgementsRef.current.size > 100) attemptedAcknowledgementsRef.current.delete(attemptedAcknowledgementsRef.current.values().next().value!);
     const throughMessageId = ids.reduce((last, id) => BigInt(id) > BigInt(last) ? id : last);
     pendingAcknowledgementsRef.current.add(snapshot);
     void fetch(`/api/admin/inquiries/${captured.inquiryId}/ack`, {
@@ -405,15 +415,18 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
       body: JSON.stringify({ throughMessageId, messageIds: ids }), signal: AbortSignal.timeout(15_000),
     }).then(async response => {
       const result = await response.json();
-      if (!response.ok || !result.success) return;
+      if (!response.ok || !result.success) throw new Error('Acknowledgement failed');
+      setAckFailure(previous => previous === captured.inquiryId ? null : previous);
       acknowledgedSnapshotsRef.current.add(snapshot);
       if (acknowledgedSnapshotsRef.current.size > 100) acknowledgedSnapshotsRef.current.delete(acknowledgedSnapshotsRef.current.values().next().value!);
       if (typeof result.admin_unread_count === 'number') {
         if (attention) attention.applyAcknowledgement(captured.inquiryId, result.admin_unread_count, captured.version);
         else patchInquiry(captured.inquiryId, { admin_unread_count: result.admin_unread_count });
       }
-    }).catch(() => {}).finally(() => pendingAcknowledgementsRef.current.delete(snapshot));
-  }, [messages, selectedInquiry, enabled, isMessagesLoading, messageError, attention, patchInquiry]);
+    }).catch(() => {
+      if (String(selectedInquiryRef.current?.id) === captured.inquiryId) setAckFailure(captured.inquiryId);
+    }).finally(() => pendingAcknowledgementsRef.current.delete(snapshot));
+  }, [messages, selectedInquiry, enabled, isMessagesLoading, messageError, attention, patchInquiry, ackAttempt]);
 
   useEffect(() => {
     if (!attention || !enabled) return;
@@ -660,14 +673,28 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
         { event: 'INSERT', schema: 'public', table: 'inquiry_messages' },
         (payload) => {
           const newPayload = payload.new as InquiryMessageRealtimeRow | null;
-          const oldPayload = payload.old as InquiryMessageRealtimeRow | null;
-          const rawId = newPayload?.id || oldPayload?.id || 'unknown';
-          const eventKey = `${payload.eventType}:${rawId}`;
-          
-          if (processedEventRef.current.has(eventKey)) return;
-          processedEventRef.current.add(eventKey);
-          setTimeout(() => processedEventRef.current.delete(eventKey), 1500);
-
+          // The same administrator can send from another browser tab. Apply the
+          // canonical row directly; waiting for this tab's send response loses it.
+          const own = payload.new as MonitorMessage;
+          if (own?.sender_id === currentUser.id && own.id != null && own.inquiry_id != null
+            && typeof own.content === 'string' && typeof own.created_at === 'string') {
+            if (deletedMessageIdsRef.current.has(String(own.id))) return;
+            const observed = observedOwnRowsRef.current.get(String(own.id))
+              ?? messagesRef.current.find(row => String(row.id) === String(own.id));
+            // A duplicate INSERT must not undo a later read/deletion UPDATE.
+            const canonical = normalizeServerMessage({ ...own, ...observed, sender: { name: OFFICIAL_SUPPORT_SENDER_NAME } });
+            observedOwnRowsRef.current.set(String(own.id), canonical);
+            if (observedOwnRowsRef.current.size > 100) observedOwnRowsRef.current.delete(observedOwnRowsRef.current.keys().next().value!);
+            const local = localMessagesRef.current.get(String(own.inquiry_id)) || new Map();
+            local.set(String(own.id), { message: canonical, version: messageRequestVersionRef.current });
+            localMessagesRef.current.set(String(own.inquiry_id), local);
+            if (String(selectedInquiryRef.current?.id) === String(own.inquiry_id)) {
+              const rows = new Map(messagesRef.current.map(row => [String(row.id), row]));
+              rows.set(String(own.id), canonical);
+              messagesRef.current = [...rows.values()].sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')));
+              setMessages(messagesRef.current);
+            }
+          }
           if (newPayload && newPayload.sender_id !== currentUser.id) {
             if (!attention) scheduleFetchInquiries();
             // 현재 열려있는 탭의 메시지인 경우 즉시 메시지 갱신
@@ -740,6 +767,24 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
       )
       .on(
         'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'inquiry_messages' },
+        payload => {
+          const id = String((payload.old as InquiryMessageRealtimeRow)?.id ?? '');
+          if (!id) return;
+          // DELETE may contain only the primary key. Keep a tombstone so a GET
+          // captured before the deletion cannot resurrect the removed message.
+          deletedMessageIdsRef.current.add(id);
+          observedOwnRowsRef.current.delete(id);
+          for (const local of localMessagesRef.current.values()) local.delete(id);
+          if (messagesRef.current.some(row => String(row.id) === id)) {
+            messagesRef.current = messagesRef.current.filter(row => String(row.id) !== id);
+            setMessages(messagesRef.current);
+          }
+          if (!attention) scheduleFetchInquiries();
+        }
+      )
+      .on(
+        'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'inquiries' },
         (payload) => {
           const newPayload = payload.new as InquiryRealtimeRow | null;
@@ -782,6 +827,8 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
     error,
     isMessagesLoading,
     messageError,
+    acknowledgementFailed: ackFailure === String(selectedInquiry?.id),
+    retryAcknowledgement: () => setAckAttempt(value => value + 1),
     loadMessages,
     selectInquiry,
     retrySelectedInquiry,

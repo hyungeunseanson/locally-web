@@ -903,6 +903,10 @@ test.describe.serial('Chat policy monitoring flow', () => {
       throw beforeInquiryError || new Error('Failed to read inquiry before moderation.');
     }
 
+    const { data: receiptBeforeModeration } = await getAdminClient().from('inquiry_messages')
+      .select('is_read, read_at').eq('id', softDeletedMessageId).single();
+    expect(receiptBeforeModeration).toBeTruthy();
+
     await adminSession.page.goto(`/admin/dashboard?tab=CHATS&inquiryId=${fixture.inquiryId}`, { waitUntil: 'domcontentloaded' });
     await expect(adminSession.page.locator('[data-participant-card="guest"]')).toBeVisible({ timeout: 15000 });
 
@@ -978,8 +982,8 @@ test.describe.serial('Chat policy monitoring flow', () => {
       deleted: {
         type: 'deleted',
         content: SOFT_DELETE_PLACEHOLDER,
-        is_read: true,
-        hasReadAt: true,
+        is_read: receiptBeforeModeration!.is_read,
+        hasReadAt: Boolean(receiptBeforeModeration!.read_at),
       },
       preserved: {
         type: 'text',

@@ -102,6 +102,37 @@ try {
   await send.query(`INSERT INTO inquiry_messages(inquiry_id,sender_id,content) VALUES(1,'${admin}','staff reply')`);
   assert.equal(await status(), 'resolved');
   console.log('ADMIN_CHAT_NATIVE_RACES_PASS: both lock orders, stale CAS, rollback, admin reply, publication rerun');
+
+  // Phase 2 ACK races use independent native connections, not sequential mocks.
+  await setup.query("CREATE TABLE public.proxy_requests(id text PRIMARY KEY,user_id uuid,form_data jsonb)");
+  await setup.query(await readFile('supabase/migrations/20261002041848_admin_attention_badges_phase_2.sql', 'utf8'));
+  await setup.query(`INSERT INTO inquiries(id,user_id,type,status) VALUES(900,'${guest}','admin_support','open');
+    INSERT INTO inquiry_messages(id,inquiry_id,sender_id,content) VALUES(9000,900,'${guest}','rendered')`);
+  const receipts = async () => (await setup.query('SELECT id,is_read,read_at FROM inquiry_messages WHERE inquiry_id=900 ORDER BY id')).rows;
+  const unread = async () => Number((await setup.query('SELECT admin_unread_count FROM get_admin_inquiry_activity(ARRAY[900]::bigint[])')).rows[0].admin_unread_count);
+  for (const id of [8999,9001]) {
+    await send.query('BEGIN');
+    await send.query(`INSERT INTO inquiry_messages(id,inquiry_id,sender_id,content) VALUES($1,900,'${guest}','late commit')`,[id]);
+    await close.query('SELECT * FROM ack_admin_inquiry_snapshot(900,ARRAY[9000]::bigint[])');
+    await send.query('COMMIT');
+  }
+  assert.equal(await unread(),2,'late lower/higher IDs remain unseen');
+  const beforeAck = await receipts();
+  await close.query('BEGIN');
+  await close.query('SELECT * FROM ack_admin_inquiry_snapshot(900,ARRAY[8999,9000,9001]::bigint[])');
+  const otherAdminAck = send.query('SELECT * FROM ack_admin_inquiry_snapshot(900,ARRAY[8999,9000,9001]::bigint[])');
+  await waiting(send); await close.query('COMMIT'); await otherAdminAck;
+  assert.equal(await unread(),0);
+  assert.deepEqual(await receipts(),beforeAck);
+  await setup.query(`INSERT INTO inquiry_messages(id,inquiry_id,sender_id,content) VALUES(9002,900,'${guest}','deleted during ACK')`);
+  const beforeDelete = await receipts();
+  await close.query('BEGIN');
+  await close.query('SELECT * FROM ack_admin_inquiry_snapshot(900,ARRAY[9002]::bigint[])');
+  const deletion = send.query("UPDATE inquiry_messages SET type='deleted',content='deleted' WHERE id=9002");
+  await waiting(send); await close.query('COMMIT'); await deletion;
+  assert.equal(await unread(),0);
+  assert.deepEqual(await receipts(),beforeDelete);
+  console.log('ADMIN_CHAT_NATIVE_ACK_PASS: late lower/higher commits, concurrent admin ACKs, delete during ACK, exact participant receipts');
 } finally {
   for (const client of clients) await client.end();
   await pg.stop();
