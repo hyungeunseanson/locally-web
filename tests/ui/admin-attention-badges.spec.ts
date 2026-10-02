@@ -16,15 +16,17 @@ test.beforeAll(async()=>{
       else if(args.path==='next/image')contents=`import React from'react';export default function Image({unoptimized,...p}){return React.createElement('img',p)}`;
       else if(args.path==='next/link')contents=`import React from'react';export default function Link(p){return React.createElement('a',p)}`;
       else if(args.path.includes('ToastContext'))contents=`const showToast=()=>{};export const useToast=()=>({showToast})`;
-      else contents=`const listeners=new Set(),channels=new Set();window.dbEvent=(table,event,row)=>{for(const l of listeners)if(l.table===table&&(l.event===event||l.event==='*'))l.cb({new:event==='DELETE'?{}:row,old:event==='DELETE'?{id:row.id}:{},eventType:event})};window.reconnect=()=>{for(const c of channels)c.status?.('SUBSCRIBED')};const client={auth:{getUser:async()=>({data:{user:{id:'admin'}}})},channel:()=>{const owned=[];const c={on:(_,opts,cb)=>{const l={...opts,cb};owned.push(l);listeners.add(l);return c},subscribe:cb=>{c.status=cb;channels.add(c);return c},owned};return c},removeChannel:c=>{c.owned.forEach(l=>listeners.delete(l));channels.delete(c)}};export const createClient=()=>client;`;
+      else contents=`const listeners=new Set(),channels=new Set();window.dbEvent=(table,event,row)=>{for(const l of listeners)if(l.table===table&&(l.event===event||l.event==='*'))l.cb({new:event==='DELETE'?{}:row,old:event==='DELETE'?{id:row.id}:{},eventType:event})};window.reconnect=()=>{for(const c of channels)c.status?.('SUBSCRIBED')};window.hasChannel=name=>[...channels].some(c=>c.name===name);const client={auth:{getUser:async()=>({data:{user:{id:'admin'}}})},channel:name=>{const owned=[];const c={name,on:(_,opts,cb)=>{const l={...opts,cb};owned.push(l);listeners.add(l);return c},subscribe:cb=>{c.status=cb;channels.add(c);return c},owned};return c},removeChannel:c=>{c.owned.forEach(l=>listeners.delete(l));channels.delete(c)}};export const createClient=()=>client;`;
       return{contents,loader:'js',resolveDir:process.cwd()};
     });
   }}]});script=bundle.outputFiles[0].text;css=(await postcss([tailwind()]).process('@import "tailwindcss";',{from:resolve('app/admin-attention-fixture.css')})).css;
 });
-async function setup(page: Page,phoneRace=false){
+type FixtureState = { unread: Record<number,number>; lastIds: Record<number,number>; alerts: number; failAck: boolean;
+  image: boolean; failImage: boolean; failResolve: boolean; failPhoneDetail: boolean; holdPhone: boolean; phoneStatus: string };
+async function setup(page: Page,phoneRace=false, sharedState?: FixtureState){
   let releasePhone:()=>void=()=>{};const phoneGate=new Promise<void>(resolve=>{releasePhone=resolve});
   let releaseMessages:()=>void=()=>{};const messageGate=new Promise<void>(resolve=>{releaseMessages=resolve});
-  const state={unread:{1:10,2:1,3:2} as Record<number,number>,lastIds:{1:10,2:1,3:2} as Record<number,number>,alerts:143,failAck:true,image:false,failImage:false,failResolve:false,failPhoneDetail:false,holdPhone:false,phoneStatus:'COMPLETED'};const calls:string[]=[];const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+  const state:FixtureState=sharedState??{unread:{1:10,2:1,3:2} as Record<number,number>,lastIds:{1:10,2:1,3:2} as Record<number,number>,alerts:143,failAck:true,image:false,failImage:false,failResolve:false,failPhoneDetail:false,holdPhone:false,phoneStatus:'COMPLETED'};const calls:string[]=[];const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
   const meta=(id:number)=>({inquiry_id:id,surface:id===1?'support':id===2?'phone':'monitor',admin_unread_count:state.unread[id],last_message_id:String(state.lastIds[id]),last_message_content:'새로운 문의',last_message_at:'2026-10-02T06:42Z',last_sender_role:id===3?'host':'customer',needs_reply:id===1,updated_at:'2026-10-02T06:42Z'});
   const row=(id:number)=>({id,user_id:'guest',host_id:'host',type:id===3?'general':'admin_support',status:'open',content:'새로운 문의',guest:{name:'고객'},host:{name:'호스트',id:'host'},...meta(id)});
   await page.route('**/*',async route=>{
@@ -81,6 +83,7 @@ test('Alerts Realtime insert, primary-key-only delete, read success and reconnec
   const f=await setup(page);await page.getByRole('button',{name:/Admin Alerts/}).filter({visible:true}).click();
   const heading=page.getByRole('heading',{name:/Admin Alerts/});await expect(heading).toContainText('143');
   const listGets=()=>f.calls.filter(url=>url==='/api/admin/alerts').length;
+  await expect.poll(()=>page.evaluate(()=>(window as unknown as {hasChannel:(name:string)=>boolean}).hasChannel('admin-alerts-tab-admin'))).toBe(true);
   const initial=listGets();f.state.alerts=144;
   await page.evaluate(()=> (window as unknown as {dbEvent:(t:string,e:string,r:unknown)=>void}).dbEvent('notifications','INSERT',{id:2,user_id:'admin',type:'admin_alert',title:'새 운영 알림',message:'새 메시지',link:null,is_read:false,created_at:'2026-10-02T06:45Z'}));
   await expect(heading).toContainText('144');await expect(page.getByText('새 운영 알림')).toBeVisible();expect(listGets()).toBe(initial);
@@ -184,5 +187,32 @@ test('audit: failed ACK can be retried explicitly without reloading the thread',
   await expect(page.getByRole('button',{name:'확인 다시 시도'})).toHaveCount(0);
   await expect(page.getByTestId('admin-chat-inquiry-row-1').getByTestId('admin-conversation-new')).toHaveCount(0);
   expect(f.calls.filter(url=>url.endsWith('/messages'))).toHaveLength(gets);
+  expect(f.errors).toEqual([]);
+});
+test('audit: two open admin browser tabs share canonical ACK outcome and never send participant receipts',async({page,context})=>{
+  const f=await setup(page);f.state.failAck=false;
+  const other=await context.newPage();const second=await setup(other,false,f.state);
+  let waiting=0,release:()=>void=()=>{};const gate=new Promise<void>(resolve=>{release=resolve});
+  for(const tab of [page,other])await tab.route('**/api/admin/inquiries/*/ack',async route=>{waiting++;await gate;await route.fallback();});
+  try {
+    await Promise.all([page.getByTestId('admin-chat-inquiry-row-1').click(),other.getByTestId('admin-chat-inquiry-row-1').click()]);
+    await expect.poll(()=>waiting).toBe(2);
+    for(const tab of [page,other])await expect(tab.getByTestId('admin-chat-inquiry-row-1').getByTestId('admin-conversation-new')).toHaveCount(1);
+    release();
+    for(const tab of [page,other])await expect(tab.getByTestId('admin-chat-inquiry-row-1').getByTestId('admin-conversation-new')).toHaveCount(0);
+    expect([...f.calls,...second.calls].filter(url=>url==='/api/inquiries/read')).toHaveLength(0);
+    expect([...f.errors,...second.errors]).toEqual([]);
+  }finally{release();await other.close();}
+});
+test('audit: leaving Alerts during its initial GET cannot create an orphan subscription',async({page})=>{
+  const f=await setup(page);let release:()=>void=()=>{},started=false,finished=false;
+  const gate=new Promise<void>(resolve=>{release=resolve});
+  await page.route('**/api/admin/alerts',async route=>{started=true;await gate;await route.fallback();finished=true;});
+  await page.getByRole('button',{name:/Admin Alerts/}).filter({visible:true}).click();
+  await expect.poll(()=>started).toBe(true);
+  await page.getByRole('button',{name:/Customer Support/}).filter({visible:true}).click();
+  release();await expect.poll(()=>finished).toBe(true);
+  await expect(page.getByTestId('admin-chat-inquiry-row-1')).toBeVisible();
+  expect(await page.evaluate(()=>(window as unknown as {hasChannel:(name:string)=>boolean}).hasChannel('admin-alerts-tab-admin'))).toBe(false);
   expect(f.errors).toEqual([]);
 });

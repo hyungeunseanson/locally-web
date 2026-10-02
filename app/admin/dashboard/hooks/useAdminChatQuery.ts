@@ -676,7 +676,11 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
           const own = payload.new as MonitorMessage;
           if (own?.sender_id === currentUser.id && own.id != null && own.inquiry_id != null
             && typeof own.content === 'string' && typeof own.created_at === 'string') {
-            const canonical = normalizeServerMessage({ ...own, sender: { name: OFFICIAL_SUPPORT_SENDER_NAME } });
+            if (deletedMessageIdsRef.current.has(String(own.id))) return;
+            const observed = observedOwnRowsRef.current.get(String(own.id))
+              ?? messagesRef.current.find(row => String(row.id) === String(own.id));
+            // A duplicate INSERT must not undo a later read/deletion UPDATE.
+            const canonical = normalizeServerMessage({ ...own, ...observed, sender: { name: OFFICIAL_SUPPORT_SENDER_NAME } });
             observedOwnRowsRef.current.set(String(own.id), canonical);
             if (observedOwnRowsRef.current.size > 100) observedOwnRowsRef.current.delete(observedOwnRowsRef.current.keys().next().value!);
             const local = localMessagesRef.current.get(String(own.inquiry_id)) || new Map();

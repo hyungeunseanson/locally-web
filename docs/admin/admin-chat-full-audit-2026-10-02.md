@@ -81,6 +81,7 @@ Statuses describe the starting main. “Fixed” identifies this PR's action, no
 | P2 A09 | Initial phone metadata GET captures pending; status changes before response; online/Realtime invalidation shares that GET | No trailing metadata request; old status remains until next event | PhoneReservationTab | Fixed; delayed-response browser test asserts exactly 2 serial GETs |
 | P2 A10 | ACK returns 500; unrelated list metadata rerenders | Silent failure and opportunistic duplicate attempts; no direct recovery | hook/ChatMonitor | Fixed: retry control, one attempt per snapshot-load/explicit retry; N retained |
 | P2 A11 | Selected hidden browser tab receives unseen message | Successful render in hidden document qualified for ACK | useAdminChatQuery | Fixed: visible-document guard; resume loads and ACKs |
+| P2 A13 | Leave Alerts while initial GET is pending, then resolve it | Init resumed after unmount and created an orphan channel | AdminAlertsTab | Fixed; delayed GET/unmount browser test |
 | P3 A12 | Tab through list, inspect state buttons; 768px long URL | Div rows; no filter pressed state; fixed list min width | ChatMonitor | Fixed; button/current/pressed/label/status semantics and wrapping |
 | P2 F01 | Change only proxy_requests in Production from another session | Table absent from supabase_realtime; subscribed socket is not evidence of delivery | Production publication + phone listener | Follow-up; configuration mutation forbidden |
 | P2 F02 | Thread grows past PostgREST row cap | Messages query has no explicit pagination; oldest ascending slice can hide newest content | messages GET + hook | Follow-up: thread cursor/loading contract; current max=43, not currently triggered |
@@ -104,7 +105,7 @@ Four focused tests were executed against `git show da69a033` before changes and 
 | 6. same snapshot reload | successful snapshot cache suppresses duplicate ACK; failed attempt can retry on fresh GET |
 | 7. delete during ACK | native soft-delete lock contention; exact receipts unchanged; PK-only deletion/stale GET unit test |
 | 8. admin own INSERT | PostgreSQL excludes staff from N; new second-tab delta test |
-| 9–10. another admin / two tabs | independent native concurrent ACKs serialize safely; store revision tests reject stale counts; canonical own message UI model |
+| 9–10. another admin / two tabs | two concurrently open Chromium/WebKit pages share delayed canonical ACK responses; independent native concurrent ACKs serialize safely; store revision tests reject stale counts |
 | 11. ACK UPDATE burst | existing real provider tests and benchmark: no additional thread/list GET |
 | 12. missed event + visibility | browser and provider tests re-read canonical state |
 | 13. offline arrival → online | no socket arrival simulated; online event fetches state in browser/provider tests |
@@ -230,6 +231,7 @@ Removed redundant INSERT event Set and 1.5s expiry timers; the actual Map/coales
 - ChatParticipantProfileModal: contained keyboard focus, restored trigger, named close.
 - CustomerSupportTabs: bounded abortable resolution and retry; abort guards.
 - PhoneReservationTab: serialized metadata catch-up and visible detail retry.
+- AdminAlertsTab: do not create a subscription after unmount during initial load.
 - useAdminChatQuery: canonical own INSERT; PK-only DELETE/tombstone; empty-thread error recovery; bounded attempt tracking/explicit ACK retry/visible-only ACK; status query; remove redundant timer state. #155 flight logic unchanged.
 - inquiries route: validated ID/status query and database-side status predicate.
 - message moderation route: preserve participant receipts.
@@ -268,11 +270,11 @@ Local Node 24.20.0; dependencies installed with repository CI's `--legacy-peer-d
 
 - Starting-main focused bug reproduction: 4 failures expected; fixed tests pass.
 - `npm run test:admin-chat:phase1`: 44 Phase 1/#155 + 94 chat unit tests, 26 chat contracts, 29 platform contracts and 14 Chromium/WebKit layout tests passed.
-- `npm run test:admin-attention:phase2`: 20 unit/contract/performance tests and 32 Chromium/WebKit real-component tests passed.
+- `npm run test:admin-attention:phase2`: 20 unit/contract/performance tests and 36 Chromium/WebKit real-component tests passed, including simultaneous browser tabs and unmount during initial Alerts loading.
 - Phone workspace: final 87 tests passed, including after trailing-metadata changes.
 - Native local PostgreSQL: historical repair, row-lock status races, late-ID and dual-admin ACK, concurrent deletion, receipt invariance pass.
 - Local Cloudflare production-build/smoke/deploy **contracts**: 157 passed; these use fixtures, not Production deployment.
-- Targeted ESLint and `tsc --noEmit`: pass; final validation also recorded in PR.
+- Full ESLint: 0 errors, 7 existing unrelated warnings. `tsc --noEmit`: pass; final validation also recorded in PR.
 - Full Cloudflare Foundation and chat CI results are recorded on the Draft PR. No live write-enabled E2E, account creation, production browser chat opening, or payment tests run.
 
 # Production impact
@@ -289,4 +291,6 @@ Only allowlisted Supabase metadata/function definitions, aggregate counts/link a
 
 # Draft PR
 
-Pending creation; exact URL, head SHA, changed files and CI conclusions are recorded at final delivery. See the PR Files changed view for the authoritative file list. No merge authorized or attempted.
+[Draft PR #162](https://github.com/hyungeunseanson/locally-web/pull/162), branch `codex/admin-chat-full-audit`. Initial implementation commit `048606ea7d6a2413d2800bbf72e586bca7e67fc0`; subsequent commits preserve history and are listed in the PR. Exact final head is recorded at final delivery. Sixteen changed files are enumerated in the PR Files changed view. No merge authorized or attempted.
+
+The first Foundation run found a lint issue in the new test probe (assignment during render). The probe now records the hook result in an effect; application code was not affected. The first Chat run also exposed a fixture timing issue: an Alerts event was injected before the subscription existed. The test now waits for channel readiness; a separate regression covers unmount during initial load. Final CI results supersede those runs.

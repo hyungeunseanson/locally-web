@@ -99,6 +99,7 @@ export default function AdminAlertsTab() {
         }
 
         await fetchNotifications();
+        if (!isMounted) return;
 
         if (channelRef.current) {
           supabase.removeChannel(channelRef.current);

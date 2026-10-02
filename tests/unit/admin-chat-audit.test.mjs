@@ -12,7 +12,7 @@ async function fixture() {
   f.auth = async () => ({ data: { user: { id: 'admin' } } });
   const useChat = f.load(hook).useAdminChatQuery;
   let chat;
-  function Probe() { chat = useChat(); return React.createElement('p', null, chat.messages.map(row => row.content).join(',')); }
+  function Probe() { const value = useChat(); React.useEffect(() => { chat = value; }); return React.createElement('p', null, value.messages.map(row => row.content).join(',')); }
   await f.mount(Probe);
   await f.flush(() => chat.selectInquiry(1));
   return Object.assign(f, { chat: () => chat, emit: (event, row) => f.flush(() => {
@@ -29,6 +29,9 @@ test('same admin sends from another tab: canonical INSERT renders once without a
     await f.emit('INSERT', row); await f.emit('INSERT', row); await f.timers(250);
     assert.equal(f.chat().messages.filter(m => m.id === 99).length, 1);
     assert.equal(f.chat().messages.find(m => m.id === 99).is_read, false);
+    await f.emit('UPDATE', { ...row, type: 'deleted', admin_read_at: '2026-10-02T11:00Z' });
+    await f.emit('INSERT', row);
+    assert.equal(f.chat().messages.find(m => m.id === 99).type, 'deleted', 'late duplicate INSERT cannot resurrect a moderated row');
     assert.equal(f.calls.requests.filter(r => r.url.endsWith('/messages')).length, gets);
   } finally { await f.dispose(); }
 });
