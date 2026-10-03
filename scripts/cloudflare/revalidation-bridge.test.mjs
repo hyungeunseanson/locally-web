@@ -6,6 +6,7 @@ import path from 'node:path';
 import { gzipSync, brotliCompressSync } from 'node:zlib';
 import { createRevalidationBridge } from '../../app/utils/isrRevalidationBridge.mjs';
 import { patchQueueArtifact, inspectQueueToken, readProviderCompatToken, sha256, assertNoClientTokenLeakage, applyRevalidationBridge } from './revalidation-bridge-build.mjs';
+import { versionProvider } from './active-version-artifact.fixture.mjs';
 import { main as deploy } from './run-production-deploy.mjs';
 
 test('initial bridge policy and current stable fixture attest the same single lineage', async () => {
@@ -54,18 +55,14 @@ for(const [name,mutate] of [
 const versionId='11111111-1111-4111-8111-111111111111';
 const policy={workerName:'locally-web-opennext-production',baselineVersionId:versionId,compatTokenSha256:sha256(compat)};
 function provider({etagMismatch=false,rollout=false,wrongToken=false}={}) {
-  let deployments=0;const calls=[];
-  return {calls,fetch:async(url,options)=>{
-    calls.push({url,method:options.method});assert.equal(options.method,'GET');
-    const ok=result=>Response.json({success:true,result});
-    if(url.endsWith('/deployments')) {deployments++;return ok({deployments:[{id:rollout&&deployments>1?'changed':'same',created_on:'2026-01-01',versions:[{version_id:versionId,percentage:100}]}]});}
-    if(url.endsWith('/content/v2')){const form=new FormData();form.set('worker.js',new Blob(['// .open-next/.build/durable-objects/queue.js\n'+queue(wrongToken?current:compat)]),'worker.js');const r=new Response(form);r.headers.set('etag',(etagMismatch?'b':'a').repeat(64));return r;}
-    return ok({id:versionId,resources:{script:{etag:'a'.repeat(64),named_handlers:[{name:'DOQueueHandler',handlers:['class']}]}}});
-  }};
+  return versionProvider('// .open-next/.build/durable-objects/queue.js\n'+queue(wrongToken?current:compat), {
+    version: (v,n) => { if(etagMismatch && n>1)v.resources.script.etag='b'.repeat(64); },
+    deployment: (d,n) => { if(rollout && n>1)d.id='22222222-2222-4222-8222-222222222222'; },
+  });
 }
-test('provider provenance ties single stable100, version ETag, content ETag and lineage digest',async()=>{
+test('provider provenance ties single stable100 to version-scoped modules and lineage digest',async()=>{
   const p=provider();const out=await readProviderCompatToken({policy,credentials:{accountId:'fixture',apiToken:'fixture'},fetchImplementation:p.fetch});
-  assert.equal(out.token,compat);assert.equal(out.provenance.compatSha256,sha256(compat));assert.equal(out.provenance.etagMatch,true);assert.equal(p.calls.length,4);
+  assert.equal(out.token,compat);assert.equal(out.provenance.compatSha256,sha256(compat));assert.equal(out.provenance.sourceKind,'workers-version-modules');assert.equal(p.calls.length,5);
   assert(!JSON.stringify(out.provenance).includes(compat));
 });
 for(const option of ['etagMismatch','rollout','wrongToken'])test(`provider rejects ${option}`,async()=>{
@@ -109,4 +106,16 @@ test('post-build patch writes only generated files, hash-only proof; failed patc
     await assert.rejects(readFile(path.join(root,'.open-next/locally-revalidation-bridge.js')),{code:'ENOENT'});
     await assert.rejects(readFile(path.join(root,'.open-next/locally-revalidation-bridge-proof.json')),{code:'ENOENT'});
   }finally{await rm(root,{recursive:true,force:true});}
+});
+
+for(const fault of [null,'wrong_uuid','changed_etag','missing_modules'])test(`exact stable artifact after newer upload: ${fault??'success'}`,async()=>{
+ const p=provider();let reads=0;
+ const fetchImplementation=async(url,options)=>{
+  if(url.includes('?include=modules'))return Response.json({success:true,result:{id:fault==='wrong_uuid'?'22222222-2222-4222-8222-222222222222':versionId,main_module:'worker.js',modules:fault==='missing_modules'?[]:[{name:'worker.js',content_type:'application/javascript+module',content_base64:Buffer.from('// .open-next/.build/durable-objects/queue.js\n'+queue(compat)).toString('base64')}]}});
+  if(url.endsWith(`/versions/${versionId}`)&&++reads===2&&fault==='changed_etag')return Response.json({success:true,result:{id:versionId,resources:{script:{etag:'c'.repeat(64)}}}});
+  return p.fetch(url,options);
+ };
+ const invoke=()=>readProviderCompatToken({policy,credentials:{accountId:'fixture',apiToken:'fixture'},fetchImplementation});
+ if(fault)await assert.rejects(invoke,{message:'OPENNEXT_REVALIDATION_BRIDGE_PROVENANCE_FAILED'});
+ else {const r=await invoke();assert.equal(r.token,compat);assert.equal(r.provenance.sourceKind,'workers-version-modules');assert.equal(r.provenance.artifactSha256.length,64);}
 });

@@ -1,13 +1,12 @@
 import { compareBridgeArtifacts } from './bridge-candidate-compatibility.mjs';
 import { verifyBridgeRuntimeMatrix } from './bridge-candidate-runtime.mjs';
 import { assertProductionBridgeProofFresh } from './revalidation-bridge-freshness.mjs';
-import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { assertConfigUnchanged, buildCandidateReleasePlan, CandidateReleaseBlocked, PRODUCTION_WORKER } from './candidate-release-contract.mjs';
+import { assertConfigUnchanged, buildCandidateReleasePlan, CandidateReleaseBlocked, PRODUCTION_WORKER, safeVersionSnapshot } from './candidate-release-contract.mjs';
 import { fingerprintDurableObjectArtifact, readStableDurableObjectArtifact } from './durable-object-release-safety.mjs';
 import { resolveProductionDeploymentContract } from './run-production-deploy.mjs';
 import { readProductionSnapshot, resolveCloudflareReadCredentials, runProductionDeploySemanticPreflight } from './verify-production-deploy-contract.mjs';
@@ -17,7 +16,7 @@ export function parseCandidateArguments(args) {
   return { dryRun: args[0] === '--dry-run' };
 }
 
-export async function readCandidateBaseline({ credentials = resolveCloudflareReadCredentials(), fetchImplementation = fetch } = {}) {
+export async function readCandidateBaseline({ credentials = resolveCloudflareReadCredentials(), fetchImplementation = fetch, stableVersionId, candidateVersionId } = {}) {
   const snapshot = await readProductionSnapshot({ ...credentials, workerName: PRODUCTION_WORKER, fetchImplementation });
   const r = await fetchImplementation(`https://api.cloudflare.com/client/v4/accounts/${credentials.accountId}/workers/scripts/${PRODUCTION_WORKER}/deployments`, {
     method: 'GET', headers: { Authorization: `Bearer ${credentials.apiToken}` },
@@ -33,16 +32,33 @@ export async function readCandidateBaseline({ credentials = resolveCloudflareRea
     if (!response.ok || !data.success) throw new CandidateReleaseBlocked('runtime_snapshot_unavailable');
     return data.result;
   };
-  const settings = await get(`/workers/scripts/${PRODUCTION_WORKER}/settings`);
+  const scriptBase = `/workers/scripts/${PRODUCTION_WORKER}`;
+  const deployment = { id: latest?.id, versions: latest?.versions.map(v => ({ id: v.version_id, percentage: v.percentage })) };
+  const selected = stableVersionId ?? deployment.versions?.find(v => v.percentage === 100)?.id;
+  if (!/^[a-f0-9-]{36}$/.test(selected ?? '') || !deployment.versions.some(v => v.id === selected)) throw new CandidateReleaseBlocked('active_version_ambiguous');
+  const activeStableVersion = safeVersionSnapshot(await get(`${scriptBase}/versions/${selected}`));
+  if (activeStableVersion.id !== selected) throw new CandidateReleaseBlocked('exact_version_mismatch');
+  const uploadedCandidateVersion = candidateVersionId ? safeVersionSnapshot(await get(`${scriptBase}/versions/${candidateVersionId}`)) : null;
+  if (candidateVersionId && uploadedCandidateVersion.id !== candidateVersionId) throw new CandidateReleaseBlocked('exact_version_mismatch');
+  const scriptGlobalSettings = await get(`${scriptBase}/script-settings`);
   const scripts = await get('/workers/scripts');
-  const script = scripts.find(s => s.id === PRODUCTION_WORKER);
-  if (!script?.migration_tag) throw new CandidateReleaseBlocked('migration_tag_missing');
-  snapshot.runtime = { compatibilityDate: settings.compatibility_date, compatibilityFlags: settings.compatibility_flags, migrationTag: script.migration_tag };
-  for (const binding of snapshot.bindings) {
-    const raw = settings.bindings.find(b => b.name === binding.name);
-    if (raw?.type === 'plain_text') binding.valueSha256 = createHash('sha256').update(raw.text).digest('hex');
-  }
-  return { snapshot, deployment: { id: latest?.id, versions: latest?.versions.map(v => ({ id: v.version_id, percentage: v.percentage })) } };
+  const migrationTag = scripts.find(s => s.id === PRODUCTION_WORKER)?.migration_tag;
+  const runtime = activeStableVersion.resources.script_runtime;
+  if (!migrationTag || runtime.migration_tag !== migrationTag) throw new CandidateReleaseBlocked('migration_tag_missing_or_drift');
+  const diagnosticLegacyBindings = snapshot.bindings.map(({ name, type }) => ({ name, type }));
+  snapshot.bindings = activeStableVersion.resources.bindings;
+  snapshot.observability = scriptGlobalSettings.observability;
+  snapshot.scriptGlobalSettings = scriptGlobalSettings;
+  snapshot.runtime = { compatibilityDate: runtime.compatibility_date, compatibilityFlags: runtime.compatibility_flags, migrationTag };
+  const { routes, customDomains, subdomain, crons, queueConsumers } = snapshot;
+  // Detect a deployment race across all reads, not just before upload.
+  const recheck = await get(`${scriptBase}/deployments`);
+  const newest = [...(recheck.deployments ?? recheck)].sort((a,b) => Date.parse(b.created_on)-Date.parse(a.created_on))[0];
+  if (newest?.id !== deployment.id || JSON.stringify(newest.versions) !== JSON.stringify(latest.versions)) throw new CandidateReleaseBlocked('concurrent_deployment_changed');
+  return { snapshot, deployment, activeDeployment: deployment, activeStableVersion, uploadedCandidateVersion,
+    scriptGlobalSettings, triggersAndBindingsOutsideVersionScope: { routes, customDomains, subdomain, crons, queueConsumers, migrationTag },
+    diagnosticLegacyBindings };
+
 }
 
 function runLocal(command, args, env) {

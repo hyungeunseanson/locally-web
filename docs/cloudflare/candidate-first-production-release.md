@@ -88,7 +88,8 @@ flag. This plan acknowledgement is not authorization to deploy.
 
 Use the official `cloudflare:build:production` with
 `LOCALLY_ISR_BRIDGE_SOURCE=provider`. The provider-linked proof ties the current
-single100 deployment/version to content ETag and the unchanged lineage. Fixture
+single100 deployment/version to exact-version module bytes, version metadata ETag,
+artifact SHA256 and the unchanged lineage. Fixture
 builds remain useful for CI but cannot satisfy the live upload contract.
 
 Compare exact provider-linked stable and fresh candidate modules. Preserve full
@@ -165,3 +166,35 @@ reset DOs, so this remains an observation, not an invented root cause.
 Local structural/runtime tests do not claim a live natural ISR success or that
 candidate0 smoke executes candidate DO code. No live candidate, override,
 traffic change, upload, deploy, rollback, or data mutation was performed here.
+
+
+## Post-upload version scope correction
+
+Observed on 2026-10-03: uploading a candidate left the deployment and exact
+stable version unchanged, while `/settings` gained `CF_VERSION_METADATA` and
+`/content/v2` returned the uploaded candidate's ETag. This is an observed
+projection, not a guarantee about every deployment shape. Neither endpoint is
+sufficient to identify the active version after upload.
+
+The reader separates `activeDeployment`, `activeStableVersion`,
+`uploadedCandidateVersion`, `scriptGlobalSettings`, and
+`triggersAndBindingsOutsideVersionScope`. Exact `/versions/{uuid}` resources
+anchor version invariance; `/script-settings` anchors global settings. Dedicated
+routes, domains, schedules and Queue consumer reads remain mandatory. Legacy
+settings are diagnostic only. Candidate bindings may add only version metadata;
+all previous bindings, runtime, lifecycle and global settings must remain equal.
+
+Artifact readers now exclusively GET
+`/workers/workers/{name}/versions/{uuid}?include=modules`. They never accept
+script-level `/content/v2` as provenance, including when its ETag matches. UUID,
+unambiguous main module, strict decoding and before/after exact metadata must
+agree. The active reader also brackets the read with identical single100
+deployment snapshots. Build proof records `sourceKind: workers-version-modules`
+and `artifactSha256`, alongside deployment/version/metadata ETag/bridge lineage.
+Final freshness re-reads these exact bytes and verifies the digest. Old receipts
+must be regenerated. No raw module or compatibility credential is logged by the
+reader. See [source evidence and regression matrix](bridge-version-provenance-2026-10-03.md).
+
+Sources: [version state](https://developers.cloudflare.com/workers/versions-and-deployments/),
+[script-global settings](https://developers.cloudflare.com/api/resources/workers/subresources/scripts/subresources/settings/methods/get/),
+[exact-version modules](https://developers.cloudflare.com/api/resources/workers/subresources/beta/subresources/workers/subresources/versions/methods/get/).
