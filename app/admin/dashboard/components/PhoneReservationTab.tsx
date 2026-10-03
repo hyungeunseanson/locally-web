@@ -1,5 +1,6 @@
 'use client';
 
+import type { PhoneRenderedSnapshot } from '@/app/utils/phoneFollowup';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
@@ -51,6 +52,11 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
   const [detailError, setDetailError] = useState('');
   const [hasMore, setHasMore] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [snapshot, setSnapshot] = useState<PhoneRenderedSnapshot>({ inquiryId: null, messageIds: [], ready: false });
+  const onSnapshot = useCallback((next: PhoneRenderedSnapshot) => setSnapshot(current =>
+    current.inquiryId === next.inquiryId && current.ready === next.ready
+      && current.messageIds.join(',') === next.messageIds.join(',') ? current : next), []);
+  const completing = useRef(false);
   const pages = useRef(1);
   const listVersion = useRef(0);
   const detailVersion = useRef(0);
@@ -197,19 +203,32 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
   // Never show the previous customer's conversation while the next detail loads.
   const selected = detail?.id === initialSelectedRequestId ? detail : null;
   const attentionLabel = selected ? getPhoneAttentionLabel(selected) : null;
-  const canComplete = Boolean(selected && !updating && selected.payment_status === 'COMPLETED' && ['PENDING', 'IN_PROGRESS'].includes(selected.status) && selected.linked_inquiry_id);
-  const complete = async () => {
-    if (!selected || !canComplete) return;
+  const completionEligible = Boolean(selected && (selected.status === 'COMPLETED' ? selected.needs_reply
+    : selected.payment_status === 'COMPLETED' && ['PENDING', 'IN_PROGRESS'].includes(selected.status)));
+  const canComplete = Boolean(completionEligible && !updating && snapshot.ready
+    && selected?.linked_inquiry_id && snapshot.inquiryId === selected.linked_inquiry_id);
+  const complete = async (requestId: string, frozen: PhoneRenderedSnapshot) => {
+    if (completing.current) return;
+    completing.current = true;
     setUpdating(true);
     try {
-      const response = await fetch(`/api/proxy-bookings/${selected.id}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'COMPLETED' }),
+      const response = await fetch(`/api/admin/proxy-bookings/${requestId}/complete`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(15_000),
+        body: JSON.stringify({ inquiryId: frozen.inquiryId, seenCustomerMessageIds: frozen.messageIds }),
       });
       const result = await response.json();
       if (!response.ok || !result.success) throw new Error(result.error || '완료 처리에 실패했습니다.');
-      refresh();
-    } catch (err) { showToast(err instanceof Error ? err.message : '완료 처리 실패', 'error'); }
-    finally { setUpdating(false); }
+      if (result.hasMoreUnhandled) showToast('확인한 메시지는 처리했습니다. 새 메시지가 남아 있습니다.', 'success');
+    } catch (err) { showToast(err instanceof Error ? err.message : '완료 처리 결과를 확인하지 못했습니다. 새로고침 후 확인해주세요.', 'error'); }
+    finally { completing.current = false; setUpdating(false); refresh(); }
+  };
+  const confirmComplete = () => {
+    if (!selected || !canComplete) return;
+    const requestId = selected.id;
+    const frozen = { ...snapshot, messageIds: [...snapshot.messageIds] };
+    requestConfirm({ title: '처리 완료', description: selected.status === 'COMPLETED'
+      ? '현재 확인한 메시지까지 처리 완료할까요? 고객에게 메시지는 전송되지 않습니다.'
+      : '이 전화예약 업무를 완료 처리할까요?', confirmLabel: '완료 처리' }, () => complete(requestId, frozen));
   };
   const paymentAction = async (action: 'confirm-payment' | 'cancel-payment' | 'refund-payment') => {
     if (!selected || updating) return;
@@ -251,7 +270,7 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
           if ((event.target as HTMLElement).closest('button')) event.currentTarget.closest('details')?.removeAttribute('open');
         }}>
           <button className="w-full rounded p-2 text-left text-xs hover:bg-slate-50" onClick={() => setPaymentDetailsId(selected.id)}>결제 상세</button>
-          {canComplete && <button disabled={updating} className="w-full rounded p-2 text-left text-xs hover:bg-slate-50 disabled:opacity-50" onClick={() => requestConfirm({ title: '처리 완료', description: '이 전화예약 업무를 완료 처리할까요?', confirmLabel: '완료 처리' }, complete)}>처리 완료</button>}
+          {completionEligible && <button disabled={!canComplete} className="w-full rounded p-2 text-left text-xs hover:bg-slate-50 disabled:opacity-50" onClick={confirmComplete}>처리 완료</button>}
           {manualPayment && <button disabled={updating} className="w-full rounded p-2 text-left text-xs hover:bg-slate-50 disabled:opacity-50" onClick={() => void paymentAction('confirm-payment')}>입금 확인</button>}
           {manualPayment && <button disabled={updating} className="w-full rounded p-2 text-left text-xs text-rose-700 hover:bg-slate-50 disabled:opacity-50" onClick={() => confirmPaymentAction('cancel-payment')}>결제 취소</button>}
           {selected.payment_status === 'COMPLETED' && <button disabled={updating} className="w-full rounded p-2 text-left text-xs text-rose-700 hover:bg-slate-50 disabled:opacity-50" onClick={() => confirmPaymentAction('refund-payment')}>환불 처리</button>}
@@ -283,7 +302,7 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
     </section>
     <section className={`${initialSelectedRequestId ? 'flex' : 'hidden md:flex'} min-h-0 min-w-0 flex-col`}>
       <ChatMonitor enabled={active && Boolean(selected?.linked_inquiry_id)} phoneContext={{
-        inquiryId: selected?.linked_inquiry_id || null, toolbar, onSent: refresh,
+        inquiryId: selected?.linked_inquiry_id || null, requestId: selected?.id || null, onSnapshot, toolbar, onSent: refresh,
       }} />
     </section>
     {active && selected && paymentDetailsId === selected.id && <PhonePaymentDetails request={selected} onClose={() => { setPaymentDetailsId(null); paymentMenuRef.current?.focus(); }} />}

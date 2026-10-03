@@ -45,7 +45,7 @@ export async function enrichPhoneRequests(db: SupabaseClient, rows: ProxyRequest
       .order('id', { referencedTable: 'inquiry_messages', ascending: false })
       .limit(1, { referencedTable: 'inquiry_messages' }) : Promise.resolve({ data: [], error: null }),
     linkedRequests(db, ids),
-    getAdminInquiryActivity(db, ids),
+    getAdminInquiryActivity(db, ids, true),
   ]);
   if (profiles.error) throw profiles.error;
   if (inquiries.error) throw inquiries.error;
@@ -54,7 +54,7 @@ export async function enrichPhoneRequests(db: SupabaseClient, rows: ProxyRequest
     const linked = inquiry && validLinkedRequest(inquiry, links)?.id === row.id;
     const latest = linked ? inquiry.inquiry_messages?.[0] : undefined;
     const latestFromCustomer = latest?.sender_id === row.user_id;
-    const completedNeedsReply = row.status === 'COMPLETED' && latestFromCustomer;
+    const completedNeedsReply = Boolean(linked && row.status === 'COMPLETED' && activities.get(String(inquiry.id))?.phone_needs_reply);
     // updated_at is refreshed by the existing trigger when the request is cancelled.
     const latestTime = Date.parse(latest?.created_at ?? '');
     const cancelledTime = Date.parse(row.updated_at ?? '');

@@ -41,7 +41,7 @@ function loadModule(entry, mocks = {}, fetch = noNetwork) {
     const localRequire = (id) => {
       if (id in mocks) return mocks[id];
       if (['react', 'react/jsx-runtime', 'lucide-react'].includes(id)) return require(id);
-      if (['@/app/utils/dashboardUserRole', '@/app/utils/chatAttachmentPolicy', '@/app/utils/inquiry', '@/app/utils/chatPolicySignals', '@/app/utils/officialSender', '@/app/utils/privateStorageDelivery'].includes(id)) {
+      if (['@/app/utils/phoneFollowup', '@/app/utils/dashboardUserRole', '@/app/utils/chatAttachmentPolicy', '@/app/utils/inquiry', '@/app/utils/chatPolicySignals', '@/app/utils/officialSender', '@/app/utils/privateStorageDelivery'].includes(id)) {
         return load(id.replace('@/', '') + '.ts');
       }
       throw new Error(`Unmocked module: ${id}`);

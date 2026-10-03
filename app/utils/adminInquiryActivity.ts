@@ -11,11 +11,12 @@ export type AdminInquiryActivity = {
   reply_waiting_since: string | null;
   support_reopened_at: string | null;
   admin_unread_count: number;
+  phone_needs_reply?: boolean;
 };
 
-export async function getAdminInquiryActivity(client: SupabaseClient, ids: (number | string)[]) {
+export async function getAdminInquiryActivity(client: SupabaseClient, ids: (number | string)[], phone = false) {
   if (!ids.length) return new Map<string, AdminInquiryActivity>();
-  const { data, error } = await client.rpc('get_admin_inquiry_activity', { p_inquiry_ids: ids });
+  const { data, error } = await client.rpc(phone ? 'get_admin_phone_activity' : 'get_admin_inquiry_activity', { p_inquiry_ids: ids });
   if (error) throw new Error('문의 활동 정보를 불러오지 못했습니다.');
   return new Map((data as AdminInquiryActivity[] ?? []).map(row => [String(row.inquiry_id), row]));
 }
