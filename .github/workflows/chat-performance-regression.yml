@@ -29,6 +29,13 @@ on:
       - 'playwright.admin-attention.config.ts'
       - 'supabase/migrations/*admin_attention_badges*'
       - 'app/api/admin/inquiries/**'
+      - 'app/utils/adminChatSearch.ts'
+      - 'app/api/admin/chat-search/**'
+      - 'tests/unit/admin-chat-search.test.mjs'
+      - 'tests/ui/admin-chat-search.spec.ts'
+      - 'playwright.admin-chat-search.config.ts'
+      - 'supabase/migrations/*admin_chat_bounded_search*'
+      - 'scripts/supabase/test-admin-chat-search-native.mjs'
       - 'app/utils/adminChatTime.ts'
       - 'app/utils/adminChatOperations.ts'
       - 'tests/unit/admin-chat-operations.test.mjs'
@@ -80,6 +87,7 @@ jobs:
       - run: npx playwright install --with-deps chromium webkit
       # All I/O is mocked. This job has no application server or service secrets.
       - run: npx tsc --noEmit
+      - run: npm run test:admin-chat:search
       - run: npm run test:admin-chat:operations
       - run: npm run test:admin-chat:phase1
       - run: npm run test:admin-attention:phase2
@@ -102,5 +110,9 @@ jobs:
       # Local PG17 process, three independent connections, no remote credentials.
       - run: npm install --prefix "$RUNNER_TEMP/phone-pg17" --no-audit --no-fund embedded-postgres@17.10.0-beta.17 pg@8.23.1
       - run: npm run test:phone-followup:native
+        env:
+          PHONE_NATIVE_MODULES: ${{ runner.temp }}/phone-pg17/node_modules
+
+      - run: npm run test:admin-chat:search:native
         env:
           PHONE_NATIVE_MODULES: ${{ runner.temp }}/phone-pg17/node_modules

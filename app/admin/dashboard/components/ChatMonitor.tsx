@@ -1,5 +1,7 @@
 'use client';
 
+import AdminChatSearch from './AdminChatSearch';
+
 import { EMPTY_CHAT_OPERATIONS, matchesChatOperations } from '@/app/utils/adminChatOperations';
 import { useConversationNavigation } from '../hooks/useConversationNavigation';
 import { ChatOperationsFiltersControl, ChatSyncStatus, ConversationNavigation, ConversationCopyMenu } from './ChatOperationsControls';
@@ -233,6 +235,14 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
     pendingUrlSelectionIdRef.current = targetId;
     appliedDeepLinkIdRef.current = targetId;
     void selectInquiry(inquiryId);
+    navigateInquiryInUrl(inquiryId);
+  };
+
+  const handleSelectSearchInquiry = (inquiryId: string) => {
+    // A locator can be outside loaded pages. Let the canonical URL resolver/list
+    // supply its metadata before the existing deep-link effect selects it once.
+    setCsStatusFilter('ALL');
+    pendingUrlSelectionIdRef.current = inquiryId;
     navigateInquiryInUrl(inquiryId);
   };
 
@@ -474,6 +484,7 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
           </div>
 
           <ChatSyncStatus sync={sync} />
+          {activeTab === 'admin' && <AdminChatSearch surface="support" enabled={enabled} onSelect={handleSelectSearchInquiry} />}
           {/* CS 상태 필터 (1:1 문의 탭에서만 노출) */}
           {activeTab === 'admin' && (
             <div className="flex gap-1 flex-wrap mt-2">

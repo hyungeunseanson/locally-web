@@ -173,6 +173,13 @@ const expectedPendingMigrations = [
     "repositoryFile": "supabase/migrations/20261002140902_phone_followup_tasks.sql",
     "repositorySha256": "88769a249dca3d7b2f0cbd2dc6a8cf2197960213a357bac71353978a5ae0e396",
     "status": "prepared_not_applied"
+  },
+  {
+    "version": "20261003122803",
+    "name": "admin_chat_bounded_search",
+    "repositoryFile": "supabase/migrations/20261003122803_admin_chat_bounded_search.sql",
+    "repositorySha256": "0e9776caab4c826924eade21baa229ec73a27857d9c1c9bb75a97b25b1b31724",
+    "status": "prepared_not_applied"
   }
 ];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));

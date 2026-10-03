@@ -74,6 +74,7 @@ test.describe('Supabase staging bootstrap contract', () => {
       'supabase/migrations/20261002015110_admin_message_monitoring_historical_reinquiry.sql',
       'supabase/migrations/20261002041848_admin_attention_badges_phase_2.sql',
       'supabase/migrations/20261002140902_phone_followup_tasks.sql',
+      'supabase/migrations/20261003122803_admin_chat_bounded_search.sql',
     ]);
     expect(manifest.pendingPrivateTables).toBeUndefined();
     expect(manifest.pendingApplicationFunctions).toBeUndefined();
@@ -87,6 +88,13 @@ test.describe('Supabase staging bootstrap contract', () => {
     "name": "phone_followup_tasks",
     "repositoryFile": "supabase/migrations/20261002140902_phone_followup_tasks.sql",
     "repositorySha256": "88769a249dca3d7b2f0cbd2dc6a8cf2197960213a357bac71353978a5ae0e396",
+    "status": "prepared_not_applied"
+  },
+  {
+    "version": "20261003122803",
+    "name": "admin_chat_bounded_search",
+    "repositoryFile": "supabase/migrations/20261003122803_admin_chat_bounded_search.sql",
+    "repositorySha256": "0e9776caab4c826924eade21baa229ec73a27857d9c1c9bb75a97b25b1b31724",
     "status": "prepared_not_applied"
   }
 ]);
