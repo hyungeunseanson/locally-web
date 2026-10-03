@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { compareDurableObjectProof } from './durable-object-release-safety.mjs';
 
 export const PRODUCTION_WORKER = 'locally-web-opennext-production';
@@ -47,6 +48,7 @@ export function safeConfigSnapshot(snapshot) {
     subdomain: { enabled: snapshot.subdomain.enabled, previews_enabled: snapshot.subdomain.previews_enabled },
     observability: snapshot.observability,
     runtime: snapshot.runtime,
+    scriptGlobalSettings: snapshot.scriptGlobalSettings,
     bindings: snapshot.bindings.map(safeBinding),
     crons: snapshot.crons,
     queueConsumers: snapshot.queueConsumers.map(c => ({
@@ -77,6 +79,40 @@ export function assertConfigUnchanged(before, after, { metadata = 'unchanged' } 
   assertBindingsUnchanged(a.bindings, b.bindings, metadata);
   delete a.bindings; delete b.bindings;
   requireCondition(stableJson(a) === stableJson(b), 'trigger_or_config_drift');
+}
+
+// Version resources are immutable and scoped to an exact UUID. Never infer
+// active bindings from the legacy script-and-version /settings projection.
+export function safeVersionSnapshot(version) {
+  requireCondition(UUID.test(version?.id) && version.resources?.script?.etag
+    && Array.isArray(version.resources.bindings) && version.resources.script_runtime, 'exact_version_missing');
+  return { id: version.id, resources: { ...version.resources,
+    bindings: version.resources.bindings.map(binding => safeBinding({ ...binding,
+      ...(binding.type === 'plain_text' ? { valueSha256: createHash('sha256').update(binding.text).digest('hex') } : {}),
+    })),
+  } };
+}
+
+export function assertPostUploadInvariance(before, after) {
+  requireCondition(before.activeDeployment && after.activeDeployment
+    && before.activeStableVersion && after.activeStableVersion
+    && before.scriptGlobalSettings && after.scriptGlobalSettings
+    && before.triggersAndBindingsOutsideVersionScope && after.triggersAndBindingsOutsideVersionScope,
+  'version_scoped_snapshot_missing');
+  requireCondition(stableJson(before.activeDeployment) === stableJson(after.activeDeployment), 'upload_changed_active_deployment');
+  captureStableVersion(before.activeDeployment);
+  requireCondition(before.activeStableVersion.id === captureStableVersion(after.activeDeployment)
+    && stableJson(before.activeStableVersion) === stableJson(after.activeStableVersion), 'active_stable_version_changed');
+  requireCondition(stableJson(before.scriptGlobalSettings) === stableJson(after.scriptGlobalSettings), 'script_global_settings_changed');
+  requireCondition(stableJson(before.triggersAndBindingsOutsideVersionScope) === stableJson(after.triggersAndBindingsOutsideVersionScope), 'trigger_or_config_drift');
+  assertConfigUnchanged(before.snapshot, after.snapshot);
+  const candidate = after.uploadedCandidateVersion;
+  requireCondition(candidate && candidate.id !== before.activeStableVersion.id, 'exact_candidate_missing');
+  assertBindingsUnchanged(before.activeStableVersion.resources.bindings, candidate.resources.bindings, 'required');
+  requireCondition(stableJson(before.activeStableVersion.resources.script_runtime) === stableJson(candidate.resources.script_runtime), 'candidate_runtime_drift');
+  for (const field of ['handlers', 'named_handlers']) requireCondition(
+    stableJson(before.activeStableVersion.resources.script[field]) === stableJson(candidate.resources.script[field]), 'candidate_export_drift');
+  return 'POST_UPLOAD_INVARIANCE_PASS';
 }
 
 export function assertDurableObjectLifecycle({ config, baselineConfig, workerSource, baselineWorkerSource }) {
@@ -155,7 +191,7 @@ export function buildCandidateReleasePlan({ config, baseline, runtimeVariables, 
   for (const name of ['SUPABASE_SERVICE_ROLE_KEY', 'NEXT_PUBLIC_SUPABASE_ANON_KEY']) {
     requireCondition(snapshot.bindings.some(b => b.name === name && b.type === 'secret_text'), 'required_encrypted_binding_missing');
   }
-  const doImplementation = compareDurableObjectProof(durableObjectProof, stableVersionId);
+  const doImplementation = compareDurableObjectProof(durableObjectProof?.deploymentId === baseline.deployment.id ? durableObjectProof : null, stableVersionId);
   const blockers = COMPATIBLE_DO.has(doImplementation) ? [] : [doImplementation];
   requireCondition(/^[a-f0-9]{64}$/.test(bridgeLineage ?? ''), 'bridge_lineage_missing');
   if (doImplementation === 'BRIDGE_COMPATIBLE_BUILD_STATE_ONLY') {
@@ -276,7 +312,8 @@ export async function executeCandidateReleaseContract(plan, actions) {
   assertDistribution(before.deployment, [{ id: plan.stableVersionId, percentage: 100 }]);
   requireCondition(before.deployment.id === plan.stableDeployment.id, 'concurrent_deployment_changed');
   const bridgeProof = await actions.bridgeProofFreshness();
-  requireCondition(bridgeProof?.kind === 'provider' && bridgeProof.etagMatch === true
+  requireCondition(bridgeProof?.kind === 'provider' && bridgeProof.sourceKind === 'workers-version-modules'
+    && bridgeProof.artifactSha256 === proof.artifactSha256 && proof.deploymentId === before.deployment.id
     && bridgeProof.deploymentId === before.deployment.id && bridgeProof.versionId === plan.stableVersionId
     && /^[a-f0-9]{64}$/.test(bridgeProof.etag ?? '') && bridgeProof.etag === proof.scriptEtag
     && (!proof.bridgeCompatibility || proof.bridgeCompatibility.compatSha256 === plan.bridgeLineage)
@@ -287,7 +324,8 @@ export async function executeCandidateReleaseContract(plan, actions) {
   requireCondition(metadata.id === candidate.versionId, 'uploaded_version_metadata_mismatch');
   assertBindingsUnchanged(plan.baselineSnapshot.bindings, metadata.bindings, 'required');
   requireCondition(stableJson(metadata.runtime) === stableJson(plan.baselineSnapshot.runtime), 'candidate_runtime_drift');
-  const afterUpload = await actions.snapshot();
+  const afterUpload = await actions.snapshot({ candidateVersionId: candidate.versionId });
+  assertPostUploadInvariance(before, afterUpload);
   assertConfigUnchanged(plan.baselineSnapshot, afterUpload.snapshot);
   assertDistribution(afterUpload.deployment, [{ id: plan.stableVersionId, percentage: 100 }]);
   requireCondition(afterUpload.deployment.id === before.deployment.id, 'upload_changed_active_deployment');
