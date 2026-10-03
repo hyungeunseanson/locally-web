@@ -476,7 +476,7 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
           </div>
 
           <ChatSyncStatus sync={sync} />
-          {activeTab === 'admin' && <AdminChatSearch surface="support" enabled={enabled} onSelect={handleSelectInquiry} />}
+          {activeTab === 'admin' && <AdminChatSearch surface="support" enabled={enabled} onSelect={id => { setCsStatusFilter('ALL'); handleSelectInquiry(id); }} />}
           {/* CS 상태 필터 (1:1 문의 탭에서만 노출) */}
           {activeTab === 'admin' && (
             <div className="flex gap-1 flex-wrap mt-2">

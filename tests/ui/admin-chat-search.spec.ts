@@ -39,8 +39,8 @@ test.beforeAll(async () => {
 });
 
 type Message = { id: number; sender_id: string; content: string; type: string; created_at: string; inquiry_id: number };
-async function fixture(page: Page, view: 'support' | 'phone' = 'support', options: { performance?: boolean; selected?: number } = {}) {
-  const rows = Array.from({ length: 12 }, (_, n) => ({ id: n + 1, user_id: 'guest', type: 'admin_support', status: 'open',
+async function fixture(page: Page, view: 'support' | 'phone' = 'support', options: { performance?: boolean; selected?: number; resolvedFirst?: boolean } = {}) {
+  const rows = Array.from({ length: 12 }, (_, n) => ({ id: n + 1, user_id: 'guest', type: 'admin_support', status: options.resolvedFirst && n === 0 ? 'resolved' : 'open',
     guest: { name: `고객 ${n + 1}` }, content: `문의 ${n + 1}`, updated_at: `2026-10-03T00:${String(59 - n).padStart(2, '0')}:00Z`,
     admin_unread_count: options.performance ? 0 : n === 0 ? 10 : n === 3 ? 1 : 0,
     needs_reply: options.performance ? false : n === 1 || n === 3, support_reopened_at: n === 2 || n === 3 ? '2026-10-02T15:01Z' : null,
@@ -75,7 +75,8 @@ async function fixture(page: Page, view: 'support' | 'phone' = 'support', option
     if (p === '/api/admin/inquiries') {
       const selected = rows.find(row => String(row.id) === url.searchParams.get('inquiryId'));
       if (url.searchParams.has('resolveOnly')) return json({ success: true, selection: { view: 'support' }, data: [] });
-      const data = rows.filter(row => matchesChatOperations(row, filters));
+      const selectedStatus = url.searchParams.get('status');
+      const data = rows.filter(row => matchesChatOperations(row, filters) && (!selectedStatus || row.status === selectedStatus));
       if (selected && !data.includes(selected)) data.unshift(selected);
       return json({ success: true, data, pagination: { hasMore: false } });
     }
@@ -220,4 +221,19 @@ for(const view of ['support','phone'] as const) test(`${view}: performance idle 
   await page.clock.runFor(600_000); const idle=[...f.reads];
   expect(searchCount([...initial,...selection,...idle])).toBe(0);
   console.log('PHASE3B_REQUESTS',JSON.stringify({source:process.env.PHASE3B_BASELINE==='1'?'starting-main':'current',view,initial,selection,idle}));
+});
+
+for (const view of ['support','phone'] as const) test(`${view}: result outside status/operations filter opens exactly one canonical thread`, async ({page}) => {
+  const f = await fixture(page,view,{resolvedFirst:true});
+  if(view==='support') await page.getByRole('button',{name:'대기',exact:true}).click();
+  await page.getByRole('checkbox',{name:'답변 필요',exact:true}).check();
+  if(view==='support') await expect(page.getByTestId('admin-chat-inquiry-row-1')).toHaveCount(0);
+  const before=threadCount(f.reads);
+  await input(page,view).fill('first'); await expect(resultRows(page)).toContainText('고객 1'); await resultRows(page).click();
+  await expect(page).toHaveURL(new RegExp(view==='phone'?'proxyRequestId=request-1':'inquiryId=1'));
+  await expect(composer(page)).toBeEnabled(); await composer(page).fill('필터 밖 대화 초안');
+  await expect(page.getByRole('checkbox',{name:'답변 필요',exact:true})).toBeChecked();
+  if(view==='support') await expect(page.getByRole('button',{name:'전체',exact:true})).toHaveAttribute('aria-pressed','true');
+  expect(threadCount(f.reads)).toBe(before+1); await expect(composer(page)).toHaveValue('필터 밖 대화 초안');
+  expect(f.runtimeErrors).toEqual([]);
 });

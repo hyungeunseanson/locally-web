@@ -4,7 +4,7 @@ Starting main: `3dfb32870c14223649abbc9dd86e9471b3a4faa5`, verified after fresh 
 
 ## Architecture decision (before implementation)
 
-A. Per-surface finder in the existing Support and Phone list headers. The repo already separates support inquiries and phone requests and owns their canonical navigation independently. Search spans the current surface regardless of list status/operations filters; this is explicit in the UI. Search results are locator summaries, never a second conversation store. Click calls the existing Support `handleSelectInquiry` or Phone `select`, retaining inquiryId/proxyRequestId, resolver, thread loading, draft, ACK and realtime ownership.
+A. Per-surface finder in the existing Support and Phone list headers. The repo already separates support inquiries and phone requests and owns their canonical navigation independently. Search spans the current surface regardless of list status/operations filters; this is explicit in the UI. Search results are locator summaries, never a second conversation store. Support result clicks set the existing status filter to ALL before calling `handleSelectInquiry`, so the existing status guard cannot immediately dismiss a result outside that filter. Operations filters are retained. Phone clicks call the existing `select`, retaining inquiryId/proxyRequestId, resolver, thread loading, draft, ACK and realtime ownership.
 
 B. Dedicated authenticated GET `/api/admin/chat-search?surface=support|phone&q=…`. Extending the existing list paths would mix search with their scan/filter/enrichment pagination and realtime refresh dependencies. In particular Phone's old `q` scans 100 requests and enriches each batch before matching; sparse matches can scan the whole database. The new finder never invokes those paths, and removes the UI dependency on old Phone q.
 
@@ -24,7 +24,7 @@ Actual starting-main source and current source run in the same browser fixture, 
 | Type / query / clear | extra T0 | extra T0 |
 | Search result selection | R1 T1, existing path | D1 T1, existing path |
 
-L=list, R=canonical URL resolver, D=Phone detail, T=thread. Idle **additional** requests=0; existing five-minute fallback is preserved. Phone omits its former empty q parameter. Both list route sources are byte-for-byte unchanged from starting main; the Phase 3A real route fixture still measures Support 7→7 and Phone 6→6 DB client operations including authorization. Existing incoming-message/burst/filter/next10 workloads also remain equal to the Phase 3A audit. Search is never a dependency of the list/detail/thread or realtime effects.
+L=list, R=canonical URL resolver, D=Phone detail, T=thread. Idle **additional** requests=0; existing five-minute fallback is preserved. Phone omits its former empty q parameter. Both list route sources are byte-for-byte unchanged from starting main; the Phase 3A real route fixture still measures Support 7→7 and Phone 6→6 DB client operations including authorization. Existing incoming-message/burst/filter/next10 workloads also remain equal to the Phase 3A audit. Search input is never a dependency of the list/detail/thread or realtime effects. A Support result click resets a non-ALL status filter through the existing list path; that list can refresh, while the canonical thread GET remains one.
 
 Search: one API request after 400ms quiet, one SQL RPC, no per-row calls or operational enrichment. The real authorization helper fixture measures one users lookup + one RPC = 2 DB operations when email is absent; normal email-bearing admin sessions also check the existing whitelist, giving 3 operations. RPC returns ≤25 locator summaries with no messages, avatars, form_data or receipts. Tests exercise cancellation immediately on input and clear, ignored-abort late responses, minimum query/no request, rapid queries, empty/error/manual retry and a defensive client cap for oversized responses.
 
@@ -33,7 +33,7 @@ Native isolated PostgreSQL 17 fixture: 20,000 inquiries, 20,000 profiles/experie
 Verification:
 
 - `npx tsc --noEmit`; `npm run lint` (seven existing unrelated warnings); changed-file ESLint has no warnings; `git diff --check`.
-- `npm run test:admin-chat:search`: route test + 26 browser tests, including canonical selection/deep-link/draft A→B→A, stale prior A/loading ownership, no duplicate thread GET, desktop/390px scroll and composer bounds. Four search screenshots visually inspected.
+- `npm run test:admin-chat:search`: route test + 30 browser tests, including canonical selection/deep-link/draft A→B→A, stale prior A/loading ownership, no duplicate thread GET, desktop/390px scroll and composer bounds. Four search screenshots visually inspected.
 - `PHASE3B_BASELINE=1 npx playwright test -c playwright.admin-chat-search.config.ts --grep 'performance idle'`: four starting-main workloads. Parsed before/after request arrays match exactly after removing old empty q.
 - `PHONE_NATIVE_MODULES=… npm run test:admin-chat:search:native`: isolated SQL/query/index/privilege tests, no remote credentials.
 - Existing `test:admin-chat:operations` (28 browser tests), `test:admin-chat:phase1` (chat performance/platform/loading and 14 admin UI tests), `test:admin-attention:phase2` (36 browser tests), `PHONE_WEBKIT=1 test:phone-followup` (192 browser/route tests), `test:phone-followup:native`, `cloudflare:production-build:contract`.
