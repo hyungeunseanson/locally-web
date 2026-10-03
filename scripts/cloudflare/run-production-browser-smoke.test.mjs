@@ -16,6 +16,34 @@ import {
 
 const runProductionBrowserSmoke = (origin, options) => productionBrowserSmoke(origin, { log: () => {}, ...options });
 
+test('candidate page/context teardown aborts paused reads before original headers can escape, including pending header capture', async () => {
+  for (const closing of ['page', 'context']) for (const stage of ['headers', 'body']) {
+    const context = new EventEmitter(), actions = [];
+    let handler, releaseHeaders, fetches = 0;
+    const headersReady = stage === 'headers' ? new Promise(resolve => { releaseHeaders = resolve; }) : Promise.resolve({cookie:'COOKIE_SENTINEL_NEVER_LOG',authorization:'AUTH_SENTINEL_NEVER_LOG'});
+    context.route = async (_, callback) => { handler = callback; };
+    context.close = async () => actions.push('context-close');
+    const page = { close: async () => actions.push('page-close') };
+    const gate = await installProductionMutationGate(context, 'https://www.locally-travel.com', {
+      versionOverride: { workerName:'locally-web-opennext-production',versionId:'22222222-2222-4222-8222-222222222222' },
+      fetchImplementation: async (_url, options) => {
+        fetches++;assert.equal(Object.hasOwn(options.headers,'cookie'),false);assert.equal(Object.hasOwn(options.headers,'authorization'),false);
+        return new Promise((_, reject) => options.signal.addEventListener('abort',()=>reject(Error('private fixture abort')),{once:true}));
+      },
+    });
+    context.emit('page',page);
+    const running = handler({request:()=>({url:()=> 'https://www.locally-travel.com/read',method:()=> 'GET',resourceType:()=> 'fetch',frame:()=>({page:()=>page}),allHeaders:()=>headersReady}),
+      fulfill:async()=>actions.push('unexpected-fulfill'),abort:async reason=>actions.push(reason)});
+    await new Promise(resolve=>setImmediate(resolve));
+    await (closing==='page'?page:context).close();
+    releaseHeaders?.({cookie:'COOKIE_SENTINEL_NEVER_LOG',authorization:'AUTH_SENTINEL_NEVER_LOG'});
+    await running;
+    assert.deepEqual(actions,['aborted',closing+'-close']);
+    assert.equal(fetches,stage==='headers'?0:1);
+    assert(!JSON.stringify({gate,actions}).includes('SENTINEL_NEVER_LOG'));
+  }
+});
+
 test('candidate GET/HEAD/OPTIONS strip credentials before injecting override; external reads strip release headers', async () => {
   let handler;
   const origin = 'https://www.locally-travel.com';
