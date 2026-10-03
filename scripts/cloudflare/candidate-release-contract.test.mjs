@@ -4,7 +4,7 @@ import { createServer } from 'node:http';
 import test from 'node:test';
 import { versionProvider, artifactDigest, deploymentId } from './active-version-artifact.fixture.mjs';
 import {
-  assertPostUploadInvariance, safeVersionSnapshot, assertConfigUnchanged, assertFullCandidateSmoke, assertOverrideIdentity, buildCandidateReleasePlan,
+  CandidateReleaseBlocked, assertPostUploadInvariance, safeVersionSnapshot, assertConfigUnchanged, assertFullCandidateSmoke, assertOverrideIdentity, buildCandidateReleasePlan,
   classifyCandidateAttempt, executeCandidateReleaseContract, parseVersionUploadOutput, promotionArguments,
   PRODUCTION_ORIGIN, PRODUCTION_WORKER, rollbackArguments, safeConfigSnapshot, stageZeroArguments, versionOverrideHeader,
 } from './candidate-release-contract.mjs';
@@ -247,35 +247,42 @@ test('failed post-promotion regression does not automatically repeat promotion o
   await assert.rejects(executeCandidateReleaseContract(makePlan(), actions), blocked('post_deploy_verification_failed')); assert.equal(calls.filter(c => c === 'promote').length, 1);
 });
 
-test('Chromium propagates override/probe on documents, data, JS, CSS, font, image and API; writes remain blocked', { timeout: 25000 }, async () => {
+test('Chromium proves client menu execution and exact asset integrity while slow browser bodies remain pending', { timeout: 25000 }, async () => {
   const received = []; const font = await readFile(new URL('../../app/fonts/Inter/Inter_18pt-Regular.woff2', import.meta.url));
+  const javascript = `fetch('/data');fetch('/cdn-cgi/rum',{method:'POST'}).catch(()=>{});
+    document.addEventListener('DOMContentLoaded',()=>{const b=document.querySelector('#globe');b.onclick=()=>{const m=document.querySelector('#language-menu');if(m)m.remove();else{const m=document.createElement('button');m.id='language-menu';m.textContent='English';document.body.append(m);}};});`;
+  const files = new Map([['/_next/static/app.js',Buffer.from(javascript)],['/_next/static/font.woff2',font],
+    ['/_next/static/style.css',Buffer.from('body{color:black}')],['/_next/static/unused.bin',Buffer.from('unused-hint-fixture')],
+    ['/_next/static/slow.bin',Buffer.from('pending-static-fixture')]]);
   const server = createServer((request, response) => {
     const pathname = new URL(request.url, 'http://127.0.0.1').pathname;
     received.push({ pathname, method: request.method, override: request.headers['cloudflare-workers-version-overrides'], probe: request.headers['x-locally-release-probe'] });
     if (pathname === '/.well-known/locally-release') { response.writeHead(204, { 'X-Locally-Worker-Version': candidateId }).end(); return; }
     if (pathname === '/api/proxy-bookings') { response.writeHead(401).end(); return; }
     if (pathname === '/data') { response.writeHead(200, { 'content-type': 'application/json' }).end('{}'); return; }
-    if (pathname === '/_next/static/app.js') { response.writeHead(200, { 'content-type': 'text/javascript' }).end("fetch('/data');fetch('/cdn-cgi/rum',{method:'POST'}).catch(()=>{});"); return; }
-    if (pathname === '/_next/static/font.woff2') { response.writeHead(200, { 'content-type': 'font/woff2' }).end(font); return; }
-    if (pathname === '/_next/static/style.css') { response.writeHead(200, { 'content-type': 'text/css' }).end('body{color:black}'); return; }
-    if (pathname === '/_next/static/unused.bin') { response.writeHead(200).end('unused-hint-fixture'); return; }
+    if (files.has(pathname)) {
+      response.writeHead(200, { 'content-type': pathname.endsWith('.js')?'text/javascript':pathname.endsWith('.css')?'text/css':pathname.endsWith('.woff2')?'font/woff2':'application/octet-stream' });
+      if(pathname.endsWith('slow.bin')){response.flushHeaders();setTimeout(()=>response.end(files.get(pathname)),2200);}else response.end(files.get(pathname));return;
+    }
     if (pathname === '/image.svg') { response.writeHead(200, { 'content-type': 'image/svg+xml' }).end('<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>'); return; }
     response.writeHead(200, { 'content-type': 'text/html' }).end(`<!doctype html><title>Fixture</title>
       <link rel="preload" href="/_next/static/font.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/_next/static/style.css">
-      <link rel="preload" href="/_next/static/unused.bin" as="unsupported-fixture-type">
+      <link rel="preload" href="/_next/static/unused.bin" as="unsupported-fixture-type"><link rel="preload" href="/_next/static/slow.bin" as="fetch" crossorigin>
       <style>@font-face{font-family:fixture;src:url('/_next/static/font.woff2')}body{font-family:fixture}</style>
-      <script src="/_next/static/app.js"></script><body><h1>Fixture</h1><img src="/image.svg"><a href="/experiences/42">Experience</a>
+      <script src="/_next/static/app.js"></script><body><h1>Fixture</h1><button id="globe"><svg class="lucide-globe" width="18" height="18"></svg></button><img src="/image.svg"><a href="/experiences/42">Experience</a>
       ${pathname === '/login' ? '<div data-testid="login-modal"><input type="email"><input type="password"></div>' : ''}</body>`);
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve)); const origin = `http://127.0.0.1:${server.address().port}`;
   try {
-    const smoke = await runCandidateBrowserSmoke({ origin, mode: 'override', workerName: PRODUCTION_WORKER, versionId: candidateId }, {
-      readAsset: async pathname => { assert.equal(pathname,'/_next/static/unused.bin');return Buffer.from('unused-hint-fixture'); },
-    });
+    const smoke = await runCandidateBrowserSmoke({ origin, mode: 'override', workerName: PRODUCTION_WORKER, versionId: candidateId }, { readAsset: async pathname => files.get(pathname) });
     assertFullCandidateSmoke(smoke); assertOverrideIdentity({ versionId: candidateId, smoke, expectedOrigin: origin });
     assert(Object.values(smoke.overrideCoverage).every(Boolean));
-    assert.equal(smoke.resourceHintProofs.length,1);assert.equal(smoke.resourceHintProofs[0].pathname,'/_next/static/unused.bin');
-    assert(!smoke.assetResponses.some(r=>r.pathname==='/_next/static/unused.bin'));
+    assert.deepEqual(smoke.clientInteractions.map(r=>r.pathname),['/','/experiences/42']);
+    assert(smoke.assetEvidence.some(r=>r.browserPending.some(p=>p.pathname==='/_next/static/slow.bin')));
+    assert(smoke.assetResponses.every(r=>r.hashMatch&&r.bodyComplete&&r.source==='direct-candidate-get'));
+    assert(smoke.resourceHintProofs.some(r=>r.pathname==='/_next/static/unused.bin'));
+    assert(!smoke.browserAssetResponses.some(r=>r.pathname==='/_next/static/unused.bin'));
+    assert.equal(smoke.requestFailures.length,0);
     for (const path of ['/', '/login', '/experiences/42', '/_next/static/app.js', '/_next/static/font.woff2', '/_next/static/style.css', '/image.svg', '/data', '/api/proxy-bookings']) {
       assert(received.some(r => r.pathname === path), path); assert(received.filter(r => r.pathname === path).every(r => r.override === versionOverrideHeader(PRODUCTION_WORKER, candidateId) && r.probe === undefined), path);
     }
@@ -416,56 +423,59 @@ test('GET reader anchors before/after upload to exact stable resources, not lega
 
 });
 
-// The response arrives while the DOM/resource snapshot is awaiting the browser.
-// Header inspection is held by a latch; no transport/status failure is involved.
+// Header observation and direct integrity are separate from browser body timing.
 async function captureOrderingFixture(options = {}) {
   const { EventEmitter } = await import('node:events');
-  const context = new EventEmitter();
-  const completed = [];
+  const context = new EventEmitter(), completed = [], probes = [];
   const override = versionOverrideHeader(PRODUCTION_WORKER, candidateId);
-  let pageSequence = 0;
+  let pageSequence = 0, applyOverride;
   const respond = (page, pathname, { type = 'script', status = 200, late = false, missingOverride = false, redirected = false, never = false, wrongVersion = false } = {}) => {
     let release;
     const latch = late || never ? new Promise(resolve => { release = resolve; }) : Promise.resolve();
     const request = { url: () => PRODUCTION_ORIGIN + pathname + '?private=NEVER_LOG', method: () => 'GET', resourceType: () => type,
       frame: () => ({ page: () => page }), redirectedFrom: () => redirected ? {} : null,
+      failure:()=>({errorText:options.teardownFailure?'net::ERR_ABORTED':'net::ERR_FAILED'}),
       headerValue: async name => { await latch; return name === 'cloudflare-workers-version-overrides' ? missingOverride ? null : override : pathname === '/.well-known/locally-release' ? '1' : null; } };
-    context.emit('request', request);
-    context.emit('response', { request: () => request, status: () => status, finished: async () => options.bodyFailure ? new Error('fixture incomplete response') : null,
+    context.emit('request', request);applyOverride?.({pathname,resourceType:type,method:'GET'});
+    if(options.requestFailure&&pathname.endsWith('app.js')){context.emit('requestfailed',request);return;}
+    context.emit('response', { request: () => request, status: () => status, finished: async () => {throw Error('Body completion must not be a one-second gate');},
       headerValue: async () => wrongVersion ? stableId : candidateId });
+    if(options.teardownFailure&&pathname.endsWith('app.js'))page.teardownRequests.push(request);
+    if(options.bodyDelayMs&&pathname.startsWith('/_next/static/'))setTimeout(()=>context.emit('requestfinished',request),options.bodyDelayMs);
+    else if(!options.pendingBodies)context.emit('requestfinished',request);
     if (late && !never) setImmediate(() => { completed.push(pathname); release(); });
   };
   context.newPage = async () => {
-    const page = { id: ++pageSequence, url: () => PRODUCTION_ORIGIN + '/fixture', close: async () => { page.closed = true; }, isClosed: () => Boolean(page.closed),
+    const page = { id: ++pageSequence, teardownRequests:[], url: () => PRODUCTION_ORIGIN + (page.pathname??'/fixture'),
+      close: async () => { for(const r of page.teardownRequests)context.emit('requestfailed',r);page.closed = true; }, isClosed: () => Boolean(page.closed),
       on: () => {}, goto: async () => respond(page, '/.well-known/locally-release', { type: 'document', status: 204, wrongVersion: options.wrongVersion }),
       locator: () => ({ evaluateAll: async () => {
-        for (const [pathname, spec] of page.responses ?? []) {
-          if (!options.otherContext) {
-            if (options.delayedResponse) setTimeout(() => respond(spec.otherPage ?? page, pathname, spec), 30);
-            else respond(spec.otherPage ?? page, pathname, spec);
-          }
-        }
+        for (const [pathname, spec] of page.responses ?? []) respond(spec.otherPage ?? page, pathname, spec);
         if (options.closeDuringCapture) await page.close();
-        return { required: page.refs, hints: options.hint ? ['/_next/static/hint.js'] : [] };
+        return { refs: [...page.refs, ...(options.hint ? ['/_next/static/hint.js'] : [])], hints: options.hint ? ['/_next/static/hint.js'] : [] };
       } }) };
-    return page;
+    context.emit('page',page);return page;
   };
   const result = await runCandidateBrowserSmoke({ origin: PRODUCTION_ORIGIN, mode: 'override', workerName: PRODUCTION_WORKER, versionId: candidateId }, {
-    readAsset: async () => Buffer.from('fixture-hint'),
+    verifyInteraction:async page=>{
+      if(options.hydrationFailure)throw new CandidateReleaseBlocked('candidate_client_interaction_failed');
+      return {pathname:new URL(page.url()).pathname,opened:!options.ssrOnly,closed:true,interaction:'locale-menu-open-close'};
+    },
+    readAsset: async () => Buffer.from('fixture-static-bytes'),
     fetchImplementation: async (url, init) => {
-      assert.equal(url, PRODUCTION_ORIGIN + '/_next/static/hint.js');
+      const pathname=new URL(url).pathname;probes.push(pathname);
       assert.equal(init.method, 'GET'); assert.equal(init.redirect, 'error'); assert(init.signal);
       assert.equal(init.headers['Cloudflare-Workers-Version-Overrides'], override);
-      if (options.hintIncomplete) return { status:200,redirected:false,arrayBuffer:async()=>{throw Error('private-fixture-body-failure');} };
-      return new Response(options.hintMismatch ? 'wrong-bytes' : 'fixture-hint', {status:options.hintStatus??200});
+      if (options.directIncomplete) return { status:200,redirected:false,arrayBuffer:async()=>{throw Error('private-fixture-body-failure');} };
+      if(options.directRedirect)return {status:200,redirected:true};
+      return new Response(options.directMismatch ? 'wrong-bytes' : 'fixture-static-bytes', {status:options.directStatus??200});
     },
     runSmoke: async (_origin, hooks) => {
-      await hooks.observeContext(context);
+      applyOverride=hooks.versionOverride.onApplied;await hooks.observeContext(context);
       for (const pathname of ['/', '/experiences/42', '/login']) {
-        const page = await context.newPage(); page.refs = ['/_next/static/app.js', '/_next/static/font.woff2', '/_next/static/style.css'];
-        respond(page, pathname, { type: 'document', missingOverride: options.workerMissingOverride });
+        const page = await context.newPage(); page.pathname=pathname;page.refs = ['/_next/static/app.js', '/_next/static/font.woff2', '/_next/static/style.css'];
+        respond(page, pathname, { type: 'document', missingOverride: options.workerMissingOverride, status:options.workerRedirect?302:200 });
         respond(page, '/data', { type: 'fetch' }); respond(page, '/image.svg', { type: 'image' });
-        hooks.versionOverride.onApplied({ pathname, resourceType: 'document', method: 'GET' });
         const otherPage = await context.newPage();
         const specs = page.refs.map((p, index) => [p, { type: ['script', 'font', 'stylesheet'][index], late: Boolean(options.late),
           ...(index === 0 ? options.asset : {}), ...(index === 2 ? options.stylesheet : {}), ...(index === 0 && options.otherPage ? { otherPage } : {}) }]);
@@ -473,76 +483,70 @@ async function captureOrderingFixture(options = {}) {
         if (options.duplicate) specs.push(specs[0]);
         if (options.completedBefore) { for (const [p,s] of specs) respond(page,p,s); page.responses=[]; }
         else page.responses = specs;
-        if (options.retryPage) { // Earlier page's same path must never satisfy the new page.
-          respond(otherPage, '/_next/static/app.js'); await otherPage.close();
-        }
-        await hooks.collectReadOnlyPageEvidence(page); await page.close();
+        await hooks.collectReadOnlyPageEvidence(page);
+        if(options.runtimeError)throw options.runtimeError;
+        if(options.bodyDelayMs)await new Promise(resolve=>setTimeout(resolve,options.bodyDelayMs+10));
+        await page.close();
       }
       const api = await context.newPage(); respond(api, '/api/proxy-bookings', { type: 'document', status: 401 });
       return { status: 'LOCALLY_PRODUCTION_BROWSER_SMOKE_PASS', homepage: 'rendered', login: 'rendered', publicExperience: '/experiences/42',
-        unauthenticatedProxyBookings: 401, blockedUnexpectedWrites: [], blockedUnexpectedExternalWrites: [],
-        pageAttempts: ['/', '/experiences/42', '/login'].map(pathname => ({ pathname, outcome: 'pass', pendingFirstPartyRequests: [], genericErrorPresent: false })) };
+        unauthenticatedProxyBookings: 401, blockedUnexpectedWrites: options.unexpectedWrite?[{method:'POST',pathname:'/api/business'}]:[], blockedUnexpectedExternalWrites: [],
+        pageAttempts: ['/', '/experiences/42', '/login'].map(pathname => ({ pathname, outcome: 'pass', pendingFirstPartyRequests: [], genericErrorPresent: Boolean(options.genericError) })) };
     },
   });
-  assert(!JSON.stringify(result).includes('NEVER_LOG'));
-  return { result, completed };
+  assert(!JSON.stringify(result).includes('NEVER_LOG'));return { result, completed, probes };
 }
 
-test('asset capture ordering: delayed successful response observed during DOM snapshot passes', async () => {
-  const { result, completed } = await captureOrderingFixture({ late: true });
-  assert.equal(result.assetSetMatches, true); assert.equal(completed.length, 9);
+test('header capture ordering remains safe when callbacks arrive during the DOM snapshot',async()=>{
+  for(const options of [{late:true},{completedBefore:true},{late:true,duplicate:true}])assert.equal((await captureOrderingFixture(options)).result.assetSetMatches,true);
 });
-test('asset capture ordering: completed responses, multiple assets and duplicates pass', async () => {
-  for (const options of [{ completedBefore: true }, { late: true, duplicate: true }, { retryPage: true, late: true }]) assert.equal((await captureOrderingFixture(options)).result.assetSetMatches, true);
+test('pending browser bodies beyond 1s PASS with executed client UI and exact direct proofs',async()=>{
+  const start=Date.now();const {result}=await captureOrderingFixture({bodyDelayMs:1200});
+  assert(Date.now()-start>=1200);assert(result.assetEvidence.some(r=>r.browserPending.length>0));
+  assert(result.assetResponses.every(r=>r.bodyComplete&&r.hashMatch));assert.equal(result.clientInteractions.length,2);
 });
-test('asset capture ordering: missing asset and other-page/retry contamination fail', async () => {
-  for (const options of [{ missing: true }, { otherPage: true, late: true }, { missing: true, retryPage: true }, { otherContext: true }])
-    await assert.rejects(captureOrderingFixture(options), blocked('candidate_asset_set_mismatch'));
+test('pending browser requests are diagnostic; DOM-only and other-page resources still require direct integrity',async()=>{
+  for(const options of [{pendingBodies:true},{otherPage:true}]){
+    const {result,probes}=await captureOrderingFixture(options);assert(result.assetSetMatches);assert(probes.includes('/_next/static/app.js'));
+  }
 });
-test('asset capture ordering: 404 and redirects remain hard failures', async () => {
-  for (const asset of [{ status: 404 }, { status: 302 }, { redirected: true }])
-    await assert.rejects(captureOrderingFixture({ late: true, asset }), blocked('candidate_http_or_asset_failure'));
+for(const asset of [{status:404},{status:503},{status:302},{redirected:true}])test(`browser asset safety ${JSON.stringify(asset)} remains hard`,async()=>{
+  await assert.rejects(captureOrderingFixture({asset}),blocked('candidate_http_or_asset_failure'));
 });
-test('asset capture ordering: missing override and wrong identity still fail', async () => {
-  for (const options of [{ late: true, asset: { missingOverride: true } }, { wrongVersion: true }])
-    await assert.rejects(captureOrderingFixture(options), blocked('candidate_identity_unverified'));
+test('requestfailed during live page execution remains hard even with valid direct bytes',async()=>{
+  await assert.rejects(captureOrderingFixture({requestFailure:true}),blocked('candidate_request_failure'));
 });
-test('asset capture ordering: unresolved capture fails within existing one-second bound', async () => {
-  const start = Date.now();
-  await assert.rejects(captureOrderingFixture({ asset: { never: true } }), blocked('candidate_capture_timeout'));
-  assert(Date.now() - start < 2000);
+test('only ERR_ABORTED after explicit page close is teardown; runtime failures cannot hide there',async()=>{
+  const {result}=await captureOrderingFixture({teardownFailure:true,pendingBodies:true});assert.equal(result.requestFailures.length,0);assert(result.intentionalTeardownAborts>0);
+  await assert.rejects(captureOrderingFixture({requestFailure:true}),blocked('candidate_request_failure'));
 });
-test('asset capture ordering: page close before evidence completes fails', async () => {
-  await assert.rejects(captureOrderingFixture({ closeDuringCapture: true, late: true }), blocked('candidate_capture_page_closed'));
+for(const [label,options] of [['404',{directStatus:404}],['5xx',{directStatus:503}],['redirect',{directStatus:302}],['redirect flag',{directRedirect:true}],['hash mismatch',{directMismatch:true}],['incomplete body',{directIncomplete:true}]])test(`all collected static assets: ${label} fails direct integrity`,async()=>{
+  await assert.rejects(captureOrderingFixture(options),blocked('candidate_asset_integrity_failed'));
 });
-
-test('asset capture ordering: incomplete response body remains a hard failure', async () => {
-  await assert.rejects(captureOrderingFixture({ bodyFailure: true }), blocked('candidate_http_or_asset_failure'));
+test('unused hints are included in the complete direct asset proof',async()=>{
+  const {result}=await captureOrderingFixture({hint:true});assert(result.assetRefs.includes('/_next/static/hint.js'));
+  assert(result.resourceHintProofs.some(r=>r.pathname==='/_next/static/hint.js'&&r.hashMatch));
 });
-
-test('required execution: zero response captures at DOM snapshot waits for actual completion within existing deadline',async()=>{
- assert.equal((await captureOrderingFixture({delayedResponse:true})).result.assetSetMatches,true);
+test('missing override and wrong candidate UUID remain hard',async()=>{
+  for(const options of [{asset:{missingOverride:true}},{workerMissingOverride:true},{wrongVersion:true}])await assert.rejects(captureOrderingFixture(options),blocked('candidate_identity_unverified'));
 });
-test('resource hint without a browser request/response is validated by exact override GET and byte hash',async()=>{
- const {result}=await captureOrderingFixture({hint:true});
- assert.equal(result.resourceHintProofs.length,1);assert.equal(result.resourceHintProofs[0].hashMatch,true);
- assert(!result.assetRefs.includes('/_next/static/hint.js'));
- assert(!result.assetResponses.some(x=>x.pathname==='/_next/static/hint.js'));
+test('header identity inspection still has its existing 1s bounded diagnostic drain',async()=>{
+  const start=Date.now();await assert.rejects(captureOrderingFixture({asset:{never:true}}),blocked('candidate_capture_timeout'));assert(Date.now()-start<2000);
 });
-for(const [name,options] of [
- ['hint404',{hintStatus:404}],['hint5xx',{hintStatus:503}],['hint redirect',{hintStatus:302}],
- ['hint byte mismatch',{hintMismatch:true}],['hint incomplete body',{hintIncomplete:true}],
-])test(name+': speculative hint proof still fails closed',async()=>{
- await assert.rejects(captureOrderingFixture({hint:true,...options}),blocked('candidate_resource_hint_proof_failed'));
+test('page close before evidence collection cannot satisfy runtime proof',async()=>{
+  await assert.rejects(captureOrderingFixture({closeDuringCapture:true}),blocked('candidate_capture_page_closed'));
 });
-test('required stylesheet404 remains a hard browser failure',async()=>{
- await assert.rejects(captureOrderingFixture({stylesheet:{status:404}}),blocked('candidate_http_or_asset_failure'));
+test('SSR-only and failed client interaction cannot satisfy hydration proof',async()=>{
+  for(const options of [{ssrOnly:true},{hydrationFailure:true}])await assert.rejects(captureOrderingFixture(options),blocked('candidate_client_interaction_failed'));
 });
-test('required asset5xx remains a hard browser failure',async()=>{
- await assert.rejects(captureOrderingFixture({asset:{status:503}}),blocked('candidate_http_or_asset_failure'));
+test('unexpected business writes remain a hard failure',async()=>{
+  await assert.rejects(captureOrderingFixture({unexpectedWrite:true}),blocked('candidate_hard_failure'));
 });
-test('actual candidate Worker read without override remains a hard identity failure',async()=>{
- await assert.rejects(captureOrderingFixture({workerMissingOverride:true}),blocked('candidate_identity_unverified'));
+for(const category of ['pageerror','first-party runtime console error'])test(`${category}: original browser safety exception is propagated unchanged`,async()=>{
+  const error=new Error(category+' fixture');await assert.rejects(captureOrderingFixture({runtimeError:error}),e=>e===error);
+});
+test('generic error and navigation redirect remain hard failures',async()=>{
+  await assert.rejects(captureOrderingFixture({genericError:true}));await assert.rejects(captureOrderingFixture({workerRedirect:true}),blocked('candidate_http_or_asset_failure'));
 });
 
 
