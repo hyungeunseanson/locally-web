@@ -247,10 +247,11 @@ test('failed post-promotion regression does not automatically repeat promotion o
   await assert.rejects(executeCandidateReleaseContract(makePlan(), actions), blocked('post_deploy_verification_failed')); assert.equal(calls.filter(c => c === 'promote').length, 1);
 });
 
-test('Chromium proves client menu execution and exact asset integrity while slow browser bodies remain pending', { timeout: 25000 }, async () => {
+test('Chromium dismisses the existing inert Home notice, then proves client menu execution and exact asset integrity', { timeout: 25000 }, async () => {
   const received = []; const font = await readFile(new URL('../../app/fonts/Inter/Inter_18pt-Regular.woff2', import.meta.url));
   const javascript = `fetch('/data');fetch('/cdn-cgi/rum',{method:'POST'}).catch(()=>{});
-    document.addEventListener('DOMContentLoaded',()=>{const b=document.querySelector('#globe');b.onclick=()=>{const m=document.querySelector('#language-menu');if(m)m.remove();else{const m=document.createElement('button');m.id='language-menu';m.textContent='English';document.body.append(m);}};});`;
+    document.addEventListener('DOMContentLoaded',()=>{const b=document.querySelector('#globe');b.onclick=()=>{const m=document.querySelector('#language-menu');if(m)m.remove();else{const m=document.createElement('button');m.id='language-menu';m.textContent='English';document.body.append(m);}};
+      const close=document.querySelector('[data-testid="legacy-experience-popup-close"]');if(close){b.setAttribute('inert','');close.onclick=()=>{document.querySelector('[data-testid="legacy-experience-popup-overlay"]').remove();b.removeAttribute('inert');localStorage.setItem('fixture-notice-dismissed','1');};}});`;
   const files = new Map([['/_next/static/app.js',Buffer.from(javascript)],['/_next/static/font.woff2',font],
     ['/_next/static/style.css',Buffer.from('body{color:black}')],['/_next/static/unused.bin',Buffer.from('unused-hint-fixture')],
     ['/_next/static/slow.bin',Buffer.from('pending-static-fixture')]]);
@@ -270,6 +271,7 @@ test('Chromium proves client menu execution and exact asset integrity while slow
       <link rel="preload" href="/_next/static/unused.bin" as="unsupported-fixture-type"><link rel="preload" href="/_next/static/slow.bin" as="fetch" crossorigin>
       <style>@font-face{font-family:fixture;src:url('/_next/static/font.woff2')}body{font-family:fixture}</style>
       <script src="/_next/static/app.js"></script><body><h1>Fixture</h1><button id="globe"><svg class="lucide-globe" width="18" height="18"></svg></button><img src="/image.svg"><a href="/experiences/42">Experience</a>
+      ${pathname === '/' ? '<div data-testid="legacy-experience-popup-overlay" style="position:fixed;inset:0;z-index:170;background:white"><button data-testid="legacy-experience-popup-close">Close notice</button></div>' : ''}
       ${pathname === '/login' ? '<div data-testid="login-modal"><input type="email"><input type="password"></div>' : ''}</body>`);
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve)); const origin = `http://127.0.0.1:${server.address().port}`;
@@ -278,6 +280,7 @@ test('Chromium proves client menu execution and exact asset integrity while slow
     assertFullCandidateSmoke(smoke); assertOverrideIdentity({ versionId: candidateId, smoke, expectedOrigin: origin });
     assert(Object.values(smoke.overrideCoverage).every(Boolean));
     assert.deepEqual(smoke.clientInteractions.map(r=>r.pathname),['/','/experiences/42']);
+    assert.deepEqual(smoke.clientInteractions.map(r=>r.noticeDismissed),[true,false]);
     assert(smoke.assetEvidence.some(r=>r.browserPending.some(p=>p.pathname==='/_next/static/slow.bin')));
     assert(smoke.assetResponses.every(r=>r.hashMatch&&r.bodyComplete&&r.source==='direct-candidate-get'));
     assert(smoke.resourceHintProofs.some(r=>r.pathname==='/_next/static/unused.bin'));

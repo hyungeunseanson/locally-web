@@ -9,6 +9,14 @@ export async function verifyReadOnlyClientInteraction(page) {
   const deadline = Date.now() + 15000;
   const timeout = () => Math.max(1, deadline - Date.now());
   try {
+    // The existing Home notice makes the app shell inert. Use its real close
+    // control first; dismissal is confined to this disposable browser context.
+    const notice = page.getByTestId('legacy-experience-popup-close');
+    const noticeDismissed = await notice.isVisible();
+    if (noticeDismissed) {
+      await notice.click({ timeout: timeout() });
+      await page.getByTestId('legacy-experience-popup-overlay').waitFor({ state: 'hidden', timeout: timeout() });
+    }
     await page.waitForFunction(() => Array.from(document.querySelectorAll('button')).some(button =>
       button.querySelector('svg.lucide-globe') && button.getBoundingClientRect().width > 0
       && (typeof button.onclick === 'function' || Object.keys(button).some(key =>
@@ -19,7 +27,7 @@ export async function verifyReadOnlyClientInteraction(page) {
     await menuItem.waitFor({ state: 'visible', timeout: timeout() });
     await globe.click({ timeout: timeout() });
     await menuItem.waitFor({ state: 'hidden', timeout: timeout() });
-    return { pathname: new URL(page.url()).pathname, interaction: 'locale-menu-open-close', opened: true, closed: true };
+    return { pathname: new URL(page.url()).pathname, interaction: 'locale-menu-open-close', opened: true, closed: true, noticeDismissed };
   } catch { throw new CandidateReleaseBlocked('candidate_client_interaction_failed'); }
 }
 
