@@ -1,5 +1,10 @@
 'use client';
 
+import { EMPTY_CHAT_OPERATIONS, appendChatOperationsFilters, matchesChatOperations } from '@/app/utils/adminChatOperations';
+import { formatPhoneTimestamp } from '@/app/utils/adminChatTime';
+import { useAdminChatSync } from '../hooks/useAdminChatSync';
+import { useConversationNavigation } from '../hooks/useConversationNavigation';
+import { ChatOperationsFiltersControl, ChatSyncStatus, ConversationNavigation, useCopyConversation } from './ChatOperationsControls';
 import type { PhoneRenderedSnapshot } from '@/app/utils/phoneFollowup';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -17,24 +22,13 @@ import { getPhoneAttentionLabel, PHONE_FILTER_LABELS, type PhoneFilter, type Pho
 const PAGE_SIZE = 10;
 const STATUS_LABELS = { PENDING: '대기', IN_PROGRESS: '진행 중', COMPLETED: '완료', CANCELLED: '취소' };
 
-function formatPhoneListTimestamp(value?: string | null) {
-  if (!value) return '';
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-
-  return date.toLocaleString('ko-KR', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-}
-
 export default function PhoneReservationTab({ initialSelectedRequestId = null, active = true }: {
   initialSelectedRequestId?: string | null; active?: boolean;
 }) {
+  const sync = useAdminChatSync(active);
+  const { onSubscription, onSuccess, onFailure } = sync;
+  const [operations, setOperations] = useState(EMPTY_CHAT_OPERATIONS);
+  const { unseen, needsReply, reopened } = operations;
   const attentionStore = useAdminAttention();
   const attention = useAdminAttentionSnapshot();
   const router = useRouter();
@@ -98,21 +92,23 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
       let nextHasMore = false;
       for (let page = 0; page < count; page++) {
         const searchParams = new URLSearchParams({ filter, q: query, offset: String(page * PAGE_SIZE), limit: String(PAGE_SIZE) });
+        appendChatOperationsFilters(searchParams, { unseen, needsReply, reopened });
         const result = await read(`/api/admin/customer-support?${searchParams}`);
         rows.push(...result.data as PhoneWorkspaceRequest[]);
         nextHasMore = result.pagination.hasMore;
         if (!nextHasMore) break;
       }
       if (version !== listVersion.current) return;
+      onSuccess();
       pages.current = count;
       setRequests([...new Map(rows.map(row => [row.id, row])).values()]);
       setHasMore(nextHasMore);
     } catch (err) {
-      if (version === listVersion.current) setError(err instanceof Error ? err.message : '목록 조회 실패');
+      if (version === listVersion.current) { onFailure(); setError(err instanceof Error ? err.message : '목록 조회 실패'); }
     } finally {
       if (version === listVersion.current) setLoading(false);
     }
-  }, [active, filter, query, read]);
+  }, [active, filter, query, read, unseen, needsReply, reopened, onSuccess, onFailure]);
 
   const loadDetail = useCallback(async () => {
     const version = ++detailVersion.current;
@@ -121,16 +117,17 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
     setDetailError('');
     try {
       const result = await read(`/api/admin/customer-support?requestId=${encodeURIComponent(initialSelectedRequestId)}`);
-      if (version === detailVersion.current) setDetail(result.data as PhoneWorkspaceRequest);
+      if (version === detailVersion.current) { onSuccess(); setDetail(result.data as PhoneWorkspaceRequest); }
     } catch (err) {
       if (version === detailVersion.current) {
+        onFailure();
         setDetail(null);
         setDetailError(err instanceof Error ? err.message : '상세 조회 실패');
       }
     } finally {
       if (version === detailVersion.current) setDetailLoading(false);
     }
-  }, [active, initialSelectedRequestId, read]);
+  }, [active, initialSelectedRequestId, read, onSuccess, onFailure]);
 
   useEffect(() => {
     pages.current = 1;
@@ -168,6 +165,7 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
   const refresh = useCallback(() => refreshRef.current(), []);
   useEffect(() => {
     if (!active) return;
+    let stopped = false;
     let timer: ReturnType<typeof setTimeout>;
     const schedule = () => { clearTimeout(timer); timer = setTimeout(refresh, 350); };
     const catchUp = () => { if (!document.hidden) refresh(); };
@@ -181,15 +179,16 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'inquiry_messages' }, payload => {
         if (payload.new.type === 'deleted' && isPhone(payload.new.inquiry_id)) schedule();
-      }).subscribe(status => { if (status === 'SUBSCRIBED') catchUp(); });
+      }).subscribe(status => { if (stopped) return; onSubscription(status); if (status === 'SUBSCRIBED') catchUp(); });
     const fallback = setInterval(catchUp, 300_000);
     window.addEventListener('online', catchUp);
     document.addEventListener('visibilitychange', catchUp);
     return () => {
-      clearTimeout(timer); clearInterval(fallback); void supabase.removeChannel(channel);
+      stopped = true;
+      clearTimeout(timer); clearInterval(fallback); onSubscription('CLOSED'); void supabase.removeChannel(channel);
       window.removeEventListener('online', catchUp); document.removeEventListener('visibilitychange', catchUp);
     };
-  }, [active, refresh, supabase, attentionStore]);
+  }, [active, refresh, supabase, attentionStore, onSubscription]);
 
   const select = (id: string | null) => {
     const next = new URLSearchParams(params.toString());
@@ -198,10 +197,15 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
     if (id) next.set('proxyRequestId', id); else next.delete('proxyRequestId');
     router.push(`/admin/dashboard?${next}`, { scroll: false });
   };
+  const visibleRequests = requests.filter(row => matchesChatOperations({ ...row,
+    admin_unread_count: attention.ready ? attention.conversations[row.linked_inquiry_id ?? '']?.admin_unread_count ?? 0 : row.admin_unread_count,
+  }, operations));
+  const navigation = useConversationNavigation(visibleRequests.map(row => row.id), initialSelectedRequestId, select, active);
   const [paymentDetailsId, setPaymentDetailsId] = useState<string | null>(null);
   const paymentMenuRef = useRef<HTMLElement>(null);
   // Never show the previous customer's conversation while the next detail loads.
   const selected = detail?.id === initialSelectedRequestId ? detail : null;
+  const copy = useCopyConversation(selected?.linked_inquiry_id ?? null, 'phone', selected?.id);
   const attentionLabel = selected ? getPhoneAttentionLabel(selected) : null;
   const completionEligible = Boolean(selected && (selected.status === 'COMPLETED' ? selected.needs_reply
     : selected.payment_status === 'COMPLETED' && ['PENDING', 'IN_PROGRESS'].includes(selected.status)));
@@ -262,6 +266,7 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
         <span className="text-slate-500">{getProxyPaymentStatusLabel(selected)}</span>
         {attentionLabel && <span className="whitespace-nowrap text-amber-700">{attentionLabel}</span>}
       </div>
+      <ConversationNavigation navigation={navigation} />
       <details key={selected.id} className="relative shrink-0" onKeyDown={event => {
         if (event.key === 'Escape') { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); }
       }}>
@@ -269,6 +274,8 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
         <div className="absolute right-0 top-full z-20 mt-2 w-36 rounded-lg border border-slate-200 bg-white p-1 shadow-lg" onClick={event => {
           if ((event.target as HTMLElement).closest('button')) event.currentTarget.closest('details')?.removeAttribute('open');
         }}>
+          {selected.linked_inquiry_id && <><button className="w-full rounded p-2 text-left text-xs hover:bg-slate-50" onClick={() => void copy('id')}>문의 ID 복사</button>
+          <button className="w-full rounded p-2 text-left text-xs hover:bg-slate-50" onClick={() => void copy('link')}>대화 링크 복사</button></>}
           <button className="w-full rounded p-2 text-left text-xs hover:bg-slate-50" onClick={() => setPaymentDetailsId(selected.id)}>결제 상세</button>
           {completionEligible && <button disabled={!canComplete} className="w-full rounded p-2 text-left text-xs hover:bg-slate-50 disabled:opacity-50" onClick={confirmComplete}>처리 완료</button>}
           {manualPayment && <button disabled={updating} className="w-full rounded p-2 text-left text-xs hover:bg-slate-50 disabled:opacity-50" onClick={() => void paymentAction('confirm-payment')}>입금 확인</button>}
@@ -283,14 +290,17 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
     <section className={`${initialSelectedRequestId ? 'hidden md:flex' : 'flex'} min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200`}>
       <div className="space-y-2 border-b border-slate-200 px-3 py-2">
         <div className="flex items-center justify-between"><h2 className="font-bold">전화예약</h2><button data-testid="admin-phone-reservation-refresh-button" disabled={loading} className="text-xs" onClick={refresh}>새로고침</button></div>
+        <ChatSyncStatus sync={sync} />
         <input aria-label="전화예약 검색" value={search} onChange={event => setSearch(event.target.value)} placeholder="고객·업체·요청번호 검색" className="h-[44px] w-full rounded-lg border border-slate-200 px-3 text-sm" />
         <div className="flex flex-wrap gap-1">{Object.entries(PHONE_FILTER_LABELS).map(([key, label]) => <button key={key} aria-pressed={filter === key} onClick={() => setFilter(key as PhoneFilter)} className={`rounded-full border border-slate-200 px-2 py-1 text-xs ${filter === key ? 'bg-slate-900 text-white' : ''}`}>{label}</button>)}</div>
+        <ChatOperationsFiltersControl value={operations} onChange={setOperations} />
+        <p className="text-[9px] text-slate-400">시간 KST · 대화 이동 Alt + ↑ / ↓ · 불러온 목록 기준</p>
       </div>
       <div className="min-h-0 flex-1 overflow-auto" data-testid="admin-phone-reservation-list">
         {error && <p role="alert" className="p-3">{error}</p>}
-        {!loading && !error && !requests.length && <p className="p-4 text-sm text-slate-500">해당하는 전화예약이 없습니다.</p>}
-        {requests.map(row => <button key={row.id} data-testid="admin-phone-reservation-list-item" onClick={() => select(row.id)} className={`w-full space-y-1 border-b border-slate-200 px-3 py-3 text-left ${row.id === initialSelectedRequestId ? 'bg-blue-50' : ''}`}>
-          <p className="flex items-center justify-between gap-2 text-xs text-slate-500"><span className="min-w-0 truncate">{getProxyCategoryLabel(row.category)}</span><span className="flex shrink-0 items-center gap-1.5"><NewConversationBadge unseen={Number(attention.ready ? attention.conversations[row.linked_inquiry_id ?? '']?.admin_unread_count ?? 0 : row.admin_unread_count ?? 0) > 0} /><span>{STATUS_LABELS[row.status]}</span><span className="text-[9px] md:text-[10px] text-slate-400 shrink-0 font-medium whitespace-nowrap leading-4" data-testid="admin-phone-list-timestamp">{formatPhoneListTimestamp(row.latest_created_at)}</span></span></p>
+        {!loading && !error && !visibleRequests.length && <p className="p-4 text-sm text-slate-500">해당하는 전화예약이 없습니다.</p>}
+        {visibleRequests.map(row => <button key={row.id} data-testid="admin-phone-reservation-list-item" onClick={() => select(row.id)} className={`w-full space-y-1 border-b border-slate-200 px-3 py-3 text-left ${row.id === initialSelectedRequestId ? 'bg-blue-50' : ''}`}>
+          <p className="flex items-center justify-between gap-2 text-xs text-slate-500"><span className="min-w-0 truncate">{getProxyCategoryLabel(row.category)}</span><span className="flex shrink-0 items-center gap-1.5"><NewConversationBadge unseen={Number(attention.ready ? attention.conversations[row.linked_inquiry_id ?? '']?.admin_unread_count ?? 0 : row.admin_unread_count ?? 0) > 0} /><span>{STATUS_LABELS[row.status]}</span><span className="text-[9px] md:text-[10px] text-slate-400 shrink-0 font-medium whitespace-nowrap leading-4" data-testid="admin-phone-list-timestamp">{formatPhoneTimestamp(row.latest_created_at)}</span></span></p>
           <p className="flex gap-1 text-sm font-bold"><span className="min-w-0 truncate" title={getProxyRequestTitle(row)}>{getProxyRequestTitle(row)}</span><span className="max-w-[40%] shrink-0 truncate">· {getProxyRequesterDisplayName(row.profiles)}</span></p>
           <p className="flex items-baseline gap-1 text-xs text-slate-500"><span className="shrink-0">{getProxyPaymentStatusLabel(row)}</span><span aria-hidden="true">·</span><span className="min-w-0 truncate">{row.latest_content}</span></p>
           {row.needs_reply && <span className="text-xs font-bold text-blue-700">추가 답장 </span>}

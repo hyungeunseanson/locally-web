@@ -1,5 +1,8 @@
 'use client';
 
+import { EMPTY_CHAT_OPERATIONS, matchesChatOperations } from '@/app/utils/adminChatOperations';
+import { useConversationNavigation } from '../hooks/useConversationNavigation';
+import { ChatOperationsFiltersControl, ChatSyncStatus, ConversationNavigation, ConversationCopyMenu } from './ChatOperationsControls';
 import { PHONE_SNAPSHOT_LIMIT, renderedPhoneMessageId, type PhoneRenderedSnapshot } from '@/app/utils/phoneFollowup';
 
 import React, { useState, useEffect, useMemo, useLayoutEffect, useRef, useCallback } from 'react';
@@ -78,8 +81,10 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
   const router = useRouter();
   const pathname = usePathname();
 
+  const [operations, setOperations] = useState(EMPTY_CHAT_OPERATIONS);
   const [csStatusFilter, setCsStatusFilter] = useState<CSStatusFilter>('ALL');
   const {
+    sync,
     inquiries,
     selectedInquiry,
     messages,
@@ -97,7 +102,7 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
     retryAcknowledgement,
     hasMore,
     loadMore,
-  } = useAdminChatQuery({ view, conversationOnly: phoneMode, enabled, statusFilter: csStatusFilter });
+  } = useAdminChatQuery({ view, conversationOnly: phoneMode, enabled, statusFilter: csStatusFilter, operations });
 
   const { showToast } = useToast();
   const { requestConfirm, ConfirmDialogElement } = useConfirmDialog();
@@ -417,6 +422,8 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
   const filteredInquiries = (inquiries || []).filter((inq) => {
     if (activeTab === 'monitor') return !isAdminSupportInquiry(inq.type);
     if (!isAdminSupportInquiry(inq.type)) return false;
+    const activity = attention.ready ? attention.conversations[String(inq.id)] : null;
+    if (!matchesChatOperations({ ...inq, ...(activity ?? {}), admin_unread_count: attention.ready ? activity?.admin_unread_count ?? 0 : inq.admin_unread_count }, operations)) return false;
     if (csStatusFilter === 'ALL') return true;
     // 상태 미설정(null) 문의는 'open' 필터에도 포함
     if (csStatusFilter === 'open') return !inq.status || inq.status === 'open';
@@ -438,6 +445,8 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
       handleClearSelected();
     }
   }, [activeTab, csStatusFilter, handleClearSelected, selectedInquiry, phoneMode, enabled]);
+
+  const navigation = useConversationNavigation(filteredInquiries.map(row => String(row.id)), selectedInquiryId, handleSelectInquiry, enabled && !phoneMode);
 
   const selectedIsAdminSupport = isAdminSupportInquiry(selectedInquiry?.type);
   const hasWarning = selectedInquiry
@@ -464,6 +473,7 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
             </button>
           </div>
 
+          <ChatSyncStatus sync={sync} />
           {/* CS 상태 필터 (1:1 문의 탭에서만 노출) */}
           {activeTab === 'admin' && (
             <div className="flex gap-1 flex-wrap mt-2">
@@ -482,6 +492,8 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
               ))}
             </div>
           )}
+          {activeTab === 'admin' && <ChatOperationsFiltersControl value={operations} onChange={setOperations} />}
+          <p className="mt-1 text-[9px] text-slate-400">대화 이동 Alt + ↑ / ↓ · 불러온 목록 기준</p>
         </div>
 
         {error && (
@@ -702,6 +714,10 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
             </div>
 
             </>}
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-100 px-3 py-1">
+              <ChatSyncStatus sync={sync} />
+              {!phoneMode && <div className="flex items-center gap-1"><ConversationNavigation navigation={navigation} /><ConversationCopyMenu inquiryId={selectedInquiry.id} view={view} /></div>}
+            </div>
             <div
               className="flex-1 min-h-24 p-3 md:p-6 overflow-y-auto bg-slate-50 space-y-3 md:space-y-4 relative custom-scrollbar"
               ref={scrollRef}

@@ -1,5 +1,7 @@
 const zone = 'Asia/Seoul';
 const time = new Intl.DateTimeFormat('ko-KR', { timeZone: zone, hour: 'numeric', minute: '2-digit', hour12: true });
+const syncTime = new Intl.DateTimeFormat('ko-KR', { timeZone: zone, hour: '2-digit', minute: '2-digit', hour12: false });
+const phoneTime = new Intl.DateTimeFormat('ko-KR', { timeZone: zone, month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
 const fullDate = new Intl.DateTimeFormat('ko-KR', { timeZone: zone, year: 'numeric', month: 'long', day: 'numeric' });
 
 function validDate(value?: string | null) {
@@ -43,4 +45,13 @@ export function formatReplyWait(value?: string | null, now = Date.now()) {
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}시간 ${minutes % 60}분 대기`;
   return `${Math.floor(hours / 24)}일 ${hours % 24}시간 대기`;
+}
+
+export function formatAdminSyncTime(value?: string | null) {
+  const date = validDate(value);
+  return date ? syncTime.format(date) : '';
+}
+export function formatPhoneTimestamp(value?: string | null) {
+  const date = validDate(value);
+  return date ? phoneTime.format(date) : '';
 }
