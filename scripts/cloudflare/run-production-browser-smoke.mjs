@@ -56,6 +56,7 @@ export async function installProductionMutationGate(context, origin, {
   reviewedExternalTelemetry = REVIEWED_EXTERNAL_TELEMETRY,
   reviewedExternalScriptStubs = REVIEWED_EXTERNAL_SCRIPT_STUBS,
   versionOverride,
+  fetchImplementation = fetch,
 } = {}) {
   const productionOrigin = new URL(origin).origin;
   const override = versionOverride === undefined ? null : versionOverrideHeader(versionOverride.workerName, versionOverride.versionId);
@@ -64,6 +65,7 @@ export async function installProductionMutationGate(context, origin, {
   const blockedExpectedExternalWrites = [];
   const blockedUnexpectedExternalWrites = [];
   const stubbedExternalScripts = [];
+  const anonymousReadHeaders = { cookieHeadersStripped: 0, authorizationHeadersStripped: 0 };
 
   await context.route('**/*', async (route) => {
     const request = route.request();
@@ -94,13 +96,36 @@ export async function installProductionMutationGate(context, origin, {
 
     if (READ_METHODS.has(method)) {
       if (override && url.origin === productionOrigin) {
-        if (request.headers().cookie || request.headers().authorization) {
-          blockedUnexpectedWrites.push({ method, pathname: url.pathname, kind: 'candidate_authenticated_read_forbidden' });
-          await route.abort('blockedbyclient'); return;
-        }
-        await route.continue({ headers: { ...request.headers(), 'Cloudflare-Workers-Version-Overrides': override,
-          ...(url.pathname === '/.well-known/locally-release' && ['GET', 'HEAD'].includes(method) ? { 'X-Locally-Release-Probe': '1' } : {}) } });
-        versionOverride.onApplied?.({ pathname: url.pathname, resourceType: request.resourceType(), method });
+        const headers = { ...await request.allHeaders() };
+        const hadCookie = Object.hasOwn(headers, 'cookie');
+        if (hadCookie) anonymousReadHeaders.cookieHeadersStripped += 1;
+        if (Object.hasOwn(headers, 'authorization')) anonymousReadHeaders.authorizationHeadersStripped += 1;
+        delete headers.cookie;
+        delete headers.authorization;
+        delete headers['cloudflare-workers-version-overrides'];
+        delete headers['x-locally-release-probe'];
+        headers['Cloudflare-Workers-Version-Overrides'] = override;
+        if (url.pathname === '/.well-known/locally-release' && ['GET', 'HEAD'].includes(method)) headers['X-Locally-Release-Probe'] = '1';
+        const forwarding = hadCookie ? 'stateless-read' : 'browser-continue';
+        // The optional second argument is an in-memory correlation only. The
+        // serializable receipt deliberately contains no header or cookie values.
+        versionOverride.onApplied?.({ pathname: url.pathname, resourceType: request.resourceType(), method, anonymous: true, forwarding }, request);
+        if (hadCookie) {
+          // Chromium ignores Cookie removal in route.continue, even after its
+          // cookie jar is cleared. Forward only this read with a stateless fetch:
+          // no cookie jar, credentials, redirects or retry. Preserve HTTP errors
+          // and turn transport/body failures into real browser requestfailed.
+          try {
+            const response = await fetchImplementation(request.url(), { method, headers, redirect: 'manual', signal: AbortSignal.timeout(NAVIGATION_TIMEOUT_MS) });
+            const responseHeaders = Object.fromEntries(response.headers);
+            // Fetch decodes compression; let fulfill set the decoded body length.
+            delete responseHeaders['content-encoding'];
+            delete responseHeaders['content-length'];
+            const cookies = response.headers.getSetCookie();
+            if (cookies.length) responseHeaders['set-cookie'] = cookies.join('\n');
+            await route.fulfill({ status: response.status, headers: responseHeaders, body: Buffer.from(await response.arrayBuffer()) });
+          } catch { await route.abort('failed').catch(() => {}); }
+        } else await route.continue({ headers });
       } else {
         if (override && url.origin !== productionOrigin) {
           const headers = { ...request.headers() };
@@ -176,6 +201,7 @@ export async function installProductionMutationGate(context, origin, {
     blockedExpectedExternalWrites,
     blockedUnexpectedExternalWrites,
     stubbedExternalScripts,
+    anonymousReadHeaders,
   };
 }
 
@@ -506,6 +532,7 @@ export async function runProductionBrowserSmoke(
       blockedExpectedExternalWrites,
       blockedUnexpectedExternalWrites,
       stubbedExternalScripts,
+      anonymousReadHeaders: mutationGate.anonymousReadHeaders,
     };
   } catch (error) {
     smokeError = error;

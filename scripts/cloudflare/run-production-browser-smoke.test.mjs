@@ -16,6 +16,64 @@ import {
 
 const runProductionBrowserSmoke = (origin, options) => productionBrowserSmoke(origin, { log: () => {}, ...options });
 
+test('candidate GET/HEAD/OPTIONS strip credentials before injecting override; external reads strip release headers', async () => {
+  let handler;
+  const origin = 'https://www.locally-travel.com';
+  const workerName = 'locally-web-opennext-production';
+  const versionId = '22222222-2222-4222-8222-222222222222';
+  const actions = [];
+  const gate = await installProductionMutationGate({ route: async (_, callback) => { handler = callback; } }, origin, {
+    versionOverride: { workerName, versionId },
+    fetchImplementation: async (_url, options) => { actions.push({action:'read-forward',headers:options.headers}); assert.equal(options.redirect,'manual'); return new Response('fixture'); },
+  });
+  const exercise = async (url, method, headers) => handler({
+    request: () => ({ url: () => url, method: () => method, headers: () => headers, allHeaders: async () => headers, resourceType: () => 'fetch' }),
+    continue: async options => actions.push({ action: 'continue', ...options }),
+    abort: async () => actions.push({ action: 'abort' }),
+    fulfill: async () => {},
+  });
+  for (const method of ['GET', 'HEAD', 'OPTIONS']) {
+    await exercise(origin + '/.well-known/locally-release', method, { cookie: 'COOKIE_SENTINEL_NEVER_LOG', authorization: 'AUTH_SENTINEL_NEVER_LOG', accept: 'text/html' });
+    const { headers } = actions.at(-1);
+    assert.equal(actions.at(-1).action, 'read-forward');
+    assert.equal(Object.hasOwn(headers, 'cookie'), false);
+    assert.equal(Object.hasOwn(headers, 'authorization'), false);
+    assert.equal(headers['Cloudflare-Workers-Version-Overrides'], `${workerName}="${versionId}"`);
+    assert.equal(headers['X-Locally-Release-Probe'], method === 'OPTIONS' ? undefined : '1');
+  }
+  await exercise('https://external.invalid/read', 'GET', { 'cloudflare-workers-version-overrides': 'private', 'x-locally-release-probe': '1', accept: 'text/plain' });
+  assert.deepEqual(actions.at(-1).headers, { accept: 'text/plain' });
+  for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) await exercise(origin + '/api/business', method, {});
+  assert.deepEqual(actions.slice(-4).map(row => row.action), ['abort', 'abort', 'abort', 'abort']);
+  assert.equal(gate.blockedUnexpectedWrites.length, 4);
+  assert.deepEqual(gate.anonymousReadHeaders, { cookieHeadersStripped: 3, authorizationHeadersStripped: 3 });
+  assert(!JSON.stringify({ gate, actions }).includes('SENTINEL_NEVER_LOG'));
+});
+
+test('stateless anonymous reads preserve 404/5xx/redirect status and abort transport/body failures without retries or value logging', async () => {
+  for (const outcome of [404, 503, 302, 'transport', 'body']) {
+    let handler, fetches = 0;
+    const actions = [], receipts = [];
+    const gate = await installProductionMutationGate({ route: async (_, callback) => { handler = callback; } }, 'https://www.locally-travel.com', {
+      versionOverride: { workerName: 'locally-web-opennext-production', versionId: '22222222-2222-4222-8222-222222222222', onApplied: receipt => receipts.push(receipt) },
+      fetchImplementation: async (_url, options) => {
+        fetches++;
+        assert.equal(Object.hasOwn(options.headers,'cookie'),false);
+        assert.equal(Object.hasOwn(options.headers,'authorization'),false);
+        if(outcome==='transport') throw Error('COOKIE_SENTINEL_NEVER_LOG');
+        if(outcome==='body') return {headers:new Headers(),status:200,arrayBuffer:async()=>{throw Error('AUTH_SENTINEL_NEVER_LOG');}};
+        return new Response('fixture', {status:outcome,headers:{'content-encoding':'gzip','content-length':'100'}});
+      },
+    });
+    await handler({request:()=>({url:()=> 'https://www.locally-travel.com/read',method:()=> 'GET',resourceType:()=> 'fetch',allHeaders:async()=>({cookie:'COOKIE_SENTINEL_NEVER_LOG',authorization:'AUTH_SENTINEL_NEVER_LOG'})}),
+      fulfill:async response=>actions.push({status:response.status,headers:response.headers}),abort:async()=>actions.push({aborted:true})});
+    assert.equal(fetches,1);
+    if(typeof outcome==='number'){assert.equal(actions[0].status,outcome);assert.equal(Object.hasOwn(actions[0].headers,'content-encoding'),false);assert.equal(Object.hasOwn(actions[0].headers,'content-length'),false);}
+    else assert.deepEqual(actions,[{aborted:true}]);
+    assert(!JSON.stringify({gate,receipts,actions}).includes('SENTINEL_NEVER_LOG'));
+  }
+});
+
 test('readiness diagnostics discard query, headers, body, credentials and external URLs', () => {
   const event = { type: 'Script', request: { url: 'https://user:password@example.invalid/chunk.js?secret=hidden', method: 'GET', headers: { authorization: 'hidden' }, postData: 'hidden' } };
   assert.deepEqual(safeNetworkRecord(event, 'https://example.invalid'), { pathname: '/chunk.js', type: 'Script', method: 'GET' });
