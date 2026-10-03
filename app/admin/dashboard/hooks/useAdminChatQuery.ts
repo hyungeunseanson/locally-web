@@ -1,5 +1,7 @@
 'use client';
 
+import { appendChatOperationsFilters, EMPTY_CHAT_OPERATIONS, type ChatOperationsFilters } from '@/app/utils/adminChatOperations';
+import { useAdminChatSync } from './useAdminChatSync';
 import type { PhoneReplySnapshot } from '@/app/utils/phoneFollowup';
 
 import { useAdminAttention } from '../components/AdminAttentionProvider';
@@ -147,10 +149,13 @@ function isAdminSendMessageResult(value: unknown): value is AdminSendMessageResu
   );
 }
 
-export function useAdminChatQuery({ view = 'support', conversationOnly = false, enabled = true, statusFilter = 'ALL' }: {
-  view?: 'support' | 'monitor'; conversationOnly?: boolean; enabled?: boolean; statusFilter?: 'ALL' | 'open' | 'in_progress' | 'resolved';
+export function useAdminChatQuery({ view = 'support', conversationOnly = false, enabled = true, statusFilter = 'ALL', operations = EMPTY_CHAT_OPERATIONS }: {
+  operations?: ChatOperationsFilters; view?: 'support' | 'monitor'; conversationOnly?: boolean; enabled?: boolean; statusFilter?: 'ALL' | 'open' | 'in_progress' | 'resolved';
 } = {}) {
   const attention = useAdminAttention();
+  const sync = useAdminChatSync(enabled);
+  const { onSubscription, onSuccess, onFailure } = sync;
+  const { unseen, needsReply, reopened } = operations;
   const [inquiries, setInquiries] = useState<MonitorInquiry[]>([]);
   const [selectedInquiry, setSelectedInquiry] = useState<MonitorInquiry | null>(null);
   const [messages, setMessages] = useState<MonitorMessage[]>([]);
@@ -262,6 +267,7 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
       for (let page = 0; page < requestedPages; page += 1) {
         const params = new URLSearchParams({ view, offset: String(page * 50), limit: '50' });
         if (view === 'support' && statusFilter !== 'ALL') params.set('status', statusFilter);
+        if (view === 'support') appendChatOperationsFilters(params, { unseen, needsReply, reopened });
         const deepLink = new URLSearchParams(window.location.search).get('inquiryId');
         if (deepLink && page === 0) params.set('inquiryId', deepLink);
         const response = await fetch('/api/admin/inquiries' + `?${params.toString()}`, { cache: 'no-store', signal: AbortSignal.timeout(15_000) });
@@ -276,6 +282,7 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
         if (!nextHasMore) break;
       }
       if (requestVersion !== inquiryRequestVersionRef.current) return;
+      onSuccess();
       pagesRef.current = requestedPages;
       setHasMore(nextHasMore);
       const existing = new Map(inquiriesRef.current.map(row => [String(row.id), row]));
@@ -285,6 +292,7 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
       const msg = err instanceof Error ? err.message : '로딩 오류';
       console.error('[AdminChatQuery] fetchInquiries error:', err);
       if (requestVersion === inquiryRequestVersionRef.current) {
+        onFailure();
         setError(msg);
       }
     } finally {
@@ -292,7 +300,7 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
         setIsLoading(false);
       }
     }
-  }, [commitInquiries, getAuthenticatedUser, view, conversationOnly, enabled, statusFilter]);
+  }, [commitInquiries, getAuthenticatedUser, view, conversationOnly, enabled, statusFilter, unseen, needsReply, reopened, onSuccess, onFailure]);
 
   const fetchMessages = useCallback(async (
     inquiryId: number | string,
@@ -336,6 +344,7 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
         return false;
       }
 
+      onSuccess();
       const fetched = (Array.isArray(result.data) ? result.data as MonitorMessage[] : [])
         .filter(row => !deletedMessageIdsRef.current.has(String(row.id)));
       const local = localMessagesRef.current.get(targetId);
@@ -380,6 +389,7 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
         requestVersion === messageRequestVersionRef.current &&
         String(selectedInquiryRef.current?.id ?? '') === targetId
       ) {
+        onFailure();
         if (shouldSelect || messagesRef.current.length === 0) {
           setMessageError('메시지를 불러오지 못했습니다. 다시 시도해주세요.');
         } else {
@@ -395,7 +405,7 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
         setIsMessagesLoading(false);
       }
     }
-  }, [patchInquiry, showToast, conversationOnly, attention]);
+  }, [patchInquiry, showToast, conversationOnly, attention, onSuccess, onFailure]);
 
   useEffect(() => {
     const captured = renderedSnapshotRef.current;
@@ -592,6 +602,8 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
     setMessageError(undefined);
   }, []);
 
+  const fetchInquiriesRef = useRef(fetchInquiries);
+  useEffect(() => { fetchInquiriesRef.current = fetchInquiries; }, [fetchInquiries]);
   const scheduleFetchInquiries = useCallback((delay = 250) => {
     if (fetchInquiriesTimerRef.current) {
       clearTimeout(fetchInquiriesTimerRef.current);
@@ -599,9 +611,9 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
 
     fetchInquiriesTimerRef.current = setTimeout(() => {
       fetchInquiriesTimerRef.current = null;
-      void fetchInquiries(false);
+      void fetchInquiriesRef.current(false);
     }, delay);
-  }, [fetchInquiries]);
+  }, []);
 
   const catchUpRef = useRef<() => void>(() => {});
   useEffect(() => {
@@ -806,6 +818,7 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
       )
       .subscribe(status => {
         if (disposed) return;
+        onSubscription(status);
         realtimeHealthyRef.current = status === 'SUBSCRIBED';
         scheduleFallbackRef.current();
         if (status === 'SUBSCRIBED') catchUpRef.current();
@@ -818,11 +831,13 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
       if (threadTimerRef.current) clearTimeout(threadTimerRef.current);
       disposed = true;
       realtimeHealthyRef.current = false;
+      onSubscription('CLOSED');
       supabase.removeChannel(channel);
     };
-  }, [supabase, currentUser, loadMessages, scheduleFetchInquiries, enabled, conversationOnly, view, attention]);
+  }, [supabase, currentUser, loadMessages, scheduleFetchInquiries, enabled, conversationOnly, view, attention, onSubscription]);
 
   return {
+    sync,
     inquiries,
     selectedInquiry,
     messages,

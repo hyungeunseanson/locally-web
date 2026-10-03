@@ -116,7 +116,8 @@
     "cloudflare:release:production": "node scripts/cloudflare/run-candidate-release.mjs",
     "cloudflare:candidate-release:contract": "node --test scripts/cloudflare/candidate-release-contract.test.mjs scripts/cloudflare/bridge-candidate-compatibility.test.mjs",
     "test:phone-followup": "node --test tests/unit/phone-followup-contract.test.mjs && playwright test -c playwright.phone-workspace.config.ts",
-    "test:phone-followup:native": "node scripts/supabase/test-phone-followup-native.mjs"
+    "test:phone-followup:native": "node scripts/supabase/test-phone-followup-native.mjs",
+    "test:admin-chat:operations": "node --test tests/unit/admin-chat-operations.test.mjs && playwright test -c playwright.admin-chat-operations.config.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

@@ -1,3 +1,4 @@
+import { matchesChatOperations, readChatOperationsFilters } from '@/app/utils/adminChatOperations';
 import { NextResponse } from 'next/server';
 import { createClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
@@ -17,6 +18,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
     }
     const params = new URL(request.url).searchParams;
+    const operations = readChatOperationsFilters(params);
     const requestId = params.get('requestId');
     if (requestId) {
       const { data, error } = await db.from('proxy_requests').select(`${PROXY_SELECT},tid,paid_at,refunded_at`)
@@ -36,7 +38,7 @@ export async function GET(request: Request) {
         .order('created_at', { ascending: false }).order('id', { ascending: false }).range(scan, scan + 99);
       if (error) throw error;
       return enrichPhoneRequests(db, data as ProxyRequest[]);
-    }, row => matchesPhoneFilter(row, filter) && (!q || [row.id, row.locally_order_id, row.profiles?.full_name,
+    }, row => matchesPhoneFilter(row, filter) && matchesChatOperations(row, operations) && (!q || [row.id, row.locally_order_id, row.profiles?.full_name,
       row.profiles?.email, row.form_data.contact_name, row.form_data.reservation_name, getProxyRequestTitle(row)]
       .some(value => String(value || '').toLocaleLowerCase().includes(q))), offset, limit);
     return NextResponse.json({ success: true, ...page }, { headers: { 'Cache-Control': 'no-store' } });
