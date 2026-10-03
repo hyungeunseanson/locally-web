@@ -1,5 +1,6 @@
 'use client';
 
+import AdminChatSearch from './AdminChatSearch';
 import { EMPTY_CHAT_OPERATIONS, appendChatOperationsFilters, matchesChatOperations } from '@/app/utils/adminChatOperations';
 import { formatPhoneTimestamp } from '@/app/utils/adminChatTime';
 import { useAdminChatSync } from '../hooks/useAdminChatSync';
@@ -36,8 +37,6 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
   const { showToast } = useToast();
   const { requestConfirm, ConfirmDialogElement } = useConfirmDialog();
   const [filter, setFilter] = useState<PhoneFilter>('todo');
-  const [search, setSearch] = useState('');
-  const [query, setQuery] = useState('');
   const [requests, setRequests] = useState<PhoneWorkspaceRequest[]>([]);
   const [detail, setDetail] = useState<PhoneWorkspaceRequest | null>(null);
   const [loading, setLoading] = useState(false);
@@ -63,11 +62,6 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
       .flatMap(row => row.linked_inquiry_id ? [String(row.linked_inquiry_id)] : []));
   }, [requests, detail]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setQuery(search.trim()), 250);
-    return () => clearTimeout(timer);
-  }, [search]);
-
   const read = useCallback(async (url: string) => {
     const existing = requestFlights.current.get(url);
     if (existing) return existing;
@@ -91,7 +85,7 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
       const rows: PhoneWorkspaceRequest[] = [];
       let nextHasMore = false;
       for (let page = 0; page < count; page++) {
-        const searchParams = new URLSearchParams({ filter, q: query, offset: String(page * PAGE_SIZE), limit: String(PAGE_SIZE) });
+        const searchParams = new URLSearchParams({ filter, offset: String(page * PAGE_SIZE), limit: String(PAGE_SIZE) });
         appendChatOperationsFilters(searchParams, { unseen, needsReply, reopened });
         const result = await read(`/api/admin/customer-support?${searchParams}`);
         rows.push(...result.data as PhoneWorkspaceRequest[]);
@@ -108,7 +102,7 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
     } finally {
       if (version === listVersion.current) setLoading(false);
     }
-  }, [active, filter, query, read, unseen, needsReply, reopened, onSuccess, onFailure]);
+  }, [active, filter, read, unseen, needsReply, reopened, onSuccess, onFailure]);
 
   const loadDetail = useCallback(async () => {
     const version = ++detailVersion.current;
@@ -291,7 +285,7 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
       <div className="space-y-2 border-b border-slate-200 px-3 py-2">
         <div className="flex items-center justify-between"><h2 className="font-bold">전화예약</h2><button data-testid="admin-phone-reservation-refresh-button" disabled={loading} className="text-xs" onClick={refresh}>새로고침</button></div>
         <ChatSyncStatus sync={sync} />
-        <input aria-label="전화예약 검색" value={search} onChange={event => setSearch(event.target.value)} placeholder="고객·업체·요청번호 검색" className="h-[44px] w-full rounded-lg border border-slate-200 px-3 text-sm" />
+        <AdminChatSearch surface="phone" enabled={active} onSelect={select} />
         <div className="flex flex-wrap gap-1">{Object.entries(PHONE_FILTER_LABELS).map(([key, label]) => <button key={key} aria-pressed={filter === key} onClick={() => setFilter(key as PhoneFilter)} className={`rounded-full border border-slate-200 px-2 py-1 text-xs ${filter === key ? 'bg-slate-900 text-white' : ''}`}>{label}</button>)}</div>
         <ChatOperationsFiltersControl value={operations} onChange={setOperations} />
         <p className="text-[9px] text-slate-400">시간 KST · 대화 이동 Alt + ↑ / ↓ · 불러온 목록 기준</p>
