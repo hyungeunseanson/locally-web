@@ -54,6 +54,8 @@ test.describe('Supabase staging bootstrap contract', () => {
       '20261002024534',
       '20261002024638',
       '20261002075149',
+      '20261003012400',
+      '20261003134417',
     ]);
     expect(manifest.freshProjectApplyOrder).toEqual([
       'supabase/migrations/20260912034545_production_schema_baseline.sql',
@@ -78,26 +80,11 @@ test.describe('Supabase staging bootstrap contract', () => {
     ]);
     expect(manifest.pendingPrivateTables).toBeUndefined();
     expect(manifest.pendingApplicationFunctions).toBeUndefined();
-    expect(manifest.applicationPrivateTables).toEqual(['private.admin_monitor_cutover']);
+    expect(manifest.applicationPrivateTables).toEqual(['private.admin_monitor_cutover', 'private.phone_followup_tasks']);
     expect(manifest.applicationFunctions).toEqual(expect.arrayContaining([
       'ack_admin_inquiry_snapshot', 'get_admin_attention',
     ]));
-    expect(manifest.pendingProductionMigrations).toEqual([
-  {
-    "version": "20261002140902",
-    "name": "phone_followup_tasks",
-    "repositoryFile": "supabase/migrations/20261002140902_phone_followup_tasks.sql",
-    "repositorySha256": "88769a249dca3d7b2f0cbd2dc6a8cf2197960213a357bac71353978a5ae0e396",
-    "status": "prepared_not_applied"
-  },
-  {
-    "version": "20261003122803",
-    "name": "admin_chat_bounded_search",
-    "repositoryFile": "supabase/migrations/20261003122803_admin_chat_bounded_search.sql",
-    "repositorySha256": "0e9776caab4c826924eade21baa229ec73a27857d9c1c9bb75a97b25b1b31724",
-    "status": "prepared_not_applied"
-  }
-]);
+    expect(manifest.pendingProductionMigrations).toEqual([]);
     expect(packageJson.scripts['supabase:staging:baseline:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:current:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:contract']).toBeTruthy();
@@ -184,7 +171,7 @@ test.describe('Supabase staging bootstrap contract', () => {
   });
 
   test('preserves actual applied ledger versions and unchanged repository SQL bytes', () => {
-    expect(currentManifest.migrationLedger.slice(-3)).toEqual([
+    expect(currentManifest.migrationLedger.slice(14,17)).toEqual([
       {
         version: '20261002024534', name: 'admin_message_monitoring_phase_1',
         repositoryVersion: '20261001170718',
@@ -209,6 +196,28 @@ test.describe('Supabase staging bootstrap contract', () => {
     ]);
     expect(currentManifest.schemaContractVersion).toBe(5);
     expect(manifest.schemaContractVersion).toBe(5);
+    expect(currentManifest.migrationLedger.slice(-2)).toEqual([
+      {
+        version: '20261003012400', name: 'phone_followup_tasks', repositoryVersion: '20261002140902',
+        repositoryFile: 'supabase/migrations/20261002140902_phone_followup_tasks.sql',
+        repositorySha256: '88769a249dca3d7b2f0cbd2dc6a8cf2197960213a357bac71353978a5ae0e396',
+        ledgerStatementsSha256: '88769a249dca3d7b2f0cbd2dc6a8cf2197960213a357bac71353978a5ae0e396',
+      },
+      {
+        version: '20261003134417', name: 'admin_chat_bounded_search', repositoryVersion: '20261003122803',
+        repositoryFile: 'supabase/migrations/20261003122803_admin_chat_bounded_search.sql',
+        repositorySha256: '0e9776caab4c826924eade21baa229ec73a27857d9c1c9bb75a97b25b1b31724',
+        ledgerStatementsSha256: '0e9776caab4c826924eade21baa229ec73a27857d9c1c9bb75a97b25b1b31724',
+      },
+    ]);
+    expect(currentContract).toContain('$phone_search_ledger_contract$');
+    expect(currentManifest.adminChatSearch).toMatchObject({
+      minimumQueryLength: 2, resultLimit: 25, lockTimeout: '2s', publicRpcExecuteRoles: ['service_role'],
+      helperExecuteRoles: ['anon', 'authenticated', 'service_role'],
+    });
+    expect(currentManifest.adminChatSearch.functions.every((fn: { securityDefiner: boolean }) => !fn.securityDefiner)).toBe(true);
+    expect(currentManifest.adminChatSearch.indexes).toHaveLength(12);
+    expect(currentManifest.phoneFollowup.directTableRoles).toEqual([]);
   });
 
   test('rejects chat schema, grants, function and applied-ledger drift in local PostgreSQL', () => {
@@ -217,7 +226,7 @@ test.describe('Supabase staging bootstrap contract', () => {
     });
     expect(result.status, `${result.stdout}${result.stderr}`).toBe(0);
     expect(result.stdout).toContain('CURRENT_STATE_CATALOG_DRIFT_TEST_PASS');
-    expect(result.stdout).toContain('"driftChecks":30');
+    expect(result.stdout).toContain('"driftChecks":39');
     expect(result.stdout).toContain('"productionMutation":0');
   });
 
@@ -329,19 +338,25 @@ test.describe('Supabase staging bootstrap contract', () => {
     expect(currentManifest.objects.publicViews).toHaveLength(2);
     expect(currentManifest.objects.publicTableColumns).toBe(517);
     expect(currentManifest.objects.publicViewColumns).toBe(27);
-    expect(currentManifest.objects.functionOverloads).toHaveLength(60);
+    expect(currentManifest.objects.functionOverloads).toHaveLength(64);
     expect(currentManifest.objects.privateFunctionOverloads).toEqual([
-      'private.advance_support_version()',
-      'private.is_admin_reader()',
-      'private.is_inquiry_admin_sender(p_sender uuid)',
-      'private.prepare_support_message()'
+      "private.admin_chat_phone_title(category text, form_data jsonb)",
+      "private.adopt_phone_followup_link()",
+      "private.advance_support_version()",
+      "private.capture_phone_followup()",
+      "private.delete_pending_phone_followup()",
+      "private.handle_phone_followup(p_request uuid, p_inquiry bigint, p_ids bigint[], p_admin uuid, p_complete boolean)",
+      "private.has_phone_followup(p_request uuid)",
+      "private.is_admin_reader()",
+      "private.is_inquiry_admin_sender(p_sender uuid)",
+      "private.prepare_support_message()"
     ]);
-    expect(currentManifest.objects.applicationTriggers).toHaveLength(14);
-    expect(currentManifest.objects.indexes).toBe(120);
-    expect(currentManifest.objects.privateTables).toEqual(['admin_monitor_cutover']);
-    expect(currentManifest.objects.privateTableColumns).toBe(4);
-    expect(currentManifest.objects.privateIndexes).toBe(1);
-    expect(currentManifest.objects.privateConstraints).toBe(4);
+    expect(currentManifest.objects.applicationTriggers).toHaveLength(17);
+    expect(currentManifest.objects.indexes).toBe(133);
+    expect(currentManifest.objects.privateTables).toEqual(['admin_monitor_cutover', 'phone_followup_tasks']);
+    expect(currentManifest.objects.privateTableColumns).toBe(9);
+    expect(currentManifest.objects.privateIndexes).toBe(4);
+    expect(currentManifest.objects.privateConstraints).toBe(8);
     expect(currentManifest.objects.constraints).toEqual({
       total: 180,
       primaryKey: 39,
@@ -362,7 +377,7 @@ test.describe('Supabase staging bootstrap contract', () => {
       storagePolicies: '898e8b7f917fd0f4530ef30c9b61961e',
       publicRlsPolicies: 'e5a16a4215c569060fbf895453a5cd00',
       publicRelationGrants: 'a9c644ba2ab5c795f29aff57092aa002',
-      privateRelationGrants: 'c0c83ee9ce880c47d3d24f3f918b4364',
+      privateRelationGrants: '4c987b9bd1b8fdc56ed01bca38365c7d',
       stagingOverlayBaselineStoragePolicies: 'd6b381fd629405acfdd615593031de5c',
     });
     for (const fingerprint of [

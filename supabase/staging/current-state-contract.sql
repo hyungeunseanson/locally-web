@@ -1,6 +1,7 @@
 \set ON_ERROR_STOP on
 
 BEGIN READ ONLY;
+SET LOCAL search_path = public, extensions;
 
 DO $current_state_contract$
 DECLARE
@@ -33,7 +34,9 @@ BEGIN
     '20260930022348:move_is_admin_reader_to_private_schema',
     '20261002024534:admin_message_monitoring_phase_1',
     '20261002024638:admin_message_monitoring_historical_reinquiry',
-    '20261002075149:admin_attention_badges_phase_2'
+    '20261002075149:admin_attention_badges_phase_2',
+    '20261003012400:phone_followup_tasks',
+    '20261003134417:admin_chat_bounded_search'
   ]::text[];
   IF actual IS DISTINCT FROM expected THEN
     RAISE EXCEPTION 'migration ledger mismatch: %', actual;
@@ -114,6 +117,7 @@ BEGIN
     'public.claim_experience_payment_atomic(p_booking_id text, p_user_id uuid, p_provider text, p_provider_reference text)',
     'public.complete_admin_manual_experience_payout_atomic(p_request_key uuid, p_host_id uuid, p_settlement_type text, p_expected_current_booking_amount integer, p_legacy_amount integer, p_reason text, p_legacy_source_reference text, p_transfer_reference text, p_paid_by_admin_id uuid, p_paid_by_admin_email text)',
     'public.complete_experience_booking_if_due_atomic(p_booking_id text)',
+    'public.complete_phone_request(p_request_id uuid, p_inquiry_id bigint, p_message_ids bigint[], p_admin_id uuid)',
     'public.complete_service_booking_if_due_atomic(p_booking_id text)',
     'public.complete_service_concierge_booking_if_due_atomic(p_booking_id text)',
     'public.confirm_experience_bank_payment_atomic(p_booking_id text)',
@@ -133,6 +137,7 @@ BEGIN
     'public.finish_service_refund_operation_atomic(p_operation_id uuid, p_outcome text, p_provider_reference text, p_error_message text)',
     'public.get_admin_attention(p_inquiry_ids bigint[])',
     'public.get_admin_inquiry_activity(p_inquiry_ids bigint[])',
+    'public.get_admin_phone_activity(p_inquiry_ids bigint[])',
     'public.get_experience_completion_due_backlog()',
     'public.get_ops_anomaly_snapshot(p_observed_at timestamp with time zone, p_claim_overdue_minutes integer, p_refund_stale_minutes integer, p_payout_long_hold_days integer, p_experience_job_missing_minutes integer, p_service_job_missing_minutes integer, p_cancel_pending_job_missing_minutes integer)',
     'public.guard_experience_payment_claim_columns()',
@@ -151,7 +156,9 @@ BEGIN
     'public.record_translation_provider_outcome(p_provider text, p_token_count integer, p_cooldown_seconds integer, p_hit_quota boolean)',
     'public.record_translation_provider_outcome(p_provider text, p_token_count integer, p_cooldown_seconds integer, p_hit_quota boolean, p_reserved_token_count integer)',
     'public.refresh_experience_popularity_snapshot()',
+    'public.reply_phone_request(p_request_id uuid, p_inquiry_id bigint, p_message_ids bigint[], p_admin_id uuid, p_content text, p_type text, p_image_url text)',
     'public.request_service_cancellation_review_atomic(p_actor_id uuid, p_order_id text, p_cancel_reason text)',
+    'public.search_admin_chat(p_surface text, p_query text)',
     'public.select_service_host_atomic(p_customer_id uuid, p_request_id uuid, p_application_id uuid)',
     'public.set_proxy_comments_updated_at()',
     'public.set_proxy_requests_updated_at()',
@@ -175,7 +182,13 @@ BEGIN
     JOIN pg_namespace AS namespace_def ON namespace_def.oid = procedure_def.pronamespace
    WHERE namespace_def.nspname = 'private';
   IF actual IS DISTINCT FROM ARRAY[
+    'private.admin_chat_phone_title(category text, form_data jsonb)',
+    'private.adopt_phone_followup_link()',
     'private.advance_support_version()',
+    'private.capture_phone_followup()',
+    'private.delete_pending_phone_followup()',
+    'private.handle_phone_followup(p_request uuid, p_inquiry bigint, p_ids bigint[], p_admin uuid, p_complete boolean)',
+    'private.has_phone_followup(p_request uuid)',
     'private.is_admin_reader()',
     'private.is_inquiry_admin_sender(p_sender uuid)',
     'private.prepare_support_message()'
@@ -237,7 +250,10 @@ BEGIN
     'public.community_likes.on_like_removed',
     'public.inquiries.inquiry_support_version',
     'public.inquiry_messages.inquiry_support_message',
+    'public.inquiry_messages.phone_followup_capture',
+    'public.inquiry_messages.phone_followup_delete',
     'public.proxy_comments.trg_pc_updated_at',
+    'public.proxy_requests.phone_followup_link',
     'public.proxy_requests.trg_pr_updated_at',
     'public.service_applications.trg_sa_updated_at',
     'public.service_bookings.trg_sb_updated_at',
@@ -248,8 +264,8 @@ BEGIN
   END IF;
 
   SELECT count(*) INTO actual_count FROM pg_indexes WHERE schemaname = 'public';
-  IF actual_count <> 120 THEN
-    RAISE EXCEPTION 'public index count %, expected 120', actual_count;
+  IF actual_count <> 133 THEN
+    RAISE EXCEPTION 'public index count %, expected 133', actual_count;
   END IF;
   IF to_regclass('public.uq_notifications_review_request_reminder_booking_id') IS NULL
     OR to_regclass('public.uq_notifications_guest_review_request_reminder_booking_id') IS NULL
@@ -910,7 +926,7 @@ BEGIN
   IF to_regprocedure('private.prepare_support_message()') IS NULL
     OR to_regprocedure('private.advance_support_version()') IS NULL THEN RAISE EXCEPTION 'Missing Phase 1 safety functions'; END IF;
   SELECT array_agg(relname::text ORDER BY relname) INTO actual FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-    WHERE n.nspname = 'private' AND relkind IN ('r','p');
+    WHERE n.nspname = 'private' AND relkind IN ('r','p') AND c.relname <> 'phone_followup_tasks';
   IF actual IS DISTINCT FROM ARRAY['admin_monitor_cutover']::text[] THEN RAISE EXCEPTION 'Private table inventory mismatch'; END IF;
   IF EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'private') THEN RAISE EXCEPTION 'Private cutover policy exists'; END IF;
   SELECT array_agg(column_name || '|' || data_type || '|' || is_nullable || '|' || coalesce(column_default,'') ORDER BY ordinal_position)
@@ -933,7 +949,7 @@ BEGIN
     CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END || '|' || a.privilege_type || '|' || a.is_grantable::text,
     E'\n' ORDER BY n.nspname,c.relname,c.relkind::text,CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END,a.privilege_type,a.is_grantable))
     INTO fingerprint FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-    CROSS JOIN LATERAL aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE n.nspname = 'private' AND c.relkind IN ('r','p','v','m','f');
+    CROSS JOIN LATERAL aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE n.nspname = 'private' AND c.relkind IN ('r','p','v','m','f') AND c.relname <> 'phone_followup_tasks';
   IF fingerprint IS DISTINCT FROM 'c0c83ee9ce880c47d3d24f3f918b4364' THEN RAISE EXCEPTION 'Private relation grant fingerprint mismatch'; END IF;
 END $admin_attention_contract$;
 
@@ -946,6 +962,179 @@ BEGIN
     RAISE EXCEPTION 'Production cutover marker mismatch';
   END IF;
 END $admin_attention_production_marker$;
+
+-- Applied Phone schema: catalog/security only; no historical task rows are asserted.
+DO $phone_search_ledger_contract$
+DECLARE actual text[];
+BEGIN
+  SELECT array_agg(version||':'||name||':'||cardinality(statements)||':'||md5(statements[1])||':'||encode(sha256(convert_to(statements[1],'UTF8')),'hex') ORDER BY version)
+    INTO actual FROM supabase_migrations.schema_migrations WHERE version IN ('20261003012400','20261003134417');
+  IF actual IS DISTINCT FROM ARRAY[
+    '20261003012400:phone_followup_tasks:1:6146c5011c4b1644e96a917f0a4f907c:88769a249dca3d7b2f0cbd2dc6a8cf2197960213a357bac71353978a5ae0e396',
+    '20261003134417:admin_chat_bounded_search:1:e70e0d43d008331211f614635d9e629d:0e9776caab4c826924eade21baa229ec73a27857d9c1c9bb75a97b25b1b31724'
+  ]::text[] THEN
+    RAISE EXCEPTION 'Phone/search applied ledger SQL mapping mismatch: %',actual;
+  END IF;
+END $phone_search_ledger_contract$;
+
+DO $phone_followup_catalog_contract$
+DECLARE actual text[]; role_name text; fingerprint text;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_class WHERE oid=to_regclass('private.phone_followup_tasks')
+    AND relkind='r' AND relrowsecurity AND NOT relforcerowsecurity
+    AND pg_get_userbyid(relowner)='postgres' AND relacl::text='{postgres=arwdDxtm/postgres}')
+    OR EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='private' AND tablename='phone_followup_tasks') THEN
+    RAISE EXCEPTION 'Phone task table security mismatch';
+  END IF;
+  FOREACH role_name IN ARRAY ARRAY['anon','authenticated','service_role'] LOOP
+    IF has_table_privilege(role_name,'private.phone_followup_tasks','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+      OR has_any_column_privilege(role_name,'private.phone_followup_tasks','SELECT,INSERT,UPDATE,REFERENCES') THEN
+      RAISE EXCEPTION 'Direct Phone task access: %',role_name;
+    END IF;
+  END LOOP;
+  SELECT array_agg(column_name||'|'||data_type||'|'||is_nullable||'|'||coalesce(column_default,'') ORDER BY ordinal_position)
+    INTO actual FROM information_schema.columns WHERE table_schema='private' AND table_name='phone_followup_tasks';
+  IF actual IS DISTINCT FROM ARRAY[
+    'proxy_request_id|uuid|NO|',
+    'inquiry_id|bigint|NO|',
+    'message_id|bigint|NO|',
+    'handled_at|timestamp with time zone|YES|',
+    'handled_by|uuid|YES|'
+  ]::text[] THEN
+    RAISE EXCEPTION 'Phone task column contract mismatch';
+  END IF;
+  SELECT array_agg(conname||'|'||contype::text||'|'||pg_get_constraintdef(oid) ORDER BY conname) INTO actual
+    FROM pg_constraint WHERE conrelid='private.phone_followup_tasks'::regclass;
+  IF actual IS DISTINCT FROM ARRAY[
+    'phone_followup_tasks_check|c|CHECK (((handled_at IS NULL) = (handled_by IS NULL)))',
+    'phone_followup_tasks_inquiry_id_message_id_key|u|UNIQUE (inquiry_id, message_id)',
+    'phone_followup_tasks_pkey|p|PRIMARY KEY (proxy_request_id, message_id)',
+    'phone_followup_tasks_proxy_request_id_fkey|f|FOREIGN KEY (proxy_request_id) REFERENCES proxy_requests(id) ON DELETE CASCADE'
+  ]::text[] THEN
+    RAISE EXCEPTION 'Phone task constraint contract mismatch';
+  END IF;
+  SELECT array_agg(n.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')|' ||
+    pg_get_userbyid(p.proowner) || '|' || p.prosecdef::text || '|' || p.provolatile::text || '|' ||
+    pg_get_function_result(p.oid) || '|' || array_to_string(p.proconfig, ',') || '|' || p.proacl::text || '|' || md5(p.prosrc)
+    ORDER BY n.nspname,p.proname,pg_get_function_identity_arguments(p.oid)) INTO actual
+    FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+    WHERE n.nspname IN ('public','private') AND p.proname = ANY (ARRAY[
+    'adopt_phone_followup_link',
+    'capture_phone_followup',
+    'delete_pending_phone_followup',
+    'handle_phone_followup',
+    'has_phone_followup',
+    'complete_phone_request',
+    'get_admin_phone_activity',
+    'reply_phone_request'
+  ]::text[]);
+  IF actual IS DISTINCT FROM ARRAY[
+    'private.adopt_phone_followup_link()|postgres|true|v|trigger|search_path=""|{postgres=X/postgres}|0f0846bd82740f86bf756a4d3efdb62a',
+    'private.capture_phone_followup()|postgres|true|v|trigger|search_path=""|{postgres=X/postgres}|8b14875d99f0233491ba8eb1b3529db4',
+    'private.delete_pending_phone_followup()|postgres|true|v|trigger|search_path=""|{postgres=X/postgres}|12ce85f818fcfb042d310e682099ed80',
+    'private.handle_phone_followup(p_request uuid, p_inquiry bigint, p_ids bigint[], p_admin uuid, p_complete boolean)|postgres|true|v|jsonb|search_path=""|{postgres=X/postgres}|ad6dfa357618613a3e720bb88ab910ed',
+    'private.has_phone_followup(p_request uuid)|postgres|true|s|boolean|search_path=""|{postgres=X/postgres}|406db886025fdbc9a246fb2b7f2de399',
+    'public.complete_phone_request(p_request_id uuid, p_inquiry_id bigint, p_message_ids bigint[], p_admin_id uuid)|postgres|true|v|jsonb|search_path=""|{postgres=X/postgres,service_role=X/postgres}|508e40c27519c58cef86371ca083428d',
+    'public.get_admin_phone_activity(p_inquiry_ids bigint[])|postgres|true|s|TABLE(inquiry_id bigint, status text, updated_at timestamp with time zone, last_message_at timestamp with time zone, last_sender_role text, last_message_content text, needs_reply boolean, reply_waiting_since timestamp with time zone, support_reopened_at timestamp with time zone, admin_unread_count bigint, phone_needs_reply boolean)|search_path=""|{postgres=X/postgres,service_role=X/postgres}|f8c71d91ff642c0be0844befecc74d80',
+    'public.reply_phone_request(p_request_id uuid, p_inquiry_id bigint, p_message_ids bigint[], p_admin_id uuid, p_content text, p_type text, p_image_url text)|postgres|true|v|jsonb|search_path=""|{postgres=X/postgres,service_role=X/postgres}|a3642483ffa73c83cfb9f7273e76c81a'
+  ]::text[] THEN
+    RAISE EXCEPTION 'Applied Phone/search function body or ACL mismatch: %', actual;
+  END IF;
+  SELECT array_agg(n.nspname || '.' || c.relname || '|' || pg_get_indexdef(c.oid) ORDER BY n.nspname,c.relname)
+    INTO actual FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_index i ON i.indexrelid=c.oid
+    WHERE n.nspname IN ('public','private') AND c.relname = ANY (ARRAY[
+    'phone_followup_pending_idx',
+    'phone_followup_tasks_inquiry_id_message_id_key',
+    'phone_followup_tasks_pkey',
+    'proxy_requests_phone_link_idx'
+  ]::text[]) AND i.indisvalid AND i.indisready;
+  IF actual IS DISTINCT FROM ARRAY[
+    'private.phone_followup_pending_idx|CREATE INDEX phone_followup_pending_idx ON private.phone_followup_tasks USING btree (proxy_request_id, message_id) WHERE (handled_at IS NULL)',
+    'private.phone_followup_tasks_inquiry_id_message_id_key|CREATE UNIQUE INDEX phone_followup_tasks_inquiry_id_message_id_key ON private.phone_followup_tasks USING btree (inquiry_id, message_id)',
+    'private.phone_followup_tasks_pkey|CREATE UNIQUE INDEX phone_followup_tasks_pkey ON private.phone_followup_tasks USING btree (proxy_request_id, message_id)',
+    'public.proxy_requests_phone_link_idx|CREATE INDEX proxy_requests_phone_link_idx ON public.proxy_requests USING btree (btrim((form_data ->> ''linked_inquiry_id''::text))) WHERE ((form_data ->> ''__proxy_card_anchor''::text) IS DISTINCT FROM ''v1''::text)'
+  ]::text[] THEN
+    RAISE EXCEPTION 'Applied Phone/search index contract mismatch: %', actual;
+  END IF;
+  SELECT array_agg(c.relname||'|'||t.tgname||'|'||pg_get_triggerdef(t.oid) ORDER BY c.relname,t.tgname) INTO actual
+    FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid WHERE NOT t.tgisinternal
+    AND t.tgname IN ('phone_followup_capture','phone_followup_delete','phone_followup_link') AND t.tgenabled='O';
+  IF actual IS DISTINCT FROM ARRAY[
+    'inquiry_messages|phone_followup_capture|CREATE TRIGGER phone_followup_capture AFTER INSERT ON public.inquiry_messages FOR EACH ROW EXECUTE FUNCTION private.capture_phone_followup()',
+    'inquiry_messages|phone_followup_delete|CREATE TRIGGER phone_followup_delete AFTER DELETE OR UPDATE OF type ON public.inquiry_messages FOR EACH ROW EXECUTE FUNCTION private.delete_pending_phone_followup()',
+    'proxy_requests|phone_followup_link|CREATE TRIGGER phone_followup_link AFTER INSERT OR UPDATE OF form_data, user_id ON public.proxy_requests FOR EACH ROW EXECUTE FUNCTION private.adopt_phone_followup_link()'
+  ]::text[] THEN
+    RAISE EXCEPTION 'Phone task trigger contract mismatch';
+  END IF;
+  SELECT md5(string_agg(n.nspname||'|'||c.relname||'|'||c.relkind::text||'|'||
+    CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END||'|'||a.privilege_type||'|'||a.is_grantable::text,
+    E'\n' ORDER BY n.nspname,c.relname,c.relkind::text,CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END,a.privilege_type,a.is_grantable))
+    INTO fingerprint FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+    CROSS JOIN LATERAL aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE n.nspname='private' AND c.relkind IN ('r','p','v','m','f');
+  IF fingerprint IS DISTINCT FROM '4c987b9bd1b8fdc56ed01bca38365c7d' THEN RAISE EXCEPTION 'Private relation grant fingerprint mismatch'; END IF;
+END $phone_followup_catalog_contract$;
+
+DO $admin_chat_search_contract$
+DECLARE actual text[];
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_extension e JOIN pg_namespace n ON n.oid=e.extnamespace
+    WHERE e.extname='pg_trgm' AND e.extversion='1.6' AND n.nspname='extensions') THEN
+    RAISE EXCEPTION 'Search extension contract mismatch';
+  END IF;
+  SELECT array_agg(n.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')|' ||
+    pg_get_userbyid(p.proowner) || '|' || p.prosecdef::text || '|' || p.provolatile::text || '|' ||
+    pg_get_function_result(p.oid) || '|' || array_to_string(p.proconfig, ',') || '|' || p.proacl::text || '|' || md5(p.prosrc)
+    ORDER BY n.nspname,p.proname,pg_get_function_identity_arguments(p.oid)) INTO actual
+    FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+    WHERE n.nspname IN ('public','private') AND p.proname = ANY (ARRAY[
+    'search_admin_chat',
+    'admin_chat_phone_title'
+  ]::text[]);
+  IF actual IS DISTINCT FROM ARRAY[
+    'private.admin_chat_phone_title(category text, form_data jsonb)|postgres|false|i|text|search_path=""|{postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}|748c55d7ba0447eadf460de422f96c6c',
+    'public.search_admin_chat(p_surface text, p_query text)|postgres|false|s|TABLE(id text, customer_name text, customer_email text, title text)|search_path=""|{postgres=X/postgres,service_role=X/postgres}|aa39a4e250b5cb71b26ad7340f2e7166'
+  ]::text[] THEN
+    RAISE EXCEPTION 'Applied Phone/search function body or ACL mismatch: %', actual;
+  END IF;
+  SELECT array_agg(n.nspname || '.' || c.relname || '|' || pg_get_indexdef(c.oid) ORDER BY n.nspname,c.relname)
+    INTO actual FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_index i ON i.indexrelid=c.oid
+    WHERE n.nspname IN ('public','private') AND c.relname = ANY (ARRAY[
+    'admin_chat_experience_title_search',
+    'admin_chat_inquiry_customer',
+    'admin_chat_inquiry_experience',
+    'admin_chat_inquiry_id_search',
+    'admin_chat_phone_contact_search',
+    'admin_chat_phone_id_search',
+    'admin_chat_phone_link',
+    'admin_chat_phone_order_search',
+    'admin_chat_phone_reservation_search',
+    'admin_chat_phone_title_search',
+    'admin_chat_profile_email_search',
+    'admin_chat_profile_name_search'
+  ]::text[]) AND i.indisvalid AND i.indisready;
+  IF actual IS DISTINCT FROM ARRAY[
+    'public.admin_chat_experience_title_search|CREATE INDEX admin_chat_experience_title_search ON public.experiences USING gin (title gin_trgm_ops)',
+    'public.admin_chat_inquiry_customer|CREATE INDEX admin_chat_inquiry_customer ON public.inquiries USING btree (user_id) WHERE (type = ANY (ARRAY[''admin''::text, ''admin_support''::text]))',
+    'public.admin_chat_inquiry_experience|CREATE INDEX admin_chat_inquiry_experience ON public.inquiries USING btree (experience_id) WHERE (type = ANY (ARRAY[''admin''::text, ''admin_support''::text]))',
+    'public.admin_chat_inquiry_id_search|CREATE INDEX admin_chat_inquiry_id_search ON public.inquiries USING gin (((id)::text) gin_trgm_ops) WHERE (type = ANY (ARRAY[''admin''::text, ''admin_support''::text]))',
+    'public.admin_chat_phone_contact_search|CREATE INDEX admin_chat_phone_contact_search ON public.proxy_requests USING gin (((form_data ->> ''contact_name''::text)) gin_trgm_ops)',
+    'public.admin_chat_phone_id_search|CREATE INDEX admin_chat_phone_id_search ON public.proxy_requests USING gin (((id)::text) gin_trgm_ops)',
+    'public.admin_chat_phone_link|CREATE INDEX admin_chat_phone_link ON public.proxy_requests USING btree (((form_data ->> ''linked_inquiry_id''::text))) WHERE ((form_data ->> ''__proxy_card_anchor''::text) IS DISTINCT FROM ''v1''::text)',
+    'public.admin_chat_phone_order_search|CREATE INDEX admin_chat_phone_order_search ON public.proxy_requests USING gin (locally_order_id gin_trgm_ops)',
+    'public.admin_chat_phone_reservation_search|CREATE INDEX admin_chat_phone_reservation_search ON public.proxy_requests USING gin (((form_data ->> ''reservation_name''::text)) gin_trgm_ops)',
+    'public.admin_chat_phone_title_search|CREATE INDEX admin_chat_phone_title_search ON public.proxy_requests USING gin (private.admin_chat_phone_title(category, form_data) gin_trgm_ops)',
+    'public.admin_chat_profile_email_search|CREATE INDEX admin_chat_profile_email_search ON public.profiles USING gin (email gin_trgm_ops)',
+    'public.admin_chat_profile_name_search|CREATE INDEX admin_chat_profile_name_search ON public.profiles USING gin (full_name gin_trgm_ops)'
+  ]::text[] THEN
+    RAISE EXCEPTION 'Applied Phone/search index contract mismatch: %', actual;
+  END IF;
+  IF has_function_privilege('anon','public.search_admin_chat(text,text)','EXECUTE')
+    OR has_function_privilege('authenticated','public.search_admin_chat(text,text)','EXECUTE')
+    OR NOT has_function_privilege('service_role','public.search_admin_chat(text,text)','EXECUTE')
+    OR NOT has_schema_privilege('service_role','private','USAGE') THEN
+    RAISE EXCEPTION 'Search RPC access mismatch';
+  END IF;
+END $admin_chat_search_contract$;
 
 SELECT 'LOCALLY_PRODUCTION_CURRENT_STATE_CONTRACT_PASS' AS result;
 

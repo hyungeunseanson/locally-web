@@ -36,7 +36,7 @@ function exact(label, actual, expected) {
   }
 }
 
-exact('applied private attention tables', required.applicationPrivateTables, ['private.admin_monitor_cutover']);
+exact('applied private attention tables', required.applicationPrivateTables, ['private.admin_monitor_cutover', 'private.phone_followup_tasks']);
 if ('pendingPrivateTables' in required || 'pendingApplicationFunctions' in required) fail('applied attention objects remain pending');
 if (!attentionTargetContract.includes('BEGIN READ ONLY;') || !attentionTargetContract.trimEnd().endsWith('ROLLBACK;')
   || !attentionTargetContract.includes('ADMIN_ATTENTION_TARGET_CONTRACT_PASS')
@@ -67,11 +67,10 @@ const expectedAppliedOrder = [
   'supabase/migrations/20261001170718_admin_message_monitoring_phase_1.sql',
   'supabase/migrations/20261002015110_admin_message_monitoring_historical_reinquiry.sql',
   'supabase/migrations/20261002041848_admin_attention_badges_phase_2.sql',
-];
-const expectedPendingOrder = [
   'supabase/migrations/20261002140902_phone_followup_tasks.sql',
   'supabase/migrations/20261003122803_admin_chat_bounded_search.sql',
 ];
+const expectedPendingOrder = [];
 const expectedApplyOrder = [...expectedAppliedOrder, ...expectedPendingOrder];
 exact('fresh-project apply order', required.freshProjectApplyOrder, expectedApplyOrder);
 exact(
@@ -151,7 +150,7 @@ for (const [name, fingerprint] of Object.entries({
   storagePolicies: '898e8b7f917fd0f4530ef30c9b61961e',
   publicRlsPolicies: 'e5a16a4215c569060fbf895453a5cd00',
   publicRelationGrants: 'a9c644ba2ab5c795f29aff57092aa002',
-  privateRelationGrants: 'c0c83ee9ce880c47d3d24f3f918b4364',
+  privateRelationGrants: '4c987b9bd1b8fdc56ed01bca38365c7d',
 })) {
   if (current.securityFingerprints[name] !== fingerprint || !currentContract.includes(fingerprint)) {
     fail(`current-state security fingerprint differs: ${name}`);

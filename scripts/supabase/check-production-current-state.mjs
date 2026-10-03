@@ -13,7 +13,7 @@ const expectedFingerprints = {
   storagePolicies: '898e8b7f917fd0f4530ef30c9b61961e',
   publicRlsPolicies: 'e5a16a4215c569060fbf895453a5cd00',
   publicRelationGrants: 'a9c644ba2ab5c795f29aff57092aa002',
-  privateRelationGrants: 'c0c83ee9ce880c47d3d24f3f918b4364',
+  privateRelationGrants: '4c987b9bd1b8fdc56ed01bca38365c7d',
   stagingOverlayBaselineStoragePolicies: 'd6b381fd629405acfdd615593031de5c',
   stagingOverlayTargetStorageBuckets: 'c3ff5767c8e4934ae05b3d96550441c8',
   stagingOverlayTargetStoragePolicies: '38c973a52a0bebe8fa78b3f53089e427',
@@ -165,23 +165,22 @@ const expectedLedger = [
     repositoryFile: 'supabase/migrations/20261002041848_admin_attention_badges_phase_2.sql',
     repositorySha256: 'd20d5774318f8fe52dc41d13a533728b13c98a20fab812cd693737dba0de51a2',
   },
-];
-const expectedPendingMigrations = [
   {
-    "version": "20261002140902",
+    "version": "20261003012400",
     "name": "phone_followup_tasks",
+    "repositoryVersion": "20261002140902",
     "repositoryFile": "supabase/migrations/20261002140902_phone_followup_tasks.sql",
-    "repositorySha256": "88769a249dca3d7b2f0cbd2dc6a8cf2197960213a357bac71353978a5ae0e396",
-    "status": "prepared_not_applied"
+    "repositorySha256": "88769a249dca3d7b2f0cbd2dc6a8cf2197960213a357bac71353978a5ae0e396"
   },
   {
-    "version": "20261003122803",
+    "version": "20261003134417",
     "name": "admin_chat_bounded_search",
+    "repositoryVersion": "20261003122803",
     "repositoryFile": "supabase/migrations/20261003122803_admin_chat_bounded_search.sql",
-    "repositorySha256": "0e9776caab4c826924eade21baa229ec73a27857d9c1c9bb75a97b25b1b31724",
-    "status": "prepared_not_applied"
-  }
+    "repositorySha256": "0e9776caab4c826924eade21baa229ec73a27857d9c1c9bb75a97b25b1b31724"
+  },
 ];
+const expectedPendingMigrations = [];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));
 for (const [index, expected] of expectedLedger.entries()) {
   const actual = manifest.migrationLedger[index];
@@ -237,15 +236,21 @@ assert(objects.publicTables.length === 39, 'expected 39 public tables');
 assert(objects.publicViews.length === 2, 'expected 2 public views');
 assert(objects.publicTableColumns === 517, 'expected 517 public table columns');
 assert(objects.publicViewColumns === 27, 'expected 27 public view columns');
-assert(objects.functionOverloads.length === 60, 'expected 60 public function overloads');
+assert(objects.functionOverloads.length === 64, 'expected 64 public function overloads');
 exact('private function overloads', objects.privateFunctionOverloads, [
-  'private.advance_support_version()',
-  'private.is_admin_reader()',
-  'private.is_inquiry_admin_sender(p_sender uuid)',
-  'private.prepare_support_message()'
+  "private.admin_chat_phone_title(category text, form_data jsonb)",
+  "private.adopt_phone_followup_link()",
+  "private.advance_support_version()",
+  "private.capture_phone_followup()",
+  "private.delete_pending_phone_followup()",
+  "private.handle_phone_followup(p_request uuid, p_inquiry bigint, p_ids bigint[], p_admin uuid, p_complete boolean)",
+  "private.has_phone_followup(p_request uuid)",
+  "private.is_admin_reader()",
+  "private.is_inquiry_admin_sender(p_sender uuid)",
+  "private.prepare_support_message()"
 ]);
-assert(objects.applicationTriggers.length === 14, 'expected 14 application triggers');
-assert(objects.indexes === 120, 'expected 120 public indexes');
+assert(objects.applicationTriggers.length === 17, 'expected 17 application triggers');
+assert(objects.indexes === 133, 'expected 133 public indexes');
 assert(objects.constraints.total === 180, 'expected 180 constraints');
 assert(objects.constraints.primaryKey === 39, 'expected 39 primary keys');
 assert(objects.constraints.foreignKey === 59, 'expected 59 foreign keys');
@@ -259,11 +264,11 @@ assert(objects.realtimePublication.tables.length === 8, 'expected eight Realtime
 assert(objects.storageBuckets.length === 6, 'expected six Storage buckets');
 assert(objects.storageObjectPolicies.length === 16, 'expected 16 Storage policies');
 
-exact('private tables', objects.privateTables, ['admin_monitor_cutover']);
+exact('private tables', objects.privateTables, ['admin_monitor_cutover', 'phone_followup_tasks']);
 exact('required private tables', required.applicationPrivateTables, objects.privateTables.map(name => `private.${name}`));
-assert(objects.privateTableColumns === 4 && objects.privateIndexes === 1 && objects.privateConstraints === 4,
+assert(objects.privateTableColumns === 9 && objects.privateIndexes === 4 && objects.privateConstraints === 8,
   'private cutover catalog counts differ');
-exact('private RLS tables', objects.privateRls.enabled, ['admin_monitor_cutover']);
+exact('private RLS tables', objects.privateRls.enabled, ['admin_monitor_cutover', 'phone_followup_tasks']);
 assert(objects.privateRls.forced.length === 0 && objects.privateRls.policies === 0, 'private RLS policy surface differs');
 
 exact('required tables', required.applicationTables, objects.publicTables);
@@ -361,6 +366,20 @@ assert(overlay.includes('policy_count <> 15'), 'overlay does not require the 15-
 assert(overlay.includes('IF NOT EXISTS ('), 'overlay does not require the exact policy before writing');
 assert(!/^\s*(?:INSERT\s+INTO|UPDATE\s+|DELETE\s+FROM|ALTER\s+|CREATE\s+|TRUNCATE\s+)/gim.test(overlayWithoutComments),
   'overlay contains an unrelated mutation');
+
+for (const section of [manifest.phoneFollowup, manifest.adminChatSearch]) {
+  for (const fn of section.functions) {
+    assert(contract.includes([fn.identity,fn.owner,fn.securityDefiner,fn.volatility,fn.result,
+      fn.configuration.join(','),fn.acl,fn.bodyMd5].join('|').replaceAll("'", "''")),
+    `applied Phone/search function assertion missing: ${fn.identity}`);
+  }
+  for (const index of (section.indexes ?? [...section.table.indexes, ...section.publicIndexes])) {
+    assert(contract.includes(index.definition.replaceAll("'", "''")), `applied index assertion missing: ${index.name}`);
+  }
+}
+assert(manifest.phoneFollowup.directTableRoles.length === 0 && manifest.adminChatSearch.resultLimit === 25
+  && manifest.adminChatSearch.minimumQueryLength === 2 && manifest.adminChatSearch.lockTimeout === '2s',
+  'applied Phone/search security or bounded search contract differs');
 
 const appFiles = await sourceFiles(resolve(root, 'app'));
 const appSources = await Promise.all(appFiles.map(async (path) => ({ path, source: await readFile(path, 'utf8') })));
