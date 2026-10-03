@@ -53,6 +53,13 @@ try {
     await assert.rejects(db.query("SELECT * FROM search_admin_chat('support','42')"), { code:'42501' });
     await db.query('RESET ROLE');
   }
+  // New expression indexes must preserve authorized customer writes. Pure title
+  // evaluation requires EXECUTE even though the query RPC is service-role-only.
+  await db.query(`GRANT INSERT, UPDATE, SELECT ON public.proxy_requests TO authenticated;
+    BEGIN; SET LOCAL ROLE authenticated;
+    INSERT INTO public.proxy_requests(id,user_id,category,form_data) VALUES(md5('writer')::uuid,md5('42')::uuid,'RESTAURANT','{"restaurant_name":"Writer title"}');
+    UPDATE public.proxy_requests SET form_data='{"restaurant_name":"Updated writer title"}' WHERE id=md5('writer')::uuid;
+    ROLLBACK;`);
   await db.query('ANALYZE; SET ROLE service_role');
   const search = async (surface,q) => (await db.query('SELECT * FROM search_admin_chat($1,$2)',[surface,q])).rows;
   const has = async (surface,q,id) => assert.ok((await search(surface,q)).some(row=>row.id===id), `${surface} ${q} => ${id}`);

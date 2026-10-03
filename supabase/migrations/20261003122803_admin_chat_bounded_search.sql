@@ -20,7 +20,9 @@ AS $$
 $$;
 REVOKE ALL ON FUNCTION private.admin_chat_phone_title(text,jsonb) FROM PUBLIC, anon, authenticated;
 GRANT USAGE ON SCHEMA private TO service_role;
-GRANT EXECUTE ON FUNCTION private.admin_chat_phone_title(text,jsonb) TO service_role;
+-- Expression indexes evaluate this pure input-only helper under the table writer role.
+-- Grant execution without adding private-schema access or any table privileges.
+GRANT EXECUTE ON FUNCTION private.admin_chat_phone_title(text,jsonb) TO anon, authenticated, service_role;
 
 CREATE INDEX admin_chat_profile_name_search ON public.profiles USING gin (full_name extensions.gin_trgm_ops);
 CREATE INDEX admin_chat_profile_email_search ON public.profiles USING gin (email extensions.gin_trgm_ops);
