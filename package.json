@@ -112,7 +112,7 @@
     "test:e2e:qa:live-gate-cross": "node scripts/run-domain-qa.mjs --bundle live-gate --run",
     "test:supabase-api-keys": "node --conditions=react-server --test tests/unit/supabase-api-key-compatibility.test.mjs tests/unit/supabase-operator-api-key-compatibility.test.mjs && python3 scripts/backup/storage_byte_backup_test.py",
     "test:admin-attention:phase2": "node --test tests/unit/admin-chat-audit.test.mjs tests/unit/admin-attention-badges.test.mjs tests/unit/admin-attention-loading.test.mjs tests/unit/admin-attention-performance.test.mjs && playwright test -c playwright.admin-attention.config.ts",
-    "cloudflare:isr-bridge:contract": "node --test scripts/cloudflare/revalidation-bridge.test.mjs scripts/cloudflare/revalidation-bridge-runtime.test.mjs scripts/cloudflare/revalidation-bridge-freshness.test.mjs",
+    "cloudflare:isr-bridge:contract": "node --test scripts/cloudflare/active-version-artifact.test.mjs scripts/cloudflare/revalidation-bridge.test.mjs scripts/cloudflare/revalidation-bridge-runtime.test.mjs scripts/cloudflare/revalidation-bridge-freshness.test.mjs",
     "cloudflare:release:production": "node scripts/cloudflare/run-candidate-release.mjs",
     "cloudflare:candidate-release:contract": "node --test scripts/cloudflare/candidate-release-contract.test.mjs scripts/cloudflare/bridge-candidate-compatibility.test.mjs"
   },

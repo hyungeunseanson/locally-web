@@ -1,5 +1,5 @@
-import { readExactVersionArtifact } from './exact-version-artifact.mjs';
 import { createHash } from 'node:crypto';
+import { readActiveVersionArtifact, VERSION_SOURCE } from './active-version-artifact.mjs';
 
 export const DO_MODULES = {
   DOQueueHandler: '.open-next/.build/durable-objects/queue.js',
@@ -40,7 +40,8 @@ export function fingerprintDurableObjectArtifact(source) {
 export function compareDurableObjectProof(proof, stableVersionId) {
   const unknown = 'DO_IMPLEMENTATION_UNKNOWN';
   if (!proof || proof.stableVersionId !== stableVersionId
-    || !SHA256.test(proof.scriptEtag ?? '') || (proof.contentEtag !== proof.scriptEtag && !(proof.sourceEvidence === 'EXACT_VERSION_MODULES' && SHA256.test(proof.sourceSha256 ?? '')))
+    || !SHA256.test(proof.scriptEtag ?? '') || proof.sourceKind !== VERSION_SOURCE
+    || !SHA256.test(proof.artifactSha256 ?? '') || !proof.deploymentId
     || !Array.isArray(proof.namedHandlers)
     || proof.namedHandlers.length !== 2
     || !Object.keys(DO_MODULES).every(name => proof.namedHandlers.some(h => h.name === name && h.handlers?.includes('class')))) return unknown;
@@ -71,17 +72,17 @@ export function compareDurableObjectProof(proof, stableVersionId) {
   return 'BRIDGE_COMPATIBLE_BUILD_STATE_ONLY';
 }
 
-// GET only. The current script content is tied to the exact deployed stable
-// version by the provider's content ETag and that version's script ETag.
-export async function readStableDurableObjectArtifact({ credentials, workerName, stableVersionId, fetchImplementation = fetch }) {
-  let artifact;
-  try { artifact = await readExactVersionArtifact({credentials,workerName,versionId:stableVersionId,fetchImplementation}); }
-  catch { return null; }
-  const { metadata, source, scriptEtag, contentEtag, sourceEvidence, sourceSha256 } = artifact;
-  const stable = fingerprintDurableObjectArtifact(source);
-  const proof = { stableVersionId, scriptEtag, contentEtag, sourceEvidence, sourceSha256,
-    namedHandlers: metadata.resources.script.named_handlers,
-    sourceRevision: 'UNKNOWN_NOT_ATTESTED_BY_PROVIDER', stable };
-  Object.defineProperty(proof, 'source', { value: source });
-  return proof;
+// Both bridge extraction and DO comparison use the same version-scoped source.
+export async function readStableDurableObjectArtifact(options) {
+  try {
+    const artifact = await readActiveVersionArtifact(options);
+    const stable = fingerprintDurableObjectArtifact(artifact.source);
+    if (!stable) return null;
+    const proof = { stableVersionId: artifact.versionId, deploymentId: artifact.deploymentId,
+      sourceKind: artifact.sourceKind, scriptEtag: artifact.etag, artifactSha256: artifact.artifactSha256,
+      namedHandlers: artifact.namedHandlers,
+      sourceRevision: 'UNKNOWN_NOT_ATTESTED_BY_PROVIDER', stable };
+    Object.defineProperty(proof, 'source', { value: artifact.source });
+    return proof;
+  } catch { return null; }
 }

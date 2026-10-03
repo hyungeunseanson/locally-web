@@ -1,9 +1,9 @@
-import { readExactVersionArtifact } from './exact-version-artifact.mjs';
 import { createHash } from 'node:crypto';
 import { readFile, writeFile, readdir, rm, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { gunzipSync, brotliDecompressSync } from 'node:zlib';
 import { parse } from 'acorn';
+import { readActiveVersionArtifact } from './active-version-artifact.mjs';
 import { resolveCloudflareReadCredentials } from './verify-production-deploy-contract.mjs';
 
 const PATCH_ERROR = 'OPENNEXT_REVALIDATION_BRIDGE_PATCH_CONTRACT_CHANGED';
@@ -81,28 +81,15 @@ export function queueModuleFromProvider(source) {
 }
 
 export async function readProviderCompatToken({ policy, credentials, fetchImplementation = fetch }) {
-  // Only GET endpoints; never pull messages, read DO storage, or persist the
-  // provider bundle. Recheck deployment after reading to detect a concurrent rollout.
   try {
     requireContract(policy.workerName === 'locally-web-opennext-production' && UUID.test(policy.baselineVersionId) && HEX.test(policy.compatTokenSha256));
-    const base = `https://api.cloudflare.com/client/v4/accounts/${credentials.accountId}/workers/scripts/${policy.workerName}`;
-    const get = async suffix => fetchImplementation(base + suffix, { method: 'GET', headers: { Authorization: `Bearer ${credentials.apiToken}` } });
-    const json = async suffix => { const r = await get(suffix); const b = await r.json(); requireContract(r.ok && b.success); return b.result; };
-    const current = async () => {
-      const r = await json('/deployments');
-      const d = [...(r.deployments ?? r)].sort((a,b) => Date.parse(b.created_on)-Date.parse(a.created_on))[0];
-      requireContract(d?.versions?.length === 1 && d.versions[0].percentage === 100 && UUID.test(d.versions[0].version_id));
-      return { deploymentId: d.id, versionId: d.versions[0].version_id };
-    };
-    const before = await current();
-    const artifact = await readExactVersionArtifact({ credentials, workerName: policy.workerName, versionId: before.versionId, fetchImplementation });
-    requireContract(artifact.metadata.resources.script.named_handlers.some(h => h.name === 'DOQueueHandler' && h.handlers.includes('class')));
-    const etag = artifact.scriptEtag;
+    const artifact = await readActiveVersionArtifact({ credentials, workerName: policy.workerName, fetchImplementation });
+    requireContract(artifact.namedHandlers.some(h => h.name === 'DOQueueHandler' && h.handlers.includes('class')));
     const token = inspectQueueToken(queueModuleFromProvider(artifact.source)).value;
     requireContract(sha256(token) === policy.compatTokenSha256);
-    const after = await current();
-    requireContract(JSON.stringify(before) === JSON.stringify(after));
-    return { token, provenance: { kind: 'provider', ...before, etag, etagMatch: true, ...(artifact.sourceEvidence === 'EXACT_VERSION_MODULES' ? { artifactIdentity: artifact.sourceEvidence, sourceSha256: artifact.sourceSha256 } : {}), compatSha256: sha256(token), length: token.length } };
+    const { sourceKind, deploymentId, versionId, etag, artifactSha256 } = artifact;
+    return { token, provenance: { kind: 'provider', sourceKind, deploymentId, versionId, etag, artifactSha256,
+      compatSha256: sha256(token), length: token.length } };
   } catch { throw new Error('OPENNEXT_REVALIDATION_BRIDGE_PROVENANCE_FAILED'); }
 }
 

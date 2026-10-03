@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import test from 'node:test';
+import { versionProvider, artifactDigest, deploymentId } from './active-version-artifact.fixture.mjs';
 import {
   assertPostUploadInvariance, safeVersionSnapshot, assertConfigUnchanged, assertFullCandidateSmoke, assertOverrideIdentity, buildCandidateReleasePlan,
   classifyCandidateAttempt, executeCandidateReleaseContract, parseVersionUploadOutput, promotionArguments,
@@ -35,7 +36,7 @@ const snapshot = {
     ...Object.keys(DO_MODULES).map(name => ({ name, class_name: name, type: 'durable_object_namespace', namespace_id: `${name}-namespace` }))],
   crons: ['*/10 * * * *'], queueConsumers: [{ queue_name: 'fixture-queue', script: PRODUCTION_WORKER, dead_letter_queue: 'fixture-dlq', settings: { max_retries: 5 } }],
 };
-const baseline = { snapshot, deployment: { id: 'stable-deployment', versions: [{ id: stableId, percentage: 100 }] } };
+const baseline = { snapshot, deployment: { id: deploymentId, versions: [{ id: stableId, percentage: 100 }] } };
 const exactStable = { id: stableId, resources: { bindings: structuredClone(snapshot.bindings), script: { etag: 'a'.repeat(64), handlers:['fetch'], named_handlers: [] }, script_runtime: { compatibility_date:'2026-01-01', compatibility_flags:['nodejs_compat'], migration_tag:'cache-v1' } } };
 const exactCandidate = { ...structuredClone(exactStable), id:candidateId };
 exactCandidate.resources.bindings.push(metadataBinding);
@@ -45,6 +46,7 @@ function scoped(value, candidate = null) { return { ...value, activeDeployment:s
   scriptGlobalSettings:{observability:{enabled:true}},
   triggersAndBindingsOutsideVersionScope:{crons:structuredClone(value.snapshot.crons),queueConsumers:structuredClone(value.snapshot.queueConsumers),routes:structuredClone(value.snapshot.routes),domains:[],migrationTag:'cache-v1'},
 }; }
+
 const blocked = code => error => error.code === code;
 function artifact(constant = 'fixture-original') {
   return 'var helper = 1;\n' + Object.entries(DO_MODULES).map(([name, p]) => `// ${p}\nvar ${name} = class extends DurableObject { value = "${constant}"; };\n`).join('')
@@ -52,7 +54,7 @@ function artifact(constant = 'fixture-original') {
     + 'var manifest = { runtimePins: { node: "24.20.0", next: "16.3.5", openNextCloudflare: "1.19.6", wrangler: "4.129.1" } };\n';
 }
 function makeProof(candidateSource = artifact()) {
-  return { stableVersionId: stableId, scriptEtag: 'a'.repeat(64), contentEtag: 'a'.repeat(64),
+  return { stableVersionId: stableId, scriptEtag: 'a'.repeat(64), sourceKind: 'workers-version-modules', deploymentId, artifactSha256: artifactDigest(artifact()),
     namedHandlers: Object.keys(DO_MODULES).map(name => ({ name, handlers: ['class'] })),
     stable: fingerprintDurableObjectArtifact(artifact()), candidate: fingerprintDurableObjectArtifact(candidateSource) };
 }
@@ -73,7 +75,7 @@ function fixtureActions() {
   const calls = []; let deployment = structuredClone(baseline.deployment); let bindings = structuredClone(snapshot.bindings);
   const actions = {
     recheckIdentity: async versionId => ({versionId,status:204}), authorizedCandidateUpload: true, authorizePromotion: async () => true,
-    bridgeProofFreshness: async () => ({kind:'provider',etagMatch:true,deploymentId:baseline.deployment.id,versionId:stableId,etag:'a'.repeat(64),compatSha256:lineage}),
+    bridgeProofFreshness: async () => ({kind:'provider',sourceKind:'workers-version-modules',artifactSha256:artifactDigest(artifact()),deploymentId:baseline.deployment.id,versionId:stableId,etag:'a'.repeat(64),compatSha256:lineage}),
     build: async () => calls.push('build'), semanticPreflight: async () => { calls.push('preflight'); return 'PASS'; },
     durableObjectProof: async () => { calls.push('do-proof'); return makeProof(); },
     snapshot: async (options = {}) => { calls.push('snapshot'); return scoped({ snapshot: { ...structuredClone(snapshot), bindings: structuredClone(bindings) }, deployment: structuredClone(deployment) }, options.candidateVersionId ? structuredClone(exactCandidate) : null); },
@@ -118,23 +120,20 @@ test('generated build/auth constants are compared without normalization', () => 
   assert(makePlan({ durableObjectProof: makeProof(artifact('changed')) }).blockers.includes('UNKNOWN'));
 });
 test('unknown artifact, dependency or provider provenance blocks', () => {
-  for (const proof of [undefined, { ...makeProof(), contentEtag: 'b'.repeat(64) }, { ...makeProof(), candidate: null },
+  for (const proof of [undefined, { ...makeProof(), sourceKind: 'script-content' }, { ...makeProof(), candidate: null },
     { ...makeProof(), stableVersionId: candidateId }, { ...makeProof(), namedHandlers: [] }]) {
     assert(makePlan({ durableObjectProof: proof }).blockers.includes('DO_IMPLEMENTATION_UNKNOWN'));
   }
   assert.equal(fingerprintDurableObjectArtifact('no generated DO modules'), null);
 });
 test('stable artifact GET is tied to the exact provider version ETag', async () => {
-  const calls = []; const form = new FormData(); form.append('worker.js', new Blob([artifact()], { type: 'application/javascript' }), 'worker.js');
-  const fetchImplementation = async (url, options) => {
-    calls.push({ url, method: options.method });
-    if (url.endsWith(`/versions/${stableId}`)) return Response.json({ success: true, result: { id: stableId, resources: { script: { etag: 'a'.repeat(64), named_handlers: makeProof().namedHandlers } } } });
-    const r = new Response(form); r.headers.set('etag', '"' + 'a'.repeat(64) + '"'); return r;
-  };
-  const result = await readStableDurableObjectArtifact({ credentials: { accountId: 'fixture', apiToken: 'fixture-not-secret' }, workerName: PRODUCTION_WORKER, stableVersionId: stableId, fetchImplementation });
+  const p = versionProvider(artifact());
+  const result = await readStableDurableObjectArtifact({ credentials: { accountId: 'fixture', apiToken: 'fixture-not-secret' }, workerName: PRODUCTION_WORKER, stableVersionId: stableId, fetchImplementation: p.fetch });
   assert.equal(result.stable.modules.DOQueueHandler.sha256, makeProof().stable.modules.DOQueueHandler.sha256);
-  assert(calls.every(c => c.method === 'GET')); assert(calls[1].url.endsWith('/content/v2'));
+  assert.equal(result.artifactSha256, artifactDigest(artifact()));
+  assert(!p.calls.some(url => url.endsWith('/content/v2')));
 });
+
 test('upload without Version URL is accepted; ambiguous UUID is rejected', () => {
   assert.deepEqual(parseVersionUploadOutput(`Worker Version ID: ${candidateId}`), { versionId: candidateId, versionUrl: null });
   for (const value of ['', `Worker Version ID: ${candidateId}\nWorker Version ID: ${stableId}`]) assert.throws(() => parseVersionUploadOutput(value));
@@ -299,7 +298,7 @@ test('unknown/runtime changes cannot generate staging or promotion args',()=>{
   }
 });
 test('fresh bridge provider lineage must match immediately before upload; fixture/changed baseline blocks',async()=>{
-  for(const patch of [{kind:'fixture'},{etagMatch:false},{deploymentId:'changed'},{versionId:candidateId},{etag:''},{compatSha256:'b'.repeat(64)}]){
+  for(const patch of [{kind:'fixture'},{sourceKind:'script-content'},{deploymentId:'changed'},{versionId:candidateId},{etag:''},{compatSha256:'b'.repeat(64)}]){
     const {actions,calls}=fixtureActions();const read=actions.bridgeProofFreshness;actions.bridgeProofFreshness=async()=>({...await read(),...patch});
     await assert.rejects(executeCandidateReleaseContract(makePlan(),actions),blocked('bridge_provenance_or_freshness_failed'));assert(!calls.includes('upload'));
   }
@@ -335,6 +334,18 @@ test('compatible plan cannot lose its explicit mode acknowledgement before mutat
   assert.throws(()=>stageZeroArguments(plan,candidateId));assert.throws(()=>promotionArguments(plan,candidateId,{}));
 });
 
+test('version-scoped proof cannot be reused for another deployment or without artifact identity', () => {
+  for (const patch of [{deploymentId:candidateId},{artifactSha256:''},{sourceKind:'script-content'}]) {
+    assert(makePlan({durableObjectProof:{...makeProof(),...patch}}).blockers.includes('DO_IMPLEMENTATION_UNKNOWN'));
+  }
+});
+test('final bridge and DO proofs must attest identical version source bytes', async () => {
+  const {actions,calls}=fixtureActions();
+  const original=actions.bridgeProofFreshness;
+  actions.bridgeProofFreshness=async()=>({...await original(),artifactSha256:'b'.repeat(64)});
+  await assert.rejects(executeCandidateReleaseContract(makePlan(),actions),blocked('bridge_provenance_or_freshness_failed'));
+  assert(!calls.includes('upload'));
+});
 
 test('real incident: latest /settings gains metadata, exact stable and globals stay unchanged', () => {
   const before=scoped(baseline);const after=scoped(baseline,structuredClone(exactCandidate));
@@ -396,4 +407,5 @@ test('GET reader anchors before/after upload to exact stable resources, not lega
   assert.equal(after.activeStableVersion.resources.bindings.some(b=>b.name==='CF_VERSION_METADATA'),false);
   assert.equal(assertPostUploadInvariance(before,after),'POST_UPLOAD_INVARIANCE_PASS');
   assert(calls.some(url=>url.endsWith('/script-settings')));
+
 });

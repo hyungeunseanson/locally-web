@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { readActiveVersionArtifact, VERSION_SOURCE } from './active-version-artifact.mjs';
 import { resolveCloudflareReadCredentials } from './verify-production-deploy-contract.mjs';
 
 const BASELINE_CHANGED = 'OPENNEXT_REVALIDATION_BRIDGE_BASELINE_CHANGED_BEFORE_DEPLOY';
@@ -12,9 +13,8 @@ const requireFresh = condition => { if (!condition) throw new Error(BASELINE_CHA
 // being accepted as proof. No file contents, provider bodies or causes are logged.
 const fields = {
   kind: value => value === 'provider',
-  artifactIdentity: value => value === 'EXACT_VERSION_MODULES',
-  sourceSha256: digest,
-  etagMatch: value => value === true,
+  sourceKind: value => value === VERSION_SOURCE,
+  artifactSha256: digest,
   deploymentId: uuid,
   versionId: uuid,
   etag: digest,
@@ -34,39 +34,22 @@ export async function assertProductionBridgeProofFresh({
   try {
     const proof = JSON.parse(await readFile(path.join(root, '.open-next/locally-revalidation-bridge-proof.json'), 'utf8'));
     requireFresh(proof && typeof proof === 'object' && !Array.isArray(proof));
-    for (const key of ['kind', 'etagMatch', 'deploymentId', 'versionId', 'etag', 'compatSha256']) {
+    for (const key of ['kind', 'sourceKind', 'artifactSha256', 'deploymentId', 'versionId', 'etag', 'compatSha256']) {
       requireFresh(fields[key](proof[key]));
     }
     for (const [key, value] of Object.entries(proof)) {
       requireFresh(Object.hasOwn(fields, key) && fields[key](value));
     }
-    requireFresh((proof.artifactIdentity === undefined) === (proof.sourceSha256 === undefined));
     const policy = JSON.parse(await readFile(path.join(root, 'config/cloudflare/revalidation-bridge.json'), 'utf8'));
     if (!digest(policy?.compatTokenSha256) || policy.compatTokenSha256 !== proof.compatSha256) {
       throw new Error(LINEAGE_MISMATCH);
     }
     requireFresh(policy.workerName === 'locally-web-opennext-production');
     const auth = credentials ?? resolveCloudflareReadCredentials({ environment });
-    const base = `https://api.cloudflare.com/client/v4/accounts/${auth.accountId}/workers/scripts/locally-web-opennext-production`;
-    const get = async suffix => {
-      const response = await fetchImplementation(base + suffix, {
-        method: 'GET', redirect: 'error', signal: AbortSignal.timeout(30_000),
-        headers: { Authorization: `Bearer ${auth.apiToken}` },
-      });
-      requireFresh(response.ok);
-      const body = await response.json();
-      requireFresh(body.success === true);
-      return body.result;
-    };
-    const result = await get('/deployments');
-    const deployments = result.deployments ?? result;
-    requireFresh(Array.isArray(deployments) && deployments.length > 0
-      && deployments.every(d => Number.isFinite(Date.parse(d.created_on))));
-    const current = [...deployments].sort((a, b) => Date.parse(b.created_on) - Date.parse(a.created_on))[0];
-    requireFresh(current.id === proof.deploymentId && current.versions?.length === 1
-      && current.versions[0].percentage === 100 && current.versions[0].version_id === proof.versionId);
-    const version = await get(`/versions/${proof.versionId}`);
-    requireFresh(version.id === proof.versionId && version.resources?.script?.etag === proof.etag);
+    const active = await readActiveVersionArtifact({ credentials: auth, workerName: policy.workerName,
+      stableVersionId: proof.versionId, fetchImplementation });
+    requireFresh(active.deploymentId === proof.deploymentId && active.etag === proof.etag
+      && active.artifactSha256 === proof.artifactSha256 && active.sourceKind === proof.sourceKind);
     return proof;
   } catch (error) {
     // Fail closed even on malformed files, transport errors or credential lookup
