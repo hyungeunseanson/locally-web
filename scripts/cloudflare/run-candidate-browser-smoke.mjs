@@ -3,12 +3,27 @@ import { assertFullCandidateSmoke, assertOverrideIdentity, CandidateReleaseBlock
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 
-// A visible SSR page alone is insufficient. Opening and closing this menu is
-// local UI state only; it neither selects a locale nor saves Production data.
+// Execute existing client state handlers without saving Production data.
 export async function verifyReadOnlyClientInteraction(page) {
   const deadline = Date.now() + 15000;
   const timeout = () => Math.max(1, deadline - Date.now());
   try {
+    const pathname = new URL(page.url()).pathname;
+    if (/^\/experiences\/\d+$/.test(pathname)) {
+      const button = page.getByTestId('experience-summary-read-more-desktop');
+      const description = page.getByTestId('experience-summary-description-desktop');
+      await button.waitFor({ state: 'visible', timeout: timeout() });
+      await description.waitFor({ state: 'visible', timeout: timeout() });
+      await page.waitForFunction(() => {
+        const button = document.querySelector('[data-testid="experience-summary-read-more-desktop"]');
+        return button && (typeof button.onclick === 'function' || Object.keys(button).some(key =>
+          key.startsWith('__reactProps$') && typeof button[key]?.onClick === 'function'));
+      }, {}, { timeout: timeout() });
+      await button.click({ timeout: timeout() });
+      await button.waitFor({ state: 'hidden', timeout: timeout() });
+      await description.waitFor({ state: 'visible', timeout: timeout() });
+      return { pathname, interaction: 'experience-description-read-more', clicked: true, expanded: true, descriptionVisible: true };
+    }
     // The existing Home notice makes the app shell inert. Use its real close
     // control first; dismissal is confined to this disposable browser context.
     const notice = page.getByTestId('legacy-experience-popup-close');
@@ -27,7 +42,7 @@ export async function verifyReadOnlyClientInteraction(page) {
     await menuItem.waitFor({ state: 'visible', timeout: timeout() });
     await globe.click({ timeout: timeout() });
     await menuItem.waitFor({ state: 'hidden', timeout: timeout() });
-    return { pathname: new URL(page.url()).pathname, interaction: 'locale-menu-open-close', opened: true, closed: true, noticeDismissed };
+    return { pathname, interaction: 'locale-menu-open-close', opened: true, closed: true, noticeDismissed };
   } catch { throw new CandidateReleaseBlocked('candidate_client_interaction_failed'); }
 }
 
@@ -45,10 +60,10 @@ export async function runCandidateBrowserSmoke({ origin, mode, workerName, versi
   const assetRefs = new Set(), hints = new Set(), browserAssetResponses = [], workerReceipts = [], assetEvidence = [], clientInteractions = [];
   const pending = new Set(), pageRequests = new WeakMap(), pageAssets = new WeakMap(), pendingRequests = new Map(), responseRows = new Map();
   const closingPages = new WeakSet(), observedPages = new Set(), requestFailures = [];
-  let probeReceipt, responseCount = 0, allFirstPartyReadsOverridden = true;
+  let probeReceipt, responseCount = 0, allFirstPartyReadsOverridden = true, allFirstPartyReadsAnonymous = true;
   let hardErrors = 0, fiveXX = 0, asset404 = 0, redirected = false, overflow = false, identityFailure = false;
   const coverage = { document: false, script: false, stylesheet: false, font: false, image: false, data: false, api: false };
-  const applied = new Set();
+  const applied = new Set(), forwardingProofs = new WeakMap();
   const trackPage = page => {
     if (observedPages.has(page)) return;
     observedPages.add(page);
@@ -69,6 +84,7 @@ export async function runCandidateBrowserSmoke({ origin, mode, workerName, versi
     if (realFailures.length) { const error = new CandidateReleaseBlocked('candidate_request_failure'); error.requestFailures = realFailures; throw error; }
     if (hardErrors || fiveXX || asset404 || overflow || redirected) throw new CandidateReleaseBlocked('candidate_http_or_asset_failure');
     if (identityFailure || !allFirstPartyReadsOverridden) throw new CandidateReleaseBlocked('candidate_identity_unverified');
+    if (!allFirstPartyReadsAnonymous) throw new CandidateReleaseBlocked('candidate_read_not_anonymous');
   };
   const drain = async () => {
     let timer;
@@ -131,8 +147,11 @@ export async function runCandidateBrowserSmoke({ origin, mode, workerName, versi
       if (request.redirectedFrom()) redirected = true;
       const observedPage = pendingRequests.get(request)?.page;
       const capture = (async () => {
-        const overrideApplied = await request.headerValue('cloudflare-workers-version-overrides') === override;
-        const probeApplied = await request.headerValue('x-locally-release-probe') === '1';
+        const forwarded = forwardingProofs.get(request);
+        const stateless = forwarded?.forwarding === 'stateless-read' && forwarded.anonymous === true;
+        const overrideApplied = stateless || await request.headerValue('cloudflare-workers-version-overrides') === override;
+        const probeApplied = stateless && pathname === '/.well-known/locally-release' || await request.headerValue('x-locally-release-probe') === '1';
+        if (!stateless && (await request.headerValue('cookie') !== null || await request.headerValue('authorization') !== null)) allFirstPartyReadsAnonymous = false;
         if (!overrideApplied || (pathname === '/.well-known/locally-release' && !probeApplied)) allFirstPartyReadsOverridden = false;
         if (staticAsset) {
           const row = { pathname, status, overrideApplied, redirected: Boolean(request.redirectedFrom()) || status >= 300 && status < 400,
@@ -162,7 +181,10 @@ export async function runCandidateBrowserSmoke({ origin, mode, workerName, versi
     const pathname = new URL(page.url()).pathname;
     if (pathname === '/' || /^\/experiences\/\d+$/.test(pathname)) {
       const receipt = await verifyInteraction(page);
-      if (receipt?.pathname !== pathname || receipt.opened !== true || receipt.closed !== true) throw new CandidateReleaseBlocked('candidate_client_interaction_failed');
+      const validInteraction = pathname === '/'
+        ? receipt?.interaction === 'locale-menu-open-close' && receipt.opened === true && receipt.closed === true
+        : receipt?.interaction === 'experience-description-read-more' && receipt.clicked === true && receipt.expanded === true && receipt.descriptionVisible === true;
+      if (receipt?.pathname !== pathname || !validInteraction) throw new CandidateReleaseBlocked('candidate_client_interaction_failed');
       clientInteractions.push(receipt);
     }
     const paths = await page.locator('script[src],link[rel="stylesheet"],link[rel="preload"],link[rel="modulepreload"],link[rel="prefetch"]').evaluateAll(elements => {
@@ -181,8 +203,9 @@ export async function runCandidateBrowserSmoke({ origin, mode, workerName, versi
       browserPending: [...pendingRequests.values()].filter(row => row.page === page).map(row => ({ pathname: row.pathname, type: row.type })) });
   };
   const result = await runSmoke(origin, {
-    versionOverride: { workerName, versionId, onApplied: ({ pathname, resourceType, method }) => {
+    versionOverride: { workerName, versionId, onApplied: ({ pathname, resourceType, method, anonymous, forwarding }, request) => {
       applied.add(`${method}:${pathname}`);
+      if (request) forwardingProofs.set(request, { anonymous, forwarding });
       if (pathname.startsWith('/_next/static/')) {
         assetRefs.add(pathname);
         // Actual browser requests are overridden by the unchanged write gate;
@@ -221,6 +244,7 @@ export async function runCandidateBrowserSmoke({ origin, mode, workerName, versi
     requestFailures: requestFailures.filter(row => !row.intentionalTeardown && !(row.pathname === '/.well-known/locally-release' && row.aborted && probeReceipt?.status === 204)),
     intentionalTeardownAborts: requestFailures.filter(row => row.intentionalTeardown).length,
     workerReceipts, probeReceipt, overrideCoverage: coverage, allFirstPartyReadsOverridden: allFirstPartyReadsOverridden && applied.size > 0,
+    allFirstPartyReadsAnonymous, anonymousReadHeaders: result.anonymousReadHeaders,
     attempts: result.pageAttempts.map(a => ({ pathname: a.pathname, pass: a.outcome === 'pass', timeout: a.outcome === 'retry',
       pendingStaticAssets: a.pendingFirstPartyRequests.filter(r => r.pathname.startsWith('/_next/static/') && ['script', 'font'].includes(r.resourceType)).length,
       httpHardErrors: hardErrors, fiveXX, asset404, genericError: a.genericErrorPresent,

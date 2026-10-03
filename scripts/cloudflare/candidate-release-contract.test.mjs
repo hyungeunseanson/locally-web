@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
+import { gzipSync } from 'node:zlib';
 import test from 'node:test';
 import { versionProvider, artifactDigest, deploymentId } from './active-version-artifact.fixture.mjs';
 import {
@@ -11,7 +12,8 @@ import {
 import { compareDurableObjectProof, DO_MODULES, fingerprintDurableObjectArtifact, readStableDurableObjectArtifact } from './durable-object-release-safety.mjs';
 import { withReleaseProbeIdentity } from '../../app/utils/cloudflareReleaseProbe.mjs';
 import { main, parseCandidateArguments, readCandidateBaseline } from './run-candidate-release.mjs';
-import { runCandidateBrowserSmoke } from './run-candidate-browser-smoke.mjs';
+import { runCandidateBrowserSmoke, verifyReadOnlyClientInteraction } from './run-candidate-browser-smoke.mjs';
+import { runProductionBrowserSmoke } from './run-production-browser-smoke.mjs';
 
 const lineage = 'a'.repeat(64);
 const stableId = '11111111-1111-4111-8111-111111111111';
@@ -247,21 +249,24 @@ test('failed post-promotion regression does not automatically repeat promotion o
   await assert.rejects(executeCandidateReleaseContract(makePlan(), actions), blocked('post_deploy_verification_failed')); assert.equal(calls.filter(c => c === 'promote').length, 1);
 });
 
-test('Chromium dismisses the existing inert Home notice, then proves client menu execution and exact asset integrity', { timeout: 25000 }, async () => {
+test('Stable and candidate Home / 4659 hydration, anonymous cookie/auth stripping and exact asset integrity', { timeout: 25000 }, async () => {
   const received = []; const font = await readFile(new URL('../../app/fonts/Inter/Inter_18pt-Regular.woff2', import.meta.url));
-  const javascript = `fetch('/data');fetch('/cdn-cgi/rum',{method:'POST'}).catch(()=>{});
+  const javascript = `document.cookie='harmless=COOKIE_SENTINEL_NEVER_LOG;path=/';
+    fetch('/data');fetch('/authorized-read',{credentials:'omit',headers:{Authorization:'AUTH_SENTINEL_NEVER_LOG'}});fetch('/cdn-cgi/rum',{method:'POST'}).catch(()=>{});
     document.addEventListener('DOMContentLoaded',()=>{const b=document.querySelector('#globe');b.onclick=()=>{const m=document.querySelector('#language-menu');if(m)m.remove();else{const m=document.createElement('button');m.id='language-menu';m.textContent='English';document.body.append(m);}};
+      const readMore=document.querySelector('[data-testid="experience-summary-read-more-desktop"]');if(readMore)readMore.onclick=()=>readMore.remove();
       const close=document.querySelector('[data-testid="legacy-experience-popup-close"]');if(close){b.setAttribute('inert','');close.onclick=()=>{document.querySelector('[data-testid="legacy-experience-popup-overlay"]').remove();b.removeAttribute('inert');localStorage.setItem('fixture-notice-dismissed','1');};}});`;
   const files = new Map([['/_next/static/app.js',Buffer.from(javascript)],['/_next/static/font.woff2',font],
     ['/_next/static/style.css',Buffer.from('body{color:black}')],['/_next/static/unused.bin',Buffer.from('unused-hint-fixture')],
     ['/_next/static/slow.bin',Buffer.from('pending-static-fixture')]]);
   const server = createServer((request, response) => {
     const pathname = new URL(request.url, 'http://127.0.0.1').pathname;
-    received.push({ pathname, method: request.method, override: request.headers['cloudflare-workers-version-overrides'], probe: request.headers['x-locally-release-probe'] });
+    received.push({ pathname, method: request.method, cookiePresent: Object.hasOwn(request.headers,'cookie'), authorizationPresent:Object.hasOwn(request.headers,'authorization'), override: request.headers['cloudflare-workers-version-overrides'], probe: request.headers['x-locally-release-probe'] });
     if (pathname === '/.well-known/locally-release') { response.writeHead(204, { 'X-Locally-Worker-Version': candidateId }).end(); return; }
     if (pathname === '/api/proxy-bookings') { response.writeHead(401).end(); return; }
-    if (pathname === '/data') { response.writeHead(200, { 'content-type': 'application/json' }).end('{}'); return; }
+    if (pathname === '/data' || pathname === '/authorized-read') { response.writeHead(200, { 'content-type': 'application/json' }).end('{}'); return; }
     if (files.has(pathname)) {
+      if(pathname.endsWith('app.js')){response.writeHead(200,{'content-type':'text/javascript','content-encoding':'gzip'}).end(gzipSync(files.get(pathname)));return;}
       response.writeHead(200, { 'content-type': pathname.endsWith('.js')?'text/javascript':pathname.endsWith('.css')?'text/css':pathname.endsWith('.woff2')?'font/woff2':'application/octet-stream' });
       if(pathname.endsWith('slow.bin')){response.flushHeaders();setTimeout(()=>response.end(files.get(pathname)),2200);}else response.end(files.get(pathname));return;
     }
@@ -270,8 +275,9 @@ test('Chromium dismisses the existing inert Home notice, then proves client menu
       <link rel="preload" href="/_next/static/font.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/_next/static/style.css">
       <link rel="preload" href="/_next/static/unused.bin" as="unsupported-fixture-type"><link rel="preload" href="/_next/static/slow.bin" as="fetch" crossorigin>
       <style>@font-face{font-family:fixture;src:url('/_next/static/font.woff2')}body{font-family:fixture}</style>
-      <script src="/_next/static/app.js"></script><body><h1>Fixture</h1><button id="globe"><svg class="lucide-globe" width="18" height="18"></svg></button><img src="/image.svg"><a href="/experiences/42">Experience</a>
+      <script src="/_next/static/app.js"></script><body><h1>Fixture</h1><button id="globe"><svg class="lucide-globe" width="18" height="18"></svg></button><img src="/image.svg"><a href="/experiences/4659">Experience</a>
       ${pathname === '/' ? '<div data-testid="legacy-experience-popup-overlay" style="position:fixed;inset:0;z-index:170;background:white"><button data-testid="legacy-experience-popup-close">Close notice</button></div>' : ''}
+      ${pathname === '/experiences/4659' ? '<p data-testid="experience-summary-description-desktop">Existing description</p><button data-testid="experience-summary-read-more-desktop">Read more</button>' : ''}
       ${pathname === '/login' ? '<div data-testid="login-modal"><input type="email"><input type="password"></div>' : ''}</body>`);
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve)); const origin = `http://127.0.0.1:${server.address().port}`;
@@ -279,18 +285,64 @@ test('Chromium dismisses the existing inert Home notice, then proves client menu
     const smoke = await runCandidateBrowserSmoke({ origin, mode: 'override', workerName: PRODUCTION_WORKER, versionId: candidateId }, { readAsset: async pathname => files.get(pathname) });
     assertFullCandidateSmoke(smoke); assertOverrideIdentity({ versionId: candidateId, smoke, expectedOrigin: origin });
     assert(Object.values(smoke.overrideCoverage).every(Boolean));
-    assert.deepEqual(smoke.clientInteractions.map(r=>r.pathname),['/','/experiences/42']);
-    assert.deepEqual(smoke.clientInteractions.map(r=>r.noticeDismissed),[true,false]);
+    assert.deepEqual(smoke.clientInteractions.map(r=>r.pathname),['/','/experiences/4659']);
+    assert.equal(smoke.clientInteractions[0].noticeDismissed,true);
+    assert.deepEqual(smoke.clientInteractions[1],{pathname:'/experiences/4659',interaction:'experience-description-read-more',clicked:true,expanded:true,descriptionVisible:true});
+    assert(smoke.anonymousReadHeaders.cookieHeadersStripped>0);
+    assert(smoke.anonymousReadHeaders.authorizationHeadersStripped>0);
+    assert.equal(smoke.allFirstPartyReadsAnonymous,true);
+    assert(received.every(r=>!r.cookiePresent&&!r.authorizationPresent),JSON.stringify(received.filter(r=>r.cookiePresent||r.authorizationPresent)));
+    assert(!JSON.stringify({smoke,received}).includes('SENTINEL_NEVER_LOG'));
     assert(smoke.assetEvidence.some(r=>r.browserPending.some(p=>p.pathname==='/_next/static/slow.bin')));
     assert(smoke.assetResponses.every(r=>r.hashMatch&&r.bodyComplete&&r.source==='direct-candidate-get'));
     assert(smoke.resourceHintProofs.some(r=>r.pathname==='/_next/static/unused.bin'));
     assert(!smoke.browserAssetResponses.some(r=>r.pathname==='/_next/static/unused.bin'));
     assert.equal(smoke.requestFailures.length,0);
-    for (const path of ['/', '/login', '/experiences/42', '/_next/static/app.js', '/_next/static/font.woff2', '/_next/static/style.css', '/image.svg', '/data', '/api/proxy-bookings']) {
+    for (const path of ['/', '/login', '/experiences/4659', '/_next/static/app.js', '/_next/static/font.woff2', '/_next/static/style.css', '/image.svg', '/data', '/api/proxy-bookings']) {
       assert(received.some(r => r.pathname === path), path); assert(received.filter(r => r.pathname === path).every(r => r.override === versionOverrideHeader(PRODUCTION_WORKER, candidateId) && r.probe === undefined), path);
     }
     assert(received.every(r => r.method === 'GET'), 'mutation gate must not forward telemetry POST');
   } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
+});
+
+test('ordinary stable Home and 4659 use the same client interactions without an Experience globe handler or writes', async () => {
+  const server = createServer((request,response) => {
+    if(request.url==='/api/proxy-bookings'){response.writeHead(401).end();return;}
+    response.writeHead(200,{'content-type':'text/html'}).end(`<!doctype html><title>Fixture</title><body><h1>Fixture</h1><a href="/experiences/4659">Experience</a>
+      ${request.url==='/'?'<button id="globe"><svg class="lucide-globe" width="18" height="18"></svg></button><script>document.querySelector("#globe").onclick=()=>{const m=document.querySelector("#menu");if(m)m.remove();else{const m=document.createElement("button");m.id="menu";m.textContent="English";document.body.append(m);}};</script>':''}
+      ${request.url==='/experiences/4659'?'<p data-testid="experience-summary-description-desktop">Fixture description</p><button data-testid="experience-summary-read-more-desktop">Read more</button><script>document.querySelector("[data-testid=experience-summary-read-more-desktop]").onclick=event=>event.target.remove();</script>':''}
+      ${request.url==='/login'?'<div data-testid="login-modal"><input type="email"></div>':''}</body>`);
+  });
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  const interactions=[];
+  try {
+    const stable=await runProductionBrowserSmoke(`http://127.0.0.1:${server.address().port}`,{log:()=>{},collectReadOnlyPageEvidence:async page=>{
+      const pathname=new URL(page.url()).pathname;
+      if(pathname==='/'||pathname==='/experiences/4659')interactions.push(await verifyReadOnlyClientInteraction(page));
+    }});
+    assert.equal(stable.status,'LOCALLY_PRODUCTION_BROWSER_SMOKE_PASS');
+    assert.deepEqual(interactions.map(r=>r.interaction),['locale-menu-open-close','experience-description-read-more']);
+    assert.equal(stable.blockedUnexpectedWrites.length+stable.blockedUnexpectedExternalWrites.length,0);
+  } finally {server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}
+});
+
+test('Experience read-more requires visible button, real handler execution and a remaining description; never substitutes globe', async () => {
+  for (const failure of ['missing-button', 'handler-not-ready', 'button-remains', 'description-disappears']) {
+    let clicks = 0;
+    const page = {
+      url: () => PRODUCTION_ORIGIN + '/experiences/4659',
+      getByTestId: name => {
+        assert(['experience-summary-read-more-desktop','experience-summary-description-desktop'].includes(name));
+        return { waitFor: async ({state}) => {
+          if ((failure==='missing-button' && name.endsWith('read-more-desktop'))
+            || (failure==='button-remains' && state==='hidden')
+            || (failure==='description-disappears' && clicks && name.endsWith('description-desktop'))) throw Error('fixture readiness failure');
+        }, click: async () => { clicks++; } };
+      },
+      waitForFunction: async () => { if(failure==='handler-not-ready') throw Error('fixture SSR-only'); },
+    };
+    await assert.rejects(verifyReadOnlyClientInteraction(page),blocked('candidate_client_interaction_failed'));
+  }
 });
 
 function compatibleProof() {
@@ -438,7 +490,7 @@ async function captureOrderingFixture(options = {}) {
     const request = { url: () => PRODUCTION_ORIGIN + pathname + '?private=NEVER_LOG', method: () => 'GET', resourceType: () => type,
       frame: () => ({ page: () => page }), redirectedFrom: () => redirected ? {} : null,
       failure:()=>({errorText:options.teardownFailure?'net::ERR_ABORTED':'net::ERR_FAILED'}),
-      headerValue: async name => { await latch; return name === 'cloudflare-workers-version-overrides' ? missingOverride ? null : override : pathname === '/.well-known/locally-release' ? '1' : null; } };
+      headerValue: async name => { await latch; return name === 'cloudflare-workers-version-overrides' ? missingOverride ? null : override : name === 'x-locally-release-probe' && pathname === '/.well-known/locally-release' ? '1' : null; } };
     context.emit('request', request);applyOverride?.({pathname,resourceType:type,method:'GET'});
     if(options.requestFailure&&pathname.endsWith('app.js')){context.emit('requestfailed',request);return;}
     context.emit('response', { request: () => request, status: () => status, finished: async () => {throw Error('Body completion must not be a one-second gate');},
@@ -462,7 +514,9 @@ async function captureOrderingFixture(options = {}) {
   const result = await runCandidateBrowserSmoke({ origin: PRODUCTION_ORIGIN, mode: 'override', workerName: PRODUCTION_WORKER, versionId: candidateId }, {
     verifyInteraction:async page=>{
       if(options.hydrationFailure)throw new CandidateReleaseBlocked('candidate_client_interaction_failed');
-      return {pathname:new URL(page.url()).pathname,opened:!options.ssrOnly,closed:true,interaction:'locale-menu-open-close'};
+      const pathname=new URL(page.url()).pathname;
+      return pathname==='/'?{pathname,opened:!options.ssrOnly,closed:true,interaction:'locale-menu-open-close'}:
+        {pathname,clicked:!options.ssrOnly,expanded:true,descriptionVisible:true,interaction:'experience-description-read-more'};
     },
     readAsset: async () => Buffer.from('fixture-static-bytes'),
     fetchImplementation: async (url, init) => {

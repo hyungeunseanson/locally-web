@@ -56,6 +56,7 @@ export async function installProductionMutationGate(context, origin, {
   reviewedExternalTelemetry = REVIEWED_EXTERNAL_TELEMETRY,
   reviewedExternalScriptStubs = REVIEWED_EXTERNAL_SCRIPT_STUBS,
   versionOverride,
+  fetchImplementation = fetch,
 } = {}) {
   const productionOrigin = new URL(origin).origin;
   const override = versionOverride === undefined ? null : versionOverrideHeader(versionOverride.workerName, versionOverride.versionId);
@@ -64,6 +65,27 @@ export async function installProductionMutationGate(context, origin, {
   const blockedExpectedExternalWrites = [];
   const blockedUnexpectedExternalWrites = [];
   const stubbedExternalScripts = [];
+  const anonymousReadHeaders = { cookieHeadersStripped: 0, authorizationHeadersStripped: 0 };
+  const pendingCandidateReads = new Map();
+  const abortPendingReads = async page => {
+    await Promise.all([...pendingCandidateReads].filter(([, state]) => !page || state.page === page).map(async ([route, state]) => {
+      state.teardown = true;
+      state.controller.abort();
+      await route.abort('aborted').catch(() => {});
+    }));
+  };
+  if (override) {
+    // Closing an intercepted page/context must not release paused requests with
+    // their original credentials. Abort those reads before Chromium teardown.
+    context.on?.('page', page => {
+      const close = page.close.bind(page);
+      page.close = async (...args) => { await abortPendingReads(page); return close(...args); };
+    });
+    if (typeof context.close === 'function') {
+      const close = context.close.bind(context);
+      context.close = async (...args) => { await abortPendingReads(); return close(...args); };
+    }
+  }
 
   await context.route('**/*', async (route) => {
     const request = route.request();
@@ -94,13 +116,35 @@ export async function installProductionMutationGate(context, origin, {
 
     if (READ_METHODS.has(method)) {
       if (override && url.origin === productionOrigin) {
-        if (request.headers().cookie || request.headers().authorization) {
-          blockedUnexpectedWrites.push({ method, pathname: url.pathname, kind: 'candidate_authenticated_read_forbidden' });
-          await route.abort('blockedbyclient'); return;
-        }
-        await route.continue({ headers: { ...request.headers(), 'Cloudflare-Workers-Version-Overrides': override,
-          ...(url.pathname === '/.well-known/locally-release' && ['GET', 'HEAD'].includes(method) ? { 'X-Locally-Release-Probe': '1' } : {}) } });
-        versionOverride.onApplied?.({ pathname: url.pathname, resourceType: request.resourceType(), method });
+        const state = { controller: new AbortController(), page: request.frame?.().page(), teardown: false };
+        pendingCandidateReads.set(route, state);
+        try {
+          const headers = { ...await request.allHeaders() };
+          if (state.teardown) return;
+          if (Object.hasOwn(headers, 'cookie')) anonymousReadHeaders.cookieHeadersStripped += 1;
+          if (Object.hasOwn(headers, 'authorization')) anonymousReadHeaders.authorizationHeadersStripped += 1;
+          delete headers.cookie;
+          delete headers.authorization;
+          delete headers['cloudflare-workers-version-overrides'];
+          delete headers['x-locally-release-probe'];
+          headers['Cloudflare-Workers-Version-Overrides'] = override;
+          if (url.pathname === '/.well-known/locally-release' && ['GET', 'HEAD'].includes(method)) headers['X-Locally-Release-Probe'] = '1';
+          // The optional second argument is in-memory correlation only. The
+          // serializable receipt contains no header or cookie values.
+          versionOverride.onApplied?.({ pathname: url.pathname, resourceType: request.resourceType(), method, anonymous: true, forwarding: 'stateless-read' }, request);
+          // Chromium restores cookies and releases paused reads on teardown.
+          // Forward candidate reads statelessly: no cookie jar, credentials,
+          // redirect following or retry; preserve HTTP and transport errors.
+          const response = await fetchImplementation(request.url(), { method, headers, redirect: 'manual', signal: AbortSignal.any([AbortSignal.timeout(NAVIGATION_TIMEOUT_MS), state.controller.signal]) });
+          const responseHeaders = Object.fromEntries(response.headers);
+          // Fetch decodes compression; let fulfill set the decoded body length.
+          delete responseHeaders['content-encoding'];
+          delete responseHeaders['content-length'];
+          const cookies = response.headers.getSetCookie();
+          if (cookies.length) responseHeaders['set-cookie'] = cookies.join('\n');
+          await route.fulfill({ status: response.status, headers: responseHeaders, body: Buffer.from(await response.arrayBuffer()) });
+        } catch { if (!state.teardown) await route.abort('failed').catch(() => {}); }
+        finally { pendingCandidateReads.delete(route); }
       } else {
         if (override && url.origin !== productionOrigin) {
           const headers = { ...request.headers() };
@@ -176,6 +220,7 @@ export async function installProductionMutationGate(context, origin, {
     blockedExpectedExternalWrites,
     blockedUnexpectedExternalWrites,
     stubbedExternalScripts,
+    anonymousReadHeaders,
   };
 }
 
@@ -506,6 +551,7 @@ export async function runProductionBrowserSmoke(
       blockedExpectedExternalWrites,
       blockedUnexpectedExternalWrites,
       stubbedExternalScripts,
+      anonymousReadHeaders: mutationGate.anonymousReadHeaders,
     };
   } catch (error) {
     smokeError = error;
