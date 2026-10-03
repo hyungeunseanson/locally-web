@@ -1,6 +1,6 @@
 {
   "schemaContractVersion": 5,
-  "capturedAt": "2026-10-02",
+  "capturedAt": "2026-10-03",
   "productionProjectRef": "uhinvcydgzqlpnvieyal",
   "source": {
     "kind": "read-only Production PostgreSQL catalog inventory",
@@ -18,7 +18,7 @@
     "publicRlsPolicies": "e5a16a4215c569060fbf895453a5cd00",
     "publicRelationGrants": "a9c644ba2ab5c795f29aff57092aa002",
     "stagingOverlayBaselineStoragePolicies": "d6b381fd629405acfdd615593031de5c",
-    "privateRelationGrants": "c0c83ee9ce880c47d3d24f3f918b4364"
+    "privateRelationGrants": "4c987b9bd1b8fdc56ed01bca38365c7d"
   },
   "migrationLedger": [
     {
@@ -128,6 +128,22 @@
       "repositoryFile": "supabase/migrations/20261002041848_admin_attention_badges_phase_2.sql",
       "repositorySha256": "d20d5774318f8fe52dc41d13a533728b13c98a20fab812cd693737dba0de51a2",
       "ledgerStatementsSha256": "d20d5774318f8fe52dc41d13a533728b13c98a20fab812cd693737dba0de51a2"
+    },
+    {
+      "version": "20261003012400",
+      "name": "phone_followup_tasks",
+      "repositoryVersion": "20261002140902",
+      "repositoryFile": "supabase/migrations/20261002140902_phone_followup_tasks.sql",
+      "repositorySha256": "88769a249dca3d7b2f0cbd2dc6a8cf2197960213a357bac71353978a5ae0e396",
+      "ledgerStatementsSha256": "88769a249dca3d7b2f0cbd2dc6a8cf2197960213a357bac71353978a5ae0e396"
+    },
+    {
+      "version": "20261003134417",
+      "name": "admin_chat_bounded_search",
+      "repositoryVersion": "20261003122803",
+      "repositoryFile": "supabase/migrations/20261003122803_admin_chat_bounded_search.sql",
+      "repositorySha256": "0e9776caab4c826924eade21baa229ec73a27857d9c1c9bb75a97b25b1b31724",
+      "ledgerStatementsSha256": "0e9776caab4c826924eade21baa229ec73a27857d9c1c9bb75a97b25b1b31724"
     }
   ],
   "operationalStateDeltas": [
@@ -202,6 +218,7 @@
       "public.claim_experience_payment_atomic(p_booking_id text, p_user_id uuid, p_provider text, p_provider_reference text)",
       "public.complete_admin_manual_experience_payout_atomic(p_request_key uuid, p_host_id uuid, p_settlement_type text, p_expected_current_booking_amount integer, p_legacy_amount integer, p_reason text, p_legacy_source_reference text, p_transfer_reference text, p_paid_by_admin_id uuid, p_paid_by_admin_email text)",
       "public.complete_experience_booking_if_due_atomic(p_booking_id text)",
+      "public.complete_phone_request(p_request_id uuid, p_inquiry_id bigint, p_message_ids bigint[], p_admin_id uuid)",
       "public.complete_service_booking_if_due_atomic(p_booking_id text)",
       "public.complete_service_concierge_booking_if_due_atomic(p_booking_id text)",
       "public.confirm_experience_bank_payment_atomic(p_booking_id text)",
@@ -221,6 +238,7 @@
       "public.finish_service_refund_operation_atomic(p_operation_id uuid, p_outcome text, p_provider_reference text, p_error_message text)",
       "public.get_admin_attention(p_inquiry_ids bigint[])",
       "public.get_admin_inquiry_activity(p_inquiry_ids bigint[])",
+      "public.get_admin_phone_activity(p_inquiry_ids bigint[])",
       "public.get_experience_completion_due_backlog()",
       "public.get_ops_anomaly_snapshot(p_observed_at timestamp with time zone, p_claim_overdue_minutes integer, p_refund_stale_minutes integer, p_payout_long_hold_days integer, p_experience_job_missing_minutes integer, p_service_job_missing_minutes integer, p_cancel_pending_job_missing_minutes integer)",
       "public.guard_experience_payment_claim_columns()",
@@ -239,7 +257,9 @@
       "public.record_translation_provider_outcome(p_provider text, p_token_count integer, p_cooldown_seconds integer, p_hit_quota boolean)",
       "public.record_translation_provider_outcome(p_provider text, p_token_count integer, p_cooldown_seconds integer, p_hit_quota boolean, p_reserved_token_count integer)",
       "public.refresh_experience_popularity_snapshot()",
+      "public.reply_phone_request(p_request_id uuid, p_inquiry_id bigint, p_message_ids bigint[], p_admin_id uuid, p_content text, p_type text, p_image_url text)",
       "public.request_service_cancellation_review_atomic(p_actor_id uuid, p_order_id text, p_cancel_reason text)",
+      "public.search_admin_chat(p_surface text, p_query text)",
       "public.select_service_host_atomic(p_customer_id uuid, p_request_id uuid, p_application_id uuid)",
       "public.set_proxy_comments_updated_at()",
       "public.set_proxy_requests_updated_at()",
@@ -249,7 +269,13 @@
       "public.snapshot_booking_guest_demographics()"
     ],
     "privateFunctionOverloads": [
+      "private.admin_chat_phone_title(category text, form_data jsonb)",
+      "private.adopt_phone_followup_link()",
       "private.advance_support_version()",
+      "private.capture_phone_followup()",
+      "private.delete_pending_phone_followup()",
+      "private.handle_phone_followup(p_request uuid, p_inquiry bigint, p_ids bigint[], p_admin uuid, p_complete boolean)",
+      "private.has_phone_followup(p_request uuid)",
       "private.is_admin_reader()",
       "private.is_inquiry_admin_sender(p_sender uuid)",
       "private.prepare_support_message()"
@@ -264,13 +290,16 @@
       "public.community_likes.on_like_removed",
       "public.inquiries.inquiry_support_version",
       "public.inquiry_messages.inquiry_support_message",
+      "public.inquiry_messages.phone_followup_capture",
+      "public.inquiry_messages.phone_followup_delete",
       "public.proxy_comments.trg_pc_updated_at",
+      "public.proxy_requests.phone_followup_link",
       "public.proxy_requests.trg_pr_updated_at",
       "public.service_applications.trg_sa_updated_at",
       "public.service_bookings.trg_sb_updated_at",
       "public.service_requests.trg_sr_updated_at"
     ],
-    "indexes": 120,
+    "indexes": 133,
     "constraints": {
       "total": 180,
       "primaryKey": 39,
@@ -339,12 +368,36 @@
       ]
     },
     "storageBuckets": [
-      {"name": "admin_files", "public": false, "fileSizeLimit": 10485760},
-      {"name": "avatars", "public": true, "fileSizeLimit": null},
-      {"name": "chat-images", "public": false, "fileSizeLimit": null},
-      {"name": "experiences", "public": false, "fileSizeLimit": null},
-      {"name": "images", "public": true, "fileSizeLimit": null},
-      {"name": "verification-docs", "public": false, "fileSizeLimit": null}
+      {
+        "name": "admin_files",
+        "public": false,
+        "fileSizeLimit": 10485760
+      },
+      {
+        "name": "avatars",
+        "public": true,
+        "fileSizeLimit": null
+      },
+      {
+        "name": "chat-images",
+        "public": false,
+        "fileSizeLimit": null
+      },
+      {
+        "name": "experiences",
+        "public": false,
+        "fileSizeLimit": null
+      },
+      {
+        "name": "images",
+        "public": true,
+        "fileSizeLimit": null
+      },
+      {
+        "name": "verification-docs",
+        "public": false,
+        "fileSizeLimit": null
+      }
     ],
     "storageObjectPolicies": [
       "Admins can delete files",
@@ -365,14 +418,16 @@
       "Verification docs owners can upload"
     ],
     "privateTables": [
-      "admin_monitor_cutover"
+      "admin_monitor_cutover",
+      "phone_followup_tasks"
     ],
-    "privateTableColumns": 4,
-    "privateIndexes": 1,
-    "privateConstraints": 4,
+    "privateTableColumns": 9,
+    "privateIndexes": 4,
+    "privateConstraints": 8,
     "privateRls": {
       "enabled": [
-        "admin_monitor_cutover"
+        "admin_monitor_cutover",
+        "phone_followup_tasks"
       ],
       "forced": [],
       "policies": 0
@@ -738,5 +793,339 @@
       "service_role"
     ],
     "searchPath": ""
+  },
+  "phoneFollowup": {
+    "table": {
+      "acl": "{postgres=arwdDxtm/postgres}",
+      "owner": "postgres",
+      "columns": [
+        {
+          "name": "proxy_request_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "inquiry_id",
+          "type": "bigint",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "message_id",
+          "type": "bigint",
+          "default": null,
+          "nullable": false
+        },
+        {
+          "name": "handled_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "nullable": true
+        },
+        {
+          "name": "handled_by",
+          "type": "uuid",
+          "default": null,
+          "nullable": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "phone_followup_pending_idx",
+          "definition": "CREATE INDEX phone_followup_pending_idx ON private.phone_followup_tasks USING btree (proxy_request_id, message_id) WHERE (handled_at IS NULL)"
+        },
+        {
+          "name": "phone_followup_tasks_inquiry_id_message_id_key",
+          "definition": "CREATE UNIQUE INDEX phone_followup_tasks_inquiry_id_message_id_key ON private.phone_followup_tasks USING btree (inquiry_id, message_id)"
+        },
+        {
+          "name": "phone_followup_tasks_pkey",
+          "definition": "CREATE UNIQUE INDEX phone_followup_tasks_pkey ON private.phone_followup_tasks USING btree (proxy_request_id, message_id)"
+        }
+      ],
+      "policies": 0,
+      "rlsForced": false,
+      "rlsEnabled": true,
+      "constraints": [
+        {
+          "name": "phone_followup_tasks_check",
+          "type": "c",
+          "definition": "CHECK (((handled_at IS NULL) = (handled_by IS NULL)))"
+        },
+        {
+          "name": "phone_followup_tasks_inquiry_id_message_id_key",
+          "type": "u",
+          "definition": "UNIQUE (inquiry_id, message_id)"
+        },
+        {
+          "name": "phone_followup_tasks_pkey",
+          "type": "p",
+          "definition": "PRIMARY KEY (proxy_request_id, message_id)"
+        },
+        {
+          "name": "phone_followup_tasks_proxy_request_id_fkey",
+          "type": "f",
+          "definition": "FOREIGN KEY (proxy_request_id) REFERENCES proxy_requests(id) ON DELETE CASCADE"
+        }
+      ]
+    },
+    "functions": [
+      {
+        "acl": "{postgres=X/postgres}",
+        "owner": "postgres",
+        "result": "trigger",
+        "bodyMd5": "0f0846bd82740f86bf756a4d3efdb62a",
+        "identity": "private.adopt_phone_followup_link()",
+        "volatility": "v",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": true
+      },
+      {
+        "acl": "{postgres=X/postgres}",
+        "owner": "postgres",
+        "result": "trigger",
+        "bodyMd5": "8b14875d99f0233491ba8eb1b3529db4",
+        "identity": "private.capture_phone_followup()",
+        "volatility": "v",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": true
+      },
+      {
+        "acl": "{postgres=X/postgres}",
+        "owner": "postgres",
+        "result": "trigger",
+        "bodyMd5": "12ce85f818fcfb042d310e682099ed80",
+        "identity": "private.delete_pending_phone_followup()",
+        "volatility": "v",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": true
+      },
+      {
+        "acl": "{postgres=X/postgres}",
+        "owner": "postgres",
+        "result": "jsonb",
+        "bodyMd5": "ad6dfa357618613a3e720bb88ab910ed",
+        "identity": "private.handle_phone_followup(p_request uuid, p_inquiry bigint, p_ids bigint[], p_admin uuid, p_complete boolean)",
+        "volatility": "v",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": true
+      },
+      {
+        "acl": "{postgres=X/postgres}",
+        "owner": "postgres",
+        "result": "boolean",
+        "bodyMd5": "406db886025fdbc9a246fb2b7f2de399",
+        "identity": "private.has_phone_followup(p_request uuid)",
+        "volatility": "s",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": true
+      },
+      {
+        "acl": "{postgres=X/postgres,service_role=X/postgres}",
+        "owner": "postgres",
+        "result": "jsonb",
+        "bodyMd5": "508e40c27519c58cef86371ca083428d",
+        "identity": "public.complete_phone_request(p_request_id uuid, p_inquiry_id bigint, p_message_ids bigint[], p_admin_id uuid)",
+        "volatility": "v",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": true
+      },
+      {
+        "acl": "{postgres=X/postgres,service_role=X/postgres}",
+        "owner": "postgres",
+        "result": "TABLE(inquiry_id bigint, status text, updated_at timestamp with time zone, last_message_at timestamp with time zone, last_sender_role text, last_message_content text, needs_reply boolean, reply_waiting_since timestamp with time zone, support_reopened_at timestamp with time zone, admin_unread_count bigint, phone_needs_reply boolean)",
+        "bodyMd5": "f8c71d91ff642c0be0844befecc74d80",
+        "identity": "public.get_admin_phone_activity(p_inquiry_ids bigint[])",
+        "volatility": "s",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": true
+      },
+      {
+        "acl": "{postgres=X/postgres,service_role=X/postgres}",
+        "owner": "postgres",
+        "result": "jsonb",
+        "bodyMd5": "a3642483ffa73c83cfb9f7273e76c81a",
+        "identity": "public.reply_phone_request(p_request_id uuid, p_inquiry_id bigint, p_message_ids bigint[], p_admin_id uuid, p_content text, p_type text, p_image_url text)",
+        "volatility": "v",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": true
+      }
+    ],
+    "triggers": [
+      {
+        "name": "phone_followup_capture",
+        "table": "inquiry_messages",
+        "definition": "CREATE TRIGGER phone_followup_capture AFTER INSERT ON public.inquiry_messages FOR EACH ROW EXECUTE FUNCTION private.capture_phone_followup()"
+      },
+      {
+        "name": "phone_followup_delete",
+        "table": "inquiry_messages",
+        "definition": "CREATE TRIGGER phone_followup_delete AFTER DELETE OR UPDATE OF type ON public.inquiry_messages FOR EACH ROW EXECUTE FUNCTION private.delete_pending_phone_followup()"
+      },
+      {
+        "name": "phone_followup_link",
+        "table": "proxy_requests",
+        "definition": "CREATE TRIGGER phone_followup_link AFTER INSERT OR UPDATE OF form_data, user_id ON public.proxy_requests FOR EACH ROW EXECUTE FUNCTION private.adopt_phone_followup_link()"
+      }
+    ],
+    "publicIndexes": [
+      {
+        "name": "proxy_requests_phone_link_idx",
+        "definition": "CREATE INDEX proxy_requests_phone_link_idx ON public.proxy_requests USING btree (btrim((form_data ->> 'linked_inquiry_id'::text))) WHERE ((form_data ->> '__proxy_card_anchor'::text) IS DISTINCT FROM 'v1'::text)"
+      }
+    ],
+    "directTableRoles": [],
+    "publicRpcExecuteRoles": [
+      "service_role"
+    ]
+  },
+  "adminChatSearch": {
+    "extension": {
+      "name": "pg_trgm",
+      "schema": "extensions",
+      "version": "1.6"
+    },
+    "functions": [
+      {
+        "acl": "{postgres=X/postgres,service_role=X/postgres}",
+        "owner": "postgres",
+        "result": "TABLE(id text, customer_name text, customer_email text, title text)",
+        "bodyMd5": "aa39a4e250b5cb71b26ad7340f2e7166",
+        "identity": "public.search_admin_chat(p_surface text, p_query text)",
+        "parallel": "u",
+        "volatility": "s",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": false
+      },
+      {
+        "acl": "{postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+        "owner": "postgres",
+        "result": "text",
+        "bodyMd5": "748c55d7ba0447eadf460de422f96c6c",
+        "identity": "private.admin_chat_phone_title(category text, form_data jsonb)",
+        "parallel": "s",
+        "volatility": "i",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": false
+      }
+    ],
+    "indexes": [
+      {
+        "name": "admin_chat_experience_title_search",
+        "ready": true,
+        "valid": true,
+        "schema": "public",
+        "definition": "CREATE INDEX admin_chat_experience_title_search ON public.experiences USING gin (title gin_trgm_ops)"
+      },
+      {
+        "name": "admin_chat_inquiry_customer",
+        "ready": true,
+        "valid": true,
+        "schema": "public",
+        "definition": "CREATE INDEX admin_chat_inquiry_customer ON public.inquiries USING btree (user_id) WHERE (type = ANY (ARRAY['admin'::text, 'admin_support'::text]))"
+      },
+      {
+        "name": "admin_chat_inquiry_experience",
+        "ready": true,
+        "valid": true,
+        "schema": "public",
+        "definition": "CREATE INDEX admin_chat_inquiry_experience ON public.inquiries USING btree (experience_id) WHERE (type = ANY (ARRAY['admin'::text, 'admin_support'::text]))"
+      },
+      {
+        "name": "admin_chat_inquiry_id_search",
+        "ready": true,
+        "valid": true,
+        "schema": "public",
+        "definition": "CREATE INDEX admin_chat_inquiry_id_search ON public.inquiries USING gin (((id)::text) gin_trgm_ops) WHERE (type = ANY (ARRAY['admin'::text, 'admin_support'::text]))"
+      },
+      {
+        "name": "admin_chat_phone_contact_search",
+        "ready": true,
+        "valid": true,
+        "schema": "public",
+        "definition": "CREATE INDEX admin_chat_phone_contact_search ON public.proxy_requests USING gin (((form_data ->> 'contact_name'::text)) gin_trgm_ops)"
+      },
+      {
+        "name": "admin_chat_phone_id_search",
+        "ready": true,
+        "valid": true,
+        "schema": "public",
+        "definition": "CREATE INDEX admin_chat_phone_id_search ON public.proxy_requests USING gin (((id)::text) gin_trgm_ops)"
+      },
+      {
+        "name": "admin_chat_phone_link",
+        "ready": true,
+        "valid": true,
+        "schema": "public",
+        "definition": "CREATE INDEX admin_chat_phone_link ON public.proxy_requests USING btree (((form_data ->> 'linked_inquiry_id'::text))) WHERE ((form_data ->> '__proxy_card_anchor'::text) IS DISTINCT FROM 'v1'::text)"
+      },
+      {
+        "name": "admin_chat_phone_order_search",
+        "ready": true,
+        "valid": true,
+        "schema": "public",
+        "definition": "CREATE INDEX admin_chat_phone_order_search ON public.proxy_requests USING gin (locally_order_id gin_trgm_ops)"
+      },
+      {
+        "name": "admin_chat_phone_reservation_search",
+        "ready": true,
+        "valid": true,
+        "schema": "public",
+        "definition": "CREATE INDEX admin_chat_phone_reservation_search ON public.proxy_requests USING gin (((form_data ->> 'reservation_name'::text)) gin_trgm_ops)"
+      },
+      {
+        "name": "admin_chat_phone_title_search",
+        "ready": true,
+        "valid": true,
+        "schema": "public",
+        "definition": "CREATE INDEX admin_chat_phone_title_search ON public.proxy_requests USING gin (private.admin_chat_phone_title(category, form_data) gin_trgm_ops)"
+      },
+      {
+        "name": "admin_chat_profile_email_search",
+        "ready": true,
+        "valid": true,
+        "schema": "public",
+        "definition": "CREATE INDEX admin_chat_profile_email_search ON public.profiles USING gin (email gin_trgm_ops)"
+      },
+      {
+        "name": "admin_chat_profile_name_search",
+        "ready": true,
+        "valid": true,
+        "schema": "public",
+        "definition": "CREATE INDEX admin_chat_profile_name_search ON public.profiles USING gin (full_name gin_trgm_ops)"
+      }
+    ],
+    "publicRpcExecuteRoles": [
+      "service_role"
+    ],
+    "helperExecuteRoles": [
+      "anon",
+      "authenticated",
+      "service_role"
+    ],
+    "minimumQueryLength": 2,
+    "resultLimit": 25,
+    "lockTimeout": "2s"
   }
 }

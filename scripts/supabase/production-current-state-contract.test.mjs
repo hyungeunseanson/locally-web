@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
+import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
 
 const current = await readFile('supabase/staging/current-state-contract.sql', 'utf8');
 const staging = await readFile('supabase/staging/schema-contract.sql', 'utf8');
@@ -9,16 +10,21 @@ const chat = current.match(/DO \$admin_message_monitoring_contract\$[\s\S]*?\$ad
 const ledger = current.match(/DO \$admin_monitoring_ledger_contract\$[\s\S]*?\$admin_monitoring_ledger_contract\$;/)?.[0];
 const attention = current.match(/DO \$admin_attention_contract\$[\s\S]*?\$admin_attention_contract\$;/)?.[0];
 const marker = current.match(/DO \$admin_attention_production_marker\$[\s\S]*?\$admin_attention_production_marker\$;/)?.[0];
+const phone = current.match(/DO \$phone_followup_catalog_contract\$[\s\S]*?\$phone_followup_catalog_contract\$;/)?.[0];
+const search = current.match(/DO \$admin_chat_search_contract\$[\s\S]*?\$admin_chat_search_contract\$;/)?.[0];
+const phoneSearchLedger = current.match(/DO \$phone_search_ledger_contract\$[\s\S]*?\$phone_search_ledger_contract\$;/)?.[0];
 assert.ok(chat && ledger && attention && marker);
+assert.ok(phone && search && phoneSearchLedger);
+assert.ok(staging.includes(phone) && staging.includes(search), 'staging shares applied Phone/search security');
 assert.ok(staging.includes(chat), 'staging and current-state enforce identical chat assertions');
 assert.ok(staging.includes(attention), 'staging and current-state enforce identical attention security');
 assert.ok(!staging.includes(marker), 'fresh staging counters must not pretend to be Production rollout counters');
 
-const db = new PGlite();
+const db = new PGlite({ extensions: { pg_trgm } });
 let driftChecks = 0;
 async function verify(sql) {
   try {
-    await db.exec(`BEGIN READ ONLY; ${sql} ROLLBACK;`);
+    await db.exec(`BEGIN READ ONLY; SET LOCAL search_path = public, extensions; ${sql} ROLLBACK;`);
   } finally {
     await db.exec('ROLLBACK;');
   }
@@ -120,6 +126,45 @@ try {
   await rejectDrift("UPDATE supabase_migrations.schema_migrations SET statements=ARRAY['-- altered Phase 2'] WHERE version='20261002075149'",
     () => db.query('UPDATE supabase_migrations.schema_migrations SET statements=$1 WHERE version=$2', [[phase2], '20261002075149']),
     /applied ledger SQL mapping mismatch/, ledger);
+  // Extend the isolated fixture to the two observed releases. Production is
+  // never connected: historical seeding here operates on empty local tables.
+  await db.exec(`CREATE SCHEMA extensions;
+    ALTER TABLE proxy_requests ALTER COLUMN id TYPE uuid USING id::uuid;
+    ALTER TABLE proxy_requests ADD COLUMN status text, ADD COLUMN payment_status text,
+      ADD COLUMN category text, ADD COLUMN locally_order_id text;
+    ALTER TABLE inquiries ADD COLUMN experience_id bigint;
+    ALTER TABLE inquiry_messages ADD COLUMN image_url text;
+    CREATE TABLE profiles(id uuid PRIMARY KEY, full_name text, email text);
+    CREATE TABLE experiences(id bigint PRIMARY KEY, title text);`);
+  const phoneMigration = await readFile('supabase/migrations/20261002140902_phone_followup_tasks.sql', 'utf8');
+  const searchMigration = await readFile('supabase/migrations/20261003122803_admin_chat_bounded_search.sql', 'utf8');
+  await db.exec(phoneMigration);
+  await db.exec(searchMigration);
+  await db.query('INSERT INTO supabase_migrations.schema_migrations VALUES ($1,$2,$3),($4,$5,$6)', [
+    '20261003012400', 'phone_followup_tasks', [phoneMigration],
+    '20261003134417', 'admin_chat_bounded_search', [searchMigration],
+  ]);
+  await verify(phone); await verify(search); await verify(phoneSearchLedger); await verify(attention);
+  await rejectDrift('GRANT EXECUTE ON FUNCTION search_admin_chat(text,text) TO PUBLIC',
+    'REVOKE EXECUTE ON FUNCTION search_admin_chat(text,text) FROM PUBLIC', /function body or ACL mismatch/, search);
+  await rejectDrift('REVOKE EXECUTE ON FUNCTION private.admin_chat_phone_title(text,jsonb) FROM authenticated',
+    'REVOKE EXECUTE ON FUNCTION private.admin_chat_phone_title(text,jsonb) FROM anon, authenticated, service_role; GRANT EXECUTE ON FUNCTION private.admin_chat_phone_title(text,jsonb) TO anon, authenticated, service_role',
+    /function body or ACL mismatch/, search);
+  const originalSearch = (await db.query("SELECT pg_get_functiondef('search_admin_chat(text,text)'::regprocedure) definition")).rows[0].definition;
+  await rejectDrift(originalSearch.replaceAll('LIMIT 25', 'LIMIT 26'), originalSearch, /function body or ACL mismatch/, search);
+  await rejectDrift('ALTER INDEX admin_chat_phone_title_search RENAME TO missing_search_index',
+    'ALTER INDEX missing_search_index RENAME TO admin_chat_phone_title_search', /index contract mismatch/, search);
+  await rejectDrift('GRANT SELECT ON private.phone_followup_tasks TO service_role',
+    'REVOKE SELECT ON private.phone_followup_tasks FROM service_role', /Phone task table security mismatch|Direct Phone task access/, phone);
+  await rejectDrift('ALTER TABLE private.phone_followup_tasks DISABLE ROW LEVEL SECURITY',
+    'ALTER TABLE private.phone_followup_tasks ENABLE ROW LEVEL SECURITY', /Phone task table security mismatch/, phone);
+  await rejectDrift('GRANT EXECUTE ON FUNCTION get_admin_phone_activity(bigint[]) TO anon',
+    'REVOKE EXECUTE ON FUNCTION get_admin_phone_activity(bigint[]) FROM anon', /function body or ACL mismatch/, phone);
+  await rejectDrift('ALTER INDEX private.phone_followup_pending_idx RENAME TO missing_phone_index',
+    'ALTER INDEX private.missing_phone_index RENAME TO phone_followup_pending_idx', /index contract mismatch/, phone);
+  await rejectDrift("UPDATE supabase_migrations.schema_migrations SET statements=ARRAY['-- wrong search SQL'] WHERE version='20261003134417'",
+    () => db.query('UPDATE supabase_migrations.schema_migrations SET statements=$1 WHERE version=$2', [[searchMigration], '20261003134417']),
+    /applied ledger SQL mapping mismatch/, phoneSearchLedger);
   console.log(JSON.stringify({ result: 'CURRENT_STATE_CATALOG_DRIFT_TEST_PASS', driftChecks, productionMutation: 0 }));
 } finally {
   await db.close();

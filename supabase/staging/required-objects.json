@@ -24,22 +24,7 @@
     "supabase/migrations/20261002140902_phone_followup_tasks.sql",
     "supabase/migrations/20261003122803_admin_chat_bounded_search.sql"
   ],
-  "pendingProductionMigrations": [
-    {
-      "version": "20261002140902",
-      "name": "phone_followup_tasks",
-      "repositoryFile": "supabase/migrations/20261002140902_phone_followup_tasks.sql",
-      "repositorySha256": "88769a249dca3d7b2f0cbd2dc6a8cf2197960213a357bac71353978a5ae0e396",
-      "status": "prepared_not_applied"
-    },
-    {
-      "version": "20261003122803",
-      "name": "admin_chat_bounded_search",
-      "repositoryFile": "supabase/migrations/20261003122803_admin_chat_bounded_search.sql",
-      "repositorySha256": "0e9776caab4c826924eade21baa229ec73a27857d9c1c9bb75a97b25b1b31724",
-      "status": "prepared_not_applied"
-    }
-  ],
+  "pendingProductionMigrations": [],
   "applicationTables": [
     "admin_audit_logs",
     "admin_job_runs",
@@ -88,6 +73,8 @@
   "applicationFunctions": [
     "ack_admin_inquiry_messages",
     "ack_admin_inquiry_snapshot",
+    "admin_chat_phone_title",
+    "adopt_phone_followup_link",
     "advance_support_version",
     "apply_experience_media_locator_cas",
     "assign_service_concierge_host_atomic",
@@ -96,12 +83,14 @@
     "begin_service_refund_operation_atomic",
     "cancel_expired_pending_bookings_atomic",
     "cancel_pending_service_concierge_atomic",
+    "capture_phone_followup",
     "check_rate_limit",
     "claim_due_admin_support_unread_alert_batches",
     "claim_due_review_request_reminders",
     "claim_experience_payment_atomic",
     "complete_admin_manual_experience_payout_atomic",
     "complete_experience_booking_if_due_atomic",
+    "complete_phone_request",
     "complete_service_booking_if_due_atomic",
     "complete_service_concierge_booking_if_due_atomic",
     "confirm_experience_bank_payment_atomic",
@@ -116,15 +105,19 @@
     "create_service_request_with_booking_atomic",
     "decrement_comment_count",
     "decrement_like_count",
+    "delete_pending_phone_followup",
     "ensure_profile_demographics_reminder",
     "finalize_proxy_card_intake_atomic",
     "finish_service_refund_operation_atomic",
     "get_admin_attention",
     "get_admin_inquiry_activity",
+    "get_admin_phone_activity",
     "get_experience_completion_due_backlog",
     "get_ops_anomaly_snapshot",
     "guard_experience_payment_claim_columns",
     "handle_new_user",
+    "handle_phone_followup",
+    "has_phone_followup",
     "increment_comment_count",
     "increment_community_post_view_count",
     "increment_like_count",
@@ -140,7 +133,9 @@
     "prune_team_workspace_tasks",
     "record_translation_provider_outcome",
     "refresh_experience_popularity_snapshot",
+    "reply_phone_request",
     "request_service_cancellation_review_atomic",
+    "search_admin_chat",
     "select_service_host_atomic",
     "set_proxy_comments_updated_at",
     "set_proxy_requests_updated_at",
@@ -159,7 +154,10 @@
     "on_like_removed",
     "inquiry_support_version",
     "inquiry_support_message",
+    "phone_followup_capture",
+    "phone_followup_delete",
     "trg_pc_updated_at",
+    "phone_followup_link",
     "trg_pr_updated_at",
     "trg_sa_updated_at",
     "trg_sb_updated_at",
@@ -320,6 +318,7 @@
     ]
   },
   "applicationPrivateTables": [
-    "private.admin_monitor_cutover"
+    "private.admin_monitor_cutover",
+    "private.phone_followup_tasks"
   ]
 }
