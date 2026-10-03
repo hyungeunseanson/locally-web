@@ -106,26 +106,24 @@ export async function installProductionMutationGate(context, origin, {
         delete headers['x-locally-release-probe'];
         headers['Cloudflare-Workers-Version-Overrides'] = override;
         if (url.pathname === '/.well-known/locally-release' && ['GET', 'HEAD'].includes(method)) headers['X-Locally-Release-Probe'] = '1';
-        const forwarding = hadCookie ? 'stateless-read' : 'browser-continue';
+        const forwarding = 'stateless-read';
         // The optional second argument is an in-memory correlation only. The
         // serializable receipt deliberately contains no header or cookie values.
         versionOverride.onApplied?.({ pathname: url.pathname, resourceType: request.resourceType(), method, anonymous: true, forwarding }, request);
-        if (hadCookie) {
-          // Chromium ignores Cookie removal in route.continue, even after its
-          // cookie jar is cleared. Forward only this read with a stateless fetch:
-          // no cookie jar, credentials, redirects or retry. Preserve HTTP errors
-          // and turn transport/body failures into real browser requestfailed.
-          try {
-            const response = await fetchImplementation(request.url(), { method, headers, redirect: 'manual', signal: AbortSignal.timeout(NAVIGATION_TIMEOUT_MS) });
-            const responseHeaders = Object.fromEntries(response.headers);
-            // Fetch decodes compression; let fulfill set the decoded body length.
-            delete responseHeaders['content-encoding'];
-            delete responseHeaders['content-length'];
-            const cookies = response.headers.getSetCookie();
-            if (cookies.length) responseHeaders['set-cookie'] = cookies.join('\n');
-            await route.fulfill({ status: response.status, headers: responseHeaders, body: Buffer.from(await response.arrayBuffer()) });
-          } catch { await route.abort('failed').catch(() => {}); }
-        } else await route.continue({ headers });
+        // Chromium can restore cookies or retry a continued preload without
+        // its overridden headers. Forward every candidate read statelessly:
+        // no cookie jar, credentials, redirects or retry. Preserve HTTP errors
+        // and turn transport/body failures into real browser requestfailed.
+        try {
+          const response = await fetchImplementation(request.url(), { method, headers, redirect: 'manual', signal: AbortSignal.timeout(NAVIGATION_TIMEOUT_MS) });
+          const responseHeaders = Object.fromEntries(response.headers);
+          // Fetch decodes compression; let fulfill set the decoded body length.
+          delete responseHeaders['content-encoding'];
+          delete responseHeaders['content-length'];
+          const cookies = response.headers.getSetCookie();
+          if (cookies.length) responseHeaders['set-cookie'] = cookies.join('\n');
+          await route.fulfill({ status: response.status, headers: responseHeaders, body: Buffer.from(await response.arrayBuffer()) });
+        } catch { await route.abort('failed').catch(() => {}); }
       } else {
         if (override && url.origin !== productionOrigin) {
           const headers = { ...request.headers() };

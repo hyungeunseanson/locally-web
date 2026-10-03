@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
+import { gzipSync } from 'node:zlib';
 import test from 'node:test';
 import { versionProvider, artifactDigest, deploymentId } from './active-version-artifact.fixture.mjs';
 import {
@@ -265,6 +266,7 @@ test('Stable and candidate Home / 4659 hydration, anonymous cookie/auth strippin
     if (pathname === '/api/proxy-bookings') { response.writeHead(401).end(); return; }
     if (pathname === '/data' || pathname === '/authorized-read') { response.writeHead(200, { 'content-type': 'application/json' }).end('{}'); return; }
     if (files.has(pathname)) {
+      if(pathname.endsWith('app.js')){response.writeHead(200,{'content-type':'text/javascript','content-encoding':'gzip'}).end(gzipSync(files.get(pathname)));return;}
       response.writeHead(200, { 'content-type': pathname.endsWith('.js')?'text/javascript':pathname.endsWith('.css')?'text/css':pathname.endsWith('.woff2')?'font/woff2':'application/octet-stream' });
       if(pathname.endsWith('slow.bin')){response.flushHeaders();setTimeout(()=>response.end(files.get(pathname)),2200);}else response.end(files.get(pathname));return;
     }
