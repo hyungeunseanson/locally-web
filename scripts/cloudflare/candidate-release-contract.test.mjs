@@ -258,18 +258,24 @@ test('Chromium propagates override/probe on documents, data, JS, CSS, font, imag
     if (pathname === '/_next/static/app.js') { response.writeHead(200, { 'content-type': 'text/javascript' }).end("fetch('/data');fetch('/cdn-cgi/rum',{method:'POST'}).catch(()=>{});"); return; }
     if (pathname === '/_next/static/font.woff2') { response.writeHead(200, { 'content-type': 'font/woff2' }).end(font); return; }
     if (pathname === '/_next/static/style.css') { response.writeHead(200, { 'content-type': 'text/css' }).end('body{color:black}'); return; }
+    if (pathname === '/_next/static/unused.bin') { response.writeHead(200).end('unused-hint-fixture'); return; }
     if (pathname === '/image.svg') { response.writeHead(200, { 'content-type': 'image/svg+xml' }).end('<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>'); return; }
     response.writeHead(200, { 'content-type': 'text/html' }).end(`<!doctype html><title>Fixture</title>
       <link rel="preload" href="/_next/static/font.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/_next/static/style.css">
+      <link rel="preload" href="/_next/static/unused.bin" as="unsupported-fixture-type">
       <style>@font-face{font-family:fixture;src:url('/_next/static/font.woff2')}body{font-family:fixture}</style>
       <script src="/_next/static/app.js"></script><body><h1>Fixture</h1><img src="/image.svg"><a href="/experiences/42">Experience</a>
       ${pathname === '/login' ? '<div data-testid="login-modal"><input type="email"><input type="password"></div>' : ''}</body>`);
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve)); const origin = `http://127.0.0.1:${server.address().port}`;
   try {
-    const smoke = await runCandidateBrowserSmoke({ origin, mode: 'override', workerName: PRODUCTION_WORKER, versionId: candidateId });
+    const smoke = await runCandidateBrowserSmoke({ origin, mode: 'override', workerName: PRODUCTION_WORKER, versionId: candidateId }, {
+      readAsset: async pathname => { assert.equal(pathname,'/_next/static/unused.bin');return Buffer.from('unused-hint-fixture'); },
+    });
     assertFullCandidateSmoke(smoke); assertOverrideIdentity({ versionId: candidateId, smoke, expectedOrigin: origin });
     assert(Object.values(smoke.overrideCoverage).every(Boolean));
+    assert.equal(smoke.resourceHintProofs.length,1);assert.equal(smoke.resourceHintProofs[0].pathname,'/_next/static/unused.bin');
+    assert(!smoke.assetResponses.some(r=>r.pathname==='/_next/static/unused.bin'));
     for (const path of ['/', '/login', '/experiences/42', '/_next/static/app.js', '/_next/static/font.woff2', '/_next/static/style.css', '/image.svg', '/data', '/api/proxy-bookings']) {
       assert(received.some(r => r.pathname === path), path); assert(received.filter(r => r.pathname === path).every(r => r.override === versionOverrideHeader(PRODUCTION_WORKER, candidateId) && r.probe === undefined), path);
     }
@@ -424,6 +430,7 @@ async function captureOrderingFixture(options = {}) {
     const request = { url: () => PRODUCTION_ORIGIN + pathname + '?private=NEVER_LOG', method: () => 'GET', resourceType: () => type,
       frame: () => ({ page: () => page }), redirectedFrom: () => redirected ? {} : null,
       headerValue: async name => { await latch; return name === 'cloudflare-workers-version-overrides' ? missingOverride ? null : override : pathname === '/.well-known/locally-release' ? '1' : null; } };
+    context.emit('request', request);
     context.emit('response', { request: () => request, status: () => status, finished: async () => options.bodyFailure ? new Error('fixture incomplete response') : null,
       headerValue: async () => wrongVersion ? stableId : candidateId });
     if (late && !never) setImmediate(() => { completed.push(pathname); release(); });
@@ -433,24 +440,35 @@ async function captureOrderingFixture(options = {}) {
       on: () => {}, goto: async () => respond(page, '/.well-known/locally-release', { type: 'document', status: 204, wrongVersion: options.wrongVersion }),
       locator: () => ({ evaluateAll: async () => {
         for (const [pathname, spec] of page.responses ?? []) {
-          if (!options.otherContext) respond(spec.otherPage ?? page, pathname, spec);
+          if (!options.otherContext) {
+            if (options.delayedResponse) setTimeout(() => respond(spec.otherPage ?? page, pathname, spec), 30);
+            else respond(spec.otherPage ?? page, pathname, spec);
+          }
         }
         if (options.closeDuringCapture) await page.close();
-        return page.refs;
+        return { required: page.refs, hints: options.hint ? ['/_next/static/hint.js'] : [] };
       } }) };
     return page;
   };
   const result = await runCandidateBrowserSmoke({ origin: PRODUCTION_ORIGIN, mode: 'override', workerName: PRODUCTION_WORKER, versionId: candidateId }, {
+    readAsset: async () => Buffer.from('fixture-hint'),
+    fetchImplementation: async (url, init) => {
+      assert.equal(url, PRODUCTION_ORIGIN + '/_next/static/hint.js');
+      assert.equal(init.method, 'GET'); assert.equal(init.redirect, 'error'); assert(init.signal);
+      assert.equal(init.headers['Cloudflare-Workers-Version-Overrides'], override);
+      if (options.hintIncomplete) return { status:200,redirected:false,arrayBuffer:async()=>{throw Error('private-fixture-body-failure');} };
+      return new Response(options.hintMismatch ? 'wrong-bytes' : 'fixture-hint', {status:options.hintStatus??200});
+    },
     runSmoke: async (_origin, hooks) => {
       await hooks.observeContext(context);
       for (const pathname of ['/', '/experiences/42', '/login']) {
         const page = await context.newPage(); page.refs = ['/_next/static/app.js', '/_next/static/font.woff2', '/_next/static/style.css'];
-        respond(page, pathname, { type: 'document' });
+        respond(page, pathname, { type: 'document', missingOverride: options.workerMissingOverride });
         respond(page, '/data', { type: 'fetch' }); respond(page, '/image.svg', { type: 'image' });
         hooks.versionOverride.onApplied({ pathname, resourceType: 'document', method: 'GET' });
         const otherPage = await context.newPage();
         const specs = page.refs.map((p, index) => [p, { type: ['script', 'font', 'stylesheet'][index], late: Boolean(options.late),
-          ...(index === 0 ? options.asset : {}), ...(index === 0 && options.otherPage ? { otherPage } : {}) }]);
+          ...(index === 0 ? options.asset : {}), ...(index === 2 ? options.stylesheet : {}), ...(index === 0 && options.otherPage ? { otherPage } : {}) }]);
         if (options.missing) specs.shift();
         if (options.duplicate) specs.push(specs[0]);
         if (options.completedBefore) { for (const [p,s] of specs) respond(page,p,s); page.responses=[]; }
@@ -500,6 +518,31 @@ test('asset capture ordering: page close before evidence completes fails', async
 
 test('asset capture ordering: incomplete response body remains a hard failure', async () => {
   await assert.rejects(captureOrderingFixture({ bodyFailure: true }), blocked('candidate_http_or_asset_failure'));
+});
+
+test('required execution: zero response captures at DOM snapshot waits for actual completion within existing deadline',async()=>{
+ assert.equal((await captureOrderingFixture({delayedResponse:true})).result.assetSetMatches,true);
+});
+test('resource hint without a browser request/response is validated by exact override GET and byte hash',async()=>{
+ const {result}=await captureOrderingFixture({hint:true});
+ assert.equal(result.resourceHintProofs.length,1);assert.equal(result.resourceHintProofs[0].hashMatch,true);
+ assert(!result.assetRefs.includes('/_next/static/hint.js'));
+ assert(!result.assetResponses.some(x=>x.pathname==='/_next/static/hint.js'));
+});
+for(const [name,options] of [
+ ['hint404',{hintStatus:404}],['hint5xx',{hintStatus:503}],['hint redirect',{hintStatus:302}],
+ ['hint byte mismatch',{hintMismatch:true}],['hint incomplete body',{hintIncomplete:true}],
+])test(name+': speculative hint proof still fails closed',async()=>{
+ await assert.rejects(captureOrderingFixture({hint:true,...options}),blocked('candidate_resource_hint_proof_failed'));
+});
+test('required stylesheet404 remains a hard browser failure',async()=>{
+ await assert.rejects(captureOrderingFixture({stylesheet:{status:404}}),blocked('candidate_http_or_asset_failure'));
+});
+test('required asset5xx remains a hard browser failure',async()=>{
+ await assert.rejects(captureOrderingFixture({asset:{status:503}}),blocked('candidate_http_or_asset_failure'));
+});
+test('actual candidate Worker read without override remains a hard identity failure',async()=>{
+ await assert.rejects(captureOrderingFixture({workerMissingOverride:true}),blocked('candidate_identity_unverified'));
 });
 
 
