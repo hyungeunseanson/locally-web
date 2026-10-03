@@ -1,3 +1,5 @@
+import { matchesChatOperations, readChatOperationsFilters } from '@/app/utils/adminChatOperations';
+import type { AdminInquiryActivity } from '@/app/utils/adminInquiryActivity';
 import { NextResponse } from 'next/server';
 import {
   ACTIVE_CHAT_POLICY_SIGNAL_CATEGORIES,
@@ -84,6 +86,9 @@ export async function GET(request: Request) {
 
     const params = new URL(request.url).searchParams;
     const view = params.get('view') === 'monitor' ? 'monitor' : 'support';
+    const operations = readChatOperationsFilters(params);
+    const filterActivity = view === 'support' && Object.values(operations).some(Boolean);
+    const cachedActivity = new Map<string, AdminInquiryActivity>();
     const selectedId = params.get('inquiryId');
     const status = params.get('status');
     if ((selectedId && !/^[1-9]\d*$/.test(selectedId)) || (status && !['open', 'in_progress', 'resolved'].includes(status))) {
@@ -118,10 +123,16 @@ export async function GET(request: Request) {
           .limit(1, { referencedTable: 'inquiry_messages' }).range(scan, scan + 99);
         if (error) throw error;
         const rows = data as InquiryListRow[];
-        const links = view === 'support' ? await linkedRequests(supabaseAdmin, rows.map(row => String(row.id))) : [];
-        return rows.map(row => ({ ...row, phoneLinked: Boolean(validLinkedRequest(row, links)) }));
-      }, row => !row.phoneLinked, offset, limit);
-    const inquiryRows: InquiryListRow[] = [...page.data];
+        const ids = rows.map(row => String(row.id));
+        const [links, activities] = await Promise.all([
+          view === 'support' ? linkedRequests(supabaseAdmin, ids) : Promise.resolve([]),
+          filterActivity ? getAdminInquiryActivity(supabaseAdmin, ids) : Promise.resolve(new Map<string, AdminInquiryActivity>()),
+        ]);
+        for (const [id, activity] of activities) cachedActivity.set(id, activity);
+        return rows.map(row => ({ row, phoneLinked: Boolean(validLinkedRequest(row, links)),
+          matchesOperations: !filterActivity || matchesChatOperations(activities.get(String(row.id)) ?? {}, operations) }));
+      }, row => !row.phoneLinked && row.matchesOperations, offset, limit);
+    const inquiryRows: InquiryListRow[] = page.data.map(item => item.row);
     if (selected && selection?.view === view && !inquiryRows.some(row => String(row.id) === String(selected.id))) inquiryRows.unshift(selected);
     if (inquiryRows.length === 0) {
       return NextResponse.json({ success: true, data: [], selection, pagination: page.pagination });
@@ -137,7 +148,8 @@ export async function GET(request: Request) {
       supabaseAdmin.from('profiles').select('id, full_name, email, avatar_url').in('id', hostIds),
       supabaseAdmin.from('host_applications').select('user_id, name, profile_photo, status').in('user_id', hostIds),
       supabaseAdmin.from('profiles').select('id, full_name, email, avatar_url').in('id', guestIds),
-      getAdminInquiryActivity(supabaseAdmin, inquiryIds)
+      getAdminInquiryActivity(supabaseAdmin, inquiryIds.filter(id => !cachedActivity.has(String(id))))
+        .then(missing => new Map([...cachedActivity, ...missing]))
     ]);
 
     const hostProfiles = (profilesRes.data || []) as ProfileRow[];

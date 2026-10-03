@@ -20,6 +20,7 @@ export default function PhonePaymentDetails({ request, onClose }: { request: Pro
   }, []);
   const method = getProxyPaymentMethod(request.form_data);
   const entries = [
+    ['요청일', paymentDate(request.created_at)],
     ['결제 상태', getProxyPaymentStatusLabel(request)],
     ['결제 채널', request.payment_channel],
     ['결제 수단', request.payment_channel === 'NAVER' ? '네이버 주문' : method === 'card' ? '카드' : method === 'bank' ? '무통장 입금' : '—'],

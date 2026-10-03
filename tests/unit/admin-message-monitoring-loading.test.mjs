@@ -14,7 +14,7 @@ async function phoneFixture(t, sources = {}, { mode = 'phone', authGate } = {}) 
   const metrics = { gets: 0, active: 0, maxActive: 0, commits: 0, messageCommits: 0 };
   const pending = [];
   const f = clientFixture({ sources, rows: [inquiry(1, mode === 'monitor' ? 'general' : 'admin_support'), inquiry(2, mode === 'monitor' ? 'general' : 'admin_support')], additionalStubs: {
-    '../hooks/useAdminChatQuery': { useAdminChatQuery: options => { const chat = useAdmin(options); React.useEffect(() => { state = chat; }); return chat; } },
+    '../hooks/useAdminChatQuery': { useAdminChatQuery: options => { const chat = useAdmin(options); React.useEffect(() => { state = chat; }); return chat.sync ? chat : { ...chat, sync: { state: 'reconnecting', lastSyncedAt: null } }; } },
     '@/app/components/ui/ConfirmModal': { default: () => null },
     '@/app/admin/dashboard/components/ChatParticipantProfileModal': { default: () => null },
   } });
@@ -93,7 +93,7 @@ for (const burst of [false, true]) test(`same phone-selection fixture (${burst ?
       } else {
         assert.equal(loading(f), false); assert.equal(f.metrics.maxActive, 1);
         assert.equal(f.metrics.gets, 2);
-        assert.ok(f.metrics.commits <= 6, 'bounded React commits per selection');
+        assert.ok(f.metrics.commits <= 7, 'six thread lifecycle commits plus one visible Realtime status commit');
       }
     } finally { await f.dispose(); }
   }

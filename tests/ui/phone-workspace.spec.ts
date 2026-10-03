@@ -378,7 +378,7 @@ for (const width of [390, 2048]) test(`phone list timestamp matches support form
   if (width === 390) await page.getByRole('button', { name: '목록으로', exact: true }).click();
   const row = page.getByTestId('admin-phone-reservation-list-item').first();
   const timestamp = row.getByTestId('admin-phone-list-timestamp');
-  const format = (value: string) => page.evaluate(value => new Date(value).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }), value);
+  const format = (value: string) => page.evaluate(value => new Date(value).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }), value);
   await expect(timestamp).toHaveText(await format(state.messages.at(-1)!.created_at));
   await expect(row.getByText('대기', { exact: true })).toBeVisible();
   const before = await row.boundingBox();
