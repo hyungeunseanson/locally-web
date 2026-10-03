@@ -87,8 +87,8 @@ export async function readProviderCompatToken({ policy, credentials, fetchImplem
     requireContract(artifact.namedHandlers.some(h => h.name === 'DOQueueHandler' && h.handlers.includes('class')));
     const token = inspectQueueToken(queueModuleFromProvider(artifact.source)).value;
     requireContract(sha256(token) === policy.compatTokenSha256);
-    const { sourceKind, deploymentId, versionId, etag, artifactSha256 } = artifact;
-    return { token, provenance: { kind: 'provider', sourceKind, deploymentId, versionId, etag, artifactSha256,
+    const { sourceKind, deploymentId, versionId, deploymentVersions, etag, artifactSha256 } = artifact;
+    return { token, provenance: { kind: 'provider', sourceKind, deploymentId, versionId, deploymentVersions, etag, artifactSha256,
       compatSha256: sha256(token), length: token.length } };
   } catch { throw new Error('OPENNEXT_REVALIDATION_BRIDGE_PROVENANCE_FAILED'); }
 }

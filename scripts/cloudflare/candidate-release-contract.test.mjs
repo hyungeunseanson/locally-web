@@ -71,11 +71,11 @@ function makeSmoke() {
     overrideCoverage: { document: true, script: true, stylesheet: true, image: true, data: true, font: true, api: true }, allFirstPartyReadsOverridden: true,
     workerReceipts: ['/', '/experiences/42', '/login', '/api/proxy-bookings'].map(pathname => ({ pathname, versionId: candidateId, overrideApplied: true, probeApplied: true })) };
 }
-function fixtureActions() {
-  const calls = []; let deployment = structuredClone(baseline.deployment); let bindings = structuredClone(snapshot.bindings);
+function fixtureActions(initialDeployment = baseline.deployment) {
+  const calls = []; let deployment = structuredClone(initialDeployment); let bindings = structuredClone(snapshot.bindings);
   const actions = {
     recheckIdentity: async versionId => ({versionId,status:204}), authorizedCandidateUpload: true, authorizePromotion: async () => true,
-    bridgeProofFreshness: async () => ({kind:'provider',sourceKind:'workers-version-modules',artifactSha256:artifactDigest(artifact()),deploymentId:baseline.deployment.id,versionId:stableId,etag:'a'.repeat(64),compatSha256:lineage}),
+    bridgeProofFreshness: async () => ({kind:'provider',sourceKind:'workers-version-modules',artifactSha256:artifactDigest(artifact()),deploymentId:baseline.deployment.id,deploymentVersions:structuredClone(initialDeployment.versions),versionId:stableId,etag:'a'.repeat(64),compatSha256:lineage}),
     build: async () => calls.push('build'), semanticPreflight: async () => { calls.push('preflight'); return 'PASS'; },
     durableObjectProof: async () => { calls.push('do-proof'); return makeProof(); },
     snapshot: async (options = {}) => { calls.push('snapshot'); return scoped({ snapshot: { ...structuredClone(snapshot), bindings: structuredClone(bindings) }, deployment: structuredClone(deployment) }, options.candidateVersionId ? structuredClone(exactCandidate) : null); },
@@ -500,4 +500,42 @@ test('asset capture ordering: page close before evidence completes fails', async
 
 test('asset capture ordering: incomplete response body remains a hard failure', async () => {
   await assert.rejects(captureOrderingFixture({ bodyFailure: true }), blocked('candidate_http_or_asset_failure'));
+});
+
+
+const priorZeroId = '33333333-3333-4333-8333-333333333333';
+const stagedBaseline = () => ({ ...structuredClone(baseline), deployment: { id: deploymentId,
+  versions: [{ id: stableId, percentage: 100 }, { id: priorZeroId, percentage: 0 }] } });
+test('known exact100/old0 baseline can upload unchanged, replace zero once, and promote once', async () => {
+  const initial=stagedBaseline(); const plan=makePlan({baseline:initial});
+  const {actions,calls}=fixtureActions(initial.deployment);
+  const result=await executeCandidateReleaseContract(plan,actions);
+  assert.equal(result.status,'CANDIDATE_OVERRIDE_ONLY_RELEASE_CONTRACT_PASS');
+  for(const op of ['upload','stage-zero','promote'])assert.equal(calls.filter(c=>c===op).length,1);
+  assert(!stageZeroArguments(plan,candidateId).some(a=>a.includes(priorZeroId)));
+});
+for(const [name,mutate] of [
+ ['old zero disappeared',d=>d.versions.pop()],
+ ['old zero UUID changed',d=>{d.versions[1].id='44444444-4444-4444-8444-444444444444';}],
+ ['old zero percentage changed',d=>{d.versions[1].percentage=1;}],
+ ['new version silently staged',d=>{d.versions.push({id:candidateId,percentage:0});}],
+])test(name+': upload invariance blocks before staging',async()=>{
+ const initial=stagedBaseline(),plan=makePlan({baseline:initial});const {actions,calls}=fixtureActions(initial.deployment),read=actions.snapshot;
+ actions.snapshot=async o=>{const r=await read(o);if(calls.includes('upload')){mutate(r.deployment);r.activeDeployment=structuredClone(r.deployment);}return r;};
+ await assert.rejects(executeCandidateReleaseContract(plan,actions),blocked('upload_changed_active_deployment'));
+ assert.equal(calls.filter(c=>c==='upload').length,1);assert(!calls.includes('stage-zero'));assert(!calls.includes('promote'));
+});
+test('unknown change to known zero baseline blocks before upload',async()=>{
+ const initial=stagedBaseline(),plan=makePlan({baseline:initial});const {actions,calls}=fixtureActions(initial.deployment),read=actions.snapshot;
+ actions.snapshot=async o=>{const r=await read(o);r.deployment.versions.pop();r.activeDeployment=structuredClone(r.deployment);return r;};
+ await assert.rejects(executeCandidateReleaseContract(plan,actions),blocked('unexpected_deployment_distribution'));
+ assert(!calls.includes('upload'));
+});
+test('staged build proof omitting or replacing zero entry blocks upload despite identical stable artifact', async()=>{
+ for(const versions of [undefined,[{id:stableId,percentage:100}],[{id:stableId,percentage:100},{id:candidateId,percentage:0}]]){
+  const initial=stagedBaseline(),plan=makePlan({baseline:initial}),{actions,calls}=fixtureActions(initial.deployment),read=actions.bridgeProofFreshness;
+  actions.bridgeProofFreshness=async()=>({...await read(),deploymentVersions:versions});
+  await assert.rejects(executeCandidateReleaseContract(plan,actions),blocked('bridge_provenance_or_freshness_failed'));
+  assert(!calls.includes('upload'));
+ }
 });

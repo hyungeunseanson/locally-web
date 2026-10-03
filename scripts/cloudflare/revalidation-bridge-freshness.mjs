@@ -9,6 +9,13 @@ const uuid = value => typeof value === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-
 const digest = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
 const requireFresh = condition => { if (!condition) throw new Error(BASELINE_CHANGED); };
 
+const validVersions = values => Array.isArray(values) && values.length >= 1 && values.length <= 2
+  && values.every(v => v && typeof v === 'object' && Object.keys(v).sort().join(',') === 'id,percentage'
+    && uuid(v.id) && (v.percentage === 100 || v.percentage === 0))
+  && new Set(values.map(v => v.id)).size === values.length
+  && values.filter(v => v.percentage === 100).length === 1;
+const versionsJson = values => JSON.stringify([...values].sort((a,b) => a.id.localeCompare(b.id)));
+
 // An allowlist prevents raw credentials or unrecognized diagnostic fields from
 // being accepted as proof. No file contents, provider bodies or causes are logged.
 const fields = {
@@ -16,6 +23,7 @@ const fields = {
   sourceKind: value => value === VERSION_SOURCE,
   artifactSha256: digest,
   deploymentId: uuid,
+  deploymentVersions: validVersions,
   versionId: uuid,
   etag: digest,
   compatSha256: digest,
@@ -40,6 +48,9 @@ export async function assertProductionBridgeProofFresh({
     for (const [key, value] of Object.entries(proof)) {
       requireFresh(Object.hasOwn(fields, key) && fields[key](value));
     }
+    const expectedVersions = proof.deploymentVersions ?? [{ id: proof.versionId, percentage: 100 }];
+    requireFresh(validVersions(expectedVersions)
+      && expectedVersions.find(v => v.percentage === 100).id === proof.versionId);
     const policy = JSON.parse(await readFile(path.join(root, 'config/cloudflare/revalidation-bridge.json'), 'utf8'));
     if (!digest(policy?.compatTokenSha256) || policy.compatTokenSha256 !== proof.compatSha256) {
       throw new Error(LINEAGE_MISMATCH);
@@ -49,7 +60,8 @@ export async function assertProductionBridgeProofFresh({
     const active = await readActiveVersionArtifact({ credentials: auth, workerName: policy.workerName,
       stableVersionId: proof.versionId, fetchImplementation });
     requireFresh(active.deploymentId === proof.deploymentId && active.etag === proof.etag
-      && active.artifactSha256 === proof.artifactSha256 && active.sourceKind === proof.sourceKind);
+      && active.artifactSha256 === proof.artifactSha256 && active.sourceKind === proof.sourceKind
+      && versionsJson(active.deploymentVersions) === versionsJson(expectedVersions));
     return proof;
   } catch (error) {
     // Fail closed even on malformed files, transport errors or credential lookup
