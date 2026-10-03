@@ -2,7 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 import { build } from 'esbuild';
 import postcss from 'postcss';
 import tailwind from '@tailwindcss/postcss';
-import { resolve } from 'node:path';
+import { resolve, relative } from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { buildProxyInquiryInitialMessage } from '@/app/utils/proxyBooking';
 
@@ -13,6 +14,7 @@ test.beforeAll(async () => {
     entryPoints: ['tests/ui/fixtures/phone-workspace-entry.tsx'], bundle: true, write: false, format: 'iife', jsx: 'automatic',
     define: { 'process.env.NODE_ENV': '"test"' },
     plugins: [{ name: 'isolated-browser-boundaries', setup(builder) {
+      if (process.env.PHONE_RECOMPLETE_BASELINE === '1') builder.onLoad({filter: /app\/admin\/dashboard\/(components\/(ChatMonitor|PhoneReservationTab)\.tsx|hooks\/useAdminChatQuery\.ts)$/}, args => ({contents:execFileSync('git',['show',`e870f8c71029298b9deede3aba53fd65a435d979:${relative(process.cwd(),args.path)}`],{encoding:'utf8'}),loader:args.path.endsWith('tsx')?'tsx':'ts',resolveDir:resolve(args.path,'..')}));
       builder.onResolve({ filter: /^(next\/navigation|next\/image|@\/app\/utils\/supabase\/client|@\/app\/context\/ToastContext)$/ }, args => ({ path: args.path, namespace: 'fixture' }));
       builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => {
         let contents = '';
@@ -35,7 +37,7 @@ test.beforeAll(async () => {
   css = (await postcss([tailwind()]).process('@import "tailwindcss";', { from: resolve('app/phone-fixture.css') })).css;
 });
 
-async function fixture(page: Page, options: { messageGate?: Promise<void>; paymentMetadata?: boolean; lastAdmin?: boolean; paymentStatus?: string; missingLink?: boolean; failSend?: boolean; failComplete?: boolean; unpaid?: boolean; status?: string; inquiryId?: string; visual?: boolean; channel?: string; method?: string } = {}) {
+async function fixture(page: Page, options: { customerMessages?: number; firstMessageId?: number; messageGate?: Promise<void>; paymentMetadata?: boolean; lastAdmin?: boolean; paymentStatus?: string; missingLink?: boolean; failSend?: boolean; failComplete?: boolean; unpaid?: boolean; status?: string; inquiryId?: string; visual?: boolean; channel?: string; method?: string } = {}) {
   const request = {
     id: 'request-1', user_id: 'guest', category: 'RESTAURANT', status: options.status || 'PENDING',
     payment_status: options.paymentStatus || (options.unpaid ? 'WAITING' : 'COMPLETED'), payment_channel: options.channel || 'LOCALLY',
@@ -48,7 +50,8 @@ async function fixture(page: Page, options: { messageGate?: Promise<void>; payme
     form_data: { payment_method: 'card', property_name: '호텔 라이브맥스 버짓 닛포리 (Hotel Livemax BUDGET Nippori)', property_phone: '03-3823-1313', property_link: 'https://maps.app.goo.gl/fCPWn7ZoYQdZ4ode7?g_st=ac', reservation_number: 'TEST-12345678', checkin_date: '2026-09-25', checkout_date: '2026-09-28', hotel_inquiry_type: 'RESERVATION_CHECK', request_content: '늦은 체크인이 가능한지 확인해주세요.', contact_name: '테스트 고객', contact_phone: '010-0000-0000', additional_notes: '현장 확인 후 안내 부탁드립니다.', linked_inquiry_id: '123' },
   });
   request.needs_attention = !request.linked_inquiry_id || (['PENDING', 'IN_PROGRESS'].includes(request.status) && ['REFUNDED', 'FAILED'].includes(request.payment_status));
-  const messages = [{ id: 1, sender_id: 'guest', content: '예약해주세요', type: 'text', created_at: '2026-09-22T10:05:00Z', sender: { name: '홍길동' } }];
+  const messages = [{ id: options.firstMessageId || 1, sender_id: 'guest', content: '예약해주세요', type: 'text', created_at: '2026-09-22T10:05:00Z', sender: { name: '홍길동' } }];
+  if(options.customerMessages) for(let id=2;id<=options.customerMessages;id++) messages.push({...messages[0],id,content:`고객 질문 ${id}`});
   if (options.visual) messages[0].content = buildProxyInquiryInitialMessage({category: 'HOTEL', formData: request.form_data, paymentChannel: 'LOCALLY', finalAmount: 6000});
   if (options.visual) messages.push(
     { id: 2, sender_id: 'admin', content: '숙소에 늦은 체크인 가능 여부를 확인하고 안내드리겠습니다.', type: 'text', created_at: '2026-09-22T10:05:00Z', sender: { name: '운영팀' } },
@@ -56,19 +59,23 @@ async function fixture(page: Page, options: { messageGate?: Promise<void>; payme
   );
   if (options.lastAdmin) messages.push({ id: 4, sender_id: 'admin', content: '환불 안내', type: 'text', created_at: '2026-09-22T10:05:00Z', sender: { name: '운영팀' } });
   if (options.paymentMetadata) Object.assign(request, { locally_order_id: 'ORDER-123', naver_buyer_name: '네이버 구매자', tid: 'CARD-TRANSACTION-123', paid_at: '2026-09-22T01:00:00Z', refunded_at: '2026-09-22T02:00:00Z' });
+  const handled = new Set<string>(options.lastAdmin ? ['1'] : []);
+  const pending = () => messages.filter(m => m.sender_id === 'guest' && m.type !== 'deleted' && !handled.has(String(m.id)));
   const calls: { path: string; body: Record<string, unknown> }[] = [];
   const messageRequests: string[] = [];
+  const reads: string[] = [];
   let failComplete = options.failComplete;
   await page.route('**/*', async route => {
     const url = new URL(route.request().url());
     if (url.hostname !== 'phone.test') return route.abort();
     const path = url.pathname;
+    if(path.startsWith('/api/') && route.request().method()==='GET') reads.push(url.pathname+url.search);
     const json = (body: unknown, status = 200) => route.fulfill({ status, json: body });
     if (path === '/api/admin/customer-support') {
       const latest = messages.at(-1)!;
       request.latest_sender_id = latest.sender_id;
       request.latest_created_at = latest.created_at;
-      request.needs_reply = latest.sender_id === 'guest' && (request.status === 'COMPLETED' || request.status === 'CANCELLED' && Date.parse(latest.created_at) > Date.parse(request.updated_at));
+      request.needs_reply = request.status === 'COMPLETED' ? pending().length > 0 : latest.sender_id === 'guest' && request.status === 'CANCELLED' && Date.parse(latest.created_at) > Date.parse(request.updated_at);
       const filter = url.searchParams.get('filter');
       const matching = filter === 'all' || filter === 'closed' && ['COMPLETED', 'CANCELLED'].includes(request.status) && !request.needs_reply && !request.needs_attention
         || filter === 'todo' && (request.needs_attention || request.needs_reply || ['PENDING', 'IN_PROGRESS'].includes(request.status) && request.payment_status === 'COMPLETED')
@@ -89,13 +96,16 @@ async function fixture(page: Page, options: { messageGate?: Promise<void>; payme
     if (path === '/api/inquiries/message') {
       const body = route.request().postDataJSON(); calls.push({ path, body });
       if (options.failSend) return json({ success: false, error: '전송 실패' }, 500);
+      for (const id of body.phoneFollowup?.seenCustomerMessageIds || []) handled.add(id);
       messages.push({ id: messages.length + 1, sender_id: 'admin', content: body.content, type: 'text', created_at: '2026-09-22T10:05:00Z', sender: { name: '관리자' } });
       return json({ success: true, inquiryId: body.inquiryId, messageId: messages.length, displayContent: body.content, updatedAt: new Date().toISOString() });
     }
-    if (path === '/api/proxy-bookings/request-1') {
+    if (path === '/api/admin/proxy-bookings/request-1/complete') {
       calls.push({ path, body: route.request().postDataJSON() });
       if (failComplete || request.payment_status !== 'COMPLETED') { failComplete = false; return json({ success: false, error: '완료 처리 실패' }, 409); }
-      request.status = 'COMPLETED'; return json({ success: true });
+      const body = route.request().postDataJSON();
+      for (const id of body.seenCustomerMessageIds || []) handled.add(id);
+      request.status = 'COMPLETED'; return json({ success: true, status: request.status, needsReply: pending().length > 0, hasMoreUnhandled: pending().length > 0 });
     }
     if (path === '/api/admin/proxy-bookings/refund-payment') {
       calls.push({ path, body: route.request().postDataJSON() });
@@ -110,7 +120,7 @@ async function fixture(page: Page, options: { messageGate?: Promise<void>; payme
     return route.fulfill({ contentType: 'text/html', body: `<html><head><style>${css}${options.visual ? '@media(min-width:768px){html{font-size:20px}body>main{max-width:1785px;margin:40px auto}}' : ''}</style></head><body><main style="padding:16px"><div id="root"></div></main><script>${script.replaceAll('</script', '<\\/script')}</script></body></html>` });
   });
   await page.goto(`http://phone.test/admin/dashboard?tab=CHATS&${options.inquiryId ? `inquiryId=${options.inquiryId}` : 'view=phone&proxyRequestId=request-1'}`);
-  return { calls, request, messages, messageRequests };
+  return { calls, request, messages, messageRequests, handled, reads };
 }
 
 const composer = (page: Page) => page.getByTestId('admin-chat-composer').filter({ visible: true });
@@ -131,8 +141,8 @@ for (const status of ['PENDING', 'IN_PROGRESS']) test(`paid ${status}: reply and
   expect(state.calls.map(call => call.path)).toEqual(['/api/inquiries/message']);
   await complete(page);
   await expect.poll(() => state.request.status).toBe('COMPLETED');
-  expect(state.calls.map(call => call.path)).toEqual(['/api/inquiries/message', '/api/proxy-bookings/request-1']);
-  expect(state.calls[1].body).toEqual({status:'COMPLETED'});
+  expect(state.calls.map(call => call.path)).toEqual(['/api/inquiries/message', '/api/admin/proxy-bookings/request-1/complete']);
+  expect(state.calls[1].body).toEqual({inquiryId:'123',seenCustomerMessageIds:['1']});
   await menu(page).click();
   await expect(page.getByRole('button', { name: '처리 완료', exact:true })).toHaveCount(0);
 });
@@ -146,7 +156,7 @@ test('completion without sending preserves draft; failure can be retried indepen
   await expect(page.getByRole('button',{name:'완료 처리',exact:true})).toHaveCount(0);
   await complete(page);
   await expect.poll(() => state.request.status).toBe('COMPLETED');
-  expect(state.calls.map(call=>call.path)).toEqual(['/api/proxy-bookings/request-1','/api/proxy-bookings/request-1']);
+  expect(state.calls.map(call=>call.path)).toEqual(['/api/admin/proxy-bookings/request-1/complete','/api/admin/proxy-bookings/request-1/complete']);
   expect(state.messages).toHaveLength(1);
   await expect(composer(page)).toHaveValue('아직 보내지 않은 초안');
 });
@@ -408,3 +418,117 @@ for (const event of ['SUBSCRIBED', 'visibilitychange', 'online']) {
     await expect.poll(() => state.messageRequests.length).toBe(2);
   });
 }
+
+for (const id of [2, 200]) test(`recomplete freezes rendered snapshot; late customer ${id} remains pending`, async ({page}) => {
+  const state = await fixture(page, {status:'COMPLETED',firstMessageId:100});
+  await expect(composer(page)).toBeEnabled();
+  await menu(page).click();
+  await page.getByRole('button',{name:'처리 완료',exact:true}).click();
+  await expect(page.getByText('현재 확인한 메시지까지 처리 완료할까요? 고객에게 메시지는 전송되지 않습니다.')).toBeVisible();
+  const row = {id, sender_id:'guest',content:'새 질문',type:'text',created_at:'2026-10-02T10:00:00Z',sender:{name:'고객'}};
+  state.messages.push(row);
+  await page.evaluate(row => (window as unknown as {emitDatabaseChange:(t:string,e:string,r:unknown)=>void}).emitDatabaseChange('inquiry_messages','INSERT',{...row,inquiry_id:123}),row);
+  await page.getByRole('button',{name:'완료 처리',exact:true}).click();
+  await expect.poll(()=>state.calls.length).toBe(1);
+  expect(state.calls[0].body).toEqual({inquiryId:'123',seenCustomerMessageIds:['100']});
+  expect(state.request.status).toBe('COMPLETED');
+  await expect.poll(()=>page.evaluate(()=>(window as unknown as {lastToast:string}).lastToast)).toBe('확인한 메시지는 처리했습니다. 새 메시지가 남아 있습니다.');
+  await expect(page.getByTestId('admin-phone-reservation-list-item')).toContainText('추가 답장');
+  expect(state.messages.filter(m=>m.sender_id==='admin')).toHaveLength(0);
+});
+
+test('recomplete unavailable while messages load; missed other-admin handling recovers on visibility', async ({page}) => {
+  let release!:()=>void;
+  const state = await fixture(page,{status:'COMPLETED',messageGate:new Promise<void>(resolve=>{release=resolve;})});
+  await menu(page).click();
+  await expect(page.getByRole('button',{name:'처리 완료',exact:true})).toBeDisabled();
+  release();
+  await expect(page.getByRole('button',{name:'처리 완료',exact:true})).toBeEnabled();
+  state.handled.add('1');
+  await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
+  await expect(page.getByTestId('admin-phone-reservation-list-item')).toHaveCount(0);
+  expect(state.calls).toHaveLength(0);
+});
+
+test('phone reply sends exact rendered snapshot with no completion or participant-read request',async({page})=>{
+  const state=await fixture(page,{status:'COMPLETED'});
+  await composer(page).fill('안내');await send(page).click();
+  await expect(composer(page)).toHaveValue('');
+  expect(state.calls).toHaveLength(1);
+  expect(state.calls[0].body.phoneFollowup).toEqual({proxyRequestId:'request-1',seenCustomerMessageIds:['1']});
+});
+
+// Same starting-main source and current source, same real component fixture.
+test('phone workload benchmark: idle ten minutes, one INSERT, ten INSERT burst, recomplete',async({page})=>{
+  await page.clock.install();
+  const state=await fixture(page,{status:'COMPLETED'});
+  await expect(composer(page)).toBeEnabled();
+  const metrics=()=>({list:state.reads.filter(p=>p.startsWith('/api/admin/customer-support?filter=')).length,
+    detail:state.reads.filter(p=>p.includes('customer-support?requestId=')).length,
+    thread:state.messageRequests.length,attention:state.reads.filter(p=>p.includes('sidebar-counts')).length,
+    ack:state.calls.filter(c=>c.path.endsWith('/ack')).length,mutations:state.calls.filter(c=>!c.path.endsWith('/ack')).length});
+  await page.evaluate(()=>(window as unknown as {emitSubscriptionStatus:(s:string)=>void}).emitSubscriptionStatus('SUBSCRIBED'));
+  await expect.poll(()=>state.messageRequests.length).toBe(2);
+  await expect.poll(()=>state.reads.filter(p=>p.includes('customer-support')).length).toBe(4);
+  await expect(composer(page)).toBeEnabled();
+  await page.clock.runFor(1000);
+  const initial=metrics();state.reads.length=0;state.messageRequests.length=0;state.calls.length=0;
+  await page.clock.runFor(600_000);await expect.poll(()=>state.reads.length).toBeGreaterThanOrEqual(4);
+  const idle=metrics();
+  const activity=async(count:number,base:number)=>{
+    state.reads.length=0;state.messageRequests.length=0;state.calls.length=0;
+    const rows=Array.from({length:count},(_,n)=>({id:base+n,sender_id:'guest',content:`fixture ${base+n}`,type:'text',created_at:'2026-10-02T10:00:00Z',sender:{name:'고객'}}));
+    state.messages.push(...rows);
+    await page.evaluate(rows=>{for(const row of rows)(window as unknown as {emitDatabaseChange:(t:string,e:string,r:unknown)=>void}).emitDatabaseChange('inquiry_messages','INSERT',{...row,inquiry_id:123});},rows);
+    await page.clock.runFor(1000);await expect.poll(()=>state.reads.filter(p=>p.includes('customer-support')).length).toBe(2);return metrics();
+  };
+  const one=await activity(1,10),burst=await activity(10,20);
+  state.reads.length=0;state.messageRequests.length=0;state.calls.length=0;
+  let recomplete:ReturnType<typeof metrics>|null=null;
+  if(process.env.PHONE_RECOMPLETE_BASELINE!=='1'){
+    await complete(page);await expect.poll(()=>state.reads.length).toBe(2);recomplete=metrics();
+    expect(recomplete.mutations).toBe(1);expect(recomplete.thread).toBe(0);
+  }
+  state.reads.length=0;state.messageRequests.length=0;state.calls.length=0;
+  await composer(page).fill('benchmark reply');await send(page).click();await expect(composer(page)).toHaveValue('');
+  await page.clock.runFor(1000);const reply=metrics();expect(reply.mutations).toBe(1);
+  console.log('PHONE_WORKLOAD',JSON.stringify({reply,source:process.env.PHONE_RECOMPLETE_BASELINE?'starting-main':'current',initial,idle,one,burst,recomplete}));
+  expect(one.thread).toBeGreaterThanOrEqual(1);expect(burst.thread).toBeGreaterThanOrEqual(1);expect(idle.list).toBe(2);expect(idle.detail).toBe(2);
+});
+
+test('delayed completion response cannot replace newer pending workspace state',async({page})=>{
+  const state=await fixture(page,{status:'COMPLETED'});
+  await expect(composer(page)).toBeEnabled();
+  let release!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve;});let started=false;
+  await page.route('**/api/admin/proxy-bookings/request-1/complete',async route=>{
+    state.handled.add('1');started=true;await gate;
+    await route.fulfill({json:{success:true,status:'COMPLETED',needsReply:false,hasMoreUnhandled:false,handledMessageIds:['1']}});
+  });
+  await complete(page);await expect.poll(()=>started).toBe(true);
+  state.messages.push({id:2,sender_id:'guest',content:'새 follow-up',type:'text',created_at:'2026-10-02T12:00:00Z',sender:{name:'고객'}});
+  await page.evaluate(()=>window.dispatchEvent(new Event('online')));
+  await expect(page.getByTestId('admin-phone-reservation-list-item')).toContainText('추가 답장');
+  release();
+  await expect(page.getByRole('button',{name:'완료 처리',exact:true})).toHaveCount(0);
+  await expect(page.getByTestId('admin-phone-reservation-list-item')).toContainText('추가 답장');
+  await menu(page).click();await expect(page.getByRole('button',{name:'처리 완료',exact:true})).toBeEnabled();
+});
+
+test('failed message load cannot produce a handled snapshot and retry restores action',async({page})=>{
+  await fixture(page,{status:'COMPLETED'});
+  await page.route('**/api/admin/inquiries/123/messages',route=>route.fulfill({status:500,json:{success:false}}));
+  await page.reload();await menu(page).click();
+  await expect(page.getByRole('button',{name:'처리 완료',exact:true})).toBeDisabled();
+  await expect(page.getByTestId('admin-chat-messages-loading')).toHaveCount(0);
+  await page.unroute('**/api/admin/inquiries/123/messages');
+  await page.getByRole('button',{name:'다시 시도',exact:true}).click();
+  await expect(page.getByRole('button',{name:'처리 완료',exact:true})).toBeEnabled();
+});
+
+test('201 rendered customer messages are not silently truncated or stranded by repeated completion',async({page})=>{
+  const state=await fixture(page,{status:'COMPLETED',customerMessages:201});
+  await expect(composer(page)).toBeEnabled();await complete(page);
+  await expect(page.getByTestId('admin-phone-reservation-list-item')).toHaveCount(0);
+  expect(state.calls[0].body.seenCustomerMessageIds).toEqual(Array.from({length:201},(_,n)=>String(n+1)));
+  expect(state.handled.size).toBe(201);
+});

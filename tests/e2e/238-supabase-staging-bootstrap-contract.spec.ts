@@ -73,6 +73,7 @@ test.describe('Supabase staging bootstrap contract', () => {
       'supabase/migrations/20261001170718_admin_message_monitoring_phase_1.sql',
       'supabase/migrations/20261002015110_admin_message_monitoring_historical_reinquiry.sql',
       'supabase/migrations/20261002041848_admin_attention_badges_phase_2.sql',
+      'supabase/migrations/20261002140902_phone_followup_tasks.sql',
     ]);
     expect(manifest.pendingPrivateTables).toBeUndefined();
     expect(manifest.pendingApplicationFunctions).toBeUndefined();
@@ -80,7 +81,15 @@ test.describe('Supabase staging bootstrap contract', () => {
     expect(manifest.applicationFunctions).toEqual(expect.arrayContaining([
       'ack_admin_inquiry_snapshot', 'get_admin_attention',
     ]));
-    expect(manifest.pendingProductionMigrations).toEqual([]);
+    expect(manifest.pendingProductionMigrations).toEqual([
+  {
+    "version": "20261002140902",
+    "name": "phone_followup_tasks",
+    "repositoryFile": "supabase/migrations/20261002140902_phone_followup_tasks.sql",
+    "repositorySha256": "88769a249dca3d7b2f0cbd2dc6a8cf2197960213a357bac71353978a5ae0e396",
+    "status": "prepared_not_applied"
+  }
+]);
     expect(packageJson.scripts['supabase:staging:baseline:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:current:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:contract']).toBeTruthy();

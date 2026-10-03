@@ -233,6 +233,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             return NextResponse.json({ success: false, error: 'Request not found' }, { status: 404 });
         }
 
+        if (isAdmin && nextStatus === 'COMPLETED') {
+            return NextResponse.json({ success: false, error: '연결된 대화를 확인한 후 전화예약 메뉴에서 처리 완료해주세요.' }, { status: 409 });
+        }
+
         if (isAdmin) {
             if (nextStatus && ALLOWED_STATUSES.has(nextStatus)) updates.status = nextStatus;
         } else {

@@ -20,9 +20,18 @@
     "supabase/migrations/20260930022348_move_is_admin_reader_to_private_schema.sql",
     "supabase/migrations/20261001170718_admin_message_monitoring_phase_1.sql",
     "supabase/migrations/20261002015110_admin_message_monitoring_historical_reinquiry.sql",
-    "supabase/migrations/20261002041848_admin_attention_badges_phase_2.sql"
+    "supabase/migrations/20261002041848_admin_attention_badges_phase_2.sql",
+    "supabase/migrations/20261002140902_phone_followup_tasks.sql"
   ],
-  "pendingProductionMigrations": [],
+  "pendingProductionMigrations": [
+    {
+      "version": "20261002140902",
+      "name": "phone_followup_tasks",
+      "repositoryFile": "supabase/migrations/20261002140902_phone_followup_tasks.sql",
+      "repositorySha256": "88769a249dca3d7b2f0cbd2dc6a8cf2197960213a357bac71353978a5ae0e396",
+      "status": "prepared_not_applied"
+    }
+  ],
   "applicationTables": [
     "admin_audit_logs",
     "admin_job_runs",

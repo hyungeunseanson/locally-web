@@ -23,6 +23,10 @@ function database(rows: Row[], inquiries: Row[]) {
   const client = createClient('http://127.0.0.1:54329', 'fixture-only-key', { global: { fetch: async input => {
     const url = new URL(String(input)); calls.push(url);
     const table = url.pathname.split('/').at(-1)!;
+    if (table === 'get_admin_phone_activity') return new Response(JSON.stringify(inquiries.map(row => ({
+      inquiry_id: row.id, admin_unread_count: 0,
+      phone_needs_reply: row.phone_pending ?? ((row.inquiry_messages as Row[] || []).filter(m => m.type == null || ['text','image'].includes(String(m.type))).at(-1)?.sender_id === row.user_id),
+    }))), { status: 200, headers: { 'content-type': 'application/json' } });
     let result = [...(tables[table] || [])];
     for (const [key, value] of url.searchParams) {
       if (key === 'or') {
@@ -252,4 +256,15 @@ test('phone timestamps reuse latest actual message and fall back only for displa
   inquiries[0].inquiry_messages.push({ sender_id: 'guest-1', type: 'text', created_at: '2026-09-22T15:25:00Z' });
   expect((await read())[0].latest_created_at).toBe('2026-09-22T15:25:00Z');
   expect(db.calls.filter(url => url.pathname.endsWith('inquiries')).every(url => url.searchParams.get('inquiry_messages.limit') === '1')).toBe(true);
+});
+
+test('COMPLETED pending tasks override latest sender and read receipts in both directions', async () => {
+  for (const pending of [true, false]) {
+    const db = database([request(1, {status: 'COMPLETED'})], [{id:1, user_id:'guest-1', type:'admin_support', phone_pending:pending,
+      inquiry_messages:[{sender_id:pending?'admin':'guest-1',type:'text',is_read:true,admin_read_at:'2026-10-01'}]}]);
+    install(db);
+    const row = (await (await phoneGet(new Request('http://local/api?requestId=request-1'))).json()).data;
+    expect(row.needs_reply).toBe(pending);
+    expect(db.calls.filter(url => url.pathname.includes('/rpc/')).map(url => url.pathname.split('/').at(-1))).toEqual(['get_admin_phone_activity']);
+  }
 });

@@ -13,6 +13,14 @@ on:
       - 'app/utils/adminAttentionState.ts'
       - 'app/api/admin/sidebar-counts/**'
       - 'app/api/admin/customer-support/**'
+      - 'app/api/admin/proxy-bookings/**'
+      - 'app/api/proxy-bookings/**'
+      - 'app/utils/phoneFollowup.ts'
+      - 'tests/unit/phone-followup*'
+      - 'tests/unit/phone-workspace.spec.ts'
+      - 'supabase/migrations/*phone_followup*'
+      - 'scripts/supabase/test-phone-followup-native.mjs'
+      - 'playwright.phone-workspace.config.ts'
       - 'tests/unit/admin-attention*.test.mjs'
       - 'tests/unit/helpers/adminAttentionDatabase.mjs'
       - 'tests/fixtures/admin-attention*'
@@ -70,3 +78,23 @@ jobs:
       - run: npm run test:admin-chat:phase1
       - run: npm run test:admin-attention:phase2
       - run: npm run cloudflare:production-build:contract
+
+  phone-followup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.20.0
+          cache: npm
+      - run: npm ci --legacy-peer-deps --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium webkit
+      - run: npm run test:phone-followup
+        env:
+          PHONE_WEBKIT: '1'
+      # Local PG17 process, three independent connections, no remote credentials.
+      - run: npm install --prefix "$RUNNER_TEMP/phone-pg17" --no-audit --no-fund embedded-postgres@17.10.0-beta.17 pg@8.23.1
+      - run: npm run test:phone-followup:native
+        env:
+          PHONE_NATIVE_MODULES: ${{ runner.temp }}/phone-pg17/node_modules

@@ -107,7 +107,7 @@ test('DB/API truth: valid phone is distinct, anchors/duplicate/wrong-user links 
     const rpc = async (name, args) => {
       const statement = name === 'get_admin_attention' ? 'SELECT get_admin_attention($1::bigint[]) result' : 'SELECT * FROM get_admin_inquiry_activity($1::bigint[])';
       const rows = (await db.query(statement,[args.p_inquiry_ids])).rows;
-      return { data: name === 'get_admin_attention' ? rows[0].result : rows };
+      return { data: name === 'get_admin_attention' ? rows[0].result : name === 'get_admin_phone_activity' ? rows.map(row => ({...row, phone_needs_reply: row.needs_reply})) : rows };
     };
     const build = sourceLoader({ 'server-only': {} })('app/api/admin/customer-support/queries.ts');
     const dbRows = (await rpc('get_admin_attention',{p_inquiry_ids:null})).data;
@@ -148,7 +148,7 @@ test('DB/API truth: valid phone is distinct, anchors/duplicate/wrong-user links 
     const phoneAPI=await load('app/api/admin/customer-support/route.ts').GET(new Request('http://local/api/admin/customer-support?filter=todo'));
     const phoneRows=(await phoneAPI.json()).data;
     assert.equal(phoneRows[0].admin_unread_count,10); assert.equal(phoneRows[0].needs_reply,true);
-    assert.equal(operations.slice(callsBefore).filter(row=>row.rpc==='get_admin_inquiry_activity').length,1,'one batch activity query, no per-phone lookup');
+    assert.equal(operations.slice(callsBefore).filter(row=>row.rpc==='get_admin_phone_activity').length,1,'one batch activity query, no per-phone lookup');
     const phone = await build.enrichPhoneRequests(client,[{id:'phone',user_id:guest,form_data:{linked_inquiry_id:'2'},status:'COMPLETED',payment_status:'COMPLETED'}]);
     assert.equal(phone[0].admin_unread_count,dbRows.find(row=>Number(row.inquiry_id)===2).admin_unread_count);
     assert.equal(phone[0].admin_unread_count,10); assert.equal(body.data.csUnseenByView.phone,1);
