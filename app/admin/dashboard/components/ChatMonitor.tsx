@@ -238,6 +238,14 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
     navigateInquiryInUrl(inquiryId);
   };
 
+  const handleSelectSearchInquiry = (inquiryId: string) => {
+    // A locator can be outside loaded pages. Let the canonical URL resolver/list
+    // supply its metadata before the existing deep-link effect selects it once.
+    setCsStatusFilter('ALL');
+    pendingUrlSelectionIdRef.current = inquiryId;
+    navigateInquiryInUrl(inquiryId);
+  };
+
   const handleCSStatusFilterChange = (nextFilter: CSStatusFilter) => {
     setCsStatusFilter(nextFilter);
     if (!selectedInquiry || !isAdminSupportInquiry(selectedInquiry.type)) return;
@@ -476,7 +484,7 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
           </div>
 
           <ChatSyncStatus sync={sync} />
-          {activeTab === 'admin' && <AdminChatSearch surface="support" enabled={enabled} onSelect={id => { setCsStatusFilter('ALL'); handleSelectInquiry(id); }} />}
+          {activeTab === 'admin' && <AdminChatSearch surface="support" enabled={enabled} onSelect={handleSelectSearchInquiry} />}
           {/* CS 상태 필터 (1:1 문의 탭에서만 노출) */}
           {activeTab === 'admin' && (
             <div className="flex gap-1 flex-wrap mt-2">

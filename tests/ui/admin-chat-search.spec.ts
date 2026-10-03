@@ -177,12 +177,21 @@ for (const view of ['support','phone'] as const) test(`${view}: result canonical
   await input(page,view).fill('second'); await expect(resultRows(page)).toContainText('고객 2');
   expect(threadCount(f.reads)).toBe(before); expect(page.url()).toBe(url); await expect(composer(page)).toHaveValue('A 초안');
   await resultRows(page).click(); await expect(page).toHaveURL(new RegExp(view==='phone'?'proxyRequestId=request-2':'inquiryId=2'));
-  await expect(composer(page)).toBeEnabled(); expect(threadCount(f.reads)).toBe(before+1);
+  await expect(page.getByTestId('admin-chat-message-list')).toContainText('대화 내용 2');
+  await expect(composer(page)).toBeVisible(); await expect(composer(page)).toBeEnabled(); expect(threadCount(f.reads)).toBe(before+1);
   await composer(page).fill('B 초안'); await input(page,view).fill('first'); await expect(resultRows(page)).toContainText('고객 1');
   await resultRows(page).click(); await expect(composer(page)).toHaveValue('A 초안'); expect(threadCount(f.reads)).toBe(before+2);
   await page.goBack(); await expect(composer(page)).toHaveValue('B 초안');
-  const current=page.url(); await page.reload(); await expect(composer(page)).toBeEnabled(); expect(page.url()).toBe(current);
   expect(f.runtimeErrors).toEqual([]);
+  // Open the canonical permalink in a fresh document with its own isolated I/O.
+  const permalink = page.url(), linked = await page.context().newPage();
+  try {
+    const fresh = await fixture(linked,view,{selected:2});
+    await expect(linked.getByTestId('admin-chat-message-list')).toContainText('대화 내용 2');
+    await expect(composer(linked)).toBeVisible(); await expect(composer(linked)).toBeEnabled();
+    expect(linked.url()).toBe(permalink); expect(threadCount(fresh.reads)).toBe(1);
+    expect(fresh.runtimeErrors).toEqual([]);
+  } finally { await linked.close(); }
 });
 
 test('search result A→B→A retains latest thread and loading ownership with prior A delayed', async ({page}) => {
