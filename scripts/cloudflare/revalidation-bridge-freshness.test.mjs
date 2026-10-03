@@ -125,3 +125,27 @@ test('source bytes changing under the same version identity block final deploy',
   const r=await exercise(t,{scoped:v=>{v.modules[0].content_base64=Buffer.from('export default { changed: true };').toString('base64');}});
   assert.equal(r.error?.message,BASELINE);assert(!r.events.includes('deploy'));
 });
+
+test('exact staged100/0 proof permits freshness; full zero-entry identity is pinned',async t=>{
+ const zero=id('4');const distribution=[{id:stableId,percentage:100},{id:zero,percentage:0}];
+ const r=await exercise(t,{proof:p=>{p.deploymentVersions=distribution;},deployment:d=>d.versions.push({version_id:zero,percentage:0})});
+ assert.equal(r.error,undefined);assert(r.events.includes('deploy'));
+});
+test('authorized replacement staging still rejects original proof; only exact newly recorded provenance passes',async t=>{
+ const current=d=>{d.id=id('7');d.versions.push({version_id:id('5'),percentage:0});};
+ const old=await exercise(t,{deployment:current,proof:p=>{p.deploymentVersions=[{id:stableId,percentage:100},{id:id('4'),percentage:0}];}});
+ assert.equal(old.error?.message,BASELINE);assert(!old.events.includes('deploy'));
+ const fresh=await exercise(t,{deployment:current,proof:p=>{p.deploymentId=id('7');p.deploymentVersions=[{id:id('5'),percentage:0},{id:stableId,percentage:100}];}});
+ assert.equal(fresh.error,undefined);assert(fresh.events.includes('deploy'));
+});
+for(const [name,change] of [
+ ['zero entry changed',{deployment:d=>d.versions.push({version_id:id('5'),percentage:0})}],
+ ['zero entry disappeared',{}],
+ ['third entry appeared',{deployment:d=>d.versions.push({version_id:id('4'),percentage:0},{version_id:id('5'),percentage:0})}],
+ ['proof zero string',{proof:p=>{p.deploymentVersions[1].percentage='0';},deployment:d=>d.versions.push({version_id:id('4'),percentage:0})}],
+ ['proof nested credential',{proof:p=>{p.deploymentVersions[1].token=secret;},deployment:d=>d.versions.push({version_id:id('4'),percentage:0})}],
+ ['proof wrong100',{proof:p=>{p.deploymentVersions[0].id=id('6');},deployment:d=>d.versions.push({version_id:id('4'),percentage:0})}],
+])test(name+': staged freshness blocks without mutation',async t=>{
+ const extra=change.proof;const r=await exercise(t,{...change,proof:p=>{p.deploymentVersions=[{id:stableId,percentage:100},{id:id('4'),percentage:0}];extra?.(p);}});
+ assert.equal(r.error?.message,BASELINE);assert(!r.events.includes('deploy'));
+});

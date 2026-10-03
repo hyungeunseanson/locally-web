@@ -10,7 +10,10 @@ export async function runCandidateBrowserSmoke({ origin, mode, workerName, versi
   const assetResponses = [];
   const workerReceipts = [];
   let probeReceipt;
-  const pending = [];
+  const pending = new Set();
+  const pageCaptures = new WeakMap();
+  const assetEvidence = [];
+  let responseCount = 0;
   const coverage = { document: false, script: false, stylesheet: false, font: false, image: false, data: false, api: false };
   const applied = new Set();
   const pageAssets = new WeakMap();
@@ -38,14 +41,25 @@ export async function runCandidateBrowserSmoke({ origin, mode, workerName, versi
       if (status >= 500) fiveXX += 1;
       const staticAsset = pathname.startsWith('/_next/static/');
       if (staticAsset && status === 404) asset404 += 1;
-      if (assetResponses.length + workerReceipts.length + pending.length >= 1000) { overflow = true; return; }
-      pending.push((async () => {
+      if (++responseCount > 1000) { overflow = true; return; }
+      // Associate the response with its page before the first async header read.
+      // A response arriving during the DOM snapshot must enter that page's drain.
+      let page;
+      let captures;
+      if (staticAsset) {
+        try { page = request.frame().page(); } catch { overflow = true; return; }
+        captures = pageCaptures.get(page) ?? new Set();
+        pageCaptures.set(page, captures);
+        if (request.redirectedFrom()) redirected = true;
+      }
+      const capture = (async () => {
         const overrideApplied = await request.headerValue('cloudflare-workers-version-overrides') === override;
         const probeApplied = await request.headerValue('x-locally-release-probe') === '1';
         if (!overrideApplied || (pathname === '/.well-known/locally-release' && !probeApplied)) allFirstPartyReadsOverridden = false;
         if (staticAsset) {
+          // A 200 response header alone does not prove that its body completed.
+          if (await response.finished()) { hardErrors += 1; return; }
           assetResponses.push({ pathname, status, overrideApplied, redirected: status >= 300 && status < 400 || Boolean(request.redirectedFrom()) });
-          const page = request.frame().page();
           const paths = pageAssets.get(page) ?? new Set(); paths.add(pathname); pageAssets.set(page, paths);
         } else if (request.method() !== 'OPTIONS' && (request.resourceType() === 'document' || api || ['fetch', 'xhr'].includes(request.resourceType()))) {
           const observedVersion = await response.headerValue('X-Locally-Worker-Version');
@@ -54,7 +68,9 @@ export async function runCandidateBrowserSmoke({ origin, mode, workerName, versi
             probeReceipt = { pathname, versionId: observedVersion === versionId ? versionId : null, status, overrideApplied, probeApplied };
           } else workerReceipts.push({ pathname, overrideApplied });
         }
-      })().catch(() => { overflow = true; }));
+      })().catch(() => { overflow = true; }).finally(() => { pending.delete(capture); captures?.delete(capture); });
+      pending.add(capture);
+      captures?.add(capture);
     });
     // The same gated browser context performs a deterministic probe first.
     const probe = await context.newPage();
@@ -69,10 +85,14 @@ export async function runCandidateBrowserSmoke({ origin, mode, workerName, versi
       if (frame === page.mainFrame() && frame.url() !== 'about:blank' && new URL(frame.url()).origin !== origin) redirected = true;
     }));
   };
-  const drain = async () => {
+  const drain = async (captures = pending) => {
     let timer;
     try {
-      await Promise.race([Promise.all(pending), new Promise((_, reject) => {
+      // Repeat snapshots under one existing deadline: a callback can append
+      // another capture while an earlier batch is being awaited.
+      await Promise.race([(async () => {
+        while (captures.size) await Promise.all([...captures]);
+      })(), new Promise((_, reject) => {
         timer = setTimeout(() => reject(new CandidateReleaseBlocked('candidate_capture_timeout')), 1000);
       })]);
     } finally { clearTimeout(timer); }
@@ -82,17 +102,32 @@ export async function runCandidateBrowserSmoke({ origin, mode, workerName, versi
     if (identityFailure || !allFirstPartyReadsOverridden) throw new CandidateReleaseBlocked('candidate_identity_unverified');
   };
   const collectReadOnlyPageEvidence = async page => {
-    await drain();
+    if (page.isClosed()) throw new CandidateReleaseBlocked('candidate_capture_page_closed');
+    await drain(pageCaptures.get(page) ?? new Set());
     const paths = await page.locator('script[src],link[rel="stylesheet"],link[rel="preload"]').evaluateAll(elements => {
       const paths = elements.map(e => new URL(e.src || e.href, location.href))
         .filter(u => u.origin === location.origin && u.pathname.startsWith('/_next/static/')).map(u => u.pathname);
-      return [...new Set(paths)];
+      const resources = performance.getEntriesByType('resource').map(r => new URL(r.name))
+        .filter(u => u.origin === location.origin && u.pathname.startsWith('/_next/static/')).map(u => u.pathname);
+      return [...new Set([...paths, ...resources])];
     });
+    // The browser round trip above can deliver additional response events.
+    // Drain those page-scoped captures before comparing, without a sleep or
+    // asset/status/override exception. Other pages cannot satisfy this set.
+    await drain(pageCaptures.get(page) ?? new Set());
+    if (page.isClosed()) throw new CandidateReleaseBlocked('candidate_capture_page_closed');
     for (const p of paths) assetRefs.add(p);
     const received = pageAssets.get(page) ?? new Set();
-    if (!paths.length || !paths.every(p => received.has(p))) assetSetMatches = false;
+    const missing = paths.filter(p => !received.has(p));
+    const evidence = { pathname: new URL(page.url()).pathname, refs: paths, completed: [...received], missing, pendingCaptures: pageCaptures.get(page)?.size ?? 0 };
+    assetEvidence.push(evidence);
+    if (!paths.length || missing.length) assetSetMatches = false;
     checkSafety();
-    if (!assetSetMatches) throw new CandidateReleaseBlocked('candidate_asset_set_mismatch');
+    if (!assetSetMatches) {
+      const error = new CandidateReleaseBlocked('candidate_asset_set_mismatch');
+      error.assetEvidence = evidence;
+      throw error;
+    }
   };
   const result = await runSmoke(origin, {
     versionOverride: { workerName, versionId, onApplied: ({ pathname, resourceType, method }) => {
@@ -106,7 +141,7 @@ export async function runCandidateBrowserSmoke({ origin, mode, workerName, versi
     checks: { home: result.homepage === 'rendered', login: result.login === 'rendered', experience: Boolean(result.publicExperience), api401: result.unauthenticatedProxyBookings === 401 },
     httpHardErrors: hardErrors, fiveXX, asset404, genericError: false, pageErrors: 0, consoleErrors: 0,
     unexpectedWrites: result.blockedUnexpectedWrites.length + result.blockedUnexpectedExternalWrites.length,
-    versionMismatch: identityFailure, assetRefs: [...assetRefs], assetResponses, assetSetMatches, workerReceipts, probeReceipt,
+    versionMismatch: identityFailure, assetRefs: [...assetRefs], assetResponses, assetSetMatches, assetEvidence, workerReceipts, probeReceipt,
     overrideCoverage: coverage, allFirstPartyReadsOverridden: allFirstPartyReadsOverridden && applied.size > 0,
     attempts: result.pageAttempts.map(a => ({ pathname: a.pathname, pass: a.outcome === 'pass', timeout: a.outcome === 'retry',
       pendingStaticAssets: a.pendingFirstPartyRequests.filter(r => r.pathname.startsWith('/_next/static/') && ['script', 'font'].includes(r.resourceType)).length,

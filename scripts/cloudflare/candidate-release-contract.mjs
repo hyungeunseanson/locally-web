@@ -134,10 +134,17 @@ export function assertDurableObjectLifecycle({ config, baselineConfig, workerSou
 }
 
 export function captureStableVersion(deployment) {
-  requireCondition(deployment?.versions?.length === 1, 'stable_deployment_not_single_version');
-  const version = deployment.versions[0];
-  requireCondition(UUID.test(version.id) && version.percentage === 100, 'stable_deployment_not_100_percent');
-  return version.id;
+  const versions = deployment?.versions;
+  requireCondition(Array.isArray(versions) && versions.length >= 1 && versions.length <= 2, 'stable_deployment_not_single_version');
+  if (versions.length === 1) {
+    requireCondition(UUID.test(versions[0].id) && versions[0].percentage === 100, 'stable_deployment_not_100_percent');
+    return versions[0].id;
+  }
+  requireCondition(versions.filter(v => v.percentage === 100).length === 1
+    && versions.filter(v => v.percentage === 0).length === 1
+    && new Set(versions.map(v => v.id)).size === 2, 'stable_deployment_not_single_version');
+  requireCondition(versions.every(v => UUID.test(v.id)), 'stable_deployment_not_100_percent');
+  return versions.find(v => v.percentage === 100).id;
 }
 
 export function versionOverrideHeader(workerName, versionId) {
@@ -309,12 +316,13 @@ export async function executeCandidateReleaseContract(plan, actions) {
   requireCondition(COMPATIBLE_DO.has(doImplementation) && doImplementation === plan.doImplementation, doImplementation);
   const before = await actions.snapshot();
   assertConfigUnchanged(plan.baselineSnapshot, before.snapshot);
-  assertDistribution(before.deployment, [{ id: plan.stableVersionId, percentage: 100 }]);
+  assertDistribution(before.deployment, plan.stableDeployment.versions);
   requireCondition(before.deployment.id === plan.stableDeployment.id, 'concurrent_deployment_changed');
   const bridgeProof = await actions.bridgeProofFreshness();
   requireCondition(bridgeProof?.kind === 'provider' && bridgeProof.sourceKind === 'workers-version-modules'
     && bridgeProof.artifactSha256 === proof.artifactSha256 && proof.deploymentId === before.deployment.id
     && bridgeProof.deploymentId === before.deployment.id && bridgeProof.versionId === plan.stableVersionId
+    && stableJson(bridgeProof.deploymentVersions) === stableJson(before.deployment.versions)
     && /^[a-f0-9]{64}$/.test(bridgeProof.etag ?? '') && bridgeProof.etag === proof.scriptEtag
     && (!proof.bridgeCompatibility || proof.bridgeCompatibility.compatSha256 === plan.bridgeLineage)
     && bridgeProof.compatSha256 === plan.bridgeLineage, 'bridge_provenance_or_freshness_failed');
@@ -327,7 +335,7 @@ export async function executeCandidateReleaseContract(plan, actions) {
   const afterUpload = await actions.snapshot({ candidateVersionId: candidate.versionId });
   assertPostUploadInvariance(before, afterUpload);
   assertConfigUnchanged(plan.baselineSnapshot, afterUpload.snapshot);
-  assertDistribution(afterUpload.deployment, [{ id: plan.stableVersionId, percentage: 100 }]);
+  assertDistribution(afterUpload.deployment, plan.stableDeployment.versions);
   requireCondition(afterUpload.deployment.id === before.deployment.id, 'upload_changed_active_deployment');
   await actions.stageZero(stageZeroArguments(plan, candidate.versionId));
   const zero = await actions.snapshot();

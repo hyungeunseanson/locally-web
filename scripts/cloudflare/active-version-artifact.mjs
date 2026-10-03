@@ -29,8 +29,13 @@ export async function readActiveVersionArtifact({ credentials, workerName, stabl
       const rows = result.deployments ?? result;
       check(Array.isArray(rows) && rows.length > 0 && rows.every(d => Number.isFinite(Date.parse(d.created_on))));
       const d = [...rows].sort((a,b) => Date.parse(b.created_on) - Date.parse(a.created_on))[0];
-      check(UUID.test(d.id) && d.versions?.length === 1 && d.versions[0].percentage === 100 && UUID.test(d.versions[0].version_id));
-      return { deploymentId: d.id, versionId: d.versions[0].version_id };
+      check(UUID.test(d.id) && Array.isArray(d.versions) && d.versions.length >= 1 && d.versions.length <= 2);
+      const versions = d.versions.map(v => ({ id: v?.version_id, percentage: v?.percentage }));
+      check(versions.every(v => UUID.test(v.id) && (v.percentage === 100 || v.percentage === 0))
+        && new Set(versions.map(v => v.id)).size === versions.length
+        && versions.filter(v => v.percentage === 100).length === 1);
+      versions.sort((a,b) => a.id.localeCompare(b.id));
+      return { deploymentId: d.id, versionId: versions.find(v => v.percentage === 100).id, deploymentVersions: versions };
     };
     const before = await deployment();
     check(stableVersionId === undefined || stableVersionId === before.versionId);
