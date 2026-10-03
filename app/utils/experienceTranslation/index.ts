@@ -33,7 +33,10 @@ export type ExperienceItineraryTranslationItem = {
   image_url: string;
 };
 
+export const FIXED_EXPERIENCE_POLICY_ID = 'locally_standard_v1' as const;
+
 export type ExperienceRulesTranslationInput = {
+  refund_policy_id?: typeof FIXED_EXPERIENCE_POLICY_ID;
   age_limit: string;
   activity_level: string;
   refund_policy: string;
@@ -127,6 +130,7 @@ function normalizeRules(value: unknown): ExperienceRulesTranslationInput {
   const raw = getSafeJsonObject(value);
 
   return {
+    ...(raw.refund_policy_id === FIXED_EXPERIENCE_POLICY_ID ? { refund_policy_id: FIXED_EXPERIENCE_POLICY_ID } : {}),
     age_limit: asTrimmedString(raw.age_limit),
     activity_level: asTrimmedString(raw.activity_level),
     refund_policy: asTrimmedString(raw.refund_policy),
@@ -547,6 +551,7 @@ export function didSourceTranslationContentChange(
     || !areItineraryArraysEqual(left.itinerary, right.itinerary)
     || left.rules.age_limit !== right.rules.age_limit
     || left.rules.activity_level !== right.rules.activity_level
+    || left.rules.refund_policy_id !== right.rules.refund_policy_id
     || left.rules.refund_policy !== right.rules.refund_policy
     || left.rules.host_notice !== right.rules.host_notice;
 }

@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { inspectExperienceLocale } from './integrity';
 import type {
   ExperienceItineraryTranslationItem,
   ExperienceLocale,
@@ -90,6 +91,7 @@ Task:
 
 Output rules:
 - Return JSON only.
+- When source rules contain refund_policy_id, return an empty refund_policy; the fixed policy is rendered by the application, never translated.
 - JSON schema:
 {
   "title": "translated title",
@@ -278,7 +280,8 @@ function parseRules(
   return {
     age_limit: parseTranslatedText(raw.age_limit, source.age_limit, 'rules.age_limit', missingFields),
     activity_level: parseTranslatedText(raw.activity_level, source.activity_level, 'rules.activity_level', missingFields),
-    refund_policy: parseTranslatedText(raw.refund_policy, source.refund_policy, 'rules.refund_policy', missingFields),
+    ...(source.refund_policy_id ? { refund_policy_id: source.refund_policy_id } : {}),
+    refund_policy: source.refund_policy_id ? '' : parseTranslatedText(raw.refund_policy, source.refund_policy, 'rules.refund_policy', missingFields),
     host_notice: parseTranslatedText(raw.host_notice, source.host_notice, 'rules.host_notice', missingFields),
   };
 }
@@ -363,6 +366,11 @@ function parseTranslationJson(
     );
   }
 
+  const integrity = inspectExperienceLocale(request.targetLocale, translation);
+  const mismatches = integrity.issues.filter(issue => issue.outcome === 'CLEAR_LANGUAGE_MISMATCH');
+  if (mismatches.length) {
+    throw invalidTranslationResponseError(provider, `${provider} returned wrong-language translation: ${mismatches.map(issue => issue.field).join(', ')}`);
+  }
   return translation;
 }
 

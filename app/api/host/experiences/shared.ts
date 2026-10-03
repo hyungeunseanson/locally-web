@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
+import { findMissingExperienceBodyFields, inspectExperienceLocale, type IntegrityIssue } from '@/app/utils/experienceTranslation/integrity';
 import {
   DEFAULT_SOLO_GUARANTEE_PRICE,
   isValidSoloGuaranteePrice,
 } from '@/app/constants/soloGuarantee';
-import { FIXED_REFUND_POLICY, MAX_EXPERIENCE_PHOTOS } from '@/app/host/create/config';
+import { MAX_EXPERIENCE_PHOTOS } from '@/app/host/create/config';
 import { captureServerException } from '@/app/utils/monitoring/sentry';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { createAdminClient } from '@/app/utils/supabase/admin';
@@ -20,6 +21,7 @@ import {
   createEmptyLocalizedTextInput,
   didSourceTranslationContentChange,
   EXPERIENCE_LOCALES,
+  FIXED_EXPERIENCE_POLICY_ID,
   getManualLocalesFromLanguageLevels,
   getManualLocalesFromManualContent,
   isExperienceLocale,
@@ -107,6 +109,7 @@ type NormalizedExperienceWriteInput = {
     age_limit: string;
     activity_level: string;
     refund_policy: string;
+    refund_policy_id: typeof FIXED_EXPERIENCE_POLICY_ID;
     host_notice: string;
   };
   price: number;
@@ -406,7 +409,8 @@ function normalizeExperienceWriteBody(
       rules: {
         age_limit: ageLimit,
         activity_level: activityLevel || '보통',
-        refund_policy: FIXED_REFUND_POLICY,
+        refund_policy: '',
+        refund_policy_id: FIXED_EXPERIENCE_POLICY_ID,
         host_notice: hostNotice,
       },
     }),
@@ -422,7 +426,8 @@ function normalizeExperienceWriteBody(
     rules: {
       age_limit: ageLimit,
       activity_level: activityLevel || '보통',
-      refund_policy: FIXED_REFUND_POLICY,
+      refund_policy: '',
+      refund_policy_id: FIXED_EXPERIENCE_POLICY_ID,
       host_notice: hostNotice,
     },
     price,
@@ -432,7 +437,32 @@ function normalizeExperienceWriteBody(
   };
 }
 
+class LocaleIntegrityError extends ApiError {
+  constructor(readonly issues: IntegrityIssue[]) {
+    const first = issues.find(issue => issue.outcome === 'CLEAR_LANGUAGE_MISMATCH')!;
+    super(400, `선택한 언어(${first.locale})와 다른 언어의 안내가 있습니다. ${first.field} 내용을 확인해주세요.`);
+  }
+}
+
+function validateWriteLocales(input: NormalizedExperienceWriteInput, manualContent: ManualContent) {
+  const issues = inspectExperienceLocale(input.sourceLocale, input.sourceContent).issues;
+  for (const locale of EXPERIENCE_LOCALES) {
+    const content = manualContent[locale];
+    if (content) {
+      if (!content.title.trim() || !content.description.trim()) {
+        throw new ApiError(400, `선택한 언어(${locale})의 제목과 소개글을 확인해주세요.`);
+      }
+      issues.push(...inspectExperienceLocale(locale, content).issues);
+    }
+  }
+  if (issues.some(issue => issue.outcome === 'CLEAR_LANGUAGE_MISMATCH')) throw new LocaleIntegrityError(issues);
+  return issues;
+}
+
 export function toApiErrorResponse(error: unknown) {
+  if (error instanceof LocaleIntegrityError) {
+    return NextResponse.json({ success: false, error: error.message, code: 'EXPERIENCE_LOCALE_MISMATCH', issues: error.issues }, { status: 400 });
+  }
   if (error instanceof ApiError) {
     return NextResponse.json({ success: false, error: error.message }, { status: error.status });
   }
@@ -568,6 +598,7 @@ export async function createExperienceFromBody(
   dependencies: ExperienceWriteDependencies = DEFAULT_EXPERIENCE_WRITE_DEPENDENCIES
 ) {
   const input = normalizeExperienceWriteBody(body);
+  const localeIntegrityWarnings = validateWriteLocales(input, input.manualContent);
   const translationVersion = 1;
   const queuedLocales = getQueuedTranslationLocales({
     sourceLocale: input.sourceLocale,
@@ -679,6 +710,7 @@ export async function createExperienceFromBody(
 
   return {
     id: data.id,
+    localeIntegrityWarnings,
     queuedLocales: translationState.queuedLocales,
   };
 }
@@ -733,6 +765,9 @@ export async function updateExperienceFromBody(params: {
     || !areExperienceLocaleArraysEqual(existingManualLocales, mergedManualLocales)
     || didManualContentChange(existingManualContent, nextManualContent, mergedManualLocales)
     || sourceContentDirty;
+  // No new ready stamp for an unchecked merged manual/source payload. A price-
+  // only update of unchanged legacy content does not retroactively certify it.
+  const localeIntegrityWarnings = translationDirty ? validateWriteLocales(input, nextManualContent) : [];
   const translationVersion = translationDirty
     ? Math.max(Number(existing.translation_version) || 1, 1) + 1
     : Math.max(Number(existing.translation_version) || 1, 1);
@@ -742,6 +777,29 @@ export async function updateExperienceFromBody(params: {
     existingManualLocales,
     sourceContentDirty,
   });
+  if (translationDirty && !sourceContentDirty) {
+    // These manual body maps are retained rather than replaced by a provider.
+    // Validate only actual stored target leaves, never a cross-locale fallback.
+    for (const locale of mergedManualLocales) {
+      if (locale === input.sourceLocale || queuedLocales.includes(locale)) continue;
+      const targetBody = buildSourceTranslationContent({
+        category: existing.category,
+        meetingPoint: existing.meeting_point_i18n?.[locale],
+        supplies: existing.supplies_i18n?.[locale],
+        inclusions: existing.inclusions_i18n?.[locale],
+        exclusions: existing.exclusions_i18n?.[locale],
+        itinerary: existing.itinerary_i18n?.[locale],
+        rules: existing.rules_i18n?.[locale],
+      });
+      const integrity = inspectExperienceLocale(locale, targetBody);
+      if (integrity.outcome === 'CLEAR_LANGUAGE_MISMATCH') throw new LocaleIntegrityError(integrity.issues);
+      const missingFields = findMissingExperienceBodyFields(nextSourceContent, targetBody);
+      if (missingFields.length) {
+        throw new ApiError(400, `선택한 언어(${locale})의 번역 본문이 누락되었습니다. ${missingFields[0]} 내용을 확인해주세요.`);
+      }
+      localeIntegrityWarnings.push(...integrity.issues);
+    }
+  }
   const translationState = buildExperienceTranslationState({
     sourceLocale: input.sourceLocale,
     manualContent: nextManualContent,
@@ -862,6 +920,7 @@ export async function updateExperienceFromBody(params: {
 
   return {
     id: data.id,
+    localeIntegrityWarnings,
     queuedLocales: translationDirty ? translationState.queuedLocales : [],
   };
 }

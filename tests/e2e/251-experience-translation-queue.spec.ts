@@ -80,13 +80,31 @@ test.describe('experience translation Queue wake transport', () => {
 
   test('manual locale protection preserves localized title/description writes', async () => {
     const deps = dependencies();
-    deps.repository.fetchExperience = async () => ({ id: 3309, source_locale: 'ko', translation_version: 2, title: 'source', description: 'source', manual_locales: ['en'] });
+    deps.repository.fetchExperience = async () => ({ id: 3309, source_locale: 'ko', translation_version: 2, title: 'source', description: 'source', manual_locales: ['en'], title_en: 'Reviewed title', description_en: 'Reviewed English description'  });
     let payload: Record<string, unknown> = {};
     deps.repository.applyExperienceTranslation = async (_task, next) => { payload = next; return true; };
     await runExperienceTranslationWorker(deps);
     expect(payload).not.toHaveProperty('title_en');
     expect(payload).not.toHaveProperty('description_en');
     expect(payload.translation_meta).toMatchObject({ en: { mode: 'manual', status: 'ready', version: 2 } });
+  });
+
+  test('wrong-language result cannot reach writeback, even through an injected provider', async () => {
+    const deps = dependencies();
+    const good = deps.translateGemini;
+    deps.translateGemini = async request => ({ ...await good(request), supplies: '歩きやすい靴をご持参ください。' });
+    await expect(runExperienceTranslationWorker(deps)).resolves.toMatchObject({ completed: 0, retried: 1 });
+    expect(deps.events).not.toContain('update');
+  });
+
+  test('protected wrong-language manual content fails without a provider call or overwrite', async () => {
+    const deps = dependencies();
+    deps.repository.fetchExperience = async () => ({ id: 3309, source_locale: 'ko', translation_version: 2,
+      title: 'source', description: 'source', manual_locales: ['en'], title_en: 'Manual title',
+      description_en: '東京の街を一緒に歩きましょう。楽しい体験をご案内します。' });
+    await expect(runExperienceTranslationWorker(deps)).resolves.toMatchObject({ failed: 1, completed: 0 });
+    expect(deps.calls).toBe(0);
+    expect(deps.events).not.toContain('update');
   });
 
   test('duplicate wakes cannot double-process an atomically leased task', async () => {
