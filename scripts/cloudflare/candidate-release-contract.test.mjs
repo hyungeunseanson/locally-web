@@ -409,3 +409,95 @@ test('GET reader anchors before/after upload to exact stable resources, not lega
   assert(calls.some(url=>url.endsWith('/script-settings')));
 
 });
+
+// The response arrives while the DOM/resource snapshot is awaiting the browser.
+// Header inspection is held by a latch; no transport/status failure is involved.
+async function captureOrderingFixture(options = {}) {
+  const { EventEmitter } = await import('node:events');
+  const context = new EventEmitter();
+  const completed = [];
+  const override = versionOverrideHeader(PRODUCTION_WORKER, candidateId);
+  let pageSequence = 0;
+  const respond = (page, pathname, { type = 'script', status = 200, late = false, missingOverride = false, redirected = false, never = false, wrongVersion = false } = {}) => {
+    let release;
+    const latch = late || never ? new Promise(resolve => { release = resolve; }) : Promise.resolve();
+    const request = { url: () => PRODUCTION_ORIGIN + pathname + '?private=NEVER_LOG', method: () => 'GET', resourceType: () => type,
+      frame: () => ({ page: () => page }), redirectedFrom: () => redirected ? {} : null,
+      headerValue: async name => { await latch; return name === 'cloudflare-workers-version-overrides' ? missingOverride ? null : override : pathname === '/.well-known/locally-release' ? '1' : null; } };
+    context.emit('response', { request: () => request, status: () => status, finished: async () => options.bodyFailure ? new Error('fixture incomplete response') : null,
+      headerValue: async () => wrongVersion ? stableId : candidateId });
+    if (late && !never) setImmediate(() => { completed.push(pathname); release(); });
+  };
+  context.newPage = async () => {
+    const page = { id: ++pageSequence, url: () => PRODUCTION_ORIGIN + '/fixture', close: async () => { page.closed = true; }, isClosed: () => Boolean(page.closed),
+      on: () => {}, goto: async () => respond(page, '/.well-known/locally-release', { type: 'document', status: 204, wrongVersion: options.wrongVersion }),
+      locator: () => ({ evaluateAll: async () => {
+        for (const [pathname, spec] of page.responses ?? []) {
+          if (!options.otherContext) respond(spec.otherPage ?? page, pathname, spec);
+        }
+        if (options.closeDuringCapture) await page.close();
+        return page.refs;
+      } }) };
+    return page;
+  };
+  const result = await runCandidateBrowserSmoke({ origin: PRODUCTION_ORIGIN, mode: 'override', workerName: PRODUCTION_WORKER, versionId: candidateId }, {
+    runSmoke: async (_origin, hooks) => {
+      await hooks.observeContext(context);
+      for (const pathname of ['/', '/experiences/42', '/login']) {
+        const page = await context.newPage(); page.refs = ['/_next/static/app.js', '/_next/static/font.woff2', '/_next/static/style.css'];
+        respond(page, pathname, { type: 'document' });
+        respond(page, '/data', { type: 'fetch' }); respond(page, '/image.svg', { type: 'image' });
+        hooks.versionOverride.onApplied({ pathname, resourceType: 'document', method: 'GET' });
+        const otherPage = await context.newPage();
+        const specs = page.refs.map((p, index) => [p, { type: ['script', 'font', 'stylesheet'][index], late: Boolean(options.late),
+          ...(index === 0 ? options.asset : {}), ...(index === 0 && options.otherPage ? { otherPage } : {}) }]);
+        if (options.missing) specs.shift();
+        if (options.duplicate) specs.push(specs[0]);
+        if (options.completedBefore) { for (const [p,s] of specs) respond(page,p,s); page.responses=[]; }
+        else page.responses = specs;
+        if (options.retryPage) { // Earlier page's same path must never satisfy the new page.
+          respond(otherPage, '/_next/static/app.js'); await otherPage.close();
+        }
+        await hooks.collectReadOnlyPageEvidence(page); await page.close();
+      }
+      const api = await context.newPage(); respond(api, '/api/proxy-bookings', { type: 'document', status: 401 });
+      return { status: 'LOCALLY_PRODUCTION_BROWSER_SMOKE_PASS', homepage: 'rendered', login: 'rendered', publicExperience: '/experiences/42',
+        unauthenticatedProxyBookings: 401, blockedUnexpectedWrites: [], blockedUnexpectedExternalWrites: [],
+        pageAttempts: ['/', '/experiences/42', '/login'].map(pathname => ({ pathname, outcome: 'pass', pendingFirstPartyRequests: [], genericErrorPresent: false })) };
+    },
+  });
+  assert(!JSON.stringify(result).includes('NEVER_LOG'));
+  return { result, completed };
+}
+
+test('asset capture ordering: delayed successful response observed during DOM snapshot passes', async () => {
+  const { result, completed } = await captureOrderingFixture({ late: true });
+  assert.equal(result.assetSetMatches, true); assert.equal(completed.length, 9);
+});
+test('asset capture ordering: completed responses, multiple assets and duplicates pass', async () => {
+  for (const options of [{ completedBefore: true }, { late: true, duplicate: true }, { retryPage: true, late: true }]) assert.equal((await captureOrderingFixture(options)).result.assetSetMatches, true);
+});
+test('asset capture ordering: missing asset and other-page/retry contamination fail', async () => {
+  for (const options of [{ missing: true }, { otherPage: true, late: true }, { missing: true, retryPage: true }, { otherContext: true }])
+    await assert.rejects(captureOrderingFixture(options), blocked('candidate_asset_set_mismatch'));
+});
+test('asset capture ordering: 404 and redirects remain hard failures', async () => {
+  for (const asset of [{ status: 404 }, { status: 302 }, { redirected: true }])
+    await assert.rejects(captureOrderingFixture({ late: true, asset }), blocked('candidate_http_or_asset_failure'));
+});
+test('asset capture ordering: missing override and wrong identity still fail', async () => {
+  for (const options of [{ late: true, asset: { missingOverride: true } }, { wrongVersion: true }])
+    await assert.rejects(captureOrderingFixture(options), blocked('candidate_identity_unverified'));
+});
+test('asset capture ordering: unresolved capture fails within existing one-second bound', async () => {
+  const start = Date.now();
+  await assert.rejects(captureOrderingFixture({ asset: { never: true } }), blocked('candidate_capture_timeout'));
+  assert(Date.now() - start < 2000);
+});
+test('asset capture ordering: page close before evidence completes fails', async () => {
+  await assert.rejects(captureOrderingFixture({ closeDuringCapture: true, late: true }), blocked('candidate_capture_page_closed'));
+});
+
+test('asset capture ordering: incomplete response body remains a hard failure', async () => {
+  await assert.rejects(captureOrderingFixture({ bodyFailure: true }), blocked('candidate_http_or_asset_failure'));
+});
