@@ -803,14 +803,38 @@ test('real browser: pending reads aborted at close pass; identical fetch errors 
       const context = await browser.newContext({ serviceWorkers: 'block' });
       const errors = [], failures = [];
       let closeRequested = false;
+      let resolveTeardownConsole;
+      const teardownConsole = new Promise(resolve => { resolveTeardownConsole = resolve; });
       try {
+        // Browser close may discard the console event on some platforms. Keep
+        // this fixture alive until the intentionally aborted fetch logs, with a
+        // bounded test-only barrier before the underlying browser close.
+        context.on('page', page => {
+          const close = page.close.bind(page);
+          page.close = async (...args) => {
+            if (mode === 'pending') {
+              let timer;
+              try {
+                await Promise.race([teardownConsole, new Promise((_, reject) => {
+                  timer = setTimeout(() => reject(new Error('Fixture teardown console not delivered')), 3000);
+                })]);
+              } finally { clearTimeout(timer); }
+            }
+            return close(...args);
+          };
+        });
         const gate = await installProductionMutationGate(context, origin, {
           versionOverride: { workerName: 'locally-web-opennext-production', versionId: '22222222-2222-4222-8222-222222222222' },
         });
         context.on('page', page => {
           const close = page.close.bind(page);
           page.close = (...args) => { closeRequested = true; return close(...args); };
-          page.on('console', message => { if (message.type() === 'error') errors.push({ text: message.text(), teardown: closeRequested }); });
+          page.on('console', message => {
+            if (message.type() === 'error') {
+              errors.push({ text: message.text(), teardown: closeRequested });
+              if (closeRequested && /TypeError: Failed to fetch/.test(message.text())) resolveTeardownConsole();
+            }
+          });
           page.on('requestfailed', request => failures.push({ error: request.failure()?.errorText, teardown: closeRequested }));
         });
         const running = visitReadOnlyPage(context, origin, '/', async () => { await reviewSeen; }, { mutationGate: gate, log: () => {} });
