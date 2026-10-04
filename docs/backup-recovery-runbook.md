@@ -172,8 +172,8 @@ hashed R2 locations only.
 The default `plan` mode lists Storage metadata and writes only a mode-`0600`
 local plan. It performs no source payload GET, transform, Queue operation, or R2
 write. The `prepare` step rechecks the complete inventory, downloads only the
-objects that lack reusable unexpired proof, enforces the 1,200-object and 512
-MiB received-byte ceilings, hashes the actual bytes, and produces the prepared
+objects that lack reusable unexpired proof, enforces the 5,000-object and 2 GiB
+received-byte ceilings, hashes the actual bytes, and produces the prepared
 plan. Response-body reads are bounded by the CLI `--timeout`, not only the
 initial HTTP connection. An interrupted prepare can reuse completed cache files
 only when the private cache is bound to the exact metadata plan digest; the
@@ -192,8 +192,8 @@ CopyObject, or DeleteObject. A final inventory drift prevents a complete
 manifest. Partial ciphertext remains immutable and the same approved plan can
 resume without recreating already accepted objects.
 
-Hard ceilings for one baseline are 1,200 source objects, 512 MiB of source
-payload received (failed attempts included), 2,500 new R2 objects, and 640 MiB
+Hard ceilings for one baseline are 5,000 source objects, 2 GiB of source
+payload received (failed attempts included), 12,000 new R2 objects, and 3 GiB
 of newly stored ciphertext/checksum/manifest bytes. Provider retries are
 disabled for R2 writes so an SDK retry cannot bypass the attempt accounting.
 The source client also performs no automatic payload retry. Operators must
@@ -310,7 +310,9 @@ or destination credentials.
 The `production-backup` environment needs the existing destination-only
 `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`, `R2_BUCKET` and public
 `AGE_RECIPIENT`, plus a dedicated backup-source Supabase backend API credential named
-`STORAGE_SUPABASE_SERVICE_ROLE_KEY` (separate from the application runtime key)
+`STORAGE_SUPABASE_SERVICE_ROLE_KEY` (separate from the application runtime key;
+its value must be a dedicated named modern `sb_secret_...` key, never a legacy
+JWT service_role key; the secret name is retained for transport compatibility)
 and a **separate,
 source-bucket Object Read Only** pair named `R2_SOURCE_READ_ACCESS_KEY_ID` and
 `R2_SOURCE_READ_SECRET_ACCESS_KEY`. Verify that the R2 source credential is scoped
@@ -341,9 +343,17 @@ metadata/association identity, ciphertext bytes and remaining expiry.
 
 The operator `scripts/backup/run_storage_backup.py` defaults to byte preparation
 without destination writes. `--apply` publishes the encrypted snapshot. Both
-modes require separated credentials. Ceilings remain 1,200 source attempts,
-512 MiB cumulative source bytes, 2,500 destination create attempts and 640 MiB
-new ciphertext. Reads have deadlines and at most one bounded source-timeout
+modes require separated credentials. Hard ceilings are 5,000 source objects/
+GET attempts, 2 GiB cumulative source bytes, 12,000 destination create attempts
+and 3 GiB new encrypted destination bytes. The 2026-10-04 input of 1,031 objects /
+422,843,988 bytes uses about 21% / 20% of source capacity, leaving meaningful
+growth room while keeping every run finite. A maximum-size 5,000-object snapshot
+needs 10,002 destination objects (ciphertext/checksum per source plus the
+manifest/checksum pair), below 12,000. The extra 1 GiB above the source byte
+ceiling covers age framing, per-object headers/checksums and encrypted manifest
+overhead. Failed attempts count toward the same limits; actual usage remains in
+the sanitized source-preparation and destination budget ledgers. Reads have
+deadlines and at most one bounded source-timeout
 retry. Exceeding a ceiling fails visibly; do not silently omit a provider.
 Private temporary plans, plaintext payloads and intermediates are removed after
 the run; only sanitized aggregate evidence is uploaded as a GitHub artifact.

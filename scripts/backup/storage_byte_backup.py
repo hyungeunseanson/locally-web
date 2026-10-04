@@ -42,10 +42,11 @@ BUCKETS = (
 )
 PRIVATE_R2_BUCKET = "locally-production-db-backups"
 R2_PREFIX = "daily/storage-v1/"
-MAX_OBJECTS = 1200
-MAX_SOURCE_BYTES = 512 * 1024 * 1024
-MAX_R2_OBJECTS = 2500
-MAX_R2_BYTES = 640 * 1024 * 1024
+MAX_OBJECTS = 5000
+MAX_SOURCE_BYTES = 2 * 1024 * 1024 * 1024
+# Two creates per source (ciphertext/checksum), manifest pair, and bounded headroom.
+MAX_R2_OBJECTS = 12000
+MAX_R2_BYTES = 3 * 1024 * 1024 * 1024
 LOCK_DAYS = 30
 EXPIRY_DAYS = 35
 CHUNK_SIZE = 1024 * 1024

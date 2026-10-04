@@ -216,6 +216,51 @@ class SequencedSource(backup.SupabaseStorageSource):
             raise response
         return response
 
+class ProductionCapacityBudgetTests(unittest.TestCase):
+    def plan(self, items):
+        return backup.make_plan(items, "capacity-fixture", "db-fixture", "2026-10-04T00:00:00Z", "2026-10-04T00:00:00Z")
+
+    def test_source_plan_accepts_exact_object_and_byte_limits_then_rejects_excess(self):
+        items = [entry("images", "capacity-" + str(n), b"") for n in range(backup.MAX_OBJECTS)]
+        backup.validate_plan(self.plan(items))
+        with self.assertRaises(backup.ValidationError):
+            backup.validate_plan(self.plan(items + [entry("images", "one-too-many", b"")]))
+        maximum = dict(entry("images", "byte-limit", b""), size=backup.MAX_SOURCE_BYTES)
+        backup.validate_plan(self.plan([maximum]))
+        with self.assertRaises(backup.ValidationError):
+            backup.validate_plan(self.plan([maximum, entry("images", "one-extra-byte", b"x")]))
+
+    def test_source_transfer_rejects_next_attempt_and_byte_with_usage_preserved(self):
+        budget = backup.TransferBudget(source_attempts=backup.MAX_OBJECTS - 1)
+        budget.begin_source()
+        with self.assertRaises(backup.BudgetError):
+            budget.begin_source()
+        budget.receive_source(backup.MAX_SOURCE_BYTES)
+        with self.assertRaises(backup.BudgetError):
+            budget.receive_source(1)
+        self.assertEqual(budget.as_dict()["source_attempts"], backup.MAX_OBJECTS)
+        self.assertEqual(budget.as_dict()["source_bytes"], backup.MAX_SOURCE_BYTES + 1)
+
+    def test_destination_rejects_next_attempt_and_byte_without_mutation(self):
+        budget = backup.TransferBudget(r2_attempts=backup.MAX_R2_OBJECTS - 1)
+        budget.begin_r2(0)
+        with self.assertRaises(backup.BudgetError):
+            budget.begin_r2(0)
+        byte_budget = backup.TransferBudget(new_r2_bytes=backup.MAX_R2_BYTES - 1)
+        byte_budget.begin_r2(1)
+        byte_budget.created_r2(1)
+        with self.assertRaises(backup.BudgetError):
+            byte_budget.begin_r2(1)
+        self.assertEqual(byte_budget.as_dict()["new_r2_bytes"], backup.MAX_R2_BYTES)
+        self.assertEqual(byte_budget.as_dict()["r2_attempts"], 1)
+
+    def test_destination_can_hold_max_source_ciphertext_checksums_and_manifest(self):
+        self.assertGreaterEqual(backup.MAX_R2_OBJECTS, 2 * backup.MAX_OBJECTS + 2)
+        # age chunk tags + generous per-file framing + 128 MiB manifest allowance.
+        overhead = ((backup.MAX_SOURCE_BYTES + 65535) // 65536) * 16 + backup.MAX_OBJECTS * 4096 + 128 * 1024 * 1024
+        self.assertGreaterEqual(backup.MAX_R2_BYTES, backup.MAX_SOURCE_BYTES + overhead)
+
+
 class StorageByteBackupTests(unittest.TestCase):
     def setUp(self):
         self.root = pathlib.Path(tempfile.mkdtemp())
