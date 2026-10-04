@@ -16,7 +16,7 @@ concurrency:
 jobs:
   backup:
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 180
     environment: production-backup
     env:
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.STORAGE_SUPABASE_SERVICE_ROLE_KEY }}
@@ -77,13 +77,7 @@ jobs:
         if: always()
         shell: bash
         run: |
-          python3 - <<'PY'
-          import os, pathlib, shutil
-          root = pathlib.Path(os.environ['RUNNER_TEMP'])
-          for path in root.glob('locally-authoritative-storage-' + os.environ['GITHUB_RUN_ID'] + '-*'):
-              if path.is_dir() and not path.is_symlink():
-                  shutil.rmtree(path)
-          PY
+          python3 scripts/backup/cleanup_storage_backup.py
 
       - name: Publish sanitized result
         if: always()
