@@ -445,7 +445,7 @@ Supabase object-info supplies custom/cache metadata and identity fields which
 are not all present with the same representation in list results. Replacing
 those passes with cached metadata would require a separate, proven digest
 contract. This bounded hardening retains the full metadata/locator drift gates
-and raises only the Storage workflow wall-clock limit from 45 to 90 minutes.
+and initially raised the Storage workflow wall-clock limit from 45 to 90 minutes.
 Request deadlines, source 5,000 attempts / 2 GiB and destination 12,000 creates /
 3 GiB ceilings remain unchanged. No source-write/delete API is introduced.
 
@@ -454,6 +454,28 @@ If it fails, retain the sanitized stage/provider/operation/code and counters,
 stop, and report FOUNDATION BLOCKED. Do not automatically dispatch another run.
 On success, perform the full isolated offline-AGE restore and fresh current-R2
 coverage proof; inventory alone cannot establish recoverability.
+
+The one controlled retry on merged main `58726bf` was cancelled by GitHub's
+90-minute job limit during destination creation after all source downloads
+completed. The Storage job now has a bounded 180-minute limit. Source 5,000 /
+2 GiB, destination 12,000 creates / 3 GiB, per-request deadlines, fail-closed
+checks, encryption, source authority and COMPLETE manifest semantics are
+unchanged. No incremental/reuse architecture is introduced.
+
+The always-run cleanup step removes only the current run's local capture
+directories under `RUNNER_TEMP`, without following directory symlinks. A
+directory-not-empty race (`ENOTEMPTY` or `EEXIST`) receives at most three removal
+attempts with one second between retries; other errors fail immediately.
+Exhausted cleanup returns nonzero and emits only fixed diagnostics and counts,
+so a cleanup failure cannot make the workflow report success. It never deletes
+remote source objects, encrypted destination objects or partial snapshot
+prefixes. A forced runner shutdown can still prevent cleanup from completing;
+check the cleanup step result instead of assuming temporary data was removed.
+
+The previous manual retry approval is exhausted. After this runtime hardening
+is merged, verify the existing scheduled workflow remains active with the
+180-minute timeout, then stop. Obtain fresh explicit user approval immediately
+before any new controlled Production backup dispatch.
 
 Provider contracts checked against [Boto3 error handling](https://docs.aws.amazon.com/boto3/latest/guide/error-handling.html),
 [botocore exception types](https://github.com/boto/botocore/blob/develop/botocore/exceptions.py),
