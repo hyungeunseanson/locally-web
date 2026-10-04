@@ -725,7 +725,7 @@ export async function updateExperienceFromBody(params: {
 
   const { data: existing, error: existingError } = await supabaseAdmin
     .from('experiences')
-    .select('id, host_id, status, is_active, photos, image_url, translation_version, source_locale, manual_locales, title, description, title_ko, title_en, title_ja, title_zh, description_ko, description_en, description_ja, description_zh, category, meeting_point, meeting_point_i18n, supplies, supplies_i18n, inclusions, inclusions_i18n, exclusions, exclusions_i18n, itinerary, itinerary_i18n, rules, rules_i18n, solo_guarantee_price')
+    .select('id, host_id, status, is_active, photos, image_url, media_revision, translation_version, source_locale, manual_locales, title, description, title_ko, title_en, title_ja, title_zh, description_ko, description_en, description_ja, description_zh, category, meeting_point, meeting_point_i18n, supplies, supplies_i18n, inclusions, inclusions_i18n, exclusions, exclusions_i18n, itinerary, itinerary_i18n, rules, rules_i18n, solo_guarantee_price')
     .eq('id', experienceId)
     .maybeSingle();
 
@@ -852,7 +852,8 @@ export async function updateExperienceFromBody(params: {
   let updateQuery = supabaseAdmin
     .from('experiences')
     .update(updatePayload)
-    .eq('id', experienceId);
+    .eq('id', experienceId)
+    .eq('media_revision', existing.media_revision ?? 0);
 
   if (!actor.isAdmin) {
     // [CRITICAL FIX] query builder는 immutable — 반드시 재할당해야 host_id 필터가 실제 쿼리에 반영됨
@@ -864,7 +865,7 @@ export async function updateExperienceFromBody(params: {
     .maybeSingle();
 
   if (error || !data) {
-    throw error ?? new ApiError(500, '체험 저장에 실패했습니다.');
+    throw error ?? new ApiError(409, '체험이 변경되었습니다. 새로고침 후 다시 저장해주세요.');
   }
 
   dependencies.scheduleMediaProducer({

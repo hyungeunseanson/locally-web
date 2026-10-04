@@ -180,7 +180,14 @@ const expectedLedger = [
     "repositorySha256": "0e9776caab4c826924eade21baa229ec73a27857d9c1c9bb75a97b25b1b31724"
   },
 ];
-const expectedPendingMigrations = [];
+const expectedPendingMigrations = [
+  {
+    "version": "20261004053224",
+    "name": "media_lifecycle_foundation",
+    "repositoryFile": "supabase/migrations/20261004053224_media_lifecycle_foundation.sql",
+    "repositorySha256": "c8cd123855ba600070fd22ddaef6b6a37591110f18cec92829de37ff0fdb3cfd"
+  }
+];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));
 for (const [index, expected] of expectedLedger.entries()) {
   const actual = manifest.migrationLedger[index];

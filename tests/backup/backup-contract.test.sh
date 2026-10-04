@@ -26,10 +26,10 @@ grep -Fq 'mktemp -d "${TMPDIR:-/tmp}/locally-backup-verify.XXXXXX"' "$verify_scr
 grep -Fq 'IfNoneMatch="*"' "$storage_module"
 grep -Fq 'PRIVATE_R2_BUCKET = "locally-production-db-backups"' "$storage_module"
 grep -Fq 'R2_PREFIX = "daily/storage-v1/"' "$storage_module"
-grep -Fq 'MAX_OBJECTS = 1200' "$storage_module"
-grep -Fq 'MAX_SOURCE_BYTES = 512 * 1024 * 1024' "$storage_module"
-grep -Fq 'MAX_R2_OBJECTS = 2500' "$storage_module"
-grep -Fq 'MAX_R2_BYTES = 640 * 1024 * 1024' "$storage_module"
+grep -Fq 'MAX_OBJECTS = 5000' "$storage_module"
+grep -Fq 'MAX_SOURCE_BYTES = 2 * 1024 * 1024 * 1024' "$storage_module"
+grep -Fq 'MAX_R2_OBJECTS = 12000' "$storage_module"
+grep -Fq 'MAX_R2_BYTES = 3 * 1024 * 1024 * 1024' "$storage_module"
 python3 - "$recovery_runbook" <<'PY'
 import pathlib
 import sys

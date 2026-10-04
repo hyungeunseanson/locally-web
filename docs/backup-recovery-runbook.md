@@ -120,7 +120,7 @@ It must not copy sensitive files into the public media bucket.
 
 | Source bucket | Sensitivity and recovery source | Planned private backup treatment |
 | --- | --- | --- |
-| `experiences` | Private and inactive experience source media; the public R2 mirror covers only a subset | Encrypt every authoritative Supabase object; use public R2 only as secondary evidence |
+| `experiences` | Private legacy/residual/operator recovery source; current Experience originals are R2 primary | Preserve all residual Supabase bytes, and separately encrypt the DB-referenced R2 originals/sources |
 | `images` | Mixed application media | Encrypt by source object identity and preserve access metadata in the snapshot manifest |
 | `avatars` | Public-facing profile media with account linkage | Encrypt; restore only after the matching DB/Auth snapshot is selected |
 | `chat-images` | The source bucket is private and conversation media is sensitive recovery data | Encrypt with restricted recovery access; never place in public R2 |
@@ -137,13 +137,14 @@ the ciphertext byte checksum.
 Storage backup retention should be explicit and compatible with deletion and
 privacy obligations. With the current database-backup policy, immutable daily
 objects remain locked for 30 days and expire after 35 days, so a source deletion
-may remain in encrypted backup until expiry. Restoration must prove the selected
-DB and Storage manifests share the same snapshot boundary, verify outer and
+may remain in encrypted backup until expiry. Restoration must record the actual time delta between the selected
+DB and Storage captures, verify outer and
 per-object checksums, restore into a non-production destination first, and
 re-check private bucket authorization before any traffic is enabled.
 
-The database workflow still performs no Storage byte copy. Storage bytes use
-the separately invoked `scripts/backup/storage-byte-backup.py` tool. It covers
+The database workflow still performs no Storage byte copy. The verified v1 baseline uses
+the separately invoked `scripts/backup/storage-byte-backup.py` tool.
+The provider-aware workflow and v2 contract below extend that implementation. It covers
 all objects in the six allowlisted buckets, including inactive, orphaned,
 legacy, zero-byte, Unicode-named, and private objects. It never changes the
 source buckets.
@@ -171,8 +172,8 @@ hashed R2 locations only.
 The default `plan` mode lists Storage metadata and writes only a mode-`0600`
 local plan. It performs no source payload GET, transform, Queue operation, or R2
 write. The `prepare` step rechecks the complete inventory, downloads only the
-objects that lack reusable unexpired proof, enforces the 1,200-object and 512
-MiB received-byte ceilings, hashes the actual bytes, and produces the prepared
+objects that lack reusable unexpired proof, enforces the 5,000-object and 2 GiB
+received-byte ceilings, hashes the actual bytes, and produces the prepared
 plan. Response-body reads are bounded by the CLI `--timeout`, not only the
 initial HTTP connection. An interrupted prepare can reuse completed cache files
 only when the private cache is bound to the exact metadata plan digest; the
@@ -191,8 +192,8 @@ CopyObject, or DeleteObject. A final inventory drift prevents a complete
 manifest. Partial ciphertext remains immutable and the same approved plan can
 resume without recreating already accepted objects.
 
-Hard ceilings for one baseline are 1,200 source objects, 512 MiB of source
-payload received (failed attempts included), 2,500 new R2 objects, and 640 MiB
+Hard ceilings for one baseline are 5,000 source objects, 2 GiB of source
+payload received (failed attempts included), 12,000 new R2 objects, and 3 GiB
 of newly stored ciphertext/checksum/manifest bytes. Provider retries are
 disabled for R2 writes so an SDK retry cannot bypass the attempt accounting.
 The source client also performs no automatic payload retry. Operators must
@@ -277,3 +278,134 @@ values from the private platform consoles/approved secret manager, recreate or
 rotate credentials through each provider, and then test in an isolated project.
 The repository documents required setting names and ordering only; secret
 values and Supabase platform root keys must never be exported into Git.
+
+
+## Provider-aware operational Storage backup (v2)
+
+Current Experience source/write authority is R2. All six Supabase buckets remain
+recoverable sources; avatars, images, chat-images, admin_files and
+verification-docs retain their existing authority and policies. A complete
+capture includes every object in those six buckets and every live DB-referenced
+R2 `originals/` or `sources/` key. Derivatives are not original backup proof.
+The enabled managed-assets option also includes registered new uploads that
+exist in R2, including pending PUTs whose final DB verification failed. A pending
+registry entry with no object is upload intent, not a missing business original.
+A missing committed/business-referenced original fails the capture.
+
+`.github/workflows/authoritative-storage-backup.yml` is a separate scheduled and
+manually dispatchable workflow. Its intended schedule is daily **18:37 UTC
+(03:37 KST)**, twenty minutes after the logical DB backup schedule. Concurrency
+prevents overlapping Storage captures. Activation requires all configuration and
+the intended additive lifecycle migration; a workflow file alone is not evidence
+that Production backup is enabled or successfully protecting current originals.
+The implementation report records actual activation and proof status.
+
+Use the existing private `locally-production-db-backups` bucket and the distinct
+`daily/storage-v1/` prefix. Version 2 is encoded inside the encrypted manifest;
+keeping this prefix preserves the verified 30-day lock / 35-day expiry policy.
+Public domains and r2.dev must remain disabled. No new business-file retention
+period is introduced. The normal application Worker receives no backup binding
+or destination credentials.
+
+The `production-backup` environment needs the existing destination-only
+`R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`, `R2_BUCKET` and public
+`AGE_RECIPIENT`, plus a dedicated backup-source Supabase backend API credential named
+`STORAGE_SUPABASE_SERVICE_ROLE_KEY` (separate from the application runtime key;
+its value must be a dedicated named modern `sb_secret_...` key, never a legacy
+JWT service_role key; the secret name is retained for transport compatibility)
+and a **separate,
+source-bucket Object Read Only** pair named `R2_SOURCE_READ_ACCESS_KEY_ID` and
+`R2_SOURCE_READ_SECRET_ACCESS_KEY`. Verify that the R2 source credential is scoped
+only to the Experience source bucket, and the destination credential only to the
+private backup bucket. Never supply a combined source/destination credential.
+The Supabase adapter only lists, reads info, reads locator associations and GETs
+object bytes; it has no source mutation operation. The Storage job never loads
+`SUPABASE_DB_URL`. No AGE private identity is stored in GitHub or a Worker.
+
+The source plan binds provider, exact bucket/key, source/version evidence, size,
+MIME, cache/custom metadata, locator associations and actual plaintext SHA-256.
+Supabase custom metadata is captured through object info, including quarantine
+provenance. R2 GET uses the planned eTag precondition and calculates SHA from the
+actual body. Required managed registry SHA/size must agree with those bytes.
+Object identities keep the v1 Supabase hash stable and put R2 in a disjoint
+provider namespace. Unicode and zero-byte legacy objects remain supported.
+
+Each object and the sensitive manifest are encrypted with age X25519 before any
+remote write. The destination receives ciphertext and checksum records only.
+Conditional creates, plan/identity proofs and re-downloaded ciphertext SHA/size
+checks make interrupted same-plan retries safe. The complete manifest is
+published after all object proofs and the end inventory match. A failed capture
+leaves only incomplete encrypted objects under its own snapshot prefix; it
+cannot replace an earlier good manifest or shorten that snapshot's retention.
+Scheduled captures perform fresh byte reads rather than depending on older
+expiring ciphertext. Optional manual reuse checks prior byte proof, exact
+metadata/association identity, ciphertext bytes and remaining expiry.
+
+The operator `scripts/backup/run_storage_backup.py` defaults to byte preparation
+without destination writes. `--apply` publishes the encrypted snapshot. Both
+modes require separated credentials. Hard ceilings are 5,000 source objects/
+GET attempts, 2 GiB cumulative source bytes, 12,000 destination create attempts
+and 3 GiB new encrypted destination bytes. The 2026-10-04 input of 1,031 objects /
+422,843,988 bytes uses about 21% / 20% of source capacity, leaving meaningful
+growth room while keeping every run finite. A maximum-size 5,000-object snapshot
+needs 10,002 destination objects (ciphertext/checksum per source plus the
+manifest/checksum pair), below 12,000. The extra 1 GiB above the source byte
+ceiling covers age framing, per-object headers/checksums and encrypted manifest
+overhead. Failed attempts count toward the same limits; actual usage remains in
+the sanitized source-preparation and destination budget ledgers. Reads have
+deadlines and at most one bounded source-timeout
+retry. Exceeding a ceiling fails visibly; do not silently omit a provider.
+Private temporary plans, plaintext payloads and intermediates are removed after
+the run; only sanitized aggregate evidence is uploaded as a GitHub artifact.
+
+### Capture association and isolated restore
+
+The operator selects the nearest prior logical DB backup whose GitHub run on
+main succeeded, then re-downloads and verifies its ciphertext checksum. Its ID,
+time and workflow evidence accompany the Storage capture. The encrypted
+manifest records Storage start/end, DB backup time, and `atomic=false`.
+Storage end is the end of source byte preparation; destination verification
+happens after this boundary. DB and Storage are not one atomic point in time.
+Recover business references from the selected DB backup and use the encrypted
+manifest's `dbReferences` to map a locator at capture time to provider/bucket/key
+and ciphertext. Assets created in the intervening delta can be recoverable as
+files while their newer business rows require a later DB snapshot; never invent
+missing rows or attach an ownerless document to a user by guess.
+
+Run restore outside the application runtime, using the offline private identity
+and a new, private local directory. The existing restore CLI accepts v1 and v2:
+
+```sh
+python3 scripts/backup/storage-byte-backup.py restore \
+  --manifest-key '<snapshot manifest key from sanitized summary>' \
+  --manifest-checksum-key '<same key>.sha256' \
+  --identity '<offline identity path>' \
+  --destination '<new isolated private directory>'
+```
+
+Selectors `--provider`, `--bucket` and `--object-identity` support subsets or one
+object; `--manifest-only` validates mappings without restoring payloads. Even a
+subset first validates the whole manifest's summary, duplicate identity set and
+approved source/metadata contract. Full restore validates every ciphertext,
+decrypts, checks plaintext SHA/size and reconstructs `provider/bucket/key` under
+the private destination. The private restored manifest retains MIME, cache,
+custom metadata and locator associations. No Production upload/overwrite is
+implemented by rehearsal tooling. A future Production restore needs its own
+explicit authorization and provider/RLS validation.
+
+The encrypted object set, checksum records and manifest are portable. They can
+be exported intact to any independent destination and restored without the
+application Worker. Until an existing independent destination is verified and
+copied, report **INDEPENDENT_OFFSITE_TIER_PENDING**. Operational R2 protection
+and offline restore can still complete; final Supabase Storage retirement
+cannot pass the independent offsite gate.
+
+## Lifecycle-managed assets and deletion safety
+
+See [media lifecycle operations](storage-media-lifecycle-runbook.md). The new
+registry does not assign guessed owners to the 747 historical Supabase objects
+or historical unregistered R2 originals. Their recovery manifest preserves
+locator/provenance evidence; active lifecycle management starts with new
+Experience uploads. Verification-document ownership/quarantine and retention
+remain fail-closed. No historical physical deletion is authorized by a backup,
+matching SHA, zero reference count, or this runbook.

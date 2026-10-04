@@ -8,6 +8,7 @@ const CONTENT_TYPES = new Set(['image/avif', 'image/gif', 'image/jpeg', 'image/p
 type R2Object = { size: number; httpMetadata?: { contentType?: string; cacheControl?: string }; customMetadata?: Record<string, string> };
 export type ExperienceMediaSourceR2 = {
   head(key: string): Promise<R2Object | null>;
+  get?(key: string): Promise<(R2Object & { arrayBuffer(): Promise<ArrayBuffer> }) | null>;
   put(key: string, value: Uint8Array, options: { onlyIf: { etagDoesNotMatch: '*' }; httpMetadata: { contentType: string; cacheControl: string }; customMetadata: Record<string, string>; sha256: string }): Promise<R2Object | null>;
 };
 
