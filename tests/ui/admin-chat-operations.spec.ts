@@ -263,7 +263,9 @@ for (const view of ['support', 'phone'] as const) test(`${view} performance: act
   if (baseline) await page.getByRole('button', { name: '전체', exact: true }).first().click();
   else await page.getByRole('checkbox', { name: '재문의', exact: true }).uncheck();
   await page.clock.runFor(1000); reset();
-  if (view === 'phone') { await page.getByTestId('admin-phone-reservation-load-more-button').click(); await page.clock.runFor(1000); reset(); }
+  if (view === 'phone') { await page.getByTestId('admin-phone-reservation-load-more-button').click(); await page.clock.runFor(1000); }
+  // Advancing the browser clock does not wait for the filter-clear response.
+  await expect(list).toHaveCount(12); reset();
   for (let id = 2; id <= 11; id++) {
     if (baseline) await list.nth(id - 1).click();
     else { await page.getByRole('button', { name: '다음 대화', exact: true }).focus(); await page.keyboard.press('Alt+ArrowDown'); }
