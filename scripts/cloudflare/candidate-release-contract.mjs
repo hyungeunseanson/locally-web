@@ -93,6 +93,19 @@ export function safeVersionSnapshot(version) {
   } };
 }
 
+// Provider version metadata may omit these two documented asset defaults.
+// Preserve absent/malformed assets and every other runtime field exactly.
+// https://developers.cloudflare.com/workers/wrangler/configuration/#assets
+function canonicalRuntime(runtime) {
+  const assets = runtime?.assets;
+  if (!assets || typeof assets !== 'object' || Array.isArray(assets)) return runtime;
+  return { ...runtime, assets: {
+    ...assets,
+    ...(!Object.hasOwn(assets, 'html_handling') ? { html_handling: 'auto-trailing-slash' } : {}),
+    ...(!Object.hasOwn(assets, 'not_found_handling') ? { not_found_handling: 'none' } : {}),
+  } };
+}
+
 export function assertPostUploadInvariance(before, after) {
   requireCondition(before.activeDeployment && after.activeDeployment
     && before.activeStableVersion && after.activeStableVersion
@@ -109,7 +122,8 @@ export function assertPostUploadInvariance(before, after) {
   const candidate = after.uploadedCandidateVersion;
   requireCondition(candidate && candidate.id !== before.activeStableVersion.id, 'exact_candidate_missing');
   assertBindingsUnchanged(before.activeStableVersion.resources.bindings, candidate.resources.bindings, 'required');
-  requireCondition(stableJson(before.activeStableVersion.resources.script_runtime) === stableJson(candidate.resources.script_runtime), 'candidate_runtime_drift');
+  requireCondition(stableJson(canonicalRuntime(before.activeStableVersion.resources.script_runtime))
+    === stableJson(canonicalRuntime(candidate.resources.script_runtime)), 'candidate_runtime_drift');
   for (const field of ['handlers', 'named_handlers']) requireCondition(
     stableJson(before.activeStableVersion.resources.script[field]) === stableJson(candidate.resources.script[field]), 'candidate_export_drift');
   return 'POST_UPLOAD_INVARIANCE_PASS';
