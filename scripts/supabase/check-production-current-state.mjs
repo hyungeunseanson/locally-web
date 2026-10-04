@@ -185,7 +185,7 @@ const expectedPendingMigrations = [
     "version": "20261004053224",
     "name": "media_lifecycle_foundation",
     "repositoryFile": "supabase/migrations/20261004053224_media_lifecycle_foundation.sql",
-    "repositorySha256": "b769a0e5538dc222b3fbdbf020bacee8154ab8a810c2f211ef5473030f1efcea"
+    "repositorySha256": "c8cd123855ba600070fd22ddaef6b6a37591110f18cec92829de37ff0fdb3cfd"
   }
 ];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));

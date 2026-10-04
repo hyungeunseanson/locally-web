@@ -27,6 +27,8 @@ an error; it never activates a Supabase fallback writer.
 
 Experience create/edit commits references and managed asset state in the same
 DB transaction. Edit uses `media_revision` CAS; stale writers receive a conflict.
+URI query/fragment, percent encoding, host casing/default port and dot-segment
+aliases are compared by canonical object identity without rewriting locators.
 Every managed locator must be owned by the parent's host, match an optional
 pending parent, and already have uploaded/verified evidence. Duplicate finalize
 keeps the original committed timestamp. Existing unregistered locators remain

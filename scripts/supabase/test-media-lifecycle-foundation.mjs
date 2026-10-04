@@ -119,4 +119,16 @@ assert.equal((await db.query('SELECT photos FROM public.experiences WHERE id=99'
 await asRole('service_role',replaceSql,replaceArgs);await asRole('service_role',replaceSql,replaceArgs);
 assert.equal((await state(newE)).state,'committed');assert.equal((await state(oldD)).state,'tombstoned');
 assert.equal((await db.query("SELECT count(*)::int n FROM public.media_asset_references WHERE parent_type='future-profile' AND asset_id=$1",[newE])).rows[0].n,1);
+
+const aliasAsset=crypto.randomUUID();await begin(aliasAsset,'9'.repeat(64));await verify(aliasAsset);
+await assert.rejects(asRole('service_role','INSERT INTO public.experiences(id,host_id,photos) VALUES (3,$1::uuid,$2::text[])',[other,[url(aliasAsset)+'?cache=1']]));
+
+const aliases=[url(aliasAsset)+'#view',url(aliasAsset).replace('/sources/','/%73ources/'),url(aliasAsset).replace('media-canary','MEDIA-CANARY'),url(aliasAsset).replace('.com/','.com:443/'),url(aliasAsset).replace('/sources/','/temp/../sources/')];
+for(const alias of aliases) await assert.rejects(asRole('service_role','INSERT INTO public.experiences(id,host_id,photos) VALUES (3,$1::uuid,$2::text[])',[other,[alias]]));
+await asRole('service_role','INSERT INTO public.experiences(id,host_id,photos) VALUES (3,$1::uuid,$2::text[])',[owner,[url(aliasAsset)+'?cache=1']]);
+assert.equal((await state(aliasAsset)).state,'committed');
+for(const alias of aliases) await asRole('service_role','UPDATE public.experiences SET photos=$1::text[] WHERE id=3',[[alias]]);
+assert.equal((await state(aliasAsset)).state,'committed');
+assert.equal((await db.query('SELECT count(*)::int n FROM public.media_asset_references WHERE asset_id=$1',[aliasAsset])).rows[0].n,1);
+for(const role of ['anon','authenticated','service_role']) assert.equal((await db.query("SELECT has_function_privilege($1,'private.canonical_experience_media_locator(text)','EXECUTE') allowed",[role])).rows[0].allowed,false);
 await db.close();console.log('MEDIA_LIFECYCLE_SCHEMA_TRANSACTION_ACL_CAS_PASS');

@@ -110,6 +110,28 @@ BEGIN NEW.media_revision := OLD.media_revision + 1; RETURN NEW; END $$;
 REVOKE ALL ON FUNCTION private.bump_experience_media_revision() FROM PUBLIC, anon, authenticated, service_role;
 CREATE TRIGGER experience_media_revision BEFORE UPDATE ON public.experiences FOR EACH ROW EXECUTE FUNCTION private.bump_experience_media_revision();
 
+-- Compare object identity across URI aliases without rewriting business locators.
+CREATE FUNCTION private.canonical_experience_media_locator(p_url text) RETURNS text
+LANGUAGE plpgsql IMMUTABLE STRICT SECURITY INVOKER SET search_path = '' AS $$
+DECLARE value text; encoded text; part text; parts text[] := ARRAY[]::text[];
+BEGIN
+  value := pg_catalog.regexp_replace(p_url,'[?#].*$','');
+  SELECT pg_catalog.string_agg(CASE WHEN pg_catalog.substr(token[1],1,1)='%' AND pg_catalog.length(token[1])=3
+    THEN pg_catalog.substr(token[1],2) ELSE pg_catalog.encode(pg_catalog.convert_to(token[1],'UTF8'),'hex') END,'')
+    INTO encoded FROM pg_catalog.regexp_matches(value,'%[a-fA-F0-9]{2}|.','g') AS match(token);
+  value := pg_catalog.convert_from(pg_catalog.decode(coalesce(encoded,''),'hex'),'UTF8');
+  IF value !~* '^https://media-canary[.]locally-travel[.]com(:443)?/' THEN RETURN p_url; END IF;
+  value := pg_catalog.regexp_replace(value,'^https://media-canary[.]locally-travel[.]com(:443)?/','','i');
+  FOREACH part IN ARRAY pg_catalog.string_to_array(value,'/') LOOP
+    IF part='.' THEN CONTINUE;
+    ELSIF part='..' THEN parts := parts[1:greatest(coalesce(pg_catalog.array_length(parts,1),0)-1,0)];
+    ELSE parts := pg_catalog.array_append(parts,part); END IF;
+  END LOOP;
+  RETURN 'https://media-canary.locally-travel.com/' || pg_catalog.array_to_string(parts,'/');
+EXCEPTION WHEN invalid_text_representation OR character_not_in_repertoire OR untranslatable_character THEN RETURN p_url;
+END $$;
+REVOKE ALL ON FUNCTION private.canonical_experience_media_locator(text) FROM PUBLIC,anon,authenticated,service_role;
+
 -- Private trigger-only definer: registry access is never granted to browsers.
 -- Existing experience RLS still authorizes the parent mutation; this trigger
 -- additionally checks Auth UID for non-backend calls and the asset's DB owner.
@@ -120,6 +142,7 @@ DECLARE
   owner_value uuid;
   doc jsonb;
   ref_digest text;
+  locator_urls text[];
   asset public.media_assets;
   present boolean;
   caller_role text := current_setting('role', true);
@@ -131,14 +154,16 @@ BEGIN
   END IF;
   doc := CASE WHEN TG_OP = 'DELETE' THEN '{}'::jsonb ELSE pg_catalog.jsonb_build_object('photos',NEW.photos,'image_url',NEW.image_url,'itinerary',NEW.itinerary,'itinerary_i18n',NEW.itinerary_i18n) END;
   ref_digest := pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(doc::text,'UTF8')),'hex');
+  SELECT coalesce(pg_catalog.array_agg(DISTINCT private.canonical_experience_media_locator(value #>> '{}')),ARRAY[]::text[])
+  INTO locator_urls FROM pg_catalog.jsonb_path_query(doc,'$.** ? (@.type() == "string")') AS leaf(value);
   FOR asset IN
     SELECT a.* FROM public.media_assets a
     WHERE a.business_scope = 'experience' AND
-      ((a.public_url IS NOT NULL AND pg_catalog.jsonb_path_exists(doc, '$.** ? (@ == $url)', pg_catalog.jsonb_build_object('url',a.public_url)))
+      ((a.public_url IS NOT NULL AND a.public_url = ANY(locator_urls))
         OR EXISTS (SELECT 1 FROM public.media_asset_references r WHERE r.asset_id=a.id AND r.parent_type='experience' AND r.parent_id=parent_id_value))
     ORDER BY a.id FOR UPDATE
   LOOP
-    present := TG_OP <> 'DELETE' AND pg_catalog.jsonb_path_exists(doc, '$.** ? (@ == $url)', pg_catalog.jsonb_build_object('url',asset.public_url));
+    present := TG_OP <> 'DELETE' AND asset.public_url = ANY(locator_urls);
     IF present THEN
       IF asset.owner_id IS DISTINCT FROM owner_value OR (asset.state='pending' AND asset.parent_id IS NOT NULL AND asset.parent_id <> parent_id_value) THEN
         RAISE EXCEPTION 'media_asset_owner_mismatch' USING ERRCODE='42501';

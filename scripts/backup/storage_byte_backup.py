@@ -575,7 +575,11 @@ def walk_string_leaves(value: Any, path: str = "$"):
 def source_locator(value: str, field: str = "") -> Optional[Tuple[str, str, str]]:
     parsed = urllib.parse.urlsplit(value)
     if parsed.scheme == "https" and parsed.hostname == "media-canary.locally-travel.com":
-        key = urllib.parse.unquote(parsed.path.lstrip("/"))
+        path = urllib.parse.unquote(parsed.path)
+        normalized = urllib.parse.urlsplit(urllib.parse.urljoin("https://media-canary.locally-travel.com/", path))
+        if normalized.hostname != "media-canary.locally-travel.com":
+            return None
+        key = normalized.path.lstrip("/")
         if key.startswith(("originals/", "sources/")):
             return "r2", R2_SOURCE_BUCKET, key
     if parsed.scheme == "https" and parsed.hostname == "uhinvcydgzqlpnvieyal.supabase.co":

@@ -82,6 +82,7 @@ class AdapterTests(unittest.TestCase):
     def test_provider_identity_and_signed_locator_sanitization(self):
         self.assertNotEqual(backup.source_identity('same','same','supabase'),backup.source_identity('same','same','r2'))
         self.assertEqual(backup.source_locator('https://uhinvcydgzqlpnvieyal.supabase.co/storage/v1/object/sign/avatars/a.png?token=SECRET'),('supabase','avatars','a.png'))
+        self.assertEqual(backup.source_locator('https://MEDIA-CANARY.locally-travel.com/temp/../%73ources/a.png?cache=1#view'),('r2',backup.R2_SOURCE_BUCKET,'sources/a.png'))
         self.assertIsNone(backup.source_locator('https://evil.test/originals/a.png'))
         self.assertIsNone(backup.source_locator('https://media-canary.locally-travel.com/derivatives/a.png'))
 
