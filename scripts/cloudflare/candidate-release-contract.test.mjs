@@ -421,6 +421,59 @@ test('real incident: latest /settings gains metadata, exact stable and globals s
   after.diagnosticLegacyBindings=[...structuredClone(snapshot.bindings),metadataBinding];
   assert.equal(assertPostUploadInvariance(before,after),'POST_UPLOAD_INVARIANCE_PASS');
 });
+
+const providerAssetDefaults = { html_handling: 'auto-trailing-slash', not_found_handling: 'none' };
+const providerAssets = { ...providerAssetDefaults, serve_directly: true, raw_run_worker_first: false, base_path: '/' };
+function assetSnapshots(stableAssets, candidateAssets) {
+  const before = scoped(baseline);
+  before.activeStableVersion.resources.script_runtime.assets = structuredClone(stableAssets);
+  const after = structuredClone(before);
+  after.uploadedCandidateVersion = structuredClone(exactCandidate);
+  after.uploadedCandidateVersion.resources.script_runtime.assets = structuredClone(candidateAssets);
+  return { before, after };
+}
+for (const field of [...Object.keys(providerAssetDefaults), 'both']) {
+  for (const reverse of [false, true]) test(`asset defaults: ${field}, ${reverse ? 'omitted to explicit' : 'explicit to omitted'} are equivalent`, () => {
+    const omitted = { ...providerAssets };
+    for (const key of field === 'both' ? Object.keys(providerAssetDefaults) : [field]) delete omitted[key];
+    const { before, after } = assetSnapshots(...(reverse ? [omitted, providerAssets] : [providerAssets, omitted]));
+    const originals = structuredClone({ before, after });
+    assert.equal(assertPostUploadInvariance(before, after), 'POST_UPLOAD_INVARIANCE_PASS');
+    assert.deepEqual({ before, after }, originals, 'raw provider evidence must remain unchanged');
+  });
+}
+for (const [field, value] of [
+  ['html_handling', 'force-trailing-slash'], ['html_handling', 'drop-trailing-slash'],
+  ['not_found_handling', '404-page'], ['not_found_handling', 'single-page-application'],
+]) for (const reverse of [false, true]) test(`non-default ${field}=${value} vs omitted blocks in ${reverse ? 'reverse' : 'forward'} comparison`, () => {
+  const omitted = { ...providerAssets }; delete omitted[field];
+  const explicit = { ...providerAssets, [field]: value };
+  const { before, after } = assetSnapshots(...(reverse ? [omitted, explicit] : [explicit, omitted]));
+  assert.throws(() => assertPostUploadInvariance(before, after), blocked('candidate_runtime_drift'));
+});
+for (const [label, mutate, code] of [
+  ['compatibility date', r => r.script_runtime.compatibility_date = '2030-01-01', 'candidate_runtime_drift'],
+  ['compatibility flag', r => r.script_runtime.compatibility_flags.push('changed'), 'candidate_runtime_drift'],
+  ['binding', r => r.bindings.shift(), 'candidate_binding_or_secret_drift'],
+  ['handler export', r => r.script.handlers.push('scheduled'), 'candidate_export_drift'],
+  ['named export', r => r.script.named_handlers.push({ name: 'Other', handlers: ['class'] }), 'candidate_export_drift'],
+  ['asset serve_directly', r => r.script_runtime.assets.serve_directly = false, 'candidate_runtime_drift'],
+  ['asset raw_run_worker_first', r => r.script_runtime.assets.raw_run_worker_first = true, 'candidate_runtime_drift'],
+  ['asset base_path', r => r.script_runtime.assets.base_path = '/other', 'candidate_runtime_drift'],
+  ['missing other asset field', r => delete r.script_runtime.assets.serve_directly, 'candidate_runtime_drift'],
+  ['unknown asset field', r => r.script_runtime.assets.future_setting = true, 'candidate_runtime_drift'],
+  ['missing assets', r => delete r.script_runtime.assets, 'candidate_runtime_drift'],
+  ['null assets', r => r.script_runtime.assets = null, 'candidate_runtime_drift'],
+  ['array assets', r => r.script_runtime.assets = [], 'candidate_runtime_drift'],
+  ['null html_handling', r => r.script_runtime.assets.html_handling = null, 'candidate_runtime_drift'],
+  ['undefined not_found_handling', r => r.script_runtime.assets.not_found_handling = undefined, 'candidate_runtime_drift'],
+  ['default outside assets', r => r.script_runtime.html_handling = 'auto-trailing-slash', 'candidate_runtime_drift'],
+]) test(`default equivalence cannot mask ${label} drift`, () => {
+  const omitted = { ...providerAssets }; delete omitted.html_handling; delete omitted.not_found_handling;
+  const { before, after } = assetSnapshots(providerAssets, omitted);
+  mutate(after.uploadedCandidateVersion.resources);
+  assert.throws(() => assertPostUploadInvariance(before, after), blocked(code));
+});
 for (const [label,change] of Object.entries({
   deployment: s=>s.activeDeployment.id='changed',
   percentage: s=>s.activeDeployment.versions[0].percentage=99,
