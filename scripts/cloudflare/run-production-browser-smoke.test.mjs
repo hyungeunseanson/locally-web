@@ -718,7 +718,7 @@ function retryFixture(plans) {
         if (plan.status !== undefined) page.emit('response', { request: () => request, status: () => plan.status });
         if (plan.pageerror) page.emit('pageerror', new Error('Fixture pageerror'));
         if (plan.consoleError) page.emit('console', {
-          type: () => 'error', location: () => ({ url: origin + '/script.js' }), text: () => 'Fixture console error',
+          type: () => 'error', location: () => ({ url: origin + '/script.js' }), text: () => plan.consoleError === true ? 'Fixture console error' : plan.consoleError,
         });
         if (plan.unexpectedWrite) mutationGate.blockedUnexpectedWrites.push({ method: 'POST', pathname: '/unexpected' });
         if (plan.externalWrite) mutationGate.blockedUnexpectedExternalWrites.push({ method: 'POST', pathname: '/external' });
@@ -740,6 +740,10 @@ function retryFixture(plans) {
       };
       page.waitForTimeout = async () => {};
       page.close = async () => {
+        if (plan.closeConsoleError) page.emit('console', {
+          type: () => 'error', location: () => ({ url: origin + '/script.js' }), text: () => plan.closeConsoleError,
+        });
+        if (plan.closePageerror) page.emit('pageerror', new Error('Teardown pageerror'));
         page.closed = true;
         if (plan.closeWrite) mutationGate.blockedUnexpectedWrites.push({ method: 'POST', pathname: '/late-write' });
       };
@@ -754,6 +758,105 @@ function retryFixture(plans) {
     }),
   };
 }
+
+test('intentional teardown excludes only new page/console errors and retains pre-boundary failures and all writes', async () => {
+  const message = '[Fixture] read failed: TypeError: Failed to fetch';
+  const pass = retryFixture([{ closeConsoleError: message, closePageerror: true }]);
+  assert.equal(await pass.visit('/'), 'ready');
+  assert.equal(pass.diagnostics[0].outcome, 'pass');
+  for (const [plan, expected] of [
+    [{ consoleError: message, closeConsoleError: message }, /Failed to fetch/],
+    [{ consoleError: 'Arbitrary first-party error', closeConsoleError: message }, /Arbitrary first-party error/],
+    [{ pageerror: true, closePageerror: true }, /uncaught browser error/],
+    [{ unexpectedWrite: true, closeConsoleError: message }, /unexpected writes/],
+    [{ closeWrite: true, closeConsoleError: message }, /unexpected writes/],
+  ]) {
+    const fixture = retryFixture([plan]);
+    await assert.rejects(fixture.visit('/'), expected);
+    assert.equal(fixture.pages.length, 1);
+    assert.equal(fixture.diagnostics[0].outcome, 'fail');
+  }
+});
+
+test('real browser: pending reads aborted at close pass; identical fetch errors and HTTP/network failures before close fail', async () => {
+  const browser = await chromium.launch();
+  try {
+    for (const mode of ['pending', 'http', 'network']) {
+      let resolveReview;
+      const reviewSeen = new Promise(resolve => { resolveReview = resolve; });
+      const server = createServer((request, response) => {
+        if (request.url === '/api/public/experiences/42/reviews') {
+          resolveReview();
+          if (mode === 'http') response.writeHead(503).end('fixture');
+          else if (mode === 'network') response.destroy();
+          return;
+        }
+        response.writeHead(200, { 'content-type': 'text/html' }).end(`<!doctype html><h1>Fixture</h1><script>
+          fetch('/api/public/experiences/42/reviews').then(response => {
+            if (!response.ok) throw new Error('Review HTTP ' + response.status);
+            return response.text();
+          }).catch(error => console.error('[Fixture] read failed:', error));
+        </script>`);
+      });
+      await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+      const origin = `http://127.0.0.1:${server.address().port}`;
+      const context = await browser.newContext({ serviceWorkers: 'block' });
+      const errors = [], failures = [];
+      let closeRequested = false;
+      let resolveTeardownConsole;
+      const teardownConsole = new Promise(resolve => { resolveTeardownConsole = resolve; });
+      try {
+        // Browser close may discard the console event on some platforms. Keep
+        // this fixture alive until the intentionally aborted fetch logs, with a
+        // bounded test-only barrier before the underlying browser close.
+        context.on('page', page => {
+          const close = page.close.bind(page);
+          page.close = async (...args) => {
+            if (mode === 'pending') {
+              let timer;
+              try {
+                await Promise.race([teardownConsole, new Promise((_, reject) => {
+                  timer = setTimeout(() => reject(new Error('Fixture teardown console not delivered')), 3000);
+                })]);
+              } finally { clearTimeout(timer); }
+            }
+            return close(...args);
+          };
+        });
+        const gate = await installProductionMutationGate(context, origin, {
+          versionOverride: { workerName: 'locally-web-opennext-production', versionId: '22222222-2222-4222-8222-222222222222' },
+        });
+        context.on('page', page => {
+          const close = page.close.bind(page);
+          page.close = (...args) => { closeRequested = true; return close(...args); };
+          page.on('console', message => {
+            if (message.type() === 'error') {
+              errors.push({ text: message.text(), teardown: closeRequested });
+              if (closeRequested && /TypeError: Failed to fetch/.test(message.text())) resolveTeardownConsole();
+            }
+          });
+          page.on('requestfailed', request => failures.push({ error: request.failure()?.errorText, teardown: closeRequested }));
+        });
+        const running = visitReadOnlyPage(context, origin, '/', async () => { await reviewSeen; }, { mutationGate: gate, log: () => {} });
+        if (mode === 'pending') {
+          await running;
+          assert(errors.some(row => row.teardown && /TypeError: Failed to fetch/.test(row.text)));
+          assert(failures.some(row => row.teardown && row.error === 'net::ERR_ABORTED'));
+          assert(errors.every(row => row.teardown));
+        } else {
+          await assert.rejects(running, /first-party browser console error/);
+          assert(errors.some(row => !row.teardown && (mode === 'http' ? /Review HTTP 503/.test(row.text) : /TypeError: Failed to fetch/.test(row.text))));
+          if (mode === 'network') assert(failures.some(row => !row.teardown));
+        }
+        assert.deepEqual(gate.blockedUnexpectedWrites, []);
+      } finally {
+        await context.close();
+        server.closeAllConnections();
+        await new Promise(resolve => server.close(resolve));
+      }
+    }
+  } finally { await browser.close(); }
+});
 
 for (const pathname of ['/', '/experiences/42?secret=DO_NOT_LOG']) {
   test(`${new URL(pathname, 'https://fixture.test').pathname} navigation timeout retries once on a fresh Page`, async () => {
