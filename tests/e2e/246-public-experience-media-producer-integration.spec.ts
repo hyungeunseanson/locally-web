@@ -80,7 +80,8 @@ class FakeQuery implements PromiseLike<QueryResult> {
     return this;
   }
 
-  eq() {
+  eq(column: string, value: unknown) {
+    this.database.filters.push({ table: this.table, operation: this.operation, column, value });
     return this;
   }
 
@@ -113,6 +114,7 @@ class FakeQuery implements PromiseLike<QueryResult> {
 
 class FakeDatabase {
   readonly calls: QueryCall[] = [];
+  readonly filters: { table: string; operation: ExpectedQuery['operation']; column: string; value: unknown }[] = [];
 
   constructor(private readonly expected: ExpectedQuery[]) {}
 
@@ -576,7 +578,7 @@ test.describe('public experience media producer application integration', () => 
     ]) {
       const producer = producerHarness();
       const database = new FakeDatabase([
-        { table: 'experiences', operation: 'select', result: success(mediaRow()) },
+        { table: 'experiences', operation: 'select', result: success(mediaRow({ media_revision: 7 })) },
         { table: 'experiences', operation: 'update', result },
       ]);
       const response = await handleHostExperienceUpdate(
@@ -587,7 +589,8 @@ test.describe('public experience media producer application integration', () => 
           writeDependencies(database, producer)
         )
       );
-      expect(response.status).toBe(500);
+      expect(response.status).toBe(result.error ? 500 : 409);
+      expect(database.filters).toContainEqual({ table: 'experiences', operation: 'update', column: 'media_revision', value: 7 });
       expect(await responseBody(response)).toMatchObject({ success: false });
       expect(producer.sendAttempts).toBe(0);
       database.assertExhausted();

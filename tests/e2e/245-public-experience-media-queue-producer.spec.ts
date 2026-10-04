@@ -343,7 +343,7 @@ test.describe('default-OFF public experience media Queue producer', () => {
     expect(shared).toContain(".select('id, status, is_active, photos, itinerary, image_url')");
     const createGuard = shared.indexOf("throw error ?? new Error('Failed to create experience.')");
     const createHook = shared.indexOf("writeKind: 'create'");
-    const editGuard = shared.indexOf("throw error ?? new ApiError(500, '체험 저장에 실패했습니다.')");
+    const editGuard = shared.indexOf("if (error || !data) {", shared.indexOf("let updateQuery"));
     const editHook = shared.indexOf("writeKind: 'edit'");
     expect(createGuard).toBeGreaterThanOrEqual(0);
     expect(createHook).toBeGreaterThanOrEqual(0);
