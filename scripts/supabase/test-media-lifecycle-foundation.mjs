@@ -11,6 +11,7 @@ const url = id => 'https://media-canary.locally-travel.com/' + key(id);
 await db.exec([
   "CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;",
   "CREATE SCHEMA private; CREATE SCHEMA auth;",
+  "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;",
   "CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$ SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;",
   "CREATE FUNCTION private.is_admin_reader() RETURNS boolean LANGUAGE sql AS $$ SELECT false $$;",
   "CREATE TABLE public.experiences (id bigint PRIMARY KEY,host_id uuid,photos text[],image_url text,itinerary jsonb,itinerary_i18n jsonb);",
@@ -25,6 +26,12 @@ for (const role of ['anon', 'authenticated']) {
     for (const action of ['SELECT', 'INSERT', 'UPDATE', 'DELETE']) {
       assert.equal((await db.query('SELECT has_table_privilege($1,$2,$3) allowed', [role,'public.'+table,action])).rows[0].allowed, false);
     }
+  }
+}
+for (const table of ['media_assets','media_asset_references','media_deletion_journal']) {
+  for (const action of ['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) {
+    const allowed = ['SELECT','UPDATE'].includes(action) || (action==='INSERT' && table!=='media_asset_references');
+    assert.equal((await db.query('SELECT has_table_privilege($1,$2,$3) allowed',['service_role','public.'+table,action])).rows[0].allowed,allowed,table+':'+action);
   }
 }
 const permissions = (await db.query("SELECT relname,relrowsecurity FROM pg_class WHERE relname IN ('media_assets','media_asset_references','media_deletion_journal')")).rows;

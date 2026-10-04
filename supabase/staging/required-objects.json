@@ -29,7 +29,7 @@
       "version": "20261004053224",
       "name": "media_lifecycle_foundation",
       "repositoryFile": "supabase/migrations/20261004053224_media_lifecycle_foundation.sql",
-      "repositorySha256": "f70a271ee6999432411558a554fd63ec8162ad6177fc1412bfdfea4ec4d6c220"
+      "repositorySha256": "b769a0e5538dc222b3fbdbf020bacee8154ab8a810c2f211ef5473030f1efcea"
     }
   ],
   "applicationTables": [

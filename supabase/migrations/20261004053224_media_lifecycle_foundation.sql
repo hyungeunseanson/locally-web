@@ -63,7 +63,8 @@ CREATE INDEX media_deletion_journal_state_idx ON public.media_deletion_journal (
 ALTER TABLE public.media_assets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.media_asset_references ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.media_deletion_journal ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON public.media_assets, public.media_asset_references, public.media_deletion_journal FROM PUBLIC, anon, authenticated;
+-- Supabase default ACL grants ALL to service_role; reset it before narrow grants.
+REVOKE ALL ON public.media_assets, public.media_asset_references, public.media_deletion_journal FROM PUBLIC, anon, authenticated, service_role;
 GRANT SELECT, INSERT, UPDATE ON public.media_assets, public.media_deletion_journal TO service_role;
 GRANT SELECT ON public.media_asset_references TO service_role;
 COMMENT ON TABLE public.media_assets IS 'New lifecycle-managed assets only; no guessed legacy ownership. Physical deletion is disabled by default in the operator.';

@@ -309,7 +309,9 @@ or destination credentials.
 
 The `production-backup` environment needs the existing destination-only
 `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`, `R2_BUCKET` and public
-`AGE_RECIPIENT`, plus `STORAGE_SUPABASE_SERVICE_ROLE_KEY` and a **separate,
+`AGE_RECIPIENT`, plus a dedicated backup-source Supabase backend API credential named
+`STORAGE_SUPABASE_SERVICE_ROLE_KEY` (separate from the application runtime key)
+and a **separate,
 source-bucket Object Read Only** pair named `R2_SOURCE_READ_ACCESS_KEY_ID` and
 `R2_SOURCE_READ_SECRET_ACCESS_KEY`. Verify that the R2 source credential is scoped
 only to the Experience source bucket, and the destination credential only to the
