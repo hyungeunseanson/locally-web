@@ -16,7 +16,7 @@ concurrency:
 jobs:
   backup:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 90
     environment: production-backup
     env:
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.STORAGE_SUPABASE_SERVICE_ROLE_KEY }}
@@ -92,18 +92,23 @@ jobs:
           python3 - <<'PY'
           import json, os, pathlib
           path = pathlib.Path(os.environ['RUNNER_TEMP']) / 'storage-backup-summary.json'
+          if not path.exists():
+              # Failure before operator start: no source or destination attempts.
+              result = dict(status='failed', diagnosticCode='configuration_incomplete', stage='configuration', provider='none', operation='validate', elapsedSeconds=None, completedObjectCount=0, completedSourceBytes=0, sourceAttempts=0, sourceRetryCount=0, destinationCreateAttempts=0, destinationObjectsCreated=0, destinationBytesCreated=0, sourceWrites=0, sourceDeletes=0)
+              path.write_text(json.dumps(result))
+              path.chmod(0o600)
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as output:
               output.write('### Authoritative Storage byte backup\n')
               output.write('- Workflow result: ${{ job.status }}\n')
               if path.exists():
                   result = json.loads(path.read_text())
-                  for field in ['snapshotId','providers','objectCount','sourceBytes','destinationByteVerification','databaseBackup','captureBoundary','restoreProof']:
+                  for field in ['status','diagnosticCode','stage','provider','operation','objectIdentityHash','elapsedSeconds','completedObjectCount','completedSourceBytes','sourceAttempts','sourceRetryCount','inventoryAttempts','inventoryRetryCount','destinationCreateAttempts','destinationObjectsCreated','destinationBytesCreated','sourceBudgetUsage','destinationBudgetUsage','snapshotId','providers','objectCount','sourceBytes','destinationByteVerification','databaseBackup','databaseBackupEvidence','captureBoundary','restoreProof']:
                       output.write('- ' + field + ': ' + json.dumps(result.get(field)) + '\n')
               output.write('- Source writes/deletes: 0\n- Private identity: offline only\n')
           PY
 
       - name: Preserve only sanitized capture evidence
-        if: success()
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: authoritative-storage-backup-summary

@@ -10,7 +10,7 @@ import re
 import shutil
 import tempfile
 import urllib.request
-from storage_byte_backup import (AgeEncryptor, BackupError, ValidationError, boto3_store, source_from_env,
+from storage_byte_backup import (AgeEncryptor, BackupError, BackupDiagnostics, ValidationError, boto3_store, source_from_env,
                                  make_plan, prepare_plan, apply_plan, safe_write_json, utc_now)
 
 
@@ -53,25 +53,34 @@ def successful_database_run(run_id,attempt):
     return run.get('conclusion')=='success' and run.get('run_attempt')==attempt and run.get('path')=='.github/workflows/supabase-r2-backup.yml' and run.get('head_branch')=='main'
 
 
-def main():
+def main(argv=None):
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--apply',action='store_true')
     parser.add_argument('--summary',required=True,type=pathlib.Path)
-    args=parser.parse_args()
-    root=pathlib.Path(tempfile.mkdtemp(prefix='locally-authoritative-storage-' + os.environ.get('GITHUB_RUN_ID','operator') + '-', dir=os.environ.get('RUNNER_TEMP')))
-    os.chmod(root,0o700)
+    args=parser.parse_args(argv)
+    diagnostics=BackupDiagnostics(args.summary)
+    root=None
+    evidence={}
     try:
-        source_args=argparse.Namespace(project_url='https://uhinvcydgzqlpnvieyal.supabase.co',timeout=30,multi_source=True)
+        diagnostics.at('configuration','none','validate')
+        root=pathlib.Path(tempfile.mkdtemp(prefix='locally-authoritative-storage-' + os.environ.get('GITHUB_RUN_ID','operator') + '-', dir=os.environ.get('RUNNER_TEMP')))
+        os.chmod(root,0o700)
+        source_args=argparse.Namespace(project_url='https://uhinvcydgzqlpnvieyal.supabase.co',timeout=30,multi_source=True,diagnostics=diagnostics)
         source=source_from_env(source_args);store=boto3_store()
         boundary=dt.datetime.now(dt.timezone.utc)
+        diagnostics.at('database_backup_association','r2','associate')
         db=nearest_database_backup(store,boundary,successful_database_run)
+        evidence['databaseBackupEvidence']=db
         run=os.environ.get('GITHUB_RUN_ID','operator');attempt=os.environ.get('GITHUB_RUN_ATTEMPT','1')
         snapshot=boundary.strftime('%Y-%m-%dT%H-%M-%SZ')+'-storage-'+run+'-'+attempt
+        evidence['snapshotId']=snapshot
+        diagnostics.at('source_inventory_supabase','supabase','inventory')
         entries=source.inventory();plan=make_plan(entries,snapshot,db['id'],db['capturedAt'],boundary.isoformat().replace('+00:00','Z'))
+        evidence.update(objectCount=len(entries),sourceBytes=sum(e['size'] for e in entries))
         safe_write_json(root/'plan.json',plan)
-        prepared,budget=prepare_plan(plan,source,root/'cache');safe_write_json(root/'prepared.json',prepared)
+        prepared,budget=prepare_plan(plan,source,root/'cache',diagnostics=diagnostics);safe_write_json(root/'prepared.json',prepared)
         if args.apply:
-            summary,_=apply_plan(prepared,prepared['planDigest'],source,store,AgeEncryptor(os.environ.get('AGE_RECIPIENT')),root/'cache',root/'ciphertext')
+            summary,_=apply_plan(prepared,prepared['planDigest'],source,store,AgeEncryptor(os.environ.get('AGE_RECIPIENT')),root/'cache',root/'ciphertext',diagnostics=diagnostics)
         else:
             summary={'status':'dry-run-byte-prepared','snapshotId':snapshot,'objectCount':len(entries),
                      'sourceBytes':sum(e['size'] for e in entries),'planDigest':prepared['planDigest'],'providers':sorted({e['provider'] for e in entries}),
@@ -80,14 +89,17 @@ def main():
         summary['databaseBackupEvidence']=db
         summary['sourceWrites']=0;summary['sourceDeletes']=0
         summary['restoreProof']='offline-private-identity-required'
+        summary.update(diagnostics.summary(summary['status'],'capture_complete'))
         safe_write_json(args.summary,summary);print(json.dumps(summary,sort_keys=True))
+        return 0
+    except Exception as error:
+        summary=diagnostics.summary('failed',error.code if isinstance(error,BackupError) else 'storage_backup_operator_failed')
+        summary.update(evidence)
+        safe_write_json(args.summary,summary);print(json.dumps(summary,sort_keys=True))
+        return 1
     finally:
-        shutil.rmtree(root,ignore_errors=True)
+        if root: shutil.rmtree(root,ignore_errors=True)
 
 
 if __name__=='__main__':
-    try: main()
-    except BackupError as error:
-        print(json.dumps({'status':'failed','diagnosticCode':error.code}));raise SystemExit(1)
-    except Exception:
-        print(json.dumps({'status':'failed','diagnosticCode':'storage_backup_operator_failed'}));raise SystemExit(1)
+    raise SystemExit(main())

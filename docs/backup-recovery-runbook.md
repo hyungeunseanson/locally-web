@@ -409,3 +409,52 @@ locator/provenance evidence; active lifecycle management starts with new
 Experience uploads. Verification-document ownership/quarantine and retention
 remain fail-closed. No historical physical deletion is authorized by a backup,
 matching SHA, zero reference count, or this runbook.
+
+## Bounded failure diagnostics and controlled retry
+
+The operator writes an atomic, sanitized progress summary before remote work
+and each operation, then writes a final summary on caught failure. Both the
+step summary and capture-evidence artifact are preserved on failure. Stages
+identify configuration, DB association, each provider inventory, source
+revalidation, provider downloads, preapply inventory, encryption, destination
+create/byte verification, final inventory and manifest publication. Object
+context is only a SHA-256 identity hash. Exception messages, provider bodies,
+source paths/URLs and credentials never enter this output.
+
+Source GET attempts/retries and all received bytes include failed attempts;
+completed objects/bytes count fully downloaded and identity-checked payloads.
+Inventory attempts/retries are separate metadata call counters. Destination
+counters record create attempts and acknowledged creates/bytes; a transport
+failure can leave an unacknowledged partial create in the unique snapshot
+prefix. Such a prefix is not a successful snapshot. Always require workflow
+success, COMPLETE manifest and byte verification before restore/coverage proof.
+Failure diagnostics retain actual budget usage even before apply starts.
+
+R2 connect/read timeout, closed/reset connection, endpoint failure, throttling
+and provider 5xx receive at most one retry per read operation. The SDK's hidden
+retry count remains one total attempt. 401/403, credential/scope errors, 412,
+identity drift and validation errors never retry. Partial local GET files are
+removed before retry, and failed network bytes still consume the hard budget.
+Supabase payload ETag must match the planned ETag when one was captured; exposed
+version headers are compared when available. Missing planned ETag evidence in
+the payload response fails closed.
+
+The existing five detailed inventory checkpoints remain: planning, prepare
+precheck, post-download revalidation, apply precheck and final drift check.
+Supabase object-info supplies custom/cache metadata and identity fields which
+are not all present with the same representation in list results. Replacing
+those passes with cached metadata would require a separate, proven digest
+contract. This bounded hardening retains the full metadata/locator drift gates
+and raises only the Storage workflow wall-clock limit from 45 to 90 minutes.
+Request deadlines, source 5,000 attempts / 2 GiB and destination 12,000 creates /
+3 GiB ceilings remain unchanged. No source-write/delete API is introduced.
+
+For the approved controlled retry, dispatch once after exact-head CI and merge.
+If it fails, retain the sanitized stage/provider/operation/code and counters,
+stop, and report FOUNDATION BLOCKED. Do not automatically dispatch another run.
+On success, perform the full isolated offline-AGE restore and fresh current-R2
+coverage proof; inventory alone cannot establish recoverability.
+
+Provider contracts checked against [Boto3 error handling](https://docs.aws.amazon.com/boto3/latest/guide/error-handling.html),
+[botocore exception types](https://github.com/boto/botocore/blob/develop/botocore/exceptions.py),
+and [Supabase Storage response headers](https://github.com/supabase/storage/blob/master/src/storage/renderer/renderer.ts).

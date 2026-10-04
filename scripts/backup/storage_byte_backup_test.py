@@ -154,7 +154,7 @@ class FailingAge(FakeAge):
 
 
 class BlockingResponse:
-    headers = {}
+    headers = {"ETag": '"etag-v1"'}
 
     def read(self, _amount):
         time.sleep(1)
@@ -165,7 +165,7 @@ class BlockingResponse:
 
 
 class ProgressingResponse:
-    headers = {}
+    headers = {"ETag": '"etag-v1"'}
 
     def __init__(self):
         self.chunks = iter((b"a", b"b", b"c", b""))
@@ -181,7 +181,7 @@ class ProgressingResponse:
 
 
 class ScriptedResponse:
-    headers = {}
+    headers = {"ETag": '"etag-v1"'}
 
     def __init__(self, *reads):
         self.reads = iter(reads)

@@ -18,9 +18,11 @@ import os
 import pathlib
 import shutil
 import signal
+import socket
 import stat
 import subprocess
 import tempfile
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -69,12 +71,113 @@ class SourceDriftError(BackupError):
     code = "source_drift"
 
 
-class SourceTimeoutError(BackupError):
+class SourceTransientError(BackupError):
+    code = "source_transient"
+
+
+class SourceTimeoutError(SourceTransientError):
     code = "source_timeout"
 
 
 class ConflictError(BackupError):
     code = "conditional_conflict"
+
+
+def provider_read_error(error: Exception, http_status=None) -> BackupError:
+    """Classify fixed SDK types/statuses, never messages, URLs or response bodies."""
+    if isinstance(error, BackupError):
+        return error
+    response = getattr(error, "response", {})
+    status = response.get("ResponseMetadata", {}).get("HTTPStatusCode") if isinstance(response, dict) else None
+    if http_status is not None:
+        status = http_status
+    code = response.get("Error", {}).get("Code") if isinstance(response, dict) else None
+    name = type(error).__name__
+    if status in (401, 403) or code in {"AccessDenied", "InvalidAccessKeyId", "SignatureDoesNotMatch", "ExpiredToken"} or name in {"NoCredentialsError", "PartialCredentialsError"}:
+        result, diagnostic = BackupError(), "source_access_denied"
+    elif status == 412 or code in {"PreconditionFailed", "412"}:
+        result, diagnostic = SourceDriftError(), "source_precondition_failed"
+    elif status == 429 or code in {"SlowDown", "Throttling", "ThrottlingException", "TooManyRequests"}:
+        result, diagnostic = SourceTransientError(), "source_throttled"
+    elif isinstance(status, int) and 500 <= status <= 599:
+        result, diagnostic = SourceTransientError(), "source_provider_5xx"
+    elif name == "ConnectTimeoutError":
+        result, diagnostic = SourceTransientError(), "source_connect_timeout"
+    elif name == "ReadTimeoutError" or isinstance(error, (TimeoutError, socket.timeout)):
+        result, diagnostic = SourceTransientError(), "source_read_timeout"
+    elif name in {"ConnectionClosedError", "ResponseStreamingError", "IncompleteReadError"} or isinstance(error, (ConnectionResetError, ConnectionAbortedError, BrokenPipeError)):
+        result, diagnostic = SourceTransientError(), "source_connection_closed"
+    elif name == "EndpointConnectionError":
+        result, diagnostic = SourceTransientError(), "source_endpoint_connection"
+    elif name == "ParamValidationError" or isinstance(status, int) and 400 <= status <= 499:
+        result, diagnostic = ValidationError(), "source_provider_validation_failed"
+    else:
+        result, diagnostic = BackupError(), "source_provider_failed"
+    result.code = diagnostic
+    return result
+
+
+class BackupDiagnostics:
+    """Durable, allowlisted progress; private provider data never enters output."""
+    stages = {"configuration", "database_backup_association", "source_inventory_supabase", "source_inventory_r2",
+              "source_revalidation", "prepare_r2_download", "prepare_supabase_download", "preapply_inventory",
+              "encryption", "destination_create", "destination_byte_verify", "manifest_publish", "final_inventory"}
+    operations = {"validate", "associate", "database_locator_get", "list", "head", "restore_metadata", "inventory",
+                  "get", "encrypt", "put_create_only", "verify_bytes", "encrypt_manifest", "publish_manifest", "verify_manifest"}
+    codes = {"backup_error", "validation_failed", "budget_exceeded", "source_drift", "source_timeout", "conditional_conflict",
+             "source_access_denied", "source_precondition_failed", "source_throttled", "source_provider_5xx", "source_connect_timeout",
+             "source_read_timeout", "source_connection_closed", "source_endpoint_connection", "source_provider_validation_failed",
+             "source_provider_failed", "storage_backup_operator_failed", "capture_in_progress", "capture_complete"}
+
+    def __init__(self, path: Optional[pathlib.Path] = None):
+        self.path, self.started = path, time.monotonic()
+        self.stage, self.provider, self.operation = "configuration", "none", "validate"
+        self.inventory_stage = None
+        self.object_identity = None
+        self.source_budget, self.destination_budget = TransferBudget(), TransferBudget()
+        self.inventory_attempts, self.inventory_retries = 0, 0
+
+    def at(self, stage: str, provider: str, operation: str, entry=None) -> None:
+        if stage not in self.stages or provider not in {"none", "supabase", "r2"} or operation not in self.operations:
+            raise ValidationError("invalid diagnostic context")
+        self.stage, self.provider, self.operation = stage, provider, operation
+        self.object_identity = source_identity(entry["bucket"], entry["key"], entry.get("provider", provider)) if entry else None
+        self.write()
+
+    def inventory_at(self, provider: str, operation: str, entry=None) -> None:
+        self.at(self.inventory_stage or ("source_inventory_" + provider), provider, operation, entry)
+
+    def summary(self, status="in_progress", code="capture_in_progress") -> Dict[str, Any]:
+        if status not in {"in_progress", "failed", "complete", "dry-run-byte-prepared"} or code not in self.codes:
+            status, code = "failed", "storage_backup_operator_failed"
+        source, destination = self.source_budget, self.destination_budget
+        result = {"status": status, "diagnosticCode": code, "stage": self.stage, "provider": self.provider,
+                  "operation": self.operation, "elapsedSeconds": round(time.monotonic() - self.started, 3),
+                  "completedObjectCount": source.source_completed_downloads, "completedSourceBytes": source.source_completed_bytes,
+                  "sourceAttempts": source.source_attempts, "sourceRetryCount": source.source_retries,
+                  "inventoryAttempts": self.inventory_attempts, "inventoryRetryCount": self.inventory_retries,
+                  "destinationCreateAttempts": destination.r2_attempts, "destinationObjectsCreated": destination.new_r2_objects,
+                  "destinationBytesCreated": destination.new_r2_bytes, "sourceBudgetUsage": source.as_dict(),
+                  "destinationBudgetUsage": destination.as_dict(), "sourceWrites": 0, "sourceDeletes": 0}
+        if self.object_identity:
+            result["objectIdentityHash"] = self.object_identity
+        return result
+
+    def write(self) -> None:
+        if self.path:
+            temporary = self.path.with_suffix(self.path.suffix + ".progress.tmp")
+            safe_write_json(temporary, self.summary())
+            os.replace(temporary, self.path)
+
+
+def scan_source(source: Any, diagnostics: Optional[BackupDiagnostics], stage: str):
+    if diagnostics:
+        diagnostics.inventory_stage = stage
+        diagnostics.at(stage, "none", "inventory")
+    entries = source.inventory()
+    if diagnostics:
+        diagnostics.at(stage, "none", "inventory")
+    return entries
 
 
 def utc_now() -> str:
@@ -364,11 +467,12 @@ def resume_or_download_source(
             budget.source_retries += 1
         try:
             result = source.download(entry, cache_path, budget)
-        except SourceTimeoutError:
+        except SourceTransientError:
             if retry == MAX_SOURCE_RETRIES_PER_OBJECT:
                 raise
             continue
         budget.source_completed_downloads += 1
+        budget.source_completed_bytes += entry["size"]
         return result
     raise AssertionError("unreachable source retry state")
 
@@ -383,6 +487,7 @@ class TransferBudget:
     source_bytes: int = 0  # All received network bytes, including failed attempts.
     source_retries: int = 0
     source_completed_downloads: int = 0
+    source_completed_bytes: int = 0
     cached_source_objects: int = 0
     cached_source_bytes: int = 0
     r2_attempts: int = 0
@@ -428,15 +533,23 @@ def supabase_api_key_headers(api_key: str) -> Dict[str, str]:
 
 
 class SupabaseStorageSource:
-    def __init__(self, project_url: str, service_role_key: str, timeout: float = 30.0):
+    def __init__(self, project_url: str, service_role_key: str, timeout: float = 30.0, diagnostics=None):
         parsed = urllib.parse.urlparse(project_url)
         if parsed.scheme != "https" or parsed.hostname != "uhinvcydgzqlpnvieyal.supabase.co" or parsed.path not in {"", "/"}:
             raise ValidationError("unexpected Supabase origin")
         self.base = project_url.rstrip("/")
         self.key = supabase_api_key_headers(service_role_key)["apikey"]
         self.timeout = timeout
+        self.diagnostics = diagnostics
 
     def _request(self, method: str, path: str, body: Optional[bytes] = None) -> urllib.response.addinfourl:
+        if self.diagnostics and not path.startswith("/storage/v1/object/authenticated/"):
+            self.diagnostics.inventory_attempts += 1
+            operation = "database_locator_get" if path.startswith("/rest/") else "restore_metadata" if "/object/info/" in path else "list"
+            # The caller supplies the opaque identity for object-info requests.
+            self.diagnostics.operation = operation
+            self.diagnostics.provider = "supabase"
+            self.diagnostics.write()
         request = urllib.request.Request(
             self.base + path,
             data=body,
@@ -446,14 +559,21 @@ class SupabaseStorageSource:
         try:
             return urllib.request.urlopen(request, timeout=self.timeout)
         except urllib.error.HTTPError as exc:
-            raise BackupError(f"Supabase Storage request failed with HTTP {exc.code}") from None
-        except (urllib.error.URLError, TimeoutError):
-            raise BackupError("Supabase Storage request transport failure") from None
+            raise provider_read_error(exc, http_status=exc.code) from None
+        except urllib.error.URLError as exc:
+            if isinstance(exc.reason, (TimeoutError, ConnectionResetError, ConnectionAbortedError)):
+                raise provider_read_error(exc.reason) from None
+            failure = SourceTransientError(); failure.code = "source_endpoint_connection"
+            raise failure from None
+        except TimeoutError as exc:
+            raise provider_read_error(exc) from None
 
     def _list_directory(self, bucket: str, prefix: str) -> Iterable[Dict[str, Any]]:
         offset = 0
         limit = 100
         while True:
+            if self.diagnostics:
+                self.diagnostics.inventory_at("supabase", "list")
             payload = canonical_json({"prefix": prefix, "limit": limit, "offset": offset, "sortBy": {"column": "name", "order": "asc"}})
             response = self._request("POST", "/storage/v1/object/list/" + urllib.parse.quote(bucket, safe=""), payload)
             try:
@@ -515,6 +635,8 @@ class SupabaseStorageSource:
         return entries
 
     def restore_metadata(self, entry: Mapping[str, Any]) -> Dict[str, Any]:
+        if self.diagnostics:
+            self.diagnostics.inventory_at("supabase", "restore_metadata", entry)
         path = "/storage/v1/object/info/" + urllib.parse.quote(entry["bucket"], safe="") + "/" + urllib.parse.quote(entry["key"], safe="/")
         with self._request("GET", path) as response:
             info = json.load(response)
@@ -529,6 +651,8 @@ class SupabaseStorageSource:
 
     def download(self, entry: Mapping[str, Any], destination: pathlib.Path, budget: TransferBudget) -> Mapping[str, Optional[str]]:
         budget.begin_source()
+        if self.diagnostics:
+            self.diagnostics.at("prepare_supabase_download", "supabase", "get", entry)
         encoded_bucket = urllib.parse.quote(entry["bucket"], safe="")
         encoded_key = urllib.parse.quote(entry["key"], safe="/")
         response = self._request("GET", f"/storage/v1/object/authenticated/{encoded_bucket}/{encoded_key}")
@@ -538,6 +662,13 @@ class SupabaseStorageSource:
         digest = hashlib.sha256()
         size = 0
         try:
+            planned_etag, received_etag = entry.get("sourceEtag"), response.headers.get("ETag")
+            # Storage exposes ETag; version headers are compared when supplied.
+            if planned_etag and (not received_etag or planned_etag.strip('"') != received_etag.strip('"')):
+                raise SourceDriftError("downloaded source ETag differs from plan")
+            received_version = response.headers.get("x-version-id") or response.headers.get("x-amz-version-id")
+            if entry.get("sourceVersion") and received_version and received_version != entry["sourceVersion"]:
+                raise SourceDriftError("downloaded source version differs from plan")
             with os.fdopen(fd, "wb") as output:
                 while True:
                     try:
@@ -552,6 +683,11 @@ class SupabaseStorageSource:
                     digest.update(chunk)
                     size += len(chunk)
         except BaseException:
+            # If identity validation failed before fdopen, close the raw fd too.
+            try:
+                os.close(fd)
+            except OSError:
+                pass
             destination.unlink(missing_ok=True)
             raise
         finally:
@@ -652,10 +788,25 @@ def database_references(source: SupabaseStorageSource, include_managed_assets: b
 
 class R2StorageSource:
     """Read-only original adapter. Deliberately has no PUT/COPY/DELETE method."""
-    def __init__(self, client: Any, bucket: str = R2_SOURCE_BUCKET, timeout: float = 30.0):
+    def __init__(self, client: Any, bucket: str = R2_SOURCE_BUCKET, timeout: float = 30.0, diagnostics=None):
         if bucket != R2_SOURCE_BUCKET:
             raise ValidationError("unexpected R2 source bucket")
         self.client, self.bucket, self.timeout = client, bucket, timeout
+        self.diagnostics = diagnostics
+
+    def _inventory_read(self, operation: str, entry=None, **params):
+        for retry in range(MAX_SOURCE_RETRIES_PER_OBJECT + 1):
+            if self.diagnostics:
+                self.diagnostics.inventory_attempts += 1
+                self.diagnostics.inventory_retries += bool(retry)
+                self.diagnostics.inventory_at("r2", operation, entry)
+            try:
+                return getattr(self.client, "list_objects_v2" if operation == "list" else "head_object")(**params)
+            except Exception as error:
+                classified = provider_read_error(error)
+                if isinstance(classified, SourceTransientError) and retry < MAX_SOURCE_RETRIES_PER_OBJECT:
+                    continue
+                raise classified from None
 
     def inventory(self, references: Mapping[Tuple[str, str, str], Any]) -> List[Dict[str, Any]]:
         listed = {}
@@ -666,7 +817,7 @@ class R2StorageSource:
                     params = {"Bucket": self.bucket, "Prefix": prefix, "MaxKeys": 1000}
                     if token:
                         params["ContinuationToken"] = token
-                    page = self.client.list_objects_v2(**params)
+                    page = self._inventory_read("list", **params)
                     for item in page.get("Contents", []):
                         key = item["Key"]
                         if key in listed or not key.startswith(prefix):
@@ -684,11 +835,13 @@ class R2StorageSource:
                     continue
                 if bucket != self.bucket:
                     raise ValidationError("unexpected R2 source authority")
+                if self.diagnostics:
+                    self.diagnostics.inventory_at("r2", "head", {"bucket":bucket, "key":key, "provider":"r2"})
                 if key not in listed:
                     if associations and all(ref.get("optionalPending") is True for ref in associations):
                         continue
                     raise SourceDriftError("referenced R2 original missing")
-                head = self.client.head_object(Bucket=bucket, Key=key)
+                head = self._inventory_read("head", {"bucket":bucket, "key":key, "provider":"r2"}, Bucket=bucket, Key=key)
                 size = head["ContentLength"]
                 if size != listed[key]["Size"]:
                     raise SourceDriftError("R2 list/head changed")
@@ -709,11 +862,13 @@ class R2StorageSource:
             return entries
         except BackupError:
             raise
-        except Exception:
-            raise BackupError("R2 source inventory failed") from None
+        except Exception as error:
+            raise provider_read_error(error) from None
 
     def download(self, entry: Mapping[str, Any], destination: pathlib.Path, budget: TransferBudget) -> Mapping[str, Optional[str]]:
         budget.begin_source()
+        if self.diagnostics:
+            self.diagnostics.at("prepare_r2_download", "r2", "get", entry)
         destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         body = None
         try:
@@ -737,28 +892,30 @@ class R2StorageSource:
         except BackupError:
             destination.unlink(missing_ok=True)
             raise
-        except TimeoutError:
+        except Exception as error:
             destination.unlink(missing_ok=True)
-            raise SourceTimeoutError("R2 payload timed out") from None
-        except Exception:
-            destination.unlink(missing_ok=True)
-            raise BackupError("R2 source download failed") from None
+            raise provider_read_error(error) from None
         finally:
             if body is not None:
                 body.close()
 
 
 class MultiStorageSource:
-    def __init__(self, supabase: SupabaseStorageSource, r2: R2StorageSource, reference_reader=database_references):
+    def __init__(self, supabase: SupabaseStorageSource, r2: R2StorageSource, reference_reader=database_references, diagnostics=None):
         self.supabase, self.r2, self.reference_reader = supabase, r2, reference_reader
+        self.diagnostics = diagnostics
 
     def inventory(self) -> List[Dict[str, Any]]:
+        if self.diagnostics:
+            self.diagnostics.inventory_at("supabase", "database_locator_get")
         refs = self.reference_reader(self.supabase)
         entries = []
         for old in self.supabase.inventory():
             entry = dict(old, provider="supabase", authority="recoverable-source", **self.supabase.restore_metadata(old))
             entry["dbReferences"] = refs.get(("supabase", old["bucket"], old["key"]), [])
             entries.append(entry)
+        if self.diagnostics:
+            self.diagnostics.inventory_at("r2", "list")
         entries.extend(self.r2.inventory(refs))
         return sorted(entries, key=lambda item: (item["provider"], item["bucket"], item["key"]))
 
@@ -818,6 +975,7 @@ def previous_by_identity(previous: Optional[Mapping[str, Any]], now: dt.datetime
 def prepare_plan(
     plan: Mapping[str, Any], source: Any, cache_dir: pathlib.Path,
     previous: Optional[Mapping[str, Any]] = None, now: Optional[dt.datetime] = None,
+    diagnostics: Optional[BackupDiagnostics] = None,
 ) -> Tuple[Dict[str, Any], TransferBudget]:
     validate_plan(plan)
     if cache_dir.is_symlink():
@@ -825,17 +983,20 @@ def prepare_plan(
     cache_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(cache_dir, 0o700)
     bind_resume_cache(cache_dir, plan)
-    current = source.inventory()
+    current = scan_source(source, diagnostics, "source_revalidation")
     if inventory_digest(current) != plan["inventoryDigest"]:
         raise SourceDriftError("source inventory changed before prepare")
     prior = previous_by_identity(previous, now or dt.datetime.now(dt.timezone.utc))
-    budget = TransferBudget()
+    budget = diagnostics.source_budget if diagnostics else TransferBudget()
     prepared = dict(plan)
     prepared["mode"] = "prepared"
     prepared_objects = []
     prefix = plan["destinationPrefix"]
     for approved in plan["objects"]:
         entry = dict(approved)
+        if diagnostics:
+            diagnostics.at("prepare_r2_download" if entry.get("provider") == "r2" else "prepare_supabase_download",
+                           entry.get("provider", "supabase"), "get", entry)
         identity = entry["identity"]
         old = prior.get(identity)
         if old and metadata_fingerprint(old) == metadata_fingerprint(entry):
@@ -879,7 +1040,9 @@ def prepare_plan(
                     (cache_dir / entry["cacheFile"]).unlink(missing_ok=True)
                 raise SourceDriftError("managed original differs from registry byte identity")
         prepared_objects.append(entry)
-    if inventory_digest(source.inventory()) != plan["inventoryDigest"]:
+        if diagnostics:
+            diagnostics.write()
+    if inventory_digest(scan_source(source, diagnostics, "source_revalidation")) != plan["inventoryDigest"]:
         raise SourceDriftError("source inventory changed during prepare")
     prepared["objects"] = prepared_objects
     prepared["preparedAt"] = utc_now()
@@ -1068,12 +1231,13 @@ def apply_plan(
     cache_dir: pathlib.Path,
     work_dir: pathlib.Path,
     now: Optional[dt.datetime] = None,
+    diagnostics: Optional[BackupDiagnostics] = None,
 ) -> Tuple[Dict[str, Any], TransferBudget]:
     validate_plan(plan, confirm_digest=confirm_digest, require_prepared=True)
     apply_time = now or dt.datetime.now(dt.timezone.utc)
     if parse_utc(plan["expiresAt"]) <= apply_time:
         raise ValidationError("prepared plan retention has expired")
-    current = source.inventory()
+    current = scan_source(source, diagnostics, "preapply_inventory")
     if inventory_digest(current) != plan["inventoryDigest"]:
         raise SourceDriftError("source inventory changed before apply")
     # Finish every local and structural validation before the first remote write.
@@ -1087,7 +1251,7 @@ def apply_plan(
 
     work_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(work_dir, 0o700)
-    budget = TransferBudget()
+    budget = diagnostics.destination_budget if diagnostics else TransferBudget()
     results: List[Dict[str, Any]] = []
     for entry in plan["objects"]:
         if entry.get("reuse"):
@@ -1101,11 +1265,15 @@ def apply_plan(
         ciphertext = work_dir / (entry["identity"] + ".age")
         checksum = work_dir / (entry["identity"] + ".age.sha256")
         ciphertext.unlink(missing_ok=True)
+        if diagnostics:
+            diagnostics.at("encryption", entry.get("provider", "supabase"), "encrypt", entry)
         encryptor.encrypt(local_files[entry["identity"]], ciphertext)
         cipher_sha, _ = sha256_file(ciphertext)
         checksum.write_text(cipher_sha + "\n", encoding="ascii")
         os.chmod(checksum, 0o600)
         source_proof = {"plan-digest": plan["planDigest"], "source-identity": entry["identity"], "source-sha256": entry["sourceSha256"]}
+        if diagnostics:
+            diagnostics.at("destination_create", "r2", "put_create_only", entry)
         _, stored_cipher_sha, stored_cipher_size = store.put_create_only(
             entry["ciphertextKey"], ciphertext, cipher_sha, budget, "source-ciphertext", source_proof
         )
@@ -1114,15 +1282,19 @@ def apply_plan(
             os.chmod(checksum, 0o600)
         checksum_sha, _ = sha256_file(checksum)
         checksum_proof = dict(source_proof, **{"cipher-sha256": stored_cipher_sha})
+        if diagnostics:
+            diagnostics.at("destination_create", "r2", "put_create_only", entry)
         store.put_create_only(
             entry["ciphertextChecksumKey"], checksum, checksum_sha, budget, "source-checksum", checksum_proof
         )
         results.append(dict(entry, ciphertextSha256=stored_cipher_sha, ciphertextSize=stored_cipher_size, expiresAt=plan["expiresAt"]))
         if plan["version"] == 2:
+            if diagnostics:
+                diagnostics.at("destination_byte_verify", "r2", "verify_bytes", entry)
             store.verify_bytes(entry["ciphertextKey"], stored_cipher_sha, stored_cipher_size)
             store.verify_bytes(entry["ciphertextChecksumKey"], checksum_sha, 65)
 
-    end_inventory = source.inventory()
+    end_inventory = scan_source(source, diagnostics, "final_inventory")
     if inventory_digest(end_inventory) != plan["inventoryDigest"]:
         raise SourceDriftError("source inventory changed during apply")
     recoverable_until = min(parse_utc(item["expiresAt"]) for item in results).isoformat().replace("+00:00", "Z") if results else plan["expiresAt"]
@@ -1158,6 +1330,8 @@ def apply_plan(
     safe_write_json(manifest_plain, manifest)
     manifest_age = work_dir / "storage-manifest.json.age"
     manifest_age.unlink(missing_ok=True)
+    if diagnostics:
+        diagnostics.at("manifest_publish", "r2", "encrypt_manifest")
     encryptor.encrypt(manifest_plain, manifest_age)
     manifest_sha, _ = sha256_file(manifest_age)
     manifest_checksum = work_dir / "storage-manifest.json.age.sha256"
@@ -1166,6 +1340,8 @@ def apply_plan(
     manifest_key = plan["destinationPrefix"] + "storage-manifest.json.age"
     manifest_checksum_key = manifest_key + ".sha256"
     manifest_proof = {"plan-digest": plan["planDigest"]}
+    if diagnostics:
+        diagnostics.at("manifest_publish", "r2", "publish_manifest")
     _, stored_manifest_sha, stored_manifest_size = store.put_create_only(
         manifest_key, manifest_age, manifest_sha, budget, "snapshot-manifest", manifest_proof
     )
@@ -1173,11 +1349,15 @@ def apply_plan(
         manifest_checksum.write_text(stored_manifest_sha + "\n", encoding="ascii")
         os.chmod(manifest_checksum, 0o600)
     checksum_sha, _ = sha256_file(manifest_checksum)
+    if diagnostics:
+        diagnostics.at("manifest_publish", "r2", "publish_manifest")
     store.put_create_only(
         manifest_checksum_key, manifest_checksum, checksum_sha, budget, "snapshot-manifest-checksum",
         {"plan-digest": plan["planDigest"], "cipher-sha256": stored_manifest_sha},
     )
     if plan["version"] == 2:
+        if diagnostics:
+            diagnostics.at("manifest_publish", "r2", "verify_manifest")
         store.verify_bytes(manifest_key, stored_manifest_sha, stored_manifest_size)
         store.verify_bytes(manifest_checksum_key, checksum_sha, 65)
     providers = {}
@@ -1334,7 +1514,8 @@ def boto3_store() -> R2Store:
 
 def source_from_env(args: argparse.Namespace):
     key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
-    source = SupabaseStorageSource(args.project_url, key, timeout=args.timeout)
+    diagnostics = getattr(args, "diagnostics", None)
+    source = SupabaseStorageSource(args.project_url, key, timeout=args.timeout, diagnostics=diagnostics)
     if not args.multi_source:
         return source
     access, secret = os.environ.get("R2_SOURCE_ACCESS_KEY_ID"), os.environ.get("R2_SOURCE_SECRET_ACCESS_KEY")
@@ -1347,8 +1528,8 @@ def source_from_env(args: argparse.Namespace):
                           config=Config(signature_version="s3v4", connect_timeout=10, read_timeout=args.timeout,
                                         retries={"total_max_attempts": 1, "mode": "standard"}))
     include_managed = os.environ.get("STORAGE_BACKUP_INCLUDE_MANAGED_ASSETS") == "true"
-    return MultiStorageSource(source, R2StorageSource(client, timeout=args.timeout),
-                              reference_reader=lambda reader: database_references(reader, include_managed))
+    return MultiStorageSource(source, R2StorageSource(client, timeout=args.timeout, diagnostics=diagnostics),
+                              reference_reader=lambda reader: database_references(reader, include_managed), diagnostics=diagnostics)
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
