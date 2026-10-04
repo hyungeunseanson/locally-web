@@ -133,6 +133,8 @@ export async function POST(request: Request) {
 
     if (table === 'profiles') {
       try {
+        const { error: lifecyclePlanError } = await supabaseAdmin.rpc('plan_media_owner_deletion', { p_owner_id: id });
+        if (lifecyclePlanError) throw new Error('Managed media deletion planning failed.');
         const { data: targetProfile } = await supabaseAdmin
           .from('profiles')
           .select('email, full_name')

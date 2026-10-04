@@ -13,29 +13,28 @@ import {
 import { getLegacyHubSeedForBoard, resolveCommunityBoard } from '@/app/community/boardMeta';
 import { getCommunityCategoryFromFormat } from '@/app/community/categoryMeta';
 import type { CommunityBoard, CommunityHub, CommunityPostFormat, CommunitySourceLocale } from '@/app/types/community';
+import { cleanupOwnedCommunityImages, isOwnedCommunityImagePath } from '@/app/utils/communityImageCleanup';
 
 const MAX_COMMUNITY_POST_IMAGES = 1;
 
-async function cleanupUploadedImages(imagePaths: string[]) {
-    if (imagePaths.length === 0) return;
-
-    try {
-        const supabaseAdmin = createAdminClient();
-        const { error } = await supabaseAdmin.storage.from('images').remove(imagePaths);
-
-        if (error) {
-            console.error('Community post image cleanup failed:', error);
-        }
-    } catch (error) {
-        console.error('Community post image cleanup threw unexpectedly:', error);
+async function cleanupUploadedImages(imagePaths: string[], ownerId: string, supabase: Awaited<ReturnType<typeof createClient>>) {
+    const supabaseAdmin = createAdminClient();
+    const result = await cleanupOwnedCommunityImages(imagePaths, ownerId, {
+        hasReferences: async path => {
+            const url = resolveExpectedCommunityImageUrl(path);
+            const { data, error } = await supabaseAdmin.from('community_posts').select('id').contains('images', [url]).limit(1);
+            if (error) throw new Error('community_reference_check_failed');
+            return Boolean(data?.length);
+        },
+        removeOwned: async paths => {
+            // Keep Storage's owner_id policy as a second boundary. No service-role remove.
+            const { error } = await supabase.storage.from('images').remove(paths);
+            if (error) throw new Error('community_owned_cleanup_failed');
+        },
+    });
+    if (result.status === 'blocked' || result.status === 'denied') {
+        console.warn('Community image cleanup blocked:', result.status);
     }
-}
-
-function isValidCommunityImagePath(imagePath: string) {
-    return imagePath.startsWith('community/')
-        && !imagePath.includes('..')
-        && !imagePath.startsWith('/')
-        && !imagePath.includes('?');
 }
 
 function resolveExpectedCommunityImageUrl(imagePath: string) {
@@ -110,7 +109,7 @@ export async function POST(request: NextRequest) {
         if (normalizedImages.length !== normalizedImagePaths.length) {
             return NextResponse.json({ error: '이미지 정보가 올바르지 않습니다.' }, { status: 400 });
         }
-        if (normalizedImagePaths.some((imagePath) => !isValidCommunityImagePath(imagePath))) {
+        if (normalizedImagePaths.some((imagePath) => !isOwnedCommunityImagePath(imagePath, user.id))) {
             return NextResponse.json({ error: '이미지 경로가 올바르지 않습니다.' }, { status: 400 });
         }
         if (normalizedImages.some((imageUrl, index) => imageUrl !== resolveExpectedCommunityImageUrl(normalizedImagePaths[index]))) {
@@ -135,7 +134,7 @@ export async function POST(request: NextRequest) {
                 email: user.email,
             });
             if (!isAdmin) {
-                await cleanupUploadedImages(normalizedImagePaths);
+                await cleanupUploadedImages(normalizedImagePaths, user.id, supabase);
                 return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
             }
         }
@@ -200,7 +199,7 @@ export async function POST(request: NextRequest) {
 
         if (error) {
             console.error('Error inserting community post:', error);
-            await cleanupUploadedImages(normalizedImagePaths);
+            await cleanupUploadedImages(normalizedImagePaths, user.id, supabase);
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
 

@@ -12,10 +12,13 @@ export class ExperienceImageUploadError extends Error {
 
 export type ExperienceImageUploadFolder = 'hero' | 'itinerary';
 
+const uploadKeys = new WeakMap<File, Map<string, string>>();
+
 export async function uploadExperienceImage(input: {
   file: File;
   folder: ExperienceImageUploadFolder;
   experienceId?: string | number;
+  idempotencyKey?: string;
 }) {
   const { bytes, contentType } = await materializeExperienceImage(input.file);
   const body = new FormData();
@@ -25,8 +28,15 @@ export async function uploadExperienceImage(input: {
     body.set('experienceId', String(input.experienceId));
   }
 
+  const scope = input.folder + ':' + String(input.experienceId ?? 'new');
+  const keys = uploadKeys.get(input.file) ?? new Map<string, string>();
+  const idempotencyKey = input.idempotencyKey ?? keys.get(scope) ?? crypto.randomUUID();
+  keys.set(scope, idempotencyKey);
+  uploadKeys.set(input.file, keys);
+
   const response = await fetch('/api/host/experience-images/upload', {
     method: 'POST',
+    headers: { 'Idempotency-Key': idempotencyKey },
     body,
   });
   const payload = await response.json().catch(() => null);
@@ -37,6 +47,7 @@ export async function uploadExperienceImage(input: {
     publicUrl: payload.publicUrl as string,
     cleanupPath: typeof payload.cleanupPath === 'string' ? payload.cleanupPath : null,
     authority: payload.authority === 'r2' ? 'r2' as const : 'supabase' as const,
+    assetId: typeof payload.assetId === 'string' ? payload.assetId : null,
   };
 }
 export async function materializeExperienceImage(file: File) {

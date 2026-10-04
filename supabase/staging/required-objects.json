@@ -24,7 +24,14 @@
     "supabase/migrations/20261002140902_phone_followup_tasks.sql",
     "supabase/migrations/20261003122803_admin_chat_bounded_search.sql"
   ],
-  "pendingProductionMigrations": [],
+  "pendingProductionMigrations": [
+    {
+      "version": "20261004053224",
+      "name": "media_lifecycle_foundation",
+      "repositoryFile": "supabase/migrations/20261004053224_media_lifecycle_foundation.sql",
+      "repositorySha256": "f70a271ee6999432411558a554fd63ec8162ad6177fc1412bfdfea4ec4d6c220"
+    }
+  ],
   "applicationTables": [
     "admin_audit_logs",
     "admin_job_runs",

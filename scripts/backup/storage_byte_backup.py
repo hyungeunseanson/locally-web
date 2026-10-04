@@ -29,6 +29,9 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 SCHEMA = "locally.supabase-storage-backup.v1"
 MANIFEST_SCHEMA = "locally.supabase-storage-snapshot.v1"
+MULTI_SCHEMA = "locally.authoritative-storage-backup.v2"
+MULTI_MANIFEST_SCHEMA = "locally.authoritative-storage-snapshot.v2"
+R2_SOURCE_BUCKET = "locally-public-experience-canary"
 BUCKETS = (
     "experiences",
     "images",
@@ -112,8 +115,10 @@ def plan_digest(plan: Mapping[str, Any]) -> str:
     return sha256_bytes(canonical_json(without_digest(plan)))
 
 
-def source_identity(bucket: str, key: str) -> str:
-    return sha256_bytes((bucket + "\0" + key).encode("utf-8"))
+def source_identity(bucket: str, key: str, provider: str = "supabase") -> str:
+    # Preserve proven v1 Supabase identities; R2 has a disjoint namespace.
+    prefix = "" if provider == "supabase" else provider + "\0"
+    return sha256_bytes((prefix + bucket + "\0" + key).encode("utf-8"))
 
 
 def safe_write_json(path: pathlib.Path, value: Any) -> None:
@@ -170,17 +175,22 @@ def validate_object_entry(entry: Mapping[str, Any], prepared: bool) -> None:
         "sourceEtag", "sourceUpdatedAt", "sourceSha256", "cacheFile", "ciphertextKey",
         "ciphertextChecksumKey", "proof", "reuse", "ciphertextSha256", "ciphertextSize",
         "expiresAt", "disposition",
+        "provider", "authority", "httpMetadata", "customMetadata", "dbReferences",
     }
     if set(entry) - allowed:
         raise ValidationError("unsupported object field")
     bucket = entry.get("bucket")
     key = entry.get("key")
-    if bucket not in BUCKETS or not isinstance(key, str) or not key or "\x00" in key:
+    provider = entry.get("provider", "supabase")
+    valid_bucket = (provider == "supabase" and bucket in BUCKETS) or (provider == "r2" and bucket == R2_SOURCE_BUCKET)
+    if not valid_bucket or not isinstance(key, str) or not key or "\x00" in key:
         raise ValidationError("invalid source object identity")
     key_path = pathlib.PurePosixPath(key)
     if key_path.is_absolute() or ".." in key_path.parts or "." in key_path.parts:
         raise ValidationError("unsafe source object key")
-    if entry.get("identity") != source_identity(bucket, key):
+    if provider == "r2" and not key.startswith(("originals/", "sources/")):
+        raise ValidationError("R2 source is not an original")
+    if entry.get("identity") != source_identity(bucket, key, provider):
         raise ValidationError("source identity mismatch")
     require_bounded_int(entry.get("size"), "source size", MAX_SOURCE_BYTES)
     for name in ("contentType", "sourceVersion", "sourceEtag", "sourceUpdatedAt"):
@@ -188,6 +198,16 @@ def validate_object_entry(entry: Mapping[str, Any], prepared: bool) -> None:
             raise ValidationError(f"invalid {name}")
     if not isinstance(entry.get("metadata"), dict):
         raise ValidationError("invalid source metadata")
+    if "provider" in entry:
+        if not isinstance(entry.get("dbReferences"), list):
+            raise ValidationError("missing locator association")
+        for field in ("httpMetadata", "customMetadata"):
+            if field in entry and not isinstance(entry[field], dict):
+                raise ValidationError("invalid restore metadata")
+        mime = (entry.get("contentType") or "").split(";", 1)[0].lower()
+        restored_mime = (entry.get("httpMetadata", {}).get("ContentType") or mime).split(";", 1)[0].lower()
+        if not mime or mime != restored_mime:
+            raise ValidationError("restore MIME mismatch")
     if prepared:
         digest = entry.get("sourceSha256")
         if not isinstance(digest, str) or len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
@@ -207,7 +227,7 @@ def validate_object_entry(entry: Mapping[str, Any], prepared: bool) -> None:
 
 
 def validate_plan(plan: Mapping[str, Any], confirm_digest: Optional[str] = None, require_prepared: bool = False) -> None:
-    if plan.get("schema") != SCHEMA or plan.get("version") != 1:
+    if (plan.get("schema"), plan.get("version")) not in {(SCHEMA, 1), (MULTI_SCHEMA, 2)}:
         raise ValidationError("unsupported plan schema")
     if plan.get("mode") not in {"plan", "prepared"}:
         raise ValidationError("invalid plan mode")
@@ -246,6 +266,8 @@ def validate_plan(plan: Mapping[str, Any], confirm_digest: Optional[str] = None,
         if not isinstance(entry, dict):
             raise ValidationError("invalid object entry")
         validate_object_entry(entry, plan.get("mode") == "prepared")
+        if plan["version"] == 2 and entry.get("provider") not in {"supabase", "r2"}:
+            raise ValidationError("multi-source entry lacks provider")
         if entry["identity"] in identities:
             raise ValidationError("duplicate object identity")
         identities.add(entry["identity"])
@@ -267,7 +289,7 @@ def validate_plan(plan: Mapping[str, Any], confirm_digest: Optional[str] = None,
 
 
 def metadata_fingerprint(entry: Mapping[str, Any]) -> Dict[str, Any]:
-    return {
+    result = {
         "bucket": entry["bucket"],
         "key": entry["key"],
         "identity": entry["identity"],
@@ -277,6 +299,9 @@ def metadata_fingerprint(entry: Mapping[str, Any]) -> Dict[str, Any]:
         "sourceEtag": entry.get("sourceEtag"),
         "sourceUpdatedAt": entry.get("sourceUpdatedAt"),
     }
+    if "provider" in entry:
+        result.update({key: entry.get(key) for key in ("provider", "authority", "metadata", "httpMetadata", "customMetadata", "dbReferences")})
+    return result
 
 
 def inventory_digest(entries: Sequence[Mapping[str, Any]]) -> str:
@@ -488,6 +513,19 @@ class SupabaseStorageSource:
         entries.sort(key=lambda item: (item["bucket"], item["key"]))
         return entries
 
+    def restore_metadata(self, entry: Mapping[str, Any]) -> Dict[str, Any]:
+        path = "/storage/v1/object/info/" + urllib.parse.quote(entry["bucket"], safe="") + "/" + urllib.parse.quote(entry["key"], safe="/")
+        with self._request("GET", path) as response:
+            info = json.load(response)
+        if not isinstance(info, dict) or info.get("size") != entry["size"] or info.get("content_type") != entry["contentType"]:
+            raise SourceDriftError("Storage info differs from listed identity")
+        custom = info.get("metadata") or {}
+        if not isinstance(custom, dict):
+            raise ValidationError("Storage custom metadata invalid")
+        return {"httpMetadata": {"ContentType": info["content_type"], "CacheControl": info.get("cache_control")},
+                "customMetadata": custom, "sourceVersion": info.get("version"),
+                "sourceEtag": info.get("etag"), "sourceUpdatedAt": info.get("last_modified")}
+
     def download(self, entry: Mapping[str, Any], destination: pathlib.Path, budget: TransferBudget) -> Mapping[str, Optional[str]]:
         budget.begin_source()
         encoded_bucket = urllib.parse.quote(entry["bucket"], safe="")
@@ -523,13 +561,216 @@ class SupabaseStorageSource:
         return {"sha256": digest.hexdigest(), "etag": response.headers.get("ETag"), "contentType": response.headers.get("Content-Type")}
 
 
+def walk_string_leaves(value: Any, path: str = "$"):
+    if isinstance(value, str):
+        yield path, value
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            yield from walk_string_leaves(child, f"{path}[{index}]")
+    elif isinstance(value, dict):
+        for name, child in value.items():
+            yield from walk_string_leaves(child, path + "." + name)
+
+
+def source_locator(value: str, field: str = "") -> Optional[Tuple[str, str, str]]:
+    parsed = urllib.parse.urlsplit(value)
+    if parsed.scheme == "https" and parsed.hostname == "media-canary.locally-travel.com":
+        key = urllib.parse.unquote(parsed.path.lstrip("/"))
+        if key.startswith(("originals/", "sources/")):
+            return "r2", R2_SOURCE_BUCKET, key
+    if parsed.scheme == "https" and parsed.hostname == "uhinvcydgzqlpnvieyal.supabase.co":
+        parts = urllib.parse.unquote(parsed.path).split("/")
+        if len(parts) >= 7 and parts[1:4] == ["storage", "v1", "object"] and parts[4] in {"public", "authenticated", "sign"}:
+            return "supabase", parts[5], "/".join(parts[6:])
+    if field == "id_card_file" and value.startswith("id_card/"):
+        return "supabase", "verification-docs", value
+    if value.startswith("/api/admin/files/"):
+        return "supabase", "admin_files", urllib.parse.unquote(value[len("/api/admin/files/"):])
+    return None
+
+
+def database_references(source: SupabaseStorageSource, include_managed_assets: bool = False) -> Dict[Tuple[str, str, str], List[Dict[str, Any]]]:
+    """Capture only locator associations, never entire business rows in a manifest."""
+    tables = {
+        "experiences": "id,host_id,photos,image_url,itinerary,itinerary_i18n",
+        "profiles": "id,avatar_url",
+        "host_applications": "id,user_id,profile_photo,id_card_file",
+        "community_posts": "id,user_id,images",
+        "inquiry_messages": "id,image_url",
+        "admin_tasks": "*",
+        "admin_task_comments": "*",
+    }
+    refs: Dict[Tuple[str, str, str], List[Dict[str, Any]]] = {}
+    for table, fields in tables.items():
+        offset, limit = 0, 500
+        while True:
+            query = urllib.parse.urlencode({"select": fields, "order": "id.asc", "offset": offset, "limit": limit})
+            with source._request("GET", "/rest/v1/" + table + "?" + query) as response:
+                rows = json.load(response)
+            if not isinstance(rows, list):
+                raise BackupError("database locator page invalid")
+            for row in rows:
+                if not isinstance(row, dict) or row.get("id") is None:
+                    raise BackupError("database locator row invalid")
+                for field, value in row.items():
+                    for path, leaf in walk_string_leaves(value):
+                        location = source_locator(leaf, field)
+                        if location:
+                            # Strip any query: signed capabilities never enter a manifest.
+                            locator = leaf.split("?", 1)[0]
+                            refs.setdefault(location, []).append({
+                                "relation": table, "rowId": str(row["id"]), "field": field,
+                                "jsonPath": path, "locator": locator,
+                            })
+            if len(rows) < limit:
+                break
+            offset += len(rows)
+    if include_managed_assets:
+        offset, limit = 0, 500
+        while True:
+            query = urllib.parse.urlencode({"select":"id,provider,bucket,object_key,public_url,state,expected_sha256,expected_size", "deleted_at":"is.null", "order":"id.asc", "limit":limit, "offset":offset})
+            with source._request("GET", "/rest/v1/media_assets?" + query) as response:
+                rows = json.load(response)
+            if not isinstance(rows, list):
+                raise ValidationError("managed asset association unavailable")
+            for row in rows:
+                location = (row["provider"],row["bucket"],row["object_key"])
+                refs.setdefault(location, []).append({"relation":"media_assets", "rowId":str(row["id"]), "field":"object_key", "jsonPath":"$",
+                    "locator":row.get("public_url"), "optionalPending":row["state"]=="pending", "expectedSha256":row["expected_sha256"], "expectedSize":row["expected_size"]})
+            if len(rows) < limit:
+                break
+            offset += len(rows)
+    for values in refs.values():
+        values.sort(key=lambda value: canonical_json(value))
+    return refs
+
+
+class R2StorageSource:
+    """Read-only original adapter. Deliberately has no PUT/COPY/DELETE method."""
+    def __init__(self, client: Any, bucket: str = R2_SOURCE_BUCKET, timeout: float = 30.0):
+        if bucket != R2_SOURCE_BUCKET:
+            raise ValidationError("unexpected R2 source bucket")
+        self.client, self.bucket, self.timeout = client, bucket, timeout
+
+    def inventory(self, references: Mapping[Tuple[str, str, str], Any]) -> List[Dict[str, Any]]:
+        listed = {}
+        try:
+            for prefix in ("originals/", "sources/"):
+                token, seen = None, set()
+                while True:
+                    params = {"Bucket": self.bucket, "Prefix": prefix, "MaxKeys": 1000}
+                    if token:
+                        params["ContinuationToken"] = token
+                    page = self.client.list_objects_v2(**params)
+                    for item in page.get("Contents", []):
+                        key = item["Key"]
+                        if key in listed or not key.startswith(prefix):
+                            raise ValidationError("R2 list duplicate or wrong prefix")
+                        listed[key] = item
+                    if not page.get("IsTruncated"):
+                        break
+                    token = page.get("NextContinuationToken")
+                    if not token or token in seen:
+                        raise ValidationError("R2 pagination incomplete")
+                    seen.add(token)
+            entries = []
+            for (provider, bucket, key), associations in sorted(references.items()):
+                if provider != "r2":
+                    continue
+                if bucket != self.bucket:
+                    raise ValidationError("unexpected R2 source authority")
+                if key not in listed:
+                    if associations and all(ref.get("optionalPending") is True for ref in associations):
+                        continue
+                    raise SourceDriftError("referenced R2 original missing")
+                head = self.client.head_object(Bucket=bucket, Key=key)
+                size = head["ContentLength"]
+                if size != listed[key]["Size"]:
+                    raise SourceDriftError("R2 list/head changed")
+                modified = head.get("LastModified")
+                modified = modified.isoformat() if hasattr(modified, "isoformat") else str(modified or "")
+                entries.append({
+                    "provider": "r2", "authority": "production-db-reference",
+                    "bucket": bucket, "key": key, "identity": source_identity(bucket, key, "r2"),
+                    "size": size, "contentType": head.get("ContentType"),
+                    "metadata": {"size": size},
+                    "httpMetadata": {name: head.get(name) for name in ("ContentType", "CacheControl", "ContentDisposition", "ContentEncoding", "ContentLanguage")},
+                    "customMetadata": head.get("Metadata", {}),
+                    "dbReferences": associations,
+                    "sourceVersion": head.get("VersionId"), "sourceEtag": head.get("ETag"),
+                    "sourceUpdatedAt": modified, "sourceSha256": None, "cacheFile": None,
+                    "ciphertextKey": None, "ciphertextChecksumKey": None, "proof": "metadata-only", "reuse": None,
+                })
+            return entries
+        except BackupError:
+            raise
+        except Exception:
+            raise BackupError("R2 source inventory failed") from None
+
+    def download(self, entry: Mapping[str, Any], destination: pathlib.Path, budget: TransferBudget) -> Mapping[str, Optional[str]]:
+        budget.begin_source()
+        destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        body = None
+        try:
+            response = self.client.get_object(Bucket=self.bucket, Key=entry["key"], IfMatch=entry["sourceEtag"])
+            body = response["Body"]
+            fd = os.open(str(destination), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            digest, size = hashlib.sha256(), 0
+            with os.fdopen(fd, "wb") as output:
+                while True:
+                    with payload_read_deadline(self.timeout):
+                        chunk = body.read(CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    budget.receive_source(len(chunk))
+                    output.write(chunk)
+                    digest.update(chunk)
+                    size += len(chunk)
+            if size != entry["size"] or response.get("ETag") != entry["sourceEtag"]:
+                raise SourceDriftError("R2 downloaded version differs")
+            return {"sha256": digest.hexdigest(), "etag": response.get("ETag"), "contentType": response.get("ContentType")}
+        except BackupError:
+            destination.unlink(missing_ok=True)
+            raise
+        except TimeoutError:
+            destination.unlink(missing_ok=True)
+            raise SourceTimeoutError("R2 payload timed out") from None
+        except Exception:
+            destination.unlink(missing_ok=True)
+            raise BackupError("R2 source download failed") from None
+        finally:
+            if body is not None:
+                body.close()
+
+
+class MultiStorageSource:
+    def __init__(self, supabase: SupabaseStorageSource, r2: R2StorageSource, reference_reader=database_references):
+        self.supabase, self.r2, self.reference_reader = supabase, r2, reference_reader
+
+    def inventory(self) -> List[Dict[str, Any]]:
+        refs = self.reference_reader(self.supabase)
+        entries = []
+        for old in self.supabase.inventory():
+            entry = dict(old, provider="supabase", authority="recoverable-source", **self.supabase.restore_metadata(old))
+            entry["dbReferences"] = refs.get(("supabase", old["bucket"], old["key"]), [])
+            entries.append(entry)
+        entries.extend(self.r2.inventory(refs))
+        return sorted(entries, key=lambda item: (item["provider"], item["bucket"], item["key"]))
+
+    def download(self, entry: Mapping[str, Any], destination: pathlib.Path, budget: TransferBudget):
+        provider = entry.get("provider")
+        if provider not in {"supabase", "r2"}:
+            raise ValidationError("unknown source provider")
+        return (self.supabase if provider == "supabase" else self.r2).download(entry, destination, budget)
+
+
 def make_plan(entries: Sequence[Mapping[str, Any]], snapshot_id: str, db_backup_id: str, db_backup_time: str, captured_at: Optional[str] = None) -> Dict[str, Any]:
     captured = captured_at or utc_now()
     expires = (parse_utc(captured) + dt.timedelta(days=EXPIRY_DAYS)).isoformat().replace("+00:00", "Z")
     objects = [dict(entry) for entry in entries]
     plan: Dict[str, Any] = {
-        "schema": SCHEMA,
-        "version": 1,
+        "schema": MULTI_SCHEMA if any("provider" in entry for entry in entries) else SCHEMA,
+        "version": 2 if any("provider" in entry for entry in entries) else 1,
         "mode": "plan",
         "projectRef": "uhinvcydgzqlpnvieyal",
         "destinationBucket": PRIVATE_R2_BUCKET,
@@ -557,7 +798,7 @@ def make_plan(entries: Sequence[Mapping[str, Any]], snapshot_id: str, db_backup_
 def previous_by_identity(previous: Optional[Mapping[str, Any]], now: dt.datetime) -> Dict[str, Mapping[str, Any]]:
     if previous is None:
         return {}
-    if previous.get("schema") != MANIFEST_SCHEMA or previous.get("status") != "complete":
+    if previous.get("schema") not in {MANIFEST_SCHEMA, MULTI_MANIFEST_SCHEMA} or previous.get("status") != "complete":
         raise ValidationError("previous manifest is not complete")
     recoverable_until = parse_utc(previous.get("recoverableUntil"))
     if recoverable_until <= now:
@@ -614,6 +855,11 @@ def prepare_plan(
             cache_name = identity + ".source"
             cache_path = cache_dir / cache_name
             result = resume_or_download_source(source, entry, cache_path, budget)
+            expected_mime = (entry.get("contentType") or "").split(";", 1)[0].strip().lower()
+            received_mime = (result.get("contentType") or "").split(";", 1)[0].strip().lower()
+            if expected_mime and expected_mime != received_mime and (plan["version"] == 2 or received_mime):
+                cache_path.unlink(missing_ok=True)
+                raise SourceDriftError("source MIME differs from inventory")
             entry.update({
                 "sourceSha256": result["sha256"],
                 "cacheFile": cache_name,
@@ -622,6 +868,11 @@ def prepare_plan(
                 "proof": "downloaded-byte-sha256",
                 "reuse": None,
             })
+        for ref in entry.get("dbReferences", []):
+            if ref.get("relation") == "media_assets" and (ref.get("expectedSha256") != entry["sourceSha256"] or ref.get("expectedSize") != entry["size"]):
+                if entry.get("cacheFile"):
+                    (cache_dir / entry["cacheFile"]).unlink(missing_ok=True)
+                raise SourceDriftError("managed original differs from registry byte identity")
         prepared_objects.append(entry)
     if inventory_digest(source.inventory()) != plan["inventoryDigest"]:
         raise SourceDriftError("source inventory changed during prepare")
@@ -737,18 +988,48 @@ class R2Store:
 
     def download(self, key: str, destination: pathlib.Path) -> None:
         destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-        fd = os.open(str(destination), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        response = self.client.get_object(Bucket=self.bucket, Key=key)
+        response = None
         try:
+            fd = os.open(str(destination), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
             with os.fdopen(fd, "wb") as output:
+                response = self.client.get_object(Bucket=self.bucket, Key=key)
+                size = 0
                 while True:
-                    chunk = response["Body"].read(CHUNK_SIZE)
+                    with payload_read_deadline(60):
+                        chunk = response["Body"].read(CHUNK_SIZE)
                     if not chunk:
                         break
+                    size += len(chunk)
+                    if size > MAX_R2_BYTES:
+                        raise BudgetError("restore object ceiling exceeded")
                     output.write(chunk)
-        except BaseException:
+        except Exception:
             destination.unlink(missing_ok=True)
+            raise BackupError("backup download failed") from None
+        finally:
+            if response is not None:
+                response["Body"].close()
+
+    def verify_bytes(self, key: str, expected_sha: str, expected_size: int) -> int:
+        """A destination HEAD/eTag is never accepted as byte verification."""
+        try:
+            response = self.client.get_object(Bucket=self.bucket, Key=key)
+            digest, size = hashlib.sha256(), 0
+            try:
+                for chunk in iter(lambda: response["Body"].read(CHUNK_SIZE), b""):
+                    size += len(chunk)
+                    if size > expected_size:
+                        raise ValidationError("destination byte size differs")
+                    digest.update(chunk)
+            finally:
+                response["Body"].close()
+            if size != expected_size or digest.hexdigest() != expected_sha:
+                raise ValidationError("destination byte SHA differs")
+            return size
+        except BackupError:
             raise
+        except Exception:
+            raise BackupError("destination byte verification failed") from None
 
 
 def ensure_cache_file(cache_dir: pathlib.Path, entry: Mapping[str, Any]) -> pathlib.Path:
@@ -806,10 +1087,15 @@ def apply_plan(
     for entry in plan["objects"]:
         if entry.get("reuse"):
             verify_reused(store, entry)
+            if plan["version"] == 2:
+                store.verify_bytes(entry["ciphertextKey"], entry["reuse"]["ciphertextSha256"], entry["reuse"]["ciphertextSize"])
+                checksum_sha = sha256_bytes((entry["reuse"]["ciphertextSha256"] + "\n").encode("ascii"))
+                store.verify_bytes(entry["ciphertextChecksumKey"], checksum_sha, 65)
             results.append(dict(entry, ciphertextSha256=entry["reuse"]["ciphertextSha256"], ciphertextSize=entry["reuse"]["ciphertextSize"], expiresAt=entry["reuse"]["expiresAt"]))
             continue
         ciphertext = work_dir / (entry["identity"] + ".age")
         checksum = work_dir / (entry["identity"] + ".age.sha256")
+        ciphertext.unlink(missing_ok=True)
         encryptor.encrypt(local_files[entry["identity"]], ciphertext)
         cipher_sha, _ = sha256_file(ciphertext)
         checksum.write_text(cipher_sha + "\n", encoding="ascii")
@@ -827,14 +1113,17 @@ def apply_plan(
             entry["ciphertextChecksumKey"], checksum, checksum_sha, budget, "source-checksum", checksum_proof
         )
         results.append(dict(entry, ciphertextSha256=stored_cipher_sha, ciphertextSize=stored_cipher_size, expiresAt=plan["expiresAt"]))
+        if plan["version"] == 2:
+            store.verify_bytes(entry["ciphertextKey"], stored_cipher_sha, stored_cipher_size)
+            store.verify_bytes(entry["ciphertextChecksumKey"], checksum_sha, 65)
 
     end_inventory = source.inventory()
     if inventory_digest(end_inventory) != plan["inventoryDigest"]:
         raise SourceDriftError("source inventory changed during apply")
     recoverable_until = min(parse_utc(item["expiresAt"]) for item in results).isoformat().replace("+00:00", "Z") if results else plan["expiresAt"]
     manifest: Dict[str, Any] = {
-        "schema": MANIFEST_SCHEMA,
-        "version": 1,
+        "schema": MULTI_MANIFEST_SCHEMA if plan["version"] == 2 else MANIFEST_SCHEMA,
+        "version": plan["version"],
         "status": "complete",
         "projectRef": plan["projectRef"],
         "destinationBucket": plan["destinationBucket"],
@@ -848,12 +1137,22 @@ def apply_plan(
         "atomicWithDatabase": False,
         "inventoryDigestStart": plan["inventoryDigest"],
         "inventoryDigestEnd": inventory_digest(end_inventory),
+        "captureBoundary": {
+            "storageStartedAt": plan["capturedAt"],
+            "storageCompletedAt": plan["manifestCreatedAt"],
+            "databaseBackupTime": plan["databaseBackup"]["capturedAt"],
+            "atomic": False,
+            "deltaWindowSeconds": (parse_utc(plan["manifestCreatedAt"]) - parse_utc(plan["databaseBackup"]["capturedAt"])).total_seconds(),
+        },
         "summary": {"objectCount": len(results), "sourceBytes": sum(item["size"] for item in results)},
         "objects": results,
     }
+    if plan["version"] == 2:
+        manifest["approvedPlan"] = dict(plan)
     manifest_plain = work_dir / "storage-manifest.json"
     safe_write_json(manifest_plain, manifest)
     manifest_age = work_dir / "storage-manifest.json.age"
+    manifest_age.unlink(missing_ok=True)
     encryptor.encrypt(manifest_plain, manifest_age)
     manifest_sha, _ = sha256_file(manifest_age)
     manifest_checksum = work_dir / "storage-manifest.json.age.sha256"
@@ -873,8 +1172,16 @@ def apply_plan(
         manifest_checksum_key, manifest_checksum, checksum_sha, budget, "snapshot-manifest-checksum",
         {"plan-digest": plan["planDigest"], "cipher-sha256": stored_manifest_sha},
     )
+    if plan["version"] == 2:
+        store.verify_bytes(manifest_key, stored_manifest_sha, stored_manifest_size)
+        store.verify_bytes(manifest_checksum_key, checksum_sha, 65)
+    providers = {}
+    for entry in results:
+        aggregate = providers.setdefault(entry.get("provider", "supabase"), {"objects": 0, "sourceBytes": 0})
+        aggregate["objects"] += 1
+        aggregate["sourceBytes"] += entry["size"]
     public_summary = {
-        "schema": SCHEMA,
+        "schema": plan["schema"],
         "status": "complete",
         "snapshotId": plan["snapshotId"],
         "planDigest": plan["planDigest"],
@@ -884,13 +1191,22 @@ def apply_plan(
         "manifestCiphertextSize": stored_manifest_size,
         "recoverableUntil": recoverable_until,
         "objectCount": len(results),
+        "newSourceObjects": sum(not bool(item.get("reuse")) for item in results),
+        "reusedSourceObjects": sum(bool(item.get("reuse")) for item in results),
+        "encryptedObjectBytes": sum(item["ciphertextSize"] for item in results),
         "sourceBytes": sum(item["size"] for item in results),
         "budget": budget.as_dict(),
+        "providers": providers,
+        "destinationByteVerification": "PASS" if plan["version"] == 2 else "restore-rehearsal-required",
+        "databaseBackup": plan["databaseBackup"],
+        "captureBoundary": manifest["captureBoundary"],
     }
     return public_summary, budget
 
 
-def restore_snapshot(store: R2Store, manifest_key: str, manifest_checksum_key: str, identity: pathlib.Path, destination: pathlib.Path, encryptor: AgeEncryptor) -> Dict[str, Any]:
+def restore_snapshot(store: R2Store, manifest_key: str, manifest_checksum_key: str, identity: pathlib.Path, destination: pathlib.Path, encryptor: AgeEncryptor,
+                     provider: Optional[str] = None, bucket_filter: Optional[str] = None,
+                     object_identity: Optional[str] = None, manifest_only: bool = False) -> Dict[str, Any]:
     if not manifest_key.startswith(R2_PREFIX) or manifest_checksum_key != manifest_key + ".sha256":
         raise ValidationError("invalid manifest key")
     if destination.exists():
@@ -912,18 +1228,49 @@ def restore_snapshot(store: R2Store, manifest_key: str, manifest_checksum_key: s
         manifest_plain = temp / "manifest.json"
         encryptor.decrypt(manifest_age, identity, manifest_plain)
         manifest = read_private_json(manifest_plain)
-        if manifest.get("schema") != MANIFEST_SCHEMA or manifest.get("status") != "complete":
+        if manifest.get("schema") not in {MANIFEST_SCHEMA, MULTI_MANIFEST_SCHEMA} or manifest.get("status") != "complete":
             raise ValidationError("invalid snapshot manifest")
         parse_utc(manifest.get("recoverableUntil"))
+        all_objects = manifest.get("objects")
+        if not isinstance(all_objects, list) or manifest.get("summary") != {"objectCount": len(all_objects), "sourceBytes": sum(item.get("size", 0) for item in all_objects)}:
+            raise ValidationError("manifest summary mismatch")
+        identities = set()
+        for entry in all_objects:
+            validate_object_entry(entry, prepared=True)
+            if entry["identity"] in identities:
+                raise ValidationError("duplicate manifest identity")
+            identities.add(entry["identity"])
+        if manifest["schema"] == MULTI_MANIFEST_SCHEMA:
+            approved = manifest.get("approvedPlan")
+            if not isinstance(approved, dict):
+                raise ValidationError("manifest missing approved identity contract")
+            validate_plan(approved, confirm_digest=manifest.get("planDigest"), require_prepared=True)
+            approved_by_id = {entry["identity"]: entry for entry in approved["objects"]}
+            if len(manifest.get("objects", [])) != len(approved_by_id):
+                raise ValidationError("manifest key set mismatch")
+            for entry in manifest["objects"]:
+                expected_entry = approved_by_id.get(entry.get("identity"))
+                if expected_entry is None or metadata_fingerprint(entry) != metadata_fingerprint(expected_entry) or entry.get("sourceSha256") != expected_entry["sourceSha256"]:
+                    raise ValidationError("manifest source identity or metadata differs")
+        selected = [entry for entry in manifest.get("objects", [])
+                    if (provider is None or entry.get("provider", "supabase") == provider)
+                    and (bucket_filter is None or entry["bucket"] == bucket_filter)
+                    and (object_identity is None or entry["identity"] == object_identity)]
+        if (provider or bucket_filter or object_identity) and not selected:
+            raise ValidationError("restore selector matched no object")
         seen_paths = set()
-        for entry in manifest.get("objects", []):
+        for entry in selected:
             validate_object_entry(entry, prepared=True)
             bucket = entry["bucket"]
             key = entry["key"]
             relative = pathlib.PurePosixPath(bucket) / pathlib.PurePosixPath(key)
+            if manifest["schema"] == MULTI_MANIFEST_SCHEMA:
+                relative = pathlib.PurePosixPath(entry["provider"]) / relative
             if relative.is_absolute() or ".." in relative.parts or str(relative) in seen_paths:
                 raise ValidationError("unsafe or duplicate restore path")
             seen_paths.add(str(relative))
+            if manifest_only:
+                continue
             cipher = temp / (entry["identity"] + ".age")
             cipher_checksum = temp / (entry["identity"] + ".age.sha256")
             store.download(entry["ciphertextKey"], cipher)
@@ -942,7 +1289,7 @@ def restore_snapshot(store: R2Store, manifest_key: str, manifest_checksum_key: s
                 raise ValidationError("restored source byte mismatch")
             restored += 1
             restored_bytes += size
-        if restored != manifest["summary"]["objectCount"] or restored_bytes != manifest["summary"]["sourceBytes"]:
+        if not manifest_only and (restored != len(selected) or restored_bytes != sum(entry["size"] for entry in selected)):
             raise ValidationError("restored key set summary mismatch")
         safe_write_json(destination / ".locally-storage-restore-metadata.json", {
             "snapshotId": manifest["snapshotId"],
@@ -952,7 +1299,9 @@ def restore_snapshot(store: R2Store, manifest_key: str, manifest_checksum_key: s
             "contentInspectionPerformed": False,
         })
         safe_write_json(destination / ".locally-storage-manifest.json", manifest)
-        return {"status": "complete", "objectCount": restored, "sourceBytes": restored_bytes, "snapshotId": manifest["snapshotId"]}
+        return {"status": "manifest-validated" if manifest_only else "complete", "objectCount": restored, "sourceBytes": restored_bytes,
+                "snapshotId": manifest["snapshotId"], "selectedObjects": len(selected), "missing": 0, "shaMismatch": 0,
+                "metadataMappingVerified": True, "databaseBackup": manifest["databaseBackup"]}
     except BaseException:
         shutil.rmtree(destination, ignore_errors=True)
         raise
@@ -978,9 +1327,23 @@ def boto3_store() -> R2Store:
     return R2Store(client, os.environ["R2_BUCKET"])
 
 
-def source_from_env(args: argparse.Namespace) -> SupabaseStorageSource:
+def source_from_env(args: argparse.Namespace):
     key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
-    return SupabaseStorageSource(args.project_url, key, timeout=args.timeout)
+    source = SupabaseStorageSource(args.project_url, key, timeout=args.timeout)
+    if not args.multi_source:
+        return source
+    access, secret = os.environ.get("R2_SOURCE_ACCESS_KEY_ID"), os.environ.get("R2_SOURCE_SECRET_ACCESS_KEY")
+    if not access or not secret or access == os.environ.get("AWS_ACCESS_KEY_ID"):
+        raise BackupError("missing separate read-only R2 source credential")
+    import boto3
+    from botocore.config import Config
+    client = boto3.client("s3", endpoint_url=os.environ.get("R2_ENDPOINT"), aws_access_key_id=access,
+                          aws_secret_access_key=secret, region_name="auto",
+                          config=Config(signature_version="s3v4", connect_timeout=10, read_timeout=args.timeout,
+                                        retries={"total_max_attempts": 1, "mode": "standard"}))
+    include_managed = os.environ.get("STORAGE_BACKUP_INCLUDE_MANAGED_ASSETS") == "true"
+    return MultiStorageSource(source, R2StorageSource(client, timeout=args.timeout),
+                              reference_reader=lambda reader: database_references(reader, include_managed))
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
@@ -989,6 +1352,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--project-url", default="https://uhinvcydgzqlpnvieyal.supabase.co")
     common.add_argument("--timeout", type=float, default=30.0)
+    common.add_argument("--multi-source", action="store_true", help="Supabase recoverable objects plus DB-referenced R2 originals")
     plan_parser = sub.add_parser("plan", parents=[common])
     plan_parser.add_argument("--output", required=True, type=pathlib.Path)
     plan_parser.add_argument("--snapshot-id", required=True)
@@ -1011,6 +1375,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     restore_parser.add_argument("--manifest-checksum-key", required=True)
     restore_parser.add_argument("--identity", required=True, type=pathlib.Path)
     restore_parser.add_argument("--destination", required=True, type=pathlib.Path)
+    restore_parser.add_argument("--provider", choices=("supabase", "r2"))
+    restore_parser.add_argument("--bucket")
+    restore_parser.add_argument("--object-identity")
+    restore_parser.add_argument("--manifest-only", action="store_true")
     args = parser.parse_args(argv)
 
     if args.command == "plan":
@@ -1037,7 +1405,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         safe_write_json(args.summary, summary)
         print(json.dumps(summary, sort_keys=True))
     else:
-        result = restore_snapshot(boto3_store(), args.manifest_key, args.manifest_checksum_key, args.identity, args.destination, AgeEncryptor())
+        result = restore_snapshot(boto3_store(), args.manifest_key, args.manifest_checksum_key, args.identity, args.destination, AgeEncryptor(),
+                                  args.provider, args.bucket, args.object_identity, args.manifest_only)
         print(json.dumps(result, sort_keys=True))
     return 0
 
@@ -1047,4 +1416,7 @@ if __name__ == "__main__":
         raise SystemExit(main())
     except BackupError as exc:
         print(json.dumps({"status": "failed", "diagnosticCode": exc.code}), file=os.sys.stderr)
+        raise SystemExit(1)
+    except Exception:
+        print(json.dumps({"status": "failed", "diagnosticCode": "backup_unexpected_failure"}), file=os.sys.stderr)
         raise SystemExit(1)

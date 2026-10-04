@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRouteActor, toApiErrorResponse } from '@/app/api/host/experiences/shared';
 import {
-  createExperienceMediaR2Source,
   experienceMediaSourceEnabled,
   EXPERIENCE_MEDIA_SOURCE_MAX_BYTES,
   hasExpectedExperienceImageMagic,
@@ -10,6 +9,7 @@ import {
   resolveExperienceMediaUploadOwner,
   repositoryProductionR2SourceDefaultEnabled,
 } from '@/app/utils/experienceMediaSource.server';
+import { MediaLifecycleError, uploadManagedExperienceMedia } from '@/app/utils/mediaLifecycle';
 
 export const runtime = 'nodejs';
 
@@ -72,14 +72,18 @@ export async function POST(request: NextRequest) {
       if (!environment.PUBLIC_EXPERIENCE_MEDIA_R2) {
         return NextResponse.json({ success: false, error: 'Image storage unavailable.' }, { status: 503 });
       }
-      const result = await createExperienceMediaR2Source({
+      const result = await uploadManagedExperienceMedia({
+        registry: supabaseAdmin,
         binding: environment.PUBLIC_EXPERIENCE_MEDIA_R2,
+        actorId: actor.id,
         ownerId,
         folder,
         bytes,
         contentType,
+        parentId: experienceId,
+        idempotencyKey: request.headers.get('Idempotency-Key'),
       });
-      return NextResponse.json({ success: true, publicUrl: result.publicUrl, authority: 'r2' });
+      return NextResponse.json({ success: true, publicUrl: result.publicUrl, assetId: result.assetId, state: result.state, authority: 'r2' });
     }
 
     if (
@@ -105,6 +109,10 @@ export async function POST(request: NextRequest) {
       authority: 'supabase',
     });
   } catch (error) {
+    if (error instanceof MediaLifecycleError) {
+      console.warn('[Media lifecycle]', error.code);
+      return NextResponse.json({ success: false, error: 'Image storage unavailable.', code: error.code }, { status: error.status });
+    }
     return toApiErrorResponse(error);
   }
 }
