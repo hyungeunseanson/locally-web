@@ -1,8 +1,8 @@
 name: Authoritative Storage Byte Backup
 
 on:
-  schedule:
-    - cron: '37 18 * * *'
+  # Temporarily paused: daily 18:37 UTC / 03:37 KST, pending destination isolation.
+  # Manual dispatch remains available; a fresh approval is required before use.
   workflow_dispatch:
 
 permissions:
@@ -96,7 +96,7 @@ jobs:
               output.write('- Workflow result: ${{ job.status }}\n')
               if path.exists():
                   result = json.loads(path.read_text())
-                  for field in ['status','diagnosticCode','stage','provider','operation','objectIdentityHash','elapsedSeconds','completedObjectCount','completedSourceBytes','sourceAttempts','sourceRetryCount','inventoryAttempts','inventoryRetryCount','destinationCreateAttempts','destinationObjectsCreated','destinationBytesCreated','sourceBudgetUsage','destinationBudgetUsage','snapshotId','providers','objectCount','sourceBytes','destinationByteVerification','databaseBackup','databaseBackupEvidence','captureBoundary','restoreProof']:
+                  for field in ['status','diagnosticCode','stage','provider','operation','objectIdentityHash','elapsedSeconds','completedObjectCount','completedSourceBytes','sourceAttempts','sourceRetryCount','inventoryAttempts','inventoryRetryCount','sdkExceptionClass','httpStatus','providerErrorCode','retryable','destinationCreateAttempts','destinationRetryCount','destinationObjectsCreated','destinationBytesCreated','sourceBudgetUsage','destinationBudgetUsage','snapshotId','providers','objectCount','sourceBytes','destinationByteVerification','databaseBackup','databaseBackupEvidence','captureBoundary','restoreProof']:
                       output.write('- ' + field + ': ' + json.dumps(result.get(field)) + '\n')
               output.write('- Source writes/deletes: 0\n- Private identity: offline only\n')
           PY

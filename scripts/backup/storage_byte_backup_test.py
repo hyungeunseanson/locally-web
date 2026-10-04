@@ -640,7 +640,7 @@ class StorageByteBackupTests(unittest.TestCase):
         prepared = self.prepared()
         client = FakeS3()
         client.fail_after = 0
-        with self.assertRaisesRegex(backup.BackupError, "R2 conditional create failed") as caught:
+        with self.assertRaisesRegex(backup.BackupError, "destination_provider_failed") as caught:
             backup.apply_plan(prepared, prepared["planDigest"], self.source, backup.R2Store(client, backup.PRIVATE_R2_BUCKET), FakeAge(), self.cache, self.work)
         self.assertNotIn("secret", str(caught.exception))
         self.assertNotIn("private", str(caught.exception))
