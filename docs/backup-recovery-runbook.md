@@ -292,8 +292,9 @@ exist in R2, including pending PUTs whose final DB verification failed. A pendin
 registry entry with no object is upload intent, not a missing business original.
 A missing committed/business-referenced original fails the capture.
 
-`.github/workflows/authoritative-storage-backup.yml` is a separate scheduled and
-manually dispatchable workflow. Its intended schedule is daily **18:37 UTC
+`.github/workflows/authoritative-storage-backup.yml` is separately manually
+dispatchable. Its scheduled trigger is temporarily paused for destination
+create-only root-cause isolation (2026-10-05 KST). Its intended schedule is daily **18:37 UTC
 (03:37 KST)**, twenty minutes after the logical DB backup schedule. Concurrency
 prevents overlapping Storage captures. Activation requires all configuration and
 the intended additive lifecycle migration; a workflow file alone is not evidence
@@ -472,10 +473,60 @@ remote source objects, encrypted destination objects or partial snapshot
 prefixes. A forced runner shutdown can still prevent cleanup from completing;
 check the cleanup step result instead of assuming temporary data was removed.
 
-The previous manual retry approval is exhausted. After this runtime hardening
-is merged, verify the existing scheduled workflow remains active with the
-180-minute timeout, then stop. Obtain fresh explicit user approval immediately
-before any new controlled Production backup dispatch.
+The subsequent controlled run `37214894208` on main `84d376cc` failed after
+preparing 1,031 source objects / 422,843,988 bytes. Its destination counters
+were one create attempt, zero acknowledged objects and zero acknowledged bytes;
+`storage_backup_operator_failed` did not retain the underlying SDK status.
+The unwrapped 412 → HEAD path is a code-level hypothesis, **not a confirmed
+412 response**. No COMPLETE manifest or full restore was produced.
+
+Only the full Storage scheduled trigger (18:37 UTC / 03:37 KST) is temporarily
+removed while this failure is isolated. Manual dispatch remains available with
+its 180-minute timeout and separated credentials. The DB backup schedule
+(18:17 UTC / 03:17 KST), Worker, application Queue/Cron, migration, credentials,
+locks/expiry and prior partial prefixes are unchanged. Restoring the Storage
+schedule requires an explicit operational decision after isolation; a merged
+probe workflow is not backup recovery proof.
+
+Destination PUT, guarded HEAD and byte-verification GET errors retain only
+allowlisted SDK class, HTTP status, provider error code and retryability, with
+stage/operation and actual budget counters. Messages, keys, URLs, headers,
+response bodies and credential fragments never enter the summary. A HEAD 404
+after 412 is `destination_head_not_found_after_precondition`; HEAD provider
+failures retain their own operation and diagnostic. Identity/checksum mismatch,
+401/403 and validation/conflict failures never trigger a write retry.
+
+Destination writes receive at most one application retry for 429, 5xx or known
+transport failures, with SDK retries still disabled. Before retrying, HEAD the
+exact key. A byte-exact SHA, size and proof-metadata match reconciles an
+ambiguous committed PUT as `committed-exact-success`, counted once in confirmed
+objects/bytes. A missing key permits one conditional retry; a HEAD failure or
+identity mismatch fails closed. All attempts retain `IfNoneMatch="*"` and are
+charged against the unchanged 12,000 / 3 GiB ceilings. Retry counters count
+actual charged second attempts. Existing 412 resume semantics for the same
+approved plaintext remain unchanged, including nondeterministic age ciphertext;
+the later GET verification still proves the selected existing ciphertext.
+
+`Storage Destination Create-Only Probe` is **manual-only** and shares the full
+backup concurrency lock. Its command is
+`python3 scripts/backup/probe_storage_destination.py --summary <private-result>`.
+It binds only destination credentials, endpoint/bucket and the public AGE
+recipient. It encrypts 32 random bytes with age (ciphertext capped at 4 KiB)
+and creates at most one object under
+`daily/storage-v1/diagnostics/<numeric-run-id>-<numeric-attempt>/`. Two logical
+PUT calls allow at most four charged attempts total: first create-only PUT →
+HEAD → GET/SHA verification, then SAME key/payload PUT → 412 → guarded HEAD →
+`concurrent-exact-skip`. The result is `probe_passed`, never a COMPLETE backup
+manifest. It inventories no source, contains no user data, loads no private AGE
+identity and never deletes the remote object; existing lifecycle expiry applies.
+Local temporary payloads use the bounded cleanup helper; cleanup failure makes
+the probe fail.
+
+The previous full-backup approval is exhausted. After exact-head CI and merge,
+verify main and the scheduled-trigger pause, then **STOP BEFORE REAL PROBE**.
+Obtain fresh explicit user approval for exactly one tiny destination probe.
+That approval does not authorize a full Storage backup. No probe or full backup
+is dispatched as part of this hardening PR.
 
 Provider contracts checked against [Boto3 error handling](https://docs.aws.amazon.com/boto3/latest/guide/error-handling.html),
 [botocore exception types](https://github.com/boto/botocore/blob/develop/botocore/exceptions.py),

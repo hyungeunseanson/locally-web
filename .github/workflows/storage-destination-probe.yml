@@ -1,0 +1,94 @@
+name: Storage Destination Create-Only Probe
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Share the full backup lock; neither operation may overlap the other.
+  group: production-authoritative-storage-byte-backup
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: production-backup
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ENDPOINT: ${{ vars.R2_ENDPOINT }}
+      R2_BUCKET: ${{ vars.R2_BUCKET }}
+      AGE_RECIPIENT: ${{ vars.AGE_RECIPIENT }}
+      AGE_VERSION: 1.3.1
+      BOTO3_VERSION: 1.43.70
+
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+
+      - name: Require manual approved destination scope
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for name in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY R2_ENDPOINT R2_BUCKET AGE_RECIPIENT; do
+            [[ -n "${!name:-}" ]]
+          done
+          [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]
+          [[ "$GITHUB_REF" == refs/heads/main ]]
+          [[ "$R2_BUCKET" == locally-production-db-backups ]]
+          [[ "$R2_ENDPOINT" == https://*.r2.cloudflarestorage.com ]]
+          [[ "$AGE_RECIPIENT" == age1* ]]
+
+      - name: Install pinned encryption and R2 client
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -m venv "${RUNNER_TEMP}/storage-r2-venv"
+          "${RUNNER_TEMP}/storage-r2-venv/bin/python" -m pip install --disable-pip-version-check --no-input "boto3==${BOTO3_VERSION}"
+          echo "${RUNNER_TEMP}/storage-r2-venv/bin" >> "$GITHUB_PATH"
+          curl --fail --silent --show-error --location \
+            "https://github.com/FiloSottile/age/releases/download/v${AGE_VERSION}/age-v${AGE_VERSION}-linux-amd64.tar.gz" \
+            --output "${RUNNER_TEMP}/storage-age.tar.gz"
+          echo "bdc69c09cbdd6cf8b1f333d372a1f58247b3a33146406333e30c0f26e8f51377  ${RUNNER_TEMP}/storage-age.tar.gz" | sha256sum --check --strict
+          tar -xzf "${RUNNER_TEMP}/storage-age.tar.gz" -C "$RUNNER_TEMP"
+          echo "${RUNNER_TEMP}/age" >> "$GITHUB_PATH"
+
+      - name: Probe one tiny encrypted diagnostic object
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          python3 scripts/backup/probe_storage_destination.py --summary "${RUNNER_TEMP}/storage-destination-probe-summary.json"
+
+      - name: Remove local opaque payload and intermediate files
+        if: always()
+        run: python3 scripts/backup/cleanup_storage_backup.py
+
+      - name: Publish sanitized probe result
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib
+          path = pathlib.Path(os.environ['RUNNER_TEMP']) / 'storage-destination-probe-summary.json'
+          if not path.exists():
+              path.write_text(json.dumps(dict(status='failed', diagnosticCode='configuration_incomplete', sourceWrites=0, sourceDeletes=0, remoteDeletes=0, completeBackupManifestPublished=False)))
+              path.chmod(0o600)
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as output:
+              output.write('### Manual destination probe\n')
+              output.write('- Workflow result: ${{ job.status }}\n')
+              result = json.loads(path.read_text())
+              for field in ['status','diagnosticCode','stage','provider','operation','sdkExceptionClass','httpStatus','providerErrorCode','retryable','destinationCreateAttempts','destinationRetryCount','destinationObjectsCreated','destinationBytesCreated','destinationBudgetUsage','firstPut','secondPut','secondPutHttpStatus','secondPutSdkExceptionClass','secondPutProviderErrorCode','headExact','ciphertextShaVerified','ciphertextBytes','temporaryCleanup','sourceWrites','sourceDeletes','remoteDeletes','sourceInventoryOperations','completeBackupManifestPublished']:
+                  output.write('- ' + field + ': ' + json.dumps(result.get(field)) + '\n')
+          PY
+
+      - name: Preserve sanitized probe evidence only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: storage-destination-probe-summary
+          path: ${{ runner.temp }}/storage-destination-probe-summary.json
+          if-no-files-found: error

@@ -93,7 +93,7 @@ def main(argv=None):
         safe_write_json(args.summary,summary);print(json.dumps(summary,sort_keys=True))
         return 0
     except Exception as error:
-        summary=diagnostics.summary('failed',error.code if isinstance(error,BackupError) else 'storage_backup_operator_failed')
+        summary=diagnostics.summary('failed',error.code if isinstance(error,BackupError) else 'storage_backup_operator_failed', error=error)
         summary.update(evidence)
         safe_write_json(args.summary,summary);print(json.dumps(summary,sort_keys=True))
         return 1

@@ -83,6 +83,94 @@ class ConflictError(BackupError):
     code = "conditional_conflict"
 
 
+DESTINATION_CODES = {
+    "destination_access_denied", "destination_precondition_failed", "destination_head_not_found_after_precondition",
+    "destination_not_found", "destination_throttled", "destination_provider_5xx", "destination_connect_timeout",
+    "destination_read_timeout", "destination_connection_closed", "destination_endpoint_connection",
+    "destination_provider_validation_failed", "destination_local_io_failed", "destination_provider_failed",
+    "destination_identity_mismatch", "destination_checksum_mismatch",
+}
+SDK_EXCEPTION_CLASSES = {
+    "ClientError", "ConnectTimeoutError", "ReadTimeoutError", "ConnectionClosedError", "ResponseStreamingError",
+    "IncompleteReadError", "EndpointConnectionError", "ParamValidationError", "NoCredentialsError",
+    "PartialCredentialsError", "TimeoutError", "ConnectionResetError", "ConnectionAbortedError", "BrokenPipeError",
+    "FileNotFoundError", "PermissionError", "OSError", "ValidationError", "ConflictError",
+}
+PROVIDER_ERROR_CODES = {
+    "AccessDenied", "InvalidAccessKeyId", "SignatureDoesNotMatch", "ExpiredToken", "PreconditionFailed", "412",
+    "NotFound", "NoSuchKey", "404", "SlowDown", "Throttling", "ThrottlingException", "TooManyRequests",
+    "InternalError", "InternalServerError", "ServiceUnavailable", "RequestTimeout", "InvalidArgument",
+    "InvalidRequest", "ConditionalRequestConflict", "BadDigest", "InvalidDigest",
+}
+DESTINATION_RETRY_CODES = {
+    "destination_throttled", "destination_provider_5xx", "destination_connect_timeout", "destination_read_timeout",
+    "destination_connection_closed", "destination_endpoint_connection",
+}
+MAX_DESTINATION_RETRIES = 1
+
+
+class DestinationError(BackupError):
+    """Only fixed fields can cross the provider exception boundary."""
+    def __init__(self, code, operation, error=None, stage=None):
+        super().__init__(code)
+        self.code, self.operation, self.stage = code, operation, stage
+        self.__suppress_context__ = True
+        response = getattr(error, "response", {})
+        response = response if isinstance(response, dict) else {}
+        metadata, detail = response.get("ResponseMetadata"), response.get("Error")
+        status = metadata.get("HTTPStatusCode") if isinstance(metadata, dict) else None
+        provider_code = detail.get("Code") if isinstance(detail, dict) else None
+        name = type(error).__name__
+        self.evidence = {
+            "sdkExceptionClass": name if name in SDK_EXCEPTION_CLASSES else "Other",
+            "httpStatus": status if type(status) is int and 100 <= status <= 599 else None,
+            "providerErrorCode": provider_code if isinstance(provider_code, str) and provider_code in PROVIDER_ERROR_CODES else "Other",
+            "retryable": code in DESTINATION_RETRY_CODES,
+        }
+
+
+class DestinationConflictError(DestinationError, ConflictError):
+    pass
+
+
+class DestinationChecksumError(DestinationError, ValidationError):
+    pass
+
+
+def destination_error(error, operation, stage=None):
+    safe = DestinationError("destination_provider_failed", operation, error, stage)
+    status, code, name = safe.evidence["httpStatus"], safe.evidence["providerErrorCode"], safe.evidence["sdkExceptionClass"]
+    if status in (401, 403) or code in {"AccessDenied", "InvalidAccessKeyId", "SignatureDoesNotMatch", "ExpiredToken"} or name in {"NoCredentialsError", "PartialCredentialsError"}:
+        diagnostic = "destination_access_denied"
+    elif status == 412 or code in {"PreconditionFailed", "412"}:
+        diagnostic = "destination_precondition_failed"
+    elif status == 404 or code in {"NotFound", "NoSuchKey", "404"}:
+        diagnostic = "destination_not_found"
+    elif code in {"BadDigest", "InvalidDigest"}:
+        diagnostic = "destination_checksum_mismatch"
+    elif code == "ConditionalRequestConflict":
+        diagnostic = "destination_identity_mismatch"
+    elif code in {"InvalidArgument", "InvalidRequest"}:
+        diagnostic = "destination_provider_validation_failed"
+    elif status == 429 or code in {"SlowDown", "Throttling", "ThrottlingException", "TooManyRequests"}:
+        diagnostic = "destination_throttled"
+    elif status is not None and 500 <= status <= 599:
+        diagnostic = "destination_provider_5xx"
+    elif name == "ConnectTimeoutError":
+        diagnostic = "destination_connect_timeout"
+    elif name in {"ReadTimeoutError", "TimeoutError"}:
+        diagnostic = "destination_read_timeout"
+    elif name in {"ConnectionClosedError", "ResponseStreamingError", "IncompleteReadError", "ConnectionResetError", "ConnectionAbortedError", "BrokenPipeError"}:
+        diagnostic = "destination_connection_closed"
+    elif name == "EndpointConnectionError":
+        diagnostic = "destination_endpoint_connection"
+    elif name == "ParamValidationError" or status is not None and 400 <= status <= 499:
+        diagnostic = "destination_provider_validation_failed"
+    else:
+        diagnostic = "destination_provider_failed"
+    return DestinationError(diagnostic, operation, error, stage)
+
+
 def provider_read_error(error: Exception, http_status=None) -> BackupError:
     """Classify fixed SDK types/statuses, never messages, URLs or response bodies."""
     if isinstance(error, BackupError):
@@ -123,11 +211,12 @@ class BackupDiagnostics:
               "source_revalidation", "prepare_r2_download", "prepare_supabase_download", "preapply_inventory",
               "encryption", "destination_create", "destination_byte_verify", "manifest_publish", "final_inventory"}
     operations = {"validate", "associate", "database_locator_get", "list", "head", "restore_metadata", "inventory",
-                  "get", "encrypt", "put_create_only", "verify_bytes", "encrypt_manifest", "publish_manifest", "verify_manifest"}
+                  "get", "encrypt", "put_create_only", "verify_bytes", "encrypt_manifest", "publish_manifest", "verify_manifest",
+                  "head_after_precondition", "head_after_ambiguous_put", "destination_head", "destination_local_read"}
     codes = {"backup_error", "validation_failed", "budget_exceeded", "source_drift", "source_timeout", "conditional_conflict",
              "source_access_denied", "source_precondition_failed", "source_throttled", "source_provider_5xx", "source_connect_timeout",
              "source_read_timeout", "source_connection_closed", "source_endpoint_connection", "source_provider_validation_failed",
-             "source_provider_failed", "storage_backup_operator_failed", "capture_in_progress", "capture_complete"}
+             "source_provider_failed", "storage_backup_operator_failed", "capture_in_progress", "capture_complete"} | DESTINATION_CODES
 
     def __init__(self, path: Optional[pathlib.Path] = None):
         self.path, self.started = path, time.monotonic()
@@ -147,7 +236,7 @@ class BackupDiagnostics:
     def inventory_at(self, provider: str, operation: str, entry=None) -> None:
         self.at(self.inventory_stage or ("source_inventory_" + provider), provider, operation, entry)
 
-    def summary(self, status="in_progress", code="capture_in_progress") -> Dict[str, Any]:
+    def summary(self, status="in_progress", code="capture_in_progress", error=None) -> Dict[str, Any]:
         if status not in {"in_progress", "failed", "complete", "dry-run-byte-prepared"} or code not in self.codes:
             status, code = "failed", "storage_backup_operator_failed"
         source, destination = self.source_budget, self.destination_budget
@@ -156,9 +245,11 @@ class BackupDiagnostics:
                   "completedObjectCount": source.source_completed_downloads, "completedSourceBytes": source.source_completed_bytes,
                   "sourceAttempts": source.source_attempts, "sourceRetryCount": source.source_retries,
                   "inventoryAttempts": self.inventory_attempts, "inventoryRetryCount": self.inventory_retries,
-                  "destinationCreateAttempts": destination.r2_attempts, "destinationObjectsCreated": destination.new_r2_objects,
+                  "destinationCreateAttempts": destination.r2_attempts, "destinationRetryCount": destination.r2_retries, "destinationObjectsCreated": destination.new_r2_objects,
                   "destinationBytesCreated": destination.new_r2_bytes, "sourceBudgetUsage": source.as_dict(),
                   "destinationBudgetUsage": destination.as_dict(), "sourceWrites": 0, "sourceDeletes": 0}
+        if isinstance(error, DestinationError):
+            result.update(error.evidence, stage=error.stage or self.stage, provider="r2", operation=error.operation)
         if self.object_identity:
             result["objectIdentityHash"] = self.object_identity
         return result
@@ -491,6 +582,7 @@ class TransferBudget:
     cached_source_objects: int = 0
     cached_source_bytes: int = 0
     r2_attempts: int = 0
+    r2_retries: int = 0
     new_r2_objects: int = 0
     new_r2_bytes: int = 0
 
@@ -1102,17 +1194,47 @@ class R2Store:
             raise ValidationError("unexpected R2 bucket")
         self.client = client
         self.bucket = bucket
+        self.last_precondition_evidence = None
+
+    def _head(self, key, operation, stage=None):
+        try:
+            result = self.client.head_object(Bucket=self.bucket, Key=key)
+            if not isinstance(result, Mapping) or not isinstance(result.get("Metadata", {}), Mapping):
+                raise DestinationError("destination_provider_validation_failed", operation, stage=stage)
+            return result
+        except DestinationError:
+            raise
+        except Exception as error:
+            raise destination_error(error, operation, stage) from None
+
+    @staticmethod
+    def _existing_identity(head, metadata, size, proof, strict):
+        existing = {str(k).lower(): str(v) for k, v in (head.get("Metadata") or {}).items()}
+        existing_sha, existing_size = existing.get("sha256", ""), head.get("ContentLength")
+        valid = (len(existing_sha) == 64 and all(c in "0123456789abcdef" for c in existing_sha)
+                 and type(existing_size) is int and existing_size >= 0
+                 and all(existing.get(name) == metadata[name] for name in {"schema", "kind", *proof}))
+        # Preserve approved-plaintext resume semantics for nondeterministic age
+        # ciphertext on 412. An ambiguous current PUT requires byte-exact identity.
+        if strict or not proof:
+            valid = valid and existing_size == size and existing_sha == metadata["sha256"]
+        if not valid:
+            raise DestinationConflictError("destination_identity_mismatch", "head_after_ambiguous_put" if strict else "head_after_precondition")
+        return existing_sha, existing_size
 
     def put_create_only(
         self, key: str, path: pathlib.Path, sha256: str, budget: TransferBudget,
         kind: str, proof: Optional[Mapping[str, str]] = None,
     ) -> Tuple[str, str, int]:
+        self.last_precondition_evidence = None
         if not key.startswith(R2_PREFIX):
             raise ValidationError("R2 key outside approved namespace")
-        actual_sha, size = sha256_file(path)
+        try:
+            actual_sha, size = sha256_file(path)
+        except OSError as error:
+            raise DestinationError("destination_local_io_failed", "destination_local_read", error) from None
         if actual_sha != sha256:
-            raise ValidationError("local upload SHA mismatch")
-        budget.begin_r2(size)
+            raise DestinationChecksumError("destination_checksum_mismatch", "destination_local_read")
         metadata = {"sha256": sha256, "kind": kind, "schema": "storage-backup-v1"}
         for proof_key, proof_value in (proof or {}).items():
             if proof_key not in {"plan-digest", "source-identity", "source-sha256", "cipher-sha256"}:
@@ -1120,39 +1242,62 @@ class R2Store:
             if not isinstance(proof_value, str) or not proof_value:
                 raise ValidationError("invalid R2 proof metadata")
             metadata[proof_key] = proof_value
-        try:
-            with path.open("rb") as body:
-                self.client.put_object(
-                    Bucket=self.bucket, Key=key, Body=body, IfNoneMatch="*",
-                    ContentType="application/octet-stream",
-                    Metadata=metadata,
-                )
-            budget.created_r2(size)
-            return "created", sha256, size
-        except Exception as exc:
-            response = getattr(exc, "response", {})
-            code = str(response.get("Error", {}).get("Code", ""))
-            status = response.get("ResponseMetadata", {}).get("HTTPStatusCode")
-            if code not in {"PreconditionFailed", "412"} and status != 412:
-                raise BackupError("R2 conditional create failed") from exc
-        head = self.client.head_object(Bucket=self.bucket, Key=key)
-        existing = {str(k).lower(): str(v) for k, v in (head.get("Metadata") or {}).items()}
-        semantic_exact = all(existing.get(name) == value for name, value in (proof or {}).items())
-        existing_sha = existing.get("sha256", "")
-        existing_size = head.get("ContentLength")
-        valid_existing_sha = len(existing_sha) == 64 and all(c in "0123456789abcdef" for c in existing_sha)
-        if (
-            existing.get("schema") != "storage-backup-v1" or existing.get("kind") != kind
-            or not semantic_exact or not valid_existing_sha
-            or isinstance(existing_size, bool) or not isinstance(existing_size, int) or existing_size < 0
-        ):
-            raise ConflictError("existing R2 object conflicts with approved ciphertext")
-        if not proof and (existing_size != size or existing_sha != sha256):
-            raise ConflictError("existing R2 object conflicts with approved ciphertext")
-        return "concurrent-exact-skip", existing_sha, existing_size
+        for attempt in range(MAX_DESTINATION_RETRIES + 1):
+            # Reopen only an unchanged local payload for the conditional retry.
+            if attempt:
+                try:
+                    retry_sha, retry_size = sha256_file(path)
+                except OSError as error:
+                    raise DestinationError("destination_local_io_failed", "destination_local_read", error) from None
+                if (retry_sha, retry_size) != (sha256, size):
+                    raise DestinationChecksumError("destination_checksum_mismatch", "destination_local_read")
+            try:
+                body = path.open("rb")
+            except OSError as error:
+                raise DestinationError("destination_local_io_failed", "destination_local_read", error) from None
+            with body:
+                budget.begin_r2(size)
+                if attempt:
+                    budget.r2_retries += 1
+                try:
+                    self.client.put_object(Bucket=self.bucket, Key=key, Body=body, IfNoneMatch="*",
+                                           ContentType="application/octet-stream", Metadata=metadata)
+                except Exception as error:
+                    failure = destination_error(error, "put_create_only")
+                else:
+                    budget.created_r2(size)
+                    return "created", sha256, size
+            if failure.code == "destination_precondition_failed":
+                self.last_precondition_evidence = dict(failure.evidence)
+                try:
+                    head = self._head(key, "head_after_precondition")
+                except DestinationError as error:
+                    if error.code == "destination_not_found":
+                        error.code = "destination_head_not_found_after_precondition"
+                        error.args = (error.code,)
+                    raise error from None
+                existing_sha, existing_size = self._existing_identity(head, metadata, size, proof or {}, strict=False)
+                return "concurrent-exact-skip", existing_sha, existing_size
+            if not failure.evidence["retryable"]:
+                raise failure from None
+            # Reconcile even HTTP transient errors before retrying. Never overwrite
+            # a possibly committed PUT or accept another object's identity.
+            try:
+                head = self._head(key, "head_after_ambiguous_put")
+            except DestinationError as error:
+                if error.code != "destination_not_found":
+                    raise error from None
+            else:
+                self._existing_identity(head, metadata, size, proof or {}, strict=True)
+                budget.created_r2(size)
+                return "committed-exact-success", sha256, size
+            if attempt == MAX_DESTINATION_RETRIES:
+                raise failure from None
+            time.sleep(1)
+        raise AssertionError("unreachable destination retry state")
 
     def head(self, key: str) -> Mapping[str, Any]:
-        return self.client.head_object(Bucket=self.bucket, Key=key)
+        return self._head(key, "destination_head")
 
     def download(self, key: str, destination: pathlib.Path) -> None:
         destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -1187,17 +1332,17 @@ class R2Store:
                 for chunk in iter(lambda: response["Body"].read(CHUNK_SIZE), b""):
                     size += len(chunk)
                     if size > expected_size:
-                        raise ValidationError("destination byte size differs")
+                        raise DestinationChecksumError("destination_checksum_mismatch", "verify_bytes", stage="destination_byte_verify")
                     digest.update(chunk)
             finally:
                 response["Body"].close()
             if size != expected_size or digest.hexdigest() != expected_sha:
-                raise ValidationError("destination byte SHA differs")
+                raise DestinationChecksumError("destination_checksum_mismatch", "verify_bytes", stage="destination_byte_verify")
             return size
         except BackupError:
             raise
-        except Exception:
-            raise BackupError("destination byte verification failed") from None
+        except Exception as error:
+            raise destination_error(error, "verify_bytes", "destination_byte_verify") from None
 
 
 def ensure_cache_file(cache_dir: pathlib.Path, entry: Mapping[str, Any]) -> pathlib.Path:

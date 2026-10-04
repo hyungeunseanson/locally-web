@@ -189,7 +189,8 @@ class OperatorSafety(unittest.TestCase):
         artifact = workflow.split('- name: Preserve only sanitized capture evidence')[1]
         self.assertIn('if: always()', artifact)
         self.assertIn('timeout-minutes: 180', workflow)
-        self.assertIn("cron: '37 18 * * *'", workflow)
+        self.assertNotIn("  schedule:", workflow)
+        self.assertIn("  workflow_dispatch:", workflow)
         self.assertEqual((backup.MAX_OBJECTS, backup.MAX_SOURCE_BYTES, backup.MAX_R2_OBJECTS, backup.MAX_R2_BYTES), (5000, 2*1024**3, 12000, 3*1024**3))
 
 
