@@ -86,8 +86,9 @@ session and existing object owner policy, with no privileged backend remove.
 
 Restore destination GETs allow at most one retry of the same immutable key for
 429, 5xx, timeouts, connection closure/reset, or endpoint connection failures.
-The partial local download is removed before retry. Auth failures, missing
-objects, validation, checksum, identity and decryption failures stop immediately.
+The partial local download is removed before retry. The S3 restore path's auth
+failures stop immediately; missing objects, validation, checksum, identity and
+decryption failures stop in every restore path.
 All ciphertext and plaintext SHA/size checks remain mandatory after retry.
 The unchanged 60-second payload deadline's internal `SourceTimeoutError` follows
 this same one-retry path as `restore_read_timeout`. Its SDK class, HTTP status
@@ -102,6 +103,38 @@ identity paths are excluded. Ordinary plaintext cleanup preserves this file.
 Storage's daily trigger stays paused until the existing COMPLETE snapshot has
 passed a full isolated restore and current authoritative R2 coverage is zero-gap.
 Restore hardening does not authorize a new capture or destination probe.
+
+The local isolated operator previously used untracked `cf_read_only.py` /
+`full_isolated_restore.py`, with one fixed Wrangler Bearer for its REST GETs.
+Its actual destination transport is now tracked in
+`scripts/backup/restore_cloudflare_oauth.py`; the operator harness uses this
+transport with the same `restore_snapshot` integrity checks. It only reads the
+private destination through Cloudflare R2 REST; it does not use S3 credentials.
+The tracked command accepts account/manifest/checksum/identity/destination and
+summary arguments. The AGE identity stays local and the checkpoint must stay
+outside disposable plaintext. An operator still needs a fresh restore approval.
+
+Startup privately captures `wrangler auth token --json`, requires `type=oauth`,
+and caches the Bearer only in memory. No login or interactive auth is invoked.
+Wrangler disk logging is explicitly disabled for this subprocess because its
+auth-token command writes the JSON through its logger; stdout/stderr remain
+privately captured and metrics are disabled.
+Only REST object GET HTTP 401 discards the Bearer, removes owned partial
+ciphertext and closes the failed response before obtaining one replacement
+through Wrangler and retrying the same key once. A second 401 stops. At most
+three refresh attempts are permitted across the whole restore. HTTP 403/404
+never refresh; 429/5xx and transport timeouts keep the existing single retry,
+whose per-download budget is not reset by OAuth recovery. Integrity failures
+never refresh. OAuth renewal does not create or rotate Production credentials.
+
+Sanitized checkpoints add `authType=oauth`, cumulative `oauthRefreshCount`,
+`oauthRefreshAttempted` (any refresh attempted), and `oauthRefreshSucceeded`
+(the most recent replacement Bearer's GET was accepted; a later 401 clears it).
+`restoreRetryCount` remains cumulative transport retries, separate from OAuth
+renewals. No token, token hash, Authorization header or Wrangler credential
+path is emitted. A recovered 401 does not increment missing. This hardening
+does not prove that the historical ordinal-540 401 was caused by token expiry.
+Storage 03:37 KST remains paused; DB backup 03:17 KST stays enabled.
 
 Apply only migration `20261004053224_media_lifecycle_foundation.sql` after the
 exact PR head is green and merged. Verify table/RPC ACLs, RLS, business counts and
