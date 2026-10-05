@@ -15,6 +15,13 @@ PRIVATE = "originals/private-owner/private-image.png"
 SECRET = "sb_secret_restore_do_not_emit"
 
 
+class DeadlineBody(io.BytesIO):
+    def read(self, size):
+        if self.tell():
+            raise backup.SourceTimeoutError(SECRET + PRIVATE + " https://private.invalid/deadline")
+        return super().read(min(size, 2))
+
+
 def error(status=None, name="ClientError"):
     value = type(name, (Exception,), {})(SECRET + PRIVATE + " https://private.invalid/signed?secret=" + SECRET)
     if status:
@@ -98,6 +105,33 @@ class RestoreReads(unittest.TestCase):
         self.assertTrue(first.closed); self.assertEqual(calls[0], calls[1])
         self.assertEqual(self.target.read_bytes(), b"whole")
 
+    def test_internal_deadline_closes_body_and_removes_partial_before_wait(self):
+        first = DeadlineBody(b"partial ciphertext"); calls = []
+        def get(**params):
+            calls.append(params)
+            self.assertEqual(self.target.stat().st_size, 0)
+            return {"Body": first if len(calls) == 1 else io.BytesIO(b"whole")}
+        def before_retry(seconds):
+            self.assertEqual(seconds, 1); self.assertTrue(first.closed)
+            self.assertFalse(self.target.exists())
+        self.client.get_object = get; diag = backup.RestoreDiagnostics()
+        with mock.patch.object(backup.time, "sleep", side_effect=before_retry) as sleep:
+            self.store.download(PRIVATE, self.target, diagnostics=diag)
+        self.assertEqual(len(calls), 2); self.assertEqual(calls[0], calls[1])
+        self.assertEqual(diag.state["restoreRetryCount"], 1)
+        self.assertEqual(self.target.read_bytes(), b"whole"); sleep.assert_called_once_with(1)
+
+    def test_other_backup_errors_never_retry(self):
+        for failure in (backup.BackupError(SECRET), backup.ValidationError(SECRET), backup.BudgetError(SECRET)):
+            with self.subTest(kind=type(failure).__name__):
+                self.client.get_object = mock.Mock(side_effect=failure); diag = backup.RestoreDiagnostics()
+                with mock.patch.object(backup.time, "sleep") as sleep:
+                    with self.assertRaises(type(failure)):
+                        self.store.download(PRIVATE, self.target, diagnostics=diag)
+                self.assertEqual(self.client.get_object.call_count, 1)
+                self.assertEqual(diag.state["restoreRetryCount"], 0); sleep.assert_not_called()
+                self.assertFalse(self.target.exists())
+
 
 class RestoreCheckpoints(unittest.TestCase):
     def setUp(self):
@@ -168,6 +202,48 @@ class RestoreCheckpoints(unittest.TestCase):
         self.assertEqual(result["restoreRetryCount"], 1)
         self.assertEqual(json.loads(self.checkpoint.read_text())["restoreRetryCount"], 1)
         self.assertEqual(attempts, [key, key])
+
+    def test_full_restore_internal_body_deadline_retries_and_verifies_bytes(self):
+        get = self.client.get_object; key = self.items[0]["ciphertextKey"]; attempts = []; first = []
+        def timeout_then_success(**params):
+            response = get(**params)
+            if params["Key"] == key:
+                attempts.append(params)
+                if len(attempts) == 1:
+                    response["Body"].close()
+                    response["Body"] = DeadlineBody(self.client.objects[key]["body"])
+                    first.append(response["Body"])
+                else: self.assertTrue(first[0].closed)
+            return response
+        self.client.get_object = timeout_then_success
+        with mock.patch.object(backup.time, "sleep"): result = self.restore()
+        self.assertEqual(len(attempts), 2); self.assertEqual(attempts[0], attempts[1])
+        self.assertEqual((result["objectCount"], result["sourceBytes"], result["restoreRetryCount"]), (2, 11, 1))
+        self.assertEqual((result["missing"], result["shaMismatch"], result["collision"]), (0, 0, 0))
+        self.assertEqual(json.loads(self.checkpoint.read_text())["status"], "complete")
+
+    def test_repeated_internal_body_deadline_fails_with_sanitized_checkpoint(self):
+        get = self.client.get_object; key = self.items[0]["ciphertextKey"]; attempts = []; bodies = []
+        def always_timeout(**params):
+            response = get(**params)
+            if params["Key"] == key:
+                attempts.append(params); response["Body"].close()
+                response["Body"] = DeadlineBody(self.client.objects[key]["body"]); bodies.append(response["Body"])
+            return response
+        self.client.get_object = always_timeout
+        with mock.patch.object(backup.time, "sleep") as sleep:
+            with self.assertRaises(backup.RestoreReadError) as caught: self.restore()
+        result = json.loads(self.checkpoint.read_text())
+        self.assertEqual(result, caught.exception.restore_evidence)
+        self.assertEqual((caught.exception.code, caught.exception.stage), ("restore_read_timeout", "isolated_full_restore"))
+        self.assertEqual(result["diagnosticCode"], "restore_read_timeout")
+        self.assertEqual((result["stage"], result["operation"]), ("isolated_full_restore", "restore_ciphertext_download"))
+        self.assertTrue(result["retryable"]); self.assertEqual(result["restoreRetryCount"], 1)
+        for field in ("sdkExceptionClass", "httpStatus", "providerErrorCode"): self.assertIsNone(result[field])
+        self.assertEqual(len(attempts), 2); self.assertEqual(attempts[0], attempts[1]); sleep.assert_called_once_with(1)
+        self.assertTrue(all(body.closed for body in bodies)); self.assertFalse(self.destination.exists())
+        for private in (PRIVATE, SECRET, str(self.identity), str(self.root), self.store.bucket, "https://"):
+            self.assertNotIn(private, self.checkpoint.read_text())
 
     def test_decryption_failure_never_retries(self):
         class CannotDecrypt(FakeAge):

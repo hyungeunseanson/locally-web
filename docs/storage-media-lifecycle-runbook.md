@@ -89,6 +89,9 @@ Restore destination GETs allow at most one retry of the same immutable key for
 The partial local download is removed before retry. Auth failures, missing
 objects, validation, checksum, identity and decryption failures stop immediately.
 All ciphertext and plaintext SHA/size checks remain mandatory after retry.
+The unchanged 60-second payload deadline's internal `SourceTimeoutError` follows
+this same one-retry path as `restore_read_timeout`. Its SDK class, HTTP status
+and provider code remain null; the prior response body closes before retry wait.
 
 The restore CLI accepts `--summary` for a private sanitized checkpoint outside
 the restored plaintext directory. It records the snapshot, opaque object hash,
