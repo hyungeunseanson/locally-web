@@ -84,6 +84,22 @@ session and existing object owner policy, with no privileged backend remove.
 
 ## Activation and rollback
 
+Restore destination GETs allow at most one retry of the same immutable key for
+429, 5xx, timeouts, connection closure/reset, or endpoint connection failures.
+The partial local download is removed before retry. Auth failures, missing
+objects, validation, checksum, identity and decryption failures stop immediately.
+All ciphertext and plaintext SHA/size checks remain mandatory after retry.
+
+The restore CLI accepts `--summary` for a private sanitized checkpoint outside
+the restored plaintext directory. It records the snapshot, opaque object hash,
+ordinal, verified object/byte counts, remaining count, missing/SHA counts and
+total read retries. Failures preserve allowlisted SDK class, HTTP status,
+provider code and retryability; keys, URLs, headers, provider bodies and AGE
+identity paths are excluded. Ordinary plaintext cleanup preserves this file.
+Storage's daily trigger stays paused until the existing COMPLETE snapshot has
+passed a full isolated restore and current authoritative R2 coverage is zero-gap.
+Restore hardening does not authorize a new capture or destination probe.
+
 Apply only migration `20261004053224_media_lifecycle_foundation.sql` after the
 exact PR head is green and merged. Verify table/RPC ACLs, RLS, business counts and
 source inventories. Then build exact main and use the existing candidate0

@@ -6,5 +6,5 @@ import sys
 try:
     raise SystemExit(main())
 except BackupError as exc:
-    print(json.dumps({"status": "failed", "diagnosticCode": exc.code}), file=sys.stderr)
+    print(json.dumps(getattr(exc, "restore_evidence", {"status": "failed", "diagnosticCode": exc.code})), file=sys.stderr)
     raise SystemExit(1)

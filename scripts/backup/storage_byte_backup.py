@@ -13,9 +13,11 @@ import contextlib
 import dataclasses
 import datetime as dt
 import hashlib
+import http.client
 import json
 import os
 import pathlib
+import re
 import shutil
 import signal
 import socket
@@ -205,6 +207,80 @@ def provider_read_error(error: Exception, http_status=None) -> BackupError:
         result, diagnostic = BackupError(), "source_provider_failed"
     result.code = diagnostic
     return result
+
+
+class RestoreReadError(DestinationError):
+    pass
+
+
+def restore_read_error(error, operation):
+    """Restore GET only: fixed transport/status evidence, never provider text."""
+    classified = destination_error(error, operation, "isolated_full_restore")
+    code = classified.code
+    status = classified.evidence["httpStatus"]
+    if isinstance(error, urllib.error.HTTPError):
+        status = error.code if type(error.code) is int and 100 <= error.code <= 599 else None
+        code = ("destination_access_denied" if status in {401, 403} else
+                "destination_not_found" if status == 404 else
+                "destination_throttled" if status == 429 else
+                "destination_provider_5xx" if status is not None and 500 <= status <= 599 else
+                "destination_provider_validation_failed")
+    cause = error.reason if isinstance(error, urllib.error.URLError) else error
+    if status is None and isinstance(cause, (http.client.IncompleteRead, http.client.RemoteDisconnected)):
+        code = "destination_connection_closed"
+    elif status is None and isinstance(cause, (TimeoutError, socket.timeout)):
+        code = "destination_read_timeout"
+    elif status is None and isinstance(cause, (ConnectionResetError, ConnectionAbortedError, BrokenPipeError)):
+        code = "destination_connection_closed"
+    elif status is None and isinstance(cause, (ConnectionRefusedError, socket.gaierror)):
+        code = "destination_endpoint_connection"
+    result = RestoreReadError(code.replace("destination_", "restore_", 1), operation, error, "isolated_full_restore")
+    name = type(error).__name__
+    result.evidence.update(httpStatus=status, retryable=code in DESTINATION_RETRY_CODES,
+                          sdkExceptionClass=name if name in SDK_EXCEPTION_CLASSES | {"HTTPError", "URLError", "IncompleteRead", "RemoteDisconnected", "ConnectionRefusedError", "gaierror"} else "Other")
+    return result
+
+
+class RestoreDiagnostics:
+    """A private checkpoint outside disposable plaintext, containing no locators."""
+    operations = {"restore_manifest_download", "restore_manifest_checksum_download", "restore_ciphertext_download",
+                  "restore_ciphertext_checksum_download", "restore_manifest_validation", "restore_ciphertext_validation",
+                  "restore_decrypt", "restore_plaintext_validation", "restore_mapping_validation"}
+
+    def __init__(self, path=None):
+        self.path = path
+        self.state = dict(status="in_progress", snapshotId=None, stage="isolated_full_restore", provider="r2",
+                          operation="restore_manifest_download", objectIdentityHash=None, objectOrdinal=0, objectCount=None,
+                          restoredObjectCount=0, restoredBytes=0, restoreRetryCount=0, missing=0, shaMismatch=0, collision=0,
+                          sdkExceptionClass=None, httpStatus=None, providerErrorCode=None, retryable=False)
+
+    def at(self, operation, key=None, entry=None, ordinal=None):
+        if operation not in self.operations:
+            raise ValidationError("invalid restore operation")
+        self.state.update(operation=operation, sdkExceptionClass=None, httpStatus=None, providerErrorCode=None, retryable=False)
+        if entry is not None:
+            self.state["objectIdentityHash"] = entry["identity"]
+        elif key is not None:
+            self.state["objectIdentityHash"] = sha256_bytes(key.encode())
+        if ordinal is not None:
+            self.state["objectOrdinal"] = ordinal
+        self.write()
+
+    def summary(self):
+        count = self.state["objectCount"]
+        return dict(self.state, remainingObjectCount=None if count is None else count - self.state["restoredObjectCount"])
+
+    def write(self):
+        if self.path:
+            safe_write_json(self.path, self.summary())
+
+    def failed(self, error):
+        self.state.update(status="failed", diagnosticCode=error.code if isinstance(error, BackupError) else "restore_failed")
+        if isinstance(error, RestoreReadError):
+            self.state.update(error.evidence)
+            self.state["missing"] += error.code == "restore_not_found"
+        self.write()
+        error.restore_evidence = self.summary()
 
 
 class BackupDiagnostics:
@@ -1319,29 +1395,46 @@ class R2Store:
     def head(self, key: str) -> Mapping[str, Any]:
         return self._head(key, "destination_head")
 
-    def download(self, key: str, destination: pathlib.Path) -> None:
-        destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-        response = None
-        try:
-            fd = os.open(str(destination), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-            with os.fdopen(fd, "wb") as output:
-                response = self.client.get_object(Bucket=self.bucket, Key=key)
-                size = 0
-                while True:
-                    with payload_read_deadline(60):
-                        chunk = response["Body"].read(CHUNK_SIZE)
-                    if not chunk:
-                        break
-                    size += len(chunk)
-                    if size > MAX_R2_BYTES:
-                        raise BudgetError("restore object ceiling exceeded")
-                    output.write(chunk)
-        except Exception:
-            destination.unlink(missing_ok=True)
-            raise BackupError("backup download failed") from None
-        finally:
-            if response is not None:
-                response["Body"].close()
+    def download(self, key: str, destination: pathlib.Path, *, operation="restore_ciphertext_download", diagnostics=None) -> None:
+        if operation not in {"restore_manifest_download", "restore_manifest_checksum_download",
+                             "restore_ciphertext_download", "restore_ciphertext_checksum_download"}:
+            raise ValidationError("invalid restore download operation")
+        for attempt in range(2):  # Exactly one retry per immutable destination GET.
+            response, created = None, False
+            try:
+                destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+                fd = os.open(str(destination), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                created = True
+                with os.fdopen(fd, "wb") as output:
+                    response = self.client.get_object(Bucket=self.bucket, Key=key)
+                    size = 0
+                    while True:
+                        with payload_read_deadline(60):
+                            chunk = response["Body"].read(CHUNK_SIZE)
+                        if not chunk:
+                            break
+                        size += len(chunk)
+                        if size > MAX_R2_BYTES:
+                            raise BudgetError("restore object ceiling exceeded")
+                        output.write(chunk)
+                return
+            except Exception as error:
+                if created:
+                    destination.unlink(missing_ok=True)
+                if isinstance(error, BackupError):
+                    raise
+                failure = restore_read_error(error, operation)
+                if attempt == 1 or not failure.evidence["retryable"]:
+                    raise failure from None
+                if diagnostics:
+                    diagnostics.state["restoreRetryCount"] += 1
+                    diagnostics.state.update(failure.evidence)
+                    diagnostics.write()
+                time.sleep(1)
+            finally:
+                if response is not None:
+                    with contextlib.suppress(Exception):
+                        response["Body"].close()
 
     def verify_bytes(self, key: str, expected_sha: str, expected_size: int) -> int:
         """A destination HEAD/eTag is never accepted as byte verification."""
@@ -1556,7 +1649,10 @@ def apply_plan(
 
 def restore_snapshot(store: R2Store, manifest_key: str, manifest_checksum_key: str, identity: pathlib.Path, destination: pathlib.Path, encryptor: AgeEncryptor,
                      provider: Optional[str] = None, bucket_filter: Optional[str] = None,
-                     object_identity: Optional[str] = None, manifest_only: bool = False) -> Dict[str, Any]:
+                     object_identity: Optional[str] = None, manifest_only: bool = False, diagnostics=None) -> Dict[str, Any]:
+    diagnostics = diagnostics or RestoreDiagnostics()
+    if diagnostics.path and (diagnostics.path.resolve() == destination.resolve() or destination.resolve() in diagnostics.path.resolve().parents):
+        raise ValidationError("restore checkpoint must be outside plaintext destination")
     if not manifest_key.startswith(R2_PREFIX) or manifest_checksum_key != manifest_key + ".sha256":
         raise ValidationError("invalid manifest key")
     if destination.exists():
@@ -1567,19 +1663,30 @@ def restore_snapshot(store: R2Store, manifest_key: str, manifest_checksum_key: s
     restored = 0
     restored_bytes = 0
     try:
+        snapshot = manifest_key[len(R2_PREFIX):].split("/")[0]
+        if re.fullmatch(r"[A-Za-z0-9._-]{1,160}", snapshot):
+            diagnostics.state["snapshotId"] = snapshot
         manifest_age = temp / "manifest.age"
         checksum = temp / "manifest.age.sha256"
-        store.download(manifest_key, manifest_age)
-        store.download(manifest_checksum_key, checksum)
+        diagnostics.at("restore_manifest_download", key=manifest_key)
+        store.download(manifest_key, manifest_age, operation="restore_manifest_download", diagnostics=diagnostics)
+        diagnostics.at("restore_manifest_checksum_download", key=manifest_checksum_key)
+        store.download(manifest_checksum_key, checksum, operation="restore_manifest_checksum_download", diagnostics=diagnostics)
+        diagnostics.at("restore_manifest_validation")
         expected = checksum.read_text(encoding="ascii").strip()
         actual, _ = sha256_file(manifest_age)
         if expected != actual:
+            diagnostics.state["shaMismatch"] += 1
             raise ValidationError("manifest ciphertext checksum mismatch")
         manifest_plain = temp / "manifest.json"
+        diagnostics.at("restore_decrypt")
         encryptor.decrypt(manifest_age, identity, manifest_plain)
+        diagnostics.at("restore_manifest_validation")
         manifest = read_private_json(manifest_plain)
         if manifest.get("schema") not in {MANIFEST_SCHEMA, MULTI_MANIFEST_SCHEMA} or manifest.get("status") != "complete":
             raise ValidationError("invalid snapshot manifest")
+        if manifest.get("snapshotId") != diagnostics.state["snapshotId"]:
+            raise ValidationError("manifest snapshot identity differs")
         parse_utc(manifest.get("recoverableUntil"))
         all_objects = manifest.get("objects")
         if not isinstance(all_objects, list) or manifest.get("summary") != {"objectCount": len(all_objects), "sourceBytes": sum(item.get("size", 0) for item in all_objects)}:
@@ -1608,8 +1715,10 @@ def restore_snapshot(store: R2Store, manifest_key: str, manifest_checksum_key: s
                     and (object_identity is None or entry["identity"] == object_identity)]
         if (provider or bucket_filter or object_identity) and not selected:
             raise ValidationError("restore selector matched no object")
+        diagnostics.state.update(snapshotId=manifest["snapshotId"], objectCount=len(selected))
         seen_paths = set()
-        for entry in selected:
+        for ordinal, entry in enumerate(selected, 1):
+            diagnostics.at("restore_mapping_validation", entry=entry, ordinal=ordinal)
             validate_object_entry(entry, prepared=True)
             bucket = entry["bucket"]
             key = entry["key"]
@@ -1617,28 +1726,38 @@ def restore_snapshot(store: R2Store, manifest_key: str, manifest_checksum_key: s
             if manifest["schema"] == MULTI_MANIFEST_SCHEMA:
                 relative = pathlib.PurePosixPath(entry["provider"]) / relative
             if relative.is_absolute() or ".." in relative.parts or str(relative) in seen_paths:
+                diagnostics.state["collision"] += str(relative) in seen_paths
                 raise ValidationError("unsafe or duplicate restore path")
             seen_paths.add(str(relative))
             if manifest_only:
                 continue
             cipher = temp / (entry["identity"] + ".age")
             cipher_checksum = temp / (entry["identity"] + ".age.sha256")
-            store.download(entry["ciphertextKey"], cipher)
-            store.download(entry["ciphertextChecksumKey"], cipher_checksum)
+            diagnostics.at("restore_ciphertext_download", entry=entry)
+            store.download(entry["ciphertextKey"], cipher, operation="restore_ciphertext_download", diagnostics=diagnostics)
+            diagnostics.at("restore_ciphertext_checksum_download", entry=entry)
+            store.download(entry["ciphertextChecksumKey"], cipher_checksum, operation="restore_ciphertext_checksum_download", diagnostics=diagnostics)
+            diagnostics.at("restore_ciphertext_validation")
             expected_cipher = cipher_checksum.read_text(encoding="ascii").strip()
             actual_cipher, actual_cipher_size = sha256_file(cipher)
             if expected_cipher != actual_cipher or actual_cipher != entry["ciphertextSha256"] or actual_cipher_size != entry["ciphertextSize"]:
+                diagnostics.state["shaMismatch"] += expected_cipher != actual_cipher or actual_cipher != entry["ciphertextSha256"]
                 raise ValidationError("source ciphertext checksum mismatch")
             output = destination / pathlib.Path(*relative.parts)
             resolved = output.resolve()
             if destination.resolve() not in resolved.parents:
                 raise ValidationError("restore path escapes destination")
+            diagnostics.at("restore_decrypt")
             encryptor.decrypt(cipher, identity, output)
+            diagnostics.at("restore_plaintext_validation")
             digest, size = sha256_file(output)
             if digest != entry["sourceSha256"] or size != entry["size"]:
+                diagnostics.state["shaMismatch"] += digest != entry["sourceSha256"]
                 raise ValidationError("restored source byte mismatch")
             restored += 1
             restored_bytes += size
+            diagnostics.state.update(restoredObjectCount=restored, restoredBytes=restored_bytes)
+            diagnostics.write()
         if not manifest_only and (restored != len(selected) or restored_bytes != sum(entry["size"] for entry in selected)):
             raise ValidationError("restored key set summary mismatch")
         safe_write_json(destination / ".locally-storage-restore-metadata.json", {
@@ -1649,11 +1768,17 @@ def restore_snapshot(store: R2Store, manifest_key: str, manifest_checksum_key: s
             "contentInspectionPerformed": False,
         })
         safe_write_json(destination / ".locally-storage-manifest.json", manifest)
+        diagnostics.state.update(status="manifest-validated" if manifest_only else "complete", diagnosticCode="restore_complete")
+        diagnostics.write()
         return {"status": "manifest-validated" if manifest_only else "complete", "objectCount": restored, "sourceBytes": restored_bytes,
                 "snapshotId": manifest["snapshotId"], "selectedObjects": len(selected), "missing": 0, "shaMismatch": 0,
+                "collision": 0, "restoreRetryCount": diagnostics.state["restoreRetryCount"],
                 "metadataMappingVerified": True, "databaseBackup": manifest["databaseBackup"]}
-    except BaseException:
-        shutil.rmtree(destination, ignore_errors=True)
+    except BaseException as error:
+        try:
+            diagnostics.failed(error)
+        finally:
+            shutil.rmtree(destination, ignore_errors=True)
         raise
     finally:
         shutil.rmtree(temp, ignore_errors=True)
@@ -1730,6 +1855,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     restore_parser.add_argument("--bucket")
     restore_parser.add_argument("--object-identity")
     restore_parser.add_argument("--manifest-only", action="store_true")
+    restore_parser.add_argument("--summary", type=pathlib.Path, help="Private sanitized checkpoint outside the restore directory")
     args = parser.parse_args(argv)
 
     if args.command == "plan":
@@ -1757,7 +1883,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(json.dumps(summary, sort_keys=True))
     else:
         result = restore_snapshot(boto3_store(), args.manifest_key, args.manifest_checksum_key, args.identity, args.destination, AgeEncryptor(),
-                                  args.provider, args.bucket, args.object_identity, args.manifest_only)
+                                  args.provider, args.bucket, args.object_identity, args.manifest_only, RestoreDiagnostics(args.summary))
         print(json.dumps(result, sort_keys=True))
     return 0
 
@@ -1766,7 +1892,7 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except BackupError as exc:
-        print(json.dumps({"status": "failed", "diagnosticCode": exc.code}), file=os.sys.stderr)
+        print(json.dumps(getattr(exc, "restore_evidence", {"status": "failed", "diagnosticCode": exc.code})), file=os.sys.stderr)
         raise SystemExit(1)
     except Exception:
         print(json.dumps({"status": "failed", "diagnosticCode": "backup_unexpected_failure"}), file=os.sys.stderr)
