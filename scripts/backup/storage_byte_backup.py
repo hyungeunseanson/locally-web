@@ -215,6 +215,11 @@ class RestoreReadError(DestinationError):
 
 def restore_read_error(error, operation):
     """Restore GET only: fixed transport/status evidence, never provider text."""
+    if isinstance(error, SourceTimeoutError):
+        result = RestoreReadError("restore_read_timeout", operation, stage="isolated_full_restore")
+        # The internal payload deadline has no SDK or provider response evidence.
+        result.evidence.update(sdkExceptionClass=None, httpStatus=None, providerErrorCode=None, retryable=True)
+        return result
     classified = destination_error(error, operation, "isolated_full_restore")
     code = classified.code
     status = classified.evidence["httpStatus"]
@@ -1421,20 +1426,23 @@ class R2Store:
             except Exception as error:
                 if created:
                     destination.unlink(missing_ok=True)
-                if isinstance(error, BackupError):
+                if isinstance(error, SourceTimeoutError):
+                    failure = restore_read_error(error, operation)
+                elif isinstance(error, BackupError):
                     raise
-                failure = restore_read_error(error, operation)
+                else:
+                    failure = restore_read_error(error, operation)
                 if attempt == 1 or not failure.evidence["retryable"]:
                     raise failure from None
                 if diagnostics:
                     diagnostics.state["restoreRetryCount"] += 1
                     diagnostics.state.update(failure.evidence)
                     diagnostics.write()
-                time.sleep(1)
             finally:
                 if response is not None:
                     with contextlib.suppress(Exception):
                         response["Body"].close()
+            time.sleep(1)
 
     def verify_bytes(self, key: str, expected_sha: str, expected_size: int) -> int:
         """A destination HEAD/eTag is never accepted as byte verification."""
