@@ -34,7 +34,7 @@ def run_probe(store, encryptor, root, diagnostics, run_id, attempt):
     key = R2_PREFIX + 'diagnostics/' + run_id + '-' + attempt + '/opaque.age'
     diagnostics.at('destination_create', 'r2', 'put_create_only')
     first, stored_sha, stored_size = store.put_create_only(key, cipher, digest, budget, 'destination-probe')
-    if first not in {'created', 'committed-exact-success'} or (stored_sha, stored_size) != (digest, size):
+    if first != 'created' or (stored_sha, stored_size) != (digest, size):
         raise DestinationError('destination_identity_mismatch', 'put_create_only')
     diagnostics.at('destination_byte_verify', 'r2', 'destination_head')
     head = store.head(key)
@@ -48,13 +48,14 @@ def run_probe(store, encryptor, root, diagnostics, run_id, attempt):
     second, second_sha, second_size = store.put_create_only(key, cipher, digest, budget, 'destination-probe')
     precondition = store.last_precondition_evidence or {}
     if (second != 'concurrent-exact-skip' or (second_sha, second_size) != (digest, size)
-            or precondition.get('httpStatus') != 412):
+            or precondition.get('httpStatus') not in {409, 412}):
         raise DestinationError('destination_identity_mismatch', 'put_create_only')
     # Return only fixed outcomes and counters; never the key, payload or endpoint.
     return dict(status='probe_passed', diagnosticCode='destination_probe_passed', firstPut=first, secondPut=second,
                 secondPutHttpStatus=precondition['httpStatus'],
                 secondPutSdkExceptionClass=precondition['sdkExceptionClass'],
-                secondPutProviderErrorCode=precondition['providerErrorCode'], headExact=True, ciphertextShaVerified=True,
+                secondPutProviderErrorCode=precondition['providerErrorCode'],
+                secondPutConflict=True, postConflictHeadExact=True, headExact=True, ciphertextShaVerified=True,
                 ciphertextBytes=size, completeBackupManifestPublished=False,
                 remoteDeletes=0, sourceInventoryOperations=0)
 

@@ -81,7 +81,7 @@ jobs:
               output.write('### Manual destination probe\n')
               output.write('- Workflow result: ${{ job.status }}\n')
               result = json.loads(path.read_text())
-              for field in ['status','diagnosticCode','stage','provider','operation','sdkExceptionClass','httpStatus','providerErrorCode','retryable','destinationCreateAttempts','destinationRetryCount','destinationObjectsCreated','destinationBytesCreated','destinationBudgetUsage','firstPut','secondPut','secondPutHttpStatus','secondPutSdkExceptionClass','secondPutProviderErrorCode','headExact','ciphertextShaVerified','ciphertextBytes','temporaryCleanup','sourceWrites','sourceDeletes','remoteDeletes','sourceInventoryOperations','completeBackupManifestPublished']:
+              for field in ['status','diagnosticCode','stage','provider','operation','sdkExceptionClass','httpStatus','providerErrorCode','retryable','destinationCreateAttempts','destinationRetryCount','destinationObjectsCreated','destinationBytesCreated','destinationBudgetUsage','firstPut','secondPut','secondPutHttpStatus','secondPutSdkExceptionClass','secondPutProviderErrorCode','secondPutConflict','postConflictHeadExact','headExact','ciphertextShaVerified','ciphertextBytes','temporaryCleanup','sourceWrites','sourceDeletes','remoteDeletes','sourceInventoryOperations','completeBackupManifestPublished']:
                   output.write('- ' + field + ': ' + json.dumps(result.get(field)) + '\n')
           PY
 

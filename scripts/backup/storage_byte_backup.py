@@ -88,7 +88,7 @@ DESTINATION_CODES = {
     "destination_not_found", "destination_throttled", "destination_provider_5xx", "destination_connect_timeout",
     "destination_read_timeout", "destination_connection_closed", "destination_endpoint_connection",
     "destination_provider_validation_failed", "destination_local_io_failed", "destination_provider_failed",
-    "destination_identity_mismatch", "destination_checksum_mismatch",
+    "destination_identity_mismatch", "destination_checksum_mismatch", "destination_conditional_conflict",
 }
 SDK_EXCEPTION_CLASSES = {
     "ClientError", "ConnectTimeoutError", "ReadTimeoutError", "ConnectionClosedError", "ResponseStreamingError",
@@ -137,10 +137,12 @@ class DestinationChecksumError(DestinationError, ValidationError):
     pass
 
 
-def destination_error(error, operation, stage=None):
+def destination_error(error, operation, stage=None, *, conditional_create=False):
     safe = DestinationError("destination_provider_failed", operation, error, stage)
     status, code, name = safe.evidence["httpStatus"], safe.evidence["providerErrorCode"], safe.evidence["sdkExceptionClass"]
-    if status in (401, 403) or code in {"AccessDenied", "InvalidAccessKeyId", "SignatureDoesNotMatch", "ExpiredToken"} or name in {"NoCredentialsError", "PartialCredentialsError"}:
+    if status == 409 and operation == "put_create_only" and conditional_create:
+        diagnostic = "destination_conditional_conflict"
+    elif status in (401, 403) or code in {"AccessDenied", "InvalidAccessKeyId", "SignatureDoesNotMatch", "ExpiredToken"} or name in {"NoCredentialsError", "PartialCredentialsError"}:
         diagnostic = "destination_access_denied"
     elif status == 412 or code in {"PreconditionFailed", "412"}:
         diagnostic = "destination_precondition_failed"
@@ -212,7 +214,7 @@ class BackupDiagnostics:
               "encryption", "destination_create", "destination_byte_verify", "manifest_publish", "final_inventory"}
     operations = {"validate", "associate", "database_locator_get", "list", "head", "restore_metadata", "inventory",
                   "get", "encrypt", "put_create_only", "verify_bytes", "encrypt_manifest", "publish_manifest", "verify_manifest",
-                  "head_after_precondition", "head_after_ambiguous_put", "destination_head", "destination_local_read"}
+                  "head_after_precondition", "head_after_ambiguous_put", "head_after_conditional_conflict", "destination_head", "destination_local_read"}
     codes = {"backup_error", "validation_failed", "budget_exceeded", "source_drift", "source_timeout", "conditional_conflict",
              "source_access_denied", "source_precondition_failed", "source_throttled", "source_provider_5xx", "source_connect_timeout",
              "source_read_timeout", "source_connection_closed", "source_endpoint_connection", "source_provider_validation_failed",
@@ -1208,7 +1210,7 @@ class R2Store:
             raise destination_error(error, operation, stage) from None
 
     @staticmethod
-    def _existing_identity(head, metadata, size, proof, strict):
+    def _existing_identity(head, metadata, size, proof, strict, operation=None):
         existing = {str(k).lower(): str(v) for k, v in (head.get("Metadata") or {}).items()}
         existing_sha, existing_size = existing.get("sha256", ""), head.get("ContentLength")
         valid = (len(existing_sha) == 64 and all(c in "0123456789abcdef" for c in existing_sha)
@@ -1219,7 +1221,7 @@ class R2Store:
         if strict or not proof:
             valid = valid and existing_size == size and existing_sha == metadata["sha256"]
         if not valid:
-            raise DestinationConflictError("destination_identity_mismatch", "head_after_ambiguous_put" if strict else "head_after_precondition")
+            raise DestinationConflictError("destination_identity_mismatch", operation or ("head_after_ambiguous_put" if strict else "head_after_precondition"))
         return existing_sha, existing_size
 
     def put_create_only(
@@ -1263,7 +1265,7 @@ class R2Store:
                     self.client.put_object(Bucket=self.bucket, Key=key, Body=body, IfNoneMatch="*",
                                            ContentType="application/octet-stream", Metadata=metadata)
                 except Exception as error:
-                    failure = destination_error(error, "put_create_only")
+                    failure = destination_error(error, "put_create_only", conditional_create=True)
                 else:
                     budget.created_r2(size)
                     return "created", sha256, size
@@ -1278,6 +1280,24 @@ class R2Store:
                     raise error from None
                 existing_sha, existing_size = self._existing_identity(head, metadata, size, proof or {}, strict=False)
                 return "concurrent-exact-skip", existing_sha, existing_size
+            if failure.code == "destination_conditional_conflict":
+                self.last_precondition_evidence = dict(failure.evidence)
+                try:
+                    head = self._head(key, "head_after_conditional_conflict")
+                except DestinationError as error:
+                    if error.code != "destination_not_found":
+                        # Preserve the existing guarded-HEAD policy: provider,
+                        # auth and transport failures fail; no blind PUT retry.
+                        raise error from None
+                else:
+                    existing_sha, existing_size = self._existing_identity(
+                        head, metadata, size, proof or {}, strict=True,
+                        operation="head_after_conditional_conflict")
+                    return "concurrent-exact-skip", existing_sha, existing_size
+                if attempt == MAX_DESTINATION_RETRIES:
+                    raise failure from None
+                time.sleep(1)
+                continue
             if not failure.evidence["retryable"]:
                 raise failure from None
             # Reconcile even HTTP transient errors before retrying. Never overwrite

@@ -494,7 +494,8 @@ stage/operation and actual budget counters. Messages, keys, URLs, headers,
 response bodies and credential fragments never enter the summary. A HEAD 404
 after 412 is `destination_head_not_found_after_precondition`; HEAD provider
 failures retain their own operation and diagnostic. Identity/checksum mismatch,
-401/403 and validation/conflict failures never trigger a write retry.
+401/403 and validation/identity failures never trigger a write retry. The
+conditional PUT HTTP 409 exception is reconciled only as described below.
 
 Destination writes receive at most one application retry for 429, 5xx or known
 transport failures, with SDK retries still disabled. Before retrying, HEAD the
@@ -515,16 +516,41 @@ recipient. It encrypts 32 random bytes with age (ciphertext capped at 4 KiB)
 and creates at most one object under
 `daily/storage-v1/diagnostics/<numeric-run-id>-<numeric-attempt>/`. Two logical
 PUT calls allow at most four charged attempts total: first create-only PUT →
-HEAD → GET/SHA verification, then SAME key/payload PUT → 412 → guarded HEAD →
+HEAD → GET/SHA verification, then SAME key/payload PUT → actual HTTP 409 or 412 → guarded HEAD exact →
 `concurrent-exact-skip`. The result is `probe_passed`, never a COMPLETE backup
 manifest. It inventories no source, contains no user data, loads no private AGE
 identity and never deletes the remote object; existing lifecycle expiry applies.
 Local temporary payloads use the bounded cleanup helper; cleanup failure makes
 the probe fail.
 
-The previous full-backup approval is exhausted. After exact-head CI and merge,
+The controlled tiny probe `37247549965` created one encrypted 232-byte object
+and reached its second same-key conditional PUT, which returned HTTP 409
+(`ClientError`, allowlisted provider code `Other`). Destination read/write byte
+integrity was established; requiring HTTP 412 specifically rejected the
+observed conditional conflict behavior. No hidden provider code is inferred.
+
+Only `put_create_only` with the literal `IfNoneMatch="*"` and HTTP 409 receives
+`destination_conditional_conflict`. HEAD the exact key; kind, schema, all proof
+metadata (including source identity/SHA when supplied), and this local
+ciphertext's SHA/size must match before `concurrent-exact-skip`. Existence alone
+is insufficient. HEAD NotFound permits at most one create-only retry, charged
+against the same budget. A second 409 with HEAD NotFound fails explicitly with
+`destination_conditional_conflict`. A mismatched identity fails closed. HEAD
+provider/auth/transport failures retain their own sanitized diagnostic and the
+existing no-blind-retry policy. Arbitrary 409 from HEAD/GET or an unguarded
+request is not accepted. Existing HTTP 412 resume behavior is unchanged.
+
+The probe requires first PUT exactly `created`, HEAD exact and GET/SHA PASS,
+then actual HTTP 409 **or** 412, post-conflict HEAD exact and
+`concurrent-exact-skip`. It records the actual status plus sanitized SDK class
+and provider code; no raw provider-code allowlist expansion is made. Source
+operations and remote deletes remain zero and no COMPLETE manifest is published.
+
+The previous full-backup and tiny-probe approvals are exhausted.
+After exact-head CI and merge,
 verify main and the scheduled-trigger pause, then **STOP BEFORE REAL PROBE**.
-Obtain fresh explicit user approval for exactly one tiny destination probe.
+Obtain fresh explicit user approval for exactly one more tiny destination probe
+(`READY_FOR_FINAL_DESTINATION_PROBE_APPROVAL`).
 That approval does not authorize a full Storage backup. No probe or full backup
 is dispatched as part of this hardening PR.
 
