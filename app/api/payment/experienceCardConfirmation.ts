@@ -142,22 +142,14 @@ async function reconcileExplicitReleasedNicePayApproval(params: {
     });
 
     const { data: refundedBooking, error: refundedBookingError } = await supabaseAdmin
-      .from('bookings')
-      .update({
-        status: 'cancelled',
-        cancel_reason: CARD_APPROVAL_RELEASE_RACE_REFUNDED_REASON,
-        refund_amount: verificationResult.approvedAmount,
-        host_payout_amount: 0,
-        platform_revenue: 0,
-      })
-      .eq('id', originalBooking.id)
-      .eq('status', 'cancellation_requested')
-      .eq('tid', verifiedTid)
-      .eq('cancel_reason', CARD_APPROVAL_RELEASE_RACE_LOCK_REASON)
-      .select('id')
-      .maybeSingle();
+      .rpc('finalize_released_card_refund_atomic', {
+        p_booking_id: originalBooking.id,
+        p_transaction_reference: verifiedTid,
+        p_order_reference: expectedReference,
+        p_amount: verificationResult.approvedAmount,
+      });
 
-    if (refundedBookingError || !refundedBooking) {
+    if (refundedBookingError || !refundedBooking?.[0]) {
       throw new Error('승인취소는 완료됐지만 예약 상태를 갱신하지 못했습니다.');
     }
 

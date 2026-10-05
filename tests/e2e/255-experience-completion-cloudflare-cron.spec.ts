@@ -103,6 +103,7 @@ function createSettlementClient(state: FixtureState) {
       return new Query(table);
     },
     async rpc(name: string) {
+      if (name === 'solo_refund_diagnostics') return { data: { reconciliation_required: 0, delivery_failed: 0 }, error: null };
       state.calls.push(`rpc:${name}`);
       if (name === 'list_due_experience_completion_candidates') {
         return { data: state.dueRows, error: null };

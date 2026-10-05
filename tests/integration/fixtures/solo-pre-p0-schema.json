@@ -1,0 +1,340 @@
+{
+  "columns": [
+    {
+      "table_name": "bookings",
+      "column_name": "id",
+      "data_type": "text",
+      "column_default": null,
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "column_default": "timezone('utc'::text, now())",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "user_id",
+      "data_type": "uuid",
+      "column_default": null,
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "amount",
+      "data_type": "integer",
+      "column_default": null,
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "order_id",
+      "data_type": "text",
+      "column_default": null,
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "status",
+      "data_type": "text",
+      "column_default": "'PAID'::text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "experience_id",
+      "data_type": "bigint",
+      "column_default": null,
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "is_private",
+      "data_type": "boolean",
+      "column_default": "false",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "date",
+      "data_type": "date",
+      "column_default": null,
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "time",
+      "data_type": "text",
+      "column_default": null,
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "type",
+      "data_type": "text",
+      "column_default": null,
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "guests",
+      "data_type": "integer",
+      "column_default": null,
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "total_price",
+      "data_type": "integer",
+      "column_default": null,
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "cancel_reason",
+      "data_type": "text",
+      "column_default": null,
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "contact_name",
+      "data_type": "text",
+      "column_default": null,
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "contact_phone",
+      "data_type": "text",
+      "column_default": null,
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "message",
+      "data_type": "text",
+      "column_default": null,
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "tid",
+      "data_type": "text",
+      "column_default": null,
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "refund_amount",
+      "data_type": "integer",
+      "column_default": "0",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "host_payout_amount",
+      "data_type": "integer",
+      "column_default": "0",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "platform_revenue",
+      "data_type": "integer",
+      "column_default": "0",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "payout_status",
+      "data_type": "text",
+      "column_default": "'pending'::text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "price_at_booking",
+      "data_type": "numeric",
+      "column_default": "0",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "total_experience_price",
+      "data_type": "numeric",
+      "column_default": "0",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "payment_method",
+      "data_type": "text",
+      "column_default": "'card'::text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "is_solo_guarantee",
+      "data_type": "boolean",
+      "column_default": "false",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "solo_guarantee_price",
+      "data_type": "integer",
+      "column_default": "0",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "payout_paid_at",
+      "data_type": "timestamp with time zone",
+      "column_default": null,
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "solo_guarantee_refund_status",
+      "data_type": "text",
+      "column_default": "'not_applicable'::text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "solo_guarantee_refund_amount",
+      "data_type": "integer",
+      "column_default": "0",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "solo_guarantee_refunded_at",
+      "data_type": "timestamp with time zone",
+      "column_default": null,
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "solo_guarantee_refund_error",
+      "data_type": "text",
+      "column_default": null,
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "solo_guarantee_refund_trigger_booking_id",
+      "data_type": "text",
+      "column_default": null,
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "guest_age_band",
+      "data_type": "text",
+      "column_default": null,
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "guest_gender",
+      "data_type": "text",
+      "column_default": null,
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "payment_claim_state",
+      "data_type": "text",
+      "column_default": null,
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "payment_claim_expires_at",
+      "data_type": "timestamp with time zone",
+      "column_default": null,
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "payment_provider",
+      "data_type": "text",
+      "column_default": null,
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "payment_provider_reference",
+      "data_type": "text",
+      "column_default": null,
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "bookings",
+      "column_name": "payment_claim_token",
+      "data_type": "uuid",
+      "column_default": null,
+      "is_nullable": "YES"
+    }
+  ],
+  "constraints": [
+    {
+      "name": "bookings_payment_claim_state_check",
+      "table": "bookings",
+      "definition": "CHECK (((payment_claim_state IS NULL) OR (payment_claim_state = ANY (ARRAY['claimed'::text, 'processing'::text, 'reconciliation_required'::text, 'completed'::text, 'released'::text]))))"
+    },
+    {
+      "name": "bookings_solo_guarantee_refund_amount_check",
+      "table": "bookings",
+      "definition": "CHECK (((solo_guarantee_refund_amount >= 0) AND (solo_guarantee_refund_amount <= GREATEST(COALESCE(solo_guarantee_price, 0), 0))))"
+    },
+    {
+      "name": "bookings_solo_guarantee_refund_status_check",
+      "table": "bookings",
+      "definition": "CHECK ((solo_guarantee_refund_status = ANY (ARRAY['not_applicable'::text, 'processing'::text, 'pending_manual'::text, 'refunded'::text, 'failed'::text])))"
+    }
+  ],
+  "definitions": [
+    {
+      "name": "complete_admin_manual_experience_payout_atomic",
+      "signature": "complete_admin_manual_experience_payout_atomic(uuid,uuid,text,integer,integer,text,text,text,uuid,text)",
+      "definition": "CREATE OR REPLACE FUNCTION public.complete_admin_manual_experience_payout_atomic(p_request_key uuid, p_host_id uuid, p_settlement_type text, p_expected_current_booking_amount integer, p_legacy_amount integer, p_reason text, p_legacy_source_reference text, p_transfer_reference text, p_paid_by_admin_id uuid, p_paid_by_admin_email text)\n RETURNS TABLE(manual_payout_id uuid, request_key uuid, host_id uuid, booking_count integer, current_booking_amount integer, legacy_amount integer, total_paid_amount integer, paid_at timestamp with time zone)\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nDECLARE\n  v_existing public.admin_manual_payouts%ROWTYPE;\n  v_booking_ids text[];\n  v_booking_snapshot jsonb;\n  v_current_amount integer;\n  v_booking_count integer;\n  v_updated_count integer;\n  v_paid_at timestamptz := clock_timestamp();\n  v_manual_payout_id uuid;\n  v_bank_name text;\n  v_account_number text;\n  v_account_holder text;\nBEGIN\n  IF p_request_key IS NULL OR p_host_id IS NULL OR p_paid_by_admin_id IS NULL THEN\n    RAISE EXCEPTION '필수 식별값이 누락되었습니다.';\n  END IF;\n\n  IF p_settlement_type NOT IN ('host_exit_final', 'legacy_carryover') THEN\n    RAISE EXCEPTION '지원하지 않는 수동 정산 유형입니다.';\n  END IF;\n\n  IF length(btrim(COALESCE(p_reason, ''))) = 0\n    OR length(btrim(COALESCE(p_transfer_reference, ''))) = 0\n    OR length(btrim(COALESCE(p_paid_by_admin_email, ''))) = 0\n  THEN\n    RAISE EXCEPTION '사유, 이체 참조값, 관리자 정보는 필수입니다.';\n  END IF;\n\n  IF length(btrim(p_reason)) > 1000\n    OR length(btrim(p_transfer_reference)) > 500\n    OR length(btrim(COALESCE(p_legacy_source_reference, ''))) > 500\n  THEN\n    RAISE EXCEPTION '정산 사유 또는 참조값이 너무 깁니다.';\n  END IF;\n\n  IF p_settlement_type = 'host_exit_final' AND COALESCE(p_legacy_amount, 0) <> 0 THEN\n    RAISE EXCEPTION '활동 종료 정산에는 legacy 금액을 포함할 수 없습니다.';\n  END IF;\n\n  IF p_settlement_type = 'legacy_carryover' AND (\n    COALESCE(p_legacy_amount, 0) <= 0\n    OR length(btrim(COALESCE(p_legacy_source_reference, ''))) = 0\n  ) THEN\n    RAISE EXCEPTION '이전 사이트 이월액과 출처는 필수입니다.';\n  END IF;\n\n  -- Serialize manual payout attempts for the same host, including different request keys.\n  PERFORM pg_advisory_xact_lock(hashtextextended(p_host_id::text, 0));\n\n  SELECT * INTO v_existing\n  FROM public.admin_manual_payouts\n  WHERE admin_manual_payouts.request_key = p_request_key;\n\n  IF FOUND THEN\n    IF v_existing.host_id <> p_host_id\n      OR v_existing.settlement_type <> p_settlement_type\n      OR v_existing.current_booking_amount <> p_expected_current_booking_amount\n      OR v_existing.legacy_amount <> COALESCE(p_legacy_amount, 0)\n      OR v_existing.reason <> btrim(p_reason)\n      OR COALESCE(v_existing.legacy_source_reference, '') <> COALESCE(NULLIF(btrim(p_legacy_source_reference), ''), '')\n      OR v_existing.transfer_reference <> btrim(p_transfer_reference)\n    THEN\n      RAISE EXCEPTION '같은 request key가 다른 정산 내용으로 재사용되었습니다.' USING ERRCODE = 'P0001';\n    END IF;\n\n    RETURN QUERY SELECT\n      v_existing.id,\n      v_existing.request_key,\n      v_existing.host_id,\n      cardinality(v_existing.booking_ids),\n      v_existing.current_booking_amount,\n      v_existing.legacy_amount,\n      v_existing.total_paid_amount,\n      v_existing.paid_at;\n    RETURN;\n  END IF;\n\n  SELECT ha.bank_name, ha.account_number, ha.account_holder\n  INTO v_bank_name, v_account_number, v_account_holder\n  FROM public.host_applications AS ha\n  WHERE ha.user_id = p_host_id\n  ORDER BY ha.created_at DESC\n  LIMIT 1;\n\n  IF length(btrim(COALESCE(v_bank_name, ''))) = 0\n    OR length(btrim(COALESCE(v_account_number, ''))) = 0\n    OR length(btrim(COALESCE(v_account_holder, ''))) = 0\n  THEN\n    RAISE EXCEPTION '호스트 지급 계좌가 등록되어 있지 않습니다.';\n  END IF;\n\n  -- Lock every current experience liability for this host before validating or updating it.\n  PERFORM b.id\n  FROM public.bookings AS b\n  JOIN public.experiences AS e ON e.id = b.experience_id\n  WHERE e.host_id = p_host_id\n    AND b.payout_status IS DISTINCT FROM 'paid'\n    AND b.status IN ('completed', 'COMPLETED', 'cancelled', 'CANCELLED')\n  ORDER BY b.id\n  FOR UPDATE OF b;\n\n  IF EXISTS (\n    SELECT 1\n    FROM public.bookings AS b\n    JOIN public.experiences AS e ON e.id = b.experience_id\n    WHERE e.host_id = p_host_id\n      AND b.payout_status IS DISTINCT FROM 'paid'\n      AND b.status IN ('completed', 'COMPLETED', 'cancelled', 'CANCELLED')\n      AND (\n        b.payout_status IS DISTINCT FROM 'pending'\n        OR b.host_payout_amount IS NULL\n        OR b.host_payout_amount < 0\n        OR (\n          b.host_payout_amount = 0\n          AND b.status NOT IN ('cancelled', 'CANCELLED')\n        )\n        OR b.solo_guarantee_refund_status IN ('processing', 'pending_manual', 'failed')\n      )\n  ) THEN\n    RAISE EXCEPTION '지급액 또는 환불 상태 확인이 필요한 예약이 포함되어 있습니다.';\n  END IF;\n\n  SELECT\n    array_agg(b.id::text ORDER BY b.id),\n    jsonb_agg(\n      jsonb_build_object(\n        'id', b.id,\n        'order_id', b.order_id,\n        'experience_id', b.experience_id,\n        'status', b.status,\n        'payout_status', b.payout_status,\n        'host_payout_amount', b.host_payout_amount,\n        'date', b.date,\n        'time', b.time\n      ) ORDER BY b.id\n    ),\n    COALESCE(sum(b.host_payout_amount), 0)::integer,\n    count(*)::integer\n  INTO v_booking_ids, v_booking_snapshot, v_current_amount, v_booking_count\n  FROM public.bookings AS b\n  JOIN public.experiences AS e ON e.id = b.experience_id\n  WHERE e.host_id = p_host_id\n    AND b.payout_status = 'pending'\n    AND b.status IN ('completed', 'COMPLETED', 'cancelled', 'CANCELLED')\n    AND b.host_payout_amount > 0;\n\n  IF v_booking_count = 0 OR v_current_amount <= 0 THEN\n    RAISE EXCEPTION '정산할 신규 사이트 체험 미정산액이 없습니다.';\n  END IF;\n\n  IF v_current_amount >= 100000 THEN\n    RAISE EXCEPTION '10만원 이상 금액은 기존 일반 정산을 이용해야 합니다.';\n  END IF;\n\n  IF p_expected_current_booking_amount IS NULL OR p_expected_current_booking_amount <> v_current_amount THEN\n    RAISE EXCEPTION '미정산 금액이 변경되었습니다. 새로고침 후 다시 확인해 주세요.';\n  END IF;\n\n  IF p_settlement_type = 'host_exit_final' THEN\n    IF EXISTS (\n      SELECT 1\n      FROM public.bookings AS b\n      JOIN public.experiences AS e ON e.id = b.experience_id\n      WHERE e.host_id = p_host_id\n        AND b.status IN ('PAID', 'confirmed')\n    ) THEN\n      RAISE EXCEPTION '미래 또는 진행 중 체험 예약이 있어 활동 종료 정산을 할 수 없습니다.';\n    END IF;\n\n    IF EXISTS (\n      SELECT 1\n      FROM public.service_bookings AS sb\n      WHERE sb.host_id = p_host_id\n        AND (\n          sb.status IN ('PAID', 'confirmed')\n          OR (sb.status = 'completed' AND sb.payout_status IS DISTINCT FROM 'paid')\n        )\n    ) THEN\n      RAISE EXCEPTION '진행 중이거나 미정산인 서비스가 있어 활동 종료 정산을 할 수 없습니다.';\n    END IF;\n  END IF;\n\n  UPDATE public.bookings AS b\n  SET payout_status = 'paid', payout_paid_at = v_paid_at\n  WHERE b.id::text = ANY(v_booking_ids)\n    AND b.payout_status = 'pending'\n    AND b.status IN ('completed', 'COMPLETED', 'cancelled', 'CANCELLED');\n\n  GET DIAGNOSTICS v_updated_count = ROW_COUNT;\n  IF v_updated_count <> v_booking_count THEN\n    RAISE EXCEPTION '정산 대상이 동시에 변경되었습니다. 새로고침 후 다시 시도해 주세요.';\n  END IF;\n\n  INSERT INTO public.admin_manual_payouts (\n    request_key, host_id, settlement_type, booking_ids, booking_snapshot,\n    current_booking_amount, legacy_amount, total_paid_amount, reason,\n    legacy_source_reference, transfer_reference, bank_name, account_number,\n    account_holder, paid_by_admin_id, paid_by_admin_email, paid_at\n  ) VALUES (\n    p_request_key, p_host_id, p_settlement_type, v_booking_ids, v_booking_snapshot,\n    v_current_amount, COALESCE(p_legacy_amount, 0), v_current_amount + COALESCE(p_legacy_amount, 0),\n    btrim(p_reason), NULLIF(btrim(p_legacy_source_reference), ''), btrim(p_transfer_reference),\n    btrim(v_bank_name), btrim(v_account_number), btrim(v_account_holder),\n    p_paid_by_admin_id, btrim(p_paid_by_admin_email), v_paid_at\n  )\n  RETURNING id INTO v_manual_payout_id;\n\n  RETURN QUERY SELECT\n    v_manual_payout_id,\n    p_request_key,\n    p_host_id,\n    v_booking_count,\n    v_current_amount,\n    COALESCE(p_legacy_amount, 0),\n    v_current_amount + COALESCE(p_legacy_amount, 0),\n    v_paid_at;\nEND;\n$function$\n"
+    },
+    {
+      "name": "complete_experience_booking_if_due_atomic",
+      "signature": "complete_experience_booking_if_due_atomic(text)",
+      "definition": "CREATE OR REPLACE FUNCTION public.complete_experience_booking_if_due_atomic(p_booking_id text)\n RETURNS TABLE(booking_id text, order_id text, user_id uuid, already_processed boolean, not_due boolean, completed boolean, notification_created boolean)\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nDECLARE\n  v_booking public.bookings%ROWTYPE;\n  v_experience_title TEXT;\n  v_experience_host_id UUID;\n  v_experience_duration INTEGER;\n  v_due_at TIMESTAMPTZ;\n  v_tour_end_at TIMESTAMPTZ;\n  v_review_requests_due BOOLEAN := FALSE;\n  v_notification_created BOOLEAN := FALSE;\nBEGIN\n  SELECT *\n  INTO v_booking\n  FROM public.bookings AS b\n  WHERE b.id = trim(p_booking_id)\n  FOR UPDATE;\n\n  IF NOT FOUND THEN\n    RAISE EXCEPTION 'EXP_COMPLETE_NOT_FOUND: experience booking not found';\n  END IF;\n\n  IF lower(COALESCE(v_booking.status, '')) = 'completed' THEN\n    RETURN QUERY\n    SELECT v_booking.id, COALESCE(v_booking.order_id, v_booking.id),\n      v_booking.user_id::UUID, TRUE, FALSE, FALSE, FALSE;\n    RETURN;\n  END IF;\n\n  IF COALESCE(v_booking.status, '') NOT IN ('PAID', 'confirmed') THEN\n    RAISE EXCEPTION 'EXP_COMPLETE_INVALID_STATUS: booking status must be PAID, confirmed, or completed';\n  END IF;\n\n  IF v_booking.date IS NULL THEN\n    RETURN QUERY\n    SELECT v_booking.id, COALESCE(v_booking.order_id, v_booking.id),\n      v_booking.user_id::UUID, FALSE, TRUE, FALSE, FALSE;\n    RETURN;\n  END IF;\n\n  -- Preserve the existing start-time completion contract, including its\n  -- missing-time 00:00 fallback. Only review notifications use strict time.\n  v_due_at := (\n    (v_booking.date::text || ' ' || COALESCE(NULLIF(v_booking.time, ''), '00:00'))::timestamp\n    AT TIME ZONE 'Asia/Seoul'\n  );\n\n  IF v_due_at >= now() THEN\n    RETURN QUERY\n    SELECT v_booking.id, COALESCE(v_booking.order_id, v_booking.id),\n      v_booking.user_id::UUID, FALSE, TRUE, FALSE, FALSE;\n    RETURN;\n  END IF;\n\n  SELECT COALESCE(e.title, '체험'), e.host_id, e.duration\n  INTO v_experience_title, v_experience_host_id, v_experience_duration\n  FROM public.experiences AS e\n  WHERE e.id = v_booking.experience_id;\n\n  IF trim(COALESCE(v_booking.time, '')) ~ '^([01]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$' THEN\n    v_tour_end_at := (\n      (v_booking.date::text || ' ' || trim(v_booking.time))::timestamp\n      AT TIME ZONE 'Asia/Seoul'\n    ) + make_interval(hours => CASE WHEN v_experience_duration > 0 THEN v_experience_duration ELSE 2 END);\n    v_review_requests_due := v_tour_end_at <= now();\n  END IF;\n\n  UPDATE public.bookings AS b\n  SET status = 'completed'\n  WHERE b.id = v_booking.id\n    AND b.status IN ('PAID', 'confirmed');\n\n  IF NOT FOUND THEN\n    RAISE EXCEPTION 'EXP_COMPLETE_UPDATE_CONFLICT: booking status changed before completion';\n  END IF;\n\n  IF\n    v_review_requests_due\n    AND v_booking.user_id IS NOT NULL\n    AND NOT EXISTS (\n      SELECT 1 FROM public.reviews AS r\n      WHERE r.booking_id = v_booking.id\n    )\n  THEN\n    INSERT INTO public.notifications (\n      user_id, type, title, message, link, is_read, created_at, booking_id\n    )\n    VALUES (\n      v_booking.user_id,\n      'review_request',\n      '후기를 남겨주세요!',\n      format('''%s'' 어떠셨나요? 소중한 후기를 남겨주세요.', COALESCE(v_experience_title, '체험')),\n      '/guest/trips',\n      FALSE,\n      now(),\n      v_booking.id\n    )\n    ON CONFLICT (booking_id) WHERE type = 'review_request' AND booking_id IS NOT NULL\n    DO NOTHING;\n\n    v_notification_created := FOUND;\n  END IF;\n\n  IF\n    v_review_requests_due\n    AND v_booking.user_id IS NOT NULL\n    AND v_experience_host_id IS NOT NULL\n    AND NOT EXISTS (\n      SELECT 1 FROM public.guest_reviews AS gr\n      WHERE gr.booking_id = v_booking.id\n        AND gr.host_id = v_experience_host_id\n    )\n  THEN\n    INSERT INTO public.notifications (\n      user_id, type, title, message, link, is_read, created_at, booking_id\n    )\n    VALUES (\n      v_experience_host_id,\n      'guest_review_request',\n      '게스트 평가를 남겨주세요',\n      format('''%s'' 체험의 게스트 평가를 남겨주세요.', COALESCE(v_experience_title, '체험')),\n      '/host/dashboard?tab=reservations',\n      FALSE,\n      now(),\n      v_booking.id\n    )\n    ON CONFLICT (booking_id) WHERE type = 'guest_review_request' AND booking_id IS NOT NULL\n    DO NOTHING;\n  END IF;\n\n  RETURN QUERY\n  SELECT v_booking.id, COALESCE(v_booking.order_id, v_booking.id),\n    v_booking.user_id::UUID, FALSE, FALSE, TRUE, v_notification_created;\nEND;\n$function$\n"
+    },
+    {
+      "name": "confirm_experience_bank_payment_atomic",
+      "signature": "confirm_experience_bank_payment_atomic(text)",
+      "definition": "CREATE OR REPLACE FUNCTION public.confirm_experience_bank_payment_atomic(p_booking_id text)\n RETURNS TABLE(outcome text)\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_booking public.bookings%ROWTYPE;\n  v_total_experience numeric;\n  v_base_price numeric;\n  v_host_payout integer;\n  v_platform_revenue integer;\n  v_refund_liability integer;\n  v_solo_net integer;\nBEGIN\n  IF coalesce(auth.role(), '') <> 'service_role' THEN\n    RAISE EXCEPTION 'BANK_CONFIRM_FORBIDDEN' USING ERRCODE = '42501';\n  END IF;\n\n  SELECT * INTO v_booking\n    FROM public.bookings\n   WHERE id = p_booking_id\n   FOR UPDATE;\n\n  IF NOT FOUND THEN\n    RAISE EXCEPTION 'BANK_CONFIRM_NOT_FOUND' USING ERRCODE = 'P0002';\n  END IF;\n\n  IF lower(coalesce(v_booking.payment_method, '')) <> 'bank' THEN\n    RAISE EXCEPTION 'BANK_CONFIRM_METHOD_CONFLICT' USING ERRCODE = 'P0001';\n  END IF;\n\n  IF lower(coalesce(v_booking.status, '')) = 'confirmed' THEN\n    IF v_booking.payout_status = 'pending'\n       AND v_booking.host_payout_amount IS NOT NULL\n       AND v_booking.platform_revenue IS NOT NULL THEN\n      RETURN QUERY SELECT 'already_processed'::text;\n      RETURN;\n    END IF;\n    RAISE EXCEPTION 'BANK_CONFIRM_STORED_RESULT_CONFLICT' USING ERRCODE = 'P0001';\n  END IF;\n\n  IF lower(coalesce(v_booking.status, '')) <> 'pending' THEN\n    RAISE EXCEPTION 'BANK_CONFIRM_STATUS_CONFLICT' USING ERRCODE = 'P0001';\n  END IF;\n\n  v_solo_net := greatest(\n    0,\n    coalesce(v_booking.solo_guarantee_price, 0)\n      - coalesce(v_booking.solo_guarantee_refund_amount, 0)\n  );\n  v_refund_liability := greatest(\n    coalesce(v_booking.refund_amount, 0),\n    coalesce(v_booking.solo_guarantee_refund_amount, 0)\n  );\n  v_total_experience := CASE\n    WHEN coalesce(v_booking.total_experience_price, 0) > 0\n      THEN v_booking.total_experience_price\n    WHEN coalesce(v_booking.total_price, 0) > 0\n      THEN v_booking.total_price\n    ELSE v_booking.amount\n  END;\n  v_base_price := CASE\n    WHEN coalesce(v_booking.price_at_booking, 0) > 0\n      THEN v_booking.price_at_booking\n    ELSE greatest(0, v_total_experience - v_solo_net)\n  END;\n  v_host_payout := CASE\n    WHEN coalesce(v_booking.host_payout_amount, 0) > 0\n      THEN v_booking.host_payout_amount\n    ELSE floor(v_total_experience * 0.8)::integer\n  END;\n  v_platform_revenue := CASE\n    WHEN coalesce(v_booking.platform_revenue, 0) > 0\n      THEN v_booking.platform_revenue\n    ELSE greatest(0, v_booking.amount - v_refund_liability - v_host_payout)\n  END;\n\n  UPDATE public.bookings\n     SET status = 'confirmed',\n         price_at_booking = v_base_price,\n         total_experience_price = v_total_experience,\n         host_payout_amount = v_host_payout,\n         platform_revenue = v_platform_revenue,\n         payout_status = 'pending'\n   WHERE id = v_booking.id;\n\n  RETURN QUERY SELECT 'confirmed_now'::text;\nEND;\n$function$\n"
+    },
+    {
+      "name": "confirm_experience_payment_atomic",
+      "signature": "confirm_experience_payment_atomic(text,text,text,text,integer)",
+      "definition": "CREATE OR REPLACE FUNCTION public.confirm_experience_payment_atomic(p_booking_id text, p_provider text, p_provider_reference text, p_provider_transaction_id text, p_verified_amount integer)\n RETURNS TABLE(outcome text)\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_booking public.bookings%ROWTYPE;\n  v_provider text := lower(btrim(coalesce(p_provider, '')));\n  v_reference text := nullif(btrim(coalesce(p_provider_reference, '')), '');\n  v_tid text := nullif(btrim(coalesce(p_provider_transaction_id, '')), '');\n  v_max_guests integer;\n  v_current_booked integer;\n  v_has_private boolean;\n  v_total_experience numeric;\n  v_base_price numeric;\n  v_host_payout integer;\n  v_platform_revenue integer;\n  v_refund_liability integer;\n  v_solo_net integer;\n  v_slot_key text;\nBEGIN\n  IF coalesce(auth.role(), '') <> 'service_role' THEN\n    RAISE EXCEPTION 'PAYMENT_CONFIRM_FORBIDDEN' USING ERRCODE = '42501';\n  END IF;\n\n  IF v_provider = '' OR v_reference IS NULL OR v_tid IS NULL\n     OR p_verified_amount IS NULL OR p_verified_amount <= 0 THEN\n    RAISE EXCEPTION 'PAYMENT_CONFIRM_BAD_REQUEST' USING ERRCODE = '22023';\n  END IF;\n\n  SELECT * INTO v_booking\n    FROM public.bookings\n   WHERE id = p_booking_id\n   FOR UPDATE;\n\n  IF NOT FOUND THEN\n    RAISE EXCEPTION 'PAYMENT_CONFIRM_NOT_FOUND' USING ERRCODE = 'P0002';\n  END IF;\n\n  IF lower(coalesce(v_booking.status, '')) IN ('paid', 'confirmed', 'completed') THEN\n    IF v_booking.payment_claim_state = 'completed'\n       AND v_booking.payment_provider = v_provider\n       AND v_booking.payment_provider_reference = v_reference\n       AND v_booking.tid = v_tid THEN\n      RETURN QUERY SELECT 'already_processed'::text;\n      RETURN;\n    END IF;\n    RAISE EXCEPTION 'PAYMENT_CONFIRM_ALREADY_PROCESSED_CONFLICT' USING ERRCODE = 'P0001';\n  END IF;\n\n  IF lower(coalesce(v_booking.status, '')) <> 'pending'\n     OR v_booking.tid IS NOT NULL THEN\n    RAISE EXCEPTION 'PAYMENT_CONFIRM_STATUS_CONFLICT' USING ERRCODE = 'P0001';\n  END IF;\n\n  IF (lower(coalesce(v_booking.payment_method, '')) = 'paypal' AND v_provider <> 'paypal')\n     OR (lower(coalesce(v_booking.payment_method, '')) = 'card' AND v_provider NOT IN ('nicepay', 'portone'))\n     OR lower(coalesce(v_booking.payment_method, '')) NOT IN ('card', 'paypal') THEN\n    RAISE EXCEPTION 'PAYMENT_CONFIRM_METHOD_CONFLICT' USING ERRCODE = 'P0001';\n  END IF;\n\n  IF v_booking.payment_provider IS DISTINCT FROM v_provider\n     OR v_booking.payment_provider_reference IS DISTINCT FROM v_reference\n     OR v_booking.payment_claim_state NOT IN ('processing', 'reconciliation_required') THEN\n    RAISE EXCEPTION 'PAYMENT_CONFIRM_ATTEMPT_CONFLICT' USING ERRCODE = 'P0001';\n  END IF;\n\n  IF v_booking.amount IS DISTINCT FROM p_verified_amount THEN\n    RAISE EXCEPTION 'PAYMENT_CONFIRM_AMOUNT_CONFLICT' USING ERRCODE = 'P0001';\n  END IF;\n\n  v_slot_key := format('%s|%s|%s', v_booking.experience_id, v_booking.date, v_booking.time);\n  PERFORM pg_advisory_xact_lock(hashtext(v_slot_key)::bigint);\n\n  SELECT coalesce(e.max_guests, 10)\n    INTO v_max_guests\n    FROM public.experiences e\n   WHERE e.id = v_booking.experience_id;\n\n  IF v_max_guests IS NULL THEN\n    RAISE EXCEPTION 'PAYMENT_CONFIRM_EXPERIENCE_NOT_FOUND' USING ERRCODE = 'P0002';\n  END IF;\n\n  SELECT\n    coalesce(sum(b.guests), 0)::integer,\n    coalesce(bool_or(b.type = 'private'), false)\n  INTO v_current_booked, v_has_private\n  FROM public.bookings b\n  WHERE b.experience_id = v_booking.experience_id\n    AND b.date = v_booking.date\n    AND b.time = v_booking.time\n    AND b.id <> v_booking.id\n    AND lower(b.status) IN ('paid', 'confirmed');\n\n  IF v_has_private\n     OR (v_booking.type = 'private' AND v_current_booked > 0)\n     OR (v_booking.type <> 'private' AND v_current_booked + coalesce(v_booking.guests, 0) > v_max_guests) THEN\n    RAISE EXCEPTION 'PAYMENT_CONFIRM_CAPACITY_CONFLICT' USING ERRCODE = 'P0001';\n  END IF;\n\n  v_solo_net := greatest(\n    0,\n    coalesce(v_booking.solo_guarantee_price, 0)\n      - coalesce(v_booking.solo_guarantee_refund_amount, 0)\n  );\n  v_refund_liability := greatest(\n    coalesce(v_booking.refund_amount, 0),\n    coalesce(v_booking.solo_guarantee_refund_amount, 0)\n  );\n  v_total_experience := CASE\n    WHEN coalesce(v_booking.total_experience_price, 0) > 0\n      THEN v_booking.total_experience_price\n    WHEN coalesce(v_booking.total_price, 0) > 0\n      THEN v_booking.total_price\n    ELSE v_booking.amount\n  END;\n  v_base_price := CASE\n    WHEN coalesce(v_booking.price_at_booking, 0) > 0\n      THEN v_booking.price_at_booking\n    ELSE greatest(0, v_total_experience - v_solo_net)\n  END;\n  v_host_payout := CASE\n    WHEN coalesce(v_booking.host_payout_amount, 0) > 0\n      THEN v_booking.host_payout_amount\n    ELSE floor(v_total_experience * 0.8)::integer\n  END;\n  v_platform_revenue := CASE\n    WHEN coalesce(v_booking.platform_revenue, 0) > 0\n      THEN v_booking.platform_revenue\n    ELSE greatest(0, v_booking.amount - v_refund_liability - v_host_payout)\n  END;\n\n  UPDATE public.bookings\n     SET status = 'PAID',\n         tid = v_tid,\n         price_at_booking = v_base_price,\n         total_experience_price = v_total_experience,\n         host_payout_amount = v_host_payout,\n         platform_revenue = v_platform_revenue,\n         payout_status = 'pending',\n         payment_claim_state = 'completed',\n         payment_claim_expires_at = NULL,\n         payment_claim_token = NULL\n   WHERE id = v_booking.id;\n\n  RETURN QUERY SELECT 'confirmed_now'::text;\nEND;\n$function$\n"
+    },
+    {
+      "name": "create_booking_atomic",
+      "signature": "create_booking_atomic(uuid,text,text,text,integer,boolean,text,text,text,boolean)",
+      "definition": "CREATE OR REPLACE FUNCTION public.create_booking_atomic(p_user_id uuid, p_experience_id text, p_date text, p_time text, p_guests integer, p_is_private boolean, p_customer_name text, p_customer_phone text, p_payment_method text DEFAULT 'card'::text, p_is_solo_guarantee boolean DEFAULT false)\n RETURNS TABLE(new_order_id text, final_amount numeric, host_id text, experience_title text)\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_experience_id public.experiences.id%TYPE;\n  v_host_id text;\n  v_title text;\n  v_price numeric;\n  v_private_price numeric;\n  v_max_guests integer;\n  v_solo_guarantee_unit_price numeric;\n  v_guest_count integer;\n  v_base_host_price numeric;\n  v_host_price numeric;\n  v_fee numeric;\n  v_final_amount numeric;\n  v_current_booked integer;\n  v_has_private_booking boolean;\n  v_confirmed_booked integer;\n  v_has_confirmed_private_booking boolean;\n  v_slot_key text;\n  v_new_order_id text;\n  v_booking_date date;\n  v_booking_time_text text;\n  v_solo_guarantee_price numeric;\nBEGIN\n  IF coalesce(auth.role(), '') <> 'service_role' THEN\n    RAISE EXCEPTION 'BOOKING_FORBIDDEN:Server-only function' USING ERRCODE = 'P0001';\n  END IF;\n\n  IF p_user_id IS NULL\n     OR coalesce(btrim(p_experience_id), '') = ''\n     OR coalesce(btrim(p_date), '') = ''\n     OR coalesce(btrim(p_time), '') = ''\n     OR coalesce(btrim(p_customer_name), '') = ''\n     OR coalesce(btrim(p_customer_phone), '') = '' THEN\n    RAISE EXCEPTION 'BOOKING_BAD_REQUEST:Missing required fields' USING ERRCODE = 'P0001';\n  END IF;\n\n  BEGIN\n    v_booking_date := p_date::date;\n    v_booking_time_text := to_char(p_time::time, 'HH24:MI');\n  EXCEPTION WHEN others THEN\n    RAISE EXCEPTION 'BOOKING_BAD_REQUEST:Invalid date/time format' USING ERRCODE = 'P0001';\n  END;\n\n  SELECT e.id, e.host_id::text, e.title, coalesce(e.price, 0),\n         coalesce(e.private_price, 0), coalesce(e.max_guests, 10),\n         coalesce(e.solo_guarantee_price, 30000)\n    INTO v_experience_id, v_host_id, v_title, v_price, v_private_price,\n         v_max_guests, v_solo_guarantee_unit_price\n    FROM public.experiences e\n   WHERE e.id::text = p_experience_id\n   LIMIT 1;\n\n  IF v_experience_id IS NULL THEN\n    RAISE EXCEPTION 'BOOKING_NOT_FOUND:Experience not found' USING ERRCODE = 'P0001';\n  END IF;\n\n  v_guest_count := greatest(coalesce(p_guests, 0), 1);\n  v_slot_key := format('%s|%s|%s', v_experience_id, v_booking_date, v_booking_time_text);\n  PERFORM pg_advisory_xact_lock(hashtext(v_slot_key)::bigint);\n\n  UPDATE public.bookings b\n     SET status = 'cancelled',\n         cancel_reason = '카드 결제 미완료 (30분 경과 자동 취소)',\n         refund_amount = 0\n   WHERE b.experience_id = v_experience_id\n     AND b.date = v_booking_date\n     AND b.time = v_booking_time_text\n     AND lower(b.status) = 'pending'\n     AND lower(coalesce(b.payment_method, '')) = 'card'\n     AND b.tid IS NULL\n     AND b.created_at < now() - interval '30 minutes'\n     AND b.payment_claim_state IS NULL;\n\n  SELECT coalesce(sum(b.guests), 0)::integer,\n         coalesce(bool_or(b.type = 'private'), false)\n    INTO v_current_booked, v_has_private_booking\n    FROM public.bookings b\n   WHERE b.experience_id = v_experience_id\n     AND b.date = v_booking_date\n     AND b.time = v_booking_time_text\n     AND lower(b.status) IN ('pending', 'paid', 'confirmed');\n\n  IF v_has_private_booking\n     OR (p_is_private AND v_current_booked > 0)\n     OR ((NOT p_is_private) AND (v_current_booked + v_guest_count > v_max_guests)) THEN\n    RAISE EXCEPTION 'BOOKING_CONFLICT:해당 시간대에 남은 좌석이 부족합니다.' USING ERRCODE = 'P0001';\n  END IF;\n\n  IF coalesce(p_is_solo_guarantee, false) AND (p_is_private OR v_guest_count <> 1) THEN\n    RAISE EXCEPTION 'BOOKING_BAD_REQUEST:Solo guarantee is only available for shared solo bookings' USING ERRCODE = 'P0001';\n  END IF;\n\n  SELECT coalesce(sum(b.guests), 0)::integer,\n         coalesce(bool_or(b.type = 'private'), false)\n    INTO v_confirmed_booked, v_has_confirmed_private_booking\n    FROM public.bookings b\n   WHERE b.experience_id = v_experience_id\n     AND b.date = v_booking_date\n     AND b.time = v_booking_time_text\n     AND lower(b.status) IN ('paid', 'confirmed');\n\n  IF coalesce(p_is_solo_guarantee, false)\n     AND (v_confirmed_booked > 0 OR v_has_confirmed_private_booking) THEN\n    RAISE EXCEPTION 'BOOKING_BAD_REQUEST:Solo guarantee is unavailable when confirmed bookings already exist' USING ERRCODE = 'P0001';\n  END IF;\n\n  v_solo_guarantee_price := CASE\n    WHEN coalesce(p_is_solo_guarantee, false) AND NOT p_is_private AND v_guest_count = 1\n      THEN v_solo_guarantee_unit_price\n    ELSE 0\n  END;\n  v_base_host_price := CASE WHEN p_is_private THEN v_private_price ELSE v_price * v_guest_count END;\n  v_host_price := v_base_host_price + v_solo_guarantee_price;\n  v_fee := floor(v_base_host_price * 0.1);\n  v_final_amount := v_host_price + v_fee;\n\n  LOOP\n    v_new_order_id := format(\n      'ORD-%s-%s',\n      to_char(clock_timestamp(), 'YYYYMMDDHH24MISSMS'),\n      lpad((floor(random() * 1000))::integer::text, 3, '0')\n    );\n    EXIT WHEN NOT EXISTS (\n      SELECT 1 FROM public.bookings b\n       WHERE b.order_id = v_new_order_id OR b.id = v_new_order_id\n    );\n  END LOOP;\n\n  INSERT INTO public.bookings (\n    id, order_id, user_id, experience_id, amount, total_price, status,\n    guests, date, time, type, contact_name, contact_phone, message,\n    created_at, payment_method, is_solo_guarantee, solo_guarantee_price\n  ) VALUES (\n    v_new_order_id, v_new_order_id, p_user_id, v_experience_id,\n    v_final_amount, v_host_price, 'PENDING', v_guest_count, v_booking_date,\n    v_booking_time_text, CASE WHEN p_is_private THEN 'private' ELSE 'group' END,\n    p_customer_name, p_customer_phone, '', now(), coalesce(p_payment_method, 'card'),\n    v_solo_guarantee_price > 0, v_solo_guarantee_price::integer\n  );\n\n  RETURN QUERY SELECT v_new_order_id, v_final_amount, v_host_id, coalesce(v_title, 'Locally 체험');\nEND;\n$function$\n"
+    },
+    {
+      "name": "list_due_experience_completion_candidates",
+      "signature": "list_due_experience_completion_candidates(text)",
+      "definition": "CREATE OR REPLACE FUNCTION public.list_due_experience_completion_candidates(p_booking_id text DEFAULT NULL::text)\n RETURNS TABLE(booking_id text, order_id text, user_id uuid, date date, \"time\" text, status text, experience_title text, due_at_kst_utc timestamp with time zone)\n LANGUAGE sql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\n  WITH candidate_rows AS (\n    SELECT\n      b.id AS booking_id,\n      COALESCE(b.order_id, b.id) AS order_id,\n      b.user_id,\n      b.date,\n      b.time,\n      b.status,\n      COALESCE(e.title, '체험') AS experience_title,\n      (\n        (b.date::text || ' ' || COALESCE(NULLIF(b.time, ''), '00:00'))::timestamp\n        AT TIME ZONE 'Asia/Seoul'\n      ) AS due_at_kst_utc\n    FROM public.bookings AS b\n    LEFT JOIN public.experiences AS e\n      ON e.id = b.experience_id\n    WHERE b.status IN ('PAID', 'confirmed')\n      AND b.date IS NOT NULL\n      AND (\n        p_booking_id IS NULL\n        OR b.id = trim(p_booking_id)\n      )\n  )\n  SELECT\n    booking_id,\n    order_id,\n    user_id::UUID,\n    date::DATE,\n    time,\n    status,\n    experience_title,\n    due_at_kst_utc\n  FROM candidate_rows\n  WHERE due_at_kst_utc < now()\n  ORDER BY due_at_kst_utc ASC;\n$function$\n"
+    }
+  ],
+  "trigger": {
+    "name": "bookings_payment_claim_columns_server_only",
+    "table": "bookings",
+    "function": "guard_experience_payment_claim_columns",
+    "definition": "CREATE TRIGGER bookings_payment_claim_columns_server_only BEFORE INSERT OR UPDATE ON public.bookings FOR EACH ROW EXECUTE FUNCTION guard_experience_payment_claim_columns()",
+    "function_definition": "CREATE OR REPLACE FUNCTION public.guard_experience_payment_claim_columns()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\nBEGIN\n  IF coalesce(auth.role(), '') IN ('anon', 'authenticated') THEN\n    IF TG_OP = 'INSERT' THEN\n      IF NEW.payment_claim_state IS NOT NULL\n         OR NEW.payment_claim_expires_at IS NOT NULL\n         OR NEW.payment_provider IS NOT NULL\n         OR NEW.payment_provider_reference IS NOT NULL\n         OR NEW.payment_claim_token IS NOT NULL THEN\n        RAISE EXCEPTION 'PAYMENT_CLAIM_COLUMNS_FORBIDDEN' USING ERRCODE = '42501';\n      END IF;\n    ELSIF NEW.payment_claim_state IS DISTINCT FROM OLD.payment_claim_state\n       OR NEW.payment_claim_expires_at IS DISTINCT FROM OLD.payment_claim_expires_at\n       OR NEW.payment_provider IS DISTINCT FROM OLD.payment_provider\n       OR NEW.payment_provider_reference IS DISTINCT FROM OLD.payment_provider_reference\n       OR NEW.payment_claim_token IS DISTINCT FROM OLD.payment_claim_token THEN\n      RAISE EXCEPTION 'PAYMENT_CLAIM_COLUMNS_FORBIDDEN' USING ERRCODE = '42501';\n    END IF;\n  END IF;\n\n  RETURN NEW;\nEND;\n$function$\n"
+  }
+}

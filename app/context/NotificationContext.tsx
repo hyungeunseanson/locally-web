@@ -154,7 +154,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         void refreshHostStatus();
       }
 
-      if (candidate.type === 'booking_confirmed' && candidate.link === '/guest/trips') {
+      if (['booking_confirmed', 'refund'].includes(candidate.type) && candidate.link === '/guest/trips') {
         queryClient.invalidateQueries({ queryKey: ['guestTrips'] });
       }
     })().finally(() => {
@@ -216,7 +216,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               showToast(newNoti);
               refreshHostStatusIfNeeded(newNoti.type);
 
-              if (newNoti.type === 'booking_confirmed' && newNoti.link === '/guest/trips') {
+              if (['booking_confirmed', 'refund'].includes(newNoti.type) && newNoti.link === '/guest/trips') {
                 queryClient.invalidateQueries({ queryKey: ['guestTrips'] });
               }
               return;

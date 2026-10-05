@@ -47,6 +47,7 @@ export interface GuestTrip {
   paymentDate?: string;
   created_at?: string;
   amount?: number;
+  refundAmount?: number;
   totalPrice?: number;
   total_price?: number;
   price?: number;
@@ -87,7 +88,7 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
   const guestCount = Number(trip.guests || 1);
   const isPendingDeposit = (trip.status || '').toLowerCase() === 'pending';
   const soloRefundStatus = normalizeSoloGuaranteeRefundStatus(trip.soloGuaranteeRefundStatus);
-  const soloRefundLabel = getSoloGuaranteeRefundGuestLabel(soloRefundStatus, trip.soloGuaranteeRefundAmount);
+  const soloRefundLabel = getSoloGuaranteeRefundGuestLabel(soloRefundStatus, trip.soloGuaranteeRefundAmount, lang);
 
   const buildMessageHref = () => {
     const messageParams = new URLSearchParams({

@@ -253,7 +253,7 @@ export default function ExperienceEarningsPanel({ summary }: ExperienceEarningsP
     return () => {
       cancelled = true;
     };
-  }, [supabase]);
+  }, [supabase, summary]);
 
   return (
     <div

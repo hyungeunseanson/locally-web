@@ -248,6 +248,14 @@ export async function renewSettlementSyncRunLease(params: RenewLeaseParams) {
 
 export async function finishSettlementSyncRunSuccess(params: JobRunFinishParams) {
   ensureAdminJobRunsAvailable(params.simulateMissingAdminJobRuns);
+  let refundDiagnostics: Record<string, number> | null = null;
+  if (params.jobName.startsWith('experience_completion_sync')) {
+    const diagnostics = await params.supabaseAdmin.rpc('solo_refund_diagnostics');
+    if (diagnostics.error || !diagnostics.data) throw new SettlementSyncInfrastructureError('Refund diagnostics unavailable.');
+    refundDiagnostics = diagnostics.data as Record<string, number>;
+  }
+  const moneyNeedsAttention = !!refundDiagnostics &&
+    (refundDiagnostics.reconciliation_required > 0 || refundDiagnostics.manual_pending > 0 || refundDiagnostics.delivery_failed > 0);
 
   const finishedAt = new Date().toISOString();
   const durationMs = Math.max(
@@ -258,13 +266,13 @@ export async function finishSettlementSyncRunSuccess(params: JobRunFinishParams)
   const { data, error } = await params.supabaseAdmin
     .from('admin_job_runs')
     .update({
-      status: 'success',
+      status: moneyNeedsAttention ? 'failed' : 'success',
       finished_at: finishedAt,
       duration_ms: durationMs,
       processed_count: params.processedCount,
       skipped_count: params.skippedCount,
-      error_message: null,
-      details: params.details || {},
+      error_message: moneyNeedsAttention ? 'solo_refund_reconciliation_required' : null,
+      details: { ...params.details, ...(refundDiagnostics ? { solo_refund_diagnostics: refundDiagnostics } : {}) },
       last_heartbeat_at: finishedAt,
       lease_expires_at: finishedAt,
     })

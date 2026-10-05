@@ -1,6 +1,6 @@
 {
   "schemaContractVersion": 5,
-  "capturedAt": "2026-10-03",
+  "capturedAt": "2026-10-05T12:52:08.492578+00:00",
   "productionProjectRef": "uhinvcydgzqlpnvieyal",
   "source": {
     "kind": "read-only Production PostgreSQL catalog inventory",
@@ -9,14 +9,16 @@
     "containsStorageObjects": false,
     "operationalControlMetadata": [
       "private.admin_monitor_cutover singleton marker"
-    ]
+    ],
+    "postgresVersion": "17.6",
+    "captureSql": "supabase/staging/production-current-state.capture.sql"
   },
   "securityFingerprints": {
     "canonicalization": "MD5 of pipe-delimited fields, newline-delimited rows in the contract's explicit deterministic order; NULL is an empty string and policy roles are comma-delimited",
     "storageBuckets": "7419cabe695cd50a522314a749216c05",
     "storagePolicies": "898e8b7f917fd0f4530ef30c9b61961e",
     "publicRlsPolicies": "e5a16a4215c569060fbf895453a5cd00",
-    "publicRelationGrants": "a9c644ba2ab5c795f29aff57092aa002",
+    "publicRelationGrants": "3b88d65d3e719c850d20d1cbf706516f",
     "stagingOverlayBaselineStoragePolicies": "d6b381fd629405acfdd615593031de5c",
     "privateRelationGrants": "4c987b9bd1b8fdc56ed01bca38365c7d"
   },
@@ -144,6 +146,20 @@
       "repositoryFile": "supabase/migrations/20261003122803_admin_chat_bounded_search.sql",
       "repositorySha256": "0e9776caab4c826924eade21baa229ec73a27857d9c1c9bb75a97b25b1b31724",
       "ledgerStatementsSha256": "0e9776caab4c826924eade21baa229ec73a27857d9c1c9bb75a97b25b1b31724"
+    },
+    {
+      "version": "20261004053224",
+      "name": "media_lifecycle_foundation",
+      "repositoryFile": "supabase/migrations/20261004053224_media_lifecycle_foundation.sql",
+      "repositorySha256": "c8cd123855ba600070fd22ddaef6b6a37591110f18cec92829de37ff0fdb3cfd",
+      "ledgerStatementsSha256": "c8cd123855ba600070fd22ddaef6b6a37591110f18cec92829de37ff0fdb3cfd"
+    },
+    {
+      "version": "20261005082309",
+      "name": "avatar_media_authority",
+      "repositoryFile": "supabase/migrations/20261005082309_avatar_media_authority.sql",
+      "repositorySha256": "b8a749115d2e279ea8b0e37d17ef6c373d3eec5e5f51b555c7fd62b1e58d774f",
+      "ledgerStatementsSha256": "b8a749115d2e279ea8b0e37d17ef6c373d3eec5e5f51b555c7fd62b1e58d774f"
     }
   ],
   "operationalStateDeltas": [
@@ -178,6 +194,9 @@
       "inquiries",
       "inquiry_messages",
       "likes",
+      "media_asset_references",
+      "media_assets",
+      "media_deletion_journal",
       "messages",
       "notifications",
       "profile_private_demographics",
@@ -200,7 +219,7 @@
       "public_host_applications",
       "public_profiles"
     ],
-    "publicTableColumns": 517,
+    "publicTableColumns": 559,
     "publicViewColumns": 27,
     "functionOverloads": [
       "public.ack_admin_inquiry_messages(p_inquiry_id bigint, p_through_message_id bigint)",
@@ -208,6 +227,9 @@
       "public.apply_experience_media_locator_cas(p_experience_id bigint, p_before_photos text[], p_before_image_url text, p_before_itinerary jsonb, p_before_itinerary_i18n jsonb, p_after_photos text[], p_after_image_url text, p_after_itinerary jsonb, p_after_itinerary_i18n jsonb)",
       "public.assign_service_concierge_host_atomic(p_admin_id uuid, p_request_id uuid, p_host_id uuid, p_host_hourly_rate integer, p_host_agreement_confirmed boolean)",
       "public.attach_experience_payment_provider_reference_atomic(p_booking_id text, p_user_id uuid, p_provider_reference text, p_claim_token uuid)",
+      "public.avatar_migration_inventory()",
+      "public.begin_avatar_media_asset(p_id uuid, p_owner_id uuid, p_key text, p_url text, p_sha256 text, p_size bigint, p_mime text, p_idempotency_key text)",
+      "public.begin_experience_media_asset(p_id uuid, p_owner_id uuid, p_key text, p_url text, p_sha256 text, p_size bigint, p_mime text, p_idempotency_key text, p_parent_id text)",
       "public.begin_experience_payment_capture_atomic(p_booking_id text, p_user_id uuid, p_provider_reference text)",
       "public.begin_service_refund_operation_atomic(p_admin_id uuid, p_order_id text, p_refund_amount integer, p_host_compensation_amount integer, p_idempotency_key text)",
       "public.cancel_expired_pending_bookings_atomic(p_batch_size integer)",
@@ -216,6 +238,8 @@
       "public.claim_due_admin_support_unread_alert_batches(p_limit integer)",
       "public.claim_due_review_request_reminders(p_limit integer)",
       "public.claim_experience_payment_atomic(p_booking_id text, p_user_id uuid, p_provider text, p_provider_reference text)",
+      "public.claim_media_deletion(p_asset_id uuid, p_enabled boolean, p_minimum_age_ms bigint)",
+      "public.commit_profile_avatar(p_owner_id uuid, p_asset_id uuid, p_expected_url text, p_sha256 text, p_size bigint)",
       "public.complete_admin_manual_experience_payout_atomic(p_request_key uuid, p_host_id uuid, p_settlement_type text, p_expected_current_booking_amount integer, p_legacy_amount integer, p_reason text, p_legacy_source_reference text, p_transfer_reference text, p_paid_by_admin_id uuid, p_paid_by_admin_email text)",
       "public.complete_experience_booking_if_due_atomic(p_booking_id text)",
       "public.complete_phone_request(p_request_id uuid, p_inquiry_id bigint, p_message_ids bigint[], p_admin_id uuid)",
@@ -251,14 +275,18 @@
       "public.list_due_experience_completion_candidates(p_booking_id text)",
       "public.list_due_experience_review_request_candidates(p_limit integer)",
       "public.mark_room_messages_read(p_room_id uuid, p_user_id uuid)",
+      "public.plan_media_owner_deletion(p_owner_id uuid)",
       "public.prune_notifications_retention(p_cutoff timestamp with time zone, p_batch_size integer)",
       "public.prune_team_workspace_comments(p_task_id uuid, p_keep_limit integer)",
       "public.prune_team_workspace_tasks(p_keep_limit integer)",
+      "public.record_media_deletion_step(p_asset_id uuid, p_event text, p_code text)",
       "public.record_translation_provider_outcome(p_provider text, p_token_count integer, p_cooldown_seconds integer, p_hit_quota boolean)",
       "public.record_translation_provider_outcome(p_provider text, p_token_count integer, p_cooldown_seconds integer, p_hit_quota boolean, p_reserved_token_count integer)",
       "public.refresh_experience_popularity_snapshot()",
+      "public.replace_managed_media_reference(p_owner_id uuid, p_parent_type text, p_parent_id text, p_expected_digest text, p_new_digest text, p_old_asset_id uuid, p_new_asset_id uuid)",
       "public.reply_phone_request(p_request_id uuid, p_inquiry_id bigint, p_message_ids bigint[], p_admin_id uuid, p_content text, p_type text, p_image_url text)",
       "public.request_service_cancellation_review_atomic(p_actor_id uuid, p_order_id text, p_cancel_reason text)",
+      "public.rollback_profile_avatar(p_owner_id uuid, p_asset_id uuid, p_expected_url text, p_old_url text)",
       "public.search_admin_chat(p_surface text, p_query text)",
       "public.select_service_host_atomic(p_customer_id uuid, p_request_id uuid, p_application_id uuid)",
       "public.set_proxy_comments_updated_at()",
@@ -266,19 +294,25 @@
       "public.set_service_applications_updated_at()",
       "public.set_service_bookings_updated_at()",
       "public.set_service_requests_updated_at()",
-      "public.snapshot_booking_guest_demographics()"
+      "public.snapshot_booking_guest_demographics()",
+      "public.verify_avatar_media_asset(p_id uuid, p_owner_id uuid, p_sha256 text, p_size bigint, p_mime text)",
+      "public.verify_experience_media_asset(p_id uuid, p_owner_id uuid, p_sha256 text, p_size bigint, p_mime text)"
     ],
     "privateFunctionOverloads": [
       "private.admin_chat_phone_title(category text, form_data jsonb)",
       "private.adopt_phone_followup_link()",
       "private.advance_support_version()",
+      "private.bump_experience_media_revision()",
+      "private.canonical_experience_media_locator(p_url text)",
       "private.capture_phone_followup()",
       "private.delete_pending_phone_followup()",
       "private.handle_phone_followup(p_request uuid, p_inquiry bigint, p_ids bigint[], p_admin uuid, p_complete boolean)",
       "private.has_phone_followup(p_request uuid)",
       "private.is_admin_reader()",
       "private.is_inquiry_admin_sender(p_sender uuid)",
-      "private.prepare_support_message()"
+      "private.prepare_support_message()",
+      "private.sync_experience_media_assets()",
+      "private.sync_profile_avatar_assets()"
     ],
     "applicationTriggers": [
       "auth.users.on_auth_user_created",
@@ -288,10 +322,15 @@
       "public.community_comments.on_comment_removed",
       "public.community_likes.on_like_added",
       "public.community_likes.on_like_removed",
+      "public.experiences.experience_media_delete_plan",
+      "public.experiences.experience_media_finalize",
+      "public.experiences.experience_media_revision",
       "public.inquiries.inquiry_support_version",
       "public.inquiry_messages.inquiry_support_message",
       "public.inquiry_messages.phone_followup_capture",
       "public.inquiry_messages.phone_followup_delete",
+      "public.profiles.profile_avatar_delete_plan",
+      "public.profiles.profile_avatar_finalize",
       "public.proxy_comments.trg_pc_updated_at",
       "public.proxy_requests.phone_followup_link",
       "public.proxy_requests.trg_pr_updated_at",
@@ -299,13 +338,13 @@
       "public.service_bookings.trg_sb_updated_at",
       "public.service_requests.trg_sr_updated_at"
     ],
-    "indexes": 133,
+    "indexes": 143,
     "constraints": {
-      "total": 180,
-      "primaryKey": 39,
-      "foreignKey": 59,
-      "unique": 14,
-      "check": 68
+      "check": 86,
+      "total": 206,
+      "unique": 17,
+      "foreignKey": 61,
+      "primaryKey": 42
     },
     "rls": {
       "enabled": [
@@ -329,6 +368,9 @@
         "inquiries",
         "inquiry_messages",
         "likes",
+        "media_asset_references",
+        "media_assets",
+        "media_deletion_journal",
         "messages",
         "notifications",
         "profile_private_demographics",
@@ -1127,5 +1169,427 @@
     "minimumQueryLength": 2,
     "resultLimit": 25,
     "lockTimeout": "2s"
+  },
+  "pendingProductionMigrations": [
+    {
+      "version": "20261005104924",
+      "name": "solo_guarantee_financial_authority",
+      "repositoryFile": "supabase/migrations/20261005104924_solo_guarantee_financial_authority.sql",
+      "repositorySha256": "df95be49a1df1e5b1fbc1e89afa0ff589b8041c4d9ed54e5d39945eaeee09c11"
+    }
+  ],
+  "selectiveProductionRollout": {
+    "allowedVersions": [
+      "20261005104924"
+    ],
+    "requiresFreshProductionLedger": true,
+    "blanketPendingMigrationApply": false,
+    "runbook": "docs/solo-guarantee-p0-rollout.md"
+  },
+  "appliedMediaAuthority": {
+    "indexes": [
+      {
+        "name": "media_asset_references_parent_idx",
+        "definition": "CREATE INDEX media_asset_references_parent_idx ON public.media_asset_references USING btree (parent_type, parent_id)"
+      },
+      {
+        "name": "media_asset_references_pkey",
+        "definition": "CREATE UNIQUE INDEX media_asset_references_pkey ON public.media_asset_references USING btree (asset_id, parent_type, parent_id)"
+      },
+      {
+        "name": "media_assets_owner_id_idempotency_key_key",
+        "definition": "CREATE UNIQUE INDEX media_assets_owner_id_idempotency_key_key ON public.media_assets USING btree (owner_id, idempotency_key)"
+      },
+      {
+        "name": "media_assets_owner_idx",
+        "definition": "CREATE INDEX media_assets_owner_idx ON public.media_assets USING btree (owner_id, business_scope)"
+      },
+      {
+        "name": "media_assets_pending_idx",
+        "definition": "CREATE INDEX media_assets_pending_idx ON public.media_assets USING btree (created_at, id) WHERE (state = 'pending'::text)"
+      },
+      {
+        "name": "media_assets_pkey",
+        "definition": "CREATE UNIQUE INDEX media_assets_pkey ON public.media_assets USING btree (id)"
+      },
+      {
+        "name": "media_assets_provider_bucket_object_key_key",
+        "definition": "CREATE UNIQUE INDEX media_assets_provider_bucket_object_key_key ON public.media_assets USING btree (provider, bucket, object_key)"
+      },
+      {
+        "name": "media_assets_public_url_key",
+        "definition": "CREATE UNIQUE INDEX media_assets_public_url_key ON public.media_assets USING btree (public_url)"
+      },
+      {
+        "name": "media_deletion_journal_pkey",
+        "definition": "CREATE UNIQUE INDEX media_deletion_journal_pkey ON public.media_deletion_journal USING btree (asset_id)"
+      },
+      {
+        "name": "media_deletion_journal_state_idx",
+        "definition": "CREATE INDEX media_deletion_journal_state_idx ON public.media_deletion_journal USING btree (state, requested_at)"
+      }
+    ],
+    "triggers": [
+      {
+        "name": "experience_media_delete_plan",
+        "table": "experiences",
+        "enabled": "O",
+        "definition": "CREATE TRIGGER experience_media_delete_plan BEFORE DELETE ON experiences FOR EACH ROW EXECUTE FUNCTION private.sync_experience_media_assets()"
+      },
+      {
+        "name": "experience_media_finalize",
+        "table": "experiences",
+        "enabled": "O",
+        "definition": "CREATE TRIGGER experience_media_finalize AFTER INSERT OR UPDATE ON experiences FOR EACH ROW EXECUTE FUNCTION private.sync_experience_media_assets()"
+      },
+      {
+        "name": "experience_media_revision",
+        "table": "experiences",
+        "enabled": "O",
+        "definition": "CREATE TRIGGER experience_media_revision BEFORE UPDATE ON experiences FOR EACH ROW EXECUTE FUNCTION private.bump_experience_media_revision()"
+      },
+      {
+        "name": "profile_avatar_delete_plan",
+        "table": "profiles",
+        "enabled": "O",
+        "definition": "CREATE TRIGGER profile_avatar_delete_plan BEFORE DELETE ON profiles FOR EACH ROW EXECUTE FUNCTION private.sync_profile_avatar_assets()"
+      },
+      {
+        "name": "profile_avatar_finalize",
+        "table": "profiles",
+        "enabled": "O",
+        "definition": "CREATE TRIGGER profile_avatar_finalize AFTER INSERT OR UPDATE OF avatar_url ON profiles FOR EACH ROW EXECUTE FUNCTION private.sync_profile_avatar_assets()"
+      }
+    ],
+    "constraints": [
+      {
+        "name": "media_asset_references_asset_id_fkey",
+        "table": "media_asset_references",
+        "definition": "FOREIGN KEY (asset_id) REFERENCES media_assets(id)"
+      },
+      {
+        "name": "media_asset_references_pkey",
+        "table": "media_asset_references",
+        "definition": "PRIMARY KEY (asset_id, parent_type, parent_id)"
+      },
+      {
+        "name": "media_asset_references_reference_digest_check",
+        "table": "media_asset_references",
+        "definition": "CHECK (reference_digest ~ '^[a-f0-9]{64}$'::text)"
+      },
+      {
+        "name": "avatar_media_identity",
+        "table": "media_assets",
+        "definition": "CHECK (business_scope <> 'avatar'::text OR provider = 'r2'::text AND bucket = 'locally-public-avatars'::text AND parent_type = 'profile_avatar'::text AND parent_id IS NOT NULL AND parent_id = owner_id::text AND public_url IS NOT NULL AND expected_size <= 10485760 AND (mime = ANY (ARRAY['image/jpeg'::text, 'image/png'::text, 'image/webp'::text, 'image/gif'::text, 'image/avif'::text])) AND object_key = ((((('avatars/v1/'::text || encode(sha256(convert_to('avatar-media-owner:'::text || owner_id::text, 'UTF8'::name)), 'hex'::text)) || '/'::text) || id::text) || '/avatar.'::text) ||\nCASE mime\n    WHEN 'image/jpeg'::text THEN 'jpg'::text\n    ELSE substr(mime, 7)\nEND) AND public_url = ('https://avatars-media.locally-travel.com/'::text || object_key))"
+      },
+      {
+        "name": "media_assets_bucket_check",
+        "table": "media_assets",
+        "definition": "CHECK (bucket ~ '^[a-zA-Z0-9_-]+$'::text)"
+      },
+      {
+        "name": "media_assets_business_scope_check",
+        "table": "media_assets",
+        "definition": "CHECK (business_scope = ANY (ARRAY['experience'::text, 'avatar'::text, 'host_profile'::text, 'community'::text, 'chat'::text, 'admin'::text, 'verification'::text]))"
+      },
+      {
+        "name": "media_assets_check",
+        "table": "media_assets",
+        "definition": "CHECK (state <> 'committed'::text OR verified_at IS NOT NULL AND committed_at IS NOT NULL)"
+      },
+      {
+        "name": "media_assets_check1",
+        "table": "media_assets",
+        "definition": "CHECK (state <> 'tombstoned'::text OR tombstoned_at IS NOT NULL)"
+      },
+      {
+        "name": "media_assets_check2",
+        "table": "media_assets",
+        "definition": "CHECK (business_scope <> 'experience'::text OR expected_size <= 10485760 AND provider = 'r2'::text AND bucket = 'locally-public-experience-canary'::text AND object_key ~~ 'sources/v1/experience/%'::text AND public_url = ('https://media-canary.locally-travel.com/'::text || object_key))"
+      },
+      {
+        "name": "media_assets_expected_sha256_check",
+        "table": "media_assets",
+        "definition": "CHECK (expected_sha256 ~ '^[a-f0-9]{64}$'::text)"
+      },
+      {
+        "name": "media_assets_expected_size_check",
+        "table": "media_assets",
+        "definition": "CHECK (expected_size > 0)"
+      },
+      {
+        "name": "media_assets_idempotency_key_check",
+        "table": "media_assets",
+        "definition": "CHECK (idempotency_key ~ '^[a-f0-9]{64}$'::text)"
+      },
+      {
+        "name": "media_assets_object_key_check",
+        "table": "media_assets",
+        "definition": "CHECK (object_key <> ''::text AND object_key !~ '(^/|(^|/)[.][.]?(/|$))'::text)"
+      },
+      {
+        "name": "media_assets_owner_id_idempotency_key_key",
+        "table": "media_assets",
+        "definition": "UNIQUE (owner_id, idempotency_key)"
+      },
+      {
+        "name": "media_assets_pkey",
+        "table": "media_assets",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "name": "media_assets_provider_bucket_object_key_key",
+        "table": "media_assets",
+        "definition": "UNIQUE (provider, bucket, object_key)"
+      },
+      {
+        "name": "media_assets_provider_check",
+        "table": "media_assets",
+        "definition": "CHECK (provider = ANY (ARRAY['supabase'::text, 'r2'::text]))"
+      },
+      {
+        "name": "media_assets_public_url_key",
+        "table": "media_assets",
+        "definition": "UNIQUE (public_url)"
+      },
+      {
+        "name": "media_assets_state_check",
+        "table": "media_assets",
+        "definition": "CHECK (state = ANY (ARRAY['pending'::text, 'committed'::text, 'tombstoned'::text]))"
+      },
+      {
+        "name": "media_deletion_journal_asset_id_fkey",
+        "table": "media_deletion_journal",
+        "definition": "FOREIGN KEY (asset_id) REFERENCES media_assets(id)"
+      },
+      {
+        "name": "media_deletion_journal_attempt_count_check",
+        "table": "media_deletion_journal",
+        "definition": "CHECK (attempt_count >= 0)"
+      },
+      {
+        "name": "media_deletion_journal_check",
+        "table": "media_deletion_journal",
+        "definition": "CHECK (state <> 'complete'::text OR object_deleted_at IS NOT NULL AND completed_at IS NOT NULL)"
+      },
+      {
+        "name": "media_deletion_journal_last_failure_check",
+        "table": "media_deletion_journal",
+        "definition": "CHECK (last_failure = ANY (ARRAY['reference_exists'::text, 'pinned'::text, 'delete_disabled'::text, 'identity_mismatch'::text, 'provider_failed'::text, 'purge_failed'::text]))"
+      },
+      {
+        "name": "media_deletion_journal_pkey",
+        "table": "media_deletion_journal",
+        "definition": "PRIMARY KEY (asset_id)"
+      },
+      {
+        "name": "media_deletion_journal_reason_check",
+        "table": "media_deletion_journal",
+        "definition": "CHECK (reason = ANY (ARRAY['replaced'::text, 'parent_deleted'::text, 'owner_deleted'::text, 'pending_abandoned'::text]))"
+      },
+      {
+        "name": "media_deletion_journal_state_check",
+        "table": "media_deletion_journal",
+        "definition": "CHECK (state = ANY (ARRAY['queued'::text, 'blocked'::text, 'deleting'::text, 'failed'::text, 'complete'::text]))"
+      }
+    ],
+    "functions": [
+      {
+        "acl": "{postgres=X/postgres}",
+        "owner": "postgres",
+        "result": "trigger",
+        "bodyMd5": "cdea8ca76a14af9f1acf520f5f3eb1df",
+        "identity": "private.bump_experience_media_revision()",
+        "volatility": "v",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": false
+      },
+      {
+        "acl": "{postgres=X/postgres}",
+        "owner": "postgres",
+        "result": "text",
+        "bodyMd5": "af146baa063876f07dc3a60c195a0f98",
+        "identity": "private.canonical_experience_media_locator(p_url text)",
+        "volatility": "i",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": false
+      },
+      {
+        "acl": "{postgres=X/postgres}",
+        "owner": "postgres",
+        "result": "trigger",
+        "bodyMd5": "fb047c74bf5b66e62a8c3fc801d975ee",
+        "identity": "private.sync_experience_media_assets()",
+        "volatility": "v",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": true
+      },
+      {
+        "acl": "{postgres=X/postgres}",
+        "owner": "postgres",
+        "result": "trigger",
+        "bodyMd5": "762aca4c44be1021f8a8711a7955eb46",
+        "identity": "private.sync_profile_avatar_assets()",
+        "volatility": "v",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": true
+      },
+      {
+        "acl": "{postgres=X/postgres,service_role=X/postgres}",
+        "owner": "postgres",
+        "result": "jsonb",
+        "bodyMd5": "67223aa9ded354e5b66cbc8af39488c2",
+        "identity": "public.avatar_migration_inventory()",
+        "volatility": "s",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": false
+      },
+      {
+        "acl": "{postgres=X/postgres,service_role=X/postgres}",
+        "owner": "postgres",
+        "result": "media_assets",
+        "bodyMd5": "23daf0b3ece0cb7dcb2ce08a0280d58d",
+        "identity": "public.begin_avatar_media_asset(p_id uuid, p_owner_id uuid, p_key text, p_url text, p_sha256 text, p_size bigint, p_mime text, p_idempotency_key text)",
+        "volatility": "v",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": false
+      },
+      {
+        "acl": "{postgres=X/postgres,service_role=X/postgres}",
+        "owner": "postgres",
+        "result": "media_assets",
+        "bodyMd5": "e6b8d8c78f0e435949c63de97a5182d4",
+        "identity": "public.begin_experience_media_asset(p_id uuid, p_owner_id uuid, p_key text, p_url text, p_sha256 text, p_size bigint, p_mime text, p_idempotency_key text, p_parent_id text)",
+        "volatility": "v",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": false
+      },
+      {
+        "acl": "{postgres=X/postgres,service_role=X/postgres}",
+        "owner": "postgres",
+        "result": "boolean",
+        "bodyMd5": "54a6e20ba2224fc1aaf30a722a3f4a9f",
+        "identity": "public.claim_media_deletion(p_asset_id uuid, p_enabled boolean, p_minimum_age_ms bigint)",
+        "volatility": "v",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": false
+      },
+      {
+        "acl": "{postgres=X/postgres,service_role=X/postgres}",
+        "owner": "postgres",
+        "result": "media_assets",
+        "bodyMd5": "0231f457894c7b7e683a2e301ada0b54",
+        "identity": "public.commit_profile_avatar(p_owner_id uuid, p_asset_id uuid, p_expected_url text, p_sha256 text, p_size bigint)",
+        "volatility": "v",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": false
+      },
+      {
+        "acl": "{postgres=X/postgres,service_role=X/postgres}",
+        "owner": "postgres",
+        "result": "integer",
+        "bodyMd5": "ac568071f0533cb850cf6d2970cded19",
+        "identity": "public.plan_media_owner_deletion(p_owner_id uuid)",
+        "volatility": "v",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": false
+      },
+      {
+        "acl": "{postgres=X/postgres,service_role=X/postgres}",
+        "owner": "postgres",
+        "result": "void",
+        "bodyMd5": "9c57b2a53ba014b26bca56528f17dd2d",
+        "identity": "public.record_media_deletion_step(p_asset_id uuid, p_event text, p_code text)",
+        "volatility": "v",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": false
+      },
+      {
+        "acl": "{postgres=X/postgres,service_role=X/postgres}",
+        "owner": "postgres",
+        "result": "void",
+        "bodyMd5": "670e43b8096a583208ff6f66ab1c03c9",
+        "identity": "public.replace_managed_media_reference(p_owner_id uuid, p_parent_type text, p_parent_id text, p_expected_digest text, p_new_digest text, p_old_asset_id uuid, p_new_asset_id uuid)",
+        "volatility": "v",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": false
+      },
+      {
+        "acl": "{postgres=X/postgres,service_role=X/postgres}",
+        "owner": "postgres",
+        "result": "boolean",
+        "bodyMd5": "00979ed226da2993efe20e85be9f21f6",
+        "identity": "public.rollback_profile_avatar(p_owner_id uuid, p_asset_id uuid, p_expected_url text, p_old_url text)",
+        "volatility": "v",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": false
+      },
+      {
+        "acl": "{postgres=X/postgres,service_role=X/postgres}",
+        "owner": "postgres",
+        "result": "media_assets",
+        "bodyMd5": "bf39eefc4fe80351afe01e3fe1081cea",
+        "identity": "public.verify_avatar_media_asset(p_id uuid, p_owner_id uuid, p_sha256 text, p_size bigint, p_mime text)",
+        "volatility": "v",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": false
+      },
+      {
+        "acl": "{postgres=X/postgres,service_role=X/postgres}",
+        "owner": "postgres",
+        "result": "media_assets",
+        "bodyMd5": "03ca290bcdae18b33b584a1da2ee78e5",
+        "identity": "public.verify_experience_media_asset(p_id uuid, p_owner_id uuid, p_sha256 text, p_size bigint, p_mime text)",
+        "volatility": "v",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": false
+      }
+    ],
+    "ledgerEvidence": [
+      {
+        "name": "media_lifecycle_foundation",
+        "version": "20261004053224",
+        "statementsMd5": "7b753190dec37819fc120e86e088b5b6",
+        "statementCount": 1,
+        "statementsSha256": "c8cd123855ba600070fd22ddaef6b6a37591110f18cec92829de37ff0fdb3cfd"
+      },
+      {
+        "name": "avatar_media_authority",
+        "version": "20261005082309",
+        "statementsMd5": "6297922f1e25f9b2a2fb21b1675d7976",
+        "statementCount": 1,
+        "statementsSha256": "b8a749115d2e279ea8b0e37d17ef6c373d3eec5e5f51b555c7fd62b1e58d774f"
+      }
+    ]
   }
 }

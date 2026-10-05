@@ -1,325 +1,96 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { hasSoloGuaranteeTourEnded, type SoloGuaranteeRefundSlotBooking } from '@/app/utils/bookings/soloGuaranteeRefundPolicy';
+import { cancelCardPayment, CardRefundOutcomeError } from '@/app/utils/payments/card/server';
+import { normalizeNotificationLocale } from '@/app/utils/notificationLocale';
+import { soloRefundNotificationCopy } from '@/app/utils/bookings/soloRefundCopy';
 
-import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
-import {
-  buildSoloRefundSettlementSnapshot,
-  findSoloGuaranteeRefundCandidatesInSlot,
-  getSoloGuaranteeRefundTargetAmount,
-  getSoloManualRefundCompletionGuard,
-  hasSoloGuaranteeTourEnded,
-  type SoloGuaranteeRefundSlotBooking,
-  toSoloGuaranteeRefundNumber as toNumber,
-} from '@/app/utils/bookings/soloGuaranteeRefundPolicy';
-import { cancelCardPayment } from '@/app/utils/payments/card/server';
-import { normalizeSoloGuaranteeRefundStatus } from '@/app/utils/soloGuaranteeRefundStatus';
-
-type CompletedSlotRow = {
-  id: string;
-  experience_id: number | string | null;
-  date: string | null;
-  time: string | null;
-};
-
-type ProcessSoloGuaranteeRefundResult = {
-  processed: number;
-  refunded: number;
-  pendingManual: number;
-  failed: number;
-  skipped: number;
-};
-
+type CompletedSlotRow = { id: string; experience_id: number | string | null; date: string | null; time: string | null };
 type CancelCardPaymentFn = typeof cancelCardPayment;
-
+export type SoloRefundOperation = {
+  id: string; booking_id: string; provider: string; payment_method: string;
+  attempt_identity: string;
+  transaction_reference: string | null; order_reference: string; requested_amount: number;
+  gross_amount: number;
+  outcome: 'claimed' | 'accepted' | 'unknown' | 'rejected' | 'manual_pending';
+  settlement_applied_at: string | null; delivery_state: string;
+};
 const SOLO_REFUND_RECONCILIATION_LIMIT = 50;
 const SOLO_REFUND_RECONCILIATION_ROTATION_MS = 2 * 60 * 60 * 1000;
-
-function normalizeExperienceMeta(value: SoloGuaranteeRefundSlotBooking['experiences']) {
-  return Array.isArray(value) ? value[0] || null : value || null;
+function buildSlotKey(row: CompletedSlotRow) { return [row.experience_id, row.date, row.time].join('|'); }
+async function rpcOperations(db: SupabaseClient, name: string, args: Record<string, unknown> = {}) {
+  const { data, error } = await db.rpc(name, args);
+  if (error) throw new Error('solo_refund_database_transition_failed');
+  return (data || []) as SoloRefundOperation[];
 }
-
-function buildSlotKey(row: Pick<CompletedSlotRow, 'experience_id' | 'date' | 'time'>) {
-  return [String(row.experience_id ?? ''), row.date || '', row.time || ''].join('|');
-}
-
-function formatWon(amount: number) {
-  return `${Math.max(0, Math.floor(amount)).toLocaleString('ko-KR')}원`;
-}
-
-async function notifyGuestSoloRefundStatus(params: {
-  supabaseAdmin: SupabaseClient;
-  booking: SoloGuaranteeRefundSlotBooking;
-  status: 'refunded' | 'pending_manual';
-  refundAmount: number;
-}) {
-  if (!params.booking.user_id) return;
-
-  const title = params.status === 'refunded'
-    ? '1인 진행 추가금 환불 완료'
-    : '1인 진행 추가금 환불 확인 중';
-  const refundAmountLabel = formatWon(params.refundAmount);
-  const message = params.status === 'refunded'
-    ? `다른 참여자가 함께 확정되어 1인 진행 추가금 ${refundAmountLabel}이 환불 처리되었습니다.`
-    : `다른 참여자가 함께 확정되어 1인 진행 추가금 ${refundAmountLabel} 환불을 운영팀이 확인 중입니다.`;
-
-  const { error } = await params.supabaseAdmin.from('notifications').insert({
-    user_id: params.booking.user_id,
-    type: 'refund',
-    title,
-    message,
-    link: '/guest/trips',
-    is_read: false,
-  });
-
-  if (error) {
-    console.error(JSON.stringify({
-      event: 'solo_guarantee_refund',
-      status: 'failed',
-      diagnosticCode: 'guest_notification_failed',
-    }));
+// Only DB transitions are retried. The dispatch token and external request are
+// never retried on a lost response, transport exception or accounting failure.
+async function saveOutcome(db: SupabaseClient, op: SoloRefundOperation, outcome: string,
+  resultCode: string | null, reference: string | null, diagnostic: string | null) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      return (await rpcOperations(db, 'record_solo_refund_outcome_atomic', {
+        p_operation_id: op.id, p_attempt_identity: op.attempt_identity, p_outcome: outcome, p_result_code: resultCode,
+        p_refund_reference: reference, p_diagnostic_code: diagnostic,
+      }))[0] || op;
+    } catch { if (attempt === 1) return { ...op, outcome: 'unknown' as const }; }
   }
+  return op;
 }
-
-async function alertAdminSoloRefundRequired(params: {
-  supabaseAdmin: SupabaseClient;
-  title: string;
-  booking: SoloGuaranteeRefundSlotBooking;
-  message: string;
-}) {
+async function applySettlement(db: SupabaseClient, op: SoloRefundOperation) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try { return (await rpcOperations(db, 'apply_solo_refund_settlement_atomic', { p_operation_id: op.id }))[0] || op; }
+    catch { /* durable ACCEPTED remains blocked and recoverable */ }
+  }
+  return op;
+}
+export async function deliverSoloRefundNotification(db: SupabaseClient, op: SoloRefundOperation) {
+  if (!op.settlement_applied_at && op.outcome !== 'manual_pending') return true;
   try {
-    const experience = normalizeExperienceMeta(params.booking.experiences);
-    await insertAdminAlerts({
-      title: params.title,
-      message: `[${String(params.booking.order_id || params.booking.id).slice(-12)}] ${
-        experience?.title || '체험 예약'
-      } - ${params.message}`,
-      link: '/admin/dashboard?tab=LEDGER',
-    }, { supabaseAdmin: params.supabaseAdmin });
+    const { data: booking, error } = await db.from('bookings').select('user_id, experiences(host_id)').eq('id', op.booking_id).single();
+    if (error) throw error;
+    const exp = Array.isArray(booking.experiences) ? booking.experiences[0] : booking.experiences;
+    const recipients = [{ id: booking.user_id, host: false }, { id: exp?.host_id, host: true }].filter(r => r.id);
+    const notifications = await Promise.all(recipients.map(async r => {
+      let locale = 'ko' as 'ko' | 'en' | 'ja' | 'zh';
+      try {
+        const user = await db.auth.admin.getUserById(r.id);
+        locale = normalizeNotificationLocale(user.data.user?.user_metadata?.preferred_locale) || 'ko';
+      } catch { /* locale fallback requires no sensitive diagnostic */ }
+      return { user_id: r.id, ...soloRefundNotificationCopy(locale, !!op.settlement_applied_at, op.requested_amount, r.host) };
+    }));
+    const { data, error: deliveryError } = await db.rpc('deliver_solo_refund_notification_atomic', {
+      p_operation_id: op.id, p_expected_phase: op.settlement_applied_at ? 'applied' : 'manual_pending', p_notifications: notifications,
+    });
+    if (deliveryError) throw new Error('notification_delivery_uncertain');
+    return data === true;
   } catch {
-    console.error(JSON.stringify({
-      event: 'solo_guarantee_refund',
-      status: 'failed',
-      diagnosticCode: 'admin_alert_failed',
-    }));
+    // The outbox stays pending. Recovery retries delivery without touching money.
+    try { await db.rpc('mark_solo_refund_delivery_failed_atomic', { p_operation_id: op.id }); } catch { /* retain outbox */ }
+    return false;
   }
 }
-
-async function markSoloRefundFailed(params: {
-  supabaseAdmin: SupabaseClient;
-  booking: SoloGuaranteeRefundSlotBooking;
-  triggerBookingId: string;
-  refundAmount: number;
-  errorMessage: string;
-}) {
-  await params.supabaseAdmin
-    .from('bookings')
-    .update({
-      solo_guarantee_refund_status: 'failed',
-      solo_guarantee_refund_amount: params.refundAmount,
-      solo_guarantee_refund_error: params.errorMessage,
-      solo_guarantee_refund_trigger_booking_id: params.triggerBookingId,
-    })
-    .eq('id', params.booking.id);
-
-  await alertAdminSoloRefundRequired({
-    supabaseAdmin: params.supabaseAdmin,
-    title: '1인 진행 추가금 환불 확인 필요',
-    booking: params.booking,
-    message: params.errorMessage,
-  });
-}
-
-async function processManualSoloRefund(params: {
-  supabaseAdmin: SupabaseClient;
-  booking: SoloGuaranteeRefundSlotBooking;
-  triggerBookingId: string;
-  refundAmount: number;
-}) {
-  if (params.booking.payout_status === 'paid') {
-    await markSoloRefundFailed({
-      supabaseAdmin: params.supabaseAdmin,
-      booking: params.booking,
-      triggerBookingId: params.triggerBookingId,
-      refundAmount: params.refundAmount,
-      errorMessage: '이미 정산 완료된 예약입니다. 수동 확인이 필요합니다.',
-    });
-    return 'failed' as const;
-  }
-
-  const snapshot = buildSoloRefundSettlementSnapshot(params.booking, params.refundAmount);
-  const { data: updatedRow, error } = await params.supabaseAdmin
-    .from('bookings')
-    .update({
-      solo_guarantee_refund_status: 'pending_manual',
-      solo_guarantee_refund_amount: params.refundAmount,
-      solo_guarantee_refund_error: null,
-      solo_guarantee_refund_trigger_booking_id: params.triggerBookingId,
-      ...snapshot,
-    })
-    .eq('id', params.booking.id)
-    .eq('status', 'completed')
-    .eq('solo_guarantee_refund_status', 'not_applicable')
-    .select('id')
-    .maybeSingle();
-
-  if (error) throw error;
-  if (!updatedRow) return 'skipped' as const;
-
-  await notifyGuestSoloRefundStatus({
-    supabaseAdmin: params.supabaseAdmin,
-    booking: params.booking,
-    status: 'pending_manual',
-    refundAmount: params.refundAmount,
-  });
-  await alertAdminSoloRefundRequired({
-    supabaseAdmin: params.supabaseAdmin,
-    title: '1인 진행 추가금 수동 환불 필요',
-    booking: params.booking,
-    message: `카드 외 결제수단 예약입니다. ${formatWon(params.refundAmount)} 수동 환불 후 장부에서 완료 처리해 주세요.`,
-  });
-
-  return 'pending_manual' as const;
-}
-
-async function processCardSoloRefund(params: {
-  supabaseAdmin: SupabaseClient;
-  booking: SoloGuaranteeRefundSlotBooking;
-  triggerBookingId: string;
-  refundAmount: number;
-  cancelCardPaymentFn: CancelCardPaymentFn;
-  now: Date;
-}) {
-  if (params.booking.payout_status === 'paid') {
-    await markSoloRefundFailed({
-      supabaseAdmin: params.supabaseAdmin,
-      booking: params.booking,
-      triggerBookingId: params.triggerBookingId,
-      refundAmount: params.refundAmount,
-      errorMessage: '이미 정산 완료된 예약입니다. 수동 확인이 필요합니다.',
-    });
-    return 'failed' as const;
-  }
-
-  if (!params.booking.tid) {
-    await markSoloRefundFailed({
-      supabaseAdmin: params.supabaseAdmin,
-      booking: params.booking,
-      triggerBookingId: params.triggerBookingId,
-      refundAmount: params.refundAmount,
-      errorMessage: '카드 환불 거래 식별값이 없어 자동 환불할 수 없습니다.',
-    });
-    return 'failed' as const;
-  }
-
-  const { data: lockedRow, error: lockError } = await params.supabaseAdmin
-    .from('bookings')
-    .update({
-      solo_guarantee_refund_status: 'processing',
-      solo_guarantee_refund_error: null,
-      solo_guarantee_refund_trigger_booking_id: params.triggerBookingId,
-    })
-    .eq('id', params.booking.id)
-    .eq('status', 'completed')
-    .eq('solo_guarantee_refund_status', 'not_applicable')
-    .select(
-      'id, order_id, user_id, experience_id, date, time, status, amount, total_price, total_experience_price, price_at_booking, solo_guarantee_price, solo_guarantee_refund_status, solo_guarantee_refund_amount, refund_amount, payment_method, tid, payout_status, experiences(title, host_id, duration)'
-    )
-    .maybeSingle();
-
-  if (lockError) throw lockError;
-  if (!lockedRow) return 'skipped' as const;
-
-  const lockedBooking = { ...params.booking, ...(lockedRow as SoloGuaranteeRefundSlotBooking) };
-  if (lockedBooking.payout_status === 'paid') {
-    await markSoloRefundFailed({
-      supabaseAdmin: params.supabaseAdmin,
-      booking: lockedBooking,
-      triggerBookingId: params.triggerBookingId,
-      refundAmount: params.refundAmount,
-      errorMessage: '이미 정산 완료된 예약입니다. 수동 확인이 필요합니다.',
-    });
-    return 'failed' as const;
-  }
-
-  const stillEligible =
-    String(lockedBooking.status || '').toLowerCase() === 'completed' &&
-    normalizeSoloGuaranteeRefundStatus(lockedBooking.solo_guarantee_refund_status) === 'processing' &&
-    String(lockedBooking.payment_method || '').toLowerCase() === 'card' &&
-    getSoloGuaranteeRefundTargetAmount(lockedBooking) === params.refundAmount &&
-    toNumber(lockedBooking.solo_guarantee_refund_amount) < params.refundAmount &&
-    hasSoloGuaranteeTourEnded(lockedBooking, params.now);
-
-  if (!stillEligible || !lockedBooking.tid) {
-    await params.supabaseAdmin
-      .from('bookings')
-      .update({
-        solo_guarantee_refund_status: 'not_applicable',
-        solo_guarantee_refund_error: null,
-        solo_guarantee_refund_trigger_booking_id: null,
-      })
-      .eq('id', params.booking.id)
-      .eq('solo_guarantee_refund_status', 'processing');
-    return 'skipped' as const;
-  }
-
+async function executeClaim(db: SupabaseClient, op: SoloRefundOperation, cancel: CancelCardPaymentFn, merchantReference = process.env.NICEPAY_MID) {
+  if (op.outcome !== 'claimed') return op;
+  let dispatch: SoloRefundOperation | undefined;
+  try { dispatch = (await rpcOperations(db, 'begin_solo_refund_request_atomic', { p_operation_id: op.id, p_attempt_identity: op.attempt_identity, p_merchant_reference: merchantReference || null }))[0]; }
+  catch { return { ...op, outcome: 'unknown' as const }; }
+  if (!dispatch) return op;
+  let next: SoloRefundOperation;
   try {
-    await params.cancelCardPaymentFn({
-      providerTransactionId: String(lockedBooking.tid),
-      orderId: lockedBooking.order_id || lockedBooking.id,
-      cancelAmount: params.refundAmount,
-      cancelReason: '1인 진행 추가금 환불',
-      totalAmount: toNumber(lockedBooking.amount),
-      requireMerchantKey: true,
-      acceptedResultCodes: ['2001', '2211'],
+    const response = await cancel({ providerTransactionId: op.transaction_reference!, orderId: op.order_reference,
+      cancelAmount: op.requested_amount, cancelReason: 'Solo guarantee refund', requireMerchantKey: true,
+      // Solo refund is a partial cancellation of the booking-time add-on.
+      totalAmount: op.gross_amount, acceptedResultCodes: ['2001', '2211'],
     });
-
-    const snapshot = buildSoloRefundSettlementSnapshot(lockedBooking, params.refundAmount);
-    const nextRefundAmount = Math.min(
-      toNumber(lockedBooking.amount),
-      toNumber(lockedBooking.refund_amount) + params.refundAmount
-    );
-    const refundedAt = new Date().toISOString();
-    const { data: updatedRow, error: updateError } = await params.supabaseAdmin
-      .from('bookings')
-      .update({
-        solo_guarantee_refund_status: 'refunded',
-        solo_guarantee_refund_amount: params.refundAmount,
-        solo_guarantee_refunded_at: refundedAt,
-        solo_guarantee_refund_error: null,
-        refund_amount: nextRefundAmount,
-        ...snapshot,
-      })
-      .eq('id', params.booking.id)
-      .eq('status', 'completed')
-      .eq('solo_guarantee_refund_status', 'processing')
-      .select('id')
-      .maybeSingle();
-
-    if (updateError) throw updateError;
-    if (!updatedRow) {
-      throw new Error('예약 상태가 변경되어 1인 진행 추가금 환불 확정 저장이 중단되었습니다. 관리자 확인이 필요합니다.');
-    }
-
-    await notifyGuestSoloRefundStatus({
-      supabaseAdmin: params.supabaseAdmin,
-      booking: params.booking,
-      status: 'refunded',
-      refundAmount: params.refundAmount,
-    });
-
-    return 'refunded' as const;
+    if (!response.refundReference) throw new CardRefundOutcomeError('unknown', 'provider_refund_identity_missing');
+    next = await saveOutcome(db, op, 'accepted', response.resultCode, response.refundReference, null);
   } catch (error) {
-    const message = error instanceof Error ? error.message : '자동 환불 처리 중 오류가 발생했습니다.';
-    await markSoloRefundFailed({
-      supabaseAdmin: params.supabaseAdmin,
-      booking: params.booking,
-      triggerBookingId: params.triggerBookingId,
-      refundAmount: params.refundAmount,
-      errorMessage: message,
-    });
-    return 'failed' as const;
+    const classification = error instanceof CardRefundOutcomeError ? error.outcome : 'unknown';
+    const code = error instanceof CardRefundOutcomeError ? error.diagnosticCode : 'provider_outcome_uncertain';
+    next = await saveOutcome(db, op, classification, error instanceof CardRefundOutcomeError ? error.resultCode : null, null, code);
   }
+  return next.outcome === 'accepted' ? applySettlement(db, next) : next;
 }
-
 async function fetchCompletedSlotRows(
   supabaseAdmin: SupabaseClient,
   completedBookingIds: string[]
@@ -412,162 +183,80 @@ async function fetchSoloRefundReconciliationBookingIds(
     .map((booking) => booking.id);
 }
 
+export async function retryRejectedSoloRefund(db: SupabaseClient, operationId: string, adminId: string) {
+  const op = (await rpcOperations(db, 'retry_rejected_solo_refund_atomic', { p_operation_id: operationId, p_admin_id: adminId }))[0];
+  if (!op) throw new Error('solo_refund_retry_unsafe');
+  const final = await executeClaim(db, op, cancelCardPayment);
+  await deliverSoloRefundNotification(db, final);
+  return final;
+}
+
+type ProcessSoloRefundResult = { processed: number; refunded: number; pendingManual: number; failed: number; skipped: number }
+  & Partial<Record<'claimed' | 'accepted' | 'unknown' | 'rejected' | 'settlement_applied' | 'manual_pending' | 'reconciliation_required' | 'delivery_failed', number>>;
 export async function processSoloGuaranteeRefundsForCompletedBookings(params: {
   supabaseAdmin: SupabaseClient;
   completedBookingIds: Array<string | number | null | undefined>;
   cancelCardPaymentFn?: CancelCardPaymentFn;
   reconcileCompleted?: boolean;
+  merchantReference?: string;
   now?: Date;
-}): Promise<ProcessSoloGuaranteeRefundResult> {
-  const now = params.now ?? new Date();
-  const bookingIds = params.completedBookingIds
-    .map((id) => String(id || '').trim())
-    .filter(Boolean);
+}): Promise<ProcessSoloRefundResult> {
+  const db = params.supabaseAdmin;
+  const ids = params.completedBookingIds.map(id => String(id || '').trim()).filter(Boolean);
+  const result = { processed: 0, refunded: 0, pendingManual: 0, failed: 0, skipped: 0,
+    claimed: 0, accepted: 0, unknown: 0, rejected: 0, settlement_applied: 0, manual_pending: 0,
+    reconciliation_required: 0, delivery_failed: 0 };
   if (params.reconcileCompleted) {
-    bookingIds.push(...await fetchSoloRefundReconciliationBookingIds(params.supabaseAdmin, now));
+    const recovery = await rpcOperations(db, 'recover_solo_refunds_atomic', { p_limit: 50 });
+    for (const operation of recovery) {
+      const op = operation.outcome === 'accepted' && !operation.settlement_applied_at ? await applySettlement(db, operation) : operation;
+      if (!await deliverSoloRefundNotification(db, op)) result.delivery_failed++;
+    }
+    ids.push(...await fetchSoloRefundReconciliationBookingIds(db, params.now ?? new Date()));
   }
-  const uniqueBookingIds = Array.from(new Set(bookingIds));
-  const result: ProcessSoloGuaranteeRefundResult = {
-    processed: 0,
-    refunded: 0,
-    pendingManual: 0,
-    failed: 0,
-    skipped: 0,
-  };
-
-  if (uniqueBookingIds.length === 0) return result;
-
-  const slots = await fetchCompletedSlotRows(params.supabaseAdmin, uniqueBookingIds);
-  const uniqueSlots = Array.from(new Map(slots.map((slot) => [buildSlotKey(slot), slot])).values());
-
-  for (const slot of uniqueSlots) {
-    const rows = await fetchSlotBookings(params.supabaseAdmin, slot);
-    const rowMap = new Map(rows.map((row) => [row.id, row]));
-    const candidates = findSoloGuaranteeRefundCandidatesInSlot(rows, { now });
-
-    for (const candidate of candidates) {
-      const booking = rowMap.get(candidate.bookingId);
-      if (!booking) {
-        result.skipped += 1;
-        continue;
+  if (ids.length) {
+    const slots = await fetchCompletedSlotRows(db, [...new Set(ids)]);
+    for (const slot of new Map(slots.map(s => [buildSlotKey(s), s])).values()) {
+      // This read is only a bounded candidate hint. SQL locks and revalidates A,
+      // qualifying B, slot, exact S and payout state at the authority boundary.
+      const rows = await fetchSlotBookings(db, slot);
+      for (const row of rows.filter(r => Number(r.solo_guarantee_price) > 0 && r.solo_guarantee_refund_status === 'not_applicable')) {
+        const op = (await rpcOperations(db, 'claim_solo_refund_atomic', { p_booking_id: row.id }))[0];
+        if (!op) { result.skipped++; continue; }
+        result.processed++;
+        if (op.outcome === 'claimed') result.claimed++;
+        const final = await executeClaim(db, op, params.cancelCardPaymentFn || cancelCardPayment, params.merchantReference);
+        if (final.settlement_applied_at) { result.refunded++; result.settlement_applied++; }
+        if (final.outcome === 'accepted') result.accepted++;
+        if (final.outcome === 'unknown') result.unknown++;
+        if (final.outcome === 'rejected') { result.rejected++; result.failed++; }
+        if (final.outcome === 'manual_pending') { result.pendingManual++; result.manual_pending++; }
+        if (!final.settlement_applied_at && final.outcome !== 'manual_pending') result.reconciliation_required++;
+        // Delivery never shares the provider/financial error handler.
+        if (!await deliverSoloRefundNotification(db, final)) result.delivery_failed++;
       }
-
-      result.processed += 1;
-      const paymentMethod = String(booking.payment_method || '').toLowerCase();
-      const outcome = paymentMethod === 'card'
-        ? await processCardSoloRefund({
-            supabaseAdmin: params.supabaseAdmin,
-            booking,
-            triggerBookingId: candidate.triggerBookingId,
-            refundAmount: candidate.refundAmount,
-            cancelCardPaymentFn: params.cancelCardPaymentFn || cancelCardPayment,
-            now,
-          })
-        : await processManualSoloRefund({
-            supabaseAdmin: params.supabaseAdmin,
-            booking,
-            triggerBookingId: candidate.triggerBookingId,
-            refundAmount: candidate.refundAmount,
-          });
-
-      if (outcome === 'refunded') result.refunded += 1;
-      else if (outcome === 'pending_manual') result.pendingManual += 1;
-      else if (outcome === 'failed') result.failed += 1;
-      else result.skipped += 1;
     }
   }
-
+  console.info(JSON.stringify({ event: 'solo_guarantee_refund', ...result }));
   return result;
 }
 
 export async function markSoloGuaranteeManualRefundCompleted(params: {
-  supabaseAdmin: SupabaseClient;
-  bookingId: string;
-  adminId?: string | null;
-  adminEmail?: string | null;
+  supabaseAdmin: SupabaseClient; bookingId: string; refundAmount?: number;
+  proofReference?: string; transactionReference?: string; adminId?: string | null; adminEmail?: string | null;
 }) {
-  const { data: booking, error } = await params.supabaseAdmin
-    .from('bookings')
-    .select(`
-      id,
-      user_id,
-      amount,
-      total_price,
-      total_experience_price,
-      price_at_booking,
-      solo_guarantee_price,
-      refund_amount,
-      solo_guarantee_refund_status,
-      solo_guarantee_refund_amount,
-      payout_status,
-      experiences(title)
-    `)
-    .eq('id', params.bookingId)
-    .maybeSingle();
-
-  if (error) throw error;
-  const row = booking as SoloGuaranteeRefundSlotBooking | null;
-  if (!row) {
-    return { success: false as const, status: 404, error: '예약 정보를 찾을 수 없습니다.' };
+  if (!Number.isSafeInteger(params.refundAmount) || !params.proofReference || !params.adminId) {
+    return { success: false as const, status: 400, error: '정확한 환불 금액과 외부 환불 참조값이 필요합니다.' };
   }
-
-  const currentStatus = normalizeSoloGuaranteeRefundStatus(row.solo_guarantee_refund_status);
-  const completionGuard = getSoloManualRefundCompletionGuard(row);
-  if (!completionGuard.ok) {
-    return {
-      success: false as const,
-      status: 409,
-      error: completionGuard.reason === 'not_waiting'
-        ? '수동 환불 대기 상태가 아닙니다.'
-        : completionGuard.reason === 'already_paid'
-        ? '이미 정산 완료된 예약입니다. 별도 정산 조정이 필요합니다.'
-        : '정산 대기 상태의 예약만 수동 환불 완료 처리할 수 있습니다.',
-    };
-  }
-
-  const refundAmount = toNumber(row.solo_guarantee_refund_amount);
-  if (refundAmount <= 0) {
-    return { success: false as const, status: 409, error: '환불 처리할 1인 진행 추가금이 없습니다.' };
-  }
-
-  const refundedAt = new Date().toISOString();
-  const snapshot = buildSoloRefundSettlementSnapshot(row, refundAmount, {
-    existingSoloRefundAlreadyApplied: currentStatus !== 'failed',
+  const { data, error } = await params.supabaseAdmin.rpc('complete_manual_solo_refund_atomic', {
+    p_booking_id: params.bookingId, p_amount: params.refundAmount, p_proof_reference: params.proofReference,
+    p_transaction_reference: params.transactionReference || null, p_admin_id: params.adminId,
   });
-  const nextRefundAmount = Math.min(toNumber(row.amount), toNumber(row.refund_amount) + refundAmount);
-  const { data: updatedRow, error: updateError } = await params.supabaseAdmin
-    .from('bookings')
-    .update({
-      solo_guarantee_refund_status: 'refunded',
-      solo_guarantee_refunded_at: refundedAt,
-      solo_guarantee_refund_error: null,
-      refund_amount: nextRefundAmount,
-      ...snapshot,
-    })
-    .eq('id', params.bookingId)
-    .eq('payout_status', 'pending')
-    .in('solo_guarantee_refund_status', ['pending_manual', 'failed'])
-    .select('id')
-    .maybeSingle();
-
-  if (updateError) throw updateError;
-  if (!updatedRow) {
-    return { success: false as const, status: 409, error: '다른 관리자에 의해 환불 상태가 변경되었습니다.' };
-  }
-
-  await notifyGuestSoloRefundStatus({
-    supabaseAdmin: params.supabaseAdmin,
-    booking: row,
-    status: 'refunded',
-    refundAmount,
-  });
-
-  return {
-    success: true as const,
-    bookingId: params.bookingId,
-    refundAmount,
-    refundedAt,
-    adminId: params.adminId || null,
-    adminEmail: params.adminEmail || null,
-  };
+  const op = (data as SoloRefundOperation[] | null)?.[0];
+  if (error || !op) return { success: false as const, status: 409, error: '환불 의무·결제수단·참조값·예약 상태를 다시 확인해 주세요.' };
+  const applied = await applySettlement(params.supabaseAdmin, op);
+  if (!applied.settlement_applied_at) return { success: false as const, status: 409, error: '외부 환불 증빙은 저장됐으며 장부 반영을 확인 중입니다. 다시 이체하지 마세요.' };
+  await deliverSoloRefundNotification(params.supabaseAdmin, applied);
+  return { success: true as const, bookingId: op.booking_id, refundAmount: op.requested_amount,
+    refundedAt: applied.settlement_applied_at, adminId: params.adminId, adminEmail: params.adminEmail || null };
 }

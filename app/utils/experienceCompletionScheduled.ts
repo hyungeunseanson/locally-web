@@ -116,6 +116,7 @@ export function createExperienceCompletionScheduledDependencies(
     processSoloGuaranteeRefunds: (params) =>
       processSoloGuaranteeRefundsForCompletedBookings({
         ...params,
+        merchantReference: environment.NICEPAY_MID,
         cancelCardPaymentFn: (request) =>
           cancelCardPayment(request, {
             environment: environment as Record<string, string | undefined>,

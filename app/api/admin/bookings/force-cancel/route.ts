@@ -6,10 +6,11 @@ import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { calculateBookingCancellationSettlement, getBookingPaidAmount } from '@/app/utils/bookingFinance';
 import { isCancelledBookingStatus, isPendingBookingStatus } from '@/app/constants/bookingStatus';
-import { cancelCardPayment } from '@/app/utils/payments/card/server';
+import { cancelCardPayment, assertCardRefundConfiguration } from '@/app/utils/payments/card/server';
 import { refundPayPalCapture } from '@/app/utils/paypal/server';
 import { getBookingReviewType, isBookingReviewPending } from '@/app/utils/hostUnavailableReview';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
+import { bookingCancellationSnapshot } from '@/app/utils/bookings/cancellationAuthority';
 import { isSoloGuaranteeRefundUnresolvedStatus } from '@/app/utils/soloGuaranteeRefundStatus';
 
 type ForceCancelBody = {
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'bookingId is required' }, { status: 400 });
     }
 
-    const { data: booking, error: bookingError } = await supabaseAdmin
+    const { data: fetchedBooking, error: bookingError } = await supabaseAdmin
       .from('bookings')
       .select(`
         id,
@@ -67,9 +68,11 @@ export async function POST(request: Request) {
       .eq('id', bookingId)
       .maybeSingle();
 
-    if (bookingError || !booking) {
+    if (bookingError || !fetchedBooking) {
       return NextResponse.json({ success: false, error: '예약 정보를 찾을 수 없습니다.' }, { status: 404 });
     }
+
+    let booking = fetchedBooking;
 
     if (isCancelledBookingStatus(booking.status)) {
       return NextResponse.json({ success: false, error: '이미 취소 또는 거절된 예약입니다.' }, { status: 409 });
@@ -92,29 +95,20 @@ export async function POST(request: Request) {
     const cancelReason = (reason || (isHostFaultRequest
       ? (reviewType === 'minimum_participants_unmet' ? '최소 진행 인원 미달 확인 취소' : '호스트 진행 불가 확인 취소')
       : '관리자 직권 취소')).trim();
+    if (booking.tid && booking.payment_method !== 'paypal' && !isPendingBookingStatus(booking.status) && calculateBookingCancellationSettlement(booking, 100).refundAmount > 0) assertCardRefundConfiguration();
+    const { data: claims, error: claimError } = await supabaseAdmin.rpc('claim_booking_cancellation_atomic', {
+      p_booking_id: String(bookingId), p_expected_snapshot: bookingCancellationSnapshot(booking),
+    });
+    const claimed = claims?.[0];
+    if (claimError || !claimed) return NextResponse.json({ success: false, error: '예약의 환불 또는 취소 상태가 변경되었습니다.' }, { status: 409 });
+    const originalStatus = booking.status;
+    booking = { ...booking, ...claimed };
     const totalAmount = getBookingPaidAmount(booking);
-    const settlement = isPendingBookingStatus(booking.status)
+    const settlement = isPendingBookingStatus(originalStatus)
       ? { refundAmount: 0, cumulativeRefundAmount: 0, hostPayout: 0, platformRevenue: 0 }
       : calculateBookingCancellationSettlement(booking, 100);
 
     if (settlement.refundAmount > 0 && booking.tid) {
-      // 🔒 Sentinel lock: status → cancellation_requested (atomic CAS, mirrors service-cancel)
-      const { data: lockRow } = await supabaseAdmin
-        .from('bookings')
-        .update({ status: 'cancellation_requested' })
-        .eq('id', bookingId)
-        .neq('status', 'cancelled')
-        .neq('status', 'cancellation_requested')
-        .select('id')
-        .maybeSingle();
-
-      if (!lockRow) {
-        return NextResponse.json(
-          { success: false, error: '환불이 이미 처리 중입니다. 잠시 후 예약 상태를 확인해주세요.' },
-          { status: 409 }
-        );
-      }
-
       if (booking.payment_method === 'paypal') {
         const refund = await refundPayPalCapture(booking.tid, settlement.refundAmount, 'KRW');
         if (!refund.status || !['COMPLETED', 'PENDING'].includes(refund.status)) {
@@ -133,19 +127,14 @@ export async function POST(request: Request) {
       }
     }
 
-    const { error: updateError } = await supabaseAdmin
-      .from('bookings')
-      .update({
-        status: 'cancelled',
-        // 마커 제거 후 최종 취소 사유로 교체
-        cancel_reason: isHostFaultRequest
-          ? `${cancelReason} (${reviewType === 'minimum_participants_unmet' ? '최소 진행 인원 미달 확인 취소' : '호스트 진행 불가 확인 취소'})`
-          : `${cancelReason} (관리자 강제 취소)`,
-        refund_amount: settlement.cumulativeRefundAmount,
-        host_payout_amount: settlement.hostPayout,
-        platform_revenue: settlement.platformRevenue,
-      })
-      .eq('id', bookingId);
+    const { error: updateError } = await supabaseAdmin.rpc('finalize_booking_cancellation_atomic', {
+      p_booking_id: booking.id, p_claim_id: claimed.cancellation_claim_id,
+      p_reason: isHostFaultRequest
+        ? `${cancelReason} (${reviewType === 'minimum_participants_unmet' ? '최소 진행 인원 미달 확인 취소' : '호스트 진행 불가 확인 취소'})`
+        : `${cancelReason} (관리자 강제 취소)`,
+      p_refund_amount: settlement.cumulativeRefundAmount, p_host_payout: settlement.hostPayout,
+      p_platform_revenue: settlement.platformRevenue,
+    });
 
     if (updateError) {
       console.error('[ADMIN] CRITICAL: PG refund succeeded but DB update failed. Manual resolution required.', {

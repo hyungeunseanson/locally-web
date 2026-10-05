@@ -69,8 +69,10 @@ const expectedAppliedOrder = [
   'supabase/migrations/20261002041848_admin_attention_badges_phase_2.sql',
   'supabase/migrations/20261002140902_phone_followup_tasks.sql',
   'supabase/migrations/20261003122803_admin_chat_bounded_search.sql',
+  'supabase/migrations/20261004053224_media_lifecycle_foundation.sql',
+  'supabase/migrations/20261005082309_avatar_media_authority.sql',
 ];
-const expectedPendingOrder = [];
+const expectedPendingOrder = ['supabase/migrations/20261005104924_solo_guarantee_financial_authority.sql'];
 const expectedApplyOrder = [...expectedAppliedOrder, ...expectedPendingOrder];
 exact('fresh-project apply order', required.freshProjectApplyOrder, expectedApplyOrder);
 exact(
@@ -149,7 +151,7 @@ for (const [name, fingerprint] of Object.entries({
   storageBuckets: '7419cabe695cd50a522314a749216c05',
   storagePolicies: '898e8b7f917fd0f4530ef30c9b61961e',
   publicRlsPolicies: 'e5a16a4215c569060fbf895453a5cd00',
-  publicRelationGrants: 'a9c644ba2ab5c795f29aff57092aa002',
+  publicRelationGrants: '3b88d65d3e719c850d20d1cbf706516f',
   privateRelationGrants: '4c987b9bd1b8fdc56ed01bca38365c7d',
 })) {
   if (current.securityFingerprints[name] !== fingerprint || !currentContract.includes(fingerprint)) {

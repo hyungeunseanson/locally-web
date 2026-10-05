@@ -2,7 +2,6 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { isCancelledOnlyBookingStatus, isCompletedBookingStatus } from '@/app/constants/bookingStatus';
 import { getBookingHostPayout } from '@/app/utils/bookingFinance';
-import { isMissingPayoutPaidAtColumnError } from '@/app/utils/payoutPaidAt';
 import { isSoloGuaranteeRefundUnresolvedStatus } from '@/app/utils/soloGuaranteeRefundStatus';
 
 type BookingPayoutRow = {
@@ -21,7 +20,6 @@ type BookingPayoutRow = {
   solo_guarantee_refund_status?: string | null;
 };
 
-const EXPERIENCE_PAYOUT_SETTLE_STATUSES = ['completed', 'COMPLETED', 'cancelled', 'CANCELLED'];
 
 function canSettleExperienceBooking(row: BookingPayoutRow) {
   const status = String(row.status || '');
@@ -148,33 +146,16 @@ export async function settleExperienceBookingPayouts(
     };
   }
 
-  const paidAt = new Date().toISOString();
-  let { data: updatedRows, error: updateError } = await supabaseAdmin
-    .from('bookings')
-    .update({ payout_status: 'paid', payout_paid_at: paidAt })
-    .in('id', uniqueBookingIds)
-    .eq('payout_status', 'pending')
-    .in('status', EXPERIENCE_PAYOUT_SETTLE_STATUSES)
-    .select('id');
-
-  if (updateError && isMissingPayoutPaidAtColumnError(updateError)) {
-    const fallbackResult = await supabaseAdmin
-      .from('bookings')
-      .update({ payout_status: 'paid' })
-      .in('id', uniqueBookingIds)
-      .eq('payout_status', 'pending')
-      .in('status', EXPERIENCE_PAYOUT_SETTLE_STATUSES)
-      .select('id');
-
-    updatedRows = fallbackResult.data;
-    updateError = fallbackResult.error;
-  }
+  const { data: updatedRows, error: updateError } = await supabaseAdmin.rpc('settle_experience_payouts_atomic', {
+    p_booking_ids: uniqueBookingIds,
+    p_expected_amounts: Object.fromEntries(rows.map(row => [row.id, getBookingHostPayout(row)])),
+  });
 
   if (updateError) {
     throw new Error(updateError.message);
   }
 
-  const updatedIds = (updatedRows || []).map((row) => String(row.id));
+  const updatedIds = ((updatedRows || []) as Array<{ id: string }>).map((row) => String(row.id));
 
   if (updatedIds.length !== uniqueBookingIds.length) {
     return {

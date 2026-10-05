@@ -1,6 +1,9 @@
 // In-memory PostgreSQL only. No URL, credentials, or network DB client is used.
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { cp, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
 
@@ -13,12 +16,55 @@ const marker = current.match(/DO \$admin_attention_production_marker\$[\s\S]*?\$
 const phone = current.match(/DO \$phone_followup_catalog_contract\$[\s\S]*?\$phone_followup_catalog_contract\$;/)?.[0];
 const search = current.match(/DO \$admin_chat_search_contract\$[\s\S]*?\$admin_chat_search_contract\$;/)?.[0];
 const phoneSearchLedger = current.match(/DO \$phone_search_ledger_contract\$[\s\S]*?\$phone_search_ledger_contract\$;/)?.[0];
+const mediaLedger = current.match(/DO \$media_authority_ledger_contract\$[\s\S]*?\$media_authority_ledger_contract\$;/)?.[0];
+const mediaCatalog = current.match(/DO \$applied_media_catalog_contract\$[\s\S]*?\$applied_media_catalog_contract\$;/)?.[0];
+const productionLedger = current.match(/DO \$current_state_contract\$[\s\S]*?RAISE EXCEPTION 'migration ledger mismatch:[\s\S]*?END IF;/)?.[0]
+  + '\nEND\n$current_state_contract$;';
 assert.ok(chat && ledger && attention && marker);
 assert.ok(phone && search && phoneSearchLedger);
+assert.ok(mediaLedger && mediaCatalog && productionLedger.includes('20261005082309:avatar_media_authority'));
 assert.ok(staging.includes(phone) && staging.includes(search), 'staging shares applied Phone/search security');
 assert.ok(staging.includes(chat), 'staging and current-state enforce identical chat assertions');
 assert.ok(staging.includes(attention), 'staging and current-state enforce identical attention security');
 assert.ok(!staging.includes(marker), 'fresh staging counters must not pretend to be Production rollout counters');
+
+// A disposable repository fixture proves the static gate does not simply
+// ignore extra files, authorize blanket pending applies, or relabel P0 applied.
+const repoFixture = await mkdtemp(join(tmpdir(), 'locally-current-contract-'));
+let staticDriftChecks = 0;
+try {
+  for (const directory of ['supabase/migrations','supabase/staging','scripts/supabase']) {
+    await cp(directory, join(repoFixture,directory), { recursive:true });
+  }
+  await symlink(resolve('app'), join(repoFixture,'app'));
+  const check = () => spawnSync(process.execPath, ['scripts/supabase/check-production-current-state.mjs'],
+    { cwd:repoFixture, encoding:'utf8', timeout:10_000 });
+  const valid = check(); assert.equal(valid.status,0,valid.stdout+valid.stderr);
+  const requiredPath = join(repoFixture,'supabase/staging/required-objects.json');
+  const manifestPath = join(repoFixture,'supabase/staging/production-current-state.manifest.json');
+  const originalRequired = await readFile(requiredPath,'utf8');
+  const originalManifest = await readFile(manifestPath,'utf8');
+  const drift = async (path,value,pattern,restore) => {
+    await writeFile(path,typeof value==='string'?value:JSON.stringify(value));
+    const result=check(); assert.notEqual(result.status,0); assert.match(result.stderr,pattern);
+    staticDriftChecks++;
+    if (restore === null) await rm(path); else await writeFile(path,restore);
+  };
+  const appliedP0 = JSON.parse(originalManifest);
+  appliedP0.migrationLedger.push(appliedP0.pendingProductionMigrations[0]);
+  appliedP0.pendingProductionMigrations=[];
+  await drift(manifestPath,appliedP0,/migration versions differs/,originalManifest);
+  const unpinned = JSON.parse(originalRequired);
+  unpinned.pendingProductionMigrations[0].repositorySha256='0'.repeat(64);
+  await drift(requiredPath,unpinned,/pending Production migration contract differs/,originalRequired);
+  const blanket = JSON.parse(originalRequired);
+  blanket.selectiveProductionRollout.blanketPendingMigrationApply=true;
+  await drift(requiredPath,blanket,/selective Production rollout rule differs/,originalRequired);
+  await drift(join(repoFixture,'supabase/migrations/20990101000000_unreviewed.sql'),
+    '-- synthetic fixture only',/repository migration files differs/,null);
+} finally {
+  await rm(repoFixture,{recursive:true,force:true});
+}
 
 const db = new PGlite({ extensions: { pg_trgm } });
 let driftChecks = 0;
@@ -165,7 +211,51 @@ try {
   await rejectDrift("UPDATE supabase_migrations.schema_migrations SET statements=ARRAY['-- wrong search SQL'] WHERE version='20261003134417'",
     () => db.query('UPDATE supabase_migrations.schema_migrations SET statements=$1 WHERE version=$2', [[searchMigration], '20261003134417']),
     /applied ledger SQL mapping mismatch/, phoneSearchLedger);
-  console.log(JSON.stringify({ result: 'CURRENT_STATE_CATALOG_DRIFT_TEST_PASS', driftChecks, productionMutation: 0 }));
+  // Apply unchanged media SQL to empty local fixtures only, then validate the
+  // read-only catalog evidence. No asset/upload/Storage/provider API is called.
+  await db.exec(`CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$ SELECT NULL::uuid $$;
+    ALTER TABLE experiences ADD COLUMN host_id uuid, ADD COLUMN photos text[], ADD COLUMN image_url text,
+      ADD COLUMN itinerary jsonb, ADD COLUMN itinerary_i18n jsonb;
+    ALTER TABLE profiles ADD COLUMN avatar_url text;
+    CREATE SCHEMA storage;
+    CREATE TABLE storage.buckets(id text,public boolean);
+    CREATE TABLE storage.objects(name text,owner_id text,metadata jsonb,version text,updated_at timestamptz,bucket_id text);`);
+  const mediaMigration = await readFile('supabase/migrations/20261004053224_media_lifecycle_foundation.sql', 'utf8');
+  const avatarMigration = await readFile('supabase/migrations/20261005082309_avatar_media_authority.sql', 'utf8');
+  await db.exec(mediaMigration); await db.exec(avatarMigration);
+  const manifest = JSON.parse(await readFile('supabase/staging/production-current-state.manifest.json', 'utf8'));
+  for (const entry of manifest.migrationLedger) {
+    const sql = await readFile(entry.repositoryFile, 'utf8');
+    await db.query('INSERT INTO supabase_migrations.schema_migrations VALUES ($1,$2,$3) ON CONFLICT DO NOTHING',
+      [entry.version,entry.name,[sql]]);
+  }
+  await verify(mediaLedger); await verify(mediaCatalog); await verify(productionLedger);
+  await rejectDrift("DELETE FROM supabase_migrations.schema_migrations WHERE version='20261005082309'",
+    () => db.query('INSERT INTO supabase_migrations.schema_migrations VALUES ($1,$2,$3)', ['20261005082309','avatar_media_authority',[avatarMigration]]),
+    /applied media\/avatar ledger SQL mismatch/, mediaLedger);
+  await rejectDrift("UPDATE supabase_migrations.schema_migrations SET statements=ARRAY['-- changed avatar'] WHERE version='20261005082309'",
+    () => db.query('UPDATE supabase_migrations.schema_migrations SET statements=$1 WHERE version=$2', [[avatarMigration],'20261005082309']),
+    /applied media\/avatar ledger SQL mismatch/, mediaLedger);
+  await rejectDrift("UPDATE supabase_migrations.schema_migrations SET version='20261004053225' WHERE version='20261004053224'",
+    "UPDATE supabase_migrations.schema_migrations SET version='20261004053224' WHERE version='20261004053225'",
+    /applied media\/avatar ledger SQL mismatch/, mediaLedger);
+  await rejectDrift("INSERT INTO supabase_migrations.schema_migrations VALUES ('20261005104924','solo_guarantee_financial_authority',ARRAY['-- synthetic'])",
+    "DELETE FROM supabase_migrations.schema_migrations WHERE version='20261005104924'", /financial P0 is pending/, mediaLedger);
+  await rejectDrift('CREATE TABLE booking_solo_refund_operations(id uuid)', 'DROP TABLE booking_solo_refund_operations', /financial P0 is pending/, mediaLedger);
+  await rejectDrift('GRANT EXECUTE ON FUNCTION begin_avatar_media_asset(uuid,uuid,text,text,text,bigint,text,text) TO anon',
+    'REVOKE EXECUTE ON FUNCTION begin_avatar_media_asset(uuid,uuid,text,text,text,bigint,text,text) FROM anon', /function body or ACL mismatch/, mediaCatalog);
+  await rejectDrift('GRANT EXECUTE ON FUNCTION private.sync_experience_media_assets() TO service_role',
+    'REVOKE EXECUTE ON FUNCTION private.sync_experience_media_assets() FROM service_role', /function body or ACL mismatch/, mediaCatalog);
+  await rejectDrift('ALTER INDEX media_assets_owner_idx RENAME TO missing_media_index',
+    'ALTER INDEX missing_media_index RENAME TO media_assets_owner_idx', /applied media index mismatch/, mediaCatalog);
+  const avatarConstraint = manifest.appliedMediaAuthority.constraints.find(c => c.name === 'avatar_media_identity').definition;
+  await rejectDrift('ALTER TABLE media_assets DROP CONSTRAINT avatar_media_identity',
+    'ALTER TABLE media_assets ADD CONSTRAINT avatar_media_identity '+avatarConstraint, /applied media constraint mismatch/, mediaCatalog);
+  await rejectDrift('ALTER TABLE profiles DISABLE TRIGGER profile_avatar_finalize',
+    'ALTER TABLE profiles ENABLE TRIGGER profile_avatar_finalize', /applied media trigger mismatch/, mediaCatalog);
+  await rejectDrift("INSERT INTO supabase_migrations.schema_migrations VALUES ('20990101000000','unreviewed',ARRAY['-- synthetic'])",
+    "DELETE FROM supabase_migrations.schema_migrations WHERE version='20990101000000'", /migration ledger mismatch/, productionLedger);
+  console.log(JSON.stringify({ result: 'CURRENT_STATE_CATALOG_DRIFT_TEST_PASS', driftChecks, staticDriftChecks, productionMutation: 0 }));
 } finally {
   await db.close();
 }

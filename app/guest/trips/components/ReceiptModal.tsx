@@ -30,6 +30,7 @@ interface ReceiptTrip {
   created_at?: string;
   price?: number;
   amount?: number;
+  refundAmount?: number;
   status?: string;
   soloGuaranteeRefundStatus?: string | null;
   soloGuaranteeRefundAmount?: number | null;
@@ -65,7 +66,11 @@ export default function ReceiptModal({ trip, onClose }: { trip: ReceiptTrip, onC
   const bankInfo = getPublicBankInfo();
   const isPending = isPendingBookingStatus(trip.status || '');
   const soloRefundStatus = normalizeSoloGuaranteeRefundStatus(trip.soloGuaranteeRefundStatus);
-  const soloRefundLabel = getSoloGuaranteeRefundGuestLabel(soloRefundStatus, trip.soloGuaranteeRefundAmount);
+  const soloRefundLabel = getSoloGuaranteeRefundGuestLabel(soloRefundStatus, trip.soloGuaranteeRefundAmount, lang);
+  const originalAmount = Number(trip.price || trip.amount || 0);
+  const refundedAmount = Math.min(originalAmount, Number(trip.refundAmount ?? (soloRefundStatus === 'refunded' ? trip.soloGuaranteeRefundAmount || 0 : 0)));
+  const moneyLabels = { ko: ['최초 결제', '환불 완료', '순 결제'], en: ['Original payment', 'Refunded', 'Net payment'],
+    ja: ['当初のお支払い', '返金済み', '返金後のお支払い'], zh: ['原始付款', '已退款', '净付款'] }[lang] || ['Original payment', 'Refunded', 'Net payment'];
   const orderDisplay = trip.orderId || String(trip.id || '-').slice(0, 15);
   const guestCount = Number(trip.guests || 1);
   const safeOrderDisplay = String(orderDisplay).replace(/[^a-zA-Z0-9_-]/g, '-');
@@ -238,10 +243,14 @@ export default function ReceiptModal({ trip, onClose }: { trip: ReceiptTrip, onC
               )}
 
               <div className="flex justify-between items-end">
-                <span className="text-[13px] md:text-sm font-bold text-slate-900">{t('receipt_amount')}</span>
-                <span className="text-[22px] md:text-2xl font-black text-rose-500">₩{Number(trip.price || trip.amount || 0).toLocaleString()}</span>
+                <span className="text-[13px] md:text-sm font-bold text-slate-900">{moneyLabels[0]}</span>
+                <span className="text-[22px] md:text-2xl font-black text-rose-500">₩{originalAmount.toLocaleString()}</span>
               </div>
 
+              {refundedAmount > 0 && <div data-testid="receipt-refund-net" className="space-y-2 text-sm">
+                <div className="flex justify-between"><span>{moneyLabels[1]}</span><span>−₩{refundedAmount.toLocaleString()}</span></div>
+                <div className="flex justify-between font-bold"><span>{moneyLabels[2]}</span><span>₩{Math.max(0, originalAmount - refundedAmount).toLocaleString()}</span></div>
+              </div>}
               {soloRefundLabel && (
                 <div className={`rounded-xl border px-4 py-3 text-left ${
                   soloRefundStatus === 'refunded'

@@ -85,11 +85,11 @@ export function buildSoloRefundSettlementSnapshot(
 }
 
 export function getSoloManualRefundCompletionGuard(
-  booking: Pick<SoloGuaranteeRefundSlotBooking, 'solo_guarantee_refund_status' | 'payout_status'>
+  booking: Pick<SoloGuaranteeRefundSlotBooking, 'solo_guarantee_refund_status' | 'payout_status' | 'payment_method'>
 ): SoloManualRefundCompletionGuard {
   const status = normalizeSoloGuaranteeRefundStatus(booking.solo_guarantee_refund_status);
 
-  if (status !== 'pending_manual' && status !== 'failed') {
+  if (status !== 'pending_manual' || !['bank', 'paypal'].includes(String(booking.payment_method || '').toLowerCase())) {
     return { ok: false, reason: 'not_waiting' };
   }
 
