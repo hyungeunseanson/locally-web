@@ -1,7 +1,9 @@
 name: Authoritative Storage Byte Backup
 
 on:
-  # Temporarily paused: daily 18:37 UTC / 03:37 KST, pending destination isolation.
+  schedule:
+    # Daily 18:37 UTC / 03:37 KST.
+    - cron: '37 18 * * *'
   # Manual dispatch remains available; a fresh approval is required before use.
   workflow_dispatch:
 
