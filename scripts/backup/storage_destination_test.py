@@ -148,6 +148,90 @@ class DestinationTests(unittest.TestCase):
         self.assertEqual((result['diagnosticCode'], result['operation'], result['httpStatus']), ('destination_access_denied', 'head_after_precondition', 403))
         self.assertEqual(client.put_calls, 1)
 
+    def test_409_head_exact_concurrent_skip_and_sanitized_status(self):
+        client = ScriptedS3()
+        proof = {'source-identity': 'a'*64, 'source-sha256': 'b'*64, 'plan-digest': 'c'*64}
+        self.put(client, proof)
+        client.actions = [sdk_error(status=409, code=PRIVATE)]
+        store = backup.R2Store(client, backup.PRIVATE_R2_BUCKET)
+        with mock.patch.object(client, 'head_object', wraps=client.head_object) as head:
+            result = store.put_create_only(self.key, self.path, self.digest, self.budget, 'fixture', proof)
+        self.assertEqual(result, ('concurrent-exact-skip', self.digest, self.size))
+        head.assert_called_once_with(Bucket=backup.PRIVATE_R2_BUCKET, Key=self.key)
+        self.assertEqual(store.last_precondition_evidence, dict(sdkExceptionClass='ClientError', httpStatus=409, providerErrorCode='Other', retryable=False))
+        self.assertNotIn(PRIVATE, json.dumps(store.last_precondition_evidence))
+        self.assertEqual((self.budget.r2_attempts, self.budget.r2_retries, self.budget.new_r2_objects), (2, 0, 1))
+        self.assertEqual(client.conditional_calls, ['*', '*'])
+
+    def test_409_head_missing_one_conditional_retry(self):
+        client = ScriptedS3([sdk_error(status=409)])
+        self.assertEqual(self.put(client), ('created', self.digest, self.size))
+        self.assertEqual(client.conditional_calls, ['*', '*'])
+        self.assertEqual((self.budget.r2_attempts, self.budget.r2_retries, self.budget.new_r2_objects), (2, 1, 1))
+        self.assertEqual(client.delete_calls, 0)
+
+    def test_409_exact_identity_all_metadata_sha_and_size_required(self):
+        proof = {'source-identity': 'a'*64, 'source-sha256': 'b'*64, 'plan-digest': 'c'*64, 'cipher-sha256': self.digest}
+        changes = [(name, 'mismatch') for name in ['kind', 'schema', *proof, 'sha256']] + [('body', b'different length')]
+        for name, value in changes:
+            with self.subTest(field=name):
+                self.budget = backup.TransferBudget()
+                client = ScriptedS3()
+                self.put(client, proof)
+                if name == 'body':
+                    client.objects[self.key]['body'] = value
+                else:
+                    client.objects[self.key]['metadata'][name] = value
+                client.actions = [sdk_error(status=409)]
+                with self.assertRaises(backup.DestinationConflictError) as caught:
+                    self.put(client, proof)
+                result = self.evidence(caught.exception)
+                self.assertEqual((result['diagnosticCode'], result['operation'], result['retryable']), ('destination_identity_mismatch', 'head_after_conditional_conflict', False))
+                self.assertEqual((client.put_calls, self.budget.r2_retries), (2, 0))
+
+    def test_409_head_auth_and_transport_error_fail_closed(self):
+        for error in [sdk_error(status=403, code='AccessDenied'), sdk_error('ReadTimeoutError'), sdk_error(status=503)]:
+            with self.subTest(status=error.response['ResponseMetadata']['HTTPStatusCode']):
+                self.budget = backup.TransferBudget()
+                client = ScriptedS3([sdk_error(status=409)])
+                client.head_failure = error
+                with self.assertRaises(backup.DestinationError) as caught:
+                    self.put(client)
+                result = self.evidence(caught.exception)
+                self.assertEqual(result['operation'], 'head_after_conditional_conflict')
+                self.assertNotEqual(result['diagnosticCode'], 'destination_conditional_conflict')
+                self.assertEqual((client.put_calls, self.budget.r2_retries), (1, 0))
+
+    def test_repeated_409_head_missing_explicit_failure_no_third_put(self):
+        client = ScriptedS3([sdk_error(status=409, code=PRIVATE), sdk_error(status=409, code=PRIVATE)])
+        with self.assertRaises(backup.DestinationError) as caught:
+            self.put(client)
+        result = self.evidence(caught.exception)
+        self.assertEqual((result['diagnosticCode'], result['operation'], result['sdkExceptionClass'], result['httpStatus'], result['providerErrorCode'], result['retryable']),
+                         ('destination_conditional_conflict', 'put_create_only', 'ClientError', 409, 'Other', False))
+        self.assertEqual((client.put_calls, self.budget.r2_retries, self.budget.new_r2_objects), (2, 1, 0))
+        self.assertEqual(client.conditional_calls, ['*', '*'])
+
+    def test_arbitrary_409_not_accepted_without_conditional_put_context(self):
+        error = sdk_error(status=409)
+        for operation, conditional in [('put_create_only', False), ('destination_head', False), ('verify_bytes', False), ('verify_bytes', True)]:
+            with self.subTest(operation=operation, conditional=conditional):
+                result = backup.destination_error(error, operation, conditional_create=conditional)
+                self.assertEqual(result.code, 'destination_provider_validation_failed')
+                self.assertFalse(result.evidence['retryable'])
+        client = ScriptedS3()
+        self.put(client)
+        store = backup.R2Store(client, backup.PRIVATE_R2_BUCKET)
+        with mock.patch.object(client, 'get_object', side_effect=error):
+            with self.assertRaises(backup.DestinationError) as caught:
+                store.verify_bytes(self.key, self.digest, self.size)
+        self.assertEqual(self.evidence(caught.exception)['diagnosticCode'], 'destination_provider_validation_failed')
+        client.head_failure = error
+        with self.assertRaises(backup.DestinationError) as caught:
+            store.head(self.key)
+        self.assertEqual(self.evidence(caught.exception)['diagnosticCode'], 'destination_provider_validation_failed')
+        self.assertEqual(client.put_calls, 1)
+
     def test_transport_head_error_is_not_blindly_retried(self):
         client = ScriptedS3([sdk_error('ReadTimeoutError')])
         client.head_failure = sdk_error('ConnectTimeoutError')
@@ -158,7 +242,7 @@ class DestinationTests(unittest.TestCase):
         self.assertEqual(client.put_calls, 1)
 
     def test_no_retry_validation_conflict_or_identity_mismatch(self):
-        for error in [sdk_error('ParamValidationError'), sdk_error(status=401), sdk_error(status=409, code='ConditionalRequestConflict'), sdk_error(status=400, code='BadDigest')]:
+        for error in [sdk_error('ParamValidationError'), sdk_error(status=401), sdk_error(status=400, code='BadDigest')]:
             with self.subTest(code=error.response['Error']['Code']):
                 client = ScriptedS3([error])
                 with self.assertRaises(backup.DestinationError) as caught:
@@ -259,6 +343,28 @@ class ProbeTests(unittest.TestCase):
             self.assertFalse(result['completeBackupManifestPublished'])
             self.assertLessEqual(result['ciphertextBytes'], probe.MAX_PROBE_CIPHERTEXT_BYTES)
             self.assertNotIn('opaque.age', json.dumps(result))
+
+    def test_tiny_probe_accepts_actual_409_after_exact_head_and_sha(self):
+        with tempfile.TemporaryDirectory() as root:
+            client, diagnostics = ScriptedS3([None, sdk_error(status=409, code=PRIVATE)]), backup.BackupDiagnostics()
+            result = probe.run_probe(backup.R2Store(client, backup.PRIVATE_R2_BUCKET), FakeAge(), pathlib.Path(root), diagnostics, '123', '1')
+            self.assertEqual((result['firstPut'], result['secondPut'], result['secondPutHttpStatus']), ('created', 'concurrent-exact-skip', 409))
+            self.assertTrue(result['secondPutConflict'])
+            self.assertTrue(result['postConflictHeadExact'])
+            self.assertTrue(result['headExact'])
+            self.assertTrue(result['ciphertextShaVerified'])
+            self.assertEqual((result['secondPutSdkExceptionClass'], result['secondPutProviderErrorCode']), ('ClientError', 'Other'))
+            self.assertEqual((client.put_calls, diagnostics.destination_budget.r2_retries, len(client.objects)), (2, 0, 1))
+            self.assertEqual((result['sourceInventoryOperations'], result['remoteDeletes']), (0, 0))
+            self.assertFalse(result['completeBackupManifestPublished'])
+            self.assertNotIn(PRIVATE, json.dumps(result))
+
+    def test_probe_requires_first_created_not_recovered_commit(self):
+        with tempfile.TemporaryDirectory() as root:
+            client = ScriptedS3([(sdk_error('ReadTimeoutError'),)])
+            with self.assertRaises(backup.DestinationError):
+                probe.run_probe(backup.R2Store(client, backup.PRIVATE_R2_BUCKET), FakeAge(), pathlib.Path(root), backup.BackupDiagnostics(), '123', '1')
+            self.assertEqual(client.put_calls, 1)
 
     def test_probe_invalid_scope_fails_before_any_upload(self):
         for run, attempt in [('private/key', '1'), ('123', '0'), ('123', '1/private'), ('1'*21, '1')]:
