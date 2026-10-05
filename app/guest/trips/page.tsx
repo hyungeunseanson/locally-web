@@ -345,7 +345,7 @@ function GuestTripsContent() {
       </main>
 
       {/* 모달 */}
-      {isReceiptModalOpen && selectedTrip && <ReceiptModal trip={selectedTrip} onClose={() => setIsReceiptModalOpen(false)} />}
+      {isReceiptModalOpen && selectedTrip && <ReceiptModal trip={[...upcomingTrips, ...pastTrips].find(trip => trip.id === selectedTrip.id) || selectedTrip} onClose={() => setIsReceiptModalOpen(false)} />}
       {isReviewModalOpen && selectedTrip && (
         <ReviewModal
           trip={selectedTrip}

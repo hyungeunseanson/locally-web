@@ -69,6 +69,7 @@ function loadEnv(): EnvMap {
 }
 
 function ensureSupabaseEnv() {
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) return;
   const env = loadEnv();
 
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL && env.NEXT_PUBLIC_SUPABASE_URL) {
@@ -985,7 +986,7 @@ test.describe('Card payment provider cutover contracts', () => {
       );
 
       return new Response(
-        `ResultCode=2001&ResultMsg=Cancel+OK&TID=TX-TID-CANCEL-001&MID=${process.env.NICEPAY_MID}&CancelAmt=77000&Signature=${cancelSignature}`,
+        `ResultCode=2001&ResultMsg=Cancel+OK&TID=TX-TID-CANCEL-001&MID=${process.env.NICEPAY_MID}&CancelAmt=77000&Moid=${body.get('Moid')}&CancelNum=TEST-CANCEL-001&Signature=${cancelSignature}`,
         {
           status: 200,
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -1121,7 +1122,7 @@ test.describe('Card payment provider cutover contracts', () => {
           `${transactionId}${process.env.NICEPAY_MID}${amount}${process.env.NICEPAY_MERCHANT_KEY}`
         );
         return new Response(
-          `ResultCode=2001&ResultMsg=Cancel+OK&TID=${transactionId}&MID=${process.env.NICEPAY_MID}&CancelAmt=${amount}&Signature=${cancelSignature}`,
+          `ResultCode=2001&ResultMsg=Cancel+OK&TID=${transactionId}&MID=${process.env.NICEPAY_MID}&CancelAmt=${amount}&Moid=${body.get('Moid')}&CancelNum=TEST-CANCEL-002&Signature=${cancelSignature}`,
           { status: 200, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
         );
       }

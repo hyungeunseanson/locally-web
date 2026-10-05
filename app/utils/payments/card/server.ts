@@ -290,6 +290,8 @@ function parseNicePayCancelResponse(raw: string) {
     transactionId: parsed.TID || null,
     cancelAmount: parsed.CancelAmt || null,
     mid: parsed.MID || null,
+    orderId: parsed.Moid || null,
+    refundReference: parsed.CancelNum || null,
   };
 }
 
@@ -724,11 +726,52 @@ export async function verifyCardPaymentNotification(params: {
   }
 }
 
+export class CardRefundOutcomeError extends Error {
+  constructor(public readonly outcome: 'unknown' | 'rejected', public readonly diagnosticCode: string,
+    public readonly resultCode: string | null = null) {
+    super(diagnosticCode);
+    this.name = 'CardRefundOutcomeError';
+  }
+}
+
+export function assertCardRefundConfiguration(environment: Record<string, string | undefined> = process.env) {
+  if (!environment.NICEPAY_MID || !environment.NICEPAY_MERCHANT_KEY) throw new Error('card_refund_configuration_unavailable');
+}
+
+// Also used by restricted reconciliation: validate the exact immutable request,
+// never use approval/cancelled status alone as proof of a partial refund.
+export function verifyCardRefundResponse(raw: string, params: CancelCardPaymentParams,
+  environment: Record<string, string | undefined> = process.env): CancelCardPaymentResult {
+  const mid = environment.NICEPAY_MID;
+  const merchantKey = environment.NICEPAY_MERCHANT_KEY;
+  const parsed = parseNicePayCancelResponse(raw);
+  if (!mid || !merchantKey || parsed.mid !== mid || parsed.transactionId !== params.providerTransactionId
+    || parsed.orderId !== params.orderId || !parsed.cancelAmount || !/^\d+$/.test(parsed.cancelAmount)
+    || Number(parsed.cancelAmount) !== params.cancelAmount || !parsed.signature
+    || parsed.signature.toLowerCase() !== sha256Hex(`${parsed.transactionId}${parsed.mid}${parsed.cancelAmount}${merchantKey}`)) {
+    throw new CardRefundOutcomeError('unknown', 'provider_response_correlation_failed');
+  }
+  if (!parsed.resultCode || !['2001', '2211'].includes(parsed.resultCode)) {
+    // Missing/malformed evidence stays UNKNOWN even when its text says failure.
+    if (!parsed.resultCode) throw new CardRefundOutcomeError('unknown', 'provider_result_missing');
+    // Completion/progress/timeouts and unclassified errors can describe prior
+    // money movement. Only documented request-validation rejections permit an
+    // explicit retry; even these require the correlated signed response above.
+    const definitelyRejected = ['2010', '2011', '2024', '2025', '2217', '2218'].includes(parsed.resultCode);
+    throw new CardRefundOutcomeError(definitelyRejected ? 'rejected' : 'unknown',
+      definitelyRejected ? 'provider_rejected' : 'provider_result_requires_reconciliation', parsed.resultCode);
+  }
+  if (!parsed.refundReference) throw new CardRefundOutcomeError('unknown', 'provider_refund_identity_missing');
+  return { resultCode: parsed.resultCode, resultMessage: parsed.resultMessage, raw,
+    refundReference: parsed.refundReference };
+}
+
 export async function cancelCardPayment(
   params: CancelCardPaymentParams,
   options: {
     environment?: Record<string, string | undefined>;
     fetch?: typeof fetch;
+    timeoutMs?: number;
   } = {}
 ): Promise<CancelCardPaymentResult> {
   const environment = options.environment ?? process.env;
@@ -763,49 +806,26 @@ export async function cancelCardPayment(
   formBody.set('CharSet', 'utf-8');
   formBody.set('EdiType', 'JSON');
 
-  const response = await (options.fetch ?? fetch)(NICEPAY_CANCEL_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: formBody.toString(),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), Math.min(30000, Math.max(1, options.timeoutMs ?? 15000)));
+  try {
+    const response = await (options.fetch ?? fetch)(NICEPAY_CANCEL_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: formBody.toString(),
+      signal: controller.signal,
+    });
 
-  if (!response.ok) {
-    throw new Error(`PG Network Timeout: ${response.status} ${response.statusText}`);
-  }
-
-  const raw = await response.text();
-  const parsed = parseNicePayCancelResponse(raw);
-  const acceptedCodes = params.acceptedResultCodes || ['2001'];
-
-  if (parsed.mid && parsed.mid !== mid) {
-    throw new Error('PG Cancel Failed: NICEPAY MID mismatch');
-  }
-
-  if (!parsed.resultCode || !acceptedCodes.includes(parsed.resultCode)) {
-    throw new Error(
-      `PG Cancel Failed: [${parsed.resultCode || 'unknown'}] ${parsed.resultMessage || '알 수 없는 오류'}`
-    );
-  }
-
-  if (merchantKey) {
-    if (!parsed.transactionId || !parsed.cancelAmount || !parsed.signature) {
-      throw new Error('PG Cancel Failed: Missing NICEPAY cancel signature fields');
+    if (!response.ok) {
+      throw new CardRefundOutcomeError('unknown', 'provider_http_uncertain');
     }
 
-    const expectedSignature = sha256Hex(
-      `${parsed.transactionId}${parsed.mid || mid}${parsed.cancelAmount}${merchantKey}`
-    );
-
-    if (parsed.signature !== expectedSignature) {
-      throw new Error('PG Cancel Failed: NICEPAY cancel signature mismatch');
-    }
-  }
-
-  return {
-    resultCode: parsed.resultCode,
-    resultMessage: parsed.resultMessage,
-    raw,
-  };
+    const raw = await response.text();
+    return verifyCardRefundResponse(raw, params, environment);
+  } catch (error) {
+    if (error instanceof CardRefundOutcomeError) throw error;
+    throw new CardRefundOutcomeError('unknown', controller.signal.aborted ? 'provider_timeout' : 'provider_transport_uncertain');
+  } finally { clearTimeout(timer); }
 }
 
 export async function readCardPaymentNotificationRequest(

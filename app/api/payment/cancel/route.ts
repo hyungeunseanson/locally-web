@@ -9,11 +9,12 @@ import {
 import { calculateBookingCancellationSettlement, getBookingPaidAmount } from '@/app/utils/bookingFinance';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
-import { cancelCardPayment } from '@/app/utils/payments/card/server';
+import { cancelCardPayment, assertCardRefundConfiguration } from '@/app/utils/payments/card/server';
 import { refundPayPalCapture } from '@/app/utils/paypal/server';
 import { captureServerException } from '@/app/utils/monitoring/sentry';
 import { calculateGuestCancellationRefundRate } from '@/app/utils/bookingCancellationPolicy';
 import { buildLocalizedNotificationInsert } from '@/app/utils/notificationCopy';
+import { bookingCancellationSnapshot } from '@/app/utils/bookings/cancellationAuthority';
 import { isSoloGuaranteeRefundUnresolvedStatus } from '@/app/utils/soloGuaranteeRefundStatus';
 import {
   formatBookingReviewMarker,
@@ -36,7 +37,7 @@ const REVIEW_PENDING_REASON_CODES: Record<string, BookingReviewRequestType> = {
 
 export async function POST(request: Request) {
   let bookingId: string | number | null = null;
-  let bookingStatusBeforeLock: string | null = null;
+  let cancellationClaimId: string | null = null;
   let cancellationLockAcquired = false;
   let cancellationCommitted = false;
 
@@ -64,15 +65,17 @@ export async function POST(request: Request) {
     const supabaseAdmin = createAdminClient();
 
     // 1. 예약 조회
-    const { data: booking, error } = await supabaseAdmin
+    const { data: fetchedBooking, error } = await supabaseAdmin
       .from('bookings')
       .select('*, experiences(host_id, title)')
       .eq('id', bookingId)
       .maybeSingle();
 
-    if (error || !booking) return NextResponse.json({ error: '예약 없음' }, { status: 404 });
+    if (error || !fetchedBooking) return NextResponse.json({ error: '예약 없음' }, { status: 404 });
 
-    bookingStatusBeforeLock = typeof booking.status === 'string' ? booking.status : null;
+    let booking = fetchedBooking;
+
+
 
     // [보안 패치] 관리자인지 확인 (관리자는 모든 예약 취소 가능)
     const { isAdmin } = await resolveAdminAccess(supabaseAdmin, {
@@ -222,22 +225,16 @@ export async function POST(request: Request) {
       });
     }
 
-    // [Race Guard] Atomic lock: PG 환불 전에 DB 상태를 먼저 점유 — 동시 요청 이중 환불 방지
-    if (!isCancellationRequested) {
-      const { data: lockAcquired } = await supabaseAdmin
-        .from('bookings')
-        .update({ status: 'cancellation_requested' })
-        .eq('id', bookingId)
-        .eq('status', booking.status)
-        .select('id')
-        .maybeSingle();
-
-      if (!lockAcquired) {
-        return NextResponse.json({ error: '이미 취소 처리 중이거나 취소된 예약입니다.' }, { status: 409 });
-      }
-
-      cancellationLockAcquired = true;
-    }
+    const previewRate = isHostCancel ? 100 : calculateGuestCancellationRefundRate({ tourDate: booking.date, tourTime: booking.time || '00:00', paymentDate: booking.created_at }).rate;
+    if (booking.tid && booking.payment_method !== 'paypal' && calculateBookingCancellationSettlement(booking, previewRate).refundAmount > 0) assertCardRefundConfiguration();
+    const { data: claims, error: claimError } = await supabaseAdmin.rpc('claim_booking_cancellation_atomic', {
+      p_booking_id: String(bookingId), p_expected_snapshot: bookingCancellationSnapshot(booking),
+    });
+    const claimed = claims?.[0];
+    if (claimError || !claimed) return NextResponse.json({ error: '예약의 환불 또는 취소 상태가 변경되었습니다.' }, { status: 409 });
+    booking = { ...booking, ...claimed };
+    cancellationClaimId = claimed.cancellation_claim_id;
+    cancellationLockAcquired = true;
 
     // 2. 환불액 및 정산액 계산
     let refundRate = 0;
@@ -288,13 +285,11 @@ export async function POST(request: Request) {
     }
 
     // 4. DB 업데이트 (lock 상태에서만 진행 보장)
-    const { error: updateError } = await supabaseAdmin.from('bookings').update({
-      status: 'cancelled',
-      cancel_reason: `${normalizedUserReason} (${reasonText})`,
-      refund_amount: cumulativeRefundAmount,
-      host_payout_amount: hostPayout,
-      platform_revenue: platformRevenue
-    }).eq('id', bookingId).eq('status', 'cancellation_requested');
+    const { error: updateError } = await supabaseAdmin.rpc('finalize_booking_cancellation_atomic', {
+      p_booking_id: String(bookingId), p_claim_id: cancellationClaimId,
+      p_reason: `${normalizedUserReason} (${reasonText})`, p_refund_amount: cumulativeRefundAmount,
+      p_host_payout: hostPayout, p_platform_revenue: platformRevenue,
+    });
 
     if (updateError) throw new Error('DB update failed after refund: ' + updateError.message);
 
@@ -417,16 +412,10 @@ export async function POST(request: Request) {
     captureServerException(error, { route: '/api/payment/cancel', method: 'POST' });
     console.error('Cancel Error:', error);
 
-    if (cancellationLockAcquired && !cancellationCommitted && bookingStatusBeforeLock && (typeof bookingId === 'string' || typeof bookingId === 'number')) {
-      try {
-        await createAdminClient()
-          .from('bookings')
-          .update({ status: bookingStatusBeforeLock })
-          .eq('id', bookingId)
-          .eq('status', 'cancellation_requested');
-      } catch (rollbackErr) {
-        console.error('Cancel rollback failed (manual reconciliation required):', rollbackErr);
-      }
+    if (cancellationLockAcquired && !cancellationCommitted) {
+      // An uncertain external result must retain the exclusive claim. Never
+      // restore the prior status and offer another refund after a timeout.
+      console.error(JSON.stringify({ event: 'booking_cancellation', diagnosticCode: 'reconciliation_required' }));
     }
 
     return NextResponse.json({ error: message }, { status: 500 });

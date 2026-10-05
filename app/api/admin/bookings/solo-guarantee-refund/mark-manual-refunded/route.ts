@@ -7,6 +7,9 @@ import { createClient as createServerClient } from '@/app/utils/supabase/server'
 
 type MarkManualRefundBody = {
   bookingId?: unknown;
+  refundAmount?: unknown;
+  proofReference?: unknown;
+  transactionReference?: unknown;
 };
 
 export async function POST(request: Request) {
@@ -43,6 +46,9 @@ export async function POST(request: Request) {
       bookingId,
       adminId: user.id,
       adminEmail: user.email,
+      refundAmount: typeof body.refundAmount === 'number' ? body.refundAmount : undefined,
+      proofReference: typeof body.proofReference === 'string' ? body.proofReference.trim() : undefined,
+      transactionReference: typeof body.transactionReference === 'string' ? body.transactionReference.trim() : undefined,
     });
 
     if (!result.success) {
@@ -72,7 +78,7 @@ export async function POST(request: Request) {
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal Server Error';
-    console.error('[ADMIN] solo guarantee manual refund complete error:', error);
+    console.error(JSON.stringify({ event: 'solo_manual_refund', diagnosticCode: 'completion_failed' }));
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

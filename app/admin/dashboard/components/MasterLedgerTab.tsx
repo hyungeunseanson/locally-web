@@ -1,4 +1,5 @@
 'use client';
+import SoloRefundOperations from './SoloRefundOperations';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -136,6 +137,8 @@ type ConfirmDialogState =
       description: string;
       confirmLabel: string;
       tone: 'blue' | 'red';
+      refundAmount?: number;
+      paymentMethod?: string;
     }
   | null;
 
@@ -554,13 +557,20 @@ export default function MasterLedgerTab({
     });
   };
 
+  const [soloProofReference, setSoloProofReference] = useState('');
+  const [soloCaptureReference, setSoloCaptureReference] = useState('');
   const performSoloManualRefundComplete = async (bookingId: string) => {
+    if (!confirmDialog || !soloProofReference.trim()) {
+      showToast('외부 이체 또는 환불 참조값을 입력해 주세요.', 'error');
+      return;
+    }
     setIsProcessing(true);
     try {
       const res = await fetch('/api/admin/bookings/solo-guarantee-refund/mark-manual-refunded', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookingId }),
+        body: JSON.stringify({ bookingId, refundAmount: confirmDialog.refundAmount,
+          proofReference: soloProofReference.trim(), transactionReference: soloCaptureReference.trim() || undefined }),
       });
       const result = await res.json();
       if (!res.ok || !result.success) throw new Error(result.error || '환불 완료 처리 실패');
@@ -570,12 +580,16 @@ export default function MasterLedgerTab({
       setConfirmDialog(null);
     } catch (error: unknown) {
       showToast(getErrorMessage(error, '환불 완료 처리 실패'), 'error');
+      await refreshAfterMutation();
+      setConfirmDialog(null);
     } finally {
       setIsProcessing(false);
     }
   };
 
   const handleSoloManualRefundComplete = async (booking: AdminMasterLedgerEntry) => {
+    setSoloProofReference('');
+    setSoloCaptureReference('');
     const refundAmount = Number(booking.solo_guarantee_refund_amount || booking.solo_guarantee_price || 0);
     const refundAmountLabel = refundAmount > 0 ? `₩${refundAmount.toLocaleString()}` : '해당 1인 추가금';
     setConfirmDialog({
@@ -585,6 +599,8 @@ export default function MasterLedgerTab({
       description: `게스트에게 ${refundAmountLabel} 수동 환불을 완료한 뒤에만 확정하세요. 완료 처리 후 호스트 정산 보류가 해제됩니다.`,
       confirmLabel: '환불 완료 처리',
       tone: 'blue',
+      refundAmount,
+      paymentMethod: booking.payment_method || '',
     });
   };
 
@@ -712,6 +728,7 @@ export default function MasterLedgerTab({
   return (
     <div className="flex h-full gap-4 md:gap-6 relative overflow-hidden md:overflow-x-clip md:overflow-y-visible flex-col md:flex-row">
       <div className={`flex-1 flex flex-col gap-4 md:gap-6 transition-all duration-300 md:min-w-0 ${selectedBooking ? 'hidden md:flex md:w-2/3' : 'flex w-full'}`}>
+        <SoloRefundOperations />
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 md:gap-4 shrink-0">
           <div className="bg-slate-900 p-2.5 md:p-5 rounded-xl md:rounded-2xl text-white shadow-lg shadow-slate-200">
@@ -1283,6 +1300,16 @@ export default function MasterLedgerTab({
                   <p className="mt-1.5 text-sm leading-6 text-slate-600">{confirmDialog.description}</p>
                 </div>
               </div>
+              {confirmDialog.kind === 'solo-manual-refund' && (
+                <div className="mt-4 space-y-3">
+                  <label className="block text-xs font-bold">외부 이체 / 환불 참조값
+                    <input aria-label="외부 이체 또는 환불 참조값" value={soloProofReference} onChange={event => setSoloProofReference(event.target.value)} maxLength={128} className="mt-1 w-full rounded-lg border p-2" />
+                  </label>
+                  {confirmDialog.paymentMethod === 'paypal' && <label className="block text-xs font-bold">PayPal capture 참조값
+                    <input aria-label="PayPal capture 참조값" value={soloCaptureReference} onChange={event => setSoloCaptureReference(event.target.value)} maxLength={128} className="mt-1 w-full rounded-lg border p-2" />
+                  </label>}
+                </div>
+              )}
               <div className="mt-5 flex gap-2.5">
                 <button
                   type="button"
@@ -1322,6 +1349,16 @@ export default function MasterLedgerTab({
                   <p className="mt-1 text-[12px] leading-5 text-slate-600">{confirmDialog.description}</p>
                 </div>
               </div>
+              {confirmDialog.kind === 'solo-manual-refund' && (
+                <div className="mt-4 space-y-3">
+                  <label className="block text-xs font-bold">외부 이체 / 환불 참조값
+                    <input aria-label="외부 이체 또는 환불 참조값" value={soloProofReference} onChange={event => setSoloProofReference(event.target.value)} maxLength={128} className="mt-1 w-full rounded-lg border p-2" />
+                  </label>
+                  {confirmDialog.paymentMethod === 'paypal' && <label className="block text-xs font-bold">PayPal capture 참조값
+                    <input aria-label="PayPal capture 참조값" value={soloCaptureReference} onChange={event => setSoloCaptureReference(event.target.value)} maxLength={128} className="mt-1 w-full rounded-lg border p-2" />
+                  </label>}
+                </div>
+              )}
               <div className="mt-4 flex gap-2">
                 <button
                   type="button"

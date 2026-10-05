@@ -1,0 +1,136 @@
+{
+  "query": "BEGIN TRANSACTION READ ONLY;\nWITH solo AS (SELECT b.*, CASE WHEN b.time ~ '^([01]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$' THEN ((b.date+b.time::time) AT TIME ZONE 'Asia/Seoul') + make_interval(hours=>CASE WHEN e.duration>0 THEN e.duration ELSE 2 END) END ends_at,\nEXISTS(SELECT 1 FROM public.bookings other WHERE other.id<>b.id AND other.experience_id=b.experience_id AND other.date=b.date AND other.time IS NOT DISTINCT FROM b.time AND lower(other.status) IN ('paid','confirmed','completed') AND other.guests>0) other_confirmed\nFROM public.bookings b LEFT JOIN public.experiences e ON e.id=b.experience_id WHERE b.is_solo_guarantee OR b.solo_guarantee_price>0)\nSELECT jsonb_build_object('captured_at',now(),'server_version',current_setting('server_version'),\n'ended_eligible_unresolved',count(*) FILTER(WHERE ends_at<=now() AND other_confirmed AND lower(status) IN ('paid','confirmed','completed') AND solo_guarantee_refund_status<>'refunded'),\n'payout_with_unresolved',count(*) FILTER(WHERE payout_status='paid' AND (solo_guarantee_refund_status IN ('processing','pending_manual','failed') OR (ends_at<=now() AND other_confirmed AND lower(status) IN ('paid','confirmed','completed') AND solo_guarantee_refund_status<>'refunded'))),\n'active_host_basis_mismatch',count(*) FILTER(WHERE lower(status) IN ('paid','confirmed','completed') AND floor(total_experience_price*0.8)<>host_payout_amount),\n'active_platform_balance_mismatch',count(*) FILTER(WHERE lower(status) IN ('paid','confirmed','completed') AND amount-greatest(coalesce(refund_amount,0),solo_guarantee_refund_amount)-host_payout_amount<>platform_revenue),\n'processing',count(*) FILTER(WHERE solo_guarantee_refund_status='processing'),\n'pending_manual',count(*) FILTER(WHERE solo_guarantee_refund_status='pending_manual'),\n'failed',count(*) FILTER(WHERE solo_guarantee_refund_status='failed'),\n'unknown_new_state','N/A: P0 migration not applied',\n'financial_operation_table_present',to_regclass('public.booking_solo_refund_operations') IS NOT NULL,\n'avatar_authority_ledger_present',EXISTS(SELECT 1 FROM supabase_migrations.schema_migrations WHERE version='20261005082309'),\n'migration_ledger',(SELECT jsonb_agg(jsonb_build_object('version',version,'name',name) ORDER BY version) FROM supabase_migrations.schema_migrations),\n'completion_definition_md5',md5(pg_get_functiondef('public.complete_experience_booking_if_due_atomic(text)'::regprocedure))\n) evidence FROM solo; COMMIT;",
+  "evidence": {
+    "failed": 0,
+    "processing": 0,
+    "captured_at": "2026-10-05T12:10:37.443991+00:00",
+    "pending_manual": 0,
+    "server_version": "17.6",
+    "migration_ledger": [
+      {
+        "name": "remote_schema",
+        "version": "20260912034545"
+      },
+      {
+        "name": "service_concierge_assignment",
+        "version": "20260912050655"
+      },
+      {
+        "name": "p0_storage_rpc_security_hardening",
+        "version": "20260915141606"
+      },
+      {
+        "name": "experience_media_locator_cas",
+        "version": "20260916024355"
+      },
+      {
+        "name": "experience_storage_lockdown",
+        "version": "20260916032730"
+      },
+      {
+        "name": "review_tour_end_db_foundation",
+        "version": "20260916111416"
+      },
+      {
+        "name": "review_direct_write_lockdown",
+        "version": "20260916134243"
+      },
+      {
+        "name": "proxy_card_intake_atomic",
+        "version": "20260918000000"
+      },
+      {
+        "name": "experience_payment_claim_and_pending_cleanup",
+        "version": "20260922081710"
+      },
+      {
+        "name": "close_refunded_phone_proxy_requests",
+        "version": "20260922125140"
+      },
+      {
+        "name": "ops_anomaly_monitor_snapshot",
+        "version": "20260923013312"
+      },
+      {
+        "name": "one_time_review_request_reminders",
+        "version": "20260923084232"
+      },
+      {
+        "name": "harden_public_host_applications_security_barrier",
+        "version": "20260929144521"
+      },
+      {
+        "name": "move_is_admin_reader_to_private_schema",
+        "version": "20260930022348"
+      },
+      {
+        "name": "admin_message_monitoring_phase_1",
+        "version": "20261002024534"
+      },
+      {
+        "name": "admin_message_monitoring_historical_reinquiry",
+        "version": "20261002024638"
+      },
+      {
+        "name": "admin_attention_badges_phase_2",
+        "version": "20261002075149"
+      },
+      {
+        "name": "phone_followup_tasks",
+        "version": "20261003012400"
+      },
+      {
+        "name": "admin_chat_bounded_search",
+        "version": "20261003134417"
+      },
+      {
+        "name": "media_lifecycle_foundation",
+        "version": "20261004053224"
+      },
+      {
+        "name": "avatar_media_authority",
+        "version": "20261005082309"
+      }
+    ],
+    "unknown_new_state": "N/A: P0 migration not applied",
+    "payout_with_unresolved": 0,
+    "completion_definition_md5": "9060cfa4c140adf0983890cdd3803cc8",
+    "ended_eligible_unresolved": 0,
+    "active_host_basis_mismatch": 0,
+    "avatar_authority_ledger_present": true,
+    "active_platform_balance_mismatch": 0,
+    "financial_operation_table_present": false
+  },
+  "function_hashes": [
+    {
+      "name": "complete_admin_manual_experience_payout_atomic",
+      "signature": "complete_admin_manual_experience_payout_atomic(uuid,uuid,text,integer,integer,text,text,text,uuid,text)",
+      "definition_md5": "97f25b12814df664df110196292d8ced"
+    },
+    {
+      "name": "complete_experience_booking_if_due_atomic",
+      "signature": "complete_experience_booking_if_due_atomic(text)",
+      "definition_md5": "9060cfa4c140adf0983890cdd3803cc8"
+    },
+    {
+      "name": "confirm_experience_bank_payment_atomic",
+      "signature": "confirm_experience_bank_payment_atomic(text)",
+      "definition_md5": "c00e80b6a53ceac9463f59f16cbee1ed"
+    },
+    {
+      "name": "confirm_experience_payment_atomic",
+      "signature": "confirm_experience_payment_atomic(text,text,text,text,integer)",
+      "definition_md5": "729570e02b43a6bf931cbc42be7004cb"
+    },
+    {
+      "name": "create_booking_atomic",
+      "signature": "create_booking_atomic(uuid,text,text,text,integer,boolean,text,text,text,boolean)",
+      "definition_md5": "9d0f1ad5622e7ab7b4d0187e2214e9f5"
+    },
+    {
+      "name": "list_due_experience_completion_candidates",
+      "signature": "list_due_experience_completion_candidates(text)",
+      "definition_md5": "bf1c439876f8b46965a12a0fb2356386"
+    }
+  ]
+}

@@ -12,6 +12,7 @@ const GUEST_TRIPS_BOOKING_SELECT = `
   time,
   guests,
   amount,
+  refund_amount,
   status,
   payment_method,
   tid,
@@ -167,6 +168,7 @@ export async function GET() {
         price: booking.amount,
         status: status, // 업데이트된 상태 사용
         cancelReason: booking.cancel_reason || null,
+        refundAmount: booking.refund_amount || 0,
         soloGuaranteeRefundStatus: booking.solo_guarantee_refund_status || null,
         soloGuaranteeRefundAmount: booking.solo_guarantee_refund_amount || 0,
         soloGuaranteeRefundedAt: booking.solo_guarantee_refunded_at || null,

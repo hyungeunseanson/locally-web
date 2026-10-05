@@ -69,6 +69,7 @@ export type CancelCardPaymentResult = {
   resultCode: string | null;
   resultMessage: string | null;
   raw: string;
+  refundReference?: string;
 };
 
 export type CardPaymentNotificationEnvelope = {

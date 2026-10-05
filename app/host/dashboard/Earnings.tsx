@@ -10,12 +10,14 @@ import type { HostUnifiedEarningsSummary, HostUnifiedEarningsSummaryResponse } f
 
 import ExperienceEarningsPanel from './components/ExperienceEarningsPanel';
 import ServiceEarningsPanel from './components/ServiceEarningsPanel';
+import { useHostBookingMoneyRevision } from './useHostBookingMoneyRevision';
 
 type EarningsTab = 'experience' | 'service';
 
 export default function Earnings() {
   const router = useRouter();
   const { t } = useLanguage();
+  const bookingMoneyRevision = useHostBookingMoneyRevision();
 
   const [activeTab, setActiveTab] = useState<EarningsTab>('experience');
   const [showSettings, setShowSettings] = useState(false);
@@ -69,7 +71,7 @@ export default function Earnings() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [bookingMoneyRevision]);
 
   const tabClass = (tab: EarningsTab) =>
     `inline-flex min-w-0 flex-1 items-center justify-center rounded-full px-3 py-2 text-xs font-bold transition-colors md:flex-none md:px-5 md:text-sm ${
