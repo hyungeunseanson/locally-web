@@ -38,7 +38,8 @@ BEGIN
     '20261003012400:phone_followup_tasks',
     '20261003134417:admin_chat_bounded_search',
     '20261004053224:media_lifecycle_foundation',
-    '20261005082309:avatar_media_authority'
+    '20261005082309:avatar_media_authority',
+    '20261005104924:solo_guarantee_financial_authority'
   ]::text[];
   IF actual IS DISTINCT FROM expected THEN
     RAISE EXCEPTION 'migration ledger mismatch: %', actual;
@@ -58,6 +59,8 @@ BEGIN
     'admin_tasks',
     'admin_whitelist',
     'analytics_events',
+    'booking_solo_refund_attempts',
+    'booking_solo_refund_operations',
     'bookings',
     'community_comments',
     'community_likes',
@@ -101,8 +104,8 @@ BEGIN
     INTO actual_count
     FROM information_schema.columns
    WHERE table_schema = 'public' AND table_name = ANY (expected);
-  IF actual_count <> 559 THEN
-    RAISE EXCEPTION 'public table column count %, expected 559', actual_count;
+  IF actual_count <> 605 THEN
+    RAISE EXCEPTION 'public table column count %, expected 605', actual_count;
   END IF;
 
   SELECT array_agg(class_def.relname ORDER BY class_def.relname)
@@ -140,6 +143,7 @@ BEGIN
     'public.ack_admin_inquiry_messages(p_inquiry_id bigint, p_through_message_id bigint)',
     'public.ack_admin_inquiry_snapshot(p_inquiry_id bigint, p_message_ids bigint[])',
     'public.apply_experience_media_locator_cas(p_experience_id bigint, p_before_photos text[], p_before_image_url text, p_before_itinerary jsonb, p_before_itinerary_i18n jsonb, p_after_photos text[], p_after_image_url text, p_after_itinerary jsonb, p_after_itinerary_i18n jsonb)',
+    'public.apply_solo_refund_settlement_atomic(p_operation_id uuid)',
     'public.assign_service_concierge_host_atomic(p_admin_id uuid, p_request_id uuid, p_host_id uuid, p_host_hourly_rate integer, p_host_agreement_confirmed boolean)',
     'public.attach_experience_payment_provider_reference_atomic(p_booking_id text, p_user_id uuid, p_provider_reference text, p_claim_token uuid)',
     'public.avatar_migration_inventory()',
@@ -147,16 +151,20 @@ BEGIN
     'public.begin_experience_media_asset(p_id uuid, p_owner_id uuid, p_key text, p_url text, p_sha256 text, p_size bigint, p_mime text, p_idempotency_key text, p_parent_id text)',
     'public.begin_experience_payment_capture_atomic(p_booking_id text, p_user_id uuid, p_provider_reference text)',
     'public.begin_service_refund_operation_atomic(p_admin_id uuid, p_order_id text, p_refund_amount integer, p_host_compensation_amount integer, p_idempotency_key text)',
+    'public.begin_solo_refund_request_atomic(p_operation_id uuid, p_attempt_identity uuid, p_merchant_reference text)',
     'public.cancel_expired_pending_bookings_atomic(p_batch_size integer)',
     'public.cancel_pending_service_concierge_atomic(p_actor_id uuid, p_order_id text, p_cancel_reason text)',
     'public.check_rate_limit(table_name text, seconds integer)',
+    'public.claim_booking_cancellation_atomic(p_booking_id text, p_expected_snapshot jsonb)',
     'public.claim_due_admin_support_unread_alert_batches(p_limit integer)',
     'public.claim_due_review_request_reminders(p_limit integer)',
     'public.claim_experience_payment_atomic(p_booking_id text, p_user_id uuid, p_provider text, p_provider_reference text)',
     'public.claim_media_deletion(p_asset_id uuid, p_enabled boolean, p_minimum_age_ms bigint)',
+    'public.claim_solo_refund_atomic(p_booking_id text)',
     'public.commit_profile_avatar(p_owner_id uuid, p_asset_id uuid, p_expected_url text, p_sha256 text, p_size bigint)',
     'public.complete_admin_manual_experience_payout_atomic(p_request_key uuid, p_host_id uuid, p_settlement_type text, p_expected_current_booking_amount integer, p_legacy_amount integer, p_reason text, p_legacy_source_reference text, p_transfer_reference text, p_paid_by_admin_id uuid, p_paid_by_admin_email text)',
     'public.complete_experience_booking_if_due_atomic(p_booking_id text)',
+    'public.complete_manual_solo_refund_atomic(p_booking_id text, p_amount integer, p_proof_reference text, p_transaction_reference text, p_admin_id uuid)',
     'public.complete_phone_request(p_request_id uuid, p_inquiry_id bigint, p_message_ids bigint[], p_admin_id uuid)',
     'public.complete_service_booking_if_due_atomic(p_booking_id text)',
     'public.complete_service_concierge_booking_if_due_atomic(p_booking_id text)',
@@ -172,8 +180,11 @@ BEGIN
     'public.create_service_request_with_booking_atomic(p_user_id uuid, p_title text, p_description text, p_city text, p_country text, p_service_date date, p_start_time text, p_duration_hours integer, p_languages text[], p_guest_count integer, p_contact_name text, p_contact_phone text)',
     'public.decrement_comment_count()',
     'public.decrement_like_count()',
+    'public.deliver_solo_refund_notification_atomic(p_operation_id uuid, p_expected_phase text, p_notifications jsonb)',
     'public.ensure_profile_demographics_reminder(p_user_id uuid, p_title text, p_message text, p_link text)',
+    'public.finalize_booking_cancellation_atomic(p_booking_id text, p_claim_id uuid, p_reason text, p_refund_amount integer, p_host_payout integer, p_platform_revenue integer)',
     'public.finalize_proxy_card_intake_atomic(p_proxy_request_id uuid, p_verified_amount integer, p_verified_tid text, p_initial_message text)',
+    'public.finalize_released_card_refund_atomic(p_booking_id text, p_transaction_reference text, p_order_reference text, p_amount integer)',
     'public.finish_service_refund_operation_atomic(p_operation_id uuid, p_outcome text, p_provider_reference text, p_error_message text)',
     'public.get_admin_attention(p_inquiry_ids bigint[])',
     'public.get_admin_inquiry_activity(p_inquiry_ids bigint[])',
@@ -190,17 +201,24 @@ BEGIN
     'public.list_due_experience_completion_candidates(p_booking_id text)',
     'public.list_due_experience_review_request_candidates(p_limit integer)',
     'public.mark_room_messages_read(p_room_id uuid, p_user_id uuid)',
+    'public.mark_solo_refund_delivery_failed_atomic(p_operation_id uuid)',
     'public.plan_media_owner_deletion(p_owner_id uuid)',
     'public.prune_notifications_retention(p_cutoff timestamp with time zone, p_batch_size integer)',
     'public.prune_team_workspace_comments(p_task_id uuid, p_keep_limit integer)',
     'public.prune_team_workspace_tasks(p_keep_limit integer)',
+    'public.reconcile_solo_refund_accepted_atomic(p_operation_id uuid, p_result_code text, p_refund_reference text, p_amount integer, p_transaction_reference text, p_order_reference text, p_admin_id uuid)',
+    'public.reconcile_solo_refund_rejected_atomic(p_operation_id uuid, p_result_code text, p_amount integer, p_transaction_reference text, p_order_reference text, p_admin_id uuid)',
     'public.record_media_deletion_step(p_asset_id uuid, p_event text, p_code text)',
+    'public.record_solo_refund_outcome_atomic(p_operation_id uuid, p_attempt_identity uuid, p_outcome text, p_result_code text, p_refund_reference text, p_diagnostic_code text)',
     'public.record_translation_provider_outcome(p_provider text, p_token_count integer, p_cooldown_seconds integer, p_hit_quota boolean)',
     'public.record_translation_provider_outcome(p_provider text, p_token_count integer, p_cooldown_seconds integer, p_hit_quota boolean, p_reserved_token_count integer)',
+    'public.recover_solo_refunds_atomic(p_limit integer)',
     'public.refresh_experience_popularity_snapshot()',
     'public.replace_managed_media_reference(p_owner_id uuid, p_parent_type text, p_parent_id text, p_expected_digest text, p_new_digest text, p_old_asset_id uuid, p_new_asset_id uuid)',
     'public.reply_phone_request(p_request_id uuid, p_inquiry_id bigint, p_message_ids bigint[], p_admin_id uuid, p_content text, p_type text, p_image_url text)',
     'public.request_service_cancellation_review_atomic(p_actor_id uuid, p_order_id text, p_cancel_reason text)',
+    'public.retry_rejected_solo_refund_atomic(p_operation_id uuid, p_admin_id uuid)',
+    'public.retry_solo_refund_delivery_atomic(p_operation_id uuid, p_admin_id uuid)',
     'public.rollback_profile_avatar(p_owner_id uuid, p_asset_id uuid, p_expected_url text, p_old_url text)',
     'public.search_admin_chat(p_surface text, p_query text)',
     'public.select_service_host_atomic(p_customer_id uuid, p_request_id uuid, p_application_id uuid)',
@@ -209,7 +227,9 @@ BEGIN
     'public.set_service_applications_updated_at()',
     'public.set_service_bookings_updated_at()',
     'public.set_service_requests_updated_at()',
+    'public.settle_experience_payouts_atomic(p_booking_ids text[], p_expected_amounts jsonb)',
     'public.snapshot_booking_guest_demographics()',
+    'public.solo_refund_diagnostics()',
     'public.verify_avatar_media_asset(p_id uuid, p_owner_id uuid, p_sha256 text, p_size bigint, p_mime text)',
     'public.verify_experience_media_asset(p_id uuid, p_owner_id uuid, p_sha256 text, p_size bigint, p_mime text)'
   ]::text[];
@@ -231,15 +251,21 @@ BEGIN
     'private.admin_chat_phone_title(category text, form_data jsonb)',
     'private.adopt_phone_followup_link()',
     'private.advance_support_version()',
+    'private.assert_booking_payout_safe(p_booking bookings)',
     'private.bump_experience_media_revision()',
     'private.canonical_experience_media_locator(p_url text)',
     'private.capture_phone_followup()',
     'private.delete_pending_phone_followup()',
+    'private.guard_booking_money_transition()',
+    'private.guard_unresolved_booking_delete()',
     'private.handle_phone_followup(p_request uuid, p_inquiry bigint, p_ids bigint[], p_admin uuid, p_complete boolean)',
     'private.has_phone_followup(p_request uuid)',
     'private.is_admin_reader()',
     'private.is_inquiry_admin_sender(p_sender uuid)',
+    'private.journal_solo_refund_attempt()',
+    'private.lock_booking_money(p_experience_id bigint)',
     'private.prepare_support_message()',
+    'private.solo_refund_due(p_booking bookings)',
     'private.sync_experience_media_assets()',
     'private.sync_profile_avatar_assets()'
   ]::text[] THEN
@@ -292,7 +318,10 @@ BEGIN
    WHERE NOT trigger_def.tgisinternal AND namespace_def.nspname IN ('public', 'auth');
   expected := ARRAY[
     'auth.users.on_auth_user_created',
+    'public.booking_solo_refund_operations.solo_refund_attempt_journal',
+    'public.bookings.bookings_money_transition_authority',
     'public.bookings.bookings_payment_claim_columns_server_only',
+    'public.bookings.bookings_unresolved_money_delete',
     'public.bookings.set_booking_guest_demographics_snapshot',
     'public.community_comments.on_comment_added',
     'public.community_comments.on_comment_removed',
@@ -319,8 +348,8 @@ BEGIN
   END IF;
 
   SELECT count(*) INTO actual_count FROM pg_indexes WHERE schemaname = 'public';
-  IF actual_count <> 143 THEN
-    RAISE EXCEPTION 'public index count %, expected 143', actual_count;
+  IF actual_count <> 149 THEN
+    RAISE EXCEPTION 'public index count %, expected 149', actual_count;
   END IF;
   IF to_regclass('public.uq_notifications_review_request_reminder_booking_id') IS NULL
     OR to_regclass('public.uq_notifications_guest_review_request_reminder_booking_id') IS NULL
@@ -343,8 +372,8 @@ BEGIN
     JOIN pg_class AS class_def ON class_def.oid = constraint_def.conrelid
     JOIN pg_namespace AS namespace_def ON namespace_def.oid = class_def.relnamespace
    WHERE namespace_def.nspname = 'public';
-  IF actual_count <> 206 OR primary_key_count <> 42 OR foreign_key_count <> 61
-     OR unique_count <> 17 OR check_count <> 86 THEN
+  IF actual_count <> 223 OR primary_key_count <> 44 OR foreign_key_count <> 62
+     OR unique_count <> 18 OR check_count <> 99 THEN
     RAISE EXCEPTION 'constraint counts differ: total %, PK %, FK %, UNIQUE %, CHECK %',
       actual_count, primary_key_count, foreign_key_count, unique_count, check_count;
   END IF;
@@ -363,6 +392,8 @@ BEGIN
     'admin_tasks',
     'admin_whitelist',
     'analytics_events',
+    'booking_solo_refund_attempts',
+    'booking_solo_refund_operations',
     'bookings',
     'community_comments',
     'community_likes',
@@ -466,7 +497,7 @@ BEGIN
     )) AS acl_entry
    WHERE namespace_def.nspname = 'public'
      AND class_def.relkind IN ('r', 'p', 'v', 'm', 'f');
-  IF actual_fingerprint IS DISTINCT FROM '3b88d65d3e719c850d20d1cbf706516f' THEN
+  IF actual_fingerprint IS DISTINCT FROM '23a636eb7731f130f48aaeceb415c8cf' THEN
     RAISE EXCEPTION 'public relation grant fingerprint mismatch: %', actual_fingerprint;
   END IF;
 
@@ -635,12 +666,169 @@ BEGIN
   ]::text[] THEN
     RAISE EXCEPTION 'applied media/avatar ledger SQL mismatch: %', actual;
   END IF;
-  IF EXISTS (SELECT 1 FROM supabase_migrations.schema_migrations WHERE version='20261005104924')
-     OR to_regclass('public.booking_solo_refund_operations') IS NOT NULL THEN
-    RAISE EXCEPTION 'financial P0 is pending, current-state evidence must be recaptured after authorized rollout';
-  END IF;
 END
 $media_authority_ledger_contract$;
+
+
+DO $solo_financial_ledger_contract$
+DECLARE actual text[];
+BEGIN
+  SELECT array_agg(version||':'||name||':'||cardinality(statements)||':'||md5(array_to_string(statements,E'\n'))||':'||encode(sha256(convert_to(array_to_string(statements,E'\n'),'UTF8')),'hex') ORDER BY version) INTO actual FROM supabase_migrations.schema_migrations WHERE version='20261005104924';
+  IF actual IS DISTINCT FROM ARRAY[
+    '20261005104924:solo_guarantee_financial_authority:1:043305b5d4d7c8af3e9d808651863c57:df95be49a1df1e5b1fbc1e89afa0ff589b8041c4d9ed54e5d39945eaeee09c11'
+  ]::text[] THEN
+    RAISE EXCEPTION 'applied financial P0 ledger SQL mismatch: %',actual;
+  END IF;
+END
+$solo_financial_ledger_contract$;
+
+DO $solo_financial_catalog_contract$
+DECLARE actual text[]; r text;
+BEGIN
+  SELECT array_agg(format('%I.%I(%s)',n.nspname,p.proname,pg_get_function_identity_arguments(p.oid))||'|'||pg_get_userbyid(p.proowner)||'|'||p.prosecdef||'|'||p.provolatile::text||'|'||pg_get_function_result(p.oid)||'|'||coalesce(array_to_string(p.proconfig,','),'')||'|'||coalesce(p.proacl::text,'')||'|'||md5(p.prosrc) ORDER BY n.nspname,p.proname,pg_get_function_identity_arguments(p.oid)) INTO actual FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE format('%I.%I(%s)',n.nspname,p.proname,pg_get_function_identity_arguments(p.oid)) = ANY (ARRAY['private.assert_booking_payout_safe(p_booking bookings)','private.guard_booking_money_transition()','private.guard_unresolved_booking_delete()','private.journal_solo_refund_attempt()','private.lock_booking_money(p_experience_id bigint)','private.solo_refund_due(p_booking bookings)','public.apply_solo_refund_settlement_atomic(p_operation_id uuid)','public.begin_solo_refund_request_atomic(p_operation_id uuid, p_attempt_identity uuid, p_merchant_reference text)','public.claim_booking_cancellation_atomic(p_booking_id text, p_expected_snapshot jsonb)','public.claim_solo_refund_atomic(p_booking_id text)','public.complete_admin_manual_experience_payout_atomic(p_request_key uuid, p_host_id uuid, p_settlement_type text, p_expected_current_booking_amount integer, p_legacy_amount integer, p_reason text, p_legacy_source_reference text, p_transfer_reference text, p_paid_by_admin_id uuid, p_paid_by_admin_email text)','public.complete_experience_booking_if_due_atomic(p_booking_id text)','public.complete_manual_solo_refund_atomic(p_booking_id text, p_amount integer, p_proof_reference text, p_transaction_reference text, p_admin_id uuid)','public.deliver_solo_refund_notification_atomic(p_operation_id uuid, p_expected_phase text, p_notifications jsonb)','public.finalize_booking_cancellation_atomic(p_booking_id text, p_claim_id uuid, p_reason text, p_refund_amount integer, p_host_payout integer, p_platform_revenue integer)','public.finalize_released_card_refund_atomic(p_booking_id text, p_transaction_reference text, p_order_reference text, p_amount integer)','public.mark_solo_refund_delivery_failed_atomic(p_operation_id uuid)','public.reconcile_solo_refund_accepted_atomic(p_operation_id uuid, p_result_code text, p_refund_reference text, p_amount integer, p_transaction_reference text, p_order_reference text, p_admin_id uuid)','public.reconcile_solo_refund_rejected_atomic(p_operation_id uuid, p_result_code text, p_amount integer, p_transaction_reference text, p_order_reference text, p_admin_id uuid)','public.record_solo_refund_outcome_atomic(p_operation_id uuid, p_attempt_identity uuid, p_outcome text, p_result_code text, p_refund_reference text, p_diagnostic_code text)','public.recover_solo_refunds_atomic(p_limit integer)','public.retry_rejected_solo_refund_atomic(p_operation_id uuid, p_admin_id uuid)','public.retry_solo_refund_delivery_atomic(p_operation_id uuid, p_admin_id uuid)','public.settle_experience_payouts_atomic(p_booking_ids text[], p_expected_amounts jsonb)','public.solo_refund_diagnostics()']::text[]);
+  IF actual IS DISTINCT FROM ARRAY[
+    'private.assert_booking_payout_safe(p_booking bookings)|postgres|false|v|void|search_path=""|{postgres=X/postgres,service_role=X/postgres}|4612965a58af90cc9c9dba68ec3ac24c',
+    'private.guard_booking_money_transition()|postgres|false|v|trigger|search_path=""|{postgres=X/postgres,service_role=X/postgres}|950046dd161810c752119f02f32e0122',
+    'private.guard_unresolved_booking_delete()|postgres|false|v|trigger|search_path=""|{postgres=X/postgres,service_role=X/postgres}|4ef4a379101cd2cc2852d4ed51660528',
+    'private.journal_solo_refund_attempt()|postgres|true|v|trigger|search_path=""|{postgres=X/postgres,service_role=X/postgres}|a90aa7ce40543dd0dda4bcddda4718c3',
+    'private.lock_booking_money(p_experience_id bigint)|postgres|false|v|void|search_path=""|{postgres=X/postgres,service_role=X/postgres}|604bf282783b0161f875c68e8e332f06',
+    'private.solo_refund_due(p_booking bookings)|postgres|false|s|boolean|search_path=""|{postgres=X/postgres,service_role=X/postgres}|a987b0a360905285d4196db5cef8e7fb',
+    'public.apply_solo_refund_settlement_atomic(p_operation_id uuid)|postgres|true|v|SETOF booking_solo_refund_operations|search_path=""|{postgres=X/postgres,service_role=X/postgres}|85eed4f68d0b47673f0abaa98bcd9ce0',
+    'public.begin_solo_refund_request_atomic(p_operation_id uuid, p_attempt_identity uuid, p_merchant_reference text)|postgres|true|v|SETOF booking_solo_refund_operations|search_path=""|{postgres=X/postgres,service_role=X/postgres}|a60a2746f31c639843f7337bc3e92b65',
+    'public.claim_booking_cancellation_atomic(p_booking_id text, p_expected_snapshot jsonb)|postgres|true|v|SETOF bookings|search_path=""|{postgres=X/postgres,service_role=X/postgres}|f3144fb1d0b80d617052bf72b261e67f',
+    'public.claim_solo_refund_atomic(p_booking_id text)|postgres|true|v|SETOF booking_solo_refund_operations|search_path=""|{postgres=X/postgres,service_role=X/postgres}|e89555fc996d732add46534b5e8fea2c',
+    'public.complete_admin_manual_experience_payout_atomic(p_request_key uuid, p_host_id uuid, p_settlement_type text, p_expected_current_booking_amount integer, p_legacy_amount integer, p_reason text, p_legacy_source_reference text, p_transfer_reference text, p_paid_by_admin_id uuid, p_paid_by_admin_email text)|postgres|true|v|TABLE(manual_payout_id uuid, request_key uuid, host_id uuid, booking_count integer, current_booking_amount integer, legacy_amount integer, total_paid_amount integer, paid_at timestamp with time zone)|search_path=""|{postgres=X/postgres,service_role=X/postgres}|593905c0f7d7427cd471be2f49fdcf46',
+    'public.complete_experience_booking_if_due_atomic(p_booking_id text)|postgres|true|v|TABLE(booking_id text, order_id text, user_id uuid, already_processed boolean, not_due boolean, completed boolean, notification_created boolean)|search_path=""|{postgres=X/postgres,service_role=X/postgres}|7259e4d292280d09099a5120055e509b',
+    'public.complete_manual_solo_refund_atomic(p_booking_id text, p_amount integer, p_proof_reference text, p_transaction_reference text, p_admin_id uuid)|postgres|true|v|SETOF booking_solo_refund_operations|search_path=""|{postgres=X/postgres,service_role=X/postgres}|9bb30a3cf363c3631aba40a39f840ea2',
+    'public.deliver_solo_refund_notification_atomic(p_operation_id uuid, p_expected_phase text, p_notifications jsonb)|postgres|true|v|boolean|search_path=""|{postgres=X/postgres,service_role=X/postgres}|8cfa53bd43153e4b86a7ef34a99bc3c9',
+    'public.finalize_booking_cancellation_atomic(p_booking_id text, p_claim_id uuid, p_reason text, p_refund_amount integer, p_host_payout integer, p_platform_revenue integer)|postgres|true|v|SETOF bookings|search_path=""|{postgres=X/postgres,service_role=X/postgres}|885e05e8d43c1242241c48c66d90eb6f',
+    'public.finalize_released_card_refund_atomic(p_booking_id text, p_transaction_reference text, p_order_reference text, p_amount integer)|postgres|true|v|SETOF bookings|search_path=""|{postgres=X/postgres,service_role=X/postgres}|76b1a0951e60e163d0925c8fec16de31',
+    'public.mark_solo_refund_delivery_failed_atomic(p_operation_id uuid)|postgres|true|v|void|search_path=""|{postgres=X/postgres,service_role=X/postgres}|46d40bb685a7d3b2e92f4fc9e1f127a8',
+    'public.reconcile_solo_refund_accepted_atomic(p_operation_id uuid, p_result_code text, p_refund_reference text, p_amount integer, p_transaction_reference text, p_order_reference text, p_admin_id uuid)|postgres|true|v|SETOF booking_solo_refund_operations|search_path=""|{postgres=X/postgres,service_role=X/postgres}|7c9901fecfcc9e60ed896b25e52b183d',
+    'public.reconcile_solo_refund_rejected_atomic(p_operation_id uuid, p_result_code text, p_amount integer, p_transaction_reference text, p_order_reference text, p_admin_id uuid)|postgres|true|v|SETOF booking_solo_refund_operations|search_path=""|{postgres=X/postgres,service_role=X/postgres}|b0ba239c597dcfef6067dfea7ea9aff3',
+    'public.record_solo_refund_outcome_atomic(p_operation_id uuid, p_attempt_identity uuid, p_outcome text, p_result_code text, p_refund_reference text, p_diagnostic_code text)|postgres|true|v|SETOF booking_solo_refund_operations|search_path=""|{postgres=X/postgres,service_role=X/postgres}|b44d04025b90b92cc09c924c4cf7a4b5',
+    'public.recover_solo_refunds_atomic(p_limit integer)|postgres|true|v|SETOF booking_solo_refund_operations|search_path=""|{postgres=X/postgres,service_role=X/postgres}|3b6cfc9456fc5606846bc67fea8897cb',
+    'public.retry_rejected_solo_refund_atomic(p_operation_id uuid, p_admin_id uuid)|postgres|true|v|SETOF booking_solo_refund_operations|search_path=""|{postgres=X/postgres,service_role=X/postgres}|31cf3cc9c31120d10137ef8c302f4feb',
+    'public.retry_solo_refund_delivery_atomic(p_operation_id uuid, p_admin_id uuid)|postgres|true|v|SETOF booking_solo_refund_operations|search_path=""|{postgres=X/postgres,service_role=X/postgres}|c7e0743430a337cb693dc19677a0b18a',
+    'public.settle_experience_payouts_atomic(p_booking_ids text[], p_expected_amounts jsonb)|postgres|true|v|TABLE(id text)|search_path=""|{postgres=X/postgres,service_role=X/postgres}|58f1bfc05014fc4546d7f96f5dee34dd',
+    'public.solo_refund_diagnostics()|postgres|true|s|jsonb|search_path=""|{postgres=X/postgres,service_role=X/postgres}|7ed678903229836dc9d9c1bfad4bdd69'
+  ]::text[] THEN
+    RAISE EXCEPTION 'financial function body or ACL mismatch: %',actual;
+  END IF;
+  SELECT array_agg(c.relname||'|'||a.attname||'|'||format_type(a.atttypid,a.atttypmod)||'|'||a.attnotnull||'|'||coalesce(pg_get_expr(d.adbin,d.adrelid),'') ORDER BY c.relname,a.attnum) INTO actual FROM pg_attribute a JOIN pg_class c ON c.oid=a.attrelid JOIN pg_namespace n ON n.oid=c.relnamespace LEFT JOIN pg_attrdef d ON d.adrelid=c.oid AND d.adnum=a.attnum WHERE n.nspname='public' AND a.attnum>0 AND NOT a.attisdropped AND (c.relname IN ('booking_solo_refund_operations','booking_solo_refund_attempts') OR (c.relname='bookings' AND a.attname LIKE 'cancellation_%') OR (c.relname='notifications' AND a.attname LIKE 'solo_refund_%'));
+  IF actual IS DISTINCT FROM ARRAY[
+    'booking_solo_refund_attempts|attempt_identity|uuid|true|',
+    'booking_solo_refund_attempts|operation_id|uuid|true|',
+    'booking_solo_refund_attempts|attempt_number|integer|true|',
+    'booking_solo_refund_attempts|order_reference|text|true|',
+    'booking_solo_refund_attempts|outcome|text|true|',
+    'booking_solo_refund_attempts|merchant_reference|text|false|',
+    'booking_solo_refund_attempts|request_started_at|timestamp with time zone|false|',
+    'booking_solo_refund_attempts|result_code|text|false|',
+    'booking_solo_refund_attempts|provider_refund_reference|text|false|',
+    'booking_solo_refund_attempts|diagnostic_code|text|false|',
+    'booking_solo_refund_attempts|recorded_at|timestamp with time zone|true|now()',
+    'booking_solo_refund_operations|id|uuid|true|gen_random_uuid()',
+    'booking_solo_refund_operations|booking_id|text|true|',
+    'booking_solo_refund_operations|attempt_identity|uuid|true|gen_random_uuid()',
+    'booking_solo_refund_operations|attempt_number|integer|true|1',
+    'booking_solo_refund_operations|provider|text|true|',
+    'booking_solo_refund_operations|payment_method|text|true|',
+    'booking_solo_refund_operations|transaction_reference|text|false|',
+    'booking_solo_refund_operations|merchant_reference|text|false|',
+    'booking_solo_refund_operations|order_reference|text|true|',
+    'booking_solo_refund_operations|requested_amount|integer|true|',
+    'booking_solo_refund_operations|original_basis|integer|true|',
+    'booking_solo_refund_operations|gross_amount|integer|true|',
+    'booking_solo_refund_operations|prior_refund_amount|integer|true|',
+    'booking_solo_refund_operations|basis_reserved|boolean|true|false',
+    'booking_solo_refund_operations|trigger_booking_id|text|false|',
+    'booking_solo_refund_operations|outcome|text|true|',
+    'booking_solo_refund_operations|request_started_at|timestamp with time zone|false|',
+    'booking_solo_refund_operations|lease_expires_at|timestamp with time zone|false|',
+    'booking_solo_refund_operations|result_code|text|false|',
+    'booking_solo_refund_operations|provider_refund_reference|text|false|',
+    'booking_solo_refund_operations|proof_reference|text|false|',
+    'booking_solo_refund_operations|proof_transaction_reference|text|false|',
+    'booking_solo_refund_operations|verified_by|uuid|false|',
+    'booking_solo_refund_operations|diagnostic_code|text|false|',
+    'booking_solo_refund_operations|settlement_applied_at|timestamp with time zone|false|',
+    'booking_solo_refund_operations|delivery_state|text|true|''pending''::text',
+    'booking_solo_refund_operations|delivery_attempts|integer|true|0',
+    'booking_solo_refund_operations|next_delivery_at|timestamp with time zone|true|now()',
+    'booking_solo_refund_operations|created_at|timestamp with time zone|true|now()',
+    'booking_solo_refund_operations|updated_at|timestamp with time zone|true|now()',
+    'bookings|cancellation_claim_id|uuid|false|',
+    'bookings|cancellation_claimed_at|timestamp with time zone|false|',
+    'bookings|cancellation_original_status|text|false|',
+    'notifications|solo_refund_operation_id|uuid|false|',
+    'notifications|solo_refund_delivery_phase|text|false|'
+  ]::text[] THEN
+    RAISE EXCEPTION 'financial column mismatch: %',actual;
+  END IF;
+  SELECT array_agg(indexdef ORDER BY indexname) INTO actual FROM pg_indexes WHERE schemaname='public' AND (tablename IN ('booking_solo_refund_operations','booking_solo_refund_attempts') OR indexname='notifications_solo_refund_once');
+  IF actual IS DISTINCT FROM ARRAY[
+    'CREATE UNIQUE INDEX booking_solo_refund_attempts_pkey ON public.booking_solo_refund_attempts USING btree (attempt_identity)',
+    'CREATE UNIQUE INDEX booking_solo_refund_manual_proof_once ON public.booking_solo_refund_operations USING btree (provider, proof_reference) WHERE (proof_reference IS NOT NULL)',
+    'CREATE UNIQUE INDEX booking_solo_refund_operations_booking_id_key ON public.booking_solo_refund_operations USING btree (booking_id)',
+    'CREATE UNIQUE INDEX booking_solo_refund_operations_pkey ON public.booking_solo_refund_operations USING btree (id)',
+    'CREATE INDEX booking_solo_refund_recovery ON public.booking_solo_refund_operations USING btree (updated_at) WHERE ((settlement_applied_at IS NULL) OR (delivery_state <> ''delivered''::text))',
+    'CREATE UNIQUE INDEX notifications_solo_refund_once ON public.notifications USING btree (solo_refund_operation_id, user_id, type, solo_refund_delivery_phase) WHERE (solo_refund_operation_id IS NOT NULL)'
+  ]::text[] THEN
+    RAISE EXCEPTION 'financial index mismatch: %',actual;
+  END IF;
+  SELECT array_agg(c.relname||'|'||k.conname||'|'||pg_get_constraintdef(k.oid,true) ORDER BY c.relname,k.conname) INTO actual FROM pg_constraint k JOIN pg_class c ON c.oid=k.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND (c.relname IN ('booking_solo_refund_operations','booking_solo_refund_attempts') OR k.conname='bookings_solo_guarantee_refund_status_check');
+  IF actual IS DISTINCT FROM ARRAY[
+    'booking_solo_refund_attempts|booking_solo_refund_attempts_operation_id_fkey|FOREIGN KEY (operation_id) REFERENCES booking_solo_refund_operations(id)',
+    'booking_solo_refund_attempts|booking_solo_refund_attempts_pkey|PRIMARY KEY (attempt_identity)',
+    'booking_solo_refund_operations|booking_solo_refund_operation_proof_transaction_reference_check|CHECK (length(proof_transaction_reference) <= 128)',
+    'booking_solo_refund_operations|booking_solo_refund_operations_attempt_number_check|CHECK (attempt_number >= 1 AND attempt_number <= 3)',
+    'booking_solo_refund_operations|booking_solo_refund_operations_booking_id_key|UNIQUE (booking_id)',
+    'booking_solo_refund_operations|booking_solo_refund_operations_check|CHECK (gross_amount >= requested_amount)',
+    'booking_solo_refund_operations|booking_solo_refund_operations_delivery_state_check|CHECK (delivery_state = ANY (ARRAY[''pending''::text, ''delivered''::text, ''failed''::text]))',
+    'booking_solo_refund_operations|booking_solo_refund_operations_diagnostic_code_check|CHECK (diagnostic_code ~ ''^[a-z0-9_]{1,80}$''::text)',
+    'booking_solo_refund_operations|booking_solo_refund_operations_merchant_reference_check|CHECK (length(merchant_reference) <= 64)',
+    'booking_solo_refund_operations|booking_solo_refund_operations_original_basis_check|CHECK (original_basis >= 0)',
+    'booking_solo_refund_operations|booking_solo_refund_operations_outcome_check|CHECK (outcome = ANY (ARRAY[''claimed''::text, ''accepted''::text, ''unknown''::text, ''rejected''::text, ''manual_pending''::text]))',
+    'booking_solo_refund_operations|booking_solo_refund_operations_pkey|PRIMARY KEY (id)',
+    'booking_solo_refund_operations|booking_solo_refund_operations_prior_refund_amount_check|CHECK (prior_refund_amount >= 0)',
+    'booking_solo_refund_operations|booking_solo_refund_operations_proof_reference_check|CHECK (length(proof_reference) <= 128)',
+    'booking_solo_refund_operations|booking_solo_refund_operations_provider_refund_reference_check|CHECK (length(provider_refund_reference) <= 128)',
+    'booking_solo_refund_operations|booking_solo_refund_operations_requested_amount_check|CHECK (requested_amount > 0)',
+    'booking_solo_refund_operations|booking_solo_refund_operations_result_code_check|CHECK (length(result_code) <= 16)',
+    'bookings|bookings_solo_guarantee_refund_status_check|CHECK (solo_guarantee_refund_status = ANY (ARRAY[''not_applicable''::text, ''processing''::text, ''pending_manual''::text, ''refunded''::text, ''failed''::text, ''accepted''::text, ''unknown''::text, ''rejected''::text, ''reconciliation_required''::text]))'
+  ]::text[] THEN
+    RAISE EXCEPTION 'financial constraint mismatch: %',actual;
+  END IF;
+  SELECT array_agg(c.relname||'|'||t.tgname||'|'||t.tgenabled::text||'|'||pg_get_triggerdef(t.oid,true) ORDER BY c.relname,t.tgname) INTO actual FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND t.tgname IN ('bookings_money_transition_authority','bookings_unresolved_money_delete','solo_refund_attempt_journal','bookings_payment_claim_columns_server_only');
+  IF actual IS DISTINCT FROM ARRAY[
+    'booking_solo_refund_operations|solo_refund_attempt_journal|O|CREATE TRIGGER solo_refund_attempt_journal AFTER INSERT OR UPDATE ON booking_solo_refund_operations FOR EACH ROW EXECUTE FUNCTION private.journal_solo_refund_attempt()',
+    'bookings|bookings_money_transition_authority|O|CREATE TRIGGER bookings_money_transition_authority BEFORE UPDATE ON bookings FOR EACH ROW EXECUTE FUNCTION private.guard_booking_money_transition()',
+    'bookings|bookings_payment_claim_columns_server_only|O|CREATE TRIGGER bookings_payment_claim_columns_server_only BEFORE INSERT OR UPDATE ON bookings FOR EACH ROW EXECUTE FUNCTION guard_experience_payment_claim_columns()',
+    'bookings|bookings_unresolved_money_delete|O|CREATE TRIGGER bookings_unresolved_money_delete BEFORE DELETE ON bookings FOR EACH ROW EXECUTE FUNCTION private.guard_unresolved_booking_delete()'
+  ]::text[] THEN
+    RAISE EXCEPTION 'financial trigger mismatch: %',actual;
+  END IF;
+  FOREACH r IN ARRAY ARRAY['anon','authenticated'] LOOP
+    IF has_table_privilege(r,'public.bookings','INSERT,UPDATE,DELETE')
+       OR has_any_column_privilege(r,'public.bookings','INSERT,UPDATE')
+       OR NOT has_table_privilege(r,'public.bookings','SELECT')
+       OR has_table_privilege(r,'public.booking_solo_refund_operations','SELECT,INSERT,UPDATE,DELETE')
+       OR has_table_privilege(r,'public.booking_solo_refund_attempts','SELECT,INSERT,UPDATE,DELETE') THEN
+      RAISE EXCEPTION 'financial client authority mismatch: %',r;
+    END IF;
+  END LOOP;
+  IF EXISTS(SELECT 1 FROM pg_class WHERE oid IN ('public.bookings'::regclass,'public.booking_solo_refund_operations'::regclass,'public.booking_solo_refund_attempts'::regclass) AND NOT relrowsecurity)
+     OR NOT has_table_privilege('service_role','public.bookings','SELECT,INSERT,UPDATE,DELETE')
+     OR NOT has_table_privilege('service_role','public.booking_solo_refund_operations','SELECT,INSERT,UPDATE')
+     OR NOT has_table_privilege('service_role','public.booking_solo_refund_attempts','SELECT') THEN
+    RAISE EXCEPTION 'financial server table authority or RLS mismatch';
+  END IF;
+  IF position('ON CONFLICT ((notification_target.booking_id))' in pg_get_functiondef('public.complete_experience_booking_if_due_atomic(text)'::regprocedure))=0 THEN
+    RAISE EXCEPTION 'completion conflict qualification missing';
+  END IF;
+END
+$solo_financial_catalog_contract$;
 
 DO $applied_media_catalog_contract$
 DECLARE actual text[];
