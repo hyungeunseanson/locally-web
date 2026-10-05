@@ -18,9 +18,11 @@ const search = current.match(/DO \$admin_chat_search_contract\$[\s\S]*?\$admin_c
 const phoneSearchLedger = current.match(/DO \$phone_search_ledger_contract\$[\s\S]*?\$phone_search_ledger_contract\$;/)?.[0];
 const mediaLedger = current.match(/DO \$media_authority_ledger_contract\$[\s\S]*?\$media_authority_ledger_contract\$;/)?.[0];
 const mediaCatalog = current.match(/DO \$applied_media_catalog_contract\$[\s\S]*?\$applied_media_catalog_contract\$;/)?.[0];
+const financialLedger = current.match(/DO \$solo_financial_ledger_contract\$[\s\S]*?\$solo_financial_ledger_contract\$;/)?.[0];
+const financialCatalog = current.match(/DO \$solo_financial_catalog_contract\$[\s\S]*?\$solo_financial_catalog_contract\$;/)?.[0];
 const productionLedger = current.match(/DO \$current_state_contract\$[\s\S]*?RAISE EXCEPTION 'migration ledger mismatch:[\s\S]*?END IF;/)?.[0]
   + '\nEND\n$current_state_contract$;';
-assert.ok(chat && ledger && attention && marker);
+assert.ok(chat && ledger && attention && marker && financialLedger && financialCatalog);
 assert.ok(phone && search && phoneSearchLedger);
 assert.ok(mediaLedger && mediaCatalog && productionLedger.includes('20261005082309:avatar_media_authority'));
 assert.ok(staging.includes(phone) && staging.includes(search), 'staging shares applied Phone/search security');
@@ -50,13 +52,15 @@ try {
     staticDriftChecks++;
     if (restore === null) await rm(path); else await writeFile(path,restore);
   };
-  const appliedP0 = JSON.parse(originalManifest);
-  appliedP0.migrationLedger.push(appliedP0.pendingProductionMigrations[0]);
-  appliedP0.pendingProductionMigrations=[];
-  await drift(manifestPath,appliedP0,/migration versions differs/,originalManifest);
-  const unpinned = JSON.parse(originalRequired);
-  unpinned.pendingProductionMigrations[0].repositorySha256='0'.repeat(64);
-  await drift(requiredPath,unpinned,/pending Production migration contract differs/,originalRequired);
+  const pendingP0 = JSON.parse(originalManifest);
+  pendingP0.pendingProductionMigrations=[pendingP0.migrationLedger.pop()];
+  await drift(manifestPath,pendingP0,/migration versions differs/,originalManifest);
+  const unpinned = JSON.parse(originalManifest);
+  unpinned.migrationLedger.at(-1).repositorySha256='0'.repeat(64);
+  await drift(manifestPath,unpinned,/repository migration hash differs/,originalManifest);
+  const alteredEvidence = JSON.parse(originalManifest);
+  alteredEvidence.appliedFinancialAuthority.functions[0].bodyMd5='0'.repeat(32);
+  await drift(manifestPath,alteredEvidence,/financial function evidence missing/,originalManifest);
   const blanket = JSON.parse(originalRequired);
   blanket.selectiveProductionRollout.blanketPendingMigrationApply=true;
   await drift(requiredPath,blanket,/selective Production rollout rule differs/,originalRequired);
@@ -229,6 +233,58 @@ try {
     await db.query('INSERT INTO supabase_migrations.schema_migrations VALUES ($1,$2,$3) ON CONFLICT DO NOTHING',
       [entry.version,entry.name,[sql]]);
   }
+  // Apply the unchanged reviewed P0 SQL to disposable empty financial tables.
+  // This extends the catalog fixture; it never calls a money RPC/provider.
+  const financialFixture = JSON.parse(await readFile('tests/integration/fixtures/solo-pre-p0-schema.json','utf8'));
+  const type = column => column.data_type === 'ARRAY' ? 'text[]' : column.data_type === 'USER-DEFINED' ? 'text' : column.data_type;
+  const bookingColumns = financialFixture.columns.filter(c => c.table_name === 'bookings')
+    .map(c => `"${c.column_name}" ${type(c)}${c.column_name === 'id' ? ' PRIMARY KEY' : ''}`);
+  await db.exec(`CREATE TABLE public.bookings (${bookingColumns.join(',')});
+    ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
+    GRANT SELECT,INSERT,UPDATE,DELETE ON public.bookings TO anon,authenticated,service_role;
+    ALTER TABLE public.experiences ADD COLUMN duration integer;
+    CREATE TABLE public.notifications(id uuid DEFAULT gen_random_uuid() PRIMARY KEY,user_id uuid,type text,title text,message text,link text,is_read boolean,created_at timestamptz,booking_id text);
+    CREATE TABLE public.admin_manual_payouts(id uuid DEFAULT gen_random_uuid() PRIMARY KEY,request_key uuid UNIQUE,host_id uuid,settlement_type text,booking_ids text[],booking_snapshot jsonb,current_booking_amount integer,legacy_amount integer,total_paid_amount integer,reason text,legacy_source_reference text,transfer_reference text,bank_name text,account_number text,account_holder text,paid_by_admin_id uuid,paid_by_admin_email text,paid_at timestamptz,created_at timestamptz DEFAULT now());
+    GRANT USAGE ON SCHEMA private TO service_role;`);
+  const statusConstraint=financialFixture.constraints.find(c => c.name === 'bookings_solo_guarantee_refund_status_check');
+  await db.exec('ALTER TABLE bookings ADD CONSTRAINT '+statusConstraint.name+' '+statusConstraint.definition);
+  await db.exec(financialFixture.trigger.function_definition);
+  await db.exec(financialFixture.trigger.definition);
+  const financialMigration = await readFile('supabase/migrations/20261005104924_solo_guarantee_financial_authority.sql','utf8');
+  await db.exec(financialMigration);
+  await verify(financialLedger); await verify(financialCatalog);
+  await rejectDrift("DELETE FROM supabase_migrations.schema_migrations WHERE version='20261005104924'",
+    () => db.query('INSERT INTO supabase_migrations.schema_migrations VALUES ($1,$2,$3)',['20261005104924','solo_guarantee_financial_authority',[financialMigration]]),
+    /applied financial P0 ledger SQL mismatch/, financialLedger);
+  await rejectDrift("UPDATE supabase_migrations.schema_migrations SET statements=ARRAY['-- altered financial SQL'] WHERE version='20261005104924'",
+    () => db.query('UPDATE supabase_migrations.schema_migrations SET statements=$1 WHERE version=$2',[[financialMigration],'20261005104924']),
+    /applied financial P0 ledger SQL mismatch/, financialLedger);
+  for (const [change,restore] of [
+    ['GRANT UPDATE ON bookings TO authenticated','REVOKE UPDATE ON bookings FROM authenticated'],
+    ['GRANT UPDATE(amount) ON bookings TO PUBLIC','REVOKE UPDATE(amount) ON bookings FROM PUBLIC'],
+    ['GRANT INSERT ON bookings TO anon','REVOKE INSERT ON bookings FROM anon'],
+    ['GRANT DELETE ON bookings TO authenticated','REVOKE DELETE ON bookings FROM authenticated'],
+    ['REVOKE SELECT ON bookings FROM authenticated','GRANT SELECT ON bookings TO authenticated'],
+    ['GRANT SELECT ON booking_solo_refund_operations TO anon','REVOKE SELECT ON booking_solo_refund_operations FROM anon'],
+    ['GRANT UPDATE ON booking_solo_refund_attempts TO authenticated','REVOKE UPDATE ON booking_solo_refund_attempts FROM authenticated'],
+  ]) await rejectDrift(change,restore,/financial client authority mismatch/,financialCatalog);
+  await rejectDrift('ALTER TABLE booking_solo_refund_operations DISABLE ROW LEVEL SECURITY',
+    'ALTER TABLE booking_solo_refund_operations ENABLE ROW LEVEL SECURITY',/financial server table authority or RLS mismatch/,financialCatalog);
+  await rejectDrift('GRANT EXECUTE ON FUNCTION claim_solo_refund_atomic(text) TO authenticated',
+    'REVOKE EXECUTE ON FUNCTION claim_solo_refund_atomic(text) FROM authenticated',/financial function body or ACL mismatch/,financialCatalog);
+  await rejectDrift('ALTER TABLE bookings DISABLE TRIGGER bookings_money_transition_authority',
+    'ALTER TABLE bookings ENABLE TRIGGER bookings_money_transition_authority',/financial trigger mismatch/,financialCatalog);
+  await rejectDrift('ALTER INDEX booking_solo_refund_manual_proof_once RENAME TO missing_financial_index',
+    'ALTER INDEX missing_financial_index RENAME TO booking_solo_refund_manual_proof_once',/financial index mismatch/,financialCatalog);
+  const amountConstraint=manifest.appliedFinancialAuthority.constraints.find(c => c.name === 'booking_solo_refund_operations_requested_amount_check');
+  await rejectDrift('ALTER TABLE booking_solo_refund_operations DROP CONSTRAINT '+amountConstraint.name,
+    'ALTER TABLE booking_solo_refund_operations ADD CONSTRAINT '+amountConstraint.name+' '+amountConstraint.definition,
+    /financial constraint mismatch/,financialCatalog);
+  await rejectDrift('ALTER TABLE booking_solo_refund_operations ALTER COLUMN requested_amount DROP NOT NULL',
+    'ALTER TABLE booking_solo_refund_operations ALTER COLUMN requested_amount SET NOT NULL',/financial column mismatch/,financialCatalog);
+  const completionDefinition=(await db.query("SELECT pg_get_functiondef('complete_experience_booking_if_due_atomic(text)'::regprocedure) definition")).rows[0].definition;
+  await rejectDrift(completionDefinition.replaceAll('((notification_target.booking_id))','(booking_id)'),
+    completionDefinition,/financial function body or ACL mismatch/,financialCatalog);
   await verify(mediaLedger); await verify(mediaCatalog); await verify(productionLedger);
   await rejectDrift("DELETE FROM supabase_migrations.schema_migrations WHERE version='20261005082309'",
     () => db.query('INSERT INTO supabase_migrations.schema_migrations VALUES ($1,$2,$3)', ['20261005082309','avatar_media_authority',[avatarMigration]]),
@@ -239,9 +295,6 @@ try {
   await rejectDrift("UPDATE supabase_migrations.schema_migrations SET version='20261004053225' WHERE version='20261004053224'",
     "UPDATE supabase_migrations.schema_migrations SET version='20261004053224' WHERE version='20261004053225'",
     /applied media\/avatar ledger SQL mismatch/, mediaLedger);
-  await rejectDrift("INSERT INTO supabase_migrations.schema_migrations VALUES ('20261005104924','solo_guarantee_financial_authority',ARRAY['-- synthetic'])",
-    "DELETE FROM supabase_migrations.schema_migrations WHERE version='20261005104924'", /financial P0 is pending/, mediaLedger);
-  await rejectDrift('CREATE TABLE booking_solo_refund_operations(id uuid)', 'DROP TABLE booking_solo_refund_operations', /financial P0 is pending/, mediaLedger);
   await rejectDrift('GRANT EXECUTE ON FUNCTION begin_avatar_media_asset(uuid,uuid,text,text,text,bigint,text,text) TO anon',
     'REVOKE EXECUTE ON FUNCTION begin_avatar_media_asset(uuid,uuid,text,text,text,bigint,text,text) FROM anon', /function body or ACL mismatch/, mediaCatalog);
   await rejectDrift('GRANT EXECUTE ON FUNCTION private.sync_experience_media_assets() TO service_role',
