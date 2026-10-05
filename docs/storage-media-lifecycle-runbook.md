@@ -134,7 +134,8 @@ Sanitized checkpoints add `authType=oauth`, cumulative `oauthRefreshCount`,
 renewals. No token, token hash, Authorization header or Wrangler credential
 path is emitted. A recovered 401 does not increment missing. This hardening
 does not prove that the historical ordinal-540 401 was caused by token expiry.
-Storage 03:37 KST remains paused; DB backup 03:17 KST stays enabled.
+Storage 03:37 KST is enabled after full isolated restore and fresh current R2
+zero-gap proof; DB backup 03:17 KST stays enabled.
 
 Apply only migration `20261004053224_media_lifecycle_foundation.sql` after the
 exact PR head is green and merged. Verify table/RPC ACLs, RLS, business counts and
