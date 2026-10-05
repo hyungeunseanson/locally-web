@@ -19,7 +19,8 @@ import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
 import { PROFILE_LANGUAGE_OPTIONS } from '@/app/constants/profile';
 import { fetchAdminAccess } from '@/app/utils/adminAccessClient';
 import { getHostPublicProfile, getProfileCompletion, normalizeLanguageList, normalizeProfileLanguageValue } from '@/app/utils/profile';
-import { validateImage, compressImage, sanitizeFileName, isHeicValidationResult } from '@/app/utils/image';
+import { uploadProfileAvatar } from '@/app/utils/avatarUpload';
+import { validateImage, compressImage, isHeicValidationResult } from '@/app/utils/image';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import { useNotification } from '@/app/context/NotificationContext';
 import { useViewMode } from '@/app/context/ViewModeContext';
@@ -485,17 +486,8 @@ export default function AccountPage() {
       // 2. 이미지 압축 (최대 1MB, 1280px 해상도)
       const compressedFile = await compressImage(file);
 
-      // 3. 안전한 파일명 생성 (한글 깨짐 등 방지)
-      const fileName = sanitizeFileName(compressedFile.name);
-      const filePath = `${user.id}/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, compressedFile);
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
-
+      const publicUrl = await uploadProfileAvatar(compressedFile);
       setProfile(prev => ({ ...prev, avatar_url: publicUrl }));
-      await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', user.id);
       showToast(t('profile_photo_change_done'), 'success'); // 🟢 번역
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : '알 수 없는 오류';
@@ -523,7 +515,6 @@ export default function AccountPage() {
       phone: profile.phone,
       mbti: profile.mbti,
       kakao_id: profile.kakao_id,
-      avatar_url: profile.avatar_url,
       languages: profile.languages, // 🟢 [추가] 저장 시 포함
       job: profile.job,
       updated_at: new Date().toISOString(),

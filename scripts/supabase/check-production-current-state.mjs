@@ -186,6 +186,12 @@ const expectedPendingMigrations = [
     "name": "media_lifecycle_foundation",
     "repositoryFile": "supabase/migrations/20261004053224_media_lifecycle_foundation.sql",
     "repositorySha256": "c8cd123855ba600070fd22ddaef6b6a37591110f18cec92829de37ff0fdb3cfd"
+  },
+  {
+    "version": "20261005082309",
+    "name": "avatar_media_authority",
+    "repositoryFile": "supabase/migrations/20261005082309_avatar_media_authority.sql",
+    "repositorySha256": "b8a749115d2e279ea8b0e37d17ef6c373d3eec5e5f51b555c7fd62b1e58d774f"
   }
 ];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));

@@ -53,6 +53,12 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
+        hostname: 'avatars-media.locally-travel.com',
+        pathname: '/avatars/v1/**',
+        search: '',
+      },
+      {
+        protocol: 'https',
         hostname: 'images.unsplash.com',
       },
       {

@@ -120,7 +120,8 @@
     "test:admin-chat:operations": "node --test tests/unit/admin-chat-operations.test.mjs && playwright test -c playwright.admin-chat-operations.config.ts",
     "test:admin-chat:search": "node --test tests/unit/admin-chat-search.test.mjs && playwright test -c playwright.admin-chat-search.config.ts",
     "test:admin-chat:search:native": "node scripts/supabase/test-admin-chat-search-native.mjs",
-    "storage:foundation:contract": "node scripts/supabase/test-media-lifecycle-foundation.mjs && node --test tests/unit/media-lifecycle-foundation.test.mjs && python3 -m unittest discover -s scripts/backup -p \"storage_*test.py\""
+    "storage:foundation:contract": "node scripts/supabase/test-media-lifecycle-foundation.mjs && node --test tests/unit/media-lifecycle-foundation.test.mjs && python3 -m unittest discover -s scripts/backup -p \"storage_*test.py\"",
+    "storage:avatar:contract": "node scripts/supabase/test-avatar-media-authority.mjs && node --test tests/unit/avatar-media.test.mjs scripts/cloudflare/avatar-media-migration.test.mjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -131,6 +132,7 @@
     "@supabase/supabase-js": "^2.93.3",
     "@tanstack/react-query": "^5.90.21",
     "@tosspayments/payment-widget-sdk": "^0.12.1",
+    "aws4fetch": "1.0.20",
     "browser-image-compression": "^2.0.2",
     "canvas-confetti": "^1.9.4",
     "date-fns": "^4.1.0",
