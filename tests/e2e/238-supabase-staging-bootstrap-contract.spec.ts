@@ -34,7 +34,7 @@ function fixtureGuard(env: Record<string, string>) {
 test.describe('Supabase staging bootstrap contract', () => {
   test('uses the canonical baseline without treating historical patches as replayable', () => {
     expect(baselineManifest.objects.publicTables).toHaveLength(36);
-    expect(currentManifest.objects.publicTables).toHaveLength(39);
+    expect(currentManifest.objects.publicTables).toHaveLength(42);
     expect(baselineManifest.historicalSql.applyAfterBaseline).toEqual([]);
     expect(currentManifest.migrationLedger.map(({ version }: { version: string }) => version)).toEqual([
       '20260912034545',
@@ -56,6 +56,8 @@ test.describe('Supabase staging bootstrap contract', () => {
       '20261002075149',
       '20261003012400',
       '20261003134417',
+      '20261004053224',
+      '20261005082309',
     ]);
     expect(manifest.freshProjectApplyOrder).toEqual([
       'supabase/migrations/20260912034545_production_schema_baseline.sql',
@@ -77,6 +79,9 @@ test.describe('Supabase staging bootstrap contract', () => {
       'supabase/migrations/20261002041848_admin_attention_badges_phase_2.sql',
       'supabase/migrations/20261002140902_phone_followup_tasks.sql',
       'supabase/migrations/20261003122803_admin_chat_bounded_search.sql',
+      'supabase/migrations/20261004053224_media_lifecycle_foundation.sql',
+      'supabase/migrations/20261005082309_avatar_media_authority.sql',
+      'supabase/migrations/20261005104924_solo_guarantee_financial_authority.sql',
     ]);
     expect(manifest.pendingPrivateTables).toBeUndefined();
     expect(manifest.pendingApplicationFunctions).toBeUndefined();
@@ -84,13 +89,31 @@ test.describe('Supabase staging bootstrap contract', () => {
     expect(manifest.applicationFunctions).toEqual(expect.arrayContaining([
       'ack_admin_inquiry_snapshot', 'get_admin_attention',
     ]));
-    expect(manifest.pendingProductionMigrations).toEqual([]);
+    expect(manifest.pendingProductionMigrations).toEqual([
+      {
+        "version": "20261005104924",
+        "name": "solo_guarantee_financial_authority",
+        "repositoryFile": "supabase/migrations/20261005104924_solo_guarantee_financial_authority.sql",
+        "repositorySha256": "df95be49a1df1e5b1fbc1e89afa0ff589b8041c4d9ed54e5d39945eaeee09c11"
+      }
+    ]);
     expect(packageJson.scripts['supabase:staging:baseline:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:current:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:contract']).toBeTruthy();
   });
 
   test('keeps the schema inventory and assertion transactions read-only', () => {
+    const capture = readFileSync(currentManifest.source.captureSql, 'utf8');
+    expect(capture.match(/^BEGIN TRANSACTION READ ONLY;$/gm)).toHaveLength(3);
+    expect(capture.match(/^ROLLBACK;$/gm)).toHaveLength(3);
+    expect(currentManifest.migrationLedger.slice(-2).map((entry: { version: string }) => entry.version))
+      .toEqual(['20261004053224', '20261005082309']);
+    expect(currentManifest.migrationLedger.some((entry: { version: string }) => entry.version === '20261005104924')).toBe(false);
+    expect(currentManifest.pendingProductionMigrations).toEqual(manifest.pendingProductionMigrations);
+    expect(manifest.selectiveProductionRollout).toEqual({
+      allowedVersions: ['20261005104924'], requiresFreshProductionLedger: true,
+      blanketPendingMigrationApply: false, runbook: 'docs/solo-guarantee-p0-rollout.md',
+    });
     expect(schemaContract).toContain('BEGIN READ ONLY;');
     expect(schemaContract).toContain('ROLLBACK;');
     expect(schemaContract).toContain('LOCALLY_STAGING_SCHEMA_CONTRACT_PASS');
@@ -196,7 +219,7 @@ test.describe('Supabase staging bootstrap contract', () => {
     ]);
     expect(currentManifest.schemaContractVersion).toBe(5);
     expect(manifest.schemaContractVersion).toBe(5);
-    expect(currentManifest.migrationLedger.slice(-2)).toEqual([
+    expect(currentManifest.migrationLedger.slice(17, 19)).toEqual([
       {
         version: '20261003012400', name: 'phone_followup_tasks', repositoryVersion: '20261002140902',
         repositoryFile: 'supabase/migrations/20261002140902_phone_followup_tasks.sql',
@@ -226,7 +249,8 @@ test.describe('Supabase staging bootstrap contract', () => {
     });
     expect(result.status, `${result.stdout}${result.stderr}`).toBe(0);
     expect(result.stdout).toContain('CURRENT_STATE_CATALOG_DRIFT_TEST_PASS');
-    expect(result.stdout).toContain('"driftChecks":39');
+    expect(result.stdout).toContain('"driftChecks":50');
+    expect(result.stdout).toContain('"staticDriftChecks":4');
     expect(result.stdout).toContain('"productionMutation":0');
   });
 
@@ -334,37 +358,41 @@ test.describe('Supabase staging bootstrap contract', () => {
   });
 
   test('models the exact Production current-state inventory and concierge boundary', () => {
-    expect(currentManifest.objects.publicTables).toHaveLength(39);
+    expect(currentManifest.objects.publicTables).toHaveLength(42);
     expect(currentManifest.objects.publicViews).toHaveLength(2);
-    expect(currentManifest.objects.publicTableColumns).toBe(517);
+    expect(currentManifest.objects.publicTableColumns).toBe(559);
     expect(currentManifest.objects.publicViewColumns).toBe(27);
-    expect(currentManifest.objects.functionOverloads).toHaveLength(64);
+    expect(currentManifest.objects.functionOverloads).toHaveLength(75);
     expect(currentManifest.objects.privateFunctionOverloads).toEqual([
       "private.admin_chat_phone_title(category text, form_data jsonb)",
       "private.adopt_phone_followup_link()",
       "private.advance_support_version()",
+      "private.bump_experience_media_revision()",
+      "private.canonical_experience_media_locator(p_url text)",
       "private.capture_phone_followup()",
       "private.delete_pending_phone_followup()",
       "private.handle_phone_followup(p_request uuid, p_inquiry bigint, p_ids bigint[], p_admin uuid, p_complete boolean)",
       "private.has_phone_followup(p_request uuid)",
       "private.is_admin_reader()",
       "private.is_inquiry_admin_sender(p_sender uuid)",
-      "private.prepare_support_message()"
+      "private.prepare_support_message()",
+      "private.sync_experience_media_assets()",
+      "private.sync_profile_avatar_assets()"
     ]);
-    expect(currentManifest.objects.applicationTriggers).toHaveLength(17);
-    expect(currentManifest.objects.indexes).toBe(133);
+    expect(currentManifest.objects.applicationTriggers).toHaveLength(22);
+    expect(currentManifest.objects.indexes).toBe(143);
     expect(currentManifest.objects.privateTables).toEqual(['admin_monitor_cutover', 'phone_followup_tasks']);
     expect(currentManifest.objects.privateTableColumns).toBe(9);
     expect(currentManifest.objects.privateIndexes).toBe(4);
     expect(currentManifest.objects.privateConstraints).toBe(8);
     expect(currentManifest.objects.constraints).toEqual({
-      total: 180,
-      primaryKey: 39,
-      foreignKey: 59,
-      unique: 14,
-      check: 68,
+      total: 206,
+      primaryKey: 42,
+      foreignKey: 61,
+      unique: 17,
+      check: 86,
     });
-    expect(currentManifest.objects.rls.enabled).toHaveLength(37);
+    expect(currentManifest.objects.rls.enabled).toHaveLength(40);
     expect(currentManifest.objects.rls.disabled).toEqual([
       'admin_job_runs',
       'admin_support_unread_alert_batches',
@@ -376,7 +404,7 @@ test.describe('Supabase staging bootstrap contract', () => {
       storageBuckets: '7419cabe695cd50a522314a749216c05',
       storagePolicies: '898e8b7f917fd0f4530ef30c9b61961e',
       publicRlsPolicies: 'e5a16a4215c569060fbf895453a5cd00',
-      publicRelationGrants: 'a9c644ba2ab5c795f29aff57092aa002',
+      publicRelationGrants: '3b88d65d3e719c850d20d1cbf706516f',
       privateRelationGrants: '4c987b9bd1b8fdc56ed01bca38365c7d',
       stagingOverlayBaselineStoragePolicies: 'd6b381fd629405acfdd615593031de5c',
     });

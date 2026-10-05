@@ -12,7 +12,7 @@ const expectedFingerprints = {
   storageBuckets: '7419cabe695cd50a522314a749216c05',
   storagePolicies: '898e8b7f917fd0f4530ef30c9b61961e',
   publicRlsPolicies: 'e5a16a4215c569060fbf895453a5cd00',
-  publicRelationGrants: 'a9c644ba2ab5c795f29aff57092aa002',
+  publicRelationGrants: '3b88d65d3e719c850d20d1cbf706516f',
   privateRelationGrants: '4c987b9bd1b8fdc56ed01bca38365c7d',
   stagingOverlayBaselineStoragePolicies: 'd6b381fd629405acfdd615593031de5c',
   stagingOverlayTargetStorageBuckets: 'c3ff5767c8e4934ae05b3d96550441c8',
@@ -23,6 +23,7 @@ const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
 const required = JSON.parse(await readFile(requiredPath, 'utf8'));
 const contract = await readFile(contractPath, 'utf8');
 const overlay = await readFile(overlayPath, 'utf8');
+const capture = await readFile(resolve(root, 'supabase/staging/production-current-state.capture.sql'), 'utf8');
 
 function fail(message) {
   throw new Error(`Production current-state contract failed: ${message}`);
@@ -180,7 +181,7 @@ const expectedLedger = [
     "repositorySha256": "0e9776caab4c826924eade21baa229ec73a27857d9c1c9bb75a97b25b1b31724"
   },
 ];
-const expectedPendingMigrations = [
+const observedAppliedMediaMigrations = [
   {
     "version": "20261004053224",
     "name": "media_lifecycle_foundation",
@@ -192,6 +193,15 @@ const expectedPendingMigrations = [
     "name": "avatar_media_authority",
     "repositoryFile": "supabase/migrations/20261005082309_avatar_media_authority.sql",
     "repositorySha256": "b8a749115d2e279ea8b0e37d17ef6c373d3eec5e5f51b555c7fd62b1e58d774f"
+  }
+];
+expectedLedger.push(...observedAppliedMediaMigrations);
+const expectedPendingMigrations = [
+  {
+    "version": "20261005104924",
+    "name": "solo_guarantee_financial_authority",
+    "repositoryFile": "supabase/migrations/20261005104924_solo_guarantee_financial_authority.sql",
+    "repositorySha256": "df95be49a1df1e5b1fbc1e89afa0ff589b8041c4d9ed54e5d39945eaeee09c11"
   }
 ];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));
@@ -238,6 +248,31 @@ for (const pending of expectedPendingMigrations) {
   assert(await sha256(pending.repositoryFile) === pending.repositorySha256, 'prepared migration bytes differ');
 }
 
+assert(JSON.stringify(manifest.pendingProductionMigrations) === JSON.stringify(expectedPendingMigrations), 'manifest pending financial P0 differs');
+assert(manifest.source.captureSql === 'supabase/staging/production-current-state.capture.sql'
+  && manifest.source.postgresMajor === 17 && manifest.source.containsRows === false
+  && manifest.source.containsStorageObjects === false, 'read-only capture provenance differs');
+assert((capture.match(/^BEGIN TRANSACTION READ ONLY;$/gm) ?? []).length === 3
+  && (capture.match(/^ROLLBACK;$/gm) ?? []).length === 3
+  && !/^\s*(?:INSERT\s+INTO|UPDATE\s+|DELETE\s+FROM|ALTER\s+|CREATE\s+|DROP\s+|TRUNCATE\s+)/gim.test(capture),
+  'current-state capture must use only read-only transactions');
+assert(JSON.stringify(manifest.selectiveProductionRollout) === JSON.stringify(required.selectiveProductionRollout)
+  && JSON.stringify(required.selectiveProductionRollout.allowedVersions) === JSON.stringify(['20261005104924'])
+  && required.selectiveProductionRollout.requiresFreshProductionLedger === true
+  && required.selectiveProductionRollout.blanketPendingMigrationApply === false
+  && required.selectiveProductionRollout.runbook === 'docs/solo-guarantee-p0-rollout.md', 'selective Production rollout rule differs');
+assert(contract.includes('$media_authority_ledger_contract$') && contract.includes('$applied_media_catalog_contract$')
+  && contract.includes("WHERE version='20261005104924'"), 'applied/pending boundary assertions missing');
+for (const entry of manifest.appliedMediaAuthority.ledgerEvidence) {
+  assert(entry.statementCount === 1 && entry.statementsSha256 === expectedLedger.find(x => x.version === entry.version)?.repositorySha256
+    && manifest.migrationLedger.find(x => x.version === entry.version)?.ledgerStatementsSha256 === entry.statementsSha256
+    && contract.includes(`${entry.version}:${entry.name}:${entry.statementCount}:${entry.statementsMd5}:${entry.statementsSha256}`), 'applied media SQL evidence differs');
+}
+for (const fn of manifest.appliedMediaAuthority.functions) {
+  assert(contract.includes([fn.identity,fn.owner,fn.securityDefiner,fn.volatility,fn.result,
+    fn.configuration.join(','),fn.acl,fn.bodyMd5].join('|').replaceAll("'", "''")), `applied media function evidence missing: ${fn.identity}`);
+}
+
 const objects = manifest.objects;
 for (const [name, fingerprint] of Object.entries(expectedFingerprints)) {
   if (!name.startsWith('stagingOverlayTarget')) {
@@ -245,31 +280,35 @@ for (const [name, fingerprint] of Object.entries(expectedFingerprints)) {
       `security fingerprint differs: ${name}`);
   }
 }
-assert(objects.publicTables.length === 39, 'expected 39 public tables');
+assert(objects.publicTables.length === 42, 'expected 42 public tables');
 assert(objects.publicViews.length === 2, 'expected 2 public views');
-assert(objects.publicTableColumns === 517, 'expected 517 public table columns');
+assert(objects.publicTableColumns === 559, 'expected 559 public table columns');
 assert(objects.publicViewColumns === 27, 'expected 27 public view columns');
-assert(objects.functionOverloads.length === 64, 'expected 64 public function overloads');
+assert(objects.functionOverloads.length === 75, 'expected 75 public function overloads');
 exact('private function overloads', objects.privateFunctionOverloads, [
   "private.admin_chat_phone_title(category text, form_data jsonb)",
   "private.adopt_phone_followup_link()",
   "private.advance_support_version()",
+  "private.bump_experience_media_revision()",
+  "private.canonical_experience_media_locator(p_url text)",
   "private.capture_phone_followup()",
   "private.delete_pending_phone_followup()",
   "private.handle_phone_followup(p_request uuid, p_inquiry bigint, p_ids bigint[], p_admin uuid, p_complete boolean)",
   "private.has_phone_followup(p_request uuid)",
   "private.is_admin_reader()",
   "private.is_inquiry_admin_sender(p_sender uuid)",
-  "private.prepare_support_message()"
+  "private.prepare_support_message()",
+  "private.sync_experience_media_assets()",
+  "private.sync_profile_avatar_assets()"
 ]);
-assert(objects.applicationTriggers.length === 17, 'expected 17 application triggers');
-assert(objects.indexes === 133, 'expected 133 public indexes');
-assert(objects.constraints.total === 180, 'expected 180 constraints');
-assert(objects.constraints.primaryKey === 39, 'expected 39 primary keys');
-assert(objects.constraints.foreignKey === 59, 'expected 59 foreign keys');
-assert(objects.constraints.unique === 14, 'expected 14 unique constraints');
-assert(objects.constraints.check === 68, 'expected 68 check constraints');
-assert(objects.rls.enabled.length === 37, 'expected 37 RLS-enabled tables');
+assert(objects.applicationTriggers.length === 22, 'expected 22 application triggers');
+assert(objects.indexes === 143, 'expected 143 public indexes');
+assert(objects.constraints.total === 206, 'expected 206 constraints');
+assert(objects.constraints.primaryKey === 42, 'expected 42 primary keys');
+assert(objects.constraints.foreignKey === 61, 'expected 61 foreign keys');
+assert(objects.constraints.unique === 17, 'expected 17 unique constraints');
+assert(objects.constraints.check === 86, 'expected 86 check constraints');
+assert(objects.rls.enabled.length === 40, 'expected 40 RLS-enabled tables');
 assert(objects.rls.disabled.length === 2, 'expected 2 RLS-disabled tables');
 assert(objects.rls.forced.length === 0, 'expected zero FORCE RLS tables');
 assert(objects.rls.publicPolicies === 106, 'expected 106 public policies');

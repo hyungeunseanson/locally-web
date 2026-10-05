@@ -36,7 +36,9 @@ BEGIN
     '20261002024638:admin_message_monitoring_historical_reinquiry',
     '20261002075149:admin_attention_badges_phase_2',
     '20261003012400:phone_followup_tasks',
-    '20261003134417:admin_chat_bounded_search'
+    '20261003134417:admin_chat_bounded_search',
+    '20261004053224:media_lifecycle_foundation',
+    '20261005082309:avatar_media_authority'
   ]::text[];
   IF actual IS DISTINCT FROM expected THEN
     RAISE EXCEPTION 'migration ledger mismatch: %', actual;
@@ -48,18 +50,48 @@ BEGIN
     JOIN pg_namespace AS namespace_def ON namespace_def.oid = class_def.relnamespace
    WHERE namespace_def.nspname = 'public' AND class_def.relkind IN ('r', 'p');
   expected := ARRAY[
-    'admin_audit_logs', 'admin_job_runs', 'admin_manual_payouts',
-    'admin_support_unread_alert_batches', 'admin_task_comments', 'admin_tasks',
-    'admin_whitelist', 'analytics_events', 'bookings', 'community_comments',
-    'community_likes', 'community_posts', 'experience_availability',
-    'experience_popularity_snapshot', 'experience_translation_jobs',
-    'experience_translation_tasks', 'experiences', 'guest_reviews',
-    'host_applications', 'inquiries', 'inquiry_messages', 'likes', 'messages',
-    'notifications', 'profile_private_demographics', 'profiles', 'proxy_comments',
-    'proxy_requests', 'reviews', 'search_logs', 'service_applications',
-    'service_assignment_history', 'service_bookings', 'service_refund_operations',
-    'service_request_schedule_items', 'service_requests', 'translation_provider_state',
-    'users', 'wishlists'
+    'admin_audit_logs',
+    'admin_job_runs',
+    'admin_manual_payouts',
+    'admin_support_unread_alert_batches',
+    'admin_task_comments',
+    'admin_tasks',
+    'admin_whitelist',
+    'analytics_events',
+    'bookings',
+    'community_comments',
+    'community_likes',
+    'community_posts',
+    'experience_availability',
+    'experience_popularity_snapshot',
+    'experience_translation_jobs',
+    'experience_translation_tasks',
+    'experiences',
+    'guest_reviews',
+    'host_applications',
+    'inquiries',
+    'inquiry_messages',
+    'likes',
+    'media_asset_references',
+    'media_assets',
+    'media_deletion_journal',
+    'messages',
+    'notifications',
+    'profile_private_demographics',
+    'profiles',
+    'proxy_comments',
+    'proxy_requests',
+    'reviews',
+    'search_logs',
+    'service_applications',
+    'service_assignment_history',
+    'service_bookings',
+    'service_refund_operations',
+    'service_request_schedule_items',
+    'service_requests',
+    'translation_provider_state',
+    'users',
+    'wishlists'
   ]::text[];
   IF actual IS DISTINCT FROM expected THEN
     RAISE EXCEPTION 'public table inventory mismatch: %', actual;
@@ -69,8 +101,8 @@ BEGIN
     INTO actual_count
     FROM information_schema.columns
    WHERE table_schema = 'public' AND table_name = ANY (expected);
-  IF actual_count <> 517 THEN
-    RAISE EXCEPTION 'public table column count %, expected 517', actual_count;
+  IF actual_count <> 559 THEN
+    RAISE EXCEPTION 'public table column count %, expected 559', actual_count;
   END IF;
 
   SELECT array_agg(class_def.relname ORDER BY class_def.relname)
@@ -78,7 +110,10 @@ BEGIN
     FROM pg_class AS class_def
     JOIN pg_namespace AS namespace_def ON namespace_def.oid = class_def.relnamespace
    WHERE namespace_def.nspname = 'public' AND class_def.relkind IN ('v', 'm');
-  expected := ARRAY['public_host_applications', 'public_profiles']::text[];
+  expected := ARRAY[
+    'public_host_applications',
+    'public_profiles'
+  ]::text[];
   IF actual IS DISTINCT FROM expected THEN
     RAISE EXCEPTION 'public view inventory mismatch: %', actual;
   END IF;
@@ -107,6 +142,9 @@ BEGIN
     'public.apply_experience_media_locator_cas(p_experience_id bigint, p_before_photos text[], p_before_image_url text, p_before_itinerary jsonb, p_before_itinerary_i18n jsonb, p_after_photos text[], p_after_image_url text, p_after_itinerary jsonb, p_after_itinerary_i18n jsonb)',
     'public.assign_service_concierge_host_atomic(p_admin_id uuid, p_request_id uuid, p_host_id uuid, p_host_hourly_rate integer, p_host_agreement_confirmed boolean)',
     'public.attach_experience_payment_provider_reference_atomic(p_booking_id text, p_user_id uuid, p_provider_reference text, p_claim_token uuid)',
+    'public.avatar_migration_inventory()',
+    'public.begin_avatar_media_asset(p_id uuid, p_owner_id uuid, p_key text, p_url text, p_sha256 text, p_size bigint, p_mime text, p_idempotency_key text)',
+    'public.begin_experience_media_asset(p_id uuid, p_owner_id uuid, p_key text, p_url text, p_sha256 text, p_size bigint, p_mime text, p_idempotency_key text, p_parent_id text)',
     'public.begin_experience_payment_capture_atomic(p_booking_id text, p_user_id uuid, p_provider_reference text)',
     'public.begin_service_refund_operation_atomic(p_admin_id uuid, p_order_id text, p_refund_amount integer, p_host_compensation_amount integer, p_idempotency_key text)',
     'public.cancel_expired_pending_bookings_atomic(p_batch_size integer)',
@@ -115,6 +153,8 @@ BEGIN
     'public.claim_due_admin_support_unread_alert_batches(p_limit integer)',
     'public.claim_due_review_request_reminders(p_limit integer)',
     'public.claim_experience_payment_atomic(p_booking_id text, p_user_id uuid, p_provider text, p_provider_reference text)',
+    'public.claim_media_deletion(p_asset_id uuid, p_enabled boolean, p_minimum_age_ms bigint)',
+    'public.commit_profile_avatar(p_owner_id uuid, p_asset_id uuid, p_expected_url text, p_sha256 text, p_size bigint)',
     'public.complete_admin_manual_experience_payout_atomic(p_request_key uuid, p_host_id uuid, p_settlement_type text, p_expected_current_booking_amount integer, p_legacy_amount integer, p_reason text, p_legacy_source_reference text, p_transfer_reference text, p_paid_by_admin_id uuid, p_paid_by_admin_email text)',
     'public.complete_experience_booking_if_due_atomic(p_booking_id text)',
     'public.complete_phone_request(p_request_id uuid, p_inquiry_id bigint, p_message_ids bigint[], p_admin_id uuid)',
@@ -150,14 +190,18 @@ BEGIN
     'public.list_due_experience_completion_candidates(p_booking_id text)',
     'public.list_due_experience_review_request_candidates(p_limit integer)',
     'public.mark_room_messages_read(p_room_id uuid, p_user_id uuid)',
+    'public.plan_media_owner_deletion(p_owner_id uuid)',
     'public.prune_notifications_retention(p_cutoff timestamp with time zone, p_batch_size integer)',
     'public.prune_team_workspace_comments(p_task_id uuid, p_keep_limit integer)',
     'public.prune_team_workspace_tasks(p_keep_limit integer)',
+    'public.record_media_deletion_step(p_asset_id uuid, p_event text, p_code text)',
     'public.record_translation_provider_outcome(p_provider text, p_token_count integer, p_cooldown_seconds integer, p_hit_quota boolean)',
     'public.record_translation_provider_outcome(p_provider text, p_token_count integer, p_cooldown_seconds integer, p_hit_quota boolean, p_reserved_token_count integer)',
     'public.refresh_experience_popularity_snapshot()',
+    'public.replace_managed_media_reference(p_owner_id uuid, p_parent_type text, p_parent_id text, p_expected_digest text, p_new_digest text, p_old_asset_id uuid, p_new_asset_id uuid)',
     'public.reply_phone_request(p_request_id uuid, p_inquiry_id bigint, p_message_ids bigint[], p_admin_id uuid, p_content text, p_type text, p_image_url text)',
     'public.request_service_cancellation_review_atomic(p_actor_id uuid, p_order_id text, p_cancel_reason text)',
+    'public.rollback_profile_avatar(p_owner_id uuid, p_asset_id uuid, p_expected_url text, p_old_url text)',
     'public.search_admin_chat(p_surface text, p_query text)',
     'public.select_service_host_atomic(p_customer_id uuid, p_request_id uuid, p_application_id uuid)',
     'public.set_proxy_comments_updated_at()',
@@ -165,7 +209,9 @@ BEGIN
     'public.set_service_applications_updated_at()',
     'public.set_service_bookings_updated_at()',
     'public.set_service_requests_updated_at()',
-    'public.snapshot_booking_guest_demographics()'
+    'public.snapshot_booking_guest_demographics()',
+    'public.verify_avatar_media_asset(p_id uuid, p_owner_id uuid, p_sha256 text, p_size bigint, p_mime text)',
+    'public.verify_experience_media_asset(p_id uuid, p_owner_id uuid, p_sha256 text, p_size bigint, p_mime text)'
   ]::text[];
   IF actual IS DISTINCT FROM expected THEN
     RAISE EXCEPTION 'public function overload inventory mismatch: %', actual;
@@ -185,13 +231,17 @@ BEGIN
     'private.admin_chat_phone_title(category text, form_data jsonb)',
     'private.adopt_phone_followup_link()',
     'private.advance_support_version()',
+    'private.bump_experience_media_revision()',
+    'private.canonical_experience_media_locator(p_url text)',
     'private.capture_phone_followup()',
     'private.delete_pending_phone_followup()',
     'private.handle_phone_followup(p_request uuid, p_inquiry bigint, p_ids bigint[], p_admin uuid, p_complete boolean)',
     'private.has_phone_followup(p_request uuid)',
     'private.is_admin_reader()',
     'private.is_inquiry_admin_sender(p_sender uuid)',
-    'private.prepare_support_message()'
+    'private.prepare_support_message()',
+    'private.sync_experience_media_assets()',
+    'private.sync_profile_avatar_assets()'
   ]::text[] THEN
     RAISE EXCEPTION 'private function overload inventory mismatch: %', actual;
   END IF;
@@ -248,10 +298,15 @@ BEGIN
     'public.community_comments.on_comment_removed',
     'public.community_likes.on_like_added',
     'public.community_likes.on_like_removed',
+    'public.experiences.experience_media_delete_plan',
+    'public.experiences.experience_media_finalize',
+    'public.experiences.experience_media_revision',
     'public.inquiries.inquiry_support_version',
     'public.inquiry_messages.inquiry_support_message',
     'public.inquiry_messages.phone_followup_capture',
     'public.inquiry_messages.phone_followup_delete',
+    'public.profiles.profile_avatar_delete_plan',
+    'public.profiles.profile_avatar_finalize',
     'public.proxy_comments.trg_pc_updated_at',
     'public.proxy_requests.phone_followup_link',
     'public.proxy_requests.trg_pr_updated_at',
@@ -264,8 +319,8 @@ BEGIN
   END IF;
 
   SELECT count(*) INTO actual_count FROM pg_indexes WHERE schemaname = 'public';
-  IF actual_count <> 133 THEN
-    RAISE EXCEPTION 'public index count %, expected 133', actual_count;
+  IF actual_count <> 143 THEN
+    RAISE EXCEPTION 'public index count %, expected 143', actual_count;
   END IF;
   IF to_regclass('public.uq_notifications_review_request_reminder_booking_id') IS NULL
     OR to_regclass('public.uq_notifications_guest_review_request_reminder_booking_id') IS NULL
@@ -288,8 +343,8 @@ BEGIN
     JOIN pg_class AS class_def ON class_def.oid = constraint_def.conrelid
     JOIN pg_namespace AS namespace_def ON namespace_def.oid = class_def.relnamespace
    WHERE namespace_def.nspname = 'public';
-  IF actual_count <> 180 OR primary_key_count <> 39 OR foreign_key_count <> 59
-     OR unique_count <> 14 OR check_count <> 68 THEN
+  IF actual_count <> 206 OR primary_key_count <> 42 OR foreign_key_count <> 61
+     OR unique_count <> 17 OR check_count <> 86 THEN
     RAISE EXCEPTION 'constraint counts differ: total %, PK %, FK %, UNIQUE %, CHECK %',
       actual_count, primary_key_count, foreign_key_count, unique_count, check_count;
   END IF;
@@ -302,17 +357,46 @@ BEGIN
      AND class_def.relkind IN ('r', 'p')
      AND class_def.relrowsecurity;
   expected := ARRAY[
-    'admin_audit_logs', 'admin_manual_payouts', 'admin_task_comments', 'admin_tasks',
-    'admin_whitelist', 'analytics_events', 'bookings', 'community_comments',
-    'community_likes', 'community_posts', 'experience_availability',
-    'experience_popularity_snapshot', 'experience_translation_jobs',
-    'experience_translation_tasks', 'experiences', 'guest_reviews',
-    'host_applications', 'inquiries', 'inquiry_messages', 'likes', 'messages',
-    'notifications', 'profile_private_demographics', 'profiles', 'proxy_comments',
-    'proxy_requests', 'reviews', 'search_logs', 'service_applications',
-    'service_assignment_history', 'service_bookings', 'service_refund_operations',
-    'service_request_schedule_items', 'service_requests', 'translation_provider_state',
-    'users', 'wishlists'
+    'admin_audit_logs',
+    'admin_manual_payouts',
+    'admin_task_comments',
+    'admin_tasks',
+    'admin_whitelist',
+    'analytics_events',
+    'bookings',
+    'community_comments',
+    'community_likes',
+    'community_posts',
+    'experience_availability',
+    'experience_popularity_snapshot',
+    'experience_translation_jobs',
+    'experience_translation_tasks',
+    'experiences',
+    'guest_reviews',
+    'host_applications',
+    'inquiries',
+    'inquiry_messages',
+    'likes',
+    'media_asset_references',
+    'media_assets',
+    'media_deletion_journal',
+    'messages',
+    'notifications',
+    'profile_private_demographics',
+    'profiles',
+    'proxy_comments',
+    'proxy_requests',
+    'reviews',
+    'search_logs',
+    'service_applications',
+    'service_assignment_history',
+    'service_bookings',
+    'service_refund_operations',
+    'service_request_schedule_items',
+    'service_requests',
+    'translation_provider_state',
+    'users',
+    'wishlists'
   ]::text[];
   IF actual IS DISTINCT FROM expected THEN
     RAISE EXCEPTION 'RLS-enabled table inventory mismatch: %', actual;
@@ -382,7 +466,7 @@ BEGIN
     )) AS acl_entry
    WHERE namespace_def.nspname = 'public'
      AND class_def.relkind IN ('r', 'p', 'v', 'm', 'f');
-  IF actual_fingerprint IS DISTINCT FROM 'a9c644ba2ab5c795f29aff57092aa002' THEN
+  IF actual_fingerprint IS DISTINCT FROM '3b88d65d3e719c850d20d1cbf706516f' THEN
     RAISE EXCEPTION 'public relation grant fingerprint mismatch: %', actual_fingerprint;
   END IF;
 
@@ -536,6 +620,131 @@ BEGIN
   END IF;
 END
 $current_state_contract$;
+
+
+-- The financial P0 migration is reviewed but not applied. Never replay media/avatar.
+DO $media_authority_ledger_contract$
+DECLARE actual text[];
+BEGIN
+  SELECT array_agg(version||':'||name||':'||cardinality(statements)||':'||md5(array_to_string(statements,E'\n'))||':'||encode(sha256(convert_to(array_to_string(statements,E'\n'),'UTF8')),'hex') ORDER BY version)
+  INTO actual FROM supabase_migrations.schema_migrations
+  WHERE version IN ('20261004053224','20261005082309');
+  IF actual IS DISTINCT FROM ARRAY[
+    '20261004053224:media_lifecycle_foundation:1:7b753190dec37819fc120e86e088b5b6:c8cd123855ba600070fd22ddaef6b6a37591110f18cec92829de37ff0fdb3cfd',
+    '20261005082309:avatar_media_authority:1:6297922f1e25f9b2a2fb21b1675d7976:b8a749115d2e279ea8b0e37d17ef6c373d3eec5e5f51b555c7fd62b1e58d774f'
+  ]::text[] THEN
+    RAISE EXCEPTION 'applied media/avatar ledger SQL mismatch: %', actual;
+  END IF;
+  IF EXISTS (SELECT 1 FROM supabase_migrations.schema_migrations WHERE version='20261005104924')
+     OR to_regclass('public.booking_solo_refund_operations') IS NOT NULL THEN
+    RAISE EXCEPTION 'financial P0 is pending, current-state evidence must be recaptured after authorized rollout';
+  END IF;
+END
+$media_authority_ledger_contract$;
+
+DO $applied_media_catalog_contract$
+DECLARE actual text[];
+BEGIN
+  SELECT array_agg(format('%I.%I(%s)',n.nspname,p.proname,pg_get_function_identity_arguments(p.oid))||'|'||pg_get_userbyid(p.proowner)||'|'||p.prosecdef||'|'||p.provolatile::text||'|'||pg_get_function_result(p.oid)||'|'||coalesce(array_to_string(p.proconfig,','),'')||'|'||coalesce(p.proacl::text,'')||'|'||md5(p.prosrc) ORDER BY n.nspname,p.proname,pg_get_function_identity_arguments(p.oid))
+  INTO actual FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+  WHERE format('%I.%I(%s)',n.nspname,p.proname,pg_get_function_identity_arguments(p.oid)) = ANY (ARRAY[
+    'private.bump_experience_media_revision()',
+    'private.canonical_experience_media_locator(p_url text)',
+    'private.sync_experience_media_assets()',
+    'private.sync_profile_avatar_assets()',
+    'public.avatar_migration_inventory()',
+    'public.begin_avatar_media_asset(p_id uuid, p_owner_id uuid, p_key text, p_url text, p_sha256 text, p_size bigint, p_mime text, p_idempotency_key text)',
+    'public.begin_experience_media_asset(p_id uuid, p_owner_id uuid, p_key text, p_url text, p_sha256 text, p_size bigint, p_mime text, p_idempotency_key text, p_parent_id text)',
+    'public.claim_media_deletion(p_asset_id uuid, p_enabled boolean, p_minimum_age_ms bigint)',
+    'public.commit_profile_avatar(p_owner_id uuid, p_asset_id uuid, p_expected_url text, p_sha256 text, p_size bigint)',
+    'public.plan_media_owner_deletion(p_owner_id uuid)',
+    'public.record_media_deletion_step(p_asset_id uuid, p_event text, p_code text)',
+    'public.replace_managed_media_reference(p_owner_id uuid, p_parent_type text, p_parent_id text, p_expected_digest text, p_new_digest text, p_old_asset_id uuid, p_new_asset_id uuid)',
+    'public.rollback_profile_avatar(p_owner_id uuid, p_asset_id uuid, p_expected_url text, p_old_url text)',
+    'public.verify_avatar_media_asset(p_id uuid, p_owner_id uuid, p_sha256 text, p_size bigint, p_mime text)',
+    'public.verify_experience_media_asset(p_id uuid, p_owner_id uuid, p_sha256 text, p_size bigint, p_mime text)'
+  ]::text[] );
+  IF actual IS DISTINCT FROM ARRAY[
+    'private.bump_experience_media_revision()|postgres|false|v|trigger|search_path=""|{postgres=X/postgres}|cdea8ca76a14af9f1acf520f5f3eb1df',
+    'private.canonical_experience_media_locator(p_url text)|postgres|false|i|text|search_path=""|{postgres=X/postgres}|af146baa063876f07dc3a60c195a0f98',
+    'private.sync_experience_media_assets()|postgres|true|v|trigger|search_path=""|{postgres=X/postgres}|fb047c74bf5b66e62a8c3fc801d975ee',
+    'private.sync_profile_avatar_assets()|postgres|true|v|trigger|search_path=""|{postgres=X/postgres}|762aca4c44be1021f8a8711a7955eb46',
+    'public.avatar_migration_inventory()|postgres|false|s|jsonb|search_path=""|{postgres=X/postgres,service_role=X/postgres}|67223aa9ded354e5b66cbc8af39488c2',
+    'public.begin_avatar_media_asset(p_id uuid, p_owner_id uuid, p_key text, p_url text, p_sha256 text, p_size bigint, p_mime text, p_idempotency_key text)|postgres|false|v|media_assets|search_path=""|{postgres=X/postgres,service_role=X/postgres}|23daf0b3ece0cb7dcb2ce08a0280d58d',
+    'public.begin_experience_media_asset(p_id uuid, p_owner_id uuid, p_key text, p_url text, p_sha256 text, p_size bigint, p_mime text, p_idempotency_key text, p_parent_id text)|postgres|false|v|media_assets|search_path=""|{postgres=X/postgres,service_role=X/postgres}|e6b8d8c78f0e435949c63de97a5182d4',
+    'public.claim_media_deletion(p_asset_id uuid, p_enabled boolean, p_minimum_age_ms bigint)|postgres|false|v|boolean|search_path=""|{postgres=X/postgres,service_role=X/postgres}|54a6e20ba2224fc1aaf30a722a3f4a9f',
+    'public.commit_profile_avatar(p_owner_id uuid, p_asset_id uuid, p_expected_url text, p_sha256 text, p_size bigint)|postgres|false|v|media_assets|search_path=""|{postgres=X/postgres,service_role=X/postgres}|0231f457894c7b7e683a2e301ada0b54',
+    'public.plan_media_owner_deletion(p_owner_id uuid)|postgres|false|v|integer|search_path=""|{postgres=X/postgres,service_role=X/postgres}|ac568071f0533cb850cf6d2970cded19',
+    'public.record_media_deletion_step(p_asset_id uuid, p_event text, p_code text)|postgres|false|v|void|search_path=""|{postgres=X/postgres,service_role=X/postgres}|9c57b2a53ba014b26bca56528f17dd2d',
+    'public.replace_managed_media_reference(p_owner_id uuid, p_parent_type text, p_parent_id text, p_expected_digest text, p_new_digest text, p_old_asset_id uuid, p_new_asset_id uuid)|postgres|false|v|void|search_path=""|{postgres=X/postgres,service_role=X/postgres}|670e43b8096a583208ff6f66ab1c03c9',
+    'public.rollback_profile_avatar(p_owner_id uuid, p_asset_id uuid, p_expected_url text, p_old_url text)|postgres|false|v|boolean|search_path=""|{postgres=X/postgres,service_role=X/postgres}|00979ed226da2993efe20e85be9f21f6',
+    'public.verify_avatar_media_asset(p_id uuid, p_owner_id uuid, p_sha256 text, p_size bigint, p_mime text)|postgres|false|v|media_assets|search_path=""|{postgres=X/postgres,service_role=X/postgres}|bf39eefc4fe80351afe01e3fe1081cea',
+    'public.verify_experience_media_asset(p_id uuid, p_owner_id uuid, p_sha256 text, p_size bigint, p_mime text)|postgres|false|v|media_assets|search_path=""|{postgres=X/postgres,service_role=X/postgres}|03ca290bcdae18b33b584a1da2ee78e5'
+  ]::text[] THEN
+    RAISE EXCEPTION 'applied media function body or ACL mismatch';
+  END IF;
+  SELECT array_agg(indexdef ORDER BY indexname) INTO actual FROM pg_indexes WHERE schemaname='public' AND tablename IN ('media_assets','media_asset_references','media_deletion_journal');
+  IF actual IS DISTINCT FROM ARRAY[
+    'CREATE INDEX media_asset_references_parent_idx ON public.media_asset_references USING btree (parent_type, parent_id)',
+    'CREATE UNIQUE INDEX media_asset_references_pkey ON public.media_asset_references USING btree (asset_id, parent_type, parent_id)',
+    'CREATE UNIQUE INDEX media_assets_owner_id_idempotency_key_key ON public.media_assets USING btree (owner_id, idempotency_key)',
+    'CREATE INDEX media_assets_owner_idx ON public.media_assets USING btree (owner_id, business_scope)',
+    'CREATE INDEX media_assets_pending_idx ON public.media_assets USING btree (created_at, id) WHERE (state = ''pending''::text)',
+    'CREATE UNIQUE INDEX media_assets_pkey ON public.media_assets USING btree (id)',
+    'CREATE UNIQUE INDEX media_assets_provider_bucket_object_key_key ON public.media_assets USING btree (provider, bucket, object_key)',
+    'CREATE UNIQUE INDEX media_assets_public_url_key ON public.media_assets USING btree (public_url)',
+    'CREATE UNIQUE INDEX media_deletion_journal_pkey ON public.media_deletion_journal USING btree (asset_id)',
+    'CREATE INDEX media_deletion_journal_state_idx ON public.media_deletion_journal USING btree (state, requested_at)'
+  ]::text[] THEN
+    RAISE EXCEPTION 'applied media index mismatch';
+  END IF;
+  SELECT array_agg(c.relname||'|'||k.conname||'|'||pg_get_constraintdef(k.oid,true) ORDER BY c.relname,k.conname) INTO actual FROM pg_constraint k JOIN pg_class c ON c.oid=k.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname IN ('media_assets','media_asset_references','media_deletion_journal');
+  IF actual IS DISTINCT FROM ARRAY[
+    'media_asset_references|media_asset_references_asset_id_fkey|FOREIGN KEY (asset_id) REFERENCES media_assets(id)',
+    'media_asset_references|media_asset_references_pkey|PRIMARY KEY (asset_id, parent_type, parent_id)',
+    'media_asset_references|media_asset_references_reference_digest_check|CHECK (reference_digest ~ ''^[a-f0-9]{64}$''::text)',
+    'media_assets|avatar_media_identity|CHECK (business_scope <> ''avatar''::text OR provider = ''r2''::text AND bucket = ''locally-public-avatars''::text AND parent_type = ''profile_avatar''::text AND parent_id IS NOT NULL AND parent_id = owner_id::text AND public_url IS NOT NULL AND expected_size <= 10485760 AND (mime = ANY (ARRAY[''image/jpeg''::text, ''image/png''::text, ''image/webp''::text, ''image/gif''::text, ''image/avif''::text])) AND object_key = (((((''avatars/v1/''::text || encode(sha256(convert_to(''avatar-media-owner:''::text || owner_id::text, ''UTF8''::name)), ''hex''::text)) || ''/''::text) || id::text) || ''/avatar.''::text) ||
+CASE mime
+    WHEN ''image/jpeg''::text THEN ''jpg''::text
+    ELSE substr(mime, 7)
+END) AND public_url = (''https://avatars-media.locally-travel.com/''::text || object_key))',
+    'media_assets|media_assets_bucket_check|CHECK (bucket ~ ''^[a-zA-Z0-9_-]+$''::text)',
+    'media_assets|media_assets_business_scope_check|CHECK (business_scope = ANY (ARRAY[''experience''::text, ''avatar''::text, ''host_profile''::text, ''community''::text, ''chat''::text, ''admin''::text, ''verification''::text]))',
+    'media_assets|media_assets_check|CHECK (state <> ''committed''::text OR verified_at IS NOT NULL AND committed_at IS NOT NULL)',
+    'media_assets|media_assets_check1|CHECK (state <> ''tombstoned''::text OR tombstoned_at IS NOT NULL)',
+    'media_assets|media_assets_check2|CHECK (business_scope <> ''experience''::text OR expected_size <= 10485760 AND provider = ''r2''::text AND bucket = ''locally-public-experience-canary''::text AND object_key ~~ ''sources/v1/experience/%''::text AND public_url = (''https://media-canary.locally-travel.com/''::text || object_key))',
+    'media_assets|media_assets_expected_sha256_check|CHECK (expected_sha256 ~ ''^[a-f0-9]{64}$''::text)',
+    'media_assets|media_assets_expected_size_check|CHECK (expected_size > 0)',
+    'media_assets|media_assets_idempotency_key_check|CHECK (idempotency_key ~ ''^[a-f0-9]{64}$''::text)',
+    'media_assets|media_assets_object_key_check|CHECK (object_key <> ''''::text AND object_key !~ ''(^/|(^|/)[.][.]?(/|$))''::text)',
+    'media_assets|media_assets_owner_id_idempotency_key_key|UNIQUE (owner_id, idempotency_key)',
+    'media_assets|media_assets_pkey|PRIMARY KEY (id)',
+    'media_assets|media_assets_provider_bucket_object_key_key|UNIQUE (provider, bucket, object_key)',
+    'media_assets|media_assets_provider_check|CHECK (provider = ANY (ARRAY[''supabase''::text, ''r2''::text]))',
+    'media_assets|media_assets_public_url_key|UNIQUE (public_url)',
+    'media_assets|media_assets_state_check|CHECK (state = ANY (ARRAY[''pending''::text, ''committed''::text, ''tombstoned''::text]))',
+    'media_deletion_journal|media_deletion_journal_asset_id_fkey|FOREIGN KEY (asset_id) REFERENCES media_assets(id)',
+    'media_deletion_journal|media_deletion_journal_attempt_count_check|CHECK (attempt_count >= 0)',
+    'media_deletion_journal|media_deletion_journal_check|CHECK (state <> ''complete''::text OR object_deleted_at IS NOT NULL AND completed_at IS NOT NULL)',
+    'media_deletion_journal|media_deletion_journal_last_failure_check|CHECK (last_failure = ANY (ARRAY[''reference_exists''::text, ''pinned''::text, ''delete_disabled''::text, ''identity_mismatch''::text, ''provider_failed''::text, ''purge_failed''::text]))',
+    'media_deletion_journal|media_deletion_journal_pkey|PRIMARY KEY (asset_id)',
+    'media_deletion_journal|media_deletion_journal_reason_check|CHECK (reason = ANY (ARRAY[''replaced''::text, ''parent_deleted''::text, ''owner_deleted''::text, ''pending_abandoned''::text]))',
+    'media_deletion_journal|media_deletion_journal_state_check|CHECK (state = ANY (ARRAY[''queued''::text, ''blocked''::text, ''deleting''::text, ''failed''::text, ''complete''::text]))'
+  ]::text[] THEN
+    RAISE EXCEPTION 'applied media constraint mismatch';
+  END IF;
+  SELECT array_agg(c.relname||'|'||t.tgname||'|'||pg_get_triggerdef(t.oid,true)||'|'||t.tgenabled::text ORDER BY c.relname,t.tgname) INTO actual FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND t.tgname IN ('experience_media_revision','experience_media_finalize','experience_media_delete_plan','profile_avatar_finalize','profile_avatar_delete_plan');
+  IF actual IS DISTINCT FROM ARRAY[
+    'experiences|experience_media_delete_plan|CREATE TRIGGER experience_media_delete_plan BEFORE DELETE ON experiences FOR EACH ROW EXECUTE FUNCTION private.sync_experience_media_assets()|O',
+    'experiences|experience_media_finalize|CREATE TRIGGER experience_media_finalize AFTER INSERT OR UPDATE ON experiences FOR EACH ROW EXECUTE FUNCTION private.sync_experience_media_assets()|O',
+    'experiences|experience_media_revision|CREATE TRIGGER experience_media_revision BEFORE UPDATE ON experiences FOR EACH ROW EXECUTE FUNCTION private.bump_experience_media_revision()|O',
+    'profiles|profile_avatar_delete_plan|CREATE TRIGGER profile_avatar_delete_plan BEFORE DELETE ON profiles FOR EACH ROW EXECUTE FUNCTION private.sync_profile_avatar_assets()|O',
+    'profiles|profile_avatar_finalize|CREATE TRIGGER profile_avatar_finalize AFTER INSERT OR UPDATE OF avatar_url ON profiles FOR EACH ROW EXECUTE FUNCTION private.sync_profile_avatar_assets()|O'
+  ]::text[] THEN
+    RAISE EXCEPTION 'applied media trigger mismatch';
+  END IF;
+END
+$applied_media_catalog_contract$;
 
 DO $concierge_security_contract$
 DECLARE
