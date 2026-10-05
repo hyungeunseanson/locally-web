@@ -24,6 +24,9 @@ jobs:
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.STORAGE_SUPABASE_SERVICE_ROLE_KEY }}
       R2_SOURCE_ACCESS_KEY_ID: ${{ secrets.R2_SOURCE_READ_ACCESS_KEY_ID }}
       R2_SOURCE_SECRET_ACCESS_KEY: ${{ secrets.R2_SOURCE_READ_SECRET_ACCESS_KEY }}
+      # Optional until avatar cutover. Dedicated avatar reader; existing keys stay unchanged.
+      R2_AVATAR_SOURCE_READ_ACCESS_KEY_ID: ${{ secrets.R2_AVATAR_SOURCE_READ_ACCESS_KEY_ID }}
+      R2_AVATAR_SOURCE_READ_SECRET_ACCESS_KEY: ${{ secrets.R2_AVATAR_SOURCE_READ_SECRET_ACCESS_KEY }}
       AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       R2_ENDPOINT: ${{ vars.R2_ENDPOINT }}

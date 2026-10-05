@@ -224,14 +224,20 @@ test.describe('P0 Storage and SECURITY DEFINER migration', () => {
     expect(normalizedMigration).not.toMatch(/CREATE\s+(?:OR\s+REPLACE\s+)?VIEW/i);
   });
 
-  test('updates each browser upload to its enforced owner namespace', () => {
+  test('enforces upload ownership through the managed avatar endpoint and legacy browser namespaces', () => {
     const account = readFileSync('app/account/page.tsx', 'utf8');
     const mobile = readFileSync('app/components/mobile/MobileProfileView.tsx', 'utf8');
+    const avatarHandler = readFileSync('app/utils/avatarUploadHandler.ts', 'utf8');
     const hostRegistration = readFileSync('app/host/register/page.tsx', 'utf8');
     const hostEditor = readFileSync('app/host/dashboard/components/ProfileEditor.tsx', 'utf8');
     const community = readFileSync('app/community/write/PostEditor.tsx', 'utf8');
-    expect(account).toContain('`${user.id}/${fileName}`');
-    expect(mobile).toContain('`${userId}/${Date.now()}-${Math.random()}.${fileExt}`');
+    for (const client of [account, mobile]) {
+      expect(client).toContain('await uploadProfileAvatar(compressedFile)');
+      expect(client).not.toContain("storage.from('avatars')");
+    }
+    expect(avatarHandler).toContain('supabase.auth.getUser()');
+    expect(avatarHandler).toContain('profile.id !== user.id');
+    expect(avatarHandler).toContain('`${user.id}/${crypto.randomUUID()}.${extension}`');
     expect(hostRegistration).toContain('`profile/${user.id}_${Date.now()}`');
     expect(hostEditor).toContain('`profile/${user.id}_${Date.now()}`');
     expect(community).toContain('`community/${user.id}/${Date.now()}-${fileName}`');

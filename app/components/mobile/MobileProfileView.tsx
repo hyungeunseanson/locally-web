@@ -12,6 +12,7 @@ import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
 import { PROFILE_LANGUAGE_OPTIONS } from '@/app/constants/profile';
 import { getProfileCompletion } from '@/app/utils/profile';
 import { useLanguage } from '@/app/context/LanguageContext';
+import { uploadProfileAvatar } from '@/app/utils/avatarUpload';
 import { compressImage, validateImage, isHeicValidationResult } from '@/app/utils/image';
 import type { LocallyMembershipStatus } from '@/app/utils/memberStatus';
 import LocallyMembershipBadgeTrigger from '@/app/components/LocallyMembershipBadgeTrigger';
@@ -145,15 +146,11 @@ export default function MobileProfileView({
         }
 
         setUploading(true);
-        const fileExt = file.name.split('.').pop();
-        const filePath = `${userId}/${Date.now()}-${Math.random()}.${fileExt}`;
         try {
             const compressedFile = await compressImage(file);
-            const { error } = await supabase.storage.from('avatars').upload(filePath, compressedFile);
-            if (error) throw error;
-            const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
+            const publicUrl = await uploadProfileAvatar(compressedFile);
             setEditData(prev => ({ ...prev, avatar_url: publicUrl }));
-            await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', userId);
+            onProfileUpdate({ ...profile, avatar_url: publicUrl });
             showToast('프로필 사진이 변경되었습니다.', 'success');
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : '알 수 없는 오류';

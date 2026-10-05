@@ -36,6 +36,7 @@ MANIFEST_SCHEMA = "locally.supabase-storage-snapshot.v1"
 MULTI_SCHEMA = "locally.authoritative-storage-backup.v2"
 MULTI_MANIFEST_SCHEMA = "locally.authoritative-storage-snapshot.v2"
 R2_SOURCE_BUCKET = "locally-public-experience-canary"
+R2_AVATAR_SOURCE_BUCKET = "locally-public-avatars"
 BUCKETS = (
     "experiences",
     "images",
@@ -460,13 +461,13 @@ def validate_object_entry(entry: Mapping[str, Any], prepared: bool) -> None:
     bucket = entry.get("bucket")
     key = entry.get("key")
     provider = entry.get("provider", "supabase")
-    valid_bucket = (provider == "supabase" and bucket in BUCKETS) or (provider == "r2" and bucket == R2_SOURCE_BUCKET)
+    valid_bucket = (provider == "supabase" and bucket in BUCKETS) or (provider == "r2" and bucket in {R2_SOURCE_BUCKET, R2_AVATAR_SOURCE_BUCKET})
     if not valid_bucket or not isinstance(key, str) or not key or "\x00" in key:
         raise ValidationError("invalid source object identity")
     key_path = pathlib.PurePosixPath(key)
     if key_path.is_absolute() or ".." in key_path.parts or "." in key_path.parts:
         raise ValidationError("unsafe source object key")
-    if provider == "r2" and not key.startswith(("originals/", "sources/")):
+    if provider == "r2" and not key.startswith(("avatars/v1/",) if bucket == R2_AVATAR_SOURCE_BUCKET else ("originals/", "sources/")):
         raise ValidationError("R2 source is not an original")
     if entry.get("identity") != source_identity(bucket, key, provider):
         raise ValidationError("source identity mismatch")
@@ -886,6 +887,10 @@ def walk_string_leaves(value: Any, path: str = "$"):
 
 def source_locator(value: str, field: str = "") -> Optional[Tuple[str, str, str]]:
     parsed = urllib.parse.urlsplit(value)
+    if parsed.scheme == "https" and parsed.netloc == "avatars-media.locally-travel.com" and not parsed.query and not parsed.fragment:
+        key = parsed.path.lstrip("/")
+        if re.fullmatch(r"avatars/v1/[a-f0-9]{64}/[a-f0-9-]{36}/avatar\.(jpg|png|webp|gif|avif)", key):
+            return "r2", R2_AVATAR_SOURCE_BUCKET, key
     if parsed.scheme == "https" and parsed.hostname == "media-canary.locally-travel.com":
         path = urllib.parse.unquote(parsed.path)
         normalized = urllib.parse.urlsplit(urllib.parse.urljoin("https://media-canary.locally-travel.com/", path))
@@ -964,7 +969,7 @@ def database_references(source: SupabaseStorageSource, include_managed_assets: b
 class R2StorageSource:
     """Read-only original adapter. Deliberately has no PUT/COPY/DELETE method."""
     def __init__(self, client: Any, bucket: str = R2_SOURCE_BUCKET, timeout: float = 30.0, diagnostics=None):
-        if bucket != R2_SOURCE_BUCKET:
+        if bucket not in {R2_SOURCE_BUCKET, R2_AVATAR_SOURCE_BUCKET}:
             raise ValidationError("unexpected R2 source bucket")
         self.client, self.bucket, self.timeout = client, bucket, timeout
         self.diagnostics = diagnostics
@@ -986,7 +991,7 @@ class R2StorageSource:
     def inventory(self, references: Mapping[Tuple[str, str, str], Any]) -> List[Dict[str, Any]]:
         listed = {}
         try:
-            for prefix in ("originals/", "sources/"):
+            for prefix in (("avatars/v1/",) if self.bucket == R2_AVATAR_SOURCE_BUCKET else ("originals/", "sources/")):
                 token, seen = None, set()
                 while True:
                     params = {"Bucket": self.bucket, "Prefix": prefix, "MaxKeys": 1000}
@@ -1076,14 +1081,20 @@ class R2StorageSource:
 
 
 class MultiStorageSource:
-    def __init__(self, supabase: SupabaseStorageSource, r2: R2StorageSource, reference_reader=database_references, diagnostics=None):
+    def __init__(self, supabase: SupabaseStorageSource, r2: R2StorageSource, reference_reader=database_references, diagnostics=None, avatar=None):
         self.supabase, self.r2, self.reference_reader = supabase, r2, reference_reader
         self.diagnostics = diagnostics
+        self.avatar = avatar
 
     def inventory(self) -> List[Dict[str, Any]]:
         if self.diagnostics:
             self.diagnostics.inventory_at("supabase", "database_locator_get")
         refs = self.reference_reader(self.supabase)
+        r2_buckets = {bucket for provider, bucket, _ in refs if provider == "r2"}
+        if r2_buckets - {R2_SOURCE_BUCKET, R2_AVATAR_SOURCE_BUCKET}:
+            raise ValidationError("unexpected R2 source authority")
+        if R2_AVATAR_SOURCE_BUCKET in r2_buckets and self.avatar is None:
+            raise ValidationError("missing separate read-only avatar source credential")
         entries = []
         for old in self.supabase.inventory():
             entry = dict(old, provider="supabase", authority="recoverable-source", **self.supabase.restore_metadata(old))
@@ -1091,14 +1102,19 @@ class MultiStorageSource:
             entries.append(entry)
         if self.diagnostics:
             self.diagnostics.inventory_at("r2", "list")
-        entries.extend(self.r2.inventory(refs))
+        entries.extend(self.r2.inventory({location: associations for location, associations in refs.items() if location[0] != "r2" or location[1] == R2_SOURCE_BUCKET}))
+        if self.avatar is not None:
+            entries.extend(self.avatar.inventory({location: associations for location, associations in refs.items() if location[0] == "r2" and location[1] == R2_AVATAR_SOURCE_BUCKET}))
         return sorted(entries, key=lambda item: (item["provider"], item["bucket"], item["key"]))
 
     def download(self, entry: Mapping[str, Any], destination: pathlib.Path, budget: TransferBudget):
         provider = entry.get("provider")
         if provider not in {"supabase", "r2"}:
             raise ValidationError("unknown source provider")
-        return (self.supabase if provider == "supabase" else self.r2).download(entry, destination, budget)
+        adapter = self.supabase if provider == "supabase" else self.avatar if entry["bucket"] == R2_AVATAR_SOURCE_BUCKET else self.r2
+        if adapter is None:
+            raise ValidationError("missing avatar source reader")
+        return adapter.download(entry, destination, budget)
 
 
 def make_plan(entries: Sequence[Mapping[str, Any]], snapshot_id: str, db_backup_id: str, db_backup_time: str, captured_at: Optional[str] = None) -> Dict[str, Any]:
@@ -1826,8 +1842,18 @@ def source_from_env(args: argparse.Namespace):
                           config=Config(signature_version="s3v4", connect_timeout=10, read_timeout=args.timeout,
                                         retries={"total_max_attempts": 1, "mode": "standard"}))
     include_managed = os.environ.get("STORAGE_BACKUP_INCLUDE_MANAGED_ASSETS") == "true"
+    avatar_access = os.environ.get("R2_AVATAR_SOURCE_READ_ACCESS_KEY_ID")
+    avatar_secret = os.environ.get("R2_AVATAR_SOURCE_READ_SECRET_ACCESS_KEY")
+    avatar = None
+    if avatar_access or avatar_secret:
+        if not avatar_access or not avatar_secret or avatar_access in {access, os.environ.get("AWS_ACCESS_KEY_ID")}:
+            raise BackupError("avatar source credential must be complete and separate")
+        avatar_client = boto3.client("s3", endpoint_url=os.environ.get("R2_ENDPOINT"), aws_access_key_id=avatar_access,
+            aws_secret_access_key=avatar_secret, region_name="auto", config=Config(signature_version="s3v4", connect_timeout=10,
+            read_timeout=args.timeout, retries={"total_max_attempts": 1, "mode": "standard"}))
+        avatar = R2StorageSource(avatar_client, bucket=R2_AVATAR_SOURCE_BUCKET, timeout=args.timeout, diagnostics=diagnostics)
     return MultiStorageSource(source, R2StorageSource(client, timeout=args.timeout, diagnostics=diagnostics),
-                              reference_reader=lambda reader: database_references(reader, include_managed), diagnostics=diagnostics)
+                              reference_reader=lambda reader: database_references(reader, include_managed), diagnostics=diagnostics, avatar=avatar)
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
