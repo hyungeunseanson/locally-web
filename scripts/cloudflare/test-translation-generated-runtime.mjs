@@ -91,6 +91,16 @@ try {
       response.end('[]');
       return;
     }
+    if (request.url?.startsWith('/rest/v1/rpc/solo_refund_diagnostics')) {
+      // Empty local P0-schema fixture only; Production P0 remains unapplied.
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({
+        claimed: 0, accepted: 0, unknown: 0, rejected: 0,
+        settlement_applied: 0, manual_pending: 0,
+        reconciliation_required: 0, delivery_failed: 0,
+      }));
+      return;
+    }
     response.writeHead(500, { 'content-type': 'application/json' });
     response.end('{"error":"unexpected_fixture_request"}');
   });
@@ -163,6 +173,7 @@ try {
   assert.equal(completionScheduled.status, 200);
   await waitFor(() => output.includes('experience_completion_scheduled'), 15_000, 'cold Experience completion scheduled outcome');
   assert.equal(backendRequests.filter((request) => request.startsWith('/rest/v1/rpc/list_due_experience_completion_candidates')).length, 1);
+  assert.equal(backendRequests.filter((request) => request.startsWith('/rest/v1/rpc/solo_refund_diagnostics')).length, 1);
   assert.equal(backendRequests.filter((request) => request.startsWith('/rest/v1/rpc/lease_experience_translation_task')).length, 2);
   assert.equal(backendRequests.filter((request) => request.startsWith('/rest/v1/rpc/refresh_experience_popularity_snapshot')).length, 1);
   assert.equal(backendRequests.filter((request) => request.startsWith('/rest/v1/rpc/claim_due_admin_support_unread_alert_batches')).length, 1);
