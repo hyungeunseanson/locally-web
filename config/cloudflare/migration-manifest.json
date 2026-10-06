@@ -291,7 +291,8 @@
       "CLOUDFLARE_FUNCTIONAL_CANARY_GOOGLE_OAUTH",
       "CLOUDFLARE_FUNCTIONAL_CANARY_KAKAO_OAUTH"
     ],
-    "hostProfileSourceStaged": ["HOST_PROFILE_R2_SOURCE_ENABLED"]
+    "hostProfileSourceStaged": ["HOST_PROFILE_R2_SOURCE_ENABLED"],
+    "communitySourceStaged": ["COMMUNITY_R2_SOURCE_ENABLED"]
   },
   "secrets": {
     "workerAlways": [
