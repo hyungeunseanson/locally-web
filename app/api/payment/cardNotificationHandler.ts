@@ -7,6 +7,10 @@ import { isCancelledBookingStatus, isConfirmedBookingStatus } from '@/app/consta
 import { isCancelledServiceBooking } from '@/app/constants/serviceStatus';
 import type { ProxyCategory } from '@/app/types/proxy';
 import { EXPLICIT_CARD_CHECKOUT_CANCEL_REASON } from '@/app/utils/bookings/pendingBookingHolds';
+import {
+  isMatchingAppliedSoloNicePayRefund,
+  isSoloRefundNotificationForBooking,
+} from '@/app/utils/bookings/soloRefundNotification';
 import { getProxyRequestFeeKrw, isProxyCardPaymentAnchor } from '@/app/utils/proxyBooking';
 import {
   getCurrentCardPaymentProvider,
@@ -183,7 +187,7 @@ async function processExperienceNotification(params: {
   }
 
   if (isNicePayPostCancellationNotification(notification)) {
-    return isMatchingCompletedNicePayCancellation({
+    if (isMatchingCompletedNicePayCancellation({
       notification,
       record: {
         orderId: booking.order_id || booking.id,
@@ -191,9 +195,26 @@ async function processExperienceNotification(params: {
         status: booking.status,
         cancelledStatus: 'cancelled',
       },
-    })
-      ? buildNotificationOkResponse()
-      : buildRejectedPostCancellationResponse();
+    })) {
+      return buildNotificationOkResponse();
+    }
+
+    if (isSoloRefundNotificationForBooking({ notification, booking })) {
+      const { data: operation, error: operationError } = await supabaseAdmin
+        .from('booking_solo_refund_operations')
+        .select('booking_id, provider, payment_method, transaction_reference, order_reference, requested_amount, outcome, settlement_applied_at')
+        .eq('booking_id', booking.id)
+        .maybeSingle();
+
+      if (operationError) {
+        throw new Error('Solo refund operation evidence lookup failed.');
+      }
+      if (isMatchingAppliedSoloNicePayRefund({ notification, booking, operation })) {
+        return buildNotificationOkResponse();
+      }
+    }
+
+    return buildRejectedPostCancellationResponse();
   }
 
   if (
