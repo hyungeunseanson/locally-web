@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
-import { useAdminAttention, useAdminAttentionSnapshot } from './AdminAttentionProvider';
+import { useAdminAttentionSnapshot } from './AdminAttentionProvider';
 import { NewConversationBadge } from './AttentionBadge';
 import ChatMonitor from './ChatMonitor';
 import PhonePaymentDetails from './PhonePaymentDetails';
@@ -30,7 +30,6 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
   const { onSubscription, onSuccess, onFailure } = sync;
   const [operations, setOperations] = useState(EMPTY_CHAT_OPERATIONS);
   const { unseen, needsReply, reopened } = operations;
-  const attentionStore = useAdminAttention();
   const attention = useAdminAttentionSnapshot();
   const router = useRouter();
   const params = useSearchParams();
@@ -54,13 +53,8 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
   const listVersion = useRef(0);
   const detailVersion = useRef(0);
   const requestFlights = useRef(new Map<string, Promise<{ success: boolean; data: PhoneWorkspaceRequest[] | PhoneWorkspaceRequest; pagination: { hasMore: boolean } }>>());
-  const linkedInquiryIds = useRef(new Set<string>());
+  const recencyReceipts = useRef(new Set<string>());
   const supabase = useMemo(() => createClient(), []);
-
-  useEffect(() => {
-    linkedInquiryIds.current = new Set([...requests, ...(detail ? [detail] : [])]
-      .flatMap(row => row.linked_inquiry_id ? [String(row.linked_inquiry_id)] : []));
-  }, [requests, detail]);
 
   const read = useCallback(async (url: string) => {
     const existing = requestFlights.current.get(url);
@@ -139,6 +133,9 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
   useEffect(() => {
     let stopped = false, running = false, again = false;
     refreshRef.current = () => {
+      if (document.hidden) return;
+      listVersion.current++;
+      detailVersion.current++;
       if (running) { again = true; return; }
       running = true;
       void (async () => {
@@ -147,10 +144,10 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
           // revalidate once; sharing that old snapshot alone loses the event.
           await Promise.allSettled([...requestFlights.current.values()]);
           do {
-            if (stopped) return;
+            if (stopped || document.hidden) return;
             again = false;
             await Promise.allSettled([loadList(), loadDetail()]);
-          } while (again && !stopped);
+          } while (again && !stopped && !document.hidden);
         } finally { running = false; }
       })();
     };
@@ -161,18 +158,31 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
     if (!active) return;
     let stopped = false;
     let timer: ReturnType<typeof setTimeout>;
-    const schedule = () => { clearTimeout(timer); timer = setTimeout(refresh, 350); };
+    const schedule = () => {
+      // A message received during a GET owns membership before the debounce fires.
+      listVersion.current++;
+      detailVersion.current++;
+      clearTimeout(timer);
+      if (!document.hidden) timer = setTimeout(refresh, 350);
+    };
     const catchUp = () => { if (!document.hidden) refresh(); };
-    const isPhone = (id: string | number) => !attentionStore || linkedInquiryIds.current.has(String(id))
-      || attentionStore.getSnapshot().conversations[String(id)]?.surface === 'phone';
+    const changed = (key: string) => {
+      if (recencyReceipts.current.has(key)) return;
+      recencyReceipts.current.add(key);
+      if (recencyReceipts.current.size > 500) recencyReceipts.current.delete(recencyReceipts.current.values().next().value!);
+      schedule();
+    };
     const channel = supabase.channel('admin-phone-workspace')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'proxy_requests' }, schedule)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'inquiry_messages' }, payload => {
-        // The shared store owns unread deltas. Only phone workspace activity needs a refresh.
-        if (isPhone(payload.new.inquiry_id)) schedule();
+        // Unknown/unloaded inquiries need bounded recovery even when unread is zero.
+        if ([null, undefined, 'text', 'image'].includes(payload.new.type)) changed(`insert:${payload.new.id}`);
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'inquiry_messages' }, payload => {
-        if (payload.new.type === 'deleted' && isPhone(payload.new.inquiry_id)) schedule();
+        if (payload.new.type === 'deleted') changed(`deleted:${payload.new.id}`);
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'inquiry_messages' }, payload => {
+        changed(`delete:${payload.old.id}`);
       }).subscribe(status => { if (stopped) return; onSubscription(status); if (status === 'SUBSCRIBED') catchUp(); });
     const fallback = setInterval(catchUp, 300_000);
     window.addEventListener('online', catchUp);
@@ -182,7 +192,7 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null, a
       clearTimeout(timer); clearInterval(fallback); onSubscription('CLOSED'); void supabase.removeChannel(channel);
       window.removeEventListener('online', catchUp); document.removeEventListener('visibilitychange', catchUp);
     };
-  }, [active, refresh, supabase, attentionStore, onSubscription]);
+  }, [active, refresh, supabase, onSubscription]);
 
   const select = (id: string | null) => {
     const next = new URLSearchParams(params.toString());

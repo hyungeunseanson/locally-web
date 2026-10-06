@@ -28,7 +28,7 @@ function countedServer(before, auditedMain = false) {
       calls.push({table,operation:state.operation});
       if(table==='users')return {data:{role:'admin'}};
       if(table==='admin_whitelist')return {data:null};
-      if(table==='inquiries')return {data:state.filters.some(([,key])=>key==='id') ? row : [row]};
+      if(table==='inquiries')return {data:state.filters.some(([method,key])=>method==='eq'&&key==='id') ? row : [row]};
       if(table==='profiles')return {data:[{id:'guest',full_name:'Customer'}]};
       if(table==='inquiry_messages') return state.columns==='inquiry_id'?{data:[]} : state.columns==='id'?{data:[],count:0}:{data:server.messages};
       if(table==='admin_support_unread_alert_batches')return {data:state.operation==='update' ? [{inquiry_id:1}] : {inquiry_id:1,first_unread_message_id:null,first_unread_message_at:null,last_unread_message_id:null}};
@@ -36,6 +36,7 @@ function countedServer(before, auditedMain = false) {
     }),
     rpc:async(name,args)=>{
       calls.push({rpc:name});
+      if(name==='list_admin_support_recency')return {data:[{id:'1',canonical_activity_at:row.updated_at}]};
       if(name==='get_admin_attention')return {data:server.unread>0||args.p_inquiry_ids ? [meta()] : []};
       if(name==='get_admin_inquiry_activity')return {data:[meta()]};
       if(name==='ack_admin_inquiry_snapshot'){server.unread=server.messages.filter(row=>!args.p_message_ids.includes(String(row.id))).length;return {data:[{changed:1,admin_unread_count:server.unread}]};}
@@ -105,13 +106,17 @@ test('same actual-route fixture: idle ten minutes, one message, ten-message burs
   const results={baselineHashes};
   for(const scenario of ['idle','single','burst'])results[scenario]={legacy:await measure('legacy',scenario),before:await measure('hotfix',scenario),auditedMain:await measure('auditedMain',scenario),after:await measure('after',scenario)};
   console.log(`ADMIN_ATTENTION_PERFORMANCE ${JSON.stringify(results)}`);
-  for(const scenario of ['idle','single','burst'])assert.deepEqual(results[scenario].auditedMain,results[scenario].after,'no request regression against starting main');
+  for(const scenario of ['idle','single','burst']) {
+    const expected={...results[scenario].auditedMain};
+    expected.db += expected.list; // One dedicated recency RPC per batch; no extra browser GET.
+    assert.deepEqual(results[scenario].after,expected,'browser/detail traffic unchanged; bounded canonical DB authority');
+  }
   assert.equal(results.idle.before.list,2); assert.equal(results.idle.after.list,2);
   assert.equal(results.idle.after.ack,0); assert.equal(results.single.after.list,0);
   assert.equal(results.single.after.thread,1); assert.equal(results.burst.after.list,0); assert.equal(results.burst.after.thread,1);
   assert.equal(results.burst.legacy.thread,10); assert.equal(results.burst.before.thread,2); assert.equal(results.burst.after.aggregate,2);
   assert.equal(results.burst.after.ack,1); assert.equal(results.burst.after.api,results.single.after.api);
-  assert.deepEqual(results.idle.after,{list:2,thread:2,aggregate:2,ack:0,api:6,db:44});
+  assert.deepEqual(results.idle.after,{list:2,thread:2,aggregate:2,ack:0,api:6,db:46});
   assert.deepEqual(results.single.after,{list:0,thread:1,aggregate:2,ack:1,api:4,db:18});
   assert.deepEqual(results.burst.after,results.single.after);
 });

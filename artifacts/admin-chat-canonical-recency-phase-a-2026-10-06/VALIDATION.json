@@ -1,0 +1,69 @@
+{
+  "baseSha": "fa6ce5e5bbc27a22bd66623eea2133e9674432b3",
+  "auditBaseSha": "a616af1c393f960b093a3aee7ae4e21fb5601738",
+  "productionMutations": 0,
+  "productionMigrationApplies": 0,
+  "deployments": 0,
+  "merges": 0,
+  "pinImplemented": false,
+  "runtime": {
+    "node": "24.20.0",
+    "next": "16.3.5",
+    "postgresMajor": 17
+  },
+  "tests": {
+    "adminChatAttentionPhoneUnit": 104,
+    "newRecencyRuntimeIncludedInUnit": 20,
+    "nativeRecencyGroups": 19,
+    "nativeExistingPhoneFollowupGroups": 30,
+    "phoneWorkspaceChromium": 96,
+    "adminAttentionChromiumWebkit": 36,
+    "adminOperationsChromiumWebkit": 28,
+    "adminSearchChromiumWebkit": 30,
+    "fullAdminChatPhase1": {
+      "monitoringUnit": 44,
+      "participantChatUnit": 94,
+      "chatRegressionBrowser": 26,
+      "chatPlatformBrowser": 29,
+      "adminChatBrowser": 14
+    }
+  },
+  "checks": {
+    "typescript": "PASS",
+    "changedFileLint": "PASS",
+    "fullLint": "PASS: 0 errors, 7 pre-existing unrelated warnings",
+    "diffCheck": "PASS",
+    "productionCurrentStateStatic": "PASS"
+  },
+  "foundationCI": "Exact-head workflow result is recorded in the Draft PR checks and task final response after push.",
+  "indexEvidence": {
+    "fixtureHistoryMessages": 20000,
+    "indexedMs": 0.014,
+    "unindexedMs": 2.969,
+    "indexedPlan": "Limit -> Index Only Scan admin_chat_visible_message_recency",
+    "unindexedPlan": "Limit -> top-N Sort -> Seq Scan",
+    "indexedSharedHitBlocks": 3,
+    "unindexedSharedHitBlocks": 235
+  },
+  "sharedAttentionPerformance": {
+    "idleTenMinutes": {
+      "listGET": 2,
+      "threadGET": 2,
+      "aggregateGET": 2,
+      "ACK": 0,
+      "databaseCallsBefore": 44,
+      "databaseCallsAfter": 46
+    },
+    "oneMessageAndTenMessageBurst": {
+      "listGET": 0,
+      "threadGET": 1,
+      "aggregateGET": 2,
+      "ACK": 1,
+      "databaseCalls": 18
+    },
+    "inflightListBurst": {
+      "maxConcurrentListGET": 1,
+      "trailingListGET": 1
+    }
+  }
+}

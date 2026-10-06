@@ -123,8 +123,14 @@ jobs:
       - name: Validate Host upload on local workerd and isolated R2 bindings
         run: npm run storage:host-profile:runtime
 
+      - name: Validate canonical Admin Chat recency and serialized list refresh
+        run: npm run test:admin-chat:recency
+
       - name: Install isolated native PostgreSQL 17 fixture
         run: npm install --prefix "$RUNNER_TEMP/host-pg17" --no-audit --no-fund embedded-postgres@17.6.0-beta.15 pg@8.16.3 esbuild@0.25.4
+
+      - name: Validate canonical Admin Chat pagination, index and ACL on native PostgreSQL 17
+        run: RECENCY_PG17_MODULES="$RUNNER_TEMP/host-pg17/node_modules" npm run test:admin-chat:recency:native
 
       - name: Validate Host source authority on native PostgreSQL 17
         run: HOST_PG17_MODULES="$RUNNER_TEMP/host-pg17/node_modules" npm run storage:host-profile:native

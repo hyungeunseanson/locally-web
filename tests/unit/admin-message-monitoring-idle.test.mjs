@@ -20,7 +20,7 @@ function countedServer() {
       queries.push(state);
       if (table === 'users') return { data: { role: 'admin' } };
       if (table === 'admin_whitelist') return { data: null };
-      if (table === 'inquiries') return { data: state.filters.some(([,key]) => key === 'id') ? row : [row] };
+      if (table === 'inquiries') return { data: state.filters.some(([method,key]) => method === 'eq' && key === 'id') ? row : [row] };
       if (table === 'proxy_requests' || table === 'host_applications') return { data: [] };
       if (table === 'profiles') return { data: [{ id: 'guest', full_name: 'Customer' }] };
       if (table === 'inquiry_messages') return state.columns === 'inquiry_id' ? { data: [] }
@@ -31,6 +31,7 @@ function countedServer() {
     }),
     rpc: async (name, args) => {
       rpcs.push({ name, args });
+      if (name === 'list_admin_support_recency') return {data:[{id:'1',canonical_activity_at:row.updated_at}]};
       return { data: name === 'get_admin_inquiry_activity' ? [{ inquiry_id: 1, status: 'open', updated_at: row.updated_at,
         last_sender_role: 'customer', last_message_at: row.updated_at, needs_reply: true, admin_unread_count: 0 }] : 0 };
     },
@@ -91,8 +92,8 @@ test('idle visible subscribed ten-minute API/DB counts: reviewed 30s baseline vs
     } finally { await f.dispose(); }
   }
   assert.deepEqual(metrics, [
-    { list: 20, thread: 20, ack: 20, api: 60, db: 480 },
-    { list: 2, thread: 2, ack: 0, api: 4, db: 34 },
+    { list: 20, thread: 20, ack: 20, api: 60, db: 500 },
+    { list: 2, thread: 2, ack: 0, api: 4, db: 36 },
   ]);
   console.log(`ADMIN_CHAT_IDLE_10_MIN ${JSON.stringify({ before: metrics[0], after: metrics[1] })}`);
 });

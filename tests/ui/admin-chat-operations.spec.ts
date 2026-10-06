@@ -41,6 +41,7 @@ test.beforeAll(async () => {
 type Message = { id: number; sender_id: string; content: string; type: string; created_at: string; inquiry_id: number };
 async function fixture(page: Page, view: 'support' | 'phone' = 'support', options: { performance?: boolean; selected?: number } = {}) {
   const rows = Array.from({ length: 12 }, (_, n) => ({ id: n + 1, user_id: 'guest', type: 'admin_support', status: 'open',
+    canonical_activity_at: `2026-10-03T00:${String(59 - n).padStart(2, '0')}:00Z`, created_at: '2025-01-01T00:00:00Z',
     guest: { name: `고객 ${n + 1}` }, content: `문의 ${n + 1}`, updated_at: `2026-10-03T00:${String(59 - n).padStart(2, '0')}:00Z`,
     admin_unread_count: options.performance ? 0 : n === 0 ? 10 : n === 3 ? 1 : 0,
     needs_reply: options.performance ? false : n === 1 || n === 3, support_reopened_at: n === 2 || n === 3 ? '2026-10-02T15:01Z' : null,
@@ -180,7 +181,8 @@ test('keyboard A→B→A does not accept delayed prior A or stale loading owners
   await expect(page.getByTestId('admin-chat-messages-loading')).toBeVisible();
   await page.getByRole('button', { name: '다음 대화', exact: true }).focus();
   await page.keyboard.press('Alt+ArrowDown');
-  await expect(page).toHaveURL(/inquiryId=3$/);
+  // Pure recency puts inquiry 2 immediately after A; the historical priority fixture put 3 there.
+  await expect(page).toHaveURL(new RegExp(`inquiryId=${process.env.PHASE3A_BASELINE === '1' ? 3 : 2}$`));
   await expect(composer(page)).toBeEnabled();
   state.messages.set(1, [{ id: 101, inquiry_id: 1, sender_id: 'guest', content: '최신 A', type: 'text', created_at: '2026-10-03T00:00Z' }]);
   state.gates.delete(1);

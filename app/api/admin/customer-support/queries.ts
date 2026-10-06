@@ -39,7 +39,7 @@ export async function enrichPhoneRequests(db: SupabaseClient, rows: ProxyRequest
   const ids = [...new Set(rows.map(row => getProxyLinkedInquiryId(row.form_data)).filter((id): id is string => Boolean(id) && /^\d+$/.test(id!)))];
   const [profiles, inquiries, links, activities] = await Promise.all([
     db.from('profiles').select('id,full_name,email,avatar_url,phone').in('id', [...new Set(rows.map(row => row.user_id))]),
-    ids.length ? db.from('inquiries').select('id,user_id,type,inquiry_messages(sender_id,content,type,created_at,id)')
+    ids.length ? db.from('inquiries').select('id::text,user_id,type,inquiry_messages(sender_id,content,type,created_at,id)')
       .in('id', ids).or('type.is.null,type.in.(text,image)', { referencedTable: 'inquiry_messages' })
       .order('created_at', { referencedTable: 'inquiry_messages', ascending: false })
       .order('id', { referencedTable: 'inquiry_messages', ascending: false })
@@ -71,9 +71,29 @@ export async function enrichPhoneRequests(db: SupabaseClient, rows: ProxyRequest
       needs_reply: completedNeedsReply || cancelledNeedsReply,
       latest_sender_id: latest?.sender_id ?? null,
       latest_content: latest?.content ?? null,
-      latest_created_at: latest?.created_at ?? row.updated_at ?? row.created_at ?? null,
+      latest_created_at: latest?.created_at ?? row.created_at ?? null,
+      canonical_activity_at: latest?.created_at ?? row.created_at ?? null,
     };
   });
+}
+
+export type CanonicalRecencyRow = { id: string; canonical_activity_at: string | null };
+
+/** IN enrichment has no ordering guarantee. Restore the RPC's explicit order. */
+export function restoreCanonicalOrder<T extends { id: string | number }>(order: CanonicalRecencyRow[], rows: T[]) {
+  const byId = new Map(rows.map(row => [String(row.id), row]));
+  return order.flatMap(activity => {
+    const row = byId.get(activity.id);
+    return row ? [{ ...row, id: activity.id, canonical_activity_at: activity.canonical_activity_at }] : [];
+  });
+}
+
+export async function supportRecency(db: SupabaseClient, offset: number, status: string | null = null, inquiryIds: string[] | null = null) {
+  const { data, error } = await db.rpc('list_admin_support_recency', {
+    p_offset: offset, p_limit: BATCH, p_status: status, p_inquiry_ids: inquiryIds,
+  });
+  if (error) throw error;
+  return data as CanonicalRecencyRow[];
 }
 
 // Bound each DB read, but never truncate the searchable universe at 100 rows.

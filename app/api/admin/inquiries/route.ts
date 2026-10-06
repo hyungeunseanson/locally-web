@@ -15,7 +15,7 @@ import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { getAdminInquiryActivity } from '@/app/utils/adminInquiryActivity';
 import { getHostPublicProfile } from '@/app/utils/profile';
-import { filteredPage, linkedRequests, validLinkedRequest } from '../customer-support/queries';
+import { filteredPage, linkedRequests, validLinkedRequest, restoreCanonicalOrder, supportRecency } from '../customer-support/queries';
 
 // `useChat`에서 사용하던 Profile/HostApp 인터페이스
 type ProfileRow = {
@@ -52,6 +52,8 @@ type InquiryListRow = {
   status?: string | null;
   content?: string | null;
   updated_at?: string | null;
+  created_at?: string | null;
+  canonical_activity_at?: string | null;
   experiences?: InquiryExperienceRelation;
   inquiry_messages?: Array<{
     sender_id?: string | null;
@@ -96,7 +98,7 @@ export async function GET(request: Request) {
     }
     const offset = Math.max(0, Number.parseInt(params.get('offset') || '0', 10) || 0);
     const limit = Math.min(50, Math.max(1, Number.parseInt(params.get('limit') || '50', 10) || 50));
-    const columns = 'id, user_id, host_id, experience_id, type, status, content, updated_at, experiences (id, title, photos, image_url, host_id), inquiry_messages (sender_id, created_at)';
+    const columns = 'id::text, user_id, host_id, experience_id, type, status, content, created_at, updated_at, experiences (id, title, photos, image_url, host_id), inquiry_messages (sender_id, created_at)';
     let selected: InquiryListRow | null = null;
     let selection: { view: string; proxyRequestId?: string } | null = null;
     if (selectedId) {
@@ -106,23 +108,34 @@ export async function GET(request: Request) {
       if (error) throw error;
       if (!data) return NextResponse.json({ success: false, error: 'Inquiry not found' }, { status: 404 });
       selected = data as InquiryListRow;
+      if (isAdminSupportInquiry(selected.type)) {
+        selected = restoreCanonicalOrder(await supportRecency(supabaseAdmin, 0, null, [selectedId]), [selected])[0] ?? selected;
+      }
       const linked = validLinkedRequest(selected, await linkedRequests(supabaseAdmin, [String(selected.id)]));
       selection = linked ? { view: 'phone', proxyRequestId: linked.id }
         : { view: isAdminSupportInquiry(selected.type) ? 'support' : 'monitor' };
     }
     const page = params.get('resolveOnly') === 'true' ? { data: [], pagination: { offset, limit, hasMore: false } }
       : await filteredPage(async scan => {
-        let query = supabaseAdmin.from('inquiries').select(columns);
-        query = view === 'support' ? query.in('type', ['admin', 'admin_support'])
-          : query.or('type.is.null,type.not.in.(admin,admin_support)');
-        if (view === 'support' && status) {
-          query = status === 'open' ? query.or('status.is.null,status.eq.open') : query.eq('status', status);
+        let rows: InquiryListRow[];
+        if (view === 'support') {
+          const order = await supportRecency(supabaseAdmin, scan, status);
+          if (!order.length) return [];
+          const { data, error } = await supabaseAdmin.from('inquiries').select(columns).in('id', order.map(row => row.id))
+            .order('created_at', { referencedTable: 'inquiry_messages', ascending: false })
+            .limit(1, { referencedTable: 'inquiry_messages' });
+          if (error) throw error;
+          rows = restoreCanonicalOrder(order, data as InquiryListRow[]);
+        } else {
+          // Monitor global pagination hardening remains outside Phase A.
+          const { data, error } = await supabaseAdmin.from('inquiries').select(columns)
+            .or('type.is.null,type.not.in.(admin,admin_support)')
+            .order('updated_at', { ascending: false }).order('id', { ascending: false })
+            .order('created_at', { referencedTable: 'inquiry_messages', ascending: false })
+            .limit(1, { referencedTable: 'inquiry_messages' }).range(scan, scan + 99);
+          if (error) throw error;
+          rows = data as InquiryListRow[];
         }
-        const { data, error } = await query.order('updated_at', { ascending: false }).order('id', { ascending: false })
-          .order('created_at', { referencedTable: 'inquiry_messages', ascending: false })
-          .limit(1, { referencedTable: 'inquiry_messages' }).range(scan, scan + 99);
-        if (error) throw error;
-        const rows = data as InquiryListRow[];
         const ids = rows.map(row => String(row.id));
         const [links, activities] = await Promise.all([
           view === 'support' ? linkedRequests(supabaseAdmin, ids) : Promise.resolve([]),

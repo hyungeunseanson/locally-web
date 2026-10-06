@@ -6,7 +6,7 @@ import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import type { ProxyRequest } from '@/app/types/proxy';
 import { getProxyRequestTitle } from '@/app/utils/proxyBooking';
 import { matchesPhoneFilter, PHONE_FILTER_LABELS, type PhoneFilter } from '@/app/utils/phoneReservationWorkspace';
-import { enrichPhoneRequests, filteredPage, FORMAL_PROXY_FILTER, PROXY_SELECT } from './queries';
+import { enrichPhoneRequests, filteredPage, FORMAL_PROXY_FILTER, PROXY_SELECT, restoreCanonicalOrder, type CanonicalRecencyRow } from './queries';
 
 export async function GET(request: Request) {
   try {
@@ -34,10 +34,14 @@ export async function GET(request: Request) {
     const offset = Math.max(0, Number.parseInt(params.get('offset') || '0', 10) || 0);
     const limit = Math.min(50, Math.max(1, Number.parseInt(params.get('limit') || '10', 10) || 10));
     const page = await filteredPage(async scan => {
+      const { data: order, error: orderError } = await db.rpc('list_admin_phone_recency', { p_offset: scan, p_limit: 100 });
+      if (orderError) throw orderError;
+      if (!order.length) return [];
       const { data, error } = await db.from('proxy_requests').select(PROXY_SELECT).or(FORMAL_PROXY_FILTER)
-        .order('created_at', { ascending: false }).order('id', { ascending: false }).range(scan, scan + 99);
+        .in('id', (order as CanonicalRecencyRow[]).map(row => row.id));
       if (error) throw error;
-      return enrichPhoneRequests(db, data as ProxyRequest[]);
+      return restoreCanonicalOrder(order, await enrichPhoneRequests(db, data as ProxyRequest[]))
+        .map(row => ({ ...row, latest_created_at: row.canonical_activity_at }));
     }, row => matchesPhoneFilter(row, filter) && matchesChatOperations(row, operations) && (!q || [row.id, row.locally_order_id, row.profiles?.full_name,
       row.profiles?.email, row.form_data.contact_name, row.form_data.reservation_name, getProxyRequestTitle(row)]
       .some(value => String(value || '').toLocaleLowerCase().includes(q))), offset, limit);
