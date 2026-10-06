@@ -199,17 +199,18 @@ async function processExperienceNotification(params: {
       return buildNotificationOkResponse();
     }
 
-    if (isSoloRefundNotificationForBooking({ notification, booking })) {
+    const expectedMerchantId = String(process.env.NICEPAY_MID || '').trim();
+    if (isSoloRefundNotificationForBooking({ notification, booking, expectedMerchantId })) {
       const { data: operation, error: operationError } = await supabaseAdmin
         .from('booking_solo_refund_operations')
-        .select('booking_id, provider, payment_method, transaction_reference, order_reference, requested_amount, outcome, settlement_applied_at')
+        .select('booking_id, provider, payment_method, transaction_reference, merchant_reference, order_reference, requested_amount, outcome, settlement_applied_at')
         .eq('booking_id', booking.id)
         .maybeSingle();
 
       if (operationError) {
         throw new Error('Solo refund operation evidence lookup failed.');
       }
-      if (isMatchingAppliedSoloNicePayRefund({ notification, booking, operation })) {
+      if (isMatchingAppliedSoloNicePayRefund({ notification, booking, operation, expectedMerchantId })) {
         return buildNotificationOkResponse();
       }
     }

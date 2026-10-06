@@ -60,11 +60,12 @@ const booking = {
 };
 const operation = {
   booking_id: booking.id, provider: 'nicepay', payment_method: 'card',
+  merchant_reference: 'nictest00m',
   transaction_reference: booking.tid, order_reference: 'solo-synthetic-attempt',
   requested_amount: 38000, outcome: 'accepted', settlement_applied_at: '2026-10-06T00:00:00Z',
 };
 const payload = {
-  MOID: booking.order_id, TID: booking.tid, CancelMOID: operation.order_reference,
+  MOID: booking.order_id, TID: booking.tid, CancelMOID: operation.order_reference, MID: 'nictest00m',
   Amt: '38000', StateCd: '2', ResultCode: '2001', PayMethod: 'CARD',
 };
 
@@ -169,9 +170,48 @@ test('duplicate post-cancel notifications are read-only and idempotently return 
   assert.equal(f.calls.reads.filter(q => q.table === 'booking_solo_refund_operations').length, 3);
 });
 
+for (const json of [false, true]) {
+  test(`distinct post-cancel TID is not compared to the stored original payment TID (${json ? 'JSON' : 'form'})`, async () => {
+    const f = fixture(); const before = structuredClone(f.rows);
+    const fields = { ...payload, TID: 'DISTINCT-CANCELLATION-TID' };
+    assert.notEqual(fields.TID, booking.tid);
+    assert.equal(operation.transaction_reference, booking.tid);
+    for (let i = 0; i < 2; i++) await assertOk(await f.post(request(fields, json)));
+    assert.deepEqual(f.rows, before);
+    assertReadOnly(f);
+    assert.equal(f.calls.reads.filter(q => q.table === 'booking_solo_refund_operations').length, 2);
+  });
+}
+
+test('unconfigured MID never acknowledges a Solo refund', async () => {
+  const savedMid = process.env.NICEPAY_MID;
+  delete process.env.NICEPAY_MID;
+  try {
+    const f = fixture();
+    const response = await f.post(request());
+    assert.equal(response.status, 409);
+    assertReadOnly(f);
+  } finally { process.env.NICEPAY_MID = savedMid; }
+});
+
+test('distinct cancellation TID never repairs an unknown, unapplied provider outcome', async () => {
+  const f = fixture({ rows: {
+    bookings: [{ ...booking, refund_amount: 0, solo_guarantee_refund_amount: 0, solo_guarantee_refund_status: 'unknown' }],
+    booking_solo_refund_operations: [{ ...operation, outcome: 'unknown', settlement_applied_at: null }],
+  } });
+  const before = structuredClone(f.rows);
+  const response = await f.post(request({ ...payload, TID: 'DISTINCT-CANCELLATION-TID' }));
+  assert.equal(response.status, 409);
+  assert.deepEqual(f.rows, before);
+  assertReadOnly(f);
+});
+
 const rejected = [
   ['notification amount mismatch', { fields: { Amt: '37999' } }],
-  ['notification TID mismatch', { fields: { TID: 'UNRELATED-TID' } }],
+  ['notification MID mismatch', { fields: { MID: 'OTHER-MID' } }],
+  ['missing notification MID', { omit: 'MID' }],
+  ['operation MID mismatch', { op: { merchant_reference: 'OTHER-MID' } }],
+  ['missing operation MID', { op: { merchant_reference: null } }],
   ['CancelMOID mismatch', { fields: { CancelMOID: 'solo-another-attempt' } }],
   ['missing CancelMOID', { omit: 'CancelMOID' }],
   ['settlement unapplied', { op: { settlement_applied_at: null } }],
@@ -187,7 +227,6 @@ const rejected = [
   ['non-CARD notification', { fields: { PayMethod: 'VBANK' } }],
   ['missing official original MOID with generic orderId', { fields: { orderId: booking.order_id }, omit: 'MOID' }],
   ['wrong original MOID masked by generic orderId', { fields: { orderId: booking.order_id, MOID: 'WRONG-ORIGINAL-MOID' } }],
-  ['wrong official TID masked by generic imp_uid', { fields: { TID: 'WRONG-OFFICIAL-TID', imp_uid: booking.tid } }],
   ['wrong official Amt masked by generic amount', { fields: { Amt: '37999', amount: '38000' } }],
   ['zero notification amount', { fields: { Amt: '0' } }],
 ];

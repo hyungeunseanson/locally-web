@@ -14,6 +14,7 @@ type SoloRefundNotificationOperation = {
   provider: string;
   payment_method: string;
   transaction_reference: string | null;
+  merchant_reference: string | null;
   order_reference: string;
   requested_amount: number;
   outcome: string;
@@ -23,8 +24,9 @@ type SoloRefundNotificationOperation = {
 export function isSoloRefundNotificationForBooking(params: {
   notification: CardPaymentNotificationEnvelope;
   booking: SoloRefundBooking;
+  expectedMerchantId: string;
 }) {
-  const { notification, booking } = params;
+  const { notification, booking, expectedMerchantId } = params;
   const bookingOrder = booking.order_id || booking.id;
 
   return (
@@ -37,11 +39,11 @@ export function isSoloRefundNotificationForBooking(params: {
     Boolean(booking.id && bookingOrder && booking.tid) &&
     notification.orderId === bookingOrder &&
     notification.originalOrderId === bookingOrder &&
-    // Generic aliases must not mask a conflicting official NICEPAY TID/Amt.
-    notification.payload.TID === booking.tid &&
-    notification.providerTransactionId === booking.tid &&
+    Boolean(expectedMerchantId) &&
+    notification.payload.MID === expectedMerchantId &&
     Boolean(notification.cancelOrderId) &&
     notification.amount != null &&
+    // Generic aliases must not mask a conflicting official NICEPAY Amt.
     /^\d+$/.test(notification.payload.Amt || '') &&
     Number(notification.payload.Amt) === notification.amount &&
     Number.isSafeInteger(notification.amount) &&
@@ -55,16 +57,20 @@ export function isMatchingAppliedSoloNicePayRefund(params: {
   notification: CardPaymentNotificationEnvelope;
   booking: SoloRefundBooking;
   operation: SoloRefundNotificationOperation | null;
+  expectedMerchantId: string;
 }) {
-  const { notification, booking, operation } = params;
+  const { notification, booking, operation, expectedMerchantId } = params;
   if (!operation || !isSoloRefundNotificationForBooking(params)) return false;
 
   return (
     operation.booking_id === booking.id &&
     operation.provider === 'nicepay' &&
     operation.payment_method === 'card' &&
+    operation.merchant_reference === expectedMerchantId &&
+    // These stored references bind the operation to its original payment.
+    // A post-cancel notification TID may identify a distinct cancellation;
+    // correlate the notification through original MOID + CancelMOID + Amt.
     operation.transaction_reference === booking.tid &&
-    operation.transaction_reference === notification.providerTransactionId &&
     operation.order_reference === notification.cancelOrderId &&
     operation.requested_amount === notification.amount &&
     operation.outcome === 'accepted' &&
