@@ -224,12 +224,13 @@ test.describe('P0 Storage and SECURITY DEFINER migration', () => {
     expect(normalizedMigration).not.toMatch(/CREATE\s+(?:OR\s+REPLACE\s+)?VIEW/i);
   });
 
-  test('enforces upload ownership through the managed avatar endpoint and legacy browser namespaces', () => {
+  test('enforces upload ownership through managed Avatar/Host endpoints and owned legacy namespaces', () => {
     const account = readFileSync('app/account/page.tsx', 'utf8');
     const mobile = readFileSync('app/components/mobile/MobileProfileView.tsx', 'utf8');
     const avatarHandler = readFileSync('app/utils/avatarUploadHandler.ts', 'utf8');
     const hostRegistration = readFileSync('app/host/register/page.tsx', 'utf8');
     const hostEditor = readFileSync('app/host/dashboard/components/ProfileEditor.tsx', 'utf8');
+    const hostHandler = readFileSync('app/utils/hostProfileUploadHandler.ts', 'utf8');
     const community = readFileSync('app/community/write/PostEditor.tsx', 'utf8');
     for (const client of [account, mobile]) {
       expect(client).toContain('await uploadProfileAvatar(compressedFile)');
@@ -238,8 +239,18 @@ test.describe('P0 Storage and SECURITY DEFINER migration', () => {
     expect(avatarHandler).toContain('supabase.auth.getUser()');
     expect(avatarHandler).toContain('profile.id !== user.id');
     expect(avatarHandler).toContain('`${user.id}/${crypto.randomUUID()}.${extension}`');
-    expect(hostRegistration).toContain('`profile/${user.id}_${Date.now()}`');
-    expect(hostEditor).toContain('`profile/${user.id}_${Date.now()}`');
+    for (const [client, input] of [[hostRegistration, 'compressedProfile'], [hostEditor, 'compressedFile']]) {
+      expect(client).toContain(`await uploadHostProfilePhoto(${input})`);
+      expect(client).not.toContain("storage.from('images')");
+      expect(client).not.toContain('uploadProfileAvatar');
+    }
+    expect(hostHandler).toContain('client.auth.getUser()');
+    expect(hostHandler).toContain('owned.data?.id!==user.id');
+    expect(hostHandler).toContain('actorId:user.id,ownerId:user.id');
+    expect(hostHandler).toContain('env!.PUBLIC_HOST_PROFILE_SOURCE_R2!');
+    expect(hostHandler).not.toContain('PUBLIC_AVATAR_R2');
+    expect(hostHandler).not.toContain('PUBLIC_EXPERIENCE');
+    expect(hostHandler).toContain('`profile/${user.id}_${Date.now()}`');
     expect(community).toContain('`community/${user.id}/${Date.now()}-${fileName}`');
   });
 });
