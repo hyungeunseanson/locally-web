@@ -51,6 +51,7 @@ const nextConfig: NextConfig = {
     qualities: [65, 75],
     minimumCacheTTL: 86400,
     remotePatterns: [
+      { protocol: 'https', hostname: 'community-media.locally-travel.com', pathname: '/community/v1/**', search: '' },
       { protocol: 'https', hostname: 'host-profile-media.locally-travel.com', pathname: '/host-profiles/v1/**', search: '' },
       {
         protocol: 'https',

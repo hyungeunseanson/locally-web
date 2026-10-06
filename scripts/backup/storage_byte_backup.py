@@ -38,12 +38,15 @@ MULTI_MANIFEST_SCHEMA = "locally.authoritative-storage-snapshot.v2"
 R2_SOURCE_BUCKET = "locally-public-experience-canary"
 R2_AVATAR_SOURCE_BUCKET = "locally-public-avatars"
 R2_HOST_PROFILE_SOURCE_BUCKET = "locally-public-host-profile-originals"
+R2_COMMUNITY_SOURCE_BUCKET = "locally-public-community-originals"
 
 def r2_source_prefixes(bucket):
     if bucket == R2_AVATAR_SOURCE_BUCKET:
         return ("avatars/v1/",)
     if bucket == R2_HOST_PROFILE_SOURCE_BUCKET:
         return ("host-profiles/v1/",)
+    if bucket == R2_COMMUNITY_SOURCE_BUCKET:
+        return ("community/v1/",)
     return ("originals/", "sources/")
 
 BUCKETS = (
@@ -470,7 +473,7 @@ def validate_object_entry(entry: Mapping[str, Any], prepared: bool) -> None:
     bucket = entry.get("bucket")
     key = entry.get("key")
     provider = entry.get("provider", "supabase")
-    valid_bucket = (provider == "supabase" and bucket in BUCKETS) or (provider == "r2" and bucket in {R2_SOURCE_BUCKET, R2_AVATAR_SOURCE_BUCKET, R2_HOST_PROFILE_SOURCE_BUCKET})
+    valid_bucket = (provider == "supabase" and bucket in BUCKETS) or (provider == "r2" and bucket in {R2_SOURCE_BUCKET, R2_AVATAR_SOURCE_BUCKET, R2_HOST_PROFILE_SOURCE_BUCKET, R2_COMMUNITY_SOURCE_BUCKET})
     if not valid_bucket or not isinstance(key, str) or not key or "\x00" in key:
         raise ValidationError("invalid source object identity")
     key_path = pathlib.PurePosixPath(key)
@@ -896,6 +899,10 @@ def walk_string_leaves(value: Any, path: str = "$"):
 
 def source_locator(value: str, field: str = "") -> Optional[Tuple[str, str, str]]:
     parsed = urllib.parse.urlsplit(value)
+    if parsed.scheme == "https" and parsed.netloc == "community-media.locally-travel.com" and not parsed.query and not parsed.fragment:
+        key = parsed.path.lstrip("/")
+        if re.fullmatch(r"community/v1/[a-f0-9]{64}/[a-f0-9-]{36}/image", key):
+            return "r2", R2_COMMUNITY_SOURCE_BUCKET, key
     if parsed.scheme == "https" and parsed.netloc == "host-profile-media.locally-travel.com" and not parsed.query and not parsed.fragment:
         key = parsed.path.lstrip("/")
         if re.fullmatch(r"host-profiles/v1/[a-f0-9]{64}/[a-f0-9-]{36}/profile", key):
@@ -923,7 +930,7 @@ def source_locator(value: str, field: str = "") -> Optional[Tuple[str, str, str]
     return None
 
 
-def database_references(source: SupabaseStorageSource, include_managed_assets: bool = False, include_host_auth: bool = False) -> Dict[Tuple[str, str, str], List[Dict[str, Any]]]:
+def database_references(source: SupabaseStorageSource, include_managed_assets: bool = False, include_host_auth: bool = False, include_community_lifecycle: bool = False) -> Dict[Tuple[str, str, str], List[Dict[str, Any]]]:
     """Capture only locator associations, never entire business rows in a manifest."""
     tables = {
         "experiences": "id,host_id,photos,image_url,itinerary,itinerary_i18n",
@@ -984,6 +991,21 @@ def database_references(source: SupabaseStorageSource, include_managed_assets: b
             if not location or row.get("kind") != "auth_legacy_host" or row.get("id") != row.get("owner"):
                 raise ValidationError("host Auth association invalid")
             refs.setdefault(location, []).append({"relation":"auth.users", "rowId":row["id"], "field":"raw_user_meta_data.avatar_url", "jsonPath":"$.avatar_url", "locator":row["locator"]})
+    if include_community_lifecycle:
+        if not include_managed_assets:
+            raise ValidationError("community lifecycle capture requires managed asset associations")
+        with source._request("POST", "/rest/v1/rpc/community_media_backup_contract", b"{}") as response:
+            contract = json.load(response)
+        if not isinstance(contract, dict) or any(not isinstance(contract.get(k), list) for k in ("assets", "references", "journal", "posts")) or not isinstance(contract.get("legacyWritesFrozen"), bool) or len(contract["assets"]) > 10000:
+            raise ValidationError("community lifecycle association unavailable")
+        for asset in contract["assets"]:
+            location = source_locator(asset.get("public_url", ""))
+            if not location or location[:2] != ("r2", R2_COMMUNITY_SOURCE_BUCKET) or asset.get("business_scope") != "community" or location[2] != asset.get("object_key"):
+                raise ValidationError("community lifecycle identity invalid")
+            rows = [r for r in contract["references"] if r.get("asset_id") == asset["id"]]
+            parent_ids = {r.get("parent_id") for r in rows}
+            refs.setdefault(location, []).append({"relation":"community_media_lifecycle", "rowId":asset["id"], "field":"contract", "jsonPath":"$", "locator":asset["public_url"], "optionalPending":asset["state"]=="pending",
+                "contract":{"asset":asset, "references":rows, "journal":[j for j in contract["journal"] if j.get("asset_id")==asset["id"]], "posts":[p for p in contract["posts"] if p.get("id") in parent_ids], "legacyWritesFrozen":contract["legacyWritesFrozen"]}})
     for values in refs.values():
         values.sort(key=lambda value: canonical_json(value))
     return refs
@@ -992,7 +1014,7 @@ def database_references(source: SupabaseStorageSource, include_managed_assets: b
 class R2StorageSource:
     """Read-only original adapter. Deliberately has no PUT/COPY/DELETE method."""
     def __init__(self, client: Any, bucket: str = R2_SOURCE_BUCKET, timeout: float = 30.0, diagnostics=None):
-        if bucket not in {R2_SOURCE_BUCKET, R2_AVATAR_SOURCE_BUCKET, R2_HOST_PROFILE_SOURCE_BUCKET}:
+        if bucket not in {R2_SOURCE_BUCKET, R2_AVATAR_SOURCE_BUCKET, R2_HOST_PROFILE_SOURCE_BUCKET, R2_COMMUNITY_SOURCE_BUCKET}:
             raise ValidationError("unexpected R2 source bucket")
         self.client, self.bucket, self.timeout = client, bucket, timeout
         self.diagnostics = diagnostics
@@ -1104,23 +1126,26 @@ class R2StorageSource:
 
 
 class MultiStorageSource:
-    def __init__(self, supabase: SupabaseStorageSource, r2: R2StorageSource, reference_reader=database_references, diagnostics=None, avatar=None, host_profile=None):
+    def __init__(self, supabase: SupabaseStorageSource, r2: R2StorageSource, reference_reader=database_references, diagnostics=None, avatar=None, host_profile=None, community=None):
         self.supabase, self.r2, self.reference_reader = supabase, r2, reference_reader
         self.diagnostics = diagnostics
         self.avatar = avatar
         self.host_profile = host_profile
+        self.community = community
 
     def inventory(self) -> List[Dict[str, Any]]:
         if self.diagnostics:
             self.diagnostics.inventory_at("supabase", "database_locator_get")
         refs = self.reference_reader(self.supabase)
         r2_buckets = {bucket for provider, bucket, _ in refs if provider == "r2"}
-        if r2_buckets - {R2_SOURCE_BUCKET, R2_AVATAR_SOURCE_BUCKET, R2_HOST_PROFILE_SOURCE_BUCKET}:
+        if r2_buckets - {R2_SOURCE_BUCKET, R2_AVATAR_SOURCE_BUCKET, R2_HOST_PROFILE_SOURCE_BUCKET, R2_COMMUNITY_SOURCE_BUCKET}:
             raise ValidationError("unexpected R2 source authority")
         if R2_AVATAR_SOURCE_BUCKET in r2_buckets and self.avatar is None:
             raise ValidationError("missing separate read-only avatar source credential")
         if R2_HOST_PROFILE_SOURCE_BUCKET in r2_buckets and self.host_profile is None:
             raise ValidationError("missing separate read-only host profile source credential")
+        if R2_COMMUNITY_SOURCE_BUCKET in r2_buckets and self.community is None:
+            raise ValidationError("missing separate read-only community source credential")
         entries = []
         for old in self.supabase.inventory():
             entry = dict(old, provider="supabase", authority="recoverable-source", **self.supabase.restore_metadata(old))
@@ -1133,13 +1158,15 @@ class MultiStorageSource:
             entries.extend(self.avatar.inventory({location: associations for location, associations in refs.items() if location[0] == "r2" and location[1] == R2_AVATAR_SOURCE_BUCKET}))
         if self.host_profile is not None:
             entries.extend(self.host_profile.inventory({location: associations for location, associations in refs.items() if location[0] == "r2" and location[1] == R2_HOST_PROFILE_SOURCE_BUCKET}))
+        if self.community is not None:
+            entries.extend(self.community.inventory({location: associations for location, associations in refs.items() if location[0] == "r2" and location[1] == R2_COMMUNITY_SOURCE_BUCKET}))
         return sorted(entries, key=lambda item: (item["provider"], item["bucket"], item["key"]))
 
     def download(self, entry: Mapping[str, Any], destination: pathlib.Path, budget: TransferBudget):
         provider = entry.get("provider")
         if provider not in {"supabase", "r2"}:
             raise ValidationError("unknown source provider")
-        adapter = self.supabase if provider == "supabase" else self.avatar if entry["bucket"] == R2_AVATAR_SOURCE_BUCKET else self.host_profile if entry["bucket"] == R2_HOST_PROFILE_SOURCE_BUCKET else self.r2
+        adapter = self.supabase if provider == "supabase" else self.avatar if entry["bucket"] == R2_AVATAR_SOURCE_BUCKET else self.host_profile if entry["bucket"] == R2_HOST_PROFILE_SOURCE_BUCKET else self.community if entry["bucket"] == R2_COMMUNITY_SOURCE_BUCKET else self.r2
         if adapter is None:
             raise ValidationError("missing dedicated source reader")
         return adapter.download(entry, destination, budget)
@@ -1890,8 +1917,18 @@ def source_from_env(args: argparse.Namespace):
             aws_secret_access_key=host_secret, region_name="auto", config=Config(signature_version="s3v4", connect_timeout=10,
             read_timeout=args.timeout, retries={"total_max_attempts": 1, "mode": "standard"}))
         host_profile = R2StorageSource(host_client, bucket=R2_HOST_PROFILE_SOURCE_BUCKET, timeout=args.timeout, diagnostics=diagnostics)
+    community_access = os.environ.get("R2_COMMUNITY_SOURCE_READ_ACCESS_KEY_ID")
+    community_secret = os.environ.get("R2_COMMUNITY_SOURCE_READ_SECRET_ACCESS_KEY")
+    community = None
+    if community_access or community_secret:
+        if not community_access or not community_secret or community_access in {access, avatar_access, host_access, os.environ.get("AWS_ACCESS_KEY_ID"), os.environ.get("COMMUNITY_R2_ACCESS_KEY_ID")} or community_secret in {secret, avatar_secret, host_secret, os.environ.get("AWS_SECRET_ACCESS_KEY"), os.environ.get("COMMUNITY_R2_SECRET_ACCESS_KEY")}:
+            raise BackupError("community source credential must be complete and separate")
+        community_client = boto3.client("s3", endpoint_url=os.environ.get("R2_ENDPOINT"), aws_access_key_id=community_access,
+            aws_secret_access_key=community_secret, region_name="auto", config=Config(signature_version="s3v4", connect_timeout=10,
+            read_timeout=args.timeout, retries={"total_max_attempts": 1, "mode": "standard"}))
+        community = R2StorageSource(community_client, bucket=R2_COMMUNITY_SOURCE_BUCKET, timeout=args.timeout, diagnostics=diagnostics)
     return MultiStorageSource(source, R2StorageSource(client, timeout=args.timeout, diagnostics=diagnostics),
-                              reference_reader=lambda reader: database_references(reader, include_managed, host_profile is not None), diagnostics=diagnostics, avatar=avatar, host_profile=host_profile)
+                              reference_reader=lambda reader: database_references(reader, include_managed, host_profile is not None, community is not None), diagnostics=diagnostics, avatar=avatar, host_profile=host_profile, community=community)
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
