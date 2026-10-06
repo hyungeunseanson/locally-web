@@ -36,7 +36,7 @@ function exact(label, actual, expected) {
   }
 }
 
-exact('applied private tables', required.applicationPrivateTables, ["private.admin_monitor_cutover", "private.host_profile_auth_cas", "private.host_profile_operation_context", "private.host_profile_source_authority", "private.phone_followup_tasks"]);
+exact('applied private tables', required.applicationPrivateTables, ["private.admin_monitor_cutover", "private.community_media_authority", "private.community_media_context", "private.community_media_plan_receipts", "private.host_profile_auth_cas", "private.host_profile_operation_context", "private.host_profile_source_authority", "private.phone_followup_tasks"]);
 if ('pendingPrivateTables' in required || 'pendingApplicationFunctions' in required) fail('applied attention objects remain pending');
 if (!attentionTargetContract.includes('BEGIN READ ONLY;') || !attentionTargetContract.trimEnd().endsWith('ROLLBACK;')
   || !attentionTargetContract.includes('ADMIN_ATTENTION_TARGET_CONTRACT_PASS')
@@ -73,11 +73,10 @@ const expectedAppliedOrder = [
   'supabase/migrations/20261005082309_avatar_media_authority.sql',
   'supabase/migrations/20261005104924_solo_guarantee_financial_authority.sql',
   'supabase/migrations/20261006013755_host_profile_media_authority.sql',
-];
-const expectedPendingOrder = [
   'supabase/migrations/20261006105322_community_media_authority.sql',
   'supabase/migrations/20261006133015_admin_chat_canonical_recency.sql',
 ];
+const expectedPendingOrder = [];
 const expectedApplyOrder = [...expectedAppliedOrder];
 exact('fresh-project apply order', required.freshProjectApplyOrder, expectedApplyOrder);
 exact(
@@ -90,7 +89,7 @@ const migrationFiles = (await readdir(resolve(root, 'supabase/migrations')))
   .filter((name) => name.endsWith('.sql'))
   .sort()
   .map((name) => `supabase/migrations/${name}`);
-exact('ordered repository migrations', migrationFiles, [...expectedAppliedOrder, ...expectedPendingOrder]);
+exact('ordered repository migrations', migrationFiles, [...expectedAppliedOrder, ...expectedPendingOrder].sort());
 exact(
   'manifest repository migrations',
   current.migrationLedger.map((entry) => entry.repositoryFile),
@@ -157,7 +156,7 @@ for (const [name, fingerprint] of Object.entries({
   storagePolicies: '898e8b7f917fd0f4530ef30c9b61961e',
   publicRlsPolicies: 'e5a16a4215c569060fbf895453a5cd00',
   publicRelationGrants: '23a636eb7731f130f48aaeceb415c8cf',
-  privateRelationGrants: 'ee6e712c55f00b284ed8a988b04b163d',
+  privateRelationGrants: '5c6eec1ba4930757fff2e15e64d79d30',
 })) {
   if (current.securityFingerprints[name] !== fingerprint || !currentContract.includes(fingerprint)) {
     fail(`current-state security fingerprint differs: ${name}`);
@@ -187,3 +186,12 @@ console.log(JSON.stringify({
   activeConciergeFunctionCount: required.activeConcierge.functions.length,
   result: 'LOCALLY_STAGING_BOOTSTRAP_CONTRACT_PASS',
 }, null, 2));
+
+const recencyAssertions = currentContract.match(/DO \$admin_chat_recency_catalog_contract\$[\s\S]*?\$admin_chat_recency_catalog_contract\$;/)?.[0];
+if (!recencyAssertions || !schemaContract.includes(recencyAssertions)
+  || schemaContract.includes('$admin_chat_recency_ledger_contract$')) {
+  fail('fresh staging must share Recency catalog security without Production ledger assertions');
+}
+
+const communityAssertions = currentContract.match(/DO \$community_authority_catalog_contract\$[\s\S]*?\$community_authority_catalog_contract\$;/)?.[0];
+if (!communityAssertions || !schemaContract.includes(communityAssertions) || schemaContract.includes("$community_authority_production_contract$")) fail("Community staging/catalog separation differs");

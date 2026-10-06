@@ -13,7 +13,7 @@ const expectedFingerprints = {
   storagePolicies: '898e8b7f917fd0f4530ef30c9b61961e',
   publicRlsPolicies: 'e5a16a4215c569060fbf895453a5cd00',
   publicRelationGrants: '23a636eb7731f130f48aaeceb415c8cf',
-  privateRelationGrants: 'ee6e712c55f00b284ed8a988b04b163d',
+  privateRelationGrants: '5c6eec1ba4930757fff2e15e64d79d30',
   stagingOverlayBaselineStoragePolicies: 'd6b381fd629405acfdd615593031de5c',
   stagingOverlayTargetStorageBuckets: 'c3ff5767c8e4934ae05b3d96550441c8',
   stagingOverlayTargetStoragePolicies: '38c973a52a0bebe8fa78b3f53089e427',
@@ -213,20 +213,21 @@ expectedLedger.push({
   "repositorySha256": "913d253b2853fa2581fb886cfd2279db147bb84f5b5b55c7dc12386fa49220d8",
   "repositoryVersion": "20261006013755"
 });
-const expectedPendingMigrations = [
-  {
-    "version": "20261006105322",
-    "name": "community_media_authority",
-    "repositoryFile": "supabase/migrations/20261006105322_community_media_authority.sql",
-    "repositorySha256": "55ac4184288d9213e31b4f40de928d7ccfd4c02765db90c0d2d7f8858c597912"
-  },
-  {
-    "version": "20261006133015",
-    "name": "admin_chat_canonical_recency",
-    "repositoryFile": "supabase/migrations/20261006133015_admin_chat_canonical_recency.sql",
-    "repositorySha256": "e2a79488d8b24a5d923f9247d5331eb2f9de95436a6ec790bf81981c00d8a889"
-  }
-];
+expectedLedger.push({
+  "version": "20261006133015",
+  "name": "admin_chat_canonical_recency",
+  "repositoryFile": "supabase/migrations/20261006133015_admin_chat_canonical_recency.sql",
+  "repositorySha256": "e2a79488d8b24a5d923f9247d5331eb2f9de95436a6ec790bf81981c00d8a889",
+  "repositoryVersion": "20261006133015"
+});
+expectedLedger.splice(-1, 0, {
+  "version": "20261006105322",
+  "name": "community_media_authority",
+  "repositoryFile": "supabase/migrations/20261006105322_community_media_authority.sql",
+  "repositorySha256": "55ac4184288d9213e31b4f40de928d7ccfd4c02765db90c0d2d7f8858c597912",
+  "repositoryVersion": "20261006105322"
+});
+const expectedPendingMigrations = [];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));
 for (const [index, expected] of expectedLedger.entries()) {
   const actual = manifest.migrationLedger[index];
@@ -275,8 +276,8 @@ assert(JSON.stringify(manifest.pendingProductionMigrations) === JSON.stringify(e
 assert(manifest.source.captureSql === 'supabase/staging/production-current-state.capture.sql'
   && manifest.source.postgresMajor === 17 && manifest.source.containsRows === false
   && manifest.source.containsStorageObjects === false, 'read-only capture provenance differs');
-assert((capture.match(/^BEGIN TRANSACTION READ ONLY;$/gm) ?? []).length === 5
-  && (capture.match(/^ROLLBACK;$/gm) ?? []).length === 5
+assert((capture.match(/^BEGIN TRANSACTION READ ONLY;$/gm) ?? []).length === 7
+  && (capture.match(/^ROLLBACK;$/gm) ?? []).length === 7
   && !/^\s*(?:INSERT\s+INTO|UPDATE\s+|DELETE\s+FROM|ALTER\s+|CREATE\s+|DROP\s+|TRUNCATE\s+)/gim.test(capture),
   'current-state capture must use only read-only transactions');
 assert(JSON.stringify(manifest.selectiveProductionRollout) === JSON.stringify(required.selectiveProductionRollout)
@@ -341,6 +342,36 @@ assert(hostLedger.version === '20261006013755' && hostLedger.statementCount === 
   && hostLedger.statementsSha256 === expectedLedger.find(x => x.version === hostLedger.version).repositorySha256
   && contract.includes(`${hostLedger.version}:${hostLedger.name}:1:${hostLedger.statementsMd5}:${hostLedger.statementsSha256}`),
   'Host ledger evidence differs');
+const recency = manifest.adminChatRecency;
+assert(recency.functions.length === 2 && recency.indexes.length === 1
+  && recency.maximumBatch === 100 && recency.existingFunctionsPreserved === 124
+  && recency.productionBusinessWrites === 0
+  && JSON.stringify(recency.publicRpcExecuteRoles) === JSON.stringify(['service_role']), 'Recency capture metadata differs');
+assert(contract.includes('$admin_chat_recency_catalog_contract$')
+  && contract.includes('$admin_chat_recency_ledger_contract$'), 'Recency current-state assertions missing');
+for (const fn of recency.functions) {
+  assert(fn.owner === 'postgres' && fn.securityDefiner === false && fn.volatility === 's'
+    && JSON.stringify(fn.configuration) === JSON.stringify(['search_path=""'])
+    && fn.acl === '{postgres=X/postgres,service_role=X/postgres}', 'Recency RPC security differs');
+  assert(contract.includes([fn.identity,fn.owner,fn.securityDefiner,fn.volatility,fn.result,
+    fn.configuration.join(','),fn.acl,fn.bodyMd5].join('|').replaceAll("'", "''")), 'Recency function evidence missing');
+  assert(manifest.objects.functionOverloads.includes(fn.identity), 'Recency overload missing');
+}
+const recencyIndex = recency.indexes[0];
+assert(recencyIndex.valid && recencyIndex.ready && !recencyIndex.unique && !recencyIndex.primary
+  && recencyIndex.name === 'admin_chat_visible_message_recency'
+  && contract.includes(recencyIndex.definition.replaceAll("'", "''"))
+  && contract.includes(recencyIndex.predicate.replaceAll("'", "''")), 'Recency index evidence differs');
+const recencyLedger = recency.ledgerEvidence[0];
+assert(recencyLedger.version === '20261006133015' && recencyLedger.statementCount === 1
+  && recencyLedger.statementsSha256 === expectedLedger.at(-1).repositorySha256
+  && contract.includes(`${recencyLedger.version}:${recencyLedger.name}:1:${recencyLedger.statementsMd5}:${recencyLedger.statementsSha256}`), 'Recency ledger evidence differs');
+const community = manifest.appliedCommunityAuthority;
+assert(community.functions.length === 18 && community.tables.length === 3 && community.columns.length === 11
+  && community.triggers.length === 7 && community.constraints.length === 7 && community.indexes.length === 3
+  && community.productionWrites === 0, 'Community catalog capture differs');
+assert(contract.includes('$community_authority_catalog_contract$') && contract.includes('$community_authority_production_contract$'), 'Community applied contracts missing');
+assert(contract.includes(JSON.stringify(Object.fromEntries(['functions','constraints','triggers','tables','columns','indexes'].map(k => [k,community[k]]))).replaceAll("'", "''")), 'Community catalog evidence differs');
 const objects = manifest.objects;
 for (const [name, fingerprint] of Object.entries(expectedFingerprints)) {
   if (!name.startsWith('stagingOverlayTarget')) {
@@ -350,20 +381,28 @@ for (const [name, fingerprint] of Object.entries(expectedFingerprints)) {
 }
 assert(objects.publicTables.length === 44, 'expected 44 public tables');
 assert(objects.publicViews.length === 2, 'expected 2 public views');
-assert(objects.publicTableColumns === 605, 'expected 605 public table columns');
+assert(objects.publicTableColumns === 606, 'expected 606 public table columns');
 assert(objects.publicViewColumns === 27, 'expected 27 public view columns');
-assert(objects.functionOverloads.length === 97, 'expected 97 public function overloads');
+assert(objects.functionOverloads.length === 107, 'expected 107 public function overloads');
 exact('private function overloads', objects.privateFunctionOverloads, [
   "private.admin_chat_phone_title(category text, form_data jsonb)",
   "private.adopt_phone_followup_link()",
   "private.advance_support_version()",
+  "private.apply_community_media_locators(p_plan_digest text, p_assets jsonb, p_posts jsonb, p_rollback boolean)",
   "private.apply_host_profile_media_locators(p_owner_id uuid, p_asset_id uuid, p_old_url text, p_references jsonb, p_rollback boolean)",
   "private.assert_booking_payout_safe(p_booking bookings)",
   "private.bump_experience_media_revision()",
   "private.canonical_experience_media_locator(p_url text)",
   "private.capture_phone_followup()",
+  "private.commit_community_post_images(p_actor_id uuid, p_post_id uuid, p_expected_revision bigint, p_expected_images text[], p_images text[])",
+  "private.community_media_backup_contract()",
+  "private.community_media_migration_inventory()",
   "private.delete_pending_phone_followup()",
   "private.guard_booking_money_transition()",
+  "private.guard_community_asset_identity()",
+  "private.guard_community_media_writer()",
+  "private.guard_community_physical_delete()",
+  "private.guard_community_reference_zero_journal()",
   "private.guard_host_profile_legacy_writer()",
   "private.guard_host_profile_reference_zero_journal()",
   "private.guard_unresolved_booking_delete()",
@@ -377,18 +416,20 @@ exact('private function overloads', objects.privateFunctionOverloads, [
   "private.lock_booking_money(p_experience_id bigint)",
   "private.lock_host_profile_owner()",
   "private.prepare_support_message()",
+  "private.set_community_legacy_writer_freeze(p_frozen boolean, p_smoke_asset_id uuid, p_sha256 text)",
   "private.solo_refund_due(p_booking bookings)",
+  "private.sync_community_media_assets()",
   "private.sync_experience_media_assets()",
   "private.sync_host_profile_assets()",
   "private.sync_profile_avatar_assets()"
 ]);
-assert(objects.applicationTriggers.length === 37, 'expected 37 application triggers');
-assert(objects.indexes === 149, 'expected 149 public indexes');
-assert(objects.constraints.total === 224, 'expected 224 constraints');
+assert(objects.applicationTriggers.length === 43, 'expected 43 application triggers');
+assert(objects.indexes === 150, 'expected 150 public indexes');
+assert(objects.constraints.total === 225, 'expected 225 constraints');
 assert(objects.constraints.primaryKey === 44, 'expected 44 primary keys');
 assert(objects.constraints.foreignKey === 62, 'expected 62 foreign keys');
 assert(objects.constraints.unique === 18, 'expected 18 unique constraints');
-assert(objects.constraints.check === 100, 'expected 100 check constraints');
+assert(objects.constraints.check === 101, 'expected 101 check constraints');
 assert(objects.rls.enabled.length === 42, 'expected 42 RLS-enabled tables');
 assert(objects.rls.disabled.length === 2, 'expected 2 RLS-disabled tables');
 assert(objects.rls.forced.length === 0, 'expected zero FORCE RLS tables');
@@ -397,11 +438,11 @@ assert(objects.realtimePublication.tables.length === 8, 'expected eight Realtime
 assert(objects.storageBuckets.length === 6, 'expected six Storage buckets');
 assert(objects.storageObjectPolicies.length === 16, 'expected 16 Storage policies');
 
-exact('private tables', objects.privateTables, ["admin_monitor_cutover", "host_profile_auth_cas", "host_profile_operation_context", "host_profile_source_authority", "phone_followup_tasks"]);
+exact('private tables', objects.privateTables, ["admin_monitor_cutover", "community_media_authority", "community_media_context", "community_media_plan_receipts", "host_profile_auth_cas", "host_profile_operation_context", "host_profile_source_authority", "phone_followup_tasks"]);
 exact('required private tables', required.applicationPrivateTables, objects.privateTables.map(name => `private.${name}`));
-assert(objects.privateTableColumns === 19 && objects.privateIndexes === 7 && objects.privateConstraints === 15,
+assert(objects.privateTableColumns === 29 && objects.privateIndexes === 10 && objects.privateConstraints === 21,
   'private cutover catalog counts differ');
-exact('private RLS tables', objects.privateRls.enabled, ['admin_monitor_cutover', 'phone_followup_tasks']);
+exact('private RLS tables', objects.privateRls.enabled, ["admin_monitor_cutover", "community_media_authority", "community_media_context", "community_media_plan_receipts", "phone_followup_tasks"]);
 assert(objects.privateRls.forced.length === 0 && objects.privateRls.policies === 0, 'private RLS policy surface differs');
 
 exact('required tables', required.applicationTables, objects.publicTables);
@@ -549,8 +590,8 @@ for (const identity of paymentClaim.securityDefinerFunctions) {
 assert(contract.includes('$payment_claim_contract$'), 'payment claim security contract is missing');
 
 const monitoring = manifest.adminMessageMonitoring;
-assert(manifest.schemaContractVersion === 7 && required.schemaContractVersion === 7,
-  'expected current-state contract version 7');
+assert(manifest.schemaContractVersion === 9 && required.schemaContractVersion === 9,
+  'expected current-state contract version 8');
 assert(monitoring.columns.length === 2 && monitoring.indexes.length === 2
   && monitoring.triggers.length === 2 && monitoring.functions.length === 7,
   'admin monitoring object counts differ');
