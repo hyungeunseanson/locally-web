@@ -73,10 +73,10 @@ const expectedAppliedOrder = [
   'supabase/migrations/20261005082309_avatar_media_authority.sql',
   'supabase/migrations/20261005104924_solo_guarantee_financial_authority.sql',
   'supabase/migrations/20261006013755_host_profile_media_authority.sql',
+  'supabase/migrations/20261006133015_admin_chat_canonical_recency.sql',
 ];
 const expectedPendingOrder = [
   'supabase/migrations/20261006105322_community_media_authority.sql',
-  'supabase/migrations/20261006133015_admin_chat_canonical_recency.sql',
 ];
 const expectedApplyOrder = [...expectedAppliedOrder];
 exact('fresh-project apply order', required.freshProjectApplyOrder, expectedApplyOrder);
@@ -90,7 +90,7 @@ const migrationFiles = (await readdir(resolve(root, 'supabase/migrations')))
   .filter((name) => name.endsWith('.sql'))
   .sort()
   .map((name) => `supabase/migrations/${name}`);
-exact('ordered repository migrations', migrationFiles, [...expectedAppliedOrder, ...expectedPendingOrder]);
+exact('ordered repository migrations', migrationFiles, [...expectedAppliedOrder, ...expectedPendingOrder].sort());
 exact(
   'manifest repository migrations',
   current.migrationLedger.map((entry) => entry.repositoryFile),
@@ -187,3 +187,9 @@ console.log(JSON.stringify({
   activeConciergeFunctionCount: required.activeConcierge.functions.length,
   result: 'LOCALLY_STAGING_BOOTSTRAP_CONTRACT_PASS',
 }, null, 2));
+
+const recencyAssertions = currentContract.match(/DO \$admin_chat_recency_catalog_contract\$[\s\S]*?\$admin_chat_recency_catalog_contract\$;/)?.[0];
+if (!recencyAssertions || !schemaContract.includes(recencyAssertions)
+  || schemaContract.includes('$admin_chat_recency_ledger_contract$')) {
+  fail('fresh staging must share Recency catalog security without Production ledger assertions');
+}

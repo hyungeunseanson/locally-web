@@ -22,6 +22,10 @@ const financialLedger = current.match(/DO \$solo_financial_ledger_contract\$[\s\
 const financialCatalog = current.match(/DO \$solo_financial_catalog_contract\$[\s\S]*?\$solo_financial_catalog_contract\$;/)?.[0];
 const hostCatalog = current.match(/DO \$host_authority_catalog_contract\$[\s\S]*?\$host_authority_catalog_contract\$;/)?.[0];
 const hostProduction = current.match(/DO \$host_authority_production_contract\$[\s\S]*?\$host_authority_production_contract\$;/)?.[0];
+const recencyCatalog = current.match(/DO \$admin_chat_recency_catalog_contract\$[\s\S]*?\$admin_chat_recency_catalog_contract\$;/)?.[0];
+const recencyLedger = current.match(/DO \$admin_chat_recency_ledger_contract\$[\s\S]*?\$admin_chat_recency_ledger_contract\$;/)?.[0];
+assert.ok(recencyCatalog && recencyLedger && staging.includes(recencyCatalog));
+assert.ok(!staging.includes(recencyLedger));
 const productionLedger = current.match(/DO \$current_state_contract\$[\s\S]*?RAISE EXCEPTION 'migration ledger mismatch:[\s\S]*?END IF;/)?.[0]
   + '\nEND\n$current_state_contract$;';
 assert.ok(chat && ledger && attention && marker && financialLedger && financialCatalog);
@@ -324,6 +328,23 @@ try {
   const completionDefinition=(await db.query("SELECT pg_get_functiondef('complete_experience_booking_if_due_atomic(text)'::regprocedure) definition")).rows[0].definition;
   await rejectDrift(completionDefinition.replaceAll('((notification_target.booking_id))','(booking_id)'),
     completionDefinition,/financial function body or ACL mismatch/,financialCatalog);
+  // Exact reviewed Recency SQL on empty local parents; never connect Production.
+  await db.exec('ALTER TABLE inquiries ADD COLUMN created_at timestamptz; ALTER TABLE proxy_requests ADD COLUMN created_at timestamptz');
+  const recencyMigration = await readFile('supabase/migrations/20261006133015_admin_chat_canonical_recency.sql','utf8');
+  await db.exec(recencyMigration);
+  await verify(recencyCatalog); await verify(recencyLedger);
+  await rejectDrift('GRANT EXECUTE ON FUNCTION list_admin_phone_recency(integer,integer) TO anon',
+    'REVOKE EXECUTE ON FUNCTION list_admin_phone_recency(integer,integer) FROM anon', /Recency function body or ACL mismatch/, recencyCatalog);
+  await rejectDrift('ALTER FUNCTION list_admin_support_recency(integer,integer,text,bigint[]) SECURITY DEFINER',
+    'ALTER FUNCTION list_admin_support_recency(integer,integer,text,bigint[]) SECURITY INVOKER', /Recency function body or ACL mismatch/, recencyCatalog);
+  await rejectDrift('ALTER FUNCTION list_admin_phone_recency(integer,integer) SET search_path=public',
+    "ALTER FUNCTION list_admin_phone_recency(integer,integer) SET search_path=''", /Recency function body or ACL mismatch/, recencyCatalog);
+  await rejectDrift('ALTER INDEX admin_chat_visible_message_recency RENAME TO missing_recency_index',
+    'ALTER INDEX missing_recency_index RENAME TO admin_chat_visible_message_recency', /Recency index mismatch/, recencyCatalog);
+  await rejectDrift("UPDATE supabase_migrations.schema_migrations SET statements=ARRAY['-- altered Recency'] WHERE version='20261006133015'",
+    () => db.query('UPDATE supabase_migrations.schema_migrations SET statements=$1 WHERE version=$2', [[recencyMigration],'20261006133015']), /Recency applied ledger SQL mismatch/, recencyLedger);
+  await rejectDrift("DELETE FROM supabase_migrations.schema_migrations WHERE version='20261006133015'",
+    () => db.query('INSERT INTO supabase_migrations.schema_migrations VALUES ($1,$2,$3)', ['20261006133015','admin_chat_canonical_recency',[recencyMigration]]), /Recency applied ledger SQL mismatch/, recencyLedger);
   await verify(mediaLedger); await verify(mediaCatalog); await verify(productionLedger);
   await rejectDrift("DELETE FROM supabase_migrations.schema_migrations WHERE version='20261005082309'",
     () => db.query('INSERT INTO supabase_migrations.schema_migrations VALUES ($1,$2,$3)', ['20261005082309','avatar_media_authority',[avatarMigration]]),

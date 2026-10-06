@@ -776,6 +776,19 @@ BEGIN
   IF EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='private' AND tablename LIKE 'host_profile%') THEN RAISE EXCEPTION 'Host private policy mismatch'; END IF;
 END $host_authority_catalog_contract$;
 
+-- Recency catalog only: never call conversation/business mutation RPCs.
+DO $admin_chat_recency_catalog_contract$
+DECLARE actual text[]; index_evidence text;
+BEGIN
+  SELECT array_agg(n.nspname||'.'||p.proname||'('||pg_get_function_identity_arguments(p.oid)||')|'||pg_get_userbyid(p.proowner)||'|'||p.prosecdef::text||'|'||p.provolatile::text||'|'||pg_get_function_result(p.oid)||'|'||array_to_string(p.proconfig,',')||'|'||p.proacl::text||'|'||md5(p.prosrc) ORDER BY p.proname,pg_get_function_identity_arguments(p.oid)) INTO actual FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname IN ('list_admin_phone_recency','list_admin_support_recency');
+  IF actual IS DISTINCT FROM ARRAY[
+    'public.list_admin_phone_recency(p_offset integer, p_limit integer)|postgres|false|s|TABLE(id text, canonical_activity_at timestamp with time zone)|search_path=""|{postgres=X/postgres,service_role=X/postgres}|6a9eab43297fba3cd0e7fc2ead26a81b',
+    'public.list_admin_support_recency(p_offset integer, p_limit integer, p_status text, p_inquiry_ids bigint[])|postgres|false|s|TABLE(id text, canonical_activity_at timestamp with time zone)|search_path=""|{postgres=X/postgres,service_role=X/postgres}|3308789e8be20187e8cd7215daf33f6d'
+  ]::text[] THEN RAISE EXCEPTION 'Recency function body or ACL mismatch: %', actual; END IF;
+  SELECT pg_get_indexdef(c.oid)||'|'||pg_get_expr(i.indpred,i.indrelid)||'|'||i.indisvalid::text||'|'||i.indisready::text||'|'||i.indisunique::text||'|'||i.indisprimary::text INTO index_evidence FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_index i ON i.indexrelid=c.oid WHERE n.nspname='public' AND c.relname='admin_chat_visible_message_recency';
+  IF index_evidence IS DISTINCT FROM 'CREATE INDEX admin_chat_visible_message_recency ON public.inquiry_messages USING btree (inquiry_id, created_at DESC, id DESC) WHERE (COALESCE(type, ''text''::text) = ANY (ARRAY[''text''::text, ''image''::text]))|(COALESCE(type, ''text''::text) = ANY (ARRAY[''text''::text, ''image''::text]))|true|true|false|false' THEN RAISE EXCEPTION 'Recency index mismatch: %', index_evidence; END IF;
+END $admin_chat_recency_catalog_contract$;
+
 SELECT 'LOCALLY_STAGING_SCHEMA_CONTRACT_PASS' AS result;
 
 ROLLBACK;

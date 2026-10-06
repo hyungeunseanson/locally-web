@@ -1,5 +1,5 @@
 {
-  "schemaContractVersion": 7,
+  "schemaContractVersion": 8,
   "productionProjectRefsDeniedForFixtureWrites": [
     "uhinvcydgzqlpnvieyal"
   ],
@@ -26,7 +26,8 @@
     "supabase/migrations/20261004053224_media_lifecycle_foundation.sql",
     "supabase/migrations/20261005082309_avatar_media_authority.sql",
     "supabase/migrations/20261005104924_solo_guarantee_financial_authority.sql",
-    "supabase/migrations/20261006013755_host_profile_media_authority.sql"
+    "supabase/migrations/20261006013755_host_profile_media_authority.sql",
+    "supabase/migrations/20261006133015_admin_chat_canonical_recency.sql"
   ],
   "pendingProductionMigrations": [
     {
@@ -34,12 +35,6 @@
       "name": "community_media_authority",
       "repositoryFile": "supabase/migrations/20261006105322_community_media_authority.sql",
       "repositorySha256": "55ac4184288d9213e31b4f40de928d7ccfd4c02765db90c0d2d7f8858c597912"
-    },
-    {
-      "version": "20261006133015",
-      "name": "admin_chat_canonical_recency",
-      "repositoryFile": "supabase/migrations/20261006133015_admin_chat_canonical_recency.sql",
-      "repositorySha256": "e2a79488d8b24a5d923f9247d5331eb2f9de95436a6ec790bf81981c00d8a889"
     }
   ],
   "applicationTables": [
@@ -173,6 +168,8 @@
     "is_inquiry_admin_sender",
     "journal_solo_refund_attempt",
     "lease_experience_translation_task",
+    "list_admin_phone_recency",
+    "list_admin_support_recency",
     "list_due_experience_completion_candidates",
     "list_due_experience_review_request_candidates",
     "lock_booking_money",

@@ -40,7 +40,8 @@ BEGIN
     '20261004053224:media_lifecycle_foundation',
     '20261005082309:avatar_media_authority',
     '20261005104924:solo_guarantee_financial_authority',
-    '20261006013755:host_profile_media_authority'
+    '20261006013755:host_profile_media_authority',
+    '20261006133015:admin_chat_canonical_recency'
   ]::text[];
   IF actual IS DISTINCT FROM expected THEN
     RAISE EXCEPTION 'migration ledger mismatch: %', actual;
@@ -203,6 +204,8 @@ BEGIN
     'public.increment_like_count()',
     'public.lease_experience_translation_task(p_provider text, p_now timestamp with time zone, p_lease_seconds integer)',
     'public.lease_experience_translation_task(p_provider text, p_now timestamp with time zone, p_lease_seconds integer, p_reserved_tokens integer)',
+    'public.list_admin_phone_recency(p_offset integer, p_limit integer)',
+    'public.list_admin_support_recency(p_offset integer, p_limit integer, p_status text, p_inquiry_ids bigint[])',
     'public.list_due_experience_completion_candidates(p_booking_id text)',
     'public.list_due_experience_review_request_candidates(p_limit integer)',
     'public.mark_room_messages_read(p_room_id uuid, p_user_id uuid)',
@@ -373,8 +376,8 @@ BEGIN
   END IF;
 
   SELECT count(*) INTO actual_count FROM pg_indexes WHERE schemaname = 'public';
-  IF actual_count <> 149 THEN
-    RAISE EXCEPTION 'public index count %, expected 149', actual_count;
+  IF actual_count <> 150 THEN
+    RAISE EXCEPTION 'public index count %, expected 150', actual_count;
   END IF;
   IF to_regclass('public.uq_notifications_review_request_reminder_booking_id') IS NULL
     OR to_regclass('public.uq_notifications_guest_review_request_reminder_booking_id') IS NULL
@@ -1691,6 +1694,26 @@ BEGIN
   IF fingerprint IS DISTINCT FROM 'ee6e712c55f00b284ed8a988b04b163d' THEN RAISE EXCEPTION 'Private relation grant fingerprint mismatch'; END IF;
   IF (SELECT count(*) FROM private.host_profile_source_authority)<>1 OR NOT EXISTS(SELECT 1 FROM private.host_profile_source_authority WHERE singleton AND r2_enabled) THEN RAISE EXCEPTION 'Production Host authority marker mismatch'; END IF;
 END $host_authority_production_contract$;
+
+-- Recency catalog only: never call conversation/business mutation RPCs.
+DO $admin_chat_recency_catalog_contract$
+DECLARE actual text[]; index_evidence text;
+BEGIN
+  SELECT array_agg(n.nspname||'.'||p.proname||'('||pg_get_function_identity_arguments(p.oid)||')|'||pg_get_userbyid(p.proowner)||'|'||p.prosecdef::text||'|'||p.provolatile::text||'|'||pg_get_function_result(p.oid)||'|'||array_to_string(p.proconfig,',')||'|'||p.proacl::text||'|'||md5(p.prosrc) ORDER BY p.proname,pg_get_function_identity_arguments(p.oid)) INTO actual FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname IN ('list_admin_phone_recency','list_admin_support_recency');
+  IF actual IS DISTINCT FROM ARRAY[
+    'public.list_admin_phone_recency(p_offset integer, p_limit integer)|postgres|false|s|TABLE(id text, canonical_activity_at timestamp with time zone)|search_path=""|{postgres=X/postgres,service_role=X/postgres}|6a9eab43297fba3cd0e7fc2ead26a81b',
+    'public.list_admin_support_recency(p_offset integer, p_limit integer, p_status text, p_inquiry_ids bigint[])|postgres|false|s|TABLE(id text, canonical_activity_at timestamp with time zone)|search_path=""|{postgres=X/postgres,service_role=X/postgres}|3308789e8be20187e8cd7215daf33f6d'
+  ]::text[] THEN RAISE EXCEPTION 'Recency function body or ACL mismatch: %', actual; END IF;
+  SELECT pg_get_indexdef(c.oid)||'|'||pg_get_expr(i.indpred,i.indrelid)||'|'||i.indisvalid::text||'|'||i.indisready::text||'|'||i.indisunique::text||'|'||i.indisprimary::text INTO index_evidence FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_index i ON i.indexrelid=c.oid WHERE n.nspname='public' AND c.relname='admin_chat_visible_message_recency';
+  IF index_evidence IS DISTINCT FROM 'CREATE INDEX admin_chat_visible_message_recency ON public.inquiry_messages USING btree (inquiry_id, created_at DESC, id DESC) WHERE (COALESCE(type, ''text''::text) = ANY (ARRAY[''text''::text, ''image''::text]))|(COALESCE(type, ''text''::text) = ANY (ARRAY[''text''::text, ''image''::text]))|true|true|false|false' THEN RAISE EXCEPTION 'Recency index mismatch: %', index_evidence; END IF;
+END $admin_chat_recency_catalog_contract$;
+
+DO $admin_chat_recency_ledger_contract$
+DECLARE actual text[];
+BEGIN
+  SELECT array_agg(version||':'||name||':'||cardinality(statements)||':'||md5(statements[1])||':'||encode(sha256(convert_to(statements[1],'UTF8')),'hex') ORDER BY version) INTO actual FROM supabase_migrations.schema_migrations WHERE version='20261006133015';
+  IF actual IS DISTINCT FROM ARRAY['20261006133015:admin_chat_canonical_recency:1:51c7ec1a33a61ffa757451d08e1d3358:e2a79488d8b24a5d923f9247d5331eb2f9de95436a6ec790bf81981c00d8a889']::text[] THEN RAISE EXCEPTION 'Recency applied ledger SQL mismatch: %', actual; END IF;
+END $admin_chat_recency_ledger_contract$;
 
 SELECT 'LOCALLY_PRODUCTION_CURRENT_STATE_CONTRACT_PASS' AS result;
 

@@ -101,3 +101,13 @@ SELECT jsonb_build_object(
  'authority',(SELECT jsonb_agg(jsonb_build_object('singleton',singleton,'r2_enabled',r2_enabled)) FROM private.host_profile_source_authority)
 ) AS host_catalog;
 ROLLBACK;
+
+-- Read-only Recency catalog/ledger. No customer rows or RPC calls.
+BEGIN TRANSACTION READ ONLY;
+SET LOCAL search_path=public,extensions;
+SELECT jsonb_build_object(
+ 'functions',(SELECT jsonb_agg(jsonb_build_object('identity',format('%I.%I(%s)',n.nspname,p.proname,pg_get_function_identity_arguments(p.oid)),'owner',pg_get_userbyid(p.proowner),'securityDefiner',p.prosecdef,'volatility',p.provolatile,'result',pg_get_function_result(p.oid),'configuration',p.proconfig,'acl',p.proacl::text,'bodyMd5',md5(p.prosrc)) ORDER BY p.proname) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname IN ('list_admin_phone_recency','list_admin_support_recency')),
+ 'index',(SELECT jsonb_build_object('schema','public','table','inquiry_messages','name',c.relname,'definition',pg_get_indexdef(c.oid),'predicate',pg_get_expr(i.indpred,i.indrelid),'unique',i.indisunique,'primary',i.indisprimary,'valid',i.indisvalid,'ready',i.indisready) FROM pg_class c JOIN pg_index i ON i.indexrelid=c.oid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname='admin_chat_visible_message_recency'),
+ 'ledgerEvidence',(SELECT jsonb_agg(jsonb_build_object('version',version,'name',name,'statementCount',cardinality(statements),'statementsMd5',md5(statements[1]),'statementsSha256',encode(sha256(convert_to(statements[1],'UTF8')),'hex'))) FROM supabase_migrations.schema_migrations WHERE version='20261006133015')
+) AS recency_catalog;
+ROLLBACK;

@@ -213,18 +213,19 @@ expectedLedger.push({
   "repositorySha256": "913d253b2853fa2581fb886cfd2279db147bb84f5b5b55c7dc12386fa49220d8",
   "repositoryVersion": "20261006013755"
 });
+expectedLedger.push({
+  "version": "20261006133015",
+  "name": "admin_chat_canonical_recency",
+  "repositoryFile": "supabase/migrations/20261006133015_admin_chat_canonical_recency.sql",
+  "repositorySha256": "e2a79488d8b24a5d923f9247d5331eb2f9de95436a6ec790bf81981c00d8a889",
+  "repositoryVersion": "20261006133015"
+});
 const expectedPendingMigrations = [
   {
     "version": "20261006105322",
     "name": "community_media_authority",
     "repositoryFile": "supabase/migrations/20261006105322_community_media_authority.sql",
     "repositorySha256": "55ac4184288d9213e31b4f40de928d7ccfd4c02765db90c0d2d7f8858c597912"
-  },
-  {
-    "version": "20261006133015",
-    "name": "admin_chat_canonical_recency",
-    "repositoryFile": "supabase/migrations/20261006133015_admin_chat_canonical_recency.sql",
-    "repositorySha256": "e2a79488d8b24a5d923f9247d5331eb2f9de95436a6ec790bf81981c00d8a889"
   }
 ];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));
@@ -275,8 +276,8 @@ assert(JSON.stringify(manifest.pendingProductionMigrations) === JSON.stringify(e
 assert(manifest.source.captureSql === 'supabase/staging/production-current-state.capture.sql'
   && manifest.source.postgresMajor === 17 && manifest.source.containsRows === false
   && manifest.source.containsStorageObjects === false, 'read-only capture provenance differs');
-assert((capture.match(/^BEGIN TRANSACTION READ ONLY;$/gm) ?? []).length === 5
-  && (capture.match(/^ROLLBACK;$/gm) ?? []).length === 5
+assert((capture.match(/^BEGIN TRANSACTION READ ONLY;$/gm) ?? []).length === 6
+  && (capture.match(/^ROLLBACK;$/gm) ?? []).length === 6
   && !/^\s*(?:INSERT\s+INTO|UPDATE\s+|DELETE\s+FROM|ALTER\s+|CREATE\s+|DROP\s+|TRUNCATE\s+)/gim.test(capture),
   'current-state capture must use only read-only transactions');
 assert(JSON.stringify(manifest.selectiveProductionRollout) === JSON.stringify(required.selectiveProductionRollout)
@@ -341,6 +342,30 @@ assert(hostLedger.version === '20261006013755' && hostLedger.statementCount === 
   && hostLedger.statementsSha256 === expectedLedger.find(x => x.version === hostLedger.version).repositorySha256
   && contract.includes(`${hostLedger.version}:${hostLedger.name}:1:${hostLedger.statementsMd5}:${hostLedger.statementsSha256}`),
   'Host ledger evidence differs');
+const recency = manifest.adminChatRecency;
+assert(recency.functions.length === 2 && recency.indexes.length === 1
+  && recency.maximumBatch === 100 && recency.existingFunctionsPreserved === 124
+  && recency.productionBusinessWrites === 0
+  && JSON.stringify(recency.publicRpcExecuteRoles) === JSON.stringify(['service_role']), 'Recency capture metadata differs');
+assert(contract.includes('$admin_chat_recency_catalog_contract$')
+  && contract.includes('$admin_chat_recency_ledger_contract$'), 'Recency current-state assertions missing');
+for (const fn of recency.functions) {
+  assert(fn.owner === 'postgres' && fn.securityDefiner === false && fn.volatility === 's'
+    && JSON.stringify(fn.configuration) === JSON.stringify(['search_path=""'])
+    && fn.acl === '{postgres=X/postgres,service_role=X/postgres}', 'Recency RPC security differs');
+  assert(contract.includes([fn.identity,fn.owner,fn.securityDefiner,fn.volatility,fn.result,
+    fn.configuration.join(','),fn.acl,fn.bodyMd5].join('|').replaceAll("'", "''")), 'Recency function evidence missing');
+  assert(manifest.objects.functionOverloads.includes(fn.identity), 'Recency overload missing');
+}
+const recencyIndex = recency.indexes[0];
+assert(recencyIndex.valid && recencyIndex.ready && !recencyIndex.unique && !recencyIndex.primary
+  && recencyIndex.name === 'admin_chat_visible_message_recency'
+  && contract.includes(recencyIndex.definition.replaceAll("'", "''"))
+  && contract.includes(recencyIndex.predicate.replaceAll("'", "''")), 'Recency index evidence differs');
+const recencyLedger = recency.ledgerEvidence[0];
+assert(recencyLedger.version === '20261006133015' && recencyLedger.statementCount === 1
+  && recencyLedger.statementsSha256 === expectedLedger.at(-1).repositorySha256
+  && contract.includes(`${recencyLedger.version}:${recencyLedger.name}:1:${recencyLedger.statementsMd5}:${recencyLedger.statementsSha256}`), 'Recency ledger evidence differs');
 const objects = manifest.objects;
 for (const [name, fingerprint] of Object.entries(expectedFingerprints)) {
   if (!name.startsWith('stagingOverlayTarget')) {
@@ -352,7 +377,7 @@ assert(objects.publicTables.length === 44, 'expected 44 public tables');
 assert(objects.publicViews.length === 2, 'expected 2 public views');
 assert(objects.publicTableColumns === 605, 'expected 605 public table columns');
 assert(objects.publicViewColumns === 27, 'expected 27 public view columns');
-assert(objects.functionOverloads.length === 97, 'expected 97 public function overloads');
+assert(objects.functionOverloads.length === 99, 'expected 99 public function overloads');
 exact('private function overloads', objects.privateFunctionOverloads, [
   "private.admin_chat_phone_title(category text, form_data jsonb)",
   "private.adopt_phone_followup_link()",
@@ -383,7 +408,7 @@ exact('private function overloads', objects.privateFunctionOverloads, [
   "private.sync_profile_avatar_assets()"
 ]);
 assert(objects.applicationTriggers.length === 37, 'expected 37 application triggers');
-assert(objects.indexes === 149, 'expected 149 public indexes');
+assert(objects.indexes === 150, 'expected 150 public indexes');
 assert(objects.constraints.total === 224, 'expected 224 constraints');
 assert(objects.constraints.primaryKey === 44, 'expected 44 primary keys');
 assert(objects.constraints.foreignKey === 62, 'expected 62 foreign keys');
@@ -549,8 +574,8 @@ for (const identity of paymentClaim.securityDefinerFunctions) {
 assert(contract.includes('$payment_claim_contract$'), 'payment claim security contract is missing');
 
 const monitoring = manifest.adminMessageMonitoring;
-assert(manifest.schemaContractVersion === 7 && required.schemaContractVersion === 7,
-  'expected current-state contract version 7');
+assert(manifest.schemaContractVersion === 8 && required.schemaContractVersion === 8,
+  'expected current-state contract version 8');
 assert(monitoring.columns.length === 2 && monitoring.indexes.length === 2
   && monitoring.triggers.length === 2 && monitoring.functions.length === 7,
   'admin monitoring object counts differ');
