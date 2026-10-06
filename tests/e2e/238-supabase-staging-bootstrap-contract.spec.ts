@@ -92,7 +92,7 @@ test.describe('Supabase staging bootstrap contract', () => {
     expect(manifest.applicationFunctions).toEqual(expect.arrayContaining([
       'ack_admin_inquiry_snapshot', 'get_admin_attention',
     ]));
-    expect(manifest.pendingProductionMigrations).toEqual([{"version": "20261006105322", "name": "community_media_authority", "repositoryFile": "supabase/migrations/20261006105322_community_media_authority.sql", "repositorySha256": "55ac4184288d9213e31b4f40de928d7ccfd4c02765db90c0d2d7f8858c597912", {"version": "20261006133015", "name": "admin_chat_canonical_recency", "repositoryFile": "supabase/migrations/20261006133015_admin_chat_canonical_recency.sql", "repositorySha256": "e2a79488d8b24a5d923f9247d5331eb2f9de95436a6ec790bf81981c00d8a889"} ]);
+    expect(manifest.pendingProductionMigrations).toEqual([{"version": "20261006105322", "name": "community_media_authority", "repositoryFile": "supabase/migrations/20261006105322_community_media_authority.sql", "repositorySha256": "55ac4184288d9213e31b4f40de928d7ccfd4c02765db90c0d2d7f8858c597912"}, {"version": "20261006133015", "name": "admin_chat_canonical_recency", "repositoryFile": "supabase/migrations/20261006133015_admin_chat_canonical_recency.sql", "repositorySha256": "e2a79488d8b24a5d923f9247d5331eb2f9de95436a6ec790bf81981c00d8a889"}]);
     expect(packageJson.scripts['supabase:staging:baseline:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:current:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:contract']).toBeTruthy();
