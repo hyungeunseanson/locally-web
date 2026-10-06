@@ -361,6 +361,7 @@ no newer-user overwrite, tombstone resurrection, orphan copying or physical dele
 | Test fixture variable-name mismatch | Match actual upload/query names | Strong separation/CAS assertions retained |
 | Remote Next image source fixture omitted approved Host origin | Add exact HTTPS Host namespace and empty query to strict full-array expectation; rerun affected gate and full CI | Existing source entries, SVG/CSP and exact-list gate retained |
 | P0 namespace ownership fixture still inspected old browser Host writer | Verify identical legacy owned namespace in server handler plus authenticated owner, dedicated R2 actor and browser endpoint separation; rerun full P0 gate and CI | Ownership acceptance retained and strengthened; all P0 SQL/RPC/private delivery assertions unchanged |
+| Host backup test required local age path env despite installed CI binaries | Resolve real age/keygen through explicit env or PATH like existing backup tests; rerun without env and full CI | Actual encryption/restore/SHA assertions remain mandatory; no skip/mock substitution |
 | Push used symbolic HEAD ref | Use explicit matching branch refs | Strict ref guard retained; main/force/delete remain blocked |
 
 Non-Production scope changes above were explicitly approved. Production approval

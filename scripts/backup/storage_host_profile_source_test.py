@@ -2,6 +2,7 @@ import io
 import json
 import os
 import pathlib
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -43,7 +44,7 @@ class HostBackupTests(unittest.TestCase):
         source._request=lambda *a:io.BytesIO(b'{}')
         with self.assertRaises(backup.BackupError):backup.database_references(source,True,True)
     def test_full_encrypted_source_restore_preserves_host_auth_mapping_and_avatar_format(self):
-        age=os.environ.get('AGE_PATH');keygen=os.environ.get('AGE_KEYGEN_PATH');self.assertTrue(age and keygen,'real age required')
+        age=os.environ.get('AGE_PATH') or shutil.which('age');keygen=os.environ.get('AGE_KEYGEN_PATH') or shutil.which('age-keygen');self.assertTrue(age and keygen,'real age required')
         with tempfile.TemporaryDirectory() as d:
             root=pathlib.Path(d);identity=root/'identity';subprocess.run([keygen,'-o',str(identity)],check=True,capture_output=True)
             recipient=subprocess.check_output([keygen,'-y',str(identity)],text=True).strip();encryptor=backup.AgeEncryptor(recipient,age)
