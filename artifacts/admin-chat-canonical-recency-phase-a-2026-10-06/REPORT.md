@@ -34,7 +34,7 @@ Production migration apply = 0. The new server APIs require this migration befor
 
 ## Required behavior coverage
 
-Native tests call actual RPCs and actual API route/enrichment/filter code with isolated SQL I/O. The fixture deliberately returns IN rows in the opposite order. Browser and React tests load production components/hooks with external I/O isolated. Invalid historical links are seeded with only the local adoption trigger temporarily disabled, then re-enabled. Production is never used as a write fixture.
+Native tests call actual RPCs and actual API route/enrichment/filter code with isolated SQL I/O. The fixture deliberately returns IN rows in the opposite order. Full paginated rank comparison yields zero differences for Support (223 rows), Phone all (135 rows) and Phone todo (92 rows). Browser and React tests load production components/hooks with external I/O isolated. Invalid historical links are seeded with only the local adoption trigger temporarily disabled, then re-enabled. Production is never used as a write fixture.
 
 | Requirement | Evidence |
 |---|---|

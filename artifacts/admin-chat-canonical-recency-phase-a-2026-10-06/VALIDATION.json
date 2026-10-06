@@ -38,8 +38,8 @@
   "foundationCI": "Exact-head workflow result is recorded in the Draft PR checks and task final response after push.",
   "indexEvidence": {
     "fixtureHistoryMessages": 20000,
-    "indexedMs": 0.014,
-    "unindexedMs": 2.969,
+    "indexedMs": 0.017,
+    "unindexedMs": 2.921,
     "indexedPlan": "Limit -> Index Only Scan admin_chat_visible_message_recency",
     "unindexedPlan": "Limit -> top-N Sort -> Seq Scan",
     "indexedSharedHitBlocks": 3,
@@ -64,6 +64,20 @@
     "inflightListBurst": {
       "maxConcurrentListGET": 1,
       "trailingListGET": 1
+    }
+  },
+  "nativeFullPaginationModel": {
+    "support": {
+      "rows": 223,
+      "rankDifference": 0
+    },
+    "phoneAll": {
+      "rows": 135,
+      "rankDifference": 0
+    },
+    "phoneTodo": {
+      "rows": 92,
+      "rankDifference": 0
     }
   }
 }

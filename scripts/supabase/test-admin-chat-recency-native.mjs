@@ -169,7 +169,20 @@ try {
       LEFT JOIN inquiries i ON i.id::text=p.form_data->>'linked_inquiry_id' AND i.user_id=p.user_id AND i.type IN ('admin','admin_support')
         AND (SELECT count(*) FROM proxy_requests other WHERE other.form_data->>'__proxy_card_anchor' IS DISTINCT FROM 'v1' AND other.form_data->>'linked_inquiry_id'=i.id::text)=1
       ORDER BY coalesce((SELECT max(created_at) FROM inquiry_messages WHERE inquiry_id=i.id AND coalesce(type,'text') IN ('text','image')),p.created_at) DESC,p.id DESC`)).rows.map(row=>row.id);
-    const actual=[];for(let offset=0;;offset+=50){const page=await phone(`filter=all&limit=50&offset=${offset}`);actual.push(...page.data.map(row=>row.id));if(!page.pagination.hasMore)break;}assert.deepEqual(actual,expected);
+    const actualRows=[];for(let offset=0;;offset+=50){const page=await phone(`filter=all&limit=50&offset=${offset}`);actualRows.push(...page.data);if(!page.pagination.hasMore)break;}
+    assert.deepEqual(actualRows.map(row=>row.id),expected);
+    const matches=sourceLoader()('app/utils/phoneReservationWorkspace.ts').matchesPhoneFilter;
+    const actualTodo=[];for(let offset=0;;offset+=10){const page=await phone(`filter=todo&limit=10&offset=${offset}`);actualTodo.push(...page.data.map(row=>row.id));if(!page.pagination.hasMore)break;}
+    const byId=new Map(actualRows.map(row=>[row.id,row]));
+    assert.deepEqual(actualTodo,expected.filter(id=>matches(byId.get(id),'todo')));
+    const expectedSupport=(await db.query(`SELECT i.id::text FROM inquiries i WHERE i.type IN ('admin','admin_support')
+      AND NOT EXISTS (SELECT 1 FROM proxy_requests p WHERE p.form_data->>'__proxy_card_anchor' IS DISTINCT FROM 'v1'
+        AND p.form_data->>'linked_inquiry_id'=i.id::text AND p.user_id=i.user_id
+        AND (SELECT count(*) FROM proxy_requests other WHERE other.form_data->>'__proxy_card_anchor' IS DISTINCT FROM 'v1' AND other.form_data->>'linked_inquiry_id'=i.id::text)=1)
+      ORDER BY coalesce((SELECT max(created_at) FROM inquiry_messages WHERE inquiry_id=i.id AND coalesce(type,'text') IN ('text','image')),i.created_at) DESC NULLS LAST,i.id DESC`)).rows.map(row=>row.id);
+    const actualSupport=[];for(let offset=0;;offset+=50){const page=await support(`limit=50&offset=${offset}`);actualSupport.push(...page.data.map(row=>row.id));if(!page.pagination.hasMore)break;}
+    assert.deepEqual(actualSupport,expectedSupport);
+    console.log('CANONICAL_RANK_MODEL',JSON.stringify({support:{rows:actualSupport.length,rankDifference:0},phoneAll:{rows:actualRows.length,rankDifference:0},phoneTodo:{rows:actualTodo.length,rankDifference:0}}));
   });
   await check('EXPLAIN: visible partial index avoids per-inquiry history sort on native PostgreSQL 17',async()=>{
     await db.query(`INSERT INTO inquiry_messages(inquiry_id,sender_id,content,type,created_at) SELECT 200,'${admin}','history',CASE WHEN n%10=0 THEN 'deleted' ELSE 'text' END,'2024-01-01'::timestamptz+n*interval '1 second' FROM generate_series(1,20000)n; ANALYZE inquiry_messages;`);
