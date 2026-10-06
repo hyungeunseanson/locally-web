@@ -13,7 +13,7 @@ const expectedFingerprints = {
   storagePolicies: '898e8b7f917fd0f4530ef30c9b61961e',
   publicRlsPolicies: 'e5a16a4215c569060fbf895453a5cd00',
   publicRelationGrants: '23a636eb7731f130f48aaeceb415c8cf',
-  privateRelationGrants: '4c987b9bd1b8fdc56ed01bca38365c7d',
+  privateRelationGrants: 'ee6e712c55f00b284ed8a988b04b163d',
   stagingOverlayBaselineStoragePolicies: 'd6b381fd629405acfdd615593031de5c',
   stagingOverlayTargetStorageBuckets: 'c3ff5767c8e4934ae05b3d96550441c8',
   stagingOverlayTargetStoragePolicies: '38c973a52a0bebe8fa78b3f53089e427',
@@ -206,13 +206,14 @@ const observedAppliedFinancialMigrations = [
   }
 ];
 expectedLedger.push(...observedAppliedFinancialMigrations);
+expectedLedger.push({
+  "version": "20261006013755",
+  "name": "host_profile_media_authority",
+  "repositoryFile": "supabase/migrations/20261006013755_host_profile_media_authority.sql",
+  "repositorySha256": "913d253b2853fa2581fb886cfd2279db147bb84f5b5b55c7dc12386fa49220d8",
+  "repositoryVersion": "20261006013755"
+});
 const expectedPendingMigrations = [
-  {
-    "version": "20261006013755",
-    "name": "host_profile_media_authority",
-    "repositoryFile": "supabase/migrations/20261006013755_host_profile_media_authority.sql",
-    "repositorySha256": "913d253b2853fa2581fb886cfd2279db147bb84f5b5b55c7dc12386fa49220d8"
-  },
   {
     "version": "20261006105322",
     "name": "community_media_authority",
@@ -274,8 +275,8 @@ assert(JSON.stringify(manifest.pendingProductionMigrations) === JSON.stringify(e
 assert(manifest.source.captureSql === 'supabase/staging/production-current-state.capture.sql'
   && manifest.source.postgresMajor === 17 && manifest.source.containsRows === false
   && manifest.source.containsStorageObjects === false, 'read-only capture provenance differs');
-assert((capture.match(/^BEGIN TRANSACTION READ ONLY;$/gm) ?? []).length === 4
-  && (capture.match(/^ROLLBACK;$/gm) ?? []).length === 4
+assert((capture.match(/^BEGIN TRANSACTION READ ONLY;$/gm) ?? []).length === 5
+  && (capture.match(/^ROLLBACK;$/gm) ?? []).length === 5
   && !/^\s*(?:INSERT\s+INTO|UPDATE\s+|DELETE\s+FROM|ALTER\s+|CREATE\s+|DROP\s+|TRUNCATE\s+)/gim.test(capture),
   'current-state capture must use only read-only transactions');
 assert(JSON.stringify(manifest.selectiveProductionRollout) === JSON.stringify(required.selectiveProductionRollout)
@@ -318,6 +319,28 @@ for (const column of financial.columns) {
 for (const object of [...financial.indexes,...financial.constraints,...financial.triggers]) {
   assert(contract.includes(object.definition.replaceAll("'", "''")), `financial object evidence missing: ${object.name}`);
 }
+const host = manifest.appliedHostAuthority;
+assert(host.functions.length === 12 && host.tables.length === 3 && host.columns.length === 10
+  && host.constraints.length === 8 && host.indexes.length === 3 && host.triggers.length === 13,
+  'Host catalog evidence counts differ');
+assert(JSON.stringify(host.authority) === JSON.stringify([{ singleton: true, r2_enabled: true }])
+  && host.productionWrites === 0, 'live Host authority evidence differs');
+assert(contract.includes('$host_authority_catalog_contract$') && contract.includes('$host_authority_production_contract$'),
+  'Host applied contracts missing');
+for (const fn of host.functions) {
+  assert(fn.owner === 'postgres' && JSON.stringify(fn.configuration) === JSON.stringify(['search_path=""']),
+    'Host function owner/search_path differs');
+  assert(contract.includes([fn.identity,fn.owner,fn.securityDefiner,fn.volatility,fn.result,
+    fn.configuration.join(','),fn.acl,fn.bodyMd5].join('|').replaceAll("'", "''")), 'Host function evidence missing');
+}
+for (const object of [...host.constraints,...host.indexes,...host.triggers]) {
+  assert(contract.includes(object.definition.replaceAll("'", "''")), 'Host catalog definition missing');
+}
+const hostLedger = host.ledgerEvidence[0];
+assert(hostLedger.version === '20261006013755' && hostLedger.statementCount === 1
+  && hostLedger.statementsSha256 === expectedLedger.find(x => x.version === hostLedger.version).repositorySha256
+  && contract.includes(`${hostLedger.version}:${hostLedger.name}:1:${hostLedger.statementsMd5}:${hostLedger.statementsSha256}`),
+  'Host ledger evidence differs');
 const objects = manifest.objects;
 for (const [name, fingerprint] of Object.entries(expectedFingerprints)) {
   if (!name.startsWith('stagingOverlayTarget')) {
@@ -329,36 +352,43 @@ assert(objects.publicTables.length === 44, 'expected 44 public tables');
 assert(objects.publicViews.length === 2, 'expected 2 public views');
 assert(objects.publicTableColumns === 605, 'expected 605 public table columns');
 assert(objects.publicViewColumns === 27, 'expected 27 public view columns');
-assert(objects.functionOverloads.length === 92, 'expected 92 public function overloads');
+assert(objects.functionOverloads.length === 97, 'expected 97 public function overloads');
 exact('private function overloads', objects.privateFunctionOverloads, [
   "private.admin_chat_phone_title(category text, form_data jsonb)",
   "private.adopt_phone_followup_link()",
   "private.advance_support_version()",
+  "private.apply_host_profile_media_locators(p_owner_id uuid, p_asset_id uuid, p_old_url text, p_references jsonb, p_rollback boolean)",
   "private.assert_booking_payout_safe(p_booking bookings)",
   "private.bump_experience_media_revision()",
   "private.canonical_experience_media_locator(p_url text)",
   "private.capture_phone_followup()",
   "private.delete_pending_phone_followup()",
   "private.guard_booking_money_transition()",
+  "private.guard_host_profile_legacy_writer()",
+  "private.guard_host_profile_reference_zero_journal()",
   "private.guard_unresolved_booking_delete()",
   "private.handle_phone_followup(p_request uuid, p_inquiry bigint, p_ids bigint[], p_admin uuid, p_complete boolean)",
   "private.has_phone_followup(p_request uuid)",
+  "private.host_profile_auth_inventory()",
+  "private.host_profile_legacy_writes_frozen()",
   "private.is_admin_reader()",
   "private.is_inquiry_admin_sender(p_sender uuid)",
   "private.journal_solo_refund_attempt()",
   "private.lock_booking_money(p_experience_id bigint)",
+  "private.lock_host_profile_owner()",
   "private.prepare_support_message()",
   "private.solo_refund_due(p_booking bookings)",
   "private.sync_experience_media_assets()",
+  "private.sync_host_profile_assets()",
   "private.sync_profile_avatar_assets()"
 ]);
-assert(objects.applicationTriggers.length === 25, 'expected 25 application triggers');
+assert(objects.applicationTriggers.length === 37, 'expected 37 application triggers');
 assert(objects.indexes === 149, 'expected 149 public indexes');
-assert(objects.constraints.total === 223, 'expected 223 constraints');
+assert(objects.constraints.total === 224, 'expected 224 constraints');
 assert(objects.constraints.primaryKey === 44, 'expected 44 primary keys');
 assert(objects.constraints.foreignKey === 62, 'expected 62 foreign keys');
 assert(objects.constraints.unique === 18, 'expected 18 unique constraints');
-assert(objects.constraints.check === 99, 'expected 99 check constraints');
+assert(objects.constraints.check === 100, 'expected 100 check constraints');
 assert(objects.rls.enabled.length === 42, 'expected 42 RLS-enabled tables');
 assert(objects.rls.disabled.length === 2, 'expected 2 RLS-disabled tables');
 assert(objects.rls.forced.length === 0, 'expected zero FORCE RLS tables');
@@ -367,9 +397,9 @@ assert(objects.realtimePublication.tables.length === 8, 'expected eight Realtime
 assert(objects.storageBuckets.length === 6, 'expected six Storage buckets');
 assert(objects.storageObjectPolicies.length === 16, 'expected 16 Storage policies');
 
-exact('private tables', objects.privateTables, ['admin_monitor_cutover', 'phone_followup_tasks']);
+exact('private tables', objects.privateTables, ["admin_monitor_cutover", "host_profile_auth_cas", "host_profile_operation_context", "host_profile_source_authority", "phone_followup_tasks"]);
 exact('required private tables', required.applicationPrivateTables, objects.privateTables.map(name => `private.${name}`));
-assert(objects.privateTableColumns === 9 && objects.privateIndexes === 4 && objects.privateConstraints === 8,
+assert(objects.privateTableColumns === 19 && objects.privateIndexes === 7 && objects.privateConstraints === 15,
   'private cutover catalog counts differ');
 exact('private RLS tables', objects.privateRls.enabled, ['admin_monitor_cutover', 'phone_followup_tasks']);
 assert(objects.privateRls.forced.length === 0 && objects.privateRls.policies === 0, 'private RLS policy surface differs');
@@ -519,8 +549,8 @@ for (const identity of paymentClaim.securityDefinerFunctions) {
 assert(contract.includes('$payment_claim_contract$'), 'payment claim security contract is missing');
 
 const monitoring = manifest.adminMessageMonitoring;
-assert(manifest.schemaContractVersion === 6 && required.schemaContractVersion === 6,
-  'expected current-state contract version 6');
+assert(manifest.schemaContractVersion === 7 && required.schemaContractVersion === 7,
+  'expected current-state contract version 7');
 assert(monitoring.columns.length === 2 && monitoring.indexes.length === 2
   && monitoring.triggers.length === 2 && monitoring.functions.length === 7,
   'admin monitoring object counts differ');

@@ -20,11 +20,15 @@ const mediaLedger = current.match(/DO \$media_authority_ledger_contract\$[\s\S]*
 const mediaCatalog = current.match(/DO \$applied_media_catalog_contract\$[\s\S]*?\$applied_media_catalog_contract\$;/)?.[0];
 const financialLedger = current.match(/DO \$solo_financial_ledger_contract\$[\s\S]*?\$solo_financial_ledger_contract\$;/)?.[0];
 const financialCatalog = current.match(/DO \$solo_financial_catalog_contract\$[\s\S]*?\$solo_financial_catalog_contract\$;/)?.[0];
+const hostCatalog = current.match(/DO \$host_authority_catalog_contract\$[\s\S]*?\$host_authority_catalog_contract\$;/)?.[0];
+const hostProduction = current.match(/DO \$host_authority_production_contract\$[\s\S]*?\$host_authority_production_contract\$;/)?.[0];
 const productionLedger = current.match(/DO \$current_state_contract\$[\s\S]*?RAISE EXCEPTION 'migration ledger mismatch:[\s\S]*?END IF;/)?.[0]
   + '\nEND\n$current_state_contract$;';
 assert.ok(chat && ledger && attention && marker && financialLedger && financialCatalog);
 assert.ok(phone && search && phoneSearchLedger);
 assert.ok(mediaLedger && mediaCatalog && productionLedger.includes('20261005082309:avatar_media_authority'));
+assert.ok(hostCatalog && hostProduction && staging.includes(hostCatalog));
+assert.ok(!staging.includes(hostProduction), 'fresh staging does not activate the live Host marker');
 assert.ok(staging.includes(phone) && staging.includes(search), 'staging shares applied Phone/search security');
 assert.ok(staging.includes(chat), 'staging and current-state enforce identical chat assertions');
 assert.ok(staging.includes(attention), 'staging and current-state enforce identical attention security');
@@ -252,6 +256,41 @@ try {
   await db.exec(financialFixture.trigger.definition);
   const financialMigration = await readFile('supabase/migrations/20261005104924_solo_guarantee_financial_authority.sql','utf8');
   await db.exec(financialMigration);
+  // Empty disposable Host parents only. The applied SQL bytes stay unchanged.
+  await db.exec(`CREATE ROLE supabase_auth_admin;
+    ALTER TABLE auth.users ADD COLUMN raw_user_meta_data jsonb;
+    CREATE TABLE public.host_applications(id uuid PRIMARY KEY,user_id uuid,profile_photo text);`);
+  const hostMigration = await readFile('supabase/migrations/20261006013755_host_profile_media_authority.sql','utf8');
+  await db.exec(hostMigration);
+  await verify(hostCatalog);
+  await assert.rejects(verify(hostProduction), /Production Host authority marker mismatch/);
+  await db.exec('UPDATE private.host_profile_source_authority SET r2_enabled=true');
+  await verify(hostProduction);
+  await rejectDrift('GRANT EXECUTE ON FUNCTION begin_host_profile_media_asset(uuid,uuid,text,text,text,bigint,text,text) TO anon',
+    'REVOKE EXECUTE ON FUNCTION begin_host_profile_media_asset(uuid,uuid,text,text,text,bigint,text,text) FROM anon', /Host function body or ACL mismatch/, hostCatalog);
+  await rejectDrift('ALTER FUNCTION host_profile_auth_backup_references() SECURITY DEFINER',
+    'ALTER FUNCTION host_profile_auth_backup_references() SECURITY INVOKER', /Host function body or ACL mismatch/, hostCatalog);
+  await rejectDrift('GRANT SELECT ON private.host_profile_auth_cas TO service_role',
+    'REVOKE SELECT ON private.host_profile_auth_cas FROM service_role', /Host private table security mismatch/, hostCatalog);
+  await rejectDrift('ALTER TABLE private.host_profile_auth_cas ENABLE ROW LEVEL SECURITY',
+    'ALTER TABLE private.host_profile_auth_cas DISABLE ROW LEVEL SECURITY', /Host private table security mismatch/, hostCatalog);
+  await rejectDrift('ALTER TABLE private.host_profile_source_authority ALTER COLUMN r2_enabled DROP DEFAULT',
+    'ALTER TABLE private.host_profile_source_authority ALTER COLUMN r2_enabled SET DEFAULT false', /Host column mismatch/, hostCatalog);
+  const hostConstraint = manifest.appliedHostAuthority.constraints.find(x => x.name === 'host_profile_media_identity');
+  await rejectDrift('ALTER TABLE media_assets DROP CONSTRAINT host_profile_media_identity',
+    'ALTER TABLE media_assets ADD CONSTRAINT host_profile_media_identity '+hostConstraint.definition, /Host constraint mismatch/, hostCatalog);
+  await rejectDrift('ALTER INDEX private.host_profile_auth_cas_pkey RENAME TO missing_host_index',
+    'ALTER INDEX private.missing_host_index RENAME TO host_profile_auth_cas_pkey', /Host (?:index|constraint) mismatch/, hostCatalog);
+  await rejectDrift('ALTER TABLE storage.objects DISABLE TRIGGER host_profile_legacy_storage_writer',
+    'ALTER TABLE storage.objects ENABLE TRIGGER host_profile_legacy_storage_writer', /Host trigger mismatch/, hostCatalog);
+  await rejectDrift('UPDATE private.host_profile_source_authority SET r2_enabled=false',
+    'UPDATE private.host_profile_source_authority SET r2_enabled=true', /Production Host authority marker mismatch/, hostProduction);
+  await rejectDrift("DELETE FROM supabase_migrations.schema_migrations WHERE version='20261006013755'",
+    () => db.query('INSERT INTO supabase_migrations.schema_migrations VALUES ($1,$2,$3)', ['20261006013755','host_profile_media_authority',[hostMigration]]), /Host applied ledger SQL mismatch/, hostProduction);
+  await rejectDrift("UPDATE supabase_migrations.schema_migrations SET statements=ARRAY['-- altered Host'] WHERE version='20261006013755'",
+    () => db.query('UPDATE supabase_migrations.schema_migrations SET statements=$1 WHERE version=$2', [[hostMigration],'20261006013755']), /Host applied ledger SQL mismatch/, hostProduction);
+  await rejectDrift('CREATE TABLE private.unreviewed_host_table(id integer)',
+    'DROP TABLE private.unreviewed_host_table', /Private table inventory mismatch/, hostProduction);
   await verify(financialLedger); await verify(financialCatalog);
   await rejectDrift("DELETE FROM supabase_migrations.schema_migrations WHERE version='20261005104924'",
     () => db.query('INSERT INTO supabase_migrations.schema_migrations VALUES ($1,$2,$3)',['20261005104924','solo_guarantee_financial_authority',[financialMigration]]),
