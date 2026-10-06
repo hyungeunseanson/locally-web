@@ -76,6 +76,10 @@ export type CardPaymentNotificationEnvelope = {
   provider: CardPaymentProvider;
   idempotencyKey: string | null;
   orderId: string | null;
+  /** NICEPAY original MOID; kept separate from generic orderId aliases. */
+  originalOrderId: string | null;
+  /** NICEPAY CancelMOID identifies the cancellation request, not the booking. */
+  cancelOrderId: string | null;
   providerTransactionId: string | null;
   amount: number | null;
   status: string | null;

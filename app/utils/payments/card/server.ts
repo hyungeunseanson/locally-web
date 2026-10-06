@@ -853,6 +853,8 @@ export async function readCardPaymentNotificationRequest(
 
   const payloadRecord = Object.fromEntries(payload.entries());
   const orderId = getPayloadValue(payload, ['merchant_uid', 'orderId', 'Moid', 'moid', 'MOID']);
+  const originalOrderId = getPayloadValue(payload, ['MOID', 'Moid', 'moid']);
+  const cancelOrderId = getPayloadValue(payload, ['CancelMOID']);
   const providerTransactionId = getPayloadValue(payload, [
     'imp_uid',
     'approvalId',
@@ -868,6 +870,8 @@ export async function readCardPaymentNotificationRequest(
     provider: getCurrentCardPaymentProvider(),
     idempotencyKey: orderId || providerTransactionId || null,
     orderId: orderId || null,
+    originalOrderId: originalOrderId || null,
+    cancelOrderId: cancelOrderId || null,
     providerTransactionId: providerTransactionId || null,
     amount: amount ? parseNumber(amount) : null,
     status: status || null,
