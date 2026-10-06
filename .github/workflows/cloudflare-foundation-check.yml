@@ -146,6 +146,14 @@ jobs:
       - name: Validate Community image-set CAS on native PostgreSQL 17
         run: COMMUNITY_PG17_MODULES="$RUNNER_TEMP/host-pg17/node_modules" npm run storage:community:native
 
+      - name: Reproduce Community freeze protection with upstream safeupdate on native PostgreSQL 17
+        env:
+          COMMUNITY_PG17_MODULES: ${{ runner.temp }}/host-pg17/node_modules
+          COMMUNITY_SAFEUPDATE_LIBRARY: ${{ runner.temp }}/community-safeupdate.so
+        run: |
+          node scripts/supabase/build-community-safeupdate-fixture.mjs
+          npm run storage:community:freeze-safeupdate:native
+
       - name: Validate Financial P0 on native PostgreSQL 17 and NICEPAY ACK
         run: |
           SOLO_PG17_MODULES="$RUNNER_TEMP/host-pg17/node_modules" npm run test:solo-guarantee-p0:native

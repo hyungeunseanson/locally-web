@@ -6,7 +6,7 @@ import { communityKey, COMMUNITY_BASE_URL, COMMUNITY_LEGACY_BASE } from '../../a
 export { owner, other, roleQuery };
 export const old1=COMMUNITY_LEGACY_BASE+'community/old-one.jpg',old2=COMMUNITY_LEGACY_BASE+'community/old-two.jpg';
 export const post1='33333333-3333-4333-8333-333333333333',post2='44444444-4444-4444-8444-444444444444';
-export async function setupCommunityDatabase(db) {
+export async function setupCommunityDatabase(db, {applyFreezeHotfix=true} = {}) {
  await setupHostDatabase(db);
  await db.exec(`CREATE TABLE public.community_posts(id uuid PRIMARY KEY,user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,images text[],content text DEFAULT 'Synthetic content',title text DEFAULT 'Synthetic title',view_count integer DEFAULT 0);
  ALTER TABLE public.community_posts ENABLE ROW LEVEL SECURITY;
@@ -15,6 +15,7 @@ export async function setupCommunityDatabase(db) {
  INSERT INTO public.community_posts(id,user_id,images) VALUES('${post1}','${owner}',ARRAY['${old1}','${old2}']);
  INSERT INTO storage.objects(name,owner_id,metadata,version,bucket_id) VALUES('community/old-one.jpg','${owner}','{"size":4,"mimetype":"image/jpeg"}','v1','images'),('community/old-two.jpg','${owner}','{"size":4,"mimetype":"image/jpeg"}','v1','images'),('community/orphan.jpg','${owner}','{"size":4,"mimetype":"image/jpeg"}','v1','images');`);
  await db.exec(await readFile('supabase/migrations/20261006105322_community_media_authority.sql','utf8'));
+ if (applyFreezeHotfix) await db.exec(await readFile('supabase/migrations/20261006173453_community_freeze_safeupdate.sql','utf8'));
 }
 export async function beginCommunity(db,actor=owner) {
  const id=randomUUID(),key=communityKey(actor,id),url=COMMUNITY_BASE_URL+'/'+key,sha='a'.repeat(64);

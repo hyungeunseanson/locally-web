@@ -227,7 +227,14 @@ expectedLedger.splice(-1, 0, {
   "repositorySha256": "55ac4184288d9213e31b4f40de928d7ccfd4c02765db90c0d2d7f8858c597912",
   "repositoryVersion": "20261006105322"
 });
-const expectedPendingMigrations = [];
+const expectedPendingMigrations = [
+  {
+    "version": "20261006173453",
+    "name": "community_freeze_safeupdate",
+    "repositoryFile": "supabase/migrations/20261006173453_community_freeze_safeupdate.sql",
+    "repositorySha256": "d54cc40925172e495631b44ad55d47092a5affafd6af15f9a569aad7f9076cfd"
+  }
+];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));
 for (const [index, expected] of expectedLedger.entries()) {
   const actual = manifest.migrationLedger[index];
