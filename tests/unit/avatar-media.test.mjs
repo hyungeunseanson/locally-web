@@ -82,11 +82,11 @@ test('Next/Image permits only canonical avatar namespace and retains external OA
   assert.deepEqual(config.images.remotePatterns.find(row=>row.hostname==='avatars-media.locally-travel.com'),{protocol:'https',hostname:'avatars-media.locally-travel.com',pathname:'/avatars/v1/**',search:''});
   for(const host of ['lh3.googleusercontent.com','k.kakaocdn.net'])assert(config.images.remotePatterns.some(row=>row.hostname===host));
 });
-test('desktop/mobile converge on one endpoint; later profile saves cannot overwrite newer avatar; host editor untouched',async()=>{
+test('desktop/mobile converge on one endpoint; later profile saves cannot overwrite newer avatar; HOST_AVATAR_AUTHORITY_SEPARATED',async()=>{
   for(const file of ['app/account/page.tsx','app/components/mobile/MobileProfileView.tsx']){
     const source=await readFile(file,'utf8');assert.match(source,/await uploadProfileAvatar\(compressedFile\)/);assert.doesNotMatch(source,/storage\.from\('avatars'\)/);assert.doesNotMatch(source,/avatar_url: (profile|editData)\.avatar_url,/);
   }
-  const host=await readFile('app/host/dashboard/components/ProfileEditor.tsx','utf8');assert.match(host,/storage\.from\('images'\)/);assert.match(host,/profile\//);
+  const host=await readFile('app/host/dashboard/components/ProfileEditor.tsx','utf8');assert.match(host,/await uploadHostProfilePhoto\(compressedFile\)/);assert.doesNotMatch(host,/storage\.from\(/);assert.doesNotMatch(host,/uploadProfileAvatar|PUBLIC_AVATAR_R2|PUBLIC_EXPERIENCE/);
 });
 
 function routeFixture({auth=true,profileOwner=owner,flag='false',failure,cas=true}={}) {

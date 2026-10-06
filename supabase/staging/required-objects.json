@@ -27,7 +27,14 @@
     "supabase/migrations/20261005082309_avatar_media_authority.sql",
     "supabase/migrations/20261005104924_solo_guarantee_financial_authority.sql"
   ],
-  "pendingProductionMigrations": [],
+  "pendingProductionMigrations": [
+  {
+    "version": "20261006013755",
+    "name": "host_profile_media_authority",
+    "repositoryFile": "supabase/migrations/20261006013755_host_profile_media_authority.sql",
+    "repositorySha256": "913d253b2853fa2581fb886cfd2279db147bb84f5b5b55c7dc12386fa49220d8"
+  }
+],
   "applicationTables": [
     "admin_audit_logs",
     "admin_job_runs",

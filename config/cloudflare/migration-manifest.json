@@ -286,7 +286,8 @@
       "CLOUDFLARE_FUNCTIONAL_CANARY_PAYMENT_MODE",
       "CLOUDFLARE_FUNCTIONAL_CANARY_GOOGLE_OAUTH",
       "CLOUDFLARE_FUNCTIONAL_CANARY_KAKAO_OAUTH"
-    ]
+    ],
+    "hostProfileSourceStaged": ["HOST_PROFILE_R2_SOURCE_ENABLED"]
   },
   "secrets": {
     "workerAlways": [

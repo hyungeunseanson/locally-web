@@ -206,7 +206,14 @@ const observedAppliedFinancialMigrations = [
   }
 ];
 expectedLedger.push(...observedAppliedFinancialMigrations);
-const expectedPendingMigrations = [];
+const expectedPendingMigrations = [
+  {
+    "version": "20261006013755",
+    "name": "host_profile_media_authority",
+    "repositoryFile": "supabase/migrations/20261006013755_host_profile_media_authority.sql",
+    "repositorySha256": "913d253b2853fa2581fb886cfd2279db147bb84f5b5b55c7dc12386fa49220d8"
+  }
+];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));
 for (const [index, expected] of expectedLedger.entries()) {
   const actual = manifest.migrationLedger[index];

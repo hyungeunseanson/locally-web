@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { getCloudflarePublicHostProfileImage } from "@/app/utils/cloudflarePublicHostProfileImages";
+import { isManagedHostProfileUrl } from "@/app/utils/hostProfileMediaContract.mjs";
 import { isManagedAvatarUrl } from "@/app/utils/avatarMediaContract.mjs";
 
 type PublicHostProfileImageProps = {
@@ -55,7 +56,7 @@ export default function PublicHostProfileImage({
         sizes={sizes}
         loading={loading}
         className={`h-full w-full ${className}`}
-        data-host-profile-image-delivery={isManagedAvatarUrl(originImageUrl) ? "avatar-r2" : "supabase-fallback"}
+        data-host-profile-image-delivery={isManagedAvatarUrl(originImageUrl) ? "avatar-r2" : isManagedHostProfileUrl(originImageUrl) ? "host-profile-r2" : "supabase-fallback"}
       />
     );
   }
