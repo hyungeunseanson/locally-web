@@ -1,6 +1,7 @@
 name: Chat performance regressions
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - 'app/hooks/useChat.ts'

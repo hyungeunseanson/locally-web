@@ -9,11 +9,11 @@ export function selectHostProfileSources(inventory) {
  if(inventory.bucketPublic!==true||!Array.isArray(inventory.references)||!Array.isArray(inventory.objects)||inventory.objects.length>1000)fail('inventory_invalid');
  for(const kind of ['host_application','profile_legacy_host','auth_legacy_host'])if(inventory.references.filter(r=>r.kind===kind).length>5000)fail('inventory_bounds');
  const objects=new Map(),groups=new Map(),parents=new Set();
- for(const o of inventory.objects){if(objects.has(o.key)||!/^profile\/[a-f0-9-]{36}_[0-9]+$/.test(o.key)||!Number.isSafeInteger(o.size)||o.size<=0)fail('object_invalid');objects.set(o.key,o);}
+ for(const o of inventory.objects){if(objects.has(o.key)||!/^profile\/[a-f0-9-]{36}_[0-9]+$/.test(o.key)||!Number.isSafeInteger(o.size)||o.size<0)fail('object_invalid');objects.set(o.key,o);}
  for(const r of inventory.references){
   if(!['host_application','profile_legacy_host','auth_legacy_host'].includes(r.kind)||parents.has(r.kind+':'+r.id))fail('duplicate_parent');parents.add(r.kind+':'+r.id);
   const key=legacyHostProfileKey(r.locator);if(key===null)continue;
-  const object=objects.get(key);if(!object)fail('source_missing');
+  const object=objects.get(key);if(!object)fail('source_missing');if(object.size===0)fail('source_empty');
   if(object.owner!==r.owner||key.split('/')[1].split('_')[0]!==r.owner||(['profile_legacy_host','auth_legacy_host'].includes(r.kind)&&r.id!==r.owner))fail('owner_mismatch');
   if(!groups.has(key))groups.set(key,{ownerId:r.owner,oldUrl:r.locator,source:object,references:[]});
   const group=groups.get(key);if(group.ownerId!==r.owner)fail('shared_owner_mismatch');if(r.kind==='auth_legacy_host' && (!/^[a-f0-9]{64}$/.test(r.metadataDigest||'') || (!inventory.references.some(p=>p.kind==='profile_legacy_host'&&p.owner===r.owner&&p.locator===r.locator)||!inventory.references.some(p=>p.kind==='host_application'&&p.owner===r.owner&&p.locator===r.locator))))fail('auth_public_disagreement');group.references.push({kind:r.kind,id:r.id,...(r.kind==='auth_legacy_host'?{metadataDigest:r.metadataDigest}:{})});
