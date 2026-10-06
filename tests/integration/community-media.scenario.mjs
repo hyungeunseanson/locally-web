@@ -8,7 +8,7 @@ export const old1=COMMUNITY_LEGACY_BASE+'community/old-one.jpg',old2=COMMUNITY_L
 export const post1='33333333-3333-4333-8333-333333333333',post2='44444444-4444-4444-8444-444444444444';
 export async function setupCommunityDatabase(db) {
  await setupHostDatabase(db);
- await db.exec(`CREATE TABLE public.community_posts(id uuid PRIMARY KEY,user_id uuid NOT NULL,images text[],content text DEFAULT 'Synthetic content',title text DEFAULT 'Synthetic title',view_count integer DEFAULT 0);
+ await db.exec(`CREATE TABLE public.community_posts(id uuid PRIMARY KEY,user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,images text[],content text DEFAULT 'Synthetic content',title text DEFAULT 'Synthetic title',view_count integer DEFAULT 0);
  ALTER TABLE public.community_posts ENABLE ROW LEVEL SECURITY;
  CREATE POLICY community_owned_write ON public.community_posts FOR ALL TO authenticated USING(auth.uid()=user_id) WITH CHECK(auth.uid()=user_id);
  GRANT SELECT,INSERT,UPDATE,DELETE ON public.community_posts TO service_role,authenticated;

@@ -38,7 +38,7 @@ export function validateCommunityPlan(plan,digest){
 }
 export function communitySqlPayload(plan){return {p_plan_digest:plan.planDigest,p_assets:plan.entries.map(e=>({id:e.assetId,owner:e.ownerId,sourceKey:e.source.key,oldUrl:e.oldUrl,newUrl:e.newUrl,sha256:e.sha256,size:e.source.size,mime:e.source.mime,version:e.source.version,updatedAt:e.source.updatedAt})),p_posts:plan.posts};}
 export function assertCommunityCurrent(plan,inventory,mode){
- if(inventory.legacyWritesFrozen!==true)fail('legacy_writer_not_frozen');selectCommunitySources(inventory);
+ if(inventory.legacyWritesFrozen!==true)fail('legacy_writer_not_frozen');const selected=selectCommunitySources(inventory),approvedSources=new Set(plan.entries.map(e=>e.source.key));if(selected.entries.some(e=>!approvedSources.has(e.source.key)))fail('unplanned_live_source');
  let phase;
  for(const p of plan.posts){const current=inventory.posts.find(r=>r.id===p.id);if(!current||current.owner!==p.owner)fail('parent_drift');const match=communityDigest(current.images);let currentPhase;
   if(match===communityDigest(p.oldImages)&&current.revision===p.revision)currentPhase='old';

@@ -56,7 +56,13 @@ REVOKE ALL ON private.community_media_authority,private.community_media_context,
 CREATE FUNCTION private.guard_community_media_writer() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE frozen boolean; images_value text[]; old_images text[]:=ARRAY[]::text[]; url text; owner_value uuid; authorized boolean:=false; rollback_value boolean:=false;
 BEGIN
- SELECT legacy_writes_frozen INTO frozen FROM private.community_media_authority;
+ IF TG_TABLE_SCHEMA='storage' THEN
+  IF NOT ((TG_OP<>'INSERT' AND OLD.bucket_id='images' AND OLD.name LIKE 'community/%') OR (TG_OP<>'DELETE' AND NEW.bucket_id='images' AND NEW.name LIKE 'community/%')) THEN
+   IF TG_OP='DELETE' THEN RETURN OLD; END IF; RETURN NEW;
+  END IF;
+ END IF;
+ -- Freeze UPDATE waits for in-flight legacy DB writers; later writers observe true.
+ SELECT legacy_writes_frozen INTO frozen FROM private.community_media_authority FOR SHARE;
  IF TG_TABLE_SCHEMA='storage' THEN
   IF frozen AND ((TG_OP<>'INSERT' AND OLD.bucket_id='images' AND OLD.name LIKE 'community/%') OR (TG_OP<>'DELETE' AND NEW.bucket_id='images' AND NEW.name LIKE 'community/%')) THEN RAISE EXCEPTION 'community_legacy_storage_write_disabled' USING ERRCODE='42501'; END IF;
   IF TG_OP='DELETE' THEN RETURN OLD; END IF; RETURN NEW;

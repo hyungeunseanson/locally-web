@@ -37,4 +37,23 @@ try{await pg.initialise();await pg.start();for(let i=0;i<3;i++){const c=pg.getPg
  const migrationUntil=Date.now()+4000;let migrationBlocked=false;while(Date.now()<migrationUntil){if((await base.query("SELECT count(*)::int n FROM pg_stat_activity WHERE pid=$1 AND wait_event_type='Lock'",[migration.processID])).rows[0].n){migrationBlocked=true;break;}}
  assert(migrationBlocked&&!migrationSettled);await writer.query('COMMIT');assert.equal((await migrating)?.code,'40001');await migration.query('ROLLBACK');assert.deepEqual((await base.query('SELECT images FROM community_posts WHERE id=$1',[racePost])).rows[0].images,[newer.url]);assert.equal((await base.query('SELECT state FROM media_assets WHERE id=$1',[prepared.id])).rows[0].state,'pending');console.log('COMMUNITY_NATIVE_PG17_MIGRATION_LOCK_RACE PASS');
 
+ // Prefix-scoped freeze must wait for already-authorized legacy metadata writes.
+ await base.query('UPDATE private.community_media_authority SET legacy_writes_frozen=false');
+ await writer.query('BEGIN');await writer.query("INSERT INTO storage.objects(name,owner_id,bucket_id,version,metadata) VALUES('community/inflight.jpg',$1,'images','v1','{\"size\":4,\"mimetype\":\"image/jpeg\"}')",[owner]);
+ let freezeSettled=false;const freezing=migration.query('SELECT public.set_community_legacy_writer_freeze(true,$1,$2)',[next.id,next.sha]).then(v=>{freezeSettled=true;return v});
+ const freezeUntil=Date.now()+4000;let freezeBlocked=false;while(Date.now()<freezeUntil){if((await base.query("SELECT count(*)::int n FROM pg_stat_activity WHERE pid=$1 AND wait_event_type='Lock'",[migration.processID])).rows[0].n){freezeBlocked=true;break;}}
+ assert(freezeBlocked&&!freezeSettled);
+ // Another product's Storage metadata is unaffected by the Community freeze wait.
+ await base.query("INSERT INTO storage.objects(name,bucket_id) VALUES('reviews/during-community-freeze.jpg','images')");
+ await writer.query('COMMIT');await freezing;
+ assert.equal((await base.query("SELECT count(*)::int n FROM storage.objects WHERE name='community/inflight.jpg'")).rows[0].n,1);
+ await assert.rejects(base.query("INSERT INTO storage.objects(name,bucket_id) VALUES('community/after-freeze.jpg','images')"));
+ console.log('COMMUNITY_NATIVE_PG17_LEGACY_FREEZE_LOCK_RACE PASS');
+
+ // Production catalog: Community owner -> profiles(id) ON DELETE CASCADE, NOT NULL.
+ const deletedOwner=randomUUID(),deletedPost=randomUUID();await base.query('INSERT INTO profiles(id) VALUES($1)',[deletedOwner]);const owned=await beginCommunity(db,deletedOwner);
+ await base.query('INSERT INTO community_posts(id,user_id,images) VALUES($1,$2,$3)',[deletedPost,deletedOwner,[owned.url]]);
+ await base.query('BEGIN; SET LOCAL ROLE service_role');await base.query('DELETE FROM profiles WHERE id=$1',[deletedOwner]);await base.query('COMMIT');
+ assert.equal((await base.query('SELECT count(*)::int n FROM community_posts WHERE id=$1',[deletedPost])).rows[0].n,0);assert.equal((await base.query('SELECT count(*)::int n FROM media_asset_references WHERE asset_id=$1',[owned.id])).rows[0].n,0);assert.equal((await base.query('SELECT state,deleted_at FROM media_assets WHERE id=$1',[owned.id])).rows[0].state,'tombstoned');assert.equal((await base.query('SELECT deleted_at FROM media_assets WHERE id=$1',[owned.id])).rows[0].deleted_at,null);console.log('COMMUNITY_NATIVE_PG17_OWNER_PROFILE_CASCADE_RETAINS_BYTES PASS');
+
 }finally{for(const c of clients)await c.end().catch(()=>{});await pg.stop().catch(()=>{});await rm(dir,{recursive:true,force:true});}
