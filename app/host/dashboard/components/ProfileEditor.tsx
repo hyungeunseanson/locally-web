@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Briefcase, Globe, Music, MessageCircle, Save, Camera, Lock, CreditCard, FileText, AlertTriangle, Mail } from 'lucide-react';
-import { createClient } from '@/app/utils/supabase/client';
+import { uploadHostProfilePhoto } from '@/app/utils/hostProfileUpload';
 import { useToast } from '@/app/context/ToastContext';
 import { PROFILE_LANGUAGE_OPTIONS } from '@/app/constants/profile';
 import { getProfileCompletion, normalizeProfileLanguageList } from '@/app/utils/profile';
@@ -28,6 +28,7 @@ export interface HostProfile {
   account_holder?: string | null;
   motivation?: string | null;
   avatar_url?: string | null;
+  host_profile_photo?: string | null;
 }
 
 interface ProfileEditorProps {
@@ -91,7 +92,8 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const supabase = useMemo(() => createClient(), []);
+  const [photoUploaded, setPhotoUploaded] = useState(false);
+
 
   useEffect(() => {
     if (profile) {
@@ -112,6 +114,7 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
         motivation: profile.motivation || ''
       });
       setAvatarUrl(profile.avatar_url || null);
+      setPhotoUploaded(false);
     }
   }, [profile]);
 
@@ -149,14 +152,9 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
 
     setUploading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const compressedFile = await compressImage(file); // 🟢 압축 추가
-      const fileName = `profile/${user.id}_${Date.now()}`;
-      const { error } = await supabase.storage.from('images').upload(fileName, compressedFile);
-      if (error) throw error;
-      const { data } = supabase.storage.from('images').getPublicUrl(fileName);
-      setAvatarUrl(data.publicUrl);
+      const compressedFile = await compressImage(file);
+      setAvatarUrl(await uploadHostProfilePhoto(compressedFile));
+      setPhotoUploaded(true);
       showToast(t('profile_photo_change_done'), 'success');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : t('hp_unknown_error');
@@ -181,7 +179,8 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
           languages: formData.languages,
           introduction: formData.introduction,
           email: formData.email,
-          avatarUrl,
+          avatarUrl: photoUploaded ? avatarUrl : profile?.host_profile_photo ?? null,
+          expectedProfilePhoto: profile?.host_profile_photo ?? null,
         }),
       });
 

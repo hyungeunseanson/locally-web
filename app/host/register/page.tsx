@@ -5,6 +5,7 @@ import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext';
 import HostRegisterForm from './components/HostRegisterForm';
+import { uploadHostProfilePhoto } from '@/app/utils/hostProfileUpload';
 import {
   type LanguageLevel,
   type LanguageLevelEntry,
@@ -28,6 +29,7 @@ type HostRegisterFormData = {
   instagram: string;
   source: string;
   profilePhoto: string | null;
+  expectedProfilePhoto: string | null;
   selfIntro: string;
   idCardFile: string | null;
   hostNationality: string;
@@ -50,6 +52,7 @@ const INITIAL_FORM_DATA: HostRegisterFormData = {
   instagram: '',
   source: '',
   profilePhoto: null,
+  expectedProfilePhoto: null,
   selfIntro: '',
   idCardFile: null,
   hostNationality: '',
@@ -221,6 +224,7 @@ export default function HostRegisterPage() {
         instagram: data.instagram || '',
         source: data.source || '',
         profilePhoto: data.profile_photo || null,
+        expectedProfilePhoto: data.profile_photo || null,
         selfIntro: data.self_intro || '',
         idCardFile: data.id_card_file || null,
         hostNationality: data.host_nationality || '',
@@ -407,20 +411,7 @@ export default function HostRegisterPage() {
 
       if (files.profile) {
         const compressedProfile = await compressImage(files.profile); // 🟢 압축 추가
-        const fileName = `profile/${user.id}_${Date.now()}`;
-        const { error } = await supabase.storage.from('images').upload(fileName, compressedProfile);
-        if (error) {
-          reportHostRegisterStorageUploadFailure(error, {
-            bucket: 'images',
-            fileKind: 'profile_photo',
-            filePath: fileName,
-            locale: lang,
-          });
-          throw new LocalizedSubmitError(copy.profilePhotoUploadFailed);
-        }
-
-        const { data } = supabase.storage.from('images').getPublicUrl(fileName);
-        profileUrl = sanitizeProfilePhotoForSubmit(data.publicUrl);
+        profileUrl = sanitizeProfilePhotoForSubmit(await uploadHostProfilePhoto(compressedProfile));
       }
 
       if (files.idCard) {
@@ -452,6 +443,7 @@ export default function HostRegisterPage() {
         instagram: formData.instagram,
         source: formData.source,
         profilePhoto: profileUrl,
+        expectedProfilePhoto: formData.expectedProfilePhoto,
         selfIntro: formData.selfIntro,
         idCardFile: idCardUrl,
         hostNationality: formData.hostNationality,

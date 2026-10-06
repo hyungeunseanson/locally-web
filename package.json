@@ -123,7 +123,10 @@
     "test:admin-chat:search": "node --test tests/unit/admin-chat-search.test.mjs && playwright test -c playwright.admin-chat-search.config.ts",
     "test:admin-chat:search:native": "node scripts/supabase/test-admin-chat-search-native.mjs",
     "storage:foundation:contract": "node scripts/supabase/test-media-lifecycle-foundation.mjs && node --test tests/unit/media-lifecycle-foundation.test.mjs && python3 -m unittest discover -s scripts/backup -p \"storage_*test.py\"",
-    "storage:avatar:contract": "node scripts/supabase/test-avatar-media-authority.mjs && node --test tests/unit/avatar-media.test.mjs scripts/cloudflare/avatar-media-migration.test.mjs"
+    "storage:avatar:contract": "node scripts/supabase/test-avatar-media-authority.mjs && node --test tests/unit/avatar-media.test.mjs scripts/cloudflare/avatar-media-migration.test.mjs",
+    "storage:host-profile:contract": "node scripts/supabase/test-host-profile-media-authority.mjs && node --test tests/unit/host-profile-media.test.mjs tests/integration/host-profile-save.test.mjs scripts/cloudflare/host-profile-media-migration.test.mjs && PYTHONPATH=scripts/backup python3 -m unittest storage_host_profile_source_test",
+    "storage:host-profile:runtime": "node scripts/cloudflare/test-host-profile-media-runtime.mjs",
+    "storage:host-profile:native": "node scripts/supabase/test-host-profile-media-native.mjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

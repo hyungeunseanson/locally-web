@@ -18,6 +18,7 @@ type HostRegisterSubmitBody = {
   instagram?: unknown;
   source?: unknown;
   profilePhoto?: unknown;
+  expectedProfilePhoto?: unknown;
   selfIntro?: unknown;
   idCardFile?: unknown;
   hostNationality?: unknown;
@@ -30,6 +31,7 @@ type HostRegisterSubmitBody = {
 type HostApplicationRow = {
   id: string;
   status: string | null;
+  profile_photo: string | null;
 };
 
 type ProfileSeedRow = {
@@ -110,7 +112,7 @@ export async function POST(request: NextRequest) {
 
     const { data: latestApplication, error: latestApplicationError } = await supabaseAdmin
       .from('host_applications')
-      .select('id, status')
+      .select('id, status, profile_photo')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -123,6 +125,10 @@ export async function POST(request: NextRequest) {
     // [Guard] 이미 승인된 호스트가 재제출 시 승인 데이터 덮어쓰기 방지
     if (latestApplication?.status === 'approved') {
       return NextResponse.json({ success: true, applicationId: latestApplication.id, status: 'approved', notifyAdmin: false });
+    }
+
+    if (latestApplication && (!Object.hasOwn(body, 'expectedProfilePhoto') || body.expectedProfilePhoto !== latestApplication.profile_photo)) {
+      return createErrorResponse(409, 'invalid_profile_photo_url', 'Host profile photo changed. Refresh before saving.');
     }
 
     const languageLevels = normalizeLanguageLevels(body.languageLevels, [], 3);
@@ -248,14 +254,11 @@ export async function POST(request: NextRequest) {
     let applicationId: string | null = latestApplication?.id ?? null;
 
     if (latestApplication) {
-      const { error: updateError } = await supabaseAdmin
-        .from('host_applications')
-        .update(payload)
-        .eq('id', latestApplication.id);
-
-      if (updateError) {
-        throw updateError;
-      }
+      let update = supabaseAdmin.from('host_applications').update(payload).eq('id', latestApplication.id).eq('status', latestApplication.status);
+      update = latestApplication.profile_photo === null ? update.is('profile_photo', null) : update.eq('profile_photo', latestApplication.profile_photo);
+      const saved = await update.select('id').maybeSingle();
+      if (saved.error) throw saved.error;
+      if (!saved.data) return createErrorResponse(409, 'invalid_profile_photo_url', 'Host profile changed. Refresh before saving.');
     } else {
       const { data: insertedApplication, error: insertError } = await supabaseAdmin
         .from('host_applications')

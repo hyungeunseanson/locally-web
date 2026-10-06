@@ -13,10 +13,12 @@ type HostProfileUpdateBody = {
   languages?: unknown;
   introduction?: unknown;
   avatarUrl?: unknown;
+  expectedProfilePhoto?: unknown;
 };
 
 type HostApplicationRef = {
   id: string;
+  profile_photo: string | null;
 };
 
 type SupabaseErrorLike = {
@@ -66,7 +68,7 @@ export async function POST(request: NextRequest) {
 
     const { data: latestApplication, error: latestApplicationError } = await supabaseAdmin
       .from('host_applications')
-      .select('id')
+      .select('id,profile_photo')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -78,6 +80,10 @@ export async function POST(request: NextRequest) {
 
     if (!latestApplication?.id) {
       return NextResponse.json({ success: false, error: 'Host application not found' }, { status: 404 });
+    }
+
+    if (!hasOwn(body, 'expectedProfilePhoto') || body.expectedProfilePhoto !== latestApplication.profile_photo) {
+      return NextResponse.json({ success: false, error: 'Host profile photo changed. Refresh before saving.' }, { status: 409 });
     }
 
     const emailProvided = hasOwn(body, 'email');
@@ -144,14 +150,11 @@ export async function POST(request: NextRequest) {
       throw profileUpdateRes.error;
     }
 
-    const hostApplicationUpdateRes = await supabaseAdmin
-      .from('host_applications')
-      .update(hostApplicationUpdates)
-      .eq('id', latestApplication.id);
-
-    if (hostApplicationUpdateRes.error) {
-      throw hostApplicationUpdateRes.error;
-    }
+    let applicationUpdate = supabaseAdmin.from('host_applications').update(hostApplicationUpdates).eq('id', latestApplication.id);
+    applicationUpdate = latestApplication.profile_photo === null ? applicationUpdate.is('profile_photo', null) : applicationUpdate.eq('profile_photo', latestApplication.profile_photo);
+    const hostApplicationUpdateRes = await applicationUpdate.select('id').maybeSingle();
+    if (hostApplicationUpdateRes.error) throw hostApplicationUpdateRes.error;
+    if (!hostApplicationUpdateRes.data) return NextResponse.json({ success: false, error: 'Host profile photo changed. Refresh before saving.' }, { status: 409 });
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -105,6 +105,7 @@ function buildMergedHostProfile(
     full_name: profileData?.full_name || hostPublicProfile.name,
     name: hostPublicProfile.name,
     avatar_url: hostPublicProfile.avatarUrl,
+    host_profile_photo: hostData?.profile_photo ?? null,
     birth_date: resolvedBirthDate,
     introduction: hostPublicProfile.bio,
     languages: hostPublicProfile.languages,

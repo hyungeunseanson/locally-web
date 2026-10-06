@@ -117,6 +117,18 @@ jobs:
       - name: Validate avatar media authority and migration boundaries
         run: npm run storage:avatar:contract
 
+      - name: Validate Host source authority, Auth atomic CAS, shared references and rollback
+        run: npm run storage:host-profile:contract
+
+      - name: Validate Host upload on local workerd and isolated R2 bindings
+        run: npm run storage:host-profile:runtime
+
+      - name: Install isolated native PostgreSQL 17 fixture
+        run: npm install --prefix "$RUNNER_TEMP/host-pg17" --no-audit --no-fund embedded-postgres@17.6.0-beta.15 pg@8.16.3
+
+      - name: Validate Host source authority on native PostgreSQL 17
+        run: HOST_PG17_MODULES="$RUNNER_TEMP/host-pg17/node_modules" npm run storage:host-profile:native
+
       - name: Validate Storage byte backup and lifecycle foundation
         run: npm run storage:foundation:contract
 

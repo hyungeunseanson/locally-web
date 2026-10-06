@@ -27,6 +27,9 @@ jobs:
       # Optional until avatar cutover. Dedicated avatar reader; existing keys stay unchanged.
       R2_AVATAR_SOURCE_READ_ACCESS_KEY_ID: ${{ secrets.R2_AVATAR_SOURCE_READ_ACCESS_KEY_ID }}
       R2_AVATAR_SOURCE_READ_SECRET_ACCESS_KEY: ${{ secrets.R2_AVATAR_SOURCE_READ_SECRET_ACCESS_KEY }}
+      # Optional before Host registration; dedicated read-only original reader.
+      R2_HOST_PROFILE_SOURCE_READ_ACCESS_KEY_ID: ${{ secrets.R2_HOST_PROFILE_SOURCE_READ_ACCESS_KEY_ID }}
+      R2_HOST_PROFILE_SOURCE_READ_SECRET_ACCESS_KEY: ${{ secrets.R2_HOST_PROFILE_SOURCE_READ_SECRET_ACCESS_KEY }}
       AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       R2_ENDPOINT: ${{ vars.R2_ENDPOINT }}

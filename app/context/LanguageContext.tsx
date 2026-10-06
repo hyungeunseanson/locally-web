@@ -6300,7 +6300,6 @@ export function LanguageProvider({
 
     void supabase.auth.updateUser({
       data: {
-        ...user.user_metadata,
         preferred_locale: lang,
       },
     }).then(({ error }) => {
