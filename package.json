@@ -131,7 +131,8 @@
     "storage:host-profile:native": "node scripts/supabase/test-host-profile-media-native.mjs",
     "storage:community:contract": "node --test tests/unit/community-media.test.mjs tests/unit/community-post-media.test.mjs scripts/cloudflare/community-media-migration.test.mjs && PYTHONPATH=scripts/backup python3 -m unittest storage_community_source_test",
     "storage:community:runtime": "node scripts/cloudflare/test-community-media-runtime.mjs && node scripts/cloudflare/test-community-readers-runtime.mjs",
-    "storage:community:native": "node scripts/supabase/test-community-media-native.mjs"
+    "storage:community:native": "node scripts/supabase/test-community-media-native.mjs",
+    "storage:community:freeze-safeupdate:native": "node scripts/supabase/test-community-freeze-safeupdate-native.mjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
