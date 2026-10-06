@@ -20,3 +20,21 @@ import {assertConfigUnchanged} from './candidate-release-contract.mjs';
 test('existing candidate integrity gate still rejects Host binding/flag drift; explicit bootstrap must precede a new baseline',()=>{const before={routes:[],customDomains:[],subdomain:{enabled:false,previews_enabled:false},crons:['one','two','three','four','five'],queueConsumers:[],bindings:[{name:'PUBLIC_AVATAR_R2',type:'r2_bucket',bucket_name:'locally-public-avatars'}]};const after=structuredClone(before);after.bindings.push({name:'PUBLIC_HOST_PROFILE_SOURCE_R2',type:'r2_bucket',bucket_name:'locally-public-host-profile-originals'});assert.throws(()=>assertConfigUnchanged(before,after),e=>e.code==='candidate_binding_or_secret_drift');assertConfigUnchanged(after,structuredClone(after));});
 
 test('Host operator credential cannot reuse known Avatar/Experience/derivative/destination/Host reader authority',()=>{const base={R2_ENDPOINT:'https://'+'a'.repeat(32)+'.r2.cloudflarestorage.com',HOST_PROFILE_R2_ACCESS_KEY_ID:'synthetic-host-id',HOST_PROFILE_R2_SECRET_ACCESS_KEY:'fixture'};for(const name of ['AVATAR_R2_ACCESS_KEY_ID','R2_AVATAR_SOURCE_READ_ACCESS_KEY_ID','R2_SOURCE_ACCESS_KEY_ID','R2_ACCESS_KEY_ID','AWS_ACCESS_KEY_ID','R2_HOST_PROFILE_SOURCE_READ_ACCESS_KEY_ID'])assert.throws(()=>hostProfileOperatorBinding({...base,[name]:base.HOST_PROFILE_R2_ACCESS_KEY_ID}),/credential_reused/);});
+
+
+test('unreferenced zero-byte JPEGs remain counted, never planned, prepared or deleted',async()=>{
+ const i=fixture();for(const suffix of [3,4])i.objects.push({key:'profile/'+owner+'_'+suffix,owner,size:0,mime:'image/jpeg',version:'empty-orphan'});
+ const selected=selectHostProfileSources(i);assert.equal(selected.entries.length,1);assert.equal(selected.unreferenced,3);
+ const p=await plan(i);assert.equal(p.entries.length,1);assert.equal(p.legacy_unreferenced_retained,3);assert.equal(p.entries[0].source.size,4);validateHostProfilePlan(p,p.planDigest);
+ const d=deps(i),result=await executeHostProfilePlan(p,p.planDigest,d,'prepare');assert.equal(result.prepared,1);assert.equal(result.physicalDeletes,0);assert.equal(d.calls.filter(c=>c==='prepare').length,1);assert(d.calls.every(c=>['prepare','record'].includes(c)));
+});
+test('referenced zero-byte JPEG is rejected before byte reads, including the plan validator',async()=>{
+ const i=fixture();i.objects[0].size=0;assert.throws(()=>selectHostProfileSources(i),/source_empty/);
+ let reads=0;await assert.rejects(planHostProfileMigration(i,async()=>{reads++;return bytes;},(_b,m)=>m),/source_empty/);assert.equal(reads,0);
+ const p=await plan(fixture());p.entries[0].source.size=0;const payload={...p};delete payload.planDigest;p.planDigest=hostProfileDigest(payload);assert.throws(()=>validateHostProfilePlan(p,p.planDigest));
+});
+test('negative, fractional, unsafe size and invalid key remain blocked even for unreferenced objects',()=>{
+ for(const mutate of [o=>o.size=-1,o=>o.size=0.5,o=>o.size=Number.MAX_SAFE_INTEGER+1,o=>o.key='profile/invalid']){
+  const i=fixture();mutate(i.objects[1]);assert.throws(()=>selectHostProfileSources(i),/object_invalid/);
+ }
+});
