@@ -273,12 +273,16 @@ try {
   await db.exec('CREATE TABLE public.community_posts(id uuid PRIMARY KEY,user_id uuid,images text[])');
   const communityMigration = await readFile('supabase/migrations/20261006105322_community_media_authority.sql','utf8');
   await db.exec(communityMigration);
+  const freezeHotfix = await readFile('supabase/migrations/20261006173453_community_freeze_safeupdate.sql','utf8');
+  await db.exec(freezeHotfix);
+  await db.exec('UPDATE private.community_media_authority SET legacy_writes_frozen=true WHERE singleton IS TRUE');
   await verify(communityCatalog); await verify(communityProduction);
+  await rejectDrift("UPDATE supabase_migrations.schema_migrations SET statements=ARRAY['-- altered hotfix'] WHERE version='20261006180321'", () => db.query('UPDATE supabase_migrations.schema_migrations SET statements=$1 WHERE version=$2', [[freezeHotfix],'20261006180321']), /Community hotfix applied ledger SQL mismatch/, communityProduction);
   await rejectDrift('GRANT SELECT ON private.community_media_authority TO service_role', 'REVOKE SELECT ON private.community_media_authority FROM service_role', /Community catalog security or definition mismatch/, communityCatalog);
   await rejectDrift('ALTER TABLE private.community_media_context DISABLE ROW LEVEL SECURITY', 'ALTER TABLE private.community_media_context ENABLE ROW LEVEL SECURITY', /Community catalog security or definition mismatch/, communityCatalog);
   await rejectDrift('ALTER TABLE community_posts ALTER COLUMN media_revision DROP NOT NULL', 'ALTER TABLE community_posts ALTER COLUMN media_revision SET NOT NULL', /Community catalog security or definition mismatch/, communityCatalog);
   await rejectDrift('ALTER TABLE storage.objects DISABLE TRIGGER community_legacy_storage_writer', 'ALTER TABLE storage.objects ENABLE TRIGGER community_legacy_storage_writer', /Community catalog security or definition mismatch/, communityCatalog);
-  await rejectDrift('UPDATE private.community_media_authority SET legacy_writes_frozen=true', 'UPDATE private.community_media_authority SET legacy_writes_frozen=false', /Production Community authority marker mismatch/, communityProduction);
+  await rejectDrift('UPDATE private.community_media_authority SET legacy_writes_frozen=false WHERE singleton IS TRUE', 'UPDATE private.community_media_authority SET legacy_writes_frozen=true WHERE singleton IS TRUE', /Production Community authority marker mismatch/, communityProduction);
   await rejectDrift("UPDATE supabase_migrations.schema_migrations SET statements=ARRAY['-- altered Community'] WHERE version='20261006105322'", () => db.query('UPDATE supabase_migrations.schema_migrations SET statements=$1 WHERE version=$2', [[communityMigration],'20261006105322']), /Community applied ledger SQL mismatch/, communityProduction);
   await verify(hostCatalog);
   await assert.rejects(verify(hostProduction), /Production Host authority marker mismatch/);

@@ -30,14 +30,7 @@
     "supabase/migrations/20261006105322_community_media_authority.sql",
     "supabase/migrations/20261006133015_admin_chat_canonical_recency.sql"
   ],
-  "pendingProductionMigrations": [
-    {
-      "version": "20261006173453",
-      "name": "community_freeze_safeupdate",
-      "repositoryFile": "supabase/migrations/20261006173453_community_freeze_safeupdate.sql",
-      "repositorySha256": "d54cc40925172e495631b44ad55d47092a5affafd6af15f9a569aad7f9076cfd"
-    }
-  ],
+  "pendingProductionMigrations": [],
   "applicationTables": [
     "admin_audit_logs",
     "admin_job_runs",

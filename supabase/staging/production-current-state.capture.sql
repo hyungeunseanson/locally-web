@@ -1,5 +1,5 @@
 -- Schema/catalog metadata only. No application rows or Storage objects.
--- Captured read-only from Production on 2026-10-06T15:16:07.294874+00:00.
+-- Captured read-only from Production on 2026-10-06T18:11:30.367161+00:00.
 BEGIN TRANSACTION READ ONLY;
 WITH relations AS (
  SELECT c.*,n.nspname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname IN ('public','private')

@@ -1,6 +1,6 @@
 {
   "schemaContractVersion": 9,
-  "capturedAt": "2026-10-06T15:16:07.294874+00:00",
+  "capturedAt": "2026-10-06T18:11:30.367161+00:00",
   "productionProjectRef": "uhinvcydgzqlpnvieyal",
   "source": {
     "kind": "read-only Production PostgreSQL catalog inventory",
@@ -194,6 +194,14 @@
       "repositorySha256": "e2a79488d8b24a5d923f9247d5331eb2f9de95436a6ec790bf81981c00d8a889",
       "repositoryVersion": "20261006133015",
       "ledgerStatementsSha256": "e2a79488d8b24a5d923f9247d5331eb2f9de95436a6ec790bf81981c00d8a889"
+    },
+    {
+      "version": "20261006180321",
+      "name": "community_freeze_safeupdate",
+      "repositoryFile": "supabase/migrations/20261006173453_community_freeze_safeupdate.sql",
+      "repositorySha256": "d54cc40925172e495631b44ad55d47092a5affafd6af15f9a569aad7f9076cfd",
+      "repositoryVersion": "20261006173453",
+      "ledgerStatementsSha256": "d54cc40925172e495631b44ad55d47092a5affafd6af15f9a569aad7f9076cfd"
     }
   ],
   "operationalStateDeltas": [
@@ -1298,14 +1306,7 @@
     "resultLimit": 25,
     "lockTimeout": "2s"
   },
-  "pendingProductionMigrations": [
-    {
-      "version": "20261006173453",
-      "name": "community_freeze_safeupdate",
-      "repositoryFile": "supabase/migrations/20261006173453_community_freeze_safeupdate.sql",
-      "repositorySha256": "d54cc40925172e495631b44ad55d47092a5affafd6af15f9a569aad7f9076cfd"
-    }
-  ],
+  "pendingProductionMigrations": [],
   "selectiveProductionRollout": {
     "allowedVersions": [
       "20261005104924"
@@ -3092,7 +3093,7 @@
         "acl": "{postgres=X/postgres,service_role=X/postgres}",
         "owner": "postgres",
         "result": "boolean",
-        "bodyMd5": "df4f50e676994beadbfc2a80f8019e04",
+        "bodyMd5": "e9f05193e92e93b2804969dd52641e63",
         "identity": "private.set_community_legacy_writer_freeze(p_frozen boolean, p_smoke_asset_id uuid, p_sha256 text)",
         "volatility": "v",
         "configuration": [
@@ -3440,10 +3441,10 @@
     "authority": [
       {
         "singleton": true,
-        "legacy_writes_frozen": false
+        "legacy_writes_frozen": true
       }
     ],
-    "catalogCapturedAt": "2026-10-06T17:01:51.386865+00:00",
+    "catalogCapturedAt": "2026-10-06T18:11:30.367161+00:00",
     "productionWrites": 0,
     "ledgerEvidence": [
       {
@@ -3452,6 +3453,13 @@
         "statementsMd5": "53e0523d80dfe4ce279fb98c548e7f58",
         "statementCount": 1,
         "statementsSha256": "55ac4184288d9213e31b4f40de928d7ccfd4c02765db90c0d2d7f8858c597912"
+      },
+      {
+        "name": "community_freeze_safeupdate",
+        "version": "20261006180321",
+        "statementsMd5": "d6fbf1ae7b3fefd10210ef4c9d4b7a77",
+        "statementCount": 1,
+        "statementsSha256": "d54cc40925172e495631b44ad55d47092a5affafd6af15f9a569aad7f9076cfd"
       }
     ]
   }
