@@ -72,6 +72,8 @@
       },
       "vars": {
         "CLOUDFLARE_DEPLOYMENT_ENV": "production",
+        "AVATAR_R2_SOURCE_ENABLED": "true",
+        "HOST_PROFILE_R2_SOURCE_ENABLED": "true",
         "PUBLIC_EXPERIENCE_MEDIA_PRODUCER_ENABLED": "false",
         "PUBLIC_EXPERIENCE_MEDIA_PRODUCER_EXPERIENCE_IDS": "",
         "EXPERIENCE_MEDIA_R2_SOURCE_ENABLED": "false",
@@ -107,6 +109,14 @@
         {
           "binding": "PUBLIC_EXPERIENCE_MEDIA_R2",
           "bucket_name": "locally-public-experience-canary"
+        },
+        {
+          "binding": "PUBLIC_AVATAR_R2",
+          "bucket_name": "locally-public-avatars"
+        },
+        {
+          "binding": "PUBLIC_HOST_PROFILE_SOURCE_R2",
+          "bucket_name": "locally-public-host-profile-originals"
         }
       ],
       "queues": {

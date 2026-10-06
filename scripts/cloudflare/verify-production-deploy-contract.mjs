@@ -11,6 +11,7 @@ const EXPECTED_ENVIRONMENT = 'production';
 const DEFAULT_QUEUE_BATCH_TIMEOUT_SECONDS = 5;
 
 const MANAGED_FEATURE_VARIABLE = /_ENABLED$/;
+const PRESERVED_SOURCE_FLAGS = new Set(['AVATAR_R2_SOURCE_ENABLED', 'HOST_PROFILE_R2_SOURCE_ENABLED']);
 
 function fail(code, diagnostics) {
   diagnostics.add(code);
@@ -72,6 +73,13 @@ export function buildExpectedProductionContract(config, expectedVariables) {
   assert.equal(production.preview_urls, false, 'Production preview_urls must remain false.');
   assert.equal(production.route, undefined, 'Production route must remain dashboard-managed.');
   assert.equal(production.routes, undefined, 'Production routes must remain dashboard-managed.');
+
+  // These authorities are already live, rather than selectable release profiles.
+  // A runtime --var must not conceal a conflicting repository declaration.
+  for (const name of PRESERVED_SOURCE_FLAGS) {
+    assert.equal(production.vars?.[name], 'true', `Production release must preserve ${name}=true.`);
+    assert.equal(expectedVariables[name], 'true', `Production release contract must preserve ${name}=true.`);
+  }
 
   const observability = production.observability ?? {};
   const samplingRate = observability.head_sampling_rate;
@@ -207,7 +215,7 @@ export function verifyProductionDeployContract({
     if (actualValue === expectedValue) continue;
     const booleanTransition = (actualValue === undefined || actualValue === 'true' || actualValue === 'false')
       && (expectedValue === 'true' || expectedValue === 'false');
-    if (allowed.has(name) && booleanTransition) {
+    if (allowed.has(name) && booleanTransition && !PRESERVED_SOURCE_FLAGS.has(name)) {
       plannedChanges.push(name);
       continue;
     }

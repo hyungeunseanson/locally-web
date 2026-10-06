@@ -7,10 +7,13 @@ import {
   readProductionSnapshot,
   verifyProductionDeployContract,
 } from './verify-production-deploy-contract.mjs';
+import { resolveProductionDeploymentContract } from './run-production-deploy.mjs';
 
 const config = JSON.parse(readFileSync(new URL('../../wrangler.jsonc', import.meta.url), 'utf8'));
 const expectedVariables = {
   CLOUDFLARE_DEPLOYMENT_ENV: 'production',
+  AVATAR_R2_SOURCE_ENABLED: 'true',
+  HOST_PROFILE_R2_SOURCE_ENABLED: 'true',
   PUBLIC_EXPERIENCE_MEDIA_PRODUCER_ENABLED: 'true',
   PUBLIC_EXPERIENCE_MEDIA_PRODUCER_EXPERIENCE_IDS: '3071,3309',
   EXPERIENCE_MEDIA_R2_SOURCE_ENABLED: 'true',
@@ -47,6 +50,8 @@ function preRolloutProductionSnapshot() {
       { name: 'EXPERIENCE_TRANSLATION_QUEUE', type: 'queue', queue_name: 'locally-experience-translation-production' },
       { name: 'NEXT_INC_CACHE_R2_BUCKET', type: 'r2_bucket', bucket_name: 'locally-opennext-incremental-cache-production' },
       { name: 'PUBLIC_EXPERIENCE_MEDIA_R2', type: 'r2_bucket', bucket_name: 'locally-public-experience-canary' },
+      { name: 'PUBLIC_AVATAR_R2', type: 'r2_bucket', bucket_name: 'locally-public-avatars' },
+      { name: 'PUBLIC_HOST_PROFILE_SOURCE_R2', type: 'r2_bucket', bucket_name: 'locally-public-host-profile-originals' },
       { name: 'NEXT_CACHE_DO_QUEUE', type: 'durable_object_namespace', class_name: 'DOQueueHandler' },
       { name: 'NEXT_TAG_CACHE_DO_SHARDED', type: 'durable_object_namespace', class_name: 'DOShardedTagCache' },
       ...Object.entries(expectedVariables)
@@ -94,6 +99,61 @@ function expectFailure(remote, code, allowedPlannedChanges) {
     (error) => error.message.startsWith('PRODUCTION_DEPLOY_SEMANTIC_PREFLIGHT_FAILED:')
       && error.message.includes(code)
   );
+}
+
+test('canonical release preserves the already-live Avatar and Host authority flags', async () => {
+  const contract = await resolveProductionDeploymentContract();
+  for (const name of ['AVATAR_R2_SOURCE_ENABLED', 'HOST_PROFILE_R2_SOURCE_ENABLED']) {
+    assert.equal(contract.runtimeVariables[name], 'true');
+    assert(contract.wranglerArguments.includes(`${name}:true`));
+  }
+  assert.equal(buildExpectedProductionContract(config, contract.runtimeVariables).r2.length, 4);
+});
+
+for (const [binding, bucket] of [
+  ['PUBLIC_AVATAR_R2', 'locally-public-avatars'],
+  ['PUBLIC_HOST_PROFILE_SOURCE_R2', 'locally-public-host-profile-originals'],
+]) {
+  test(`semantic gate rejects a removed or replaced live ${binding} in either direction`, () => {
+    assert.deepEqual(config.env.production.r2_buckets.find(b => b.binding === binding), { binding, bucket_name: bucket });
+    for (const replace of [false, true]) {
+      const changedConfig = structuredClone(config);
+      if (replace) changedConfig.env.production.r2_buckets.find(b => b.binding === binding).bucket_name = 'wrong-bucket';
+      else changedConfig.env.production.r2_buckets = changedConfig.env.production.r2_buckets.filter(b => b.binding !== binding);
+      assert.throws(() => verifyProductionDeployContract({
+        expected: buildExpectedProductionContract(changedConfig, expectedVariables),
+        remote: preRolloutProductionSnapshot(),
+        allowedPlannedChanges: ['SERVICE_COMPLETION_SCHEDULED_ENABLED'],
+        allowedPlannedCronAdditions: ['7,37 * * * *'],
+      }), /r2_binding_mismatch/);
+
+      const changedRemote = preRolloutProductionSnapshot();
+      if (replace) changedRemote.bindings.find(b => b.name === binding).bucket_name = 'wrong-bucket';
+      else changedRemote.bindings = changedRemote.bindings.filter(b => b.name !== binding);
+      expectFailure(changedRemote, 'r2_binding_mismatch');
+    }
+  });
+}
+
+for (const name of ['AVATAR_R2_SOURCE_ENABLED', 'HOST_PROFILE_R2_SOURCE_ENABLED']) {
+  test(`semantic gate rejects missing, disabled or malformed ${name} without a waiver`, () => {
+    for (const value of [undefined, 'false', 'TRUE']) {
+      const changedConfig = structuredClone(config);
+      if (value === undefined) delete changedConfig.env.production.vars[name];
+      else changedConfig.env.production.vars[name] = value;
+      assert.throws(() => buildExpectedProductionContract(changedConfig, expectedVariables), /must preserve/);
+      const changedContract = { ...expectedVariables };
+      if (value === undefined) delete changedContract[name];
+      else changedContract[name] = value;
+      assert.throws(() => buildExpectedProductionContract(config, changedContract), /must preserve/);
+      const changedRemote = preRolloutProductionSnapshot();
+      changedRemote.bindings = changedRemote.bindings.filter(b => b.name !== name);
+      if (value !== undefined) changedRemote.bindings.push(plainVariable(name, value));
+      expectFailure(changedRemote, `variable_mismatch:${name}`);
+      // Source-authority transitions cannot be requested as a release waiver.
+      expectFailure(changedRemote, `variable_mismatch:${name}`, ['SERVICE_COMPLETION_SCHEDULED_ENABLED', name]);
+    }
+  });
 }
 
 test('accepts a pre-rollout snapshot with only the explicit pending-cleanup Cron addition', () => {
