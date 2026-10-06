@@ -39,7 +39,8 @@ BEGIN
     '20261003134417:admin_chat_bounded_search',
     '20261004053224:media_lifecycle_foundation',
     '20261005082309:avatar_media_authority',
-    '20261005104924:solo_guarantee_financial_authority'
+    '20261005104924:solo_guarantee_financial_authority',
+    '20261006013755:host_profile_media_authority'
   ]::text[];
   IF actual IS DISTINCT FROM expected THEN
     RAISE EXCEPTION 'migration ledger mismatch: %', actual;
@@ -143,6 +144,7 @@ BEGIN
     'public.ack_admin_inquiry_messages(p_inquiry_id bigint, p_through_message_id bigint)',
     'public.ack_admin_inquiry_snapshot(p_inquiry_id bigint, p_message_ids bigint[])',
     'public.apply_experience_media_locator_cas(p_experience_id bigint, p_before_photos text[], p_before_image_url text, p_before_itinerary jsonb, p_before_itinerary_i18n jsonb, p_after_photos text[], p_after_image_url text, p_after_itinerary jsonb, p_after_itinerary_i18n jsonb)',
+    'public.apply_host_profile_media_locators(p_owner_id uuid, p_asset_id uuid, p_old_url text, p_references jsonb, p_rollback boolean)',
     'public.apply_solo_refund_settlement_atomic(p_operation_id uuid)',
     'public.assign_service_concierge_host_atomic(p_admin_id uuid, p_request_id uuid, p_host_id uuid, p_host_hourly_rate integer, p_host_agreement_confirmed boolean)',
     'public.attach_experience_payment_provider_reference_atomic(p_booking_id text, p_user_id uuid, p_provider_reference text, p_claim_token uuid)',
@@ -150,6 +152,7 @@ BEGIN
     'public.begin_avatar_media_asset(p_id uuid, p_owner_id uuid, p_key text, p_url text, p_sha256 text, p_size bigint, p_mime text, p_idempotency_key text)',
     'public.begin_experience_media_asset(p_id uuid, p_owner_id uuid, p_key text, p_url text, p_sha256 text, p_size bigint, p_mime text, p_idempotency_key text, p_parent_id text)',
     'public.begin_experience_payment_capture_atomic(p_booking_id text, p_user_id uuid, p_provider_reference text)',
+    'public.begin_host_profile_media_asset(p_id uuid, p_owner_id uuid, p_key text, p_url text, p_sha256 text, p_size bigint, p_mime text, p_idempotency_key text)',
     'public.begin_service_refund_operation_atomic(p_admin_id uuid, p_order_id text, p_refund_amount integer, p_host_compensation_amount integer, p_idempotency_key text)',
     'public.begin_solo_refund_request_atomic(p_operation_id uuid, p_attempt_identity uuid, p_merchant_reference text)',
     'public.cancel_expired_pending_bookings_atomic(p_batch_size integer)',
@@ -193,6 +196,8 @@ BEGIN
     'public.get_ops_anomaly_snapshot(p_observed_at timestamp with time zone, p_claim_overdue_minutes integer, p_refund_stale_minutes integer, p_payout_long_hold_days integer, p_experience_job_missing_minutes integer, p_service_job_missing_minutes integer, p_cancel_pending_job_missing_minutes integer)',
     'public.guard_experience_payment_claim_columns()',
     'public.handle_new_user()',
+    'public.host_profile_auth_backup_references()',
+    'public.host_profile_migration_inventory()',
     'public.increment_comment_count()',
     'public.increment_community_post_view_count(p_post_id uuid)',
     'public.increment_like_count()',
@@ -231,7 +236,8 @@ BEGIN
     'public.snapshot_booking_guest_demographics()',
     'public.solo_refund_diagnostics()',
     'public.verify_avatar_media_asset(p_id uuid, p_owner_id uuid, p_sha256 text, p_size bigint, p_mime text)',
-    'public.verify_experience_media_asset(p_id uuid, p_owner_id uuid, p_sha256 text, p_size bigint, p_mime text)'
+    'public.verify_experience_media_asset(p_id uuid, p_owner_id uuid, p_sha256 text, p_size bigint, p_mime text)',
+    'public.verify_host_profile_media_asset(p_id uuid, p_owner_id uuid, p_sha256 text, p_size bigint, p_mime text)'
   ]::text[];
   IF actual IS DISTINCT FROM expected THEN
     RAISE EXCEPTION 'public function overload inventory mismatch: %', actual;
@@ -251,22 +257,29 @@ BEGIN
     'private.admin_chat_phone_title(category text, form_data jsonb)',
     'private.adopt_phone_followup_link()',
     'private.advance_support_version()',
+    'private.apply_host_profile_media_locators(p_owner_id uuid, p_asset_id uuid, p_old_url text, p_references jsonb, p_rollback boolean)',
     'private.assert_booking_payout_safe(p_booking bookings)',
     'private.bump_experience_media_revision()',
     'private.canonical_experience_media_locator(p_url text)',
     'private.capture_phone_followup()',
     'private.delete_pending_phone_followup()',
     'private.guard_booking_money_transition()',
+    'private.guard_host_profile_legacy_writer()',
+    'private.guard_host_profile_reference_zero_journal()',
     'private.guard_unresolved_booking_delete()',
     'private.handle_phone_followup(p_request uuid, p_inquiry bigint, p_ids bigint[], p_admin uuid, p_complete boolean)',
     'private.has_phone_followup(p_request uuid)',
+    'private.host_profile_auth_inventory()',
+    'private.host_profile_legacy_writes_frozen()',
     'private.is_admin_reader()',
     'private.is_inquiry_admin_sender(p_sender uuid)',
     'private.journal_solo_refund_attempt()',
     'private.lock_booking_money(p_experience_id bigint)',
+    'private.lock_host_profile_owner()',
     'private.prepare_support_message()',
     'private.solo_refund_due(p_booking bookings)',
     'private.sync_experience_media_assets()',
+    'private.sync_host_profile_assets()',
     'private.sync_profile_avatar_assets()'
   ]::text[] THEN
     RAISE EXCEPTION 'private function overload inventory mismatch: %', actual;
@@ -317,6 +330,10 @@ BEGIN
     JOIN pg_namespace AS namespace_def ON namespace_def.oid = class_def.relnamespace
    WHERE NOT trigger_def.tgisinternal AND namespace_def.nspname IN ('public', 'auth');
   expected := ARRAY[
+    'auth.users.a_auth_host_profile_owner_lock',
+    'auth.users.auth_host_profile_delete_plan',
+    'auth.users.auth_host_profile_finalize',
+    'auth.users.b_auth_legacy_host_writer',
     'auth.users.on_auth_user_created',
     'public.booking_solo_refund_operations.solo_refund_attempt_journal',
     'public.bookings.bookings_money_transition_authority',
@@ -330,10 +347,18 @@ BEGIN
     'public.experiences.experience_media_delete_plan',
     'public.experiences.experience_media_finalize',
     'public.experiences.experience_media_revision',
+    'public.host_applications.a_host_profile_owner_lock',
+    'public.host_applications.b_host_profile_legacy_writer',
+    'public.host_applications.host_profile_delete_plan',
+    'public.host_applications.host_profile_finalize',
     'public.inquiries.inquiry_support_version',
     'public.inquiry_messages.inquiry_support_message',
     'public.inquiry_messages.phone_followup_capture',
     'public.inquiry_messages.phone_followup_delete',
+    'public.media_deletion_journal.host_profile_reference_zero_journal',
+    'public.profiles.b_profile_legacy_host_writer',
+    'public.profiles.legacy_host_profile_delete_plan',
+    'public.profiles.legacy_host_profile_finalize',
     'public.profiles.profile_avatar_delete_plan',
     'public.profiles.profile_avatar_finalize',
     'public.proxy_comments.trg_pc_updated_at',
@@ -372,8 +397,8 @@ BEGIN
     JOIN pg_class AS class_def ON class_def.oid = constraint_def.conrelid
     JOIN pg_namespace AS namespace_def ON namespace_def.oid = class_def.relnamespace
    WHERE namespace_def.nspname = 'public';
-  IF actual_count <> 223 OR primary_key_count <> 44 OR foreign_key_count <> 62
-     OR unique_count <> 18 OR check_count <> 99 THEN
+  IF actual_count <> 224 OR primary_key_count <> 44 OR foreign_key_count <> 62
+     OR unique_count <> 18 OR check_count <> 100 THEN
     RAISE EXCEPTION 'constraint counts differ: total %, PK %, FK %, UNIQUE %, CHECK %',
       actual_count, primary_key_count, foreign_key_count, unique_count, check_count;
   END IF;
@@ -886,7 +911,7 @@ BEGIN
   ]::text[] THEN
     RAISE EXCEPTION 'applied media index mismatch';
   END IF;
-  SELECT array_agg(c.relname||'|'||k.conname||'|'||pg_get_constraintdef(k.oid,true) ORDER BY c.relname,k.conname) INTO actual FROM pg_constraint k JOIN pg_class c ON c.oid=k.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname IN ('media_assets','media_asset_references','media_deletion_journal');
+  SELECT array_agg(c.relname||'|'||k.conname||'|'||pg_get_constraintdef(k.oid,true) ORDER BY c.relname,k.conname) INTO actual FROM pg_constraint k JOIN pg_class c ON c.oid=k.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname IN ('media_assets','media_asset_references','media_deletion_journal') AND k.conname <> 'host_profile_media_identity';
   IF actual IS DISTINCT FROM ARRAY[
     'media_asset_references|media_asset_references_asset_id_fkey|FOREIGN KEY (asset_id) REFERENCES media_assets(id)',
     'media_asset_references|media_asset_references_pkey|PRIMARY KEY (asset_id, parent_type, parent_id)',
@@ -1323,9 +1348,9 @@ BEGIN
   IF to_regprocedure('private.prepare_support_message()') IS NULL
     OR to_regprocedure('private.advance_support_version()') IS NULL THEN RAISE EXCEPTION 'Missing Phase 1 safety functions'; END IF;
   SELECT array_agg(relname::text ORDER BY relname) INTO actual FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-    WHERE n.nspname = 'private' AND relkind IN ('r','p') AND c.relname <> 'phone_followup_tasks';
+    WHERE n.nspname = 'private' AND relkind IN ('r','p') AND c.relname NOT IN ('phone_followup_tasks','host_profile_auth_cas','host_profile_operation_context','host_profile_source_authority');
   IF actual IS DISTINCT FROM ARRAY['admin_monitor_cutover']::text[] THEN RAISE EXCEPTION 'Private table inventory mismatch'; END IF;
-  IF EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'private') THEN RAISE EXCEPTION 'Private cutover policy exists'; END IF;
+  IF EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'private' AND tablename IN ('admin_monitor_cutover','phone_followup_tasks')) THEN RAISE EXCEPTION 'Private cutover policy exists'; END IF;
   SELECT array_agg(column_name || '|' || data_type || '|' || is_nullable || '|' || coalesce(column_default,'') ORDER BY ordinal_position)
     INTO actual FROM information_schema.columns WHERE table_schema = 'private' AND table_name = 'admin_monitor_cutover';
   IF actual IS DISTINCT FROM ARRAY['singleton|boolean|NO|true','applied_at|timestamp with time zone|NO|',
@@ -1346,7 +1371,7 @@ BEGIN
     CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END || '|' || a.privilege_type || '|' || a.is_grantable::text,
     E'\n' ORDER BY n.nspname,c.relname,c.relkind::text,CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END,a.privilege_type,a.is_grantable))
     INTO fingerprint FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-    CROSS JOIN LATERAL aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE n.nspname = 'private' AND c.relkind IN ('r','p','v','m','f') AND c.relname <> 'phone_followup_tasks';
+    CROSS JOIN LATERAL aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE n.nspname = 'private' AND c.relkind IN ('r','p','v','m','f') AND c.relname NOT IN ('phone_followup_tasks','host_profile_auth_cas','host_profile_operation_context','host_profile_source_authority');
   IF fingerprint IS DISTINCT FROM 'c0c83ee9ce880c47d3d24f3f918b4364' THEN RAISE EXCEPTION 'Private relation grant fingerprint mismatch'; END IF;
 END $admin_attention_contract$;
 
@@ -1467,7 +1492,7 @@ BEGIN
     CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END||'|'||a.privilege_type||'|'||a.is_grantable::text,
     E'\n' ORDER BY n.nspname,c.relname,c.relkind::text,CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END,a.privilege_type,a.is_grantable))
     INTO fingerprint FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
-    CROSS JOIN LATERAL aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE n.nspname='private' AND c.relkind IN ('r','p','v','m','f');
+    CROSS JOIN LATERAL aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE n.nspname='private' AND c.relkind IN ('r','p','v','m','f') AND c.relname IN ('admin_monitor_cutover','phone_followup_tasks');
   IF fingerprint IS DISTINCT FROM '4c987b9bd1b8fdc56ed01bca38365c7d' THEN RAISE EXCEPTION 'Private relation grant fingerprint mismatch'; END IF;
 END $phone_followup_catalog_contract$;
 
@@ -1532,6 +1557,140 @@ BEGIN
     RAISE EXCEPTION 'Search RPC access mismatch';
   END IF;
 END $admin_chat_search_contract$;
+
+-- Fresh read-only Host catalog capture. No Host RPC is invoked.
+DO $host_authority_catalog_contract$
+DECLARE actual text[]; fingerprint text;
+BEGIN
+  SELECT array_agg(n.nspname||'.'||p.proname||'('||pg_get_function_identity_arguments(p.oid)||')|'||pg_get_userbyid(p.proowner)||'|'||p.prosecdef::text||'|'||p.provolatile::text||'|'||pg_get_function_result(p.oid)||'|'||array_to_string(p.proconfig,',')||'|'||p.proacl::text||'|'||md5(p.prosrc) ORDER BY n.nspname,p.proname,pg_get_function_identity_arguments(p.oid)) INTO actual FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname IN ('public','private') AND p.proname=ANY(ARRAY[
+    'apply_host_profile_media_locators',
+    'begin_host_profile_media_asset',
+    'guard_host_profile_legacy_writer',
+    'guard_host_profile_reference_zero_journal',
+    'host_profile_auth_backup_references',
+    'host_profile_auth_inventory',
+    'host_profile_legacy_writes_frozen',
+    'host_profile_migration_inventory',
+    'lock_host_profile_owner',
+    'sync_host_profile_assets',
+    'verify_host_profile_media_asset'
+  ]::text[]);
+  IF actual IS DISTINCT FROM ARRAY[
+    'private.apply_host_profile_media_locators(p_owner_id uuid, p_asset_id uuid, p_old_url text, p_references jsonb, p_rollback boolean)|postgres|true|v|boolean|search_path=""|{postgres=X/postgres,service_role=X/postgres}|7bddc050b8e1d1c0540826a6c2447e78',
+    'private.guard_host_profile_legacy_writer()|postgres|true|v|trigger|search_path=""|{postgres=X/postgres}|a3176ab9ae4815de66cdf233aa761873',
+    'private.guard_host_profile_reference_zero_journal()|postgres|true|v|trigger|search_path=""|{postgres=X/postgres}|b0f932b28c54d089481b34ea042bba32',
+    'private.host_profile_auth_inventory()|postgres|true|s|jsonb|search_path=""|{postgres=X/postgres,service_role=X/postgres}|d26300dcd9398edf95085b24651f974c',
+    'private.host_profile_legacy_writes_frozen()|postgres|true|s|boolean|search_path=""|{postgres=X/postgres,service_role=X/postgres}|2914a3f459392cb57fcdbc13d60ebd4c',
+    'private.lock_host_profile_owner()|postgres|true|v|trigger|search_path=""|{postgres=X/postgres}|4896928f1c3a68f56077a74e69c5b4db',
+    'private.sync_host_profile_assets()|postgres|true|v|trigger|search_path=""|{postgres=X/postgres}|37f1b19ef488d481795bf78114578849',
+    'public.apply_host_profile_media_locators(p_owner_id uuid, p_asset_id uuid, p_old_url text, p_references jsonb, p_rollback boolean)|postgres|false|v|boolean|search_path=""|{postgres=X/postgres,service_role=X/postgres}|0b4adfa947f3528b61d02f01f38d5d4e',
+    'public.begin_host_profile_media_asset(p_id uuid, p_owner_id uuid, p_key text, p_url text, p_sha256 text, p_size bigint, p_mime text, p_idempotency_key text)|postgres|false|v|media_assets|search_path=""|{postgres=X/postgres,service_role=X/postgres}|ef99f4c6e62e03bf4f75bd4545cb7c5c',
+    'public.host_profile_auth_backup_references()|postgres|false|s|jsonb|search_path=""|{postgres=X/postgres,service_role=X/postgres}|80ff8e6c33dc9d5e9e371f6754c27979',
+    'public.host_profile_migration_inventory()|postgres|false|s|jsonb|search_path=""|{postgres=X/postgres,service_role=X/postgres}|15801981a0fbc87d7dbeeb1eb95bcf92',
+    'public.verify_host_profile_media_asset(p_id uuid, p_owner_id uuid, p_sha256 text, p_size bigint, p_mime text)|postgres|false|v|media_assets|search_path=""|{postgres=X/postgres,service_role=X/postgres}|d5c1d6a913d1af3f3868abf49cd7987a'
+  ]::text[] THEN
+    RAISE EXCEPTION 'Host function body or ACL mismatch: %', actual;
+  END IF;
+  SELECT array_agg(n.nspname||'.'||c.relname||'|'||pg_get_userbyid(c.relowner)||'|'||c.relrowsecurity::text||'|'||c.relforcerowsecurity::text||'|'||c.relacl::text ORDER BY c.relname) INTO actual FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='private' AND c.relkind='r' AND c.relname LIKE 'host_profile%';
+  IF actual IS DISTINCT FROM ARRAY[
+    'private.host_profile_auth_cas|postgres|false|false|{postgres=arwdDxtm/postgres}',
+    'private.host_profile_operation_context|postgres|false|false|{postgres=arwdDxtm/postgres}',
+    'private.host_profile_source_authority|postgres|false|false|{postgres=arwdDxtm/postgres}'
+  ]::text[] THEN
+    RAISE EXCEPTION 'Host private table security mismatch: %', actual;
+  END IF;
+  SELECT array_agg(c.relname||'|'||a.attname||'|'||format_type(a.atttypid,a.atttypmod)||'|'||a.attnotnull::text||'|'||coalesce(pg_get_expr(d.adbin,d.adrelid),'') ORDER BY c.relname,a.attnum) INTO actual FROM pg_attribute a JOIN pg_class c ON c.oid=a.attrelid JOIN pg_namespace n ON n.oid=c.relnamespace LEFT JOIN pg_attrdef d ON d.adrelid=c.oid AND d.adnum=a.attnum WHERE n.nspname='private' AND c.relkind='r' AND c.relname LIKE 'host_profile%' AND a.attnum>0 AND NOT a.attisdropped;
+  IF actual IS DISTINCT FROM ARRAY[
+    'host_profile_auth_cas|asset_id|uuid|true|',
+    'host_profile_auth_cas|owner_id|uuid|true|',
+    'host_profile_auth_cas|before_digest|text|true|',
+    'host_profile_auth_cas|after_digest|text|true|',
+    'host_profile_operation_context|backend_id|integer|true|',
+    'host_profile_operation_context|transaction_id|bigint|true|',
+    'host_profile_operation_context|owner_id|uuid|false|',
+    'host_profile_operation_context|legacy_url|text|false|',
+    'host_profile_source_authority|singleton|boolean|true|',
+    'host_profile_source_authority|r2_enabled|boolean|true|false'
+  ]::text[] THEN
+    RAISE EXCEPTION 'Host column mismatch: %', actual;
+  END IF;
+  SELECT array_agg(n.nspname||'.'||c.relname||'|'||k.conname||'|'||pg_get_constraintdef(k.oid,true) ORDER BY n.nspname,c.relname,k.conname) INTO actual FROM pg_constraint k JOIN pg_class c ON c.oid=k.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE (n.nspname='private' AND c.relname LIKE 'host_profile%') OR k.conname='host_profile_media_identity';
+  IF actual IS DISTINCT FROM ARRAY[
+    'private.host_profile_auth_cas|host_profile_auth_cas_after_digest_check|CHECK (after_digest ~ ''^[a-f0-9]{64}$''::text)',
+    'private.host_profile_auth_cas|host_profile_auth_cas_asset_id_fkey|FOREIGN KEY (asset_id) REFERENCES media_assets(id)',
+    'private.host_profile_auth_cas|host_profile_auth_cas_before_digest_check|CHECK (before_digest ~ ''^[a-f0-9]{64}$''::text)',
+    'private.host_profile_auth_cas|host_profile_auth_cas_pkey|PRIMARY KEY (asset_id)',
+    'private.host_profile_operation_context|host_profile_operation_context_pkey|PRIMARY KEY (backend_id, transaction_id)',
+    'private.host_profile_source_authority|host_profile_source_authority_pkey|PRIMARY KEY (singleton)',
+    'private.host_profile_source_authority|host_profile_source_authority_singleton_check|CHECK (singleton)',
+    'public.media_assets|host_profile_media_identity|CHECK (business_scope <> ''host_profile''::text OR provider = ''r2''::text AND bucket = ''locally-public-host-profile-originals''::text AND parent_type = ''host_profile_owner''::text AND parent_id = owner_id::text AND expected_size <= 10485760 AND mime ~ ''^image/[a-z0-9][a-z0-9.+-]{0,79}$''::text AND (mime <> ALL (ARRAY[''image/heic''::text, ''image/heif''::text])) AND object_key = ((((''host-profiles/v1/''::text || encode(sha256(convert_to(''host-profile-media-owner:''::text || owner_id::text, ''UTF8''::name)), ''hex''::text)) || ''/''::text) || id::text) || ''/profile''::text) AND public_url = (''https://host-profile-media.locally-travel.com/''::text || object_key) AND public_url IS NOT NULL)'
+  ]::text[] THEN
+    RAISE EXCEPTION 'Host constraint mismatch: %', actual;
+  END IF;
+  SELECT array_agg(x.schemaname||'.'||x.indexname||'|'||x.indexdef ORDER BY x.schemaname,x.indexname) INTO actual FROM pg_indexes x JOIN pg_namespace n ON n.nspname=x.schemaname JOIN pg_class c ON c.relnamespace=n.oid AND c.relname=x.indexname JOIN pg_index i ON i.indexrelid=c.oid WHERE x.schemaname='private' AND x.tablename LIKE 'host_profile%' AND i.indisvalid AND i.indisready;
+  IF actual IS DISTINCT FROM ARRAY[
+    'private.host_profile_auth_cas_pkey|CREATE UNIQUE INDEX host_profile_auth_cas_pkey ON private.host_profile_auth_cas USING btree (asset_id)',
+    'private.host_profile_operation_context_pkey|CREATE UNIQUE INDEX host_profile_operation_context_pkey ON private.host_profile_operation_context USING btree (backend_id, transaction_id)',
+    'private.host_profile_source_authority_pkey|CREATE UNIQUE INDEX host_profile_source_authority_pkey ON private.host_profile_source_authority USING btree (singleton)'
+  ]::text[] THEN
+    RAISE EXCEPTION 'Host index mismatch: %', actual;
+  END IF;
+  SELECT array_agg(n.nspname||'.'||c.relname||'|'||t.tgname||'|'||pg_get_triggerdef(t.oid,true)||'|'||t.tgenabled::text ORDER BY n.nspname,c.relname,t.tgname) INTO actual FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_proc p ON p.oid=t.tgfoid WHERE NOT t.tgisinternal AND p.proname=ANY(ARRAY[
+    'apply_host_profile_media_locators',
+    'begin_host_profile_media_asset',
+    'guard_host_profile_legacy_writer',
+    'guard_host_profile_reference_zero_journal',
+    'host_profile_auth_backup_references',
+    'host_profile_auth_inventory',
+    'host_profile_legacy_writes_frozen',
+    'host_profile_migration_inventory',
+    'lock_host_profile_owner',
+    'sync_host_profile_assets',
+    'verify_host_profile_media_asset'
+  ]::text[]);
+  IF actual IS DISTINCT FROM ARRAY[
+    'auth.users|a_auth_host_profile_owner_lock|CREATE TRIGGER a_auth_host_profile_owner_lock BEFORE DELETE OR UPDATE OF raw_user_meta_data ON auth.users FOR EACH ROW EXECUTE FUNCTION private.lock_host_profile_owner()|O',
+    'auth.users|auth_host_profile_delete_plan|CREATE TRIGGER auth_host_profile_delete_plan BEFORE DELETE ON auth.users FOR EACH ROW EXECUTE FUNCTION private.sync_host_profile_assets()|O',
+    'auth.users|auth_host_profile_finalize|CREATE TRIGGER auth_host_profile_finalize AFTER UPDATE OF raw_user_meta_data ON auth.users FOR EACH ROW EXECUTE FUNCTION private.sync_host_profile_assets()|O',
+    'auth.users|b_auth_legacy_host_writer|CREATE TRIGGER b_auth_legacy_host_writer BEFORE INSERT OR UPDATE OF raw_user_meta_data ON auth.users FOR EACH ROW EXECUTE FUNCTION private.guard_host_profile_legacy_writer()|O',
+    'public.host_applications|a_host_profile_owner_lock|CREATE TRIGGER a_host_profile_owner_lock BEFORE INSERT OR DELETE OR UPDATE OF profile_photo, user_id, id ON host_applications FOR EACH ROW EXECUTE FUNCTION private.lock_host_profile_owner()|O',
+    'public.host_applications|b_host_profile_legacy_writer|CREATE TRIGGER b_host_profile_legacy_writer BEFORE INSERT OR UPDATE OF profile_photo ON host_applications FOR EACH ROW EXECUTE FUNCTION private.guard_host_profile_legacy_writer()|O',
+    'public.host_applications|host_profile_delete_plan|CREATE TRIGGER host_profile_delete_plan BEFORE DELETE ON host_applications FOR EACH ROW EXECUTE FUNCTION private.sync_host_profile_assets()|O',
+    'public.host_applications|host_profile_finalize|CREATE TRIGGER host_profile_finalize AFTER INSERT OR UPDATE OF profile_photo, user_id, id ON host_applications FOR EACH ROW EXECUTE FUNCTION private.sync_host_profile_assets()|O',
+    'public.media_deletion_journal|host_profile_reference_zero_journal|CREATE TRIGGER host_profile_reference_zero_journal BEFORE INSERT ON media_deletion_journal FOR EACH ROW EXECUTE FUNCTION private.guard_host_profile_reference_zero_journal()|O',
+    'public.profiles|b_profile_legacy_host_writer|CREATE TRIGGER b_profile_legacy_host_writer BEFORE INSERT OR UPDATE OF avatar_url ON profiles FOR EACH ROW EXECUTE FUNCTION private.guard_host_profile_legacy_writer()|O',
+    'public.profiles|legacy_host_profile_delete_plan|CREATE TRIGGER legacy_host_profile_delete_plan BEFORE DELETE ON profiles FOR EACH ROW EXECUTE FUNCTION private.sync_host_profile_assets()|O',
+    'public.profiles|legacy_host_profile_finalize|CREATE TRIGGER legacy_host_profile_finalize AFTER INSERT OR UPDATE OF avatar_url, id ON profiles FOR EACH ROW EXECUTE FUNCTION private.sync_host_profile_assets()|O',
+    'storage.objects|host_profile_legacy_storage_writer|CREATE TRIGGER host_profile_legacy_storage_writer BEFORE INSERT OR DELETE OR UPDATE ON storage.objects FOR EACH ROW EXECUTE FUNCTION private.guard_host_profile_legacy_writer()|O'
+  ]::text[] THEN
+    RAISE EXCEPTION 'Host trigger mismatch: %', actual;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='private' AND tablename LIKE 'host_profile%') THEN RAISE EXCEPTION 'Host private policy mismatch'; END IF;
+END $host_authority_catalog_contract$;
+
+DO $host_authority_production_contract$
+DECLARE actual text[]; fingerprint text;
+BEGIN
+  SELECT array_agg(version||':'||name||':'||cardinality(statements)||':'||md5(statements[1])||':'||encode(sha256(convert_to(statements[1],'UTF8')),'hex') ORDER BY version) INTO actual FROM supabase_migrations.schema_migrations WHERE version='20261006013755';
+  IF actual IS DISTINCT FROM ARRAY[
+    '20261006013755:host_profile_media_authority:1:97a61bd500d8121cf5dd5e66a2751c8b:913d253b2853fa2581fb886cfd2279db147bb84f5b5b55c7dc12386fa49220d8'
+  ]::text[] THEN
+    RAISE EXCEPTION 'Host applied ledger SQL mismatch: %', actual;
+  END IF;
+  SELECT array_agg(c.relname::text ORDER BY c.relname) INTO actual FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='private' AND c.relkind IN ('r','p');
+  IF actual IS DISTINCT FROM ARRAY[
+    'admin_monitor_cutover',
+    'host_profile_auth_cas',
+    'host_profile_operation_context',
+    'host_profile_source_authority',
+    'phone_followup_tasks'
+  ]::text[] THEN
+    RAISE EXCEPTION 'Private table inventory mismatch: %', actual;
+  END IF;
+  SELECT md5(string_agg(n.nspname||'|'||c.relname||'|'||c.relkind::text||'|'||CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END||'|'||a.privilege_type||'|'||a.is_grantable::text,E'\n' ORDER BY n.nspname,c.relname,c.relkind::text,CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END,a.privilege_type,a.is_grantable)) INTO fingerprint FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace CROSS JOIN LATERAL aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE n.nspname='private' AND c.relkind IN ('r','p','v','m','f');
+  IF fingerprint IS DISTINCT FROM 'ee6e712c55f00b284ed8a988b04b163d' THEN RAISE EXCEPTION 'Private relation grant fingerprint mismatch'; END IF;
+  IF (SELECT count(*) FROM private.host_profile_source_authority)<>1 OR NOT EXISTS(SELECT 1 FROM private.host_profile_source_authority WHERE singleton AND r2_enabled) THEN RAISE EXCEPTION 'Production Host authority marker mismatch'; END IF;
+END $host_authority_production_contract$;
 
 SELECT 'LOCALLY_PRODUCTION_CURRENT_STATE_CONTRACT_PASS' AS result;
 

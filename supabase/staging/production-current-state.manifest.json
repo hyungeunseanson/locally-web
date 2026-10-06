@@ -1,6 +1,6 @@
 {
-  "schemaContractVersion": 6,
-  "capturedAt": "2026-10-05T14:09:25.783736+00:00",
+  "schemaContractVersion": 7,
+  "capturedAt": "2026-10-06T15:16:07.294874+00:00",
   "productionProjectRef": "uhinvcydgzqlpnvieyal",
   "source": {
     "kind": "read-only Production PostgreSQL catalog inventory",
@@ -8,7 +8,8 @@
     "containsRows": false,
     "containsStorageObjects": false,
     "operationalControlMetadata": [
-      "private.admin_monitor_cutover singleton marker"
+      "private.admin_monitor_cutover singleton marker",
+      "private.host_profile_source_authority singleton R2 authority marker"
     ],
     "postgresVersion": "17.6",
     "captureSql": "supabase/staging/production-current-state.capture.sql"
@@ -20,7 +21,7 @@
     "publicRlsPolicies": "e5a16a4215c569060fbf895453a5cd00",
     "publicRelationGrants": "23a636eb7731f130f48aaeceb415c8cf",
     "stagingOverlayBaselineStoragePolicies": "d6b381fd629405acfdd615593031de5c",
-    "privateRelationGrants": "4c987b9bd1b8fdc56ed01bca38365c7d"
+    "privateRelationGrants": "ee6e712c55f00b284ed8a988b04b163d"
   },
   "migrationLedger": [
     {
@@ -168,6 +169,14 @@
       "repositorySha256": "df95be49a1df1e5b1fbc1e89afa0ff589b8041c4d9ed54e5d39945eaeee09c11",
       "ledgerStatementsSha256": "df95be49a1df1e5b1fbc1e89afa0ff589b8041c4d9ed54e5d39945eaeee09c11",
       "repositoryVersion": "20261005104924"
+    },
+    {
+      "version": "20261006013755",
+      "name": "host_profile_media_authority",
+      "repositoryFile": "supabase/migrations/20261006013755_host_profile_media_authority.sql",
+      "repositorySha256": "913d253b2853fa2581fb886cfd2279db147bb84f5b5b55c7dc12386fa49220d8",
+      "repositoryVersion": "20261006013755",
+      "ledgerStatementsSha256": "913d253b2853fa2581fb886cfd2279db147bb84f5b5b55c7dc12386fa49220d8"
     }
   ],
   "operationalStateDeltas": [
@@ -235,6 +244,7 @@
       "public.ack_admin_inquiry_messages(p_inquiry_id bigint, p_through_message_id bigint)",
       "public.ack_admin_inquiry_snapshot(p_inquiry_id bigint, p_message_ids bigint[])",
       "public.apply_experience_media_locator_cas(p_experience_id bigint, p_before_photos text[], p_before_image_url text, p_before_itinerary jsonb, p_before_itinerary_i18n jsonb, p_after_photos text[], p_after_image_url text, p_after_itinerary jsonb, p_after_itinerary_i18n jsonb)",
+      "public.apply_host_profile_media_locators(p_owner_id uuid, p_asset_id uuid, p_old_url text, p_references jsonb, p_rollback boolean)",
       "public.apply_solo_refund_settlement_atomic(p_operation_id uuid)",
       "public.assign_service_concierge_host_atomic(p_admin_id uuid, p_request_id uuid, p_host_id uuid, p_host_hourly_rate integer, p_host_agreement_confirmed boolean)",
       "public.attach_experience_payment_provider_reference_atomic(p_booking_id text, p_user_id uuid, p_provider_reference text, p_claim_token uuid)",
@@ -242,6 +252,7 @@
       "public.begin_avatar_media_asset(p_id uuid, p_owner_id uuid, p_key text, p_url text, p_sha256 text, p_size bigint, p_mime text, p_idempotency_key text)",
       "public.begin_experience_media_asset(p_id uuid, p_owner_id uuid, p_key text, p_url text, p_sha256 text, p_size bigint, p_mime text, p_idempotency_key text, p_parent_id text)",
       "public.begin_experience_payment_capture_atomic(p_booking_id text, p_user_id uuid, p_provider_reference text)",
+      "public.begin_host_profile_media_asset(p_id uuid, p_owner_id uuid, p_key text, p_url text, p_sha256 text, p_size bigint, p_mime text, p_idempotency_key text)",
       "public.begin_service_refund_operation_atomic(p_admin_id uuid, p_order_id text, p_refund_amount integer, p_host_compensation_amount integer, p_idempotency_key text)",
       "public.begin_solo_refund_request_atomic(p_operation_id uuid, p_attempt_identity uuid, p_merchant_reference text)",
       "public.cancel_expired_pending_bookings_atomic(p_batch_size integer)",
@@ -285,6 +296,8 @@
       "public.get_ops_anomaly_snapshot(p_observed_at timestamp with time zone, p_claim_overdue_minutes integer, p_refund_stale_minutes integer, p_payout_long_hold_days integer, p_experience_job_missing_minutes integer, p_service_job_missing_minutes integer, p_cancel_pending_job_missing_minutes integer)",
       "public.guard_experience_payment_claim_columns()",
       "public.handle_new_user()",
+      "public.host_profile_auth_backup_references()",
+      "public.host_profile_migration_inventory()",
       "public.increment_comment_count()",
       "public.increment_community_post_view_count(p_post_id uuid)",
       "public.increment_like_count()",
@@ -323,31 +336,43 @@
       "public.snapshot_booking_guest_demographics()",
       "public.solo_refund_diagnostics()",
       "public.verify_avatar_media_asset(p_id uuid, p_owner_id uuid, p_sha256 text, p_size bigint, p_mime text)",
-      "public.verify_experience_media_asset(p_id uuid, p_owner_id uuid, p_sha256 text, p_size bigint, p_mime text)"
+      "public.verify_experience_media_asset(p_id uuid, p_owner_id uuid, p_sha256 text, p_size bigint, p_mime text)",
+      "public.verify_host_profile_media_asset(p_id uuid, p_owner_id uuid, p_sha256 text, p_size bigint, p_mime text)"
     ],
     "privateFunctionOverloads": [
       "private.admin_chat_phone_title(category text, form_data jsonb)",
       "private.adopt_phone_followup_link()",
       "private.advance_support_version()",
+      "private.apply_host_profile_media_locators(p_owner_id uuid, p_asset_id uuid, p_old_url text, p_references jsonb, p_rollback boolean)",
       "private.assert_booking_payout_safe(p_booking bookings)",
       "private.bump_experience_media_revision()",
       "private.canonical_experience_media_locator(p_url text)",
       "private.capture_phone_followup()",
       "private.delete_pending_phone_followup()",
       "private.guard_booking_money_transition()",
+      "private.guard_host_profile_legacy_writer()",
+      "private.guard_host_profile_reference_zero_journal()",
       "private.guard_unresolved_booking_delete()",
       "private.handle_phone_followup(p_request uuid, p_inquiry bigint, p_ids bigint[], p_admin uuid, p_complete boolean)",
       "private.has_phone_followup(p_request uuid)",
+      "private.host_profile_auth_inventory()",
+      "private.host_profile_legacy_writes_frozen()",
       "private.is_admin_reader()",
       "private.is_inquiry_admin_sender(p_sender uuid)",
       "private.journal_solo_refund_attempt()",
       "private.lock_booking_money(p_experience_id bigint)",
+      "private.lock_host_profile_owner()",
       "private.prepare_support_message()",
       "private.solo_refund_due(p_booking bookings)",
       "private.sync_experience_media_assets()",
+      "private.sync_host_profile_assets()",
       "private.sync_profile_avatar_assets()"
     ],
     "applicationTriggers": [
+      "auth.users.a_auth_host_profile_owner_lock",
+      "auth.users.auth_host_profile_delete_plan",
+      "auth.users.auth_host_profile_finalize",
+      "auth.users.b_auth_legacy_host_writer",
       "auth.users.on_auth_user_created",
       "public.booking_solo_refund_operations.solo_refund_attempt_journal",
       "public.bookings.bookings_money_transition_authority",
@@ -361,10 +386,18 @@
       "public.experiences.experience_media_delete_plan",
       "public.experiences.experience_media_finalize",
       "public.experiences.experience_media_revision",
+      "public.host_applications.a_host_profile_owner_lock",
+      "public.host_applications.b_host_profile_legacy_writer",
+      "public.host_applications.host_profile_delete_plan",
+      "public.host_applications.host_profile_finalize",
       "public.inquiries.inquiry_support_version",
       "public.inquiry_messages.inquiry_support_message",
       "public.inquiry_messages.phone_followup_capture",
       "public.inquiry_messages.phone_followup_delete",
+      "public.media_deletion_journal.host_profile_reference_zero_journal",
+      "public.profiles.b_profile_legacy_host_writer",
+      "public.profiles.legacy_host_profile_delete_plan",
+      "public.profiles.legacy_host_profile_finalize",
       "public.profiles.profile_avatar_delete_plan",
       "public.profiles.profile_avatar_finalize",
       "public.proxy_comments.trg_pc_updated_at",
@@ -376,8 +409,8 @@
     ],
     "indexes": 149,
     "constraints": {
-      "check": 99,
-      "total": 223,
+      "check": 100,
+      "total": 224,
       "unique": 18,
       "foreignKey": 62,
       "primaryKey": 44
@@ -499,18 +532,26 @@
     ],
     "privateTables": [
       "admin_monitor_cutover",
+      "host_profile_auth_cas",
+      "host_profile_operation_context",
+      "host_profile_source_authority",
       "phone_followup_tasks"
     ],
-    "privateTableColumns": 9,
-    "privateIndexes": 4,
-    "privateConstraints": 8,
+    "privateTableColumns": 19,
+    "privateIndexes": 7,
+    "privateConstraints": 15,
     "privateRls": {
       "enabled": [
         "admin_monitor_cutover",
         "phone_followup_tasks"
       ],
       "forced": [],
-      "policies": 0
+      "policies": 0,
+      "disabled": [
+        "host_profile_auth_cas",
+        "host_profile_operation_context",
+        "host_profile_source_authority"
+      ]
     }
   },
   "activeConcierge": {
@@ -1209,19 +1250,13 @@
     "lockTimeout": "2s"
   },
   "pendingProductionMigrations": [
-  {
-    "version": "20261006013755",
-    "name": "host_profile_media_authority",
-    "repositoryFile": "supabase/migrations/20261006013755_host_profile_media_authority.sql",
-    "repositorySha256": "913d253b2853fa2581fb886cfd2279db147bb84f5b5b55c7dc12386fa49220d8"
-  },
-  {
-    "version": "20261006105322",
-    "name": "community_media_authority",
-    "repositoryFile": "supabase/migrations/20261006105322_community_media_authority.sql",
-    "repositorySha256": "55ac4184288d9213e31b4f40de928d7ccfd4c02765db90c0d2d7f8858c597912"
-  }
-],
+    {
+      "version": "20261006105322",
+      "name": "community_media_authority",
+      "repositoryFile": "supabase/migrations/20261006105322_community_media_authority.sql",
+      "repositorySha256": "55ac4184288d9213e31b4f40de928d7ccfd4c02765db90c0d2d7f8858c597912"
+    }
+  ],
   "selectiveProductionRollout": {
     "allowedVersions": [
       "20261005104924"
@@ -2425,5 +2460,428 @@
       "service_role"
     ],
     "completion42702Qualified": true
+  },
+  "appliedHostAuthority": {
+    "tables": [
+      {
+        "acl": "{postgres=arwdDxtm/postgres}",
+        "rls": false,
+        "name": "host_profile_auth_cas",
+        "owner": "postgres",
+        "forced": false,
+        "schema": "private"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres}",
+        "rls": false,
+        "name": "host_profile_operation_context",
+        "owner": "postgres",
+        "forced": false,
+        "schema": "private"
+      },
+      {
+        "acl": "{postgres=arwdDxtm/postgres}",
+        "rls": false,
+        "name": "host_profile_source_authority",
+        "owner": "postgres",
+        "forced": false,
+        "schema": "private"
+      }
+    ],
+    "columns": [
+      {
+        "name": "asset_id",
+        "type": "uuid",
+        "table": "host_profile_auth_cas",
+        "default": "",
+        "notNull": true
+      },
+      {
+        "name": "owner_id",
+        "type": "uuid",
+        "table": "host_profile_auth_cas",
+        "default": "",
+        "notNull": true
+      },
+      {
+        "name": "before_digest",
+        "type": "text",
+        "table": "host_profile_auth_cas",
+        "default": "",
+        "notNull": true
+      },
+      {
+        "name": "after_digest",
+        "type": "text",
+        "table": "host_profile_auth_cas",
+        "default": "",
+        "notNull": true
+      },
+      {
+        "name": "backend_id",
+        "type": "integer",
+        "table": "host_profile_operation_context",
+        "default": "",
+        "notNull": true
+      },
+      {
+        "name": "transaction_id",
+        "type": "bigint",
+        "table": "host_profile_operation_context",
+        "default": "",
+        "notNull": true
+      },
+      {
+        "name": "owner_id",
+        "type": "uuid",
+        "table": "host_profile_operation_context",
+        "default": "",
+        "notNull": false
+      },
+      {
+        "name": "legacy_url",
+        "type": "text",
+        "table": "host_profile_operation_context",
+        "default": "",
+        "notNull": false
+      },
+      {
+        "name": "singleton",
+        "type": "boolean",
+        "table": "host_profile_source_authority",
+        "default": "",
+        "notNull": true
+      },
+      {
+        "name": "r2_enabled",
+        "type": "boolean",
+        "table": "host_profile_source_authority",
+        "default": "false",
+        "notNull": true
+      }
+    ],
+    "indexes": [
+      {
+        "name": "host_profile_auth_cas_pkey",
+        "schema": "private",
+        "definition": "CREATE UNIQUE INDEX host_profile_auth_cas_pkey ON private.host_profile_auth_cas USING btree (asset_id)"
+      },
+      {
+        "name": "host_profile_operation_context_pkey",
+        "schema": "private",
+        "definition": "CREATE UNIQUE INDEX host_profile_operation_context_pkey ON private.host_profile_operation_context USING btree (backend_id, transaction_id)"
+      },
+      {
+        "name": "host_profile_source_authority_pkey",
+        "schema": "private",
+        "definition": "CREATE UNIQUE INDEX host_profile_source_authority_pkey ON private.host_profile_source_authority USING btree (singleton)"
+      }
+    ],
+    "triggers": [
+      {
+        "name": "a_auth_host_profile_owner_lock",
+        "table": "users",
+        "schema": "auth",
+        "enabled": "O",
+        "definition": "CREATE TRIGGER a_auth_host_profile_owner_lock BEFORE DELETE OR UPDATE OF raw_user_meta_data ON auth.users FOR EACH ROW EXECUTE FUNCTION private.lock_host_profile_owner()"
+      },
+      {
+        "name": "auth_host_profile_delete_plan",
+        "table": "users",
+        "schema": "auth",
+        "enabled": "O",
+        "definition": "CREATE TRIGGER auth_host_profile_delete_plan BEFORE DELETE ON auth.users FOR EACH ROW EXECUTE FUNCTION private.sync_host_profile_assets()"
+      },
+      {
+        "name": "auth_host_profile_finalize",
+        "table": "users",
+        "schema": "auth",
+        "enabled": "O",
+        "definition": "CREATE TRIGGER auth_host_profile_finalize AFTER UPDATE OF raw_user_meta_data ON auth.users FOR EACH ROW EXECUTE FUNCTION private.sync_host_profile_assets()"
+      },
+      {
+        "name": "b_auth_legacy_host_writer",
+        "table": "users",
+        "schema": "auth",
+        "enabled": "O",
+        "definition": "CREATE TRIGGER b_auth_legacy_host_writer BEFORE INSERT OR UPDATE OF raw_user_meta_data ON auth.users FOR EACH ROW EXECUTE FUNCTION private.guard_host_profile_legacy_writer()"
+      },
+      {
+        "name": "a_host_profile_owner_lock",
+        "table": "host_applications",
+        "schema": "public",
+        "enabled": "O",
+        "definition": "CREATE TRIGGER a_host_profile_owner_lock BEFORE INSERT OR DELETE OR UPDATE OF profile_photo, user_id, id ON host_applications FOR EACH ROW EXECUTE FUNCTION private.lock_host_profile_owner()"
+      },
+      {
+        "name": "b_host_profile_legacy_writer",
+        "table": "host_applications",
+        "schema": "public",
+        "enabled": "O",
+        "definition": "CREATE TRIGGER b_host_profile_legacy_writer BEFORE INSERT OR UPDATE OF profile_photo ON host_applications FOR EACH ROW EXECUTE FUNCTION private.guard_host_profile_legacy_writer()"
+      },
+      {
+        "name": "host_profile_delete_plan",
+        "table": "host_applications",
+        "schema": "public",
+        "enabled": "O",
+        "definition": "CREATE TRIGGER host_profile_delete_plan BEFORE DELETE ON host_applications FOR EACH ROW EXECUTE FUNCTION private.sync_host_profile_assets()"
+      },
+      {
+        "name": "host_profile_finalize",
+        "table": "host_applications",
+        "schema": "public",
+        "enabled": "O",
+        "definition": "CREATE TRIGGER host_profile_finalize AFTER INSERT OR UPDATE OF profile_photo, user_id, id ON host_applications FOR EACH ROW EXECUTE FUNCTION private.sync_host_profile_assets()"
+      },
+      {
+        "name": "host_profile_reference_zero_journal",
+        "table": "media_deletion_journal",
+        "schema": "public",
+        "enabled": "O",
+        "definition": "CREATE TRIGGER host_profile_reference_zero_journal BEFORE INSERT ON media_deletion_journal FOR EACH ROW EXECUTE FUNCTION private.guard_host_profile_reference_zero_journal()"
+      },
+      {
+        "name": "b_profile_legacy_host_writer",
+        "table": "profiles",
+        "schema": "public",
+        "enabled": "O",
+        "definition": "CREATE TRIGGER b_profile_legacy_host_writer BEFORE INSERT OR UPDATE OF avatar_url ON profiles FOR EACH ROW EXECUTE FUNCTION private.guard_host_profile_legacy_writer()"
+      },
+      {
+        "name": "legacy_host_profile_delete_plan",
+        "table": "profiles",
+        "schema": "public",
+        "enabled": "O",
+        "definition": "CREATE TRIGGER legacy_host_profile_delete_plan BEFORE DELETE ON profiles FOR EACH ROW EXECUTE FUNCTION private.sync_host_profile_assets()"
+      },
+      {
+        "name": "legacy_host_profile_finalize",
+        "table": "profiles",
+        "schema": "public",
+        "enabled": "O",
+        "definition": "CREATE TRIGGER legacy_host_profile_finalize AFTER INSERT OR UPDATE OF avatar_url, id ON profiles FOR EACH ROW EXECUTE FUNCTION private.sync_host_profile_assets()"
+      },
+      {
+        "name": "host_profile_legacy_storage_writer",
+        "table": "objects",
+        "schema": "storage",
+        "enabled": "O",
+        "definition": "CREATE TRIGGER host_profile_legacy_storage_writer BEFORE INSERT OR DELETE OR UPDATE ON storage.objects FOR EACH ROW EXECUTE FUNCTION private.guard_host_profile_legacy_writer()"
+      }
+    ],
+    "authority": [
+      {
+        "singleton": true,
+        "r2_enabled": true
+      }
+    ],
+    "functions": [
+      {
+        "acl": "{postgres=X/postgres,service_role=X/postgres}",
+        "owner": "postgres",
+        "result": "boolean",
+        "bodyMd5": "7bddc050b8e1d1c0540826a6c2447e78",
+        "identity": "private.apply_host_profile_media_locators(p_owner_id uuid, p_asset_id uuid, p_old_url text, p_references jsonb, p_rollback boolean)",
+        "volatility": "v",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": true
+      },
+      {
+        "acl": "{postgres=X/postgres}",
+        "owner": "postgres",
+        "result": "trigger",
+        "bodyMd5": "a3176ab9ae4815de66cdf233aa761873",
+        "identity": "private.guard_host_profile_legacy_writer()",
+        "volatility": "v",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": true
+      },
+      {
+        "acl": "{postgres=X/postgres}",
+        "owner": "postgres",
+        "result": "trigger",
+        "bodyMd5": "b0f932b28c54d089481b34ea042bba32",
+        "identity": "private.guard_host_profile_reference_zero_journal()",
+        "volatility": "v",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": true
+      },
+      {
+        "acl": "{postgres=X/postgres,service_role=X/postgres}",
+        "owner": "postgres",
+        "result": "jsonb",
+        "bodyMd5": "d26300dcd9398edf95085b24651f974c",
+        "identity": "private.host_profile_auth_inventory()",
+        "volatility": "s",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": true
+      },
+      {
+        "acl": "{postgres=X/postgres,service_role=X/postgres}",
+        "owner": "postgres",
+        "result": "boolean",
+        "bodyMd5": "2914a3f459392cb57fcdbc13d60ebd4c",
+        "identity": "private.host_profile_legacy_writes_frozen()",
+        "volatility": "s",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": true
+      },
+      {
+        "acl": "{postgres=X/postgres}",
+        "owner": "postgres",
+        "result": "trigger",
+        "bodyMd5": "4896928f1c3a68f56077a74e69c5b4db",
+        "identity": "private.lock_host_profile_owner()",
+        "volatility": "v",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": true
+      },
+      {
+        "acl": "{postgres=X/postgres}",
+        "owner": "postgres",
+        "result": "trigger",
+        "bodyMd5": "37f1b19ef488d481795bf78114578849",
+        "identity": "private.sync_host_profile_assets()",
+        "volatility": "v",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": true
+      },
+      {
+        "acl": "{postgres=X/postgres,service_role=X/postgres}",
+        "owner": "postgres",
+        "result": "boolean",
+        "bodyMd5": "0b4adfa947f3528b61d02f01f38d5d4e",
+        "identity": "public.apply_host_profile_media_locators(p_owner_id uuid, p_asset_id uuid, p_old_url text, p_references jsonb, p_rollback boolean)",
+        "volatility": "v",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": false
+      },
+      {
+        "acl": "{postgres=X/postgres,service_role=X/postgres}",
+        "owner": "postgres",
+        "result": "media_assets",
+        "bodyMd5": "ef99f4c6e62e03bf4f75bd4545cb7c5c",
+        "identity": "public.begin_host_profile_media_asset(p_id uuid, p_owner_id uuid, p_key text, p_url text, p_sha256 text, p_size bigint, p_mime text, p_idempotency_key text)",
+        "volatility": "v",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": false
+      },
+      {
+        "acl": "{postgres=X/postgres,service_role=X/postgres}",
+        "owner": "postgres",
+        "result": "jsonb",
+        "bodyMd5": "80ff8e6c33dc9d5e9e371f6754c27979",
+        "identity": "public.host_profile_auth_backup_references()",
+        "volatility": "s",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": false
+      },
+      {
+        "acl": "{postgres=X/postgres,service_role=X/postgres}",
+        "owner": "postgres",
+        "result": "jsonb",
+        "bodyMd5": "15801981a0fbc87d7dbeeb1eb95bcf92",
+        "identity": "public.host_profile_migration_inventory()",
+        "volatility": "s",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": false
+      },
+      {
+        "acl": "{postgres=X/postgres,service_role=X/postgres}",
+        "owner": "postgres",
+        "result": "media_assets",
+        "bodyMd5": "d5c1d6a913d1af3f3868abf49cd7987a",
+        "identity": "public.verify_host_profile_media_asset(p_id uuid, p_owner_id uuid, p_sha256 text, p_size bigint, p_mime text)",
+        "volatility": "v",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "securityDefiner": false
+      }
+    ],
+    "constraints": [
+      {
+        "name": "host_profile_auth_cas_after_digest_check",
+        "table": "host_profile_auth_cas",
+        "schema": "private",
+        "definition": "CHECK (after_digest ~ '^[a-f0-9]{64}$'::text)"
+      },
+      {
+        "name": "host_profile_auth_cas_asset_id_fkey",
+        "table": "host_profile_auth_cas",
+        "schema": "private",
+        "definition": "FOREIGN KEY (asset_id) REFERENCES media_assets(id)"
+      },
+      {
+        "name": "host_profile_auth_cas_before_digest_check",
+        "table": "host_profile_auth_cas",
+        "schema": "private",
+        "definition": "CHECK (before_digest ~ '^[a-f0-9]{64}$'::text)"
+      },
+      {
+        "name": "host_profile_auth_cas_pkey",
+        "table": "host_profile_auth_cas",
+        "schema": "private",
+        "definition": "PRIMARY KEY (asset_id)"
+      },
+      {
+        "name": "host_profile_operation_context_pkey",
+        "table": "host_profile_operation_context",
+        "schema": "private",
+        "definition": "PRIMARY KEY (backend_id, transaction_id)"
+      },
+      {
+        "name": "host_profile_source_authority_pkey",
+        "table": "host_profile_source_authority",
+        "schema": "private",
+        "definition": "PRIMARY KEY (singleton)"
+      },
+      {
+        "name": "host_profile_source_authority_singleton_check",
+        "table": "host_profile_source_authority",
+        "schema": "private",
+        "definition": "CHECK (singleton)"
+      },
+      {
+        "name": "host_profile_media_identity",
+        "table": "media_assets",
+        "schema": "public",
+        "definition": "CHECK (business_scope <> 'host_profile'::text OR provider = 'r2'::text AND bucket = 'locally-public-host-profile-originals'::text AND parent_type = 'host_profile_owner'::text AND parent_id = owner_id::text AND expected_size <= 10485760 AND mime ~ '^image/[a-z0-9][a-z0-9.+-]{0,79}$'::text AND (mime <> ALL (ARRAY['image/heic'::text, 'image/heif'::text])) AND object_key = (((('host-profiles/v1/'::text || encode(sha256(convert_to('host-profile-media-owner:'::text || owner_id::text, 'UTF8'::name)), 'hex'::text)) || '/'::text) || id::text) || '/profile'::text) AND public_url = ('https://host-profile-media.locally-travel.com/'::text || object_key) AND public_url IS NOT NULL)"
+      }
+    ],
+    "ledgerEvidence": [
+      {
+        "name": "host_profile_media_authority",
+        "version": "20261006013755",
+        "statementsMd5": "97a61bd500d8121cf5dd5e66a2751c8b",
+        "statementCount": 1,
+        "statementsSha256": "913d253b2853fa2581fb886cfd2279db147bb84f5b5b55c7dc12386fa49220d8"
+      }
+    ],
+    "catalogCapturedAt": "2026-10-06T15:16:07.294874+00:00",
+    "productionWrites": 0
   }
 }

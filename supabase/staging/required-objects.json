@@ -1,5 +1,5 @@
 {
-  "schemaContractVersion": 6,
+  "schemaContractVersion": 7,
   "productionProjectRefsDeniedForFixtureWrites": [
     "uhinvcydgzqlpnvieyal"
   ],
@@ -25,22 +25,17 @@
     "supabase/migrations/20261003122803_admin_chat_bounded_search.sql",
     "supabase/migrations/20261004053224_media_lifecycle_foundation.sql",
     "supabase/migrations/20261005082309_avatar_media_authority.sql",
-    "supabase/migrations/20261005104924_solo_guarantee_financial_authority.sql"
+    "supabase/migrations/20261005104924_solo_guarantee_financial_authority.sql",
+    "supabase/migrations/20261006013755_host_profile_media_authority.sql"
   ],
   "pendingProductionMigrations": [
-  {
-    "version": "20261006013755",
-    "name": "host_profile_media_authority",
-    "repositoryFile": "supabase/migrations/20261006013755_host_profile_media_authority.sql",
-    "repositorySha256": "913d253b2853fa2581fb886cfd2279db147bb84f5b5b55c7dc12386fa49220d8"
-  },
-  {
-    "version": "20261006105322",
-    "name": "community_media_authority",
-    "repositoryFile": "supabase/migrations/20261006105322_community_media_authority.sql",
-    "repositorySha256": "55ac4184288d9213e31b4f40de928d7ccfd4c02765db90c0d2d7f8858c597912"
-  }
-],
+    {
+      "version": "20261006105322",
+      "name": "community_media_authority",
+      "repositoryFile": "supabase/migrations/20261006105322_community_media_authority.sql",
+      "repositorySha256": "55ac4184288d9213e31b4f40de928d7ccfd4c02765db90c0d2d7f8858c597912"
+    }
+  ],
   "applicationTables": [
     "admin_audit_logs",
     "admin_job_runs",
@@ -98,6 +93,7 @@
     "adopt_phone_followup_link",
     "advance_support_version",
     "apply_experience_media_locator_cas",
+    "apply_host_profile_media_locators",
     "apply_solo_refund_settlement_atomic",
     "assert_booking_payout_safe",
     "assign_service_concierge_host_atomic",
@@ -106,6 +102,7 @@
     "begin_avatar_media_asset",
     "begin_experience_media_asset",
     "begin_experience_payment_capture_atomic",
+    "begin_host_profile_media_asset",
     "begin_service_refund_operation_atomic",
     "begin_solo_refund_request_atomic",
     "bump_experience_media_revision",
@@ -153,10 +150,16 @@
     "get_ops_anomaly_snapshot",
     "guard_booking_money_transition",
     "guard_experience_payment_claim_columns",
+    "guard_host_profile_legacy_writer",
+    "guard_host_profile_reference_zero_journal",
     "guard_unresolved_booking_delete",
     "handle_new_user",
     "handle_phone_followup",
     "has_phone_followup",
+    "host_profile_auth_backup_references",
+    "host_profile_auth_inventory",
+    "host_profile_legacy_writes_frozen",
+    "host_profile_migration_inventory",
     "increment_comment_count",
     "increment_community_post_view_count",
     "increment_like_count",
@@ -167,6 +170,7 @@
     "list_due_experience_completion_candidates",
     "list_due_experience_review_request_candidates",
     "lock_booking_money",
+    "lock_host_profile_owner",
     "mark_room_messages_read",
     "mark_solo_refund_delivery_failed_atomic",
     "plan_media_owner_deletion",
@@ -199,9 +203,11 @@
     "solo_refund_diagnostics",
     "solo_refund_due",
     "sync_experience_media_assets",
+    "sync_host_profile_assets",
     "sync_profile_avatar_assets",
     "verify_avatar_media_asset",
-    "verify_experience_media_asset"
+    "verify_experience_media_asset",
+    "verify_host_profile_media_asset"
   ],
   "applicationTriggers": [
     "on_auth_user_created",
@@ -228,7 +234,19 @@
     "trg_pr_updated_at",
     "trg_sa_updated_at",
     "trg_sb_updated_at",
-    "trg_sr_updated_at"
+    "trg_sr_updated_at",
+    "a_auth_host_profile_owner_lock",
+    "a_host_profile_owner_lock",
+    "auth_host_profile_delete_plan",
+    "auth_host_profile_finalize",
+    "b_auth_legacy_host_writer",
+    "b_host_profile_legacy_writer",
+    "b_profile_legacy_host_writer",
+    "host_profile_delete_plan",
+    "host_profile_finalize",
+    "host_profile_reference_zero_journal",
+    "legacy_host_profile_delete_plan",
+    "legacy_host_profile_finalize"
   ],
   "realtimePublicationTables": [
     "admin_audit_logs",
@@ -386,6 +404,9 @@
   },
   "applicationPrivateTables": [
     "private.admin_monitor_cutover",
+    "private.host_profile_auth_cas",
+    "private.host_profile_operation_context",
+    "private.host_profile_source_authority",
     "private.phone_followup_tasks"
   ],
   "selectiveProductionRollout": {
