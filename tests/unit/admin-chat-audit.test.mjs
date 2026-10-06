@@ -83,7 +83,7 @@ test('moderation deletion never marks participant receipts read', async () => {
 
 test('status filter is applied before server pagination; invalid IDs fail with 400', async () => {
   const queries=[];
-  const db={from:table=>queryBuilder(table,state=>{queries.push(state);return {data:[]};}),rpc:async()=>({data:[]})};
+  const db={from:table=>queryBuilder(table,state=>{queries.push(state);return {data:[]};}),rpc:async(name,args)=>{queries.push({rpc:name,args});return {data:[]};}};
   const load=sourceLoader({'server-only':{},'next/server':{NextResponse:{json:(body,init)=>response(body,init?.status??200)}},
     '@/app/utils/supabase/server':{createClient:async()=>({auth:{getUser:async()=>({data:{user:{id:'admin'}}})}})},
     '@/app/utils/supabase/admin':{createAdminClient:()=>db},
@@ -93,8 +93,9 @@ test('status filter is applied before server pagination; invalid IDs fail with 4
   for(const status of ['open','resolved','in_progress']) {
     queries.length=0;
     assert.equal((await GET(new Request(`http://local/api/admin/inquiries?view=support&status=${status}&offset=50`))).status,200);
-    const query=queries.find(q=>q.table==='inquiries');
-    assert.ok(query.filters.some(([op,col,value])=>status==='open'?op==='or'&&col==='status.is.null,status.eq.open':op==='eq'&&col==='status'&&value===status));
+    const query=queries.find(q=>q.rpc==='list_admin_support_recency');
+    assert.equal(query.args.p_status,status);
+    assert.equal(query.args.p_offset,0,'response offset is applied only after operational filters');
   }
   for(const query of ['inquiryId=abc','inquiryId=-1','status=unknown']) {
     queries.length=0; assert.equal((await GET(new Request(`http://local/api/admin/inquiries?${query}`))).status,400);

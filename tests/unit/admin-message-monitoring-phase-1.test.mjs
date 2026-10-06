@@ -196,12 +196,12 @@ test('hidden admin fallback does no work; stale list cannot revert a newer statu
 
 test('customer INSERT alone refreshes reopened status and moves a completed inquiry to the reply queue without inquiries publication', async t => {
   const f = await adminFixture(t, { rows: [
-    { ...inquiry(1, 'admin_support'), status: 'resolved', needs_reply: false, last_message_at: '2026-10-01T00:00Z' },
-    { ...inquiry(2, 'admin_support'), needs_reply: false, last_message_at: '2026-10-02T01:00Z' },
+    { ...inquiry(1, 'admin_support'), status: 'resolved', needs_reply: false, last_message_at: '2026-10-01T00:00Z', canonical_activity_at: '2026-10-01T00:00Z' },
+    { ...inquiry(2, 'admin_support'), needs_reply: false, last_message_at: '2026-10-02T01:00Z', canonical_activity_at: '2026-10-02T01:00Z' },
   ] });
   assert.deepEqual(f.admin().inquiries.map(row => row.id), [2, 1]);
   await f.flush(() => f.admin().selectInquiry(1));
-  f.rows[0] = { ...f.rows[0], status: 'open', needs_reply: true, updated_at: '2026-10-02T02:00Z', last_sender_role: 'customer', last_message_at: '2026-10-02T02:00Z', support_reopened_at: '2026-10-02T02:00Z' };
+  f.rows[0] = { ...f.rows[0], status: 'open', needs_reply: true, updated_at: '2026-10-02T02:00Z', last_sender_role: 'customer', last_message_at: '2026-10-02T02:00Z', canonical_activity_at: '2026-10-02T02:00Z', support_reopened_at: '2026-10-02T02:00Z' };
   const insert = f.calls.channels[0].handlers.find(([, filter]) => filter.event === 'INSERT' && filter.table === 'inquiry_messages')[2];
   await f.flush(() => insert({ eventType: 'INSERT', new: { id: 99, inquiry_id: 1, sender_id: 'guest' } }));
   await f.timers(300);

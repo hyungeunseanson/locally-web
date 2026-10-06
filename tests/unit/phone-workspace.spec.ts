@@ -14,15 +14,37 @@ type Row = Record<string, unknown>;
 const request = (i: number, patch: Row = {}): Row => ({ id: `request-${i}`, user_id: `guest-${i}`, category: 'RESTAURANT', status: 'PENDING', payment_status: 'COMPLETED', payment_channel: 'LOCALLY', created_at: String(1000 - i), form_data: { restaurant_name: `식당 ${i}`, linked_inquiry_id: String(i), payment_method: 'card' }, ...patch });
 
 function database(rows: Row[], inquiries: Row[]) {
+  // Creation timestamps make the existing ascending fixture membership explicit.
+  inquiries.forEach(row => { row.created_at ??= new Date(Date.UTC(2026, 0, 1) - Number(row.id) * 60_000).toISOString(); });
   const calls: URL[] = [];
   const tables: Record<string, Row[]> = {
     proxy_requests: rows, inquiries,
     profiles: rows.map(row => ({ id: row.user_id, full_name: `고객 ${row.id}`, email: `${row.id}@example.test` })),
     users: [{ id: 'admin', role: 'admin' }], admin_whitelist: [], host_applications: [], inquiry_messages: [],
   };
-  const client = createClient('http://127.0.0.1:54329', 'fixture-only-key', { global: { fetch: async input => {
+  const client = createClient('http://127.0.0.1:54329', 'fixture-only-key', { global: { fetch: async (input, init) => {
     const url = new URL(String(input)); calls.push(url);
     const table = url.pathname.split('/').at(-1)!;
+    if (table === 'list_admin_support_recency' || table === 'list_admin_phone_recency') {
+      const args = JSON.parse(String(init?.body || '{}'));
+      const formal = rows.filter(row => (row.form_data as Row)?.__proxy_card_anchor !== 'v1');
+      const latest = (inquiry?: Row) => (inquiry?.inquiry_messages as Row[] || []).filter(m => m.type == null || ['text','image'].includes(String(m.type)))
+        .slice().sort((a,b) => Date.parse(String(b.created_at)) - Date.parse(String(a.created_at))).at(0)?.created_at;
+      let ordered: Row[];
+      if (table === 'list_admin_support_recency') ordered = inquiries.filter(row => ['admin','admin_support'].includes(String(row.type))
+        && (!args.p_inquiry_ids || args.p_inquiry_ids.map(String).includes(String(row.id)))
+        && (!args.p_status || String(row.status || 'open') === args.p_status))
+        .map(row => ({id:String(row.id),canonical_activity_at:latest(row) ?? row.created_at}));
+      else ordered = formal.map(row => {
+        const id=(row.form_data as Row)?.linked_inquiry_id;
+        const linked=inquiries.find(inquiry => String(inquiry.id) === String(id) && inquiry.user_id === row.user_id && ['admin','admin_support'].includes(String(inquiry.type))
+          && formal.filter(other => (other.form_data as Row)?.linked_inquiry_id === id).length === 1);
+        return {id:String(row.id),canonical_activity_at:latest(linked) ?? row.created_at};
+      });
+      ordered.sort((a,b) => (Date.parse(String(b.canonical_activity_at)) || 0) - (Date.parse(String(a.canonical_activity_at)) || 0)
+        || (table === 'list_admin_support_recency' ? Number(b.id)-Number(a.id) : String(b.id).localeCompare(String(a.id))));
+      return new Response(JSON.stringify(ordered.slice(args.p_offset,args.p_offset+args.p_limit)),{status:200,headers:{'content-type':'application/json'}});
+    }
     if (table === 'get_admin_phone_activity') return new Response(JSON.stringify(inquiries.map(row => ({
       inquiry_id: row.id, admin_unread_count: 0,
       phone_needs_reply: row.phone_pending ?? ((row.inquiry_messages as Row[] || []).filter(m => m.type == null || ['text','image'].includes(String(m.type))).at(-1)?.sender_id === row.user_id),
@@ -83,7 +105,7 @@ test('phone search reaches old records; excludes anchor before filtering and pag
   expect(response.status).toBe(200);
   expect(result.data.map((row: Row) => row.id)).toEqual(['request-121']);
   expect(db.calls.filter(url => url.pathname.endsWith('proxy_requests')).every(url => url.searchParams.get('or') === `(${FORMAL_PROXY_FILTER})`)).toBe(true);
-  expect(db.calls.some(url => url.searchParams.get('offset') === '100')).toBe(true);
+  expect(db.calls.filter(url => url.pathname.endsWith('list_admin_phone_recency')).length).toBe(2);
 });
 
 test('valid phone inquiries are excluded from support, broken customer links stay visible', async () => {
@@ -91,7 +113,7 @@ test('valid phone inquiries are excluded from support, broken customer links sta
   const inquiries = [1, 2, 3].map(id => ({ id, user_id: `guest-${id}`, type: 'admin_support', inquiry_messages: [] }));
   const db = database(rows, inquiries); install(db);
   const result = await (await inquiryGet(new Request('http://local/api?view=support'))).json();
-  expect(result.data.map((row: Row) => row.id)).toEqual([2, 3]);
+  expect(result.data.map((row: Row) => Number(row.id))).toEqual([2, 3]);
   const linked = await (await inquiryGet(new Request('http://local/api?inquiryId=1&resolveOnly=true'))).json();
   expect(linked.selection).toEqual({ view: 'phone', proxyRequestId: 'request-1' });
 });
@@ -148,12 +170,12 @@ test('support pagination excludes linked requests before slicing and direct link
   const inquiries = Array.from({ length: 125 }, (_, index) => ({ id: index + 1, user_id: `guest-${index + 1}`, type: 'admin_support', inquiry_messages: [] }));
   install(database(rows, inquiries));
   const first = await (await inquiryGet(new Request('http://local/api?view=support&limit=10'))).json();
-  expect(first.data.map((row: Row) => row.id)).toEqual(Array.from({ length: 10 }, (_, index) => index + 111));
+  expect(first.data.map((row: Row) => Number(row.id))).toEqual(Array.from({ length: 10 }, (_, index) => index + 111));
   expect(first.pagination.hasMore).toBe(true);
   const last = await (await inquiryGet(new Request('http://local/api?view=support&limit=10&offset=10'))).json();
-  expect(last.data.map((row: Row) => row.id)).toEqual([121, 122, 123, 124, 125]);
+  expect(last.data.map((row: Row) => Number(row.id))).toEqual([121, 122, 123, 124, 125]);
   const deepLink = await (await inquiryGet(new Request('http://local/api?view=support&limit=10&inquiryId=125'))).json();
-  expect(deepLink.data.some((row: Row) => row.id === 125)).toBe(true);
+  expect(deepLink.data.some((row: Row) => String(row.id) === '125')).toBe(true);
 });
 
 for (const scenario of [
@@ -252,7 +274,8 @@ test('phone timestamps reuse latest actual message and fall back only for displa
   const inquiries = rows.slice(0, 4).map((row, i) => ({ id: i + 1, user_id: row.user_id, type: 'admin_support', inquiry_messages: i === 0 ? [{ sender_id: 'guest-1', type: 'text', created_at: latest }] : [] }));
   const db = database(rows, inquiries); install(db);
   const read = async () => (await (await phoneGet(new Request('http://local/api?filter=all'))).json()).data;
-  expect((await read()).map((row: PhoneWorkspaceRequest) => row.latest_created_at)).toEqual([latest, updated, created, null, updated]);
+  const timestamps = Object.fromEntries((await read()).map((row: PhoneWorkspaceRequest) => [row.id,row.latest_created_at]));
+  expect(timestamps).toEqual({'request-1':latest,'request-2':created,'request-3':created,'request-4':null,'request-5':rows[4].created_at});
   inquiries[0].inquiry_messages.push({ sender_id: 'guest-1', type: 'text', created_at: '2026-09-22T15:25:00Z' });
   expect((await read())[0].latest_created_at).toBe('2026-09-22T15:25:00Z');
   expect(db.calls.filter(url => url.pathname.endsWith('inquiries')).every(url => url.searchParams.get('inquiry_messages.limit') === '1')).toBe(true);

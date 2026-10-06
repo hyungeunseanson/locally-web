@@ -11,6 +11,7 @@ export type PhoneWorkspaceRequest = ProxyRequest & {
   latest_sender_id: string | null;
   latest_content: string | null;
   latest_created_at: string | null;
+  canonical_activity_at?: string | null;
 };
 
 export const PHONE_FILTER_LABELS: Record<PhoneFilter, string> = {

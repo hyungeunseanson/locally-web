@@ -85,6 +85,11 @@ function serverFixture(before = false, count = 4) {
     },
     rpc: async (name, args) => {
       calls.push({ rpc: name, ids: args.p_inquiry_ids });
+      if (name === 'list_admin_support_recency' || name === 'list_admin_phone_recency') {
+        const candidates = name === 'list_admin_support_recency' ? rows : requests;
+        return { data: candidates.filter(row => !args.p_inquiry_ids || args.p_inquiry_ids.map(String).includes(String(row.id)))
+          .slice(args.p_offset, args.p_offset + args.p_limit).map(row => ({ id: String(row.id), canonical_activity_at: '2026-10-02T00:00Z' })), error: null };
+      }
       return { data: activities.filter(row => args.p_inquiry_ids.map(String).includes(String(row.inquiry_id))), error: null };
     },
   };
@@ -106,7 +111,7 @@ for (const surface of ['support', 'phone']) test(`${surface} server filters prec
     f.calls.length = 0;
     const result = await (await f.get(surface, `${key}=true`)).json();
     assert.deepEqual(result.data.map(row => Number(String(row.id).replace('request-', ''))), expected[key]);
-    assert.equal(f.calls.filter(call => call.rpc).length, 1, 'one existing activity RPC per batch');
+    assert.equal(f.calls.filter(call => call.rpc?.startsWith('get_admin_')).length, 1, 'one existing activity RPC per batch');
     assert.equal(result.data.some(row => 'phoneLinked' in row || 'matchesOperations' in row || 'row' in row), false);
   }
   const combined = await (await f.get(surface, 'unseen=true&needsReply=true&reopened=true')).json();
@@ -116,7 +121,7 @@ for (const surface of ['support', 'phone']) test(`${surface} server filters prec
   assert.equal(page.pagination.hasMore, false);
   const before = serverFixture(true), after = serverFixture();
   await before.get(surface); await after.get(surface);
-  assert.equal(after.calls.length, before.calls.length);
+  assert.equal(after.calls.length, before.calls.length + 1, 'one bounded recency authority per candidate batch');
   console.log('PHASE3A_DB', JSON.stringify({ surface, initialBefore: before.calls.length, initialAfter: after.calls.length, filters: f.calls.filter(c => c.rpc).length }));
 });
 
@@ -124,15 +129,15 @@ test('support filter finds a sparse match beyond 100 without re-reading activity
   const f = serverFixture(false, 205);
   f.activities.forEach(row => { row.admin_unread_count = row.inquiry_id === 205 ? 1 : 0; });
   const result = await (await f.get('support', 'unseen=true')).json();
-  assert.deepEqual(result.data.map(row => row.id), [205]);
-  assert.equal(f.calls.filter(call => call.rpc).length, 3);
-  assert.equal(Math.max(...f.calls.filter(call => call.rpc).map(call => call.ids.length)), 100);
+  assert.deepEqual(result.data.map(row => String(row.id)), ['205']);
+  assert.equal(f.calls.filter(call => call.rpc?.startsWith('get_admin_')).length, 3);
+  assert.equal(Math.max(...f.calls.filter(call => call.rpc?.startsWith('get_admin_')).map(call => call.ids.length)), 100);
 });
 
 test('selected inquiry outside operations filter remains available for canonical URL resolution', async () => {
   const f = serverFixture();
   const result = await (await f.get('support', 'unseen=true&inquiryId=2')).json();
-  assert.deepEqual(result.data.map(row => row.id), [2, 1, 4]);
+  assert.deepEqual(result.data.map(row => Number(row.id)), [2, 1, 4]);
   assert.deepEqual(result.selection, { view: 'support' });
   f.setUser(null);
   assert.equal((await f.get('support', 'unseen=true')).status, 401);

@@ -74,7 +74,10 @@ const expectedAppliedOrder = [
   'supabase/migrations/20261005104924_solo_guarantee_financial_authority.sql',
   'supabase/migrations/20261006013755_host_profile_media_authority.sql',
 ];
-const expectedPendingOrder = ['supabase/migrations/20261006105322_community_media_authority.sql'];
+const expectedPendingOrder = [
+  'supabase/migrations/20261006105322_community_media_authority.sql',
+  'supabase/migrations/20261006133015_admin_chat_canonical_recency.sql',
+];
 const expectedApplyOrder = [...expectedAppliedOrder];
 exact('fresh-project apply order', required.freshProjectApplyOrder, expectedApplyOrder);
 exact(
