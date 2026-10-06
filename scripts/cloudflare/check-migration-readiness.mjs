@@ -130,6 +130,14 @@ assert.deepEqual(wrangler.env.production.r2_buckets, [
     binding: manifest.bindings.publicExperienceMediaR2,
     bucket_name: manifest.environments.production.publicExperienceMediaR2,
   },
+  {
+    binding: manifest.bindings.publicAvatarR2,
+    bucket_name: manifest.environments.production.publicAvatarR2,
+  },
+  {
+    binding: manifest.bindings.publicHostProfileSourceR2,
+    bucket_name: manifest.environments.production.publicHostProfileSourceR2,
+  },
 ]);
 assert.deepEqual(wrangler.env.production.queues, {
   producers: [

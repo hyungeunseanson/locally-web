@@ -28,6 +28,8 @@
       "worker": "locally-web-opennext-production",
       "incrementalCacheR2": "locally-opennext-incremental-cache-production",
       "publicExperienceMediaR2": "locally-public-experience-canary",
+      "publicAvatarR2": "locally-public-avatars",
+      "publicHostProfileSourceR2": "locally-public-host-profile-originals",
       "publicExperienceMediaQueue": "locally-public-experience-media-mirror-production",
       "publicExperienceMediaDeadLetterQueue": "locally-public-experience-media-mirror-dlq-production",
       "experienceTranslationQueue": "locally-experience-translation-production",
@@ -43,6 +45,8 @@
     "images": "IMAGES",
     "incrementalCacheR2": "NEXT_INC_CACHE_R2_BUCKET",
     "publicExperienceMediaR2": "PUBLIC_EXPERIENCE_MEDIA_R2",
+    "publicAvatarR2": "PUBLIC_AVATAR_R2",
+    "publicHostProfileSourceR2": "PUBLIC_HOST_PROFILE_SOURCE_R2",
     "publicExperienceMediaQueueProducer": "PUBLIC_EXPERIENCE_MEDIA_QUEUE",
     "experienceTranslationQueueProducer": "EXPERIENCE_TRANSLATION_QUEUE",
     "queueDurableObject": {
